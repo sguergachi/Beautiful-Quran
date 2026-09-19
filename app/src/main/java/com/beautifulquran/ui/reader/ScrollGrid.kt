@@ -84,7 +84,12 @@ object ScrollGrid {
     val OPENING_FOOT_BEFORE_BASMALAH: Dp = UNIT * 2
     val ROSETTE: Dp = 52.dp
     val ROSETTE_TO_TITLE: Dp = UNIT * 4
-    val TITLE_TO_SUBTITLE: Dp = UNIT * 2
+    /**
+     * Nothing: the Hafs title's 1.6 em line box already leaves ~15 dp of paper
+     * under its ink, which is the lockup's gap. Adding more set the two
+     * scripts of one name as far apart as the rosette from the title.
+     */
+    val TITLE_TO_SUBTITLE: Dp = 0.dp
     val SUBTITLE_TO_META: Dp = UNIT
 
     /** 8 + 24 = 32 from the opening's metadata. */
@@ -114,9 +119,14 @@ object ScrollGrid {
 
     // ── Chapter invitations ───────────────────────────────────────────────
 
-    /** "NEXT" band above the next chapter's opening. */
-    val INVITE_HEAD: Dp = UNIT * 12
-    val INVITE_LABEL_TOP: Dp = UNIT * 6
+    /**
+     * "NEXT" band above the next chapter's opening. The label names what
+     * follows, so it sits on the band's foot — 46 dp of ink from the rosette
+     * and twice that from the verse it leaves. Centred in the band it floated
+     * nearly midway (69 / 54) and belonged to neither.
+     */
+    val INVITE_HEAD: Dp = UNIT * 16
+    val INVITE_LABEL_TOP: Dp = INVITE_HEAD - UNIT * 4
 
     /** Continue pill band beneath it. */
     val INVITE_FOOT: Dp = UNIT * 20

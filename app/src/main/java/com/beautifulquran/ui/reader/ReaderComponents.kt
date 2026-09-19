@@ -91,6 +91,7 @@ import androidx.compose.ui.graphics.drawscope.clipRect
 import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.layout
 import androidx.compose.ui.layout.LayoutCoordinates
 import androidx.compose.ui.layout.boundsInWindow
 import androidx.compose.ui.layout.onGloballyPositioned
@@ -136,6 +137,7 @@ import com.beautifulquran.ui.theme.ArabicTitleStyle
 import com.beautifulquran.ui.theme.ArabicWordStyle
 import com.beautifulquran.ui.theme.GeneratedChapterRosette
 import com.beautifulquran.ui.theme.GildedFlourish
+import com.beautifulquran.ui.theme.DisplayFontFamily
 import com.beautifulquran.ui.theme.HafsFontFamily
 import com.beautifulquran.ui.theme.IslamicBackToOriginCapsule
 import com.beautifulquran.ui.theme.LocalQuranAccents
@@ -1645,7 +1647,7 @@ private fun WordUnit(
                 onClick = onClick,
                 onLongClick = onLongClick,
             )
-            .padding(horizontal = 5.dp, vertical = 2.dp),
+            .padding(horizontal = WORD_TILE_PAD_H, vertical = WORD_TILE_PAD_V),
     ) {
         HighlightLayeredText(
             text = word.arabic,
@@ -2044,7 +2046,9 @@ private fun ResponsiveEnglishAyah(
             // Glue space belongs to the mark so a tap on the gap before ﴿N﴾
             // gathers instead of falling through as an ayah miss.
             val markStart = length
-            if (length > 0) append(" ")
+            // A narrow no-break space, as the English leaf sets it: a mark that
+            // opens a line reads as if it introduced the verse below.
+            if (length > 0) append("\u202F")
             // 17/22 keeps the ornament proportional. Sharing the prose
             // baseline avoids a font-metric paint lift on Android.
             appendAyahNumberMark(
@@ -2271,7 +2275,7 @@ private fun ResponsiveHafsAyah(
         val ranges = ArrayList<IntRange>(ayah.words.size)
         var markRange = 0..-1
         val text = buildAnnotatedString {
-            ayah.words.forEach { word ->
+            ayah.words.forEachIndexed { index, word ->
                 val start = length
                 // One contiguous colour span per word keeps Uthmanic Hafs
                 // joining/ligatures intact. Per-glyph spans split shaping runs
@@ -2280,7 +2284,10 @@ private fun ResponsiveHafsAyah(
                     append(word.arabic)
                 }
                 ranges += start until length
-                append(" ")
+                // The last word binds to its mark: Hafs' U+00A0 is its own word
+                // space, so nothing moves, but the mark can no longer open a
+                // line and read as the start of the next verse.
+                append(if (index == ayah.words.lastIndex) "\u00A0" else " ")
             }
             val markStart = if (length > 0) length - 1 else 0
             appendAyahNumberMark(
@@ -2406,6 +2413,39 @@ fun AyahNumberMark(
     }
 }
 
+/** A word tile's own air: 5 dp either side, 2 dp above and below. */
+private val WORD_TILE_PAD_H = 5.dp
+private val WORD_TILE_PAD_V = 2.dp
+
+/**
+ * Lets a row of word tiles hang their outermost side air into the margin, so
+ * the first and last words' *ink* stands on the column's rules — as the
+ * Arabic-only line and the translation beneath already do — instead of 5 dp
+ * inside them.
+ */
+private fun Modifier.hangTileAir(): Modifier = layout { measurable, constraints ->
+    val hang = WORD_TILE_PAD_H.roundToPx()
+    val widened = if (constraints.hasBoundedWidth) {
+        constraints.copy(
+            minWidth = constraints.minWidth + 2 * hang,
+            maxWidth = constraints.maxWidth + 2 * hang,
+        )
+    } else {
+        constraints
+    }
+    val placeable = measurable.measure(widened)
+    val width = (placeable.width - 2 * hang).coerceAtLeast(0)
+    layout(width, placeable.height) { placeable.place(-hang, 0) }
+}
+
+/**
+ * The chapter view's one caps label: NEXT, PREVIOUS and the top bar's chapter
+ * line. 10 sp keeps the caps legible at whisper ink; 0.22 em is small-caps
+ * tracking — wide enough to open the capitals, not so wide the word falls apart.
+ */
+internal val CAPS_LABEL_SIZE = 10.sp
+internal val CAPS_TRACKING = 2.2.sp
+
 @Composable
 private fun ArabicAyahNumberUnit(
     number: Int,
@@ -2420,7 +2460,11 @@ private fun ArabicAyahNumberUnit(
     }
     Box(
         modifier = Modifier
-            .padding(16.dp)
+            // The word tiles' own 2 dp head, so the mark's line box sits on
+            // the Arabic line box beside it and the cups centre on its ink.
+            // The old 16 dp padding sat outside the tap target: it grew
+            // nothing but the row, and dropped the mark toward the gloss.
+            .padding(top = WORD_TILE_PAD_V)
             .requiredHeight(maxOf(arabicLineHeight, 56.dp))
             .then(
                 if (onClick != null || onLongClick != null) {
@@ -2431,7 +2475,10 @@ private fun ArabicAyahNumberUnit(
                 } else {
                     Modifier
                 },
-            ),
+            )
+            // Air on both sides lives inside the target: the finger gets it,
+            // and the mark keeps close to its verse's last word.
+            .padding(horizontal = 8.dp),
         contentAlignment = Alignment.Center,
     ) {
         AyahNumberMark(number, fontScale, useArabicIndicDigits = useArabicIndicDigits)
@@ -3091,13 +3138,15 @@ fun AyahBlock(
             } else if (readingMode == ReadingMode.ARABIC_ENGLISH && showGloss) {
                 CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Rtl) {
                     FlowRow(
-                        modifier = Modifier.fillMaxWidth(),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .hangTileAir(),
                         horizontalArrangement = Arrangement.spacedBy(2.dp),
-                        verticalArrangement = Arrangement.spacedBy(if (showGloss) 12.dp else 4.dp),
+                        verticalArrangement = Arrangement.spacedBy(12.dp),
                     ) {
-                        ayah.words.forEachIndexed { index, word ->
+                        val wordTile: @Composable (Int) -> Unit = { index ->
+                            val word = ayah.words[index]
                             val motion = motions[index]
-                            val isActiveWord = motion.isActive
                             val flashing = word.position in searchTargets
                             WordUnit(
                                 word = word,
@@ -3106,7 +3155,7 @@ fun AyahBlock(
                                 showGloss = showGloss,
                                 showTransliteration = showTransliteration,
                                 searchHit = hits(word),
-                                keepInView = keepActiveWordInView && isActiveWord,
+                                keepInView = keepActiveWordInView && motion.isActive,
                                 listCoordinates = listCoordinates,
                                 onKeepWordInView = onKeepWordInView,
                                 onClick = onWordClick?.let { handler -> { handler(word) } },
@@ -3116,21 +3165,28 @@ fun AyahBlock(
                                 searchBackgroundAlpha = { searchBackgroundAlpha.value },
                             )
                         }
-                        Box(
-                            modifier = Modifier.graphicsLayer {
-                                alpha = ayahMarkAlpha.value * if (searchTargetAyah) {
-                                    searchBackgroundAlpha.value
-                                } else {
-                                    1f
-                                }
-                            },
-                        ) {
-                            ArabicAyahNumberUnit(
-                                ayah.number,
-                                fontScale,
-                                useArabicIndicDigits = useArabicIndicDigits,
-                                onClick = onAyahMarkClick,
-                            )
+                        for (index in 0 until ayah.words.lastIndex) wordTile(index)
+                        // The last word and the mark are one flow item — the
+                        // tile row's no-break space — so the mark can never be
+                        // left alone at the head of a row.
+                        Row {
+                            if (ayah.words.isNotEmpty()) wordTile(ayah.words.lastIndex)
+                            Box(
+                                modifier = Modifier.graphicsLayer {
+                                    alpha = ayahMarkAlpha.value * if (searchTargetAyah) {
+                                        searchBackgroundAlpha.value
+                                    } else {
+                                        1f
+                                    }
+                                },
+                            ) {
+                                ArabicAyahNumberUnit(
+                                    ayah.number,
+                                    fontScale,
+                                    useArabicIndicDigits = useArabicIndicDigits,
+                                    onClick = onAyahMarkClick,
+                                )
+                            }
                         }
                     }
                 }
@@ -3173,7 +3229,8 @@ fun AyahBlock(
                     style = MaterialTheme.typography.bodyLarge.copy(
                         fontFamily = TranslationFontFamily,
                         fontSize = MaterialTheme.typography.bodyLarge.fontSize * (0.9f + 0.1f * fontScale),
-                        lineHeight = 26.sp,
+                        // 17/26 at every size: leading follows the type.
+                        lineHeight = MaterialTheme.typography.bodyLarge.lineHeight * (0.9f + 0.1f * fontScale),
                     ),
                     color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.66f),
                     modifier = Modifier
@@ -3594,7 +3651,7 @@ fun OrnateSurahTitle(
         val titlePadding = if (showFlourishes) 12.dp else 2.dp
         val arabicFontSize = if (maxWidth < 150.dp) 17.sp else 19.sp
         val transliterationSpacing = when {
-            maxWidth >= 200.dp -> 2.sp
+            maxWidth >= 200.dp -> CAPS_TRACKING
             maxWidth >= 150.dp -> 1.2.sp
             else -> 0.8.sp
         }
@@ -3635,7 +3692,7 @@ fun OrnateSurahTitle(
                     style = MaterialTheme.typography.labelSmall.copy(
                         letterSpacing = transliterationSpacing,
                     ),
-                    fontSize = 9.sp,
+                    fontSize = CAPS_LABEL_SIZE,
                     color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
                     textAlign = TextAlign.Center,
                     maxLines = 1,
@@ -3781,8 +3838,8 @@ fun NextChapterFooter(
             Spacer(Modifier.height(ScrollGrid.INVITE_LABEL_TOP))
             Text(
                 text = "NEXT",
-                style = MaterialTheme.typography.labelSmall.copy(letterSpacing = 3.sp),
-                fontSize = 10.sp,
+                style = MaterialTheme.typography.labelSmall.copy(letterSpacing = CAPS_TRACKING),
+                fontSize = CAPS_LABEL_SIZE,
                 color = accents.gold.copy(alpha = 0.55f),
             )
         }
@@ -3891,13 +3948,23 @@ fun NextChapterOpenPill(
     ) {
         Text(
             text = actionLabel,
-            style = MaterialTheme.typography.labelLarge.copy(letterSpacing = 0.6.sp),
+            // The display face, as the web pill sets it. labelLarge is not in
+            // the app's scale and fell through to Material's sans.
+            style = TextStyle(
+                fontFamily = DisplayFontFamily,
+                fontWeight = FontWeight.Medium,
+                fontSize = 16.sp,
+                // Lowercase takes almost no tracking; caps labels take 0.22 em.
+                letterSpacing = 0.02.em,
+            ),
             color = contentColor,
         )
         Spacer(Modifier.width(8.dp))
         Canvas(Modifier.size(18.dp)) {
+            // Near the display face's stem, so the chevron is written in the
+            // same weight as the word it follows.
             val stroke = Stroke(
-                width = 2.2.dp.toPx(),
+                width = 1.6.dp.toPx(),
                 cap = StrokeCap.Round,
                 join = StrokeJoin.Round,
             )
@@ -3943,8 +4010,8 @@ fun PreviousChapterPullChrome(
     ) {
         Text(
             text = "PREVIOUS",
-            style = MaterialTheme.typography.labelSmall.copy(letterSpacing = 3.sp),
-            fontSize = 10.sp,
+            style = MaterialTheme.typography.labelSmall.copy(letterSpacing = CAPS_TRACKING),
+            fontSize = CAPS_LABEL_SIZE,
             color = accents.gold.copy(alpha = 0.55f),
         )
         Spacer(Modifier.height(ScrollGrid.PULL_LABEL_GAP))

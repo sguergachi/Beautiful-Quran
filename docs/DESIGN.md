@@ -739,6 +739,20 @@ not the app's.
   fill or stroke. Gold is Quranic ornament — the stage mark is quiet ink.
 - Ayah markers are typographic — gold `﴿٧﴾` ornate brackets in the Hafs
   face — not drawn ornaments.
+- **A verse mark never opens a line.** It closes the verse before it; at the
+  head of a line it reads as introducing the next one. English binds it with a
+  narrow no-break space (the leaf and Customize already did), Arabic-only with
+  Hafs' own no-break word space (same width as its space), and the glossed tile
+  row carries the last word and the mark as one flow item. In the tile row the
+  mark shares the Arabic line box, so its cups sit where Hafs sets them inline:
+  bottoms on the word's descender line — not 20 dp lower, level with the gloss.
+- **Glossed Arabic ink stands on the column rule**, like the Arabic-only line and
+  the translation: the outermost tiles hang their 5 dp side air into the margin.
+- **One caps label** in the chapter view — NEXT, PREVIOUS and the top bar's
+  chapter line: 10 sp EB Garamond, 0.22 em tracking. Lowercase is never tracked
+  beyond 0.02 em.
+- **The Continue / Open pill** is set in the display face (Cormorant 16 sp,
+  500), as on web; its chevron's 1.6 dp stroke matches that face's stem.
 
 Reference points: **Unread** (iOS RSS reader) for chrome-free typographic
 lists and reading view; **Apple Music lyrics** for the word illumination and
