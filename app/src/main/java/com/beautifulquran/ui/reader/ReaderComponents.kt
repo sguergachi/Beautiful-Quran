@@ -3689,7 +3689,9 @@ fun PageBreak(
             .padding(contentPadding),
     ) {
         Row(
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(ScrollGrid.FOLIO_BAND),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             if (folio.centered) {
@@ -3705,6 +3707,7 @@ fun PageBreak(
                 style = if (folio.centered) singleStyle else MaterialTheme.typography.labelSmall,
                 fontSize = pageNumberSize,
                 color = pageNumberColor,
+                modifier = Modifier.wrapContentHeight(unbounded = true),
             )
             Spacer(Modifier.width(8.dp))
             HorizontalDivider(
@@ -3724,6 +3727,7 @@ fun PageBreak(
                     ),
                     fontSize = pageNumberSize,
                     color = pageNumberColor,
+                    modifier = Modifier.wrapContentHeight(unbounded = true),
                 )
             }
         }

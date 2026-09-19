@@ -3259,7 +3259,13 @@ fun ReaderScreen(
                                     // ribbon gutter included, not the paper.
                                     contentPadding = ScrollGrid.column(
                                         bookmarkSide,
-                                        top = ScrollGrid.FOLIO_HEAD,
+                                        top = if (
+                                            settings.readingMode == ReadingMode.ENGLISH_ONLY
+                                        ) {
+                                            ScrollGrid.FOLIO_HEAD_ENGLISH
+                                        } else {
+                                            ScrollGrid.FOLIO_HEAD
+                                        },
                                         bottom = ScrollGrid.FOLIO_FOOT,
                                     ),
                                 )

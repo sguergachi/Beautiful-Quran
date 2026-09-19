@@ -764,7 +764,9 @@ not from local `dp` literals.
   it (Arabic, translation, note), 56 dp verse-to-verse (48 in English-only).
 - **Opening.** 40 dp head, 32 dp foot; opening to basmalah 32, basmalah to the
   first verse 40.
-- **Folio.** Centered in its verse gap: 40 dp above the rule, 40 below.
+- **Folio.** A fixed 16 dp band (dp, not the figures' sp line box), centred in
+  its verse gap: 40 dp of paper above and below in every mode — English-only
+  adds 8 dp over the folio to make up its tighter verse gap.
 - **Anchors, not steps.** The ribbon gutter and the 52 dp rosette belong to
   their components. The grid places them and never resizes them. The ribbon tip
   follows the verse pad (`RIBBON_TIP`), so changing the pad keeps the tip on

@@ -97,10 +97,20 @@ object ScrollGrid {
 
     /**
      * The folio sits in a verse gap, so the verse above already brings its
-     * pad and gap (40) and the folio adds the same beneath it (24 + 16).
+     * pad and gap (16 + 24 = 40) and the folio adds the same beneath it
+     * (24 + the next verse's 16).
      */
     val FOLIO_HEAD: Dp = 0.dp
     val FOLIO_FOOT: Dp = UNIT * 6
+
+    /** English closes its verse gap to 16, so the folio makes up the 8. */
+    val FOLIO_HEAD_ENGLISH: Dp = VERSE_GAP - VERSE_GAP_ENGLISH
+
+    /**
+     * The folio's own band. Fixed in dp, not in the figures' sp line box, so
+     * a larger system font cannot push everything beneath it off the step.
+     */
+    val FOLIO_BAND: Dp = UNIT * 4
 
     // ── Chapter invitations ───────────────────────────────────────────────
 
