@@ -725,7 +725,14 @@ not the app's.
   or the timing/search identity of a word.
 - **Translations**: EB Garamond, 17 sp, 26 sp leading, at 66 % ink.
 - **UI text**: the same serif at small sizes with letterspacing and reduced
-  alpha; labels never compete with scripture. Nothing in the app is sans.
+  alpha; labels never compete with scripture. One deliberate exception on
+  Android: interactive UI labels that use Material's `labelLarge` — search
+  section labels, "Show N more", the search dial's Open, the chapter
+  Continue / Open pill — stay in Material's sans. Set against the serif page
+  they read as controls, not as text, and the pairing looked better than an
+  all-serif scale (tried and declined in #773). Everything that is read —
+  scripture, translation, names, facts, captions — stays serif. Do not "fix"
+  the sans slots back to Garamond.
   Settings rows and the Download manager share one scale: **17 / 26**
   bodyLarge for names, **12 / 16** labelSmall for facts and every verb
   (Download, Resume, Pause, Delete, Keep). Reciter verbs sit 16 dp
@@ -739,6 +746,20 @@ not the app's.
   fill or stroke. Gold is Quranic ornament — the stage mark is quiet ink.
 - Ayah markers are typographic — gold `﴿٧﴾` ornate brackets in the Hafs
   face — not drawn ornaments.
+- **A verse mark never opens a line.** It closes the verse before it; at the
+  head of a line it reads as introducing the next one. English binds it with a
+  narrow no-break space (the leaf and Customize already did), Arabic-only with
+  Hafs' own no-break word space (same width as its space), and the glossed tile
+  row carries the last word and the mark as one flow item. In the tile row the
+  mark shares the Arabic line box, so its cups sit where Hafs sets them inline:
+  bottoms on the word's descender line — not 20 dp lower, level with the gloss.
+- **Glossed Arabic ink stands on the column rule**, like the Arabic-only line and
+  the translation: the outermost tiles hang their 5 dp side air into the margin.
+- **One caps label** in the chapter view — NEXT, PREVIOUS and the top bar's
+  chapter line: 10 sp EB Garamond, 0.22 em tracking. Lowercase is never tracked
+  beyond 0.02 em.
+- **The Continue / Open pill** keeps Material's sans `labelLarge` (see UI
+  text above); its chevron's 1.6 dp stroke matches the label's stem weight.
 
 Reference points: **Unread** (iOS RSS reader) for chrome-free typographic
 lists and reading view; **Apple Music lyrics** for the word illumination and
@@ -746,6 +767,42 @@ the recede-while-playing behavior. Running-text rules follow Bringhurst's
 *Elements of Typographic Style* (45–75 character measure, natural word space,
 ragged-right setting, leading proportional to type size) and WCAG's text
 spacing / visual-presentation guidance.
+
+### The scroll grid
+
+The mushaf hangs on its line pitch (`MushafGrid`). The scrolling chapter
+cannot, because Hafs, glosses and translation each carry their own leading
+and pinch rescales all of them, so it hangs on a fixed 4 dp step instead:
+`ui/reader/ScrollGrid.kt`. Every piece of paper between two pieces of ink is
+a whole number of steps, and components take their figures from the grid,
+not from local `dp` literals.
+
+- **Three vertical rules, one axis.** Equal 38 dp margins — the ribbon's own
+  strip (`BookmarkStripWidth`) on its side, matched on the rail side — so the
+  text block is centred on the same axis as everything centred on the sheet:
+  opening, basmalah, NEXT, the pill, the top title, the player. (A 28 dp rail
+  side once centred the verses 5 dp left of all of them.) Western ink starts on
+  the left rule — translation, English, the back arrow, the Western folio
+  figure; Arabic ink ends on the right rule — Hafs, the settings mark, the
+  Arabic folio figure. The rail and ribbon live in the margins; text never
+  does. Top-bar icons are *placed* onto the rules (offset, not padding), so the
+  title slot stays centred; the mushaf leaf keeps its own margins.
+- **Folio figures.** Garamond *lining* figures (old-style 3, 4, 5, 7, 9 hang
+  below a rule) and Hafs Arabic-Indic at 14 sp, level with them; the rule runs
+  through both figures' ink centre.
+- **Verse rhythm.** 16 dp pad inside each verse, 12 dp between voices within
+  it (Arabic, translation, note), 56 dp verse-to-verse (48 in English-only).
+- **Opening.** 40 dp head, 32 dp foot; opening to basmalah 32, basmalah to the
+  first verse 40.
+- **Folio.** A fixed 16 dp band (dp, not the figures' sp line box), centred in
+  its verse gap: 40 dp of paper above and below in every mode — English-only
+  adds 8 dp over the folio to make up its tighter verse gap.
+- **Anchors, not steps.** The ribbon gutter and the 52 dp rosette belong to
+  their components. The grid places them and never resizes them. The ribbon tip
+  follows the verse pad (`RIBBON_TIP`), so changing the pad keeps the tip on
+  the first ink line.
+
+Android only for now; the web reader still uses its own rem values.
 
 ### Information surfaces: learned rules
 
