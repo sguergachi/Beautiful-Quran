@@ -726,6 +726,11 @@ not the app's.
 - **Translations**: EB Garamond, 17 sp, 26 sp leading, at 66 % ink.
 - **UI text**: the same serif at small sizes with letterspacing and reduced
   alpha; labels never compete with scripture. Nothing in the app is sans.
+  That includes Material's own slots: `QuranTypography` defines all fifteen,
+  because an undefined slot is Roboto and components pick slots themselves
+  (`TypographyTest` guards it). A glyph the book faces lack falls back to a
+  system sans too — draw it (the Root viewer's info mark is an italic *i* in a
+  hairline ring) rather than set ⓘ.
   Settings rows and the Download manager share one scale: **17 / 26**
   bodyLarge for names, **12 / 16** labelSmall for facts and every verb
   (Download, Resume, Pause, Delete, Keep). Reciter verbs sit 16 dp

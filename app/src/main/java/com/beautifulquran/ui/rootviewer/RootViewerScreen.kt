@@ -53,6 +53,7 @@ import kotlinx.coroutines.launch
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.layout.layout
@@ -795,20 +796,41 @@ private fun ExplainedHeading(
                                         if (expanded) "Expanded" else "Collapsed"
                                 },
                         ) {
-                            Text(
-                                text = "ⓘ",
-                                color = MaterialTheme.colorScheme.primary.copy(alpha = 0.8f),
-                                style = TextStyle(
-                                    fontSize = 14.sp,
-                                    lineHeight = 14.sp,
-                                    platformStyle = PlatformTextStyle(includeFontPadding = false),
-                                    lineHeightStyle = LineHeightStyle(
-                                        alignment = LineHeightStyle.Alignment.Center,
-                                        trim = LineHeightStyle.Trim.Both,
+                            // EB Garamond has no ⓘ, so the glyph always fell
+                            // back to the system sans. The book's own form: an
+                            // italic i in a hairline ring, at the ~12 dp the
+                            // glyph's ring inked.
+                            val infoInk = MaterialTheme.colorScheme.primary.copy(alpha = 0.8f)
+                            Box(
+                                contentAlignment = Alignment.Center,
+                                modifier = Modifier
+                                    .size(12.dp)
+                                    .drawBehind {
+                                        val stroke = 0.8.dp.toPx()
+                                        drawCircle(
+                                            color = infoInk,
+                                            radius = (size.minDimension - stroke) / 2f,
+                                            style = Stroke(width = stroke),
+                                        )
+                                    },
+                            ) {
+                                Text(
+                                    text = "i",
+                                    color = infoInk,
+                                    style = TextStyle(
+                                        fontFamily = SerifFontFamily,
+                                        fontStyle = FontStyle.Italic,
+                                        fontSize = 10.sp,
+                                        lineHeight = 10.sp,
+                                        platformStyle = PlatformTextStyle(includeFontPadding = false),
+                                        lineHeightStyle = LineHeightStyle(
+                                            alignment = LineHeightStyle.Alignment.Center,
+                                            trim = LineHeightStyle.Trim.Both,
+                                        ),
                                     ),
-                                ),
-                                textAlign = TextAlign.Center,
-                            )
+                                    textAlign = TextAlign.Center,
+                                )
+                            }
                         }
                     }
                 }

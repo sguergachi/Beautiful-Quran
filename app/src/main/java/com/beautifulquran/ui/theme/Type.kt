@@ -115,8 +115,68 @@ private const val BOOK_FEATURES = "'kern' 1, 'liga' 1, 'onum' 1"
 /**
  * Full serif scale. EB Garamond runs a small x-height, so sizes sit ~1sp
  * above the Material defaults to keep the same apparent size.
+ *
+ * **Every slot is defined**, including ones the app barely uses. A slot left
+ * out is not absent — it is Material's default, which is Roboto — and Material
+ * components reach for slots on their own (a button's label is labelLarge). Four
+ * missing slots once set the search section labels, "Show N more", the reader's
+ * Continue pill and the back-to capsule in sans, against "nothing in the app is
+ * sans" (docs/DESIGN.md, Type). `TypographyTest` fails if one goes missing.
  */
 val QuranTypography = Typography(
+    displayLarge = TextStyle(
+        fontFamily = DisplayFontFamily,
+        fontWeight = FontWeight.SemiBold,
+        fontSize = 57.sp,
+        lineHeight = 64.sp,
+    ),
+    displayMedium = TextStyle(
+        fontFamily = DisplayFontFamily,
+        fontWeight = FontWeight.SemiBold,
+        fontSize = 45.sp,
+        lineHeight = 52.sp,
+    ),
+    displaySmall = TextStyle(
+        fontFamily = DisplayFontFamily,
+        fontWeight = FontWeight.SemiBold,
+        fontSize = 36.sp,
+        lineHeight = 44.sp,
+    ),
+    headlineLarge = TextStyle(
+        fontFamily = DisplayFontFamily,
+        fontWeight = FontWeight.SemiBold,
+        fontSize = 32.sp,
+        lineHeight = 38.sp,
+        letterSpacing = 0.2.sp,
+    ),
+    headlineSmall = TextStyle(
+        fontFamily = DisplayFontFamily,
+        fontWeight = FontWeight.SemiBold,
+        fontSize = 24.sp,
+        lineHeight = 30.sp,
+        letterSpacing = 0.2.sp,
+    ),
+    titleSmall = TextStyle(
+        fontFamily = SerifFontFamily,
+        fontWeight = FontWeight.Medium,
+        fontSize = 15.sp,
+        lineHeight = 20.sp,
+        letterSpacing = 0.1.sp,
+        fontFeatureSettings = BOOK_FEATURES,
+    ),
+    bodySmall = TextStyle(
+        fontFamily = SerifFontFamily,
+        fontSize = 13.sp,
+        lineHeight = 18.sp,
+        fontFeatureSettings = BOOK_FEATURES,
+    ),
+    labelLarge = TextStyle(
+        fontFamily = SerifFontFamily,
+        fontWeight = FontWeight.Medium,
+        fontSize = 15.sp,
+        lineHeight = 20.sp,
+        letterSpacing = 0.1.sp,
+    ),
     headlineMedium = TextStyle(
         fontFamily = DisplayFontFamily,
         fontWeight = FontWeight.SemiBold,
