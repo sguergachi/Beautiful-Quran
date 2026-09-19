@@ -1,5 +1,9 @@
 package com.beautifulquran.ui.reader
 
+import androidx.compose.ui.semantics.Role
+import com.beautifulquran.ui.theme.quietClickable
+import com.beautifulquran.ui.theme.SettingsNuqtaIcon
+import com.beautifulquran.ui.theme.rememberSettingsNuqtaState
 import com.beautifulquran.DevProfiling
 import com.beautifulquran.QuranApp
 import android.app.Activity
@@ -58,7 +62,6 @@ import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.KeyboardArrowDown
 import androidx.compose.material.icons.rounded.KeyboardArrowUp
 import androidx.compose.material.icons.rounded.Search
-import androidx.compose.material.icons.rounded.Tune
 import androidx.compose.material3.CenterAlignedTopAppBar
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -1808,17 +1811,27 @@ fun ReaderScreen(
                         } else {
                             Spacer(Modifier.width(48.dp))
                         }
-                        IconButton(
-                            onClick = onOpenSettings,
-                            enabled = !recitingActive,
+                        val settingsNuqta = rememberSettingsNuqtaState()
+                        // Not an IconButton: its clip would cut off the
+                        // nuqta's swell.
+                        Box(
+                            contentAlignment = Alignment.Center,
+                            modifier = Modifier
+                                .size(48.dp)
+                                .quietClickable(
+                                    enabled = !recitingActive,
+                                    role = Role.Button,
+                                    interactionSource = settingsNuqta.interactions,
+                                ) {
+                                    settingsNuqta.drop()
+                                    onOpenSettings()
+                                },
                         ) {
-                            Icon(
-                                Icons.Rounded.Tune,
+                            SettingsNuqtaIcon(
+                                state = settingsNuqta,
                                 contentDescription = "Settings",
                                 tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.55f),
-                                modifier = Modifier
-                                    .offset(x = (-4).dp)
-                                    .size(26.dp),
+                                modifier = Modifier.offset(x = (-4).dp),
                             )
                         }
                     }
