@@ -5,6 +5,7 @@ import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.input.pointer.PointerEvent
@@ -25,18 +26,20 @@ import androidx.compose.ui.unit.IntSize
  * on a sheet should use this rather than a raw [clickable].
  *
  * Pass [onLongClick] to handle press-and-hold; the long-press carries the
- * same quiet treatment (no ink ripple).
+ * same quiet treatment (no ink ripple). Pass [interactionSource] when the
+ * content draws its own pressed state.
  */
 @OptIn(ExperimentalFoundationApi::class)
 fun Modifier.quietClickable(
     enabled: Boolean = true,
     role: Role? = null,
     onLongClick: (() -> Unit)? = null,
+    interactionSource: MutableInteractionSource? = null,
     onClick: () -> Unit,
 ): Modifier =
     if (onLongClick == null) {
         clickable(
-            interactionSource = null,
+            interactionSource = interactionSource,
             indication = null,
             enabled = enabled,
             role = role,
@@ -44,7 +47,7 @@ fun Modifier.quietClickable(
         )
     } else {
         combinedClickable(
-            interactionSource = null,
+            interactionSource = interactionSource,
             indication = null,
             enabled = enabled,
             role = role,

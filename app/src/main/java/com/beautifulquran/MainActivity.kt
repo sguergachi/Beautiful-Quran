@@ -85,6 +85,7 @@ import com.beautifulquran.ui.home.FloatingPlaybackCoverVisibleMaxPage
 import com.beautifulquran.ui.home.FloatingPlaybackListClearance
 import com.beautifulquran.ui.home.HomeScreen
 import com.beautifulquran.ui.home.HomeViewModel
+import com.beautifulquran.ui.home.LocalReaderApproach
 import com.beautifulquran.ui.reader.BackToOriginPill
 import com.beautifulquran.ui.reader.ReaderPlaybackSnapshot
 import com.beautifulquran.ui.reader.ReaderScreen
@@ -121,6 +122,8 @@ import com.beautifulquran.ui.theme.BeautifulQuranTheme
 import com.beautifulquran.ui.theme.FloatingPaperControl
 import com.beautifulquran.ui.theme.InkRevealOverlay
 import com.beautifulquran.ui.theme.LocalNuqtaParams
+import com.beautifulquran.ui.theme.LocalSettingsApproach
+import com.beautifulquran.ui.theme.SettingsApproach
 import com.beautifulquran.ui.theme.LocalQuranAccents
 import com.beautifulquran.ui.theme.TimingsLabAccents
 import com.beautifulquran.ui.theme.absorbPointerEvents
@@ -360,6 +363,9 @@ class MainActivity : ComponentActivity() {
     }
 }
 
+/** A settings turn that never moves, for a sheet not beneath Settings. */
+private val SettingsApproachAtRest = SettingsApproach(progress = { 0f }, dragging = { false }, commitAt = 1f)
+
 private const val BOOKMARKS_LAYER = -1
 private const val COVER_LAYER = 0
 private const val AYAH_LAYER = 1
@@ -569,6 +575,21 @@ private fun PaperStackApp(
     }
     val scope = rememberCoroutineScope()
     val settingsLayer = if (selectedSurahId == 0) AYAH_LAYER else SETTINGS_LAYER
+    // The settings button's nuqta spreads with the turn from the sheet just
+    // beneath Settings, whichever sheet that is.
+    var stackDragging by remember { mutableStateOf(false) }
+    // The continue row inks as the chapter list turns into the open reader.
+    val readerApproach = remember(stackPosition, selectedSurahId != 0) {
+        val readerOpen = selectedSurahId != 0
+        { if (readerOpen) (stackPosition.value - COVER_LAYER).coerceIn(0f, 1f) else 0f }
+    }
+    val settingsApproach = remember(stackPosition, settingsLayer) {
+        SettingsApproach(
+            progress = { (stackPosition.value - (settingsLayer - 1)).coerceIn(0f, 1f) },
+            dragging = { stackDragging },
+            commitAt = STACK_PAGE_TURN_THRESHOLD,
+        )
+    }
     // The stack's top sheet, read live: a detail page (Customize, Downloads)
     // raises the ceiling the moment it is asked for — a captured value would
     // still hold the old bound when settleTo runs, clamping the turn to
@@ -923,6 +944,7 @@ private fun PaperStackApp(
                 gesturesBlocked = { stackGesturesBlocked.value },
                 onDragStart = {
                     dragStartPosition = stackPosition.value
+                    stackDragging = true
                 },
                 onDrag = { deltaPages ->
                     // A single gesture may advance at most one layer, so a hard swipe
@@ -943,6 +965,7 @@ private fun PaperStackApp(
                     }
                 },
                 onSettle = { target ->
+                    stackDragging = false
                     dragSnapJob?.cancel()
                     animateTo(target)
                 },
@@ -1050,58 +1073,60 @@ private fun PaperStackApp(
                 settingsLayer = settingsLayer,
                 modifier = Modifier.zIndex(if (readerBleedOpen) 3f else 1f),
             ) {
-                key(readerSession) {
-                    ReaderScreen(
-                        surahId = selectedSurahId,
-                        startAyah = selectedStartAyah.takeIf { it > 0 },
-                        startPlaybackRequested = selectedStartPlayback,
-                        startWordPosition = selectedStartWord.takeIf { it >= 0 },
-                        startWordPositions = selectedStartWords,
-                        startSearchText = selectedSearchText,
-                        readerSheetSettled = {
-                            abs(stackPosition.value - AYAH_LAYER) <= 0.01f
-                        },
-                        viewModel = readerViewModel,
-                        onBack = { animateTo(COVER_LAYER) },
-                        onOpenSettings = { animateTo(SETTINGS_LAYER) },
-                        onOpenNextChapter = { nextId ->
-                            // Content is already installed by the reader's
-                            // continuous-scroll advance — only sync the sheet id.
-                            selectedSurahId = nextId
-                            selectedStartAyah = 0
-                            selectedStartPlayback = false
-                            selectedStartWord = -1
-                            selectedStartWords = emptyList()
-                            selectedSearchText = null
-                        },
-                        onOpenPreviousChapter = { prevId ->
-                            selectedSurahId = prevId
-                            selectedStartAyah = 0
-                            selectedStartPlayback = false
-                            selectedStartWord = -1
-                            selectedStartWords = emptyList()
-                            selectedSearchText = null
-                        },
-                        onAyahSelectorExpandedChange = { ayahSelectorExpanded = it },
-                        onOpenRootViewer = { sid, a, word -> onWordLongPress(sid, a, word) },
-                        onRootReturnUserMoved = { onRootReturnUserMovedLatest.value() },
-                        rootReturnVisible = rootReturnVisible,
-                        keepStatusBarVisible = overlayBlocking,
-                        onInkOverlayVisibilityChange = { readerInkOverlayVisible = it },
-                        gathering = shareUi.gathering,
-                        gatherOrdinal = { sid, a -> shareUi.ordinals[AyahRef(sid, a)] },
-                        onToggleGatheredAyah = shareViewModel::toggle,
-                        shareCount = shareUi.selection.size,
-                        preparingShareText = shareUi.preparingText,
-                        preparingShareImage = shareUi.preparingImage,
-                        shareError = shareUi.error,
-                        onShareMarkTap = shareViewModel::onMarkTap,
-                        onShareCancel = shareViewModel::onChromeCancel,
-                        onShareText = { shareViewModel.shareAsText() },
-                        onShareImage = {
-                            if (activity != null) shareViewModel.shareAsImage(activity)
-                        },
-                    )
+                CompositionLocalProvider(LocalSettingsApproach provides settingsApproach) {
+                    key(readerSession) {
+                        ReaderScreen(
+                            surahId = selectedSurahId,
+                            startAyah = selectedStartAyah.takeIf { it > 0 },
+                            startPlaybackRequested = selectedStartPlayback,
+                            startWordPosition = selectedStartWord.takeIf { it >= 0 },
+                            startWordPositions = selectedStartWords,
+                            startSearchText = selectedSearchText,
+                            readerSheetSettled = {
+                                abs(stackPosition.value - AYAH_LAYER) <= 0.01f
+                            },
+                            viewModel = readerViewModel,
+                            onBack = { animateTo(COVER_LAYER) },
+                            onOpenSettings = { animateTo(SETTINGS_LAYER) },
+                            onOpenNextChapter = { nextId ->
+                                // Content is already installed by the reader's
+                                // continuous-scroll advance — only sync the sheet id.
+                                selectedSurahId = nextId
+                                selectedStartAyah = 0
+                                selectedStartPlayback = false
+                                selectedStartWord = -1
+                                selectedStartWords = emptyList()
+                                selectedSearchText = null
+                            },
+                            onOpenPreviousChapter = { prevId ->
+                                selectedSurahId = prevId
+                                selectedStartAyah = 0
+                                selectedStartPlayback = false
+                                selectedStartWord = -1
+                                selectedStartWords = emptyList()
+                                selectedSearchText = null
+                            },
+                            onAyahSelectorExpandedChange = { ayahSelectorExpanded = it },
+                            onOpenRootViewer = { sid, a, word -> onWordLongPress(sid, a, word) },
+                            onRootReturnUserMoved = { onRootReturnUserMovedLatest.value() },
+                            rootReturnVisible = rootReturnVisible,
+                            keepStatusBarVisible = overlayBlocking,
+                            onInkOverlayVisibilityChange = { readerInkOverlayVisible = it },
+                            gathering = shareUi.gathering,
+                            gatherOrdinal = { sid, a -> shareUi.ordinals[AyahRef(sid, a)] },
+                            onToggleGatheredAyah = shareViewModel::toggle,
+                            shareCount = shareUi.selection.size,
+                            preparingShareText = shareUi.preparingText,
+                            preparingShareImage = shareUi.preparingImage,
+                            shareError = shareUi.error,
+                            onShareMarkTap = shareViewModel::onMarkTap,
+                            onShareCancel = shareViewModel::onChromeCancel,
+                            onShareText = { shareViewModel.shareAsText() },
+                            onShareImage = {
+                                if (activity != null) shareViewModel.shareAsImage(activity)
+                            },
+                        )
+                    }
                 }
 
                 // Gather/Send: back handling + Send ink-bleed (text share PR1).
@@ -1178,41 +1203,52 @@ private fun PaperStackApp(
             settingsLayer = settingsLayer,
             modifier = Modifier.zIndex(2f),
         ) {
-            HomeScreen(
-                viewModel = homeViewModel,
-                onOpenSurah = { surahId, ayah, wordPosition, searchText ->
-                    readerViewModel.load(surahId)
-                    selectedSurahId = surahId
-                    selectedStartAyah = ayah ?: 0
-                    selectedStartPlayback = false
-                    selectedStartWord = wordPosition ?: -1
-                    selectedStartWords = listOfNotNull(wordPosition?.takeIf { it > 0 })
-                    selectedSearchText = searchText
-                    readerSession++
-                    animateTo(AYAH_LAYER)
+            CompositionLocalProvider(
+                // The cover lies beneath Settings only while no reader is
+                // open; otherwise the reader's turns are not the cover's.
+                LocalSettingsApproach provides if (selectedSurahId == 0) {
+                    settingsApproach
+                } else {
+                    SettingsApproachAtRest
                 },
-                onOpenSearchHit = { hit, query ->
-                    readerViewModel.load(hit.surahId)
-                    selectedSurahId = hit.surahId
-                    selectedStartAyah = hit.ayahNumber
-                    selectedStartPlayback = false
-                    selectedStartWord = hit.position
-                    selectedStartWords = hit.targetPositions
-                    selectedSearchText = query
-                    readerSession++
-                    animateTo(AYAH_LAYER)
-                },
-                onOpenSettings = { animateTo(SETTINGS_LAYER) },
-                // Drive the float's enter/exit from the live page turn so it
-                // slides in when returning to chapter selection and out when
-                // leaving for the reader — not only when nowPlaying flips.
-                coverSheetVisible = coverSheetVisible,
-                readerVisitActive = settledLayer == AYAH_LAYER,
-                chapterRibbonReady = chapterRibbonReady,
-                bookmarkCount = bookmarkCount,
-                bookmarkStyle = homeBookmarkStyle,
-                onOpenBookmarks = { animateTo(BOOKMARKS_LAYER) },
-            )
+                LocalReaderApproach provides readerApproach,
+            ) {
+                HomeScreen(
+                    viewModel = homeViewModel,
+                    onOpenSurah = { surahId, ayah, wordPosition, searchText ->
+                        readerViewModel.load(surahId)
+                        selectedSurahId = surahId
+                        selectedStartAyah = ayah ?: 0
+                        selectedStartPlayback = false
+                        selectedStartWord = wordPosition ?: -1
+                        selectedStartWords = listOfNotNull(wordPosition?.takeIf { it > 0 })
+                        selectedSearchText = searchText
+                        readerSession++
+                        animateTo(AYAH_LAYER)
+                    },
+                    onOpenSearchHit = { hit, query ->
+                        readerViewModel.load(hit.surahId)
+                        selectedSurahId = hit.surahId
+                        selectedStartAyah = hit.ayahNumber
+                        selectedStartPlayback = false
+                        selectedStartWord = hit.position
+                        selectedStartWords = hit.targetPositions
+                        selectedSearchText = query
+                        readerSession++
+                        animateTo(AYAH_LAYER)
+                    },
+                    onOpenSettings = { animateTo(SETTINGS_LAYER) },
+                    // Drive the float's enter/exit from the live page turn so it
+                    // slides in when returning to chapter selection and out when
+                    // leaving for the reader — not only when nowPlaying flips.
+                    coverSheetVisible = coverSheetVisible,
+                    readerVisitActive = settledLayer == AYAH_LAYER,
+                    chapterRibbonReady = chapterRibbonReady,
+                    bookmarkCount = bookmarkCount,
+                    bookmarkStyle = homeBookmarkStyle,
+                    onOpenBookmarks = { animateTo(BOOKMARKS_LAYER) },
+                )
+            }
         }
 
         // Concordance "Back to …" — opaque floating capsule above the paper

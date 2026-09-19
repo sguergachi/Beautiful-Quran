@@ -1,5 +1,7 @@
 package com.beautifulquran.ui.home
 
+import com.beautifulquran.ui.theme.SettingsNuqtaIcon
+import com.beautifulquran.ui.theme.rememberSettingsNuqtaState
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.tween
@@ -31,9 +33,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.rounded.Tune
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
@@ -45,7 +45,9 @@ import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -60,6 +62,7 @@ import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.SpanStyle
@@ -72,6 +75,7 @@ import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlin.math.roundToInt
+import kotlinx.coroutines.launch
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.ui.res.stringResource
 import com.beautifulquran.R
@@ -516,6 +520,7 @@ fun HomeScreen(
 private fun HomeHeader(
     onOpenSettings: () -> Unit,
 ) {
+    val settingsNuqta = rememberSettingsNuqtaState()
     Row(
         verticalAlignment = Alignment.CenterVertically,
         modifier = Modifier
@@ -545,15 +550,17 @@ private fun HomeHeader(
                 .size(48.dp)
                 // The title sits 7 dp below the masthead's overall center.
                 .offset(y = 7.dp)
-                .clip(CircleShape)
-                .quietClickable(role = Role.Button, onClick = onOpenSettings)
+                // Unclipped: the settings nuqta swells past this box.
+                .quietClickable(role = Role.Button, interactionSource = settingsNuqta.interactions) {
+                    settingsNuqta.drop()
+                    onOpenSettings()
+                }
                 .semantics { contentDescription = "Open settings" },
         ) {
-            Icon(
-                imageVector = Icons.Rounded.Tune,
+            SettingsNuqtaIcon(
+                state = settingsNuqta,
                 contentDescription = "Open settings",
                 tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.55f),
-                modifier = Modifier.size(26.dp),
             )
         }
     }
@@ -657,13 +664,47 @@ private fun SavedPassagesRow(
 
 @Composable
 private fun ContinueRow(target: ContinueTarget, onClick: () -> Unit) {
-    Row(
-        verticalAlignment = Alignment.CenterVertically,
+    // Turning into the reader floods the row with ink; its words take the
+    // paper colour only where the ink lies.
+    val ink = rememberContinueInk()
+    val scope = rememberCoroutineScope()
+    Box(
         modifier = Modifier
             .fillMaxWidth()
             .padding(top = 18.dp)
             .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.1f))
-            .quietClickable(onClick = onClick)
+            .continueInkWash(ink, color = MaterialTheme.colorScheme.primary)
+            .quietClickable {
+                ink.tapped = true
+                // Let the ink's first frame land before the reader is built.
+                scope.launch {
+                    withFrameNanos { }
+                    onClick()
+                }
+            },
+    ) {
+        ContinueRowContent(target, onInk = false)
+        ContinueRowContent(
+            target,
+            onInk = true,
+            modifier = Modifier
+                .clearAndSetSemantics {}
+                .continueInkMask(ink),
+        )
+    }
+}
+
+@Composable
+private fun ContinueRowContent(
+    target: ContinueTarget,
+    onInk: Boolean,
+    modifier: Modifier = Modifier,
+) {
+    val colors = MaterialTheme.colorScheme
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = modifier
+            .fillMaxWidth()
             .padding(vertical = 18.dp),
     ) {
         Spacer(Modifier.width(HomeStartInset + HomeNumberColumn))
@@ -672,13 +713,13 @@ private fun ContinueRow(target: ContinueTarget, onClick: () -> Unit) {
             Text(
                 text = "Continue listening",
                 style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.primary.copy(alpha = 0.75f),
+                color = if (onInk) colors.onPrimary.copy(alpha = 0.8f) else colors.primary.copy(alpha = 0.75f),
             )
             Spacer(Modifier.height(2.dp))
             Text(
                 text = "${target.surah.nameTransliteration} · Ayah ${target.ayah}",
                 style = MaterialTheme.typography.titleMedium,
-                color = MaterialTheme.colorScheme.onSurface,
+                color = if (onInk) colors.onPrimary else colors.onSurface,
             )
         }
         Spacer(Modifier.width(16.dp))
@@ -686,7 +727,7 @@ private fun ContinueRow(target: ContinueTarget, onClick: () -> Unit) {
             text = target.surah.nameArabic,
             style = ArabicTitleStyle,
             fontSize = 24.sp,
-            color = MaterialTheme.colorScheme.primary,
+            color = if (onInk) colors.onPrimary else colors.primary,
             modifier = Modifier.padding(end = HomeEndInset + HomeArabicOpticalInset),
         )
     }
