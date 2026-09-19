@@ -747,6 +747,31 @@ the recede-while-playing behavior. Running-text rules follow Bringhurst's
 ragged-right setting, leading proportional to type size) and WCAG's text
 spacing / visual-presentation guidance.
 
+### The scroll grid
+
+The mushaf hangs on its line pitch (`MushafGrid`). The scrolling chapter
+cannot, because Hafs, glosses and translation each carry their own leading
+and pinch rescales all of them, so it hangs on a fixed 4 dp step instead:
+`ui/reader/ScrollGrid.kt`. Every piece of paper between two pieces of ink is
+a whole number of steps, and components take their figures from the grid,
+not from local `dp` literals.
+
+- **Columns.** A 28 dp outer margin (the Chapters index lane) and, on the
+  bookmark side, the ribbon's own 38 dp gutter (`BookmarkStripWidth`). Verses
+  *and* page folios sit on this column, so a folio rule never runs past the
+  words it separates.
+- **Verse rhythm.** 16 dp pad inside each verse, 12 dp between voices within
+  it (Arabic, translation, note), 56 dp verse-to-verse (48 in English-only).
+- **Opening.** 40 dp head, 32 dp foot; opening to basmalah 32, basmalah to the
+  first verse 40.
+- **Folio.** Centered in its verse gap: 40 dp above the rule, 40 below.
+- **Anchors, not steps.** The ribbon gutter and the 52 dp rosette belong to
+  their components. The grid places them and never resizes them. The ribbon tip
+  follows the verse pad (`RIBBON_TIP`), so changing the pad keeps the tip on
+  the first ink line.
+
+Android only for now; the web reader still uses its own rem values.
+
 ### Information surfaces: learned rules
 
 Lexicons, search results, bookmarks, and settings are quieter than scripture,

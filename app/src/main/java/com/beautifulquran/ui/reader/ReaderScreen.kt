@@ -3255,6 +3255,13 @@ fun ReaderScreen(
                                 PageBreak(
                                     page = item.page,
                                     script = settings.pageNumberScript,
+                                    // The folio's rule spans the verse column,
+                                    // ribbon gutter included, not the paper.
+                                    contentPadding = ScrollGrid.column(
+                                        bookmarkSide,
+                                        top = ScrollGrid.FOLIO_HEAD,
+                                        bottom = ScrollGrid.FOLIO_FOOT,
+                                    ),
                                 )
                             }
                         }

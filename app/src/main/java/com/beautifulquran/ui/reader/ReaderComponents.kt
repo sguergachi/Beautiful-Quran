@@ -3055,10 +3055,11 @@ fun AyahBlock(
                 .padding(
                     // Extra room on the bookmark ribbon's side so its tip
                     // doesn't crowd the verse text.
-                    start = if (bookmarkSide == AyahSelectorSide.LEFT) 38.dp else 28.dp,
-                    end = if (bookmarkSide == AyahSelectorSide.RIGHT) 38.dp else 28.dp,
-                    top = 14.dp,
-                    bottom = 14.dp,
+                    ScrollGrid.column(
+                        bookmarkSide,
+                        top = ScrollGrid.VERSE_PAD,
+                        bottom = ScrollGrid.VERSE_PAD,
+                    ),
                 ),
         ) {
             val useArabicIndicDigits = verseNumberScript == VerseNumberScript.ARABIC
@@ -3160,7 +3161,7 @@ fun AyahBlock(
                 }
             }
             if (showTranslation && readingMode == ReadingMode.ARABIC_ENGLISH) {
-                Spacer(Modifier.height(12.dp))
+                Spacer(Modifier.height(ScrollGrid.VOICE_GAP))
                 // Block alpha stays 1 while recessed (word-level dim); the
                 // translation still needs to recede with the verse.
                 Text(
@@ -3227,7 +3228,7 @@ fun AyahBlock(
                 Column {
                     // The note is a different voice, so it earns at least the
                     // air the translation takes from the Arabic above it.
-                    Spacer(Modifier.height(12.dp))
+                    Spacer(Modifier.height(ScrollGrid.VOICE_GAP))
                     VerseAnnotationField(
                         text = annotationText ?: "",
                         isEditing = isEditingAnnotation,
@@ -3243,7 +3244,15 @@ fun AyahBlock(
                 }
             }
             // Whitespace is the divider.
-            Spacer(Modifier.height(if (readingMode == ReadingMode.ENGLISH_ONLY) 18.dp else 26.dp))
+            Spacer(
+                Modifier.height(
+                    if (readingMode == ReadingMode.ENGLISH_ONLY) {
+                        ScrollGrid.VERSE_GAP_ENGLISH
+                    } else {
+                        ScrollGrid.VERSE_GAP
+                    },
+                ),
+            )
         }
 
         if (gatherOrdinal != null && bookmarkSide != null) {
@@ -3287,6 +3296,7 @@ fun AyahBlock(
                     placeUnfurlSignal = placeUnfurlSignal,
                     onPlaceUnfurlConsumed = onPlaceUnfurlConsumed,
                     reservePlaceLane = true,
+                    topInset = ScrollGrid.RIBBON_TIP,
                     side = bookmarkSide,
                     chromeAlpha = bookmarkChromeAlpha,
                     interactive = bookmarkInteractive,
@@ -3441,22 +3451,26 @@ fun ChapterOpening(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(
-                    top = 36.dp,
-                    bottom = if (compactBottom) 8.dp else 30.dp,
-                    start = 24.dp,
-                    end = 24.dp,
+                    top = ScrollGrid.OPENING_HEAD,
+                    bottom = if (compactBottom) {
+                        ScrollGrid.OPENING_FOOT_BEFORE_BASMALAH
+                    } else {
+                        ScrollGrid.OPENING_FOOT
+                    },
+                    start = ScrollGrid.MARGIN,
+                    end = ScrollGrid.MARGIN,
                 ),
         ) {
-            // Always reserve the 52.dp slot so handoff layout doesn't jump when
+            // Always reserve the rosette slot so handoff layout doesn't jump when
             // ownership moves from flyer → settled header.
             Box(
                 contentAlignment = Alignment.Center,
-                modifier = Modifier.size(52.dp),
+                modifier = Modifier.size(ScrollGrid.ROSETTE),
             ) {
                 if (showRosette) {
                     GeneratedChapterRosette(
                         spec = ornament.rosette,
-                        size = 52.dp,
+                        size = ScrollGrid.ROSETTE,
                         brightGold = accents.goldBright,
                         deepGold = accents.goldDeep,
                         embossDark = accents.embossDark,
@@ -3470,7 +3484,7 @@ fun ChapterOpening(
                     )
                 }
             }
-            Spacer(Modifier.height(16.dp))
+            Spacer(Modifier.height(ScrollGrid.ROSETTE_TO_TITLE))
             Column(
                 horizontalAlignment = Alignment.CenterHorizontally,
                 modifier = Modifier.graphicsLayer { alpha = titles },
@@ -3481,13 +3495,13 @@ fun ChapterOpening(
                     fontSize = 32.sp,
                     color = MaterialTheme.colorScheme.onSurface,
                 )
-                Spacer(Modifier.height(10.dp))
+                Spacer(Modifier.height(ScrollGrid.TITLE_TO_SUBTITLE))
                 Text(
                     text = "$nameTransliteration · $nameTranslation",
                     style = MaterialTheme.typography.titleMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.85f),
                 )
-                Spacer(Modifier.height(4.dp))
+                Spacer(Modifier.height(ScrollGrid.SUBTITLE_TO_META))
                 Text(
                     text = "Chapter $chapterNumber · ${revelationPlace.replaceFirstChar { it.uppercase() }} · $ayahCount ayahs",
                     style = MaterialTheme.typography.labelMedium,
@@ -3544,7 +3558,12 @@ fun BasmalahBlock(
         contentAlignment = Alignment.Center,
         modifier = Modifier
             .fillMaxWidth()
-            .padding(start = 24.dp, end = 24.dp, top = 20.dp, bottom = 28.dp),
+            .padding(
+                start = ScrollGrid.MARGIN,
+                end = ScrollGrid.MARGIN,
+                top = ScrollGrid.BASMALAH_HEAD,
+                bottom = ScrollGrid.BASMALAH_FOOT,
+            ),
     ) {
         BasmalahCalligraphy(
             active = active,
@@ -3649,7 +3668,11 @@ fun OrnateSurahTitle(
 fun PageBreak(
     page: Int,
     script: PageNumberScript = PageNumberScript.BOTH,
-    contentPadding: PaddingValues = PaddingValues(horizontal = 28.dp, vertical = 10.dp),
+    contentPadding: PaddingValues = ScrollGrid.column(
+        bookmarkSide = null,
+        top = ScrollGrid.FOLIO_HEAD,
+        bottom = ScrollGrid.FOLIO_FOOT,
+    ),
 ) {
     val accents = LocalQuranAccents.current
     val folio = pageFolioLayout(page, script)
@@ -3748,10 +3771,10 @@ fun NextChapterFooter(
             horizontalAlignment = Alignment.CenterHorizontally,
             modifier = Modifier
                 .fillMaxWidth()
-                .height(50.dp)
+                .height(ScrollGrid.INVITE_HEAD)
                 .graphicsLayer { alpha = invite },
         ) {
-            Spacer(Modifier.height(20.dp))
+            Spacer(Modifier.height(ScrollGrid.INVITE_LABEL_TOP))
             Text(
                 text = "NEXT",
                 style = MaterialTheme.typography.labelSmall.copy(letterSpacing = 3.sp),
@@ -3785,10 +3808,10 @@ fun NextChapterFooter(
             horizontalAlignment = Alignment.CenterHorizontally,
             modifier = Modifier
                 .fillMaxWidth()
-                .height(82.dp)
+                .height(ScrollGrid.INVITE_FOOT)
                 .graphicsLayer { alpha = invite },
         ) {
-            Spacer(Modifier.height(22.dp))
+            Spacer(Modifier.height(ScrollGrid.INVITE_PILL_TOP))
             NextChapterOpenPill(
                 chapterName = nameTransliteration,
                 onClick = onOpen,
@@ -3856,7 +3879,7 @@ fun NextChapterOpenPill(
                 }
             }
             .quietClickable(enabled = enabled, role = Role.Button, onClick = onClick)
-            .padding(horizontal = 22.dp)
+            .padding(horizontal = ScrollGrid.PILL_INSET)
             .semantics {
                 contentDescription = label
                 role = Role.Button
@@ -3911,8 +3934,8 @@ fun PreviousChapterPullChrome(
         horizontalAlignment = Alignment.CenterHorizontally,
         modifier = modifier
             .fillMaxWidth()
-            .padding(horizontal = 24.dp)
-            .padding(top = 10.dp, bottom = 14.dp),
+            .padding(horizontal = ScrollGrid.MARGIN)
+            .padding(top = ScrollGrid.PULL_HEAD, bottom = ScrollGrid.PULL_FOOT),
     ) {
         Text(
             text = "PREVIOUS",
@@ -3920,13 +3943,13 @@ fun PreviousChapterPullChrome(
             fontSize = 10.sp,
             color = accents.gold.copy(alpha = 0.55f),
         )
-        Spacer(Modifier.height(6.dp))
+        Spacer(Modifier.height(ScrollGrid.PULL_LABEL_GAP))
         Text(
             text = nameTransliteration,
             style = MaterialTheme.typography.titleMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.85f),
         )
-        Spacer(Modifier.height(12.dp))
+        Spacer(Modifier.height(ScrollGrid.PULL_PILL_GAP))
         NextChapterOpenPill(
             chapterName = nameTransliteration,
             onClick = onOpen,
