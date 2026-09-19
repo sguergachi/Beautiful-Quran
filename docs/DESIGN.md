@@ -725,7 +725,14 @@ not the app's.
   or the timing/search identity of a word.
 - **Translations**: EB Garamond, 17 sp, 26 sp leading, at 66 % ink.
 - **UI text**: the same serif at small sizes with letterspacing and reduced
-  alpha; labels never compete with scripture. Nothing in the app is sans.
+  alpha; labels never compete with scripture. One deliberate exception on
+  Android: interactive UI labels that use Material's `labelLarge` — search
+  section labels, "Show N more", the search dial's Open, the chapter
+  Continue / Open pill — stay in Material's sans. Set against the serif page
+  they read as controls, not as text, and the pairing looked better than an
+  all-serif scale (tried and declined in #773). Everything that is read —
+  scripture, translation, names, facts, captions — stays serif. Do not "fix"
+  the sans slots back to Garamond.
   Settings rows and the Download manager share one scale: **17 / 26**
   bodyLarge for names, **12 / 16** labelSmall for facts and every verb
   (Download, Resume, Pause, Delete, Keep). Reciter verbs sit 16 dp
@@ -751,8 +758,8 @@ not the app's.
 - **One caps label** in the chapter view — NEXT, PREVIOUS and the top bar's
   chapter line: 10 sp EB Garamond, 0.22 em tracking. Lowercase is never tracked
   beyond 0.02 em.
-- **The Continue / Open pill** is set in the display face (Cormorant 16 sp,
-  500), as on web; its chevron's 1.6 dp stroke matches that face's stem.
+- **The Continue / Open pill** keeps Material's sans `labelLarge` (see UI
+  text above); its chevron's 1.6 dp stroke matches the label's stem weight.
 
 Reference points: **Unread** (iOS RSS reader) for chrome-free typographic
 lists and reading view; **Apple Music lyrics** for the word illumination and

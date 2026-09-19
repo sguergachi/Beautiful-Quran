@@ -137,7 +137,6 @@ import com.beautifulquran.ui.theme.ArabicTitleStyle
 import com.beautifulquran.ui.theme.ArabicWordStyle
 import com.beautifulquran.ui.theme.GeneratedChapterRosette
 import com.beautifulquran.ui.theme.GildedFlourish
-import com.beautifulquran.ui.theme.DisplayFontFamily
 import com.beautifulquran.ui.theme.HafsFontFamily
 import com.beautifulquran.ui.theme.IslamicBackToOriginCapsule
 import com.beautifulquran.ui.theme.LocalQuranAccents
@@ -3970,21 +3969,15 @@ fun NextChapterOpenPill(
     ) {
         Text(
             text = actionLabel,
-            // The display face, as the web pill sets it. labelLarge is not in
-            // the app's scale and fell through to Material's sans.
-            style = TextStyle(
-                fontFamily = DisplayFontFamily,
-                fontWeight = FontWeight.Medium,
-                fontSize = 16.sp,
-                // Lowercase takes almost no tracking; caps labels take 0.22 em.
-                letterSpacing = 0.02.em,
-            ),
+            // Material's sans on purpose: a UI verb in sans pairs with the
+            // serif page rather than posing as part of it (docs/DESIGN.md).
+            style = MaterialTheme.typography.labelLarge.copy(letterSpacing = 0.6.sp),
             color = contentColor,
         )
         Spacer(Modifier.width(8.dp))
         Canvas(Modifier.size(18.dp)) {
-            // Near the display face's stem, so the chevron is written in the
-            // same weight as the word it follows.
+            // Near the label's stem weight, so the chevron reads as part of
+            // the word it follows rather than heavier than it.
             val stroke = Stroke(
                 width = 1.6.dp.toPx(),
                 cap = StrokeCap.Round,
