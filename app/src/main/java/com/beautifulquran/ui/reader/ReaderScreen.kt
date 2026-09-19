@@ -1636,6 +1636,12 @@ fun ReaderScreen(
             // Once the opening header scrolls off, the surah name reappears
             // here between gilded flourishes. In search, the bar becomes the
             // search field with match navigation.
+            // In Scroll, the icons' ink stands on the text rules (ScrollGrid);
+            // the mushaf leaf keeps its own margins.
+            val topBarStartShift =
+                if (mushafMode) 0.dp else ScrollGrid.MARGIN - ScrollGrid.TOP_BAR_START_INK
+            val topBarEndShift =
+                if (mushafMode) 0.dp else ScrollGrid.MARGIN - ScrollGrid.TOP_BAR_END_INK
             CenterAlignedTopAppBar(
                 modifier = Modifier.graphicsLayer {
                     alpha = if (search.active) 1f else topBarAlpha.value
@@ -1730,6 +1736,9 @@ fun ReaderScreen(
                         IconButton(
                             onClick = { if (search.active) search.close() else onBack() },
                             enabled = search.active || !recitingActive,
+                            // Ink on the left text rule. Offset, not padding:
+                            // the title slot stays on the centre line.
+                            modifier = Modifier.offset(x = topBarStartShift),
                         ) {
                             Icon(
                                 imageVector = when {
@@ -1798,6 +1807,7 @@ fun ReaderScreen(
                             IconButton(
                                 onClick = { search.active = true },
                                 enabled = !recitingActive,
+                                modifier = Modifier.offset(x = -topBarEndShift),
                             ) {
                                 Icon(
                                     Icons.Rounded.Search,
@@ -1817,6 +1827,8 @@ fun ReaderScreen(
                         Box(
                             contentAlignment = Alignment.Center,
                             modifier = Modifier
+                                // Ink on the right text rule, with search.
+                                .offset(x = -topBarEndShift)
                                 .size(48.dp)
                                 .quietClickable(
                                     enabled = !recitingActive,
@@ -3268,10 +3280,8 @@ fun ReaderScreen(
                                 PageBreak(
                                     page = item.page,
                                     script = settings.pageNumberScript,
-                                    // The folio's rule spans the verse column,
-                                    // ribbon gutter included, not the paper.
+                                    // The folio's figures stand on the text rules.
                                     contentPadding = ScrollGrid.column(
-                                        bookmarkSide,
                                         top = if (
                                             settings.readingMode == ReadingMode.ENGLISH_ONLY
                                         ) {

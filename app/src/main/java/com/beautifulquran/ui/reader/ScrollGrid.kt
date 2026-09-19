@@ -3,7 +3,6 @@ package com.beautifulquran.ui.reader
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import com.beautifulquran.data.AyahSelectorSide
 
 /**
  * The Scroll reader's grid — the sheet's answer to [com.beautifulquran.domain.MushafGrid].
@@ -17,13 +16,21 @@ import com.beautifulquran.data.AyahSelectorSide
  * apart wherever two components met.
  *
  * ```
- *  horizontal                       vertical (paper between ink)
- *  28  margin: the outer lane,      56  verse to verse (Arabic)
- *      same as the Chapters index   48  verse to verse (English)
- *  38  ribbon gutter, owned by      40  basmalah to first verse
- *      [BookmarkStripWidth]         32  opening to basmalah
- *                                   12  voices within one verse
+ *  vertical rules (x)               vertical rhythm (paper between ink)
+ *  38  left rule  — Western text,   56  verse to verse (Arabic)
+ *      back arrow, Western folio    48  verse to verse (English)
+ *  ½   the axis — everything        40  basmalah to first verse
+ *      centred: opening, basmalah,  32  opening to basmalah
+ *      NEXT, pill, title, player    12  voices within one verse
+ *  38  right rule — Arabic, the
+ *      settings mark, Arabic folio
  * ```
+ *
+ * Three vertical rules and nothing else. The margins are equal because the
+ * sheet has one axis: the opening, the basmalah, the top title and the player
+ * are centred on the screen, so the text block must be too. With a 28 dp rail
+ * side against the ribbon's 38 the verses were centred 5 dp left of everything
+ * above and below them.
  *
  * Two figures are anchors, not steps: the ribbon gutter belongs to the ribbon
  * component (its cloth and the gather ordinal are measured inside it), and the
@@ -36,24 +43,30 @@ object ScrollGrid {
 
     // ── Horizontal ────────────────────────────────────────────────────────
 
-    /** The outer text lane — the same 28 as the Chapters index lane. */
-    val MARGIN: Dp = UNIT * 7
-
-    /** The bookmark side's lane: the ribbon strip is the authority. */
-    val RIBBON_GUTTER: Dp get() = BookmarkStripWidth
+    /**
+     * Both margins. The ribbon's strip is the authority on its side (its cloth
+     * and the gather ordinal live in it), and the rail side matches it so the
+     * text block is centred on the sheet's one axis. The rail and the ribbon
+     * sit in these margins; text never does.
+     */
+    val MARGIN: Dp get() = BookmarkStripWidth
 
     /**
-     * The verse column. Everything that reads as part of the text — verses,
-     * page folios — begins and ends on these two edges, so a page rule never
-     * reaches past the words it separates.
+     * The verse column: everything that reads as text — verses, translation,
+     * notes, page folios — begins and ends on the two rules.
      */
-    fun column(bookmarkSide: AyahSelectorSide?, top: Dp = 0.dp, bottom: Dp = 0.dp) =
-        PaddingValues(
-            start = if (bookmarkSide == AyahSelectorSide.LEFT) RIBBON_GUTTER else MARGIN,
-            end = if (bookmarkSide == AyahSelectorSide.RIGHT) RIBBON_GUTTER else MARGIN,
-            top = top,
-            bottom = bottom,
-        )
+    fun column(top: Dp = 0.dp, bottom: Dp = 0.dp) =
+        PaddingValues(start = MARGIN, end = MARGIN, top = top, bottom = bottom)
+
+    /**
+     * Where the top bar's icons put their ink, measured on device: the back
+     * arrow from the left edge (4 dp bar inset + 12 dp of its 48 dp button +
+     * the glyph's side bearing), the settings mark from the right (its button
+     * already nudged 4 dp outward). The Scroll reader shifts each group by the
+     * difference so its ink stands on the text rules.
+     */
+    val TOP_BAR_START_INK: Dp = 20.6.dp
+    val TOP_BAR_END_INK: Dp = 22.1.dp
 
     // ── Verse ─────────────────────────────────────────────────────────────
 

@@ -770,10 +770,19 @@ and pinch rescales all of them, so it hangs on a fixed 4 dp step instead:
 a whole number of steps, and components take their figures from the grid,
 not from local `dp` literals.
 
-- **Columns.** A 28 dp outer margin (the Chapters index lane) and, on the
-  bookmark side, the ribbon's own 38 dp gutter (`BookmarkStripWidth`). Verses
-  *and* page folios sit on this column, so a folio rule never runs past the
-  words it separates.
+- **Three vertical rules, one axis.** Equal 38 dp margins — the ribbon's own
+  strip (`BookmarkStripWidth`) on its side, matched on the rail side — so the
+  text block is centred on the same axis as everything centred on the sheet:
+  opening, basmalah, NEXT, the pill, the top title, the player. (A 28 dp rail
+  side once centred the verses 5 dp left of all of them.) Western ink starts on
+  the left rule — translation, English, the back arrow, the Western folio
+  figure; Arabic ink ends on the right rule — Hafs, the settings mark, the
+  Arabic folio figure. The rail and ribbon live in the margins; text never
+  does. Top-bar icons are *placed* onto the rules (offset, not padding), so the
+  title slot stays centred; the mushaf leaf keeps its own margins.
+- **Folio figures.** Garamond *lining* figures (old-style 3, 4, 5, 7, 9 hang
+  below a rule) and Hafs Arabic-Indic at 14 sp, level with them; the rule runs
+  through both figures' ink centre.
 - **Verse rhythm.** 16 dp pad inside each verse, 12 dp between voices within
   it (Arabic, translation, note), 56 dp verse-to-verse (48 in English-only).
 - **Opening.** 40 dp head, 32 dp foot; opening to basmalah 32, basmalah to the

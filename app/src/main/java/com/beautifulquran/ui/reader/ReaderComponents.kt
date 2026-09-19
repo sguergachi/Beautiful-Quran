@@ -3103,7 +3103,6 @@ fun AyahBlock(
                     // Extra room on the bookmark ribbon's side so its tip
                     // doesn't crowd the verse text.
                     ScrollGrid.column(
-                        bookmarkSide,
                         top = ScrollGrid.VERSE_PAD,
                         bottom = ScrollGrid.VERSE_PAD,
                     ),
@@ -3721,25 +3720,55 @@ fun OrnateSurahTitle(
  * figures at opposite ends of a thin gold line. A single script centres that
  * figure between equal rules.
  */
+/**
+ * The folio's Western figures: EB Garamond *lining* figures. The book face
+ * defaults to old-style, whose 3, 4, 5, 7 and 9 hang below the baseline — right
+ * in prose, wrong beside a rule, where a figure must stand level with its
+ * partner across the page.
+ */
+@Composable
+private fun folioWesternStyle(): TextStyle = MaterialTheme.typography.labelSmall.copy(
+    fontSize = FOLIO_WESTERN_SIZE,
+    fontFeatureSettings = "'lnum' 1",
+)
+
+/**
+ * The folio's Arabic-Indic figures, in Hafs like every other Arabic numeral on
+ * the sheet (the verse marks). They used to ask for `FontFamily.Serif`, which
+ * has no Arabic, so the system's fallback set them in a third hand.
+ */
+@Composable
+private fun folioArabicStyle(): TextStyle = TextStyle(
+    fontFamily = HafsFontFamily,
+    fontSize = FOLIO_ARABIC_SIZE,
+    lineHeight = FOLIO_ARABIC_SIZE,
+    platformStyle = PlatformTextStyle(includeFontPadding = false),
+)
+
+private val FOLIO_WESTERN_SIZE = 12.sp
+
+/**
+ * Hafs' Arabic-Indic figures ink shorter than Garamond's lining ones: at the
+ * same 12 sp, ٣ stood 5.8 dp against 3's 7.6. 14 sp brings it to ~6.8 dp — a
+ * pair across the rule, with the Arabic figure keeping its own proportion.
+ */
+private val FOLIO_ARABIC_SIZE = 14.sp
+
 @Composable
 fun PageBreak(
     page: Int,
     script: PageNumberScript = PageNumberScript.BOTH,
     contentPadding: PaddingValues = ScrollGrid.column(
-        bookmarkSide = null,
         top = ScrollGrid.FOLIO_HEAD,
         bottom = ScrollGrid.FOLIO_FOOT,
     ),
 ) {
     val accents = LocalQuranAccents.current
     val folio = pageFolioLayout(page, script)
-    val pageNumberSize = 12.sp
     val pageNumberColor = accents.gold.copy(alpha = 0.68f)
-    val singleStyle = if (script == PageNumberScript.ARABIC) {
-        MaterialTheme.typography.labelSmall.copy(fontFamily = FontFamily.Serif)
-    } else {
-        MaterialTheme.typography.labelSmall
-    }
+    val westernStyle = folioWesternStyle()
+    val arabicStyle = folioArabicStyle()
+    val singleStyle = if (script == PageNumberScript.ARABIC) arabicStyle else westernStyle
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -3761,8 +3790,7 @@ fun PageBreak(
             }
             Text(
                 text = folio.leading,
-                style = if (folio.centered) singleStyle else MaterialTheme.typography.labelSmall,
-                fontSize = pageNumberSize,
+                style = if (folio.centered) singleStyle else westernStyle,
                 color = pageNumberColor,
                 modifier = Modifier.wrapContentHeight(unbounded = true),
             )
@@ -3776,13 +3804,7 @@ fun PageBreak(
                 Spacer(Modifier.width(8.dp))
                 Text(
                     text = folio.trailing,
-                    // Keep the Arabic-Indic digits at the same 12sp as the Western
-                    // numeral, but ask for a serif fallback so they stay in the
-                    // same family class as the EB Garamond label.
-                    style = MaterialTheme.typography.labelSmall.copy(
-                        fontFamily = FontFamily.Serif,
-                    ),
-                    fontSize = pageNumberSize,
+                    style = arabicStyle,
                     color = pageNumberColor,
                     modifier = Modifier.wrapContentHeight(unbounded = true),
                 )
