@@ -27,6 +27,7 @@ import androidx.compose.ui.graphics.Paint
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
 import androidx.compose.ui.unit.dp
+import com.beautifulquran.ui.PageTurnSounds
 import com.beautifulquran.ui.theme.LocalNuqtaParams
 import com.beautifulquran.ui.theme.NuqtaParams
 import com.beautifulquran.ui.theme.drawInkWashCoats
@@ -47,12 +48,20 @@ import kotlinx.coroutines.launch
 val LocalReaderApproach = staticCompositionLocalOf<() -> Float> { { 0f } }
 
 /**
+ * How long the page-turn's current sweep spike lasts, in ms. The continue
+ * row's wipe ends with that spike, not with the stem's quiet tail.
+ */
+val LocalSweepSpikeMs = staticCompositionLocalOf<() -> Int> {
+    { PageTurnSounds.FLIPS[1].sweepSpikeEndMs }
+}
+
+/**
  * Ink that floods the continue row the moment the chapter list starts to turn
  * into the reader it continues. The wash plays out on its own clock whatever
- * the drag does. It stays wet under the reader, and whenever the chapter list
- * settles again — a turn let go short, or a return from the reader — it wipes
- * back out of the row toward where it landed. The ink stays dense as it
- * withdraws, so every word is plainly on ink or on paper, never half-way.
+ * the drag does. It stays wet under the reader. Returning, it stays wet
+ * through the lift and wipes with the sweep, ending when that stem's volume
+ * spike ends. A turn let go short wipes the same way. The ink stays dense as
+ * it withdraws, so every word is plainly on ink or on paper, never half-way.
  */
 @Stable
 internal class ContinueInk(val params: NuqtaParams) {
@@ -106,7 +115,9 @@ internal fun rememberContinueInk(): ContinueInk {
     val params = LocalNuqtaParams.current
     val ink = remember(params) { ContinueInk(params) }
     val approach = LocalReaderApproach.current
-    LaunchedEffect(ink, approach) {
+    val sweepSpikeMs = LocalSweepSpikeMs.current
+    LaunchedEffect(ink, approach, sweepSpikeMs) {
+        var fromReader = false
         snapshotFlow {
             val p = approach()
             when {
@@ -117,34 +128,55 @@ internal fun rememberContinueInk(): ContinueInk {
         }.distinctUntilChanged().collectLatest { turn ->
             when (turn) {
                 ContinueTurn.Turning -> coroutineScope {
-                    // The wash plays out on its own clock. Turned again
-                    // mid-wipe, the wipe runs back from where it stands, as
-                    // fast as it came, while the flood carries on — every
-                    // interruption picks up the ink exactly as it is.
-                    launch {
-                        ink.dry.animateTo(
-                            0f,
-                            tween((ContinueInkDryMs * ink.dry.value).roundToInt(), easing = ContinueInkRewetEasing),
-                        )
+                    if (fromReader && !ink.tapped) {
+                        // Stay wet through the lift. The wipe starts with the
+                        // sweep stem and runs only as long as that stem's
+                        // volume spike, so it ends when the whoosh does.
+                        snapshotFlow { approach() <= 1f - PageTurnSounds.SWEEP_AT }
+                            .distinctUntilChanged()
+                            .collectLatest { sweeping ->
+                                if (sweeping) {
+                                    wipeContinueInk(ink, sweepSpikeMs())
+                                } else if (ink.dry.value > 0f) {
+                                    ink.dry.animateTo(
+                                        0f,
+                                        tween(
+                                            (sweepSpikeMs() * ink.dry.value).roundToInt(),
+                                            easing = ContinueInkRewetEasing,
+                                        ),
+                                    )
+                                }
+                            }
+                    } else {
+                        fromReader = false
+                        // The wash plays out on its own clock. Turned again
+                        // mid-wipe, the wipe runs back from where it stands, as
+                        // fast as it came, while the flood carries on — every
+                        // interruption picks up the ink exactly as it is.
+                        launch {
+                            ink.dry.animateTo(
+                                0f,
+                                tween(
+                                    (sweepSpikeMs() * ink.dry.value).roundToInt(),
+                                    easing = ContinueInkRewetEasing,
+                                ),
+                            )
+                        }
+                        ink.flood()
                     }
-                    ink.flood()
                 }
                 ContinueTurn.Landed -> {
                     // Under the reader the row stays wet, so turning back
-                    // uncovers it inked and it dries as the list settles.
+                    // uncovers it inked and it dries with the sweep.
                     ink.tapped = false
+                    fromReader = true
                     ink.fill()
                     ink.dry.snapTo(0f)
                 }
                 ContinueTurn.Resting -> {
+                    fromReader = false
                     if (ink.spread > 0f) {
-                        // A wipe interrupted and resumed covers only what is
-                        // left of it, in its share of the time.
-                        val wipeEasing = if (ink.dry.value > 0f) ContinueInkRewetEasing else ContinueInkWipeEasing
-                        ink.dry.animateTo(
-                            1f,
-                            tween((ContinueInkDryMs * (1f - ink.dry.value)).roundToInt(), easing = wipeEasing),
-                        )
+                        wipeContinueInk(ink, sweepSpikeMs())
                         ink.clear()
                         ink.dry.snapTo(0f)
                     }
@@ -154,6 +186,20 @@ internal fun rememberContinueInk(): ContinueInk {
     }
     return ink
 }
+
+private suspend fun wipeContinueInk(ink: ContinueInk, spikeMs: Int) {
+    // A wipe interrupted and resumed covers only what is left of it, in
+    // its share of the time — ending with the spike, not after it.
+    val wipeEasing = if (ink.dry.value > 0f) ContinueInkRewetEasing else ContinueInkWipeEasing
+    ink.dry.animateTo(
+        1f,
+        tween(continueWipeMs(spikeMs, ink.dry.value), easing = wipeEasing),
+    )
+}
+
+/** Remaining wipe, so a resumed dry still ends with the spike. */
+internal fun continueWipeMs(spikeMs: Int, dry: Float): Int =
+    (spikeMs * (1f - dry)).roundToInt().coerceAtLeast(0)
 
 /** The wash itself, drawn behind the row, landing at its right (Arabic) end. */
 internal fun Modifier.continueInkWash(ink: ContinueInk, color: Color): Modifier =
@@ -226,9 +272,6 @@ private const val ContinueTurnEpsilon = 0.001f
 
 /** The most a single frame may advance the wash's clock. */
 private const val ContinueInkMaxFrameMs = 20f
-
-/** The wash wipes back out of the row over this long — the page-turn sweep. */
-private const val ContinueInkDryMs = 460
 
 /** The wipe gathers, crosses the words briskly, and settles into the Arabic end. */
 private val ContinueInkWipeEasing = CubicBezierEasing(0.4f, 0f, 0.2f, 1f)

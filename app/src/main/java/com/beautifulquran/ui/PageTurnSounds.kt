@@ -17,6 +17,12 @@ data class PageTurnFlip(
     val liftRes: Int,
     val sweepRes: Int,
     val dropRes: Int,
+    /**
+     * When the sweep stem's volume spike is over (ms from the stem's start):
+     * last time an 8 ms peak-hold envelope sits at 20 % of its peak. The
+     * quiet tail after that is not the whoosh.
+     */
+    val sweepSpikeEndMs: Int,
 )
 
 /**
@@ -169,6 +175,15 @@ class PageTurnSounds(context: Context) {
     }
 
     /**
+     * How long the active flip's sweep spike lasts at the current turn rate —
+     * the continue row's wipe ends with this, not with the stem's quiet tail.
+     */
+    fun sweepSpikeMs(): Int {
+        val flip = activeFlip ?: FLIPS.getOrNull(lastFlipIndex) ?: FLIPS[1]
+        return (flip.sweepSpikeEndMs / turnRate).roundToInt().coerceAtLeast(1)
+    }
+
+    /**
      * One whole flip paced for the entrance cover's slow hinge open (~1.1 s):
      * lift as the board leaves the page block, sweep through the arc, drop as
      * it settles flat. Fired once by the entrance, not scrubbed like the stack.
@@ -200,13 +215,13 @@ class PageTurnSounds(context: Context) {
         private const val COVER_OPEN_RATE = 0.92f
         private const val START_EPS = 0.03f
         private const val SETTLE_EPS = 0.03f
-        private const val SWEEP_AT = 0.42f
+        internal const val SWEEP_AT = 0.42f
         private const val DROP_AT = 0.88f
 
         val FLIPS = listOf(
-            PageTurnFlip("Flip 2 (crisp)", R.raw.flip2_lift, R.raw.flip2_sweep, R.raw.flip2_drop),
-            PageTurnFlip("Flip 8 (busy)", R.raw.flip8_lift, R.raw.flip8_sweep, R.raw.flip8_drop),
-            PageTurnFlip("Flip 9 (soft sweep)", R.raw.flip9_lift, R.raw.flip9_sweep, R.raw.flip9_drop),
+            PageTurnFlip("Flip 2 (crisp)", R.raw.flip2_lift, R.raw.flip2_sweep, R.raw.flip2_drop, 148),
+            PageTurnFlip("Flip 8 (busy)", R.raw.flip8_lift, R.raw.flip8_sweep, R.raw.flip8_drop, 237),
+            PageTurnFlip("Flip 9 (soft sweep)", R.raw.flip9_lift, R.raw.flip9_sweep, R.raw.flip9_drop, 200),
         )
     }
 }
