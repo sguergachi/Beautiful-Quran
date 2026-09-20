@@ -30,4 +30,24 @@ class ContinueInkTest {
         assertEquals(106, continueWipeMs(dry = 0.5f))
         assertEquals(0, continueWipeMs(dry = 1f))
     }
+
+    @Test
+    fun `only Continue tap floods the row`() {
+        assertEquals(true, continueInkShouldFlood(tapped = true, fromReader = false))
+        assertEquals(false, continueInkShouldFlood(tapped = false, fromReader = false))
+        assertEquals(false, continueInkShouldFlood(tapped = true, fromReader = true))
+    }
+
+    @Test
+    fun `a return wipe only runs after a Continue-owned reader`() {
+        assertEquals(true, continueInkShouldWipe(tapped = false, fromReader = true))
+        assertEquals(false, continueInkShouldWipe(tapped = false, fromReader = false))
+    }
+
+    @Test
+    fun `opening another chapter does not keep the row wet under the reader`() {
+        assertEquals(false, continueInkShouldFill(tapped = false, spread = 0f))
+        assertEquals(true, continueInkShouldFill(tapped = true, spread = 0f))
+        assertEquals(true, continueInkShouldFill(tapped = false, spread = 1f))
+    }
 }

@@ -48,13 +48,13 @@ import kotlinx.coroutines.launch
 val LocalReaderApproach = staticCompositionLocalOf<() -> Float> { { 0f } }
 
 /**
- * Ink that floods the continue row the moment the chapter list starts to turn
- * into the reader it continues. The wash plays out on its own clock whatever
- * the drag does. It stays wet under the reader. Returning, it stays wet
- * through the lift and the wipe is scrubbed by the same swipe that plays the
- * stems: it starts with the sweep and finishes the frame the drop — the
- * ending of the sound — begins. A turn let go short wipes the leftover. The
- * ink stays dense as it withdraws, so every word is plainly on ink or on
+ * Ink that floods the continue row when Continue is chosen — a tap, not
+ * opening some other chapter from the list. The wash plays out on its own
+ * clock whatever the drag does. It stays wet under the reader. Returning, it
+ * stays wet through the lift and the wipe is scrubbed by the same swipe that
+ * plays the stems: it starts with the sweep and finishes the frame the drop
+ * — the ending of the sound — begins. A turn let go short wipes the leftover.
+ * The ink stays dense as it withdraws, so every word is plainly on ink or on
  * paper, never half-way.
  */
 @Stable
@@ -121,13 +121,13 @@ internal fun rememberContinueInk(): ContinueInk {
         }.distinctUntilChanged().collectLatest { turn ->
             when (turn) {
                 ContinueTurn.Turning -> coroutineScope {
-                    if (fromReader && !ink.tapped) {
+                    if (continueInkShouldWipe(tapped = ink.tapped, fromReader = fromReader)) {
                         // Same clock as the stems: wet through the lift,
                         // wipe through the sweep, gone the frame the drop
                         // (the ending) starts.
                         snapshotFlow { continueWipeProgress(1f - approach()) }
                             .collect { ink.dry.snapTo(it) }
-                    } else {
+                    } else if (continueInkShouldFlood(tapped = ink.tapped, fromReader = fromReader)) {
                         fromReader = false
                         // The wash plays out on its own clock. Turned again
                         // mid-wipe, the wipe runs back from where it stands, as
@@ -144,14 +144,20 @@ internal fun rememberContinueInk(): ContinueInk {
                         }
                         ink.flood()
                     }
+                    // A chapter opened from the list is not Continue: leave the row dry.
                 }
                 ContinueTurn.Landed -> {
-                    // Under the reader the row stays wet, so turning back
-                    // uncovers it inked and it dries with the sweep.
+                    val owned = continueInkShouldFill(tapped = ink.tapped, spread = ink.spread)
                     ink.tapped = false
-                    fromReader = true
-                    ink.fill()
-                    ink.dry.snapTo(0f)
+                    if (owned) {
+                        // Under the reader the row stays wet, so turning back
+                        // uncovers it inked and it dries with the sweep.
+                        fromReader = true
+                        ink.fill()
+                        ink.dry.snapTo(0f)
+                    } else {
+                        fromReader = false
+                    }
                 }
                 ContinueTurn.Resting -> {
                     fromReader = false
@@ -173,6 +179,18 @@ internal fun rememberContinueInk(): ContinueInk {
     }
     return ink
 }
+
+/** Continue was chosen: flood the row. Opening another chapter does not. */
+internal fun continueInkShouldFlood(tapped: Boolean, fromReader: Boolean): Boolean =
+    tapped && !fromReader
+
+/** Returning from a Continue-owned reader: wipe with the page-turn drop. */
+internal fun continueInkShouldWipe(tapped: Boolean, fromReader: Boolean): Boolean =
+    fromReader && !tapped
+
+/** Landed on a Continue-owned reader: keep the row wet underneath. */
+internal fun continueInkShouldFill(tapped: Boolean, spread: Float): Boolean =
+    tapped || spread > 0f
 
 /**
  * How far the continue row has wiped for a return swipe of [turnProgress]
