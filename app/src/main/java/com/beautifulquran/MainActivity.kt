@@ -86,7 +86,6 @@ import com.beautifulquran.ui.home.FloatingPlaybackListClearance
 import com.beautifulquran.ui.home.HomeScreen
 import com.beautifulquran.ui.home.HomeViewModel
 import com.beautifulquran.ui.home.LocalReaderApproach
-import com.beautifulquran.ui.home.LocalSweepSpikeMs
 import com.beautifulquran.ui.reader.BackToOriginPill
 import com.beautifulquran.ui.reader.ReaderPlaybackSnapshot
 import com.beautifulquran.ui.reader.ReaderScreen
@@ -622,7 +621,6 @@ private fun PaperStackApp(
 
     val context = LocalContext.current
     val pageTurnSounds = remember { PageTurnSounds(context) }
-    val sweepSpikeMs = remember(pageTurnSounds) { { pageTurnSounds.sweepSpikeMs() } }
     DisposableEffect(pageTurnSounds) {
         onDispose { pageTurnSounds.release() }
     }
@@ -1214,7 +1212,6 @@ private fun PaperStackApp(
                     SettingsApproachAtRest
                 },
                 LocalReaderApproach provides readerApproach,
-                LocalSweepSpikeMs provides sweepSpikeMs,
             ) {
                 HomeScreen(
                     viewModel = homeViewModel,

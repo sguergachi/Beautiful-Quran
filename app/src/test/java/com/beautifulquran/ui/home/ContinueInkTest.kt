@@ -2,35 +2,32 @@ package com.beautifulquran.ui.home
 
 import com.beautifulquran.ui.PageTurnSounds
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class ContinueInkTest {
 
     @Test
-    fun `a full wipe lasts the sweep spike`() {
-        assertEquals(237, continueWipeMs(spikeMs = 237, dry = 0f))
+    fun `wipe stays wet through the lift`() {
+        assertEquals(0f, continueWipeProgress(0f))
+        assertEquals(0f, continueWipeProgress(PageTurnSounds.SWEEP_AT))
     }
 
     @Test
-    fun `a resumed wipe covers only what is left`() {
-        assertEquals(100, continueWipeMs(spikeMs = 200, dry = 0.5f))
-        assertEquals(0, continueWipeMs(spikeMs = 237, dry = 1f))
+    fun `wipe finishes the frame the drop — the ending — begins`() {
+        assertEquals(1f, continueWipeProgress(PageTurnSounds.DROP_AT))
+        assertEquals(1f, continueWipeProgress(1f))
     }
 
     @Test
-    fun `sweep spike ends are the whoosh, not the quiet tail`() {
-        val ends = PageTurnSounds.FLIPS.map { it.name to it.sweepSpikeEndMs }
-        assertEquals(
-            listOf(
-                "Flip 2 (crisp)" to 148,
-                "Flip 8 (busy)" to 237,
-                "Flip 9 (soft sweep)" to 200,
-            ),
-            ends,
-        )
-        ends.forEach { (_, ms) ->
-            assertTrue("$ms ms spike is shorter than the 460 ms stem tail", ms < 460)
-        }
+    fun `wipe is half done midway from sweep to drop`() {
+        val mid = (PageTurnSounds.SWEEP_AT + PageTurnSounds.DROP_AT) / 2f
+        assertEquals(0.5f, continueWipeProgress(mid), 0.0001f)
+    }
+
+    @Test
+    fun `a leftover wipe covers only what is left`() {
+        assertEquals(212, continueWipeMs(dry = 0f))
+        assertEquals(106, continueWipeMs(dry = 0.5f))
+        assertEquals(0, continueWipeMs(dry = 1f))
     }
 }
