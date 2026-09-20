@@ -155,6 +155,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlin.math.abs
+import com.beautifulquran.ui.theme.QuranTheme
 
 /** Paused highlight polling is 250 ms; leave one scheduling beat for a fresh sample. */
 private const val HELD_WORD_REFRESH_MS = 300L
@@ -1769,7 +1770,7 @@ fun ReaderScreen(
                                 "${currentMatch + 1}/${searchMatches.size}"
                             },
                             style = MaterialTheme.typography.labelMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+                            color = QuranTheme.ink.muted,
                         )
                         IconButton(
                             onClick = {
@@ -1812,7 +1813,7 @@ fun ReaderScreen(
                                 Icon(
                                     Icons.Rounded.Search,
                                     contentDescription = "Search in surah",
-                                    tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.55f),
+                                    tint = QuranTheme.ink.quiet,
                                     modifier = Modifier
                                         .offset(x = 4.dp)
                                         .size(26.dp),
@@ -1842,7 +1843,7 @@ fun ReaderScreen(
                             SettingsNuqtaIcon(
                                 state = settingsNuqta,
                                 contentDescription = "Settings",
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.55f),
+                                tint = QuranTheme.ink.quiet,
                                 modifier = Modifier.offset(x = (-4).dp),
                             )
                         }
@@ -1866,7 +1867,7 @@ fun ReaderScreen(
                     Text(
                         text = playerState.error.orEmpty(),
                         style = MaterialTheme.typography.labelMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+                        color = QuranTheme.ink.muted,
                         textAlign = TextAlign.Center,
                         modifier = Modifier
                             .fillMaxWidth()

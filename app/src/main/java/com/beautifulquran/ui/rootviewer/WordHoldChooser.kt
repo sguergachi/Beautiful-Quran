@@ -16,6 +16,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.beautifulquran.ui.theme.quietClickable
+import com.beautifulquran.ui.theme.QuranTheme
 
 /**
  * Developer-mode ink-bleed chooser: three quiet lines, no Material dialog.
@@ -46,7 +47,7 @@ fun WordHoldChooser(
             Text(
                 text = "Open",
                 style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.45f),
+                color = QuranTheme.ink.muted,
             )
             Spacer(Modifier.height(28.dp))
             Text(
@@ -64,7 +65,7 @@ fun WordHoldChooser(
                 text = "Timings Lab",
                 style = MaterialTheme.typography.headlineMedium,
                 textAlign = TextAlign.Center,
-                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.85f),
+                color = QuranTheme.ink.strong,
                 modifier = Modifier
                     .fillMaxWidth()
                     .quietClickable(onClick = onOpenTimingsLab)
@@ -75,7 +76,7 @@ fun WordHoldChooser(
                 text = "Tarjīʿ Lab",
                 style = MaterialTheme.typography.headlineMedium,
                 textAlign = TextAlign.Center,
-                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.85f),
+                color = QuranTheme.ink.strong,
                 modifier = Modifier
                     .fillMaxWidth()
                     .quietClickable(onClick = onOpenTarjiLab)
@@ -85,7 +86,7 @@ fun WordHoldChooser(
             Text(
                 text = "Not now",
                 style = MaterialTheme.typography.bodyLarge,
-                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f),
+                color = QuranTheme.ink.quiet,
                 modifier = Modifier
                     .quietClickable(onClick = onDismiss)
                     .padding(vertical = 8.dp),

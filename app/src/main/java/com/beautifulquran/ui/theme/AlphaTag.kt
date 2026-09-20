@@ -22,7 +22,7 @@ fun AlphaTag(modifier: Modifier = Modifier) {
         text = stringResource(R.string.alpha_tag).uppercase(),
         style = MaterialTheme.typography.labelSmall,
         letterSpacing = 2.sp,
-        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.45f),
+        color = QuranTheme.ink.muted,
         modifier = modifier.semantics { contentDescription = description },
     )
 }

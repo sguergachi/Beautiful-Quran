@@ -84,6 +84,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
+import com.beautifulquran.ui.theme.QuranTheme
 
 private sealed class Pending {
     data object DeleteAll : Pending()
@@ -229,7 +230,7 @@ internal fun DownloadManagerPage(
                             Text(
                                 text = "Delete all downloads?",
                                 style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.72f),
+                                color = QuranTheme.ink.muted,
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis,
                                 modifier = Modifier.weight(1f, fill = false),
@@ -525,7 +526,7 @@ private fun ReciterHeader(
                 Text(
                     text = subtitle,
                     style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.55f),
+                    color = QuranTheme.ink.quiet,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                     modifier = Modifier.weight(1f, fill = false),
@@ -577,7 +578,7 @@ private fun FactActionRow(
         Text(
             text = fact,
             style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.55f),
+            color = QuranTheme.ink.quiet,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
             modifier = Modifier.weight(1f, fill = false),
@@ -660,7 +661,7 @@ private fun ActionWord(
         color = if (fetch) {
             MaterialTheme.colorScheme.primary
         } else {
-            MaterialTheme.colorScheme.onSurface.copy(alpha = 0.78f)
+            QuranTheme.ink.body
         },
         maxLines = 1,
         modifier = modifier
@@ -734,7 +735,7 @@ private fun ChapterRow(
                 color = if (downloading || paused || row.complete) {
                     progressInk
                 } else {
-                    MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.55f)
+                    QuranTheme.ink.quiet
                 },
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,

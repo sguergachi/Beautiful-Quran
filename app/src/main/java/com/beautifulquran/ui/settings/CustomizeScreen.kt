@@ -115,6 +115,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import com.beautifulquran.ui.theme.shippedCheckParams
 import com.beautifulquran.ui.theme.verticalFadingEdges
+import com.beautifulquran.ui.theme.QuranTheme
 
 // A control joining or leaving the sheet. The paper opens the room first and
 // the ink arrives into it; on the way out the ink goes first and the paper
@@ -552,7 +553,7 @@ internal fun ReadingPreview(
                                 fontFamily = TranslationFontFamily,
                                 fontSize = PreviewLyricSize * 13f / 18f,
                                 lineHeight = 1.4.em,
-                                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
+                                color = QuranTheme.ink.tertiary,
                             )
                         }
                         if (showTranslation) {
@@ -724,7 +725,7 @@ private fun PreviewEnglishMushafLeaf(
     modifier: Modifier,
 ) {
     val gold = LocalQuranAccents.current.gold
-    val ink = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.88f)
+    val ink = QuranTheme.ink.strong
     val text = buildAnnotatedString {
         listOf(
             SAMPLE_ENGLISH_LEAF_1 to PreviewMushafAyahFirst,
@@ -787,7 +788,7 @@ private fun PreviewEnglishMushafLeaf(
  */
 @Composable
 private fun PreviewLeafRunningHead() {
-    val ink = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.44f)
+    val ink = QuranTheme.ink.muted
     val style = MaterialTheme.typography.labelSmall.copy(
         fontSize = PreviewLeafHeadSize,
         letterSpacing = 0.10.em,
@@ -1009,7 +1010,7 @@ private fun PreviewEnglishLyric(
     arabicMarks: Boolean,
 ) {
     val gold = LocalQuranAccents.current.gold
-    val ink = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.88f)
+    val ink = QuranTheme.ink.strong
     val text = buildAnnotatedString {
         withStyle(SpanStyle(color = ink)) { append(verse) }
         append(" ")
@@ -1102,7 +1103,7 @@ private fun PreviewTranslation() {
         fontFamily = TranslationFontFamily,
         fontSize = PreviewTranslationSize,
         lineHeight = 21.sp,
-        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.66f),
+        color = QuranTheme.ink.secondary,
     )
 }
 

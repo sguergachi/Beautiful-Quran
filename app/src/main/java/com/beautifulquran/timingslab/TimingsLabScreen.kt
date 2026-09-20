@@ -90,6 +90,7 @@ import com.beautifulquran.ui.theme.quietClickable
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlin.math.roundToLong
+import com.beautifulquran.ui.theme.QuranTheme
 
 /** Milliseconds the slide bar covers across its full width while adjusting —
  * fixed, so control feels consistent; small moves give fine (~ms) control and
@@ -580,9 +581,9 @@ private fun EditTimeline(
 ) {
     val duration = ui.durationMs.coerceAtLeast(1L)
     val repeats = remember(ui.passes) { repeatFlags(ui.passes) }
-    val trackColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.18f)
-    val playheadColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.75f)
-    val guideColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.25f)
+    val trackColor = QuranTheme.ink.wash
+    val playheadColor = QuranTheme.ink.body
+    val guideColor = QuranTheme.ink.hairline
 
     // Window the view: full ayah at zoom 0, tightening around the selected
     // marker as zoom rises. Kept as floats; the Canvas maps time→x through it.
@@ -808,7 +809,7 @@ private fun HintLine(ui: TimingsLabUiState, accents: QuranAccents) {
         color = if (ui.mode == LabMode.RECORD) {
             accents.repeatInk.copy(alpha = 0.85f)
         } else {
-            MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.55f)
+            QuranTheme.ink.quiet
         },
         textAlign = TextAlign.Center,
         modifier = Modifier
@@ -842,7 +843,7 @@ private fun SubmitRibbon(
                 else -> "${ui.overrideCount} ayah${if (ui.overrideCount == 1) "" else "s"} corrected on this device"
             },
             style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+            color = QuranTheme.ink.muted,
         )
         Spacer(Modifier.size(10.dp))
         if (ui.isOverridden) {

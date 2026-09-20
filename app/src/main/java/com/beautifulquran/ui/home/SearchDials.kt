@@ -49,6 +49,7 @@ import com.beautifulquran.ui.theme.LocalQuranAccents
 import com.beautifulquran.ui.theme.quietClickable
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlin.math.abs
+import com.beautifulquran.ui.theme.QuranTheme
 
 /** Dark ink for text sitting on the flat gold Open button — readable on both light and dark gold. */
 private val OnGold = Color(0xFF241B00)
@@ -189,7 +190,7 @@ private fun WheelLabel(text: String) {
     Text(
         text = text,
         style = MaterialTheme.typography.labelMedium,
-        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+        color = QuranTheme.ink.muted,
     )
 }
 
@@ -209,7 +210,7 @@ private fun SurahItem(surah: Surah, selected: Boolean) {
             Text(
                 text = surah.id.toString(),
                 style = MaterialTheme.typography.labelMedium,
-                color = accents.gold.copy(alpha = if (selected) 0.95f else 0.6f),
+                color = if (selected) accents.goldInk else QuranTheme.ink.quiet,
             )
         }
         Spacer(Modifier.width(SurahNameGap))
@@ -219,7 +220,7 @@ private fun SurahItem(surah: Surah, selected: Boolean) {
             color = if (selected) {
                 MaterialTheme.colorScheme.onSurface
             } else {
-                MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+                QuranTheme.ink.muted
             },
             fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
             maxLines = 1,
@@ -249,7 +250,7 @@ private fun NumberItem(value: Int, selected: Boolean) {
             color = if (selected) {
                 MaterialTheme.colorScheme.primary
             } else {
-                MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+                QuranTheme.ink.muted
             },
             fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
         )

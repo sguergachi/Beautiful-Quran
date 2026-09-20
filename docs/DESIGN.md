@@ -46,24 +46,43 @@ by as much as the figure rises.
 block's own margin. Three different edges on one leaf is the loudest
 typographic fault the page can carry.
 
-**Rank by role, not by taste.** The revelation is the darkest thing on the
-page (~15:1 against the paper). Back / play / forward carry real ink (~4.7:1)
-because they are what a listener reaches for; chapters, settings, repeat and
-speed recede (~2.1:1) because they choose what to hear rather than hear it —
-and while a chapter recites they leave the transport altogether. Running head
-and folio are quiet ink (~3–3.5:1), never gold: gold loses contrast on cream,
-and at 9 sp a gold folio disappears.
+**Rank by role, not by taste.** Weight says what a thing is for, so the app
+keeps one ladder of ink weights (`QuranInk`) and everything hangs off a rung of
+it. The revelation is `scripture`, the darkest mark on the page. Back / play /
+forward carry real ink (`secondary`) because they are what a listener reaches
+for; chapters, settings, repeat and speed recede (`quiet`) because they choose
+what to hear rather than hear it — and while a chapter recites they leave the
+transport altogether. Running head and folio are `quiet` too, never gold: at
+9 sp a gold folio disappears, and gold that must carry a word uses `goldInk`
+rather than being faded until it cannot be read.
+
+The rungs are set in **APCA** lightness contrast, not a WCAG ratio, and each
+one's alpha is solved separately for every theme. This is not pedantry: a WCAG
+ratio scores both polarities the same, so it will happily call a night page and
+a paper page equal when the night one is visibly weaker — which is exactly what
+had happened. `quiet` metadata written as one alpha read at Lc 41 on cream and
+Lc 16 at night, a third of the weight, and below the point where type is
+legible at all. `ColorSystemTest` holds every rung to its target.
+
+`furniture` and below are rules, grounds and icon strokes. They sit under the
+floor where type stays readable, so a label must never be set in them.
 
 **Gold is illumination, ink is furniture.** On the leaf gold means the ayah
 marks, a chapter's name in its ʿunwān panel, and that panel's rules and
 shamsas. The running head and folio are wayfinding, so they are ink in both
 themes.
 
-Gold does not carry one weight across both leaves: it gains contrast on
-Nightfall's near-black and loses it on cream, so anything drawn faintly in
-gold — the panel's tooled ground above all — is weighed against the paper it
-sits on rather than given a single alpha (`paper.luminance()`). Ink needs no
-such correction; that is the other reason furniture is ink.
+Gold is solved per theme so that it illuminates with the same strength on
+cream as on Nightfall's near-black — left to one value it loses a quarter of its
+presence on paper and gains it back at night. Anything drawn faintly in gold —
+the panel's tooled ground above all — is still weighed against the paper it sits
+on rather than given a single alpha (`paper.luminance()`), because a wash of
+gold is a fraction of a colour that is itself already theme-dependent.
+
+`goldBright` and `goldDeep` are the two ends of the gilding gradient, not
+colours anything is set in. What matters for them is the *relief* between the
+stops, which is held the same in every theme; their own contrast against the
+paper is not a meaningful number and differs widely by design.
 
 The running head is type alone: the chapter at the spine, the juzʾ at the
 fore-edge, each carrying its name twice — Arabic over a Latin gloss — so the

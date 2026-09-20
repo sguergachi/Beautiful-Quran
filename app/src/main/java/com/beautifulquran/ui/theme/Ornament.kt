@@ -524,7 +524,7 @@ fun IslamicBackToOriginCapsule(
         Text(
             text = chapterLabel,
             style = MaterialTheme.typography.titleSmall,
-            color = colors.onSurface.copy(alpha = 0.88f),
+            color = QuranTheme.ink.strong,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
             modifier = Modifier.widthIn(max = 160.dp),
@@ -532,12 +532,12 @@ fun IslamicBackToOriginCapsule(
         Text(
             text = "  ·  ",
             style = MaterialTheme.typography.titleSmall,
-            color = colors.onSurface.copy(alpha = 0.28f),
+            color = QuranTheme.ink.quiet,
         )
         Text(
             text = ayahLabel,
             style = MaterialTheme.typography.titleSmall,
-            color = colors.onSurface.copy(alpha = 0.62f),
+            color = QuranTheme.ink.secondary,
             maxLines = 1,
         )
     }

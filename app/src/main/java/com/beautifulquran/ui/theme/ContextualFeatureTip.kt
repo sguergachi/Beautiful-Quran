@@ -239,7 +239,7 @@ private fun LessonCopy(title: String, body: String) {
                 fontSize = 19.sp,
                 lineHeight = 24.sp,
             ),
-            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.76f),
+            color = QuranTheme.ink.body,
         )
     }
 }

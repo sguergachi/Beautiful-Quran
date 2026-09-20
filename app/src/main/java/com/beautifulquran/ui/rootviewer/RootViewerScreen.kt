@@ -87,6 +87,7 @@ import com.beautifulquran.ui.theme.LocalQuranAccents
 import com.beautifulquran.ui.theme.SerifFontFamily
 import com.beautifulquran.ui.theme.quietClickable
 import com.beautifulquran.ui.theme.verticalFadingEdges
+import com.beautifulquran.ui.theme.QuranTheme
 
 internal const val ROOT_CHAPTER_PREVIEW_LIMIT = 8
 internal const val ROOT_OCCURRENCE_PREVIEW_LIMIT = 5
@@ -204,7 +205,7 @@ fun RootViewerScreen(
                         Icon(
                             imageVector = Icons.Rounded.Close,
                             contentDescription = "Close",
-                            tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.68f),
+                            tint = QuranTheme.ink.secondary,
                         )
                     }
                 },
@@ -275,7 +276,7 @@ fun RootViewerScreen(
                                     text = "This root occurs ${times(ui.occurrenceCount)} across " +
                                         "${sections.size} ${if (sections.size == 1) "chapter" else "chapters"}.",
                                     style = MaterialTheme.typography.bodyLarge,
-                                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.74f),
+                                    color = QuranTheme.ink.body,
                                     modifier = Modifier.padding(top = 4.dp),
                                 )
                                 Spacer(Modifier.height(20.dp))
@@ -584,7 +585,7 @@ private fun WordAnalysis(
                 )
                 if (rootSense != null) {
                     val bodyColor = MaterialTheme.colorScheme.onSurface.copy(alpha = AnalysisGlossAlpha)
-                    val citationColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
+                    val citationColor = QuranTheme.ink.quiet
                     val annotated = remember(rootSense, bodyColor, citationColor) {
                         lexiconAnnotated(rootSense, bodyColor, citationColor)
                     }
@@ -614,7 +615,7 @@ private fun WordAnalysis(
                             trim = LineHeightStyle.Trim.None,
                         ),
                     ),
-                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.74f),
+                    color = QuranTheme.ink.body,
                 )
             }
         }
@@ -700,7 +701,7 @@ private fun RootLabel(
         textContent = {
             Text(
                 text = it,
-                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.72f),
+                color = QuranTheme.ink.body,
                 // Keep EB Garamond (a bare TextStyle drops LocalTextStyle's
                 // serif and falls back to system sans). Trim matches the ⓘ
                 // so CenterVertically stays even between ROOT and LEMMA.
@@ -742,7 +743,7 @@ private fun RootSectionTitle(text: String, explanation: String? = null) {
                 Modifier
                     .weight(1f)
                     .height(1.dp)
-                    .background(MaterialTheme.colorScheme.onSurface.copy(alpha = 0.09f)),
+                    .background(QuranTheme.ink.wash),
             )
         },
     )
@@ -797,7 +798,7 @@ private fun ExplainedHeading(
                         ) {
                             Text(
                                 text = "ⓘ",
-                                color = MaterialTheme.colorScheme.primary.copy(alpha = 0.8f),
+                                color = QuranTheme.accents.greenInk,
                                 style = TextStyle(
                                     fontSize = 14.sp,
                                     lineHeight = 14.sp,
@@ -823,7 +824,7 @@ private fun ExplainedHeading(
             Text(
                 text = explanation.orEmpty(),
                 style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f),
+                color = QuranTheme.ink.body,
                 modifier = Modifier.padding(top = 4.dp, bottom = 4.dp),
             )
         }
@@ -854,7 +855,7 @@ private fun OnlineReferences(
                 Text(
                     text = reference.description,
                     style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.68f),
+                    color = QuranTheme.ink.secondary,
                     modifier = Modifier.padding(top = 2.dp),
                 )
             }
@@ -891,7 +892,7 @@ private fun ChapterHeading(section: RootOccurrenceSection, open: Boolean, onClic
                 fontFamily = DisplayFontFamily,
                 fontSize = 18.sp,
                 lineHeight = 24.sp,
-                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.9f),
+                color = QuranTheme.ink.strong,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
@@ -903,7 +904,7 @@ private fun ChapterHeading(section: RootOccurrenceSection, open: Boolean, onClic
             Text(
                 text = section.occurrences.size.toString(),
                 style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.68f),
+                color = QuranTheme.ink.secondary,
             )
             Spacer(Modifier.width(8.dp))
             Icon(
@@ -954,7 +955,7 @@ private fun OccurrenceRow(occurrence: RootOccurrence, isCurrent: Boolean, onClic
                 Text(
                     text = occurrence.translation,
                     style = MaterialTheme.typography.bodyLarge,
-                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.68f),
+                    color = QuranTheme.ink.secondary,
                     modifier = Modifier.weight(1f),
                 )
             }
@@ -989,13 +990,13 @@ private fun RelatedFormRow(form: RootLemmaSummary) {
                 Text(
                     text = MorphologyLabels.posLabel(form.pos),
                     style = MaterialTheme.typography.bodyLarge,
-                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.68f),
+                    color = QuranTheme.ink.secondary,
                 )
             }
             Text(
                 text = if (form.occurrenceCount == 1) "once" else "${form.occurrenceCount}×",
                 style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.68f),
+                color = QuranTheme.ink.secondary,
                 modifier = Modifier.padding(start = 16.dp),
             )
         }
@@ -1003,7 +1004,7 @@ private fun RelatedFormRow(form: RootLemmaSummary) {
             Text(
                 text = form.gloss,
                 style = MaterialTheme.typography.bodyLarge,
-                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.68f),
+                color = QuranTheme.ink.secondary,
                 modifier = Modifier.padding(top = 2.dp),
             )
         }
@@ -1262,7 +1263,7 @@ private fun LemmaMeta(
         if (grammar.isNotBlank()) {
             Text(
                 text = grammar,
-                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.52f),
+                color = QuranTheme.ink.tertiary,
                 style = lemmaMetaStyle(),
             )
         }
@@ -1270,7 +1271,7 @@ private fun LemmaMeta(
             Text(
                 text = "This lemma occurs ${times(lemmaCount)}.",
                 style = lemmaMetaStyle(),
-                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.48f),
+                color = QuranTheme.ink.muted,
             )
         }
     }
@@ -1303,8 +1304,8 @@ private fun LexiconArticle(
 ) {
     val text = remember(entry.text, expanded) { lexiconArticleText(entry.text, expanded) }
     val blocks = remember(text) { lexiconBlocks(text) }
-    val bodyColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.86f)
-    val citationColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
+    val bodyColor = QuranTheme.ink.strong
+    val citationColor = QuranTheme.ink.quiet
     val onlineUrl = remember(entry.root) { laneLexiconUrl(entry.root) }
 
     Column(modifier = Modifier.fillMaxWidth()) {
@@ -1342,7 +1343,7 @@ private fun LexiconArticle(
             Text(
                 text = "Lane on arabiclexicon.hawramani.com — the complete article for this root.",
                 style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.68f),
+                color = QuranTheme.ink.secondary,
                 modifier = Modifier.padding(top = 2.dp),
             )
         }
@@ -1484,7 +1485,7 @@ private fun WordHeader(word: Word, isPlaying: Boolean, onPlay: () -> Unit) {
             text = word.transliteration,
             style = MaterialTheme.typography.bodyMedium,
             textAlign = TextAlign.Center,
-            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.68f),
+            color = QuranTheme.ink.secondary,
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(top = 2.dp),
@@ -1535,7 +1536,7 @@ private fun WordSpeakerButton(isPlaying: Boolean, onPlay: () -> Unit, size: Dp) 
     Icon(
         imageVector = Icons.AutoMirrored.Rounded.VolumeUp,
         contentDescription = "Play word",
-        tint = MaterialTheme.colorScheme.primary.copy(alpha = if (isPlaying) 0.9f else 0.65f),
+        tint = if (isPlaying) QuranTheme.accents.greenInk else QuranTheme.accents.greenQuiet,
         modifier = Modifier
             .size(size)
             .quietClickable(onClick = onPlay)

@@ -81,6 +81,7 @@ import com.beautifulquran.ui.theme.quietClickable
 import kotlin.math.abs
 import kotlin.math.max
 import kotlin.math.roundToInt
+import com.beautifulquran.ui.theme.QuranTheme
 
 private val GlintGold = Color(0xFFF8E9BE)
 
@@ -274,7 +275,7 @@ fun TarjiLabScreen(
                                     Text(
                                         text = "Note",
                                         style = MaterialTheme.typography.bodySmall,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.55f),
+                                        color = QuranTheme.ink.quiet,
                                     )
                                 }
                                 field()
@@ -369,7 +370,7 @@ private fun WordRow(
 @Composable
 private fun CaptureProgress(progress: Float, modifier: Modifier = Modifier) {
     val active = MaterialTheme.colorScheme.primary
-    val track = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.25f)
+    val track = QuranTheme.ink.hairline
     Column(modifier.fillMaxWidth()) {
         Text(
             text = "Muted capture ${(progress.coerceIn(0f, 1f) * 100f).roundToInt()}%",
@@ -464,7 +465,7 @@ private fun ResetSlot(visible: Boolean, onReset: () -> Unit) {
             Text(
                 text = "Reset",
                 style = MaterialTheme.typography.labelLarge,
-                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.75f),
+                color = QuranTheme.ink.muted,
                 maxLines = 1,
                 softWrap = false,
                 modifier = Modifier
@@ -693,9 +694,9 @@ private fun WaveformPanel(
 ) {
     val capture = ui.capture
     val trace = ui.trace
-    val waveColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.55f)
+    val waveColor = QuranTheme.ink.quiet
     val shapeColor = MaterialTheme.colorScheme.primary
-    val guideColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+    val guideColor = QuranTheme.ink.muted
     val durationMs = capture?.let { it.hopCount * it.hopContentDurationMs() } ?: 0f
     val view = if (ui.view.spanMs > 1f) ui.view else TarjiViewWindow.fit(durationMs)
     val window = ui.expectation.window
@@ -956,8 +957,8 @@ private fun StatusSlot(
 /** Faded key — only the marks the current tool uses. */
 @Composable
 private fun WaveformLegend(tool: TarjiLabTool, modifier: Modifier = Modifier) {
-    val ink = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
-    val voice = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.38f)
+    val ink = QuranTheme.ink.quiet
+    val voice = QuranTheme.ink.furniture
     val env = MaterialTheme.colorScheme.primary.copy(alpha = 0.38f)
     val now = Color.White.copy(alpha = 0.38f)
     Row(
@@ -1073,7 +1074,7 @@ private fun KnobsPanel(
         Text(
             text = "These change what the detector hears — the faint gold band — not the stroke you draw.",
             style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+            color = QuranTheme.ink.muted,
             modifier = Modifier.padding(bottom = 10.dp),
         )
         Row(

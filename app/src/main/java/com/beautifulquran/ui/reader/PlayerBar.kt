@@ -34,6 +34,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.media3.common.Player
 import com.beautifulquran.playback.PlayerUiState
+import com.beautifulquran.ui.theme.QuranTheme
 
 /**
  * Flat playback controls that sit on the same sheet of paper as the text —
@@ -78,7 +79,7 @@ fun PlayerBar(
                 Text(
                     text = reciterName,
                     style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+                    color = QuranTheme.ink.muted,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
@@ -115,7 +116,7 @@ fun PlayerBar(
                         },
                         contentDescription = "Repeat",
                         tint = if (state.repeatMode == Player.REPEAT_MODE_OFF && !rangeActive) {
-                            MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.45f)
+                            QuranTheme.ink.furniture
                         } else {
                             MaterialTheme.colorScheme.primary
                         },
@@ -183,7 +184,7 @@ fun PlayerBar(
                             fontSize = 15.sp,
                         ),
                         color = if (state.speed == 1f) {
-                            MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.45f)
+                            QuranTheme.ink.furniture
                         } else {
                             MaterialTheme.colorScheme.primary
                         },

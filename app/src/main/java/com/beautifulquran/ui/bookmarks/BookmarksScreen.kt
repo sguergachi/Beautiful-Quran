@@ -83,6 +83,7 @@ import com.beautifulquran.ui.theme.LocalQuranAccents
 import com.beautifulquran.ui.theme.quietClickable
 import com.beautifulquran.ui.theme.verticalFadingEdges
 import kotlinx.coroutines.flow.first
+import com.beautifulquran.ui.theme.QuranTheme
 
 private data class BookmarkKey(val surahId: Int, val ayahNumber: Int)
 
@@ -317,7 +318,7 @@ private fun BookmarksHeader(onClose: () -> Unit) {
             Icon(
                 imageVector = Icons.AutoMirrored.Rounded.ArrowForward,
                 contentDescription = "Back to Chapters",
-                tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.75f),
+                tint = QuranTheme.ink.body,
                 modifier = Modifier.size(24.dp),
             )
         }
@@ -420,7 +421,7 @@ private fun BookmarkAyahRow(
             Text(
                 text = bookmark.text,
                 style = ArabicTitleStyle.copy(fontSize = 24.sp, lineHeight = 36.sp),
-                color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.92f),
+                color = QuranTheme.ink.strong,
                 textAlign = TextAlign.End,
                 maxLines = 2,
                 overflow = TextOverflow.Ellipsis,
@@ -430,7 +431,7 @@ private fun BookmarkAyahRow(
             Text(
                 text = bookmark.translation,
                 style = MaterialTheme.typography.bodyLarge.copy(fontSize = 17.sp, lineHeight = 25.sp),
-                color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.84f),
+                color = QuranTheme.ink.strong,
                 maxLines = 2,
                 overflow = TextOverflow.Ellipsis,
             )
@@ -578,7 +579,7 @@ private fun BookmarkReferenceOrConfirmation(
                     Text(
                         "Remove this bookmark?",
                         style = bookmarkMetadataStyle(),
-                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.72f),
+                        color = QuranTheme.ink.muted,
                         modifier = Modifier.weight(1f),
                         maxLines = 1,
                     )
@@ -594,7 +595,7 @@ private fun BookmarkReferenceOrConfirmation(
                     Text(
                         "Remove",
                         style = bookmarkMetadataStyle(FontWeight.Medium),
-                        color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.78f),
+                        color = QuranTheme.ink.body,
                         modifier = Modifier
                             .quietClickable(role = Role.Button, onClick = onRemove)
                             .padding(start = 8.dp, top = 12.dp, bottom = 12.dp),
@@ -605,7 +606,7 @@ private fun BookmarkReferenceOrConfirmation(
                     Text(
                         text = "Ayah",
                         style = bookmarkMetadataStyle(),
-                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.62f),
+                        color = QuranTheme.ink.quiet,
                     )
                     Spacer(Modifier.width(4.dp))
                     Text(
@@ -660,7 +661,7 @@ private fun BookmarkEmptyState(query: String) {
                 "No marked verse matches “${query.trim()}”."
             },
             style = MaterialTheme.typography.bodyLarge.copy(fontSize = 17.sp, lineHeight = 25.sp),
-            color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.82f),
+            color = QuranTheme.ink.strong,
             textAlign = TextAlign.Center,
         )
         if (query.isBlank()) {
@@ -668,7 +669,7 @@ private fun BookmarkEmptyState(query: String) {
             Text(
                 "Mark a verse in the reader to return to it later.",
                 style = bookmarkMetadataStyle(),
-                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.68f),
+                color = QuranTheme.ink.muted,
                 textAlign = TextAlign.Center,
             )
         }

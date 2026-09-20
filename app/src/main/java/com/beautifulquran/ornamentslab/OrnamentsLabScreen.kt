@@ -59,6 +59,7 @@ import com.beautifulquran.ui.theme.LocalQuranAccents
 import com.beautifulquran.ui.theme.generatedFieldWeave
 import com.beautifulquran.ui.theme.ornament.generateCoverOrnament
 import com.beautifulquran.ui.theme.quietClickable
+import com.beautifulquran.ui.theme.QuranTheme
 
 /**
  * Ornaments Lab — a developer tool for exploring the procedural ornament
@@ -142,7 +143,7 @@ fun OrnamentsLabScreen(
             Icon(
                 Icons.Rounded.ContentCopy,
                 contentDescription = "Copy seed",
-                tint = colors.onBackground.copy(alpha = 0.7f),
+                tint = QuranTheme.ink.body,
                 modifier = Modifier
                     .quietClickable(onClick = ::copySeed)
                     .padding(12.dp)
@@ -397,7 +398,7 @@ fun OrnamentsLabScreen(
                                         Text(
                                             text = "name this seed…",
                                             style = MaterialTheme.typography.bodyLarge,
-                                            color = colors.onSurfaceVariant.copy(alpha = 0.55f),
+                                            color = QuranTheme.ink.quiet,
                                         )
                                     }
                                     inner()
@@ -457,7 +458,7 @@ fun OrnamentsLabScreen(
                                 Icon(
                                     Icons.Rounded.Delete,
                                     contentDescription = "Delete ${entry.name}",
-                                    tint = colors.onSurfaceVariant.copy(alpha = 0.65f),
+                                    tint = QuranTheme.ink.quiet,
                                     modifier = Modifier
                                         .quietClickable(onClick = { viewModel.remove(entry.seed) })
                                         .padding(8.dp)
@@ -541,7 +542,7 @@ private fun ChipGroup(
                 color = if (isOn) {
                     MaterialTheme.colorScheme.primary
                 } else {
-                    MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.75f)
+                    QuranTheme.ink.muted
                 },
                 modifier = Modifier
                     .quietClickable(onClick = {
