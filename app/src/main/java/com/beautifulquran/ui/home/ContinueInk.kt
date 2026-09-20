@@ -227,8 +227,8 @@ private const val ContinueTurnEpsilon = 0.001f
 /** The most a single frame may advance the wash's clock. */
 private const val ContinueInkMaxFrameMs = 20f
 
-/** The wash wipes back out of the row over this long. */
-private const val ContinueInkDryMs = 700
+/** The wash wipes back out of the row over this long — the page-turn sweep. */
+private const val ContinueInkDryMs = 460
 
 /** The wipe gathers, crosses the words briskly, and settles into the Arabic end. */
 private val ContinueInkWipeEasing = CubicBezierEasing(0.4f, 0f, 0.2f, 1f)
