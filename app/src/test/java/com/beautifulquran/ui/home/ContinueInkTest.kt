@@ -32,10 +32,30 @@ class ContinueInkTest {
     }
 
     @Test
-    fun `only Continue tap floods the row`() {
-        assertEquals(true, continueInkShouldFlood(tapped = true, fromReader = false))
-        assertEquals(false, continueInkShouldFlood(tapped = false, fromReader = false))
-        assertEquals(false, continueInkShouldFlood(tapped = true, fromReader = true))
+    fun `Continue tap or a swipe into that chapter floods the row`() {
+        assertEquals(
+            true,
+            continueInkShouldFlood(tapped = true, fromReader = false, toContinueChapter = false),
+        )
+        assertEquals(
+            true,
+            continueInkShouldFlood(tapped = false, fromReader = false, toContinueChapter = true),
+        )
+        assertEquals(
+            false,
+            continueInkShouldFlood(tapped = false, fromReader = false, toContinueChapter = false),
+        )
+        assertEquals(
+            false,
+            continueInkShouldFlood(tapped = true, fromReader = true, toContinueChapter = true),
+        )
+    }
+
+    @Test
+    fun `a swipe into the Continue chapter is a Continue turn`() {
+        assertEquals(true, continueInkToContinueChapter(openSurahId = 18, continueSurahId = 18))
+        assertEquals(false, continueInkToContinueChapter(openSurahId = 2, continueSurahId = 18))
+        assertEquals(false, continueInkToContinueChapter(openSurahId = 18, continueSurahId = 0))
     }
 
     @Test
@@ -46,8 +66,21 @@ class ContinueInkTest {
 
     @Test
     fun `opening another chapter does not keep the row wet under the reader`() {
-        assertEquals(false, continueInkShouldFill(tapped = false, spread = 0f))
-        assertEquals(true, continueInkShouldFill(tapped = true, spread = 0f))
-        assertEquals(true, continueInkShouldFill(tapped = false, spread = 1f))
+        assertEquals(
+            false,
+            continueInkShouldFill(tapped = false, spread = 0f, toContinueChapter = false),
+        )
+        assertEquals(
+            true,
+            continueInkShouldFill(tapped = true, spread = 0f, toContinueChapter = false),
+        )
+        assertEquals(
+            true,
+            continueInkShouldFill(tapped = false, spread = 1f, toContinueChapter = false),
+        )
+        assertEquals(
+            true,
+            continueInkShouldFill(tapped = false, spread = 0f, toContinueChapter = true),
+        )
     }
 }

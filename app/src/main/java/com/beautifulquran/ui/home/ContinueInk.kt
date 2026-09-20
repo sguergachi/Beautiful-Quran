@@ -47,15 +47,18 @@ import kotlinx.coroutines.launch
  */
 val LocalReaderApproach = staticCompositionLocalOf<() -> Float> { { 0f } }
 
+/** The surah the paper stack is turning into, 0 when none. */
+val LocalOpenSurahId = staticCompositionLocalOf { { 0 } }
+
 /**
- * Ink that floods the continue row when Continue is chosen — a tap, not
- * opening some other chapter from the list. The wash plays out on its own
- * clock whatever the drag does. It stays wet under the reader. Returning, it
- * stays wet through the lift and the wipe is scrubbed by the same swipe that
- * plays the stems: it starts with the sweep and finishes the frame the drop
- * — the ending of the sound — begins. A turn let go short wipes the leftover.
- * The ink stays dense as it withdraws, so every word is plainly on ink or on
- * paper, never half-way.
+ * Ink that floods the continue row when Continue is chosen — a tap on that
+ * row, or a swipe into that chapter. Opening some other chapter from the
+ * list does not. The wash plays out on its own clock whatever the drag does.
+ * It stays wet under the reader. Returning, it stays wet through the lift
+ * and the wipe is scrubbed by the same swipe that plays the stems: it starts
+ * with the sweep and finishes the frame the drop — the ending of the sound
+ * — begins. A turn let go short wipes the leftover. The ink stays dense as
+ * it withdraws, so every word is plainly on ink or on paper, never half-way.
  */
 @Stable
 internal class ContinueInk(val params: NuqtaParams) {
@@ -105,11 +108,12 @@ internal class ContinueInk(val params: NuqtaParams) {
 private enum class ContinueTurn { Resting, Turning, Landed }
 
 @Composable
-internal fun rememberContinueInk(): ContinueInk {
+internal fun rememberContinueInk(continueSurahId: Int): ContinueInk {
     val params = LocalNuqtaParams.current
     val ink = remember(params) { ContinueInk(params) }
     val approach = LocalReaderApproach.current
-    LaunchedEffect(ink, approach) {
+    val openSurahId = LocalOpenSurahId.current
+    LaunchedEffect(ink, approach, continueSurahId, openSurahId) {
         var fromReader = false
         snapshotFlow {
             val p = approach()
@@ -119,6 +123,7 @@ internal fun rememberContinueInk(): ContinueInk {
                 else -> ContinueTurn.Resting
             }
         }.distinctUntilChanged().collectLatest { turn ->
+            val toContinue = continueInkToContinueChapter(openSurahId(), continueSurahId)
             when (turn) {
                 ContinueTurn.Turning -> coroutineScope {
                     if (continueInkShouldWipe(tapped = ink.tapped, fromReader = fromReader)) {
@@ -127,7 +132,13 @@ internal fun rememberContinueInk(): ContinueInk {
                         // (the ending) starts.
                         snapshotFlow { continueWipeProgress(1f - approach()) }
                             .collect { ink.dry.snapTo(it) }
-                    } else if (continueInkShouldFlood(tapped = ink.tapped, fromReader = fromReader)) {
+                    } else if (
+                        continueInkShouldFlood(
+                            tapped = ink.tapped,
+                            fromReader = fromReader,
+                            toContinueChapter = toContinue,
+                        )
+                    ) {
                         fromReader = false
                         // The wash plays out on its own clock. Turned again
                         // mid-wipe, the wipe runs back from where it stands, as
@@ -144,10 +155,14 @@ internal fun rememberContinueInk(): ContinueInk {
                         }
                         ink.flood()
                     }
-                    // A chapter opened from the list is not Continue: leave the row dry.
+                    // A different chapter from the list: leave the row dry.
                 }
                 ContinueTurn.Landed -> {
-                    val owned = continueInkShouldFill(tapped = ink.tapped, spread = ink.spread)
+                    val owned = continueInkShouldFill(
+                        tapped = ink.tapped,
+                        spread = ink.spread,
+                        toContinueChapter = toContinue,
+                    )
                     ink.tapped = false
                     if (owned) {
                         // Under the reader the row stays wet, so turning back
@@ -180,17 +195,27 @@ internal fun rememberContinueInk(): ContinueInk {
     return ink
 }
 
-/** Continue was chosen: flood the row. Opening another chapter does not. */
-internal fun continueInkShouldFlood(tapped: Boolean, fromReader: Boolean): Boolean =
-    tapped && !fromReader
+/** The paper is turning into the Continue chapter. */
+internal fun continueInkToContinueChapter(openSurahId: Int, continueSurahId: Int): Boolean =
+    continueSurahId != 0 && openSurahId == continueSurahId
+
+/** Continue was chosen: a tap, or a swipe into that chapter. */
+internal fun continueInkShouldFlood(
+    tapped: Boolean,
+    fromReader: Boolean,
+    toContinueChapter: Boolean,
+): Boolean = !fromReader && (tapped || toContinueChapter)
 
 /** Returning from a Continue-owned reader: wipe with the page-turn drop. */
 internal fun continueInkShouldWipe(tapped: Boolean, fromReader: Boolean): Boolean =
     fromReader && !tapped
 
 /** Landed on a Continue-owned reader: keep the row wet underneath. */
-internal fun continueInkShouldFill(tapped: Boolean, spread: Float): Boolean =
-    tapped || spread > 0f
+internal fun continueInkShouldFill(
+    tapped: Boolean,
+    spread: Float,
+    toContinueChapter: Boolean,
+): Boolean = tapped || spread > 0f || toContinueChapter
 
 /**
  * How far the continue row has wiped for a return swipe of [turnProgress]
