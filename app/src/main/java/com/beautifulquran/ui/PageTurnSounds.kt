@@ -200,8 +200,8 @@ class PageTurnSounds(context: Context) {
         private const val COVER_OPEN_RATE = 0.92f
         private const val START_EPS = 0.03f
         private const val SETTLE_EPS = 0.03f
-        private const val SWEEP_AT = 0.42f
-        private const val DROP_AT = 0.88f
+        internal const val SWEEP_AT = 0.42f
+        internal const val DROP_AT = 0.88f
 
         val FLIPS = listOf(
             PageTurnFlip("Flip 2 (crisp)", R.raw.flip2_lift, R.raw.flip2_sweep, R.raw.flip2_drop),
