@@ -382,6 +382,48 @@ class ColorSystemTest {
     }
 
     @Test
+    fun `the legacy palette is intact, and is the thing the ladder replaced`() {
+        // The developer A/B is only worth anything if LEGACY really is the old
+        // palette. These are the measurements that motivated the pass, so if
+        // the legacy side ever stops reproducing them the toggle is lying.
+        val quiet = themes.map {
+            val (scheme, ink, _) = legacyThemeParts(it)
+            contrastOn(ink.quiet, scheme.background)
+        }
+        assertTrue(
+            "legacy quiet should read at roughly 41 / 16 / 17 Lc — got " +
+                quiet.map { "%.0f".format(it) },
+            quiet[0] > 35 && quiet[1] < 22 && quiet[2] < 23,
+        )
+        assertTrue(
+            "the whole point: legacy quiet spreads across themes, the ladder's does not",
+            (quiet.max() - quiet.min()) > 15.0,
+        )
+        for (mode in themes) {
+            val (scheme, ink, acc) = legacyThemeParts(mode)
+            assertTrue(
+                "$mode legacy ladder must still descend",
+                contrastOn(ink.scripture, scheme.background) >
+                    contrastOn(ink.strong, scheme.background),
+            )
+            assertTrue("$mode legacy accents must be populated", acc.gold.alpha == 1f)
+        }
+        // Nightfall's legacy sheet is the blue-grey one.
+        val night = legacyThemeParts(ThemeMode.DARK).first.background
+        assertTrue(
+            "legacy Nightfall should be the cool sheet, hue ~248deg — got %.0f".format(
+                oklch(night).hue,
+            ),
+            hueDistance(oklch(night).hue, 248.0) <= 20.0,
+        )
+        // ...and the shipped one is warm.
+        assertTrue(
+            "shipped Nightfall should be warm",
+            hueDistance(oklch(scheme(ThemeMode.DARK).background).hue, 85.0) <= 25.0,
+        )
+    }
+
+    @Test
     fun `the system theme follows the device into the dark`() {
         assertEquals(quranThemeParts(ThemeMode.SYSTEM, systemDark = false), parts(ThemeMode.LIGHT))
         assertEquals(quranThemeParts(ThemeMode.SYSTEM, systemDark = true), parts(ThemeMode.DARK))

@@ -1,11 +1,5 @@
 package com.beautifulquran.ui.reader
 
-import androidx.compose.ui.semantics.Role
-import com.beautifulquran.ui.theme.quietClickable
-import com.beautifulquran.ui.theme.SettingsNuqtaIcon
-import com.beautifulquran.ui.theme.rememberSettingsNuqtaState
-import com.beautifulquran.DevProfiling
-import com.beautifulquran.QuranApp
 import android.app.Activity
 import android.content.Context
 import android.content.ContextWrapper
@@ -22,8 +16,6 @@ import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
-import kotlin.math.sin
-import kotlin.math.PI
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
@@ -36,19 +28,19 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.asPaddingValues
-import androidx.compose.foundation.layout.imeAnimationTarget
-import androidx.compose.foundation.layout.isImeVisible
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.imeAnimationTarget
+import androidx.compose.foundation.layout.isImeVisible
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.statusBarsIgnoringVisibility
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.pager.rememberPagerState
@@ -71,6 +63,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.MutableState
@@ -88,8 +81,8 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.withFrameNanos
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.AbsoluteAlignment
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.focus.FocusRequester
@@ -105,57 +98,69 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.LayoutCoordinates
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInRoot
-import androidx.compose.ui.platform.LocalFontFamilyResolver
-import androidx.compose.ui.platform.LocalLayoutDirection
-import androidx.compose.ui.platform.LocalWindowInfo
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.platform.LocalFontFamilyResolver
 import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.platform.LocalView
-import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.platform.LocalWindowInfo
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.TextMeasurer
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Velocity
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
+import androidx.core.view.WindowCompat
+import androidx.core.view.WindowInsetsCompat
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import androidx.core.view.WindowCompat
-import androidx.core.view.WindowInsetsCompat
+import com.beautifulquran.DevProfiling
+import com.beautifulquran.QuranApp
 import com.beautifulquran.data.AyahSelectorSide
 import com.beautifulquran.data.ReadingLayout
 import com.beautifulquran.data.ReadingMode
 import com.beautifulquran.data.RuntimeCachePhase
 import com.beautifulquran.data.model.Surah
-import com.beautifulquran.domain.EnglishVerseAlignments
-import com.beautifulquran.domain.englishSeekWordPosition
-import com.beautifulquran.ui.share.ShareRibbon
 import com.beautifulquran.domain.BASMALAH_PLAYLIST_AYAH
+import com.beautifulquran.domain.EnglishVerseAlignments
 import com.beautifulquran.domain.MushafToken
+import com.beautifulquran.domain.englishSeekWordPosition
 import com.beautifulquran.domain.mushafFontPreloadPages
+import com.beautifulquran.ui.reader.MushafQcfFonts
 import com.beautifulquran.ui.reader.focus.FocusEngine
 import com.beautifulquran.ui.reader.focus.rememberReaderFocusController
-import com.beautifulquran.ui.reader.MushafQcfFonts
+import com.beautifulquran.ui.share.ShareRibbon
 import com.beautifulquran.ui.theme.FloatingPaperControl
-import com.beautifulquran.ui.theme.IslamicReturnToAyahButton
-import com.beautifulquran.ui.theme.ReturnArrowHeading
 import com.beautifulquran.ui.theme.InkRevealOverlay
+import com.beautifulquran.ui.theme.IslamicReturnToAyahButton
+import com.beautifulquran.ui.theme.LocalQuranAccents
+import com.beautifulquran.ui.theme.LocalQuranInk
+import com.beautifulquran.ui.theme.QuranTheme
+import com.beautifulquran.ui.theme.ReturnArrowHeading
+import com.beautifulquran.ui.theme.SettingsNuqtaIcon
 import com.beautifulquran.ui.theme.absorbPointerEvents
-import com.beautifulquran.ui.theme.contrastingOverlayColorScheme
 import com.beautifulquran.ui.theme.contextualGuideProgressiveBlur
+import com.beautifulquran.ui.theme.contrastingOverlayAccents
+import com.beautifulquran.ui.theme.contrastingOverlayColorScheme
+import com.beautifulquran.ui.theme.contrastingOverlayInk
 import com.beautifulquran.ui.theme.paperToggleHaptic
+import com.beautifulquran.ui.theme.quietClickable
+import com.beautifulquran.ui.theme.rememberSettingsNuqtaState
 import com.beautifulquran.ui.theme.verticalFadingEdges
+import kotlin.math.PI
+import kotlin.math.abs
+import kotlin.math.sin
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import kotlin.math.abs
-import com.beautifulquran.ui.theme.QuranTheme
 
 /** Paused highlight polling is 250 ms; leave one scheduling beat for a fresh sample. */
 private const val HELD_WORD_REFRESH_MS = 300L
@@ -3549,29 +3554,36 @@ fun ReaderScreen(
             originY = REPEAT_BLEED_ORIGIN_Y,
             onRenderedChange = { repeatRendered = it },
         ) {
-            MaterialTheme(
-                colorScheme = repeatOverlayColors,
-                typography = MaterialTheme.typography,
+            // The overlay swaps the sheet out from under its content, so it
+            // has to swap the ink ladder and accents too.
+            CompositionLocalProvider(
+                LocalQuranAccents provides contrastingOverlayAccents(),
+                LocalQuranInk provides contrastingOverlayInk(settings.themeMode),
             ) {
-                Box(Modifier.fillMaxSize()) {
-                    // Nothing beneath the bleed may be touched through it.
-                    Box(Modifier.matchParentSize().absorbPointerEvents())
-                    if (repeatContent != null && repeatStartAyah != null) {
-                        RepeatSheet(
-                            ayahCount = repeatContent.surah.ayahCount,
-                            repeatMode = playerState.repeatMode,
-                            repeatRange = playerState.repeatRange
-                                .takeIf { playerState.nowPlaying?.surahId == renderedSurahId },
-                            currentAyah = repeatStartAyah,
-                            retainedChoice = retainedRepeatChoice,
-                            onDismiss = { showRepeatDialog = false },
-                            onRepeatMode = viewModel::setRepeatMode,
-                            onRepeatRange = { from, to ->
-                                dispatch(ReaderInteractionEvent.EnableFollow)
-                                viewModel.setRepeatRange(from, to)
-                            },
-                            onChoiceApplied = { retainedRepeatChoice = it },
-                        )
+    MaterialTheme(
+                    colorScheme = repeatOverlayColors,
+                    typography = MaterialTheme.typography,
+                ) {
+                    Box(Modifier.fillMaxSize()) {
+                        // Nothing beneath the bleed may be touched through it.
+                        Box(Modifier.matchParentSize().absorbPointerEvents())
+                        if (repeatContent != null && repeatStartAyah != null) {
+                            RepeatSheet(
+                                ayahCount = repeatContent.surah.ayahCount,
+                                repeatMode = playerState.repeatMode,
+                                repeatRange = playerState.repeatRange
+                                    .takeIf { playerState.nowPlaying?.surahId == renderedSurahId },
+                                currentAyah = repeatStartAyah,
+                                retainedChoice = retainedRepeatChoice,
+                                onDismiss = { showRepeatDialog = false },
+                                onRepeatMode = viewModel::setRepeatMode,
+                                onRepeatRange = { from, to ->
+                                    dispatch(ReaderInteractionEvent.EnableFollow)
+                                    viewModel.setRepeatRange(from, to)
+                                },
+                                onChoiceApplied = { retainedRepeatChoice = it },
+                            )
+                        }
                     }
                 }
             }

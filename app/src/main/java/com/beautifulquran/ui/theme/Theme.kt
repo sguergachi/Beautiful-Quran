@@ -8,6 +8,7 @@ import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.graphics.Color
+import com.beautifulquran.data.ColorSystem
 import com.beautifulquran.data.ThemeMode
 
 // "Paper" light palette
@@ -381,6 +382,120 @@ private val RoyalGreenAccents = QuranAccents(
     glintInk = Color(0xFFFFF7DE),
 )
 
+// ---------------------------------------------------------------------------
+// Legacy palette — the colours as they stood before the ink ladder.
+//
+// Kept whole so the two systems can be held against each other on a device
+// (Settings -> Developer -> "Legacy colours"). Everything below is the old
+// value verbatim; nothing here is solved or corrected, which is the point.
+//
+// The ladder reconstruction is approximate by necessity: 54 hand-picked alphas
+// were collapsed onto 10 rungs, so each legacy rung carries the alpha that the
+// majority of that rung's call sites used to have. Sites that once differed by
+// a point or two of alpha come back identical. See [ColorSystem].
+// ---------------------------------------------------------------------------
+
+private val LegacyParchment = Color(0xFFE8E2D5)
+private val LegacyParchmentMuted = Color(0xFF97917F)
+private val LegacySoftGreen = Color(0xFF7FB8A4)
+private val LegacyNightBackground = Color(0xFF0A0B0C)
+private val LegacyNightSurface = Color(0xFF111315)
+private val LegacyNightSurfaceHigh = Color(0xFF1A1D20)
+
+private val LegacyDarkColors: ColorScheme = DarkColors.copy(
+    primary = LegacySoftGreen,
+    primaryContainer = Color(0xFF282D30),
+    onPrimaryContainer = Color(0xFFE4E8E5),
+    secondary = LegacySoftGreen,
+    onSecondary = LegacyNightBackground,
+    secondaryContainer = Color(0xFF24282B),
+    onSecondaryContainer = Color(0xFFE0E4E1),
+    tertiary = Color(0xFFC1C7C4),
+    onTertiary = Color(0xFF202426),
+    tertiaryContainer = Color(0xFF2E3336),
+    onTertiaryContainer = Color(0xFFE6E9E7),
+    background = LegacyNightBackground,
+    onBackground = LegacyParchment,
+    surface = LegacyNightSurface,
+    onSurface = LegacyParchment,
+    surfaceVariant = LegacyNightSurfaceHigh,
+    onSurfaceVariant = LegacyParchmentMuted,
+    surfaceTint = LegacySoftGreen,
+    inverseSurface = LegacyParchment,
+    outline = Color(0xFF686E72),
+    outlineVariant = Color(0xFF303538),
+    surfaceBright = Color(0xFF303438),
+    surfaceDim = LegacyNightBackground,
+    surfaceContainerLowest = Color(0xFF050607),
+    surfaceContainerLow = Color(0xFF0E1012),
+    surfaceContainer = LegacyNightSurfaceHigh,
+    surfaceContainerHigh = Color(0xFF24282B),
+    surfaceContainerHighest = Color(0xFF303438),
+)
+
+private val LegacyRoyalGreenColors: ColorScheme = RoyalGreenColors.copy(
+    primary = LegacySoftGreen,
+    secondary = LegacySoftGreen,
+    onBackground = LegacyParchment,
+    onSurface = LegacyParchment,
+    onSurfaceVariant = LegacyParchmentMuted,
+    surfaceTint = LegacySoftGreen,
+    inverseSurface = LegacyParchment,
+    outline = Color(0xFF568276),
+    outlineVariant = Color(0xFF2C5E51),
+    surfaceBright = Color(0xFF1C5E4E),
+)
+
+/** Rung -> the alpha the majority of that rung's old call sites carried. */
+private fun legacyInk(strongBase: Color, quietBase: Color) = QuranInk(
+    scripture = strongBase,
+    strong = strongBase.copy(alpha = 0.86f),
+    body = strongBase.copy(alpha = 0.74f),
+    secondary = strongBase.copy(alpha = 0.68f),
+    tertiary = quietBase.copy(alpha = 0.85f),
+    muted = quietBase.copy(alpha = 0.70f),
+    quiet = quietBase.copy(alpha = 0.55f),
+    furniture = quietBase.copy(alpha = 0.45f),
+    hairline = quietBase.copy(alpha = 0.25f),
+    wash = quietBase.copy(alpha = 0.12f),
+)
+
+private val LegacyLightInk = legacyInk(Ink, InkMuted)
+private val LegacyDarkInk = legacyInk(LegacyParchment, LegacyParchmentMuted)
+
+/** The old accents. [QuranAccents.goldInk] and the green rungs did not exist,
+ * so they are filled with the faded gold and green their call sites used to
+ * apply inline — which is exactly the thing the new values replaced. */
+private fun legacyAccents(green: Color, glint: Color?) = QuranAccents(
+    gold = if (glint == null) Color(0xFFB8901C) else Color(0xFFD9B44A),
+    goldInk = (if (glint == null) Color(0xFFB8901C) else Color(0xFFD9B44A)).copy(alpha = 0.75f),
+    goldBright = if (glint == null) Color(0xFFE9CD7A) else Color(0xFFEDD188),
+    goldDeep = if (glint == null) Color(0xFF8A6B1E) else Color(0xFF9A7B2A),
+    embossDark = if (glint == null) Color(0x24000000) else Color(0x66000000),
+    embossLight = if (glint == null) Color(0x59FFFFFF) else Color(0x1FFFFFFF),
+    repeatInk = if (glint == null) Color(0xFFB4551E) else Color(0xFFE06A18),
+    bookmarkRibbon = if (glint == null) Color(0xFFB3122F) else Color(0xFFD64358),
+    annotationInk = if (glint == null) Color(0xFF6B2838) else Color(0xFFF0A5B1),
+    greenInk = green.copy(alpha = 0.88f),
+    greenQuiet = green.copy(alpha = 0.75f),
+    greenWash = green.copy(alpha = 0.10f),
+    glintInk = glint,
+)
+
+private val LegacyLightAccents = legacyAccents(DeepGreen, null)
+private val LegacyDarkAccents = legacyAccents(LegacySoftGreen, Color(0xFFF8E9BE))
+
+/** Which colour system the surrounding content is painted in. */
+val LocalColorSystem = staticCompositionLocalOf { ColorSystem.LADDER }
+
+private fun legacySchemeFor(themeMode: ThemeMode, systemDark: Boolean): ColorScheme =
+    when (themeMode) {
+        ThemeMode.SYSTEM -> if (systemDark) LegacyDarkColors else LightColors
+        ThemeMode.LIGHT -> LightColors
+        ThemeMode.DARK -> LegacyDarkColors
+        ThemeMode.ROYAL_GREEN -> LegacyRoyalGreenColors
+    }
+
 @Composable
 fun themePreviewColors(themeMode: ThemeMode): List<Color> {
     val systemDark = isSystemInDarkTheme()
@@ -401,25 +516,49 @@ fun themePreviewColors(themeMode: ThemeMode): List<Color> {
  * overlays on the reader): always Royal Green so they read as a distinct
  * surface — except under the Royal Green theme itself, where Nightfall
  * provides the contrast instead. */
-fun contrastingOverlayColorScheme(themeMode: ThemeMode): ColorScheme = when (themeMode) {
-    ThemeMode.ROYAL_GREEN -> DarkColors
-    else -> RoyalGreenColors
-}
+@Composable
+fun contrastingOverlayColorScheme(themeMode: ThemeMode): ColorScheme =
+    if (LocalColorSystem.current == ColorSystem.LEGACY) {
+        when (themeMode) {
+            ThemeMode.ROYAL_GREEN -> LegacyDarkColors
+            else -> LegacyRoyalGreenColors
+        }
+    } else {
+        when (themeMode) {
+            ThemeMode.ROYAL_GREEN -> DarkColors
+            else -> RoyalGreenColors
+        }
+    }
 
 /** The ink ladder belonging to a [contrastingOverlayColorScheme]. An overlay
  * swaps the whole sheet out from under its content, so it has to swap the
  * ladder too — the reader's own rungs are solved against the reader's paper
  * and land on the wrong weights here. */
-fun contrastingOverlayInk(themeMode: ThemeMode): QuranInk = when (themeMode) {
-    ThemeMode.ROYAL_GREEN -> NightInkLadder
-    else -> RoyalInkLadder
-}
+@Composable
+fun contrastingOverlayInk(themeMode: ThemeMode): QuranInk =
+    if (LocalColorSystem.current == ColorSystem.LEGACY) {
+        LegacyDarkInk
+    } else {
+        when (themeMode) {
+            ThemeMode.ROYAL_GREEN -> NightInkLadder
+            else -> RoyalInkLadder
+        }
+    }
+
+/** The accents belonging to a [contrastingOverlayColorScheme]. */
+@Composable
+fun contrastingOverlayAccents(): QuranAccents =
+    if (LocalColorSystem.current == ColorSystem.LEGACY) LegacyDarkAccents else TimingsLabAccents
 
 /** Fixed royal-green ink surface for contextual teaching blooms. */
-fun royalGreenOverlayColorScheme(): ColorScheme = RoyalGreenColors
+@Composable
+fun royalGreenOverlayColorScheme(): ColorScheme =
+    if (LocalColorSystem.current == ColorSystem.LEGACY) LegacyRoyalGreenColors else RoyalGreenColors
 
 /** The ladder that goes with [royalGreenOverlayColorScheme]. */
-val RoyalGreenOverlayInk: QuranInk = RoyalInkLadder
+@Composable
+fun royalGreenOverlayInk(): QuranInk =
+    if (LocalColorSystem.current == ColorSystem.LEGACY) LegacyDarkInk else RoyalInkLadder
 
 /** These contrasting overlays are always a dark surface, so their gold/orange
  * accents use the dark set regardless of the user's theme — the reader's own
@@ -443,22 +582,31 @@ val CoverParchment = Parchment
 @Composable
 fun BeautifulQuranTheme(
     themeMode: ThemeMode = ThemeMode.SYSTEM,
+    colorSystem: ColorSystem = ColorSystem.LADDER,
     content: @Composable () -> Unit,
 ) {
     val systemDark = isSystemInDarkTheme()
-    val accents = when (themeMode) {
+    val legacy = colorSystem == ColorSystem.LEGACY
+    val darkish = themeMode == ThemeMode.DARK ||
+        themeMode == ThemeMode.ROYAL_GREEN ||
+        (themeMode == ThemeMode.SYSTEM && systemDark)
+    val accents = if (legacy) {
+        if (darkish) LegacyDarkAccents else LegacyLightAccents
+    } else when (themeMode) {
         ThemeMode.SYSTEM -> if (systemDark) DarkAccents else LightAccents
         ThemeMode.LIGHT -> LightAccents
         ThemeMode.DARK -> DarkAccents
         ThemeMode.ROYAL_GREEN -> RoyalGreenAccents
     }
-    val ink = when (themeMode) {
+    val ink = if (legacy) {
+        if (darkish) LegacyDarkInk else LegacyLightInk
+    } else when (themeMode) {
         ThemeMode.SYSTEM -> if (systemDark) NightInkLadder else LightInk
         ThemeMode.LIGHT -> LightInk
         ThemeMode.DARK -> NightInkLadder
         ThemeMode.ROYAL_GREEN -> RoyalInkLadder
     }
-    val colors = when (themeMode) {
+    val colors = if (legacy) legacySchemeFor(themeMode, systemDark) else when (themeMode) {
         ThemeMode.SYSTEM -> if (systemDark) DarkColors else LightColors
         ThemeMode.LIGHT -> LightColors
         ThemeMode.DARK -> DarkColors
@@ -467,6 +615,7 @@ fun BeautifulQuranTheme(
     androidx.compose.runtime.CompositionLocalProvider(
         LocalQuranAccents provides accents,
         LocalQuranInk provides ink,
+        LocalColorSystem provides colorSystem,
     ) {
         MaterialTheme(
             colorScheme = colors,
@@ -478,6 +627,15 @@ fun BeautifulQuranTheme(
 
 /** Every theme's three parts in one place, for `ColorSystemTest`, which holds
  * the palette to the perceptual targets it was solved against. */
+internal fun legacyThemeParts(themeMode: ThemeMode): Triple<ColorScheme, QuranInk, QuranAccents> {
+    val dark = themeMode == ThemeMode.DARK || themeMode == ThemeMode.ROYAL_GREEN
+    return Triple(
+        legacySchemeFor(themeMode, systemDark = false),
+        if (dark) LegacyDarkInk else LegacyLightInk,
+        if (dark) LegacyDarkAccents else LegacyLightAccents,
+    )
+}
+
 internal fun quranThemeParts(
     themeMode: ThemeMode,
     systemDark: Boolean = false,

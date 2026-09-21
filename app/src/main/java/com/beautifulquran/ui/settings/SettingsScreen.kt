@@ -105,6 +105,7 @@ import com.beautifulquran.ui.theme.themePreviewColors
 import com.beautifulquran.ui.theme.verticalFadingEdges
 import kotlin.math.roundToInt
 import com.beautifulquran.ui.theme.QuranTheme
+import com.beautifulquran.data.ColorSystem
 
 private val ATTRIBUTIONS = """
 Quran text (Uthmani script) and Saheeh International translation via the
@@ -391,6 +392,26 @@ private fun DeveloperSection(
     Spacer(Modifier.height(20.dp))
     val app = context.applicationContext as QuranApp
     MushafRuntimeCacheStatus(app.runtimeMushaf)
+
+    Spacer(Modifier.height(20.dp))
+    ToggleRow(
+        label = "Legacy colours",
+        checked = settings.colorSystem == ColorSystem.LEGACY,
+        onChange = { legacy ->
+            viewModel.settings.update {
+                it.copy(colorSystem = if (legacy) ColorSystem.LEGACY else ColorSystem.LADDER)
+            }
+        },
+        checkParams = checkParams,
+        checkPaintToken = checkPaintToken,
+    )
+    Caption(
+        "Repaints the app in the palette that preceded the ink ladder — the " +
+            "blue-cast Nightfall sheet and the un-corrected accents. Close to " +
+            "the old build but not exact: the ladder collapsed 54 alphas onto " +
+            "10 rungs, so each rung comes back at the weight most of its call " +
+            "sites used to carry. Switch with a chapter open to compare.",
+    )
 
     Spacer(Modifier.height(20.dp))
     ToggleRow(

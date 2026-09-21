@@ -133,6 +133,9 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.launch
 import kotlin.math.abs
 import kotlin.math.roundToInt
+import com.beautifulquran.ui.theme.LocalQuranInk
+import com.beautifulquran.ui.theme.contrastingOverlayInk
+import com.beautifulquran.ui.theme.contrastingOverlayAccents
 
 /** Grace after a concordance jump so the programmatic settle / page turn
  *  that lands the jump does not arm the "Back to …" dismiss timer. */
@@ -291,7 +294,10 @@ class MainActivity : ComponentActivity() {
                 }
             }
 
-            BeautifulQuranTheme(themeMode = settings.themeMode) {
+            BeautifulQuranTheme(
+                themeMode = settings.themeMode,
+                colorSystem = settings.colorSystem,
+            ) {
                 // Cold start paints the closed mushaf first; the paper stack
                 // mounts under it after the title settles (onWarmStack), not
                 // at splash handoff — so ViewModel init cannot jank first paint.
@@ -1147,7 +1153,10 @@ private fun PaperStackApp(
                     onRenderedChange = { chooserRendered = it },
                 ) {
                     MaterialTheme(colorScheme = overlayColors, typography = MaterialTheme.typography) {
-                        CompositionLocalProvider(LocalQuranAccents provides TimingsLabAccents) {
+                        CompositionLocalProvider(
+                            LocalQuranAccents provides contrastingOverlayAccents(),
+                            LocalQuranInk provides contrastingOverlayInk(themeMode),
+                        ) {
                             Box(Modifier.fillMaxSize()) {
                                 Box(Modifier.matchParentSize().absorbPointerEvents())
                                 WordHoldChooser(
@@ -1182,7 +1191,10 @@ private fun PaperStackApp(
                     onRenderedChange = { rootRendered = it },
                 ) {
                     MaterialTheme(colorScheme = overlayColors, typography = MaterialTheme.typography) {
-                        CompositionLocalProvider(LocalQuranAccents provides TimingsLabAccents) {
+                        CompositionLocalProvider(
+                            LocalQuranAccents provides contrastingOverlayAccents(),
+                            LocalQuranInk provides contrastingOverlayInk(themeMode),
+                        ) {
                             Box(Modifier.fillMaxSize()) {
                                 Box(Modifier.matchParentSize().absorbPointerEvents())
                                 RootViewerScreen(
@@ -1294,7 +1306,10 @@ private fun PaperStackApp(
             onRenderedChange = { labRendered = it },
         ) {
             MaterialTheme(colorScheme = overlayColors, typography = MaterialTheme.typography) {
-                CompositionLocalProvider(LocalQuranAccents provides TimingsLabAccents) {
+                CompositionLocalProvider(
+                    LocalQuranAccents provides contrastingOverlayAccents(),
+                    LocalQuranInk provides contrastingOverlayInk(themeMode),
+                ) {
                     Box(Modifier.fillMaxSize()) {
                         Box(Modifier.matchParentSize().absorbPointerEvents())
                         TimingsLabScreen(
@@ -1317,7 +1332,10 @@ private fun PaperStackApp(
             onRenderedChange = { ornamentsLabRendered = it },
         ) {
             MaterialTheme(colorScheme = overlayColors, typography = MaterialTheme.typography) {
-                CompositionLocalProvider(LocalQuranAccents provides TimingsLabAccents) {
+                CompositionLocalProvider(
+                    LocalQuranAccents provides contrastingOverlayAccents(),
+                    LocalQuranInk provides contrastingOverlayInk(themeMode),
+                ) {
                     Box(Modifier.fillMaxSize()) {
                         Box(Modifier.matchParentSize().absorbPointerEvents())
                         OrnamentsLabScreen(
@@ -1340,7 +1358,10 @@ private fun PaperStackApp(
             onRenderedChange = { tarjiLabRendered = it },
         ) {
             MaterialTheme(colorScheme = overlayColors, typography = MaterialTheme.typography) {
-                CompositionLocalProvider(LocalQuranAccents provides TimingsLabAccents) {
+                CompositionLocalProvider(
+                    LocalQuranAccents provides contrastingOverlayAccents(),
+                    LocalQuranInk provides contrastingOverlayInk(themeMode),
+                ) {
                     Box(Modifier.fillMaxSize()) {
                         Box(Modifier.matchParentSize().absorbPointerEvents())
                         TarjiLabScreen(

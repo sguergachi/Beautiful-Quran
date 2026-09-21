@@ -41,6 +41,25 @@ enum class PageNumberScript { BOTH, ARABIC, ENGLISH }
 /** Which screen edge the ayah selector rail lives on. */
 enum class AyahSelectorSide { LEFT, RIGHT }
 
+/**
+ * Which colour system paints the app.
+ *
+ * [LADDER] is what ships: one ink ladder pinned to perceptual targets, with
+ * every rung's alpha solved separately per theme. [LEGACY] reconstructs the
+ * palette as it stood before that pass — the blue-cast Nightfall sheet, the
+ * un-corrected accents, and each rung set back to the alpha the majority of
+ * its call sites used to carry.
+ *
+ * The reconstruction is close but not exact, and cannot be: the ladder
+ * collapsed 54 hand-picked alphas onto 10 rungs, so sites that used to differ
+ * by a point or two of alpha now share a rung and come back identical. It is
+ * faithful where it matters — the dominant weight at each rung, the old base
+ * inks, the old accents — which is enough to judge the two side by side.
+ *
+ * Developer-only A/B; see Settings → Developer.
+ */
+enum class ColorSystem { LADDER, LEGACY }
+
 /** Developer-selectable bookmark treatment on the Chapters sheet. */
 enum class HomeBookmarkStyle { TOP_BOUND, SAVED_PASSAGES }
 
@@ -108,6 +127,9 @@ data class Settings(
     val brushCircleStyle: BrushCircleStyle = BrushCircleStyle.BASELINE,
     /** Developer-only: removes parenthetical and bracketed asides from English-only reading. */
     val hideEnglishParentheticals: Boolean = false,
+    /** Developer-only A/B between the shipped ink ladder and the palette that
+     *  preceded it. See [ColorSystem]. */
+    val colorSystem: ColorSystem = ColorSystem.LADDER,
 )
 
 /** Maps a persisted ordinal back to an enum entry, falling back to [default]
@@ -178,6 +200,7 @@ class SettingsRepository(context: Context) {
         inkLabEnabled = prefs.getBoolean("inkLabEnabled", false),
         homeBookmarkStyle = prefs.homeBookmarkStyle(),
         brushCircleStyle = prefs.enum("brushCircleStyle", BrushCircleStyle.BASELINE),
+        colorSystem = prefs.enum("colorSystem", ColorSystem.LADDER),
         hideEnglishParentheticals = prefs.getBoolean("hideEnglishParentheticals", false),
     )
 
@@ -282,6 +305,7 @@ class SettingsRepository(context: Context) {
             putString("homeBookmarkStyleV2", next.homeBookmarkStyle.name)
             remove("homeBookmarkStyle")
             putInt("brushCircleStyle", next.brushCircleStyle.ordinal)
+            putInt("colorSystem", next.colorSystem.ordinal)
             putBoolean("hideEnglishParentheticals", next.hideEnglishParentheticals)
             remove("shareUxVariant")
         }

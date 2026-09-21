@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -19,8 +20,12 @@ import androidx.compose.ui.zIndex
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.beautifulquran.data.ThemeMode
 import com.beautifulquran.ui.theme.InkRevealOverlay
+import com.beautifulquran.ui.theme.LocalQuranAccents
+import com.beautifulquran.ui.theme.LocalQuranInk
 import com.beautifulquran.ui.theme.absorbPointerEvents
+import com.beautifulquran.ui.theme.contrastingOverlayAccents
 import com.beautifulquran.ui.theme.contrastingOverlayColorScheme
+import com.beautifulquran.ui.theme.contrastingOverlayInk
 
 /**
  * Owns gather/send back handling and the Send ink-bleed so MainActivity does
@@ -87,26 +92,33 @@ fun ShareHost(
         modifier = Modifier.zIndex(4.5f),
         onRenderedChange = { sendRendered = it },
     ) {
-        MaterialTheme(colorScheme = overlayColors, typography = MaterialTheme.typography) {
-            Box(Modifier.fillMaxSize()) {
-                Box(Modifier.matchParentSize().absorbPointerEvents())
-                ShareComposeSheet(
-                    verseLines = ui.verseLines,
-                    preparingText = ui.preparingText,
-                    preparingImage = ui.preparingImage,
-                    error = ui.error,
-                    onBack = viewModel::closeSend,
-                    onShareText = { viewModel.shareAsText() },
-                    onShareImage = {
-                        if (activity != null) {
-                            viewModel.shareAsImage(activity)
-                        } else {
-                            // Should not happen — ShareHost lives in MainActivity.
-                            viewModel.shareAsText()
-                        }
-                    },
-                    onRemove = viewModel::remove,
-                )
+        // The overlay swaps the sheet out from under its content, so it
+        // has to swap the ink ladder and accents too.
+        CompositionLocalProvider(
+            LocalQuranAccents provides contrastingOverlayAccents(),
+            LocalQuranInk provides contrastingOverlayInk(themeMode),
+        ) {
+    MaterialTheme(colorScheme = overlayColors, typography = MaterialTheme.typography) {
+                Box(Modifier.fillMaxSize()) {
+                    Box(Modifier.matchParentSize().absorbPointerEvents())
+                    ShareComposeSheet(
+                        verseLines = ui.verseLines,
+                        preparingText = ui.preparingText,
+                        preparingImage = ui.preparingImage,
+                        error = ui.error,
+                        onBack = viewModel::closeSend,
+                        onShareText = { viewModel.shareAsText() },
+                        onShareImage = {
+                            if (activity != null) {
+                                viewModel.shareAsImage(activity)
+                            } else {
+                                // Should not happen — ShareHost lives in MainActivity.
+                                viewModel.shareAsText()
+                            }
+                        },
+                        onRemove = viewModel::remove,
+                    )
+                }
             }
         }
     }
