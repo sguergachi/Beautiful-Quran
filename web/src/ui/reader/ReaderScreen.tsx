@@ -31,8 +31,8 @@ import {
   IconRepeat,
   IconRepeatOne,
   IconSearch,
-  IconTune,
 } from '../icons/PlaybackIcons'
+import { SettingsNuqtaButton } from '../theme/SettingsNuqtaButton'
 import { AyahSelectorRail, type AyahSelectorRailHandle } from './AyahSelectorRail'
 import { AyahRailTip } from './AyahRailTip'
 import { BookmarkNoteTip } from './BookmarkNoteTip'
@@ -1379,15 +1379,11 @@ export function ReaderScreen({ stackLayer }: { stackLayer: StackLayer }) {
             >
               <IconSearch />
             </button>
-            <button
-              type="button"
+            <SettingsNuqtaButton
               className="icon-btn"
-              aria-label="Settings"
               disabled={recitingActive}
-              onClick={() => appStore.setSheet('settings')}
-            >
-              <IconTune />
-            </button>
+              onActivate={() => appStore.setSheet('settings')}
+            />
           </div>
         )}
       </div>
@@ -1405,6 +1401,7 @@ export function ReaderScreen({ stackLayer }: { stackLayer: StackLayer }) {
               data-search-flash={flashTarget != null || undefined}
               data-search-focus-active={flashTarget?.focusActive || undefined}
               data-chapter-advancing={chapterAdvancing || undefined}
+              data-english={state.settings.readingMode === 'english_only' || undefined}
               style={{
                 ['--upcoming-alpha' as string]: String(inkTuning.upcomingAlpha),
                 ['--upcoming-cover' as string]: String(1 - inkTuning.upcomingAlpha),

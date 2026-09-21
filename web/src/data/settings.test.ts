@@ -38,6 +38,14 @@ describe('gapless5Playback setting', () => {
   })
 })
 
+describe('colorSystem setting', () => {
+  it('ships the ink ladder and only accepts the legacy palette by name', () => {
+    expect(normalizeSettings().colorSystem).toBe('ladder')
+    expect(normalizeSettings({ colorSystem: 'legacy' }).colorSystem).toBe('legacy')
+    expect(normalizeSettings({ colorSystem: 'nope' as never }).colorSystem).toBe('ladder')
+  })
+})
+
 describe('educationGuidesEnabled setting', () => {
   it('defaults off and coerces to boolean', () => {
     expect(normalizeSettings().educationGuidesEnabled).toBe(false)
