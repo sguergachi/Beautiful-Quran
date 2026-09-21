@@ -588,17 +588,36 @@ fun Modifier.shapedWordBloom(
                             } else {
                                 cover.left + local - lineEdge
                             }
+                            // The mask has to reach every pixel this layer could
+                            // have painted, not just the line box. The halo is
+                            // blurred out to [colorBleed] past the glyphs, so a
+                            // DstIn pass bounded by the box left that fringe
+                            // untouched: a word the sweep had not reached yet
+                            // still wore its full glow, hanging under the line
+                            // with no ink inside it.
+                            //
+                            // Only the painted area grows. The travel —
+                            // [total], [headX], and the brush's own origin under
+                            // [translate] — is still measured from [cover], and
+                            // the ramp is a horizontal clamped gradient, so
+                            // widening the rect cannot move or reshape it.
+                            val mask = washMaskRect(
+                                cover = cover,
+                                bleed = colorBleed,
+                                openTop = i == 0,
+                                openBottom = i == tintBounds.lastIndex,
+                            )
                             clipRect(
-                                left = cover.left,
-                                top = cover.top,
-                                right = cover.right,
-                                bottom = cover.bottom,
+                                left = mask.left,
+                                top = mask.top,
+                                right = mask.right,
+                                bottom = mask.bottom,
                             ) {
                                 translate(left = headX, top = 0f) {
                                     drawRect(
                                         brush = brush,
-                                        topLeft = Offset(cover.left - headX, cover.top),
-                                        size = Size(cover.width, cover.height),
+                                        topLeft = Offset(mask.left - headX, mask.top),
+                                        size = Size(mask.width, mask.height),
                                         blendMode = BlendMode.DstIn,
                                     )
                                 }
@@ -917,6 +936,28 @@ private class GlyphHaloCache {
         ).also { byRange[key] = it }
     }
 }
+
+/**
+ * The area one line's directional wash must cover.
+ *
+ * [cover] is the line box the sweep is measured across; the glow and tint reach
+ * [bleed] past it, and anything the wash does not cover keeps full alpha — ink
+ * and light the sweep has not arrived at yet. Vertical room is only opened at
+ * the ends of the range ([openTop]/[openBottom]): a word set over two lines
+ * would otherwise have one line's mask reach into the next and erase a
+ * neighbour's light that its own pass had already resolved.
+ */
+internal fun washMaskRect(
+    cover: Rect,
+    bleed: Float,
+    openTop: Boolean,
+    openBottom: Boolean,
+): Rect = Rect(
+    left = cover.left - bleed,
+    top = if (openTop) cover.top - bleed else cover.top,
+    right = cover.right + bleed,
+    bottom = if (openBottom) cover.bottom + bleed else cover.bottom,
+)
 
 /** Word-local horizontal bounds per line, at the layout's full line height. */
 private fun computeLineBounds(
