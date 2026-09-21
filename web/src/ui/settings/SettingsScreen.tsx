@@ -454,6 +454,27 @@ export function SettingsScreen({
 
             <div className="settings-dev-block">
               <PaperSwitch
+                id="setting-legacy-colours"
+                label="Legacy colours"
+                checked={s.colorSystem === 'legacy'}
+                checkParams={checkParams}
+                paintToken={checkPaintToken}
+                onChange={(legacy) =>
+                  appStore.updateSettings({ colorSystem: legacy ? 'legacy' : 'ladder' })
+                }
+              />
+              <p className="settings-caption">
+                Repaints the app in the palette that preceded the ink ladder —
+                the blue-cast Nightfall sheet and the un-corrected accents.
+                Close to the old build but not exact: the ladder collapsed 54
+                alphas onto 10 rungs, so each rung comes back at the weight
+                most of its call sites used to carry. Switch with a chapter
+                open to compare.
+              </p>
+            </div>
+
+            <div className="settings-dev-block">
+              <PaperSwitch
                 id="setting-education-guides"
                 label="Contextual feature guides"
                 checked={s.educationGuidesEnabled}

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react'
 import { appStore, shallowEqual, useAppSelector } from '../store/appStore'
 import { hasReaderOpen } from './paper/stack'
 import { HomeScreen } from './home/HomeScreen'
@@ -8,6 +8,7 @@ import { SettingsScreen } from './settings/SettingsScreen'
 import { EntranceCover } from './entrance/EntranceCover'
 import { BOOKMARKS_LAYER, COVER_LAYER } from './paper/stack'
 import { OrnamentsLab } from './lab/OrnamentsLab'
+import { syncSheetMotion } from './paper/sheetMotion'
 
 /** True while the URL hash routes to the Ornaments Lab (`#lab`). */
 function useLabRoute(): boolean {
@@ -67,6 +68,8 @@ export function App() {
   const [entranceDone, setEntranceDone] = useState(false)
   const isLab = useLabRoute()
   const swipeStart = useRef<{ x: number; y: number; pointerId: number } | null>(null)
+  const stack = state.stackLayer
+  const hasReader = hasReaderOpen(state.content, state.sheet)
 
   useEffect(() => {
     void appStore.init()
@@ -76,6 +79,11 @@ export function App() {
     const resolved = resolveTheme(state.settings.themeMode)
     if (resolved === 'light') document.documentElement.removeAttribute('data-theme')
     else document.documentElement.setAttribute('data-theme', resolved)
+    if (state.settings.colorSystem === 'legacy') {
+      document.documentElement.dataset.colors = 'legacy'
+    } else {
+      delete document.documentElement.dataset.colors
+    }
 
     // Cover owns theme-color while the leather is up.
     if (!entranceDone) return
@@ -83,10 +91,18 @@ export function App() {
     if (meta) {
       meta.setAttribute(
         'content',
-        resolved === 'light' ? '#FAF3E8' : resolved === 'royal_green' ? '#062C24' : '#0A0B0C',
+        resolved === 'light' ? '#FAF3E8' : resolved === 'royal_green' ? '#062C24' : state.settings.colorSystem === 'legacy' ? '#0A0B0C' : '#0C0B09',
       )
     }
-  }, [state.settings.themeMode, entranceDone])
+  }, [state.settings.themeMode, state.settings.colorSystem, entranceDone])
+
+  useLayoutEffect(() => {
+    syncSheetMotion({
+      hasReader,
+      stack,
+      openSurahId: state.content?.surah.id ?? 0,
+    })
+  }, [hasReader, stack, state.content?.surah.id])
 
   // Escape peels one sheet back through the paper stack (cover handles its own).
   useEffect(() => {
@@ -103,9 +119,6 @@ export function App() {
   // it renders over everything the moment the hash routes to it.
   if (isLab) return <OrnamentsLab />
 
-  const stack = state.stackLayer
-  // Keep explicit reader ownership as a guard for transient state restores.
-  const hasReader = hasReaderOpen(state.content, state.sheet)
   // The cover *is* the loading screen — show the shell underneath only once
   // the book is ready so the open reveals chapters, not an empty page.
   const showStack = state.ready

@@ -1,6 +1,5 @@
 import {
   useEffect,
-  useId,
   useMemo,
   useRef,
   useState,
@@ -13,8 +12,9 @@ import {
   IconPause,
   IconPlay,
 } from '../icons/PlaybackIcons'
-import { AlphaTag } from '../kit/AlphaTag'
 import { PaperInput } from '../kit/PaperInput'
+import { SettingsNuqtaButton } from '../theme/SettingsNuqtaButton'
+import { ContinueRow } from './ContinueRow'
 import {
   appStore,
   useAppSelector,
@@ -249,17 +249,12 @@ export function HomeScreen({ stackLayer }: { stackLayer: StackLayer }) {
         >
           <h1>
             <span>Beautiful Quran</span>
-            <AlphaTag />
           </h1>
-          <button
-            type="button"
+          <SettingsNuqtaButton
             className="home-settings"
-            aria-label="Open settings"
-            tabIndex={searchFocused ? -1 : undefined}
-            onClick={() => appStore.setSheet('settings')}
-          >
-            <HomeRosette />
-          </button>
+            disabled={searchFocused}
+            onActivate={() => appStore.setSheet('settings')}
+          />
         </header>
 
         <div className="edge-fade">
@@ -315,34 +310,13 @@ export function HomeScreen({ stackLayer }: { stackLayer: StackLayer }) {
               </div>
 
             {continueSurah ? (
-              <div className="continue-row">
-                <button
-                  type="button"
-                  className="continue"
-                  onPointerEnter={() => prepareChapter(continueSurah.id)}
-                  onPointerDown={() => prepareChapter(continueSurah.id)}
-                  onFocus={() => prepareChapter(continueSurah.id)}
-                  onClick={() =>
-                    appStore.openSurah(
-                      continueSurah.id,
-                      state.settings.lastAyah || 1,
-                    )
-                  }
-                >
-                  <span className="continue-copy">
-                    <span className="continue-label">Continue listening</span>
-                    <span className="continue-target">
-                      {continueSurah.nameTransliteration}
-                      {state.settings.lastAyah > 0
-                        ? ` · Ayah ${state.settings.lastAyah}`
-                        : ''}
-                    </span>
-                  </span>
-                  <span className="continue-ar" lang="ar" dir="rtl">
-                    {continueSurah.nameArabic}
-                  </span>
-                </button>
-              </div>
+              <ContinueRow
+                surahId={continueSurah.id}
+                ayah={state.settings.lastAyah || 1}
+                transliteration={continueSurah.nameTransliteration}
+                arabic={continueSurah.nameArabic}
+                onPrepare={() => prepareChapter(continueSurah.id)}
+              />
             ) : null}
 
             {hasBookmarks && bookmarkStyle === 'saved_passages' && !searching ? (
@@ -514,55 +488,6 @@ export function HomeScreen({ stackLayer }: { stackLayer: StackLayer }) {
         </div>
       ) : null}
     </div>
-  )
-}
-
-function HomeRosette() {
-  const gradientId = useId()
-  const octagram = Array.from({ length: 9 }, (_, i) => {
-    const k = (i * 3) % 8
-    const angle = ((22.5 + k * 45) * Math.PI) / 180
-    return `${50 + 33 * Math.cos(angle)},${50 + 33 * Math.sin(angle)}`
-  }).join(' ')
-  const geometry = (
-    <>
-      <path d="M17.5 17.5H82.5V82.5H17.5ZM50 4L96 50 50 96 4 50Z" />
-      <polyline points={octagram} />
-    </>
-  )
-
-  return (
-    <svg className="home-rosette" viewBox="0 0 100 100" aria-hidden="true">
-      <defs>
-        <linearGradient id={gradientId} x1="0" y1="35" x2="100" y2="65">
-          <stop offset="0" stopColor="var(--gold-deep)" />
-          <stop offset="0.5" stopColor="var(--gold-bright)" />
-          <stop offset="1" stopColor="var(--gold-deep)" />
-        </linearGradient>
-      </defs>
-      <g className="home-rosette-relief home-rosette-dark" transform="translate(0.8 0.8)">
-        {geometry}
-      </g>
-      <g className="home-rosette-relief home-rosette-light" transform="translate(-0.8 -0.8)">
-        {geometry}
-      </g>
-      <g className="home-rosette-face" stroke={`url(#${gradientId})`}>
-        {geometry}
-      </g>
-      <circle cx="50" cy="50" r="3.5" fill={`url(#${gradientId})`} />
-      {Array.from({ length: 8 }, (_, k) => {
-        const angle = (k * Math.PI) / 4
-        return (
-          <circle
-            key={k}
-            cx={50 + 46 * Math.cos(angle)}
-            cy={50 + 46 * Math.sin(angle)}
-            r="1.8"
-            fill={`url(#${gradientId})`}
-          />
-        )
-      })}
-    </svg>
   )
 }
 

@@ -7,6 +7,8 @@ export type VerseNumberScript = 'arabic' | 'english'
 export type PageNumberScript = 'both' | 'arabic' | 'english'
 export type AyahSelectorSide = 'left' | 'right'
 export type HomeBookmarkStyle = 'top_bound' | 'saved_passages'
+/** Android `ColorSystem`. Ladder ships; legacy is the pre-ladder palette. */
+export type ColorSystem = 'ladder' | 'legacy'
 
 export const HOME_BOOKMARK_STYLES: HomeBookmarkStyle[] = [
   'top_bound',
@@ -51,6 +53,8 @@ export interface Settings {
   playbackSpeed: number
   /** Reveals developer tools (e.g. the Ornaments Lab). Off by default. */
   developerMode: boolean
+  /** Developer A/B: the ink ladder, or the palette that preceded it. */
+  colorSystem: ColorSystem
   /**
    * Developer-only gate for contextual feature lessons. Off until their
    * visual language is approved for readers. Enabling rearms every lesson.
@@ -82,6 +86,7 @@ const DEFAULTS: Settings = {
   lastAyah: 1,
   playbackSpeed: 1,
   developerMode: false,
+  colorSystem: 'ladder',
   educationGuidesEnabled: false,
   gapless5Playback: true,
   homeBookmarkStyle: 'top_bound',
@@ -108,6 +113,7 @@ export function normalizeSettings(partial: Partial<Settings> = {}): Settings {
     ...partial,
     fontScale: clampFontScale(partial.fontScale ?? DEFAULTS.fontScale),
     developerMode: Boolean(partial.developerMode ?? DEFAULTS.developerMode),
+    colorSystem: partial.colorSystem === 'legacy' ? 'legacy' : 'ladder',
     educationGuidesEnabled: Boolean(
       partial.educationGuidesEnabled ?? DEFAULTS.educationGuidesEnabled,
     ),
