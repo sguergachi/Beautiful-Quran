@@ -162,6 +162,7 @@ import com.beautifulquran.ui.theme.verticalFadingEdges
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.first
+import com.beautifulquran.ui.theme.QuranTheme
 
 internal fun Int.toArabicIndic(): String =
     toString().map { '٠' + (it - '0') }.joinToString("")
@@ -1696,7 +1697,7 @@ private fun WordUnit(
                 text = word.transliteration,
                 fontSize = 11.sp * fontScale,
                 lineHeight = 14.sp * fontScale,
-                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.55f),
+                color = QuranTheme.ink.quiet,
                 textAlign = TextAlign.Center,
                 modifier = Modifier.glyphLayerAlpha {
                     motion.secondaryAlpha() *
@@ -3230,7 +3231,7 @@ fun AyahBlock(
                         // 17/26 at every size: leading follows the type.
                         lineHeight = MaterialTheme.typography.bodyLarge.lineHeight * (0.9f + 0.1f * fontScale),
                     ),
-                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.66f),
+                    color = QuranTheme.ink.secondary,
                     modifier = Modifier
                         .fillMaxWidth()
                         .graphicsLayer {
@@ -3419,7 +3420,7 @@ private fun GatherOrdinalMark(
         ) {
             Text(
                 text = ordinal.toString(),
-                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.72f),
+                color = QuranTheme.ink.body,
                 style = TextStyle(
                     fontFamily = SerifFontFamily,
                     fontSize = GatherOrdinalSp.sp,
@@ -3495,7 +3496,7 @@ fun ChapterOpening(
                     .matchParentSize()
                     .generatedFieldWeave(
                         field = ornament.field,
-                        ink = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.04f),
+                        ink = QuranTheme.ink.wash,
                         embossLight = accents.embossLight.copy(alpha = 0.05f),
                     )
                     .verticalFadingEdges(color = weaveFade, top = 12.dp, bottom = 36.dp),
@@ -3554,13 +3555,13 @@ fun ChapterOpening(
                 Text(
                     text = "$nameTransliteration · $nameTranslation",
                     style = MaterialTheme.typography.titleMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.85f),
+                    color = QuranTheme.ink.tertiary,
                 )
                 Spacer(Modifier.height(ScrollGrid.SUBTITLE_TO_META))
                 Text(
                     text = "Chapter $chapterNumber · ${revelationPlace.replaceFirstChar { it.uppercase() }} · $ayahCount ayahs",
                     style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
+                    color = QuranTheme.ink.quiet,
                 )
             }
         }
@@ -3691,7 +3692,7 @@ fun OrnateSurahTitle(
                         letterSpacing = transliterationSpacing,
                     ),
                     fontSize = CAPS_LABEL_SIZE,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
+                    color = QuranTheme.ink.quiet,
                     textAlign = TextAlign.Center,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
@@ -3861,7 +3862,7 @@ fun NextChapterFooter(
                 text = "NEXT",
                 style = MaterialTheme.typography.labelSmall.copy(letterSpacing = CAPS_TRACKING),
                 fontSize = CAPS_LABEL_SIZE,
-                color = accents.gold.copy(alpha = 0.55f),
+                color = accents.goldInk,
             )
         }
 
@@ -3923,6 +3924,7 @@ fun NextChapterOpenPill(
     chevronDown: Boolean = true,
 ) {
     val colors = MaterialTheme.colorScheme
+    val greenWash = QuranTheme.accents.greenWash
     val label = "Open $chapterName"
     val fill = fillProgress.coerceIn(0f, 1f)
     // Ink flips to the fill's contrasting color once the wash covers the label.
@@ -3952,7 +3954,7 @@ fun NextChapterOpenPill(
                     )
                 }
                 // Quiet resting wash.
-                drawPath(capsule, colors.primary.copy(alpha = 0.10f))
+                drawPath(capsule, greenWash)
                 // Progress fill — clipped stadium growing left → right.
                 if (fill > 0f) {
                     clipRect(right = size.width * fill) {
@@ -4027,13 +4029,13 @@ fun PreviousChapterPullChrome(
             text = "PREVIOUS",
             style = MaterialTheme.typography.labelSmall.copy(letterSpacing = CAPS_TRACKING),
             fontSize = CAPS_LABEL_SIZE,
-            color = accents.gold.copy(alpha = 0.55f),
+            color = accents.goldInk,
         )
         Spacer(Modifier.height(ScrollGrid.PULL_LABEL_GAP))
         Text(
             text = nameTransliteration,
             style = MaterialTheme.typography.titleMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.85f),
+            color = QuranTheme.ink.tertiary,
         )
         Spacer(Modifier.height(ScrollGrid.PULL_PILL_GAP))
         NextChapterOpenPill(

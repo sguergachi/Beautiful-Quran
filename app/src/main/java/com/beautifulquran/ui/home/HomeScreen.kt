@@ -96,6 +96,7 @@ import com.beautifulquran.ui.theme.PaperSearchField
 import com.beautifulquran.ui.theme.paperBottomFeather
 import com.beautifulquran.ui.theme.quietClickable
 import com.beautifulquran.ui.theme.verticalFadingEdges
+import com.beautifulquran.ui.theme.QuranTheme
 
 /** The search field leads the scrolling document beneath the fixed masthead. */
 private const val SEARCH_ITEM_INDEX = 0
@@ -433,7 +434,7 @@ fun HomeScreen(
                             Text(
                                 text = "No relevant ayahs found",
                                 style = MaterialTheme.typography.bodyLarge,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.45f),
+                                color = QuranTheme.ink.quiet,
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .padding(
@@ -560,7 +561,7 @@ private fun HomeHeader(
             SettingsNuqtaIcon(
                 state = settingsNuqta,
                 contentDescription = "Open settings",
-                tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.55f),
+                tint = QuranTheme.ink.quiet,
             )
         }
     }
@@ -650,7 +651,7 @@ private fun SavedPassagesRow(
             Text(
                 text = "Saved passages",
                 style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.primary.copy(alpha = 0.75f),
+                color = QuranTheme.accents.greenQuiet,
             )
             Spacer(Modifier.height(2.dp))
             Text(
@@ -672,7 +673,7 @@ private fun ContinueRow(target: ContinueTarget, onClick: () -> Unit) {
         modifier = Modifier
             .fillMaxWidth()
             .padding(top = 18.dp)
-            .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.1f))
+            .background(QuranTheme.accents.greenWash)
             .continueInkWash(ink, color = MaterialTheme.colorScheme.primary)
             .quietClickable {
                 ink.tapped = true
@@ -713,7 +714,7 @@ private fun ContinueRowContent(
             Text(
                 text = "Continue listening",
                 style = MaterialTheme.typography.labelMedium,
-                color = if (onInk) colors.onPrimary.copy(alpha = 0.8f) else colors.primary.copy(alpha = 0.75f),
+                color = if (onInk) colors.onPrimary.copy(alpha = 0.8f) else QuranTheme.accents.greenQuiet,
             )
             Spacer(Modifier.height(2.dp))
             Text(
@@ -782,7 +783,7 @@ private fun SurahRow(
             Text(
                 text = surah.id.toString(),
                 style = MaterialTheme.typography.labelMedium,
-                color = accents.gold.copy(alpha = 0.75f),
+                color = accents.goldInk,
             )
         }
         Spacer(Modifier.width(HomeColumnGap))
@@ -797,7 +798,7 @@ private fun SurahRow(
             Text(
                 text = "${surah.nameTranslation} · ${surah.ayahCount} ayahs",
                 style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.55f),
+                color = QuranTheme.ink.quiet,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
@@ -806,7 +807,7 @@ private fun SurahRow(
         Text(
             text = surah.nameArabic,
             style = ArabicTitleStyle,
-            color = MaterialTheme.colorScheme.primary.copy(alpha = 0.9f),
+            color = QuranTheme.accents.greenInk,
             modifier = Modifier.padding(end = HomeArabicOpticalInset),
         )
     }
@@ -823,7 +824,7 @@ private fun SearchSectionLabel(text: String, topPadding: Dp = 8.dp) {
     Text(
         text = text,
         style = MaterialTheme.typography.labelLarge,
-        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
+        color = QuranTheme.ink.quiet,
         modifier = Modifier
             .fillMaxWidth()
             .padding(
@@ -841,13 +842,13 @@ private fun SearchCorrectionLabel(correctedQuery: String) {
     Text(
         text = buildAnnotatedString {
             append("Searching instead for ")
-            withStyle(SpanStyle(color = accents.gold.copy(alpha = 0.8f))) {
+            withStyle(SpanStyle(color = accents.goldInk)) {
                 append(correctedQuery)
             }
         },
         style = MaterialTheme.typography.labelLarge,
         fontWeight = FontWeight.Normal,
-        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
+        color = QuranTheme.ink.quiet,
         modifier = Modifier
             .fillMaxWidth()
             .padding(
@@ -861,7 +862,7 @@ private fun SearchCorrectionLabel(correctedQuery: String) {
 @Composable
 private fun WordSearchSurahHeader(section: SurahWordSearchSection) {
     val accents = LocalQuranAccents.current
-    val rule = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.1f)
+    val rule = QuranTheme.ink.wash
     Row(
         verticalAlignment = Alignment.CenterVertically,
         modifier = Modifier
@@ -894,14 +895,14 @@ private fun WordSearchSurahHeader(section: SurahWordSearchSection) {
         Text(
             text = "${section.totalCount}",
             style = MaterialTheme.typography.labelMedium,
-            color = accents.gold.copy(alpha = 0.7f),
+            color = accents.goldInk,
         )
         Spacer(Modifier.width(10.dp))
         Text(
             text = section.surahNameArabic,
             style = ArabicTitleStyle,
             fontSize = 20.sp,
-            color = MaterialTheme.colorScheme.primary.copy(alpha = 0.85f),
+            color = QuranTheme.accents.greenInk,
         )
     }
 }
@@ -963,14 +964,14 @@ private fun WordSearchHitRow(
                 append(" · ${hit.matchReason}")
             },
             style = MaterialTheme.typography.labelMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.45f),
+            color = QuranTheme.ink.quiet,
         )
         if (translation.isNotBlank()) {
             Spacer(Modifier.height(4.dp))
             Text(
                 text = translation,
                 style = MaterialTheme.typography.bodyLarge,
-                color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.88f),
+                color = QuranTheme.ink.strong,
                 maxLines = 4,
                 overflow = TextOverflow.Ellipsis,
             )
@@ -986,7 +987,7 @@ private fun WordSearchExpandRow(
     Text(
         text = "Show ${section.hiddenCount} more in ${section.surahNameTransliteration}",
         style = MaterialTheme.typography.labelLarge,
-        color = MaterialTheme.colorScheme.primary.copy(alpha = 0.85f),
+        color = QuranTheme.accents.greenInk,
         modifier = Modifier
             .fillMaxWidth()
             .quietClickable(role = Role.Button, onClick = onClick)
@@ -1004,7 +1005,7 @@ private fun WordSearchCollapseRow(onClick: () -> Unit) {
     Text(
         text = "Show less",
         style = MaterialTheme.typography.labelLarge,
-        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.55f),
+        color = QuranTheme.ink.quiet,
         modifier = Modifier
             .fillMaxWidth()
             .quietClickable(role = Role.Button, onClick = onClick)

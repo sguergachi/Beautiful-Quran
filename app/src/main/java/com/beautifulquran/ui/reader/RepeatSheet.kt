@@ -34,6 +34,7 @@ import com.beautifulquran.ui.home.SearchDialWheel
 import com.beautifulquran.ui.theme.InkCircledChoiceColumn
 import com.beautifulquran.ui.theme.UnselectedChoiceInk
 import com.beautifulquran.ui.theme.quietClickable
+import com.beautifulquran.ui.theme.QuranTheme
 
 /** How playback should loop, chosen on the repeat sheet. */
 enum class RepeatChoice(val label: String) {
@@ -234,7 +235,7 @@ fun RepeatSheet(
             Text(
                 text = "Repeat",
                 style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.45f),
+                color = QuranTheme.ink.muted,
             )
             Spacer(Modifier.height(24.dp))
 
@@ -385,7 +386,7 @@ private fun BoxScope.RangeJoint() {
         text = "to",
         style = MaterialTheme.typography.bodyMedium,
         // Quiet ink — it is the joint between the figures, not a third figure.
-        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.45f),
+        color = QuranTheme.ink.muted,
         modifier = Modifier.align(Alignment.Center),
     )
 }
@@ -495,7 +496,7 @@ private fun RepeatFromHereDial(
                 Text(
                     text = "ayahs",
                     style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.45f),
+                    color = QuranTheme.ink.muted,
                 )
             }
         }
@@ -550,7 +551,7 @@ private fun RepeatRangeLabel(from: Int, to: Int) {
             Text(
                 text = RangeJoinWord,
                 style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.45f),
+                color = QuranTheme.ink.muted,
             )
             Text(
                 text = to.toString(),

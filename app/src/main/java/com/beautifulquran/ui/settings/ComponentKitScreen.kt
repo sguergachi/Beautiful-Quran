@@ -56,6 +56,7 @@ import com.beautifulquran.ui.theme.shippedCheckParams
 import com.beautifulquran.ui.theme.verticalFadingEdges
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import com.beautifulquran.ui.theme.QuranTheme
 
 /** The components the kit tunes, in swipe order. */
 private enum class KitComponent(val title: String, val blurb: String) {
@@ -172,7 +173,7 @@ private fun KitPage(
         Text(
             text = "${index + 1} of $count · ${component.blurb}",
             style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+            color = QuranTheme.ink.muted,
         )
         Spacer(Modifier.height(16.dp))
         // The stage: stays put while the dials below scroll, so every change

@@ -42,6 +42,7 @@ import com.beautifulquran.ui.theme.LocalQuranAccents
 import com.beautifulquran.ui.theme.SerifFontFamily
 import com.beautifulquran.ui.theme.quietClickable
 import com.beautifulquran.ui.theme.verticalFadingEdges
+import com.beautifulquran.ui.theme.QuranTheme
 
 /**
  * Send page for a gathered selection — text + full-ink image.
@@ -59,7 +60,7 @@ fun ShareComposeSheet(
     onShareImage: () -> Unit,
     onRemove: (AyahRef) -> Unit,
 ) {
-    val gold = LocalQuranAccents.current.gold
+    val gold = LocalQuranAccents.current.goldInk
     val busy = preparingText || preparingImage
     val canShare = !busy && verseLines.isNotEmpty()
     Scaffold(
@@ -126,7 +127,7 @@ fun ShareComposeSheet(
                 Text(
                     text = error,
                     style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.75f),
+                    color = QuranTheme.ink.muted,
                     textAlign = TextAlign.Center,
                     modifier = Modifier
                         .fillMaxWidth()
@@ -170,7 +171,7 @@ private fun ShareActionLine(
     Text(
         text = label,
         style = MaterialTheme.typography.titleMedium,
-        color = if (enabled) gold else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f),
+        color = if (enabled) gold else QuranTheme.ink.quiet,
         textAlign = TextAlign.Center,
         modifier = Modifier
             .fillMaxWidth()
@@ -192,7 +193,7 @@ private fun GatheredVerseLine(
     line: ShareVerseLine,
     onRemove: () -> Unit,
 ) {
-    val gold = LocalQuranAccents.current.gold
+    val gold = LocalQuranAccents.current.goldInk
     Row(
         verticalAlignment = Alignment.Top,
         modifier = Modifier
@@ -202,7 +203,7 @@ private fun GatheredVerseLine(
         Text(
             text = ordinal.toString(),
             style = MaterialTheme.typography.titleMedium.copy(fontFamily = SerifFontFamily),
-            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.72f),
+            color = QuranTheme.ink.body,
             modifier = Modifier
                 .padding(end = 14.dp, top = 2.dp)
                 .width(22.dp),
@@ -217,7 +218,7 @@ private fun GatheredVerseLine(
                     lineHeight = 30.sp,
                     textDirection = TextDirection.Rtl,
                 ),
-                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.92f),
+                color = QuranTheme.ink.strong,
                 maxLines = 2,
                 overflow = TextOverflow.Ellipsis,
                 textAlign = TextAlign.Start,
@@ -227,7 +228,7 @@ private fun GatheredVerseLine(
             Text(
                 text = line.reference,
                 style = MaterialTheme.typography.labelMedium,
-                color = gold.copy(alpha = 0.85f),
+                color = gold,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
@@ -235,7 +236,7 @@ private fun GatheredVerseLine(
         Text(
             text = "×",
             style = MaterialTheme.typography.headlineSmall,
-            color = gold.copy(alpha = 0.88f),
+            color = gold,
             modifier = Modifier
                 .padding(start = 10.dp, top = 0.dp)
                 .semantics {

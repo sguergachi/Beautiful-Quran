@@ -104,6 +104,8 @@ import com.beautifulquran.ui.theme.shippedCheckParams
 import com.beautifulquran.ui.theme.themePreviewColors
 import com.beautifulquran.ui.theme.verticalFadingEdges
 import kotlin.math.roundToInt
+import com.beautifulquran.ui.theme.QuranTheme
+import com.beautifulquran.data.ColorSystem
 
 private val ATTRIBUTIONS = """
 Quran text (Uthmani script) and Saheeh International translation via the
@@ -302,7 +304,7 @@ internal fun SettingsScreen(
                     Text(
                         text = usage?.let(::formatUsage) ?: "…",
                         style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.55f),
+                        color = QuranTheme.ink.quiet,
                     )
                 }
                 DisclosureChevron(expanded = false)
@@ -352,7 +354,7 @@ internal fun SettingsScreen(
                 text = ATTRIBUTIONS,
                 style = MaterialTheme.typography.bodyMedium,
                 textAlign = TextAlign.Center,
-                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.55f),
+                color = QuranTheme.ink.quiet,
                 modifier = Modifier.fillMaxWidth(),
             )
             Spacer(Modifier.height(48.dp))
@@ -390,6 +392,26 @@ private fun DeveloperSection(
     Spacer(Modifier.height(20.dp))
     val app = context.applicationContext as QuranApp
     MushafRuntimeCacheStatus(app.runtimeMushaf)
+
+    Spacer(Modifier.height(20.dp))
+    ToggleRow(
+        label = "Legacy colours",
+        checked = settings.colorSystem == ColorSystem.LEGACY,
+        onChange = { legacy ->
+            viewModel.settings.update {
+                it.copy(colorSystem = if (legacy) ColorSystem.LEGACY else ColorSystem.LADDER)
+            }
+        },
+        checkParams = checkParams,
+        checkPaintToken = checkPaintToken,
+    )
+    Caption(
+        "Repaints the app in the palette that preceded the ink ladder — the " +
+            "blue-cast Nightfall sheet and the un-corrected accents. Close to " +
+            "the old build but not exact: the ladder collapsed 54 alphas onto " +
+            "10 rungs, so each rung comes back at the weight most of its call " +
+            "sites used to carry. Switch with a chapter open to compare.",
+    )
 
     Spacer(Modifier.height(20.dp))
     ToggleRow(
@@ -593,7 +615,7 @@ internal fun BackChevron(onBack: () -> Unit) {
         Icon(
             imageVector = Icons.AutoMirrored.Rounded.ArrowBack,
             contentDescription = "Back",
-            tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.75f),
+            tint = QuranTheme.ink.body,
             modifier = Modifier.size(24.dp),
         )
     }
@@ -626,7 +648,7 @@ private fun Colophon(
             Text(
                 text = stringResource(R.string.app_name),
                 style = MaterialTheme.typography.titleLarge,
-                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.85f),
+                color = QuranTheme.ink.strong,
             )
             AlphaTag()
         }
@@ -636,7 +658,7 @@ private fun Colophon(
                 if (developerModeEnabled) append(" · developer mode")
             },
             style = MaterialTheme.typography.labelMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
+            color = QuranTheme.ink.quiet,
         )
     }
 }
@@ -666,7 +688,7 @@ private fun NavigateRow(
             Text(
                 text = note,
                 style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+                color = QuranTheme.ink.muted,
             )
         }
         DisclosureChevron(expanded = false)
@@ -708,7 +730,7 @@ internal fun SelectRow(
                 Text(
                     text = note,
                     style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.55f),
+                    color = QuranTheme.ink.quiet,
                 )
             }
         }
@@ -1168,9 +1190,9 @@ internal fun TextSizeControl(scale: Float, onScale: (Float) -> Unit) {
     var widthPx by remember { mutableStateOf(1) }
     val fraction = ((scale - FONT_SCALE_MIN) / (FONT_SCALE_MAX - FONT_SCALE_MIN)).coerceIn(0f, 1f)
     val animFraction by animateFloatAsState(fraction, label = "sizeDot")
-    val trackInk = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.28f)
+    val trackInk = QuranTheme.ink.furniture
     val accent = MaterialTheme.colorScheme.primary
-    val glyphInk = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
+    val glyphInk = QuranTheme.ink.muted
 
     fun setFromX(x: Float) {
         val f = (x / widthPx.coerceAtLeast(1)).coerceIn(0f, 1f)
@@ -1355,7 +1377,7 @@ internal fun SectionLabel(text: String) {
         text = text.uppercase(),
         style = MaterialTheme.typography.labelSmall,
         letterSpacing = 2.sp,
-        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.45f),
+        color = QuranTheme.ink.muted,
     )
 }
 
@@ -1364,6 +1386,6 @@ internal fun Caption(text: String) {
     Text(
         text = text,
         style = MaterialTheme.typography.labelSmall,
-        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.55f),
+        color = QuranTheme.ink.quiet,
     )
 }

@@ -45,6 +45,7 @@ import com.beautifulquran.ui.theme.FloatingControlBottomInset
 import com.beautifulquran.ui.theme.FloatingPaperEnter
 import com.beautifulquran.ui.theme.FloatingPaperExit
 import com.beautifulquran.ui.theme.quietClickable
+import com.beautifulquran.ui.theme.QuranTheme
 
 /** Extra list padding so the last surah rows clear the floating transport. */
 val FloatingPlaybackListClearance: Dp = 96.dp
@@ -108,7 +109,7 @@ fun FloatingPlaybackControl(
                         Text(
                             text = reciterName,
                             style = MaterialTheme.typography.labelMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+                            color = QuranTheme.ink.muted,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
                         )
@@ -119,7 +120,7 @@ fun FloatingPlaybackControl(
                         modifier = Modifier
                             .padding(vertical = 4.dp)
                             .background(
-                                MaterialTheme.colorScheme.primary.copy(alpha = 0.1f),
+                                QuranTheme.accents.greenWash,
                                 RoundedCornerShape(50),
                             )
                             .quietClickable(onClick = onOpenNowPlaying)
@@ -140,12 +141,12 @@ fun FloatingPlaybackControl(
                         Text(
                             text = "  ·  ",
                             style = MaterialTheme.typography.titleMedium,
-                            color = MaterialTheme.colorScheme.primary.copy(alpha = 0.4f),
+                            color = QuranTheme.accents.greenQuiet,
                         )
                         Text(
                             text = ayahLabel,
                             style = MaterialTheme.typography.titleMedium,
-                            color = MaterialTheme.colorScheme.primary.copy(alpha = 0.75f),
+                            color = QuranTheme.accents.greenInk,
                             maxLines = 1,
                         )
                         Icon(
@@ -176,7 +177,7 @@ fun FloatingPlaybackControl(
                                 },
                                 contentDescription = "Repeat",
                                 tint = if (state.repeatMode == Player.REPEAT_MODE_OFF && !rangeActive) {
-                                    MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.45f)
+                                    QuranTheme.ink.furniture
                                 } else {
                                     MaterialTheme.colorScheme.primary
                                 },
@@ -225,7 +226,7 @@ fun FloatingPlaybackControl(
                                 text = "${if (state.speed % 1f == 0f) state.speed.toInt() else state.speed}×",
                                 style = MaterialTheme.typography.labelMedium,
                                 color = if (state.speed == 1f) {
-                                    MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.45f)
+                                    QuranTheme.ink.furniture
                                 } else {
                                     MaterialTheme.colorScheme.primary
                                 },
@@ -243,7 +244,7 @@ fun FloatingPlaybackControl(
                     Icon(
                         Icons.Rounded.Close,
                         contentDescription = "Close playback",
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.45f),
+                        tint = QuranTheme.ink.furniture,
                         modifier = Modifier.size(20.dp),
                     )
                 }

@@ -41,6 +41,7 @@ import java.util.Locale
 import kotlin.math.ln
 import kotlin.math.pow
 import kotlin.math.roundToInt
+import com.beautifulquran.ui.theme.QuranTheme
 
 /**
  * Developer-mode overlay for tuning the highlight feel live: sliders bound
@@ -719,7 +720,7 @@ private fun LabCaption(text: String) {
     Text(
         text = text,
         style = MaterialTheme.typography.labelSmall,
-        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.72f),
+        color = QuranTheme.ink.muted,
         modifier = Modifier
             .fillMaxWidth()
             .padding(bottom = 4.dp),
