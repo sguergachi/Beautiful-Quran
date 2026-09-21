@@ -27,6 +27,7 @@ import androidx.compose.ui.graphics.Paint
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
 import androidx.compose.ui.unit.dp
+import com.beautifulquran.ui.PageTurnSounds
 import com.beautifulquran.ui.theme.LocalNuqtaParams
 import com.beautifulquran.ui.theme.NuqtaParams
 import com.beautifulquran.ui.theme.drawInkWashCoats
@@ -46,13 +47,18 @@ import kotlinx.coroutines.launch
  */
 val LocalReaderApproach = staticCompositionLocalOf<() -> Float> { { 0f } }
 
+/** The surah the paper stack is turning into, 0 when none. */
+val LocalOpenSurahId = staticCompositionLocalOf { { 0 } }
+
 /**
- * Ink that floods the continue row the moment the chapter list starts to turn
- * into the reader it continues. The wash plays out on its own clock whatever
- * the drag does. It stays wet under the reader, and whenever the chapter list
- * settles again — a turn let go short, or a return from the reader — it wipes
- * back out of the row toward where it landed. The ink stays dense as it
- * withdraws, so every word is plainly on ink or on paper, never half-way.
+ * Ink that floods the continue row when Continue is chosen — a tap on that
+ * row, or a swipe into that chapter. Opening some other chapter from the
+ * list does not. The wash plays out on its own clock whatever the drag does.
+ * It stays wet under the reader. Returning, it stays wet through the lift
+ * and the wipe is scrubbed by the same swipe that plays the stems: it starts
+ * with the sweep and finishes the frame the drop — the ending of the sound
+ * — begins. A turn let go short wipes the leftover. The ink stays dense as
+ * it withdraws, so every word is plainly on ink or on paper, never half-way.
  */
 @Stable
 internal class ContinueInk(val params: NuqtaParams) {
@@ -102,11 +108,13 @@ internal class ContinueInk(val params: NuqtaParams) {
 private enum class ContinueTurn { Resting, Turning, Landed }
 
 @Composable
-internal fun rememberContinueInk(): ContinueInk {
+internal fun rememberContinueInk(continueSurahId: Int): ContinueInk {
     val params = LocalNuqtaParams.current
     val ink = remember(params) { ContinueInk(params) }
     val approach = LocalReaderApproach.current
-    LaunchedEffect(ink, approach) {
+    val openSurahId = LocalOpenSurahId.current
+    LaunchedEffect(ink, approach, continueSurahId, openSurahId) {
+        var fromReader = false
         snapshotFlow {
             val p = approach()
             when {
@@ -115,36 +123,68 @@ internal fun rememberContinueInk(): ContinueInk {
                 else -> ContinueTurn.Resting
             }
         }.distinctUntilChanged().collectLatest { turn ->
+            val toContinue = continueInkToContinueChapter(openSurahId(), continueSurahId)
             when (turn) {
                 ContinueTurn.Turning -> coroutineScope {
-                    // The wash plays out on its own clock. Turned again
-                    // mid-wipe, the wipe runs back from where it stands, as
-                    // fast as it came, while the flood carries on — every
-                    // interruption picks up the ink exactly as it is.
-                    launch {
-                        ink.dry.animateTo(
-                            0f,
-                            tween((ContinueInkDryMs * ink.dry.value).roundToInt(), easing = ContinueInkRewetEasing),
+                    if (continueInkShouldWipe(tapped = ink.tapped, fromReader = fromReader)) {
+                        // Same clock as the stems: wet through the lift,
+                        // wipe through the sweep, gone the frame the drop
+                        // (the ending) starts.
+                        snapshotFlow { continueWipeProgress(1f - approach()) }
+                            .collect { ink.dry.snapTo(it) }
+                    } else if (
+                        continueInkShouldFlood(
+                            tapped = ink.tapped,
+                            fromReader = fromReader,
+                            toContinueChapter = toContinue,
                         )
+                    ) {
+                        fromReader = false
+                        // The wash plays out on its own clock. Turned again
+                        // mid-wipe, the wipe runs back from where it stands, as
+                        // fast as it came, while the flood carries on — every
+                        // interruption picks up the ink exactly as it is.
+                        launch {
+                            ink.dry.animateTo(
+                                0f,
+                                tween(
+                                    (ContinueInkDryMs * ink.dry.value).roundToInt(),
+                                    easing = ContinueInkRewetEasing,
+                                ),
+                            )
+                        }
+                        ink.flood()
                     }
-                    ink.flood()
+                    // A different chapter from the list: leave the row dry.
                 }
                 ContinueTurn.Landed -> {
-                    // Under the reader the row stays wet, so turning back
-                    // uncovers it inked and it dries as the list settles.
+                    val owned = continueInkShouldFill(
+                        tapped = ink.tapped,
+                        spread = ink.spread,
+                        toContinueChapter = toContinue,
+                    )
                     ink.tapped = false
-                    ink.fill()
-                    ink.dry.snapTo(0f)
+                    if (owned) {
+                        // Under the reader the row stays wet, so turning back
+                        // uncovers it inked and it dries with the sweep.
+                        fromReader = true
+                        ink.fill()
+                        ink.dry.snapTo(0f)
+                    } else {
+                        fromReader = false
+                    }
                 }
                 ContinueTurn.Resting -> {
+                    fromReader = false
                     if (ink.spread > 0f) {
-                        // A wipe interrupted and resumed covers only what is
-                        // left of it, in its share of the time.
-                        val wipeEasing = if (ink.dry.value > 0f) ContinueInkRewetEasing else ContinueInkWipeEasing
-                        ink.dry.animateTo(
-                            1f,
-                            tween((ContinueInkDryMs * (1f - ink.dry.value)).roundToInt(), easing = wipeEasing),
-                        )
+                        if (ink.dry.value < 1f) {
+                            val wipeEasing =
+                                if (ink.dry.value > 0f) ContinueInkRewetEasing else ContinueInkWipeEasing
+                            ink.dry.animateTo(
+                                1f,
+                                tween(continueWipeMs(ink.dry.value), easing = wipeEasing),
+                            )
+                        }
                         ink.clear()
                         ink.dry.snapTo(0f)
                     }
@@ -154,6 +194,43 @@ internal fun rememberContinueInk(): ContinueInk {
     }
     return ink
 }
+
+/** The paper is turning into the Continue chapter. */
+internal fun continueInkToContinueChapter(openSurahId: Int, continueSurahId: Int): Boolean =
+    continueSurahId != 0 && openSurahId == continueSurahId
+
+/** Continue was chosen: a tap, or a swipe into that chapter. */
+internal fun continueInkShouldFlood(
+    tapped: Boolean,
+    fromReader: Boolean,
+    toContinueChapter: Boolean,
+): Boolean = !fromReader && (tapped || toContinueChapter)
+
+/** Returning from a Continue-owned reader: wipe with the page-turn drop. */
+internal fun continueInkShouldWipe(tapped: Boolean, fromReader: Boolean): Boolean =
+    fromReader && !tapped
+
+/** Landed on a Continue-owned reader: keep the row wet underneath. */
+internal fun continueInkShouldFill(
+    tapped: Boolean,
+    spread: Float,
+    toContinueChapter: Boolean,
+): Boolean = tapped || spread > 0f || toContinueChapter
+
+/**
+ * How far the continue row has wiped for a return swipe of [turnProgress]
+ * (0 at the reader, 1 at home). 0 through the lift, 1 the frame the drop
+ * stem — the ending of the sound — begins.
+ */
+internal fun continueWipeProgress(turnProgress: Float): Float {
+    val start = PageTurnSounds.SWEEP_AT
+    val end = PageTurnSounds.DROP_AT
+    return ((turnProgress - start) / (end - start)).coerceIn(0f, 1f)
+}
+
+/** Remaining leftover wipe, as a share of the sweep-to-drop window. */
+internal fun continueWipeMs(dry: Float): Int =
+    (ContinueInkDryMs * (1f - dry)).roundToInt().coerceAtLeast(0)
 
 /** The wash itself, drawn behind the row, landing at its right (Arabic) end. */
 internal fun Modifier.continueInkWash(ink: ContinueInk, color: Color): Modifier =
@@ -227,8 +304,8 @@ private const val ContinueTurnEpsilon = 0.001f
 /** The most a single frame may advance the wash's clock. */
 private const val ContinueInkMaxFrameMs = 20f
 
-/** The wash wipes back out of the row over this long. */
-private const val ContinueInkDryMs = 700
+/** Leftover wipes (a turn let go short of the reader) run over the sweep-to-drop window of a 460 ms page turn. */
+private const val ContinueInkDryMs = 212
 
 /** The wipe gathers, crosses the words briskly, and settles into the Arabic end. */
 private val ContinueInkWipeEasing = CubicBezierEasing(0.4f, 0f, 0.2f, 1f)

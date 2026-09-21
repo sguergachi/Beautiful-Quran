@@ -667,7 +667,7 @@ private fun SavedPassagesRow(
 private fun ContinueRow(target: ContinueTarget, onClick: () -> Unit) {
     // Turning into the reader floods the row with ink; its words take the
     // paper colour only where the ink lies.
-    val ink = rememberContinueInk()
+    val ink = rememberContinueInk(target.surah.id)
     val scope = rememberCoroutineScope()
     Box(
         modifier = Modifier

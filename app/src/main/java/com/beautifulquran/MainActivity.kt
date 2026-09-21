@@ -85,6 +85,7 @@ import com.beautifulquran.ui.home.FloatingPlaybackCoverVisibleMaxPage
 import com.beautifulquran.ui.home.FloatingPlaybackListClearance
 import com.beautifulquran.ui.home.HomeScreen
 import com.beautifulquran.ui.home.HomeViewModel
+import com.beautifulquran.ui.home.LocalOpenSurahId
 import com.beautifulquran.ui.home.LocalReaderApproach
 import com.beautifulquran.ui.reader.BackToOriginPill
 import com.beautifulquran.ui.reader.ReaderPlaybackSnapshot
@@ -589,6 +590,7 @@ private fun PaperStackApp(
         val readerOpen = selectedSurahId != 0
         { if (readerOpen) (stackPosition.value - COVER_LAYER).coerceIn(0f, 1f) else 0f }
     }
+    val openSurahId = remember { { selectedSurahId } }
     val settingsApproach = remember(stackPosition, settingsLayer) {
         SettingsApproach(
             progress = { (stackPosition.value - (settingsLayer - 1)).coerceIn(0f, 1f) },
@@ -1224,6 +1226,7 @@ private fun PaperStackApp(
                     SettingsApproachAtRest
                 },
                 LocalReaderApproach provides readerApproach,
+                LocalOpenSurahId provides openSurahId,
             ) {
                 HomeScreen(
                     viewModel = homeViewModel,
