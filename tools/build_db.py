@@ -15,7 +15,7 @@ Sources (all fetched over HTTPS, cached in tools/.cache):
                         to whole-ayah highlighting.
   * Qur'anic Universal Audio v3
                       — repeat-aware Yasser Al-Dosari word timings (CC-BY 4.0),
-                        locked to the canonical EveryAyah source recording.
+                        rebased by exact MP3-frame matches onto EveryAyah clips.
   * tools/audio_onsets — generated voice onsets from the streamed everyayah MP3s
                         (only the compact committed measurements are consumed).
 
@@ -115,6 +115,8 @@ MUSHAF_LAYOUT_PAGE_URL = (
 QCF_V2_FIRST_CODEPOINT = 0xFC41
 
 # id, everyayah slug (audio dir + timing file key), display name, style
+YASSER_RECITER_ID = 9
+YASSER_SLUG = "Yasser_Ad-Dussary_128kbps"
 RECITERS = [
     (1, "Alafasy_128kbps", "Mishary Rashid Alafasy", "Murattal"),
     (2, "Husary_64kbps", "Mahmoud Khalil Al-Husary", "Murattal"),
@@ -123,7 +125,7 @@ RECITERS = [
     (5, "Abdurrahmaan_As-Sudais_192kbps", "Abdurrahman As-Sudais", "Murattal"),
     (6, "Saood_ash-Shuraym_128kbps", "Saud Ash-Shuraym", "Murattal"),
     (7, "Hani_Rifai_192kbps", "Hani Ar-Rifai", "Murattal"),
-    (9, "Yasser_Ad-Dussary_128kbps", "Yasser Al-Dosari", "Murattal"),
+    (YASSER_RECITER_ID, YASSER_SLUG, "Yasser Al-Dosari", "Murattal"),
     (14, "Abu_Bakr_Ash-Shaatree_128kbps", "Abu Bakr Al-Shatri", "Murattal"),
     (16, "Abdul_Basit_Mujawwad_128kbps", "AbdulBaset AbdulSamad", "Mujawwad"),
     (17, "Husary_Muallim_128kbps", "Mahmoud Khalil Al-Husary", "Muallim"),
@@ -137,12 +139,32 @@ YASSER_QUA_URL = (
     "/v3.0.0/yasser_al_dosari_archive.zip"
 )
 YASSER_QUA_SHA256 = "02d269a409cb1cb2ddf5c1cdd0f5e8919cafb3e8f1386679aabb3acf27c0880a"
-YASSER_BASMALAH = [
-    [1, 282, 764],
-    [2, 764, 1428],
-    [3, 1428, 2353],
-    [4, 2353, 3017],
-]
+YASSER_CLOCK_FILE = (
+    Path(__file__).resolve().parent / "timing_sources" / "yasser-everyayah-clock.json"
+)
+YASSER_SUPPLEMENTS = {
+    (1, 1): [[1, 282, 764], [2, 764, 1428], [3, 1428, 2353], [4, 2353, 3017]],
+    (39, 47): [
+        [1, 200, 670], [2, 670, 1300], [3, 1300, 2230], [4, 2230, 2870],
+        [5, 2870, 3190], [6, 3190, 3380], [7, 3380, 4020], [8, 4020, 5160],
+        [9, 5160, 6110], [10, 6110, 6760], [11, 6760, 7550], [12, 7550, 8240],
+        [11, 8240, 9010], [12, 9010, 9470], [13, 9470, 10340],
+        [14, 10340, 11790], [15, 11790, 12600], [16, 12600, 13070],
+        [17, 13070, 14300], [18, 14300, 14950], [19, 14950, 15720],
+        [20, 15720, 16010], [21, 16010, 16680], [22, 16680, 17030],
+        [23, 17030, 17320], [24, 17320, 18190], [25, 18190, 19464],
+    ],
+    (39, 50): [
+        [1, 130, 470], [2, 470, 1050], [3, 1050, 1860], [4, 1860, 2680],
+        [5, 2680, 3460], [6, 3460, 4940], [7, 4940, 5560], [8, 5560, 6440],
+        [9, 6440, 6800], [10, 6800, 7490], [11, 7490, 8390],
+    ],
+    (50, 21): [
+        [1, 80, 3727], [2, 3727, 4288], [3, 4288, 5881],
+        [4, 5881, 6743], [5, 6743, 10440], [6, 10440, 12243],
+    ],
+    (92, 16): [[1, 110, 924], [2, 924, 1668], [3, 1668, 2592]],
+}
 QURAN_ALIGN_SUPPLEMENTS = {
     (18, 32, 24): [
         [1, 390, 1612],
@@ -1531,11 +1553,11 @@ QUA_TOPOLOGY_RULES = {
 }
 
 
-def remap_qua_topology(key, segs, n_words, words):
+def remap_qua_topology(key, segs, n_words, words, require_coverage=True):
     """Map one QUA occurrence row onto the app's canonical word positions."""
     rule = QUA_TOPOLOGY_RULES.get(key)
     if rule is None:
-        return segs if _covers_all_words(segs, n_words) else None
+        return segs if not require_coverage or _covers_all_words(segs, n_words) else None
     canonical_start, canonical_count, source_start, source_count = rule
     shift = canonical_count - source_count
     out = []
@@ -1566,42 +1588,109 @@ def remap_qua_topology(key, segs, n_words, words):
             out.append([canonical_start, start, segs[index + source_count - 1][2]])
             index += source_count - 1
         index += 1
-    return out if _covers_all_words(out, n_words) else None
+    return out if not require_coverage or _covers_all_words(out, n_words) else None
 
 
-def load_qua_timings(zip_path, word_counts, word_text):
-    """Load QUA's canonical Yasser occurrences on the streamed ayah clock.
+def load_yasser_clock_origins(path=YASSER_CLOCK_FILE):
+    """Load exact source-clock origins measured from EveryAyah MP3 frames."""
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+        origins = {
+            tuple(map(int, key.split(":"))): int(value)
+            for key, value in payload["sourceOriginsMs"].items()
+        }
+        unmatched = {tuple(map(int, key.split(":"))) for key in payload["unmatchedAyahs"]}
+    except (OSError, json.JSONDecodeError, KeyError, TypeError, ValueError) as e:
+        raise SystemExit(f"invalid Yasser EveryAyah clock map: {e}") from e
+    valid_meta = (
+        payload.get("schema") == 1
+        and payload.get("reciterSlug") == YASSER_SLUG
+        and payload.get("sampleRateHz") == 44_100
+        and payload.get("samplesPerFrame") == 1_152
+        and payload.get("matchedAyahs") == len(origins) == 6_231
+        and not set(origins) & unmatched
+    )
+    if not valid_meta:
+        raise SystemExit("unsupported Yasser EveryAyah clock map")
+    if unmatched != set(YASSER_SUPPLEMENTS):
+        raise SystemExit(f"Yasser clock map needs supplements for {sorted(unmatched)}")
+    return origins
 
-    QUA aligns the same full-surah recording from which EveryAyah cut the app's
-    files. Its canonical occurrence start is the clip origin even where an old
-    EveryAyah split-text archive still includes a later whole-verse repeat.
-    Phrase repeats inside that occurrence remain ordered in ``words`` and are
-    retained for the reader's orange second wash.
+
+def qua_clip_segments(source_rows, origin_ms, duration_ms, key, n_words, words):
+    """Return every QUA occurrence physically present in one EveryAyah clip."""
+    clip_end = origin_ms + duration_ms
+    selected = []
+    for row in sorted(source_rows, key=lambda candidate: int(candidate[1])):
+        source_words = row[5]
+        if not source_words:
+            continue
+        word_start, word_end = source_words[0][1], source_words[-1][2]
+        overlap = max(0, min(word_end, clip_end) - max(word_start, origin_ms))
+        if overlap / max(1, word_end - word_start) < 0.8:
+            continue
+        relative = [
+            [
+                int(pos),
+                max(0, int(start) - origin_ms),
+                min(duration_ms, int(end) - origin_ms),
+            ]
+            for pos, start, end in source_words
+        ]
+        mapped = remap_qua_topology(
+            key, relative, n_words, words, require_coverage=False
+        )
+        if mapped:
+            selected.extend(mapped)
+    selected = sanitize_timing_row(trim_to_next_start(selected)) if selected else None
+    return selected if selected and _covers_all_words(selected, n_words) else None
+
+
+def load_qua_timings(zip_path, word_counts, word_text, audio_durations):
+    """Load every Yasser occurrence that exists in each exact EveryAyah clip.
+
+    QUA aligns the whole-surah source recording. EveryAyah's independently cut
+    MP3s sometimes contain two complete passes, a partial lead-in, or a source
+    edit. The committed clock map byte-matches each clip's first MPEG frames
+    back to that recording; rows are selected by physical overlap and then
+    rebased onto the file clock. Clips that do not byte-match use the narrow
+    dual-model supplements above.
     """
     with zipfile.ZipFile(zip_path) as archive:
         payload = json.loads(gzip.decompress(archive.read("word_timestamps.json.gz")))
     meta = payload.get("_meta", {})
     if meta.get("schema_version") != 3 or meta.get("units") != "ms":
         raise SystemExit("unsupported Quranic Universal Audio timing schema")
-    rows = {}
+    origins = load_yasser_clock_origins()
+    durations = {
+        key[1:]: duration
+        for key, duration in audio_durations.items()
+        if key[0] == YASSER_RECITER_ID
+    }
+    if set(durations) != set(word_counts):
+        missing = sorted(set(word_counts) - set(durations))
+        raise SystemExit(f"incomplete Yasser EveryAyah durations: {missing[:5]}")
+    grouped = {}
     for row in payload.get("rows", []):
-        ref, verse_start, _verse_end, canonical, _silence_after, source_words = row
-        if not canonical:
+        key = tuple(int(part) for part in row[0].split(":"))
+        grouped.setdefault(key, []).append(row)
+    rows = {}
+    for key, n_words in word_counts.items():
+        if key in YASSER_SUPPLEMENTS:
+            rows[key] = YASSER_SUPPLEMENTS[key]
             continue
-        key = tuple(int(part) for part in ref.split(":"))
-        if key in rows:
-            raise SystemExit(f"duplicate canonical QUA row {ref}")
-        relative = [
-            [int(pos), int(start) - int(verse_start), int(end) - int(verse_start)]
-            for pos, start, end in source_words
-        ]
-        mapped = remap_qua_topology(
-            key, relative, word_counts[key], word_text.get(key, {})
+        if key not in origins:
+            raise SystemExit(f"missing Yasser EveryAyah clock origin {key}")
+        mapped = qua_clip_segments(
+            grouped.get(key, []),
+            origins[key],
+            durations[key],
+            key,
+            n_words,
+            word_text.get(key, {}),
         )
-        mapped = sanitize_timing_row(trim_to_next_start(mapped)) if mapped else None
         if mapped:
             rows[key] = mapped
-    rows[(1, 1)] = YASSER_BASMALAH
     if set(rows) != set(word_counts):
         missing = sorted(set(word_counts) - set(rows))
         extra = sorted(set(rows) - set(word_counts))
@@ -1609,8 +1698,11 @@ def load_qua_timings(zip_path, word_counts, word_text):
     return rows
 
 
-def append_new_reciter_timings(timing_rows, word_counts, word_text):
-    """Add only complete, source-locked timing corpora absent from the baseline."""
+def append_new_reciter_timings(timing_rows, word_counts, word_text, audio_durations):
+    """Add complete source-locked corpora, rebuilding Yasser's exact clip clock."""
+    # Yasser's source is deterministic and inexpensive to rebase, so rebuild
+    # it even when an earlier source-clock import exists in the preserved DB.
+    timing_rows = [row for row in timing_rows if row[0] != YASSER_RECITER_ID]
     existing = {row[0] for row in timing_rows}
     wanted_align = QURAN_ALIGN_ADDITIONS - existing
     alignment_zip = None
@@ -1621,10 +1713,12 @@ def append_new_reciter_timings(timing_rows, word_counts, word_text):
     for rid, slug, _name, _style in RECITERS:
         if rid in existing:
             continue
-        if rid == 9:
+        if rid == YASSER_RECITER_ID:
             source = fetch(YASSER_QUA_URL, "yasser-al-dosari-qua-v3.zip")
             verify_source(source, YASSER_QUA_SHA256, "Yasser QUA v3 corpus")
-            rows = load_qua_timings(source, word_counts, word_text)
+            rows = load_qua_timings(
+                source, word_counts, word_text, audio_durations
+            )
         elif rid in wanted_align:
             rows = {
                 (surah, ayah): segs
@@ -3124,7 +3218,9 @@ def main():
 
     if not args.skip_timings:
         print("[timing sources] adding complete highlighted reciters")
-        timing_rows = append_new_reciter_timings(timing_rows, word_counts, word_text)
+        timing_rows = append_new_reciter_timings(
+            timing_rows, word_counts, word_text, audio_durations
+        )
 
     reciter_rows = declared_reciter_rows(timing_rows)
     OUT.parent.mkdir(parents=True, exist_ok=True)

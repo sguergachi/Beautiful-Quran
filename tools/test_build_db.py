@@ -50,6 +50,7 @@ from build_db import (  # noqa: E402
     preserve_complete_repeat_topology,
     parse_alignment_payload,
     preserve_peer_repeats,
+    qua_clip_segments,
     recover_negative_opening,
     refit_displaced_rows,
     rebase_qdc_clock,
@@ -944,6 +945,24 @@ def check_alignment_payload_parse():
         return valid
 
 
+def check_qua_clip_occurrences():
+    """A streamed clip keeps every source occurrence inside its real clock."""
+    source_rows = [
+        ["2:1", 100, 400, False, 0, [[1, 110, 150], [2, 160, 200]]],
+        [
+            "2:1", 500, 800, True, 0,
+            [[1, 510, 550], [2, 560, 600], [3, 610, 700]],
+        ],
+        ["2:1", 900, 1000, False, 0, [[1, 910, 990]]],
+    ]
+    selected = qua_clip_segments(source_rows, 100, 700, (2, 1), 3, {})
+    incomplete = qua_clip_segments(source_rows[:1], 100, 700, (2, 1), 3, {})
+    return selected == [
+        [1, 10, 50], [2, 60, 100],
+        [1, 410, 450], [2, 460, 500], [3, 510, 600],
+    ] and incomplete is None
+
+
 def main():
     cases = load_cases()
     failures = []
@@ -997,6 +1016,7 @@ def main():
     completion_ok = check_completion_pipeline()
     gloss_ok = check_gloss_normalize()
     alignment_payload_ok = check_alignment_payload_parse()
+    qua_clip_ok = check_qua_clip_occurrences()
     database_ok = audit_bundled_db()
     reciter_catalog_ok = check_reciter_catalog()
     qcf_runs_ok = check_qcf_v2_page_runs()
@@ -1012,6 +1032,7 @@ def main():
         f"  {'ok  ' if alignment_payload_ok else 'FAIL'} "
         "quran-align release payload parse"
     )
+    print(f"  {'ok  ' if qua_clip_ok else 'FAIL'} QUA clip occurrence selection")
     print(f"  {'ok  ' if database_ok else 'FAIL'} bundled timing database invariants")
     print(f"  {'ok  ' if reciter_catalog_ok else 'FAIL'} declared reciter catalog")
     print(f"  {'ok  ' if qcf_runs_ok else 'FAIL'} public DB excludes QCF V2 fields")
@@ -1029,6 +1050,8 @@ def main():
         failures.append(("gloss normalize", "trailing-space strip failed", None))
     if not alignment_payload_ok:
         failures.append(("quran-align payload", "release artifact parse failed", None))
+    if not qua_clip_ok:
+        failures.append(("QUA clip occurrences", "clip clock selection failed", None))
     if not database_ok:
         failures.append(("bundled database", "timing audit failed", None))
     if not reciter_catalog_ok:
@@ -1052,7 +1075,7 @@ def main():
                 for line in str(detail).splitlines():
                     print(f"    {line}")
         return 1
-    print(f"all {len(cases) + 11} cases pass ({CASES_DIR.relative_to(Path.cwd())})")
+    print(f"all {len(cases) + 12} cases pass ({CASES_DIR.relative_to(Path.cwd())})")
     return 0
 
 
