@@ -123,20 +123,12 @@ export function MushafReader({
               {line.tokens.map((token, index) => {
                 const active =
                   token.surahId === activeSurahId && token.ayah === activeAyah
-                const previous = line.tokens[index - 1]
-                const opensAyah = !previous || previous.ayah !== token.ayah || previous.surahId !== token.surahId
                 const endsAyah =
                   index === line.tokens.length - 1 ||
                   line.tokens[index + 1]!.ayah !== token.ayah ||
                   line.tokens[index + 1]!.surahId !== token.surahId
-                const chapterOpens = token.ayah === 1 && token.position === 1 && opensAyah
                 return (
                   <span key={`${token.surahId}:${token.ayah}:${token.position}`}>
-                    {chapterOpens ? (
-                      <span className="mushaf-chapter">
-                        {QuranRepository.surahContent(token.surahId).surah.nameArabic}
-                      </span>
-                    ) : null}
                     <button
                       type="button"
                       className="mushaf-word"

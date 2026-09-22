@@ -957,7 +957,7 @@ select {
 }
 
 .continue-on-ink .continue-label {
-  color: color-mix(in srgb, var(--on-accent) 80%, transparent);
+  color: rgb(from var(--on-accent) r g b / 0.8);
 }
 
 .continue-on-ink .continue-target,
@@ -1809,12 +1809,6 @@ select {
   /* Shared with .word-arabic / .ayah-mark so the verse sign tracks glyph size. */
   --word-arabic-size: calc(1.8rem * var(--font-scale, 1));
   --word-arabic-line: 1.9;
-  /*
-   * Off-screen paint skip. Intrinsic size must not under-estimate real
-   * verse height or fast scroll shows empty paper where content will land.
-   */
-  content-visibility: auto;
-  contain-intrinsic-size: auto 14rem;
 }
 
 .scroll[data-english='true'] .ayah-block {
@@ -1830,7 +1824,6 @@ select {
  * is far offscreen; `auto` would otherwise expose only the intrinsic estimate. */
 .ayah-block[data-focus-target='true'] {
   content-visibility: visible;
-  contain-intrinsic-size: none;
 }
 
 /* Progressive-mount scroll padding — one block above/below the window. */
@@ -1895,20 +1888,21 @@ select {
 }
 
 button.ayah-mark {
+  appearance: none;
   background: none;
   border: 0;
   padding: 0;
   cursor: pointer;
 }
 
+/* Gold at 26% of itself. color-mix with transparent blends in black. */
 .ayah-block[data-gathered='true'] {
-  background: color-mix(in srgb, var(--gold) 26%, transparent);
+  background: rgb(from var(--gold) r g b / 0.26);
 }
 
 .gather-ordinal {
   position: absolute;
   top: 6px;
-  inset-inline-start: 6px;
   z-index: 2;
   font-family: var(--font-body);
   font-size: 16px;
@@ -1916,6 +1910,15 @@ button.ayah-mark {
   font-variant-numeric: lining-nums;
   color: var(--ink);
   line-height: 1;
+}
+
+.gather-ordinal[data-side='right'] {
+  right: 6px;
+}
+
+.gather-ordinal[data-side='left'],
+.gather-ordinal:not([data-side]) {
+  left: 6px;
 }
 
 .ayah-mark {
@@ -2579,31 +2582,41 @@ button.ayah-mark {
 
 .mushaf-lines {
   flex: 1;
-  display: flex;
-  flex-direction: column;
-  justify-content: space-between;
+  display: grid;
+  grid-template-rows: repeat(15, minmax(0, 1fr));
   min-height: 0;
   margin-top: 1em;
 }
 
 .mushaf-line {
   margin: 0;
-  text-align: justify;
-  text-align-last: justify;
+  min-height: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.35em;
   font-family: var(--font-arabic);
-  font-size: clamp(1.15rem, 4.6vw, 1.7rem);
+  font-size: clamp(1.05rem, 4.2vw, 1.55rem);
   line-height: 1;
-  min-height: 1.35em;
+  overflow: hidden;
 }
 
 .mushaf-word,
+.mushaf-mark,
 .mushaf-english-text {
+  appearance: none;
   background: none;
   border: 0;
   padding: 0;
+  margin: 0;
   font: inherit;
   color: inherit;
   cursor: pointer;
+  line-height: 1;
+}
+
+.mushaf-word {
+  display: inline;
 }
 
 .mushaf-word[data-active='true'] {

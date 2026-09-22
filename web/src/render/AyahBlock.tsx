@@ -198,7 +198,11 @@ function AyahBlockInner({
       <span className="ayah-recess-veil" aria-hidden="true" />
       {gathering ? (
         gatherOrdinal != null ? (
-          <span className="gather-ordinal" aria-label={`Selected, ${gatherOrdinal}`}>
+          <span
+            className="gather-ordinal"
+            data-side={bookmarkSide}
+            aria-label={`Selected, ${gatherOrdinal}`}
+          >
             {gatherOrdinal}
           </span>
         ) : null

@@ -1636,7 +1636,9 @@ export function ReaderScreen({ stackLayer }: { stackLayer: StackLayer }) {
                 disabled={state.gatherSelection.length === 0}
                 onClick={() => void appStore.shareGatheredText()}
               >
-                “
+                <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true">
+                  <path fill="currentColor" d="M6 17h3l2-4V7H5v6h3l-2 4zm8 0h3l2-4V7h-6v6h3l-2 4z" />
+                </svg>
               </button>
               <button
                 type="button"
@@ -1645,7 +1647,9 @@ export function ReaderScreen({ stackLayer }: { stackLayer: StackLayer }) {
                 disabled={state.gatherSelection.length === 0}
                 onClick={() => void appStore.shareGatheredImage()}
               >
-                ▢
+                <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true">
+                  <path fill="currentColor" d="M21 19V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2zM8.5 13.5 11 16.5 14.5 12 19 18H5l3.5-4.5z" />
+                </svg>
               </button>
             </div>
           ) : (
