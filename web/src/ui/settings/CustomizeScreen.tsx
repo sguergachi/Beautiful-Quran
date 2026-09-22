@@ -8,7 +8,9 @@ import type {
   VerseNumberScript,
 } from '../../data/settings'
 import {
+  applyReadingLayout,
   applyReadingMode,
+  MUSHAF_VIEW_MODES,
   showsPreviewWordGloss,
   showsWordGlossChrome,
 } from '../../data/customizePolicy'
@@ -26,6 +28,11 @@ const VIEW_OPTIONS = [
   { value: 'arabic_only' as const, label: 'Arabic' },
   { value: 'english_only' as const, label: 'English' },
   { value: 'arabic_english' as const, label: 'Both' },
+]
+
+const LAYOUT_OPTIONS = [
+  { value: 'scroll' as const, label: 'Scroll' },
+  { value: 'mushaf' as const, label: 'Mushaf' },
 ]
 
 const VERSE_OPTIONS = [
@@ -118,20 +125,46 @@ export function CustomizeScreen({
 
       <div className="customize-scroll">
           <section className="settings-section">
+            <h2>Layout</h2>
+            <PaperSegmented
+              aria-label="Layout"
+              value={settings.readingLayout}
+              brushParams={brushParams}
+              paintToken={paintToken}
+              options={LAYOUT_OPTIONS}
+              onChange={(v) =>
+                appStore.updateSettings(
+                  applyReadingLayout(settings, v === 'mushaf' ? 'mushaf' : 'scroll'),
+                )
+              }
+            />
+          </section>
+
+          <section className="settings-section">
             <h2>View</h2>
             <PaperSegmented
               aria-label="View"
               value={settings.readingMode}
               brushParams={brushParams}
               paintToken={paintToken}
-              options={VIEW_OPTIONS}
-              onChange={(v) =>
-                appStore.updateSettings(applyReadingMode(v as ReadingMode))
+              options={
+                settings.readingLayout === 'mushaf'
+                  ? VIEW_OPTIONS.filter((option) => MUSHAF_VIEW_MODES.includes(option.value))
+                  : VIEW_OPTIONS
               }
+              onChange={(v) => {
+                if (
+                  settings.readingLayout === 'mushaf' &&
+                  !MUSHAF_VIEW_MODES.includes(v as ReadingMode)
+                ) {
+                  return
+                }
+                appStore.updateSettings(applyReadingMode(v as ReadingMode))
+              }}
             />
           </section>
 
-          {showsWordGlossChrome(settings.readingMode) ? (
+          {settings.readingLayout === 'scroll' && showsWordGlossChrome(settings.readingMode) ? (
             <section className="settings-section settings-section-toggles">
               <PaperSwitch
                 id="setting-gloss"
@@ -146,6 +179,7 @@ export function CustomizeScreen({
             </section>
           ) : null}
 
+        {settings.readingLayout === 'mushaf' && settings.readingMode === 'arabic_only' ? null : (
         <section className="settings-section">
           <h2>Verse numbers</h2>
           <PaperSegmented
@@ -159,6 +193,7 @@ export function CustomizeScreen({
             }
           />
         </section>
+        )}
 
       <section className="settings-section">
         <h2>Page numbers</h2>

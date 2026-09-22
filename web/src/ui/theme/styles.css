@@ -1894,6 +1894,30 @@ select {
   direction: ltr;
 }
 
+button.ayah-mark {
+  background: none;
+  border: 0;
+  padding: 0;
+  cursor: pointer;
+}
+
+.ayah-block[data-gathered='true'] {
+  background: color-mix(in srgb, var(--gold) 26%, transparent);
+}
+
+.gather-ordinal {
+  position: absolute;
+  top: 6px;
+  inset-inline-start: 6px;
+  z-index: 2;
+  font-family: var(--font-body);
+  font-size: 16px;
+  font-weight: 700;
+  font-variant-numeric: lining-nums;
+  color: var(--ink);
+  line-height: 1;
+}
+
 .ayah-mark {
   font-family: var(--font-arabic);
   color: var(--gold);
@@ -2488,6 +2512,160 @@ select {
   .hafs-word:hover .word-ink-slot > .hafs-glyph:not(.hafs-repeat-overlay) {
     color: var(--accent);
   }
+}
+
+.share-ribbon {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 4px calc(4px + env(safe-area-inset-bottom, 0px));
+  background: var(--accent);
+  color: var(--on-accent);
+  z-index: 4;
+}
+
+.share-ribbon-error {
+  flex: 1;
+  min-width: 0;
+  text-align: center;
+  font-size: 0.75rem;
+  opacity: 0.7;
+}
+
+.share-ribbon-icon {
+  width: 48px;
+  height: 48px;
+  display: grid;
+  place-items: center;
+  color: var(--on-accent);
+  background: none;
+  border: 0;
+  font-family: var(--font-display);
+  font-size: 1.4rem;
+  cursor: pointer;
+}
+
+.share-ribbon-icon:disabled {
+  opacity: 0.35;
+}
+
+.mushaf {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  padding: max(0.4rem, env(safe-area-inset-top, 0px)) 10px 5rem;
+  touch-action: pan-y;
+}
+
+.mushaf-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  font-size: 0.72rem;
+  letter-spacing: 0.04em;
+  color: var(--ink-rung-quiet);
+}
+
+.mushaf-head span:last-child {
+  font-family: var(--font-arabic);
+  font-size: 1rem;
+  letter-spacing: 0;
+}
+
+.mushaf-lines {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  min-height: 0;
+  margin-top: 1em;
+}
+
+.mushaf-line {
+  margin: 0;
+  text-align: justify;
+  text-align-last: justify;
+  font-family: var(--font-arabic);
+  font-size: clamp(1.15rem, 4.6vw, 1.7rem);
+  line-height: 1;
+  min-height: 1.35em;
+}
+
+.mushaf-word,
+.mushaf-english-text {
+  background: none;
+  border: 0;
+  padding: 0;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+}
+
+.mushaf-word[data-active='true'] {
+  color: var(--accent);
+}
+
+.mushaf-mark {
+  color: var(--gold);
+  font-size: 0.72em;
+  margin-inline: 0.15em;
+  background: none;
+  border: 0;
+  padding: 0;
+  font-family: inherit;
+  cursor: pointer;
+}
+
+.mushaf-chapter {
+  display: block;
+  text-align: center;
+  font-size: 0.85em;
+  margin-bottom: 0.2em;
+}
+
+.mushaf-english {
+  flex: 1;
+  overflow: auto;
+  margin-top: 1.2em;
+  font-family: var(--font-body);
+  font-size: 1.05rem;
+  line-height: 1.55;
+  color: var(--ink-rung-body);
+}
+
+.mushaf-english-ayah {
+  margin: 0 0 0.8em;
+}
+
+.mushaf-english-text {
+  text-align: start;
+}
+
+.mushaf-folio {
+  text-align: center;
+  font-variant-numeric: lining-nums;
+  color: var(--ink-rung-quiet);
+  font-size: 0.8rem;
+  padding: 0.4rem 0 0.2rem;
+}
+
+.mushaf-wait {
+  flex: 1;
+  display: grid;
+  place-content: center;
+  text-align: center;
+  gap: 0.4rem;
+  padding: 2rem;
+  color: var(--ink-rung-quiet);
+}
+
+.mushaf-wait p {
+  margin: 0;
 }
 
 .player-bar {
