@@ -49,6 +49,11 @@ interface Props {
   onPlayWord: (ayah: number, wordPosition: number) => void
   onToggleBookmark: (ayah: number) => boolean
   onHoldWord: (ayah: number, word: Word) => void
+  /** Gather mode. The mark enters it; the verse body toggles once inside. */
+  gathering?: boolean
+  gatherOrdinal?: number | null
+  onMarkTap?: () => void
+  onVerseBodyTap?: () => void
 }
 
 function AyahBlockInner({
@@ -78,6 +83,10 @@ function AyahBlockInner({
   onPlayWord,
   onToggleBookmark,
   onHoldWord,
+  gathering = false,
+  gatherOrdinal = null,
+  onMarkTap,
+  onVerseBodyTap,
 }: Props) {
   const englishOnly = readingMode === 'english_only'
   const arabicOnly = readingMode === 'arabic_only'
@@ -167,6 +176,15 @@ function AyahBlockInner({
     <article
       className="ayah-block"
       data-ayah={ayah.number}
+      data-gathered={gatherOrdinal != null || undefined}
+      onClick={
+        gathering
+          ? (event) => {
+              if ((event.target as HTMLElement).closest('button')) return
+              onVerseBodyTap?.()
+            }
+          : undefined
+      }
       data-ayah-active={isActiveAyah || undefined}
       data-dimmed={dimmed || undefined}
       data-search-flash-ayah={searchTargetAyah || undefined}
@@ -178,15 +196,23 @@ function AyahBlockInner({
       {/* One paper veil per inactive ayah while reciting — not per-word covers.
           Avoids hundreds of simultaneous opacity transitions on play. */}
       <span className="ayah-recess-veil" aria-hidden="true" />
-      <VerseBookmarkRibbon
-        bookmarked={bookmarked}
-        focused={focused}
-        hovered={hovered}
-        side={bookmarkSide}
-        chromeAlpha={bookmarkChromeAlpha}
-        interactive={bookmarkInteractive}
-        onToggle={() => onToggleBookmark(ayah.number)}
-      />
+      {gathering ? (
+        gatherOrdinal != null ? (
+          <span className="gather-ordinal" aria-label={`Selected, ${gatherOrdinal}`}>
+            {gatherOrdinal}
+          </span>
+        ) : null
+      ) : (
+        <VerseBookmarkRibbon
+          bookmarked={bookmarked}
+          focused={focused}
+          hovered={hovered}
+          side={bookmarkSide}
+          chromeAlpha={bookmarkChromeAlpha}
+          interactive={bookmarkInteractive}
+          onToggle={() => onToggleBookmark(ayah.number)}
+        />
+      )}
 
       {arabicOnly ? (
         <p className="hafs-ayah" lang="ar" dir="rtl" translate="no">
@@ -214,12 +240,18 @@ function AyahBlockInner({
               />
             )
           })}
-          <span
+          <button
+            type="button"
             className={verseNumberScript === 'arabic' ? 'ayah-mark' : 'ayah-mark ayah-mark--ltr'}
             dir={verseNumberScript === 'arabic' ? undefined : 'ltr'}
+            aria-label={`Gather ayah ${ayah.number}`}
+            onClick={(event) => {
+              event.stopPropagation()
+              onMarkTap?.()
+            }}
           >
             {ayahMark}
-          </span>
+          </button>
         </p>
       ) : (
         <div className="words" dir={englishOnly ? 'ltr' : 'rtl'} data-lyric={englishOnly ? 'english' : 'arabic'}>
@@ -261,12 +293,18 @@ function AyahBlockInner({
               </span>
             )
           })}
-          <span
+          <button
+            type="button"
             className={verseNumberScript === 'arabic' ? 'ayah-mark' : 'ayah-mark ayah-mark--ltr'}
             dir={verseNumberScript === 'arabic' ? undefined : 'ltr'}
+            aria-label={`Gather ayah ${ayah.number}`}
+            onClick={(event) => {
+              event.stopPropagation()
+              onMarkTap?.()
+            }}
           >
             {ayahMark}
-          </span>
+          </button>
         </div>
       )}
 
@@ -315,6 +353,8 @@ export const AyahBlock = memo(AyahBlockInner, (prev, next) => {
     prev.flashWordPosition === next.flashWordPosition &&
     prev.flashWordPositions === next.flashWordPositions &&
     prev.searchFocusActive === next.searchFocusActive &&
-    prev.searchFlashText === next.searchFlashText
+    prev.searchFlashText === next.searchFlashText &&
+    prev.gathering === next.gathering &&
+    prev.gatherOrdinal === next.gatherOrdinal
   )
 })
