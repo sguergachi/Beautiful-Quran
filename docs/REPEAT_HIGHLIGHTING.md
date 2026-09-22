@@ -127,8 +127,9 @@ ear-verified (Mishary 2:14, Hani 2:16); **verify the rest before enabling.**
 | Ash-Shuraym | 10 | no (one-pass) |
 | AbdulBaset (mujawwad) | 1 | voice ships; qdc is one-pass |
 
-Yasser Al-Dosari is separate from this qdc table: his shipped QUA v3 source
-already preserves phrase repeats inside the canonical EveryAyah occurrence.
+Yasser Al-Dosari is separate from this qdc table: his QUA v3 whole-surah clock
+is byte-matched onto the exact EveryAyah clip. Every occurrence physically in
+that clip is retained, including the full or partial re-says found in 163 clips.
 
 ## How a repeat is detected
 

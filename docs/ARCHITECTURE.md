@@ -132,7 +132,7 @@ Sources (all fetched over HTTPS, cached in `tools/.cache/`):
 | `quran-json` (npm) | Uthmani Unicode text, Saheeh International translation, surah metadata | Tanzil-derived, verse-keyed, no auth |
 | Quran Foundation authenticated Content API (runtime only) | Per-word English gloss, transliteration, QCF V2 layout, page | Three Content Sync resources are joined and validated in the device cache; never committed to `quran.db` |
 | `cpfair/quran-align` release zip | Word-level timestamps per reciter, CC-BY 4.0 | The canonical open word-alignment dataset, matched to everyayah.com audio |
-| Qur'anic Universal Audio v3 | Repeat-aware word timestamps for Yasser Al-Dosari, CC-BY 4.0 | Canonical occurrences from the same source recording as the streamed EveryAyah clips; archive digest and complete output corpus are locked |
+| Qur'anic Universal Audio v3 | Repeat-aware word timestamps for Yasser Al-Dosari, CC-BY 4.0 | Whole-surah annotations rebased by exact MPEG-frame matches onto the streamed EveryAyah clips; archive digest and complete output corpus are locked |
 | quran.com legacy `qdc` audio API (offline build input) | **Repeat-aware** word topology for reciters in `QDC_REPEAT_RECITERS` | Normalized, repaired, and bundled in `quran.db`; written redistribution permission pending. See [REPEAT_HIGHLIGHTING.md](REPEAT_HIGHLIGHTING.md) |
 | everyayah MP3 ranges | Leading-silence and duration measurements in `tools/audio_onsets/` | Some individual ayah files begin with silence. The offline scanner holds the first wash until sustained voice without moving valid later word boundaries, and records each file's length as the ceiling no timing row may cross. |
 | Quranic Arabic Corpus (QAC) v0.4 | Per-word root, lemma, POS, morphology; root concordance | Standard open Quranic morphology / root dictionary. Powers the [Root Word Viewer](ROOT_VIEWER.md) |
@@ -145,6 +145,12 @@ excluding popular voices whose complete timing corpus uses a different audio
 clock. The result is 13 recitations, all with word highlighting. New corpora
 are pinned by source SHA-256 and by one hash over all 6,236 output rows; later
 edits to any shipped row still require the ordinary per-row acoustic verdict.
+
+Yasser's QUA annotations use a whole-surah clock, while playback uses separate
+EveryAyah files. `tools/timing_sources/yasser-everyayah-clock.json` records the
+exact source-frame origin of 6,231 clips and retains every full or partial
+occurrence physically inside each clip. Five clips that cannot be byte-matched
+use committed two-model forced-alignment evidence instead.
 
 The **canonical word segmentation** is the space-split of the Uthmani text.
 The other two sources are mapped onto it by position:
