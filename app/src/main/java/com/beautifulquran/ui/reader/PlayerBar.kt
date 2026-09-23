@@ -34,6 +34,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.media3.common.Player
 import com.beautifulquran.playback.PlayerUiState
+import com.beautifulquran.ui.theme.DisclosureChevron
 import com.beautifulquran.ui.theme.QuranTheme
 
 /**
@@ -82,6 +83,10 @@ fun PlayerBar(
                     color = QuranTheme.ink.muted,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
+                )
+                DisclosureChevron(
+                    expanded = false,
+                    modifier = Modifier.padding(start = 2.dp).size(16.dp),
                 )
             }
             Row(
