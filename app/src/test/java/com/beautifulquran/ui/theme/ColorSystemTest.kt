@@ -223,7 +223,6 @@ class ColorSystemTest {
         for ((name, target, pick) in listOf(
             Triple("greenInk", 72.0, { a: QuranAccents -> a.greenInk }),
             Triple("greenQuiet", 52.0, { a: QuranAccents -> a.greenQuiet }),
-            Triple("greenWash", 8.0, { a: QuranAccents -> a.greenWash }),
         )) {
             val across = themes.map { apca(pick(accents(it)), paper(it)) }
             for ((mode, got) in themes.zip(across)) {
@@ -245,9 +244,40 @@ class ColorSystemTest {
             )
             assertTrue(
                 "$mode the green rungs must stay green",
-                listOf(a.greenInk, a.greenQuiet, a.greenWash).all {
+                listOf(a.greenInk, a.greenQuiet).all {
                     hueDistance(oklch(it).hue, 172.0) <= 25.0
                 },
+            )
+        }
+    }
+
+    @Test
+    fun `the band tint is paper carrying a green, not a green`() {
+        // greenWash is the one green that is not a rung. Solving it to a
+        // contrast target with its chroma held — the way the readable greens
+        // are solved — puts a saturated mint behind the Continue band on
+        // paper: 4x the colour of the tint it replaced. Its chroma belongs to
+        // the sheet it tints, so that is what it is held to.
+        for (mode in themes) {
+            val wash = accents(mode).greenWash
+            val sheet = paper(mode)
+            val washC = oklch(wash).chroma
+            val paperC = oklch(sheet).chroma
+            assertTrue(
+                "$mode greenWash is chroma %.3f against a sheet at %.3f — that is a "
+                    .format(washC, paperC) + "green, not paper with a green in it",
+                washC <= paperC + 0.012,
+            )
+            assertTrue(
+                "$mode greenWash must stay a tint, barely off its sheet",
+                apca(wash, sheet) < 12.0,
+            )
+            assertTrue(
+                "$mode greenWash must still lean green — it is %.0f deg from green, "
+                    .format(hueDistance(oklch(wash).hue, 172.0)) +
+                    "its sheet %.0f".format(hueDistance(oklch(sheet).hue, 172.0)),
+                hueDistance(oklch(wash).hue, 172.0) <=
+                    hueDistance(oklch(sheet).hue, 172.0) + 5.0,
             )
         }
     }
@@ -317,6 +347,35 @@ class ColorSystemTest {
                 "across $themes — it should be seated the same way in each",
             seats.max() - seats.min() <= 0.06,
         )
+    }
+
+    @Test
+    fun `no accent is washed out to reach its target`() {
+        // Every accent here is solved against its own sheet, and the solver will
+        // happily spend chroma to hit a number. That is how the Continue band
+        // became a mint and how Royal Green's glint went near-white: one had its
+        // chroma held and its lightness chased, the other the reverse. An accent
+        // that has lost most of its colour is no longer the accent.
+        val floors = mapOf(
+            "gold" to (0.10 to { a: QuranAccents -> a.gold }),
+            "goldInk" to (0.10 to { a: QuranAccents -> a.goldInk }),
+            "repeatInk" to (0.12 to { a: QuranAccents -> a.repeatInk }),
+            "bookmarkRibbon" to (0.15 to { a: QuranAccents -> a.bookmarkRibbon }),
+            "glintInk" to (0.042 to { a: QuranAccents -> a.glintInk ?: Color.White }),
+        )
+        for (mode in themes) {
+            val a = accents(mode)
+            for ((name, spec) in floors) {
+                val (floor, pick) = spec
+                if (name == "glintInk" && a.glintInk == null) continue
+                val c = oklch(pick(a)).chroma
+                assertTrue(
+                    "$mode $name is chroma %.3f, under its floor of %.3f — it has been "
+                        .format(c, floor) + "solved past the colour that identifies it",
+                    c >= floor,
+                )
+            }
+        }
     }
 
     @Test
