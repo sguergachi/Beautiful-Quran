@@ -42,6 +42,7 @@ jobs:
       - name: Verify canonical and built databases
         run: |
           test -s ../data/quran.db && test -s dist/quran.db
+          test -s dist/timings/1.json && test -s dist/timings/19.json
           test -s ../data/lexicon.db && test -s dist/lexicon.db
           test -s ../data/dictionary.db && test -s dist/dictionary.db
 

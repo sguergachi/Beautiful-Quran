@@ -5,17 +5,17 @@
  *   - Navigations / HTML → network-first; on success stash a copy for offline
  *     reload only. HTML is never served from cache while online (avoids a
  *     poisoned shell pointing at deleted hashed assets after a Pages deploy).
- *   - Hashed JS/CSS, wasm, fonts, quran.db → cache-first
+ *   - Hashed JS/CSS, wasm, fonts, quran.db, timing JSON → cache-first
  *   - After boot, the client may postMessage WARM_ASSETS so the DB/wasm land
  *     in the Cache API even though the first fetch happened before register
  *   - sw.js itself is never cached through this worker
  *
- * Bump CACHE (and OFFLINE_SHELL) whenever this contract changes. Activate
- * deletes every other cache name and reloads open clients so a poisoned
- * shell cannot stick.
+ * Bump CACHE (and OFFLINE_SHELL) whenever quran.db data or this contract
+ * changes. Activate deletes every other cache name and reloads open clients
+ * so stale scripture data or a poisoned shell cannot stick.
  */
-const CACHE = 'beautiful-quran-web-v11'
-const OFFLINE_SHELL = 'beautiful-quran-offline-shell-v11'
+const CACHE = 'beautiful-quran-web-v12'
+const OFFLINE_SHELL = 'beautiful-quran-offline-shell-v12'
 const BASE = self.registration.scope
 
 function isNavigationRequest(req, url) {
@@ -50,13 +50,14 @@ function shouldCacheAsset(url) {
     url.pathname.endsWith('.woff2') ||
     url.pathname.endsWith('.wasm') ||
     url.pathname.endsWith('.svg') ||
+    url.pathname.endsWith('.json') ||
     url.pathname.endsWith('.webmanifest') ||
     url.pathname.endsWith('.png')
   )
 }
 
 self.addEventListener('install', () => {
-  // Do not precache HTML or the 27 MB DB during install — HTML must stay
+  // Do not precache HTML or the core DB during install — HTML must stay
   // network-first, and addAll(quran.db) blows mobile cache quotas.
   self.skipWaiting()
 })

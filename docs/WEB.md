@@ -6,7 +6,8 @@ performance bar as the Android app. This document is the working spec for
 implementation; it does not change Android behavior.
 
 **Status: implemented (v1) + hosted.** The `web/` package ships the three pure
-engines with Vitest parity, WASM SQLite over the committed `quran.db`,
+engines with Vitest parity, WASM SQLite over a web core derived from the
+committed `quran.db`, lazy per-reciter timing corpora,
 paper-stack UI (Bookmarks / Home / Reader / Settings), cold-start entrance cover (closed
 mushaf + isti'adha text fade-in), directional ink wash, focus follow, bookmarks, root
 viewer, and a PWA shell. Production build is published to GitHub Pages at
@@ -15,10 +16,11 @@ viewer, and a PWA shell. Production build is published to GitHub Pages at
 `web/README.md` for run instructions. The sections
 below remain the design record and quality bar.
 
-The current data layer mirrors Android: reviewed repeat-aware timings live in
-the shared database, while authenticated Quran Foundation word/QCF fields live
-in a separate IndexedDB cache with six-day revalidation, a seven-day hard
-freshness limit, and automatic retry when the browser comes back online.
+The current data layer mirrors Android: reviewed repeat-aware timings come from
+the shared database and are exported per reciter for lazy web loading, while
+authenticated Quran Foundation word/QCF fields live in a separate IndexedDB
+cache with six-day revalidation, a seven-day hard freshness limit, and
+automatic retry when the browser comes back online.
 Developer Mode exposes that cache's state, refresh/expiry times, and API calls.
 
 The reader also treats its focused ayah as a keyboard cursor: Up/Down move one
@@ -45,7 +47,7 @@ optional timing-content backend.
 | Ink policy | `ui/reader/InkEngine.kt` + `InkEngineTest` | `web/src/ui/reader/InkEngine.ts`; render policy stays outside the engine |
 | Draw primitives | `ui/theme/Fade.kt` (`letterFadeIn`, `shapedWordBloom`, `inkSmootherstep`) | Port math; web uses the same smootherstep mask wash (soft faded edge — never hard peels) |
 | Marketing ink demo | `docs/ink-fade.js`, `docs/reveal.js` | **Prototype only** — whole-word opacity, not product-grade directional wash |
-| Data | `data/quran.db` (27 MB, committed) | Same DB; load via WASM SQLite |
+| Data | `data/quran.db` (committed) | Timing-free derived core via WASM SQLite + lazy reciter corpora |
 | Design law | `docs/DESIGN.md` | Identical rules on web |
 | Perf law | `docs/PERFORMANCE.md` | Same frame-budget mindset |
 
@@ -57,9 +59,9 @@ the marketing compromise as the highlight.
 ## 3. Architecture (mirror Android)
 
 ```text
-tools/build_db.py  ──►  quran.db  (shared asset; optional web export step)
-                              │
-web/                          ▼
+tools/build_db.py  ──►  quran.db  (canonical Android asset)
+                              │ web/scripts/sync-data.mjs
+web/                          ▼ core DB + per-reciter timing JSON
   domain/          HighlightEngine / HighlightClock + domain policy
   data/            WASM SQLite + typed queries + separate IndexedDB word/QCF cache
   playback/        Gapless-5 (default) / dual-`<audio>` fallback + Media Session + Cache API LRU
@@ -89,7 +91,7 @@ a browser. Controllers and renderers are the only DOM-touching layers.
 | Bundler | Vite | Fast, simple, good for PWA + WASM |
 | UI | React 19 | Familiar; fine if we keep animation off the React tree (see §7) |
 | State | Small hand-rolled stores (or Zustand) | Match “no Hilt / no Nav” — no Redux |
-| Data | `sql.js` or `wa-sqlite` (OPFS) over the committed `quran.db` | Same pipeline; no second data format unless forced |
+| Data | `sql.js` over a derived core DB + lazy timing JSON | Same canonical pipeline; startup does not carry every reciter |
 | Audio | `<audio>` + Media Session API + Cache API | Offline-first stream/cache like Media3 |
 | Virtualization | Custom or `@tanstack/react-virtual` | Surah lists + ayah lists must virtualize |
 | Fonts | Bundle Hafs + EB Garamond + Cormorant from `app/src/main/res/font/` | No Google Fonts dependency for scripture |
@@ -198,22 +200,19 @@ Renderers consume these; they do not re-derive curves.
 
 ### 6.1 Database
 
-- Ship the same `quran.db` (or a build step that copies it into `web/public/`).
+- Derive the timing-free web `quran.db` and reciter corpora from the same
+  canonical `data/quran.db` during every dev/production build.
 - First visit: download once → cache in Cache API or OPFS; subsequent loads
   are local.
 - Queries mirror `QuranRepository`: surah list, surah content (ayahs + words),
-  timings for (reciter, surah), morphology for root viewer.
+  morphology for root viewer, plus a cached selected-reciter timing corpus.
 - At startup, all 114 chapters progressively materialize into the repository
   cache, one chapter per browser idle slice (the last-read chapter first).
   This keeps the main-thread sql.js work from freezing the cover or paper
   peel. Timings remain lazy and hydrate after the reader's first frame.
 - **Do not** add data-repair logic in the web app (Android invariant #2).
-- The shared DB contains the same reviewed repeat-aware timing rows Android
-  uses. Opening a chapter performs no timing API request.
-
-Optional later optimization (not required for v1): export per-surah JSON
-shards for faster first paint. Only if 27 MB WASM open proves too slow on
-mid-tier phones — measure first.
+- The generated timing corpora contain the exact reviewed repeat-aware rows
+  Android uses. They are static first-party assets, not a timing API.
 
 ### 6.2 Audio
 
@@ -308,7 +307,7 @@ Translate `docs/PERFORMANCE.md` into web terms:
 7. **Content-bearing peel.** Startup progressively materializes all chapter
    text during idle slices; `openSurah` commits cached content and the paper
    slide in one state change. There is no intermediate reader-loading sheet.
-   Audio and whole-surah timings hydrate after the first reader frame. A new
+   Audio and the selected reciter's timing corpus hydrate after the first reader frame. A new
    chapter gets fresh focus-controller and rail geometry, initialized at its
    target ayah, so stale dial state cannot move during the peel.
    Long surahs first mount a tight ayah window with scroll padding. Expansion
@@ -453,7 +452,7 @@ sans.
 ### Phase 0 — Engines + scaffold
 - Create `web/` Vite + TS + Vitest.
 - Port Highlight / Focus / Ink + fade math with full test parity.
-- Copy/link `quran.db` + fonts into `web/public`.
+- Generate the core database and timing corpora + copy fonts into `web/public`.
 - Doc: this file + short `web/README.md`.
 
 ### Phase 1 — Data + silent reader
@@ -525,7 +524,8 @@ web/
   vite.config.ts
   index.html
   public/
-    quran.db          # copy or CI-synced from app assets
+    quran.db          # generated timing-free startup database
+    timings/          # generated lazy corpora keyed by reciter id
     fonts/            # hafs, eb-garamond, cormorant
   src/
     domain/
@@ -562,7 +562,7 @@ web/
 ```
 
 Android stays the product of record for mobile. Web is a sibling package in
-the same monorepo; shared *truth* is `quran.db` + the engine algorithms +
+the same monorepo; shared *truth* is `data/quran.db` + the engine algorithms +
 the design docs — not shared UI code.
 
 ## 12. CI / delivery
@@ -584,8 +584,8 @@ A phase is done only when:
 3. Highlight is timed, animated, word-by-word (no static fallback shipped).
 4. Scroll + ink stay smooth on a mid-tier phone browser (manual or
    Playwright trace).
-5. Offline: after first load, text + quran-align timings work without network;
-   a still-current repeat snapshot is also local, and audio
+5. Offline: after first load, text works without network; each reciter's
+   timings work offline after that corpus has been opened once, and audio
    works from cache when previously heard.
 6. Relevant docs updated (`docs/WEB.md` status, `AGENTS.md` repo map).
 
@@ -593,7 +593,7 @@ A phase is done only when:
 
 | Risk | Mitigation |
 |---|---|
-| 27 MB DB first load | OPFS/Cache; progress UI as ink on paper; measure; shard only if needed |
+| Core DB first load | Generate without the timing table; lazy-load and cache only selected reciter corpora |
 | Arabic-only shaping + wash | Defer to Phase 4; use Range/Canvas path bloom; never SpanStyle-style splits |
 | React per-frame jank | Boundary-only store updates; rAF/CSS for wash progress |
 | Safari audio / autoplay | User gesture to start; Media Session; clear play affordance |
@@ -605,7 +605,7 @@ A phase is done only when:
 ## 15. Decision checklist (approve before coding)
 
 1. **Sibling `web/` package** with Vite + React + Vitest — yes/no?
-2. **Same `quran.db` via WASM SQLite** (not a new JSON pipeline) — yes/no?
+2. **Canonical `quran.db` with build-derived web core/timing assets** — yes/no?
 3. **Phase order** (engines → silent reader → sync+ink → focus → Arabic-only) — yes/no?
 4. **Arabic-only in Phase 4** (gloss+English prove the product first) — yes/no?
 5. **QCF V2 / Timings Lab out of v1** — yes/no?

@@ -37,6 +37,9 @@ let searchConceptPromise: Promise<SearchConcept[]> | null = null
 const surahContentCache = new Map<number, SurahContent>()
 /** Per-reciter+surah timing segments (raw); PreparedTimings are built lazily. */
 const timingsCache = new Map<string, Map<number, Segment[]>>()
+type TimingCorpus = Record<string, Record<string, number[][]>>
+const timingCorpora = new Map<number, TimingCorpus>()
+const timingCorpusLoads = new Map<number, Promise<void>>()
 
 export async function ensureReady(
   onProgress?: (p: LoadProgress) => void,
@@ -157,21 +160,49 @@ export async function preloadAllSurahContent(preferredSurahId?: number): Promise
 
 export function parseSegments(raw: string): Segment[] {
   try {
-    const parsed = JSON.parse(raw) as number[][]
-    const segments: Segment[] = []
-    for (const row of parsed) {
-      if (row.length < 3) continue
-      segments.push({
-        position: Number(row[0]),
-        startMs: Number(row[1]),
-        endMs: Number(row[2]),
-      })
-    }
-    segments.sort((a, b) => a.startMs - b.startMs)
-    return segments
+    return mapSegments(JSON.parse(raw) as number[][])
   } catch {
     return []
   }
+}
+
+function mapSegments(rows: number[][]): Segment[] {
+  return rows
+    .filter((row) => row.length >= 3)
+    .map((row) => ({
+      position: Number(row[0]),
+      startMs: Number(row[1]),
+      endMs: Number(row[2]),
+    }))
+    .sort((a, b) => a.startMs - b.startMs)
+}
+
+/** Fetch one reciter's corpus only when the reader needs highlighting. */
+export function ensureTimings(reciterId: number): Promise<void> {
+  if (timingCorpora.has(reciterId)) return Promise.resolve()
+  const pending = timingCorpusLoads.get(reciterId)
+  if (pending) return pending
+
+  const load = fetch(assetUrl(`timings/${reciterId}.json`))
+    .then((response) => {
+      if (!response.ok) throw new Error(`Timing corpus ${reciterId}: HTTP ${response.status}`)
+      return response.json() as Promise<TimingCorpus>
+    })
+    .then((corpus) => {
+      if (!corpus || typeof corpus !== 'object' || Array.isArray(corpus)) {
+        throw new Error(`Timing corpus ${reciterId} is invalid`)
+      }
+      timingCorpora.set(reciterId, corpus)
+      for (const key of timingsCache.keys()) {
+        if (key.startsWith(`${reciterId}:`)) timingsCache.delete(key)
+      }
+    })
+    .catch((error) => {
+      timingCorpusLoads.delete(reciterId)
+      throw error
+    })
+  timingCorpusLoads.set(reciterId, load)
+  return load
 }
 
 export function timings(reciterId: number, surahId: number): Map<number, Segment[]> {
@@ -180,14 +211,10 @@ export function timings(reciterId: number, surahId: number): Map<number, Segment
   if (cached) return cached
 
   const map = new Map<number, Segment[]>()
-  queryAll(
-    'SELECT ayah_number, segments FROM timings WHERE reciter_id = ? AND surah_id = ?',
-    [reciterId, surahId],
-    (r) => {
-      map.set(Number(r.ayah_number), parseSegments(String(r.segments)))
-      return null
-    },
-  )
+  const rows = timingCorpora.get(reciterId)?.[String(surahId)] ?? {}
+  for (const [ayah, segments] of Object.entries(rows)) {
+    map.set(Number(ayah), mapSegments(segments))
+  }
   timingsCache.set(key, map)
   return map
 }
@@ -505,6 +532,7 @@ export const QuranRepository = {
   reciters,
   surahContent,
   preloadAllSurahContent,
+  ensureTimings,
   timings,
   parseSegments,
   wordMorphology,

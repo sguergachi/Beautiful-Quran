@@ -1698,20 +1698,35 @@ def load_qua_timings(zip_path, word_counts, word_text, audio_durations):
     return rows
 
 
-def append_new_reciter_timings(timing_rows, word_counts, word_text, audio_durations):
-    """Add complete source-locked corpora, rebuilding Yasser's exact clip clock."""
+def append_new_reciter_timings(
+    timing_rows,
+    word_counts,
+    word_text,
+    audio_durations,
+    include_yasser_qua=True,
+):
+    """Complete source-locked corpora, optionally rebuilding Yasser from QUA."""
     # Yasser's source is deterministic and inexpensive to rebase, so rebuild
     # it even when an earlier source-clock import exists in the preserved DB.
-    timing_rows = [row for row in timing_rows if row[0] != YASSER_RECITER_ID]
-    existing = {row[0] for row in timing_rows}
-    wanted_align = QURAN_ALIGN_ADDITIONS - existing
+    if include_yasser_qua:
+        timing_rows = [row for row in timing_rows if row[0] != YASSER_RECITER_ID]
+    expected = set(word_counts)
+    existing = {}
+    for rid, surah, ayah, _segments in timing_rows:
+        existing.setdefault(rid, set()).add((surah, ayah))
+    wanted_align = {
+        rid for rid in QURAN_ALIGN_ADDITIONS
+        if existing.get(rid, set()) != expected
+    }
     alignment_zip = None
     if wanted_align:
         alignment_zip = fetch(ALIGN_ZIP, "quran-align-data.zip")
         verify_source(alignment_zip, ALIGN_ZIP_SHA256, "quran-align release")
 
     for rid, slug, _name, _style in RECITERS:
-        if rid in existing:
+        if rid == YASSER_RECITER_ID and not include_yasser_qua:
+            continue
+        if rid not in wanted_align and rid != YASSER_RECITER_ID:
             continue
         if rid == YASSER_RECITER_ID:
             source = fetch(YASSER_QUA_URL, "yasser-al-dosari-qua-v3.zip")
@@ -1742,6 +1757,7 @@ def append_new_reciter_timings(timing_rows, word_counts, word_text, audio_durati
             raise SystemExit(f"reciter {slug} has no complete highlighting source")
         if set(rows) != set(word_counts):
             raise SystemExit(f"reciter {slug} does not cover all 6,236 ayahs")
+        timing_rows = [row for row in timing_rows if row[0] != rid]
         timing_rows.extend(
             (rid, surah, ayah, json.dumps(rows[(surah, ayah)], separators=(",", ":")))
             for surah, ayah in sorted(rows)
@@ -3219,7 +3235,11 @@ def main():
     if not args.skip_timings:
         print("[timing sources] adding complete highlighted reciters")
         timing_rows = append_new_reciter_timings(
-            timing_rows, word_counts, word_text, audio_durations
+            timing_rows,
+            word_counts,
+            word_text,
+            audio_durations,
+            include_yasser_qua=not args.quran_align_only,
         )
 
     reciter_rows = declared_reciter_rows(timing_rows)
