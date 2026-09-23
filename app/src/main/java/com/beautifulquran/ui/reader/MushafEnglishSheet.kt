@@ -85,7 +85,6 @@ import com.beautifulquran.ui.theme.quietClickable
 import com.beautifulquran.ui.theme.shapedWordBloom
 import kotlin.math.roundToInt
 import kotlinx.coroutines.flow.StateFlow
-import com.beautifulquran.ui.theme.coversFirst
 
 /**
  * The English leaf — the same Madinah page, set as a page of a book.
@@ -967,8 +966,6 @@ private fun EnglishProseBlock(
                     if (!liveInk) {
                         emptyList()
                     } else {
-                        // Each verse orders its own share; the concatenation
-                        // re-interleaves them. See [coversFirst].
                         block.verses.flatMap { verse ->
                             englishVerseBlooms(
                                 verse = verse,
@@ -977,7 +974,7 @@ private fun EnglishProseBlock(
                                 glintInk = glintInk,
                                 text = block.text,
                             )
-                        }.coversFirst()
+                        }
                     }
                 },
                 layout = { layoutResult },

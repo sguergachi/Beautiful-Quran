@@ -158,7 +158,7 @@ class ShapedBloomOrderTest {
     }
 
     @Test
-    fun `ordering an already-ordered frame changes nothing`() {
+    fun `ordering is idempotent, and the second pass does not copy`() {
         val once = blooms()
         assertSame("the ordered fast path should not copy", once, once.coversFirst())
     }

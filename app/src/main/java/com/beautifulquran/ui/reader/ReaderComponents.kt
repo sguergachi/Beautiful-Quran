@@ -1925,9 +1925,12 @@ internal fun buildShapedBlooms(
             )
         }
     }
-    // Covers before ink, so no cover can cut a glint halo. Callers that
-    // concatenate several of these lists must order the result again — see
-    // [coversFirst].
+    // Ordered here as well as in [Modifier.shapedWordBloom]. The draw path is
+    // the guarantee — it is the only chokepoint every caller passes through —
+    // but it sits inside a draw modifier, where no unit test can reach it, and
+    // this invariant has already been broken twice. Ordering the frame here too
+    // keeps it under test; the second pass is free, since [coversFirst] returns
+    // an already-ordered list untouched.
     return blooms.coversFirst()
 }
 

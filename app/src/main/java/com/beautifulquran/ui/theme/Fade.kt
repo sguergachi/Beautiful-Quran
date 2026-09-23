@@ -343,7 +343,12 @@ fun Modifier.shapedWordBloom(
     val wordInkCache = WordInkCache()
     val washBrushCache = WashBrushCache(rtl, stops)
     return drawWithContent {
-        val bloomList = blooms()
+        // The one place a frame is consumed, and so the one place the
+        // covers-before-ink order can be guaranteed. Enforcing it in the
+        // builders instead left it to be re-broken by every caller that
+        // concatenates their output — which is how a cover kept landing on a
+        // lit word's halo after the builders had been fixed. See [coversFirst].
+        val bloomList = blooms().coversFirst()
         val punchLayer = bloomList.any { bloom ->
             when (bloom) {
                 is ShapedWordBloom.UpcomingDim -> bloom.coverAlpha > 0f
