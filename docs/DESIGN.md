@@ -675,6 +675,9 @@ While reciting, the top bar, reciter name, repeat, and speed fade to 8 % over
 rewind/forward controls on the page. Pause, and it breathes back. Non-active
 verses recess to upcoming ink over ~400 ms.
 
+The reciter name above the chapter transport carries a small disclosure
+chevron: the name and cue are one quiet button leading to reciter settings.
+
 ## Color
 
 Two themes, both "paper":
