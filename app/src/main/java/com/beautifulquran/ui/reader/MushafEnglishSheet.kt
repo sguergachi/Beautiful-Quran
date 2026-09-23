@@ -85,6 +85,7 @@ import com.beautifulquran.ui.theme.quietClickable
 import com.beautifulquran.ui.theme.shapedWordBloom
 import kotlin.math.roundToInt
 import kotlinx.coroutines.flow.StateFlow
+import com.beautifulquran.ui.theme.coversFirst
 
 /**
  * The English leaf — the same Madinah page, set as a page of a book.
@@ -966,6 +967,8 @@ private fun EnglishProseBlock(
                     if (!liveInk) {
                         emptyList()
                     } else {
+                        // Each verse orders its own share; the concatenation
+                        // re-interleaves them. See [coversFirst].
                         block.verses.flatMap { verse ->
                             englishVerseBlooms(
                                 verse = verse,
@@ -974,7 +977,7 @@ private fun EnglishProseBlock(
                                 glintInk = glintInk,
                                 text = block.text,
                             )
-                        }
+                        }.coversFirst()
                     }
                 },
                 layout = { layoutResult },
@@ -1110,12 +1113,14 @@ private fun englishVerseBlooms(
         }
         if (!bands.ahead.isEmpty()) blooms += cover(bands.ahead, paper, waiting)
     }
-    if (ends != null) {
-        blooms.addEnglishInkLayerBlooms(verse, motions, ends, palette, glintInk, text)
-    }
+    // The mark's cover is paper, so it goes down before any ink — left after
+    // the ink layers it landed on the last word's glint halo and cut it.
     val markCover = (1f - pack.markAlpha.value).coerceIn(0f, 1f)
     if (markCover > 0f && !verse.markRange.isEmpty()) {
         blooms += cover(verse.markRange, paper, markCover)
+    }
+    if (ends != null) {
+        blooms.addEnglishInkLayerBlooms(verse, motions, ends, palette, glintInk, text)
     }
     return blooms
 }

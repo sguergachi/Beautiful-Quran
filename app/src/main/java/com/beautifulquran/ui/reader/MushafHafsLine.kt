@@ -65,6 +65,7 @@ import com.beautifulquran.ui.theme.ShapedWordBloom
 import com.beautifulquran.ui.theme.glyphLayerAlpha
 import com.beautifulquran.ui.theme.letterFadeIn
 import com.beautifulquran.ui.theme.shapedWordBloom
+import com.beautifulquran.ui.theme.coversFirst
 
 private const val MARK_SIZE_RATIO = 20f / 30f
 
@@ -1158,6 +1159,9 @@ private fun buildLineBlooms(
     palette: WordInkPalette,
     glintInk: androidx.compose.ui.graphics.Color?,
 ) = buildList {
+    // One buildShapedBlooms call per token, so each token's covers are only
+    // grouped within itself — the line is re-interleaved by the concatenation
+    // and ordered again at the end. See [coversFirst].
     slices.forEach { slice ->
         val token = slice.token
         val pack = packs[token.surahId to token.ayah] ?: return@forEach
@@ -1192,4 +1196,4 @@ private fun buildLineBlooms(
             ),
         )
     }
-}
+}.coversFirst()

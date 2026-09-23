@@ -5,6 +5,9 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.AnnotatedString
 import com.beautifulquran.data.model.Word
 import com.beautifulquran.ui.theme.ShapedWordBloom
+import com.beautifulquran.ui.theme.coversFirst
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertSame
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -119,6 +122,45 @@ class ShapedBloomOrderTest {
             list.any { it is ShapedWordBloom.UpcomingDim } &&
                 list.any { it is ShapedWordBloom.InkReveal },
         )
+    }
+
+    @Test
+    fun `concatenating per-token frames re-interleaves, and is re-ordered`() {
+        // The mushaf Hafs line calls buildShapedBlooms once per token and
+        // concatenates; the English leaf does the same per verse. Each share is
+        // ordered on its own, so the concatenation puts the next token's cover
+        // back on top of the previous token's glint — which is how this bug
+        // survived being fixed one layer further down.
+        val perToken = listOf(blooms(), blooms())
+        val concatenated = perToken.flatten()
+        val firstInk = concatenated.indexOfFirst { it is ShapedWordBloom.ColorReveal }
+        assertTrue(
+            "concatenation must re-interleave, or this test guards nothing",
+            concatenated.withIndex().any { (i, b) -> i > firstInk && isCover(b) },
+        )
+        val ordered = concatenated.coversFirst()
+        val orderedFirstInk = ordered.indexOfFirst { it is ShapedWordBloom.ColorReveal }
+        assertTrue(
+            "no cover may survive after ink once ordered",
+            ordered.withIndex().none { (i, b) -> i > orderedFirstInk && isCover(b) },
+        )
+        assertEquals("ordering may not drop or add a layer", concatenated.size, ordered.size)
+        assertEquals(
+            "covers keep their relative order",
+            concatenated.filter { isCover(it) },
+            ordered.filter { isCover(it) },
+        )
+        assertEquals(
+            "and so does ink",
+            concatenated.filterNot { isCover(it) },
+            ordered.filterNot { isCover(it) },
+        )
+    }
+
+    @Test
+    fun `ordering an already-ordered frame changes nothing`() {
+        val once = blooms()
+        assertSame("the ordered fast path should not copy", once, once.coversFirst())
     }
 
     @Test

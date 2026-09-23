@@ -228,6 +228,50 @@ sealed class ShapedWordBloom {
     ) : ShapedWordBloom()
 }
 
+/**
+ * Whether this bloom lays paper down rather than ink: an unread dim, a fading
+ * ﴿N﴾ mark, or the first-pass reveal that is paper pulled back off the glyphs.
+ */
+internal val ShapedWordBloom.isPaperCover: Boolean
+    get() = this is ShapedWordBloom.UpcomingDim || this is ShapedWordBloom.InkReveal
+
+/**
+ * Every paper cover in a frame, then every ink layer, each keeping its own
+ * order.
+ *
+ * A cover reaches past its own box by `coverPad` to catch glyph overhang, and
+ * that is safe because — as [Modifier.shapedWordBloom] puts it — "any neighbour
+ * ink it laps is redrawn by the same text pass". The glint halo is the one
+ * layer that is not: it is a one-shot blur emitted for a single word, and
+ * nothing redraws it. Let a later cover land on top of it and it is cut square
+ * along the line box, so a lit word wears a rectangle.
+ *
+ * This has to be applied where a frame's blooms are *finally* assembled, not
+ * inside one word's or one verse's share of them. Every caller that
+ * concatenates per-token or per-verse lists rebuilds the interleaving at its
+ * own level, which is exactly how the bug outlived a fix applied one layer
+ * down ([buildShapedBlooms] alone).
+ *
+ * Covers keep their order relative to each other and so do inks, so nothing
+ * else about the frame moves.
+ */
+internal fun List<ShapedWordBloom>.coversFirst(): List<ShapedWordBloom> {
+    var seenInk = false
+    var interleaved = false
+    for (bloom in this) {
+        if (bloom.isPaperCover) {
+            if (seenInk) { interleaved = true; break }
+        } else {
+            seenInk = true
+        }
+    }
+    if (!interleaved) return this
+    val ordered = ArrayList<ShapedWordBloom>(size)
+    filterTo(ordered) { it.isPaperCover }
+    filterNotTo(ordered) { it.isPaperCover }
+    return ordered
+}
+
 /** Unread covers punch the glyph layer ([BlendMode.DstOut]) so the wash
  * reveals whatever is already on the paper. Painting page colour would
  * cut a cream hole in a gather stain. */

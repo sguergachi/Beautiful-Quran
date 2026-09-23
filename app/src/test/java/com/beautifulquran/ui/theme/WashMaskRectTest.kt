@@ -2,6 +2,7 @@ package com.beautifulquran.ui.theme
 
 import androidx.compose.ui.geometry.Rect
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import kotlin.math.max
@@ -39,14 +40,17 @@ class WashMaskRectTest {
     }
 
     @Test
-    fun `the old line-box mask did not, which is the bug`() {
+    fun `the bare line box does not, which is the bug`() {
+        // The defect this guards: clipping the wash to the line box leaves the
+        // halo's fringe unmasked, so it keeps full alpha however far along the
+        // sweep is. Stated as the difference the helper makes.
         val colorBleed = 30f
         val layer = glowLayer(lineBox, colorBleed)
-        assertTrue(
-            "the line box should fall short below the glow — otherwise this " +
-                "test is not describing the defect it guards",
-            lineBox.bottom < layer.bottom && lineBox.top > layer.top,
-        )
+        val mask = washMaskRect(lineBox, colorBleed, openTop = true, openBottom = true)
+        val boxCovers = lineBox.top <= layer.top && lineBox.bottom >= layer.bottom
+        val maskCovers = mask.top <= layer.top && mask.bottom >= layer.bottom
+        assertFalse("the line box must fall short, or there was no bug", boxCovers)
+        assertTrue("the mask must not", maskCovers)
     }
 
     @Test
@@ -72,11 +76,23 @@ class WashMaskRectTest {
     }
 
     @Test
-    fun `the sweep geometry is untouched by the mask`() {
-        // Travel is measured from the line box, never the mask: widening the
-        // painted area must not move the head or restretch the feather.
-        val mask = washMaskRect(lineBox, 30f, openTop = true, openBottom = true)
-        assertTrue("the mask is strictly wider", mask.width > lineBox.width)
-        assertEquals("the line box itself is unchanged", 300f, lineBox.width, 0f)
+    fun `the mask grows by the bleed and nothing else`() {
+        // Travel is measured from the line box, never the mask, so the only
+        // thing the helper may do is widen — by exactly the bleed, symmetrically.
+        val bleed = 30f
+        val mask = washMaskRect(lineBox, bleed, openTop = true, openBottom = true)
+        assertEquals(lineBox.left - bleed, mask.left, 0f)
+        assertEquals(lineBox.right + bleed, mask.right, 0f)
+        assertEquals(lineBox.width + bleed * 2f, mask.width, 0f)
+        assertEquals(lineBox.height + bleed * 2f, mask.height, 0f)
+        assertEquals(
+            "the mask stays centred on the box, so the sweep's midpoint holds",
+            lineBox.center.x, mask.center.x, 0f,
+        )
+    }
+
+    @Test
+    fun `zero bleed is the identity`() {
+        assertEquals(lineBox, washMaskRect(lineBox, 0f, openTop = true, openBottom = true))
     }
 }

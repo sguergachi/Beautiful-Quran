@@ -163,6 +163,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.first
 import com.beautifulquran.ui.theme.QuranTheme
+import com.beautifulquran.ui.theme.coversFirst
 
 internal fun Int.toArabicIndic(): String =
     toString().map { '٠' + (it - '0') }.joinToString("")
@@ -1761,39 +1762,19 @@ private fun MutableList<ShapedWordBloom>.addShapedInkMotionBlooms(
      */
     baseReveal: Boolean = true,
 ) {
-    // Every word's paper cover goes down before any word's ink.
-    //
-    // These are emitted per word, and a cover reaches past its own box by
-    // [PaperCoverPad] to catch glyph overhang. Interleaved, that pad let the
-    // *next* word's cover land on top of the previous word's glint halo and
-    // cut it along the line box — a lit word wearing a rectangle. The cover
-    // lapping a neighbour is otherwise harmless precisely because "any
-    // neighbour ink it laps is redrawn by the same text pass"
-    // ([Modifier.shapedWordBloom]) — but the halo is a one-shot blur emitted
-    // for that word alone, so nothing redraws it. Grouping the covers first
-    // restores that assumption for every layer above them.
-    //
-    // Order is otherwise untouched: base text still sits under every cover,
-    // each word's own cover still precedes its own ink, and within a word the
-    // wasl -> repeat -> glint sequence is unchanged.
-    if (baseReveal) {
-        motions.forEachIndexed { index, motion ->
-            val range = ranges.getOrNull(index) ?: return@forEachIndexed
-            if (!motion.repeat && motion.sweepProgress < 1f) {
-                add(
-                    ShapedWordBloom.InkReveal(
-                        range = range,
-                        progress = motion.sweepProgress,
-                        paper = palette.paperColor,
-                        restingAlpha = InkEngine.State.Upcoming.inkAlpha(),
-                        feather = motion.sweepFeather,
-                    ),
-                )
-            }
-        }
-    }
     motions.forEachIndexed { index, motion ->
         val range = ranges.getOrNull(index) ?: return@forEachIndexed
+        if (baseReveal && !motion.repeat && motion.sweepProgress < 1f) {
+            add(
+                ShapedWordBloom.InkReveal(
+                    range = range,
+                    progress = motion.sweepProgress,
+                    paper = palette.paperColor,
+                    restingAlpha = InkEngine.State.Upcoming.inkAlpha(),
+                    feather = motion.sweepFeather,
+                ),
+            )
+        }
         val wasl = motion.waslPrefix
         val waslProgress = wasl?.displayProgress() ?: 0f
         if (waslInk != null && wasl != null && waslProgress > 0f) {
@@ -1944,7 +1925,10 @@ internal fun buildShapedBlooms(
             )
         }
     }
-    return blooms
+    // Covers before ink, so no cover can cut a glint halo. Callers that
+    // concatenate several of these lists must order the result again — see
+    // [coversFirst].
+    return blooms.coversFirst()
 }
 
 /** Paper-cover strength for one shaped word during an ayah handoff. */
