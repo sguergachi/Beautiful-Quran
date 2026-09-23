@@ -31,6 +31,7 @@ import {
 } from '../domain/Basmalah'
 import { HighlightClock } from '../domain/HighlightClock'
 import { OutputLatency } from '../domain/OutputLatency'
+import { ReciterSync } from '../domain/ReciterSync'
 import {
   fastForwardAction,
   midpointMs,
@@ -1075,9 +1076,10 @@ class AppStore {
     mediaPositionMs: number,
     forcedMediaMs: number | null,
     firstWordStartMs: number,
+    reciterId: number,
   ): number {
     const latencyMs = OutputLatency.LOCAL_MS
-    const leadMs = getHighlightLeadMs()
+    const leadMs = getHighlightLeadMs() + ReciterSync.highlightAdvanceMs(reciterId)
     if (leadMs !== this.lastHighlightLeadMs) {
       this.lastHighlightLeadMs = leadMs
       this.highlightClock.acceptNextSample()
@@ -1115,7 +1117,12 @@ class AppStore {
     const prepared = this.ensurePrepared(np.ayah)
     const firstWordStartMs = prepared?.segments[0]?.startMs ?? 0
     const heardMs = OutputLatency.heardMs(ps.positionMs, OutputLatency.LOCAL_MS)
-    const rawMs = this.highlightPositionMs(ps.positionMs, forcedMs, firstWordStartMs)
+    const rawMs = this.highlightPositionMs(
+      ps.positionMs,
+      forcedMs,
+      firstWordStartMs,
+      np.reciterId,
+    )
     const mediaKey = `${np.surahId}:${np.ayah}:${np.reciterId}`
     const highlightPositionMs = this.highlightClock.sample(mediaKey, rawMs)
     if (mediaKey !== this.lastInkMediaKey) {

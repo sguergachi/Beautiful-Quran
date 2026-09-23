@@ -27,6 +27,7 @@ import com.beautifulquran.domain.buildEnglishBookByLayout
 import com.beautifulquran.domain.buildEnglishBook
 import com.beautifulquran.domain.quranWordKey
 import com.beautifulquran.domain.OutputLatency
+import com.beautifulquran.domain.ReciterSync
 import com.beautifulquran.domain.SURAH_FATIHA
 import com.beautifulquran.domain.surahOpensWithBasmalahPreface
 import com.beautifulquran.playback.AudioOutputLatency
@@ -562,7 +563,7 @@ class ReaderViewModel(
      * change steps query time, so arm [HighlightClock] to take it rather than
      * hold it as jitter.
      */
-    private fun highlightPositionMs(firstWordStartMs: Long): Long {
+    private fun highlightPositionMs(firstWordStartMs: Long, reciterId: Int): Long {
         val latencyMs = outputLatencyMs()
         // The tarjīʿ shimmer delays the tapped voice signal by the same
         // latency plus the sink buffer so it lands on the same clock the
@@ -620,7 +621,8 @@ class ReaderViewModel(
                 )
             }
         }
-        val leadMs = InkEngine.highlightLeadMs.toLong().coerceAtLeast(0L)
+        val leadMs = InkEngine.highlightLeadMs.toLong().coerceAtLeast(0L) +
+            ReciterSync.highlightAdvanceMs(reciterId)
         if (latencyMs != lastOutputLatencyMs || leadMs != lastHighlightLeadMs) {
             lastOutputLatencyMs = latencyMs
             lastHighlightLeadMs = leadMs
@@ -650,7 +652,7 @@ class ReaderViewModel(
                 ?.firstOrNull()
                 ?.startMs
                 ?: 0L
-            val rawMs = highlightPositionMs(firstWordStartMs)
+            val rawMs = highlightPositionMs(firstWordStartMs, np.reciterId)
             val clockMs = highlightClock.sample(np, rawMs)
             activeWordPollCache.activeWord(
                 ayah = np.ayah,
