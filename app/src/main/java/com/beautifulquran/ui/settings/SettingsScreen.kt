@@ -188,7 +188,6 @@ internal fun SettingsScreen(
     val settings by viewModel.settings.settings.collectAsStateWithLifecycle()
     val reciters by viewModel.reciters.collectAsStateWithLifecycle()
     val favoriteReciters = reciters.filter { it.id in settings.favoriteReciterIds }
-    val selectedReciter = reciters.firstOrNull { it.id == settings.reciterId }
     val context = LocalContext.current
     var usage by remember { mutableStateOf<RecitationUsage?>(null) }
     LaunchedEffect(downloadsRefreshKey) {
@@ -294,12 +293,7 @@ internal fun SettingsScreen(
             }
             NavigateRow(
                 label = "All reciters",
-                note = buildString {
-                    append(selectedReciter?.name ?: "Choose a voice")
-                    append(" · ")
-                    append(reciters.size)
-                    append(" voices")
-                },
+                note = "${reciters.size} reciters total",
                 onClick = onOpenReciters,
             )
 
