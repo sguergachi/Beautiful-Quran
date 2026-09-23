@@ -228,6 +228,50 @@ sealed class ShapedWordBloom {
     ) : ShapedWordBloom()
 }
 
+/**
+ * Whether this bloom lays paper down rather than ink: an unread dim, a fading
+ * ﴿N﴾ mark, or the first-pass reveal that is paper pulled back off the glyphs.
+ */
+internal val ShapedWordBloom.isPaperCover: Boolean
+    get() = this is ShapedWordBloom.UpcomingDim || this is ShapedWordBloom.InkReveal
+
+/**
+ * Every paper cover in a frame, then every ink layer, each keeping its own
+ * order.
+ *
+ * A cover reaches past its own box by `coverPad` to catch glyph overhang, and
+ * that is safe because — as [Modifier.shapedWordBloom] puts it — "any neighbour
+ * ink it laps is redrawn by the same text pass". The glint halo is the one
+ * layer that is not: it is a one-shot blur emitted for a single word, and
+ * nothing redraws it. Let a later cover land on top of it and it is cut square
+ * along the line box, so a lit word wears a rectangle.
+ *
+ * This has to be applied where a frame's blooms are *finally* assembled, not
+ * inside one word's or one verse's share of them. Every caller that
+ * concatenates per-token or per-verse lists rebuilds the interleaving at its
+ * own level, which is exactly how the bug outlived a fix applied one layer
+ * down ([buildShapedBlooms] alone).
+ *
+ * Covers keep their order relative to each other and so do inks, so nothing
+ * else about the frame moves.
+ */
+internal fun List<ShapedWordBloom>.coversFirst(): List<ShapedWordBloom> {
+    var seenInk = false
+    var interleaved = false
+    for (bloom in this) {
+        if (bloom.isPaperCover) {
+            if (seenInk) { interleaved = true; break }
+        } else {
+            seenInk = true
+        }
+    }
+    if (!interleaved) return this
+    val ordered = ArrayList<ShapedWordBloom>(size)
+    filterTo(ordered) { it.isPaperCover }
+    filterNotTo(ordered) { it.isPaperCover }
+    return ordered
+}
+
 /** Unread covers punch the glyph layer ([BlendMode.DstOut]) so the wash
  * reveals whatever is already on the paper. Painting page colour would
  * cut a cream hole in a gather stain. */
@@ -299,7 +343,12 @@ fun Modifier.shapedWordBloom(
     val wordInkCache = WordInkCache()
     val washBrushCache = WashBrushCache(rtl, stops)
     return drawWithContent {
-        val bloomList = blooms()
+        // The one place a frame is consumed, and so the one place the
+        // covers-before-ink order can be guaranteed. Enforcing it in the
+        // builders instead left it to be re-broken by every caller that
+        // concatenates their output — which is how a cover kept landing on a
+        // lit word's halo after the builders had been fixed. See [coversFirst].
+        val bloomList = blooms().coversFirst()
         val punchLayer = bloomList.any { bloom ->
             when (bloom) {
                 is ShapedWordBloom.UpcomingDim -> bloom.coverAlpha > 0f
@@ -588,17 +637,36 @@ fun Modifier.shapedWordBloom(
                             } else {
                                 cover.left + local - lineEdge
                             }
+                            // The mask has to reach every pixel this layer could
+                            // have painted, not just the line box. The halo is
+                            // blurred out to [colorBleed] past the glyphs, so a
+                            // DstIn pass bounded by the box left that fringe
+                            // untouched: a word the sweep had not reached yet
+                            // still wore its full glow, hanging under the line
+                            // with no ink inside it.
+                            //
+                            // Only the painted area grows. The travel —
+                            // [total], [headX], and the brush's own origin under
+                            // [translate] — is still measured from [cover], and
+                            // the ramp is a horizontal clamped gradient, so
+                            // widening the rect cannot move or reshape it.
+                            val mask = washMaskRect(
+                                cover = cover,
+                                bleed = colorBleed,
+                                openTop = i == 0,
+                                openBottom = i == tintBounds.lastIndex,
+                            )
                             clipRect(
-                                left = cover.left,
-                                top = cover.top,
-                                right = cover.right,
-                                bottom = cover.bottom,
+                                left = mask.left,
+                                top = mask.top,
+                                right = mask.right,
+                                bottom = mask.bottom,
                             ) {
                                 translate(left = headX, top = 0f) {
                                     drawRect(
                                         brush = brush,
-                                        topLeft = Offset(cover.left - headX, cover.top),
-                                        size = Size(cover.width, cover.height),
+                                        topLeft = Offset(mask.left - headX, mask.top),
+                                        size = Size(mask.width, mask.height),
                                         blendMode = BlendMode.DstIn,
                                     )
                                 }
@@ -917,6 +985,28 @@ private class GlyphHaloCache {
         ).also { byRange[key] = it }
     }
 }
+
+/**
+ * The area one line's directional wash must cover.
+ *
+ * [cover] is the line box the sweep is measured across; the glow and tint reach
+ * [bleed] past it, and anything the wash does not cover keeps full alpha — ink
+ * and light the sweep has not arrived at yet. Vertical room is only opened at
+ * the ends of the range ([openTop]/[openBottom]): a word set over two lines
+ * would otherwise have one line's mask reach into the next and erase a
+ * neighbour's light that its own pass had already resolved.
+ */
+internal fun washMaskRect(
+    cover: Rect,
+    bleed: Float,
+    openTop: Boolean,
+    openBottom: Boolean,
+): Rect = Rect(
+    left = cover.left - bleed,
+    top = if (openTop) cover.top - bleed else cover.top,
+    right = cover.right + bleed,
+    bottom = if (openBottom) cover.bottom + bleed else cover.bottom,
+)
 
 /** Word-local horizontal bounds per line, at the layout's full line height. */
 private fun computeLineBounds(

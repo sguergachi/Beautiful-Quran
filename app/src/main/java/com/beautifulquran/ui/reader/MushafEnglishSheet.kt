@@ -1110,12 +1110,14 @@ private fun englishVerseBlooms(
         }
         if (!bands.ahead.isEmpty()) blooms += cover(bands.ahead, paper, waiting)
     }
-    if (ends != null) {
-        blooms.addEnglishInkLayerBlooms(verse, motions, ends, palette, glintInk, text)
-    }
+    // The mark's cover is paper, so it goes down before any ink — left after
+    // the ink layers it landed on the last word's glint halo and cut it.
     val markCover = (1f - pack.markAlpha.value).coerceIn(0f, 1f)
     if (markCover > 0f && !verse.markRange.isEmpty()) {
         blooms += cover(verse.markRange, paper, markCover)
+    }
+    if (ends != null) {
+        blooms.addEnglishInkLayerBlooms(verse, motions, ends, palette, glintInk, text)
     }
     return blooms
 }
