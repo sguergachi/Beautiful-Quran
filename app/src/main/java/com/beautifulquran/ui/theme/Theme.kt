@@ -139,7 +139,16 @@ data class QuranAccents(
     val greenInk: Color,
     /** The green at [QuranInk.muted] weight — a section label over a band. */
     val greenQuiet: Color,
-    /** The green barely off the paper: the ground a band is tinted with. */
+    /**
+     * The ground a band is tinted with: the *paper*, carrying a hint of the
+     * green — not a green.
+     *
+     * Solved as the sheet under a tenth of [ColorScheme.primary], which is what
+     * the call sites used to write inline. It is the one green that must not be
+     * solved to a contrast target the way the others are: hold its chroma fixed
+     * and match a lightness, and what comes out at a band's lightness is a
+     * saturated mint. Its chroma belongs to the paper it tints.
+     */
     val greenWash: Color,
     val embossDark: Color,
     val embossLight: Color,
@@ -328,7 +337,7 @@ private val LightAccents = QuranAccents(
     goldDeep = Color(0xFF7A5B05),
     greenInk = Color(0xFF2B725F),
     greenQuiet = Color(0xFF5F9C8A),
-    greenWash = Color(0xFFB8EDDB),
+    greenWash = Color(0xFFE2E4D8),
     embossDark = Color(0x24000000),
     embossLight = Color(0x59FFFFFF),
     repeatInk = Color(0xFFB4551E),
@@ -345,7 +354,7 @@ private val DarkAccents = QuranAccents(
     goldDeep = Color(0xFF9A7B32),
     greenInk = Color(0xFF8FD3BC),
     greenQuiet = Color(0xFF72AF9A),
-    greenWash = Color(0xFF134738),
+    greenWash = Color(0xFF181D19),
     embossDark = Color(0x66000000),
     embossLight = Color(0x1FFFFFFF),
     // Deep saturated orange — reads as warm ink on charcoal/green, not a pale
@@ -373,7 +382,7 @@ private val RoyalGreenAccents = QuranAccents(
     goldDeep = Color(0xFFA07F38),
     greenInk = Color(0xFF95D9C1),
     greenQuiet = Color(0xFF78B49F),
-    greenWash = Color(0xFF1F5141),
+    greenWash = Color(0xFF133B32),
     embossDark = Color(0x66000000),
     embossLight = Color(0x1FFFFFFF),
     repeatInk = Color(0xFFFF9359),
