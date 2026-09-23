@@ -4,6 +4,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
@@ -77,6 +78,7 @@ fun PlayerBar(
                 contentPadding = PaddingValues(horizontal = 16.dp, vertical = 2.dp),
                 modifier = Modifier.graphicsLayer { alpha = chromeAlpha() },
             ) {
+                Spacer(Modifier.size(18.dp))
                 Text(
                     text = reciterName,
                     style = MaterialTheme.typography.labelMedium,
