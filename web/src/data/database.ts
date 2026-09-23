@@ -1,5 +1,6 @@
 /**
- * WASM SQLite wrapper over the committed quran.db asset.
+ * WASM SQLite wrapper over the timing-free web database generated from the
+ * committed canonical quran.db asset.
  *
  * Vite resolves `sql.js` to `sql-wasm-browser.js`, which asks locateFile for
  * `sql-wasm-browser.wasm` (not `sql-wasm.wasm`). Both names are shipped under

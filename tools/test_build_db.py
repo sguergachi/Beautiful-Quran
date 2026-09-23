@@ -25,6 +25,7 @@ sys.path.insert(0, str(TOOLS))
 from build_db import (  # noqa: E402
     AUDIO_ONSETS_DIR,
     QCF_V2_FIRST_CODEPOINT,
+    QURAN_ALIGN_ADDITIONS,
     RECITERS,
     adjust_qdc_segments,
     apply_boundary_repair,
@@ -41,6 +42,7 @@ from build_db import (  # noqa: E402
     load_audio_durations,
     load_audio_onsets,
     apply_audit_holds,
+    append_new_reciter_timings,
     discard_false_same_position_lead,
     declared_reciter_rows,
     false_same_position_leads,
@@ -963,6 +965,34 @@ def check_qua_clip_occurrences():
     ] and incomplete is None
 
 
+def check_source_locked_reciter_completion():
+    """A partial quran-align import is replaced, while audit Yasser stays pure."""
+    word_counts = {(1, 1): 4, (32, 24): 10}
+    complete = [[1, 0, 100], [2, 100, 200], [3, 200, 300], [4, 300, 400]]
+    timing_rows = [
+        (rid, surah, ayah, json.dumps(complete))
+        for rid in QURAN_ALIGN_ADDITIONS - {18}
+        for surah, ayah in word_counts
+    ]
+    yasser = (9, 1, 1, "yasser-quran-align")
+    timing_rows.extend([yasser, (18, 1, 1, json.dumps(complete))])
+    aligned = {(18, 1, 1): complete}
+    with (
+        patch("build_db.fetch", return_value=Path("unused")),
+        patch("build_db.verify_source"),
+        patch("build_db.alignment_reference", return_value=aligned),
+    ):
+        completed = append_new_reciter_timings(
+            timing_rows,
+            word_counts,
+            {},
+            {},
+            include_yasser_qua=False,
+        )
+    minshawy_keys = {(surah, ayah) for rid, surah, ayah, _ in completed if rid == 18}
+    return yasser in completed and minshawy_keys == set(word_counts)
+
+
 def main():
     cases = load_cases()
     failures = []
@@ -1017,6 +1047,7 @@ def main():
     gloss_ok = check_gloss_normalize()
     alignment_payload_ok = check_alignment_payload_parse()
     qua_clip_ok = check_qua_clip_occurrences()
+    source_locked_ok = check_source_locked_reciter_completion()
     database_ok = audit_bundled_db()
     reciter_catalog_ok = check_reciter_catalog()
     qcf_runs_ok = check_qcf_v2_page_runs()
@@ -1033,6 +1064,10 @@ def main():
         "quran-align release payload parse"
     )
     print(f"  {'ok  ' if qua_clip_ok else 'FAIL'} QUA clip occurrence selection")
+    print(
+        f"  {'ok  ' if source_locked_ok else 'FAIL'} "
+        "source-locked reciter completion"
+    )
     print(f"  {'ok  ' if database_ok else 'FAIL'} bundled timing database invariants")
     print(f"  {'ok  ' if reciter_catalog_ok else 'FAIL'} declared reciter catalog")
     print(f"  {'ok  ' if qcf_runs_ok else 'FAIL'} public DB excludes QCF V2 fields")
@@ -1052,6 +1087,8 @@ def main():
         failures.append(("quran-align payload", "release artifact parse failed", None))
     if not qua_clip_ok:
         failures.append(("QUA clip occurrences", "clip clock selection failed", None))
+    if not source_locked_ok:
+        failures.append(("source-locked reciters", "partial corpus was not completed", None))
     if not database_ok:
         failures.append(("bundled database", "timing audit failed", None))
     if not reciter_catalog_ok:
@@ -1075,7 +1112,7 @@ def main():
                 for line in str(detail).splitlines():
                     print(f"    {line}")
         return 1
-    print(f"all {len(cases) + 12} cases pass ({CASES_DIR.relative_to(Path.cwd())})")
+    print(f"all {len(cases) + 14} cases pass ({CASES_DIR.relative_to(Path.cwd())})")
     return 0
 
 

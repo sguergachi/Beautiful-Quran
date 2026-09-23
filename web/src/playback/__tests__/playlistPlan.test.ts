@@ -42,12 +42,24 @@ describe('buildPlaylist', () => {
       2,
       3,
     ])
-    expect(playlist[0]?.url).toContain('/bismillah.mp3')
+    expect(playlist[0]?.url).toContain('/001001.mp3')
   })
 
   it('does not add a separate basmalah to Al-Fatihah or At-Tawbah', () => {
     expect(buildPlaylist(content(1), reciter).map((item) => item.ayah)).toEqual([1, 2, 3])
     expect(buildPlaylist(content(9), reciter).map((item) => item.ayah)).toEqual([1, 2, 3])
+  })
+
+  it.each([
+    'Yasser_Ad-Dussary_128kbps',
+    'Abdul_Basit_Mujawwad_128kbps',
+    'Husary_Muallim_128kbps',
+    'Minshawy_Mujawwad_192kbps',
+    'Mohammad_al_Tablaway_128kbps',
+  ])('uses the universally available Al-Fatihah clip for %s', (slug) => {
+    expect(buildPlaylist(content(2), { ...reciter, slug })[0]?.url).toContain(
+      `/${slug}/001001.mp3`,
+    )
   })
 
   it('starts a mid-surah playlist at the requested ayah without a preface', () => {

@@ -29,12 +29,14 @@ npm run build    # static site → dist/
 npm run build:pages  # → ../_site/app (CI does this on master)
 ```
 
-Requires Node 22+. `npm run dev` and `npm run build` copy the canonical
-`../data/quran.db` into the generated web assets. The database is committed
-once and shared with Android; it contains the reviewed repeat-aware timing
-dataset. The browser automatically fills a separate IndexedDB word/QCF cache
-through the authenticated Quran Foundation Content Sync proxy. QF credentials
-remain in Cloudflare and are never included in the web bundle.
+Requires Node 22+. `npm run dev` and `npm run build` derive web assets from the
+canonical `../data/quran.db`: a timing-free startup database plus one lazy JSON
+corpus per reciter. Android still packages the complete database, and both
+surfaces therefore use the same reviewed timing rows without making the web
+download every reciter at startup. The browser automatically fills a separate
+IndexedDB word/QCF cache through the authenticated Quran Foundation Content
+Sync proxy. QF credentials remain in Cloudflare and are never included in the
+web bundle.
 
 ## Architecture
 
@@ -59,13 +61,15 @@ Engines are DOM-free and unit-tested against the Android JVM suites. See
   toward the reader. Frame, corner seals, medallion, and type scale from a
   48-unit grid on the live board size (`coverLayout`). Tap or Escape skips
   once ready.
-- First load downloads `quran.db`; a service worker caches the DB, fonts, and
-  hashed assets (cache-first) **only after a successful boot**, then warms the
-  DB/wasm into the Cache API. Navigations are **network-first**: a successful
+- First load downloads the timing-free `quran.db`; the selected reciter's
+  corpus loads when a chapter opens. A service worker caches the DB, timing
+  JSON, fonts, and hashed assets (cache-first) **only after a successful boot**,
+  then warms the DB/wasm into the Cache API. Navigations are **network-first**: a successful
   fetch stashes HTML in a side cache used only when offline, so a deploy cannot
   leave phones on a stale shell while online. Bump `CACHE` /
-  `OFFLINE_SHELL` in `public/sw.js` when changing that contract. Recitation
-  audio stays in the separate AudioPrefetch Cache API (cross-origin).
+  `OFFLINE_SHELL` in `public/sw.js` whenever the core database or cache contract
+  changes. Recitation audio stays in the separate AudioPrefetch Cache API
+  (cross-origin).
 - `sql.js`’s browser build requests `sql-wasm-browser.wasm` (copied into
   `public/` on `npm install`). Shipping only `sql-wasm.wasm` 404s on Pages.
 - Audio streams from everyayah.com; upcoming ayahs are prefetched in parallel
@@ -81,8 +85,8 @@ Engines are DOM-free and unit-tested against the Android JVM suites. See
   hard abut — no crossfade). Word highlight still uses the same per-ayah
   `positionMs` clock. Developer mode can disable it to A/B the legacy
   dual-`<audio>` transport.
-- Repeat-aware timings always come from the bundled database, so chapter open
-  and repeat highlighting require no timing network request.
+- Repeat-aware timings are build-generated from the canonical database and
+  cached after the selected reciter's first chapter open.
 - The QF word/QCF cache bootstraps once, refreshes from its saved checkpoint
   after six days, and withholds those fields after seven days until it can sync.
 - Click a word to play from there; right-click / long-press opens the Root Word Viewer.
