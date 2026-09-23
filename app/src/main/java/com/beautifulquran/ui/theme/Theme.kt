@@ -375,6 +375,13 @@ private val DarkAccents = QuranAccents(
 /** Royal Green's paper is a full step lighter than Nightfall's, so it cannot
  * share Nightfall's inks and still read at the same weight — each accent is
  * solved against its own sheet. */
+// Royal Green's glint is its own value, and carries less gold than Nightfall's.
+// Its sheet is a full step lighter, so scripture sits near the ceiling here and
+// a highlight has little room above it: at Nightfall's chroma the brightest
+// warm gold available lands *below* the page's own ink. Chroma is therefore
+// taken as high as still clears scripture (0.046 of 0.058) rather than fixed
+// and the brightness chased — fixing it the other way round is what turned
+// this near-white.
 private val RoyalGreenAccents = QuranAccents(
     gold = Color(0xFFD0AA4D),
     goldInk = Color(0xFFD7B255),
@@ -388,7 +395,7 @@ private val RoyalGreenAccents = QuranAccents(
     repeatInk = Color(0xFFFF9359),
     bookmarkRibbon = Color(0xFFFF727B),
     annotationInk = Color(0xFFF4A4B2),
-    glintInk = Color(0xFFFFF7DE),
+    glintInk = Color(0xFFFFF4D5),
 )
 
 // ---------------------------------------------------------------------------

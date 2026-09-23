@@ -273,8 +273,11 @@ class ColorSystemTest {
                 apca(wash, sheet) < 12.0,
             )
             assertTrue(
-                "$mode greenWash must still lean green against its own sheet",
-                oklch(wash).hue > oklch(sheet).hue || mode == ThemeMode.ROYAL_GREEN,
+                "$mode greenWash must still lean green — it is %.0f deg from green, "
+                    .format(hueDistance(oklch(wash).hue, 172.0)) +
+                    "its sheet %.0f".format(hueDistance(oklch(sheet).hue, 172.0)),
+                hueDistance(oklch(wash).hue, 172.0) <=
+                    hueDistance(oklch(sheet).hue, 172.0) + 5.0,
             )
         }
     }
@@ -344,6 +347,35 @@ class ColorSystemTest {
                 "across $themes — it should be seated the same way in each",
             seats.max() - seats.min() <= 0.06,
         )
+    }
+
+    @Test
+    fun `no accent is washed out to reach its target`() {
+        // Every accent here is solved against its own sheet, and the solver will
+        // happily spend chroma to hit a number. That is how the Continue band
+        // became a mint and how Royal Green's glint went near-white: one had its
+        // chroma held and its lightness chased, the other the reverse. An accent
+        // that has lost most of its colour is no longer the accent.
+        val floors = mapOf(
+            "gold" to (0.10 to { a: QuranAccents -> a.gold }),
+            "goldInk" to (0.10 to { a: QuranAccents -> a.goldInk }),
+            "repeatInk" to (0.12 to { a: QuranAccents -> a.repeatInk }),
+            "bookmarkRibbon" to (0.15 to { a: QuranAccents -> a.bookmarkRibbon }),
+            "glintInk" to (0.042 to { a: QuranAccents -> a.glintInk ?: Color.White }),
+        )
+        for (mode in themes) {
+            val a = accents(mode)
+            for ((name, spec) in floors) {
+                val (floor, pick) = spec
+                if (name == "glintInk" && a.glintInk == null) continue
+                val c = oklch(pick(a)).chroma
+                assertTrue(
+                    "$mode $name is chroma %.3f, under its floor of %.3f — it has been "
+                        .format(c, floor) + "solved past the colour that identifies it",
+                    c >= floor,
+                )
+            }
+        }
     }
 
     @Test
