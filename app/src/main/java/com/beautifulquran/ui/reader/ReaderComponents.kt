@@ -163,6 +163,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.first
 import com.beautifulquran.ui.theme.QuranTheme
+import com.beautifulquran.ui.theme.coversFirst
 
 internal fun Int.toArabicIndic(): String =
     toString().map { '٠' + (it - '0') }.joinToString("")
@@ -1924,7 +1925,13 @@ internal fun buildShapedBlooms(
             )
         }
     }
-    return blooms
+    // Ordered here as well as in [Modifier.shapedWordBloom]. The draw path is
+    // the guarantee — it is the only chokepoint every caller passes through —
+    // but it sits inside a draw modifier, where no unit test can reach it, and
+    // this invariant has already been broken twice. Ordering the frame here too
+    // keeps it under test; the second pass is free, since [coversFirst] returns
+    // an already-ordered list untouched.
+    return blooms.coversFirst()
 }
 
 /** Paper-cover strength for one shaped word during an ayah handoff. */
