@@ -28,7 +28,8 @@
   --gold-deep: #7a5b05;
   --green-ink: #2b725f;
   --green-quiet: #5f9c8a;
-  --green-wash: #b8eddb;
+  /* Sheet under a tenth of the green. Not a saturated mint. */
+  --green-wash: #e2e4d8;
   --emboss-dark: rgba(0, 0, 0, 0.141);
   --emboss-light: rgba(255, 255, 255, 0.349);
   --repeat: #b4551e;
@@ -110,7 +111,7 @@
   --gold-deep: #9a7b32;
   --green-ink: #8fd3bc;
   --green-quiet: #72af9a;
-  --green-wash: #134738;
+  --green-wash: #181d19;
   --emboss-dark: rgba(0, 0, 0, 0.4);
   --emboss-light: rgba(255, 255, 255, 0.122);
   --repeat: #ff8948;
@@ -144,7 +145,7 @@
   --gold-deep: #a07f38;
   --green-ink: #95d9c1;
   --green-quiet: #78b49f;
-  --green-wash: #1f5141;
+  --green-wash: #133b32;
   --emboss-dark: rgba(0, 0, 0, 0.4);
   --emboss-light: rgba(255, 255, 255, 0.122);
   --repeat: #ff9359;
