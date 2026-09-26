@@ -34,11 +34,6 @@ export interface Reciter {
   hasTimings: boolean
 }
 
-const BASMALAH_001000_SLUGS = new Set([
-  'Minshawy_Murattal_128kbps',
-  'Abdurrahmaan_As-Sudais_192kbps',
-])
-
 export function audioUrl(reciter: Reciter, surah: number, ayah: number): string {
   const s = String(surah).padStart(3, '0')
   const a = String(ayah).padStart(3, '0')
@@ -46,8 +41,7 @@ export function audioUrl(reciter: Reciter, surah: number, ayah: number): string 
 }
 
 export function basmalahAudioUrl(reciter: Reciter): string {
-  const file = BASMALAH_001000_SLUGS.has(reciter.slug) ? '001000.mp3' : 'bismillah.mp3'
-  return `https://everyayah.com/data/${reciter.slug}/${file}`
+  return audioUrl(reciter, 1, 1)
 }
 
 /** One highlighted span: word [position] is active from [startMs] until [endMs]. */

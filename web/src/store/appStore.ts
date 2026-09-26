@@ -31,6 +31,7 @@ import {
 } from '../domain/Basmalah'
 import { HighlightClock } from '../domain/HighlightClock'
 import { OutputLatency } from '../domain/OutputLatency'
+import { ReciterSync } from '../domain/ReciterSync'
 import {
   fastForwardAction,
   midpointMs,
@@ -198,6 +199,8 @@ class AppStore {
   private forcedHighlight: { ayah: number; seekMs: number } | null = null
   /** Bumps when a newer openSurah supersedes an in-flight peel→load. */
   private openToken = 0
+  /** Bumps when a chapter or reciter supersedes an in-flight timing fetch. */
+  private timingLoadToken = 0
   /**
    * Reading session captured when the root viewer opened. Normal close restores
    * the chapter queue; autoplay only when [wasPlaying]. Concordance jumps
@@ -554,25 +557,35 @@ class AppStore {
     }
     if (patch.reciterId != null && this.state.content) {
       const reciter = this.state.reciters.find((r) => r.id === patch.reciterId)
-      if (reciter) this.reloadTimingsAndReciter(reciter)
+      if (reciter) void this.reloadTimingsAndReciter(reciter)
     }
   }
 
-  private reloadTimingsAndReciter(reciter: Reciter) {
-    if (!this.state.content) return
-    const surahId = this.state.content.surah.id
+  private async reloadTimingsAndReciter(reciter: Reciter) {
+    const content = this.state.content
+    if (!content) return
+    const token = ++this.timingLoadToken
+    const surahId = content.surah.id
+    const ayah = this.state.player.nowPlaying?.ayah ?? this.state.settings.lastAyah
+    const start = ayah > 0 ? ayah : 1
+    this.timingSegments = new Map()
+    this.prepared = new Map()
+    player.loadSurah(content, reciter, start, { warm: false })
+    this.set({ hasTimings: false })
+    try {
+      await QuranRepository.ensureTimings(reciter.id)
+    } catch {
+      return
+    }
+    if (token !== this.timingLoadToken) return
     const map = withBasmalahLeadIn(
       QuranRepository.timings(reciter.id, surahId),
       reciter.id,
       surahId,
     )
     this.timingSegments = map
-    this.prepared = new Map()
-    const ayah = this.state.player.nowPlaying?.ayah ?? this.state.settings.lastAyah
-    const start = ayah > 0 ? ayah : 1
     this.ensurePrepared(start)
     this.ensurePrepared(start + 1)
-    player.loadSurah(this.state.content, reciter, start, { warm: false })
     this.set({ hasTimings: reciter.hasTimings && map.size > 0 })
   }
 
@@ -649,6 +662,7 @@ class AppStore {
     }
 
     const token = ++this.openToken
+    const timingToken = ++this.timingLoadToken
 
     // Materialize chapter text before changing sheets. Most clicks hit the
     // pointer/focus cache warmed by Home; cold programmatic opens do the same
@@ -690,14 +704,19 @@ class AppStore {
 
       // Timings are independent of the initial text render. Parse them in an
       // idle task and refresh the current highlight if Play was tapped first.
-      const loadTimings = () => {
-        if (token !== this.openToken) return
+      const loadTimings = async () => {
+        if (token !== this.openToken || timingToken !== this.timingLoadToken) return
+        try {
+          await QuranRepository.ensureTimings(reciter.id)
+        } catch {
+          return
+        }
         const map = withBasmalahLeadIn(
           QuranRepository.timings(reciter.id, surahId),
           reciter.id,
           surahId,
         )
-        if (token !== this.openToken) return
+        if (token !== this.openToken || timingToken !== this.timingLoadToken) return
         this.timingSegments = map
         this.ensurePrepared(ayah)
         this.ensurePrepared(ayah + 1)
@@ -1093,6 +1112,12 @@ class AppStore {
         this.state.reciters.find((r) => r.id === this.state.settings.reciterId)?.id ??
         this.state.reciters[0]?.id
       if (reciterId != null) {
+        try {
+          await QuranRepository.ensureTimings(reciterId)
+        } catch {
+          return
+        }
+        if (this.state.rootViewer !== rv || this.state.rootViewerClosing) return
         segments = QuranRepository.timings(reciterId, rv.surahId).get(rv.ayah)
       }
     }
@@ -1194,9 +1219,10 @@ class AppStore {
     mediaPositionMs: number,
     forcedMediaMs: number | null,
     firstWordStartMs: number,
+    reciterId: number,
   ): number {
     const latencyMs = OutputLatency.LOCAL_MS
-    const leadMs = getHighlightLeadMs()
+    const leadMs = getHighlightLeadMs() + ReciterSync.highlightAdvanceMs(reciterId)
     if (leadMs !== this.lastHighlightLeadMs) {
       this.lastHighlightLeadMs = leadMs
       this.highlightClock.acceptNextSample()
@@ -1234,7 +1260,12 @@ class AppStore {
     const prepared = this.ensurePrepared(np.ayah)
     const firstWordStartMs = prepared?.segments[0]?.startMs ?? 0
     const heardMs = OutputLatency.heardMs(ps.positionMs, OutputLatency.LOCAL_MS)
-    const rawMs = this.highlightPositionMs(ps.positionMs, forcedMs, firstWordStartMs)
+    const rawMs = this.highlightPositionMs(
+      ps.positionMs,
+      forcedMs,
+      firstWordStartMs,
+      np.reciterId,
+    )
     const mediaKey = `${np.surahId}:${np.ayah}:${np.reciterId}`
     const highlightPositionMs = this.highlightClock.sample(mediaKey, rawMs)
     if (mediaKey !== this.lastInkMediaKey) {

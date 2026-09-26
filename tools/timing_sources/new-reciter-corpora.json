@@ -1,0 +1,123 @@
+{
+  "schema": 1,
+  "corpora": [
+    {
+      "reciter": "Yasser_Ad-Dussary_128kbps",
+      "verdict": "accept",
+      "expectedRows": 6236,
+      "corpusPayloadSha256": "32ffcd8f67647b885bf82d5c5d5bddb8c3f09cd071ceaa3832a4173a75e9c9a1",
+      "evidence": {
+        "kind": "pinned_corpus_bootstrap",
+        "summary": "Complete QUA corpus rebased to exact EveryAyah MPEG-frame origins, retaining every occurrence physically inside each clip; five unmatched clips use two agreeing acoustic models.",
+        "artifact": "tools/timing_sources/yasser-everyayah-clock.json",
+        "sources": [
+          {
+            "url": "https://github.com/Wider-Community/quranic-universal-audio/releases/download/v3.0.0/yasser_al_dosari_archive.zip",
+            "sha256": "02d269a409cb1cb2ddf5c1cdd0f5e8919cafb3e8f1386679aabb3acf27c0880a"
+          },
+          {
+            "url": "https://everyayah.com/data/Yasser_Ad-Dussary_128kbps/001001.mp3",
+            "sha256": "efc922e29b8e10cd09e83617fe85ba09a2a77ed9e449a09b9e515250d2806ce0"
+          },
+          {
+            "url": "https://everyayah.com/data/Yasser_Ad-Dussary_128kbps/039047.mp3",
+            "sha256": "e561f6362e2e5e7c3d3fbb08c48e1109d9af296eda60350df8af90422c146c45"
+          },
+          {
+            "url": "https://everyayah.com/data/Yasser_Ad-Dussary_128kbps/039050.mp3",
+            "sha256": "e589f02eb515cb969a21712a812a8d4cb55f1694b6442e8251bf9e565f63d403"
+          },
+          {
+            "url": "https://everyayah.com/data/Yasser_Ad-Dussary_128kbps/050021.mp3",
+            "sha256": "6a1567b9f783ade09982e4731b9b84a9d252e6162ebdcb93bf7d86f6fc2103b4"
+          },
+          {
+            "url": "https://everyayah.com/data/Yasser_Ad-Dussary_128kbps/092016.mp3",
+            "sha256": "7fba401afe4df4fba1a0781f1501405359a410753c3172f3d0517e70330b6e79"
+          }
+        ]
+      }
+    },
+    {
+      "reciter": "Abu_Bakr_Ash-Shaatree_128kbps",
+      "verdict": "accept",
+      "expectedRows": 6236,
+      "corpusPayloadSha256": "ba147644fc3ba211fc06187b51772b45883a8eb3dc907125c9bacc4df02e047b",
+      "evidence": {
+        "kind": "pinned_corpus_bootstrap",
+        "summary": "Complete EveryAyah-matched quran-align corpus.",
+        "artifact": "tools/timing_sources/README.md",
+        "sources": [{
+          "url": "https://github.com/cpfair/quran-align/releases/download/release-2016-11-24/quran-align-data-2016-11-24.zip",
+          "sha256": "5eeb045d8a7895208c94d2d7ec243567f8f550728835411527c4ffa1e789c9b7"
+        }]
+      }
+    },
+    {
+      "reciter": "Abdul_Basit_Mujawwad_128kbps",
+      "verdict": "accept",
+      "expectedRows": 6236,
+      "corpusPayloadSha256": "9ef505eeee746023f0a587afcf1827331318a65fdf3b2b4ee324ccf8424edc5d",
+      "evidence": {
+        "kind": "pinned_corpus_bootstrap",
+        "summary": "Complete EveryAyah-matched quran-align corpus.",
+        "artifact": "tools/timing_sources/README.md",
+        "sources": [{
+          "url": "https://github.com/cpfair/quran-align/releases/download/release-2016-11-24/quran-align-data-2016-11-24.zip",
+          "sha256": "5eeb045d8a7895208c94d2d7ec243567f8f550728835411527c4ffa1e789c9b7"
+        }]
+      }
+    },
+    {
+      "reciter": "Husary_Muallim_128kbps",
+      "verdict": "accept",
+      "expectedRows": 6236,
+      "corpusPayloadSha256": "3d90e1057bdb8fad87e9da2e7ddae6e869cfe3d31943fef255e23e6a2a0160be",
+      "evidence": {
+        "kind": "pinned_corpus_bootstrap",
+        "summary": "Complete EveryAyah-matched quran-align corpus.",
+        "artifact": "tools/timing_sources/README.md",
+        "sources": [{
+          "url": "https://github.com/cpfair/quran-align/releases/download/release-2016-11-24/quran-align-data-2016-11-24.zip",
+          "sha256": "5eeb045d8a7895208c94d2d7ec243567f8f550728835411527c4ffa1e789c9b7"
+        }]
+      }
+    },
+    {
+      "reciter": "Minshawy_Mujawwad_192kbps",
+      "verdict": "accept",
+      "expectedRows": 6236,
+      "corpusPayloadSha256": "46b47a8758fa528533f310b9a279e5dedc5b19d0e2b118c2abf07c73e3b74e4f",
+      "evidence": {
+        "kind": "pinned_corpus_bootstrap",
+        "summary": "Complete quran-align corpus; its one empty upstream row is supplied by two agreeing acoustic models over the exact EveryAyah MP3.",
+        "artifact": "tools/timing_sources/minshawy-mujawwad-32-24-dual-model.json",
+        "sources": [
+          {
+            "url": "https://github.com/cpfair/quran-align/releases/download/release-2016-11-24/quran-align-data-2016-11-24.zip",
+            "sha256": "5eeb045d8a7895208c94d2d7ec243567f8f550728835411527c4ffa1e789c9b7"
+          },
+          {
+            "url": "https://everyayah.com/data/Minshawy_Mujawwad_192kbps/032024.mp3",
+            "sha256": "d287480e42037f8fdb66eeb6038adf13db6abc22ce10e48f64fd2648e121b72e"
+          }
+        ]
+      }
+    },
+    {
+      "reciter": "Mohammad_al_Tablaway_128kbps",
+      "verdict": "accept",
+      "expectedRows": 6236,
+      "corpusPayloadSha256": "e42146aa0e1328009623f7f941e03a678afeb5697ff8ffaaee176cb65d72a268",
+      "evidence": {
+        "kind": "pinned_corpus_bootstrap",
+        "summary": "Complete EveryAyah-matched quran-align corpus.",
+        "artifact": "tools/timing_sources/README.md",
+        "sources": [{
+          "url": "https://github.com/cpfair/quran-align/releases/download/release-2016-11-24/quran-align-data-2016-11-24.zip",
+          "sha256": "5eeb045d8a7895208c94d2d7ec243567f8f550728835411527c4ffa1e789c9b7"
+        }]
+      }
+    }
+  ]
+}

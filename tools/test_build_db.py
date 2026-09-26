@@ -25,6 +25,8 @@ sys.path.insert(0, str(TOOLS))
 from build_db import (  # noqa: E402
     AUDIO_ONSETS_DIR,
     QCF_V2_FIRST_CODEPOINT,
+    QURAN_ALIGN_ADDITIONS,
+    RECITERS,
     adjust_qdc_segments,
     apply_boundary_repair,
     apply_clocked_timing_repair,
@@ -40,7 +42,9 @@ from build_db import (  # noqa: E402
     load_audio_durations,
     load_audio_onsets,
     apply_audit_holds,
+    append_new_reciter_timings,
     discard_false_same_position_lead,
+    declared_reciter_rows,
     false_same_position_leads,
     hand_lead_to_previous_word,
     normalize_text,
@@ -48,6 +52,7 @@ from build_db import (  # noqa: E402
     preserve_complete_repeat_topology,
     parse_alignment_payload,
     preserve_peer_repeats,
+    qua_clip_segments,
     recover_negative_opening,
     refit_displaced_rows,
     rebase_qdc_clock,
@@ -58,6 +63,7 @@ from build_db import (  # noqa: E402
 import detect_audio_onsets as onset_detector  # noqa: E402
 from timing_delta import (  # noqa: E402
     build_delta,
+    load_corpus_bootstraps,
     load_verdict_ledger,
     read_git_timing_rows,
     read_timing_rows,
@@ -65,6 +71,7 @@ from timing_delta import (  # noqa: E402
 )
 CASES_DIR = TOOLS / "timing_patch_cases"
 VERDICTS_DIR = TOOLS / "timing_verdicts"
+TIMING_SOURCES_DIR = TOOLS / "timing_sources"
 PIPELINES = frozenset(
     {
         "adjust_qdc_segments",
@@ -618,6 +625,12 @@ def audit_bundled_db():
         },
         6: {(12, 50), (12, 75), (12, 76), (91, 15)},
         7: set(),
+        9: set(),
+        14: set(),
+        16: set(),
+        17: set(),
+        18: set(),
+        19: set(),
     }
     exact &= all(
         set(counts) - {(s, a) for rid_, s, a in timings if rid_ == rid}
@@ -691,6 +704,22 @@ def audit_bundled_db():
     return not bad and exact and provider_ok and not overrides and db.execute(
         "PRAGMA integrity_check"
     ).fetchone()[0] == "ok"
+
+
+def check_reciter_catalog():
+    """The packaged catalog matches declarations and derives timing support."""
+    with sqlite3.connect(ROOT / "data/quran.db") as db:
+        actual = list(db.execute(
+            "SELECT id,slug,name,style,has_timings FROM reciters ORDER BY id"
+        ))
+        timing_rows = list(db.execute(
+            "SELECT reciter_id,surah_id,ayah_number,segments FROM timings"
+        ))
+    return (
+        actual == declared_reciter_rows(timing_rows)
+        and len(actual) == len(RECITERS)
+        and all(row[4] == 1 for row in actual)
+    )
 
 
 def check_gloss_normalize():
@@ -891,7 +920,12 @@ def check_timing_delta():
         report = build_delta(
             read_git_timing_rows(base), read_timing_rows(ROOT / "data" / "quran.db"), ledger
         )
-        rejected = rejected_changes(report["changes"])
+        bootstraps = [
+            entry
+            for path in sorted(TIMING_SOURCES_DIR.glob("*-corpora.json"))
+            for entry in load_corpus_bootstraps(path)
+        ]
+        rejected = rejected_changes(report["changes"], bootstraps)
     except (OSError, subprocess.CalledProcessError, ValueError, sqlite3.Error) as exc:
         return False, str(exc)
     if rejected:
@@ -911,6 +945,52 @@ def check_alignment_payload_parse():
         return False
     except json.JSONDecodeError:
         return valid
+
+
+def check_qua_clip_occurrences():
+    """A streamed clip keeps every source occurrence inside its real clock."""
+    source_rows = [
+        ["2:1", 100, 400, False, 0, [[1, 110, 150], [2, 160, 200]]],
+        [
+            "2:1", 500, 800, True, 0,
+            [[1, 510, 550], [2, 560, 600], [3, 610, 700]],
+        ],
+        ["2:1", 900, 1000, False, 0, [[1, 910, 990]]],
+    ]
+    selected = qua_clip_segments(source_rows, 100, 700, (2, 1), 3, {})
+    incomplete = qua_clip_segments(source_rows[:1], 100, 700, (2, 1), 3, {})
+    return selected == [
+        [1, 10, 50], [2, 60, 100],
+        [1, 410, 450], [2, 460, 500], [3, 510, 600],
+    ] and incomplete is None
+
+
+def check_source_locked_reciter_completion():
+    """A partial quran-align import is replaced, while audit Yasser stays pure."""
+    word_counts = {(1, 1): 4, (32, 24): 10}
+    complete = [[1, 0, 100], [2, 100, 200], [3, 200, 300], [4, 300, 400]]
+    timing_rows = [
+        (rid, surah, ayah, json.dumps(complete))
+        for rid in QURAN_ALIGN_ADDITIONS - {18}
+        for surah, ayah in word_counts
+    ]
+    yasser = (9, 1, 1, "yasser-quran-align")
+    timing_rows.extend([yasser, (18, 1, 1, json.dumps(complete))])
+    aligned = {(18, 1, 1): complete}
+    with (
+        patch("build_db.fetch", return_value=Path("unused")),
+        patch("build_db.verify_source"),
+        patch("build_db.alignment_reference", return_value=aligned),
+    ):
+        completed = append_new_reciter_timings(
+            timing_rows,
+            word_counts,
+            {},
+            {},
+            include_yasser_qua=False,
+        )
+    minshawy_keys = {(surah, ayah) for rid, surah, ayah, _ in completed if rid == 18}
+    return yasser in completed and minshawy_keys == set(word_counts)
 
 
 def main():
@@ -966,7 +1046,10 @@ def main():
     completion_ok = check_completion_pipeline()
     gloss_ok = check_gloss_normalize()
     alignment_payload_ok = check_alignment_payload_parse()
+    qua_clip_ok = check_qua_clip_occurrences()
+    source_locked_ok = check_source_locked_reciter_completion()
     database_ok = audit_bundled_db()
+    reciter_catalog_ok = check_reciter_catalog()
     qcf_runs_ok = check_qcf_v2_page_runs()
     qcf_assert_ok = check_qcf_v2_run_assertion()
     recovered_boundary_ok = check_recovered_boundary_repairs()
@@ -980,7 +1063,13 @@ def main():
         f"  {'ok  ' if alignment_payload_ok else 'FAIL'} "
         "quran-align release payload parse"
     )
+    print(f"  {'ok  ' if qua_clip_ok else 'FAIL'} QUA clip occurrence selection")
+    print(
+        f"  {'ok  ' if source_locked_ok else 'FAIL'} "
+        "source-locked reciter completion"
+    )
     print(f"  {'ok  ' if database_ok else 'FAIL'} bundled timing database invariants")
+    print(f"  {'ok  ' if reciter_catalog_ok else 'FAIL'} declared reciter catalog")
     print(f"  {'ok  ' if qcf_runs_ok else 'FAIL'} public DB excludes QCF V2 fields")
     print(f"  {'ok  ' if qcf_assert_ok else 'FAIL'} QCF V2 run assertion rejects a wrong page")
     print(f"  {'ok  ' if recovered_boundary_ok else 'FAIL'} recovered-row boundary deferral")
@@ -996,8 +1085,14 @@ def main():
         failures.append(("gloss normalize", "trailing-space strip failed", None))
     if not alignment_payload_ok:
         failures.append(("quran-align payload", "release artifact parse failed", None))
+    if not qua_clip_ok:
+        failures.append(("QUA clip occurrences", "clip clock selection failed", None))
+    if not source_locked_ok:
+        failures.append(("source-locked reciters", "partial corpus was not completed", None))
     if not database_ok:
         failures.append(("bundled database", "timing audit failed", None))
+    if not reciter_catalog_ok:
+        failures.append(("reciter catalog", "database does not match declarations", None))
     if not qcf_runs_ok:
         failures.append(("public QCF exclusion", "Quran.com QCF data remains in quran.db", None))
     if not qcf_assert_ok:
@@ -1017,7 +1112,7 @@ def main():
                 for line in str(detail).splitlines():
                     print(f"    {line}")
         return 1
-    print(f"all {len(cases) + 10} cases pass ({CASES_DIR.relative_to(Path.cwd())})")
+    print(f"all {len(cases) + 14} cases pass ({CASES_DIR.relative_to(Path.cwd())})")
     return 0
 
 

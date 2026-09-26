@@ -1,7 +1,7 @@
 # Output latency (Bluetooth karaoke sync)
 
-**Status: implemented on Android and web; shipped word selection uses LOCAL lag
-and no word-boundary lead.**
+**Status: implemented on Android and web; shipped word selection uses LOCAL lag,
+no global word-boundary lead, and one ear-verified reciter calibration.**
 The reader subtracts a small, route-based delay from the media playhead
 before the highlight clock and `HighlightEngine` see it. Web ports the pure
 `OutputLatency` helpers and feeds `highlightMs(..., leadMs)` into
@@ -50,7 +50,7 @@ the other consumers must not:
 
 | Consumer | Clock |
 |---|---|
-| Word ink (`activeWord`) | Heard position; optional explicit Ink Lab lead after word 1 starts |
+| Word ink (`activeWord`) | Heard position; optional Ink Lab + reciter calibration lead after word 1 starts |
 | Ayah fade lead (`ayahWithFadeLead`) | Heard position + its own `fadeLeadMs` |
 | Basmalah calligraphy wash | Heard position |
 
@@ -76,6 +76,13 @@ after the first segment starts it **ramps** from 0 to full lead over the first
 `+lead` cliff at the gate was larger than `HighlightClock`'s post-handoff settle
 step and froze the clock through short word 1 (both words lit when settle ended
 on word 2). Neither lag nor lead is baked into `HighlightEngine`.
+
+**Reciter calibration.** `ReciterSync` adds a 200 ms word-only lead for Yasser
+Al-Dosari, whose source-aligned wash was ear-verified that far behind the voice.
+It uses the same opening ramp as the Ink Lab lead, so short first words remain
+visible instead of being skipped. Timing rows, ayah handoff, basmalah wash, and
+every other reciter stay on their existing clocks. Android and web share the
+same policy.
 
 ## Presets
 
@@ -142,6 +149,7 @@ compensation is separate — see [TIMINGS_LAB.md](TIMINGS_LAB.md)).
 |---|---|
 | `domain/OutputLatency.kt` | Pure kinds, classify, presets, `heardMs` |
 | `domain/OutputLatencyTest.kt` | Spec for classify + heard clamp |
+| `domain/ReciterSync.kt` | Pure reciter-specific word-clock calibration |
 | `playback/AudioOutputLatency.kt` | Android device watch → `StateFlow` latency |
 | `ui/reader/ReaderViewModel.kt` | Applies heard clock on the poll path |
 | `web/src/domain/OutputLatency.ts` | Same pure presets + `highlightMs` (Vitest twin) |

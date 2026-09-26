@@ -675,6 +675,9 @@ While reciting, the top bar, reciter name, repeat, and speed fade to 8 % over
 rewind/forward controls on the page. Pause, and it breathes back. Non-active
 verses recess to upcoming ink over ~400 ms.
 
+The reciter name above the chapter transport carries a small disclosure
+chevron: the name and cue are one quiet button leading to reciter settings.
+
 ## Color
 
 Two themes, both "paper":
@@ -1402,11 +1405,16 @@ Chapters ribbon is navigation only and never retracts when tapped.
 
 ## Reading modes
 
-Settings, **Customize**, and **Download manager** are consecutive leaves in
-the physical paper stack. Their rows turn to the requested detail leaf, and
+Settings, **Reciters**, **Customize**, and **Download manager** are consecutive
+leaves in the physical paper stack. Their rows turn to the requested detail leaf, and
 the back chevron or a rightward swipe returns to main Settings while leaving
 that detail underneath for a forward swipe to reopen. Main Settings
-does not repeat section labels above those two navigation rows. Text size,
+shows only favorite voices above the Reciters row; the Reciters leaf always
+keeps the complete catalog accessible and uses a qalam nuqta for the selected
+voice plus quiet gold stars for favorites. The original seven voices begin as
+favorites when this preference does not exist, preserving the old main leaf;
+an explicitly empty favorite set stays empty. Main Settings does not repeat
+section labels above Customize and Download manager. Text size,
 transliteration, and ayah translation live in Customize with theme, view,
 layout, numeral scripts, verse annotations, the ayah-selector side, and
 word-by-word English under Arabic.

@@ -1,0 +1,24 @@
+{
+  "schema": 1,
+  "reciter": "Yasser_Ad-Dussary_128kbps",
+  "verse": "1:1",
+  "audio": {
+    "url": "https://everyayah.com/data/Yasser_Ad-Dussary_128kbps/001001.mp3",
+    "sha256": "efc922e29b8e10cd09e83617fe85ba09a2a77ed9e449a09b9e515250d2806ce0",
+    "durationMs": 3299
+  },
+  "models": [
+    {
+      "name": "jonatasgrosman/wav2vec2-large-xlsr-53-arabic",
+      "viterbiLogProbabilityPerFrame": -0.5183910742038633,
+      "words": [[1, 282, 644], [2, 764, 1307], [3, 1428, 2253], [4, 2353, 3017]]
+    },
+    {
+      "name": "MahmoudAshraf/mms-300m-1130-forced-aligner",
+      "viterbiLogProbabilityPerFrame": -0.038438686510411706,
+      "words": [[1, 282, 644], [2, 764, 1307], [3, 1428, 2253], [4, 2353, 3017]]
+    }
+  ],
+  "shippedConsensus": [[1, 282, 764], [2, 764, 1428], [3, 1428, 2353], [4, 2353, 3017]]
+}
+

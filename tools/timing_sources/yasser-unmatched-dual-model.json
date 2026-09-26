@@ -1,0 +1,99 @@
+{
+  "schema": 1,
+  "reciter": "Yasser_Ad-Dussary_128kbps",
+  "kind": "exact_everyayah_clips_without_qua_byte_match",
+  "verses": [
+    {
+      "verse": "39:47",
+      "audio": {
+        "url": "https://everyayah.com/data/Yasser_Ad-Dussary_128kbps/039047.mp3",
+        "sha256": "e561f6362e2e5e7c3d3fbb08c48e1109d9af296eda60350df8af90422c146c45",
+        "durationMs": 19865
+      },
+      "models": [
+        {
+          "name": "jonatasgrosman/wav2vec2-large-xlsr-53-arabic",
+          "viterbiLogProbabilityPerFrame": -0.458696,
+          "startsMs": [200, 641, 1302, 2243, 2884, 3204, 3444, 4025, 5166, 6108, 6768, 7549, 8250, 9011, 9472, 10353, 11855, 12616, 13036, 14298, 14939, 15720, 16040, 16681, 17041, 17342, 18203]
+        },
+        {
+          "name": "MahmoudAshraf/mms-300m-1130-forced-aligner",
+          "viterbiLogProbabilityPerFrame": -0.103579,
+          "startsMs": [200, 701, 1302, 2223, 2864, 3184, 3324, 4005, 5146, 6108, 6748, 7549, 8230, 9011, 9472, 10333, 11715, 12576, 13096, 14298, 14959, 15720, 15980, 16681, 17021, 17302, 18183]
+        }
+      ],
+      "positions": [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25],
+      "shippedStartsMs": [200, 670, 1300, 2230, 2870, 3190, 3380, 4020, 5160, 6110, 6760, 7550, 8240, 9010, 9470, 10340, 11790, 12600, 13070, 14300, 14950, 15720, 16010, 16680, 17030, 17320, 18190],
+      "shippedFinalEndMs": 19464
+    },
+    {
+      "verse": "39:50",
+      "audio": {
+        "url": "https://everyayah.com/data/Yasser_Ad-Dussary_128kbps/039050.mp3",
+        "sha256": "e589f02eb515cb969a21712a812a8d4cb55f1694b6442e8251bf9e565f63d403",
+        "durationMs": 8800
+      },
+      "models": [
+        {
+          "name": "jonatasgrosman/wav2vec2-large-xlsr-53-arabic",
+          "viterbiLogProbabilityPerFrame": -0.310520,
+          "startsMs": [140, 481, 1042, 1864, 2686, 3468, 4931, 5573, 6435, 6796, 7497]
+        },
+        {
+          "name": "MahmoudAshraf/mms-300m-1130-forced-aligner",
+          "viterbiLogProbabilityPerFrame": -0.092810,
+          "startsMs": [120, 461, 1062, 1864, 2666, 3448, 4951, 5553, 6435, 6796, 7477]
+        }
+      ],
+      "positions": [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11],
+      "shippedStartsMs": [130, 470, 1050, 1860, 2680, 3460, 4940, 5560, 6440, 6800, 7490],
+      "shippedFinalEndMs": 8390
+    },
+    {
+      "verse": "50:21",
+      "audio": {
+        "url": "https://everyayah.com/data/Yasser_Ad-Dussary_128kbps/050021.mp3",
+        "sha256": "6a1567b9f783ade09982e4731b9b84a9d252e6162ebdcb93bf7d86f6fc2103b4",
+        "durationMs": 12584
+      },
+      "models": [
+        {
+          "name": "jonatasgrosman/wav2vec2-large-xlsr-53-arabic",
+          "viterbiLogProbabilityPerFrame": -0.257758,
+          "startsMs": [80, 3727, 4288, 5891, 6753, 10440]
+        },
+        {
+          "name": "MahmoudAshraf/mms-300m-1130-forced-aligner",
+          "viterbiLogProbabilityPerFrame": -0.035716,
+          "startsMs": [80, 3727, 4288, 5871, 6733, 10440]
+        }
+      ],
+      "positions": [1, 2, 3, 4, 5, 6],
+      "shippedStartsMs": [80, 3727, 4288, 5881, 6743, 10440],
+      "shippedFinalEndMs": 12243
+    },
+    {
+      "verse": "92:16",
+      "audio": {
+        "url": "https://everyayah.com/data/Yasser_Ad-Dussary_128kbps/092016.mp3",
+        "sha256": "7fba401afe4df4fba1a0781f1501405359a410753c3172f3d0517e70330b6e79",
+        "durationMs": 3034
+      },
+      "models": [
+        {
+          "name": "jonatasgrosman/wav2vec2-large-xlsr-53-arabic",
+          "viterbiLogProbabilityPerFrame": -1.004444,
+          "startsMs": [141, 924, 1668]
+        },
+        {
+          "name": "MahmoudAshraf/mms-300m-1130-forced-aligner",
+          "viterbiLogProbabilityPerFrame": -0.132058,
+          "startsMs": [80, 924, 1668]
+        }
+      ],
+      "positions": [1, 2, 3],
+      "shippedStartsMs": [110, 924, 1668],
+      "shippedFinalEndMs": 2592
+    }
+  ]
+}

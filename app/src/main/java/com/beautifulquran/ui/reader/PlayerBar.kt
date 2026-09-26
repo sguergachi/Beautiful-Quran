@@ -4,6 +4,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
@@ -34,6 +35,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.media3.common.Player
 import com.beautifulquran.playback.PlayerUiState
+import com.beautifulquran.ui.theme.DisclosureChevron
 import com.beautifulquran.ui.theme.QuranTheme
 
 /**
@@ -76,12 +78,17 @@ fun PlayerBar(
                 contentPadding = PaddingValues(horizontal = 16.dp, vertical = 2.dp),
                 modifier = Modifier.graphicsLayer { alpha = chromeAlpha() },
             ) {
+                Spacer(Modifier.size(18.dp))
                 Text(
                     text = reciterName,
                     style = MaterialTheme.typography.labelMedium,
                     color = QuranTheme.ink.muted,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
+                )
+                DisclosureChevron(
+                    expanded = false,
+                    modifier = Modifier.padding(start = 2.dp).size(16.dp),
                 )
             }
             Row(
