@@ -12,6 +12,7 @@ import {
   IconPause,
   IconPlay,
 } from '../icons/PlaybackIcons'
+import { AlphaTag } from '../kit/AlphaTag'
 import { PaperInput } from '../kit/PaperInput'
 import { SettingsNuqtaButton } from '../theme/SettingsNuqtaButton'
 import { ContinueRow } from './ContinueRow'
@@ -249,6 +250,7 @@ export function HomeScreen({ stackLayer }: { stackLayer: StackLayer }) {
         >
           <h1>
             <span>Beautiful Quran</span>
+            <AlphaTag />
           </h1>
           <SettingsNuqtaButton
             className="home-settings"

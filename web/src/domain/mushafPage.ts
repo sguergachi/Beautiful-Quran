@@ -55,6 +55,42 @@ export function buildMushafPage(page: number, words: readonly MushafWordPlacemen
   return { page, lines }
 }
 
+/**
+ * A canonical word that shares a printed glyph with an earlier word has
+ * `qcf_page` 0. It belongs on the owner's line, which [qcf_span_end] names.
+ */
+export function inheritSpannedPlacement<T extends {
+  surah_id: number
+  ayah_number: number
+  position: number
+  qcf_page: number
+  qcf_line: number
+  qcf_span_end: number
+}>(rows: readonly T[]): T[] {
+  const byVerse = new Map<string, T[]>()
+  for (const row of rows) {
+    const key = `${row.surah_id}:${row.ayah_number}`
+    const list = byVerse.get(key) ?? []
+    list.push(row)
+    byVerse.set(key, list)
+  }
+  return rows.map((row) => {
+    if (row.qcf_page >= 1 && row.qcf_line >= 1) return row
+    const owner = byVerse.get(`${row.surah_id}:${row.ayah_number}`)?.find((other) =>
+      other.qcf_page >= 1 &&
+      other.qcf_line >= 1 &&
+      other.position <= row.position &&
+      row.position <= other.qcf_span_end,
+    )
+    return owner ? { ...row, qcf_page: owner.qcf_page, qcf_line: owner.qcf_line } : row
+  })
+}
+
+/** The ornament belongs on the ayah's last word, never on the last word of a line. */
+export function mushafTokenEndsAyah(position: number, lastPosition: number): boolean {
+  return lastPosition > 0 && position === lastPosition
+}
+
 /** Ayahs on a page, in reading order, for the English leaf of that same page. */
 export function pageAyahs(words: readonly MushafWordPlacement[]): { surahId: number; ayah: number }[] {
   const seen = new Set<string>()

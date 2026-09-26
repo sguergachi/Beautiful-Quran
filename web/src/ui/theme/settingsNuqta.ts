@@ -78,16 +78,22 @@ export class SettingsNuqtaMachine {
     }
   }
 
+  /**
+   * True only while something is still moving. A drop that has settled on
+   * Settings stays painted and does not keep a frame loop alive.
+   */
   busy(): boolean {
+    const drying = this.presence > 0.001 && this.presence < 0.999
+    const spreading = this.spread > 0.001 && this.spread < 0.999 && this.presence > 0
     return (
       this.pressed ||
       this.held ||
       this.spreading ||
       this.presenceRunning ||
-      this.spread > 0.001 ||
-      this.presence > 0.001 ||
-      Math.abs(this.stage) > 0.001 ||
-      Math.abs(this.pull) > 0.001
+      drying ||
+      spreading ||
+      Math.abs(this.stageV) > 0.02 ||
+      Math.abs(this.pullV) > 0.02
     )
   }
 

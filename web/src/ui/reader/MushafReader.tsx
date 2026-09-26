@@ -4,11 +4,26 @@ import { runtimeMushafCache } from '../../data/runtimeMushaf'
 import {
   buildMushafPage,
   MUSHAF_PAGE_COUNT,
+  mushafTokenEndsAyah,
   pageAyahs,
   type MushafWordPlacement,
 } from '../../domain/mushafPage'
 import { formatAyahNumberMark } from '../../util/digits'
 import { appStore } from '../../store/appStore'
+
+/** Playback highlight when it exists; otherwise the ayah the sheet was opened on. */
+function followedAyah(activeAyah: number | null, openAyah: number): number {
+  return activeAyah != null && activeAyah > 0 ? activeAyah : Math.max(1, openAyah)
+}
+
+function ayahLastPosition(surahId: number, ayahNumber: number): number {
+  const verse = QuranRepository.surahContent(surahId).ayahs.find((item) => item.number === ayahNumber)
+  let last = 0
+  for (const word of verse?.words ?? []) {
+    if (word.position > last) last = word.position
+  }
+  return last
+}
 
 /**
  * One Madinah leaf. The 604 page boundaries come from the Quran Foundation
@@ -18,16 +33,28 @@ import { appStore } from '../../store/appStore'
 export function MushafReader({
   activeSurahId,
   activeAyah,
+  openAyah,
+  openRevision,
   english,
   onPlayWord,
 }: {
   activeSurahId: number
   activeAyah: number | null
+  openAyah: number
+  openRevision: number
   english: boolean
   onPlayWord: (surahId: number, ayah: number, position: number) => void
 }) {
+  const targetAyah = followedAyah(activeAyah, openAyah)
+  // Swipes stick until the opened ayah or the recited ayah changes.
+  const followKey = `${activeSurahId}:${openRevision}:${targetAyah}`
+  const [manualPage, setManualPage] = useState<number | null>(null)
+  const [manualFor, setManualFor] = useState(followKey)
+  if (manualFor !== followKey) {
+    setManualFor(followKey)
+    setManualPage(null)
+  }
   const [ready, setReady] = useState(() => runtimeMushafCache?.layoutReady() ?? false)
-  const [page, setPage] = useState(1)
   const [drag, setDrag] = useState<{ x: number; y: number } | null>(null)
 
   useEffect(() => {
@@ -35,14 +62,16 @@ export function MushafReader({
     return runtimeMushafCache.subscribe(() => setReady(runtimeMushafCache.layoutReady()))
   }, [])
 
-  useEffect(() => {
-    if (!ready || activeAyah == null || !runtimeMushafCache) return
-    const next = runtimeMushafCache.pageOfAyah(activeSurahId, activeAyah)
-    if (next) setPage(next)
-  }, [ready, activeSurahId, activeAyah])
+  const derived = ready && runtimeMushafCache
+    ? runtimeMushafCache.pageOfAyah(activeSurahId, targetAyah)
+    : null
+  const page = manualPage ?? derived ?? 1
 
   const turn = (delta: number) => {
-    setPage((current) => Math.min(MUSHAF_PAGE_COUNT, Math.max(1, current + delta)))
+    setManualPage((current) => {
+      const base = current ?? derived ?? 1
+      return Math.min(MUSHAF_PAGE_COUNT, Math.max(1, base + delta))
+    })
   }
 
   if (!ready || !runtimeMushafCache) {
@@ -111,7 +140,17 @@ export function MushafReader({
                 >
                   {ayah?.translation}
                 </button>
-                <span className="mushaf-mark">{formatAyahNumberMark(item.ayah, false)}</span>
+                <button
+                  type="button"
+                  className="mushaf-mark"
+                  aria-label={`Gather ayah ${item.ayah}`}
+                  onClick={(event) => {
+                    event.stopPropagation()
+                    appStore.onMarkTap(item.surahId, item.ayah)
+                  }}
+                >
+                  {formatAyahNumberMark(item.ayah, false)}
+                </button>
               </p>
             )
           })}
@@ -120,13 +159,13 @@ export function MushafReader({
         <div className="mushaf-lines">
           {leaf.lines.map((line) => (
             <p key={line.number} className="mushaf-line" lang="ar">
-              {line.tokens.map((token, index) => {
+              {line.tokens.map((token) => {
                 const active =
                   token.surahId === activeSurahId && token.ayah === activeAyah
-                const endsAyah =
-                  index === line.tokens.length - 1 ||
-                  line.tokens[index + 1]!.ayah !== token.ayah ||
-                  line.tokens[index + 1]!.surahId !== token.surahId
+                const endsAyah = mushafTokenEndsAyah(
+                  token.position,
+                  ayahLastPosition(token.surahId, token.ayah),
+                )
                 return (
                   <span key={`${token.surahId}:${token.ayah}:${token.position}`}>
                     <button
