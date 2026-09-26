@@ -1403,6 +1403,8 @@ export function ReaderScreen({ stackLayer }: { stackLayer: StackLayer }) {
             <MushafReader
               activeSurahId={content.surah.id}
               activeAyah={state.activeAyah}
+              openAyah={state.openAyah}
+              openRevision={state.readerOpenRevision}
               english={state.settings.readingMode === 'english_only'}
               onPlayWord={(surahId, ayah, position) => {
                 if (state.gathering) {

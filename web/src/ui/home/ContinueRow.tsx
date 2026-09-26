@@ -108,9 +108,14 @@ export function ContinueRow({
       frame.current = requestAnimationFrame(loop)
     }
     kickRef.current = kick
+    paint()
     kick()
     const unsub = subscribeSheetMotion(kick)
+    const observed = buttonRef.current
+    const observer = new ResizeObserver(() => paint())
+    if (observed) observer.observe(observed)
     return () => {
+      observer.disconnect()
       unsub()
       if (frame.current) cancelAnimationFrame(frame.current)
     }

@@ -1,5 +1,25 @@
 import { describe, expect, it } from 'vitest'
-import { buildMushafPage, pageAyahs } from './mushafPage'
+import {
+  buildMushafPage,
+  inheritSpannedPlacement,
+  mushafTokenEndsAyah,
+  pageAyahs,
+} from './mushafPage'
+
+describe('spanned words', () => {
+  it('puts the unmapped half of a fused pair on the owner line', () => {
+    const placed = inheritSpannedPlacement([
+      { surah_id: 2, ayah_number: 72, position: 4, qcf_page: 11, qcf_line: 3, qcf_span_end: 5 },
+      { surah_id: 2, ayah_number: 72, position: 5, qcf_page: 0, qcf_line: 0, qcf_span_end: 5 },
+    ])
+    expect(placed[1]).toMatchObject({ qcf_page: 11, qcf_line: 3 })
+  })
+
+  it('marks only the ayah last word, not the last word of a line', () => {
+    expect(mushafTokenEndsAyah(4, 9)).toBe(false)
+    expect(mushafTokenEndsAyah(9, 9)).toBe(true)
+  })
+})
 
 describe('mushaf page', () => {
   it('keeps all fifteen lines, including the empty ones', () => {

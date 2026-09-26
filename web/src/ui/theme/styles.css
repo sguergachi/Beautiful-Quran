@@ -790,6 +790,8 @@ select {
   position: absolute;
   left: 50%;
   top: 50%;
+  width: calc(26px * 1.6);
+  height: calc(26px * 1.6);
   transform: translate(-50%, -50%);
   pointer-events: none;
 }
@@ -799,48 +801,6 @@ select {
   z-index: 1;
   display: grid;
   place-items: center;
-}
-
-.settings-nuqta-glyph svg {
-  width: 26px;
-  height: 26px;
-}
-
-.settings-nuqta-on-ink {
-  position: absolute;
-  inset: 0;
-  z-index: 2;
-  color: var(--on-accent);
-  opacity: 0;
-  -webkit-mask-repeat: no-repeat;
-  mask-repeat: no-repeat;
-  -webkit-mask-position: center;
-  mask-position: center;
-  -webkit-mask-size: contain;
-  mask-size: contain;
-}
-
-.home-rosette {
-  display: block;
-  width: 30px;
-  height: 30px;
-  overflow: visible;
-}
-
-.home-rosette-relief,
-.home-rosette-face {
-  fill: none;
-  stroke-width: 1.6;
-  stroke-linecap: round;
-  stroke-linejoin: round;
-}
-
-.home-rosette-dark {
-  stroke: var(--emboss-dark);
-}
-
-.home-rosette-light {
-  stroke: var(--emboss-light);
 }
 
 .search-row {
@@ -1819,12 +1779,6 @@ select {
 .scroll[data-english='true'] .page-break {
   height: calc(var(--folio-band) + var(--folio-foot) + var(--folio-head-english));
   padding-top: var(--folio-head-english);
-}
-
-/* FocusEngine needs the chosen ayah's real wrapped-text height even while it
- * is far offscreen; `auto` would otherwise expose only the intrinsic estimate. */
-.ayah-block[data-focus-target='true'] {
-  content-visibility: visible;
 }
 
 /* Progressive-mount scroll padding — one block above/below the window. */

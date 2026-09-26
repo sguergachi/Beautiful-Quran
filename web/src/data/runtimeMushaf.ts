@@ -1,4 +1,5 @@
 import { queryAll } from './database'
+import { inheritSpannedPlacement } from '../domain/mushafPage'
 import {
   normalizeQfMushaf,
   type RuntimeMushafWord,
@@ -366,7 +367,7 @@ export class RuntimeMushafCache {
     if (!this.state || !fresh(this.state.updatedAtMs, this.now())) return null
     if (this.pageWordsIndex) return this.pageWordsIndex
     const pages = new Map<number, RuntimeMushafWord[]>()
-    for (const row of this.state.records) {
+    for (const row of inheritSpannedPlacement(this.state.records)) {
       if (row.qcf_page < 1 || row.qcf_line < 1) continue
       const list = pages.get(row.qcf_page) ?? []
       list.push(row)
