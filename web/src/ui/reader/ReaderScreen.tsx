@@ -31,8 +31,8 @@ import {
   IconRepeat,
   IconRepeatOne,
   IconSearch,
-  IconTune,
 } from '../icons/PlaybackIcons'
+import { SettingsNuqtaButton } from '../theme/SettingsNuqtaButton'
 import { AyahSelectorRail, type AyahSelectorRailHandle } from './AyahSelectorRail'
 import { AyahRailTip } from './AyahRailTip'
 import { BookmarkNoteTip } from './BookmarkNoteTip'
@@ -44,6 +44,8 @@ import {
 import { OrnateSurahTitle } from './OrnateSurahTitle'
 import { NextChapterFooter } from './NextChapterFooter'
 import { PageBreak } from './PageBreak'
+import { MushafReader } from './MushafReader'
+import { ayahKey } from '../../share/gather'
 import { buildReaderItems, sliceReaderItems } from './readerItems'
 import { ReaderFocusController } from './focus/ReaderFocusController'
 import { selectedPlaybackAyah } from './selectedPlaybackAyah'
@@ -1218,7 +1220,11 @@ export function ReaderScreen({ stackLayer }: { stackLayer: StackLayer }) {
 
   // Keep the rail off under-sheets — when Settings (or any sheet above) is
   // open, a peek of the reader must not show the dial hanging beside it.
-  const rail = isTop ? (
+  const mushaf = state.settings.readingLayout === 'mushaf'
+  const ordinals = new Map(
+    state.gatherSelection.map((ref, index) => [ayahKey(ref.surahId, ref.ayah), index + 1]),
+  )
+  const rail = mushaf ? null : isTop ? (
     <AyahSelectorRail
       ref={railHandleRef}
       ayahCount={ayahCount}
@@ -1379,15 +1385,11 @@ export function ReaderScreen({ stackLayer }: { stackLayer: StackLayer }) {
             >
               <IconSearch />
             </button>
-            <button
-              type="button"
+            <SettingsNuqtaButton
               className="icon-btn"
-              aria-label="Settings"
               disabled={recitingActive}
-              onClick={() => appStore.setSheet('settings')}
-            >
-              <IconTune />
-            </button>
+              onActivate={() => appStore.setSheet('settings')}
+            />
           </div>
         )}
       </div>
@@ -1397,6 +1399,26 @@ export function ReaderScreen({ stackLayer }: { stackLayer: StackLayer }) {
 
       <div className="reader-body">
         <div className="reader-main">
+          {mushaf ? (
+            <MushafReader
+              activeSurahId={content.surah.id}
+              activeAyah={state.activeAyah}
+              openAyah={state.openAyah}
+              openRevision={state.readerOpenRevision}
+              english={state.settings.readingMode === 'english_only'}
+              onPlayWord={(surahId, ayah, position) => {
+                if (state.gathering) {
+                  appStore.onVerseTap(surahId, ayah)
+                  return
+                }
+                if (surahId !== content.surah.id) {
+                  appStore.openSurah(surahId, ayah)
+                  return
+                }
+                void appStore.playFromWord(ayah, position)
+              }}
+            />
+          ) : (
           <div className="edge-fade">
             <div
               className="scroll"
@@ -1405,6 +1427,7 @@ export function ReaderScreen({ stackLayer }: { stackLayer: StackLayer }) {
               data-search-flash={flashTarget != null || undefined}
               data-search-focus-active={flashTarget?.focusActive || undefined}
               data-chapter-advancing={chapterAdvancing || undefined}
+              data-english={state.settings.readingMode === 'english_only' || undefined}
               style={{
                 ['--upcoming-alpha' as string]: String(inkTuning.upcomingAlpha),
                 ['--upcoming-cover' as string]: String(1 - inkTuning.upcomingAlpha),
@@ -1518,9 +1541,22 @@ export function ReaderScreen({ stackLayer }: { stackLayer: StackLayer }) {
                       }
                       speed={state.settings.playbackSpeed}
                       fontScale={state.settings.fontScale}
-                      onPlayWord={onPlayWord}
+                      onPlayWord={(ayahNumber, position) => {
+                        if (state.gathering) {
+                          appStore.onVerseTap(content.surah.id, ayahNumber)
+                          return
+                        }
+                        onPlayWord(ayahNumber, position)
+                      }}
                       onToggleBookmark={onToggleBookmark}
-                      onHoldWord={onHoldWord}
+                      onHoldWord={(ayahNumber, word) => {
+                        if (state.gathering) return
+                        onHoldWord(ayahNumber, word)
+                      }}
+                      gathering={state.gathering}
+                      gatherOrdinal={ordinals.get(ayahKey(content.surah.id, ayah.number)) ?? null}
+                      onMarkTap={() => appStore.onMarkTap(content.surah.id, ayah.number)}
+                      onVerseBodyTap={() => appStore.onVerseTap(content.surah.id, ayah.number)}
                       searchQuery={
                         deferredQuery != null && matchAyahSet.has(ayah.number)
                           ? deferredQuery
@@ -1570,6 +1606,7 @@ export function ReaderScreen({ stackLayer }: { stackLayer: StackLayer }) {
               ) : null}
             </div>
           </div>
+          )}
 
           {showReturn &&
           recitingActive &&
@@ -1584,6 +1621,40 @@ export function ReaderScreen({ stackLayer }: { stackLayer: StackLayer }) {
             />
           ) : null}
 
+          {state.gathering ? (
+            <div className="share-ribbon" role="group" aria-label={
+              state.gatherSelection.length === 1
+                ? '1 verse selected'
+                : `${state.gatherSelection.length} verses selected`
+            }>
+              <button type="button" className="share-ribbon-icon" aria-label="Cancel share" onClick={() => appStore.exitGather()}>
+                <IconClose />
+              </button>
+              <span className="share-ribbon-error">{state.shareError}</span>
+              <button
+                type="button"
+                className="share-ribbon-icon"
+                aria-label="Share as text"
+                disabled={state.gatherSelection.length === 0}
+                onClick={() => void appStore.shareGatheredText()}
+              >
+                <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true">
+                  <path fill="currentColor" d="M6 17h3l2-4V7H5v6h3l-2 4zm8 0h3l2-4V7h-6v6h3l-2 4z" />
+                </svg>
+              </button>
+              <button
+                type="button"
+                className="share-ribbon-icon"
+                aria-label="Share as image"
+                disabled={state.gatherSelection.length === 0}
+                onClick={() => void appStore.shareGatheredImage()}
+              >
+                <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true">
+                  <path fill="currentColor" d="M21 19V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2zM8.5 13.5 11 16.5 14.5 12 19 18H5l3.5-4.5z" />
+                </svg>
+              </button>
+            </div>
+          ) : (
           <div className="player-bar">
             <button
               type="button"
@@ -1662,6 +1733,7 @@ export function ReaderScreen({ stackLayer }: { stackLayer: StackLayer }) {
               </button>
             </div>
           </div>
+          )}
         </div>
       </div>
 

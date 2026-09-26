@@ -54,6 +54,16 @@ import {
   type StackLayer,
 } from '../ui/paper/stack'
 import { wordClipBounds } from '../ui/root/wordClipBounds'
+import {
+  composeShareText,
+  onLeaveReaderSheet,
+  onMarkTap,
+  onVerseTap,
+  toggleGatheredAyah,
+  type AyahRef,
+  type ShareVerse,
+} from '../share/gather'
+import { renderShareCard } from '../share/shareImage'
 
 export type Sheet = 'bookmarks' | 'home' | 'reader' | 'settings'
 
@@ -138,6 +148,10 @@ export interface AppState {
     wordPositions: number[]
     text?: string
   } | null
+  /** Gather mode — ordered verses to send. Survives a chapter turn. */
+  gathering: boolean
+  gatherSelection: { surahId: number; ayah: number }[]
+  shareError: string | null
 }
 
 type Listener = () => void
@@ -232,6 +246,9 @@ class AppStore {
     openAyah: 1,
     readerOpenRevision: 0,
     pendingSearchFlash: null,
+    gathering: false,
+    gatherSelection: [],
+    shareError: null,
   }
 
   constructor() {
@@ -338,9 +355,12 @@ class AppStore {
     const max = settingsLayerFor(this.hasReader())
     const min = this.state.bookmarks.length > 0 ? BOOKMARKS_LAYER : COVER_LAYER
     const stackLayer = Math.max(min, Math.min(max, Math.round(layer))) as StackLayer
+    const sheet = deriveSheet(stackLayer, this.hasReader())
+    const leave = onLeaveReaderSheet(this.state.gathering && this.state.sheet === 'reader' && sheet !== 'reader')
     this.set({
       stackLayer,
-      sheet: deriveSheet(stackLayer, this.hasReader()),
+      sheet,
+      ...(leave.type === 'exit' ? { gathering: false, gatherSelection: [], shareError: null } : {}),
     })
   }
 
@@ -349,6 +369,10 @@ class AppStore {
     // Match Android: only consume back while the bleed is open (not mid-exit).
     if (this.state.rootViewer && !this.state.rootViewerClosing) {
       this.closeRootViewer()
+      return
+    }
+    if (this.state.gathering && this.state.sheet === 'reader') {
+      this.exitGather()
       return
     }
     if (this.state.stackLayer === BOOKMARKS_LAYER) {
@@ -426,6 +450,101 @@ class AppStore {
     else if (sheet === 'home') this.setStackLayer(COVER_LAYER)
     else if (sheet === 'reader') this.setStackLayer(READER_LAYER)
     else this.setStackLayer(settingsLayerFor(this.hasReader()))
+  }
+
+  /** Tap ﴿N﴾. The first tap gathers that verse and pauses. Later taps toggle. */
+  onMarkTap(surahId: number, ayah: number) {
+    if (surahId < 1 || ayah < 1) return
+    const action = onMarkTap(this.state.gathering, { surahId, ayah })
+    if (action.type === 'enter') this.enterGather(action.ref)
+    else if (action.type === 'toggle') this.toggleGather(action.ref)
+  }
+
+  /** A verse body toggles only while already gathering. */
+  onVerseTap(surahId: number, ayah: number) {
+    if (!this.state.gathering || surahId < 1 || ayah < 1) return
+    const action = onVerseTap(true, { surahId, ayah })
+    if (action.type === 'toggle') this.toggleGather(action.ref)
+  }
+
+  exitGather() {
+    this.set({ gathering: false, gatherSelection: [], shareError: null })
+  }
+
+  private enterGather(ref: AyahRef) {
+    player.pause()
+    this.set({
+      gathering: true,
+      gatherSelection: [ref],
+      shareError: null,
+    })
+  }
+
+  private toggleGather(ref: AyahRef) {
+    this.set({
+      gatherSelection: toggleGatheredAyah(this.state.gatherSelection, ref),
+      shareError: null,
+    })
+  }
+
+  private shareVerses(): ShareVerse[] {
+    return this.state.gatherSelection.map((ref) => {
+      const content = QuranRepository.surahContent(ref.surahId)
+      const ayah = content.ayahs.find((item) => item.number === ref.ayah)
+      return {
+        arabic: ayah?.text ?? '',
+        translation: ayah?.translation ?? '',
+        surahNameTransliteration: content.surah.nameTransliteration,
+        surahId: ref.surahId,
+        ayah: ref.ayah,
+      }
+    })
+  }
+
+  /** Image: the paper card, via the system share sheet or a downloaded PNG. */
+  async shareGatheredImage(): Promise<void> {
+    if (!this.state.gathering || this.state.gatherSelection.length === 0) return
+    try {
+      const blob = await renderShareCard(this.shareVerses())
+      const file = new File([blob], 'beautiful-quran.png', { type: 'image/png' })
+      if (navigator.canShare?.({ files: [file] })) {
+        await navigator.share({ files: [file] })
+      } else {
+        const url = URL.createObjectURL(blob)
+        const link = document.createElement('a')
+        link.href = url
+        link.download = 'beautiful-quran.png'
+        document.body.appendChild(link)
+        link.click()
+        link.remove()
+        window.setTimeout(() => URL.revokeObjectURL(url), 1000)
+      }
+      this.set({ shareError: null })
+    } catch (error) {
+      if (error instanceof DOMException && error.name === 'AbortError') return
+      this.set({ shareError: 'Could not share the image' })
+    }
+  }
+
+  /** Quote: the system share sheet, or the clipboard when share is unavailable. */
+  async shareGatheredText(): Promise<void> {
+    if (!this.state.gathering || this.state.gatherSelection.length === 0) return
+    const text = composeShareText(this.shareVerses())
+    if (!text) {
+      this.set({ shareError: 'Those verses have no text yet' })
+      return
+    }
+    try {
+      if (navigator.share) {
+        await navigator.share({ text })
+      } else {
+        await navigator.clipboard.writeText(text)
+      }
+      this.set({ shareError: null })
+    } catch (error) {
+      if (error instanceof DOMException && error.name === 'AbortError') return
+      this.set({ shareError: 'Could not share the text' })
+    }
   }
 
   updateSettings(patch: Partial<Settings>) {

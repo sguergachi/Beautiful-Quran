@@ -1,9 +1,23 @@
 import type {
+  ReadingLayout,
   ReadingMode,
   Settings,
   VerseNumberScript,
 } from './settings'
 import type { WordSearchSources } from '../domain/WordSearch'
+
+export const MUSHAF_VIEW_MODES: ReadingMode[] = ['arabic_only', 'english_only']
+
+/** Bilingual has no printed leaf, so entering mushaf from it lands on Arabic. */
+export function applyReadingLayout(
+  settings: Settings,
+  layout: ReadingLayout,
+): Partial<Settings> {
+  if (layout === 'mushaf' && !MUSHAF_VIEW_MODES.includes(settings.readingMode)) {
+    return { readingLayout: layout, readingMode: 'arabic_only' }
+  }
+  return { readingLayout: layout }
+}
 
 export function applyReadingMode(mode: ReadingMode): Partial<Settings> {
   return { readingMode: mode }
@@ -41,6 +55,10 @@ export function themeLabel(mode: Settings['themeMode']): string {
 
 export function customizeSummary(settings: Settings): string {
   const theme = themeLabel(settings.themeMode)
+  if (settings.readingLayout === 'mushaf') {
+    const hand = settings.readingMode === 'english_only' ? 'English' : 'Arabic'
+    return `Mushaf · ${hand} · ${theme}`
+  }
   const view =
     settings.readingMode === 'english_only'
       ? 'English'

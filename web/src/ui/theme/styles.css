@@ -5,18 +5,37 @@
 :root {
   --paper: #faf3e8;
   --paper-surface: #fffbf2;
+  --paper-high: #f2e7d5;
   --ink: #1c1b18;
   --ink-muted: #6e6858;
+  /* Ink ladder — Android QuranInk, alphas solved per theme. */
+  --ink-rung-strong: rgb(28 27 24 / 0.863);
+  --ink-rung-body: rgb(28 27 24 / 0.741);
+  --ink-rung-secondary: rgb(28 27 24 / 0.655);
+  --ink-rung-tertiary: rgb(110 104 88 / 0.86);
+  --ink-rung-muted: rgb(110 104 88 / 0.709);
+  --ink-rung-quiet: rgb(110 104 88 / 0.608);
+  --ink-rung-furniture: rgb(110 104 88 / 0.446);
+  --ink-rung-hairline: rgb(110 104 88 / 0.277);
+  --ink-rung-wash: rgb(110 104 88 / 0.126);
   --accent: #0e5c4a;
-  --accent-soft: #7fb8a4;
+  --on-accent: #ffffff;
+  --accent-soft: #9bb8af;
   --accent-container: #d7e8e1;
-  --gold: #c9a227;
-  --gold-bright: #e9cd7a;
-  --gold-deep: #8a6b1e;
-  --emboss-dark: rgba(0, 0, 0, 0.14);
-  --emboss-light: rgba(255, 255, 255, 0.35);
-  --repeat: #c2622a;
+  --gold: #a8831d;
+  --gold-ink: #9f7b0b;
+  --gold-bright: #c9ae67;
+  --gold-deep: #7a5b05;
+  --green-ink: #2b725f;
+  --green-quiet: #5f9c8a;
+  /* Sheet under a tenth of the green. Not a saturated mint. */
+  --green-wash: #e2e4d8;
+  --emboss-dark: rgba(0, 0, 0, 0.141);
+  --emboss-light: rgba(255, 255, 255, 0.349);
+  --repeat: #b4551e;
   --bookmark: #b3122f;
+  --annotation: #6b2838;
+  --font-ui: system-ui, sans-serif;
   --font-display: 'Cormorant Garamond', 'Times New Roman', serif;
   --font-body: 'EB Garamond', 'Times New Roman', serif;
   --font-arabic: 'Hafs Uthmanic', 'Noto Naskh Arabic', serif;
@@ -24,6 +43,27 @@
      roman rather than that same voice leaning. Verse notes only. */
   --font-scribe: 'Cormorant Garamond', 'Times New Roman', serif;
   --sheet-pad: clamp(1.1rem, 4.5vw, 2.75rem);
+  /* Scroll reader grid — Android ScrollGrid, 1px = 1dp. */
+  --scroll-margin: 38px;
+  --verse-pad: 16px;
+  --verse-gap: 24px;
+  --verse-gap-english: 16px;
+  --voice-gap: 12px;
+  --opening-head: 40px;
+  --opening-foot: 32px;
+  --opening-foot-basmalah: 8px;
+  --rosette: 52px;
+  --basmalah-head: 24px;
+  --basmalah-foot: 24px;
+  --folio-foot: 24px;
+  --folio-head-english: 8px;
+  --folio-band: 16px;
+  --invite-head: 64px;
+  --invite-foot: 80px;
+  --invite-pill-top: 24px;
+  --pill-inset: 24px;
+  /* Back / settings glyph ink lands on the 38px text rules. */
+  --top-bar-pad: 26px;
   --reader-max: 40rem;
   --home-max: 40rem;
   --home-start-inset: 28px;
@@ -46,44 +86,155 @@
 }
 
 [data-theme='dark'] {
-  --paper: #0a0b0c;
-  --paper-surface: #111315;
-  --ink: #e8e2d5;
-  --ink-muted: #97917f;
-  --accent: #7fb8a4;
-  --accent-soft: #7fb8a4;
-  --accent-container: #282d30;
-  --gold: #d9b44a;
-  --gold-bright: #e9cd7a;
-  --gold-deep: #a8842a;
+  /* Warm charcoal, not the old blue-grey Nightfall sheet. */
+  --paper: #0c0b09;
+  --paper-surface: #141310;
+  --paper-high: #1e1c18;
+  --ink: #f3ecdf;
+  --ink-muted: #cbc4b3;
+  --ink-rung-strong: rgb(243 236 223 / 0.96);
+  --ink-rung-body: rgb(243 236 223 / 0.89);
+  --ink-rung-secondary: rgb(243 236 223 / 0.829);
+  --ink-rung-tertiary: rgb(203 196 179 / 0.916);
+  --ink-rung-muted: rgb(203 196 179 / 0.819);
+  --ink-rung-quiet: rgb(203 196 179 / 0.743);
+  --ink-rung-furniture: rgb(203 196 179 / 0.614);
+  --ink-rung-hairline: rgb(203 196 179 / 0.453);
+  --ink-rung-wash: rgb(203 196 179 / 0.28);
+  --accent: #88c0ac;
+  --on-accent: #06382d;
+  --accent-soft: #88c0ac;
+  --accent-container: #2b2822;
+  --gold: #caa547;
+  --gold-ink: #d2ad4f;
+  --gold-bright: #ecd189;
+  --gold-deep: #9a7b32;
+  --green-ink: #8fd3bc;
+  --green-quiet: #72af9a;
+  --green-wash: #181d19;
   --emboss-dark: rgba(0, 0, 0, 0.4);
-  --emboss-light: rgba(255, 255, 255, 0.12);
-  /* Deep saturated orange — warm ink on charcoal, not a pale peach wash. */
-  --repeat: #e06a18;
-  --bookmark: #d64358;
-  /* Fresh-ink glint: white gold a breath brighter and warmer than the
-   * parchment ink, so a newly read word glints on dark themes without
-   * shouting. Shared by Nightfall and Royal Green. */
-  --glint: #f8e9be;
+  --emboss-light: rgba(255, 255, 255, 0.122);
+  --repeat: #ff8948;
+  --bookmark: #ff6672;
+  --annotation: #f0a5b1;
+  --glint: #fff0c7;
   color-scheme: dark;
 }
 
 [data-theme='royal_green'] {
   --paper: #062c24;
   --paper-surface: #0a382e;
+  --paper-high: #10483b;
+  --ink: #f8f2e4;
+  --ink-muted: #d0cab8;
+  --ink-rung-strong: rgb(248 242 228 / 0.952);
+  --ink-rung-body: rgb(248 242 228 / 0.876);
+  --ink-rung-secondary: rgb(248 242 228 / 0.811);
+  --ink-rung-tertiary: rgb(208 202 184 / 0.903);
+  --ink-rung-muted: rgb(208 202 184 / 0.8);
+  --ink-rung-quiet: rgb(208 202 184 / 0.718);
+  --ink-rung-furniture: rgb(208 202 184 / 0.573);
+  --ink-rung-hairline: rgb(208 202 184 / 0.402);
+  --ink-rung-wash: rgb(208 202 184 / 0.212);
+  --accent: #8cc6b1;
+  --on-accent: #06382d;
+  --accent-container: #0e5c4a;
+  --gold: #d0aa4d;
+  --gold-ink: #d7b255;
+  --gold-bright: #f2d68f;
+  --gold-deep: #a07f38;
+  --green-ink: #95d9c1;
+  --green-quiet: #78b49f;
+  --green-wash: #133b32;
+  --emboss-dark: rgba(0, 0, 0, 0.4);
+  --emboss-light: rgba(255, 255, 255, 0.122);
+  --repeat: #ff9359;
+  --bookmark: #ff727b;
+  --annotation: #f4a4b2;
+  --glint: #fff7de;
+  color-scheme: dark;
+}
+
+/* Settings → Developer → Legacy colours. The pre-ladder palette, verbatim. */
+:root[data-colors='legacy'] {
+  --ink-rung-strong: rgb(28 27 24 / 0.86);
+  --ink-rung-body: rgb(28 27 24 / 0.74);
+  --ink-rung-secondary: rgb(28 27 24 / 0.68);
+  --ink-rung-tertiary: rgb(110 104 88 / 0.85);
+  --ink-rung-muted: rgb(110 104 88 / 0.7);
+  --ink-rung-quiet: rgb(110 104 88 / 0.55);
+  --ink-rung-furniture: rgb(110 104 88 / 0.45);
+  --ink-rung-hairline: rgb(110 104 88 / 0.25);
+  --ink-rung-wash: rgb(110 104 88 / 0.12);
+  --gold: #b8901c;
+  --gold-ink: rgb(184 144 28 / 0.75);
+  --gold-bright: #e9cd7a;
+  --gold-deep: #8a6b1e;
+  --green-ink: rgb(14 92 74 / 0.88);
+  --green-quiet: rgb(14 92 74 / 0.75);
+  --green-wash: rgb(14 92 74 / 0.1);
+  --repeat: #b4551e;
+  --bookmark: #b3122f;
+  --annotation: #6b2838;
+}
+
+:root[data-colors='legacy'][data-theme='dark'] {
+  --paper: #0a0b0c;
+  --paper-surface: #111315;
+  --paper-high: #1a1d20;
   --ink: #e8e2d5;
   --ink-muted: #97917f;
+  --ink-rung-strong: rgb(232 226 213 / 0.86);
+  --ink-rung-body: rgb(232 226 213 / 0.74);
+  --ink-rung-secondary: rgb(232 226 213 / 0.68);
+  --ink-rung-tertiary: rgb(151 145 127 / 0.85);
+  --ink-rung-muted: rgb(151 145 127 / 0.7);
+  --ink-rung-quiet: rgb(151 145 127 / 0.55);
+  --ink-rung-furniture: rgb(151 145 127 / 0.45);
+  --ink-rung-hairline: rgb(151 145 127 / 0.25);
+  --ink-rung-wash: rgb(151 145 127 / 0.12);
   --accent: #7fb8a4;
-  --accent-container: #0e5c4a;
+  --on-accent: #0a0b0c;
+  --accent-soft: #7fb8a4;
+  --accent-container: #282d30;
   --gold: #d9b44a;
-  --gold-bright: #e9cd7a;
-  --gold-deep: #a8842a;
-  --emboss-dark: rgba(0, 0, 0, 0.4);
-  --emboss-light: rgba(255, 255, 255, 0.12);
+  --gold-ink: rgb(217 180 74 / 0.75);
+  --gold-bright: #edd188;
+  --gold-deep: #9a7b2a;
+  --green-ink: rgb(127 184 164 / 0.88);
+  --green-quiet: rgb(127 184 164 / 0.75);
+  --green-wash: rgb(127 184 164 / 0.1);
   --repeat: #e06a18;
   --bookmark: #d64358;
+  --annotation: #f0a5b1;
   --glint: #f8e9be;
-  color-scheme: dark;
+}
+
+:root[data-colors='legacy'][data-theme='royal_green'] {
+  --ink: #e8e2d5;
+  --ink-muted: #97917f;
+  --ink-rung-strong: rgb(232 226 213 / 0.86);
+  --ink-rung-body: rgb(232 226 213 / 0.74);
+  --ink-rung-secondary: rgb(232 226 213 / 0.68);
+  --ink-rung-tertiary: rgb(151 145 127 / 0.85);
+  --ink-rung-muted: rgb(151 145 127 / 0.7);
+  --ink-rung-quiet: rgb(151 145 127 / 0.55);
+  --ink-rung-furniture: rgb(151 145 127 / 0.45);
+  --ink-rung-hairline: rgb(151 145 127 / 0.25);
+  --ink-rung-wash: rgb(151 145 127 / 0.12);
+  --accent: #7fb8a4;
+  --on-accent: #062c24;
+  --gold: #d9b44a;
+  --gold-ink: rgb(217 180 74 / 0.75);
+  --gold-bright: #edd188;
+  --gold-deep: #9a7b2a;
+  --green-ink: rgb(127 184 164 / 0.88);
+  --green-quiet: rgb(127 184 164 / 0.75);
+  --green-wash: rgb(127 184 164 / 0.1);
+  --repeat: #e06a18;
+  --bookmark: #d64358;
+  --annotation: #f0a5b1;
+  --glint: #f8e9be;
 }
 
 *,
@@ -198,10 +349,10 @@ select {
   /* Visible paper peel — long enough to read as a sheet glide, short enough
      not to feel stuck. Heavy work must not run on this same frame. */
   transition:
-    transform 360ms cubic-bezier(0.24, 0.02, 0.12, 1),
+    transform 460ms cubic-bezier(0.24, 0.02, 0.12, 1),
     opacity 300ms ease,
-    left 360ms cubic-bezier(0.24, 0.02, 0.12, 1),
-    right 360ms cubic-bezier(0.24, 0.02, 0.12, 1);
+    left 460ms cubic-bezier(0.24, 0.02, 0.12, 1),
+    right 460ms cubic-bezier(0.24, 0.02, 0.12, 1);
   transform-origin: center center;
   transform: translateX(0) scale(1);
   opacity: 1;
@@ -540,7 +691,7 @@ select {
   /* Collapse the masthead when search is focused so the field sits higher. */
   max-height: 8rem;
   opacity: 1;
-  overflow: hidden;
+  overflow: visible;
   transition:
     max-height 220ms ease,
     opacity 180ms ease,
@@ -554,6 +705,7 @@ select {
   padding-top: 0;
   padding-bottom: 0;
   margin: 0;
+  overflow: hidden;
   pointer-events: none;
 }
 
@@ -613,37 +765,42 @@ select {
   width: 48px;
   height: 48px;
   flex: 0 0 48px;
+  /* The title sits 7px below the masthead's centre. */
+  transform: translateY(7px);
+}
+
+.settings-nuqta {
+  position: relative;
   display: grid;
   place-items: center;
-}
-
-@media (hover: hover) {
-  .home-settings:hover .home-rosette {
-    filter: brightness(1.08);
-  }
-}
-
-.home-rosette {
-  display: block;
-  width: 30px;
-  height: 30px;
   overflow: visible;
+  color: var(--ink-rung-quiet);
+  padding: 0;
+  background: none;
+  border: 0;
+  cursor: pointer;
 }
 
-.home-rosette-relief,
-.home-rosette-face {
-  fill: none;
-  stroke-width: 1.6;
-  stroke-linecap: round;
-  stroke-linejoin: round;
+.settings-nuqta:disabled {
+  opacity: 0.35;
+  pointer-events: none;
 }
 
-.home-rosette-dark {
-  stroke: var(--emboss-dark);
+.settings-nuqta canvas {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: calc(26px * 1.6);
+  height: calc(26px * 1.6);
+  transform: translate(-50%, -50%);
+  pointer-events: none;
 }
 
-.home-rosette-light {
-  stroke: var(--emboss-light);
+.settings-nuqta-glyph {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  place-items: center;
 }
 
 .search-row {
@@ -709,6 +866,7 @@ select {
 }
 
 .continue {
+  position: relative;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -717,11 +875,55 @@ select {
   margin: 0;
   padding: 18px 20px 18px
     calc(var(--home-number-column) + var(--home-column-gap));
-  background-color: color-mix(in srgb, var(--accent) 8%, transparent);
+  overflow: hidden;
+  background-color: var(--green-wash);
   color: var(--ink);
   text-align: start;
   min-height: 44px;
-  border-radius: 14px;
+  border-radius: 0;
+}
+
+.continue-wash {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+
+.continue-face {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  width: 100%;
+  min-width: 0;
+}
+
+.continue-on-ink {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  padding: inherit;
+  box-sizing: border-box;
+  color: var(--on-accent);
+  opacity: 0;
+  pointer-events: none;
+  -webkit-mask-repeat: no-repeat;
+  mask-repeat: no-repeat;
+  -webkit-mask-size: 100% 100%;
+  mask-size: 100% 100%;
+}
+
+.continue-on-ink .continue-label {
+  color: rgb(from var(--on-accent) r g b / 0.8);
+}
+
+.continue-on-ink .continue-target,
+.continue-on-ink .continue-ar {
+  color: var(--on-accent);
 }
 
 .continue-copy {
@@ -733,7 +935,7 @@ select {
 }
 
 .continue-label {
-  color: color-mix(in srgb, var(--accent) 80%, var(--ink-muted));
+  color: var(--green-quiet);
   font-size: 0.88rem;
 }
 
@@ -786,7 +988,7 @@ select {
 }
 
 .saved-passages-title {
-  color: color-mix(in srgb, var(--accent) 80%, var(--ink-muted));
+  color: var(--green-quiet);
   font-size: 0.88rem;
 }
 
@@ -808,7 +1010,7 @@ select {
 
 @media (hover: hover) {
   .continue:hover {
-    background-color: color-mix(in srgb, var(--accent) 12%, transparent);
+    background-color: color-mix(in srgb, var(--green-wash) 82%, var(--accent));
   }
 }
 
@@ -976,7 +1178,7 @@ select {
 
 .surah-num {
   font-variant-numeric: oldstyle-nums;
-  color: var(--gold);
+  color: var(--gold-ink);
   font-size: 0.95rem;
 }
 
@@ -992,7 +1194,7 @@ select {
 }
 
 .surah-names .meta {
-  color: var(--ink-muted);
+  color: var(--ink-rung-muted);
   font-size: 13px;
   white-space: nowrap;
   overflow: hidden;
@@ -1012,7 +1214,7 @@ select {
   align-items: center;
   justify-content: space-between;
   gap: 0.75rem;
-  padding: 0.65rem var(--sheet-pad) 0.25rem;
+  padding: 0.65rem var(--top-bar-pad) 0.25rem;
   padding-top: max(0.65rem, env(safe-area-inset-top));
   max-width: var(--reader-max);
   width: 100%;
@@ -1093,7 +1295,7 @@ select {
   font-size: 0.56rem;
   letter-spacing: 0.14em;
   text-transform: uppercase;
-  color: color-mix(in srgb, var(--ink-muted) 60%, transparent);
+  color: var(--ink-rung-quiet);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -1107,7 +1309,7 @@ select {
 }
 
 .reader-top .back {
-  color: var(--ink-muted);
+  color: var(--ink-rung-secondary);
   font-size: 1.25rem;
   line-height: 1;
   padding: 0.55rem 0.1rem;
@@ -1137,7 +1339,7 @@ select {
 }
 
 .reader-top .icon-btn {
-  color: var(--ink-muted);
+  color: var(--ink-rung-quiet);
   min-width: 44px;
   min-height: 44px;
   padding: 0.45rem;
@@ -1151,6 +1353,11 @@ select {
   display: block;
   width: 1.25rem;
   height: 1.25rem;
+}
+
+.reader-top .settings-nuqta svg {
+  width: 26px;
+  height: 26px;
 }
 
 .reader-search {
@@ -1204,6 +1411,12 @@ select {
   flex-direction: column;
   /* Clip the continuous next-chapter slide so pages don't paint outside. */
   overflow: hidden;
+}
+
+/* The verse column owns the 38px rules. The scroll's own pad would double them. */
+.reader-main .scroll {
+  padding-left: 0;
+  padding-right: 0;
 }
 
 /*
@@ -1282,9 +1495,13 @@ select {
 .surah-header {
   position: relative;
   text-align: center;
-  padding: 1.35rem 0 1.75rem;
+  padding: var(--opening-head) var(--scroll-margin) var(--opening-foot);
   max-width: var(--reader-max);
   margin: 0 auto;
+}
+
+.surah-header:has(+ .basmalah-block) {
+  padding-bottom: var(--opening-foot-basmalah);
 }
 
 /* This chapter's own Hankin field, tooled at whisper ink behind the
@@ -1314,9 +1531,9 @@ select {
 
 .surah-header .rosette {
   position: relative;
-  width: 3.75rem;
-  height: 3.75rem;
-  margin: 0 auto 0.9rem;
+  width: var(--rosette);
+  height: var(--rosette);
+  margin: 0 auto 16px;
   opacity: 0.92;
 }
 
@@ -1324,18 +1541,20 @@ select {
   font-family: var(--font-display);
   font-weight: 600;
   font-size: clamp(1.7rem, 5vw, 2.35rem);
-  margin: 0 0 0.3rem;
+  margin: 0;
+  color: var(--ink-rung-strong);
 }
 
 .surah-header .ar-title {
   font-family: var(--font-arabic);
   font-size: clamp(1.35rem, 4vw, 1.6rem);
-  margin: 0 0 0.45rem;
+  margin: 0 0 4px;
   direction: rtl;
+  color: var(--green-ink);
 }
 
 .surah-header .sub {
-  color: var(--ink-muted);
+  color: var(--ink-rung-muted);
   margin: 0;
   font-size: 0.92rem;
 }
@@ -1360,21 +1579,20 @@ select {
   align-items: center;
   justify-content: flex-end;
   width: 100%;
-  height: calc(3rem * var(--invite, 1));
+  height: calc(var(--invite-head) * var(--invite, 1));
   opacity: var(--invite, 1);
   overflow: hidden;
   pointer-events: none;
 }
 
 .next-chapter-label {
-  font-family: var(--font-ui, var(--font-display));
-  font-size: 0.625rem;
+  font-family: var(--font-ui);
+  font-size: 0.6875rem;
   font-weight: 500;
   letter-spacing: 0.22em;
   text-transform: uppercase;
-  color: var(--gold);
-  opacity: 0.55;
-  margin: 0 0 0.5rem;
+  color: var(--gold-ink);
+  margin: 0;
 }
 
 /* Reuses .surah-header styles; only the rosette paint is invitation-scaled. */
@@ -1395,8 +1613,8 @@ select {
   align-items: center;
   justify-content: flex-start;
   width: 100%;
-  height: calc(5.25rem * var(--invite, 1));
-  padding-top: calc(1.25rem * var(--invite, 1));
+  height: calc(var(--invite-foot) * var(--invite, 1));
+  padding-top: calc(var(--invite-pill-top) * var(--invite, 1));
   opacity: var(--invite, 1);
   overflow: hidden;
 }
@@ -1409,15 +1627,15 @@ select {
   align-items: center;
   justify-content: center;
   gap: 0.45rem;
-  height: 2.75rem;
-  padding: 0 1.35rem;
+  height: 44px;
+  padding: 0 var(--pill-inset);
   border: none;
   border-radius: 999px;
   overflow: hidden;
-  background: color-mix(in srgb, var(--accent) 10%, transparent);
+  background: var(--green-wash);
   color: var(--accent);
-  font-family: var(--font-display);
-  font-size: 0.95rem;
+  font-family: var(--font-ui);
+  font-size: 0.875rem;
   font-weight: 500;
   letter-spacing: 0.06em;
   cursor: pointer;
@@ -1484,7 +1702,7 @@ select {
   position: relative;
   display: flex;
   justify-content: center;
-  padding: 1.25rem 1.5rem 1.75rem;
+  padding: var(--basmalah-head) var(--scroll-margin) var(--basmalah-foot);
   /* Same verse size as .ayah-block, so the artwork can match its strokes. */
   --word-arabic-size: calc(1.8rem * var(--font-scale, 1));
 }
@@ -1545,26 +1763,22 @@ select {
 
 .ayah-block {
   max-width: var(--reader-max);
-  margin: 0 auto;
-  padding: 1.2rem 2.6rem 1.45rem;
+  margin: 0 auto var(--verse-gap);
+  padding: var(--verse-pad) var(--scroll-margin);
   position: relative;
   scroll-margin-top: 12vh;
   /* Shared with .word-arabic / .ayah-mark so the verse sign tracks glyph size. */
   --word-arabic-size: calc(1.8rem * var(--font-scale, 1));
   --word-arabic-line: 1.9;
-  /*
-   * Off-screen paint skip. Intrinsic size must not under-estimate real
-   * verse height or fast scroll shows empty paper where content will land.
-   */
-  content-visibility: auto;
-  contain-intrinsic-size: auto 14rem;
 }
 
-/* FocusEngine needs the chosen ayah's real wrapped-text height even while it
- * is far offscreen; `auto` would otherwise expose only the intrinsic estimate. */
-.ayah-block[data-focus-target='true'] {
-  content-visibility: visible;
-  contain-intrinsic-size: none;
+.scroll[data-english='true'] .ayah-block {
+  margin-bottom: var(--verse-gap-english);
+}
+
+.scroll[data-english='true'] .page-break {
+  height: calc(var(--folio-band) + var(--folio-foot) + var(--folio-head-english));
+  padding-top: var(--folio-head-english);
 }
 
 /* Progressive-mount scroll padding — one block above/below the window. */
@@ -1575,6 +1789,7 @@ select {
 
 /* Progressive-mount placeholder — keeps scroll geometry while the window expands. */
 .ayah-block--spacer {
+  margin: 0;
   padding: 0;
   content-visibility: auto;
   contain-intrinsic-size: auto 7rem;
@@ -1588,11 +1803,13 @@ select {
 .page-break {
   max-width: var(--reader-max);
   margin: 0 auto;
-  padding: 0.625rem 2.6rem;
+  /* 16px band, then the 24px foot. Border-box so the band is the content box. */
+  box-sizing: border-box;
+  height: calc(var(--folio-band) + var(--folio-foot));
+  padding: 0 var(--scroll-margin) var(--folio-foot);
   display: flex;
   align-items: center;
   gap: 0.5rem;
-  box-sizing: border-box;
 }
 
 .page-break__num {
@@ -1623,6 +1840,40 @@ select {
 .ayah-mark--ltr {
   unicode-bidi: isolate;
   direction: ltr;
+}
+
+button.ayah-mark {
+  appearance: none;
+  background: none;
+  border: 0;
+  padding: 0;
+  cursor: pointer;
+}
+
+/* Gold at 26% of itself. color-mix with transparent blends in black. */
+.ayah-block[data-gathered='true'] {
+  background: rgb(from var(--gold) r g b / 0.26);
+}
+
+.gather-ordinal {
+  position: absolute;
+  top: 6px;
+  z-index: 2;
+  font-family: var(--font-body);
+  font-size: 16px;
+  font-weight: 700;
+  font-variant-numeric: lining-nums;
+  color: var(--ink);
+  line-height: 1;
+}
+
+.gather-ordinal[data-side='right'] {
+  right: 6px;
+}
+
+.gather-ordinal[data-side='left'],
+.gather-ordinal:not([data-side]) {
+  left: 6px;
 }
 
 .ayah-mark {
@@ -2053,10 +2304,10 @@ select {
 }
 
 .ayah-translation {
-  margin: 0.8rem 0 0;
+  margin: var(--voice-gap) 0 0;
+  color: var(--ink-rung-body);
   font-size: calc(1.02rem * var(--font-scale, 1));
   line-height: 1.55;
-  color: color-mix(in srgb, var(--ink) 66%, transparent);
   transition: opacity var(--ink-fade-ms) var(--recede-ease);
 }
 
@@ -2219,6 +2470,170 @@ select {
   .hafs-word:hover .word-ink-slot > .hafs-glyph:not(.hafs-repeat-overlay) {
     color: var(--accent);
   }
+}
+
+.share-ribbon {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 4px calc(4px + env(safe-area-inset-bottom, 0px));
+  background: var(--accent);
+  color: var(--on-accent);
+  z-index: 4;
+}
+
+.share-ribbon-error {
+  flex: 1;
+  min-width: 0;
+  text-align: center;
+  font-size: 0.75rem;
+  opacity: 0.7;
+}
+
+.share-ribbon-icon {
+  width: 48px;
+  height: 48px;
+  display: grid;
+  place-items: center;
+  color: var(--on-accent);
+  background: none;
+  border: 0;
+  font-family: var(--font-display);
+  font-size: 1.4rem;
+  cursor: pointer;
+}
+
+.share-ribbon-icon:disabled {
+  opacity: 0.35;
+}
+
+.mushaf {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  padding: max(0.4rem, env(safe-area-inset-top, 0px)) 10px 5rem;
+  touch-action: pan-y;
+}
+
+.mushaf-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  font-size: 0.72rem;
+  letter-spacing: 0.04em;
+  color: var(--ink-rung-quiet);
+}
+
+.mushaf-head span:last-child {
+  font-family: var(--font-arabic);
+  font-size: 1rem;
+  letter-spacing: 0;
+}
+
+.mushaf-lines {
+  flex: 1;
+  display: grid;
+  grid-template-rows: repeat(15, minmax(0, 1fr));
+  min-height: 0;
+  margin-top: 1em;
+}
+
+.mushaf-line {
+  margin: 0;
+  min-height: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.35em;
+  font-family: var(--font-arabic);
+  font-size: clamp(1.05rem, 4.2vw, 1.55rem);
+  line-height: 1;
+  overflow: hidden;
+}
+
+.mushaf-word,
+.mushaf-mark,
+.mushaf-english-text {
+  appearance: none;
+  background: none;
+  border: 0;
+  padding: 0;
+  margin: 0;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+  line-height: 1;
+}
+
+.mushaf-word {
+  display: inline;
+}
+
+.mushaf-word[data-active='true'] {
+  color: var(--accent);
+}
+
+.mushaf-mark {
+  color: var(--gold);
+  font-size: 0.72em;
+  margin-inline: 0.15em;
+  background: none;
+  border: 0;
+  padding: 0;
+  font-family: inherit;
+  cursor: pointer;
+}
+
+.mushaf-chapter {
+  display: block;
+  text-align: center;
+  font-size: 0.85em;
+  margin-bottom: 0.2em;
+}
+
+.mushaf-english {
+  flex: 1;
+  overflow: auto;
+  margin-top: 1.2em;
+  font-family: var(--font-body);
+  font-size: 1.05rem;
+  line-height: 1.55;
+  color: var(--ink-rung-body);
+}
+
+.mushaf-english-ayah {
+  margin: 0 0 0.8em;
+}
+
+.mushaf-english-text {
+  text-align: start;
+}
+
+.mushaf-folio {
+  text-align: center;
+  font-variant-numeric: lining-nums;
+  color: var(--ink-rung-quiet);
+  font-size: 0.8rem;
+  padding: 0.4rem 0 0.2rem;
+}
+
+.mushaf-wait {
+  flex: 1;
+  display: grid;
+  place-content: center;
+  text-align: center;
+  gap: 0.4rem;
+  padding: 2rem;
+  color: var(--ink-rung-quiet);
+}
+
+.mushaf-wait p {
+  margin: 0;
 }
 
 .player-bar {
@@ -3030,6 +3445,7 @@ select {
 }
 
 .reading-preview .page-break {
+  height: auto;
   padding: 0.4rem 0;
   max-width: none;
 }
@@ -4648,7 +5064,7 @@ select {
   }
 
   .ayah-block {
-    padding-inline: 2.85rem;
+    padding-inline: var(--scroll-margin);
     --word-arabic-size: calc(1.65rem * var(--font-scale, 1));
   }
 
@@ -4657,7 +5073,7 @@ select {
   }
 
   .page-break {
-    padding-inline: 2.85rem;
+    padding-inline: var(--scroll-margin);
   }
 
   .hafs-ayah {

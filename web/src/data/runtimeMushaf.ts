@@ -1,4 +1,5 @@
 import { queryAll } from './database'
+import { inheritSpannedPlacement } from '../domain/mushafPage'
 import {
   normalizeQfMushaf,
   type RuntimeMushafWord,
@@ -336,9 +337,61 @@ export class RuntimeMushafCache {
     }
   }
 
+  private pageWordsIndex: Map<number, RuntimeMushafWord[]> | null = null
+  private ayahPageIndex = new Map<string, number>()
+
+  /** True once the printed page map is on this device. */
+  layoutReady(): boolean {
+    return this.ensurePageIndex() != null
+  }
+
+  /** Words on one Madinah page, in line order. Null until the page map arrives. */
+  pageWords(page: number): RuntimeMushafWord[] | null {
+    const index = this.ensurePageIndex()
+    if (!index) return null
+    return index.get(page) ?? []
+  }
+
+  /** Printed page of an ayah, or null when the map is not here yet. */
+  pageOfAyah(surah: number, ayah: number): number | null {
+    if (!this.ensurePageIndex()) return null
+    return this.ayahPageIndex.get(`${surah}:${ayah}`) ?? null
+  }
+
+  private dropPageIndex(): void {
+    this.pageWordsIndex = null
+    this.ayahPageIndex.clear()
+  }
+
+  private ensurePageIndex(): Map<number, RuntimeMushafWord[]> | null {
+    if (!this.state || !fresh(this.state.updatedAtMs, this.now())) return null
+    if (this.pageWordsIndex) return this.pageWordsIndex
+    const pages = new Map<number, RuntimeMushafWord[]>()
+    for (const row of inheritSpannedPlacement(this.state.records)) {
+      if (row.qcf_page < 1 || row.qcf_line < 1) continue
+      const list = pages.get(row.qcf_page) ?? []
+      list.push(row)
+      pages.set(row.qcf_page, list)
+      if (!this.ayahPageIndex.has(`${row.surah_id}:${row.ayah_number}`)) {
+        this.ayahPageIndex.set(`${row.surah_id}:${row.ayah_number}`, row.ayah_page || row.qcf_page)
+      }
+    }
+    for (const list of pages.values()) {
+      list.sort((a, b) =>
+        a.qcf_line - b.qcf_line ||
+        a.surah_id - b.surah_id ||
+        a.ayah_number - b.ayah_number ||
+        a.position - b.position,
+      )
+    }
+    this.pageWordsIndex = pages
+    return pages
+  }
+
   private install(resource: StoredMushaf) {
     this.resource = resource
     this.byKey = new Map(resource.records.map((row) => [row.record_key, row]))
+    this.dropPageIndex()
     this.scheduleChecks(resource)
     for (const listener of this.listeners) listener()
   }
