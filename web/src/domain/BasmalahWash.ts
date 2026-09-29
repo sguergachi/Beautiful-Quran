@@ -95,7 +95,7 @@ export function basmalahWashProgress(
  * last mark — port of Android `BasmalahWash.settleMs`.
  *
  * Four of the seven shipped rows stop marking before the reciter stops
- * (As-Sudais by 345 ms), which finished the calligraphy while "ar-raḥīīīm" was
+ * (As-Sudais by 160 ms), which finished the calligraphy while "ar-raḥīīīm" was
  * still going. Late beats early, so the closing word owns the rest of the clip,
  * capped at its own marked length so a long tail of silence cannot make the ink
  * crawl for seconds after the voice.

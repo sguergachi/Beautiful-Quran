@@ -11,11 +11,11 @@
     "topology"
    ],
    "baselinePayloadHash": "698eff60fedcf25bf2669ed22d583d1a7fe5f0e0131e9c992091c37d34952951",
-   "candidatePayloadHash": "ff803b22563d89100db0e95036545e089ed8c3d75417b40747b0bb8abf3438e9",
+   "candidatePayloadHash": "135bd4ff911ef245a2da048c42dfda7055d4ad584009b072e775b6e99efa60b3",
    "evidence": {
     "kind": "dual_model_topology",
     "artifact": "tools/timing_verdicts/qdc-rewind-onset-class.json",
-    "summary": "Rewind onset: qdc tiles the ayah gaplessly, so where the reciter stops and goes back it stamps the next word's index on the instant of the rewind — a first-pass label shorter than any spoken word (< 200 ms), followed at once by the rewind, of a word the row recites later. clean_qdc_artifacts folds that instant into the word being finished. The stored occurrence sequence changes, so Arabic XLSR and MMS/uroman forced alignment both score the candidate sequence better than the baseline one on the exact EveryAyah file. Sudais rows keep the shipped (pre-#712) clock: the rule is applied to the baseline row because the pipeline's Sudais re-clock is unreviewed drift (tools/timing_verdicts/OUTSTANDING.md).",
+    "summary": "Rewind onset: qdc tiles the ayah gaplessly, so where the reciter stops and goes back it stamps the next word's index on the instant of the rewind — a first-pass label shorter than any spoken word (< 200 ms), followed at once by the rewind, of a word the row recites later. clean_qdc_artifacts folds that instant into the word being finished. The stored occurrence sequence changes, so Arabic XLSR and MMS/uroman forced alignment both score the candidate sequence better than the baseline one on the exact EveryAyah file. Sudais ships on the re-clocked source row (v64-pipeline-resync.json); both models also place its word starts closer (XLSR 146 -> 97 ms, MMS 144 -> 94 ms mean residual).",
     "audioSha256": "b40381da4e662cb513e7632ccd62177bfb0f3a4647620c348f4b334e3c6ecb3c",
     "waveformVeto": false,
     "models": [
@@ -40,11 +40,11 @@
     "topology"
    ],
    "baselinePayloadHash": "d7c19abb7995d73637fe99ec139c2eba4699e81326c2d8ac99fcdb630b0725ae",
-   "candidatePayloadHash": "486667519d8f96c2ace182a086a8708ab58aa48341996ffe4a32ce9effd8a326",
+   "candidatePayloadHash": "313c9c9d83627a2bcaad36a484432309cb4001082ee6629aa88a3a9d83e3aa41",
    "evidence": {
     "kind": "dual_model_topology",
     "artifact": "tools/timing_verdicts/qdc-rewind-onset-class.json",
-    "summary": "Rewind onset: qdc tiles the ayah gaplessly, so where the reciter stops and goes back it stamps the next word's index on the instant of the rewind — a first-pass label shorter than any spoken word (< 200 ms), followed at once by the rewind, of a word the row recites later. clean_qdc_artifacts folds that instant into the word being finished. The stored occurrence sequence changes, so Arabic XLSR and MMS/uroman forced alignment both score the candidate sequence better than the baseline one on the exact EveryAyah file. Sudais rows keep the shipped (pre-#712) clock: the rule is applied to the baseline row because the pipeline's Sudais re-clock is unreviewed drift (tools/timing_verdicts/OUTSTANDING.md).",
+    "summary": "Rewind onset: qdc tiles the ayah gaplessly, so where the reciter stops and goes back it stamps the next word's index on the instant of the rewind — a first-pass label shorter than any spoken word (< 200 ms), followed at once by the rewind, of a word the row recites later. clean_qdc_artifacts folds that instant into the word being finished. The stored occurrence sequence changes, so Arabic XLSR and MMS/uroman forced alignment both score the candidate sequence better than the baseline one on the exact EveryAyah file. Sudais ships on the re-clocked source row (v64-pipeline-resync.json); both models also place its word starts closer (XLSR 206 -> 158 ms, MMS 174 -> 138 ms mean residual).",
     "audioSha256": "a7e29b37e429bdf7847dc5b97924156fa4de5835ee43a45309427c43a9cbaf83",
     "waveformVeto": false,
     "models": [
@@ -69,11 +69,11 @@
     "topology"
    ],
    "baselinePayloadHash": "082da909196adbc02014bd702edd0fe69c976c0a849fe90ae4a3644d62874d45",
-   "candidatePayloadHash": "a22b093c318f36edf924437395fe67873e713529c889c9db2bb1f7fc4a0538f4",
+   "candidatePayloadHash": "fc925c4fe58a20c1db3290d96c46f611ed634590dc81d6b6a404538337b07eee",
    "evidence": {
     "kind": "dual_model_topology",
     "artifact": "tools/timing_verdicts/qdc-rewind-onset-class.json",
-    "summary": "Rewind onset: qdc tiles the ayah gaplessly, so where the reciter stops and goes back it stamps the next word's index on the instant of the rewind — a first-pass label shorter than any spoken word (< 200 ms), followed at once by the rewind, of a word the row recites later. clean_qdc_artifacts folds that instant into the word being finished. The stored occurrence sequence changes, so Arabic XLSR and MMS/uroman forced alignment both score the candidate sequence better than the baseline one on the exact EveryAyah file. Sudais rows keep the shipped (pre-#712) clock: the rule is applied to the baseline row because the pipeline's Sudais re-clock is unreviewed drift (tools/timing_verdicts/OUTSTANDING.md).",
+    "summary": "Rewind onset: qdc tiles the ayah gaplessly, so where the reciter stops and goes back it stamps the next word's index on the instant of the rewind — a first-pass label shorter than any spoken word (< 200 ms), followed at once by the rewind, of a word the row recites later. clean_qdc_artifacts folds that instant into the word being finished. The stored occurrence sequence changes, so Arabic XLSR and MMS/uroman forced alignment both score the candidate sequence better than the baseline one on the exact EveryAyah file. Sudais ships on the re-clocked source row (v64-pipeline-resync.json); both models also place its word starts closer (XLSR 178 -> 133 ms, MMS 166 -> 123 ms mean residual).",
     "audioSha256": "fbc6072e22f7a3504594a98cf505a92cf906c1d900bcb30dfd8a88351579993e",
     "waveformVeto": false,
     "models": [
@@ -98,11 +98,11 @@
     "topology"
    ],
    "baselinePayloadHash": "f4954b94f4618ebe14e56627b65b3de62a3d67955ae66e01a7f30db2ebe694b8",
-   "candidatePayloadHash": "a950f3d5c62702a5b142dce238b04c008ac8e3bee96e5a8043ecf73846dce693",
+   "candidatePayloadHash": "3d39e4497a4dd93e462258cbf5f3030d1bf023c90d0d5e4e3dbfa4773a446be3",
    "evidence": {
     "kind": "dual_model_topology",
     "artifact": "tools/timing_verdicts/qdc-rewind-onset-class.json",
-    "summary": "Rewind onset: qdc tiles the ayah gaplessly, so where the reciter stops and goes back it stamps the next word's index on the instant of the rewind — a first-pass label shorter than any spoken word (< 200 ms), followed at once by the rewind, of a word the row recites later. clean_qdc_artifacts folds that instant into the word being finished. The stored occurrence sequence changes, so Arabic XLSR and MMS/uroman forced alignment both score the candidate sequence better than the baseline one on the exact EveryAyah file. Sudais rows keep the shipped (pre-#712) clock: the rule is applied to the baseline row because the pipeline's Sudais re-clock is unreviewed drift (tools/timing_verdicts/OUTSTANDING.md).",
+    "summary": "Rewind onset: qdc tiles the ayah gaplessly, so where the reciter stops and goes back it stamps the next word's index on the instant of the rewind — a first-pass label shorter than any spoken word (< 200 ms), followed at once by the rewind, of a word the row recites later. clean_qdc_artifacts folds that instant into the word being finished. The stored occurrence sequence changes, so Arabic XLSR and MMS/uroman forced alignment both score the candidate sequence better than the baseline one on the exact EveryAyah file. Sudais ships on the re-clocked source row (v64-pipeline-resync.json); both models also place its word starts closer (XLSR 158 -> 111 ms, MMS 144 -> 114 ms mean residual).",
     "audioSha256": "27a697104152e95b689de8a5f33393a989fd98fee5ac091eda11a932f33588c6",
     "waveformVeto": false,
     "models": [
@@ -127,11 +127,11 @@
     "topology"
    ],
    "baselinePayloadHash": "d2902d0eaf8a5e5bd9189f22d3f8388390f96b428bd8ff3aca30a087ccb78cb4",
-   "candidatePayloadHash": "c60c5729a16f306c96860b8601aa9bc6f07f16c71514ef34232feecc99099afe",
+   "candidatePayloadHash": "9db5fbd77efe9ff2be627f14fdf9beb4c074c6cc1d27bf6aaf362448845d0b76",
    "evidence": {
     "kind": "dual_model_topology",
     "artifact": "tools/timing_verdicts/qdc-rewind-onset-class.json",
-    "summary": "Rewind onset: qdc tiles the ayah gaplessly, so where the reciter stops and goes back it stamps the next word's index on the instant of the rewind — a first-pass label shorter than any spoken word (< 200 ms), followed at once by the rewind, of a word the row recites later. clean_qdc_artifacts folds that instant into the word being finished. The stored occurrence sequence changes, so Arabic XLSR and MMS/uroman forced alignment both score the candidate sequence better than the baseline one on the exact EveryAyah file. Sudais rows keep the shipped (pre-#712) clock: the rule is applied to the baseline row because the pipeline's Sudais re-clock is unreviewed drift (tools/timing_verdicts/OUTSTANDING.md).",
+    "summary": "Rewind onset: qdc tiles the ayah gaplessly, so where the reciter stops and goes back it stamps the next word's index on the instant of the rewind — a first-pass label shorter than any spoken word (< 200 ms), followed at once by the rewind, of a word the row recites later. clean_qdc_artifacts folds that instant into the word being finished. The stored occurrence sequence changes, so Arabic XLSR and MMS/uroman forced alignment both score the candidate sequence better than the baseline one on the exact EveryAyah file. Sudais ships on the re-clocked source row (v64-pipeline-resync.json); both models also place its word starts closer (XLSR 132 -> 79 ms, MMS 112 -> 74 ms mean residual).",
     "audioSha256": "6843b309f75e6eb6c3143656735e2f8d6c2eaf3850c4b3c6e6d06bdcb0d75621",
     "waveformVeto": false,
     "models": [
@@ -156,11 +156,11 @@
     "topology"
    ],
    "baselinePayloadHash": "cc90a39af85281197e3521df1d146a470f84d1e9f680f93212143506fd44012d",
-   "candidatePayloadHash": "844060f56b274a4b52f67fd6d3ec1065ed45e4699da5592fd5b1e59812679913",
+   "candidatePayloadHash": "177d4e3a6c1d50a69900a39090b8c05346a09ca5410d100f8b1c2120f2c62f2d",
    "evidence": {
     "kind": "dual_model_topology",
     "artifact": "tools/timing_verdicts/qdc-rewind-onset-class.json",
-    "summary": "Rewind onset: qdc tiles the ayah gaplessly, so where the reciter stops and goes back it stamps the next word's index on the instant of the rewind — a first-pass label shorter than any spoken word (< 200 ms), followed at once by the rewind, of a word the row recites later. clean_qdc_artifacts folds that instant into the word being finished. The stored occurrence sequence changes, so Arabic XLSR and MMS/uroman forced alignment both score the candidate sequence better than the baseline one on the exact EveryAyah file. Sudais rows keep the shipped (pre-#712) clock: the rule is applied to the baseline row because the pipeline's Sudais re-clock is unreviewed drift (tools/timing_verdicts/OUTSTANDING.md).",
+    "summary": "Rewind onset: qdc tiles the ayah gaplessly, so where the reciter stops and goes back it stamps the next word's index on the instant of the rewind — a first-pass label shorter than any spoken word (< 200 ms), followed at once by the rewind, of a word the row recites later. clean_qdc_artifacts folds that instant into the word being finished. The stored occurrence sequence changes, so Arabic XLSR and MMS/uroman forced alignment both score the candidate sequence better than the baseline one on the exact EveryAyah file. Sudais ships on the re-clocked source row (v64-pipeline-resync.json); both models also place its word starts closer (XLSR 155 -> 86 ms, MMS 137 -> 74 ms mean residual).",
     "audioSha256": "59a85b54c61b20f7501755356b31edf1083428bfc8c497dd7886d616da6118e8",
     "waveformVeto": false,
     "models": [
@@ -185,11 +185,11 @@
     "topology"
    ],
    "baselinePayloadHash": "b58dbda39907e3bd0779060015be3fecb2d0d4e1c04338a2bda615f848906f97",
-   "candidatePayloadHash": "984c866d2796697309892dc16fdf5dc9c0c84bbf897cf7f2945bc1ad5e73e2c9",
+   "candidatePayloadHash": "8c543099e2ed7d52d187fe25abf894744f87401050bfe86cb634a837e2e02574",
    "evidence": {
     "kind": "dual_model_topology",
     "artifact": "tools/timing_verdicts/qdc-rewind-onset-class.json",
-    "summary": "Rewind onset: qdc tiles the ayah gaplessly, so where the reciter stops and goes back it stamps the next word's index on the instant of the rewind — a first-pass label shorter than any spoken word (< 200 ms), followed at once by the rewind, of a word the row recites later. clean_qdc_artifacts folds that instant into the word being finished. The stored occurrence sequence changes, so Arabic XLSR and MMS/uroman forced alignment both score the candidate sequence better than the baseline one on the exact EveryAyah file. Sudais rows keep the shipped (pre-#712) clock: the rule is applied to the baseline row because the pipeline's Sudais re-clock is unreviewed drift (tools/timing_verdicts/OUTSTANDING.md).",
+    "summary": "Rewind onset: qdc tiles the ayah gaplessly, so where the reciter stops and goes back it stamps the next word's index on the instant of the rewind — a first-pass label shorter than any spoken word (< 200 ms), followed at once by the rewind, of a word the row recites later. clean_qdc_artifacts folds that instant into the word being finished. The stored occurrence sequence changes, so Arabic XLSR and MMS/uroman forced alignment both score the candidate sequence better than the baseline one on the exact EveryAyah file. Sudais ships on the re-clocked source row (v64-pipeline-resync.json); both models also place its word starts closer (XLSR 184 -> 117 ms, MMS 144 -> 95 ms mean residual).",
     "audioSha256": "f0de8928d227e1dbdb6bdd8c9ebf7111787e5a9cbce89163ed3b5e1a8be22415",
     "waveformVeto": false,
     "models": [
@@ -214,11 +214,11 @@
     "topology"
    ],
    "baselinePayloadHash": "5fb53dcd874d7733eca6c1f06bf4ebe00be38f17d3c76fbc3ac8a3d1d4bcf5c7",
-   "candidatePayloadHash": "ecd4f5822fcf3752e66b996b71a45bb0488c80dc19a608c1799d78a32baa37c7",
+   "candidatePayloadHash": "bc588c4a66d18ef8ed2312b3d37c3cbed29ba9fffd19025abd2222f256957fff",
    "evidence": {
     "kind": "dual_model_topology",
     "artifact": "tools/timing_verdicts/qdc-rewind-onset-class.json",
-    "summary": "Rewind onset: qdc tiles the ayah gaplessly, so where the reciter stops and goes back it stamps the next word's index on the instant of the rewind — a first-pass label shorter than any spoken word (< 200 ms), followed at once by the rewind, of a word the row recites later. clean_qdc_artifacts folds that instant into the word being finished. The stored occurrence sequence changes, so Arabic XLSR and MMS/uroman forced alignment both score the candidate sequence better than the baseline one on the exact EveryAyah file. Sudais rows keep the shipped (pre-#712) clock: the rule is applied to the baseline row because the pipeline's Sudais re-clock is unreviewed drift (tools/timing_verdicts/OUTSTANDING.md).",
+    "summary": "Rewind onset: qdc tiles the ayah gaplessly, so where the reciter stops and goes back it stamps the next word's index on the instant of the rewind — a first-pass label shorter than any spoken word (< 200 ms), followed at once by the rewind, of a word the row recites later. clean_qdc_artifacts folds that instant into the word being finished. The stored occurrence sequence changes, so Arabic XLSR and MMS/uroman forced alignment both score the candidate sequence better than the baseline one on the exact EveryAyah file. Sudais ships on the re-clocked source row (v64-pipeline-resync.json); both models also place its word starts closer (XLSR 148 -> 99 ms, MMS 134 -> 88 ms mean residual).",
     "audioSha256": "c211ec3f730e06320fd920f97482137a1bba45a323065e3d68c8f6801a0fb55c",
     "waveformVeto": false,
     "models": [
@@ -243,11 +243,11 @@
     "topology"
    ],
    "baselinePayloadHash": "e93e681d13569d039bd9c758fab59c81573d2d2a2f3182bac12fa4cc7bc369f8",
-   "candidatePayloadHash": "fdf54dd3b809c0ec04d8359334f44ad40c1f38653d4cefc777777576ca7eec2a",
+   "candidatePayloadHash": "f7bf28ececfbb68f7c8a1696fd74dfd9de008654c1c0a0989e1133d74f90e8cf",
    "evidence": {
     "kind": "dual_model_topology",
     "artifact": "tools/timing_verdicts/qdc-rewind-onset-class.json",
-    "summary": "Rewind onset: qdc tiles the ayah gaplessly, so where the reciter stops and goes back it stamps the next word's index on the instant of the rewind — a first-pass label shorter than any spoken word (< 200 ms), followed at once by the rewind, of a word the row recites later. clean_qdc_artifacts folds that instant into the word being finished. The stored occurrence sequence changes, so Arabic XLSR and MMS/uroman forced alignment both score the candidate sequence better than the baseline one on the exact EveryAyah file. Sudais rows keep the shipped (pre-#712) clock: the rule is applied to the baseline row because the pipeline's Sudais re-clock is unreviewed drift (tools/timing_verdicts/OUTSTANDING.md).",
+    "summary": "Rewind onset: qdc tiles the ayah gaplessly, so where the reciter stops and goes back it stamps the next word's index on the instant of the rewind — a first-pass label shorter than any spoken word (< 200 ms), followed at once by the rewind, of a word the row recites later. clean_qdc_artifacts folds that instant into the word being finished. The stored occurrence sequence changes, so Arabic XLSR and MMS/uroman forced alignment both score the candidate sequence better than the baseline one on the exact EveryAyah file. Sudais ships on the re-clocked source row (v64-pipeline-resync.json); both models also place its word starts closer (XLSR 158 -> 103 ms, MMS 138 -> 95 ms mean residual).",
     "audioSha256": "987fa24a7c594dd54ad38a4846f044538a36cba0e9dcdc202f8d74cd8d1d874c",
     "waveformVeto": false,
     "models": [
@@ -272,11 +272,11 @@
     "topology"
    ],
    "baselinePayloadHash": "bed7ca62445b61a702b75eac112196ea3a90c842e2744a89317d862f3847fc76",
-   "candidatePayloadHash": "9df29874a4d5edf52349aaf6fecb8833589a8c3869956abf9f0ca7e808d7779c",
+   "candidatePayloadHash": "c953e08166e482926a1fee316c57c92cf57594c1a11f9174ba30439dc48ccc44",
    "evidence": {
     "kind": "dual_model_topology",
     "artifact": "tools/timing_verdicts/qdc-rewind-onset-class.json",
-    "summary": "Rewind onset: qdc tiles the ayah gaplessly, so where the reciter stops and goes back it stamps the next word's index on the instant of the rewind — a first-pass label shorter than any spoken word (< 200 ms), followed at once by the rewind, of a word the row recites later. clean_qdc_artifacts folds that instant into the word being finished. The stored occurrence sequence changes, so Arabic XLSR and MMS/uroman forced alignment both score the candidate sequence better than the baseline one on the exact EveryAyah file. Sudais rows keep the shipped (pre-#712) clock: the rule is applied to the baseline row because the pipeline's Sudais re-clock is unreviewed drift (tools/timing_verdicts/OUTSTANDING.md).",
+    "summary": "Rewind onset: qdc tiles the ayah gaplessly, so where the reciter stops and goes back it stamps the next word's index on the instant of the rewind — a first-pass label shorter than any spoken word (< 200 ms), followed at once by the rewind, of a word the row recites later. clean_qdc_artifacts folds that instant into the word being finished. The stored occurrence sequence changes, so Arabic XLSR and MMS/uroman forced alignment both score the candidate sequence better than the baseline one on the exact EveryAyah file. Sudais ships on the re-clocked source row (v64-pipeline-resync.json); both models also place its word starts closer (XLSR 193 -> 124 ms, MMS 155 -> 107 ms mean residual).",
     "audioSha256": "6e1867ef2fb03c46b9d2c3f1d55ce4877824add5e6b1b20f4dd17711d00be690",
     "waveformVeto": false,
     "models": [
@@ -301,11 +301,11 @@
     "topology"
    ],
    "baselinePayloadHash": "86b84a702c42f93e0ead58b25c76d7b6e912765bda31477b744bd3968ad830a8",
-   "candidatePayloadHash": "525964d25e29af2a80ee42e790e07a86aeb5aea2061c01657375d92b9f786aac",
+   "candidatePayloadHash": "b33d083e875dcacbd83b2bc2a8fe420112e7dbc41d105dee8da00d9883cd2a35",
    "evidence": {
     "kind": "dual_model_topology",
     "artifact": "tools/timing_verdicts/qdc-rewind-onset-class.json",
-    "summary": "Rewind onset: qdc tiles the ayah gaplessly, so where the reciter stops and goes back it stamps the next word's index on the instant of the rewind — a first-pass label shorter than any spoken word (< 200 ms), followed at once by the rewind, of a word the row recites later. clean_qdc_artifacts folds that instant into the word being finished. The stored occurrence sequence changes, so Arabic XLSR and MMS/uroman forced alignment both score the candidate sequence better than the baseline one on the exact EveryAyah file. Sudais rows keep the shipped (pre-#712) clock: the rule is applied to the baseline row because the pipeline's Sudais re-clock is unreviewed drift (tools/timing_verdicts/OUTSTANDING.md).",
+    "summary": "Rewind onset: qdc tiles the ayah gaplessly, so where the reciter stops and goes back it stamps the next word's index on the instant of the rewind — a first-pass label shorter than any spoken word (< 200 ms), followed at once by the rewind, of a word the row recites later. clean_qdc_artifacts folds that instant into the word being finished. The stored occurrence sequence changes, so Arabic XLSR and MMS/uroman forced alignment both score the candidate sequence better than the baseline one on the exact EveryAyah file. Sudais ships on the re-clocked source row (v64-pipeline-resync.json); both models also place its word starts closer (XLSR 216 -> 137 ms, MMS 190 -> 129 ms mean residual).",
     "audioSha256": "e7664fe3cd3589addc89a5f8a6c1eff28f037b6118b084dc42584c338c5ac6f5",
     "waveformVeto": false,
     "models": [
@@ -330,11 +330,11 @@
     "topology"
    ],
    "baselinePayloadHash": "0defb62a97136435f598d4d7ab76d529c86ee2eaa3f7681defecef5f546638bb",
-   "candidatePayloadHash": "c829406e99360dcf26f258d29e0dad6565ac2a79ef286fb18fe7ce81c3eedfed",
+   "candidatePayloadHash": "3b5276b17f1d7d6872c6a611b222aea7d2179616040cd46ca3138ea196a35c2f",
    "evidence": {
     "kind": "dual_model_topology",
     "artifact": "tools/timing_verdicts/qdc-rewind-onset-class.json",
-    "summary": "Rewind onset: qdc tiles the ayah gaplessly, so where the reciter stops and goes back it stamps the next word's index on the instant of the rewind — a first-pass label shorter than any spoken word (< 200 ms), followed at once by the rewind, of a word the row recites later. clean_qdc_artifacts folds that instant into the word being finished. The stored occurrence sequence changes, so Arabic XLSR and MMS/uroman forced alignment both score the candidate sequence better than the baseline one on the exact EveryAyah file. Sudais rows keep the shipped (pre-#712) clock: the rule is applied to the baseline row because the pipeline's Sudais re-clock is unreviewed drift (tools/timing_verdicts/OUTSTANDING.md).",
+    "summary": "Rewind onset: qdc tiles the ayah gaplessly, so where the reciter stops and goes back it stamps the next word's index on the instant of the rewind — a first-pass label shorter than any spoken word (< 200 ms), followed at once by the rewind, of a word the row recites later. clean_qdc_artifacts folds that instant into the word being finished. The stored occurrence sequence changes, so Arabic XLSR and MMS/uroman forced alignment both score the candidate sequence better than the baseline one on the exact EveryAyah file. Sudais ships on the re-clocked source row (v64-pipeline-resync.json); both models also place its word starts closer (XLSR 167 -> 107 ms, MMS 166 -> 116 ms mean residual).",
     "audioSha256": "b99922a39db3bdd5b5c81dcc3a6c820479e04962208acbc22441531a43033f7d",
     "waveformVeto": false,
     "models": [
@@ -359,11 +359,11 @@
     "topology"
    ],
    "baselinePayloadHash": "e49b86c559e34b1f5c0c563afcbf1dfef25c7137070bc610cb38c00c3f96c9f6",
-   "candidatePayloadHash": "25615aa16619a68829642ce8f06eeff2af3e7517dbcd63fdaa4011c92bd31d6a",
+   "candidatePayloadHash": "36a453d4f88d17d65f642819badd1f1cd2397bfd65c475cddfd5c375fe3fa0f8",
    "evidence": {
     "kind": "dual_model_topology",
     "artifact": "tools/timing_verdicts/qdc-rewind-onset-class.json",
-    "summary": "Rewind onset: qdc tiles the ayah gaplessly, so where the reciter stops and goes back it stamps the next word's index on the instant of the rewind — a first-pass label shorter than any spoken word (< 200 ms), followed at once by the rewind, of a word the row recites later. clean_qdc_artifacts folds that instant into the word being finished. The stored occurrence sequence changes, so Arabic XLSR and MMS/uroman forced alignment both score the candidate sequence better than the baseline one on the exact EveryAyah file. Sudais rows keep the shipped (pre-#712) clock: the rule is applied to the baseline row because the pipeline's Sudais re-clock is unreviewed drift (tools/timing_verdicts/OUTSTANDING.md).",
+    "summary": "Rewind onset: qdc tiles the ayah gaplessly, so where the reciter stops and goes back it stamps the next word's index on the instant of the rewind — a first-pass label shorter than any spoken word (< 200 ms), followed at once by the rewind, of a word the row recites later. clean_qdc_artifacts folds that instant into the word being finished. The stored occurrence sequence changes, so Arabic XLSR and MMS/uroman forced alignment both score the candidate sequence better than the baseline one on the exact EveryAyah file. Sudais ships on the re-clocked source row (v64-pipeline-resync.json); both models also place its word starts closer (XLSR 198 -> 103 ms, MMS 176 -> 150 ms mean residual).",
     "audioSha256": "11861057648d547d9ab72a5df38d7ad67ec797fea3f7dde88e31111bcfb33bec",
     "waveformVeto": false,
     "models": [
@@ -388,11 +388,11 @@
     "topology"
    ],
    "baselinePayloadHash": "748357db49daa886fd21fcca64a17ca67ea1c177c0b574eecf42b2579e3eb0cc",
-   "candidatePayloadHash": "2b824398744a442d5750269958fa1bac0f999539f31f1b25b99b6ca1303ebdb6",
+   "candidatePayloadHash": "4db037c6cf0cd76e5c874160ec6f60806fcd8aa0e2eeb54c24933b9b9b5c50e3",
    "evidence": {
     "kind": "dual_model_topology",
     "artifact": "tools/timing_verdicts/qdc-rewind-onset-class.json",
-    "summary": "Rewind onset: qdc tiles the ayah gaplessly, so where the reciter stops and goes back it stamps the next word's index on the instant of the rewind — a first-pass label shorter than any spoken word (< 200 ms), followed at once by the rewind, of a word the row recites later. clean_qdc_artifacts folds that instant into the word being finished. The stored occurrence sequence changes, so Arabic XLSR and MMS/uroman forced alignment both score the candidate sequence better than the baseline one on the exact EveryAyah file. Sudais rows keep the shipped (pre-#712) clock: the rule is applied to the baseline row because the pipeline's Sudais re-clock is unreviewed drift (tools/timing_verdicts/OUTSTANDING.md).",
+    "summary": "Rewind onset: qdc tiles the ayah gaplessly, so where the reciter stops and goes back it stamps the next word's index on the instant of the rewind — a first-pass label shorter than any spoken word (< 200 ms), followed at once by the rewind, of a word the row recites later. clean_qdc_artifacts folds that instant into the word being finished. The stored occurrence sequence changes, so Arabic XLSR and MMS/uroman forced alignment both score the candidate sequence better than the baseline one on the exact EveryAyah file. Sudais ships on the re-clocked source row (v64-pipeline-resync.json); both models also place its word starts closer (XLSR 183 -> 116 ms, MMS 174 -> 120 ms mean residual).",
     "audioSha256": "4e991e95b90be78a70017af7764fa394140ac43312f2c55bddc8b36578f1e2bb",
     "waveformVeto": false,
     "models": [
@@ -417,11 +417,11 @@
     "topology"
    ],
    "baselinePayloadHash": "697b74822969273ac1d85290eb76f05350aea21788c8acd95f19a1ee771188f3",
-   "candidatePayloadHash": "de85df423f199560e9d5db751a1452e9c03952805fd18e97b7e8ca44a205cc10",
+   "candidatePayloadHash": "315009add61ecef9ecf4e04651af0f026e52fc0cd0953dbb17c40ab0f05d1e2c",
    "evidence": {
     "kind": "dual_model_topology",
     "artifact": "tools/timing_verdicts/qdc-rewind-onset-class.json",
-    "summary": "Rewind onset: qdc tiles the ayah gaplessly, so where the reciter stops and goes back it stamps the next word's index on the instant of the rewind — a first-pass label shorter than any spoken word (< 200 ms), followed at once by the rewind, of a word the row recites later. clean_qdc_artifacts folds that instant into the word being finished. The stored occurrence sequence changes, so Arabic XLSR and MMS/uroman forced alignment both score the candidate sequence better than the baseline one on the exact EveryAyah file. Sudais rows keep the shipped (pre-#712) clock: the rule is applied to the baseline row because the pipeline's Sudais re-clock is unreviewed drift (tools/timing_verdicts/OUTSTANDING.md).",
+    "summary": "Rewind onset: qdc tiles the ayah gaplessly, so where the reciter stops and goes back it stamps the next word's index on the instant of the rewind — a first-pass label shorter than any spoken word (< 200 ms), followed at once by the rewind, of a word the row recites later. clean_qdc_artifacts folds that instant into the word being finished. The stored occurrence sequence changes, so Arabic XLSR and MMS/uroman forced alignment both score the candidate sequence better than the baseline one on the exact EveryAyah file. Sudais ships on the re-clocked source row (v64-pipeline-resync.json); both models also place its word starts closer (XLSR 155 -> 107 ms, MMS 150 -> 112 ms mean residual).",
     "audioSha256": "30a3367d550266cd333f565947008db4a32d180c9cf524c9721f2b620611b26b",
     "waveformVeto": false,
     "models": [
@@ -446,11 +446,11 @@
     "topology"
    ],
    "baselinePayloadHash": "dae6e25aac4523d83c0a3355b44aa9de75fc884065363d26a13c73598edabd80",
-   "candidatePayloadHash": "ab256471add9800bcb6e11a75746d11d4d0b697be93a1e2005b00e226c8f61dd",
+   "candidatePayloadHash": "9dded63a7d7656b7015bfea85977000277c9279b47e7f8abe7f11ed9c0aa806f",
    "evidence": {
     "kind": "dual_model_topology",
     "artifact": "tools/timing_verdicts/qdc-rewind-onset-class.json",
-    "summary": "Rewind onset: qdc tiles the ayah gaplessly, so where the reciter stops and goes back it stamps the next word's index on the instant of the rewind — a first-pass label shorter than any spoken word (< 200 ms), followed at once by the rewind, of a word the row recites later. clean_qdc_artifacts folds that instant into the word being finished. The stored occurrence sequence changes, so Arabic XLSR and MMS/uroman forced alignment both score the candidate sequence better than the baseline one on the exact EveryAyah file. Sudais rows keep the shipped (pre-#712) clock: the rule is applied to the baseline row because the pipeline's Sudais re-clock is unreviewed drift (tools/timing_verdicts/OUTSTANDING.md).",
+    "summary": "Rewind onset: qdc tiles the ayah gaplessly, so where the reciter stops and goes back it stamps the next word's index on the instant of the rewind — a first-pass label shorter than any spoken word (< 200 ms), followed at once by the rewind, of a word the row recites later. clean_qdc_artifacts folds that instant into the word being finished. The stored occurrence sequence changes, so Arabic XLSR and MMS/uroman forced alignment both score the candidate sequence better than the baseline one on the exact EveryAyah file. Sudais ships on the re-clocked source row (v64-pipeline-resync.json); both models also place its word starts closer (XLSR 140 -> 92 ms, MMS 133 -> 91 ms mean residual).",
     "audioSha256": "a316590a4e02932668b91d8b872d3a2f8ff25a4830d70fd317a7e5cf1a738f90",
     "waveformVeto": false,
     "models": [
@@ -475,11 +475,11 @@
     "topology"
    ],
    "baselinePayloadHash": "341a2a5732f4da426fee50e4384f6c6f1bfe8ec263b27f34f75dfbc5401bb936",
-   "candidatePayloadHash": "7d5464653681ca5251cbee2510525bc48ed169b3d7675a07a71923209b1678d0",
+   "candidatePayloadHash": "0b7d4ebbacff8322ca6d8ea2f3498760ed4ee287bb8e531bf5a4a8c114f79033",
    "evidence": {
     "kind": "dual_model_topology",
     "artifact": "tools/timing_verdicts/qdc-rewind-onset-class.json",
-    "summary": "Rewind onset: qdc tiles the ayah gaplessly, so where the reciter stops and goes back it stamps the next word's index on the instant of the rewind — a first-pass label shorter than any spoken word (< 200 ms), followed at once by the rewind, of a word the row recites later. clean_qdc_artifacts folds that instant into the word being finished. The stored occurrence sequence changes, so Arabic XLSR and MMS/uroman forced alignment both score the candidate sequence better than the baseline one on the exact EveryAyah file. Sudais rows keep the shipped (pre-#712) clock: the rule is applied to the baseline row because the pipeline's Sudais re-clock is unreviewed drift (tools/timing_verdicts/OUTSTANDING.md).",
+    "summary": "Rewind onset: qdc tiles the ayah gaplessly, so where the reciter stops and goes back it stamps the next word's index on the instant of the rewind — a first-pass label shorter than any spoken word (< 200 ms), followed at once by the rewind, of a word the row recites later. clean_qdc_artifacts folds that instant into the word being finished. The stored occurrence sequence changes, so Arabic XLSR and MMS/uroman forced alignment both score the candidate sequence better than the baseline one on the exact EveryAyah file. Sudais ships on the re-clocked source row (v64-pipeline-resync.json); both models also place its word starts closer (XLSR 190 -> 130 ms, MMS 172 -> 125 ms mean residual).",
     "audioSha256": "b635e9b723317ccfddfb89915e9a0b32e4c7c37bb3fca56088259f8ef3c417ba",
     "waveformVeto": false,
     "models": [
@@ -504,11 +504,11 @@
     "topology"
    ],
    "baselinePayloadHash": "3957f76357dba727f211a6f1371aed180e995cc6e5a86b0582e5a849b59608f0",
-   "candidatePayloadHash": "29af6eb2b04b2be732233bde0740c3c9b3d1422e5806edcf8f628f08d60c14ce",
+   "candidatePayloadHash": "4a821413da76204a7866eb29a0120b805ec94d8a23c5cc49abd38fb9b7d51199",
    "evidence": {
     "kind": "dual_model_topology",
     "artifact": "tools/timing_verdicts/qdc-rewind-onset-class.json",
-    "summary": "Rewind onset: qdc tiles the ayah gaplessly, so where the reciter stops and goes back it stamps the next word's index on the instant of the rewind — a first-pass label shorter than any spoken word (< 200 ms), followed at once by the rewind, of a word the row recites later. clean_qdc_artifacts folds that instant into the word being finished. The stored occurrence sequence changes, so Arabic XLSR and MMS/uroman forced alignment both score the candidate sequence better than the baseline one on the exact EveryAyah file. Sudais rows keep the shipped (pre-#712) clock: the rule is applied to the baseline row because the pipeline's Sudais re-clock is unreviewed drift (tools/timing_verdicts/OUTSTANDING.md).",
+    "summary": "Rewind onset: qdc tiles the ayah gaplessly, so where the reciter stops and goes back it stamps the next word's index on the instant of the rewind — a first-pass label shorter than any spoken word (< 200 ms), followed at once by the rewind, of a word the row recites later. clean_qdc_artifacts folds that instant into the word being finished. The stored occurrence sequence changes, so Arabic XLSR and MMS/uroman forced alignment both score the candidate sequence better than the baseline one on the exact EveryAyah file. Sudais ships on the re-clocked source row (v64-pipeline-resync.json); both models also place its word starts closer (XLSR 160 -> 111 ms, MMS 145 -> 113 ms mean residual).",
     "audioSha256": "5b11239fa01ffc7f7fc605e189ee8eb7bb082145612d83f37335862cd4ae5bb1",
     "waveformVeto": false,
     "models": [
@@ -533,11 +533,11 @@
     "topology"
    ],
    "baselinePayloadHash": "9f668bf42f4b5ebe53554a153ceacce3984d730cbf7e30454518e177b74e5312",
-   "candidatePayloadHash": "234990e392f94be1d2c8efa15ffb403216e17197dd4a0c4ceadfca97c3598f0c",
+   "candidatePayloadHash": "df61f7e8676f37caa2df71c63924c532980955ed8ca684ebf435583f2a7421d6",
    "evidence": {
     "kind": "dual_model_topology",
     "artifact": "tools/timing_verdicts/qdc-rewind-onset-class.json",
-    "summary": "Rewind onset: qdc tiles the ayah gaplessly, so where the reciter stops and goes back it stamps the next word's index on the instant of the rewind — a first-pass label shorter than any spoken word (< 200 ms), followed at once by the rewind, of a word the row recites later. clean_qdc_artifacts folds that instant into the word being finished. The stored occurrence sequence changes, so Arabic XLSR and MMS/uroman forced alignment both score the candidate sequence better than the baseline one on the exact EveryAyah file. Sudais rows keep the shipped (pre-#712) clock: the rule is applied to the baseline row because the pipeline's Sudais re-clock is unreviewed drift (tools/timing_verdicts/OUTSTANDING.md).",
+    "summary": "Rewind onset: qdc tiles the ayah gaplessly, so where the reciter stops and goes back it stamps the next word's index on the instant of the rewind — a first-pass label shorter than any spoken word (< 200 ms), followed at once by the rewind, of a word the row recites later. clean_qdc_artifacts folds that instant into the word being finished. The stored occurrence sequence changes, so Arabic XLSR and MMS/uroman forced alignment both score the candidate sequence better than the baseline one on the exact EveryAyah file. Sudais ships on the re-clocked source row (v64-pipeline-resync.json); both models also place its word starts closer (XLSR 140 -> 95 ms, MMS 133 -> 87 ms mean residual).",
     "audioSha256": "88992672db05650fc1bcda5223a25d56b4c86ec865ff10dea342ca7c67a57d86",
     "waveformVeto": false,
     "models": [
@@ -562,11 +562,11 @@
     "topology"
    ],
    "baselinePayloadHash": "15afeb394bf087c619e8d566f37d58b35cfd8ed37e18c9c34ab8f4a0bdd8cde1",
-   "candidatePayloadHash": "25c524cf4fcf4e08b7a0af7d764311164cb1887374dc41c6224e160ba756ae64",
+   "candidatePayloadHash": "867ddfb7a3cf9c1ccb0dc63cec9493df603f526c9d063e55cc9ca4481ad0d9d2",
    "evidence": {
     "kind": "dual_model_topology",
     "artifact": "tools/timing_verdicts/qdc-rewind-onset-class.json",
-    "summary": "Rewind onset: qdc tiles the ayah gaplessly, so where the reciter stops and goes back it stamps the next word's index on the instant of the rewind — a first-pass label shorter than any spoken word (< 200 ms), followed at once by the rewind, of a word the row recites later. clean_qdc_artifacts folds that instant into the word being finished. The stored occurrence sequence changes, so Arabic XLSR and MMS/uroman forced alignment both score the candidate sequence better than the baseline one on the exact EveryAyah file. Sudais rows keep the shipped (pre-#712) clock: the rule is applied to the baseline row because the pipeline's Sudais re-clock is unreviewed drift (tools/timing_verdicts/OUTSTANDING.md).",
+    "summary": "Rewind onset: qdc tiles the ayah gaplessly, so where the reciter stops and goes back it stamps the next word's index on the instant of the rewind — a first-pass label shorter than any spoken word (< 200 ms), followed at once by the rewind, of a word the row recites later. clean_qdc_artifacts folds that instant into the word being finished. The stored occurrence sequence changes, so Arabic XLSR and MMS/uroman forced alignment both score the candidate sequence better than the baseline one on the exact EveryAyah file. Sudais ships on the re-clocked source row (v64-pipeline-resync.json); both models also place its word starts closer (XLSR 157 -> 91 ms, MMS 141 -> 83 ms mean residual).",
     "audioSha256": "c07673dd5f156dec48c47e5794aa90a7b021cbc22fb180da2d15a6e899af858b",
     "waveformVeto": false,
     "models": [
@@ -591,11 +591,11 @@
     "topology"
    ],
    "baselinePayloadHash": "09b33bf770ef0114e3f6e768e75014b2e1ff46668aa58bc8ba660dba2f161efd",
-   "candidatePayloadHash": "63d3e6bee3cc8cb41513ece9d9d47a9b83d0b5d9879367c7a93212b9de4156bf",
+   "candidatePayloadHash": "b0b9bfa9a263fda9afe9dc598cf406636665b9403c06c58a7bb14b057daf9d12",
    "evidence": {
     "kind": "dual_model_topology",
     "artifact": "tools/timing_verdicts/qdc-rewind-onset-class.json",
-    "summary": "Rewind onset: qdc tiles the ayah gaplessly, so where the reciter stops and goes back it stamps the next word's index on the instant of the rewind — a first-pass label shorter than any spoken word (< 200 ms), followed at once by the rewind, of a word the row recites later. clean_qdc_artifacts folds that instant into the word being finished. The stored occurrence sequence changes, so Arabic XLSR and MMS/uroman forced alignment both score the candidate sequence better than the baseline one on the exact EveryAyah file. Sudais rows keep the shipped (pre-#712) clock: the rule is applied to the baseline row because the pipeline's Sudais re-clock is unreviewed drift (tools/timing_verdicts/OUTSTANDING.md).",
+    "summary": "Rewind onset: qdc tiles the ayah gaplessly, so where the reciter stops and goes back it stamps the next word's index on the instant of the rewind — a first-pass label shorter than any spoken word (< 200 ms), followed at once by the rewind, of a word the row recites later. clean_qdc_artifacts folds that instant into the word being finished. The stored occurrence sequence changes, so Arabic XLSR and MMS/uroman forced alignment both score the candidate sequence better than the baseline one on the exact EveryAyah file. Sudais ships on the re-clocked source row (v64-pipeline-resync.json); both models also place its word starts closer (XLSR 204 -> 154 ms, MMS 212 -> 141 ms mean residual).",
     "audioSha256": "5353510d9fb79b0a551348b931f9f51592b8fabc77ae4ab59e55a500848d0bac",
     "waveformVeto": false,
     "models": [
@@ -620,11 +620,11 @@
     "topology"
    ],
    "baselinePayloadHash": "fea6ae74bd58b61ff19a79f02ad5a21fb0ad840dd21547202661a697ea69747d",
-   "candidatePayloadHash": "0099b3104e2d214fc44a4302f084f02fcda902abf508469d016c593e1be278c5",
+   "candidatePayloadHash": "e12b8a7fc9e5d9aa0004b66deceea439306494f3d23d1129e8b8eda955ef2cf0",
    "evidence": {
     "kind": "dual_model_topology",
     "artifact": "tools/timing_verdicts/qdc-rewind-onset-class.json",
-    "summary": "Rewind onset: qdc tiles the ayah gaplessly, so where the reciter stops and goes back it stamps the next word's index on the instant of the rewind — a first-pass label shorter than any spoken word (< 200 ms), followed at once by the rewind, of a word the row recites later. clean_qdc_artifacts folds that instant into the word being finished. The stored occurrence sequence changes, so Arabic XLSR and MMS/uroman forced alignment both score the candidate sequence better than the baseline one on the exact EveryAyah file. Sudais rows keep the shipped (pre-#712) clock: the rule is applied to the baseline row because the pipeline's Sudais re-clock is unreviewed drift (tools/timing_verdicts/OUTSTANDING.md).",
+    "summary": "Rewind onset: qdc tiles the ayah gaplessly, so where the reciter stops and goes back it stamps the next word's index on the instant of the rewind — a first-pass label shorter than any spoken word (< 200 ms), followed at once by the rewind, of a word the row recites later. clean_qdc_artifacts folds that instant into the word being finished. The stored occurrence sequence changes, so Arabic XLSR and MMS/uroman forced alignment both score the candidate sequence better than the baseline one on the exact EveryAyah file. Sudais ships on the re-clocked source row (v64-pipeline-resync.json); both models also place its word starts closer (XLSR 139 -> 84 ms, MMS 131 -> 80 ms mean residual).",
     "audioSha256": "aae0828277d631b1efe2258c3206ac1f4269baf0dd60ce7947cc09fdc0658811",
     "waveformVeto": false,
     "models": [

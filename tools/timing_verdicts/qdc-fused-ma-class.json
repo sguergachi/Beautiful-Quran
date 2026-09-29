@@ -167,33 +167,6 @@
     ]
    }
   },
-  "Abdurrahmaan_As-Sudais_192kbps:41:47": {
-   "verdict": "accept",
-   "kinds": [
-    "topology"
-   ],
-   "baselinePayloadHash": "f126496814ee1662552ba36704b680734ad19b38cc42f037ce0a4e03f07e1742",
-   "candidatePayloadHash": "8d248bd7e111706a1ce7a7720ae5d0b47203709b36f657d7e5ed5fcf529ac185",
-   "evidence": {
-    "kind": "dual_model_topology",
-    "artifact": "tools/timing_verdicts/qdc-fused-ma-class.json",
-    "summary": "qdc times وَمَا+لِيَ (or لو+ما / ما+منا) as two words; QAC writes one. Clamping the extra last index invented a flush pair and skipped the real next word. Fold the extra token at the glued ما.",
-    "audioSha256": "d2dbba409e0861508ffffd6768b237e20fafe389927f1c0eb9abd460700649ac",
-    "waveformVeto": false,
-    "models": [
-     {
-      "name": "qdc-fused-ma",
-      "qdcPositions": 28,
-      "qacWords": 27,
-      "fusePosition": 25
-     },
-     {
-      "name": "qdc-token-map",
-      "source": "raw qdc 1..n+1 remapped onto QAC n"
-     }
-    ]
-   }
-  },
   "Hani_Rifai_192kbps:37:164": {
    "verdict": "accept",
    "kinds": [
@@ -222,5 +195,5 @@
    }
   }
  },
- "supersededNote": "Entries removed here were re-decided for quran-v54; their current verdicts live in false-same-position-lead-class.json / v54-pipeline-resync.json."
+ "supersededNote": "Sudais 41:47 was re-clocked for quran-v64; its current verdict lives in v64-pipeline-resync.json."
 }
