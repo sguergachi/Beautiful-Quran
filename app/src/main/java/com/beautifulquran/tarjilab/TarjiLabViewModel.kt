@@ -120,6 +120,7 @@ class TarjiLabViewModel(
 
     /** [focusWordPosition] is the word long-pressed in the reader. */
     fun changeTarget(surahId: Int, ayah: Int, focusWordPosition: Int? = null) {
+        player.setSkipSilenceGaps(false)
         stopPreview()
         if (matchesLab(player.state.value) && player.state.value.isPlaying) {
             player.pause()
@@ -1002,6 +1003,7 @@ class TarjiLabViewModel(
 
     /** Called when the lab is left: silence the preview and the player. */
     fun onExit() {
+        player.setSkipSilenceGaps(true)
         stopPreview()
         abortCapture()
         player.setSpeed(1f)

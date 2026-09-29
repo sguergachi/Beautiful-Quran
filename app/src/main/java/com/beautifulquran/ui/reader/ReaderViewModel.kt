@@ -18,7 +18,9 @@ import com.beautifulquran.data.model.Surah
 import com.beautifulquran.data.model.SurahContent
 import com.beautifulquran.domain.BASMALAH_PLAYLIST_AYAH
 import com.beautifulquran.domain.HighlightClock
-import com.beautifulquran.domain.verseOpeningSeekMs
+import com.beautifulquran.domain.isAfterLastWord
+import com.beautifulquran.domain.nextVerseAyah
+import com.beautifulquran.domain.nextVoicedMs
 import com.beautifulquran.domain.HighlightEngine
 import com.beautifulquran.domain.EnglishBook
 import com.beautifulquran.domain.MushafCatalog
@@ -33,7 +35,6 @@ import com.beautifulquran.domain.SURAH_FATIHA
 import com.beautifulquran.domain.surahOpensWithBasmalahPreface
 import com.beautifulquran.playback.AudioOutputLatency
 import com.beautifulquran.playback.NowPlaying
-import com.beautifulquran.playback.PlaybackPositionEvents
 import com.beautifulquran.playback.PlayerController
 import com.beautifulquran.playback.PlayerUiState
 import com.beautifulquran.playback.TarjiBacklogAnchor
@@ -788,30 +789,45 @@ class ReaderViewModel(
     }
 
     /**
-     * A verse that starts at the beginning of its file seeks to the first
-     * word. That is the same gate the highlight holds for, so the voice and
-     * the ink start together. [events.positionMs] is where the jump landed;
-     * the controller position can still be the previous file at this callback.
-     * [player.liveNowPlaying] is already the new item.
+     * While this surah is playing, silence the word timings already mark is
+     * skipped: before a word, and after the last word of a verse. The seek
+     * lands on the next word's start, which is when the highlight starts it.
+     * A seek already in flight is left to land, so this cannot undo a word tap.
      */
-    private fun skipVerseOpening(events: PlaybackPositionEvents) {
+    private fun skipMarkedSilence() {
+        if (!player.skipSilenceGaps || player.silenceSkipHeld()) return
+        if (!player.state.value.isPlaying) return
         val np = player.liveNowPlaying ?: return
         if (np.surahId != surahId) return
-        val firstWordStartMs = preparedTimings[np.ayah]?.segments?.firstOrNull()?.startMs ?: return
-        val entry = verseOpeningSeekMs(firstWordStartMs, events.positionMs) ?: return
-        // Leaves playWhenReady alone, so a verse that was already playing keeps playing.
-        player.seekToWord(np.ayah, entry)
+        val segments = preparedTimings[np.ayah]?.segments?.takeIf { it.isNotEmpty() } ?: return
+        val positionMs = player.positionMs
+        val voicedMs = nextVoicedMs(segments, positionMs)
+        if (voicedMs != null) {
+            player.seekToWord(np.ayah, voicedMs)
+            return
+        }
+        if (!isAfterLastWord(segments, positionMs)) return
+        val state = player.state.value
+        val count = _uiState.value.content?.surah?.ayahCount ?: return
+        val next = nextVerseAyah(
+            ayah = np.ayah,
+            ayahCount = count,
+            repeatOne = state.repeatMode == Player.REPEAT_MODE_ONE,
+            repeatAll = state.repeatMode == Player.REPEAT_MODE_ALL,
+            range = state.repeatRange,
+            opensWithBasmalah = surahOpensWithBasmalahPreface(np.surahId),
+        ) ?: return
+        val startMs = preparedTimings[next]?.segments?.firstOrNull()?.startMs ?: 0L
+        player.seekToWord(next, startMs)
     }
 
     init {
-        // The subscription's current value is the last jump, not a new one.
-        // Acting on it would skip the opening of a chapter the listener just started.
         viewModelScope.launch {
-            player.state
-                .map { it.positionEvents }
-                .distinctUntilChanged { previous, next -> previous.clockId == next.clockId }
-                .drop(1)
-                .collect { events -> skipVerseOpening(events) }
+            while (true) {
+                ensureActive()
+                skipMarkedSilence()
+                delay(if (player.state.value.isPlaying) 40L else 250L)
+            }
         }
         viewModelScope.launch {
             polledActiveWord.collect { polled ->
