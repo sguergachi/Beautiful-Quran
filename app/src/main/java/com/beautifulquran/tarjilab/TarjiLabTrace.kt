@@ -197,6 +197,11 @@ fun analyzeTarjiCapture(
     )
 }
 
+/** Signed pulse after the detector's gates and attack/release gain, on a fixed
+ * −1..1 scale so changing a threshold never auto-amplifies a weak result. */
+fun tarjiPulseWave(trace: TarjiLabTrace): List<Float> =
+    List(trace.hopCount) { i -> (trace.tremolo[i] * trace.gain[i]).coerceIn(-1f, 1f) }
+
 /** RMS of the 80 ms frame ending at hop [hop] (hops [hop−3]..[hop]) — the
  * detector's own envelope window. */
 private fun frameRms(pcm: FloatArray, hop: Int, hopSamples: Int): Float {

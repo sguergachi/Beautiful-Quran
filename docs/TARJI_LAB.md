@@ -13,6 +13,8 @@ manual envelope, vibrato label, or look control that can override it.
    Capture progress and failures appear on the page; **Retry** repeats capture.
 3. Play the whole capture, or choose **Loop range**, drag the gold handles,
    and play that range. **Seek** lets a tap or drag pause at a precise sample.
+   **Rewind** returns to the active loop start (or the whole capture start),
+   keeping playback running if it was running, or paused if it was paused.
    Pinch to zoom, two-finger pan to move, and **Fit** to restore the whole view.
 4. Listen at 1×, ½, or ¼ while adjusting the always-visible detector controls.
    Re-analysis updates the scope and word without restarting audio or moving
@@ -20,9 +22,11 @@ manual envelope, vibrato label, or look control that can override it.
 5. **Reset** restores shipped detector defaults for this reciter. **Export**
    saves the audio, loop, knobs, and optional note; **Import** replays a sample.
 
-The waveform is the recorded voice. The primary curve is signed detector
-modulation multiplied by its attack/release gain (zero modulation sits at
-mid-height). The gold rail marks each detected hold, including gaps between
+The scope has two labeled lanes: **Recorded voice** above and **Tuned pulse**
+below. The pulse is signed detector modulation multiplied by its attack/release
+gain, on a fixed −1..1 scale with zero at the center line. Its scale never
+auto-expands weak results, so changes from the knobs stay visible. A flat pulse
+means no modulation passed the detector; tuning does not change the recording. The gold rail marks each detected hold, including gaps between
 holds. The cursor, detector readout, and word all share one content position.
 The readout shows hold state, modulation rate, and gain.
 
@@ -37,6 +41,12 @@ Profiles persist per reciter and write through to `InkEngine.tuning`:
 - **Regularity**: periodicity threshold.
 - **Pitch wander**: tolerated fundamental drift.
 - **Attack / Release**: detector gate response.
+
+Every knob includes a persistent explanation of what lowering or raising it
+does. Start by lowering Min depth or Regularity if an audible hold is missed;
+raise them or Hold min if ordinary speech triggers the detector. Then tune
+Attack for the entrance and Release for brief detection gaps. Release does
+not prolong the true end of a hold, which has its own fast decay.
 
 Each edit replays the same PCM through the same pure `Tarji` implementation
 used by the live audio tap. Background analysis is canceled on a new target,

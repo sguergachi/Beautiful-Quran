@@ -126,6 +126,16 @@ class TarjiLabTraceTest {
     }
 
     @Test
+    fun `pulse graph changes with detection thresholds on the same voice`() {
+        val capture = captureOf(heldNote(2.5f, 130f, amHz = 5f, amDepth = 0.03f))
+        val rejected = tarjiPulseWave(analyzeTarjiCapture(capture, TarjiLabKnobs()))
+        val accepted = tarjiPulseWave(analyzeTarjiCapture(capture, TarjiLabKnobs(minTremoloDepth = 0.01f)))
+        assertTrue(rejected.all { it == 0f })
+        assertTrue(accepted.any { abs(it) > 0.01f })
+        assertTrue(accepted.all { it in -1f..1f })
+    }
+
+    @Test
     fun `trace point interpolates between hops`() {
         val pcm = heldNote(seconds = 2.5f, pitchHz = 130f, amHz = 5f, amDepth = 0.25f)
         val trace = analyzeTarjiCapture(captureOf(pcm), TarjiLabKnobs())

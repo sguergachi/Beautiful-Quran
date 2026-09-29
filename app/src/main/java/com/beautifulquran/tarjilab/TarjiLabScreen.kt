@@ -35,6 +35,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.Pause
 import androidx.compose.material.icons.rounded.PlayArrow
+import androidx.compose.material.icons.rounded.Replay
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -176,7 +177,7 @@ fun TarjiLabScreen(
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(156.dp)
+                        .height(196.dp)
                         .systemGestureExclusion(),
                 ) {
                     WaveformPanel(
@@ -378,11 +379,7 @@ private fun TransportRow(
 ) {
     val holdPlaying = ui.previewPlaying && ui.previewScope == TarjiPreviewScope.HOLD
     val wordPlaying = ui.previewPlaying && ui.previewScope == TarjiPreviewScope.WORD
-    Row(
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.SpaceBetween,
-        modifier = Modifier.fillMaxWidth().padding(top = 8.dp).heightIn(min = 52.dp),
-    ) {
+    Column(Modifier.fillMaxWidth()) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             InkSpotChoiceRow(
                 entries = TarjiPreviewSpeed.entries,
@@ -398,6 +395,14 @@ private fun TransportRow(
                     modifier = Modifier.semantics { contentDescription = speed.mark },
                 )
             }
+            Icon(
+                imageVector = Icons.Rounded.Replay,
+                contentDescription = "Rewind to loop start",
+                tint = MaterialTheme.colorScheme.onSurface,
+                modifier = Modifier.size(44.dp)
+                    .quietClickable(enabled = ui.capture != null, onClick = viewModel::rewindPreview)
+                    .padding(10.dp),
+            )
             PreviewButton(
                 playing = holdPlaying,
                 enabled = ui.capture != null,
@@ -566,9 +571,7 @@ private fun WaveformPanel(
     val durationMs = capture?.let { it.hopCount * it.hopContentDurationMs() } ?: 0f
     val view = if (ui.view.spanMs > 1f) ui.view else TarjiViewWindow.fit(durationMs)
     val window = ui.expectation.window
-    val detectorEnvelope = remember(trace) {
-        trace?.let { t -> List(t.hopCount) { i -> 0.5f + 0.5f * t.tremolo[i] * t.gain[i] } }.orEmpty()
-    }
+    val detectorEnvelope = remember(trace) { trace?.let(::tarjiPulseWave).orEmpty() }
     val peak = remember(capture) {
         capture?.pcm?.let { p ->
             var m = 0f
@@ -715,8 +718,16 @@ private fun WaveformPanel(
             }
 
             val slice = pcmSlice(view, durationMs, capture.pcm.size)
-            val mid = size.height * 0.5f
-            val amp = size.height * 0.42f
+            val labelPaint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
+                color = guideColor.toArgb()
+                textSize = 11.sp.toPx()
+            }
+            drawContext.canvas.nativeCanvas.drawText("Recorded voice", 8.dp.toPx(), 14.sp.toPx(), labelPaint)
+            drawContext.canvas.nativeCanvas.drawText("Tuned pulse", 8.dp.toPx(), size.height * 0.55f, labelPaint)
+            val mid = size.height * 0.27f
+            val amp = size.height * 0.16f
+            drawLine(guideColor.copy(alpha = 0.2f), Offset(0f, size.height * 0.76f),
+                Offset(size.width, size.height * 0.76f), strokeWidth = 1f)
             val stride = max(1, slice.count() / (size.width.toInt() * 2).coerceAtLeast(1))
             var last: Offset? = null
             var i = slice.first
@@ -740,9 +751,9 @@ private fun WaveformPanel(
                         last = null
                         continue
                     }
-                    val y = size.height * (1f - envelope[i].coerceIn(0f, 1f) * 0.84f - 0.08f)
+                    val y = size.height * (0.76f - envelope[i] * 0.17f)
                     last?.let {
-                        drawLine(shapeColor, it, Offset(x, y), strokeWidth = 2f, cap = StrokeCap.Round)
+                        drawLine(shapeColor, it, Offset(x, y), strokeWidth = 2.dp.toPx(), cap = StrokeCap.Round)
                     }
                     last = Offset(x, y)
                 }
@@ -750,7 +761,7 @@ private fun WaveformPanel(
                 val hx = viewX(head, size.width, view)
                 val hop = (head / durationMs * envelope.size).toInt()
                     .coerceIn(0, envelope.lastIndex)
-                val hy = size.height * (1f - envelope[hop].coerceIn(0f, 1f) * 0.84f - 0.08f)
+                val hy = size.height * (0.76f - envelope[hop] * 0.17f)
                 drawCircle(GlintGold, radius = 5f, center = Offset(hx, hy))
             }
 
@@ -841,7 +852,7 @@ private fun KnobsPanel(
     val knobs = ui.knobs
     Column(modifier = modifier) {
         Text(
-            text = "Tune while listening. The curve and word show detector output; the gold rail marks detected holds.",
+            text = "Start with a hold you can hear. If the pulse stays flat, lower Min depth or Regularity. If speech triggers it, raise those or Hold min. Then adjust Attack and Release. A flat pulse means no modulation passed the detector; the voice waveform does not change.",
             style = MaterialTheme.typography.labelSmall,
             color = QuranTheme.ink.muted,
             modifier = Modifier.padding(bottom = 10.dp),
@@ -854,28 +865,28 @@ private fun KnobsPanel(
             WordAction("Import", onImport, MaterialTheme.colorScheme.onSurfaceVariant)
             WordAction("Reset", onReset, MaterialTheme.colorScheme.onSurfaceVariant)
         }
-        LabSlider("Hold min ms", knobs.holdMinMs, 100f..1_200f) { v ->
+        LabSlider("Hold min ms", knobs.holdMinMs, 100f..1_200f, help = "How long a note must stay steady. Lower catches shorter holds sooner; higher rejects brief syllables.") { v ->
             onKnob { k -> k.copy(holdMinMs = v) }
         }
-        LabSlider("Wobble min Hz", knobs.minTremoloHz, 1.5f..5f) { v ->
+        LabSlider("Wobble min Hz", knobs.minTremoloHz, 1.5f..5f, help = "Slowest accepted pulse rate (cycles per second). Lower to include slower vibrato; raise to reject slow volume swells.", decimals = 1) { v ->
             onKnob { k -> k.copy(minTremoloHz = v, maxTremoloHz = maxOf(v, k.maxTremoloHz)) }
         }
-        LabSlider("Wobble max Hz", knobs.maxTremoloHz, 1.5f..10f) { v ->
+        LabSlider("Wobble max Hz", knobs.maxTremoloHz, 1.5f..10f, help = "Fastest accepted pulse rate. Raise if a fast vibrato is missed; lower if rapid roughness triggers it. The band filters the voice; it does not invent a pulse rate.", decimals = 1) { v ->
             onKnob { k -> k.copy(maxTremoloHz = v, minTremoloHz = minOf(v, k.minTremoloHz)) }
         }
-        LabSlider("Min depth", knobs.minTremoloDepth, 0.01f..0.25f) { v ->
+        LabSlider("Min depth", knobs.minTremoloDepth, 0.01f..0.25f, help = "Minimum strength of the wobble. Lower reveals subtle vibrato; higher rejects weak fluctuations and noise.") { v ->
             onKnob { k -> k.copy(minTremoloDepth = v) }
         }
-        LabSlider("Regularity", knobs.minPeriodicity, 0.15f..0.85f) { v ->
+        LabSlider("Regularity", knobs.minPeriodicity, 0.15f..0.85f, help = "How evenly the wobble must repeat. Lower accepts uneven vibrato; higher requires a cleaner, steadier rhythm.") { v ->
             onKnob { k -> k.copy(minPeriodicity = v) }
         }
-        LabSlider("Pitch wander", knobs.maxPitchDrift, 0.04f..0.30f) { v ->
+        LabSlider("Pitch wander", knobs.maxPitchDrift, 0.04f..0.30f, help = "How far the note may drift while still counting as a hold. Raise for sliding notes; lower if changing syllables are mistaken for one held note.") { v ->
             onKnob { k -> k.copy(maxPitchDrift = v) }
         }
-        LabSlider("Attack ms", knobs.attackMs, 50f..600f) { v ->
+        LabSlider("Attack ms", knobs.attackMs, 50f..600f, help = "How slowly a detected pulse gains strength. Lower makes it appear sooner; higher softens its entrance.") { v ->
             onKnob { k -> k.copy(attackMs = v) }
         }
-        LabSlider("Release ms", knobs.releaseMs, 100f..2_000f) { v ->
+        LabSlider("Release ms", knobs.releaseMs, 100f..2_000f, help = "How long pulse strength bridges a brief detection gap. Higher smooths flicker; lower clears it sooner. The actual end of a hold still fades quickly.") { v ->
             onKnob { k -> k.copy(releaseMs = v) }
         }
     }
@@ -887,38 +898,47 @@ private fun LabSlider(
     value: Float,
     range: ClosedFloatingPointRange<Float>,
     decimals: Int? = null,
+    help: String,
     onChange: (Float) -> Unit,
 ) {
-    Row(
-        verticalAlignment = Alignment.CenterVertically,
-        modifier = Modifier.fillMaxWidth(),
-    ) {
+    Column(Modifier.fillMaxWidth().padding(bottom = 12.dp)) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier.fillMaxWidth(),
+        ) {
+            Text(
+                text = label,
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.width(108.dp),
+            )
+            Slider(
+                value = value.coerceIn(range.start, range.endInclusive),
+                onValueChange = onChange,
+                valueRange = range,
+                colors = SliderDefaults.colors(
+                    thumbColor = MaterialTheme.colorScheme.primary,
+                    activeTrackColor = MaterialTheme.colorScheme.primary,
+                    inactiveTrackColor = MaterialTheme.colorScheme.primaryContainer,
+                ),
+                modifier = Modifier.weight(1f),
+            )
+            Text(
+                text = when (decimals ?: if (range.endInclusive - range.start <= 1f) 2 else 0) {
+                    0 -> value.roundToInt().toString()
+                    1 -> "%.1f".format(value)
+                    else -> "%.2f".format(value)
+                },
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.width(44.dp),
+            )
+        }
         Text(
-            text = label,
-            style = MaterialTheme.typography.labelMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.width(108.dp),
-        )
-        Slider(
-            value = value.coerceIn(range.start, range.endInclusive),
-            onValueChange = onChange,
-            valueRange = range,
-            colors = SliderDefaults.colors(
-                thumbColor = MaterialTheme.colorScheme.primary,
-                activeTrackColor = MaterialTheme.colorScheme.primary,
-                inactiveTrackColor = MaterialTheme.colorScheme.primaryContainer,
-            ),
-            modifier = Modifier.weight(1f),
-        )
-        Text(
-            text = when (decimals ?: if (range.endInclusive - range.start <= 1f) 2 else 0) {
-                0 -> value.roundToInt().toString()
-                1 -> "%.1f".format(value)
-                else -> "%.2f".format(value)
-            },
-            style = MaterialTheme.typography.labelMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.width(44.dp),
+            text = help,
+            style = MaterialTheme.typography.bodySmall,
+            color = QuranTheme.ink.quiet,
+            modifier = Modifier.padding(end = 8.dp),
         )
     }
 }

@@ -697,6 +697,14 @@ class TarjiLabViewModel(
         }
     }
 
+    /** Return to the active loop's beginning, preserving playing/paused state. */
+    fun rewindPreview() {
+        val st = _ui.value
+        val capture = st.capture ?: return
+        val start = previewLoopWindow(st.previewScope, st.expectation.window, capture.totalContentMs).startMs
+        seekPreviewTo(start)
+    }
+
     /** A drag always leaves the loop paused at the chosen sample. */
     fun beginPreviewScrub() {
         if (_ui.value.previewPlaying) pausePreview()
