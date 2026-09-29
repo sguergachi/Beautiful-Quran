@@ -7,19 +7,17 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
- * Pause ligatures in Hafs (صلى U+06D6, قلى U+06D7) paint above the line box.
+ * Pause ligatures in Hafs (صلى U+06D6, قلى U+06D7) ink above the em square.
  * The faded-word rect stops at the line, so those tips stayed full ink.
- * The bands are where the extra punch is allowed to look.
+ * The cover is the ligature's own ink, just above the line.
  */
 class RaisedMarkOverhangTest {
-
-    private val line = Rect(left = 100f, top = 200f, right = 400f, bottom = 280f)
 
     @Test
     fun `pause ligatures count, the sukun mark does not`() {
         assertTrue(hasRaisedQuranMark("شَيۡـٔٗاۖ", 0, "شَيۡـٔٗاۖ".length))
         assertTrue(hasRaisedQuranMark("بِهَاۗ", 0, "بِهَاۗ".length))
-        // U+06E1, the small high dotless head. It sits inside the line.
+        // U+06E1, the small high dotless head. It sits inside the em square.
         assertFalse(hasRaisedQuranMark("ٱلۡقِسۡطَ", 0, "ٱلۡقِسۡطَ".length))
         assertFalse(hasRaisedQuranMark("وَنَضَعُ", 0, "وَنَضَعُ".length))
     }
@@ -32,25 +30,30 @@ class RaisedMarkOverhangTest {
     }
 
     @Test
-    fun `bands sit outside the line and meet it`() {
-        val bands = raisedMarkBands(line, reach = 20f, horizontalPad = 8f)
+    fun `cover sits on the ligature and stops at the line`() {
+        val ink = raisedMarkInk(0x06D6)!!
+        val cover = raisedMarkCoverRect(
+            cursorA = 100f,
+            cursorB = 110f,
+            lineTop = 200f,
+            fontPx = 100f,
+            ink = ink,
+        )
 
-        assertEquals(2, bands.size)
-        val above = bands[0]
-        assertEquals(line.top - 20f, above.top, 0f)
-        assertEquals(line.top, above.bottom, 0f)
-        assertEquals(line.left - 8f, above.left, 0f)
-        assertEquals(line.right + 8f, above.right, 0f)
-        val below = bands[1]
-        assertEquals(line.bottom, below.top, 0f)
-        assertEquals(line.bottom + 20f, below.bottom, 0f)
-        assertTrue(above.bottom <= line.top)
-        assertTrue(below.top >= line.bottom)
-        assertFalse(above.overlaps(Rect(line.left, line.top + 1f, line.right, line.bottom - 1f)))
+        assertEquals(200f, cover.bottom, 0f)
+        // yMax clears the em square by 0.143em, plus the 0.04em edge margin.
+        assertEquals(200f - (ink.aboveEm * 100f + 4f), cover.top, 0.01f)
+        assertTrue(cover.top > 200f - 30f)
+        assertTrue(cover.left < 100f)
+        assertTrue(cover.right > 110f)
+        assertFalse(cover.overlaps(Rect(0f, 200.5f, 500f, 280f)))
     }
 
     @Test
-    fun `no reach grows no band`() {
-        assertTrue(raisedMarkBands(line, reach = 0f, horizontalPad = 8f).isEmpty())
+    fun `no font size grows no cover`() {
+        val ink = raisedMarkInk(0x06D7)!!
+        assertTrue(
+            raisedMarkCoverRect(0f, 10f, 200f, fontPx = 0f, ink = ink).isEmpty,
+        )
     }
 }
