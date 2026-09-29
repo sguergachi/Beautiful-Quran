@@ -1158,13 +1158,13 @@ drop; it only runs after playback was heard in that visit. A completed drop
 consumes its motion token, so scrolling the verse away and back shows settled
 cloth instead of replaying the placement. On an unsaved verse green uses the
 outer, screen-edge lane while the empty bookmark tip stays fixed in its reserved
-inner lane; the two never overpaint. That green cloth absorbs its own touch area
-without dispatching to the ruby bookmark action beside it.
+inner lane; the two never overpaint. The ruby bookmark action owns the whole
+gutter strip, so a tap on the green cloth marks or unmarks the verse too.
 
 The verse mark is a **full ribbon**, with the same top, tail, and block-length
 as a saved ruby bookmark, but 72% of its width. That quieter silhouette makes
-green read as a passive place marker, not a second tap target; only the ruby
-lane remains interactive. When one verse owns both meanings, green keeps the
+green read as a passive place marker; it has no action of its own, and a tap on
+it falls through to the ruby bookmark. When one verse owns both meanings, green keeps the
 outer, screen-edge lane and ruby remains in its permanently reserved lane
 toward the page. Green sits 4 dp closer to the screen edge, increasing the
 paper between them without moving ruby. The ruby cloth and empty
