@@ -85,4 +85,24 @@ class ReaderPollingTest {
         assertNotSame(first, cache.activeWord(ayah = 5, timings.activeInfo(1_100), activation = 7))
         assertNotSame(first, cache.activeWord(ayah = 5, timings.activeInfo(100), activation = 8))
     }
+
+    @Test
+    fun `opening wash runs from the voice to the next word`() {
+        val timings = HighlightEngine.PreparedTimings.prepare(
+            listOf(
+                Segment(position = 1, startMs = 1_951, endMs = 4_790),
+                Segment(position = 2, startMs = 4_790, endMs = 5_510),
+            ),
+        )
+        val cache = ActiveWordPollCache()
+        val info = timings.activeInfo(4_300)!!
+        val first = cache.activeWord(ayah = 148, info = info, activation = 1, washStartMs = 4_283)
+        assertEquals(4_283L, first!!.startMs)
+        assertEquals(4_790L - 4_283L, first.durationMs)
+        assertEquals(4_790L - 4_283L, first.spokenMs)
+        assertSame(
+            first,
+            cache.activeWord(ayah = 148, info = timings.activeInfo(4_500), activation = 1, washStartMs = 4_283),
+        )
+    }
 }

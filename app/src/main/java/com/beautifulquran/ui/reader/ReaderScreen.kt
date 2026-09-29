@@ -3176,8 +3176,6 @@ fun ReaderScreen(
                                 } else {
                                     wordClick@{ word ->
                                         if (editingAnnotationAyah != 0) return@wordClick
-                                        val segment = viewModel.segmentsFor(ayah.number)
-                                            ?.firstOrNull { it.position == word.position }
                                         // Mid-verse word play must not verse-home: for tall
                                         // ayahs that pins the top, un-lays-out the bottom
                                         // line the reader tapped, and word-band follow cannot
@@ -3189,8 +3187,12 @@ fun ReaderScreen(
                                         followWasEnabled = true
                                         pendingWordTapAyah = ayah.number
                                         dispatch(ReaderInteractionEvent.EnableFollow)
-                                        if (segment != null) {
-                                            viewModel.playFromWord(ayah.number, segment.startMs)
+                                        val start = viewModel.startMsForWord(
+                                            ayah.number,
+                                            word.position,
+                                        )
+                                        if (start != null) {
+                                            viewModel.playFromWord(ayah.number, start)
                                         } else {
                                             viewModel.playFromAyah(ayah.number)
                                         }
