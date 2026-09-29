@@ -22,6 +22,7 @@ import com.beautifulquran.playback.mapTapContentToMediaMs
 import com.beautifulquran.playback.sonicContentLatencyMs
 import com.beautifulquran.ui.reader.InkEngine
 import java.io.File
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -33,9 +34,8 @@ import kotlinx.coroutines.withContext
 import kotlin.math.roundToInt
 
 /**
- * The Tarjīʿ Lab: capture one word, mark the held-note window, optionally
- * sculpt its envelope, and tune this reciter's detector against that
- * signature. The loop plays the selected window. Knob edits re-run the
+ * Capture one word and tune the live detector against it. The loop plays
+ * the selected window. Knob edits re-run the
  * pure [com.beautifulquran.playback.Tarji] detector over the same PCM.
  */
 class TarjiLabViewModel(
@@ -62,13 +62,12 @@ class TarjiLabViewModel(
         val capture: TarjiLabCapture? = null,
         val firstHopMediaMs: Double = 0.0,
         val trace: TarjiLabTrace? = null,
-        val sineFit: TarjiSineFit? = null,
         val knobs: TarjiLabKnobs = TarjiLabKnobs(),
-        /** Listener-authored hold window, label, and optional envelope. */
+        /** Loop selection; the legacy exchange format also carries old labels. */
         val expectation: TarjiLabExpectation = TarjiLabExpectation(),
-        val tool: TarjiLabTool = TarjiLabTool.HOLD,
+        val tool: TarjiLabTool = TarjiLabTool.LISTEN,
         val previewSpeed: TarjiPreviewSpeed = TarjiPreviewSpeed.FULL,
-        val previewScope: TarjiPreviewScope = TarjiPreviewScope.HOLD,
+        val previewScope: TarjiPreviewScope = TarjiPreviewScope.WORD,
         val view: TarjiViewWindow = TarjiViewWindow.fit(0f),
         val sampleNotes: String = "",
         /** True while a hold handle is being dragged — the only time we print the range. */
@@ -79,8 +78,6 @@ class TarjiLabViewModel(
         val analyzing: Boolean = false,
         val captureError: String? = null,
         val previewPlaying: Boolean = false,
-        /** Wall clock when the preview loop started (−1 while stopped). */
-        val previewStartWallMs: Long = -1L,
         val previewDurationMs: Float = 0f,
         /** Loop position at the last pause/seek, in content milliseconds. */
         val previewPositionMs: Float = 0f,
@@ -99,13 +96,13 @@ class TarjiLabViewModel(
     private var analyzeJob: Job? = null
     private var audioTrack: AudioTrack? = null
     private var previewRateHz = 0
-    private var previewTotalFrames = 0
-    private var previewLoopStart = 0
-    private var previewLoopEnd = 0
     private var scrubActive = false
     private var holdEditActive = false
     private var ayahSegments: List<Segment> = emptyList()
-    private var recitersCache: List<Reciter> = emptyList()
+    private var previewClock: TarjiPreviewClock? = null
+    private var captureProbe: VoiceEnergy? = null
+    private var originalSpeed: Float? = null
+    private var originalRepeatMode: Int? = null
 
     // ── Target ─────────────────────────────────────────────────────────────
 
@@ -140,8 +137,9 @@ class TarjiLabViewModel(
 
     private fun load(surahId: Int, ayah: Int, focusWordPosition: Int?) {
         loadJob?.cancel()
+        analyzeJob?.cancel()
         abortCapture()
-        audioTrack?.let { runCatching { it.pause() } }
+        stopPreview()
         val keepTool = _ui.value.tool
         _ui.value = TarjiLabUiState(
             isLoading = true,
@@ -151,43 +149,47 @@ class TarjiLabViewModel(
             tool = keepTool,
         )
         loadJob = viewModelScope.launch {
-            val reciters = repository.reciters()
-            recitersCache = reciters
-            val reciter = reciters.firstOrNull { it.id == settingsRepo.settings.value.reciterId }
-                ?: reciters.first()
-            applyReciterProfile(reciter.id)
-            val content = repository.surahContent(surahId)
-            if (surahId != _ui.value.surahId || ayah != _ui.value.ayah) return@launch
-            val ayahRow = content.ayahs[(ayah - 1).coerceIn(0, content.ayahs.lastIndex)]
-            val words = ayahRow.words
-            ayahSegments = repository.timings(reciter.id, surahId)[ayahRow.number].orEmpty()
-            val position = if (focusWordPosition in 1..words.size) {
-                focusWordPosition!!
-            } else {
-                // No held word (Settings entry): the verse closer — the
-                // canonical tarjīʿ spot.
-                words.size
+            try {
+                val reciters = repository.reciters()
+                val reciter = reciters.firstOrNull { it.id == settingsRepo.settings.value.reciterId }
+                    ?: reciters.first()
+                applyReciterProfile(reciter.id)
+                val content = repository.surahContent(surahId)
+                if (surahId != _ui.value.surahId || ayah != _ui.value.ayah) return@launch
+                val ayahRow = content.ayahs[(ayah - 1).coerceIn(0, content.ayahs.lastIndex)]
+                val words = ayahRow.words
+                ayahSegments = repository.timings(reciter.id, surahId)[ayahRow.number].orEmpty()
+                val position = if (focusWordPosition in 1..words.size) {
+                    focusWordPosition!!
+                } else {
+                    // No held word (Settings entry): the verse closer — the
+                    // canonical tarjīʿ spot.
+                    words.size
+                }
+                val span = TarjiLabTrim.wordSpanMs(ayahSegments, position, 0L, 0L)
+                val word = words[position - 1]
+                _ui.value = TarjiLabUiState(
+                    isLoading = false,
+                    surahId = surahId,
+                    surahName = content.surah.nameTransliteration,
+                    ayah = ayahRow.number,
+                    ayahCount = content.surah.ayahCount,
+                    reciter = reciter,
+                    wordPosition = position,
+                    wordArabic = word.arabic,
+                    wordTranslation = word.translation,
+                    wordCount = words.size,
+                    wordStartMs = span?.first ?: 0L,
+                    wordEndMs = span?.last ?: 0L,
+                    knobs = knobsForReciter(reciter.id),
+                    tool = _ui.value.tool,
+                )
+                captureWord()
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (error: Exception) {
+                _ui.value = _ui.value.copy(isLoading = false, captureError = "Could not load this word: ${error.message}")
             }
-            val span = TarjiLabTrim.wordSpanMs(ayahSegments, position, 0L, 0L)
-            val word = words[position - 1]
-            _ui.value = TarjiLabUiState(
-                isLoading = false,
-                surahId = surahId,
-                surahName = content.surah.nameTransliteration,
-                ayah = ayahRow.number,
-                ayahCount = content.surah.ayahCount,
-                reciter = reciter,
-                wordPosition = position,
-                wordArabic = word.arabic,
-                wordTranslation = word.translation,
-                wordCount = words.size,
-                wordStartMs = span?.first ?: 0L,
-                wordEndMs = span?.last ?: 0L,
-                knobs = knobsForReciter(reciter.id),
-                tool = _ui.value.tool,
-            )
-            settingsRepo.updateListeningPosition(surahId, ayahRow.number)
-            captureWord()
         }
     }
 
@@ -220,34 +222,32 @@ class TarjiLabViewModel(
         // end and the capture would wait out its deadline. The duration is
         // only known once the media item loads, so the clamp happens live in
         // the polling loop below.
-        val ve = VoiceEnergy.active
-        if (ve == null) {
-            _ui.value = st.copy(captureError = "No audio probe (player not created).")
-            return
-        }
-        // Deterministic start: pause, arm, then seek — the seek's sink flush
-        // starts the capture cleanly at the new position.
-        if (matchesLab(player.state.value)) {
-            player.pause()
-        } else {
-            startLabPlayback()
-        }
+        originalSpeed = originalSpeed ?: player.state.value.speed
+        originalRepeatMode = originalRepeatMode ?: player.state.value.repeatMode
+        startLabPlayback()
+        player.pause()
+        player.setRepeatMode(androidx.media3.common.Player.REPEAT_MODE_OFF)
         player.setVolume(0f)
-        ve.armCapture()
         player.setSpeed(1f)
-        player.seekToWordAndPlay(st.ayah, span.first)
-        _ui.value = st.copy(
-            capturing = true,
-            captureProgress = 0f,
-            captureError = null,
-            note = null,
-        )
-        val deadline = SystemClock.elapsedRealtime() + CAPTURE_TIMEOUT_MS
+        _ui.value = st.copy(capturing = true, captureProgress = 0f, captureError = null, note = null)
+        val deadline = SystemClock.elapsedRealtime() + CAPTURE_TIMEOUT_MS + (span.last - span.first)
         captureJob?.cancel()
         captureJob = viewModelScope.launch {
+            // A cold Settings entry may not have created the PCM tap yet.
+            while (VoiceEnergy.active == null || !matchesLab(player.state.value)) {
+                if (SystemClock.elapsedRealtime() > deadline) {
+                    finishCapture("Could not prepare audio for capture.")
+                    return@launch
+                }
+                delay(POLL_MS)
+            }
+            val ve = VoiceEnergy.active ?: return@launch
+            captureProbe = ve
+            ve.armCapture()
+            player.seekToWordAndPlay(st.ayah, span.first.coerceAtLeast(0L))
             var seekLanded = false
             while (true) {
-                val active = VoiceEnergy.active?.captureActive == true
+                val active = ve.captureActive
                 val durationMs = player.durationMs.takeIf { it > 0L }
                 val spanEnd = if (durationMs != null) {
                     minOf(span.last, durationMs - END_GUARD_MS)
@@ -260,7 +260,7 @@ class TarjiLabViewModel(
                     seekLanded = nowPlaying?.surahId == st.surahId &&
                         nowPlaying.ayah == st.ayah &&
                         nowPlaying.reciterId == st.reciter.id &&
-                        captureSeekHasLanded(positionMs, span.first)
+                        captureSeekHasLanded(positionMs, span.first.coerceAtLeast(0L))
                     if (!seekLanded) {
                         if (SystemClock.elapsedRealtime() > deadline) {
                             finishCapture("Could not reach the word for muted capture.")
@@ -274,6 +274,11 @@ class TarjiLabViewModel(
                     (spanEnd - span.first).coerceAtLeast(1L))
                     .coerceIn(0f, 1f)
                 _ui.value = _ui.value.copy(captureProgress = progress)
+                if (nowPlaying?.surahId != st.surahId || nowPlaying.ayah != st.ayah ||
+                    nowPlaying.reciterId != st.reciter.id || VoiceEnergy.active !== ve) {
+                    finishCapture("Playback changed during capture. Retry this word.")
+                    return@launch
+                }
                 val done = !active || positionMs >= spanEnd
                 if (done) {
                     finishCapture(if (active) null else "Audio stopped before the word's end.")
@@ -290,26 +295,38 @@ class TarjiLabViewModel(
 
     /** Retry is shown only after an automatic capture fails. */
     fun retryCapture() {
-        if (!_ui.value.capturing) captureWord()
+        val st = _ui.value
+        if (st.capturing) return
+        if (st.wordPosition == 0) load(st.surahId, st.ayah, null) else captureWord()
     }
 
     /** Stop every capture side effect, including a queued or failed player. */
     private fun abortCapture() {
         captureJob?.cancel()
         captureJob = null
-        VoiceEnergy.active?.disarmCapture()
+        captureProbe?.disarmCapture()
+        captureProbe = null
+        restorePlayer()
+        _ui.value = _ui.value.copy(capturing = false)
+    }
+
+    private fun restorePlayer() {
         player.pause()
         player.setVolume(1f)
+        originalSpeed?.let(player::setSpeed)
+        originalSpeed = null
+        originalRepeatMode?.let(player::setRepeatMode)
+        originalRepeatMode = null
     }
 
     private fun finishCapture(error: String?) {
         captureJob?.cancel()
         captureJob = null
-        val ve = VoiceEnergy.active
+        val ve = captureProbe
+        captureProbe = null
         val st = _ui.value
         val capture = ve?.disarmCapture()
-        player.pause()
-        player.setVolume(1f)
+        restorePlayer()
         if (error != null || capture == null) {
             _ui.value = st.copy(
                 capturing = false,
@@ -318,7 +335,7 @@ class TarjiLabViewModel(
             )
             return
         }
-        val speed = player.state.value.speed.coerceAtLeast(0f)
+        val speed = 1f // Muted capture always runs at unity speed.
         val backlog = ve.measuredBacklogContentMs.takeIf { it >= 0.0 }
             ?: (ve.sinkLatencyMs * speed + sonicContentLatencyMs(speed)).toDouble()
         val firstHopMediaMs = mapTapContentToMediaMs(
@@ -333,18 +350,19 @@ class TarjiLabViewModel(
             CAPTURE_LEAD_MS,
             CAPTURE_TAIL_MS,
         )
-        val trimmed = if (span != null) {
-            val range = TarjiLabTrim.hopRangeInSpan(capture, firstHopMediaMs, span)
-            if (range.isEmpty()) capture else capture.slice(range)
-        } else {
-            capture
+        val range = span?.let { TarjiLabTrim.hopRangeInSpan(capture, firstHopMediaMs, it) }
+            ?: (0 until capture.hopCount)
+        if (range.isEmpty()) {
+            _ui.value = st.copy(capturing = false, captureError = "Captured audio missed the word. Retry.")
+            return
         }
+        val trimmed = capture.slice(range)
         val captureMs = trimmed.hopCount * trimmed.hopContentDurationMs()
         _ui.value = st.copy(
             capturing = false,
             captureProgress = 1f,
             capture = trimmed,
-            firstHopMediaMs = firstHopMediaMs,
+            firstHopMediaMs = capture.hopMediaMs(range.first, firstHopMediaMs),
             expectation = TarjiLabExpectation().withWindow(
                 TarjiHoldWindow(0f, captureMs),
                 captureMs,
@@ -388,30 +406,8 @@ class TarjiLabViewModel(
                 analyzeTarjiCapture(capture, st.knobs)
             }
             val live = _ui.value
-            val captureMs = capture.hopCount * capture.hopContentDurationMs()
-            val defaultWindow = live.expectation.kind == TarjiExpectationKind.UNLABELED &&
-                live.expectation.startMs == 0f &&
-                kotlin.math.abs((live.expectation.endMs ?: -1f) - captureMs) < 1f
-            val expectation = if (defaultWindow) {
-                val span = trace.reverberatingSpan
-                val hop = trace.hopDurationMs
-                live.expectation.withWindow(
-                    seedHoldWindow(
-                        captureMs,
-                        span?.first?.let { (it + 0.5f) * hop },
-                        span?.last?.let { (it + 0.5f) * hop },
-                    ),
-                    captureMs,
-                )
-            } else {
-                live.expectation
-            }
-            _ui.value = live.copy(
-                trace = trace,
-                sineFit = fitTarjiSine(trace),
-                expectation = expectation,
-                analyzing = false,
-            )
+            if (live.capture !== capture || live.knobs != st.knobs) return@launch
+            _ui.value = live.copy(trace = trace, analyzing = false)
         }
     }
 
@@ -422,7 +418,7 @@ class TarjiLabViewModel(
         val next = transform(_ui.value.knobs)
         if (next == _ui.value.knobs) return
         persistKnobs(next)
-        _ui.value = _ui.value.copy(knobs = next)
+        _ui.value = _ui.value.copy(knobs = next, analyzing = _ui.value.capture != null)
         analyzeJob?.cancel()
         analyzeJob = viewModelScope.launch {
             delay(KNOB_DEBOUNCE_MS)
@@ -441,34 +437,17 @@ class TarjiLabViewModel(
     }
 
     fun setTool(tool: TarjiLabTool) {
-        val st = _ui.value
-        val expectation = if (
-            tool == TarjiLabTool.SHAPE && st.expectation.envelope.isEmpty()
-        ) {
-            st.expectation.withEnvelope(st.trace?.let { envelopeFromTrace(it) }.orEmpty())
-        } else {
-            st.expectation
-        }
-        _ui.value = st.copy(tool = tool, expectation = expectation, note = null)
+        scrubActive = false
+        holdEditActive = false
+        _ui.value = _ui.value.copy(tool = tool, holdEditing = false)
     }
 
     fun setPreviewSpeed(speed: TarjiPreviewSpeed) {
         val st = _ui.value
-        val visual = if (st.previewPlaying) previewPlayheadMs() else st.previewPositionMs
-        _ui.value = st.copy(
-            previewSpeed = speed,
-            previewPositionMs = visual.coerceAtLeast(0f),
-            previewStartWallMs = if (st.previewPlaying) {
-                SystemClock.elapsedRealtime()
-            } else {
-                st.previewStartWallMs
-            },
-        )
-        applyPreviewSpeed()
-        if (st.previewPlaying && st.capture != null && visual >= 0f) {
-            runCatching {
-                audioTrack?.setPlaybackHeadPosition(previewFrame(st.capture, visual))
-            }
+        if (st.previewSpeed == speed) return
+        _ui.value = st.copy(previewSpeed = speed)
+        if (!applyPreviewSpeed()) {
+            _ui.value = _ui.value.copy(previewSpeed = st.previewSpeed, note = "This speed is unavailable on this device.")
         }
     }
 
@@ -525,64 +504,6 @@ class TarjiLabViewModel(
         _ui.value = _ui.value.copy(holdEditing = false)
     }
 
-    fun paintEnvelopeAt(x: Float, y: Float, width: Float, height: Float) {
-        val st = _ui.value
-        val capture = st.capture ?: return
-        val captureMs = capture.hopCount * capture.hopContentDurationMs()
-        val seed = st.expectation.envelope.ifEmpty {
-            st.trace?.let { envelopeFromTrace(it) }.orEmpty()
-        }
-        val painted = paintEnvelope(
-            current = seed,
-            hopCount = capture.hopCount,
-            captureMs = captureMs,
-            x = x,
-            y = y,
-            width = width,
-            height = height,
-            view = st.view,
-        )
-        val atMs = viewMs(x, width, st.view)
-        _ui.value = st.copy(
-            expectation = st.expectation.withEnvelope(painted),
-            previewPositionMs = if (st.previewPlaying) st.previewPositionMs else atMs,
-            note = null,
-        )
-    }
-
-    /** Put the stroke back to what the current knobs hear. */
-    fun resetEnvelopeToKnobs() {
-        val st = _ui.value
-        val seeded = st.trace?.let { envelopeFromTrace(it) } ?: return
-        _ui.value = st.copy(expectation = st.expectation.withEnvelope(seeded), note = null)
-    }
-
-    fun labelHold() {
-        if (_ui.value.capture == null) return
-        _ui.value = _ui.value.copy(
-            expectation = _ui.value.expectation.labeled(TarjiExpectationKind.PULSES),
-            note = null,
-        )
-    }
-
-    fun labelStill() {
-        if (_ui.value.capture == null) return
-        _ui.value = _ui.value.copy(
-            expectation = _ui.value.expectation.labeled(TarjiExpectationKind.NO_SHIMMER),
-            note = null,
-        )
-    }
-
-    /** Tap the hold to flip its life: wave ↔ flat. */
-    fun toggleHoldLife() {
-        if (_ui.value.capture == null || _ui.value.expectation.window == null) return
-        val next = nextHoldLife(_ui.value.expectation.kind)
-        _ui.value = _ui.value.copy(
-            expectation = _ui.value.expectation.labeled(next),
-            note = null,
-        )
-    }
-
     fun updateSampleNotes(notes: String) {
         _ui.value = _ui.value.copy(sampleNotes = notes.take(MAX_NOTES_LENGTH))
     }
@@ -595,8 +516,11 @@ class TarjiLabViewModel(
     }
 
     private fun persistKnobs(knobs: TarjiLabKnobs) {
-        InkEngine.tuning = TarjiLabKnobs.applyToTuning(knobs, InkEngine.tuning)
-        profiles?.save(activeReciterId(), knobs)
+        val reciterId = activeReciterId()
+        if (reciterId == settingsRepo.settings.value.reciterId) {
+            InkEngine.tuning = TarjiLabKnobs.applyToTuning(knobs, InkEngine.tuning)
+        }
+        profiles?.save(reciterId, knobs)
     }
 
     private fun activeReciterId(): Int =
@@ -674,7 +598,6 @@ class TarjiLabViewModel(
             _ui.value = st.copy(note = "Could not load the captured audio.")
             return
         }
-        val totalFrames = capture.hopCount * capture.hopSamples
         val durationMs = capture.hopCount * capture.hopContentDurationMs()
         val loop = loopRange(
             previewLoopWindow(scope, st.expectation.window, durationMs),
@@ -694,50 +617,25 @@ class TarjiLabViewModel(
             return
         }
         previewRateHz = rate
-        previewTotalFrames = totalFrames
-        previewLoopStart = loop.startFrame
-        previewLoopEnd = loop.endFrame
         audioTrack = track
-        applyPreviewSpeed()
-        track.play()
+        previewClock = TarjiPreviewClock(frame, track.playbackHeadPosition, loop.startFrame, loop.endFrame)
+        if (!applyPreviewSpeed() || runCatching { track.play() }.isFailure) {
+            stopPreview()
+            _ui.value = _ui.value.copy(note = "Could not start preview at this speed.")
+            return
+        }
         _ui.value = st.copy(
             previewPlaying = true,
             previewScope = scope,
-            previewStartWallMs = SystemClock.elapsedRealtime(),
             previewDurationMs = durationMs,
             previewPositionMs = positionMs,
         )
     }
 
-    /** Hardware loop of the whole static buffer. The modern form is
-     * (start, end, loopCount) with −1 = infinite — the only one the recent
-     * stubs carry; older runtimes may still offer the two-argument form.
-     * Reflect both so the lab works on any supported API. */
-    private fun loopInfinitely(track: AudioTrack, startFrame: Int, endFrame: Int): Boolean {
-        val start = startFrame.coerceAtLeast(0)
-        val end = endFrame.coerceAtLeast(start + 1)
-        val threeArg = runCatching {
-            AudioTrack::class.java
-                .getMethod(
-                    "setLoopPoints",
-                    Int::class.javaPrimitiveType,
-                    Int::class.javaPrimitiveType,
-                    Int::class.javaPrimitiveType,
-                )
-                .invoke(track, start, end, -1) as? Int
-        }.getOrNull()
-        if (threeArg != null) return threeArg >= 0
-        return runCatching {
-            AudioTrack::class.java
-                .getMethod(
-                    "setLoopPoints",
-                    Int::class.javaPrimitiveType,
-                    Int::class.javaPrimitiveType,
-                )
-                .invoke(track, start, end)
-            true
-        }.getOrDefault(false)
-    }
+    /** Static looping has used this three-argument API since Android API 3. */
+    private fun loopInfinitely(track: AudioTrack, startFrame: Int, endFrame: Int): Boolean =
+        runCatching { track.setLoopPoints(startFrame, endFrame, -1) == AudioTrack.SUCCESS }
+            .getOrDefault(false)
 
     private data class LoopRange(
         val startMs: Float,
@@ -770,7 +668,6 @@ class TarjiLabViewModel(
         runCatching { audioTrack?.pause() }
         _ui.value = st.copy(
             previewPlaying = false,
-            previewStartWallMs = -1L,
             previewPositionMs = position,
         )
     }
@@ -789,27 +686,15 @@ class TarjiLabViewModel(
         val position = if (st.previewPlaying) {
             positionMs.coerceIn(loop.startMs, (loop.endMs - 1f).coerceAtLeast(loop.startMs))
         } else {
-            normalizePreviewPosition(positionMs, durationMs)
+            positionMs.coerceIn(0f, (durationMs - 1f).coerceAtLeast(0f))
         }
-        val wasPlaying = st.previewPlaying
-        val track = audioTrack
-        var seekFailed = false
-        if (track != null) {
-            runCatching {
-                if (wasPlaying) track.pause()
-                check(track.setPlaybackHeadPosition(previewFrame(capture, position)) == AudioTrack.SUCCESS)
-                if (wasPlaying) track.play()
-            }.onFailure {
-                seekFailed = true
-            }
+        if (st.previewPlaying) {
+            startPreviewAt(position, st.previewScope)
+        } else {
+            // Paused audio never owns the cursor; stale hardware counters must
+            // not overwrite a scrub or a newly edited loop range.
+            _ui.value = st.copy(previewPositionMs = position, previewDurationMs = durationMs)
         }
-        _ui.value = st.copy(
-            previewPlaying = wasPlaying,
-            previewStartWallMs = if (wasPlaying) SystemClock.elapsedRealtime() else -1L,
-            previewDurationMs = durationMs,
-            previewPositionMs = position,
-            note = if (seekFailed) "Could not seek the preview loop." else st.note,
-        )
     }
 
     /** A drag always leaves the loop paused at the chosen sample. */
@@ -829,16 +714,13 @@ class TarjiLabViewModel(
             runCatching { it.release() }
         }
         audioTrack = null
+        previewClock = null
         previewRateHz = 0
-        previewTotalFrames = 0
-        previewLoopStart = 0
-        previewLoopEnd = 0
         scrubActive = false
         holdEditActive = false
         _ui.value = _ui.value.copy(
             previewPlaying = false,
-            previewStartWallMs = -1L,
-            previewDurationMs = 0f,
+            previewDurationMs = _ui.value.capture?.totalContentMs ?: 0f,
             previewPositionMs = 0f,
         )
     }
@@ -848,61 +730,25 @@ class TarjiLabViewModel(
         val st = _ui.value
         val duration = st.previewDurationMs
         if (duration <= 0f) return -1f
-        if (scrubActive || holdEditActive) return st.previewPositionMs.coerceIn(0f, duration)
-        val fallback = previewLoopWindow(st.previewScope, st.expectation.window, duration)
-        val loopStartMs = if (previewRateHz > 0) {
-            previewLoopStart * 1_000f / previewRateHz
-        } else {
-            fallback.startMs
-        }
-        val loopEndMs = if (previewRateHz > 0) {
-            val endFrame = previewLoopEnd.takeIf { it > previewLoopStart } ?: previewTotalFrames
-            endFrame * 1_000f / previewRateHz
-        } else {
-            fallback.endMs
-        }
-        val atUnity = kotlin.math.abs(st.previewSpeed.factor - 1f) < 0.01f
-        val track = audioTrack
-        if (atUnity && track != null && previewRateHz > 0 && previewTotalFrames > 0) {
-            val head = track.playbackHeadPosition.toLong() and 0xFFFF_FFFFL
-            val loopStart = previewLoopStart
-            val loopEnd = previewLoopEnd.takeIf { it > loopStart } ?: previewTotalFrames
-            val loopLen = (loopEnd - loopStart).coerceAtLeast(1)
-            val frame = loopStart + ((head - loopStart).mod(loopLen.toLong())).toInt()
-            return frame * 1_000f / previewRateHz
-        }
-        val anchor = st.previewPositionMs.coerceIn(0f, duration)
-        if (!st.previewPlaying || st.previewStartWallMs < 0L) return anchor
-        val elapsed = (SystemClock.elapsedRealtime() - st.previewStartWallMs).toFloat()
-        return loopPlayheadMs(
-            anchor,
-            elapsed,
-            st.previewSpeed.factor,
-            loopStartMs,
-            loopEndMs,
-        )
+        if (!st.previewPlaying || scrubActive || holdEditActive) return st.previewPositionMs.coerceIn(0f, duration)
+        val track = audioTrack ?: return st.previewPositionMs
+        val clock = previewClock ?: return st.previewPositionMs
+        return clock.frameAt(track.playbackHeadPosition) * 1_000f / previewRateHz
     }
 
-    private fun applyPreviewSpeed() {
-        val track = audioTrack ?: return
-        val speed = _ui.value.previewSpeed.factor
-        val stretched = runCatching {
-            track.playbackParams = PlaybackParams().setSpeed(speed).setPitch(1f)
+    private fun applyPreviewSpeed(): Boolean {
+        val track = audioTrack ?: return true
+        return runCatching {
+            track.playbackParams = PlaybackParams().setSpeed(_ui.value.previewSpeed.factor).setPitch(1f)
+            // Setting PlaybackParams on a paused track can start it.
+            if (!_ui.value.previewPlaying) track.pause()
         }.isSuccess
-        if (!stretched && previewRateHz > 0) {
-            runCatching { track.playbackRate = (previewRateHz * speed).toInt() }
-        }
     }
 
     private fun previewFrame(capture: TarjiLabCapture, positionMs: Float): Int {
         val rate = TarjiLabCodec.playbackSampleRate(capture)
         val totalFrames = (capture.hopCount * capture.hopSamples).coerceAtLeast(1)
         return (positionMs * rate / 1_000f).roundToInt().coerceIn(0, totalFrames - 1)
-    }
-
-    private fun normalizePreviewPosition(positionMs: Float, durationMs: Float): Float {
-        if (durationMs <= 0f) return 0f
-        return ((positionMs % durationMs) + durationMs) % durationMs
     }
 
     // ── Samples ────────────────────────────────────────────────────────────
@@ -958,8 +804,6 @@ class TarjiLabViewModel(
     /** Load a [TarjiLabSample] (from the file picker): its capture replaces
      * the current one, its knobs become the lab's, and analysis re-runs. */
     fun importSample(json: String) {
-        abortCapture()
-        stopPreview()
         val sample = runCatching { TarjiLabCodec.decode(json) }.getOrNull()
         if (sample == null) {
             _ui.value = _ui.value.copy(note = "Not a Tarjīʿ Lab sample.")
@@ -970,7 +814,13 @@ class TarjiLabViewModel(
             _ui.value = _ui.value.copy(note = "Sample has no PCM.")
             return
         }
-        InkEngine.tuning = TarjiLabKnobs.applyToTuning(sample.knobs, InkEngine.tuning)
+        loadJob?.cancel()
+        analyzeJob?.cancel()
+        abortCapture()
+        stopPreview()
+        if (sample.reciterId == settingsRepo.settings.value.reciterId) {
+            InkEngine.tuning = TarjiLabKnobs.applyToTuning(sample.knobs, InkEngine.tuning)
+        }
         profiles?.save(sample.reciterId, sample.knobs)
         _ui.value = _ui.value.copy(
             isLoading = false,
@@ -988,9 +838,18 @@ class TarjiLabViewModel(
             wordStartMs = 0L,
             wordEndMs = 0L,
             capture = capture,
+            trace = null,
+            capturing = false,
+            previewDurationMs = capture.totalContentMs,
+            previewPositionMs = 0f,
+            wordCount = 0,
+            surahName = "Sample",
             firstHopMediaMs = sample.firstHopMediaMs,
             knobs = sample.knobs,
-            expectation = sample.expectation,
+            expectation = TarjiLabExpectation().withWindow(
+                sample.expectation.window ?: TarjiHoldWindow(0f, capture.totalContentMs),
+                capture.totalContentMs,
+            ),
             tool = _ui.value.tool,
             sampleNotes = sample.notes,
             captureError = null,
@@ -1000,11 +859,24 @@ class TarjiLabViewModel(
         reanalyze()
     }
 
+    /** Refresh analysis after returning from the background; audio stays paused. */
+    fun onResume() {
+        if (_ui.value.capture != null) reanalyze()
+    }
+
     /** Called when the lab is left: silence the preview and the player. */
     fun onExit() {
+        loadJob?.cancel()
+        analyzeJob?.cancel()
         stopPreview()
+        val interruptedCapture = _ui.value.capturing || _ui.value.isLoading
         abortCapture()
-        player.setSpeed(1f)
+        _ui.value = _ui.value.copy(
+            analyzing = false,
+            isLoading = false,
+            captureError = if (interruptedCapture) "Capture interrupted. Retry this word." else _ui.value.captureError,
+        )
+        profiles?.applyToEngine(settingsRepo.settings.value.reciterId)
     }
 
     override fun onCleared() {

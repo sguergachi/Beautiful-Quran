@@ -91,6 +91,28 @@ class TarjiLabCodecTest {
     }
 
     @Test
+    fun `import rejects partial hops and invalid clocks before playback`() {
+        val valid = TarjiLabSample(
+            label = "test", reciterId = 7, reciterName = "Alafasy", surahId = 1,
+            ayah = 1, wordPosition = 1, wordArabic = "", sampleRate = 8000,
+            hopSamples = 160, firstHopMediaMs = 0.0,
+            pcmB64 = TarjiLabCodec.pcmToBase64(captureOf(note(0.1f))),
+            knobs = TarjiLabKnobs(),
+        )
+        val partial = java.util.Base64.getEncoder().encodeToString(ByteArray(321))
+        for (invalid in listOf(
+            valid.copy(hopSamples = 0),
+            valid.copy(hopContentDurationMs = 0f),
+            valid.copy(hopContentDurationMs = Float.NaN),
+            valid.copy(pcmB64 = partial),
+            valid.copy(pcmB64 = ""),
+        )) {
+            assertTrue(runCatching { TarjiLabCodec.toCapture(invalid) }.isFailure)
+        }
+        assertEquals(5, TarjiLabCodec.toCapture(valid).hopCount)
+    }
+
+    @Test
     fun `playback rate preserves the true hop duration`() {
         // 44.1 kHz source decimates to 7.35 kHz: 147 samples ≈ 20 ms.
         val capture147 = TarjiLabCapture(

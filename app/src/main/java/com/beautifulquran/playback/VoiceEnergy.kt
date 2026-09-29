@@ -103,9 +103,8 @@ class VoiceEnergy {
     var captureActive = false
         private set
 
-    /** Capture flags/counters are published across the audio↔UI thread
-     * boundary the same way the detector mirrors are: volatile handoff so
-     * the UI's reads of the hop arrays always see the audio thread's writes. */
+    /** Arm, append and disarm share a lock so buffer replacement cannot race
+     * a UI-thread snapshot. Volatile flags also serve the capture poller. */
     @Volatile
     private var captureArmed = false
     @Volatile
@@ -120,7 +119,9 @@ class VoiceEnergy {
     /** Arm a lab capture of the decimated hop stream (UI thread). The next
      * hop analyzed after the next sink reset — or after arming — begins the
      * recording; hops are capped at [maxHops] (12 s at 20 ms). */
+    @Synchronized
     fun armCapture(maxHops: Int = MAX_CAPTURE_HOPS) {
+        captureHopCount = 0
         captureArmed = true
         captureCapacityHops = maxHops.coerceIn(MIN_CAPTURE_HOPS, MAX_CAPTURE_HOPS)
         capturePendingFreshStart = true
@@ -129,6 +130,7 @@ class VoiceEnergy {
 
     /** Stop recording and return what was captured, or null if no hop ever
      * flowed through the tap (playback was not running). */
+    @Synchronized
     fun disarmCapture(): TarjiLabCapture? {
         captureArmed = false
         captureActive = false
@@ -138,6 +140,7 @@ class VoiceEnergy {
         System.arraycopy(captureSamples, 0, samples, 0, samples.size)
         val content = FloatArray(n)
         System.arraycopy(captureHopContentMs, 0, content, 0, n)
+        captureHopCount = 0
         return TarjiLabCapture(
             sampleRate = Tarji.SAMPLE_RATE,
             hopSamples = captureHopSamples,
@@ -260,7 +263,7 @@ class VoiceEnergy {
         tarji.onSamples8k(analysisHop)
         sessionContentMs += hopContentDurationMs
         hopFill = 0
-        captureHop(hopContentDurationMs)
+        if (captureArmed) captureHop(hopContentDurationMs)
         reverberating = tarji.syncReverberating
         tremolo = tarji.syncTremolo
         tremoloGain = tarji.syncTremoloGain
@@ -276,8 +279,9 @@ class VoiceEnergy {
         lastFeedMs = SystemClock.elapsedRealtime()
     }
 
-    /** Append this hop to the lab capture when armed. Runs on the audio
-     * thread; the buffers were sized at [armCapture], so no allocation here. */
+    /** Append on the audio thread. Only armed captures take the snapshot lock;
+     * the first hop after arming or a sink flush allocates a fresh buffer. */
+    @Synchronized
     private fun captureHop(hopContentDurationMs: Double) {
         if (!captureArmed) return
         if (capturePendingFreshStart) {

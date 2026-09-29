@@ -199,6 +199,16 @@ class TarjiLabTraceTest {
     }
 
     @Test
+    fun `trimmed capture rebases its first hop without shifting retained media positions`() {
+        val capture = captureOf(FloatArray(8_000))
+        val range = TarjiLabTrim.hopRangeInSpan(capture, 500.0, 700L..900L)
+        val trimmed = capture.slice(range)
+        val origin = capture.hopMediaMs(range.first, 500.0)
+        assertEquals(700.0, origin, 0.001)
+        assertEquals(900.0, trimmed.hopMediaMs(trimmed.hopCount - 1, origin), 0.001)
+    }
+
+    @Test
     fun `knobs map to and from the Ink Lab tuning`() {
         val t = InkEngine.Tuning()
         val knobs = TarjiLabKnobs.fromTuning(t)
