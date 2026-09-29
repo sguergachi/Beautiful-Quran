@@ -3,13 +3,6 @@ package com.beautifulquran.domain
 /** Rubʿ al-ḥizb mark in Uthmani text (۞). */
 internal const val HIZB_MARKER = '\u06DE'
 
-/**
- * A hizb file whose first word starts this late is a recited stop, not a
- * breath. Shorter openings, including mujawwad pauses under this line and
- * ordinary verse breaths, play from the start of the file.
- */
-internal const val HIZB_STOP_LEAD_MS = 800L
-
 /** How much of the file to keep in front of the first word, so the attack is not clipped. */
 internal const val HIZB_ATTACK_MS = 160L
 
@@ -20,11 +13,12 @@ internal fun isHizbStop(ayahText: String): Boolean = HIZB_MARKER in ayahText
 
 /**
  * File position where an automatic advance into this ayah should start.
- * 0 means play the file from the beginning. The returned position is still
- * on the file clock, so segment timings do not move.
+ * Every rubʿ al-ḥizb keeps [HIZB_ATTACK_MS] before the first word. A shorter
+ * lead plays from the start of the file. The position stays on the file clock,
+ * so segment timings do not move.
  */
 internal fun hizbGapEntryMs(hizbStop: Boolean, firstWordStartMs: Long): Long {
-    if (!hizbStop || firstWordStartMs < HIZB_STOP_LEAD_MS) return 0L
+    if (!hizbStop) return 0L
     return (firstWordStartMs - HIZB_ATTACK_MS).coerceAtLeast(0L)
 }
 
