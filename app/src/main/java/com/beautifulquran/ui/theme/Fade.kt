@@ -12,6 +12,7 @@ import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Canvas
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.FilterQuality
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.Paint
 import androidx.compose.ui.graphics.Path
@@ -30,10 +31,13 @@ import androidx.compose.ui.text.TextMeasurer
 import androidx.compose.ui.text.style.TextIndent
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import kotlin.math.ceil
 import kotlin.math.abs
 import kotlin.math.floor
+import kotlin.math.roundToInt
 
 
 /**
@@ -884,29 +888,48 @@ internal fun hasRaisedQuranMark(text: CharSequence, start: Int, endExclusive: In
 }
 
 /**
- * Where bitmap pixel (0, 0) sits on the shared line.
+ * Where the trace bitmap is blitted, and where the lone word is painted in it.
  *
- * The lone word is painted with its origin inset, so a mark that draws
- * outside that word's box still lands on the bitmap. [wordLeft] and
- * [wordBaseline] are the lone layout; [lineLeft] and [lineBaseline] are
- * the same edges on the shared line.
+ * [left] and [top] are integer, so the blit is one bitmap pixel per screen
+ * pixel. [translateX] and [translateY] place the lone word's origin at the
+ * same subpixel phase it has on the shared line: a filtered draw at a
+ * fractional position softens a thin ligature, and the tip stays lighter
+ * than the letters.
  */
-internal fun raisedMarkTraceOrigin(
+internal class RaisedMarkBlit(
+    val left: Float,
+    val top: Float,
+    val translateX: Float,
+    val translateY: Float,
+)
+
+internal fun raisedMarkTraceBlit(
     lineLeft: Float,
     lineBaseline: Float,
     wordLeft: Float,
     wordBaseline: Float,
     inset: Float,
-): Offset = Offset(
-    x = lineLeft - wordLeft - inset,
-    y = lineBaseline - wordBaseline - inset,
-)
+): RaisedMarkBlit {
+    val screenX = lineLeft - wordLeft
+    val screenY = lineBaseline - wordBaseline
+    val left = floor(screenX) - inset
+    val top = floor(screenY) - inset
+    return RaisedMarkBlit(
+        left = left,
+        top = top,
+        translateX = screenX - left,
+        translateY = screenY - top,
+    )
+}
 
 /**
- * Clear every painted pixel the line paper already covers.
+ * Clear every painted pixel the line paper already covers, and make whatever
+ * is left opaque.
  *
  * Returns whether any ink was left. That remainder is the overhang: the
  * pause stroke where it leaves the word, not a rectangle around the cursor.
+ * The line punch is a solid rect. This stroke is a few pixels wide, so a
+ * punch at its own coverage leaves it lighter than the letters beside it.
  * A pixel is addressed by its centre.
  */
 internal fun clearCoveredTracePixels(
@@ -925,6 +948,7 @@ internal fun clearCoveredTracePixels(
         if (paper.contains(Offset(originX + x + 0.5f, originY + y + 0.5f))) {
             pixels[i] = 0
         } else {
+            pixels[i] = 0xFFFFFFFF.toInt()
             keep = true
         }
     }
@@ -1032,25 +1056,30 @@ private class RaisedMarkTraceCache {
             word.getHorizontalPosition(0, usePrimaryDirection = true),
             word.getHorizontalPosition(wordLength, usePrimaryDirection = true),
         )
+        // Paint places the glyph from the cursor. The paper box is the selection.
+        val cursorLeft = minOf(
+            textLayout.getHorizontalPosition(start, usePrimaryDirection = true),
+            textLayout.getHorizontalPosition(endExclusive, usePrimaryDirection = true),
+        )
         val inset = ceil(fontPx).coerceAtLeast(1f)
-        val width = ceil(word.size.width + inset * 2f).toInt()
-        val height = ceil(word.size.height + inset * 2f).toInt()
-        if (width <= 0 || height <= 0 || width > 4096 || height > 4096) return null
-        val origin = raisedMarkTraceOrigin(
-            lineLeft = line.left,
+        val blit = raisedMarkTraceBlit(
+            lineLeft = cursorLeft,
             lineBaseline = textLayout.getLineBaseline(textLayout.getLineForOffset(start)),
             wordLeft = wordLeft,
             wordBaseline = word.firstBaseline,
             inset = inset,
         )
+        val width = ceil(word.size.width + blit.translateX + inset).toInt()
+        val height = ceil(word.size.height + blit.translateY + inset).toInt()
+        if (width <= 0 || height <= 0 || width > 4096 || height > 4096) return null
         val glyphs = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
         val canvas = Canvas(android.graphics.Canvas(glyphs))
-        canvas.translate(inset, inset)
+        canvas.translate(blit.translateX, blit.translateY)
         word.multiParagraph.paint(canvas)
         val pixels = IntArray(width * height)
         glyphs.getPixels(pixels, 0, width, 0, 0, width, height)
         val paper = linePaperCoverBounds(line, padPx)
-        val keep = clearCoveredTracePixels(pixels, width, origin.x, origin.y, paper)
+        val keep = clearCoveredTracePixels(pixels, width, blit.left, blit.top, paper)
         if (!keep) {
             glyphs.recycle()
             return null
@@ -1058,8 +1087,8 @@ private class RaisedMarkTraceCache {
         glyphs.setPixels(pixels, 0, width, 0, 0, width, height)
         return Trace(
             image = glyphs.asImageBitmap(),
-            left = origin.x,
-            top = origin.y,
+            left = blit.left,
+            top = blit.top,
             width = width.toFloat(),
             height = height.toFloat(),
         )
@@ -1094,7 +1123,12 @@ private fun DrawScope.coverRaisedMarks(
                 Paint().apply { this.blendMode = BlendMode.DstOut },
             )
         }
-        drawImage(image = mask.image, topLeft = Offset(mask.left, mask.top))
+        drawImage(
+            image = mask.image,
+            dstOffset = IntOffset(mask.left.roundToInt(), mask.top.roundToInt()),
+            dstSize = IntSize(mask.width.toInt(), mask.height.toInt()),
+            filterQuality = FilterQuality.None,
+        )
         translate(left = washHeadX, top = 0f) {
             drawRect(
                 brush = washBrush,
@@ -1107,9 +1141,11 @@ private fun DrawScope.coverRaisedMarks(
     } else {
         drawImage(
             image = mask.image,
-            topLeft = Offset(mask.left, mask.top),
+            dstOffset = IntOffset(mask.left.roundToInt(), mask.top.roundToInt()),
+            dstSize = IntSize(mask.width.toInt(), mask.height.toInt()),
             alpha = coverAlpha.coerceIn(0f, 1f),
             blendMode = blendMode,
+            filterQuality = FilterQuality.None,
         )
     }
 }

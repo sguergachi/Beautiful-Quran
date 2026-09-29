@@ -30,31 +30,34 @@ class RaisedMarkOverhangTest {
     }
 
     @Test
-    fun `the lone word's origin lines up with the shared line`() {
-        val origin = raisedMarkTraceOrigin(
-            lineLeft = 100f,
-            lineBaseline = 280f,
+    fun `the lone word is blitted on whole pixels at the line's subpixel phase`() {
+        val blit = raisedMarkTraceBlit(
+            lineLeft = 100.4f,
+            lineBaseline = 280.7f,
             wordLeft = 0f,
             wordBaseline = 80f,
             inset = 40f,
         )
-        assertEquals(60f, origin.x, 0f)
-        assertEquals(160f, origin.y, 0f)
+        assertEquals(60f, blit.left, 0f)
+        assertEquals(160f, blit.top, 0f)
+        assertEquals(40.4f, blit.translateX, 0.001f)
+        assertEquals(40.7f, blit.translateY, 0.001f)
     }
 
     @Test
-    fun `ink beside the word is kept and ink inside the paper is cleared`() {
+    fun `ink beside the word is kept solid and ink inside the paper is cleared`() {
         // Pixel centres: x = 89.5 + x + 0.5, y = 189.5 + y + 0.5.
         val width = 30
         val height = 61
         val pixels = IntArray(width * height)
         val ink = 0xFFDCC8A0.toInt()
+        val thin = 0x66DCC8A0
         val tipAbove = 0 // (0, 0) → (90, 190), above the line
         val capAbove = 20 // (20, 0) → (110, 190), above the line over the word
         val beside = 60 * width // (0, 60) → (90, 250), level with the body
         val body = 60 * width + 20 // (20, 60) → (110, 250), inside the paper
         pixels[tipAbove] = ink
-        pixels[capAbove] = ink
+        pixels[capAbove] = thin
         pixels[beside] = ink
         pixels[body] = ink
         val paper = Rect(100f, 200f, 400f, 360f)
@@ -68,9 +71,10 @@ class RaisedMarkOverhangTest {
         )
 
         assertTrue(keep)
-        assertEquals(ink, pixels[tipAbove])
-        assertEquals(ink, pixels[capAbove])
-        assertEquals(ink, pixels[beside])
+        val solid = 0xFFFFFFFF.toInt()
+        assertEquals(solid, pixels[tipAbove])
+        assertEquals(solid, pixels[capAbove])
+        assertEquals(solid, pixels[beside])
         assertEquals(0, pixels[body])
     }
 }
