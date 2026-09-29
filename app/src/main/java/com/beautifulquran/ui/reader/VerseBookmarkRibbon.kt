@@ -8,9 +8,7 @@ import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.width
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
@@ -21,7 +19,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Path
@@ -37,7 +34,6 @@ import androidx.compose.ui.unit.dp
 import com.beautifulquran.data.AyahSelectorSide
 import com.beautifulquran.ui.theme.LocalQuranAccents
 import com.beautifulquran.ui.theme.VerseSoakRimInset
-import com.beautifulquran.ui.theme.absorbPointerEvents
 import com.beautifulquran.ui.theme.quietClickable
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Job
@@ -60,9 +56,6 @@ import kotlin.math.sin
 
 /** Matches the bookmark-side verse pad so the strip cannot cover English ﴿N﴾. */
 internal val BookmarkStripWidth = 38.dp
-
-/** Extra tap past the page edge, never into the verse. */
-internal const val BookmarkTapOutsetDp = 16f
 
 internal const val BookmarkEdgeInsetDp = 8f    // from the block's outer edge
 internal const val BookmarkRibbonWidthDp = 11f
@@ -102,9 +95,6 @@ internal fun placeRibbonInsetDp(reservePlaceLane: Boolean, edgeInsetDp: Float): 
 
 internal fun placeRibbonWidthDp(ribbonWidthDp: Float): Float =
     ribbonWidthDp * PLACE_RIBBON_WIDTH_RATIO
-
-internal fun placeRibbonTapGuardWidthDp(placeMarked: Boolean, ribbonWidthDp: Float): Float =
-    if (placeMarked) placeRibbonWidthDp(ribbonWidthDp) else 0f
 
 /** A completion only consumes the animation generation it actually presented. */
 internal fun remainingUnfurlSignal(current: Int, consumed: Int): Int =
@@ -253,10 +243,9 @@ internal fun VerseBookmarkRibbon(
         latestOnPlaceUnfurlConsumed(placeUnfurlSignal)
     }
 
-    // Ruby owns the wide gutter target; the passive green cloth places a child
-    // guard over only its own pixels below so those touches never reach ruby.
-    // Hit area hangs past the page edge (not into the verse) so the nub is
-    // easy to catch without covering English ﴿N﴾.
+    // Ruby owns the whole strip, including the pixels under the green place
+    // cloth, so tapping green marks or unmarks the verse too. The hit area
+    // never reaches into the verse or English ﴿N﴾.
     val onRibbonClick: () -> Unit = {
         if (latestChrome() >= 0.1f) {
             if (!animateOnTap) {
@@ -440,10 +429,10 @@ internal fun VerseBookmarkRibbon(
         if (interactive) {
             Box(
                 Modifier
-                    .align(if (mirrored) Alignment.CenterEnd else Alignment.CenterStart)
-                    .fillMaxHeight()
-                    .width(BookmarkStripWidth + BookmarkTapOutsetDp.dp)
-                    .offset(x = if (mirrored) BookmarkTapOutsetDp.dp else -BookmarkTapOutsetDp.dp)
+                    // The whole strip, edge to verse. Hit testing never leaves
+                    // the parent's bounds and width() is clamped to them, so a
+                    // wider or shifted box only shrinks the target.
+                    .fillMaxSize()
                     .quietClickable(
                         role = Role.Button,
                         onLongClick = onLongClick?.let {
@@ -453,24 +442,6 @@ internal fun VerseBookmarkRibbon(
                         },
                         onClick = onRibbonClick,
                     ),
-            )
-        }
-        val placeTapGuardWidth = placeRibbonTapGuardWidthDp(
-            placeMarked = placeMarked,
-            ribbonWidthDp = ribbonWidth.value,
-        ).dp
-        if (interactive && placeTapGuardWidth > 0.dp) {
-            val placeInset = placeRibbonInsetDp(
-                reservePlaceLane = reservePlaceLane,
-                edgeInsetDp = edgeInset.value,
-            ).dp
-            Box(
-                Modifier
-                    .align(if (mirrored) Alignment.TopEnd else Alignment.TopStart)
-                    .offset(x = if (mirrored) -placeInset else placeInset)
-                    .width(placeTapGuardWidth)
-                    .fillMaxHeight()
-                    .absorbPointerEvents(),
             )
         }
     }
