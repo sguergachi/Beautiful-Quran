@@ -40,6 +40,48 @@ class VerseOpeningTest {
     }
 
     @Test
+    fun `a click stored as the first word seeks to the real voice`() {
+        // Hani 4:148. The onset scan heard a click at 1951ms. Speech starts at 4283.
+        val verse = listOf(Segment(1, 1_951, 4_790), Segment(2, 4_790, 5_510))
+        val silence = listOf(AudibleSilence(0, 4_283))
+        assertEquals(4_283L, playbackSkipMs(0L, verse, silence))
+        assertEquals(4_283L, playbackSkipMs(1_951L, verse, silence))
+        assertNull(playbackSkipMs(4_300L, verse, silence))
+    }
+
+    @Test
+    fun `a lead that ends at the word start keeps the word clock`() {
+        // Hani 4:58. Speech and the first word meet. The lead is not inside a word.
+        val verse = listOf(Segment(1, 5_600, 7_080))
+        assertEquals(5_600L, playbackSkipMs(0L, verse, emptyList()))
+    }
+
+    @Test
+    fun `silence inside a word seeks to the next voice`() {
+        // Hani 4:88. Words 9 and 10 are timed back to back across 1.2s of quiet.
+        val verse = listOf(Segment(9, 14_750, 20_110), Segment(10, 20_130, 22_000))
+        val silence = listOf(AudibleSilence(19_360, 20_560))
+        assertEquals(20_560L, playbackSkipMs(19_400L, verse, silence))
+        assertNull(playbackSkipMs(18_000L, verse, silence))
+    }
+
+    @Test
+    fun `the silence table ignores a torn line`() {
+        val parsed = parseAudibleSilence(
+            """
+            # comment
+            4 148 0 4283
+            bad
+            4 88 19360 20560
+            4 88 1 1
+
+            """.trimIndent(),
+        )
+        assertEquals(listOf(AudibleSilence(0, 4_283)), parsed[silenceKey(4, 148)])
+        assertEquals(listOf(AudibleSilence(19_360, 20_560)), parsed[silenceKey(4, 88)])
+    }
+
+    @Test
     fun `the verse after a finished one follows repeat`() {
         assertEquals(149, nextVerseAyah(148, 176, repeatOne = false, repeatAll = false, range = null, opensWithBasmalah = true))
         assertEquals(1, nextVerseAyah(0, 176, repeatOne = false, repeatAll = false, range = null, opensWithBasmalah = true))

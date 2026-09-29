@@ -8,6 +8,9 @@ import androidx.media3.session.MediaController
 import androidx.media3.session.SessionToken
 import com.beautifulquran.data.model.Reciter
 import com.beautifulquran.data.model.Surah
+import com.beautifulquran.domain.AudibleSilence
+import com.beautifulquran.domain.parseAudibleSilence
+import com.beautifulquran.domain.silenceKey
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -135,6 +138,25 @@ class PlayerController(private val context: Context) {
     private fun holdSilenceSkip() {
         silenceSkipHoldUntilMs = android.os.SystemClock.elapsedRealtime() + 500L
     }
+
+    /** Measured quiet the word clock still treats as a sounding word, per reciter. */
+    private val silenceByReciter = HashMap<Int, Map<Int, List<AudibleSilence>>>()
+
+    /**
+     * Silence spans for one ayah file. Playlist ayah 0 is not a file; the
+     * caller passes the clip that is actually playing (Al-Fatihah 1:1).
+     */
+    internal fun audibleSilence(reciterId: Int, surahId: Int, ayah: Int): List<AudibleSilence> {
+        val table = synchronized(silenceByReciter) {
+            silenceByReciter.getOrPut(reciterId) { loadAudibleSilence(reciterId) }
+        }
+        return table[silenceKey(surahId, ayah)].orEmpty()
+    }
+
+    private fun loadAudibleSilence(reciterId: Int): Map<Int, List<AudibleSilence>> =
+        runCatching {
+            context.assets.open("silence/$reciterId.txt").bufferedReader().use { it.readText() }
+        }.map(::parseAudibleSilence).getOrDefault(emptyMap())
 
     /**
      * [NowPlaying] parsed straight from the controller's current media item.
