@@ -18,8 +18,7 @@ import com.beautifulquran.data.model.Surah
 import com.beautifulquran.data.model.SurahContent
 import com.beautifulquran.domain.BASMALAH_PLAYLIST_AYAH
 import com.beautifulquran.domain.HighlightClock
-import com.beautifulquran.domain.hizbGapSeekMs
-import com.beautifulquran.domain.isHizbStop
+import com.beautifulquran.domain.verseOpeningSeekMs
 import com.beautifulquran.domain.HighlightEngine
 import com.beautifulquran.domain.EnglishBook
 import com.beautifulquran.domain.MushafCatalog
@@ -789,29 +788,17 @@ class ReaderViewModel(
     }
 
     /**
-     * Automatic advance into a rubʿ al-ḥizb file seeks past the recited stop.
-     * [player.liveNowPlaying] is the item the controller is already on;
-     * [PlayerUiState.nowPlaying] is still the previous ayah at this callback.
-     * The seek stays on the file clock. User seeks, a repeat of the same
-     * file, and verses without ۞ play from the start.
+     * A verse that starts at the beginning of its file seeks to the first
+     * word. That is the same gate the highlight holds for, so the voice and
+     * the ink start together. [events.positionMs] is where the jump landed;
+     * the controller position can still be the previous file at this callback.
+     * [player.liveNowPlaying] is already the new item.
      */
-    private fun cutHizbLead(events: PlaybackPositionEvents) {
+    private fun skipVerseOpening(events: PlaybackPositionEvents) {
         val np = player.liveNowPlaying ?: return
-        if (np.surahId != surahId || np.ayah == BASMALAH_PLAYLIST_AYAH) return
-        val text = _uiState.value.content
-            ?.takeIf { it.surah.id == np.surahId }
-            ?.ayahs
-            ?.firstOrNull { it.number == np.ayah }
-            ?.text
-            ?: return
+        if (np.surahId != surahId) return
         val firstWordStartMs = preparedTimings[np.ayah]?.segments?.firstOrNull()?.startMs ?: return
-        val entry = hizbGapSeekMs(
-            automaticItemAdvance = events.reason == Player.DISCONTINUITY_REASON_AUTO_TRANSITION &&
-                events.itemChanged,
-            hizbStop = isHizbStop(text),
-            firstWordStartMs = firstWordStartMs,
-            positionMs = player.positionMs,
-        ) ?: return
+        val entry = verseOpeningSeekMs(firstWordStartMs, events.positionMs) ?: return
         // Leaves playWhenReady alone, so a verse that was already playing keeps playing.
         player.seekToWord(np.ayah, entry)
     }
@@ -824,7 +811,7 @@ class ReaderViewModel(
                 .map { it.positionEvents }
                 .distinctUntilChanged { previous, next -> previous.clockId == next.clockId }
                 .drop(1)
-                .collect { events -> cutHizbLead(events) }
+                .collect { events -> skipVerseOpening(events) }
         }
         viewModelScope.launch {
             polledActiveWord.collect { polled ->
