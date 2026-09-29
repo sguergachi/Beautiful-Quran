@@ -84,6 +84,11 @@ class Tarji {
         private set
     val lastVisualUsesAmplitude: Boolean get() = visualUsesAmplitude
 
+    /** Measured pulse before hold/depth/lifecycle gates. The lab needs this
+     * evidence even when the reader correctly suppresses the shimmer. */
+    var lastCandidateModulation = 0f
+        private set
+
     /**
      * Read-out delay in content hops, set from the tap-to-ear latency
      * (wall-time route × playback speed + content-time tap backlog + the
@@ -411,6 +416,7 @@ class Tarji {
 
     /** Envelope oscillation scan over the held note's own envelope. */
     private fun updateTremolo() {
+        lastCandidateModulation = 0f
         // Only envelope samples from within the hold: the syllable attack
         // ramp would otherwise poison the depth estimate for ~1 s.
         val n = minOf(envCount - holdStartEnvCount, ENV_HOPS)
@@ -508,6 +514,7 @@ class Tarji {
         }
         val rateHz = if (visualUsesAmplitude) amScan.rateHz else fmScan.rateHz
         val liveModulation = if (visualUsesAmplitude) amScan.raw else fmScan.raw
+        lastCandidateModulation = liveModulation
         lastRateHz = rateHz
         val anyCoherent = amScan.coherent || fmScan.coherent
         val lifecycleCoherent = amScan.lifecycleCoherent || fmScan.coherent
@@ -816,6 +823,7 @@ class Tarji {
     }
 
     private fun clearModulationDiagnostics() {
+        lastCandidateModulation = 0f
         lastAmplitudeRateHz = 0f
         lastPitchModulationRateHz = 0f
         lastAmplitudeDepth = 0f

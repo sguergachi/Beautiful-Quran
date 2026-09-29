@@ -128,11 +128,33 @@ class TarjiLabTraceTest {
     @Test
     fun `pulse graph changes with detection thresholds on the same voice`() {
         val capture = captureOf(heldNote(2.5f, 130f, amHz = 5f, amDepth = 0.03f))
-        val rejected = tarjiPulseWave(analyzeTarjiCapture(capture, TarjiLabKnobs()))
-        val accepted = tarjiPulseWave(analyzeTarjiCapture(capture, TarjiLabKnobs(minTremoloDepth = 0.01f)))
+        val rejected = tarjiAcceptedPulseWave(analyzeTarjiCapture(capture, TarjiLabKnobs()))
+        val accepted = tarjiAcceptedPulseWave(analyzeTarjiCapture(capture, TarjiLabKnobs(minTremoloDepth = 0.01f)))
         assertTrue(rejected.all { it == 0f })
         assertTrue(accepted.any { abs(it) > 0.01f })
         assertTrue(accepted.all { it in -1f..1f })
+    }
+
+    @Test
+    fun `rejected hold still exposes the measured pulse for tuning`() {
+        val capture = captureOf(heldNote(2.5f, 130f, amHz = 5f, amDepth = 0.03f))
+        val trace = analyzeTarjiCapture(capture, TarjiLabKnobs())
+        assertNull(trace.reverberatingSpan)
+        assertTrue(tarjiAcceptedPulseWave(trace).all { it == 0f })
+        assertTrue(tarjiPulseWave(trace).any { abs(it) > 0.1f })
+        assertTrue(tarjiPulseWave(trace).all { it in -1f..1f })
+    }
+
+    @Test
+    fun `candidate diagnostics clear on reset without changing the reader gate`() {
+        val detector = Tarji()
+        detector.minTremoloDepth = 0.5f
+        val pcm = heldNote(2.5f, 130f, amHz = 5f, amDepth = 0.03f)
+        detector.onSamples8k(pcm)
+        assertFalse(detector.reverberating)
+        assertTrue(abs(detector.lastCandidateModulation) > 0.01f)
+        detector.reset()
+        assertEquals(0f, detector.lastCandidateModulation, 0f)
     }
 
     @Test

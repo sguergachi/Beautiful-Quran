@@ -572,6 +572,7 @@ private fun WaveformPanel(
     val view = if (ui.view.spanMs > 1f) ui.view else TarjiViewWindow.fit(durationMs)
     val window = ui.expectation.window
     val detectorEnvelope = remember(trace) { trace?.let(::tarjiPulseWave).orEmpty() }
+    val acceptedEnvelope = remember(trace) { trace?.let(::tarjiAcceptedPulseWave).orEmpty() }
     val peak = remember(capture) {
         capture?.pcm?.let { p ->
             var m = 0f
@@ -718,16 +719,8 @@ private fun WaveformPanel(
             }
 
             val slice = pcmSlice(view, durationMs, capture.pcm.size)
-            val labelPaint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
-                color = guideColor.toArgb()
-                textSize = 11.sp.toPx()
-            }
-            drawContext.canvas.nativeCanvas.drawText("Recorded voice", 8.dp.toPx(), 14.sp.toPx(), labelPaint)
-            drawContext.canvas.nativeCanvas.drawText("Tuned pulse", 8.dp.toPx(), size.height * 0.55f, labelPaint)
-            val mid = size.height * 0.27f
-            val amp = size.height * 0.16f
-            drawLine(guideColor.copy(alpha = 0.2f), Offset(0f, size.height * 0.76f),
-                Offset(size.width, size.height * 0.76f), strokeWidth = 1f)
+            val mid = size.height * 0.5f
+            val amp = size.height * 0.42f
             val stride = max(1, slice.count() / (size.width.toInt() * 2).coerceAtLeast(1))
             var last: Offset? = null
             var i = slice.first
@@ -742,27 +735,31 @@ private fun WaveformPanel(
                 i += stride
             }
 
-            val envelope = detectorEnvelope
-            if (envelope.isNotEmpty() && durationMs > 0f) {
+            // Both curves use the voice's time axis. The candidate remains
+            // visible when a threshold rejects it; gold is the reader output.
+            fun drawPulse(envelope: List<Float>, color: Color, width: Float, acceptedOnly: Boolean) {
                 var last: Offset? = null
                 for (i in envelope.indices) {
                     val x = viewX((i + 0.5f) / envelope.size * durationMs, size.width, view)
-                    if (x < -2f || x > size.width + 2f) {
+                    if (x < -2f || x > size.width + 2f ||
+                        (acceptedOnly && (trace == null || trace.gain[i] <= 0.001f))) {
                         last = null
                         continue
                     }
-                    val y = size.height * (0.76f - envelope[i] * 0.17f)
-                    last?.let {
-                        drawLine(shapeColor, it, Offset(x, y), strokeWidth = 2.dp.toPx(), cap = StrokeCap.Round)
-                    }
-                    last = Offset(x, y)
+                    val point = Offset(x, mid - envelope[i] * amp)
+                    last?.let { drawLine(color, it, point, strokeWidth = width, cap = StrokeCap.Round) }
+                    last = point
                 }
+            }
+            drawPulse(detectorEnvelope, shapeColor, 1.5.dp.toPx(), acceptedOnly = false)
+            drawPulse(acceptedEnvelope, GlintGold, 2.5.dp.toPx(), acceptedOnly = true)
+            if (detectorEnvelope.isNotEmpty()) {
                 val head = if (playheadMs >= 0f) playheadMs else ui.previewPositionMs
-                val hx = viewX(head, size.width, view)
-                val hop = (head / durationMs * envelope.size).toInt()
-                    .coerceIn(0, envelope.lastIndex)
-                val hy = size.height * (0.76f - envelope[hop] * 0.17f)
-                drawCircle(GlintGold, radius = 5f, center = Offset(hx, hy))
+                val hop = (head / durationMs * detectorEnvelope.size).toInt()
+                    .coerceIn(0, detectorEnvelope.lastIndex)
+                drawCircle(shapeColor, radius = 3.dp.toPx(), center = Offset(
+                    viewX(head, size.width, view), mid - detectorEnvelope[hop] * amp,
+                ))
             }
 
             if (playheadMs >= view.startMs && playheadMs <= view.endMs) {
@@ -821,7 +818,7 @@ private fun DetectorReadout(ui: TarjiLabViewModel.TarjiLabUiState, playheadMs: F
         ui.analyzing -> "Updating detector…"
         point == null -> "Waiting for audio"
         point.reverberating -> "Hold · %.1f Hz · gain %.2f".format(point.rateHz, point.gain)
-        else -> "No hold detected"
+        else -> "Measured pulse · no accepted hold"
     }
     Text(
         text = "${formatLabClock(playheadMs, ui.previewDurationMs)} · $status",
@@ -852,7 +849,7 @@ private fun KnobsPanel(
     val knobs = ui.knobs
     Column(modifier = modifier) {
         Text(
-            text = "Start with a hold you can hear. If the pulse stays flat, lower Min depth or Regularity. If speech triggers it, raise those or Hold min. Then adjust Attack and Release. A flat pulse means no modulation passed the detector; the voice waveform does not change.",
+            text = "Start with a hold you can hear. If the pulse stays flat, lower Min depth or Regularity. If speech triggers it, raise those or Hold min. Then adjust Attack and Release. The pulse overlays the voice. The fine curve is measured modulation; thick gold shows what these settings let through. The dot follows the audible position.",
             style = MaterialTheme.typography.labelSmall,
             color = QuranTheme.ink.muted,
             modifier = Modifier.padding(bottom = 10.dp),

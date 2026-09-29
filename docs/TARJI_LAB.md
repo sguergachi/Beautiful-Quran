@@ -22,13 +22,20 @@ manual envelope, vibrato label, or look control that can override it.
 5. **Reset** restores shipped detector defaults for this reciter. **Export**
    saves the audio, loop, knobs, and optional note; **Import** replays a sample.
 
-The scope has two labeled lanes: **Recorded voice** above and **Tuned pulse**
-below. The pulse is signed detector modulation multiplied by its attack/release
-gain, on a fixed −1..1 scale with zero at the center line. Its scale never
-auto-expands weak results, so changes from the knobs stay visible. A flat pulse
-means no modulation passed the detector; tuning does not change the recording. The gold rail marks each detected hold, including gaps between
-holds. The cursor, detector readout, and word all share one content position.
-The readout shows hold state, modulation rate, and gain.
+The pulse is **overlaid on the recorded waveform**, on the same time axis.
+The fine primary curve is the detector's measured modulation **before** its
+acceptance gate. It remains visible when the current settings reject a hold;
+the lab must not multiply away the evidence you need to tune. The thicker gold
+curve is the accepted output after attack/release gain. Both use a fixed −1..1
+scale. The gold rail marks detected holds, including gaps. A moving dot follows
+the measured pulse at the playback position; the word still uses only accepted
+output. No synthetic oscillator or hand-drawn curve drives either signal.
+
+All knobs re-analyze the recording. Frequency band and pitch continuity affect
+the measured candidate; hold/depth/regularity gates and attack/release affect
+which pulses pass and their strength. A threshold need not change a candidate
+that is already far above it. Silence and insufficient stable-note evidence
+can still have no measurable pulse; the graph does not invent one.
 
 ## Detector controls
 
@@ -99,3 +106,18 @@ seek rebasing, unsigned rollover, looping, and stalled playback).
 On device, check cold Settings entry, repeated word changes during capture,
 loop/whole-capture playback, paused seeking, all three speeds, knob edits while
 playing, import, and exit/background during capture and preview.
+
+## Real-reciter pulse audit (2026-09-29)
+
+`tools/tarji_samples/pulse_audit_2026-09-29.csv` records a check of all 13
+catalog reciters, using the last word of 1:7 and 44:59 (26 actual EveryAyah
+recordings). Each clip was cut from the committed timing span with the lab's
+300 ms lead and 1 s tail, decoded to 8 kHz mono PCM, and replayed through
+`analyzeTarjiCapture`. No audio fixtures are shipped with the app.
+
+All 26 had nonzero measured modulation. Changing from shipped defaults to
+hold=100 ms, depth=0.01, regularity=0.15, pitch drift=0.30, attack=50 ms changed
+the accepted output in 25 clips, covering every reciter. The 0.5-second
+AbdulBaset Mujawwad 44:59 clip exposed a candidate but no accepted output with
+either setting. This checks graph visibility and tuning response, not detection
+accuracy for every word or device-level audio latency.

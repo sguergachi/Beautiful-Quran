@@ -4,10 +4,9 @@ Drop exported Tarjīʿ Lab samples here (see `docs/TARJI_LAB.md`): JSON files
 produced by **Export** in the in-app lab, named
 `tarji_<reciterId>_<surah>_<ayah>_w<word>.json`.
 
-Each schema-3 sample is one reciter-signature waveform: the captured PCM, the
-hold window you marked, an optional hand-shaped envelope, that reciter's
-detector knobs, and a listening note. Schema-2 crest/sine samples still
-import; their start/end become the hold.
+Each schema-3 sample carries captured PCM, the selected loop window, detector
+knobs, and a listening note. Legacy envelopes and labels still decode but never
+drive the preview. Schema-2 samples import with their start/end as the loop.
 
 ## Building a useful reciter set
 
@@ -19,9 +18,10 @@ keep both positive holds and matched stills:
 - still vowels, consonant flutter, breath, and room echo that must **not**
   fire
 
-Mark the hold (and shape the envelope when the raw wave is messy) before
-changing knobs. Every detector change should improve the held-out set as
-well as the examples used to derive it.
+Listen to the same loop while changing knobs. The fine pulse overlay shows
+measured modulation before acceptance; gold shows the accepted response.
+Every detector change should improve held-out examples as well as the
+examples used to derive it.
 
 ## How to extract samples from a device
 
@@ -65,3 +65,11 @@ adb pull /sdcard/Android/data/com.beautifulquran.debug/files/Download/tarji_*.js
 Decode with the in-app lab's **Import**, or with any JSON tool (the PCM is
 plain Base64). The app-side codec is `TarjiLabCodec` in
 `app/src/main/java/com/beautifulquran/tarjilab/`.
+
+## Pulse visibility audit
+
+`pulse_audit_2026-09-29.csv` checks two recorded word captures for every catalog
+reciter. Clip keys are `reciterId-surah-ayah`; hop counts use 20 ms hops.
+`candidate_hops` counts |measured pulse| > 0.01 at shipped defaults,
+`accepted_hops` counts detected holds, and `changed_output_hops` counts output
+changes > 0.001 under the tuning described in `docs/TARJI_LAB.md`.

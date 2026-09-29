@@ -90,6 +90,7 @@ class TarjiLabTrace internal constructor(
     val amplitudePeriodicity: FloatArray = FloatArray(hopCount),
     val pitchModulationPeriodicity: FloatArray = FloatArray(hopCount),
     val visualUsesAmplitude: BooleanArray = BooleanArray(hopCount),
+    val candidateModulation: FloatArray = FloatArray(hopCount),
 ) {
     /** The closed span of hops where the detector held a reverberation. */
     val reverberatingSpan: IntRange?
@@ -152,6 +153,7 @@ fun analyzeTarjiCapture(
     val amPeriodicity = FloatArray(n)
     val fmPeriodicity = FloatArray(n)
     val usesAmplitude = BooleanArray(n)
+    val candidate = FloatArray(n)
     var resolved = -1
     for (i in 0 until n) {
         System.arraycopy(capture.pcm, i * capture.hopSamples, scratch, 0, capture.hopSamples)
@@ -174,6 +176,7 @@ fun analyzeTarjiCapture(
         amPeriodicity[i] = detector.lastAmplitudePeriodicity
         fmPeriodicity[i] = detector.lastPitchModulationPeriodicity
         usesAmplitude[i] = detector.lastVisualUsesAmplitude
+        candidate[i] = detector.lastCandidateModulation
     }
     if (resolved < 0) resolved = DETECTOR_FRAME_HOPS - 1
     return TarjiLabTrace(
@@ -194,12 +197,17 @@ fun analyzeTarjiCapture(
         amplitudePeriodicity = amPeriodicity,
         pitchModulationPeriodicity = fmPeriodicity,
         visualUsesAmplitude = usesAmplitude,
+        candidateModulation = candidate,
     )
 }
 
-/** Signed pulse after the detector's gates and attack/release gain, on a fixed
- * −1..1 scale so changing a threshold never auto-amplifies a weak result. */
+/** Measured pulse before the acceptance gate. Preserve a fixed scale so a
+ * rejected hold remains inspectable rather than being multiplied into silence. */
 fun tarjiPulseWave(trace: TarjiLabTrace): List<Float> =
+    List(trace.hopCount) { i -> trace.candidateModulation[i].coerceIn(-1f, 1f) }
+
+/** Reader output, drawn over the candidate where the tuned detector accepts it. */
+fun tarjiAcceptedPulseWave(trace: TarjiLabTrace): List<Float> =
     List(trace.hopCount) { i -> (trace.tremolo[i] * trace.gain[i]).coerceIn(-1f, 1f) }
 
 /** RMS of the 80 ms frame ending at hop [hop] (hops [hop−3]..[hop]) — the
