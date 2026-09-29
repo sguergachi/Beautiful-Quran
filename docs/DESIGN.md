@@ -962,10 +962,15 @@ image, so it is crisp at any density and nearly free to render.
   platforms.
 - **Gilding.** Gold is never a flat color. Gilded elements (the surah
   rosette, ayah number marks, the home mark) carry a three-stop leaf
-  gradient (deep bronze → bright gilt → deep bronze). On the reader, the
-  gradient's lighting axis tilts with page scroll, so light appears to catch
-  the leaf as the sheet moves — computed at draw time only, animating
-  exclusively on scroll frames.
+  gradient (deep bronze → bright gilt → deep bronze). The gradient's
+  lighting axis follows how the phone is held — the accelerometer's roll,
+  low-passed (`ui/theme/GildingTilt.kt`, one listener for the whole app) — so
+  light appears to catch the leaf as the phone moves in the hand: the reader's
+  header rosette and top-bar medallion, the cover's gilding. It is read at draw
+  time only, listens only while the app is started, and rests level when the
+  device has no accelerometer or animations are off. The gilding no longer
+  brightens with page scroll. Verse-number marks (`gilded()`) are still a
+  fixed vertical gradient.
 - **Embossing.** Ornament is pressed into the paper: each figure is drawn
   with a dark copy nudged to the lower-right and a light copy to the
   upper-left beneath its face — relief under a top-left light, subtle enough

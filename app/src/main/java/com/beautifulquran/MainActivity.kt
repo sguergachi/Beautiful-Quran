@@ -122,6 +122,8 @@ import com.beautifulquran.tarjilab.TarjiLabScreen
 import com.beautifulquran.tarjilab.TarjiLabViewModel
 import com.beautifulquran.ui.theme.BeautifulQuranTheme
 import com.beautifulquran.ui.theme.FloatingPaperControl
+import com.beautifulquran.ui.theme.LocalGildingTilt
+import com.beautifulquran.ui.theme.rememberGildingTilt
 import com.beautifulquran.ui.theme.InkRevealOverlay
 import com.beautifulquran.ui.theme.LocalNuqtaParams
 import com.beautifulquran.ui.theme.LocalSettingsApproach
@@ -296,68 +298,70 @@ class MainActivity : ComponentActivity() {
                 }
             }
 
-            BeautifulQuranTheme(
-                themeMode = settings.themeMode,
-                colorSystem = settings.colorSystem,
-            ) {
-                // Cold start paints the closed mushaf first; the paper stack
-                // mounts under it after the title settles (onWarmStack), not
-                // at splash handoff — so ViewModel init cannot jank first paint.
-                var stackMounted by remember { mutableStateOf(entranceDone) }
-                var coverSounds by remember { mutableStateOf<PageTurnSounds?>(null) }
-                DisposableEffect(Unit) {
-                    onDispose { coverSounds?.release() }
-                }
-                Box(Modifier.fillMaxSize()) {
-                    if (stackMounted) {
-                        PaperStackApp(
-                            themeMode = settings.themeMode,
-                            developerModeEnabled = settings.developerModeEnabled,
-                            homeBookmarkStyle = settings.homeBookmarkStyle,
-                            entranceVisible = !entranceDone,
-                            pendingAssistantAction = assistantAction,
-                            onAssistantActionConsumed = {
-                                pendingAssistantAction.value = null
-                            },
-                            onRecordSystemTrace = {
-                                DevProfiling.recordSystemTrace(this@MainActivity)
-                            },
-                        )
+            CompositionLocalProvider(LocalGildingTilt provides rememberGildingTilt()) {
+                BeautifulQuranTheme(
+                    themeMode = settings.themeMode,
+                    colorSystem = settings.colorSystem,
+                ) {
+                    // Cold start paints the closed mushaf first; the paper stack
+                    // mounts under it after the title settles (onWarmStack), not
+                    // at splash handoff — so ViewModel init cannot jank first paint.
+                    var stackMounted by remember { mutableStateOf(entranceDone) }
+                    var coverSounds by remember { mutableStateOf<PageTurnSounds?>(null) }
+                    DisposableEffect(Unit) {
+                        onDispose { coverSounds?.release() }
                     }
-                    if (!entranceDone) {
-                        EntranceCover(
-                            chrome = coverChrome,
-                            ornament = coverOrnament,
-                            contentReady = contentReady,
-                            loadLabel = contentLoadLabel,
-                            loadProgress = when {
-                                mushafDiagnostics.requestsSettled -> 1f
-                                else -> mushafProgress?.fraction
-                            },
-                            onOpenBegan = {
-                                val sounds = coverSounds
-                                    ?: PageTurnSounds(this@MainActivity).also { coverSounds = it }
-                                sounds.playCoverOpen()
-                            },
-                            onReady = {
-                                splashPending = false
-                                DevProfiling.mark("coverReady")
-                            },
-                            onWarmStack = {
-                                DevProfiling.mark("warmStack")
-                                stackMounted = true
-                                if (coverSounds == null) {
-                                    coverSounds = DevProfiling.trace("coverSounds") {
-                                        PageTurnSounds(this@MainActivity)
+                    Box(Modifier.fillMaxSize()) {
+                        if (stackMounted) {
+                            PaperStackApp(
+                                themeMode = settings.themeMode,
+                                developerModeEnabled = settings.developerModeEnabled,
+                                homeBookmarkStyle = settings.homeBookmarkStyle,
+                                entranceVisible = !entranceDone,
+                                pendingAssistantAction = assistantAction,
+                                onAssistantActionConsumed = {
+                                    pendingAssistantAction.value = null
+                                },
+                                onRecordSystemTrace = {
+                                    DevProfiling.recordSystemTrace(this@MainActivity)
+                                },
+                            )
+                        }
+                        if (!entranceDone) {
+                            EntranceCover(
+                                chrome = coverChrome,
+                                ornament = coverOrnament,
+                                contentReady = contentReady,
+                                loadLabel = contentLoadLabel,
+                                loadProgress = when {
+                                    mushafDiagnostics.requestsSettled -> 1f
+                                    else -> mushafProgress?.fraction
+                                },
+                                onOpenBegan = {
+                                    val sounds = coverSounds
+                                        ?: PageTurnSounds(this@MainActivity).also { coverSounds = it }
+                                    sounds.playCoverOpen()
+                                },
+                                onReady = {
+                                    splashPending = false
+                                    DevProfiling.mark("coverReady")
+                                },
+                                onWarmStack = {
+                                    DevProfiling.mark("warmStack")
+                                    stackMounted = true
+                                    if (coverSounds == null) {
+                                        coverSounds = DevProfiling.trace("coverSounds") {
+                                            PageTurnSounds(this@MainActivity)
+                                        }
                                     }
-                                }
-                            },
-                            onFinished = {
-                                entranceDone = true
-                                DevProfiling.reportFullyDrawn(this@MainActivity)
-                            },
-                            modifier = Modifier.zIndex(1f),
-                        )
+                                },
+                                onFinished = {
+                                    entranceDone = true
+                                    DevProfiling.reportFullyDrawn(this@MainActivity)
+                                },
+                                modifier = Modifier.zIndex(1f),
+                            )
+                        }
                     }
                 }
             }
