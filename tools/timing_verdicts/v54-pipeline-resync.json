@@ -466,72 +466,6 @@
     ]
    }
   },
-  "Abdurrahmaan_As-Sudais_192kbps:6:104": {
-   "verdict": "accept",
-   "kinds": [
-    "timestamp"
-   ],
-   "baselinePayloadHash": "036ffc16de11e44d80739ddee0b0718d27c710e91c089d0ad81b255112bb2c21",
-   "candidatePayloadHash": "1da42905a46f25b6f04e4cda0a824bef853457a27ef3848a948c9b472ae709df",
-   "evidence": {
-    "kind": "dual_model_boundary",
-    "artifact": "tools/timing_verdicts/v54-pipeline-resync.json",
-    "summary": "Rebuilding the shipped database from its own current pipeline, restoring pipeline/database parity. The occurrence sequence is unchanged, so the evidence is a Pareto non-regression of the mean absolute start residual against Arabic XLSR and MMS/uroman forced alignment.",
-    "audioSha256": "a3c39a164e1c9c4bfc2fa73eb34e30b106e06bb70f837dec11d0ad2550f033b2",
-    "waveformVeto": false,
-    "models": [
-     {
-      "name": "arabic-xlsr-ctc",
-      "metric": "meanAbsStartResidualMs",
-      "baselineResidualMs": 124.944,
-      "candidateResidualMs": 120.5,
-      "baselineScore": -124.944,
-      "candidateScore": -120.5
-     },
-     {
-      "name": "mms-uroman-ctc",
-      "metric": "meanAbsStartResidualMs",
-      "baselineResidualMs": 111.278,
-      "candidateResidualMs": 106.833,
-      "baselineScore": -111.278,
-      "candidateScore": -106.833
-     }
-    ]
-   }
-  },
-  "Abdurrahmaan_As-Sudais_192kbps:70:10": {
-   "verdict": "accept",
-   "kinds": [
-    "timestamp"
-   ],
-   "baselinePayloadHash": "b13085419ff72b78d70ed64afc84c81e5914419c168958f148425172addb7633",
-   "candidatePayloadHash": "d606120a8851d025a618f3e2632e23abd7b3b8e5b4a295e52ba1fb9e3d295f0d",
-   "evidence": {
-    "kind": "dual_model_boundary",
-    "artifact": "tools/timing_verdicts/v54-pipeline-resync.json",
-    "summary": "Rebuilding the shipped database from its own current pipeline, restoring pipeline/database parity. The occurrence sequence is unchanged, so the evidence is a Pareto non-regression of the mean absolute start residual against Arabic XLSR and MMS/uroman forced alignment.",
-    "audioSha256": "8fa9100cb32a7137b77080cfe9973ffa6ac596957734fedbca745268fe772ab0",
-    "waveformVeto": false,
-    "models": [
-     {
-      "name": "arabic-xlsr-ctc",
-      "metric": "meanAbsStartResidualMs",
-      "baselineResidualMs": 377.5,
-      "candidateResidualMs": 187.0,
-      "baselineScore": -377.5,
-      "candidateScore": -187.0
-     },
-     {
-      "name": "mms-uroman-ctc",
-      "metric": "meanAbsStartResidualMs",
-      "baselineResidualMs": 368.75,
-      "candidateResidualMs": 151.75,
-      "baselineScore": -368.75,
-      "candidateScore": -151.75
-     }
-    ]
-   }
-  },
   "Alafasy_128kbps:3:32": {
    "verdict": "accept",
    "kinds": [
@@ -9970,5 +9904,6 @@
     ]
    }
   }
- }
+ },
+ "supersededNote": "Sudais 6:104 and 70:10 were re-clocked for quran-v64; their current verdicts live in v64-pipeline-resync.json."
 }
