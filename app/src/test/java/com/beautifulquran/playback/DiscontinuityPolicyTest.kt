@@ -45,4 +45,14 @@ class DiscontinuityPolicyTest {
         assertEquals(1L, advanced.clockId)
         assertEquals(1L, advanced.inkId)
     }
+
+    @Test
+    fun `a jump records where on the file it landed`() {
+        val landed = PlaybackPositionEvents().afterDiscontinuity(
+            reason = Player.DISCONTINUITY_REASON_SEEK,
+            positionMs = 1_951L,
+        )
+
+        assertEquals(1_951L, landed.positionMs)
+    }
 }
