@@ -114,6 +114,29 @@ class PlayerController(private val context: Context) {
         get() = controller?.currentPosition ?: 0L
 
     /**
+     * Listening skips silence the word timings already mark. The timings lab
+     * turns this off so a scrub can sit inside a gap.
+     */
+    @Volatile
+    var skipSilenceGaps: Boolean = true
+        private set
+
+    fun setSkipSilenceGaps(enabled: Boolean) {
+        skipSilenceGaps = enabled
+    }
+
+    /** A seek has been issued and the playhead has not reported the landing yet. */
+    @Volatile
+    private var silenceSkipHoldUntilMs = 0L
+
+    internal fun silenceSkipHeld(): Boolean =
+        android.os.SystemClock.elapsedRealtime() < silenceSkipHoldUntilMs
+
+    private fun holdSilenceSkip() {
+        silenceSkipHoldUntilMs = android.os.SystemClock.elapsedRealtime() + 500L
+    }
+
+    /**
      * [NowPlaying] parsed straight from the controller's current media item.
      *
      * [state] is fed by listener callbacks, so for a beat after an item
@@ -161,6 +184,7 @@ class PlayerController(private val context: Context) {
             newPosition: Player.PositionInfo,
             reason: Int,
         ) {
+            silenceSkipHoldUntilMs = 0L
             _state.value = _state.value.copy(
                 positionEvents = _state.value.positionEvents.afterDiscontinuity(
                     reason = reason,
@@ -341,7 +365,7 @@ class PlayerController(private val context: Context) {
         // Latest load wins: abandon any in-flight connect/play from an earlier
         // chapter so rapid navigation cannot start the superseded surah first.
         val epoch = commands.invalidate()
-        withController(epoch) { c ->
+        withController(epoch, holdSilenceSkip = true) { c ->
             val startPos = if (queue.startIndex == 0 && queue.hasBasmalahLeadIn) 0L
             else startPositionMs
             c.setMediaItems(queue.items, queue.startIndex, startPos)
@@ -358,8 +382,10 @@ class PlayerController(private val context: Context) {
      */
     private fun withController(
         epoch: Long = commands.epoch,
+        holdSilenceSkip: Boolean = false,
         block: suspend (MediaController) -> Unit,
     ) {
+        if (holdSilenceSkip) holdSilenceSkip()
         scope.launch {
             commands.runIfCurrent(epoch) {
                 val c = ensureController()
@@ -389,7 +415,7 @@ class PlayerController(private val context: Context) {
      * variants below are the combinations the UI actually uses.
      */
     private fun seekTo(ayah: Int, positionMs: Long, play: Boolean, playIfOutOfRange: Boolean = play) =
-        withController { c ->
+        withController(holdSilenceSkip = true) { c ->
             val index = playlistIndex(ayah)
             val inRange = index in 0 until c.mediaItemCount
             if (inRange) c.seekTo(index, positionMs)
@@ -399,7 +425,7 @@ class PlayerController(private val context: Context) {
     fun seekToAyah(ayah: Int) = seekTo(ayah, 0L, play = false)
 
     /** Restart the chapter-opening basmalah clip (no-op when the playlist has none). */
-    fun seekToBasmalah() = withController { c ->
+    fun seekToBasmalah() = withController(holdSilenceSkip = true) { c ->
         if (!basmalahLeadIn || c.mediaItemCount == 0) return@withController
         c.seekTo(0, 0L)
     }
@@ -407,7 +433,7 @@ class PlayerController(private val context: Context) {
     /** Seek to [ayah] in the already-loaded playlist and play — also resumes
      * when the index is out of range (e.g. a stale jump request). When seeking
      * to ayah 1 of a basmalah-preface surah, restarts from the basmalah clip. */
-    fun playLoadedFromAyah(ayah: Int) = withController { c ->
+    fun playLoadedFromAyah(ayah: Int) = withController(holdSilenceSkip = true) { c ->
         val startAtBasmalah = basmalahLeadIn && ayah == 1
         val index = if (startAtBasmalah) 0 else playlistIndex(ayah)
         if (index in 0 until c.mediaItemCount) c.seekTo(index, 0L)
@@ -418,9 +444,9 @@ class PlayerController(private val context: Context) {
 
     fun seekToWordAndPlay(ayah: Int, positionMs: Long) = seekTo(ayah, positionMs, play = true, playIfOutOfRange = false)
 
-    fun next() = withController { it.seekToNextMediaItem() }
+    fun next() = withController(holdSilenceSkip = true) { it.seekToNextMediaItem() }
 
-    fun previous() = withController { it.seekToPreviousMediaItem() }
+    fun previous() = withController(holdSilenceSkip = true) { it.seekToPreviousMediaItem() }
 
     fun setRepeatMode(mode: Int) = withController { it.repeatMode = mode }
 

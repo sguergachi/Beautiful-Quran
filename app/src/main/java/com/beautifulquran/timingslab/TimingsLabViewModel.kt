@@ -170,6 +170,7 @@ class TimingsLabViewModel(
     // ── Target ayah ────────────────────────────────────────────────────────
 
     fun initFromLastOpened() {
+        player.setSkipSilenceGaps(false)
         val s = settingsRepo.settings.value
         changeTarget(s.lastSurah.takeIf { it in 1..114 } ?: 1, s.lastAyah.coerceAtLeast(1))
     }
@@ -178,6 +179,7 @@ class TimingsLabViewModel(
      * its mark is selected and auditioned as soon as the ayah loads, so the
      * fix loop starts without another tap. */
     fun changeTarget(surahId: Int, ayah: Int, focusWordPosition: Int? = null) {
+        player.setSkipSilenceGaps(false)
         if (_ui.value.mode == LabMode.RECORD) finishRecord()
         persistNow()
         pauseIfLabAyahPlaying()
@@ -613,6 +615,7 @@ class TimingsLabViewModel(
     /** Called when the Lab page is left: settle everything so the reader
      * comes back to normal speed and silence. */
     fun onExit() {
+        player.setSkipSilenceGaps(true)
         auditionJob?.cancel()
         if (_ui.value.mode == LabMode.RECORD) finishRecord()
         persistNow()
