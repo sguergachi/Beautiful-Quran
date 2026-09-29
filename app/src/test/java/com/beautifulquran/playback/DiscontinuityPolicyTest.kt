@@ -47,6 +47,29 @@ class DiscontinuityPolicyTest {
     }
 
     @Test
+    fun `a same verse silence landing keeps the ink`() {
+        val seek = PlaybackPositionEvents().afterDiscontinuity(
+            reason = Player.DISCONTINUITY_REASON_SEEK,
+            positionMs = 4_283L,
+            keepInk = true,
+        )
+
+        assertEquals(1L, seek.clockId)
+        assertEquals(0L, seek.inkId)
+        assertEquals(4_283L, seek.positionMs)
+    }
+
+    @Test
+    fun `silence ink matches only its own landing`() {
+        val ink = SilenceInk()
+        ink.arm(4_283L)
+        assertFalse(ink.claims(0L, itemChanged = false))
+        assertFalse(ink.claims(4_283L, itemChanged = true))
+        assertTrue(ink.claims(4_283L, itemChanged = false))
+        assertFalse(ink.claims(4_283L, itemChanged = false))
+    }
+
+    @Test
     fun `a jump records where on the file it landed`() {
         val landed = PlaybackPositionEvents().afterDiscontinuity(
             reason = Player.DISCONTINUITY_REASON_SEEK,

@@ -12,6 +12,13 @@ class VerseOpeningTest {
     private fun seg(start: Long, end: Long) = Segment(position = 1, startMs = start, endMs = end)
 
     @Test
+    fun `only murattal skips silence`() {
+        assertTrue(silenceSkipAllowed("Murattal"))
+        assertFalse(silenceSkipAllowed("Mujawwad"))
+        assertFalse(silenceSkipAllowed("Muallim"))
+    }
+
+    @Test
     fun `silence before a word seeks to that word`() {
         // Hani 4:148 opens at 1951ms. 4:147 opens at 220ms.
         val nisa148 = listOf(seg(1_951, 4_790), seg(4_790, 5_510))
