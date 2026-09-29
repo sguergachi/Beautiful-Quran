@@ -13,10 +13,8 @@ class VerseBookmarkRibbonTest {
     }
 
     @Test
-    fun placeRibbon_isNarrowerThanTheTappableBookmark() {
+    fun placeRibbon_isNarrowerThanTheBookmark() {
         assertEquals(7.92f, placeRibbonWidthDp(11f), 0.001f)
-        assertEquals(7.92f, placeRibbonTapGuardWidthDp(true, 11f), 0.001f)
-        assertEquals(0f, placeRibbonTapGuardWidthDp(false, 11f), 0f)
     }
 
     @Test
