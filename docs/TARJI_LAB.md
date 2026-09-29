@@ -11,49 +11,48 @@ manual envelope, vibrato label, or look control that can override it.
    Settings → Developer. The ‹ › arrows choose another word in the ayah.
 2. The lab captures the word muted at 1×, including 300 ms lead and 1 s tail.
    Capture progress and failures appear on the page; **Retry** repeats capture.
-3. Play the whole capture, or choose **Loop range**, drag the gold handles,
-   and play that range. **Seek** lets a tap or drag pause at a precise sample.
-   **Rewind** returns to the active loop start (or the whole capture start),
-   keeping playback running if it was running, or paused if it was paused.
+3. Press **Play word** to repeat the capture. **Choose loop** reveals the
+   range controls: drag the two ends, then press **Play loop**. **Whole word**
+   returns to the full capture. Tapping the waveform pauses at that position.
+   **Rewind** returns to the current playback range start and preserves pause/play.
    Pinch to zoom, two-finger pan to move, and **Fit** to restore the whole view.
-4. Listen at 1×, ½, or ¼ while adjusting the always-visible detector controls.
-   Re-analysis updates the scope and word without restarting audio or moving
-   the chosen loop. The readout says when analysis is updating.
-5. **Reset** restores shipped detector defaults for this reciter. **Export**
-   saves the audio, loop, knobs, and optional note; **Import** replays a sample.
+4. Listen at 1×, ½, or ¼. The quiet waveform is the audio; the **gold pulse**
+   overlaid on it is the actual output used by the word’s glow. The vertical
+   line shows playback position. There is no raw teal candidate trace or
+   diagnostic dot in the user-facing graph. The readout says **Pulse here** or
+   **No pulse here** at the current position, and **Updating pulse** during analysis.
+5. Use the three main controls. If audible wavering is missed, increase
+   **Sensitivity** or lower **Shortest note**. If normal speech pulses, reverse
+   those adjustments. **Rhythm tolerance** accepts less evenly repeating
+   wavering as it increases. Each slider has a direction guide and short help.
+   Changes save automatically for the selected reciter; **Reset** restores defaults.
+6. **More controls** reveals pulse frequency limits, tolerated note slides,
+   fade-in, and brief-gap bridging, plus sample import/export and optional notes.
+   These remain collapsed until requested.
 
-The pulse is **overlaid on the recorded waveform**, on the same time axis.
-The fine primary curve is the detector's measured modulation **before** its
-acceptance gate. It remains visible when the current settings reject a hold;
-the lab must not multiply away the evidence you need to tune. The thicker gold
-curve is the accepted output after attack/release gain. Both use a fixed −1..1
-scale. The gold rail marks detected holds, including gaps. A moving dot follows
-the measured pulse at the playback position; the word still uses only accepted
-output. No synthetic oscillator or hand-drawn curve drives either signal.
-
-All knobs re-analyze the recording. Frequency band and pitch continuity affect
-the measured candidate; hold/depth/regularity gates and attack/release affect
-which pulses pass and their strength. A threshold need not change a candidate
-that is already far above it. Silence and insufficient stable-note evidence
-can still have no measurable pulse; the graph does not invent one.
+The gold curve uses the recorded audio’s time axis and a fixed −1..1 scale.
+It shows accepted modulation after attack/release gain. Rejected regions have
+no gold curve; no synthetic oscillator or hand-drawn curve invents a pulse.
+The pre-gate candidate remains available to analyzer tests and corpus audits,
+but is not a tuning target in this interface.
 
 ## Detector controls
 
 Profiles persist per reciter and write through to `InkEngine.tuning`:
 
-- **Hold min**: minimum stable-note duration.
-- **Wobble min / max Hz**: permitted modulation band. Editing either endpoint
-  keeps the band ordered.
-- **Min depth**: minimum modulation depth.
-- **Regularity**: periodicity threshold.
-- **Pitch wander**: tolerated fundamental drift.
-- **Attack / Release**: detector gate response.
+- **Sensitivity** reverses the modulation-depth threshold: 0% = depth 0.25,
+  100% = depth 0.01. More sensitivity accepts subtler wavering.
+- **Shortest note** is the minimum stable-note duration, 100–1,200 ms.
+- **Rhythm tolerance** reverses periodicity: 0% = threshold 0.85,
+  100% = threshold 0.15. More tolerance accepts uneven wavering.
+- Under **More controls**: **Slowest / Fastest pulse** set the frequency band;
+  **Allow note slides** sets pitch drift; **Fade in** sets attack;
+  **Bridge gaps** sets release. Frequency endpoints stay ordered.
 
-Every knob includes a persistent explanation of what lowering or raising it
-does. Start by lowering Min depth or Regularity if an audible hold is missed;
-raise them or Hold min if ordinary speech triggers the detector. Then tune
-Attack for the entrance and Release for brief detection gaps. Release does
-not prolong the true end of a hold, which has its own fast decay.
+The percentages are normalized slider positions, not confidence scores.
+Re-analysis updates the graph and word without restarting audio or moving the
+chosen loop. Release bridges brief detection gaps, while the real end of a
+hold still uses its own fast decay.
 
 Each edit replays the same PCM through the same pure `Tarji` implementation
 used by the live audio tap. Background analysis is canceled on a new target,

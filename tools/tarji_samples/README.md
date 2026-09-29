@@ -18,8 +18,9 @@ keep both positive holds and matched stills:
 - still vowels, consonant flutter, breath, and room echo that must **not**
   fire
 
-Listen to the same loop while changing knobs. The fine pulse overlay shows
-measured modulation before acceptance; gold shows the accepted response.
+Listen to the same loop while changing knobs. The gold pulse overlay shows
+the accepted response used by the word’s glow. Raw candidate modulation is
+kept for analyzer audits, and is not drawn in the lab.
 Every detector change should improve held-out examples as well as the
 examples used to derive it.
 
