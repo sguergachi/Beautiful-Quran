@@ -8,10 +8,32 @@ import com.beautifulquran.data.model.Segment
  */
 internal const val SILENCE_SLACK_MS = 40L
 
-/**
- * Murattal gaps are silence. Mujawwad waqf and Muallim teaching pauses stay.
- */
+/** Rubʿ al-ḥizb mark in Uthmani text (۞). */
+internal const val HIZB_MARKER = '\u06DE'
+
+/** Murattal gaps at a ۞ are silence. Mujawwad waqf and Muallim pauses stay. */
 internal fun silenceSkipAllowed(style: String): Boolean = style == "Murattal"
+
+internal fun isHizbStop(ayahText: String): Boolean = HIZB_MARKER in ayahText
+
+/**
+ * Where a hizb verse's opening should land, or null when this playhead
+ * should keep going. Ordinary verses return null: their breath plays through.
+ * The landing is the first word's voice, on the file clock.
+ */
+internal fun hizbOpeningSeekMs(
+    hizbStop: Boolean,
+    positionMs: Long,
+    segments: List<Segment>,
+    silence: List<AudibleSilence>,
+): Long? {
+    if (!hizbStop) return null
+    val voice = firstWordHighlightMs(segments, silence)
+    val lastEnd = segments.lastOrNull()?.endMs ?: return null
+    if (voice >= lastEnd) return null
+    if (positionMs + SILENCE_SLACK_MS >= voice) return null
+    return voice
+}
 
 /**
  * Quiet that the word timings still call a sounding word.

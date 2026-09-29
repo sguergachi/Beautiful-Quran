@@ -12,6 +12,18 @@ class VerseOpeningTest {
     private fun seg(start: Long, end: Long) = Segment(position = 1, startMs = start, endMs = end)
 
     @Test
+    fun `only a hizb opening seeks to the voice`() {
+        assertTrue(isHizbStop("۞وَأَيُّوبَ إِذۡ نَادَىٰ"))
+        assertFalse(isHizbStop("وَمِنَ ٱلشَّيَٰطِينِ مَن يَغُوصُونَ"))
+        // Hani 4:148. Click at 1951, speech at 4283.
+        val nisa148 = listOf(Segment(1, 1_951, 4_790), Segment(2, 4_790, 5_510))
+        val silence = listOf(AudibleSilence(0, 4_283))
+        assertEquals(4_283L, hizbOpeningSeekMs(true, 0L, nisa148, silence))
+        assertNull(hizbOpeningSeekMs(true, 4_300L, nisa148, silence))
+        assertNull(hizbOpeningSeekMs(false, 0L, nisa148, silence))
+    }
+
+    @Test
     fun `only murattal skips silence`() {
         assertTrue(silenceSkipAllowed("Murattal"))
         assertFalse(silenceSkipAllowed("Mujawwad"))
