@@ -14,8 +14,8 @@
  * changes. Activate deletes every other cache name and reloads open clients
  * so stale scripture data or a poisoned shell cannot stick.
  */
-const CACHE = 'beautiful-quran-web-v12'
-const OFFLINE_SHELL = 'beautiful-quran-offline-shell-v12'
+const CACHE = 'beautiful-quran-web-v13'
+const OFFLINE_SHELL = 'beautiful-quran-offline-shell-v13'
 const BASE = self.registration.scope
 
 function isNavigationRequest(req, url) {

@@ -238,7 +238,9 @@ close a `Timings patch — …` GitHub issue, **do this checklist in order**:
    | Symptom | Fix where | Test |
    |---|---|---|
 | Forward spike, stray, split sliver, non-contiguous / **gap phantom** (`…11,8,9,13…` missing 12 or `…1,3,3…` missing 2) | `clean_qdc_artifacts` in `tools/build_db.py` | `tools/timing_patch_cases/<id>.json` + `python3 tools/test_build_db.py` |
+| Sub-word next-word label on the instant of a rewind (`…6,[7 60 ms],6,7…`) | rewind onset in `clean_qdc_artifacts` | `rewind-onset-*` case |
 | Topology cannot distinguish a false loop from a real repeat | narrow typed operation in `tools/timing_corrections/` | `pipeline: "timing_correction"` case |
+| Word said twice, qdc hands the second utterance to the next word (next word starts a whole utterance early) | `restore_flattened_resay` typed operation + dual-model verdict | `pipeline: "timing_correction"` case |
    | Repair flattens a multi-word re-say that cleaned qdc still has | `apply_timing_repairs` span-protect (`erases_span_repeat`) | `pipeline: "erases_span_repeat"` case |
 | Repair erases a peer same-word re-say while fixing elsewhere | per-position `preserve_peer_repeats` | `pipeline: "preserve_peer_repeats"` case |
 | Same-position pair is really the previous word's held tail (qdc tiles gaplessly, so a madd gets the next word's index) | `false_same_position_leads` + `hand_lead_to_previous_word`, gated on quran-align's onset | `pipeline: "false_same_position_lead"` case |

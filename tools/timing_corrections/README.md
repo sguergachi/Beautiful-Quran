@@ -25,6 +25,16 @@ Supported operations:
   the witnesses cannot reach — an ayah with no quran-align row, where the rule
   abstains by design.
 
+- `restore_flattened_resay`: restore one audio-proven re-say that qdc
+  labelled as the following word. The mirror of the false lead: a word said
+  twice with one qdc label hands its second utterance to the next word, which
+  then starts a whole utterance early. The entry names the word, the re-say
+  onset and the next word's onset; both must fall inside the flat source pair.
+  Hani 21:46 يَٰوَيۡلَنَآ (#779) is this shape: qdc opens إِنَّا at 9800 while
+  quran-align, the Lab and both forced aligners put it at 11350–11520. No
+  pipeline rule can reach it — qdc flattened the repeat, quran-align cannot
+  express one, and CTC fused the rewind into a single token (`وَيلنايا`).
+
 Every entry carries evidence provenance. The build fails if its expected source
 shape no longer exists, so a pinned-source refresh cannot silently retain a
 stale verdict.

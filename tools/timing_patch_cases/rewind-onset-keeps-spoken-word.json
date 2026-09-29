@@ -1,0 +1,73 @@
+{
+  "id": "rewind-onset-keeps-spoken-word",
+  "label": "a first-pass word long enough to be spoken stays before a phrase re-say",
+  "refs": [
+    "Alafasy 2:229 إِلَّا أَن shape (520 ms)"
+  ],
+  "pipeline": "clean_qdc_artifacts",
+  "notes": "Only a label shorter than QDC_REWIND_ONSET_MS is an instant; a spoken word before a rewind is left to the topology rules and typed verdicts.",
+  "input_segments": [
+    [
+      15,
+      19545,
+      20275
+    ],
+    [
+      16,
+      20275,
+      21105
+    ],
+    [
+      17,
+      21105,
+      21625
+    ],
+    [
+      16,
+      21625,
+      23705
+    ],
+    [
+      17,
+      23705,
+      23915
+    ],
+    [
+      18,
+      23915,
+      26615
+    ]
+  ],
+  "expected_segments": [
+    [
+      15,
+      19545,
+      20275
+    ],
+    [
+      16,
+      20275,
+      21105
+    ],
+    [
+      17,
+      21105,
+      21625
+    ],
+    [
+      16,
+      21625,
+      23705
+    ],
+    [
+      17,
+      23705,
+      23915
+    ],
+    [
+      18,
+      23915,
+      26615
+    ]
+  ]
+}
