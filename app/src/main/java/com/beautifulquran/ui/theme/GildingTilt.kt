@@ -4,6 +4,7 @@ import android.hardware.Sensor
 import android.hardware.SensorEvent
 import android.hardware.SensorEventListener
 import android.hardware.SensorManager
+import android.os.PowerManager
 import android.provider.Settings
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -34,8 +35,20 @@ const val GILDING_REST = 0.5f
 /** Roll, in g's (sin of the angle), that carries the sheen its whole way: ~25°. */
 private const val ROLL_FULL_SCALE = 0.42f
 
-/** Share of the remaining distance covered per sample — ~16 Hz, so the light settles in ~0.3 s. */
-private const val SMOOTHING = 0.25f
+/** Sampling while the phone is being moved: 5 Hz, the slowest the platform names. */
+private const val MOVING_PERIOD_US = 200_000
+
+/** Sampling once it has been still for [STILL_AFTER_SAMPLES]: 1 Hz, just enough to notice a pick-up. */
+private const val STILL_PERIOD_US = 1_000_000
+
+/** Consecutive samples with no real change before the sensor drops to [STILL_PERIOD_US]. */
+private const val STILL_AFTER_SAMPLES = 8
+
+/** A jump this large (of the 0..1 sheen) at the slow rate means the phone is moving again. */
+private const val MOVING_STEP = 0.02f
+
+/** Share of the remaining distance covered per sample — at 5 Hz, ~0.4 s to settle. */
+private const val SMOOTHING = 0.5f
 
 /**
  * A change smaller than this is not worth redrawing every gilded figure for:
@@ -108,27 +121,51 @@ fun rememberGildingTilt(): State<Float> {
         if (manager == null || sensor == null || !animated) {
             return@DisposableEffect onDispose {}
         }
+        lateinit var listener: SensorEventListener
+        val powerManager = context.getSystemService(PowerManager::class.java)
         var smoothed = GILDING_REST
         var seeded = false
-        val listener = object : SensorEventListener {
+        var still = 0
+        var slow = false
+        var listening = false
+        fun register(periodUs: Int) {
+            manager.unregisterListener(listener)
+            manager.registerListener(listener, sensor, periodUs)
+        }
+        listener = object : SensorEventListener {
             override fun onSensorChanged(event: SensorEvent) {
                 val target = sheenForRoll(event.values[0] / SensorManager.GRAVITY_EARTH)
+                val jump = abs(target - smoothed)
                 smoothed = if (seeded) smoothed + (target - smoothed) * SMOOTHING else target
                 seeded = true
                 tilt.set(smoothed)
+                // A held phone barely moves: back off to a slow watch, and come
+                // back up the moment it does.
+                if (jump < MIN_STEP) still++ else still = 0
+                if (!slow && still >= STILL_AFTER_SAMPLES) {
+                    slow = true
+                    register(STILL_PERIOD_US)
+                } else if (slow && jump >= MOVING_STEP) {
+                    slow = false
+                    still = 0
+                    register(MOVING_PERIOD_US)
+                }
             }
 
             override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) = Unit
         }
         var started = false
-        var listening = false
         fun sync() {
-            val shouldListen = started && tilt.demand > 0
+            // Battery saver asks for no ambient motion; the gilding rests.
+            val shouldListen = started && tilt.demand > 0 &&
+                powerManager?.isPowerSaveMode != true
             if (shouldListen == listening) return
             listening = shouldListen
             if (shouldListen) {
                 seeded = false
-                manager.registerListener(listener, sensor, SensorManager.SENSOR_DELAY_UI)
+                still = 0
+                slow = false
+                register(MOVING_PERIOD_US)
             } else {
                 manager.unregisterListener(listener)
             }
