@@ -1,0 +1,63 @@
+{
+  "id": "rewind-onset-keeps-unrecited-word",
+  "label": "a sub-word label before a rewind stays when the row never recites that word again",
+  "refs": [
+    "Alafasy 25:46 shape"
+  ],
+  "pipeline": "clean_qdc_artifacts",
+  "notes": "Dropping it would leave the word with no span at all; coverage is the finalizer's problem, not a guess the cleaner may make.",
+  "input_segments": [
+    [
+      3,
+      2540,
+      3500
+    ],
+    [
+      4,
+      3500,
+      4220
+    ],
+    [
+      5,
+      4220,
+      4240
+    ],
+    [
+      3,
+      4240,
+      5330
+    ],
+    [
+      4,
+      5330,
+      6905
+    ]
+  ],
+  "expected_segments": [
+    [
+      3,
+      2540,
+      3500
+    ],
+    [
+      4,
+      3500,
+      4220
+    ],
+    [
+      5,
+      4220,
+      4240
+    ],
+    [
+      3,
+      4240,
+      5330
+    ],
+    [
+      4,
+      5330,
+      6905
+    ]
+  ]
+}

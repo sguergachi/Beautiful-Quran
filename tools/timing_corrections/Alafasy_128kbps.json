@@ -22,15 +22,6 @@
     },
     {
       "reciterId": 1,
-      "surahId": 4,
-      "ayah": 19,
-      "op": "one_utterance",
-      "positions": [17, 18],
-      "evidence": ["CTC", "quran-align"],
-      "refs": ["full-corpus acoustic audit"]
-    },
-    {
-      "reciterId": 1,
       "surahId": 6,
       "ayah": 145,
       "op": "one_utterance",

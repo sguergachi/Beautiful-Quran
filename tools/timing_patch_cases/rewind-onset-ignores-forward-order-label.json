@@ -1,0 +1,73 @@
+{
+  "id": "rewind-onset-ignores-forward-order-label",
+  "label": "a short early label before words still unsaid is not a rewind onset",
+  "refs": [
+    "code review of PR #786"
+  ],
+  "pipeline": "clean_qdc_artifacts",
+  "notes": "5,[7 for 80 ms],6,7: word 6 has never been said, so the reciter is not going back and the rewind-onset rule must not fold the 7 into word 5.",
+  "input_segments": [
+    [
+      4,
+      0,
+      900
+    ],
+    [
+      5,
+      900,
+      1700
+    ],
+    [
+      7,
+      1700,
+      1780
+    ],
+    [
+      6,
+      1780,
+      2600
+    ],
+    [
+      7,
+      2600,
+      3400
+    ],
+    [
+      8,
+      3400,
+      4200
+    ]
+  ],
+  "expected_segments": [
+    [
+      4,
+      0,
+      900
+    ],
+    [
+      5,
+      900,
+      1700
+    ],
+    [
+      7,
+      1700,
+      1780
+    ],
+    [
+      6,
+      1780,
+      2600
+    ],
+    [
+      7,
+      2600,
+      3400
+    ],
+    [
+      8,
+      3400,
+      4200
+    ]
+  ]
+}

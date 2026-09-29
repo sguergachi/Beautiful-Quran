@@ -1,0 +1,70 @@
+{
+  "id": "rewind-onset-alafasy-4-19",
+  "label": "Alafasy 4:19 60 ms أَن stamped on the rewind to إِلَّآ",
+  "refs": [
+    "dual CTC",
+    "waveform",
+    "retires the July one_utterance verdict"
+  ],
+  "pipeline": "clean_qdc_artifacts",
+  "notes": "Alafasy says a short إِلَّا (21.44-22.36 s), breathes, then restarts it with its madd (22.74-24.46 s) before أَن. The old one_utterance correction read 17,[18],17,18 as a false loop and dropped the second إِلَّآ, leaving 2.1 s of recitation unlit. The 520 ms middle labels of the ear-verified 2:229/2:235 loops are far above this floor.",
+  "input_segments": [
+    [
+      16,
+      18575,
+      21395
+    ],
+    [
+      17,
+      21395,
+      22305
+    ],
+    [
+      18,
+      22305,
+      22365
+    ],
+    [
+      17,
+      22365,
+      24435
+    ],
+    [
+      18,
+      24435,
+      24735
+    ],
+    [
+      19,
+      24735,
+      26405
+    ]
+  ],
+  "expected_segments": [
+    [
+      16,
+      18575,
+      21395
+    ],
+    [
+      17,
+      21395,
+      22365
+    ],
+    [
+      17,
+      22365,
+      24435
+    ],
+    [
+      18,
+      24435,
+      24735
+    ],
+    [
+      19,
+      24735,
+      26405
+    ]
+  ]
+}

@@ -31,7 +31,9 @@ jobs:
         run: test -s data/quran.db && test -s data/lexicon.db && test -s data/dictionary.db
 
       - name: Timing pipeline regressions
-        run: python3 tools/test_build_db.py
+        run: |
+          python3 tools/test_build_db.py
+          python3 tools/test_find_flattened_resays.py
 
       - name: QF proxy regressions
         run: node --test worker/test/*.test.mjs

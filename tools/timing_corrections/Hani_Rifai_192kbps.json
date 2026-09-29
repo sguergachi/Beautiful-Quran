@@ -1,5 +1,47 @@
 {
   "schema": 1,
   "reciter": "Hani_Rifai_192kbps",
-  "edits": []
+  "edits": [
+    {
+      "reciterId": 7,
+      "surahId": 21,
+      "ayah": 46,
+      "op": "restore_flattened_resay",
+      "position": 8,
+      "resayStartMs": 9340,
+      "nextOnsetMs": 11400,
+      "sourcePair": [[8, 7710, 9800], [9, 9800, 12340]],
+      "requiresAudioVerdict": true,
+      "evidence": ["ear", "dual CTC", "waveform", "quran-align"],
+      "refs": ["GitHub issue #779", "tools/timing_verdicts/flattened-resay-class.json"]
+    },
+    {
+      "reciterId": 7,
+      "surahId": 2,
+      "ayah": 54,
+      "op": "restore_flattened_resay",
+      "position": 5,
+      "resayStartMs": 5414,
+      "nextOnsetMs": 7150,
+      "sourcePair": [[5, 3780, 5700], [6, 5700, 8580]],
+      "requiresAudioVerdict": true,
+      "generator": "tools/find_flattened_resays.py",
+      "evidence": ["dual-model forced alignment", "quran-align"],
+      "refs": ["tools/timing_verdicts/flattened-resay-class.json"]
+    },
+    {
+      "reciterId": 7,
+      "surahId": 39,
+      "ayah": 49,
+      "op": "restore_flattened_resay",
+      "position": 11,
+      "resayStartMs": 12076,
+      "nextOnsetMs": 12922,
+      "sourcePair": [[11, 10760, 12110], [12, 12110, 14370]],
+      "requiresAudioVerdict": true,
+      "generator": "tools/find_flattened_resays.py",
+      "evidence": ["dual-model forced alignment", "quran-align"],
+      "refs": ["tools/timing_verdicts/flattened-resay-class.json"]
+    }
+  ]
 }

@@ -1,0 +1,1140 @@
+{
+ "schemaVersion": 1,
+ "baseline": {
+  "commit": "abdb218e3b7d96513a25204e0311ed853a67deb5",
+  "databaseSha256": "abd68ae29a24f55a9bc9afd27a6b41d58f839b67af929a70c85d10d292e5be54"
+ },
+ "verdicts": {
+  "Abdurrahmaan_As-Sudais_192kbps:10:15": {
+   "verdict": "accept",
+   "kinds": [
+    "topology"
+   ],
+   "baselinePayloadHash": "698eff60fedcf25bf2669ed22d583d1a7fe5f0e0131e9c992091c37d34952951",
+   "candidatePayloadHash": "135bd4ff911ef245a2da048c42dfda7055d4ad584009b072e775b6e99efa60b3",
+   "evidence": {
+    "kind": "dual_model_topology",
+    "artifact": "tools/timing_verdicts/qdc-rewind-onset-class.json",
+    "summary": "Rewind onset: qdc tiles the ayah gaplessly, so where the reciter stops and goes back it stamps the next word's index on the instant of the rewind — a first-pass label shorter than any spoken word (< 200 ms), followed at once by the rewind, of a word the row recites later. clean_qdc_artifacts folds that instant into the word being finished. The stored occurrence sequence changes, so Arabic XLSR and MMS/uroman forced alignment both score the candidate sequence better than the baseline one on the exact EveryAyah file. Sudais ships on the re-clocked source row (v64-pipeline-resync.json); both models also place its word starts closer (XLSR 146 -> 97 ms, MMS 144 -> 94 ms mean residual).",
+    "audioSha256": "b40381da4e662cb513e7632ccd62177bfb0f3a4647620c348f4b334e3c6ecb3c",
+    "waveformVeto": false,
+    "models": [
+     {
+      "name": "arabic-xlsr-ctc",
+      "metric": "viterbiLogProbabilityPerFrame",
+      "baselineScore": -0.350162,
+      "candidateScore": -0.31693
+     },
+     {
+      "name": "mms-uroman-ctc",
+      "metric": "viterbiLogProbabilityPerFrame",
+      "baselineScore": -0.105442,
+      "candidateScore": -0.0874
+     }
+    ]
+   }
+  },
+  "Abdurrahmaan_As-Sudais_192kbps:10:83": {
+   "verdict": "accept",
+   "kinds": [
+    "topology"
+   ],
+   "baselinePayloadHash": "d7c19abb7995d73637fe99ec139c2eba4699e81326c2d8ac99fcdb630b0725ae",
+   "candidatePayloadHash": "313c9c9d83627a2bcaad36a484432309cb4001082ee6629aa88a3a9d83e3aa41",
+   "evidence": {
+    "kind": "dual_model_topology",
+    "artifact": "tools/timing_verdicts/qdc-rewind-onset-class.json",
+    "summary": "Rewind onset: qdc tiles the ayah gaplessly, so where the reciter stops and goes back it stamps the next word's index on the instant of the rewind — a first-pass label shorter than any spoken word (< 200 ms), followed at once by the rewind, of a word the row recites later. clean_qdc_artifacts folds that instant into the word being finished. The stored occurrence sequence changes, so Arabic XLSR and MMS/uroman forced alignment both score the candidate sequence better than the baseline one on the exact EveryAyah file. Sudais ships on the re-clocked source row (v64-pipeline-resync.json); both models also place its word starts closer (XLSR 206 -> 158 ms, MMS 174 -> 138 ms mean residual).",
+    "audioSha256": "a7e29b37e429bdf7847dc5b97924156fa4de5835ee43a45309427c43a9cbaf83",
+    "waveformVeto": false,
+    "models": [
+     {
+      "name": "arabic-xlsr-ctc",
+      "metric": "viterbiLogProbabilityPerFrame",
+      "baselineScore": -0.537095,
+      "candidateScore": -0.509732
+     },
+     {
+      "name": "mms-uroman-ctc",
+      "metric": "viterbiLogProbabilityPerFrame",
+      "baselineScore": -0.10278,
+      "candidateScore": -0.085502
+     }
+    ]
+   }
+  },
+  "Abdurrahmaan_As-Sudais_192kbps:13:33": {
+   "verdict": "accept",
+   "kinds": [
+    "topology"
+   ],
+   "baselinePayloadHash": "082da909196adbc02014bd702edd0fe69c976c0a849fe90ae4a3644d62874d45",
+   "candidatePayloadHash": "fc925c4fe58a20c1db3290d96c46f611ed634590dc81d6b6a404538337b07eee",
+   "evidence": {
+    "kind": "dual_model_topology",
+    "artifact": "tools/timing_verdicts/qdc-rewind-onset-class.json",
+    "summary": "Rewind onset: qdc tiles the ayah gaplessly, so where the reciter stops and goes back it stamps the next word's index on the instant of the rewind — a first-pass label shorter than any spoken word (< 200 ms), followed at once by the rewind, of a word the row recites later. clean_qdc_artifacts folds that instant into the word being finished. The stored occurrence sequence changes, so Arabic XLSR and MMS/uroman forced alignment both score the candidate sequence better than the baseline one on the exact EveryAyah file. Sudais ships on the re-clocked source row (v64-pipeline-resync.json); both models also place its word starts closer (XLSR 178 -> 133 ms, MMS 166 -> 123 ms mean residual).",
+    "audioSha256": "fbc6072e22f7a3504594a98cf505a92cf906c1d900bcb30dfd8a88351579993e",
+    "waveformVeto": false,
+    "models": [
+     {
+      "name": "arabic-xlsr-ctc",
+      "metric": "viterbiLogProbabilityPerFrame",
+      "baselineScore": -0.567805,
+      "candidateScore": -0.553536
+     },
+     {
+      "name": "mms-uroman-ctc",
+      "metric": "viterbiLogProbabilityPerFrame",
+      "baselineScore": -0.066573,
+      "candidateScore": -0.056894
+     }
+    ]
+   }
+  },
+  "Abdurrahmaan_As-Sudais_192kbps:16:80": {
+   "verdict": "accept",
+   "kinds": [
+    "topology"
+   ],
+   "baselinePayloadHash": "f4954b94f4618ebe14e56627b65b3de62a3d67955ae66e01a7f30db2ebe694b8",
+   "candidatePayloadHash": "3d39e4497a4dd93e462258cbf5f3030d1bf023c90d0d5e4e3dbfa4773a446be3",
+   "evidence": {
+    "kind": "dual_model_topology",
+    "artifact": "tools/timing_verdicts/qdc-rewind-onset-class.json",
+    "summary": "Rewind onset: qdc tiles the ayah gaplessly, so where the reciter stops and goes back it stamps the next word's index on the instant of the rewind — a first-pass label shorter than any spoken word (< 200 ms), followed at once by the rewind, of a word the row recites later. clean_qdc_artifacts folds that instant into the word being finished. The stored occurrence sequence changes, so Arabic XLSR and MMS/uroman forced alignment both score the candidate sequence better than the baseline one on the exact EveryAyah file. Sudais ships on the re-clocked source row (v64-pipeline-resync.json); both models also place its word starts closer (XLSR 158 -> 111 ms, MMS 144 -> 114 ms mean residual).",
+    "audioSha256": "27a697104152e95b689de8a5f33393a989fd98fee5ac091eda11a932f33588c6",
+    "waveformVeto": false,
+    "models": [
+     {
+      "name": "arabic-xlsr-ctc",
+      "metric": "viterbiLogProbabilityPerFrame",
+      "baselineScore": -0.429994,
+      "candidateScore": -0.396441
+     },
+     {
+      "name": "mms-uroman-ctc",
+      "metric": "viterbiLogProbabilityPerFrame",
+      "baselineScore": -0.048113,
+      "candidateScore": -0.026311
+     }
+    ]
+   }
+  },
+  "Abdurrahmaan_As-Sudais_192kbps:17:64": {
+   "verdict": "accept",
+   "kinds": [
+    "topology"
+   ],
+   "baselinePayloadHash": "d2902d0eaf8a5e5bd9189f22d3f8388390f96b428bd8ff3aca30a087ccb78cb4",
+   "candidatePayloadHash": "9db5fbd77efe9ff2be627f14fdf9beb4c074c6cc1d27bf6aaf362448845d0b76",
+   "evidence": {
+    "kind": "dual_model_topology",
+    "artifact": "tools/timing_verdicts/qdc-rewind-onset-class.json",
+    "summary": "Rewind onset: qdc tiles the ayah gaplessly, so where the reciter stops and goes back it stamps the next word's index on the instant of the rewind — a first-pass label shorter than any spoken word (< 200 ms), followed at once by the rewind, of a word the row recites later. clean_qdc_artifacts folds that instant into the word being finished. The stored occurrence sequence changes, so Arabic XLSR and MMS/uroman forced alignment both score the candidate sequence better than the baseline one on the exact EveryAyah file. Sudais ships on the re-clocked source row (v64-pipeline-resync.json); both models also place its word starts closer (XLSR 132 -> 79 ms, MMS 112 -> 74 ms mean residual).",
+    "audioSha256": "6843b309f75e6eb6c3143656735e2f8d6c2eaf3850c4b3c6e6d06bdcb0d75621",
+    "waveformVeto": false,
+    "models": [
+     {
+      "name": "arabic-xlsr-ctc",
+      "metric": "viterbiLogProbabilityPerFrame",
+      "baselineScore": -0.871565,
+      "candidateScore": -0.84064
+     },
+     {
+      "name": "mms-uroman-ctc",
+      "metric": "viterbiLogProbabilityPerFrame",
+      "baselineScore": -0.060317,
+      "candidateScore": -0.034782
+     }
+    ]
+   }
+  },
+  "Abdurrahmaan_As-Sudais_192kbps:24:14": {
+   "verdict": "accept",
+   "kinds": [
+    "topology"
+   ],
+   "baselinePayloadHash": "cc90a39af85281197e3521df1d146a470f84d1e9f680f93212143506fd44012d",
+   "candidatePayloadHash": "177d4e3a6c1d50a69900a39090b8c05346a09ca5410d100f8b1c2120f2c62f2d",
+   "evidence": {
+    "kind": "dual_model_topology",
+    "artifact": "tools/timing_verdicts/qdc-rewind-onset-class.json",
+    "summary": "Rewind onset: qdc tiles the ayah gaplessly, so where the reciter stops and goes back it stamps the next word's index on the instant of the rewind — a first-pass label shorter than any spoken word (< 200 ms), followed at once by the rewind, of a word the row recites later. clean_qdc_artifacts folds that instant into the word being finished. The stored occurrence sequence changes, so Arabic XLSR and MMS/uroman forced alignment both score the candidate sequence better than the baseline one on the exact EveryAyah file. Sudais ships on the re-clocked source row (v64-pipeline-resync.json); both models also place its word starts closer (XLSR 155 -> 86 ms, MMS 137 -> 74 ms mean residual).",
+    "audioSha256": "59a85b54c61b20f7501755356b31edf1083428bfc8c497dd7886d616da6118e8",
+    "waveformVeto": false,
+    "models": [
+     {
+      "name": "arabic-xlsr-ctc",
+      "metric": "viterbiLogProbabilityPerFrame",
+      "baselineScore": -0.323649,
+      "candidateScore": -0.27922
+     },
+     {
+      "name": "mms-uroman-ctc",
+      "metric": "viterbiLogProbabilityPerFrame",
+      "baselineScore": -0.081366,
+      "candidateScore": -0.049876
+     }
+    ]
+   }
+  },
+  "Abdurrahmaan_As-Sudais_192kbps:24:19": {
+   "verdict": "accept",
+   "kinds": [
+    "topology"
+   ],
+   "baselinePayloadHash": "b58dbda39907e3bd0779060015be3fecb2d0d4e1c04338a2bda615f848906f97",
+   "candidatePayloadHash": "8c543099e2ed7d52d187fe25abf894744f87401050bfe86cb634a837e2e02574",
+   "evidence": {
+    "kind": "dual_model_topology",
+    "artifact": "tools/timing_verdicts/qdc-rewind-onset-class.json",
+    "summary": "Rewind onset: qdc tiles the ayah gaplessly, so where the reciter stops and goes back it stamps the next word's index on the instant of the rewind — a first-pass label shorter than any spoken word (< 200 ms), followed at once by the rewind, of a word the row recites later. clean_qdc_artifacts folds that instant into the word being finished. The stored occurrence sequence changes, so Arabic XLSR and MMS/uroman forced alignment both score the candidate sequence better than the baseline one on the exact EveryAyah file. Sudais ships on the re-clocked source row (v64-pipeline-resync.json); both models also place its word starts closer (XLSR 184 -> 117 ms, MMS 144 -> 95 ms mean residual).",
+    "audioSha256": "f0de8928d227e1dbdb6bdd8c9ebf7111787e5a9cbce89163ed3b5e1a8be22415",
+    "waveformVeto": false,
+    "models": [
+     {
+      "name": "arabic-xlsr-ctc",
+      "metric": "viterbiLogProbabilityPerFrame",
+      "baselineScore": -0.197477,
+      "candidateScore": -0.165498
+     },
+     {
+      "name": "mms-uroman-ctc",
+      "metric": "viterbiLogProbabilityPerFrame",
+      "baselineScore": -0.06478,
+      "candidateScore": -0.046864
+     }
+    ]
+   }
+  },
+  "Abdurrahmaan_As-Sudais_192kbps:24:58": {
+   "verdict": "accept",
+   "kinds": [
+    "topology"
+   ],
+   "baselinePayloadHash": "5fb53dcd874d7733eca6c1f06bf4ebe00be38f17d3c76fbc3ac8a3d1d4bcf5c7",
+   "candidatePayloadHash": "bc588c4a66d18ef8ed2312b3d37c3cbed29ba9fffd19025abd2222f256957fff",
+   "evidence": {
+    "kind": "dual_model_topology",
+    "artifact": "tools/timing_verdicts/qdc-rewind-onset-class.json",
+    "summary": "Rewind onset: qdc tiles the ayah gaplessly, so where the reciter stops and goes back it stamps the next word's index on the instant of the rewind — a first-pass label shorter than any spoken word (< 200 ms), followed at once by the rewind, of a word the row recites later. clean_qdc_artifacts folds that instant into the word being finished. The stored occurrence sequence changes, so Arabic XLSR and MMS/uroman forced alignment both score the candidate sequence better than the baseline one on the exact EveryAyah file. Sudais ships on the re-clocked source row (v64-pipeline-resync.json); both models also place its word starts closer (XLSR 148 -> 99 ms, MMS 134 -> 88 ms mean residual).",
+    "audioSha256": "c211ec3f730e06320fd920f97482137a1bba45a323065e3d68c8f6801a0fb55c",
+    "waveformVeto": false,
+    "models": [
+     {
+      "name": "arabic-xlsr-ctc",
+      "metric": "viterbiLogProbabilityPerFrame",
+      "baselineScore": -0.216018,
+      "candidateScore": -0.189612
+     },
+     {
+      "name": "mms-uroman-ctc",
+      "metric": "viterbiLogProbabilityPerFrame",
+      "baselineScore": -0.085583,
+      "candidateScore": -0.069072
+     }
+    ]
+   }
+  },
+  "Abdurrahmaan_As-Sudais_192kbps:27:82": {
+   "verdict": "accept",
+   "kinds": [
+    "topology"
+   ],
+   "baselinePayloadHash": "e93e681d13569d039bd9c758fab59c81573d2d2a2f3182bac12fa4cc7bc369f8",
+   "candidatePayloadHash": "f7bf28ececfbb68f7c8a1696fd74dfd9de008654c1c0a0989e1133d74f90e8cf",
+   "evidence": {
+    "kind": "dual_model_topology",
+    "artifact": "tools/timing_verdicts/qdc-rewind-onset-class.json",
+    "summary": "Rewind onset: qdc tiles the ayah gaplessly, so where the reciter stops and goes back it stamps the next word's index on the instant of the rewind — a first-pass label shorter than any spoken word (< 200 ms), followed at once by the rewind, of a word the row recites later. clean_qdc_artifacts folds that instant into the word being finished. The stored occurrence sequence changes, so Arabic XLSR and MMS/uroman forced alignment both score the candidate sequence better than the baseline one on the exact EveryAyah file. Sudais ships on the re-clocked source row (v64-pipeline-resync.json); both models also place its word starts closer (XLSR 158 -> 103 ms, MMS 138 -> 95 ms mean residual).",
+    "audioSha256": "987fa24a7c594dd54ad38a4846f044538a36cba0e9dcdc202f8d74cd8d1d874c",
+    "waveformVeto": false,
+    "models": [
+     {
+      "name": "arabic-xlsr-ctc",
+      "metric": "viterbiLogProbabilityPerFrame",
+      "baselineScore": -0.628361,
+      "candidateScore": -0.580161
+     },
+     {
+      "name": "mms-uroman-ctc",
+      "metric": "viterbiLogProbabilityPerFrame",
+      "baselineScore": -0.071843,
+      "candidateScore": -0.049123
+     }
+    ]
+   }
+  },
+  "Abdurrahmaan_As-Sudais_192kbps:2:266": {
+   "verdict": "accept",
+   "kinds": [
+    "topology"
+   ],
+   "baselinePayloadHash": "bed7ca62445b61a702b75eac112196ea3a90c842e2744a89317d862f3847fc76",
+   "candidatePayloadHash": "c953e08166e482926a1fee316c57c92cf57594c1a11f9174ba30439dc48ccc44",
+   "evidence": {
+    "kind": "dual_model_topology",
+    "artifact": "tools/timing_verdicts/qdc-rewind-onset-class.json",
+    "summary": "Rewind onset: qdc tiles the ayah gaplessly, so where the reciter stops and goes back it stamps the next word's index on the instant of the rewind — a first-pass label shorter than any spoken word (< 200 ms), followed at once by the rewind, of a word the row recites later. clean_qdc_artifacts folds that instant into the word being finished. The stored occurrence sequence changes, so Arabic XLSR and MMS/uroman forced alignment both score the candidate sequence better than the baseline one on the exact EveryAyah file. Sudais ships on the re-clocked source row (v64-pipeline-resync.json); both models also place its word starts closer (XLSR 193 -> 124 ms, MMS 155 -> 107 ms mean residual).",
+    "audioSha256": "6e1867ef2fb03c46b9d2c3f1d55ce4877824add5e6b1b20f4dd17711d00be690",
+    "waveformVeto": false,
+    "models": [
+     {
+      "name": "arabic-xlsr-ctc",
+      "metric": "viterbiLogProbabilityPerFrame",
+      "baselineScore": -0.573325,
+      "candidateScore": -0.558594
+     },
+     {
+      "name": "mms-uroman-ctc",
+      "metric": "viterbiLogProbabilityPerFrame",
+      "baselineScore": -0.053473,
+      "candidateScore": -0.043526
+     }
+    ]
+   }
+  },
+  "Abdurrahmaan_As-Sudais_192kbps:34:33": {
+   "verdict": "accept",
+   "kinds": [
+    "topology"
+   ],
+   "baselinePayloadHash": "86b84a702c42f93e0ead58b25c76d7b6e912765bda31477b744bd3968ad830a8",
+   "candidatePayloadHash": "b33d083e875dcacbd83b2bc2a8fe420112e7dbc41d105dee8da00d9883cd2a35",
+   "evidence": {
+    "kind": "dual_model_topology",
+    "artifact": "tools/timing_verdicts/qdc-rewind-onset-class.json",
+    "summary": "Rewind onset: qdc tiles the ayah gaplessly, so where the reciter stops and goes back it stamps the next word's index on the instant of the rewind — a first-pass label shorter than any spoken word (< 200 ms), followed at once by the rewind, of a word the row recites later. clean_qdc_artifacts folds that instant into the word being finished. The stored occurrence sequence changes, so Arabic XLSR and MMS/uroman forced alignment both score the candidate sequence better than the baseline one on the exact EveryAyah file. Sudais ships on the re-clocked source row (v64-pipeline-resync.json); both models also place its word starts closer (XLSR 216 -> 137 ms, MMS 190 -> 129 ms mean residual).",
+    "audioSha256": "e7664fe3cd3589addc89a5f8a6c1eff28f037b6118b084dc42584c338c5ac6f5",
+    "waveformVeto": false,
+    "models": [
+     {
+      "name": "arabic-xlsr-ctc",
+      "metric": "viterbiLogProbabilityPerFrame",
+      "baselineScore": -0.614614,
+      "candidateScore": -0.599229
+     },
+     {
+      "name": "mms-uroman-ctc",
+      "metric": "viterbiLogProbabilityPerFrame",
+      "baselineScore": -0.065995,
+      "candidateScore": -0.057508
+     }
+    ]
+   }
+  },
+  "Abdurrahmaan_As-Sudais_192kbps:3:165": {
+   "verdict": "accept",
+   "kinds": [
+    "topology"
+   ],
+   "baselinePayloadHash": "0defb62a97136435f598d4d7ab76d529c86ee2eaa3f7681defecef5f546638bb",
+   "candidatePayloadHash": "3b5276b17f1d7d6872c6a611b222aea7d2179616040cd46ca3138ea196a35c2f",
+   "evidence": {
+    "kind": "dual_model_topology",
+    "artifact": "tools/timing_verdicts/qdc-rewind-onset-class.json",
+    "summary": "Rewind onset: qdc tiles the ayah gaplessly, so where the reciter stops and goes back it stamps the next word's index on the instant of the rewind — a first-pass label shorter than any spoken word (< 200 ms), followed at once by the rewind, of a word the row recites later. clean_qdc_artifacts folds that instant into the word being finished. The stored occurrence sequence changes, so Arabic XLSR and MMS/uroman forced alignment both score the candidate sequence better than the baseline one on the exact EveryAyah file. Sudais ships on the re-clocked source row (v64-pipeline-resync.json); both models also place its word starts closer (XLSR 167 -> 107 ms, MMS 166 -> 116 ms mean residual).",
+    "audioSha256": "b99922a39db3bdd5b5c81dcc3a6c820479e04962208acbc22441531a43033f7d",
+    "waveformVeto": false,
+    "models": [
+     {
+      "name": "arabic-xlsr-ctc",
+      "metric": "viterbiLogProbabilityPerFrame",
+      "baselineScore": -0.357673,
+      "candidateScore": -0.326949
+     },
+     {
+      "name": "mms-uroman-ctc",
+      "metric": "viterbiLogProbabilityPerFrame",
+      "baselineScore": -0.068336,
+      "candidateScore": -0.049625
+     }
+    ]
+   }
+  },
+  "Abdurrahmaan_As-Sudais_192kbps:3:99": {
+   "verdict": "accept",
+   "kinds": [
+    "topology"
+   ],
+   "baselinePayloadHash": "e49b86c559e34b1f5c0c563afcbf1dfef25c7137070bc610cb38c00c3f96c9f6",
+   "candidatePayloadHash": "36a453d4f88d17d65f642819badd1f1cd2397bfd65c475cddfd5c375fe3fa0f8",
+   "evidence": {
+    "kind": "dual_model_topology",
+    "artifact": "tools/timing_verdicts/qdc-rewind-onset-class.json",
+    "summary": "Rewind onset: qdc tiles the ayah gaplessly, so where the reciter stops and goes back it stamps the next word's index on the instant of the rewind — a first-pass label shorter than any spoken word (< 200 ms), followed at once by the rewind, of a word the row recites later. clean_qdc_artifacts folds that instant into the word being finished. The stored occurrence sequence changes, so Arabic XLSR and MMS/uroman forced alignment both score the candidate sequence better than the baseline one on the exact EveryAyah file. Sudais ships on the re-clocked source row (v64-pipeline-resync.json); both models also place its word starts closer (XLSR 198 -> 103 ms, MMS 176 -> 150 ms mean residual).",
+    "audioSha256": "11861057648d547d9ab72a5df38d7ad67ec797fea3f7dde88e31111bcfb33bec",
+    "waveformVeto": false,
+    "models": [
+     {
+      "name": "arabic-xlsr-ctc",
+      "metric": "viterbiLogProbabilityPerFrame",
+      "baselineScore": -0.29187,
+      "candidateScore": -0.234533
+     },
+     {
+      "name": "mms-uroman-ctc",
+      "metric": "viterbiLogProbabilityPerFrame",
+      "baselineScore": -0.135744,
+      "candidateScore": -0.098185
+     }
+    ]
+   }
+  },
+  "Abdurrahmaan_As-Sudais_192kbps:40:56": {
+   "verdict": "accept",
+   "kinds": [
+    "topology"
+   ],
+   "baselinePayloadHash": "748357db49daa886fd21fcca64a17ca67ea1c177c0b574eecf42b2579e3eb0cc",
+   "candidatePayloadHash": "4db037c6cf0cd76e5c874160ec6f60806fcd8aa0e2eeb54c24933b9b9b5c50e3",
+   "evidence": {
+    "kind": "dual_model_topology",
+    "artifact": "tools/timing_verdicts/qdc-rewind-onset-class.json",
+    "summary": "Rewind onset: qdc tiles the ayah gaplessly, so where the reciter stops and goes back it stamps the next word's index on the instant of the rewind — a first-pass label shorter than any spoken word (< 200 ms), followed at once by the rewind, of a word the row recites later. clean_qdc_artifacts folds that instant into the word being finished. The stored occurrence sequence changes, so Arabic XLSR and MMS/uroman forced alignment both score the candidate sequence better than the baseline one on the exact EveryAyah file. Sudais ships on the re-clocked source row (v64-pipeline-resync.json); both models also place its word starts closer (XLSR 183 -> 116 ms, MMS 174 -> 120 ms mean residual).",
+    "audioSha256": "4e991e95b90be78a70017af7764fa394140ac43312f2c55bddc8b36578f1e2bb",
+    "waveformVeto": false,
+    "models": [
+     {
+      "name": "arabic-xlsr-ctc",
+      "metric": "viterbiLogProbabilityPerFrame",
+      "baselineScore": -0.599478,
+      "candidateScore": -0.569189
+     },
+     {
+      "name": "mms-uroman-ctc",
+      "metric": "viterbiLogProbabilityPerFrame",
+      "baselineScore": -0.06419,
+      "candidateScore": -0.046316
+     }
+    ]
+   }
+  },
+  "Abdurrahmaan_As-Sudais_192kbps:40:60": {
+   "verdict": "accept",
+   "kinds": [
+    "topology"
+   ],
+   "baselinePayloadHash": "697b74822969273ac1d85290eb76f05350aea21788c8acd95f19a1ee771188f3",
+   "candidatePayloadHash": "315009add61ecef9ecf4e04651af0f026e52fc0cd0953dbb17c40ab0f05d1e2c",
+   "evidence": {
+    "kind": "dual_model_topology",
+    "artifact": "tools/timing_verdicts/qdc-rewind-onset-class.json",
+    "summary": "Rewind onset: qdc tiles the ayah gaplessly, so where the reciter stops and goes back it stamps the next word's index on the instant of the rewind — a first-pass label shorter than any spoken word (< 200 ms), followed at once by the rewind, of a word the row recites later. clean_qdc_artifacts folds that instant into the word being finished. The stored occurrence sequence changes, so Arabic XLSR and MMS/uroman forced alignment both score the candidate sequence better than the baseline one on the exact EveryAyah file. Sudais ships on the re-clocked source row (v64-pipeline-resync.json); both models also place its word starts closer (XLSR 155 -> 107 ms, MMS 150 -> 112 ms mean residual).",
+    "audioSha256": "30a3367d550266cd333f565947008db4a32d180c9cf524c9721f2b620611b26b",
+    "waveformVeto": false,
+    "models": [
+     {
+      "name": "arabic-xlsr-ctc",
+      "metric": "viterbiLogProbabilityPerFrame",
+      "baselineScore": -0.66028,
+      "candidateScore": -0.627005
+     },
+     {
+      "name": "mms-uroman-ctc",
+      "metric": "viterbiLogProbabilityPerFrame",
+      "baselineScore": -0.069425,
+      "candidateScore": -0.046049
+     }
+    ]
+   }
+  },
+  "Abdurrahmaan_As-Sudais_192kbps:49:7": {
+   "verdict": "accept",
+   "kinds": [
+    "topology"
+   ],
+   "baselinePayloadHash": "dae6e25aac4523d83c0a3355b44aa9de75fc884065363d26a13c73598edabd80",
+   "candidatePayloadHash": "9dded63a7d7656b7015bfea85977000277c9279b47e7f8abe7f11ed9c0aa806f",
+   "evidence": {
+    "kind": "dual_model_topology",
+    "artifact": "tools/timing_verdicts/qdc-rewind-onset-class.json",
+    "summary": "Rewind onset: qdc tiles the ayah gaplessly, so where the reciter stops and goes back it stamps the next word's index on the instant of the rewind — a first-pass label shorter than any spoken word (< 200 ms), followed at once by the rewind, of a word the row recites later. clean_qdc_artifacts folds that instant into the word being finished. The stored occurrence sequence changes, so Arabic XLSR and MMS/uroman forced alignment both score the candidate sequence better than the baseline one on the exact EveryAyah file. Sudais ships on the re-clocked source row (v64-pipeline-resync.json); both models also place its word starts closer (XLSR 140 -> 92 ms, MMS 133 -> 91 ms mean residual).",
+    "audioSha256": "a316590a4e02932668b91d8b872d3a2f8ff25a4830d70fd317a7e5cf1a738f90",
+    "waveformVeto": false,
+    "models": [
+     {
+      "name": "arabic-xlsr-ctc",
+      "metric": "viterbiLogProbabilityPerFrame",
+      "baselineScore": -0.317243,
+      "candidateScore": -0.298943
+     },
+     {
+      "name": "mms-uroman-ctc",
+      "metric": "viterbiLogProbabilityPerFrame",
+      "baselineScore": -0.048825,
+      "candidateScore": -0.0352
+     }
+    ]
+   }
+  },
+  "Abdurrahmaan_As-Sudais_192kbps:4:101": {
+   "verdict": "accept",
+   "kinds": [
+    "topology"
+   ],
+   "baselinePayloadHash": "341a2a5732f4da426fee50e4384f6c6f1bfe8ec263b27f34f75dfbc5401bb936",
+   "candidatePayloadHash": "0b7d4ebbacff8322ca6d8ea2f3498760ed4ee287bb8e531bf5a4a8c114f79033",
+   "evidence": {
+    "kind": "dual_model_topology",
+    "artifact": "tools/timing_verdicts/qdc-rewind-onset-class.json",
+    "summary": "Rewind onset: qdc tiles the ayah gaplessly, so where the reciter stops and goes back it stamps the next word's index on the instant of the rewind — a first-pass label shorter than any spoken word (< 200 ms), followed at once by the rewind, of a word the row recites later. clean_qdc_artifacts folds that instant into the word being finished. The stored occurrence sequence changes, so Arabic XLSR and MMS/uroman forced alignment both score the candidate sequence better than the baseline one on the exact EveryAyah file. Sudais ships on the re-clocked source row (v64-pipeline-resync.json); both models also place its word starts closer (XLSR 190 -> 130 ms, MMS 172 -> 125 ms mean residual).",
+    "audioSha256": "b635e9b723317ccfddfb89915e9a0b32e4c7c37bb3fca56088259f8ef3c417ba",
+    "waveformVeto": false,
+    "models": [
+     {
+      "name": "arabic-xlsr-ctc",
+      "metric": "viterbiLogProbabilityPerFrame",
+      "baselineScore": -0.663365,
+      "candidateScore": -0.635438
+     },
+     {
+      "name": "mms-uroman-ctc",
+      "metric": "viterbiLogProbabilityPerFrame",
+      "baselineScore": -0.049068,
+      "candidateScore": -0.033826
+     }
+    ]
+   }
+  },
+  "Abdurrahmaan_As-Sudais_192kbps:6:146": {
+   "verdict": "accept",
+   "kinds": [
+    "topology"
+   ],
+   "baselinePayloadHash": "3957f76357dba727f211a6f1371aed180e995cc6e5a86b0582e5a849b59608f0",
+   "candidatePayloadHash": "4a821413da76204a7866eb29a0120b805ec94d8a23c5cc49abd38fb9b7d51199",
+   "evidence": {
+    "kind": "dual_model_topology",
+    "artifact": "tools/timing_verdicts/qdc-rewind-onset-class.json",
+    "summary": "Rewind onset: qdc tiles the ayah gaplessly, so where the reciter stops and goes back it stamps the next word's index on the instant of the rewind — a first-pass label shorter than any spoken word (< 200 ms), followed at once by the rewind, of a word the row recites later. clean_qdc_artifacts folds that instant into the word being finished. The stored occurrence sequence changes, so Arabic XLSR and MMS/uroman forced alignment both score the candidate sequence better than the baseline one on the exact EveryAyah file. Sudais ships on the re-clocked source row (v64-pipeline-resync.json); both models also place its word starts closer (XLSR 160 -> 111 ms, MMS 145 -> 113 ms mean residual).",
+    "audioSha256": "5b11239fa01ffc7f7fc605e189ee8eb7bb082145612d83f37335862cd4ae5bb1",
+    "waveformVeto": false,
+    "models": [
+     {
+      "name": "arabic-xlsr-ctc",
+      "metric": "viterbiLogProbabilityPerFrame",
+      "baselineScore": -0.206058,
+      "candidateScore": -0.183798
+     },
+     {
+      "name": "mms-uroman-ctc",
+      "metric": "viterbiLogProbabilityPerFrame",
+      "baselineScore": -0.057282,
+      "candidateScore": -0.046142
+     }
+    ]
+   }
+  },
+  "Abdurrahmaan_As-Sudais_192kbps:7:33": {
+   "verdict": "accept",
+   "kinds": [
+    "topology"
+   ],
+   "baselinePayloadHash": "9f668bf42f4b5ebe53554a153ceacce3984d730cbf7e30454518e177b74e5312",
+   "candidatePayloadHash": "df61f7e8676f37caa2df71c63924c532980955ed8ca684ebf435583f2a7421d6",
+   "evidence": {
+    "kind": "dual_model_topology",
+    "artifact": "tools/timing_verdicts/qdc-rewind-onset-class.json",
+    "summary": "Rewind onset: qdc tiles the ayah gaplessly, so where the reciter stops and goes back it stamps the next word's index on the instant of the rewind — a first-pass label shorter than any spoken word (< 200 ms), followed at once by the rewind, of a word the row recites later. clean_qdc_artifacts folds that instant into the word being finished. The stored occurrence sequence changes, so Arabic XLSR and MMS/uroman forced alignment both score the candidate sequence better than the baseline one on the exact EveryAyah file. Sudais ships on the re-clocked source row (v64-pipeline-resync.json); both models also place its word starts closer (XLSR 140 -> 95 ms, MMS 133 -> 87 ms mean residual).",
+    "audioSha256": "88992672db05650fc1bcda5223a25d56b4c86ec865ff10dea342ca7c67a57d86",
+    "waveformVeto": false,
+    "models": [
+     {
+      "name": "arabic-xlsr-ctc",
+      "metric": "viterbiLogProbabilityPerFrame",
+      "baselineScore": -0.542733,
+      "candidateScore": -0.510186
+     },
+     {
+      "name": "mms-uroman-ctc",
+      "metric": "viterbiLogProbabilityPerFrame",
+      "baselineScore": -0.056482,
+      "candidateScore": -0.0432
+     }
+    ]
+   }
+  },
+  "Abdurrahmaan_As-Sudais_192kbps:7:36": {
+   "verdict": "accept",
+   "kinds": [
+    "topology"
+   ],
+   "baselinePayloadHash": "15afeb394bf087c619e8d566f37d58b35cfd8ed37e18c9c34ab8f4a0bdd8cde1",
+   "candidatePayloadHash": "867ddfb7a3cf9c1ccb0dc63cec9493df603f526c9d063e55cc9ca4481ad0d9d2",
+   "evidence": {
+    "kind": "dual_model_topology",
+    "artifact": "tools/timing_verdicts/qdc-rewind-onset-class.json",
+    "summary": "Rewind onset: qdc tiles the ayah gaplessly, so where the reciter stops and goes back it stamps the next word's index on the instant of the rewind — a first-pass label shorter than any spoken word (< 200 ms), followed at once by the rewind, of a word the row recites later. clean_qdc_artifacts folds that instant into the word being finished. The stored occurrence sequence changes, so Arabic XLSR and MMS/uroman forced alignment both score the candidate sequence better than the baseline one on the exact EveryAyah file. Sudais ships on the re-clocked source row (v64-pipeline-resync.json); both models also place its word starts closer (XLSR 157 -> 91 ms, MMS 141 -> 83 ms mean residual).",
+    "audioSha256": "c07673dd5f156dec48c47e5794aa90a7b021cbc22fb180da2d15a6e899af858b",
+    "waveformVeto": false,
+    "models": [
+     {
+      "name": "arabic-xlsr-ctc",
+      "metric": "viterbiLogProbabilityPerFrame",
+      "baselineScore": -0.529187,
+      "candidateScore": -0.499238
+     },
+     {
+      "name": "mms-uroman-ctc",
+      "metric": "viterbiLogProbabilityPerFrame",
+      "baselineScore": -0.073648,
+      "candidateScore": -0.054155
+     }
+    ]
+   }
+  },
+  "Abdurrahmaan_As-Sudais_192kbps:7:71": {
+   "verdict": "accept",
+   "kinds": [
+    "topology"
+   ],
+   "baselinePayloadHash": "09b33bf770ef0114e3f6e768e75014b2e1ff46668aa58bc8ba660dba2f161efd",
+   "candidatePayloadHash": "b0b9bfa9a263fda9afe9dc598cf406636665b9403c06c58a7bb14b057daf9d12",
+   "evidence": {
+    "kind": "dual_model_topology",
+    "artifact": "tools/timing_verdicts/qdc-rewind-onset-class.json",
+    "summary": "Rewind onset: qdc tiles the ayah gaplessly, so where the reciter stops and goes back it stamps the next word's index on the instant of the rewind — a first-pass label shorter than any spoken word (< 200 ms), followed at once by the rewind, of a word the row recites later. clean_qdc_artifacts folds that instant into the word being finished. The stored occurrence sequence changes, so Arabic XLSR and MMS/uroman forced alignment both score the candidate sequence better than the baseline one on the exact EveryAyah file. Sudais ships on the re-clocked source row (v64-pipeline-resync.json); both models also place its word starts closer (XLSR 204 -> 154 ms, MMS 212 -> 141 ms mean residual).",
+    "audioSha256": "5353510d9fb79b0a551348b931f9f51592b8fabc77ae4ab59e55a500848d0bac",
+    "waveformVeto": false,
+    "models": [
+     {
+      "name": "arabic-xlsr-ctc",
+      "metric": "viterbiLogProbabilityPerFrame",
+      "baselineScore": -0.244118,
+      "candidateScore": -0.219696
+     },
+     {
+      "name": "mms-uroman-ctc",
+      "metric": "viterbiLogProbabilityPerFrame",
+      "baselineScore": -0.054784,
+      "candidateScore": -0.043052
+     }
+    ]
+   }
+  },
+  "Abdurrahmaan_As-Sudais_192kbps:9:81": {
+   "verdict": "accept",
+   "kinds": [
+    "topology"
+   ],
+   "baselinePayloadHash": "fea6ae74bd58b61ff19a79f02ad5a21fb0ad840dd21547202661a697ea69747d",
+   "candidatePayloadHash": "e12b8a7fc9e5d9aa0004b66deceea439306494f3d23d1129e8b8eda955ef2cf0",
+   "evidence": {
+    "kind": "dual_model_topology",
+    "artifact": "tools/timing_verdicts/qdc-rewind-onset-class.json",
+    "summary": "Rewind onset: qdc tiles the ayah gaplessly, so where the reciter stops and goes back it stamps the next word's index on the instant of the rewind — a first-pass label shorter than any spoken word (< 200 ms), followed at once by the rewind, of a word the row recites later. clean_qdc_artifacts folds that instant into the word being finished. The stored occurrence sequence changes, so Arabic XLSR and MMS/uroman forced alignment both score the candidate sequence better than the baseline one on the exact EveryAyah file. Sudais ships on the re-clocked source row (v64-pipeline-resync.json); both models also place its word starts closer (XLSR 139 -> 84 ms, MMS 131 -> 80 ms mean residual).",
+    "audioSha256": "aae0828277d631b1efe2258c3206ac1f4269baf0dd60ce7947cc09fdc0658811",
+    "waveformVeto": false,
+    "models": [
+     {
+      "name": "arabic-xlsr-ctc",
+      "metric": "viterbiLogProbabilityPerFrame",
+      "baselineScore": -0.589156,
+      "candidateScore": -0.569375
+     },
+     {
+      "name": "mms-uroman-ctc",
+      "metric": "viterbiLogProbabilityPerFrame",
+      "baselineScore": -0.060791,
+      "candidateScore": -0.046769
+     }
+    ]
+   }
+  },
+  "Alafasy_128kbps:25:70": {
+   "verdict": "accept",
+   "kinds": [
+    "topology"
+   ],
+   "baselinePayloadHash": "96c0c927e1bb2152b417c41c3d8593ff8e9079ff739380bd145631cb10e7f3f4",
+   "candidatePayloadHash": "4de46cb34aa2e83e2c28fd4bd957b318a43adcffb3a4615bf305087ea0866cf8",
+   "evidence": {
+    "kind": "dual_model_topology",
+    "artifact": "tools/timing_verdicts/qdc-rewind-onset-class.json",
+    "summary": "Rewind onset: qdc tiles the ayah gaplessly, so where the reciter stops and goes back it stamps the next word's index on the instant of the rewind — a first-pass label shorter than any spoken word (< 200 ms), followed at once by the rewind, of a word the row recites later. clean_qdc_artifacts folds that instant into the word being finished. The stored occurrence sequence changes, so Arabic XLSR and MMS/uroman forced alignment both score the candidate sequence better than the baseline one on the exact EveryAyah file.",
+    "audioSha256": "bda76a3be3e6855ff521d9e8895abb061864590de2d290c2104c10cfeb67ac8a",
+    "waveformVeto": false,
+    "models": [
+     {
+      "name": "arabic-xlsr-ctc",
+      "metric": "viterbiLogProbabilityPerFrame",
+      "baselineScore": -0.359653,
+      "candidateScore": -0.329215
+     },
+     {
+      "name": "mms-uroman-ctc",
+      "metric": "viterbiLogProbabilityPerFrame",
+      "baselineScore": -0.100325,
+      "candidateScore": -0.071507
+     }
+    ]
+   }
+  },
+  "Alafasy_128kbps:41:10": {
+   "verdict": "accept",
+   "kinds": [
+    "topology"
+   ],
+   "baselinePayloadHash": "17028fe8517b9bf2930bc19bda2d8df02c2a56f0e3e1d9cc98bda7b53958b6e8",
+   "candidatePayloadHash": "910945f86734e7cc1bee287e476cb4009d60119a502bfdbcb859e9ec915a1053",
+   "evidence": {
+    "kind": "dual_model_topology",
+    "artifact": "tools/timing_verdicts/qdc-rewind-onset-class.json",
+    "summary": "Rewind onset: qdc tiles the ayah gaplessly, so where the reciter stops and goes back it stamps the next word's index on the instant of the rewind — a first-pass label shorter than any spoken word (< 200 ms), followed at once by the rewind, of a word the row recites later. clean_qdc_artifacts folds that instant into the word being finished. The stored occurrence sequence changes, so Arabic XLSR and MMS/uroman forced alignment both score the candidate sequence better than the baseline one on the exact EveryAyah file.",
+    "audioSha256": "750ad17743be0d8ff8f002640a5d57ff4808fbd86b53d542c2b201af63aee819",
+    "waveformVeto": false,
+    "models": [
+     {
+      "name": "arabic-xlsr-ctc",
+      "metric": "viterbiLogProbabilityPerFrame",
+      "baselineScore": -0.35119,
+      "candidateScore": -0.335272
+     },
+     {
+      "name": "mms-uroman-ctc",
+      "metric": "viterbiLogProbabilityPerFrame",
+      "baselineScore": -0.033216,
+      "candidateScore": -0.020238
+     }
+    ]
+   }
+  },
+  "Alafasy_128kbps:4:19": {
+   "verdict": "accept",
+   "kinds": [
+    "topology"
+   ],
+   "baselinePayloadHash": "214cd830221989f87a0f4df265f2f6fa0c1d89550b5bd0ce4e7fe14cd06b1c53",
+   "candidatePayloadHash": "8f31629d8b52883b23d557cc248376749cf9a78f2ff77a2fb4be934630159db6",
+   "evidence": {
+    "kind": "dual_model_topology",
+    "artifact": "tools/timing_verdicts/qdc-rewind-onset-class.json",
+    "summary": "Rewind onset: qdc tiles the ayah gaplessly, so where the reciter stops and goes back it stamps the next word's index on the instant of the rewind — a first-pass label shorter than any spoken word (< 200 ms), followed at once by the rewind, of a word the row recites later. clean_qdc_artifacts folds that instant into the word being finished. The stored occurrence sequence changes, so Arabic XLSR and MMS/uroman forced alignment both score the candidate sequence better than the baseline one on the exact EveryAyah file. Alafasy 4:19 retires its July one_utterance verdict: that collapse read 17,[18 for 60 ms],17,18 as one utterance and left a 2.1 s hole, but CTC decodes إِلّا twice (21.44-22.00 s, 22.74-23.30 s) and both forced aligners place an إِلَّآ in each window.",
+    "audioSha256": "b8b1e919243806bbfa599415e87aaef4267c6fb46e56dd55524fb2ac31a45963",
+    "waveformVeto": false,
+    "models": [
+     {
+      "name": "arabic-xlsr-ctc",
+      "metric": "viterbiLogProbabilityPerFrame",
+      "baselineScore": -0.461392,
+      "candidateScore": -0.456317
+     },
+     {
+      "name": "mms-uroman-ctc",
+      "metric": "viterbiLogProbabilityPerFrame",
+      "baselineScore": -0.045839,
+      "candidateScore": -0.042134
+     }
+    ]
+   }
+  },
+  "Alafasy_128kbps:6:146": {
+   "verdict": "accept",
+   "kinds": [
+    "topology"
+   ],
+   "baselinePayloadHash": "05ebc774574c1f87d33ad68993706ca74dc77bd0b5ffd0c421e9d0da894881de",
+   "candidatePayloadHash": "2fb5d986849d351ec0bd3454e8fd86a10a724bc68a4690b4b4a71f42092084d8",
+   "evidence": {
+    "kind": "dual_model_topology",
+    "artifact": "tools/timing_verdicts/qdc-rewind-onset-class.json",
+    "summary": "Rewind onset: qdc tiles the ayah gaplessly, so where the reciter stops and goes back it stamps the next word's index on the instant of the rewind — a first-pass label shorter than any spoken word (< 200 ms), followed at once by the rewind, of a word the row recites later. clean_qdc_artifacts folds that instant into the word being finished. The stored occurrence sequence changes, so Arabic XLSR and MMS/uroman forced alignment both score the candidate sequence better than the baseline one on the exact EveryAyah file.",
+    "audioSha256": "8b802ebb04d44ca474d2952dd5904ce47fa01f5ad9da7b62d244bcd4fdb254f8",
+    "waveformVeto": false,
+    "models": [
+     {
+      "name": "arabic-xlsr-ctc",
+      "metric": "viterbiLogProbabilityPerFrame",
+      "baselineScore": -0.404782,
+      "candidateScore": -0.391501
+     },
+     {
+      "name": "mms-uroman-ctc",
+      "metric": "viterbiLogProbabilityPerFrame",
+      "baselineScore": -0.033277,
+      "candidateScore": -0.025318
+     }
+    ]
+   }
+  },
+  "Alafasy_128kbps:8:41": {
+   "verdict": "accept",
+   "kinds": [
+    "topology"
+   ],
+   "baselinePayloadHash": "28a76e4c72f4f633da98f1e48f6cb9cab53f61fec9fcdcd1d80f6fbd8a4cec39",
+   "candidatePayloadHash": "94f7c21a2da4431f67ab410bfb2eb1e6bd5ffde92048d7e33aa922d702e83595",
+   "evidence": {
+    "kind": "dual_model_topology",
+    "artifact": "tools/timing_verdicts/qdc-rewind-onset-class.json",
+    "summary": "Rewind onset: qdc tiles the ayah gaplessly, so where the reciter stops and goes back it stamps the next word's index on the instant of the rewind — a first-pass label shorter than any spoken word (< 200 ms), followed at once by the rewind, of a word the row recites later. clean_qdc_artifacts folds that instant into the word being finished. The stored occurrence sequence changes, so Arabic XLSR and MMS/uroman forced alignment both score the candidate sequence better than the baseline one on the exact EveryAyah file.",
+    "audioSha256": "460fc0b48683e4b3d6e9860e9a3cea69b13bf18e5509529fba5fc806e7516c62",
+    "waveformVeto": false,
+    "models": [
+     {
+      "name": "arabic-xlsr-ctc",
+      "metric": "viterbiLogProbabilityPerFrame",
+      "baselineScore": -0.504295,
+      "candidateScore": -0.499126
+     },
+     {
+      "name": "mms-uroman-ctc",
+      "metric": "viterbiLogProbabilityPerFrame",
+      "baselineScore": -0.065172,
+      "candidateScore": -0.059288
+     }
+    ]
+   }
+  },
+  "Hani_Rifai_192kbps:21:63": {
+   "verdict": "accept",
+   "kinds": [
+    "topology"
+   ],
+   "baselinePayloadHash": "0eda914359114bd0cd5c6e8763136abfe217eeb5866512cff595db286f48d9d3",
+   "candidatePayloadHash": "f301764f242f82877a14e77ed8ab5967570e5fde0ad699198f9cd78c781cbd6e",
+   "evidence": {
+    "kind": "dual_model_topology",
+    "artifact": "tools/timing_verdicts/qdc-rewind-onset-class.json",
+    "summary": "Rewind onset: qdc tiles the ayah gaplessly, so where the reciter stops and goes back it stamps the next word's index on the instant of the rewind — a first-pass label shorter than any spoken word (< 200 ms), followed at once by the rewind, of a word the row recites later. clean_qdc_artifacts folds that instant into the word being finished. The stored occurrence sequence changes, so Arabic XLSR and MMS/uroman forced alignment both score the candidate sequence better than the baseline one on the exact EveryAyah file.",
+    "audioSha256": "eab9482f9f2e730f318efa2de932d52f962e093019acc61b81b820585ad6bca6",
+    "waveformVeto": false,
+    "models": [
+     {
+      "name": "arabic-xlsr-ctc",
+      "metric": "viterbiLogProbabilityPerFrame",
+      "baselineScore": -0.201168,
+      "candidateScore": -0.124924
+     },
+     {
+      "name": "mms-uroman-ctc",
+      "metric": "viterbiLogProbabilityPerFrame",
+      "baselineScore": -0.098645,
+      "candidateScore": -0.071007
+     }
+    ]
+   }
+  },
+  "Hani_Rifai_192kbps:24:19": {
+   "verdict": "accept",
+   "kinds": [
+    "topology"
+   ],
+   "baselinePayloadHash": "0718a916e0d3b12ea97ab3cbfd6c562ebcd2f6d5635ac5e197dc070e139caf87",
+   "candidatePayloadHash": "93ddeca01880e194ca94b0c2316329591f0c98282143983cc8bdc759ae8a2e90",
+   "evidence": {
+    "kind": "dual_model_topology",
+    "artifact": "tools/timing_verdicts/qdc-rewind-onset-class.json",
+    "summary": "Rewind onset: qdc tiles the ayah gaplessly, so where the reciter stops and goes back it stamps the next word's index on the instant of the rewind — a first-pass label shorter than any spoken word (< 200 ms), followed at once by the rewind, of a word the row recites later. clean_qdc_artifacts folds that instant into the word being finished. The stored occurrence sequence changes, so Arabic XLSR and MMS/uroman forced alignment both score the candidate sequence better than the baseline one on the exact EveryAyah file.",
+    "audioSha256": "ec4543115443e0d21baf3c6e04202979b9401d85bbb333672cb77f66b2933073",
+    "waveformVeto": false,
+    "models": [
+     {
+      "name": "arabic-xlsr-ctc",
+      "metric": "viterbiLogProbabilityPerFrame",
+      "baselineScore": -0.441632,
+      "candidateScore": -0.417886
+     },
+     {
+      "name": "mms-uroman-ctc",
+      "metric": "viterbiLogProbabilityPerFrame",
+      "baselineScore": -0.076996,
+      "candidateScore": -0.061892
+     }
+    ]
+   }
+  },
+  "Hani_Rifai_192kbps:4:127": {
+   "verdict": "accept",
+   "kinds": [
+    "topology"
+   ],
+   "baselinePayloadHash": "382381df3561436fd48e6d73ed9c872ff8d8aa75a93fa6833a636fed6c99e3a7",
+   "candidatePayloadHash": "b2829e4745edf607a6ccaecf1236db1b6e77c4293127d71b3a2537b367d5b50f",
+   "evidence": {
+    "kind": "dual_model_topology",
+    "artifact": "tools/timing_verdicts/qdc-rewind-onset-class.json",
+    "summary": "Rewind onset: qdc tiles the ayah gaplessly, so where the reciter stops and goes back it stamps the next word's index on the instant of the rewind — a first-pass label shorter than any spoken word (< 200 ms), followed at once by the rewind, of a word the row recites later. clean_qdc_artifacts folds that instant into the word being finished. The stored occurrence sequence changes, so Arabic XLSR and MMS/uroman forced alignment both score the candidate sequence better than the baseline one on the exact EveryAyah file.",
+    "audioSha256": "682559eed2c79470fd966b7d05f9fb5eef9c5afbaff44905290aa4ad665bcfa0",
+    "waveformVeto": false,
+    "models": [
+     {
+      "name": "arabic-xlsr-ctc",
+      "metric": "viterbiLogProbabilityPerFrame",
+      "baselineScore": -0.417971,
+      "candidateScore": -0.406241
+     },
+     {
+      "name": "mms-uroman-ctc",
+      "metric": "viterbiLogProbabilityPerFrame",
+      "baselineScore": -0.05636,
+      "candidateScore": -0.051447
+     }
+    ]
+   }
+  },
+  "Hani_Rifai_192kbps:5:48": {
+   "verdict": "accept",
+   "kinds": [
+    "topology"
+   ],
+   "baselinePayloadHash": "943e5490775303d1f30e61018ce2b30c337eeb1aca34002e3c8aa2244a030f6b",
+   "candidatePayloadHash": "71bb91e1fbd1e28b8bc1453a2a44ce033a034bb928d3cf46b0bce9a4f01d16e6",
+   "evidence": {
+    "kind": "dual_model_topology",
+    "artifact": "tools/timing_verdicts/qdc-rewind-onset-class.json",
+    "summary": "Rewind onset: qdc tiles the ayah gaplessly, so where the reciter stops and goes back it stamps the next word's index on the instant of the rewind — a first-pass label shorter than any spoken word (< 200 ms), followed at once by the rewind, of a word the row recites later. clean_qdc_artifacts folds that instant into the word being finished. The stored occurrence sequence changes, so Arabic XLSR and MMS/uroman forced alignment both score the candidate sequence better than the baseline one on the exact EveryAyah file.",
+    "audioSha256": "4864a880a15d4bf13c3212e82a5234ae185dea21e66bd0107757ea0a141cb237",
+    "waveformVeto": false,
+    "models": [
+     {
+      "name": "arabic-xlsr-ctc",
+      "metric": "viterbiLogProbabilityPerFrame",
+      "baselineScore": -0.345268,
+      "candidateScore": -0.336693
+     },
+     {
+      "name": "mms-uroman-ctc",
+      "metric": "viterbiLogProbabilityPerFrame",
+      "baselineScore": -0.052104,
+      "candidateScore": -0.049205
+     }
+    ]
+   }
+  },
+  "Hani_Rifai_192kbps:60:8": {
+   "verdict": "accept",
+   "kinds": [
+    "topology"
+   ],
+   "baselinePayloadHash": "0527f6cfadcde5f25b8c2054f27493785f8c7cb71863554dc27f4b15335cc9f3",
+   "candidatePayloadHash": "e4281d000ff966528ced9bceea16d283d95acf6d5fdff5d86309fb0dca5db7d8",
+   "evidence": {
+    "kind": "dual_model_topology",
+    "artifact": "tools/timing_verdicts/qdc-rewind-onset-class.json",
+    "summary": "Rewind onset: qdc tiles the ayah gaplessly, so where the reciter stops and goes back it stamps the next word's index on the instant of the rewind — a first-pass label shorter than any spoken word (< 200 ms), followed at once by the rewind, of a word the row recites later. clean_qdc_artifacts folds that instant into the word being finished. The stored occurrence sequence changes, so Arabic XLSR and MMS/uroman forced alignment both score the candidate sequence better than the baseline one on the exact EveryAyah file.",
+    "audioSha256": "ebb7bf7fd9886d5df3bef0b55ad4476984c66ce6a29fb41fd91e23410e566749",
+    "waveformVeto": false,
+    "models": [
+     {
+      "name": "arabic-xlsr-ctc",
+      "metric": "viterbiLogProbabilityPerFrame",
+      "baselineScore": -0.634095,
+      "candidateScore": -0.605811
+     },
+     {
+      "name": "mms-uroman-ctc",
+      "metric": "viterbiLogProbabilityPerFrame",
+      "baselineScore": -0.048557,
+      "candidateScore": -0.036583
+     }
+    ]
+   }
+  },
+  "Husary_64kbps:28:81": {
+   "verdict": "accept",
+   "kinds": [
+    "topology"
+   ],
+   "baselinePayloadHash": "618f10ad54a940559912b5114648b530803bb87156e91f8eed782c5b583f1ee5",
+   "candidatePayloadHash": "e7611c5fa360447045c1e37b77d6090912cc83bd33f4a0f6d244ec42c687efbb",
+   "evidence": {
+    "kind": "dual_model_topology",
+    "artifact": "tools/timing_verdicts/qdc-rewind-onset-class.json",
+    "summary": "Rewind onset: qdc tiles the ayah gaplessly, so where the reciter stops and goes back it stamps the next word's index on the instant of the rewind — a first-pass label shorter than any spoken word (< 200 ms), followed at once by the rewind, of a word the row recites later. clean_qdc_artifacts folds that instant into the word being finished. The stored occurrence sequence changes, so Arabic XLSR and MMS/uroman forced alignment both score the candidate sequence better than the baseline one on the exact EveryAyah file.",
+    "audioSha256": "74b8e4602a5c86e0539c8c25b0f9c10e5677d41e7747c0b972b42a61ff97300e",
+    "waveformVeto": false,
+    "models": [
+     {
+      "name": "arabic-xlsr-ctc",
+      "metric": "viterbiLogProbabilityPerFrame",
+      "baselineScore": -0.200573,
+      "candidateScore": -0.188299
+     },
+     {
+      "name": "mms-uroman-ctc",
+      "metric": "viterbiLogProbabilityPerFrame",
+      "baselineScore": -0.063058,
+      "candidateScore": -0.052288
+     }
+    ]
+   }
+  },
+  "Husary_64kbps:49:7": {
+   "verdict": "accept",
+   "kinds": [
+    "topology"
+   ],
+   "baselinePayloadHash": "0e40caddcc1ad41e73011da701b62a0296dcbc7692641e66519752392a748d93",
+   "candidatePayloadHash": "b73b37a43c3e816e802859a0ca4aa753129f94e3b159f6beb52fab915fccb5a2",
+   "evidence": {
+    "kind": "dual_model_topology",
+    "artifact": "tools/timing_verdicts/qdc-rewind-onset-class.json",
+    "summary": "Rewind onset: qdc tiles the ayah gaplessly, so where the reciter stops and goes back it stamps the next word's index on the instant of the rewind — a first-pass label shorter than any spoken word (< 200 ms), followed at once by the rewind, of a word the row recites later. clean_qdc_artifacts folds that instant into the word being finished. The stored occurrence sequence changes, so Arabic XLSR and MMS/uroman forced alignment both score the candidate sequence better than the baseline one on the exact EveryAyah file.",
+    "audioSha256": "b6dfbe8806cb697b019392719174bab3c90e28b40d3bd0d43ff6e9580fa36fef",
+    "waveformVeto": false,
+    "models": [
+     {
+      "name": "arabic-xlsr-ctc",
+      "metric": "viterbiLogProbabilityPerFrame",
+      "baselineScore": -0.341849,
+      "candidateScore": -0.335774
+     },
+     {
+      "name": "mms-uroman-ctc",
+      "metric": "viterbiLogProbabilityPerFrame",
+      "baselineScore": -0.05924,
+      "candidateScore": -0.055365
+     }
+    ]
+   }
+  },
+  "Husary_64kbps:8:41": {
+   "verdict": "accept",
+   "kinds": [
+    "topology"
+   ],
+   "baselinePayloadHash": "a26bb9f92e5e076ff8f71e76ed16177476050b3de83fc10037a446031978e3ce",
+   "candidatePayloadHash": "de06aa847c3dacdcc583f94d9dc3060cacb4d3669fc68ef03258879b6c48ae40",
+   "evidence": {
+    "kind": "dual_model_topology",
+    "artifact": "tools/timing_verdicts/qdc-rewind-onset-class.json",
+    "summary": "Rewind onset: qdc tiles the ayah gaplessly, so where the reciter stops and goes back it stamps the next word's index on the instant of the rewind — a first-pass label shorter than any spoken word (< 200 ms), followed at once by the rewind, of a word the row recites later. clean_qdc_artifacts folds that instant into the word being finished. The stored occurrence sequence changes, so Arabic XLSR and MMS/uroman forced alignment both score the candidate sequence better than the baseline one on the exact EveryAyah file.",
+    "audioSha256": "e20828f799b436067799447bd418ecd534418ef4e4709af63ab1e1d3d061d78a",
+    "waveformVeto": false,
+    "models": [
+     {
+      "name": "arabic-xlsr-ctc",
+      "metric": "viterbiLogProbabilityPerFrame",
+      "baselineScore": -0.381856,
+      "candidateScore": -0.379447
+     },
+     {
+      "name": "mms-uroman-ctc",
+      "metric": "viterbiLogProbabilityPerFrame",
+      "baselineScore": -0.068101,
+      "candidateScore": -0.06637
+     }
+    ]
+   }
+  },
+  "Minshawy_Murattal_128kbps:12:62": {
+   "verdict": "accept",
+   "kinds": [
+    "topology"
+   ],
+   "baselinePayloadHash": "639e90e573b4b98954a3da9a343c41a89a2f62d51afc7efd4a8a41c6f5077d1b",
+   "candidatePayloadHash": "f3838487f71b3f271812d77e8239fbdb20728c413a34f1131f7c8b72de719234",
+   "evidence": {
+    "kind": "dual_model_topology",
+    "artifact": "tools/timing_verdicts/qdc-rewind-onset-class.json",
+    "summary": "Rewind onset: qdc tiles the ayah gaplessly, so where the reciter stops and goes back it stamps the next word's index on the instant of the rewind — a first-pass label shorter than any spoken word (< 200 ms), followed at once by the rewind, of a word the row recites later. clean_qdc_artifacts folds that instant into the word being finished. The stored occurrence sequence changes, so Arabic XLSR and MMS/uroman forced alignment both score the candidate sequence better than the baseline one on the exact EveryAyah file.",
+    "audioSha256": "a2d6cab50e5498e31f0787349605bb84fdf05d93332bfbc5c68635f787dd7577",
+    "waveformVeto": false,
+    "models": [
+     {
+      "name": "arabic-xlsr-ctc",
+      "metric": "viterbiLogProbabilityPerFrame",
+      "baselineScore": -0.314182,
+      "candidateScore": -0.284214
+     },
+     {
+      "name": "mms-uroman-ctc",
+      "metric": "viterbiLogProbabilityPerFrame",
+      "baselineScore": -0.075465,
+      "candidateScore": -0.052172
+     }
+    ]
+   }
+  },
+  "Minshawy_Murattal_128kbps:22:23": {
+   "verdict": "accept",
+   "kinds": [
+    "topology"
+   ],
+   "baselinePayloadHash": "581946108d87b7e0003b0bc7d179ae646a2b735ac9a3e97a69f321fec8b71eab",
+   "candidatePayloadHash": "2cb4b012b641b4c5fce418f3f4be9f418ed8aa52c96aa75e2f1d8c62c33cba4e",
+   "evidence": {
+    "kind": "dual_model_topology",
+    "artifact": "tools/timing_verdicts/qdc-rewind-onset-class.json",
+    "summary": "Rewind onset: qdc tiles the ayah gaplessly, so where the reciter stops and goes back it stamps the next word's index on the instant of the rewind — a first-pass label shorter than any spoken word (< 200 ms), followed at once by the rewind, of a word the row recites later. clean_qdc_artifacts folds that instant into the word being finished. The stored occurrence sequence changes, so Arabic XLSR and MMS/uroman forced alignment both score the candidate sequence better than the baseline one on the exact EveryAyah file.",
+    "audioSha256": "5a9cacc0bad6327a61ac9a90d807018a3b51b189243b1110b9d881dfa9730f4d",
+    "waveformVeto": false,
+    "models": [
+     {
+      "name": "arabic-xlsr-ctc",
+      "metric": "viterbiLogProbabilityPerFrame",
+      "baselineScore": -0.203929,
+      "candidateScore": -0.178969
+     },
+     {
+      "name": "mms-uroman-ctc",
+      "metric": "viterbiLogProbabilityPerFrame",
+      "baselineScore": -0.054333,
+      "candidateScore": -0.041881
+     }
+    ]
+   }
+  },
+  "Minshawy_Murattal_128kbps:39:71": {
+   "verdict": "accept",
+   "kinds": [
+    "topology"
+   ],
+   "baselinePayloadHash": "5198f32cdba0e2fb95bc116861320114c853d90cf92c765d22f9357fe8b0dacb",
+   "candidatePayloadHash": "7f47008420ca9c10a5dbbb4c8e9eb4adf7ef4f3a3929aea6a08c2d290ca33c12",
+   "evidence": {
+    "kind": "dual_model_topology",
+    "artifact": "tools/timing_verdicts/qdc-rewind-onset-class.json",
+    "summary": "Rewind onset: qdc tiles the ayah gaplessly, so where the reciter stops and goes back it stamps the next word's index on the instant of the rewind — a first-pass label shorter than any spoken word (< 200 ms), followed at once by the rewind, of a word the row recites later. clean_qdc_artifacts folds that instant into the word being finished. The stored occurrence sequence changes, so Arabic XLSR and MMS/uroman forced alignment both score the candidate sequence better than the baseline one on the exact EveryAyah file.",
+    "audioSha256": "7298fe198c249b8a6805026a0e00a79bd3a61ca7b56629aa65a1a6427fef9d49",
+    "waveformVeto": false,
+    "models": [
+     {
+      "name": "arabic-xlsr-ctc",
+      "metric": "viterbiLogProbabilityPerFrame",
+      "baselineScore": -0.571528,
+      "candidateScore": -0.552178
+     },
+     {
+      "name": "mms-uroman-ctc",
+      "metric": "viterbiLogProbabilityPerFrame",
+      "baselineScore": -0.060719,
+      "candidateScore": -0.048956
+     }
+    ]
+   }
+  },
+  "Minshawy_Murattal_128kbps:5:106": {
+   "verdict": "accept",
+   "kinds": [
+    "topology"
+   ],
+   "baselinePayloadHash": "ac06d3920160d47a681a7abb79129776dd778bbdd4126325dbbb010c69169247",
+   "candidatePayloadHash": "ec7b0d81b87fcba63578bdd9ed858a91fe16dfc866dbacc19977f7f4f5ac26a4",
+   "evidence": {
+    "kind": "dual_model_topology",
+    "artifact": "tools/timing_verdicts/qdc-rewind-onset-class.json",
+    "summary": "Rewind onset: qdc tiles the ayah gaplessly, so where the reciter stops and goes back it stamps the next word's index on the instant of the rewind — a first-pass label shorter than any spoken word (< 200 ms), followed at once by the rewind, of a word the row recites later. clean_qdc_artifacts folds that instant into the word being finished. The stored occurrence sequence changes, so Arabic XLSR and MMS/uroman forced alignment both score the candidate sequence better than the baseline one on the exact EveryAyah file.",
+    "audioSha256": "be389084c35dc9271141de444c7fd42b85bfbd6d355bcd7cf9281df70843a603",
+    "waveformVeto": false,
+    "models": [
+     {
+      "name": "arabic-xlsr-ctc",
+      "metric": "viterbiLogProbabilityPerFrame",
+      "baselineScore": -0.536424,
+      "candidateScore": -0.527528
+     },
+     {
+      "name": "mms-uroman-ctc",
+      "metric": "viterbiLogProbabilityPerFrame",
+      "baselineScore": -0.052883,
+      "candidateScore": -0.046131
+     }
+    ]
+   }
+  }
+ }
+}

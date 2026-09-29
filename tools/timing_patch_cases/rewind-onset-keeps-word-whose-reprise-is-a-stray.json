@@ -1,0 +1,53 @@
+{
+  "id": "rewind-onset-keeps-word-whose-reprise-is-a-stray",
+  "label": "a rewind onset stays when the later occurrence it relies on is itself cleaned away",
+  "refs": [
+    "code review of PR #786"
+  ],
+  "pipeline": "clean_qdc_artifacts",
+  "notes": "Inside the fixpoint the first 6 was dropped because a later 6 existed, then that later 6 was dropped as a stray in the same pass, leaving word 6 with no span. The rule now runs once on the settled row.",
+  "input_segments": [
+    [
+      4,
+      0,
+      900
+    ],
+    [
+      5,
+      900,
+      1500
+    ],
+    [
+      6,
+      1500,
+      1560
+    ],
+    [
+      5,
+      1560,
+      2500
+    ],
+    [
+      7,
+      2500,
+      3500
+    ],
+    [
+      6,
+      3500,
+      3600
+    ],
+    [
+      8,
+      3600,
+      4000
+    ]
+  ],
+  "expected_positions": [
+    4,
+    5,
+    6,
+    7,
+    8
+  ]
+}

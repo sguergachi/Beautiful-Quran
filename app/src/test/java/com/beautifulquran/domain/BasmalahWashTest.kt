@@ -204,7 +204,7 @@ class BasmalahWashTest {
     @Test
     fun `the closing word settles with the clip, never before the voice`() {
         // Every shipped clip, measured with ffprobe + an energy envelope: the
-        // rows stop marking before the reciter stops (As-Sudais by 345 ms), so
+        // rows stop marking before the reciter stops (Minshawi by 185 ms), so
         // settling on the row's own mark finished the ink mid-madd. The wash
         // must not be complete before the voice is, and must be complete by the
         // end of the clip.
@@ -214,7 +214,7 @@ class BasmalahWashTest {
             Clip("Husary", listOf(Segment(1, 50, 520), Segment(2, 520, 1330), Segment(3, 1330, 2336), Segment(4, 2336, 4790)), 5120, 4650),
             Clip("AbdulBaset", listOf(Segment(1, 536, 970), Segment(2, 970, 1590), Segment(3, 1590, 2540), Segment(4, 2540, 4255)), 4336, 4320),
             Clip("Minshawi", listOf(Segment(1, 544, 960), Segment(2, 960, 1620), Segment(3, 1620, 2740), Segment(4, 2740, 4075)), 4971, 4260),
-            Clip("As-Sudais", listOf(Segment(1, 0, 650), Segment(2, 650, 1130), Segment(3, 1130, 1860), Segment(4, 1860, 2725)), 3082, 3070),
+            Clip("As-Sudais", listOf(Segment(1, 380, 845), Segment(2, 845, 1325), Segment(3, 1325, 2055), Segment(4, 2055, 2920)), 3082, 3070),
             Clip("Ash-Shuraym", listOf(Segment(1, 140, 650), Segment(2, 660, 1160), Segment(3, 1170, 2110), Segment(4, 2120, 2560)), 2722, 2710),
             Clip("Hani", listOf(Segment(1, 945, 2285), Segment(2, 2285, 2865), Segment(3, 2865, 3685), Segment(4, 3685, 5417)), 4472, 4010),
         )

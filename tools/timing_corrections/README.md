@@ -25,6 +25,23 @@ Supported operations:
   the witnesses cannot reach — an ayah with no quran-align row, where the rule
   abstains by design.
 
+- `restore_flattened_resay`: restore one audio-proven re-say that qdc
+  labelled as the following word. The mirror of the false lead: a word said
+  twice with one qdc label hands its second utterance to the next word, which
+  then starts a whole utterance early. The entry names the word, the re-say
+  onset, the next word's onset, and the exact flat `sourcePair` it was
+  verified on. The onsets are absolute times, so any source or clock change
+  that moves that pair fails the build instead of shifting the verdict.
+  Hani 21:46 يَٰوَيۡلَنَآ (#779) is this shape: qdc opens إِنَّا at 9800 while
+  quran-align, the Lab and both forced aligners put it at 11350–11520. No
+  row shape reveals it — qdc flattened the repeat, quran-align cannot
+  express one, and CTC fused the rewind into a single token (`وَيلنايا`) — so
+  the audio decides: `tools/find_flattened_resays.py` forces both sequences
+  through Arabic XLSR and MMS/uroman and writes an entry (marked
+  `"generator"`) only when both prefer the repeat. Regenerating replaces only
+  generated entries; hand entries such as 21:46 carry an ear verdict and are
+  never candidates.
+
 Every entry carries evidence provenance. The build fails if its expected source
 shape no longer exists, so a pinned-source refresh cannot silently retain a
 stale verdict.

@@ -57,6 +57,7 @@ from build_db import (  # noqa: E402
     refit_displaced_rows,
     rebase_qdc_clock,
     rebase_timing_repair,
+    restore_flattened_resay,
     suspicious_pacing,
     trim_to_next_start,
 )
@@ -243,6 +244,15 @@ def run_pipeline(case, segs):
         return offset_for_audio_onset(segs, onset)
     if pipeline == "timing_correction":
         position = case.get("correction_position")
+        if case.get("correction_op") == "restore_flattened_resay":
+            return restore_flattened_resay(
+                segs,
+                position,
+                case["resay_start_ms"],
+                case["next_onset_ms"],
+                case["source_pair"],
+                bool(case.get("requires_audio_verdict")),
+            )
         if position is not None:
             return discard_false_same_position_lead(
                 segs, position, bool(case.get("requires_audio_verdict"))
@@ -619,10 +629,9 @@ def audit_bundled_db():
         2: set(),
         3: set(),
         4: set(),
-        5: {
-            (2, 25), (2, 198), (2, 223), (7, 5),
-            (13, 37), (73, 4),
-        },
+        # 2:25 and 7:5 ship since the Sudais re-clock gave them a file clock;
+        # the other four still fail its accuracy bar (audit-held-rows.json).
+        5: {(2, 198), (2, 223), (13, 37), (73, 4)},
         6: {(12, 50), (12, 75), (12, 76), (91, 15)},
         7: set(),
         9: set(),
@@ -809,6 +818,13 @@ def check_audit_holds():
         for row in payload.get("rows") or []:
             key = (row["reciterSlug"], row["surahId"], row["ayah"])
             shipped = baseline.get(key)
+            if row.get("segments") is None:
+                # Keeps withheld a row the baseline does not ship either; it
+                # restores nothing, so there is no payload to compare.
+                if shipped is not None or not row.get("reason") or not row.get("models"):
+                    parity = False
+                    break
+                continue
             if shipped is None:
                 parity = False
                 break
@@ -830,12 +846,20 @@ def check_audit_holds():
             {"reciterId": 2, "reciterSlug": "Husary_64kbps", "surahId": 1,
              "ayah": 2, "reason": "test", "audioOnsetMs": 0,
              "segments": [[1, 0, 50]]},
+            {"reciterId": 5, "reciterSlug": "Abdurrahmaan_As-Sudais_192kbps",
+             "surahId": 1, "ayah": 4, "reason": "test", "audioOnsetMs": None,
+             "segments": None},
         ]}))
-        rows = [(1, 1, 1, json.dumps([[1, 0, 999]])), (3, 1, 3, json.dumps([[1, 0, 5]]))]
+        rows = [
+            (1, 1, 1, json.dumps([[1, 0, 999]])),
+            (3, 1, 3, json.dumps([[1, 0, 5]])),
+            (5, 1, 4, json.dumps([[1, 0, 70]])),
+        ]
         out, onsets, held = apply_audit_holds(rows, {(1, 1, 1): 0}, holds)
         restored = dict(((r, s, a), segs) for r, s, a, segs in out)
         mechanism = (
-            held == 2
+            held == 3
+            and (5, 1, 4) not in restored                         # stays withheld
             and json.loads(restored[(1, 1, 1)]) == [[1, 0, 100]]
             and onsets[(1, 1, 1)] == 7
             and json.loads(restored[(2, 1, 2)]) == [[1, 0, 50]]   # dropped row re-added

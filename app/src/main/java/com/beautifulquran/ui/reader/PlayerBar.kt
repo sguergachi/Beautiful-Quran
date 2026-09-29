@@ -1,12 +1,16 @@
 package com.beautifulquran.ui.reader
 
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
@@ -25,10 +29,15 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -37,6 +46,13 @@ import androidx.media3.common.Player
 import com.beautifulquran.playback.PlayerUiState
 import com.beautifulquran.ui.theme.DisclosureChevron
 import com.beautifulquran.ui.theme.QuranTheme
+import com.beautifulquran.ui.theme.quietClickable
+
+/** Gap before the disclosure chevron, matched by [ReciterNameButton]'s centering offset. */
+private val ReciterChevronGap = 2.dp
+
+/** Chevron box. [DisclosureChevron] also asks for 20dp; the outer size here wins. */
+private val ReciterChevronSize = 16.dp
 
 /**
  * Flat playback controls that sit on the same sheet of paper as the text —
@@ -72,25 +88,13 @@ fun PlayerBar(
                 .fillMaxWidth()
                 .navigationBarsPadding(),
         ) {
-            TextButton(
+            ReciterNameButton(
+                name = reciterName,
                 onClick = onReciterClick,
                 enabled = enabled,
-                contentPadding = PaddingValues(horizontal = 16.dp, vertical = 2.dp),
+                disclosure = true,
                 modifier = Modifier.graphicsLayer { alpha = chromeAlpha() },
-            ) {
-                Spacer(Modifier.size(18.dp))
-                Text(
-                    text = reciterName,
-                    style = MaterialTheme.typography.labelMedium,
-                    color = QuranTheme.ink.muted,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-                DisclosureChevron(
-                    expanded = false,
-                    modifier = Modifier.padding(start = 2.dp).size(16.dp),
-                )
-            }
+            )
             Row(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(
@@ -197,6 +201,64 @@ fun PlayerBar(
                         },
                     )
                 }
+            }
+        }
+    }
+}
+
+/**
+ * Opens reciter settings. The press wash hugs the name and, when [disclosure]
+ * is set, the chevron. The hit target stays 48dp. The name stays on the page
+ * center; the chevron hangs to its right.
+ */
+@Composable
+internal fun ReciterNameButton(
+    name: String,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    enabled: Boolean = true,
+    disclosure: Boolean = false,
+) {
+    val interactions = remember { MutableInteractionSource() }
+    val pressed by interactions.collectIsPressedAsState()
+    val press = MaterialTheme.colorScheme.primary.copy(alpha = 0.10f)
+    val chevronFootprint = ReciterChevronGap + ReciterChevronSize
+    Box(
+        contentAlignment = Alignment.Center,
+        modifier = modifier
+            .offset(x = if (disclosure) chevronFootprint / 2 else 0.dp)
+            .defaultMinSize(minWidth = 48.dp, minHeight = 48.dp)
+            .quietClickable(
+                enabled = enabled,
+                role = Role.Button,
+                interactionSource = interactions,
+                onClick = onClick,
+            ),
+    ) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier
+                .drawBehind {
+                    if (!pressed) return@drawBehind
+                    drawRoundRect(
+                        color = press,
+                        cornerRadius = CornerRadius(size.minDimension / 2f),
+                    )
+                }
+                .padding(horizontal = 8.dp, vertical = 4.dp),
+        ) {
+            Text(
+                text = name,
+                style = MaterialTheme.typography.labelMedium,
+                color = QuranTheme.ink.muted,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            if (disclosure) {
+                DisclosureChevron(
+                    expanded = false,
+                    modifier = Modifier.padding(start = ReciterChevronGap).size(ReciterChevronSize),
+                )
             }
         }
     }
