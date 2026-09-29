@@ -3694,7 +3694,18 @@ fun OrnateSurahTitle(
                 overflow = TextOverflow.Ellipsis,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(top = 2.dp),
+                    .padding(top = 2.dp)
+                    // Hafs' line box leaves air under the descenders; hand it to
+                    // the line beneath, so the caps line sits close to the name
+                    // and keeps its own paper below, away from the text
+                    // scrolling under the bar.
+                    .layout { measurable, constraints ->
+                        val placeable = measurable.measure(constraints)
+                        val trim = TOP_BAR_NAME_TRIM.roundToPx()
+                        layout(placeable.width, placeable.height - trim) {
+                            placeable.place(0, 0)
+                        }
+                    },
             )
             Text(
                 text = "$chapterNumber · ${nameTransliteration.uppercase()}",
@@ -3706,11 +3717,16 @@ fun OrnateSurahTitle(
                 textAlign = TextAlign.Center,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(bottom = TOP_BAR_NAME_TRIM),
             )
         }
     }
 }
+
+/** Air under the name's descenders handed to the paper below the caps line. */
+private val TOP_BAR_NAME_TRIM = 5.dp
 
 /** The header medallion's little sibling in the top bar. */
 private val TOP_BAR_ROSETTE = 18.dp
