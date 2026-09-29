@@ -1,0 +1,80 @@
+{
+  "id": "rewind-onset-hani-21-63",
+  "label": "Hani 21:63 60 ms إِن stamped on the rewind to فَسۡـَٔلُوهُمۡ",
+  "refs": [
+    "GitHub issue #781",
+    "dual CTC",
+    "waveform"
+  ],
+  "pipeline": "clean_qdc_artifacts",
+  "notes": "Raw qdc 6,[7 for 60 ms],6,7 read as a two-word phrase re-say, so إِن flashed and washed orange though it is only said once. The reciter stops after فَسۡـَٔلُوهُمۡ and says it again; CTC decodes فسألوه, فسألوهم with nothing between. The shipped row regressed in #562 (3c35b94e) when the CTC restore that had fixed it was dropped.",
+  "input_segments": [
+    [
+      5,
+      3190,
+      3990
+    ],
+    [
+      6,
+      3990,
+      5600
+    ],
+    [
+      7,
+      5600,
+      5660
+    ],
+    [
+      6,
+      5660,
+      7180
+    ],
+    [
+      7,
+      7180,
+      7920
+    ],
+    [
+      8,
+      7920,
+      8700
+    ],
+    [
+      9,
+      8700,
+      10805
+    ]
+  ],
+  "expected_segments": [
+    [
+      5,
+      3190,
+      3990
+    ],
+    [
+      6,
+      3990,
+      5660
+    ],
+    [
+      6,
+      5660,
+      7180
+    ],
+    [
+      7,
+      7180,
+      7920
+    ],
+    [
+      8,
+      7920,
+      8700
+    ],
+    [
+      9,
+      8700,
+      10805
+    ]
+  ]
+}

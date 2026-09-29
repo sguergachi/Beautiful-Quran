@@ -1,0 +1,38 @@
+{
+ "schemaVersion": 1,
+ "baseline": {
+  "commit": "abdb218e3b7d96513a25204e0311ed853a67deb5",
+  "databaseSha256": "abd68ae29a24f55a9bc9afd27a6b41d58f839b67af929a70c85d10d292e5be54"
+ },
+ "verdicts": {
+  "Hani_Rifai_192kbps:21:46": {
+   "verdict": "accept",
+   "kinds": [
+    "topology"
+   ],
+   "baselinePayloadHash": "0fb2b56418f974a19d880d4aa0206ce3fff54e8c07506928a9d6de5d0877adea",
+   "candidatePayloadHash": "cf700964d5e76d03579e12be5a305d0d56b70bd9a9bf9a97dbebf053994102c8",
+   "evidence": {
+    "kind": "dual_model_topology",
+    "artifact": "tools/timing_verdicts/flattened-resay-class.json",
+    "summary": "Flattened re-say (GitHub #779): Hani recites يَٰوَيۡلَنَآ twice, voiced to 9.34 s, a ~500 ms breath, then again from 9.84 s to 11.36 s. qdc has one label and hands the second utterance to إِنَّا (start 9800); quran-align opens إِنَّا at 11350, the Lab ear patch at 11435, XLSR at 11397 and MMS at 11518. CTC fused the rewind into one token (وَيلنايا), so neither the cleaner nor the CTC repair generator can see it; restore_flattened_resay applies the typed verdict. Both forced aligners score the 8,8 sequence better than the flat baseline.",
+    "audioSha256": "34b29772624e63e2e8d6347467c1376ce8e9d973ec961069325d844c819aae34",
+    "waveformVeto": false,
+    "models": [
+     {
+      "name": "arabic-xlsr-ctc",
+      "metric": "viterbiLogProbabilityPerFrame",
+      "baselineScore": -0.445153,
+      "candidateScore": -0.431751
+     },
+     {
+      "name": "mms-uroman-ctc",
+      "metric": "viterbiLogProbabilityPerFrame",
+      "baselineScore": -0.06785,
+      "candidateScore": -0.048952
+     }
+    ]
+   }
+  }
+ }
+}

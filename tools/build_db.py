@@ -594,6 +594,15 @@ QDC_SPLIT_FRAGMENT_CEIL_MS = 700  # in [FRAGMENT_MS, CEIL) it is a fragment only
 #                                   إِلَىٰ = 1600+600), not a second utterance.
 QDC_SPLIT_FRAGMENT_RATIO = 0.40  # shorter/longer below this = a split fragment,
 #                                  not a peer utterance
+# qdc tiles gaplessly, so when a reciter stops and goes back it stamps the NEXT
+# word's index on the instant of the rewind: a first-pass label shorter than
+# any spoken word, immediately followed by the rewind (Hani 21:63 فَسۡـَٔلُوهُمۡ
+# ×2 reads 6,[7 for 60 ms],6,7). The reader then flashed إِن and washed it
+# orange as part of a phrase re-say that was never recited. Same physical
+# floor as a same-position fragment. On the v62 corpus the rule changed 40 rows
+# across five reciters and Arabic XLSR and MMS/uroman forced alignment preferred
+# the cleaned row on every one (tools/timing_verdicts/qdc-rewind-onset-class.json).
+QDC_REWIND_ONSET_MS = QDC_SPLIT_FRAGMENT_MS
 
 # CTC restore requires a pause this long to emit a same-word repeat
 # (timing_repairs/README.md "repeat-vs-split invariant"). Committed restore
@@ -1099,6 +1108,24 @@ def clean_qdc_artifacts(segs, stats, recover_singleton_gap=False):
             if stray:
                 prev[2] = max(prev[2], end)
                 stats["dropped_strays"] += 1
+                changed = True
+                i += 1
+                continue
+            # Rewind onset: a sub-word first-pass label at a new high-water
+            # position, followed at once by a rewind. The word must be recited
+            # later in the row, so dropping this label can never lose coverage;
+            # its instant goes back to the word the reciter was finishing.
+            rewind_onset = (
+                prev is not None
+                and pos > running_max
+                and end - start < QDC_REWIND_ONSET_MS
+                and next_pos is not None
+                and next_pos < pos
+                and any(seg[0] == pos for seg in merged[i + 1 :])
+            )
+            if rewind_onset:
+                prev[2] = max(prev[2], end)
+                stats["rewind_onsets"] = stats.get("rewind_onsets", 0) + 1
                 changed = True
                 i += 1
                 continue
@@ -1941,6 +1968,50 @@ def discard_false_same_position_lead(segs, position, requires_audio_verdict=Fals
     ]
 
 
+def restore_flattened_resay(
+    segs, position, resay_start_ms, next_onset_ms, requires_audio_verdict=False
+):
+    """Restore one acoustically-vetted re-say that qdc labelled as the next word.
+
+    The mirror of [discard_false_same_position_lead]. qdc tiles gaplessly, so a
+    word said twice with no second label hands its second utterance to the
+    following word, which then starts a whole utterance early (Hani 21:46
+    يَٰوَيۡلَنَآ ×2: qdc opens إِنَّا at 9800, quran-align at 11350). Neither
+    source can show the repeat — qdc flattened it and the monotonic aligner
+    cannot express one — and CTC fused the rewind into a single token
+    (``وَيلنايا``), so no pipeline rule can reach it. The correction names the
+    word, the re-say onset, and the following word's onset; both must fall
+    inside the flat source pair, and the word must be said only once.
+    """
+    if not requires_audio_verdict:
+        raise ValueError("restore_flattened_resay requires an audio verdict")
+    if sum(1 for seg in segs if seg[0] == position) != 1:
+        raise ValueError(f"restore_flattened_resay expected one {position}")
+    matches = [
+        i
+        for i in range(len(segs) - 1)
+        if segs[i][0] == position and segs[i + 1][0] == position + 1
+    ]
+    if len(matches) != 1:
+        raise ValueError(
+            f"restore_flattened_resay expected {position},{position + 1}"
+        )
+    i = matches[0]
+    word, following = segs[i], segs[i + 1]
+    if not word[1] < resay_start_ms < word[2] <= following[1] < next_onset_ms < following[2]:
+        raise ValueError(
+            "restore_flattened_resay onsets fall outside the source pair "
+            f"{word} {following}"
+        )
+    return [
+        *[list(seg) for seg in segs[:i]],
+        [position, word[1], resay_start_ms],
+        [position, resay_start_ms, next_onset_ms],
+        [position + 1, next_onset_ms, following[2]],
+        *[list(seg) for seg in segs[i + 2 :]],
+    ]
+
+
 def apply_timing_corrections(
     timing_rows,
     corrections_dir=CORRECTIONS_DIR,
@@ -1984,6 +2055,14 @@ def apply_timing_corrections(
                     by_key[key] = discard_false_same_position_lead(
                         by_key[key],
                         int(edit["position"]),
+                        bool(edit.get("requiresAudioVerdict")),
+                    )
+                elif op == "restore_flattened_resay":
+                    by_key[key] = restore_flattened_resay(
+                        by_key[key],
+                        int(edit["position"]),
+                        int(edit["resayStartMs"]),
+                        int(edit["nextOnsetMs"]),
                         bool(edit.get("requiresAudioVerdict")),
                     )
                 else:
@@ -3041,7 +3120,7 @@ def main():
                     "opening_shift": 0,
                     "merged_splits": 0, "dropped_strays": 0,
                     "noncontiguous_orphans": 0, "gap_phantoms": 0,
-                    "clock_rebased": 0,
+                    "rewind_onsets": 0, "clock_rebased": 0,
                     "clock_abstained": 0, "quran_align_fallback": 0,
                     "repeat_tail_clamped": 0,
                 }
@@ -3119,6 +3198,7 @@ def main():
                     f"stray mislabels dropped {stats['dropped_strays']}, "
                     f"noncontiguous orphans {stats['noncontiguous_orphans']}, "
                     f"gap phantoms {stats.get('gap_phantoms', 0)}, "
+                    f"rewind onsets {stats.get('rewind_onsets', 0)}, "
                     f"clock-rebased {stats['clock_rebased']}, "
                     f"clock-abstained {stats['clock_abstained']}, "
                     f"quran-align fallback {stats['quran_align_fallback']}, "

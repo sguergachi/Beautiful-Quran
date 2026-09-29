@@ -231,7 +231,9 @@ one of these local shapes supplies positive evidence:
   near-high-water component;
 - a backtrack run occupies a skipped forward gap;
 - a duplicated forward destination exactly accounts for words absent
-  everywhere else in the row.
+  everywhere else in the row;
+- a sub-word first-pass label is stamped on the instant of a rewind to a word
+  the row recites again later.
 
 A real re-say does **not** have to return to the previous high-water tip. If a
 skipped word appears later, the duplicate-gap rule abstains. Acoustics alone
@@ -369,6 +371,28 @@ are **not audible repeats**. Artifact classes scrubbed in `clean_qdc_artifacts`
    an otherwise absent gap (`1,3,3,4` becomes `1,2,3,4`). If the skipped word
    appears anywhere later, the rule abstains; Alafasy 16:106 locks that
    counterexample.
+7. **Rewind onsets.** qdc tiles an ayah gaplessly, so where a reciter stops
+   and goes back it stamps the *next* word's index on the instant of the
+   rewind: a first-pass label shorter than any spoken word, followed at once
+   by the rewind (Hani 21:63 `…6, [7 for 60 ms], 6, 7…` — فَسۡـَٔلُوهُمۡ said
+   twice). The row then reads as a two-word phrase re-say: إِن flashes for
+   60 ms and washes orange on its only real utterance. Fix: when such a label
+   is shorter than `QDC_REWIND_ONSET_MS` (the 200 ms fragment floor) and the
+   row recites that word later, fold its instant into the word being
+   finished. Across the shipped corpus 40 rows had this shape; both forced
+   aligners preferred the cleaned row on every one
+   (`tools/timing_verdicts/qdc-rewind-onset-class.json`). The label must be
+   re-said later, so the rule can never erase a word's only span.
+
+   This class was fixed once before and silently regressed. In July the
+   Hani 21:63 row carried a CTC `restore` (c0c1d7f6); #562 (3c35b94e) then
+   taught the generator to treat "qdc repeats `{6,7}`, CTC repeats `{6}`" as a
+   per-position split question, found no same-position pair to unsplit, and
+   dropped the restore. Scrubbing the instant in the cleaner removes the
+   shape before any repair logic has to reason about it. It also retired a
+   wrong typed verdict: Alafasy 4:19 `17,[18],17,18` had been collapsed with
+   `one_utterance`, deleting a real إِلَّآ restart and leaving 2.1 s of
+   recitation unlit.
 
 > **⚠️ A genuine single-word repeat looks exactly like a split sliver — same
 > position, ~0 ms gap — so the merge must key on *duration*, not the gap.**

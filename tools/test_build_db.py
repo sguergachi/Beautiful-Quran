@@ -57,6 +57,7 @@ from build_db import (  # noqa: E402
     refit_displaced_rows,
     rebase_qdc_clock,
     rebase_timing_repair,
+    restore_flattened_resay,
     suspicious_pacing,
     trim_to_next_start,
 )
@@ -243,6 +244,14 @@ def run_pipeline(case, segs):
         return offset_for_audio_onset(segs, onset)
     if pipeline == "timing_correction":
         position = case.get("correction_position")
+        if case.get("correction_op") == "restore_flattened_resay":
+            return restore_flattened_resay(
+                segs,
+                position,
+                case["resay_start_ms"],
+                case["next_onset_ms"],
+                bool(case.get("requires_audio_verdict")),
+            )
         if position is not None:
             return discard_false_same_position_lead(
                 segs, position, bool(case.get("requires_audio_verdict"))

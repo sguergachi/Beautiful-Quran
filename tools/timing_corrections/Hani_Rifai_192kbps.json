@@ -1,5 +1,21 @@
 {
   "schema": 1,
   "reciter": "Hani_Rifai_192kbps",
-  "edits": []
+  "edits": [
+    {
+      "reciterId": 7,
+      "surahId": 21,
+      "ayah": 46,
+      "op": "restore_flattened_resay",
+      "position": 8,
+      "resayStartMs": 9340,
+      "nextOnsetMs": 11400,
+      "requiresAudioVerdict": true,
+      "evidence": ["ear", "dual CTC", "waveform", "quran-align"],
+      "refs": [
+        "GitHub issue #779",
+        "tools/timing_verdicts/flattened-resay-class.json"
+      ]
+    }
+  ]
 }

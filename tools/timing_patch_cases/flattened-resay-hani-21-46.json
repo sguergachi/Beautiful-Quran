@@ -1,0 +1,66 @@
+{
+  "id": "flattened-resay-hani-21-46",
+  "label": "Hani 21:46 يَٰوَيۡلَنَآ said twice; qdc hands the second utterance to إِنَّا",
+  "refs": [
+    "GitHub issue #779",
+    "dual CTC",
+    "waveform",
+    "quran-align"
+  ],
+  "pipeline": "timing_correction",
+  "notes": "Voiced to 9.34 s, a ~500 ms breath, said again from 9.84 s to 11.36 s. qdc opens إِنَّا at 9800; quran-align 11350, Lab 11435, XLSR 11397, MMS 11518. CTC fused the rewind into one token (وَيلنايا), so no pipeline rule can see it.",
+  "correction_op": "restore_flattened_resay",
+  "correction_position": 8,
+  "resay_start_ms": 9340,
+  "next_onset_ms": 11400,
+  "requires_audio_verdict": true,
+  "input_segments": [
+    [
+      7,
+      6030,
+      7710
+    ],
+    [
+      8,
+      7710,
+      9800
+    ],
+    [
+      9,
+      9800,
+      12340
+    ],
+    [
+      10,
+      12340,
+      13680
+    ]
+  ],
+  "expected_segments": [
+    [
+      7,
+      6030,
+      7710
+    ],
+    [
+      8,
+      7710,
+      9340
+    ],
+    [
+      8,
+      9340,
+      11400
+    ],
+    [
+      9,
+      11400,
+      12340
+    ],
+    [
+      10,
+      12340,
+      13680
+    ]
+  ]
+}
