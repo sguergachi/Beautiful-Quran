@@ -21,11 +21,8 @@ import com.beautifulquran.domain.HighlightClock
 import com.beautifulquran.domain.AudibleSilence
 import com.beautifulquran.domain.firstWordHighlightMs
 import com.beautifulquran.domain.hizbOpeningSeekMs
-import com.beautifulquran.domain.isAfterLastWord
 import com.beautifulquran.domain.isHizbStop
-import com.beautifulquran.domain.nextVerseAyah
 import com.beautifulquran.domain.openingWashStartMs
-import com.beautifulquran.domain.playbackSkipMs
 import com.beautifulquran.domain.silenceSkipAllowed
 import com.beautifulquran.domain.HighlightEngine
 import com.beautifulquran.domain.EnglishBook
@@ -819,9 +816,9 @@ class ReaderViewModel(
 
     /**
      * A murattal ۞ opening skips its long pause and lands on the first word's
-     * voice. The wash keeps running. Every other verse plays through, including
-     * the breath between verses. Mujawwad waqf and Muallim pauses stay.
-     * A seek already in flight is left to land, so this cannot undo a word tap.
+     * voice, inside that verse. The wash keeps running. Nothing seeks into
+     * the next verse: that join is the click between verses. Mujawwad waqf
+     * and Muallim pauses stay. A seek already in flight is left to land.
      */
     private fun skipMarkedSilence() {
         if (!player.skipSilenceGaps || player.silenceSkipHeld()) return
@@ -831,31 +828,13 @@ class ReaderViewModel(
         val style = _uiState.value.currentReciter?.takeIf { it.id == np.reciterId }?.style
         if (style == null || !silenceSkipAllowed(style)) return
         val segments = preparedTimings[np.ayah]?.segments?.takeIf { it.isNotEmpty() } ?: return
-        val positionMs = player.positionMs
-        val silence = audibleSilenceFor(np.reciterId, np.surahId, np.ayah)
         val opening = hizbOpeningSeekMs(
             hizbStop = isHizbAyah(np.ayah),
-            positionMs = positionMs,
+            positionMs = player.positionMs,
             segments = segments,
-            silence = silence,
-        )
-        if (opening != null) {
-            player.skipSilenceWithinAyah(np.ayah, opening)
-            return
-        }
-        if (!isAfterLastWord(segments, positionMs)) return
-        val state = player.state.value
-        val count = _uiState.value.content?.surah?.ayahCount ?: return
-        val next = nextVerseAyah(
-            ayah = np.ayah,
-            ayahCount = count,
-            repeatOne = state.repeatMode == Player.REPEAT_MODE_ONE,
-            repeatAll = state.repeatMode == Player.REPEAT_MODE_ALL,
-            range = state.repeatRange,
-            opensWithBasmalah = surahOpensWithBasmalahPreface(np.surahId),
+            silence = audibleSilenceFor(np.reciterId, np.surahId, np.ayah),
         ) ?: return
-        if (!isHizbAyah(next)) return
-        player.seekToWord(next, nextVerseStartMs(np.reciterId, np.surahId, next))
+        player.skipSilenceWithinAyah(np.ayah, opening)
     }
 
     /** First-word highlight gate. Only a ۞ uses the measured voice. */
@@ -881,16 +860,6 @@ class ReaderViewModel(
         val audioSurah = if (ayah == BASMALAH_PLAYLIST_AYAH) SURAH_FATIHA else surahId
         val audioAyah = if (ayah == BASMALAH_PLAYLIST_AYAH) 1 else ayah
         return player.audibleSilence(reciterId, audioSurah, audioAyah)
-    }
-
-    /** First voiced sample of [ayah], or 0 when it has no timings. */
-    private fun nextVerseStartMs(reciterId: Int, surahId: Int, ayah: Int): Long {
-        val segments = preparedTimings[ayah]?.segments.orEmpty()
-        if (segments.isEmpty()) return 0L
-        val start = playbackSkipMs(0L, segments, audibleSilenceFor(reciterId, surahId, ayah))
-            ?: segments.first().startMs
-        val lastEnd = segments.last().endMs
-        return if (start < lastEnd) start else segments.first().startMs
     }
 
     init {
