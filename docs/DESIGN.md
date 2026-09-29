@@ -967,7 +967,8 @@ image, so it is crisp at any density and nearly free to render.
   low-passed (`ui/theme/GildingTilt.kt`, one listener for the whole app) — so
   light appears to catch the leaf as the phone moves in the hand: the reader's
   header rosette and top-bar medallion, the cover's gilding. It is read at draw
-  time only, listens only while the app is started, and rests level when the
+  time only, listens (at UI rate) only while the app is started *and* a gilded
+  figure is on screen, writes nothing while the phone is still, and rests level when the
   device has no accelerometer or animations are off. The gilding no longer
   brightens with page scroll. Verse-number marks (`gilded()`) are still a
   fixed vertical gradient.

@@ -7,6 +7,7 @@ import android.hardware.SensorManager
 import android.provider.Settings
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.Stable
 import androidx.compose.runtime.State
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.remember
@@ -33,11 +34,14 @@ const val GILDING_REST = 0.5f
 /** Roll, in g's (sin of the angle), that carries the sheen its whole way: ~25°. */
 private const val ROLL_FULL_SCALE = 0.42f
 
-/** Share of the remaining distance covered per sample — ~50 Hz, so the light settles in ~0.3 s. */
-private const val SMOOTHING = 0.06f
+/** Share of the remaining distance covered per sample — ~16 Hz, so the light settles in ~0.3 s. */
+private const val SMOOTHING = 0.25f
 
-/** A change smaller than this is not worth redrawing every gilded figure for. */
-private const val MIN_STEP = 0.002f
+/**
+ * A change smaller than this is not worth redrawing every gilded figure for:
+ * a phone lying still (or held steadily) writes nothing at all.
+ */
+private const val MIN_STEP = 0.005f
 
 /** The sheen for a phone rolled so that gravity reads [rollG] g's across its width. */
 internal fun sheenForRoll(rollG: Float): Float =
@@ -48,16 +52,52 @@ private object RestingTilt : State<Float> {
 }
 
 /**
- * The accelerometer, low-passed into a sheen. Listens only while the app is
- * started, and not at all when the user has turned animations off (or the
- * device has no accelerometer) — then the gilding simply rests.
+ * The live tilt. [demand] counts the gilded figures on screen (see
+ * [GildingDemand]); the sensor runs only while it is above zero, so the
+ * Home list, Settings and every other screen without gold pay nothing.
+ */
+@Stable
+class GildingTilt internal constructor() : State<Float> {
+    private val sheen = mutableFloatStateOf(GILDING_REST)
+    internal var demand = 0
+        private set
+
+    /** Set by [rememberGildingTilt]: start or stop the sensor to match [demand]. */
+    internal var onDemandChanged: () -> Unit = {}
+
+    internal fun acquire() { demand++; onDemandChanged() }
+
+    internal fun release() { demand--; onDemandChanged() }
+
+    override val value: Float get() = sheen.floatValue
+
+    internal fun set(v: Float) {
+        if (abs(v - sheen.floatValue) >= MIN_STEP) sheen.floatValue = v
+    }
+}
+
+/** Keeps the tilt sensor alive for as long as this figure is composed. */
+@Composable
+internal fun GildingDemand(sheen: State<Float>) {
+    if (sheen !is GildingTilt) return
+    DisposableEffect(sheen) {
+        sheen.acquire()
+        onDispose { sheen.release() }
+    }
+}
+
+/**
+ * The accelerometer, low-passed into a sheen, at UI rate. It listens only while
+ * the app is started *and* a gilded figure is on screen, and not at all when the
+ * user has turned animations off (or the device has no accelerometer) — then the
+ * gilding simply rests.
  */
 @Composable
 fun rememberGildingTilt(): State<Float> {
     val context = LocalContext.current
     val lifecycle = LocalLifecycleOwner.current.lifecycle
-    val tilt = remember { mutableFloatStateOf(GILDING_REST) }
-    DisposableEffect(context, lifecycle) {
+    val tilt = remember { GildingTilt() }
+    DisposableEffect(context, lifecycle, tilt) {
         val manager = context.getSystemService(SensorManager::class.java)
         val sensor = manager?.getDefaultSensor(Sensor.TYPE_ACCELEROMETER)
         val animated = Settings.Global.getFloat(
@@ -75,23 +115,35 @@ fun rememberGildingTilt(): State<Float> {
                 val target = sheenForRoll(event.values[0] / SensorManager.GRAVITY_EARTH)
                 smoothed = if (seeded) smoothed + (target - smoothed) * SMOOTHING else target
                 seeded = true
-                if (abs(smoothed - tilt.floatValue) >= MIN_STEP) tilt.floatValue = smoothed
+                tilt.set(smoothed)
             }
 
             override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) = Unit
         }
+        var started = false
+        var listening = false
+        fun sync() {
+            val shouldListen = started && tilt.demand > 0
+            if (shouldListen == listening) return
+            listening = shouldListen
+            if (shouldListen) {
+                seeded = false
+                manager.registerListener(listener, sensor, SensorManager.SENSOR_DELAY_UI)
+            } else {
+                manager.unregisterListener(listener)
+            }
+        }
         val observer = LifecycleEventObserver { _, event ->
             when (event) {
-                Lifecycle.Event.ON_START -> {
-                    seeded = false
-                    manager.registerListener(listener, sensor, SensorManager.SENSOR_DELAY_GAME)
-                }
-                Lifecycle.Event.ON_STOP -> manager.unregisterListener(listener)
+                Lifecycle.Event.ON_START -> { started = true; sync() }
+                Lifecycle.Event.ON_STOP -> { started = false; sync() }
                 else -> Unit
             }
         }
         lifecycle.addObserver(observer)
+        tilt.onDemandChanged = ::sync
         onDispose {
+            tilt.onDemandChanged = {}
             lifecycle.removeObserver(observer)
             manager.unregisterListener(listener)
         }
