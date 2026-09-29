@@ -185,7 +185,7 @@ object BasmalahWash {
      * own last mark.
      *
      * Four of the seven shipped rows stop marking before the reciter stops —
-     * As-Sudais 160 ms early, then Minshawi, Ash-Shuraym and Alafasy by ~150 ms
+     * Minshawi 185 ms early, then As-Sudais, Ash-Shuraym and Alafasy by 150 ms
      * — which left the calligraphy finished while "ar-raḥīīīm" was still going.
      * Since late is better than early, the closing word simply owns the rest of
      * the clip. The extension is capped at the closer's own marked length so a

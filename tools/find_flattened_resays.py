@@ -182,7 +182,10 @@ def find_candidates(rows, references, shipped, owned, lead_ms):
             # The corrected pair must be the one that ships, or the verdict
             # would describe a row the finalizer rewrote.
             final = shipped.get(key) or []
-            if [p, s0, e0] not in final or [q, s1, e1] not in final:
+            if not any(
+                final[i : i + 2] == [[p, s0, e0], [q, s1, e1]]
+                for i in range(len(final) - 1)
+            ):
                 continue
             if best is None or lead > best["leadMs"]:
                 best = {
@@ -200,6 +203,8 @@ def hypothesis(segs, source_pair):
     """The same row with ``p`` said twice; boundaries are irrelevant to Viterbi."""
     (p, s0, e0), (q, s1, e1) = source_pair
     i = segs.index([p, s0, e0])
+    if segs[i + 1] != [q, s1, e1]:
+        raise ValueError(f"source pair {source_pair} is not adjacent in {segs}")
     mid = (s1 + e1) // 2
     return [*segs[:i], [p, s0, e0], [p, s1, mid], [q, mid, e1], *segs[i + 2 :]]
 
@@ -214,6 +219,9 @@ def cmd_candidates(args):
     print(f"{len(found)} candidate row(s): {dict(sorted(by_reciter.items()))}")
 
 
+SCORE_CHUNK = 250  # rows persisted per flush, so --resume loses at most one chunk
+
+
 def cmd_score(args):
     import audit_forced_alignment as af
 
@@ -222,7 +230,22 @@ def cmd_score(args):
     done = set()
     if args.resume and out.is_file():
         done = {tuple(json.loads(line)["key"]) for line in out.read_text().splitlines() if line}
+    elif out.exists():
+        out.unlink()  # a fresh run must not append a second score for any row
     todo = [c for c in candidates if tuple(c["key"]) not in done]
+    models = {}
+
+    def model(tag, name, romanize):
+        if tag not in models:
+            processor, net, device = af.load_model(name, "auto")
+            romanizer = None
+            if romanize:
+                import uroman as ur
+
+                romanizer = ur.Uroman()
+            models[tag] = (processor, net, device, romanizer)
+        return models[tag]
+
     with tempfile.TemporaryDirectory() as tmp:
         dbs = {}
         for tag in ("base", "hyp"):
@@ -238,48 +261,44 @@ def cmd_score(args):
             db.commit()
             dbs[tag] = db
         slugs = dict(dbs["base"].execute("SELECT id, slug FROM reciters"))
-        results = {tuple(c["key"]): {"key": c["key"]} for c in todo}
-        for tag, model_name, romanize in (
-            ("xlsr", af.MODEL_NAME, False),
-            ("mms", af.MMS_MODEL_NAME, True),
-        ):
-            processor, model, device = af.load_model(model_name, "auto")
-            romanizer = None
-            if romanize:
-                import uroman as ur
-
-                romanizer = ur.Uroman()
-            for n, c in enumerate(todo, start=1):
-                key = tuple(c["key"])
-                for which, db in dbs.items():
-                    try:
-                        evidence = af.force_one(
-                            db=db, processor=processor, model=model, device=device,
-                            qasr_root=af.DEFAULT_QASR, reciter_id=key[0], slug=slugs[key[0]],
-                            surah=key[1], ayah=key[2], min_label_probability=0.15,
-                            max_residual_ms=250, romanize=romanize,
-                            model_name=model_name, romanizer=romanizer,
-                        )
-                    except Exception as error:  # evidence must record, not hide, a gap
-                        results[key][f"{tag}Error"] = f"{type(error).__name__}: {error}"
-                        continue
-                    results[key][f"{tag}_{which}"] = evidence["viterbiLogProbabilityPerFrame"]
-                    results[key]["audioSha256"] = evidence["audioSha256"]
-                    if which == "hyp":
-                        results[key][f"{tag}Words"] = [
-                            [
-                                w["position"], w["forcedStartMs"], w["forcedEndMs"],
-                                round(w["meanLabelProbability"], 4),
+        for first in range(0, len(todo), SCORE_CHUNK):
+            chunk = todo[first : first + SCORE_CHUNK]
+            results = {tuple(c["key"]): {"key": c["key"]} for c in chunk}
+            for tag, model_name, romanize in (
+                ("xlsr", af.MODEL_NAME, False),
+                ("mms", af.MMS_MODEL_NAME, True),
+            ):
+                processor, net, device, romanizer = model(tag, model_name, romanize)
+                for c in chunk:
+                    key = tuple(c["key"])
+                    for which, db in dbs.items():
+                        try:
+                            evidence = af.force_one(
+                                db=db, processor=processor, model=net, device=device,
+                                qasr_root=af.DEFAULT_QASR, reciter_id=key[0], slug=slugs[key[0]],
+                                surah=key[1], ayah=key[2], min_label_probability=0.15,
+                                max_residual_ms=250, romanize=romanize,
+                                model_name=model_name, romanizer=romanizer,
+                            )
+                        except Exception as error:  # evidence must record, not hide, a gap
+                            results[key][f"{tag}Error"] = f"{type(error).__name__}: {error}"
+                            continue
+                        results[key][f"{tag}_{which}"] = evidence["viterbiLogProbabilityPerFrame"]
+                        results[key]["audioSha256"] = evidence["audioSha256"]
+                        if which == "hyp":
+                            results[key][f"{tag}Words"] = [
+                                [
+                                    w["position"], w["forcedStartMs"], w["forcedEndMs"],
+                                    round(w["meanLabelProbability"], 4),
+                                ]
+                                for w in evidence["words"]
                             ]
-                            for w in evidence["words"]
-                        ]
-                if n % 250 == 0:
-                    print(f"  {tag} {n}/{len(todo)}", flush=True)
-        with out.open("a", encoding="utf-8") as report:
-            for c in todo:
-                row = results[tuple(c["key"])]
-                row.update({"position": c["position"], "sourcePair": c["sourcePair"], "leadMs": c["leadMs"]})
-                report.write(json.dumps(row, ensure_ascii=False) + "\n")
+            with out.open("a", encoding="utf-8") as report:
+                for c in chunk:
+                    row = results[tuple(c["key"])]
+                    row.update({"position": c["position"], "sourcePair": c["sourcePair"], "leadMs": c["leadMs"]})
+                    report.write(json.dumps(row, ensure_ascii=False) + "\n")
+            print(f"  scored {first + len(chunk)}/{len(todo)}", flush=True)
     print(f"scored {len(todo)} candidate row(s)")
 
 
@@ -320,7 +339,11 @@ def accepted(row):
 
 
 def cmd_write(args):
-    rows = [json.loads(line) for line in Path(args.scores).read_text().splitlines() if line]
+    # One score per row; a later line (a rescore) replaces an earlier one.
+    rows = list({
+        tuple(row["key"]): row
+        for row in (json.loads(line) for line in Path(args.scores).read_text().splitlines() if line)
+    }.values())
     slugs = {}
     for path in CORRECTIONS_DIR.glob("*.json"):
         payload = _load(path)
@@ -329,16 +352,28 @@ def cmd_write(args):
     import build_db
 
     slugs.update({rid: slug for rid, slug, _name, _style in build_db.RECITERS})
+
+    def buildable(row, onsets):
+        # Validate with the build's own operation, so an entry the build would
+        # refuse is never written.
+        try:
+            build_db.restore_flattened_resay(
+                row["sourcePair"], row["position"], *onsets, row["sourcePair"], True
+            )
+        except ValueError:
+            return False
+        return True
+
     edits = collections.defaultdict(list)
     rejected_bounds = 0
     for row in rows:
         if not accepted(row):
             continue
         onsets = forced_resay(row)
-        (p, s0, _e0), (_q, _s1, e1) = row["sourcePair"]
-        if onsets is None or not s0 < onsets[0] < onsets[1] < e1:
+        if onsets is None or not buildable(row, onsets):
             rejected_bounds += 1
             continue
+        p = row["position"]
         rid, sid, ay = row["key"]
         edits[rid].append({
             "reciterId": rid,
@@ -367,19 +402,18 @@ def cmd_write(args):
 
 
 def _dump_corrections(payload):
-    """Pretty JSON that keeps pairs and short lists on one line, like hand entries."""
+    """Pretty JSON with flat lists on one line, the way the hand entries are written."""
     text = json.dumps(payload, ensure_ascii=False, indent=2)
-    number = r"\s*(-?\d+),\s*(-?\d+),\s*(-?\d+)\s*"
-    text = re.sub(
-        r'"sourcePair": \[\s*\[' + number + r'\],\s*\[' + number + r'\]\s*\]',
-        r'"sourcePair": [[\1, \2, \3], [\4, \5, \6]]',
-        text,
-    )
-    text = re.sub(
-        r'"evidence": \[\s*((?:"[^"]*",?\s*)+)\]',
-        lambda m: '"evidence": [' + ", ".join(re.findall(r'"[^"]*"', m.group(1))) + "]",
-        text,
-    )
+    scalar = r'(?:-?\d+|"[^"\n]*"|true|false)'
+    flat = re.compile(r"\[\s*(" + scalar + r"(?:,\s*" + scalar + r")*)\s*\]")
+    pair = re.compile(r"\[\s*(\[[^\[\]\n]*\](?:,\s*\[[^\[\]\n]*\])*)\s*\]")
+
+    def one_line(match):
+        items = re.findall(scalar, match.group(1))
+        return "[" + ", ".join(items) + "]"
+
+    text = flat.sub(one_line, text)
+    text = pair.sub(lambda m: "[" + ", ".join(re.findall(r"\[[^\[\]]*\]", m.group(1))) + "]", text)
     return text + "\n"
 
 
@@ -404,7 +438,12 @@ def cmd_verdicts(args):
         key = (rid, *(int(x) for x in change["key"].split(":")[1:]))
         if key not in generated:
             continue
-        row = scores[key]
+        row = scores.get(key)
+        if row is None:
+            raise SystemExit(
+                f"no score for generated correction {change['key']}; "
+                "pass the scores file that produced the corrections"
+            )
         verdicts[change["key"]] = {
             "verdict": "accept",
             "kinds": change["kinds"],

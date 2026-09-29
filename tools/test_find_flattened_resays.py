@@ -46,6 +46,18 @@ def test_no_candidate_when_the_pair_does_not_ship():
     assert candidates(shipped=[[7, 6030, 7710], [8, 7710, 9900], [9, 9900, 12340]]) == []
 
 
+def test_no_candidate_when_the_shipped_pair_is_split_apart():
+    # Both segments still ship, but something now sits between them.
+    shipped = [[7, 6030, 7710], [8, 7710, 9800], [8, 9800, 9800], [9, 9800, 12340]]
+    assert candidates(shipped=shipped) == []
+
+
+def test_hand_written_corrections_survive_a_rewrite():
+    for path in sorted(f.CORRECTIONS_DIR.glob("*.json")):
+        text = path.read_text(encoding="utf-8")
+        assert f._dump_corrections(__import__("json").loads(text)) == text, path.name
+
+
 def test_hypothesis_only_adds_the_repeated_occurrence():
     hyp = f.hypothesis(ROW, [[8, 7710, 9800], [9, 9800, 12340]])
     assert [s[0] for s in hyp] == [7, 8, 8, 9, 10]

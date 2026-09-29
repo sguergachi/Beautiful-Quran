@@ -13,10 +13,7 @@
       "sourcePair": [[8, 7710, 9800], [9, 9800, 12340]],
       "requiresAudioVerdict": true,
       "evidence": ["ear", "dual CTC", "waveform", "quran-align"],
-      "refs": [
-        "GitHub issue #779",
-        "tools/timing_verdicts/flattened-resay-class.json"
-      ]
+      "refs": ["GitHub issue #779", "tools/timing_verdicts/flattened-resay-class.json"]
     },
     {
       "reciterId": 7,
@@ -30,9 +27,7 @@
       "requiresAudioVerdict": true,
       "generator": "tools/find_flattened_resays.py",
       "evidence": ["dual-model forced alignment", "quran-align"],
-      "refs": [
-        "tools/timing_verdicts/flattened-resay-class.json"
-      ]
+      "refs": ["tools/timing_verdicts/flattened-resay-class.json"]
     },
     {
       "reciterId": 7,
@@ -46,9 +41,7 @@
       "requiresAudioVerdict": true,
       "generator": "tools/find_flattened_resays.py",
       "evidence": ["dual-model forced alignment", "quran-align"],
-      "refs": [
-        "tools/timing_verdicts/flattened-resay-class.json"
-      ]
+      "refs": ["tools/timing_verdicts/flattened-resay-class.json"]
     }
   ]
 }

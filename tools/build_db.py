@@ -599,7 +599,7 @@ QDC_SPLIT_FRAGMENT_RATIO = 0.40  # shorter/longer below this = a split fragment,
 # any spoken word, immediately followed by the rewind (Hani 21:63 فَسۡـَٔلُوهُمۡ
 # ×2 reads 6,[7 for 60 ms],6,7). The reader then flashed إِن and washed it
 # orange as part of a phrase re-say that was never recited. Same physical
-# floor as a same-position fragment. On the v62 corpus the rule changed 40 rows
+# floor as a same-position fragment. On the v62 corpus the rule changed 39 rows
 # across five reciters and Arabic XLSR and MMS/uroman forced alignment preferred
 # the cleaned row on every one (tools/timing_verdicts/qdc-rewind-onset-class.json).
 QDC_REWIND_ONSET_MS = QDC_SPLIT_FRAGMENT_MS
@@ -1140,7 +1140,7 @@ def drop_rewind_onsets(segs, stats):
             and pos > running_max
             and end - start < QDC_REWIND_ONSET_MS
             and next_pos is not None
-            and next_pos < pos
+            and next_pos <= running_max
             and any(seg[0] == pos for seg in segs[i + 1 :])
         ):
             out[-1][2] = max(out[-1][2], end)

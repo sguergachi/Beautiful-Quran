@@ -204,7 +204,7 @@ class BasmalahWashTest {
     @Test
     fun `the closing word settles with the clip, never before the voice`() {
         // Every shipped clip, measured with ffprobe + an energy envelope: the
-        // rows stop marking before the reciter stops (As-Sudais by 160 ms), so
+        // rows stop marking before the reciter stops (Minshawi by 185 ms), so
         // settling on the row's own mark finished the ink mid-madd. The wash
         // must not be complete before the voice is, and must be complete by the
         // end of the clip.

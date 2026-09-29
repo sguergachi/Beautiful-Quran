@@ -379,7 +379,7 @@ are **not audible repeats**. Artifact classes scrubbed in `clean_qdc_artifacts`
    60 ms and washes orange on its only real utterance. Fix: when such a label
    is shorter than `QDC_REWIND_ONSET_MS` (the 200 ms fragment floor) and the
    row recites that word later, fold its instant into the word being
-   finished. Across the shipped corpus 40 rows had this shape; both forced
+   finished. Across the shipped corpus 39 rows had this shape; both forced
    aligners preferred the cleaned row on every one
    (`tools/timing_verdicts/qdc-rewind-onset-class.json`). The label must be
    re-said later, so the rule can never erase a word's only span.
