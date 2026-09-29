@@ -50,6 +50,70 @@ class VerseOpeningTest {
     }
 
     @Test
+    fun `the first word highlights when the voice starts`() {
+        // Hani 4:148. Click at 1951, speech at 4283, word ends at 4790.
+        val verse = listOf(Segment(1, 1_951, 4_790), Segment(2, 4_790, 5_510))
+        val silence = listOf(AudibleSilence(0, 4_283))
+        val voice = firstWordHighlightMs(verse, silence)
+        assertEquals(4_283L, voice)
+        assertEquals(4_790L - 4_283L, verse[1].startMs - voice)
+        assertNull(
+            openingWashStartMs(
+                startMs = 1_951,
+                position = 1,
+                segments = verse,
+                positionMs = 2_000,
+                voiceMs = voice,
+            ),
+        )
+        assertEquals(
+            4_283L,
+            openingWashStartMs(
+                startMs = 1_951,
+                position = 1,
+                segments = verse,
+                positionMs = 4_300,
+                voiceMs = voice,
+            ),
+        )
+        // Word 2 keeps its stored start.
+        assertEquals(
+            4_790L,
+            openingWashStartMs(
+                startMs = 4_790,
+                position = 2,
+                segments = verse,
+                positionMs = 4_800,
+                voiceMs = voice,
+            ),
+        )
+    }
+
+    @Test
+    fun `a word clock that already meets the voice stays`() {
+        // Hani 4:58. Speech and the first word meet.
+        val verse = listOf(Segment(1, 5_600, 7_080))
+        assertEquals(5_600L, firstWordHighlightMs(verse, emptyList()))
+        assertEquals(
+            5_600L,
+            openingWashStartMs(
+                startMs = 5_600,
+                position = 1,
+                segments = verse,
+                positionMs = 5_700,
+                voiceMs = 5_600,
+            ),
+        )
+    }
+
+    @Test
+    fun `a voice that returns in a later word leaves the first word clock`() {
+        val verse = listOf(Segment(1, 40, 890), Segment(2, 900, 4_000))
+        val silence = listOf(AudibleSilence(0, 3_350))
+        assertEquals(40L, firstWordHighlightMs(verse, silence))
+    }
+
+    @Test
     fun `a lead that ends at the word start keeps the word clock`() {
         // Hani 4:58. Speech and the first word meet. The lead is not inside a word.
         val verse = listOf(Segment(1, 5_600, 7_080))

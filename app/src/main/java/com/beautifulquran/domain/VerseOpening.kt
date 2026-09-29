@@ -57,6 +57,47 @@ internal fun spanCovering(silence: List<AudibleSilence>, timeMs: Long): AudibleS
 }
 
 /**
+ * When the first word's highlight starts.
+ *
+ * The stored start is a click when an opening silence span still covers it
+ * and the voice returns before that word ends. The wash then runs from the
+ * voice to the same hold the timing table already uses. A word clock that
+ * already meets the voice, or a voice that returns in a later word, is left
+ * alone.
+ */
+internal fun firstWordHighlightMs(
+    segments: List<Segment>,
+    silence: List<AudibleSilence>,
+): Long {
+    val first = segments.firstOrNull() ?: return 0L
+    val quiet = spanCovering(silence, first.startMs) ?: return first.startMs
+    val voice = quiet.endMs
+    if (voice <= first.startMs + SILENCE_SLACK_MS) return first.startMs
+    val holdEnd = segments.getOrNull(1)?.startMs ?: first.endMs
+    if (voice >= first.endMs || voice >= holdEnd) return first.startMs
+    return voice
+}
+
+/**
+ * Wash start for the word at [positionMs], or null while the playhead is
+ * still in the quiet before the first word's voice. Later words keep their
+ * stored starts.
+ */
+internal fun openingWashStartMs(
+    startMs: Long,
+    position: Int,
+    segments: List<Segment>,
+    positionMs: Long,
+    voiceMs: Long,
+): Long? {
+    val first = segments.firstOrNull() ?: return startMs
+    val opening = position == first.position && startMs == first.startMs
+    if (!opening) return startMs
+    if (positionMs < voiceMs) return null
+    return voiceMs
+}
+
+/**
  * Where to seek so the playhead lands on voice.
  *
  * A timing gap seeks to that word's start. When the word start (or the
@@ -82,8 +123,8 @@ internal fun playbackSkipMs(
 /**
  * Where to seek when [positionMs] is in silence before a word.
  * Null when a word is already sounding, or the remaining quiet is inside
- * the slack. The returned time is that word's [Segment.startMs], the same
- * instant the highlight starts it.
+ * the slack. The returned time is that word's [Segment.startMs].
+ * [firstWordHighlightMs] is the matching highlight when that start is a click.
  */
 internal fun nextVoicedMs(segments: List<Segment>, positionMs: Long): Long? {
     if (segments.isEmpty() || positionMs < 0L) return null
