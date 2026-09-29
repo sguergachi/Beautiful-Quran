@@ -29,5 +29,20 @@ class DiscontinuityPolicyTest {
 
         assertEquals(2L, adjusted.clockId)
         assertEquals(1L, adjusted.inkId)
+        assertEquals(Player.DISCONTINUITY_REASON_SEEK_ADJUSTMENT, adjusted.reason)
+        assertFalse(adjusted.itemChanged)
+    }
+
+    @Test
+    fun `an automatic advance records that the playlist item changed`() {
+        val advanced = PlaybackPositionEvents().afterDiscontinuity(
+            reason = Player.DISCONTINUITY_REASON_AUTO_TRANSITION,
+            itemChanged = true,
+        )
+
+        assertEquals(Player.DISCONTINUITY_REASON_AUTO_TRANSITION, advanced.reason)
+        assertTrue(advanced.itemChanged)
+        assertEquals(1L, advanced.clockId)
+        assertEquals(1L, advanced.inkId)
     }
 }
