@@ -30,10 +30,14 @@ data class NowPlaying(
 )
 
 /** Cumulative Media3 position events. Every jump advances [clockId], while
- * only a new ink performance advances [inkId]. */
+ * only a new ink performance advances [inkId]. [reason] is the latest
+ * discontinuity. [itemChanged] is true when that jump landed on a different
+ * playlist item — a repeat of the same file does not. */
 data class PlaybackPositionEvents(
     val clockId: Long = 0L,
     val inkId: Long = 0L,
+    val reason: Int = Player.DISCONTINUITY_REASON_INTERNAL,
+    val itemChanged: Boolean = false,
 )
 
 data class PlayerUiState(
@@ -58,9 +62,12 @@ internal fun discontinuityRestartsInk(reason: Int): Boolean =
 
 internal fun PlaybackPositionEvents.afterDiscontinuity(
     reason: Int,
+    itemChanged: Boolean = false,
 ): PlaybackPositionEvents = copy(
     clockId = clockId + 1L,
     inkId = inkId + if (discontinuityRestartsInk(reason)) 1L else 0L,
+    reason = reason,
+    itemChanged = itemChanged,
 )
 
 /**
@@ -152,7 +159,10 @@ class PlayerController(private val context: Context) {
             reason: Int,
         ) {
             _state.value = _state.value.copy(
-                positionEvents = _state.value.positionEvents.afterDiscontinuity(reason),
+                positionEvents = _state.value.positionEvents.afterDiscontinuity(
+                    reason = reason,
+                    itemChanged = oldPosition.mediaItemIndex != newPosition.mediaItemIndex,
+                ),
             )
         }
 
