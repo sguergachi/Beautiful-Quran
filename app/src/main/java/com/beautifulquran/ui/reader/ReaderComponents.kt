@@ -3677,6 +3677,7 @@ fun OrnateSurahTitle(
                 embossDark = accents.embossDark,
                 embossLight = accents.embossLight,
                 sheen = sheen,
+                stroke = TOP_BAR_ROSETTE_STROKE,
             )
             Text(
                 text = "سُورَةُ $nameArabic",
@@ -3730,6 +3731,9 @@ private val TOP_BAR_NAME_TRIM = 5.dp
 
 /** The header medallion's little sibling in the top bar. */
 private val TOP_BAR_ROSETTE = 18.dp
+
+/** Hairline for that size: the header's 1 dp strokes fill it in solid. */
+private val TOP_BAR_ROSETTE_STROKE = 0.45.dp
 
 /**
  * Subtle page break: [PageNumberScript.BOTH] places Western and Arabic-Indic

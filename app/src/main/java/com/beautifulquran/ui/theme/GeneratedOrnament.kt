@@ -88,6 +88,7 @@ private fun DrawScope.drawRosette(
     embossDark: Color,
     embossLight: Color,
     progress: Float,
+    emboss: Float = 0.8f,
 ) {
     translate(center.x, center.y) {
         for (s in paths.strokes) {
@@ -101,8 +102,8 @@ private fun DrawScope.drawRosette(
                 s.partial
             }
             val stroke = Stroke(width = s.width, cap = StrokeCap.Round, join = StrokeJoin.Round)
-            translate(0.8f, 0.8f) { drawPath(path, embossDark, style = stroke) }
-            translate(-0.8f, -0.8f) { drawPath(path, embossLight, style = stroke) }
+            translate(emboss, emboss) { drawPath(path, embossDark, style = stroke) }
+            translate(-emboss, -emboss) { drawPath(path, embossLight, style = stroke) }
             drawPath(path, gold, style = stroke)
         }
         for (d in paths.dots) {
@@ -163,7 +164,9 @@ fun GeneratedMedallion(
  * of the page's fixed typography rather than a ceremony, so it is static:
  * complete on first composition, no build wash. Same stroke-weight recipe
  * as [GeneratedCornerSeals] (1dp uniform) — both render at a similar,
- * small physical size.
+ * small physical size. A miniature (the top bar's) passes a hairline
+ * [stroke]: at 1dp the strokes of a star that small run into one gold disc,
+ * so the line work needs to shrink with it, emboss offset included.
  */
 @Composable
 fun GeneratedChapterRosette(
@@ -175,6 +178,7 @@ fun GeneratedChapterRosette(
     embossLight: Color,
     sheen: State<Float>,
     modifier: Modifier = Modifier,
+    stroke: Dp = 1.dp,
 ) {
     Spacer(
         modifier
@@ -184,8 +188,8 @@ fun GeneratedChapterRosette(
                 val paths = RosettePaths(
                     spec,
                     d,
-                    ruleWidth = 1.dp.toPx(),
-                    hairWidth = 1.dp.toPx(),
+                    ruleWidth = stroke.toPx(),
+                    hairWidth = stroke.toPx(),
                 )
                 onDrawBehind {
                     val gold = goldBrush(brightGold, deepGold, sheen.value.coerceIn(0f, 1f))
@@ -196,6 +200,7 @@ fun GeneratedChapterRosette(
                         embossDark,
                         embossLight,
                         1f,
+                        emboss = 0.8f * (stroke / 1.dp),
                     )
                 }
             },
