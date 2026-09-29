@@ -865,18 +865,17 @@ private class WordInkCache {
 private const val WordInkAdvanceSlackPx = 1f
 
 /**
- * Ink of a Hafs pause ligature that rises above the em square.
+ * Ink of a Hafs pause ligature, in ems (upem 2048 in hafs_uthmanic.ttf).
  *
- * The line box stops at that square, so the tip paints into the line above
- * and stays full cream while the word is faded. Units are ems of the font
- * (upem 2048 in hafs_uthmanic.ttf). [aboveEm] is how far [yMax] clears the
- * em square. U+06E1, the sukūn head, stays inside the square and is absent.
+ * [yMaxEm] is the top of the ink above the baseline. The line box stops
+ * below that, so the whole ligature can sit in the line above and stay full
+ * cream. U+06E1, the sukūn head, stays inside the line and is absent.
  */
 internal class RaisedMarkInk(
     val xMinEm: Float,
     val xMaxEm: Float,
     val advanceEm: Float,
-    val aboveEm: Float,
+    val yMaxEm: Float,
 )
 
 private const val HafsUpem = 2048f
@@ -893,7 +892,7 @@ private fun hafsMark(xMin: Int, xMax: Int, advance: Int, yMax: Int) = RaisedMark
     xMinEm = xMin / HafsUpem,
     xMaxEm = xMax / HafsUpem,
     advanceEm = advance / HafsUpem,
-    aboveEm = (yMax - HafsUpem) / HafsUpem,
+    yMaxEm = yMax / HafsUpem,
 )
 
 internal fun hasRaisedQuranMark(text: CharSequence, start: Int, endExclusive: Int): Boolean {
@@ -907,27 +906,30 @@ internal fun hasRaisedQuranMark(text: CharSequence, start: Int, endExclusive: In
 }
 
 /**
- * The ligature's ink just above [lineTop].
+ * The ligature's ink from its font top down to [lineTop].
  *
- * The advance box is a few pixels. The drawn ligature is wider, and the run
- * may hang that ink off either edge of the box. The rect covers both hangs
- * and stops at the line, so it does not fade the word the line rect already
- * covers, nor a descender that is not directly over this ligature.
+ * The top is [baseline] minus the glyph's yMax, which is where Hafs draws
+ * it. Stopping at the line keeps the punch out of the word the line rect
+ * already covers. The advance box is a few pixels and the ink may hang off
+ * either edge, so the rect covers both.
  */
 internal fun raisedMarkCoverRect(
     cursorA: Float,
     cursorB: Float,
     lineTop: Float,
+    baseline: Float,
     fontPx: Float,
     ink: RaisedMarkInk,
 ): Rect {
-    if (fontPx <= 0f || ink.aboveEm <= 0f) return Rect.Zero
+    if (fontPx <= 0f) return Rect.Zero
+    val glyphTop = baseline - ink.yMaxEm * fontPx
+    if (glyphTop >= lineTop) return Rect.Zero
     val left = minOf(cursorA, cursorB)
     val right = maxOf(cursorA, cursorB)
-    val margin = fontPx * 0.04f
+    val margin = fontPx * 0.06f
     return Rect(
         left = minOf(left + ink.xMinEm * fontPx, right - ink.xMaxEm * fontPx) - margin,
-        top = lineTop - (ink.aboveEm * fontPx + margin),
+        top = glyphTop - margin,
         right = maxOf(left + ink.xMaxEm * fontPx, right - ink.xMinEm * fontPx) + margin,
         bottom = lineTop,
     )
@@ -969,7 +971,15 @@ private fun DrawScope.coverRaisedMarks(
             (index + 1).coerceAtMost(text.length),
             usePrimaryDirection = true,
         )
-        val column = raisedMarkCoverRect(cursorA, cursorB, line.top, fontPx, ink)
+        val lineIndex = textLayout.getLineForOffset(index.coerceAtMost(text.length - 1))
+        val column = raisedMarkCoverRect(
+            cursorA = cursorA,
+            cursorB = cursorB,
+            lineTop = line.top,
+            baseline = textLayout.getLineBaseline(lineIndex),
+            fontPx = fontPx,
+            ink = ink,
+        )
         if (column.isEmpty || column.width <= 0f || column.height <= 0f) {
             index++
             continue

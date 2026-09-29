@@ -7,9 +7,9 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
- * Pause ligatures in Hafs (صلى U+06D6, قلى U+06D7) ink above the em square.
- * The faded-word rect stops at the line, so those tips stayed full ink.
- * The cover is the ligature's own ink, just above the line.
+ * Pause ligatures in Hafs (صلى U+06D6, قلى U+06D7) ink above the line box.
+ * The faded-word rect stops at the line, so the ligature stayed full ink.
+ * The cover runs from the baseline up to the glyph top.
  */
 class RaisedMarkOverhangTest {
 
@@ -30,30 +30,48 @@ class RaisedMarkOverhangTest {
     }
 
     @Test
-    fun `cover sits on the ligature and stops at the line`() {
+    fun `cover reaches the glyph top above the line`() {
         val ink = raisedMarkInk(0x06D6)!!
+        // Line ascent is 0.8em. The ligature top is 1.14em above the baseline,
+        // so it clears the line by about a third of an em — the whole mark.
         val cover = raisedMarkCoverRect(
             cursorA = 100f,
             cursorB = 110f,
             lineTop = 200f,
+            baseline = 280f,
             fontPx = 100f,
             ink = ink,
         )
 
         assertEquals(200f, cover.bottom, 0f)
-        // yMax clears the em square by 0.143em, plus the 0.04em edge margin.
-        assertEquals(200f - (ink.aboveEm * 100f + 4f), cover.top, 0.01f)
-        assertTrue(cover.top > 200f - 30f)
+        assertEquals(280f - ink.yMaxEm * 100f - 6f, cover.top, 0.01f)
+        assertTrue(cover.height > 30f)
         assertTrue(cover.left < 100f)
         assertTrue(cover.right > 110f)
-        assertFalse(cover.overlaps(Rect(0f, 200.5f, 500f, 280f)))
+        assertFalse(cover.overlaps(Rect(0f, 200.5f, 500f, 360f)))
+    }
+
+    @Test
+    fun `a mark inside the line grows no cover`() {
+        val ink = raisedMarkInk(0x06D6)!!
+        val cover = raisedMarkCoverRect(
+            cursorA = 100f,
+            cursorB = 110f,
+            lineTop = 200f,
+            baseline = 320f,
+            fontPx = 100f,
+            ink = ink,
+        )
+        assertTrue(cover.isEmpty)
     }
 
     @Test
     fun `no font size grows no cover`() {
         val ink = raisedMarkInk(0x06D7)!!
         assertTrue(
-            raisedMarkCoverRect(0f, 10f, 200f, fontPx = 0f, ink = ink).isEmpty,
+            raisedMarkCoverRect(
+                0f, 10f, 200f, baseline = 280f, fontPx = 0f, ink = ink,
+            ).isEmpty,
         )
     }
 }
