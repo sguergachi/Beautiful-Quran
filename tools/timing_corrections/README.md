@@ -29,7 +29,9 @@ Supported operations:
   labelled as the following word. The mirror of the false lead: a word said
   twice with one qdc label hands its second utterance to the next word, which
   then starts a whole utterance early. The entry names the word, the re-say
-  onset and the next word's onset; both must fall inside the flat source pair.
+  onset, the next word's onset, and the exact flat `sourcePair` it was
+  verified on. The onsets are absolute times, so any source or clock change
+  that moves that pair fails the build instead of shifting the verdict.
   Hani 21:46 يَٰوَيۡلَنَآ (#779) is this shape: qdc opens إِنَّا at 9800 while
   quran-align, the Lab and both forced aligners put it at 11350–11520. No
   pipeline rule can reach it — qdc flattened the repeat, quran-align cannot

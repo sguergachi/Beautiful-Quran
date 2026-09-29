@@ -1111,31 +1111,44 @@ def clean_qdc_artifacts(segs, stats, recover_singleton_gap=False):
                 changed = True
                 i += 1
                 continue
-            # Rewind onset: a sub-word first-pass label at a new high-water
-            # position, followed at once by a rewind. The word must be recited
-            # later in the row, so dropping this label can never lose coverage;
-            # its instant goes back to the word the reciter was finishing.
-            rewind_onset = (
-                prev is not None
-                and pos > running_max
-                and end - start < QDC_REWIND_ONSET_MS
-                and next_pos is not None
-                and next_pos < pos
-                and any(seg[0] == pos for seg in merged[i + 1 :])
-            )
-            if rewind_onset:
-                prev[2] = max(prev[2], end)
-                stats["rewind_onsets"] = stats.get("rewind_onsets", 0) + 1
-                changed = True
-                i += 1
-                continue
             kept.append([pos, start, end])
             running_max = max(running_max, pos)
             i += 1
         kept, run_changed = adjudicate_backtrack_runs(kept, stats)
         changed |= run_changed
         segs = kept
-    return segs
+    return drop_rewind_onsets(segs, stats)
+
+
+def drop_rewind_onsets(segs, stats):
+    """Fold each sub-word first-pass label stamped on the instant of a rewind.
+
+    The label sits at a new high-water position and a rewind follows at once;
+    the word must still be recited later in the row, so dropping this label
+    can never lose coverage. Its instant goes back to the word the reciter was
+    finishing. This runs once, on the settled row: inside the fixpoint the
+    later occurrence could still be dropped as a stray (erasing the word), and
+    the ``A,A`` pair the fold leaves could be merged as a split (erasing the
+    restart the rule exists to keep).
+    """
+    out = []
+    running_max = -1
+    for i, (pos, start, end) in enumerate(segs):
+        next_pos = segs[i + 1][0] if i + 1 < len(segs) else None
+        if (
+            out
+            and pos > running_max
+            and end - start < QDC_REWIND_ONSET_MS
+            and next_pos is not None
+            and next_pos < pos
+            and any(seg[0] == pos for seg in segs[i + 1 :])
+        ):
+            out[-1][2] = max(out[-1][2], end)
+            stats["rewind_onsets"] = stats.get("rewind_onsets", 0) + 1
+            continue
+        out.append([pos, start, end])
+        running_max = max(running_max, pos)
+    return out
 
 
 def recover_negative_opening(segs):
@@ -1969,7 +1982,12 @@ def discard_false_same_position_lead(segs, position, requires_audio_verdict=Fals
 
 
 def restore_flattened_resay(
-    segs, position, resay_start_ms, next_onset_ms, requires_audio_verdict=False
+    segs,
+    position,
+    resay_start_ms,
+    next_onset_ms,
+    source_pair,
+    requires_audio_verdict=False,
 ):
     """Restore one acoustically-vetted re-say that qdc labelled as the next word.
 
@@ -1980,8 +1998,10 @@ def restore_flattened_resay(
     source can show the repeat — qdc flattened it and the monotonic aligner
     cannot express one — and CTC fused the rewind into a single token
     (``وَيلنايا``), so no pipeline rule can reach it. The correction names the
-    word, the re-say onset, and the following word's onset; both must fall
-    inside the flat source pair, and the word must be said only once.
+    word, the re-say onset, the following word's onset, and the exact flat
+    source pair it was verified against. Its onsets are absolute times, so a
+    source or clock change that moves the pair at all must fail the build
+    rather than carry the verdict onto different audio.
     """
     if not requires_audio_verdict:
         raise ValueError("restore_flattened_resay requires an audio verdict")
@@ -1998,7 +2018,14 @@ def restore_flattened_resay(
         )
     i = matches[0]
     word, following = segs[i], segs[i + 1]
-    if not word[1] < resay_start_ms < word[2] <= following[1] < next_onset_ms < following[2]:
+    if [list(word), list(following)] != [list(seg) for seg in source_pair]:
+        raise ValueError(
+            f"restore_flattened_resay source pair is now {word} {following}, "
+            f"not the verified {source_pair}"
+        )
+    # The re-say may begin on either side of qdc's boundary: qdc can hand
+    # the breath before it to either word.
+    if not word[1] < resay_start_ms < next_onset_ms < following[2]:
         raise ValueError(
             "restore_flattened_resay onsets fall outside the source pair "
             f"{word} {following}"
@@ -2063,6 +2090,7 @@ def apply_timing_corrections(
                         int(edit["position"]),
                         int(edit["resayStartMs"]),
                         int(edit["nextOnsetMs"]),
+                        edit["sourcePair"],
                         bool(edit.get("requiresAudioVerdict")),
                     )
                 else:

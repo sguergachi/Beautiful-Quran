@@ -250,6 +250,7 @@ def run_pipeline(case, segs):
                 position,
                 case["resay_start_ms"],
                 case["next_onset_ms"],
+                case["source_pair"],
                 bool(case.get("requires_audio_verdict")),
             )
         if position is not None:
