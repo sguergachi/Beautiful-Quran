@@ -12,13 +12,17 @@ import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Canvas
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.FilterQuality
+import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.Paint
 import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.PathOperation
 import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.graphics.drawscope.clipPath
 import androidx.compose.ui.graphics.drawscope.clipRect
+import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
 import androidx.compose.ui.graphics.drawscope.translate
 import androidx.compose.ui.text.TextLayoutResult
@@ -27,10 +31,14 @@ import androidx.compose.ui.text.TextMeasurer
 import androidx.compose.ui.text.style.TextIndent
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import kotlin.math.ceil
 import kotlin.math.abs
 import kotlin.math.floor
+import kotlin.math.roundToInt
+
 
 /**
  * Letter reveal for the word being recited: a soft ink wash sweeps across the
@@ -341,6 +349,7 @@ fun Modifier.shapedWordBloom(
     val glyphHaloCache = GlyphHaloCache()
     val glyphPathCache = GlyphPathCache()
     val wordInkCache = WordInkCache()
+    val raisedMarkTrace = RaisedMarkTraceCache()
     val washBrushCache = WashBrushCache(rtl, stops)
     return drawWithContent {
         // The one place a frame is consumed, and so the one place the
@@ -410,6 +419,19 @@ fun Modifier.shapedWordBloom(
                             )
                         }
                     }
+                    // Pause ligatures ink past the line paper. Trace that stroke.
+                    lineBounds.singleOrNull()?.let { line ->
+                        coverRaisedMarks(
+                            textLayout = textLayout,
+                            start = start,
+                            endExclusive = endExclusive,
+                            line = line,
+                            padPx = pad,
+                            coverAlpha = a,
+                            blendMode = coverBlend,
+                            trace = raisedMarkTrace,
+                        )
+                    }
                 }
                 is ShapedWordBloom.InkReveal -> {
                     // Full ink is already on the page; pull paper back along the
@@ -475,6 +497,21 @@ fun Modifier.shapedWordBloom(
                                     blendMode = coverBlend,
                                 )
                             }
+                        }
+                        // Same ligature, while this word is the one being read.
+                        if (lineBounds.size == 1) {
+                            coverRaisedMarks(
+                                textLayout = textLayout,
+                                start = start,
+                                endExclusive = endExclusive,
+                                line = lineBounds[i],
+                                padPx = pad,
+                                coverAlpha = 1f,
+                                blendMode = coverBlend,
+                                trace = raisedMarkTrace,
+                                washHeadX = headX,
+                                washBrush = brush,
+                            )
                         }
                     }
                 }
@@ -833,6 +870,285 @@ private class WordInkCache {
 
 /** How far a word's lone advance may differ from the line's before it is not trusted. */
 private const val WordInkAdvanceSlackPx = 1f
+
+/** Pause ligatures whose ink GPOS seats off the cursor box. U+06E1 stays inside it. */
+internal fun isRaisedPauseMark(code: Int): Boolean = when (code) {
+    0x06D6, 0x06D7, 0x06D9, 0x06DA -> true
+    else -> false
+}
+
+internal fun hasRaisedQuranMark(text: CharSequence, start: Int, endExclusive: Int): Boolean {
+    val end = endExclusive.coerceAtMost(text.length)
+    var index = start.coerceAtLeast(0)
+    while (index < end) {
+        if (isRaisedPauseMark(text[index].code)) return true
+        index++
+    }
+    return false
+}
+
+/**
+ * Where the trace bitmap is blitted, and where the lone word is painted in it.
+ *
+ * [left] and [top] are integer, so the blit is one bitmap pixel per screen
+ * pixel. [translateX] and [translateY] place the lone word's origin at the
+ * same subpixel phase it has on the shared line: a filtered draw at a
+ * fractional position softens a thin ligature, and the tip stays lighter
+ * than the letters.
+ */
+internal class RaisedMarkBlit(
+    val left: Float,
+    val top: Float,
+    val translateX: Float,
+    val translateY: Float,
+)
+
+internal fun raisedMarkTraceBlit(
+    lineLeft: Float,
+    lineBaseline: Float,
+    wordLeft: Float,
+    wordBaseline: Float,
+    inset: Float,
+): RaisedMarkBlit {
+    val screenX = lineLeft - wordLeft
+    val screenY = lineBaseline - wordBaseline
+    val left = floor(screenX) - inset
+    val top = floor(screenY) - inset
+    return RaisedMarkBlit(
+        left = left,
+        top = top,
+        translateX = screenX - left,
+        translateY = screenY - top,
+    )
+}
+
+/**
+ * Clear every painted pixel the line paper already covers, and make whatever
+ * is left opaque.
+ *
+ * Returns whether any ink was left. That remainder is the overhang: the
+ * pause stroke where it leaves the word, not a rectangle around the cursor.
+ * The line punch is a solid rect. This stroke is a few pixels wide, so a
+ * punch at its own coverage leaves it lighter than the letters beside it.
+ * A pixel is addressed by its centre.
+ */
+internal fun clearCoveredTracePixels(
+    pixels: IntArray,
+    width: Int,
+    originX: Float,
+    originY: Float,
+    paper: Rect,
+): Boolean {
+    if (width <= 0) return false
+    var keep = false
+    for (i in pixels.indices) {
+        if (pixels[i] ushr 24 == 0) continue
+        val x = i % width
+        val y = i / width
+        if (paper.contains(Offset(originX + x + 0.5f, originY + y + 0.5f))) {
+            pixels[i] = 0
+        } else {
+            pixels[i] = 0xFFFFFFFF.toInt()
+            keep = true
+        }
+    }
+    return keep
+}
+
+/**
+ * The pause ligature, traced from the word's own paint.
+ *
+ * GPOS seats the stroke off the cursor, and part of it already sits inside
+ * the line paper, so a column from the font box both misses the tip and
+ * reprints the body. Draw the word alone — Arabic shaping does not cross
+ * the space — into a bitmap tall enough that the paint is not clipped, then
+ * [clearCoveredTracePixels]. An empty clip before that paint makes
+ * [androidx.compose.ui.text.android.TextLayout.paint] return without
+ * drawing, which is why an earlier mask never showed.
+ */
+private class RaisedMarkTraceCache {
+    class Trace(
+        val image: ImageBitmap,
+        val left: Float,
+        val top: Float,
+        val width: Float,
+        val height: Float,
+    )
+
+    private data class Key(
+        val start: Int,
+        val endExclusive: Int,
+        val padBits: Int,
+        val leftBits: Int,
+        val topBits: Int,
+        val rightBits: Int,
+        val bottomBits: Int,
+    )
+
+    private var layout: TextLayoutResult? = null
+    private var measurer: TextMeasurer? = null
+    private val byRange = object : LinkedHashMap<Key, Trace?>(8, 0.75f, true) {
+        override fun removeEldestEntry(eldest: MutableMap.MutableEntry<Key, Trace?>?): Boolean =
+            size > 16
+    }
+
+    fun traceFor(
+        textLayout: TextLayoutResult,
+        start: Int,
+        endExclusive: Int,
+        line: Rect,
+        padPx: Float,
+    ): Trace? {
+        if (layout !== textLayout) {
+            layout = textLayout
+            measurer = null
+            byRange.clear()
+        }
+        val key = Key(
+            start,
+            endExclusive,
+            padPx.toBits(),
+            line.left.toBits(),
+            line.top.toBits(),
+            line.right.toBits(),
+            line.bottom.toBits(),
+        )
+        if (byRange.containsKey(key)) return byRange[key]
+        return trace(textLayout, start, endExclusive, line, padPx).also { byRange[key] = it }
+    }
+
+    private fun trace(
+        textLayout: TextLayoutResult,
+        start: Int,
+        endExclusive: Int,
+        line: Rect,
+        padPx: Float,
+    ): Trace? {
+        if (textLayout.getLineForOffset(start) != textLayout.getLineForOffset(endExclusive - 1)) {
+            return null
+        }
+        val input = textLayout.layoutInput
+        if (input.placeholders.any { it.start < endExclusive && it.end > start }) return null
+        val fontSize = input.style.fontSize
+        if (!fontSize.isSp) return null
+        val fontPx = with(input.density) { fontSize.toPx() }
+        if (fontPx <= 0f) return null
+        val textMeasurer = measurer ?: TextMeasurer(
+            defaultFontFamilyResolver = input.fontFamilyResolver,
+            defaultDensity = input.density,
+            defaultLayoutDirection = input.layoutDirection,
+            cacheSize = 0,
+        ).also { measurer = it }
+        val word = textMeasurer.measure(
+            text = input.text.subSequence(start, endExclusive),
+            style = input.style.copy(textIndent = TextIndent.None),
+            overflow = TextOverflow.Visible,
+            softWrap = false,
+            maxLines = 1,
+            layoutDirection = input.layoutDirection,
+            density = input.density,
+            fontFamilyResolver = input.fontFamilyResolver,
+            skipCache = true,
+        )
+        val wordLength = word.layoutInput.text.length
+        if (wordLength <= 0 || word.size.width <= 0 || word.size.height <= 0) return null
+        val wordLeft = minOf(
+            word.getHorizontalPosition(0, usePrimaryDirection = true),
+            word.getHorizontalPosition(wordLength, usePrimaryDirection = true),
+        )
+        // Paint places the glyph from the cursor. The paper box is the selection.
+        val cursorLeft = minOf(
+            textLayout.getHorizontalPosition(start, usePrimaryDirection = true),
+            textLayout.getHorizontalPosition(endExclusive, usePrimaryDirection = true),
+        )
+        val inset = ceil(fontPx).coerceAtLeast(1f)
+        val blit = raisedMarkTraceBlit(
+            lineLeft = cursorLeft,
+            lineBaseline = textLayout.getLineBaseline(textLayout.getLineForOffset(start)),
+            wordLeft = wordLeft,
+            wordBaseline = word.firstBaseline,
+            inset = inset,
+        )
+        val width = ceil(word.size.width + blit.translateX + inset).toInt()
+        val height = ceil(word.size.height + blit.translateY + inset).toInt()
+        if (width <= 0 || height <= 0 || width > 4096 || height > 4096) return null
+        val glyphs = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
+        val canvas = Canvas(android.graphics.Canvas(glyphs))
+        canvas.translate(blit.translateX, blit.translateY)
+        word.multiParagraph.paint(canvas)
+        val pixels = IntArray(width * height)
+        glyphs.getPixels(pixels, 0, width, 0, 0, width, height)
+        val paper = linePaperCoverBounds(line, padPx)
+        val keep = clearCoveredTracePixels(pixels, width, blit.left, blit.top, paper)
+        if (!keep) {
+            glyphs.recycle()
+            return null
+        }
+        glyphs.setPixels(pixels, 0, width, 0, 0, width, height)
+        return Trace(
+            image = glyphs.asImageBitmap(),
+            left = blit.left,
+            top = blit.top,
+            width = width.toFloat(),
+            height = height.toFloat(),
+        )
+    }
+}
+
+/**
+ * Punch the traced pause stroke with the same cover the line already uses.
+ *
+ * [washBrush] set: the word is being read, and the stroke follows that wash.
+ * Otherwise it takes the uniform cover of the faded word.
+ */
+private fun DrawScope.coverRaisedMarks(
+    textLayout: TextLayoutResult,
+    start: Int,
+    endExclusive: Int,
+    line: Rect,
+    padPx: Float,
+    coverAlpha: Float,
+    blendMode: BlendMode,
+    trace: RaisedMarkTraceCache,
+    washHeadX: Float? = null,
+    washBrush: Brush? = null,
+) {
+    if (washBrush == null && coverAlpha <= 0f) return
+    if (!hasRaisedQuranMark(textLayout.layoutInput.text, start, endExclusive)) return
+    val mask = trace.traceFor(textLayout, start, endExclusive, line, padPx) ?: return
+    if (washBrush != null && washHeadX != null) {
+        drawIntoCanvas { canvas ->
+            canvas.saveLayer(
+                Rect(mask.left, mask.top, mask.left + mask.width, mask.top + mask.height),
+                Paint().apply { this.blendMode = BlendMode.DstOut },
+            )
+        }
+        drawImage(
+            image = mask.image,
+            dstOffset = IntOffset(mask.left.roundToInt(), mask.top.roundToInt()),
+            dstSize = IntSize(mask.width.toInt(), mask.height.toInt()),
+            filterQuality = FilterQuality.None,
+        )
+        translate(left = washHeadX, top = 0f) {
+            drawRect(
+                brush = washBrush,
+                topLeft = Offset(mask.left - washHeadX, mask.top),
+                size = Size(mask.width, mask.height),
+                blendMode = BlendMode.DstIn,
+            )
+        }
+        drawIntoCanvas { canvas -> canvas.restore() }
+    } else {
+        drawImage(
+            image = mask.image,
+            dstOffset = IntOffset(mask.left.roundToInt(), mask.top.roundToInt()),
+            dstSize = IntSize(mask.width.toInt(), mask.height.toInt()),
+            alpha = coverAlpha.coerceIn(0f, 1f),
+            blendMode = blendMode,
+            filterQuality = FilterQuality.None,
+        )
+    }
+}
 
 /**
  * Directional wash ramps, built once and reused across draw frames.

@@ -41,6 +41,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.media3.common.Player
 import com.beautifulquran.playback.PlayerUiState
+import com.beautifulquran.ui.reader.ReciterNameButton
 import com.beautifulquran.ui.theme.FloatingControlBottomInset
 import com.beautifulquran.ui.theme.FloatingPaperEnter
 import com.beautifulquran.ui.theme.FloatingPaperExit
@@ -102,18 +103,10 @@ fun FloatingPlaybackControl(
                     horizontalAlignment = Alignment.CenterHorizontally,
                     modifier = Modifier.fillMaxWidth(),
                 ) {
-                    TextButton(
+                    ReciterNameButton(
+                        name = reciterName,
                         onClick = onReciterClick,
-                        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 2.dp),
-                    ) {
-                        Text(
-                            text = reciterName,
-                            style = MaterialTheme.typography.labelMedium,
-                            color = QuranTheme.ink.muted,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                        )
-                    }
+                    )
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.Center,
