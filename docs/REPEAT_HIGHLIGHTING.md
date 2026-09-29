@@ -411,6 +411,24 @@ are **not audible repeats**. Artifact classes scrubbed in `clean_qdc_artifacts`
 > *dwarfed* by its neighbour, so it can never touch two peer utterances however
 > the absolute floor is tuned.
 
+### Flattened re-says
+
+The opposite failure has no shape at all. When a reciter says a word twice
+and qdc labels it once, qdc's gapless tiling hands the second utterance to the
+*next* word, which then lights a whole utterance early (Hani 21:46
+يَٰوَيۡلَنَآ, #779). The row is ordinary and monotonic, quran-align cannot
+express a repeat, and CTC often fuses the rewind into one token, so no cleaner
+rule can see it. The audio can:
+[`tools/find_flattened_resays.py`](../tools/find_flattened_resays.py) takes
+every pair where quran-align opens the next word at least 600 ms after qdc
+(3,731 rows), forces both `…p, p+1…` and `…p, p, p+1…` through Arabic XLSR and
+MMS/uroman, and accepts a re-say only when both models prefer the repeat and
+hear each occurrence as the word. Calibrated on the #748 false leads — a held
+madd, the look-alike — it rejected all 169, and it accepted 14 of 16 known
+flattened re-says. On quran-v64 it found three: Sudais 39:75 يُسَبِّحُونَ,
+Hani 2:54 يَٰقَوۡمِ and Hani 39:49 قَالَ. Accepted rows land as generated
+`restore_flattened_resay` corrections pinned to their source pair.
+
 ### False same-position lead
 
 The duration test above asks whether both halves are full utterances. That is a
