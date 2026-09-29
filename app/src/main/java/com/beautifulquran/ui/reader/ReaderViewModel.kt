@@ -24,6 +24,7 @@ import com.beautifulquran.domain.isAfterLastWord
 import com.beautifulquran.domain.nextVerseAyah
 import com.beautifulquran.domain.openingWashStartMs
 import com.beautifulquran.domain.playbackSkipMs
+import com.beautifulquran.domain.silenceSkipAllowed
 import com.beautifulquran.domain.HighlightEngine
 import com.beautifulquran.domain.EnglishBook
 import com.beautifulquran.domain.MushafCatalog
@@ -815,16 +816,19 @@ class ReaderViewModel(
     }
 
     /**
-     * While this surah is playing, silence is skipped: a gap the word timings
-     * mark, and quiet those timings still call a sounding word. The seek lands
-     * on the next voiced sample. A seek already in flight is left to land, so
-     * this cannot undo a word tap.
+     * While this surah is playing, murattal silence is skipped: a gap the word
+     * timings mark, and quiet those timings still call a sounding word. The
+     * seek lands on the next voiced sample. A seek inside the verse leaves the
+     * letter wash running. Mujawwad waqf and Muallim pauses are left alone.
+     * A seek already in flight is left to land, so this cannot undo a word tap.
      */
     private fun skipMarkedSilence() {
         if (!player.skipSilenceGaps || player.silenceSkipHeld()) return
         if (!player.state.value.isPlaying) return
         val np = player.liveNowPlaying ?: return
         if (np.surahId != surahId) return
+        val style = _uiState.value.currentReciter?.takeIf { it.id == np.reciterId }?.style
+        if (style == null || !silenceSkipAllowed(style)) return
         val segments = preparedTimings[np.ayah]?.segments?.takeIf { it.isNotEmpty() } ?: return
         val positionMs = player.positionMs
         val silence = audibleSilenceFor(np.reciterId, np.surahId, np.ayah)
@@ -833,7 +837,7 @@ class ReaderViewModel(
         // Quiet that runs out past the last word is the verse's tail. Enter
         // the next verse instead of seeking to the end of this file.
         if (voicedMs != null && voicedMs < lastEnd) {
-            player.seekToWord(np.ayah, voicedMs)
+            player.skipSilenceWithinAyah(np.ayah, voicedMs)
             return
         }
         if (voicedMs == null && !isAfterLastWord(segments, positionMs)) return

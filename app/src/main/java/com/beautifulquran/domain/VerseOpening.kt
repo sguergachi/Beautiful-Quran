@@ -9,6 +9,11 @@ import com.beautifulquran.data.model.Segment
 internal const val SILENCE_SLACK_MS = 40L
 
 /**
+ * Murattal gaps are silence. Mujawwad waqf and Muallim teaching pauses stay.
+ */
+internal fun silenceSkipAllowed(style: String): Boolean = style == "Murattal"
+
+/**
  * Quiet that the word timings still call a sounding word.
  *
  * The onset scan stores a few-millisecond click as the first letter, and the

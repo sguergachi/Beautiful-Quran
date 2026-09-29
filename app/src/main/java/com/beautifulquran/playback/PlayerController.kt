@@ -68,13 +68,40 @@ internal fun PlaybackPositionEvents.afterDiscontinuity(
     reason: Int,
     itemChanged: Boolean = false,
     positionMs: Long = 0L,
+    keepInk: Boolean = false,
 ): PlaybackPositionEvents = copy(
     clockId = clockId + 1L,
-    inkId = inkId + if (discontinuityRestartsInk(reason)) 1L else 0L,
+    inkId = inkId + if (!keepInk && discontinuityRestartsInk(reason)) 1L else 0L,
     reason = reason,
     itemChanged = itemChanged,
     positionMs = positionMs,
 )
+
+/**
+ * Same-verse silence seeks that must not restart the letter wash.
+ * Matched by landing position so a word tap or a verse change cannot consume
+ * the mark, and a mark cannot keep the ink of a different jump.
+ */
+internal class SilenceInk {
+    private val marks = ArrayDeque<Long>()
+
+    fun arm(positionMs: Long) {
+        if (marks.size >= 3) marks.removeFirst()
+        marks.addLast(positionMs)
+    }
+
+    fun clear() {
+        marks.clear()
+    }
+
+    fun claims(positionMs: Long, itemChanged: Boolean): Boolean {
+        if (itemChanged || marks.isEmpty()) return false
+        val index = marks.indexOfFirst { it == positionMs }
+        if (index < 0) return false
+        marks.removeAt(index)
+        return true
+    }
+}
 
 /**
  * UI-process handle on the playback session. Wraps a [MediaController]
@@ -131,6 +158,8 @@ class PlayerController(private val context: Context) {
     /** A seek has been issued and the playhead has not reported the landing yet. */
     @Volatile
     private var silenceSkipHoldUntilMs = 0L
+
+    private val silenceInk = SilenceInk()
 
     internal fun silenceSkipHeld(): Boolean =
         android.os.SystemClock.elapsedRealtime() < silenceSkipHoldUntilMs
@@ -207,11 +236,15 @@ class PlayerController(private val context: Context) {
             reason: Int,
         ) {
             silenceSkipHoldUntilMs = 0L
+            val itemChanged = oldPosition.mediaItemIndex != newPosition.mediaItemIndex
+            val keepInk = reason == Player.DISCONTINUITY_REASON_SEEK &&
+                silenceInk.claims(newPosition.positionMs, itemChanged)
             _state.value = _state.value.copy(
                 positionEvents = _state.value.positionEvents.afterDiscontinuity(
                     reason = reason,
-                    itemChanged = oldPosition.mediaItemIndex != newPosition.mediaItemIndex,
+                    itemChanged = itemChanged,
                     positionMs = newPosition.positionMs,
+                    keepInk = keepInk,
                 ),
             )
         }
@@ -386,6 +419,7 @@ class PlayerController(private val context: Context) {
 
         // Latest load wins: abandon any in-flight connect/play from an earlier
         // chapter so rapid navigation cannot start the superseded surah first.
+        silenceInk.clear()
         val epoch = commands.invalidate()
         withController(epoch, holdSilenceSkip = true) { c ->
             val startPos = if (queue.startIndex == 0 && queue.hasBasmalahLeadIn) 0L
@@ -436,13 +470,24 @@ class PlayerController(private val context: Context) {
      * loaded playlist) and optionally starts playback. The four public
      * variants below are the combinations the UI actually uses.
      */
-    private fun seekTo(ayah: Int, positionMs: Long, play: Boolean, playIfOutOfRange: Boolean = play) =
-        withController(holdSilenceSkip = true) { c ->
-            val index = playlistIndex(ayah)
-            val inRange = index in 0 until c.mediaItemCount
-            if (inRange) c.seekTo(index, positionMs)
-            if ((inRange && play) || (!inRange && playIfOutOfRange)) c.play()
+    private fun seekTo(
+        ayah: Int,
+        positionMs: Long,
+        play: Boolean,
+        playIfOutOfRange: Boolean = play,
+        keepInk: Boolean = false,
+    ) = withController(holdSilenceSkip = true) { c ->
+        val index = playlistIndex(ayah)
+        val inRange = index in 0 until c.mediaItemCount
+        if (inRange) {
+            val sameItem = c.currentMediaItemIndex == index
+            if (keepInk && sameItem && c.currentPosition != positionMs) {
+                silenceInk.arm(positionMs)
+            }
+            c.seekTo(index, positionMs)
         }
+        if ((inRange && play) || (!inRange && playIfOutOfRange)) c.play()
+    }
 
     fun seekToAyah(ayah: Int) = seekTo(ayah, 0L, play = false)
 
@@ -463,6 +508,10 @@ class PlayerController(private val context: Context) {
     }
 
     fun seekToWord(ayah: Int, positionMs: Long) = seekTo(ayah, positionMs, play = false)
+
+    /** Seek inside the current verse without restarting the letter wash. */
+    fun skipSilenceWithinAyah(ayah: Int, positionMs: Long) =
+        seekTo(ayah, positionMs, play = false, keepInk = true)
 
     fun seekToWordAndPlay(ayah: Int, positionMs: Long) = seekTo(ayah, positionMs, play = true, playIfOutOfRange = false)
 
@@ -485,6 +534,7 @@ class PlayerController(private val context: Context) {
      */
     fun stop() {
         resetRepeatState()
+        silenceInk.clear()
         basmalahLeadIn = false
         voiceEnergy.release()
         val epoch = commands.invalidate()
