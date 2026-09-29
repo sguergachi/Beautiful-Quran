@@ -500,8 +500,9 @@ sans.
   (HTML5 + Web Audio hybrid). Developer mode can fall back to dual-`<audio>`
   standby (iOS single-element HTTPS path on that legacy engine).
 - ✅ Collapsed surah title in the reader top bar once the opening header
-  scrolls off (Android `OrnateSurahTitle` parity — Arabic + chapter ·
-  transliteration, flanked by gilded flourishes).
+  scrolls off (Android `OrnateSurahTitle` — since #783 a miniature chapter medallion over
+  Arabic + chapter · transliteration, arriving with scroll; web still uses the
+  earlier gilded flourishes and a threshold switch).
 - ✅ Mushaf page breaks (Android `PageBreak` — gold hairline + Western /
   Arabic-Indic page numbers from `ayahs.page`).
 - ✅ Contextual feature guides (ayah-rail + bookmark-note lessons; developer

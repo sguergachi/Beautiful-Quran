@@ -666,7 +666,7 @@ fun ReaderScreen(
      * name can fade out instead of vanishing when the list remounts.
      */
     var pinnedTopNavTitle by remember {
-        mutableStateOf<Triple<Int, String, String>?>(null)
+        mutableStateOf<Surah?>(null)
     }
 
     // In-surah English search: matches are ayahs whose translation or any
@@ -1683,8 +1683,26 @@ fun ReaderScreen(
                                 .focusRequester(searchFocus),
                         )
                     } else {
+                        // 0 → 1 as the header's medallion and name scroll under
+                        // the bar, so the bar's own copy arrives in step with
+                        // the one leaving instead of switching on at a threshold.
+                        val headerExit = remember {
+                            derivedStateOf {
+                                if (listState.firstVisibleItemIndex > 0) {
+                                    1f
+                                } else {
+                                    val start = with(density) { ScrollGrid.OPENING_HEAD.toPx() }
+                                    val span = with(density) {
+                                        (ScrollGrid.ROSETTE + ScrollGrid.ROSETTE_TO_TITLE + 40.dp)
+                                            .toPx()
+                                    }
+                                    ((listState.firstVisibleItemScrollOffset - start) / span)
+                                        .coerceIn(0f, 1f)
+                                }
+                            }
+                        }
                         val scrolledPastHeader by remember {
-                            derivedStateOf { listState.firstVisibleItemIndex > 0 }
+                            derivedStateOf { headerExit.value > 0f }
                         }
                         val live = uiState.content?.surah
                         val pinned = pinnedTopNavTitle
@@ -1695,22 +1713,15 @@ fun ReaderScreen(
                         }
                         // While advancing, keep painting the pinned previous
                         // chapter so its fade-out has something to fade.
-                        val displayNumber = pinned?.first
-                            ?: mushafSurah?.id
-                            ?: live?.takeIf { scrolledPastHeader && !chapterAdvancing }?.id
-                        val displayArabic = pinned?.second
-                            ?: mushafSurah?.nameArabic
-                            ?: live?.takeIf { scrolledPastHeader && !chapterAdvancing }?.nameArabic
-                        val displayTranslit = pinned?.third
-                            ?: mushafSurah?.nameTransliteration
+                        val shown = pinned
+                            ?: mushafSurah
                             ?: live?.takeIf { scrolledPastHeader && !chapterAdvancing }
-                                ?.nameTransliteration
                         val topTitleAlpha by animateFloatAsState(
                             targetValue = when {
                                 // Next-chapter advance: always fade the top name away.
                                 chapterAdvancing -> 0f
                                 mushafMode && (mushafSurah != null || live != null) -> 1f
-                                scrolledPastHeader && live != null -> 1f
+                                live != null -> 1f
                                 else -> 0f
                             },
                             animationSpec = tween(
@@ -1719,21 +1730,30 @@ fun ReaderScreen(
                             ),
                             label = "topNavTitleAlpha",
                         )
-                        if (
-                            displayNumber != null &&
-                            displayArabic != null &&
-                            displayTranslit != null
-                        ) {
-                            Box(
-                                Modifier.graphicsLayer { alpha = topTitleAlpha },
-                            ) {
-                                OrnateSurahTitle(
-                                    chapterNumber = displayNumber,
-                                    nameArabic = displayArabic,
-                                    nameTransliteration = displayTranslit,
-                                    sheen = sheen,
-                                )
-                            }
+                        if (shown != null) {
+                            // Pinned and mushaf titles are already in place; only
+                            // the scrolling chapter's follows the header.
+                            val followsHeader = pinned == null && !mushafMode
+                            val arrivalLift = with(density) { 6.dp.toPx() }
+                            OrnateSurahTitle(
+                                chapterNumber = shown.id,
+                                nameArabic = shown.nameArabic,
+                                nameTransliteration = shown.nameTransliteration,
+                                ayahCount = shown.ayahCount,
+                                sheen = sheen,
+                                modifier = Modifier.graphicsLayer {
+                                    val t = if (followsHeader) {
+                                        FastOutSlowInEasing.transform(headerExit.value)
+                                    } else {
+                                        1f
+                                    }
+                                    alpha = topTitleAlpha * t
+                                    translationY = (1f - t) * arrivalLift
+                                    val scale = 0.9f + 0.1f * t
+                                    scaleX = scale
+                                    scaleY = scale
+                                },
+                            )
                         }
                     }
                 },
@@ -2079,11 +2099,7 @@ fun ReaderScreen(
                 // (user is usually past the header at the chapter end).
                 val prev = uiState.content?.surah
                 if (prev != null && listState.firstVisibleItemIndex > 0) {
-                    pinnedTopNavTitle = Triple(
-                        prev.id,
-                        prev.nameArabic,
-                        prev.nameTransliteration,
-                    )
+                    pinnedTopNavTitle = prev
                 }
                 // Capture rubber-band lift BEFORE clearing pull so the fly can
                 // continue upward from the finger's release point.
