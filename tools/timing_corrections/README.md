@@ -34,8 +34,13 @@ Supported operations:
   that moves that pair fails the build instead of shifting the verdict.
   Hani 21:46 يَٰوَيۡلَنَآ (#779) is this shape: qdc opens إِنَّا at 9800 while
   quran-align, the Lab and both forced aligners put it at 11350–11520. No
-  pipeline rule can reach it — qdc flattened the repeat, quran-align cannot
-  express one, and CTC fused the rewind into a single token (`وَيلنايا`).
+  row shape reveals it — qdc flattened the repeat, quran-align cannot
+  express one, and CTC fused the rewind into a single token (`وَيلنايا`) — so
+  the audio decides: `tools/find_flattened_resays.py` forces both sequences
+  through Arabic XLSR and MMS/uroman and writes an entry (marked
+  `"generator"`) only when both prefer the repeat. Regenerating replaces only
+  generated entries; hand entries such as 21:46 carry an ear verdict and are
+  never candidates.
 
 Every entry carries evidence provenance. The build fails if its expected source
 shape no longer exists, so a pinned-source refresh cannot silently retain a

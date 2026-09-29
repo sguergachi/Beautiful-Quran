@@ -102272,39 +102272,6 @@
     ]
    }
   },
-  "Abdurrahmaan_As-Sudais_192kbps:39:75": {
-   "verdict": "accept",
-   "kinds": [
-    "timestamp"
-   ],
-   "baselinePayloadHash": "9a1ddfa7a646918ca51802146a862b2161e1533956a4550118fb7389f67d0916",
-   "candidatePayloadHash": "775f9ae216ad994bef2d6d631c0db10f13fa74b7143a98494393e0a3339dee53",
-   "evidence": {
-    "kind": "dual_model_boundary",
-    "artifact": "tools/timing_verdicts/v64-pipeline-resync.json",
-    "summary": "Rebuilding the shipped database from its own current pipeline, restoring pipeline/database parity. For Sudais this is the re-clock that c4e17836 (#712) enabled by parsing his quran-align file: rows used to abstain from rebase_qdc_clock for lack of a reference. The occurrence sequence is unchanged, so the evidence is a Pareto non-regression of the mean absolute start residual against Arabic XLSR and MMS/uroman forced alignment.",
-    "audioSha256": "5ad343d3514d5150652d6bbb86fcf338b7ed2b7459ec2139f2acb2702be1fe11",
-    "waveformVeto": false,
-    "models": [
-     {
-      "name": "arabic-xlsr-ctc",
-      "metric": "meanAbsStartResidualMs",
-      "baselineResidualMs": 312.05,
-      "candidateResidualMs": 232.85,
-      "baselineScore": -312.05,
-      "candidateScore": -232.85
-     },
-     {
-      "name": "mms-uroman-ctc",
-      "metric": "meanAbsStartResidualMs",
-      "baselineResidualMs": 402.1,
-      "candidateResidualMs": 323.1,
-      "baselineScore": -402.1,
-      "candidateScore": -323.1
-     }
-    ]
-   }
-  },
   "Abdurrahmaan_As-Sudais_192kbps:39:8": {
    "verdict": "accept",
    "kinds": [

@@ -17,6 +17,38 @@
         "GitHub issue #779",
         "tools/timing_verdicts/flattened-resay-class.json"
       ]
+    },
+    {
+      "reciterId": 7,
+      "surahId": 2,
+      "ayah": 54,
+      "op": "restore_flattened_resay",
+      "position": 5,
+      "resayStartMs": 5414,
+      "nextOnsetMs": 7150,
+      "sourcePair": [[5, 3780, 5700], [6, 5700, 8580]],
+      "requiresAudioVerdict": true,
+      "generator": "tools/find_flattened_resays.py",
+      "evidence": ["dual-model forced alignment", "quran-align"],
+      "refs": [
+        "tools/timing_verdicts/flattened-resay-class.json"
+      ]
+    },
+    {
+      "reciterId": 7,
+      "surahId": 39,
+      "ayah": 49,
+      "op": "restore_flattened_resay",
+      "position": 11,
+      "resayStartMs": 12076,
+      "nextOnsetMs": 12922,
+      "sourcePair": [[11, 10760, 12110], [12, 12110, 14370]],
+      "requiresAudioVerdict": true,
+      "generator": "tools/find_flattened_resays.py",
+      "evidence": ["dual-model forced alignment", "quran-align"],
+      "refs": [
+        "tools/timing_verdicts/flattened-resay-class.json"
+      ]
     }
   ]
 }

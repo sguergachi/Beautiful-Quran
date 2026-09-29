@@ -5,6 +5,36 @@
   "databaseSha256": "abd68ae29a24f55a9bc9afd27a6b41d58f839b67af929a70c85d10d292e5be54"
  },
  "verdicts": {
+  "Abdurrahmaan_As-Sudais_192kbps:39:75": {
+   "verdict": "accept",
+   "kinds": [
+    "topology"
+   ],
+   "baselinePayloadHash": "9a1ddfa7a646918ca51802146a862b2161e1533956a4550118fb7389f67d0916",
+   "candidatePayloadHash": "369aecf89dd4cc686e79b8c1ee96c5d5a96189e687027a816fd65a2962677675",
+   "evidence": {
+    "kind": "dual_model_topology",
+    "generator": "tools/find_flattened_resays.py",
+    "artifact": "tools/timing_verdicts/flattened-resay-class.json",
+    "summary": "Flattened re-say: qdc labelled the second utterance of a word as the next word, which quran-align opens a full utterance later. Arabic XLSR and MMS/uroman forced alignment both score the repeated occurrence sequence better than the flat one by more than 0.001 per frame; the boundaries are the pause midpoints both models agree on.",
+    "audioSha256": "5ad343d3514d5150652d6bbb86fcf338b7ed2b7459ec2139f2acb2702be1fe11",
+    "waveformVeto": false,
+    "models": [
+     {
+      "name": "arabic-xlsr-ctc",
+      "metric": "viterbiLogProbabilityPerFrame",
+      "baselineScore": -0.410078,
+      "candidateScore": -0.388743
+     },
+     {
+      "name": "mms-uroman-ctc",
+      "metric": "viterbiLogProbabilityPerFrame",
+      "baselineScore": -0.044613,
+      "candidateScore": -0.03789
+     }
+    ]
+   }
+  },
   "Hani_Rifai_192kbps:21:46": {
    "verdict": "accept",
    "kinds": [
@@ -30,6 +60,66 @@
       "metric": "viterbiLogProbabilityPerFrame",
       "baselineScore": -0.06785,
       "candidateScore": -0.048952
+     }
+    ]
+   }
+  },
+  "Hani_Rifai_192kbps:2:54": {
+   "verdict": "accept",
+   "kinds": [
+    "topology"
+   ],
+   "baselinePayloadHash": "e6bf35f4ad7466c4edf3d1fbb39c8bbed2146024fb0665a9348aa77ab73232b9",
+   "candidatePayloadHash": "db54d113910c1d1ccc708bb68b4970bfa9076e4ccbab5f9bdb2cbd774782b2c5",
+   "evidence": {
+    "kind": "dual_model_topology",
+    "generator": "tools/find_flattened_resays.py",
+    "artifact": "tools/timing_verdicts/flattened-resay-class.json",
+    "summary": "Flattened re-say: qdc labelled the second utterance of a word as the next word, which quran-align opens a full utterance later. Arabic XLSR and MMS/uroman forced alignment both score the repeated occurrence sequence better than the flat one by more than 0.001 per frame; the boundaries are the pause midpoints both models agree on.",
+    "audioSha256": "81a4aee6385e5c24f3d4a5522c53c0374bb5617d2a932335993f2117df2e25b9",
+    "waveformVeto": false,
+    "models": [
+     {
+      "name": "arabic-xlsr-ctc",
+      "metric": "viterbiLogProbabilityPerFrame",
+      "baselineScore": -0.174842,
+      "candidateScore": -0.169262
+     },
+     {
+      "name": "mms-uroman-ctc",
+      "metric": "viterbiLogProbabilityPerFrame",
+      "baselineScore": -0.069604,
+      "candidateScore": -0.067728
+     }
+    ]
+   }
+  },
+  "Hani_Rifai_192kbps:39:49": {
+   "verdict": "accept",
+   "kinds": [
+    "topology"
+   ],
+   "baselinePayloadHash": "3bd4035e8612ec22da027e129c84d85674ed201b45166c38ca849ada277a906a",
+   "candidatePayloadHash": "5a02f73a88e42a098e6cce30b49ef829efd6500c9c0fb4a5f874fee7a515069f",
+   "evidence": {
+    "kind": "dual_model_topology",
+    "generator": "tools/find_flattened_resays.py",
+    "artifact": "tools/timing_verdicts/flattened-resay-class.json",
+    "summary": "Flattened re-say: qdc labelled the second utterance of a word as the next word, which quran-align opens a full utterance later. Arabic XLSR and MMS/uroman forced alignment both score the repeated occurrence sequence better than the flat one by more than 0.001 per frame; the boundaries are the pause midpoints both models agree on.",
+    "audioSha256": "d903af2b2ca18b389916e717a002b6bd2aa977e68b67a0257ced4670ed5fcae7",
+    "waveformVeto": false,
+    "models": [
+     {
+      "name": "arabic-xlsr-ctc",
+      "metric": "viterbiLogProbabilityPerFrame",
+      "baselineScore": -0.409916,
+      "candidateScore": -0.387944
+     },
+     {
+      "name": "mms-uroman-ctc",
+      "metric": "viterbiLogProbabilityPerFrame",
+      "baselineScore": -0.058735,
+      "candidateScore": -0.051981
      }
     ]
    }

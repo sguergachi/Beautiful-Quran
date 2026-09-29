@@ -1997,7 +1997,10 @@ def restore_flattened_resay(
     يَٰوَيۡلَنَآ ×2: qdc opens إِنَّا at 9800, quran-align at 11350). Neither
     source can show the repeat — qdc flattened it and the monotonic aligner
     cannot express one — and CTC fused the rewind into a single token
-    (``وَيلنايا``), so no pipeline rule can reach it. The correction names the
+    (``وَيلنايا``), so no row shape reveals it. Only the audio does:
+    tools/find_flattened_resays.py tests the repeat with both forced aligners
+    and generates these entries; hand entries carry an ear verdict. The
+    correction names the
     word, the re-say onset, the following word's onset, and the exact flat
     source pair it was verified against. Its onsets are absolute times, so a
     source or clock change that moves the pair at all must fail the build

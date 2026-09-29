@@ -6,7 +6,7 @@ them; this file keeps that from being silent. Remove an entry when its rows ship
 with a verdict, are held with their model scores, or its cause is reverted.
 
 **Nothing is outstanding.** `python3 tools/build_db.py --refresh-qdc-timings`
-reproduces the shipped database (quran-v64) row for row.
+reproduces the shipped database (quran-v65) row for row.
 
 ## Resolved: Sudais re-clock after #712 (quran-v64)
 
