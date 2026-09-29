@@ -61,9 +61,6 @@ import kotlin.math.sin
 /** Matches the bookmark-side verse pad so the strip cannot cover English ﴿N﴾. */
 internal val BookmarkStripWidth = 38.dp
 
-/** Extra tap past the page edge, never into the verse. */
-internal const val BookmarkTapOutsetDp = 16f
-
 internal const val BookmarkEdgeInsetDp = 8f    // from the block's outer edge
 internal const val BookmarkRibbonWidthDp = 11f
 internal const val BookmarkTopInsetDp = 24f    // align the tip with the verse's first ink line
@@ -255,8 +252,8 @@ internal fun VerseBookmarkRibbon(
 
     // Ruby owns the wide gutter target; the passive green cloth places a child
     // guard over only its own pixels below so those touches never reach ruby.
-    // Hit area hangs past the page edge (not into the verse) so the nub is
-    // easy to catch without covering English ﴿N﴾.
+    // The hit area is the full strip, so the ribbon and the paper around it
+    // catch the tap without reaching into the verse or English ﴿N﴾.
     val onRibbonClick: () -> Unit = {
         if (latestChrome() >= 0.1f) {
             if (!animateOnTap) {
@@ -440,10 +437,10 @@ internal fun VerseBookmarkRibbon(
         if (interactive) {
             Box(
                 Modifier
-                    .align(if (mirrored) Alignment.CenterEnd else Alignment.CenterStart)
-                    .fillMaxHeight()
-                    .width(BookmarkStripWidth + BookmarkTapOutsetDp.dp)
-                    .offset(x = if (mirrored) BookmarkTapOutsetDp.dp else -BookmarkTapOutsetDp.dp)
+                    // The whole strip, edge to verse. Hit testing never leaves
+                    // the parent's bounds and width() is clamped to them, so a
+                    // wider or shifted box only shrinks the target.
+                    .fillMaxSize()
                     .quietClickable(
                         role = Role.Button,
                         onLongClick = onLongClick?.let {
