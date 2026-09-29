@@ -63,6 +63,10 @@ class TarjiLabViewModel(
         val firstHopMediaMs: Double = 0.0,
         val trace: TarjiLabTrace? = null,
         val knobs: TarjiLabKnobs = TarjiLabKnobs(),
+        val reference: TarjiLabReference? = null,
+        val showingReference: Boolean = false,
+        val canUndo: Boolean = false,
+        val canRedo: Boolean = false,
         /** Loop selection; the legacy exchange format also carries old labels. */
         val expectation: TarjiLabExpectation = TarjiLabExpectation(),
         val tool: TarjiLabTool = TarjiLabTool.LISTEN,
@@ -86,8 +90,12 @@ class TarjiLabViewModel(
         val sampleReciterId: Int? = null,
         val sampleReciterName: String? = null,
         val note: String? = null,
-    )
+    ) {
+        val displayTrace: TarjiLabTrace? get() = if (showingReference) reference?.trace else trace
+        val displayKnobs: TarjiLabKnobs get() = if (showingReference) reference?.knobs ?: knobs else knobs
+    }
 
+    private val knobHistory = TarjiKnobHistory()
     private val _ui = MutableStateFlow(TarjiLabUiState())
     val ui: StateFlow<TarjiLabUiState> = _ui.asStateFlow()
 
@@ -140,6 +148,7 @@ class TarjiLabViewModel(
         analyzeJob?.cancel()
         abortCapture()
         stopPreview()
+        knobHistory.clear()
         val keepTool = _ui.value.tool
         _ui.value = TarjiLabUiState(
             isLoading = true,
@@ -362,6 +371,9 @@ class TarjiLabViewModel(
             capturing = false,
             captureProgress = 1f,
             capture = trimmed,
+            trace = null,
+            reference = null,
+            showingReference = false,
             firstHopMediaMs = capture.hopMediaMs(range.first, firstHopMediaMs),
             expectation = TarjiLabExpectation().withWindow(
                 TarjiHoldWindow(0f, captureMs),
@@ -397,49 +409,87 @@ class TarjiLabViewModel(
     /** Re-run the detector over the captured stream with the current knobs.
      * Pure DSP on a background thread; the preview keeps playing under it. */
     private fun reanalyze() {
-        val st = _ui.value
-        val capture = st.capture ?: return
+        if (_ui.value.capture == null) return
         analyzeJob?.cancel()
-        _ui.value = st.copy(analyzing = true)
+        _ui.value = _ui.value.copy(analyzing = true)
         analyzeJob = viewModelScope.launch {
-            val trace = withContext(Dispatchers.Default) {
-                analyzeTarjiCapture(capture, st.knobs)
+            while (true) {
+                val st = _ui.value
+                val capture = st.capture ?: return@launch
+                val trace = withContext(Dispatchers.Default) {
+                    analyzeTarjiCapture(capture, st.knobs)
+                }
+                val live = _ui.value
+                if (live.capture !== capture) return@launch
+                val pending = live.knobs != st.knobs
+                _ui.value = live.copy(
+                    trace = trace,
+                    reference = live.reference ?: TarjiLabReference(st.knobs, trace),
+                    analyzing = pending,
+                )
+                if (!pending) return@launch
+                // Edits coalesce into the next replay rather than canceling
+                // every frame or waiting for the finger to stop moving.
             }
-            val live = _ui.value
-            if (live.capture !== capture || live.knobs != st.knobs) return@launch
-            _ui.value = live.copy(trace = trace, analyzing = false)
         }
     }
 
-    // ── Knobs ──────────────────────────────────────────────────────────────
-
-    /** Edit this reciter's detector knobs, persist the profile, re-analyze. */
+    /** One slider drag is one undo step; playback continues while analysis catches up. */
     fun updateKnobs(transform: (TarjiLabKnobs) -> TarjiLabKnobs) {
         val next = transform(_ui.value.knobs)
         if (next == _ui.value.knobs) return
-        persistKnobs(next)
-        _ui.value = _ui.value.copy(knobs = next, analyzing = _ui.value.capture != null)
-        analyzeJob?.cancel()
-        analyzeJob = viewModelScope.launch {
-            delay(KNOB_DEBOUNCE_MS)
-            reanalyze()
+        knobHistory.record(_ui.value.knobs)
+        applyKnobs(next)
+    }
+
+    private fun applyKnobs(knobs: TarjiLabKnobs) {
+        persistKnobs(knobs)
+        _ui.value = _ui.value.copy(knobs = knobs, showingReference = false,
+            canUndo = knobHistory.canUndo, canRedo = knobHistory.canRedo,
+            analyzing = _ui.value.capture != null)
+        if (analyzeJob?.isActive != true) reanalyze()
+    }
+
+    fun finishKnobEdit() {
+        knobHistory.finish(_ui.value.knobs)
+        _ui.value = _ui.value.copy(canUndo = knobHistory.canUndo, canRedo = knobHistory.canRedo)
+    }
+
+    fun undoKnobs() { knobHistory.undo(_ui.value.knobs)?.let(::applyKnobs) }
+    fun redoKnobs() { knobHistory.redo(_ui.value.knobs)?.let(::applyKnobs) }
+
+    /** Compare graph and glow at the same audio position without changing the profile. */
+    fun toggleReference() {
+        finishKnobEdit()
+        if (_ui.value.reference != null) {
+            _ui.value = _ui.value.copy(showingReference = !_ui.value.showingReference)
         }
     }
 
-    /** Restore shipped defaults for this reciter only. */
-    fun resetKnobs() {
-        val reciterId = activeReciterId()
-        profiles?.clear(reciterId)
-        val knobs = TarjiLabKnobs.fromTuning(InkEngine.Tuning())
-        persistKnobs(knobs)
-        _ui.value = _ui.value.copy(knobs = knobs)
-        reanalyze()
+    fun setReference() {
+        finishKnobEdit()
+        val st = _ui.value
+        if (st.analyzing || st.trace == null) return
+        _ui.value = st.copy(reference = TarjiLabReference(st.knobs, st.trace), showingReference = false)
     }
 
+    /** Restore only this reciter's defaults; the reset itself is undoable. */
+    fun resetKnobs() {
+        finishKnobEdit()
+        updateKnobs { TarjiLabKnobs.fromTuning(InkEngine.Tuning()) }
+        finishKnobEdit()
+    }
+
+    /** Choose the playback range and its editing tool together, preserving play/pause. */
     fun setTool(tool: TarjiLabTool) {
+        val st = _ui.value
+        val scope = if (tool == TarjiLabTool.HOLD) TarjiPreviewScope.HOLD else TarjiPreviewScope.WORD
+        val switchPlayback = st.previewPlaying && st.previewScope != scope
+        val position = if (switchPlayback) previewPlayheadMs() else st.previewPositionMs
         scrubActive = false
         holdEditActive = false
-        _ui.value = _ui.value.copy(tool = tool, holdEditing = false)
+        _ui.value = st.copy(tool = tool, previewScope = scope, holdEditing = false)
+        if (switchPlayback) startPreviewAt(position, scope)
     }
 
     fun setPreviewSpeed(speed: TarjiPreviewSpeed) {
@@ -830,6 +880,7 @@ class TarjiLabViewModel(
             InkEngine.tuning = TarjiLabKnobs.applyToTuning(sample.knobs, InkEngine.tuning)
         }
         profiles?.save(sample.reciterId, sample.knobs)
+        knobHistory.clear()
         _ui.value = _ui.value.copy(
             isLoading = false,
             // The sample may come from a different word/ayah than the current
@@ -847,6 +898,10 @@ class TarjiLabViewModel(
             wordEndMs = 0L,
             capture = capture,
             trace = null,
+            reference = null,
+            showingReference = false,
+            canUndo = false,
+            canRedo = false,
             capturing = false,
             previewDurationMs = capture.totalContentMs,
             previewPositionMs = 0f,
@@ -908,7 +963,6 @@ class TarjiLabViewModel(
         private const val CAPTURE_TAIL_MS = 1_000L
         private const val CAPTURE_TIMEOUT_MS = 20_000L
         private const val POLL_MS = 40L
-        private const val KNOB_DEBOUNCE_MS = 120L
         private const val MAX_NOTES_LENGTH = 1_000
         /** Tail guard so the poll never chases the very last audio frames. */
         private const val END_GUARD_MS = 20L

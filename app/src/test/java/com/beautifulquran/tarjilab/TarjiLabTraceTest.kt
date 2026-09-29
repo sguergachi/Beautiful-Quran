@@ -13,6 +13,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertSame
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -133,6 +134,24 @@ class TarjiLabTraceTest {
         assertTrue(rejected.all { it == 0f })
         assertTrue(accepted.any { abs(it) > 0.01f })
         assertTrue(accepted.all { it in -1f..1f })
+    }
+
+    @Test
+    fun `comparison changes the visible pulse without replacing live tuning`() {
+        val capture = captureOf(heldNote(2.5f, 130f, amHz = 5f, amDepth = 0.03f))
+        val referenceKnobs = TarjiLabKnobs()
+        val liveKnobs = referenceKnobs.copy(minTremoloDepth = 0.01f)
+        val reference = TarjiLabReference(referenceKnobs, analyzeTarjiCapture(capture, referenceKnobs))
+        val live = TarjiLabViewModel.TarjiLabUiState(
+            capture = capture, knobs = liveKnobs, trace = analyzeTarjiCapture(capture, liveKnobs),
+            reference = reference,
+        )
+        val comparing = live.copy(showingReference = true)
+        assertTrue(tarjiAcceptedPulseWave(comparing.displayTrace!!).all { it == 0f })
+        assertTrue(tarjiAcceptedPulseWave(live.displayTrace!!).any { abs(it) > 0.01f })
+        assertEquals(referenceKnobs, comparing.displayKnobs)
+        assertEquals(liveKnobs, comparing.knobs)
+        assertSame(live.trace, comparing.copy(showingReference = false).displayTrace)
     }
 
     @Test

@@ -11,24 +11,35 @@ manual envelope, vibrato label, or look control that can override it.
    Settings → Developer. The ‹ › arrows choose another word in the ayah.
 2. The lab captures the word muted at 1×, including 300 ms lead and 1 s tail.
    Capture progress and failures appear on the page; **Retry** repeats capture.
-3. Press **Play word** to repeat the capture. **Choose loop** reveals the
-   range controls: drag the two ends, then press **Play loop**. **Whole word**
-   returns to the full capture. Tapping the waveform pauses at that position.
-   **Rewind** returns to the current playback range start and preserves pause/play.
-   Pinch to zoom, two-finger pan to move, and **Fit** to restore the whole view.
-4. Listen at 1×, ½, or ¼. The quiet waveform is the audio; the **gold pulse**
-   overlaid on it is the actual output used by the word’s glow. The vertical
-   line shows playback position. There is no raw teal candidate trace or
-   diagnostic dot in the user-facing graph. The readout says **Pulse here** or
-   **No pulse here** at the current position, and **Updating pulse** during analysis.
-5. Use the three main controls. If audible wavering is missed, increase
-   **Sensitivity** or lower **Shortest note**. If normal speech pulses, reverse
-   those adjustments. **Rhythm tolerance** accepts less evenly repeating
-   wavering as it increases. Each slider has a direction guide and short help.
-   Changes save automatically for the selected reciter; **Reset** restores defaults.
-6. **More controls** reveals pulse frequency limits, tolerated note slides,
-   fade-in, and brief-gap bridging, plus sample import/export and optional notes.
-   These remain collapsed until requested.
+3. The transport is a single row of 48 dp icon targets: **Rewind**, a larger
+   **Play/Pause**, **Loop**, **Speed**, and **Fit**. Play repeats the whole word.
+   Loop isolates a selection with large visible drag handles; toggling Loop
+   during playback switches the range without requiring a second Play tap.
+   Speed cycles 1× → ½ → ¼. Tapping the waveform pauses at that position;
+   pinch zoom and two-finger pan preserve precise inspection.
+4. The graph stays pinned while controls scroll. A time ruler, playback line,
+   and loop range show where the audible note is. The quiet waveform is audio;
+   the **gold pulse** is the accepted output used by the word’s glow. There is
+   no raw teal trace. The readout says **Pulse here**, **No pulse here**, or
+   **Updating**; it never invents an accepted pulse.
+5. Adjust **Sensitivity**, **Shortest note**, or **Rhythm tolerance**. Each
+   slider has a thin track, current value, direction labels, and short guidance.
+   **− / +** make precise nudges: 1 percentage point on the normalized controls,
+   10 ms on durations, 0.1 Hz on rate limits, and 0.01 on note-slide tolerance.
+   Changes save automatically for this reciter. Graph and glow update while
+   dragging; audio continues on the same clock.
+6. **Compare** switches the graph, glow, and displayed knob values between
+   **Live tuning** and one **Reference**, without changing audio, position, or
+   saved settings. The initial reference is the first completed analysis for
+   this capture; **Set ref** replaces it with the current completed tuning.
+   Reference mode disables knob edits; tap Compare to return. Reference and
+   history clear on a new word/import, so captures cannot be compared across
+   different timelines.
+7. **Undo / Redo** reverse tuning edits without restarting playback. One full
+   slider drag is one undo step; each nudge is another. History retains 32 edits
+   for the current word. **Reset** restores shipped defaults and is undoable.
+   **Fine tuning** reveals frequency limits, note slides, fade-in, and gap
+   bridging, with sample import/export and optional notes below.
 
 The gold curve uses the recorded audio’s time axis and a fixed −1..1 scale.
 It shows accepted modulation after attack/release gain. Rejected regions have
@@ -56,7 +67,11 @@ hold still uses its own fast decay.
 
 Each edit replays the same PCM through the same pure `Tarji` implementation
 used by the live audio tap. Background analysis is canceled on a new target,
-import, or exit; a result can publish only for its original capture and knobs.
+import, or exit; a result can publish only for its original capture.
+During a drag, one worker coalesces edits into the latest replay instead of
+restarting a 120 ms trailing debounce on every pointer event. Completed intermediate replays update the curve during a drag; it stays
+marked Updating until the worker catches the current knobs. A single ordered
+worker cannot replace a newer result with an older one. Reference creation is disabled while analysis is pending.
 A loop replays the captured detector history, including its lead-in, so every
 pass compares the same acoustic evidence rather than warming up at the loop
 boundary. This is tuning feedback, not synthesis or waveform authoring.
@@ -99,12 +114,14 @@ Keep reproducible captures in `tools/tarji_samples/`.
 ## Verification
 
 `./gradlew testDebugUnitTest` covers detector replay, sample round trips,
-range manipulation, capture trimming, and the preview clock (nonzero starts,
+range manipulation, grouped undo/redo, non-mutating comparison, capture trimming, and the preview clock (nonzero starts,
 seek rebasing, unsigned rollover, looping, and stalled playback).
 
 On device, check cold Settings entry, repeated word changes during capture,
 loop/whole-capture playback, paused seeking, all three speeds, knob edits while
-playing, import, and exit/background during capture and preview.
+playing, Compare/Set ref, undo/redo after a drag and after Reset, import, and
+exit/background during capture and preview. Device verification remains
+pending where the emulator System UI fails before the app can be inspected.
 
 ## Real-reciter pulse audit (2026-09-29)
 
@@ -120,3 +137,14 @@ the accepted output in 25 clips, covering every reciter. The 0.5-second
 AbdulBaset Mujawwad 44:59 clip exposed a candidate but no accepted output with
 either setting. This checks graph visibility and tuning response, not detection
 accuracy for every word or device-level audio latency.
+
+## Interface references
+
+The design borrows waveform/selection proximity from
+[Logic Pro’s Quick Sampler](https://www.apple.com/logic-pro/) and precise
+parameter feedback from [FabFilter’s knob controls](https://www.fabfilter.com/help/one/using/knobsandswitches).
+The adaptation stays within the app’s paper language: flat ink, no floating
+panels or shadows, familiar icons with short captions, and brief press motion.
+Only the gold result is plotted. The loop and comparison controls serve a
+single listen → isolate → tweak → compare cycle; there is no preset browser,
+new synthesis engine, or additional framework.
