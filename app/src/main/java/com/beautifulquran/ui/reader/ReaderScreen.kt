@@ -139,6 +139,7 @@ import com.beautifulquran.ui.share.ShareRibbon
 import com.beautifulquran.ui.theme.FloatingPaperControl
 import com.beautifulquran.ui.theme.InkRevealOverlay
 import com.beautifulquran.ui.theme.IslamicReturnToAyahButton
+import com.beautifulquran.ui.theme.LocalGildingTilt
 import com.beautifulquran.ui.theme.LocalQuranAccents
 import com.beautifulquran.ui.theme.LocalQuranInk
 import com.beautifulquran.ui.theme.QuranTheme
@@ -553,28 +554,9 @@ fun ReaderScreen(
             ayahRailTipOpen = false
         }
     }
-    // Gilding sheen: light catches the header rosette as the page moves.
-    // At chapter end (scrolled) sheen is bright (~0.85); cold open at the top
-    // rests dimmer (~0.15). Next-chapter advance pins the bright value for the
-    // whole fly and **keeps** it after landing so the medallion stays lit.
-    fun scrollSheenValue(): Float =
-        if (listState.firstVisibleItemIndex == 0) {
-            0.15f + 0.7f *
-                (listState.firstVisibleItemScrollOffset / 900f).coerceIn(0f, 1f)
-        } else {
-            0.85f
-        }
-    val sheenAnim = remember { Animatable(0.15f) }
-    var sheenFollowScroll by remember { mutableStateOf(true) }
-    LaunchedEffect(
-        listState.firstVisibleItemIndex,
-        listState.firstVisibleItemScrollOffset,
-        sheenFollowScroll,
-    ) {
-        if (!sheenFollowScroll) return@LaunchedEffect
-        sheenAnim.snapTo(scrollSheenValue())
-    }
-    val sheen = remember { derivedStateOf { sheenAnim.value } }
+    // Gilding sheen: the phone's tilt (LocalGildingTilt), so light catches the
+    // header rosette and the bar's medallion as the phone moves in the hand.
+    val sheen = LocalGildingTilt.current
     // Follow / jump / annotation precedence — pure rules in ReaderInteraction.
     var didInitialScroll by rememberSaveable { mutableStateOf(false) }
     var interaction by remember {
@@ -636,14 +618,6 @@ fun ReaderScreen(
     var verseRevealForSurah by remember { mutableIntStateOf(0) }
     /** When true, parked verses sit above the header and animate downward. */
     var verseEnterFromAbove by remember { mutableStateOf(false) }
-    // Normal navigation (not continuous handoff): restore scroll-linked sheen.
-    // Advance pins bright gold and leaves sheenFollowScroll false on purpose.
-    LaunchedEffect(surahId) {
-        if (!chapterAdvancing && verseRevealForSurah == 0) {
-            sheenFollowScroll = true
-            sheenAnim.snapTo(scrollSheenValue())
-        }
-    }
     val chapterAdvanceEasing = remember { CubicBezierEasing(0.22f, 1f, 0.36f, 1f) }
     // Bottom overscroll fills the Continue pill (0..1). Release at full opens.
     var nextChapterPull by remember { mutableFloatStateOf(0f) }
@@ -2122,10 +2096,6 @@ fun ReaderScreen(
                 // drop; fly takes over translation via startLiftPx.
                 nextChapterPullArmed = false
                 dispatch(ReaderInteractionEvent.ChapterAdvanceStarted)
-                // Hold the bright end-of-chapter sheen for the whole fly +
-                // handoff so the medallion doesn't dim when we scrollToItem(0).
-                sheenFollowScroll = false
-                sheenAnim.snapTo(scrollSheenValue())
                 headerMorph.snapTo(morphAtRelease)
 
                 val prepared = viewModel.materialize(nextId)
@@ -2133,7 +2103,6 @@ fun ReaderScreen(
                     nextChapterPull = 0f
                     headerMorph.snapTo(0f)
                     chapterAdvancing = false
-                    sheenFollowScroll = true
                     return@launch
                 }
 
@@ -2199,10 +2168,6 @@ fun ReaderScreen(
                 chapterAdvancing = false
                 // Top-nav pin has finished fading (or was never set).
                 pinnedTopNavTitle = null
-
-                // Keep the bright sheen after landing (do not ease to the dim
-                // at-rest header value). sheenFollowScroll stays false so the
-                // medallion remains bright on the new chapter top.
 
                 // Verses fade and rise in as soon as the header has landed.
                 if (verseRevealForSurah != nextId) return@launch

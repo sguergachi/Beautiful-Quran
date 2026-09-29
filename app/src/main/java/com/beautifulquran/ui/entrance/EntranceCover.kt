@@ -68,6 +68,7 @@ import com.beautifulquran.ui.theme.CoverAccents
 import com.beautifulquran.ui.theme.CoverLeatherCenter
 import com.beautifulquran.ui.theme.CoverLeatherEdge
 import com.beautifulquran.ui.theme.CoverParchment
+import com.beautifulquran.ui.theme.LocalGildingTilt
 import com.beautifulquran.ui.theme.GeneratedBorderBand
 import com.beautifulquran.ui.theme.GeneratedCornerSeals
 import com.beautifulquran.ui.theme.GeneratedMedallion
@@ -312,11 +313,14 @@ fun EntranceCover(
     }
 
     val accents = CoverAccents
-    val sheen = rememberInfiniteTransition(label = "coverSheen").animateFloat(
+    // The gilding catches light as the phone is tilted; the indeterminate load
+    // bar keeps its own slow sweep.
+    val sheen = LocalGildingTilt.current
+    val loadSweep = rememberInfiniteTransition(label = "coverLoadSweep").animateFloat(
         initialValue = 0.18f,
         targetValue = 0.82f,
         animationSpec = infiniteRepeatable(tween(6_500), RepeatMode.Reverse),
-        label = "coverSheenTilt",
+        label = "coverLoadSweepPosition",
     )
     // State view of the build so renderers re-draw (never recompose) as it runs.
     val buildState = remember { derivedStateOf { build.value } }
@@ -516,7 +520,7 @@ fun EntranceCover(
                         Spacer(Modifier.height(9.dp))
                         CoverLoadProgress(
                             progress = loadProgress,
-                            motion = sheen.value,
+                            motion = loadSweep.value,
                             modifier = Modifier.width(156.dp),
                         )
                     }
