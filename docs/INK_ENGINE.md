@@ -426,7 +426,7 @@ tween-vs-snap rules, sweep entry and residual rules, repeat wash timing, the
   `onRowClock`), not with its own mark, because **late ink beats early ink**: a
   wash that completes while the reciter is still sustaining ٱلرَّحِيمِ reads as
   broken, one that finishes into the file's closing silence reads as calm. Rows
-  that stop marking early (As-Sudais by 345 ms, then Minshawi, Ash-Shuraym and
+  that stop marking early (As-Sudais by 160 ms, then Minshawi, Ash-Shuraym and
   Alafasy by ~150 ms) extend into the clip — capped at the closer's own marked
   length so a long tail of room tone cannot make the ink crawl. A row that ends
   *after* its MP3 (Hani Ar-Rifai overruns by 945 ms) is fitted inside the

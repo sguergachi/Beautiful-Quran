@@ -10,6 +10,7 @@
       "position": 8,
       "resayStartMs": 9340,
       "nextOnsetMs": 11400,
+      "sourcePair": [[8, 7710, 9800], [9, 9800, 12340]],
       "requiresAudioVerdict": true,
       "evidence": ["ear", "dual CTC", "waveform", "quran-align"],
       "refs": [

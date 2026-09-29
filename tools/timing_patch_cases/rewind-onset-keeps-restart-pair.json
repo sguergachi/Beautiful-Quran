@@ -1,0 +1,68 @@
+{
+  "id": "rewind-onset-keeps-restart-pair",
+  "label": "folding a rewind onset leaves the A,A restart for the reader, never for the split merge",
+  "refs": [
+    "code review of PR #786"
+  ],
+  "pipeline": "clean_qdc_artifacts",
+  "notes": "A,[B 60 ms],A folds to a flush A,A pair whose first half (560 ms) is under 0.4 of the re-say. Inside the fixpoint the next pass merged it as a split, erasing the restart the rule exists to keep.",
+  "input_segments": [
+    [
+      4,
+      0,
+      900
+    ],
+    [
+      5,
+      900,
+      1400
+    ],
+    [
+      6,
+      1400,
+      1460
+    ],
+    [
+      5,
+      1460,
+      2900
+    ],
+    [
+      6,
+      2900,
+      3500
+    ],
+    [
+      7,
+      3500,
+      4000
+    ]
+  ],
+  "expected_segments": [
+    [
+      4,
+      0,
+      900
+    ],
+    [
+      5,
+      900,
+      1460
+    ],
+    [
+      5,
+      1460,
+      2900
+    ],
+    [
+      6,
+      2900,
+      3500
+    ],
+    [
+      7,
+      3500,
+      4000
+    ]
+  ]
+}
