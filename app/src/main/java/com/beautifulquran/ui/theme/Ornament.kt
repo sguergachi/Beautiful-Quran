@@ -128,6 +128,7 @@ fun GildedRosette(
     sheen: State<Float>,
     modifier: Modifier = Modifier,
 ) {
+    GildingDemand(sheen)
     Canvas(modifier.then(Modifier.size(size))) {
         val s = min(this.size.width, this.size.height)
         val c = s / 2f
@@ -181,6 +182,7 @@ fun MushafCoverFrame(
     geometry: com.beautifulquran.ui.entrance.CoverFrameGeometry,
     modifier: Modifier = Modifier,
 ) {
+    GildingDemand(sheen)
     Canvas(modifier) {
         val outerInset = geometry.outerInsetPx
         val innerInset = geometry.innerInsetPx
@@ -246,6 +248,7 @@ fun GildedFlourish(
     mirrored: Boolean = false,
     modifier: Modifier = Modifier,
 ) {
+    GildingDemand(sheen)
     Canvas(
         modifier
             .then(Modifier.size(width, height))
