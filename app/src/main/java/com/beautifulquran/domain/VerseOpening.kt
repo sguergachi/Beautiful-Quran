@@ -9,6 +9,77 @@ import com.beautifulquran.data.model.Segment
 internal const val SILENCE_SLACK_MS = 40L
 
 /**
+ * Quiet that the word timings still call a sounding word.
+ *
+ * The onset scan stores a few-millisecond click as the first letter, and the
+ * verse itself starts seconds later, inside that word. A pause drawn across
+ * a word boundary has the same shape. [endMs] is the next voiced sample.
+ */
+internal data class AudibleSilence(val startMs: Long, val endMs: Long)
+
+/** `surah * 1000 + ayah` for the measured-silence table. Ayahs stop at 286. */
+internal fun silenceKey(surah: Int, ayah: Int): Int = surah * 1_000 + ayah
+
+/**
+ * One reciter's table. Lines are `surah ayah startMs endMs`. A blank or `#`
+ * line is ignored. Malformed lines are skipped so a torn asset cannot throw
+ * on the playback poll.
+ */
+internal fun parseAudibleSilence(text: String): Map<Int, List<AudibleSilence>> {
+    val out = HashMap<Int, MutableList<AudibleSilence>>()
+    for (line in text.lineSequence()) {
+        if (line.isEmpty() || line[0] == '#') continue
+        val parts = line.split(' ')
+        if (parts.size != 4) continue
+        val surah = parts[0].toIntOrNull() ?: continue
+        val ayah = parts[1].toIntOrNull() ?: continue
+        val start = parts[2].toLongOrNull() ?: continue
+        val end = parts[3].toLongOrNull() ?: continue
+        if (end <= start) continue
+        out.getOrPut(silenceKey(surah, ayah)) { mutableListOf() }
+            .add(AudibleSilence(start, end))
+    }
+    return out
+}
+
+/** The silence span that contains [timeMs], if one does. */
+internal fun spanCovering(silence: List<AudibleSilence>, timeMs: Long): AudibleSilence? {
+    var found: AudibleSilence? = null
+    for (span in silence) {
+        val current = found
+        if (timeMs >= span.startMs && timeMs < span.endMs &&
+            (current == null || span.endMs > current.endMs)
+        ) {
+            found = span
+        }
+    }
+    return found
+}
+
+/**
+ * Where to seek so the playhead lands on voice.
+ *
+ * A timing gap seeks to that word's start. When the word start (or the
+ * playhead itself) is still inside measured quiet, the seek goes to the end
+ * of that quiet instead. Null when a word is already sounding.
+ */
+internal fun playbackSkipMs(
+    positionMs: Long,
+    segments: List<Segment>,
+    silence: List<AudibleSilence>,
+): Long? {
+    val timed = nextVoicedMs(segments, positionMs)
+    if (timed != null) {
+        val quiet = spanCovering(silence, timed)
+        if (quiet != null && quiet.endMs > positionMs + SILENCE_SLACK_MS) return quiet.endMs
+        return timed
+    }
+    val quiet = spanCovering(silence, positionMs)
+    if (quiet != null && quiet.endMs > positionMs + SILENCE_SLACK_MS) return quiet.endMs
+    return null
+}
+
+/**
  * Where to seek when [positionMs] is in silence before a word.
  * Null when a word is already sounding, or the remaining quiet is inside
  * the slack. The returned time is that word's [Segment.startMs], the same
