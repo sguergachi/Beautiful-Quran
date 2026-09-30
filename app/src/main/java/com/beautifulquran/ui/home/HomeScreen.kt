@@ -1,7 +1,5 @@
 package com.beautifulquran.ui.home
 
-import com.beautifulquran.ui.theme.SettingsNuqtaIcon
-import com.beautifulquran.ui.theme.rememberSettingsNuqtaState
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.tween
@@ -34,6 +32,7 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.Tune
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
@@ -45,9 +44,7 @@ import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
-import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -62,7 +59,6 @@ import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.semantics.Role
-import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.SpanStyle
@@ -75,7 +71,6 @@ import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlin.math.roundToInt
-import kotlinx.coroutines.launch
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.ui.res.stringResource
 import com.beautifulquran.R
@@ -521,7 +516,6 @@ fun HomeScreen(
 private fun HomeHeader(
     onOpenSettings: () -> Unit,
 ) {
-    val settingsNuqta = rememberSettingsNuqtaState()
     Row(
         verticalAlignment = Alignment.CenterVertically,
         modifier = Modifier
@@ -551,17 +545,14 @@ private fun HomeHeader(
                 .size(48.dp)
                 // The title sits 7 dp below the masthead's overall center.
                 .offset(y = 7.dp)
-                // Unclipped: the settings nuqta swells past this box.
-                .quietClickable(role = Role.Button, interactionSource = settingsNuqta.interactions) {
-                    settingsNuqta.drop()
-                    onOpenSettings()
-                }
+                .quietClickable(role = Role.Button, onClick = onOpenSettings)
                 .semantics { contentDescription = "Open settings" },
         ) {
-            SettingsNuqtaIcon(
-                state = settingsNuqta,
-                contentDescription = "Open settings",
+            Icon(
+                imageVector = Icons.Rounded.Tune,
+                contentDescription = null,
                 tint = QuranTheme.ink.quiet,
+                modifier = Modifier.size(26.dp),
             )
         }
     }
@@ -665,47 +656,14 @@ private fun SavedPassagesRow(
 
 @Composable
 private fun ContinueRow(target: ContinueTarget, onClick: () -> Unit) {
-    // Turning into the reader floods the row with ink; its words take the
-    // paper colour only where the ink lies.
-    val ink = rememberContinueInk(target.surah.id)
-    val scope = rememberCoroutineScope()
-    Box(
+    val colors = MaterialTheme.colorScheme
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
         modifier = Modifier
             .fillMaxWidth()
             .padding(top = 18.dp)
             .background(QuranTheme.accents.greenWash)
-            .continueInkWash(ink, color = MaterialTheme.colorScheme.primary)
-            .quietClickable {
-                ink.tapped = true
-                // Let the ink's first frame land before the reader is built.
-                scope.launch {
-                    withFrameNanos { }
-                    onClick()
-                }
-            },
-    ) {
-        ContinueRowContent(target, onInk = false)
-        ContinueRowContent(
-            target,
-            onInk = true,
-            modifier = Modifier
-                .clearAndSetSemantics {}
-                .continueInkMask(ink),
-        )
-    }
-}
-
-@Composable
-private fun ContinueRowContent(
-    target: ContinueTarget,
-    onInk: Boolean,
-    modifier: Modifier = Modifier,
-) {
-    val colors = MaterialTheme.colorScheme
-    Row(
-        verticalAlignment = Alignment.CenterVertically,
-        modifier = modifier
-            .fillMaxWidth()
+            .quietClickable(onClick = onClick)
             .padding(vertical = 18.dp),
     ) {
         Spacer(Modifier.width(HomeStartInset + HomeNumberColumn))
@@ -714,13 +672,13 @@ private fun ContinueRowContent(
             Text(
                 text = "Continue listening",
                 style = MaterialTheme.typography.labelMedium,
-                color = if (onInk) colors.onPrimary.copy(alpha = 0.8f) else QuranTheme.accents.greenQuiet,
+                color = QuranTheme.accents.greenQuiet,
             )
             Spacer(Modifier.height(2.dp))
             Text(
                 text = "${target.surah.nameTransliteration} · Ayah ${target.ayah}",
                 style = MaterialTheme.typography.titleMedium,
-                color = if (onInk) colors.onPrimary else colors.onSurface,
+                color = colors.onSurface,
             )
         }
         Spacer(Modifier.width(16.dp))
@@ -728,7 +686,7 @@ private fun ContinueRowContent(
             text = target.surah.nameArabic,
             style = ArabicTitleStyle,
             fontSize = 24.sp,
-            color = if (onInk) colors.onPrimary else colors.primary,
+            color = colors.primary,
             modifier = Modifier.padding(end = HomeEndInset + HomeArabicOpticalInset),
         )
     }

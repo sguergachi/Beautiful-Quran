@@ -769,11 +769,9 @@ select {
   transform: translateY(7px);
 }
 
-.settings-nuqta {
-  position: relative;
+.settings-button {
   display: grid;
   place-items: center;
-  overflow: visible;
   color: var(--ink-rung-quiet);
   padding: 0;
   background: none;
@@ -781,26 +779,14 @@ select {
   cursor: pointer;
 }
 
-.settings-nuqta:disabled {
+.settings-button:disabled {
   opacity: 0.35;
   pointer-events: none;
 }
 
-.settings-nuqta canvas {
-  position: absolute;
-  left: 50%;
-  top: 50%;
-  width: calc(26px * 1.6);
-  height: calc(26px * 1.6);
-  transform: translate(-50%, -50%);
-  pointer-events: none;
-}
-
-.settings-nuqta-glyph {
-  position: relative;
-  z-index: 1;
-  display: grid;
-  place-items: center;
+.settings-button svg {
+  width: 26px;
+  height: 26px;
 }
 
 .search-row {
@@ -875,55 +861,11 @@ select {
   margin: 0;
   padding: 18px 20px 18px
     calc(var(--home-number-column) + var(--home-column-gap));
-  overflow: hidden;
   background-color: var(--green-wash);
   color: var(--ink);
   text-align: start;
   min-height: 44px;
   border-radius: 0;
-}
-
-.continue-wash {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  pointer-events: none;
-}
-
-.continue-face {
-  position: relative;
-  z-index: 1;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 1rem;
-  width: 100%;
-  min-width: 0;
-}
-
-.continue-on-ink {
-  position: absolute;
-  inset: 0;
-  z-index: 2;
-  padding: inherit;
-  box-sizing: border-box;
-  color: var(--on-accent);
-  opacity: 0;
-  pointer-events: none;
-  -webkit-mask-repeat: no-repeat;
-  mask-repeat: no-repeat;
-  -webkit-mask-size: 100% 100%;
-  mask-size: 100% 100%;
-}
-
-.continue-on-ink .continue-label {
-  color: rgb(from var(--on-accent) r g b / 0.8);
-}
-
-.continue-on-ink .continue-target,
-.continue-on-ink .continue-ar {
-  color: var(--on-accent);
 }
 
 .continue-copy {
@@ -1355,7 +1297,7 @@ select {
   height: 1.25rem;
 }
 
-.reader-top .settings-nuqta svg {
+.reader-top .settings-button svg {
   width: 26px;
   height: 26px;
 }

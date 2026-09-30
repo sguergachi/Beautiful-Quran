@@ -48,6 +48,7 @@ import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.Tune
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.automirrored.rounded.MenuBook
 import androidx.compose.material.icons.rounded.Close
@@ -144,7 +145,6 @@ import com.beautifulquran.ui.theme.LocalQuranAccents
 import com.beautifulquran.ui.theme.LocalQuranInk
 import com.beautifulquran.ui.theme.QuranTheme
 import com.beautifulquran.ui.theme.ReturnArrowHeading
-import com.beautifulquran.ui.theme.SettingsNuqtaIcon
 import com.beautifulquran.ui.theme.absorbPointerEvents
 import com.beautifulquran.ui.theme.contextualGuideProgressiveBlur
 import com.beautifulquran.ui.theme.contrastingOverlayAccents
@@ -152,7 +152,6 @@ import com.beautifulquran.ui.theme.contrastingOverlayColorScheme
 import com.beautifulquran.ui.theme.contrastingOverlayInk
 import com.beautifulquran.ui.theme.paperToggleHaptic
 import com.beautifulquran.ui.theme.quietClickable
-import com.beautifulquran.ui.theme.rememberSettingsNuqtaState
 import com.beautifulquran.ui.theme.verticalFadingEdges
 import kotlin.math.PI
 import kotlin.math.abs
@@ -1821,9 +1820,6 @@ fun ReaderScreen(
                         } else {
                             Spacer(Modifier.width(48.dp))
                         }
-                        val settingsNuqta = rememberSettingsNuqtaState()
-                        // Not an IconButton: its clip would cut off the
-                        // nuqta's swell.
                         Box(
                             contentAlignment = Alignment.Center,
                             modifier = Modifier
@@ -1833,17 +1829,16 @@ fun ReaderScreen(
                                 .quietClickable(
                                     enabled = !recitingActive,
                                     role = Role.Button,
-                                    interactionSource = settingsNuqta.interactions,
-                                ) {
-                                    settingsNuqta.drop()
-                                    onOpenSettings()
-                                },
+                                    onClick = onOpenSettings,
+                                ),
                         ) {
-                            SettingsNuqtaIcon(
-                                state = settingsNuqta,
+                            Icon(
+                                imageVector = Icons.Rounded.Tune,
                                 contentDescription = "Settings",
                                 tint = QuranTheme.ink.quiet,
-                                modifier = Modifier.offset(x = (-4).dp),
+                                modifier = Modifier
+                                    .offset(x = (-4).dp)
+                                    .size(26.dp),
                             )
                         }
                     }

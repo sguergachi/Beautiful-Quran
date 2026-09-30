@@ -1,8 +1,6 @@
 package com.beautifulquran.ui.reader
 
 import com.beautifulquran.ui.theme.quietClickable
-import com.beautifulquran.ui.theme.SettingsNuqtaIcon
-import com.beautifulquran.ui.theme.rememberSettingsNuqtaState
 import androidx.compose.foundation.Canvas
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.animateFloatAsState
@@ -22,6 +20,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.Tune
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.rounded.FastForward
 import androidx.compose.material.icons.rounded.FastRewind
@@ -391,8 +390,6 @@ internal fun MushafReadingSheet(
                     tint = quiet,
                     modifier = Modifier.align(Alignment.CenterStart),
                 )
-                val settingsNuqta = rememberSettingsNuqtaState()
-                // Not an IconButton: its clip would cut off the nuqta's swell.
                 Box(
                     contentAlignment = Alignment.Center,
                     modifier = Modifier
@@ -401,17 +398,14 @@ internal fun MushafReadingSheet(
                         .quietClickable(
                             enabled = secondaryEnabled,
                             role = Role.Button,
-                            interactionSource = settingsNuqta.interactions,
-                        ) {
-                            settingsNuqta.drop()
-                            onOpenSettings()
-                        },
+                            onClick = onOpenSettings,
+                        ),
                 ) {
-                    SettingsNuqtaIcon(
-                        state = settingsNuqta,
+                    Icon(
+                        imageVector = Icons.Rounded.Tune,
                         contentDescription = "Settings",
                         tint = quiet,
-                        iconSize = 20.dp,
+                        modifier = Modifier.size(20.dp),
                     )
                 }
             }

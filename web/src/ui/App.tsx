@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react'
+import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react'
 import { appStore, shallowEqual, useAppSelector } from '../store/appStore'
 import { hasReaderOpen } from './paper/stack'
 import { HomeScreen } from './home/HomeScreen'
@@ -8,7 +8,6 @@ import { SettingsScreen } from './settings/SettingsScreen'
 import { EntranceCover } from './entrance/EntranceCover'
 import { BOOKMARKS_LAYER, COVER_LAYER } from './paper/stack'
 import { OrnamentsLab } from './lab/OrnamentsLab'
-import { syncSheetMotion } from './paper/sheetMotion'
 
 /** True while the URL hash routes to the Ornaments Lab (`#lab`). */
 function useLabRoute(): boolean {
@@ -95,14 +94,6 @@ export function App() {
       )
     }
   }, [state.settings.themeMode, state.settings.colorSystem, entranceDone])
-
-  useLayoutEffect(() => {
-    syncSheetMotion({
-      hasReader,
-      stack,
-      openSurahId: state.content?.surah.id ?? 0,
-    })
-  }, [hasReader, stack, state.content?.surah.id])
 
   // Escape peels one sheet back through the paper stack (cover handles its own).
   useEffect(() => {
