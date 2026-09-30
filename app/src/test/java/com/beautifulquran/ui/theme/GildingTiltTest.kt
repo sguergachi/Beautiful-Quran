@@ -51,3 +51,15 @@ class GildingGlideTest {
         assertEquals(0.8f, tilt.aim.floatValue, 0f)
     }
 }
+
+class ScreenRollTest {
+    @Test
+    fun rollFollowsTheScreensWidthInEveryRotation() {
+        // A phone tipped so the screen's right edge is lower reads the same roll
+        // however the screen is turned.
+        assertEquals(3f, screenRoll(3f, 9f, android.view.Surface.ROTATION_0), 0f)
+        assertEquals(9f, screenRoll(3f, 9f, android.view.Surface.ROTATION_90), 0f)
+        assertEquals(-3f, screenRoll(3f, 9f, android.view.Surface.ROTATION_180), 0f)
+        assertEquals(-9f, screenRoll(3f, 9f, android.view.Surface.ROTATION_270), 0f)
+    }
+}

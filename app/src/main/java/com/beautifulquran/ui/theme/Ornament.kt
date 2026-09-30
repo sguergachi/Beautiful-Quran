@@ -232,59 +232,6 @@ fun MushafCoverFrame(
 }
 
 /**
- * A small horizontal flourish for flanking a title: a gilded khatam star at
- * the inner end with a hairline rule tapering away from it, embossed like the
- * rosette. [mirrored] flips it for the far side of the title.
- */
-@Composable
-fun GildedFlourish(
-    width: Dp,
-    height: Dp,
-    brightGold: Color,
-    deepGold: Color,
-    embossDark: Color,
-    embossLight: Color,
-    sheen: State<Float>,
-    mirrored: Boolean = false,
-    modifier: Modifier = Modifier,
-) {
-    GildingDemand(sheen)
-    Canvas(
-        modifier
-            .then(Modifier.size(width, height))
-            .graphicsLayer { scaleX = if (mirrored) -1f else 1f },
-    ) {
-        val w = size.width
-        val h = size.height
-        val cy = h / 2f
-        val starR = h * 0.42f
-        val starCx = w - starR - 1f
-        val star = Path().apply { addKhatam(starCx, cy, starR) }
-        val line = Stroke(width = (h * 0.07f).coerceAtLeast(1f))
-
-        embossed(star, line, embossDark, embossLight)
-        val gold = goldBrush(brightGold, deepGold, sheen.value.coerceIn(0f, 1f))
-        drawPath(star, gold, style = line)
-        drawCircle(gold, radius = h * 0.07f, center = Offset(starCx, cy))
-
-        // Rule tapering to nothing away from the star.
-        val ruleEnd = starCx - starR - h * 0.25f
-        if (ruleEnd > 0f) {
-            drawLine(
-                brush = Brush.horizontalGradient(
-                    colors = listOf(deepGold.copy(alpha = 0f), deepGold),
-                    startX = 0f,
-                    endX = ruleEnd,
-                ),
-                start = Offset(0f, cy),
-                end = Offset(ruleEnd, cy),
-                strokeWidth = line.width,
-            )
-        }
-    }
-}
-
-/**
  * Gilds the content it wraps: a vertical gold-leaf gradient is composited
  * onto the rendered glyphs (SrcAtop), so text itself reads as leafed gold.
  * The offscreen layer is only the size of the mark — a few dp — so this is

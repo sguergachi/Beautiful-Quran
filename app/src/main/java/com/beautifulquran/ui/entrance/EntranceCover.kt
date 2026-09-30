@@ -26,6 +26,7 @@ import androidx.compose.foundation.shape.AbsoluteRoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.State
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
@@ -68,6 +69,7 @@ import com.beautifulquran.ui.theme.CoverAccents
 import com.beautifulquran.ui.theme.CoverLeatherCenter
 import com.beautifulquran.ui.theme.CoverLeatherEdge
 import com.beautifulquran.ui.theme.CoverParchment
+import com.beautifulquran.ui.theme.GildingTilt
 import com.beautifulquran.ui.theme.LocalGildingTilt
 import com.beautifulquran.ui.theme.GeneratedBorderBand
 import com.beautifulquran.ui.theme.GeneratedCornerSeals
@@ -313,15 +315,17 @@ fun EntranceCover(
     }
 
     val accents = CoverAccents
-    // The gilding catches light as the phone is tilted; the indeterminate load
-    // bar keeps its own slow sweep.
-    val sheen = LocalGildingTilt.current
-    val loadSweep = rememberInfiniteTransition(label = "coverLoadSweep").animateFloat(
+    // The gilding catches light as the phone is tilted. Without an
+    // accelerometer to tilt it, the cover keeps its slow idle sweep; the
+    // indeterminate load bar rides the same one.
+    val loadSweep = rememberInfiniteTransition(label = "coverSweep").animateFloat(
         initialValue = 0.18f,
         targetValue = 0.82f,
         animationSpec = infiniteRepeatable(tween(6_500), RepeatMode.Reverse),
-        label = "coverLoadSweepPosition",
+        label = "coverSweepPosition",
     )
+    val tilt = LocalGildingTilt.current
+    val sheen: State<Float> = if ((tilt as? GildingTilt)?.hasSensor == false) loadSweep else tilt
     // State view of the build so renderers re-draw (never recompose) as it runs.
     val buildState = remember { derivedStateOf { build.value } }
     val captionAlpha by animateFloatAsState(

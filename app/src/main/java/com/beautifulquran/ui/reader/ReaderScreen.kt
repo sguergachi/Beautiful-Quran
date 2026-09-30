@@ -1613,9 +1613,9 @@ fun ReaderScreen(
                 return@topBar
             }
             // Unread-style chrome: quiet marks that recede behind the text.
-            // Once the opening header scrolls off, the surah name reappears
-            // here between gilded flourishes. In search, the bar becomes the
-            // search field with match navigation.
+            // As the opening header scrolls off, its medallion and name
+            // reappear here in miniature, arriving with the scroll. In search,
+            // the bar becomes the search field with match navigation.
             // In Scroll, the icons' ink stands on the text rules (ScrollGrid);
             // the mushaf leaf keeps its own margins.
             val topBarStartShift =
@@ -1660,7 +1660,7 @@ fun ReaderScreen(
                         // 0 → 1 as the header's medallion and name scroll under
                         // the bar, so the bar's own copy arrives in step with
                         // the one leaving instead of switching on at a threshold.
-                        val headerExit = remember {
+                        val headerExit = remember(density) {
                             derivedStateOf {
                                 if (listState.firstVisibleItemIndex > 0) {
                                     1f
