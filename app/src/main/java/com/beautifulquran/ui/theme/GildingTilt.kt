@@ -1,5 +1,9 @@
 package com.beautifulquran.ui.theme
 
+import android.content.BroadcastReceiver
+import android.content.Context
+import android.content.Intent
+import android.content.IntentFilter
 import android.hardware.Sensor
 import android.hardware.SensorEvent
 import android.hardware.SensorEventListener
@@ -14,6 +18,7 @@ import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.platform.LocalContext
+import androidx.core.content.ContextCompat
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
@@ -157,8 +162,9 @@ fun rememberGildingTilt(): State<Float> {
         var started = false
         fun sync() {
             // Battery saver asks for no ambient motion; the gilding rests.
-            val shouldListen = started && tilt.demand > 0 &&
-                powerManager?.isPowerSaveMode != true
+            val saving = powerManager?.isPowerSaveMode == true
+            val shouldListen = started && tilt.demand > 0 && !saving
+            if (saving) tilt.set(GILDING_REST)
             if (shouldListen == listening) return
             listening = shouldListen
             if (shouldListen) {
@@ -170,10 +176,30 @@ fun rememberGildingTilt(): State<Float> {
                 manager.unregisterListener(listener)
             }
         }
+        // Battery saver is toggled from the shade with the app still open, so
+        // it has to be heard as it happens, not only when the app comes forward.
+        val powerSaveChanged = object : BroadcastReceiver() {
+            override fun onReceive(context: Context?, intent: Intent?) = sync()
+        }
+        var receiving = false
+        fun receive(on: Boolean) {
+            if (on == receiving) return
+            receiving = on
+            if (on) {
+                ContextCompat.registerReceiver(
+                    context,
+                    powerSaveChanged,
+                    IntentFilter(PowerManager.ACTION_POWER_SAVE_MODE_CHANGED),
+                    ContextCompat.RECEIVER_NOT_EXPORTED,
+                )
+            } else {
+                context.unregisterReceiver(powerSaveChanged)
+            }
+        }
         val observer = LifecycleEventObserver { _, event ->
             when (event) {
-                Lifecycle.Event.ON_START -> { started = true; sync() }
-                Lifecycle.Event.ON_STOP -> { started = false; sync() }
+                Lifecycle.Event.ON_START -> { started = true; receive(true); sync() }
+                Lifecycle.Event.ON_STOP -> { started = false; receive(false); sync() }
                 else -> Unit
             }
         }
@@ -182,6 +208,7 @@ fun rememberGildingTilt(): State<Float> {
         onDispose {
             tilt.onDemandChanged = {}
             lifecycle.removeObserver(observer)
+            receive(false)
             manager.unregisterListener(listener)
         }
     }
