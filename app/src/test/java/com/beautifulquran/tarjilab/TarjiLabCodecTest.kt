@@ -10,6 +10,7 @@ import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.jsonObject
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -33,6 +34,39 @@ class TarjiLabCodecTest {
             val t = it / 8000f
             0.3f * sin(2f * PI.toFloat() * 130f * t)
         }
+    }
+
+    @Test
+    fun `export freezes an imported capture and live tuning before the picker opens`() {
+        val audio = captureOf(note(1f))
+        val live = TarjiLabKnobs(holdMinMs = 720f)
+        val ui = TarjiLabViewModel.TarjiLabUiState(
+            capture = audio, firstHopMediaMs = 1234.0,
+            sampleReciterId = 7, sampleReciterName = "Imported reciter",
+            surahId = 1, ayah = 7, wordPosition = 1, wordArabic = "نَعْبُدُ",
+            knobs = live, sampleNotes = "Listen to the ending",
+            expectation = TarjiLabExpectation(startMs = 200f, endMs = 800f),
+            showingReference = true,
+            reference = TarjiLabReference(TarjiLabKnobs(), analyzeTarjiCapture(audio, TarjiLabKnobs())),
+        )
+        val frozen = ui.sampleForExport()!!
+        val changed = ui.copy(capture = captureOf(note(0.5f)), knobs = TarjiLabKnobs(), sampleReciterId = 99)
+        val restored = TarjiLabCodec.decode(TarjiLabCodec.encode(frozen))
+        assertEquals(7, restored.reciterId)
+        assertEquals("Imported reciter", restored.reciterName)
+        assertEquals(live, restored.knobs)
+        assertEquals(ui.expectation, restored.expectation)
+        assertEquals("Listen to the ending", restored.notes)
+        assertEquals(1234.0, restored.firstHopMediaMs, 0.0)
+        assertEquals(audio.hopCount, TarjiLabCodec.toCapture(restored).hopCount)
+        assertEquals(99, changed.sampleForExport()!!.reciterId)
+    }
+
+    @Test
+    fun `export requires both captured audio and identifiable reciter`() {
+        val ui = TarjiLabViewModel.TarjiLabUiState(sampleReciterId = 7, sampleReciterName = "Reciter")
+        assertNull(ui.sampleForExport())
+        assertNull(ui.copy(capture = captureOf(note(1f)), sampleReciterId = null).sampleForExport())
     }
 
     @Test

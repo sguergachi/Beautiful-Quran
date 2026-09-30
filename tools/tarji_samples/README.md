@@ -26,10 +26,15 @@ examples used to derive it.
 
 ## How to extract samples from a device
 
+Tap **Export sample** in the lab and save the JSON to **Downloads** using
+Android’s file picker. The lab confirms the saved filename. To retrieve it:
+
 ```bash
-adb pull /sdcard/Android/data/com.beautifulquran.debug/files/Download/tarji_*.json .
-# or the release variant:  com.beautifulquran/files/...
+adb shell ls /sdcard/Download/tarji_*.json
+adb pull /sdcard/Download/<saved-filename>.json .
 ```
+
+You can also share the saved JSON directly from the phone’s Files app.
 
 ## Schema
 

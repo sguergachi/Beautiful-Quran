@@ -5,7 +5,7 @@ import android.media.AudioAttributes
 import android.media.AudioFormat
 import android.media.AudioTrack
 import android.media.PlaybackParams
-import android.os.Environment
+import android.net.Uri
 import android.os.SystemClock
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -21,7 +21,6 @@ import com.beautifulquran.playback.VoiceEnergy
 import com.beautifulquran.playback.mapTapContentToMediaMs
 import com.beautifulquran.playback.sonicContentLatencyMs
 import com.beautifulquran.ui.reader.InkEngine
-import java.io.File
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -93,12 +92,29 @@ class TarjiLabViewModel(
     ) {
         val displayTrace: TarjiLabTrace? get() = if (showingReference) reference?.trace else trace
         val displayKnobs: TarjiLabKnobs get() = if (showingReference) reference?.knobs ?: knobs else knobs
+
+        /** Freeze this capture and live tuning before opening the system save picker. */
+        fun sampleForExport(): TarjiLabSample? {
+            val audio = capture ?: return null
+            val id = sampleReciterId ?: reciter?.id ?: return null
+            val name = sampleReciterName ?: reciter?.name ?: return null
+            return TarjiLabCodec.buildSample(
+                capture = audio,
+                firstHopMediaMs = firstHopMediaMs,
+                label = TarjiLabCodec.label(name, surahId, ayah, wordPosition),
+                reciterId = id, reciterName = name,
+                surahId = surahId, ayah = ayah, wordPosition = wordPosition,
+                wordArabic = wordArabic, knobs = knobs,
+                expectation = expectation, notes = sampleNotes,
+            )
+        }
     }
 
     private val knobHistory = TarjiKnobHistory()
     private val _ui = MutableStateFlow(TarjiLabUiState())
     val ui: StateFlow<TarjiLabUiState> = _ui.asStateFlow()
 
+    private var pendingExport: TarjiLabSample? = null
     private var loadJob: Job? = null
     private var captureJob: Job? = null
     private var analyzeJob: Job? = null
@@ -445,7 +461,7 @@ class TarjiLabViewModel(
 
     private fun applyKnobs(knobs: TarjiLabKnobs) {
         persistKnobs(knobs)
-        _ui.value = _ui.value.copy(knobs = knobs, showingReference = false,
+        _ui.value = _ui.value.copy(knobs = knobs, showingReference = false, note = null,
             canUndo = knobHistory.canUndo, canRedo = knobHistory.canRedo,
             analyzing = _ui.value.capture != null)
         if (analyzeJob?.isActive != true) reanalyze()
@@ -463,7 +479,7 @@ class TarjiLabViewModel(
     fun toggleReference() {
         finishKnobEdit()
         if (_ui.value.reference != null) {
-            _ui.value = _ui.value.copy(showingReference = !_ui.value.showingReference)
+            _ui.value = _ui.value.copy(showingReference = !_ui.value.showingReference, note = null)
         }
     }
 
@@ -471,7 +487,8 @@ class TarjiLabViewModel(
         finishKnobEdit()
         val st = _ui.value
         if (st.analyzing || st.trace == null) return
-        _ui.value = st.copy(reference = TarjiLabReference(st.knobs, st.trace), showingReference = false)
+        _ui.value = st.copy(reference = TarjiLabReference(st.knobs, st.trace), showingReference = false,
+            note = "Reference saved · tap Compare")
     }
 
     /** Restore only this reciter's defaults; the reset itself is undoable. */
@@ -812,52 +829,36 @@ class TarjiLabViewModel(
 
     // ── Samples ────────────────────────────────────────────────────────────
 
-    fun exportSample(context: Context) {
-        val st = _ui.value
-        val capture = st.capture ?: run {
-            _ui.value = st.copy(note = "Capture a word first.")
-            return
+    /** Keep a snapshot across the picker (including Activity recreation). */
+    fun prepareSampleExport(): String? {
+        pendingExport = _ui.value.sampleForExport()
+        val sample = pendingExport ?: run {
+            _ui.value = _ui.value.copy(note = "Capture a word with reciter details first.")
+            return null
         }
-        val reciter = st.reciter ?: return
-        val sampleReciterId = st.sampleReciterId ?: reciter.id
-        val sampleReciterName = st.sampleReciterName ?: reciter.name
-        val sample = TarjiLabCodec.buildSample(
-            capture = capture,
-            firstHopMediaMs = st.firstHopMediaMs,
-            label = TarjiLabCodec.label(
-                sampleReciterName,
-                st.surahId,
-                st.ayah,
-                st.wordPosition,
-            ),
-            reciterId = sampleReciterId,
-            reciterName = sampleReciterName,
-            surahId = st.surahId,
-            ayah = st.ayah,
-            wordPosition = st.wordPosition,
-            wordArabic = st.wordArabic,
-            knobs = st.knobs,
-            expectation = st.expectation,
-            notes = st.sampleNotes,
-        )
-        val json = TarjiLabCodec.encode(sample)
-        val dir = runCatching {
-            context.getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS)
-        }.getOrNull()
-        if (dir == null) {
-            _ui.value = st.copy(note = "No external files dir — cannot export.")
-            return
+        return TarjiLabCodec.fileName(sample)
+    }
+
+    /** Write only to the user-selected destination; canceling the picker writes nothing. */
+    fun exportSample(context: Context, uri: Uri?) {
+        val sample = pendingExport ?: return
+        pendingExport = null
+        if (uri == null) return
+        val resolver = context.applicationContext.contentResolver
+        viewModelScope.launch {
+            try {
+                withContext(Dispatchers.IO) {
+                    val output = resolver.openOutputStream(uri, "wt")
+                        ?: error("Could not open the selected file")
+                    output.bufferedWriter().use { it.write(TarjiLabCodec.encode(sample)) }
+                }
+                _ui.value = _ui.value.copy(note = "Saved ${TarjiLabCodec.fileName(sample)}")
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (error: Exception) {
+                _ui.value = _ui.value.copy(note = "Export failed: ${error.message}")
+            }
         }
-        val file = File(dir, TarjiLabCodec.fileName(sample))
-        runCatching { file.writeText(json) }
-            .onSuccess {
-                _ui.value = _ui.value.copy(
-                    note = "Exported: ${file.absolutePath}",
-                )
-            }
-            .onFailure {
-                _ui.value = _ui.value.copy(note = "Export failed: ${it.message}")
-            }
     }
 
     /** Load a [TarjiLabSample] (from the file picker): its capture replaces

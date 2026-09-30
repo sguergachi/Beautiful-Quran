@@ -127,6 +127,10 @@ fun TarjiLabScreen(
         playheadMs = viewModel.previewPlayheadMs()
     }
 
+    val exportLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.CreateDocument("application/json"),
+    ) { uri -> viewModel.exportSample(context, uri) }
+
     val importLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.OpenDocument(),
     ) { uri ->
@@ -243,7 +247,7 @@ fun TarjiLabScreen(
                         showHelp = showHelp,
                         onKnob = viewModel::updateKnobs,
                         onReset = viewModel::resetKnobs,
-                        onExport = { viewModel.exportSample(context) },
+                        onExport = { viewModel.prepareSampleExport()?.let { exportLauncher.launch(it) } },
                         onNotes = viewModel::updateSampleNotes,
                         onFinished = viewModel::finishKnobEdit,
                         onImport = {
@@ -395,7 +399,8 @@ private fun ComparisonRow(
         LabIconAction(Icons.Rounded.CompareArrows, "Compare reference", viewModel::toggleReference,
             enabled = ui.reference != null, selected = ui.showingReference)
         LabIconAction(Icons.Rounded.BookmarkAdd, "Set comparison reference", viewModel::setReference,
-            enabled = ui.trace != null && !ui.analyzing && !ui.showingReference)
+            enabled = ui.trace != null && !ui.analyzing && !ui.showingReference,
+            selected = ui.reference?.knobs == ui.knobs)
         LabIconAction(Icons.Rounded.Undo, "Undo tuning", viewModel::undoKnobs, enabled = ui.canUndo)
         LabIconAction(Icons.Rounded.Redo, "Redo tuning", viewModel::redoKnobs, enabled = ui.canRedo)
     }
@@ -438,10 +443,11 @@ private fun WordAction(
     Text(
         text = label,
         style = MaterialTheme.typography.labelLarge,
-        color = color,
+        color = if (enabled) color else QuranTheme.ink.quiet,
         modifier = Modifier
-            .quietClickable(enabled = enabled, onClick = onClick)
-            .padding(vertical = 4.dp),
+            .heightIn(min = 48.dp)
+            .quietClickable(enabled = enabled, role = Role.Button, onClick = onClick)
+            .padding(vertical = 12.dp),
     )
 }
 
@@ -813,7 +819,7 @@ private fun KnobsPanel(
                 onKnob { k -> k.copy(releaseMs = v) }
             }
             Row(horizontalArrangement = Arrangement.spacedBy(24.dp)) {
-                WordAction("Export sample", onExport, QuranTheme.ink.secondary)
+                WordAction("Export sample", onExport, QuranTheme.ink.secondary, enabled = ui.capture != null && !ui.capturing)
                 WordAction("Import sample", onImport, QuranTheme.ink.secondary)
             }
             BasicTextField(

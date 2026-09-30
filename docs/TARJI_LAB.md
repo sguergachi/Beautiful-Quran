@@ -34,7 +34,10 @@ manual envelope, vibrato label, or look control that can override it.
 6. **Compare** switches the graph, glow, and displayed knob values between
    live tuning and one **Reference**, without changing audio, position, or
    saved settings. The initial reference is the first completed analysis for
-   this capture; **Set ref** replaces it with the current completed tuning.
+   this capture; the ribbon-shaped **Set ref** icon replaces it with the current
+   completed tuning and confirms **Reference saved**. It glows gold when the
+   live settings match the saved reference. This is a comparison checkpoint
+   for the current capture, not a reader bookmark.
    Reference mode disables knob edits; tap Compare to return. Reference and
    history clear on a new word/import, so captures cannot be compared across
    different timelines.
@@ -112,9 +115,14 @@ fine timing on the intended listening device.
 
 ## Samples and compatibility
 
-Export writes JSON under the app's external `files/Download/` directory,
-with reciter, ayah, word, decimated PCM (16-bit LE Base64), hop duration,
-media origin, loop range, detector parameters, and notes.
+Export opens Android’s save picker with a suggested JSON filename. Choose
+Downloads or another document location; canceling writes nothing. The sample
+is frozen at the Export tap so a later target or knob change cannot replace
+it while the picker is open. File writing runs off the UI thread, and success
+or failure appears on the lab’s message line. No storage permission is needed.
+The JSON includes reciter, ayah, word, decimated PCM (16-bit LE Base64), hop
+duration, media origin, loop range, live detector parameters, and notes.
+Imported captures retain their source reciter metadata when exported again.
 
 Schema 2 and 3 samples still import. Their hold window becomes the loop range;
 legacy labels, crests, and drawn envelopes never drive the preview. Imported
