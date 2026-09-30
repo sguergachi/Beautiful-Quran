@@ -18,6 +18,12 @@ import com.beautifulquran.data.model.Surah
 import com.beautifulquran.data.model.SurahContent
 import com.beautifulquran.domain.BASMALAH_PLAYLIST_AYAH
 import com.beautifulquran.domain.HighlightClock
+import com.beautifulquran.domain.AudibleSilence
+import com.beautifulquran.domain.firstWordHighlightMs
+import com.beautifulquran.domain.hizbOpeningSeekMs
+import com.beautifulquran.domain.isHizbStop
+import com.beautifulquran.domain.openingWashStartMs
+import com.beautifulquran.domain.silenceSkipAllowed
 import com.beautifulquran.domain.HighlightEngine
 import com.beautifulquran.domain.EnglishBook
 import com.beautifulquran.domain.MushafCatalog
@@ -139,29 +145,38 @@ internal class ActiveWordPollCache {
     private var info: HighlightEngine.ActiveInfo? = null
     private var ayah = 0
     private var activation = 0L
+    private var washStartMs = Long.MIN_VALUE
     private var word: ActiveWord? = null
 
     fun activeWord(
         ayah: Int,
         info: HighlightEngine.ActiveInfo?,
         activation: Long,
+        /** Voice time for this word's wash. [Long.MIN_VALUE] keeps [info]'s start. */
+        washStartMs: Long = Long.MIN_VALUE,
     ): ActiveWord? {
         if (info == null) {
             this.info = null
             word = null
             return null
         }
+        val startMs = if (washStartMs == Long.MIN_VALUE) info.startMs else washStartMs
         val cached = word
-        if (info === this.info && ayah == this.ayah && activation == this.activation && cached != null) {
+        if (info === this.info &&
+            ayah == this.ayah &&
+            activation == this.activation &&
+            startMs == this.washStartMs &&
+            cached != null
+        ) {
             return cached
         }
-        val durationMs = (info.holdEndMs - info.startMs).coerceAtLeast(0L)
+        val durationMs = (info.holdEndMs - startMs).coerceAtLeast(0L)
         return ActiveWord(
             ayah = ayah,
             wordPosition = info.position,
-            startMs = info.startMs,
+            startMs = startMs,
             durationMs = durationMs,
-            spokenMs = (info.endMs - info.startMs).coerceIn(0L, durationMs),
+            spokenMs = (info.endMs - startMs).coerceIn(0L, durationMs),
             nextWordPosition = info.nextPosition,
             isRepeat = info.isRepeat,
             highWater = info.highWater,
@@ -171,6 +186,7 @@ internal class ActiveWordPollCache {
             this.info = info
             this.ayah = ayah
             this.activation = activation
+            this.washStartMs = startMs
             word = it
         }
     }
@@ -647,17 +663,30 @@ class ReaderViewModel(
                 highlightClock.acceptNextSample()
                 lastClockEventId = events.clockId
             }
-            val firstWordStartMs = preparedTimings[np.ayah]
-                ?.segments
-                ?.firstOrNull()
-                ?.startMs
-                ?: 0L
-            val rawMs = highlightPositionMs(firstWordStartMs, np.reciterId)
+            val prepared = preparedTimings[np.ayah]
+            val segments = prepared?.segments.orEmpty()
+            // Opening quiet is skipped to the voice. The wash starts there too,
+            // so a click stored as word 1 does not light early or run long.
+            val voiceMs = firstWordVoiceMs(np.ayah, np.reciterId, segments)
+            val rawMs = highlightPositionMs(voiceMs, np.reciterId)
             val clockMs = highlightClock.sample(np, rawMs)
+            val info = prepared?.activeInfo(clockMs)
+            val washStart = if (info == null) {
+                null
+            } else {
+                openingWashStartMs(
+                    startMs = info.startMs,
+                    position = info.position,
+                    segments = segments,
+                    positionMs = clockMs,
+                    voiceMs = voiceMs,
+                )
+            }
             activeWordPollCache.activeWord(
                 ayah = np.ayah,
-                info = preparedTimings[np.ayah]?.activeInfo(clockMs),
+                info = if (washStart == null) null else info,
                 activation = events.inkId,
+                washStartMs = washStart ?: Long.MIN_VALUE,
             )
         }
 
@@ -785,7 +814,62 @@ class ReaderViewModel(
         )
     }
 
+    /**
+     * A murattal ۞ opening skips its long pause and lands on the first word's
+     * voice, inside that verse. The wash keeps running. Nothing seeks into
+     * the next verse: that join is the click between verses. Mujawwad waqf
+     * and Muallim pauses stay. A seek already in flight is left to land.
+     */
+    private fun skipMarkedSilence() {
+        if (!player.skipSilenceGaps || player.silenceSkipHeld()) return
+        if (!player.state.value.isPlaying) return
+        val np = player.liveNowPlaying ?: return
+        if (np.surahId != surahId) return
+        val style = _uiState.value.currentReciter?.takeIf { it.id == np.reciterId }?.style
+        if (style == null || !silenceSkipAllowed(style)) return
+        val segments = preparedTimings[np.ayah]?.segments?.takeIf { it.isNotEmpty() } ?: return
+        val opening = hizbOpeningSeekMs(
+            hizbStop = isHizbAyah(np.ayah),
+            positionMs = player.positionMs,
+            segments = segments,
+            silence = audibleSilenceFor(np.reciterId, np.surahId, np.ayah),
+        ) ?: return
+        player.skipSilenceWithinAyah(np.ayah, opening)
+    }
+
+    /** First-word highlight gate. Only a ۞ uses the measured voice. */
+    private fun firstWordVoiceMs(ayah: Int, reciterId: Int, segments: List<Segment>): Long {
+        val stored = segments.firstOrNull()?.startMs ?: return 0L
+        if (!player.skipSilenceGaps || !isHizbAyah(ayah)) return stored
+        return firstWordHighlightMs(segments, audibleSilenceFor(reciterId, surahId, ayah))
+    }
+
+    private fun isHizbAyah(ayah: Int): Boolean {
+        if (ayah == BASMALAH_PLAYLIST_AYAH) return false
+        val text = _uiState.value.content
+            ?.takeIf { it.surah.id == surahId }
+            ?.ayahs
+            ?.firstOrNull { it.number == ayah }
+            ?.text
+            ?: return false
+        return isHizbStop(text)
+    }
+
+    /** Playlist ayah 0 plays the shared Al-Fatihah 1:1 clip. */
+    private fun audibleSilenceFor(reciterId: Int, surahId: Int, ayah: Int): List<AudibleSilence> {
+        val audioSurah = if (ayah == BASMALAH_PLAYLIST_AYAH) SURAH_FATIHA else surahId
+        val audioAyah = if (ayah == BASMALAH_PLAYLIST_AYAH) 1 else ayah
+        return player.audibleSilence(reciterId, audioSurah, audioAyah)
+    }
+
     init {
+        viewModelScope.launch {
+            while (true) {
+                ensureActive()
+                skipMarkedSilence()
+                delay(if (player.state.value.isPlaying) 40L else 250L)
+            }
+        }
         viewModelScope.launch {
             polledActiveWord.collect { polled ->
                 val tap = tapInk.value
@@ -1190,12 +1274,20 @@ class ReaderViewModel(
         val seg = segs.firstOrNull { it.position == word }
             ?: segs.filter { it.position <= word }.maxByOrNull { it.position }
             ?: return
+        val first = segs.first()
+        val opening = seg.position == first.position && seg.startMs == first.startMs
+        val reciterId = _uiState.value.currentReciter?.id
+        val start = if (opening && reciterId != null) {
+            firstWordVoiceMs(ayah, reciterId, segs)
+        } else {
+            seg.startMs
+        }
         val next = segs.firstOrNull { it.startMs > seg.startMs }?.position
-        val duration = (seg.endMs - seg.startMs).coerceAtLeast(0L)
+        val duration = (seg.endMs - start).coerceAtLeast(0L)
         val seed = ActiveWord(
             ayah = ayah,
             wordPosition = word,
-            startMs = seg.startMs,
+            startMs = start,
             durationMs = duration,
             spokenMs = duration,
             nextWordPosition = next,
@@ -1214,7 +1306,17 @@ class ReaderViewModel(
     fun startMsForWord(ayah: Int, word: Int): Long? {
         val segments = timings[ayah]?.takeIf { it.isNotEmpty() } ?: return null
         val exact = segments.firstOrNull { it.position == word }
-        if (exact != null) return exact.startMs
+        if (exact != null) {
+            val first = segments.first()
+            val reciterId = _uiState.value.currentReciter?.id
+            if (reciterId != null &&
+                exact.position == first.position &&
+                exact.startMs == first.startMs
+            ) {
+                return firstWordVoiceMs(ayah, reciterId, segments)
+            }
+            return exact.startMs
+        }
         return segments.filter { it.position <= word }.maxByOrNull { it.position }?.startMs
     }
 

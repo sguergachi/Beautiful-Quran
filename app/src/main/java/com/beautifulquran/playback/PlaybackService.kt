@@ -127,7 +127,7 @@ class PlaybackService : MediaLibraryService() {
                 val sink = DefaultAudioSink.Builder(context)
                     .setEnableFloatOutput(enableFloatOutput)
                     .setEnableAudioTrackPlaybackParams(enableAudioTrackPlaybackParams)
-                    .setAudioProcessors(arrayOf(tap))
+                    .setAudioProcessors(arrayOf(VerseSeamAudioProcessor(), tap))
                     .build()
                 tap.attach(sink)
                 return sink

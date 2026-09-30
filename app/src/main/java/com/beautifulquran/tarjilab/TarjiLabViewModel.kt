@@ -125,6 +125,7 @@ class TarjiLabViewModel(
 
     /** [focusWordPosition] is the word long-pressed in the reader. */
     fun changeTarget(surahId: Int, ayah: Int, focusWordPosition: Int? = null) {
+        player.setSkipSilenceGaps(false)
         stopPreview()
         if (matchesLab(player.state.value) && player.state.value.isPlaying) {
             player.pause()
@@ -931,6 +932,7 @@ class TarjiLabViewModel(
     fun onExit() {
         loadJob?.cancel()
         analyzeJob?.cancel()
+        player.setSkipSilenceGaps(true)
         stopPreview()
         val interruptedCapture = _ui.value.capturing || _ui.value.isLoading
         abortCapture()
