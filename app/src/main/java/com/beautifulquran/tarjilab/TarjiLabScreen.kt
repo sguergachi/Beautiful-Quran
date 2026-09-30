@@ -3,7 +3,6 @@ package com.beautifulquran.tarjilab
 import android.app.Activity
 import android.content.Context
 import android.content.ContextWrapper
-import android.util.Log
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.core.animateFloatAsState
@@ -41,20 +40,21 @@ import androidx.compose.material.icons.rounded.Replay
 import androidx.compose.material.icons.rounded.Repeat
 import androidx.compose.material.icons.rounded.ChevronLeft
 import androidx.compose.material.icons.rounded.ChevronRight
-import androidx.compose.material.icons.rounded.Undo
-import androidx.compose.material.icons.rounded.Redo
-import androidx.compose.material.icons.rounded.CompareArrows
+import androidx.compose.material.icons.automirrored.rounded.Undo
+import androidx.compose.material.icons.automirrored.rounded.Redo
+import androidx.compose.material.icons.automirrored.rounded.CompareArrows
 import androidx.compose.material.icons.rounded.BookmarkAdd
 import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.Remove
 import androidx.compose.material.icons.rounded.Tune
 import androidx.compose.material.icons.rounded.RestartAlt
 import androidx.compose.material.icons.rounded.ZoomOutMap
-import androidx.compose.material.icons.rounded.HelpOutline
+import androidx.compose.material.icons.automirrored.rounded.HelpOutline
 import androidx.compose.material3.Icon
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Slider
+import androidx.compose.material3.RangeSlider
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -84,6 +84,7 @@ import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -134,17 +135,7 @@ fun TarjiLabScreen(
     val importLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.OpenDocument(),
     ) { uri ->
-        if (uri != null) {
-            val text = runCatching {
-                context.contentResolver.openInputStream(uri)
-                    ?.bufferedReader()?.use { it.readText() }
-            }.getOrNull()
-            if (text == null) {
-                Log.e("TarjiLab", "could not read $uri")
-            } else {
-                viewModel.importSample(text)
-            }
-        }
+        if (uri != null) viewModel.importSample(context, uri)
     }
 
     val lifecycleOwner = androidx.lifecycle.compose.LocalLifecycleOwner.current
@@ -383,7 +374,7 @@ private fun TransportRow(
         }
         LabIconAction(Icons.Rounded.ZoomOutMap, "Fit waveform", viewModel::fitView,
             enabled = ui.capture != null)
-        LabIconAction(Icons.Rounded.HelpOutline, "Show tuning help", onHelp, selected = showHelp)
+        LabIconAction(Icons.AutoMirrored.Rounded.HelpOutline, "Show tuning help", onHelp, selected = showHelp)
     }
 }
 
@@ -396,13 +387,13 @@ private fun ComparisonRow(
 ) {
     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
         DetectorReadout(ui, playheadMs, Modifier.weight(1f))
-        LabIconAction(Icons.Rounded.CompareArrows, "Compare reference", viewModel::toggleReference,
+        LabIconAction(Icons.AutoMirrored.Rounded.CompareArrows, "Compare reference", viewModel::toggleReference,
             enabled = ui.reference != null, selected = ui.showingReference)
         LabIconAction(Icons.Rounded.BookmarkAdd, "Set comparison reference", viewModel::setReference,
             enabled = ui.trace != null && !ui.analyzing && !ui.showingReference,
             selected = ui.reference?.knobs == ui.knobs)
-        LabIconAction(Icons.Rounded.Undo, "Undo tuning", viewModel::undoKnobs, enabled = ui.canUndo)
-        LabIconAction(Icons.Rounded.Redo, "Redo tuning", viewModel::redoKnobs, enabled = ui.canRedo)
+        LabIconAction(Icons.AutoMirrored.Rounded.Undo, "Undo tuning", viewModel::undoKnobs, enabled = ui.canUndo)
+        LabIconAction(Icons.AutoMirrored.Rounded.Redo, "Redo tuning", viewModel::redoKnobs, enabled = ui.canRedo)
     }
 }
 
@@ -503,6 +494,7 @@ private fun WaveformPanel(
     val trace = ui.displayTrace
     val waveColor = QuranTheme.ink.quiet
     val guideColor = QuranTheme.ink.muted
+    val pulseColor = QuranTheme.accents.greenInk
     val durationMs = capture?.let { it.hopCount * it.hopContentDurationMs() } ?: 0f
     val view = if (ui.view.spanMs > 1f) ui.view else TarjiViewWindow.fit(durationMs)
     val window = ui.expectation.window.takeIf { ui.tool == TarjiLabTool.HOLD }
@@ -670,7 +662,7 @@ private fun WaveformPanel(
                 }
                 val point = Offset(x, mid - acceptedEnvelope[i] * amp)
                 previousPulse?.let {
-                    drawLine(GlintGold, it, point, strokeWidth = 2.5.dp.toPx(), cap = StrokeCap.Round)
+                    drawLine(pulseColor, it, point, strokeWidth = 2.5.dp.toPx(), cap = StrokeCap.Round)
                 }
                 previousPulse = point
             }
@@ -715,7 +707,8 @@ private fun StatusSlot(
             } else {
                 MaterialTheme.colorScheme.onSurfaceVariant
             },
-            maxLines = 1,
+            maxLines = if (error != null) 3 else 2,
+            overflow = TextOverflow.Ellipsis,
             modifier = Modifier.weight(1f),
         )
         if (error != null) {
@@ -731,16 +724,18 @@ private fun DetectorReadout(ui: TarjiLabViewModel.TarjiLabUiState, playheadMs: F
     val status = when {
         ui.analyzing && !ui.showingReference -> "Updating…"
         point == null -> "Waiting for audio"
-        point.gain > 0.001f -> "Pulse here"
+        point.gain > 0.001f && point.rateHz > 0f -> "${if (point.visualUsesAmplitude) "Volume" else "Pitch"} · %.1f Hz".format(point.rateHz)
+        point.gain > 0.001f -> "Pulse fading"
         else -> "No pulse here"
     }
     Column(modifier) {
         Text(formatLabClock(playheadMs, ui.previewDurationMs),
             style = MaterialTheme.typography.labelSmall.copy(fontFeatureSettings = "'tnum' 1, 'lnum' 1"),
-            color = QuranTheme.ink.secondary, maxLines = 1)
+            color = QuranTheme.ink.secondary, maxLines = 1, overflow = TextOverflow.Ellipsis)
         Text(if (ui.showingReference) "Reference" else status,
             style = MaterialTheme.typography.labelSmall,
-            color = if (ui.showingReference) GlintGold else QuranTheme.ink.secondary, maxLines = 1)
+            color = if (ui.showingReference) GlintGold else if ((point?.gain ?: 0f) > 0.001f) QuranTheme.accents.greenInk else QuranTheme.ink.secondary,
+            maxLines = 1, overflow = TextOverflow.Ellipsis)
     }
 }
 
@@ -786,26 +781,22 @@ private fun KnobsPanel(
             enabled = !ui.showingReference, showHelp = showHelp, onFinished = onFinished) { v ->
             onKnob { k -> k.copy(minPeriodicity = 0.85f - v * 0.70f) }
         }
+        PulseSpeedControl(knobs, !ui.showingReference, showHelp, onFinished) { band ->
+            onKnob { it.copy(minTremoloHz = band.start, maxTremoloHz = band.endInclusive) }
+        }
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
             LabIconAction(Icons.Rounded.Tune, "More tuning controls", { more = !more }, selected = more)
             Text(if (more) "More controls" else "Fine tuning", style = MaterialTheme.typography.labelLarge,
-                color = QuranTheme.ink.secondary, modifier = Modifier.weight(1f).quietClickable { more = !more })
+                color = QuranTheme.ink.secondary, modifier = Modifier.weight(1f).heightIn(min = 48.dp).quietClickable(role = Role.Button) { more = !more }
+                    .padding(vertical = 12.dp))
             LabIconAction(Icons.Rounded.RestartAlt, "Reset reciter tuning", onReset)
         }
         if (showHelp) Text(
-            "Gold is the pulse driving the word’s glow. Tap the graph to seek; pinch to zoom. Loop lets you isolate a note. Compare shows your reference; the bookmark saves a new one.",
+            "The green pulse drives the word’s glow. Tap the graph to seek; pinch to zoom. Loop lets you isolate a note. Compare shows your reference; the bookmark saves a new one.",
             style = MaterialTheme.typography.bodySmall, color = QuranTheme.ink.secondary,
             modifier = Modifier.padding(bottom = 8.dp),
         )
         if (more) {
-            LabSlider("Slowest pulse", knobs.minTremoloHz, 1.5f..5f, enabled = !ui.showingReference, showHelp = showHelp, onFinished = onFinished, decimals = 1,
-                help = "Lower to catch slow wavering; raise to ignore slow volume swells.") { v ->
-                onKnob { k -> k.copy(minTremoloHz = v, maxTremoloHz = maxOf(v, k.maxTremoloHz)) }
-            }
-            LabSlider("Fastest pulse", knobs.maxTremoloHz, 1.5f..10f, enabled = !ui.showingReference, showHelp = showHelp, onFinished = onFinished, decimals = 1,
-                help = "Raise to catch fast wavering; lower to ignore rapid roughness.") { v ->
-                onKnob { k -> k.copy(maxTremoloHz = v, minTremoloHz = minOf(v, k.minTremoloHz)) }
-            }
             LabSlider("Allow note slides", knobs.maxPitchDrift, 0.04f..0.30f, enabled = !ui.showingReference, showHelp = showHelp, onFinished = onFinished,
                 help = "Raise for a sliding held note. Lower if changing notes trigger a pulse.") { v ->
                 onKnob { k -> k.copy(maxPitchDrift = v) }
@@ -838,6 +829,54 @@ private fun KnobsPanel(
             )
         }
     }
+}
+
+/** One band control replaces separate rate endpoints, keeping both on the same scale. */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun PulseSpeedControl(
+    knobs: TarjiLabKnobs,
+    enabled: Boolean,
+    showHelp: Boolean,
+    onFinished: () -> Unit,
+    onChange: (ClosedFloatingPointRange<Float>) -> Unit,
+) {
+    val ink = QuranTheme.ink
+    val pulseColor = if (enabled) QuranTheme.accents.greenInk else ink.quiet
+    val low = knobs.minTremoloHz.coerceIn(1.5f, 10f)
+    val high = knobs.maxTremoloHz.coerceIn(low, 10f)
+    Column(Modifier.fillMaxWidth().padding(bottom = 8.dp)) {
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            Text("Pulse speed", style = MaterialTheme.typography.labelLarge, color = ink.secondary,
+                modifier = Modifier.weight(1f))
+            Text("%.1f–%.1f Hz".format(low, high),
+                style = MaterialTheme.typography.labelSmall.copy(fontFeatureSettings = "'tnum' 1, 'lnum' 1"),
+                color = ink.secondary)
+        }
+        RangeSlider(
+            value = low..high, onValueChange = onChange, onValueChangeFinished = onFinished,
+            valueRange = 1.5f..10f, steps = 84, enabled = enabled,
+            startThumb = { PulseThumb(pulseColor) }, endThumb = { PulseThumb(pulseColor) },
+            track = { state ->
+                Canvas(Modifier.fillMaxWidth().height(24.dp)) {
+                    val y = size.height / 2
+                    drawLine(ink.hairline, Offset(0f, y), Offset(size.width, y), 3.dp.toPx(), StrokeCap.Round)
+                    drawLine(pulseColor, Offset((state.activeRangeStart - 1.5f) / 8.5f * size.width, y),
+                        Offset((state.activeRangeEnd - 1.5f) / 8.5f * size.width, y), 3.dp.toPx(), StrokeCap.Round)
+                }
+            },
+            modifier = Modifier.fillMaxWidth().semantics { contentDescription = "Slowest and fastest pulse speed" },
+        )
+        if (showHelp) Text(
+            "Drag the two ends to include the wavering you hear: left is slower, right is faster. Hz means pulses per second, not the voice’s pitch. A wider range catches more kinds of wavering in volume or pitch.",
+            style = MaterialTheme.typography.bodySmall, color = ink.secondary,
+        )
+    }
+}
+
+@Composable
+private fun PulseThumb(color: Color) {
+    Canvas(Modifier.size(20.dp)) { drawCircle(color, radius = 7.dp.toPx()) }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -878,9 +917,7 @@ private fun LabSlider(
                 enabled = enabled,
                 valueRange = range,
                 thumb = {
-                    Canvas(Modifier.size(20.dp)) {
-                        drawCircle(if (enabled) GlintGold else ink.quiet, radius = 7.dp.toPx())
-                    }
+                    PulseThumb(if (enabled) GlintGold else ink.quiet)
                 },
                 track = { state ->
                     Canvas(Modifier.fillMaxWidth().height(24.dp)) {

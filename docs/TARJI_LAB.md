@@ -19,10 +19,11 @@ manual envelope, vibrato label, or look control that can override it.
    pinch zoom and two-finger pan preserve precise inspection.
 4. The graph stays pinned while controls scroll. The playback line, loop range,
    and compact elapsed/total clock show where the audible note is. The quiet waveform is audio;
-   the **gold pulse** is the accepted output used by the word’s glow. There is
-   no raw teal trace. The readout says **Pulse here**, **No pulse here**, or
-   **Updating**; it never invents an accepted pulse.
-5. Adjust **Sensitivity**, **Shortest note**, or **Rhythm tolerance**. Each
+   the **green pulse** is the accepted output used by the word’s glow. There is
+   no raw teal trace. The readout shows the accepted
+   **Volume / Pitch** channel and its rate in Hz, **Pulse fading**, **No pulse
+   here**, or **Updating**; it never invents an accepted pulse.
+5. Adjust **Sensitivity**, **Shortest note**, **Rhythm tolerance**, or **Pulse speed**. Each
    slider has a thin track, current value, and precise nudge buttons. The **?**
    button beside Fit reveals knob explanations and gesture help;
    guidance is hidden by default to leave room for tuning. Help stays pinned
@@ -44,19 +45,21 @@ manual envelope, vibrato label, or look control that can override it.
 7. **Undo / Redo** reverse tuning edits without restarting playback. One full
    slider drag is one undo step; each nudge is another. History retains 32 edits
    for the current word. **Reset** restores shipped defaults and is undoable.
-   **Fine tuning** reveals frequency limits, note slides, fade-in, and gap
+   **Fine tuning** reveals note slides, fade-in, and gap
    bridging, with sample import/export and optional notes below.
 
 The normal layout has two 48 dp rows below the graph: transport, then clock /
 pulse status alongside Compare, Set reference, Undo, and Redo. Familiar controls
 use icons with accessible names instead of stacked captions. There is no
 permanent legend, gesture caption, time-ruler row, or duplicate Fit action.
-Capture errors and sample messages take a row only when present. Main controls
+Capture errors and sample messages take a row only when present and wrap
+instead of disappearing past the edge. Fine tuning and file actions retain
+48 dp hit targets; directional action icons mirror with the layout direction. Main controls
 show only their name, value, slider, and − / + until help is requested.
 
-The gold curve uses the recorded audio’s time axis and a fixed −1..1 scale.
+The green curve uses the recorded audio’s time axis and a fixed −1..1 scale.
 It shows accepted modulation after attack/release gain. Rejected regions have
-no gold curve; no synthetic oscillator or hand-drawn curve invents a pulse.
+no green curve; no synthetic oscillator or hand-drawn curve invents a pulse.
 The pre-gate candidate remains available to analyzer tests and corpus audits,
 but is not a tuning target in this interface.
 
@@ -69,9 +72,15 @@ Profiles persist per reciter and write through to `InkEngine.tuning`:
 - **Shortest note** is the minimum stable-note duration, 100–1,200 ms.
 - **Rhythm tolerance** reverses periodicity: 0% = threshold 0.85,
   100% = threshold 0.15. More tolerance accepts uneven wavering.
-- Under **More controls**: **Slowest / Fastest pulse** set the frequency band;
-  **Allow note slides** sets pitch drift; **Fade in** sets attack;
-  **Bridge gaps** sets release. Frequency endpoints stay ordered.
+- **Pulse speed** selects the accepted wavering band, 1.5–10 Hz, using two
+  handles on one scale in 0.1 Hz steps. Left is slower, right faster; a wider
+  band includes more rates. This tunes pulse cycles per second, not the
+  reciter’s fundamental pitch or a room-echo frequency. The existing detector
+  measures both loudness tremolo and pitch vibrato; the readout identifies
+  whichever drives the accepted event. This replaces separate advanced rate
+  limits and persists through the same reciter profile, comparison, and history.
+- Under **More controls**: **Allow note slides** sets pitch drift; **Fade in**
+  sets attack; **Bridge gaps** sets release.
 
 The percentages are normalized slider positions, not confidence scores.
 Re-analysis updates the graph and word without restarting audio or moving the
@@ -116,12 +125,15 @@ fine timing on the intended listening device.
 ## Samples and compatibility
 
 Export opens Android’s save picker with a suggested JSON filename. Choose
-Downloads or another document location; canceling writes nothing. The sample
-is frozen at the Export tap so a later target or knob change cannot replace
+Downloads or another document location; canceling writes nothing. The
+displayed settings and capture are frozen at the Export tap so a later target or knob change cannot replace
 it while the picker is open. File writing runs off the UI thread, and success
-or failure appears on the lab’s message line. No storage permission is needed.
+or failure appears on the lab’s message line. Import also reads off the UI
+thread and reports unreadable documents on the page. No storage permission
+is needed.
 The JSON includes reciter, ayah, word, decimated PCM (16-bit LE Base64), hop
-duration, media origin, loop range, live detector parameters, and notes.
+duration, media origin, loop range, displayed detector parameters, and notes.
+Export in Compare mode saves the reference settings you are viewing without changing the live profile.
 Imported captures retain their source reciter metadata when exported again.
 
 Schema 2 and 3 samples still import. Their hold window becomes the loop range;
@@ -163,6 +175,6 @@ The design borrows waveform/selection proximity from
 parameter feedback from [FabFilter’s knob controls](https://www.fabfilter.com/help/one/using/knobsandswitches).
 The adaptation stays within the app’s paper language: flat ink, no floating
 panels or shadows, familiar icons with accessible names, and brief press motion.
-Only the gold result is plotted. The loop and comparison controls serve a
+Only the green result is plotted. The loop and comparison controls serve a
 single listen → isolate → tweak → compare cycle; there is no preset browser,
 new synthesis engine, or additional framework.

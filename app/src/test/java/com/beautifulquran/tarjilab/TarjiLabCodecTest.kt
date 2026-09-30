@@ -46,7 +46,7 @@ class TarjiLabCodecTest {
             surahId = 1, ayah = 7, wordPosition = 1, wordArabic = "نَعْبُدُ",
             knobs = live, sampleNotes = "Listen to the ending",
             expectation = TarjiLabExpectation(startMs = 200f, endMs = 800f),
-            showingReference = true,
+            showingReference = false,
             reference = TarjiLabReference(TarjiLabKnobs(), analyzeTarjiCapture(audio, TarjiLabKnobs())),
         )
         val frozen = ui.sampleForExport()!!
@@ -60,6 +60,21 @@ class TarjiLabCodecTest {
         assertEquals(1234.0, restored.firstHopMediaMs, 0.0)
         assertEquals(audio.hopCount, TarjiLabCodec.toCapture(restored).hopCount)
         assertEquals(99, changed.sampleForExport()!!.reciterId)
+    }
+
+    @Test
+    fun `export in compare mode matches the graph without changing live settings`() {
+        val audio = captureOf(note(1f))
+        val checkpoint = TarjiLabKnobs(holdMinMs = 900f)
+        val live = TarjiLabKnobs(holdMinMs = 300f)
+        val ui = TarjiLabViewModel.TarjiLabUiState(
+            capture = audio, sampleReciterId = 7, sampleReciterName = "Reciter",
+            knobs = live, showingReference = true,
+            reference = TarjiLabReference(checkpoint, analyzeTarjiCapture(audio, checkpoint)),
+        )
+        val restored = TarjiLabCodec.decode(TarjiLabCodec.encode(ui.sampleForExport()!!))
+        assertEquals(checkpoint, restored.knobs)
+        assertEquals(live, ui.knobs)
     }
 
     @Test

@@ -93,7 +93,7 @@ class TarjiLabViewModel(
         val displayTrace: TarjiLabTrace? get() = if (showingReference) reference?.trace else trace
         val displayKnobs: TarjiLabKnobs get() = if (showingReference) reference?.knobs ?: knobs else knobs
 
-        /** Freeze this capture and live tuning before opening the system save picker. */
+        /** Freeze this capture and displayed tuning before opening the system save picker. */
         fun sampleForExport(): TarjiLabSample? {
             val audio = capture ?: return null
             val id = sampleReciterId ?: reciter?.id ?: return null
@@ -104,7 +104,7 @@ class TarjiLabViewModel(
                 label = TarjiLabCodec.label(name, surahId, ayah, wordPosition),
                 reciterId = id, reciterName = name,
                 surahId = surahId, ayah = ayah, wordPosition = wordPosition,
-                wordArabic = wordArabic, knobs = knobs,
+                wordArabic = wordArabic, knobs = displayKnobs,
                 expectation = expectation, notes = sampleNotes,
             )
         }
@@ -857,6 +857,24 @@ class TarjiLabViewModel(
                 throw cancelled
             } catch (error: Exception) {
                 _ui.value = _ui.value.copy(note = "Export failed: ${error.message}")
+            }
+        }
+    }
+
+    /** Document reads never block the transport; failures remain visible in the lab. */
+    fun importSample(context: Context, uri: Uri) {
+        val resolver = context.applicationContext.contentResolver
+        viewModelScope.launch {
+            try {
+                val text = withContext(Dispatchers.IO) {
+                    resolver.openInputStream(uri)?.bufferedReader()?.use { it.readText() }
+                        ?: error("Could not open the selected sample")
+                }
+                importSample(text)
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (error: Exception) {
+                _ui.value = _ui.value.copy(note = "Import failed: ${error.message}")
             }
         }
     }

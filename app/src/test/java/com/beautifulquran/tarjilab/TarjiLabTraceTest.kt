@@ -8,6 +8,7 @@ import com.beautifulquran.ui.reader.InkEngine
 import kotlin.math.PI
 import kotlin.math.abs
 import kotlin.math.sin
+import kotlin.math.pow
 import kotlin.math.sqrt
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -97,6 +98,37 @@ class TarjiLabTraceTest {
             "tremolo phase-locked to the envelope ($agree/$total)",
             agree > total * 0.85,
         )
+    }
+
+    @Test
+    fun `selected pulse band includes or excludes audible volume wavering`() {
+        val capture = captureOf(heldNote(4f, 130f, amHz = 5f, amDepth = 0.03f))
+        val knobs = TarjiLabKnobs(minTremoloDepth = 0.01f, minTremoloHz = 4f, maxTremoloHz = 6f)
+        val included = analyzeTarjiCapture(capture, knobs)
+        assertNotNull(included.reverberatingSpan)
+        assertTrue(included.visualUsesAmplitude[included.reverberatingSpan!!.last])
+        assertTrue(tarjiAcceptedPulseWave(included).any { abs(it) > 0.01f })
+        val excluded = analyzeTarjiCapture(capture, knobs.copy(minTremoloHz = 1.5f, maxTremoloHz = 3f))
+        assertNull(excluded.reverberatingSpan)
+        assertTrue(tarjiAcceptedPulseWave(excluded).all { it == 0f })
+    }
+
+    @Test
+    fun `selected pulse band includes or excludes pitch-only vibrato`() {
+        var phase = 0f
+        val pcm = FloatArray(4 * Tarji.SAMPLE_RATE) { i ->
+            val wobble = sin(2f * PI.toFloat() * 5.5f * i / Tarji.SAMPLE_RATE)
+            val frequency = 150f * 2f.pow(30f * wobble / 1200f)
+            phase += 2f * PI.toFloat() * frequency / Tarji.SAMPLE_RATE
+            0.3f * sin(phase)
+        }
+        val capture = captureOf(pcm)
+        val knobs = TarjiLabKnobs(minTremoloHz = 4.5f, maxTremoloHz = 6.5f)
+        val included = analyzeTarjiCapture(capture, knobs)
+        assertNotNull(included.reverberatingSpan)
+        assertFalse(included.visualUsesAmplitude[included.reverberatingSpan!!.last])
+        val excluded = analyzeTarjiCapture(capture, knobs.copy(minTremoloHz = 1.5f, maxTremoloHz = 3f))
+        assertNull(excluded.reverberatingSpan)
     }
 
     @Test
