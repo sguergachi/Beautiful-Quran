@@ -41,7 +41,7 @@ class VerseSeamFadeTest {
     }
 }
 
-private fun pcm16(frames: Int, value: Int, channels: Int = 1): ByteArray {
+internal fun pcm16(frames: Int, value: Int, channels: Int = 1): ByteArray {
     val out = ByteArray(frames * channels * 2)
     var offset = 0
     repeat(frames * channels) {
@@ -52,7 +52,7 @@ private fun pcm16(frames: Int, value: Int, channels: Int = 1): ByteArray {
     return out
 }
 
-private fun sampleAt(pcm: ByteArray, frame: Int, channels: Int = 1, channel: Int = 0): Int {
+internal fun sampleAt(pcm: ByteArray, frame: Int, channels: Int = 1, channel: Int = 0): Int {
     val offset = (frame * channels + channel) * 2
     val sample = (pcm[offset].toInt() and 0xff) or (pcm[offset + 1].toInt() shl 8)
     return sample.toShort().toInt()

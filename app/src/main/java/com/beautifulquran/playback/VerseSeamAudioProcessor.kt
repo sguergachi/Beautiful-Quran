@@ -8,6 +8,12 @@ import java.nio.ByteBuffer
 /**
  * Puts [VerseSeamFade] on the playback PCM. Float output sits the processor
  * out; the verse files are 16-bit.
+ *
+ * The next verse is configured while this file's last few milliseconds are
+ * still held. [onConfigure] must not build a new fade: that runs before
+ * [onQueueEndOfStream], and the tail would be thrown away instead of ramped.
+ * The fade for the new file is built in [onFlush], after the ended file has
+ * been drained.
  */
 @androidx.annotation.OptIn(androidx.media3.common.util.UnstableApi::class)
 class VerseSeamAudioProcessor : BaseAudioProcessor() {
@@ -20,7 +26,6 @@ class VerseSeamAudioProcessor : BaseAudioProcessor() {
         if (inputAudioFormat.encoding != C.ENCODING_PCM_16BIT) {
             return AudioProcessor.AudioFormat.NOT_SET
         }
-        seam = VerseSeamFade(inputAudioFormat.channelCount, inputAudioFormat.sampleRate)
         return inputAudioFormat
     }
 
@@ -42,7 +47,12 @@ class VerseSeamAudioProcessor : BaseAudioProcessor() {
     }
 
     override fun onFlush(streamMetadata: AudioProcessor.StreamMetadata) {
-        seam?.clear()
+        val format = inputAudioFormat
+        seam = if (isActive && format.encoding == C.ENCODING_PCM_16BIT) {
+            VerseSeamFade(format.channelCount, format.sampleRate)
+        } else {
+            null
+        }
     }
 
     override fun onReset() {
