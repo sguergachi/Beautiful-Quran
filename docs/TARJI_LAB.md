@@ -12,24 +12,27 @@ manual envelope, vibrato label, or look control that can override it.
 2. The lab captures the word muted at 1×, including 300 ms lead and 1 s tail.
    Capture progress and failures appear on the page; **Retry** repeats capture.
 3. The transport is a single row of 48 dp icon targets: **Rewind**, a larger
-   **Play/Pause**, **Loop**, **Speed**, and **Fit**. Play repeats the whole word.
+   **Play/Pause**, **Loop**, **Speed**, **Fit**, and **Help**. Play repeats the whole word.
    Loop isolates a selection with large visible drag handles; toggling Loop
    during playback switches the range without requiring a second Play tap.
    Speed cycles 1× → ½ → ¼. Tapping the waveform pauses at that position;
    pinch zoom and two-finger pan preserve precise inspection.
-4. The graph stays pinned while controls scroll. A time ruler, playback line,
-   and loop range show where the audible note is. The quiet waveform is audio;
+4. The graph stays pinned while controls scroll. The playback line, loop range,
+   and compact elapsed/total clock show where the audible note is. The quiet waveform is audio;
    the **gold pulse** is the accepted output used by the word’s glow. There is
    no raw teal trace. The readout says **Pulse here**, **No pulse here**, or
    **Updating**; it never invents an accepted pulse.
 5. Adjust **Sensitivity**, **Shortest note**, or **Rhythm tolerance**. Each
-   slider has a thin track, current value, direction labels, and short guidance.
+   slider has a thin track, current value, and precise nudge buttons. The **?**
+   button beside Fit reveals knob explanations and gesture help;
+   guidance is hidden by default to leave room for tuning. Help stays pinned
+   beside transport when the explanations expand.
    **− / +** make precise nudges: 1 percentage point on the normalized controls,
    10 ms on durations, 0.1 Hz on rate limits, and 0.01 on note-slide tolerance.
    Changes save automatically for this reciter. Graph and glow update while
    dragging; audio continues on the same clock.
 6. **Compare** switches the graph, glow, and displayed knob values between
-   **Live tuning** and one **Reference**, without changing audio, position, or
+   live tuning and one **Reference**, without changing audio, position, or
    saved settings. The initial reference is the first completed analysis for
    this capture; **Set ref** replaces it with the current completed tuning.
    Reference mode disables knob edits; tap Compare to return. Reference and
@@ -40,6 +43,13 @@ manual envelope, vibrato label, or look control that can override it.
    for the current word. **Reset** restores shipped defaults and is undoable.
    **Fine tuning** reveals frequency limits, note slides, fade-in, and gap
    bridging, with sample import/export and optional notes below.
+
+The normal layout has two 48 dp rows below the graph: transport, then clock /
+pulse status alongside Compare, Set reference, Undo, and Redo. Familiar controls
+use icons with accessible names instead of stacked captions. There is no
+permanent legend, gesture caption, time-ruler row, or duplicate Fit action.
+Capture errors and sample messages take a row only when present. Main controls
+show only their name, value, slider, and − / + until help is requested.
 
 The gold curve uses the recorded audio’s time axis and a fixed −1..1 scale.
 It shows accepted modulation after attack/release gain. Rejected regions have
@@ -144,7 +154,7 @@ The design borrows waveform/selection proximity from
 [Logic Pro’s Quick Sampler](https://www.apple.com/logic-pro/) and precise
 parameter feedback from [FabFilter’s knob controls](https://www.fabfilter.com/help/one/using/knobsandswitches).
 The adaptation stays within the app’s paper language: flat ink, no floating
-panels or shadows, familiar icons with short captions, and brief press motion.
+panels or shadows, familiar icons with accessible names, and brief press motion.
 Only the gold result is plotted. The loop and comparison controls serve a
 single listen → isolate → tweak → compare cycle; there is no preset browser,
 new synthesis engine, or additional framework.

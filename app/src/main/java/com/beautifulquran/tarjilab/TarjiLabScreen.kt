@@ -25,7 +25,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -51,6 +50,7 @@ import androidx.compose.material.icons.rounded.Remove
 import androidx.compose.material.icons.rounded.Tune
 import androidx.compose.material.icons.rounded.RestartAlt
 import androidx.compose.material.icons.rounded.ZoomOutMap
+import androidx.compose.material.icons.rounded.HelpOutline
 import androidx.compose.material3.Icon
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
@@ -113,6 +113,7 @@ fun TarjiLabScreen(
     val context = LocalContext.current
 
     var playheadMs by remember { mutableFloatStateOf(-1f) }
+    var showHelp by remember { mutableStateOf(false) }
     androidx.compose.runtime.LaunchedEffect(
         ui.previewPlaying,
         ui.previewDurationMs,
@@ -222,28 +223,14 @@ fun TarjiLabScreen(
                             )
                         }
                     }
-                    val captureMs = ui.capture?.let { it.hopCount * it.hopContentDurationMs() } ?: 0f
-                    if (captureMs > 0f && ui.view.spanMs + 1f < captureMs) {
-                        Text(
-                            text = "Fit",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier
-                                .align(Alignment.TopEnd)
-                                .quietClickable(onClick = viewModel::fitView)
-                                .padding(8.dp),
-                        )
-                    }
                 }
-                WaveformRuler(ui)
                 StatusSlot(
                     error = ui.captureError,
                     note = ui.note,
                     onRetry = viewModel::retryCapture,
                 )
-                TransportRow(ui, viewModel)
-                DetectorReadout(ui, playheadMs)
-                ComparisonRow(ui, viewModel)
+                TransportRow(ui, viewModel, showHelp) { showHelp = !showHelp }
+                ComparisonRow(ui, viewModel, playheadMs)
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -253,6 +240,7 @@ fun TarjiLabScreen(
                 ) {
                     KnobsPanel(
                         ui = ui,
+                        showHelp = showHelp,
                         onKnob = viewModel::updateKnobs,
                         onReset = viewModel::resetKnobs,
                         onExport = { viewModel.exportSample(context) },
@@ -360,62 +348,54 @@ private fun CaptureProgress(progress: Float, modifier: Modifier = Modifier) {
 private fun TransportRow(
     ui: TarjiLabViewModel.TarjiLabUiState,
     viewModel: TarjiLabViewModel,
+    showHelp: Boolean,
+    onHelp: () -> Unit,
 ) {
-    Column(Modifier.fillMaxWidth()) {
-        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceEvenly) {
-            LabIconAction(Icons.Rounded.Replay, "Rewind", viewModel::rewindPreview,
-                enabled = ui.capture != null, caption = "Rewind")
-            LabIconAction(
-                if (ui.previewPlaying) Icons.Rounded.Pause else Icons.Rounded.PlayArrow,
-                if (ui.previewPlaying) "Pause" else "Play", {
-                    val scope = if (ui.previewPlaying) ui.previewScope
-                        else if (ui.tool == TarjiLabTool.HOLD) TarjiPreviewScope.HOLD else TarjiPreviewScope.WORD
-                    if (scope == TarjiPreviewScope.HOLD) viewModel.togglePreview() else viewModel.toggleWordPreview()
-                }, enabled = ui.capture != null, prominent = true,
-                caption = if (ui.previewPlaying) "Pause" else "Play",
-            )
-            LabIconAction(Icons.Rounded.Repeat, "Loop selection", {
-                val tool = if (ui.tool == TarjiLabTool.HOLD) TarjiLabTool.LISTEN else TarjiLabTool.HOLD
-                viewModel.setTool(tool)
-            }, enabled = ui.capture != null, selected = ui.tool == TarjiLabTool.HOLD, caption = "Loop")
-            Column(
-                horizontalAlignment = Alignment.CenterHorizontally,
-                modifier = Modifier.width(48.dp).heightIn(min = 48.dp)
-                    .quietClickable(enabled = ui.capture != null, role = Role.Button) {
-                        val speeds = TarjiPreviewSpeed.entries
-                        viewModel.setPreviewSpeed(speeds[(speeds.indexOf(ui.previewSpeed) + 1) % speeds.size])
-                    }.semantics { contentDescription = "Playback speed ${ui.previewSpeed.mark}. Tap to change." }
-                    .padding(vertical = 6.dp),
-            ) {
-                Text(ui.previewSpeed.mark, style = MaterialTheme.typography.labelLarge, color = QuranTheme.ink.secondary)
-                Text("Speed", style = MaterialTheme.typography.labelSmall, color = QuranTheme.ink.secondary)
-            }
-            LabIconAction(Icons.Rounded.ZoomOutMap, "Fit waveform", viewModel::fitView,
-                enabled = ui.capture != null, caption = "Fit")
-        }
-        Text(
-            if (ui.tool == TarjiLabTool.HOLD) "Drag the handles to isolate a note · pinch to zoom"
-            else "Repeats the word · tap to seek · pinch to zoom",
-            style = MaterialTheme.typography.labelSmall,
-            color = QuranTheme.ink.secondary,
-            modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
-            textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.SpaceEvenly) {
+        LabIconAction(Icons.Rounded.Replay, "Rewind", viewModel::rewindPreview,
+            enabled = ui.capture != null)
+        LabIconAction(
+            if (ui.previewPlaying) Icons.Rounded.Pause else Icons.Rounded.PlayArrow,
+            if (ui.previewPlaying) "Pause" else "Play", {
+                val scope = if (ui.previewPlaying) ui.previewScope
+                    else if (ui.tool == TarjiLabTool.HOLD) TarjiPreviewScope.HOLD else TarjiPreviewScope.WORD
+                if (scope == TarjiPreviewScope.HOLD) viewModel.togglePreview() else viewModel.toggleWordPreview()
+            }, enabled = ui.capture != null, prominent = true,
         )
+        LabIconAction(Icons.Rounded.Repeat, "Loop selection", {
+            val tool = if (ui.tool == TarjiLabTool.HOLD) TarjiLabTool.LISTEN else TarjiLabTool.HOLD
+            viewModel.setTool(tool)
+        }, enabled = ui.capture != null, selected = ui.tool == TarjiLabTool.HOLD)
+        Box(
+            contentAlignment = Alignment.Center,
+            modifier = Modifier.size(48.dp)
+                .quietClickable(enabled = ui.capture != null, role = Role.Button) {
+                    val speeds = TarjiPreviewSpeed.entries
+                    viewModel.setPreviewSpeed(speeds[(speeds.indexOf(ui.previewSpeed) + 1) % speeds.size])
+                }.semantics { contentDescription = "Playback speed ${ui.previewSpeed.mark}. Tap to change." },
+        ) {
+            Text(ui.previewSpeed.mark, style = MaterialTheme.typography.labelLarge, color = QuranTheme.ink.secondary)
+        }
+        LabIconAction(Icons.Rounded.ZoomOutMap, "Fit waveform", viewModel::fitView,
+            enabled = ui.capture != null)
+        LabIconAction(Icons.Rounded.HelpOutline, "Show tuning help", onHelp, selected = showHelp)
     }
 }
 
 /** Comparison affects only the graph and glow; the recorded voice keeps its place. */
 @Composable
-private fun ComparisonRow(ui: TarjiLabViewModel.TarjiLabUiState, viewModel: TarjiLabViewModel) {
+private fun ComparisonRow(
+    ui: TarjiLabViewModel.TarjiLabUiState,
+    viewModel: TarjiLabViewModel,
+    playheadMs: Float,
+) {
     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+        DetectorReadout(ui, playheadMs, Modifier.weight(1f))
         LabIconAction(Icons.Rounded.CompareArrows, "Compare reference", viewModel::toggleReference,
-            enabled = ui.reference != null, selected = ui.showingReference, caption = "Compare")
-        Text(if (ui.showingReference) "Reference" else "Live tuning",
-            style = MaterialTheme.typography.labelLarge, color = if (ui.showingReference) GlintGold else QuranTheme.ink.secondary,
-            modifier = Modifier.weight(1f))
+            enabled = ui.reference != null, selected = ui.showingReference)
         LabIconAction(Icons.Rounded.BookmarkAdd, "Set comparison reference", viewModel::setReference,
-            enabled = ui.trace != null && !ui.analyzing && !ui.showingReference, caption = "Set ref")
+            enabled = ui.trace != null && !ui.analyzing && !ui.showingReference)
         LabIconAction(Icons.Rounded.Undo, "Undo tuning", viewModel::undoKnobs, enabled = ui.canUndo)
         LabIconAction(Icons.Rounded.Redo, "Redo tuning", viewModel::redoKnobs, enabled = ui.canRedo)
     }
@@ -430,23 +410,20 @@ private fun LabIconAction(
     enabled: Boolean = true,
     selected: Boolean = false,
     prominent: Boolean = false,
-    caption: String? = null,
 ) {
     val interaction = remember { MutableInteractionSource() }
     val pressed by interaction.collectIsPressedAsState()
     val scale = animateFloatAsState(if (pressed) 0.9f else 1f, label = "control press")
     val ink = if (!enabled) QuranTheme.ink.quiet else if (selected || prominent) GlintGold else QuranTheme.ink.secondary
-    Column(
-        horizontalAlignment = Alignment.CenterHorizontally,
-        modifier = Modifier.width(if (prominent) 56.dp else 48.dp).heightIn(min = 48.dp)
+    Box(
+        contentAlignment = Alignment.Center,
+        modifier = Modifier.size(48.dp)
             .quietClickable(enabled = enabled, role = Role.Button, interactionSource = interaction, onClick = onClick)
-            .semantics { contentDescription = label; this.selected = selected }
-            .padding(vertical = 6.dp),
+            .semantics { contentDescription = label; this.selected = selected },
     ) {
         Icon(icon, contentDescription = null, tint = ink,
             modifier = Modifier.size(if (prominent) 36.dp else 24.dp)
                 .graphicsLayer { scaleX = scale.value; scaleY = scale.value })
-        caption?.let { Text(it, style = MaterialTheme.typography.labelSmall, color = ink) }
     }
 }
 
@@ -704,18 +681,6 @@ private fun WaveformPanel(
         }
 }
 
-@Composable
-private fun WaveformRuler(ui: TarjiLabViewModel.TarjiLabUiState) {
-    val view = ui.view
-    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-        for (fraction in listOf(0f, 0.5f, 1f)) {
-            Text("%.2f s".format((view.startMs + view.spanMs * fraction) / 1000f),
-                style = MaterialTheme.typography.labelSmall.copy(fontFeatureSettings = "'tnum' 1, 'lnum' 1"),
-                color = QuranTheme.ink.quiet)
-        }
-    }
-}
-
 private fun DrawScope.drawHandle(x: Float, color: Color) {
     val visibleX = x.coerceIn(5.dp.toPx(), size.width - 5.dp.toPx())
     drawLine(color, Offset(visibleX, 0f), Offset(visibleX, size.height), strokeWidth = 1.dp.toPx())
@@ -723,21 +688,21 @@ private fun DrawScope.drawHandle(x: Float, color: Color) {
         Offset(visibleX, size.height / 2 + 14.dp.toPx()), strokeWidth = 5.dp.toPx(), cap = StrokeCap.Round)
 }
 
-/** Always the same height so error, note, or silence never move the scope. */
+/** Messages use space only when there is something to report. */
 @Composable
 private fun StatusSlot(
     error: String?,
     note: String?,
     onRetry: () -> Unit,
 ) {
+    val message = error ?: note ?: return
     Row(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(12.dp),
-        modifier = Modifier.fillMaxWidth().height(28.dp),
+        modifier = Modifier.fillMaxWidth().heightIn(min = if (error != null) 48.dp else 24.dp),
     ) {
-        val message = error ?: note ?: "Audio waveform · gold pulse = word glow"
         Text(
-            text = message.orEmpty(),
+            text = message,
             style = MaterialTheme.typography.labelSmall,
             color = if (error != null) {
                 MaterialTheme.colorScheme.error
@@ -748,14 +713,14 @@ private fun StatusSlot(
             modifier = Modifier.weight(1f),
         )
         if (error != null) {
-            WordAction("Retry", onRetry, MaterialTheme.colorScheme.primary)
+            LabIconAction(Icons.Rounded.Replay, "Retry capture", onRetry)
         }
     }
 }
 
 /** Values at the same content position as the audible loop. */
 @Composable
-private fun DetectorReadout(ui: TarjiLabViewModel.TarjiLabUiState, playheadMs: Float) {
+private fun DetectorReadout(ui: TarjiLabViewModel.TarjiLabUiState, playheadMs: Float, modifier: Modifier) {
     val point = ui.displayTrace?.let { tracePointAt(it, playheadMs.coerceAtLeast(0f)) }
     val status = when {
         ui.analyzing && !ui.showingReference -> "Updating…"
@@ -763,12 +728,14 @@ private fun DetectorReadout(ui: TarjiLabViewModel.TarjiLabUiState, playheadMs: F
         point.gain > 0.001f -> "Pulse here"
         else -> "No pulse here"
     }
-    Text(
-        text = "${formatLabClock(playheadMs, ui.previewDurationMs)}   ·   $status",
-        style = MaterialTheme.typography.labelSmall,
-        color = QuranTheme.ink.secondary,
-        modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
-    )
+    Column(modifier) {
+        Text(formatLabClock(playheadMs, ui.previewDurationMs),
+            style = MaterialTheme.typography.labelSmall.copy(fontFeatureSettings = "'tnum' 1, 'lnum' 1"),
+            color = QuranTheme.ink.secondary, maxLines = 1)
+        Text(if (ui.showingReference) "Reference" else status,
+            style = MaterialTheme.typography.labelSmall,
+            color = if (ui.showingReference) GlintGold else QuranTheme.ink.secondary, maxLines = 1)
+    }
 }
 
 private fun DrawScope.drawGuide(text: String, color: Color) {
@@ -783,6 +750,7 @@ private fun DrawScope.drawGuide(text: String, color: Color) {
 @Composable
 private fun KnobsPanel(
     ui: TarjiLabViewModel.TarjiLabUiState,
+    showHelp: Boolean,
     onKnob: ((TarjiLabKnobs) -> TarjiLabKnobs) -> Unit,
     onReset: () -> Unit,
     onExport: () -> Unit,
@@ -794,55 +762,53 @@ private fun KnobsPanel(
     val knobs = ui.displayKnobs
     var more by remember { mutableStateOf(false) }
     Column(modifier = modifier) {
-        if (ui.showingReference) Text(
-            "Reference · tap Compare to return to live tuning",
-            style = MaterialTheme.typography.labelSmall,
-            color = QuranTheme.ink.secondary,
-            modifier = Modifier.padding(bottom = 8.dp),
-        )
         LabSlider("Sensitivity", (0.25f - knobs.minTremoloDepth) / 0.24f, 0f..1f,
             valueLabel = "${((0.25f - knobs.minTremoloDepth) / 0.24f * 100).roundToInt()}%",
-            help = "Missing a pulse? Move right. Speech pulsing? Move left.", ends = "Less" to "More",
-            enabled = !ui.showingReference, onFinished = onFinished) { v ->
+            help = "Missing a pulse? Move right. Speech pulsing? Move left.",
+            enabled = !ui.showingReference, showHelp = showHelp, onFinished = onFinished) { v ->
             onKnob { k -> k.copy(minTremoloDepth = 0.25f - v * 0.24f) }
         }
         LabSlider("Shortest note", knobs.holdMinMs, 100f..1_200f,
             valueLabel = "${knobs.holdMinMs.roundToInt()} ms",
-            help = "Move left for brief holds; right to ignore short syllables.", ends = "Shorter" to "Longer",
-            enabled = !ui.showingReference, onFinished = onFinished) { v ->
+            help = "Move left for brief holds; right to ignore short syllables.",
+            enabled = !ui.showingReference, showHelp = showHelp, onFinished = onFinished) { v ->
             onKnob { k -> k.copy(holdMinMs = v) }
         }
         LabSlider("Rhythm tolerance", (0.85f - knobs.minPeriodicity) / 0.70f, 0f..1f,
             valueLabel = "${((0.85f - knobs.minPeriodicity) / 0.70f * 100).roundToInt()}%",
-            help = "Move right for uneven wavering; left for a steady rhythm.", ends = "Steady only" to "Uneven too",
-            enabled = !ui.showingReference, onFinished = onFinished) { v ->
+            help = "Move right for uneven wavering; left for a steady rhythm.",
+            enabled = !ui.showingReference, showHelp = showHelp, onFinished = onFinished) { v ->
             onKnob { k -> k.copy(minPeriodicity = 0.85f - v * 0.70f) }
         }
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
             LabIconAction(Icons.Rounded.Tune, "More tuning controls", { more = !more }, selected = more)
             Text(if (more) "More controls" else "Fine tuning", style = MaterialTheme.typography.labelLarge,
                 color = QuranTheme.ink.secondary, modifier = Modifier.weight(1f).quietClickable { more = !more })
-            LabIconAction(Icons.Rounded.RestartAlt, "Reset reciter tuning", onReset, caption = "Reset")
+            LabIconAction(Icons.Rounded.RestartAlt, "Reset reciter tuning", onReset)
         }
+        if (showHelp) Text(
+            "Gold is the pulse driving the word’s glow. Tap the graph to seek; pinch to zoom. Loop lets you isolate a note. Compare shows your reference; the bookmark saves a new one.",
+            style = MaterialTheme.typography.bodySmall, color = QuranTheme.ink.secondary,
+            modifier = Modifier.padding(bottom = 8.dp),
+        )
         if (more) {
-            Spacer(Modifier.height(12.dp))
-            LabSlider("Slowest pulse", knobs.minTremoloHz, 1.5f..5f, enabled = !ui.showingReference, onFinished = onFinished, decimals = 1,
+            LabSlider("Slowest pulse", knobs.minTremoloHz, 1.5f..5f, enabled = !ui.showingReference, showHelp = showHelp, onFinished = onFinished, decimals = 1,
                 help = "Lower to catch slow wavering; raise to ignore slow volume swells.") { v ->
                 onKnob { k -> k.copy(minTremoloHz = v, maxTremoloHz = maxOf(v, k.maxTremoloHz)) }
             }
-            LabSlider("Fastest pulse", knobs.maxTremoloHz, 1.5f..10f, enabled = !ui.showingReference, onFinished = onFinished, decimals = 1,
+            LabSlider("Fastest pulse", knobs.maxTremoloHz, 1.5f..10f, enabled = !ui.showingReference, showHelp = showHelp, onFinished = onFinished, decimals = 1,
                 help = "Raise to catch fast wavering; lower to ignore rapid roughness.") { v ->
                 onKnob { k -> k.copy(maxTremoloHz = v, minTremoloHz = minOf(v, k.minTremoloHz)) }
             }
-            LabSlider("Allow note slides", knobs.maxPitchDrift, 0.04f..0.30f, enabled = !ui.showingReference, onFinished = onFinished,
+            LabSlider("Allow note slides", knobs.maxPitchDrift, 0.04f..0.30f, enabled = !ui.showingReference, showHelp = showHelp, onFinished = onFinished,
                 help = "Raise for a sliding held note. Lower if changing notes trigger a pulse.") { v ->
                 onKnob { k -> k.copy(maxPitchDrift = v) }
             }
-            LabSlider("Fade in", knobs.attackMs, 50f..600f, enabled = !ui.showingReference, onFinished = onFinished,
+            LabSlider("Fade in", knobs.attackMs, 50f..600f, enabled = !ui.showingReference, showHelp = showHelp, onFinished = onFinished,
                 help = "Lower for a quicker entrance. Raise for a gentler glow.") { v ->
                 onKnob { k -> k.copy(attackMs = v) }
             }
-            LabSlider("Bridge gaps", knobs.releaseMs, 100f..2_000f, enabled = !ui.showingReference, onFinished = onFinished,
+            LabSlider("Bridge gaps", knobs.releaseMs, 100f..2_000f, enabled = !ui.showingReference, showHelp = showHelp, onFinished = onFinished,
                 help = "Raise to smooth brief interruptions. Lower to clear the pulse sooner.") { v ->
                 onKnob { k -> k.copy(releaseMs = v) }
             }
@@ -877,7 +843,7 @@ private fun LabSlider(
     decimals: Int? = null,
     valueLabel: String? = null,
     help: String,
-    ends: Pair<String, String>? = null,
+    showHelp: Boolean = false,
     enabled: Boolean = true,
     onFinished: () -> Unit,
     onChange: (Float) -> Unit,
@@ -925,13 +891,7 @@ private fun LabSlider(
                 onChange((value + step).coerceIn(range)); onFinished()
             }, enabled = enabled && value < range.endInclusive)
         }
-        ends?.let { (left, right) ->
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                Text(left, style = MaterialTheme.typography.labelSmall, color = QuranTheme.ink.secondary)
-                Text(right, style = MaterialTheme.typography.labelSmall, color = QuranTheme.ink.secondary)
-            }
-        }
-        Text(help, style = MaterialTheme.typography.bodySmall, color = QuranTheme.ink.secondary)
+        if (showHelp) Text(help, style = MaterialTheme.typography.bodySmall, color = QuranTheme.ink.secondary)
     }
 }
 
