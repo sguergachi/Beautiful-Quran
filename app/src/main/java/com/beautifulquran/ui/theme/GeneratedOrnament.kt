@@ -255,7 +255,7 @@ fun GeneratedChapterRosette(
                                 center,
                                 embossDark,
                                 embossLight,
-                                emboss = 0.8f * (stroke / 1.dp),
+                                emboss = max(RELIEF_FLOOR_PX, 0.8f * (stroke / 1.dp)),
                             )
                         }
                         recorded = true
@@ -270,6 +270,9 @@ fun GeneratedChapterRosette(
             },
     )
 }
+
+/** The relief never thins below this (px): a hairline rosette still reads as pressed. */
+private const val RELIEF_FLOOR_PX = 0.6f
 
 /** Centre of the border band's cross-section, from the frame geometry. */
 private fun bandCenter(geometry: CoverFrameGeometry): Float =

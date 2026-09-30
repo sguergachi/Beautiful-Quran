@@ -10,6 +10,12 @@ import android.hardware.SensorEventListener
 import android.hardware.SensorManager
 import android.os.PowerManager
 import android.provider.Settings
+import android.database.ContentObserver
+import android.hardware.display.DisplayManager
+import android.os.Handler
+import android.os.Looper
+import android.view.Display
+import android.view.Surface
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -24,7 +30,7 @@ import androidx.core.content.ContextCompat
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
-import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.first
 import androidx.compose.runtime.withFrameNanos
 import kotlin.math.abs
 import kotlin.math.exp
@@ -81,6 +87,18 @@ private const val MIN_STEP = 0.005f
 /** Close enough to the aim to stop drawing frames for it. */
 private const val ARRIVED = 0.001f
 
+/**
+ * Gravity across the *screen's* width, in m/s², from the sensor's device-frame
+ * [x] and [y] and the display's [rotation] (`Surface.ROTATION_*`) — so a phone
+ * held in landscape rolls the light the same way as one held upright.
+ */
+internal fun screenRoll(x: Float, y: Float, rotation: Int): Float = when (rotation) {
+    Surface.ROTATION_90 -> y
+    Surface.ROTATION_180 -> -x
+    Surface.ROTATION_270 -> -y
+    else -> x
+}
+
 /** The sheen for a phone rolled so that gravity reads [rollG] g's across its width. */
 internal fun sheenForRoll(rollG: Float): Float =
     GILDING_REST + GILDING_REST * (rollG / ROLL_FULL_SCALE).coerceIn(-1f, 1f)
@@ -95,7 +113,10 @@ private object RestingTilt : State<Float> {
  * Home list, Settings and every other screen without gold pay nothing.
  */
 @Stable
-class GildingTilt internal constructor() : State<Float> {
+class GildingTilt internal constructor(
+    /** False on a device with nothing to tilt; the cover then keeps its idle sweep. */
+    val hasSensor: Boolean = true,
+) : State<Float> {
     private val sheen = mutableFloatStateOf(GILDING_REST)
 
     /** Where the latest sample says the light should be; [sheen] glides to it. */
@@ -144,18 +165,28 @@ internal fun GildingDemand(sheen: State<Float>) {
 }
 
 /**
- * The accelerometer, low-passed into a sheen, at UI rate. It listens only while
- * the app is started *and* a gilded figure is on screen, and not at all when the
- * user has turned animations off (or the device has no accelerometer) — then the
- * gilding simply rests.
+ * The accelerometer, low-passed into a sheen. It listens only while the app is
+ * started *and* a gilded figure is on screen, and not at all in battery saver,
+ * with animations turned off, or on a device with no accelerometer — then the
+ * gilding simply rests. Both settings are followed live.
  */
 @Composable
 fun rememberGildingTilt(): State<Float> {
     val context = LocalContext.current
     val lifecycle = LocalLifecycleOwner.current.lifecycle
-    val tilt = remember { GildingTilt() }
+    val tilt = remember(context) {
+        GildingTilt(
+            hasSensor = context.getSystemService(SensorManager::class.java)
+                ?.getDefaultSensor(Sensor.TYPE_ACCELEROMETER) != null,
+        )
+    }
+    // One loop for the life of the tilt: it sleeps while the sheen is at its aim
+    // and, once a sample moves the aim, closes on it a frame at a time. A new
+    // sample mid-glide just changes what the next frame closes on — nothing is
+    // restarted, so no frame's time is lost.
     LaunchedEffect(tilt) {
-        snapshotFlow { tilt.aim.floatValue }.collectLatest {
+        while (true) {
+            snapshotFlow { tilt.aim.floatValue != tilt.value }.first { it }
             var last = withFrameNanos { it }
             do {
                 val now = withFrameNanos { it }
@@ -167,16 +198,18 @@ fun rememberGildingTilt(): State<Float> {
     DisposableEffect(context, lifecycle, tilt) {
         val manager = context.getSystemService(SensorManager::class.java)
         val sensor = manager?.getDefaultSensor(Sensor.TYPE_ACCELEROMETER)
-        val animated = Settings.Global.getFloat(
-            context.contentResolver,
-            Settings.Global.ANIMATOR_DURATION_SCALE,
-            1f,
-        ) > 0f
-        if (manager == null || sensor == null || !animated) {
+        if (manager == null || sensor == null) {
             return@DisposableEffect onDispose {}
         }
         lateinit var listener: SensorEventListener
         val powerManager = context.getSystemService(PowerManager::class.java)
+        val display = context.getSystemService(DisplayManager::class.java)
+            ?.getDisplay(Display.DEFAULT_DISPLAY)
+        fun animationsOff() = Settings.Global.getFloat(
+            context.contentResolver,
+            Settings.Global.ANIMATOR_DURATION_SCALE,
+            1f,
+        ) <= 0f
         var smoothed = GILDING_REST
         var seeded = false
         var still = 0
@@ -188,7 +221,12 @@ fun rememberGildingTilt(): State<Float> {
         }
         listener = object : SensorEventListener {
             override fun onSensorChanged(event: SensorEvent) {
-                val target = sheenForRoll(event.values[0] / SensorManager.GRAVITY_EARTH)
+                val roll = screenRoll(
+                    event.values[0],
+                    event.values[1],
+                    display?.rotation ?: Surface.ROTATION_0,
+                )
+                val target = sheenForRoll(roll / SensorManager.GRAVITY_EARTH)
                 val jump = abs(target - smoothed)
                 smoothed = if (seeded) smoothed + (target - smoothed) * SMOOTHING else target
                 if (seeded) tilt.aimAt(smoothed) else tilt.snapTo(smoothed)
@@ -210,10 +248,11 @@ fun rememberGildingTilt(): State<Float> {
         }
         var started = false
         fun sync() {
-            // Battery saver asks for no ambient motion; the gilding rests.
-            val saving = powerManager?.isPowerSaveMode == true
-            val shouldListen = started && tilt.demand > 0 && !saving
-            if (saving) tilt.aimAt(GILDING_REST)
+            // Battery saver, or the user's animations turned off, asks for no
+            // ambient motion; the gilding rests.
+            val resting = powerManager?.isPowerSaveMode == true || animationsOff()
+            val shouldListen = started && tilt.demand > 0 && !resting
+            if (resting) tilt.aimAt(GILDING_REST)
             if (shouldListen == listening) return
             listening = shouldListen
             if (shouldListen) {
@@ -225,10 +264,14 @@ fun rememberGildingTilt(): State<Float> {
                 manager.unregisterListener(listener)
             }
         }
-        // Battery saver is toggled from the shade with the app still open, so
-        // it has to be heard as it happens, not only when the app comes forward.
+        // Battery saver and the animation scale are both changed with the app
+        // still open, so they are heard as they happen, not only when the app
+        // comes forward.
         val powerSaveChanged = object : BroadcastReceiver() {
             override fun onReceive(context: Context?, intent: Intent?) = sync()
+        }
+        val animationScaleChanged = object : ContentObserver(Handler(Looper.getMainLooper())) {
+            override fun onChange(selfChange: Boolean) = sync()
         }
         var receiving = false
         fun receive(on: Boolean) {
@@ -241,8 +284,14 @@ fun rememberGildingTilt(): State<Float> {
                     IntentFilter(PowerManager.ACTION_POWER_SAVE_MODE_CHANGED),
                     ContextCompat.RECEIVER_NOT_EXPORTED,
                 )
+                context.contentResolver.registerContentObserver(
+                    Settings.Global.getUriFor(Settings.Global.ANIMATOR_DURATION_SCALE),
+                    false,
+                    animationScaleChanged,
+                )
             } else {
                 context.unregisterReceiver(powerSaveChanged)
+                context.contentResolver.unregisterContentObserver(animationScaleChanged)
             }
         }
         val observer = LifecycleEventObserver { _, event ->
