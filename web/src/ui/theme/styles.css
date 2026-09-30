@@ -384,6 +384,63 @@ select {
   z-index: 3;
 }
 
+/*
+ * Settings is its own stock of paper, one step off the reading paper — deeper
+ * on cream, lifted on the dark sheets — so a turn shows which sheet is
+ * arriving. The ink ladder is solved again for it. Android `SettingsPaper`.
+ */
+.sheet[data-name='settings'] {
+  --paper: #f2e7d5;
+}
+
+[data-theme='dark'] .sheet[data-name='settings'] {
+  --paper: #1e1c18;
+}
+
+[data-theme='royal_green'] .sheet[data-name='settings'] {
+  --paper: #0a382e;
+}
+
+:root[data-colors='legacy'][data-theme='dark'] .sheet[data-name='settings'] {
+  --paper: #1a1d20;
+}
+
+:root:not([data-colors='legacy']) .sheet[data-name='settings'] {
+  --ink-rung-strong: rgb(28 27 24 / 0.979);
+  --ink-rung-body: rgb(28 27 24 / 0.81);
+  --ink-rung-secondary: rgb(28 27 24 / 0.708);
+  --ink-rung-tertiary: rgb(110 104 88 / 0.959);
+  --ink-rung-muted: rgb(110 104 88 / 0.791);
+  --ink-rung-quiet: rgb(110 104 88 / 0.677);
+  --ink-rung-furniture: rgb(110 104 88 / 0.493);
+  --ink-rung-hairline: rgb(110 104 88 / 0.308);
+  --ink-rung-wash: rgb(110 104 88 / 0.14);
+}
+
+:root:not([data-colors='legacy'])[data-theme='dark'] .sheet[data-name='settings'] {
+  --ink-rung-strong: rgb(243 236 223 / 0.967);
+  --ink-rung-body: rgb(243 236 223 / 0.889);
+  --ink-rung-secondary: rgb(243 236 223 / 0.826);
+  --ink-rung-tertiary: rgb(203 196 179 / 0.92);
+  --ink-rung-muted: rgb(203 196 179 / 0.814);
+  --ink-rung-quiet: rgb(203 196 179 / 0.732);
+  --ink-rung-furniture: rgb(203 196 179 / 0.591);
+  --ink-rung-hairline: rgb(203 196 179 / 0.418);
+  --ink-rung-wash: rgb(203 196 179 / 0.23);
+}
+
+:root:not([data-colors='legacy'])[data-theme='royal_green'] .sheet[data-name='settings'] {
+  --ink-rung-strong: rgb(248 242 228 / 0.967);
+  --ink-rung-body: rgb(248 242 228 / 0.885);
+  --ink-rung-secondary: rgb(248 242 228 / 0.822);
+  --ink-rung-tertiary: rgb(208 202 184 / 0.924);
+  --ink-rung-muted: rgb(208 202 184 / 0.81);
+  --ink-rung-quiet: rgb(208 202 184 / 0.728);
+  --ink-rung-furniture: rgb(208 202 184 / 0.575);
+  --ink-rung-hairline: rgb(208 202 184 / 0.395);
+  --ink-rung-wash: rgb(208 202 184 / 0.199);
+}
+
 .sheet[data-empty='true'] {
   visibility: hidden;
   pointer-events: none;

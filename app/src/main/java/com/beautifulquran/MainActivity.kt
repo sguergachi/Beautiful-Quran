@@ -125,6 +125,7 @@ import com.beautifulquran.ui.theme.rememberGildingTilt
 import com.beautifulquran.ui.theme.InkRevealOverlay
 import com.beautifulquran.ui.theme.LocalNuqtaParams
 import com.beautifulquran.ui.theme.LocalQuranAccents
+import com.beautifulquran.ui.theme.SettingsPaper
 import com.beautifulquran.ui.theme.TimingsLabAccents
 import com.beautifulquran.ui.theme.absorbPointerEvents
 import com.beautifulquran.ui.theme.contrastingOverlayColorScheme
@@ -992,34 +993,36 @@ private fun PaperStackApp(
             settingsLayer = settingsLayer,
             modifier = Modifier.zIndex(0f),
         ) {
-            SettingsScreen(
-                viewModel = settingsViewModel,
-                inkPreview = settingsInkPreview,
-                downloadsRefreshKey = downloadsRefreshKey,
-                onBack = {
-                    animateTo(if (selectedSurahId == 0) COVER_LAYER else AYAH_LAYER)
-                },
-                onOpenReciters = {
-                    settingsDetail = SettingsDetail.RECITERS
-                    animateTo(settingsLayer + 1)
-                },
-                onOpenCustomize = {
-                    settingsDetail = SettingsDetail.CUSTOMIZE
-                    animateTo(settingsLayer + 1)
-                },
-                onOpenDownloads = {
-                    settingsDetail = SettingsDetail.DOWNLOADS
-                    animateTo(settingsLayer + 1)
-                },
-                onOpenComponentKit = {
-                    settingsDetail = SettingsDetail.COMPONENT_KIT
-                    animateTo(settingsLayer + 1)
-                },
-                onOpenTimingsLab = { openTimingsLab() },
-                onOpenTarjiLab = { openTarjiLab() },
-                onOpenOrnamentsLab = { openOrnamentsLab() },
-                onRecordSystemTrace = onRecordSystemTrace,
-            )
+            SettingsPaper {
+                SettingsScreen(
+                    viewModel = settingsViewModel,
+                    inkPreview = settingsInkPreview,
+                    downloadsRefreshKey = downloadsRefreshKey,
+                    onBack = {
+                        animateTo(if (selectedSurahId == 0) COVER_LAYER else AYAH_LAYER)
+                    },
+                    onOpenReciters = {
+                        settingsDetail = SettingsDetail.RECITERS
+                        animateTo(settingsLayer + 1)
+                    },
+                    onOpenCustomize = {
+                        settingsDetail = SettingsDetail.CUSTOMIZE
+                        animateTo(settingsLayer + 1)
+                    },
+                    onOpenDownloads = {
+                        settingsDetail = SettingsDetail.DOWNLOADS
+                        animateTo(settingsLayer + 1)
+                    },
+                    onOpenComponentKit = {
+                        settingsDetail = SettingsDetail.COMPONENT_KIT
+                        animateTo(settingsLayer + 1)
+                    },
+                    onOpenTimingsLab = { openTimingsLab() },
+                    onOpenTarjiLab = { openTarjiLab() },
+                    onOpenOrnamentsLab = { openOrnamentsLab() },
+                    onRecordSystemTrace = onRecordSystemTrace,
+                )
+            }
         }
 
         if (settingsDetail != null) {
@@ -1031,29 +1034,31 @@ private fun PaperStackApp(
                 // sheet turns away to reveal, so it must draw under it.
                 modifier = Modifier.zIndex(-0.5f),
             ) {
-                when (settingsDetail) {
-                    SettingsDetail.RECITERS -> RecitersSheet(
-                        viewModel = settingsViewModel,
-                        onBack = { animateTo(settingsLayer) },
-                    )
-                    SettingsDetail.CUSTOMIZE -> CustomizeSheet(
-                        viewModel = settingsViewModel,
-                        inkPreview = settingsInkPreview,
-                        // Back keeps the page where it is: the leaf you turned
-                        // back from stays under your thumb, so swiping forward
-                        // from Settings re-opens exactly that sheet.
-                        onBack = { animateTo(settingsLayer) },
-                    )
-                    SettingsDetail.DOWNLOADS -> DownloadsSheet(
-                        viewModel = settingsViewModel,
-                        onBack = { animateTo(settingsLayer) },
-                    )
-                    SettingsDetail.COMPONENT_KIT -> ComponentKitScreen(
-                        viewModel = settingsViewModel,
-                        inkPreview = settingsInkPreview,
-                        onBack = { animateTo(settingsLayer) },
-                    )
-                    null -> {}
+                SettingsPaper {
+                    when (settingsDetail) {
+                        SettingsDetail.RECITERS -> RecitersSheet(
+                            viewModel = settingsViewModel,
+                            onBack = { animateTo(settingsLayer) },
+                        )
+                        SettingsDetail.CUSTOMIZE -> CustomizeSheet(
+                            viewModel = settingsViewModel,
+                            inkPreview = settingsInkPreview,
+                            // Back keeps the page where it is: the leaf you turned
+                            // back from stays under your thumb, so swiping forward
+                            // from Settings re-opens exactly that sheet.
+                            onBack = { animateTo(settingsLayer) },
+                        )
+                        SettingsDetail.DOWNLOADS -> DownloadsSheet(
+                            viewModel = settingsViewModel,
+                            onBack = { animateTo(settingsLayer) },
+                        )
+                        SettingsDetail.COMPONENT_KIT -> ComponentKitScreen(
+                            viewModel = settingsViewModel,
+                            inkPreview = settingsInkPreview,
+                            onBack = { animateTo(settingsLayer) },
+                        )
+                        null -> {}
+                    }
                 }
             }
         }
