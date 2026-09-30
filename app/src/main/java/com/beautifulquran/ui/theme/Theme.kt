@@ -330,6 +330,92 @@ private val RoyalInkLadder = QuranInk(
     wash = RoyalInkMuted.copy(alpha = 0.212f),
 )
 
+// ---------------------------------------------------------------------------
+// The Settings sheet — its own stock of paper.
+//
+// Every sheet in the stack used to be cut from one paper, so mid-turn nothing
+// said whether the page arriving was Settings or a chapter. Settings and the
+// pages behind it are now a second stock one step off the reading paper: a
+// shade deeper on cream, a shade lighter on the two dark sheets, which is the
+// direction a sheet lying on top of the stack goes in each.
+//
+// A rung is a weight against the sheet it sits on, so the ladder is solved
+// again for this paper — the reading ladder on it comes out about five points
+// light at the bottom of the cream theme, which is the quiet rung going under
+// the floor where type stays readable. `ColorSystemTest` holds these the same
+// way it holds the reading ladders.
+// ---------------------------------------------------------------------------
+
+private val PaperSettings = PaperSurfaceHigh
+private val NightSettings = NightSurfaceHigh
+private val RoyalGreenSettings = RoyalGreenSurface
+
+private val LightSettingsInk = QuranInk(
+    scripture = Ink,
+    strong = Ink.copy(alpha = 0.979f),
+    body = Ink.copy(alpha = 0.810f),
+    secondary = Ink.copy(alpha = 0.708f),
+    tertiary = InkMuted.copy(alpha = 0.959f),
+    muted = InkMuted.copy(alpha = 0.791f),
+    quiet = InkMuted.copy(alpha = 0.677f),
+    furniture = InkMuted.copy(alpha = 0.493f),
+    hairline = InkMuted.copy(alpha = 0.308f),
+    wash = InkMuted.copy(alpha = 0.140f),
+)
+
+private val NightSettingsInk = QuranInk(
+    scripture = NightInk,
+    strong = NightInk.copy(alpha = 0.967f),
+    body = NightInk.copy(alpha = 0.889f),
+    secondary = NightInk.copy(alpha = 0.826f),
+    tertiary = NightInkMuted.copy(alpha = 0.920f),
+    muted = NightInkMuted.copy(alpha = 0.814f),
+    quiet = NightInkMuted.copy(alpha = 0.732f),
+    furniture = NightInkMuted.copy(alpha = 0.591f),
+    hairline = NightInkMuted.copy(alpha = 0.418f),
+    wash = NightInkMuted.copy(alpha = 0.230f),
+)
+
+private val RoyalSettingsInk = QuranInk(
+    scripture = RoyalInk,
+    strong = RoyalInk.copy(alpha = 0.967f),
+    body = RoyalInk.copy(alpha = 0.885f),
+    secondary = RoyalInk.copy(alpha = 0.822f),
+    tertiary = RoyalInkMuted.copy(alpha = 0.924f),
+    muted = RoyalInkMuted.copy(alpha = 0.810f),
+    quiet = RoyalInkMuted.copy(alpha = 0.728f),
+    furniture = RoyalInkMuted.copy(alpha = 0.575f),
+    hairline = RoyalInkMuted.copy(alpha = 0.395f),
+    wash = RoyalInkMuted.copy(alpha = 0.199f),
+)
+
+/** A sheet of the stack that is not the reading paper: its stock, and the ink ladder solved on it. */
+@androidx.compose.runtime.Immutable
+class QuranSheet(val paper: Color, val ink: QuranInk)
+
+private val LightSettingsSheet = QuranSheet(PaperSettings, LightSettingsInk)
+private val NightSettingsSheet = QuranSheet(NightSettings, NightSettingsInk)
+private val RoyalSettingsSheet = QuranSheet(RoyalGreenSettings, RoyalSettingsInk)
+
+val LocalSettingsSheet = staticCompositionLocalOf { LightSettingsSheet }
+
+/**
+ * Sets [content] on the Settings stock: `colorScheme.background` becomes that
+ * paper, so every fade and dissolve that takes the sheet's colour follows it,
+ * and the ink ladder is the one solved against it.
+ */
+@Composable
+fun SettingsPaper(content: @Composable () -> Unit) {
+    val sheet = LocalSettingsSheet.current
+    androidx.compose.runtime.CompositionLocalProvider(LocalQuranInk provides sheet.ink) {
+        MaterialTheme(
+            colorScheme = MaterialTheme.colorScheme.copy(background = sheet.paper),
+            typography = MaterialTheme.typography,
+            content = content,
+        )
+    }
+}
+
 private val LightAccents = QuranAccents(
     gold = Color(0xFFA8831D),
     goldInk = Color(0xFF9F7B0B),
@@ -501,6 +587,12 @@ private fun legacyAccents(green: Color, glint: Color?) = QuranAccents(
 private val LegacyLightAccents = legacyAccents(DeepGreen, null)
 private val LegacyDarkAccents = legacyAccents(LegacySoftGreen, Color(0xFFF8E9BE))
 
+/** The old system never solved a rung against a sheet, so its Settings stock
+ * carries the same unsolved ladder as its reading paper. */
+private val LegacyDarkSettingsSheet = QuranSheet(LegacyNightSurfaceHigh, LegacyDarkInk)
+private val LegacyRoyalSettingsSheet = QuranSheet(RoyalGreenSettings, LegacyDarkInk)
+private val LegacyLightSettingsSheet = QuranSheet(PaperSettings, LegacyLightInk)
+
 /** Which colour system the surrounding content is painted in. */
 val LocalColorSystem = staticCompositionLocalOf { ColorSystem.LADDER }
 
@@ -628,9 +720,16 @@ fun BeautifulQuranTheme(
         ThemeMode.DARK -> DarkColors
         ThemeMode.ROYAL_GREEN -> RoyalGreenColors
     }
+    val night = themeMode == ThemeMode.DARK || (themeMode == ThemeMode.SYSTEM && systemDark)
+    val settingsSheet = when {
+        themeMode == ThemeMode.ROYAL_GREEN -> if (legacy) LegacyRoyalSettingsSheet else RoyalSettingsSheet
+        night -> if (legacy) LegacyDarkSettingsSheet else NightSettingsSheet
+        else -> if (legacy) LegacyLightSettingsSheet else LightSettingsSheet
+    }
     androidx.compose.runtime.CompositionLocalProvider(
         LocalQuranAccents provides accents,
         LocalQuranInk provides ink,
+        LocalSettingsSheet provides settingsSheet,
         LocalColorSystem provides colorSystem,
     ) {
         MaterialTheme(
@@ -663,3 +762,12 @@ internal fun quranThemeParts(
     ThemeMode.DARK -> Triple(DarkColors, NightInkLadder, DarkAccents)
     ThemeMode.ROYAL_GREEN -> Triple(RoyalGreenColors, RoyalInkLadder, RoyalGreenAccents)
 }
+
+/** The Settings stock for each theme, for `ColorSystemTest`. */
+internal fun settingsSheetFor(themeMode: ThemeMode, systemDark: Boolean = false): QuranSheet =
+    when (themeMode) {
+        ThemeMode.SYSTEM -> if (systemDark) NightSettingsSheet else LightSettingsSheet
+        ThemeMode.LIGHT -> LightSettingsSheet
+        ThemeMode.DARK -> NightSettingsSheet
+        ThemeMode.ROYAL_GREEN -> RoyalSettingsSheet
+    }
