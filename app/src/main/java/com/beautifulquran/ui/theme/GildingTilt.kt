@@ -12,6 +12,8 @@ import android.os.PowerManager
 import android.provider.Settings
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.State
 import androidx.compose.runtime.mutableFloatStateOf
@@ -22,7 +24,10 @@ import androidx.core.content.ContextCompat
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
+import kotlinx.coroutines.flow.collectLatest
+import androidx.compose.runtime.withFrameNanos
 import kotlin.math.abs
+import kotlin.math.exp
 
 /**
  * How the phone is held, as the gilding's `sheen` (0..1, the lighting axis
@@ -40,26 +45,41 @@ const val GILDING_REST = 0.5f
 /** Roll, in g's (sin of the angle), that carries the sheen its whole way: ~25°. */
 private const val ROLL_FULL_SCALE = 0.42f
 
-/** Sampling while the phone is being moved: 5 Hz, the slowest the platform names. */
-private const val MOVING_PERIOD_US = 200_000
+/**
+ * Sampling while the phone is being moved: 10 Hz. The eye never sees these
+ * samples — the light glides between them (see [GLIDE_SECONDS]) — so the sensor
+ * can be slow and the motion still smooth.
+ */
+private const val MOVING_PERIOD_US = 100_000
 
 /** Sampling once it has been still for [STILL_AFTER_SAMPLES]: 1 Hz, just enough to notice a pick-up. */
 private const val STILL_PERIOD_US = 1_000_000
 
-/** Consecutive samples with no real change before the sensor drops to [STILL_PERIOD_US]. */
-private const val STILL_AFTER_SAMPLES = 8
+/** Consecutive samples with no real change (1.5 s) before the sensor drops to [STILL_PERIOD_US]. */
+private const val STILL_AFTER_SAMPLES = 15
 
 /** A jump this large (of the 0..1 sheen) at the slow rate means the phone is moving again. */
 private const val MOVING_STEP = 0.02f
 
-/** Share of the remaining distance covered per sample — at 5 Hz, ~0.4 s to settle. */
+/** Share of the remaining distance covered per sample: takes the tremor out of a hand. */
 private const val SMOOTHING = 0.5f
+
+/**
+ * Time constant of the glide toward the latest sample. The displayed sheen
+ * closes on it exponentially, one frame at a time, and only while it is not
+ * there yet — so the light moves at display rate however slowly the sensor
+ * reports, and a settled or still phone draws no frames at all.
+ */
+private const val GLIDE_SECONDS = 0.14f
 
 /**
  * A change smaller than this is not worth redrawing every gilded figure for:
  * a phone lying still (or held steadily) writes nothing at all.
  */
 private const val MIN_STEP = 0.005f
+
+/** Close enough to the aim to stop drawing frames for it. */
+private const val ARRIVED = 0.001f
 
 /** The sheen for a phone rolled so that gravity reads [rollG] g's across its width. */
 internal fun sheenForRoll(rollG: Float): Float =
@@ -77,6 +97,9 @@ private object RestingTilt : State<Float> {
 @Stable
 class GildingTilt internal constructor() : State<Float> {
     private val sheen = mutableFloatStateOf(GILDING_REST)
+
+    /** Where the latest sample says the light should be; [sheen] glides to it. */
+    internal val aim = mutableFloatStateOf(GILDING_REST)
     internal var demand = 0
         private set
 
@@ -89,8 +112,24 @@ class GildingTilt internal constructor() : State<Float> {
 
     override val value: Float get() = sheen.floatValue
 
-    internal fun set(v: Float) {
-        if (abs(v - sheen.floatValue) >= MIN_STEP) sheen.floatValue = v
+    /** A sample: retarget the glide. Steps under [MIN_STEP] are not worth a frame. */
+    internal fun aimAt(v: Float) {
+        if (abs(v - aim.floatValue) >= MIN_STEP) aim.floatValue = v
+    }
+
+    /** The first sample after a pause: no glide across a gap nobody watched. */
+    internal fun snapTo(v: Float) {
+        aim.floatValue = v
+        sheen.floatValue = v
+    }
+
+    /** One frame of the glide, [dtSeconds] long. True when it has arrived. */
+    internal fun glide(dtSeconds: Float): Boolean {
+        val target = aim.floatValue
+        val next = sheen.floatValue + (target - sheen.floatValue) * (1f - exp(-dtSeconds / GLIDE_SECONDS))
+        val arrived = abs(target - next) < ARRIVED
+        sheen.floatValue = if (arrived) target else next
+        return arrived
     }
 }
 
@@ -115,6 +154,16 @@ fun rememberGildingTilt(): State<Float> {
     val context = LocalContext.current
     val lifecycle = LocalLifecycleOwner.current.lifecycle
     val tilt = remember { GildingTilt() }
+    LaunchedEffect(tilt) {
+        snapshotFlow { tilt.aim.floatValue }.collectLatest {
+            var last = withFrameNanos { it }
+            do {
+                val now = withFrameNanos { it }
+                val arrived = tilt.glide((now - last) / 1_000_000_000f)
+                last = now
+            } while (!arrived)
+        }
+    }
     DisposableEffect(context, lifecycle, tilt) {
         val manager = context.getSystemService(SensorManager::class.java)
         val sensor = manager?.getDefaultSensor(Sensor.TYPE_ACCELEROMETER)
@@ -142,8 +191,8 @@ fun rememberGildingTilt(): State<Float> {
                 val target = sheenForRoll(event.values[0] / SensorManager.GRAVITY_EARTH)
                 val jump = abs(target - smoothed)
                 smoothed = if (seeded) smoothed + (target - smoothed) * SMOOTHING else target
+                if (seeded) tilt.aimAt(smoothed) else tilt.snapTo(smoothed)
                 seeded = true
-                tilt.set(smoothed)
                 // A held phone barely moves: back off to a slow watch, and come
                 // back up the moment it does.
                 if (jump < MIN_STEP) still++ else still = 0
@@ -164,7 +213,7 @@ fun rememberGildingTilt(): State<Float> {
             // Battery saver asks for no ambient motion; the gilding rests.
             val saving = powerManager?.isPowerSaveMode == true
             val shouldListen = started && tilt.demand > 0 && !saving
-            if (saving) tilt.set(GILDING_REST)
+            if (saving) tilt.aimAt(GILDING_REST)
             if (shouldListen == listening) return
             listening = shouldListen
             if (shouldListen) {
