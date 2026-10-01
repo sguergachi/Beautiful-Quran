@@ -4,6 +4,8 @@
 
 :root {
   --paper: #faf3e8;
+  /* The reading paper, for sheets that set their own --paper (Settings). */
+  --reading-paper: var(--paper);
   --paper-surface: #fffbf2;
   --paper-high: #f2e7d5;
   --ink: #1c1b18;
@@ -3303,7 +3305,8 @@ button.ayah-mark {
   overflow: hidden;
   border-radius: 3px;
   border: 0.5px solid rgb(from var(--gold) r g b / 0.28);
-  background: color-mix(in srgb, var(--paper-surface) 42%, transparent);
+  /* A piece of the reading sheet, not a wash that can match the Settings stock. */
+  background: var(--reading-paper);
   opacity: 0.74;
 }
 
