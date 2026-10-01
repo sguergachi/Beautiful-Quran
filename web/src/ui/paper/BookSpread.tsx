@@ -1,6 +1,7 @@
 import { useMemo } from 'react'
 import { GeneratedRosette } from '../theme/GeneratedOrnament'
 import { generateCoverOrnament } from '../theme/ornamentGenerator'
+import { setVersoLeafSlot } from './bookSpread'
 
 /**
  * The open book the desktop sheets lie on: binding boards, two pages with
@@ -38,6 +39,8 @@ export function BookSpread({ titlePage }: { titlePage: boolean }) {
           ) : null}
         </div>
       </div>
+      {/* Mushaf layout: the reader portals the facing leaf in here. */}
+      <div className="book-verso-leaf" ref={setVersoLeafSlot} />
       {/* The gutter's turn — above the sheets, so both pages curve into it. */}
       <div className="book-spine" aria-hidden="true" />
     </>

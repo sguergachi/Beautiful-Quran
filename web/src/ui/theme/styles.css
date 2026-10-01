@@ -2560,9 +2560,10 @@ button.ayah-mark {
   justify-content: space-between;
   gap: 0.35em;
   font-family: var(--font-arabic);
-  font-size: clamp(1.05rem, 4.2vw, 1.55rem);
+  font-size: calc(clamp(1.05rem, 4.2vw, 1.55rem) * var(--mushaf-fit, 1));
   line-height: 1;
   overflow: hidden;
+  white-space: nowrap;
 }
 
 .mushaf-word,
@@ -6339,7 +6340,7 @@ html[data-entrance='true'] body {
 
 /* Chapters is always beside the reader, so its way back is not needed. The
    same button closes in-chapter search, where it stays. */
-.app-shell[data-spread='true'] .reader-top[data-search='false'] > .back {
+.app-shell[data-spread='true']:not([data-leaves='true']) .reader-top[data-search='false'] > .back {
   visibility: hidden;
 }
 
@@ -6424,4 +6425,96 @@ html[data-entrance='true']:not([data-entrance-opening])
   margin: 3.5rem 0 0;
   font-style: italic;
   color: var(--ink-rung-quiet);
+}
+
+/* —— Spread, Mushaf layout: two facing leaves ——
+ * The recto leaf is the reader sheet's own; the verso leaf is portalled
+ * under the verso sheets, so Chapters, Bookmarks and Settings lie over it. */
+.book-verso-leaf {
+  display: none;
+}
+
+.app-shell[data-spread='true'] .book-verso-leaf {
+  display: block;
+  position: absolute;
+  top: var(--page-y);
+  bottom: var(--page-y);
+  left: var(--page-outer);
+  right: 50%;
+  z-index: 0;
+  transition: opacity 520ms ease;
+}
+
+.book-verso-leaf > .mushaf {
+  position: absolute;
+}
+
+/* Chapters is put away while both leaves are being read. */
+.app-shell[data-spread='true'][data-leaves='true'] .sheet[data-name='home'][data-active='false'] {
+  opacity: 0;
+  pointer-events: none;
+}
+
+html[data-entrance='true']:not([data-entrance-opening])
+  .app-shell[data-spread='true']
+  .book-verso-leaf {
+  opacity: 0;
+}
+
+/* A page is taller than a phone is wide: size the hand to the line pitch
+   the fifteen-line grid actually has, not to the window's width. */
+.app-shell[data-spread='true'] .mushaf-line {
+  font-size: calc(clamp(1.05rem, 3.1vh, 1.75rem) * var(--mushaf-fit, 1));
+}
+
+/* Clear of the transport's dissolve, so the recto's folio is not under it;
+   the verso takes the same foot and the two grids stay level. */
+.app-shell[data-spread='true'] .mushaf {
+  padding-bottom: 6.5rem;
+}
+
+/* Turning: a strip of each fore-edge. Pages run right to left, so the way
+   on is the left edge. The mark shows only under a pointer or on focus. */
+.mushaf-turn {
+  display: none;
+}
+
+.app-shell[data-spread='true'] .mushaf-turn {
+  display: grid;
+  place-items: center;
+  position: absolute;
+  top: 12%;
+  bottom: 12%;
+  width: 2.25rem;
+  z-index: 6;
+  font-family: var(--font-display);
+  font-size: 1.6rem;
+  color: var(--ink-rung-furniture);
+}
+
+.app-shell[data-spread='true'] .mushaf-turn span {
+  opacity: 0;
+  transition: opacity 180ms ease;
+}
+
+.app-shell[data-spread='true'] .mushaf-turn--back {
+  right: 0;
+}
+
+.app-shell[data-spread='true'] .mushaf-turn--forward {
+  left: 0;
+}
+
+.app-shell[data-spread='true'] .mushaf-turn:disabled {
+  visibility: hidden;
+}
+
+.app-shell[data-spread='true'] .mushaf-turn:focus-visible span {
+  opacity: 1;
+}
+
+@media (hover: hover) {
+  .app-shell[data-spread='true'] .mushaf-turn:hover span {
+    opacity: 1;
+  }
 }

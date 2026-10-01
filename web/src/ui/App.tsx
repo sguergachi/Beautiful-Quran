@@ -73,7 +73,10 @@ export function App() {
   const stack = state.stackLayer
   const hasReader = hasReaderOpen(state.content, state.sheet)
   const spread = useBookSpread()
-  const pageLayers = spreadLayers(spread, stack, state.content != null)
+  // Facing leaves: Mushaf layout in a spread, once a chapter is open.
+  const leaves =
+    spread && state.content != null && state.settings.readingLayout === 'mushaf'
+  const pageLayers = spreadLayers(spread, stack, state.content != null, leaves)
 
   useEffect(() => {
     void appStore.init()
@@ -165,6 +168,7 @@ export function App() {
       data-stack={stack}
       data-has-reader={hasReader}
       data-spread={spread ? 'true' : undefined}
+      data-leaves={leaves ? 'true' : undefined}
       data-booting={showStack ? undefined : 'true'}
       onPointerDown={beginBookmarkSwipe}
       onPointerUp={finishBookmarkSwipe}

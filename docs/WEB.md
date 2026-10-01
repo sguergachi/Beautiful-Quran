@@ -370,7 +370,13 @@ each page the layer it should believe it is on (`spreadLayers`), so the reader
 stays live — focus follow, keys, rail — while Chapters is also on top; the
 store's real stack layer is untouched. `BookSpread` draws the boards, page
 block and title page under the sheets; all geometry is CSS keyed on
-`data-spread`. Below that size nothing changes. Rationale in
+`data-spread`. In Mushaf layout the spread shows two facing leaves
+(`mushafFacingPages`): `MushafReader` draws the recto and portals the verso
+into `BookSpread`'s slot, sized to the recto's own box; Chapters keeps its
+real layer and covers the verso only at layer 0 (`data-leaves`). Hafs stands
+in for the page faces, so each leaf measures its lines and scales the type
+until the longest fits (`--mushaf-fit`), on phones too.
+Below that size nothing changes. Rationale in
 `docs/DESIGN.md` ("On a desktop browser the sheets lie open as a book").
 
 1. **Home** — surah list, Quran-wide word search (sectioned by surah with
