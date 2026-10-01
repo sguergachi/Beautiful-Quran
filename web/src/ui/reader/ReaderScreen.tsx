@@ -31,8 +31,8 @@ import {
   IconRepeat,
   IconRepeatOne,
   IconSearch,
+  IconTune,
 } from '../icons/PlaybackIcons'
-import { SettingsNuqtaButton } from '../theme/SettingsNuqtaButton'
 import { AyahSelectorRail, type AyahSelectorRailHandle } from './AyahSelectorRail'
 import { AyahRailTip } from './AyahRailTip'
 import { BookmarkNoteTip } from './BookmarkNoteTip'
@@ -1404,11 +1404,15 @@ export function ReaderScreen({ stackLayer }: { stackLayer: StackLayer }) {
             >
               <IconSearch />
             </button>
-            <SettingsNuqtaButton
-              className="icon-btn"
+            <button
+              type="button"
+              className="settings-button icon-btn"
+              aria-label="Open settings"
               disabled={recitingActive}
-              onActivate={() => appStore.setSheet('settings')}
-            />
+              onClick={() => appStore.setSheet('settings')}
+            >
+              <IconTune />
+            </button>
           </div>
         )}
       </div>

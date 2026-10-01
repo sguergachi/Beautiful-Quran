@@ -727,6 +727,15 @@ Two themes, both "paper":
 Gold never marks interaction; green never decorates. Green may identify the
 reader's current place because that mark is wayfinding, not ornament.
 
+**Settings is its own stock of paper.** Settings and the pages behind it
+(Customize, Reciters, Downloads) sit one step off the reading paper — deeper
+on cream (`#F2E7D5`), lifted on the dark sheets (`#1E1C18` Nightfall,
+`#0A382E` Royal green) — so a page turn shows which sheet is arriving without
+any ink moving to announce it. The step is the whole signal: no motion rides
+the swipe for wayfinding. The ink ladder is solved again for that stock
+(`SettingsPaper` in `Theme.kt`, `.sheet[data-name='settings']` on web), since
+a rung is a weight against the sheet it sits on; `ColorSystemTest` holds both.
+
 **Ruby** `#B3122F` (paper) / `#D64358` (nightfall + royal green) is the one
 deliberate third hue, and it belongs to saved-verse ink: the
 [bookmark ribbon](#bookmark-ribbon) and recolored bars on the ayah selector
