@@ -6,6 +6,12 @@
  */
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { BOOK_SPREAD_QUERY } from '../paper/bookSpread'
+import {
+  BOOK_OPEN_SCHEDULE,
+  COVER_OPEN_SCHEDULE,
+  playFlip,
+  warmPageTurnSounds,
+} from '../paper/pageTurnSounds'
 import { animate, type AnimationPlaybackControls } from 'motion'
 import { washMaskImage } from '../theme/Fade'
 import { coverLayout, coverLayoutCssVars } from './coverLayout'
@@ -205,6 +211,11 @@ export function EntranceCover({
     momentAcRef.current?.abort()
   }, [canOpen, phase])
 
+  // Stems decode while the cover is up, so the open can sound on its beat.
+  useEffect(() => {
+    warmPageTurnSounds()
+  }, [])
+
   useEffect(() => {
     const prevTheme = document.querySelector('meta[name="theme-color"]')?.getAttribute('content')
     const meta = document.querySelector('meta[name="theme-color"]')
@@ -220,6 +231,11 @@ export function EntranceCover({
   useEffect(() => {
     if (!opening) return
     document.documentElement.dataset.entranceOpening = 'true'
+    if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      playFlip(
+        window.matchMedia(BOOK_SPREAD_QUERY).matches ? BOOK_OPEN_SCHEDULE : COVER_OPEN_SCHEDULE,
+      )
+    }
     return () => {
       document.documentElement.removeAttribute('data-entrance-opening')
     }

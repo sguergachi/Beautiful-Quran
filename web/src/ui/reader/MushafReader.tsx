@@ -24,6 +24,7 @@ import { appStore } from '../../store/appStore'
 import { useBookSpread, useTurningLeafSlot, useVersoLeafSlot } from '../paper/bookSpread'
 import { COVER_LAYER, READER_LAYER } from '../paper/stack'
 import { TurningLeaf } from './TurningLeaf'
+import { PAGE_TURN_SCHEDULE, playFlip, warmPageTurnSounds } from '../paper/pageTurnSounds'
 
 /** Keep in step with `mushaf-leaf-turn` in styles.css. */
 const PAGE_TURN_MS = 760
@@ -87,6 +88,10 @@ export function MushafReader({
     const key = side ?? 'recto'
     setFits((current) => (Math.abs(current[key] - fit) < 0.002 ? current : { ...current, [key]: fit }))
   }
+
+  useEffect(() => {
+    warmPageTurnSounds()
+  }, [])
 
   useEffect(() => {
     if (!runtimeMushafCache) return
@@ -169,6 +174,7 @@ export function MushafReader({
       setSettled(place)
       return
     }
+    playFlip(PAGE_TURN_SCHEDULE)
     // A hidden tab never fires animationend; do not leave a leaf in the air.
     const timer = window.setTimeout(() => setSettled(place), PAGE_TURN_MS + 250)
     return () => window.clearTimeout(timer)
@@ -329,7 +335,9 @@ function MushafLeaf({
   // than the measure. Measure at full size and report the scale that fits.
   useLayoutEffect(() => {
     const lines = linesRef.current
-    if (!lines) return
+    // A leaf in the air is a picture at the size already found. Measuring
+    // every copy of it forces a layout per strip as the turn starts.
+    if (!lines || onFit === noFit) return
     const measure = () => {
       const applied = lines.style.getPropertyValue('--mushaf-fit')
       lines.style.setProperty('--mushaf-fit', '1')

@@ -386,7 +386,11 @@ turns inside the reader sheet). The leaf (`TurningLeaf`) is a chain of nine
 strips, each hinged on the one before and bending a few degrees at its joint,
 so the page furls; every strip windows its own slice of the page. `EntranceCover` wraps its tooling in
 `.entrance-front` and adds `.entrance-inside`, so the spread's cover swings a
-full 180° (`BOOK_OPEN_MS`). Paper grain is one static `.app-shell::after`
+full 180° (`BOOK_OPEN_MS`). Turns are heard as well: `ui/paper/pageTurnSounds.ts` puts Android's
+three flip stems (lift, sweep, drop — `web/public/sounds`, MP3 transcodes of
+`app/src/main/res/raw/flip*.ogg`) on the Web Audio clock at the moments the
+turn and the cover reach those phases. A turn the browser will not yet let
+sound (no gesture so far) is silent, never late. Paper grain is one static `.app-shell::after`
 layer, light theme only, plain alpha with no blend mode.
 Below that size nothing changes. Rationale in
 `docs/DESIGN.md` ("On a desktop browser the sheets lie open as a book").
