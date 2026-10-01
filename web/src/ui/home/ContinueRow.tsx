@@ -22,7 +22,7 @@ export function ContinueRow({
         onPointerEnter={onPrepare}
         onPointerDown={onPrepare}
         onFocus={onPrepare}
-        onClick={() => appStore.openSurah(surahId, ayah || 1)}
+        onClick={() => appStore.openReading(surahId, ayah || 1)}
       >
         <span className="continue-copy">
           <span className="continue-label">Continue listening</span>

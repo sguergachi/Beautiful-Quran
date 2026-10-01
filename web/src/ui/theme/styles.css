@@ -735,8 +735,9 @@ select {
 }
 
 .home-header {
-  --home-header-top: max(clamp(1rem, 2.5vh, 2rem), env(safe-area-inset-top, 0px));
-  padding: clamp(1rem, 2.5vh, 2rem) var(--home-end-inset) 0.5rem
+  /* Android: 38dp above the masthead, 24dp between it and the search field. */
+  --home-header-top: max(38px, env(safe-area-inset-top, 0px));
+  padding: 38px var(--home-end-inset) 20px
     var(--home-start-inset);
   padding-top: var(--home-header-top);
   display: flex;
@@ -776,9 +777,11 @@ select {
 .home-header h1 {
   font-family: var(--font-display);
   font-weight: 600;
-  font-size: clamp(1.75rem, 5vw, 2.15rem);
+  /* Android Home masthead: 34sp on a 40sp line, 0.2sp tracking. */
+  font-size: 34px;
+  line-height: 40px;
   margin: 0;
-  letter-spacing: 0.01em;
+  letter-spacing: 0.2px;
   display: flex;
   align-items: center;
   flex-wrap: wrap;
@@ -1178,9 +1181,11 @@ select {
 }
 
 .surah-num {
+  font-weight: 500;
+  letter-spacing: 0.6px;
   font-variant-numeric: oldstyle-nums;
   color: var(--gold-ink);
-  font-size: 0.95rem;
+  font-size: 13px;
 }
 
 .surah-names {
@@ -1192,11 +1197,17 @@ select {
 
 .surah-names .en {
   font-size: 17px;
+  line-height: 23px;
+  font-weight: 500;
+  letter-spacing: 0.15px;
 }
 
 .surah-names .meta {
-  color: var(--ink-rung-muted);
+  color: var(--ink-rung-quiet);
   font-size: 13px;
+  line-height: 17px;
+  font-weight: 500;
+  letter-spacing: 0.6px;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -1205,7 +1216,11 @@ select {
 .surah-ar {
   font-family: var(--font-arabic);
   font-size: 24px;
-  line-height: 1.6;
+  /* Tight box: at 1.6 the Arabic line set the row's height (83px against
+     Android's 72dp). The glyphs overhang the box; nothing clips them. */
+  line-height: 1.2;
+  /* Android HomeScreen: the Arabic name is the row's one green. */
+  color: var(--green-ink);
   direction: rtl;
 }
 
@@ -1311,10 +1326,11 @@ select {
 
 .reader-top .back {
   color: var(--ink-rung-secondary);
-  font-size: 1.25rem;
+  /* The arrow glyph at the size of Android's 24dp back icon. */
+  font-size: 26px;
   line-height: 1;
   padding: 0.55rem 0.1rem;
-  min-height: 44px;
+  min-height: 48px;
   min-width: 44px;
   display: inline-flex;
   align-items: center;
@@ -1341,9 +1357,10 @@ select {
 
 .reader-top .icon-btn {
   color: var(--ink-rung-quiet);
-  min-width: 44px;
-  min-height: 44px;
-  padding: 0.45rem;
+  /* Android IconButton: 48dp target around a 24dp glyph. */
+  min-width: 48px;
+  min-height: 48px;
+  padding: 0;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -1352,8 +1369,8 @@ select {
 
 .reader-top .icon-btn svg {
   display: block;
-  width: 1.25rem;
-  height: 1.25rem;
+  width: 24px;
+  height: 24px;
 }
 
 .reader-top .settings-button svg {
@@ -1538,26 +1555,35 @@ select {
   opacity: 0.92;
 }
 
-.surah-header h2 {
-  font-family: var(--font-display);
-  font-weight: 600;
-  font-size: clamp(1.7rem, 5vw, 2.35rem);
-  margin: 0;
-  color: var(--ink-rung-strong);
-}
-
+/* Android chapter opening: the Arabic name leads at 32sp in the page's
+   ink, then transliteration · meaning (titleMedium), then the chapter line
+   (labelMedium) 4dp beneath. */
 .surah-header .ar-title {
   font-family: var(--font-arabic);
-  font-size: clamp(1.35rem, 4vw, 1.6rem);
-  margin: 0 0 4px;
+  font-size: 32px;
+  line-height: 1.6;
+  margin: 0;
   direction: rtl;
-  color: var(--green-ink);
+  color: var(--ink);
+}
+
+.surah-header h2 {
+  margin: 0;
+  font-family: var(--font-body);
+  font-weight: 500;
+  font-size: 17px;
+  line-height: 23px;
+  letter-spacing: 0.15px;
+  color: var(--ink-rung-tertiary);
 }
 
 .surah-header .sub {
-  color: var(--ink-rung-muted);
-  margin: 0;
-  font-size: 0.92rem;
+  color: var(--ink-rung-quiet);
+  margin: 4px 0 0;
+  font-size: 13px;
+  line-height: 17px;
+  font-weight: 500;
+  letter-spacing: 0.6px;
 }
 
 /* End-of-chapter invitation: invitation chrome around a real .surah-header
@@ -1705,7 +1731,7 @@ select {
   justify-content: center;
   padding: var(--basmalah-head) var(--scroll-margin) var(--basmalah-foot);
   /* Same verse size as .ayah-block, so the artwork can match its strokes. */
-  --word-arabic-size: calc(1.8rem * var(--font-scale, 1));
+  --word-arabic-size: calc(30px * var(--font-scale, 1));
 }
 
 .basmalah-block .basmalah,
@@ -1769,7 +1795,7 @@ select {
   position: relative;
   scroll-margin-top: 12vh;
   /* Shared with .word-arabic / .ayah-mark so the verse sign tracks glyph size. */
-  --word-arabic-size: calc(1.8rem * var(--font-scale, 1));
+  --word-arabic-size: calc(30px * var(--font-scale, 1));
   --word-arabic-line: 1.9;
 }
 
@@ -2441,9 +2467,13 @@ button.ayah-mark {
 }
 
 .hafs-ayah {
+  /* A <p>: without this its default 1em margins doubled the paper between
+     Arabic-only verses (Android: 16 + 24 + 16). */
+  margin: 0;
   font-family: var(--font-arabic);
-  font-size: calc(1.85rem * var(--font-scale, 1));
-  line-height: 2;
+  /* Android ResponsiveHafsAyah: the 30sp word size, multiplier 1.0. */
+  font-size: calc(30px * var(--font-scale, 1));
+  line-height: 1.9;
   direction: rtl;
   text-align: right;
 }
@@ -2533,6 +2563,43 @@ button.ayah-mark {
   touch-action: pan-y;
 }
 
+/* One measure: running head, text and folio all hang on the text block's
+   own margins. The block is drawn in to its widest line (--mushaf-measure),
+   so justifying never has to open rivers to reach a page that is too wide. */
+/* One measure. Hafs is not the page's own face and sets narrower than the
+   print, so justifying every line out to the page opens rivers between the
+   words. The text block is instead as wide as its widest line set with
+   minimum word spaces, and every other line justifies to that. Running head
+   and folio hang on the same block. */
+.mushaf-block {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  width: max-content;
+  min-width: 72%;
+  max-width: 100%;
+  margin-inline: auto;
+  justify-content: center;
+}
+
+/* Letter widening, the stand-in for the print's elongated letters: a loose
+   line is set a few percent wide before any space is added between its
+   words. The line is laid out narrower by the same factor and scaled back
+   out, so its word spaces are solved against the widened letters. */
+.mushaf-line[data-widen] {
+  width: calc(100% / var(--line-widen, 1));
+  transform: scaleX(var(--line-widen, 1));
+  transform-origin: right center;
+}
+
+/* A line too short to justify without rivers is centred at an ordinary
+   word space, as the print centres a chapter's last line. */
+.mushaf-line[data-short] {
+  justify-content: center;
+  gap: 0.42em;
+}
+
 .mushaf-head {
   display: flex;
   justify-content: space-between;
@@ -2553,7 +2620,17 @@ button.ayah-mark {
   display: grid;
   grid-template-rows: repeat(15, minmax(0, 1fr));
   min-height: 0;
-  margin-top: 1em;
+  margin-top: 0.6em;
+  /* The page's hand. --mushaf-fit is solved per leaf (MushafReader). */
+  font-size: calc(clamp(1.05rem, 4.2vw, 1.55rem) * var(--mushaf-fit, 1));
+  /* Leading follows the type: fifteen lines never spread further apart
+     than this, however tall the sheet. The block then sits centred. */
+  max-height: calc(15 * 2.15em);
+}
+
+.mushaf-head,
+.mushaf-folio {
+  flex: none;
 }
 
 .mushaf-line {
@@ -2562,9 +2639,9 @@ button.ayah-mark {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 0.35em;
+  /* The least a word space may be. Justification only ever adds to it. */
+  gap: 0.3em;
   font-family: var(--font-arabic);
-  font-size: calc(clamp(1.05rem, 4.2vw, 1.55rem) * var(--mushaf-fit, 1));
   line-height: 1;
   overflow: hidden;
   white-space: nowrap;
@@ -2595,7 +2672,6 @@ button.ayah-mark {
 .mushaf-mark {
   color: var(--gold);
   font-size: 0.72em;
-  margin-inline: 0.15em;
   background: none;
   border: 0;
   padding: 0;
@@ -2612,7 +2688,14 @@ button.ayah-mark {
 
 .mushaf-english {
   flex: 1;
+  min-height: 0;
   overflow: auto;
+  scrollbar-width: none;
+  /* A leaf's translation can run longer than the leaf; it scrolls, and the
+     ink dissolves at the foot rather than being cut through a line. */
+  -webkit-mask-image: linear-gradient(to bottom, #000 calc(100% - 2.2em), transparent);
+  mask-image: linear-gradient(to bottom, #000 calc(100% - 2.2em), transparent);
+  padding-bottom: 2.2em;
   margin-top: 1.2em;
   font-family: var(--font-body);
   font-size: 1.05rem;
@@ -2625,7 +2708,22 @@ button.ayah-mark {
 }
 
 .mushaf-english-text {
-  text-align: start;
+  cursor: pointer;
+  /* Prose leading, not the single-line leading the Arabic words take. */
+  line-height: inherit;
+}
+
+.mushaf-english-text:focus-visible {
+  outline: 1px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.mushaf-english-ayah .mushaf-mark {
+  white-space: nowrap;
+}
+
+.mushaf-english::-webkit-scrollbar {
+  display: none;
 }
 
 .mushaf-folio {
@@ -2701,9 +2799,11 @@ button.ayah-mark {
 }
 
 .player-bar .reciter-btn {
-  color: color-mix(in srgb, var(--ink-muted) 70%, transparent);
-  font-size: 0.82rem;
-  letter-spacing: 0.02em;
+  color: var(--ink-rung-quiet);
+  /* Android labelMedium. */
+  font-size: 13px;
+  font-weight: 500;
+  letter-spacing: 0.6px;
   padding: 0.2rem 1rem;
   min-height: 32px;
   max-width: min(100%, 22rem);
@@ -2719,6 +2819,25 @@ button.ayah-mark {
   }
 }
 
+/* The disclosure chevron after the name (Android: 16dp, 2dp off the text).
+   Equal space leads the name so the name itself stays on the centre line. */
+.player-bar .reciter-btn::after {
+  content: '›';
+  display: inline-block;
+  width: 16px;
+  margin-inline-start: 2px;
+  font-size: 16px;
+  line-height: 1;
+  text-align: center;
+  color: var(--green-ink);
+}
+
+.player-bar .reciter-btn::before {
+  content: '';
+  display: inline-block;
+  width: 18px;
+}
+
 .player-bar .reciter-btn[data-receded='true'] {
   opacity: 0.08;
   pointer-events: none;
@@ -2728,18 +2847,18 @@ button.ayah-mark {
   display: flex;
   align-items: center;
   justify-content: center;
-  flex-wrap: wrap;
-  gap: 0.35rem 0.65rem;
+  flex-wrap: nowrap;
+  /* Android PlayerBar: 48dp buttons, 12dp apart, a 56dp play. */
+  gap: 12px;
   width: 100%;
   max-width: 42rem;
 }
 
 .player-bar .ctrl {
-  font-size: 1.05rem;
   color: var(--ink-muted);
-  min-width: 44px;
-  min-height: 44px;
-  padding: 0.45rem 0.55rem;
+  width: 48px;
+  height: 48px;
+  padding: 0;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -2747,7 +2866,8 @@ button.ayah-mark {
 }
 
 .player-bar .ctrl.speed {
-  font-size: 0.95rem;
+  font-size: 15px;
+  font-weight: 500;
   font-variant-numeric: lining-nums;
   min-width: 48px;
 }
@@ -2756,6 +2876,22 @@ button.ayah-mark {
 .player-bar .play svg,
 .floating-play svg {
   display: block;
+}
+
+/* Material's 24dp glyph; repeat is drawn at 22dp, play at 34dp. */
+.player-bar .ctrl svg {
+  width: 24px;
+  height: 24px;
+}
+
+.player-bar .ctrl:first-child svg {
+  width: 22px;
+  height: 22px;
+}
+
+.player-bar .play svg {
+  width: 34px;
+  height: 34px;
 }
 
 @keyframes ink-spin {
@@ -2776,11 +2912,10 @@ button.ayah-mark {
 }
 
 .player-bar .play {
-  font-size: 1.35rem;
   color: var(--ink-muted);
-  min-width: 56px;
-  min-height: 48px;
-  padding: 0.45rem 0.7rem;
+  width: 56px;
+  height: 56px;
+  padding: 0;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -5096,9 +5231,10 @@ button.ayah-mark {
   /* The 44px desktop target extends 16px outside the sheet on phones, leaving
    * Android's deliberate 28px Home-edge target and the same 28px content lane. */
 
-  body {
-    font-size: 16px;
-  }
+  /* Type is not shrunk for phones: these are Android's sizes at 1px = 1dp,
+     and Android sets them on the same 360–412dp screens. An earlier block
+     here cut the Arabic to 26px, chapter names to 18px and the title to
+     26px, which is why the phone web read smaller than the app. */
 
   /*
    * Same drawing width as desktop. Mobile paints Android-style edge-flush
@@ -5111,45 +5247,25 @@ button.ayah-mark {
 
   .ayah-block {
     padding-inline: var(--scroll-margin);
-    --word-arabic-size: calc(1.65rem * var(--font-scale, 1));
-  }
-
-  .basmalah-block {
-    --word-arabic-size: calc(1.65rem * var(--font-scale, 1));
   }
 
   .page-break {
     padding-inline: var(--scroll-margin);
   }
 
-  .hafs-ayah {
-    font-size: calc(1.65rem * var(--font-scale, 1));
-  }
-
-  .player-bar {
-    gap: 0.05rem;
-  }
-
+  /* Android PlayerBar `compact`: 4dp between controls on a narrow screen. */
   .player-transport {
-    gap: 0.15rem 0.35rem;
+    gap: 4px;
   }
 
-  .player-bar .ctrl {
-    font-size: 0.85rem;
-    padding: 0.4rem 0.4rem;
+  /* Home hangs on Android's 28dp lane: the sheet's own padding comes off,
+     so the search field and the chapter rows start where the masthead does. */
+  .sheet[data-name='home'] .scroll {
+    padding-inline: 0;
   }
 
-  .surah-row {
-    grid-template-columns: 2rem minmax(0, 1fr) auto;
-    gap: 0.55rem 0.65rem;
-  }
-
-  .surah-ar {
-    font-size: 1.15rem;
-  }
-
-  .home-header h1 {
-    font-size: 1.65rem;
+  .home-scroll-page > .search-row {
+    padding-inline: var(--home-start-inset) var(--home-end-inset);
   }
 
   .reader-top-title {
@@ -6209,6 +6325,8 @@ html[data-entrance='true'] body {
   --book-board: #0a382e;
   --book-board-deep: #031c15;
   --book-gutter-shade: rgb(60 44 20 / 0.16);
+  --book-gutter-rgb: 60, 44, 20;
+  --book-gutter-alpha: 0.16;
   --book-edge-line: rgb(110 104 88 / 0.3);
 }
 
@@ -6217,6 +6335,8 @@ html[data-entrance='true'] body {
   --book-board: #1a1814;
   --book-board-deep: #100f0c;
   --book-gutter-shade: rgb(0 0 0 / 0.55);
+  --book-gutter-rgb: 0, 0, 0;
+  --book-gutter-alpha: 0.55;
   --book-edge-line: rgb(203 196 179 / 0.2);
 }
 
@@ -6225,6 +6345,8 @@ html[data-entrance='true'] body {
   --book-board: #0d4336;
   --book-board-deep: #072e25;
   --book-gutter-shade: rgb(0 0 0 / 0.32);
+  --book-gutter-rgb: 0, 0, 0;
+  --book-gutter-alpha: 0.32;
   --book-edge-line: rgb(208 202 184 / 0.2);
 }
 
@@ -6234,14 +6356,36 @@ html[data-entrance='true'] body {
 }
 
 .app-shell[data-spread='true'] {
-  --desk-pad: clamp(14px, 3.4vh, 44px);
-  --book-width: min(100% - 2 * clamp(20px, 3vw, 56px), 88rem);
-  --book-x: calc((100% - var(--book-width)) / 2);
   /* Binding board showing past the page block, then the block's own edge. */
   --book-rim: 8px;
   --book-fore-edge: 6px;
+  --desk-pad: clamp(14px, 3.4vh, 44px);
+  --desk-side: clamp(20px, 3vw, 56px);
+  /*
+   * Golden page. A page is 1 : φ, as tall as the window allows or as wide,
+   * whichever binds first. Its margins run inner : head : fore-edge : foot
+   * = 1 : φ : φ : φ² in one unit u — and for any u that leaves a text block
+   * that is itself 1 : φ, the page's own shape set inside it. u is the
+   * page's width over φ⁶ (block ≈ 85% of the page), opened further only
+   * when the foot would otherwise be too shallow to hold the transport.
+   */
+  --phi: 1.618034;
+  --page-w: min(
+    calc((100vw - 2 * var(--desk-side)) / 2 - var(--book-rim) - var(--book-fore-edge)),
+    calc((100vh - 2 * var(--desk-pad) - 2 * var(--book-rim)) / var(--phi))
+  );
+  --page-h: calc(var(--page-w) * var(--phi));
+  --transport-h: 5.6rem;
+  --grid-u: max(calc(var(--page-w) / 17.944), calc(var(--transport-h) / 2.618));
+  --margin-inner: var(--grid-u);
+  --margin-head: calc(var(--grid-u) * var(--phi));
+  --margin-fore: calc(var(--grid-u) * var(--phi));
+  --margin-foot: calc(var(--grid-u) * var(--phi) * var(--phi));
+  --book-width: calc(2 * (var(--page-w) + var(--book-rim) + var(--book-fore-edge)));
+  --book-x: calc((100% - var(--book-width)) / 2);
+  --desk-y: calc((100% - var(--page-h) - 2 * var(--book-rim)) / 2);
   --page-outer: calc(var(--book-x) + var(--book-rim) + var(--book-fore-edge));
-  --page-y: calc(var(--desk-pad) + var(--book-rim));
+  --page-y: calc(var(--desk-y) + var(--book-rim));
   --peek-step: 0px;
   background: var(--desk);
 }
@@ -6253,8 +6397,8 @@ html[data-entrance='true'] body {
 .app-shell[data-spread='true'] .book {
   display: block;
   position: absolute;
-  top: var(--desk-pad);
-  bottom: var(--desk-pad);
+  top: var(--desk-y);
+  bottom: var(--desk-y);
   left: var(--book-x);
   right: var(--book-x);
   z-index: 0;
@@ -6318,13 +6462,13 @@ html[data-entrance='true'] body {
   background: linear-gradient(
     to right,
     transparent 0%,
-    rgb(from var(--book-gutter-shade) r g b / calc(alpha * 0.07)) 20%,
-    rgb(from var(--book-gutter-shade) r g b / calc(alpha * 0.26)) 38%,
-    rgb(from var(--book-gutter-shade) r g b / calc(alpha * 0.72)) 47.5%,
+    rgba(var(--book-gutter-rgb), calc(var(--book-gutter-alpha) * 0.07)) 20%,
+    rgba(var(--book-gutter-rgb), calc(var(--book-gutter-alpha) * 0.26)) 38%,
+    rgba(var(--book-gutter-rgb), calc(var(--book-gutter-alpha) * 0.72)) 47.5%,
     var(--book-gutter-shade) 50%,
-    rgb(from var(--book-gutter-shade) r g b / calc(alpha * 0.72)) 52.5%,
-    rgb(from var(--book-gutter-shade) r g b / calc(alpha * 0.26)) 62%,
-    rgb(from var(--book-gutter-shade) r g b / calc(alpha * 0.07)) 80%,
+    rgba(var(--book-gutter-rgb), calc(var(--book-gutter-alpha) * 0.72)) 52.5%,
+    rgba(var(--book-gutter-rgb), calc(var(--book-gutter-alpha) * 0.26)) 62%,
+    rgba(var(--book-gutter-rgb), calc(var(--book-gutter-alpha) * 0.07)) 80%,
     transparent 100%
   );
   transition: opacity 520ms ease;
@@ -6362,7 +6506,9 @@ html[data-entrance='true'] body {
 /* A page is phone-narrow but carries the desktop rail, which stands in the
    margin rather than on the edge — so the text block gives it that margin. */
 .app-shell[data-spread='true'] .sheet[data-name='reader'] {
-  --reader-max: min(40rem, 100% - 5rem);
+  /* From the page, not a percentage: the column's children take this same
+     variable, and a percentage would be subtracted again at each level. */
+  --reader-max: min(40rem, calc(var(--page-w) - 3.5rem));
 }
 
 /* Reading continues on the recto while Settings is open beside it. */
@@ -6387,40 +6533,138 @@ html[data-entrance='true'] body {
 
 /* Closed book: the board alone, centred on the desk. Opening carries it to
    the recto first, so the hinge lands on the spine of the spread beneath. */
-.app-shell[data-spread='true'] .entrance-board {
-  top: var(--desk-pad);
-  bottom: var(--desk-pad);
+:is(.app-shell[data-spread='true'] .entrance-board:not([data-opening-mode='phone']), .entrance-board[data-opening-mode='spread']) {
+  top: var(--desk-y);
+  bottom: var(--desk-y);
   left: 50%;
   right: var(--book-x);
   border-radius: 3px 9px 9px 3px;
   transform: translateX(-50%);
 }
 
-.app-shell[data-spread='true'] .entrance-board--opening {
-  animation-name: entrance-book-open;
+:is(.app-shell[data-spread='true'] .entrance-board:not([data-opening-mode='phone']), .entrance-board[data-opening-mode='spread']) {
+  /* Two faces in real depth; the front clips its own tooling instead. */
+  overflow: visible;
+  backface-visibility: visible;
 }
 
+.entrance-board[data-opening-mode='spread'].entrance-board--opening {
+  /* Duration mirrors BOOK_OPEN_MS in EntranceCover. */
+  animation: entrance-book-open 1700ms linear forwards;
+}
+
+/* The closed book slides onto the right-hand page block, then the board
+   swings all the way over its spine and lies open on the left. Nothing
+   fades: the inside of the board is what the left half then is. */
 @keyframes entrance-book-open {
   0% {
-    transform: perspective(2200px) translateX(-50%) rotateY(0deg);
-    opacity: 1;
+    transform: perspective(2400px) translateX(-50%) rotateY(0deg);
+    animation-timing-function: cubic-bezier(0.45, 0, 0.3, 1);
   }
-  38% {
-    transform: perspective(2200px) translateX(0) rotateY(0deg);
-    opacity: 1;
+  30% {
+    transform: perspective(2400px) translateX(0) rotateY(0deg);
+    animation-timing-function: cubic-bezier(0.5, 0.03, 0.2, 1);
   }
-  72% {
+  100% {
+    transform: perspective(2400px) translateX(0) rotateY(-180deg);
+  }
+}
+
+.entrance-front {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  border-radius: inherit;
+  backface-visibility: hidden;
+}
+
+.entrance-inside {
+  display: none;
+}
+
+:is(.app-shell[data-spread='true'] .entrance-board:not([data-opening-mode='phone']), .entrance-board[data-opening-mode='spread']) .entrance-inside {
+  display: block;
+  position: absolute;
+  inset: 0;
+  transform: rotateY(180deg);
+  backface-visibility: hidden;
+  /* Seen from inside the corners swap: this is the book's left half. */
+  border-radius: 9px 0 0 9px;
+  background: linear-gradient(to bottom, var(--book-board), var(--book-board-deep));
+}
+
+.entrance-inside-page {
+  position: absolute;
+  top: var(--book-rim);
+  bottom: var(--book-rim);
+  left: calc(var(--book-rim) + var(--book-fore-edge));
+  right: 0;
+  background: var(--paper);
+}
+
+.entrance-inside-page::before {
+  content: '';
+  position: absolute;
+  top: 2px;
+  bottom: 2px;
+  right: 100%;
+  width: var(--book-fore-edge);
+  border-radius: 2px 0 0 2px;
+  background:
+    repeating-linear-gradient(to right, var(--book-edge-line) 0 1px, transparent 1px 2px),
+    var(--paper);
+}
+
+/* The board's inside comes out of its own shade as it lies flat. */
+.entrance-inside::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: linear-gradient(
+    to right,
+    rgba(var(--book-gutter-rgb), calc(var(--book-gutter-alpha) * 0.5)),
+    var(--book-gutter-shade)
+  );
+  opacity: 0;
+}
+
+.entrance-board--opening .entrance-inside::after {
+  animation: entrance-inside-light 1700ms linear forwards;
+}
+
+@keyframes entrance-inside-light {
+  0%,
+  60% {
     opacity: 1;
   }
   100% {
-    transform: perspective(2200px) translateX(0) rotateY(-95deg);
     opacity: 0;
   }
 }
 
+/* Closed: the board alone. */
 html[data-entrance='true']:not([data-entrance-opening])
   .app-shell[data-spread='true']
-  :is(.book, .book-spine, .sheet) {
+  :is(.book, .book-spine, .sheet, .book-verso-leaf) {
+  opacity: 0 !important;
+}
+
+/* Opening: only the page block the board is lifting off, and only once the
+   board has slid over it. The left half does not exist until the board
+   lands there; the ink on it settles in after. */
+html[data-entrance-opening] .app-shell[data-spread='true'] .book {
+  clip-path: inset(0 0 0 50%);
+  transition: opacity 60ms linear 480ms;
+}
+
+html[data-entrance-opening] .app-shell[data-spread='true'] .sheet[data-name='reader'] {
+  transition: opacity 60ms linear 480ms;
+}
+
+html[data-entrance-opening]
+  .app-shell[data-spread='true']
+  :is(.book-spine, .book-verso-leaf, .sheet:not([data-name='reader'])) {
   opacity: 0 !important;
 }
 
@@ -6491,16 +6735,45 @@ html[data-entrance='true']:not([data-entrance-opening])
   pointer-events: none;
 }
 
-html[data-entrance='true']:not([data-entrance-opening])
-  .app-shell[data-spread='true']
-  .book-verso-leaf {
-  opacity: 0;
+/* On the spread the hand starts from the page, not the window's width;
+   the fit then grows or shrinks it until the widest line fills the block. */
+.app-shell[data-spread='true'] .mushaf-lines {
+  font-size: calc(var(--page-w) / 24 * var(--mushaf-fit, 1));
+  max-height: none;
 }
 
-/* A page is taller than a phone is wide: size the hand to the line pitch
-   the fifteen-line grid actually has, not to the window's width. */
-.app-shell[data-spread='true'] .mushaf-line {
-  font-size: calc(clamp(1.05rem, 3.1vh, 1.75rem) * var(--mushaf-fit, 1));
+/* A leaf is the golden text block of its page: inner margin at the spine,
+   φ at head and fore-edge, φ² at the foot. Recto and verso mirror. The
+   !important beats the measured inline box the verso used to be given. */
+.app-shell[data-spread='true'] .mushaf[data-side],
+.app-shell[data-spread='true'] .mushaf-fit-probes > .mushaf {
+  position: absolute !important;
+  top: var(--margin-head) !important;
+  bottom: var(--margin-foot) !important;
+  left: var(--margin-inner) !important;
+  right: var(--margin-fore) !important;
+  width: auto !important;
+  height: auto !important;
+  padding: 0;
+}
+
+.app-shell[data-spread='true'] .mushaf[data-side='verso'] {
+  left: var(--margin-fore) !important;
+  right: var(--margin-inner) !important;
+}
+
+/* Nothing scrolls beneath the transport on a leaf, so it needs no paper of
+   its own — and its dissolve would lie across the recto's folio. It stands
+   in the foot margin, which the grid opens to hold it. */
+.app-shell[data-spread='true'][data-leaves='true'] .player-bar {
+  background: none;
+  padding-top: 0.4rem;
+}
+
+/* The recto leaf is placed against its page, not the reader's column. */
+.app-shell[data-spread='true'][data-leaves='true'] .sheet[data-name='reader'] :is(.reader-body, .reader-main) {
+  position: static;
+  max-width: none;
 }
 
 /* Facing leaves mirror: each carries the chapter's Latin name at its
@@ -6552,5 +6825,314 @@ html[data-entrance='true']:not([data-entrance-opening])
 @media (hover: hover) {
   .app-shell[data-spread='true'] .mushaf-turn:hover span {
     opacity: 1;
+  }
+}
+
+/* —— Page turn (Mushaf layout) ——
+ * A leaf lifts off one page, swings over its bound edge and lies down on
+ * the other. It is a picture of the two pages it carries; the real leaves
+ * beneath are already what the turn will leave behind. */
+.book-turn {
+  display: none;
+}
+
+.app-shell[data-spread='true'] .book-turn {
+  display: block;
+  position: absolute;
+  top: var(--page-y);
+  bottom: var(--page-y);
+  left: var(--page-outer);
+  right: var(--page-outer);
+  /* Over the sheets, under the gutter's shade. */
+  z-index: 24;
+  pointer-events: none;
+}
+
+.mushaf-flip {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  perspective: 2600px;
+  /* Spread: the leaf is one page wide, on the side it lifts from. */
+  --leaf-width: 50%;
+  --turn-ms: 760ms;
+}
+
+/* Pages run right to left. Going on, the left leaf swings to the right. */
+.mushaf-flip[data-dir='on'] {
+  --turn-from: 0deg;
+  --turn-to: 180deg;
+  --furl: 6.5deg;
+}
+
+.mushaf-flip[data-dir='back'] {
+  --turn-from: 0deg;
+  --turn-to: -180deg;
+  --furl: -6.5deg;
+}
+
+/* A single leaf is bound at its right edge and has nowhere to land: it
+   lifts until it is edge-on, or comes down from there. */
+.mushaf-flip--single {
+  perspective: 1700px;
+  --leaf-width: 100%;
+  --furl: 6deg;
+}
+
+.mushaf-flip--single[data-dir='on'] {
+  --turn-from: 0deg;
+  --turn-to: 96deg;
+}
+
+.mushaf-flip--single[data-dir='back'] {
+  --turn-from: 96deg;
+  --turn-to: 0deg;
+}
+
+/* A strip of the leaf. The first is bound to the page's edge and carries
+   the turn; each one after hangs on the strip before it and bends a little
+   at the joint, so the free edge lifts first and the sheet bows behind it. */
+.mushaf-flip-strip {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 100%;
+  transform-style: preserve-3d;
+  animation: mushaf-leaf-furl var(--turn-ms) ease-in-out both;
+}
+
+.mushaf-flip[data-hinge='right'] .mushaf-flip-strip {
+  right: 100%;
+  transform-origin: right center;
+}
+
+.mushaf-flip[data-hinge='left'] .mushaf-flip-strip {
+  left: 100%;
+  transform-origin: left center;
+}
+
+.mushaf-flip-strip[data-bound] {
+  width: calc(var(--leaf-width) / var(--strips));
+  /* The bound edge follows the hand: it starts late and settles last. */
+  animation: mushaf-leaf-turn var(--turn-ms) cubic-bezier(0.5, 0.02, 0.28, 1) both;
+}
+
+.mushaf-flip[data-hinge='right'] .mushaf-flip-strip[data-bound] {
+  right: calc(100% - var(--leaf-width));
+}
+
+.mushaf-flip--single[data-hinge='right'] .mushaf-flip-strip[data-bound] {
+  right: 0;
+}
+
+.mushaf-flip[data-hinge='left'] .mushaf-flip-strip[data-bound] {
+  left: var(--leaf-width);
+}
+
+.mushaf-flip--single[data-dir='back'] .mushaf-flip-strip:not([data-bound]) {
+  animation-direction: reverse;
+}
+
+@keyframes mushaf-leaf-turn {
+  from {
+    transform: rotateY(var(--turn-from));
+  }
+  to {
+    transform: rotateY(var(--turn-to));
+  }
+}
+
+/* Bend at one joint: quick into the curl as the edge is picked up, slow
+   out of it as the sheet is laid flat. */
+@keyframes mushaf-leaf-furl {
+  0% {
+    transform: rotateY(0deg);
+  }
+  34% {
+    transform: rotateY(var(--furl));
+  }
+  90%,
+  100% {
+    transform: rotateY(0deg);
+  }
+}
+
+.mushaf-flip--single .mushaf-flip-strip:not([data-bound]) {
+  animation-name: mushaf-leaf-furl-lift;
+}
+
+/* A leaf that leaves stays bowed until it is gone. */
+@keyframes mushaf-leaf-furl-lift {
+  0% {
+    transform: rotateY(0deg);
+  }
+  45%,
+  100% {
+    transform: rotateY(var(--furl));
+  }
+}
+
+.mushaf-flip-face {
+  position: absolute;
+  /* Over the joint by a pixel each side, so nothing shows between strips. */
+  inset: 0 -1px;
+  overflow: hidden;
+  background: var(--paper);
+  backface-visibility: hidden;
+}
+
+.mushaf-flip-face--back {
+  transform: rotateY(180deg);
+}
+
+/* The whole page, laid behind the strip's window at this strip's slice. */
+.mushaf-flip-page {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  /* Percentages here are of the widened face; undo its 2px so each strip's
+     slice still starts exactly where the last one ended. */
+  width: calc(var(--strips) * (100% - 2px));
+  margin-left: 1px;
+}
+
+.mushaf-flip--single .mushaf-flip-page {
+  display: flex;
+  flex-direction: column;
+}
+
+.mushaf-flip-page > .mushaf {
+  position: absolute;
+}
+
+.mushaf-flip--single .mushaf-flip-page > .mushaf {
+  position: static;
+}
+
+/* The leaf's own shading as it stands up out of the light — darkest toward
+   the bound edge, and one gradient across the whole page so the strips read
+   as a single bowed sheet. Paper turning, not a shadow cast beneath. */
+.mushaf-flip-page::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    to right,
+    rgba(var(--book-gutter-rgb), calc(var(--book-gutter-alpha) * 0.3)),
+    var(--book-gutter-shade)
+  );
+  animation: mushaf-leaf-shade var(--turn-ms) ease-in-out both;
+}
+
+/* Bound on the left (or seen from behind a right-bound leaf): the dark end
+   of that gradient belongs at the other side. */
+.mushaf-flip[data-hinge='left'] .mushaf-flip-face:not(.mushaf-flip-face--back) .mushaf-flip-page::after,
+.mushaf-flip[data-hinge='right'] .mushaf-flip-face--back .mushaf-flip-page::after {
+  transform: scaleX(-1);
+}
+
+.mushaf-flip--single .mushaf-flip-page::after {
+  animation-name: mushaf-leaf-shade-lift;
+}
+
+.mushaf-flip--single[data-dir='back'] .mushaf-flip-page::after {
+  animation-direction: reverse;
+}
+
+@keyframes mushaf-leaf-shade {
+  0%,
+  100% {
+    opacity: 0;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+@keyframes mushaf-leaf-shade-lift {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mushaf-flip {
+    display: none;
+  }
+}
+
+/* —— Paper tooth (Paper theme) ——
+ * The light theme is the one that is literally paper, so it alone carries
+ * grain: fine tooth plus a few long fibres, as specks of warm ink at a few
+ * percent. One static layer over the whole shell with ordinary alpha — no
+ * blend mode, nothing that repaints as the sheets scroll beneath it. */
+:root:not([data-theme]) .app-shell::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  /* Over everything, the cover's board included: one material, one grain. */
+  z-index: 45;
+  pointer-events: none;
+  background-image:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='260' height='260'%3E%3Cfilter id='t' x='0' y='0' width='100%25' height='100%25'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='3' seed='7' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0.36 0 0 0 0 0.27 0 0 0 0 0.14 0 0 0 0.5 -0.17'/%3E%3C/filter%3E%3Crect width='260' height='260' filter='url(%23t)'/%3E%3C/svg%3E"),
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='520' height='520'%3E%3Cfilter id='f' x='0' y='0' width='100%25' height='100%25'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.02 0.09' numOctaves='2' seed='11' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0.36 0 0 0 0 0.27 0 0 0 0 0.14 0 0 0 0.24 -0.1'/%3E%3C/filter%3E%3Crect width='520' height='520' filter='url(%23f)'/%3E%3C/svg%3E");
+  background-size: 260px 260px, 520px 520px;
+  opacity: 0.3;
+}
+
+/* Fit the incoming leaves at the reader's exact measure before lifting. */
+.mushaf-fit-probes {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  visibility: hidden;
+  pointer-events: none;
+}
+
+.mushaf-fit-probes > .mushaf {
+  position: absolute;
+  inset: 0;
+}
+
+@supports (color: rgb(from white r g b)) {
+  .app-shell[data-spread='true'] .book-spine {
+    background: linear-gradient(
+      to right,
+      transparent 0%,
+      rgb(from var(--book-gutter-shade) r g b / calc(alpha * 0.07)) 20%,
+      rgb(from var(--book-gutter-shade) r g b / calc(alpha * 0.26)) 38%,
+      rgb(from var(--book-gutter-shade) r g b / calc(alpha * 0.72)) 47.5%,
+      var(--book-gutter-shade) 50%,
+      rgb(from var(--book-gutter-shade) r g b / calc(alpha * 0.72)) 52.5%,
+      rgb(from var(--book-gutter-shade) r g b / calc(alpha * 0.26)) 62%,
+      rgb(from var(--book-gutter-shade) r g b / calc(alpha * 0.07)) 80%,
+      transparent 100%
+    );
+  }
+
+  .entrance-inside::after {
+    background: linear-gradient(
+      to right,
+      rgb(from var(--book-gutter-shade) r g b / calc(alpha * 0.5)),
+      var(--book-gutter-shade)
+    );
+  }
+
+  .mushaf-flip-page::after {
+    background: linear-gradient(
+      to right,
+      rgb(from var(--book-gutter-shade) r g b / calc(alpha * 0.3)),
+      var(--book-gutter-shade)
+    );
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .entrance-board[data-opening-mode].entrance-board--opening {
+    animation: none;
+    opacity: 0;
   }
 }

@@ -52,7 +52,8 @@ function shouldCacheAsset(url) {
     url.pathname.endsWith('.svg') ||
     url.pathname.endsWith('.json') ||
     url.pathname.endsWith('.webmanifest') ||
-    url.pathname.endsWith('.png')
+    url.pathname.endsWith('.png') ||
+    url.pathname.endsWith('.mp3')
   )
 }
 

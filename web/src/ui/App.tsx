@@ -6,10 +6,11 @@ import { BookmarksScreen } from './bookmarks/BookmarksScreen'
 import { ReaderScreen } from './reader/ReaderScreen'
 import { SettingsScreen } from './settings/SettingsScreen'
 import { EntranceCover } from './entrance/EntranceCover'
-import { BOOKMARKS_LAYER, COVER_LAYER } from './paper/stack'
+import { BOOKMARKS_LAYER, COVER_LAYER, READER_LAYER, type StackLayer } from './paper/stack'
 import { OrnamentsLab } from './lab/OrnamentsLab'
-import { spreadLayers, useBookSpread } from './paper/bookSpread'
+import { bookmarkSwipeDestination, spreadLayers, useBookSpread } from './paper/bookSpread'
 import { BookSpread } from './paper/BookSpread'
+import { unlockPageTurnSounds } from './paper/pageTurnSounds'
 
 /** True while the URL hash routes to the Ornaments Lab (`#lab`). */
 function useLabRoute(): boolean {
@@ -60,6 +61,7 @@ export function App() {
       stackLayer: s.stackLayer,
       sheet: s.sheet,
       content: s.content,
+      readerOpenRevision: s.readerOpenRevision,
       bookmarks: s.bookmarks,
       settings: s.settings,
     }),
@@ -68,7 +70,7 @@ export function App() {
   // Once per page load — mirrors Android rememberSaveable entranceDone.
   const [entranceDone, setEntranceDone] = useState(false)
   const isLab = useLabRoute()
-  const swipeStart = useRef<{ x: number; y: number; pointerId: number } | null>(null)
+  const swipeStart = useRef<{ x: number; y: number; pointerId: number; layer: StackLayer } | null>(null)
   const stack = state.stackLayer
   const hasReader = hasReaderOpen(state.content, state.sheet)
   const spread = useBookSpread()
@@ -112,7 +114,16 @@ export function App() {
     if (focused instanceof HTMLElement && focused.classList.contains('surah-row')) {
       focused.blur()
     }
-  }, [spread, openSurahId])
+  }, [spread, openSurahId, state.readerOpenRevision])
+
+  useEffect(() => {
+    window.addEventListener('pointerdown', unlockPageTurnSounds, true)
+    window.addEventListener('keydown', unlockPageTurnSounds, true)
+    return () => {
+      window.removeEventListener('pointerdown', unlockPageTurnSounds, true)
+      window.removeEventListener('keydown', unlockPageTurnSounds, true)
+    }
+  }, [])
 
   // Escape peels one sheet back through the paper stack (cover handles its own).
   useEffect(() => {
@@ -134,9 +145,12 @@ export function App() {
   const showStack = state.ready
 
   const beginBookmarkSwipe = (event: ReactPointerEvent<HTMLDivElement>) => {
-    if (stack !== COVER_LAYER && stack !== BOOKMARKS_LAYER) return
+    const sheet = (event.target as Element).closest('.sheet')
+    const layer = sheet?.getAttribute('data-name') === 'home' ? pageLayers.home
+      : sheet?.getAttribute('data-name') === 'bookmarks' ? stack : null
+    if (layer !== COVER_LAYER && layer !== BOOKMARKS_LAYER) return
     if (event.pointerType === 'mouse' && event.button !== 0) return
-    swipeStart.current = { x: event.clientX, y: event.clientY, pointerId: event.pointerId }
+    swipeStart.current = { x: event.clientX, y: event.clientY, pointerId: event.pointerId, layer }
   }
 
   const finishBookmarkSwipe = (event: ReactPointerEvent<HTMLDivElement>) => {
@@ -146,11 +160,8 @@ export function App() {
     const dx = event.clientX - start.x
     const dy = event.clientY - start.y
     if (Math.abs(dx) < 64 || Math.abs(dx) < Math.abs(dy) * 1.35) return
-    if (stack === COVER_LAYER && dx > 0 && state.bookmarks.length > 0) {
-      appStore.revealLayer(BOOKMARKS_LAYER)
-    } else if (stack === BOOKMARKS_LAYER && dx < 0) {
-      appStore.revealLayer(COVER_LAYER)
-    }
+    const destination = bookmarkSwipeDestination(start.layer, dx, state.bookmarks.length > 0)
+    if (destination != null) appStore.revealLayer(destination)
   }
 
   return (
@@ -167,9 +178,6 @@ export function App() {
     >
       {showStack && (
         <>
-          {spread ? <BookSpread titlePage={state.content == null} /> : null}
-          <BookmarksScreen stackLayer={stack} />
-          <HomeScreen stackLayer={pageLayers.home} />
           {/* Chapter boundaries get fresh focus/rail geometry. Carrying the
               previous chapter's dial state into the first peel frame makes
               the rail visibly jump before the initial focus settles. */}
@@ -177,6 +185,9 @@ export function App() {
             key={state.content?.surah.id ?? 'empty-reader'}
             stackLayer={pageLayers.reader}
           />
+          {spread ? <BookSpread titlePage={state.content == null} versoCovered={!leaves || stack !== READER_LAYER} /> : null}
+          <BookmarksScreen stackLayer={stack} />
+          <HomeScreen stackLayer={pageLayers.home} />
           <SettingsScreen stackLayer={stack} hasReader={hasReader} />
         </>
       )}

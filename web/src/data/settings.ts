@@ -12,6 +12,10 @@ export type HomeBookmarkStyle = 'top_bound' | 'saved_passages'
 /** Android `ColorSystem`. Ladder ships; legacy is the pre-ladder palette. */
 export type ColorSystem = 'ladder' | 'legacy'
 
+/** Percent. The print elongates letters to fill a line; this is the web's stand-in. */
+export type MushafGlyphWiden = 0 | 4 | 6 | 8
+export const MUSHAF_GLYPH_WIDENS: MushafGlyphWiden[] = [0, 4, 6, 8]
+
 export const HOME_BOOKMARK_STYLES: HomeBookmarkStyle[] = [
   'top_bound',
   'saved_passages',
@@ -68,6 +72,11 @@ export interface Settings {
    * developer toggle can fall back to dual-`<audio>` handoff for A/B.
    */
   gapless5Playback: boolean
+  /**
+   * Mushaf: the most a loose line's letters may be widened, in percent,
+   * before space is added between its words. 0 turns widening off.
+   */
+  mushafGlyphWiden: MushafGlyphWiden
   /** Developer-selectable Chapters bookmark treatment. */
   homeBookmarkStyle: HomeBookmarkStyle
   /** Developer-only: ink-brush circle style around selected enums. */
@@ -93,6 +102,7 @@ const DEFAULTS: Settings = {
   colorSystem: 'ladder',
   educationGuidesEnabled: false,
   gapless5Playback: true,
+  mushafGlyphWiden: 6,
   homeBookmarkStyle: 'top_bound',
   brushCircleStyle: 'baseline',
 }
@@ -124,6 +134,9 @@ export function normalizeSettings(partial: Partial<Settings> = {}): Settings {
     gapless5Playback: Boolean(
       partial.gapless5Playback ?? DEFAULTS.gapless5Playback,
     ),
+    mushafGlyphWiden: MUSHAF_GLYPH_WIDENS.includes(partial.mushafGlyphWiden as MushafGlyphWiden)
+      ? (partial.mushafGlyphWiden as MushafGlyphWiden)
+      : DEFAULTS.mushafGlyphWiden,
     homeBookmarkStyle: HOME_BOOKMARK_STYLES.includes(
       partial.homeBookmarkStyle as HomeBookmarkStyle,
     )

@@ -34,6 +34,59 @@ strip of either fore-edge whose mark shows only under a pointer; pages run
 right to left, so the left edge is the way on. Chapters is then laid over the
 left leaf on demand, as Settings is, and touching the open page puts it away.
 
+**The golden page (web, desktop spread).** A page is 1 : φ, as tall as the
+window allows or as wide, whichever binds first. Its margins run inner : head
+: fore-edge : foot = 1 : φ : φ : φ² in one unit, and for any unit that leaves
+a text block that is itself 1 : φ — the page's own shape set inside it,
+nearer the spine and the head, as a bound book sits. The unit is the page's
+width over φ⁶ (the block is about 85% of the page), opened further only when
+the foot would be too shallow to hold the transport, which stands in that
+margin with no paper of its own. A Mushaf leaf is that block; recto and verso
+mirror. Chapters, Settings and the scrolling reader keep their own column on
+the same golden page.
+
+**What the page solves for itself (web Mushaf).** In order: the type grows or
+shrinks until the leaf's widest line, at minimum word spaces, fills the
+block — never so far that fifteen lines would stand closer than 1.75 times
+the type. Each loose line then has its *letters* widened a few percent
+(6 by default; Settings → Developer offers 0, 4, 6, 8) toward a word space of
+0.42 em before any space is added between words: the stand-in for the print's
+elongated letters, and it adds nothing to the text. A line that fills less
+than 62% of the measure is centred at an ordinary word space instead of being
+justified, as the print centres a chapter's last line. On a phone, leading
+is capped at 2.15 times the type and the block sits centred in the sheet.
+
+**Justified, with even word spaces (web Mushaf).** The browser sets the
+leaf in Hafs, not in the page's own face, and Hafs sets narrower than the
+print — the print fills its line by elongating letters, which the app must
+not imitate by adding characters to the revelation. Justifying such lines
+out to the full page opened rivers three word-spaces wide. So the text block
+is drawn in to its widest line set with minimum word spaces (0.3 em), and
+every other line justifies to that; the type only ever shrinks, when a line
+would overrun the page. A verse mark is an item of the line like a word, so
+the space falls evenly on both its sides. Facing leaves keep one type size
+but each its own block width: two blocks of one width matter less than a
+sparse page not being all gaps. Running head and folio hang on the block.
+What remains uneven is line against line — a line the print stretched with
+long letters still sets looser than a full one — and only the page faces
+would close that.
+
+**The book behaves as paper does.** A page turn is a leaf in the air: it
+lifts off one page, swings over its bound edge and lies down on the other,
+carrying the old spread's inner page on its face and the new one's on its
+back. It furls: paper is not a board, so the free
+edge is lifted first and the sheet bows behind it, then is laid flat. What it uncovers is already the new page. A single leaf (phones) is
+bound at its right edge and lifts to edge-on. The cover opens the same way:
+the closed book slides onto the right-hand page block and the board swings
+right over the spine to lie open on the left, its inside becoming the left
+half of the spread — nothing fades. The leaf and the board carry their own
+shading as they stand up out of the light; nothing casts a shadow on the page
+beneath. In the Paper theme the whole sheet carries a faint grain — tooth and
+a few fibres at a few percent — because that theme alone is literally paper.
+A turn finishes before the latest requested destination lifts; reversing
+queues the return rather than snapping the leaf flat. The type is fitted
+before lift and keeps its size as it lands. Reduced motion skips every turn.
+
 This bends two rules, narrowly. *One sheet at a time* becomes two, because
 they are the two a reader moves between constantly and neither is read in
 sequence with the other — the rule against inventing desktop columns for
