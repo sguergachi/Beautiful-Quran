@@ -2314,6 +2314,8 @@ button.ayah-mark {
 
 .ayah-translation {
   margin: var(--voice-gap) 0 0;
+  /* No one-word last line under a verse. */
+  text-wrap: pretty;
   color: var(--ink-rung-body);
   font-size: calc(1.02rem * var(--font-scale, 1));
   line-height: 1.55;
@@ -2525,7 +2527,8 @@ button.ayah-mark {
   min-height: 0;
   display: flex;
   flex-direction: column;
-  padding: max(0.4rem, env(safe-area-inset-top, 0px)) 10px 5rem;
+  /* Foot clears the transport's dissolve, so the folio is never under it. */
+  padding: max(0.4rem, env(safe-area-inset-top, 0px)) 10px 6.5rem;
   touch-action: pan-y;
 }
 
@@ -2625,11 +2628,42 @@ button.ayah-mark {
 }
 
 .mushaf-folio {
-  text-align: center;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 0.55em;
+  /* Figures only: one direction, so the pair never reorders on an RTL leaf. */
+  direction: ltr;
   font-variant-numeric: lining-nums;
   color: var(--ink-rung-quiet);
   font-size: 0.8rem;
-  padding: 0.4rem 0 0.2rem;
+  line-height: 1;
+  padding: 0.55rem 0 0.2rem;
+}
+
+.mushaf-folio [lang='ar'] {
+  font-family: var(--font-arabic);
+  font-size: 1.2em;
+}
+
+.mushaf-folio-diamond {
+  width: 0.3em;
+  height: 0.3em;
+  background: var(--ink-rung-furniture);
+  transform: rotate(45deg);
+}
+
+/* Opening leaves: the few lines keep the page's pitch and sit centred, each
+   line centred too, as they are printed inside their medallion. */
+.mushaf-lines[data-opening='true'] {
+  grid-template-rows: none;
+  grid-auto-rows: calc(100% / 15);
+  align-content: center;
+}
+
+.mushaf-lines[data-opening='true'] .mushaf-line {
+  justify-content: center;
+  gap: 0.7em;
 }
 
 .mushaf-wait {
@@ -6467,10 +6501,10 @@ html[data-entrance='true']:not([data-entrance-opening])
   font-size: calc(clamp(1.05rem, 3.1vh, 1.75rem) * var(--mushaf-fit, 1));
 }
 
-/* Clear of the transport's dissolve, so the recto's folio is not under it;
-   the verso takes the same foot and the two grids stay level. */
-.app-shell[data-spread='true'] .mushaf {
-  padding-bottom: 6.5rem;
+/* Facing leaves mirror: each carries the chapter's Latin name at its
+   fore-edge and the Arabic at the spine. */
+.mushaf[data-side='verso'] .mushaf-head {
+  flex-direction: row-reverse;
 }
 
 /* Turning: a strip of each fore-edge. Pages run right to left, so the way

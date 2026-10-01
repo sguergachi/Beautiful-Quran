@@ -376,6 +376,9 @@ into `BookSpread`'s slot, sized to the recto's own box; Chapters keeps its
 real layer and covers the verso only at layer 0 (`data-leaves`). Hafs stands
 in for the page faces, so each leaf measures its lines and scales the type
 until the longest fits (`--mushaf-fit`), on phones too.
+The leaf's folio follows the Customize page-number script (both figures
+share one centred line with a diamond between), opening leaves 1–2 centre
+their few lines in the well, and facing leaves mirror their running heads.
 Below that size nothing changes. Rationale in
 `docs/DESIGN.md` ("On a desktop browser the sheets lie open as a book").
 

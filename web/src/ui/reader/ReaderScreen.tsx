@@ -1425,6 +1425,7 @@ export function ReaderScreen({ stackLayer }: { stackLayer: StackLayer }) {
               openAyah={state.openAyah}
               openRevision={state.readerOpenRevision}
               english={state.settings.readingMode === 'english_only'}
+              pageNumberScript={pageNumberScript}
               onPlayWord={(surahId, ayah, position) => {
                 if (state.gathering) {
                   appStore.onVerseTap(surahId, ayah)
