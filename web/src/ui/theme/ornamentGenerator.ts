@@ -667,13 +667,13 @@ function fieldCurve(coords: number[][], closed: boolean): OrnamentStroke {
 }
 
 /**
- * An ogee stem with four attached leaves, scrolls or palmettes. Branches
+ * An ogee stem with four attached curling tendrils. Branches
  * share stem tangents; the cell-edge cusps meet their neighbours seamlessly.
  * The four RNG draws preserve the other ornament parts' seed contract.
  * See docs/ORNAMENT_FIELDS.md for the construction and design rules.
  */
 function generateField(rng: Mulberry32): FieldSpec {
-  const style = rng.int(3)
+  const curl = rng.range(0.26, 0.30)
   const mirrored = rng.chance(0.5)
   const bend = rng.range(0.20, 0.24)
   const spacing = rng.range(96, 116)
@@ -683,18 +683,11 @@ function generateField(rng: Mulberry32): FieldSpec {
     [0.5, 1 - bend], [bend, 0.5], [0, 0.5],
     [bend, 0.5], [0.5, bend], [0.5, 0],
   ], true)
-  const motifs = [
-    [[0, 0.5], [0.16, 0.5], [0.18, 0.35], [0.32, 0.35],
-      [0.26, 0.46], [0.13, 0.5], [0, 0.5]],
-    [[0, 0.5], [0.17, 0.5], [0.20, 0.31], [0.34, 0.36],
-      [0.44, 0.40], [0.34, 0.55], [0.26, 0.52],
-      [0.18, 0.50], [0.22, 0.42], [0.28, 0.44]],
-    [[0, 0.5], [0.13, 0.5], [0.15, 0.40], [0.24, 0.38],
-      [0.25, 0.32], [0.32, 0.30], [0.35, 0.32],
-      [0.32, 0.36], [0.33, 0.44], [0.26, 0.46],
-      [0.19, 0.49], [0.11, 0.5], [0, 0.5]],
-  ]
-  const motif = fieldCurve(motifs[style]!, style !== 1)
+  const motif = fieldCurve([
+    [0, 0.5], [0.17, 0.5], [0.20, 0.31], [0.34, 0.36],
+    [0.44, 0.40], [0.34, 0.55], [0.26, 0.52],
+    [0.18, 0.50], [0.22, 0.42], [curl, 0.44],
+  ], false)
   const strokes = [stem]
   for (let i = 0; i < 4; i++) {
     const a = i * Math.PI / 2

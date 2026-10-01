@@ -730,13 +730,13 @@ private fun fieldCurve(coords: List<Pair<Double, Double>>, closed: Boolean): Orn
 }
 
 /**
- * An ogee stem with four attached leaves, scrolls or palmettes. Branches
+ * An ogee stem with four attached curling tendrils. Branches
  * share stem tangents; the cell-edge cusps meet their neighbours seamlessly.
  * The four RNG draws preserve the other ornament parts' seed contract.
  * See docs/ORNAMENT_FIELDS.md for the construction and design rules.
  */
 private fun generateField(rng: Mulberry32): FieldSpec {
-    val style = rng.int(3)
+    val curl = rng.range(0.26, 0.30)
     val mirrored = rng.chance(0.5)
     val bend = rng.range(0.20, 0.24)
     val spacing = rng.range(96.0, 116.0)
@@ -746,18 +746,11 @@ private fun generateField(rng: Mulberry32): FieldSpec {
         0.5 to 1 - bend, bend to 0.5, 0.0 to 0.5,
         bend to 0.5, 0.5 to bend, 0.5 to 0.0,
     ), true)
-    val motifs = listOf(
-        listOf(0.0 to 0.5, 0.16 to 0.5, 0.18 to 0.35, 0.32 to 0.35,
-            0.26 to 0.46, 0.13 to 0.5, 0.0 to 0.5),
-        listOf(0.0 to 0.5, 0.17 to 0.5, 0.20 to 0.31, 0.34 to 0.36,
-            0.44 to 0.40, 0.34 to 0.55, 0.26 to 0.52,
-            0.18 to 0.50, 0.22 to 0.42, 0.28 to 0.44),
-        listOf(0.0 to 0.5, 0.13 to 0.5, 0.15 to 0.40, 0.24 to 0.38,
-            0.25 to 0.32, 0.32 to 0.30, 0.35 to 0.32,
-            0.32 to 0.36, 0.33 to 0.44, 0.26 to 0.46,
-            0.19 to 0.49, 0.11 to 0.5, 0.0 to 0.5),
-    )
-    val motif = fieldCurve(motifs[style], style != 1)
+    val motif = fieldCurve(listOf(
+        0.0 to 0.5, 0.17 to 0.5, 0.20 to 0.31, 0.34 to 0.36,
+        0.44 to 0.40, 0.34 to 0.55, 0.26 to 0.52,
+        0.18 to 0.50, 0.22 to 0.42, curl to 0.44,
+    ), false)
     val strokes = mutableListOf(stem)
     repeat(4) { i ->
         val a = i * PI / 2

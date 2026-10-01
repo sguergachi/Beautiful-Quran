@@ -50,17 +50,14 @@ function randomSeed(): number {
 interface CoverTraits {
   medallionFold: number
   sealFold: number
-  fieldStyle: string
   borderSignature: string
 }
 
 /** Derive high-level traits from a generated ornament (what's actually drawn). */
 function coverTraits(o: CoverOrnament): CoverTraits {
-  const f = o.field
   return {
     medallionFold: o.medallion.fold,
     sealFold: o.cornerSeal.fold,
-    fieldStyle: ['leaf', 'scroll', 'palmette'][(f.strokes[1]!.points.length - 21) / 10]!,
     borderSignature: `${o.border.strokes.length}·${o.border.dots.length}`,
   }
 }
@@ -141,7 +138,6 @@ export function OrnamentsLab() {
 
   // Trait filters for "design by trait" search.
   const [fFold, setFFold] = useState('any')
-  const [fStyle, setFStyle] = useState('any')
   const [searchNote, setSearchNote] = useState('')
 
   const cover = useMemo(() => generateCoverOrnament(seed), [seed])
@@ -191,13 +187,12 @@ export function OrnamentsLab() {
       const candidate = (start + i) | 0
       const t = coverTraits(generateCoverOrnament(candidate))
       if (fFold !== 'any' && t.medallionFold !== Number(fFold)) continue
-      if (fStyle !== 'any' && t.fieldStyle !== fStyle) continue
       setSeed(candidate)
       setSearchNote(`Found after ${i + 1} tries`)
       return
     }
     setSearchNote('No match in 200k seeds — loosen the filters')
-  }, [fFold, fStyle])
+  }, [fFold])
 
   const gold = { brightGold: 'var(--gold-bright)', deepGold: 'var(--gold-deep)', embossDark: 'var(--emboss-dark)', embossLight: 'var(--emboss-light)' }
   const paper = THEME_PAPER[theme]
@@ -284,7 +279,7 @@ export function OrnamentsLab() {
           <dl>
             <div><dt>Medallion fold</dt><dd>{traits.medallionFold}</dd></div>
             <div><dt>Seal fold</dt><dd>{traits.sealFold}</dd></div>
-            <div><dt>Field style</dt><dd>{traits.fieldStyle}</dd></div>
+            <div><dt>Field style</dt><dd>scrolling arabesque</dd></div>
             <div><dt>Border</dt><dd>{traits.borderSignature}</dd></div>
           </dl>
         </section>
@@ -296,11 +291,6 @@ export function OrnamentsLab() {
           <label>Medallion fold
             <select value={fFold} onChange={(e) => setFFold(e.target.value)}>
               <option value="any">any</option><option>8</option><option>10</option><option>12</option><option>16</option>
-            </select>
-          </label>
-          <label>Field style
-            <select value={fStyle} onChange={(e) => setFStyle(e.target.value)}>
-              <option value="any">any</option><option value="leaf">leaf</option><option value="scroll">scroll</option><option value="palmette">palmette</option>
             </select>
           </label>
           <button onClick={findSeed}>Find a seed</button>

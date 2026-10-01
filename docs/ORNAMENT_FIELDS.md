@@ -25,8 +25,8 @@ These are design precedents, not universal measurements of beauty.
    is drawn in the field. The geometric medallions, seals and borders retain
    their own vocabulary.
 2. **Detail grows from the stem.** Four rotated branches share the stem's edge
-   roots and tangent axes. Choose one coherent motif for the entire repeat:
-   a tapered leaf, an open curling tendril, or a lobed palmette. There are no
+   roots and tangent axes. Use open curling tendrils throughout the repeat, with gently varied curl
+   tips (0.26–0.30 in local coordinates). There are no
    detached flowers or centre marks.
 3. **Avoid crossing and crowding.** Fit each branch along the stem by scaling
    its local horizontal reach by 1.2 and its vertical excursion by 0.6.
@@ -39,7 +39,7 @@ These are design precedents, not universal measurements of beauty.
    proportions from the sources.
 5. **Repeat with continuity.** Stem contacts lie exactly on the four shared
    cell-edge midpoints. Branch positions have quarter-turn symmetry. The
-   entire repeat may have either handedness; a leaf or scroll is not forced
+   entire repeat may have either handedness; a scroll is not forced
    to have reflection symmetry. No individual tile is displaced or rotated.
 6. **Preserve the softness.** Sample cubic arcs with the shared Bézier helper.
    Web field SVGs retain four decimal places in cell coordinates. No long
@@ -49,8 +49,8 @@ These are design precedents, not universal measurements of beauty.
 
 The four field RNG draws remain in their original position, and both platforms
 consume the same stream. Saved seeds are deterministic under this grammar;
-medallions, seals and borders remain identical. The Lab offers leaf, scroll
-and palmette filters, reflecting the geometry it actually draws.
+medallions, seals and borders remain identical. The Lab identifies the field as scrolling arabesque; seed search varies the
+medallion fold. Every seed retains the scrolling direction chosen for the field.
 
 Tests cover attachment, cell-edge contacts, short curve segments, quarter-turn
 symmetry, line density and absence of intersections across 400 seeds. The

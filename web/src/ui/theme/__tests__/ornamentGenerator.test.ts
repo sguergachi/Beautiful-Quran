@@ -227,14 +227,14 @@ describe('ornamentGenerator', () => {
     expect(violations).toEqual([])
   })
 
-  it('a seed sample uses every fold, field style, and border', () => {
+  it('a seed sample uses every fold, varied scroll geometry, and border', () => {
     const folds = new Set<number>()
     const fieldStyles = new Set<string>()
     const borders = new Set<string>()
     for (let seed = 0; seed < 200; seed++) {
       const o = generateCoverOrnament(seed)
       folds.add(o.medallion.fold)
-      fieldStyles.add(o.field.strokes.map((s) => s.points.length).join('/'))
+      fieldStyles.add(JSON.stringify(o.field.strokes[1]!.points))
       borders.add(`${o.border.strokes.length}/${o.border.dots.length}`)
     }
     expect([...folds].sort((a, b) => a - b)).toEqual([8, 10, 12, 16])
@@ -286,10 +286,10 @@ describe('ornamentGenerator', () => {
 
   it('field known answers match Android including the reported bare-grid seed', () => {
     for (const [seed, signature, width] of [
-      [1, [41, 41, 41, 41, 41], 116.80120593002229],
-      [8, [41, 21, 21, 21, 21], 126.02219951472625],
-      [21, [41, 31, 31, 31, 31], 120.35108730175789],
-      [132614421, [41, 41, 41, 41, 41], 125.66355094491087],
+      [1, [41, 31, 31, 31, 31], 111.04546135725428],
+      [8, [41, 31, 31, 31, 31], 125.3411369186788],
+      [21, [41, 31, 31, 31, 31], 120.31693265760579],
+      [132614421, [41, 31, 31, 31, 31], 119.5239755323823],
     ] as const) {
       const f = generateCoverOrnament(seed).field
       expect(f.strokes.map((s) => s.points.length)).toEqual(signature)

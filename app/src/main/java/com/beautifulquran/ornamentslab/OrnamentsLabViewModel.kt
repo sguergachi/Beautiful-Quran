@@ -13,17 +13,14 @@ import kotlin.random.Random
 data class OrnamentTraits(
     val medallionFold: Int,
     val sealFold: Int,
-    val fieldStyle: String,
     val borderSignature: String,
 )
 
 /** Derive traits from what the generator actually drew (mirrors the web Lab's `coverTraits`). */
 private fun decodeTraits(o: CoverOrnament): OrnamentTraits {
-    val f = o.field
     return OrnamentTraits(
         medallionFold = o.medallion.fold,
         sealFold = o.cornerSeal.fold,
-        fieldStyle = listOf("leaf", "scroll", "palmette")[(f.strokes[1].points.size - 21) / 10],
         borderSignature = "${o.border.strokes.size}·${o.border.dots.size}",
     )
 }
@@ -79,13 +76,12 @@ class OrnamentsLabViewModel(private val store: OrnamentSeedStore) : ViewModel() 
      * non-null filter, up to 200k tries. A random start (rather than 0) means
      * repeated searches with the same filters turn up different seeds.
      */
-    fun findSeed(fold: Int?, style: String?) {
+    fun findSeed(fold: Int?) {
         val start = Random.nextInt()
         for (i in 0 until MAX_SEARCH_TRIES) {
             val candidate = start + i
             val traits = decodeTraits(generateCoverOrnament(candidate))
             if (fold != null && traits.medallionFold != fold) continue
-            if (style != null && traits.fieldStyle != style) continue
             _ui.value = freshState(candidate).copy(searchNote = "Found after ${i + 1} tries")
             return
         }
