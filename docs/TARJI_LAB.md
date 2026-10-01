@@ -30,6 +30,10 @@ manual envelope, vibrato label, or look control that can override it.
    beside transport when the explanations expand.
    **− / +** make precise nudges: 1 percentage point on the normalized controls,
    10 ms on durations, 0.1 Hz on rate limits, and 0.01 on note-slide tolerance.
+   The wand beside **Pulse speed** is **Match this section**: it measures the
+   selected loop, or the whole word when Loop is off, and suggests a speed
+   range. It changes only Pulse speed and is one undo step; playback continues.
+   If the section is too short or unclear, select a longer, steady portion.
    Changes save automatically for this reciter. Graph and glow update while
    dragging; audio continues on the same clock.
 6. **Compare** switches the graph, glow, and displayed knob values between
@@ -122,6 +126,26 @@ The hardware playback head does not measure physical Bluetooth/acoustic
 latency. Device-route latency can still affect perceived alignment; verify
 fine timing on the intended listening device.
 
+## Matching a selected section
+
+Matching slices only complete PCM hops inside the current loop. It replays the
+existing detector over its full 1.5–10 Hz band with a temporary sensitivity
+floor and shipped regularity gate; pitch/voicing checks remain intact. This
+probe is never drawn, saved as a profile, or used for the reader glow.
+
+The matcher counts positive crossings of the coherent, measured modulation
+wave with hysteresis. This avoids using the broad-band autocorrelation's
+sometimes slower multiple of the true cycle. At least two agreeing cycles,
+300 ms of support, and agreement over 75% of measured cycle duration are
+required. Silence, brief sections, and conflicting rhythms produce no suggestion.
+The median cycle rate gets a ±15% or ±0.5 Hz margin, rounded outward to 0.1 Hz
+and bounded by the supported band. Sensitivity and the other knobs remain yours
+to tune; matching estimates speed rather than guaranteeing acceptance.
+
+Matching runs off the UI thread. Changing target, capture, knobs, loop,
+comparison mode, or leaving the lab cancels the request. A successful match
+uses the usual undo and re-analysis path without changing playback position.
+
 ## Samples and compatibility
 
 Export opens Android’s save picker with a suggested JSON filename. Choose
@@ -144,12 +168,13 @@ Keep reproducible captures in `tools/tarji_samples/`.
 ## Verification
 
 `./gradlew testDebugUnitTest` covers detector replay, sample round trips,
-range manipulation, grouped undo/redo, non-mutating comparison, capture trimming, and the preview clock (nonzero starts,
+range manipulation, selected-section matching (volume/pitch, fast cycles,
+conflicting rhythms, silence, and invalid selections), grouped undo/redo, non-mutating comparison, capture trimming, and the preview clock (nonzero starts,
 seek rebasing, unsigned rollover, looping, and stalled playback).
 
 On device, check cold Settings entry, repeated word changes during capture,
 loop/whole-capture playback, paused seeking, all three speeds, knob edits while
-playing, Compare/Set ref, undo/redo after a drag and after Reset, import, and
+playing, Match on a loop and on the whole word, undo after Match, Compare/Set ref, undo/redo after a drag and after Reset, import, and
 exit/background during capture and preview. Device verification remains
 pending where the emulator System UI fails before the app can be inspected.
 
@@ -167,6 +192,18 @@ the accepted output in 25 clips, covering every reciter. The 0.5-second
 AbdulBaset Mujawwad 44:59 clip exposed a candidate but no accepted output with
 either setting. This checks graph visibility and tuning response, not detection
 accuracy for every word or device-level audio latency.
+
+## Match audit (2026-09-30)
+
+`tools/tarji_samples/pulse_match_audit_2026-09-30.csv` replays the same 26
+cached clips through the matcher with shipped pitch-drift settings. It tests
+the whole word and every complete 2-second selection at 250 ms offsets.
+Whole-word matching succeeds in 2 clips; 18 of 339 selected sections match,
+covering 8 reciters. Other selections report unclear rather than installing a
+potentially misleading range. This is a conservative suggestion tool: choose
+a steady portion and adjust the speed range manually when it cannot match.
+These counts verify execution and refusal behavior, not the perceptual accuracy
+of the estimated rates. The short 0.5-second clip has no 2-second selection.
 
 ## Interface references
 

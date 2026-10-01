@@ -47,6 +47,7 @@ import androidx.compose.material.icons.rounded.BookmarkAdd
 import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.Remove
 import androidx.compose.material.icons.rounded.Tune
+import androidx.compose.material.icons.rounded.AutoFixHigh
 import androidx.compose.material.icons.rounded.RestartAlt
 import androidx.compose.material.icons.rounded.ZoomOutMap
 import androidx.compose.material.icons.automirrored.rounded.HelpOutline
@@ -238,6 +239,7 @@ fun TarjiLabScreen(
                         showHelp = showHelp,
                         onKnob = viewModel::updateKnobs,
                         onReset = viewModel::resetKnobs,
+                        onMatch = viewModel::matchPulse,
                         onExport = { viewModel.prepareSampleExport()?.let { exportLauncher.launch(it) } },
                         onNotes = viewModel::updateSampleNotes,
                         onFinished = viewModel::finishKnobEdit,
@@ -722,6 +724,7 @@ private fun StatusSlot(
 private fun DetectorReadout(ui: TarjiLabViewModel.TarjiLabUiState, playheadMs: Float, modifier: Modifier) {
     val point = ui.displayTrace?.let { tracePointAt(it, playheadMs.coerceAtLeast(0f)) }
     val status = when {
+        ui.matchingPulse -> "Matching…"
         ui.analyzing && !ui.showingReference -> "Updating…"
         point == null -> "Waiting for audio"
         point.gain > 0.001f && point.rateHz > 0f -> "${if (point.visualUsesAmplitude) "Volume" else "Pitch"} · %.1f Hz".format(point.rateHz)
@@ -754,6 +757,7 @@ private fun KnobsPanel(
     showHelp: Boolean,
     onKnob: ((TarjiLabKnobs) -> TarjiLabKnobs) -> Unit,
     onReset: () -> Unit,
+    onMatch: () -> Unit,
     onExport: () -> Unit,
     onImport: () -> Unit,
     onNotes: (String) -> Unit,
@@ -781,7 +785,8 @@ private fun KnobsPanel(
             enabled = !ui.showingReference, showHelp = showHelp, onFinished = onFinished) { v ->
             onKnob { k -> k.copy(minPeriodicity = 0.85f - v * 0.70f) }
         }
-        PulseSpeedControl(knobs, !ui.showingReference, showHelp, onFinished) { band ->
+        PulseSpeedControl(knobs, !ui.showingReference, showHelp, onFinished, onMatch,
+            canMatch = ui.capture != null && !ui.showingReference && !ui.matchingPulse && !ui.holdEditing && !ui.capturing) { band ->
             onKnob { it.copy(minTremoloHz = band.start, maxTremoloHz = band.endInclusive) }
         }
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
@@ -839,6 +844,8 @@ private fun PulseSpeedControl(
     enabled: Boolean,
     showHelp: Boolean,
     onFinished: () -> Unit,
+    onMatch: () -> Unit,
+    canMatch: Boolean,
     onChange: (ClosedFloatingPointRange<Float>) -> Unit,
 ) {
     val ink = QuranTheme.ink
@@ -852,6 +859,7 @@ private fun PulseSpeedControl(
             Text("%.1f–%.1f Hz".format(low, high),
                 style = MaterialTheme.typography.labelSmall.copy(fontFeatureSettings = "'tnum' 1, 'lnum' 1"),
                 color = ink.secondary)
+            LabIconAction(Icons.Rounded.AutoFixHigh, "Match this section", onMatch, enabled = canMatch)
         }
         RangeSlider(
             value = low..high, onValueChange = onChange, onValueChangeFinished = onFinished,
@@ -868,7 +876,7 @@ private fun PulseSpeedControl(
             modifier = Modifier.fillMaxWidth().semantics { contentDescription = "Slowest and fastest pulse speed" },
         )
         if (showHelp) Text(
-            "Drag the two ends to include the wavering you hear: left is slower, right is faster. Hz means pulses per second, not the voice’s pitch. A wider range catches more kinds of wavering in volume or pitch.",
+            "Drag the two ends to include the wavering you hear: left is slower, right is faster. Hz means pulses per second, not the voice’s pitch. A wider range catches more kinds of wavering in volume or pitch. The wand matches the selected loop, or the whole word. Use Loop to isolate the wavering you hear.",
             style = MaterialTheme.typography.bodySmall, color = ink.secondary,
         )
     }

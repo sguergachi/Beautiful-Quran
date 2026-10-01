@@ -79,6 +79,7 @@ class TarjiLabViewModel(
         /** Capture progress from the requested word span, 0..1. */
         val captureProgress: Float = 0f,
         val analyzing: Boolean = false,
+        val matchingPulse: Boolean = false,
         val captureError: String? = null,
         val previewPlaying: Boolean = false,
         val previewDurationMs: Float = 0f,
@@ -118,6 +119,7 @@ class TarjiLabViewModel(
     private var loadJob: Job? = null
     private var captureJob: Job? = null
     private var analyzeJob: Job? = null
+    private var matchJob: Job? = null
     private var audioTrack: AudioTrack? = null
     private var previewRateHz = 0
     private var scrubActive = false
@@ -161,6 +163,7 @@ class TarjiLabViewModel(
     }
 
     private fun load(surahId: Int, ayah: Int, focusWordPosition: Int?) {
+        cancelPulseMatch()
         loadJob?.cancel()
         analyzeJob?.cancel()
         abortCapture()
@@ -229,6 +232,7 @@ class TarjiLabViewModel(
 
     /** Automatically play the target span muted while the tap records it. */
     private fun captureWord() {
+        cancelPulseMatch()
         val st = _ui.value
         if (st.isLoading || st.reciter == null || st.wordPosition == 0) return
         if (st.capturing) return
@@ -451,6 +455,36 @@ class TarjiLabViewModel(
         }
     }
 
+    /** Suggest a pulse band from the loop (or whole word), preserving playback and other knobs. */
+    fun matchPulse() {
+        val st = _ui.value
+        val capture = st.capture ?: return
+        if (st.matchingPulse || st.showingReference || st.holdEditing || st.capturing) return
+        val scope = if (st.tool == TarjiLabTool.HOLD) TarjiPreviewScope.HOLD else TarjiPreviewScope.WORD
+        val window = previewLoopWindow(scope, st.expectation.window, capture.totalContentMs)
+        _ui.value = st.copy(matchingPulse = true, note = null)
+        matchJob = viewModelScope.launch {
+            val match = withContext(Dispatchers.Default) { matchTarjiPulse(capture, window, st.knobs) }
+            matchJob = null
+            _ui.value = _ui.value.copy(matchingPulse = false)
+            if (_ui.value.capture !== capture || _ui.value.knobs != st.knobs) return@launch
+            if (match == null) {
+                _ui.value = _ui.value.copy(note = "No clear pulse · select a longer, steady section")
+                return@launch
+            }
+            finishKnobEdit()
+            updateKnobs { it.copy(minTremoloHz = match.minHz, maxTremoloHz = match.maxHz) }
+            finishKnobEdit()
+            _ui.value = _ui.value.copy(note = "Matched %.1f Hz · fine-tune Pulse speed".format(match.rateHz))
+        }
+    }
+
+    private fun cancelPulseMatch() {
+        matchJob?.cancel()
+        matchJob = null
+        if (_ui.value.matchingPulse) _ui.value = _ui.value.copy(matchingPulse = false)
+    }
+
     /** One slider drag is one undo step; playback continues while analysis catches up. */
     fun updateKnobs(transform: (TarjiLabKnobs) -> TarjiLabKnobs) {
         val next = transform(_ui.value.knobs)
@@ -460,6 +494,7 @@ class TarjiLabViewModel(
     }
 
     private fun applyKnobs(knobs: TarjiLabKnobs) {
+        cancelPulseMatch()
         persistKnobs(knobs)
         _ui.value = _ui.value.copy(knobs = knobs, showingReference = false, note = null,
             canUndo = knobHistory.canUndo, canRedo = knobHistory.canRedo,
@@ -477,6 +512,7 @@ class TarjiLabViewModel(
 
     /** Compare graph and glow at the same audio position without changing the profile. */
     fun toggleReference() {
+        cancelPulseMatch()
         finishKnobEdit()
         if (_ui.value.reference != null) {
             _ui.value = _ui.value.copy(showingReference = !_ui.value.showingReference, note = null)
@@ -500,6 +536,7 @@ class TarjiLabViewModel(
 
     /** Choose the playback range and its editing tool together, preserving play/pause. */
     fun setTool(tool: TarjiLabTool) {
+        cancelPulseMatch()
         val st = _ui.value
         val scope = if (tool == TarjiLabTool.HOLD) TarjiPreviewScope.HOLD else TarjiPreviewScope.WORD
         val switchPlayback = st.previewPlaying && st.previewScope != scope
@@ -543,6 +580,7 @@ class TarjiLabViewModel(
 
     /** Pause so a hold drag cannot fight the hardware loop. */
     fun beginHoldEdit() {
+        cancelPulseMatch()
         if (_ui.value.previewPlaying) pausePreview()
         holdEditActive = true
         _ui.value = _ui.value.copy(holdEditing = true)
@@ -554,6 +592,7 @@ class TarjiLabViewModel(
      * Play looping the *previous* range. Play rebuilds the loop.
      */
     fun setHoldWindow(window: TarjiHoldWindow, playheadMs: Float? = null) {
+        cancelPulseMatch()
         val st = _ui.value
         val capture = st.capture ?: return
         val captureMs = capture.hopCount * capture.hopContentDurationMs()
@@ -895,6 +934,7 @@ class TarjiLabViewModel(
         loadJob?.cancel()
         analyzeJob?.cancel()
         abortCapture()
+        cancelPulseMatch()
         stopPreview()
         if (sample.reciterId == settingsRepo.settings.value.reciterId) {
             InkEngine.tuning = TarjiLabKnobs.applyToTuning(sample.knobs, InkEngine.tuning)
@@ -949,6 +989,7 @@ class TarjiLabViewModel(
 
     /** Called when the lab is left: silence the preview and the player. */
     fun onExit() {
+        cancelPulseMatch()
         loadJob?.cancel()
         analyzeJob?.cancel()
         player.setSkipSilenceGaps(true)
