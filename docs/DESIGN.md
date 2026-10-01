@@ -34,6 +34,21 @@ strip of either fore-edge whose mark shows only under a pointer; pages run
 right to left, so the left edge is the way on. Chapters is then laid over the
 left leaf on demand, as Settings is, and touching the open page puts it away.
 
+**Justified, with even word spaces (web Mushaf).** The browser sets the
+leaf in Hafs, not in the page's own face, and Hafs sets narrower than the
+print — the print fills its line by elongating letters, which the app must
+not imitate by adding characters to the revelation. Justifying such lines
+out to the full page opened rivers three word-spaces wide. So the text block
+is drawn in to its widest line set with minimum word spaces (0.3 em), and
+every other line justifies to that; the type only ever shrinks, when a line
+would overrun the page. A verse mark is an item of the line like a word, so
+the space falls evenly on both its sides. Facing leaves keep one type size
+but each its own block width: two blocks of one width matter less than a
+sparse page not being all gaps. Running head and folio hang on the block.
+What remains uneven is line against line — a line the print stretched with
+long letters still sets looser than a full one — and only the page faces
+would close that.
+
 **The book behaves as paper does.** A page turn is a leaf in the air: it
 lifts off one page, swings over its bound edge and lies down on the other,
 carrying the old spread's inner page on its face and the new one's on its

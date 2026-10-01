@@ -2532,6 +2532,25 @@ button.ayah-mark {
   touch-action: pan-y;
 }
 
+/* One measure: running head, text and folio all hang on the text block's
+   own margins. The block is drawn in to its widest line (--mushaf-measure),
+   so justifying never has to open rivers to reach a page that is too wide. */
+/* One measure. Hafs is not the page's own face and sets narrower than the
+   print, so justifying every line out to the page opens rivers between the
+   words. The text block is instead as wide as its widest line set with
+   minimum word spaces, and every other line justifies to that. Running head
+   and folio hang on the same block. */
+.mushaf-block {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  width: max-content;
+  min-width: 72%;
+  max-width: 100%;
+  margin-inline: auto;
+}
+
 .mushaf-head {
   display: flex;
   justify-content: space-between;
@@ -2561,7 +2580,8 @@ button.ayah-mark {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 0.35em;
+  /* The least a word space may be. Justification only ever adds to it. */
+  gap: 0.3em;
   font-family: var(--font-arabic);
   font-size: calc(clamp(1.05rem, 4.2vw, 1.55rem) * var(--mushaf-fit, 1));
   line-height: 1;
@@ -2594,7 +2614,6 @@ button.ayah-mark {
 .mushaf-mark {
   color: var(--gold);
   font-size: 0.72em;
-  margin-inline: 0.15em;
   background: none;
   border: 0;
   padding: 0;

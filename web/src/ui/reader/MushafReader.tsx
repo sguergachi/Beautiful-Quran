@@ -1,4 +1,5 @@
 import {
+  Fragment,
   useCallback,
   useEffect,
   useMemo,
@@ -24,7 +25,7 @@ import { useBookSpread, useTurningLeafSlot, useVersoLeafSlot } from '../paper/bo
 import { COVER_LAYER, READER_LAYER } from '../paper/stack'
 import { TurningLeaf } from './TurningLeaf'
 import { finishPageTurn, requestPageTurn, type PageTurnQueue } from './pageTurnQueue'
-import { mushafFit } from './mushafFit'
+import { mushafFit, mushafLeafFit, naturalLineWidth } from './mushafFit'
 import { mushafLeafModel } from './mushafLeafModel'
 import { PAGE_TURN_SCHEDULE, playFlip, warmPageTurnSounds } from '../paper/pageTurnSounds'
 
@@ -371,7 +372,7 @@ function MushafLeaf({
 }: {
   page: number
   fitRevision: number
-  /** Scale on the line's type so the page's longest line stays inside the measure. */
+  /** The hand both facing leaves are set in: the tighter page's fit. */
   fit: number
   onFit: (page: number, fit: number) => void
   /** Which page of a desktop spread this leaf is; absent on a single leaf. */
@@ -388,8 +389,9 @@ function MushafLeaf({
   const drag = useRef<{ x: number; y: number } | null>(null)
   const linesRef = useRef<HTMLDivElement>(null)
 
-  // Hafs stands in for the page's own face, so a printed line can set wider
-  // than the measure. Measure at full size and report the scale that fits.
+  // Hafs stands in for the page's own face, so a printed line sets wider or
+  // narrower than the page. Measure every line at full size, word spaces at
+  // their minimum, and report how the widest compares with the page.
   useLayoutEffect(() => {
     const lines = linesRef.current
     // A leaf in the air is a picture at the size already found. Measuring
@@ -400,21 +402,32 @@ function MushafLeaf({
     let disposed = false
     const measure = () => {
       if (disposed) return
-      const applied = lines.style.getPropertyValue('--mushaf-fit')
-      lines.style.setProperty('--mushaf-fit', '1')
-      let ratio = 1
-      for (const line of lines.children) {
-        if (line.scrollWidth > line.clientWidth) {
-          ratio = Math.min(ratio, line.clientWidth / line.scrollWidth)
-        }
-      }
-      lines.style.setProperty('--mushaf-fit', applied)
-      // A hair under, so rounding never leaves the last word a pixel over.
-      onFit(page, ratio < 1 ? ratio * 0.99 : 1)
+      const leaf = lines.closest('.mushaf')
+      if (!(leaf instanceof HTMLElement)) return
+      // Widths are read at the scale already applied and divided back out:
+      // every length in a line is in em, so they scale with the type exactly.
+      // Rewriting the scale to measure at full size re-laid the block and
+      // let the measurement chase its own result.
+      const scale = Number(lines.style.getPropertyValue('--mushaf-fit')) || 1
+      const first = lines.firstElementChild
+      const gap = first ? parseFloat(getComputedStyle(first).columnGap) || 0 : 0
+      const widest = opening
+        ? 0
+        : Math.max(0, ...Array.from(lines.children, (line) => naturalLineWidth(
+            Array.from(line.children, (item) => item.getBoundingClientRect().width),
+            gap,
+          ))) / scale
+      const box = getComputedStyle(leaf)
+      const available = leaf.clientWidth - parseFloat(box.paddingLeft) - parseFloat(box.paddingRight)
+      onFit(page, mushafLeafFit(available, widest))
     }
     measure()
     const observer = new ResizeObserver(measure)
     observer.observe(lines)
+    // The block is sized by its own lines, so it does not change when the
+    // page around it does. Watch the page as well.
+    const leaf = lines.closest('.mushaf')
+    if (leaf) observer.observe(leaf)
     void document.fonts?.ready.then(measure)
     return () => { disposed = true; observer.disconnect() }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -458,6 +471,8 @@ function MushafLeaf({
         drag.current = null
       }}
     >
+      {/* One measure: head, text and folio share the text block's width. */}
+      <div className="mushaf-block">
       <div className="mushaf-head">
         <span>{headSurah?.nameTransliteration ?? ''}</span>
         <span>{headSurah?.nameArabic ?? ''}</span>
@@ -510,8 +525,10 @@ function MushafLeaf({
                   token.position,
                   lastPositions.get(`${token.surahId}:${token.ayah}`) ?? 0,
                 )
+                // Word and mark are separate items of the line, so the
+                // justified space falls evenly on both sides of a mark.
                 return (
-                  <span key={`${token.surahId}:${token.ayah}:${token.position}`}>
+                  <Fragment key={`${token.surahId}:${token.ayah}:${token.position}`}>
                     <button
                       type="button"
                       className="mushaf-word"
@@ -533,7 +550,7 @@ function MushafLeaf({
                         {formatAyahNumberMark(token.ayah, true)}
                       </button>
                     ) : null}
-                  </span>
+                  </Fragment>
                 )
               })}
             </p>
@@ -550,6 +567,7 @@ function MushafLeaf({
         ) : (
           <span lang={pageNumberScript === 'arabic' ? 'ar' : undefined}>{folio.leading}</span>
         )}
+      </div>
       </div>
     </div>
   )

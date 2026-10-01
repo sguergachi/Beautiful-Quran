@@ -379,6 +379,13 @@ first in DOM and Tab order. Gathering stays active while another sheet covers
 the verso, and Escape cancels gathering before peeling that sheet away. Hafs stands
 in for the page faces, so each leaf measures its lines and scales the type
 until the longest fits (`--mushaf-fit`), on phones too.
+Mushaf lines justify by even word spaces: words and verse marks are
+separate flex items of the line (`space-between`, 0.3 em minimum gap) inside
+`.mushaf-block`, which is `width: max-content` — as wide as the leaf's widest
+line — so head, lines and folio share that measure. `mushafLeafFit` only
+shrinks the type when the widest line overruns the page; widths are read at
+the applied scale and divided back (toggling the scale to measure made the
+measurement oscillate). Rationale in `docs/DESIGN.md`.
 The leaf's folio follows the Customize page-number script (both figures
 share one centred line with a diamond between), opening leaves 1–2 centre
 their few lines in the well, and facing leaves mirror their running heads.
