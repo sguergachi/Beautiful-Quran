@@ -404,6 +404,13 @@ private val RoyalSettingsSheet = QuranSheet(RoyalGreenSettings, RoyalSettingsInk
 val LocalSettingsSheet = staticCompositionLocalOf { LightSettingsSheet }
 
 /**
+ * The paper the Quran is read on, whatever sheet the caller is standing on —
+ * for a miniature of the reader set on the Settings stock, where
+ * `colorScheme.background` is no longer that paper.
+ */
+val LocalReadingPaper = staticCompositionLocalOf { PaperBackground }
+
+/**
  * Sets [content] on the Settings stock: `colorScheme.background` becomes that
  * paper, so every fade and dissolve that takes the sheet's colour follows it,
  * and the ink ladder is the one solved against it. The sheet itself is laid
@@ -737,6 +744,7 @@ fun BeautifulQuranTheme(
         LocalQuranAccents provides accents,
         LocalQuranInk provides ink,
         LocalSettingsSheet provides settingsSheet,
+        LocalReadingPaper provides colors.background,
         LocalColorSystem provides colorSystem,
     ) {
         MaterialTheme(
