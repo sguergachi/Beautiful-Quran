@@ -233,7 +233,11 @@ sealed class ShapedWordBloom {
         val glowRadius: Float = 3.5f,
         /** How much of the word the directional mask may reveal. */
         val revealFraction: Float = 1f,
-    ) : ShapedWordBloom()
+    ) : ShapedWordBloom() {
+        /** Match the ink's wash travel; halo bleed expands only the mask's painted area. */
+        internal fun washBounds(line: Rect, coverPad: Float): Rect =
+            linePaperCoverBounds(line, coverPad)
+    }
 }
 
 /**
@@ -642,12 +646,13 @@ fun Modifier.shapedWordBloom(
                             start,
                             endExclusive,
                         )
-                        // The wash has to reach as far as the tint did, or
-                        // an overhang keeps ink the sweep has not arrived at.
-                        val washBleed = if (clipped) bleed else colorBleed
+                        // Halo padding is not part of the word's wash distance:
+                        // including it made mid-hold glint trail the revealed ink.
+                        // The full bleed still belongs to the mask rect below.
+                        val washPad = coverPad.toPx()
                         var total = 0f
                         for (i in tintBounds.indices) {
-                            total += tintBounds[i].width + washBleed * 2f
+                            total += tintBounds[i].width + washPad * 2f
                         }
                         total = total.coerceAtLeast(1f)
                         val lineEdge =
@@ -660,12 +665,7 @@ fun Modifier.shapedWordBloom(
                         var travelled = 0f
                         for (i in tintBounds.indices) {
                             val lineBox = tintBounds[i]
-                            val cover = Rect(
-                                left = lineBox.left - washBleed,
-                                top = lineBox.top,
-                                right = lineBox.right + washBleed,
-                                bottom = lineBox.bottom,
-                            )
+                            val cover = bloom.washBounds(lineBox, washPad)
                             val wLine = cover.width
                             val local = lineHead - travelled
                             travelled += wLine

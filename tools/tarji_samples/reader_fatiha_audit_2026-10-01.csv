@@ -1,0 +1,14 @@
+reciter,name,word_start,word_end,detected,allowed,prior_event,finished_gate,first_allowed,last_allowed
+1,Mishary Rashid Alafasy,6650,13155,136,145,0,0,7280,10160
+2,Mahmoud Khalil Al-Husary,7740,13809,60,29,15,19,8780,9340
+3,AbdulBaset AbdulSamad,7760,12725,178,193,11,0,8860,12700
+4,Mohamed Siddiq El-Minshawi,8240,13165,144,10,0,139,8500,8680
+5,Abdurrahman As-Sudais,7110,11495,165,188,23,0,7700,11440
+6,Saud Ash-Shuraym,6390,11650,182,138,13,43,7100,9840
+7,Hani Ar-Rifai,7610,12727,151,143,0,33,7620,10460
+9,Yasser Al-Dosari,7159,14629,220,0,220,0,-1,-1
+14,Abu Bakr Al-Shatri,11050,18510,149,164,10,0,11280,14540
+16,AbdulBaset AbdulSamad,15420,24980,95,98,0,25,16740,18680
+17,Mahmoud Khalil Al-Husary,11880,16640,106,84,13,25,12840,14500
+18,Mohamed Siddiq El-Minshawi,28970,34800,82,22,0,64,29180,29600
+19,Mohammad Mahmoud Al-Tablawi,6860,9040,48,58,0,0,7880,9020

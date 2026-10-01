@@ -20,7 +20,7 @@ without changing the measured pulse or detector acceptance.
    pinch zoom and two-finger pan preserve precise inspection.
 4. The graph stays pinned while controls scroll. The playback line, loop range,
    and compact elapsed/total clock show where the audible note is. The quiet waveform is audio;
-   the **green pulse** is the accepted output used by the word’s glow. There is
+   the **green pulse** is the detector’s accepted output used by the preview glow. There is
    no raw teal trace. The readout shows the accepted
    **Volume / Pitch** channel and its rate in Hz, **Pulse fading**, **No pulse
    here**, or **Updating**; it never invents an accepted pulse.
@@ -216,6 +216,29 @@ potentially misleading range. This is a conservative suggestion tool: choose
 a steady portion and adjust the speed range manually when it cannot match.
 These counts verify execution and refusal behavior, not the perceptual accuracy
 of the estimated rates. The short 0.5-second clip has no 2-second selection.
+
+## Reader admission audit (2026-10-01)
+
+`tools/tarji_samples/reader_fatiha_audit_2026-10-01.csv` decodes the cached
+whole 1:7 recordings for all 13 reciters at 8 kHz and feeds the shipped detector
+without resetting it at the final word. The canonical final-word span and
+`TarjiWordGate` then count admitted hops. This checks the reader’s additional
+event-ownership and one-event rules, which the lab’s detector trace does not
+apply. It is a zero-delay offline check, not a device render or acoustic-sync
+measurement, and does not use a phone’s customized tuning.
+
+All 13 detect modulation during the final word; 12 admit at least one event.
+Yasser’s detected event starts before the final-word boundary and is withheld;
+several other voices have later events withheld after the first one settles.
+Those guards remain in place: they prevent a preceding word’s pulse and room
+or consonant tails from relighting the next word. A green lab trace alone does
+not prove that the reader will admit every event. Theme eligibility, a strong
+hold, the event gate, and the wash mask also affect what appears in the reader.
+
+The shaped-reader wash mismatch found in this investigation is fixed separately:
+tint and halo travel now use the paper-cover geometry, while the full blur area
+remains masked. Regression coverage checks a mid-word feather in both directions
+and several halo sizes. Device visual verification remains blocked by System UI.
 
 ## Interface references
 

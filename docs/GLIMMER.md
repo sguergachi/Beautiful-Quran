@@ -55,6 +55,13 @@ directional wash, with the same duration, easing, direction, and feather:
 6. When the voice moves on, the extra glimmer recedes over `glintFadeMs` while
    the identical terracotta repeat ink remains intact underneath.
 
+For shaped text, the tint and halo use the same padded word boxes as the
+paper-cover wash to measure directional travel. The halo’s blur radius expands
+only the area the mask paints; it must not lengthen the sweep. Using halo bleed
+in the travel box made the glint much fainter than the underlying revealed ink
+early in a long hold. The mask still reaches the full halo so no unmapped
+fringe survives outside the word box. The feather profile stays unchanged.
+
 The glimmer's colour is latched when it forms and held for its full rendered
 lifetime. Chain release may change a repeat word back to a normal recited state
 while its glimmer is still fading; that state change must not recolour the
