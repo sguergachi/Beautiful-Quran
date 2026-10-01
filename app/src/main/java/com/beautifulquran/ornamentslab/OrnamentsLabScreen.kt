@@ -57,6 +57,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.beautifulquran.ui.theme.GeneratedChapterRosette
 import com.beautifulquran.ui.theme.LocalQuranAccents
 import com.beautifulquran.ui.theme.generatedFieldWeave
+import com.beautifulquran.ui.theme.ornament.FIELD_PATTERNS
 import com.beautifulquran.ui.theme.ornament.generateCoverOrnament
 import com.beautifulquran.ui.theme.quietClickable
 import com.beautifulquran.ui.theme.QuranTheme
@@ -89,6 +90,7 @@ fun OrnamentsLabScreen(
     var seedText by remember(ui.seed) { mutableStateOf(ui.seed.toString()) }
     var saveName by remember { mutableStateOf("") }
     var fFold by remember { mutableStateOf<Int?>(null) }
+    var fPattern by remember { mutableStateOf<String?>(null) }
 
     // Dark workbench: force light status-bar icons so the clock/battery don't
     // read as black-on-black over royal green. Restored when the Lab closes.
@@ -304,7 +306,7 @@ fun OrnamentsLabScreen(
                 ) {
                     TraitRow("Medallion fold", ui.traits.medallionFold.toString())
                     TraitRow("Seal fold", ui.traits.sealFold.toString())
-                    TraitRow("Field style", "star-and-cross filigree")
+                    TraitRow("Field style", ui.cover.field.pattern)
                     TraitRow("Border", ui.traits.borderSignature)
                 }
             }
@@ -327,6 +329,11 @@ fun OrnamentsLabScreen(
                         options = listOf("8", "10", "12", "16"),
                         selected = fFold?.toString(),
                     ) { fFold = it?.toInt() }
+                    ChipGroup(
+                        label = "Field pattern",
+                        options = FIELD_PATTERNS,
+                        selected = fPattern,
+                    ) { fPattern = it }
                     Spacer(Modifier.height(8.dp))
                     Text(
                         text = "Find a seed",
@@ -334,7 +341,7 @@ fun OrnamentsLabScreen(
                         color = colors.primary,
                         modifier = Modifier
                             .quietClickable(onClick = {
-                                viewModel.findSeed(fFold)
+                                viewModel.findSeed(fFold, fPattern)
                             })
                             .padding(vertical = 6.dp),
                     )

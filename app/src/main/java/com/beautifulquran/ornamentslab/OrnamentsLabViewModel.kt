@@ -76,11 +76,13 @@ class OrnamentsLabViewModel(private val store: OrnamentSeedStore) : ViewModel() 
      * non-null filter, up to 200k tries. A random start (rather than 0) means
      * repeated searches with the same filters turn up different seeds.
      */
-    fun findSeed(fold: Int?) {
+    fun findSeed(fold: Int?, pattern: String?) {
         val start = Random.nextInt()
         for (i in 0 until MAX_SEARCH_TRIES) {
             val candidate = start + i
-            val traits = decodeTraits(generateCoverOrnament(candidate))
+            val cover = generateCoverOrnament(candidate)
+            val traits = decodeTraits(cover)
+            if (pattern != null && cover.field.pattern != pattern) continue
             if (fold != null && traits.medallionFold != fold) continue
             _ui.value = freshState(candidate).copy(searchNote = "Found after ${i + 1} tries")
             return

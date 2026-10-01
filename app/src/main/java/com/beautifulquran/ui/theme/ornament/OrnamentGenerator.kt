@@ -71,12 +71,16 @@ data class RosetteSpec(
     val tipRadius: Double = 0.0,
 )
 
+/** Curated repeat families; labels are shared with the web generator and Lab. */
+val FIELD_PATTERNS = listOf("star-and-cross", "octagonal garden", "lozenge rosettes")
+
 /**
  * A geometric field with filigree: one translational unit cell.
  * Strokes are in cell units ([cellW] × [cellH]); [cellWidthDp] is the
  * suggested rendered cell width so different tilings read at similar scale.
  */
 data class FieldSpec(
+    val pattern: String,
     val cellW: Double,
     val cellH: Double,
     val cellWidthDp: Double,
@@ -730,12 +734,13 @@ private fun fieldCurve(coords: List<Pair<Double, Double>>, closed: Boolean): Orn
 }
 
 /**
- * Star-and-cross geometry with a paired outline and eight mirrored foliate
- * sprays. Detail stays inside its compartment; four RNG draws vary only
- * proportions within this grammar. See docs/ORNAMENT_FIELDS.md.
+ * Three composed geometric families with compartment-specific filigree.
+ * Four RNG draws choose a family and its safe proportions. See docs/ORNAMENT_FIELDS.md.
  */
 private fun generateField(rng: Mulberry32): FieldSpec {
-    val inset = rng.range(0.042, 0.052)
+    val choice = rng.range(0.0, 3.0)
+    val family = choice.toInt()
+    val inset = 0.042 + (choice - family) * 0.01
     val curl = rng.range(0.265, 0.285)
     val tip = rng.range(0.392, 0.410)
     val spacing = rng.range(148.0, 168.0)
@@ -744,8 +749,11 @@ private fun generateField(rng: Mulberry32): FieldSpec {
             radius * if (i % 2 == 1) cos(PI / 4) / cos(PI / 8) else 1.0) },
         true, weight, 0.0, 1.0,
     )
-    val strokes = mutableListOf(star(0.5, StrokeWeight.Rule),
-        star(0.5 - inset, StrokeWeight.Rule), star(0.13, StrokeWeight.Hairline))
+    fun frame(radius: Double) = if (family == 0) star(radius, StrokeWeight.Rule) else OrnamentStroke(
+        List(if (family == 1) 8 else 4) { i -> polar(i * TAU / (if (family == 1) 8 else 4), radius) },
+        true, StrokeWeight.Rule, 0.0, 1.0,
+    )
+    val strokes = mutableListOf(frame(0.5), frame(0.5 - inset), star(0.13, StrokeWeight.Hairline))
     val scroll = fieldCurve(listOf(
         0.13 to 0.0, 0.19 to 0.0, 0.20 to -0.075, 0.27 to -0.075,
         0.34 to -0.075, 0.35 to -0.01, 0.30 to -0.012,
@@ -755,9 +763,20 @@ private fun generateField(rng: Mulberry32): FieldSpec {
         0.35 to 0.0, 0.37 to -0.02, tip - 0.02 to -0.02, tip to 0.0,
         tip - 0.02 to 0.02, 0.37 to 0.02, 0.35 to 0.0,
     ), true)
-    repeat(8) { i ->
-        val a = i * PI / 4
-        for ((motif, sign) in listOf(scroll to -1, scroll to 1, leaf to 1)) {
+    val petal = fieldCurve(listOf(
+        0.13 to 0.0, 0.19 to -0.035, 0.29 to -0.055, tip to 0.0,
+        0.29 to 0.055, 0.19 to 0.035, 0.13 to 0.0,
+    ), true)
+    val vein = fieldCurve(listOf(
+        0.13 to 0.0, 0.20 to 0.0, 0.25 to -0.025, curl + 0.04 to 0.0,
+        0.25 to 0.025, 0.20 to 0.0, 0.13 to 0.0,
+    ), true)
+    val motifs = if (family == 1) listOf(petal to 1, vein to 1) else
+        listOf(scroll to -1, scroll to 1, leaf to 1)
+    val fold = if (family == 2) 4 else 8
+    repeat(fold) { i ->
+        val a = i * TAU / fold
+        for ((motif, sign) in motifs) {
             strokes.add(motif.copy(points = motif.points.map { p ->
                 OrnamentPoint(0.5 + p.x * cos(a) - p.y * sign * sin(a),
                     0.5 + p.x * sin(a) + p.y * sign * cos(a))
@@ -769,9 +788,14 @@ private fun generateField(rng: Mulberry32): FieldSpec {
         0.04 to 0.0, 0.068 to 0.0, 0.045 to 0.045, 0.064 to 0.064,
         0.045 to 0.045, 0.0 to 0.068, 0.0 to 0.04,
     ), false)
+    val cornerStar = star(0.18, StrokeWeight.Hairline).let { s ->
+        s.copy(closed = false, points = s.points.take(5).map { p -> OrnamentPoint(p.x - 0.5, p.y - 0.5) })
+    }
+    val corners = if (family == 2) listOf(cornerStar,
+        quarter.copy(points = quarter.points.map { p -> OrnamentPoint(p.x * 1.5, p.y * 1.5) })) else listOf(quarter)
     for ((cx, cy, sx, sy) in listOf(listOf(0, 0, 1, 1), listOf(1, 0, -1, 1),
         listOf(1, 1, -1, -1), listOf(0, 1, 1, -1))) {
-        strokes.add(quarter.copy(points = quarter.points.map { p ->
+        for (motif in corners) strokes.add(motif.copy(points = motif.points.map { p ->
             OrnamentPoint(cx + sx * p.x, cy + sy * p.y)
         }))
     }
@@ -780,7 +804,7 @@ private fun generateField(rng: Mulberry32): FieldSpec {
         points.zipWithNext().sumOf { (p, q) -> kotlin.math.hypot(p.x - q.x, p.y - q.y) } *
             if (s.weight == StrokeWeight.Rule) 1.0 else 0.55
     }
-    return FieldSpec(1.0, 1.0, spacing * inkLength / 11.5, strokes)
+    return FieldSpec(FIELD_PATTERNS[family], 1.0, 1.0, spacing * inkLength / listOf(11.5, 11.0, 9.0)[family], strokes)
 }
 
 /**

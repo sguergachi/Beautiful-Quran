@@ -995,12 +995,14 @@ image, so it is crisp at any density and nearly free to render.
   ({10/4} → two {5/2} pentacles stacked), 6-fold seals, and 6-fold field
   tilings are all excluded by construction and guarded by tests on both
   platforms.
-- **Field harmony.** Eight-pointed star-and-cross geometry establishes the
-  repeat; paired star contours use stronger rules and mirrored foliate sprays
-  use finer hairlines inside the compartments. Details cannot cross or graze
-  the frame. Reflection and quarter-turn balance, deliberate empty space and
-  weight-aware repeat spacing keep richness composed rather than noisy.
-  Construction, research and testable rules: [ORNAMENT_FIELDS.md](ORNAMENT_FIELDS.md).
+- **Field harmony.** Seeds choose among composed star-and-cross, octagonal
+  garden and lozenge-rosette families, each with its own geometric frame and
+  foliate layout. Paired contours use stronger rules; interior filigree uses
+  finer hairlines. Details cannot cross or graze the frame. Reflection and
+  quarter-turn balance, deliberate empty space and weight-aware repeat
+  spacing keep richness composed rather than noisy. The Lab can search each
+  family. Construction, research and testable rules:
+  [ORNAMENT_FIELDS.md](ORNAMENT_FIELDS.md).
 - **Gilding.** Gold is never a flat color. Gilded elements (the surah
   rosette, ayah number marks, the home mark) carry a three-stop leaf
   gradient (deep bronze → bright gilt → deep bronze). The gradient's

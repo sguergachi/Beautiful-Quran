@@ -50,8 +50,12 @@ export interface RosetteSpec {
   tipRadius: number
 }
 
+/** Curated repeat families shared with the Android generator and Lab. */
+export const FIELD_PATTERNS = ['star-and-cross', 'octagonal garden', 'lozenge rosettes'] as const
+
 /** One translational unit cell of a geometric field with filigree. */
 export interface FieldSpec {
+  pattern: typeof FIELD_PATTERNS[number]
   cellW: number
   cellH: number
   cellWidthDp: number
@@ -667,12 +671,13 @@ function fieldCurve(coords: number[][], closed: boolean): OrnamentStroke {
 }
 
 /**
- * Star-and-cross geometry with a paired outline and eight mirrored foliate
- * sprays. Detail stays inside its compartment; four RNG draws vary only
- * proportions within this grammar. See docs/ORNAMENT_FIELDS.md.
+ * Three composed geometric families with compartment-specific filigree.
+ * Four RNG draws choose a family and its safe proportions. See docs/ORNAMENT_FIELDS.md.
  */
 function generateField(rng: Mulberry32): FieldSpec {
-  const inset = rng.range(0.042, 0.052)
+  const choice = rng.range(0, 3)
+  const family = Math.floor(choice)
+  const inset = 0.042 + (choice - family) * 0.01
   const curl = rng.range(0.265, 0.285)
   const tip = rng.range(0.392, 0.410)
   const spacing = rng.range(148, 168)
@@ -681,7 +686,12 @@ function generateField(rng: Mulberry32): FieldSpec {
       radius * (i % 2 ? Math.cos(Math.PI / 4) / Math.cos(Math.PI / 8) : 1))),
     closed: true, weight, birth: 0, span: 1,
   })
-  const strokes = [star(0.5, 'rule'), star(0.5 - inset, 'rule'), star(0.13, 'hairline')]
+  const frame = (radius: number): OrnamentStroke => family === 0 ? star(radius, 'rule') : ({
+    points: Array.from({ length: family === 1 ? 8 : 4 }, (_, i) =>
+      polar(i * TAU / (family === 1 ? 8 : 4), radius)),
+    closed: true, weight: 'rule', birth: 0, span: 1,
+  })
+  const strokes = [frame(0.5), frame(0.5 - inset), star(0.13, 'hairline')]
   const scroll = fieldCurve([
     [0.13, 0], [0.19, 0], [0.20, -0.075], [0.27, -0.075],
     [0.34, -0.075], [0.35, -0.01], [0.30, -0.012],
@@ -691,9 +701,20 @@ function generateField(rng: Mulberry32): FieldSpec {
     [0.35, 0], [0.37, -0.02], [tip - 0.02, -0.02], [tip, 0],
     [tip - 0.02, 0.02], [0.37, 0.02], [0.35, 0],
   ], true)
-  for (let i = 0; i < 8; i++) {
-    const a = i * Math.PI / 4
-    for (const [motif, sign] of [[scroll, -1], [scroll, 1], [leaf, 1]] as const) {
+  const petal = fieldCurve([
+    [0.13, 0], [0.19, -0.035], [0.29, -0.055], [tip, 0],
+    [0.29, 0.055], [0.19, 0.035], [0.13, 0],
+  ], true)
+  const vein = fieldCurve([
+    [0.13, 0], [0.20, 0], [0.25, -0.025], [curl + 0.04, 0],
+    [0.25, 0.025], [0.20, 0], [0.13, 0],
+  ], true)
+  const motifs: [OrnamentStroke, number][] = family === 1 ? [[petal, 1], [vein, 1]] :
+    [[scroll, -1], [scroll, 1], [leaf, 1]]
+  const fold = family === 2 ? 4 : 8
+  for (let i = 0; i < fold; i++) {
+    const a = i * TAU / fold
+    for (const [motif, sign] of motifs) {
       strokes.push({ ...motif, points: motif.points.map((p) => ({
         x: 0.5 + p.x * Math.cos(a) - p.y * sign * Math.sin(a),
         y: 0.5 + p.x * Math.sin(a) + p.y * sign * Math.cos(a),
@@ -705,8 +726,13 @@ function generateField(rng: Mulberry32): FieldSpec {
     [0.04, 0], [0.068, 0], [0.045, 0.045], [0.064, 0.064],
     [0.045, 0.045], [0, 0.068], [0, 0.04],
   ], false)
+  const cornerStar: OrnamentStroke = { ...star(0.18, 'hairline'), closed: false,
+    points: star(0.18, 'hairline').points.slice(0, 5).map((p) => ({ x: p.x - 0.5, y: p.y - 0.5 })) }
+  const corners = family === 2 ? [cornerStar, { ...quarter,
+    points: quarter.points.map((p) => ({ x: p.x * 1.5, y: p.y * 1.5 })) }] : [quarter]
   for (const [cx, cy, sx, sy] of [[0, 0, 1, 1], [1, 0, -1, 1], [1, 1, -1, -1], [0, 1, 1, -1]]) {
-    strokes.push({ ...quarter, points: quarter.points.map((p) => ({ x: cx! + sx! * p.x, y: cy! + sy! * p.y })) })
+    for (const motif of corners) strokes.push({ ...motif,
+      points: motif.points.map((p) => ({ x: cx! + sx! * p.x, y: cy! + sy! * p.y })) })
   }
   const inkLength = strokes.reduce((total, s) => {
     const points = s.closed ? [...s.points, s.points[0]!] : s.points
@@ -716,7 +742,8 @@ function generateField(rng: Mulberry32): FieldSpec {
     }, 0)
     return total + length * (s.weight === 'rule' ? 1 : 0.55)
   }, 0)
-  return { cellW: 1, cellH: 1, cellWidthDp: spacing * inkLength / 11.5, strokes }
+  return { pattern: FIELD_PATTERNS[family]!, cellW: 1, cellH: 1,
+    cellWidthDp: spacing * inkLength / [11.5, 11, 9][family]!, strokes }
 }
 
 /**

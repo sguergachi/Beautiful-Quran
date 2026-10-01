@@ -11,6 +11,7 @@
  */
 import { useCallback, useEffect, useId, useMemo, useState } from 'react'
 import {
+  FIELD_PATTERNS,
   generateChapterOrnament,
   generateCoverOrnament,
   type CoverOrnament,
@@ -138,6 +139,7 @@ export function OrnamentsLab() {
 
   // Trait filters for "design by trait" search.
   const [fFold, setFFold] = useState('any')
+  const [fPattern, setFPattern] = useState('any')
   const [searchNote, setSearchNote] = useState('')
 
   const cover = useMemo(() => generateCoverOrnament(seed), [seed])
@@ -185,14 +187,16 @@ export function OrnamentsLab() {
     const start = randomSeed()
     for (let i = 0; i < 200_000; i++) {
       const candidate = (start + i) | 0
-      const t = coverTraits(generateCoverOrnament(candidate))
+      const cover = generateCoverOrnament(candidate)
+      const t = coverTraits(cover)
+      if (fPattern !== 'any' && cover.field.pattern !== fPattern) continue
       if (fFold !== 'any' && t.medallionFold !== Number(fFold)) continue
       setSeed(candidate)
       setSearchNote(`Found after ${i + 1} tries`)
       return
     }
     setSearchNote('No match in 200k seeds — loosen the filters')
-  }, [fFold])
+  }, [fFold, fPattern])
 
   const gold = { brightGold: 'var(--gold-bright)', deepGold: 'var(--gold-deep)', embossDark: 'var(--emboss-dark)', embossLight: 'var(--emboss-light)' }
   const paper = THEME_PAPER[theme]
@@ -279,7 +283,7 @@ export function OrnamentsLab() {
           <dl>
             <div><dt>Medallion fold</dt><dd>{traits.medallionFold}</dd></div>
             <div><dt>Seal fold</dt><dd>{traits.sealFold}</dd></div>
-            <div><dt>Field style</dt><dd>star-and-cross filigree</dd></div>
+            <div><dt>Field style</dt><dd>{cover.field.pattern}</dd></div>
             <div><dt>Border</dt><dd>{traits.borderSignature}</dd></div>
           </dl>
         </section>
@@ -291,6 +295,12 @@ export function OrnamentsLab() {
           <label>Medallion fold
             <select value={fFold} onChange={(e) => setFFold(e.target.value)}>
               <option value="any">any</option><option>8</option><option>10</option><option>12</option><option>16</option>
+            </select>
+          </label>
+          <label>Field pattern
+            <select value={fPattern} onChange={(e) => setFPattern(e.target.value)}>
+              <option value="any">any</option>
+              {FIELD_PATTERNS.map((pattern) => <option key={pattern}>{pattern}</option>)}
             </select>
           </label>
           <button onClick={findSeed}>Find a seed</button>

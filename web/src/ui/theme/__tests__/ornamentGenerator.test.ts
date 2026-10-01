@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
+  FIELD_PATTERNS,
   chapterOrnamentSeed,
   generateChapterOrnament,
   generateCoverOrnament,
@@ -230,15 +231,22 @@ describe('ornamentGenerator', () => {
   it('a seed sample uses every fold, varied filigree geometry, and border', () => {
     const folds = new Set<number>()
     const fieldStyles = new Set<string>()
+    const coverPatterns = new Set<string>(), chapterPatterns = new Set<string>(), frames = new Set<number>()
     const borders = new Set<string>()
     for (let seed = 0; seed < 200; seed++) {
       const o = generateCoverOrnament(seed)
       folds.add(o.medallion.fold)
       fieldStyles.add(JSON.stringify(o.field.strokes[1]!.points))
+      coverPatterns.add(o.field.pattern)
+      chapterPatterns.add(generateChapterOrnament(seed).field.pattern)
+      frames.add(o.field.strokes[0]!.points.length)
       borders.add(`${o.border.strokes.length}/${o.border.dots.length}`)
     }
     expect([...folds].sort((a, b) => a - b)).toEqual([8, 10, 12, 16])
     expect(fieldStyles.size).toBeGreaterThanOrEqual(3)
+    expect([...coverPatterns].sort()).toEqual([...FIELD_PATTERNS].sort())
+    expect([...chapterPatterns].sort()).toEqual([...FIELD_PATTERNS].sort())
+    expect([...frames].sort((a, b) => a - b)).toEqual([4, 8, 16])
     expect(borders.size).toBeGreaterThanOrEqual(3)
   })
 
@@ -255,7 +263,10 @@ describe('ornamentGenerator', () => {
     }
     for (let seed = 0; seed < 400; seed++) {
       const f = generateCoverOrnament(seed * 104729 + 13).field
-      expect(f.strokes.length).toBe(31)
+      const family = FIELD_PATTERNS.indexOf(f.pattern)
+      const density = [11.5, 11, 9][family]!
+      const detailEnd = [27, 19, 15][family]!
+      expect(f.strokes.length).toBe(family === 0 ? 31 : 23)
       expect(f.strokes.filter((s) => s.weight === 'rule').length).toBe(2)
       const pts = f.strokes.flatMap((s) => s.points)
       const edges = f.strokes.flatMap((s) => {
@@ -267,8 +278,8 @@ describe('ornamentGenerator', () => {
         const length = p.slice(1).reduce((n, q, i) => n + Math.hypot(q.x - p[i]!.x, q.y - p[i]!.y), 0)
         return sum + length * (s.weight === 'rule' ? 1 : 0.55)
       }, 0)
-      expect(inkLength / f.cellWidthDp).toBeGreaterThanOrEqual(11.5 / 168 - 1e-9)
-      expect(inkLength / f.cellWidthDp).toBeLessThanOrEqual(11.5 / 148 + 1e-9)
+      expect(inkLength / f.cellWidthDp).toBeGreaterThanOrEqual(density / 168 - 1e-9)
+      expect(inkLength / f.cellWidthDp).toBeLessThanOrEqual(density / 148 + 1e-9)
       expect(pts.every((p) => p.x >= -1e-9 && p.x <= 1 + 1e-9 && p.y >= -1e-9 && p.y <= 1 + 1e-9)).toBe(true)
       const key = (x: number, y: number) => `${Math.round(x * 1e9)}/${Math.round(y * 1e9)}`
       const coordinates = new Set(pts.map((p) => key(p.x, p.y)))
@@ -282,8 +293,8 @@ describe('ornamentGenerator', () => {
         return Math.hypot(p.x - a.x - t * dx, p.y - a.y - t * dy)
       }
       let maxRadius = 0, clearance = Infinity
-      f.strokes.slice(3, 27).forEach((s, i) => {
-        if (i % 3 !== 2) expect(heart.some((p) => Math.hypot(p.x - s.points[0]!.x, p.y - s.points[0]!.y) < 1e-9)).toBe(true)
+      f.strokes.slice(3, detailEnd).forEach((s, i) => {
+        if (family === 1 || i % 3 !== 2) expect(heart.some((p) => Math.hypot(p.x - s.points[0]!.x, p.y - s.points[0]!.y) < 1e-9)).toBe(true)
         for (const p of s.points) {
           maxRadius = Math.max(maxRadius, Math.hypot(p.x - 0.5, p.y - 0.5))
           clearance = Math.min(clearance, ...frame.map((a, j) => distanceToEdge(p, a, frame[(j + 1) % frame.length]!)))
@@ -300,14 +311,18 @@ describe('ornamentGenerator', () => {
   })
 
   it('field known answers match Android including the reported bare-grid seed', () => {
-    const signature = [16, 16, 16, ...Array.from({ length: 8 }, () => [31, 31, 21]).flat(), 21, 21, 21, 21]
-    for (const [seed, width] of [
-      [1, 140.10369868522923],
-      [8, 154.91225717307822],
-      [21, 148.96731388542358],
-      [132614421, 147.25736671122036],
+    const star = [16, 16, 16, ...Array.from({ length: 8 }, () => [31, 31, 21]).flat(), 21, 21, 21, 21]
+    const garden = [8, 8, 16, ...Array(20).fill(21)]
+    const lozenge = [4, 4, 16, ...Array.from({ length: 4 }, () => [31, 31, 21]).flat(),
+      ...Array.from({ length: 4 }, () => [5, 21]).flat()]
+    for (const [seed, pattern, signature, width] of [
+      [1, 'lozenge rosettes', lozenge, 146.9723347978903],
+      [8, 'star-and-cross', star, 154.83824103705285],
+      [21, 'octagonal garden', garden, 153.434968365201],
+      [132614421, 'lozenge rosettes', lozenge, 154.24336790663426],
     ] as const) {
       const f = generateCoverOrnament(seed).field
+      expect(f.pattern).toBe(pattern)
       expect(f.strokes.map((s) => s.points.length)).toEqual(signature)
       expect(f.cellWidthDp).toBeCloseTo(width, 9)
     }
