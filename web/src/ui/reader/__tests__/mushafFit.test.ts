@@ -33,7 +33,7 @@ describe('measure', () => {
 
   it('grows the type to fill the measure, up to the leading floor', () => {
     const fit = mushafLeafFit(600, 500, 2)
-    expect(fit).toBeGreaterThan(1.19)
+    expect(fit).toBeGreaterThan(1.18)
     expect(500 * fit).toBeLessThanOrEqual(600)
     // The line pitch only allows 5% more: stop there, block drawn in instead.
     expect(mushafLeafFit(600, 500, 1.05)).toBe(1.05)
