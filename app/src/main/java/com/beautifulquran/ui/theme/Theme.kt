@@ -1,12 +1,16 @@
 package com.beautifulquran.ui.theme
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.ColorScheme
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.staticCompositionLocalOf
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import com.beautifulquran.data.ColorSystem
 import com.beautifulquran.data.ThemeMode
@@ -402,7 +406,9 @@ val LocalSettingsSheet = staticCompositionLocalOf { LightSettingsSheet }
 /**
  * Sets [content] on the Settings stock: `colorScheme.background` becomes that
  * paper, so every fade and dissolve that takes the sheet's colour follows it,
- * and the ink ladder is the one solved against it.
+ * and the ink ladder is the one solved against it. The sheet itself is laid
+ * here: a page that paints no ground of its own (Customize) would otherwise
+ * show the reading paper through, with only its edge fades in this stock.
  */
 @Composable
 fun SettingsPaper(content: @Composable () -> Unit) {
@@ -411,8 +417,9 @@ fun SettingsPaper(content: @Composable () -> Unit) {
         MaterialTheme(
             colorScheme = MaterialTheme.colorScheme.copy(background = sheet.paper),
             typography = MaterialTheme.typography,
-            content = content,
-        )
+        ) {
+            Box(Modifier.fillMaxSize().background(sheet.paper)) { content() }
+        }
     }
 }
 
