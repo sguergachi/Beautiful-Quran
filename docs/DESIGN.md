@@ -37,7 +37,8 @@ left leaf on demand, as Settings is, and touching the open page puts it away.
 **The book behaves as paper does.** A page turn is a leaf in the air: it
 lifts off one page, swings over its bound edge and lies down on the other,
 carrying the old spread's inner page on its face and the new one's on its
-back. What it uncovers is already the new page. A single leaf (phones) is
+back. It furls: paper is not a board, so the free
+edge is lifted first and the sheet bows behind it, then is laid flat. What it uncovers is already the new page. A single leaf (phones) is
 bound at its right edge and lifts to edge-on. The cover opens the same way:
 the closed book slides onto the right-hand page block and the board swings
 right over the spine to lie open on the left, its inside becoming the left

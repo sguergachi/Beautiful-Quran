@@ -23,6 +23,7 @@ import type { PageNumberScript } from '../../data/settings'
 import { appStore } from '../../store/appStore'
 import { useBookSpread, useTurningLeafSlot, useVersoLeafSlot } from '../paper/bookSpread'
 import { COVER_LAYER, READER_LAYER } from '../paper/stack'
+import { TurningLeaf } from './TurningLeaf'
 
 /** Keep in step with `mushaf-leaf-turn` in styles.css. */
 const PAGE_TURN_MS = 760
@@ -206,17 +207,14 @@ export function MushafReader({
       <>
         <MushafLeaf page={under} fit={fits.recto} {...leafProps} />
         {turning ? (
-          <div className="mushaf-flip mushaf-flip--single" key={flipKey}>
-            <div
-              className="mushaf-flip-leaf"
-              data-dir={forward ? 'on' : 'back'}
-              onAnimationEnd={endTurn}
-            >
-              <div className="mushaf-flip-face">
-                <MushafLeaf page={inAir} fit={fits.recto} {...airProps} />
-              </div>
-            </div>
-          </div>
+          <TurningLeaf
+            key={flipKey}
+            single
+            hinge="right"
+            dir={forward ? 'on' : 'back'}
+            face={() => <MushafLeaf page={inAir} fit={fits.recto} {...airProps} />}
+            onEnd={endTurn}
+          />
         ) : null}
       </>
     )
@@ -261,32 +259,30 @@ export function MushafReader({
         : null}
       {turning && turnSlot
         ? createPortal(
-            <div className="mushaf-flip" key={flipKey}>
-              <div
-                className="mushaf-flip-leaf"
-                data-dir={forward ? 'on' : 'back'}
-                onAnimationEnd={endTurn}
-              >
-                <div className="mushaf-flip-face">
-                  <MushafLeaf
-                    page={forward ? was.left : was.right}
-                    side={forward ? 'verso' : 'recto'}
-                    fit={fit}
-                    style={versoBox}
-                    {...airProps}
-                  />
-                </div>
-                <div className="mushaf-flip-face mushaf-flip-face--back">
-                  <MushafLeaf
-                    page={forward ? now.right : now.left}
-                    side={forward ? 'recto' : 'verso'}
-                    fit={fit}
-                    style={versoBox}
-                    {...airProps}
-                  />
-                </div>
-              </div>
-            </div>,
+            <TurningLeaf
+              key={flipKey}
+              hinge={forward ? 'right' : 'left'}
+              dir={forward ? 'on' : 'back'}
+              face={() => (
+                <MushafLeaf
+                  page={forward ? was.left : was.right}
+                  side={forward ? 'verso' : 'recto'}
+                  fit={fit}
+                  style={versoBox}
+                  {...airProps}
+                />
+              )}
+              back={() => (
+                <MushafLeaf
+                  page={forward ? now.right : now.left}
+                  side={forward ? 'recto' : 'verso'}
+                  fit={fit}
+                  style={versoBox}
+                  {...airProps}
+                />
+              )}
+              onEnd={endTurn}
+            />,
             turnSlot,
           )
         : null}

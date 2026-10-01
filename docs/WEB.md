@@ -382,7 +382,9 @@ their few lines in the well, and facing leaves mirror their running heads.
 Page turns: `MushafReader` keeps the place the book last settled on and,
 while it differs from the current place, portals a two-faced leaf into
 `BookSpread`'s turn slot (`.mushaf-flip`, CSS `rotateY`, 760 ms; a single leaf
-turns inside the reader sheet). `EntranceCover` wraps its tooling in
+turns inside the reader sheet). The leaf (`TurningLeaf`) is a chain of nine
+strips, each hinged on the one before and bending a few degrees at its joint,
+so the page furls; every strip windows its own slice of the page. `EntranceCover` wraps its tooling in
 `.entrance-front` and adds `.entrance-inside`, so the spread's cover swings a
 full 180° (`BOOK_OPEN_MS`). Paper grain is one static `.app-shell::after`
 layer, light theme only, plain alpha with no blend mode.

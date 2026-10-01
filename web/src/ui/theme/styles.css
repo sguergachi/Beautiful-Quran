@@ -6670,56 +6670,84 @@ html[data-entrance-opening]
   inset: 0;
   pointer-events: none;
   perspective: 2600px;
-}
-
-.mushaf-flip-leaf {
-  position: absolute;
-  top: 0;
-  bottom: 0;
-  width: 50%;
-  transform-style: preserve-3d;
-  /* Duration mirrors PAGE_TURN_MS in MushafReader. */
-  animation: mushaf-leaf-turn 760ms cubic-bezier(0.42, 0.04, 0.22, 1) both;
+  /* Spread: the leaf is one page wide, on the side it lifts from. */
+  --leaf-width: 50%;
+  --turn-ms: 760ms;
 }
 
 /* Pages run right to left. Going on, the left leaf swings to the right. */
-.mushaf-flip-leaf[data-dir='on'] {
-  left: 0;
-  transform-origin: right center;
+.mushaf-flip[data-dir='on'] {
   --turn-from: 0deg;
   --turn-to: 180deg;
-  --shade-angle: 90deg;
+  --furl: 6.5deg;
 }
 
-.mushaf-flip-leaf[data-dir='back'] {
-  left: 50%;
-  transform-origin: left center;
+.mushaf-flip[data-dir='back'] {
   --turn-from: 0deg;
   --turn-to: -180deg;
-  --shade-angle: 270deg;
+  --furl: -6.5deg;
 }
 
 /* A single leaf is bound at its right edge and has nowhere to land: it
    lifts until it is edge-on, or comes down from there. */
 .mushaf-flip--single {
   perspective: 1700px;
+  --leaf-width: 100%;
+  --furl: 6deg;
 }
 
-.mushaf-flip--single .mushaf-flip-leaf {
-  left: 0;
-  width: 100%;
-  transform-origin: right center;
-  --shade-angle: 90deg;
-}
-
-.mushaf-flip--single .mushaf-flip-leaf[data-dir='on'] {
+.mushaf-flip--single[data-dir='on'] {
   --turn-from: 0deg;
   --turn-to: 96deg;
 }
 
-.mushaf-flip--single .mushaf-flip-leaf[data-dir='back'] {
+.mushaf-flip--single[data-dir='back'] {
   --turn-from: 96deg;
   --turn-to: 0deg;
+}
+
+/* A strip of the leaf. The first is bound to the page's edge and carries
+   the turn; each one after hangs on the strip before it and bends a little
+   at the joint, so the free edge lifts first and the sheet bows behind it. */
+.mushaf-flip-strip {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 100%;
+  transform-style: preserve-3d;
+  animation: mushaf-leaf-furl var(--turn-ms) ease-in-out both;
+}
+
+.mushaf-flip[data-hinge='right'] .mushaf-flip-strip {
+  right: 100%;
+  transform-origin: right center;
+}
+
+.mushaf-flip[data-hinge='left'] .mushaf-flip-strip {
+  left: 100%;
+  transform-origin: left center;
+}
+
+.mushaf-flip-strip[data-bound] {
+  width: calc(var(--leaf-width) / var(--strips));
+  /* The bound edge follows the hand: it starts late and settles last. */
+  animation: mushaf-leaf-turn var(--turn-ms) cubic-bezier(0.5, 0.02, 0.28, 1) both;
+}
+
+.mushaf-flip[data-hinge='right'] .mushaf-flip-strip[data-bound] {
+  right: calc(100% - var(--leaf-width));
+}
+
+.mushaf-flip--single[data-hinge='right'] .mushaf-flip-strip[data-bound] {
+  right: 0;
+}
+
+.mushaf-flip[data-hinge='left'] .mushaf-flip-strip[data-bound] {
+  left: var(--leaf-width);
+}
+
+.mushaf-flip--single[data-dir='back'] .mushaf-flip-strip:not([data-bound]) {
+  animation-direction: reverse;
 }
 
 @keyframes mushaf-leaf-turn {
@@ -6731,9 +6759,40 @@ html[data-entrance-opening]
   }
 }
 
+/* Bend at one joint: quick into the curl as the edge is picked up, slow
+   out of it as the sheet is laid flat. */
+@keyframes mushaf-leaf-furl {
+  0% {
+    transform: rotateY(0deg);
+  }
+  34% {
+    transform: rotateY(var(--furl));
+  }
+  90%,
+  100% {
+    transform: rotateY(0deg);
+  }
+}
+
+.mushaf-flip--single .mushaf-flip-strip:not([data-bound]) {
+  animation-name: mushaf-leaf-furl-lift;
+}
+
+/* A leaf that leaves stays bowed until it is gone. */
+@keyframes mushaf-leaf-furl-lift {
+  0% {
+    transform: rotateY(0deg);
+  }
+  45%,
+  100% {
+    transform: rotateY(var(--furl));
+  }
+}
+
 .mushaf-flip-face {
   position: absolute;
-  inset: 0;
+  /* Over the joint by a pixel each side, so nothing shows between strips. */
+  inset: 0 -1px;
   overflow: hidden;
   background: var(--paper);
   backface-visibility: hidden;
@@ -6743,43 +6802,57 @@ html[data-entrance-opening]
   transform: rotateY(180deg);
 }
 
-.mushaf-flip--single .mushaf-flip-face {
+/* The whole page, laid behind the strip's window at this strip's slice. */
+.mushaf-flip-page {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  /* Percentages here are of the widened face; undo its 2px so each strip's
+     slice still starts exactly where the last one ended. */
+  width: calc(var(--strips) * (100% - 2px));
+  margin-left: 1px;
+}
+
+.mushaf-flip--single .mushaf-flip-page {
   display: flex;
   flex-direction: column;
 }
 
-.mushaf-flip-face > .mushaf {
+.mushaf-flip-page > .mushaf {
   position: absolute;
 }
 
-.mushaf-flip--single .mushaf-flip-face > .mushaf {
+.mushaf-flip--single .mushaf-flip-page > .mushaf {
   position: static;
 }
 
 /* The leaf's own shading as it stands up out of the light — darkest toward
-   the bound edge. Paper turning, not a shadow cast on the page beneath. */
-.mushaf-flip-face::after {
+   the bound edge, and one gradient across the whole page so the strips read
+   as a single bowed sheet. Paper turning, not a shadow cast beneath. */
+.mushaf-flip-page::after {
   content: '';
   position: absolute;
   inset: 0;
   background: linear-gradient(
-    var(--shade-angle),
-    rgb(from var(--book-gutter-shade) r g b / calc(alpha * 0.35)),
+    to right,
+    rgb(from var(--book-gutter-shade) r g b / calc(alpha * 0.3)),
     var(--book-gutter-shade)
   );
-  animation: mushaf-leaf-shade 760ms ease-in-out both;
+  animation: mushaf-leaf-shade var(--turn-ms) ease-in-out both;
 }
 
-.mushaf-flip-face--back::after {
+/* Bound on the left (or seen from behind a right-bound leaf): the dark end
+   of that gradient belongs at the other side. */
+.mushaf-flip[data-hinge='left'] .mushaf-flip-face:not(.mushaf-flip-face--back) .mushaf-flip-page::after,
+.mushaf-flip[data-hinge='right'] .mushaf-flip-face--back .mushaf-flip-page::after {
   transform: scaleX(-1);
 }
 
-.mushaf-flip--single .mushaf-flip-leaf[data-dir='on'] .mushaf-flip-face::after {
+.mushaf-flip--single .mushaf-flip-page::after {
   animation-name: mushaf-leaf-shade-lift;
 }
 
-.mushaf-flip--single .mushaf-flip-leaf[data-dir='back'] .mushaf-flip-face::after {
-  animation-name: mushaf-leaf-shade-lift;
+.mushaf-flip--single[data-dir='back'] .mushaf-flip-page::after {
   animation-direction: reverse;
 }
 
