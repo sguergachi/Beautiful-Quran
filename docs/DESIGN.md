@@ -995,6 +995,11 @@ image, so it is crisp at any density and nearly free to render.
   ({10/4} → two {5/2} pentacles stacked), 6-fold seals, and 6-fold field
   tilings are all excluded by construction and guarded by tests on both
   platforms.
+- **Field harmony.** The ground uses three constrained star-and-cross recipes:
+  open khatam outline, outline with a small centre, or two-square khatam.
+  Square corner knots meet the diagonal tips without added crossings;
+  richer recipes get larger repeats according to their total line length.
+  Construction, research and testable rules: [ORNAMENT_FIELDS.md](ORNAMENT_FIELDS.md).
 - **Gilding.** Gold is never a flat color. Gilded elements (the surah
   rosette, ayah number marks, the home mark) carry a three-stop leaf
   gradient (deep bronze → bright gilt → deep bronze). The gradient's
@@ -1014,7 +1019,7 @@ image, so it is crisp at any density and nearly free to render.
   upper-left beneath its face — relief under a top-left light, subtle enough
   to be felt more than seen.
 - **The weave.** Behind each surah opening, that chapter's own generated
-  Hankin field at ~4 % ink, embossed, dissolving into the page at its
+  star-and-cross field at ~4 % ink, embossed, dissolving into the page at its
   edges — grown from the same seed as the rosette sitting on it (see "The
   generating machine" above), not a fixed pattern every chapter shares.
 - **Basmalah.** Every surah except Al-Fatihah (where it *is* ayah 1) and

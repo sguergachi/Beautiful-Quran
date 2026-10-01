@@ -22,14 +22,13 @@ data class OrnamentTraits(
 /** Derive traits from what the generator actually drew (mirrors the web Lab's `coverTraits`). */
 private fun decodeTraits(o: CoverOrnament): OrnamentTraits {
     val f = o.field
-    val octagram = f.strokes[0].points.size == 8
-    val base = if (octagram) 2 else 3
-    val knot = if (octagram) f.strokes[1] else f.strokes[2]
+    val outline = f.strokes[0].points.size == 16
+    val base = if (outline) 2 else 3
     return OrnamentTraits(
         medallionFold = o.medallion.fold,
         sealFold = o.cornerSeal.fold,
-        fieldStar = if (octagram) "octagram" else "khatam",
-        fieldKnot = if (knot.points.size == 8) "octagon" else "square",
+        fieldStar = if (outline) "outline" else "khatam",
+        fieldKnot = "square",
         fieldCentre = f.strokes.size > base,
         borderSignature = "${o.border.strokes.size}·${o.border.dots.size}",
     )
@@ -86,14 +85,17 @@ class OrnamentsLabViewModel(private val store: OrnamentSeedStore) : ViewModel() 
      * non-null filter, up to 200k tries. A random start (rather than 0) means
      * repeated searches with the same filters turn up different seeds.
      */
-    fun findSeed(fold: Int?, star: String?, knot: String?, centre: Boolean?) {
+    fun findSeed(fold: Int?, star: String?, centre: Boolean?) {
+        if (star == "khatam" && centre == true) {
+            _ui.value = _ui.value.copy(searchNote = "Centre details belong to the outline star — choose outline or no centre")
+            return
+        }
         val start = Random.nextInt()
         for (i in 0 until MAX_SEARCH_TRIES) {
             val candidate = start + i
             val traits = decodeTraits(generateCoverOrnament(candidate))
             if (fold != null && traits.medallionFold != fold) continue
             if (star != null && traits.fieldStar != star) continue
-            if (knot != null && traits.fieldKnot != knot) continue
             if (centre != null && traits.fieldCentre != centre) continue
             _ui.value = freshState(candidate).copy(searchNote = "Found after ${i + 1} tries")
             return

@@ -50,7 +50,7 @@ export interface RosetteSpec {
   tipRadius: number
 }
 
-/** One translational unit cell of a periodic Hankin field. */
+/** One translational unit cell of a periodic star-and-cross field. */
 export interface FieldSpec {
   cellW: number
   cellH: number
@@ -702,20 +702,14 @@ function khatamStar(cx: number, cy: number): OrnamentStroke[] {
   ]
 }
 
-/**
- * The {8/3} octagram at (cx, cy): one interlaced closed polyline through the
- * same eight points as the khatam, for a more woven star.
- */
-function octagramStar(cx: number, cy: number): OrnamentStroke {
-  const r = FIELD_STAR_R
-  const points: OrnamentPoint[] = []
-  let k = 0
-  for (let i = 0; i < 8; i++) {
-    const a = (k * Math.PI) / 4
-    points.push({ x: cx + r * Math.cos(a), y: cy + r * Math.sin(a) })
-    k = (k + 3) % 8
-  }
-  return fieldStroke(points)
+/** The outer silhouette of two overlapped squares, without their internal crossings. */
+function outlinedStar(cx: number, cy: number): OrnamentStroke {
+  const inner = FIELD_STAR_R / (Math.cos(Math.PI / 8) + Math.sin(Math.PI / 8))
+  return fieldStroke(Array.from({ length: 16 }, (_, i) => {
+    const a = i * Math.PI / 8
+    const r = i % 2 === 0 ? FIELD_STAR_R : inner
+    return { x: cx + r * Math.cos(a), y: cy + r * Math.sin(a) }
+  }))
 }
 
 /** Square knot at (cx, cy): corners on the four nearest star diagonal tips. */
@@ -729,17 +723,6 @@ function squareKnot(cx: number, cy: number): OrnamentStroke {
   ])
 }
 
-/** Octagon knot at (cx, cy): a regular octagon through the same diagonal tips. */
-function octagonKnot(cx: number, cy: number): OrnamentStroke {
-  const rr = FIELD_G * Math.sqrt(2)
-  const points: OrnamentPoint[] = []
-  for (let i = 0; i < 8; i++) {
-    const a = (i * Math.PI) / 4
-    points.push({ x: cx + rr * Math.cos(a), y: cy + rr * Math.sin(a) })
-  }
-  return fieldStroke(points)
-}
-
 /** A small diamond centre-mark inside the star. */
 function centreMark(cx: number, cy: number, h: number): OrnamentStroke {
   return fieldStroke([
@@ -751,24 +734,27 @@ function centreMark(cx: number, cy: number, h: number): OrnamentStroke {
 }
 
 /**
- * A star-and-cross field: an eight-pointed star (khatam or {8/3} octagram)
- * at the cell centre, a knot (square or octagon) at the cell corner, and an
- * optional centre-mark. One unit cell tiles the plane into the continuous
- * pattern; density comes from the rendered cell width. Everything is in the
- * 4/8-fold khatam family, so nothing can read as a hexagram.
+ * Compose a quiet field: an open star, an enriched open star, or a woven
+ * khatam. Only the open silhouette gets a centre; square knots touch the
+ * diagonal tips without crossing the stars. Spacing follows total line
+ * length, so richer motifs cannot make a darker, busier ground.
+ * See docs/ORNAMENT_FIELDS.md for the construction and design rules.
  */
 function generateField(rng: Mulberry32): FieldSpec {
-  const octagram = rng.chance(0.5)
-  const useOctagonKnot = rng.chance(0.5)
-  const withCentre = rng.chance(0.5)
-  const cellWidthDp = rng.range(48, 74)
+  const outlined = rng.chance(0.7)
+  const withCentre = rng.chance(0.4)
+  const centreRadius = rng.range(0.07, 0.10)
+  const spacing = rng.range(64, 80)
 
-  const strokes: OrnamentStroke[] = []
-  if (octagram) strokes.push(octagramStar(0.5, 0.5))
-  else strokes.push(...khatamStar(0.5, 0.5))
-  strokes.push(useOctagonKnot ? octagonKnot(0, 0) : squareKnot(0, 0))
-  if (withCentre) strokes.push(centreMark(0.5, 0.5, 0.08))
+  const strokes = outlined ? [outlinedStar(0.5, 0.5)] : khatamStar(0.5, 0.5)
+  strokes.push(squareKnot(0, 0))
+  if (outlined && withCentre) strokes.push(centreMark(0.5, 0.5, centreRadius))
 
+  const lineLength = strokes.reduce((total, s) => total + s.points.reduce((length, p, i) => {
+    const q = s.points[(i + 1) % s.points.length]!
+    return length + Math.hypot(p.x - q.x, p.y - q.y)
+  }, 0), 0)
+  const cellWidthDp = spacing * lineLength / 4.5
   return { cellW: 1, cellH: 1, cellWidthDp, strokes }
 }
 

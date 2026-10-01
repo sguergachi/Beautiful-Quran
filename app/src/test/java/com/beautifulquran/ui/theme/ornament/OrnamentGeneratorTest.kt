@@ -249,19 +249,64 @@ class OrnamentGeneratorTest {
     @Test
     fun `variety - a seed sample uses every fold, field style and border`() {
         val folds = HashSet<Int>()
-        val fieldStyles = HashSet<Int>()
+        val fieldStyles = HashSet<List<Int>>()
         val borderShapes = HashSet<Int>()
         for (seed in 0 until 200) {
             val o = generateCoverOrnament(seed)
             folds.add(o.medallion.fold)
-            // Star style (khatam = 2 strokes vs octagram = 1) and centre-mark
-            // presence both shift the field's stroke count.
-            fieldStyles.add(o.field.strokes.size)
+            fieldStyles.add(o.field.strokes.map { it.points.size })
             borderShapes.add(o.border.strokes.size * 31 + o.border.dots.size)
         }
         assertEquals(setOf(8, 10, 12, 16), folds)
         assertTrue("expected several field styles, got $fieldStyles", fieldStyles.size >= 3)
         assertTrue("expected several border grammars, got $borderShapes", borderShapes.size >= 3)
+    }
+
+    @Test
+    fun `fields retain symmetry tip contacts and an equal line-density budget`() {
+        repeat(400) { seed ->
+            val f = generateCoverOrnament(seed * 104729 + 13).field
+            val outline = f.strokes[0].points.size == 16
+            val expected = if (outline) {
+                if (f.strokes.size == 3) listOf(16, 4, 4) else listOf(16, 4)
+            } else listOf(4, 4, 4)
+            assertEquals(expected, f.strokes.map { it.points.size })
+            val length = f.strokes.sumOf { s ->
+                s.points.indices.sumOf { i ->
+                    val p = s.points[i]
+                    val q = s.points[(i + 1) % s.points.size]
+                    hypot(p.x - q.x, p.y - q.y)
+                }
+            }
+            assertTrue(length / f.cellWidthDp >= 4.5 / 80 - 1e-9)
+            assertTrue(length / f.cellWidthDp <= 4.5 / 64 + 1e-9)
+            val pts = f.strokes.flatMap { it.points }
+            fun matches(points: List<OrnamentPoint>, x: Double, y: Double) = points.any { p ->
+                abs(p.x - x - kotlin.math.round(p.x - x)) < 1e-9 &&
+                    abs(p.y - y - kotlin.math.round(p.y - y)) < 1e-9
+            }
+            for (p in pts) {
+                assertTrue("seed $seed: quarter-turn symmetry", matches(pts, 1 - p.y, p.x))
+                assertTrue("seed $seed: reflection symmetry", matches(pts, 1 - p.x, p.y))
+            }
+            val knot = f.strokes[if (outline) 1 else 2]
+            val tips = f.strokes.take(if (outline) 1 else 2).flatMap { it.points }
+            for (p in knot.points) {
+                assertTrue("seed $seed: knot misses diagonal tip", matches(tips, p.x, p.y))
+            }
+        }
+    }
+
+    @Test
+    fun `field known answers match web for all three recipes`() {
+        val seeds = listOf(1, 8, 21)
+        val signatures = listOf(listOf(4, 4, 4), listOf(16, 4), listOf(16, 4, 4))
+        val widths = listOf(98.15283630134532, 75.79477456023277, 78.9859811710065)
+        seeds.forEachIndexed { i, seed ->
+            val f = generateCoverOrnament(seed).field
+            assertEquals(signatures[i], f.strokes.map { it.points.size })
+            assertEquals(widths[i], f.cellWidthDp, 1e-9)
+        }
     }
 
     @Test

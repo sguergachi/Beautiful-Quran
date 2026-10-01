@@ -90,7 +90,6 @@ fun OrnamentsLabScreen(
     var saveName by remember { mutableStateOf("") }
     var fFold by remember { mutableStateOf<Int?>(null) }
     var fStar by remember { mutableStateOf<String?>(null) }
-    var fKnot by remember { mutableStateOf<String?>(null) }
     var fCentre by remember { mutableStateOf<Boolean?>(null) }
 
     // Dark workbench: force light status-bar icons so the clock/battery don't
@@ -334,14 +333,9 @@ fun OrnamentsLabScreen(
                     ) { fFold = it?.toInt() }
                     ChipGroup(
                         label = "Field star",
-                        options = listOf("khatam", "octagram"),
+                        options = listOf("khatam", "outline"),
                         selected = fStar,
                     ) { fStar = it }
-                    ChipGroup(
-                        label = "Field knot",
-                        options = listOf("square", "octagon"),
-                        selected = fKnot,
-                    ) { fKnot = it }
                     ChipGroup(
                         label = "Field centre",
                         options = listOf("yes", "no"),
@@ -354,7 +348,7 @@ fun OrnamentsLabScreen(
                         color = colors.primary,
                         modifier = Modifier
                             .quietClickable(onClick = {
-                                viewModel.findSeed(fFold, fStar, fKnot, fCentre)
+                                viewModel.findSeed(fFold, fStar, fCentre)
                             })
                             .padding(vertical = 6.dp),
                     )

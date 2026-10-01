@@ -229,19 +229,64 @@ describe('ornamentGenerator', () => {
 
   it('a seed sample uses every fold, field style, and border', () => {
     const folds = new Set<number>()
-    const fieldStyles = new Set<number>()
+    const fieldStyles = new Set<string>()
     const borders = new Set<string>()
     for (let seed = 0; seed < 200; seed++) {
       const o = generateCoverOrnament(seed)
       folds.add(o.medallion.fold)
-      // Star style (khatam = 2 strokes vs octagram = 1) and centre-mark
-      // presence both shift the field's stroke count.
-      fieldStyles.add(o.field.strokes.length)
+      fieldStyles.add(o.field.strokes.map((s) => s.points.length).join('/'))
       borders.add(`${o.border.strokes.length}/${o.border.dots.length}`)
     }
     expect([...folds].sort((a, b) => a - b)).toEqual([8, 10, 12, 16])
     expect(fieldStyles.size).toBeGreaterThanOrEqual(3)
     expect(borders.size).toBeGreaterThanOrEqual(3)
+  })
+
+  it('fields retain symmetry, tip contacts and an equal line-density budget', () => {
+    for (let seed = 0; seed < 400; seed++) {
+      const f = generateCoverOrnament(seed * 104729 + 13).field
+      const outline = f.strokes[0]!.points.length === 16
+      expect(f.strokes.map((s) => s.points.length)).toEqual(
+        outline ? (f.strokes.length === 3 ? [16, 4, 4] : [16, 4]) : [4, 4, 4],
+      )
+      const length = f.strokes.reduce((sum, s) => sum + s.points.reduce((sum, p, i) => {
+        const q = s.points[(i + 1) % s.points.length]!
+        return sum + Math.hypot(p.x - q.x, p.y - q.y)
+      }, 0), 0)
+      expect(length / f.cellWidthDp).toBeGreaterThanOrEqual(4.5 / 80 - 1e-9)
+      expect(length / f.cellWidthDp).toBeLessThanOrEqual(4.5 / 64 + 1e-9)
+      const pts = f.strokes.flatMap((s) => s.points)
+      const matches = (x: number, y: number) => pts.some((p) =>
+        Math.abs(p.x - x - Math.round(p.x - x)) < 1e-9 &&
+        Math.abs(p.y - y - Math.round(p.y - y)) < 1e-9)
+      for (const p of pts) {
+        expect(matches(1 - p.y, p.x), `seed ${seed}: quarter-turn symmetry`).toBe(true)
+        expect(matches(1 - p.x, p.y), `seed ${seed}: reflection symmetry`).toBe(true)
+      }
+      for (const [x, y] of [[0.5, 0], [0, 0.5], [1, 0.5], [0.5, 1]]) {
+        expect(matches(x!, y!), `seed ${seed}: edge contact`).toBe(true)
+      }
+      const knot = f.strokes[outline ? 1 : 2]!
+      const tips = f.strokes.slice(0, outline ? 1 : 2).flatMap((s) => s.points)
+      for (const p of knot.points) {
+        expect(tips.some((q) =>
+          Math.abs(p.x - q.x - Math.round(p.x - q.x)) < 1e-9 &&
+          Math.abs(p.y - q.y - Math.round(p.y - q.y)) < 1e-9),
+        `seed ${seed}: knot misses diagonal tip`).toBe(true)
+      }
+    }
+  })
+
+  it('field known answers match Android for all three recipes', () => {
+    for (const [seed, signature, width] of [
+      [1, [4, 4, 4], 98.15283630134532],
+      [8, [16, 4], 75.79477456023277],
+      [21, [16, 4, 4], 78.9859811710065],
+    ] as const) {
+      const f = generateCoverOrnament(seed).field
+      expect(f.strokes.map((s) => s.points.length)).toEqual(signature)
+      expect(f.cellWidthDp).toBeCloseTo(width, 9)
+    }
   })
 
   it('chapter seed recovers the chapter number regardless of ayah count', () => {

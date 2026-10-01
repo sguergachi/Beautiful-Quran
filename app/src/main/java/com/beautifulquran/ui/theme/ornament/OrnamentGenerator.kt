@@ -764,20 +764,14 @@ private fun khatamStar(cx: Double, cy: Double): List<OrnamentStroke> {
     )
 }
 
-/**
- * The {8/3} octagram at (cx, cy): one interlaced closed polyline through the
- * same eight points as the khatam, for a more woven star.
- */
-private fun octagramStar(cx: Double, cy: Double): OrnamentStroke {
-    val r = FIELD_STAR_R
-    val pts = ArrayList<OrnamentPoint>(8)
-    var k = 0
-    repeat(8) {
-        val a = k * PI / 4.0
-        pts.add(OrnamentPoint(cx + r * cos(a), cy + r * sin(a)))
-        k = (k + 3) % 8
-    }
-    return fieldStroke(pts)
+/** The outer silhouette of two overlapped squares, without their internal crossings. */
+private fun outlinedStar(cx: Double, cy: Double): OrnamentStroke {
+    val inner = FIELD_STAR_R / (cos(PI / 8) + sin(PI / 8))
+    return fieldStroke(List(16) { i ->
+        val a = i * PI / 8
+        val r = if (i % 2 == 0) FIELD_STAR_R else inner
+        OrnamentPoint(cx + r * cos(a), cy + r * sin(a))
+    })
 }
 
 /** Square knot at (cx, cy): corners on the four nearest star diagonal tips. */
@@ -791,17 +785,6 @@ private fun squareKnot(cx: Double, cy: Double): OrnamentStroke {
     )
 }
 
-/** Octagon knot at (cx, cy): a regular octagon through the same diagonal tips. */
-private fun octagonKnot(cx: Double, cy: Double): OrnamentStroke {
-    val rr = FIELD_G * kotlin.math.sqrt(2.0)
-    val pts = ArrayList<OrnamentPoint>(8)
-    for (i in 0 until 8) {
-        val a = i * PI / 4.0
-        pts.add(OrnamentPoint(cx + rr * cos(a), cy + rr * sin(a)))
-    }
-    return fieldStroke(pts)
-}
-
 /** A small diamond centre-mark inside the star. */
 private fun centreMark(cx: Double, cy: Double, h: Double): OrnamentStroke =
     fieldStroke(
@@ -812,23 +795,30 @@ private fun centreMark(cx: Double, cy: Double, h: Double): OrnamentStroke =
     )
 
 /**
- * A star-and-cross field: an eight-pointed star (khatam or {8/3} octagram)
- * at the cell centre, a knot (square or octagon) at the cell corner, and an
- * optional centre-mark. One unit cell tiles the plane into the continuous
- * pattern; density comes from the rendered cell width. Everything is in the
- * 4/8-fold khatam family, so nothing can read as a hexagram.
+ * Compose a quiet field: an open star, an enriched open star, or a woven
+ * khatam. Only the open silhouette gets a centre; square knots touch the
+ * diagonal tips without crossing the stars. Spacing follows total line
+ * length, so richer motifs cannot make a darker, busier ground.
+ * See docs/ORNAMENT_FIELDS.md for the construction and design rules.
  */
 private fun generateField(rng: Mulberry32): FieldSpec {
-    val octagram = rng.chance(0.5)
-    val useOctagonKnot = rng.chance(0.5)
-    val withCentre = rng.chance(0.5)
-    val cellWidthDp = rng.range(48.0, 74.0)
+    val outlined = rng.chance(0.7)
+    val withCentre = rng.chance(0.4)
+    val centreRadius = rng.range(0.07, 0.10)
+    val spacing = rng.range(64.0, 80.0)
 
-    val strokes = ArrayList<OrnamentStroke>()
-    if (octagram) strokes.add(octagramStar(0.5, 0.5)) else strokes.addAll(khatamStar(0.5, 0.5))
-    strokes.add(if (useOctagonKnot) octagonKnot(0.0, 0.0) else squareKnot(0.0, 0.0))
-    if (withCentre) strokes.add(centreMark(0.5, 0.5, 0.08))
+    val strokes = (if (outlined) listOf(outlinedStar(0.5, 0.5)) else khatamStar(0.5, 0.5)).toMutableList()
+    strokes.add(squareKnot(0.0, 0.0))
+    if (outlined && withCentre) strokes.add(centreMark(0.5, 0.5, centreRadius))
 
+    val lineLength = strokes.sumOf { s ->
+        s.points.indices.sumOf { i ->
+            val p = s.points[i]
+            val q = s.points[(i + 1) % s.points.size]
+            kotlin.math.hypot(p.x - q.x, p.y - q.y)
+        }
+    }
+    val cellWidthDp = spacing * lineLength / 4.5
     return FieldSpec(1.0, 1.0, cellWidthDp, strokes)
 }
 
