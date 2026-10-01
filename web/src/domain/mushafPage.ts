@@ -19,6 +19,8 @@ export interface MushafPage {
 
 export const MUSHAF_PAGE_COUNT = 604
 export const MUSHAF_LINES_PER_PAGE = 15
+/** Al-Fātiḥah and the opening of al-Baqarah: short leaves, centred in the well. */
+export const MUSHAF_OPENING_PAGES = 2
 
 export interface MushafWordPlacement {
   surahId: number

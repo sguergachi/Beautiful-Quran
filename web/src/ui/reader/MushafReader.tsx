@@ -11,13 +11,15 @@ import { QuranRepository } from '../../data/repository'
 import { runtimeMushafCache } from '../../data/runtimeMushaf'
 import {
   buildMushafPage,
+  MUSHAF_OPENING_PAGES,
   MUSHAF_PAGE_COUNT,
   mushafFacingPages,
   mushafTokenEndsAyah,
   pageAyahs,
   type MushafWordPlacement,
 } from '../../domain/mushafPage'
-import { formatAyahNumberMark } from '../../util/digits'
+import { formatAyahNumberMark, pageFolioLayout } from '../../util/digits'
+import type { PageNumberScript } from '../../data/settings'
 import { appStore } from '../../store/appStore'
 import { useBookSpread, useVersoLeafSlot } from '../paper/bookSpread'
 import { COVER_LAYER, READER_LAYER } from '../paper/stack'
@@ -47,8 +49,10 @@ export function MushafReader({
   openAyah,
   openRevision,
   english,
+  pageNumberScript,
   onPlayWord,
 }: {
+  pageNumberScript: PageNumberScript
   activeSurahId: number
   activeAyah: number | null
   openAyah: number
@@ -149,7 +153,15 @@ export function MushafReader({
     )
   }
 
-  const leafProps = { activeSurahId, activeAyah, english, onPlayWord, onTurn: turn, onFit: reportFit }
+  const leafProps = {
+    activeSurahId,
+    activeAyah,
+    english,
+    pageNumberScript,
+    onPlayWord,
+    onTurn: turn,
+    onFit: reportFit,
+  }
   if (!facing) return <MushafLeaf page={page} fit={fits.recto} {...leafProps} />
 
   const fit = Math.min(fits.recto, fits.verso)
@@ -197,6 +209,7 @@ function MushafLeaf({
   activeSurahId,
   activeAyah,
   english,
+  pageNumberScript,
   onPlayWord,
   onTurn,
   fit,
@@ -213,6 +226,7 @@ function MushafLeaf({
   activeSurahId: number
   activeAyah: number | null
   english: boolean
+  pageNumberScript: PageNumberScript
   onPlayWord: (surahId: number, ayah: number, position: number) => void
   onTurn: (delta: number) => void
 }) {
@@ -263,6 +277,11 @@ function MushafLeaf({
   const head = placements[0]
   const headSurah = head ? QuranRepository.surahContent(head.surahId).surah : null
   const englishAyahs = pageAyahs(placements)
+  const folio = pageFolioLayout(page, english ? 'english' : pageNumberScript)
+  // The two opening leaves carry a few short lines, set in the middle of the
+  // well; every other leaf hangs its fifteen lines from the head.
+  const opening = page <= MUSHAF_OPENING_PAGES
+  const lines = opening ? leaf.lines.filter((line) => line.tokens.length > 0) : leaf.lines
 
   return (
     <div
@@ -334,10 +353,11 @@ function MushafLeaf({
       ) : (
         <div
           className="mushaf-lines"
+          data-opening={opening || undefined}
           ref={linesRef}
           style={{ ['--mushaf-fit' as string]: String(fit) }}
         >
-          {leaf.lines.map((line) => (
+          {lines.map((line) => (
             <p key={line.number} className="mushaf-line" lang="ar">
               {line.tokens.map((token) => {
                 const active =
@@ -376,7 +396,17 @@ function MushafLeaf({
           ))}
         </div>
       )}
-      <div className="mushaf-folio">{page}</div>
+      <div className="mushaf-folio">
+        {folio.trailing != null ? (
+          <>
+            <span lang="ar">{folio.trailing}</span>
+            <span className="mushaf-folio-diamond" aria-hidden="true" />
+            <span>{folio.leading}</span>
+          </>
+        ) : (
+          <span lang={pageNumberScript === 'arabic' ? 'ar' : undefined}>{folio.leading}</span>
+        )}
+      </div>
     </div>
   )
 }
