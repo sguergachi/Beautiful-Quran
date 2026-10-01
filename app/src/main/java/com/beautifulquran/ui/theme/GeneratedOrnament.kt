@@ -18,6 +18,8 @@ import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.translate
+import androidx.compose.ui.graphics.layer.drawLayer
+import androidx.compose.ui.graphics.rememberGraphicsLayer
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.beautifulquran.ui.entrance.CoverFrameGeometry
@@ -88,28 +90,75 @@ private fun DrawScope.drawRosette(
     embossDark: Color,
     embossLight: Color,
     progress: Float,
+    emboss: Float = 0.8f,
 ) {
     translate(center.x, center.y) {
         for (s in paths.strokes) {
-            val f = ((progress - s.birth) / s.span).coerceIn(0f, 1f)
-            if (f <= 0f) continue
-            val path = if (f >= 1f) {
-                s.full
-            } else {
-                s.partial.reset()
-                s.measure.getSegment(0f, s.length * f, s.partial, true)
-                s.partial
-            }
+            val path = grownPath(s, progress) ?: continue
             val stroke = Stroke(width = s.width, cap = StrokeCap.Round, join = StrokeJoin.Round)
-            translate(0.8f, 0.8f) { drawPath(path, embossDark, style = stroke) }
-            translate(-0.8f, -0.8f) { drawPath(path, embossLight, style = stroke) }
+            translate(emboss, emboss) { drawPath(path, embossDark, style = stroke) }
+            translate(-emboss, -emboss) { drawPath(path, embossLight, style = stroke) }
             drawPath(path, gold, style = stroke)
         }
-        for (d in paths.dots) {
-            val f = ((progress - d.birth) / 0.06f).coerceIn(0f, 1f)
-            if (f <= 0f) continue
-            drawCircle(gold, radius = d.radius * f, center = d.center)
+        drawDots(paths, gold, progress)
+    }
+}
+
+/** The relief half of [drawRosette] — two nudged copies, no gold. It does not
+ *  depend on the sheen, so a finished rosette records it once. */
+private fun DrawScope.drawRosetteRelief(
+    paths: RosettePaths,
+    center: Offset,
+    embossDark: Color,
+    embossLight: Color,
+    emboss: Float,
+) {
+    translate(center.x, center.y) {
+        for (s in paths.strokes) {
+            val stroke = Stroke(width = s.width, cap = StrokeCap.Round, join = StrokeJoin.Round)
+            translate(emboss, emboss) { drawPath(s.full, embossDark, style = stroke) }
+            translate(-emboss, -emboss) { drawPath(s.full, embossLight, style = stroke) }
         }
+    }
+}
+
+/** The leaf half of [drawRosette]: one pass of gold per stroke, which is all
+ *  a tilting sheen has to redraw. */
+private fun DrawScope.drawRosetteGold(
+    paths: RosettePaths,
+    center: Offset,
+    gold: androidx.compose.ui.graphics.Brush,
+) {
+    translate(center.x, center.y) {
+        for (s in paths.strokes) {
+            drawPath(
+                s.full,
+                gold,
+                style = Stroke(width = s.width, cap = StrokeCap.Round, join = StrokeJoin.Round),
+            )
+        }
+        drawDots(paths, gold, 1f)
+    }
+}
+
+private fun grownPath(s: StrokeRender, progress: Float): Path? {
+    val f = ((progress - s.birth) / s.span).coerceIn(0f, 1f)
+    if (f <= 0f) return null
+    if (f >= 1f) return s.full
+    s.partial.reset()
+    s.measure.getSegment(0f, s.length * f, s.partial, true)
+    return s.partial
+}
+
+private fun DrawScope.drawDots(
+    paths: RosettePaths,
+    gold: androidx.compose.ui.graphics.Brush,
+    progress: Float,
+) {
+    for (d in paths.dots) {
+        val f = ((progress - d.birth) / 0.06f).coerceIn(0f, 1f)
+        if (f <= 0f) continue
+        drawCircle(gold, radius = d.radius * f, center = d.center)
     }
 }
 
@@ -130,6 +179,7 @@ fun GeneratedMedallion(
     build: State<Float>,
     modifier: Modifier = Modifier,
 ) {
+    GildingDemand(sheen)
     Spacer(
         modifier
             .size(size)
@@ -163,7 +213,9 @@ fun GeneratedMedallion(
  * of the page's fixed typography rather than a ceremony, so it is static:
  * complete on first composition, no build wash. Same stroke-weight recipe
  * as [GeneratedCornerSeals] (1dp uniform) — both render at a similar,
- * small physical size.
+ * small physical size. A miniature (the top bar's) passes a hairline
+ * [stroke]: at 1dp the strokes of a star that small run into one gold disc,
+ * so the line work needs to shrink with it, emboss offset included.
  */
 @Composable
 fun GeneratedChapterRosette(
@@ -175,7 +227,13 @@ fun GeneratedChapterRosette(
     embossLight: Color,
     sheen: State<Float>,
     modifier: Modifier = Modifier,
+    stroke: Dp = 1.dp,
 ) {
+    GildingDemand(sheen)
+    // A finished rosette only moves its light. The relief (two nudged copies of
+    // every stroke) does not, so it is recorded once into a layer and replayed;
+    // each tilt step then redraws one pass of gold instead of three.
+    val relief = rememberGraphicsLayer()
     Spacer(
         modifier
             .size(size)
@@ -184,23 +242,37 @@ fun GeneratedChapterRosette(
                 val paths = RosettePaths(
                     spec,
                     d,
-                    ruleWidth = 1.dp.toPx(),
-                    hairWidth = 1.dp.toPx(),
+                    ruleWidth = stroke.toPx(),
+                    hairWidth = stroke.toPx(),
                 )
+                val center = Offset(this.size.width / 2f, this.size.height / 2f)
+                var recorded = false
                 onDrawBehind {
-                    val gold = goldBrush(brightGold, deepGold, sheen.value.coerceIn(0f, 1f))
-                    drawRosette(
+                    if (!recorded) {
+                        relief.record {
+                            drawRosetteRelief(
+                                paths,
+                                center,
+                                embossDark,
+                                embossLight,
+                                emboss = max(RELIEF_FLOOR_PX, 0.8f * (stroke / 1.dp)),
+                            )
+                        }
+                        recorded = true
+                    }
+                    drawLayer(relief)
+                    drawRosetteGold(
                         paths,
-                        Offset(this.size.width / 2f, this.size.height / 2f),
-                        gold,
-                        embossDark,
-                        embossLight,
-                        1f,
+                        center,
+                        goldBrush(brightGold, deepGold, sheen.value.coerceIn(0f, 1f)),
                     )
                 }
             },
     )
 }
+
+/** The relief never thins below this (px): a hairline rosette still reads as pressed. */
+private const val RELIEF_FLOOR_PX = 0.6f
 
 /** Centre of the border band's cross-section, from the frame geometry. */
 private fun bandCenter(geometry: CoverFrameGeometry): Float =
@@ -270,6 +342,7 @@ fun GeneratedCornerSeals(
     sheen: State<Float>,
     modifier: Modifier = Modifier,
 ) {
+    GildingDemand(sheen)
     Spacer(
         modifier
             .fillMaxSize()
@@ -328,6 +401,7 @@ fun GeneratedBorderBand(
     sheen: State<Float>,
     modifier: Modifier = Modifier,
 ) {
+    GildingDemand(sheen)
     Spacer(
         modifier
             .fillMaxSize()

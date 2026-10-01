@@ -18,6 +18,32 @@ one at a time. Navigation glides the next sheet in from the side (a
 quarter-width slide softened with a fade, 380 ms); nothing stacks, nothing
 floats, nothing casts a shadow.
 
+**On a desktop browser the sheets lie open as a book** (web only, windows at
+least 1100 × 600). A phone shows one sheet because one sheet is all it has
+room for; a wide window showing one phone-width column in an empty field is
+not calm, it is unused. So the stack opens flat: Chapters on the left page,
+the Reader on the right, the binding's boards showing past the page block and
+the paper turning down into the gutter. Bookmarks and Settings are laid over
+the left page, so a reader changes the type and watches the right page answer.
+Before a chapter is chosen the right page is the title page.
+
+In **Mushaf** layout the spread is the bound book itself: two facing leaves,
+the odd page on the right and the next on the left (1|2 … 603|604), their
+fifteen lines on one grid. They turn together — the arrow keys, a drag, or a
+strip of either fore-edge whose mark shows only under a pointer; pages run
+right to left, so the left edge is the way on. Chapters is then laid over the
+left leaf on demand, as Settings is, and touching the open page puts it away.
+
+This bends two rules, narrowly. *One sheet at a time* becomes two, because
+they are the two a reader moves between constantly and neither is read in
+sequence with the other — the rule against inventing desktop columns for
+sequential facts still holds inside each page. And the gutter is shaded,
+which is not elevation: nothing floats over anything, the paper itself
+curves. The desk, boards and gutter are the only drawn furniture; there is
+still no shadow under the book and none between sheets. The closed cover
+rests centred on the desk and slides onto the right page before its hinge
+opens, so the spine it turns on is the spread's own.
+
 In **Mushaf** layout (Settings → Reading) the Reader sheet is a full-screen
 leaf with **no frame** — iBooks, not a gilt box. The paper runs to the edges
 and the text block is the only composed thing on it: a running head, the text
@@ -701,6 +727,15 @@ Two themes, both "paper":
 Gold never marks interaction; green never decorates. Green may identify the
 reader's current place because that mark is wayfinding, not ornament.
 
+**Settings is its own stock of paper.** Settings and the pages behind it
+(Customize, Reciters, Downloads) sit one step off the reading paper — deeper
+on cream (`#F2E7D5`), lifted on the dark sheets (`#1E1C18` Nightfall,
+`#0A382E` Royal green) — so a page turn shows which sheet is arriving without
+any ink moving to announce it. The step is the whole signal: no motion rides
+the swipe for wayfinding. The ink ladder is solved again for that stock
+(`SettingsPaper` in `Theme.kt`, `.sheet[data-name='settings']` on web), since
+a rung is a weight against the sheet it sits on; `ColorSystemTest` holds both.
+
 **Ruby** `#B3122F` (paper) / `#D64358` (nightfall + royal green) is the one
 deliberate third hue, and it belongs to saved-verse ink: the
 [bookmark ribbon](#bookmark-ribbon) and recolored bars on the ayah selector
@@ -962,10 +997,18 @@ image, so it is crisp at any density and nearly free to render.
   platforms.
 - **Gilding.** Gold is never a flat color. Gilded elements (the surah
   rosette, ayah number marks, the home mark) carry a three-stop leaf
-  gradient (deep bronze → bright gilt → deep bronze). On the reader, the
-  gradient's lighting axis tilts with page scroll, so light appears to catch
-  the leaf as the sheet moves — computed at draw time only, animating
-  exclusively on scroll frames.
+  gradient (deep bronze → bright gilt → deep bronze). The gradient's
+  lighting axis follows how the phone is held — the accelerometer's roll across
+  the screen's width, so landscape works — low-passed and glided per frame
+  (`ui/theme/GildingTilt.kt`, one listener for the whole app), so light appears
+  to catch the leaf as the phone moves in the hand: the reader's header rosette
+  and top-bar medallion, the cover's gilding. It is read at draw time only. The
+  sensor runs (10 Hz moving, 1 Hz once still) only while the app is started
+  *and* a gilded figure is on screen, and nothing is drawn while the phone is
+  steady. In battery saver or with animations off — both followed live — the
+  gilding rests level; with no accelerometer at all the cover keeps its idle
+  sweep. The gilding no longer brightens with page scroll. Verse-number marks
+  (`gilded()`) are still a fixed vertical gradient.
 - **Embossing.** Ornament is pressed into the paper: each figure is drawn
   with a dark copy nudged to the lower-right and a light copy to the
   upper-left beneath its face — relief under a top-left light, subtle enough

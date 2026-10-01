@@ -4,6 +4,8 @@
 
 :root {
   --paper: #faf3e8;
+  /* The reading paper, for sheets that set their own --paper (Settings). */
+  --reading-paper: var(--paper);
   --paper-surface: #fffbf2;
   --paper-high: #f2e7d5;
   --ink: #1c1b18;
@@ -382,6 +384,63 @@ select {
 
 .sheet[data-name='settings'] {
   z-index: 3;
+}
+
+/*
+ * Settings is its own stock of paper, one step off the reading paper — deeper
+ * on cream, lifted on the dark sheets — so a turn shows which sheet is
+ * arriving. The ink ladder is solved again for it. Android `SettingsPaper`.
+ */
+.sheet[data-name='settings'] {
+  --paper: #f2e7d5;
+}
+
+[data-theme='dark'] .sheet[data-name='settings'] {
+  --paper: #1e1c18;
+}
+
+[data-theme='royal_green'] .sheet[data-name='settings'] {
+  --paper: #0a382e;
+}
+
+:root[data-colors='legacy'][data-theme='dark'] .sheet[data-name='settings'] {
+  --paper: #1a1d20;
+}
+
+:root:not([data-colors='legacy']) .sheet[data-name='settings'] {
+  --ink-rung-strong: rgb(28 27 24 / 0.979);
+  --ink-rung-body: rgb(28 27 24 / 0.81);
+  --ink-rung-secondary: rgb(28 27 24 / 0.708);
+  --ink-rung-tertiary: rgb(110 104 88 / 0.959);
+  --ink-rung-muted: rgb(110 104 88 / 0.791);
+  --ink-rung-quiet: rgb(110 104 88 / 0.677);
+  --ink-rung-furniture: rgb(110 104 88 / 0.493);
+  --ink-rung-hairline: rgb(110 104 88 / 0.308);
+  --ink-rung-wash: rgb(110 104 88 / 0.14);
+}
+
+:root:not([data-colors='legacy'])[data-theme='dark'] .sheet[data-name='settings'] {
+  --ink-rung-strong: rgb(243 236 223 / 0.967);
+  --ink-rung-body: rgb(243 236 223 / 0.889);
+  --ink-rung-secondary: rgb(243 236 223 / 0.826);
+  --ink-rung-tertiary: rgb(203 196 179 / 0.92);
+  --ink-rung-muted: rgb(203 196 179 / 0.814);
+  --ink-rung-quiet: rgb(203 196 179 / 0.732);
+  --ink-rung-furniture: rgb(203 196 179 / 0.591);
+  --ink-rung-hairline: rgb(203 196 179 / 0.418);
+  --ink-rung-wash: rgb(203 196 179 / 0.23);
+}
+
+:root:not([data-colors='legacy'])[data-theme='royal_green'] .sheet[data-name='settings'] {
+  --ink-rung-strong: rgb(248 242 228 / 0.967);
+  --ink-rung-body: rgb(248 242 228 / 0.885);
+  --ink-rung-secondary: rgb(248 242 228 / 0.822);
+  --ink-rung-tertiary: rgb(208 202 184 / 0.924);
+  --ink-rung-muted: rgb(208 202 184 / 0.81);
+  --ink-rung-quiet: rgb(208 202 184 / 0.728);
+  --ink-rung-furniture: rgb(208 202 184 / 0.575);
+  --ink-rung-hairline: rgb(208 202 184 / 0.395);
+  --ink-rung-wash: rgb(208 202 184 / 0.199);
 }
 
 .sheet[data-empty='true'] {
@@ -769,11 +828,9 @@ select {
   transform: translateY(7px);
 }
 
-.settings-nuqta {
-  position: relative;
+.settings-button {
   display: grid;
   place-items: center;
-  overflow: visible;
   color: var(--ink-rung-quiet);
   padding: 0;
   background: none;
@@ -781,26 +838,14 @@ select {
   cursor: pointer;
 }
 
-.settings-nuqta:disabled {
+.settings-button:disabled {
   opacity: 0.35;
   pointer-events: none;
 }
 
-.settings-nuqta canvas {
-  position: absolute;
-  left: 50%;
-  top: 50%;
-  width: calc(26px * 1.6);
-  height: calc(26px * 1.6);
-  transform: translate(-50%, -50%);
-  pointer-events: none;
-}
-
-.settings-nuqta-glyph {
-  position: relative;
-  z-index: 1;
-  display: grid;
-  place-items: center;
+.settings-button svg {
+  width: 26px;
+  height: 26px;
 }
 
 .search-row {
@@ -875,55 +920,11 @@ select {
   margin: 0;
   padding: 18px 20px 18px
     calc(var(--home-number-column) + var(--home-column-gap));
-  overflow: hidden;
   background-color: var(--green-wash);
   color: var(--ink);
   text-align: start;
   min-height: 44px;
   border-radius: 0;
-}
-
-.continue-wash {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  pointer-events: none;
-}
-
-.continue-face {
-  position: relative;
-  z-index: 1;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 1rem;
-  width: 100%;
-  min-width: 0;
-}
-
-.continue-on-ink {
-  position: absolute;
-  inset: 0;
-  z-index: 2;
-  padding: inherit;
-  box-sizing: border-box;
-  color: var(--on-accent);
-  opacity: 0;
-  pointer-events: none;
-  -webkit-mask-repeat: no-repeat;
-  mask-repeat: no-repeat;
-  -webkit-mask-size: 100% 100%;
-  mask-size: 100% 100%;
-}
-
-.continue-on-ink .continue-label {
-  color: rgb(from var(--on-accent) r g b / 0.8);
-}
-
-.continue-on-ink .continue-target,
-.continue-on-ink .continue-ar {
-  color: var(--on-accent);
 }
 
 .continue-copy {
@@ -1355,7 +1356,7 @@ select {
   height: 1.25rem;
 }
 
-.reader-top .settings-nuqta svg {
+.reader-top .settings-button svg {
   width: 26px;
   height: 26px;
 }
@@ -1893,7 +1894,8 @@ button.ayah-mark {
  * (Android ArabicAyahNumberUnit). Without this, flex stretch parks the
  * smaller mark at the top of the tall word column (Arabic + gloss).
  */
-.words[data-lyric='arabic'] > .ayah-mark {
+.words[data-lyric='arabic'] > .ayah-mark,
+.words[data-lyric='arabic'] > .word-tail > .ayah-mark {
   display: inline-flex;
   align-items: center;
   align-self: flex-start;
@@ -1959,6 +1961,14 @@ button.ayah-mark {
 
 .english-word-run {
   display: inline;
+}
+
+/* The last word and ﴿N﴾ wrap as one item (Android's tail Row), so the mark
+   is never left alone at the head of a line. */
+.word-tail {
+  display: flex;
+  flex-wrap: nowrap;
+  column-gap: 0.8rem;
 }
 
 /* Structural keyed wrapper only; preserve the Arabic flex row's direct items. */
@@ -2305,6 +2315,8 @@ button.ayah-mark {
 
 .ayah-translation {
   margin: var(--voice-gap) 0 0;
+  /* No one-word last line under a verse. */
+  text-wrap: pretty;
   color: var(--ink-rung-body);
   font-size: calc(1.02rem * var(--font-scale, 1));
   line-height: 1.55;
@@ -2516,7 +2528,8 @@ button.ayah-mark {
   min-height: 0;
   display: flex;
   flex-direction: column;
-  padding: max(0.4rem, env(safe-area-inset-top, 0px)) 10px 5rem;
+  /* Foot clears the transport's dissolve, so the folio is never under it. */
+  padding: max(0.4rem, env(safe-area-inset-top, 0px)) 10px 6.5rem;
   touch-action: pan-y;
 }
 
@@ -2551,9 +2564,10 @@ button.ayah-mark {
   justify-content: space-between;
   gap: 0.35em;
   font-family: var(--font-arabic);
-  font-size: clamp(1.05rem, 4.2vw, 1.55rem);
+  font-size: calc(clamp(1.05rem, 4.2vw, 1.55rem) * var(--mushaf-fit, 1));
   line-height: 1;
   overflow: hidden;
+  white-space: nowrap;
 }
 
 .mushaf-word,
@@ -2615,11 +2629,42 @@ button.ayah-mark {
 }
 
 .mushaf-folio {
-  text-align: center;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 0.55em;
+  /* Figures only: one direction, so the pair never reorders on an RTL leaf. */
+  direction: ltr;
   font-variant-numeric: lining-nums;
   color: var(--ink-rung-quiet);
   font-size: 0.8rem;
-  padding: 0.4rem 0 0.2rem;
+  line-height: 1;
+  padding: 0.55rem 0 0.2rem;
+}
+
+.mushaf-folio [lang='ar'] {
+  font-family: var(--font-arabic);
+  font-size: 1.2em;
+}
+
+.mushaf-folio-diamond {
+  width: 0.3em;
+  height: 0.3em;
+  background: var(--ink-rung-furniture);
+  transform: rotate(45deg);
+}
+
+/* Opening leaves: the few lines keep the page's pitch and sit centred, each
+   line centred too, as they are printed inside their medallion. */
+.mushaf-lines[data-opening='true'] {
+  grid-template-rows: none;
+  grid-auto-rows: calc(100% / 15);
+  align-content: center;
+}
+
+.mushaf-lines[data-opening='true'] .mushaf-line {
+  justify-content: center;
+  gap: 0.7em;
 }
 
 .mushaf-wait {
@@ -3304,7 +3349,8 @@ button.ayah-mark {
   overflow: hidden;
   border-radius: 3px;
   border: 0.5px solid rgb(from var(--gold) r g b / 0.28);
-  background: color-mix(in srgb, var(--paper-surface) 42%, transparent);
+  /* A piece of the reading sheet, not a wash that can match the Settings stock. */
+  background: var(--reading-paper);
   opacity: 0.74;
 }
 
@@ -6150,5 +6196,361 @@ html[data-entrance='true'] body {
 @media (prefers-reduced-motion: reduce) {
   .contextual-pulse-mark {
     animation: none;
+  }
+}
+
+/* —— Desktop book spread ——
+ * Wide windows lay the paper stack open as a book on a desk: Chapters (and
+ * the sheets that cover it — Bookmarks, Settings) on the verso, the Reader
+ * on the recto. `data-spread` comes from `useBookSpread`; phones never get
+ * it and keep the one-sheet deck above untouched. */
+:root {
+  --desk: #e7ddca;
+  --book-board: #0a382e;
+  --book-board-deep: #031c15;
+  --book-gutter-shade: rgb(60 44 20 / 0.16);
+  --book-edge-line: rgb(110 104 88 / 0.3);
+}
+
+[data-theme='dark'] {
+  --desk: #040403;
+  --book-board: #1a1814;
+  --book-board-deep: #100f0c;
+  --book-gutter-shade: rgb(0 0 0 / 0.55);
+  --book-edge-line: rgb(203 196 179 / 0.2);
+}
+
+[data-theme='royal_green'] {
+  --desk: #031913;
+  --book-board: #0d4336;
+  --book-board-deep: #072e25;
+  --book-gutter-shade: rgb(0 0 0 / 0.32);
+  --book-edge-line: rgb(208 202 184 / 0.2);
+}
+
+.book,
+.book-spine {
+  display: none;
+}
+
+.app-shell[data-spread='true'] {
+  --desk-pad: clamp(14px, 3.4vh, 44px);
+  --book-width: min(100% - 2 * clamp(20px, 3vw, 56px), 88rem);
+  --book-x: calc((100% - var(--book-width)) / 2);
+  /* Binding board showing past the page block, then the block's own edge. */
+  --book-rim: 8px;
+  --book-fore-edge: 6px;
+  --page-outer: calc(var(--book-x) + var(--book-rim) + var(--book-fore-edge));
+  --page-y: calc(var(--desk-pad) + var(--book-rim));
+  --peek-step: 0px;
+  background: var(--desk);
+}
+
+.app-shell[data-spread='true'][data-booting='true'] {
+  background: var(--desk);
+}
+
+.app-shell[data-spread='true'] .book {
+  display: block;
+  position: absolute;
+  top: var(--desk-pad);
+  bottom: var(--desk-pad);
+  left: var(--book-x);
+  right: var(--book-x);
+  z-index: 0;
+  border-radius: 9px;
+  background: linear-gradient(to bottom, var(--book-board), var(--book-board-deep));
+  transition: opacity 520ms ease;
+}
+
+.book-page {
+  position: absolute;
+  top: var(--book-rim);
+  bottom: var(--book-rim);
+  background: var(--paper);
+}
+
+.book-page--verso {
+  left: calc(var(--book-rim) + var(--book-fore-edge));
+  right: 50%;
+}
+
+.book-page--recto {
+  left: 50%;
+  right: calc(var(--book-rim) + var(--book-fore-edge));
+}
+
+/* The page block seen edge-on: leaves under the open pair. */
+.book-page::before {
+  content: '';
+  position: absolute;
+  top: 2px;
+  bottom: 2px;
+  width: var(--book-fore-edge);
+  background:
+    repeating-linear-gradient(
+      to right,
+      var(--book-edge-line) 0 1px,
+      transparent 1px 2px
+    ),
+    var(--paper);
+}
+
+.book-page--verso::before {
+  right: 100%;
+  border-radius: 2px 0 0 2px;
+}
+
+.book-page--recto::before {
+  left: 100%;
+  border-radius: 0 2px 2px 0;
+}
+
+.app-shell[data-spread='true'] .book-spine {
+  display: block;
+  position: absolute;
+  top: var(--page-y);
+  bottom: var(--page-y);
+  left: calc(50% - 3.5rem);
+  width: 7rem;
+  z-index: 25;
+  pointer-events: none;
+  background: linear-gradient(
+    to right,
+    transparent 0%,
+    rgb(from var(--book-gutter-shade) r g b / calc(alpha * 0.07)) 20%,
+    rgb(from var(--book-gutter-shade) r g b / calc(alpha * 0.26)) 38%,
+    rgb(from var(--book-gutter-shade) r g b / calc(alpha * 0.72)) 47.5%,
+    var(--book-gutter-shade) 50%,
+    rgb(from var(--book-gutter-shade) r g b / calc(alpha * 0.72)) 52.5%,
+    rgb(from var(--book-gutter-shade) r g b / calc(alpha * 0.26)) 62%,
+    rgb(from var(--book-gutter-shade) r g b / calc(alpha * 0.07)) 80%,
+    transparent 100%
+  );
+  transition: opacity 520ms ease;
+}
+
+/* Geometry is !important because the deck's own left/right rules are keyed
+   on stack depth and would otherwise re-centre a page mid-turn. */
+.app-shell[data-spread='true'] .sheet {
+  top: var(--page-y) !important;
+  bottom: var(--page-y) !important;
+  left: var(--page-outer) !important;
+  right: 50% !important;
+  transition:
+    transform 380ms cubic-bezier(0.24, 0.02, 0.12, 1),
+    opacity 300ms ease;
+}
+
+.app-shell[data-spread='true'] .sheet[data-name='reader'] {
+  left: 50% !important;
+  right: var(--page-outer) !important;
+}
+
+/* A page laid onto the verso settles in from its fore-edge — nothing slides
+   across the desk or over the spine. */
+.app-shell[data-spread='true'] .sheet[data-name='bookmarks'][data-active='false'],
+.app-shell[data-spread='true'] .sheet[data-name='settings'][data-active='false'] {
+  transform: translateX(-1.25rem);
+}
+
+.app-shell[data-spread='true']
+  .sheet[data-name='reader'][data-active='false']:not([data-depth='1']):not([data-depth='2']) {
+  transform: none;
+}
+
+/* A page is phone-narrow but carries the desktop rail, which stands in the
+   margin rather than on the edge — so the text block gives it that margin. */
+.app-shell[data-spread='true'] .sheet[data-name='reader'] {
+  --reader-max: min(40rem, 100% - 5rem);
+}
+
+/* Reading continues on the recto while Settings is open beside it. */
+.app-shell[data-spread='true'] .sheet[data-name='reader'][data-depth] {
+  opacity: 1;
+}
+
+.app-shell[data-spread='true'] .sheet-edge-back {
+  display: none;
+}
+
+/* Chapters is always beside the reader, so its way back is not needed. The
+   same button closes in-chapter search, where it stays. */
+.app-shell[data-spread='true']:not([data-leaves='true']) .reader-top[data-search='false'] > .back {
+  visibility: hidden;
+}
+
+/* The recto carries its own transport. */
+.app-shell[data-spread='true'][data-has-reader='true'] .floating-play {
+  display: none;
+}
+
+/* Closed book: the board alone, centred on the desk. Opening carries it to
+   the recto first, so the hinge lands on the spine of the spread beneath. */
+.app-shell[data-spread='true'] .entrance-board {
+  top: var(--desk-pad);
+  bottom: var(--desk-pad);
+  left: 50%;
+  right: var(--book-x);
+  border-radius: 3px 9px 9px 3px;
+  transform: translateX(-50%);
+}
+
+.app-shell[data-spread='true'] .entrance-board--opening {
+  animation-name: entrance-book-open;
+}
+
+@keyframes entrance-book-open {
+  0% {
+    transform: perspective(2200px) translateX(-50%) rotateY(0deg);
+    opacity: 1;
+  }
+  38% {
+    transform: perspective(2200px) translateX(0) rotateY(0deg);
+    opacity: 1;
+  }
+  72% {
+    opacity: 1;
+  }
+  100% {
+    transform: perspective(2200px) translateX(0) rotateY(-95deg);
+    opacity: 0;
+  }
+}
+
+html[data-entrance='true']:not([data-entrance-opening])
+  .app-shell[data-spread='true']
+  :is(.book, .book-spine, .sheet) {
+  opacity: 0 !important;
+}
+
+.book-title-page {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 2rem;
+  text-align: center;
+}
+
+.book-title-medallion {
+  width: min(42%, 15rem);
+  aspect-ratio: 1;
+  overflow: visible;
+}
+
+.book-title-ar {
+  margin: 2.25rem 0 0;
+  font-family: var(--font-arabic);
+  font-size: 2.6rem;
+  line-height: 1.6;
+  color: var(--gold-ink);
+}
+
+.book-title-en {
+  margin: 0.15rem 0 0;
+  font-family: var(--font-display);
+  font-size: 1.3rem;
+  letter-spacing: 0.2em;
+  color: var(--ink-rung-tertiary);
+}
+
+.book-title-hint {
+  margin: 3.5rem 0 0;
+  font-style: italic;
+  color: var(--ink-rung-quiet);
+}
+
+/* —— Spread, Mushaf layout: two facing leaves ——
+ * The recto leaf is the reader sheet's own; the verso leaf is portalled
+ * under the verso sheets, so Chapters, Bookmarks and Settings lie over it. */
+.book-verso-leaf {
+  display: none;
+}
+
+.app-shell[data-spread='true'] .book-verso-leaf {
+  display: block;
+  position: absolute;
+  top: var(--page-y);
+  bottom: var(--page-y);
+  left: var(--page-outer);
+  right: 50%;
+  z-index: 0;
+  transition: opacity 520ms ease;
+}
+
+.book-verso-leaf > .mushaf {
+  position: absolute;
+}
+
+/* Chapters is put away while both leaves are being read. */
+.app-shell[data-spread='true'][data-leaves='true'] .sheet[data-name='home'][data-active='false'] {
+  opacity: 0;
+  pointer-events: none;
+}
+
+html[data-entrance='true']:not([data-entrance-opening])
+  .app-shell[data-spread='true']
+  .book-verso-leaf {
+  opacity: 0;
+}
+
+/* A page is taller than a phone is wide: size the hand to the line pitch
+   the fifteen-line grid actually has, not to the window's width. */
+.app-shell[data-spread='true'] .mushaf-line {
+  font-size: calc(clamp(1.05rem, 3.1vh, 1.75rem) * var(--mushaf-fit, 1));
+}
+
+/* Facing leaves mirror: each carries the chapter's Latin name at its
+   fore-edge and the Arabic at the spine. */
+.mushaf[data-side='verso'] .mushaf-head {
+  flex-direction: row-reverse;
+}
+
+/* Turning: a strip of each fore-edge. Pages run right to left, so the way
+   on is the left edge. The mark shows only under a pointer or on focus. */
+.mushaf-turn {
+  display: none;
+}
+
+.app-shell[data-spread='true'] .mushaf-turn {
+  display: grid;
+  place-items: center;
+  position: absolute;
+  top: 12%;
+  bottom: 12%;
+  width: 2.25rem;
+  z-index: 6;
+  font-family: var(--font-display);
+  font-size: 1.6rem;
+  color: var(--ink-rung-furniture);
+}
+
+.app-shell[data-spread='true'] .mushaf-turn span {
+  opacity: 0;
+  transition: opacity 180ms ease;
+}
+
+.app-shell[data-spread='true'] .mushaf-turn--back {
+  right: 0;
+}
+
+.app-shell[data-spread='true'] .mushaf-turn--forward {
+  left: 0;
+}
+
+.app-shell[data-spread='true'] .mushaf-turn:disabled {
+  visibility: hidden;
+}
+
+.app-shell[data-spread='true'] .mushaf-turn:focus-visible span {
+  opacity: 1;
+}
+
+@media (hover: hover) {
+  .app-shell[data-spread='true'] .mushaf-turn:hover span {
+    opacity: 1;
   }
 }

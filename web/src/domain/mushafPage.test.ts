@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import {
   buildMushafPage,
   inheritSpannedPlacement,
+  mushafFacingPages,
   mushafTokenEndsAyah,
   pageAyahs,
 } from './mushafPage'
@@ -43,5 +44,19 @@ describe('mushaf page', () => {
       { surahId: 1, ayah: 1 },
       { surahId: 1, ayah: 2 },
     ])
+  })
+})
+
+describe('mushafFacingPages', () => {
+  it('stands the odd page on the right and the next on the left', () => {
+    expect(mushafFacingPages(1)).toEqual({ right: 1, left: 2 })
+    expect(mushafFacingPages(2)).toEqual({ right: 1, left: 2 })
+    expect(mushafFacingPages(77)).toEqual({ right: 77, left: 78 })
+    expect(mushafFacingPages(604)).toEqual({ right: 603, left: 604 })
+  })
+
+  it('clamps to the book', () => {
+    expect(mushafFacingPages(0)).toEqual({ right: 1, left: 2 })
+    expect(mushafFacingPages(900)).toEqual({ right: 603, left: 604 })
   })
 })

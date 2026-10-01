@@ -81,6 +81,37 @@ class ColorSystemTest {
     }
 
     @Test
+    fun `every rung lands on its target weight on the settings sheet`() {
+        for (mode in themes) {
+            val sheet = settingsSheetFor(mode)
+            for ((name, target) in ladder) {
+                val got = contrastOn(rung(sheet.ink, name), sheet.paper)
+                assertTrue(
+                    "$mode settings ink.$name is Lc %.1f but the ladder puts it at %.1f"
+                        .format(got, target),
+                    abs(got - target) <= 1.5,
+                )
+            }
+        }
+    }
+
+    @Test
+    fun `the settings sheet is one visible step off the reading paper`() {
+        // Enough that a turn shows which sheet is arriving, never so much that
+        // Settings stops being paper from the same book. Cream goes deeper; the
+        // dark sheets lift, as the sheet on top of a dark stack does.
+        for (mode in themes) {
+            val reading = oklch(paper(mode)).lightness
+            val step = oklch(settingsSheetFor(mode).paper).lightness - reading
+            val toward = if (reading > 0.5) -step else step
+            assertTrue(
+                "$mode settings paper is %.3f off the reading paper".format(step),
+                toward in 0.03..0.09,
+            )
+        }
+    }
+
+    @Test
     fun `scripture is the strongest thing on every sheet`() {
         for (mode in themes) {
             val ink = ink(mode)

@@ -136,7 +136,6 @@ import com.beautifulquran.ui.reader.focus.FocusEngine
 import com.beautifulquran.ui.theme.ArabicTitleStyle
 import com.beautifulquran.ui.theme.ArabicWordStyle
 import com.beautifulquran.ui.theme.GeneratedChapterRosette
-import com.beautifulquran.ui.theme.GildedFlourish
 import com.beautifulquran.ui.theme.HafsFontFamily
 import com.beautifulquran.ui.theme.IslamicBackToOriginCapsule
 import com.beautifulquran.ui.theme.LocalQuranAccents
@@ -3640,87 +3639,101 @@ fun BasmalahBlock(
 
 /**
  * The surah name as it reappears in the top bar once the opening header has
- * scrolled off the page: flanked by gilded khatam flourishes, with the
- * transliteration whispered beneath. [sheen] keeps the gold lit in step with
- * the header rosette.
+ * scrolled off the page: the chapter's own medallion in miniature, the name
+ * beneath it and the transliteration whispered under that — the header's
+ * vertical centre line, shrunk to a bar. [sheen] keeps the gold lit in step
+ * with the header rosette; [ayahCount] seeds the same generated medallion the
+ * header draws, so the one that scrolled away is the one that arrives.
  */
 @Composable
 fun OrnateSurahTitle(
     chapterNumber: Int,
     nameArabic: String,
     nameTransliteration: String,
+    ayahCount: Int,
     sheen: State<Float>,
+    modifier: Modifier = Modifier,
 ) {
     val accents = LocalQuranAccents.current
-    BoxWithConstraints(Modifier.fillMaxWidth()) {
-        val showFlourishes = maxWidth >= 200.dp
-        val titlePadding = if (showFlourishes) 12.dp else 2.dp
-        val arabicFontSize = if (maxWidth < 150.dp) 17.sp else 19.sp
+    val ornament = remember(chapterNumber, ayahCount) {
+        generateChapterOrnament(chapterOrnamentSeed(chapterNumber, ayahCount))
+    }
+    BoxWithConstraints(modifier.fillMaxWidth()) {
+        val arabicFontSize = if (maxWidth < 150.dp) 17.sp else 18.sp
         val transliterationSpacing = when {
             maxWidth >= 200.dp -> CAPS_TRACKING
             maxWidth >= 150.dp -> 1.2.sp
             else -> 0.8.sp
         }
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.Center,
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
             modifier = Modifier.fillMaxWidth(),
         ) {
-            if (showFlourishes) {
-                GildedFlourish(
-                    width = 36.dp,
-                    height = 13.dp,
-                    brightGold = accents.goldBright,
-                    deepGold = accents.goldDeep,
-                    embossDark = accents.embossDark,
-                    embossLight = accents.embossLight,
-                    sheen = sheen,
-                )
-            }
-            Column(
-                horizontalAlignment = Alignment.CenterHorizontally,
-                modifier = Modifier
-                    .weight(1f)
-                    .padding(horizontal = titlePadding),
-            ) {
-                Text(
-                    text = "سُورَةُ $nameArabic",
-                    style = ArabicTitleStyle,
-                    fontSize = arabicFontSize,
-                    color = MaterialTheme.colorScheme.onSurface,
-                    textAlign = TextAlign.Center,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.fillMaxWidth(),
-                )
-                Text(
-                    text = "$chapterNumber · ${nameTransliteration.uppercase()}",
-                    style = MaterialTheme.typography.labelSmall.copy(
-                        letterSpacing = transliterationSpacing,
+            GeneratedChapterRosette(
+                spec = ornament.rosette,
+                size = TOP_BAR_ROSETTE,
+                brightGold = accents.goldBright,
+                deepGold = accents.goldDeep,
+                embossDark = accents.embossDark,
+                embossLight = accents.embossLight,
+                sheen = sheen,
+                stroke = TOP_BAR_ROSETTE_STROKE,
+            )
+            Text(
+                text = "سُورَةُ $nameArabic",
+                style = ArabicTitleStyle.copy(
+                    lineHeight = arabicFontSize,
+                    lineHeightStyle = LineHeightStyle(
+                        alignment = LineHeightStyle.Alignment.Center,
+                        trim = LineHeightStyle.Trim.None,
                     ),
-                    fontSize = CAPS_LABEL_SIZE,
-                    color = QuranTheme.ink.quiet,
-                    textAlign = TextAlign.Center,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.fillMaxWidth(),
-                )
-            }
-            if (showFlourishes) {
-                GildedFlourish(
-                    width = 36.dp,
-                    height = 13.dp,
-                    brightGold = accents.goldBright,
-                    deepGold = accents.goldDeep,
-                    embossDark = accents.embossDark,
-                    embossLight = accents.embossLight,
-                    sheen = sheen,
-                    mirrored = true,
-                )
-            }
+                ),
+                fontSize = arabicFontSize,
+                color = MaterialTheme.colorScheme.onSurface,
+                textAlign = TextAlign.Center,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 2.dp)
+                    // Hafs' line box leaves air under the descenders; hand it to
+                    // the line beneath, so the caps line sits close to the name
+                    // and keeps its own paper below, away from the text
+                    // scrolling under the bar.
+                    .layout { measurable, constraints ->
+                        val placeable = measurable.measure(constraints)
+                        val trim = TOP_BAR_NAME_TRIM.roundToPx()
+                        layout(placeable.width, placeable.height - trim) {
+                            placeable.place(0, 0)
+                        }
+                    },
+            )
+            Text(
+                text = "$chapterNumber · ${nameTransliteration.uppercase()}",
+                style = MaterialTheme.typography.labelSmall.copy(
+                    letterSpacing = transliterationSpacing,
+                ),
+                fontSize = CAPS_LABEL_SIZE,
+                color = QuranTheme.ink.quiet,
+                textAlign = TextAlign.Center,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(bottom = TOP_BAR_NAME_TRIM),
+            )
         }
     }
 }
+
+/** Air under the name's descenders handed to the paper below the caps line. */
+private val TOP_BAR_NAME_TRIM = 5.dp
+
+/** The header medallion's little sibling in the top bar. */
+private val TOP_BAR_ROSETTE = 18.dp
+
+/** Hairline for that size: the header's 1 dp strokes fill it in solid. */
+private val TOP_BAR_ROSETTE_STROKE = 0.45.dp
 
 /**
  * Subtle page break: [PageNumberScript.BOTH] places Western and Arabic-Indic

@@ -48,6 +48,7 @@ import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.Tune
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.automirrored.rounded.MenuBook
 import androidx.compose.material.icons.rounded.Close
@@ -139,11 +140,11 @@ import com.beautifulquran.ui.share.ShareRibbon
 import com.beautifulquran.ui.theme.FloatingPaperControl
 import com.beautifulquran.ui.theme.InkRevealOverlay
 import com.beautifulquran.ui.theme.IslamicReturnToAyahButton
+import com.beautifulquran.ui.theme.LocalGildingTilt
 import com.beautifulquran.ui.theme.LocalQuranAccents
 import com.beautifulquran.ui.theme.LocalQuranInk
 import com.beautifulquran.ui.theme.QuranTheme
 import com.beautifulquran.ui.theme.ReturnArrowHeading
-import com.beautifulquran.ui.theme.SettingsNuqtaIcon
 import com.beautifulquran.ui.theme.absorbPointerEvents
 import com.beautifulquran.ui.theme.contextualGuideProgressiveBlur
 import com.beautifulquran.ui.theme.contrastingOverlayAccents
@@ -151,7 +152,6 @@ import com.beautifulquran.ui.theme.contrastingOverlayColorScheme
 import com.beautifulquran.ui.theme.contrastingOverlayInk
 import com.beautifulquran.ui.theme.paperToggleHaptic
 import com.beautifulquran.ui.theme.quietClickable
-import com.beautifulquran.ui.theme.rememberSettingsNuqtaState
 import com.beautifulquran.ui.theme.verticalFadingEdges
 import kotlin.math.PI
 import kotlin.math.abs
@@ -553,28 +553,9 @@ fun ReaderScreen(
             ayahRailTipOpen = false
         }
     }
-    // Gilding sheen: light catches the header rosette as the page moves.
-    // At chapter end (scrolled) sheen is bright (~0.85); cold open at the top
-    // rests dimmer (~0.15). Next-chapter advance pins the bright value for the
-    // whole fly and **keeps** it after landing so the medallion stays lit.
-    fun scrollSheenValue(): Float =
-        if (listState.firstVisibleItemIndex == 0) {
-            0.15f + 0.7f *
-                (listState.firstVisibleItemScrollOffset / 900f).coerceIn(0f, 1f)
-        } else {
-            0.85f
-        }
-    val sheenAnim = remember { Animatable(0.15f) }
-    var sheenFollowScroll by remember { mutableStateOf(true) }
-    LaunchedEffect(
-        listState.firstVisibleItemIndex,
-        listState.firstVisibleItemScrollOffset,
-        sheenFollowScroll,
-    ) {
-        if (!sheenFollowScroll) return@LaunchedEffect
-        sheenAnim.snapTo(scrollSheenValue())
-    }
-    val sheen = remember { derivedStateOf { sheenAnim.value } }
+    // Gilding sheen: the phone's tilt (LocalGildingTilt), so light catches the
+    // header rosette and the bar's medallion as the phone moves in the hand.
+    val sheen = LocalGildingTilt.current
     // Follow / jump / annotation precedence — pure rules in ReaderInteraction.
     var didInitialScroll by rememberSaveable { mutableStateOf(false) }
     var interaction by remember {
@@ -636,14 +617,6 @@ fun ReaderScreen(
     var verseRevealForSurah by remember { mutableIntStateOf(0) }
     /** When true, parked verses sit above the header and animate downward. */
     var verseEnterFromAbove by remember { mutableStateOf(false) }
-    // Normal navigation (not continuous handoff): restore scroll-linked sheen.
-    // Advance pins bright gold and leaves sheenFollowScroll false on purpose.
-    LaunchedEffect(surahId) {
-        if (!chapterAdvancing && verseRevealForSurah == 0) {
-            sheenFollowScroll = true
-            sheenAnim.snapTo(scrollSheenValue())
-        }
-    }
     val chapterAdvanceEasing = remember { CubicBezierEasing(0.22f, 1f, 0.36f, 1f) }
     // Bottom overscroll fills the Continue pill (0..1). Release at full opens.
     var nextChapterPull by remember { mutableFloatStateOf(0f) }
@@ -666,7 +639,7 @@ fun ReaderScreen(
      * name can fade out instead of vanishing when the list remounts.
      */
     var pinnedTopNavTitle by remember {
-        mutableStateOf<Triple<Int, String, String>?>(null)
+        mutableStateOf<Surah?>(null)
     }
 
     // In-surah English search: matches are ayahs whose translation or any
@@ -1639,9 +1612,9 @@ fun ReaderScreen(
                 return@topBar
             }
             // Unread-style chrome: quiet marks that recede behind the text.
-            // Once the opening header scrolls off, the surah name reappears
-            // here between gilded flourishes. In search, the bar becomes the
-            // search field with match navigation.
+            // As the opening header scrolls off, its medallion and name
+            // reappear here in miniature, arriving with the scroll. In search,
+            // the bar becomes the search field with match navigation.
             // In Scroll, the icons' ink stands on the text rules (ScrollGrid);
             // the mushaf leaf keeps its own margins.
             val topBarStartShift =
@@ -1683,8 +1656,26 @@ fun ReaderScreen(
                                 .focusRequester(searchFocus),
                         )
                     } else {
+                        // 0 → 1 as the header's medallion and name scroll under
+                        // the bar, so the bar's own copy arrives in step with
+                        // the one leaving instead of switching on at a threshold.
+                        val headerExit = remember(density) {
+                            derivedStateOf {
+                                if (listState.firstVisibleItemIndex > 0) {
+                                    1f
+                                } else {
+                                    val start = with(density) { ScrollGrid.OPENING_HEAD.toPx() }
+                                    val span = with(density) {
+                                        (ScrollGrid.ROSETTE + ScrollGrid.ROSETTE_TO_TITLE + 40.dp)
+                                            .toPx()
+                                    }
+                                    ((listState.firstVisibleItemScrollOffset - start) / span)
+                                        .coerceIn(0f, 1f)
+                                }
+                            }
+                        }
                         val scrolledPastHeader by remember {
-                            derivedStateOf { listState.firstVisibleItemIndex > 0 }
+                            derivedStateOf { headerExit.value > 0f }
                         }
                         val live = uiState.content?.surah
                         val pinned = pinnedTopNavTitle
@@ -1695,22 +1686,15 @@ fun ReaderScreen(
                         }
                         // While advancing, keep painting the pinned previous
                         // chapter so its fade-out has something to fade.
-                        val displayNumber = pinned?.first
-                            ?: mushafSurah?.id
-                            ?: live?.takeIf { scrolledPastHeader && !chapterAdvancing }?.id
-                        val displayArabic = pinned?.second
-                            ?: mushafSurah?.nameArabic
-                            ?: live?.takeIf { scrolledPastHeader && !chapterAdvancing }?.nameArabic
-                        val displayTranslit = pinned?.third
-                            ?: mushafSurah?.nameTransliteration
+                        val shown = pinned
+                            ?: mushafSurah
                             ?: live?.takeIf { scrolledPastHeader && !chapterAdvancing }
-                                ?.nameTransliteration
                         val topTitleAlpha by animateFloatAsState(
                             targetValue = when {
                                 // Next-chapter advance: always fade the top name away.
                                 chapterAdvancing -> 0f
                                 mushafMode && (mushafSurah != null || live != null) -> 1f
-                                scrolledPastHeader && live != null -> 1f
+                                live != null -> 1f
                                 else -> 0f
                             },
                             animationSpec = tween(
@@ -1719,21 +1703,30 @@ fun ReaderScreen(
                             ),
                             label = "topNavTitleAlpha",
                         )
-                        if (
-                            displayNumber != null &&
-                            displayArabic != null &&
-                            displayTranslit != null
-                        ) {
-                            Box(
-                                Modifier.graphicsLayer { alpha = topTitleAlpha },
-                            ) {
-                                OrnateSurahTitle(
-                                    chapterNumber = displayNumber,
-                                    nameArabic = displayArabic,
-                                    nameTransliteration = displayTranslit,
-                                    sheen = sheen,
-                                )
-                            }
+                        if (shown != null) {
+                            // Pinned and mushaf titles are already in place; only
+                            // the scrolling chapter's follows the header.
+                            val followsHeader = pinned == null && !mushafMode
+                            val arrivalLift = with(density) { 6.dp.toPx() }
+                            OrnateSurahTitle(
+                                chapterNumber = shown.id,
+                                nameArabic = shown.nameArabic,
+                                nameTransliteration = shown.nameTransliteration,
+                                ayahCount = shown.ayahCount,
+                                sheen = sheen,
+                                modifier = Modifier.graphicsLayer {
+                                    val t = if (followsHeader) {
+                                        FastOutSlowInEasing.transform(headerExit.value)
+                                    } else {
+                                        1f
+                                    }
+                                    alpha = topTitleAlpha * t
+                                    translationY = (1f - t) * arrivalLift
+                                    val scale = 0.9f + 0.1f * t
+                                    scaleX = scale
+                                    scaleY = scale
+                                },
+                            )
                         }
                     }
                 },
@@ -1827,9 +1820,6 @@ fun ReaderScreen(
                         } else {
                             Spacer(Modifier.width(48.dp))
                         }
-                        val settingsNuqta = rememberSettingsNuqtaState()
-                        // Not an IconButton: its clip would cut off the
-                        // nuqta's swell.
                         Box(
                             contentAlignment = Alignment.Center,
                             modifier = Modifier
@@ -1839,17 +1829,16 @@ fun ReaderScreen(
                                 .quietClickable(
                                     enabled = !recitingActive,
                                     role = Role.Button,
-                                    interactionSource = settingsNuqta.interactions,
-                                ) {
-                                    settingsNuqta.drop()
-                                    onOpenSettings()
-                                },
+                                    onClick = onOpenSettings,
+                                ),
                         ) {
-                            SettingsNuqtaIcon(
-                                state = settingsNuqta,
+                            Icon(
+                                imageVector = Icons.Rounded.Tune,
                                 contentDescription = "Settings",
                                 tint = QuranTheme.ink.quiet,
-                                modifier = Modifier.offset(x = (-4).dp),
+                                modifier = Modifier
+                                    .offset(x = (-4).dp)
+                                    .size(26.dp),
                             )
                         }
                     }
@@ -2079,11 +2068,7 @@ fun ReaderScreen(
                 // (user is usually past the header at the chapter end).
                 val prev = uiState.content?.surah
                 if (prev != null && listState.firstVisibleItemIndex > 0) {
-                    pinnedTopNavTitle = Triple(
-                        prev.id,
-                        prev.nameArabic,
-                        prev.nameTransliteration,
-                    )
+                    pinnedTopNavTitle = prev
                 }
                 // Capture rubber-band lift BEFORE clearing pull so the fly can
                 // continue upward from the finger's release point.
@@ -2106,10 +2091,6 @@ fun ReaderScreen(
                 // drop; fly takes over translation via startLiftPx.
                 nextChapterPullArmed = false
                 dispatch(ReaderInteractionEvent.ChapterAdvanceStarted)
-                // Hold the bright end-of-chapter sheen for the whole fly +
-                // handoff so the medallion doesn't dim when we scrollToItem(0).
-                sheenFollowScroll = false
-                sheenAnim.snapTo(scrollSheenValue())
                 headerMorph.snapTo(morphAtRelease)
 
                 val prepared = viewModel.materialize(nextId)
@@ -2117,7 +2098,6 @@ fun ReaderScreen(
                     nextChapterPull = 0f
                     headerMorph.snapTo(0f)
                     chapterAdvancing = false
-                    sheenFollowScroll = true
                     return@launch
                 }
 
@@ -2183,10 +2163,6 @@ fun ReaderScreen(
                 chapterAdvancing = false
                 // Top-nav pin has finished fading (or was never set).
                 pinnedTopNavTitle = null
-
-                // Keep the bright sheen after landing (do not ease to the dim
-                // at-rest header value). sheenFollowScroll stays false so the
-                // medallion remains bright on the new chapter top.
 
                 // Verses fade and rise in as soon as the header has landed.
                 if (verseRevealForSurah != nextId) return@launch

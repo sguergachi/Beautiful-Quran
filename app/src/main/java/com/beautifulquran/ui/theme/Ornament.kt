@@ -128,6 +128,7 @@ fun GildedRosette(
     sheen: State<Float>,
     modifier: Modifier = Modifier,
 ) {
+    GildingDemand(sheen)
     Canvas(modifier.then(Modifier.size(size))) {
         val s = min(this.size.width, this.size.height)
         val c = s / 2f
@@ -181,6 +182,7 @@ fun MushafCoverFrame(
     geometry: com.beautifulquran.ui.entrance.CoverFrameGeometry,
     modifier: Modifier = Modifier,
 ) {
+    GildingDemand(sheen)
     Canvas(modifier) {
         val outerInset = geometry.outerInsetPx
         val innerInset = geometry.innerInsetPx
@@ -226,58 +228,6 @@ fun MushafCoverFrame(
         val gold = goldBrush(brightGold, deepGold, sheen.value.coerceIn(0f, 1f))
         drawPath(outer, gold, style = rule)
         drawPath(inner, gold, style = hairline)
-    }
-}
-
-/**
- * A small horizontal flourish for flanking a title: a gilded khatam star at
- * the inner end with a hairline rule tapering away from it, embossed like the
- * rosette. [mirrored] flips it for the far side of the title.
- */
-@Composable
-fun GildedFlourish(
-    width: Dp,
-    height: Dp,
-    brightGold: Color,
-    deepGold: Color,
-    embossDark: Color,
-    embossLight: Color,
-    sheen: State<Float>,
-    mirrored: Boolean = false,
-    modifier: Modifier = Modifier,
-) {
-    Canvas(
-        modifier
-            .then(Modifier.size(width, height))
-            .graphicsLayer { scaleX = if (mirrored) -1f else 1f },
-    ) {
-        val w = size.width
-        val h = size.height
-        val cy = h / 2f
-        val starR = h * 0.42f
-        val starCx = w - starR - 1f
-        val star = Path().apply { addKhatam(starCx, cy, starR) }
-        val line = Stroke(width = (h * 0.07f).coerceAtLeast(1f))
-
-        embossed(star, line, embossDark, embossLight)
-        val gold = goldBrush(brightGold, deepGold, sheen.value.coerceIn(0f, 1f))
-        drawPath(star, gold, style = line)
-        drawCircle(gold, radius = h * 0.07f, center = Offset(starCx, cy))
-
-        // Rule tapering to nothing away from the star.
-        val ruleEnd = starCx - starR - h * 0.25f
-        if (ruleEnd > 0f) {
-            drawLine(
-                brush = Brush.horizontalGradient(
-                    colors = listOf(deepGold.copy(alpha = 0f), deepGold),
-                    startX = 0f,
-                    endX = ruleEnd,
-                ),
-                start = Offset(0f, cy),
-                end = Offset(ruleEnd, cy),
-                strokeWidth = line.width,
-            )
-        }
     }
 }
 

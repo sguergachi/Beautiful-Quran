@@ -31,8 +31,8 @@ import {
   IconRepeat,
   IconRepeatOne,
   IconSearch,
+  IconTune,
 } from '../icons/PlaybackIcons'
-import { SettingsNuqtaButton } from '../theme/SettingsNuqtaButton'
 import { AyahSelectorRail, type AyahSelectorRailHandle } from './AyahSelectorRail'
 import { AyahRailTip } from './AyahRailTip'
 import { BookmarkNoteTip } from './BookmarkNoteTip'
@@ -314,6 +314,8 @@ export function ReaderScreen({ stackLayer }: { stackLayer: StackLayer }) {
     isBuffering: state.player.isBuffering,
   })
   const receded = recitingActive && !searchActive
+  // This sheet is keyed by chapter, so the ref starts false at every opening.
+  const recitedSinceOpen = useRef(false)
 
   // Virtualization center: follow the reciting ayah, else the open/focus verse.
   // Window only expands during scroll (never unmounts under the viewport).
@@ -630,6 +632,17 @@ export function ReaderScreen({ stackLayer }: { stackLayer: StackLayer }) {
     let cancelled = false
     const raf = requestAnimationFrame(() => {
       if (cancelled) return
+      // A chapter opened at its first verse opens on its title, as Android's
+      // list does at scroll 0. Putting ayah 1 on the reading line pushed the
+      // rosette and name off a phone-height sheet. Landings inside a chapter
+      // (bookmark, search, Continue) still take the reading line.
+      if (ayah <= 1 && state.pendingSearchFlash == null) {
+        const el = scrollRef.current
+        if (el) el.scrollTop = 0
+        setFocusedAyah(1)
+        setInitialFocusSettled(true)
+        return
+      }
       void focusAyah(ayah, { animate: false, preRoll: false }).then(() => {
         if (cancelled) return
         setFocusedAyah(focus.focusedAyah())
@@ -965,6 +978,11 @@ export function ReaderScreen({ stackLayer }: { stackLayer: StackLayer }) {
       if (!state.followEnabled) followWasEnabled.current = false
       return
     }
+    // Opening a chapter primes its first clip, silent. That is not yet a
+    // recitation to follow: the sheet rests on its title until the voice
+    // starts, then the opening verse takes the reading line.
+    if (recitingActive) recitedSinceOpen.current = true
+    if (!recitedSinceOpen.current && target <= 1) return
     const justEnabled = !followWasEnabled.current
     followWasEnabled.current = true
     let cancelled = false
@@ -987,6 +1005,7 @@ export function ReaderScreen({ stackLayer }: { stackLayer: StackLayer }) {
     state.followEnabled,
     state.player.nowPlaying?.ayah,
     isTop,
+    recitingActive,
     content?.surah.id,
   ])
 
@@ -1385,11 +1404,15 @@ export function ReaderScreen({ stackLayer }: { stackLayer: StackLayer }) {
             >
               <IconSearch />
             </button>
-            <SettingsNuqtaButton
-              className="icon-btn"
+            <button
+              type="button"
+              className="settings-button icon-btn"
+              aria-label="Open settings"
               disabled={recitingActive}
-              onActivate={() => appStore.setSheet('settings')}
-            />
+              onClick={() => appStore.setSheet('settings')}
+            >
+              <IconTune />
+            </button>
           </div>
         )}
       </div>
@@ -1406,6 +1429,7 @@ export function ReaderScreen({ stackLayer }: { stackLayer: StackLayer }) {
               openAyah={state.openAyah}
               openRevision={state.readerOpenRevision}
               english={state.settings.readingMode === 'english_only'}
+              pageNumberScript={pageNumberScript}
               onPlayWord={(surahId, ayah, position) => {
                 if (state.gathering) {
                   appStore.onVerseTap(surahId, ayah)

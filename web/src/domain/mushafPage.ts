@@ -19,6 +19,8 @@ export interface MushafPage {
 
 export const MUSHAF_PAGE_COUNT = 604
 export const MUSHAF_LINES_PER_PAGE = 15
+/** Al-Fātiḥah and the opening of al-Baqarah: short leaves, centred in the well. */
+export const MUSHAF_OPENING_PAGES = 2
 
 export interface MushafWordPlacement {
   surahId: number
@@ -105,4 +107,15 @@ export function pageAyahs(words: readonly MushafWordPlacement[]): { surahId: num
     out.push({ surahId: word.surahId, ayah: word.ayah })
   }
   return out
+}
+
+/**
+ * The two leaves that face each other in the bound book. It reads right to
+ * left, so the odd page stands on the right and the even one after it on the
+ * left: 1|2, 3|4 … 603|604.
+ */
+export function mushafFacingPages(page: number): { right: number; left: number } {
+  const clamped = Math.min(MUSHAF_PAGE_COUNT, Math.max(1, Math.round(page)))
+  const right = clamped % 2 === 1 ? clamped : clamped - 1
+  return { right, left: right + 1 }
 }

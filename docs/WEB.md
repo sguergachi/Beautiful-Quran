@@ -362,6 +362,26 @@ the complete layer and visual-verification contract.
 
 Three sheets, hand-rolled paper stack (no router chrome):
 
+**Desktop book spread.** At `(min-width: 1100px) and (min-height: 600px)`
+(`ui/paper/bookSpread.ts`) the stack is laid open as a book instead of a
+centred phone column: Chapters on the verso, Reader on the recto, Bookmarks
+and Settings over the verso. `App` sets `data-spread` on the shell and hands
+each page the layer it should believe it is on (`spreadLayers`), so the reader
+stays live — focus follow, keys, rail — while Chapters is also on top; the
+store's real stack layer is untouched. `BookSpread` draws the boards, page
+block and title page under the sheets; all geometry is CSS keyed on
+`data-spread`. In Mushaf layout the spread shows two facing leaves
+(`mushafFacingPages`): `MushafReader` draws the recto and portals the verso
+into `BookSpread`'s slot, sized to the recto's own box; Chapters keeps its
+real layer and covers the verso only at layer 0 (`data-leaves`). Hafs stands
+in for the page faces, so each leaf measures its lines and scales the type
+until the longest fits (`--mushaf-fit`), on phones too.
+The leaf's folio follows the Customize page-number script (both figures
+share one centred line with a diamond between), opening leaves 1–2 centre
+their few lines in the well, and facing leaves mirror their running heads.
+Below that size nothing changes. Rationale in
+`docs/DESIGN.md` ("On a desktop browser the sheets lie open as a book").
+
 1. **Home** — surah list, Quran-wide word search (sectioned by surah with
    truncated expand-in-place lists), `surah:ayah` references, continue-
    listening, floating playback control while a verse is loaded (chapter ·
@@ -500,8 +520,9 @@ sans.
   (HTML5 + Web Audio hybrid). Developer mode can fall back to dual-`<audio>`
   standby (iOS single-element HTTPS path on that legacy engine).
 - ✅ Collapsed surah title in the reader top bar once the opening header
-  scrolls off (Android `OrnateSurahTitle` parity — Arabic + chapter ·
-  transliteration, flanked by gilded flourishes).
+  scrolls off (Android `OrnateSurahTitle` — since #783 a miniature chapter medallion over
+  Arabic + chapter · transliteration, arriving with scroll; web still uses the
+  earlier gilded flourishes and a threshold switch).
 - ✅ Mushaf page breaks (Android `PageBreak` — gold hairline + Western /
   Arabic-Indic page numbers from `ayahs.page`).
 - ✅ Contextual feature guides (ayah-rail + bookmark-note lessons; developer

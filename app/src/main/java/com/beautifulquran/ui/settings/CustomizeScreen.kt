@@ -110,6 +110,7 @@ import com.beautifulquran.ui.theme.HafsFontFamily
 import com.beautifulquran.ui.theme.InkCircledChoiceRow
 import com.beautifulquran.ui.theme.InkExpandEasing
 import com.beautifulquran.ui.theme.LocalQuranAccents
+import com.beautifulquran.ui.theme.LocalReadingPaper
 import com.beautifulquran.ui.theme.TranslationFontFamily
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -484,7 +485,10 @@ internal fun ReadingPreview(
     val showGloss = showsPreviewWordGloss(readingLayout, readingMode, showWordGloss)
     val showRail = showsPreviewAyahRail(readingLayout)
     val gold = LocalQuranAccents.current.gold
-    val leaf = MaterialTheme.colorScheme.surface
+    // The reading paper itself, so the miniature is a piece of the sheet it
+    // previews. It used to be a wash of `surface`, which on Royal green is
+    // the Settings stock exactly and left the leaf with no ground at all.
+    val leaf = LocalReadingPaper.current
     val railPad = if (showRail) 10.dp else 0.dp
     val contentPad = Modifier
         .fillMaxWidth()
@@ -498,7 +502,7 @@ internal fun ReadingPreview(
         modifier = Modifier
             .fillMaxWidth()
             .clip(PreviewLeaf)
-            .background(leaf.copy(alpha = 0.42f), PreviewLeaf)
+            .background(leaf, PreviewLeaf)
             .border(0.5.dp, gold.copy(alpha = 0.28f), PreviewLeaf)
             .graphicsLayer { alpha = 0.74f },
     ) {
