@@ -31,10 +31,37 @@ export function spreadLayers(
   spread: boolean,
   stack: StackLayer,
   hasReader: boolean,
+  leaves = false,
 ): { home: StackLayer; reader: StackLayer } {
   if (!spread || !hasReader) return { home: stack, reader: stack }
   return {
-    home: stack === READER_LAYER ? COVER_LAYER : stack,
+    // Mushaf layout fills both pages with facing leaves, so Chapters keeps
+    // its real layer there: laid over the verso at layer 0, gone at layer 1.
+    home: !leaves && stack === READER_LAYER ? COVER_LAYER : stack,
     reader: READER_LAYER,
   }
+}
+
+/**
+ * Where the reader hangs the facing (left) leaf. The element lives under
+ * the verso sheets in `BookSpread`; the reader owns what is drawn in it.
+ */
+let versoLeafSlot: HTMLElement | null = null
+const slotListeners = new Set<() => void>()
+
+export function setVersoLeafSlot(el: HTMLElement | null) {
+  if (versoLeafSlot === el) return
+  versoLeafSlot = el
+  for (const listener of slotListeners) listener()
+}
+
+export function useVersoLeafSlot(): HTMLElement | null {
+  return useSyncExternalStore(
+    (onChange) => {
+      slotListeners.add(onChange)
+      return () => slotListeners.delete(onChange)
+    },
+    () => versoLeafSlot,
+    () => null,
+  )
 }

@@ -106,3 +106,14 @@ export function pageAyahs(words: readonly MushafWordPlacement[]): { surahId: num
   }
   return out
 }
+
+/**
+ * The two leaves that face each other in the bound book. It reads right to
+ * left, so the odd page stands on the right and the even one after it on the
+ * left: 1|2, 3|4 … 603|604.
+ */
+export function mushafFacingPages(page: number): { right: number; left: number } {
+  const clamped = Math.min(MUSHAF_PAGE_COUNT, Math.max(1, Math.round(page)))
+  const right = clamped % 2 === 1 ? clamped : clamped - 1
+  return { right, left: right + 1 }
+}

@@ -18,6 +18,11 @@ describe('spreadLayers', () => {
     expect(spreadLayers(true, BOOKMARKS_LAYER, true)).toEqual({ home: BOOKMARKS_LAYER, reader: READER_LAYER })
   })
 
+  it('gives Chapters its real layer when facing leaves fill the spread', () => {
+    expect(spreadLayers(true, READER_LAYER, true, true)).toEqual({ home: READER_LAYER, reader: READER_LAYER })
+    expect(spreadLayers(true, COVER_LAYER, true, true)).toEqual({ home: COVER_LAYER, reader: READER_LAYER })
+  })
+
   it('has no reader page before a chapter is opened', () => {
     // Layer 1 is Settings here, so Chapters is genuinely underneath it.
     expect(spreadLayers(true, READER_LAYER, false)).toEqual({ home: READER_LAYER, reader: READER_LAYER })

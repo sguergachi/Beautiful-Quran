@@ -27,6 +27,13 @@ the paper turning down into the gutter. Bookmarks and Settings are laid over
 the left page, so a reader changes the type and watches the right page answer.
 Before a chapter is chosen the right page is the title page.
 
+In **Mushaf** layout the spread is the bound book itself: two facing leaves,
+the odd page on the right and the next on the left (1|2 … 603|604), their
+fifteen lines on one grid. They turn together — the arrow keys, a drag, or a
+strip of either fore-edge whose mark shows only under a pointer; pages run
+right to left, so the left edge is the way on. Chapters is then laid over the
+left leaf on demand, as Settings is, and touching the open page puts it away.
+
 This bends two rules, narrowly. *One sheet at a time* becomes two, because
 they are the two a reader moves between constantly and neither is read in
 sequence with the other — the rule against inventing desktop columns for
