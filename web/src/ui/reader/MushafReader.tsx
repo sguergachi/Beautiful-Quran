@@ -13,6 +13,7 @@ import { createPortal } from 'react-dom'
 import { QuranRepository } from '../../data/repository'
 import { runtimeMushafCache } from '../../data/runtimeMushaf'
 import {
+  MUSHAF_LINES_PER_PAGE,
   MUSHAF_OPENING_PAGES,
   MUSHAF_PAGE_COUNT,
   mushafFacingPages,
@@ -25,7 +26,7 @@ import { useBookSpread, useTurningLeafSlot, useVersoLeafSlot } from '../paper/bo
 import { COVER_LAYER, READER_LAYER } from '../paper/stack'
 import { TurningLeaf } from './TurningLeaf'
 import { finishPageTurn, requestPageTurn, type PageTurnQueue } from './pageTurnQueue'
-import { mushafFit, mushafLeafFit, naturalLineWidth } from './mushafFit'
+import { MUSHAF_MIN_LEADING, mushafFit, mushafLeafFit, naturalLineWidth, solveLine } from './mushafFit'
 import { mushafLeafModel } from './mushafLeafModel'
 import { PAGE_TURN_SCHEDULE, playFlip, warmPageTurnSounds } from '../paper/pageTurnSounds'
 
@@ -50,8 +51,10 @@ export function MushafReader({
   openRevision,
   english,
   pageNumberScript,
+  glyphWiden,
   onPlayWord,
 }: {
+  glyphWiden: number
   pageNumberScript: PageNumberScript
   ownsKeyboard: boolean
   activeSurahId: number
@@ -189,7 +192,7 @@ export function MushafReader({
     props: typeof leafProps
     box: CSSProperties
   } | null>(null)
-  const leafProps = { fitRevision, activeSurahId, activeAyah, english, pageNumberScript, onPlayWord, onTurn: turn, onFit: reportFit }
+  const leafProps = { fitRevision, activeSurahId, activeAyah, english, pageNumberScript, glyphWiden, onPlayWord, onTurn: turn, onFit: reportFit }
   const reset = settledFooting !== footing || reduced || !ownsKeyboard
   useLayoutEffect(() => {
     if (reset) {
@@ -365,6 +368,7 @@ function MushafLeaf({
   activeAyah,
   english,
   pageNumberScript,
+  glyphWiden,
   onPlayWord,
   onTurn,
   fit,
@@ -383,11 +387,16 @@ function MushafLeaf({
   activeAyah: number | null
   english: boolean
   pageNumberScript: PageNumberScript
+  /** Most a loose line's letters may be widened, as a fraction (0.06 = 6%). */
+  glyphWiden: number
   onPlayWord: (surahId: number, ayah: number, position: number) => void
   onTurn: (delta: number) => void
 }) {
   const drag = useRef<{ x: number; y: number } | null>(null)
   const linesRef = useRef<HTMLDivElement>(null)
+  // The two opening leaves carry a few short lines, set in the middle of the
+  // well; every other leaf hangs its fifteen lines from the head.
+  const opening = page <= MUSHAF_OPENING_PAGES
 
   // Hafs stands in for the page's own face, so a printed line sets wider or
   // narrower than the page. Measure every line at full size, word spaces at
@@ -419,7 +428,16 @@ function MushafLeaf({
           ))) / scale
       const box = getComputedStyle(leaf)
       const available = leaf.clientWidth - parseFloat(box.paddingLeft) - parseFloat(box.paddingRight)
-      onFit(page, mushafLeafFit(available, widest))
+      // Room to grow is bounded by the line pitch the page can give: the
+      // block's height, less its running head and folio, over fifteen lines.
+      const block = lines.parentElement
+      const furniture = block
+        ? Array.from(block.children).reduce((sum, child) => (child === lines ? sum : sum + child.clientHeight), 0)
+        : 0
+      const pitch = block ? (block.clientHeight - furniture) / MUSHAF_LINES_PER_PAGE : 0
+      const baseEm = parseFloat(getComputedStyle(lines).fontSize) / scale
+      const maxGrow = pitch > 0 && baseEm > 0 ? pitch / (MUSHAF_MIN_LEADING * baseEm) : 1
+      onFit(page, mushafLeafFit(available, widest, maxGrow))
     }
     measure()
     const observer = new ResizeObserver(measure)
@@ -433,13 +451,42 @@ function MushafLeaf({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [page, english, side, fitRevision, onFit === noFit])
 
+  // Once the hand and the measure are settled, set each line: widen the
+  // letters of a loose line toward the target word space, and centre a line
+  // too short to justify. Written straight to the lines — it is derived
+  // from layout, and cloned as it stands into a turning leaf.
+  useLayoutEffect(() => {
+    const lines = linesRef.current
+    if (!lines || english) return
+    const em = parseFloat(getComputedStyle(lines).fontSize)
+    const measure = lines.clientWidth
+    for (const line of Array.from(lines.children) as HTMLElement[]) {
+      line.removeAttribute('data-widen')
+      line.removeAttribute('data-short')
+      line.style.removeProperty('--line-widen')
+    }
+    if (opening) return
+    // Read every line before writing any, so the page is laid out once.
+    const settings = (Array.from(lines.children) as HTMLElement[]).map((line) => {
+      const ink = Array.from(line.children).reduce((sum, item) => sum + item.getBoundingClientRect().width, 0)
+      return solveLine(ink, line.children.length - 1, measure, em, glyphWiden)
+    })
+    settings.forEach((setting, index) => {
+      const line = lines.children[index] as HTMLElement
+      if (setting.short) line.setAttribute('data-short', '')
+      else if (setting.widen > 1.001) {
+        line.setAttribute('data-widen', '')
+        line.style.setProperty('--line-widen', setting.widen.toFixed(4))
+      }
+    })
+  }, [page, english, side, fit, fitRevision, glyphWiden, opening])
+
   if (!runtimeMushafCache) return null
   const rows = runtimeMushafCache.pageWords(page) ?? []
   const { leaf, headSurah, englishAyahs, lastPositions } = mushafLeafModel(page, rows, QuranRepository.surahContent)
   const folio = pageFolioLayout(page, english ? 'english' : pageNumberScript)
   // The two opening leaves carry a few short lines, set in the middle of the
   // well; every other leaf hangs its fifteen lines from the head.
-  const opening = page <= MUSHAF_OPENING_PAGES
   const lines = opening ? leaf.lines.filter((line) => line.tokens.length > 0) : leaf.lines
 
   return (

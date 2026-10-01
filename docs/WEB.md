@@ -379,6 +379,15 @@ first in DOM and Tab order. Gathering stays active while another sheet covers
 the verso, and Escape cancels gathering before peeling that sheet away. Hafs stands
 in for the page faces, so each leaf measures its lines and scales the type
 until the longest fits (`--mushaf-fit`), on phones too.
+The spread's page is golden: `--page-w` / `--page-h` (1 : φ) and the margin
+unit `--grid-u` in `styles.css` ("Golden page") drive the book, the cover
+board and every sheet; a Mushaf leaf is absolutely placed on
+`--margin-inner/head/fore/foot`. The per-leaf solver is in
+`ui/reader/mushafFit.ts`: `mushafLeafFit` (type size, bounded by
+`MUSHAF_MIN_LEADING`) and `solveLine` (letter widening toward
+`MUSHAF_TARGET_GAP`, or centring below `MUSHAF_SHORT_FILL`), applied to the
+lines in a layout effect in `MushafLeaf`. The cap is the
+`mushafGlyphWiden` setting.
 Mushaf lines justify by even word spaces: words and verse marks are
 separate flex items of the line (`space-between`, 0.3 em minimum gap) inside
 `.mushaf-block`, which is `width: max-content` — as wide as the leaf's widest

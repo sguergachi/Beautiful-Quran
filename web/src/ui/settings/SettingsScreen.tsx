@@ -3,8 +3,10 @@ import { assetUrl } from '../../assetUrl'
 import { appStore, useAppSelector } from '../../store/appStore'
 import { runtimeMushafCache, type RuntimeCacheStatus } from '../../data/runtimeMushaf'
 import {
+  MUSHAF_GLYPH_WIDENS,
   type HomeBookmarkStyle,
   type BrushCircleStyle,
+  type MushafGlyphWiden,
 } from '../../data/settings'
 import { customizeSummary } from '../../data/customizePolicy'
 import type { Reciter } from '../../data/models'
@@ -567,6 +569,25 @@ export function SettingsScreen({
                 options={HOME_BOOKMARK_OPTIONS}
                 onChange={(homeBookmarkStyle) =>
                   appStore.updateSettings({ homeBookmarkStyle })
+                }
+              />
+            </div>
+
+            <div className="settings-dev-block">
+              <p className="settings-body-label">Mushaf letter widening</p>
+              <p className="settings-caption">
+                How far a loose line&rsquo;s letters may be widened before space is
+                added between its words.
+              </p>
+              <PaperChoiceList
+                aria-label="Mushaf letter widening"
+                value={String(s.mushafGlyphWiden)}
+                options={MUSHAF_GLYPH_WIDENS.map((percent) => ({
+                  value: String(percent),
+                  label: percent === 0 ? 'Off' : `Up to ${percent}%`,
+                }))}
+                onChange={(value) =>
+                  appStore.updateSettings({ mushafGlyphWiden: Number(value) as MushafGlyphWiden })
                 }
               />
             </div>

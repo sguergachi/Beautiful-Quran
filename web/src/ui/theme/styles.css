@@ -2549,6 +2549,24 @@ button.ayah-mark {
   min-width: 72%;
   max-width: 100%;
   margin-inline: auto;
+  justify-content: center;
+}
+
+/* Letter widening, the stand-in for the print's elongated letters: a loose
+   line is set a few percent wide before any space is added between its
+   words. The line is laid out narrower by the same factor and scaled back
+   out, so its word spaces are solved against the widened letters. */
+.mushaf-line[data-widen] {
+  width: calc(100% / var(--line-widen, 1));
+  transform: scaleX(var(--line-widen, 1));
+  transform-origin: right center;
+}
+
+/* A line too short to justify without rivers is centred at an ordinary
+   word space, as the print centres a chapter's last line. */
+.mushaf-line[data-short] {
+  justify-content: center;
+  gap: 0.42em;
 }
 
 .mushaf-head {
@@ -2571,7 +2589,17 @@ button.ayah-mark {
   display: grid;
   grid-template-rows: repeat(15, minmax(0, 1fr));
   min-height: 0;
-  margin-top: 1em;
+  margin-top: 0.6em;
+  /* The page's hand. --mushaf-fit is solved per leaf (MushafReader). */
+  font-size: calc(clamp(1.05rem, 4.2vw, 1.55rem) * var(--mushaf-fit, 1));
+  /* Leading follows the type: fifteen lines never spread further apart
+     than this, however tall the sheet. The block then sits centred. */
+  max-height: calc(15 * 2.15em);
+}
+
+.mushaf-head,
+.mushaf-folio {
+  flex: none;
 }
 
 .mushaf-line {
@@ -2583,7 +2611,6 @@ button.ayah-mark {
   /* The least a word space may be. Justification only ever adds to it. */
   gap: 0.3em;
   font-family: var(--font-arabic);
-  font-size: calc(clamp(1.05rem, 4.2vw, 1.55rem) * var(--mushaf-fit, 1));
   line-height: 1;
   overflow: hidden;
   white-space: nowrap;
@@ -6257,14 +6284,36 @@ html[data-entrance='true'] body {
 }
 
 .app-shell[data-spread='true'] {
-  --desk-pad: clamp(14px, 3.4vh, 44px);
-  --book-width: min(100% - 2 * clamp(20px, 3vw, 56px), 88rem);
-  --book-x: calc((100% - var(--book-width)) / 2);
   /* Binding board showing past the page block, then the block's own edge. */
   --book-rim: 8px;
   --book-fore-edge: 6px;
+  --desk-pad: clamp(14px, 3.4vh, 44px);
+  --desk-side: clamp(20px, 3vw, 56px);
+  /*
+   * Golden page. A page is 1 : φ, as tall as the window allows or as wide,
+   * whichever binds first. Its margins run inner : head : fore-edge : foot
+   * = 1 : φ : φ : φ² in one unit u — and for any u that leaves a text block
+   * that is itself 1 : φ, the page's own shape set inside it. u is the
+   * page's width over φ⁶ (block ≈ 85% of the page), opened further only
+   * when the foot would otherwise be too shallow to hold the transport.
+   */
+  --phi: 1.618034;
+  --page-w: min(
+    calc((100vw - 2 * var(--desk-side)) / 2 - var(--book-rim) - var(--book-fore-edge)),
+    calc((100vh - 2 * var(--desk-pad) - 2 * var(--book-rim)) / var(--phi))
+  );
+  --page-h: calc(var(--page-w) * var(--phi));
+  --transport-h: 5.6rem;
+  --grid-u: max(calc(var(--page-w) / 17.944), calc(var(--transport-h) / 2.618));
+  --margin-inner: var(--grid-u);
+  --margin-head: calc(var(--grid-u) * var(--phi));
+  --margin-fore: calc(var(--grid-u) * var(--phi));
+  --margin-foot: calc(var(--grid-u) * var(--phi) * var(--phi));
+  --book-width: calc(2 * (var(--page-w) + var(--book-rim) + var(--book-fore-edge)));
+  --book-x: calc((100% - var(--book-width)) / 2);
+  --desk-y: calc((100% - var(--page-h) - 2 * var(--book-rim)) / 2);
   --page-outer: calc(var(--book-x) + var(--book-rim) + var(--book-fore-edge));
-  --page-y: calc(var(--desk-pad) + var(--book-rim));
+  --page-y: calc(var(--desk-y) + var(--book-rim));
   --peek-step: 0px;
   background: var(--desk);
 }
@@ -6276,8 +6325,8 @@ html[data-entrance='true'] body {
 .app-shell[data-spread='true'] .book {
   display: block;
   position: absolute;
-  top: var(--desk-pad);
-  bottom: var(--desk-pad);
+  top: var(--desk-y);
+  bottom: var(--desk-y);
   left: var(--book-x);
   right: var(--book-x);
   z-index: 0;
@@ -6385,7 +6434,9 @@ html[data-entrance='true'] body {
 /* A page is phone-narrow but carries the desktop rail, which stands in the
    margin rather than on the edge — so the text block gives it that margin. */
 .app-shell[data-spread='true'] .sheet[data-name='reader'] {
-  --reader-max: min(40rem, 100% - 5rem);
+  /* From the page, not a percentage: the column's children take this same
+     variable, and a percentage would be subtracted again at each level. */
+  --reader-max: min(40rem, calc(var(--page-w) - 3.5rem));
 }
 
 /* Reading continues on the recto while Settings is open beside it. */
@@ -6411,8 +6462,8 @@ html[data-entrance='true'] body {
 /* Closed book: the board alone, centred on the desk. Opening carries it to
    the recto first, so the hinge lands on the spine of the spread beneath. */
 :is(.app-shell[data-spread='true'] .entrance-board:not([data-opening-mode='phone']), .entrance-board[data-opening-mode='spread']) {
-  top: var(--desk-pad);
-  bottom: var(--desk-pad);
+  top: var(--desk-y);
+  bottom: var(--desk-y);
   left: 50%;
   right: var(--book-x);
   border-radius: 3px 9px 9px 3px;
@@ -6612,10 +6663,45 @@ html[data-entrance-opening]
   pointer-events: none;
 }
 
-/* A page is taller than a phone is wide: size the hand to the line pitch
-   the fifteen-line grid actually has, not to the window's width. */
-.app-shell[data-spread='true'] .mushaf-line {
-  font-size: calc(clamp(1.05rem, 3.1vh, 1.75rem) * var(--mushaf-fit, 1));
+/* On the spread the hand starts from the page, not the window's width;
+   the fit then grows or shrinks it until the widest line fills the block. */
+.app-shell[data-spread='true'] .mushaf-lines {
+  font-size: calc(var(--page-w) / 24 * var(--mushaf-fit, 1));
+  max-height: none;
+}
+
+/* A leaf is the golden text block of its page: inner margin at the spine,
+   φ at head and fore-edge, φ² at the foot. Recto and verso mirror. The
+   !important beats the measured inline box the verso used to be given. */
+.app-shell[data-spread='true'] .mushaf[data-side],
+.app-shell[data-spread='true'] .mushaf-fit-probes > .mushaf {
+  position: absolute !important;
+  top: var(--margin-head) !important;
+  bottom: var(--margin-foot) !important;
+  left: var(--margin-inner) !important;
+  right: var(--margin-fore) !important;
+  width: auto !important;
+  height: auto !important;
+  padding: 0;
+}
+
+.app-shell[data-spread='true'] .mushaf[data-side='verso'] {
+  left: var(--margin-fore) !important;
+  right: var(--margin-inner) !important;
+}
+
+/* Nothing scrolls beneath the transport on a leaf, so it needs no paper of
+   its own — and its dissolve would lie across the recto's folio. It stands
+   in the foot margin, which the grid opens to hold it. */
+.app-shell[data-spread='true'][data-leaves='true'] .player-bar {
+  background: none;
+  padding-top: 0.4rem;
+}
+
+/* The recto leaf is placed against its page, not the reader's column. */
+.app-shell[data-spread='true'][data-leaves='true'] .sheet[data-name='reader'] :is(.reader-body, .reader-main) {
+  position: static;
+  max-width: none;
 }
 
 /* Facing leaves mirror: each carries the chapter's Latin name at its

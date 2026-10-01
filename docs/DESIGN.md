@@ -34,6 +34,28 @@ strip of either fore-edge whose mark shows only under a pointer; pages run
 right to left, so the left edge is the way on. Chapters is then laid over the
 left leaf on demand, as Settings is, and touching the open page puts it away.
 
+**The golden page (web, desktop spread).** A page is 1 : φ, as tall as the
+window allows or as wide, whichever binds first. Its margins run inner : head
+: fore-edge : foot = 1 : φ : φ : φ² in one unit, and for any unit that leaves
+a text block that is itself 1 : φ — the page's own shape set inside it,
+nearer the spine and the head, as a bound book sits. The unit is the page's
+width over φ⁶ (the block is about 85% of the page), opened further only when
+the foot would be too shallow to hold the transport, which stands in that
+margin with no paper of its own. A Mushaf leaf is that block; recto and verso
+mirror. Chapters, Settings and the scrolling reader keep their own column on
+the same golden page.
+
+**What the page solves for itself (web Mushaf).** In order: the type grows or
+shrinks until the leaf's widest line, at minimum word spaces, fills the
+block — never so far that fifteen lines would stand closer than 1.75 times
+the type. Each loose line then has its *letters* widened a few percent
+(6 by default; Settings → Developer offers 0, 4, 6, 8) toward a word space of
+0.42 em before any space is added between words: the stand-in for the print's
+elongated letters, and it adds nothing to the text. A line that fills less
+than 62% of the measure is centred at an ordinary word space instead of being
+justified, as the print centres a chapter's last line. On a phone, leading
+is capped at 2.15 times the type and the block sits centred in the sheet.
+
 **Justified, with even word spaces (web Mushaf).** The browser sets the
 leaf in Hafs, not in the page's own face, and Hafs sets narrower than the
 print — the print fills its line by elongating letters, which the app must
