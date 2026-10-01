@@ -7,6 +7,7 @@ import {
   type BrushCircleStyle,
 } from '../../data/settings'
 import { customizeSummary } from '../../data/customizePolicy'
+import type { Reciter } from '../../data/models'
 import { CustomizeScreen } from './CustomizeScreen'
 import { NuqtaLab } from './NuqtaLab'
 import { settingsLayerFor, type StackLayer } from '../paper/stack'
@@ -65,6 +66,15 @@ const HOME_BOOKMARK_OPTIONS: { value: HomeBookmarkStyle; label: string }[] = [
 
 /** Triple-tap window for developer unlock — matches Android SettingsScreen. */
 const DEVELOPER_TAP_RESET_MS = 1500
+
+/** Android RecitersScreen: a style is named only when it is not Murattal. */
+function reciterDescription(reciter: Reciter): string | undefined {
+  const parts = [
+    reciter.style && reciter.style !== 'Murattal' ? reciter.style : null,
+    reciter.hasTimings ? null : 'No word highlighting',
+  ].filter(Boolean)
+  return parts.length > 0 ? parts.join(' · ') : undefined
+}
 
 export function SettingsScreen({
   stackLayer,
@@ -372,7 +382,7 @@ export function SettingsScreen({
             options={reciters.map((r) => ({
               value: String(r.id),
               label: r.name,
-              description: r.hasTimings ? undefined : 'No word highlighting',
+              description: reciterDescription(r),
             }))}
             onChange={(v) => appStore.updateSettings({ reciterId: Number(v) })}
           />

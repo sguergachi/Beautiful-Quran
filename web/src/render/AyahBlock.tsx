@@ -171,6 +171,23 @@ function AyahBlockInner({
     if (el) onKeepWordInView(el)
   }, [keepActiveWordInView, onKeepWordInView, activeWord?.wordPosition])
 
+  const markButton = (
+    <button
+      type="button"
+      className={verseNumberScript === 'arabic' ? 'ayah-mark' : 'ayah-mark ayah-mark--ltr'}
+      dir={verseNumberScript === 'arabic' ? undefined : 'ltr'}
+      aria-label={`Gather ayah ${ayah.number}`}
+      onClick={(event) => {
+        event.stopPropagation()
+        onMarkTap?.()
+      }}
+    >
+      {ayahMark}
+    </button>
+  )
+  // Word tiles only: prose (English, continuous Hafs) breaks inline already.
+  const markWithLastWord = !arabicOnly && !englishOnly && words.length > 0
+
   return (
     <RepeatWashGateProvider>
     <article
@@ -244,18 +261,7 @@ function AyahBlockInner({
               />
             )
           })}
-          <button
-            type="button"
-            className={verseNumberScript === 'arabic' ? 'ayah-mark' : 'ayah-mark ayah-mark--ltr'}
-            dir={verseNumberScript === 'arabic' ? undefined : 'ltr'}
-            aria-label={`Gather ayah ${ayah.number}`}
-            onClick={(event) => {
-              event.stopPropagation()
-              onMarkTap?.()
-            }}
-          >
-            {ayahMark}
-          </button>
+          {markButton}
         </p>
       ) : (
         <div className="words" dir={englishOnly ? 'ltr' : 'rtl'} data-lyric={englishOnly ? 'english' : 'arabic'}>
@@ -264,7 +270,16 @@ function AyahBlockInner({
             const isActive = ink.state === InkState.Active
             if (englishOnly && !englishWords[index]) return null
             return (
-              <span key={w.position} className={englishOnly ? 'english-word-run' : 'word-unit-run'}>
+              <span
+                key={w.position}
+                className={
+                  englishOnly
+                    ? 'english-word-run'
+                    : markWithLastWord && index === words.length - 1
+                      ? 'word-tail'
+                      : 'word-unit-run'
+                }
+              >
                 <WordUnit
                   word={w}
                   englishText={englishOnly ? englishWords[index] : undefined}
@@ -294,21 +309,11 @@ function AyahBlockInner({
                   }}
                 />
                 {englishOnly ? ' ' : null}
+                {markWithLastWord && index === words.length - 1 ? markButton : null}
               </span>
             )
           })}
-          <button
-            type="button"
-            className={verseNumberScript === 'arabic' ? 'ayah-mark' : 'ayah-mark ayah-mark--ltr'}
-            dir={verseNumberScript === 'arabic' ? undefined : 'ltr'}
-            aria-label={`Gather ayah ${ayah.number}`}
-            onClick={(event) => {
-              event.stopPropagation()
-              onMarkTap?.()
-            }}
-          >
-            {ayahMark}
-          </button>
+          {markWithLastWord ? null : markButton}
         </div>
       )}
 

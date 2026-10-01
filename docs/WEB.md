@@ -362,6 +362,17 @@ the complete layer and visual-verification contract.
 
 Three sheets, hand-rolled paper stack (no router chrome):
 
+**Desktop book spread.** At `(min-width: 1100px) and (min-height: 600px)`
+(`ui/paper/bookSpread.ts`) the stack is laid open as a book instead of a
+centred phone column: Chapters on the verso, Reader on the recto, Bookmarks
+and Settings over the verso. `App` sets `data-spread` on the shell and hands
+each page the layer it should believe it is on (`spreadLayers`), so the reader
+stays live — focus follow, keys, rail — while Chapters is also on top; the
+store's real stack layer is untouched. `BookSpread` draws the boards, page
+block and title page under the sheets; all geometry is CSS keyed on
+`data-spread`. Below that size nothing changes. Rationale in
+`docs/DESIGN.md` ("On a desktop browser the sheets lie open as a book").
+
 1. **Home** — surah list, Quran-wide word search (sectioned by surah with
    truncated expand-in-place lists), `surah:ayah` references, continue-
    listening, floating playback control while a verse is loaded (chapter ·
