@@ -1,59 +1,62 @@
-# Flowing ornament fields
+# Geometric fields with filigree
 
-The field is a quiet vegetal ground for the illumination. Its structure is
-curved: adding flowers to a straight lattice does not remove the lattice's
-visual noise. These rules apply to covers, chapter headers and Ornaments Lab
-on Android and web.
+The field combines a legible geometric repeat with finer foliate enrichment.
+Geometry must look composed; filigree rewards a closer look without obscuring
+that structure. A bare grid is too dull, arbitrary overlays are too noisy, and
+standalone decorative loops lose the intended Islamic character.
 
 ## Research and interpretation
 
-The [Met's vegetal ornament essay](https://www.metmuseum.org/essays/vegetal-patterns-in-islamic-art)
-places abstract plant ornament in Islamic manuscripts, textiles and buildings,
-and includes wavy-vine examples. It supports a vegetal field alongside the
-geometric medallion; geometric stars need not be the language of every surface.
-Our stems and motifs are an interpretation, not a reproduction of one object.
+The [Met's geometric ornament essay](https://www.metmuseum.org/essays/geometric-patterns-in-islamic-art)
+describes repetition, interlace, unity and order, and the combination of
+geometric and other ornament. The [V&A's Iranian star-and-cross tile panel](https://www.vam.ac.uk/articles/design-and-make-your-own-islamic-tile-and-printed-pattern)
+illustrates a repeat of eight-pointed stars and complementary cross spaces,
+with finer decoration contained by the tiles.
 
-[Owen Jones, *The Grammar of Ornament*, propositions 6–12](https://www.readingdesign.org/grammar-of-ornament)
-provides three useful construction principles: detail grows from a parent
-stem, curved junctions share tangents, and the general form precedes enrichment.
-These are design precedents, not universal measurements of beauty.
+The [al-Zanjani Qur'an folio, dated 1137](https://www.metmuseum.org/art/collection/search/453372)
+combines geometric interlace and foliate scrolls. This is a useful precedent
+for geometry and delicate secondary ornament sharing one composition.
+Our field is an interpretation of that relationship, not a facsimile or a
+claim to reproduce a particular historical pattern.
 
 ## Generator rules
 
-1. **Curves form the structure.** Four cubic ogee arcs connect the cell-edge
-   midpoints. No straight star, square knot, diamond heart or polygon scaffold
-   is drawn in the field. The geometric medallions, seals and borders retain
-   their own vocabulary.
-2. **Detail grows from the stem.** Four rotated branches share the stem's edge
-   roots and tangent axes. Use open curling tendrils throughout the repeat, with gently varied curl
-   tips (0.26–0.30 in local coordinates). There are no
-   detached flowers or centre marks.
-3. **Avoid crossing and crowding.** Fit each branch along the stem by scaling
-   its local horizontal reach by 1.2 and its vertical excursion by 0.6.
-   Sampled branch and stem segments must not cross. Leave the broad central
-   areas empty; the rosette and words provide the page's stronger detail.
-4. **Balance the ground.** Sum actual path lengths (without closing open
-   tendrils). Set `cellWidthDp = spacing × lineLength / 5.5`, with spacing
-   96–116 dp. Line density stays between 0.047414 and 0.057292 dp⁻¹ at a
-   constant stroke width. These are visually tuned bounds, not historical
-   proportions from the sources.
-5. **Repeat with continuity.** Stem contacts lie exactly on the four shared
-   cell-edge midpoints. Branch positions have quarter-turn symmetry. The
-   entire repeat may have either handedness; a scroll is not forced
-   to have reflection symmetry. No individual tile is displaced or rotated.
-6. **Preserve the softness.** Sample cubic arcs with the shared Bézier helper.
-   Web field SVGs retain four decimal places in cell coordinates. No long
-   ruler-like segments, loose ray fragments or fine polygon compartments.
-   Existing whisper ink, embossing and edge dissolves keep the field below
-   the medallion and the words.
+1. **One coherent geometric repeat.** The envelope of two squares supplies
+   a sixteen-vertex eight-pointed star. Cardinal tips reach the shared cell
+   midpoints; the spaces between stars form the complementary cross ground.
+   Draw the outline, not the overlapping square construction guides.
+2. **Give the geometry a crafted edge.** A second star contour follows the
+   first at a restrained radial inset of 0.042–0.052 cell units. Both contours
+   use a 1 dp rule; all interior filigree uses a 0.55 dp hairline. Every field
+   renderer honors this distinction, including the Lab.
+3. **Compose the interior.** A small central eight-pointed star anchors eight
+   mirrored pairs of curling stems. Each pair faces a primary star point;
+   a separate narrow leaf accent occupies its tip. Four floret quarters
+   join across tile boundaries to enrich the cross compartments.
+4. **Protect the spaces.** Filigree stays at least 0.02 cell units from the
+   inner star contour. It cannot cross itself, adjacent sprays or the frame.
+   The centre stays open. No independently chosen square knots, grids or
+   scattered centre marks are added.
+5. **Vary proportions, not the grammar.** Four seeded draws control frame
+   inset, curl tip, leaf reach and spacing. Whole-repeat reflection and
+   quarter-turn symmetry remain exact. There is no per-tile randomness.
+6. **Balance visible ink.** Sum closed and open path lengths, weighting rules
+   by 1 and hairlines by 0.55. Set `cellWidthDp = spacing × inkLength / 11.5`,
+   with spacing 148–168 dp. This keeps weighted line density bounded while
+   leaving the motifs large enough to read at phone scale. These dimensions
+   are visually tuned, not historical measurements from the sources.
+7. **Keep page ornament subordinate.** The existing whisper ink, embossing
+   and edge dissolves keep the field below the medallion and the words.
+   Paths are cached outside drawing; weight separation uses two cached paths
+   on Android rather than one draw call for every spray or repeat.
 
-The four field RNG draws remain in their original position, and both platforms
-consume the same stream. Saved seeds are deterministic under this grammar;
-medallions, seals and borders remain identical. The Lab identifies the field as scrolling arabesque; seed search varies the
-medallion fold. Every seed retains the scrolling direction chosen for the field.
+Android and web consume the same four RNG draws in their original position.
+Saved seeds remain deterministic; medallions, seals and borders keep their
+existing seeded output. The Lab calls the field star-and-cross filigree.
 
-Tests cover attachment, cell-edge contacts, short curve segments, quarter-turn
-symmetry, line density and absence of intersections across 400 seeds. The
-reported seed `132614421` is a cross-platform known-answer fixture. The former
-star-edge and reflection assertions protected the straight lattice; the new
-checks preserve continuity and balance while allowing flowing handed motifs.
+Tests cover reflection and quarter-turn balance, attachment to the central
+star, frame clearance, cell-edge contacts, weighted line density and absence
+of accidental intersections across 400 seeds, including closing edges. Known
+answers pin Android/web parity and the reported seed `132614421`. Geometric
+edges are intentionally straight; the former all-curved short-segment check
+is replaced by compartment clearance and the retained no-crossing checks.

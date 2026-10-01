@@ -64,8 +64,8 @@ function coverTraits(o: CoverOrnament): CoverTraits {
 
 // ── Field rendering (crisp inline SVG, full control over ink) ────────────────
 
-function fieldPaths(field: FieldSpec, cols: number, rows: number, cellPx: number): string[] {
-  const paths: string[] = []
+function fieldPaths(field: FieldSpec, cols: number, rows: number, cellPx: number): { d: string; weight: 'rule' | 'hairline' }[] {
+  const paths: { d: string; weight: 'rule' | 'hairline' }[] = []
   for (let gx = -1; gx <= cols; gx++) {
     for (let gy = -1; gy <= rows; gy++) {
       for (const s of field.strokes) {
@@ -76,7 +76,7 @@ function fieldPaths(field: FieldSpec, cols: number, rows: number, cellPx: number
                 `${i === 0 ? 'M' : 'L'} ${((gx + p.x) * cellPx).toFixed(2)} ${((gy + p.y) * cellPx).toFixed(2)}`,
             )
             .join(' ') + (s.closed ? ' Z' : '')
-        paths.push(d)
+        paths.push({ d, weight: s.weight })
       }
     }
   }
@@ -108,8 +108,8 @@ function FieldSurface({
     >
       <defs>
         <pattern id={patternId} width={cellPx} height={cellPx} patternUnits="userSpaceOnUse">
-          {paths.map((d, i) => (
-            <path key={i} d={d} fill="none" stroke={stroke} strokeWidth={strokeWidth} strokeLinejoin="round" />
+          {paths.map(({ d, weight }, i) => (
+            <path key={i} d={d} fill="none" stroke={stroke} strokeWidth={strokeWidth * (weight === 'rule' ? 1 : 0.55)} strokeLinejoin="round" />
           ))}
         </pattern>
       </defs>
@@ -279,7 +279,7 @@ export function OrnamentsLab() {
           <dl>
             <div><dt>Medallion fold</dt><dd>{traits.medallionFold}</dd></div>
             <div><dt>Seal fold</dt><dd>{traits.sealFold}</dd></div>
-            <div><dt>Field style</dt><dd>scrolling arabesque</dd></div>
+            <div><dt>Field style</dt><dd>star-and-cross filigree</dd></div>
             <div><dt>Border</dt><dd>{traits.borderSignature}</dd></div>
           </dl>
         </section>

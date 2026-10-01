@@ -141,8 +141,8 @@ class OrnamentGeneratorTest {
     }
 
     @Test
-    fun `curved stem meets its neighbours at every cell-edge midpoint`() {
-        // Stem cusps land on shared edge midpoints, preserving the seamless
+    fun `star outline meets its neighbours at every cell-edge midpoint`() {
+        // Star tips land on shared edge midpoints, preserving the seamless
         // continuity that the former star-and-cross geometry required.
         for (seed in intArrayOf(5, 8, 21, 100, 4242)) {
             val f = generateCoverOrnament(seed).field
@@ -155,7 +155,7 @@ class OrnamentGeneratorTest {
             )
             for (m in midpoints) {
                 val hit = verts.any { abs(it.x - m.x) < 1e-9 && abs(it.y - m.y) < 1e-9 }
-                assertTrue("seed $seed: no stem contact at edge midpoint $m", hit)
+                assertTrue("seed $seed: no star contact at edge midpoint $m", hit)
             }
         }
     }
@@ -246,7 +246,7 @@ class OrnamentGeneratorTest {
     }
 
     @Test
-    fun `variety - a seed sample uses every fold, field style and border`() {
+    fun `variety - a seed sample uses every fold, filigree variation and border`() {
         val folds = HashSet<Int>()
         val fieldStyles = HashSet<List<OrnamentPoint>>()
         val borderShapes = HashSet<Int>()
@@ -257,12 +257,12 @@ class OrnamentGeneratorTest {
             borderShapes.add(o.border.strokes.size * 31 + o.border.dots.size)
         }
         assertEquals(setOf(8, 10, 12, 16), folds)
-        assertTrue("expected varied scroll geometry, got $fieldStyles", fieldStyles.size >= 3)
+        assertTrue("expected varied filigree geometry, got $fieldStyles", fieldStyles.size >= 3)
         assertTrue("expected several border grammars, got $borderShapes", borderShapes.size >= 3)
     }
 
     @Test
-    fun `curved fields stay rooted continuous balanced and free of crossings`() {
+    fun `geometric fields keep filigree contained balanced and free of crossings`() {
         fun crosses(a: OrnamentPoint, b: OrnamentPoint, c: OrnamentPoint, d: OrnamentPoint): Boolean {
             val dx = b.x - a.x; val dy = b.y - a.y
             val ex = d.x - c.x; val ey = d.y - c.y
@@ -274,27 +274,44 @@ class OrnamentGeneratorTest {
         }
         repeat(400) { seed ->
             val f = generateCoverOrnament(seed * 104729 + 13).field
-            assertEquals(5, f.strokes.size)
+            assertEquals(31, f.strokes.size)
+            assertEquals(2, f.strokes.count { it.weight == StrokeWeight.Rule })
             val pts = f.strokes.flatMap { it.points }
-            val edges = f.strokes.flatMap { it.points.zipWithNext() }
-            val length = edges.sumOf { (p, q) -> hypot(p.x - q.x, p.y - q.y) }
-            assertTrue(length / f.cellWidthDp >= 5.5 / 116 - 1e-9)
-            assertTrue(length / f.cellWidthDp <= 5.5 / 96 + 1e-9)
-            assertTrue(edges.maxOf { (p, q) -> hypot(p.x - q.x, p.y - q.y) } < 0.09)
+            val edges = f.strokes.flatMap { s ->
+                (if (s.closed) s.points + s.points.first() else s.points).zipWithNext()
+            }
+            val inkLength = f.strokes.sumOf { s ->
+                (if (s.closed) s.points + s.points.first() else s.points).zipWithNext()
+                    .sumOf { (p, q) -> hypot(p.x - q.x, p.y - q.y) } *
+                    if (s.weight == StrokeWeight.Rule) 1.0 else 0.55
+            }
+            assertTrue(inkLength / f.cellWidthDp >= 11.5 / 168 - 1e-9)
+            assertTrue(inkLength / f.cellWidthDp <= 11.5 / 148 + 1e-9)
             assertTrue(pts.all { it.x in -1e-9..1 + 1e-9 && it.y in -1e-9..1 + 1e-9 })
             for (p in pts) {
-                assertTrue("seed $seed: quarter-turn symmetry", pts.any { q ->
-                    abs(q.x - (1 - p.y)) < 1e-9 && abs(q.y - p.x) < 1e-9
-                })
+                assertTrue(pts.any { q -> hypot(q.x - (1 - p.y), q.y - p.x) < 1e-9 })
+                assertTrue(pts.any { q -> hypot(q.x - (1 - p.x), q.y - p.y) < 1e-9 })
             }
-            val stem = f.strokes.first().points
-            for (branch in f.strokes.drop(1)) {
-                val root = branch.points.first()
-                assertTrue(stem.any { hypot(it.x - root.x, it.y - root.y) < 1e-9 })
-                assertTrue(root.x == 0.0 || root.x == 1.0 || root.y == 0.0 || root.y == 1.0)
+            val frame = f.strokes[1].points
+            val heart = f.strokes[2].points
+            fun distanceToEdge(p: OrnamentPoint, a: OrnamentPoint, b: OrnamentPoint): Double {
+                val dx = b.x - a.x; val dy = b.y - a.y
+                val t = (((p.x - a.x) * dx + (p.y - a.y) * dy) / (dx * dx + dy * dy)).coerceIn(0.0, 1.0)
+                return hypot(p.x - a.x - t * dx, p.y - a.y - t * dy)
+            }
+            f.strokes.subList(3, 27).forEachIndexed { i, s ->
+                if (i % 3 != 2) assertTrue(heart.any { p ->
+                    hypot(p.x - s.points.first().x, p.y - s.points.first().y) < 1e-9
+                })
+                for (p in s.points) {
+                    assertTrue(hypot(p.x - 0.5, p.y - 0.5) < 0.411)
+                    assertTrue(frame.indices.minOf { j ->
+                        distanceToEdge(p, frame[j], frame[(j + 1) % frame.size])
+                    } > 0.02)
+                }
             }
             for (i in edges.indices) for (j in i + 1 until edges.size) {
-                assertFalse("seed $seed: branches cross", crosses(
+                assertFalse("seed $seed: accidental crossing", crosses(
                     edges[i].first, edges[i].second, edges[j].first, edges[j].second,
                 ))
             }
@@ -304,11 +321,11 @@ class OrnamentGeneratorTest {
     @Test
     fun `field known answers match web including the reported bare-grid seed`() {
         val seeds = listOf(1, 8, 21, 132614421)
-        val signatures = List(4) { listOf(41, 31, 31, 31, 31) }
-        val widths = listOf(111.04546135725428, 125.3411369186788, 120.31693265760579, 119.5239755323823)
+        val signature = listOf(16, 16, 16) + List(8) { listOf(31, 31, 21) }.flatten() + List(4) { 21 }
+        val widths = listOf(140.10369868522923, 154.91225717307822, 148.96731388542358, 147.25736671122036)
         seeds.forEachIndexed { i, seed ->
             val f = generateCoverOrnament(seed).field
-            assertEquals(signatures[i], f.strokes.map { it.points.size })
+            assertEquals(signature, f.strokes.map { it.points.size })
             assertEquals(widths[i], f.cellWidthDp, 1e-9)
         }
     }

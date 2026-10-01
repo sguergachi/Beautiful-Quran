@@ -304,7 +304,7 @@ fun OrnamentsLabScreen(
                 ) {
                     TraitRow("Medallion fold", ui.traits.medallionFold.toString())
                     TraitRow("Seal fold", ui.traits.sealFold.toString())
-                    TraitRow("Field style", "scrolling arabesque")
+                    TraitRow("Field style", "star-and-cross filigree")
                     TraitRow("Border", ui.traits.borderSignature)
                 }
             }

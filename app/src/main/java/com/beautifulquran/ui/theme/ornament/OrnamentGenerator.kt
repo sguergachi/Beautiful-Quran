@@ -72,7 +72,7 @@ data class RosetteSpec(
 )
 
 /**
- * An arabesque field: one translational unit cell of a curved vegetal pattern.
+ * A geometric field with filigree: one translational unit cell.
  * Strokes are in cell units ([cellW] × [cellH]); [cellWidthDp] is the
  * suggested rendered cell width so different tilings read at similar scale.
  */
@@ -717,7 +717,7 @@ private fun pointInConvex(vertices: List<OrnamentPoint>, px: Double, py: Double)
     return true
 }
 
-// ── Flowing arabesque fields ──────────────────────────────────────────────
+// ── Geometric fields with filigree ──────────────────────────────────────────────
 
 /** A sampled cubic path; closed motifs explicitly return to their first point. */
 private fun fieldCurve(coords: List<Pair<Double, Double>>, closed: Boolean): OrnamentStroke {
@@ -730,44 +730,57 @@ private fun fieldCurve(coords: List<Pair<Double, Double>>, closed: Boolean): Orn
 }
 
 /**
- * An ogee stem with four attached curling tendrils. Branches
- * share stem tangents; the cell-edge cusps meet their neighbours seamlessly.
- * The four RNG draws preserve the other ornament parts' seed contract.
- * See docs/ORNAMENT_FIELDS.md for the construction and design rules.
+ * Star-and-cross geometry with a paired outline and eight mirrored foliate
+ * sprays. Detail stays inside its compartment; four RNG draws vary only
+ * proportions within this grammar. See docs/ORNAMENT_FIELDS.md.
  */
 private fun generateField(rng: Mulberry32): FieldSpec {
-    val curl = rng.range(0.26, 0.30)
-    val mirrored = rng.chance(0.5)
-    val bend = rng.range(0.20, 0.24)
-    val spacing = rng.range(96.0, 116.0)
-    val stem = fieldCurve(listOf(
-        0.5 to 0.0, 0.5 to bend, 1 - bend to 0.5, 1.0 to 0.5,
-        1 - bend to 0.5, 0.5 to 1 - bend, 0.5 to 1.0,
-        0.5 to 1 - bend, bend to 0.5, 0.0 to 0.5,
-        bend to 0.5, 0.5 to bend, 0.5 to 0.0,
-    ), true)
-    val motif = fieldCurve(listOf(
-        0.0 to 0.5, 0.17 to 0.5, 0.20 to 0.31, 0.34 to 0.36,
-        0.44 to 0.40, 0.34 to 0.55, 0.26 to 0.52,
-        0.18 to 0.50, 0.22 to 0.42, curl to 0.44,
+    val inset = rng.range(0.042, 0.052)
+    val curl = rng.range(0.265, 0.285)
+    val tip = rng.range(0.392, 0.410)
+    val spacing = rng.range(148.0, 168.0)
+    fun star(radius: Double, weight: StrokeWeight) = OrnamentStroke(
+        List(16) { i -> polar(i * PI / 8,
+            radius * if (i % 2 == 1) cos(PI / 4) / cos(PI / 8) else 1.0) },
+        true, weight, 0.0, 1.0,
+    )
+    val strokes = mutableListOf(star(0.5, StrokeWeight.Rule),
+        star(0.5 - inset, StrokeWeight.Rule), star(0.13, StrokeWeight.Hairline))
+    val scroll = fieldCurve(listOf(
+        0.13 to 0.0, 0.19 to 0.0, 0.20 to -0.075, 0.27 to -0.075,
+        0.34 to -0.075, 0.35 to -0.01, 0.30 to -0.012,
+        0.26 to -0.001, 0.24 to -0.045, curl to -0.05,
     ), false)
-    val strokes = mutableListOf(stem)
-    repeat(4) { i ->
-        val a = i * PI / 2
-        strokes.add(motif.copy(points = motif.points.map { p ->
-            val x = p.x * 1.2 - 0.5
-            val y = (p.y - 0.5) * 0.6 * if (mirrored) -1 else 1
-            OrnamentPoint(0.5 + x * cos(a) - y * sin(a), 0.5 + x * sin(a) + y * cos(a))
-        }))
-    }
-    val lineLength = strokes.sumOf { s ->
-        (1 until s.points.size).sumOf { i ->
-            val p = s.points[i]
-            val q = s.points[i - 1]
-            kotlin.math.hypot(p.x - q.x, p.y - q.y)
+    val leaf = fieldCurve(listOf(
+        0.35 to 0.0, 0.37 to -0.02, tip - 0.02 to -0.02, tip to 0.0,
+        tip - 0.02 to 0.02, 0.37 to 0.02, 0.35 to 0.0,
+    ), true)
+    repeat(8) { i ->
+        val a = i * PI / 4
+        for ((motif, sign) in listOf(scroll to -1, scroll to 1, leaf to 1)) {
+            strokes.add(motif.copy(points = motif.points.map { p ->
+                OrnamentPoint(0.5 + p.x * cos(a) - p.y * sign * sin(a),
+                    0.5 + p.x * sin(a) + p.y * sign * cos(a))
+            }))
         }
     }
-    return FieldSpec(1.0, 1.0, spacing * lineLength / 5.5, strokes)
+    // Four quarters complete one floret at each shared cross-compartment centre.
+    val quarter = fieldCurve(listOf(
+        0.04 to 0.0, 0.068 to 0.0, 0.045 to 0.045, 0.064 to 0.064,
+        0.045 to 0.045, 0.0 to 0.068, 0.0 to 0.04,
+    ), false)
+    for ((cx, cy, sx, sy) in listOf(listOf(0, 0, 1, 1), listOf(1, 0, -1, 1),
+        listOf(1, 1, -1, -1), listOf(0, 1, 1, -1))) {
+        strokes.add(quarter.copy(points = quarter.points.map { p ->
+            OrnamentPoint(cx + sx * p.x, cy + sy * p.y)
+        }))
+    }
+    val inkLength = strokes.sumOf { s ->
+        val points = if (s.closed) s.points + s.points.first() else s.points
+        points.zipWithNext().sumOf { (p, q) -> kotlin.math.hypot(p.x - q.x, p.y - q.y) } *
+            if (s.weight == StrokeWeight.Rule) 1.0 else 0.55
+    }
+    return FieldSpec(1.0, 1.0, spacing * inkLength / 11.5, strokes)
 }
 
 /**

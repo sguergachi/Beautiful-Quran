@@ -50,7 +50,7 @@ export interface RosetteSpec {
   tipRadius: number
 }
 
-/** One translational unit cell of a periodic arabesque field. */
+/** One translational unit cell of a geometric field with filigree. */
 export interface FieldSpec {
   cellW: number
   cellH: number
@@ -654,7 +654,7 @@ function pointInConvex(vertices: OrnamentPoint[], px: number, py: number): boole
   return true
 }
 
-// ── Flowing arabesque fields ──────────────────────────────────────────────
+// ── Geometric fields with filigree ──────────────────────────────────────────────
 
 /** A sampled cubic path; closed motifs explicitly return to their first point. */
 function fieldCurve(coords: number[][], closed: boolean): OrnamentStroke {
@@ -667,41 +667,56 @@ function fieldCurve(coords: number[][], closed: boolean): OrnamentStroke {
 }
 
 /**
- * An ogee stem with four attached curling tendrils. Branches
- * share stem tangents; the cell-edge cusps meet their neighbours seamlessly.
- * The four RNG draws preserve the other ornament parts' seed contract.
- * See docs/ORNAMENT_FIELDS.md for the construction and design rules.
+ * Star-and-cross geometry with a paired outline and eight mirrored foliate
+ * sprays. Detail stays inside its compartment; four RNG draws vary only
+ * proportions within this grammar. See docs/ORNAMENT_FIELDS.md.
  */
 function generateField(rng: Mulberry32): FieldSpec {
-  const curl = rng.range(0.26, 0.30)
-  const mirrored = rng.chance(0.5)
-  const bend = rng.range(0.20, 0.24)
-  const spacing = rng.range(96, 116)
-  const stem = fieldCurve([
-    [0.5, 0], [0.5, bend], [1 - bend, 0.5], [1, 0.5],
-    [1 - bend, 0.5], [0.5, 1 - bend], [0.5, 1],
-    [0.5, 1 - bend], [bend, 0.5], [0, 0.5],
-    [bend, 0.5], [0.5, bend], [0.5, 0],
-  ], true)
-  const motif = fieldCurve([
-    [0, 0.5], [0.17, 0.5], [0.20, 0.31], [0.34, 0.36],
-    [0.44, 0.40], [0.34, 0.55], [0.26, 0.52],
-    [0.18, 0.50], [0.22, 0.42], [curl, 0.44],
+  const inset = rng.range(0.042, 0.052)
+  const curl = rng.range(0.265, 0.285)
+  const tip = rng.range(0.392, 0.410)
+  const spacing = rng.range(148, 168)
+  const star = (radius: number, weight: StrokeWeight): OrnamentStroke => ({
+    points: Array.from({ length: 16 }, (_, i) => polar(i * Math.PI / 8,
+      radius * (i % 2 ? Math.cos(Math.PI / 4) / Math.cos(Math.PI / 8) : 1))),
+    closed: true, weight, birth: 0, span: 1,
+  })
+  const strokes = [star(0.5, 'rule'), star(0.5 - inset, 'rule'), star(0.13, 'hairline')]
+  const scroll = fieldCurve([
+    [0.13, 0], [0.19, 0], [0.20, -0.075], [0.27, -0.075],
+    [0.34, -0.075], [0.35, -0.01], [0.30, -0.012],
+    [0.26, -0.001], [0.24, -0.045], [curl, -0.05],
   ], false)
-  const strokes = [stem]
-  for (let i = 0; i < 4; i++) {
-    const a = i * Math.PI / 2
-    strokes.push({ ...motif, points: motif.points.map((p) => {
-      const x = p.x * 1.2 - 0.5
-      const y = (p.y - 0.5) * 0.6 * (mirrored ? -1 : 1)
-      return { x: 0.5 + x * Math.cos(a) - y * Math.sin(a), y: 0.5 + x * Math.sin(a) + y * Math.cos(a) }
-    }) })
+  const leaf = fieldCurve([
+    [0.35, 0], [0.37, -0.02], [tip - 0.02, -0.02], [tip, 0],
+    [tip - 0.02, 0.02], [0.37, 0.02], [0.35, 0],
+  ], true)
+  for (let i = 0; i < 8; i++) {
+    const a = i * Math.PI / 4
+    for (const [motif, sign] of [[scroll, -1], [scroll, 1], [leaf, 1]] as const) {
+      strokes.push({ ...motif, points: motif.points.map((p) => ({
+        x: 0.5 + p.x * Math.cos(a) - p.y * sign * Math.sin(a),
+        y: 0.5 + p.x * Math.sin(a) + p.y * sign * Math.cos(a),
+      })) })
+    }
   }
-  const lineLength = strokes.reduce((total, s) => total + s.points.slice(1).reduce((length, p, i) => {
-    const q = s.points[i]!
-    return length + Math.hypot(p.x - q.x, p.y - q.y)
-  }, 0), 0)
-  return { cellW: 1, cellH: 1, cellWidthDp: spacing * lineLength / 5.5, strokes }
+  // Four quarters complete one floret at each shared cross-compartment centre.
+  const quarter = fieldCurve([
+    [0.04, 0], [0.068, 0], [0.045, 0.045], [0.064, 0.064],
+    [0.045, 0.045], [0, 0.068], [0, 0.04],
+  ], false)
+  for (const [cx, cy, sx, sy] of [[0, 0, 1, 1], [1, 0, -1, 1], [1, 1, -1, -1], [0, 1, 1, -1]]) {
+    strokes.push({ ...quarter, points: quarter.points.map((p) => ({ x: cx! + sx! * p.x, y: cy! + sy! * p.y })) })
+  }
+  const inkLength = strokes.reduce((total, s) => {
+    const points = s.closed ? [...s.points, s.points[0]!] : s.points
+    const length = points.slice(1).reduce((sum, p, i) => {
+      const q = points[i]!
+      return sum + Math.hypot(p.x - q.x, p.y - q.y)
+    }, 0)
+    return total + length * (s.weight === 'rule' ? 1 : 0.55)
+  }, 0)
+  return { cellW: 1, cellH: 1, cellWidthDp: spacing * inkLength / 11.5, strokes }
 }
 
 /**

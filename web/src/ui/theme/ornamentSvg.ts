@@ -45,7 +45,7 @@ export function fieldWeaveBackground(
   const h = field.cellH
   // One CSS pixel expressed in cell units, at the suggested render size.
   const px = field.cellW / field.cellWidthDp
-  const body = field.strokes.map((s) => `<path d='${pathD(s, 1, 4)}'/>`).join('')
+  const body = field.strokes.map((s) => `<path d='${pathD(s, 1, 4)}' stroke-width='${(px * (s.weight === 'rule' ? 1 : 0.55)).toFixed(4)}'/>`).join('')
   const uses: string[] = []
   for (const [stroke, off] of [
     [embossLight, -0.6 * px],

@@ -995,11 +995,12 @@ image, so it is crisp at any density and nearly free to render.
   ({10/4} → two {5/2} pentacles stacked), 6-fold seals, and 6-fold field
   tilings are all excluded by construction and guarded by tests on both
   platforms.
-- **Field harmony.** The ground is a flowing vegetal arabesque: curved ogee
-  stems with attached curling tendrils, broad empty areas, and no
-  straight lattice. Branches share stem tangents and cannot cross. Repeat
-  spacing follows total path length. Construction, research and testable
-  rules: [ORNAMENT_FIELDS.md](ORNAMENT_FIELDS.md).
+- **Field harmony.** Eight-pointed star-and-cross geometry establishes the
+  repeat; paired star contours use stronger rules and mirrored foliate sprays
+  use finer hairlines inside the compartments. Details cannot cross or graze
+  the frame. Reflection and quarter-turn balance, deliberate empty space and
+  weight-aware repeat spacing keep richness composed rather than noisy.
+  Construction, research and testable rules: [ORNAMENT_FIELDS.md](ORNAMENT_FIELDS.md).
 - **Gilding.** Gold is never a flat color. Gilded elements (the surah
   rosette, ayah number marks, the home mark) carry a three-stop leaf
   gradient (deep bronze → bright gilt → deep bronze). The gradient's

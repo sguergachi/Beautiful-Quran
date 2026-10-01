@@ -227,7 +227,7 @@ describe('ornamentGenerator', () => {
     expect(violations).toEqual([])
   })
 
-  it('a seed sample uses every fold, varied scroll geometry, and border', () => {
+  it('a seed sample uses every fold, varied filigree geometry, and border', () => {
     const folds = new Set<number>()
     const fieldStyles = new Set<string>()
     const borders = new Set<string>()
@@ -242,8 +242,10 @@ describe('ornamentGenerator', () => {
     expect(borders.size).toBeGreaterThanOrEqual(3)
   })
 
-  it('curved fields stay rooted, continuous, balanced and free of crossings', () => {
+  it('geometric fields keep filigree contained, balanced and free of crossings', () => {
     const crosses = (a: OrnamentPoint, b: OrnamentPoint, c: OrnamentPoint, d: OrnamentPoint) => {
+      if (Math.max(a.x, b.x) < Math.min(c.x, d.x) || Math.max(c.x, d.x) < Math.min(a.x, b.x) ||
+        Math.max(a.y, b.y) < Math.min(c.y, d.y) || Math.max(c.y, d.y) < Math.min(a.y, b.y)) return false
       const dx = b.x - a.x, dy = b.y - a.y, ex = d.x - c.x, ey = d.y - c.y
       const den = dx * ey - dy * ex
       if (Math.abs(den) < 1e-10) return false
@@ -253,43 +255,57 @@ describe('ornamentGenerator', () => {
     }
     for (let seed = 0; seed < 400; seed++) {
       const f = generateCoverOrnament(seed * 104729 + 13).field
-      expect(f.strokes.length).toBe(5)
+      expect(f.strokes.length).toBe(31)
+      expect(f.strokes.filter((s) => s.weight === 'rule').length).toBe(2)
       const pts = f.strokes.flatMap((s) => s.points)
-      const edges = f.strokes.flatMap((s) => s.points.slice(1).map((p, i) => [s.points[i]!, p] as const))
-      const length = edges.reduce((sum, [p, q]) => sum + Math.hypot(p.x - q.x, p.y - q.y), 0)
-      expect(length / f.cellWidthDp).toBeGreaterThanOrEqual(5.5 / 116 - 1e-9)
-      expect(length / f.cellWidthDp).toBeLessThanOrEqual(5.5 / 96 + 1e-9)
-      expect(Math.max(...edges.map(([p, q]) => Math.hypot(p.x - q.x, p.y - q.y)))).toBeLessThan(0.09)
+      const edges = f.strokes.flatMap((s) => {
+        const p = s.closed ? [...s.points, s.points[0]!] : s.points
+        return p.slice(1).map((q, i) => [p[i]!, q] as const)
+      })
+      const inkLength = f.strokes.reduce((sum, s) => {
+        const p = s.closed ? [...s.points, s.points[0]!] : s.points
+        const length = p.slice(1).reduce((n, q, i) => n + Math.hypot(q.x - p[i]!.x, q.y - p[i]!.y), 0)
+        return sum + length * (s.weight === 'rule' ? 1 : 0.55)
+      }, 0)
+      expect(inkLength / f.cellWidthDp).toBeGreaterThanOrEqual(11.5 / 168 - 1e-9)
+      expect(inkLength / f.cellWidthDp).toBeLessThanOrEqual(11.5 / 148 + 1e-9)
       expect(pts.every((p) => p.x >= -1e-9 && p.x <= 1 + 1e-9 && p.y >= -1e-9 && p.y <= 1 + 1e-9)).toBe(true)
-      for (const p of pts) {
-        expect(pts.some((q) => Math.abs(q.x - (1 - p.y)) < 1e-9 && Math.abs(q.y - p.x) < 1e-9),
-          `seed ${seed}: quarter-turn symmetry`).toBe(true)
+      const key = (x: number, y: number) => `${Math.round(x * 1e9)}/${Math.round(y * 1e9)}`
+      const coordinates = new Set(pts.map((p) => key(p.x, p.y)))
+      expect(pts.every((p) => coordinates.has(key(1 - p.y, p.x)))).toBe(true)
+      expect(pts.every((p) => coordinates.has(key(1 - p.x, p.y)))).toBe(true)
+      const frame = f.strokes[1]!.points
+      const heart = f.strokes[2]!.points
+      const distanceToEdge = (p: OrnamentPoint, a: OrnamentPoint, b: OrnamentPoint) => {
+        const dx = b.x - a.x, dy = b.y - a.y
+        const t = Math.max(0, Math.min(1, ((p.x - a.x) * dx + (p.y - a.y) * dy) / (dx * dx + dy * dy)))
+        return Math.hypot(p.x - a.x - t * dx, p.y - a.y - t * dy)
       }
-      const stem = f.strokes[0]!.points
-      for (const branch of f.strokes.slice(1)) {
-        const root = branch.points[0]!
-        expect(stem.some((p) => Math.hypot(p.x - root.x, p.y - root.y) < 1e-9)).toBe(true)
-        expect(root.x === 0 || root.x === 1 || root.y === 0 || root.y === 1).toBe(true)
-      }
-      for (const [x, y] of [[0.5, 0], [0, 0.5], [1, 0.5], [0.5, 1]]) {
-        expect(stem.some((p) => Math.abs(p.x - x!) < 1e-9 && Math.abs(p.y - y!) < 1e-9)).toBe(true)
-      }
-      let crossing = false
-      for (let i = 0; i < edges.length; i++) {
-        for (let j = i + 1; j < edges.length; j++) {
-          if (crosses(...edges[i]!, ...edges[j]!)) crossing = true
+      let maxRadius = 0, clearance = Infinity
+      f.strokes.slice(3, 27).forEach((s, i) => {
+        if (i % 3 !== 2) expect(heart.some((p) => Math.hypot(p.x - s.points[0]!.x, p.y - s.points[0]!.y) < 1e-9)).toBe(true)
+        for (const p of s.points) {
+          maxRadius = Math.max(maxRadius, Math.hypot(p.x - 0.5, p.y - 0.5))
+          clearance = Math.min(clearance, ...frame.map((a, j) => distanceToEdge(p, a, frame[(j + 1) % frame.length]!)))
         }
+      })
+      expect(maxRadius).toBeLessThan(0.411)
+      expect(clearance).toBeGreaterThan(0.02)
+      let crossing = false
+      for (let i = 0; i < edges.length; i++) for (let j = i + 1; j < edges.length; j++) {
+        if (crosses(edges[i]![0], edges[i]![1], edges[j]![0], edges[j]![1])) crossing = true
       }
-      expect(crossing, `seed ${seed}: branches cross`).toBe(false)
+      expect(crossing, `seed ${seed}: accidental crossing`).toBe(false)
     }
   })
 
   it('field known answers match Android including the reported bare-grid seed', () => {
-    for (const [seed, signature, width] of [
-      [1, [41, 31, 31, 31, 31], 111.04546135725428],
-      [8, [41, 31, 31, 31, 31], 125.3411369186788],
-      [21, [41, 31, 31, 31, 31], 120.31693265760579],
-      [132614421, [41, 31, 31, 31, 31], 119.5239755323823],
+    const signature = [16, 16, 16, ...Array.from({ length: 8 }, () => [31, 31, 21]).flat(), 21, 21, 21, 21]
+    for (const [seed, width] of [
+      [1, 140.10369868522923],
+      [8, 154.91225717307822],
+      [21, 148.96731388542358],
+      [132614421, 147.25736671122036],
     ] as const) {
       const f = generateCoverOrnament(seed).field
       expect(f.strokes.map((s) => s.points.length)).toEqual(signature)
