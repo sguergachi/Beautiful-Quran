@@ -18,6 +18,32 @@ one at a time. Navigation glides the next sheet in from the side (a
 quarter-width slide softened with a fade, 380 ms); nothing stacks, nothing
 floats, nothing casts a shadow.
 
+**On a desktop browser the sheets lie open as a book** (web only, windows at
+least 1100 × 600). A phone shows one sheet because one sheet is all it has
+room for; a wide window showing one phone-width column in an empty field is
+not calm, it is unused. So the stack opens flat: Chapters on the left page,
+the Reader on the right, the binding's boards showing past the page block and
+the paper turning down into the gutter. Bookmarks and Settings are laid over
+the left page, so a reader changes the type and watches the right page answer.
+Before a chapter is chosen the right page is the title page.
+
+In **Mushaf** layout the spread is the bound book itself: two facing leaves,
+the odd page on the right and the next on the left (1|2 … 603|604), their
+fifteen lines on one grid. They turn together — the arrow keys, a drag, or a
+strip of either fore-edge whose mark shows only under a pointer; pages run
+right to left, so the left edge is the way on. Chapters is then laid over the
+left leaf on demand, as Settings is, and touching the open page puts it away.
+
+This bends two rules, narrowly. *One sheet at a time* becomes two, because
+they are the two a reader moves between constantly and neither is read in
+sequence with the other — the rule against inventing desktop columns for
+sequential facts still holds inside each page. And the gutter is shaded,
+which is not elevation: nothing floats over anything, the paper itself
+curves. The desk, boards and gutter are the only drawn furniture; there is
+still no shadow under the book and none between sheets. The closed cover
+rests centred on the desk and slides onto the right page before its hinge
+opens, so the spine it turns on is the spread's own.
+
 In **Mushaf** layout (Settings → Reading) the Reader sheet is a full-screen
 leaf with **no frame** — iBooks, not a gilt box. The paper runs to the edges
 and the text block is the only composed thing on it: a running head, the text
