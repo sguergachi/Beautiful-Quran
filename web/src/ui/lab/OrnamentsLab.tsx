@@ -4,7 +4,7 @@
  * Self-contained and database-free, so it opens instantly without the book.
  *
  * Explore a seed → live previews of its cover ornament, chapter header, and
- * the star-and-cross field; read the seed's decoded traits; "design" an
+ * the arabesque field; read the seed's decoded traits; "design" an
  * ornament by choosing traits and searching for a seed that matches; and
  * save named seeds to reuse later. Every preview uses the very same
  * generator + renderers the app ships, so what you see is what you get.
@@ -50,23 +50,17 @@ function randomSeed(): number {
 interface CoverTraits {
   medallionFold: number
   sealFold: number
-  fieldStar: 'khatam' | 'outline'
-  fieldKnot: 'square'
-  fieldCentre: boolean
+  fieldStyle: string
   borderSignature: string
 }
 
 /** Derive high-level traits from a generated ornament (what's actually drawn). */
 function coverTraits(o: CoverOrnament): CoverTraits {
   const f = o.field
-  const outline = f.strokes[0]!.points.length === 16
-  const base = outline ? 3 : 4
   return {
     medallionFold: o.medallion.fold,
     sealFold: o.cornerSeal.fold,
-    fieldStar: outline ? 'outline' : 'khatam',
-    fieldKnot: 'square',
-    fieldCentre: f.strokes.length > base,
+    fieldStyle: ['leaf', 'scroll', 'palmette'][(f.strokes[1]!.points.length - 21) / 10]!,
     borderSignature: `${o.border.strokes.length}·${o.border.dots.length}`,
   }
 }
@@ -147,8 +141,7 @@ export function OrnamentsLab() {
 
   // Trait filters for "design by trait" search.
   const [fFold, setFFold] = useState('any')
-  const [fStar, setFStar] = useState('any')
-  const [fCentre, setFCentre] = useState('any')
+  const [fStyle, setFStyle] = useState('any')
   const [searchNote, setSearchNote] = useState('')
 
   const cover = useMemo(() => generateCoverOrnament(seed), [seed])
@@ -198,14 +191,13 @@ export function OrnamentsLab() {
       const candidate = (start + i) | 0
       const t = coverTraits(generateCoverOrnament(candidate))
       if (fFold !== 'any' && t.medallionFold !== Number(fFold)) continue
-      if (fStar !== 'any' && t.fieldStar !== fStar) continue
-      if (fCentre !== 'any' && t.fieldCentre !== (fCentre === 'yes')) continue
+      if (fStyle !== 'any' && t.fieldStyle !== fStyle) continue
       setSeed(candidate)
       setSearchNote(`Found after ${i + 1} tries`)
       return
     }
     setSearchNote('No match in 200k seeds — loosen the filters')
-  }, [fFold, fStar, fCentre])
+  }, [fFold, fStyle])
 
   const gold = { brightGold: 'var(--gold-bright)', deepGold: 'var(--gold-deep)', embossDark: 'var(--emboss-dark)', embossLight: 'var(--emboss-light)' }
   const paper = THEME_PAPER[theme]
@@ -241,7 +233,7 @@ export function OrnamentsLab() {
       </header>
 
       <div className="lab-grid">
-        {/* The background pattern — the star-and-cross field, drawn bold. */}
+        {/* The background pattern — the arabesque field, drawn bold. */}
         <section className="lab-panel" style={{ background: paper }}>
           <h3>Field pattern (this seed)</h3>
           <FieldSurface
@@ -292,9 +284,7 @@ export function OrnamentsLab() {
           <dl>
             <div><dt>Medallion fold</dt><dd>{traits.medallionFold}</dd></div>
             <div><dt>Seal fold</dt><dd>{traits.sealFold}</dd></div>
-            <div><dt>Field star</dt><dd>{traits.fieldStar}</dd></div>
-            <div><dt>Field knot</dt><dd>{traits.fieldKnot}</dd></div>
-            <div><dt>Field centre</dt><dd>{traits.fieldCentre ? 'yes' : 'no'}</dd></div>
+            <div><dt>Field style</dt><dd>{traits.fieldStyle}</dd></div>
             <div><dt>Border</dt><dd>{traits.borderSignature}</dd></div>
           </dl>
         </section>
@@ -308,14 +298,9 @@ export function OrnamentsLab() {
               <option value="any">any</option><option>8</option><option>10</option><option>12</option><option>16</option>
             </select>
           </label>
-          <label>Field star
-            <select value={fStar} onChange={(e) => setFStar(e.target.value)}>
-              <option value="any">any</option><option value="khatam">khatam</option><option value="outline">outline</option>
-            </select>
-          </label>
-          <label>Field centre
-            <select value={fCentre} onChange={(e) => setFCentre(e.target.value)}>
-              <option value="any">any</option><option value="yes">yes</option><option value="no">no</option>
+          <label>Field style
+            <select value={fStyle} onChange={(e) => setFStyle(e.target.value)}>
+              <option value="any">any</option><option value="leaf">leaf</option><option value="scroll">scroll</option><option value="palmette">palmette</option>
             </select>
           </label>
           <button onClick={findSeed}>Find a seed</button>

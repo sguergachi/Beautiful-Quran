@@ -534,7 +534,7 @@ export function SettingsScreen({
               Ornaments Lab
             </button>
             <p className="settings-caption">
-              Explore, design, and save seeds for the procedural star-and-cross ornament
+              Explore, design, and save seeds for the procedural ornament
               generator.
             </p>
 

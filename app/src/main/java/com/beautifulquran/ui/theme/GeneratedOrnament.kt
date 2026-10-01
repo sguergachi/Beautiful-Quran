@@ -493,7 +493,7 @@ fun GeneratedBorderBand(
 }
 
 /**
- * A generated Hankin field tiled at whisper ink — the cover's leather
+ * A generated arabesque field tiled at whisper ink — the cover's leather
  * tooling when [build] is given (washes in over the first half of the
  * build, re-drawing only, geometry built once per size), or a chapter's
  * static surah-header backdrop when [build] is null (fully inked from the

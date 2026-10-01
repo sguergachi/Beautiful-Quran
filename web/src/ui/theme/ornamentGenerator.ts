@@ -50,7 +50,7 @@ export interface RosetteSpec {
   tipRadius: number
 }
 
-/** One translational unit cell of a periodic star-and-cross field. */
+/** One translational unit cell of a periodic arabesque field. */
 export interface FieldSpec {
   cellW: number
   cellH: number
@@ -654,110 +654,61 @@ function pointInConvex(vertices: OrnamentPoint[], px: number, py: number): boole
   return true
 }
 
-// ── Star-and-cross field ───────────────────────────────────────────────────
-//
-// The all-over background of illuminated pages and tooled bindings: a
-// continuous star-and-cross tessellation, drawn as complete interlocking
-// motifs (not ray fragments, which read as scattered marks at whisper ink).
-// Eight-pointed khatam stars sit at the centre of a unit cell; their four
-// cardinal points reach exactly to the cell-edge midpoints, so each star
-// kisses its orthogonal neighbours tip-to-tip. Their diagonal points are
-// tied together by a small knot at each cell corner — one knot per lattice
-// point when the cell tiles — closing the weave into one unbroken net.
+// ── Flowing arabesque fields ──────────────────────────────────────────────
 
-/** Star outer radius: cardinal points land on the cell-edge midpoints. */
-const FIELD_STAR_R = 0.5
-
-/** Diagonal half-extent of the star's points (R/√2). */
-const FIELD_S = FIELD_STAR_R / Math.sqrt(2)
-
-/** Knot half-extent at a corner: reaches the four nearest diagonal tips. */
-const FIELD_G = FIELD_STAR_R - FIELD_S
-
-function fieldStroke(points: OrnamentPoint[]): OrnamentStroke {
-  return { points, closed: true, weight: 'hairline', birth: 0, span: 1 }
+/** A sampled cubic path; closed motifs explicitly return to their first point. */
+function fieldCurve(coords: number[][], closed: boolean): OrnamentStroke {
+  const nodes = coords.map(([x, y]) => ({ x: x!, y: y! }))
+  const points = [nodes[0]!]
+  for (let i = 1; i < nodes.length; i += 3) {
+    sampleCubicInto(points, points[points.length - 1]!, nodes[i]!, nodes[i + 1]!, nodes[i + 2]!)
+  }
+  return { points, closed, weight: 'hairline', birth: 0, span: 1 }
 }
 
 /**
- * Eight-pointed khatam star at (cx, cy): a diamond through the cardinal
- * points and an axis-aligned square through the diagonal points, both
- * reaching FIELD_STAR_R — two overlapped squares, the classic khatam.
- */
-function khatamStar(cx: number, cy: number): OrnamentStroke[] {
-  const r = FIELD_STAR_R
-  const s = FIELD_S
-  return [
-    fieldStroke([
-      { x: cx + r, y: cy },
-      { x: cx, y: cy + r },
-      { x: cx - r, y: cy },
-      { x: cx, y: cy - r },
-    ]),
-    fieldStroke([
-      { x: cx + s, y: cy + s },
-      { x: cx - s, y: cy + s },
-      { x: cx - s, y: cy - s },
-      { x: cx + s, y: cy - s },
-    ]),
-  ]
-}
-
-/** The outer silhouette of two overlapped squares, without their internal crossings. */
-function outlinedStar(cx: number, cy: number): OrnamentStroke {
-  const inner = FIELD_STAR_R / (Math.cos(Math.PI / 8) + Math.sin(Math.PI / 8))
-  return fieldStroke(Array.from({ length: 16 }, (_, i) => {
-    const a = i * Math.PI / 8
-    const r = i % 2 === 0 ? FIELD_STAR_R : inner
-    return { x: cx + r * Math.cos(a), y: cy + r * Math.sin(a) }
-  }))
-}
-
-/** Square knot at (cx, cy): corners on the four nearest star diagonal tips. */
-function squareKnot(cx: number, cy: number): OrnamentStroke {
-  const g = FIELD_G
-  return fieldStroke([
-    { x: cx + g, y: cy + g },
-    { x: cx - g, y: cy + g },
-    { x: cx - g, y: cy - g },
-    { x: cx + g, y: cy - g },
-  ])
-}
-
-/** A small diamond centre-mark inside the star. */
-function centreMark(cx: number, cy: number, h: number): OrnamentStroke {
-  return fieldStroke([
-    { x: cx + h, y: cy },
-    { x: cx, y: cy + h },
-    { x: cx - h, y: cy },
-    { x: cx, y: cy - h },
-  ])
-}
-
-/**
- * Compose a lattice of eight-petal rosettes: a readable geometric scaffold,
- * an ogee corolla inside its clear central compartment, and an optional
- * small heart. Curves enrich every repeat without crossing the lattice.
- * Spacing follows total line length, keeping the enriched ground balanced.
+ * An ogee stem with four attached leaves, scrolls or palmettes. Branches
+ * share stem tangents; the cell-edge cusps meet their neighbours seamlessly.
+ * The four RNG draws preserve the other ornament parts' seed contract.
  * See docs/ORNAMENT_FIELDS.md for the construction and design rules.
  */
 function generateField(rng: Mulberry32): FieldSpec {
-  const outlined = rng.chance(0.7)
-  const withCentre = rng.chance(0.4)
-  const petalDepth = rng.range(0.54, 0.66)
-  const spacing = rng.range(64, 80)
-
-  const strokes = outlined ? [outlinedStar(0.5, 0.5)] : khatamStar(0.5, 0.5)
-  strokes.push(squareKnot(0, 0))
-  const flowerRadius = outlined ? 0.29 : 0.215
-  strokes.push(corollaStroke(8, flowerRadius * petalDepth, flowerRadius, 0, 'hairline'))
-  if (withCentre) strokes.push(centreMark(0.5, 0.5, flowerRadius * 0.18))
-
-  const lineLength = strokes.reduce((total, s) => total + s.points.reduce((length, p, i) => {
-    const q = s.points[(i + 1) % s.points.length]!
+  const style = rng.int(3)
+  const mirrored = rng.chance(0.5)
+  const bend = rng.range(0.20, 0.24)
+  const spacing = rng.range(96, 116)
+  const stem = fieldCurve([
+    [0.5, 0], [0.5, bend], [1 - bend, 0.5], [1, 0.5],
+    [1 - bend, 0.5], [0.5, 1 - bend], [0.5, 1],
+    [0.5, 1 - bend], [bend, 0.5], [0, 0.5],
+    [bend, 0.5], [0.5, bend], [0.5, 0],
+  ], true)
+  const motifs = [
+    [[0, 0.5], [0.16, 0.5], [0.18, 0.35], [0.32, 0.35],
+      [0.26, 0.46], [0.13, 0.5], [0, 0.5]],
+    [[0, 0.5], [0.17, 0.5], [0.20, 0.31], [0.34, 0.36],
+      [0.44, 0.40], [0.34, 0.55], [0.26, 0.52],
+      [0.18, 0.50], [0.22, 0.42], [0.28, 0.44]],
+    [[0, 0.5], [0.13, 0.5], [0.15, 0.40], [0.24, 0.38],
+      [0.25, 0.32], [0.32, 0.30], [0.35, 0.32],
+      [0.32, 0.36], [0.33, 0.44], [0.26, 0.46],
+      [0.19, 0.49], [0.11, 0.5], [0, 0.5]],
+  ]
+  const motif = fieldCurve(motifs[style]!, style !== 1)
+  const strokes = [stem]
+  for (let i = 0; i < 4; i++) {
+    const a = i * Math.PI / 2
+    strokes.push({ ...motif, points: motif.points.map((p) => {
+      const x = p.x * 1.2 - 0.5
+      const y = (p.y - 0.5) * 0.6 * (mirrored ? -1 : 1)
+      return { x: 0.5 + x * Math.cos(a) - y * Math.sin(a), y: 0.5 + x * Math.sin(a) + y * Math.cos(a) }
+    }) })
+  }
+  const lineLength = strokes.reduce((total, s) => total + s.points.slice(1).reduce((length, p, i) => {
+    const q = s.points[i]!
     return length + Math.hypot(p.x - q.x, p.y - q.y)
   }, 0), 0)
-  const cellWidthDp = spacing * lineLength / 6.5
-  return { cellW: 1, cellH: 1, cellWidthDp, strokes }
+  return { cellW: 1, cellH: 1, cellWidthDp: spacing * lineLength / 5.5, strokes }
 }
 
 /**
@@ -789,8 +740,7 @@ export function chapterOrnamentSeed(chapterNumber: number, ayahCount: number): n
 /**
  * Grow a chapter's rosette and backing field — no corner seal or border,
  * which the header has no use for — from a seed. Same star-polygon and
- * Hankin-field vocabulary and RNG rules (never a hexagram) as the medallion
- * and field inside a full cover ornament.
+ * rosette/arabesque vocabulary and RNG rules as a full cover ornament.
  */
 export function generateChapterOrnament(seed: number): ChapterOrnament {
   const rng = new Mulberry32(seed)

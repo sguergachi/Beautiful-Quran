@@ -1,67 +1,59 @@
-# Harmonious ornament fields
+# Flowing ornament fields
 
-The field is the ground of the illumination. It must read as a coherent weave
-at a glance and yield attention to the rosette or the words. These rules apply
-to the shared generator, including Ornaments Lab, covers and chapter headers
+The field is a quiet vegetal ground for the illumination. Its structure is
+curved: adding flowers to a straight lattice does not remove the lattice's
+visual noise. These rules apply to covers, chapter headers and Ornaments Lab
 on Android and web.
 
 ## Research and interpretation
 
-[Owen Jones, *The Grammar of Ornament*, propositions 3–11](https://www.readingdesign.org/grammar-of-ornament)
-connects repose with fitness, proportion and harmony, and places the general
-form before its subdivisions and enrichment. His geometric construction and
-simple-unit principles support deriving details from a single repeat rather
-than picking unrelated embellishments. Proposition 10 also balances straight,
-inclined and curved lines: restraint should not reduce the field to a bare
-construction grid. This is a design precedent, not a
-claim that his nineteenth-century theory is a universal measure of beauty.
+The [Met's vegetal ornament essay](https://www.metmuseum.org/essays/vegetal-patterns-in-islamic-art)
+places abstract plant ornament in Islamic manuscripts, textiles and buildings,
+and includes wavy-vine examples. It supports a vegetal field alongside the
+geometric medallion; geometric stars need not be the language of every surface.
+Our stems and motifs are an interpretation, not a reproduction of one object.
 
-The [V&A's Islamic tile guide](https://www.vam.ac.uk/articles/design-and-make-your-own-islamic-tile-and-printed-pattern)
-shows a thirteenth-century Iranian eight-point star-and-cross tessellation,
-and explains repetition and reflection symmetry. We use that structure as a
-precedent for a continuous, balanced ground; our linework is an interpretation,
-not a reproduction of that tile panel.
+[Owen Jones, *The Grammar of Ornament*, propositions 6–12](https://www.readingdesign.org/grammar-of-ornament)
+provides three useful construction principles: detail grows from a parent
+stem, curved junctions share tangents, and the general form precedes enrichment.
+These are design precedents, not universal measurements of beauty.
 
 ## Generator rules
 
-1. **Structure and ornament, both.** The eight-point outline or two-square
-   khatam defines the repeating lattice. Every star carries an eight-petal ogee
-   corolla: geometry makes the field coherent, while the curves give it
-   character. An empty lattice can be orderly yet visually unrewarding.
-2. **Connected detail.** A square knot at each lattice corner meets the four
-   nearest diagonal star tips exactly. Its half-extent is `0.5 − 0.5/√2`.
-   Octagonal knots are excluded: their extra edges intersect the stars and
-   introduce small competing compartments.
-3. **Separate levels of detail.** Fit the corolla to the lattice's clear central
-   compartment: outer radius 0.29 for the outline, 0.215 for the khatam, leaving
-   at least 0.035 units between flower and lattice. Petal cusps are 54–66% of
-   that radius. An optional diamond heart uses 18% of the flower radius and
-   stays clear of the petals. The four recipes pair either lattice with a
-   corolla, with or without its heart. There is no per-tile randomness.
-4. **Balanced richness.** Sum the perimeter of every stroke in one repeat,
-   then choose `cellWidthDp = spacing × lineLength / 6.5`, where spacing is
-   64–80 dp. Total line length per unit of ground area stays between 0.08125
-   and 0.1015625 dp⁻¹ at a constant stroke width. Richer recipes get larger
-   repeats. The original 4.5 budget made the unenriched lattice too sparse;
-   6.5 allows rewarding detail while preserving clear compartments. These
-   bounds are our visual tuning, not historical proportions from the sources.
-5. **Symmetry and continuity.** Keep fourfold reflection/rotation symmetry,
-   the cardinal tips on the cell-edge midpoints, and corner knots on the
-   diagonal tips. No random displacement, rotation or incomplete ray fragments.
-6. **The field remains subordinate.** Retain the existing whisper ink,
-   embossing and edge dissolves. Do not compensate for crowded geometry just
-   by lowering opacity: solve its construction and spacing first.
+1. **Curves form the structure.** Four cubic ogee arcs connect the cell-edge
+   midpoints. No straight star, square knot, diamond heart or polygon scaffold
+   is drawn in the field. The geometric medallions, seals and borders retain
+   their own vocabulary.
+2. **Detail grows from the stem.** Four rotated branches share the stem's edge
+   roots and tangent axes. Choose one coherent motif for the entire repeat:
+   a tapered leaf, an open curling tendril, or a lobed palmette. There are no
+   detached flowers or centre marks.
+3. **Avoid crossing and crowding.** Fit each branch along the stem by scaling
+   its local horizontal reach by 1.2 and its vertical excursion by 0.6.
+   Sampled branch and stem segments must not cross. Leave the broad central
+   areas empty; the rosette and words provide the page's stronger detail.
+4. **Balance the ground.** Sum actual path lengths (without closing open
+   tendrils). Set `cellWidthDp = spacing × lineLength / 5.5`, with spacing
+   96–116 dp. Line density stays between 0.047414 and 0.057292 dp⁻¹ at a
+   constant stroke width. These are visually tuned bounds, not historical
+   proportions from the sources.
+5. **Repeat with continuity.** Stem contacts lie exactly on the four shared
+   cell-edge midpoints. Branch positions have quarter-turn symmetry. The
+   entire repeat may have either handedness; a leaf or scroll is not forced
+   to have reflection symmetry. No individual tile is displaced or rotated.
+6. **Preserve the softness.** Sample cubic arcs with the shared Bézier helper.
+   Web field SVGs retain four decimal places in cell coordinates. No long
+   ruler-like segments, loose ray fragments or fine polygon compartments.
+   Existing whisper ink, embossing and edge dissolves keep the field below
+   the medallion and the words.
 
-The outline's inner radius is `0.5 / (cos(π/8) + sin(π/8))`, the intersection
-radius of the two original squares. All construction uses the same unit cell.
 The four field RNG draws remain in their original position, and both platforms
-consume the same stream. A saved seed is still deterministic, but its field
-now follows these rules; its medallion, seal and border remain identical.
+consume the same stream. Saved seeds are deterministic under this grammar;
+medallions, seals and borders remain identical. The Lab offers leaf, scroll
+and palmette filters, reflecting the geometry it actually draws.
 
-Tests pin the four recipes, line-density budget, rotational symmetry,
-edge/corner contacts and known-answer fields on both platforms. The variety
-check counts point-count signatures rather than stroke counts, so different
-structures remain distinguishable when they have the same number of strokes.
-The reported sparse-grid seed `132614421` is a cross-platform regression fixture.
-Web field SVGs retain four decimal places in cell coordinates so their sampled
-curves stay smooth at full size.
+Tests cover attachment, cell-edge contacts, short curve segments, quarter-turn
+symmetry, line density and absence of intersections across 400 seeds. The
+reported seed `132614421` is a cross-platform known-answer fixture. The former
+star-edge and reflection assertions protected the straight lattice; the new
+checks preserve continuity and balance while allowing flowing handed motifs.

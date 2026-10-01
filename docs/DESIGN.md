@@ -957,7 +957,7 @@ Traditional, geometric, and nearly invisible — ornament whispers, never
 speaks. All of it is drawn procedurally (`ui/theme/Ornament.kt`), never an
 image, so it is crisp at any density and nearly free to render.
 
-- **Khatam geometry.** The vocabulary throughout is the classical star:
+- **Khatam geometry.** The medallions, seals and borders use the classical star:
   {n/k} star polygons (8/10/12/16-fold; gcd(n, k) > 1 yields the interlaced
   polygons — the khatam is {8/2}) and Hankin's polygons-in-contact method
   (rays from tile-edge midpoints at a sampled contact angle) — the same
@@ -995,11 +995,11 @@ image, so it is crisp at any density and nearly free to render.
   ({10/4} → two {5/2} pentacles stacked), 6-fold seals, and 6-fold field
   tilings are all excluded by construction and guarded by tests on both
   platforms.
-- **Field harmony.** The ground pairs either a khatam outline or a two-square
-  khatam lattice with an eight-petal ogee rosette and an optional diamond heart.
-  Square corner knots meet the diagonal tips without added crossings;
-  richer recipes get larger repeats according to their total line length.
-  Construction, research and testable rules: [ORNAMENT_FIELDS.md](ORNAMENT_FIELDS.md).
+- **Field harmony.** The ground is a flowing vegetal arabesque: curved ogee
+  stems with attached leaves, scrolls or palmettes, broad empty areas, and no
+  straight lattice. Branches share stem tangents and cannot cross. Repeat
+  spacing follows total path length. Construction, research and testable
+  rules: [ORNAMENT_FIELDS.md](ORNAMENT_FIELDS.md).
 - **Gilding.** Gold is never a flat color. Gilded elements (the surah
   rosette, ayah number marks, the home mark) carry a three-stop leaf
   gradient (deep bronze → bright gilt → deep bronze). The gradient's
@@ -1019,7 +1019,7 @@ image, so it is crisp at any density and nearly free to render.
   upper-left beneath its face — relief under a top-left light, subtle enough
   to be felt more than seen.
 - **The weave.** Behind each surah opening, that chapter's own generated
-  star-and-cross field at ~4 % ink, embossed, dissolving into the page at its
+  arabesque field at ~4 % ink, embossed, dissolving into the page at its
   edges — grown from the same seed as the rosette sitting on it (see "The
   generating machine" above), not a fixed pattern every chapter shares.
 - **Basmalah.** Every surah except Al-Fatihah (where it *is* ayah 1) and
@@ -1094,7 +1094,7 @@ three moments:
    so border and corner ornaments are one continuous piece of geometry. The frame, border, and seals
    are the binding's tooling and render complete on the very first
    frame — no wash, no fade. Tooled *inside* that frame, this launch's
-   generated Hankin field (whisper ink) and the generated medallion
+   generated arabesque field (whisper ink) and the generated medallion
    (`GeneratedMedallion`) with the title **القرآن الكريم** beneath it
    in the Hafs hand, leafed in gold, ink themselves onto the leather in
    real time as the ceremony arrives — the illumination, drawn before

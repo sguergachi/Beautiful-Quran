@@ -72,7 +72,7 @@ data class RosetteSpec(
 )
 
 /**
- * A Hankin field: one translational unit cell of a periodic star pattern.
+ * An arabesque field: one translational unit cell of a curved vegetal pattern.
  * Strokes are in cell units ([cellW] × [cellH]); [cellWidthDp] is the
  * suggested rendered cell width so different tilings read at similar scale.
  */
@@ -717,111 +717,64 @@ private fun pointInConvex(vertices: List<OrnamentPoint>, px: Double, py: Double)
     return true
 }
 
-// ── Star-and-cross field ───────────────────────────────────────────────────
-//
-// The all-over background of illuminated pages and tooled bindings: a
-// continuous star-and-cross tessellation, drawn as complete interlocking
-// motifs (not ray fragments, which read as scattered marks at whisper ink).
-// Eight-pointed khatam stars sit at the centre of a unit cell; their four
-// cardinal points reach exactly to the cell-edge midpoints, so each star
-// kisses its orthogonal neighbours tip-to-tip. Their diagonal points are
-// tied together by a small knot at each cell corner — one knot per lattice
-// point when the cell tiles — closing the weave into one unbroken net.
+// ── Flowing arabesque fields ──────────────────────────────────────────────
 
-/** Star outer radius: cardinal points land on the cell-edge midpoints. */
-private const val FIELD_STAR_R = 0.5
-
-/** Diagonal half-extent of the star's points (R/√2). */
-private val FIELD_S = FIELD_STAR_R / kotlin.math.sqrt(2.0)
-
-/** Knot half-extent at a corner: reaches the four nearest diagonal tips. */
-private val FIELD_G = FIELD_STAR_R - FIELD_S
-
-private fun fieldStroke(pts: List<OrnamentPoint>) =
-    OrnamentStroke(pts, closed = true, weight = StrokeWeight.Hairline, birth = 0.0, span = 1.0)
+/** A sampled cubic path; closed motifs explicitly return to their first point. */
+private fun fieldCurve(coords: List<Pair<Double, Double>>, closed: Boolean): OrnamentStroke {
+    val nodes = coords.map { (x, y) -> OrnamentPoint(x, y) }
+    val points = mutableListOf(nodes.first())
+    for (i in 1 until nodes.size step 3) {
+        sampleCubicInto(points, points.last(), nodes[i], nodes[i + 1], nodes[i + 2])
+    }
+    return OrnamentStroke(points, closed, StrokeWeight.Hairline, 0.0, 1.0)
+}
 
 /**
- * Eight-pointed khatam star at (cx, cy): a diamond through the cardinal
- * points and an axis-aligned square through the diagonal points, both
- * reaching [FIELD_STAR_R] — two overlapped squares, the classic khatam.
- */
-private fun khatamStar(cx: Double, cy: Double): List<OrnamentStroke> {
-    val r = FIELD_STAR_R
-    val s = FIELD_S
-    return listOf(
-        fieldStroke(
-            listOf(
-                OrnamentPoint(cx + r, cy), OrnamentPoint(cx, cy + r),
-                OrnamentPoint(cx - r, cy), OrnamentPoint(cx, cy - r),
-            ),
-        ),
-        fieldStroke(
-            listOf(
-                OrnamentPoint(cx + s, cy + s), OrnamentPoint(cx - s, cy + s),
-                OrnamentPoint(cx - s, cy - s), OrnamentPoint(cx + s, cy - s),
-            ),
-        ),
-    )
-}
-
-/** The outer silhouette of two overlapped squares, without their internal crossings. */
-private fun outlinedStar(cx: Double, cy: Double): OrnamentStroke {
-    val inner = FIELD_STAR_R / (cos(PI / 8) + sin(PI / 8))
-    return fieldStroke(List(16) { i ->
-        val a = i * PI / 8
-        val r = if (i % 2 == 0) FIELD_STAR_R else inner
-        OrnamentPoint(cx + r * cos(a), cy + r * sin(a))
-    })
-}
-
-/** Square knot at (cx, cy): corners on the four nearest star diagonal tips. */
-private fun squareKnot(cx: Double, cy: Double): OrnamentStroke {
-    val g = FIELD_G
-    return fieldStroke(
-        listOf(
-            OrnamentPoint(cx + g, cy + g), OrnamentPoint(cx - g, cy + g),
-            OrnamentPoint(cx - g, cy - g), OrnamentPoint(cx + g, cy - g),
-        ),
-    )
-}
-
-/** A small diamond centre-mark inside the star. */
-private fun centreMark(cx: Double, cy: Double, h: Double): OrnamentStroke =
-    fieldStroke(
-        listOf(
-            OrnamentPoint(cx + h, cy), OrnamentPoint(cx, cy + h),
-            OrnamentPoint(cx - h, cy), OrnamentPoint(cx, cy - h),
-        ),
-    )
-
-/**
- * Compose a lattice of eight-petal rosettes: a readable geometric scaffold,
- * an ogee corolla inside its clear central compartment, and an optional
- * small heart. Curves enrich every repeat without crossing the lattice.
- * Spacing follows total line length, keeping the enriched ground balanced.
+ * An ogee stem with four attached leaves, scrolls or palmettes. Branches
+ * share stem tangents; the cell-edge cusps meet their neighbours seamlessly.
+ * The four RNG draws preserve the other ornament parts' seed contract.
  * See docs/ORNAMENT_FIELDS.md for the construction and design rules.
  */
 private fun generateField(rng: Mulberry32): FieldSpec {
-    val outlined = rng.chance(0.7)
-    val withCentre = rng.chance(0.4)
-    val petalDepth = rng.range(0.54, 0.66)
-    val spacing = rng.range(64.0, 80.0)
-
-    val strokes = (if (outlined) listOf(outlinedStar(0.5, 0.5)) else khatamStar(0.5, 0.5)).toMutableList()
-    strokes.add(squareKnot(0.0, 0.0))
-    val flowerRadius = if (outlined) 0.29 else 0.215
-    strokes.add(corollaStroke(8, flowerRadius * petalDepth, flowerRadius, 0.0, StrokeWeight.Hairline))
-    if (withCentre) strokes.add(centreMark(0.5, 0.5, flowerRadius * 0.18))
-
+    val style = rng.int(3)
+    val mirrored = rng.chance(0.5)
+    val bend = rng.range(0.20, 0.24)
+    val spacing = rng.range(96.0, 116.0)
+    val stem = fieldCurve(listOf(
+        0.5 to 0.0, 0.5 to bend, 1 - bend to 0.5, 1.0 to 0.5,
+        1 - bend to 0.5, 0.5 to 1 - bend, 0.5 to 1.0,
+        0.5 to 1 - bend, bend to 0.5, 0.0 to 0.5,
+        bend to 0.5, 0.5 to bend, 0.5 to 0.0,
+    ), true)
+    val motifs = listOf(
+        listOf(0.0 to 0.5, 0.16 to 0.5, 0.18 to 0.35, 0.32 to 0.35,
+            0.26 to 0.46, 0.13 to 0.5, 0.0 to 0.5),
+        listOf(0.0 to 0.5, 0.17 to 0.5, 0.20 to 0.31, 0.34 to 0.36,
+            0.44 to 0.40, 0.34 to 0.55, 0.26 to 0.52,
+            0.18 to 0.50, 0.22 to 0.42, 0.28 to 0.44),
+        listOf(0.0 to 0.5, 0.13 to 0.5, 0.15 to 0.40, 0.24 to 0.38,
+            0.25 to 0.32, 0.32 to 0.30, 0.35 to 0.32,
+            0.32 to 0.36, 0.33 to 0.44, 0.26 to 0.46,
+            0.19 to 0.49, 0.11 to 0.5, 0.0 to 0.5),
+    )
+    val motif = fieldCurve(motifs[style], style != 1)
+    val strokes = mutableListOf(stem)
+    repeat(4) { i ->
+        val a = i * PI / 2
+        strokes.add(motif.copy(points = motif.points.map { p ->
+            val x = p.x * 1.2 - 0.5
+            val y = (p.y - 0.5) * 0.6 * if (mirrored) -1 else 1
+            OrnamentPoint(0.5 + x * cos(a) - y * sin(a), 0.5 + x * sin(a) + y * cos(a))
+        }))
+    }
     val lineLength = strokes.sumOf { s ->
-        s.points.indices.sumOf { i ->
+        (1 until s.points.size).sumOf { i ->
             val p = s.points[i]
-            val q = s.points[(i + 1) % s.points.size]
+            val q = s.points[i - 1]
             kotlin.math.hypot(p.x - q.x, p.y - q.y)
         }
     }
-    val cellWidthDp = spacing * lineLength / 6.5
-    return FieldSpec(1.0, 1.0, cellWidthDp, strokes)
+    return FieldSpec(1.0, 1.0, spacing * lineLength / 5.5, strokes)
 }
 
 /**
@@ -856,8 +809,7 @@ fun pageOrnamentSeed(page: Int): Int = 1_000_000 + page
 /**
  * Grow a chapter's rosette and backing field — no corner seal or border,
  * which the header has no use for — from [seed]. Same star-polygon and
- * Hankin-field vocabulary and RNG rules (never a hexagram) as the medallion
- * and field inside a full cover ornament.
+ * rosette/arabesque vocabulary and RNG rules as a full cover ornament.
  */
 fun generateChapterOrnament(seed: Int): ChapterOrnament {
     val rng = Mulberry32(seed)

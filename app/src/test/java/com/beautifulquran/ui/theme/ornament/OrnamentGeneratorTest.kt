@@ -141,10 +141,9 @@ class OrnamentGeneratorTest {
     }
 
     @Test
-    fun `star-and-cross field kisses at every cell-edge midpoint`() {
-        // The star's four cardinal points must land exactly on the cell-edge
-        // midpoints, so when the cell tiles each star meets its orthogonal
-        // neighbour tip-to-tip — the seam-free continuity of the weave.
+    fun `curved stem meets its neighbours at every cell-edge midpoint`() {
+        // Stem cusps land on shared edge midpoints, preserving the seamless
+        // continuity that the former star-and-cross geometry required.
         for (seed in intArrayOf(5, 8, 21, 100, 4242)) {
             val f = generateCoverOrnament(seed).field
             val verts = f.strokes.flatMap { it.points }
@@ -156,7 +155,7 @@ class OrnamentGeneratorTest {
             )
             for (m in midpoints) {
                 val hit = verts.any { abs(it.x - m.x) < 1e-9 && abs(it.y - m.y) < 1e-9 }
-                assertTrue("seed $seed: no star point at edge midpoint $m", hit)
+                assertTrue("seed $seed: no stem contact at edge midpoint $m", hit)
             }
         }
     }
@@ -263,44 +262,41 @@ class OrnamentGeneratorTest {
     }
 
     @Test
-    fun `fields retain symmetry tip contacts and an equal line-density budget`() {
+    fun `curved fields stay rooted continuous balanced and free of crossings`() {
+        fun crosses(a: OrnamentPoint, b: OrnamentPoint, c: OrnamentPoint, d: OrnamentPoint): Boolean {
+            val dx = b.x - a.x; val dy = b.y - a.y
+            val ex = d.x - c.x; val ey = d.y - c.y
+            val den = dx * ey - dy * ex
+            if (abs(den) < 1e-10) return false
+            val t = ((c.x - a.x) * ey - (c.y - a.y) * ex) / den
+            val u = ((c.x - a.x) * dy - (c.y - a.y) * dx) / den
+            return t > 1e-6 && t < 1 - 1e-6 && u > 1e-6 && u < 1 - 1e-6
+        }
         repeat(400) { seed ->
             val f = generateCoverOrnament(seed * 104729 + 13).field
-            val outline = f.strokes[0].points.size == 16
-            val expected = if (outline) {
-                if (f.strokes.size == 4) listOf(16, 4, 161, 4) else listOf(16, 4, 161)
-            } else if (f.strokes.size == 5) listOf(4, 4, 4, 161, 4) else listOf(4, 4, 4, 161)
-            assertEquals(expected, f.strokes.map { it.points.size })
-            val length = f.strokes.sumOf { s ->
-                s.points.indices.sumOf { i ->
-                    val p = s.points[i]
-                    val q = s.points[(i + 1) % s.points.size]
-                    hypot(p.x - q.x, p.y - q.y)
-                }
-            }
-            assertTrue(length / f.cellWidthDp >= 6.5 / 80 - 1e-9)
-            assertTrue(length / f.cellWidthDp <= 6.5 / 64 + 1e-9)
+            assertEquals(5, f.strokes.size)
             val pts = f.strokes.flatMap { it.points }
-            fun matches(points: List<OrnamentPoint>, x: Double, y: Double) = points.any { p ->
-                abs(p.x - x - kotlin.math.round(p.x - x)) < 1e-9 &&
-                    abs(p.y - y - kotlin.math.round(p.y - y)) < 1e-9
-            }
+            val edges = f.strokes.flatMap { it.points.zipWithNext() }
+            val length = edges.sumOf { (p, q) -> hypot(p.x - q.x, p.y - q.y) }
+            assertTrue(length / f.cellWidthDp >= 5.5 / 116 - 1e-9)
+            assertTrue(length / f.cellWidthDp <= 5.5 / 96 + 1e-9)
+            assertTrue(edges.maxOf { (p, q) -> hypot(p.x - q.x, p.y - q.y) } < 0.09)
+            assertTrue(pts.all { it.x in -1e-9..1 + 1e-9 && it.y in -1e-9..1 + 1e-9 })
             for (p in pts) {
-                assertTrue("seed $seed: quarter-turn symmetry", matches(pts, 1 - p.y, p.x))
-                assertTrue("seed $seed: reflection symmetry", matches(pts, 1 - p.x, p.y))
+                assertTrue("seed $seed: quarter-turn symmetry", pts.any { q ->
+                    abs(q.x - (1 - p.y)) < 1e-9 && abs(q.y - p.x) < 1e-9
+                })
             }
-            val flower = f.strokes[if (outline) 2 else 3]
-            val radii = flower.points.map { hypot(it.x - 0.5, it.y - 0.5) }
-            val compartment = if (outline) 0.5 / kotlin.math.sqrt(2.0) else 0.25
-            assertTrue("seed $seed: flower grazes lattice", compartment - radii.max() >= 0.035 - 1e-9)
-            if (f.strokes.size == if (outline) 4 else 5) {
-                val heartRadius = f.strokes.last().points.maxOf { hypot(it.x - 0.5, it.y - 0.5) }
-                assertTrue("seed $seed: heart grazes petals", radii.min() - heartRadius > 0.035)
+            val stem = f.strokes.first().points
+            for (branch in f.strokes.drop(1)) {
+                val root = branch.points.first()
+                assertTrue(stem.any { hypot(it.x - root.x, it.y - root.y) < 1e-9 })
+                assertTrue(root.x == 0.0 || root.x == 1.0 || root.y == 0.0 || root.y == 1.0)
             }
-            val knot = f.strokes[if (outline) 1 else 2]
-            val tips = f.strokes.take(if (outline) 1 else 2).flatMap { it.points }
-            for (p in knot.points) {
-                assertTrue("seed $seed: knot misses diagonal tip", matches(tips, p.x, p.y))
+            for (i in edges.indices) for (j in i + 1 until edges.size) {
+                assertFalse("seed $seed: branches cross", crosses(
+                    edges[i].first, edges[i].second, edges[j].first, edges[j].second,
+                ))
             }
         }
     }
@@ -308,8 +304,8 @@ class OrnamentGeneratorTest {
     @Test
     fun `field known answers match web including the reported bare-grid seed`() {
         val seeds = listOf(1, 8, 21, 132614421)
-        val signatures = listOf(listOf(4, 4, 4, 161, 4), listOf(16, 4, 161), listOf(16, 4, 161, 4), listOf(4, 4, 4, 161, 4))
-        val widths = listOf(89.20289961546513, 81.61275582570407, 79.50955432269119, 96.12998267816585)
+        val signatures = listOf(List(5) { 41 }, listOf(41, 21, 21, 21, 21), listOf(41, 31, 31, 31, 31), List(5) { 41 })
+        val widths = listOf(116.80120593002229, 126.02219951472625, 120.35108730175789, 125.66355094491087)
         seeds.forEachIndexed { i, seed ->
             val f = generateCoverOrnament(seed).field
             assertEquals(signatures[i], f.strokes.map { it.points.size })

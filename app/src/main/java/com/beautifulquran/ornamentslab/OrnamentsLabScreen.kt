@@ -89,8 +89,7 @@ fun OrnamentsLabScreen(
     var seedText by remember(ui.seed) { mutableStateOf(ui.seed.toString()) }
     var saveName by remember { mutableStateOf("") }
     var fFold by remember { mutableStateOf<Int?>(null) }
-    var fStar by remember { mutableStateOf<String?>(null) }
-    var fCentre by remember { mutableStateOf<Boolean?>(null) }
+    var fStyle by remember { mutableStateOf<String?>(null) }
 
     // Dark workbench: force light status-bar icons so the clock/battery don't
     // read as black-on-black over royal green. Restored when the Lab closes.
@@ -306,9 +305,7 @@ fun OrnamentsLabScreen(
                 ) {
                     TraitRow("Medallion fold", ui.traits.medallionFold.toString())
                     TraitRow("Seal fold", ui.traits.sealFold.toString())
-                    TraitRow("Field star", ui.traits.fieldStar)
-                    TraitRow("Field knot", ui.traits.fieldKnot)
-                    TraitRow("Field centre", if (ui.traits.fieldCentre) "yes" else "no")
+                    TraitRow("Field style", ui.traits.fieldStyle)
                     TraitRow("Border", ui.traits.borderSignature)
                 }
             }
@@ -332,15 +329,10 @@ fun OrnamentsLabScreen(
                         selected = fFold?.toString(),
                     ) { fFold = it?.toInt() }
                     ChipGroup(
-                        label = "Field star",
-                        options = listOf("khatam", "outline"),
-                        selected = fStar,
-                    ) { fStar = it }
-                    ChipGroup(
-                        label = "Field centre",
-                        options = listOf("yes", "no"),
-                        selected = fCentre?.let { if (it) "yes" else "no" },
-                    ) { fCentre = it?.let { v -> v == "yes" } }
+                        label = "Field style",
+                        options = listOf("leaf", "scroll", "palmette"),
+                        selected = fStyle,
+                    ) { fStyle = it }
                     Spacer(Modifier.height(8.dp))
                     Text(
                         text = "Find a seed",
@@ -348,7 +340,7 @@ fun OrnamentsLabScreen(
                         color = colors.primary,
                         modifier = Modifier
                             .quietClickable(onClick = {
-                                viewModel.findSeed(fFold, fStar, fCentre)
+                                viewModel.findSeed(fFold, fStyle)
                             })
                             .padding(vertical = 6.dp),
                     )
