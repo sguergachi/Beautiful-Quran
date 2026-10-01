@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react'
+import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react'
 import { appStore, shallowEqual, useAppSelector } from '../store/appStore'
 import { hasReaderOpen } from './paper/stack'
 import { HomeScreen } from './home/HomeScreen'
@@ -8,7 +8,6 @@ import { SettingsScreen } from './settings/SettingsScreen'
 import { EntranceCover } from './entrance/EntranceCover'
 import { BOOKMARKS_LAYER, COVER_LAYER, READER_LAYER, type StackLayer } from './paper/stack'
 import { OrnamentsLab } from './lab/OrnamentsLab'
-import { syncSheetMotion } from './paper/sheetMotion'
 import { bookmarkSwipeDestination, spreadLayers, useBookSpread } from './paper/bookSpread'
 import { BookSpread } from './paper/BookSpread'
 import { unlockPageTurnSounds } from './paper/pageTurnSounds'
@@ -104,14 +103,6 @@ export function App() {
       )
     }
   }, [state.settings.themeMode, state.settings.colorSystem, entranceDone])
-
-  useLayoutEffect(() => {
-    syncSheetMotion({
-      hasReader,
-      stack,
-      openSurahId: state.content?.surah.id ?? 0,
-    })
-  }, [hasReader, stack, state.content?.surah.id])
 
   // In a spread the chapter list stays on screen, so the row that opened a
   // chapter would keep keyboard focus and swallow the reader's keys (Space,
