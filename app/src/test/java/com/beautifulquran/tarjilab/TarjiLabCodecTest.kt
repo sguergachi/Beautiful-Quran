@@ -37,6 +37,14 @@ class TarjiLabCodecTest {
     }
 
     @Test
+    fun `old profiles keep shipped brightness and new profiles restore the scale`() {
+        val old = ReciterTarjiProfileBook.decode("""{"profiles":{"7":{"holdMinMs":600}}}""")
+        assertEquals(1f, old.profiles.getValue("7").glintBrightness, 0f)
+        val bright = ReciterTarjiProfileBook(mapOf("7" to old.profiles.getValue("7").copy(glintBrightness = 1.6f)))
+        assertEquals(bright, ReciterTarjiProfileBook.decode(ReciterTarjiProfileBook.encode(bright)))
+    }
+
+    @Test
     fun `export freezes an imported capture and live tuning before the picker opens`() {
         val audio = captureOf(note(1f))
         val live = TarjiLabKnobs(holdMinMs = 720f)
@@ -87,7 +95,7 @@ class TarjiLabCodecTest {
     @Test
     fun `sample round-trips through JSON`() {
         val capture = captureOf(note(1.0f))
-        val knobs = TarjiLabKnobs(maxTremoloHz = 4f, minTremoloDepth = 0.05f, holdMinMs = 450f)
+        val knobs = TarjiLabKnobs(maxTremoloHz = 4f, minTremoloDepth = 0.05f, holdMinMs = 450f, glintBrightness = 1.4f)
         val expectation = TarjiLabExpectation(
             kind = TarjiExpectationKind.PULSES,
             startMs = 320f,

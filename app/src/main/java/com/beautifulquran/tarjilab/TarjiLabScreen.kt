@@ -462,7 +462,8 @@ private fun PreviewWord(
             enabled = true,
         )
         Canvas(Modifier.fillMaxSize()) {
-            val amount = 0.22f * resonance.layerMult + 0.9f * resonance.peak
+            val amount = (0.22f * resonance.layerMult + 0.9f * resonance.peak) *
+                ui.displayKnobs.glintBrightness.coerceIn(0f, 2f)
             if (amount > 0.01f) {
                 drawCircle(
                     color = GlintGold.copy(alpha = (amount * 0.55f).coerceIn(0f, 0.75f)),
@@ -767,6 +768,12 @@ private fun KnobsPanel(
     val knobs = ui.displayKnobs
     var more by remember { mutableStateOf(false) }
     Column(modifier = modifier) {
+        LabSlider("Glint brightness", knobs.glintBrightness / 2f, 0f..1f,
+            valueLabel = "${(knobs.glintBrightness * 100).roundToInt()}%",
+            help = "Left dims the glint; right brightens it. 100% is the original look. This changes the sheen and halo, not which pulses are detected.",
+            enabled = !ui.showingReference, showHelp = showHelp, onFinished = onFinished) { v ->
+            onKnob { it.copy(glintBrightness = v * 2f) }
+        }
         LabSlider("Sensitivity", (0.25f - knobs.minTremoloDepth) / 0.24f, 0f..1f,
             valueLabel = "${((0.25f - knobs.minTremoloDepth) / 0.24f * 100).roundToInt()}%",
             help = "Missing a pulse? Move right. Speech pulsing? Move left.",

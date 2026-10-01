@@ -78,11 +78,12 @@ The ḥadīth of Ibn Mughaffal (Bukhārī 5048) describes the Prophet's ﷺ
 recitation with exactly this word: يُرَجِّعُ — "his voice reverberated".
 
 > **Tuning it:** the [Tarjīʿ Lab](TARJI_LAB.md) (developer mode, word
-> long-press) captures a word's PCM, lets you mark the held-note window
-> and sculpt its envelope, and re-runs this reciter's detector offline
-> on every knob edit. Exported samples are signature waveforms — PCM,
-> hold, optional hand shape, and the knobs that heard them — so a
-> per-reciter algorithm can be derived from a real corpus.
+> long-press) loops captured PCM and replays this reciter’s detector as you
+> adjust its knobs. Export preserves the capture, loop, and displayed tuning.
+> **Glint brightness** scales the sheen and halo from 0–200% and saves per
+> reciter. 100% keeps the shipped look; it does not change detection, the
+> pulse’s phase, the wash, or the halo’s radius.
+
 
 The glint **listens for it directly**. `VoiceTapAudioProcessor` mirrors the
 player's own PCM (no mic permission, no Visualizer — which also means it

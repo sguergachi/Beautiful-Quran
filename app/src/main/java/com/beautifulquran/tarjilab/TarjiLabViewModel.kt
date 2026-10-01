@@ -442,7 +442,8 @@ class TarjiLabViewModel(
                 }
                 val live = _ui.value
                 if (live.capture !== capture) return@launch
-                val pending = live.knobs != st.knobs
+                // Brightness is render-only; every detector edit still needs a replay.
+                val pending = live.knobs.copy(glintBrightness = st.knobs.glintBrightness) != st.knobs
                 _ui.value = live.copy(
                     trace = trace,
                     reference = live.reference ?: TarjiLabReference(st.knobs, trace),
@@ -494,12 +495,13 @@ class TarjiLabViewModel(
     }
 
     private fun applyKnobs(knobs: TarjiLabKnobs) {
+        val detectorChanged = knobs.copy(glintBrightness = _ui.value.knobs.glintBrightness) != _ui.value.knobs
         cancelPulseMatch()
         persistKnobs(knobs)
         _ui.value = _ui.value.copy(knobs = knobs, showingReference = false, note = null,
             canUndo = knobHistory.canUndo, canRedo = knobHistory.canRedo,
-            analyzing = _ui.value.capture != null)
-        if (analyzeJob?.isActive != true) reanalyze()
+            analyzing = _ui.value.analyzing || (detectorChanged && _ui.value.capture != null))
+        if (detectorChanged && analyzeJob?.isActive != true) reanalyze()
     }
 
     fun finishKnobEdit() {

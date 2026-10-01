@@ -10,8 +10,8 @@ import kotlin.math.sqrt
 import kotlinx.serialization.Serializable
 
 /**
- * The Tarjīʿ Lab's detector knobs — the same eight the Ink Lab's Tarjīʿ
- * section exposes, mirrored 1:1 onto [Tarji] for offline replay.
+ * Per-reciter detector knobs and visual glint scale. Detector fields mirror
+ * [Tarji] for offline replay; brightness applies only to paint.
  */
 @Serializable
 data class TarjiLabKnobs(
@@ -23,6 +23,8 @@ data class TarjiLabKnobs(
     val maxPitchDrift: Float = Tarji.MAX_PITCH_DRIFT,
     val attackMs: Float = Tarji.ATTACK_MS,
     val releaseMs: Float = Tarji.RELEASE_MS,
+    /** Visual scale only; never changes the detector or measured trace. */
+    val glintBrightness: Float = 1f,
 ) {
     /** Apply onto a fresh detector — the analysis entry point. */
     fun applyTo(detector: Tarji) {
@@ -47,6 +49,7 @@ data class TarjiLabKnobs(
             maxPitchDrift = t.tarjiPitchDrift,
             attackMs = t.tarjiAttackMs,
             releaseMs = t.tarjiReleaseMs,
+            glintBrightness = t.glintBrightness,
         )
 
         /** Restore an imported sample's knobs into the Ink Lab tuning. */
@@ -60,6 +63,7 @@ data class TarjiLabKnobs(
                 tarjiPitchDrift = knobs.maxPitchDrift,
                 tarjiAttackMs = knobs.attackMs,
                 tarjiReleaseMs = knobs.releaseMs,
+                glintBrightness = knobs.glintBrightness,
             )
     }
 }

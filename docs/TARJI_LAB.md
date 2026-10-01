@@ -3,7 +3,8 @@
 The developer workbench for **live algorithm tuning**: loop a real captured
 word, change this reciter's detector parameters, and hear and see the result.
 The word and scope always show the detector's measured output. There is no
-manual envelope, vibrato label, or look control that can override it.
+manual envelope or synthesized pulse. Glint brightness scales the visual effect
+without changing the measured pulse or detector acceptance.
 
 ## Workflow
 
@@ -23,7 +24,8 @@ manual envelope, vibrato label, or look control that can override it.
    no raw teal trace. The readout shows the accepted
    **Volume / Pitch** channel and its rate in Hz, **Pulse fading**, **No pulse
    here**, or **Updating**; it never invents an accepted pulse.
-5. Adjust **Sensitivity**, **Shortest note**, **Rhythm tolerance**, or **Pulse speed**. Each
+5. Adjust **Glint brightness**, **Sensitivity**, **Shortest note**,
+   **Rhythm tolerance**, or **Pulse speed**. Each
    slider has a thin track, current value, and precise nudge buttons. The **?**
    button beside Fit reveals knob explanations and gesture help;
    guidance is hidden by default to leave room for tuning. Help stays pinned
@@ -34,6 +36,8 @@ manual envelope, vibrato label, or look control that can override it.
    selected loop, or the whole word when Loop is off, and suggests a speed
    range. It changes only Pulse speed and is one undo step; playback continues.
    If the section is too short or unclear, select a longer, steady portion.
+   **Glint brightness** responds immediately without re-analyzing audio;
+   its nudges move by 2 percentage points.
    Changes save automatically for this reciter. Graph and glow update while
    dragging; audio continues on the same clock.
 6. **Compare** switches the graph, glow, and displayed knob values between
@@ -67,9 +71,16 @@ no green curve; no synthetic oscillator or hand-drawn curve invents a pulse.
 The pre-gate candidate remains available to analyzer tests and corpus audits,
 but is not a tuning target in this interface.
 
-## Detector controls
+## Tuning controls
 
 Profiles persist per reciter and write through to `InkEngine.tuning`:
+
+- **Glint brightness** scales the tint and halo together from 0–200%.
+  0% removes the sheen, 100% preserves the shipped look, and 200% brightens it
+  up to the renderer’s opacity limit. It affects the lab glow and reader glint
+  (including the repeat glimmer). It leaves the green trace, detection, pulse
+  timing, wash, and halo size unchanged. Compare, undo/redo, reset, and sample
+  export include brightness. Old samples/profiles default to 100%.
 
 - **Sensitivity** reverses the modulation-depth threshold: 0% = depth 0.25,
   100% = depth 0.01. More sensitivity accepts subtler wavering.
@@ -86,12 +97,13 @@ Profiles persist per reciter and write through to `InkEngine.tuning`:
 - Under **More controls**: **Allow note slides** sets pitch drift; **Fade in**
   sets attack; **Bridge gaps** sets release.
 
-The percentages are normalized slider positions, not confidence scores.
+Detector percentages are normalized slider positions, not confidence scores.
+Brightness is a multiplier of the visual glint.
 Re-analysis updates the graph and word without restarting audio or moving the
 chosen loop. Release bridges brief detection gaps, while the real end of a
 hold still uses its own fast decay.
 
-Each edit replays the same PCM through the same pure `Tarji` implementation
+Each detector edit replays the same PCM through the same pure `Tarji` implementation
 used by the live audio tap. Background analysis is canceled on a new target,
 import, or exit; a result can publish only for its original capture.
 During a drag, one worker coalesces edits into the latest replay instead of

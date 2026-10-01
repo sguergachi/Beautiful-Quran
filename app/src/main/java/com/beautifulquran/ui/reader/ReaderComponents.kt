@@ -1218,13 +1218,11 @@ internal class InkMotion(
 
     /** Tint alpha: always-on wet strength, lifted further on tarjīʿ peaks. */
     fun glintTintColorAlpha(base: Float): Float =
-        (base * (1f + InkEngine.GLINT_RESONANCE_PEAK_BOOST * glintPeak))
-            .coerceIn(0f, 1f)
+        InkEngine.glintColorAlpha(base, glintPeak)
 
     /** Halo alpha: same peak lift as the tint. */
     fun glintGlowColorAlpha(base: Float): Float =
-        (base * (1f + InkEngine.GLINT_RESONANCE_PEAK_BOOST * glintPeak))
-            .coerceIn(0f, 1f)
+        InkEngine.glintColorAlpha(base, glintPeak)
 
     /** Whether the orange repeat overlay still has any ink to show. */
     val showRepeatLayer: Boolean get() = repeatAlpha > 0f

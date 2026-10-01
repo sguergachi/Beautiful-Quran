@@ -292,17 +292,32 @@ class TarjiLabTraceTest {
     }
 
     @Test
+    fun `brightness edits preserve accepted wave and detection`() {
+        val capture = captureOf(heldNote(2.5f, 130f, amHz = 5f, amDepth = 0.25f))
+        val dim = analyzeTarjiCapture(capture, TarjiLabKnobs(glintBrightness = 0f))
+        val bright = analyzeTarjiCapture(capture, TarjiLabKnobs(glintBrightness = 2f))
+        assertTrue(bright.reverberating.any { it })
+        org.junit.Assert.assertArrayEquals(dim.gain, bright.gain, 0f)
+        org.junit.Assert.assertArrayEquals(dim.tremolo, bright.tremolo, 0f)
+        assertEquals(tarjiAcceptedPulseWave(dim), tarjiAcceptedPulseWave(bright))
+    }
+
+    @Test
     fun `knobs map to and from the Ink Lab tuning`() {
-        val t = InkEngine.Tuning()
+        val t = InkEngine.Tuning(glintBrightness = 0.4f)
         val knobs = TarjiLabKnobs.fromTuning(t)
         assertEquals(t.glintResonanceMaxHz, knobs.maxTremoloHz, 0f)
         assertEquals(t.tarjiHoldMinMs, knobs.holdMinMs, 0f)
+        assertEquals(t.glintBrightness, knobs.glintBrightness, 0f)
         val back = TarjiLabKnobs.applyToTuning(knobs, t)
         assertEquals(t, back)
-        val modified = TarjiLabKnobs(maxTremoloHz = 4f, holdMinMs = 900f)
+        val modified = TarjiLabKnobs(maxTremoloHz = 4f, holdMinMs = 900f, glintBrightness = 1.6f)
         val applied = TarjiLabKnobs.applyToTuning(modified, t)
         assertEquals(4f, applied.glintResonanceMaxHz, 0f)
         assertEquals(900f, applied.tarjiHoldMinMs, 0f)
+        assertEquals(1.6f, applied.glintBrightness, 0f)
+        assertEquals(t.glintTintAlpha, applied.glintTintAlpha, 0f)
+        assertEquals(applied, TarjiLabKnobs.applyToTuning(modified, applied))
     }
 
     @Test
