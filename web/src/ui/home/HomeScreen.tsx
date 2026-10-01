@@ -13,7 +13,6 @@ import {
   IconPlay,
   IconTune,
 } from '../icons/PlaybackIcons'
-import { AlphaTag } from '../kit/AlphaTag'
 import { PaperInput } from '../kit/PaperInput'
 import { ContinueRow } from './ContinueRow'
 import {
@@ -174,7 +173,7 @@ export function HomeScreen({ stackLayer }: { stackLayer: StackLayer }) {
       appStore.revealLayer(READER_LAYER)
       return
     }
-    appStore.openSurah(nowPlaying.surahId, floatAyah)
+    appStore.openReading(nowPlaying.surahId, floatAyah)
   }
 
   const toggleSection = (surahId: number) => {
@@ -250,7 +249,6 @@ export function HomeScreen({ stackLayer }: { stackLayer: StackLayer }) {
         >
           <h1>
             <span>Beautiful Quran</span>
-            <AlphaTag />
           </h1>
           <button
             type="button"
@@ -372,14 +370,14 @@ export function HomeScreen({ stackLayer }: { stackLayer: StackLayer }) {
                     onPointerDown={() => prepareChapter(s.id)}
                     onFocus={() => prepareChapter(s.id)}
                     onClick={() =>
-                      appStore.openSurah(s.id, ayahTarget ?? 1)
+                      searching ? appStore.openReading(s.id, ayahTarget ?? 1) : appStore.openSurah(s.id)
                     }
                   >
                     <span className="surah-num">{s.id}</span>
                     <span className="surah-names">
                       <span className="en">{s.nameTransliteration}</span>
                       <span className="meta">
-                        {s.nameTranslation} · {s.ayahCount}
+                        {s.nameTranslation} · {s.ayahCount} ayahs
                       </span>
                     </span>
                     <span className="surah-ar">{s.nameArabic}</span>

@@ -62,7 +62,8 @@ import { fieldWeaveBackground, GeneratedRosette } from '../theme/GeneratedOrname
 import { chapterOrnamentSeed, generateChapterOrnament } from '../theme/ornamentGenerator'
 import { resolveTheme } from '../App'
 import type { Word } from '../../data/models'
-import { isKeyboardControl, readerKeyboardAction } from './keyboardNavigation'
+import { readerOpensOnTitle } from './readerOpening'
+import { isKeyboardControl, readerKeyboardAction, readerOwnsKeyboard } from './keyboardNavigation'
 
 const NO_SEARCH_FLASH_WORDS: number[] = []
 
@@ -636,7 +637,7 @@ export function ReaderScreen({ stackLayer }: { stackLayer: StackLayer }) {
       // list does at scroll 0. Putting ayah 1 on the reading line pushed the
       // rosette and name off a phone-height sheet. Landings inside a chapter
       // (bookmark, search, Continue) still take the reading line.
-      if (ayah <= 1 && state.pendingSearchFlash == null) {
+      if (readerOpensOnTitle(ayah, state.readerOpenIntent)) {
         const el = scrollRef.current
         if (el) el.scrollTop = 0
         setFocusedAyah(1)
@@ -1133,7 +1134,7 @@ export function ReaderScreen({ stackLayer }: { stackLayer: StackLayer }) {
   // The reading line is the keyboard cursor. Reuse rail jumps so keys get the
   // same progressive mount, focus glide, playback parking, and follow policy.
   useEffect(() => {
-    if (!isTop || !content || state.rootViewer) return
+    if (!readerOwnsKeyboard(isTop, state.rootViewer != null) || !content) return
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.defaultPrevented || event.altKey || event.ctrlKey || event.metaKey) return
       if (isKeyboardControl(event.target)) return
@@ -1424,12 +1425,14 @@ export function ReaderScreen({ stackLayer }: { stackLayer: StackLayer }) {
         <div className="reader-main">
           {mushaf ? (
             <MushafReader
+              ownsKeyboard={readerOwnsKeyboard(isTop, state.rootViewer != null)}
               activeSurahId={content.surah.id}
               activeAyah={state.activeAyah}
               openAyah={state.openAyah}
               openRevision={state.readerOpenRevision}
               english={state.settings.readingMode === 'english_only'}
               pageNumberScript={pageNumberScript}
+              glyphWiden={state.settings.mushafGlyphWiden / 100}
               onPlayWord={(surahId, ayah, position) => {
                 if (state.gathering) {
                   appStore.onVerseTap(surahId, ayah)
@@ -1469,11 +1472,15 @@ export function ReaderScreen({ stackLayer }: { stackLayer: StackLayer }) {
                   ayahCount={content.surah.ayahCount}
                   themeMode={state.settings.themeMode}
                 />
-                <h2>{content.surah.nameTransliteration}</h2>
-                <p className="ar-title">{content.surah.nameArabic}</p>
+                <p className="ar-title" lang="ar">سُورَةُ {content.surah.nameArabic}</p>
+                <h2>
+                  {content.surah.nameTransliteration} · {content.surah.nameTranslation}
+                </h2>
                 <p className="sub">
-                  {content.surah.nameTranslation} · {content.surah.ayahCount} ayahs ·{' '}
-                  {content.surah.revelationPlace}
+                  Chapter {content.surah.id} ·{' '}
+                  {content.surah.revelationPlace.charAt(0).toUpperCase() +
+                    content.surah.revelationPlace.slice(1)}{' '}
+                  · {content.surah.ayahCount} ayahs
                 </p>
               </header>
               {showBasmalah ? (

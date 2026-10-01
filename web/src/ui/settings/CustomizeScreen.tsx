@@ -1,4 +1,5 @@
 import { appStore } from '../../store/appStore'
+import { FontSizeControl } from '../kit/FontSizeControl'
 import type {
   AyahSelectorSide,
   PageNumberScript,
@@ -101,9 +102,9 @@ export function CustomizeScreen({
           aria-hidden="true"
         >
           <path
-            d="M15.5 5.5 L9 12 l6.5 6.5"
+            d="M19 12 H5.5 M11 6 L5 12 l6 6"
             stroke="currentColor"
-            strokeWidth="1.75"
+            strokeWidth="1.9"
             strokeLinecap="round"
             strokeLinejoin="round"
           />
@@ -139,6 +140,18 @@ export function CustomizeScreen({
               }
             />
           </section>
+
+          {/* Android Customize: text size sits between Layout and View,
+              and only where the reader sets its own size (Scroll). */}
+          {settings.readingLayout === 'scroll' ? (
+            <section className="settings-section">
+              <h2>Text size</h2>
+              <FontSizeControl
+                scale={settings.fontScale}
+                onChange={(fontScale) => appStore.updateSettings({ fontScale })}
+              />
+            </section>
+          ) : null}
 
           <section className="settings-section">
             <h2>View</h2>

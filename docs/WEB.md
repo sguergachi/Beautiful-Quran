@@ -362,6 +362,16 @@ the complete layer and visual-verification contract.
 
 Three sheets, hand-rolled paper stack (no router chrome):
 
+**Sizes are Android's, at 1 px = 1 dp.** The phone web is checked against
+the Android app side by side (emulator screenshot beside a 412 × 915
+headless capture), and type is *not* shrunk for narrow screens — Android
+sets the same sizes on the same widths. Masthead 34/40, chapter rows
+17 / 13 / 24 on a 28 px lane with the Arabic name in green ink, 30 px Arabic,
+48 px icon targets around 24 px glyphs, transport 48 / 56 / 48 with a 34 px
+play glyph, chapter opening as `سُورَةُ name` (32 px) · transliteration ·
+meaning · `Chapter N · Place · N ayahs`. Settings keeps Android's order:
+reciters, then Customize; text size lives in Customize (Scroll only).
+
 **Desktop book spread.** At `(min-width: 1100px) and (min-height: 600px)`
 (`ui/paper/bookSpread.ts`) the stack is laid open as a book instead of a
 centred phone column: Chapters on the verso, Reader on the recto, Bookmarks
@@ -373,12 +383,64 @@ block and title page under the sheets; all geometry is CSS keyed on
 `data-spread`. In Mushaf layout the spread shows two facing leaves
 (`mushafFacingPages`): `MushafReader` draws the recto and portals the verso
 into `BookSpread`'s slot, sized to the recto's own box; Chapters keeps its
-real layer and covers the verso only at layer 0 (`data-leaves`). Hafs stands
+real layer and covers the verso only at layer 0 (`data-leaves`). Covered
+verso content is inert and hidden from assistive technology; the recto comes
+first in DOM and Tab order. Gathering stays active while another sheet covers
+the verso, and Escape cancels gathering before peeling that sheet away. Hafs stands
 in for the page faces, so each leaf measures its lines and scales the type
 until the longest fits (`--mushaf-fit`), on phones too.
+The spread's page is golden: `--page-w` / `--page-h` (1 : φ) and the margin
+unit `--grid-u` in `styles.css` ("Golden page") drive the book, the cover
+board and every sheet; a Mushaf leaf is absolutely placed on
+`--margin-inner/head/fore/foot`. The per-leaf solver is in
+`ui/reader/mushafFit.ts`: `mushafLeafFit` (type size, bounded by
+`MUSHAF_MIN_LEADING`) and `solveLine` (letter widening toward
+`MUSHAF_TARGET_GAP`, or centring below `MUSHAF_SHORT_FILL`), applied to the
+lines in a layout effect in `MushafLeaf`. The cap is the
+`mushafGlyphWiden` setting.
+Mushaf lines justify by even word spaces: words and verse marks are
+separate flex items of the line (`space-between`, 0.3 em minimum gap) inside
+`.mushaf-block`, which is `width: max-content` — as wide as the leaf's widest
+line — so head, lines and folio share that measure. `mushafLeafFit` only
+shrinks the type when the widest line overruns the page; widths are read at
+the applied scale and divided back (toggling the scale to measure made the
+measurement oscillate). Rationale in `docs/DESIGN.md`.
 The leaf's folio follows the Customize page-number script (both figures
 share one centred line with a diamond between), opening leaves 1–2 centre
 their few lines in the well, and facing leaves mirror their running heads.
+Page turns: `MushafReader` keeps the place the book last settled on,
+prepares both destination leaves at the reader’s measure, then portals a
+two-faced leaf into
+`BookSpread`'s turn slot (`.mushaf-flip`, CSS `rotateY`, 760 ms; a single leaf
+turns inside the reader sheet). The leaf (`TurningLeaf`) is a chain of nine
+strips, each hinged on the one before and bending a few degrees at its joint,
+so the page furls; every strip windows its own slice of the page. Each face is
+rendered once and its frozen DOM cloned into the strips; page models and
+verse-tail positions are shared across copies. The whole airborne subtree is
+inert and hidden from assistive technology. Incoming fit is known before lift
+and frozen through landing; the outgoing face keeps its previous fit. One leaf
+finishes its turn before the latest queued destination starts, including a
+reversal. Hidden readers and an open root viewer yield the page keys; gathering
+retains the ordinary reader-key policy. Reduced motion cancels the moving leaf
+and its scheduled stems. `EntranceCover` wraps its tooling in
+`.entrance-front` and adds `.entrance-inside`, so the spread's cover swings a
+full 180° (`BOOK_OPEN_MS`). The opening mode and board geometry are frozen
+across breakpoint changes; the board’s own animationend finishes the opening,
+with a timeout fallback. Tap/Escape aborts arrival or the du’a immediately and
+opens once the book is ready. Turns are heard as well:
+`ui/paper/pageTurnSounds.ts` puts Android's
+three flip stems (lift, sweep, drop — `web/public/sounds`, MP3 transcodes of
+`app/src/main/res/raw/flip*.ogg`) on the Web Audio clock at the moments the
+turn and the cover reach those phases. A turn the browser will not yet let
+sound (no gesture so far) is silent, never late. Fetching starts before the
+gesture; AudioContext creation/resume runs directly on pointerdown/keydown.
+Failed stems can retry. Lateness includes turn-mount work, and cancelling a
+turn stops even its scheduled sweep/drop stems. Ordinary chapter opens at ayah
+1 rest on the title; Continue, bookmark and search opens carry reading intent
+and settle on the verse line, including while paused. Reader focus hand-off
+runs for every explicit open, including reopening the same chapter. Paper
+grain is one static `.app-shell::after`
+layer, light theme only, plain alpha with no blend mode.
 Below that size nothing changes. Rationale in
 `docs/DESIGN.md` ("On a desktop browser the sheets lie open as a book").
 

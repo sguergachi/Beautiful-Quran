@@ -1,14 +1,14 @@
 import { useMemo } from 'react'
 import { GeneratedRosette } from '../theme/GeneratedOrnament'
 import { generateCoverOrnament } from '../theme/ornamentGenerator'
-import { setVersoLeafSlot } from './bookSpread'
+import { setTurningLeafSlot, setVersoLeafSlot } from './bookSpread'
 
 /**
  * The open book the desktop sheets lie on: binding boards, two pages with
  * their fore-edges, and a title page on the recto until a chapter opens.
  * Drawn under the sheets; hidden entirely outside the spread.
  */
-export function BookSpread({ titlePage }: { titlePage: boolean }) {
+export function BookSpread({ titlePage, versoCovered }: { titlePage: boolean; versoCovered: boolean }) {
   const medallion = useMemo(
     () => generateCoverOrnament((Math.random() * 0x7fffffff) | 0).medallion,
     [],
@@ -40,7 +40,9 @@ export function BookSpread({ titlePage }: { titlePage: boolean }) {
         </div>
       </div>
       {/* Mushaf layout: the reader portals the facing leaf in here. */}
-      <div className="book-verso-leaf" ref={setVersoLeafSlot} />
+      <div className="book-verso-leaf" ref={setVersoLeafSlot} inert={versoCovered} aria-hidden={versoCovered || undefined} />
+      {/* …and the leaf that is mid-turn, which crosses the spine. */}
+      <div className="book-turn" ref={setTurningLeafSlot} aria-hidden="true" />
       {/* The gutter's turn — above the sheets, so both pages curve into it. */}
       <div className="book-spine" aria-hidden="true" />
     </>
