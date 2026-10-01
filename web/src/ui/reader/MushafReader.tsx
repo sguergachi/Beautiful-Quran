@@ -534,13 +534,24 @@ function MushafLeaf({
                 className="mushaf-english-ayah"
                 data-active={active || undefined}
               >
-                <button
-                  type="button"
+                {/* A span, not a button: a button is one box and cannot break
+                    across lines, which pushed the verse number onto a line
+                    of its own beneath every verse. */}
+                <span
+                  role="button"
+                  tabIndex={0}
                   className="mushaf-english-text"
                   onClick={() => onPlayWord(item.surahId, item.ayah, 1)}
+                  onKeyDown={(event) => {
+                    if (event.key !== 'Enter' && event.key !== ' ') return
+                    event.preventDefault()
+                    onPlayWord(item.surahId, item.ayah, 1)
+                  }}
                 >
                   {item.translation}
-                </button>
+                </span>
+                {/* No-break space: the number never starts a line alone. */}
+                {'\u00A0'}
                 <button
                   type="button"
                   className="mushaf-mark"

@@ -2657,7 +2657,14 @@ button.ayah-mark {
 
 .mushaf-english {
   flex: 1;
+  min-height: 0;
   overflow: auto;
+  scrollbar-width: none;
+  /* A leaf's translation can run longer than the leaf; it scrolls, and the
+     ink dissolves at the foot rather than being cut through a line. */
+  -webkit-mask-image: linear-gradient(to bottom, #000 calc(100% - 2.2em), transparent);
+  mask-image: linear-gradient(to bottom, #000 calc(100% - 2.2em), transparent);
+  padding-bottom: 2.2em;
   margin-top: 1.2em;
   font-family: var(--font-body);
   font-size: 1.05rem;
@@ -2670,7 +2677,22 @@ button.ayah-mark {
 }
 
 .mushaf-english-text {
-  text-align: start;
+  cursor: pointer;
+  /* Prose leading, not the single-line leading the Arabic words take. */
+  line-height: inherit;
+}
+
+.mushaf-english-text:focus-visible {
+  outline: 1px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.mushaf-english-ayah .mushaf-mark {
+  white-space: nowrap;
+}
+
+.mushaf-english::-webkit-scrollbar {
+  display: none;
 }
 
 .mushaf-folio {
