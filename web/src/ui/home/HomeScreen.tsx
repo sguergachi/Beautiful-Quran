@@ -174,7 +174,7 @@ export function HomeScreen({ stackLayer }: { stackLayer: StackLayer }) {
       appStore.revealLayer(READER_LAYER)
       return
     }
-    appStore.openSurah(nowPlaying.surahId, floatAyah)
+    appStore.openReading(nowPlaying.surahId, floatAyah)
   }
 
   const toggleSection = (surahId: number) => {
@@ -368,7 +368,7 @@ export function HomeScreen({ stackLayer }: { stackLayer: StackLayer }) {
                     onPointerDown={() => prepareChapter(s.id)}
                     onFocus={() => prepareChapter(s.id)}
                     onClick={() =>
-                      appStore.openSurah(s.id, ayahTarget ?? 1)
+                      searching ? appStore.openReading(s.id, ayahTarget ?? 1) : appStore.openSurah(s.id)
                     }
                   >
                     <span className="surah-num">{s.id}</span>

@@ -159,6 +159,12 @@ export function EntranceCover({
   const [phase, setPhase] = useState<Phase>('loading')
   const [sheetAlpha, setSheetAlpha] = useState(0)
   const [opening, setOpening] = useState(false)
+  const [skipped, setSkipped] = useState(false)
+  const [openingMode, setOpeningMode] = useState<'phone' | 'spread' | null>(null)
+  const [openingStyle, setOpeningStyle] = useState({})
+  const openingRef = useRef(false)
+  const arrivalAcRef = useRef<AbortController | null>(null)
+  const openingAtRef = useRef(0)
   const [captionOn, setCaptionOn] = useState(false)
   const [arrivalDone, setArrivalDone] = useState(false)
   const [board, setBoard] = useState(() => ({ w: 390, h: 844, layout: coverLayout(390, 844) }))
@@ -204,14 +210,45 @@ export function EntranceCover({
     return () => ro.disconnect()
   }, [])
 
-  const skipToOpening = useCallback(() => {
-    if (!canOpen || phase === 'opening') return
-    setPhase('opening')
-    setCaptionOn(true)
-    momentAcRef.current?.abort()
-  }, [canOpen, phase])
+  const finishOpening = useCallback(() => {
+    if (finishedRef.current) return
+    finishedRef.current = true
+    onFinishedRef.current()
+  }, [])
 
-  // Stems decode while the cover is up, so the open can sound on its beat.
+  const open = useCallback(() => {
+    if (openingRef.current || finishedRef.current) return
+    openingRef.current = true
+    openingAtRef.current = performance.now()
+    const spread = window.matchMedia(BOOK_SPREAD_QUERY).matches
+    const el = boardRef.current
+    if (el) {
+      const css = getComputedStyle(el)
+      setOpeningStyle({
+        top: css.top, left: css.left, width: css.width, height: css.height,
+        bottom: 'auto', right: 'auto', borderRadius: css.borderRadius,
+      })
+    }
+    setOpeningMode(spread ? 'spread' : 'phone')
+    applyWash(titleArRef.current, 1, 0)
+    applyWash(titleEnRef.current, 1, 0)
+    applyWash(duaRef.current, 1, 0.12)
+    setSheetAlpha(1)
+    setCaptionOn(true)
+    setPhase('opening')
+    setOpening(true)
+  }, [])
+
+  const skipToOpening = useCallback(() => {
+    if (openingRef.current) return
+    setSkipped(true)
+    setCaptionOn(true)
+    arrivalAcRef.current?.abort()
+    momentAcRef.current?.abort()
+    if (canOpen) open()
+  }, [canOpen, open])
+
+  // Fetch while the cover is up; the first gesture unlocks decoding and audio.
   useEffect(() => {
     warmPageTurnSounds()
   }, [])
@@ -227,19 +264,30 @@ export function EntranceCover({
     }
   }, [])
 
-  // The desktop spread stays shut under the board until the hinge moves.
+  // The board owns completion. Its mode and geometry survive breakpoint changes.
   useEffect(() => {
     if (!opening) return
     document.documentElement.dataset.entranceOpening = 'true'
-    if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
-      playFlip(
-        window.matchMedia(BOOK_SPREAD_QUERY).matches ? BOOK_OPEN_SCHEDULE : COVER_OPEN_SCHEDULE,
-      )
+    const query = window.matchMedia('(prefers-reduced-motion: reduce)')
+    const cancelSound = query.matches ? () => {} : playFlip(
+      openingMode === 'spread' ? BOOK_OPEN_SCHEDULE : COVER_OPEN_SCHEDULE,
+      openingAtRef.current,
+    )
+    const changed = () => {
+      if (!query.matches) return
+      cancelSound()
+      finishOpening()
     }
+    query.addEventListener('change', changed)
+    const timer = window.setTimeout(finishOpening, query.matches ? 0 :
+      (openingMode === 'spread' ? BOOK_OPEN_MS : OPEN_MS) + 250)
     return () => {
+      window.clearTimeout(timer)
+      if (!finishedRef.current) cancelSound()
+      query.removeEventListener('change', changed)
       document.documentElement.removeAttribute('data-entrance-opening')
     }
-  }, [opening])
+  }, [opening, openingMode, finishOpening])
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -256,6 +304,7 @@ export function EntranceCover({
   // Arrival — fade + title wash once, while the book may still be loading.
   useEffect(() => {
     const ac = new AbortController()
+    arrivalAcRef.current = ac
     const { signal } = ac
     ;(async () => {
       try {
@@ -279,64 +328,36 @@ export function EntranceCover({
     return () => ac.abort()
   }, [])
 
-  // Once arrival is done and the book is ready, fade the du'a then open.
-  // Skip aborts the in-flight moment without replaying the title.
+  // Skip can end arrival as well as the du'a; opening runs exactly once.
   useEffect(() => {
-    if (!arrivalDone || !canOpen || ceremonyStartedRef.current || finishedRef.current) {
+    if (!canOpen || finishedRef.current) return
+    if (skipped) {
+      open()
       return
     }
+    if (!arrivalDone || ceremonyStartedRef.current) return
     ceremonyStartedRef.current = true
-
-    const momentAc = new AbortController()
-    momentAcRef.current = momentAc
-    const openAc = new AbortController()
-    const { signal } = momentAc
-
+    const ac = new AbortController()
+    momentAcRef.current = ac
+    let disposed = false
     ;(async () => {
       try {
         setPhase('dua')
         setCaptionOn(true)
-        await runWash(
-          DUA_WASH_MS,
-          (p) => applyWash(duaRef.current, p, 0.12),
-          signal,
-        )
-        await wait(DUA_HOLD_MS, signal)
+        await runWash(DUA_WASH_MS, (p) => applyWash(duaRef.current, p, 0.12), ac.signal)
+        await wait(DUA_HOLD_MS, ac.signal)
+        if (!disposed) open()
       } catch {
-        /* skip / unmount — fall through to open */
-      }
-
-      if (finishedRef.current || openAc.signal.aborted) return
-
-      applyWash(titleArRef.current, 1, 0)
-      applyWash(titleEnRef.current, 1, 0)
-      applyWash(duaRef.current, 1, 0.12)
-      setSheetAlpha(1)
-      setCaptionOn(true)
-      setPhase('opening')
-      setOpening(true)
-      const openMs = window.matchMedia('(prefers-reduced-motion: reduce)').matches
-        ? 0
-        : window.matchMedia(BOOK_SPREAD_QUERY).matches
-          ? BOOK_OPEN_MS
-          : OPEN_MS
-      try {
-        await wait(openMs, openAc.signal)
-      } catch {
-        return
-      }
-      if (!finishedRef.current && !openAc.signal.aborted) {
-        finishedRef.current = true
-        onFinishedRef.current()
+        /* skip / unmount owns the next moment */
       }
     })()
-
     return () => {
-      momentAc.abort()
-      openAc.abort()
+      disposed = true
+      ac.abort()
       momentAcRef.current = null
+      ceremonyStartedRef.current = false
     }
-  }, [arrivalDone, canOpen])
+  }, [arrivalDone, canOpen, skipped, open])
 
   const progressPct =
     loadProgress != null ? Math.round(Math.min(1, Math.max(0, loadProgress)) * 100) : null
@@ -351,16 +372,21 @@ export function EntranceCover({
     >
       <div
         ref={boardRef}
+        data-opening-mode={openingMode ?? undefined}
+        onAnimationEnd={(event) => {
+          if (event.target === event.currentTarget && openingRef.current) finishOpening()
+        }}
         className={`entrance-board${opening ? ' entrance-board--opening' : ''}`}
         style={{
           ...layoutVars,
+          ...openingStyle,
           opacity: opening ? undefined : sheetAlpha || 1,
         }}
-        role={canOpen && phase !== 'opening' ? 'button' : undefined}
-        tabIndex={canOpen && phase !== 'opening' ? 0 : undefined}
-        onClick={canOpen && phase !== 'opening' ? skipToOpening : undefined}
+        role={!error && phase !== 'opening' ? 'button' : undefined}
+        tabIndex={!error && phase !== 'opening' ? 0 : undefined}
+        onClick={!error && phase !== 'opening' ? skipToOpening : undefined}
         onKeyDown={
-          canOpen && phase !== 'opening'
+          !error && phase !== 'opening'
             ? (e) => {
                 if (e.key === 'Enter' || e.key === ' ') {
                   e.preventDefault()

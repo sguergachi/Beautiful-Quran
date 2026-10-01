@@ -15,7 +15,6 @@ import { assetUrl } from '../../assetUrl'
 
 const FLIPS = ['flip2', 'flip8', 'flip9'] as const
 const STEMS = ['lift', 'sweep', 'drop'] as const
-type Stem = (typeof STEMS)[number]
 
 /** When each stem starts, in ms from the start of the motion, and its pitch. */
 export interface FlipSchedule {
@@ -53,75 +52,112 @@ export function nextFlipIndex(last: number, random: number, count: number = FLIP
 }
 
 let context: AudioContext | null = null
-let buffers: Promise<Map<string, AudioBuffer>> | null = null
+const bytes = new Map<string, ArrayBuffer>()
+const buffers = new Map<string, AudioBuffer>()
+const fetching = new Map<string, Promise<void>>()
+const decoding = new Map<string, Promise<void>>()
 let lastFlip = -1
 
-function audioContext(): AudioContext | null {
-  if (context) return context
-  const Ctor =
-    window.AudioContext ??
-    (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext
-  if (!Ctor) return null
-  context = new Ctor()
-  return context
-}
-
-/** Fetch and decode the stems ahead of the first turn. Safe to call often. */
-export function warmPageTurnSounds(): void {
-  const ctx = audioContext()
-  if (!ctx || buffers) return
-  buffers = (async () => {
-    const loaded = new Map<string, AudioBuffer>()
-    await Promise.all(
-      FLIPS.flatMap((flip) =>
-        STEMS.map(async (stem) => {
-          try {
-            const response = await fetch(assetUrl(`sounds/${flip}_${stem}.mp3`))
-            if (!response.ok) return
-            loaded.set(`${flip}_${stem}`, await ctx.decodeAudioData(await response.arrayBuffer()))
-          } catch {
-            /* a missing stem stays silent */
-          }
-        }),
-      ),
-    )
-    return loaded
-  })()
-}
-
-/**
- * Sound one flip against the audio clock. Silent when the browser has not
- * yet been given a gesture, when the stems are still loading, or when the
- * context could only start after the motion was well under way.
- */
-export function playFlip(schedule: FlipSchedule): void {
-  const ctx = audioContext()
-  if (!ctx) return
-  warmPageTurnSounds()
-  const asked = performance.now()
-  const flip = FLIPS[(lastFlip = nextFlipIndex(lastFlip, Math.random()))]!
-  void Promise.all([ctx.resume(), buffers])
-    .then(([, loaded]) => {
-      const late = performance.now() - asked
-      if (!loaded || ctx.state !== 'running' || late > LATE_MS) return
-      const start = ctx.currentTime - late / 1000
-      const gain = ctx.createGain()
-      gain.gain.value = GAIN
-      gain.connect(ctx.destination)
-      const at = (stem: Stem, ms: number) => {
-        const buffer = loaded.get(`${flip}_${stem}`)
-        if (!buffer) return
-        const source = ctx.createBufferSource()
-        source.buffer = buffer
-        source.playbackRate.value = schedule.rate
-        source.connect(gain)
-        source.start(Math.max(ctx.currentTime, start + ms / 1000))
+/** Fetch separately from audio activation; failed stems remain retryable. */
+function fetchStems(): Promise<void[]> {
+  return Promise.all(FLIPS.flatMap((flip) => STEMS.map((stem) => {
+    const key = `${flip}_${stem}`
+    if (bytes.has(key)) return Promise.resolve()
+    const pending = fetching.get(key)
+    if (pending) return pending
+    const load = (async () => {
+      try {
+        const response = await fetch(assetUrl(`sounds/${key}.mp3`))
+        if (response.ok) bytes.set(key, await response.arrayBuffer())
+      } catch {
+        /* a missing stem stays silent until the next warm */
+      } finally {
+        fetching.delete(key)
       }
-      at('lift', schedule.lift)
-      at('sweep', schedule.sweep)
-      at('drop', schedule.drop)
-    })
-    .catch(() => {
-      /* autoplay refused: the turn is simply quiet */
-    })
+    })()
+    fetching.set(key, load)
+    return load
+  })))
+}
+
+function decodeStems(ctx: AudioContext): Promise<void[]> {
+  return Promise.all(Array.from(bytes, ([key, data]) => {
+    if (buffers.has(key)) return Promise.resolve()
+    const pending = decoding.get(key)
+    if (pending) return pending
+    const load = ctx.decodeAudioData(data.slice(0)).then((buffer) => {
+      buffers.set(key, buffer)
+    }).catch(() => {
+      bytes.delete(key)
+    }).finally(() => decoding.delete(key))
+    decoding.set(key, load)
+    return load
+  }))
+}
+
+/** Fetch ahead of the first turn, without creating an AudioContext. */
+export function warmPageTurnSounds(): void {
+  void fetchStems().then(() => context ? decodeStems(context) : undefined)
+}
+
+/** Call directly from pointerdown/keydown so strict autoplay policies allow sound. */
+export function unlockPageTurnSounds(): void {
+  try {
+    if (!context) {
+      const Ctor = window.AudioContext ??
+        (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext
+      if (!Ctor) return
+      context = new Ctor()
+    }
+    void context.resume().catch(() => {})
+    warmPageTurnSounds()
+  } catch {
+    /* audio unavailable: the book still opens */
+  }
+}
+
+/** Schedule against motion initiation, including time spent preparing its DOM. */
+export function playFlip(schedule: FlipSchedule, initiatedAt = performance.now()): () => void {
+  const ctx = context
+  const sources: AudioBufferSourceNode[] = []
+  let gain: GainNode | null = null
+  let cancelled = false
+  const cancel = () => {
+    cancelled = true
+    for (const source of sources) {
+      source.stop()
+      source.disconnect()
+    }
+    sources.length = 0
+    gain?.disconnect()
+  }
+  if (!ctx) return cancel
+  const flip = FLIPS[(lastFlip = nextFlipIndex(lastFlip, Math.random()))]!
+  void fetchStems().then(() => decodeStems(ctx)).then(() => {
+    const late = performance.now() - initiatedAt
+    if (cancelled || ctx.state !== 'running' || late > LATE_MS) return
+    const start = ctx.currentTime - late / 1000
+    gain = ctx.createGain()
+    gain.gain.value = GAIN
+    gain.connect(ctx.destination)
+    for (const stem of STEMS) {
+      const buffer = buffers.get(`${flip}_${stem}`)
+      if (!buffer) continue
+      const source = ctx.createBufferSource()
+      source.buffer = buffer
+      source.playbackRate.value = schedule.rate
+      source.connect(gain)
+      sources.push(source)
+      source.onended = () => {
+        source.disconnect()
+        const index = sources.indexOf(source)
+        if (index >= 0) sources.splice(index, 1)
+        if (sources.length === 0) gain?.disconnect()
+      }
+      source.start(Math.max(ctx.currentTime, start + schedule[stem] / 1000))
+    }
+  }).catch(() => {
+    /* autoplay refused: the turn is simply quiet */
+  })
+  return cancel
 }

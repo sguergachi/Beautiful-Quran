@@ -6207,6 +6207,8 @@ html[data-entrance='true'] body {
   --book-board: #0a382e;
   --book-board-deep: #031c15;
   --book-gutter-shade: rgb(60 44 20 / 0.16);
+  --book-gutter-rgb: 60, 44, 20;
+  --book-gutter-alpha: 0.16;
   --book-edge-line: rgb(110 104 88 / 0.3);
 }
 
@@ -6215,6 +6217,8 @@ html[data-entrance='true'] body {
   --book-board: #1a1814;
   --book-board-deep: #100f0c;
   --book-gutter-shade: rgb(0 0 0 / 0.55);
+  --book-gutter-rgb: 0, 0, 0;
+  --book-gutter-alpha: 0.55;
   --book-edge-line: rgb(203 196 179 / 0.2);
 }
 
@@ -6223,6 +6227,8 @@ html[data-entrance='true'] body {
   --book-board: #0d4336;
   --book-board-deep: #072e25;
   --book-gutter-shade: rgb(0 0 0 / 0.32);
+  --book-gutter-rgb: 0, 0, 0;
+  --book-gutter-alpha: 0.32;
   --book-edge-line: rgb(208 202 184 / 0.2);
 }
 
@@ -6316,13 +6322,13 @@ html[data-entrance='true'] body {
   background: linear-gradient(
     to right,
     transparent 0%,
-    rgb(from var(--book-gutter-shade) r g b / calc(alpha * 0.07)) 20%,
-    rgb(from var(--book-gutter-shade) r g b / calc(alpha * 0.26)) 38%,
-    rgb(from var(--book-gutter-shade) r g b / calc(alpha * 0.72)) 47.5%,
+    rgba(var(--book-gutter-rgb), calc(var(--book-gutter-alpha) * 0.07)) 20%,
+    rgba(var(--book-gutter-rgb), calc(var(--book-gutter-alpha) * 0.26)) 38%,
+    rgba(var(--book-gutter-rgb), calc(var(--book-gutter-alpha) * 0.72)) 47.5%,
     var(--book-gutter-shade) 50%,
-    rgb(from var(--book-gutter-shade) r g b / calc(alpha * 0.72)) 52.5%,
-    rgb(from var(--book-gutter-shade) r g b / calc(alpha * 0.26)) 62%,
-    rgb(from var(--book-gutter-shade) r g b / calc(alpha * 0.07)) 80%,
+    rgba(var(--book-gutter-rgb), calc(var(--book-gutter-alpha) * 0.72)) 52.5%,
+    rgba(var(--book-gutter-rgb), calc(var(--book-gutter-alpha) * 0.26)) 62%,
+    rgba(var(--book-gutter-rgb), calc(var(--book-gutter-alpha) * 0.07)) 80%,
     transparent 100%
   );
   transition: opacity 520ms ease;
@@ -6385,7 +6391,7 @@ html[data-entrance='true'] body {
 
 /* Closed book: the board alone, centred on the desk. Opening carries it to
    the recto first, so the hinge lands on the spine of the spread beneath. */
-.app-shell[data-spread='true'] .entrance-board {
+:is(.app-shell[data-spread='true'] .entrance-board:not([data-opening-mode='phone']), .entrance-board[data-opening-mode='spread']) {
   top: var(--desk-pad);
   bottom: var(--desk-pad);
   left: 50%;
@@ -6394,13 +6400,13 @@ html[data-entrance='true'] body {
   transform: translateX(-50%);
 }
 
-.app-shell[data-spread='true'] .entrance-board {
+:is(.app-shell[data-spread='true'] .entrance-board:not([data-opening-mode='phone']), .entrance-board[data-opening-mode='spread']) {
   /* Two faces in real depth; the front clips its own tooling instead. */
   overflow: visible;
   backface-visibility: visible;
 }
 
-.app-shell[data-spread='true'] .entrance-board--opening {
+.entrance-board[data-opening-mode='spread'].entrance-board--opening {
   /* Duration mirrors BOOK_OPEN_MS in EntranceCover. */
   animation: entrance-book-open 1700ms linear forwards;
 }
@@ -6434,7 +6440,7 @@ html[data-entrance='true'] body {
   display: none;
 }
 
-.app-shell[data-spread='true'] .entrance-inside {
+:is(.app-shell[data-spread='true'] .entrance-board:not([data-opening-mode='phone']), .entrance-board[data-opening-mode='spread']) .entrance-inside {
   display: block;
   position: absolute;
   inset: 0;
@@ -6475,7 +6481,7 @@ html[data-entrance='true'] body {
   border-radius: inherit;
   background: linear-gradient(
     to right,
-    rgb(from var(--book-gutter-shade) r g b / calc(alpha * 0.5)),
+    rgba(var(--book-gutter-rgb), calc(var(--book-gutter-alpha) * 0.5)),
     var(--book-gutter-shade)
   );
   opacity: 0;
@@ -6835,7 +6841,7 @@ html[data-entrance-opening]
   inset: 0;
   background: linear-gradient(
     to right,
-    rgb(from var(--book-gutter-shade) r g b / calc(alpha * 0.3)),
+    rgba(var(--book-gutter-rgb), calc(var(--book-gutter-alpha) * 0.3)),
     var(--book-gutter-shade)
   );
   animation: mushaf-leaf-shade var(--turn-ms) ease-in-out both;
@@ -6898,4 +6904,58 @@ html[data-entrance-opening]
     url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='520' height='520'%3E%3Cfilter id='f' x='0' y='0' width='100%25' height='100%25'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.02 0.09' numOctaves='2' seed='11' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0.36 0 0 0 0 0.27 0 0 0 0 0.14 0 0 0 0.24 -0.1'/%3E%3C/filter%3E%3Crect width='520' height='520' filter='url(%23f)'/%3E%3C/svg%3E");
   background-size: 260px 260px, 520px 520px;
   opacity: 0.3;
+}
+
+/* Fit the incoming leaves at the reader's exact measure before lifting. */
+.mushaf-fit-probes {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  visibility: hidden;
+  pointer-events: none;
+}
+
+.mushaf-fit-probes > .mushaf {
+  position: absolute;
+  inset: 0;
+}
+
+@supports (color: rgb(from white r g b)) {
+  .app-shell[data-spread='true'] .book-spine {
+    background: linear-gradient(
+      to right,
+      transparent 0%,
+      rgb(from var(--book-gutter-shade) r g b / calc(alpha * 0.07)) 20%,
+      rgb(from var(--book-gutter-shade) r g b / calc(alpha * 0.26)) 38%,
+      rgb(from var(--book-gutter-shade) r g b / calc(alpha * 0.72)) 47.5%,
+      var(--book-gutter-shade) 50%,
+      rgb(from var(--book-gutter-shade) r g b / calc(alpha * 0.72)) 52.5%,
+      rgb(from var(--book-gutter-shade) r g b / calc(alpha * 0.26)) 62%,
+      rgb(from var(--book-gutter-shade) r g b / calc(alpha * 0.07)) 80%,
+      transparent 100%
+    );
+  }
+
+  .entrance-inside::after {
+    background: linear-gradient(
+      to right,
+      rgb(from var(--book-gutter-shade) r g b / calc(alpha * 0.5)),
+      var(--book-gutter-shade)
+    );
+  }
+
+  .mushaf-flip-page::after {
+    background: linear-gradient(
+      to right,
+      rgb(from var(--book-gutter-shade) r g b / calc(alpha * 0.3)),
+      var(--book-gutter-shade)
+    );
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .entrance-board[data-opening-mode].entrance-board--opening {
+    animation: none;
+    opacity: 0;
+  }
 }

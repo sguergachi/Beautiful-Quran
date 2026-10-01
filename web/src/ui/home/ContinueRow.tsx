@@ -150,7 +150,7 @@ export function ContinueRow({
           kickRef.current()
           // Let the ink's first frame land before the reader is built.
           requestAnimationFrame(() => {
-            appStore.openSurah(surahId, ayah || 1)
+            appStore.openReading(surahId, ayah || 1)
           })
         }}
       >

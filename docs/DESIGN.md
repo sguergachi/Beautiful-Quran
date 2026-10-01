@@ -46,7 +46,9 @@ half of the spread — nothing fades. The leaf and the board carry their own
 shading as they stand up out of the light; nothing casts a shadow on the page
 beneath. In the Paper theme the whole sheet carries a faint grain — tooth and
 a few fibres at a few percent — because that theme alone is literally paper.
-Reduced motion skips every turn.
+A turn finishes before the latest requested destination lifts; reversing
+queues the return rather than snapping the leaf flat. The type is fitted
+before lift and keeps its size as it lands. Reduced motion skips every turn.
 
 This bends two rules, narrowly. *One sheet at a time* becomes two, because
 they are the two a reader moves between constantly and neither is read in

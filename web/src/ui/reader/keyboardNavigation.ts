@@ -35,3 +35,8 @@ export function isKeyboardControl(target: EventTarget | null): boolean {
     target.closest('input, textarea, select, button, [contenteditable="true"], [role="slider"]'),
   )
 }
+
+/** Only the visible reader owns navigation; an open root sheet owns its keys. */
+export function readerOwnsKeyboard(visible: boolean, rootViewerOpen: boolean): boolean {
+  return visible && !rootViewerOpen
+}

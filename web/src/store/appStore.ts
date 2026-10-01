@@ -64,6 +64,8 @@ import {
   type ShareVerse,
 } from '../share/gather'
 import { renderShareCard } from '../share/shareImage'
+import type { ReaderOpenIntent } from '../ui/reader/readerOpening'
+import { BOOK_SPREAD_QUERY, leavesReader, readerVisible } from '../ui/paper/bookSpread'
 
 export type Sheet = 'bookmarks' | 'home' | 'reader' | 'settings'
 
@@ -138,6 +140,7 @@ export interface AppState {
   openAyah: number
   /** Bumps for each explicit reader open, including a bookmark in the current surah. */
   readerOpenRevision: number
+  readerOpenIntent: ReaderOpenIntent
   /**
    * Pending home word-search flash — set by [openSurah] with a word position,
    * consumed by the reader after focus settles.
@@ -245,6 +248,7 @@ class AppStore {
     followEnabled: true,
     openAyah: 1,
     readerOpenRevision: 0,
+    readerOpenIntent: 'chapter',
     pendingSearchFlash: null,
     gathering: false,
     gatherSelection: [],
@@ -356,7 +360,10 @@ class AppStore {
     const min = this.state.bookmarks.length > 0 ? BOOKMARKS_LAYER : COVER_LAYER
     const stackLayer = Math.max(min, Math.min(max, Math.round(layer))) as StackLayer
     const sheet = deriveSheet(stackLayer, this.hasReader())
-    const leave = onLeaveReaderSheet(this.state.gathering && this.state.sheet === 'reader' && sheet !== 'reader')
+    const leave = onLeaveReaderSheet(this.state.gathering && leavesReader(
+      window.matchMedia(BOOK_SPREAD_QUERY).matches,
+      this.state.stackLayer, stackLayer, this.hasReader(),
+    ))
     this.set({
       stackLayer,
       sheet,
@@ -371,7 +378,9 @@ class AppStore {
       this.closeRootViewer()
       return
     }
-    if (this.state.gathering && this.state.sheet === 'reader') {
+    if (this.state.gathering && readerVisible(
+      window.matchMedia(BOOK_SPREAD_QUERY).matches, this.state.stackLayer, this.hasReader(),
+    )) {
       this.exitGather()
       return
     }
@@ -610,12 +619,17 @@ class AppStore {
     QuranRepository.surahContent(surahId)
   }
 
+  openReading(surahId: number, ayah: number) {
+    this.openSurah(surahId, ayah, undefined, undefined, [], 'reading')
+  }
+
   openSurah(
     surahId: number,
     ayah = 1,
     wordPosition?: number,
     searchText?: string,
     wordPositions: number[] = [],
+    intent: AppState['readerOpenIntent'] = 'chapter',
   ) {
     const reciter =
       this.state.reciters.find((r) => r.id === this.state.settings.reciterId) ??
@@ -626,6 +640,7 @@ class AppStore {
     // the user actually plays a verse (see [rememberListened]).
     const openAyah = Math.max(1, ayah)
     const readerOpenRevision = this.state.readerOpenRevision + 1
+    const readerOpenIntent = wordPosition != null ? 'reading' : intent
     const flashWord = wordPosition != null && wordPosition >= 0 ? wordPosition : null
     const flash = flashWord != null
       ? {
@@ -653,6 +668,7 @@ class AppStore {
         sheet: 'reader',
         openAyah,
         readerOpenRevision,
+        readerOpenIntent,
         followEnabled: true,
         rootViewer: this.state.rootViewer,
         rootViewerClosing,
@@ -683,6 +699,7 @@ class AppStore {
       content,
       openAyah,
       readerOpenRevision,
+      readerOpenIntent,
       hasTimings: false,
       activeWord: null,
       activeAyah: null,
