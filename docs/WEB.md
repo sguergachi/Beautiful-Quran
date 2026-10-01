@@ -362,6 +362,16 @@ the complete layer and visual-verification contract.
 
 Three sheets, hand-rolled paper stack (no router chrome):
 
+**Sizes are Android's, at 1 px = 1 dp.** The phone web is checked against
+the Android app side by side (emulator screenshot beside a 412 × 915
+headless capture), and type is *not* shrunk for narrow screens — Android
+sets the same sizes on the same widths. Masthead 34/40, chapter rows
+17 / 13 / 24 on a 28 px lane with the Arabic name in green ink, 30 px Arabic,
+48 px icon targets around 24 px glyphs, transport 48 / 56 / 48 with a 34 px
+play glyph, chapter opening as `سُورَةُ name` (32 px) · transliteration ·
+meaning · `Chapter N · Place · N ayahs`. Settings keeps Android's order:
+reciters, then Customize; text size lives in Customize (Scroll only).
+
 **Desktop book spread.** At `(min-width: 1100px) and (min-height: 600px)`
 (`ui/paper/bookSpread.ts`) the stack is laid open as a book instead of a
 centred phone column: Chapters on the verso, Reader on the recto, Bookmarks

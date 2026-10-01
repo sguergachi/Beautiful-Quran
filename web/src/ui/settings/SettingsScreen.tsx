@@ -36,7 +36,6 @@ import {
   type BrushKnobKey,
 } from '../kit/brushMark'
 import { AlphaTag } from '../kit/AlphaTag'
-import { FontSizeControl } from '../kit/FontSizeControl'
 import { DisclosureChevron } from '../kit/DisclosureChevron'
 import { InkCheckMark } from '../kit/InkCheckMark'
 import { PaperChoiceList } from '../kit/PaperChoiceList'
@@ -390,8 +389,8 @@ export function SettingsScreen({
           />
         </section>
 
+        {/* No heading: on Android the Customize row follows the reciters. */}
         <section className="settings-section">
-          <h2>Reading</h2>
           <button
             type="button"
             className="settings-nav"
@@ -403,14 +402,6 @@ export function SettingsScreen({
             </span>
             <DisclosureChevron expanded={false} />
           </button>
-        </section>
-
-        <section className="settings-section">
-          <h2>Text size</h2>
-          <FontSizeControl
-            scale={s.fontScale}
-            onChange={(fontScale) => appStore.updateSettings({ fontScale })}
-          />
         </section>
 
         {showReadingToggles ? (
@@ -887,9 +878,9 @@ function BackChevron() {
       aria-hidden="true"
     >
       <path
-        d="M15.5 5.5 L9 12 l6.5 6.5"
+        d="M19 12 H5.5 M11 6 L5 12 l6 6"
         stroke="currentColor"
-        strokeWidth="1.75"
+        strokeWidth="1.9"
         strokeLinecap="round"
         strokeLinejoin="round"
       />

@@ -100,12 +100,16 @@ export function NextChapterFooter({
           embossDark="var(--emboss-dark)"
           embossLight="var(--emboss-light)"
         />
-        <h2>{surah.nameTransliteration}</h2>
+        {/* Same three lines as the reader's own opening: this block flies
+            into that slot, so the two must set identically. */}
         <p className="ar-title" lang="ar" dir="rtl">
-          {surah.nameArabic}
+          سُورَةُ {surah.nameArabic}
         </p>
+        <h2>
+          {surah.nameTransliteration} · {surah.nameTranslation}
+        </h2>
         <p className="sub">
-          {surah.nameTranslation} · {surah.ayahCount} ayahs · {place}
+          Chapter {surah.id} · {place.charAt(0).toUpperCase() + place.slice(1)} · {surah.ayahCount} ayahs
         </p>
       </div>
 

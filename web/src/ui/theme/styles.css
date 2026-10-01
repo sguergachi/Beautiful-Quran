@@ -676,8 +676,9 @@ select {
 }
 
 .home-header {
-  --home-header-top: max(clamp(1rem, 2.5vh, 2rem), env(safe-area-inset-top, 0px));
-  padding: clamp(1rem, 2.5vh, 2rem) var(--home-end-inset) 0.5rem
+  /* Android: 38dp above the masthead, 24dp between it and the search field. */
+  --home-header-top: max(38px, env(safe-area-inset-top, 0px));
+  padding: 38px var(--home-end-inset) 20px
     var(--home-start-inset);
   padding-top: var(--home-header-top);
   display: flex;
@@ -717,9 +718,11 @@ select {
 .home-header h1 {
   font-family: var(--font-display);
   font-weight: 600;
-  font-size: clamp(1.75rem, 5vw, 2.15rem);
+  /* Android Home masthead: 34sp on a 40sp line, 0.2sp tracking. */
+  font-size: 34px;
+  line-height: 40px;
   margin: 0;
-  letter-spacing: 0.01em;
+  letter-spacing: 0.2px;
   display: flex;
   align-items: center;
   flex-wrap: wrap;
@@ -1177,9 +1180,11 @@ select {
 }
 
 .surah-num {
+  font-weight: 500;
+  letter-spacing: 0.6px;
   font-variant-numeric: oldstyle-nums;
   color: var(--gold-ink);
-  font-size: 0.95rem;
+  font-size: 13px;
 }
 
 .surah-names {
@@ -1191,11 +1196,17 @@ select {
 
 .surah-names .en {
   font-size: 17px;
+  line-height: 23px;
+  font-weight: 500;
+  letter-spacing: 0.15px;
 }
 
 .surah-names .meta {
-  color: var(--ink-rung-muted);
+  color: var(--ink-rung-quiet);
   font-size: 13px;
+  line-height: 17px;
+  font-weight: 500;
+  letter-spacing: 0.6px;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -1204,7 +1215,11 @@ select {
 .surah-ar {
   font-family: var(--font-arabic);
   font-size: 24px;
-  line-height: 1.6;
+  /* Tight box: at 1.6 the Arabic line set the row's height (83px against
+     Android's 72dp). The glyphs overhang the box; nothing clips them. */
+  line-height: 1.2;
+  /* Android HomeScreen: the Arabic name is the row's one green. */
+  color: var(--green-ink);
   direction: rtl;
 }
 
@@ -1310,10 +1325,11 @@ select {
 
 .reader-top .back {
   color: var(--ink-rung-secondary);
-  font-size: 1.25rem;
+  /* The arrow glyph at the size of Android's 24dp back icon. */
+  font-size: 26px;
   line-height: 1;
   padding: 0.55rem 0.1rem;
-  min-height: 44px;
+  min-height: 48px;
   min-width: 44px;
   display: inline-flex;
   align-items: center;
@@ -1340,9 +1356,10 @@ select {
 
 .reader-top .icon-btn {
   color: var(--ink-rung-quiet);
-  min-width: 44px;
-  min-height: 44px;
-  padding: 0.45rem;
+  /* Android IconButton: 48dp target around a 24dp glyph. */
+  min-width: 48px;
+  min-height: 48px;
+  padding: 0;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -1351,8 +1368,8 @@ select {
 
 .reader-top .icon-btn svg {
   display: block;
-  width: 1.25rem;
-  height: 1.25rem;
+  width: 24px;
+  height: 24px;
 }
 
 .reader-top .settings-nuqta svg {
@@ -1537,26 +1554,35 @@ select {
   opacity: 0.92;
 }
 
-.surah-header h2 {
-  font-family: var(--font-display);
-  font-weight: 600;
-  font-size: clamp(1.7rem, 5vw, 2.35rem);
-  margin: 0;
-  color: var(--ink-rung-strong);
-}
-
+/* Android chapter opening: the Arabic name leads at 32sp in the page's
+   ink, then transliteration · meaning (titleMedium), then the chapter line
+   (labelMedium) 4dp beneath. */
 .surah-header .ar-title {
   font-family: var(--font-arabic);
-  font-size: clamp(1.35rem, 4vw, 1.6rem);
-  margin: 0 0 4px;
+  font-size: 32px;
+  line-height: 1.6;
+  margin: 0;
   direction: rtl;
-  color: var(--green-ink);
+  color: var(--ink);
+}
+
+.surah-header h2 {
+  margin: 0;
+  font-family: var(--font-body);
+  font-weight: 500;
+  font-size: 17px;
+  line-height: 23px;
+  letter-spacing: 0.15px;
+  color: var(--ink-rung-tertiary);
 }
 
 .surah-header .sub {
-  color: var(--ink-rung-muted);
-  margin: 0;
-  font-size: 0.92rem;
+  color: var(--ink-rung-quiet);
+  margin: 4px 0 0;
+  font-size: 13px;
+  line-height: 17px;
+  font-weight: 500;
+  letter-spacing: 0.6px;
 }
 
 /* End-of-chapter invitation: invitation chrome around a real .surah-header
@@ -1704,7 +1730,7 @@ select {
   justify-content: center;
   padding: var(--basmalah-head) var(--scroll-margin) var(--basmalah-foot);
   /* Same verse size as .ayah-block, so the artwork can match its strokes. */
-  --word-arabic-size: calc(1.8rem * var(--font-scale, 1));
+  --word-arabic-size: calc(30px * var(--font-scale, 1));
 }
 
 .basmalah-block .basmalah,
@@ -1768,7 +1794,7 @@ select {
   position: relative;
   scroll-margin-top: 12vh;
   /* Shared with .word-arabic / .ayah-mark so the verse sign tracks glyph size. */
-  --word-arabic-size: calc(1.8rem * var(--font-scale, 1));
+  --word-arabic-size: calc(30px * var(--font-scale, 1));
   --word-arabic-line: 1.9;
 }
 
@@ -2440,9 +2466,13 @@ button.ayah-mark {
 }
 
 .hafs-ayah {
+  /* A <p>: without this its default 1em margins doubled the paper between
+     Arabic-only verses (Android: 16 + 24 + 16). */
+  margin: 0;
   font-family: var(--font-arabic);
-  font-size: calc(1.85rem * var(--font-scale, 1));
-  line-height: 2;
+  /* Android ResponsiveHafsAyah: the 30sp word size, multiplier 1.0. */
+  font-size: calc(30px * var(--font-scale, 1));
+  line-height: 1.9;
   direction: rtl;
   text-align: right;
 }
@@ -2768,9 +2798,11 @@ button.ayah-mark {
 }
 
 .player-bar .reciter-btn {
-  color: color-mix(in srgb, var(--ink-muted) 70%, transparent);
-  font-size: 0.82rem;
-  letter-spacing: 0.02em;
+  color: var(--ink-rung-quiet);
+  /* Android labelMedium. */
+  font-size: 13px;
+  font-weight: 500;
+  letter-spacing: 0.6px;
   padding: 0.2rem 1rem;
   min-height: 32px;
   max-width: min(100%, 22rem);
@@ -2786,6 +2818,25 @@ button.ayah-mark {
   }
 }
 
+/* The disclosure chevron after the name (Android: 16dp, 2dp off the text).
+   Equal space leads the name so the name itself stays on the centre line. */
+.player-bar .reciter-btn::after {
+  content: '›';
+  display: inline-block;
+  width: 16px;
+  margin-inline-start: 2px;
+  font-size: 16px;
+  line-height: 1;
+  text-align: center;
+  color: var(--green-ink);
+}
+
+.player-bar .reciter-btn::before {
+  content: '';
+  display: inline-block;
+  width: 18px;
+}
+
 .player-bar .reciter-btn[data-receded='true'] {
   opacity: 0.08;
   pointer-events: none;
@@ -2795,18 +2846,18 @@ button.ayah-mark {
   display: flex;
   align-items: center;
   justify-content: center;
-  flex-wrap: wrap;
-  gap: 0.35rem 0.65rem;
+  flex-wrap: nowrap;
+  /* Android PlayerBar: 48dp buttons, 12dp apart, a 56dp play. */
+  gap: 12px;
   width: 100%;
   max-width: 42rem;
 }
 
 .player-bar .ctrl {
-  font-size: 1.05rem;
   color: var(--ink-muted);
-  min-width: 44px;
-  min-height: 44px;
-  padding: 0.45rem 0.55rem;
+  width: 48px;
+  height: 48px;
+  padding: 0;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -2814,7 +2865,8 @@ button.ayah-mark {
 }
 
 .player-bar .ctrl.speed {
-  font-size: 0.95rem;
+  font-size: 15px;
+  font-weight: 500;
   font-variant-numeric: lining-nums;
   min-width: 48px;
 }
@@ -2823,6 +2875,22 @@ button.ayah-mark {
 .player-bar .play svg,
 .floating-play svg {
   display: block;
+}
+
+/* Material's 24dp glyph; repeat is drawn at 22dp, play at 34dp. */
+.player-bar .ctrl svg {
+  width: 24px;
+  height: 24px;
+}
+
+.player-bar .ctrl:first-child svg {
+  width: 22px;
+  height: 22px;
+}
+
+.player-bar .play svg {
+  width: 34px;
+  height: 34px;
 }
 
 @keyframes ink-spin {
@@ -2843,11 +2911,10 @@ button.ayah-mark {
 }
 
 .player-bar .play {
-  font-size: 1.35rem;
   color: var(--ink-muted);
-  min-width: 56px;
-  min-height: 48px;
-  padding: 0.45rem 0.7rem;
+  width: 56px;
+  height: 56px;
+  padding: 0;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -5162,9 +5229,10 @@ button.ayah-mark {
   /* The 44px desktop target extends 16px outside the sheet on phones, leaving
    * Android's deliberate 28px Home-edge target and the same 28px content lane. */
 
-  body {
-    font-size: 16px;
-  }
+  /* Type is not shrunk for phones: these are Android's sizes at 1px = 1dp,
+     and Android sets them on the same 360–412dp screens. An earlier block
+     here cut the Arabic to 26px, chapter names to 18px and the title to
+     26px, which is why the phone web read smaller than the app. */
 
   /*
    * Same drawing width as desktop. Mobile paints Android-style edge-flush
@@ -5177,45 +5245,25 @@ button.ayah-mark {
 
   .ayah-block {
     padding-inline: var(--scroll-margin);
-    --word-arabic-size: calc(1.65rem * var(--font-scale, 1));
-  }
-
-  .basmalah-block {
-    --word-arabic-size: calc(1.65rem * var(--font-scale, 1));
   }
 
   .page-break {
     padding-inline: var(--scroll-margin);
   }
 
-  .hafs-ayah {
-    font-size: calc(1.65rem * var(--font-scale, 1));
-  }
-
-  .player-bar {
-    gap: 0.05rem;
-  }
-
+  /* Android PlayerBar `compact`: 4dp between controls on a narrow screen. */
   .player-transport {
-    gap: 0.15rem 0.35rem;
+    gap: 4px;
   }
 
-  .player-bar .ctrl {
-    font-size: 0.85rem;
-    padding: 0.4rem 0.4rem;
+  /* Home hangs on Android's 28dp lane: the sheet's own padding comes off,
+     so the search field and the chapter rows start where the masthead does. */
+  .sheet[data-name='home'] .scroll {
+    padding-inline: 0;
   }
 
-  .surah-row {
-    grid-template-columns: 2rem minmax(0, 1fr) auto;
-    gap: 0.55rem 0.65rem;
-  }
-
-  .surah-ar {
-    font-size: 1.15rem;
-  }
-
-  .home-header h1 {
-    font-size: 1.65rem;
+  .home-scroll-page > .search-row {
+    padding-inline: var(--home-start-inset) var(--home-end-inset);
   }
 
   .reader-top-title {

@@ -1468,11 +1468,15 @@ export function ReaderScreen({ stackLayer }: { stackLayer: StackLayer }) {
                   ayahCount={content.surah.ayahCount}
                   themeMode={state.settings.themeMode}
                 />
-                <h2>{content.surah.nameTransliteration}</h2>
-                <p className="ar-title">{content.surah.nameArabic}</p>
+                <p className="ar-title" lang="ar">سُورَةُ {content.surah.nameArabic}</p>
+                <h2>
+                  {content.surah.nameTransliteration} · {content.surah.nameTranslation}
+                </h2>
                 <p className="sub">
-                  {content.surah.nameTranslation} · {content.surah.ayahCount} ayahs ·{' '}
-                  {content.surah.revelationPlace}
+                  Chapter {content.surah.id} ·{' '}
+                  {content.surah.revelationPlace.charAt(0).toUpperCase() +
+                    content.surah.revelationPlace.slice(1)}{' '}
+                  · {content.surah.ayahCount} ayahs
                 </p>
               </header>
               {showBasmalah ? (
