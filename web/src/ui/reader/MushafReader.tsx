@@ -21,8 +21,11 @@ import {
 import { formatAyahNumberMark, pageFolioLayout } from '../../util/digits'
 import type { PageNumberScript } from '../../data/settings'
 import { appStore } from '../../store/appStore'
-import { useBookSpread, useVersoLeafSlot } from '../paper/bookSpread'
+import { useBookSpread, useTurningLeafSlot, useVersoLeafSlot } from '../paper/bookSpread'
 import { COVER_LAYER, READER_LAYER } from '../paper/stack'
+
+/** Keep in step with `mushaf-leaf-turn` in styles.css. */
+const PAGE_TURN_MS = 760
 
 /** Playback highlight when it exists; otherwise the ayah the sheet was opened on. */
 function followedAyah(activeAyah: number | null, openAyah: number): number {
@@ -72,6 +75,7 @@ export function MushafReader({
   const [ready, setReady] = useState(() => runtimeMushafCache?.layoutReady() ?? false)
   const spread = useBookSpread()
   const versoSlot = useVersoLeafSlot()
+  const turnSlot = useTurningLeafSlot()
   // Two facing leaves on a desktop spread; one leaf everywhere else.
   const facing = spread && versoSlot != null
   const rectoRef = useRef<HTMLDivElement>(null)
@@ -144,6 +148,31 @@ export function MushafReader({
     return () => window.removeEventListener('keydown', onKey)
   })
 
+  // Where the book lies open, and where it lay before the leaf in the air
+  // began to move. They differ only while a turn is running.
+  const place = facing ? mushafFacingPages(page).right : page
+  const [settled, setSettled] = useState(place)
+  // Neither the page map arriving nor a resize between one leaf and two is
+  // a page turn: the book is simply found open there.
+  const footing = `${ready}:${facing}`
+  const [settledFooting, setSettledFooting] = useState(footing)
+  if (settledFooting !== footing) {
+    setSettledFooting(footing)
+    setSettled(place)
+  }
+  const turning = settled !== place && settledFooting === footing
+  const forward = place > settled
+  useEffect(() => {
+    if (!turning) return
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      setSettled(place)
+      return
+    }
+    // A hidden tab never fires animationend; do not leave a leaf in the air.
+    const timer = window.setTimeout(() => setSettled(place), PAGE_TURN_MS + 250)
+    return () => window.clearTimeout(timer)
+  }, [turning, place])
+
   if (!ready || !runtimeMushafCache) {
     return (
       <div className="mushaf-wait">
@@ -162,19 +191,53 @@ export function MushafReader({
     onTurn: turn,
     onFit: reportFit,
   }
-  if (!facing) return <MushafLeaf page={page} fit={fits.recto} {...leafProps} />
+  // The leaf in the air is a picture of a page, not a second control.
+  const airProps = { ...leafProps, onFit: noFit }
+  const flipKey = `${settled}:${place}`
+  const endTurn = () => setSettled(place)
+
+  if (!facing) {
+    // One leaf, bound at its right edge. Going on, the old leaf lifts away
+    // to the right over the new one; going back, the earlier leaf comes
+    // down from the right onto the one being left.
+    const under = turning ? Math.max(settled, place) : place
+    const inAir = Math.min(settled, place)
+    return (
+      <>
+        <MushafLeaf page={under} fit={fits.recto} {...leafProps} />
+        {turning ? (
+          <div className="mushaf-flip mushaf-flip--single" key={flipKey}>
+            <div
+              className="mushaf-flip-leaf"
+              data-dir={forward ? 'on' : 'back'}
+              onAnimationEnd={endTurn}
+            >
+              <div className="mushaf-flip-face">
+                <MushafLeaf page={inAir} fit={fits.recto} {...airProps} />
+              </div>
+            </div>
+          </div>
+        ) : null}
+      </>
+    )
+  }
 
   const fit = Math.min(fits.recto, fits.verso)
-
-  const pair = mushafFacingPages(page)
+  const now = mushafFacingPages(place)
+  const was = mushafFacingPages(settled)
+  // The leaf between the two spreads carries the old spread's inner page on
+  // its face and the new spread's on its back. What it uncovers is already
+  // the new page; what it has yet to cover is still the old one.
+  const rectoPage = turning && forward ? was.right : now.right
+  const versoPage = turning && !forward ? was.left : now.left
   return (
     <>
-      <MushafLeaf page={pair.right} side="recto" fit={fit} leafRef={rectoRef} {...leafProps} />
+      <MushafLeaf page={rectoPage} side="recto" fit={fit} leafRef={rectoRef} {...leafProps} />
       <button
         type="button"
         className="mushaf-turn mushaf-turn--back"
         aria-label="Previous pages"
-        disabled={pair.right <= 1}
+        disabled={now.right <= 1}
         onClick={() => turn(-1)}
       >
         <span aria-hidden="true">›</span>
@@ -182,12 +245,12 @@ export function MushafReader({
       {versoSlot
         ? createPortal(
             <>
-              <MushafLeaf page={pair.left} side="verso" fit={fit} style={versoBox} {...leafProps} />
+              <MushafLeaf page={versoPage} side="verso" fit={fit} style={versoBox} {...leafProps} />
               <button
                 type="button"
                 className="mushaf-turn mushaf-turn--forward"
                 aria-label="Next pages"
-                disabled={pair.left >= MUSHAF_PAGE_COUNT}
+                disabled={now.left >= MUSHAF_PAGE_COUNT}
                 onClick={() => turn(1)}
               >
                 <span aria-hidden="true">‹</span>
@@ -196,9 +259,42 @@ export function MushafReader({
             versoSlot,
           )
         : null}
+      {turning && turnSlot
+        ? createPortal(
+            <div className="mushaf-flip" key={flipKey}>
+              <div
+                className="mushaf-flip-leaf"
+                data-dir={forward ? 'on' : 'back'}
+                onAnimationEnd={endTurn}
+              >
+                <div className="mushaf-flip-face">
+                  <MushafLeaf
+                    page={forward ? was.left : was.right}
+                    side={forward ? 'verso' : 'recto'}
+                    fit={fit}
+                    style={versoBox}
+                    {...airProps}
+                  />
+                </div>
+                <div className="mushaf-flip-face mushaf-flip-face--back">
+                  <MushafLeaf
+                    page={forward ? now.right : now.left}
+                    side={forward ? 'recto' : 'verso'}
+                    fit={fit}
+                    style={versoBox}
+                    {...airProps}
+                  />
+                </div>
+              </div>
+            </div>,
+            turnSlot,
+          )
+        : null}
     </>
   )
 }
+
+function noFit() {}
 
 /** One printed page: running head, fifteen lines (or its translation), folio. */
 function MushafLeaf({

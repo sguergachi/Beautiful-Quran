@@ -5,6 +5,7 @@
  * the book is ready.
  */
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { BOOK_SPREAD_QUERY } from '../paper/bookSpread'
 import { animate, type AnimationPlaybackControls } from 'motion'
 import { washMaskImage } from '../theme/Fade'
 import { coverLayout, coverLayoutCssVars } from './coverLayout'
@@ -25,6 +26,8 @@ const ARRIVAL_HOLD_MS = 300
 const DUA_WASH_MS = 2_400
 const DUA_HOLD_MS = 900
 const OPEN_MS = 1_150
+/** Desktop spread: slide onto the recto, then swing the board right over. */
+const BOOK_OPEN_MS = 1_700
 
 type Phase = 'loading' | 'arriving' | 'dua' | 'opening'
 
@@ -298,7 +301,9 @@ export function EntranceCover({
       setOpening(true)
       const openMs = window.matchMedia('(prefers-reduced-motion: reduce)').matches
         ? 0
-        : OPEN_MS
+        : window.matchMedia(BOOK_SPREAD_QUERY).matches
+          ? BOOK_OPEN_MS
+          : OPEN_MS
       try {
         await wait(openMs, openAc.signal)
       } catch {
@@ -356,6 +361,9 @@ export function EntranceCover({
               : 'The Noble Quran — touch to open'
         }
       >
+        {/* The board's outside. Its own layer, so the inside can face the
+            other way when the desktop book swings the cover fully open. */}
+        <div className="entrance-front">
         <div className="entrance-leather" aria-hidden="true" />
         <div
           className={`entrance-weave${built ? ' entrance-weave--on' : ''}`}
@@ -419,6 +427,12 @@ export function EntranceCover({
             </div>
           )}
           <div className="entrance-air entrance-air--bot" />
+        </div>
+        </div>
+        {/* The board's inside: lining and the first blank leaf pasted to it.
+            It lands exactly where the spread's left half then stands. */}
+        <div className="entrance-inside" aria-hidden="true">
+          <div className="entrance-inside-page" />
         </div>
       </div>
     </div>

@@ -34,6 +34,19 @@ strip of either fore-edge whose mark shows only under a pointer; pages run
 right to left, so the left edge is the way on. Chapters is then laid over the
 left leaf on demand, as Settings is, and touching the open page puts it away.
 
+**The book behaves as paper does.** A page turn is a leaf in the air: it
+lifts off one page, swings over its bound edge and lies down on the other,
+carrying the old spread's inner page on its face and the new one's on its
+back. What it uncovers is already the new page. A single leaf (phones) is
+bound at its right edge and lifts to edge-on. The cover opens the same way:
+the closed book slides onto the right-hand page block and the board swings
+right over the spine to lie open on the left, its inside becoming the left
+half of the spread — nothing fades. The leaf and the board carry their own
+shading as they stand up out of the light; nothing casts a shadow on the page
+beneath. In the Paper theme the whole sheet carries a faint grain — tooth and
+a few fibres at a few percent — because that theme alone is literally paper.
+Reduced motion skips every turn.
+
 This bends two rules, narrowly. *One sheet at a time* becomes two, because
 they are the two a reader moves between constantly and neither is read in
 sequence with the other — the rule against inventing desktop columns for

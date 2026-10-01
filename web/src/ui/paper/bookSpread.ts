@@ -42,26 +42,33 @@ export function spreadLayers(
   }
 }
 
-/**
- * Where the reader hangs the facing (left) leaf. The element lives under
- * the verso sheets in `BookSpread`; the reader owns what is drawn in it.
- */
-let versoLeafSlot: HTMLElement | null = null
-const slotListeners = new Set<() => void>()
-
-export function setVersoLeafSlot(el: HTMLElement | null) {
-  if (versoLeafSlot === el) return
-  versoLeafSlot = el
-  for (const listener of slotListeners) listener()
+/** A DOM node `BookSpread` owns and the reader draws into through a portal. */
+function createSlot() {
+  let node: HTMLElement | null = null
+  const listeners = new Set<() => void>()
+  const set = (el: HTMLElement | null) => {
+    if (node === el) return
+    node = el
+    for (const listener of listeners) listener()
+  }
+  const use = (): HTMLElement | null =>
+    useSyncExternalStore(
+      (onChange) => {
+        listeners.add(onChange)
+        return () => listeners.delete(onChange)
+      },
+      () => node,
+      () => null,
+    )
+  return { set, use }
 }
 
-export function useVersoLeafSlot(): HTMLElement | null {
-  return useSyncExternalStore(
-    (onChange) => {
-      slotListeners.add(onChange)
-      return () => slotListeners.delete(onChange)
-    },
-    () => versoLeafSlot,
-    () => null,
-  )
-}
+/** The facing (left) leaf, under the verso sheets. */
+const versoLeaf = createSlot()
+export const setVersoLeafSlot = versoLeaf.set
+export const useVersoLeafSlot = versoLeaf.use
+
+/** The leaf in the air during a page turn: across both pages, over the sheets. */
+const turningLeaf = createSlot()
+export const setTurningLeafSlot = turningLeaf.set
+export const useTurningLeafSlot = turningLeaf.use
