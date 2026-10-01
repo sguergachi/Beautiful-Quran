@@ -247,14 +247,15 @@ describe('ornamentGenerator', () => {
       const f = generateCoverOrnament(seed * 104729 + 13).field
       const outline = f.strokes[0]!.points.length === 16
       expect(f.strokes.map((s) => s.points.length)).toEqual(
-        outline ? (f.strokes.length === 3 ? [16, 4, 4] : [16, 4]) : [4, 4, 4],
+        outline ? (f.strokes.length === 4 ? [16, 4, 161, 4] : [16, 4, 161]) :
+          (f.strokes.length === 5 ? [4, 4, 4, 161, 4] : [4, 4, 4, 161]),
       )
       const length = f.strokes.reduce((sum, s) => sum + s.points.reduce((sum, p, i) => {
         const q = s.points[(i + 1) % s.points.length]!
         return sum + Math.hypot(p.x - q.x, p.y - q.y)
       }, 0), 0)
-      expect(length / f.cellWidthDp).toBeGreaterThanOrEqual(4.5 / 80 - 1e-9)
-      expect(length / f.cellWidthDp).toBeLessThanOrEqual(4.5 / 64 + 1e-9)
+      expect(length / f.cellWidthDp).toBeGreaterThanOrEqual(6.5 / 80 - 1e-9)
+      expect(length / f.cellWidthDp).toBeLessThanOrEqual(6.5 / 64 + 1e-9)
       const pts = f.strokes.flatMap((s) => s.points)
       const matches = (x: number, y: number) => pts.some((p) =>
         Math.abs(p.x - x - Math.round(p.x - x)) < 1e-9 &&
@@ -265,6 +266,15 @@ describe('ornamentGenerator', () => {
       }
       for (const [x, y] of [[0.5, 0], [0, 0.5], [1, 0.5], [0.5, 1]]) {
         expect(matches(x!, y!), `seed ${seed}: edge contact`).toBe(true)
+      }
+      const flower = f.strokes[outline ? 2 : 3]!
+      const radii = flower.points.map((p) => Math.hypot(p.x - 0.5, p.y - 0.5))
+      const compartment = outline ? 0.5 / Math.sqrt(2) : 0.25
+      expect(compartment - Math.max(...radii), `seed ${seed}: flower grazes lattice`).toBeGreaterThanOrEqual(0.035 - 1e-9)
+      if (f.strokes.length === (outline ? 4 : 5)) {
+        const heart = f.strokes[f.strokes.length - 1]!
+        const heartRadius = Math.max(...heart.points.map((p) => Math.hypot(p.x - 0.5, p.y - 0.5)))
+        expect(Math.min(...radii) - heartRadius, `seed ${seed}: heart grazes petals`).toBeGreaterThan(0.035)
       }
       const knot = f.strokes[outline ? 1 : 2]!
       const tips = f.strokes.slice(0, outline ? 1 : 2).flatMap((s) => s.points)
@@ -277,11 +287,12 @@ describe('ornamentGenerator', () => {
     }
   })
 
-  it('field known answers match Android for all three recipes', () => {
+  it('field known answers match Android including the reported bare-grid seed', () => {
     for (const [seed, signature, width] of [
-      [1, [4, 4, 4], 98.15283630134532],
-      [8, [16, 4], 75.79477456023277],
-      [21, [16, 4, 4], 78.9859811710065],
+      [1, [4, 4, 4, 161, 4], 89.20289961546513],
+      [8, [16, 4, 161], 81.61275582570407],
+      [21, [16, 4, 161, 4], 79.50955432269119],
+      [132614421, [4, 4, 4, 161, 4], 96.12998267816585],
     ] as const) {
       const f = generateCoverOrnament(seed).field
       expect(f.strokes.map((s) => s.points.length)).toEqual(signature)

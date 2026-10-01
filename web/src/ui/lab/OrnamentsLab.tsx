@@ -60,7 +60,7 @@ interface CoverTraits {
 function coverTraits(o: CoverOrnament): CoverTraits {
   const f = o.field
   const outline = f.strokes[0]!.points.length === 16
-  const base = outline ? 2 : 3
+  const base = outline ? 3 : 4
   return {
     medallionFold: o.medallion.fold,
     sealFold: o.cornerSeal.fold,
@@ -190,10 +190,6 @@ export function OrnamentsLab() {
   )
 
   const findSeed = useCallback(() => {
-    if (fStar === 'khatam' && fCentre === 'yes') {
-      setSearchNote('Centre details belong to the outline star — choose outline or no centre')
-      return
-    }
     setSearchNote('Searching…')
     // Scan deterministically from a random offset so repeated searches with
     // the same filters surface different matches.

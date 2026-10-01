@@ -23,7 +23,7 @@ data class OrnamentTraits(
 private fun decodeTraits(o: CoverOrnament): OrnamentTraits {
     val f = o.field
     val outline = f.strokes[0].points.size == 16
-    val base = if (outline) 2 else 3
+    val base = if (outline) 3 else 4
     return OrnamentTraits(
         medallionFold = o.medallion.fold,
         sealFold = o.cornerSeal.fold,
@@ -86,10 +86,6 @@ class OrnamentsLabViewModel(private val store: OrnamentSeedStore) : ViewModel() 
      * repeated searches with the same filters turn up different seeds.
      */
     fun findSeed(fold: Int?, star: String?, centre: Boolean?) {
-        if (star == "khatam" && centre == true) {
-            _ui.value = _ui.value.copy(searchNote = "Centre details belong to the outline star — choose outline or no centre")
-            return
-        }
         val start = Random.nextInt()
         for (i in 0 until MAX_SEARCH_TRIES) {
             val candidate = start + i

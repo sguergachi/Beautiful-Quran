@@ -268,8 +268,8 @@ class OrnamentGeneratorTest {
             val f = generateCoverOrnament(seed * 104729 + 13).field
             val outline = f.strokes[0].points.size == 16
             val expected = if (outline) {
-                if (f.strokes.size == 3) listOf(16, 4, 4) else listOf(16, 4)
-            } else listOf(4, 4, 4)
+                if (f.strokes.size == 4) listOf(16, 4, 161, 4) else listOf(16, 4, 161)
+            } else if (f.strokes.size == 5) listOf(4, 4, 4, 161, 4) else listOf(4, 4, 4, 161)
             assertEquals(expected, f.strokes.map { it.points.size })
             val length = f.strokes.sumOf { s ->
                 s.points.indices.sumOf { i ->
@@ -278,8 +278,8 @@ class OrnamentGeneratorTest {
                     hypot(p.x - q.x, p.y - q.y)
                 }
             }
-            assertTrue(length / f.cellWidthDp >= 4.5 / 80 - 1e-9)
-            assertTrue(length / f.cellWidthDp <= 4.5 / 64 + 1e-9)
+            assertTrue(length / f.cellWidthDp >= 6.5 / 80 - 1e-9)
+            assertTrue(length / f.cellWidthDp <= 6.5 / 64 + 1e-9)
             val pts = f.strokes.flatMap { it.points }
             fun matches(points: List<OrnamentPoint>, x: Double, y: Double) = points.any { p ->
                 abs(p.x - x - kotlin.math.round(p.x - x)) < 1e-9 &&
@@ -288,6 +288,14 @@ class OrnamentGeneratorTest {
             for (p in pts) {
                 assertTrue("seed $seed: quarter-turn symmetry", matches(pts, 1 - p.y, p.x))
                 assertTrue("seed $seed: reflection symmetry", matches(pts, 1 - p.x, p.y))
+            }
+            val flower = f.strokes[if (outline) 2 else 3]
+            val radii = flower.points.map { hypot(it.x - 0.5, it.y - 0.5) }
+            val compartment = if (outline) 0.5 / kotlin.math.sqrt(2.0) else 0.25
+            assertTrue("seed $seed: flower grazes lattice", compartment - radii.max() >= 0.035 - 1e-9)
+            if (f.strokes.size == if (outline) 4 else 5) {
+                val heartRadius = f.strokes.last().points.maxOf { hypot(it.x - 0.5, it.y - 0.5) }
+                assertTrue("seed $seed: heart grazes petals", radii.min() - heartRadius > 0.035)
             }
             val knot = f.strokes[if (outline) 1 else 2]
             val tips = f.strokes.take(if (outline) 1 else 2).flatMap { it.points }
@@ -298,10 +306,10 @@ class OrnamentGeneratorTest {
     }
 
     @Test
-    fun `field known answers match web for all three recipes`() {
-        val seeds = listOf(1, 8, 21)
-        val signatures = listOf(listOf(4, 4, 4), listOf(16, 4), listOf(16, 4, 4))
-        val widths = listOf(98.15283630134532, 75.79477456023277, 78.9859811710065)
+    fun `field known answers match web including the reported bare-grid seed`() {
+        val seeds = listOf(1, 8, 21, 132614421)
+        val signatures = listOf(listOf(4, 4, 4, 161, 4), listOf(16, 4, 161), listOf(16, 4, 161, 4), listOf(4, 4, 4, 161, 4))
+        val widths = listOf(89.20289961546513, 81.61275582570407, 79.50955432269119, 96.12998267816585)
         seeds.forEachIndexed { i, seed ->
             val f = generateCoverOrnament(seed).field
             assertEquals(signatures[i], f.strokes.map { it.points.size })

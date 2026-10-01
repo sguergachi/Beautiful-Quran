@@ -995,8 +995,8 @@ image, so it is crisp at any density and nearly free to render.
   ({10/4} → two {5/2} pentacles stacked), 6-fold seals, and 6-fold field
   tilings are all excluded by construction and guarded by tests on both
   platforms.
-- **Field harmony.** The ground uses three constrained star-and-cross recipes:
-  open khatam outline, outline with a small centre, or two-square khatam.
+- **Field harmony.** The ground pairs either a khatam outline or a two-square
+  khatam lattice with an eight-petal ogee rosette and an optional diamond heart.
   Square corner knots meet the diagonal tips without added crossings;
   richer recipes get larger repeats according to their total line length.
   Construction, research and testable rules: [ORNAMENT_FIELDS.md](ORNAMENT_FIELDS.md).

@@ -795,21 +795,23 @@ private fun centreMark(cx: Double, cy: Double, h: Double): OrnamentStroke =
     )
 
 /**
- * Compose a quiet field: an open star, an enriched open star, or a woven
- * khatam. Only the open silhouette gets a centre; square knots touch the
- * diagonal tips without crossing the stars. Spacing follows total line
- * length, so richer motifs cannot make a darker, busier ground.
+ * Compose a lattice of eight-petal rosettes: a readable geometric scaffold,
+ * an ogee corolla inside its clear central compartment, and an optional
+ * small heart. Curves enrich every repeat without crossing the lattice.
+ * Spacing follows total line length, keeping the enriched ground balanced.
  * See docs/ORNAMENT_FIELDS.md for the construction and design rules.
  */
 private fun generateField(rng: Mulberry32): FieldSpec {
     val outlined = rng.chance(0.7)
     val withCentre = rng.chance(0.4)
-    val centreRadius = rng.range(0.07, 0.10)
+    val petalDepth = rng.range(0.54, 0.66)
     val spacing = rng.range(64.0, 80.0)
 
     val strokes = (if (outlined) listOf(outlinedStar(0.5, 0.5)) else khatamStar(0.5, 0.5)).toMutableList()
     strokes.add(squareKnot(0.0, 0.0))
-    if (outlined && withCentre) strokes.add(centreMark(0.5, 0.5, centreRadius))
+    val flowerRadius = if (outlined) 0.29 else 0.215
+    strokes.add(corollaStroke(8, flowerRadius * petalDepth, flowerRadius, 0.0, StrokeWeight.Hairline))
+    if (withCentre) strokes.add(centreMark(0.5, 0.5, flowerRadius * 0.18))
 
     val lineLength = strokes.sumOf { s ->
         s.points.indices.sumOf { i ->
@@ -818,7 +820,7 @@ private fun generateField(rng: Mulberry32): FieldSpec {
             kotlin.math.hypot(p.x - q.x, p.y - q.y)
         }
     }
-    val cellWidthDp = spacing * lineLength / 4.5
+    val cellWidthDp = spacing * lineLength / 6.5
     return FieldSpec(1.0, 1.0, cellWidthDp, strokes)
 }
 
