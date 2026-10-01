@@ -213,6 +213,15 @@ export function EntranceCover({
     }
   }, [])
 
+  // The desktop spread stays shut under the board until the hinge moves.
+  useEffect(() => {
+    if (!opening) return
+    document.documentElement.dataset.entranceOpening = 'true'
+    return () => {
+      document.documentElement.removeAttribute('data-entrance-opening')
+    }
+  }, [opening])
+
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {

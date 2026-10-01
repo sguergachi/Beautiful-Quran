@@ -9,6 +9,8 @@ import { EntranceCover } from './entrance/EntranceCover'
 import { BOOKMARKS_LAYER, COVER_LAYER } from './paper/stack'
 import { OrnamentsLab } from './lab/OrnamentsLab'
 import { syncSheetMotion } from './paper/sheetMotion'
+import { spreadLayers, useBookSpread } from './paper/bookSpread'
+import { BookSpread } from './paper/BookSpread'
 
 /** True while the URL hash routes to the Ornaments Lab (`#lab`). */
 function useLabRoute(): boolean {
@@ -70,6 +72,8 @@ export function App() {
   const swipeStart = useRef<{ x: number; y: number; pointerId: number } | null>(null)
   const stack = state.stackLayer
   const hasReader = hasReaderOpen(state.content, state.sheet)
+  const spread = useBookSpread()
+  const pageLayers = spreadLayers(spread, stack, state.content != null)
 
   useEffect(() => {
     void appStore.init()
@@ -103,6 +107,18 @@ export function App() {
       openSurahId: state.content?.surah.id ?? 0,
     })
   }, [hasReader, stack, state.content?.surah.id])
+
+  // In a spread the chapter list stays on screen, so the row that opened a
+  // chapter would keep keyboard focus and swallow the reader's keys (Space,
+  // arrows). Opening hands the keyboard to the page being read.
+  const openSurahId = state.content?.surah.id
+  useEffect(() => {
+    if (!spread || openSurahId == null) return
+    const focused = document.activeElement
+    if (focused instanceof HTMLElement && focused.classList.contains('surah-row')) {
+      focused.blur()
+    }
+  }, [spread, openSurahId])
 
   // Escape peels one sheet back through the paper stack (cover handles its own).
   useEffect(() => {
@@ -148,6 +164,7 @@ export function App() {
       className="app-shell"
       data-stack={stack}
       data-has-reader={hasReader}
+      data-spread={spread ? 'true' : undefined}
       data-booting={showStack ? undefined : 'true'}
       onPointerDown={beginBookmarkSwipe}
       onPointerUp={finishBookmarkSwipe}
@@ -155,14 +172,15 @@ export function App() {
     >
       {showStack && (
         <>
+          {spread ? <BookSpread titlePage={state.content == null} /> : null}
           <BookmarksScreen stackLayer={stack} />
-          <HomeScreen stackLayer={stack} />
+          <HomeScreen stackLayer={pageLayers.home} />
           {/* Chapter boundaries get fresh focus/rail geometry. Carrying the
               previous chapter's dial state into the first peel frame makes
               the rail visibly jump before the initial focus settles. */}
           <ReaderScreen
             key={state.content?.surah.id ?? 'empty-reader'}
-            stackLayer={stack}
+            stackLayer={pageLayers.reader}
           />
           <SettingsScreen stackLayer={stack} hasReader={hasReader} />
         </>
