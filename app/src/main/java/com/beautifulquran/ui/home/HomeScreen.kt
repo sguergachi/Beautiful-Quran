@@ -19,11 +19,14 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.calculateEndPadding
+import androidx.compose.foundation.layout.calculateStartPadding
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.ime
+import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.padding
@@ -39,6 +42,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
@@ -58,6 +62,7 @@ import androidx.compose.ui.layout.boundsInWindow
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -131,6 +136,15 @@ fun HomeScreen(
     bookmarkCount: Int = 0,
     bookmarkStyle: HomeBookmarkStyle = HomeBookmarkStyle.TOP_BOUND,
     onOpenBookmarks: () -> Unit = {},
+    /**
+     * The chapter bar is pinned above the paper stack, so this sheet does
+     * not draw a second transport. [pinnedPlaybackHeight] is that bar's
+     * body, already above the navigation inset. Read it here, not in the
+     * activity, so the pill's expansion does not recompose the reader.
+     */
+    playbackPinned: Boolean = false,
+    pinnedPlaybackHeight: () -> Dp = { 0.dp },
+    playbackHost: com.beautifulquran.ui.reader.PinnedPlaybackHost? = null,
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val focusManager = LocalFocusManager.current
@@ -174,7 +188,37 @@ fun HomeScreen(
         coverSheetVisible = coverSheetVisible,
         searchActive = searchActive,
     )
-    val listBottomInset = if (showFloatingPlayback) floatingPlaybackHeight else 0.dp
+    // The list reaches the screen edge. A visible bar clears its own paper.
+    // With no bar, the last row still sits above the gesture inset.
+    val navigationBottom = with(density) {
+        WindowInsets.navigationBars.getBottom(density).toDp()
+    }
+    val listBottomInset = when {
+        playbackPinned -> {
+            val measured = pinnedPlaybackHeight()
+            measured.takeIf { it > 0.dp } ?: FloatingPlaybackListClearance
+        }
+        showFloatingPlayback -> floatingPlaybackHeight
+        else -> navigationBottom
+    }
+    val host = playbackHost
+    if (host != null) {
+        val session = floatingPlayback != null && !searchActive
+        if (host.coverSession != session) host.coverSession = session
+        if (host.chapterLabel != floatingPlayback?.surah?.nameTransliteration.orEmpty()) {
+            host.chapterLabel = floatingPlayback?.surah?.nameTransliteration.orEmpty()
+        }
+        val ayah = floatingPlayback?.let { "${it.surah.id}:${it.ayah}" }.orEmpty()
+        if (host.ayahLabel != ayah) host.ayahLabel = ayah
+        SideEffect {
+            host.onOpenNowPlaying = open@{
+                val target = floatingPlayback ?: return@open
+                focusManager.clearFocus()
+                onOpenSurah(target.surah.id, target.ayah, null, null)
+            }
+            host.onClose = viewModel::dismissFloatingPlayback
+        }
+    }
     val listBottomPadding = listFadeBottom + listBottomInset
     val showSurahMatches = searching && uiState.surahs.isNotEmpty()
     val showWordSections = searching &&
@@ -227,10 +271,17 @@ fun HomeScreen(
 
     BackHandler(enabled = searchFocused) { focusManager.clearFocus() }
 
+    val layoutDirection = LocalLayoutDirection.current
     Scaffold(containerColor = MaterialTheme.colorScheme.background) { padding ->
         Box(
             Modifier
-                .padding(padding)
+                // Bottom stays open so the playback bar can meet the screen edge.
+                // The list pads itself for the bar, or for the gesture inset.
+                .padding(
+                    start = padding.calculateStartPadding(layoutDirection),
+                    top = padding.calculateTopPadding(),
+                    end = padding.calculateEndPadding(layoutDirection),
+                )
                 .fillMaxSize()
                 .pointerInput(searchFocused, searchPaneVisible, searchBounds, searchPaneBounds) {
                     // Empty-query dials only: an outside tap dismisses without
@@ -477,10 +528,10 @@ fun HomeScreen(
                     .onGloballyPositioned { searchPaneBounds = it.boundsInRoot() },
             )
 
-            // Floating transport — same bottom inset as the reader's floating
-            // Back-to / return-to-ayah controls so the paper stack keeps one
-            // vertical rhythm. Embedded PlayerBar takes over on the reader.
-            FloatingPlaybackControl(
+            // While the reader sheet is open the chapter bar is pinned above
+            // the stack and carries this pill itself. This copy is only for
+            // a session whose reader sheet is not mounted.
+            if (!playbackPinned) FloatingPlaybackControl(
                 visible = showFloatingPlayback,
                 state = uiState.playerState,
                 chapterLabel = floatingPlayback?.surah?.nameTransliteration.orEmpty(),

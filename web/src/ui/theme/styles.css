@@ -338,6 +338,30 @@ select {
   --sheet-half: 28rem;
 }
 
+/* Phone scroll chapter: the bar is portaled here so a sheet transform
+   cannot carry it. Pointers pass through the host; the bar opts back in. */
+#playback-pin {
+  position: absolute;
+  inset: 0;
+  z-index: 8;
+  pointer-events: none;
+}
+
+#playback-pin :is(.player-bar, .floating-play) {
+  pointer-events: auto;
+}
+
+.app-shell[data-playback-pinned='true'] .sheet :is(.player-bar, .floating-play) {
+  visibility: hidden;
+  pointer-events: none;
+}
+
+/* Cover search is local to the chapter list. Hide the pinned bar with it. */
+.app-shell[data-stack='0'][data-cover-search='true'] #playback-pin .player-bar {
+  visibility: hidden;
+  pointer-events: none;
+}
+
 .sheet {
   position: absolute;
   top: 0;
@@ -601,7 +625,7 @@ select {
   overscroll-behavior: contain;
   -webkit-overflow-scrolling: touch;
   padding: var(--edge-fade, 0.5rem) var(--sheet-pad) 8rem;
-  padding-bottom: calc(8rem + env(safe-area-inset-bottom, 0px));
+  padding-bottom: calc(7.3rem + env(safe-area-inset-bottom, 0px));
   scrollbar-width: none;
   touch-action: pan-y;
 }
@@ -1448,7 +1472,7 @@ select {
 .ayah-rail {
   position: absolute;
   top: calc(max(0.65rem, env(safe-area-inset-top, 0px)) + 3rem);
-  bottom: calc(4.75rem + env(safe-area-inset-bottom, 0px));
+  bottom: calc(4.05rem + env(safe-area-inset-bottom, 0px));
   width: 5.5rem;
   z-index: 6;
   transition: opacity var(--chrome-recede-ms) var(--recede-ease);
@@ -2784,8 +2808,9 @@ button.ayah-mark {
   left: 0;
   right: 0;
   bottom: 0;
-  /* Extra top pad so the soft dissolve sits above the reciter, not through it. */
-  padding: 1.1rem var(--sheet-pad) calc(0.95rem + env(safe-area-inset-bottom, 0px));
+  /* Extra top pad so the soft dissolve sits above the reciter, not through it.
+     The foot is 0.25rem, then the home gesture inset. Paper meets the edge. */
+  padding: 1.1rem var(--sheet-pad) calc(0.25rem + env(safe-area-inset-bottom, 0px));
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -2796,6 +2821,106 @@ button.ayah-mark {
   background: linear-gradient(to top, var(--paper) calc(100% - 0.85rem), transparent);
   /* Above the ayah rail so edge transport controls stay tappable. */
   z-index: 7;
+}
+
+.player-reciter-row {
+  position: relative;
+  display: flex;
+  justify-content: center;
+  width: 100%;
+}
+
+.player-bar .player-close {
+  position: absolute;
+  top: 50%;
+  /* The row sits inside the bar padding. Pull Close out to the paper's end. */
+  right: calc(0.25rem - var(--sheet-pad));
+  transform: translateY(-50%);
+  color: color-mix(in srgb, var(--ink) 45%, transparent);
+  min-width: 40px;
+  min-height: 40px;
+  padding: 0.45rem;
+}
+
+.player-bar .player-close svg {
+  width: 20px;
+  height: 20px;
+}
+
+.player-bar.cover-chrome .reciter-btn {
+  padding-inline: 3rem;
+}
+
+.player-bar.cover-chrome .player-close {
+  animation: cover-close-in 200ms ease;
+}
+
+.player-return {
+  display: inline-flex;
+  align-items: baseline;
+  justify-content: center;
+  max-width: calc(100% - 1rem);
+  margin-block: 0.25rem;
+  padding: 0.45rem 1.125rem;
+  border-radius: 999px;
+  background: var(--green-wash);
+  color: var(--accent);
+  font-family: var(--font-display);
+  font-size: 1rem;
+  font-weight: 500;
+  line-height: 1.35;
+  letter-spacing: 0.01em;
+  white-space: nowrap;
+}
+
+.player-bar.cover-chrome .player-return {
+  animation: cover-pill-in 240ms ease;
+}
+
+.player-return-chapter {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 12rem;
+}
+
+.player-return-sep {
+  color: var(--green-quiet);
+  flex-shrink: 0;
+}
+
+.player-return-ayah {
+  color: var(--green-ink);
+  flex-shrink: 0;
+}
+
+.player-return-arrow {
+  width: 18px;
+  height: 18px;
+  margin-inline-start: 0.5rem;
+  flex-shrink: 0;
+  align-self: center;
+}
+
+@keyframes cover-close-in {
+  from {
+    opacity: 0;
+    transform: translate(8px, -50%);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(-50%);
+  }
+}
+
+@keyframes cover-pill-in {
+  from {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
 }
 
 .player-bar .reciter-btn {
@@ -2937,7 +3062,7 @@ button.ayah-mark {
  * No border/chip chrome: the gilt corolla is drawn on the canvas. */
 .return-ayah {
   position: absolute;
-  bottom: calc(7.25rem + env(safe-area-inset-bottom, 0px));
+  bottom: calc(6.55rem + env(safe-area-inset-bottom, 0px));
   left: 50%;
   transform: translateX(-50%);
   z-index: 6;
@@ -5109,14 +5234,21 @@ button.ayah-mark {
 }
 
 .scroll-with-float {
-  padding-bottom: 6.5rem;
+  /* Bar is the top pad, the label, the 44px transport, the 0.25rem foot,
+     and the home gesture inset inside the paper. */
+  padding-bottom: calc(6rem + env(safe-area-inset-bottom, 0px));
+}
+
+.scroll-with-chapter {
+  /* Same chapter bar, plus the return pill between the reciter and the transport. */
+  padding-bottom: calc(9.6rem + env(safe-area-inset-bottom, 0px));
 }
 
 .floating-play {
   position: absolute;
   left: 0;
   right: 0;
-  bottom: calc(0.55rem + env(safe-area-inset-bottom, 0px));
+  bottom: 0;
   z-index: 8;
   display: flex;
   flex-direction: column;
@@ -5128,7 +5260,9 @@ button.ayah-mark {
      without consuming its transform, which remains available for entrance. */
   width: min(100%, var(--home-max));
   margin-inline: auto;
-  padding: 0.45rem var(--sheet-pad) 0.35rem;
+  /* 1.1rem matches .player-bar above the controls. The foot is 0.25rem,
+     then the home gesture inset, and the paper still meets the screen edge. */
+  padding: 1.1rem var(--sheet-pad) calc(0.25rem + env(safe-area-inset-bottom, 0px));
   background: var(--paper);
   animation: floating-play-in 280ms ease;
   color: var(--accent);
@@ -5162,8 +5296,7 @@ button.ayah-mark {
   justify-content: center;
   gap: 0;
   max-width: calc(100% - 2.5rem);
-  padding: 0.2rem 0.5rem;
-  min-height: 1.75rem;
+  padding: 0 0.5rem;
   color: color-mix(in srgb, var(--ink) 82%, transparent);
   font-family: var(--font-display);
   font-size: 1.05rem;
@@ -5196,7 +5329,7 @@ button.ayah-mark {
 
 .floating-play .float-transport button {
   color: var(--ink-muted);
-  padding: 0.55rem 0.75rem;
+  padding: 0 0.65rem;
   font-size: 1.05rem;
   white-space: nowrap;
   min-height: 44px;

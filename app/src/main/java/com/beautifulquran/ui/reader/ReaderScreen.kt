@@ -112,6 +112,7 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.TextMeasurer
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.Velocity
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
@@ -272,6 +273,27 @@ fun ReaderScreen(
     onShareCancel: () -> Unit = {},
     onShareText: () -> Unit = {},
     onShareImage: () -> Unit = {},
+    /**
+     * When set, the chapter bar is drawn above the paper stack instead of
+     * inside this sheet, so a page turn does not carry it off.
+     */
+    playbackHost: PinnedPlaybackHost? = null,
+    playbackPinned: Boolean = false,
+    /**
+     * Scroll's top-bar back arrow. False from the first pixel of a swipe
+     * until that sheet is parked again. This is a threshold boolean: read it
+     * in the top-bar slot, which drops the control, so a swipe does not
+     * recompose the chapter and the hidden control cannot be tapped.
+     * Mushaf ignores this. The play bar never uses it.
+     */
+    showScrollBackArrow: () -> Boolean = { true },
+    /**
+     * Full measured height of the pinned bar, including the navigation
+     * inset and the return pill while that pill is open. Read from the
+     * bottom bar only. The spacer uses this height as-is and must not add
+     * its own navigation padding.
+     */
+    playbackBarBodyHeight: () -> Dp = { ChapterPlaybackBodyHeight },
 ) {
     LaunchedEffect(surahId) { viewModel.load(surahId) }
     DisposableEffect(onAyahSelectorExpandedChange) {
@@ -1596,6 +1618,47 @@ fun ReaderScreen(
     } else {
         settings.ayahSelectorSide
     }
+    fun playFromBar() {
+        if (isThisSurahPlaying) {
+            if (playerState.isPlaying) {
+                viewModel.player.togglePlayPause()
+            } else {
+                dispatch(ReaderInteractionEvent.EnableFollow)
+                if (requestedJumpAyah > 0) {
+                    viewModel.playLoadedFromAyah(selectedPlaybackAyah())
+                } else {
+                    viewModel.player.togglePlayPause()
+                }
+            }
+        } else {
+            dispatch(ReaderInteractionEvent.EnableFollow)
+            viewModel.playFromAyah(selectedPlaybackAyah())
+        }
+    }
+    val host = playbackHost
+    if (host != null) {
+        val pinHere = playbackPinned && !mushafMode && !gathering
+        if (!pinHere) {
+            if (host.player != null) host.player = null
+        } else {
+            if (host.player != playerState) host.player = playerState
+            if (host.reciterName != uiState.currentReciter?.name.orEmpty()) {
+                host.reciterName = uiState.currentReciter?.name.orEmpty()
+            }
+            if (host.enabled != !contextualGuideOpen) host.enabled = !contextualGuideOpen
+            if (host.thisSurahLoaded != isThisSurahPlaying) host.thisSurahLoaded = isThisSurahPlaying
+            SideEffect {
+                // The float is read when the bar draws, not while this sheet composes.
+                host.chromeAlpha = { chromeAlpha.value }
+                host.onPlayPause = ::playFromBar
+                host.onFastBackward = viewModel::fastBackward
+                host.onFastForward = viewModel::fastForward
+                host.onRepeatClick = { showRepeatDialog = true }
+                host.onSpeed = viewModel::cycleSpeed
+                host.onReciterClick = onOpenSettings
+            }
+        }
+    }
     Box(Modifier.fillMaxSize()) {
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
@@ -1731,28 +1794,48 @@ fun ReaderScreen(
                     }
                 },
                 navigationIcon = {
+                    // The slot stays so the title does not jump. Scroll omits
+                    // the control while a swipe owns the sheet, so it cannot
+                    // be tapped or read out.
                     Row {
-                        IconButton(
-                            onClick = { if (search.active) search.close() else onBack() },
-                            enabled = search.active || !recitingActive,
-                            // Ink on the left text rule. Offset, not padding:
-                            // the title slot stays on the centre line.
-                            modifier = Modifier.offset(x = topBarStartShift),
-                        ) {
-                            Icon(
-                                imageVector = when {
-                                    search.active -> Icons.Rounded.Close
-                                    mushafMode -> Icons.AutoMirrored.Rounded.MenuBook
-                                    else -> Icons.AutoMirrored.Rounded.ArrowBack
-                                },
-                                contentDescription = when {
-                                    search.active -> "Close search"
-                                    mushafMode -> "Chapters"
-                                    else -> "Back"
-                                },
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant
-                                    .copy(alpha = 0.55f),
-                            )
+                        if (search.active || mushafMode) {
+                            IconButton(
+                                onClick = { if (search.active) search.close() else onBack() },
+                                enabled = search.active || !recitingActive,
+                                modifier = Modifier.offset(x = topBarStartShift),
+                            ) {
+                                Icon(
+                                    imageVector = if (search.active) {
+                                        Icons.Rounded.Close
+                                    } else {
+                                        Icons.AutoMirrored.Rounded.MenuBook
+                                    },
+                                    contentDescription = if (search.active) {
+                                        "Close search"
+                                    } else {
+                                        "Chapters"
+                                    },
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                                        .copy(alpha = 0.55f),
+                                )
+                            }
+                        } else if (showScrollBackArrow()) {
+                            IconButton(
+                                onClick = onBack,
+                                enabled = !recitingActive,
+                                // Ink on the left text rule. Offset, not padding:
+                                // the title slot stays on the centre line.
+                                modifier = Modifier.offset(x = topBarStartShift),
+                            ) {
+                                Icon(
+                                    imageVector = Icons.AutoMirrored.Rounded.ArrowBack,
+                                    contentDescription = "Back",
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                                        .copy(alpha = 0.55f),
+                                )
+                            }
+                        } else {
+                            Spacer(Modifier.size(48.dp).offset(x = topBarStartShift))
                         }
                         // Match the two trailing buttons so Material's title
                         // slot stays on the physical centre line at narrow widths.
@@ -1878,6 +1961,18 @@ fun ReaderScreen(
                         onShareText = onShareText,
                         onShareImage = onShareImage,
                     )
+                } else if (playbackPinned) {
+                    // The visible bar is pinned above the paper stack. Its
+                    // measured body includes the return pill, so the last
+                    // lines stay clear while that pill opens.
+                    val barBody = playbackBarBodyHeight()
+                    Spacer(
+                        Modifier
+                            .fillMaxWidth()
+                            .height(
+                                if (barBody > 0.dp) barBody else ChapterPlaybackBodyHeight,
+                            ),
+                    )
                 } else {
                     PlayerBar(
                         state = playerState,
@@ -1885,24 +1980,7 @@ fun ReaderScreen(
                         enabled = !contextualGuideOpen,
                         chromeAlpha = { chromeAlpha.value },
                         reciterName = uiState.currentReciter?.name.orEmpty(),
-                        onPlayPause = {
-                            if (isThisSurahPlaying) {
-                                if (playerState.isPlaying) {
-                                    viewModel.player.togglePlayPause()
-                                } else {
-                                    dispatch(ReaderInteractionEvent.EnableFollow)
-                                    if (requestedJumpAyah > 0) {
-                                        val selectedAyah = selectedPlaybackAyah()
-                                        viewModel.playLoadedFromAyah(selectedAyah)
-                                    } else {
-                                        viewModel.player.togglePlayPause()
-                                    }
-                                }
-                            } else {
-                                dispatch(ReaderInteractionEvent.EnableFollow)
-                                viewModel.playFromAyah(selectedPlaybackAyah())
-                            }
-                        },
+                        onPlayPause = ::playFromBar,
                         onFastBackward = viewModel::fastBackward,
                         onFastForward = viewModel::fastForward,
                         onRepeatClick = { showRepeatDialog = true },
