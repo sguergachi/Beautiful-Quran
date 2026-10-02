@@ -680,7 +680,7 @@ function generateField(rng: Mulberry32): FieldSpec {
   const inset = 0.042 + (choice - family) * 0.01
   const curl = rng.range(0.265, 0.285)
   const tip = rng.range(0.392, 0.410)
-  const spacing = rng.range(148, 168)
+  const spacing = rng.range(100, 116)
   const star = (radius: number, weight: StrokeWeight): OrnamentStroke => ({
     points: Array.from({ length: 16 }, (_, i) => polar(i * Math.PI / 8,
       radius * (i % 2 ? Math.cos(Math.PI / 4) / Math.cos(Math.PI / 8) : 1))),

@@ -278,8 +278,8 @@ describe('ornamentGenerator', () => {
         const length = p.slice(1).reduce((n, q, i) => n + Math.hypot(q.x - p[i]!.x, q.y - p[i]!.y), 0)
         return sum + length * (s.weight === 'rule' ? 1 : 0.55)
       }, 0)
-      expect(inkLength / f.cellWidthDp).toBeGreaterThanOrEqual(density / 168 - 1e-9)
-      expect(inkLength / f.cellWidthDp).toBeLessThanOrEqual(density / 148 + 1e-9)
+      expect(inkLength / f.cellWidthDp).toBeGreaterThanOrEqual(density / 116 - 1e-9)
+      expect(inkLength / f.cellWidthDp).toBeLessThanOrEqual(density / 100 + 1e-9)
       expect(pts.every((p) => p.x >= -1e-9 && p.x <= 1 + 1e-9 && p.y >= -1e-9 && p.y <= 1 + 1e-9)).toBe(true)
       const key = (x: number, y: number) => `${Math.round(x * 1e9)}/${Math.round(y * 1e9)}`
       const coordinates = new Set(pts.map((p) => key(p.x, p.y)))
@@ -316,10 +316,10 @@ describe('ornamentGenerator', () => {
     const lozenge = [4, 4, 16, ...Array.from({ length: 4 }, () => [31, 31, 21]).flat(),
       ...Array.from({ length: 4 }, () => [5, 21]).flat()]
     for (const [seed, pattern, signature, width] of [
-      [1, 'lozenge rosettes', lozenge, 146.9723347978903],
-      [8, 'star-and-cross', star, 154.83824103705285],
-      [21, 'octagonal garden', garden, 153.434968365201],
-      [132614421, 'lozenge rosettes', lozenge, 154.24336790663426],
+      [1, 'lozenge rosettes', lozenge, 99.41053498025346],
+      [8, 'star-and-cross', star, 106.39774871088862],
+      [21, 'octagonal garden', garden, 104.8016739340302],
+      [132614421, 'lozenge rosettes', lozenge, 105.19301250182379],
     ] as const) {
       const f = generateCoverOrnament(seed).field
       expect(f.pattern).toBe(pattern)

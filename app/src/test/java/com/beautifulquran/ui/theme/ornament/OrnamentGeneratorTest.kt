@@ -296,8 +296,8 @@ class OrnamentGeneratorTest {
                     .sumOf { (p, q) -> hypot(p.x - q.x, p.y - q.y) } *
                     if (s.weight == StrokeWeight.Rule) 1.0 else 0.55
             }
-            assertTrue(inkLength / f.cellWidthDp >= density / 168 - 1e-9)
-            assertTrue(inkLength / f.cellWidthDp <= density / 148 + 1e-9)
+            assertTrue(inkLength / f.cellWidthDp >= density / 116 - 1e-9)
+            assertTrue(inkLength / f.cellWidthDp <= density / 100 + 1e-9)
             assertTrue(pts.all { it.x in -1e-9..1 + 1e-9 && it.y in -1e-9..1 + 1e-9 })
             for (p in pts) {
                 assertTrue(pts.any { q -> hypot(q.x - (1 - p.y), q.y - p.x) < 1e-9 })
@@ -338,7 +338,7 @@ class OrnamentGeneratorTest {
             List(4) { listOf(5, 21) }.flatten()
         val signatures = listOf(lozenge, star, garden, lozenge)
         val patterns = listOf("lozenge rosettes", "star-and-cross", "octagonal garden", "lozenge rosettes")
-        val widths = listOf(146.9723347978903, 154.83824103705285, 153.434968365201, 154.24336790663426)
+        val widths = listOf(99.41053498025346, 106.39774871088862, 104.8016739340302, 105.19301250182379)
         seeds.forEachIndexed { i, seed ->
             val f = generateCoverOrnament(seed).field
             assertEquals(patterns[i], f.pattern)

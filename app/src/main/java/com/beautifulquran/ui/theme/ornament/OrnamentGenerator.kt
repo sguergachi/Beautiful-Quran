@@ -743,7 +743,7 @@ private fun generateField(rng: Mulberry32): FieldSpec {
     val inset = 0.042 + (choice - family) * 0.01
     val curl = rng.range(0.265, 0.285)
     val tip = rng.range(0.392, 0.410)
-    val spacing = rng.range(148.0, 168.0)
+    val spacing = rng.range(100.0, 116.0)
     fun star(radius: Double, weight: StrokeWeight) = OrnamentStroke(
         List(16) { i -> polar(i * PI / 8,
             radius * if (i % 2 == 1) cos(PI / 4) / cos(PI / 8) else 1.0) },

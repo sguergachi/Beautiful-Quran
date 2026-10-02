@@ -50,9 +50,11 @@ claim to reproduce a particular historical pattern.
    symmetry remain exact. There is no per-tile randomness.
 6. **Balance visible ink.** Sum closed and open path lengths, weighting rules
    by 1 and hairlines by 0.55. Set `cellWidthDp = spacing × inkLength / target`,
-   with spacing 148–168 dp and targets 11.5, 11 and 9 respectively for the
+   with spacing 100–116 dp and targets 11.5, 11 and 9 respectively for the
    three families. This keeps weighted line density bounded while
-   leaving the motifs large enough to read at phone scale. These dimensions
+   making the repeat about 31–32% smaller than the former 148–168 dp
+   spacing. More motifs fit across a phone-width field; the geometric frame
+   and filigree retain their original stroke weights. These dimensions
    are visually tuned, not historical measurements from the sources.
 7. **Keep page ornament subordinate.** The existing whisper ink, embossing
    and edge dissolves keep the field below the medallion and the words.
