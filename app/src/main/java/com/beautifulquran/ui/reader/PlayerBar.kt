@@ -4,6 +4,7 @@ import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -40,6 +41,7 @@ import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.media3.common.Player
@@ -53,6 +55,13 @@ private val ReciterChevronGap = 2.dp
 
 /** Chevron box. [DisclosureChevron] also asks for 20dp; the outer size here wins. */
 private val ReciterChevronSize = 16.dp
+
+/**
+ * Reciter row plus the transport, without the navigation inset.
+ * The live bar adds the phone's navigation inset under the 4 dp foot.
+ * The verse list clears the measured height, which includes that inset.
+ */
+internal val ChapterPlaybackBodyHeight = 108.dp
 
 /**
  * Flat playback controls that sit on the same sheet of paper as the text —
@@ -79,6 +88,22 @@ fun PlayerBar(
     onRepeatClick: () -> Unit,
     onSpeed: () -> Unit,
     onReciterClick: () -> Unit,
+    /**
+     * Cover controls in the reciter row, such as Close. The scrolling play
+     * bar never puts a back arrow here. The caller aligns them. The
+     * transport underneath does not move.
+     */
+    edgeChrome: @Composable BoxScope.() -> Unit = {},
+    /** Cover context between the reciter and the transport. */
+    belowReciter: @Composable () -> Unit = {},
+    /** Insets the name so [edgeChrome] does not paint through it. */
+    edgePad: Dp = 0.dp,
+    /**
+     * Puts the phone's navigation inset inside the paper, under the 4 dp
+     * foot, so the transport stays above the home gesture bar. The paper
+     * still meets the screen edge.
+     */
+    includeNavigationPadding: Boolean = true,
 ) {
     val compact = LocalConfiguration.current.screenWidthDp < 340
     Surface(color = MaterialTheme.colorScheme.background) {
@@ -86,15 +111,24 @@ fun PlayerBar(
             horizontalAlignment = Alignment.CenterHorizontally,
             modifier = Modifier
                 .fillMaxWidth()
-                .navigationBarsPadding(),
+                .then(
+                    if (includeNavigationPadding) Modifier.navigationBarsPadding() else Modifier,
+                ),
         ) {
-            ReciterNameButton(
-                name = reciterName,
-                onClick = onReciterClick,
-                enabled = enabled,
-                disclosure = true,
-                modifier = Modifier.graphicsLayer { alpha = chromeAlpha() },
-            )
+            Box(Modifier.fillMaxWidth()) {
+                ReciterNameButton(
+                    name = reciterName,
+                    onClick = onReciterClick,
+                    enabled = enabled,
+                    disclosure = true,
+                    modifier = Modifier
+                        .align(Alignment.Center)
+                        .padding(horizontal = edgePad)
+                        .graphicsLayer { alpha = chromeAlpha() },
+                )
+                edgeChrome()
+            }
+            belowReciter()
             Row(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(

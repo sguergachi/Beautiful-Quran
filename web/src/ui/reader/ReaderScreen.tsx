@@ -18,6 +18,7 @@ import {
   READER_LAYER,
 } from '../../store/appStore'
 import type { StackLayer } from '../paper/stack'
+import { PlaybackPin } from '../paper/PlaybackPin'
 import { PaperInput } from '../kit/PaperInput'
 import {
   IconBuffering,
@@ -129,7 +130,14 @@ function SurahHeaderOrnament({
   )
 }
 
-export function ReaderScreen({ stackLayer }: { stackLayer: StackLayer }) {
+export function ReaderScreen({
+  stackLayer,
+  playbackPinned = false,
+}: {
+  stackLayer: StackLayer
+  /** Phone scroll stack: draw the chapter bar above the sheets. */
+  playbackPinned?: boolean
+}) {
   const state = useAppState()
   const inkTuning = getTuning()
   const content = state.content
@@ -1270,6 +1278,25 @@ export function ReaderScreen({ stackLayer }: { stackLayer: StackLayer }) {
     Number.isFinite(bookmarkNoteTipCenterY)
 
   const repeatMode = state.player.repeatMode
+  const nowPlaying = state.player.nowPlaying
+  // Cover keeps this same bar and opens the return pill and Close into it.
+  const coverChrome =
+    playbackPinned && stackLayer === COVER_LAYER && nowPlaying != null
+  const coverSurah = coverChrome
+    ? state.surahs.find((s) => s.id === nowPlaying.surahId) ?? null
+    : null
+  const coverChapter = coverSurah?.nameTransliteration ?? ''
+  const coverAyahLabel = coverChrome
+    ? `${nowPlaying.surahId}:${Math.max(1, nowPlaying.ayah)}`
+    : ''
+  const openCoverVerse = () => {
+    if (!nowPlaying) return
+    if (content.surah.id === nowPlaying.surahId) {
+      appStore.revealLayer(READER_LAYER)
+      return
+    }
+    appStore.openSurah(nowPlaying.surahId, Math.max(1, nowPlaying.ayah))
+  }
   const keepWordInView =
     state.followEnabled && recitingActive && activeExceedsViewport
   // Focus leads by 500 ms to begin the glide before an ayah ends. Karaoke ink
@@ -1686,16 +1713,50 @@ export function ReaderScreen({ stackLayer }: { stackLayer: StackLayer }) {
               </button>
             </div>
           ) : (
-          <div className="player-bar">
-            <button
-              type="button"
-              className="reciter-btn"
-              data-receded={receded}
-              aria-label={`Reciter ${reciterName}. Open settings`}
-              onClick={() => appStore.setSheet('settings')}
-            >
-              {reciterName}
-            </button>
+          <PlaybackPin active={playbackPinned}>
+          <div className={`player-bar${coverChrome ? ' cover-chrome' : ''}`}>
+            <div className="player-reciter-row">
+              <button
+                type="button"
+                className="reciter-btn"
+                data-receded={receded}
+                aria-label={`Reciter ${reciterName}. Open settings`}
+                onClick={() => appStore.setSheet('settings')}
+              >
+                {reciterName}
+              </button>
+              {coverChrome ? (
+                <button
+                  type="button"
+                  className="player-close"
+                  aria-label="Close playback"
+                  onClick={() => appStore.dismissFloatingPlayback()}
+                >
+                  <IconClose />
+                </button>
+              ) : null}
+            </div>
+            {coverChrome ? (
+              <button
+                type="button"
+                className="player-return"
+                aria-label={`Return to ${coverChapter} · ${coverAyahLabel}`}
+                onClick={openCoverVerse}
+              >
+                <span className="player-return-chapter">{coverChapter}</span>
+                <span className="player-return-sep" aria-hidden="true">
+                  {' '}
+                  ·{' '}
+                </span>
+                <span className="player-return-ayah">{coverAyahLabel}</span>
+                <svg className="player-return-arrow" viewBox="0 0 24 24" aria-hidden="true">
+                  <path
+                    fill="currentColor"
+                    d="M5 13h11.17l-4.88 4.88a1 1 0 0 0 1.41 1.42l6.59-6.59a1 1 0 0 0 0-1.41l-6.58-6.6a1 1 0 0 0-1.41 1.41L16.17 11H5a1 1 0 0 0 0 2z"
+                  />
+                </svg>
+              </button>
+            ) : null}
             <div className="player-transport">
               <button
                 type="button"
@@ -1764,6 +1825,7 @@ export function ReaderScreen({ stackLayer }: { stackLayer: StackLayer }) {
               </button>
             </div>
           </div>
+          </PlaybackPin>
           )}
         </div>
       </div>
