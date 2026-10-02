@@ -15,8 +15,8 @@ import { resolveTheme } from '../App'
 
 function chapterWeaveInk(themeMode: string): string {
   return resolveTheme(themeMode) === 'light'
-    ? 'rgba(28, 27, 24, 0.04)'
-    : 'rgba(232, 226, 213, 0.04)'
+    ? 'rgba(28, 27, 24, 0.03)'
+    : 'rgba(232, 226, 213, 0.03)'
 }
 
 /** Material-ish ease for invitation collapse. */
@@ -60,7 +60,7 @@ export function NextChapterFooter({
       fieldWeaveBackground(
         ornament.field,
         chapterWeaveInk(themeMode),
-        'rgba(255, 255, 255, 0.05)',
+        'rgba(255, 255, 255, 0.0375)',
         fieldSize.cellWidth,
       ),
     [ornament.field, themeMode, fieldSize.cellWidth],

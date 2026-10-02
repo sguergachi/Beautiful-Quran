@@ -1549,7 +1549,7 @@ select {
 /* This chapter's own Hankin field, tooled at whisper ink behind the
    header — grown from the same seed as the rosette sitting on it, not the
    fixed pattern every chapter used to share. Fades at the top/bottom edges
-   (mirrors Android `verticalFadingEdges`, 12px top / 36px bottom) so it
+   (mirrors Android `verticalFadingEdges`, 72px top / 36px bottom) so it
    dissolves into the page instead of cutting off hard. */
 .surah-header-weave {
   position: absolute;
@@ -1558,14 +1558,14 @@ select {
   mask-image: linear-gradient(
     to bottom,
     transparent 0,
-    black 12px,
+    black 72px,
     black calc(100% - 36px),
     transparent 100%
   );
   -webkit-mask-image: linear-gradient(
     to bottom,
     transparent 0,
-    black 12px,
+    black 72px,
     black calc(100% - 36px),
     transparent 100%
   );

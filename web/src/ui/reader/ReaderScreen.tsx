@@ -78,18 +78,16 @@ function activeSearchQuery(active: boolean, query: string): string | null {
  * A data-URI SVG background can't resolve `var(--ink)` (it isn't part of
  * the live cascade), so the whisper-faint field weave needs a literal
  * color resolved from the reader's own theme instead — same `--ink` values
- * as styles.css, at the same ~4% alpha Android's `onBackground.copy(alpha
- * = 0.04f)` uses. `--emboss-light` is white at low alpha in every theme.
+ * as styles.css, with the chapter field softened by 25% on both platforms. `--emboss-light` is white at low alpha in every theme.
  */
 function chapterWeaveInk(themeMode: string): string {
-  return resolveTheme(themeMode) === 'light' ? 'rgba(28, 27, 24, 0.04)' : 'rgba(232, 226, 213, 0.04)'
+  return resolveTheme(themeMode) === 'light' ? 'rgba(28, 27, 24, 0.03)' : 'rgba(232, 226, 213, 0.03)'
 }
 
 /**
  * The surah header's own ornament: a distinct rosette and backing field per
- * chapter, grown from one seed — ayah count is the dominant term (length as
- * fingerprint), folded with the chapter number so all 114 chapters render
- * distinctly even though many share an ayah count. Both are static — part
+ * chapter, with chapter number assigning its structure and verse count
+ * varying its safe proportions. Both are static — part
  * of the page's fixed typography, not a ceremony — and themed off the
  * reader's own gold/emboss/ink custom properties rather than the entrance
  * cover's fixed leather gold, since this sits on the page background.
@@ -109,7 +107,7 @@ function SurahHeaderOrnament({
   )
   const fieldSize = useFieldCellWidth(ornament.field.cellWidthDp)
   const weave = useMemo(
-    () => fieldWeaveBackground(ornament.field, chapterWeaveInk(themeMode), 'rgba(255, 255, 255, 0.05)', fieldSize.cellWidth),
+    () => fieldWeaveBackground(ornament.field, chapterWeaveInk(themeMode), 'rgba(255, 255, 255, 0.0375)', fieldSize.cellWidth),
     [ornament.field, themeMode, fieldSize.cellWidth],
   )
   return (
