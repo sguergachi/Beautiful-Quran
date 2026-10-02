@@ -37,7 +37,14 @@ import {
 import { wordSearchSources } from '../../data/customizePolicy'
 import { BOOKMARKS_LAYER, type StackLayer } from '../paper/stack'
 
-export function HomeScreen({ stackLayer }: { stackLayer: StackLayer }) {
+export function HomeScreen({
+  stackLayer,
+  playbackPinned = false,
+}: {
+  stackLayer: StackLayer
+  /** Phone scroll stack: the chapter bar is pinned, so this sheet keeps its float in place. */
+  playbackPinned?: boolean
+}) {
   // Chapters sheet: skip word-tick / active-ink emits from the reader.
   const state = useAppSelector(
     (s) => ({
@@ -96,6 +103,18 @@ export function HomeScreen({ stackLayer }: { stackLayer: StackLayer }) {
     window.addEventListener('keydown', dismissSearch, true)
     return () => window.removeEventListener('keydown', dismissSearch, true)
   }, [])
+
+  // Cover search is local, so the pinned chapter bar cannot see it through
+  // the store. Hide that bar until the query is gone, without a keystroke emit.
+  useEffect(() => {
+    const shell = document.querySelector('.app-shell')
+    if (!(shell instanceof HTMLElement)) return
+    if (searchFocused || searching) shell.dataset.coverSearch = 'true'
+    else delete shell.dataset.coverSearch
+    return () => {
+      delete shell.dataset.coverSearch
+    }
+  }, [searchFocused, searching])
 
   useEffect(() => {
     setExpandedSurahIds(new Set())
@@ -166,6 +185,9 @@ export function HomeScreen({ stackLayer }: { stackLayer: StackLayer }) {
   const chapterLabel = floatSurah?.nameTransliteration ?? ''
   const ayahLabel =
     floatSurah != null ? `${floatSurah.id}:${floatAyah}` : ''
+  // The pinned cover keeps the chapter bar. The reduced float stays for an
+  // idle session, and for the moment before the reader sheet can draw that bar.
+  const pinnedCoverBar = showFloat && playbackPinned && state.content != null
 
   const openNowPlaying = () => {
     if (!nowPlaying) return
@@ -262,7 +284,7 @@ export function HomeScreen({ stackLayer }: { stackLayer: StackLayer }) {
         </header>
 
         <div className="edge-fade">
-          <div className={`scroll${showFloat ? ' scroll-with-float' : ''}`}>
+          <div className={`scroll${showFloat ? ' scroll-with-float' : ''}${pinnedCoverBar ? ' scroll-with-chapter' : ''}`}>
             <div
               className="home-scroll-page"
               data-has-bookmarks={hasBookmarks || undefined}
@@ -427,7 +449,7 @@ export function HomeScreen({ stackLayer }: { stackLayer: StackLayer }) {
         </div>
       </div>
 
-      {showFloat ? (
+      {showFloat && !pinnedCoverBar ? (
         <div className="floating-play" role="group" aria-label="Playback">
           <button
             type="button"

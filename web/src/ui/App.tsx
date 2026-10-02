@@ -1,12 +1,18 @@
 import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react'
 import { appStore, shallowEqual, useAppSelector } from '../store/appStore'
-import { hasReaderOpen } from './paper/stack'
+import {
+  BOOKMARKS_LAYER,
+  COVER_LAYER,
+  READER_LAYER,
+  hasReaderOpen,
+  showPinnedChapterBar,
+  type StackLayer,
+} from './paper/stack'
 import { HomeScreen } from './home/HomeScreen'
 import { BookmarksScreen } from './bookmarks/BookmarksScreen'
 import { ReaderScreen } from './reader/ReaderScreen'
 import { SettingsScreen } from './settings/SettingsScreen'
 import { EntranceCover } from './entrance/EntranceCover'
-import { BOOKMARKS_LAYER, COVER_LAYER, READER_LAYER, type StackLayer } from './paper/stack'
 import { OrnamentsLab } from './lab/OrnamentsLab'
 import { bookmarkSwipeDestination, spreadLayers, useBookSpread } from './paper/bookSpread'
 import { BookSpread } from './paper/BookSpread'
@@ -73,6 +79,15 @@ export function App() {
   const swipeStart = useRef<{ x: number; y: number; pointerId: number; layer: StackLayer } | null>(null)
   const stack = state.stackLayer
   const hasReader = hasReaderOpen(state.content, state.sheet)
+  const playbackPinned = useAppSelector((s) =>
+    showPinnedChapterBar({
+      hasReader: hasReaderOpen(s.content, s.sheet),
+      mushaf: s.settings.readingLayout === 'mushaf',
+      gathering: s.gathering,
+      stackLayer: s.stackLayer,
+      coverSession: s.player.nowPlaying != null,
+    }),
+  )
   const spread = useBookSpread()
   // Facing leaves: Mushaf layout in a spread, once a chapter is open.
   const leaves =
@@ -170,6 +185,7 @@ export function App() {
       data-stack={stack}
       data-has-reader={hasReader}
       data-spread={spread ? 'true' : undefined}
+      data-playback-pinned={playbackPinned && !spread ? 'true' : undefined}
       data-leaves={leaves ? 'true' : undefined}
       data-booting={showStack ? undefined : 'true'}
       onPointerDown={beginBookmarkSwipe}
@@ -184,11 +200,16 @@ export function App() {
           <ReaderScreen
             key={state.content?.surah.id ?? 'empty-reader'}
             stackLayer={pageLayers.reader}
+            playbackPinned={playbackPinned && !spread}
           />
           {spread ? <BookSpread titlePage={state.content == null} versoCovered={!leaves || stack !== READER_LAYER} /> : null}
           <BookmarksScreen stackLayer={stack} />
-          <HomeScreen stackLayer={pageLayers.home} />
+          <HomeScreen
+            stackLayer={pageLayers.home}
+            playbackPinned={playbackPinned && !spread}
+          />
           <SettingsScreen stackLayer={stack} hasReader={hasReader} />
+          <div id="playback-pin" />
         </>
       )}
       {!entranceDone && (

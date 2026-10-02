@@ -415,8 +415,11 @@ Hard rules:
   inset): the reader's **return-to-ayah roundel** and the stack-level
   **Back-to capsule** (opaque stadium with the same gilt rim and drawn
   qalam arrow). The cover sheet's **floating playback control** reuses that
-  same motion and inset over the chapter list while a verse is loaded. One
-  vertical rhythm when the paper stack turns between cover and reader.
+  same motion over the chapter list while a verse is loaded. The stack stays
+  vertical — reciter, quiet green return pill, then transport — and the paper
+  runs to the bottom edge of the screen. A 4 dp foot sits under the transport,
+  then the phone's navigation inset, so the controls stay above the home
+  gesture bar. It does not take the ornaments' 10 dp foot. One vertical rhythm when the paper stack turns between cover and reader.
 - **Edges dissolve.** Scrolling content fades out at the top and bottom of
   every sheet — ink fading off the page, not content clipped by a boundary.
 - **Taps have no ripple.** Touch feedback is the content's own motion
@@ -1230,9 +1233,22 @@ weight.
 - On the chapter list, when a verse is loaded (playing or paused mid-session),
   the floating playback control slides up with the same fade + vertical
   motion as the reader's return-to-ayah / Back-to ornaments
-  (`FloatingPaperControl`), using the shared **10 dp** bottom inset. The
-  current chapter and ayah form a compact quiet-green stadium with a right
-  arrow: tapping it returns to that verse in the reader. The
+  (`FloatingPaperControl`). The stack stays vertical: the reciter, then the
+  current chapter · ayah as a compact quiet-green stadium, then the transport,
+  with the same 4 dp foot as `PlayerBar`, then the phone's navigation inset
+  inside the paper. The controls stay above the home gesture bar. It does not
+  take the ornaments' 10 dp foot. While the cover and the reader
+  turn, the chapter bar stays fixed above both sheets. In the scrolling
+  reader that bar never carries a back arrow. The scroll sheet's own back
+  control is in the top bar only while that sheet is parked; a swipe removes
+  it until the reader settles again. The reader's bottom clearance follows
+  the pinned bar's measured body, including the return pill while that pill
+  is open. On the phone web stack that same bar is drawn above the sheets;
+  a desktop spread keeps the transport on the reader leaf. Landing on the chapter list expands the return
+  pill and the close into that same bar; the transport does not leave and
+  come back. The chapter and ayah carry
+  a right arrow:
+  tapping it returns to that verse in the reader. The
   enter/exit is also tied to the paper-stack page turn: returning to chapter
   selection plays the entrance; leaving for the reader plays the exit. A
   quiet Close in the corner dismisses the session (stops playback) so the

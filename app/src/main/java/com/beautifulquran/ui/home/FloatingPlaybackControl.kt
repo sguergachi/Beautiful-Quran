@@ -42,7 +42,6 @@ import androidx.compose.ui.unit.dp
 import androidx.media3.common.Player
 import com.beautifulquran.playback.PlayerUiState
 import com.beautifulquran.ui.reader.ReciterNameButton
-import com.beautifulquran.ui.theme.FloatingControlBottomInset
 import com.beautifulquran.ui.theme.FloatingPaperEnter
 import com.beautifulquran.ui.theme.FloatingPaperExit
 import com.beautifulquran.ui.theme.quietClickable
@@ -64,8 +63,12 @@ const val FloatingPlaybackCoverVisibleMaxPage = 0.45f
  * quiet ink over the cover sheet — no card, elevation, or border — and slides
  * up only while a verse is loaded (playing or paused mid-session) and the
  * chapter-selection page is in view. Its now-playing reference is a quiet
- * green return pill. An opaque paper [Surface] masks the list beneath,
- * matching the embedded bar. Uses the same enter/exit motion as
+ * green return pill under the reciter, then the transport, with the same
+ * 4 dp foot as the reader bar. The home scaffold already keeps this paper
+ * above the navigation bar, so the bar does not add that inset again, and
+ * it does not take the ornaments' 10 dp foot. An opaque paper [Surface]
+ * masks the list beneath, matching the embedded bar. Uses the same
+ * enter/exit motion as
  * [com.beautifulquran.ui.theme.FloatingPaperControl]. A quiet Close dismisses
  * the session so the bar leaves with the shared exit animation.
  */
@@ -93,64 +96,25 @@ fun FloatingPlaybackControl(
         modifier = modifier,
     ) {
         Surface(color = MaterialTheme.colorScheme.background) {
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .navigationBarsPadding()
-                    .padding(bottom = FloatingControlBottomInset),
-            ) {
+            // Paper runs to the screen edge. The navigation inset sits inside
+            // it, under the 4 dp foot, so the transport stays above the
+            // home gesture bar.
+            Box(modifier = Modifier.fillMaxWidth()) {
                 Column(
                     horizontalAlignment = Alignment.CenterHorizontally,
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .navigationBarsPadding(),
                 ) {
                     ReciterNameButton(
                         name = reciterName,
                         onClick = onReciterClick,
                     )
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.Center,
-                        modifier = Modifier
-                            .padding(vertical = 4.dp)
-                            .background(
-                                QuranTheme.accents.greenWash,
-                                RoundedCornerShape(50),
-                            )
-                            .quietClickable(onClick = onOpenNowPlaying)
-                            .padding(horizontal = 18.dp, vertical = 8.dp)
-                            .semantics {
-                                contentDescription = "Return to $chapterLabel · $ayahLabel"
-                                role = Role.Button
-                            },
-                    ) {
-                        Text(
-                            text = chapterLabel,
-                            style = MaterialTheme.typography.titleMedium,
-                            color = MaterialTheme.colorScheme.primary,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                            modifier = Modifier.widthIn(max = 200.dp),
-                        )
-                        Text(
-                            text = "  ·  ",
-                            style = MaterialTheme.typography.titleMedium,
-                            color = QuranTheme.accents.greenQuiet,
-                        )
-                        Text(
-                            text = ayahLabel,
-                            style = MaterialTheme.typography.titleMedium,
-                            color = QuranTheme.accents.greenInk,
-                            maxLines = 1,
-                        )
-                        Icon(
-                            imageVector = Icons.AutoMirrored.Rounded.ArrowForward,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier
-                                .padding(start = 8.dp)
-                                .size(18.dp),
-                        )
-                    }
+                    ReturnToAyahPill(
+                        chapterLabel = chapterLabel,
+                        ayahLabel = ayahLabel,
+                        onClick = onOpenNowPlaying,
+                    )
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(12.dp, Alignment.CenterHorizontally),
@@ -253,6 +217,60 @@ fun FloatingPlaybackControl(
  * [searchActive] (field focused or a query on the sheet) keeps the transport
  * off the paper until search mode is dismissed.
  */
+/** Quiet green stadium: chapter · ayah, returning to that verse. */
+@Composable
+internal fun ReturnToAyahPill(
+    chapterLabel: String,
+    ayahLabel: String,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.Center,
+        modifier = modifier
+            .padding(vertical = 4.dp)
+            .background(
+                QuranTheme.accents.greenWash,
+                RoundedCornerShape(50),
+            )
+            .quietClickable(onClick = onClick)
+            .padding(horizontal = 18.dp, vertical = 8.dp)
+            .semantics {
+                contentDescription = "Return to $chapterLabel · $ayahLabel"
+                role = Role.Button
+            },
+    ) {
+        Text(
+            text = chapterLabel,
+            style = MaterialTheme.typography.titleMedium,
+            color = MaterialTheme.colorScheme.primary,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.widthIn(max = 200.dp),
+        )
+        Text(
+            text = "  ·  ",
+            style = MaterialTheme.typography.titleMedium,
+            color = QuranTheme.accents.greenQuiet,
+        )
+        Text(
+            text = ayahLabel,
+            style = MaterialTheme.typography.titleMedium,
+            color = QuranTheme.accents.greenInk,
+            maxLines = 1,
+        )
+        Icon(
+            imageVector = Icons.AutoMirrored.Rounded.ArrowForward,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.primary,
+            modifier = Modifier
+                .padding(start = 8.dp)
+                .size(18.dp),
+        )
+    }
+}
+
 internal fun shouldShowFloatingPlayback(
     nowPlayingPresent: Boolean,
     coverSheetVisible: Boolean,

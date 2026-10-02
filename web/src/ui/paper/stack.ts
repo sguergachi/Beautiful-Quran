@@ -27,6 +27,24 @@ export function hasReaderOpen(
   return content != null || sheet === 'reader'
 }
 
+/**
+ * Phone scroll reader: one chapter bar stays above the cover and the reader.
+ * Mushaf, gather, bookmarks, and settings keep the bar on their own sheet.
+ * The cover shows it only while a verse is loaded.
+ */
+export function showPinnedChapterBar(input: {
+  hasReader: boolean
+  mushaf: boolean
+  gathering: boolean
+  stackLayer: number
+  coverSession: boolean
+}): boolean {
+  if (!input.hasReader || input.mushaf || input.gathering) return false
+  if (input.stackLayer < COVER_LAYER || input.stackLayer > READER_LAYER) return false
+  if (input.stackLayer === COVER_LAYER && !input.coverSession) return false
+  return true
+}
+
 export function settingsLayerFor(hasReader: boolean): StackLayer {
   return hasReader ? SETTINGS_LAYER : READER_LAYER
 }
