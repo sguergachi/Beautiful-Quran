@@ -13,6 +13,88 @@ import kotlin.math.sin
 
 class OrnamentGeneratorTest {
     @Test
+    fun `all chapters have distinct coarse field and medallion shapes with safe geometry`() {
+        fun shape(strokes: List<OrnamentStroke>) = strokes.map { s ->
+            s.closed to s.points.map { p -> kotlin.math.round(p.x * 16).toInt() to kotlin.math.round(p.y * 16).toInt() }
+        }
+        fun crosses(a: OrnamentPoint, b: OrnamentPoint, c: OrnamentPoint, d: OrnamentPoint): Boolean {
+            val dx = b.x - a.x; val dy = b.y - a.y; val ex = d.x - c.x; val ey = d.y - c.y
+            val den = dx * ey - dy * ex
+            if (abs(den) < 1e-10) return false
+            val t = ((c.x - a.x) * ey - (c.y - a.y) * ex) / den
+            val u = ((c.x - a.x) * dy - (c.y - a.y) * dx) / den
+            return t > 1e-6 && t < 1 - 1e-6 && u > 1e-6 && u < 1 - 1e-6
+        }
+        val verseCounts = listOf(7, 286, 200, 176, 120, 165, 206, 75, 129, 109, 123, 111, 43, 52, 99, 128, 111, 110, 98, 135, 112, 78, 118, 64, 77, 227, 93, 88, 69, 60, 34, 30, 73, 54, 45, 83, 182, 88, 75, 85, 54, 53, 89, 59, 37, 35, 38, 29, 18, 45, 60, 49, 62, 55, 78, 96, 29, 22, 24, 13, 14, 11, 11, 18, 12, 12, 30, 52, 52, 44, 28, 28, 20, 56, 40, 31, 50, 40, 46, 42, 29, 19, 36, 25, 22, 17, 19, 26, 30, 20, 15, 21, 11, 8, 8, 19, 5, 8, 8, 11, 11, 8, 3, 9, 5, 4, 7, 3, 6, 3, 5, 4, 5, 6)
+        for (sample in listOf(3, 11, 286, 0)) {
+            val fields = mutableSetOf<Any>(); val rosettes = mutableSetOf<Any>()
+            for (chapter in 1..114) {
+                val o = generateChapterOrnament(chapterOrnamentSeed(chapter, if (sample == 0) verseCounts[chapter - 1] else sample)); val f = o.field
+                fields.add(shape(f.strokes)); rosettes.add(shape(o.rosette.strokes))
+                for (s in f.strokes + o.rosette.strokes) {
+                    assertFalse(s.closed && s.points.size == 3)
+                    if (s.closed && s.points.size == 5) {
+                        val a = atan2(s.points[0].y - 0.5, s.points[0].x - 0.5)
+                        val b = atan2(s.points[1].y - 0.5, s.points[1].x - 0.5)
+                        val delta = ((b - a) % (2 * PI) + 2 * PI) % (2 * PI)
+                        assertTrue(abs(delta - 4 * PI / 5) > 0.05)
+                        assertTrue(abs(delta - 6 * PI / 5) > 0.05)
+                    }
+                }
+                val points = f.strokes.flatMap { it.points }
+                assertTrue(points.all { it.x in -1e-9..1 + 1e-9 && it.y in -1e-9..1 + 1e-9 })
+                fun key(x: Double, y: Double) = kotlin.math.round(x * 1e9).toLong() to kotlin.math.round(y * 1e9).toLong()
+                val balanced = points.map { key(it.x, it.y) }.toSet()
+                assertTrue(points.all { key(1 - it.y, it.x) in balanced && key(1 - it.x, it.y) in balanced })
+                val frames = f.strokes.take(2).map { it.points }
+                var clearance = Double.POSITIVE_INFINITY
+                for (s in f.strokes.drop(2)) {
+                    for (p in s.points) for (frame in frames) for (j in frame.indices) {
+                        val a = frame[j]; val b = frame[(j + 1) % frame.size]
+                        val dx = b.x - a.x; val dy = b.y - a.y
+                        val t = (((p.x - a.x) * dx + (p.y - a.y) * dy) / (dx * dx + dy * dy)).coerceIn(0.0, 1.0)
+                        clearance = minOf(clearance, hypot(p.x - a.x - t * dx, p.y - a.y - t * dy))
+                    }
+                }
+                assertTrue("chapter $chapter: frame clearance", clearance > 0.02)
+                val edges = f.strokes.flatMap { s -> (if (s.closed) s.points + s.points.first() else s.points).zipWithNext() }
+                var crossing = false
+                for (i in edges.indices) for (j in i + 1 until edges.size) {
+                    val (a, b) = edges[i]; val (c, d) = edges[j]
+                    if (maxOf(a.x, b.x) < minOf(c.x, d.x) || maxOf(c.x, d.x) < minOf(a.x, b.x) ||
+                        maxOf(a.y, b.y) < minOf(c.y, d.y) || maxOf(c.y, d.y) < minOf(a.y, b.y)) continue
+                    if (crosses(a, b, c, d)) crossing = true
+                }
+                assertFalse("chapter $chapter: accidental crossing", crossing)
+                val inkLength = f.strokes.sumOf { s ->
+                    (if (s.closed) s.points + s.points.first() else s.points).zipWithNext().sumOf { (p, q) -> hypot(p.x - q.x, p.y - q.y) } *
+                        if (s.weight == StrokeWeight.Rule) 1.0 else 0.55
+                }
+                assertTrue(inkLength / f.cellWidthDp <= 11.5 / 48 + 1e-9)
+                assertTrue(f.cellWidthDp <= 58)
+            }
+            assertEquals(114, fields.size)
+            assertEquals(114, rosettes.size)
+        }
+    }
+
+    @Test
+    fun `chapter known answers match web across the new layouts`() {
+        val chapters = listOf(1 to 7, 4 to 176, 7 to 206, 112 to 4, 114 to 6)
+        val widths = listOf(49.27532235905528, 52.470998737961054, 54.28618001751602, 55.88055209070444, 53.45646559819579)
+        val frames = listOf(16, 12, 4, 12, 8); val strokes = listOf(31, 19, 20, 20, 27)
+        val folds = listOf(8, 8, 10, 16, 8); val rosettes = listOf(8, 13, 7, 22, 6)
+        for ((i, chapter) in chapters.withIndex()) {
+            val o = generateChapterOrnament(chapterOrnamentSeed(chapter.first, chapter.second))
+            assertEquals(widths[i], o.field.cellWidthDp, 1e-9)
+            assertEquals(frames[i], o.field.strokes.first().points.size)
+            assertEquals(strokes[i], o.field.strokes.size)
+            assertEquals(folds[i], o.rosette.fold)
+            assertEquals(rosettes[i], o.rosette.strokes.size)
+        }
+    }
+
+    @Test
     fun `fits complete even repeats on narrow phone and wide fields`() {
         for ((width, count) in listOf(20 to 2, 320 to 6, 390 to 8, 450 to 10, 768 to 16)) {
             assertEquals(width.toDouble() / count, fittedFieldCellWidth(width.toDouble(), 50.0), 1e-9)
@@ -271,7 +353,7 @@ class OrnamentGeneratorTest {
         }
         assertEquals(setOf(8, 10, 12, 16), folds)
         assertEquals(FIELD_PATTERNS.toSet(), coverPatterns)
-        assertEquals(FIELD_PATTERNS.toSet(), chapterPatterns)
+        assertEquals((FIELD_PATTERNS + "chamfered lattice").toSet(), chapterPatterns)
         assertEquals(setOf(4, 8, 16), frames)
         assertTrue("expected varied filigree geometry, got $fieldStyles", fieldStyles.size >= 3)
         assertTrue("expected several border grammars, got $borderShapes", borderShapes.size >= 3)

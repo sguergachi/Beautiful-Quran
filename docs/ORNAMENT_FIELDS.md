@@ -27,8 +27,9 @@ claim to reproduce a particular historical pattern.
    octagonal enclosures and an eight-petal flower with nested leaf veins.
    `lozenge rosettes` alternates diamond compartments with four foliate sprays
    and smaller eight-pointed corner rosettes. The families have distinct
-   geometric frames and interior layouts; never independently shuffle their
-   parts. Their names describe our generator recipes, not historical styles.
+   geometric frames and interior layouts. Cover recipes keep these parts
+   together. Chapter recipes combine only the fitted, exhaustively checked
+   placements below; arbitrary overlays remain forbidden. Their names describe our generator recipes, not historical styles.
    All primary frames contact neighbours at the shared edge midpoints.
 2. **Give the geometry a crafted edge.** A second contour follows the
    primary frame at a restrained radial inset of 0.042–0.052 cell units.
@@ -51,7 +52,9 @@ claim to reproduce a particular historical pattern.
 6. **Balance visible ink.** Sum closed and open path lengths, weighting rules
    by 1 and hairlines by 0.55. Set `cellWidthDp = spacing × inkLength / target`,
    with spacing 48–56 dp and targets 11.5, 11 and 9 respectively for the
-   three families. This keeps relative line density bounded. Repeats are
+   three cover families. Chapters use `min(58, max(spacing, spacing × inkLength / 11.5))`
+   so sparse recipes retain the texture scale and dense ones cannot exceed
+   the existing ink-density ceiling. This keeps relative line density bounded. Repeats are
    about 48–51 dp for representative seeds, fitting roughly eight across a
    phone-width field so the ornament reads as a continuous texture. Rules
    and hairlines are both thinned to 60% of their former widths to preserve
@@ -67,16 +70,52 @@ claim to reproduce a particular historical pattern.
    Paths are cached outside drawing; weight separation uses two cached paths
    on Android rather than one draw call for every spray or repeat.
 
-Android and web consume the same four RNG draws in their original position.
-Saved seeds remain deterministic; medallions, seals and borders keep their
-existing seeded output. The Lab displays the generated family and can search
-for any of the three patterns alongside a medallion fold.
+## Chapter identities
 
-Tests require all three families in both cover and chapter seed samples,
+A random seed alone did not give chapters visibly different structures.
+With Opus 5.5's design input, chapter number now assigns a structural recipe:
+recover zero-based `c = floorMod(seed - 1, 114)`, then choose frame `c % 4`,
+interior `c % 7` and corner `c % 5`. These pairwise-coprime counts yield 140
+unique combinations; the first 114 never collide. Consecutive chapters differ
+on all three axes. Ayah count still varies the safe proportions, not the
+chapter's structural identity.
+
+- Four frames: star-and-cross, octagon, lozenge and chamfered square lattice.
+- Seven interiors: eight scroll pairs, eight veined petals, four scroll pairs,
+  four veined petals, alternating long petals and short diagonal scrolls,
+  four geometric palmettes with diagonal leaf buds, and a geometric star medallion with leaf buds.
+- Five corner treatments: floret, star-and-floret, diagonal leaf, diamond bud,
+  and a four-pearl cluster.
+
+Diamond frames shorten diagonal sprays about their heart attachment to 55%
+of the normal reach. The alternating recipe also shortens its diagonal
+scrolls. Chamfered frames shrink corner details to 60%; their edges meet
+neighbours only at midpoint tips, avoiding double-inked shared edges. Diamond
+buds and star florets retain clear gaps from their enclosing lines. These
+fixed geometric fits replace random part shuffling; the frame-clearance and no-crossing
+requirements still apply to every composition. No runtime fit search is used.
+
+Chapter medallions also receive distinct structural recipes: ten permitted
+(fold, star-index) pairs times three secondary motifs times four cores yield
+120 combinations. The fourth core is a diamond. Sixteen-fold primary stars
+use only indices 2, 3 and 4, keeping denser folds from dominating the catalogue.
+`(c × 37) % 120` selects them injectively for all 114 chapters. The existing occult-compound exclusions and separated zones remain.
+
+Android and web preserve the cover's four field RNG draws and its existing
+seeded output, including its medallion, seals and border. Chapter ornaments
+intentionally change. The Lab previews the chapter recipe for its current
+seed; its family/fold search continues to explore cover recipes.
+
+Tests require the three cover families and four chapter frames,
 and distinct primary frame geometries (16, 8 and 4 vertices). They also cover
 reflection and quarter-turn balance, attachment to the central star, frame clearance, cell-edge contacts, weighted line density and absence
 of accidental intersections across 400 seeds, including closing edges. Width-fitting tests cover narrow, phone and wide
 fields, including the even-count rounding boundary. Known
-answers pin Android/web parity and the reported seed `132614421`. Geometric
-edges are intentionally straight; the former all-curved short-segment check
+answers pin Android/web parity, five chapter layouts and the reported cover
+seed `132614421`. All 114 chapters at three sample ayah counts and their
+actual verse counts must have distinct geometry after coarse 1/16-cell quantization, separately for their fields and
+medallions. They also pass bounds, symmetry, 0.02 frame clearance, density,
+no-crossing, hexagram and pentagram checks. Clearance includes all corner
+ornament against both frame contours; preferred texture size cannot exceed
+58 dp. Geometric edges are intentionally straight; the former all-curved short-segment check
 is replaced by compartment clearance and the retained no-crossing checks.

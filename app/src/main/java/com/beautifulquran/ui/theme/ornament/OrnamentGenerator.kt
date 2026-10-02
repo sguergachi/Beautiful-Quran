@@ -320,9 +320,12 @@ private fun assignBirths(strokes: List<OrnamentStroke>): List<OrnamentStroke> {
  *    a hairball, so the dense folds carry their inner zones as hairlines —
  *    the hierarchy illuminators use to keep a crowded rosette legible.
  */
-private fun generateMedallion(rng: Mulberry32): RosetteSpec {
+private fun generateMedallion(rng: Mulberry32, chapter: Int? = null): RosetteSpec {
     val u = rng.next()
-    val fold = if (u < 0.30) 8 else if (u < 0.55) 10 else if (u < 0.85) 12 else 16
+    val pairs = if (chapter == null) emptyList() else listOf(8, 10, 12, 16).flatMap { n -> allowedStarKs(n).filter { n != 16 || it <= 4 }.map { n to it } }
+    val recipe = chapter?.let { (it * 37) % 120 }
+    val pair = recipe?.let { pairs[it % 10] }
+    val fold = pair?.first ?: if (u < 0.30) 8 else if (u < 0.55) 10 else if (u < 0.85) 12 else 16
     val step = TAU / fold
     val seg = fold * 12
     val strokes = ArrayList<OrnamentStroke>()
@@ -337,7 +340,7 @@ private fun generateMedallion(rng: Mulberry32): RosetteSpec {
     // so the two never graze; the star owns the widest zone.
     val ks = allowedStarKs(fold)
     val kIndex = rng.int(ks.size)
-    val k = ks[kIndex]
+    val k = pair?.second ?: ks[kIndex]
     val rs = r2 - rng.range(0.030, 0.052)
     strokes.addAll(starPolygons(fold, k, rs, ROT0, StrokeWeight.Rule))
 
@@ -347,7 +350,8 @@ private fun generateMedallion(rng: Mulberry32): RosetteSpec {
     // Zone 3 — the secondary motif, a fixed fraction of the star so the
     // annulus between them stays legible at every fold.
     val rMid = rs * rng.range(0.66, 0.74)
-    when (rng.int(3)) {
+    val drawnVariant = rng.int(3)
+    when (recipe?.let { it / 10 % 3 } ?: drawnVariant) {
         0 -> {
             // The woven double star: a second {n/k2} half a step out of
             // phase. k2 must differ from k — the same star drawn smaller is
@@ -388,8 +392,11 @@ private fun generateMedallion(rng: Mulberry32): RosetteSpec {
     // Zone 4 — the core, always inked: whatever room zone 3 leaves gets a
     // small rosette of its own rather than a bare field around the heart.
     val rCore = rMid * rng.range(0.50, 0.60)
-    val coreRecipe = rng.int(3)
+    val drawnCore = rng.int(3)
+    val coreRecipe = recipe?.let { it / 30 } ?: drawnCore
     when (coreRecipe) {
+        3 -> strokes.add(OrnamentStroke(List(4) { i -> polar(ROT0 + i * PI / 2, rCore) },
+            true, StrokeWeight.Hairline, 0.0, 1.0))
         0 -> {
             val i3 = rng.int(ks.size)
             strokes.addAll(
@@ -739,13 +746,15 @@ private fun fieldCurve(coords: List<Pair<Double, Double>>, closed: Boolean): Orn
 }
 
 /**
- * Three composed geometric families with compartment-specific filigree.
+ * Composed cover families and chapter recipes with compartment-specific filigree.
  * Four RNG draws choose a family and its safe proportions. See docs/ORNAMENT_FIELDS.md.
  */
-private fun generateField(rng: Mulberry32): FieldSpec {
+private fun generateField(rng: Mulberry32, chapter: Int? = null): FieldSpec {
     val choice = rng.range(0.0, 3.0)
-    val family = choice.toInt()
-    val inset = 0.042 + (choice - family) * 0.01
+    val family = chapter?.rem(4) ?: choice.toInt()
+    val layout = chapter?.rem(7) ?: family
+    val corner = chapter?.rem(5) ?: if (family == 2) 1 else 0
+    val inset = 0.042 + (choice - choice.toInt()) * 0.01
     val curl = rng.range(0.265, 0.285)
     val tip = rng.range(0.392, 0.410)
     val spacing = rng.range(48.0, 56.0)
@@ -754,7 +763,12 @@ private fun generateField(rng: Mulberry32): FieldSpec {
             radius * if (i % 2 == 1) cos(PI / 4) / cos(PI / 8) else 1.0) },
         true, weight, 0.0, 1.0,
     )
-    fun frame(radius: Double) = if (family == 0) star(radius, StrokeWeight.Rule) else OrnamentStroke(
+    fun frame(radius: Double) = if (family == 0) star(radius, StrokeWeight.Rule) else if (family == 3) OrnamentStroke(
+        (0..3).flatMap { i -> listOf(1.0 to 0.0, 0.94 to 0.47, 0.47 to 0.94).map { (x, y) ->
+            OrnamentPoint(0.5 + radius * (x * cos(i * PI / 2) - y * sin(i * PI / 2)),
+                0.5 + radius * (x * sin(i * PI / 2) + y * cos(i * PI / 2)))
+        } }, true, StrokeWeight.Rule, 0.0, 1.0,
+    ) else OrnamentStroke(
         List(if (family == 1) 8 else 4) { i -> polar(i * TAU / (if (family == 1) 8 else 4), radius) },
         true, StrokeWeight.Rule, 0.0, 1.0,
     )
@@ -776,15 +790,26 @@ private fun generateField(rng: Mulberry32): FieldSpec {
         0.13 to 0.0, 0.20 to 0.0, 0.25 to -0.025, curl + 0.04 to 0.0,
         0.25 to 0.025, 0.20 to 0.0, 0.13 to 0.0,
     ), true)
-    val motifs = if (family == 1) listOf(petal to 1, vein to 1) else
-        listOf(scroll to -1, scroll to 1, leaf to 1)
-    val fold = if (family == 2) 4 else 8
+    val spear = petal.copy(points = listOf(OrnamentPoint(0.13, 0.0), OrnamentPoint(0.21, -0.07),
+        OrnamentPoint(0.33, -0.05), OrnamentPoint(tip, 0.0), OrnamentPoint(0.33, 0.05), OrnamentPoint(0.21, 0.07)))
+    val paired = listOf(scroll to -1, scroll to 1, leaf to 1)
+    val petals = listOf(petal to 1, vein to 1)
+    val fold = if (layout == 2 || layout == 3) 4 else 8
+    if (layout == 6) strokes.add(star(0.23, StrokeWeight.Hairline))
     repeat(fold) { i ->
         val a = i * TAU / fold
+        val motifs = when {
+            layout == 6 -> listOf(leaf to 1)
+            layout == 5 -> if (i % 2 == 1) listOf(leaf to 1) else listOf(spear to 1, vein to 1)
+            layout == 1 || layout == 3 || (layout == 4 && i % 2 == 0) -> petals
+            else -> paired
+        }
+        // Narrow diamond compartments have less room along the diagonals.
+        val scale = if (chapter != null && (family == 2 || layout == 4) && fold == 8 && i % 2 == 1) 0.55 else 1.0
         for ((motif, sign) in motifs) {
             strokes.add(motif.copy(points = motif.points.map { p ->
-                OrnamentPoint(0.5 + p.x * cos(a) - p.y * sign * sin(a),
-                    0.5 + p.x * sin(a) + p.y * sign * cos(a))
+                val x = 0.13 + (p.x - 0.13) * scale; val y = p.y * scale * sign
+                OrnamentPoint(0.5 + x * cos(a) - y * sin(a), 0.5 + x * sin(a) + y * cos(a))
             }))
         }
     }
@@ -796,12 +821,24 @@ private fun generateField(rng: Mulberry32): FieldSpec {
     val cornerStar = star(0.18, StrokeWeight.Hairline).let { s ->
         s.copy(closed = false, points = s.points.take(5).map { p -> OrnamentPoint(p.x - 0.5, p.y - 0.5) })
     }
-    val corners = if (family == 2) listOf(cornerStar,
-        quarter.copy(points = quarter.points.map { p -> OrnamentPoint(p.x * 1.5, p.y * 1.5) })) else listOf(quarter)
+    val bud = petal.copy(points = petal.points.map { p ->
+        OrnamentPoint((p.x - p.y) * 0.16 / kotlin.math.sqrt(2.0), (p.x + p.y) * 0.16 / kotlin.math.sqrt(2.0))
+    })
+    val diamond = cornerStar.copy(points = listOf(OrnamentPoint(0.14, 0.0), OrnamentPoint(0.07, 0.07), OrnamentPoint(0.0, 0.14)))
+    val corners = when (corner) {
+        1 -> listOf(cornerStar, quarter.copy(points = quarter.points.map { p -> OrnamentPoint(p.x * (if (chapter == null) 1.5 else 1.2), p.y * (if (chapter == null) 1.5 else 1.2)) }))
+        2 -> listOf(bud.copy(points = bud.points.map { p -> OrnamentPoint(p.x * 1.45, p.y * 1.45) }))
+        3 -> listOf(diamond, bud)
+        4 -> listOf(circleStroke(0.03, 16, StrokeWeight.Hairline).let { motif ->
+            motif.copy(points = motif.points.map { p -> OrnamentPoint(p.x - 0.5 + 0.07, p.y - 0.5 + 0.07) })
+        })
+        else -> listOf(quarter)
+    }
+    val cornerScale = if (chapter != null && family == 3) 0.6 else 1.0
     for ((cx, cy, sx, sy) in listOf(listOf(0, 0, 1, 1), listOf(1, 0, -1, 1),
         listOf(1, 1, -1, -1), listOf(0, 1, 1, -1))) {
         for (motif in corners) strokes.add(motif.copy(points = motif.points.map { p ->
-            OrnamentPoint(cx + sx * p.x, cy + sy * p.y)
+            OrnamentPoint(cx + sx * p.x * cornerScale, cy + sy * p.y * cornerScale)
         }))
     }
     val inkLength = strokes.sumOf { s ->
@@ -809,7 +846,9 @@ private fun generateField(rng: Mulberry32): FieldSpec {
         points.zipWithNext().sumOf { (p, q) -> kotlin.math.hypot(p.x - q.x, p.y - q.y) } *
             if (s.weight == StrokeWeight.Rule) 1.0 else 0.55
     }
-    return FieldSpec(FIELD_PATTERNS[family], 1.0, 1.0, spacing * inkLength / listOf(11.5, 11.0, 9.0)[family], strokes)
+    val width = if (chapter == null) spacing * inkLength / listOf(11.5, 11.0, 9.0)[family] else
+        minOf(58.0, maxOf(spacing, spacing * inkLength / 11.5))
+    return FieldSpec((FIELD_PATTERNS + "chamfered lattice")[family], 1.0, 1.0, width, strokes)
 }
 
 /**
@@ -827,13 +866,8 @@ fun generateCoverOrnament(seed: Int): CoverOrnament {
 }
 
 /**
- * Seed for a chapter's surah-header rosette. Ayah count is the dominant
- * term — chapters of similar length grow kin-looking rosettes, so length
- * reads as the ornament's "fingerprint" — folded with the chapter number
- * (always < 114) so it acts as a low digit the multiply-by-114 term never
- * touches: `seed % 114` always recovers the chapter number, so all 114
- * chapters get distinct rosettes even though only 77 of them have a
- * distinct ayah count (37 chapters share a count with another chapter).
+ * Chapter number fixes structural identity; verse count varies safe proportions.
+ * The zero-based chapter is recovered by floorMod(seed - 1, 114).
  */
 fun chapterOrnamentSeed(chapterNumber: Int, ayahCount: Int): Int =
     ayahCount * 114 + chapterNumber
@@ -843,12 +877,15 @@ fun pageOrnamentSeed(page: Int): Int = 1_000_000 + page
 
 /**
  * Grow a chapter's rosette and backing field — no corner seal or border,
- * which the header has no use for — from [seed]. Same star-polygon and
+ * which the header has no use for — from [seed]. Chapter number assigns distinct structural recipes; ayah count
+ * varies their proportions. Same star-polygon and
  * rosette/arabesque vocabulary and RNG rules as a full cover ornament.
  */
 fun generateChapterOrnament(seed: Int): ChapterOrnament {
     val rng = Mulberry32(seed)
-    val rosette = generateMedallion(rng)
-    val field = generateField(rng)
+    // 4 frames x 7 interiors x 5 corners: coprime axes give 140 distinct recipes.
+    val chapter = Math.floorMod(seed - 1, 114)
+    val rosette = generateMedallion(rng, chapter)
+    val field = generateField(rng, chapter)
     return ChapterOrnament(seed, rosette, field)
 }

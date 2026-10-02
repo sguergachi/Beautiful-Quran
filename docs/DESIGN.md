@@ -1028,13 +1028,11 @@ image, so it is crisp at any density and nearly free to render.
   seed per launch. The **surah header is seeded per chapter** instead — one
   `chapterOrnamentSeed(chapterNumber, ayahCount)` grows both the rosette
   *and* the field tooled behind it (`ChapterOrnament`/`generateChapterOrnament`),
-  so the header's whole ornament is this chapter's own, not a rosette
-  sitting on a pattern every chapter shares. The seed folds the chapter's
-  verse count (the dominant term, so a chapter's length reads as its
-  ornament's fingerprint — chapters of similar length grow kin-looking
-  rosettes) with its number (so all 114 chapters render distinctly even
-  though only 77 of them have a verse count no other chapter shares); the
-  same chapter always regrows the same ornament. Border friezes (cover
+  so the header's whole ornament is this chapter's own. Chapter number
+  assigns a distinct frame/interior/corner recipe and a distinct medallion
+  structure across all 114 chapters; verse count varies their safe
+  proportions. The same chapter always regrows the same ornament. Border
+  friezes (cover
   only) come from five band grammars of tooled bindings: a zigzag lattice
   with pearls in its diamonds, a two-strand cable with pearl eyes, a Hankin
   strip, a nested lozenge chain, and a khatam chain of small eight-fold
@@ -1054,7 +1052,10 @@ image, so it is crisp at any density and nearly free to render.
 - **Field harmony.** Seeds choose among composed star-and-cross, octagonal
   garden and lozenge-rosette families, each with its own geometric frame and
   foliate layout. Paired contours use stronger rules; interior filigree uses
-  finer hairlines. Details cannot cross or graze the frame. Reflection and
+  finer hairlines. Chapters have 114 distinct structural combinations drawn
+  from four frames, seven interiors and five corner treatments, with fixed
+  fitting rules for narrow compartments. Details cannot cross or graze the
+  frame. Reflection and
   quarter-turn balance, deliberate empty space and weight-aware repeat
   spacing keep richness composed rather than noisy. Small repeats (roughly
   eight across a phone) and delicate strokes make the field a texture. Each
