@@ -6,7 +6,8 @@
  * medallion/corner-seals and the reader's per-chapter surah header; the
  * border/field pieces below it (cover-only) pull in the cover's layout type.
  */
-import { useEffect, useId, useMemo, useState } from 'react'
+import { useEffect, useId, useLayoutEffect, useMemo, useState } from 'react'
+import { fittedFieldCellWidth } from './ornamentGenerator'
 import type { BorderSpec, OrnamentStroke, RosetteSpec } from './ornamentGenerator'
 import { borderBandBackground, pathD, svgDataUri } from './ornamentSvg'
 import type { CoverLayout } from '../entrance/coverLayout'
@@ -14,6 +15,23 @@ import type { CoverLayout } from '../entrance/coverLayout'
 // The pure serializers live in ornamentSvg.ts (Node can import them without
 // React); re-exported here so existing call sites keep their import path.
 export { borderBandBackground, fieldWeaveBackground } from './ornamentSvg'
+
+/** Measure the field itself so every surface fits an even number of repeats. */
+export function useFieldCellWidth(preferred: number) {
+  const [element, ref] = useState<Element | null>(null)
+  const [cellWidth, setCellWidth] = useState(preferred)
+  useLayoutEffect(() => {
+    if (!element) return
+    const measure = () => setCellWidth(fittedFieldCellWidth(element.clientWidth, preferred))
+    measure()
+    const observer = new ResizeObserver(([entry]) => {
+      if (entry) setCellWidth(fittedFieldCellWidth(entry.contentRect.width, preferred))
+    })
+    observer.observe(element)
+    return () => observer.disconnect()
+  }, [element, preferred])
+  return { ref, cellWidth }
+}
 
 /** One build clock for the whole cover; Android uses the same schedule. */
 export const ORNAMENT_BUILD_MS = 3_400

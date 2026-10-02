@@ -17,7 +17,7 @@ import {
   type CoverOrnament,
   type FieldSpec,
 } from '../theme/ornamentGenerator'
-import { GeneratedRosette } from '../theme/GeneratedOrnament'
+import { GeneratedRosette, useFieldCellWidth } from '../theme/GeneratedOrnament'
 
 type ThemeName = 'light' | 'dark' | 'royal_green'
 
@@ -99,23 +99,26 @@ function FieldSurface({
   background?: string
   height?: number
 }) {
+  const { ref, cellWidth } = useFieldCellWidth(cellPx)
   const patternId = useId()
   const h = height ?? 240
-  const paths = useMemo(() => fieldPaths(field, 1, 1, cellPx), [field, cellPx])
+  const paths = useMemo(() => fieldPaths(field, 1, 1, cellWidth), [field, cellWidth])
   return (
-    <svg
-      style={{ width: '100%', height: h, display: 'block', background }}
-      aria-hidden="true"
-    >
-      <defs>
-        <pattern id={patternId} width={cellPx} height={cellPx} patternUnits="userSpaceOnUse">
-          {paths.map(({ d, weight }, i) => (
-            <path key={i} d={d} fill="none" stroke={stroke} strokeWidth={strokeWidth * (weight === 'rule' ? 1 : 0.55)} strokeLinejoin="round" />
-          ))}
-        </pattern>
-      </defs>
-      <rect width="100%" height="100%" fill={`url(#${patternId})`} />
-    </svg>
+    <div ref={ref}>
+      <svg
+        style={{ width: '100%', height: h, display: 'block', background }}
+        aria-hidden="true"
+      >
+        <defs>
+          <pattern id={patternId} width={cellWidth} height={cellWidth} patternUnits="userSpaceOnUse">
+            {paths.map(({ d, weight }, i) => (
+              <path key={i} d={d} fill="none" stroke={stroke} strokeWidth={strokeWidth * (weight === 'rule' ? 0.6 : 0.33)} strokeLinejoin="round" />
+            ))}
+          </pattern>
+        </defs>
+        <rect width="100%" height="100%" fill={`url(#${patternId})`} />
+      </svg>
+    </div>
   )
 }
 

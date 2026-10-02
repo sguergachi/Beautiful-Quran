@@ -33,7 +33,7 @@ claim to reproduce a particular historical pattern.
 2. **Give the geometry a crafted edge.** A second contour follows the
    primary frame at a restrained radial inset of 0.042–0.052 cell units.
    Both contours
-   use a 1 dp rule; all interior filigree uses a 0.55 dp hairline. Every field
+   use a 0.6 dp rule; all interior filigree uses a 0.33 dp hairline. Every field
    renderer honors this distinction, including the Lab.
 3. **Compose the interior.** A small central eight-pointed star anchors each
    family’s sprays or petals. Star-and-cross repeats eight mirrored pairs of
@@ -50,12 +50,18 @@ claim to reproduce a particular historical pattern.
    symmetry remain exact. There is no per-tile randomness.
 6. **Balance visible ink.** Sum closed and open path lengths, weighting rules
    by 1 and hairlines by 0.55. Set `cellWidthDp = spacing × inkLength / target`,
-   with spacing 100–116 dp and targets 11.5, 11 and 9 respectively for the
-   three families. This keeps weighted line density bounded while
-   making the repeat about 31–32% smaller than the former 148–168 dp
-   spacing. More motifs fit across a phone-width field; the geometric frame
-   and filigree retain their original stroke weights. These dimensions
-   are visually tuned, not historical measurements from the sources.
+   with spacing 48–56 dp and targets 11.5, 11 and 9 respectively for the
+   three families. This keeps relative line density bounded. Repeats are
+   about 48–51 dp for representative seeds, fitting roughly eight across a
+   phone-width field so the ornament reads as a continuous texture. Rules
+   and hairlines are both thinned to 60% of their former widths to preserve
+   delicacy at this scale. Each live field rounds its width / preferred repeat
+   to the nearest even count (at least two), then divides the available width
+   by that count. Repeats fit exactly across the field and stay square; height
+   clips the continuous texture rather than stretching motifs. Android uses
+   its drawing bounds; web and Lab observe their own field element on resize.
+   These dimensions are visually tuned, not historical measurements from the
+   sources.
 7. **Keep page ornament subordinate.** The existing whisper ink, embossing
    and edge dissolves keep the field below the medallion and the words.
    Paths are cached outside drawing; weight separation uses two cached paths
@@ -69,7 +75,8 @@ for any of the three patterns alongside a medallion fold.
 Tests require all three families in both cover and chapter seed samples,
 and distinct primary frame geometries (16, 8 and 4 vertices). They also cover
 reflection and quarter-turn balance, attachment to the central star, frame clearance, cell-edge contacts, weighted line density and absence
-of accidental intersections across 400 seeds, including closing edges. Known
+of accidental intersections across 400 seeds, including closing edges. Width-fitting tests cover narrow, phone and wide
+fields, including the even-count rounding boundary. Known
 answers pin Android/web parity and the reported seed `132614421`. Geometric
 edges are intentionally straight; the former all-curved short-segment check
 is replaced by compartment clearance and the retained no-crossing checks.

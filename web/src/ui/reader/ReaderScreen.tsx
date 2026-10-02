@@ -59,7 +59,7 @@ import {
 } from './useProgressiveAyahWindow'
 import { RootViewer } from '../root/RootViewer'
 import { SearchHitFlash, searchHitFlashTotalMs } from './SearchHitFlash'
-import { fieldWeaveBackground, GeneratedRosette } from '../theme/GeneratedOrnament'
+import { fieldWeaveBackground, GeneratedRosette, useFieldCellWidth } from '../theme/GeneratedOrnament'
 import { chapterOrnamentSeed, generateChapterOrnament } from '../theme/ornamentGenerator'
 import { resolveTheme } from '../App'
 import type { Word } from '../../data/models'
@@ -107,13 +107,14 @@ function SurahHeaderOrnament({
     () => generateChapterOrnament(chapterOrnamentSeed(chapterNumber, ayahCount)),
     [chapterNumber, ayahCount],
   )
+  const fieldSize = useFieldCellWidth(ornament.field.cellWidthDp)
   const weave = useMemo(
-    () => fieldWeaveBackground(ornament.field, chapterWeaveInk(themeMode), 'rgba(255, 255, 255, 0.05)'),
-    [ornament.field, themeMode],
+    () => fieldWeaveBackground(ornament.field, chapterWeaveInk(themeMode), 'rgba(255, 255, 255, 0.05)', fieldSize.cellWidth),
+    [ornament.field, themeMode, fieldSize.cellWidth],
   )
   return (
     <>
-      <div className="surah-header-weave" style={weave} aria-hidden="true" />
+      <div className="surah-header-weave" ref={fieldSize.ref} style={weave} aria-hidden="true" />
       <GeneratedRosette
         spec={ornament.rosette}
         className="rosette"

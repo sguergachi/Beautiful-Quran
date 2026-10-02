@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   FIELD_PATTERNS,
+  fittedFieldCellWidth,
   chapterOrnamentSeed,
   generateChapterOrnament,
   generateCoverOrnament,
@@ -10,6 +11,13 @@ import {
 } from '../ornamentGenerator'
 
 describe('ornamentGenerator', () => {
+  it('fits complete even repeats on narrow, phone and wide fields', () => {
+    for (const [width, count] of [[20, 2], [320, 6], [390, 8], [450, 10], [768, 16]]) {
+      expect(fittedFieldCellWidth(width!, 50)).toBeCloseTo(width! / count!, 9)
+    }
+    expect(fittedFieldCellWidth(0, 50)).toBe(50)
+  })
+
   it('prng matches the reference mulberry32 stream (Android parity)', () => {
     // Same known-answer values asserted by OrnamentGeneratorTest.kt — the
     // cross-platform contract that keeps both covers drawing from one stream.
@@ -278,8 +286,8 @@ describe('ornamentGenerator', () => {
         const length = p.slice(1).reduce((n, q, i) => n + Math.hypot(q.x - p[i]!.x, q.y - p[i]!.y), 0)
         return sum + length * (s.weight === 'rule' ? 1 : 0.55)
       }, 0)
-      expect(inkLength / f.cellWidthDp).toBeGreaterThanOrEqual(density / 116 - 1e-9)
-      expect(inkLength / f.cellWidthDp).toBeLessThanOrEqual(density / 100 + 1e-9)
+      expect(inkLength / f.cellWidthDp).toBeGreaterThanOrEqual(density / 56 - 1e-9)
+      expect(inkLength / f.cellWidthDp).toBeLessThanOrEqual(density / 48 + 1e-9)
       expect(pts.every((p) => p.x >= -1e-9 && p.x <= 1 + 1e-9 && p.y >= -1e-9 && p.y <= 1 + 1e-9)).toBe(true)
       const key = (x: number, y: number) => `${Math.round(x * 1e9)}/${Math.round(y * 1e9)}`
       const coordinates = new Set(pts.map((p) => key(p.x, p.y)))
@@ -316,10 +324,10 @@ describe('ornamentGenerator', () => {
     const lozenge = [4, 4, 16, ...Array.from({ length: 4 }, () => [31, 31, 21]).flat(),
       ...Array.from({ length: 4 }, () => [5, 21]).flat()]
     for (const [seed, pattern, signature, width] of [
-      [1, 'lozenge rosettes', lozenge, 99.41053498025346],
-      [8, 'star-and-cross', star, 106.39774871088862],
-      [21, 'octagonal garden', garden, 104.8016739340302],
-      [132614421, 'lozenge rosettes', lozenge, 105.19301250182379],
+      [1, 'lozenge rosettes', lozenge, 47.73055739685947],
+      [8, 'star-and-cross', star, 51.29965216862327],
+      [21, 'octagonal garden', garden, 50.4501521020009],
+      [132614421, 'lozenge rosettes', lozenge, 50.61806257444628],
     ] as const) {
       const f = generateCoverOrnament(seed).field
       expect(f.pattern).toBe(pattern)

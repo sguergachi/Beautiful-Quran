@@ -1056,7 +1056,11 @@ image, so it is crisp at any density and nearly free to render.
   foliate layout. Paired contours use stronger rules; interior filigree uses
   finer hairlines. Details cannot cross or graze the frame. Reflection and
   quarter-turn balance, deliberate empty space and weight-aware repeat
-  spacing keep richness composed rather than noisy. The Lab can search each
+  spacing keep richness composed rather than noisy. Small repeats (roughly
+  eight across a phone) and delicate strokes make the field a texture. Each
+  field fits an even number of complete repeats across its own width without
+  stretching the motifs.
+  The Lab can search each
   family. Construction, research and testable rules:
   [ORNAMENT_FIELDS.md](ORNAMENT_FIELDS.md).
 - **Gilding.** Gold is never a flat color. Gilded elements (the surah

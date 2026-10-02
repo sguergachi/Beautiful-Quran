@@ -25,6 +25,7 @@ import androidx.compose.ui.unit.dp
 import com.beautifulquran.ui.entrance.CoverFrameGeometry
 import com.beautifulquran.ui.theme.ornament.BorderSpec
 import com.beautifulquran.ui.theme.ornament.FieldSpec
+import com.beautifulquran.ui.theme.ornament.fittedFieldCellWidth
 import com.beautifulquran.ui.theme.ornament.RosetteSpec
 import com.beautifulquran.ui.theme.ornament.StrokeWeight
 import kotlin.math.max
@@ -508,7 +509,8 @@ fun Modifier.generatedFieldWeave(
     // Tile one cell past every edge so the weave reads continuous at the
     // bounds, then clip so neighbouring sections never paint over each other
     // (the Lab's stacked previews depend on this).
-    val pxPerUnit = (field.cellWidthDp.toFloat().dp.toPx()) / field.cellW.toFloat()
+    val fittedWidth = fittedFieldCellWidth(size.width.toDp().value.toDouble(), field.cellWidthDp)
+    val pxPerUnit = fittedWidth.toFloat().dp.toPx() / field.cellW.toFloat()
     val cellW = (field.cellW * pxPerUnit).toFloat()
     val cellH = (field.cellH * pxPerUnit).toFloat()
     val weaves = listOf(Path(), Path())
@@ -529,7 +531,7 @@ fun Modifier.generatedFieldWeave(
         }
         y += cellH
     }
-    val styles = listOf(Stroke(width = 1.dp.toPx()), Stroke(width = 0.55.dp.toPx()))
+    val styles = listOf(Stroke(width = 0.6.dp.toPx()), Stroke(width = 0.33.dp.toPx()))
     onDrawBehind {
         val a = if (build == null) 1f else (build.value / 0.55f).coerceIn(0f, 1f)
         if (a <= 0f) return@onDrawBehind

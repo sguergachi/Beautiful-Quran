@@ -5,6 +5,11 @@ import kotlin.math.abs
 import kotlin.math.cos
 import kotlin.math.min
 import kotlin.math.sin
+import kotlin.math.roundToInt
+
+/** Fit whole, even repeats across the field without stretching its geometry. */
+fun fittedFieldCellWidth(width: Double, preferred: Double): Double =
+    if (width > 0) width / (2 * (width / preferred / 2).roundToInt().coerceAtLeast(1)) else preferred
 
 /*
  * The ornament-generating machine: a seeded, pure generator of Islamic
@@ -743,7 +748,7 @@ private fun generateField(rng: Mulberry32): FieldSpec {
     val inset = 0.042 + (choice - family) * 0.01
     val curl = rng.range(0.265, 0.285)
     val tip = rng.range(0.392, 0.410)
-    val spacing = rng.range(100.0, 116.0)
+    val spacing = rng.range(48.0, 56.0)
     fun star(radius: Double, weight: StrokeWeight) = OrnamentStroke(
         List(16) { i -> polar(i * PI / 8,
             radius * if (i % 2 == 1) cos(PI / 4) / cos(PI / 8) else 1.0) },

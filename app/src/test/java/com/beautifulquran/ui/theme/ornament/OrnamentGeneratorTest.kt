@@ -12,6 +12,14 @@ import kotlin.math.hypot
 import kotlin.math.sin
 
 class OrnamentGeneratorTest {
+    @Test
+    fun `fits complete even repeats on narrow phone and wide fields`() {
+        for ((width, count) in listOf(20 to 2, 320 to 6, 390 to 8, 450 to 10, 768 to 16)) {
+            assertEquals(width.toDouble() / count, fittedFieldCellWidth(width.toDouble(), 50.0), 1e-9)
+        }
+        assertEquals(50.0, fittedFieldCellWidth(0.0, 50.0), 0.0)
+    }
+
 
     /**
      * mulberry32 known-answer values (computed with the reference JS
@@ -296,8 +304,8 @@ class OrnamentGeneratorTest {
                     .sumOf { (p, q) -> hypot(p.x - q.x, p.y - q.y) } *
                     if (s.weight == StrokeWeight.Rule) 1.0 else 0.55
             }
-            assertTrue(inkLength / f.cellWidthDp >= density / 116 - 1e-9)
-            assertTrue(inkLength / f.cellWidthDp <= density / 100 + 1e-9)
+            assertTrue(inkLength / f.cellWidthDp >= density / 56 - 1e-9)
+            assertTrue(inkLength / f.cellWidthDp <= density / 48 + 1e-9)
             assertTrue(pts.all { it.x in -1e-9..1 + 1e-9 && it.y in -1e-9..1 + 1e-9 })
             for (p in pts) {
                 assertTrue(pts.any { q -> hypot(q.x - (1 - p.y), q.y - p.x) < 1e-9 })
@@ -338,7 +346,7 @@ class OrnamentGeneratorTest {
             List(4) { listOf(5, 21) }.flatten()
         val signatures = listOf(lozenge, star, garden, lozenge)
         val patterns = listOf("lozenge rosettes", "star-and-cross", "octagonal garden", "lozenge rosettes")
-        val widths = listOf(99.41053498025346, 106.39774871088862, 104.8016739340302, 105.19301250182379)
+        val widths = listOf(47.73055739685947, 51.29965216862327, 50.4501521020009, 50.61806257444628)
         seeds.forEachIndexed { i, seed ->
             val f = generateCoverOrnament(seed).field
             assertEquals(patterns[i], f.pattern)
