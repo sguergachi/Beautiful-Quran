@@ -991,6 +991,8 @@ fun ReaderScreen(
         val request = requestedJumpAyah
             .takeIf { it > 0 }
             ?: return@LaunchedEffect
+        // A word tap can supersede this effect before its launch gets a frame.
+        if (interaction.pendingJumpAyah != request) return@LaunchedEffect
         val target = request.coerceIn(1, content.surah.ayahCount)
         // Do NOT clear pendingJump before focus() finishes: this effect is
         // keyed on it, so settling early cancels the coroutine mid-slide and the
@@ -2771,7 +2773,7 @@ fun ReaderScreen(
                     }
                     val onMushafWordClick = remember(mushafSurahId, viewModel) {
                         { token: MushafToken ->
-                            mushafDispatch.value(ReaderInteractionEvent.EnableFollow)
+                            mushafDispatch.value(ReaderInteractionEvent.WordPlayRequested)
                             if (token.surahId == mushafSurahId) {
                                 viewModel.playFromAyahWord(token.ayah, token.word.position)
                             } else {
@@ -2820,7 +2822,7 @@ fun ReaderScreen(
                     val seekAlignments = remember(content) { EnglishVerseAlignments(content) }
                     val onMushafVerseSeek = remember(mushafSurahId, viewModel, content, seekAlignments) {
                         { surahId: Int, ayah: Int, through: Float ->
-                            mushafDispatch.value(ReaderInteractionEvent.EnableFollow)
+                            mushafDispatch.value(ReaderInteractionEvent.WordPlayRequested)
                             val verse = content.ayahs
                                 .firstOrNull { it.number == ayah }
                                 ?.takeIf { surahId == mushafSurahId }
@@ -3222,7 +3224,7 @@ fun ReaderScreen(
                                         lastFollowFocusTarget = ayah.number
                                         followWasEnabled = true
                                         pendingWordTapAyah = ayah.number
-                                        dispatch(ReaderInteractionEvent.EnableFollow)
+                                        dispatch(ReaderInteractionEvent.WordPlayRequested)
                                         val start = viewModel.startMsForWord(
                                             ayah.number,
                                             word.position,
