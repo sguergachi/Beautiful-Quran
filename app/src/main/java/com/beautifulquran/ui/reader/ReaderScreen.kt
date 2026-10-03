@@ -243,6 +243,9 @@ fun ReaderScreen(
     /** Opens the previous chapter from a top-of-chapter overscroll pull. */
     onOpenPreviousChapter: (surahId: Int) -> Unit = {},
     onAyahSelectorExpandedChange: (Boolean) -> Unit = {},
+    /** Reports whether a verse annotation editor is open, so the paper stack
+     *  can hold its page turn while the reader is writing. */
+    onEditingAnnotationChange: (Boolean) -> Unit = {},
     /** Opens the Root Word Viewer (default word long-press). In developer mode
      *  MainActivity may intercept this into a chooser that can also open the
      *  Timings Lab. See docs/ROOT_VIEWER.md. */
@@ -534,6 +537,15 @@ fun ReaderScreen(
         }
     }
     val focusManager = LocalFocusManager.current
+    val editingAnnotationChangeLatest = rememberUpdatedState(onEditingAnnotationChange)
+    LaunchedEffect(editingAnnotationAyah) {
+        editingAnnotationChangeLatest.value(editingAnnotationAyah != 0)
+    }
+    // System Back ends the edit first: it clears focus, which hides the
+    // keyboard and commits through the field's focus-loss path. Only the next
+    // press may turn the paper stack beneath. Composed after MainActivity's
+    // stack handlers, so this one wins while an editor is open.
+    BackHandler(enabled = editingAnnotationAyah != 0) { focusManager.clearFocus() }
 
     val listState = rememberLazyListState()
     // Two ways out of the editor besides Done, both meaning "I've stopped

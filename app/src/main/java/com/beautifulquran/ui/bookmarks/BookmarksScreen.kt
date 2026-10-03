@@ -35,6 +35,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.activity.compose.BackHandler
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -94,6 +95,8 @@ fun BookmarksScreen(
     sheetVisible: () -> Boolean,
     onClose: () -> Unit,
     onOpenAyah: (surahId: Int, ayah: Int) -> Unit,
+    /** Reports whether a note editor is open, so the paper stack holds its page turn. */
+    onEditingAnnotationChange: (Boolean) -> Unit = {},
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     var pendingRemoval by remember { mutableStateOf<BookmarkKey?>(null) }
@@ -104,6 +107,13 @@ fun BookmarksScreen(
     var annotationDraft by rememberSaveable { mutableStateOf("") }
     val searching = uiState.query.isNotBlank()
     val focusManager = LocalFocusManager.current
+    val editingChangeLatest = rememberUpdatedState(onEditingAnnotationChange)
+    LaunchedEffect(editingAyah) {
+        editingChangeLatest.value(editingAyah != 0)
+    }
+    // System Back ends the edit first: it clears focus, which hides the
+    // keyboard and commits through the field's focus-loss path.
+    BackHandler(enabled = editingAyah != 0) { focusManager.clearFocus() }
     val listState = rememberLazyListState()
 
     fun commitAnnotation() {
