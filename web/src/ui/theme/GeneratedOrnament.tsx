@@ -10,7 +10,7 @@ import { useEffect, useId, useLayoutEffect, useMemo, useState } from 'react'
 import { fittedFieldCellWidth } from './ornamentGenerator'
 import type { BorderSpec, OrnamentStroke, RosetteSpec } from './ornamentGenerator'
 import { borderBandBackground, pathD, svgDataUri } from './ornamentSvg'
-import type { CoverLayout } from '../entrance/coverLayout'
+import { sealBox, type CoverLayout } from '../entrance/coverLayout'
 
 // The pure serializers live in ornamentSvg.ts (Node can import them without
 // React); re-exported here so existing call sites keep their import path.
@@ -225,7 +225,12 @@ export function GeneratedBorder({
   const verticalBg = useMemo(() => borderBandBackground(border, true), [border])
 
   const bandH = layout.bandHeight
-  const tipU = layout.bandCenter + layout.starSize * sealTip
+  // The frieze runs only along the straight part of the band: past the
+  // corner arc, where the seal is seated, and past the seal's own reach,
+  // whichever is further out. The channel mouth tapers in from there.
+  const arcEnd = layout.outerRadius + layout.outerInset
+  const sealU = layout.sealCenter + sealBox(layout, sealTip) * sealTip
+  const tipU = Math.max(sealU, arcEnd)
   const taper = bandH * 0.8
   const bandStart = tipU + taper
   const periodPx = border.period * bandH

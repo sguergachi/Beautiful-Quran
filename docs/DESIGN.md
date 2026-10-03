@@ -1242,11 +1242,15 @@ weight.
   current chapter · ayah as a compact quiet-green stadium, then the transport,
   with the same 4 dp foot as `PlayerBar`, then the phone's navigation inset
   inside the paper. The controls stay above the home gesture bar. It does not
-  take the ornaments' 10 dp foot. While the cover and the reader
-  turn, the chapter bar stays fixed above both sheets. In the scrolling
-  reader that bar never carries a back arrow. The scroll sheet's own back
-  control is in the top bar only while that sheet is parked; a swipe removes
-  it until the reader settles again. The reader's bottom clearance follows
+  take the ornaments' 10 dp foot. Until playback has created a session, Home
+  covers the bar, which shares the reader's subtle sideways shift and scale
+  underneath. After playback, a
+  cover ↔ reader turn keeps the chapter bar fixed above both sheets. Turning
+  from the reader to Settings carries that same bar away with the reader sheet;
+  it stays mounted throughout the turn. In the scrolling reader that bar never
+  carries a back arrow. The scroll sheet's own back
+  control stays in the top bar throughout a swipe and travels with the sheet;
+  recitation still recedes the top chrome. The reader's bottom clearance follows
   the pinned bar's measured body, including the return pill while that pill
   is open. On the phone web stack that same bar is drawn above the sheets;
   a desktop spread keeps the transport on the reader leaf. Landing on the chapter list expands the return
@@ -1256,11 +1260,12 @@ weight.
   tapping it returns to that verse in the reader. The
   enter/exit is also tied to the paper-stack page turn: returning to chapter
   selection plays the entrance; leaving for the reader plays the exit. A
-  quiet Close in the corner dismisses the session (stops playback) so the
-  bar exits the same way. The list's soft bottom dissolve sits **just above
-  the float** (`verticalFadingEdges` `bottomInset`), not stretched through
+  quiet Close in the corner stops playback immediately. The whole bar retains
+  its chapter pill and paper while sliding a full bar-height down over 260 ms;
+  only then does Home cover it. The list keeps its clearance through the exit.
+  The list's soft bottom dissolve sits **just above the float** (`verticalFadingEdges` `bottomInset`), not stretched through
   it — same paper edge as the reader above its embedded `PlayerBar`.
-  Opening the reader replaces the float with that bar.
+  The scrolling reader shares that transport with Chapters.
 
 ## Current-place ribbon
 
@@ -1431,22 +1436,17 @@ bookmark icon, a second ribbon shape, or a bespoke animated substitute.
 
 ### Chapters bookmark treatment
 
-Android and web developer settings compare two quiet placements without
-changing the bookmark language: a top-bound ribbon and a typographic *Saved
-passages* line whose number-column mark is the same ruby cloth. The web ribbon
-is 96 px tall; Android begins at the physical screen edge and carries its 96 dp
-body below the status-bar inset so the tip clears the title. Both appear only
-when a bookmark exists, open the same Bookmarks sheet, and reuse each
-platform's `VerseBookmarkRibbon`; verse-level ribbons in the Reader never
-change.
+Android uses the top-bound ruby ribbon to open Bookmarks. It starts at the
+physical screen edge and carries its 96 dp body below the status-bar inset
+so the tip clears the title. It appears only when a bookmark exists and keeps
+the fixed 28 dp Home lane and separate quiet navigation target. Cloth animation
+does not change the chapter document or act as navigation feedback.
 
-The selector is visible only in developer mode, but its persisted choice stays
-active if developer mode is hidden again. The inline treatment is omitted
-during active search so results remain answer-first. Its second line reports
-the live bookmark count as “1 saved ayah” or “12 saved ayahs.” The top-bound
-treatment retains the fixed 28 dp Home lane and separate
-quiet navigation target, so switching treatments never moves the chapter document
-or turns cloth animation into navigation feedback.
+Web retains its developer comparison with a typographic *Saved passages*
+line; the web top-bound ribbon is 96 px tall. Both treatments open the same
+Bookmarks sheet and reuse `VerseBookmarkRibbon`. Reader verse ribbons retain
+their own geometry. Android developer settings no longer expose bookmark
+placement, legacy colours, bracket hiding, or page-turn sound auditions.
 
 The bookmark index is a compact bilingual concordance, shared by Android and
 web. It uses one centered column (560 dp / 36 rem maximum) and a fixed 40 dp/px

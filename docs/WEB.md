@@ -399,9 +399,13 @@ board and every sheet; a Mushaf leaf is absolutely placed on
 lines in a layout effect in `MushafLeaf`. The cap is the
 `mushafGlyphWiden` setting.
 Mushaf lines justify by even word spaces: words and verse marks are
-separate flex items of the line (`space-between`, 0.3 em minimum gap) inside
-`.mushaf-block`, which is `width: max-content` — as wide as the leaf's widest
-line — so head, lines and folio share that measure. `mushafLeafFit` only
+separate flex items of the line (`space-between`) inside `.mushaf-block`, so
+head, lines and folio share one measure. The minimum gap is Hafs's own word
+space (`MUSHAF_MIN_GAP`, 0.22 em) and loose lines widen toward 0.3 em. The
+block's width is `mushafMeasure`: the widest line set at minimum spaces with
+its letters condensed by up to `MUSHAF_MAX_CONDENSE` (4%), written inline by
+`MushafLeaf`. One outlier line used to set the measure for the whole page and
+loosen every other line; now it is set slightly narrow instead. `mushafLeafFit` only
 shrinks the type when the widest line overruns the page; widths are read at
 the applied scale and divided back (toggling the scale to measure made the
 measurement oscillate). Rationale in `docs/DESIGN.md`.
@@ -412,12 +416,40 @@ Page turns: `MushafReader` keeps the place the book last settled on,
 prepares both destination leaves at the reader’s measure, then portals a
 two-faced leaf into
 `BookSpread`'s turn slot (`.mushaf-flip`, CSS `rotateY`, 760 ms; a single leaf
-turns inside the reader sheet). The leaf (`TurningLeaf`) is a chain of nine
-strips, each hinged on the one before and bending a few degrees at its joint,
+turns inside the reader sheet). The leaf (`TurningLeaf`) is a chain of
+eighteen strips (nine left each joint a visible crease down the page), each hinged on the one before and bending a few degrees at its joint,
 so the page furls; every strip windows its own slice of the page. Each face is
 rendered once and its frozen DOM cloned into the strips; page models and
 verse-tail positions are shared across copies. The whole airborne subtree is
-inert and hidden from assistive technology. Incoming fit is known before lift
+inert and hidden from assistive technology. A sideways two-finger sweep on a
+trackpad turns one leaf (`wheelTurn.ts`; one sweep is one turn, momentum
+included). On facing leaves Chapters is the book's left-most page and
+Settings its right-most (Settings moves to the recto there): each is
+uncovered beneath the leaf on its side — the verso leaf lifts for Chapters,
+the recto leaf for Settings (`bookTurnDirection`) — and the same leaf is
+laid back down on the way out. From Chapters, the sweep that turns a leaf
+back (finger or two-finger trackpad sweep moving left) closes the book
+(`closesBook`): `EntranceCover` remounts with `returning`, runs its opening
+hinge in reverse fully inked, and waits to be opened by hand (tap, Enter,
+Escape or a forward sweep).
+The cover's corner seals are part of the border as on Android
+(`sealCenterPx` / `sealBoxPx`): `coverLayout` gives each a radius of half
+the band and seats it on the band's centreline arc at 45°, tangent to both
+rules; the frieze starts past the arc. On a desk the gilding's light follows
+the mouse (`.entrance-glint`): a difference layer then a dodge layer, tuned
+so the leather is returned unchanged and only gold flares. They need
+`.entrance-front` to be an isolated group.
+Root viewer on the spread: right-clicking a word lays the viewer as a loose
+sheet on the page facing that word (`facingPage`; the leaf passes its side
+through `onHoldWord` into `RootViewerState.origin`), so the word stays in
+sight. `RootViewer` portals into `BookSpread`'s `.book-loose` slot and the
+sheet slides down from above the window (`root-sheet-in` / `root-sheet-out`):
+leading edge lifted, a slight skew, a small overrun and settle. No shadow.
+Phones keep the ink bleed inside the reader sheet.
+Mushaf words take the same ink as the scroll reader: each is a `HafsWord`
+(paper-cover wash, glint, orange repeat) under the policy in
+`ui/reader/mushafInk.ts`, a port of Android `mushafInkPackKind`. A leaf in
+the air is a picture and starts no wash. Incoming fit is known before lift
 and frozen through landing; the outgoing face keeps its previous fit. One leaf
 finishes its turn before the latest queued destination starts, including a
 reversal. Hidden readers and an open root viewer yield the page keys; gathering

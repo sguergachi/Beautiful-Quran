@@ -640,8 +640,8 @@ right.
 **And the ruler measures the leaf, not a copy of it.** The first one built its
 own string from the raw translation and measured that. It is the obvious way to
 write it and it is wrong, because the leaf's string is not the raw translation:
-`englishLeaf` closes whitespace, trims, drops the translator's asides where the
-reader has asked for that, snaps its offsets off the middle of words with
+`englishLeaf` closes whitespace, trims, retains the translator's asides,
+snaps its offsets off the middle of words with
 `englishLeafBreak`, and sets a verse's mark only on the run that *ends* it. A
 ruler that rebuilds that is a second implementation of the leaf, and the two
 drift precisely where drift is invisible in a test and obvious on a page: the
@@ -655,9 +655,8 @@ fitted", and the pagination widens the offer rather than ending a leaf short,
 so no leaf is ever decided by how much text it happened to be shown.
 
 **And the cut only ever moves back.** `englishLeafBreak` takes the offset the
-ruler measured and moves it to a word boundary outside any bracket — the reader
-may have asked for the translator's asides to come off, and half a bracket on
-each leaf would strip neither. It used to move *forward*, and that one word of
+ruler measured and moves it to a word boundary outside any bracket, keeping
+the translator's aside together. It used to move *forward*, and that one word of
 direction was the cause of every short last line in this section's history.
 
 A leaf is measured before it is set, and the offset that comes back is the end
@@ -796,11 +795,10 @@ verse up.
 
 The offsets are estimates — the pagination counts characters, not glyphs — so
 the leaf snaps them to a word boundary as it sets them (`englishLeafBreak`).
-It only ever moves forward and is a pure function of the text, so the leaf that
+It only ever moves back and is a pure function of the text, so the leaf that
 ends at an offset and the leaf that begins there land on the same character
-without either knowing about the other. It never stops inside brackets either:
-the reader may have asked for the translator's asides to come off, those are
-stripped per half, and half a bracket on each leaf would strip from neither.
+without either knowing about the other. It never stops inside brackets either,
+so a translator's aside stays together.
 
 **The constants are fitted, not guessed.** Eleven real leaves were rendered on
 device and their line counts solved for what the layout actually does:

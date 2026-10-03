@@ -184,6 +184,7 @@ fun GeneratedMedallion(
     Spacer(
         modifier
             .size(size)
+            .gildingLayer()
             .drawWithCache {
                 val d = min(this.size.width, this.size.height)
                 val paths = RosettePaths(
@@ -238,6 +239,7 @@ fun GeneratedChapterRosette(
     Spacer(
         modifier
             .size(size)
+            .gildingLayer()
             .drawWithCache {
                 val d = min(this.size.width, this.size.height)
                 val paths = RosettePaths(
@@ -347,6 +349,7 @@ fun GeneratedCornerSeals(
     Spacer(
         modifier
             .fillMaxSize()
+            .gildingLayer()
             .drawWithCache {
                 val d = sealBoxPx(geometry, spec)
                 val paths = RosettePaths(
@@ -406,6 +409,7 @@ fun GeneratedBorderBand(
     Spacer(
         modifier
             .fillMaxSize()
+            .gildingLayer()
             .drawWithCache {
                 val bandH = ((geometry.innerInsetPx - geometry.outerInsetPx) * 0.72f)
                     .coerceIn(10.dp.toPx(), 20.dp.toPx())

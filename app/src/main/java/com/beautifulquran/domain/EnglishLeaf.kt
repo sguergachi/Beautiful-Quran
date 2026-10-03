@@ -92,7 +92,6 @@ data class EnglishLeafVerse(
      * counting them. See [textOffsetOf].
      */
     val source: String? = null,
-    val hideParentheticals: Boolean = false,
 ) {
     /** The mark closes the verse, so only the fragment that ends it carries one. */
     val endsVerse: Boolean get() = to >= verseLength
@@ -107,26 +106,13 @@ data class EnglishLeafVerse(
 
     /**
      * For each letter of [source] from [textFrom] that [text] prints, the offset
-     * just past it — the asides' letters are skipped when they were hidden, by
-     * the same bracket rules `hideParentheticalText` applies.
+     * just past it.
      */
     private val sourceLetterEnds: IntArray by lazy {
         val src = source ?: return@lazy IntArray(0)
         val ends = ArrayList<Int>(text.length)
-        var parens = 0
-        var squares = 0
         for (i in textFrom.coerceIn(0, src.length) until to.coerceIn(0, src.length)) {
-            val c = src[i]
-            if (hideParentheticals) {
-                when (c) {
-                    '(' -> parens++
-                    ')' -> if (parens > 0) parens--
-                    '[' -> squares++
-                    ']' -> if (squares > 0) squares--
-                }
-                if (parens > 0 || squares > 0) continue
-            }
-            if (c.isLetter()) ends += i + 1
+            if (src[i].isLetter()) ends += i + 1
         }
         ends.toIntArray()
     }
@@ -377,7 +363,6 @@ fun englishLeafVerseKeys(page: MushafPage): List<Pair<Int, Int>> =
 fun englishLeaf(
     page: Int,
     runs: List<EnglishVerseRun>,
-    hideParentheticals: Boolean = false,
     translation: (surahId: Int, ayah: Int) -> String,
 ): EnglishLeaf {
     val blocks = ArrayList<EnglishLeafBlock>(4)
@@ -403,7 +388,7 @@ fun englishLeaf(
         val to = englishLeafBreak(whole, verseRun.to)
         if (to <= from && whole.isNotEmpty()) return@forEach
         val slice = whole.substring(from, to)
-        val text = englishVerseProse(slice, hideParentheticals)
+        val text = englishVerseProse(slice)
         if (text.isNotEmpty()) {
             prose += EnglishLeafVerse(
                 surahId = verseRun.surahId,
@@ -414,7 +399,6 @@ fun englishLeaf(
                 verseLength = whole.length,
                 textFrom = from + (slice.length - slice.trimStart().length),
                 source = whole,
-                hideParentheticals = hideParentheticals,
             )
         }
     }
@@ -423,21 +407,15 @@ fun englishLeaf(
 }
 
 /**
- * A verse as the leaf sets it: one run of prose, its bracketed asides removed
- * where the reader has asked for that, and its internal line breaks closed up
- * — the source keeps a few, and a book page does not break a sentence in the
- * middle for them.
+ * A verse as the leaf sets it: one run of prose, its internal line breaks
+ * closed up — the source keeps a few, and a book page does not break a
+ * sentence in the middle for them.
  */
-private fun englishVerseProse(text: String, hideParentheticals: Boolean): String {
-    val shown = if (hideParentheticals) {
-        hideParentheticalText(listOf(text)).single()
-    } else {
-        text
-    }
+private fun englishVerseProse(text: String): String {
     // The vetoed cuts: bad hyphen breaks joined before the breaker sees the
     // text. The ruler composes through this same function, so the pagination
     // measures exactly what the leaf draws.
-    return EnglishHyphenation.setProse(shown.replace(WHITESPACE_RUN, " ").trim())
+    return EnglishHyphenation.setProse(text.replace(WHITESPACE_RUN, " ").trim())
 }
 
 private val WHITESPACE_RUN = Regex("\\s+")

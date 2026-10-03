@@ -13,7 +13,6 @@ import kotlin.random.Random
 
 /** A page-turn recording split into the three phases of a physical flip. */
 data class PageTurnFlip(
-    val name: String,
     val liftRes: Int,
     val sweepRes: Int,
     val dropRes: Int,
@@ -180,14 +179,6 @@ class PageTurnSounds(context: Context) {
         handler.postDelayed({ playStem(flip.dropRes, COVER_OPEN_RATE) }, 820)
     }
 
-    /** Play a whole flip at natural pace — for auditioning in developer settings. */
-    fun auditionFlip(index: Int) {
-        val flip = FLIPS.getOrNull(index) ?: return
-        playStem(flip.liftRes, 1f)
-        handler.postDelayed({ playStem(flip.sweepRes, 1f) }, 110)
-        handler.postDelayed({ playStem(flip.dropRes, 1f) }, 300)
-    }
-
     fun release() {
         handler.removeCallbacksAndMessages(null)
         soundPool.release()
@@ -204,9 +195,9 @@ class PageTurnSounds(context: Context) {
         internal const val DROP_AT = 0.88f
 
         val FLIPS = listOf(
-            PageTurnFlip("Flip 2 (crisp)", R.raw.flip2_lift, R.raw.flip2_sweep, R.raw.flip2_drop),
-            PageTurnFlip("Flip 8 (busy)", R.raw.flip8_lift, R.raw.flip8_sweep, R.raw.flip8_drop),
-            PageTurnFlip("Flip 9 (soft sweep)", R.raw.flip9_lift, R.raw.flip9_sweep, R.raw.flip9_drop),
+            PageTurnFlip(R.raw.flip2_lift, R.raw.flip2_sweep, R.raw.flip2_drop),
+            PageTurnFlip(R.raw.flip8_lift, R.raw.flip8_sweep, R.raw.flip8_drop),
+            PageTurnFlip(R.raw.flip9_lift, R.raw.flip9_sweep, R.raw.flip9_drop),
         )
     }
 }

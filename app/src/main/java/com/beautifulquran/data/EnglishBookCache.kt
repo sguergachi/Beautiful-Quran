@@ -42,7 +42,6 @@ class EnglishBookCache internal constructor(private val dir: File) {
         wellPx: Float,
         measurePx: Float,
         verseNumberScript: Int,
-        hideParentheticals: Boolean,
         leafText: Int,
         database: String,
     ): String = listOf(
@@ -50,7 +49,6 @@ class EnglishBookCache internal constructor(private val dir: File) {
         wellPx.toRawBits(),
         measurePx.toRawBits(),
         verseNumberScript,
-        if (hideParentheticals) 1 else 0,
         leafText,
         database,
     ).joinToString("-")

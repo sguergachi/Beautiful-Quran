@@ -1,4 +1,7 @@
 import { useEffect, useId, useMemo, useState } from 'react'
+import { createPortal } from 'react-dom'
+import { facingPage, useBookSpread, useLooseSheetSlot } from '../paper/bookSpread'
+import { SHEET_LAY_SCHEDULE, playFlip } from '../paper/pageTurnSounds'
 import { appStore, useAppSelector, type RootViewerState } from '../../store/appStore'
 import { IconClose, IconVolumeUp } from '../icons/PlaybackIcons'
 import { featureSummary, posLabel, spacedRoot } from './morphologyLabels'
@@ -28,6 +31,8 @@ import {
 
 /** Exit hole duration — keep in sync with `.ink-bleed[data-closing]`. */
 const BLEED_OUT_MS = 420
+/** The loose sheet drawn back off the page — `root-sheet-out` in styles.css. */
+const SHEET_OUT_MS = 460
 
 /** Lane prose: Arabic mushaf face, quiet citations; glue "see" to its target. */
 function LexiconProse({ text }: { text: string }) {
@@ -120,21 +125,52 @@ function ExplainedHeading({
   )
 }
 
-/** Root lexicon ink bleed hosted inside the reader sheet. */
+/**
+ * Root lexicon. On a phone it is an ink bleed over the reader sheet. On the
+ * desktop spread it is a loose sheet slid down from the head of the book
+ * onto the page facing the word, which stays in sight beside it.
+ */
 export function RootViewer() {
   const rv = useAppSelector((s) => s.rootViewer)
   const closing = useAppSelector((s) => s.rootViewerClosing)
+  const spread = useBookSpread()
+  const slot = useLooseSheetSlot()
+  const sheet = spread && slot != null
+  const open = rv != null
 
   useEffect(() => {
     if (!closing) return
-    const timer = window.setTimeout(() => appStore.finishCloseRootViewer(), BLEED_OUT_MS + 80)
+    const timer = window.setTimeout(
+      () => appStore.finishCloseRootViewer(),
+      (sheet ? SHEET_OUT_MS : BLEED_OUT_MS) + 80,
+    )
     return () => window.clearTimeout(timer)
-  }, [closing])
+  }, [closing, sheet])
 
-  return rv ? <RootViewerBleed closing={closing} rv={rv} /> : null
+  // Paper on paper, once as the sheet is laid; another word on a sheet
+  // already down changes its ink, not the sheet.
+  useEffect(() => {
+    if (!open || !sheet) return
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return
+    playFlip(SHEET_LAY_SCHEDULE)
+  }, [open, sheet])
+
+  if (!rv) return null
+  return sheet
+    ? createPortal(<RootViewerBleed closing={closing} rv={rv} page={facingPage(rv.origin)} />, slot)
+    : <RootViewerBleed closing={closing} rv={rv} />
 }
 
-function RootViewerBleed({ closing, rv }: { closing: boolean; rv: RootViewerState }) {
+function RootViewerBleed({
+  closing,
+  rv,
+  page,
+}: {
+  closing: boolean
+  rv: RootViewerState
+  /** The page of the spread the loose sheet lies on; absent for the phone's bleed. */
+  page?: 'recto' | 'verso'
+}) {
   const sections = useMemo(() => rootOccurrenceSections(rv.occurrences), [rv.occurrences])
   const relatedForms = useMemo(
     () => relatedRootForms(rv.lemmas, rv.lemma, rv.pos),
@@ -195,11 +231,13 @@ function RootViewerBleed({ closing, rv }: { closing: boolean; rv: RootViewerStat
 
   return (
     <div
-      className="ink-bleed"
+      className={page ? 'ink-bleed root-sheet' : 'ink-bleed'}
+      data-page={page}
       data-closing={closing ? 'true' : undefined}
       style={{ ['--ox' as string]: '50%', ['--oy' as string]: '35%' }}
       onAnimationEnd={(event) => {
-        if (event.target === event.currentTarget && closing && event.animationName === 'bleed-out') {
+        const out = page ? 'root-sheet-out' : 'bleed-out'
+        if (event.target === event.currentTarget && closing && event.animationName === out) {
           appStore.finishCloseRootViewer()
         }
       }}

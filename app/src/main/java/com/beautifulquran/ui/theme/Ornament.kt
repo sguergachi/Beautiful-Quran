@@ -129,7 +129,7 @@ fun GildedRosette(
     modifier: Modifier = Modifier,
 ) {
     GildingDemand(sheen)
-    Canvas(modifier.then(Modifier.size(size))) {
+    Canvas(modifier.then(Modifier.size(size)).gildingLayer()) {
         val s = min(this.size.width, this.size.height)
         val c = s / 2f
         val line = Stroke(width = s * 0.016f)
@@ -183,7 +183,7 @@ fun MushafCoverFrame(
     modifier: Modifier = Modifier,
 ) {
     GildingDemand(sheen)
-    Canvas(modifier) {
+    Canvas(modifier.gildingLayer()) {
         val outerInset = geometry.outerInsetPx
         val innerInset = geometry.innerInsetPx
         val rule = Stroke(width = 2.dp.toPx())

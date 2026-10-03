@@ -101,6 +101,11 @@ export interface RootViewerState {
   dictionary: DictionaryEntry | null
   /** True while the header speaker is auditioning this word. */
   isPlayingWord: boolean
+  /**
+   * Which page of a desktop spread the word stands on. The viewer is laid
+   * over the other one, so the word stays in sight.
+   */
+  origin: 'recto' | 'verso'
 }
 
 const START_SEEK_GRACE_MS = 1_500
@@ -1028,7 +1033,7 @@ class AppStore {
     this.set({ rootViewer: null, rootViewerClosing: false })
   }
 
-  openRootViewer(surahId: number, ayah: number, word: Word) {
+  openRootViewer(surahId: number, ayah: number, word: Word, origin: 'recto' | 'verso' = 'recto') {
     this.stopWordAudition(true)
     // Android pauseForRootViewer: capture when this chapter is on the player
     // (playing or paused) so exit can restore a full queue after word audition.
@@ -1067,6 +1072,7 @@ class AppStore {
           lexicon: null,
           dictionary: null,
           isPlayingWord: false,
+          origin,
         },
       })
       return
@@ -1091,6 +1097,7 @@ class AppStore {
         lexicon: null,
         dictionary: null,
         isPlayingWord: false,
+        origin,
       },
     })
     // Lane lives in its own ~20 MB asset, fetched on the first root a reader

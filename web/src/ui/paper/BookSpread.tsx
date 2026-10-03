@@ -1,7 +1,7 @@
 import { useMemo } from 'react'
 import { GeneratedRosette } from '../theme/GeneratedOrnament'
 import { generateCoverOrnament } from '../theme/ornamentGenerator'
-import { setTurningLeafSlot, setVersoLeafSlot } from './bookSpread'
+import { setLooseSheetSlot, setTurningLeafSlot, setVersoLeafSlot } from './bookSpread'
 
 /**
  * The open book the desktop sheets lie on: binding boards, two pages with
@@ -41,6 +41,8 @@ export function BookSpread({ titlePage, versoCovered }: { titlePage: boolean; ve
       </div>
       {/* Mushaf layout: the reader portals the facing leaf in here. */}
       <div className="book-verso-leaf" ref={setVersoLeafSlot} inert={versoCovered} aria-hidden={versoCovered || undefined} />
+      {/* A loose sheet laid over either page: the root viewer. */}
+      <div className="book-loose" ref={setLooseSheetSlot} />
       {/* …and the leaf that is mid-turn, which crosses the spine. */}
       <div className="book-turn" ref={setTurningLeafSlot} aria-hidden="true" />
       {/* The gutter's turn — above the sheets, so both pages curve into it. */}
