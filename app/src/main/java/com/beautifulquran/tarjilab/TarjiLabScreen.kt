@@ -461,17 +461,18 @@ private fun PreviewWord(
             depth = InkEngine.GLINT_RESONANCE_DEPTH,
             enabled = true,
         )
+        val pulseColor = com.beautifulquran.ui.theme.glintPulseColor(GlintGold, resonance.peak)
         Canvas(Modifier.fillMaxSize()) {
             val amount = (0.22f * resonance.layerMult + 0.9f * resonance.peak) *
                 ui.displayKnobs.glintBrightness.coerceIn(0f, 2f)
             if (amount > 0.01f) {
                 drawCircle(
-                    color = GlintGold.copy(alpha = (amount * 0.55f).coerceIn(0f, 0.75f)),
+                    color = pulseColor.copy(alpha = (amount * 0.55f).coerceIn(0f, 0.75f)),
                     radius = size.minDimension * 0.42f,
                     center = center,
                 )
                 drawCircle(
-                    color = GlintGold.copy(alpha = (amount * 0.3f).coerceIn(0f, 0.45f)),
+                    color = pulseColor.copy(alpha = (amount * 0.3f).coerceIn(0f, 0.45f)),
                     radius = size.minDimension * 0.62f,
                     center = center,
                 )
@@ -481,7 +482,9 @@ private fun PreviewWord(
             text = ui.wordArabic,
             style = ArabicWordStyle,
             fontSize = fontSize,
-            color = GlintGold,
+            color = com.beautifulquran.ui.theme.glintPulseColor(
+                GlintGold, resonance.peak * ui.displayKnobs.glintBrightness.coerceIn(0f, 1f),
+            ),
         )
     }
 }

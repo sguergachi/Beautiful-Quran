@@ -81,6 +81,7 @@ import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.geometry.RoundRect
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.graphics.Paint
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.Shadow
@@ -1216,6 +1217,10 @@ internal class InkMotion(
     val glintPeak: Float
         get() = if (isActive) tarji.value.peak else 0f
 
+    /** Live crest hue, read by both paint adapters inside their draw scopes. */
+    fun glintColor(base: Color): Color =
+        com.beautifulquran.ui.theme.glintPulseColor(base, glintPeak)
+
     /** Tint alpha: always-on wet strength, lifted further on tarjīʿ peaks. */
     fun glintTintColorAlpha(base: Float): Float =
         InkEngine.glintColorAlpha(base, glintPeak)
@@ -1257,14 +1262,17 @@ private fun Modifier.layeredBaseInk(motion: InkMotion, rtl: Boolean): Modifier =
 
 /** Draw-phase alpha gate for a glyph layer, padded by [GlintLayerBleed] so the
  * halo's blur is not clipped at the layer edge. */
-private fun Modifier.bleedAlphaLayer(alpha: () -> Float): Modifier = drawWithContent {
+private fun Modifier.bleedAlphaLayer(alpha: () -> Float, color: () -> Color): Modifier = drawWithContent {
     val a = alpha()
     if (a <= 0f) return@drawWithContent
     val bleed = GlintLayerBleed.toPx()
     drawIntoCanvas { canvas ->
         canvas.saveLayer(
             Rect(-bleed, -bleed, size.width + bleed, size.height + bleed),
-            Paint().apply { this.alpha = a },
+            Paint().apply {
+                this.alpha = a
+                colorFilter = ColorFilter.tint(color())
+            },
         )
     }
     drawContent()
@@ -1272,8 +1280,11 @@ private fun Modifier.bleedAlphaLayer(alpha: () -> Float): Modifier = drawWithCon
 }
 
 /** Layered-word adapter for the glint tint riding the word's live wash. */
-private fun Modifier.layeredGlintInk(motion: InkMotion, rtl: Boolean): Modifier =
-    bleedAlphaLayer { motion.glintLayerAlpha }.letterFadeIn(
+private fun Modifier.layeredGlintInk(motion: InkMotion, rtl: Boolean, color: Color, tintBase: Float): Modifier =
+    bleedAlphaLayer(
+        alpha = { motion.glintLayerAlpha * motion.glintTintColorAlpha(tintBase) },
+        color = { motion.glintColor(color) },
+    ).letterFadeIn(
         progress = { motion.glintProgress },
         rtl = rtl,
         restingAlpha = 0f,
@@ -1281,12 +1292,15 @@ private fun Modifier.layeredGlintInk(motion: InkMotion, rtl: Boolean): Modifier 
     )
 
 /** Layered-word adapter for the tight glyph halo. */
-private fun Modifier.layeredGlintHalo(motion: InkMotion, rtl: Boolean): Modifier =
+private fun Modifier.layeredGlintHalo(motion: InkMotion, rtl: Boolean, color: Color): Modifier =
     // Same directional wash as the tint: the halo forms *during* the bloom on
     // the revealed letters, not as a whole-word fade that only peels fully at
     // progress 1 (that made mid-wash glimmer invisible). Tarjīʿ still gates
     // strength via [glintLayerAlpha].
-    bleedAlphaLayer { motion.glintLayerAlpha }.letterFadeIn(
+    bleedAlphaLayer(
+        alpha = { motion.glintLayerAlpha * motion.glintGlowColorAlpha(InkEngine.tuning.glintGlowAlpha) },
+        color = { motion.glintColor(color) },
+    ).letterFadeIn(
         progress = { motion.glintProgress },
         rtl = rtl,
         restingAlpha = 0f,
@@ -1525,16 +1539,12 @@ private fun HighlightLayeredText(
                 text = text,
                 style = style.copy(
                     shadow = Shadow(
-                        color = glimmerInk.copy(
-                            alpha = motion.glintGlowColorAlpha(
-                                InkEngine.tuning.glintGlowAlpha,
-                            ),
-                        ),
+                        color = glimmerInk,
                         blurRadius = InkEngine.tuning.glintGlowRadius,
                     ),
                 ),
                 color = glimmerInk.copy(alpha = 0.01f),
-                modifier = Modifier.layeredGlintHalo(motion, rtl),
+                modifier = Modifier.layeredGlintHalo(motion, rtl, glimmerInk),
             )
         }
         Text(
@@ -1596,7 +1606,7 @@ private fun HighlightLayeredText(
                 modifier = Modifier.repeatInkLayer(orangeWash, rtl),
             )
         }
-        // First-pass words glimmer white-gold; repeats glimmer terracotta.
+        // Base hue stays latched; accepted crests lift either hue toward white.
         if (glintInk != null && motion.showGlintLayer) {
             val tintBase = if (motion.glintIsRepeat) {
                 InkEngine.tuning.repeatInkAlpha
@@ -1606,10 +1616,8 @@ private fun HighlightLayeredText(
             InkOverlayText(
                 text = text,
                 style = style,
-                color = glimmerInk.copy(
-                    alpha = motion.glintTintColorAlpha(tintBase),
-                ),
-                modifier = Modifier.layeredGlintInk(motion, rtl),
+                color = glimmerInk,
+                modifier = Modifier.layeredGlintInk(motion, rtl, glimmerInk, tintBase),
             )
         }
     }
@@ -1807,11 +1815,11 @@ private fun MutableList<ShapedWordBloom>.addShapedInkMotionBlooms(
                 ShapedWordBloom.ColorReveal(
                     range = range,
                     progress = motion.glintProgress,
-                    color = if (motion.glintIsRepeat) {
+                    color = motion.glintColor(if (motion.glintIsRepeat) {
                         palette.repeatInkColor
                     } else {
                         glintInk
-                    },
+                    }),
                     restingAlpha = 0f,
                     layerAlpha = motion.glintLayerAlpha,
                     colorAlpha = motion.glintTintColorAlpha(tintBase),

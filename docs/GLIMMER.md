@@ -44,8 +44,8 @@ The glimmer has no independent sweep. It rides the active word's existing
 directional wash, with the same duration, easing, direction, and feather:
 
 1. The normal base ink remains the source of legibility.
-2. During a repeat, the glimmer itself uses the dark terracotta repeat ink;
-   white gold remains exclusive to first-pass words.
+2. During a repeat, the glimmer's base hue is the dark terracotta repeat ink;
+   white gold is the base hue of first-pass words.
 3. A glyph-shaped white-gold halo forms behind the visible ink **on the same
    directional wash as the tint** — during the bloom, not only after it.
 4. A restrained white-gold tint forms inside the glyphs above the other ink,
@@ -62,7 +62,7 @@ in the travel box made the glint much fainter than the underlying revealed ink
 early in a long hold. The mask still reaches the full halo so no unmapped
 fringe survives outside the word box. The feather profile stays unchanged.
 
-The glimmer's colour is latched when it forms and held for its full rendered
+The glimmer's base colour is latched when it forms and held for its full rendered
 lifetime. Chain release may change a repeat word back to a normal recited state
 while its glimmer is still fading; that state change must not recolour the
 drying shimmer white-gold. Conversely, when a single word moves directly from
@@ -109,6 +109,14 @@ mid-bloom and long waqf parks included. **Tarjīʿ turns it on and off**: the
 glimmer itself extinguishes at pulse troughs and lights with the crests —
 the voice's reverberation is the glimmer. The attack/release ramp
 (`tremoloGain`) blends the transitions so no detection edge pops.
+
+On Android, accepted positive crests also turn the glint tint and halo toward
+**full white**. A full-strength crest reaches white; as it falls, the hue returns
+to the formed glint's white-gold or repeat terracotta. Existing crest alpha
+boost and per-reciter brightness still apply. The colour shift is painted
+inside the same soft directional mask, so it lights revealed glyph ink during
+the wash and never exposes unread letters. Both shaped and layered readers
+sample the hue at draw time; the lab preview uses the same crest-to-colour map.
 
 The shimmer is the **build to the climax**: it engages as the hold's
 reverberation starts (the hold gate is short, ~300 ms, and the minimum

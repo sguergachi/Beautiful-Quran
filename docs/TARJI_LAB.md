@@ -5,6 +5,8 @@ word, change this reciter's detector parameters, and hear and see the result.
 The word and scope always show the detector's measured output. There is no
 manual envelope or synthesized pulse. Glint brightness scales the visual effect
 without changing the measured pulse or detector acceptance.
+The preview text and glow turn toward full white on accepted pulse crests,
+then return to white-gold as the pulse falls, matching the reader's crest hue.
 
 ## Workflow
 
