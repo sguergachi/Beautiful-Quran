@@ -112,6 +112,16 @@ const versoLeaf = createSlot()
 export const setVersoLeafSlot = versoLeaf.set
 export const useVersoLeafSlot = versoLeaf.use
 
+/** A loose sheet laid over one page of the spread (the root viewer). */
+const looseSheet = createSlot()
+export const setLooseSheetSlot = looseSheet.set
+export const useLooseSheetSlot = looseSheet.use
+
+/** A loose sheet is laid on the page facing the one it was called from. */
+export function facingPage(origin: 'recto' | 'verso'): 'recto' | 'verso' {
+  return origin === 'recto' ? 'verso' : 'recto'
+}
+
 /** The leaf in the air during a page turn: across both pages, over the sheets. */
 const turningLeaf = createSlot()
 export const setTurningLeafSlot = turningLeaf.set

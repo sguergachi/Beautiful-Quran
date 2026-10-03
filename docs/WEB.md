@@ -439,6 +439,13 @@ rules; the frieze starts past the arc. On a desk the gilding's light follows
 the mouse (`.entrance-glint`): a difference layer then a dodge layer, tuned
 so the leather is returned unchanged and only gold flares. They need
 `.entrance-front` to be an isolated group.
+Root viewer on the spread: right-clicking a word lays the viewer as a loose
+sheet on the page facing that word (`facingPage`; the leaf passes its side
+through `onHoldWord` into `RootViewerState.origin`), so the word stays in
+sight. `RootViewer` portals into `BookSpread`'s `.book-loose` slot and the
+sheet slides down from above the window (`root-sheet-in` / `root-sheet-out`):
+leading edge lifted, a slight skew, a small overrun and settle. No shadow.
+Phones keep the ink bleed inside the reader sheet.
 Mushaf words take the same ink as the scroll reader: each is a `HafsWord`
 (paper-cover wash, glint, orange repeat) under the policy in
 `ui/reader/mushafInk.ts`, a port of Android `mushafInkPackKind`. A leaf in

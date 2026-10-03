@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { bookTurnDirection, bookmarkSwipeDestination, closesBook, leavesReader, readerVisible, spreadLayers } from '../bookSpread'
+import { bookTurnDirection, bookmarkSwipeDestination, closesBook, facingPage, leavesReader, readerVisible, spreadLayers } from '../bookSpread'
 import { BOOKMARKS_LAYER, COVER_LAYER, READER_LAYER, SETTINGS_LAYER } from '../stack'
 
 describe('spreadLayers', () => {
@@ -90,5 +90,12 @@ describe('closing the book', () => {
     expect(closesBook(COVER_LAYER, 80)).toBe(false)
     expect(closesBook(READER_LAYER, -80)).toBe(false)
     expect(closesBook(BOOKMARKS_LAYER, -80)).toBe(false)
+  })
+})
+
+describe('a loose sheet', () => {
+  it('lies on the page facing the word, never over it', () => {
+    expect(facingPage('recto')).toBe('verso')
+    expect(facingPage('verso')).toBe('recto')
   })
 })

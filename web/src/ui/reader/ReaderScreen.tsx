@@ -1473,12 +1473,12 @@ export function ReaderScreen({
               pageNumberScript={pageNumberScript}
               glyphWiden={state.settings.mushafGlyphWiden / 100}
               ink={mushafInk}
-              onHoldWord={(surahId, ayah, position) => {
+              onHoldWord={(surahId, ayah, position, side) => {
                 if (state.gathering) return
                 const word = QuranRepository.surahContent(surahId).ayahs
                   .find((item) => item.number === ayah)?.words
                   .find((item) => item.position === position)
-                if (word) appStore.openRootViewer(surahId, ayah, word)
+                if (word) appStore.openRootViewer(surahId, ayah, word, side)
               }}
               onPlayWord={(surahId, ayah, position) => {
                 if (state.gathering) {

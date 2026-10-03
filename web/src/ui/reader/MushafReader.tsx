@@ -92,7 +92,8 @@ export function MushafReader({
   openRevision: number
   english: boolean
   onPlayWord: (surahId: number, ayah: number, position: number) => void
-  onHoldWord: (surahId: number, ayah: number, position: number) => void
+  /** [side] is the page of a spread the word stands on. */
+  onHoldWord: (surahId: number, ayah: number, position: number, side?: 'recto' | 'verso') => void
 }) {
   const targetAyah = followedAyah(activeAyah, openAyah)
   // Swipes stick until the opened ayah or the recited ayah changes.
@@ -512,7 +513,7 @@ function MushafLeaf({
    * and no word starts a wash of its own. */
   still?: boolean
   onPlayWord: (surahId: number, ayah: number, position: number) => void
-  onHoldWord: (surahId: number, ayah: number, position: number) => void
+  onHoldWord: (surahId: number, ayah: number, position: number, side?: 'recto' | 'verso') => void
   onTurn: (delta: number) => void
 }) {
   const drag = useRef<{ x: number; y: number } | null>(null)
@@ -772,7 +773,7 @@ function MushafLeaf({
                         sweepMs={owner ? InkEngine.sweepMs(ink.activeWord, ink.speed) : null}
                         activation={owner ? (ink.activeWord?.activation ?? 0) : 0}
                         onPlay={() => playRef.current(surahId, ayah, position)}
-                        onHold={() => holdRef.current(surahId, ayah, position)}
+                        onHold={() => holdRef.current(surahId, ayah, position, side)}
                       />
                     )}
                     {endsAyah ? (

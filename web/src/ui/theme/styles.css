@@ -7080,6 +7080,95 @@ html[data-entrance-closing]
   }
 }
 
+/* —— Root viewer as a loose sheet (desktop spread) ——
+ * Right-clicking a word slides a sheet down from the head of the book onto
+ * the page facing that word, so the word stays in sight beside it. The
+ * sheet is the root viewer's own contrasting stock, a little smaller than
+ * the page it lies on. Nothing casts a shadow: it reads as a sheet by how
+ * it moves. It is fed in by its top edge with the leading edge lifted off
+ * the page and a hand's slight skew, slows as paper drags on paper, runs a
+ * touch long and is drawn back square. Leaving, it is lifted and pulled
+ * back out the way it came. */
+.book-loose {
+  display: none;
+}
+
+.app-shell[data-spread='true'] .book-loose {
+  display: block;
+  position: absolute;
+  top: var(--page-y);
+  bottom: var(--page-y);
+  left: var(--page-outer);
+  right: var(--page-outer);
+  /* Over the sheets, under a turning leaf and the gutter's shade. */
+  z-index: 23;
+  pointer-events: none;
+  perspective: 1900px;
+  perspective-origin: 50% 0%;
+}
+
+.ink-bleed.root-sheet {
+  inset: auto;
+  top: 0.7rem;
+  bottom: 0.8rem;
+  border-radius: 2px;
+  pointer-events: auto;
+  transform-origin: 50% 0%;
+  /* From above the window, not the book: it arrives over the desk. */
+  --sheet-off: calc(-100% - var(--page-y) - 2rem);
+  animation: root-sheet-in 640ms both;
+}
+
+.ink-bleed.root-sheet[data-page='verso'] {
+  left: 0.8rem;
+  right: calc(50% + 1.1rem);
+  --sheet-skew: -1.3deg;
+}
+
+.ink-bleed.root-sheet[data-page='recto'] {
+  left: calc(50% + 1.1rem);
+  right: 0.8rem;
+  --sheet-skew: 1.3deg;
+}
+
+.ink-bleed.root-sheet[data-closing='true'] {
+  -webkit-mask-image: none;
+  mask-image: none;
+  animation: root-sheet-out 460ms both;
+}
+
+@keyframes root-sheet-in {
+  0% {
+    transform: translateY(var(--sheet-off)) rotateX(8deg) rotateZ(var(--sheet-skew));
+    animation-timing-function: cubic-bezier(0.2, 0.72, 0.3, 1);
+  }
+  64% {
+    transform: translateY(0.4rem) rotateX(1.4deg) rotateZ(calc(var(--sheet-skew) * -0.22));
+    animation-timing-function: ease-in-out;
+  }
+  84% {
+    transform: translateY(-0.1rem) rotateX(0deg) rotateZ(calc(var(--sheet-skew) * 0.06));
+    animation-timing-function: ease-out;
+  }
+  100% {
+    transform: translateY(0) rotateX(0deg) rotateZ(0deg);
+  }
+}
+
+@keyframes root-sheet-out {
+  0% {
+    transform: translateY(0) rotateX(0deg) rotateZ(0deg);
+    animation-timing-function: ease-out;
+  }
+  20% {
+    transform: translateY(0.25rem) rotateX(2.4deg) rotateZ(calc(var(--sheet-skew) * 0.2));
+    animation-timing-function: cubic-bezier(0.5, 0, 0.85, 0.4);
+  }
+  100% {
+    transform: translateY(var(--sheet-off)) rotateX(8deg) rotateZ(calc(var(--sheet-skew) * -0.8));
+  }
+}
+
 /* —— Page turn (Mushaf layout) ——
  * A leaf lifts off one page, swings over its bound edge and lies down on
  * the other. It is a picture of the two pages it carries; the real leaves
