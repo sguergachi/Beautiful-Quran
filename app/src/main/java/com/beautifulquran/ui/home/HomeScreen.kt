@@ -78,6 +78,8 @@ import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlin.math.roundToInt
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.drop
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.ui.res.stringResource
@@ -199,17 +201,35 @@ fun HomeScreen(
     }
     val pinnedSession = playbackPinned && !searchActive &&
         (floatingPlayback != null || playbackHost?.closing == true)
+    // Dismissal staging: the transport sweeps down as one opaque sheet to
+    // uncover the rows, so the inset holds until the sweep lands and only
+    // then eases out — otherwise the fade band visibly slides down behind
+    // the bar. Entering needs no staging: the rising sheet masks the
+    // padding opening beneath it.
+    var floatExitHold by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) {
+        snapshotFlow { showFloatingPlayback }
+            .drop(1)
+            .collectLatest { visible ->
+                if (!visible) {
+                    floatExitHold = true
+                    delay(HomeFloatExitMs.toLong())
+                    floatExitHold = false
+                } else {
+                    floatExitHold = false
+                }
+            }
+    }
     val listBottomInsetTarget = homeListBottomInset(
         pinnedSession = pinnedSession,
         pinnedHeight = if (pinnedSession) pinnedPlaybackHeight() else 0.dp,
-        floatingVisible = showFloatingPlayback,
+        floatingVisible = showFloatingPlayback || floatExitHold,
         floatingHeight = floatingPlaybackHeight,
         navigationBottom = navigationBottom,
     )
-    // Glide with the bar, don't pop under it. Dismissing the transport
-    // slides it out over 260 ms; collapsing the list padding in the same
-    // frame would jerk the rows up beneath the exiting bar. Same glide
-    // on entry, and when search covers the sheet.
+    // Glide with the bar, don't pop under it. The inset eases toward its
+    // target over the sweep length: settling the rows after a dismissal,
+    // and opening room under an entering bar.
     val listBottomInset by animateDpAsState(
         targetValue = listBottomInsetTarget,
         animationSpec = tween(260),

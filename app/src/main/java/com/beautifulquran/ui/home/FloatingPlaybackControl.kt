@@ -1,6 +1,8 @@
 package com.beautifulquran.ui.home
 
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -43,12 +45,19 @@ import androidx.media3.common.Player
 import com.beautifulquran.playback.PlayerUiState
 import com.beautifulquran.ui.reader.ReciterNameButton
 import com.beautifulquran.ui.theme.FloatingPaperEnter
-import com.beautifulquran.ui.theme.FloatingPaperExit
 import com.beautifulquran.ui.theme.quietClickable
 import com.beautifulquran.ui.theme.QuranTheme
 
 /** Extra list padding so the last surah rows clear the floating transport. */
 val FloatingPlaybackListClearance: Dp = 96.dp
+
+/**
+ * Dismissal sweep, matching the shared enter's full travel. The transport
+ * leaves as one opaque sheet instead of dissolving in place, so it uncovers
+ * the rows beneath rather than smearing over them. Home holds the list
+ * inset for exactly this long before easing it out (see HomeScreen).
+ */
+internal const val HomeFloatExitMs = 260
 
 /**
  * How far the paper stack may leave the cover before the float starts its
@@ -67,10 +76,11 @@ const val FloatingPlaybackCoverVisibleMaxPage = 0.45f
  * 4 dp foot as the reader bar. The home scaffold already keeps this paper
  * above the navigation bar, so the bar does not add that inset again, and
  * it does not take the ornaments' 10 dp foot. An opaque paper [Surface]
- * masks the list beneath, matching the embedded bar. Uses the same
- * enter/exit motion as
- * [com.beautifulquran.ui.theme.FloatingPaperControl]. A quiet Close dismisses
- * the session so the bar leaves with the shared exit animation.
+ * masks the list beneath, matching the embedded bar. Enter shares
+ * [com.beautifulquran.ui.theme.FloatingPaperEnter]; exit sweeps the whole
+ * sheet down ([HomeFloatExitMs]) to uncover the rows instead of dissolving
+ * over them. A quiet Close dismisses
+ * the session so the bar leaves with that sweep.
  */
 @Composable
 fun FloatingPlaybackControl(
@@ -92,7 +102,7 @@ fun FloatingPlaybackControl(
     AnimatedVisibility(
         visible = visible,
         enter = FloatingPaperEnter,
-        exit = FloatingPaperExit,
+        exit = slideOutVertically(animationSpec = tween(HomeFloatExitMs)) { it },
         modifier = modifier,
     ) {
         Surface(color = MaterialTheme.colorScheme.background) {
@@ -280,9 +290,9 @@ internal fun shouldShowFloatingPlayback(
 /**
  * Bottom paper the chapter list keeps clear of the transport. The pinned
  * chapter session wins while it owns a verse (or is sliding away); else
- * the floating bar while it is up; else just the gesture inset. The caller
- * animates toward this target instead of snapping, so rows glide rather
- * than pop when the bar enters or leaves.
+ * the floating bar while it is up — including its exit sweep, which the
+ * caller holds through — else just the gesture inset. The caller animates
+ * toward this target instead of snapping, so rows glide rather than pop.
  */
 internal fun homeListBottomInset(
     pinnedSession: Boolean,
