@@ -18,6 +18,7 @@ import {
   READER_LAYER,
 } from '../../store/appStore'
 import type { StackLayer } from '../paper/stack'
+import { useBookSpread } from '../paper/bookSpread'
 import { PlaybackPin } from '../paper/PlaybackPin'
 import { PaperInput } from '../kit/PaperInput'
 import {
@@ -243,6 +244,11 @@ export function ReaderScreen({
     void appStore.playFromWord(ayah, pos)
   }, [])
   const sheetRef = useRef<HTMLDivElement>(null)
+  const spread = useBookSpread()
+  // Facing leaves with Chapters lying over the left one: touching the page
+  // still being read, anywhere on it, puts Chapters away, and that touch
+  // does nothing else. The page's own controls keep their meaning.
+  const putAwayRef = useRef(false)
   const [sheetSize, setSheetSize] = useState({ width: 0, height: 0 })
   const [initialFocusSettled, setInitialFocusSettled] = useState(false)
   const [ayahRailTipOpen, setAyahRailTipOpen] = useState(false)
@@ -1336,6 +1342,21 @@ export function ReaderScreen({
       data-layer={READER_LAYER}
       data-depth={depth}
       data-active={active}
+      onPointerDownCapture={(event) => {
+        putAwayRef.current = false
+        if (!spread || state.settings.readingLayout !== 'mushaf') return
+        if (appStore.getSnapshot().stackLayer !== COVER_LAYER) return
+        const target = event.target as Element
+        // Portals (the facing leaf, the root sheet) are not this page.
+        if (!sheetRef.current?.contains(target) || target.closest('.reader-top, .player-bar')) return
+        putAwayRef.current = true
+        appStore.revealLayer(READER_LAYER)
+      }}
+      onClickCapture={(event) => {
+        if (!putAwayRef.current) return
+        putAwayRef.current = false
+        event.stopPropagation()
+      }}
       style={
         {
           ['--reader-paper' as string]: 'var(--paper)',

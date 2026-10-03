@@ -236,6 +236,7 @@ export function App() {
           <HomeScreen
             stackLayer={pageLayers.home}
             playbackPinned={playbackPinned && !spread}
+            onCloseBook={spread ? closeBook : undefined}
           />
           <SettingsScreen stackLayer={stack} hasReader={hasReader} />
           <div id="playback-pin" />

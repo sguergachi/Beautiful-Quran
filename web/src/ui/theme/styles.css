@@ -6678,11 +6678,21 @@ html[data-entrance='true'] body {
   right: var(--page-outer) !important;
 }
 
-/* A page laid onto the verso settles in from its fore-edge — nothing slides
-   across the desk or over the spine. */
-.app-shell[data-spread='true'] .sheet[data-name='bookmarks'][data-active='false'],
-.app-shell[data-spread='true'] .sheet[data-name='settings'][data-active='false'] {
+/* Settings is the right page in every layout: laid over the title page or
+   the chapter, never over Chapters. */
+.app-shell[data-spread='true'] .sheet[data-name='settings'] {
+  left: 50% !important;
+  right: var(--page-outer) !important;
+}
+
+/* A page laid onto either side settles in from its own fore-edge — nothing
+   slides across the desk or over the spine. */
+.app-shell[data-spread='true'] .sheet[data-name='bookmarks'][data-active='false'] {
   transform: translateX(-1.25rem);
+}
+
+.app-shell[data-spread='true'] .sheet[data-name='settings'][data-active='false'] {
+  transform: translateX(1.25rem);
 }
 
 .app-shell[data-spread='true']
@@ -6698,7 +6708,8 @@ html[data-entrance='true'] body {
   --reader-max: min(40rem, calc(var(--page-w) - 3.5rem));
 }
 
-/* Reading continues on the recto while Settings is open beside it. */
+/* A chapter under Settings is covered, not dimmed: the deck's fade for an
+   under-sheet would show through nothing here. */
 .app-shell[data-spread='true'] .sheet[data-name='reader'][data-depth] {
   opacity: 1;
 }
@@ -6955,6 +6966,101 @@ html[data-entrance-closing]
   color: var(--ink-rung-quiet);
 }
 
+/* —— One page grid ——
+ * Every page of the open book stands in the leaf's text block: φ at the
+ * fore-edge and the head, one unit at the spine. Chapters and Settings were
+ * set on the phone sheet's own padding (a share of the window's width, laid
+ * on top of the rows' insets), so their text sat in a narrower column than
+ * the leaf a turn uncovers them from, and clipped on a small window. */
+.app-shell[data-spread='true'] .sheet[data-name='home'] {
+  --home-start-inset: var(--margin-fore);
+  --home-end-inset: var(--margin-inner);
+}
+
+.app-shell[data-spread='true'] .sheet[data-name='home'] .scroll {
+  padding-inline: 0;
+}
+
+.app-shell[data-spread='true'] .home-scroll-page > .search-row {
+  padding-inline: var(--home-start-inset) var(--home-end-inset);
+}
+
+.app-shell[data-spread='true'] .home-header {
+  --home-header-top: var(--margin-head);
+}
+
+/* Settings is a right-hand page: spine on its left, fore-edge on its right. */
+.app-shell[data-spread='true'] .sheet[data-name='settings'] .settings {
+  padding-inline: var(--margin-inner) var(--margin-fore);
+}
+
+/* —— One of each thing on a spread ——
+ * Both pages are open at once, so a control that both sheets carry shows
+ * twice. The page being read keeps Settings; Chapters gives its own up. */
+.app-shell[data-spread='true'][data-has-reader='true'] .home-settings {
+  /* Hidden, not removed: the masthead keeps its height, so Chapters does
+     not shift when a chapter is opened beside it. */
+  visibility: hidden;
+}
+
+/* Settings is already open on the facing page. */
+.app-shell[data-spread='true'][data-has-reader='false'][data-stack='1'] .home-settings {
+  visibility: hidden;
+}
+
+/* The masthead is one line on any page: it scales with a small page
+   instead of breaking beside its own control. */
+.app-shell[data-spread='true'] .home-header h1 {
+  font-size: min(34px, calc(var(--page-w) * 0.078));
+  white-space: nowrap;
+}
+
+/* Facing leaves, Chapters open: the way to Chapters is already taken, and
+   the page beneath it cannot be turned from the recto alone. */
+.app-shell[data-spread='true'][data-leaves='true'][data-stack='0'] .reader-top[data-search='false'] > .back,
+.app-shell[data-spread='true'][data-leaves='true'][data-stack='0'] .sheet[data-name='reader'] .mushaf-turn {
+  visibility: hidden;
+}
+
+/* Closing the book: a strip of Chapters' fore-edge, like the leaves' own
+   turning strips. The mark shows only under a pointer or on focus. */
+.book-close {
+  display: none;
+}
+
+.app-shell[data-spread='true'] .book-close {
+  display: grid;
+  place-items: center;
+  position: absolute;
+  top: 22%;
+  bottom: 12%;
+  left: 0;
+  width: 1.6rem;
+  z-index: 6;
+  font-family: var(--font-display);
+  font-size: 1.6rem;
+  color: var(--ink-rung-furniture);
+}
+
+.app-shell[data-spread='true'] .book-close span {
+  opacity: 0;
+  transition: opacity 180ms ease;
+}
+
+.app-shell[data-spread='true'] .book-close:focus-visible span {
+  opacity: 1;
+}
+
+@media (hover: hover) {
+  .app-shell[data-spread='true'] .book-close:hover span {
+    opacity: 1;
+  }
+}
+
+.app-shell[data-cover-search='true'] .book-close {
+  visibility: hidden;
+}
+
 /* —— Spread, Mushaf layout: two facing leaves ——
  * The recto leaf is the reader sheet's own; the verso leaf is portalled
  * under the verso sheets, so Chapters, Bookmarks and Settings lie over it. */
@@ -6983,11 +7089,9 @@ html[data-entrance-closing]
   pointer-events: none;
 }
 
-/* Settings is the book's right-most page: on facing leaves it lies on the
-   recto, under the leaf that is turned away to show it. */
+/* On facing leaves Settings lies under the recto leaf, which is turned
+   away to show it, so it does not slide in. */
 .app-shell[data-spread='true'][data-leaves='true'] .sheet[data-name='settings'] {
-  left: 50% !important;
-  right: var(--page-outer) !important;
   transform: none;
   /* Still on the page until the leaf coming back down has covered it. */
   content-visibility: visible;

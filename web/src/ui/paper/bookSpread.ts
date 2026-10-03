@@ -1,9 +1,11 @@
 import { useSyncExternalStore } from 'react'
-import { BOOKMARKS_LAYER, COVER_LAYER, READER_LAYER, type StackLayer } from './stack'
+import { BOOKMARKS_LAYER, COVER_LAYER, READER_LAYER, SETTINGS_LAYER, type StackLayer } from './stack'
 
 /**
- * Desktop lays the paper stack open as a book: Chapters (and whatever sheet
- * covers it — Bookmarks, Settings) on the verso, the Reader on the recto.
+ * Desktop lays the paper stack open as a book, and every sheet has one
+ * place in it: Chapters is the left page (Bookmarks is laid over it), and
+ * the right page is whatever was opened from it — the title page, the
+ * chapter being read, or Settings laid over that.
  * Phones and narrow windows keep the one-sheet-at-a-time deck.
  */
 export const BOOK_SPREAD_QUERY = '(min-width: 1100px) and (min-height: 600px)'
@@ -24,8 +26,8 @@ export function useBookSpread(): boolean {
 
 /**
  * The layer each page believes the stack is on. In a spread the two pages
- * are both on top: an open chapter always owns the recto, and Chapters owns
- * the verso until Bookmarks or Settings is laid over it.
+ * are both on top: Chapters owns the verso until Bookmarks is laid over it,
+ * and an open chapter owns the recto until Settings is laid over it.
  */
 export function spreadLayers(
   spread: boolean,
@@ -33,18 +35,22 @@ export function spreadLayers(
   hasReader: boolean,
   leaves = false,
 ): { home: StackLayer; reader: StackLayer } {
-  if (!spread || !hasReader) return { home: stack, reader: stack }
+  if (!spread) return { home: stack, reader: stack }
+  // Mushaf layout fills both pages with facing leaves, so Chapters keeps
+  // its real layer there: laid over the verso at layer 0, gone above it.
+  // Otherwise nothing above Chapters' own layer covers the left page.
+  const home = !leaves && stack > COVER_LAYER ? COVER_LAYER : stack
+  if (!hasReader) return { home, reader: stack }
   return {
-    // Mushaf layout fills both pages with facing leaves, so Chapters keeps
-    // its real layer there: laid over the verso at layer 0, gone at layer 1.
-    home: !leaves && stack === READER_LAYER ? COVER_LAYER : stack,
-    reader: READER_LAYER,
+    home,
+    // Under Settings the chapter is a covered page: it gives up the keys.
+    reader: stack === SETTINGS_LAYER ? SETTINGS_LAYER : READER_LAYER,
   }
 }
 
-/** Visibility follows the facing page, rather than the sheet covering the verso. */
+/** In a spread the chapter is in sight beside Chapters and Bookmarks; Settings covers it. */
 export function readerVisible(spread: boolean, stack: StackLayer, hasReader: boolean): boolean {
-  return hasReader && (spread || stack === READER_LAYER)
+  return hasReader && (stack === READER_LAYER || (spread && stack < READER_LAYER))
 }
 
 export function leavesReader(
