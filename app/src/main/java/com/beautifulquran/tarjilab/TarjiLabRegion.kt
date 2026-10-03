@@ -8,7 +8,7 @@ import kotlin.math.roundToInt
 import kotlin.math.sin
 
 /** What a finger is doing on the waveform scope. */
-enum class TarjiLabTool { LISTEN, HOLD, SHAPE }
+enum class TarjiLabTool { LISTEN, HOLD }
 
 /** Loop playback rate for the hold preview. */
 enum class TarjiPreviewSpeed(val factor: Float, val mark: String) {

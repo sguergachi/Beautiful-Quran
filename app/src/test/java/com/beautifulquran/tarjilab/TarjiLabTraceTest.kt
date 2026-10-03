@@ -8,11 +8,13 @@ import com.beautifulquran.ui.reader.InkEngine
 import kotlin.math.PI
 import kotlin.math.abs
 import kotlin.math.sin
+import kotlin.math.pow
 import kotlin.math.sqrt
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertSame
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -99,6 +101,37 @@ class TarjiLabTraceTest {
     }
 
     @Test
+    fun `selected pulse band includes or excludes audible volume wavering`() {
+        val capture = captureOf(heldNote(4f, 130f, amHz = 5f, amDepth = 0.03f))
+        val knobs = TarjiLabKnobs(minTremoloDepth = 0.01f, minTremoloHz = 4f, maxTremoloHz = 6f)
+        val included = analyzeTarjiCapture(capture, knobs)
+        assertNotNull(included.reverberatingSpan)
+        assertTrue(included.visualUsesAmplitude[included.reverberatingSpan!!.last])
+        assertTrue(tarjiAcceptedPulseWave(included).any { abs(it) > 0.01f })
+        val excluded = analyzeTarjiCapture(capture, knobs.copy(minTremoloHz = 1.5f, maxTremoloHz = 3f))
+        assertNull(excluded.reverberatingSpan)
+        assertTrue(tarjiAcceptedPulseWave(excluded).all { it == 0f })
+    }
+
+    @Test
+    fun `selected pulse band includes or excludes pitch-only vibrato`() {
+        var phase = 0f
+        val pcm = FloatArray(4 * Tarji.SAMPLE_RATE) { i ->
+            val wobble = sin(2f * PI.toFloat() * 5.5f * i / Tarji.SAMPLE_RATE)
+            val frequency = 150f * 2f.pow(30f * wobble / 1200f)
+            phase += 2f * PI.toFloat() * frequency / Tarji.SAMPLE_RATE
+            0.3f * sin(phase)
+        }
+        val capture = captureOf(pcm)
+        val knobs = TarjiLabKnobs(minTremoloHz = 4.5f, maxTremoloHz = 6.5f)
+        val included = analyzeTarjiCapture(capture, knobs)
+        assertNotNull(included.reverberatingSpan)
+        assertFalse(included.visualUsesAmplitude[included.reverberatingSpan!!.last])
+        val excluded = analyzeTarjiCapture(capture, knobs.copy(minTremoloHz = 1.5f, maxTremoloHz = 3f))
+        assertNull(excluded.reverberatingSpan)
+    }
+
+    @Test
     fun `knobs gate the trace like the live detector`() {
         val pcm = heldNote(seconds = 2.5f, pitchHz = 130f, amHz = 5f, amDepth = 0.25f)
         val capture = captureOf(pcm)
@@ -123,6 +156,56 @@ class TarjiLabTraceTest {
         assertNotNull("lowered depth admits shallow AM",
             analyzeTarjiCapture(captureOf(shallow), TarjiLabKnobs(minTremoloDepth = 0.01f))
                 .reverberatingSpan)
+    }
+
+    @Test
+    fun `pulse graph changes with detection thresholds on the same voice`() {
+        val capture = captureOf(heldNote(2.5f, 130f, amHz = 5f, amDepth = 0.03f))
+        val rejected = tarjiAcceptedPulseWave(analyzeTarjiCapture(capture, TarjiLabKnobs()))
+        val accepted = tarjiAcceptedPulseWave(analyzeTarjiCapture(capture, TarjiLabKnobs(minTremoloDepth = 0.01f)))
+        assertTrue(rejected.all { it == 0f })
+        assertTrue(accepted.any { abs(it) > 0.01f })
+        assertTrue(accepted.all { it in -1f..1f })
+    }
+
+    @Test
+    fun `comparison changes the visible pulse without replacing live tuning`() {
+        val capture = captureOf(heldNote(2.5f, 130f, amHz = 5f, amDepth = 0.03f))
+        val referenceKnobs = TarjiLabKnobs()
+        val liveKnobs = referenceKnobs.copy(minTremoloDepth = 0.01f)
+        val reference = TarjiLabReference(referenceKnobs, analyzeTarjiCapture(capture, referenceKnobs))
+        val live = TarjiLabViewModel.TarjiLabUiState(
+            capture = capture, knobs = liveKnobs, trace = analyzeTarjiCapture(capture, liveKnobs),
+            reference = reference,
+        )
+        val comparing = live.copy(showingReference = true)
+        assertTrue(tarjiAcceptedPulseWave(comparing.displayTrace!!).all { it == 0f })
+        assertTrue(tarjiAcceptedPulseWave(live.displayTrace!!).any { abs(it) > 0.01f })
+        assertEquals(referenceKnobs, comparing.displayKnobs)
+        assertEquals(liveKnobs, comparing.knobs)
+        assertSame(live.trace, comparing.copy(showingReference = false).displayTrace)
+    }
+
+    @Test
+    fun `rejected hold still exposes the measured pulse for tuning`() {
+        val capture = captureOf(heldNote(2.5f, 130f, amHz = 5f, amDepth = 0.03f))
+        val trace = analyzeTarjiCapture(capture, TarjiLabKnobs())
+        assertNull(trace.reverberatingSpan)
+        assertTrue(tarjiAcceptedPulseWave(trace).all { it == 0f })
+        assertTrue(tarjiPulseWave(trace).any { abs(it) > 0.1f })
+        assertTrue(tarjiPulseWave(trace).all { it in -1f..1f })
+    }
+
+    @Test
+    fun `candidate diagnostics clear on reset without changing the reader gate`() {
+        val detector = Tarji()
+        detector.minTremoloDepth = 0.5f
+        val pcm = heldNote(2.5f, 130f, amHz = 5f, amDepth = 0.03f)
+        detector.onSamples8k(pcm)
+        assertFalse(detector.reverberating)
+        assertTrue(abs(detector.lastCandidateModulation) > 0.01f)
+        detector.reset()
+        assertEquals(0f, detector.lastCandidateModulation, 0f)
     }
 
     @Test
@@ -199,17 +282,42 @@ class TarjiLabTraceTest {
     }
 
     @Test
+    fun `trimmed capture rebases its first hop without shifting retained media positions`() {
+        val capture = captureOf(FloatArray(8_000))
+        val range = TarjiLabTrim.hopRangeInSpan(capture, 500.0, 700L..900L)
+        val trimmed = capture.slice(range)
+        val origin = capture.hopMediaMs(range.first, 500.0)
+        assertEquals(700.0, origin, 0.001)
+        assertEquals(900.0, trimmed.hopMediaMs(trimmed.hopCount - 1, origin), 0.001)
+    }
+
+    @Test
+    fun `brightness edits preserve accepted wave and detection`() {
+        val capture = captureOf(heldNote(2.5f, 130f, amHz = 5f, amDepth = 0.25f))
+        val dim = analyzeTarjiCapture(capture, TarjiLabKnobs(glintBrightness = 0f))
+        val bright = analyzeTarjiCapture(capture, TarjiLabKnobs(glintBrightness = 2f))
+        assertTrue(bright.reverberating.any { it })
+        org.junit.Assert.assertArrayEquals(dim.gain, bright.gain, 0f)
+        org.junit.Assert.assertArrayEquals(dim.tremolo, bright.tremolo, 0f)
+        assertEquals(tarjiAcceptedPulseWave(dim), tarjiAcceptedPulseWave(bright))
+    }
+
+    @Test
     fun `knobs map to and from the Ink Lab tuning`() {
-        val t = InkEngine.Tuning()
+        val t = InkEngine.Tuning(glintBrightness = 0.4f)
         val knobs = TarjiLabKnobs.fromTuning(t)
         assertEquals(t.glintResonanceMaxHz, knobs.maxTremoloHz, 0f)
         assertEquals(t.tarjiHoldMinMs, knobs.holdMinMs, 0f)
+        assertEquals(t.glintBrightness, knobs.glintBrightness, 0f)
         val back = TarjiLabKnobs.applyToTuning(knobs, t)
         assertEquals(t, back)
-        val modified = TarjiLabKnobs(maxTremoloHz = 4f, holdMinMs = 900f)
+        val modified = TarjiLabKnobs(maxTremoloHz = 4f, holdMinMs = 900f, glintBrightness = 1.6f)
         val applied = TarjiLabKnobs.applyToTuning(modified, t)
         assertEquals(4f, applied.glintResonanceMaxHz, 0f)
         assertEquals(900f, applied.tarjiHoldMinMs, 0f)
+        assertEquals(1.6f, applied.glintBrightness, 0f)
+        assertEquals(t.glintTintAlpha, applied.glintTintAlpha, 0f)
+        assertEquals(applied, TarjiLabKnobs.applyToTuning(modified, applied))
     }
 
     @Test

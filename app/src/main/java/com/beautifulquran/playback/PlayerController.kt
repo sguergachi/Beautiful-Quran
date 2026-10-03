@@ -457,10 +457,8 @@ class PlayerController(private val context: Context) {
         if (c.isPlaying) c.pause() else c.play()
     }
 
-    /** Pause if playing — used by one-shot word clips that must not resume. */
-    fun pause() = withController { c ->
-        if (c.isPlaying) c.pause()
-    }
+    /** Clear play intent even while buffering, so one-shot clips cannot resume later. */
+    fun pause() = withController { it.pause() }
 
     /** Resume the loaded queue without changing its current position. */
     fun resume() = withController { it.play() }

@@ -10,8 +10,8 @@ import kotlin.math.sqrt
 import kotlinx.serialization.Serializable
 
 /**
- * The Tarjīʿ Lab's detector knobs — the same eight the Ink Lab's Tarjīʿ
- * section exposes, mirrored 1:1 onto [Tarji] for offline replay.
+ * Per-reciter detector knobs and visual glint scale. Detector fields mirror
+ * [Tarji] for offline replay; brightness applies only to paint.
  */
 @Serializable
 data class TarjiLabKnobs(
@@ -23,6 +23,8 @@ data class TarjiLabKnobs(
     val maxPitchDrift: Float = Tarji.MAX_PITCH_DRIFT,
     val attackMs: Float = Tarji.ATTACK_MS,
     val releaseMs: Float = Tarji.RELEASE_MS,
+    /** Visual scale only; never changes the detector or measured trace. */
+    val glintBrightness: Float = 1f,
 ) {
     /** Apply onto a fresh detector — the analysis entry point. */
     fun applyTo(detector: Tarji) {
@@ -47,6 +49,7 @@ data class TarjiLabKnobs(
             maxPitchDrift = t.tarjiPitchDrift,
             attackMs = t.tarjiAttackMs,
             releaseMs = t.tarjiReleaseMs,
+            glintBrightness = t.glintBrightness,
         )
 
         /** Restore an imported sample's knobs into the Ink Lab tuning. */
@@ -60,6 +63,7 @@ data class TarjiLabKnobs(
                 tarjiPitchDrift = knobs.maxPitchDrift,
                 tarjiAttackMs = knobs.attackMs,
                 tarjiReleaseMs = knobs.releaseMs,
+                glintBrightness = knobs.glintBrightness,
             )
     }
 }
@@ -90,6 +94,7 @@ class TarjiLabTrace internal constructor(
     val amplitudePeriodicity: FloatArray = FloatArray(hopCount),
     val pitchModulationPeriodicity: FloatArray = FloatArray(hopCount),
     val visualUsesAmplitude: BooleanArray = BooleanArray(hopCount),
+    val candidateModulation: FloatArray = FloatArray(hopCount),
 ) {
     /** The closed span of hops where the detector held a reverberation. */
     val reverberatingSpan: IntRange?
@@ -152,6 +157,7 @@ fun analyzeTarjiCapture(
     val amPeriodicity = FloatArray(n)
     val fmPeriodicity = FloatArray(n)
     val usesAmplitude = BooleanArray(n)
+    val candidate = FloatArray(n)
     var resolved = -1
     for (i in 0 until n) {
         System.arraycopy(capture.pcm, i * capture.hopSamples, scratch, 0, capture.hopSamples)
@@ -174,6 +180,7 @@ fun analyzeTarjiCapture(
         amPeriodicity[i] = detector.lastAmplitudePeriodicity
         fmPeriodicity[i] = detector.lastPitchModulationPeriodicity
         usesAmplitude[i] = detector.lastVisualUsesAmplitude
+        candidate[i] = detector.lastCandidateModulation
     }
     if (resolved < 0) resolved = DETECTOR_FRAME_HOPS - 1
     return TarjiLabTrace(
@@ -194,8 +201,18 @@ fun analyzeTarjiCapture(
         amplitudePeriodicity = amPeriodicity,
         pitchModulationPeriodicity = fmPeriodicity,
         visualUsesAmplitude = usesAmplitude,
+        candidateModulation = candidate,
     )
 }
+
+/** Measured pulse before the acceptance gate. Preserve a fixed scale so a
+ * rejected hold remains inspectable rather than being multiplied into silence. */
+fun tarjiPulseWave(trace: TarjiLabTrace): List<Float> =
+    List(trace.hopCount) { i -> trace.candidateModulation[i].coerceIn(-1f, 1f) }
+
+/** Reader output, drawn over the candidate where the tuned detector accepts it. */
+fun tarjiAcceptedPulseWave(trace: TarjiLabTrace): List<Float> =
+    List(trace.hopCount) { i -> (trace.tremolo[i] * trace.gain[i]).coerceIn(-1f, 1f) }
 
 /** RMS of the 80 ms frame ending at hop [hop] (hops [hop−3]..[hop]) — the
  * detector's own envelope window. */

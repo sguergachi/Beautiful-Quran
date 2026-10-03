@@ -92,9 +92,15 @@ object TarjiLabCodec {
         }
 
     fun toCapture(sample: TarjiLabSample): TarjiLabCapture {
+        require(sample.hopSamples in 1..1_920 && sample.sampleRate > 0)
+        require(sample.hopContentDurationMs.isFinite() && sample.hopContentDurationMs > 0f)
+        require(playbackSampleRate(sample) in 4_000..192_000)
         val bytes = Base64.getDecoder().decode(sample.pcmB64)
-        val n = bytes.size / 2
         val hop = sample.hopSamples
+        require(bytes.isNotEmpty() && bytes.size <= 1_048_576 && bytes.size % (2 * hop) == 0) {
+            "PCM must contain complete hops within the preview buffer limit."
+        }
+        val n = bytes.size / 2
         val floats = FloatArray(n)
         for (i in 0 until n) {
             val lo = bytes[2 * i].toInt() and 0xFF

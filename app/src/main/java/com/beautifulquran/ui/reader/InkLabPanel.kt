@@ -558,6 +558,7 @@ internal fun formatTuningCopy(t: InkEngine.Tuning): String {
         appendLine("    glintTintAlpha = ${f(t.glintTintAlpha)},")
         appendLine("    glintGlowAlpha = ${f(t.glintGlowAlpha)},")
         appendLine("    glintGlowRadius = ${f(t.glintGlowRadius)},")
+        appendLine("    glintBrightness = ${f(t.glintBrightness)},")
         appendLine("    washFeather = ${f(t.washFeather)},")
         appendLine("    sweepEaseX1 = ${f(t.sweepEaseX1)},")
         appendLine("    sweepEaseY1 = ${f(t.sweepEaseY1)},")

@@ -10,6 +10,7 @@ import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.jsonObject
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -36,9 +37,65 @@ class TarjiLabCodecTest {
     }
 
     @Test
+    fun `old profiles keep shipped brightness and new profiles restore the scale`() {
+        val old = ReciterTarjiProfileBook.decode("""{"profiles":{"7":{"holdMinMs":600}}}""")
+        assertEquals(1f, old.profiles.getValue("7").glintBrightness, 0f)
+        val bright = ReciterTarjiProfileBook(mapOf("7" to old.profiles.getValue("7").copy(glintBrightness = 1.6f)))
+        assertEquals(bright, ReciterTarjiProfileBook.decode(ReciterTarjiProfileBook.encode(bright)))
+    }
+
+    @Test
+    fun `export freezes an imported capture and live tuning before the picker opens`() {
+        val audio = captureOf(note(1f))
+        val live = TarjiLabKnobs(holdMinMs = 720f)
+        val ui = TarjiLabViewModel.TarjiLabUiState(
+            capture = audio, firstHopMediaMs = 1234.0,
+            sampleReciterId = 7, sampleReciterName = "Imported reciter",
+            surahId = 1, ayah = 7, wordPosition = 1, wordArabic = "نَعْبُدُ",
+            knobs = live, sampleNotes = "Listen to the ending",
+            expectation = TarjiLabExpectation(startMs = 200f, endMs = 800f),
+            showingReference = false,
+            reference = TarjiLabReference(TarjiLabKnobs(), analyzeTarjiCapture(audio, TarjiLabKnobs())),
+        )
+        val frozen = ui.sampleForExport()!!
+        val changed = ui.copy(capture = captureOf(note(0.5f)), knobs = TarjiLabKnobs(), sampleReciterId = 99)
+        val restored = TarjiLabCodec.decode(TarjiLabCodec.encode(frozen))
+        assertEquals(7, restored.reciterId)
+        assertEquals("Imported reciter", restored.reciterName)
+        assertEquals(live, restored.knobs)
+        assertEquals(ui.expectation, restored.expectation)
+        assertEquals("Listen to the ending", restored.notes)
+        assertEquals(1234.0, restored.firstHopMediaMs, 0.0)
+        assertEquals(audio.hopCount, TarjiLabCodec.toCapture(restored).hopCount)
+        assertEquals(99, changed.sampleForExport()!!.reciterId)
+    }
+
+    @Test
+    fun `export in compare mode matches the graph without changing live settings`() {
+        val audio = captureOf(note(1f))
+        val checkpoint = TarjiLabKnobs(holdMinMs = 900f)
+        val live = TarjiLabKnobs(holdMinMs = 300f)
+        val ui = TarjiLabViewModel.TarjiLabUiState(
+            capture = audio, sampleReciterId = 7, sampleReciterName = "Reciter",
+            knobs = live, showingReference = true,
+            reference = TarjiLabReference(checkpoint, analyzeTarjiCapture(audio, checkpoint)),
+        )
+        val restored = TarjiLabCodec.decode(TarjiLabCodec.encode(ui.sampleForExport()!!))
+        assertEquals(checkpoint, restored.knobs)
+        assertEquals(live, ui.knobs)
+    }
+
+    @Test
+    fun `export requires both captured audio and identifiable reciter`() {
+        val ui = TarjiLabViewModel.TarjiLabUiState(sampleReciterId = 7, sampleReciterName = "Reciter")
+        assertNull(ui.sampleForExport())
+        assertNull(ui.copy(capture = captureOf(note(1f)), sampleReciterId = null).sampleForExport())
+    }
+
+    @Test
     fun `sample round-trips through JSON`() {
         val capture = captureOf(note(1.0f))
-        val knobs = TarjiLabKnobs(maxTremoloHz = 4f, minTremoloDepth = 0.05f, holdMinMs = 450f)
+        val knobs = TarjiLabKnobs(maxTremoloHz = 4f, minTremoloDepth = 0.05f, holdMinMs = 450f, glintBrightness = 1.4f)
         val expectation = TarjiLabExpectation(
             kind = TarjiExpectationKind.PULSES,
             startMs = 320f,
@@ -88,6 +145,28 @@ class TarjiLabCodecTest {
         legacyFields.remove("expectation")
         val legacy = TarjiLabCodec.decode(JsonObject(legacyFields).toString())
         assertEquals(TarjiExpectationKind.UNLABELED, legacy.expectation.kind)
+    }
+
+    @Test
+    fun `import rejects partial hops and invalid clocks before playback`() {
+        val valid = TarjiLabSample(
+            label = "test", reciterId = 7, reciterName = "Alafasy", surahId = 1,
+            ayah = 1, wordPosition = 1, wordArabic = "", sampleRate = 8000,
+            hopSamples = 160, firstHopMediaMs = 0.0,
+            pcmB64 = TarjiLabCodec.pcmToBase64(captureOf(note(0.1f))),
+            knobs = TarjiLabKnobs(),
+        )
+        val partial = java.util.Base64.getEncoder().encodeToString(ByteArray(321))
+        for (invalid in listOf(
+            valid.copy(hopSamples = 0),
+            valid.copy(hopContentDurationMs = 0f),
+            valid.copy(hopContentDurationMs = Float.NaN),
+            valid.copy(pcmB64 = partial),
+            valid.copy(pcmB64 = ""),
+        )) {
+            assertTrue(runCatching { TarjiLabCodec.toCapture(invalid) }.isFailure)
+        }
+        assertEquals(5, TarjiLabCodec.toCapture(valid).hopCount)
     }
 
     @Test
