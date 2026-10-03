@@ -308,8 +308,8 @@ class MainActivity : ComponentActivity() {
                     themeMode = settings.themeMode,
                 ) {
                     // Cold start paints the closed mushaf first; the paper stack
-                    // mounts under it after the title settles (onWarmStack), not
-                    // at splash handoff — so ViewModel init cannot jank first paint.
+                    // mounts under it after two board frames (onWarmStack),
+                    // before the title wash starts, so startup cannot interrupt it.
                     var stackMounted by remember { mutableStateOf(entranceDone) }
                     var coverSounds by remember { mutableStateOf<PageTurnSounds?>(null) }
                     DisposableEffect(Unit) {
