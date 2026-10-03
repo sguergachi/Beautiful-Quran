@@ -106,6 +106,29 @@ class ReaderInteractionTest {
     }
 
     @Test
+    fun `word play cancels a pending verse seek before it can restart the word`() {
+        val jumping = ReaderInteraction.reduce(
+            idle,
+            ReaderInteractionEvent.JumpRequested(2, resumeFollowIfPlaying = false),
+        )
+        val wordPlay = ReaderInteraction.reduce(jumping, ReaderInteractionEvent.WordPlayRequested)
+        assertEquals(0, wordPlay.pendingJumpAyah)
+        assertTrue(ReaderInteraction.shouldFollowPlayback(wordPlay))
+        assertEquals(
+            wordPlay,
+            ReaderInteraction.reduce(wordPlay, ReaderInteractionEvent.JumpSettled(2)),
+        )
+    }
+
+    @Test
+    fun `return to verse keeps the pending selection until it lands`() {
+        val jumping = idle.copy(followEnabled = false, pendingJumpAyah = 2)
+        val following = ReaderInteraction.reduce(jumping, ReaderInteractionEvent.EnableFollow)
+        assertEquals(2, following.pendingJumpAyah)
+        assertTrue(following.followEnabled)
+    }
+
+    @Test
     fun `annotating blocks playback follow even when follow enabled`() {
         val annotating = idle.copy(followEnabled = true, annotating = true)
         assertFalse(ReaderInteraction.shouldFollowPlayback(annotating))

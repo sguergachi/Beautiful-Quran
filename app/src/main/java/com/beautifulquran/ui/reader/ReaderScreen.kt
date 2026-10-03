@@ -243,6 +243,9 @@ fun ReaderScreen(
     /** Opens the previous chapter from a top-of-chapter overscroll pull. */
     onOpenPreviousChapter: (surahId: Int) -> Unit = {},
     onAyahSelectorExpandedChange: (Boolean) -> Unit = {},
+    /** Reports whether a verse annotation editor is open, so the paper stack
+     *  can hold its page turn while the reader is writing. */
+    onEditingAnnotationChange: (Boolean) -> Unit = {},
     /** Opens the Root Word Viewer (default word long-press). In developer mode
      *  MainActivity may intercept this into a chooser that can also open the
      *  Timings Lab. See docs/ROOT_VIEWER.md. */
@@ -534,6 +537,15 @@ fun ReaderScreen(
         }
     }
     val focusManager = LocalFocusManager.current
+    val editingAnnotationChangeLatest = rememberUpdatedState(onEditingAnnotationChange)
+    LaunchedEffect(editingAnnotationAyah) {
+        editingAnnotationChangeLatest.value(editingAnnotationAyah != 0)
+    }
+    // System Back ends the edit first: it clears focus, which hides the
+    // keyboard and commits through the field's focus-loss path. Only the next
+    // press may turn the paper stack beneath. Composed after MainActivity's
+    // stack handlers, so this one wins while an editor is open.
+    BackHandler(enabled = editingAnnotationAyah != 0) { focusManager.clearFocus() }
 
     val listState = rememberLazyListState()
     // Two ways out of the editor besides Done, both meaning "I've stopped
@@ -991,6 +1003,8 @@ fun ReaderScreen(
         val request = requestedJumpAyah
             .takeIf { it > 0 }
             ?: return@LaunchedEffect
+        // A word tap can supersede this effect before its launch gets a frame.
+        if (interaction.pendingJumpAyah != request) return@LaunchedEffect
         val target = request.coerceIn(1, content.surah.ayahCount)
         // Do NOT clear pendingJump before focus() finishes: this effect is
         // keyed on it, so settling early cancels the coroutine mid-slide and the
@@ -2771,7 +2785,7 @@ fun ReaderScreen(
                     }
                     val onMushafWordClick = remember(mushafSurahId, viewModel) {
                         { token: MushafToken ->
-                            mushafDispatch.value(ReaderInteractionEvent.EnableFollow)
+                            mushafDispatch.value(ReaderInteractionEvent.WordPlayRequested)
                             if (token.surahId == mushafSurahId) {
                                 viewModel.playFromAyahWord(token.ayah, token.word.position)
                             } else {
@@ -2820,7 +2834,7 @@ fun ReaderScreen(
                     val seekAlignments = remember(content) { EnglishVerseAlignments(content) }
                     val onMushafVerseSeek = remember(mushafSurahId, viewModel, content, seekAlignments) {
                         { surahId: Int, ayah: Int, through: Float ->
-                            mushafDispatch.value(ReaderInteractionEvent.EnableFollow)
+                            mushafDispatch.value(ReaderInteractionEvent.WordPlayRequested)
                             val verse = content.ayahs
                                 .firstOrNull { it.number == ayah }
                                 ?.takeIf { surahId == mushafSurahId }
@@ -3222,7 +3236,7 @@ fun ReaderScreen(
                                         lastFollowFocusTarget = ayah.number
                                         followWasEnabled = true
                                         pendingWordTapAyah = ayah.number
-                                        dispatch(ReaderInteractionEvent.EnableFollow)
+                                        dispatch(ReaderInteractionEvent.WordPlayRequested)
                                         val start = viewModel.startMsForWord(
                                             ayah.number,
                                             word.position,

@@ -529,6 +529,10 @@ private fun PaperStackApp(
     var readerSession by rememberSaveable { mutableIntStateOf(0) }
     var settledLayer by rememberSaveable { mutableIntStateOf(COVER_LAYER) }
     var ayahSelectorExpanded by remember { mutableStateOf(false) }
+    /** True while a verse annotation editor is open in the reader sheet. */
+    var readerAnnotationEditing by remember { mutableStateOf(false) }
+    /** True while a verse annotation editor is open in the bookmarks index. */
+    var bookmarksAnnotationEditing by remember { mutableStateOf(false) }
     /** The Timings Lab is not a page in the stack: it is a work sheet that
      * rises in place over whatever is open (usually the reader) and lowers
      * back onto it, so a long-pressed word is fixed exactly where it was
@@ -636,7 +640,7 @@ private fun PaperStackApp(
         settledLayer == settingsLayer + 1
     val stackGesturesBlocked = rememberUpdatedState(
         ayahSelectorExpanded || overlayBlocking || entranceVisible || mushafPageTurns ||
-            componentKitOpen,
+            componentKitOpen || readerAnnotationEditing || bookmarksAnnotationEditing,
     )
     val rootReturnVisible = rootReturnTarget != null && !overlayBlocking
     val onRootReturnUserMovedLatest = rememberUpdatedState {
@@ -1014,6 +1018,7 @@ private fun PaperStackApp(
                 viewModel = bookmarksViewModel,
                 sheetVisible = { stackPosition.value <= BOOKMARKS_LAYER + 0.02f },
                 onClose = { animateTo(COVER_LAYER) },
+                onEditingAnnotationChange = { bookmarksAnnotationEditing = it },
                 onOpenAyah = { surahId, ayah ->
                     if (surahId != selectedSurahId) readerViewModel.load(surahId)
                     selectedSurahId = surahId
@@ -1148,6 +1153,7 @@ private fun PaperStackApp(
                             selectedSearchText = null
                         },
                         onAyahSelectorExpandedChange = { ayahSelectorExpanded = it },
+                        onEditingAnnotationChange = { readerAnnotationEditing = it },
                         onOpenRootViewer = { sid, a, word -> onWordLongPress(sid, a, word) },
                         onRootReturnUserMoved = { onRootReturnUserMovedLatest.value() },
                         rootReturnVisible = rootReturnVisible,

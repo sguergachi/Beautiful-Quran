@@ -48,6 +48,9 @@ sealed class ReaderInteractionEvent {
     /** Return-to-ayah, play, or basmalah tap — re-enable lyric follow. */
     data object EnableFollow : ReaderInteractionEvent()
 
+    /** A word seek supersedes a verse jump, including its pending seek to zero. */
+    data object WordPlayRequested : ReaderInteractionEvent()
+
     /** Verse note editor opened or closed. */
     data class SetAnnotating(val active: Boolean) : ReaderInteractionEvent()
 }
@@ -113,6 +116,11 @@ object ReaderInteraction {
         )
 
         ReaderInteractionEvent.EnableFollow -> state.copy(followEnabled = true)
+
+        ReaderInteractionEvent.WordPlayRequested -> state.copy(
+            followEnabled = true,
+            pendingJumpAyah = 0,
+        )
 
         is ReaderInteractionEvent.SetAnnotating -> state.copy(annotating = event.active)
     }
