@@ -2,6 +2,7 @@ package com.beautifulquran.ui.home
 
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
@@ -196,15 +197,28 @@ fun HomeScreen(
     val navigationBottom = with(density) {
         WindowInsets.navigationBars.getBottom(density).toDp()
     }
-    val listBottomInset = when {
-        playbackPinned && !searchActive &&
-            (floatingPlayback != null || playbackHost?.closing == true) -> {
-            val measured = pinnedPlaybackHeight()
-            measured.takeIf { it > 0.dp } ?: FloatingPlaybackListClearance
-        }
-        showFloatingPlayback -> floatingPlaybackHeight
-        else -> navigationBottom
-    }
+    // No staging on dismiss anywhere: Close clears the session in the
+    // same frame the sweep starts, so the inset target falls at tap and
+    // glides with the slide — bar, fade band, and rows travel as one.
+    // (host.closing still stages the chrome layering above; just never
+    // the paper: holding the inset through the slide reads as a second
+    // bar sliding behind the first.)
+    val pinnedSession = playbackPinned && !searchActive && floatingPlayback != null
+    val listBottomInsetTarget = homeListBottomInset(
+        pinnedSession = pinnedSession,
+        pinnedHeight = if (pinnedSession) pinnedPlaybackHeight() else 0.dp,
+        floatingVisible = showFloatingPlayback,
+        floatingHeight = floatingPlaybackHeight,
+        navigationBottom = navigationBottom,
+    )
+    // One motion, not two: the sweep and the inset share duration and
+    // easing, so bar, fade band, and rows travel down together. Staging
+    // them (hold, then settle) reads as a second bar sliding behind.
+    val listBottomInset by animateDpAsState(
+        targetValue = listBottomInsetTarget,
+        animationSpec = tween(260),
+        label = "homeListBottomInset",
+    )
     val host = playbackHost
     if (host != null) {
         if (!host.closing) {
