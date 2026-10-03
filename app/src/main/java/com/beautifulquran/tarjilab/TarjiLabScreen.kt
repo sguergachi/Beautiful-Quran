@@ -461,7 +461,9 @@ private fun PreviewWord(
             depth = InkEngine.GLINT_RESONANCE_DEPTH,
             enabled = true,
         )
-        val pulseColor = com.beautifulquran.ui.theme.glintPulseColor(GlintGold, resonance.peak)
+        val pulseColor = com.beautifulquran.ui.theme.glintPulseColor(
+            GlintGold, resonance.peak, ui.displayKnobs.glintBrightness,
+        )
         Canvas(Modifier.fillMaxSize()) {
             val amount = (0.22f * resonance.layerMult + 0.9f * resonance.peak) *
                 ui.displayKnobs.glintBrightness.coerceIn(0f, 2f)
@@ -482,9 +484,7 @@ private fun PreviewWord(
             text = ui.wordArabic,
             style = ArabicWordStyle,
             fontSize = fontSize,
-            color = com.beautifulquran.ui.theme.glintPulseColor(
-                GlintGold, resonance.peak * ui.displayKnobs.glintBrightness.coerceIn(0f, 1f),
-            ),
+            color = pulseColor,
         )
     }
 }

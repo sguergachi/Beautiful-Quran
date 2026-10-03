@@ -14,6 +14,20 @@ import org.junit.Test
 class InkEngineTest {
 
     @Test
+    fun `turning off visual holds cannot disable an acoustic hold`() {
+        val original = InkEngine.tuning
+        try {
+            InkEngine.tuning = original.copy(tajweedPacing = false, holdMadd = false, holdWaqf = false)
+            assertNull(InkEngine.pacing("ٱلضَّآلِّينَ", active(9, 5000), isAyahFinal = true))
+            assertTrue(InkEngine.tarjiEligible("ٱلضَّآلِّينَ", isAyahFinal = true))
+            assertFalse(InkEngine.tarjiEligible("وَلَا", isAyahFinal = false))
+            assertFalse(InkEngine.tarjiEligible("يَقُولُ", isAyahFinal = false))
+        } finally {
+            InkEngine.tuning = original
+        }
+    }
+
+    @Test
     fun `paper handoff fades outgoing shaped ink without exposing future verses`() {
         val upcomingCover = 0.73f
 

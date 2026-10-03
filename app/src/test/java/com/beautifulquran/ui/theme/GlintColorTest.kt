@@ -11,6 +11,15 @@ class GlintColorTest {
     private val repeat = Color(0xFFE06A18)
 
     @Test
+    fun `brightness can lift a moderate real crest to white without lifting troughs`() {
+        for (base in listOf(gold, repeat)) {
+            assertEquals(Color.White, glintPulseColor(base, 0.67f, brightness = 2f))
+            assertEquals(base, glintPulseColor(base, 0f, brightness = 2f))
+            assertEquals(base, glintPulseColor(base, 0.67f, brightness = 0f))
+        }
+    }
+
+    @Test
     fun `accepted positive crest reaches white and falls back to the original hue`() {
         for (base in listOf(gold, repeat)) {
             val colours = listOf(-1f, 0f, 0.5f, 1f, 0.5f, 0f, -1f).map { pulse ->

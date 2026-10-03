@@ -1219,7 +1219,7 @@ internal class InkMotion(
 
     /** Live crest hue, read by both paint adapters inside their draw scopes. */
     fun glintColor(base: Color): Color =
-        com.beautifulquran.ui.theme.glintPulseColor(base, glintPeak)
+        com.beautifulquran.ui.theme.glintPulseColor(base, glintPeak, InkEngine.tuning.glintBrightness)
 
     /** Tint alpha: always-on wet strength, lifted further on tarjīʿ peaks. */
     fun glintTintColorAlpha(base: Float): Float =
@@ -1397,7 +1397,10 @@ internal fun rememberInkMotions(
         val glinting = glintInk != null && InkEngine.glinting(ink.state, wetInk)
         val glintIdentity = rememberGlintIdentity(glinting, ink.repeat)
         // Tarjīʿ only runs its vsync sampler on the Active strong-hold word.
-        val tarjiEligible = glinting && entryPacing?.hasStrongHold == true
+        val strongHold = remember(isActive, words[index].arabic, index == words.lastIndex) {
+            isActive && InkEngine.tarjiEligible(words[index].arabic, index == words.lastIndex)
+        }
+        val tarjiEligible = glinting && strongHold
         val sweep = rememberLetterSweep(
             active = isActive,
             finishResidual = ink.state == InkEngine.State.Recited,

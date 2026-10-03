@@ -52,9 +52,11 @@ data class TarjiLabKnobs(
             glintBrightness = t.glintBrightness,
         )
 
-        /** Restore an imported sample's knobs into the Ink Lab tuning. */
+        /** Apply the lab's full pulse and knobs to live playback, preserving the wash settings. */
         fun applyToTuning(knobs: TarjiLabKnobs, t: InkEngine.Tuning): InkEngine.Tuning =
             t.copy(
+                glintResonance = true,
+                glintResonanceDepth = InkEngine.GLINT_RESONANCE_DEPTH,
                 glintResonanceMaxHz = knobs.maxTremoloHz,
                 tarjiMinHz = knobs.minTremoloHz,
                 tarjiHoldMinMs = knobs.holdMinMs,

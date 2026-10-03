@@ -526,6 +526,13 @@ object InkEngine {
         )?.forWash(t.pacedFeather)
     }
 
+    /** Acoustic hold eligibility is independent of visual wash pacing and its lab toggles. */
+    fun tarjiEligible(arabic: String, isAyahFinal: Boolean): Boolean =
+        TajweedPacing.curve(
+            arabic = arabic,
+            hold = TajweedPacing.Hold(isAyahFinal = isAyahFinal),
+        )?.hasStrongHold == true
+
     /** Cross-word prefix bloom for a nūn/tanwīn connection, when enabled. */
     fun connection(prevArabic: String, arabic: String): TajweedPacing.Connection? {
         val t = tuning

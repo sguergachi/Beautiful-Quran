@@ -1,6 +1,11 @@
 package com.beautifulquran.playback
 
 import com.beautifulquran.ui.reader.TarjiWordGate
+import com.beautifulquran.tarjilab.HANI_TUNING
+import com.beautifulquran.tarjilab.TarjiLabCodec
+import com.beautifulquran.ui.reader.InkEngine
+import com.beautifulquran.ui.theme.glintPulseColor
+import androidx.compose.ui.graphics.Color
 import kotlin.math.PI
 import kotlin.math.pow
 import kotlin.math.sin
@@ -16,6 +21,40 @@ import org.junit.Test
  * fed in 20 ms hops exactly as [VoiceEnergy] decimates them.
  */
 class TarjiTest {
+
+    @Test
+    fun `supplied Hani tuning reaches a bright crest through the live word gate`() {
+        val sample = TarjiLabCodec.decode(javaClass.getResourceAsStream("/tarji/hani_1_7_w9_tuned.json")!!
+            .bufferedReader().use { it.readText() })
+        assertEquals(sample.knobs, HANI_TUNING)
+        val capture = TarjiLabCodec.toCapture(sample)
+        val detector = Tarji()
+        detector.hopSamples = capture.hopSamples
+        HANI_TUNING.applyTo(detector)
+        val gate = TarjiWordGate()
+        var admitted = 0
+        var peak = 0f
+        for (hop in 0 until capture.hopCount) {
+            val offset = hop * capture.hopSamples
+            detector.onSamples8k(capture.pcm.copyOfRange(offset, offset + capture.hopSamples))
+            val mediaMs = (sample.firstHopMediaMs + (hop + 1) * sample.hopContentDurationMs).toLong()
+            if (mediaMs !in 7610L..12727L) continue
+            val eventMs = if (detector.syncEventStartHop < 0) VoiceEnergy.NO_EVENT_MS
+                else (sample.firstHopMediaMs + detector.syncEventStartHop * sample.hopContentDurationMs).toLong()
+            if (!gate.allows(detector.syncTremoloGain, detector.syncReverberating, eventMs, 7610L)) continue
+            admitted++
+            peak = maxOf(peak, InkEngine.glintResonance(
+                holding = true,
+                tremolo = detector.syncTremolo,
+                tremoloGain = detector.syncTremoloGain,
+                depth = 1f,
+                enabled = true,
+            ).peak)
+        }
+        assertTrue("Hani's final hold must pass the live gate", admitted >= 50)
+        assertTrue("the admitted pulse must have substantial gain ($peak)", peak > 0.6f)
+        assertEquals(Color.White, glintPulseColor(Color(0xFFF8E9BE), peak, HANI_TUNING.glintBrightness))
+    }
 
     private fun wavResource(name: String): FloatArray {
         val wav = javaClass.getResourceAsStream("/tarji/$name")

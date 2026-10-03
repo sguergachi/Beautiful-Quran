@@ -88,7 +88,8 @@ recitation with exactly this word: يُرَجِّعُ — "his voice reverberate
 > long-press) loops captured PCM and replays this reciter’s detector as you
 > adjust its knobs. Export preserves the capture, loop, and displayed tuning.
 > **Glint brightness** scales the sheen and halo from 0–200% and saves per
-> reciter. 100% keeps the shipped look; it does not change detection, the
+> reciter. It also scales the crest's white blend: at 200%, a half-strength
+> accepted crest can reach full white. 100% keeps the shipped look; it does not change detection, the
 > pulse’s phase, the wash, or the halo’s radius.
 
 
@@ -103,6 +104,12 @@ tajweed hold of their own** — a long madd, a ghunnah (the shadda نّ of
 ٱلنَّارِ), or the verse-closing waqf (`TajweedPacing.Curve.hasStrongHold`;
 a wasl entry alone sustains the previous word's nūn and never qualifies) —
 and starts the moment the reverberation is detected there.
+
+Acoustic eligibility is derived from the Arabic word independently of visual
+letter pacing. Turning off the paced wash or viewing English prose must not
+disable a detected hold. All reader paint paths, including the English mushaf,
+use the same crest colour. Applying a Tarjīʿ Lab profile enables the full pulse
+auditioned in the lab; the Ink Lab can still disable it afterwards.
 
 The **wet-ink glint always rides the wash** for the whole Active word —
 mid-bloom and long waqf parks included. **Tarjīʿ turns it on and off**: the

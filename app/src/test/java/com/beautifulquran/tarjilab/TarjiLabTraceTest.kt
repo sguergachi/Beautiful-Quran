@@ -321,6 +321,16 @@ class TarjiLabTraceTest {
     }
 
     @Test
+    fun `applying a lab profile enables the pulse the lab previews`() {
+        val t = InkEngine.Tuning(glintResonance = false, glintResonanceDepth = 0f, tajweedPacing = false)
+        val applied = TarjiLabKnobs.applyToTuning(HANI_TUNING, t)
+        assertTrue(applied.glintResonance)
+        assertEquals(1f, applied.glintResonanceDepth, 0f)
+        assertEquals(false, applied.tajweedPacing)
+        assertEquals(HANI_TUNING, TarjiLabKnobs.fromTuning(applied))
+    }
+
+    @Test
     fun `words without marks span the gap between neighbours`() {
         val segs = listOf(
             Segment(1, 0L, 500L),

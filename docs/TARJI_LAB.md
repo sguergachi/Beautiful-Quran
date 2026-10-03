@@ -77,9 +77,20 @@ but is not a tuning target in this interface.
 
 Profiles persist per reciter and write through to `InkEngine.tuning`:
 
+Applying a profile enables the same full-depth pulse shown in the lab, while
+preserving the wash settings. Live acoustic eligibility remains independent
+of the visual tajweed-pacing toggle, including in English reading modes.
+
+The supplied `tarji_7_1_7_w9.json` tuning is installed once for **Hani Ar-Rifai**
+(app reciter id 7): 200% brightness, 1.6–8 Hz, 656.6863 ms minimum hold,
+0.13819668 minimum depth, 0.38481894 periodicity, 0.3 pitch drift, 50 ms
+attack, and 1095.3691 ms release. This replaces any older Hani profile once;
+later lab edits persist normally. Other stored reciter profiles are preserved.
+
 - **Glint brightness** scales the tint and halo together from 0–200%.
   0% removes the sheen, 100% preserves the shipped look, and 200% brightens it
-  up to the renderer’s opacity limit. It affects the lab glow and reader glint
+  up to the renderer’s opacity limit and scales the crest's blend toward white.
+  It affects the lab glow and reader glint
   (including the repeat glimmer). It leaves the green trace, detection, pulse
   timing, wash, and halo size unchanged. Compare, undo/redo, reset, and sample
   export include brightness. Old samples/profiles default to 100%.
