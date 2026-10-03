@@ -23,7 +23,15 @@ import {
 import { formatAyahNumberMark, pageFolioLayout } from '../../util/digits'
 import type { PageNumberScript } from '../../data/settings'
 import { appStore, useAppSelector } from '../../store/appStore'
-import { bookTurnDirection, useBookSpread, useTurningLeafSlot, useVersoLeafSlot } from '../paper/bookSpread'
+import {
+  bookRightShare,
+  bookTurnDirection,
+  setBookPlace,
+  turnMs,
+  useBookSpread,
+  useTurningLeafSlot,
+  useVersoLeafSlot,
+} from '../paper/bookSpread'
 import type { StackLayer } from '../paper/stack'
 import { TurningLeaf } from './TurningLeaf'
 import { finishPageTurn, requestPageTurn, type PageTurnQueue } from './pageTurnQueue'
@@ -37,7 +45,7 @@ import {
   solveLine,
 } from './mushafFit'
 import { mushafLeafModel } from './mushafLeafModel'
-import { PAGE_TURN_SCHEDULE, playFlip, warmPageTurnSounds } from '../paper/pageTurnSounds'
+import { pileTurnSchedule, playFlip, warmPageTurnSounds } from '../paper/pageTurnSounds'
 import { InkEngine, InkState, getTuning, type InkWord } from './InkEngine'
 import { MUSHAF_STILL_INK, mushafTokenInk, type MushafInk } from './mushafInk'
 import type { MushafToken } from '../../domain/mushafPage'
@@ -46,8 +54,10 @@ import { BASMALAH_PLAYLIST_AYAH } from '../../domain/Basmalah'
 import { createWheelTurn, isSidewaysWheel } from './wheelTurn'
 import { RepeatWashGateProvider } from '../../render/RepeatWashContext'
 
-/** Keep in step with `mushaf-leaf-turn` in styles.css. */
-const PAGE_TURN_MS = 760
+/** The share of the block between two pages: the pile a turn between them carries. */
+function pileBetween(from: number, to: number): number {
+  return Math.abs(to - from) / (MUSHAF_PAGE_COUNT - 1)
+}
 
 /** Whether [page] carries any word of the verse that owns the voice. */
 function pageHoldsVoice(page: number, surahId: number, ink: MushafInk): boolean {
@@ -230,11 +240,20 @@ export function MushafReader({
   })
 
   const place = facing ? mushafFacingPages(page).right : page
+  // The piles under the open pages follow the place the book is open at.
+  useEffect(() => {
+    if (!facing) return
+    setBookPlace(place)
+    return () => setBookPlace(null)
+  }, [facing, place])
   const [queue, setQueue] = useState<PageTurnQueue>({ settled: place, flight: null, queued: null })
   const footing = `${ready}:${facing}:${english}:${pageNumberScript}`
   const [settledFooting, setSettledFooting] = useState(footing)
   const [motion, setMotion] = useState<{
     flight: NonNullable<PageTurnQueue['flight']>
+    /** Share of the block this turn carries, and how long that takes. */
+    wad: number
+    ms: number
     fit: number
     fromFit: number
     initiatedAt: number
@@ -267,8 +286,11 @@ export function MushafReader({
   const fitReady = fontsReady && preparedFit != null
   useLayoutEffect(() => {
     if (reset || !queue.flight || motion || !fitReady) return
+    const wad = facing ? pileBetween(queue.flight.from, queue.flight.to) : 0
     setMotion({
       flight: queue.flight,
+      wad,
+      ms: turnMs(wad),
       fit: preparedFit!,
       fromFit: mushafFit(queue.flight.from, facing, fits) ?? 1,
       initiatedAt: performance.now(),
@@ -289,9 +311,9 @@ export function MushafReader({
   useEffect(() => {
     if (!motion || reset) return
     cancelSoundRef.current?.()
-    const cancelSound = playFlip(PAGE_TURN_SCHEDULE, motion.initiatedAt)
+    const cancelSound = playFlip(pileTurnSchedule(motion.ms), motion.initiatedAt)
     cancelSoundRef.current = cancelSound
-    const timer = window.setTimeout(endTurn, PAGE_TURN_MS + 250)
+    const timer = window.setTimeout(endTurn, motion.ms + 250)
     return () => {
       window.clearTimeout(timer)
       // A normal landing lets the drop ring out; cancellation cuts its stems.
@@ -304,25 +326,36 @@ export function MushafReader({
   // covered again by the same leaf on the way back.
   const stackLayer = useAppSelector((state) => state.stackLayer)
   const [seenLayer, setSeenLayer] = useState<StackLayer>(stackLayer)
-  const [sheetTurn, setSheetTurn] = useState<{ dir: 'on' | 'back'; initiatedAt: number } | null>(null)
+  const [sheetTurn, setSheetTurn] = useState<{
+    dir: 'on' | 'back'
+    /** The pile between the open page and that end of the book. */
+    wad: number
+    ms: number
+    initiatedAt: number
+  } | null>(null)
   // Derived while rendering, so the leaf is in the air on the same frame
   // the sheet beneath it changes.
   if (seenLayer !== stackLayer) {
     setSeenLayer(stackLayer)
     const dir = bookTurnDirection(seenLayer, stackLayer)
+    // Chapters lies under the whole left pile and Settings under the whole
+    // right one: the turn carries every leaf that changes sides.
+    const wad = Math.abs(
+      bookRightShare(true, stackLayer, place) - bookRightShare(true, seenLayer, place),
+    )
     setSheetTurn(dir && facing && !reduced && ready
-      ? { dir, initiatedAt: performance.now() }
+      ? { dir, wad, ms: turnMs(wad), initiatedAt: performance.now() }
       : null)
   }
   const endSheetTurn = useCallback(() => setSheetTurn(null), [])
   useEffect(() => {
     if (!sheetTurn) return
-    const cancelSound = playFlip(PAGE_TURN_SCHEDULE, sheetTurn.initiatedAt)
+    const cancelSound = playFlip(pileTurnSchedule(sheetTurn.ms), sheetTurn.initiatedAt)
     let landed = false
-    const timer = window.setTimeout(() => { landed = true; endSheetTurn() }, PAGE_TURN_MS + 250)
+    const timer = window.setTimeout(() => { landed = true; endSheetTurn() }, sheetTurn.ms + 250)
     return () => {
       window.clearTimeout(timer)
-      if (!landed && performance.now() - sheetTurn.initiatedAt < PAGE_TURN_MS) cancelSound()
+      if (!landed && performance.now() - sheetTurn.initiatedAt < sheetTurn.ms) cancelSound()
     }
   }, [sheetTurn, endSheetTurn])
 
@@ -440,6 +473,8 @@ export function MushafReader({
               key={`sheet:${sheetTurn.initiatedAt}`}
               hinge={sheetTurn.dir === 'on' ? 'right' : 'left'}
               dir={sheetTurn.dir}
+              wad={sheetTurn.wad}
+              ms={sheetTurn.ms}
               // Both leaves keep the pages being read. Going on, the verso
               // leaf lifts and lands on the recto; going back, the recto
               // leaf lifts and lands on the verso.
@@ -456,6 +491,8 @@ export function MushafReader({
               key={`${settled}:${landing}`}
               hinge={forward ? 'right' : 'left'}
               dir={forward ? 'on' : 'back'}
+              wad={motion.wad}
+              ms={motion.ms}
               face={air?.face}
               back={air?.back}
               onEnd={endTurn}

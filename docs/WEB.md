@@ -398,14 +398,32 @@ sheet returns to reading and its click is swallowed (`ReaderScreen`). Hafs stand
 in for the page faces, so each leaf measures its lines and scales the type
 until the longest fits (`--mushaf-fit`), on phones too.
 The spread is one grid: a single module `--u` in `styles.css`
-(`min(100vh / 32.743, 100vw / 39.889)`) sizes the desk margin, the board
-(`--book-rim`), the page block's edge (`--book-fore-edge`), the page
+(`min(100vh / 32.743, 100vw / 41.889)`) sizes the desk margin, the board
+(`--book-rim`), the band the page block's edges stand in
+(`--book-fore-edge`), the page
 (`--page-w` = φ⁶u, `--page-h`), the margins and the gutter's shade
 (`--gutter-shade`). It drives the book, the cover board and every sheet; a
 Mushaf leaf is absolutely placed on `--margin-inner/head/fore/foot`. Head and
 foot are floored at `--chrome-h` / `--transport-h`; inner and fore are not.
 The scrolling reader's column is the same block (`--reader-max`, and the
-sheet's `padding-right` of fore − inner). Search fields hide the browser's
+sheet's `padding-right` of fore − inner). The block's two piles: `App` sets `--book-right` (a registered `<number>`,
+eased over 900 ms) from `bookRightShare`, the share of the 302 leaves on the
+right, taken from the page the leaves are open at (`setBookPlace` from
+`MushafReader`) or where a scrolling chapter begins. `--edge-l` / `--edge-r`
+size the two fanned edges inside the fixed band; the rest of the band shows
+`--book-pastedown`. A turn carries a pile: `TurningLeaf` takes `wad` (share
+of the block; `--wad` = share × `--book-block`) and `ms` (`turnMs`), sets the
+back face that far behind the front, and draws the pile's fore-edge and
+head/foot caps (`.mushaf-flip-edge`, `.mushaf-flip-cap`) above
+`WAD_VISIBLE`. Sheet turns carry the whole pile on that side; page turns
+carry the leaves between the two pages. Scrollbars (pointers that can hover only, `--sb` = 10px, else 0): a thin
+thread at rest that thickens and turns solid under the pointer, drawn as a
+thumb inside transparent borders so the lane never changes width. Each
+scroller gives the lane back from its padding, so nothing in it moves. On the
+spread a bar runs down its page's fore-edge: the left page's scrollers are
+`direction: rtl` with their contents set back, and the scrolling reader's
+scroller is let out to the page's edges. Touch keeps scrollbars hidden.
+Search fields hide the browser's
 own clear mark (`::-webkit-search-cancel-button`); the field draws one. The per-leaf solver is in
 `ui/reader/mushafFit.ts`: `mushafLeafFit` (type size, bounded by
 `MUSHAF_MIN_LEADING`) and `solveLine` (letter widening toward

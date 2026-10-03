@@ -6510,6 +6510,14 @@ html[data-entrance='true'] body {
   }
 }
 
+/* Share of the book's leaves lying on the right: a number, so it can be
+   eased and every length derived from it moves with it. */
+@property --book-right {
+  syntax: '<number>';
+  inherits: true;
+  initial-value: 1;
+}
+
 /* —— Desktop book spread ——
  * Wide windows lay the paper stack open as a book on a desk: Chapters (and
  * the sheets that cover it — Bookmarks, Settings) on the verso, the Reader
@@ -6523,6 +6531,8 @@ html[data-entrance='true'] body {
   --book-gutter-rgb: 60, 44, 20;
   --book-gutter-alpha: 0.16;
   --book-edge-line: rgb(110 104 88 / 0.3);
+  --book-edge-shade: rgb(60 44 20 / 0.14);
+  --book-pastedown: #efe6d4;
 }
 
 [data-theme='dark'] {
@@ -6533,6 +6543,8 @@ html[data-entrance='true'] body {
   --book-gutter-rgb: 0, 0, 0;
   --book-gutter-alpha: 0.55;
   --book-edge-line: rgb(203 196 179 / 0.2);
+  --book-edge-shade: rgb(0 0 0 / 0.4);
+  --book-pastedown: #12110e;
 }
 
 [data-theme='royal_green'] {
@@ -6543,6 +6555,8 @@ html[data-entrance='true'] body {
   --book-gutter-rgb: 0, 0, 0;
   --book-gutter-alpha: 0.32;
   --book-edge-line: rgb(208 202 184 / 0.2);
+  --book-edge-shade: rgb(0 0 0 / 0.3);
+  --book-pastedown: #08342a;
 }
 
 .book,
@@ -6557,19 +6571,36 @@ html[data-entrance='true'] body {
    * window: the desk around the book, the binding board, the edge of the
    * page block, the page and the margins inside it.
    *
-   *   across:  desk φ · board φ⁻³ · block edge φ⁻⁴ · page φ⁶ | page … desk
+   *   across:  desk φ · board φ⁻³ · block edge φ⁻⁴ + 1 · page φ⁶ | page … desk
    *   down:    desk φ · board φ⁻³ · page φ⁷ · board φ⁻³ · desk φ
    *
    * So the window is 2φ + 2φ⁻³ + φ⁷ = 32.743 u tall or
-   * 2φ + 2(φ⁻³ + φ⁻⁴ + φ⁶) = 39.889 u wide, whichever binds first, and the
+   * 2φ + 2(φ⁻³ + φ⁻⁴ + 1 + φ⁶) = 41.889 u wide, whichever binds first, and the
    * other way the book is centred with desk to spare. The desk's margin is
    * the page's own head and fore-edge margin, carried outward.
    */
   --phi: 1.618034;
-  --u: min(calc(100vh / 32.743), calc(100vw / 39.889));
+  --u: min(calc(100vh / 32.743), calc(100vw / 41.889));
   /* Board and block edge keep a floor: below it they stop reading as edges. */
   --book-rim: max(5px, calc(var(--u) * 0.2361));
-  --book-fore-edge: max(4px, calc(var(--u) * 0.1459));
+  /*
+   * The page block has its real thickness. 604 pages are 302 leaves, and the
+   * open book shows them as the fanned edges of two piles, one under each
+   * page. --book-right is the share of the leaves lying on the right (set
+   * by App from the page being read): the piles trade leaves as the book is
+   * read, and a pile is never thinner than its last few leaves.
+   * Each board carries a band wide enough for the whole block; what a pile
+   * does not cover shows the pastedown, the paper lining the board. So the
+   * pages never move as the piles change.
+   */
+  --book-edge-min: max(3px, calc(var(--u) * 0.1459));
+  --book-fan: var(--u);
+  --book-fore-edge: calc(var(--book-edge-min) + var(--book-fan));
+  --edge-r: calc(var(--book-edge-min) + var(--book-fan) * var(--book-right));
+  --edge-l: calc(var(--book-edge-min) + var(--book-fan) * (1 - var(--book-right)));
+  /* The whole block's thickness, for the pile in the air during a turn. */
+  --book-block: calc(var(--u) * 2);
+  transition: --book-right 900ms cubic-bezier(0.5, 0.02, 0.28, 1);
   /*
    * Golden page: 1 : φ, φ⁶ u wide. Margins run inner : head : fore-edge :
    * foot = 1 : φ : φ : φ², which leaves a text block that is itself 1 : φ.
@@ -6633,14 +6664,25 @@ html[data-entrance='true'] body {
   right: calc(var(--book-rim) + var(--book-fore-edge));
 }
 
-/* The page block seen edge-on: leaves under the open pair. */
+/* The pastedown: paper lining the board, seen wherever a pile is thin. */
+.app-shell[data-spread='true'] .book::before {
+  content: '';
+  position: absolute;
+  inset: var(--book-rim);
+  border-radius: 2px;
+  background: var(--book-pastedown);
+}
+
+/* A pile seen edge-on: the leaves under the open page, fanned by the
+   binding, in shade as they go down toward the board. As wide as the share
+   of the block that lies on this side (--edge-l / --edge-r). */
 .book-page::before {
   content: '';
   position: absolute;
   top: 2px;
   bottom: 2px;
-  width: var(--book-fore-edge);
   background:
+    linear-gradient(var(--edge-away), transparent, var(--book-edge-shade)),
     repeating-linear-gradient(
       to right,
       var(--book-edge-line) 0 1px,
@@ -6651,12 +6693,16 @@ html[data-entrance='true'] body {
 
 .book-page--verso::before {
   right: 100%;
+  width: var(--edge-l);
   border-radius: 2px 0 0 2px;
+  --edge-away: to left;
 }
 
 .book-page--recto::before {
   left: 100%;
+  width: var(--edge-r);
   border-radius: 0 2px 2px 0;
+  --edge-away: to right;
 }
 
 .app-shell[data-spread='true'] .book-spine {
@@ -6871,15 +6917,29 @@ html[data-entrance-settled] .app-shell[data-spread='true'] :is(.sheet, .book-ver
   transition: none !important;
 }
 
+/* The board's inside is the book's left half: pastedown, then the left
+   pile's edge, as .book draws them. */
 .entrance-inside-page::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  right: 100%;
+  width: var(--book-fore-edge);
+  border-radius: 2px 0 0 2px;
+  background: var(--book-pastedown);
+}
+
+.entrance-inside-page::after {
   content: '';
   position: absolute;
   top: 2px;
   bottom: 2px;
   right: 100%;
-  width: var(--book-fore-edge);
+  width: var(--edge-l);
   border-radius: 2px 0 0 2px;
   background:
+    linear-gradient(to left, transparent, var(--book-edge-shade)),
     repeating-linear-gradient(to right, var(--book-edge-line) 0 1px, transparent 1px 2px),
     var(--paper);
 }
@@ -7380,8 +7440,16 @@ html[data-entrance-closing]
      pixel wide, so their edges are soft; at one pixel the page beneath
      showed through every joint as a vertical rule. */
   --joint: 2px;
+  /*
+   * A turn can carry more than one leaf: going to Chapters or Settings, or
+   * to a page far off, turns the whole pile between here and there.
+   * --wad-share is that pile's share of the block (TurningLeaf), and --wad
+   * its thickness. A pile is stiff: the thicker it is the less it curls.
+   */
+  --wad: calc(var(--wad-share, 0) * var(--book-block, 0px));
+  --curl: calc(52deg * (1 - 0.86 * var(--wad-share, 0)));
   /* The whole sheet's curl, shared out among the joints. */
-  --furl-total: 52deg;
+  --furl-total: var(--curl);
   --furl: calc(var(--furl-total) / (var(--strips) - 1));
 }
 
@@ -7394,7 +7462,7 @@ html[data-entrance-closing]
 .mushaf-flip[data-dir='back'] {
   --turn-from: 0deg;
   --turn-to: -180deg;
-  --furl-total: -52deg;
+  --furl-total: calc(-1 * var(--curl));
 }
 
 /* A single leaf is bound at its right edge and has nowhere to land: it
@@ -7459,12 +7527,15 @@ html[data-entrance-closing]
   animation-direction: reverse;
 }
 
+/* A pile turns about the middle of its own thickness: the face it lifted
+   by starts level with the page, and the face it lands on ends level with
+   the page it lands on. A single leaf has no thickness and only rotates. */
 @keyframes mushaf-leaf-turn {
   from {
-    transform: rotateY(var(--turn-from));
+    transform: translateZ(0px) rotateY(var(--turn-from));
   }
   to {
-    transform: rotateY(var(--turn-to));
+    transform: translateZ(calc(-1 * var(--wad))) rotateY(var(--turn-to));
   }
 }
 
@@ -7508,7 +7579,61 @@ html[data-entrance-closing]
 }
 
 .mushaf-flip-face--back {
-  transform: rotateY(180deg);
+  /* The underside of the pile, its thickness below the face. */
+  transform: translateZ(calc(-1 * var(--wad))) rotateY(180deg);
+}
+
+/* The pile's own edges: its fore-edge on the free strip, and its head and
+   foot on every strip. Leaves seen edge-on, like the piles at rest. Only
+   drawn for a pile (TurningLeaf), never for one leaf. */
+.mushaf-flip-edge {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: var(--wad);
+  background:
+    linear-gradient(to right, transparent, var(--book-edge-shade)),
+    repeating-linear-gradient(to right, var(--book-edge-line) 0 1px, transparent 1px 2px),
+    var(--paper);
+}
+
+.mushaf-flip[data-hinge='right'] .mushaf-flip-edge {
+  left: calc(-1 * var(--joint));
+  transform-origin: left center;
+  transform: rotateY(90deg);
+}
+
+.mushaf-flip[data-hinge='left'] .mushaf-flip-edge {
+  right: calc(-1 * var(--joint));
+  transform-origin: right center;
+  transform: rotateY(-90deg);
+}
+
+.mushaf-flip-cap {
+  position: absolute;
+  left: calc(-1 * var(--joint));
+  right: calc(-1 * var(--joint));
+  height: var(--wad);
+  background:
+    linear-gradient(to bottom, transparent, var(--book-edge-shade)),
+    repeating-linear-gradient(to bottom, var(--book-edge-line) 0 1px, transparent 1px 2px),
+    var(--paper);
+}
+
+.mushaf-flip-cap--head {
+  top: 0;
+  transform-origin: center top;
+  transform: rotateX(-90deg);
+}
+
+.mushaf-flip-cap--foot {
+  bottom: 0;
+  transform-origin: center bottom;
+  transform: rotateX(90deg);
+  background:
+    linear-gradient(to top, transparent, var(--book-edge-shade)),
+    repeating-linear-gradient(to bottom, var(--book-edge-line) 0 1px, transparent 1px 2px),
+    var(--paper);
 }
 
 /* The whole page, laid behind the strip's window at this strip's slice. */
@@ -7660,5 +7785,148 @@ html[data-entrance-closing]
   .entrance-board[data-opening-mode].entrance-board--opening {
     animation: none;
     opacity: 0;
+  }
+}
+
+/* —— Scrollbars (a pointer that can hover) ——
+ * A thread of ink down the edge of whatever scrolls, there at rest so a long
+ * page shows how long it is; under the pointer it thickens and turns solid,
+ * so it can be caught. Touch screens keep theirs hidden: a finger scrolls
+ * the page itself.
+ *
+ * The bar is a fixed lane (--sb) that takes that much of the scroller's
+ * width, so each scroller gives the same amount back from its right-hand
+ * padding and nothing in it moves. The thread is the thumb drawn inside
+ * transparent borders: thickening it changes the borders, never the lane,
+ * and the whole lane is the target.
+ */
+:root {
+  --sb: 0px;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  :root {
+    --sb: 10px;
+  }
+
+  :is(.scroll, .settings, .customize-scroll, .ink-bleed) {
+    /* The standard properties would switch the styled bar below off. */
+    scrollbar-width: auto;
+    scrollbar-color: auto;
+  }
+
+  :is(.scroll, .settings, .customize-scroll, .ink-bleed)::-webkit-scrollbar {
+    display: block;
+    width: var(--sb);
+    height: var(--sb);
+  }
+
+  :is(.scroll, .settings, .customize-scroll, .ink-bleed)::-webkit-scrollbar-track,
+  :is(.scroll, .settings, .customize-scroll, .ink-bleed)::-webkit-scrollbar-corner {
+    background: transparent;
+  }
+
+  :is(.scroll, .settings, .customize-scroll, .ink-bleed)::-webkit-scrollbar-thumb {
+    min-height: 2.5rem;
+    border: 3.5px solid transparent;
+    border-radius: 999px;
+    background-clip: padding-box;
+    background-color: color-mix(in srgb, var(--ink) 22%, transparent);
+  }
+
+  :is(.scroll, .settings, .customize-scroll, .ink-bleed)::-webkit-scrollbar-thumb:hover,
+  :is(.scroll, .settings, .customize-scroll, .ink-bleed)::-webkit-scrollbar-thumb:active {
+    border-width: 1px;
+    background-color: color-mix(in srgb, var(--ink) 55%, var(--paper));
+  }
+
+  /* Engines without the styled bar (Firefox) take the standard thin one. */
+  @supports not selector(::-webkit-scrollbar) {
+    :is(.scroll, .settings, .customize-scroll, .ink-bleed) {
+      scrollbar-width: thin;
+      scrollbar-color: color-mix(in srgb, var(--ink) 30%, transparent) transparent;
+    }
+  }
+
+  /* Each scroller gives the lane back from its right-hand padding. */
+  .scroll {
+    padding-right: calc(var(--sheet-pad) - var(--sb));
+  }
+
+  .settings {
+    padding-right: calc(var(--sheet-pad) - var(--sb));
+  }
+
+  .customize-scroll {
+    padding-right: calc(var(--sheet-pad) - var(--sb));
+  }
+
+  .bookmarks-scroll {
+    padding-right: calc(var(--bookmark-pad) - var(--sb));
+  }
+
+  .ink-bleed {
+    padding-right: calc(var(--root-inline-padding) - var(--sb));
+  }
+
+  /* The verse column has no padding to give (its verses carry the rules), so
+     the column is a lane wider each side and the verses stay where they were. */
+  .reader-body {
+    max-width: calc(var(--reader-max) + 2 * var(--sb));
+  }
+
+  .reader-main .scroll {
+    padding-left: var(--sb);
+  }
+
+  /*
+   * On the desktop book a bar runs down the fore-edge of its page, the
+   * outside of the spread: the right edge of the right page and the left
+   * edge of the left page. Never down the spine.
+   *
+   * Left page: a scroller set right-to-left carries its bar on the left; its
+   * contents are set back. Chapters has no padding of its own (its rows
+   * carry the page's margins), so the lane comes off the fore-edge margin.
+   */
+  .app-shell[data-spread='true'] :is(.sheet[data-name='home'], .sheet[data-name='bookmarks']) .scroll {
+    direction: rtl;
+  }
+
+  .app-shell[data-spread='true'] :is(.sheet[data-name='home'], .sheet[data-name='bookmarks']) .scroll > * {
+    direction: ltr;
+  }
+
+  .app-shell[data-spread='true'] .sheet[data-name='home'] .scroll {
+    padding-inline: 0;
+    --home-start-inset: calc(var(--margin-fore) - var(--sb));
+  }
+
+  .app-shell[data-spread='true'] .sheet[data-name='bookmarks'] .scroll {
+    padding-right: var(--bookmark-pad);
+    padding-left: calc(var(--bookmark-pad) - var(--sb));
+  }
+
+  /* Right page. Settings is as wide as its page already. */
+  .app-shell[data-spread='true'] .sheet[data-name='settings'] .settings {
+    padding-right: calc(var(--margin-fore) - var(--sb));
+  }
+
+  /* A scrolling chapter's scroller is only as wide as the text block, which
+     would stand its bar beside the text. It is let out to the page's edges
+     and takes the page's margins as padding, so the verses do not move. */
+  .app-shell[data-spread='true']:not([data-leaves='true']) .sheet[data-name='reader'] .reader-body {
+    max-width: none;
+    width: auto;
+    margin: 0 calc(var(--margin-inner) - var(--margin-fore)) 0 0;
+  }
+
+  .app-shell[data-spread='true']:not([data-leaves='true']) .sheet[data-name='reader'] .reader-main .scroll {
+    padding-left: var(--margin-inner);
+    padding-right: calc(var(--margin-fore) - var(--sb));
+  }
+
+  /* The transport stands in that same column, so it takes both margins now. */
+  .app-shell[data-spread='true']:not([data-leaves='true']) .sheet[data-name='reader'] .player-bar {
+    padding-inline: var(--margin-inner) var(--margin-fore);
   }
 }
