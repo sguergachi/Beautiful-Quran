@@ -62,7 +62,7 @@ android {
         minSdk = 30
         targetSdk = 37
         versionCode = 11
-        versionName = "1.0"
+        versionName = "0.10"
         buildConfigField("String", "QF_CONTENT_BASE_URL", "\"$qfContentBaseUrl\"")
     }
 
