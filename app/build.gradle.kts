@@ -61,8 +61,8 @@ android {
         applicationId = "com.beautifulquran"
         minSdk = 30
         targetSdk = 37
-        versionCode = 10
-        versionName = "0.9"
+        versionCode = 11
+        versionName = "0.10"
         buildConfigField("String", "QF_CONTENT_BASE_URL", "\"$qfContentBaseUrl\"")
     }
 
