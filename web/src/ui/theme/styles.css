@@ -698,6 +698,14 @@ select {
   }
 }
 
+/* A search field draws its own clear mark; the browser's would be a second. */
+input[type='search']::-webkit-search-cancel-button,
+input[type='search']::-webkit-search-decoration {
+  -webkit-appearance: none;
+  appearance: none;
+  display: none;
+}
+
 /* —— Home —— */
 .home-scroll-page {
   position: relative;
@@ -6543,31 +6551,45 @@ html[data-entrance='true'] body {
 }
 
 .app-shell[data-spread='true'] {
-  /* Binding board showing past the page block, then the block's own edge. */
-  --book-rim: 8px;
-  --book-fore-edge: 6px;
-  --desk-pad: clamp(14px, 3.4vh, 44px);
-  --desk-side: clamp(20px, 3vw, 56px);
   /*
-   * Golden page. A page is 1 : φ, as tall as the window allows or as wide,
-   * whichever binds first. Its margins run inner : head : fore-edge : foot
-   * = 1 : φ : φ : φ² in one unit u — and for any u that leaves a text block
-   * that is itself 1 : φ, the page's own shape set inside it. u is the
-   * page's width over φ⁶ (block ≈ 85% of the page), opened further only
-   * when the foot would otherwise be too shallow to hold the transport.
+   * One grid for the whole window. Everything the book is made of is a
+   * power of φ times one module u, and u is the largest that fits the
+   * window: the desk around the book, the binding board, the edge of the
+   * page block, the page and the margins inside it.
+   *
+   *   across:  desk φ · board φ⁻³ · block edge φ⁻⁴ · page φ⁶ | page … desk
+   *   down:    desk φ · board φ⁻³ · page φ⁷ · board φ⁻³ · desk φ
+   *
+   * So the window is 2φ + 2φ⁻³ + φ⁷ = 32.743 u tall or
+   * 2φ + 2(φ⁻³ + φ⁻⁴ + φ⁶) = 39.889 u wide, whichever binds first, and the
+   * other way the book is centred with desk to spare. The desk's margin is
+   * the page's own head and fore-edge margin, carried outward.
    */
   --phi: 1.618034;
-  --page-w: min(
-    calc((100vw - 2 * var(--desk-side)) / 2 - var(--book-rim) - var(--book-fore-edge)),
-    calc((100vh - 2 * var(--desk-pad) - 2 * var(--book-rim)) / var(--phi))
-  );
+  --u: min(calc(100vh / 32.743), calc(100vw / 39.889));
+  /* Board and block edge keep a floor: below it they stop reading as edges. */
+  --book-rim: max(5px, calc(var(--u) * 0.2361));
+  --book-fore-edge: max(4px, calc(var(--u) * 0.1459));
+  /*
+   * Golden page: 1 : φ, φ⁶ u wide. Margins run inner : head : fore-edge :
+   * foot = 1 : φ : φ : φ², which leaves a text block that is itself 1 : φ.
+   * The two inner margins make a gutter of 2u, wider than the φu fore-edge
+   * so the pages part at the spine. Head and foot also carry furniture of
+   * a fixed size (the page's controls, the transport), so on a small
+   * window those two deepen to hold it; inner and fore-edge never do, and
+   * the text keeps its width. (All four used to swell together, which kept
+   * the block golden but set a small page in margins sized for a large one.)
+   */
+  --page-w: calc(var(--u) * 17.944);
   --page-h: calc(var(--page-w) * var(--phi));
+  --chrome-h: 3.6rem;
   --transport-h: 5.6rem;
-  --grid-u: max(calc(var(--page-w) / 17.944), calc(var(--transport-h) / 2.618));
-  --margin-inner: var(--grid-u);
-  --margin-head: calc(var(--grid-u) * var(--phi));
-  --margin-fore: calc(var(--grid-u) * var(--phi));
-  --margin-foot: calc(var(--grid-u) * var(--phi) * var(--phi));
+  --margin-inner: var(--u);
+  --margin-fore: calc(var(--u) * var(--phi));
+  --margin-head: max(calc(var(--u) * var(--phi)), var(--chrome-h));
+  --margin-foot: max(calc(var(--u) * var(--phi) * var(--phi)), var(--transport-h));
+  /* The shade of the paper turning down into the spine. */
+  --gutter-shade: calc(var(--u) * 4.236);
   --book-width: calc(2 * (var(--page-w) + var(--book-rim) + var(--book-fore-edge)));
   --book-x: calc((100% - var(--book-width)) / 2);
   --desk-y: calc((100% - var(--page-h) - 2 * var(--book-rim)) / 2);
@@ -6642,8 +6664,8 @@ html[data-entrance='true'] body {
   position: absolute;
   top: var(--page-y);
   bottom: var(--page-y);
-  left: calc(50% - 3.5rem);
-  width: 7rem;
+  left: calc(50% - var(--gutter-shade) / 2);
+  width: var(--gutter-shade);
   z-index: 25;
   pointer-events: none;
   background: linear-gradient(
@@ -6705,7 +6727,27 @@ html[data-entrance='true'] body {
 .app-shell[data-spread='true'] .sheet[data-name='reader'] {
   /* From the page, not a percentage: the column's children take this same
      variable, and a percentage would be subtracted again at each level. */
-  --reader-max: min(40rem, calc(var(--page-w) - 3.5rem));
+  --reader-max: min(40rem, calc(var(--page-w) - var(--margin-inner) - var(--margin-fore)));
+}
+
+/* A scrolling chapter's column is the page's text block too: as wide, and
+   nearer the spine by the same step. The sheet gives up the difference
+   between its two margins at the fore-edge, which moves everything set in
+   its column; the transport, placed against the sheet, takes the margins
+   itself. Facing leaves are placed against the page and need neither. */
+.app-shell[data-spread='true']:not([data-leaves='true']) .sheet[data-name='reader'] {
+  padding-right: calc(var(--margin-fore) - var(--margin-inner));
+}
+
+/* The transport is centred under the block. Beside a scrolling chapter it
+   already stands inside the sheet's narrowed box, so it takes one margin
+   each side; on a leaf it is placed against the whole page and takes both. */
+.app-shell[data-spread='true'] .sheet[data-name='reader'] .player-bar {
+  padding-inline: var(--margin-inner);
+}
+
+.app-shell[data-spread='true'][data-leaves='true'] .sheet[data-name='reader'] .player-bar {
+  padding-inline: var(--margin-inner) var(--margin-fore);
 }
 
 /* A chapter under Settings is covered, not dimmed: the deck's fade for an
@@ -6934,7 +6976,8 @@ html[data-entrance-closing]
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  padding: 2rem;
+  /* The title stands in the text block, like every other page. */
+  padding: var(--margin-head) var(--margin-fore) var(--margin-foot) var(--margin-inner);
   text-align: center;
 }
 
@@ -7148,6 +7191,14 @@ html[data-entrance-closing]
   padding-top: 0.4rem;
 }
 
+/* The recto's furniture stands on the leaf's block: its controls end on the
+   block's edges (a control's mark is inset 12px in its own box). */
+.app-shell[data-spread='true'][data-leaves='true'] .sheet[data-name='reader'] .reader-top {
+  max-width: none;
+  margin: 0;
+  padding-inline: calc(var(--margin-inner) - 12px) calc(var(--margin-fore) - 12px);
+}
+
 /* The recto leaf is placed against its page, not the reader's column. */
 .app-shell[data-spread='true'][data-leaves='true'] .sheet[data-name='reader'] :is(.reader-body, .reader-main) {
   position: static;
@@ -7235,8 +7286,10 @@ html[data-entrance-closing]
 
 .ink-bleed.root-sheet {
   inset: auto;
-  top: 0.7rem;
-  bottom: 0.8rem;
+  /* Smaller than its page by a step of the grid on every side. */
+  --sheet-inset: calc(var(--u) * 0.382);
+  top: var(--sheet-inset);
+  bottom: var(--sheet-inset);
   border-radius: 2px;
   pointer-events: auto;
   transform-origin: 50% 0%;
@@ -7246,14 +7299,14 @@ html[data-entrance-closing]
 }
 
 .ink-bleed.root-sheet[data-page='verso'] {
-  left: 0.8rem;
-  right: calc(50% + 1.1rem);
+  left: var(--sheet-inset);
+  right: calc(50% + var(--u) * 0.618);
   --sheet-skew: -1.3deg;
 }
 
 .ink-bleed.root-sheet[data-page='recto'] {
-  left: calc(50% + 1.1rem);
-  right: 0.8rem;
+  left: calc(50% + var(--u) * 0.618);
+  right: var(--sheet-inset);
   --sheet-skew: 1.3deg;
 }
 

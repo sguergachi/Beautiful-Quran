@@ -397,10 +397,16 @@ On facing leaves with Chapters open, a pointer-down anywhere on the reader
 sheet returns to reading and its click is swallowed (`ReaderScreen`). Hafs stands
 in for the page faces, so each leaf measures its lines and scales the type
 until the longest fits (`--mushaf-fit`), on phones too.
-The spread's page is golden: `--page-w` / `--page-h` (1 : φ) and the margin
-unit `--grid-u` in `styles.css` ("Golden page") drive the book, the cover
-board and every sheet; a Mushaf leaf is absolutely placed on
-`--margin-inner/head/fore/foot`. The per-leaf solver is in
+The spread is one grid: a single module `--u` in `styles.css`
+(`min(100vh / 32.743, 100vw / 39.889)`) sizes the desk margin, the board
+(`--book-rim`), the page block's edge (`--book-fore-edge`), the page
+(`--page-w` = φ⁶u, `--page-h`), the margins and the gutter's shade
+(`--gutter-shade`). It drives the book, the cover board and every sheet; a
+Mushaf leaf is absolutely placed on `--margin-inner/head/fore/foot`. Head and
+foot are floored at `--chrome-h` / `--transport-h`; inner and fore are not.
+The scrolling reader's column is the same block (`--reader-max`, and the
+sheet's `padding-right` of fore − inner). Search fields hide the browser's
+own clear mark (`::-webkit-search-cancel-button`); the field draws one. The per-leaf solver is in
 `ui/reader/mushafFit.ts`: `mushafLeafFit` (type size, bounded by
 `MUSHAF_MIN_LEADING`) and `solveLine` (letter widening toward
 `MUSHAF_TARGET_GAP`, or centring below `MUSHAF_SHORT_FILL`), applied to the
