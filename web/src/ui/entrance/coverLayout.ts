@@ -15,8 +15,14 @@ export interface CoverLayout {
   innerInset: number
   outerRadius: number
   innerRadius: number
-  /** Corner seal diameter (Android uses radius ≈ 0.70 × outer inset). */
-  starSize: number
+  /**
+   * Radius of a corner seal, centre to its outermost feature: half the band
+   * between the two rules, so the seal fills the band exactly and breaks
+   * neither rule (Android `CoverFrameGeometry.starRadiusPx`).
+   */
+  sealRadius: number
+  /** Distance from both board edges to a corner seal's centre. */
+  sealCenter: number
   /** Centre line of the border band, measured in from each edge. */
   bandCenter: number
   /** Cross-section height of the border band between the two rules. */
@@ -49,8 +55,8 @@ function clamp(n: number, lo: number, hi: number): number {
  * Derive a cover layout from the board's CSS pixel size.
  *
  * Grid: 48 units on the short side. Frame margin ≈ 5.5–7% of the short
- * side; corner seals ≈ 1.4× the outer margin (diameter); medallion capped
- * by both axes so a tall phone does not crush the titles beneath it.
+ * side; corner seals inscribed in the border band; medallion capped by
+ * both axes so a tall phone does not crush the titles beneath it.
  */
 export function coverLayout(width: number, height: number): CoverLayout {
   const w = Math.max(1, width)
@@ -73,14 +79,21 @@ export function coverLayout(width: number, height: number): CoverLayout {
   const outerRadius = Math.max(0, designR - outerInset * 0.15)
   const innerRadius = Math.max(20, outerRadius - ruleGap)
 
-  // Corner seals: diameter ≈ 1.35–1.5× outer inset — pressed into the margin,
-  // not pinpricks. Floor so small boards still read as seals.
-  const starSize = clamp(outerInset * 1.42, unit * 2.6, outerInset * 1.65)
-
-  // The generated border frieze runs between the two rules; the seals sit
-  // on its corners (bandCenter) covering the miter joints. Mirrors
+  // The generated border frieze runs between the two rules. Mirrors
   // Android's 0.72 factor and 10–20dp clamp for a fuller tooled channel.
   const bandCenter = (outerInset + innerInset) / 2
+
+  // Corner seals are part of the border, not a stamp over it (Android
+  // `sealCenterPx`). The two rules are concentric rounded rects, so the band
+  // turns at a corner: the miter, where the straight centrelines would
+  // cross, lies outside the band's own arc. The seal rides the band's
+  // centreline arc at 45° instead, inscribed in the corner annulus — tangent
+  // to both rules, the fit it would have along a straight run. A corner
+  // with no arc left falls back to the miter, so the two cases meet.
+  const sealRadius = ruleGap / 2
+  const cornerRadius = outerRadius + outerInset
+  const arc = cornerRadius - bandCenter
+  const sealCenter = arc > 0 ? cornerRadius - arc * Math.SQRT1_2 : bandCenter
   const bandHeight = clamp((innerInset - outerInset) * 0.72, 10, 20)
 
   // Medallion: Android's ceremonial scale — 52% of board width, capped by
@@ -128,7 +141,8 @@ export function coverLayout(width: number, height: number): CoverLayout {
     innerInset,
     outerRadius,
     innerRadius,
-    starSize,
+    sealRadius,
+    sealCenter,
     bandCenter,
     bandHeight,
     medallion,
@@ -149,6 +163,17 @@ export function coverLayout(width: number, height: number): CoverLayout {
   }
 }
 
+/**
+ * Side of a corner seal's drawing box, sized so the seal's outermost feature
+ * lands on [CoverLayout.sealRadius]. Bezel tips sit at `tipRadius` of the
+ * box (0.58–0.66, not 0.5), so a box of twice the radius would overhang the
+ * rules. The seals and the band's channel mouths both read this (Android
+ * `sealBoxPx`).
+ */
+export function sealBox(layout: CoverLayout, tipRadius: number): number {
+  return layout.sealRadius / Math.max(0.5, tipRadius)
+}
+
 /** CSS custom properties applied to `.entrance-board`. */
 export function coverLayoutCssVars(layout: CoverLayout): Record<string, string> {
   const px = (n: number) => `${n.toFixed(2)}px`
@@ -158,7 +183,7 @@ export function coverLayoutCssVars(layout: CoverLayout): Record<string, string> 
     '--cover-inner-inset': px(layout.innerInset),
     '--cover-outer-radius': px(layout.outerRadius),
     '--cover-inner-radius': px(layout.innerRadius),
-    '--cover-star': px(layout.starSize),
+    '--cover-seal-c': px(layout.sealCenter),
     '--cover-band-c': px(layout.bandCenter),
     '--cover-band-h': px(layout.bandHeight),
     '--cover-medallion': px(layout.medallion),
