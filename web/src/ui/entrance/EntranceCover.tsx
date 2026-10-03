@@ -85,6 +85,32 @@ function wait(ms: number, signal: AbortSignal): Promise<void> {
   })
 }
 
+/**
+ * The board's inside lands exactly on the spread's left page, so it carries
+ * a picture of that page as it swings: Chapters as it stands, at its own
+ * scroll offset. The real sheet is under the board the whole time and takes
+ * over, unchanged, when the board is gone. Without this the book opened and
+ * closed on a blank page and the ink arrived after.
+ */
+function pictureLeftPage(into: HTMLElement | null) {
+  const page = document.querySelector('.app-shell > .sheet[data-name="home"]')
+  if (!into || !(page instanceof HTMLElement)) return
+  const picture = page.cloneNode(true) as HTMLElement
+  picture.setAttribute('data-picture', 'true')
+  picture.inert = true
+  into.replaceChildren(picture)
+  // A clone starts scrolled to the top; the page may not be.
+  const from = page.querySelectorAll('*')
+  const to = picture.querySelectorAll('*')
+  from.forEach((el, index) => {
+    const copy = to[index]
+    if (copy && (el.scrollTop !== 0 || el.scrollLeft !== 0)) {
+      copy.scrollTop = el.scrollTop
+      copy.scrollLeft = el.scrollLeft
+    }
+  })
+}
+
 function applyWash(
   el: HTMLElement | null,
   progress: number,
@@ -206,6 +232,7 @@ export function EntranceCover({
   const built = useOrnamentBuilt() || returning
 
   const boardRef = useRef<HTMLDivElement>(null)
+  const insidePageRef = useRef<HTMLDivElement>(null)
   const glintRef = useRef<HTMLDivElement>(null)
   // Android turns the gilding's sheen with the phone's tilt. A desk has a
   // pointer instead: the light falls where the mouse is. Written straight
@@ -263,6 +290,7 @@ export function EntranceCover({
     openingRef.current = true
     openingAtRef.current = performance.now()
     const spread = window.matchMedia(BOOK_SPREAD_QUERY).matches
+    if (spread) pictureLeftPage(insidePageRef.current)
     const el = boardRef.current
     if (el) {
       const css = getComputedStyle(el)
@@ -311,6 +339,7 @@ export function EntranceCover({
       endClosing()
       return
     }
+    if (openingMode === 'spread') pictureLeftPage(insidePageRef.current)
     document.documentElement.dataset.entranceClosing = 'true'
     const cancelSound = playFlip(
       openingMode === 'spread' ? BOOK_CLOSE_SCHEDULE : COVER_CLOSE_SCHEDULE,
@@ -378,6 +407,12 @@ export function EntranceCover({
       if (!finishedRef.current) cancelSound()
       query.removeEventListener('change', changed)
       document.documentElement.removeAttribute('data-entrance-opening')
+      // The pages take over from their picture on the board: at once, with
+      // no fade of their own. Held just long enough to skip that transition.
+      if (finishedRef.current) {
+        document.documentElement.dataset.entranceSettled = 'true'
+        window.setTimeout(() => document.documentElement.removeAttribute('data-entrance-settled'), 120)
+      }
     }
   }, [opening, openingMode, finishOpening])
 
@@ -580,7 +615,7 @@ export function EntranceCover({
         {/* The board's inside: lining and the first blank leaf pasted to it.
             It lands exactly where the spread's left half then stands. */}
         <div className="entrance-inside" aria-hidden="true">
-          <div className="entrance-inside-page" />
+          <div className="entrance-inside-page" ref={insidePageRef} />
         </div>
       </div>
     </div>
