@@ -23,27 +23,69 @@ least 1100 × 600). A phone shows one sheet because one sheet is all it has
 room for; a wide window showing one phone-width column in an empty field is
 not calm, it is unused. So the stack opens flat: Chapters on the left page,
 the Reader on the right, the binding's boards showing past the page block and
-the paper turning down into the gutter. Bookmarks and Settings are laid over
-the left page, so a reader changes the type and watches the right page answer.
-Before a chapter is chosen the right page is the title page.
+the paper turning down into the gutter. Every sheet has one place in the
+book. The left page is Chapters, and Bookmarks is laid over it. The right
+page is whatever was opened from it: the title page before a chapter is
+chosen, then the chapter, with Settings laid over that. Settings used to lie
+on the left beside a scrolling chapter (so the right page answered a change
+as it was made) and on the right of facing leaves; one sheet in two places
+is not a book, and Customize carries its own preview leaf. A control both
+pages would carry shows once: the page being read keeps Settings, and
+Chapters gives its own up. The book closes from Chapters: a sweep back
+across it, or the strip of its fore-edge, whose mark shows only under a
+pointer, like the leaves' own.
 
 In **Mushaf** layout the spread is the bound book itself: two facing leaves,
 the odd page on the right and the next on the left (1|2 … 603|604), their
 fifteen lines on one grid. They turn together — the arrow keys, a drag, or a
 strip of either fore-edge whose mark shows only under a pointer; pages run
 right to left, so the left edge is the way on. Chapters is then laid over the
-left leaf on demand, as Settings is, and touching the open page puts it away.
+left leaf on demand, and touching the page still being read, anywhere on it,
+puts it away and does nothing else.
 
-**The golden page (web, desktop spread).** A page is 1 : φ, as tall as the
-window allows or as wide, whichever binds first. Its margins run inner : head
-: fore-edge : foot = 1 : φ : φ : φ² in one unit, and for any unit that leaves
-a text block that is itself 1 : φ — the page's own shape set inside it,
-nearer the spine and the head, as a bound book sits. The unit is the page's
-width over φ⁶ (the block is about 85% of the page), opened further only when
-the foot would be too shallow to hold the transport, which stands in that
-margin with no paper of its own. A Mushaf leaf is that block; recto and verso
-mirror. Chapters, Settings and the scrolling reader keep their own column on
-the same golden page.
+**One grid for the window (web, desktop spread).** Everything the book is
+made of is a power of φ times one module *u*, and *u* is the largest that
+fits the window. Across: desk φ, board φ⁻³, the page block's edge φ⁻⁴ + 1,
+page φ⁶, and the same again mirrored. Down: desk φ, board φ⁻³, page φ⁷,
+board, desk. So the window is 32.743 *u* tall or 41.889 *u* wide, whichever binds
+first, and the other way the book is centred with desk to spare. The desk's
+margin is the page's own head and fore-edge margin carried outward, and the
+gutter's shade is φ³ wide.
+
+**The block has its thickness.** The Quran is 604 pages, 302 leaves, and the
+open book shows them as two piles, one under each page, seen as the fanned
+edges of their leaves. Pages run right to left, so every leaf read is turned
+over onto the right: at the first page the whole block lies on the left, at
+the last on the right, and the piles trade leaves in between. Each board
+carries a band wide enough for the whole block (1 *u*, plus φ⁻⁴ for the last
+few leaves); what a pile does not cover shows the pastedown, the paper lining
+the board. So the pages themselves never move as the piles change.
+
+On facing leaves Chapters is the left-most page, under every leaf of the left
+pile, and Settings the right-most, under every leaf of the right pile. Going
+to either turns that whole pile over, as one thick wad with its own
+fore-edge, head and foot, and coming back turns it home. A far page does the
+same with the leaves in between. A pile is stiffer and slower than a leaf:
+it barely curls, and the whole block takes half as long again to turn. It
+turns about the middle of its own thickness, so it starts and lands level
+with the pages. (Chapters at the left end is the reader's choice of where
+the book begins; in a bound mushaf that is the back board.)
+
+**The golden page.** A page is 1 : φ. Its margins run inner : head :
+fore-edge : foot = 1 : φ : φ : φ² in that same module, which leaves a text
+block that is itself 1 : φ — the page's own shape set inside it, nearer the
+spine and the head, as a bound book sits. The two inner margins make a
+gutter of 2*u*, wider than the φ*u* fore-edge, so the pages part at the
+spine. Head and foot also carry furniture of a fixed size (the page's
+controls, the transport, which stands in the foot with no paper of its own),
+so on a small window those two deepen to hold it. Inner and fore-edge never
+do: the text keeps its width. (All four margins used to swell together below
+a 1190px window, which kept the block golden but set a small page in margins
+sized for a large one.) A Mushaf leaf is that block; recto and verso
+mirror. The leaf's controls end on the block's edges and the transport is
+centred under it. Chapters and Settings stand in that same block, so a leaf turned
+away uncovers text where its own text stood. A scrolling chapter's column is
+the block as well, as wide and as near the spine, and so is the title page.
 
 **What the page solves for itself (web Mushaf).** In order: the type grows or
 shrinks until the leaf's widest line, at minimum word spaces, fills the

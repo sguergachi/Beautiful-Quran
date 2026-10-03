@@ -1,4 +1,11 @@
-import { useCallback, useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react'
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  type CSSProperties,
+  type PointerEvent as ReactPointerEvent,
+} from 'react'
 import { appStore, shallowEqual, useAppSelector } from '../store/appStore'
 import {
   BOOKMARKS_LAYER,
@@ -14,7 +21,14 @@ import { ReaderScreen } from './reader/ReaderScreen'
 import { SettingsScreen } from './settings/SettingsScreen'
 import { EntranceCover } from './entrance/EntranceCover'
 import { OrnamentsLab } from './lab/OrnamentsLab'
-import { bookmarkSwipeDestination, closesBook, spreadLayers, useBookSpread } from './paper/bookSpread'
+import {
+  bookRightShare,
+  bookmarkSwipeDestination,
+  closesBook,
+  spreadLayers,
+  useBookPlace,
+  useBookSpread,
+} from './paper/bookSpread'
 import { createWheelTurn, isSidewaysWheel } from './reader/wheelTurn'
 import { BookSpread } from './paper/BookSpread'
 import { unlockPageTurnSounds } from './paper/pageTurnSounds'
@@ -100,6 +114,14 @@ export function App() {
   const leaves =
     spread && state.content != null && state.settings.readingLayout === 'mushaf'
   const pageLayers = spreadLayers(spread, stack, state.content != null, leaves)
+  // How the block's leaves are shared between the two piles: by the page the
+  // leaves are open at, or by where a scrolling chapter begins.
+  const leavesPlace = useBookPlace()
+  const bookRight = bookRightShare(
+    leaves,
+    stack,
+    leaves ? leavesPlace : state.content?.ayahs[0]?.page ?? null,
+  )
 
   useEffect(() => {
     void appStore.init()
@@ -217,6 +239,7 @@ export function App() {
       data-playback-pinned={playbackPinned && !spread ? 'true' : undefined}
       data-leaves={leaves ? 'true' : undefined}
       data-booting={showStack ? undefined : 'true'}
+      style={spread ? ({ ['--book-right' as string]: bookRight } as CSSProperties) : undefined}
       onPointerDown={beginBookmarkSwipe}
       onPointerUp={finishBookmarkSwipe}
       onPointerCancel={() => { swipeStart.current = null }}
@@ -236,6 +259,7 @@ export function App() {
           <HomeScreen
             stackLayer={pageLayers.home}
             playbackPinned={playbackPinned && !spread}
+            onCloseBook={spread ? closeBook : undefined}
           />
           <SettingsScreen stackLayer={stack} hasReader={hasReader} />
           <div id="playback-pin" />

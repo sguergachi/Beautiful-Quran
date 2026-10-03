@@ -40,7 +40,10 @@ import { BOOKMARKS_LAYER, type StackLayer } from '../paper/stack'
 export function HomeScreen({
   stackLayer,
   playbackPinned = false,
+  onCloseBook,
 }: {
+  /** Desktop book: closes the book from its first page. */
+  onCloseBook?: () => void
   stackLayer: StackLayer
   /** Phone scroll stack: the chapter bar is pinned, so this sheet keeps its float in place. */
   playbackPinned?: boolean
@@ -234,6 +237,20 @@ export function HomeScreen({
           aria-label="Back to chapters"
           onClick={() => appStore.revealLayer(COVER_LAYER)}
         />
+      ) : null}
+
+      {/* The board the book closes on lies under this page's fore-edge:
+          the strip there shuts it, as the leaves' own strips turn them. */}
+      {onCloseBook && isTop ? (
+        <button
+          type="button"
+          className="book-close"
+          aria-label="Close the book"
+          title="Close the book"
+          onClick={onCloseBook}
+        >
+          <span aria-hidden="true">‹</span>
+        </button>
       ) : null}
 
       <div
