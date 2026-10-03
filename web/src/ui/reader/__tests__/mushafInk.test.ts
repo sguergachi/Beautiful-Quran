@@ -19,6 +19,7 @@ const voice = (extra: Partial<MushafInk>): MushafInk => ({
   inkAyah: 5,
   leadAyah: 5,
   activeWord: word(5, 3),
+  inkAyahRead: true,
   speed: 1,
   ...extra,
 })
@@ -52,8 +53,21 @@ describe('mushaf leaf ink', () => {
   })
 
   it('waits under paper until the verse has its first word', () => {
-    const ink = voice({ activeWord: null })
+    const ink = voice({ activeWord: null, inkAyahRead: false })
     expect(state(at(5, 1), ink)).toBe(InkState.Upcoming)
+  })
+
+  it('keeps a verse inked through its audio tail, after its last word', () => {
+    const ink = voice({ activeWord: null, inkAyahRead: true })
+    expect(state(at(5, 1), ink)).toBe(InkState.Recited)
+    expect(state(at(5, 9), ink)).toBe(InkState.Recited)
+    // The verse after it is still to come.
+    expect(state(at(6, 1), ink)).toBe(InkState.Upcoming)
+  })
+
+  it('does not ink the lead verse early because the last one was read', () => {
+    const ink = voice({ activeWord: null, inkAyahRead: true, leadAyah: 6 })
+    expect(state(at(6, 1), ink)).toBe(InkState.Upcoming)
   })
 
   it('carries the orange repeat chain', () => {

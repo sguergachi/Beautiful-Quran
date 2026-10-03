@@ -448,7 +448,14 @@ leading edge lifted, a slight skew, a small overrun and settle. No shadow.
 Phones keep the ink bleed inside the reader sheet.
 Mushaf words take the same ink as the scroll reader: each is a `HafsWord`
 (paper-cover wash, glint, orange repeat) under the policy in
-`ui/reader/mushafInk.ts`, a port of Android `mushafInkPackKind`. A leaf in
+`ui/reader/mushafInk.ts`, a port of Android `mushafInkPackKind`. A verse that
+has had a word keeps its ink through the clip's tail (`inkAyahRead`, Android
+`playingAyahHasWord`) instead of dropping back under paper until the next
+verse takes over. The player resets `positionMs` in the same update that
+names the next verse (`syncGapless5Index`), and skips position reads while
+the next clip is still loading (`awaitingClip`): the old clip's time under
+the new verse lit the wrong word for about 110 ms. Mushaf words do not take
+the scroll reader's pointer tint. A leaf in
 the air is a picture and starts no wash. Incoming fit is known before lift
 and frozen through landing; the outgoing face keeps its previous fit. One leaf
 finishes its turn before the latest queued destination starts, including a

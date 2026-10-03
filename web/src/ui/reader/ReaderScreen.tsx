@@ -243,6 +243,7 @@ export function ReaderScreen({
     void appStore.playFromWord(ayah, pos)
   }, [])
   const sheetRef = useRef<HTMLDivElement>(null)
+  const inkReadRef = useRef<{ ayah: number | null; read: boolean }>({ ayah: null, read: false })
   const [sheetSize, setSheetSize] = useState({ width: 0, height: 0 })
   const [initialFocusSettled, setInitialFocusSettled] = useState(false)
   const [ayahRailTipOpen, setAyahRailTipOpen] = useState(false)
@@ -1310,12 +1311,17 @@ export function ReaderScreen({
   const leadAyah = recitingActive ? state.activeAyah : null
   const mushafInkActiveWord =
     inkAyah != null && state.activeWord?.ayah === inkAyah ? state.activeWord : null
+  // Whether the voiced verse has had a word yet: after that, no active word
+  // means its tail, not its lead-in. Reset when the voice moves on.
+  if (inkReadRef.current.ayah !== inkAyah) inkReadRef.current = { ayah: inkAyah, read: false }
+  if (mushafInkActiveWord) inkReadRef.current.read = true
   const mushafInk: MushafInk = recitingActive
     ? {
         reciting: true,
         inkAyah,
         leadAyah,
         activeWord: mushafInkActiveWord,
+        inkAyahRead: inkReadRef.current.read,
         speed: state.settings.playbackSpeed,
       }
     : MUSHAF_INK_IDLE
