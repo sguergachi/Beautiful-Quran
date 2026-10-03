@@ -105,7 +105,7 @@ export function bookRightShare(leaves: boolean, stack: StackLayer, page: number 
   return Math.min(1, Math.max(0, (page - 1) / (BOOK_PAGES - 1)))
 }
 
-/** One leaf turns in this long (`mushaf-leaf-turn` in styles.css). */
+/** One leaf turns in this long (its motion is pageTurnMotion). */
 export const LEAF_TURN_MS = 760
 
 /** A pile is heavier than a leaf: the whole block takes half as long again. */

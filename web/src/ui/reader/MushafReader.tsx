@@ -46,6 +46,7 @@ import {
 } from './mushafFit'
 import { mushafLeafModel } from './mushafLeafModel'
 import { pileTurnSchedule, playFlip, warmPageTurnSounds } from '../paper/pageTurnSounds'
+import { warmPageTurn } from '../paper/pageTurn'
 import { InkEngine, InkState, getTuning, type InkWord } from './InkEngine'
 import { MUSHAF_STILL_INK, mushafTokenInk, type MushafInk } from './mushafInk'
 import type { MushafToken } from '../../domain/mushafPage'
@@ -139,6 +140,7 @@ export function MushafReader({
 
   useEffect(() => {
     warmPageTurnSounds()
+    warmPageTurn()
   }, [])
 
   useEffect(() => {
@@ -392,7 +394,7 @@ export function MushafReader({
       back: facing ? <MushafLeaf page={backPage} live={leafLive(backPage, props.ink)} fit={motion.fit} side={on ? 'recto' : 'verso'} style={motion.box} {...props} /> : undefined,
     }
   }, [motion, facing])
-  // Two incoming leaves are measured once, before any strips mount.
+  // Two incoming leaves are measured once, before the leaf lifts.
   const probes = !reset && queue.flight && !motion ? (
     <div className="mushaf-fit-probes" inert aria-hidden="true">
       {[...new Set([pair.right, pair.left])].filter((page) => fits[page] == null).map((page) => (
@@ -587,7 +589,7 @@ function MushafLeaf({
   useLayoutEffect(() => {
     const lines = linesRef.current
     // A leaf in the air is a picture at the size already found. Measuring
-    // every copy of it forces a layout per strip as the turn starts.
+    // it again forces a layout as the turn starts.
     if (onFit === noFit) return
     if (english) { onFit(page, 1); return }
     if (!lines) return
@@ -801,8 +803,8 @@ function MushafLeaf({
                 return (
                   <Fragment key={`${surahId}:${ayah}:${position}`}>
                     {still ? (
-                      // A picture is copied into every strip of a turning
-                      // leaf: the word alone, and its paper while it waits.
+                      // A picture is drawn from this (pagePicture): the
+                      // word alone, and its paper while it waits.
                       <span className="hafs-word" data-state={wordInk.state} lang="ar">
                         <span className="hafs-shell">
                           <span className="word-ink-slot">
@@ -864,8 +866,8 @@ function MushafLeaf({
 /**
  * A leaf as a picture, for a pile turning to Chapters or Settings. It is
  * taken once, when it mounts: a leaf re-renders on every word the voice
- * reaches, and each render of a picture re-ran 150 words for strips that
- * had already copied its DOM.
+ * reaches, and each render of a picture re-ran 150 words for a leaf whose
+ * picture had already been drawn.
  */
 const StillLeaf = memo(MushafLeaf, () => true)
 
