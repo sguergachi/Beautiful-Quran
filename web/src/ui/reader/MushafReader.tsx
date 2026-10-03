@@ -24,7 +24,7 @@ import { formatAyahNumberMark, pageFolioLayout } from '../../util/digits'
 import type { PageNumberScript } from '../../data/settings'
 import { appStore, useAppSelector } from '../../store/appStore'
 import { bookTurnDirection, useBookSpread, useTurningLeafSlot, useVersoLeafSlot } from '../paper/bookSpread'
-import { COVER_LAYER, READER_LAYER, type StackLayer } from '../paper/stack'
+import type { StackLayer } from '../paper/stack'
 import { TurningLeaf } from './TurningLeaf'
 import { finishPageTurn, requestPageTurn, type PageTurnQueue } from './pageTurnQueue'
 import {
@@ -653,11 +653,6 @@ function MushafLeaf({
       ref={leafRef}
       onPointerDown={(event) => {
         drag.current = { x: event.clientX, y: event.clientY }
-        // Chapters lies over the facing leaf; touching the open page puts
-        // it away, as touching the reader's peek does on the deck.
-        if (side === 'recto' && appStore.getSnapshot().stackLayer === COVER_LAYER) {
-          appStore.revealLayer(READER_LAYER)
-        }
       }}
       onPointerUp={(event) => {
         const start = drag.current

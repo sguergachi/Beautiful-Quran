@@ -23,16 +23,25 @@ least 1100 × 600). A phone shows one sheet because one sheet is all it has
 room for; a wide window showing one phone-width column in an empty field is
 not calm, it is unused. So the stack opens flat: Chapters on the left page,
 the Reader on the right, the binding's boards showing past the page block and
-the paper turning down into the gutter. Bookmarks and Settings are laid over
-the left page, so a reader changes the type and watches the right page answer.
-Before a chapter is chosen the right page is the title page.
+the paper turning down into the gutter. Every sheet has one place in the
+book. The left page is Chapters, and Bookmarks is laid over it. The right
+page is whatever was opened from it: the title page before a chapter is
+chosen, then the chapter, with Settings laid over that. Settings used to lie
+on the left beside a scrolling chapter (so the right page answered a change
+as it was made) and on the right of facing leaves; one sheet in two places
+is not a book, and Customize carries its own preview leaf. A control both
+pages would carry shows once: the page being read keeps Settings, and
+Chapters gives its own up. The book closes from Chapters: a sweep back
+across it, or the strip of its fore-edge, whose mark shows only under a
+pointer, like the leaves' own.
 
 In **Mushaf** layout the spread is the bound book itself: two facing leaves,
 the odd page on the right and the next on the left (1|2 … 603|604), their
 fifteen lines on one grid. They turn together — the arrow keys, a drag, or a
 strip of either fore-edge whose mark shows only under a pointer; pages run
 right to left, so the left edge is the way on. Chapters is then laid over the
-left leaf on demand, as Settings is, and touching the open page puts it away.
+left leaf on demand, and touching the page still being read, anywhere on it,
+puts it away and does nothing else.
 
 **The golden page (web, desktop spread).** A page is 1 : φ, as tall as the
 window allows or as wide, whichever binds first. Its margins run inner : head
@@ -42,8 +51,9 @@ nearer the spine and the head, as a bound book sits. The unit is the page's
 width over φ⁶ (the block is about 85% of the page), opened further only when
 the foot would be too shallow to hold the transport, which stands in that
 margin with no paper of its own. A Mushaf leaf is that block; recto and verso
-mirror. Chapters, Settings and the scrolling reader keep their own column on
-the same golden page.
+mirror. Chapters and Settings stand in that same block, so a leaf turned
+away uncovers text where its own text stood; the scrolling reader keeps its
+own column on the same golden page.
 
 **What the page solves for itself (web Mushaf).** In order: the type grows or
 shrinks until the leaf's widest line, at minimum word spaces, fills the

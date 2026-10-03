@@ -374,8 +374,9 @@ reciters, then Customize; text size lives in Customize (Scroll only).
 
 **Desktop book spread.** At `(min-width: 1100px) and (min-height: 600px)`
 (`ui/paper/bookSpread.ts`) the stack is laid open as a book instead of a
-centred phone column: Chapters on the verso, Reader on the recto, Bookmarks
-and Settings over the verso. `App` sets `data-spread` on the shell and hands
+centred phone column: Chapters on the verso with Bookmarks laid over it, and
+on the recto the title page, then the Reader, with Settings laid over that
+in every layout. `App` sets `data-spread` on the shell and hands
 each page the layer it should believe it is on (`spreadLayers`), so the reader
 stays live — focus follow, keys, rail — while Chapters is also on top; the
 store's real stack layer is untouched. `BookSpread` draws the boards, page
@@ -386,7 +387,14 @@ into `BookSpread`'s slot, sized to the recto's own box; Chapters keeps its
 real layer and covers the verso only at layer 0 (`data-leaves`). Covered
 verso content is inert and hidden from assistive technology; the recto comes
 first in DOM and Tab order. Gathering stays active while another sheet covers
-the verso, and Escape cancels gathering before peeling that sheet away. Hafs stands
+the verso, and Escape cancels gathering before peeling that sheet away;
+Settings covers the chapter itself, so it ends gathering and the covered
+reader gives up the keys (`spreadLayers` hands it the Settings layer).
+Chapters and Settings take the leaf's golden margins (`--margin-fore`,
+`--margin-inner`, `--margin-head`) instead of the phone sheet's padding.
+`HomeScreen` carries a fore-edge strip that closes the book (`.book-close`).
+On facing leaves with Chapters open, a pointer-down anywhere on the reader
+sheet returns to reading and its click is swallowed (`ReaderScreen`). Hafs stands
 in for the page faces, so each leaf measures its lines and scales the type
 until the longest fits (`--mushaf-fit`), on phones too.
 The spread's page is golden: `--page-w` / `--page-h` (1 : φ) and the margin

@@ -13,9 +13,14 @@ describe('spreadLayers', () => {
     expect(spreadLayers(true, COVER_LAYER, true)).toEqual({ home: COVER_LAYER, reader: READER_LAYER })
   })
 
-  it('lets Settings and Bookmarks cover Chapters without parking the reader', () => {
-    expect(spreadLayers(true, SETTINGS_LAYER, true)).toEqual({ home: SETTINGS_LAYER, reader: READER_LAYER })
+  it('lays Bookmarks over Chapters and Settings over the chapter', () => {
     expect(spreadLayers(true, BOOKMARKS_LAYER, true)).toEqual({ home: BOOKMARKS_LAYER, reader: READER_LAYER })
+    // Chapters stays in reach beside Settings; the covered chapter is no longer on top.
+    expect(spreadLayers(true, SETTINGS_LAYER, true)).toEqual({ home: COVER_LAYER, reader: SETTINGS_LAYER })
+  })
+
+  it('hides Chapters under facing leaves while Settings is open', () => {
+    expect(spreadLayers(true, SETTINGS_LAYER, true, true)).toEqual({ home: SETTINGS_LAYER, reader: SETTINGS_LAYER })
   })
 
   it('gives Chapters its real layer when facing leaves fill the spread', () => {
@@ -23,19 +28,24 @@ describe('spreadLayers', () => {
     expect(spreadLayers(true, COVER_LAYER, true, true)).toEqual({ home: COVER_LAYER, reader: READER_LAYER })
   })
 
-  it('has no reader page before a chapter is opened', () => {
-    // Layer 1 is Settings here, so Chapters is genuinely underneath it.
-    expect(spreadLayers(true, READER_LAYER, false)).toEqual({ home: READER_LAYER, reader: READER_LAYER })
+  it('keeps Chapters on top beside Settings before a chapter is opened', () => {
+    // Layer 1 is Settings here, laid over the title page on the right.
+    expect(spreadLayers(true, READER_LAYER, false)).toEqual({ home: COVER_LAYER, reader: READER_LAYER })
   })
 })
 
 describe('visible reader navigation', () => {
-  it('keeps gather on the desktop reader beside Chapters, Bookmarks and Settings', () => {
-    for (const layer of [COVER_LAYER, BOOKMARKS_LAYER, SETTINGS_LAYER, READER_LAYER] as const) {
+  it('keeps gather on the desktop reader beside Chapters and Bookmarks', () => {
+    for (const layer of [COVER_LAYER, BOOKMARKS_LAYER, READER_LAYER] as const) {
       expect(readerVisible(true, layer, true)).toBe(true)
       expect(leavesReader(true, READER_LAYER, layer, true)).toBe(false)
-      expect(leavesReader(true, SETTINGS_LAYER, layer, true)).toBe(false)
     }
+  })
+
+  it('exits gather when Settings is laid over the chapter', () => {
+    expect(readerVisible(true, SETTINGS_LAYER, true)).toBe(false)
+    expect(leavesReader(true, READER_LAYER, SETTINGS_LAYER, true)).toBe(true)
+    expect(leavesReader(true, COVER_LAYER, SETTINGS_LAYER, true)).toBe(true)
   })
 
   it('exits gather when a phone parks the reader', () => {
