@@ -116,7 +116,11 @@ private val HomeRowRibbonGutter = (HomeNumberColumn - HomeRibbonWidth) / 2f
 private val HomeColumnGap = 4.dp
 private val HomeArabicOpticalInset = 4.dp
 private val TopBoundRibbonHeight = 96.dp
-private val SearchBottomBreath = 12.dp
+/**
+ * With the feather below it, this sets the field as far above the Continue
+ * band (34 dp) as the masthead title's baseline sits above the field.
+ */
+private val SearchBottomBreath = 10.dp
 private val SearchBottomFeather = 24.dp
 
 @OptIn(ExperimentalFoundationApi::class)
@@ -174,7 +178,7 @@ fun HomeScreen(
     val searchPaneVisible = searchFocused && uiState.query.isEmpty()
     val density = LocalDensity.current
     val imeBottom = WindowInsets.ime.getBottom(density).toFloat()
-    val searchPaneTopGap = SearchBottomBreath
+    val searchPaneTopGap = 12.dp
     val searchPaneBottomGap = 10.dp
     val searchPaneTopGapPx = with(density) { searchPaneTopGap.toPx() }
     val searchPaneBottomGapPx = with(density) { searchPaneBottomGap.toPx() }
@@ -682,7 +686,6 @@ private fun ContinueRow(target: ContinueTarget, onClick: () -> Unit) {
         verticalAlignment = Alignment.CenterVertically,
         modifier = Modifier
             .fillMaxWidth()
-            .padding(top = 18.dp)
             .background(QuranTheme.accents.greenWash)
             .quietClickable(onClick = onClick)
             .padding(vertical = 18.dp),
