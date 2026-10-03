@@ -167,6 +167,8 @@ it while the picker is open. File writing runs off the UI thread, and success
 or failure appears on the lab’s message line. Import also reads off the UI
 thread and reports unreadable documents on the page. No storage permission
 is needed.
+Leaving the lab, changing words, or starting another import cancels the pending
+read; a late result or failure cannot change tuning, the target, or playback.
 The JSON includes reciter, ayah, word, decimated PCM (16-bit LE Base64), hop
 duration, media origin, loop range, displayed detector parameters, and notes.
 Export in Compare mode saves the reference settings you are viewing without changing the live profile.

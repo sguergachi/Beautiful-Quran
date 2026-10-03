@@ -25,6 +25,7 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -120,6 +121,7 @@ class TarjiLabViewModel(
     private var captureJob: Job? = null
     private var analyzeJob: Job? = null
     private var matchJob: Job? = null
+    private var importJob: Job? = null
     private var audioTrack: AudioTrack? = null
     private var previewRateHz = 0
     private var scrubActive = false
@@ -163,6 +165,7 @@ class TarjiLabViewModel(
     }
 
     private fun load(surahId: Int, ayah: Int, focusWordPosition: Int?) {
+        importJob?.cancel()
         cancelPulseMatch()
         loadJob?.cancel()
         analyzeJob?.cancel()
@@ -904,8 +907,9 @@ class TarjiLabViewModel(
 
     /** Document reads never block the transport; failures remain visible in the lab. */
     fun importSample(context: Context, uri: Uri) {
+        importJob?.cancel()
         val resolver = context.applicationContext.contentResolver
-        viewModelScope.launch {
+        importJob = viewModelScope.launch {
             try {
                 val text = withContext(Dispatchers.IO) {
                     resolver.openInputStream(uri)?.bufferedReader()?.use { it.readText() }
@@ -915,6 +919,7 @@ class TarjiLabViewModel(
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (error: Exception) {
+                coroutineContext.ensureActive()
                 _ui.value = _ui.value.copy(note = "Import failed: ${error.message}")
             }
         }
@@ -991,6 +996,7 @@ class TarjiLabViewModel(
 
     /** Called when the lab is left: silence the preview and the player. */
     fun onExit() {
+        importJob?.cancel()
         cancelPulseMatch()
         loadJob?.cancel()
         analyzeJob?.cancel()
