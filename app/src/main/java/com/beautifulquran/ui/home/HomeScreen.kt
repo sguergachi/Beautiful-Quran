@@ -519,7 +519,10 @@ fun HomeScreen(
             }
             }
 
-            if (bookmarkCount > 0 && bookmarkStyle != HomeBookmarkStyle.SAVED_PASSAGES) {
+            // The ribbon is the bookmarks entry; search owns the sheet while
+            // active (dials or results), so it steps aside until the query
+            // clears and focus leaves.
+            if (!searchActive && bookmarkCount > 0 && bookmarkStyle != HomeBookmarkStyle.SAVED_PASSAGES) {
                 HomeBookmarkOverlay(
                     height = TopBoundRibbonHeight + padding.calculateTopPadding(),
                     unfurlSignal = ribbonUnfurlEpoch,
