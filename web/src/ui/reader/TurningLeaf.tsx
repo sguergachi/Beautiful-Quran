@@ -9,6 +9,9 @@ import { memo, useLayoutEffect, useRef, type AnimationEvent, type ReactNode } fr
  */
 export const TURNING_LEAF_STRIPS = 18
 
+/** The share of the block below which a turning pile is drawn as one leaf. */
+export const WAD_VISIBLE = 0.02
+
 /** Faces overlap their joints by --joint a side (styles.css), so a slice is the face less two. */
 function sliceOffset(slice: number): string {
   return `calc(${-slice} * (100% - 2 * var(--joint)))`
@@ -25,10 +28,20 @@ export const TurningLeaf = memo(function TurningLeaf({
   hinge,
   dir,
   single = false,
+  wad = 0,
+  ms,
   face,
   back,
   onEnd,
 }: {
+  /**
+   * The share of the book's block this turn carries, 0 to 1: one leaf is 0,
+   * and going to Chapters, Settings or a far page turns the whole pile in
+   * between. A pile has thickness, so it is drawn with its edges.
+   */
+  wad?: number
+  /** How long the turn takes; a pile is slower than a leaf. */
+  ms?: number
   /** Which edge of the leaf is bound. */
   hinge: 'left' | 'right'
   dir: 'on' | 'back'
@@ -53,6 +66,8 @@ export const TurningLeaf = memo(function TurningLeaf({
     }
   }, [])
   const count = TURNING_LEAF_STRIPS
+  // Below a few leaves a pile's edge is under a pixel: it is a leaf.
+  const pile = !single && wad > WAD_VISIBLE
   // Only the bound strip's own turn ends the turn; joints and shading run
   // the same clock and bubble their own animationend through here.
   const ended = (event: AnimationEvent) => {
@@ -82,6 +97,13 @@ export const TurningLeaf = memo(function TurningLeaf({
             </div>
           </div>
         ) : null}
+        {pile ? (
+          <>
+            <div className="mushaf-flip-cap mushaf-flip-cap--head" />
+            <div className="mushaf-flip-cap mushaf-flip-cap--foot" />
+            {index + 1 === count ? <div className="mushaf-flip-edge" /> : null}
+          </>
+        ) : null}
         {index + 1 < count ? strip(index + 1) : null}
       </div>
     )
@@ -95,7 +117,11 @@ export const TurningLeaf = memo(function TurningLeaf({
       className={single ? 'mushaf-flip mushaf-flip--single' : 'mushaf-flip'}
       data-hinge={hinge}
       data-dir={dir}
-      style={{ ['--strips' as string]: count }}
+      style={{
+        ['--strips' as string]: count,
+        ['--wad-share' as string]: pile ? wad : 0,
+        ...(ms != null ? { ['--turn-ms' as string]: `${ms}ms` } : null),
+      }}
     >
       {strip(0)}
     </div>

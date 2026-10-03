@@ -85,6 +85,58 @@ export function closesBook(layer: StackLayer, dx: number): boolean {
   return layer === COVER_LAYER && dx < 0
 }
 
+/** Pages in the book, for the thickness of its two piles. */
+const BOOK_PAGES = 604
+
+/**
+ * The share of the book's leaves lying on the right-hand pile, 0 to 1.
+ *
+ * Pages run right to left, so each leaf read is turned over onto the right:
+ * at page 1 the whole block is on the left, at the last page on the right.
+ * On facing leaves, Chapters is the left-most page, under every leaf of the
+ * left pile, and Settings the right-most, under every leaf of the right
+ * pile. Showing either turns that whole pile over, so nothing is left on
+ * its side. Before a chapter is chosen the book stands open at Chapters.
+ */
+export function bookRightShare(leaves: boolean, stack: StackLayer, page: number | null): number {
+  if (leaves && stack <= COVER_LAYER) return 1
+  if (leaves && stack === SETTINGS_LAYER) return 0
+  if (page == null) return 1
+  return Math.min(1, Math.max(0, (page - 1) / (BOOK_PAGES - 1)))
+}
+
+/** One leaf turns in this long (`mushaf-leaf-turn` in styles.css). */
+export const LEAF_TURN_MS = 760
+
+/** A pile is heavier than a leaf: the whole block takes half as long again. */
+export function turnMs(share: number): number {
+  return Math.round(LEAF_TURN_MS * (1 + 0.5 * Math.min(1, Math.max(0, share))))
+}
+
+/** The page the facing leaves are open at, for the piles under them. */
+const bookPlace = (() => {
+  let page: number | null = null
+  const listeners = new Set<() => void>()
+  return {
+    set(next: number | null) {
+      if (page === next) return
+      page = next
+      for (const listener of listeners) listener()
+    },
+    use: (): number | null =>
+      useSyncExternalStore(
+        (onChange) => {
+          listeners.add(onChange)
+          return () => listeners.delete(onChange)
+        },
+        () => page,
+        () => null,
+      ),
+  }
+})()
+export const setBookPlace = bookPlace.set
+export const useBookPlace = bookPlace.use
+
 /** A swipe belongs to the sheet on which its pointer went down. */
 export function bookmarkSwipeDestination(layer: StackLayer, dx: number, hasBookmarks: boolean): StackLayer | null {
   if (layer === COVER_LAYER && dx > 0 && hasBookmarks) return BOOKMARKS_LAYER

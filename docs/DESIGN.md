@@ -45,12 +45,31 @@ puts it away and does nothing else.
 
 **One grid for the window (web, desktop spread).** Everything the book is
 made of is a power of φ times one module *u*, and *u* is the largest that
-fits the window. Across: desk φ, board φ⁻³, the page block's edge φ⁻⁴, page
-φ⁶, and the same again mirrored. Down: desk φ, board φ⁻³, page φ⁷, board,
-desk. So the window is 32.743 *u* tall or 39.889 *u* wide, whichever binds
+fits the window. Across: desk φ, board φ⁻³, the page block's edge φ⁻⁴ + 1,
+page φ⁶, and the same again mirrored. Down: desk φ, board φ⁻³, page φ⁷,
+board, desk. So the window is 32.743 *u* tall or 41.889 *u* wide, whichever binds
 first, and the other way the book is centred with desk to spare. The desk's
 margin is the page's own head and fore-edge margin carried outward, and the
 gutter's shade is φ³ wide.
+
+**The block has its thickness.** The Quran is 604 pages, 302 leaves, and the
+open book shows them as two piles, one under each page, seen as the fanned
+edges of their leaves. Pages run right to left, so every leaf read is turned
+over onto the right: at the first page the whole block lies on the left, at
+the last on the right, and the piles trade leaves in between. Each board
+carries a band wide enough for the whole block (1 *u*, plus φ⁻⁴ for the last
+few leaves); what a pile does not cover shows the pastedown, the paper lining
+the board. So the pages themselves never move as the piles change.
+
+On facing leaves Chapters is the left-most page, under every leaf of the left
+pile, and Settings the right-most, under every leaf of the right pile. Going
+to either turns that whole pile over, as one thick wad with its own
+fore-edge, head and foot, and coming back turns it home. A far page does the
+same with the leaves in between. A pile is stiffer and slower than a leaf:
+it barely curls, and the whole block takes half as long again to turn. It
+turns about the middle of its own thickness, so it starts and lands level
+with the pages. (Chapters at the left end is the reader's choice of where
+the book begins; in a bound mushaf that is the back board.)
 
 **The golden page.** A page is 1 : φ. Its margins run inner : head :
 fore-edge : foot = 1 : φ : φ : φ² in that same module, which leaves a text

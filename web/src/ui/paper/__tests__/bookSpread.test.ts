@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { bookTurnDirection, bookmarkSwipeDestination, closesBook, facingPage, leavesReader, readerVisible, spreadLayers } from '../bookSpread'
+import { bookRightShare, bookTurnDirection, bookmarkSwipeDestination, closesBook, facingPage, turnMs, leavesReader, readerVisible, spreadLayers } from '../bookSpread'
 import { BOOKMARKS_LAYER, COVER_LAYER, READER_LAYER, SETTINGS_LAYER } from '../stack'
 
 describe('spreadLayers', () => {
@@ -107,5 +107,34 @@ describe('a loose sheet', () => {
   it('lies on the page facing the word, never over it', () => {
     expect(facingPage('recto')).toBe('verso')
     expect(facingPage('verso')).toBe('recto')
+  })
+})
+
+describe('the two piles of the page block', () => {
+  it('puts the whole block on the left at the first page and on the right at the last', () => {
+    expect(bookRightShare(true, READER_LAYER, 1)).toBe(0)
+    expect(bookRightShare(true, READER_LAYER, 604)).toBe(1)
+    expect(bookRightShare(true, READER_LAYER, 302)).toBeCloseTo(0.499, 3)
+    // A scrolling chapter counts by the page it begins on.
+    expect(bookRightShare(false, READER_LAYER, 604)).toBe(1)
+  })
+
+  it('turns the whole left pile over for Chapters and the whole right pile for Settings', () => {
+    expect(bookRightShare(true, COVER_LAYER, 300)).toBe(1)
+    expect(bookRightShare(true, BOOKMARKS_LAYER, 300)).toBe(1)
+    expect(bookRightShare(true, SETTINGS_LAYER, 300)).toBe(0)
+    // Beside a scrolling chapter Chapters and Settings are laid over a page; nothing turns.
+    expect(bookRightShare(false, COVER_LAYER, 300)).toBeCloseTo(299 / 603, 6)
+    expect(bookRightShare(false, SETTINGS_LAYER, 300)).toBeCloseTo(299 / 603, 6)
+  })
+
+  it('stands open at Chapters before a chapter is chosen', () => {
+    expect(bookRightShare(false, COVER_LAYER, null)).toBe(1)
+  })
+
+  it('takes longer to turn a pile than a leaf', () => {
+    expect(turnMs(0)).toBe(760)
+    expect(turnMs(1)).toBe(1140)
+    expect(turnMs(0.5)).toBeGreaterThan(turnMs(0.1))
   })
 })

@@ -31,6 +31,17 @@ export interface FlipSchedule {
  */
 export const PAGE_TURN_SCHEDULE: FlipSchedule = { lift: 0, sweep: 230, drop: 540, rate: 1 }
 
+/** The same three moments for a turn of any length; a pile is slower and lower. */
+export function pileTurnSchedule(ms: number): FlipSchedule {
+  const stretch = ms / 760
+  return {
+    lift: 0,
+    sweep: Math.round(PAGE_TURN_SCHEDULE.sweep * stretch),
+    drop: Math.round(PAGE_TURN_SCHEDULE.drop * stretch),
+    rate: Math.max(0.8, 1 / stretch),
+  }
+}
+
 /** Phone cover, 1150 ms hinge — Android `playCoverOpen`, verbatim. */
 export const COVER_OPEN_SCHEDULE: FlipSchedule = { lift: 0, sweep: 260, drop: 820, rate: 0.92 }
 
