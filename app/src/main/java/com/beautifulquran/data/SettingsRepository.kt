@@ -41,28 +41,6 @@ enum class PageNumberScript { BOTH, ARABIC, ENGLISH }
 /** Which screen edge the ayah selector rail lives on. */
 enum class AyahSelectorSide { LEFT, RIGHT }
 
-/**
- * Which colour system paints the app.
- *
- * [LADDER] is what ships: one ink ladder pinned to perceptual targets, with
- * every rung's alpha solved separately per theme. [LEGACY] reconstructs the
- * palette as it stood before that pass — the blue-cast Nightfall sheet, the
- * un-corrected accents, and each rung set back to the alpha the majority of
- * its call sites used to carry.
- *
- * The reconstruction is close but not exact, and cannot be: the ladder
- * collapsed 54 hand-picked alphas onto 10 rungs, so sites that used to differ
- * by a point or two of alpha now share a rung and come back identical. It is
- * faithful where it matters — the dominant weight at each rung, the old base
- * inks, the old accents — which is enough to judge the two side by side.
- *
- * Developer-only A/B; see Settings → Developer.
- */
-enum class ColorSystem { LADDER, LEGACY }
-
-/** Developer-selectable bookmark treatment on the Chapters sheet. */
-enum class HomeBookmarkStyle { TOP_BOUND, SAVED_PASSAGES }
-
 /** The original catalog stays on the main Settings leaf after upgrading. */
 internal val DEFAULT_FAVORITE_RECITER_IDS = (1..7).toSet()
 
@@ -125,15 +103,8 @@ data class Settings(
      *  [developerModeEnabled] is on. Lab numbers persist via
      *  [com.beautifulquran.ui.reader.InkLabStore] until Reset. */
     val inkLabEnabled: Boolean = false,
-    /** Developer-selectable Chapters bookmark treatment. */
-    val homeBookmarkStyle: HomeBookmarkStyle = HomeBookmarkStyle.TOP_BOUND,
     /** Developer-only: which ink-brush circle to paint around selected enums. */
     val brushCircleStyle: BrushCircleStyle = BrushCircleStyle.BASELINE,
-    /** Developer-only: removes parenthetical and bracketed asides from English-only reading. */
-    val hideEnglishParentheticals: Boolean = false,
-    /** Developer-only A/B between the shipped ink ladder and the palette that
-     *  preceded it. See [ColorSystem]. */
-    val colorSystem: ColorSystem = ColorSystem.LADDER,
 )
 
 /** Maps a persisted ordinal back to an enum entry, falling back to [default]
@@ -144,16 +115,6 @@ internal fun <E : Enum<E>> enumForOrdinal(entries: List<E>, ordinal: Int, defaul
 /** Reads an enum stored by ordinal, tolerating stale ordinals. */
 private inline fun <reified E : Enum<E>> SharedPreferences.enum(key: String, default: E): E =
     enumForOrdinal(enumValues<E>().toList(), getInt(key, default.ordinal), default)
-
-/** Reads the named v2 value, migrating the old five-way ordinal experiment. */
-private fun SharedPreferences.homeBookmarkStyle(): HomeBookmarkStyle =
-    getString("homeBookmarkStyleV2", null)?.let { stored ->
-        runCatching { HomeBookmarkStyle.valueOf(stored) }.getOrNull()
-    } ?: if (getInt("homeBookmarkStyle", -1) == 3) {
-        HomeBookmarkStyle.SAVED_PASSAGES
-    } else {
-        HomeBookmarkStyle.TOP_BOUND
-    }
 
 /** Missing means a pre-favorites install; an explicitly empty set stays empty. */
 internal fun decodeFavoriteReciterIds(stored: Set<String>?): Set<Int> =
@@ -209,10 +170,7 @@ class SettingsRepository(context: Context) {
         developerModeEnabled = prefs.getBoolean("developerModeEnabled", false),
         educationGuidesEnabled = prefs.getBoolean("educationGuidesEnabled", false),
         inkLabEnabled = prefs.getBoolean("inkLabEnabled", false),
-        homeBookmarkStyle = prefs.homeBookmarkStyle(),
         brushCircleStyle = prefs.enum("brushCircleStyle", BrushCircleStyle.BASELINE),
-        colorSystem = prefs.enum("colorSystem", ColorSystem.LADDER),
-        hideEnglishParentheticals = prefs.getBoolean("hideEnglishParentheticals", false),
     )
 
     /**
@@ -317,11 +275,13 @@ class SettingsRepository(context: Context) {
             putBoolean("developerModeEnabled", next.developerModeEnabled)
             putBoolean("educationGuidesEnabled", next.educationGuidesEnabled)
             putBoolean("inkLabEnabled", next.inkLabEnabled)
-            putString("homeBookmarkStyleV2", next.homeBookmarkStyle.name)
+            // Developer experiments that have been taken out: clear what
+            // they left behind rather than carry it forever.
+            remove("homeBookmarkStyleV2")
             remove("homeBookmarkStyle")
+            remove("colorSystem")
+            remove("hideEnglishParentheticals")
             putInt("brushCircleStyle", next.brushCircleStyle.ordinal)
-            putInt("colorSystem", next.colorSystem.ordinal)
-            putBoolean("hideEnglishParentheticals", next.hideEnglishParentheticals)
             remove("shareUxVariant")
         }
     }

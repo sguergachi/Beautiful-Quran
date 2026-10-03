@@ -43,6 +43,7 @@ import { PaperSlider } from '../kit/PaperSlider'
 import { NuqtaParamsContext, SHIPPED_NUQTA, type NuqtaParams } from '../kit/nuqta'
 import { PaperSwitch } from '../kit/PaperSwitch'
 import { rearmEducation } from '../../data/education'
+import { version as APP_VERSION } from '../../../package.json'
 
 const ATTRIBUTIONS = `Quran text (Uthmani script) and Saheeh International translation via the quran-json project, from Tanzil and Al Quran Cloud.
 
@@ -57,8 +58,6 @@ Recitation audio streamed from everyayah.com. All rights to the recitations belo
 Arabic typeface: KFGQPC HAFS Uthmanic Script © King Fahd Glorious Quran Printing Complex, Madinah.
 
 This app is free, ad-free, and collects no data.`
-
-const APP_VERSION = '0.1.0'
 
 const HOME_BOOKMARK_OPTIONS: { value: HomeBookmarkStyle; label: string }[] = [
   { value: 'top_bound', label: 'Top-bound ribbon' },

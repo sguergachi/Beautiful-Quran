@@ -167,48 +167,39 @@ cannot create an EGL display in a headless session), which yields `No process
 found` rather than a measurement. Emulator-renderer instability is not an app
 regression, and a fabricated before/after must not enter the performance record.
 
-## Debug ProfilingManager workflow
+## Local performance capture
 
-`DevProfiling` has source-set-specific implementations:
+`DevProfiling` lives in the main source set. Developer → **Record performance
+profile** is available in debug and release builds on every supported API.
+It watches ten seconds of use, then offers one share with a text report of
+frame callback intervals, main-thread stack samples, and named marks. API 35+
+requests a system trace through Jetpack `SystemTraceRequestBuilder`; older
+versions use ART method sampling. If the platform rejects a trace request,
+the text report still shares. Trace delivery has a bounded 30-second wait
+after recording ends. Nothing is sent until the user chooses a destination.
 
-- `src/debug` uses Jetpack `SystemTraceRequestBuilder` +
-  `androidx.core.os.requestProfiling` (API 35+) for manual traces, and
-  registers Android 17 cold-start / fully-drawn triggers (API 37+);
-- `src/release` is a no-op, so release builds register nothing and collect
-  nothing.
+Release captures are opt-in. Automatic ceremony traces and Android 17
+cold-start / fully-drawn triggers remain debug-only. On API 37,
+`TRIGGER_TYPE_COLD_START` records until `Activity.reportFullyDrawn()` or its
+timeout; `TRIGGER_TYPE_APP_FULLY_DRAWN` captures that milestone. Automatic
+trigger capture depends on the system background trace being active.
 
-On Android 17 debug builds, `TRIGGER_TYPE_COLD_START` starts a system trace as
-early as the process allows and keeps it until `Activity.reportFullyDrawn()`
-(the entrance ceremony calls this when the cover finishes opening) or a
-5-second default timeout. `TRIGGER_TYPE_APP_FULLY_DRAWN` captures the moment
-fully-drawn is reported. Trigger capture depends on the system background
-trace being active — enable the testing helpers below for local work.
+Named milestones (`coverReady`, `warmStack`, stack drag/settle, …) correlate
+interactions with the log. Synchronous `DevProfiling.trace` spans attribute
+startup, search, and English pagination while tracing is enabled; never wrap
+suspend points because `beginSection` is thread-local. Release stack names
+are obfuscated: retain the matching build's `mapping.txt` for retracing.
+Frame callback intervals indicate missed callbacks, not GPU render duration;
+use Perfetto's frame timeline for a full attribution.
 
-Ceremony milestones also emit `BeautifulQuranProfile` log lines and atrace
-sections (`coverChrome`, `coverOrnament`, `coverReady`, `warmStack`, …) so a
-Perfetto UI search finds the handoff points quickly. Debug-only synchronous
-`DevProfiling.trace` spans can attribute cold start, search, and English
-pagination on a debug APK. They must not wrap suspend points
-(`beginSection` is thread-local). Release `DevProfiling` stays a no-op, so
-macrobenchmarks cannot read those names as `TraceSectionMetric`. Use a debug
-trace to decide whether the measure-first items in
-[PERFORMANCE.md](PERFORMANCE.md) are real; do not change ink rendering or
-defer `QuranApp` initialization without that evidence.
+1. Install the APK and enable Developer by tapping the app mark three times.
+2. Tap **Record performance profile**.
+3. Return to the chapter and swipe to Settings during the next ten seconds.
+4. Choose a destination in the share sheet. Open an attached system trace in
+   [Perfetto](https://ui.perfetto.dev/).
 
-For an explicit local trace request:
-
-1. Install and run the debug APK on API 35+ (API 37 for cold-start triggers).
-2. Open Settings and tap the app mark three times to enable developer mode.
-3. In Developer, tap **Record 10-second system trace**.
-4. Exercise the interaction of interest during those ten seconds.
-5. Read the result path from logcat:
-
-```bash
-adb logcat -s BeautifulQuranProfile
-```
-
-Pull the returned `resultFilePath` with `adb pull` and open it in
-[Perfetto](https://ui.perfetto.dev/). For repeated local requests, disable
+Result paths and errors also appear in `adb logcat -s BeautifulQuranProfile`.
+For repeated local requests, disable
 rate limiting and keep temporary results:
 
 ```bash

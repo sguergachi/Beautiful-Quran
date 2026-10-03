@@ -30,7 +30,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
-import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Slider
@@ -38,7 +37,6 @@ import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
-import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -74,7 +72,6 @@ import com.beautifulquran.BuildConfig
 import com.beautifulquran.QuranApp
 import com.beautifulquran.R
 import com.beautifulquran.data.BrushCircleStyle
-import com.beautifulquran.data.HomeBookmarkStyle
 import com.beautifulquran.data.RuntimeCachePhase
 import com.beautifulquran.data.RuntimeMushafCache
 import com.beautifulquran.data.Settings
@@ -82,7 +79,6 @@ import com.beautifulquran.data.ThemeMode
 import com.beautifulquran.playback.RecitationCache
 import com.beautifulquran.playback.RecitationUsage
 import com.beautifulquran.playback.formatUsage
-import com.beautifulquran.ui.PageTurnSounds
 import com.beautifulquran.ui.theme.AlphaTag
 import com.beautifulquran.ui.theme.BrushCheckParams
 import com.beautifulquran.ui.theme.BrushCircleParams
@@ -105,7 +101,6 @@ import com.beautifulquran.ui.theme.themePreviewColors
 import com.beautifulquran.ui.theme.verticalFadingEdges
 import kotlin.math.roundToInt
 import com.beautifulquran.ui.theme.QuranTheme
-import com.beautifulquran.data.ColorSystem
 
 private val ATTRIBUTIONS = """
 Quran text (Uthmani script) and Saheeh International translation via the
@@ -387,13 +382,7 @@ private fun DeveloperSection(
     onRecordSystemTrace: () -> Unit,
 ) {
     val context = LocalContext.current
-    // Created on first audition tap: a SoundPool with nine loaded samples is
-    // too heavy to spin up just because the settings sheet composed.
-    var sounds by remember { mutableStateOf<PageTurnSounds?>(null) }
     var educationRearmed by remember { mutableStateOf(false) }
-    DisposableEffect(Unit) {
-        onDispose { sounds?.release() }
-    }
 
     SectionLabel("Developer")
     Spacer(Modifier.height(2.dp))
@@ -402,26 +391,6 @@ private fun DeveloperSection(
     Spacer(Modifier.height(20.dp))
     val app = context.applicationContext as QuranApp
     MushafRuntimeCacheStatus(app.runtimeMushaf)
-
-    Spacer(Modifier.height(20.dp))
-    ToggleRow(
-        label = "Legacy colours",
-        checked = settings.colorSystem == ColorSystem.LEGACY,
-        onChange = { legacy ->
-            viewModel.settings.update {
-                it.copy(colorSystem = if (legacy) ColorSystem.LEGACY else ColorSystem.LADDER)
-            }
-        },
-        checkParams = checkParams,
-        checkPaintToken = checkPaintToken,
-    )
-    Caption(
-        "Repaints the app in the palette that preceded the ink ladder — the " +
-            "blue-cast Nightfall sheet and the un-corrected accents. Close to " +
-            "the old build but not exact: the ladder collapsed 54 alphas onto " +
-            "10 rungs, so each rung comes back at the weight most of its call " +
-            "sites used to carry. Switch with a chapter open to compare.",
-    )
 
     Spacer(Modifier.height(20.dp))
     ToggleRow(
@@ -463,27 +432,21 @@ private fun DeveloperSection(
         },
     )
 
-    if (BuildConfig.DEBUG && Build.VERSION.SDK_INT >= 35) {
-        Spacer(Modifier.height(20.dp))
-        Text(
-            text = "Record & send performance profile",
-            style = MaterialTheme.typography.bodyLarge,
-            modifier = Modifier
-                .fillMaxWidth()
-                .quietClickable(onClick = onRecordSystemTrace)
-                .padding(vertical = 6.dp),
-            color = MaterialTheme.colorScheme.primary,
-        )
-        Caption(
-            if (Build.VERSION.SDK_INT >= 37) {
-                "Records ten seconds — use the app while it runs — then opens " +
-                    "the share sheet. Also registers cold-start triggers."
-            } else {
-                "Records ten seconds — use the app while it runs — then opens " +
-                    "the share sheet. Cold-start triggers need API 37."
-            },
-        )
-    }
+    Spacer(Modifier.height(20.dp))
+    Text(
+        text = "Record performance profile",
+        style = MaterialTheme.typography.bodyLarge,
+        modifier = Modifier
+            .fillMaxWidth()
+            .quietClickable(onClick = onRecordSystemTrace)
+            .padding(vertical = 6.dp),
+        color = MaterialTheme.colorScheme.primary,
+    )
+    Caption(
+        "Records ten seconds — use the app while it runs — then opens the " +
+            "share sheet with a frame and stack log" +
+            if (Build.VERSION.SDK_INT >= 35) " and a system trace." else ".",
+    )
 
     Spacer(Modifier.height(20.dp))
     Text(
@@ -535,16 +498,6 @@ private fun DeveloperSection(
     Caption("Live sliders over the reader's highlight tuning. Numbers persist until Reset.")
 
     Spacer(Modifier.height(20.dp))
-    ToggleRow(
-        label = "Hide bracketed English",
-        checked = settings.hideEnglishParentheticals,
-        onChange = { on -> viewModel.settings.update { it.copy(hideEnglishParentheticals = on) } },
-        checkParams = checkParams,
-        checkPaintToken = checkPaintToken,
-    )
-    Caption("English-only reading hides text in parentheses or square brackets, including the brackets.")
-
-    Spacer(Modifier.height(20.dp))
     Text(
         text = "Component kit",
         style = MaterialTheme.typography.bodyLarge,
@@ -555,61 +508,6 @@ private fun DeveloperSection(
         color = MaterialTheme.colorScheme.primary,
     )
     Caption("Tune the nuqta, ink check and brush circle live, one component per page.")
-
-    Spacer(Modifier.height(20.dp))
-    Text(
-        "Home bookmark",
-        style = MaterialTheme.typography.bodyLarge,
-        color = MaterialTheme.colorScheme.onSurface,
-    )
-    Caption("Changes the Chapters shortcut; bookmark ribbons inside verses are unchanged.")
-    Spacer(Modifier.height(4.dp))
-    HomeBookmarkStyle.entries.forEach { style ->
-        SelectRow(
-            label = when (style) {
-                HomeBookmarkStyle.TOP_BOUND -> "Top-bound ribbon"
-                HomeBookmarkStyle.SAVED_PASSAGES -> "Saved passages line"
-            },
-            selected = settings.homeBookmarkStyle == style,
-            onClick = {
-                viewModel.settings.update { it.copy(homeBookmarkStyle = style) }
-            },
-        )
-    }
-
-    Spacer(Modifier.height(18.dp))
-    Text(
-        "Page turn sounds",
-        style = MaterialTheme.typography.bodyLarge,
-        color = MaterialTheme.colorScheme.onSurface,
-    )
-    Caption("Tap to hear the whole flip (lift → sweep → drop).")
-    Spacer(Modifier.height(4.dp))
-    PageTurnSounds.FLIPS.forEachIndexed { index, flip ->
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            modifier = Modifier
-                .fillMaxWidth()
-                .quietClickable {
-                    (sounds ?: PageTurnSounds(context).also { sounds = it })
-                        .auditionFlip(index)
-                }
-                .padding(vertical = 8.dp),
-        ) {
-            Icon(
-                imageVector = Icons.Rounded.PlayArrow,
-                contentDescription = "Play ${flip.name}",
-                tint = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.size(20.dp),
-            )
-            Spacer(Modifier.size(14.dp))
-            Text(
-                flip.name,
-                style = MaterialTheme.typography.bodyLarge,
-                color = MaterialTheme.colorScheme.onSurface,
-            )
-        }
-    }
 }
 
 // ── Header / footer ────────────────────────────────────────────────────────

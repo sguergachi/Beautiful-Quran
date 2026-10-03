@@ -274,19 +274,11 @@ fun ReaderScreen(
     onShareText: () -> Unit = {},
     onShareImage: () -> Unit = {},
     /**
-     * When set, the chapter bar is drawn above the paper stack instead of
-     * inside this sheet, so a page turn does not carry it off.
+     * Hosts the chapter bar alongside this sheet. Home covers it until a
+     * playback session exists; then it stays above Home through the turn.
      */
     playbackHost: PinnedPlaybackHost? = null,
     playbackPinned: Boolean = false,
-    /**
-     * Scroll's top-bar back arrow. False from the first pixel of a swipe
-     * until that sheet is parked again. This is a threshold boolean: read it
-     * in the top-bar slot, which drops the control, so a swipe does not
-     * recompose the chapter and the hidden control cannot be tapped.
-     * Mushaf ignores this. The play bar never uses it.
-     */
-    showScrollBackArrow: () -> Boolean = { true },
     /**
      * Full measured height of the pinned bar, including the navigation
      * inset and the return pill while that pill is open. Read from the
@@ -362,7 +354,6 @@ fun ReaderScreen(
         leafMetrics,
         settings.englishLeafText,
         settings.verseNumberScript,
-        settings.hideEnglishParentheticals,
     ) {
         val well = leafMetrics?.getOrNull(0) ?: return@LaunchedEffect
         val measure = leafMetrics.getOrNull(1) ?: return@LaunchedEffect
@@ -384,7 +375,6 @@ fun ReaderScreen(
                     density = rulerDensity,
                     measurer = rulerMeasurer,
                     verseNumberScript = settings.verseNumberScript,
-                    hideParentheticals = settings.hideEnglishParentheticals,
                     translation = translation,
                 )
             },
@@ -392,13 +382,11 @@ fun ReaderScreen(
                 well,
                 measure,
                 settings.verseNumberScript,
-                settings.hideEnglishParentheticals,
             ),
             cacheKey = viewModel.englishBookCacheKey(
                 wellPx = well,
                 measurePx = measure,
                 verseNumberScript = settings.verseNumberScript.ordinal,
-                hideParentheticals = settings.hideEnglishParentheticals,
                 leafText = settings.englishLeafText.ordinal,
             ),
         )
@@ -1526,7 +1514,6 @@ fun ReaderScreen(
         settings.showWordGloss,
         settings.showTransliteration,
         settings.showTranslation,
-        settings.hideEnglishParentheticals,
         settings.fontScale,
     )
     var lastLayoutSignature by remember { mutableStateOf(layoutSignature) }
@@ -1794,9 +1781,8 @@ fun ReaderScreen(
                     }
                 },
                 navigationIcon = {
-                    // The slot stays so the title does not jump. Scroll omits
-                    // the control while a swipe owns the sheet, so it cannot
-                    // be tapped or read out.
+                    // The arrow rides this sheet through a turn; only recitation
+                    // and search change its ink or action.
                     Row {
                         if (search.active || mushafMode) {
                             IconButton(
@@ -1819,7 +1805,7 @@ fun ReaderScreen(
                                         .copy(alpha = 0.55f),
                                 )
                             }
-                        } else if (showScrollBackArrow()) {
+                        } else {
                             IconButton(
                                 onClick = onBack,
                                 enabled = !recitingActive,
@@ -1834,8 +1820,6 @@ fun ReaderScreen(
                                         .copy(alpha = 0.55f),
                                 )
                             }
-                        } else {
-                            Spacer(Modifier.size(48.dp).offset(x = topBarStartShift))
                         }
                         // Match the two trailing buttons so Material's title
                         // slot stays on the physical centre line at narrow widths.
@@ -1962,7 +1946,7 @@ fun ReaderScreen(
                         onShareImage = onShareImage,
                     )
                 } else if (playbackPinned) {
-                    // The visible bar is pinned above the paper stack. Its
+                    // The bar is hosted beside the paper stack. Its
                     // measured body includes the return pill, so the last
                     // lines stay clear while that pill opens.
                     val barBody = playbackBarBodyHeight()
@@ -2902,7 +2886,6 @@ fun ReaderScreen(
                         onBasmalahClick = onMushafBasmalahClick,
                         english = settings.readingMode == ReadingMode.ENGLISH_ONLY,
                         verseNumberScript = settings.verseNumberScript,
-                        hideEnglishParentheticals = settings.hideEnglishParentheticals,
                         leafText = leafTextForSetting,
                         book = englishBook,
                         modifier = Modifier.fillMaxSize(),
@@ -3124,7 +3107,6 @@ fun ReaderScreen(
                                 showTransliteration = settings.showTransliteration,
                                 showTranslation = settings.showTranslation,
                                 verseNumberScript = settings.verseNumberScript,
-                                hideEnglishParentheticals = settings.hideEnglishParentheticals,
                                 searchQuery = activeQuery,
                                 flashWordPosition = searchFlashWord
                                     ?.takeIf { searchFlashAyah == ayah.number },

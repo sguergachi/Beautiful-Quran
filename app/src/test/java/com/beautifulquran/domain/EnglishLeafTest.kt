@@ -13,14 +13,12 @@ class EnglishLeafTest {
     private fun leafOf(
         catalog: MushafCatalog,
         page: Int,
-        hideParentheticals: Boolean = false,
         translation: (Int, Int) -> String,
     ) = englishLeaf(
         page = page,
         runs = englishLeafVerseKeys(catalog.page(page)!!).map { (s, a) ->
             EnglishVerseRun(s, a, from = 0, to = Int.MAX_VALUE)
         },
-        hideParentheticals = hideParentheticals,
         translation = translation,
     )
 
@@ -111,15 +109,6 @@ class EnglishLeafTest {
         val catalog = buildMushafCatalog(listOf(source(2, 5, 1, page = 3, line = 1)))
         val leaf = leafOf(catalog, 3) { _, _ -> "  Alif\nLam   Mim  " }
         assertEquals("Alif Lam Mim", leaf.verses.single().text)
-    }
-
-    @Test
-    fun `parentheticals come off when the reader has asked for it`() {
-        val catalog = buildMushafCatalog(listOf(source(2, 5, 1, page = 3, line = 1)))
-        val leaf = leafOf(catalog, 3, hideParentheticals = true) { _, _ ->
-            "Alif [Lam] (Mim) Sad"
-        }
-        assertEquals("Alif Sad", leaf.verses.single().text)
     }
 
     @Test
@@ -232,11 +221,10 @@ class EnglishLeafTest {
     }
 
     /** One verse set as the leaf sets it, from its whole source. */
-    private fun setVerse(source: String, hideParentheticals: Boolean = false): EnglishLeafVerse =
+    private fun setVerse(source: String): EnglishLeafVerse =
         englishLeaf(
             page = 1,
             runs = listOf(EnglishVerseRun(67, 2, from = 0, to = Int.MAX_VALUE)),
-            hideParentheticals = hideParentheticals,
         ) { _, _ -> source }.verses.single()
 
     /** The printed text up to where a share of the verse lands, joiners dropped. */
@@ -260,15 +248,6 @@ class EnglishLeafTest {
             assertEquals(source.substring(0, end), verse.inkedThrough(source, end))
         }
         assertEquals(1f, verse.fragmentInkProgress(1f), 0f)
-    }
-
-    @Test
-    fun `hidden asides do not shift the ink along the sentence`() {
-        val source = "[He] who created death and life to test you [as to] which of you is best"
-        val verse = setVerse(source, hideParentheticals = true)
-        val end = source.indexOf("which of you") + "which of you".length
-        assertEquals("who created death and life to test you which of you",
-            verse.inkedThrough(source, end))
     }
 
     @Test

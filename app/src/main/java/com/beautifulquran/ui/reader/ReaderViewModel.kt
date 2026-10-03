@@ -436,13 +436,11 @@ class ReaderViewModel(
         wellPx: Float,
         measurePx: Float,
         verseNumberScript: Int,
-        hideParentheticals: Boolean,
         leafText: Int,
     ): String = englishBookCache.key(
         wellPx = wellPx,
         measurePx = measurePx,
         verseNumberScript = verseNumberScript,
-        hideParentheticals = hideParentheticals,
         leafText = leafText,
         database = QuranDatabase.DB_FILE_NAME,
     )

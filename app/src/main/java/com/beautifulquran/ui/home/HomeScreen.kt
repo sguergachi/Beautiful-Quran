@@ -85,7 +85,6 @@ import com.beautifulquran.data.model.Surah
 import com.beautifulquran.data.model.SurahWordSearchSection
 import com.beautifulquran.data.model.WordSearchHit
 import com.beautifulquran.data.AyahSelectorSide
-import com.beautifulquran.data.HomeBookmarkStyle
 import com.beautifulquran.domain.WORD_SEARCH_PREVIEW_LIMIT
 import com.beautifulquran.domain.englishTranslationHighlightSpans
 import com.beautifulquran.domain.parseSearchQuery
@@ -139,7 +138,6 @@ fun HomeScreen(
     chapterRibbonReady: Boolean = true,
     /** Number of saved verses; zero removes the Home-page ribbon entirely. */
     bookmarkCount: Int = 0,
-    bookmarkStyle: HomeBookmarkStyle = HomeBookmarkStyle.TOP_BOUND,
     onOpenBookmarks: () -> Unit = {},
     /**
      * The chapter bar is pinned above the paper stack, so this sheet does
@@ -199,7 +197,8 @@ fun HomeScreen(
         WindowInsets.navigationBars.getBottom(density).toDp()
     }
     val listBottomInset = when {
-        playbackPinned -> {
+        playbackPinned && !searchActive &&
+            (floatingPlayback != null || playbackHost?.closing == true) -> {
             val measured = pinnedPlaybackHeight()
             measured.takeIf { it > 0.dp } ?: FloatingPlaybackListClearance
         }
@@ -208,13 +207,15 @@ fun HomeScreen(
     }
     val host = playbackHost
     if (host != null) {
-        val session = floatingPlayback != null && !searchActive
-        if (host.coverSession != session) host.coverSession = session
-        if (host.chapterLabel != floatingPlayback?.surah?.nameTransliteration.orEmpty()) {
-            host.chapterLabel = floatingPlayback?.surah?.nameTransliteration.orEmpty()
+        if (!host.closing) {
+            val session = floatingPlayback != null && !searchActive
+            if (host.coverSession != session) host.coverSession = session
+            if (host.chapterLabel != floatingPlayback?.surah?.nameTransliteration.orEmpty()) {
+                host.chapterLabel = floatingPlayback?.surah?.nameTransliteration.orEmpty()
+            }
+            val ayah = floatingPlayback?.let { "${it.surah.id}:${it.ayah}" }.orEmpty()
+            if (host.ayahLabel != ayah) host.ayahLabel = ayah
         }
-        val ayah = floatingPlayback?.let { "${it.surah.id}:${it.ayah}" }.orEmpty()
-        if (host.ayahLabel != ayah) host.ayahLabel = ayah
         SideEffect {
             host.onOpenNowPlaying = open@{
                 val target = floatingPlayback ?: return@open
@@ -414,17 +415,6 @@ fun HomeScreen(
                                 )
                             }
                         }
-                        if (
-                            bookmarkCount > 0 &&
-                            bookmarkStyle == HomeBookmarkStyle.SAVED_PASSAGES &&
-                            !searching
-                        ) {
-                            SavedPassagesRow(
-                                bookmarkCount = bookmarkCount,
-                                unfurlSignal = ribbonUnfurlEpoch,
-                                onClick = onOpenBookmarks,
-                            )
-                        }
                         Spacer(Modifier.height(16.dp))
 
                         if (showSurahMatches) SearchSectionLabel(text = "Surahs")
@@ -522,7 +512,7 @@ fun HomeScreen(
             // The ribbon is the bookmarks entry; search owns the sheet while
             // active (dials or results), so it steps aside until the query
             // clears and focus leaves.
-            if (!searchActive && bookmarkCount > 0 && bookmarkStyle != HomeBookmarkStyle.SAVED_PASSAGES) {
+            if (!searchActive && bookmarkCount > 0) {
                 HomeBookmarkOverlay(
                     height = TopBoundRibbonHeight + padding.calculateTopPadding(),
                     unfurlSignal = ribbonUnfurlEpoch,
@@ -668,64 +658,6 @@ private fun HomeBookmarkOverlay(
                 .quietClickable(role = Role.Button, onClick = onClick)
                 .semantics { contentDescription = "Open bookmarks" },
         )
-    }
-}
-
-/** A bookmark index entry written into the chapter document. */
-@Composable
-private fun SavedPassagesRow(
-    bookmarkCount: Int,
-    unfurlSignal: Int,
-    onClick: () -> Unit,
-) {
-    Row(
-        verticalAlignment = Alignment.CenterVertically,
-        modifier = Modifier
-            .fillMaxWidth()
-            .quietClickable(role = Role.Button, onClick = onClick)
-            .semantics { contentDescription = "Open bookmarks" }
-            .padding(
-                start = HomeStartInset,
-                end = HomeEndInset,
-                top = 18.dp,
-                bottom = 18.dp,
-            ),
-    ) {
-        Box(
-            modifier = Modifier
-                .width(HomeNumberColumn)
-                .height(44.dp),
-        ) {
-            VerseBookmarkRibbon(
-                bookmarked = true,
-                placeMarked = false,
-                side = AyahSelectorSide.LEFT,
-                chromeAlpha = { 1f },
-                interactive = false,
-                onToggle = { true },
-                animateOnTap = false,
-                unfurlSignal = unfurlSignal,
-                edgeInset = HomeRowRibbonGutter,
-                ribbonWidth = HomeRibbonWidth,
-                topInset = 0.dp,
-                bottomGap = 0.dp,
-                modifier = Modifier.fillMaxSize(),
-            )
-        }
-        Spacer(Modifier.width(HomeColumnGap))
-        Column(Modifier.weight(1f)) {
-            Text(
-                text = "Saved passages",
-                style = MaterialTheme.typography.labelMedium,
-                color = QuranTheme.accents.greenQuiet,
-            )
-            Spacer(Modifier.height(2.dp))
-            Text(
-                text = if (bookmarkCount == 1) "1 saved ayah" else "$bookmarkCount saved ayahs",
-                style = MaterialTheme.typography.titleMedium,
-                color = MaterialTheme.colorScheme.onSurface,
-            )
-        }
     }
 }
 

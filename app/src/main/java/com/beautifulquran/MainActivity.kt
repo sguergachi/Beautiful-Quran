@@ -43,13 +43,16 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.draw.drawWithCache
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color as ComposeColor
+import androidx.compose.ui.graphics.CompositingStrategy
+import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.PointerEventPass
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.pointer.positionChange
 import androidx.compose.ui.input.pointer.util.VelocityTracker
@@ -64,7 +67,6 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.beautifulquran.assistant.AssistantAction
 import com.beautifulquran.assistant.AssistantIntents
 import com.beautifulquran.assistant.ForegroundAppFunctions
-import com.beautifulquran.data.HomeBookmarkStyle
 import com.beautifulquran.data.ReadingLayout
 import com.beautifulquran.data.ReadingMode
 import com.beautifulquran.data.RuntimeCachePhase
@@ -88,10 +90,11 @@ import com.beautifulquran.ui.home.HomeViewModel
 import com.beautifulquran.ui.reader.BackToOriginPill
 import com.beautifulquran.ui.reader.PinnedChapterPlayback
 import com.beautifulquran.ui.reader.PinnedPlaybackHost
-import com.beautifulquran.ui.reader.hideScrollBackOnFingerUp
-import com.beautifulquran.ui.reader.showScrollReaderBackArrow
 import com.beautifulquran.ui.reader.ReaderPlaybackSnapshot
 import com.beautifulquran.ui.reader.ReaderScreen
+import com.beautifulquran.ui.reader.pinnedBarTurn
+import com.beautifulquran.ui.reader.pinnedBarReveal
+import com.beautifulquran.ui.reader.pinnedChapterBarZIndex
 import com.beautifulquran.ui.reader.showPinnedChapterBar
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalFontFamilyResolver
@@ -303,7 +306,6 @@ class MainActivity : ComponentActivity() {
             CompositionLocalProvider(LocalGildingTilt provides rememberGildingTilt()) {
                 BeautifulQuranTheme(
                     themeMode = settings.themeMode,
-                    colorSystem = settings.colorSystem,
                 ) {
                     // Cold start paints the closed mushaf first; the paper stack
                     // mounts under it after the title settles (onWarmStack), not
@@ -318,7 +320,6 @@ class MainActivity : ComponentActivity() {
                             PaperStackApp(
                                 themeMode = settings.themeMode,
                                 developerModeEnabled = settings.developerModeEnabled,
-                                homeBookmarkStyle = settings.homeBookmarkStyle,
                                 entranceVisible = !entranceDone,
                                 pendingAssistantAction = assistantAction,
                                 onAssistantActionConsumed = {
@@ -393,7 +394,6 @@ private val StackMotionEasing = CubicBezierEasing(0.24f, 0.02f, 0.12f, 1f)
 private fun PaperStackApp(
     themeMode: ThemeMode,
     developerModeEnabled: Boolean,
-    homeBookmarkStyle: HomeBookmarkStyle,
     entranceVisible: Boolean,
     pendingAssistantAction: AssistantAction? = null,
     onAssistantActionConsumed: () -> Unit = {},
@@ -456,7 +456,6 @@ private fun PaperStackApp(
         windowSize,
         settings.englishLeafText,
         settings.verseNumberScript,
-        settings.hideEnglishParentheticals,
     ) {
         // Nothing remembered — a first launch, or a window this app has not
         // been this size in. Work the leaf's size out instead of waiting for a
@@ -488,7 +487,6 @@ private fun PaperStackApp(
                     density = leafDensity,
                     measurer = leafMeasurer,
                     verseNumberScript = settings.verseNumberScript,
-                    hideParentheticals = settings.hideEnglishParentheticals,
                     translation = translation,
                 )
             },
@@ -496,13 +494,11 @@ private fun PaperStackApp(
                 metrics[0],
                 metrics[1],
                 settings.verseNumberScript,
-                settings.hideEnglishParentheticals,
             ),
             cacheKey = app.englishBookCache.key(
                 wellPx = metrics[0],
                 measurePx = metrics[1],
                 verseNumberScript = settings.verseNumberScript.ordinal,
-                hideParentheticals = settings.hideEnglishParentheticals,
                 leafText = settings.englishLeafText.ordinal,
                 database = QuranDatabase.DB_FILE_NAME,
                 ),
@@ -573,6 +569,11 @@ private fun PaperStackApp(
     val stackPastCover by remember {
         derivedStateOf { stackPosition.value > COVER_LAYER + 0.01f }
     }
+    // A threshold, not the live page: read bare in the bookmarks BackHandler,
+    // the position recomposed this whole stack on every frame of every turn.
+    val stackBeforeCover by remember {
+        derivedStateOf { stackPosition.value < COVER_LAYER - 0.01f }
+    }
     val coverSheetVisible by remember {
         derivedStateOf { stackPosition.value <= FloatingPlaybackCoverVisibleMaxPage }
     }
@@ -608,39 +609,17 @@ private fun PaperStackApp(
                 ornamentsLabRendered || tarjiLabRendered || readerInkOverlayVisible ||
                 shareUi.sendOpen || shareSendRendered
             showPinnedChapterBar(
-                stackPage = stackPosition.value,
                 readerOpen = selectedSurahId != 0,
                 mushaf = settings.readingLayout == ReadingLayout.MUSHAF,
                 gathering = shareUi.gathering,
                 overlayBlocking = blocked,
-                coverSession = pinnedPlayback.coverSession,
             )
         }
     }
-    // Off from the first pixel of a swipe until the scroll sheet is parked
-    // again. The derived boolean flips only at that boundary, so the top bar
-    // slot can drop the control without recomposing the chapter every frame.
-    var scrollDragHidesBack by remember { mutableStateOf(false) }
-    var scrollBackEpoch by remember { mutableIntStateOf(0) }
-    val scrollReaderOpen = rememberUpdatedState(
-        selectedSurahId != 0 && settings.readingLayout != ReadingLayout.MUSHAF,
-    )
-    val scrollMushaf = rememberUpdatedState(settings.readingLayout == ReadingLayout.MUSHAF)
-    val scrollBackVisible by remember {
-        derivedStateOf {
-            showScrollReaderBackArrow(
-                page = stackPosition.value,
-                mushaf = scrollMushaf.value,
-                dragHidesBack = scrollDragHidesBack,
-            )
-        }
-    }
-    val showScrollBackArrow = remember { { scrollBackVisible } }
     val playbackOnCover by remember {
         derivedStateOf { stackPosition.value < 0.55f }
     }
-    // Flips only at the threshold, so the scroll back arrow can leave without
-    // the reader recomposing on every frame of the turn.
+    // Reader entry policy consumes a threshold, never the animated position.
     val scrollSheetSettled by remember {
         derivedStateOf { abs(stackPosition.value - AYAH_LAYER) <= 0.01f }
     }
@@ -678,23 +657,13 @@ private fun PaperStackApp(
     suspend fun settleTo(layer: Int) {
         val minimumLayer = if (bookmarkCount > 0) BOOKMARKS_LAYER else COVER_LAYER
         val boundedLayer = layer.coerceIn(minimumLayer, maxStackLayer())
+        DevProfiling.mark("stackSettleStart ${stackPosition.value} to $boundedLayer")
         val distance = abs(boundedLayer - stackPosition.value)
         if (settingsDetail == SettingsDetail.DOWNLOADS &&
             boundedLayer == settingsLayer &&
             stackPosition.value > settingsLayer + 0.01f
         ) {
             downloadsRefreshKey++
-        }
-        // Hide before the sheet moves. A newer drag or settle bumps the epoch
-        // so a cancelled animation cannot bring the arrow back, and cannot
-        // leave it hidden after a later settle has parked on the reader.
-        val backEpoch = ++scrollBackEpoch
-        val openingReader = boundedLayer == AYAH_LAYER
-        if (
-            scrollReaderOpen.value &&
-            (!openingReader || abs(stackPosition.value - AYAH_LAYER) > 0.01f)
-        ) {
-            scrollDragHidesBack = true
         }
         settledLayer = boundedLayer
         try {
@@ -707,14 +676,7 @@ private fun PaperStackApp(
                 ),
             )
         } finally {
-            if (
-                backEpoch == scrollBackEpoch &&
-                openingReader &&
-                scrollReaderOpen.value &&
-                abs(stackPosition.value - AYAH_LAYER) <= 0.01f
-            ) {
-                scrollDragHidesBack = false
-            }
+            DevProfiling.mark("stackSettleEnd ${stackPosition.value}")
         }
     }
 
@@ -962,7 +924,7 @@ private fun PaperStackApp(
     BackHandler(enabled = settledLayer > COVER_LAYER || stackPastCover) {
         animateTo((stackPosition.value.roundToInt() - 1).coerceAtLeast(COVER_LAYER))
     }
-    BackHandler(enabled = settledLayer < COVER_LAYER || stackPosition.value < -0.01f) {
+    BackHandler(enabled = settledLayer < COVER_LAYER || stackBeforeCover) {
         animateTo(COVER_LAYER)
     }
     BackHandler(enabled = settingsDetail != null && settledLayer > settingsLayer) {
@@ -989,11 +951,14 @@ private fun PaperStackApp(
     }
 
     var dragStartPosition by remember { mutableFloatStateOf(0f) }
+    // Read where the pinned bar draws, never in composition.
+    val stackHeightPx = remember { mutableIntStateOf(0) }
     var dragSnapJob by remember { mutableStateOf<kotlinx.coroutines.Job?>(null) }
     Box(
         modifier = Modifier
             .fillMaxSize()
             .background(MaterialTheme.colorScheme.background)
+            .onSizeChanged { stackHeightPx.intValue = it.height }
             .paperStackDrag(
                 gestureKey = selectedSurahId,
                 position = { stackPosition.value },
@@ -1011,12 +976,7 @@ private fun PaperStackApp(
                 gesturesBlocked = { stackGesturesBlocked.value },
                 onDragStart = {
                     dragStartPosition = stackPosition.value
-                    scrollBackEpoch++
-                    if (scrollReaderOpen.value &&
-                        abs(stackPosition.value - AYAH_LAYER) <= 0.05f
-                    ) {
-                        scrollDragHidesBack = true
-                    }
+                    DevProfiling.mark("stackDragStart $dragStartPosition")
                 },
                 onDrag = { deltaPages ->
                     // A single gesture may advance at most one layer, so a hard swipe
@@ -1038,17 +998,6 @@ private fun PaperStackApp(
                 },
                 onSettle = { target ->
                     dragSnapJob?.cancel()
-                    // Finger-up never brings the arrow back. A release that
-                    // is already parked leaves the flag alone; settleTo
-                    // clears it only after the sheet has parked.
-                    if (hideScrollBackOnFingerUp(
-                            scrollReaderOpen = scrollReaderOpen.value,
-                            target = target,
-                            page = stackPosition.value,
-                        )
-                    ) {
-                        scrollDragHidesBack = true
-                    }
                     animateTo(target)
                 },
             ),
@@ -1176,7 +1125,6 @@ private fun PaperStackApp(
                         startWordPositions = selectedStartWords,
                         startSearchText = selectedSearchText,
                         readerSheetSettled = { scrollSheetSettled },
-                        showScrollBackArrow = showScrollBackArrow,
                         playbackBarBodyHeight = { pinnedPlaybackHeight },
                         viewModel = readerViewModel,
                         onBack = { animateTo(COVER_LAYER) },
@@ -1335,7 +1283,6 @@ private fun PaperStackApp(
                 readerVisitActive = settledLayer == AYAH_LAYER,
                 chapterRibbonReady = chapterRibbonReady,
                 bookmarkCount = bookmarkCount,
-                bookmarkStyle = homeBookmarkStyle,
                 onOpenBookmarks = { animateTo(BOOKMARKS_LAYER) },
                 playbackPinned = playbackPinned,
                 pinnedPlaybackHeight = { pinnedPlaybackHeight },
@@ -1350,7 +1297,12 @@ private fun PaperStackApp(
                 onHeight = { pinnedPlaybackHeight = it },
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
-                    .zIndex(2.3f),
+                    .zIndex(pinnedChapterBarZIndex(pinnedPlayback.coverSession))
+                    .pinnedBarRidesReader(
+                        stackPosition = stackPositionProvider,
+                        coverSession = pinnedPlayback.coverSession,
+                        stackHeightPx = { stackHeightPx.intValue },
+                    ),
             )
         }
 
@@ -1538,10 +1490,15 @@ private fun PaperPage(
     Box(
         modifier = modifier
             .fillMaxSize()
-            .paperLayerTransform(layer, stackPosition, settingsLayer)
-            .paperDropShadow(layer, stackPosition, settingsLayer),
+            .paperLayerTransform(layer, stackPosition, settingsLayer),
     ) {
         content()
+        // The cast is its own layer beside the sheet's content. Drawn on the
+        // sheet itself, its read of the live position re-recorded every word
+        // and ornament on the page for each frame of a turn.
+        if (layer != PaperLayer.Detail) {
+            Box(Modifier.matchParentSize().paperDropShadow(layer, stackPosition, settingsLayer))
+        }
     }
 }
 
@@ -1607,6 +1564,31 @@ private fun Modifier.paperLayerTransform(
     }
 }
 
+// An unplayed bar is a strip of the reader sheet and shares its reveal.
+// After playback it stays fixed over Home; Settings still takes it away with
+// the reader. Both transforms pivot on the sheet's centre, not the bar's.
+private fun Modifier.pinnedBarRidesReader(
+    stackPosition: () -> Float,
+    coverSession: Boolean,
+    stackHeightPx: () -> Int,
+): Modifier = graphicsLayer {
+    val position = stackPosition()
+    val reveal = pinnedBarReveal(position, coverSession)
+    val turn = pinnedBarTurn(position)
+    val sheetHeight = stackHeightPx()
+    // The bar sits on the sheet's foot: its top is sheetHeight - barHeight.
+    transformOrigin = TransformOrigin(
+        pivotFractionX = 0.5f,
+        pivotFractionY = if (size.height > 0f) 1f - sheetHeight / (2f * size.height) else 0.5f,
+    )
+    cameraDistance = 18f * density
+    translationX = size.width * 0.055f * (1f - reveal) -
+        (size.width + STACK_OFFSCREEN_OVERSCAN_DP * density) * turn
+    scaleX = 0.985f + 0.015f * reveal
+    scaleY = scaleX
+    rotationY = -4f * turn
+}
+
 // A lifted sheet casts a soft shadow onto the page beneath it, spilling just
 // past its leading edge rather than darkening the sheet's own edge. The cast
 // is strongest mid-swipe and fades to nothing once either sheet settles.
@@ -1614,8 +1596,7 @@ private fun Modifier.paperDropShadow(
     layer: PaperLayer,
     stackPosition: () -> Float,
     settingsLayer: Int,
-): Modifier = drawWithContent {
-    drawContent()
+): Modifier = graphicsLayer {
     val position = stackPosition()
     val turning = when (layer) {
         PaperLayer.Bookmarks -> (-position).coerceIn(0f, 1f)
@@ -1626,18 +1607,25 @@ private fun Modifier.paperDropShadow(
         PaperLayer.Detail -> 0f
     }
     val depth = (4f * turning * (1f - turning)).coerceIn(0f, 1f)
-    if (depth > 0.01f) {
-        val shadowWidth = 24.dp.toPx()
+    // The cast is recorded once at full strength; the turn only changes how
+    // much of it shows. One rectangle, so alpha goes on the draw itself and
+    // the spill past the sheet's edge needs no offscreen buffer to clip it.
+    alpha = if (depth > 0.01f) depth else 0f
+    compositingStrategy = CompositingStrategy.ModulateAlpha
+}.drawWithCache {
+    val shadowWidth = 24.dp.toPx()
+    val cast = Brush.horizontalGradient(
+        colors = listOf(
+            ComposeColor.Black.copy(alpha = 0.26f),
+            ComposeColor.Black.copy(alpha = 0.09f),
+            ComposeColor.Transparent,
+        ),
+        startX = size.width,
+        endX = size.width + shadowWidth,
+    )
+    onDrawBehind {
         drawRect(
-            brush = Brush.horizontalGradient(
-                colors = listOf(
-                    ComposeColor.Black.copy(alpha = 0.26f * depth),
-                    ComposeColor.Black.copy(alpha = 0.09f * depth),
-                    ComposeColor.Transparent,
-                ),
-                startX = size.width,
-                endX = size.width + shadowWidth,
-            ),
+            brush = cast,
             topLeft = Offset(size.width, 0f),
             size = Size(shadowWidth, size.height),
         )
