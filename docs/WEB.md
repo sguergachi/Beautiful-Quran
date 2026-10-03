@@ -446,6 +446,11 @@ sight. `RootViewer` portals into `BookSpread`'s `.book-loose` slot and the
 sheet slides down from above the window (`root-sheet-in` / `root-sheet-out`):
 leading edge lifted, a slight skew, a small overrun and settle. No shadow.
 Phones keep the ink bleed inside the reader sheet.
+The desktop cover opens and closes on filled pages: the board's inside
+carries a picture of the left page (`pictureLeftPage` clones the Chapters
+sheet, scroll offset included, into `.entrance-inside-page`), and when the
+board is gone the real sheets take over with no fade
+(`html[data-entrance-settled]`).
 Mushaf words take the same ink as the scroll reader: each is a `HafsWord`
 (paper-cover wash, glint, orange repeat) under the policy in
 `ui/reader/mushafInk.ts`, a port of Android `mushafInkPackKind`. A leaf in
