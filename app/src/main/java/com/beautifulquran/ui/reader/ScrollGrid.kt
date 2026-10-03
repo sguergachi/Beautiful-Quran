@@ -20,7 +20,7 @@ import androidx.compose.ui.unit.dp
  *  38  left rule  — Western text,   56  verse to verse (Arabic)
  *      back arrow, Western folio    48  verse to verse (English)
  *  ½   the axis — everything        40  basmalah to first verse
- *      centred: opening, basmalah,  32  opening to basmalah
+ *      centred: opening, basmalah,  72  opening to basmalah
  *      NEXT, pill, title, player    12  voices within one verse
  *  38  right rule — Arabic, the
  *      settings mark, Arabic folio
