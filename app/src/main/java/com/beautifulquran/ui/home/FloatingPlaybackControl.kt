@@ -240,7 +240,9 @@ internal fun ReturnToAyahPill(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.Center,
         modifier = modifier
-            .padding(vertical = 4.dp)
+            // Uneven on purpose: the reciter's name is small and quiet, so
+            // equal air above reads as more than the air over the transport.
+            .padding(top = 2.dp, bottom = 6.dp)
             .background(
                 QuranTheme.accents.greenWash,
                 RoundedCornerShape(50),
