@@ -124,6 +124,9 @@ Then, in place:
 3. Tapping anywhere off the note, opening another verse's note, or leaving
    the sheet **commits**. There is no OK, no Save, no Cancel — paper has none
    of them, and an autosaved note cannot be lost to a mis-tap.
+   System Back ends the edit first (hiding the keyboard and committing);
+   only the next press may leave the sheet. A horizontal page turn cannot
+   begin while the field is open.
 4. Committing an empty (or whitespace-only) note deletes it and the line
    closes; the verse remains bookmarked.
 
