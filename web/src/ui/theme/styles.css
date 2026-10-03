@@ -7787,3 +7787,146 @@ html[data-entrance-closing]
     opacity: 0;
   }
 }
+
+/* —— Scrollbars (a pointer that can hover) ——
+ * A thread of ink down the edge of whatever scrolls, there at rest so a long
+ * page shows how long it is; under the pointer it thickens and turns solid,
+ * so it can be caught. Touch screens keep theirs hidden: a finger scrolls
+ * the page itself.
+ *
+ * The bar is a fixed lane (--sb) that takes that much of the scroller's
+ * width, so each scroller gives the same amount back from its right-hand
+ * padding and nothing in it moves. The thread is the thumb drawn inside
+ * transparent borders: thickening it changes the borders, never the lane,
+ * and the whole lane is the target.
+ */
+:root {
+  --sb: 0px;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  :root {
+    --sb: 10px;
+  }
+
+  :is(.scroll, .settings, .customize-scroll, .ink-bleed) {
+    /* The standard properties would switch the styled bar below off. */
+    scrollbar-width: auto;
+    scrollbar-color: auto;
+  }
+
+  :is(.scroll, .settings, .customize-scroll, .ink-bleed)::-webkit-scrollbar {
+    display: block;
+    width: var(--sb);
+    height: var(--sb);
+  }
+
+  :is(.scroll, .settings, .customize-scroll, .ink-bleed)::-webkit-scrollbar-track,
+  :is(.scroll, .settings, .customize-scroll, .ink-bleed)::-webkit-scrollbar-corner {
+    background: transparent;
+  }
+
+  :is(.scroll, .settings, .customize-scroll, .ink-bleed)::-webkit-scrollbar-thumb {
+    min-height: 2.5rem;
+    border: 3.5px solid transparent;
+    border-radius: 999px;
+    background-clip: padding-box;
+    background-color: color-mix(in srgb, var(--ink) 22%, transparent);
+  }
+
+  :is(.scroll, .settings, .customize-scroll, .ink-bleed)::-webkit-scrollbar-thumb:hover,
+  :is(.scroll, .settings, .customize-scroll, .ink-bleed)::-webkit-scrollbar-thumb:active {
+    border-width: 1px;
+    background-color: color-mix(in srgb, var(--ink) 55%, var(--paper));
+  }
+
+  /* Engines without the styled bar (Firefox) take the standard thin one. */
+  @supports not selector(::-webkit-scrollbar) {
+    :is(.scroll, .settings, .customize-scroll, .ink-bleed) {
+      scrollbar-width: thin;
+      scrollbar-color: color-mix(in srgb, var(--ink) 30%, transparent) transparent;
+    }
+  }
+
+  /* Each scroller gives the lane back from its right-hand padding. */
+  .scroll {
+    padding-right: calc(var(--sheet-pad) - var(--sb));
+  }
+
+  .settings {
+    padding-right: calc(var(--sheet-pad) - var(--sb));
+  }
+
+  .customize-scroll {
+    padding-right: calc(var(--sheet-pad) - var(--sb));
+  }
+
+  .bookmarks-scroll {
+    padding-right: calc(var(--bookmark-pad) - var(--sb));
+  }
+
+  .ink-bleed {
+    padding-right: calc(var(--root-inline-padding) - var(--sb));
+  }
+
+  /* The verse column has no padding to give (its verses carry the rules), so
+     the column is a lane wider each side and the verses stay where they were. */
+  .reader-body {
+    max-width: calc(var(--reader-max) + 2 * var(--sb));
+  }
+
+  .reader-main .scroll {
+    padding-left: var(--sb);
+  }
+
+  /*
+   * On the desktop book a bar runs down the fore-edge of its page, the
+   * outside of the spread: the right edge of the right page and the left
+   * edge of the left page. Never down the spine.
+   *
+   * Left page: a scroller set right-to-left carries its bar on the left; its
+   * contents are set back. Chapters has no padding of its own (its rows
+   * carry the page's margins), so the lane comes off the fore-edge margin.
+   */
+  .app-shell[data-spread='true'] :is(.sheet[data-name='home'], .sheet[data-name='bookmarks']) .scroll {
+    direction: rtl;
+  }
+
+  .app-shell[data-spread='true'] :is(.sheet[data-name='home'], .sheet[data-name='bookmarks']) .scroll > * {
+    direction: ltr;
+  }
+
+  .app-shell[data-spread='true'] .sheet[data-name='home'] .scroll {
+    padding-inline: 0;
+    --home-start-inset: calc(var(--margin-fore) - var(--sb));
+  }
+
+  .app-shell[data-spread='true'] .sheet[data-name='bookmarks'] .scroll {
+    padding-right: var(--bookmark-pad);
+    padding-left: calc(var(--bookmark-pad) - var(--sb));
+  }
+
+  /* Right page. Settings is as wide as its page already. */
+  .app-shell[data-spread='true'] .sheet[data-name='settings'] .settings {
+    padding-right: calc(var(--margin-fore) - var(--sb));
+  }
+
+  /* A scrolling chapter's scroller is only as wide as the text block, which
+     would stand its bar beside the text. It is let out to the page's edges
+     and takes the page's margins as padding, so the verses do not move. */
+  .app-shell[data-spread='true']:not([data-leaves='true']) .sheet[data-name='reader'] .reader-body {
+    max-width: none;
+    width: auto;
+    margin: 0 calc(var(--margin-inner) - var(--margin-fore)) 0 0;
+  }
+
+  .app-shell[data-spread='true']:not([data-leaves='true']) .sheet[data-name='reader'] .reader-main .scroll {
+    padding-left: var(--margin-inner);
+    padding-right: calc(var(--margin-fore) - var(--sb));
+  }
+
+  /* The transport stands in that same column, so it takes both margins now. */
+  .app-shell[data-spread='true']:not([data-leaves='true']) .sheet[data-name='reader'] .player-bar {
+    padding-inline: var(--margin-inner) var(--margin-fore);
+  }
+}
