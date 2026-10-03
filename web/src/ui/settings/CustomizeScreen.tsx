@@ -126,6 +126,21 @@ export function CustomizeScreen({
 
       <div className="customize-scroll">
           <section className="settings-section">
+            <h2>Theme</h2>
+            <PaperChoiceList
+              aria-label="Theme"
+              value={settings.themeMode}
+              options={THEME_OPTIONS.map((opt) => ({
+                ...opt,
+                trailing: <ThemeSwatches mode={opt.value} />,
+              }))}
+              onChange={(v) =>
+                appStore.updateSettings({ themeMode: v as ThemeMode })
+              }
+            />
+          </section>
+
+          <section className="settings-section">
             <h2>Layout</h2>
             <PaperSegmented
               aria-label="Layout"
@@ -238,20 +253,6 @@ export function CustomizeScreen({
         />
       </section>
 
-      <section className="settings-section">
-        <h2>Theme</h2>
-        <PaperChoiceList
-          aria-label="Theme"
-          value={settings.themeMode}
-          options={THEME_OPTIONS.map((opt) => ({
-            ...opt,
-            trailing: <ThemeSwatches mode={opt.value} />,
-          }))}
-          onChange={(v) =>
-            appStore.updateSettings({ themeMode: v as ThemeMode })
-          }
-        />
-      </section>
       </div>
     </div>
   )

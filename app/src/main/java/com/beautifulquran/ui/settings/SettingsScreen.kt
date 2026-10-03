@@ -298,6 +298,13 @@ internal fun SettingsScreen(
             )
 
             Spacer(Modifier.height(20.dp))
+            NavigateRow(
+                label = "Customize",
+                note = customizeSummary(settings),
+                onClick = { onOpenCustomize() },
+            )
+
+            Spacer(Modifier.height(20.dp))
             Row(
                 verticalAlignment = Alignment.CenterVertically,
                 modifier = Modifier
@@ -319,13 +326,6 @@ internal fun SettingsScreen(
                 }
                 DisclosureChevron(expanded = false)
             }
-
-            Spacer(Modifier.height(20.dp))
-            NavigateRow(
-                label = "Customize",
-                note = customizeSummary(settings),
-                onClick = { onOpenCustomize() },
-            )
 
             if (settings.developerModeEnabled) {
                 Spacer(Modifier.height(44.dp))

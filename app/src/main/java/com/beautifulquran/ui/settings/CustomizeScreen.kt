@@ -245,6 +245,17 @@ internal fun CustomizeScreen(
                 .verticalScroll(rememberScrollState())
                 .padding(horizontal = 28.dp),
         ) {
+        Section("Theme")
+        Spacer(Modifier.height(2.dp))
+        ThemeMode.entries.forEach { mode ->
+            SelectRow(
+                label = mode.label,
+                selected = settings.themeMode == mode,
+                onClick = { onUpdate { it.copy(themeMode = mode) } },
+                trailing = { ThemeColorPreview(mode = mode) },
+            )
+        }
+
         Section("Layout")
         InkCircledChoiceRow(
             entries = ReadingLayout.entries,
@@ -417,17 +428,6 @@ internal fun CustomizeScreen(
                     }
                 },
                 onSelect = { side -> onUpdate { it.copy(ayahSelectorSide = side) } },
-            )
-        }
-
-        Section("Theme")
-        Spacer(Modifier.height(2.dp))
-        ThemeMode.entries.forEach { mode ->
-            SelectRow(
-                label = mode.label,
-                selected = settings.themeMode == mode,
-                onClick = { onUpdate { it.copy(themeMode = mode) } },
-                trailing = { ThemeColorPreview(mode = mode) },
             )
         }
 
