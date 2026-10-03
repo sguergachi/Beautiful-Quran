@@ -68,9 +68,11 @@ claim to reproduce a particular historical pattern.
 7. **Keep page ornament subordinate.** The existing whisper ink, embossing
    and edge dissolves keep the field below the medallion and the words.
    Chapter-opening ink and emboss are softened by 25%, with a top
-   dissolve matching the 40 dp opening head (36 dp at the bottom). Following
-   Opus’s proportion review, the field reaches full strength at the medallion’s
-   top: the empty head dissolves without washing out the medallion’s backdrop.
+   40 dp top dissolve inside a 64 dp head, leaving 24 dp of full pattern above
+   the medallion. The 48 dp foot before a basmalah (56 dp otherwise) leaves
+   16–24 dp of full pattern below the metadata before a 32 dp bottom dissolve.
+   Opus’s screenshot review informed these proportions: the field surrounds
+   the content, and neither fade washes through the title lockup.
    Paths are cached outside drawing; weight separation uses two cached paths
    on Android rather than one draw call for every spray or repeat.
 

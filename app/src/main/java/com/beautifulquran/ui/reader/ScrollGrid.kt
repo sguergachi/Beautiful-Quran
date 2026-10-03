@@ -90,11 +90,12 @@ object ScrollGrid {
 
     // ── Chapter opening ───────────────────────────────────────────────────
 
-    val OPENING_HEAD: Dp = UNIT * 10
-    val OPENING_FOOT: Dp = UNIT * 8
+    // Keep a band of full-strength field outside the medallion and title lockup.
+    val OPENING_HEAD: Dp = UNIT * 16
+    val OPENING_FOOT: Dp = UNIT * 14
 
     /** The basmalah supplies its own head, so the opening only closes up. */
-    val OPENING_FOOT_BEFORE_BASMALAH: Dp = UNIT * 2
+    val OPENING_FOOT_BEFORE_BASMALAH: Dp = UNIT * 12
     val ROSETTE: Dp = 52.dp
     val ROSETTE_TO_TITLE: Dp = UNIT * 4
     /**
