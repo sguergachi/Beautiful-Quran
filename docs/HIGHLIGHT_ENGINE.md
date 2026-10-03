@@ -159,7 +159,7 @@ The engine is a pure function; the *cadence* of calling it lives in
 
 ```
 ExoPlayer.currentPosition ──(polled every 33 ms while playing)──►
-OutputLatency.heardMs (route preset: speaker 0 / LE 80 / A2DP 180) ──►
+OutputLatency.heardMs (extra manual lag only; automatic lag 0) ──►
 HighlightClock.sample ──►
 PreparedTimings.activeInfo(positionMs) ──►
 StateFlow<ActiveWord?>  (distinctUntilChanged: emits once per word boundary) ──►
@@ -178,10 +178,10 @@ Key points, detailed in [PERFORMANCE.md](PERFORMANCE.md) and
 - Source-data word accuracy is ±73 ms on average — inside the ~150 ms window
   that reads as "in sync" to a human — which is why a 33 ms boundary poll is
   plenty and frame-accurate syncing would be wasted work.
-- **Output latency is applied on the clock, not in this engine.** Bluetooth
-  A2DP (and similar) deliver sound after the media playhead; Android has no
-  reliable ear-delay API, so the reader subtracts a coarse route preset
-  (`OutputLatency` / `AudioOutputLatency`) before `HighlightClock`. See
+- **Output latency is applied on the clock, not in this engine.** Media3
+  already corrects its position for audio presentation. The reader uses that
+  clock directly; only an explicit Ink Lab lag is subtracted (wall ms × speed)
+  before `HighlightClock`. PCM route presets must not be subtracted again. See
   [OUTPUT_LATENCY.md](OUTPUT_LATENCY.md). Shipped word selection has no visual
   lead; an explicit Ink Lab lead is gated until the first segment starts, so it
   cannot cross encoded opening silence.

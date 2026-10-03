@@ -12,8 +12,9 @@ import kotlinx.coroutines.flow.asStateFlow
 
 /**
  * Watches system audio outputs and exposes the [OutputLatency] preset that
- * the reader should subtract from the media playhead before driving the
- * highlight. App-lifetime: register once from [com.beautifulquran.QuranApp].
+ * raw PCM tarjīʿ tap needs on its path to the ear. Media3's presentation
+ * clock already handles output delay; do not subtract this preset again
+ * for word highlighting. App-lifetime: register once from [com.beautifulquran.QuranApp].
  *
  * Classification is coarse (connected BT device present → BT preset). Android
  * does not give a reliable end-to-end A2DP ear-delay for media playback; the
