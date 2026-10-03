@@ -67,8 +67,10 @@ claim to reproduce a particular historical pattern.
    sources.
 7. **Keep page ornament subordinate.** The existing whisper ink, embossing
    and edge dissolves keep the field below the medallion and the words.
-   Chapter-opening ink and emboss are softened by 25%, with a 72 dp top
-   dissolve (36 dp at the bottom), so the first repeat emerges gradually.
+   Chapter-opening ink and emboss are softened by 25%, with a top
+   dissolve matching the 40 dp opening head (36 dp at the bottom). Following
+   Opus’s proportion review, the field reaches full strength at the medallion’s
+   top: the empty head dissolves without washing out the medallion’s backdrop.
    Paths are cached outside drawing; weight separation uses two cached paths
    on Android rather than one draw call for every spray or repeat.
 

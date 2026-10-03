@@ -3505,7 +3505,7 @@ fun ChapterOpening(
                         ink = QuranTheme.ink.wash.let { it.copy(alpha = it.alpha * 0.75f) },
                         embossLight = accents.embossLight.copy(alpha = 0.0375f),
                     )
-                    .verticalFadingEdges(color = weaveFade, top = 72.dp, bottom = 36.dp),
+                    .verticalFadingEdges(color = weaveFade, top = ScrollGrid.OPENING_HEAD, bottom = 36.dp),
             )
         }
         Column(
