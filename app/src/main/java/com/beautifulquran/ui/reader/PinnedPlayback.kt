@@ -1,6 +1,7 @@
 package com.beautifulquran.ui.reader
 
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.expandVertically
@@ -19,11 +20,14 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.Dp
@@ -53,6 +57,8 @@ class PinnedPlaybackHost {
 
     /** A verse is loaded and search is not covering the chapter list. */
     var coverSession by mutableStateOf(false)
+    /** Keeps the Home chrome above its sheet until the dismissal slide finishes. */
+    var closing by mutableStateOf(false)
     var chapterLabel by mutableStateOf("")
     var ayahLabel by mutableStateOf("")
     var onOpenNowPlaying: () -> Unit = {}
@@ -86,6 +92,19 @@ internal fun PinnedChapterPlayback(
 ) {
     val state = host.player ?: return
     val density = LocalDensity.current
+    val closeProgress = remember { Animatable(0f) }
+    LaunchedEffect(host.closing, host.coverSession) {
+        if (host.closing) {
+            try {
+                closeProgress.animateTo(1f, tween(260))
+            } finally {
+                host.closing = false
+            }
+        } else if (!host.coverSession) {
+            // Reset only after Home has covered the bar, avoiding a one-frame flash.
+            closeProgress.snapTo(0f)
+        }
+    }
     val showCoverChrome = onCover && host.coverSession
     val edgePad by animateDpAsState(
         targetValue = if (showCoverChrome) 48.dp else 0.dp,
@@ -95,6 +114,7 @@ internal fun PinnedChapterPlayback(
     Box(
         modifier
             .fillMaxWidth()
+            .graphicsLayer { translationY = size.height * closeProgress.value }
             .onGloballyPositioned { coords ->
                 onHeight(with(density) { coords.size.height.toDp() })
             },
@@ -102,7 +122,7 @@ internal fun PinnedChapterPlayback(
         PlayerBar(
             state = state,
             isThisSurahLoaded = host.thisSurahLoaded,
-            enabled = if (onCover) true else host.enabled,
+            enabled = !host.closing && (onCover || host.enabled),
             chromeAlpha = { if (onCover) 1f else host.chromeAlpha() },
             reciterName = host.reciterName,
             onPlayPause = host.onPlayPause,
@@ -122,7 +142,14 @@ internal fun PinnedChapterPlayback(
                         .align(Alignment.CenterEnd)
                         .padding(end = 4.dp),
                 ) {
-                    IconButton(onClick = host.onClose, modifier = Modifier.size(40.dp)) {
+                    IconButton(
+                        onClick = {
+                            host.closing = true
+                            host.onClose()
+                        },
+                        enabled = !host.closing,
+                        modifier = Modifier.size(40.dp),
+                    ) {
                         Icon(
                             imageVector = Icons.Rounded.Close,
                             contentDescription = "Close playback",

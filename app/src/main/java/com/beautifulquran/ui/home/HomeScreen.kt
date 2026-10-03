@@ -192,7 +192,8 @@ fun HomeScreen(
         WindowInsets.navigationBars.getBottom(density).toDp()
     }
     val listBottomInset = when {
-        playbackPinned && floatingPlayback != null && !searchActive -> {
+        playbackPinned && !searchActive &&
+            (floatingPlayback != null || playbackHost?.closing == true) -> {
             val measured = pinnedPlaybackHeight()
             measured.takeIf { it > 0.dp } ?: FloatingPlaybackListClearance
         }
@@ -201,13 +202,15 @@ fun HomeScreen(
     }
     val host = playbackHost
     if (host != null) {
-        val session = floatingPlayback != null && !searchActive
-        if (host.coverSession != session) host.coverSession = session
-        if (host.chapterLabel != floatingPlayback?.surah?.nameTransliteration.orEmpty()) {
-            host.chapterLabel = floatingPlayback?.surah?.nameTransliteration.orEmpty()
+        if (!host.closing) {
+            val session = floatingPlayback != null && !searchActive
+            if (host.coverSession != session) host.coverSession = session
+            if (host.chapterLabel != floatingPlayback?.surah?.nameTransliteration.orEmpty()) {
+                host.chapterLabel = floatingPlayback?.surah?.nameTransliteration.orEmpty()
+            }
+            val ayah = floatingPlayback?.let { "${it.surah.id}:${it.ayah}" }.orEmpty()
+            if (host.ayahLabel != ayah) host.ayahLabel = ayah
         }
-        val ayah = floatingPlayback?.let { "${it.surah.id}:${it.ayah}" }.orEmpty()
-        if (host.ayahLabel != ayah) host.ayahLabel = ayah
         SideEffect {
             host.onOpenNowPlaying = open@{
                 val target = floatingPlayback ?: return@open

@@ -1259,9 +1259,10 @@ weight.
   tapping it returns to that verse in the reader. The
   enter/exit is also tied to the paper-stack page turn: returning to chapter
   selection plays the entrance; leaving for the reader plays the exit. A
-  quiet Close in the corner dismisses the session (stops playback) so the
-  bar exits the same way. The list's soft bottom dissolve sits **just above
-  the float** (`verticalFadingEdges` `bottomInset`), not stretched through
+  quiet Close in the corner stops playback immediately. The whole bar retains
+  its chapter pill and paper while sliding a full bar-height down over 260 ms;
+  only then does Home cover it. The list keeps its clearance through the exit.
+  The list's soft bottom dissolve sits **just above the float** (`verticalFadingEdges` `bottomInset`), not stretched through
   it — same paper edge as the reader above its embedded `PlayerBar`.
   The scrolling reader shares that transport with Chapters.
 
