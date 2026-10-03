@@ -1,5 +1,6 @@
 package com.beautifulquran.ui.reader
 
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -55,17 +56,26 @@ class PinnedChapterBarTest {
     }
 
     @Test
-    fun leavesWithTheReaderWhenSettingsOpens() {
-        assertFalse(
-            showPinnedChapterBar(
-                stackPage = 1.2f,
-                readerOpen = true,
-                mushaf = false,
-                gathering = false,
-                overlayBlocking = false,
-                coverSession = true,
-            ),
-        )
+    fun staysPinnedAndRidesTheReaderWhenSettingsOpens() {
+        // Dropping it here swapped in the reader's own bar mid-swipe, which
+        // recomposed the reader and the chapter list on the turn's first frames.
+        for (page in listOf(1.01f, 1.2f, 2f, 3f)) {
+            assertTrue(
+                showPinnedChapterBar(
+                    stackPage = page,
+                    readerOpen = true,
+                    mushaf = false,
+                    gathering = false,
+                    overlayBlocking = false,
+                    coverSession = false,
+                ),
+            )
+        }
+        assertEquals(0f, pinnedBarTurn(0.4f), 0f)
+        assertEquals(0f, pinnedBarTurn(1f), 0f)
+        assertEquals(0.5f, pinnedBarTurn(1.5f), 1e-6f)
+        assertEquals(1f, pinnedBarTurn(2f), 0f)
+        assertEquals(1f, pinnedBarTurn(3f), 0f)
     }
 
     @Test

@@ -49,8 +49,10 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color as ComposeColor
 import androidx.compose.ui.graphics.CompositingStrategy
+import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.PointerEventPass
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.pointer.positionChange
 import androidx.compose.ui.input.pointer.util.VelocityTracker
@@ -65,7 +67,6 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.beautifulquran.assistant.AssistantAction
 import com.beautifulquran.assistant.AssistantIntents
 import com.beautifulquran.assistant.ForegroundAppFunctions
-import com.beautifulquran.data.HomeBookmarkStyle
 import com.beautifulquran.data.ReadingLayout
 import com.beautifulquran.data.ReadingMode
 import com.beautifulquran.data.RuntimeCachePhase
@@ -93,6 +94,7 @@ import com.beautifulquran.ui.reader.hideScrollBackOnFingerUp
 import com.beautifulquran.ui.reader.showScrollReaderBackArrow
 import com.beautifulquran.ui.reader.ReaderPlaybackSnapshot
 import com.beautifulquran.ui.reader.ReaderScreen
+import com.beautifulquran.ui.reader.pinnedBarTurn
 import com.beautifulquran.ui.reader.showPinnedChapterBar
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalFontFamilyResolver
@@ -304,7 +306,6 @@ class MainActivity : ComponentActivity() {
             CompositionLocalProvider(LocalGildingTilt provides rememberGildingTilt()) {
                 BeautifulQuranTheme(
                     themeMode = settings.themeMode,
-                    colorSystem = settings.colorSystem,
                 ) {
                     // Cold start paints the closed mushaf first; the paper stack
                     // mounts under it after the title settles (onWarmStack), not
@@ -319,7 +320,6 @@ class MainActivity : ComponentActivity() {
                             PaperStackApp(
                                 themeMode = settings.themeMode,
                                 developerModeEnabled = settings.developerModeEnabled,
-                                homeBookmarkStyle = settings.homeBookmarkStyle,
                                 entranceVisible = !entranceDone,
                                 pendingAssistantAction = assistantAction,
                                 onAssistantActionConsumed = {
@@ -394,7 +394,6 @@ private val StackMotionEasing = CubicBezierEasing(0.24f, 0.02f, 0.12f, 1f)
 private fun PaperStackApp(
     themeMode: ThemeMode,
     developerModeEnabled: Boolean,
-    homeBookmarkStyle: HomeBookmarkStyle,
     entranceVisible: Boolean,
     pendingAssistantAction: AssistantAction? = null,
     onAssistantActionConsumed: () -> Unit = {},
@@ -457,7 +456,6 @@ private fun PaperStackApp(
         windowSize,
         settings.englishLeafText,
         settings.verseNumberScript,
-        settings.hideEnglishParentheticals,
     ) {
         // Nothing remembered — a first launch, or a window this app has not
         // been this size in. Work the leaf's size out instead of waiting for a
@@ -489,7 +487,6 @@ private fun PaperStackApp(
                     density = leafDensity,
                     measurer = leafMeasurer,
                     verseNumberScript = settings.verseNumberScript,
-                    hideParentheticals = settings.hideEnglishParentheticals,
                     translation = translation,
                 )
             },
@@ -497,13 +494,11 @@ private fun PaperStackApp(
                 metrics[0],
                 metrics[1],
                 settings.verseNumberScript,
-                settings.hideEnglishParentheticals,
             ),
             cacheKey = app.englishBookCache.key(
                 wellPx = metrics[0],
                 measurePx = metrics[1],
                 verseNumberScript = settings.verseNumberScript.ordinal,
-                hideParentheticals = settings.hideEnglishParentheticals,
                 leafText = settings.englishLeafText.ordinal,
                 database = QuranDatabase.DB_FILE_NAME,
                 ),
@@ -684,6 +679,7 @@ private fun PaperStackApp(
     suspend fun settleTo(layer: Int) {
         val minimumLayer = if (bookmarkCount > 0) BOOKMARKS_LAYER else COVER_LAYER
         val boundedLayer = layer.coerceIn(minimumLayer, maxStackLayer())
+        DevProfiling.mark("stackSettleStart ${stackPosition.value} to $boundedLayer")
         val distance = abs(boundedLayer - stackPosition.value)
         if (settingsDetail == SettingsDetail.DOWNLOADS &&
             boundedLayer == settingsLayer &&
@@ -713,6 +709,7 @@ private fun PaperStackApp(
                 ),
             )
         } finally {
+            DevProfiling.mark("stackSettleEnd ${stackPosition.value}")
             if (
                 backEpoch == scrollBackEpoch &&
                 openingReader &&
@@ -995,11 +992,14 @@ private fun PaperStackApp(
     }
 
     var dragStartPosition by remember { mutableFloatStateOf(0f) }
+    // Read where the pinned bar draws, never in composition.
+    val stackHeightPx = remember { mutableIntStateOf(0) }
     var dragSnapJob by remember { mutableStateOf<kotlinx.coroutines.Job?>(null) }
     Box(
         modifier = Modifier
             .fillMaxSize()
             .background(MaterialTheme.colorScheme.background)
+            .onSizeChanged { stackHeightPx.intValue = it.height }
             .paperStackDrag(
                 gestureKey = selectedSurahId,
                 position = { stackPosition.value },
@@ -1017,6 +1017,7 @@ private fun PaperStackApp(
                 gesturesBlocked = { stackGesturesBlocked.value },
                 onDragStart = {
                     dragStartPosition = stackPosition.value
+                    DevProfiling.mark("stackDragStart $dragStartPosition")
                     scrollBackEpoch++
                     if (scrollReaderOpen.value &&
                         abs(stackPosition.value - AYAH_LAYER) <= 0.05f
@@ -1341,7 +1342,6 @@ private fun PaperStackApp(
                 readerVisitActive = settledLayer == AYAH_LAYER,
                 chapterRibbonReady = chapterRibbonReady,
                 bookmarkCount = bookmarkCount,
-                bookmarkStyle = homeBookmarkStyle,
                 onOpenBookmarks = { animateTo(BOOKMARKS_LAYER) },
                 playbackPinned = playbackPinned,
                 pinnedPlaybackHeight = { pinnedPlaybackHeight },
@@ -1356,7 +1356,8 @@ private fun PaperStackApp(
                 onHeight = { pinnedPlaybackHeight = it },
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
-                    .zIndex(2.3f),
+                    .zIndex(2.3f)
+                    .pinnedBarRidesReader(stackPositionProvider) { stackHeightPx.intValue },
             )
         }
 
@@ -1616,6 +1617,25 @@ private fun Modifier.paperLayerTransform(
             scaleY = 0.985f + 0.015f * reveal
         }
     }
+}
+
+// The pinned chapter bar belongs to the reader sheet, so it leaves with it:
+// the reader's own turn, pivoted on the sheet's centre rather than the bar's,
+// so the bar moves as the strip of that sheet it is drawn over.
+private fun Modifier.pinnedBarRidesReader(
+    stackPosition: () -> Float,
+    stackHeightPx: () -> Int,
+): Modifier = graphicsLayer {
+    val turn = pinnedBarTurn(stackPosition())
+    val sheetHeight = stackHeightPx()
+    // The bar sits on the sheet's foot: its top is sheetHeight - barHeight.
+    transformOrigin = TransformOrigin(
+        pivotFractionX = 0.5f,
+        pivotFractionY = if (size.height > 0f) 1f - sheetHeight / (2f * size.height) else 0.5f,
+    )
+    cameraDistance = 18f * density
+    translationX = -(size.width + STACK_OFFSCREEN_OVERSCAN_DP * density) * turn
+    rotationY = -4f * turn
 }
 
 // A lifted sheet casts a soft shadow onto the page beneath it, spilling just

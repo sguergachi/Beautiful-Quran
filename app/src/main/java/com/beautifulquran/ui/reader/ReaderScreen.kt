@@ -362,7 +362,6 @@ fun ReaderScreen(
         leafMetrics,
         settings.englishLeafText,
         settings.verseNumberScript,
-        settings.hideEnglishParentheticals,
     ) {
         val well = leafMetrics?.getOrNull(0) ?: return@LaunchedEffect
         val measure = leafMetrics.getOrNull(1) ?: return@LaunchedEffect
@@ -384,7 +383,6 @@ fun ReaderScreen(
                     density = rulerDensity,
                     measurer = rulerMeasurer,
                     verseNumberScript = settings.verseNumberScript,
-                    hideParentheticals = settings.hideEnglishParentheticals,
                     translation = translation,
                 )
             },
@@ -392,13 +390,11 @@ fun ReaderScreen(
                 well,
                 measure,
                 settings.verseNumberScript,
-                settings.hideEnglishParentheticals,
             ),
             cacheKey = viewModel.englishBookCacheKey(
                 wellPx = well,
                 measurePx = measure,
                 verseNumberScript = settings.verseNumberScript.ordinal,
-                hideParentheticals = settings.hideEnglishParentheticals,
                 leafText = settings.englishLeafText.ordinal,
             ),
         )
@@ -1526,7 +1522,6 @@ fun ReaderScreen(
         settings.showWordGloss,
         settings.showTransliteration,
         settings.showTranslation,
-        settings.hideEnglishParentheticals,
         settings.fontScale,
     )
     var lastLayoutSignature by remember { mutableStateOf(layoutSignature) }
@@ -2902,7 +2897,6 @@ fun ReaderScreen(
                         onBasmalahClick = onMushafBasmalahClick,
                         english = settings.readingMode == ReadingMode.ENGLISH_ONLY,
                         verseNumberScript = settings.verseNumberScript,
-                        hideEnglishParentheticals = settings.hideEnglishParentheticals,
                         leafText = leafTextForSetting,
                         book = englishBook,
                         modifier = Modifier.fillMaxSize(),
@@ -3124,7 +3118,6 @@ fun ReaderScreen(
                                 showTransliteration = settings.showTransliteration,
                                 showTranslation = settings.showTranslation,
                                 verseNumberScript = settings.verseNumberScript,
-                                hideEnglishParentheticals = settings.hideEnglishParentheticals,
                                 searchQuery = activeQuery,
                                 flashWordPosition = searchFlashWord
                                     ?.takeIf { searchFlashAyah == ayah.number },

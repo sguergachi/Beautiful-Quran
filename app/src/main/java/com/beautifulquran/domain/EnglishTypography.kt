@@ -27,7 +27,6 @@ object EnglishTypography {
     fun lyricize(
         glosses: List<String>,
         arabicWords: List<String>,
-        hideParentheticals: Boolean = false,
     ): List<String> {
         require(glosses.size == arabicWords.size) { "glosses and Arabic words must align" }
         val prose = glosses.mapIndexed { index, gloss ->
@@ -42,7 +41,7 @@ object EnglishTypography {
                 gloss
             }
         }
-        return punctuate(if (hideParentheticals) hideParentheticalText(prose) else prose)
+        return punctuate(prose)
     }
 
     /** Visible owner of a shared gloss when [requestedIndex] was coalesced. */

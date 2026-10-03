@@ -25,6 +25,8 @@ import androidx.compose.runtime.State
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.staticCompositionLocalOf
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalContext
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.Lifecycle
@@ -153,6 +155,15 @@ class GildingTilt internal constructor(
         return arrived
     }
 }
+
+/**
+ * A gilded figure's own layer. Its gold reads the tilt at draw time, and a draw
+ * read invalidates the nearest layer above it: without one here that is the
+ * whole sheet the figure sits on, re-recorded and redrawn for every step of the
+ * light. A hand turning a page tilts the phone, so that was every frame of
+ * every turn.
+ */
+internal fun Modifier.gildingLayer(): Modifier = graphicsLayer()
 
 /** Keeps the tilt sensor alive for as long as this figure is composed. */
 @Composable

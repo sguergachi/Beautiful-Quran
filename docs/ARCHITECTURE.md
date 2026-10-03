@@ -515,7 +515,8 @@ horizontal page turn — draggable, fling-able, with page-turn audio
   control (paper-native transport) while a verse is loaded in the session;
   opening a word hit flashes that Arabic (and English gloss) word twice with
   the orange repeat wash (directional wash in, dissolve out) on the reader. The reader's
-  embedded `PlayerBar` takes over once that sheet is open.
+  scrolling `PlayerBar` stays mounted above the stack through the turn and
+  moves away with the reader when Settings opens.
 - `reader/ReaderScreen` — the follow-along view. Scroll layout is
   `SurahHeader` + one `AyahBlock` per ayah in a `LazyColumn`. Mushaf layout
   is `MushafPager` (604 Madinah pages, same ink). `AyahBlock` renders

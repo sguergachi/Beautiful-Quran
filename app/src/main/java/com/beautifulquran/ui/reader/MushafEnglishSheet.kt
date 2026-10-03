@@ -135,7 +135,6 @@ internal fun MushafEnglishSheet(
      *  clocks are shared with the Arabic leaf and read both. */
     flashWordPositions: Set<Int>,
     searchFocusActive: Boolean,
-    hideParentheticals: Boolean,
     /** The leaf's well and measure, in px, once it has laid out. */
     onMetrics: (wellPx: Float, measurePx: Float) -> Unit = { _, _ -> },
     /**
@@ -220,9 +219,9 @@ internal fun MushafEnglishSheet(
             packsState = packsState,
         )
     }
-    val leaf = remember(page.page, leafRuns, leafText, hideParentheticals) {
+    val leaf = remember(page.page, leafRuns, leafText) {
         val text = leafText ?: return@remember null
-        englishLeaf(page.page, leafRuns, hideParentheticals) { surahId, ayah ->
+        englishLeaf(page.page, leafRuns) { surahId, ayah ->
             text[quranWordKey(surahId, ayah, 1)].orEmpty()
         }
     }
@@ -1480,7 +1479,6 @@ internal fun englishLeafRuler(
     density: Density,
     measurer: TextMeasurer,
     verseNumberScript: VerseNumberScript,
-    hideParentheticals: Boolean,
     translation: (surahId: Int, ayah: Int) -> String,
 ): EnglishLeafRuler {
     val handPx = englishBookHandPx(wellPx, measurePx, density, measurer)
@@ -1490,7 +1488,7 @@ internal fun englishLeafRuler(
     val style = with(density) { englishProseStyle(handPx.toSp(), pitchPx.toSp()) }
     val constraints = Constraints(maxWidth = measurePx.toInt().coerceAtLeast(1))
     return EnglishLeafRuler { page, runs ->
-        val leaf = englishLeaf(page, runs, hideParentheticals, translation)
+        val leaf = englishLeaf(page, runs, translation)
         val blocks = englishLeafBlockTexts(
             leaf = leaf,
             openingTokens = emptyMap(),
@@ -1558,7 +1556,7 @@ internal fun englishLeafRuler(
                 // Reading that as "too long" would break the monotonicity the
                 // search rests on and could settle it below the answer.
                 fun fits(at: Int): Boolean = englishLeafLineCount(
-                    page, runs, stops[at], hideParentheticals, translation,
+                    page, runs, stops[at], translation,
                     verseNumberScript, style, constraints, density, measurer,
                 ) <= lines
                 // Straddle: `lo` fits, `hi` does not, and the answer is the
@@ -1683,7 +1681,6 @@ private fun englishLeafLineCount(
     page: Int,
     runs: List<EnglishVerseRun>,
     cut: EnglishRulerCut,
-    hideParentheticals: Boolean,
     translation: (Int, Int) -> String,
     verseNumberScript: VerseNumberScript,
     style: TextStyle,
@@ -1696,7 +1693,7 @@ private fun englishLeafLineCount(
         EnglishVerseRun(it.surahId, it.ayah, it.from, cut.to)
     }
     val prose = englishLeafBlockTexts(
-        leaf = englishLeaf(page, kept, hideParentheticals, translation),
+        leaf = englishLeaf(page, kept, translation),
         openingTokens = emptyMap(),
         wordEnds = emptyMap(),
         ink = Color.Black,

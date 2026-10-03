@@ -63,6 +63,12 @@ class PinnedPlaybackHost {
  * The chapter bar stays while the cover and the reader trade places
  * ([stackPage] 0..1). On the chapter list it stays only when a verse is
  * loaded. Mushaf, gather, and ink-bleed overlays keep their own chrome.
+ *
+ * Past the reader it stays pinned too, and rides the reader sheet away as
+ * Settings arrives ([pinnedBarTurn]). It used to be dropped there and the
+ * reader set its own bar instead: that swap recomposed the whole reader and
+ * the chapter list, and built a second bar, two points into the swipe — the
+ * dropped frames at the start of every turn to Settings.
  */
 internal fun showPinnedChapterBar(
     stackPage: Float,
@@ -73,10 +79,15 @@ internal fun showPinnedChapterBar(
     coverSession: Boolean,
 ): Boolean {
     if (!readerOpen || mushaf || gathering || overlayBlocking) return false
-    if (stackPage > 1.02f) return false
     if (stackPage < 0.5f && !coverSession) return false
     return true
 }
+
+/**
+ * How far the pinned bar has turned away with the reader sheet: 0 while the
+ * reader (or the cover) holds it, 1 once Settings has taken the stack.
+ */
+internal fun pinnedBarTurn(stackPage: Float): Float = (stackPage - 1f).coerceIn(0f, 1f)
 
 /**
  * Scroll's top-bar back arrow. Shown only while that sheet is parked.

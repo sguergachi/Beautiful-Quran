@@ -70,26 +70,6 @@ class DeveloperModeSettingsTest {
     }
 
     @Test
-    fun `English parentheticals stay visible unless the developer setting enables hiding`() {
-        assertFalse(Settings().hideEnglishParentheticals)
-        assertTrue(Settings().copy(hideEnglishParentheticals = true).hideEnglishParentheticals)
-    }
-
-    @Test
-    fun `home bookmark style defaults to top bound and survives developer mode`() {
-        val alternative = Settings().copy(
-            homeBookmarkStyle = HomeBookmarkStyle.SAVED_PASSAGES,
-            developerModeEnabled = true,
-        )
-
-        assertEquals(HomeBookmarkStyle.TOP_BOUND, Settings().homeBookmarkStyle)
-        assertEquals(
-            HomeBookmarkStyle.SAVED_PASSAGES,
-            alternative.copy(developerModeEnabled = false).homeBookmarkStyle,
-        )
-    }
-
-    @Test
     fun `brush circle style defaults to baseline and has ten variants beyond it`() {
         assertEquals(BrushCircleStyle.BASELINE, Settings().brushCircleStyle)
         // Baseline + 10 developer variants for A/B feel.
