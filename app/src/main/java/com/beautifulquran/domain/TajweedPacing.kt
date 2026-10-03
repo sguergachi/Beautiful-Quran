@@ -187,6 +187,22 @@ object TajweedPacing {
          * on this word. Gates the tarjīʿ shimmer's eligibility. */
         val hasStrongHold: Boolean = false,
     ) {
+        /** Centre the wash's soft edge on each letter hold. The renderer travels
+         * across the word plus its feather; endpoints still start unread and
+         * finish fully inked at the original voiced boundary. */
+        fun forWash(feather: Float): Curve {
+            val edge = feather.coerceAtLeast(0f)
+            return Curve(
+                times,
+                FloatArray(positions.size) { i ->
+                    val x = positions[i]
+                    if (x <= 0f || x >= 1f) x else (x + edge / 2f) / (1f + edge)
+                },
+                letterCount,
+                hasStrongHold,
+            )
+        }
+
         fun at(t: Float): Float {
             if (t >= 1f) return 1f
             val c = t.coerceAtLeast(0f)

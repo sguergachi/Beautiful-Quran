@@ -70,6 +70,25 @@ class TajweedPacingTest {
     }
 
     @Test
+    fun `allies holds its alif inside the soft wash rather than beyond the word`() {
+        val letters = curveOf("أَوۡلِيَآءَ") // 4:144, alif is slot 5 of 6.
+        for (feather in listOf(0f, 0.4f, 1.1092f, 2f)) {
+            val wash = letters.forWash(feather)
+            for (t in listOf(0.65f, 0.75f)) {
+                val centre = wash.at(t) * (1f + feather) - feather / 2f
+                assertEquals(letters.at(t), centre, 1e-6f)
+                assertTrue("the faded edge must hold on the alif", centre in (4f / 6f)..(5f / 6f))
+            }
+            assertEquals(0f, wash.at(0f), 0f)
+            assertEquals(1f, wash.at(1f), 0f)
+            assertEquals(letters.hasStrongHold, wash.hasStrongHold)
+        }
+        val settling = curveOf("أَوۡلِيَآءَ", spoken = 0.8f).forWash(1.1092f)
+        assertEquals(1f, settling.at(0.8f), 0f)
+        assertEquals(1f, settling.at(0.9f), 0f)
+    }
+
+    @Test
     fun `turning off the madd rule takes the gate with it`() {
         assertNull(TajweedPacing.curve(dallin, 1f, Hold(madd = false)))
     }
