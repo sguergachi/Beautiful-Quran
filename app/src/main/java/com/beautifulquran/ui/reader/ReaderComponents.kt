@@ -1219,7 +1219,7 @@ internal class InkMotion(
 
     /** Live crest hue, read by both paint adapters inside their draw scopes. */
     fun glintColor(base: Color): Color =
-        com.beautifulquran.ui.theme.glintPulseColor(base, glintPeak, InkEngine.tuning.glintBrightness)
+        com.beautifulquran.ui.theme.glintPulseColor(base, if (isActive) tarji.value.whiteMix else 0f)
 
     /** Tint alpha: always-on wet strength, lifted further on tarjīʿ peaks. */
     fun glintTintColorAlpha(base: Float): Float =
@@ -1333,11 +1333,13 @@ private fun rememberTarjiGate(
             return@LaunchedEffect
         }
         val eventGate = TarjiWordGate()
+        val hue = com.beautifulquran.ui.theme.GlintColorTransition()
+        var lastReport = 0L
         while (true) {
-            withFrameNanos {
+            withFrameNanos { now ->
                 val voice = com.beautifulquran.playback.VoiceEnergy.active
                 val g = voice?.shimmerGain ?: 0f
-                frame.value = if (
+                val pulse = if (
                     eventGate.allows(
                         gain = g,
                         detected = voice?.reverberating == true,
@@ -1353,6 +1355,14 @@ private fun rememberTarjiGate(
                     )
                 } else {
                     InkEngine.GlintResonance.Idle
+                }
+                frame.value = pulse.copy(whiteMix = hue.next(pulse.peak, InkEngine.tuning.glintBrightness, now))
+                if (com.beautifulquran.DevProfiling.captureStart.get() != null && now - lastReport >= 100_000_000L) {
+                    lastReport = now
+                    com.beautifulquran.DevProfiling.mark(
+                        "tarji word=$wordStartMs event=${voice?.eventStartMediaMs} live=${voice?.isLive} " +
+                            "detected=${voice?.reverberating} gain=$g peak=${pulse.peak} white=${frame.value.whiteMix}",
+                    )
                 }
             }
         }

@@ -563,6 +563,7 @@ class ReaderViewModel(
     private var tapBacklogAnchor: TarjiBacklogAnchor? = null
     private var smoothedBacklogContentMs = 0.0
     private var shimmerWasOn = false
+    private var lastTarjiReport = 0L
     /** Media3 already follows presentation time; only an explicit lab lag is extra. */
     private fun outputLatencyMs(): Long =
         OutputLatency.mediaLagMs(
@@ -625,6 +626,17 @@ class ReaderViewModel(
                 voice.measuredBacklogContentMs = smoothedBacklogContentMs
             }
             voice.updatePlaybackPosition(player.positionMs)
+            val now = System.nanoTime()
+            if (DevProfiling.captureStart.get() != null && now - lastTarjiReport >= 100_000_000L) {
+                lastTarjiReport = now
+                DevProfiling.mark(
+                    "tarji tap media=${player.positionMs} pcm=${voice.pcmSampleRate} hops=${voice.hopCount} live=${voice.isLive} " +
+                        "gain=${voice.shimmerGain} detected=${voice.reverberating} ear=${voice.earDelayTotalMs} " +
+                        "hold=${voice.holdMs} hz=${voice.rateHz} " +
+                        "sink=${voice.sinkLatencyMs} enabled=${InkEngine.tuning.glintResonance} " +
+                        "depth=${InkEngine.tuning.glintResonanceDepth} brightness=${InkEngine.tuning.glintBrightness}",
+                )
+            }
             // Live tarjīʿ effect log: the shimmer's on/off transitions in
             // media time (the same gain the renderer gates on), so the
             // effect's engagement is confirmable in logcat as it happens.

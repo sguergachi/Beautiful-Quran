@@ -192,6 +192,12 @@ are obfuscated: retain the matching build's `mapping.txt` for retracing.
 Frame callback intervals indicate missed callbacks, not GPU render duration;
 use Perfetto's frame timeline for a full attribution.
 
+During recitation, requested profiles also sample the live tarjīʿ tap and active
+eligible word at most ten times a second. `tarji tap` records the PCM hop count,
+gain, output delays and tuning switches; `tarji word` records acoustic ownership,
+the admitted crest and the smoothed white mix. To diagnose a missing glint,
+return to the reader and replay that word during the recording window.
+
 1. Install the APK and enable Developer by tapping the app mark three times.
 2. Tap **Record performance profile**.
 3. Return to the chapter and swipe to Settings during the next ten seconds.

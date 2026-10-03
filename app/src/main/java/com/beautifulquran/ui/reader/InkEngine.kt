@@ -590,6 +590,8 @@ object InkEngine {
     data class GlintResonance(
         val peak: Float,
         val layerMult: Float = 1f,
+        /** Smoothed paint hue; the measured crest and vocal alpha remain unchanged. */
+        val whiteMix: Float = 0f,
     ) {
         companion object {
             val Idle = GlintResonance(peak = 0f)

@@ -124,6 +124,16 @@ boost and per-reciter brightness still apply. The colour shift is painted
 inside the same soft directional mask, so it lights revealed glyph ink during
 the wash and never exposes unread letters. Both shaped and layered readers
 sample the hue at draw time; the lab preview uses the same crest-to-colour map.
+Hue travel is limited to one full gold-to-white transition per 120 ms in both
+previews and live playback. This softens changes between audio hops; the vocal
+alpha, wash edge, and detector timing remain on their original clocks.
+
+When a phone differs from a simulator, Developer → Record performance profile
+includes `tarji tap` samples (PCM hops, live gain, sink/ear delay, enabled/depth/
+brightness) and `tarji word` samples (word/event ownership, admitted crest,
+white mix). These are captured only during the requested local profile. Replay
+the affected word during its ten-second window and share the text report to
+distinguish a missing PCM feed, rejected event, and paint signal.
 
 The shimmer is the **build to the climax**: it engages as the hold's
 reverberation starts (the hold gate is short, ~300 ms, and the minimum

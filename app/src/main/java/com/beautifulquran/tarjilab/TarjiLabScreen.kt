@@ -461,8 +461,9 @@ private fun PreviewWord(
             depth = InkEngine.GLINT_RESONANCE_DEPTH,
             enabled = true,
         )
+        val hue = remember { com.beautifulquran.ui.theme.GlintColorTransition() }
         val pulseColor = com.beautifulquran.ui.theme.glintPulseColor(
-            GlintGold, resonance.peak, ui.displayKnobs.glintBrightness,
+            GlintGold, hue.next(resonance.peak, ui.displayKnobs.glintBrightness, System.nanoTime()),
         )
         Canvas(Modifier.fillMaxSize()) {
             val amount = (0.22f * resonance.layerMult + 0.9f * resonance.peak) *

@@ -11,6 +11,27 @@ class GlintColorTest {
     private val repeat = Color(0xFFE06A18)
 
     @Test
+    fun `a stepped crest travels through colour before reaching white`() {
+        val hue = GlintColorTransition()
+        assertEquals(0f, hue.next(0.67f, 2f, 0L), 0f)
+        val halfway = hue.next(0.67f, 2f, 60_000_000L)
+        assertEquals(0.5f, halfway, 0.0001f)
+        assertTrue(glintPulseColor(gold, halfway).blue in (gold.blue + 0.01f)..0.99f)
+        assertEquals(1f, hue.next(0.67f, 2f, 120_000_000L), 0.0001f)
+        assertEquals(0.5f, hue.next(0f, 2f, 180_000_000L), 0.0001f)
+        assertEquals(0f, hue.next(0f, 2f, 240_000_000L), 0.0001f)
+    }
+
+    @Test
+    fun `hue travel follows elapsed time at either display refresh rate`() {
+        fun at(rate: Int): Float {
+            val hue = GlintColorTransition()
+            return (0..rate / 10).map { i -> hue.next(0.67f, 2f, i * 1_000_000_000L / rate) }.last()
+        }
+        assertEquals(at(60), at(120), 0.0001f)
+    }
+
+    @Test
     fun `brightness can lift a moderate real crest to white without lifting troughs`() {
         for (base in listOf(gold, repeat)) {
             assertEquals(Color.White, glintPulseColor(base, 0.67f, brightness = 2f))

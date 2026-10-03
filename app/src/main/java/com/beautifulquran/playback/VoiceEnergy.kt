@@ -330,6 +330,9 @@ class VoiceEnergy {
     val hopCount: Int
         get() = tarji.hopCount
 
+    /** Source PCM rate for local playback diagnostics. */
+    internal val pcmSampleRate: Int get() = sourceSampleRate
+
     /** Detection goes silent when the PCM stops (pause, track change). */
     val isLive: Boolean
         get() = SystemClock.elapsedRealtime() - lastFeedMs < LIVE_WINDOW_MS
