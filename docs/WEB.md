@@ -416,7 +416,14 @@ of the block; `--wad` = share × `--book-block`) and `ms` (`turnMs`), sets the
 back face that far behind the front, and draws the pile's fore-edge and
 head/foot caps (`.mushaf-flip-edge`, `.mushaf-flip-cap`) above
 `WAD_VISIBLE`. Sheet turns carry the whole pile on that side; page turns
-carry the leaves between the two pages. Search fields hide the browser's
+carry the leaves between the two pages. Scrollbars (pointers that can hover only, `--sb` = 10px, else 0): a thin
+thread at rest that thickens and turns solid under the pointer, drawn as a
+thumb inside transparent borders so the lane never changes width. Each
+scroller gives the lane back from its padding, so nothing in it moves. On the
+spread a bar runs down its page's fore-edge: the left page's scrollers are
+`direction: rtl` with their contents set back, and the scrolling reader's
+scroller is let out to the page's edges. Touch keeps scrollbars hidden.
+Search fields hide the browser's
 own clear mark (`::-webkit-search-cancel-button`); the field draws one. The per-leaf solver is in
 `ui/reader/mushafFit.ts`: `mushafLeafFit` (type size, bounded by
 `MUSHAF_MIN_LEADING`) and `solveLine` (letter widening toward
