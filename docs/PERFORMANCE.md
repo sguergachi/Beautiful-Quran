@@ -53,8 +53,9 @@ alpha (`CompositingStrategy.ModulateAlpha`, so no offscreen buffer clips the
 spill past the sheet's edge).
 
 The scroll playback bar keeps one owner throughout every stack turn.
-Home covers the mounted bar before playback creates a session; after playback
-it sits above Home. Its owner never changes at a swipe threshold. On a reader
+Home covers the mounted bar before playback creates a session; its draw-phase
+transform shares the reader's reveal offset, scale, and whole-sheet pivot.
+After playback it sits above Home and stays still through that reveal. Its owner never changes at a swipe threshold. On a reader
 → Settings turn it follows the reader's transform through a draw-phase layer,
 with its pivot at the sheet's centre. The earlier 1.02-page
 visibility gate swapped the pinned bar for an embedded reader bar just after

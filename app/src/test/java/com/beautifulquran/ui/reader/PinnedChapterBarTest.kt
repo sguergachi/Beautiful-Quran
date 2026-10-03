@@ -28,6 +28,15 @@ class PinnedChapterBarTest {
     }
 
     @Test
+    fun onlyAnUnplayedBarSharesTheChapterReveal() {
+        // At rest and halfway under Home, it has exactly the chapter's reveal.
+        for (page in listOf(0f, 0.25f, 0.5f, 0.75f, 1f, 1.5f)) {
+            assertEquals(page.coerceIn(0f, 1f), pinnedBarReveal(page, false), 0f)
+            assertEquals(1f, pinnedBarReveal(page, true), 0f)
+        }
+    }
+
+    @Test
     fun mushafGatherAndOverlaysKeepTheirOwnChrome() {
         assertFalse(showPinnedChapterBar(
             readerOpen = true, mushaf = true, gathering = false, overlayBlocking = false,

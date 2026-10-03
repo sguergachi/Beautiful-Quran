@@ -77,6 +77,10 @@ internal fun showPinnedChapterBar(
 internal fun pinnedChapterBarZIndex(coverSession: Boolean): Float =
     if (coverSession) 2.3f else 1.3f
 
+/** Before playback, the bar shares the chapter's reveal; afterward it stays pinned. */
+internal fun pinnedBarReveal(stackPage: Float, coverSession: Boolean): Float =
+    if (coverSession) 1f else stackPage.coerceIn(0f, 1f)
+
 /**
  * How far the pinned bar has turned away with the reader sheet: 0 while the
  * reader (or the cover) holds it, 1 once Settings has taken the stack.

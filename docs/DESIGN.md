@@ -1243,7 +1243,8 @@ weight.
   with the same 4 dp foot as `PlayerBar`, then the phone's navigation inset
   inside the paper. The controls stay above the home gesture bar. It does not
   take the ornaments' 10 dp foot. Until playback has created a session, Home
-  covers the bar, which stays above the reader underneath. After playback, a
+  covers the bar, which shares the reader's subtle sideways shift and scale
+  underneath. After playback, a
   cover ↔ reader turn keeps the chapter bar fixed above both sheets. Turning
   from the reader to Settings carries that same bar away with the reader sheet;
   it stays mounted throughout the turn. In the scrolling reader that bar never

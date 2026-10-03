@@ -93,6 +93,7 @@ import com.beautifulquran.ui.reader.PinnedPlaybackHost
 import com.beautifulquran.ui.reader.ReaderPlaybackSnapshot
 import com.beautifulquran.ui.reader.ReaderScreen
 import com.beautifulquran.ui.reader.pinnedBarTurn
+import com.beautifulquran.ui.reader.pinnedBarReveal
 import com.beautifulquran.ui.reader.pinnedChapterBarZIndex
 import com.beautifulquran.ui.reader.showPinnedChapterBar
 import androidx.compose.ui.platform.LocalDensity
@@ -1297,7 +1298,11 @@ private fun PaperStackApp(
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
                     .zIndex(pinnedChapterBarZIndex(pinnedPlayback.coverSession))
-                    .pinnedBarRidesReader(stackPositionProvider) { stackHeightPx.intValue },
+                    .pinnedBarRidesReader(
+                        stackPosition = stackPositionProvider,
+                        coverSession = pinnedPlayback.coverSession,
+                        stackHeightPx = { stackHeightPx.intValue },
+                    ),
             )
         }
 
@@ -1559,14 +1564,17 @@ private fun Modifier.paperLayerTransform(
     }
 }
 
-// The pinned chapter bar belongs to the reader sheet, so it leaves with it:
-// the reader's own turn, pivoted on the sheet's centre rather than the bar's,
-// so the bar moves as the strip of that sheet it is drawn over.
+// An unplayed bar is a strip of the reader sheet and shares its reveal.
+// After playback it stays fixed over Home; Settings still takes it away with
+// the reader. Both transforms pivot on the sheet's centre, not the bar's.
 private fun Modifier.pinnedBarRidesReader(
     stackPosition: () -> Float,
+    coverSession: Boolean,
     stackHeightPx: () -> Int,
 ): Modifier = graphicsLayer {
-    val turn = pinnedBarTurn(stackPosition())
+    val position = stackPosition()
+    val reveal = pinnedBarReveal(position, coverSession)
+    val turn = pinnedBarTurn(position)
     val sheetHeight = stackHeightPx()
     // The bar sits on the sheet's foot: its top is sheetHeight - barHeight.
     transformOrigin = TransformOrigin(
@@ -1574,7 +1582,10 @@ private fun Modifier.pinnedBarRidesReader(
         pivotFractionY = if (size.height > 0f) 1f - sheetHeight / (2f * size.height) else 0.5f,
     )
     cameraDistance = 18f * density
-    translationX = -(size.width + STACK_OFFSCREEN_OVERSCAN_DP * density) * turn
+    translationX = size.width * 0.055f * (1f - reveal) -
+        (size.width + STACK_OFFSCREEN_OVERSCAN_DP * density) * turn
+    scaleX = 0.985f + 0.015f * reveal
+    scaleY = scaleX
     rotationY = -4f * turn
 }
 
