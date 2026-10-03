@@ -5,13 +5,12 @@ package com.beautifulquran.domain
  *
  * [HighlightEngine] is pure: it answers "which word at time *t*?". Bluetooth
  * (and similar) delay is a property of the *playback path*, not of the
- * segments — so the reader subtracts a small offset from
- * `player.positionMs` before [HighlightClock] / [HighlightEngine] see it.
+ * segments. Media3 already corrects its playhead for output latency, so these
+ * route presets are for the PCM-tapped tarjīʿ signal, not the word clock.
  *
  * Android never exposes a reliable end-to-end "ms until the ear" number for
- * A2DP. These presets are intentionally coarse: good enough that ink lands
- * with the voice on typical headsets, without baking lag into timing data or
- * the engine. A later user nudge can sit on top if needed.
+ * A2DP. These PCM presets remain coarse estimates without baking device
+ * delay into timing data or the engine.
  */
 object OutputLatency {
 
@@ -56,6 +55,14 @@ object OutputLatency {
     }
 
     fun latencyMs(kinds: Set<OutputKind>): Long = latencyMs(classify(kinds))
+
+    /**
+     * Extra correction for Media3's presentation clock. Automatic mode adds
+     * none: subtracting a Bluetooth preset again makes the ink late. A manual
+     * lab correction is in wall milliseconds, so scale it to the media clock.
+     */
+    fun mediaLagMs(additionalLagMs: Long?, playbackSpeed: Float): Long =
+        ((additionalLagMs ?: 0L).coerceAtLeast(0L) * playbackSpeed).toLong()
 
     /**
      * Media-timeline position adjusted so the highlight tracks what the

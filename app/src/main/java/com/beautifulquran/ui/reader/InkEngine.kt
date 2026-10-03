@@ -300,9 +300,9 @@ object InkEngine {
         }
 
     /**
-     * Extra output lag subtracted from the media playhead before the highlight
-     * clock, or null to use the route preset from [AudioOutputLatency]
-     * (speaker ≈ 0, A2DP ≈ 180, LE ≈ 80). Lab override is absolute when set.
+     * Extra wall-time lag subtracted from Media3's presentation clock, or null
+     * to use that already-corrected clock directly. Also overrides the route
+     * preset used to delay the raw PCM tarjīʿ tap.
      */
     private var outputLatencyOverrideState by mutableStateOf<Int?>(null)
     var outputLatencyOverrideMs: Int?

@@ -1,22 +1,29 @@
 # Output latency (Bluetooth karaoke sync)
 
-**Status: implemented on Android and web; shipped word selection uses LOCAL lag,
-no global word-boundary lead, and one ear-verified reciter calibration.**
-The reader subtracts a small, route-based delay from the media playhead
-before the highlight clock and `HighlightEngine` see it. Web ports the pure
+**Status: Android uses Media3’s output-corrected presentation clock; web uses
+its media clock. No automatic extra Bluetooth lag is subtracted.**
+An explicit Ink Lab lag is an additional wall-time correction, converted to
+media time at the current playback speed before `HighlightClock` sees it.
+Web ports the pure
 `OutputLatency` helpers and feeds `highlightMs(..., leadMs)` into
 `HighlightClock` (default lead 0). Browser output-route classification is
 still hard, so web lag stays at LOCAL (0 ms) until a monitor exists.
 
 ## Why
 
-`MediaController.currentPosition` / ExoPlayer’s playhead advance with the
-decoder. Bluetooth A2DP (and similar wireless paths) deliver sound to the
-ear **after** that playhead — often ~150–300 ms later. Without compensation
-the ink lights early relative to the voice.
+Media3 1.10.1 derives audio position from AudioTrack presentation timestamps.
+When timestamps are unavailable, its playback-head fallback subtracts reported
+mixer/hardware latency. This is already a presentation clock, not the decoder
+position. Subtracting another 180 ms for A2DP or 80 ms for LE can compensate
+Bluetooth twice and make word ink late. The old connected-device heuristic
+also delayed ink on the phone speaker while a Bluetooth device remained paired.
 
-Android does **not** expose a reliable end-to-end “ms until the ear” for
-media over A2DP. So we use **coarse route presets**, not a measured delay.
+Use the player's clock directly. Android does not promise exact physical ear
+latency on every headset; the existing manual lab adjustment remains available
+for residual error. Do not guess an additional delay from device presence.
+
+Sources: [Media3 1.10.1 position tracker](https://github.com/androidx/media/blob/1.10.1/libraries/exoplayer/src/main/java/androidx/media3/exoplayer/audio/AudioTrackPositionTracker.java),
+[Android AudioTrack timestamps](https://developer.android.com/reference/android/media/AudioTrack#getTimestamp(android.media.AudioTimestamp)).
 
 ## Design rule
 
@@ -24,15 +31,15 @@ media over A2DP. So we use **coarse route presets**, not a measured delay.
 |---|---|
 | `HighlightEngine` | **No** — stays pure: segments + time *t* → word |
 | Word timing segments / DB | **No** — lag is a device path, not reciter data |
-| `OutputLatency` (pure presets) | **Yes** — classify route → ms |
-| `AudioOutputLatency` (Android) | **Yes** — watch devices, expose current ms |
-| `ReaderViewModel` poll | **Yes** — `heardMs = positionMs − latencyMs` before `HighlightClock` |
+| `OutputLatency` (pure policy) | **Yes** — manual wall lag → media lag; route presets for PCM |
+| `AudioOutputLatency` (Android) | Watch devices for the raw PCM tarjīʿ delay only |
+| `ReaderViewModel` poll | `heardMs = positionMs − manualLagMs × speed` before `HighlightClock` |
 
 ```
 ExoPlayer.currentPosition
         │
         ▼
-AudioOutputLatency.latencyMs   (0 / 80 / 180 from route)
+OutputLatency.mediaLagMs      (0 automatically; manual wall lag × speed)
         │
         ├──► OutputLatency.heardMs(...)      media − lag
         │         └──► ayah fade lead + basmalah wash
@@ -55,8 +62,8 @@ the other consumers must not:
 | Basmalah calligraphy wash | Heard position |
 
 Only the ink poll additionally arms `HighlightClock.acceptNextSample()` when the
-route or lab value steps, so a latency change is taken as a real jump instead of
-held as jitter. The pure heard-position reader cannot consume that latch on the
+applied manual media lag or word lead steps, so the change is taken as a real
+jump instead of held as jitter. The pure heard-position reader cannot consume that latch on the
 ink poll's behalf.
 
 **Continue Listening reads neither clock.** It persists the *playing media
@@ -84,7 +91,7 @@ visible instead of being skipped. Timing rows, ayah handoff, basmalah wash, and
 every other reciter stay on their existing clocks. Android and web share the
 same policy.
 
-## Presets
+## Raw PCM presets
 
 | Route | When | Offset |
 |---|---|---|
@@ -96,10 +103,9 @@ If several outputs are listed at once (common: built-in speaker **and** A2DP
 headset connected), **higher-latency wins** so a connected headset is not
 ignored.
 
-These numbers are product defaults, not per-device science. They are meant to
-land inside the same ~150 ms “feels in sync” window as the existing ±73 ms
-timing data noise. Exact ear sync on every headset is not achievable without
-a user nudge (not shipped).
+These presets only delay the PCM-tapped tarjīʿ signal, which has not passed
+through Media3's presentation clock. Its sink-buffer correction remains separate.
+They never delay word selection, ayah fade, or basmalah wash automatically.
 
 ## Route detection
 
@@ -110,7 +116,7 @@ a user nudge (not shipped).
    (A2DP / LE / local; unknown types ignored).
 3. `OutputLatency.classify` → preset ms.
 4. `AudioDeviceCallback` refreshes on add/remove so mid-surah connect /
-   disconnect updates the offset.
+   disconnect updates the raw PCM offset.
 
 Classification is “BT device present among outputs,” not a full active-route
 graph. That matches the usual “headphones connected → media goes there” case
@@ -120,12 +126,13 @@ and stays thin.
 
 In `ReaderViewModel`:
 
-- Normal word polls: `highlightPositionMs(null)` →
-  `OutputLatency.highlightMs(player.positionMs, latency, highlightLeadMs)`.
+- Normal word polls: `highlightPositionMs(firstWordStartMs, reciterId)` →
+  `OutputLatency.highlightMs(player.positionMs, manualLagMs × speed, highlightLeadMs)`.
+  Automatic lag is zero; the raw PCM route preset is not fed to this clock.
 - **Forced word seeks** (tap-to-play): keep the **media** timeline target so
   ink jumps to the sought word immediately; do not re-delay a deliberate seek.
-- On a **latency change**, call `HighlightClock.acceptNextSample()` so the
-  ~preset jump is not held as sampling jitter.
+- On a **manual media-lag change**, call `HighlightClock.acceptNextSample()` so the
+  correction jump is not held as sampling jitter.
 - Ayah fade and basmalah preface wash use `heardPositionMs()` so they stay with
   the voice on BT without inheriting the word-only lead.
 
@@ -139,7 +146,7 @@ compensation is separate — see [TIMINGS_LAB.md](TIMINGS_LAB.md)).
 
 - Not FocusEngine scroll pacing.
 - Not tajweed letter pacing ([TAJWEED_PACING.md](TAJWEED_PACING.md)).
-- Not a user-facing “sync” slider (possible later if presets miss stubborn pairs).
+- No new user-facing sync slider; residual correction stays in Ink Lab.
 - Not codec fingerprinting (SBC/aptX/LDAC) — high complexity, weak gain over
   the A2DP/LE split.
 
@@ -147,7 +154,7 @@ compensation is separate — see [TIMINGS_LAB.md](TIMINGS_LAB.md)).
 
 | File | Role |
 |---|---|
-| `domain/OutputLatency.kt` | Pure kinds, classify, presets, `heardMs` |
+| `domain/OutputLatency.kt` | Pure kinds, PCM presets, `mediaLagMs`, `heardMs` |
 | `domain/OutputLatencyTest.kt` | Spec for classify + heard clamp |
 | `domain/ReciterSync.kt` | Pure reciter-specific word-clock calibration |
 | `playback/AudioOutputLatency.kt` | Android device watch → `StateFlow` latency |
@@ -157,6 +164,6 @@ compensation is separate — see [TIMINGS_LAB.md](TIMINGS_LAB.md)).
 
 ## Tuning
 
-Change the constants in `OutputLatency` only after ear-checking speaker **and**
+Change the raw PCM presets in `OutputLatency` only after ear-checking speaker **and**
 at least one classic A2DP pair. Prefer small integer presets; do not push
 device-specific tables into the engine.

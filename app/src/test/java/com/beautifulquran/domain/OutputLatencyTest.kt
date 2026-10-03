@@ -10,6 +10,46 @@ import org.junit.Test
 class OutputLatencyTest {
 
     @Test
+    fun `presentation clock lights the heard word without a second Bluetooth delay`() {
+        val segments = listOf(
+            Segment(position = 1, startMs = 0, endMs = 1_000),
+            Segment(position = 2, startMs = 1_000, endMs = 2_000),
+        )
+        for (speed in listOf(0.5f, 1f, 2f)) {
+            val lag = OutputLatency.mediaLagMs(null, speed)
+            val clock = HighlightClock()
+            for (positionMs in listOf(950L, 1_000L, 1_050L)) {
+                val queryMs = clock.sample(
+                    "ayah1",
+                    OutputLatency.highlightMs(positionMs, lag),
+                )
+                assertEquals(
+                    if (positionMs < 1_000) 1 else 2,
+                    HighlightEngine.activeWord(segments, queryMs),
+                )
+            }
+        }
+    }
+
+    @Test
+    fun `manual wall delay keeps the same heard word at every playback speed`() {
+        val segments = listOf(
+            Segment(position = 1, startMs = 0, endMs = 1_000),
+            Segment(position = 2, startMs = 1_000, endMs = 2_000),
+        )
+        for (speed in listOf(0.5f, 1f, 2f)) {
+            val lag = OutputLatency.mediaLagMs(180L, speed)
+            val mediaPositionMs = 1_000L + (180 * speed).toLong()
+            assertEquals(1, HighlightEngine.activeWord(
+                segments, OutputLatency.heardMs(mediaPositionMs - 1, lag),
+            ))
+            assertEquals(2, HighlightEngine.activeWord(
+                segments, OutputLatency.heardMs(mediaPositionMs, lag),
+            ))
+        }
+    }
+
+    @Test
     fun `empty kinds are local with zero latency`() {
         assertEquals(Route.LOCAL, OutputLatency.classify(emptySet()))
         assertEquals(0L, OutputLatency.latencyMs(emptySet()))

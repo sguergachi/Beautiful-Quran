@@ -412,10 +412,10 @@ fun InkLabPanel(
                         }
                         LabCaption(
                             if (override == null) {
-                                "Auto: route preset (speaker 0 / A2DP 180 / LE 80). " +
-                                    "Lag delays ink to match late audio."
+                                "Auto: the player's output-corrected clock. " +
+                                    "Bluetooth delay is already handled by the player."
                             } else {
-                                "Override absolute lag subtracted from the playhead."
+                                "Extra delay after the player's output correction, in wall ms."
                             },
                         )
                         if (override != null) {
@@ -600,7 +600,7 @@ internal fun formatHighlightCopy(): String = buildString {
     val lag = InkEngine.outputLatencyOverrideMs
     append(
         if (lag == null) {
-            "InkEngine.outputLatencyOverrideMs = null // auto route preset"
+            "InkEngine.outputLatencyOverrideMs = null // player presentation clock"
         } else {
             "InkEngine.outputLatencyOverrideMs = $lag"
         },

@@ -563,9 +563,12 @@ class ReaderViewModel(
     private var tapBacklogAnchor: TarjiBacklogAnchor? = null
     private var smoothedBacklogContentMs = 0.0
     private var shimmerWasOn = false
-    /** Ink Lab → Highlight can override route detection with an absolute lag. */
+    /** Media3 already follows presentation time; only an explicit lab lag is extra. */
     private fun outputLatencyMs(): Long =
-        InkEngine.outputLatencyOverrideMs?.toLong() ?: outputLatency.latencyMs.value
+        OutputLatency.mediaLagMs(
+            InkEngine.outputLatencyOverrideMs?.toLong(),
+            player.state.value.speed,
+        )
 
     /** Media position at the listener's ear, before any word-only ink lead. */
     private fun heardPositionMs(): Long =
@@ -573,19 +576,21 @@ class ReaderViewModel(
 
     /**
      * The heard position plus the word-only Ink Lab lead. [firstWordStartMs]
-     * keeps that lead from crossing encoded opening silence. A route or lab
-     * change steps query time, so arm [HighlightClock] to take it rather than
+     * keeps that lead from crossing encoded opening silence. A manual lag or
+     * lead change steps query time, so arm [HighlightClock] to take it rather than
      * hold it as jitter.
      */
     private fun highlightPositionMs(firstWordStartMs: Long, reciterId: Int): Long {
         val latencyMs = outputLatencyMs()
-        // The tarjīʿ shimmer delays the tapped voice signal by the same
-        // latency plus the sink buffer so it lands on the same clock the
+        // The tarjīʿ shimmer delays the tapped voice signal by the
+        // route latency plus the sink buffer so it lands on the same clock the
         // highlight uses. Once that buffer has filled, exact tap and playback
         // content clocks track only queue growth/drain around the stable
         // baseline; a small EMA rejects position polling jitter.
         val voice = com.beautifulquran.playback.VoiceEnergy.active
-        voice?.outputLatencyMs = latencyMs
+        // Unlike Media3's playhead, the raw PCM tap has no output correction.
+        voice?.outputLatencyMs = InkEngine.outputLatencyOverrideMs?.toLong()
+            ?: outputLatency.latencyMs.value
         if (voice != null) {
             val speed = voice.playbackSpeed
             if (voice.sessionStartWall != latchedTapSessionStart) {
