@@ -1,10 +1,13 @@
 import { describe, expect, it } from 'vitest'
 import {
   BOOKMARKS_LAYER,
+  COVER_LAYER,
   READER_LAYER,
+  SETTINGS_LAYER,
   hasReaderOpen,
   settingsLayerFor,
   sheetAtLayer,
+  showPinnedChapterBar,
 } from '../stack'
 
 describe('hasReaderOpen', () => {
@@ -27,6 +30,24 @@ describe('hasReaderOpen', () => {
   it('is true when content is loaded', () => {
     expect(hasReaderOpen({ surah: { id: 1 } }, 'reader')).toBe(true)
     expect(hasReaderOpen({ surah: { id: 1 } }, 'home')).toBe(true)
+  })
+
+  it('pins the scroll bar across the cover and the reader only', () => {
+    const base = {
+      hasReader: true,
+      mushaf: false,
+      gathering: false,
+      stackLayer: READER_LAYER,
+      coverSession: false,
+    }
+    expect(showPinnedChapterBar(base)).toBe(true)
+    expect(showPinnedChapterBar({ ...base, stackLayer: COVER_LAYER, coverSession: true })).toBe(true)
+    expect(showPinnedChapterBar({ ...base, stackLayer: COVER_LAYER, coverSession: false })).toBe(false)
+    expect(showPinnedChapterBar({ ...base, mushaf: true })).toBe(false)
+    expect(showPinnedChapterBar({ ...base, gathering: true })).toBe(false)
+    expect(showPinnedChapterBar({ ...base, stackLayer: SETTINGS_LAYER })).toBe(false)
+    expect(showPinnedChapterBar({ ...base, stackLayer: BOOKMARKS_LAYER })).toBe(false)
+    expect(showPinnedChapterBar({ ...base, hasReader: false })).toBe(false)
   })
 
   it('would flash settings if peel used content-only hasReader', () => {

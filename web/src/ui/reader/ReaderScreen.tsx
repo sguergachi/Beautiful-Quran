@@ -18,6 +18,7 @@ import {
   READER_LAYER,
 } from '../../store/appStore'
 import type { StackLayer } from '../paper/stack'
+import { PlaybackPin } from '../paper/PlaybackPin'
 import { PaperInput } from '../kit/PaperInput'
 import {
   IconBuffering,
@@ -58,11 +59,12 @@ import {
 } from './useProgressiveAyahWindow'
 import { RootViewer } from '../root/RootViewer'
 import { SearchHitFlash, searchHitFlashTotalMs } from './SearchHitFlash'
-import { fieldWeaveBackground, GeneratedRosette } from '../theme/GeneratedOrnament'
+import { fieldWeaveBackground, GeneratedRosette, useFieldCellWidth } from '../theme/GeneratedOrnament'
 import { chapterOrnamentSeed, generateChapterOrnament } from '../theme/ornamentGenerator'
 import { resolveTheme } from '../App'
 import type { Word } from '../../data/models'
-import { isKeyboardControl, readerKeyboardAction } from './keyboardNavigation'
+import { readerOpensOnTitle } from './readerOpening'
+import { isKeyboardControl, readerKeyboardAction, readerOwnsKeyboard } from './keyboardNavigation'
 
 const NO_SEARCH_FLASH_WORDS: number[] = []
 
@@ -76,18 +78,16 @@ function activeSearchQuery(active: boolean, query: string): string | null {
  * A data-URI SVG background can't resolve `var(--ink)` (it isn't part of
  * the live cascade), so the whisper-faint field weave needs a literal
  * color resolved from the reader's own theme instead — same `--ink` values
- * as styles.css, at the same ~4% alpha Android's `onBackground.copy(alpha
- * = 0.04f)` uses. `--emboss-light` is white at low alpha in every theme.
+ * as styles.css, with the chapter field softened by 25% on both platforms. `--emboss-light` is white at low alpha in every theme.
  */
 function chapterWeaveInk(themeMode: string): string {
-  return resolveTheme(themeMode) === 'light' ? 'rgba(28, 27, 24, 0.04)' : 'rgba(232, 226, 213, 0.04)'
+  return resolveTheme(themeMode) === 'light' ? 'rgba(28, 27, 24, 0.03)' : 'rgba(232, 226, 213, 0.03)'
 }
 
 /**
  * The surah header's own ornament: a distinct rosette and backing field per
- * chapter, grown from one seed — ayah count is the dominant term (length as
- * fingerprint), folded with the chapter number so all 114 chapters render
- * distinctly even though many share an ayah count. Both are static — part
+ * chapter, with chapter number assigning its structure and verse count
+ * varying its safe proportions. Both are static — part
  * of the page's fixed typography, not a ceremony — and themed off the
  * reader's own gold/emboss/ink custom properties rather than the entrance
  * cover's fixed leather gold, since this sits on the page background.
@@ -105,13 +105,14 @@ function SurahHeaderOrnament({
     () => generateChapterOrnament(chapterOrnamentSeed(chapterNumber, ayahCount)),
     [chapterNumber, ayahCount],
   )
+  const fieldSize = useFieldCellWidth(ornament.field.cellWidthDp)
   const weave = useMemo(
-    () => fieldWeaveBackground(ornament.field, chapterWeaveInk(themeMode), 'rgba(255, 255, 255, 0.05)'),
-    [ornament.field, themeMode],
+    () => fieldWeaveBackground(ornament.field, chapterWeaveInk(themeMode), 'rgba(255, 255, 255, 0.0375)', fieldSize.cellWidth),
+    [ornament.field, themeMode, fieldSize.cellWidth],
   )
   return (
     <>
-      <div className="surah-header-weave" style={weave} aria-hidden="true" />
+      <div className="surah-header-weave" ref={fieldSize.ref} style={weave} aria-hidden="true" />
       <GeneratedRosette
         spec={ornament.rosette}
         className="rosette"
@@ -128,7 +129,14 @@ function SurahHeaderOrnament({
   )
 }
 
-export function ReaderScreen({ stackLayer }: { stackLayer: StackLayer }) {
+export function ReaderScreen({
+  stackLayer,
+  playbackPinned = false,
+}: {
+  stackLayer: StackLayer
+  /** Phone scroll stack: draw the chapter bar above the sheets. */
+  playbackPinned?: boolean
+}) {
   const state = useAppState()
   const inkTuning = getTuning()
   const content = state.content
@@ -636,7 +644,7 @@ export function ReaderScreen({ stackLayer }: { stackLayer: StackLayer }) {
       // list does at scroll 0. Putting ayah 1 on the reading line pushed the
       // rosette and name off a phone-height sheet. Landings inside a chapter
       // (bookmark, search, Continue) still take the reading line.
-      if (ayah <= 1 && state.pendingSearchFlash == null) {
+      if (readerOpensOnTitle(ayah, state.readerOpenIntent)) {
         const el = scrollRef.current
         if (el) el.scrollTop = 0
         setFocusedAyah(1)
@@ -1133,7 +1141,7 @@ export function ReaderScreen({ stackLayer }: { stackLayer: StackLayer }) {
   // The reading line is the keyboard cursor. Reuse rail jumps so keys get the
   // same progressive mount, focus glide, playback parking, and follow policy.
   useEffect(() => {
-    if (!isTop || !content || state.rootViewer) return
+    if (!readerOwnsKeyboard(isTop, state.rootViewer != null) || !content) return
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.defaultPrevented || event.altKey || event.ctrlKey || event.metaKey) return
       if (isKeyboardControl(event.target)) return
@@ -1269,6 +1277,25 @@ export function ReaderScreen({ stackLayer }: { stackLayer: StackLayer }) {
     Number.isFinite(bookmarkNoteTipCenterY)
 
   const repeatMode = state.player.repeatMode
+  const nowPlaying = state.player.nowPlaying
+  // Cover keeps this same bar and opens the return pill and Close into it.
+  const coverChrome =
+    playbackPinned && stackLayer === COVER_LAYER && nowPlaying != null
+  const coverSurah = coverChrome
+    ? state.surahs.find((s) => s.id === nowPlaying.surahId) ?? null
+    : null
+  const coverChapter = coverSurah?.nameTransliteration ?? ''
+  const coverAyahLabel = coverChrome
+    ? `${nowPlaying.surahId}:${Math.max(1, nowPlaying.ayah)}`
+    : ''
+  const openCoverVerse = () => {
+    if (!nowPlaying) return
+    if (content.surah.id === nowPlaying.surahId) {
+      appStore.revealLayer(READER_LAYER)
+      return
+    }
+    appStore.openSurah(nowPlaying.surahId, Math.max(1, nowPlaying.ayah))
+  }
   const keepWordInView =
     state.followEnabled && recitingActive && activeExceedsViewport
   // Focus leads by 500 ms to begin the glide before an ayah ends. Karaoke ink
@@ -1424,12 +1451,14 @@ export function ReaderScreen({ stackLayer }: { stackLayer: StackLayer }) {
         <div className="reader-main">
           {mushaf ? (
             <MushafReader
+              ownsKeyboard={readerOwnsKeyboard(isTop, state.rootViewer != null)}
               activeSurahId={content.surah.id}
               activeAyah={state.activeAyah}
               openAyah={state.openAyah}
               openRevision={state.readerOpenRevision}
               english={state.settings.readingMode === 'english_only'}
               pageNumberScript={pageNumberScript}
+              glyphWiden={state.settings.mushafGlyphWiden / 100}
               onPlayWord={(surahId, ayah, position) => {
                 if (state.gathering) {
                   appStore.onVerseTap(surahId, ayah)
@@ -1469,11 +1498,15 @@ export function ReaderScreen({ stackLayer }: { stackLayer: StackLayer }) {
                   ayahCount={content.surah.ayahCount}
                   themeMode={state.settings.themeMode}
                 />
-                <h2>{content.surah.nameTransliteration}</h2>
-                <p className="ar-title">{content.surah.nameArabic}</p>
+                <p className="ar-title" lang="ar">سُورَةُ {content.surah.nameArabic}</p>
+                <h2>
+                  {content.surah.nameTransliteration} · {content.surah.nameTranslation}
+                </h2>
                 <p className="sub">
-                  {content.surah.nameTranslation} · {content.surah.ayahCount} ayahs ·{' '}
-                  {content.surah.revelationPlace}
+                  Chapter {content.surah.id} ·{' '}
+                  {content.surah.revelationPlace.charAt(0).toUpperCase() +
+                    content.surah.revelationPlace.slice(1)}{' '}
+                  · {content.surah.ayahCount} ayahs
                 </p>
               </header>
               {showBasmalah ? (
@@ -1679,16 +1712,50 @@ export function ReaderScreen({ stackLayer }: { stackLayer: StackLayer }) {
               </button>
             </div>
           ) : (
-          <div className="player-bar">
-            <button
-              type="button"
-              className="reciter-btn"
-              data-receded={receded}
-              aria-label={`Reciter ${reciterName}. Open settings`}
-              onClick={() => appStore.setSheet('settings')}
-            >
-              {reciterName}
-            </button>
+          <PlaybackPin active={playbackPinned}>
+          <div className={`player-bar${coverChrome ? ' cover-chrome' : ''}`}>
+            <div className="player-reciter-row">
+              <button
+                type="button"
+                className="reciter-btn"
+                data-receded={receded}
+                aria-label={`Reciter ${reciterName}. Open settings`}
+                onClick={() => appStore.setSheet('settings')}
+              >
+                {reciterName}
+              </button>
+              {coverChrome ? (
+                <button
+                  type="button"
+                  className="player-close"
+                  aria-label="Close playback"
+                  onClick={() => appStore.dismissFloatingPlayback()}
+                >
+                  <IconClose />
+                </button>
+              ) : null}
+            </div>
+            {coverChrome ? (
+              <button
+                type="button"
+                className="player-return"
+                aria-label={`Return to ${coverChapter} · ${coverAyahLabel}`}
+                onClick={openCoverVerse}
+              >
+                <span className="player-return-chapter">{coverChapter}</span>
+                <span className="player-return-sep" aria-hidden="true">
+                  {' '}
+                  ·{' '}
+                </span>
+                <span className="player-return-ayah">{coverAyahLabel}</span>
+                <svg className="player-return-arrow" viewBox="0 0 24 24" aria-hidden="true">
+                  <path
+                    fill="currentColor"
+                    d="M5 13h11.17l-4.88 4.88a1 1 0 0 0 1.41 1.42l6.59-6.59a1 1 0 0 0 0-1.41l-6.58-6.6a1 1 0 0 0-1.41 1.41L16.17 11H5a1 1 0 0 0 0 2z"
+                  />
+                </svg>
+              </button>
+            ) : null}
             <div className="player-transport">
               <button
                 type="button"
@@ -1757,6 +1824,7 @@ export function ReaderScreen({ stackLayer }: { stackLayer: StackLayer }) {
               </button>
             </div>
           </div>
+          </PlaybackPin>
           )}
         </div>
       </div>

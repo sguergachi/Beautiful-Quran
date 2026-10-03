@@ -25,6 +25,7 @@ import androidx.compose.ui.unit.dp
 import com.beautifulquran.ui.entrance.CoverFrameGeometry
 import com.beautifulquran.ui.theme.ornament.BorderSpec
 import com.beautifulquran.ui.theme.ornament.FieldSpec
+import com.beautifulquran.ui.theme.ornament.fittedFieldCellWidth
 import com.beautifulquran.ui.theme.ornament.RosetteSpec
 import com.beautifulquran.ui.theme.ornament.StrokeWeight
 import kotlin.math.max
@@ -493,7 +494,7 @@ fun GeneratedBorderBand(
 }
 
 /**
- * A generated Hankin field tiled at whisper ink — the cover's leather
+ * A generated geometric field with filigree tiled at whisper ink — the cover's leather
  * tooling when [build] is given (washes in over the first half of the
  * build, re-drawing only, geometry built once per size), or a chapter's
  * static surah-header backdrop when [build] is null (fully inked from the
@@ -508,15 +509,17 @@ fun Modifier.generatedFieldWeave(
     // Tile one cell past every edge so the weave reads continuous at the
     // bounds, then clip so neighbouring sections never paint over each other
     // (the Lab's stacked previews depend on this).
-    val pxPerUnit = (field.cellWidthDp.toFloat().dp.toPx()) / field.cellW.toFloat()
+    val fittedWidth = fittedFieldCellWidth(size.width.toDp().value.toDouble(), field.cellWidthDp)
+    val pxPerUnit = fittedWidth.toFloat().dp.toPx() / field.cellW.toFloat()
     val cellW = (field.cellW * pxPerUnit).toFloat()
     val cellH = (field.cellH * pxPerUnit).toFloat()
-    val weave = Path()
+    val weaves = listOf(Path(), Path())
     var y = -cellH
     while (y < size.height + cellH) {
         var x = -cellW
         while (x < size.width + cellW) {
             for (s in field.strokes) {
+                val weave = weaves[if (s.weight == StrokeWeight.Rule) 0 else 1]
                 s.points.forEachIndexed { i, p ->
                     val px = x + (p.x * pxPerUnit).toFloat()
                     val py = y + (p.y * pxPerUnit).toFloat()
@@ -528,14 +531,16 @@ fun Modifier.generatedFieldWeave(
         }
         y += cellH
     }
-    val stroke = Stroke(width = 1.dp.toPx())
+    val styles = listOf(Stroke(width = 0.6.dp.toPx()), Stroke(width = 0.33.dp.toPx()))
     onDrawBehind {
         val a = if (build == null) 1f else (build.value / 0.55f).coerceIn(0f, 1f)
         if (a <= 0f) return@onDrawBehind
-        translate(-0.6f, -0.6f) {
-            drawPath(weave, embossLight.copy(alpha = embossLight.alpha * a), style = stroke)
+        for (i in weaves.indices) {
+            translate(-0.6f, -0.6f) {
+                drawPath(weaves[i], embossLight.copy(alpha = embossLight.alpha * a), style = styles[i])
+            }
+            drawPath(weaves[i], ink.copy(alpha = ink.alpha * a), style = styles[i])
         }
-        drawPath(weave, ink.copy(alpha = ink.alpha * a), style = stroke)
     }
 }
 

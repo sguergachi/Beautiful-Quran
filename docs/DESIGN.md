@@ -34,6 +34,59 @@ strip of either fore-edge whose mark shows only under a pointer; pages run
 right to left, so the left edge is the way on. Chapters is then laid over the
 left leaf on demand, as Settings is, and touching the open page puts it away.
 
+**The golden page (web, desktop spread).** A page is 1 : φ, as tall as the
+window allows or as wide, whichever binds first. Its margins run inner : head
+: fore-edge : foot = 1 : φ : φ : φ² in one unit, and for any unit that leaves
+a text block that is itself 1 : φ — the page's own shape set inside it,
+nearer the spine and the head, as a bound book sits. The unit is the page's
+width over φ⁶ (the block is about 85% of the page), opened further only when
+the foot would be too shallow to hold the transport, which stands in that
+margin with no paper of its own. A Mushaf leaf is that block; recto and verso
+mirror. Chapters, Settings and the scrolling reader keep their own column on
+the same golden page.
+
+**What the page solves for itself (web Mushaf).** In order: the type grows or
+shrinks until the leaf's widest line, at minimum word spaces, fills the
+block — never so far that fifteen lines would stand closer than 1.75 times
+the type. Each loose line then has its *letters* widened a few percent
+(6 by default; Settings → Developer offers 0, 4, 6, 8) toward a word space of
+0.42 em before any space is added between words: the stand-in for the print's
+elongated letters, and it adds nothing to the text. A line that fills less
+than 62% of the measure is centred at an ordinary word space instead of being
+justified, as the print centres a chapter's last line. On a phone, leading
+is capped at 2.15 times the type and the block sits centred in the sheet.
+
+**Justified, with even word spaces (web Mushaf).** The browser sets the
+leaf in Hafs, not in the page's own face, and Hafs sets narrower than the
+print — the print fills its line by elongating letters, which the app must
+not imitate by adding characters to the revelation. Justifying such lines
+out to the full page opened rivers three word-spaces wide. So the text block
+is drawn in to its widest line set with minimum word spaces (0.3 em), and
+every other line justifies to that; the type only ever shrinks, when a line
+would overrun the page. A verse mark is an item of the line like a word, so
+the space falls evenly on both its sides. Facing leaves keep one type size
+but each its own block width: two blocks of one width matter less than a
+sparse page not being all gaps. Running head and folio hang on the block.
+What remains uneven is line against line — a line the print stretched with
+long letters still sets looser than a full one — and only the page faces
+would close that.
+
+**The book behaves as paper does.** A page turn is a leaf in the air: it
+lifts off one page, swings over its bound edge and lies down on the other,
+carrying the old spread's inner page on its face and the new one's on its
+back. It furls: paper is not a board, so the free
+edge is lifted first and the sheet bows behind it, then is laid flat. What it uncovers is already the new page. A single leaf (phones) is
+bound at its right edge and lifts to edge-on. The cover opens the same way:
+the closed book slides onto the right-hand page block and the board swings
+right over the spine to lie open on the left, its inside becoming the left
+half of the spread — nothing fades. The leaf and the board carry their own
+shading as they stand up out of the light; nothing casts a shadow on the page
+beneath. In the Paper theme the whole sheet carries a faint grain — tooth and
+a few fibres at a few percent — because that theme alone is literally paper.
+A turn finishes before the latest requested destination lifts; reversing
+queues the return rather than snapping the leaf flat. The type is fitted
+before lift and keeps its size as it lands. Reduced motion skips every turn.
+
 This bends two rules, narrowly. *One sheet at a time* becomes two, because
 they are the two a reader moves between constantly and neither is read in
 sequence with the other — the rule against inventing desktop columns for
@@ -362,8 +415,11 @@ Hard rules:
   inset): the reader's **return-to-ayah roundel** and the stack-level
   **Back-to capsule** (opaque stadium with the same gilt rim and drawn
   qalam arrow). The cover sheet's **floating playback control** reuses that
-  same motion and inset over the chapter list while a verse is loaded. One
-  vertical rhythm when the paper stack turns between cover and reader.
+  same motion over the chapter list while a verse is loaded. The stack stays
+  vertical — reciter, quiet green return pill, then transport — and the paper
+  runs to the bottom edge of the screen. A 4 dp foot sits under the transport,
+  then the phone's navigation inset, so the controls stay above the home
+  gesture bar. It does not take the ornaments' 10 dp foot. One vertical rhythm when the paper stack turns between cover and reader.
 - **Edges dissolve.** Scrolling content fades out at the top and bottom of
   every sheet — ink fading off the page, not content clipped by a boundary.
 - **Taps have no ripple.** Touch feedback is the content's own motion
@@ -957,7 +1013,7 @@ Traditional, geometric, and nearly invisible — ornament whispers, never
 speaks. All of it is drawn procedurally (`ui/theme/Ornament.kt`), never an
 image, so it is crisp at any density and nearly free to render.
 
-- **Khatam geometry.** The vocabulary throughout is the classical star:
+- **Khatam geometry.** The medallions, seals and borders use the classical star:
   {n/k} star polygons (8/10/12/16-fold; gcd(n, k) > 1 yields the interlaced
   polygons — the khatam is {8/2}) and Hankin's polygons-in-contact method
   (rays from tile-edge midpoints at a sampled contact angle) — the same
@@ -972,13 +1028,11 @@ image, so it is crisp at any density and nearly free to render.
   seed per launch. The **surah header is seeded per chapter** instead — one
   `chapterOrnamentSeed(chapterNumber, ayahCount)` grows both the rosette
   *and* the field tooled behind it (`ChapterOrnament`/`generateChapterOrnament`),
-  so the header's whole ornament is this chapter's own, not a rosette
-  sitting on a pattern every chapter shares. The seed folds the chapter's
-  verse count (the dominant term, so a chapter's length reads as its
-  ornament's fingerprint — chapters of similar length grow kin-looking
-  rosettes) with its number (so all 114 chapters render distinctly even
-  though only 77 of them have a verse count no other chapter shares); the
-  same chapter always regrows the same ornament. Border friezes (cover
+  so the header's whole ornament is this chapter's own. Chapter number
+  assigns a distinct frame/interior/corner recipe and a distinct medallion
+  structure across all 114 chapters; verse count varies their safe
+  proportions. The same chapter always regrows the same ornament. Border
+  friezes (cover
   only) come from five band grammars of tooled bindings: a zigzag lattice
   with pearls in its diamonds, a two-strand cable with pearl eyes, a Hankin
   strip, a nested lozenge chain, and a khatam chain of small eight-fold
@@ -995,6 +1049,21 @@ image, so it is crisp at any density and nearly free to render.
   ({10/4} → two {5/2} pentacles stacked), 6-fold seals, and 6-fold field
   tilings are all excluded by construction and guarded by tests on both
   platforms.
+- **Field harmony.** Seeds choose among composed star-and-cross, octagonal
+  garden and lozenge-rosette families, each with its own geometric frame and
+  foliate layout. Paired contours use stronger rules; interior filigree uses
+  finer hairlines. Chapters have 114 distinct structural combinations drawn
+  from four frames, seven interiors and five corner treatments, with fixed
+  fitting rules for narrow compartments. Details cannot cross or graze the
+  frame. Reflection and
+  quarter-turn balance, deliberate empty space and weight-aware repeat
+  spacing keep richness composed rather than noisy. Small repeats (roughly
+  eight across a phone) and delicate strokes make the field a texture. Each
+  field fits an even number of complete repeats across its own width without
+  stretching the motifs.
+  The Lab can search each
+  family. Construction, research and testable rules:
+  [ORNAMENT_FIELDS.md](ORNAMENT_FIELDS.md).
 - **Gilding.** Gold is never a flat color. Gilded elements (the surah
   rosette, ayah number marks, the home mark) carry a three-stop leaf
   gradient (deep bronze → bright gilt → deep bronze). The gradient's
@@ -1014,7 +1083,7 @@ image, so it is crisp at any density and nearly free to render.
   upper-left beneath its face — relief under a top-left light, subtle enough
   to be felt more than seen.
 - **The weave.** Behind each surah opening, that chapter's own generated
-  Hankin field at ~4 % ink, embossed, dissolving into the page at its
+  arabesque field at ~4 % ink, embossed, dissolving into the page at its
   edges — grown from the same seed as the rosette sitting on it (see "The
   generating machine" above), not a fixed pattern every chapter shares.
 - **Basmalah.** Every surah except Al-Fatihah (where it *is* ayah 1) and
@@ -1089,7 +1158,7 @@ three moments:
    so border and corner ornaments are one continuous piece of geometry. The frame, border, and seals
    are the binding's tooling and render complete on the very first
    frame — no wash, no fade. Tooled *inside* that frame, this launch's
-   generated Hankin field (whisper ink) and the generated medallion
+   generated arabesque field (whisper ink) and the generated medallion
    (`GeneratedMedallion`) with the title **القرآن الكريم** beneath it
    in the Hafs hand, leafed in gold, ink themselves onto the leather in
    real time as the ceremony arrives — the illumination, drawn before
@@ -1169,9 +1238,22 @@ weight.
 - On the chapter list, when a verse is loaded (playing or paused mid-session),
   the floating playback control slides up with the same fade + vertical
   motion as the reader's return-to-ayah / Back-to ornaments
-  (`FloatingPaperControl`), using the shared **10 dp** bottom inset. The
-  current chapter and ayah form a compact quiet-green stadium with a right
-  arrow: tapping it returns to that verse in the reader. The
+  (`FloatingPaperControl`). The stack stays vertical: the reciter, then the
+  current chapter · ayah as a compact quiet-green stadium, then the transport,
+  with the same 4 dp foot as `PlayerBar`, then the phone's navigation inset
+  inside the paper. The controls stay above the home gesture bar. It does not
+  take the ornaments' 10 dp foot. While the cover and the reader
+  turn, the chapter bar stays fixed above both sheets. In the scrolling
+  reader that bar never carries a back arrow. The scroll sheet's own back
+  control is in the top bar only while that sheet is parked; a swipe removes
+  it until the reader settles again. The reader's bottom clearance follows
+  the pinned bar's measured body, including the return pill while that pill
+  is open. On the phone web stack that same bar is drawn above the sheets;
+  a desktop spread keeps the transport on the reader leaf. Landing on the chapter list expands the return
+  pill and the close into that same bar; the transport does not leave and
+  come back. The chapter and ayah carry
+  a right arrow:
+  tapping it returns to that verse in the reader. The
   enter/exit is also tied to the paper-stack page turn: returning to chapter
   selection plays the entrance; leaving for the reader plays the exit. A
   quiet Close in the corner dismisses the session (stops playback) so the

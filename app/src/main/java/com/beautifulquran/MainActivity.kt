@@ -86,8 +86,13 @@ import com.beautifulquran.ui.home.FloatingPlaybackListClearance
 import com.beautifulquran.ui.home.HomeScreen
 import com.beautifulquran.ui.home.HomeViewModel
 import com.beautifulquran.ui.reader.BackToOriginPill
+import com.beautifulquran.ui.reader.PinnedChapterPlayback
+import com.beautifulquran.ui.reader.PinnedPlaybackHost
+import com.beautifulquran.ui.reader.hideScrollBackOnFingerUp
+import com.beautifulquran.ui.reader.showScrollReaderBackArrow
 import com.beautifulquran.ui.reader.ReaderPlaybackSnapshot
 import com.beautifulquran.ui.reader.ReaderScreen
+import com.beautifulquran.ui.reader.showPinnedChapterBar
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalFontFamilyResolver
 import androidx.compose.ui.platform.LocalLayoutDirection
@@ -590,6 +595,55 @@ private fun PaperStackApp(
         tarjiLabVisible ||
         labRendered || rootRendered || chooserRendered || ornamentsLabRendered || tarjiLabRendered ||
         readerInkOverlayVisible || shareUi.sendOpen || shareSendRendered
+    val pinnedPlayback = remember { PinnedPlaybackHost() }
+    var pinnedPlaybackHeight by remember { mutableStateOf(0.dp) }
+    // Booleans, not the live page: the bar must not recompose on every
+    // frame of the turn. It only changes when it appears, or when the
+    // cover pill and close take their place. The scrolling bar has no
+    // back arrow.
+    val playbackPinned by remember {
+        derivedStateOf {
+            val blocked = labVisible || rootVisible || chooserVisible || ornamentsLabVisible ||
+                tarjiLabVisible || labRendered || rootRendered || chooserRendered ||
+                ornamentsLabRendered || tarjiLabRendered || readerInkOverlayVisible ||
+                shareUi.sendOpen || shareSendRendered
+            showPinnedChapterBar(
+                stackPage = stackPosition.value,
+                readerOpen = selectedSurahId != 0,
+                mushaf = settings.readingLayout == ReadingLayout.MUSHAF,
+                gathering = shareUi.gathering,
+                overlayBlocking = blocked,
+                coverSession = pinnedPlayback.coverSession,
+            )
+        }
+    }
+    // Off from the first pixel of a swipe until the scroll sheet is parked
+    // again. The derived boolean flips only at that boundary, so the top bar
+    // slot can drop the control without recomposing the chapter every frame.
+    var scrollDragHidesBack by remember { mutableStateOf(false) }
+    var scrollBackEpoch by remember { mutableIntStateOf(0) }
+    val scrollReaderOpen = rememberUpdatedState(
+        selectedSurahId != 0 && settings.readingLayout != ReadingLayout.MUSHAF,
+    )
+    val scrollMushaf = rememberUpdatedState(settings.readingLayout == ReadingLayout.MUSHAF)
+    val scrollBackVisible by remember {
+        derivedStateOf {
+            showScrollReaderBackArrow(
+                page = stackPosition.value,
+                mushaf = scrollMushaf.value,
+                dragHidesBack = scrollDragHidesBack,
+            )
+        }
+    }
+    val showScrollBackArrow = remember { { scrollBackVisible } }
+    val playbackOnCover by remember {
+        derivedStateOf { stackPosition.value < 0.55f }
+    }
+    // Flips only at the threshold, so the scroll back arrow can leave without
+    // the reader recomposing on every frame of the turn.
+    val scrollSheetSettled by remember {
+        derivedStateOf { abs(stackPosition.value - AYAH_LAYER) <= 0.01f }
+    }
     val readerSheetOpen = selectedSurahId != 0 && settledLayer == AYAH_LAYER
     LaunchedEffect(readerSheetOpen) {
         if (!readerSheetOpen) shareViewModel.onLeaveReaderSheet()
@@ -631,15 +685,37 @@ private fun PaperStackApp(
         ) {
             downloadsRefreshKey++
         }
+        // Hide before the sheet moves. A newer drag or settle bumps the epoch
+        // so a cancelled animation cannot bring the arrow back, and cannot
+        // leave it hidden after a later settle has parked on the reader.
+        val backEpoch = ++scrollBackEpoch
+        val openingReader = boundedLayer == AYAH_LAYER
+        if (
+            scrollReaderOpen.value &&
+            (!openingReader || abs(stackPosition.value - AYAH_LAYER) > 0.01f)
+        ) {
+            scrollDragHidesBack = true
+        }
         settledLayer = boundedLayer
-        stackPosition.animateTo(
-            targetValue = boundedLayer.toFloat(),
-            animationSpec = tween(
-                durationMillis = (STACK_PAGE_DURATION_MS * distance).roundToInt()
-                    .coerceAtLeast(STACK_PAGE_DURATION_MS / 2),
-                easing = StackMotionEasing,
-            ),
-        )
+        try {
+            stackPosition.animateTo(
+                targetValue = boundedLayer.toFloat(),
+                animationSpec = tween(
+                    durationMillis = (STACK_PAGE_DURATION_MS * distance).roundToInt()
+                        .coerceAtLeast(STACK_PAGE_DURATION_MS / 2),
+                    easing = StackMotionEasing,
+                ),
+            )
+        } finally {
+            if (
+                backEpoch == scrollBackEpoch &&
+                openingReader &&
+                scrollReaderOpen.value &&
+                abs(stackPosition.value - AYAH_LAYER) <= 0.01f
+            ) {
+                scrollDragHidesBack = false
+            }
+        }
     }
 
     fun animateTo(layer: Int) {
@@ -935,6 +1011,12 @@ private fun PaperStackApp(
                 gesturesBlocked = { stackGesturesBlocked.value },
                 onDragStart = {
                     dragStartPosition = stackPosition.value
+                    scrollBackEpoch++
+                    if (scrollReaderOpen.value &&
+                        abs(stackPosition.value - AYAH_LAYER) <= 0.05f
+                    ) {
+                        scrollDragHidesBack = true
+                    }
                 },
                 onDrag = { deltaPages ->
                     // A single gesture may advance at most one layer, so a hard swipe
@@ -956,6 +1038,17 @@ private fun PaperStackApp(
                 },
                 onSettle = { target ->
                     dragSnapJob?.cancel()
+                    // Finger-up never brings the arrow back. A release that
+                    // is already parked leaves the flag alone; settleTo
+                    // clears it only after the sheet has parked.
+                    if (hideScrollBackOnFingerUp(
+                            scrollReaderOpen = scrollReaderOpen.value,
+                            target = target,
+                            page = stackPosition.value,
+                        )
+                    ) {
+                        scrollDragHidesBack = true
+                    }
                     animateTo(target)
                 },
             ),
@@ -1082,9 +1175,9 @@ private fun PaperStackApp(
                         startWordPosition = selectedStartWord.takeIf { it >= 0 },
                         startWordPositions = selectedStartWords,
                         startSearchText = selectedSearchText,
-                        readerSheetSettled = {
-                            abs(stackPosition.value - AYAH_LAYER) <= 0.01f
-                        },
+                        readerSheetSettled = { scrollSheetSettled },
+                        showScrollBackArrow = showScrollBackArrow,
+                        playbackBarBodyHeight = { pinnedPlaybackHeight },
                         viewModel = readerViewModel,
                         onBack = { animateTo(COVER_LAYER) },
                         onOpenSettings = { animateTo(SETTINGS_LAYER) },
@@ -1125,6 +1218,8 @@ private fun PaperStackApp(
                         onShareImage = {
                             if (activity != null) shareViewModel.shareAsImage(activity)
                         },
+                        playbackHost = pinnedPlayback,
+                        playbackPinned = playbackPinned,
                     )
                 }
 
@@ -1242,6 +1337,20 @@ private fun PaperStackApp(
                 bookmarkCount = bookmarkCount,
                 bookmarkStyle = homeBookmarkStyle,
                 onOpenBookmarks = { animateTo(BOOKMARKS_LAYER) },
+                playbackPinned = playbackPinned,
+                pinnedPlaybackHeight = { pinnedPlaybackHeight },
+                playbackHost = pinnedPlayback,
+            )
+        }
+
+        if (playbackPinned) {
+            PinnedChapterPlayback(
+                host = pinnedPlayback,
+                onCover = playbackOnCover,
+                onHeight = { pinnedPlaybackHeight = it },
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .zIndex(2.3f),
             )
         }
 

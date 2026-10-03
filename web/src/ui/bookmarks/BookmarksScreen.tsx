@@ -173,7 +173,7 @@ export function BookmarksScreen({ stackLayer }: { stackLayer: StackLayer }) {
                           key={key}
                           verse={{ surah, ayah }}
                           confirming={pendingRemoval === key}
-                          onOpen={() => void appStore.openSurah(surah.id, ayah.number)}
+                          onOpen={() => void appStore.openReading(surah.id, ayah.number)}
                           onRequestRemove={() => setPendingRemoval(key)}
                           onKeep={() => setPendingRemoval(null)}
                           onRemove={() => {

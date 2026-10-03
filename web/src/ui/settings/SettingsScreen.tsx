@@ -3,8 +3,10 @@ import { assetUrl } from '../../assetUrl'
 import { appStore, useAppSelector } from '../../store/appStore'
 import { runtimeMushafCache, type RuntimeCacheStatus } from '../../data/runtimeMushaf'
 import {
+  MUSHAF_GLYPH_WIDENS,
   type HomeBookmarkStyle,
   type BrushCircleStyle,
+  type MushafGlyphWiden,
 } from '../../data/settings'
 import { customizeSummary } from '../../data/customizePolicy'
 import type { Reciter } from '../../data/models'
@@ -34,7 +36,6 @@ import {
   type BrushKnobKey,
 } from '../kit/brushMark'
 import { AlphaTag } from '../kit/AlphaTag'
-import { FontSizeControl } from '../kit/FontSizeControl'
 import { DisclosureChevron } from '../kit/DisclosureChevron'
 import { InkCheckMark } from '../kit/InkCheckMark'
 import { PaperChoiceList } from '../kit/PaperChoiceList'
@@ -388,8 +389,8 @@ export function SettingsScreen({
           />
         </section>
 
+        {/* No heading: on Android, Customize sits under the reciters and above Download manager. */}
         <section className="settings-section">
-          <h2>Reading</h2>
           <button
             type="button"
             className="settings-nav"
@@ -401,14 +402,6 @@ export function SettingsScreen({
             </span>
             <DisclosureChevron expanded={false} />
           </button>
-        </section>
-
-        <section className="settings-section">
-          <h2>Text size</h2>
-          <FontSizeControl
-            scale={s.fontScale}
-            onChange={(fontScale) => appStore.updateSettings({ fontScale })}
-          />
         </section>
 
         {showReadingToggles ? (
@@ -534,7 +527,7 @@ export function SettingsScreen({
               Ornaments Lab
             </button>
             <p className="settings-caption">
-              Explore, design, and save seeds for the procedural star-and-cross ornament
+              Explore, design, and save seeds for the procedural ornament
               generator.
             </p>
 
@@ -567,6 +560,25 @@ export function SettingsScreen({
                 options={HOME_BOOKMARK_OPTIONS}
                 onChange={(homeBookmarkStyle) =>
                   appStore.updateSettings({ homeBookmarkStyle })
+                }
+              />
+            </div>
+
+            <div className="settings-dev-block">
+              <p className="settings-body-label">Mushaf letter widening</p>
+              <p className="settings-caption">
+                How far a loose line&rsquo;s letters may be widened before space is
+                added between its words.
+              </p>
+              <PaperChoiceList
+                aria-label="Mushaf letter widening"
+                value={String(s.mushafGlyphWiden)}
+                options={MUSHAF_GLYPH_WIDENS.map((percent) => ({
+                  value: String(percent),
+                  label: percent === 0 ? 'Off' : `Up to ${percent}%`,
+                }))}
+                onChange={(value) =>
+                  appStore.updateSettings({ mushafGlyphWiden: Number(value) as MushafGlyphWiden })
                 }
               />
             </div>
@@ -866,9 +878,9 @@ function BackChevron() {
       aria-hidden="true"
     >
       <path
-        d="M15.5 5.5 L9 12 l6.5 6.5"
+        d="M19 12 H5.5 M11 6 L5 12 l6 6"
         stroke="currentColor"
-        strokeWidth="1.75"
+        strokeWidth="1.9"
         strokeLinecap="round"
         strokeLinejoin="round"
       />

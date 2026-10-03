@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { readerKeyboardAction } from '../keyboardNavigation'
+import { readerKeyboardAction, readerOwnsKeyboard } from '../keyboardNavigation'
 
 describe('readerKeyboardAction', () => {
   it('steps and pages through ayahs with chapter bounds', () => {
@@ -16,5 +16,14 @@ describe('readerKeyboardAction', () => {
     expect(readerKeyboardAction('/', 3, 10)).toEqual({ type: 'search' })
     expect(readerKeyboardAction('b', 3, 10)).toEqual({ type: 'bookmark' })
     expect(readerKeyboardAction('Tab', 3, 10)).toBeNull()
+  })
+})
+
+describe('reader keyboard ownership', () => {
+  it('yields when hidden or when the root viewer owns the surface', () => {
+    expect(readerOwnsKeyboard(false, false)).toBe(false)
+    expect(readerOwnsKeyboard(true, true)).toBe(false)
+    expect(readerOwnsKeyboard(false, true)).toBe(false)
+    expect(readerOwnsKeyboard(true, false)).toBe(true)
   })
 })

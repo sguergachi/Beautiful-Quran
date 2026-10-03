@@ -1,5 +1,8 @@
 import {
+  Fragment,
+  useCallback,
   useEffect,
+  useMemo,
   useLayoutEffect,
   useRef,
   useState,
@@ -10,32 +13,29 @@ import { createPortal } from 'react-dom'
 import { QuranRepository } from '../../data/repository'
 import { runtimeMushafCache } from '../../data/runtimeMushaf'
 import {
-  buildMushafPage,
+  MUSHAF_LINES_PER_PAGE,
   MUSHAF_OPENING_PAGES,
   MUSHAF_PAGE_COUNT,
   mushafFacingPages,
   mushafTokenEndsAyah,
-  pageAyahs,
-  type MushafWordPlacement,
 } from '../../domain/mushafPage'
 import { formatAyahNumberMark, pageFolioLayout } from '../../util/digits'
 import type { PageNumberScript } from '../../data/settings'
 import { appStore } from '../../store/appStore'
-import { useBookSpread, useVersoLeafSlot } from '../paper/bookSpread'
+import { useBookSpread, useTurningLeafSlot, useVersoLeafSlot } from '../paper/bookSpread'
 import { COVER_LAYER, READER_LAYER } from '../paper/stack'
+import { TurningLeaf } from './TurningLeaf'
+import { finishPageTurn, requestPageTurn, type PageTurnQueue } from './pageTurnQueue'
+import { MUSHAF_MIN_LEADING, mushafFit, mushafLeafFit, naturalLineWidth, solveLine } from './mushafFit'
+import { mushafLeafModel } from './mushafLeafModel'
+import { PAGE_TURN_SCHEDULE, playFlip, warmPageTurnSounds } from '../paper/pageTurnSounds'
+
+/** Keep in step with `mushaf-leaf-turn` in styles.css. */
+const PAGE_TURN_MS = 760
 
 /** Playback highlight when it exists; otherwise the ayah the sheet was opened on. */
 function followedAyah(activeAyah: number | null, openAyah: number): number {
   return activeAyah != null && activeAyah > 0 ? activeAyah : Math.max(1, openAyah)
-}
-
-function ayahLastPosition(surahId: number, ayahNumber: number): number {
-  const verse = QuranRepository.surahContent(surahId).ayahs.find((item) => item.number === ayahNumber)
-  let last = 0
-  for (const word of verse?.words ?? []) {
-    if (word.position > last) last = word.position
-  }
-  return last
 }
 
 /**
@@ -44,15 +44,19 @@ function ayahLastPosition(surahId: number, ayahNumber: number): number {
  * faces are not shipped to the browser.
  */
 export function MushafReader({
+  ownsKeyboard,
   activeSurahId,
   activeAyah,
   openAyah,
   openRevision,
   english,
   pageNumberScript,
+  glyphWiden,
   onPlayWord,
 }: {
+  glyphWiden: number
   pageNumberScript: PageNumberScript
+  ownsKeyboard: boolean
   activeSurahId: number
   activeAyah: number | null
   openAyah: number
@@ -72,16 +76,29 @@ export function MushafReader({
   const [ready, setReady] = useState(() => runtimeMushafCache?.layoutReady() ?? false)
   const spread = useBookSpread()
   const versoSlot = useVersoLeafSlot()
+  const turnSlot = useTurningLeafSlot()
   // Two facing leaves on a desktop spread; one leaf everywhere else.
   const facing = spread && versoSlot != null
   const rectoRef = useRef<HTMLDivElement>(null)
   const [versoBox, setVersoBox] = useState<CSSProperties>({})
-  // Facing leaves share one hand: the tighter page sets the size for both.
-  const [fits, setFits] = useState<{ recto: number; verso: number }>({ recto: 1, verso: 1 })
-  const reportFit = (side: 'recto' | 'verso' | undefined, fit: number) => {
-    const key = side ?? 'recto'
-    setFits((current) => (Math.abs(current[key] - fit) < 0.002 ? current : { ...current, [key]: fit }))
-  }
+  const [fitRevision, setFitRevision] = useState(0)
+  const [fontsReady, setFontsReady] = useState(() => !document.fonts || document.fonts.status === 'loaded')
+  const [fits, setFits] = useState<Record<number, number>>({})
+  const reportFit = useCallback((page: number, fit: number) => {
+    setFits((current) => current[page] != null && Math.abs(current[page] - fit) < 0.002
+      ? current : { ...current, [page]: fit })
+  }, [])
+  const [reduced, setReduced] = useState(() => window.matchMedia('(prefers-reduced-motion: reduce)').matches)
+  useEffect(() => {
+    const query = window.matchMedia('(prefers-reduced-motion: reduce)')
+    const changed = () => setReduced(query.matches)
+    query.addEventListener('change', changed)
+    return () => query.removeEventListener('change', changed)
+  }, [])
+
+  useEffect(() => {
+    warmPageTurnSounds()
+  }, [])
 
   useEffect(() => {
     if (!runtimeMushafCache) return
@@ -107,10 +124,19 @@ export function MushafReader({
   useLayoutEffect(() => {
     const leaf = rectoRef.current
     const sheet = leaf?.closest('.sheet')
-    if (!facing || !leaf || !sheet) return
+    if (!leaf || !sheet) return
+    let size = ''
+    let disposed = false
     const measure = () => {
+      if (disposed) return
       const box = leaf.getBoundingClientRect()
       const page = sheet.getBoundingClientRect()
+      const nextSize = `${box.width}:${box.height}`
+      if (size !== nextSize) {
+        size = nextSize
+        setFits({})
+        setFitRevision((revision) => revision + 1)
+      }
       setVersoBox({
         top: box.top - page.top,
         left: box.left - page.left,
@@ -122,18 +148,28 @@ export function MushafReader({
     const observer = new ResizeObserver(measure)
     observer.observe(leaf)
     observer.observe(sheet)
-    return () => observer.disconnect()
-  }, [facing, ready])
+    void document.fonts?.ready.then(() => {
+      if (!disposed) {
+        setFontsReady(true)
+        setFits({})
+        setFitRevision((revision) => revision + 1)
+      }
+    })
+    return () => { disposed = true; observer.disconnect() }
+  }, [facing, ready, english])
 
   // Pages run right to left: the left arrow goes on, the right arrow back.
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
-      if (event.defaultPrevented || event.altKey || event.ctrlKey || event.metaKey) return
+      if (!ownsKeyboard || event.defaultPrevented || event.altKey || event.ctrlKey || event.metaKey) return
       if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') return
+      // Only fields that use the arrows themselves keep them. A focused
+      // button does not — on a phone the chapter row that opened this
+      // reader still holds focus behind it, and would swallow every turn.
       const target = event.target
       if (
         target instanceof HTMLElement &&
-        (target.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(target.tagName))
+        (target.isContentEditable || target.closest('input, textarea, select, [role="slider"]'))
       ) {
         return
       }
@@ -144,6 +180,95 @@ export function MushafReader({
     return () => window.removeEventListener('keydown', onKey)
   })
 
+  const place = facing ? mushafFacingPages(page).right : page
+  const [queue, setQueue] = useState<PageTurnQueue>({ settled: place, flight: null, queued: null })
+  const footing = `${ready}:${facing}:${english}:${pageNumberScript}`
+  const [settledFooting, setSettledFooting] = useState(footing)
+  const [motion, setMotion] = useState<{
+    flight: NonNullable<PageTurnQueue['flight']>
+    fit: number
+    fromFit: number
+    initiatedAt: number
+    props: typeof leafProps
+    box: CSSProperties
+  } | null>(null)
+  const leafProps = { fitRevision, activeSurahId, activeAyah, english, pageNumberScript, glyphWiden, onPlayWord, onTurn: turn, onFit: reportFit }
+  const reset = settledFooting !== footing || reduced || !ownsKeyboard
+  useLayoutEffect(() => {
+    if (reset) {
+      setSettledFooting(footing)
+      setQueue({ settled: place, flight: null, queued: null })
+      setMotion(null)
+    } else {
+      setQueue((current) => requestPageTurn(current, place))
+    }
+  }, [place, footing, reset])
+
+  const destination = queue.flight?.to ?? queue.settled
+  const pair = facing ? mushafFacingPages(destination) : { right: destination, left: destination }
+  const preparedFit = mushafFit(destination, facing, fits)
+  const fitReady = fontsReady && preparedFit != null
+  useLayoutEffect(() => {
+    if (reset || !queue.flight || motion || !fitReady) return
+    setMotion({
+      flight: queue.flight,
+      fit: preparedFit!,
+      fromFit: mushafFit(queue.flight.from, facing, fits) ?? 1,
+      initiatedAt: performance.now(),
+      props: leafProps,
+      box: versoBox,
+    })
+    // The page, ink and geometry in the air stay frozen until it lands.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [queue.flight, fitReady, motion, reset])
+  const landedFlight = useRef<PageTurnQueue['flight']>(null)
+  const cancelSoundRef = useRef<(() => void) | null>(null)
+  useEffect(() => () => cancelSoundRef.current?.(), [])
+  const endTurn = useCallback(() => {
+    landedFlight.current = motion?.flight ?? null
+    setQueue((current) => finishPageTurn(current, motion?.flight ?? null))
+    setMotion((current) => current === motion ? null : current)
+  }, [motion])
+  useEffect(() => {
+    if (!motion || reset) return
+    cancelSoundRef.current?.()
+    const cancelSound = playFlip(PAGE_TURN_SCHEDULE, motion.initiatedAt)
+    cancelSoundRef.current = cancelSound
+    const timer = window.setTimeout(endTurn, PAGE_TURN_MS + 250)
+    return () => {
+      window.clearTimeout(timer)
+      // A normal landing lets the drop ring out; cancellation cuts its stems.
+      if (landedFlight.current !== motion.flight) cancelSound()
+    }
+  }, [motion, reset, endTurn])
+
+  const turning = motion != null && !reset
+  const settled = reset ? place : queue.settled
+  const landing = turning ? motion.flight.to : settled
+  const forward = landing > settled
+  const fit = turning ? motion.fit : (mushafFit(settled, facing, fits) ?? 1)
+  const air = useMemo(() => {
+    if (!motion) return null
+    const from = mushafFacingPages(motion.flight.from)
+    const to = mushafFacingPages(motion.flight.to)
+    const on = motion.flight.to > motion.flight.from
+    const props = { ...motion.props, onFit: noFit }
+    return {
+      face: <MushafLeaf page={facing ? on ? from.left : from.right : Math.min(motion.flight.from, motion.flight.to)}
+        fit={facing || on ? motion.fromFit : motion.fit}
+        side={facing ? on ? 'verso' : 'recto' : undefined} style={facing ? motion.box : undefined} {...props} />,
+      back: facing ? <MushafLeaf page={on ? to.right : to.left} fit={motion.fit} side={on ? 'recto' : 'verso'} style={motion.box} {...props} /> : undefined,
+    }
+  }, [motion, facing])
+  // Two incoming leaves are measured once, before any strips mount.
+  const probes = !reset && queue.flight && !motion ? (
+    <div className="mushaf-fit-probes" inert aria-hidden="true">
+      {[...new Set([pair.right, pair.left])].filter((page) => fits[page] == null).map((page) => (
+        <MushafLeaf key={page} page={page} fit={1} {...leafProps} />
+      ))}
+    </div>
+  ) : null
+
   if (!ready || !runtimeMushafCache) {
     return (
       <div className="mushaf-wait">
@@ -153,28 +278,45 @@ export function MushafReader({
     )
   }
 
-  const leafProps = {
-    activeSurahId,
-    activeAyah,
-    english,
-    pageNumberScript,
-    onPlayWord,
-    onTurn: turn,
-    onFit: reportFit,
+  if (!facing) {
+    // One leaf, bound at its right edge. Going on, the old leaf lifts away
+    // to the right over the new one; going back, the earlier leaf comes
+    // down from the right onto the one being left.
+    const under = turning ? Math.max(settled, landing) : settled
+    return (
+      <>
+        <MushafLeaf page={under} fit={turning && !forward ? motion.fromFit : fit} leafRef={rectoRef} {...leafProps} onFit={turning ? noFit : reportFit} />
+        {probes}
+        {turning ? (
+          <TurningLeaf
+            key={`${settled}:${landing}`}
+            single
+            hinge="right"
+            dir={forward ? 'on' : 'back'}
+            face={air?.face}
+            onEnd={endTurn}
+          />
+        ) : null}
+      </>
+    )
   }
-  if (!facing) return <MushafLeaf page={page} fit={fits.recto} {...leafProps} />
 
-  const fit = Math.min(fits.recto, fits.verso)
-
-  const pair = mushafFacingPages(page)
+  const now = mushafFacingPages(landing)
+  const was = mushafFacingPages(settled)
+  // The leaf between the two spreads carries the old spread's inner page on
+  // its face and the new spread's on its back. What it uncovers is already
+  // the new page; what it has yet to cover is still the old one.
+  const rectoPage = turning && forward ? was.right : now.right
+  const versoPage = turning && !forward ? was.left : now.left
   return (
     <>
-      <MushafLeaf page={pair.right} side="recto" fit={fit} leafRef={rectoRef} {...leafProps} />
+      <MushafLeaf page={rectoPage} side="recto" fit={turning && forward ? motion.fromFit : fit} leafRef={rectoRef} {...leafProps} onFit={turning ? noFit : reportFit} />
+      {probes}
       <button
         type="button"
         className="mushaf-turn mushaf-turn--back"
         aria-label="Previous pages"
-        disabled={pair.right <= 1}
+        disabled={now.right <= 1}
         onClick={() => turn(-1)}
       >
         <span aria-hidden="true">›</span>
@@ -182,12 +324,12 @@ export function MushafReader({
       {versoSlot
         ? createPortal(
             <>
-              <MushafLeaf page={pair.left} side="verso" fit={fit} style={versoBox} {...leafProps} />
+              <MushafLeaf page={versoPage} side="verso" fit={turning && !forward ? motion.fromFit : fit} style={versoBox} {...leafProps} onFit={turning ? noFit : reportFit} />
               <button
                 type="button"
                 className="mushaf-turn mushaf-turn--forward"
                 aria-label="Next pages"
-                disabled={pair.left >= MUSHAF_PAGE_COUNT}
+                disabled={now.left >= MUSHAF_PAGE_COUNT}
                 onClick={() => turn(1)}
               >
                 <span aria-hidden="true">‹</span>
@@ -196,13 +338,29 @@ export function MushafReader({
             versoSlot,
           )
         : null}
+      {turning && turnSlot
+        ? createPortal(
+            <TurningLeaf
+              key={`${settled}:${landing}`}
+              hinge={forward ? 'right' : 'left'}
+              dir={forward ? 'on' : 'back'}
+              face={air?.face}
+              back={air?.back}
+              onEnd={endTurn}
+            />,
+            turnSlot,
+          )
+        : null}
     </>
   )
 }
 
+function noFit() {}
+
 /** One printed page: running head, fifteen lines (or its translation), folio. */
 function MushafLeaf({
   page,
+  fitRevision,
   side,
   style,
   leafRef,
@@ -210,15 +368,17 @@ function MushafLeaf({
   activeAyah,
   english,
   pageNumberScript,
+  glyphWiden,
   onPlayWord,
   onTurn,
   fit,
   onFit,
 }: {
   page: number
-  /** Scale on the line's type so the page's longest line stays inside the measure. */
+  fitRevision: number
+  /** The hand both facing leaves are set in: the tighter page's fit. */
   fit: number
-  onFit: (side: 'recto' | 'verso' | undefined, fit: number) => void
+  onFit: (page: number, fit: number) => void
   /** Which page of a desktop spread this leaf is; absent on a single leaf. */
   side?: 'recto' | 'verso'
   style?: CSSProperties
@@ -227,60 +387,106 @@ function MushafLeaf({
   activeAyah: number | null
   english: boolean
   pageNumberScript: PageNumberScript
+  /** Most a loose line's letters may be widened, as a fraction (0.06 = 6%). */
+  glyphWiden: number
   onPlayWord: (surahId: number, ayah: number, position: number) => void
   onTurn: (delta: number) => void
 }) {
   const drag = useRef<{ x: number; y: number } | null>(null)
   const linesRef = useRef<HTMLDivElement>(null)
+  // The two opening leaves carry a few short lines, set in the middle of the
+  // well; every other leaf hangs its fifteen lines from the head.
+  const opening = page <= MUSHAF_OPENING_PAGES
 
-  // Hafs stands in for the page's own face, so a printed line can set wider
-  // than the measure. Measure at full size and report the scale that fits.
+  // Hafs stands in for the page's own face, so a printed line sets wider or
+  // narrower than the page. Measure every line at full size, word spaces at
+  // their minimum, and report how the widest compares with the page.
   useLayoutEffect(() => {
     const lines = linesRef.current
+    // A leaf in the air is a picture at the size already found. Measuring
+    // every copy of it forces a layout per strip as the turn starts.
+    if (onFit === noFit) return
+    if (english) { onFit(page, 1); return }
     if (!lines) return
+    let disposed = false
     const measure = () => {
-      const applied = lines.style.getPropertyValue('--mushaf-fit')
-      lines.style.setProperty('--mushaf-fit', '1')
-      let ratio = 1
-      for (const line of lines.children) {
-        if (line.scrollWidth > line.clientWidth) {
-          ratio = Math.min(ratio, line.clientWidth / line.scrollWidth)
-        }
-      }
-      lines.style.setProperty('--mushaf-fit', applied)
-      // A hair under, so rounding never leaves the last word a pixel over.
-      onFit(side, ratio < 1 ? ratio * 0.99 : 1)
+      if (disposed) return
+      const leaf = lines.closest('.mushaf')
+      if (!(leaf instanceof HTMLElement)) return
+      // Widths are read at the scale already applied and divided back out:
+      // every length in a line is in em, so they scale with the type exactly.
+      // Rewriting the scale to measure at full size re-laid the block and
+      // let the measurement chase its own result.
+      const scale = Number(lines.style.getPropertyValue('--mushaf-fit')) || 1
+      const first = lines.firstElementChild
+      const gap = first ? parseFloat(getComputedStyle(first).columnGap) || 0 : 0
+      const widest = opening
+        ? 0
+        : Math.max(0, ...Array.from(lines.children, (line) => naturalLineWidth(
+            Array.from(line.children, (item) => item.getBoundingClientRect().width),
+            gap,
+          ))) / scale
+      const box = getComputedStyle(leaf)
+      const available = leaf.clientWidth - parseFloat(box.paddingLeft) - parseFloat(box.paddingRight)
+      // Room to grow is bounded by the line pitch the page can give: the
+      // block's height, less its running head and folio, over fifteen lines.
+      const block = lines.parentElement
+      const furniture = block
+        ? Array.from(block.children).reduce((sum, child) => (child === lines ? sum : sum + child.clientHeight), 0)
+        : 0
+      const pitch = block ? (block.clientHeight - furniture) / MUSHAF_LINES_PER_PAGE : 0
+      const baseEm = parseFloat(getComputedStyle(lines).fontSize) / scale
+      const maxGrow = pitch > 0 && baseEm > 0 ? pitch / (MUSHAF_MIN_LEADING * baseEm) : 1
+      onFit(page, mushafLeafFit(available, widest, maxGrow))
     }
     measure()
     const observer = new ResizeObserver(measure)
     observer.observe(lines)
+    // The block is sized by its own lines, so it does not change when the
+    // page around it does. Watch the page as well.
+    const leaf = lines.closest('.mushaf')
+    if (leaf) observer.observe(leaf)
     void document.fonts?.ready.then(measure)
-    return () => observer.disconnect()
+    return () => { disposed = true; observer.disconnect() }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [page, english, side])
+  }, [page, english, side, fitRevision, onFit === noFit])
+
+  // Once the hand and the measure are settled, set each line: widen the
+  // letters of a loose line toward the target word space, and centre a line
+  // too short to justify. Written straight to the lines — it is derived
+  // from layout, and cloned as it stands into a turning leaf.
+  useLayoutEffect(() => {
+    const lines = linesRef.current
+    if (!lines || english) return
+    const em = parseFloat(getComputedStyle(lines).fontSize)
+    const measure = lines.clientWidth
+    for (const line of Array.from(lines.children) as HTMLElement[]) {
+      line.removeAttribute('data-widen')
+      line.removeAttribute('data-short')
+      line.style.removeProperty('--line-widen')
+    }
+    if (opening) return
+    // Read every line before writing any, so the page is laid out once.
+    const settings = (Array.from(lines.children) as HTMLElement[]).map((line) => {
+      const ink = Array.from(line.children).reduce((sum, item) => sum + item.getBoundingClientRect().width, 0)
+      return solveLine(ink, line.children.length - 1, measure, em, glyphWiden)
+    })
+    settings.forEach((setting, index) => {
+      const line = lines.children[index] as HTMLElement
+      if (setting.short) line.setAttribute('data-short', '')
+      else if (setting.widen > 1.001) {
+        line.setAttribute('data-widen', '')
+        line.style.setProperty('--line-widen', setting.widen.toFixed(4))
+      }
+    })
+  }, [page, english, side, fit, fitRevision, glyphWiden, opening])
 
   if (!runtimeMushafCache) return null
   const rows = runtimeMushafCache.pageWords(page) ?? []
-  const placements: MushafWordPlacement[] = rows.map((row) => {
-    const content = QuranRepository.surahContent(row.surah_id)
-    const ayah = content.ayahs.find((item) => item.number === row.ayah_number)
-    const word = ayah?.words.find((item) => item.position === row.position)
-    return {
-      surahId: row.surah_id,
-      ayah: row.ayah_number,
-      position: row.position,
-      line: row.qcf_line,
-      arabic: word?.arabic ?? '',
-    }
-  })
-  const leaf = buildMushafPage(page, placements)
-  const head = placements[0]
-  const headSurah = head ? QuranRepository.surahContent(head.surahId).surah : null
-  const englishAyahs = pageAyahs(placements)
+  const { leaf, headSurah, englishAyahs, lastPositions } = mushafLeafModel(page, rows, QuranRepository.surahContent)
   const folio = pageFolioLayout(page, english ? 'english' : pageNumberScript)
   // The two opening leaves carry a few short lines, set in the middle of the
   // well; every other leaf hangs its fifteen lines from the head.
-  const opening = page <= MUSHAF_OPENING_PAGES
   const lines = opening ? leaf.lines.filter((line) => line.tokens.length > 0) : leaf.lines
 
   return (
@@ -312,6 +518,8 @@ function MushafLeaf({
         drag.current = null
       }}
     >
+      {/* One measure: head, text and folio share the text block's width. */}
+      <div className="mushaf-block">
       <div className="mushaf-head">
         <span>{headSurah?.nameTransliteration ?? ''}</span>
         <span>{headSurah?.nameArabic ?? ''}</span>
@@ -319,8 +527,6 @@ function MushafLeaf({
       {english ? (
         <div className="mushaf-english">
           {englishAyahs.map((item) => {
-            const content = QuranRepository.surahContent(item.surahId)
-            const ayah = content.ayahs.find((candidate) => candidate.number === item.ayah)
             const active = item.surahId === activeSurahId && item.ayah === activeAyah
             return (
               <p
@@ -328,13 +534,24 @@ function MushafLeaf({
                 className="mushaf-english-ayah"
                 data-active={active || undefined}
               >
-                <button
-                  type="button"
+                {/* A span, not a button: a button is one box and cannot break
+                    across lines, which pushed the verse number onto a line
+                    of its own beneath every verse. */}
+                <span
+                  role="button"
+                  tabIndex={0}
                   className="mushaf-english-text"
                   onClick={() => onPlayWord(item.surahId, item.ayah, 1)}
+                  onKeyDown={(event) => {
+                    if (event.key !== 'Enter' && event.key !== ' ') return
+                    event.preventDefault()
+                    onPlayWord(item.surahId, item.ayah, 1)
+                  }}
                 >
-                  {ayah?.translation}
-                </button>
+                  {item.translation}
+                </span>
+                {/* No-break space: the number never starts a line alone. */}
+                {'\u00A0'}
                 <button
                   type="button"
                   className="mushaf-mark"
@@ -364,10 +581,12 @@ function MushafLeaf({
                   token.surahId === activeSurahId && token.ayah === activeAyah
                 const endsAyah = mushafTokenEndsAyah(
                   token.position,
-                  ayahLastPosition(token.surahId, token.ayah),
+                  lastPositions.get(`${token.surahId}:${token.ayah}`) ?? 0,
                 )
+                // Word and mark are separate items of the line, so the
+                // justified space falls evenly on both sides of a mark.
                 return (
-                  <span key={`${token.surahId}:${token.ayah}:${token.position}`}>
+                  <Fragment key={`${token.surahId}:${token.ayah}:${token.position}`}>
                     <button
                       type="button"
                       className="mushaf-word"
@@ -389,7 +608,7 @@ function MushafLeaf({
                         {formatAyahNumberMark(token.ayah, true)}
                       </button>
                     ) : null}
-                  </span>
+                  </Fragment>
                 )
               })}
             </p>
@@ -406,6 +625,7 @@ function MushafLeaf({
         ) : (
           <span lang={pageNumberScript === 'arabic' ? 'ar' : undefined}>{folio.leading}</span>
         )}
+      </div>
       </div>
     </div>
   )

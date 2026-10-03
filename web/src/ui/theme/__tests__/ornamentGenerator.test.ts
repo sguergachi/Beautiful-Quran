@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
+  FIELD_PATTERNS,
+  fittedFieldCellWidth,
   chapterOrnamentSeed,
   generateChapterOrnament,
   generateCoverOrnament,
@@ -9,6 +11,13 @@ import {
 } from '../ornamentGenerator'
 
 describe('ornamentGenerator', () => {
+  it('fits complete even repeats on narrow, phone and wide fields', () => {
+    for (const [width, count] of [[20, 2], [320, 6], [390, 8], [450, 10], [768, 16]]) {
+      expect(fittedFieldCellWidth(width!, 50)).toBeCloseTo(width! / count!, 9)
+    }
+    expect(fittedFieldCellWidth(0, 50)).toBe(50)
+  })
+
   it('prng matches the reference mulberry32 stream (Android parity)', () => {
     // Same known-answer values asserted by OrnamentGeneratorTest.kt — the
     // cross-platform contract that keeps both covers drawing from one stream.
@@ -227,21 +236,184 @@ describe('ornamentGenerator', () => {
     expect(violations).toEqual([])
   })
 
-  it('a seed sample uses every fold, field style, and border', () => {
+  it('a seed sample uses every fold, varied filigree geometry, and border', () => {
     const folds = new Set<number>()
-    const fieldStyles = new Set<number>()
+    const fieldStyles = new Set<string>()
+    const coverPatterns = new Set<string>(), chapterPatterns = new Set<string>(), frames = new Set<number>()
     const borders = new Set<string>()
     for (let seed = 0; seed < 200; seed++) {
       const o = generateCoverOrnament(seed)
       folds.add(o.medallion.fold)
-      // Star style (khatam = 2 strokes vs octagram = 1) and centre-mark
-      // presence both shift the field's stroke count.
-      fieldStyles.add(o.field.strokes.length)
+      fieldStyles.add(JSON.stringify(o.field.strokes[1]!.points))
+      coverPatterns.add(o.field.pattern)
+      chapterPatterns.add(generateChapterOrnament(seed).field.pattern)
+      frames.add(o.field.strokes[0]!.points.length)
       borders.add(`${o.border.strokes.length}/${o.border.dots.length}`)
     }
     expect([...folds].sort((a, b) => a - b)).toEqual([8, 10, 12, 16])
     expect(fieldStyles.size).toBeGreaterThanOrEqual(3)
+    expect([...coverPatterns].sort()).toEqual([...FIELD_PATTERNS].sort())
+    expect([...chapterPatterns].sort()).toEqual([...FIELD_PATTERNS, 'chamfered lattice'].sort())
+    expect([...frames].sort((a, b) => a - b)).toEqual([4, 8, 16])
     expect(borders.size).toBeGreaterThanOrEqual(3)
+  })
+
+  it('geometric fields keep filigree contained, balanced and free of crossings', () => {
+    const crosses = (a: OrnamentPoint, b: OrnamentPoint, c: OrnamentPoint, d: OrnamentPoint) => {
+      if (Math.max(a.x, b.x) < Math.min(c.x, d.x) || Math.max(c.x, d.x) < Math.min(a.x, b.x) ||
+        Math.max(a.y, b.y) < Math.min(c.y, d.y) || Math.max(c.y, d.y) < Math.min(a.y, b.y)) return false
+      const dx = b.x - a.x, dy = b.y - a.y, ex = d.x - c.x, ey = d.y - c.y
+      const den = dx * ey - dy * ex
+      if (Math.abs(den) < 1e-10) return false
+      const t = ((c.x - a.x) * ey - (c.y - a.y) * ex) / den
+      const u = ((c.x - a.x) * dy - (c.y - a.y) * dx) / den
+      return t > 1e-6 && t < 1 - 1e-6 && u > 1e-6 && u < 1 - 1e-6
+    }
+    for (let seed = 0; seed < 400; seed++) {
+      const f = generateCoverOrnament(seed * 104729 + 13).field
+      const family = FIELD_PATTERNS.findIndex(pattern => pattern === f.pattern)
+      const density = [11.5, 11, 9][family]!
+      const detailEnd = [27, 19, 15][family]!
+      expect(f.strokes.length).toBe(family === 0 ? 31 : 23)
+      expect(f.strokes.filter((s) => s.weight === 'rule').length).toBe(2)
+      const pts = f.strokes.flatMap((s) => s.points)
+      const edges = f.strokes.flatMap((s) => {
+        const p = s.closed ? [...s.points, s.points[0]!] : s.points
+        return p.slice(1).map((q, i) => [p[i]!, q] as const)
+      })
+      const inkLength = f.strokes.reduce((sum, s) => {
+        const p = s.closed ? [...s.points, s.points[0]!] : s.points
+        const length = p.slice(1).reduce((n, q, i) => n + Math.hypot(q.x - p[i]!.x, q.y - p[i]!.y), 0)
+        return sum + length * (s.weight === 'rule' ? 1 : 0.55)
+      }, 0)
+      expect(inkLength / f.cellWidthDp).toBeGreaterThanOrEqual(density / 56 - 1e-9)
+      expect(inkLength / f.cellWidthDp).toBeLessThanOrEqual(density / 48 + 1e-9)
+      expect(pts.every((p) => p.x >= -1e-9 && p.x <= 1 + 1e-9 && p.y >= -1e-9 && p.y <= 1 + 1e-9)).toBe(true)
+      const key = (x: number, y: number) => `${Math.round(x * 1e9)}/${Math.round(y * 1e9)}`
+      const coordinates = new Set(pts.map((p) => key(p.x, p.y)))
+      expect(pts.every((p) => coordinates.has(key(1 - p.y, p.x)))).toBe(true)
+      expect(pts.every((p) => coordinates.has(key(1 - p.x, p.y)))).toBe(true)
+      const frame = f.strokes[1]!.points
+      const heart = f.strokes[2]!.points
+      const distanceToEdge = (p: OrnamentPoint, a: OrnamentPoint, b: OrnamentPoint) => {
+        const dx = b.x - a.x, dy = b.y - a.y
+        const t = Math.max(0, Math.min(1, ((p.x - a.x) * dx + (p.y - a.y) * dy) / (dx * dx + dy * dy)))
+        return Math.hypot(p.x - a.x - t * dx, p.y - a.y - t * dy)
+      }
+      let maxRadius = 0, clearance = Infinity
+      f.strokes.slice(3, detailEnd).forEach((s, i) => {
+        if (family === 1 || i % 3 !== 2) expect(heart.some((p) => Math.hypot(p.x - s.points[0]!.x, p.y - s.points[0]!.y) < 1e-9)).toBe(true)
+        for (const p of s.points) {
+          maxRadius = Math.max(maxRadius, Math.hypot(p.x - 0.5, p.y - 0.5))
+          clearance = Math.min(clearance, ...frame.map((a, j) => distanceToEdge(p, a, frame[(j + 1) % frame.length]!)))
+        }
+      })
+      expect(maxRadius).toBeLessThan(0.411)
+      expect(clearance).toBeGreaterThan(0.02)
+      let crossing = false
+      for (let i = 0; i < edges.length; i++) for (let j = i + 1; j < edges.length; j++) {
+        if (crosses(edges[i]![0], edges[i]![1], edges[j]![0], edges[j]![1])) crossing = true
+      }
+      expect(crossing, `seed ${seed}: accidental crossing`).toBe(false)
+    }
+  })
+
+  it('field known answers match Android including the reported bare-grid seed', () => {
+    const star = [16, 16, 16, ...Array.from({ length: 8 }, () => [31, 31, 21]).flat(), 21, 21, 21, 21]
+    const garden = [8, 8, 16, ...Array(20).fill(21)]
+    const lozenge = [4, 4, 16, ...Array.from({ length: 4 }, () => [31, 31, 21]).flat(),
+      ...Array.from({ length: 4 }, () => [5, 21]).flat()]
+    for (const [seed, pattern, signature, width] of [
+      [1, 'lozenge rosettes', lozenge, 47.73055739685947],
+      [8, 'star-and-cross', star, 51.29965216862327],
+      [21, 'octagonal garden', garden, 50.4501521020009],
+      [132614421, 'lozenge rosettes', lozenge, 50.61806257444628],
+    ] as const) {
+      const f = generateCoverOrnament(seed).field
+      expect(f.pattern).toBe(pattern)
+      expect(f.strokes.map((s) => s.points.length)).toEqual(signature)
+      expect(f.cellWidthDp).toBeCloseTo(width, 9)
+    }
+  })
+
+  it('all chapters have distinct coarse field and medallion shapes with safe geometry', () => {
+    const crosses = (a: OrnamentPoint, b: OrnamentPoint, c: OrnamentPoint, d: OrnamentPoint) => {
+      const dx = b.x - a.x, dy = b.y - a.y, ex = d.x - c.x, ey = d.y - c.y, den = dx * ey - dy * ex
+      if (Math.abs(den) < 1e-10) return false
+      const t = ((c.x - a.x) * ey - (c.y - a.y) * ex) / den
+      const u = ((c.x - a.x) * dy - (c.y - a.y) * dx) / den
+      return t > 1e-6 && t < 1 - 1e-6 && u > 1e-6 && u < 1 - 1e-6
+    }
+    const shape = (strokes: ReturnType<typeof generateChapterOrnament>['field']['strokes']) =>
+      JSON.stringify(strokes.map(s => [s.closed, s.points.map(p => [Math.round(p.x * 16), Math.round(p.y * 16)])]))
+    const verseCounts = [7, 286, 200, 176, 120, 165, 206, 75, 129, 109, 123, 111, 43, 52, 99, 128, 111, 110, 98, 135, 112, 78, 118, 64, 77, 227, 93, 88, 69, 60, 34, 30, 73, 54, 45, 83, 182, 88, 75, 85, 54, 53, 89, 59, 37, 35, 38, 29, 18, 45, 60, 49, 62, 55, 78, 96, 29, 22, 24, 13, 14, 11, 11, 18, 12, 12, 30, 52, 52, 44, 28, 28, 20, 56, 40, 31, 50, 40, 46, 42, 29, 19, 36, 25, 22, 17, 19, 26, 30, 20, 15, 21, 11, 8, 8, 19, 5, 8, 8, 11, 11, 8, 3, 9, 5, 4, 7, 3, 6, 3, 5, 4, 5, 6]
+    for (const sample of [3, 11, 286, 0]) {
+      const fields = new Set<string>(), rosettes = new Set<string>()
+      for (let chapter = 1; chapter <= 114; chapter++) {
+        const o = generateChapterOrnament(chapterOrnamentSeed(chapter, sample || verseCounts[chapter - 1]!)), f = o.field
+        fields.add(shape(f.strokes)); rosettes.add(shape(o.rosette.strokes))
+        for (const s of [...f.strokes, ...o.rosette.strokes]) {
+          expect(s.closed && s.points.length === 3).toBe(false)
+          if (s.closed && s.points.length === 5) {
+            const a = Math.atan2(s.points[0]!.y - .5, s.points[0]!.x - .5)
+            const b = Math.atan2(s.points[1]!.y - .5, s.points[1]!.x - .5)
+            const delta = ((b - a) % (2 * Math.PI) + 2 * Math.PI) % (2 * Math.PI)
+            expect(Math.abs(delta - 4 * Math.PI / 5)).toBeGreaterThan(.05)
+            expect(Math.abs(delta - 6 * Math.PI / 5)).toBeGreaterThan(.05)
+          }
+        }
+        const points = f.strokes.flatMap(s => s.points)
+        expect(points.every(p => p.x >= -1e-9 && p.x <= 1 + 1e-9 && p.y >= -1e-9 && p.y <= 1 + 1e-9)).toBe(true)
+        const key = (x: number, y: number) => `${Math.round(x * 1e9)}/${Math.round(y * 1e9)}`
+        const balanced = new Set(points.map(p => key(p.x, p.y)))
+        expect(points.every(p => balanced.has(key(1 - p.y, p.x)) && balanced.has(key(1 - p.x, p.y)))).toBe(true)
+        const frames = f.strokes.slice(0, 2).map(s => s.points)
+        let clearance = Infinity
+        for (const s of f.strokes.slice(2)) {
+          for (const p of s.points) for (const frame of frames) for (let j = 0; j < frame.length; j++) {
+            const a = frame[j]!, b = frame[(j + 1) % frame.length]!, dx = b.x - a.x, dy = b.y - a.y
+            const t = Math.max(0, Math.min(1, ((p.x - a.x) * dx + (p.y - a.y) * dy) / (dx * dx + dy * dy)))
+            clearance = Math.min(clearance, Math.hypot(p.x - a.x - t * dx, p.y - a.y - t * dy))
+          }
+        }
+        expect(clearance, `chapter ${chapter}: frame clearance`).toBeGreaterThan(.02)
+        const edges = f.strokes.flatMap(s => (s.closed ? [...s.points, s.points[0]!] : s.points).slice(1).map((p, i) => [s.points[i]!, p] as const))
+        let inkLength = 0, crossing = false
+        for (let i = 0; i < edges.length; i++) {
+          const [a, b] = edges[i]!
+          for (let j = i + 1; j < edges.length; j++) {
+            const [c, d] = edges[j]!
+            if (Math.max(a.x, b.x) < Math.min(c.x, d.x) || Math.max(c.x, d.x) < Math.min(a.x, b.x) ||
+                Math.max(a.y, b.y) < Math.min(c.y, d.y) || Math.max(c.y, d.y) < Math.min(a.y, b.y)) continue
+            if (crosses(a, b, c, d)) crossing = true
+          }
+        }
+        for (const s of f.strokes) {
+          const p = s.closed ? [...s.points, s.points[0]!] : s.points
+          inkLength += p.slice(1).reduce((sum, q, i) => sum + Math.hypot(q.x - p[i]!.x, q.y - p[i]!.y), 0) * (s.weight === 'rule' ? 1 : .55)
+        }
+        expect(crossing, `chapter ${chapter}: accidental crossing`).toBe(false)
+        expect(inkLength / f.cellWidthDp).toBeLessThanOrEqual(11.5 / 48 + 1e-9)
+        expect(f.cellWidthDp).toBeLessThanOrEqual(58)
+      }
+      expect(fields.size).toBe(114)
+      expect(rosettes.size).toBe(114)
+    }
+  })
+
+  it('chapter known answers match Android across the new layouts', () => {
+    const chapters = [[1, 7], [4, 176], [7, 206], [112, 4], [114, 6]]
+    const widths = [49.27532235905528, 52.470998737961054, 54.28618001751602, 55.88055209070444, 53.45646559819579]
+    const frames = [16, 12, 4, 12, 8], strokes = [31, 19, 20, 20, 27]
+    const folds = [8, 8, 10, 16, 8], rosettes = [8, 13, 7, 22, 6]
+    chapters.forEach(([chapter, ayahs], i) => {
+      const o = generateChapterOrnament(chapterOrnamentSeed(chapter!, ayahs!))
+      expect(o.field.cellWidthDp).toBeCloseTo(widths[i]!, 9)
+      expect(o.field.strokes[0]!.points.length).toBe(frames[i])
+      expect(o.field.strokes.length).toBe(strokes[i])
+      expect(o.rosette.fold).toBe(folds[i])
+      expect(o.rosette.strokes.length).toBe(rosettes[i])
+    })
   })
 
   it('chapter seed recovers the chapter number regardless of ayah count', () => {

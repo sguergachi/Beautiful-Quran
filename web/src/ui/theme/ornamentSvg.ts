@@ -10,9 +10,9 @@
  */
 import type { BorderSpec, FieldSpec, OrnamentStroke } from './ornamentGenerator'
 
-export function pathD(stroke: OrnamentStroke, scale: number): string {
+export function pathD(stroke: OrnamentStroke, scale: number, precision = 2): string {
   const parts = stroke.points.map(
-    (p, i) => `${i === 0 ? 'M' : 'L'} ${(p.x * scale).toFixed(2)} ${(p.y * scale).toFixed(2)}`,
+    (p, i) => `${i === 0 ? 'M' : 'L'} ${(p.x * scale).toFixed(precision)} ${(p.y * scale).toFixed(precision)}`,
   )
   if (stroke.closed) parts.push('Z')
   return parts.join(' ')
@@ -37,6 +37,7 @@ export function fieldWeaveBackground(
   field: FieldSpec,
   ink = 'rgba(217,180,74,0.07)',
   embossLight = 'rgba(255,255,255,0.05)',
+  cellWidth = field.cellWidthDp,
 ): {
   backgroundImage: string
   backgroundSize: string
@@ -44,8 +45,8 @@ export function fieldWeaveBackground(
   const w = field.cellW
   const h = field.cellH
   // One CSS pixel expressed in cell units, at the suggested render size.
-  const px = field.cellW / field.cellWidthDp
-  const body = field.strokes.map((s) => `<path d='${pathD(s, 1)}'/>`).join('')
+  const px = field.cellW / cellWidth
+  const body = field.strokes.map((s) => `<path d='${pathD(s, 1, 4)}' stroke-width='${(px * (s.weight === 'rule' ? 0.6 : 0.33)).toFixed(4)}'/>`).join('')
   const uses: string[] = []
   for (const [stroke, off] of [
     [embossLight, -0.6 * px],
@@ -64,10 +65,10 @@ export function fieldWeaveBackground(
     `<defs><g id='c' fill='none' stroke-width='${px.toFixed(4)}' stroke-linejoin='round' stroke-linecap='round'>${body}</g></defs>` +
     uses.join('') +
     `</svg>`
-  const cssH = (field.cellWidthDp * h) / w
+  const cssH = (cellWidth * h) / w
   return {
     backgroundImage: svgDataUri(svg),
-    backgroundSize: `${field.cellWidthDp.toFixed(2)}px ${cssH.toFixed(2)}px`,
+    backgroundSize: `${cellWidth.toFixed(4)}px ${cssH.toFixed(2)}px`,
   }
 }
 

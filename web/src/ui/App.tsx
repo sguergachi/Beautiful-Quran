@@ -1,15 +1,22 @@
 import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react'
 import { appStore, shallowEqual, useAppSelector } from '../store/appStore'
-import { hasReaderOpen } from './paper/stack'
+import {
+  BOOKMARKS_LAYER,
+  COVER_LAYER,
+  READER_LAYER,
+  hasReaderOpen,
+  showPinnedChapterBar,
+  type StackLayer,
+} from './paper/stack'
 import { HomeScreen } from './home/HomeScreen'
 import { BookmarksScreen } from './bookmarks/BookmarksScreen'
 import { ReaderScreen } from './reader/ReaderScreen'
 import { SettingsScreen } from './settings/SettingsScreen'
 import { EntranceCover } from './entrance/EntranceCover'
-import { BOOKMARKS_LAYER, COVER_LAYER } from './paper/stack'
 import { OrnamentsLab } from './lab/OrnamentsLab'
-import { spreadLayers, useBookSpread } from './paper/bookSpread'
+import { bookmarkSwipeDestination, spreadLayers, useBookSpread } from './paper/bookSpread'
 import { BookSpread } from './paper/BookSpread'
+import { unlockPageTurnSounds } from './paper/pageTurnSounds'
 
 /** True while the URL hash routes to the Ornaments Lab (`#lab`). */
 function useLabRoute(): boolean {
@@ -60,6 +67,7 @@ export function App() {
       stackLayer: s.stackLayer,
       sheet: s.sheet,
       content: s.content,
+      readerOpenRevision: s.readerOpenRevision,
       bookmarks: s.bookmarks,
       settings: s.settings,
     }),
@@ -68,9 +76,18 @@ export function App() {
   // Once per page load — mirrors Android rememberSaveable entranceDone.
   const [entranceDone, setEntranceDone] = useState(false)
   const isLab = useLabRoute()
-  const swipeStart = useRef<{ x: number; y: number; pointerId: number } | null>(null)
+  const swipeStart = useRef<{ x: number; y: number; pointerId: number; layer: StackLayer } | null>(null)
   const stack = state.stackLayer
   const hasReader = hasReaderOpen(state.content, state.sheet)
+  const playbackPinned = useAppSelector((s) =>
+    showPinnedChapterBar({
+      hasReader: hasReaderOpen(s.content, s.sheet),
+      mushaf: s.settings.readingLayout === 'mushaf',
+      gathering: s.gathering,
+      stackLayer: s.stackLayer,
+      coverSession: s.player.nowPlaying != null,
+    }),
+  )
   const spread = useBookSpread()
   // Facing leaves: Mushaf layout in a spread, once a chapter is open.
   const leaves =
@@ -112,7 +129,16 @@ export function App() {
     if (focused instanceof HTMLElement && focused.classList.contains('surah-row')) {
       focused.blur()
     }
-  }, [spread, openSurahId])
+  }, [spread, openSurahId, state.readerOpenRevision])
+
+  useEffect(() => {
+    window.addEventListener('pointerdown', unlockPageTurnSounds, true)
+    window.addEventListener('keydown', unlockPageTurnSounds, true)
+    return () => {
+      window.removeEventListener('pointerdown', unlockPageTurnSounds, true)
+      window.removeEventListener('keydown', unlockPageTurnSounds, true)
+    }
+  }, [])
 
   // Escape peels one sheet back through the paper stack (cover handles its own).
   useEffect(() => {
@@ -134,9 +160,12 @@ export function App() {
   const showStack = state.ready
 
   const beginBookmarkSwipe = (event: ReactPointerEvent<HTMLDivElement>) => {
-    if (stack !== COVER_LAYER && stack !== BOOKMARKS_LAYER) return
+    const sheet = (event.target as Element).closest('.sheet')
+    const layer = sheet?.getAttribute('data-name') === 'home' ? pageLayers.home
+      : sheet?.getAttribute('data-name') === 'bookmarks' ? stack : null
+    if (layer !== COVER_LAYER && layer !== BOOKMARKS_LAYER) return
     if (event.pointerType === 'mouse' && event.button !== 0) return
-    swipeStart.current = { x: event.clientX, y: event.clientY, pointerId: event.pointerId }
+    swipeStart.current = { x: event.clientX, y: event.clientY, pointerId: event.pointerId, layer }
   }
 
   const finishBookmarkSwipe = (event: ReactPointerEvent<HTMLDivElement>) => {
@@ -146,11 +175,8 @@ export function App() {
     const dx = event.clientX - start.x
     const dy = event.clientY - start.y
     if (Math.abs(dx) < 64 || Math.abs(dx) < Math.abs(dy) * 1.35) return
-    if (stack === COVER_LAYER && dx > 0 && state.bookmarks.length > 0) {
-      appStore.revealLayer(BOOKMARKS_LAYER)
-    } else if (stack === BOOKMARKS_LAYER && dx < 0) {
-      appStore.revealLayer(COVER_LAYER)
-    }
+    const destination = bookmarkSwipeDestination(start.layer, dx, state.bookmarks.length > 0)
+    if (destination != null) appStore.revealLayer(destination)
   }
 
   return (
@@ -159,6 +185,7 @@ export function App() {
       data-stack={stack}
       data-has-reader={hasReader}
       data-spread={spread ? 'true' : undefined}
+      data-playback-pinned={playbackPinned && !spread ? 'true' : undefined}
       data-leaves={leaves ? 'true' : undefined}
       data-booting={showStack ? undefined : 'true'}
       onPointerDown={beginBookmarkSwipe}
@@ -167,17 +194,22 @@ export function App() {
     >
       {showStack && (
         <>
-          {spread ? <BookSpread titlePage={state.content == null} /> : null}
-          <BookmarksScreen stackLayer={stack} />
-          <HomeScreen stackLayer={pageLayers.home} />
           {/* Chapter boundaries get fresh focus/rail geometry. Carrying the
               previous chapter's dial state into the first peel frame makes
               the rail visibly jump before the initial focus settles. */}
           <ReaderScreen
             key={state.content?.surah.id ?? 'empty-reader'}
             stackLayer={pageLayers.reader}
+            playbackPinned={playbackPinned && !spread}
+          />
+          {spread ? <BookSpread titlePage={state.content == null} versoCovered={!leaves || stack !== READER_LAYER} /> : null}
+          <BookmarksScreen stackLayer={stack} />
+          <HomeScreen
+            stackLayer={pageLayers.home}
+            playbackPinned={playbackPinned && !spread}
           />
           <SettingsScreen stackLayer={stack} hasReader={hasReader} />
+          <div id="playback-pin" />
         </>
       )}
       {!entranceDone && (

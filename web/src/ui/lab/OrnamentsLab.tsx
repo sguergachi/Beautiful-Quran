@@ -4,19 +4,20 @@
  * Self-contained and database-free, so it opens instantly without the book.
  *
  * Explore a seed → live previews of its cover ornament, chapter header, and
- * the star-and-cross field; read the seed's decoded traits; "design" an
+ * the arabesque field; read the seed's decoded traits; "design" an
  * ornament by choosing traits and searching for a seed that matches; and
  * save named seeds to reuse later. Every preview uses the very same
  * generator + renderers the app ships, so what you see is what you get.
  */
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useId, useMemo, useState } from 'react'
 import {
+  FIELD_PATTERNS,
   generateChapterOrnament,
   generateCoverOrnament,
   type CoverOrnament,
   type FieldSpec,
 } from '../theme/ornamentGenerator'
-import { GeneratedRosette } from '../theme/GeneratedOrnament'
+import { GeneratedRosette, useFieldCellWidth } from '../theme/GeneratedOrnament'
 
 type ThemeName = 'light' | 'dark' | 'royal_green'
 
@@ -50,32 +51,22 @@ function randomSeed(): number {
 interface CoverTraits {
   medallionFold: number
   sealFold: number
-  fieldStar: 'khatam' | 'octagram'
-  fieldKnot: 'square' | 'octagon'
-  fieldCentre: boolean
   borderSignature: string
 }
 
 /** Derive high-level traits from a generated ornament (what's actually drawn). */
 function coverTraits(o: CoverOrnament): CoverTraits {
-  const f = o.field
-  const octagram = f.strokes[0]!.points.length === 8
-  const knot = octagram ? f.strokes[1]! : f.strokes[2]!
-  const base = octagram ? 2 : 3
   return {
     medallionFold: o.medallion.fold,
     sealFold: o.cornerSeal.fold,
-    fieldStar: octagram ? 'octagram' : 'khatam',
-    fieldKnot: knot.points.length === 8 ? 'octagon' : 'square',
-    fieldCentre: f.strokes.length > base,
     borderSignature: `${o.border.strokes.length}·${o.border.dots.length}`,
   }
 }
 
 // ── Field rendering (crisp inline SVG, full control over ink) ────────────────
 
-function fieldPaths(field: FieldSpec, cols: number, rows: number, cellPx: number): string[] {
-  const paths: string[] = []
+function fieldPaths(field: FieldSpec, cols: number, rows: number, cellPx: number): { d: string; weight: 'rule' | 'hairline' }[] {
+  const paths: { d: string; weight: 'rule' | 'hairline' }[] = []
   for (let gx = -1; gx <= cols; gx++) {
     for (let gy = -1; gy <= rows; gy++) {
       for (const s of field.strokes) {
@@ -86,7 +77,7 @@ function fieldPaths(field: FieldSpec, cols: number, rows: number, cellPx: number
                 `${i === 0 ? 'M' : 'L'} ${((gx + p.x) * cellPx).toFixed(2)} ${((gy + p.y) * cellPx).toFixed(2)}`,
             )
             .join(' ') + (s.closed ? ' Z' : '')
-        paths.push(d)
+        paths.push({ d, weight: s.weight })
       }
     }
   }
@@ -95,8 +86,6 @@ function fieldPaths(field: FieldSpec, cols: number, rows: number, cellPx: number
 
 function FieldSurface({
   field,
-  cols,
-  rows,
   cellPx,
   stroke,
   strokeWidth,
@@ -104,28 +93,32 @@ function FieldSurface({
   height,
 }: {
   field: FieldSpec
-  cols: number
-  rows: number
   cellPx: number
   stroke: string
   strokeWidth: number
   background?: string
   height?: number
 }) {
-  const w = cols * cellPx
-  const h = (height ?? rows * cellPx)
-  const paths = useMemo(() => fieldPaths(field, cols, rows, cellPx), [field, cols, rows, cellPx])
+  const { ref, cellWidth } = useFieldCellWidth(cellPx)
+  const patternId = useId()
+  const h = height ?? 240
+  const paths = useMemo(() => fieldPaths(field, 1, 1, cellWidth), [field, cellWidth])
   return (
-    <svg
-      viewBox={`0 0 ${w} ${h}`}
-      preserveAspectRatio="xMidYMid slice"
-      style={{ width: '100%', height: h, display: 'block', background }}
-      aria-hidden="true"
-    >
-      {paths.map((d, i) => (
-        <path key={i} d={d} fill="none" stroke={stroke} strokeWidth={strokeWidth} strokeLinejoin="round" />
-      ))}
-    </svg>
+    <div ref={ref}>
+      <svg
+        style={{ width: '100%', height: h, display: 'block', background }}
+        aria-hidden="true"
+      >
+        <defs>
+          <pattern id={patternId} width={cellWidth} height={cellWidth} patternUnits="userSpaceOnUse">
+            {paths.map(({ d, weight }, i) => (
+              <path key={i} d={d} fill="none" stroke={stroke} strokeWidth={strokeWidth * (weight === 'rule' ? 0.6 : 0.33)} strokeLinejoin="round" />
+            ))}
+          </pattern>
+        </defs>
+        <rect width="100%" height="100%" fill={`url(#${patternId})`} />
+      </svg>
+    </div>
   )
 }
 
@@ -149,9 +142,7 @@ export function OrnamentsLab() {
 
   // Trait filters for "design by trait" search.
   const [fFold, setFFold] = useState('any')
-  const [fStar, setFStar] = useState('any')
-  const [fKnot, setFKnot] = useState('any')
-  const [fCentre, setFCentre] = useState('any')
+  const [fPattern, setFPattern] = useState('any')
   const [searchNote, setSearchNote] = useState('')
 
   const cover = useMemo(() => generateCoverOrnament(seed), [seed])
@@ -199,17 +190,16 @@ export function OrnamentsLab() {
     const start = randomSeed()
     for (let i = 0; i < 200_000; i++) {
       const candidate = (start + i) | 0
-      const t = coverTraits(generateCoverOrnament(candidate))
+      const cover = generateCoverOrnament(candidate)
+      const t = coverTraits(cover)
+      if (fPattern !== 'any' && cover.field.pattern !== fPattern) continue
       if (fFold !== 'any' && t.medallionFold !== Number(fFold)) continue
-      if (fStar !== 'any' && t.fieldStar !== fStar) continue
-      if (fKnot !== 'any' && t.fieldKnot !== fKnot) continue
-      if (fCentre !== 'any' && t.fieldCentre !== (fCentre === 'yes')) continue
       setSeed(candidate)
       setSearchNote(`Found after ${i + 1} tries`)
       return
     }
     setSearchNote('No match in 200k seeds — loosen the filters')
-  }, [fFold, fStar, fKnot, fCentre])
+  }, [fFold, fPattern])
 
   const gold = { brightGold: 'var(--gold-bright)', deepGold: 'var(--gold-deep)', embossDark: 'var(--emboss-dark)', embossLight: 'var(--emboss-light)' }
   const paper = THEME_PAPER[theme]
@@ -245,14 +235,12 @@ export function OrnamentsLab() {
       </header>
 
       <div className="lab-grid">
-        {/* The background pattern — the star-and-cross field, drawn bold. */}
+        {/* The background pattern — the arabesque field, drawn bold. */}
         <section className="lab-panel" style={{ background: paper }}>
           <h3>Field pattern (this seed)</h3>
           <FieldSurface
             field={cover.field}
-            cols={6}
-            rows={4}
-            cellPx={64}
+            cellPx={cover.field.cellWidthDp}
             stroke="var(--gold-deep)"
             strokeWidth={1.4}
             height={240}
@@ -266,9 +254,7 @@ export function OrnamentsLab() {
           <div className="lab-header-preview">
             <FieldSurface
               field={chapter.field}
-              cols={6}
-              rows={3}
-              cellPx={52}
+              cellPx={chapter.field.cellWidthDp}
               stroke="rgba(28, 27, 24, 0.10)"
               strokeWidth={1}
               height={200}
@@ -300,9 +286,7 @@ export function OrnamentsLab() {
           <dl>
             <div><dt>Medallion fold</dt><dd>{traits.medallionFold}</dd></div>
             <div><dt>Seal fold</dt><dd>{traits.sealFold}</dd></div>
-            <div><dt>Field star</dt><dd>{traits.fieldStar}</dd></div>
-            <div><dt>Field knot</dt><dd>{traits.fieldKnot}</dd></div>
-            <div><dt>Field centre</dt><dd>{traits.fieldCentre ? 'yes' : 'no'}</dd></div>
+            <div><dt>Field style</dt><dd>{cover.field.pattern}</dd></div>
             <div><dt>Border</dt><dd>{traits.borderSignature}</dd></div>
           </dl>
         </section>
@@ -316,19 +300,10 @@ export function OrnamentsLab() {
               <option value="any">any</option><option>8</option><option>10</option><option>12</option><option>16</option>
             </select>
           </label>
-          <label>Field star
-            <select value={fStar} onChange={(e) => setFStar(e.target.value)}>
-              <option value="any">any</option><option value="khatam">khatam</option><option value="octagram">octagram</option>
-            </select>
-          </label>
-          <label>Field knot
-            <select value={fKnot} onChange={(e) => setFKnot(e.target.value)}>
-              <option value="any">any</option><option value="square">square</option><option value="octagon">octagon</option>
-            </select>
-          </label>
-          <label>Field centre
-            <select value={fCentre} onChange={(e) => setFCentre(e.target.value)}>
-              <option value="any">any</option><option value="yes">yes</option><option value="no">no</option>
+          <label>Field pattern
+            <select value={fPattern} onChange={(e) => setFPattern(e.target.value)}>
+              <option value="any">any</option>
+              {FIELD_PATTERNS.map((pattern) => <option key={pattern}>{pattern}</option>)}
             </select>
           </label>
           <button onClick={findSeed}>Find a seed</button>
@@ -354,8 +329,6 @@ export function OrnamentsLab() {
                 <button className="lab-swatch" onClick={() => setSeed(s.seed)} aria-label={`Load ${s.name}`}>
                   <FieldSurface
                     field={generateCoverOrnament(s.seed).field}
-                    cols={2}
-                    rows={2}
                     cellPx={22}
                     stroke="var(--gold-deep)"
                     strokeWidth={1}
