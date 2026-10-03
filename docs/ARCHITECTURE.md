@@ -323,7 +323,10 @@ ReaderFocusController ── holds the LazyListState; the sole writer to it
 - Opening a bookmark (or another explicit verse target) inside the same paused
   playlist is a manual jump: the held verse yields focus, the playlist seeks
   to the chosen verse without playing, and the transport can then resume from
-  that selection.
+  that selection. A word tap supersedes any pending verse jump and its
+  seek-to-zero effect before seeking to the word; a delayed jump effect checks
+  that it still owns the request. Scroll, Arabic mushaf, and English leaf word
+  seeks share this interaction rule.
 - Display settings that reflow ayah heights (reading mode, word gloss,
   transliteration, translation, font scale) recover the pinned verse after the
   LazyColumn remasures, so the reading line stays on the ayah the reader was
