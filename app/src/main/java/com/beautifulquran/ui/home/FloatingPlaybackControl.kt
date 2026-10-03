@@ -276,3 +276,22 @@ internal fun shouldShowFloatingPlayback(
     coverSheetVisible: Boolean,
     searchActive: Boolean = false,
 ): Boolean = nowPlayingPresent && coverSheetVisible && !searchActive
+
+/**
+ * Bottom paper the chapter list keeps clear of the transport. The pinned
+ * chapter session wins while it owns a verse (or is sliding away); else
+ * the floating bar while it is up; else just the gesture inset. The caller
+ * animates toward this target instead of snapping, so rows glide rather
+ * than pop when the bar enters or leaves.
+ */
+internal fun homeListBottomInset(
+    pinnedSession: Boolean,
+    pinnedHeight: Dp,
+    floatingVisible: Boolean,
+    floatingHeight: Dp,
+    navigationBottom: Dp,
+): Dp = when {
+    pinnedSession -> pinnedHeight.takeIf { it > 0.dp } ?: FloatingPlaybackListClearance
+    floatingVisible -> floatingHeight
+    else -> navigationBottom
+}

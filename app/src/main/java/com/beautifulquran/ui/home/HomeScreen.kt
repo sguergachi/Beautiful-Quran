@@ -2,6 +2,7 @@ package com.beautifulquran.ui.home
 
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
@@ -196,15 +197,24 @@ fun HomeScreen(
     val navigationBottom = with(density) {
         WindowInsets.navigationBars.getBottom(density).toDp()
     }
-    val listBottomInset = when {
-        playbackPinned && !searchActive &&
-            (floatingPlayback != null || playbackHost?.closing == true) -> {
-            val measured = pinnedPlaybackHeight()
-            measured.takeIf { it > 0.dp } ?: FloatingPlaybackListClearance
-        }
-        showFloatingPlayback -> floatingPlaybackHeight
-        else -> navigationBottom
-    }
+    val pinnedSession = playbackPinned && !searchActive &&
+        (floatingPlayback != null || playbackHost?.closing == true)
+    val listBottomInsetTarget = homeListBottomInset(
+        pinnedSession = pinnedSession,
+        pinnedHeight = if (pinnedSession) pinnedPlaybackHeight() else 0.dp,
+        floatingVisible = showFloatingPlayback,
+        floatingHeight = floatingPlaybackHeight,
+        navigationBottom = navigationBottom,
+    )
+    // Glide with the bar, don't pop under it. Dismissing the transport
+    // slides it out over 260 ms; collapsing the list padding in the same
+    // frame would jerk the rows up beneath the exiting bar. Same glide
+    // on entry, and when search covers the sheet.
+    val listBottomInset by animateDpAsState(
+        targetValue = listBottomInsetTarget,
+        animationSpec = tween(260),
+        label = "homeListBottomInset",
+    )
     val host = playbackHost
     if (host != null) {
         if (!host.closing) {
