@@ -99,6 +99,12 @@ function pictureLeftPage(into: HTMLElement | null) {
   picture.setAttribute('data-picture', 'true')
   picture.inert = true
   into.replaceChildren(picture)
+  // The left pile under that page is as thick as the open book's.
+  const book = document.querySelector('.app-shell > .book')
+  const inside = into.parentElement
+  if (book instanceof HTMLElement && inside) {
+    inside.style.setProperty('--book-right', book.style.getPropertyValue('--book-right') || '1')
+  }
   // A clone starts scrolled to the top; the page may not be.
   const from = page.querySelectorAll('*')
   const to = picture.querySelectorAll('*')
@@ -237,17 +243,34 @@ export function EntranceCover({
   // Android turns the gilding's sheen with the phone's tilt. A desk has a
   // pointer instead: the light falls where the mouse is. Written straight
   // to the element, so moving the mouse never re-renders the cover.
+  // One write per frame however many moves arrive in it, a transform and
+  // nothing else, against a box measured once as the pointer comes in.
+  const glintState = useRef({ left: 0, top: 0, x: 0, y: 0, frame: 0 })
+  const measureGlint = (event: ReactPointerEvent<HTMLDivElement>) => {
+    const box = event.currentTarget.getBoundingClientRect()
+    glintState.current.left = box.left
+    glintState.current.top = box.top
+  }
   const moveGlint = (event: ReactPointerEvent<HTMLDivElement>) => {
     const glint = glintRef.current
     if (!glint || event.pointerType !== 'mouse') return
-    const box = event.currentTarget.getBoundingClientRect()
-    glint.style.setProperty('--glint-x', `${(event.clientX - box.left).toFixed(1)}px`)
-    glint.style.setProperty('--glint-y', `${(event.clientY - box.top).toFixed(1)}px`)
-    glint.dataset.on = 'true'
+    const state = glintState.current
+    state.x = event.clientX - state.left
+    state.y = event.clientY - state.top
+    if (state.frame) return
+    state.frame = requestAnimationFrame(() => {
+      state.frame = 0
+      const move = `translate3d(${state.x.toFixed(1)}px, ${state.y.toFixed(1)}px, 0)`
+      for (const layer of Array.from(glint.children) as HTMLElement[]) layer.style.transform = move
+      glint.dataset.on = 'true'
+    })
   }
   const dropGlint = () => {
+    cancelAnimationFrame(glintState.current.frame)
+    glintState.current.frame = 0
     if (glintRef.current) delete glintRef.current.dataset.on
   }
+  useEffect(() => () => cancelAnimationFrame(glintState.current.frame), [])
   const titleArRef = useRef<HTMLParagraphElement>(null)
   const titleEnRef = useRef<HTMLParagraphElement>(null)
   const duaRef = useRef<HTMLParagraphElement>(null)
@@ -516,6 +539,7 @@ export function EntranceCover({
         role={!error && phase !== 'opening' ? 'button' : undefined}
         tabIndex={!error && phase !== 'opening' ? 0 : undefined}
         onClick={!error && phase !== 'opening' ? skipToOpening : undefined}
+        onPointerEnter={measureGlint}
         onPointerMove={moveGlint}
         onPointerLeave={dropGlint}
         onKeyDown={

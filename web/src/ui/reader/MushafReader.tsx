@@ -199,10 +199,18 @@ export function MushafReader({
     return () => { disposed = true; observer.disconnect() }
   }, [facing, ready, english])
 
+  // The listeners below are bound once and read what they need through
+  // refs. Bound with no dependencies they were torn down and re-added on
+  // every render, and a leaf renders on every word the voice reaches.
+  const turnRef = useRef(turn)
+  turnRef.current = turn
+  const ownsKeyboardRef = useRef(ownsKeyboard)
+  ownsKeyboardRef.current = ownsKeyboard
+
   // Pages run right to left: the left arrow goes on, the right arrow back.
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
-      if (!ownsKeyboard || event.defaultPrevented || event.altKey || event.ctrlKey || event.metaKey) return
+      if (!ownsKeyboardRef.current || event.defaultPrevented || event.altKey || event.ctrlKey || event.metaKey) return
       if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') return
       // Only fields that use the arrows themselves keep them. A focused
       // button does not — on a phone the chapter row that opened this
@@ -215,29 +223,34 @@ export function MushafReader({
         return
       }
       event.preventDefault()
-      turn(event.key === 'ArrowLeft' ? 1 : -1)
+      turnRef.current(event.key === 'ArrowLeft' ? 1 : -1)
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  })
+  }, [])
 
   // Two fingers swept sideways turn a leaf. Taken from the browser, which
-  // would otherwise go back or forward in its history on the same sweep.
-  const wheelTurnRef = useRef<ReturnType<typeof createWheelTurn> | null>(null)
+  // would otherwise go back or forward in its history on the same sweep, so
+  // the listener cannot be passive. It is bound to the two pages the leaves
+  // lie on, not the window: there it held up every scroll in the app
+  // (Chapters, Settings) until the handler had run.
   useEffect(() => {
-    // One gesture outlives the render its own turn causes.
-    const wheelTurn = (wheelTurnRef.current ??= createWheelTurn())
-    const onWheel = (event: WheelEvent) => {
-      if (!ownsKeyboard || event.ctrlKey || !isSidewaysWheel(event.deltaX, event.deltaY)) return
-      const target = event.target
+    if (!ready) return
+    const wheelTurn = createWheelTurn()
+    const onWheel = (event: Event) => {
+      const wheel = event as WheelEvent
+      if (!ownsKeyboardRef.current || wheel.ctrlKey || !isSidewaysWheel(wheel.deltaX, wheel.deltaY)) return
+      const target = wheel.target
       if (!(target instanceof Element) || !target.closest('.mushaf, .mushaf-turn')) return
-      event.preventDefault()
-      const delta = wheelTurn(event.deltaX, event.deltaY, event.timeStamp)
-      if (delta !== 0) turn(delta)
+      wheel.preventDefault()
+      const delta = wheelTurn(wheel.deltaX, wheel.deltaY, wheel.timeStamp)
+      if (delta !== 0) turnRef.current(delta)
     }
-    window.addEventListener('wheel', onWheel, { passive: false })
-    return () => window.removeEventListener('wheel', onWheel)
-  })
+    const pages = [rectoRef.current?.closest('.sheet'), facing ? versoSlot : null]
+      .filter((el): el is HTMLElement => el instanceof HTMLElement)
+    for (const el of pages) el.addEventListener('wheel', onWheel, { passive: false })
+    return () => { for (const el of pages) el.removeEventListener('wheel', onWheel) }
+  }, [ready, facing, versoSlot])
 
   const place = facing ? mushafFacingPages(page).right : page
   // The piles under the open pages follow the place the book is open at.
@@ -429,11 +442,13 @@ export function MushafReader({
   const rectoPage = turning && forward ? was.right : now.right
   const versoPage = turning && !forward ? was.left : now.left
   const live = leafLive(rectoPage)
+  // A pile in the air is a picture taken as it lifts: StillLeaf never
+  // renders again, whatever the voice does to the leaves beneath it.
   const rectoPicture = sheetTurn
-    ? <MushafLeaf page={rectoPage} side="recto" fit={fit} style={versoBox} {...leafProps} live={live} onFit={noFit} still />
+    ? <StillLeaf page={rectoPage} side="recto" fit={fit} style={versoBox} {...leafProps} live={live} onFit={noFit} still />
     : null
   const versoPicture = sheetTurn
-    ? <MushafLeaf page={versoPage} side="verso" fit={fit} style={versoBox} {...leafProps} live={live} onFit={noFit} still />
+    ? <StillLeaf page={versoPage} side="verso" fit={fit} style={versoBox} {...leafProps} live={live} onFit={noFit} still />
     : null
   return (
     <>
@@ -845,6 +860,14 @@ function MushafLeaf({
     </div>
   )
 }
+
+/**
+ * A leaf as a picture, for a pile turning to Chapters or Settings. It is
+ * taken once, when it mounts: a leaf re-renders on every word the voice
+ * reaches, and each render of a picture re-ran 150 words for strips that
+ * had already copied its DOM.
+ */
+const StillLeaf = memo(MushafLeaf, () => true)
 
 /**
  * A word of the leaf, inked by the scroll reader's own Hafs renderer: full

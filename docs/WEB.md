@@ -416,7 +416,19 @@ of the block; `--wad` = share × `--book-block`) and `ms` (`turnMs`), sets the
 back face that far behind the front, and draws the pile's fore-edge and
 head/foot caps (`.mushaf-flip-edge`, `.mushaf-flip-cap`) above
 `WAD_VISIBLE`. Sheet turns carry the whole pile on that side; page turns
-carry the leaves between the two pages. Scrollbars (pointers that can hover only, `--sb` = 10px, else 0): a thin
+carry the leaves between the two pages. Cost of a turn: each strip of `TurningLeaf` holds only the words its slice
+shows (`slicePages`; the page is measured once under `data-measuring`, flat
+and with its lines unstretched), about 5,700 elements for a leaf instead of
+20,500, and the longest task at the start of a turn fell from 300–420 ms to
+about 100 ms in headless Chromium. `--book-right` is set and eased on `.book`
+(`BookSpread` reads the place), not on the app shell, where it restyled the
+whole app each frame. Wheel listeners that must not be passive are bound to
+the pages they serve (Chapters; the two leaf pages), never to the window. A
+sweep that has turned a leaf turns nothing more for `WHEEL_TURN_HOLD_MS`.
+The cover's glint is two fixed squares moved by a transform once a frame.
+Scrollbars (pointers that can hover only, `--sb` = 10px, else 0; the lane is
+kept with `scrollbar-gutter: stable`, and anything standing on a bar's edge
+is moved in by the lane): a thin
 thread at rest that thickens and turns solid under the pointer, drawn as a
 thumb inside transparent borders so the lane never changes width. Each
 scroller gives the lane back from its padding, so nothing in it moves. On the

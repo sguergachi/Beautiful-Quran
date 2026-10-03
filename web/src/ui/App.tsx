@@ -1,11 +1,4 @@
-import {
-  useCallback,
-  useEffect,
-  useRef,
-  useState,
-  type CSSProperties,
-  type PointerEvent as ReactPointerEvent,
-} from 'react'
+import { useCallback, useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react'
 import { appStore, shallowEqual, useAppSelector } from '../store/appStore'
 import {
   BOOKMARKS_LAYER,
@@ -21,15 +14,7 @@ import { ReaderScreen } from './reader/ReaderScreen'
 import { SettingsScreen } from './settings/SettingsScreen'
 import { EntranceCover } from './entrance/EntranceCover'
 import { OrnamentsLab } from './lab/OrnamentsLab'
-import {
-  bookRightShare,
-  bookmarkSwipeDestination,
-  closesBook,
-  spreadLayers,
-  useBookPlace,
-  useBookSpread,
-} from './paper/bookSpread'
-import { createWheelTurn, isSidewaysWheel } from './reader/wheelTurn'
+import { bookmarkSwipeDestination, closesBook, spreadLayers, useBookSpread } from './paper/bookSpread'
 import { BookSpread } from './paper/BookSpread'
 import { unlockPageTurnSounds } from './paper/pageTurnSounds'
 
@@ -114,14 +99,6 @@ export function App() {
   const leaves =
     spread && state.content != null && state.settings.readingLayout === 'mushaf'
   const pageLayers = spreadLayers(spread, stack, state.content != null, leaves)
-  // How the block's leaves are shared between the two piles: by the page the
-  // leaves are open at, or by where a scrolling chapter begins.
-  const leavesPlace = useBookPlace()
-  const bookRight = bookRightShare(
-    leaves,
-    stack,
-    leaves ? leavesPlace : state.content?.ayahs[0]?.page ?? null,
-  )
 
   useEffect(() => {
     void appStore.init()
@@ -180,22 +157,6 @@ export function App() {
     return () => window.removeEventListener('keydown', onKey)
   }, [entranceDone])
 
-  // Two fingers swept back across Chapters close the book, as a finger
-  // dragged back across it does. Taken from the browser's history sweep.
-  useEffect(() => {
-    if (!entranceDone) return
-    const wheelTurn = createWheelTurn()
-    const onWheel = (event: WheelEvent) => {
-      if (event.ctrlKey || !isSidewaysWheel(event.deltaX, event.deltaY)) return
-      const sheet = event.target instanceof Element ? event.target.closest('.sheet') : null
-      if (sheet?.getAttribute('data-name') !== 'home' || sheet.getAttribute('data-active') !== 'true') return
-      event.preventDefault()
-      if (wheelTurn(event.deltaX, event.deltaY, event.timeStamp) === -1) closeBook()
-    }
-    window.addEventListener('wheel', onWheel, { passive: false })
-    return () => window.removeEventListener('wheel', onWheel)
-  }, [entranceDone, closeBook])
-
   // The Ornaments Lab is a standalone dev tool — it needs no database, so
   // it renders over everything the moment the hash routes to it.
   if (isLab) return <OrnamentsLab />
@@ -239,7 +200,6 @@ export function App() {
       data-playback-pinned={playbackPinned && !spread ? 'true' : undefined}
       data-leaves={leaves ? 'true' : undefined}
       data-booting={showStack ? undefined : 'true'}
-      style={spread ? ({ ['--book-right' as string]: bookRight } as CSSProperties) : undefined}
       onPointerDown={beginBookmarkSwipe}
       onPointerUp={finishBookmarkSwipe}
       onPointerCancel={() => { swipeStart.current = null }}
@@ -254,12 +214,21 @@ export function App() {
             stackLayer={pageLayers.reader}
             playbackPinned={playbackPinned && !spread}
           />
-          {spread ? <BookSpread titlePage={state.content == null} versoCovered={!leaves || stack !== READER_LAYER} /> : null}
+          {spread ? (
+            <BookSpread
+              titlePage={state.content == null}
+              versoCovered={!leaves || stack !== READER_LAYER}
+              leaves={leaves}
+              stack={stack}
+              chapterPage={state.content?.ayahs[0]?.page ?? null}
+            />
+          ) : null}
           <BookmarksScreen stackLayer={stack} />
           <HomeScreen
             stackLayer={pageLayers.home}
             playbackPinned={playbackPinned && !spread}
-            onCloseBook={spread ? closeBook : undefined}
+            onCloseBook={entranceDone ? closeBook : undefined}
+            closeStrip={spread}
           />
           <SettingsScreen stackLayer={stack} hasReader={hasReader} />
           <div id="playback-pin" />

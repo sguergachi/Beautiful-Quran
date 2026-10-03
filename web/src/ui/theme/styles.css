@@ -5603,16 +5603,24 @@ button.ayah-mark {
      on its own, against nothing, and laid over the board as a dark sheet.
      The two layers blend with the board directly. */
   display: contents;
-  --glint-at: circle calc(var(--cover-unit) * 13) at var(--glint-x, 50%) var(--glint-y, 50%);
 }
 
+/* Each layer is a fixed square of light, moved with a transform. Drawn as a
+   gradient across the whole board with its centre in a custom property, it
+   was repainted, board-sized and twice over, on every move of the mouse.
+   Outside the square nothing is drawn, which is no change either. */
 .entrance-glint > span {
+  --glint-r: calc(var(--cover-unit) * 13);
   position: absolute;
-  inset: 0;
+  top: calc(-1 * var(--glint-r));
+  left: calc(-1 * var(--glint-r));
+  width: calc(2 * var(--glint-r));
+  height: calc(2 * var(--glint-r));
   z-index: 2;
   pointer-events: none;
   opacity: 0;
   transition: opacity 420ms ease;
+  will-change: transform;
 }
 
 .entrance-glint[data-on='true'] > span {
@@ -5622,12 +5630,12 @@ button.ayah-mark {
 
 .entrance-glint > span:first-child {
   mix-blend-mode: difference;
-  background: radial-gradient(var(--glint-at), rgb(5 24 17) 0%, rgb(2 11 8) 40%, #000 100%);
+  background: radial-gradient(circle closest-side, rgb(5 24 17) 0%, rgb(2 11 8) 40%, #000 100%);
 }
 
 .entrance-glint > span:last-child {
   mix-blend-mode: color-dodge;
-  background: radial-gradient(var(--glint-at), rgb(122 114 96) 0%, rgb(56 52 44) 40%, #000 100%);
+  background: radial-gradient(circle closest-side, rgb(122 114 96) 0%, rgb(56 52 44) 40%, #000 100%);
 }
 
 .entrance-board--opening .entrance-glint,
@@ -6598,11 +6606,8 @@ html[data-entrance='true'] body {
   --book-edge-min: max(3px, calc(var(--u) * 0.1459));
   --book-fan: var(--u);
   --book-fore-edge: calc(var(--book-edge-min) + var(--book-fan));
-  --edge-r: calc(var(--book-edge-min) + var(--book-fan) * var(--book-right));
-  --edge-l: calc(var(--book-edge-min) + var(--book-fan) * (1 - var(--book-right)));
   /* The whole block's thickness, for the pile in the air during a turn. */
   --book-block: calc(var(--u) * 2);
-  transition: --book-right 900ms cubic-bezier(0.5, 0.02, 0.28, 1);
   /*
    * Golden page: 1 : φ, φ⁶ u wide. Margins run inner : head : fore-edge :
    * foot = 1 : φ : φ : φ², which leaves a text block that is itself 1 : φ.
@@ -6646,7 +6651,19 @@ html[data-entrance='true'] body {
   z-index: 0;
   border-radius: 9px;
   background: linear-gradient(to bottom, var(--book-board), var(--book-board-deep));
-  transition: opacity 520ms ease;
+  transition:
+    opacity 520ms ease,
+    --book-right 900ms cubic-bezier(0.5, 0.02, 0.28, 1);
+}
+
+/* --book-right is set on the book itself (BookSpread), and on the cover's
+   inside when it stands in for the left half. Set and eased on the app
+   shell, it re-styled every element of the app on each frame of the ease,
+   and once more on every page turn. Only the piles read it. */
+.app-shell[data-spread='true'] .book,
+.entrance-inside {
+  --edge-r: calc(var(--book-edge-min) + var(--book-fan) * var(--book-right));
+  --edge-l: calc(var(--book-edge-min) + var(--book-fan) * (1 - var(--book-right)));
 }
 
 .book-page {
@@ -7485,6 +7502,13 @@ html[data-entrance-closing]
   --turn-to: 0deg;
 }
 
+/* While TurningLeaf measures the page it is about to cut into strips, the
+   leaf lies flat: no turn, no curl, no face turned over or set back. */
+.mushaf-flip[data-measuring] :is(.mushaf-flip-strip, .mushaf-flip-face, .mushaf-line) {
+  animation: none !important;
+  transform: none !important;
+}
+
 /* A strip of the leaf. The first is bound to the page's edge and carries
    the turn; each one after hangs on the strip before it and bends a little
    at the joint, so the free edge lifts first and the sheet bows behind it. */
@@ -7815,6 +7839,9 @@ html[data-entrance-closing]
     /* The standard properties would switch the styled bar below off. */
     scrollbar-width: auto;
     scrollbar-color: auto;
+    /* The lane is there whether or not anything overflows: the padding
+       below gives it back either way, and a short page must not shift. */
+    scrollbar-gutter: stable;
   }
 
   :is(.scroll, .settings, .customize-scroll, .ink-bleed)::-webkit-scrollbar {
@@ -7842,11 +7869,39 @@ html[data-entrance-closing]
     background-color: color-mix(in srgb, var(--ink) 55%, var(--paper));
   }
 
-  /* Engines without the styled bar (Firefox) take the standard thin one. */
+  /* Settings does not scroll while Customize is open in it (Customize has
+     its own scroller), and a stable gutter is kept even by a clipped box. */
+  .settings:has(.customize) {
+    scrollbar-gutter: auto;
+  }
+
+  /* The lane runs under the furniture standing at a scroller's foot, where
+     the thread could be neither seen nor caught: its track stops above it. */
+  .reader-main .scroll::-webkit-scrollbar-track {
+    margin-bottom: 7rem;
+  }
+
+  .scroll-with-float::-webkit-scrollbar-track {
+    margin-bottom: 5.5rem;
+  }
+
+  .scroll-with-chapter::-webkit-scrollbar-track {
+    margin-bottom: 9rem;
+  }
+
+  /* Engines without the styled bar (Firefox) take the standard thin one. Its
+     width is the platform's (none at all for an overlay bar), so nothing is
+     taken back from the padding there; the gutter is kept on both edges
+     instead, which leaves whatever scrolls centred. */
   @supports not selector(::-webkit-scrollbar) {
+    :root {
+      --sb: 0px;
+    }
+
     :is(.scroll, .settings, .customize-scroll, .ink-bleed) {
       scrollbar-width: thin;
       scrollbar-color: color-mix(in srgb, var(--ink) 30%, transparent) transparent;
+      scrollbar-gutter: stable both-edges;
     }
   }
 
@@ -7871,9 +7926,18 @@ html[data-entrance-closing]
     padding-right: calc(var(--root-inline-padding) - var(--sb));
   }
 
+  /* A narrow window drops Home's own padding (its rows carry the 28px
+     lane), so there the lane comes off the rows' end inset. */
+  @media (max-width: 640px) {
+    .sheet[data-name='home'] .scroll {
+      --home-end-inset: calc(28px - var(--sb));
+    }
+  }
+
   /* The verse column has no padding to give (its verses carry the rules), so
-     the column is a lane wider each side and the verses stay where they were. */
-  .reader-body {
+     the column is a lane wider each side and the verses stay where they were.
+     Only a column that scrolls: a Mushaf leaf has no bar, and is measured. */
+  .reader-body:has(.scroll) {
     max-width: calc(var(--reader-max) + 2 * var(--sb));
   }
 
@@ -7908,8 +7972,19 @@ html[data-entrance-closing]
     padding-left: calc(var(--bookmark-pad) - var(--sb));
   }
 
-  /* Right page. Settings is as wide as its page already. */
-  .app-shell[data-spread='true'] .sheet[data-name='settings'] .settings {
+  /* The root viewer laid on the left page is a left page too. */
+  .ink-bleed.root-sheet[data-page='verso'] {
+    direction: rtl;
+    padding-right: var(--root-inline-padding);
+    padding-left: calc(var(--root-inline-padding) - var(--sb));
+  }
+
+  .ink-bleed.root-sheet[data-page='verso'] > * {
+    direction: ltr;
+  }
+
+  /* Right page. Customize scrolls inside Settings and has its own rule. */
+  .app-shell[data-spread='true'] .sheet[data-name='settings'] .settings:not(:has(.customize)) {
     padding-right: calc(var(--margin-fore) - var(--sb));
   }
 
@@ -7927,8 +8002,57 @@ html[data-entrance-closing]
     padding-right: calc(var(--margin-fore) - var(--sb));
   }
 
-  /* The transport stands in that same column, so it takes both margins now. */
+  /* The transport stands in that same column, so it takes both margins now,
+     and so does everything else placed against it: the share ribbon spans
+     the text block, and Return-to-ayah is centred on it, not on the page. */
   .app-shell[data-spread='true']:not([data-leaves='true']) .sheet[data-name='reader'] .player-bar {
     padding-inline: var(--margin-inner) var(--margin-fore);
   }
+
+  .app-shell[data-spread='true']:not([data-leaves='true']) .sheet[data-name='reader'] .share-ribbon {
+    left: var(--margin-inner);
+    right: var(--margin-fore);
+  }
+
+  .app-shell[data-spread='true']:not([data-leaves='true']) .sheet[data-name='reader'] .return-ayah {
+    left: calc(50% - (var(--margin-fore) - var(--margin-inner)) / 2);
+  }
+}
+
+/* Whatever stands on a scroller's bar edge moves in by the lane, so the bar
+   beneath it can be reached: the strip that closes the book on Chapters'
+   fore-edge, and the ayah rail when it is set on the right. */
+.app-shell[data-spread='true'] .book-close {
+  left: var(--sb);
+}
+
+.ayah-rail[data-side='right'] {
+  right: var(--sb);
+}
+
+/* On the desktop book a sheet is as wide as its page at any window size:
+   the phone column's caps would stand a bar inside the page on a large
+   window. Rows keep their own measure. */
+.app-shell[data-spread='true'] .sheet-frame {
+  width: 100%;
+}
+
+.app-shell[data-spread='true'] .bookmarks-frame,
+.app-shell[data-spread='true'] .sheet[data-name='settings'] .settings {
+  max-width: none;
+}
+
+/* Customize scrolls inside Settings: Settings gives up its own margins there
+   and Customize's header and scroller take the page's, the scroller less
+   the lane. (Both used to apply, and set Customize in a narrower column.) */
+.app-shell[data-spread='true'] .sheet[data-name='settings'] .settings:has(.customize) {
+  padding-inline: 0;
+}
+
+.app-shell[data-spread='true'] .sheet[data-name='settings'] .customize-sticky {
+  padding-inline: var(--margin-inner) var(--margin-fore);
+}
+
+.app-shell[data-spread='true'] .sheet[data-name='settings'] .customize-scroll {
+  padding-inline: var(--margin-inner) calc(var(--margin-fore) - var(--sb));
 }
