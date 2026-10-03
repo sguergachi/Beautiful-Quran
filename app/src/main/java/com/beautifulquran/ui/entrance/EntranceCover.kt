@@ -18,8 +18,8 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.AbsoluteRoundedCornerShape
@@ -152,9 +152,9 @@ private const val COVER_FRAME_SCALE = 1.10f
  * The system splash is the same leather; [chrome] is pre-read from the
  * window in `onCreate` so the gilt frame is inset-correct on the first
  * Compose frame, and [onReady] dismisses splash as soon as this board has
- * laid out. [onWarmStack] fires once the arrival title has settled (or on
- * skip) so the paper stack can mount under the cover without stealing the
- * first frames. The status bar is hidden for the ceremony so the leather
+ * laid out. [onWarmStack] mounts the paper stack after two board frames;
+ * the arrival wash starts after that first composition so it runs without
+ * a startup interruption. The status bar is hidden for the ceremony so the leather
  * board reads as a full-bleed cover; it is restored when this composable
  * leaves.
  */
@@ -274,15 +274,14 @@ fun EntranceCover(
     // in-flight moment without re-keying this effect — re-keying on phase
     // used to replay the title wash.
     LaunchedEffect(Unit) {
-        // Ornament was pre-grown in onCreate; ink wash runs beside the ceremony.
+        // Paint the board, then let the underlying stack mount before starting
+        // the wash. Its first composition must not interrupt visible arrival.
+        withFrameNanos { }
+        withFrameNanos { }
+        warmStackOnce()
+        withFrameNanos { }
+        withFrameNanos { }
         launch { build.animateTo(1f, tween(ORNAMENT_BUILD_MS, easing = LinearEasing)) }
-        // Two exclusive cover frames, then mount the stack under the board so
-        // a fast skip-to-open still has time to warm ViewModels.
-        launch {
-            withFrameNanos { }
-            withFrameNanos { }
-            warmStackOnce()
-        }
         val moment = launch {
             titleWash.animateTo(1f, tween(TITLE_WASH_MS, easing = LinearEasing))
             delay(ARRIVAL_HOLD_MS)
@@ -442,7 +441,7 @@ fun EntranceCover(
                 horizontalAlignment = Alignment.CenterHorizontally,
                 modifier = Modifier
                     .fillMaxSize()
-                    .navigationBarsPadding()
+                    .padding(bottom = (chrome.safeInsets.bottom / localDensity.density).dp)
                     .padding(horizontal = 40.dp),
             ) {
                 Spacer(Modifier.weight(0.9f))
@@ -513,23 +512,30 @@ fun EntranceCover(
                         textAlign = TextAlign.Center,
                         color = CoverParchment.copy(alpha = 0.55f),
                     )
+                }
+                // Loading occupies the lower air rather than changing the
+                // height of the du'a and moving the title mid-wash.
+                Box(Modifier.weight(0.5f).fillMaxWidth().graphicsLayer { alpha = captionAlpha }) {
                     if (!contentReady) {
-                        Spacer(Modifier.height(14.dp))
-                        Text(
-                            text = loadLabel,
-                            style = MaterialTheme.typography.bodySmall,
-                            textAlign = TextAlign.Center,
-                            color = CoverParchment.copy(alpha = 0.55f),
-                        )
-                        Spacer(Modifier.height(9.dp))
-                        CoverLoadProgress(
-                            progress = loadProgress,
-                            motion = loadSweep.value,
-                            modifier = Modifier.width(156.dp),
-                        )
+                        Column(
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            modifier = Modifier.fillMaxWidth().padding(top = 14.dp),
+                        ) {
+                            Text(
+                                text = loadLabel,
+                                style = MaterialTheme.typography.bodySmall,
+                                textAlign = TextAlign.Center,
+                                color = CoverParchment.copy(alpha = 0.55f),
+                            )
+                            Spacer(Modifier.height(9.dp))
+                            CoverLoadProgress(
+                                progress = loadProgress,
+                                motion = loadSweep.value,
+                                modifier = Modifier.width(156.dp),
+                            )
+                        }
                     }
                 }
-                Spacer(Modifier.weight(0.5f))
             }
         }
     }

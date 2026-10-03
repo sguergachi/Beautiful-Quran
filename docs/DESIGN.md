@@ -1184,8 +1184,11 @@ three moments:
    icon, held on screen until Compose lays out the closed mushaf, then
    handed off with no second fade.    Cold start composes the cover first; chrome and this launch's ornament
    are pre-built in `onCreate`, and the paper stack mounts under the board
-   only after two cover frames (not at splash handoff) so ViewModel init
-   cannot jank first paint. Safe-area insets (system bars ignoring
+   only after two cover frames (not at splash handoff). The title and
+   ornament wash start after the stack's first composition, so ViewModel
+   init cannot interrupt arrival. The title uses the same pre-read bottom
+   inset as the frame; loading text occupies the lower air without changing
+   the title or du'a positions when readiness changes. Safe-area insets (system bars ignoring
    visibility ∪ cutout) and screen-corner radii come from
    `WindowManager.currentWindowMetrics`, so the gilt frame is correct on
    the first Compose frame and splash hands off without waiting for
