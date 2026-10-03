@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { bookmarkSwipeDestination, leavesReader, readerVisible, spreadLayers } from '../bookSpread'
+import { bookTurnDirection, bookmarkSwipeDestination, closesBook, leavesReader, readerVisible, spreadLayers } from '../bookSpread'
 import { BOOKMARKS_LAYER, COVER_LAYER, READER_LAYER, SETTINGS_LAYER } from '../stack'
 
 describe('spreadLayers', () => {
@@ -57,5 +57,38 @@ describe('bookmark swipe ownership', () => {
   it('returns from Bookmarks only in the closing direction', () => {
     expect(bookmarkSwipeDestination(BOOKMARKS_LAYER, -80, true)).toBe(COVER_LAYER)
     expect(bookmarkSwipeDestination(BOOKMARKS_LAYER, 80, true)).toBeNull()
+  })
+})
+
+describe('sheet turns on facing leaves', () => {
+  it('lifts the verso leaf to uncover Chapters, the left-most page', () => {
+    expect(bookTurnDirection(READER_LAYER, COVER_LAYER)).toBe('on')
+    expect(bookTurnDirection(SETTINGS_LAYER, COVER_LAYER)).toBe('on')
+  })
+
+  it('lifts the recto leaf to uncover Settings, the right-most page', () => {
+    expect(bookTurnDirection(READER_LAYER, SETTINGS_LAYER)).toBe('back')
+    expect(bookTurnDirection(COVER_LAYER, SETTINGS_LAYER)).toBe('back')
+  })
+
+  it('lays the same leaf back down on the way out', () => {
+    expect(bookTurnDirection(COVER_LAYER, READER_LAYER)).toBe('back')
+    expect(bookTurnDirection(SETTINGS_LAYER, READER_LAYER)).toBe('on')
+  })
+
+  it('turns nothing for Bookmarks, a sheet laid over Chapters', () => {
+    expect(bookTurnDirection(READER_LAYER, READER_LAYER)).toBeNull()
+    expect(bookTurnDirection(COVER_LAYER, BOOKMARKS_LAYER)).toBeNull()
+    expect(bookTurnDirection(BOOKMARKS_LAYER, COVER_LAYER)).toBeNull()
+    expect(bookTurnDirection(BOOKMARKS_LAYER, READER_LAYER)).toBe('back')
+  })
+})
+
+describe('closing the book', () => {
+  it('takes the backward sweep on Chapters only', () => {
+    expect(closesBook(COVER_LAYER, -80)).toBe(true)
+    expect(closesBook(COVER_LAYER, 80)).toBe(false)
+    expect(closesBook(READER_LAYER, -80)).toBe(false)
+    expect(closesBook(BOOKMARKS_LAYER, -80)).toBe(false)
   })
 })

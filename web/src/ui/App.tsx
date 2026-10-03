@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react'
+import { useCallback, useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react'
 import { appStore, shallowEqual, useAppSelector } from '../store/appStore'
 import {
   BOOKMARKS_LAYER,
@@ -14,7 +14,8 @@ import { ReaderScreen } from './reader/ReaderScreen'
 import { SettingsScreen } from './settings/SettingsScreen'
 import { EntranceCover } from './entrance/EntranceCover'
 import { OrnamentsLab } from './lab/OrnamentsLab'
-import { bookmarkSwipeDestination, spreadLayers, useBookSpread } from './paper/bookSpread'
+import { bookmarkSwipeDestination, closesBook, spreadLayers, useBookSpread } from './paper/bookSpread'
+import { createWheelTurn, isSidewaysWheel } from './reader/wheelTurn'
 import { BookSpread } from './paper/BookSpread'
 import { unlockPageTurnSounds } from './paper/pageTurnSounds'
 
@@ -75,8 +76,14 @@ export function App() {
   )
   // Once per page load — mirrors Android rememberSaveable entranceDone.
   const [entranceDone, setEntranceDone] = useState(false)
+  // Chapters is the first page: turning back from it closes the book again.
+  const [coverReturns, setCoverReturns] = useState(0)
+  const closeBook = useCallback(() => {
+    setCoverReturns((count) => count + 1)
+    setEntranceDone(false)
+  }, [])
   const isLab = useLabRoute()
-  const swipeStart = useRef<{ x: number; y: number; pointerId: number; layer: StackLayer } | null>(null)
+  const swipeStart = useRef<{ x: number; y: number; pointerId: number; layer: StackLayer; field: boolean } | null>(null)
   const stack = state.stackLayer
   const hasReader = hasReaderOpen(state.content, state.sheet)
   const playbackPinned = useAppSelector((s) =>
@@ -151,6 +158,22 @@ export function App() {
     return () => window.removeEventListener('keydown', onKey)
   }, [entranceDone])
 
+  // Two fingers swept back across Chapters close the book, as a finger
+  // dragged back across it does. Taken from the browser's history sweep.
+  useEffect(() => {
+    if (!entranceDone) return
+    const wheelTurn = createWheelTurn()
+    const onWheel = (event: WheelEvent) => {
+      if (event.ctrlKey || !isSidewaysWheel(event.deltaX, event.deltaY)) return
+      const sheet = event.target instanceof Element ? event.target.closest('.sheet') : null
+      if (sheet?.getAttribute('data-name') !== 'home' || sheet.getAttribute('data-active') !== 'true') return
+      event.preventDefault()
+      if (wheelTurn(event.deltaX, event.deltaY, event.timeStamp) === -1) closeBook()
+    }
+    window.addEventListener('wheel', onWheel, { passive: false })
+    return () => window.removeEventListener('wheel', onWheel)
+  }, [entranceDone, closeBook])
+
   // The Ornaments Lab is a standalone dev tool — it needs no database, so
   // it renders over everything the moment the hash routes to it.
   if (isLab) return <OrnamentsLab />
@@ -165,7 +188,9 @@ export function App() {
       : sheet?.getAttribute('data-name') === 'bookmarks' ? stack : null
     if (layer !== COVER_LAYER && layer !== BOOKMARKS_LAYER) return
     if (event.pointerType === 'mouse' && event.button !== 0) return
-    swipeStart.current = { x: event.clientX, y: event.clientY, pointerId: event.pointerId, layer }
+    // A drag inside a text field selects text; it never closes the book.
+    const field = (event.target as Element).closest('input, textarea') != null
+    swipeStart.current = { x: event.clientX, y: event.clientY, pointerId: event.pointerId, layer, field }
   }
 
   const finishBookmarkSwipe = (event: ReactPointerEvent<HTMLDivElement>) => {
@@ -175,6 +200,10 @@ export function App() {
     const dx = event.clientX - start.x
     const dy = event.clientY - start.y
     if (Math.abs(dx) < 64 || Math.abs(dx) < Math.abs(dy) * 1.35) return
+    if (!start.field && closesBook(start.layer, dx)) {
+      closeBook()
+      return
+    }
     const destination = bookmarkSwipeDestination(start.layer, dx, state.bookmarks.length > 0)
     if (destination != null) appStore.revealLayer(destination)
   }
@@ -214,6 +243,8 @@ export function App() {
       )}
       {!entranceDone && (
         <EntranceCover
+          key={coverReturns}
+          returning={coverReturns > 0}
           ready={state.ready}
           loadLabel={state.loadLabel}
           loadProgress={state.loadProgress}

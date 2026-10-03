@@ -40,6 +40,12 @@ export const COVER_OPEN_SCHEDULE: FlipSchedule = { lift: 0, sweep: 260, drop: 82
  */
 export const BOOK_OPEN_SCHEDULE: FlipSchedule = { lift: 500, sweep: 860, drop: 1440, rate: 0.92 }
 
+/** Phone cover coming back down: the same hinge, landing as it runs out. */
+export const COVER_CLOSE_SCHEDULE: FlipSchedule = { lift: 0, sweep: 330, drop: 900, rate: 0.92 }
+
+/** Desktop cover closing: the board lands at 1190 ms, then the book slides. */
+export const BOOK_CLOSE_SCHEDULE: FlipSchedule = { lift: 0, sweep: 420, drop: 1000, rate: 0.92 }
+
 /** Under the recitation, never over it. The stems already sit 6 dB down. */
 const GAIN = 0.32
 /** A turn whose audio could not start this soon after it began plays nothing. */

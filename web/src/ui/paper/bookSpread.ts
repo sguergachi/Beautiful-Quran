@@ -56,6 +56,29 @@ export function leavesReader(
   return readerVisible(spread, from, hasReader) && !readerVisible(spread, to, hasReader)
 }
 
+/**
+ * Facing mushaf leaves: Chapters is the left-most page of the open book and
+ * Settings the right-most, each lying under the leaf on its side. Going to
+ * Chapters lifts the verso leaf and swings it right ('on'); going to
+ * Settings lifts the recto leaf and swings it left ('back'). Leaving either
+ * lays that leaf back down over it. Bookmarks is a sheet laid over Chapters,
+ * not a page of the book, so it turns nothing.
+ */
+export function bookTurnDirection(from: StackLayer, to: StackLayer): 'on' | 'back' | null {
+  const start = Math.max(COVER_LAYER, from)
+  const end = Math.max(COVER_LAYER, to)
+  if (start === end) return null
+  return end > start ? 'back' : 'on'
+}
+
+/**
+ * Chapters is the first page, so the sweep that turns a leaf back (a finger
+ * moving left) closes the book from it. Bookmarks owns the other direction.
+ */
+export function closesBook(layer: StackLayer, dx: number): boolean {
+  return layer === COVER_LAYER && dx < 0
+}
+
 /** A swipe belongs to the sheet on which its pointer went down. */
 export function bookmarkSwipeDestination(layer: StackLayer, dx: number, hasBookmarks: boolean): StackLayer | null {
   if (layer === COVER_LAYER && dx > 0 && hasBookmarks) return BOOKMARKS_LAYER

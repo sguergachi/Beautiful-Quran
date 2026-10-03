@@ -2587,14 +2587,12 @@ button.ayah-mark {
   touch-action: pan-y;
 }
 
-/* One measure: running head, text and folio all hang on the text block's
-   own margins. The block is drawn in to its widest line (--mushaf-measure),
-   so justifying never has to open rivers to reach a page that is too wide. */
 /* One measure. Hafs is not the page's own face and sets narrower than the
    print, so justifying every line out to the page opens rivers between the
    words. The text block is instead as wide as its widest line set with
-   minimum word spaces, and every other line justifies to that. Running head
-   and folio hang on the same block. */
+   minimum word spaces and slightly condensed letters (mushafMeasure, written
+   inline once the lines are measured), and every other line justifies to
+   that. Running head and folio hang on the same block. */
 .mushaf-block {
   flex: 1;
   min-height: 0;
@@ -2610,7 +2608,9 @@ button.ayah-mark {
 /* Letter widening, the stand-in for the print's elongated letters: a loose
    line is set a few percent wide before any space is added between its
    words. The line is laid out narrower by the same factor and scaled back
-   out, so its word spaces are solved against the widened letters. */
+   out, so its word spaces are solved against the widened letters. The one
+   or two lines longer than the measure take a factor under 1 the same way:
+   set a few percent narrow, at minimum word spaces. */
 .mushaf-line[data-widen] {
   width: calc(100% / var(--line-widen, 1));
   transform: scaleX(var(--line-widen, 1));
@@ -2621,7 +2621,7 @@ button.ayah-mark {
    word space, as the print centres a chapter's last line. */
 .mushaf-line[data-short] {
   justify-content: center;
-  gap: 0.42em;
+  gap: 0.3em;
 }
 
 .mushaf-head {
@@ -2663,15 +2663,15 @@ button.ayah-mark {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  /* The least a word space may be. Justification only ever adds to it. */
-  gap: 0.3em;
+  /* The least a word space may be: Hafs's own space (MUSHAF_MIN_GAP).
+     Justification only ever adds to it. */
+  gap: 0.22em;
   font-family: var(--font-arabic);
   line-height: 1;
   overflow: hidden;
   white-space: nowrap;
 }
 
-.mushaf-word,
 .mushaf-mark,
 .mushaf-english-text {
   appearance: none;
@@ -2685,14 +2685,6 @@ button.ayah-mark {
   line-height: 1;
 }
 
-.mushaf-word {
-  display: inline;
-}
-
-.mushaf-word[data-active='true'] {
-  color: var(--accent);
-}
-
 .mushaf-mark {
   color: var(--gold);
   font-size: 0.72em;
@@ -2701,6 +2693,14 @@ button.ayah-mark {
   padding: 0;
   font-family: inherit;
   cursor: pointer;
+  transition: opacity var(--ayah-mark-fade-ms, 400ms) var(--recede-ease);
+}
+
+/* A verse still to come waits with its words; its mark returns as the
+   verse's last word is reached. */
+.mushaf-mark[data-state='Upcoming'] {
+  opacity: var(--upcoming-alpha, 0.2661);
+  transition-duration: var(--recess-ms, 400ms);
 }
 
 .mushaf-chapter {
@@ -5524,7 +5524,8 @@ button.ayah-mark {
   --cover-inner-inset: 33px;
   --cover-outer-radius: 30px;
   --cover-inner-radius: 20px;
-  --cover-star: 32px;
+  --cover-seal: 16px;
+  --cover-seal-c: 31px;
   --cover-medallion: 203px;
   --cover-title-ar: 37px;
   --cover-title-en: 20px;
@@ -5576,6 +5577,58 @@ button.ayah-mark {
     transform: perspective(1400px) rotateY(-95deg);
     opacity: 0;
   }
+}
+
+/* Light on the gilding, where the mouse is (EntranceCover moveGlint). The
+   light must catch gold and leave leather alone, so a wash laid over the
+   board will not do: dodge alone lifts the leather into a pale patch.
+   Two blends make a line that pivots on the leather instead. Difference
+   takes a little off every channel, then dodge scales what is left: the
+   first layer is the leather's own colour times the second's, so leather
+   comes back exactly as it was, while gold, far above it, flares toward
+   white-gold. Both fade to black, which is no change for either blend, so
+   the pivot holds all the way down the falloff. */
+.entrance-glint {
+  /* No box and no stacking context of its own: a group would be blended
+     on its own, against nothing, and laid over the board as a dark sheet.
+     The two layers blend with the board directly. */
+  display: contents;
+  --glint-at: circle calc(var(--cover-unit) * 13) at var(--glint-x, 50%) var(--glint-y, 50%);
+}
+
+.entrance-glint > span {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 420ms ease;
+}
+
+.entrance-glint[data-on='true'] > span {
+  opacity: 1;
+  transition-duration: 180ms;
+}
+
+.entrance-glint > span:first-child {
+  mix-blend-mode: difference;
+  background: radial-gradient(var(--glint-at), rgb(5 24 17) 0%, rgb(2 11 8) 40%, #000 100%);
+}
+
+.entrance-glint > span:last-child {
+  mix-blend-mode: color-dodge;
+  background: radial-gradient(var(--glint-at), rgb(122 114 96) 0%, rgb(56 52 44) 40%, #000 100%);
+}
+
+.entrance-board--opening .entrance-glint,
+.entrance-board--closing .entrance-glint {
+  display: none;
+}
+
+/* Closing runs the same hinge the other way: the board comes back down. */
+.entrance-board--closing {
+  animation: entrance-cover-open 1150ms cubic-bezier(0.24, 0.02, 0.12, 1) reverse both;
+  pointer-events: none;
 }
 
 .entrance-leather {
@@ -5694,12 +5747,13 @@ button.ayah-mark {
 .entrance-corner {
   position: absolute;
   box-sizing: border-box;
-  width: var(--cover-star);
-  height: var(--cover-star);
+  width: var(--cover-seal);
+  height: var(--cover-seal);
   aspect-ratio: 1 / 1;
   flex-shrink: 0;
   overflow: visible;
-  /* Centered on the border band's corners — square seal, never stretched. */
+  /* Seated on the border band's corner arc, inscribed between the two
+     rules — square seal, never stretched. */
 }
 
 .entrance-corner svg {
@@ -5710,23 +5764,23 @@ button.ayah-mark {
 }
 
 .entrance-corner--tl {
-  top: calc(var(--cover-band-c) - var(--cover-star) / 2);
-  left: calc(var(--cover-band-c) - var(--cover-star) / 2);
+  top: calc(var(--cover-seal-c) - var(--cover-seal) / 2);
+  left: calc(var(--cover-seal-c) - var(--cover-seal) / 2);
 }
 
 .entrance-corner--tr {
-  top: calc(var(--cover-band-c) - var(--cover-star) / 2);
-  right: calc(var(--cover-band-c) - var(--cover-star) / 2);
+  top: calc(var(--cover-seal-c) - var(--cover-seal) / 2);
+  right: calc(var(--cover-seal-c) - var(--cover-seal) / 2);
 }
 
 .entrance-corner--bl {
-  bottom: calc(var(--cover-band-c) - var(--cover-star) / 2);
-  left: calc(var(--cover-band-c) - var(--cover-star) / 2);
+  bottom: calc(var(--cover-seal-c) - var(--cover-seal) / 2);
+  left: calc(var(--cover-seal-c) - var(--cover-seal) / 2);
 }
 
 .entrance-corner--br {
-  bottom: calc(var(--cover-band-c) - var(--cover-star) / 2);
-  right: calc(var(--cover-band-c) - var(--cover-star) / 2);
+  bottom: calc(var(--cover-seal-c) - var(--cover-seal) / 2);
+  right: calc(var(--cover-seal-c) - var(--cover-seal) / 2);
 }
 
 /*
@@ -6703,9 +6757,16 @@ html[data-entrance='true'] body {
   }
 }
 
+.entrance-board[data-opening-mode='spread'].entrance-board--closing {
+  /* Duration mirrors BOOK_CLOSE_MS in EntranceCover. */
+  animation: entrance-book-open 1700ms linear reverse both;
+}
+
 .entrance-front {
   position: absolute;
   inset: 0;
+  /* One group: the glint's blends see the whole face, and nothing past it. */
+  isolation: isolate;
   overflow: hidden;
   border-radius: inherit;
   backface-visibility: hidden;
@@ -6766,6 +6827,10 @@ html[data-entrance='true'] body {
   animation: entrance-inside-light 1700ms linear forwards;
 }
 
+.entrance-board--closing .entrance-inside::after {
+  animation: entrance-inside-light 1700ms linear reverse both;
+}
+
 @keyframes entrance-inside-light {
   0%,
   60% {
@@ -6777,7 +6842,7 @@ html[data-entrance='true'] body {
 }
 
 /* Closed: the board alone. */
-html[data-entrance='true']:not([data-entrance-opening])
+html[data-entrance='true']:not([data-entrance-opening]):not([data-entrance-closing])
   .app-shell[data-spread='true']
   :is(.book, .book-spine, .sheet, .book-verso-leaf) {
   opacity: 0 !important;
@@ -6799,6 +6864,34 @@ html[data-entrance-opening]
   .app-shell[data-spread='true']
   :is(.book-spine, .book-verso-leaf, .sheet:not([data-name='reader'])) {
   opacity: 0 !important;
+}
+
+/* Closing: the board lifts off the left half, which is gone with it, and
+   comes down on the page block. The block goes as the closed book slides
+   back to the middle of the desk. */
+html[data-entrance-closing] .app-shell[data-spread='true'] .book {
+  clip-path: inset(0 0 0 50%);
+}
+
+html[data-entrance-closing] .app-shell[data-spread='true'] :is(.book, .sheet[data-name='reader']) {
+  animation: entrance-book-away 1700ms linear both;
+}
+
+html[data-entrance-closing]
+  .app-shell[data-spread='true']
+  :is(.book-spine, .book-verso-leaf, .book-turn, .sheet:not([data-name='reader'])) {
+  opacity: 0 !important;
+}
+
+@keyframes entrance-book-away {
+  0%,
+  70% {
+    opacity: 1;
+  }
+  72%,
+  100% {
+    opacity: 0;
+  }
 }
 
 .book-title-page {
@@ -6866,6 +6959,32 @@ html[data-entrance-opening]
 .app-shell[data-spread='true'][data-leaves='true'] .sheet[data-name='home'][data-active='false'] {
   opacity: 0;
   pointer-events: none;
+}
+
+/* Settings is the book's right-most page: on facing leaves it lies on the
+   recto, under the leaf that is turned away to show it. */
+.app-shell[data-spread='true'][data-leaves='true'] .sheet[data-name='settings'] {
+  left: 50% !important;
+  right: var(--page-outer) !important;
+  transform: none;
+  /* Still on the page until the leaf coming back down has covered it. */
+  content-visibility: visible;
+  contain: none;
+}
+
+/* Chapters and Settings are uncovered by a turning leaf (MushafReader sheet
+   turn): each is whole the moment the leaf over it lifts, and stays until
+   the leaf laid back down has covered it. */
+@media (prefers-reduced-motion: no-preference) {
+  .app-shell[data-spread='true'][data-leaves='true']
+    .sheet:is([data-name='home'], [data-name='settings'])[data-active='true'] {
+    transition: none;
+  }
+
+  .app-shell[data-spread='true'][data-leaves='true']
+    .sheet:is([data-name='home'], [data-name='settings'])[data-active='false'] {
+    transition: opacity 0s linear 700ms;
+  }
 }
 
 /* On the spread the hand starts from the page, not the window's width;
@@ -6989,19 +7108,25 @@ html[data-entrance-opening]
   /* Spread: the leaf is one page wide, on the side it lifts from. */
   --leaf-width: 50%;
   --turn-ms: 760ms;
+  /* How far each face laps over its joints. Strips are a fraction of a
+     pixel wide, so their edges are soft; at one pixel the page beneath
+     showed through every joint as a vertical rule. */
+  --joint: 2px;
+  /* The whole sheet's curl, shared out among the joints. */
+  --furl-total: 52deg;
+  --furl: calc(var(--furl-total) / (var(--strips) - 1));
 }
 
 /* Pages run right to left. Going on, the left leaf swings to the right. */
 .mushaf-flip[data-dir='on'] {
   --turn-from: 0deg;
   --turn-to: 180deg;
-  --furl: 6.5deg;
 }
 
 .mushaf-flip[data-dir='back'] {
   --turn-from: 0deg;
   --turn-to: -180deg;
-  --furl: -6.5deg;
+  --furl-total: -52deg;
 }
 
 /* A single leaf is bound at its right edge and has nowhere to land: it
@@ -7009,7 +7134,7 @@ html[data-entrance-opening]
 .mushaf-flip--single {
   perspective: 1700px;
   --leaf-width: 100%;
-  --furl: 6deg;
+  --furl-total: 48deg;
 }
 
 .mushaf-flip--single[data-dir='on'] {
@@ -7107,8 +7232,8 @@ html[data-entrance-opening]
 
 .mushaf-flip-face {
   position: absolute;
-  /* Over the joint by a pixel each side, so nothing shows between strips. */
-  inset: 0 -1px;
+  /* Over the joint each side, so nothing shows between strips. */
+  inset: 0 calc(-1 * var(--joint));
   overflow: hidden;
   background: var(--paper);
   backface-visibility: hidden;
@@ -7123,10 +7248,10 @@ html[data-entrance-opening]
   position: absolute;
   top: 0;
   bottom: 0;
-  /* Percentages here are of the widened face; undo its 2px so each strip's
+  /* Percentages here are of the widened face; undo its lap so each strip's
      slice still starts exactly where the last one ended. */
-  width: calc(var(--strips) * (100% - 2px));
-  margin-left: 1px;
+  width: calc(var(--strips) * (100% - 2 * var(--joint)));
+  margin-left: var(--joint);
 }
 
 .mushaf-flip--single .mushaf-flip-page {

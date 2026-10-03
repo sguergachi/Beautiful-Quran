@@ -1,11 +1,17 @@
 import { memo, useLayoutEffect, useRef, type AnimationEvent, type ReactNode } from 'react'
 
-/** Strips the leaf in the air is cut into. Each joint bends a little, so the sheet furls. */
-export const TURNING_LEAF_STRIPS = 9
+/**
+ * Strips the leaf in the air is cut into. Each joint bends a little, so the
+ * sheet furls. Every strip is flat, so a joint is a crease: the text kinks
+ * there, and at nine strips the creases read as vertical rules down the
+ * page. Enough strips that each bends only a few degrees, and the sheet
+ * reads as one curve. The total curl is fixed in styles.css (--furl-total).
+ */
+export const TURNING_LEAF_STRIPS = 18
 
-/** Faces overlap their joints by 1px a side (styles.css), so a slice is the face less 2px. */
+/** Faces overlap their joints by --joint a side (styles.css), so a slice is the face less two. */
 function sliceOffset(slice: number): string {
-  return `calc(${-slice} * (100% - 2px))`
+  return `calc(${-slice} * (100% - 2 * var(--joint)))`
 }
 
 /**

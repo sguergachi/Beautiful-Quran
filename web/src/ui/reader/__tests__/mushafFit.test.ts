@@ -1,5 +1,13 @@
 import { describe, expect, it } from 'vitest'
-import { mushafFit, mushafLeafFit, naturalLineWidth, solveLine } from '../mushafFit'
+import {
+  MUSHAF_MAX_CONDENSE,
+  MUSHAF_MIN_GAP,
+  mushafFit,
+  mushafLeafFit,
+  mushafMeasure,
+  naturalLineWidth,
+  solveLine,
+} from '../mushafFit'
 
 describe('incoming page fit', () => {
   it('waits for both incoming leaves, including the hidden recto', () => {
@@ -18,6 +26,14 @@ describe('measure', () => {
     expect(naturalLineWidth([], 8)).toBe(0)
     expect(naturalLineWidth([100], 8)).toBe(100)
     expect(naturalLineWidth([100, 50, 20], 8)).toBe(186)
+  })
+
+  it('measures a line as it would be set condensed', () => {
+    expect(naturalLineWidth([100, 100], 10, 0.04)).toBeCloseTo(192 + 10, 6)
+  })
+
+  it('never sets a word space wider than Hafs sets its own', () => {
+    expect(MUSHAF_MIN_GAP).toBeLessThanOrEqual(0.22)
   })
 
   it('shrinks the type when the widest line overflows the page', () => {
@@ -47,18 +63,48 @@ describe('measure', () => {
   })
 })
 
+describe('mushafMeasure', () => {
+  const em = 20
+  it('draws the block in to the widest line set condensed at minimum spaces', () => {
+    const lines = [{ ink: 500, gaps: 10 }, { ink: 450, gaps: 9 }]
+    expect(mushafMeasure(lines, em, 1000)).toBeCloseTo(500 * (1 - MUSHAF_MAX_CONDENSE) + 10 * MUSHAF_MIN_GAP * em, 6)
+  })
+
+  it('never asks for more than the page gives', () => {
+    expect(mushafMeasure([{ ink: 900, gaps: 10 }], em, 600)).toBe(600)
+  })
+
+  it('takes the page with nothing to measure', () => {
+    expect(mushafMeasure([], em, 600)).toBe(600)
+  })
+
+  it('leaves the long line room enough at the condense limit', () => {
+    const lines = [{ ink: 500, gaps: 10 }, { ink: 420, gaps: 8 }]
+    const measure = mushafMeasure(lines, em, 1000)
+    const { widen } = solveLine(500, 10, measure, em, 0.06)
+    expect(widen).toBeCloseTo(1 - MUSHAF_MAX_CONDENSE, 6)
+    expect(500 * widen + 10 * MUSHAF_MIN_GAP * em).toBeLessThanOrEqual(measure + 1e-9)
+  })
+})
+
 describe('solveLine', () => {
   const em = 20
   it('leaves a full line alone', () => {
-    // 10 gaps at the 0.42 em target need 84px; ink 516 fills the 600 measure.
-    expect(solveLine(516, 10, 600, em, 0.06)).toEqual({ widen: 1, short: false })
-    expect(solveLine(580, 10, 600, em, 0.06)).toEqual({ widen: 1, short: false })
+    // 10 gaps at the 0.3 em target need 60px; ink 540 fills the 600 measure.
+    expect(solveLine(540, 10, 600, em, 0.06)).toEqual({ widen: 1, short: false })
+    expect(solveLine(550, 10, 600, em, 0.06)).toEqual({ widen: 1, short: false })
   })
 
   it('widens a loose line only as far as the target word space', () => {
-    const { widen, short } = solveLine(500, 10, 600, em, 0.06)
+    const { widen, short } = solveLine(530, 10, 600, em, 0.06)
     expect(short).toBe(false)
-    expect(widen).toBeCloseTo(516 / 500, 4)
+    expect(widen).toBeCloseTo(540 / 530, 4)
+  })
+
+  it('condenses a line that overruns at minimum spaces, up to the limit', () => {
+    // 10 minimum spaces are 44px; 570 ink needs 614 > 600.
+    expect(solveLine(570, 10, 600, em, 0.06).widen).toBeCloseTo(556 / 570, 6)
+    expect(solveLine(700, 10, 600, em, 0.06).widen).toBe(1 - MUSHAF_MAX_CONDENSE)
   })
 
   it('stops at the cap', () => {

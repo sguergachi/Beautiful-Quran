@@ -45,7 +45,9 @@ import {
 import { OrnateSurahTitle } from './OrnateSurahTitle'
 import { NextChapterFooter } from './NextChapterFooter'
 import { PageBreak } from './PageBreak'
+import { QuranRepository } from '../../data/repository'
 import { MushafReader } from './MushafReader'
+import { MUSHAF_INK_IDLE, type MushafInk } from './mushafInk'
 import { ayahKey } from '../../share/gather'
 import { buildReaderItems, sliceReaderItems } from './readerItems'
 import { ReaderFocusController } from './focus/ReaderFocusController'
@@ -1306,6 +1308,17 @@ export function ReaderScreen({
     ? readerInkAyah(state.activeWord, state.player.nowPlaying?.ayah)
     : null
   const leadAyah = recitingActive ? state.activeAyah : null
+  const mushafInkActiveWord =
+    inkAyah != null && state.activeWord?.ayah === inkAyah ? state.activeWord : null
+  const mushafInk: MushafInk = recitingActive
+    ? {
+        reciting: true,
+        inkAyah,
+        leadAyah,
+        activeWord: mushafInkActiveWord,
+        speed: state.settings.playbackSpeed,
+      }
+    : MUSHAF_INK_IDLE
   const reciterName =
     state.reciters.find((r) => r.id === state.settings.reciterId)?.name ?? 'Reciter'
   const matchLabel =
@@ -1459,6 +1472,14 @@ export function ReaderScreen({
               english={state.settings.readingMode === 'english_only'}
               pageNumberScript={pageNumberScript}
               glyphWiden={state.settings.mushafGlyphWiden / 100}
+              ink={mushafInk}
+              onHoldWord={(surahId, ayah, position) => {
+                if (state.gathering) return
+                const word = QuranRepository.surahContent(surahId).ayahs
+                  .find((item) => item.number === ayah)?.words
+                  .find((item) => item.position === position)
+                if (word) appStore.openRootViewer(surahId, ayah, word)
+              }}
               onPlayWord={(surahId, ayah, position) => {
                 if (state.gathering) {
                   appStore.onVerseTap(surahId, ayah)

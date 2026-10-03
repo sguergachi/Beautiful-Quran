@@ -4,17 +4,28 @@
  * with progress inked onto the leather; arrive → du'a text fade → open once
  * the book is ready.
  */
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+  type PointerEvent as ReactPointerEvent,
+} from 'react'
 import { BOOK_SPREAD_QUERY } from '../paper/bookSpread'
 import {
+  BOOK_CLOSE_SCHEDULE,
   BOOK_OPEN_SCHEDULE,
+  COVER_CLOSE_SCHEDULE,
   COVER_OPEN_SCHEDULE,
   playFlip,
   warmPageTurnSounds,
 } from '../paper/pageTurnSounds'
 import { animate, type AnimationPlaybackControls } from 'motion'
+import { createWheelTurn, isSidewaysWheel } from '../reader/wheelTurn'
 import { washMaskImage } from '../theme/Fade'
-import { coverLayout, coverLayoutCssVars } from './coverLayout'
+import { coverLayout, coverLayoutCssVars, sealBox } from './coverLayout'
 import { generateCoverOrnament, type CoverOrnament, type RosetteSpec } from '../theme/ornamentGenerator'
 import {
   fieldWeaveBackground,
@@ -36,7 +47,7 @@ const OPEN_MS = 1_150
 /** Desktop spread: slide onto the recto, then swing the board right over. */
 const BOOK_OPEN_MS = 1_700
 
-type Phase = 'loading' | 'arriving' | 'dua' | 'opening'
+type Phase = 'loading' | 'arriving' | 'dua' | 'opening' | 'closing' | 'closed'
 
 export interface EntranceCoverProps {
   /** True once quran.db is open and the chapter list can be shown. */
@@ -49,6 +60,11 @@ export interface EntranceCoverProps {
   error: string | null
   onRetry?: () => void
   onFinished: () => void
+  /**
+   * The book is being closed from Chapters rather than arriving: the board
+   * comes back down fully inked, and waits to be opened again.
+   */
+  returning?: boolean
 }
 
 function wait(ms: number, signal: AbortSignal): Promise<void> {
@@ -120,20 +136,26 @@ async function runWash(
  * grid. The seals are the hubs the border band's channels taper onto, part
  * of the tooled binding rather than the ink wash, so they render complete
  * from the first frame (matches Android's static `GeneratedCornerSeals`).
+ * [box] is the seal's drawing box in px; its strokes stay one rule wide.
  */
-function MushafCoverFrame({ seal }: { seal: RosetteSpec }) {
+function MushafCoverFrame({ seal, box }: { seal: RosetteSpec; box: number }) {
+  const stroke = 220 / Math.max(1, box)
   const corner = (pos: string) => (
     <GeneratedRosette
       spec={seal}
       built
       animated={false}
       className={`entrance-corner entrance-corner--${pos}`}
-      ruleWidth={4.6}
-      hairWidth={4.6}
+      ruleWidth={stroke}
+      hairWidth={stroke}
     />
   )
   return (
-    <div className="entrance-frame" aria-hidden="true">
+    <div
+      className="entrance-frame"
+      aria-hidden="true"
+      style={{ ['--cover-seal' as string]: `${box.toFixed(2)}px` }}
+    >
       <div className="entrance-frame-outer" />
       <div className="entrance-frame-inner" />
       {corner('tl')}
@@ -156,17 +178,20 @@ export function EntranceCover({
   error,
   onRetry,
   onFinished,
+  returning = false,
 }: EntranceCoverProps) {
-  const [phase, setPhase] = useState<Phase>('loading')
-  const [sheetAlpha, setSheetAlpha] = useState(0)
+  const [phase, setPhase] = useState<Phase>(returning ? 'closing' : 'loading')
+  const [sheetAlpha, setSheetAlpha] = useState(returning ? 1 : 0)
   const [opening, setOpening] = useState(false)
   const [skipped, setSkipped] = useState(false)
-  const [openingMode, setOpeningMode] = useState<'phone' | 'spread' | null>(null)
+  // Closing swings on the same hinge as opening, so it takes the same mode.
+  const [openingMode, setOpeningMode] = useState<'phone' | 'spread' | null>(() =>
+    returning ? (window.matchMedia(BOOK_SPREAD_QUERY).matches ? 'spread' : 'phone') : null)
   const [openingStyle, setOpeningStyle] = useState({})
   const openingRef = useRef(false)
   const arrivalAcRef = useRef<AbortController | null>(null)
   const openingAtRef = useRef(0)
-  const [captionOn, setCaptionOn] = useState(false)
+  const [captionOn, setCaptionOn] = useState(returning)
   const [arrivalDone, setArrivalDone] = useState(false)
   const [board, setBoard] = useState(() => ({ w: 390, h: 844, layout: coverLayout(390, 844) }))
   const layoutVars = useMemo(() => coverLayoutCssVars(board.layout), [board.layout])
@@ -178,9 +203,24 @@ export function EntranceCover({
   const fieldSize = useFieldCellWidth(ornament.field.cellWidthDp)
   const weave = useMemo(() => fieldWeaveBackground(ornament.field, undefined, undefined, fieldSize.cellWidth), [ornament, fieldSize.cellWidth])
   // Flips one frame after mount; starts every stroke's dash-reveal clock.
-  const built = useOrnamentBuilt()
+  const built = useOrnamentBuilt() || returning
 
   const boardRef = useRef<HTMLDivElement>(null)
+  const glintRef = useRef<HTMLDivElement>(null)
+  // Android turns the gilding's sheen with the phone's tilt. A desk has a
+  // pointer instead: the light falls where the mouse is. Written straight
+  // to the element, so moving the mouse never re-renders the cover.
+  const moveGlint = (event: ReactPointerEvent<HTMLDivElement>) => {
+    const glint = glintRef.current
+    if (!glint || event.pointerType !== 'mouse') return
+    const box = event.currentTarget.getBoundingClientRect()
+    glint.style.setProperty('--glint-x', `${(event.clientX - box.left).toFixed(1)}px`)
+    glint.style.setProperty('--glint-y', `${(event.clientY - box.top).toFixed(1)}px`)
+    glint.dataset.on = 'true'
+  }
+  const dropGlint = () => {
+    if (glintRef.current) delete glintRef.current.dataset.on
+  }
   const titleArRef = useRef<HTMLParagraphElement>(null)
   const titleEnRef = useRef<HTMLParagraphElement>(null)
   const duaRef = useRef<HTMLParagraphElement>(null)
@@ -241,14 +281,64 @@ export function EntranceCover({
     setOpening(true)
   }, [])
 
+  const closing = phase === 'closing'
   const skipToOpening = useCallback(() => {
-    if (openingRef.current) return
+    if (openingRef.current || closing) return
     setSkipped(true)
     setCaptionOn(true)
     arrivalAcRef.current?.abort()
     momentAcRef.current?.abort()
     if (canOpen) open()
-  }, [canOpen, open])
+  }, [canOpen, open, closing])
+
+  const endClosing = useCallback(() => {
+    setOpeningMode(null)
+    setPhase((current) => (current === 'closing' ? 'closed' : current))
+  }, [])
+
+  // A returning cover is already inked: nothing washes in a second time.
+  useLayoutEffect(() => {
+    if (!returning) return
+    applyWash(titleArRef.current, 1, 0)
+    applyWash(titleEnRef.current, 1, 0)
+    applyWash(duaRef.current, 1, 0.12)
+  }, [returning])
+
+  // Before paint, so the open book is never hidden for a frame.
+  useLayoutEffect(() => {
+    if (!closing) return
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      endClosing()
+      return
+    }
+    document.documentElement.dataset.entranceClosing = 'true'
+    const cancelSound = playFlip(
+      openingMode === 'spread' ? BOOK_CLOSE_SCHEDULE : COVER_CLOSE_SCHEDULE,
+      performance.now(),
+    )
+    let landed = false
+    const timer = window.setTimeout(() => { landed = true; endClosing() },
+      (openingMode === 'spread' ? BOOK_OPEN_MS : OPEN_MS) + 250)
+    return () => {
+      window.clearTimeout(timer)
+      if (!landed) cancelSound()
+      document.documentElement.removeAttribute('data-entrance-closing')
+    }
+    // The mode is fixed for the whole swing.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [closing, endClosing])
+
+  // The sweep that turns a leaf on opens the closed book.
+  useEffect(() => {
+    const wheelTurn = createWheelTurn()
+    const onWheel = (event: WheelEvent) => {
+      if (event.ctrlKey || !isSidewaysWheel(event.deltaX, event.deltaY)) return
+      event.preventDefault()
+      if (wheelTurn(event.deltaX, event.deltaY, event.timeStamp) === 1) skipToOpening()
+    }
+    window.addEventListener('wheel', onWheel, { passive: false })
+    return () => window.removeEventListener('wheel', onWheel)
+  }, [skipToOpening])
 
   // Fetch while the cover is up; the first gesture unlocks decoding and audio.
   useEffect(() => {
@@ -305,6 +395,7 @@ export function EntranceCover({
 
   // Arrival — fade + title wash once, while the book may still be loading.
   useEffect(() => {
+    if (returning) return
     const ac = new AbortController()
     arrivalAcRef.current = ac
     const { signal } = ac
@@ -328,7 +419,7 @@ export function EntranceCover({
       }
     })()
     return () => ac.abort()
-  }, [])
+  }, [returning])
 
   // Skip can end arrival as well as the du'a; opening runs exactly once.
   useEffect(() => {
@@ -337,7 +428,8 @@ export function EntranceCover({
       open()
       return
     }
-    if (!arrivalDone || ceremonyStartedRef.current) return
+    // A book closed by hand stays closed until it is opened by hand.
+    if (returning || !arrivalDone || ceremonyStartedRef.current) return
     ceremonyStartedRef.current = true
     const ac = new AbortController()
     momentAcRef.current = ac
@@ -359,7 +451,7 @@ export function EntranceCover({
       momentAcRef.current = null
       ceremonyStartedRef.current = false
     }
-  }, [arrivalDone, canOpen, skipped, open])
+  }, [arrivalDone, canOpen, skipped, open, returning])
 
   const progressPct =
     loadProgress != null ? Math.round(Math.min(1, Math.max(0, loadProgress)) * 100) : null
@@ -376,9 +468,11 @@ export function EntranceCover({
         ref={boardRef}
         data-opening-mode={openingMode ?? undefined}
         onAnimationEnd={(event) => {
-          if (event.target === event.currentTarget && openingRef.current) finishOpening()
+          if (event.target !== event.currentTarget) return
+          if (openingRef.current) finishOpening()
+          else if (closing) endClosing()
         }}
-        className={`entrance-board${opening ? ' entrance-board--opening' : ''}`}
+        className={`entrance-board${opening ? ' entrance-board--opening' : ''}${closing ? ' entrance-board--closing' : ''}`}
         style={{
           ...layoutVars,
           ...openingStyle,
@@ -387,6 +481,8 @@ export function EntranceCover({
         role={!error && phase !== 'opening' ? 'button' : undefined}
         tabIndex={!error && phase !== 'opening' ? 0 : undefined}
         onClick={!error && phase !== 'opening' ? skipToOpening : undefined}
+        onPointerMove={moveGlint}
+        onPointerLeave={dropGlint}
         onKeyDown={
           !error && phase !== 'opening'
             ? (e) => {
@@ -422,12 +518,16 @@ export function EntranceCover({
           width={board.w}
           height={board.h}
         />
-        <MushafCoverFrame seal={ornament.cornerSeal} />
+        <MushafCoverFrame
+          seal={ornament.cornerSeal}
+          box={sealBox(board.layout, ornament.cornerSeal.tipRadius)}
+        />
         <div className="entrance-content">
           <div className="entrance-air entrance-air--top" />
           <GeneratedRosette
             spec={ornament.medallion}
             built={built}
+            animated={!returning}
             className="entrance-medallion"
           />
           <div className="entrance-titles">
@@ -472,6 +572,9 @@ export function EntranceCover({
             </div>
           )}
           <div className="entrance-air entrance-air--bot" />
+        </div>
+        <div ref={glintRef} className="entrance-glint" aria-hidden="true">
+          <span /><span />
         </div>
         </div>
         {/* The board's inside: lining and the first blank leaf pasted to it.
