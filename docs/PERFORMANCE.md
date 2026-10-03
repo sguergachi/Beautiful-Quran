@@ -38,10 +38,19 @@ same draw-phase-only behavior but expands the offscreen layer beyond the
 logical word box, preserving EB Garamond serifs and Hafs marks that overhang
 their advances while alpha is animated.
 
-The paper stack follows the same rule: its live page position is read inside
-each sheet's `graphicsLayer` and shadow draw callback. Only threshold-derived
-booleans return to composition, so dragging or settling a page does not wake the
-root three-sheet composition every frame.
+The paper stack follows the same rule: its live page position is read only
+inside `graphicsLayer` blocks — the sheet's transform and the alpha of its drop
+shadow. Only threshold-derived booleans return to composition, so dragging or
+settling a page does not wake the root three-sheet composition every frame. A
+bare `stackPosition.value` anywhere in the stack's composition (a `BackHandler`
+`enabled`, an `if`) undoes this for every turn; wrap it in `derivedStateOf`.
+
+The shadow is a sibling layer, not a draw modifier on the sheet. A draw callback
+that reads the position invalidates the sheet's own layer, which re-records all
+of the sheet's content that has no layer of its own for each frame of the turn.
+The cast is recorded once at full strength and the turn changes only its layer
+alpha (`CompositingStrategy.ModulateAlpha`, so no offscreen buffer clips the
+spill past the sheet's edge).
 
 The no-gloss Arabic path (`ResponsiveHafsAyah`) cannot put `letterFadeIn` on
 the whole ayah. It keeps the shaped ayah as static full-ink spans and applies

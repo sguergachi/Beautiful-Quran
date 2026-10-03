@@ -43,11 +43,12 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.draw.drawWithCache
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color as ComposeColor
+import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
@@ -573,6 +574,11 @@ private fun PaperStackApp(
     val stackPastCover by remember {
         derivedStateOf { stackPosition.value > COVER_LAYER + 0.01f }
     }
+    // A threshold, not the live page: read bare in the bookmarks BackHandler,
+    // the position recomposed this whole stack on every frame of every turn.
+    val stackBeforeCover by remember {
+        derivedStateOf { stackPosition.value < COVER_LAYER - 0.01f }
+    }
     val coverSheetVisible by remember {
         derivedStateOf { stackPosition.value <= FloatingPlaybackCoverVisibleMaxPage }
     }
@@ -962,7 +968,7 @@ private fun PaperStackApp(
     BackHandler(enabled = settledLayer > COVER_LAYER || stackPastCover) {
         animateTo((stackPosition.value.roundToInt() - 1).coerceAtLeast(COVER_LAYER))
     }
-    BackHandler(enabled = settledLayer < COVER_LAYER || stackPosition.value < -0.01f) {
+    BackHandler(enabled = settledLayer < COVER_LAYER || stackBeforeCover) {
         animateTo(COVER_LAYER)
     }
     BackHandler(enabled = settingsDetail != null && settledLayer > settingsLayer) {
@@ -1538,10 +1544,15 @@ private fun PaperPage(
     Box(
         modifier = modifier
             .fillMaxSize()
-            .paperLayerTransform(layer, stackPosition, settingsLayer)
-            .paperDropShadow(layer, stackPosition, settingsLayer),
+            .paperLayerTransform(layer, stackPosition, settingsLayer),
     ) {
         content()
+        // The cast is its own layer beside the sheet's content. Drawn on the
+        // sheet itself, its read of the live position re-recorded every word
+        // and ornament on the page for each frame of a turn.
+        if (layer != PaperLayer.Detail) {
+            Box(Modifier.matchParentSize().paperDropShadow(layer, stackPosition, settingsLayer))
+        }
     }
 }
 
@@ -1614,8 +1625,7 @@ private fun Modifier.paperDropShadow(
     layer: PaperLayer,
     stackPosition: () -> Float,
     settingsLayer: Int,
-): Modifier = drawWithContent {
-    drawContent()
+): Modifier = graphicsLayer {
     val position = stackPosition()
     val turning = when (layer) {
         PaperLayer.Bookmarks -> (-position).coerceIn(0f, 1f)
@@ -1626,18 +1636,25 @@ private fun Modifier.paperDropShadow(
         PaperLayer.Detail -> 0f
     }
     val depth = (4f * turning * (1f - turning)).coerceIn(0f, 1f)
-    if (depth > 0.01f) {
-        val shadowWidth = 24.dp.toPx()
+    // The cast is recorded once at full strength; the turn only changes how
+    // much of it shows. One rectangle, so alpha goes on the draw itself and
+    // the spill past the sheet's edge needs no offscreen buffer to clip it.
+    alpha = if (depth > 0.01f) depth else 0f
+    compositingStrategy = CompositingStrategy.ModulateAlpha
+}.drawWithCache {
+    val shadowWidth = 24.dp.toPx()
+    val cast = Brush.horizontalGradient(
+        colors = listOf(
+            ComposeColor.Black.copy(alpha = 0.26f),
+            ComposeColor.Black.copy(alpha = 0.09f),
+            ComposeColor.Transparent,
+        ),
+        startX = size.width,
+        endX = size.width + shadowWidth,
+    )
+    onDrawBehind {
         drawRect(
-            brush = Brush.horizontalGradient(
-                colors = listOf(
-                    ComposeColor.Black.copy(alpha = 0.26f * depth),
-                    ComposeColor.Black.copy(alpha = 0.09f * depth),
-                    ComposeColor.Transparent,
-                ),
-                startX = size.width,
-                endX = size.width + shadowWidth,
-            ),
+            brush = cast,
             topLeft = Offset(size.width, 0f),
             size = Size(shadowWidth, size.height),
         )
