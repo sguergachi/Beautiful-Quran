@@ -389,7 +389,7 @@ export function SettingsScreen({
           />
         </section>
 
-        {/* No heading: on Android the Customize row follows the reciters. */}
+        {/* No heading: on Android, Customize sits under the reciters and above Download manager. */}
         <section className="settings-section">
           <button
             type="button"
