@@ -54,8 +54,9 @@ val FloatingPlaybackListClearance: Dp = 96.dp
 /**
  * Dismissal sweep, matching the shared enter's full travel. The transport
  * leaves as one opaque sheet instead of dissolving in place, so it uncovers
- * the rows beneath rather than smearing over them. Home holds the list
- * inset for exactly this long before easing it out (see HomeScreen).
+ * the rows beneath rather than smearing over them. The list inset eases
+ * over exactly this long with the same easing, so the whole assembly
+ * travels as one.
  */
 internal const val HomeFloatExitMs = 260
 
@@ -290,9 +291,9 @@ internal fun shouldShowFloatingPlayback(
 /**
  * Bottom paper the chapter list keeps clear of the transport. The pinned
  * chapter session wins while it owns a verse (or is sliding away); else
- * the floating bar while it is up — including its exit sweep, which the
- * caller holds through — else just the gesture inset. The caller animates
- * toward this target instead of snapping, so rows glide rather than pop.
+ * the floating bar while it is up; else just the gesture inset. The caller
+ * animates toward this target over the sweep length, so bar, fade band,
+ * and rows travel as one instead of popping.
  */
 internal fun homeListBottomInset(
     pinnedSession: Boolean,
