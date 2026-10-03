@@ -252,6 +252,36 @@ describe('PlayerController event sequences', () => {
     vi.useRealTimers()
   })
 
+  it('does not publish the old clip\'s position under the next verse while its clip loads', async () => {
+    const audio = new FakeAudio()
+    const prefetcher = instantPrefetcher()
+    const player = new PlayerController(prefetcher, true, null, () => audio.asAudio())
+    player.loadSurah(content, reciter, 1, { quiet: true, warm: false })
+    await player.play()
+
+    // The next clip is slow to arrive.
+    let arrive: (src: string) => void = () => {}
+    vi.mocked(prefetcher.ensure).mockImplementationOnce(
+      () => new Promise<string>((resolve) => { arrive = resolve }),
+    )
+    audio.currentTime = 4.5
+    audio.ended = true
+    audio.emit('ended')
+    await vi.waitFor(() => expect(player.getState().nowPlaying?.ayah).toBe(2))
+
+    // The element still holds verse 1, 4.5 s in. That is not verse 2's time.
+    audio.emit('timeupdate')
+    expect(player.getState()).toMatchObject({ nowPlaying: { ayah: 2 }, positionMs: 0 })
+
+    audio.ended = false
+    audio.currentTime = 0
+    arrive('blob:next')
+    await vi.waitFor(() => expect(audio.play).toHaveBeenCalledTimes(2))
+    audio.currentTime = 0.3
+    audio.emit('timeupdate')
+    expect(player.getState()).toMatchObject({ nowPlaying: { ayah: 2 }, positionMs: 300 })
+  })
+
   it('advances on natural ended when gapless path is not used', async () => {
     const audio = new FakeAudio()
     const player = new PlayerController(

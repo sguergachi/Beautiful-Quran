@@ -2532,8 +2532,10 @@ button.ayah-mark {
   transform: translateY(-0.18em);
 }
 
+/* A scrolling chapter tints the word under the pointer. A Mushaf leaf does
+   not: it is a printed page, and Android's has no pointer to answer. */
 @media (hover: hover) {
-  .hafs-word:hover .word-ink-slot > .hafs-glyph:not(.hafs-repeat-overlay) {
+  .hafs-word:not(.mushaf .hafs-word):hover .word-ink-slot > .hafs-glyph:not(.hafs-repeat-overlay) {
     color: var(--accent);
   }
 }

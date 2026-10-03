@@ -107,6 +107,14 @@ export class PlayerController {
   /** Prevents rAF + `ended` from advancing the same audible boundary twice. */
   private gaplessAdvancing = false
   /**
+   * The playlist index has moved on but the active element still holds the
+   * previous clip (its source is being fetched). A position read then is the
+   * old clip's, a few seconds in, published under the new verse: the ink
+   * lit whichever word of the new verse that time fell in, then jumped back
+   * to the first.
+   */
+  private awaitingClip = false
+  /**
    * Remaining pause events to ignore while swapping `src` during autoplay.
    * Consumed by the `pause` listener (and cleared when playback resumes).
    * A single-shot flag was not enough: load()/pause races can emit twice and
@@ -352,7 +360,7 @@ export class PlayerController {
     return new Gapless5Backend({
       onTime: (positionMs, durationMs, index) => {
         if (index >= 0 && index !== this.index) {
-          this.syncGapless5Index(index)
+          this.syncGapless5Index(index, positionMs)
         }
         this.patch({ positionMs, durationMs })
       },
@@ -381,7 +389,7 @@ export class PlayerController {
   }
 
   /** Apply Gapless-5 auto-advance; wrap range-repeat when it walks past last. */
-  private syncGapless5Index(index: number) {
+  private syncGapless5Index(index: number, positionMs = 0) {
     if (!this.gapless5Enabled || index < 0 || index >= this.playlist.length) return
 
     if (this.state.repeatMode === 'range' && this.state.repeatRange) {
@@ -407,6 +415,11 @@ export class PlayerController {
         ayah: item.ayah,
         reciterId: this.reciter?.id ?? 0,
       },
+      // The new verse starts its own clock. Left out, the last position of
+      // the verse before it was published under this one until the next
+      // time update: the ink took whichever word of the new verse that time
+      // fell in, and the highlight clock then held it there while it settled.
+      positionMs,
       error: null,
     })
     this.updateMediaSession()
@@ -419,6 +432,9 @@ export class PlayerController {
   }
 
   private onTime() {
+    // Between naming the next verse and its clip reaching the element, the
+    // element still holds the clip before it. Its time is not this verse's.
+    if (this.awaitingClip) return
     this.patch({
       positionMs: this.positionMs,
       durationMs: this.gapless5Enabled && this.gapless5
@@ -786,6 +802,7 @@ export class PlayerController {
     ) {
       this.joins.promoteStandby(i)
       this.index = i
+      this.awaitingClip = false
       this.seekActiveToAudibleStart(i)
       this.active.volume = opts.fadeIn ? 0 : 1
       // Intent before await play() so chrome recess does not wait on the
@@ -825,6 +842,7 @@ export class PlayerController {
     }
 
     this.index = i
+    this.awaitingClip = true
     const item = this.playlist[i]!
     // Quiet chapter-open: set nowPlaying without a store fan-out storm — patch
     // once after src is assigned. Loud path publishes intent immediately.
@@ -857,6 +875,8 @@ export class PlayerController {
     // User may have paused while warming.
     if (autoplay && !this.state.isPlaying) {
       this.setBuffering(false)
+      // Nothing is on its way to the element any more.
+      this.awaitingClip = false
       return
     }
     // iOS gets one persistent media element and an ordinary HTTPS source.
@@ -873,6 +893,7 @@ export class PlayerController {
       playbackRate: this.state.speed,
       volume: opts.fadeIn ? 0 : 1,
     })
+    this.awaitingClip = false
     if (quiet) {
       // One emit after src assign — listeners see nowPlaying without a second
       // mid-mount patch from publishNowPlaying.
