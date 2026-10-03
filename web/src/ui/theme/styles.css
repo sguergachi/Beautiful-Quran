@@ -6796,6 +6796,28 @@ html[data-entrance='true'] body {
   background: var(--paper);
 }
 
+/* The page the board lands on, as a picture (EntranceCover pictureLeftPage):
+   a copy of the Chapters sheet, laid on the board's inside instead of at the
+   sheet's own place in the spread, and never hidden with the real sheets. */
+html .app-shell[data-spread='true'] .entrance-inside .entrance-inside-page > .sheet[data-picture='true'] {
+  top: 0 !important;
+  bottom: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
+  opacity: 1 !important;
+  transform: none !important;
+  transition: none;
+  pointer-events: none;
+  cursor: default;
+  color: var(--ink);
+  text-align: start;
+}
+
+/* The real pages replace that picture the moment the board is gone. */
+html[data-entrance-settled] .app-shell[data-spread='true'] :is(.sheet, .book-verso-leaf) {
+  transition: none !important;
+}
+
 .entrance-inside-page::before {
   content: '';
   position: absolute;
@@ -6850,7 +6872,7 @@ html[data-entrance='true']:not([data-entrance-opening]):not([data-entrance-closi
 
 /* Opening: only the page block the board is lifting off, and only once the
    board has slid over it. The left half does not exist until the board
-   lands there; the ink on it settles in after. */
+   lands there; until then its page is the picture on the board's inside. */
 html[data-entrance-opening] .app-shell[data-spread='true'] .book {
   clip-path: inset(0 0 0 50%);
   transition: opacity 60ms linear 480ms;
