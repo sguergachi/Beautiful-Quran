@@ -1013,7 +1013,7 @@ Traditional, geometric, and nearly invisible — ornament whispers, never
 speaks. All of it is drawn procedurally (`ui/theme/Ornament.kt`), never an
 image, so it is crisp at any density and nearly free to render.
 
-- **Khatam geometry.** The vocabulary throughout is the classical star:
+- **Khatam geometry.** The medallions, seals and borders use the classical star:
   {n/k} star polygons (8/10/12/16-fold; gcd(n, k) > 1 yields the interlaced
   polygons — the khatam is {8/2}) and Hankin's polygons-in-contact method
   (rays from tile-edge midpoints at a sampled contact angle) — the same
@@ -1028,13 +1028,11 @@ image, so it is crisp at any density and nearly free to render.
   seed per launch. The **surah header is seeded per chapter** instead — one
   `chapterOrnamentSeed(chapterNumber, ayahCount)` grows both the rosette
   *and* the field tooled behind it (`ChapterOrnament`/`generateChapterOrnament`),
-  so the header's whole ornament is this chapter's own, not a rosette
-  sitting on a pattern every chapter shares. The seed folds the chapter's
-  verse count (the dominant term, so a chapter's length reads as its
-  ornament's fingerprint — chapters of similar length grow kin-looking
-  rosettes) with its number (so all 114 chapters render distinctly even
-  though only 77 of them have a verse count no other chapter shares); the
-  same chapter always regrows the same ornament. Border friezes (cover
+  so the header's whole ornament is this chapter's own. Chapter number
+  assigns a distinct frame/interior/corner recipe and a distinct medallion
+  structure across all 114 chapters; verse count varies their safe
+  proportions. The same chapter always regrows the same ornament. Border
+  friezes (cover
   only) come from five band grammars of tooled bindings: a zigzag lattice
   with pearls in its diamonds, a two-strand cable with pearl eyes, a Hankin
   strip, a nested lozenge chain, and a khatam chain of small eight-fold
@@ -1051,6 +1049,21 @@ image, so it is crisp at any density and nearly free to render.
   ({10/4} → two {5/2} pentacles stacked), 6-fold seals, and 6-fold field
   tilings are all excluded by construction and guarded by tests on both
   platforms.
+- **Field harmony.** Seeds choose among composed star-and-cross, octagonal
+  garden and lozenge-rosette families, each with its own geometric frame and
+  foliate layout. Paired contours use stronger rules; interior filigree uses
+  finer hairlines. Chapters have 114 distinct structural combinations drawn
+  from four frames, seven interiors and five corner treatments, with fixed
+  fitting rules for narrow compartments. Details cannot cross or graze the
+  frame. Reflection and
+  quarter-turn balance, deliberate empty space and weight-aware repeat
+  spacing keep richness composed rather than noisy. Small repeats (roughly
+  eight across a phone) and delicate strokes make the field a texture. Each
+  field fits an even number of complete repeats across its own width without
+  stretching the motifs.
+  The Lab can search each
+  family. Construction, research and testable rules:
+  [ORNAMENT_FIELDS.md](ORNAMENT_FIELDS.md).
 - **Gilding.** Gold is never a flat color. Gilded elements (the surah
   rosette, ayah number marks, the home mark) carry a three-stop leaf
   gradient (deep bronze → bright gilt → deep bronze). The gradient's
@@ -1070,7 +1083,7 @@ image, so it is crisp at any density and nearly free to render.
   upper-left beneath its face — relief under a top-left light, subtle enough
   to be felt more than seen.
 - **The weave.** Behind each surah opening, that chapter's own generated
-  Hankin field at ~4 % ink, embossed, dissolving into the page at its
+  arabesque field at ~4 % ink, embossed, dissolving into the page at its
   edges — grown from the same seed as the rosette sitting on it (see "The
   generating machine" above), not a fixed pattern every chapter shares.
 - **Basmalah.** Every surah except Al-Fatihah (where it *is* ayah 1) and
@@ -1145,7 +1158,7 @@ three moments:
    so border and corner ornaments are one continuous piece of geometry. The frame, border, and seals
    are the binding's tooling and render complete on the very first
    frame — no wash, no fade. Tooled *inside* that frame, this launch's
-   generated Hankin field (whisper ink) and the generated medallion
+   generated arabesque field (whisper ink) and the generated medallion
    (`GeneratedMedallion`) with the title **القرآن الكريم** beneath it
    in the Hafs hand, leafed in gold, ink themselves onto the leather in
    real time as the ceremony arrives — the illumination, drawn before

@@ -18,6 +18,7 @@ import { coverLayout, coverLayoutCssVars } from './coverLayout'
 import { generateCoverOrnament, type CoverOrnament, type RosetteSpec } from '../theme/ornamentGenerator'
 import {
   fieldWeaveBackground,
+  useFieldCellWidth,
   GeneratedBorder,
   GeneratedRosette,
   useOrnamentBuilt,
@@ -174,7 +175,8 @@ export function EntranceCover({
     () => generateCoverOrnament((Math.random() * 0x7fffffff) | 0),
     [],
   )
-  const weave = useMemo(() => fieldWeaveBackground(ornament.field), [ornament])
+  const fieldSize = useFieldCellWidth(ornament.field.cellWidthDp)
+  const weave = useMemo(() => fieldWeaveBackground(ornament.field, undefined, undefined, fieldSize.cellWidth), [ornament, fieldSize.cellWidth])
   // Flips one frame after mount; starts every stroke's dash-reveal clock.
   const built = useOrnamentBuilt()
 
@@ -409,6 +411,7 @@ export function EntranceCover({
         <div className="entrance-leather" aria-hidden="true" />
         <div
           className={`entrance-weave${built ? ' entrance-weave--on' : ''}`}
+          ref={fieldSize.ref}
           style={weave}
           aria-hidden="true"
         />

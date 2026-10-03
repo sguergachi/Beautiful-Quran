@@ -20,7 +20,7 @@ import androidx.compose.ui.unit.dp
  *  38  left rule  — Western text,   56  verse to verse (Arabic)
  *      back arrow, Western folio    48  verse to verse (English)
  *  ½   the axis — everything        40  basmalah to first verse
- *      centred: opening, basmalah,  32  opening to basmalah
+ *      centred: opening, basmalah,  72  opening to basmalah
  *      NEXT, pill, title, player    12  voices within one verse
  *  38  right rule — Arabic, the
  *      settings mark, Arabic folio
@@ -90,11 +90,12 @@ object ScrollGrid {
 
     // ── Chapter opening ───────────────────────────────────────────────────
 
-    val OPENING_HEAD: Dp = UNIT * 10
-    val OPENING_FOOT: Dp = UNIT * 8
+    // Keep a band of full-strength field outside the medallion and title lockup.
+    val OPENING_HEAD: Dp = UNIT * 16
+    val OPENING_FOOT: Dp = UNIT * 14
 
     /** The basmalah supplies its own head, so the opening only closes up. */
-    val OPENING_FOOT_BEFORE_BASMALAH: Dp = UNIT * 2
+    val OPENING_FOOT_BEFORE_BASMALAH: Dp = UNIT * 12
     val ROSETTE: Dp = 52.dp
     val ROSETTE_TO_TITLE: Dp = UNIT * 4
     /**

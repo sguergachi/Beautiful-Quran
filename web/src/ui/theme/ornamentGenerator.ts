@@ -13,6 +13,11 @@
  * sync when editing either.
  */
 
+/** Fit whole, even repeats across the field without stretching its geometry. */
+export function fittedFieldCellWidth(width: number, preferred: number): number {
+  return width > 0 ? width / (2 * Math.max(1, Math.round(width / preferred / 2))) : preferred
+}
+
 export interface OrnamentPoint {
   x: number
   y: number
@@ -50,8 +55,12 @@ export interface RosetteSpec {
   tipRadius: number
 }
 
-/** One translational unit cell of a periodic Hankin field. */
+/** Curated repeat families shared with the Android generator and Lab. */
+export const FIELD_PATTERNS = ['star-and-cross', 'octagonal garden', 'lozenge rosettes'] as const
+
+/** One translational unit cell of a geometric field with filigree. */
 export interface FieldSpec {
+  pattern: string
   cellW: number
   cellH: number
   cellWidthDp: number
@@ -267,9 +276,12 @@ function assignBirths(strokes: OrnamentStroke[]): OrnamentStroke[] {
  * let neighbouring radii collide or nearly coincide), the core is never
  * empty, and weight thins inward so a dense fold stays legible.
  */
-function generateMedallion(rng: Mulberry32): RosetteSpec {
+function generateMedallion(rng: Mulberry32, chapter?: number): RosetteSpec {
   const u = rng.next()
-  const fold = u < 0.3 ? 8 : u < 0.55 ? 10 : u < 0.85 ? 12 : 16
+  const pairs = chapter === undefined ? [] : [8, 10, 12, 16].flatMap(n => allowedStarKs(n).filter(k => n !== 16 || k <= 4).map(k => [n, k] as const))
+  const recipe = chapter === undefined ? undefined : (chapter * 37) % 120
+  const pair = recipe === undefined ? undefined : pairs[recipe % 10]
+  const fold = pair?.[0] ?? (u < 0.3 ? 8 : u < 0.55 ? 10 : u < 0.85 ? 12 : 16)
   const step = TAU / fold
   const seg = fold * 12
   const strokes: OrnamentStroke[] = []
@@ -283,7 +295,8 @@ function generateMedallion(rng: Mulberry32): RosetteSpec {
   // Zone 2 — the star. Its tips stop a clear gap short of the inner rule
   // so the two never graze; the star owns the widest zone.
   const ks = allowedStarKs(fold)
-  const k = ks[rng.int(ks.length)]!
+  const drawnK = ks[rng.int(ks.length)]!
+  const k = pair?.[1] ?? drawnK
   const rs = r2 - rng.range(0.03, 0.052)
   strokes.push(...starPolygons(fold, k, rs, ROT0, 'rule'))
 
@@ -293,7 +306,8 @@ function generateMedallion(rng: Mulberry32): RosetteSpec {
   // Zone 3 — the secondary motif, a fixed fraction of the star so the
   // annulus between them stays legible at every fold.
   const rMid = rs * rng.range(0.66, 0.74)
-  const variant = rng.int(3)
+  const drawnVariant = rng.int(3)
+  const variant = recipe === undefined ? drawnVariant : Math.floor(recipe / 10) % 3
   if (variant === 0) {
     // The woven double star: a second {n/k2} half a step out of phase. k2
     // must differ from k — the same star drawn smaller is an echo, not a
@@ -328,12 +342,16 @@ function generateMedallion(rng: Mulberry32): RosetteSpec {
   // Zone 4 — the core, always inked: whatever room zone 3 leaves gets a
   // small rosette of its own rather than a bare field around the heart.
   const rCore = rMid * rng.range(0.5, 0.6)
-  const coreRecipe = rng.int(3)
+  const drawnCore = rng.int(3)
+  const coreRecipe = recipe === undefined ? drawnCore : Math.floor(recipe / 30)
   if (coreRecipe === 0) {
     const i3 = rng.int(ks.length)
     strokes.push(...starPolygons(fold, ks[i3]!, rCore, ROT0 + Math.PI / fold, 'hairline'))
   } else if (coreRecipe === 1) {
     strokes.push(corollaStroke(fold, rCore * rng.range(0.46, 0.56), rCore, ROT0, 'hairline'))
+  } else if (coreRecipe === 3) {
+    strokes.push({ points: Array.from({ length: 4 }, (_, i) => polar(ROT0 + i * Math.PI / 2, rCore)),
+      closed: true, weight: 'hairline', birth: 0, span: 1 })
   } else {
     // A plain ring alone leaves the centre a bare target, so this one is
     // always pearled below.
@@ -654,122 +672,118 @@ function pointInConvex(vertices: OrnamentPoint[], px: number, py: number): boole
   return true
 }
 
-// ── Star-and-cross field ───────────────────────────────────────────────────
-//
-// The all-over background of illuminated pages and tooled bindings: a
-// continuous star-and-cross tessellation, drawn as complete interlocking
-// motifs (not ray fragments, which read as scattered marks at whisper ink).
-// Eight-pointed khatam stars sit at the centre of a unit cell; their four
-// cardinal points reach exactly to the cell-edge midpoints, so each star
-// kisses its orthogonal neighbours tip-to-tip. Their diagonal points are
-// tied together by a small knot at each cell corner — one knot per lattice
-// point when the cell tiles — closing the weave into one unbroken net.
+// ── Geometric fields with filigree ──────────────────────────────────────────────
 
-/** Star outer radius: cardinal points land on the cell-edge midpoints. */
-const FIELD_STAR_R = 0.5
-
-/** Diagonal half-extent of the star's points (R/√2). */
-const FIELD_S = FIELD_STAR_R / Math.sqrt(2)
-
-/** Knot half-extent at a corner: reaches the four nearest diagonal tips. */
-const FIELD_G = FIELD_STAR_R - FIELD_S
-
-function fieldStroke(points: OrnamentPoint[]): OrnamentStroke {
-  return { points, closed: true, weight: 'hairline', birth: 0, span: 1 }
-}
-
-/**
- * Eight-pointed khatam star at (cx, cy): a diamond through the cardinal
- * points and an axis-aligned square through the diagonal points, both
- * reaching FIELD_STAR_R — two overlapped squares, the classic khatam.
- */
-function khatamStar(cx: number, cy: number): OrnamentStroke[] {
-  const r = FIELD_STAR_R
-  const s = FIELD_S
-  return [
-    fieldStroke([
-      { x: cx + r, y: cy },
-      { x: cx, y: cy + r },
-      { x: cx - r, y: cy },
-      { x: cx, y: cy - r },
-    ]),
-    fieldStroke([
-      { x: cx + s, y: cy + s },
-      { x: cx - s, y: cy + s },
-      { x: cx - s, y: cy - s },
-      { x: cx + s, y: cy - s },
-    ]),
-  ]
-}
-
-/**
- * The {8/3} octagram at (cx, cy): one interlaced closed polyline through the
- * same eight points as the khatam, for a more woven star.
- */
-function octagramStar(cx: number, cy: number): OrnamentStroke {
-  const r = FIELD_STAR_R
-  const points: OrnamentPoint[] = []
-  let k = 0
-  for (let i = 0; i < 8; i++) {
-    const a = (k * Math.PI) / 4
-    points.push({ x: cx + r * Math.cos(a), y: cy + r * Math.sin(a) })
-    k = (k + 3) % 8
+/** A sampled cubic path; closed motifs explicitly return to their first point. */
+function fieldCurve(coords: number[][], closed: boolean): OrnamentStroke {
+  const nodes = coords.map(([x, y]) => ({ x: x!, y: y! }))
+  const points = [nodes[0]!]
+  for (let i = 1; i < nodes.length; i += 3) {
+    sampleCubicInto(points, points[points.length - 1]!, nodes[i]!, nodes[i + 1]!, nodes[i + 2]!)
   }
-  return fieldStroke(points)
-}
-
-/** Square knot at (cx, cy): corners on the four nearest star diagonal tips. */
-function squareKnot(cx: number, cy: number): OrnamentStroke {
-  const g = FIELD_G
-  return fieldStroke([
-    { x: cx + g, y: cy + g },
-    { x: cx - g, y: cy + g },
-    { x: cx - g, y: cy - g },
-    { x: cx + g, y: cy - g },
-  ])
-}
-
-/** Octagon knot at (cx, cy): a regular octagon through the same diagonal tips. */
-function octagonKnot(cx: number, cy: number): OrnamentStroke {
-  const rr = FIELD_G * Math.sqrt(2)
-  const points: OrnamentPoint[] = []
-  for (let i = 0; i < 8; i++) {
-    const a = (i * Math.PI) / 4
-    points.push({ x: cx + rr * Math.cos(a), y: cy + rr * Math.sin(a) })
-  }
-  return fieldStroke(points)
-}
-
-/** A small diamond centre-mark inside the star. */
-function centreMark(cx: number, cy: number, h: number): OrnamentStroke {
-  return fieldStroke([
-    { x: cx + h, y: cy },
-    { x: cx, y: cy + h },
-    { x: cx - h, y: cy },
-    { x: cx, y: cy - h },
-  ])
+  return { points, closed, weight: 'hairline', birth: 0, span: 1 }
 }
 
 /**
- * A star-and-cross field: an eight-pointed star (khatam or {8/3} octagram)
- * at the cell centre, a knot (square or octagon) at the cell corner, and an
- * optional centre-mark. One unit cell tiles the plane into the continuous
- * pattern; density comes from the rendered cell width. Everything is in the
- * 4/8-fold khatam family, so nothing can read as a hexagram.
+ * Composed cover families and chapter recipes with compartment-specific filigree.
+ * Four RNG draws choose a family and its safe proportions. See docs/ORNAMENT_FIELDS.md.
  */
-function generateField(rng: Mulberry32): FieldSpec {
-  const octagram = rng.chance(0.5)
-  const useOctagonKnot = rng.chance(0.5)
-  const withCentre = rng.chance(0.5)
-  const cellWidthDp = rng.range(48, 74)
-
-  const strokes: OrnamentStroke[] = []
-  if (octagram) strokes.push(octagramStar(0.5, 0.5))
-  else strokes.push(...khatamStar(0.5, 0.5))
-  strokes.push(useOctagonKnot ? octagonKnot(0, 0) : squareKnot(0, 0))
-  if (withCentre) strokes.push(centreMark(0.5, 0.5, 0.08))
-
-  return { cellW: 1, cellH: 1, cellWidthDp, strokes }
+function generateField(rng: Mulberry32, chapter?: number): FieldSpec {
+  const choice = rng.range(0, 3)
+  const family = chapter === undefined ? Math.floor(choice) : chapter % 4
+  const layout = chapter === undefined ? family : chapter % 7
+  const corner = chapter === undefined ? (family === 2 ? 1 : 0) : chapter % 5
+  const inset = 0.042 + (choice - Math.floor(choice)) * 0.01
+  const curl = rng.range(0.265, 0.285)
+  const tip = rng.range(0.392, 0.410)
+  const spacing = rng.range(48, 56)
+  const star = (radius: number, weight: StrokeWeight): OrnamentStroke => ({
+    points: Array.from({ length: 16 }, (_, i) => polar(i * Math.PI / 8,
+      radius * (i % 2 ? Math.cos(Math.PI / 4) / Math.cos(Math.PI / 8) : 1))),
+    closed: true, weight, birth: 0, span: 1,
+  })
+  const frame = (radius: number): OrnamentStroke => family === 0 ? star(radius, 'rule') : family === 3 ? ({
+    points: Array.from({ length: 4 }, (_, i) => [[1, 0], [0.94, 0.47], [0.47, 0.94]].map(([x, y]) => ({
+      x: 0.5 + radius * (x! * Math.cos(i * Math.PI / 2) - y! * Math.sin(i * Math.PI / 2)),
+      y: 0.5 + radius * (x! * Math.sin(i * Math.PI / 2) + y! * Math.cos(i * Math.PI / 2)),
+    }))).flat(), closed: true, weight: 'rule', birth: 0, span: 1,
+  }) : ({
+    points: Array.from({ length: family === 1 ? 8 : 4 }, (_, i) =>
+      polar(i * TAU / (family === 1 ? 8 : 4), radius)),
+    closed: true, weight: 'rule', birth: 0, span: 1,
+  })
+  const strokes = [frame(0.5), frame(0.5 - inset), star(0.13, 'hairline')]
+  const scroll = fieldCurve([
+    [0.13, 0], [0.19, 0], [0.20, -0.075], [0.27, -0.075],
+    [0.34, -0.075], [0.35, -0.01], [0.30, -0.012],
+    [0.26, -0.001], [0.24, -0.045], [curl, -0.05],
+  ], false)
+  const leaf = fieldCurve([
+    [0.35, 0], [0.37, -0.02], [tip - 0.02, -0.02], [tip, 0],
+    [tip - 0.02, 0.02], [0.37, 0.02], [0.35, 0],
+  ], true)
+  const petal = fieldCurve([
+    [0.13, 0], [0.19, -0.035], [0.29, -0.055], [tip, 0],
+    [0.29, 0.055], [0.19, 0.035], [0.13, 0],
+  ], true)
+  const vein = fieldCurve([
+    [0.13, 0], [0.20, 0], [0.25, -0.025], [curl + 0.04, 0],
+    [0.25, 0.025], [0.20, 0], [0.13, 0],
+  ], true)
+  const spear: OrnamentStroke = { ...petal, points: [
+    { x: 0.13, y: 0 }, { x: 0.21, y: -0.07 }, { x: 0.33, y: -0.05 },
+    { x: tip, y: 0 }, { x: 0.33, y: 0.05 }, { x: 0.21, y: 0.07 },
+  ] }
+  const paired: [OrnamentStroke, number][] = [[scroll, -1], [scroll, 1], [leaf, 1]]
+  const petals: [OrnamentStroke, number][] = [[petal, 1], [vein, 1]]
+  const fold = layout === 2 || layout === 3 ? 4 : 8
+  if (layout === 6) strokes.push(star(0.23, 'hairline'))
+  for (let i = 0; i < fold; i++) {
+    const a = i * TAU / fold
+    const motifs = layout === 6 ? [[leaf, 1] as [OrnamentStroke, number]] :
+      layout === 5 ? (i % 2 ? [[leaf, 1]] : [[spear, 1], [vein, 1]]) as [OrnamentStroke, number][] :
+      layout === 1 || layout === 3 || (layout === 4 && i % 2 === 0) ? petals : paired
+    // Narrow diamond compartments have less room along the diagonals.
+    const scale = chapter !== undefined && (family === 2 || layout === 4) && fold === 8 && i % 2 === 1 ? 0.55 : 1
+    for (const [motif, sign] of motifs) {
+      strokes.push({ ...motif, points: motif.points.map((p) => {
+        const x = 0.13 + (p.x - 0.13) * scale, y = p.y * scale * sign
+        return { x: 0.5 + x * Math.cos(a) - y * Math.sin(a), y: 0.5 + x * Math.sin(a) + y * Math.cos(a) }
+      }) })
+    }
+  }
+  // Four quarters complete one floret at each shared cross-compartment centre.
+  const quarter = fieldCurve([
+    [0.04, 0], [0.068, 0], [0.045, 0.045], [0.064, 0.064],
+    [0.045, 0.045], [0, 0.068], [0, 0.04],
+  ], false)
+  const cornerStar: OrnamentStroke = { ...star(0.18, 'hairline'), closed: false,
+    points: star(0.18, 'hairline').points.slice(0, 5).map((p) => ({ x: p.x - 0.5, y: p.y - 0.5 })) }
+  const bud = { ...petal, points: petal.points.map(p => ({ x: (p.x - p.y) * 0.16 / Math.SQRT2,
+    y: (p.x + p.y) * 0.16 / Math.SQRT2 })) }
+  const diamond = { ...cornerStar, points: [{ x: 0.14, y: 0 }, { x: 0.07, y: 0.07 }, { x: 0, y: 0.14 }] }
+  const corners = corner === 1 ? [cornerStar, { ...quarter,
+    points: quarter.points.map((p) => ({ x: p.x * (chapter === undefined ? 1.5 : 1.2), y: p.y * (chapter === undefined ? 1.5 : 1.2) })) }] :
+    corner === 2 ? [{ ...bud, points: bud.points.map(p => ({ x: p.x * 1.45, y: p.y * 1.45 })) }] :
+    corner === 3 ? [diamond, bud] : corner === 4 ? [{
+      ...circleStroke(0.03, 16, 'hairline'), points: circleStroke(0.03, 16, 'hairline').points.map(p => ({ x: p.x - 0.5 + 0.07, y: p.y - 0.5 + 0.07 })),
+    }] : [quarter]
+  const cornerScale = chapter !== undefined && family === 3 ? 0.6 : 1
+  for (const [cx, cy, sx, sy] of [[0, 0, 1, 1], [1, 0, -1, 1], [1, 1, -1, -1], [0, 1, 1, -1]]) {
+    for (const motif of corners) strokes.push({ ...motif,
+      points: motif.points.map((p) => ({ x: cx! + sx! * p.x * cornerScale, y: cy! + sy! * p.y * cornerScale })) })
+  }
+  const inkLength = strokes.reduce((total, s) => {
+    const points = s.closed ? [...s.points, s.points[0]!] : s.points
+    const length = points.slice(1).reduce((sum, p, i) => {
+      const q = points[i]!
+      return sum + Math.hypot(p.x - q.x, p.y - q.y)
+    }, 0)
+    return total + length * (s.weight === 'rule' ? 1 : 0.55)
+  }, 0)
+  return { pattern: [...FIELD_PATTERNS, 'chamfered lattice'][family]!, cellW: 1, cellH: 1,
+    cellWidthDp: chapter === undefined ? spacing * inkLength / [11.5, 11, 9][family]! :
+      Math.min(58, Math.max(spacing, spacing * inkLength / 11.5)), strokes }
 }
 
 /**
@@ -786,13 +800,8 @@ export function generateCoverOrnament(seed: number): CoverOrnament {
 }
 
 /**
- * Seed for a chapter's surah-header rosette. Ayah count is the dominant
- * term — chapters of similar length grow kin-looking rosettes, so length
- * reads as the ornament's "fingerprint" — folded with the chapter number
- * (always < 114) so it acts as a low digit the multiply-by-114 term never
- * touches: `seed % 114` always recovers the chapter number, so all 114
- * chapters get distinct rosettes even though only 77 of them have a
- * distinct ayah count (37 chapters share a count with another chapter).
+ * Chapter number fixes structural identity; verse count varies safe proportions.
+ * The zero-based chapter is recovered by floorMod(seed - 1, 114).
  */
 export function chapterOrnamentSeed(chapterNumber: number, ayahCount: number): number {
   return ayahCount * 114 + chapterNumber
@@ -800,13 +809,15 @@ export function chapterOrnamentSeed(chapterNumber: number, ayahCount: number): n
 
 /**
  * Grow a chapter's rosette and backing field — no corner seal or border,
- * which the header has no use for — from a seed. Same star-polygon and
- * Hankin-field vocabulary and RNG rules (never a hexagram) as the medallion
- * and field inside a full cover ornament.
+ * which the header has no use for — from a seed. Chapter number assigns distinct structural recipes; ayah count
+ * varies their proportions. Same star-polygon and
+ * rosette/arabesque vocabulary and RNG rules as a full cover ornament.
  */
 export function generateChapterOrnament(seed: number): ChapterOrnament {
   const rng = new Mulberry32(seed)
-  const rosette = generateMedallion(rng)
-  const field = generateField(rng)
+  // 4 frames x 7 interiors x 5 corners: coprime axes give 140 distinct recipes.
+  const chapter = ((seed - 1) % 114 + 114) % 114
+  const rosette = generateMedallion(rng, chapter)
+  const field = generateField(rng, chapter)
   return { seed, rosette, field }
 }

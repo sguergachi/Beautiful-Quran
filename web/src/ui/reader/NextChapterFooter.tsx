@@ -9,14 +9,14 @@
 
 import { useMemo } from 'react'
 import type { Surah } from '../../data/models'
-import { fieldWeaveBackground, GeneratedRosette } from '../theme/GeneratedOrnament'
+import { fieldWeaveBackground, GeneratedRosette, useFieldCellWidth } from '../theme/GeneratedOrnament'
 import { chapterOrnamentSeed, generateChapterOrnament } from '../theme/ornamentGenerator'
 import { resolveTheme } from '../App'
 
 function chapterWeaveInk(themeMode: string): string {
   return resolveTheme(themeMode) === 'light'
-    ? 'rgba(28, 27, 24, 0.04)'
-    : 'rgba(232, 226, 213, 0.04)'
+    ? 'rgba(28, 27, 24, 0.03)'
+    : 'rgba(232, 226, 213, 0.03)'
 }
 
 /** Material-ish ease for invitation collapse. */
@@ -54,14 +54,16 @@ export function NextChapterFooter({
     () => generateChapterOrnament(chapterOrnamentSeed(surah.id, surah.ayahCount)),
     [surah.id, surah.ayahCount],
   )
+  const fieldSize = useFieldCellWidth(ornament.field.cellWidthDp)
   const weave = useMemo(
     () =>
       fieldWeaveBackground(
         ornament.field,
         chapterWeaveInk(themeMode),
-        'rgba(255, 255, 255, 0.05)',
+        'rgba(255, 255, 255, 0.0375)',
+        fieldSize.cellWidth,
       ),
-    [ornament.field, themeMode],
+    [ornament.field, themeMode, fieldSize.cellWidth],
   )
   const place =
     surah.revelationPlace.length > 0
@@ -87,7 +89,7 @@ export function NextChapterFooter({
 
       {/* Same structure / classes as .surah-header — the continuous handoff target. */}
       <div className="surah-header next-chapter-opening">
-        <div className="surah-header-weave" style={weave} aria-hidden="true" />
+        <div className="surah-header-weave" ref={fieldSize.ref} style={weave} aria-hidden="true" />
         <GeneratedRosette
           spec={ornament.rosette}
           className="rosette next-chapter-rosette"

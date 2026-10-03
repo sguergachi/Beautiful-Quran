@@ -51,9 +51,9 @@
   --verse-gap: 24px;
   --verse-gap-english: 16px;
   --voice-gap: 12px;
-  --opening-head: 40px;
-  --opening-foot: 32px;
-  --opening-foot-basmalah: 8px;
+  --opening-head: 64px;
+  --opening-foot: 56px;
+  --opening-foot-basmalah: 48px;
   --rosette: 52px;
   --basmalah-head: 24px;
   --basmalah-foot: 24px;
@@ -1549,7 +1549,7 @@ select {
 /* This chapter's own Hankin field, tooled at whisper ink behind the
    header — grown from the same seed as the rosette sitting on it, not the
    fixed pattern every chapter used to share. Fades at the top/bottom edges
-   (mirrors Android `verticalFadingEdges`, 12px top / 36px bottom) so it
+   (mirrors Android `verticalFadingEdges`, 40px top / 32px bottom) so it
    dissolves into the page instead of cutting off hard. */
 .surah-header-weave {
   position: absolute;
@@ -1558,15 +1558,15 @@ select {
   mask-image: linear-gradient(
     to bottom,
     transparent 0,
-    black 12px,
-    black calc(100% - 36px),
+    black 40px,
+    black calc(100% - 32px),
     transparent 100%
   );
   -webkit-mask-image: linear-gradient(
     to bottom,
     transparent 0,
-    black 12px,
-    black calc(100% - 36px),
+    black 40px,
+    black calc(100% - 32px),
     transparent 100%
   );
 }
