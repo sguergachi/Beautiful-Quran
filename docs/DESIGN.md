@@ -43,17 +43,30 @@ right to left, so the left edge is the way on. Chapters is then laid over the
 left leaf on demand, and touching the page still being read, anywhere on it,
 puts it away and does nothing else.
 
-**The golden page (web, desktop spread).** A page is 1 : φ, as tall as the
-window allows or as wide, whichever binds first. Its margins run inner : head
-: fore-edge : foot = 1 : φ : φ : φ² in one unit, and for any unit that leaves
-a text block that is itself 1 : φ — the page's own shape set inside it,
-nearer the spine and the head, as a bound book sits. The unit is the page's
-width over φ⁶ (the block is about 85% of the page), opened further only when
-the foot would be too shallow to hold the transport, which stands in that
-margin with no paper of its own. A Mushaf leaf is that block; recto and verso
-mirror. Chapters and Settings stand in that same block, so a leaf turned
-away uncovers text where its own text stood; the scrolling reader keeps its
-own column on the same golden page.
+**One grid for the window (web, desktop spread).** Everything the book is
+made of is a power of φ times one module *u*, and *u* is the largest that
+fits the window. Across: desk φ, board φ⁻³, the page block's edge φ⁻⁴, page
+φ⁶, and the same again mirrored. Down: desk φ, board φ⁻³, page φ⁷, board,
+desk. So the window is 32.743 *u* tall or 39.889 *u* wide, whichever binds
+first, and the other way the book is centred with desk to spare. The desk's
+margin is the page's own head and fore-edge margin carried outward, and the
+gutter's shade is φ³ wide.
+
+**The golden page.** A page is 1 : φ. Its margins run inner : head :
+fore-edge : foot = 1 : φ : φ : φ² in that same module, which leaves a text
+block that is itself 1 : φ — the page's own shape set inside it, nearer the
+spine and the head, as a bound book sits. The two inner margins make a
+gutter of 2*u*, wider than the φ*u* fore-edge, so the pages part at the
+spine. Head and foot also carry furniture of a fixed size (the page's
+controls, the transport, which stands in the foot with no paper of its own),
+so on a small window those two deepen to hold it. Inner and fore-edge never
+do: the text keeps its width. (All four margins used to swell together below
+a 1190px window, which kept the block golden but set a small page in margins
+sized for a large one.) A Mushaf leaf is that block; recto and verso
+mirror. The leaf's controls end on the block's edges and the transport is
+centred under it. Chapters and Settings stand in that same block, so a leaf turned
+away uncovers text where its own text stood. A scrolling chapter's column is
+the block as well, as wide and as near the spine, and so is the title page.
 
 **What the page solves for itself (web Mushaf).** In order: the type grows or
 shrinks until the leaf's widest line, at minimum word spaces, fills the
