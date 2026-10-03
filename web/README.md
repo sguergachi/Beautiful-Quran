@@ -25,9 +25,16 @@ cd web
 npm install
 npm run dev      # http://localhost:5173
 npm test         # engine unit tests (Vitest)
+npm run typecheck    # tsc alone
 npm run build    # static site → dist/
 npm run build:pages  # → ../_site/app (CI does this on master)
 ```
+
+Builds and tests are kept short: the type check is incremental (its cache is
+in `node_modules/.cache`) and runs beside the bundle (`scripts/parallel.mjs`);
+`sync-data` does nothing when the canonical files are unchanged; tests share
+one module graph per worker (`isolate: false` in `vite.config.ts`), so a test
+that needs a clean module registry must call `vi.resetModules()` itself.
 
 Requires Node 22+. `npm run dev` and `npm run build` derive web assets from the
 canonical `../data/quran.db`: a timing-free startup database plus one lazy JSON
