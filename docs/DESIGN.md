@@ -1242,13 +1242,14 @@ weight.
   current chapter · ayah as a compact quiet-green stadium, then the transport,
   with the same 4 dp foot as `PlayerBar`, then the phone's navigation inset
   inside the paper. The controls stay above the home gesture bar. It does not
-  take the ornaments' 10 dp foot. While the cover and the reader
-  turn, the chapter bar stays fixed above both sheets. Turning from the reader
-  to Settings carries that same bar away with the reader sheet; it stays
-  mounted throughout the turn. In the scrolling
-  reader that bar never carries a back arrow. The scroll sheet's own back
-  control is in the top bar only while that sheet is parked; a swipe removes
-  it until the reader settles again. The reader's bottom clearance follows
+  take the ornaments' 10 dp foot. Until playback has created a session, Home
+  covers the bar, which stays above the reader underneath. After playback, a
+  cover ↔ reader turn keeps the chapter bar fixed above both sheets. Turning
+  from the reader to Settings carries that same bar away with the reader sheet;
+  it stays mounted throughout the turn. In the scrolling reader that bar never
+  carries a back arrow. The scroll sheet's own back
+  control stays in the top bar throughout a swipe and travels with the sheet;
+  recitation still recedes the top chrome. The reader's bottom clearance follows
   the pinned bar's measured body, including the return pill while that pill
   is open. On the phone web stack that same bar is drawn above the sheets;
   a desktop spread keeps the transport on the reader leaf. Landing on the chapter list expands the return

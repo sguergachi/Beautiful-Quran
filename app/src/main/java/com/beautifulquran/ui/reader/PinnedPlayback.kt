@@ -33,8 +33,8 @@ import com.beautifulquran.ui.home.ReturnToAyahPill
 import com.beautifulquran.ui.theme.QuranTheme
 
 /**
- * Chapter playback published by the reader sheet and drawn above the paper
- * stack, so a cover ↔ reader turn does not carry the bar away with the page.
+ * Chapter playback published by the reader sheet and hosted beside the paper
+ * stack. Home covers it until playback has created a session.
  * Callbacks are plain vars: refreshing them must not recompose the bar.
  */
 class PinnedPlaybackHost {
@@ -59,67 +59,23 @@ class PinnedPlaybackHost {
     var onClose: () -> Unit = {}
 }
 
-/**
- * The chapter bar stays while the cover and the reader trade places
- * ([stackPage] 0..1). On the chapter list it stays only when a verse is
- * loaded. Mushaf, gather, and ink-bleed overlays keep their own chrome.
- *
- * Past the reader it stays pinned too, and rides the reader sheet away as
- * Settings arrives ([pinnedBarTurn]). It used to be dropped there and the
- * reader set its own bar instead: that swap recomposed the whole reader and
- * the chapter list, and built a second bar, two points into the swipe — the
- * dropped frames at the start of every turn to Settings.
- */
+/** Keeps one bar mounted for the scroll reader, including every page turn. */
 internal fun showPinnedChapterBar(
-    stackPage: Float,
     readerOpen: Boolean,
     mushaf: Boolean,
     gathering: Boolean,
     overlayBlocking: Boolean,
-    coverSession: Boolean,
-): Boolean {
-    if (!readerOpen || mushaf || gathering || overlayBlocking) return false
-    if (stackPage < 0.5f && !coverSession) return false
-    return true
-}
+): Boolean = readerOpen && !mushaf && !gathering && !overlayBlocking
+
+/** Unplayed transport belongs under Home (z=2), above the reader (z=1). */
+internal fun pinnedChapterBarZIndex(coverSession: Boolean): Float =
+    if (coverSession) 2.3f else 1.3f
 
 /**
  * How far the pinned bar has turned away with the reader sheet: 0 while the
  * reader (or the cover) holds it, 1 once Settings has taken the stack.
  */
 internal fun pinnedBarTurn(stackPage: Float): Float = (stackPage - 1f).coerceIn(0f, 1f)
-
-/**
- * Scroll's top-bar back arrow. Shown only while that sheet is parked.
- * A swipe and the settle after it keep the arrow off. Mushaf keeps its book
- * control. The scrolling play bar itself never draws a back arrow.
- */
-internal fun showScrollReaderBackArrow(
-    page: Float,
-    mushaf: Boolean,
-    dragHidesBack: Boolean,
-): Boolean {
-    if (mushaf) return true
-    if (dragHidesBack) return false
-    return page in 0.99f..1.01f
-}
-
-/**
- * Finger-up never reveals the scroll reader's back arrow.
- *
- * True when this settle must hide it. A release already parked on the
- * reader returns false, so the caller leaves the flag as the drag set it.
- * The settle's end is the only place that shows the arrow again.
- */
-internal fun hideScrollBackOnFingerUp(
-    scrollReaderOpen: Boolean,
-    target: Int,
-    page: Float,
-): Boolean {
-    if (!scrollReaderOpen) return false
-    val alreadyParked = target == 1 && page in 0.99f..1.01f
-    return !alreadyParked
-}
 
 @Composable
 internal fun PinnedChapterPlayback(

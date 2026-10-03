@@ -192,7 +192,7 @@ fun HomeScreen(
         WindowInsets.navigationBars.getBottom(density).toDp()
     }
     val listBottomInset = when {
-        playbackPinned -> {
+        playbackPinned && floatingPlayback != null && !searchActive -> {
             val measured = pinnedPlaybackHeight()
             measured.takeIf { it > 0.dp } ?: FloatingPlaybackListClearance
         }

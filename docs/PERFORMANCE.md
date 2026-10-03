@@ -52,14 +52,17 @@ The cast is recorded once at full strength and the turn changes only its layer
 alpha (`CompositingStrategy.ModulateAlpha`, so no offscreen buffer clips the
 spill past the sheet's edge).
 
-The scroll playback bar keeps one owner throughout a reader → Settings turn.
-It remains mounted above the stack and follows the reader's transform through
-a draw-phase layer, with its pivot at the sheet's centre. The earlier 1.02-page
+The scroll playback bar keeps one owner throughout every stack turn.
+Home covers the mounted bar before playback creates a session; after playback
+it sits above Home. Its owner never changes at a swipe threshold. On a reader
+→ Settings turn it follows the reader's transform through a draw-phase layer,
+with its pivot at the sheet's centre. The earlier 1.02-page
 visibility gate swapped the pinned bar for an embedded reader bar just after
 finger-down; that changed both sheets' layout and rebuilt the transport during
 the swipe. Settings still receives its own chrome: the pinned bar travels
-fully offscreen with the reader. Gilded ornaments have their own recording
-layers so tilt-driven sheen redraws do not invalidate the sheet around them.
+fully offscreen with the reader. The chapter's top-left arrow stays in its
+sheet throughout a turn, so no drag/settle state swaps that slot either.
+Gilded ornaments have their own recording layers so tilt-driven sheen redraws do not invalidate the sheet around them.
 
 Developer → **Record performance profile** works in release builds too. It
 captures ten seconds of frame callback intervals, main-thread stack samples,
