@@ -49,6 +49,7 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -76,6 +77,7 @@ import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlin.math.roundToInt
+import kotlinx.coroutines.flow.drop
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.ui.res.stringResource
 import com.beautifulquran.R
@@ -100,6 +102,9 @@ import com.beautifulquran.ui.theme.QuranTheme
 
 /** The search field leads the scrolling document beneath the fixed masthead. */
 private const val SEARCH_ITEM_INDEX = 0
+
+/** How far (px) the list must move past the lifted search before a scroll counts as "dismiss". */
+internal const val DISMISS_SCROLL_THRESHOLD_PX = 24
 
 private val HomeRibbonLane = 28.dp
 private val HomeRibbonWidth = 13.dp
@@ -262,11 +267,26 @@ fun HomeScreen(
         }
     }
 
-    // Lift the focused search to the top of its scrolling document. The field
-    // stays focused while results move beneath it; Back owns dismissal.
+    // Lift the focused search to the top of its scrolling document, then
+    // dismiss the keyboard on a deliberate scroll. Results stay: searchActive
+    // covers a query without focus, so the field keeps its sticky seat while
+    // the keyboard and dials go away. Back still dismisses without scrolling.
     LaunchedEffect(searchFocused) {
         if (!searchFocused) return@LaunchedEffect
         listState.animateScrollToItem(SEARCH_ITEM_INDEX)
+        snapshotFlow {
+            Triple(
+                listState.isScrollInProgress,
+                listState.firstVisibleItemIndex,
+                listState.firstVisibleItemScrollOffset,
+            )
+        }
+            .drop(1)
+            .collect { (isScrolling, index, offset) ->
+                if (shouldDismissSearchOnScroll(isScrolling, index, offset)) {
+                    focusManager.clearFocus()
+                }
+            }
     }
 
     BackHandler(enabled = searchFocused) { focusManager.clearFocus() }
@@ -287,7 +307,8 @@ fun HomeScreen(
                     // Empty-query dials only: an outside tap dismisses without
                     // activating the list under the pane. Once a query is up,
                     // result rows must receive the gesture (they clear focus
-                    // themselves on open). Scroll still dismisses while focused.
+                    // themselves on open). Scroll dismissal lives in the
+                    // snapshotFlow watcher above, for both states.
                     if (!searchFocused || !searchPaneVisible) return@pointerInput
                     awaitEachGesture {
                         awaitFirstDown(
@@ -498,7 +519,10 @@ fun HomeScreen(
             }
             }
 
-            if (bookmarkCount > 0 && bookmarkStyle != HomeBookmarkStyle.SAVED_PASSAGES) {
+            // The ribbon is the bookmarks entry; search owns the sheet while
+            // active (dials or results), so it steps aside until the query
+            // clears and focus leaves.
+            if (!searchActive && bookmarkCount > 0 && bookmarkStyle != HomeBookmarkStyle.SAVED_PASSAGES) {
                 HomeBookmarkOverlay(
                     height = TopBoundRibbonHeight + padding.calculateTopPadding(),
                     unfurlSignal = ribbonUnfurlEpoch,
@@ -827,6 +851,17 @@ internal fun shouldUnfurlReadingPlaceRibbon(
     chapterRibbonReady: Boolean,
     currentPlacePresent: Boolean,
 ): Boolean = pendingReturn && chapterRibbonReady && currentPlacePresent
+
+/** A deliberate list scroll past the lifted search dismisses the keyboard. */
+internal fun shouldDismissSearchOnScroll(
+    isScrolling: Boolean,
+    firstVisibleItemIndex: Int,
+    firstVisibleItemScrollOffset: Int,
+): Boolean = isScrolling &&
+    (
+        firstVisibleItemIndex != SEARCH_ITEM_INDEX ||
+            firstVisibleItemScrollOffset > DISMISS_SCROLL_THRESHOLD_PX
+        )
 
 @Composable
 private fun SearchSectionLabel(text: String, topPadding: Dp = 8.dp) {
