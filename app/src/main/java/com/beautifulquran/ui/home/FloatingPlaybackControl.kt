@@ -240,9 +240,9 @@ internal fun ReturnToAyahPill(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.Center,
         modifier = modifier
-            // Uneven on purpose: the reciter's 48 dp target leaves more air
-            // under its name than the transport leaves over its glyphs.
-            .padding(top = 6.dp, bottom = 2.dp)
+            // Uneven on purpose: the reciter's name is small and quiet, so
+            // equal air above reads as more than the air over the transport.
+            .padding(top = 2.dp, bottom = 6.dp)
             .background(
                 QuranTheme.accents.greenWash,
                 RoundedCornerShape(50),
