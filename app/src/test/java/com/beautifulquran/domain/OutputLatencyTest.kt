@@ -3,11 +3,59 @@ package com.beautifulquran.domain
 import com.beautifulquran.data.model.Segment
 import com.beautifulquran.domain.OutputLatency.OutputKind
 import com.beautifulquran.domain.OutputLatency.Route
+import com.beautifulquran.playback.Tarji
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class OutputLatencyTest {
+
+    @Test
+    fun `manual zero preserves Bluetooth shimmer timing`() {
+        for (route in Route.entries) {
+            val preset = OutputLatency.latencyMs(route)
+            for (speed in listOf(0.5f, 1f, 2f)) {
+                val autoHops = Tarji.earDelayHops(
+                    routeMs = OutputLatency.pcmLagMs(preset, null),
+                    sinkMs = 80L,
+                    speed = speed,
+                )
+                val manualHops = Tarji.earDelayHops(
+                    routeMs = OutputLatency.pcmLagMs(preset, 0L),
+                    sinkMs = 80L,
+                    speed = speed,
+                )
+                assertEquals(autoHops, manualHops, 0.001f)
+                assertEquals(0L, OutputLatency.mediaLagMs(0L, speed))
+            }
+        }
+    }
+
+    @Test
+    fun `manual lag shifts shimmer and word clock by the same content duration`() {
+        for (route in Route.entries) {
+            val preset = OutputLatency.latencyMs(route)
+            for (speed in listOf(0.5f, 1f, 2f)) {
+                val autoHops = Tarji.earDelayHops(
+                    routeMs = OutputLatency.pcmLagMs(preset, null),
+                    sinkMs = 80L,
+                    speed = speed,
+                    measuredSinkContentMs = 100.0,
+                )
+                val manualHops = Tarji.earDelayHops(
+                    routeMs = OutputLatency.pcmLagMs(preset, 120L),
+                    sinkMs = 80L,
+                    speed = speed,
+                    measuredSinkContentMs = 100.0,
+                )
+                assertEquals(
+                    OutputLatency.mediaLagMs(120L, speed).toFloat(),
+                    (manualHops - autoHops) * Tarji.HOP_MS,
+                    0.001f,
+                )
+            }
+        }
+    }
 
     @Test
     fun `presentation clock lights the heard word without a second Bluetooth delay`() {

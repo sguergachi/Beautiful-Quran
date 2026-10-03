@@ -64,6 +64,10 @@ object OutputLatency {
     fun mediaLagMs(additionalLagMs: Long?, playbackSpeed: Float): Long =
         ((additionalLagMs ?: 0L).coerceAtLeast(0L) * playbackSpeed).toLong()
 
+    /** Raw PCM needs its route delay plus the same additional manual wall lag. */
+    fun pcmLagMs(routeLagMs: Long, additionalLagMs: Long?): Long =
+        routeLagMs + (additionalLagMs ?: 0L).coerceAtLeast(0L)
+
     /**
      * Media-timeline position adjusted so the highlight tracks what the
      * listener *hears*, not the decoder playhead.

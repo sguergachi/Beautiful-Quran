@@ -589,8 +589,10 @@ class ReaderViewModel(
         // baseline; a small EMA rejects position polling jitter.
         val voice = com.beautifulquran.playback.VoiceEnergy.active
         // Unlike Media3's playhead, the raw PCM tap has no output correction.
-        voice?.outputLatencyMs = InkEngine.outputLatencyOverrideMs?.toLong()
-            ?: outputLatency.latencyMs.value
+        voice?.outputLatencyMs = OutputLatency.pcmLagMs(
+            outputLatency.latencyMs.value,
+            InkEngine.outputLatencyOverrideMs?.toLong(),
+        )
         if (voice != null) {
             val speed = voice.playbackSpeed
             if (voice.sessionStartWall != latchedTapSessionStart) {

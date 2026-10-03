@@ -301,8 +301,8 @@ object InkEngine {
 
     /**
      * Extra wall-time lag subtracted from Media3's presentation clock, or null
-     * to use that already-corrected clock directly. Also overrides the route
-     * preset used to delay the raw PCM tarjīʿ tap.
+     * to use that already-corrected clock directly. Adds the same delay to the
+     * raw PCM tarjīʿ tap without replacing its route preset.
      */
     private var outputLatencyOverrideState by mutableStateOf<Int?>(null)
     var outputLatencyOverrideMs: Int?

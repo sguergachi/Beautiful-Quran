@@ -107,6 +107,11 @@ These presets only delay the PCM-tapped tarjīʿ signal, which has not passed
 through Media3's presentation clock. Its sink-buffer correction remains separate.
 They never delay word selection, ayah fade, or basmalah wash automatically.
 
+Manual output lag is **additional** on both paths: the word clock subtracts
+`manualLagMs × speed`, while the PCM tap uses `routePresetMs + manualLagMs`
+in wall time before its existing content-hop conversion. Manual 0 is identical
+to Auto; a manual adjustment shifts the words and shimmer by the same amount.
+
 ## Route detection
 
 `playback/AudioOutputLatency` (app-lifetime, from `QuranApp`):
