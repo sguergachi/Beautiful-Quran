@@ -374,8 +374,9 @@ reciters, then Customize; text size lives in Customize (Scroll only).
 
 **Desktop book spread.** At `(min-width: 1100px) and (min-height: 600px)`
 (`ui/paper/bookSpread.ts`) the stack is laid open as a book instead of a
-centred phone column: Chapters on the verso, Reader on the recto, Bookmarks
-and Settings over the verso. `App` sets `data-spread` on the shell and hands
+centred phone column: Chapters on the verso with Bookmarks laid over it, and
+on the recto the title page, then the Reader, with Settings laid over that
+in every layout. `App` sets `data-spread` on the shell and hands
 each page the layer it should believe it is on (`spreadLayers`), so the reader
 stays live — focus follow, keys, rail — while Chapters is also on top; the
 store's real stack layer is untouched. `BookSpread` draws the boards, page
@@ -386,13 +387,56 @@ into `BookSpread`'s slot, sized to the recto's own box; Chapters keeps its
 real layer and covers the verso only at layer 0 (`data-leaves`). Covered
 verso content is inert and hidden from assistive technology; the recto comes
 first in DOM and Tab order. Gathering stays active while another sheet covers
-the verso, and Escape cancels gathering before peeling that sheet away. Hafs stands
+the verso, and Escape cancels gathering before peeling that sheet away;
+Settings covers the chapter itself, so it ends gathering and the covered
+reader gives up the keys (`spreadLayers` hands it the Settings layer).
+Chapters and Settings take the leaf's golden margins (`--margin-fore`,
+`--margin-inner`, `--margin-head`) instead of the phone sheet's padding.
+`HomeScreen` carries a fore-edge strip that closes the book (`.book-close`).
+On facing leaves with Chapters open, a pointer-down anywhere on the reader
+sheet returns to reading and its click is swallowed (`ReaderScreen`). Hafs stands
 in for the page faces, so each leaf measures its lines and scales the type
 until the longest fits (`--mushaf-fit`), on phones too.
-The spread's page is golden: `--page-w` / `--page-h` (1 : φ) and the margin
-unit `--grid-u` in `styles.css` ("Golden page") drive the book, the cover
-board and every sheet; a Mushaf leaf is absolutely placed on
-`--margin-inner/head/fore/foot`. The per-leaf solver is in
+The spread is one grid: a single module `--u` in `styles.css`
+(`min(100vh / 32.743, 100vw / 41.889)`) sizes the desk margin, the board
+(`--book-rim`), the band the page block's edges stand in
+(`--book-fore-edge`), the page
+(`--page-w` = φ⁶u, `--page-h`), the margins and the gutter's shade
+(`--gutter-shade`). It drives the book, the cover board and every sheet; a
+Mushaf leaf is absolutely placed on `--margin-inner/head/fore/foot`. Head and
+foot are floored at `--chrome-h` / `--transport-h`; inner and fore are not.
+The scrolling reader's column is the same block (`--reader-max`, and the
+sheet's `padding-right` of fore − inner). The block's two piles: `App` sets `--book-right` (a registered `<number>`,
+eased over 900 ms) from `bookRightShare`, the share of the 302 leaves on the
+right, taken from the page the leaves are open at (`setBookPlace` from
+`MushafReader`) or where a scrolling chapter begins. `--edge-l` / `--edge-r`
+size the two fanned edges inside the fixed band; the rest of the band shows
+`--book-pastedown`. A turn carries a pile: `TurningLeaf` takes `wad` (share
+of the block; `--wad` = share × `--book-block`) and `ms` (`turnMs`), sets the
+back face that far behind the front, and draws the pile's fore-edge and
+head/foot caps (`.mushaf-flip-edge`, `.mushaf-flip-cap`) above
+`WAD_VISIBLE`. Sheet turns carry the whole pile on that side; page turns
+carry the leaves between the two pages. Cost of a turn: each strip of `TurningLeaf` holds only the words its slice
+shows (`slicePages`; the page is measured once under `data-measuring`, flat
+and with its lines unstretched), about 5,700 elements for a leaf instead of
+20,500, and the longest task at the start of a turn fell from 300–420 ms to
+about 100 ms in headless Chromium. `--book-right` is set and eased on `.book`
+(`BookSpread` reads the place), not on the app shell, where it restyled the
+whole app each frame. Wheel listeners that must not be passive are bound to
+the pages they serve (Chapters; the two leaf pages), never to the window. A
+sweep that has turned a leaf turns nothing more for `WHEEL_TURN_HOLD_MS`.
+The cover's glint is two fixed squares moved by a transform once a frame.
+Scrollbars (pointers that can hover only, `--sb` = 10px, else 0; the lane is
+kept with `scrollbar-gutter: stable`, and anything standing on a bar's edge
+is moved in by the lane): a thin
+thread at rest that thickens and turns solid under the pointer, drawn as a
+thumb inside transparent borders so the lane never changes width. Each
+scroller gives the lane back from its padding, so nothing in it moves. On the
+spread a bar runs down its page's fore-edge: the left page's scrollers are
+`direction: rtl` with their contents set back, and the scrolling reader's
+scroller is let out to the page's edges. Touch keeps scrollbars hidden.
+Search fields hide the browser's
+own clear mark (`::-webkit-search-cancel-button`); the field draws one. The per-leaf solver is in
 `ui/reader/mushafFit.ts`: `mushafLeafFit` (type size, bounded by
 `MUSHAF_MIN_LEADING`) and `solveLine` (letter widening toward
 `MUSHAF_TARGET_GAP`, or centring below `MUSHAF_SHORT_FILL`), applied to the

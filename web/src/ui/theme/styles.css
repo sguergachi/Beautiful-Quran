@@ -698,6 +698,14 @@ select {
   }
 }
 
+/* A search field draws its own clear mark; the browser's would be a second. */
+input[type='search']::-webkit-search-cancel-button,
+input[type='search']::-webkit-search-decoration {
+  -webkit-appearance: none;
+  appearance: none;
+  display: none;
+}
+
 /* —— Home —— */
 .home-scroll-page {
   position: relative;
@@ -5595,16 +5603,24 @@ button.ayah-mark {
      on its own, against nothing, and laid over the board as a dark sheet.
      The two layers blend with the board directly. */
   display: contents;
-  --glint-at: circle calc(var(--cover-unit) * 13) at var(--glint-x, 50%) var(--glint-y, 50%);
 }
 
+/* Each layer is a fixed square of light, moved with a transform. Drawn as a
+   gradient across the whole board with its centre in a custom property, it
+   was repainted, board-sized and twice over, on every move of the mouse.
+   Outside the square nothing is drawn, which is no change either. */
 .entrance-glint > span {
+  --glint-r: calc(var(--cover-unit) * 13);
   position: absolute;
-  inset: 0;
+  top: calc(-1 * var(--glint-r));
+  left: calc(-1 * var(--glint-r));
+  width: calc(2 * var(--glint-r));
+  height: calc(2 * var(--glint-r));
   z-index: 2;
   pointer-events: none;
   opacity: 0;
   transition: opacity 420ms ease;
+  will-change: transform;
 }
 
 .entrance-glint[data-on='true'] > span {
@@ -5614,12 +5630,12 @@ button.ayah-mark {
 
 .entrance-glint > span:first-child {
   mix-blend-mode: difference;
-  background: radial-gradient(var(--glint-at), rgb(5 24 17) 0%, rgb(2 11 8) 40%, #000 100%);
+  background: radial-gradient(circle closest-side, rgb(5 24 17) 0%, rgb(2 11 8) 40%, #000 100%);
 }
 
 .entrance-glint > span:last-child {
   mix-blend-mode: color-dodge;
-  background: radial-gradient(var(--glint-at), rgb(122 114 96) 0%, rgb(56 52 44) 40%, #000 100%);
+  background: radial-gradient(circle closest-side, rgb(122 114 96) 0%, rgb(56 52 44) 40%, #000 100%);
 }
 
 .entrance-board--opening .entrance-glint,
@@ -6504,6 +6520,14 @@ html[data-entrance='true'] body {
   }
 }
 
+/* Share of the book's leaves lying on the right: a number, so it can be
+   eased and every length derived from it moves with it. */
+@property --book-right {
+  syntax: '<number>';
+  inherits: true;
+  initial-value: 1;
+}
+
 /* —— Desktop book spread ——
  * Wide windows lay the paper stack open as a book on a desk: Chapters (and
  * the sheets that cover it — Bookmarks, Settings) on the verso, the Reader
@@ -6517,6 +6541,8 @@ html[data-entrance='true'] body {
   --book-gutter-rgb: 60, 44, 20;
   --book-gutter-alpha: 0.16;
   --book-edge-line: rgb(110 104 88 / 0.3);
+  --book-edge-shade: rgb(60 44 20 / 0.14);
+  --book-pastedown: #efe6d4;
 }
 
 [data-theme='dark'] {
@@ -6527,6 +6553,8 @@ html[data-entrance='true'] body {
   --book-gutter-rgb: 0, 0, 0;
   --book-gutter-alpha: 0.55;
   --book-edge-line: rgb(203 196 179 / 0.2);
+  --book-edge-shade: rgb(0 0 0 / 0.4);
+  --book-pastedown: #12110e;
 }
 
 [data-theme='royal_green'] {
@@ -6537,6 +6565,8 @@ html[data-entrance='true'] body {
   --book-gutter-rgb: 0, 0, 0;
   --book-gutter-alpha: 0.32;
   --book-edge-line: rgb(208 202 184 / 0.2);
+  --book-edge-shade: rgb(0 0 0 / 0.3);
+  --book-pastedown: #08342a;
 }
 
 .book,
@@ -6545,31 +6575,59 @@ html[data-entrance='true'] body {
 }
 
 .app-shell[data-spread='true'] {
-  /* Binding board showing past the page block, then the block's own edge. */
-  --book-rim: 8px;
-  --book-fore-edge: 6px;
-  --desk-pad: clamp(14px, 3.4vh, 44px);
-  --desk-side: clamp(20px, 3vw, 56px);
   /*
-   * Golden page. A page is 1 : φ, as tall as the window allows or as wide,
-   * whichever binds first. Its margins run inner : head : fore-edge : foot
-   * = 1 : φ : φ : φ² in one unit u — and for any u that leaves a text block
-   * that is itself 1 : φ, the page's own shape set inside it. u is the
-   * page's width over φ⁶ (block ≈ 85% of the page), opened further only
-   * when the foot would otherwise be too shallow to hold the transport.
+   * One grid for the whole window. Everything the book is made of is a
+   * power of φ times one module u, and u is the largest that fits the
+   * window: the desk around the book, the binding board, the edge of the
+   * page block, the page and the margins inside it.
+   *
+   *   across:  desk φ · board φ⁻³ · block edge φ⁻⁴ + 1 · page φ⁶ | page … desk
+   *   down:    desk φ · board φ⁻³ · page φ⁷ · board φ⁻³ · desk φ
+   *
+   * So the window is 2φ + 2φ⁻³ + φ⁷ = 32.743 u tall or
+   * 2φ + 2(φ⁻³ + φ⁻⁴ + 1 + φ⁶) = 41.889 u wide, whichever binds first, and the
+   * other way the book is centred with desk to spare. The desk's margin is
+   * the page's own head and fore-edge margin, carried outward.
    */
   --phi: 1.618034;
-  --page-w: min(
-    calc((100vw - 2 * var(--desk-side)) / 2 - var(--book-rim) - var(--book-fore-edge)),
-    calc((100vh - 2 * var(--desk-pad) - 2 * var(--book-rim)) / var(--phi))
-  );
+  --u: min(calc(100vh / 32.743), calc(100vw / 41.889));
+  /* Board and block edge keep a floor: below it they stop reading as edges. */
+  --book-rim: max(5px, calc(var(--u) * 0.2361));
+  /*
+   * The page block has its real thickness. 604 pages are 302 leaves, and the
+   * open book shows them as the fanned edges of two piles, one under each
+   * page. --book-right is the share of the leaves lying on the right (set
+   * by App from the page being read): the piles trade leaves as the book is
+   * read, and a pile is never thinner than its last few leaves.
+   * Each board carries a band wide enough for the whole block; what a pile
+   * does not cover shows the pastedown, the paper lining the board. So the
+   * pages never move as the piles change.
+   */
+  --book-edge-min: max(3px, calc(var(--u) * 0.1459));
+  --book-fan: var(--u);
+  --book-fore-edge: calc(var(--book-edge-min) + var(--book-fan));
+  /* The whole block's thickness, for the pile in the air during a turn. */
+  --book-block: calc(var(--u) * 2);
+  /*
+   * Golden page: 1 : φ, φ⁶ u wide. Margins run inner : head : fore-edge :
+   * foot = 1 : φ : φ : φ², which leaves a text block that is itself 1 : φ.
+   * The two inner margins make a gutter of 2u, wider than the φu fore-edge
+   * so the pages part at the spine. Head and foot also carry furniture of
+   * a fixed size (the page's controls, the transport), so on a small
+   * window those two deepen to hold it; inner and fore-edge never do, and
+   * the text keeps its width. (All four used to swell together, which kept
+   * the block golden but set a small page in margins sized for a large one.)
+   */
+  --page-w: calc(var(--u) * 17.944);
   --page-h: calc(var(--page-w) * var(--phi));
+  --chrome-h: 3.6rem;
   --transport-h: 5.6rem;
-  --grid-u: max(calc(var(--page-w) / 17.944), calc(var(--transport-h) / 2.618));
-  --margin-inner: var(--grid-u);
-  --margin-head: calc(var(--grid-u) * var(--phi));
-  --margin-fore: calc(var(--grid-u) * var(--phi));
-  --margin-foot: calc(var(--grid-u) * var(--phi) * var(--phi));
+  --margin-inner: var(--u);
+  --margin-fore: calc(var(--u) * var(--phi));
+  --margin-head: max(calc(var(--u) * var(--phi)), var(--chrome-h));
+  --margin-foot: max(calc(var(--u) * var(--phi) * var(--phi)), var(--transport-h));
+  /* The shade of the paper turning down into the spine. */
+  --gutter-shade: calc(var(--u) * 4.236);
   --book-width: calc(2 * (var(--page-w) + var(--book-rim) + var(--book-fore-edge)));
   --book-x: calc((100% - var(--book-width)) / 2);
   --desk-y: calc((100% - var(--page-h) - 2 * var(--book-rim)) / 2);
@@ -6593,7 +6651,19 @@ html[data-entrance='true'] body {
   z-index: 0;
   border-radius: 9px;
   background: linear-gradient(to bottom, var(--book-board), var(--book-board-deep));
-  transition: opacity 520ms ease;
+  transition:
+    opacity 520ms ease,
+    --book-right 900ms cubic-bezier(0.5, 0.02, 0.28, 1);
+}
+
+/* --book-right is set on the book itself (BookSpread), and on the cover's
+   inside when it stands in for the left half. Set and eased on the app
+   shell, it re-styled every element of the app on each frame of the ease,
+   and once more on every page turn. Only the piles read it. */
+.app-shell[data-spread='true'] .book,
+.entrance-inside {
+  --edge-r: calc(var(--book-edge-min) + var(--book-fan) * var(--book-right));
+  --edge-l: calc(var(--book-edge-min) + var(--book-fan) * (1 - var(--book-right)));
 }
 
 .book-page {
@@ -6613,14 +6683,25 @@ html[data-entrance='true'] body {
   right: calc(var(--book-rim) + var(--book-fore-edge));
 }
 
-/* The page block seen edge-on: leaves under the open pair. */
+/* The pastedown: paper lining the board, seen wherever a pile is thin. */
+.app-shell[data-spread='true'] .book::before {
+  content: '';
+  position: absolute;
+  inset: var(--book-rim);
+  border-radius: 2px;
+  background: var(--book-pastedown);
+}
+
+/* A pile seen edge-on: the leaves under the open page, fanned by the
+   binding, in shade as they go down toward the board. As wide as the share
+   of the block that lies on this side (--edge-l / --edge-r). */
 .book-page::before {
   content: '';
   position: absolute;
   top: 2px;
   bottom: 2px;
-  width: var(--book-fore-edge);
   background:
+    linear-gradient(var(--edge-away), transparent, var(--book-edge-shade)),
     repeating-linear-gradient(
       to right,
       var(--book-edge-line) 0 1px,
@@ -6631,12 +6712,16 @@ html[data-entrance='true'] body {
 
 .book-page--verso::before {
   right: 100%;
+  width: var(--edge-l);
   border-radius: 2px 0 0 2px;
+  --edge-away: to left;
 }
 
 .book-page--recto::before {
   left: 100%;
+  width: var(--edge-r);
   border-radius: 0 2px 2px 0;
+  --edge-away: to right;
 }
 
 .app-shell[data-spread='true'] .book-spine {
@@ -6644,8 +6729,8 @@ html[data-entrance='true'] body {
   position: absolute;
   top: var(--page-y);
   bottom: var(--page-y);
-  left: calc(50% - 3.5rem);
-  width: 7rem;
+  left: calc(50% - var(--gutter-shade) / 2);
+  width: var(--gutter-shade);
   z-index: 25;
   pointer-events: none;
   background: linear-gradient(
@@ -6680,11 +6765,21 @@ html[data-entrance='true'] body {
   right: var(--page-outer) !important;
 }
 
-/* A page laid onto the verso settles in from its fore-edge — nothing slides
-   across the desk or over the spine. */
-.app-shell[data-spread='true'] .sheet[data-name='bookmarks'][data-active='false'],
-.app-shell[data-spread='true'] .sheet[data-name='settings'][data-active='false'] {
+/* Settings is the right page in every layout: laid over the title page or
+   the chapter, never over Chapters. */
+.app-shell[data-spread='true'] .sheet[data-name='settings'] {
+  left: 50% !important;
+  right: var(--page-outer) !important;
+}
+
+/* A page laid onto either side settles in from its own fore-edge — nothing
+   slides across the desk or over the spine. */
+.app-shell[data-spread='true'] .sheet[data-name='bookmarks'][data-active='false'] {
   transform: translateX(-1.25rem);
+}
+
+.app-shell[data-spread='true'] .sheet[data-name='settings'][data-active='false'] {
+  transform: translateX(1.25rem);
 }
 
 .app-shell[data-spread='true']
@@ -6697,10 +6792,31 @@ html[data-entrance='true'] body {
 .app-shell[data-spread='true'] .sheet[data-name='reader'] {
   /* From the page, not a percentage: the column's children take this same
      variable, and a percentage would be subtracted again at each level. */
-  --reader-max: min(40rem, calc(var(--page-w) - 3.5rem));
+  --reader-max: min(40rem, calc(var(--page-w) - var(--margin-inner) - var(--margin-fore)));
 }
 
-/* Reading continues on the recto while Settings is open beside it. */
+/* A scrolling chapter's column is the page's text block too: as wide, and
+   nearer the spine by the same step. The sheet gives up the difference
+   between its two margins at the fore-edge, which moves everything set in
+   its column; the transport, placed against the sheet, takes the margins
+   itself. Facing leaves are placed against the page and need neither. */
+.app-shell[data-spread='true']:not([data-leaves='true']) .sheet[data-name='reader'] {
+  padding-right: calc(var(--margin-fore) - var(--margin-inner));
+}
+
+/* The transport is centred under the block. Beside a scrolling chapter it
+   already stands inside the sheet's narrowed box, so it takes one margin
+   each side; on a leaf it is placed against the whole page and takes both. */
+.app-shell[data-spread='true'] .sheet[data-name='reader'] .player-bar {
+  padding-inline: var(--margin-inner);
+}
+
+.app-shell[data-spread='true'][data-leaves='true'] .sheet[data-name='reader'] .player-bar {
+  padding-inline: var(--margin-inner) var(--margin-fore);
+}
+
+/* A chapter under Settings is covered, not dimmed: the deck's fade for an
+   under-sheet would show through nothing here. */
 .app-shell[data-spread='true'] .sheet[data-name='reader'][data-depth] {
   opacity: 1;
 }
@@ -6820,15 +6936,29 @@ html[data-entrance-settled] .app-shell[data-spread='true'] :is(.sheet, .book-ver
   transition: none !important;
 }
 
+/* The board's inside is the book's left half: pastedown, then the left
+   pile's edge, as .book draws them. */
 .entrance-inside-page::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  right: 100%;
+  width: var(--book-fore-edge);
+  border-radius: 2px 0 0 2px;
+  background: var(--book-pastedown);
+}
+
+.entrance-inside-page::after {
   content: '';
   position: absolute;
   top: 2px;
   bottom: 2px;
   right: 100%;
-  width: var(--book-fore-edge);
+  width: var(--edge-l);
   border-radius: 2px 0 0 2px;
   background:
+    linear-gradient(to left, transparent, var(--book-edge-shade)),
     repeating-linear-gradient(to right, var(--book-edge-line) 0 1px, transparent 1px 2px),
     var(--paper);
 }
@@ -6925,7 +7055,8 @@ html[data-entrance-closing]
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  padding: 2rem;
+  /* The title stands in the text block, like every other page. */
+  padding: var(--margin-head) var(--margin-fore) var(--margin-foot) var(--margin-inner);
   text-align: center;
 }
 
@@ -6957,6 +7088,101 @@ html[data-entrance-closing]
   color: var(--ink-rung-quiet);
 }
 
+/* —— One page grid ——
+ * Every page of the open book stands in the leaf's text block: φ at the
+ * fore-edge and the head, one unit at the spine. Chapters and Settings were
+ * set on the phone sheet's own padding (a share of the window's width, laid
+ * on top of the rows' insets), so their text sat in a narrower column than
+ * the leaf a turn uncovers them from, and clipped on a small window. */
+.app-shell[data-spread='true'] .sheet[data-name='home'] {
+  --home-start-inset: var(--margin-fore);
+  --home-end-inset: var(--margin-inner);
+}
+
+.app-shell[data-spread='true'] .sheet[data-name='home'] .scroll {
+  padding-inline: 0;
+}
+
+.app-shell[data-spread='true'] .home-scroll-page > .search-row {
+  padding-inline: var(--home-start-inset) var(--home-end-inset);
+}
+
+.app-shell[data-spread='true'] .home-header {
+  --home-header-top: var(--margin-head);
+}
+
+/* Settings is a right-hand page: spine on its left, fore-edge on its right. */
+.app-shell[data-spread='true'] .sheet[data-name='settings'] .settings {
+  padding-inline: var(--margin-inner) var(--margin-fore);
+}
+
+/* —— One of each thing on a spread ——
+ * Both pages are open at once, so a control that both sheets carry shows
+ * twice. The page being read keeps Settings; Chapters gives its own up. */
+.app-shell[data-spread='true'][data-has-reader='true'] .home-settings {
+  /* Hidden, not removed: the masthead keeps its height, so Chapters does
+     not shift when a chapter is opened beside it. */
+  visibility: hidden;
+}
+
+/* Settings is already open on the facing page. */
+.app-shell[data-spread='true'][data-has-reader='false'][data-stack='1'] .home-settings {
+  visibility: hidden;
+}
+
+/* The masthead is one line on any page: it scales with a small page
+   instead of breaking beside its own control. */
+.app-shell[data-spread='true'] .home-header h1 {
+  font-size: min(34px, calc(var(--page-w) * 0.078));
+  white-space: nowrap;
+}
+
+/* Facing leaves, Chapters open: the way to Chapters is already taken, and
+   the page beneath it cannot be turned from the recto alone. */
+.app-shell[data-spread='true'][data-leaves='true'][data-stack='0'] .reader-top[data-search='false'] > .back,
+.app-shell[data-spread='true'][data-leaves='true'][data-stack='0'] .sheet[data-name='reader'] .mushaf-turn {
+  visibility: hidden;
+}
+
+/* Closing the book: a strip of Chapters' fore-edge, like the leaves' own
+   turning strips. The mark shows only under a pointer or on focus. */
+.book-close {
+  display: none;
+}
+
+.app-shell[data-spread='true'] .book-close {
+  display: grid;
+  place-items: center;
+  position: absolute;
+  top: 22%;
+  bottom: 12%;
+  left: 0;
+  width: 1.6rem;
+  z-index: 6;
+  font-family: var(--font-display);
+  font-size: 1.6rem;
+  color: var(--ink-rung-furniture);
+}
+
+.app-shell[data-spread='true'] .book-close span {
+  opacity: 0;
+  transition: opacity 180ms ease;
+}
+
+.app-shell[data-spread='true'] .book-close:focus-visible span {
+  opacity: 1;
+}
+
+@media (hover: hover) {
+  .app-shell[data-spread='true'] .book-close:hover span {
+    opacity: 1;
+  }
+}
+
+.app-shell[data-cover-search='true'] .book-close {
+  visibility: hidden;
+}
+
 /* —— Spread, Mushaf layout: two facing leaves ——
  * The recto leaf is the reader sheet's own; the verso leaf is portalled
  * under the verso sheets, so Chapters, Bookmarks and Settings lie over it. */
@@ -6985,11 +7211,9 @@ html[data-entrance-closing]
   pointer-events: none;
 }
 
-/* Settings is the book's right-most page: on facing leaves it lies on the
-   recto, under the leaf that is turned away to show it. */
+/* On facing leaves Settings lies under the recto leaf, which is turned
+   away to show it, so it does not slide in. */
 .app-shell[data-spread='true'][data-leaves='true'] .sheet[data-name='settings'] {
-  left: 50% !important;
-  right: var(--page-outer) !important;
   transform: none;
   /* Still on the page until the leaf coming back down has covered it. */
   content-visibility: visible;
@@ -7044,6 +7268,14 @@ html[data-entrance-closing]
 .app-shell[data-spread='true'][data-leaves='true'] .player-bar {
   background: none;
   padding-top: 0.4rem;
+}
+
+/* The recto's furniture stands on the leaf's block: its controls end on the
+   block's edges (a control's mark is inset 12px in its own box). */
+.app-shell[data-spread='true'][data-leaves='true'] .sheet[data-name='reader'] .reader-top {
+  max-width: none;
+  margin: 0;
+  padding-inline: calc(var(--margin-inner) - 12px) calc(var(--margin-fore) - 12px);
 }
 
 /* The recto leaf is placed against its page, not the reader's column. */
@@ -7133,8 +7365,10 @@ html[data-entrance-closing]
 
 .ink-bleed.root-sheet {
   inset: auto;
-  top: 0.7rem;
-  bottom: 0.8rem;
+  /* Smaller than its page by a step of the grid on every side. */
+  --sheet-inset: calc(var(--u) * 0.382);
+  top: var(--sheet-inset);
+  bottom: var(--sheet-inset);
   border-radius: 2px;
   pointer-events: auto;
   transform-origin: 50% 0%;
@@ -7144,14 +7378,14 @@ html[data-entrance-closing]
 }
 
 .ink-bleed.root-sheet[data-page='verso'] {
-  left: 0.8rem;
-  right: calc(50% + 1.1rem);
+  left: var(--sheet-inset);
+  right: calc(50% + var(--u) * 0.618);
   --sheet-skew: -1.3deg;
 }
 
 .ink-bleed.root-sheet[data-page='recto'] {
-  left: calc(50% + 1.1rem);
-  right: 0.8rem;
+  left: calc(50% + var(--u) * 0.618);
+  right: var(--sheet-inset);
   --sheet-skew: 1.3deg;
 }
 
@@ -7225,8 +7459,16 @@ html[data-entrance-closing]
      pixel wide, so their edges are soft; at one pixel the page beneath
      showed through every joint as a vertical rule. */
   --joint: 2px;
+  /*
+   * A turn can carry more than one leaf: going to Chapters or Settings, or
+   * to a page far off, turns the whole pile between here and there.
+   * --wad-share is that pile's share of the block (TurningLeaf), and --wad
+   * its thickness. A pile is stiff: the thicker it is the less it curls.
+   */
+  --wad: calc(var(--wad-share, 0) * var(--book-block, 0px));
+  --curl: calc(52deg * (1 - 0.86 * var(--wad-share, 0)));
   /* The whole sheet's curl, shared out among the joints. */
-  --furl-total: 52deg;
+  --furl-total: var(--curl);
   --furl: calc(var(--furl-total) / (var(--strips) - 1));
 }
 
@@ -7239,7 +7481,7 @@ html[data-entrance-closing]
 .mushaf-flip[data-dir='back'] {
   --turn-from: 0deg;
   --turn-to: -180deg;
-  --furl-total: -52deg;
+  --furl-total: calc(-1 * var(--curl));
 }
 
 /* A single leaf is bound at its right edge and has nowhere to land: it
@@ -7258,6 +7500,13 @@ html[data-entrance-closing]
 .mushaf-flip--single[data-dir='back'] {
   --turn-from: 96deg;
   --turn-to: 0deg;
+}
+
+/* While TurningLeaf measures the page it is about to cut into strips, the
+   leaf lies flat: no turn, no curl, no face turned over or set back. */
+.mushaf-flip[data-measuring] :is(.mushaf-flip-strip, .mushaf-flip-face, .mushaf-line) {
+  animation: none !important;
+  transform: none !important;
 }
 
 /* A strip of the leaf. The first is bound to the page's edge and carries
@@ -7304,12 +7553,15 @@ html[data-entrance-closing]
   animation-direction: reverse;
 }
 
+/* A pile turns about the middle of its own thickness: the face it lifted
+   by starts level with the page, and the face it lands on ends level with
+   the page it lands on. A single leaf has no thickness and only rotates. */
 @keyframes mushaf-leaf-turn {
   from {
-    transform: rotateY(var(--turn-from));
+    transform: translateZ(0px) rotateY(var(--turn-from));
   }
   to {
-    transform: rotateY(var(--turn-to));
+    transform: translateZ(calc(-1 * var(--wad))) rotateY(var(--turn-to));
   }
 }
 
@@ -7353,7 +7605,61 @@ html[data-entrance-closing]
 }
 
 .mushaf-flip-face--back {
-  transform: rotateY(180deg);
+  /* The underside of the pile, its thickness below the face. */
+  transform: translateZ(calc(-1 * var(--wad))) rotateY(180deg);
+}
+
+/* The pile's own edges: its fore-edge on the free strip, and its head and
+   foot on every strip. Leaves seen edge-on, like the piles at rest. Only
+   drawn for a pile (TurningLeaf), never for one leaf. */
+.mushaf-flip-edge {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: var(--wad);
+  background:
+    linear-gradient(to right, transparent, var(--book-edge-shade)),
+    repeating-linear-gradient(to right, var(--book-edge-line) 0 1px, transparent 1px 2px),
+    var(--paper);
+}
+
+.mushaf-flip[data-hinge='right'] .mushaf-flip-edge {
+  left: calc(-1 * var(--joint));
+  transform-origin: left center;
+  transform: rotateY(90deg);
+}
+
+.mushaf-flip[data-hinge='left'] .mushaf-flip-edge {
+  right: calc(-1 * var(--joint));
+  transform-origin: right center;
+  transform: rotateY(-90deg);
+}
+
+.mushaf-flip-cap {
+  position: absolute;
+  left: calc(-1 * var(--joint));
+  right: calc(-1 * var(--joint));
+  height: var(--wad);
+  background:
+    linear-gradient(to bottom, transparent, var(--book-edge-shade)),
+    repeating-linear-gradient(to bottom, var(--book-edge-line) 0 1px, transparent 1px 2px),
+    var(--paper);
+}
+
+.mushaf-flip-cap--head {
+  top: 0;
+  transform-origin: center top;
+  transform: rotateX(-90deg);
+}
+
+.mushaf-flip-cap--foot {
+  bottom: 0;
+  transform-origin: center bottom;
+  transform: rotateX(90deg);
+  background:
+    linear-gradient(to top, transparent, var(--book-edge-shade)),
+    repeating-linear-gradient(to bottom, var(--book-edge-line) 0 1px, transparent 1px 2px),
+    var(--paper);
 }
 
 /* The whole page, laid behind the strip's window at this strip's slice. */
@@ -7506,4 +7812,247 @@ html[data-entrance-closing]
     animation: none;
     opacity: 0;
   }
+}
+
+/* —— Scrollbars (a pointer that can hover) ——
+ * A thread of ink down the edge of whatever scrolls, there at rest so a long
+ * page shows how long it is; under the pointer it thickens and turns solid,
+ * so it can be caught. Touch screens keep theirs hidden: a finger scrolls
+ * the page itself.
+ *
+ * The bar is a fixed lane (--sb) that takes that much of the scroller's
+ * width, so each scroller gives the same amount back from its right-hand
+ * padding and nothing in it moves. The thread is the thumb drawn inside
+ * transparent borders: thickening it changes the borders, never the lane,
+ * and the whole lane is the target.
+ */
+:root {
+  --sb: 0px;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  :root {
+    --sb: 10px;
+  }
+
+  :is(.scroll, .settings, .customize-scroll, .ink-bleed) {
+    /* The standard properties would switch the styled bar below off. */
+    scrollbar-width: auto;
+    scrollbar-color: auto;
+    /* The lane is there whether or not anything overflows: the padding
+       below gives it back either way, and a short page must not shift. */
+    scrollbar-gutter: stable;
+  }
+
+  :is(.scroll, .settings, .customize-scroll, .ink-bleed)::-webkit-scrollbar {
+    display: block;
+    width: var(--sb);
+    height: var(--sb);
+  }
+
+  :is(.scroll, .settings, .customize-scroll, .ink-bleed)::-webkit-scrollbar-track,
+  :is(.scroll, .settings, .customize-scroll, .ink-bleed)::-webkit-scrollbar-corner {
+    background: transparent;
+  }
+
+  :is(.scroll, .settings, .customize-scroll, .ink-bleed)::-webkit-scrollbar-thumb {
+    min-height: 2.5rem;
+    border: 3.5px solid transparent;
+    border-radius: 999px;
+    background-clip: padding-box;
+    background-color: color-mix(in srgb, var(--ink) 22%, transparent);
+  }
+
+  :is(.scroll, .settings, .customize-scroll, .ink-bleed)::-webkit-scrollbar-thumb:hover,
+  :is(.scroll, .settings, .customize-scroll, .ink-bleed)::-webkit-scrollbar-thumb:active {
+    border-width: 1px;
+    background-color: color-mix(in srgb, var(--ink) 55%, var(--paper));
+  }
+
+  /* Settings does not scroll while Customize is open in it (Customize has
+     its own scroller), and a stable gutter is kept even by a clipped box. */
+  .settings:has(.customize) {
+    scrollbar-gutter: auto;
+  }
+
+  /* The lane runs under the furniture standing at a scroller's foot, where
+     the thread could be neither seen nor caught: its track stops above it. */
+  .reader-main .scroll::-webkit-scrollbar-track {
+    margin-bottom: 7rem;
+  }
+
+  .scroll-with-float::-webkit-scrollbar-track {
+    margin-bottom: 5.5rem;
+  }
+
+  .scroll-with-chapter::-webkit-scrollbar-track {
+    margin-bottom: 9rem;
+  }
+
+  /* Engines without the styled bar (Firefox) take the standard thin one. Its
+     width is the platform's (none at all for an overlay bar), so nothing is
+     taken back from the padding there; the gutter is kept on both edges
+     instead, which leaves whatever scrolls centred. */
+  @supports not selector(::-webkit-scrollbar) {
+    :root {
+      --sb: 0px;
+    }
+
+    :is(.scroll, .settings, .customize-scroll, .ink-bleed) {
+      scrollbar-width: thin;
+      scrollbar-color: color-mix(in srgb, var(--ink) 30%, transparent) transparent;
+      scrollbar-gutter: stable both-edges;
+    }
+  }
+
+  /* Each scroller gives the lane back from its right-hand padding. */
+  .scroll {
+    padding-right: calc(var(--sheet-pad) - var(--sb));
+  }
+
+  .settings {
+    padding-right: calc(var(--sheet-pad) - var(--sb));
+  }
+
+  .customize-scroll {
+    padding-right: calc(var(--sheet-pad) - var(--sb));
+  }
+
+  .bookmarks-scroll {
+    padding-right: calc(var(--bookmark-pad) - var(--sb));
+  }
+
+  .ink-bleed {
+    padding-right: calc(var(--root-inline-padding) - var(--sb));
+  }
+
+  /* A narrow window drops Home's own padding (its rows carry the 28px
+     lane), so there the lane comes off the rows' end inset. */
+  @media (max-width: 640px) {
+    .sheet[data-name='home'] .scroll {
+      --home-end-inset: calc(28px - var(--sb));
+    }
+  }
+
+  /* The verse column has no padding to give (its verses carry the rules), so
+     the column is a lane wider each side and the verses stay where they were.
+     Only a column that scrolls: a Mushaf leaf has no bar, and is measured. */
+  .reader-body:has(.scroll) {
+    max-width: calc(var(--reader-max) + 2 * var(--sb));
+  }
+
+  .reader-main .scroll {
+    padding-left: var(--sb);
+  }
+
+  /*
+   * On the desktop book a bar runs down the fore-edge of its page, the
+   * outside of the spread: the right edge of the right page and the left
+   * edge of the left page. Never down the spine.
+   *
+   * Left page: a scroller set right-to-left carries its bar on the left; its
+   * contents are set back. Chapters has no padding of its own (its rows
+   * carry the page's margins), so the lane comes off the fore-edge margin.
+   */
+  .app-shell[data-spread='true'] :is(.sheet[data-name='home'], .sheet[data-name='bookmarks']) .scroll {
+    direction: rtl;
+  }
+
+  .app-shell[data-spread='true'] :is(.sheet[data-name='home'], .sheet[data-name='bookmarks']) .scroll > * {
+    direction: ltr;
+  }
+
+  .app-shell[data-spread='true'] .sheet[data-name='home'] .scroll {
+    padding-inline: 0;
+    --home-start-inset: calc(var(--margin-fore) - var(--sb));
+  }
+
+  .app-shell[data-spread='true'] .sheet[data-name='bookmarks'] .scroll {
+    padding-right: var(--bookmark-pad);
+    padding-left: calc(var(--bookmark-pad) - var(--sb));
+  }
+
+  /* The root viewer laid on the left page is a left page too. */
+  .ink-bleed.root-sheet[data-page='verso'] {
+    direction: rtl;
+    padding-right: var(--root-inline-padding);
+    padding-left: calc(var(--root-inline-padding) - var(--sb));
+  }
+
+  .ink-bleed.root-sheet[data-page='verso'] > * {
+    direction: ltr;
+  }
+
+  /* Right page. Customize scrolls inside Settings and has its own rule. */
+  .app-shell[data-spread='true'] .sheet[data-name='settings'] .settings:not(:has(.customize)) {
+    padding-right: calc(var(--margin-fore) - var(--sb));
+  }
+
+  /* A scrolling chapter's scroller is only as wide as the text block, which
+     would stand its bar beside the text. It is let out to the page's edges
+     and takes the page's margins as padding, so the verses do not move. */
+  .app-shell[data-spread='true']:not([data-leaves='true']) .sheet[data-name='reader'] .reader-body {
+    max-width: none;
+    width: auto;
+    margin: 0 calc(var(--margin-inner) - var(--margin-fore)) 0 0;
+  }
+
+  .app-shell[data-spread='true']:not([data-leaves='true']) .sheet[data-name='reader'] .reader-main .scroll {
+    padding-left: var(--margin-inner);
+    padding-right: calc(var(--margin-fore) - var(--sb));
+  }
+
+  /* The transport stands in that same column, so it takes both margins now,
+     and so does everything else placed against it: the share ribbon spans
+     the text block, and Return-to-ayah is centred on it, not on the page. */
+  .app-shell[data-spread='true']:not([data-leaves='true']) .sheet[data-name='reader'] .player-bar {
+    padding-inline: var(--margin-inner) var(--margin-fore);
+  }
+
+  .app-shell[data-spread='true']:not([data-leaves='true']) .sheet[data-name='reader'] .share-ribbon {
+    left: var(--margin-inner);
+    right: var(--margin-fore);
+  }
+
+  .app-shell[data-spread='true']:not([data-leaves='true']) .sheet[data-name='reader'] .return-ayah {
+    left: calc(50% - (var(--margin-fore) - var(--margin-inner)) / 2);
+  }
+}
+
+/* Whatever stands on a scroller's bar edge moves in by the lane, so the bar
+   beneath it can be reached: the strip that closes the book on Chapters'
+   fore-edge, and the ayah rail when it is set on the right. */
+.app-shell[data-spread='true'] .book-close {
+  left: var(--sb);
+}
+
+.ayah-rail[data-side='right'] {
+  right: var(--sb);
+}
+
+/* On the desktop book a sheet is as wide as its page at any window size:
+   the phone column's caps would stand a bar inside the page on a large
+   window. Rows keep their own measure. */
+.app-shell[data-spread='true'] .sheet-frame {
+  width: 100%;
+}
+
+.app-shell[data-spread='true'] .bookmarks-frame,
+.app-shell[data-spread='true'] .sheet[data-name='settings'] .settings {
+  max-width: none;
+}
+
+/* Customize scrolls inside Settings: Settings gives up its own margins there
+   and Customize's header and scroller take the page's, the scroller less
+   the lane. (Both used to apply, and set Customize in a narrower column.) */
+.app-shell[data-spread='true'] .sheet[data-name='settings'] .settings:has(.customize) {
+  padding-inline: 0;
+}
+
+.app-shell[data-spread='true'] .sheet[data-name='settings'] .customize-sticky {
+  padding-inline: var(--margin-inner) var(--margin-fore);
+}
+
+.app-shell[data-spread='true'] .sheet[data-name='settings'] .customize-scroll {
+  padding-inline: var(--margin-inner) calc(var(--margin-fore) - var(--sb));
 }

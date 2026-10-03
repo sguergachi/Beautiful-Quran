@@ -1,9 +1,11 @@
 import { useSyncExternalStore } from 'react'
-import { BOOKMARKS_LAYER, COVER_LAYER, READER_LAYER, type StackLayer } from './stack'
+import { BOOKMARKS_LAYER, COVER_LAYER, READER_LAYER, SETTINGS_LAYER, type StackLayer } from './stack'
 
 /**
- * Desktop lays the paper stack open as a book: Chapters (and whatever sheet
- * covers it — Bookmarks, Settings) on the verso, the Reader on the recto.
+ * Desktop lays the paper stack open as a book, and every sheet has one
+ * place in it: Chapters is the left page (Bookmarks is laid over it), and
+ * the right page is whatever was opened from it — the title page, the
+ * chapter being read, or Settings laid over that.
  * Phones and narrow windows keep the one-sheet-at-a-time deck.
  */
 export const BOOK_SPREAD_QUERY = '(min-width: 1100px) and (min-height: 600px)'
@@ -24,8 +26,8 @@ export function useBookSpread(): boolean {
 
 /**
  * The layer each page believes the stack is on. In a spread the two pages
- * are both on top: an open chapter always owns the recto, and Chapters owns
- * the verso until Bookmarks or Settings is laid over it.
+ * are both on top: Chapters owns the verso until Bookmarks is laid over it,
+ * and an open chapter owns the recto until Settings is laid over it.
  */
 export function spreadLayers(
   spread: boolean,
@@ -33,18 +35,22 @@ export function spreadLayers(
   hasReader: boolean,
   leaves = false,
 ): { home: StackLayer; reader: StackLayer } {
-  if (!spread || !hasReader) return { home: stack, reader: stack }
+  if (!spread) return { home: stack, reader: stack }
+  // Mushaf layout fills both pages with facing leaves, so Chapters keeps
+  // its real layer there: laid over the verso at layer 0, gone above it.
+  // Otherwise nothing above Chapters' own layer covers the left page.
+  const home = !leaves && stack > COVER_LAYER ? COVER_LAYER : stack
+  if (!hasReader) return { home, reader: stack }
   return {
-    // Mushaf layout fills both pages with facing leaves, so Chapters keeps
-    // its real layer there: laid over the verso at layer 0, gone at layer 1.
-    home: !leaves && stack === READER_LAYER ? COVER_LAYER : stack,
-    reader: READER_LAYER,
+    home,
+    // Under Settings the chapter is a covered page: it gives up the keys.
+    reader: stack === SETTINGS_LAYER ? SETTINGS_LAYER : READER_LAYER,
   }
 }
 
-/** Visibility follows the facing page, rather than the sheet covering the verso. */
+/** In a spread the chapter is in sight beside Chapters and Bookmarks; Settings covers it. */
 export function readerVisible(spread: boolean, stack: StackLayer, hasReader: boolean): boolean {
-  return hasReader && (spread || stack === READER_LAYER)
+  return hasReader && (stack === READER_LAYER || (spread && stack < READER_LAYER))
 }
 
 export function leavesReader(
@@ -78,6 +84,58 @@ export function bookTurnDirection(from: StackLayer, to: StackLayer): 'on' | 'bac
 export function closesBook(layer: StackLayer, dx: number): boolean {
   return layer === COVER_LAYER && dx < 0
 }
+
+/** Pages in the book, for the thickness of its two piles. */
+const BOOK_PAGES = 604
+
+/**
+ * The share of the book's leaves lying on the right-hand pile, 0 to 1.
+ *
+ * Pages run right to left, so each leaf read is turned over onto the right:
+ * at page 1 the whole block is on the left, at the last page on the right.
+ * On facing leaves, Chapters is the left-most page, under every leaf of the
+ * left pile, and Settings the right-most, under every leaf of the right
+ * pile. Showing either turns that whole pile over, so nothing is left on
+ * its side. Before a chapter is chosen the book stands open at Chapters.
+ */
+export function bookRightShare(leaves: boolean, stack: StackLayer, page: number | null): number {
+  if (leaves && stack <= COVER_LAYER) return 1
+  if (leaves && stack === SETTINGS_LAYER) return 0
+  if (page == null) return 1
+  return Math.min(1, Math.max(0, (page - 1) / (BOOK_PAGES - 1)))
+}
+
+/** One leaf turns in this long (`mushaf-leaf-turn` in styles.css). */
+export const LEAF_TURN_MS = 760
+
+/** A pile is heavier than a leaf: the whole block takes half as long again. */
+export function turnMs(share: number): number {
+  return Math.round(LEAF_TURN_MS * (1 + 0.5 * Math.min(1, Math.max(0, share))))
+}
+
+/** The page the facing leaves are open at, for the piles under them. */
+const bookPlace = (() => {
+  let page: number | null = null
+  const listeners = new Set<() => void>()
+  return {
+    set(next: number | null) {
+      if (page === next) return
+      page = next
+      for (const listener of listeners) listener()
+    },
+    use: (): number | null =>
+      useSyncExternalStore(
+        (onChange) => {
+          listeners.add(onChange)
+          return () => listeners.delete(onChange)
+        },
+        () => page,
+        () => null,
+      ),
+  }
+})()
+export const setBookPlace = bookPlace.set
+export const useBookPlace = bookPlace.use
 
 /** A swipe belongs to the sheet on which its pointer went down. */
 export function bookmarkSwipeDestination(layer: StackLayer, dx: number, hasBookmarks: boolean): StackLayer | null {

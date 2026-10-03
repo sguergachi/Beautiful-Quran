@@ -36,11 +36,18 @@ import {
 } from '../../domain/WordSearch'
 import { wordSearchSources } from '../../data/customizePolicy'
 import { BOOKMARKS_LAYER, type StackLayer } from '../paper/stack'
+import { createWheelTurn, isSidewaysWheel } from '../reader/wheelTurn'
 
 export function HomeScreen({
   stackLayer,
   playbackPinned = false,
+  onCloseBook,
+  closeStrip = false,
 }: {
+  /** Closes the book from its first page. */
+  onCloseBook?: () => void
+  /** Desktop book: the strip of this page's fore-edge that closes it. */
+  closeStrip?: boolean
   stackLayer: StackLayer
   /** Phone scroll stack: the chapter bar is pinned, so this sheet keeps its float in place. */
   playbackPinned?: boolean
@@ -75,6 +82,7 @@ export function HomeScreen({
   const [searchFocused, setSearchFocused] = useState(false)
   const searchInputRef = useRef<HTMLInputElement>(null)
   const searching = search.trim().length > 0
+  const sheetRef = useRef<HTMLDivElement>(null)
   const { surahs: filtered, ayahTarget } = useMemo(
     () => filterSurahs(state.surahs, search),
     [state.surahs, search],
@@ -174,6 +182,27 @@ export function HomeScreen({
 
   const depth = Math.max(0, stackLayer - COVER_LAYER)
   const isTop = stackLayer === COVER_LAYER
+
+  // Two fingers swept back across Chapters close the book, as a finger
+  // dragged back across it does. The sweep is taken from the browser's own
+  // history gesture, so the listener cannot be passive; it is on this sheet
+  // alone, not the window, where it would hold up every scroll in the app
+  // until the handler had run.
+  const closeBookRef = useRef(onCloseBook)
+  closeBookRef.current = onCloseBook
+  const canCloseBook = onCloseBook != null && isTop
+  useEffect(() => {
+    const sheet = sheetRef.current
+    if (!sheet || !canCloseBook) return
+    const wheelTurn = createWheelTurn()
+    const onWheel = (event: WheelEvent) => {
+      if (event.ctrlKey || !isSidewaysWheel(event.deltaX, event.deltaY)) return
+      event.preventDefault()
+      if (wheelTurn(event.deltaX, event.deltaY, event.timeStamp) === -1) closeBookRef.current?.()
+    }
+    sheet.addEventListener('wheel', onWheel, { passive: false })
+    return () => sheet.removeEventListener('wheel', onWheel)
+  }, [canCloseBook])
   const nowPlaying = state.player.nowPlaying
   // Hide the float for the whole search session (focused field or query).
   const showFloat = nowPlaying != null && isTop && !searchFocused && !searching
@@ -226,6 +255,7 @@ export function HomeScreen({
       data-layer={COVER_LAYER}
       data-depth={depth}
       data-active={isTop}
+      ref={sheetRef}
     >
       {depth > 0 ? (
         <button
@@ -234,6 +264,20 @@ export function HomeScreen({
           aria-label="Back to chapters"
           onClick={() => appStore.revealLayer(COVER_LAYER)}
         />
+      ) : null}
+
+      {/* The board the book closes on lies under this page's fore-edge:
+          the strip there shuts it, as the leaves' own strips turn them. */}
+      {onCloseBook && closeStrip && isTop ? (
+        <button
+          type="button"
+          className="book-close"
+          aria-label="Close the book"
+          title="Close the book"
+          onClick={onCloseBook}
+        >
+          <span aria-hidden="true">‹</span>
+        </button>
       ) : null}
 
       <div

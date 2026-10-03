@@ -1,21 +1,47 @@
-import { useMemo } from 'react'
+import { useMemo, type CSSProperties } from 'react'
 import { GeneratedRosette } from '../theme/GeneratedOrnament'
 import { generateCoverOrnament } from '../theme/ornamentGenerator'
-import { setLooseSheetSlot, setTurningLeafSlot, setVersoLeafSlot } from './bookSpread'
+import {
+  bookRightShare,
+  setLooseSheetSlot,
+  setTurningLeafSlot,
+  setVersoLeafSlot,
+  useBookPlace,
+} from './bookSpread'
+import type { StackLayer } from './stack'
 
 /**
  * The open book the desktop sheets lie on: binding boards, two pages with
  * their fore-edges, and a title page on the recto until a chapter opens.
  * Drawn under the sheets; hidden entirely outside the spread.
  */
-export function BookSpread({ titlePage, versoCovered }: { titlePage: boolean; versoCovered: boolean }) {
+export function BookSpread({
+  titlePage,
+  versoCovered,
+  leaves,
+  stack,
+  chapterPage,
+}: {
+  titlePage: boolean
+  versoCovered: boolean
+  /** Facing Mushaf leaves are open on the spread. */
+  leaves: boolean
+  stack: StackLayer
+  /** Where a scrolling chapter begins; the leaves report their own place. */
+  chapterPage: number | null
+}) {
+  // How the block's leaves are shared between the two piles. Read here, by
+  // the one element that draws them: the app shell does not re-render on a
+  // page turn, and the eased value restyles the book alone.
+  const leavesPlace = useBookPlace()
+  const right = bookRightShare(leaves, stack, leaves ? leavesPlace : chapterPage)
   const medallion = useMemo(
     () => generateCoverOrnament((Math.random() * 0x7fffffff) | 0).medallion,
     [],
   )
   return (
     <>
-      <div className="book" aria-hidden="true">
+      <div className="book" aria-hidden="true" style={{ ['--book-right' as string]: right } as CSSProperties}>
         <div className="book-page book-page--verso" />
         <div className="book-page book-page--recto">
           {titlePage ? (

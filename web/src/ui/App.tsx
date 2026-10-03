@@ -15,7 +15,6 @@ import { SettingsScreen } from './settings/SettingsScreen'
 import { EntranceCover } from './entrance/EntranceCover'
 import { OrnamentsLab } from './lab/OrnamentsLab'
 import { bookmarkSwipeDestination, closesBook, spreadLayers, useBookSpread } from './paper/bookSpread'
-import { createWheelTurn, isSidewaysWheel } from './reader/wheelTurn'
 import { BookSpread } from './paper/BookSpread'
 import { unlockPageTurnSounds } from './paper/pageTurnSounds'
 
@@ -158,22 +157,6 @@ export function App() {
     return () => window.removeEventListener('keydown', onKey)
   }, [entranceDone])
 
-  // Two fingers swept back across Chapters close the book, as a finger
-  // dragged back across it does. Taken from the browser's history sweep.
-  useEffect(() => {
-    if (!entranceDone) return
-    const wheelTurn = createWheelTurn()
-    const onWheel = (event: WheelEvent) => {
-      if (event.ctrlKey || !isSidewaysWheel(event.deltaX, event.deltaY)) return
-      const sheet = event.target instanceof Element ? event.target.closest('.sheet') : null
-      if (sheet?.getAttribute('data-name') !== 'home' || sheet.getAttribute('data-active') !== 'true') return
-      event.preventDefault()
-      if (wheelTurn(event.deltaX, event.deltaY, event.timeStamp) === -1) closeBook()
-    }
-    window.addEventListener('wheel', onWheel, { passive: false })
-    return () => window.removeEventListener('wheel', onWheel)
-  }, [entranceDone, closeBook])
-
   // The Ornaments Lab is a standalone dev tool — it needs no database, so
   // it renders over everything the moment the hash routes to it.
   if (isLab) return <OrnamentsLab />
@@ -231,11 +214,21 @@ export function App() {
             stackLayer={pageLayers.reader}
             playbackPinned={playbackPinned && !spread}
           />
-          {spread ? <BookSpread titlePage={state.content == null} versoCovered={!leaves || stack !== READER_LAYER} /> : null}
+          {spread ? (
+            <BookSpread
+              titlePage={state.content == null}
+              versoCovered={!leaves || stack !== READER_LAYER}
+              leaves={leaves}
+              stack={stack}
+              chapterPage={state.content?.ayahs[0]?.page ?? null}
+            />
+          ) : null}
           <BookmarksScreen stackLayer={stack} />
           <HomeScreen
             stackLayer={pageLayers.home}
             playbackPinned={playbackPinned && !spread}
+            onCloseBook={entranceDone ? closeBook : undefined}
+            closeStrip={spread}
           />
           <SettingsScreen stackLayer={stack} hasReader={hasReader} />
           <div id="playback-pin" />
