@@ -615,6 +615,29 @@ class InkEngineTest {
     }
 
     @Test
+    fun `glint brightness scales sheen and crest without changing the pulse`() {
+        val pulse = InkEngine.glintResonance(true, tremolo = 0.7f, tremoloGain = 0.8f)
+        for (peak in listOf(0f, pulse.peak)) {
+            val normal = InkEngine.glintColorAlpha(0.2f, peak, 1f)
+            assertEquals(normal * 0.5f, InkEngine.glintColorAlpha(0.2f, peak, 0.5f), 0.0001f)
+            assertEquals(normal * 2f, InkEngine.glintColorAlpha(0.2f, peak, 2f), 0.0001f)
+            assertEquals(0f, InkEngine.glintColorAlpha(0.2f, peak, 0f), 0f)
+        }
+        assertEquals(1f, InkEngine.glintColorAlpha(0.88f, 1f, 2f), 0f)
+        assertEquals(0f, InkEngine.glintColorAlpha(0.88f, 1f, -1f), 0f)
+    }
+
+    @Test
+    fun `one hundred percent brightness preserves shipped glint alphas`() {
+        for (base in listOf(0f, 0.3f, 0.78f, 0.88f)) {
+            for (peak in listOf(0f, 0.5f, 1f)) {
+                val shipped = (base * (1f + InkEngine.GLINT_RESONANCE_PEAK_BOOST * peak)).coerceIn(0f, 1f)
+                assertEquals(shipped, InkEngine.glintColorAlpha(base, peak, 1f), 0f)
+            }
+        }
+    }
+
+    @Test
     fun `glint resonance is idle when not holding or disabled`() {
         assertEquals(InkEngine.GlintResonance.Idle, InkEngine.glintResonance(holding = false))
         assertEquals(

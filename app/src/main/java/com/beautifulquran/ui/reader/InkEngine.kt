@@ -105,6 +105,8 @@ object InkEngine {
         val glintTintAlpha: Float = 0.88f,
         val glintGlowAlpha: Float = 0.78f,
         val glintGlowRadius: Float = 10f,
+        /** Glint tint and halo brightness multiplier: 0 = off, 1 = shipped, 2 = brighter. */
+        val glintBrightness: Float = 1f,
         /** Width of the ink feather relative to the word (see
          *  ui/theme/Fade.kt: the wash reads as a whole-word breath). */
         val washFeather: Float = 1.6f,
@@ -622,6 +624,11 @@ object InkEngine {
         val mult = 1f - g * d * (1f - on) * (1f - floor)
         return GlintResonance(peak = g * crest * d, layerMult = mult)
     }
+
+    /** Scale tint and halo together, preserving the measured pulse and its troughs. */
+    fun glintColorAlpha(base: Float, peak: Float, brightness: Float = tuning.glintBrightness): Float =
+        (base * (1f + GLINT_RESONANCE_PEAK_BOOST * peak.coerceIn(0f, 1f)) *
+            brightness.coerceIn(0f, 2f)).coerceIn(0f, 1f)
 
     /**
      * How hard tarjīʿ crests boost the wet-ink sheen (0 = no pulse, 1 = full

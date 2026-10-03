@@ -47,6 +47,7 @@ class InkLabStoreTest {
             upcomingAlpha = 0.31f,
             inkFadeMs = 512,
             glintGlowRadius = 4.25f,
+            glintBrightness = 1.3f,
             tajweedPacing = true,
             cruiseCap = 1.55f,
             holdGhunnah = true,
@@ -82,6 +83,7 @@ class InkLabStoreTest {
         // Untouched Tuning fields still match a fresh Tuning().
         val defaults = InkEngine.Tuning()
         assertEquals(defaults.repeatInkAlpha, snap.repeatInkAlpha, 0.0001f)
+        assertEquals(1f, snap.glintBrightness, 0f)
         assertEquals(defaults.washFeather, snap.washFeather, 0.0001f)
         assertEquals(defaults.tajweedPacing, snap.tajweedPacing)
         assertEquals(defaults.waslHandoff, snap.waslHandoff, 0.0001f)

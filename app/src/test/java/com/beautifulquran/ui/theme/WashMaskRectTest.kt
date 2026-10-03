@@ -1,6 +1,7 @@
 package com.beautifulquran.ui.theme
 
 import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.graphics.Color
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -25,6 +26,34 @@ class WashMaskRectTest {
     )
 
     private val lineBox = Rect(100f, 200f, 400f, 260f)
+
+    @Test
+    fun `halo size cannot delay the glint behind a mid-word ink wash`() {
+        val line = Rect(0f, 0f, 100f, 40f)
+        val ink = linePaperCoverBounds(line, 4f)
+        val progress = 0.13f
+        val feather = 1.1092f
+        fun alpha(cover: Rect, rtl: Boolean): Float {
+            val x = if (rtl) line.right else line.left
+            val position = if (rtl) cover.right - x else x - cover.left
+            val edge = cover.width * feather
+            return inkSmootherstep((progress * (cover.width + edge) - position) / edge)
+        }
+        for (radius in listOf(3.5f, 10f, 30f)) {
+            val glint = ShapedWordBloom.ColorReveal(0..3, progress, Color.White,
+                glowAlpha = 0.78f, glowRadius = radius)
+            val travel = glint.washBounds(line, 4f)
+            for (rtl in listOf(false, true)) {
+                assertEquals(alpha(ink, rtl), alpha(travel, rtl), 0f)
+                assertTrue("the leading glint must be visible during the held note", alpha(travel, rtl) > 0.06f)
+            }
+            val bleed = radius * 3f
+            val mask = washMaskRect(travel, bleed, openTop = true, openBottom = true)
+            val halo = glowLayer(line, bleed)
+            assertTrue(mask.left <= halo.left && mask.right >= halo.right &&
+                mask.top <= halo.top && mask.bottom >= halo.bottom)
+        }
+    }
 
     @Test
     fun `the mask covers everything the glow layer can paint`() {
