@@ -140,6 +140,13 @@ folded into the adjacent letter's glide (leading silents ride the letter
 after them, trailing silents the one before), so the wash crosses the
 article of `ٱلضَّآلِّينَ` in motion during the `ضّ` rather than teleporting.
 
+Letter positions are distinct from mask travel: the renderer sweeps across
+the word **plus the feather**. `Curve.forWash` maps each interior breakpoint
+`x` to `(x + feather / 2) / (1 + feather)`, centring the faded edge on the
+held letter. The unread and fully inked endpoints stay 0 and 1, and the
+hold's times stay unchanged. Without this conversion, a late madd such as
+the alif of `أَوۡلِيَآءَ` (4:144) holds at the end of the word instead.
+
 If the Ink Lab audition shows the edge visibly missing letters on long words,
 the measured upgrade is:
 
@@ -323,7 +330,8 @@ Two refinements built into the curve, not the callers:
 - **`InkEngine`** — `sweepMs` unchanged.
   `InkEngine.pacing(arabic, activeWord, isAyahFinal, prevArabic)`
   returns the nullable curve (gated on `Tuning.tajweedPacing`, default on)
-  and assembles a `TajweedPacing.Hold` from the tuning;
+  and assembles a `TajweedPacing.Hold` from the tuning, then converts letter
+  positions to wash travel with `forWash(pacedFeather)`;
   `InkEngine.pacedFeather()` supplies the paced edge. Knobs on the Ink Lab's
   **Tajweed** tab: the `tajweedPacing` master toggle, `holdMadd` /
   `holdGhunnah` / `holdWaqf` / `holdConnect`, and the `cruiseCap`,

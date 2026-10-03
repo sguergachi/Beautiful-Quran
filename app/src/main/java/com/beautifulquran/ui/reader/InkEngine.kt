@@ -523,7 +523,7 @@ object InkEngine {
                 creep = t.holdCreep,
             ),
             prevArabic = prevArabic,
-        )
+        )?.forWash(t.pacedFeather)
     }
 
     /** Cross-word prefix bloom for a nūn/tanwīn connection, when enabled. */
