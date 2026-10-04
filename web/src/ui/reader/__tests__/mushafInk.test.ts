@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { ActiveWord } from '../../../data/models'
 import { InkState } from '../InkEngine'
-import { MUSHAF_INK_IDLE, mushafTokenInk, type MushafInk } from '../mushafInk'
+import { MUSHAF_INK_IDLE, mushafMarkWaits, mushafTokenInk, type MushafInk } from '../mushafInk'
 
 const word = (ayah: number, wordPosition: number, extra: Partial<ActiveWord> = {}): ActiveWord => ({
   ayah,
@@ -85,5 +85,40 @@ describe('mushaf leaf ink', () => {
   it('leaves a browsed leaf, and a silent one, in plain ink', () => {
     expect(state(at(6, 1), voice({}), false)).toBe(InkState.Plain)
     expect(state(at(5, 3), MUSHAF_INK_IDLE)).toBe(InkState.Plain)
+  })
+})
+
+describe('mushaf verse numbers', () => {
+  const waits = (ayah: number, ink: MushafInk, live = true, surahId = 2) =>
+    mushafMarkWaits({ surahId, ayah }, 2, ink, live)
+
+  it('lights the number of the verse the voice has just started', () => {
+    // First word of the verse: its last word is still under paper.
+    const ink = voice({ activeWord: word(5, 1), inkAyahRead: false })
+    expect(state(at(5, 9), ink)).toBe(InkState.Upcoming)
+    expect(waits(5, ink)).toBe(false)
+  })
+
+  it('lights it before the first word, as soon as the verse owns the voice', () => {
+    expect(waits(5, voice({ activeWord: null, inkAyahRead: false }))).toBe(false)
+  })
+
+  it('keeps the numbers of verses still to come under paper, and those read lit', () => {
+    const ink = voice({})
+    expect(waits(6, ink)).toBe(true)
+    expect(waits(4, ink)).toBe(false)
+    expect(waits(1, ink, true, 3)).toBe(true)
+    expect(waits(200, ink, true, 1)).toBe(false)
+  })
+
+  it('lights the next verse\'s number with the lead, ahead of the hand-off', () => {
+    const ink = voice({ leadAyah: 6 })
+    expect(waits(6, ink)).toBe(false)
+    expect(waits(7, ink)).toBe(true)
+  })
+
+  it('leaves every number lit on a leaf away from the voice, or with no voice', () => {
+    expect(waits(9, voice({}), false)).toBe(false)
+    expect(waits(9, MUSHAF_INK_IDLE)).toBe(false)
   })
 })

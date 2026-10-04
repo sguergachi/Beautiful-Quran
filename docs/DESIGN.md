@@ -59,7 +59,16 @@ over onto the right: at the first page the whole block lies on the left, at
 the last on the right, and the piles trade leaves in between. Each board
 carries a band wide enough for the whole block (1 *u*, plus φ⁻⁴ for the last
 few leaves); what a pile does not cover shows the pastedown, the paper lining
-the board. So the pages themselves never move as the piles change.
+the board. So the pages themselves never move as the piles change. On
+facing leaves a pile changes only by the leaves that are turned: they leave
+it as they lift and join the other as they land, and while they are in the
+air they lie on neither. Nothing is added to a pile that was not turned onto
+it. The book is one object and it is always somewhere: choosing a
+chapter turns the leaves between where the book lies and that chapter's
+page, as one pile, off what was showing (the title page, or the leaf last
+read). From Chapters that is the pile turned over to show it, coming home
+less the leaves that now belong on the right; from another page, the leaves
+in between.
 
 On facing leaves Chapters is the left-most page, under every leaf of the left
 pile, and Settings the right-most, under every leaf of the right pile. Going

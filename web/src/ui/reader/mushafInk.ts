@@ -65,3 +65,22 @@ export function mushafTokenInk(
   const frontier = Math.max(ink.inkAyah ?? 0, ink.leadAyah ?? 0)
   return token.ayah > frontier ? UPCOMING : PLAIN
 }
+
+/**
+ * Whether a verse's number still waits under paper on a leaf that carries
+ * the voice. Android `rememberAyahMarkAlpha`: the mark belongs to the verse,
+ * not to its last word, so it lights as the voice takes the verse up (and
+ * with the lead, a moment before the hand-off) and stays lit after. Taking
+ * its ink from the verse's last word held it dim until that word was
+ * reached, with the rest of the verse already being read.
+ */
+export function mushafMarkWaits(
+  token: Pick<MushafToken, 'surahId' | 'ayah'>,
+  surahId: number,
+  ink: MushafInk,
+  live: boolean,
+): boolean {
+  if (!live || !ink.reciting) return false
+  if (token.surahId !== surahId) return token.surahId > surahId
+  return token.ayah > Math.max(ink.inkAyah ?? 0, ink.leadAyah ?? 0)
+}
