@@ -957,7 +957,32 @@ not from local `dp` literals.
   follows the verse pad (`RIBBON_TIP`), so changing the pad keeps the tip on
   the first ink line.
 
-Android only for now; the web reader still uses its own rem values.
+The web chapter hangs on the same figures (`web/src/ui/reader/scrollGrid.ts`,
+1px = 1dp).
+
+### The sheet grid
+
+The chapter's margin is one of four. Every sheet hangs its ink on two
+vertical rules, and its margin says what kind of sheet it is:
+
+| Margin | Sheets |
+|---|---|
+| 28 | information: Home (its ribbon lane), Settings, Customize, Reciters, Downloads |
+| 24 | reference: Bookmarks, the word viewer |
+| 38 | the scrolling chapter |
+| 10 | a Mushaf leaf, which is a printed page and keeps its own |
+
+A margin is fixed. It does not grow with the window: a sheet wider than
+640 dp centres its column and keeps the margin inside it. On the web's
+one-sheet deck (phones, and any window too small to lie open as a book) the
+margins were a share of the window, so Settings stood at 16 px on a 360 px
+phone and 18.5 on a 412 px one beside a Home that stood at 28, and the left
+edge moved as the sheets turned. They are Android's figures now
+(`web/src/ui/paper/sheetGrid.ts`, held to the stylesheet by its test), and
+Settings takes Android's vertical figures with them: 20 over the back
+chevron, 6 to the title, 36 to the first label, 4 from a label to its rows,
+8 inside a row, 56 to the colophon and 48 at the foot. The desktop book is
+not on this grid; it has its own (one module, *u*, above).
 
 ### Information surfaces: learned rules
 

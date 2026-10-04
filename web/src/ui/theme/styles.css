@@ -45,6 +45,21 @@
      roman rather than that same voice leaning. Verse notes only. */
   --font-scribe: 'Cormorant Garamond', 'Times New Roman', serif;
   --sheet-pad: clamp(1.1rem, 4.5vw, 2.75rem);
+  /*
+   * The phone's grid — Android's, at 1px = 1dp (ui/paper/sheetGrid.ts).
+   * Every sheet hangs its ink on two vertical rules, and paper between two
+   * pieces of ink is a whole number of 4px steps. Each kind of sheet has
+   * its margin: an information sheet (Home, Settings, Customize) 28, a
+   * reference sheet (Bookmarks, the word viewer) 24, the scrolling chapter
+   * 38 (below); a Mushaf leaf keeps its own 10. A margin that grew with the
+   * window (4.5vw) put Settings at 16px on a 360px phone and 18.5 on a 412px
+   * one, beside a Home that stood at 28. The desktop book has its own grid
+   * (--u) and keeps --sheet-pad as it was.
+   */
+  --grid: 4px;
+  --sheet-margin: 28px;
+  --reference-margin: 24px;
+  --leaf-margin: 10px;
   /* Scroll reader grid — Android ScrollGrid, 1px = 1dp. */
   --scroll-margin: 38px;
   --verse-pad: 16px;
@@ -2593,7 +2608,7 @@ button.ayah-mark {
   display: flex;
   flex-direction: column;
   /* Foot clears the transport's dissolve, so the folio is never under it. */
-  padding: max(0.4rem, env(safe-area-inset-top, 0px)) 10px 6.5rem;
+  padding: max(0.4rem, env(safe-area-inset-top, 0px)) var(--leaf-margin) 6.5rem;
   touch-action: pan-y;
 }
 
@@ -3167,7 +3182,8 @@ button.ayah-mark {
 
 /* —— Bookmark index —— */
 .bookmarks-frame {
-  --bookmark-pad: clamp(1.25rem, 4vw, 1.5rem);
+  /* Android BookmarksScreen: 24dp, at any width (it shrank to 20 on a phone). */
+  --bookmark-pad: var(--reference-margin);
   --bookmark-spine: 40px;
   --bookmark-rule: var(--bookmark-pad);
   width: 100%;
@@ -5366,10 +5382,102 @@ button.ayah-mark {
 }
 
 /* —— Responsive —— */
+/* The one-sheet deck (phones, and any window too small for the book) stands
+   on the grid's rules, whatever its width. */
+.app-shell:not([data-spread='true']) {
+  --sheet-pad: var(--sheet-margin);
+}
+
+.app-shell:not([data-spread='true']) .ink-bleed {
+  /* Android RootViewerScreen: 24dp. */
+  --root-inline-padding: var(--reference-margin);
+}
+
+/* Home hangs on Android's 28dp lane: the sheet's own padding comes off, so
+   the search field and the chapter rows start where the masthead does. At
+   any width of the deck: between 640px and the book this held only for the
+   masthead, and the field, the masthead and the rows began at 44, 50 and 56. */
+.app-shell:not([data-spread='true']) .sheet[data-name='home'] .scroll {
+  padding-inline: 0;
+}
+
+.app-shell:not([data-spread='true']) .home-scroll-page > .search-row {
+  padding-inline: var(--home-start-inset) var(--home-end-inset);
+}
+
+/*
+ * Settings and Customize on the grid: Android SettingsScreen's own figures,
+ * at 1px = 1dp. They were rem values near these (0.35rem for 6, 0.65rem for
+ * 10, 0.85rem for 14, 1.35rem for 22), each sensible alone and none on the
+ * step, and the sheet began 8px from the top where Android begins at 20.
+ *
+ *  20  head (under the status bar)       8  inside a row, above and below
+ *  40  the back chevron's box            4  section label to its rows
+ *   6  chevron to title                 20  one group to the next
+ *  36  title to the first label         56  to the colophon; 18; 48 foot
+ */
+.app-shell:not([data-spread='true']) .settings {
+  padding-top: calc(env(safe-area-inset-top, 0px) + 20px);
+  padding-bottom: calc(48px + env(safe-area-inset-bottom, 0px));
+}
+
+.app-shell:not([data-spread='true']) :is(.settings .back, .settings-back) {
+  margin-bottom: 6px;
+}
+
+.app-shell:not([data-spread='true']) .settings h1 {
+  margin-bottom: 36px;
+}
+
+.app-shell:not([data-spread='true']) .settings-section h2 {
+  margin-bottom: 4px;
+}
+
+.app-shell:not([data-spread='true']) .settings-caption {
+  margin: 4px 0 12px;
+}
+
+.app-shell:not([data-spread='true']) .settings-dev-block {
+  margin-top: 20px;
+}
+
+.app-shell:not([data-spread='true']) .settings-dev-primary {
+  margin-top: 4px;
+}
+
+.app-shell:not([data-spread='true']) .setting-row {
+  padding-block: 12px;
+}
+
+.app-shell:not([data-spread='true']) .paper-check-row {
+  padding-block: 8px;
+}
+
+.app-shell:not([data-spread='true']) .paper-select-trigger {
+  padding-block: 4px;
+}
+
+.app-shell:not([data-spread='true']) .paper-field-slider {
+  padding-block: 4px 8px;
+}
+
+.app-shell:not([data-spread='true']) .customize-sticky {
+  padding-bottom: 4px;
+}
+
+.app-shell:not([data-spread='true']) .customize-scroll {
+  padding-bottom: calc(48px + env(safe-area-inset-bottom, 0px));
+}
+
+.app-shell:not([data-spread='true']) .settings-colophon {
+  margin: 56px 0 18px;
+}
+
+.app-shell:not([data-spread='true']) .settings-attributions {
+  margin-bottom: 0;
+}
+
 @media (max-width: 640px) {
-  :root {
-    --sheet-pad: clamp(0.95rem, 4.5vw, 1.35rem);
-  }
 
   /* The 44px desktop target extends 16px outside the sheet on phones, leaving
    * Android's deliberate 28px Home-edge target and the same 28px content lane. */
@@ -5399,16 +5507,6 @@ button.ayah-mark {
   /* Android PlayerBar `compact`: 4dp between controls on a narrow screen. */
   .player-transport {
     gap: 4px;
-  }
-
-  /* Home hangs on Android's 28dp lane: the sheet's own padding comes off,
-     so the search field and the chapter rows start where the masthead does. */
-  .sheet[data-name='home'] .scroll {
-    padding-inline: 0;
-  }
-
-  .home-scroll-page > .search-row {
-    padding-inline: var(--home-start-inset) var(--home-end-inset);
   }
 
   .reader-top-title {
