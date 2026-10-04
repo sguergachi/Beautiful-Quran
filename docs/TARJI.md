@@ -244,14 +244,14 @@ vocal swell and negative is its trough.
 ```
 crest    = smootherstep(clamp(tremolo, 0, 1))
 trough   = smootherstep(clamp(−tremolo, 0, 1))
-flame    = −rest + (1 + rest)·crest − (1 − rest)·trough     // rest = 0.45
+flame    = −rest + (1 + rest)·crest − (1 − rest)·trough     // rest = 0.25
 presence = min(1, 4·g)·depth                                // g = tremoloGain
 light    = presence·flame                                   // −1 ember … +1 flare
 peak     = g·depth·crest
 ```
 
 `light` is what the voice asks of the flame; `GlintFlame` follows it (rise
-inside a frame, 24 ms cooling) and that `glow` is painted. Never use
+within two frames, 45 ms cooling) and that `glow` is painted. Never use
 `abs(tremolo)`: it flashes on both the loud crest and quiet trough, doubling
 the visual pulse rate. At `g = 0` the light is exactly 0 — **no tell** before
 the voice actually reverberates. The halo forms only with the directional

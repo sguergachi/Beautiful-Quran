@@ -120,24 +120,31 @@ value, `glow`, drives everything —
 |---|---|---|---|
 | `+1` | a flare, on a vocal crest | white | full |
 | `0` | the ordinary wet sheen | the glint's gold / repeat terracotta | resting |
-| `−0.45` | candle-light: where an accepted hold rests | toward the ember | lowered |
-| `−1` | an ember, in a vocal trough | dim and warmer (a low flame reddens) | all but out |
+| `−0.25` | where an accepted hold rests | a touch toward the ember | a touch lower |
+| `−1` | an ember, in a vocal trough | a little dimmer and warmer (a low flame reddens) | halved |
+
+**It is meant to be barely there.** The first cut swung from a dark ember to
+white with the halo going out between pulses, and it was far too much: it took
+the eye off the verse. The whole swing now stays in the top half of the page's
+brightness — the reader should only feel that the voice is touching the word's
+light, not watch a strobe. If it needs more, the per-reciter brightness is the
+knob; do not deepen the ember.
 
 Three things make it read as light the voice is causing:
 
 1. **Room to rise.** A fresh word's sheen is already almost white; gold to
    white is a tenth of the page's range and the eye does not catch it. So the
-   flame settles to candle-light (`GLINT_RESONANCE_REST`) as the hold is
+   flame lowers slightly (`GLINT_RESONANCE_REST`) as the hold is
    accepted — easing down over the first quarter of the detector's swell —
    and each crest lifts it to white from there. Before that, flares on top of
    full sheen were invisible; then the whole negative half-cycle was painted
    dark, which read as ink switching colour rather than light.
-2. **A flame's answer.** `GlintFlame` catches a rising pulse inside a frame and
-   lets a falling one cool (24 ms). The sharp rise is what ties each flare to
+2. **A flame's answer.** `GlintFlame` catches a rising pulse within two frames
+   and lets a falling one cool (45 ms). The sharp rise is what ties each flare to
    the reverberation that caused it; a symmetric slew made it breathe.
 3. **The halo is the light.** The glyph tint stays opaque while the flame moves
    (an ember must cover the bright ink under it), so the halo carries the
-   swing: full on a flare, a tenth of its resting strength in an ember.
+   swing: full on a flare, half its resting strength in an ember.
 
 Brightness scales how far the same pulse travels toward white and toward the
 ember, never where it rests without a pulse; depth scales the whole swing. The

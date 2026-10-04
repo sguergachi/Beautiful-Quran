@@ -20,9 +20,11 @@ internal fun glintPulseColor(base: Color, glow: Float, brightness: Float = 1f): 
     return lerp(base, if (glow >= 0f) Color.White else glintEmber(base), reach)
 }
 
-/** [base] with the light nearly out: dim, and warmer — a low flame reddens. */
+/** [base] with the light lowered: a little dimmer and a little warmer — a low
+ * flame reddens. Deliberately mild: at a third of the page's range the pulse
+ * took the eye off the verse; the word should only seem to answer the voice. */
 internal fun glintEmber(base: Color): Color =
-    base.copy(red = base.red * 0.50f, green = base.green * 0.36f, blue = base.blue * 0.24f)
+    base.copy(red = base.red * 0.88f, green = base.green * 0.84f, blue = base.blue * 0.76f)
 
 /** Tint coverage: the ordinary sheen at rest, opaque as the light moves either
  * way — a flare must not be thinned and an ember must cover the bright ink. */
@@ -35,7 +37,7 @@ internal fun glintLitAlpha(resting: Float, glow: Float, brightness: Float = 1f):
  * ember. The halo is the light itself, so it swings harder than the glyphs. */
 internal fun glintHaloAlpha(resting: Float, glow: Float, brightness: Float = 1f): Float {
     val reach = (abs(glow) * brightness.coerceIn(0f, 2f)).coerceIn(0f, 1f)
-    return if (glow >= 0f) resting + (1f - resting) * reach else resting * (1f - 0.9f * reach)
+    return if (glow >= 0f) resting + (1f - resting) * reach else resting * (1f - 0.5f * reach)
 }
 
 /**
@@ -61,10 +63,11 @@ internal class GlintFlame {
     }
 
     private companion object {
-        /** Full ember-to-flare travel: inside one frame at 60 Hz. */
-        const val RISE_MS = 16f
-        /** Cooling time constant: a flare visibly outlasts its rise, yet a
-         * 10 Hz vibrato (50 ms from crest to trough) still reaches its ember. */
-        const val FALL_MS = 24f
+        /** Full ember-to-flare travel: two frames at 60 Hz — prompt enough to
+         * land with the voice, not so abrupt that it strobes. */
+        const val RISE_MS = 30f
+        /** Cooling time constant: the flare lingers a little and the troughs
+         * of a fast vibrato soften rather than snap. */
+        const val FALL_MS = 45f
     }
 }

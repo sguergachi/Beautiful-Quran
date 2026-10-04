@@ -127,8 +127,10 @@ class TarjiTest {
             peaks.count { it >= 0.3f } >= 32)
         assertTrue("the admitted crest must flare to white through the reader's flame ($brightest)",
             brightest >= 0.99f)
-        assertTrue("the painted ink must have a large peak-valley swing on nearly every phase ($swings)",
-            swings.count { it >= 0.45f } >= 32)
+        assertTrue("the painted ink must visibly swing on nearly every phase ($swings)",
+            swings.count { it >= 0.25f } >= 32)
+        assertTrue("and never so far that it takes the eye off the verse ($swings)",
+            swings.all { it <= 0.5f })
     }
 
     @Test

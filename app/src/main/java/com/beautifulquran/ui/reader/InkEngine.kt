@@ -666,7 +666,7 @@ object InkEngine {
      * to candle-light as the hold is accepted and each crest lifts it to
      * white from there.
      */
-    const val GLINT_RESONANCE_REST = 0.45f
+    const val GLINT_RESONANCE_REST = 0.25f
 
     /**
      * Extra tint/halo strength at a full tarjīʿ peak, as a fraction of the
