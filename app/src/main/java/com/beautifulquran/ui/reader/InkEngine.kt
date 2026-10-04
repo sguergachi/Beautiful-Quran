@@ -562,14 +562,42 @@ object InkEngine {
     var tarjiTestPulse by mutableStateOf(false)
 
     /**
-     * Ink Lab only: underline every word that may pulse — the ones whose own
+     * Ink Lab only: mark every word that may pulse — the ones whose own
      * letters carry a long madd, a ghunnah or the verse's closing hold
-     * ([tarjiEligible]). Session-only, like the test pulse.
+     * ([tarjiEligible]) — with a baseline that becomes a graph of its pulse
+     * as the word is recited. Session-only, like the test pulse.
      */
     var tarjiMarkCandidates by mutableStateOf(false)
 
-    /** The candidate underline: the page's gold, at a strength that stays a mark. */
-    val TARJI_CANDIDATE_MARK = androidx.compose.ui.graphics.Color(0xB3CAA547)
+    /**
+     * The pulse one word was given, over the word's own span in time: what the
+     * lab draws under a candidate. Main thread only.
+     */
+    class TarjiTrace {
+        val samples = FloatArray(TARJI_TRACE_BINS)
+        var filled by androidx.compose.runtime.mutableIntStateOf(0)
+            private set
+
+        fun reset() {
+            samples.fill(0f)
+            filled = 0
+        }
+
+        /** [value] (−1..1) at [progress] (0..1) through the word; never backwards. */
+        fun record(progress: Float, value: Float) {
+            val bin = (progress.coerceIn(0f, 1f) * samples.size).toInt().coerceAtMost(samples.lastIndex)
+            if (bin < filled - 1) return
+            for (i in (filled - 1).coerceAtLeast(0)..bin) samples[i] = value
+            if (bin + 1 > filled) filled = bin + 1
+        }
+    }
+
+    const val TARJI_TRACE_BINS = 64
+
+    // Keyed by the word itself and held weakly: a trace lives as long as its verse is loaded.
+    private val tarjiTraces = java.util.WeakHashMap<Any, TarjiTrace>()
+
+    fun tarjiTrace(word: Any): TarjiTrace = tarjiTraces.getOrPut(word) { TarjiTrace() }
 
     /**
      * What the reader's light last did for the active word, for the Ink Lab's

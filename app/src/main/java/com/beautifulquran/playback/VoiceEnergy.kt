@@ -123,6 +123,7 @@ class VoiceEnergy {
         // The frame is shown a vsync after it is read; lead by that much so
         // the crest lands with the sound.
         // [leadMs] more cancels the lag of whatever smooths the light next.
+        if (anchored) out.earMediaMs = (earClock.mediaMsOfContent(earContentMs) + beyondHeadMs).roundToLong()
         if (!earTrack.read(earContentMs + DISPLAY_LEAD_MS + leadMs.coerceAtLeast(0f), hopMs, out)) return false
         if (out.eventStartHop >= 0 && anchored) {
             out.eventStartMediaMs =

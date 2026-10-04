@@ -135,6 +135,7 @@ import com.beautifulquran.domain.EnglishTypography
 import com.beautifulquran.domain.TajweedPacing
 import com.beautifulquran.ui.reader.focus.FocusEngine
 import com.beautifulquran.ui.theme.ArabicTitleStyle
+import com.beautifulquran.ui.theme.drawPulseTrace
 import com.beautifulquran.ui.theme.ArabicWordStyle
 import com.beautifulquran.ui.theme.GeneratedChapterRosette
 import com.beautifulquran.ui.theme.HafsFontFamily
@@ -1081,6 +1082,7 @@ internal fun rememberWaslProgress(
 internal val ActiveWordBottomMargin = 132.dp
 private val GlintLayerBleed = 40.dp
 private const val TARJI_TEST_PULSE_HZ = 6.0
+private const val TARJI_TRACE_DEFAULT_MS = 3_000
 
 /** Measures a target as (top, bottom) in LazyColumn viewport pixels. */
 private typealias ViewportBoundsMeasure = () -> Pair<Float, Float>?
@@ -1167,8 +1169,10 @@ internal class InkMotion(
      * closers (1:7 الضَّالِّينَ).
      */
     private val tarji: State<InkEngine.GlintResonance>,
-    /** Ink Lab: this word may pulse, and the lab is marking the ones that may. */
-    val tarjiCandidate: Boolean = false,
+    /** Ink Lab: this word may pulse and the lab is marking the ones that may —
+     * its recorded pulse, and the green to draw it in. */
+    val tarjiTrace: InkEngine.TarjiTrace? = null,
+    val tarjiTraceColor: Color = Color.Unspecified,
 ) {
     val isActive: Boolean get() = ink.state == InkEngine.State.Active
     val repeat: Boolean get() = ink.repeat
@@ -1275,17 +1279,11 @@ private fun Modifier.layeredBaseInk(motion: InkMotion, rtl: Boolean): Modifier =
     )
 }
 
-/** The Ink Lab's hairline under a word that may pulse (see [ShapedWordBloom.Underline]). */
-private fun Modifier.tarjiCandidateMark(): Modifier = drawBehind {
-    val inset = 2.dp.toPx()
-    if (size.width <= inset * 2f) return@drawBehind
-    drawLine(
-        color = InkEngine.TARJI_CANDIDATE_MARK,
-        start = Offset(inset, size.height - inset),
-        end = Offset(size.width - inset, size.height - inset),
-        strokeWidth = 1.5.dp.toPx(),
-    )
-}
+/** The Ink Lab's pulse graph under a word that may pulse (see [ShapedWordBloom.PulseTrace]). */
+private fun Modifier.tarjiPulseTrace(trace: InkEngine.TarjiTrace, color: Color, rtl: Boolean): Modifier =
+    drawBehind {
+        drawPulseTrace(0f, size.width, size.height, trace.samples, trace.filled, rtl, color)
+    }
 
 /** Draw-phase alpha gate for a glyph layer, padded by [GlintLayerBleed] so the
  * halo's blur is not clipped at the layer edge. */
@@ -1356,6 +1354,9 @@ private fun rememberTarjiGate(
     activation: Long,
     repeat: Boolean,
     wordStartMs: Long,
+    /** Ink Lab: where to record this word's pulse, across [durationMs] of it. */
+    trace: InkEngine.TarjiTrace?,
+    durationMs: Int?,
 ): State<InkEngine.GlintResonance> {
     val frame = remember {
         mutableStateOf(InkEngine.GlintResonance.Idle)
@@ -1373,10 +1374,25 @@ private fun rememberTarjiGate(
             }
         }
     }
-    LaunchedEffect(run, test, activation, repeat) {
+    LaunchedEffect(run, test, activation, repeat, trace) {
         if (!run) {
             frame.value = InkEngine.GlintResonance.Idle
             return@LaunchedEffect
+        }
+        trace?.reset()
+        var traceStart = 0L
+        // Through the word by the ear's place in it, or by the clock where
+        // that is not known yet.
+        fun traced(now: Long, earMediaMs: Long, value: Float) {
+            if (trace == null) return
+            if (traceStart == 0L) traceStart = now
+            val span = (durationMs ?: 0).takeIf { it > 0 } ?: TARJI_TRACE_DEFAULT_MS
+            val elapsedMs = if (earMediaMs != Long.MIN_VALUE && wordStartMs != Long.MIN_VALUE) {
+                (earMediaMs - wordStartMs).toFloat()
+            } else {
+                (now - traceStart) / 1_000_000f
+            }
+            trace.record(elapsedMs / span, value)
         }
         if (test) {
             // The lab's steady pulse: the paint alone, no detector in the way.
@@ -1384,6 +1400,7 @@ private fun rememberTarjiGate(
             while (true) {
                 withFrameNanos { now ->
                     val swing = kotlin.math.sin(now / 1e9 * 2.0 * Math.PI * TARJI_TEST_PULSE_HZ).toFloat()
+                    traced(now, Long.MIN_VALUE, swing)
                     val glow = light.next(swing, now, InkEngine.tuning.tarjiLightSmoothMs)
                     frame.value = InkEngine.GlintResonance(peak = 1f, light = swing, glow = glow)
                     InkEngine.TarjiProbe.admitted = true
@@ -1423,6 +1440,7 @@ private fun rememberTarjiGate(
                     InkEngine.GlintResonance.Idle
                 }
                 frame.value = pulse.copy(glow = light.next(pulse.light, now, smoothMs))
+                traced(now, ear.earMediaMs, pulse.light)
                 InkEngine.TarjiProbe.admitted = pulse !== InkEngine.GlintResonance.Idle
                 InkEngine.TarjiProbe.gain = g
                 InkEngine.TarjiProbe.glow = frame.value.glow
@@ -1464,6 +1482,7 @@ internal fun rememberInkMotions(
         "words, inks, and wasl prefixes must align"
     }
     val glintInk = LocalQuranAccents.current.glintInk
+    val traceInk = LocalQuranAccents.current.greenInk
     val motions = ArrayList<InkMotion>(inks.size)
     var predecessor: State<Float>? = null
     inks.forEachIndexed { index, ink ->
@@ -1481,10 +1500,12 @@ internal fun rememberInkMotions(
             isActive && InkEngine.tarjiEligible(words[index].arabic, index == words.lastIndex)
         }
         val tarjiEligible = glinting && strongHold
-        val tarjiCandidate = InkEngine.tarjiMarkCandidates &&
+        val tarjiTrace = if (
+            InkEngine.tarjiMarkCandidates &&
             remember(words[index].arabic, index == words.lastIndex) {
                 InkEngine.tarjiEligible(words[index].arabic, index == words.lastIndex)
             }
+        ) InkEngine.tarjiTrace(words[index]) else null
         val sweep = rememberLetterSweep(
             active = isActive,
             finishResidual = ink.state == InkEngine.State.Recited,
@@ -1522,8 +1543,11 @@ internal fun rememberInkMotions(
                 activation = wordActivation,
                 repeat = ink.repeat,
                 wordStartMs = activeWordStartMs,
+                trace = tarjiTrace,
+                durationMs = activeSweepMs,
             ),
-            tarjiCandidate = tarjiCandidate,
+            tarjiTrace = tarjiTrace,
+            tarjiTraceColor = traceInk,
         )
         predecessor = sweep.progress
     }
@@ -1621,7 +1645,8 @@ private fun HighlightLayeredText(
     // modifier so breathing does not recompose or remeasure this word.
     val searchHitActive = !motion.showRepeatLayer && searchHitWash != null
     val orangeWash = motion.repeatWash.takeIf { motion.showRepeatLayer }
-    Box(if (motion.tarjiCandidate) modifier.tarjiCandidateMark() else modifier) {
+    val trace = motion.tarjiTrace
+    Box(if (trace != null) modifier.tarjiPulseTrace(trace, motion.tarjiTraceColor, rtl) else modifier) {
         // The glow is a light's falloff, glyph-shaped at every width — no
         // radial field: a wide faint veil, the halo, and a tight bloom.
         if (glintInk != null && motion.showGlintLayer) {
@@ -2026,9 +2051,9 @@ internal fun buildShapedBlooms(
         )
     }
     motions.forEachIndexed { index, motion ->
-        if (!motion.tarjiCandidate) return@forEachIndexed
+        val trace = motion.tarjiTrace ?: return@forEachIndexed
         val range = rendered.wordRanges.getOrNull(index) ?: return@forEachIndexed
-        blooms += ShapedWordBloom.Underline(range, InkEngine.TARJI_CANDIDATE_MARK)
+        blooms += ShapedWordBloom.PulseTrace(range, motion.tarjiTraceColor, trace.samples, trace.filled)
     }
     blooms.addShapedInkMotionBlooms(
         motions = motions,

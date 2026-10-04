@@ -22,7 +22,9 @@ import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.graphics.drawscope.clipPath
 import androidx.compose.ui.graphics.drawscope.clipRect
+import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.DrawScope
+import androidx.compose.ui.text.style.ResolvedTextDirection
 import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
 import androidx.compose.ui.graphics.drawscope.translate
 import androidx.compose.ui.text.TextLayoutResult
@@ -216,11 +218,14 @@ sealed class ShapedWordBloom {
         val feather: Float? = null,
     ) : ShapedWordBloom()
 
-    /** A hairline under the word: the Ink Lab's mark for a tarjīʿ candidate.
-     * Never drawn outside the lab. */
-    data class Underline(
+    /** The Ink Lab's mark under a tarjīʿ candidate: a baseline, and over it the
+     * pulse the word was given as it was recited ([drawPulseTrace]). Never
+     * drawn outside the lab. */
+    class PulseTrace(
         override val range: IntRange,
         val color: Color,
+        val samples: FloatArray,
+        val filled: Int,
     ) : ShapedWordBloom()
 
     /** Tinted ink (orange repeat, white-gold glint): shaped glyphs tinted to
@@ -250,6 +255,47 @@ sealed class ShapedWordBloom {
         /** Match the ink's wash travel; halo bleed expands only the mask's painted area. */
         internal fun washBounds(line: Rect, coverPad: Float): Rect =
             linePaperCoverBounds(line, coverPad)
+    }
+}
+
+/**
+ * A word's pulse as a small graph under it: a faint baseline across
+ * [left]..[right], and the first [filled] of [samples] (−1..1, the word's
+ * span in time) drawn over it in reading order. [bottom] is the word's box.
+ */
+internal fun DrawScope.drawPulseTrace(
+    left: Float,
+    right: Float,
+    bottom: Float,
+    samples: FloatArray,
+    filled: Int,
+    rtl: Boolean,
+    color: Color,
+) {
+    val inset = 2.dp.toPx()
+    val width = right - left - inset * 2f
+    if (width <= 0f || samples.isEmpty()) return
+    val swing = 5.dp.toPx()
+    val baseline = bottom - swing - 1.dp.toPx()
+    drawLine(
+        color = color.copy(alpha = color.alpha * 0.4f),
+        start = Offset(left + inset, baseline),
+        end = Offset(right - inset, baseline),
+        strokeWidth = 1.dp.toPx(),
+    )
+    fun x(i: Int): Float {
+        val along = (i + 0.5f) / samples.size * width
+        return if (rtl) right - inset - along else left + inset + along
+    }
+    val stroke = 1.5.dp.toPx()
+    for (i in 1 until filled.coerceAtMost(samples.size)) {
+        drawLine(
+            color = color,
+            start = Offset(x(i - 1), baseline - samples[i - 1].coerceIn(-1f, 1f) * swing),
+            end = Offset(x(i), baseline - samples[i].coerceIn(-1f, 1f) * swing),
+            strokeWidth = stroke,
+            cap = StrokeCap.Round,
+        )
     }
 }
 
@@ -380,7 +426,7 @@ fun Modifier.shapedWordBloom(
                 is ShapedWordBloom.UpcomingDim -> bloom.coverAlpha > 0f
                 is ShapedWordBloom.InkReveal -> bloom.progress < 1f
                 is ShapedWordBloom.ColorReveal -> false
-                is ShapedWordBloom.Underline -> false
+                is ShapedWordBloom.PulseTrace -> false
             }
         }
         val coverBlend = paperCoverBlendMode(punchLayer)
@@ -412,17 +458,10 @@ fun Modifier.shapedWordBloom(
             // the shaped glyph path. Deriving both for every bloom meant a long
             // ayah rebuilt ~2 paths per word on every animation frame.
             when (bloom) {
-                is ShapedWordBloom.Underline -> {
-                    val inset = 2.dp.toPx()
+                is ShapedWordBloom.PulseTrace -> {
+                    val rtl = textLayout.getParagraphDirection(start) == ResolvedTextDirection.Rtl
                     lineBoundsCache.boundsFor(textLayout, start, endExclusive).forEach { bounds ->
-                        if (bounds.width <= inset * 2f) return@forEach
-                        val y = bounds.bottom - inset
-                        drawLine(
-                            color = bloom.color,
-                            start = Offset(bounds.left + inset, y),
-                            end = Offset(bounds.right - inset, y),
-                            strokeWidth = 1.5.dp.toPx(),
-                        )
+                        drawPulseTrace(bounds.left, bounds.right, bounds.bottom, bloom.samples, bloom.filled, rtl, bloom.color)
                     }
                 }
                 is ShapedWordBloom.UpcomingDim -> {

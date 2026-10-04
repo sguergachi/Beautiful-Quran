@@ -165,9 +165,12 @@ what reaches the eye is a soft swell of a few percent in the glyphs and a
 clearly breathing glow. Raise one without the other and it is a strobe again.
 
 **Finding the words that can pulse.** **Mark candidates** on the same tab
-underlines every word `InkEngine.tarjiEligible` admits — a long madd, a
-ghunnah or the verse's closing hold on its own letters. It is a lab mark,
-session-only, and is not drawn on the English mushaf's prose.
+draws a green baseline under every word `InkEngine.tarjiEligible` admits — a
+long madd, a ghunnah or the verse's closing hold on its own letters. As the
+word is recited the baseline becomes a graph of the pulse it was given, in
+reading order across the word's span in time, and stays until the verse is
+unloaded. It is a lab mark, session-only, and is not drawn on the English
+mushaf's prose.
 
 **Telling paint from detection.** The Tarjīʿ tab has a **Test pulse** (a steady
 6 Hz light on the lit word, detector bypassed) and a **Word** line saying

@@ -173,9 +173,29 @@ class ShapedBloomOrderTest {
     }
 
     @Test
-    fun `the lab's candidate underline is drawn over the paper covers, never under one`() {
-        val mark = ShapedWordBloom.Underline(0..3, InkEngine.TARJI_CANDIDATE_MARK)
+    fun `the lab's pulse graph is drawn over the paper covers, never under one`() {
+        val mark = ShapedWordBloom.PulseTrace(0..3, androidx.compose.ui.graphics.Color.Green, FloatArray(4), 0)
         val cover = ShapedWordBloom.UpcomingDim(range = 0..3, paper = androidx.compose.ui.graphics.Color.Black, coverAlpha = 0.7f)
         assertEquals(listOf(cover, mark), listOf(mark, cover).coversFirst())
+    }
+
+    @Test
+    fun `a word's pulse is recorded across its span and never runs backwards`() {
+        val trace = InkEngine.TarjiTrace()
+        trace.record(0f, 0.5f)
+        assertEquals(1, trace.filled)
+        // A frame that skips bins carries its value across them: no holes.
+        trace.record(0.25f, -1f)
+        assertEquals(InkEngine.TARJI_TRACE_BINS / 4 + 1, trace.filled)
+        assertEquals(-1f, trace.samples[8], 0f)
+        // A late or repeated frame cannot rewrite what was drawn.
+        trace.record(0.1f, 0.9f)
+        assertEquals(-1f, trace.samples[6], 0f)
+        // Past the word's end the graph simply fills.
+        trace.record(3f, 0.2f)
+        assertEquals(InkEngine.TARJI_TRACE_BINS, trace.filled)
+        trace.reset()
+        assertEquals(0, trace.filled)
+        assertEquals(0f, trace.samples.max(), 0f)
     }
 }
