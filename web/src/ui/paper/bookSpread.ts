@@ -105,7 +105,7 @@ export function bookRightShare(leaves: boolean, stack: StackLayer, page: number 
   return Math.min(1, Math.max(0, (page - 1) / (BOOK_PAGES - 1)))
 }
 
-/** One leaf turns in this long (`mushaf-leaf-turn` in styles.css). */
+/** One leaf turns in this long (its motion is pageTurnMotion). */
 export const LEAF_TURN_MS = 760
 
 /** A pile is heavier than a leaf: the whole block takes half as long again. */
@@ -136,6 +136,49 @@ const bookPlace = (() => {
 })()
 export const setBookPlace = bookPlace.set
 export const useBookPlace = bookPlace.use
+
+/**
+ * The leaves in the air during a turn, as the share of the block that lay
+ * on the right before it and will after it. They lie on neither pile.
+ */
+export interface BookAir {
+  from: number
+  to: number
+}
+
+const bookAir = (() => {
+  let air: BookAir | null = null
+  const listeners = new Set<() => void>()
+  return {
+    set(next: BookAir | null) {
+      if (air === next || (air && next && air.from === next.from && air.to === next.to)) return
+      air = next
+      for (const listener of listeners) listener()
+    },
+    use: (): BookAir | null =>
+      useSyncExternalStore(
+        (onChange) => {
+          listeners.add(onChange)
+          return () => listeners.delete(onChange)
+        },
+        () => air,
+        () => null,
+      ),
+  }
+})()
+export const setBookAir = bookAir.set
+export const useBookAir = bookAir.use
+
+/**
+ * The two piles, as shares of the block, with [right] of it turned onto the
+ * right. A pile holds only leaves that lie on it: the leaves of a turn leave
+ * theirs as they lift and join the other as they land, and in between they
+ * are in the air. So nothing is added to a pile that was not turned onto it.
+ */
+export function bookPiles(right: number, air: BookAir | null): { right: number; left: number } {
+  if (!air) return { right, left: 1 - right }
+  return { right: Math.min(air.from, air.to), left: 1 - Math.max(air.from, air.to) }
+}
 
 /** A swipe belongs to the sheet on which its pointer went down. */
 export function bookmarkSwipeDestination(layer: StackLayer, dx: number, hasBookmarks: boolean): StackLayer | null {

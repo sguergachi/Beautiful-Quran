@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { bookRightShare, bookTurnDirection, bookmarkSwipeDestination, closesBook, facingPage, turnMs, leavesReader, readerVisible, spreadLayers } from '../bookSpread'
+import { bookRightShare, bookTurnDirection, bookmarkSwipeDestination, closesBook, facingPage, turnMs, leavesReader, readerVisible, spreadLayers, bookPiles } from '../bookSpread'
 import { BOOKMARKS_LAYER, COVER_LAYER, READER_LAYER, SETTINGS_LAYER } from '../stack'
 
 describe('spreadLayers', () => {
@@ -136,5 +136,31 @@ describe('the two piles of the page block', () => {
     expect(turnMs(0)).toBe(760)
     expect(turnMs(1)).toBe(1140)
     expect(turnMs(0.5)).toBeGreaterThan(turnMs(0.1))
+  })
+})
+
+describe('the piles while leaves are in the air', () => {
+  it('share the whole block between them at rest', () => {
+    expect(bookPiles(0.25, null)).toEqual({ right: 0.25, left: 0.75 })
+  })
+
+  it('take the lifted leaves off their pile at once and add them to the other only on landing', () => {
+    // Going to Settings from a quarter of the way in: the right pile is turned to the left.
+    const toSettings = bookPiles(0, { from: 0.75, to: 0 })
+    expect(toSettings.right).toBe(0)
+    // The left pile still has only what lay on it: the rest is in the air.
+    expect(toSettings.left).toBeCloseTo(0.25)
+    // Coming back, those leaves leave the left pile and have not reached the right.
+    const back = bookPiles(0.75, { from: 0, to: 0.75 })
+    expect(back.right).toBe(0)
+    expect(back.left).toBeCloseTo(0.25)
+  })
+
+  it('never holds more than the block', () => {
+    for (const [from, to] of [[0, 1], [1, 0], [0.3, 0.31], [0.9, 0.2]]) {
+      const piles = bookPiles(to, { from, to })
+      expect(piles.left + piles.right).toBeLessThanOrEqual(1 + 1e-9)
+      expect(piles.left + piles.right + Math.abs(to - from)).toBeCloseTo(1)
+    }
   })
 })
