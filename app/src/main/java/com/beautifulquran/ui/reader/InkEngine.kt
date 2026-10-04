@@ -526,6 +526,13 @@ object InkEngine {
         )?.forWash(t.pacedFeather)
     }
 
+    /** Acoustic hold eligibility is independent of visual wash pacing and its lab toggles. */
+    fun tarjiEligible(arabic: String, isAyahFinal: Boolean): Boolean =
+        TajweedPacing.curve(
+            arabic = arabic,
+            hold = TajweedPacing.Hold(isAyahFinal = isAyahFinal),
+        )?.hasStrongHold == true
+
     /** Cross-word prefix bloom for a nūn/tanwīn connection, when enabled. */
     fun connection(prevArabic: String, arabic: String): TajweedPacing.Connection? {
         val t = tuning
@@ -583,6 +590,12 @@ object InkEngine {
     data class GlintResonance(
         val peak: Float,
         val layerMult: Float = 1f,
+        /** Smoothed paint hue; the measured crest and vocal alpha remain unchanged. */
+        val whiteMix: Float = 0f,
+        /** Accepted crest before the gain envelope; hue can reach white during a soft pulse. */
+        val huePeak: Float = peak,
+        /** Opaque pulse tint coverage; the gain ramp eases it into and out of the ordinary sheen. */
+        val inkStrength: Float = 0f,
     ) {
         companion object {
             val Idle = GlintResonance(peak = 0f)
@@ -610,6 +623,7 @@ object InkEngine {
         depth: Float = tuning.glintResonanceDepth,
         troughFloor: Float = GLINT_RESONANCE_TROUGH_FLOOR,
         enabled: Boolean = tuning.glintResonance,
+        brightness: Float = tuning.glintBrightness,
     ): GlintResonance {
         if (!holding || !enabled || depth <= 0f) return GlintResonance.Idle
         val g = tremoloGain.coerceIn(0f, 1f)
@@ -622,7 +636,8 @@ object InkEngine {
         val d = depth.coerceIn(0f, 1f)
         val floor = troughFloor.coerceIn(0f, 1f)
         val mult = 1f - g * d * (1f - on) * (1f - floor)
-        return GlintResonance(peak = g * crest * d, layerMult = mult)
+        return GlintResonance(peak = g * crest * d, layerMult = mult, huePeak = crest * d,
+            inkStrength = (g * 4f).coerceAtMost(1f) * d * brightness.coerceIn(0f, 1f))
     }
 
     /** Scale tint and halo together, preserving the measured pulse and its troughs. */

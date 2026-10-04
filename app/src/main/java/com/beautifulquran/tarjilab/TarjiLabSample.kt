@@ -16,6 +16,8 @@ import kotlinx.serialization.json.Json
  * [pcmB64] is the decimated mono stream as 16-bit little-endian PCM
  * (Base64). [firstHopMediaMs] is the media-clock position of the first
  * captured hop, so the word span is recoverable against the ayah's marks.
+ * [leadInPcmB64] is the same stream for the hops just before it — detector
+ * context only (see [TarjiLabCapture.leadInPcm]); older samples omit it.
  *
  * Schema 3 is a reciter-signature sample: PCM + hold window + optional
  * hand-shaped envelope + this reciter's knobs. Schema 2 (crest/sine
@@ -38,6 +40,7 @@ data class TarjiLabSample(
     val hopContentDurationMs: Float = 20f,
     val firstHopMediaMs: Double,
     val pcmB64: String,
+    val leadInPcmB64: String = "",
     val knobs: TarjiLabKnobs,
     /** What the listener says the shimmer should do on this exact PCM. */
     val expectation: TarjiLabExpectation = TarjiLabExpectation(),
@@ -73,7 +76,8 @@ object TarjiLabCodec {
         hopSamples = capture.hopSamples,
         hopContentDurationMs = capture.hopContentDurationMs(),
         firstHopMediaMs = firstHopMediaMs,
-        pcmB64 = pcmToBase64(capture),
+        pcmB64 = pcmToBase64(capture.pcm),
+        leadInPcmB64 = pcmToBase64(capture.leadInPcm),
         knobs = knobs,
         expectation = expectation,
         notes = notes,
@@ -100,6 +104,17 @@ object TarjiLabCodec {
         require(bytes.isNotEmpty() && bytes.size <= 1_048_576 && bytes.size % (2 * hop) == 0) {
             "PCM must contain complete hops within the preview buffer limit."
         }
+        val leadBytes = Base64.getDecoder().decode(sample.leadInPcmB64)
+        require(leadBytes.size <= 1_048_576 && leadBytes.size % (2 * hop) == 0) {
+            "Lead-in PCM must contain complete hops."
+        }
+        val floats = pcm16ToFloats(bytes)
+        val hopDur = sample.hopContentDurationMs
+        val content = FloatArray(floats.size / hop) { it * hopDur }
+        return TarjiLabCapture(sample.sampleRate, hop, content, floats, pcm16ToFloats(leadBytes))
+    }
+
+    private fun pcm16ToFloats(bytes: ByteArray): FloatArray {
         val n = bytes.size / 2
         val floats = FloatArray(n)
         for (i in 0 until n) {
@@ -107,9 +122,7 @@ object TarjiLabCodec {
             val hi = bytes[2 * i + 1].toInt()
             floats[i] = ((hi shl 8) or lo).toShort() / 32768f
         }
-        val hopDur = sample.hopContentDurationMs
-        val content = FloatArray(n / hop) { it * hopDur }
-        return TarjiLabCapture(sample.sampleRate, hop, content, floats)
+        return floats
     }
 
     /** Frame rate the loop preview must play the PCM at so hop content time
@@ -129,11 +142,13 @@ object TarjiLabCodec {
             capture.sampleRate
         }
 
-    fun pcmToBase64(capture: TarjiLabCapture): String {
-        val n = capture.pcm.size
+    fun pcmToBase64(capture: TarjiLabCapture): String = pcmToBase64(capture.pcm)
+
+    private fun pcmToBase64(pcm: FloatArray): String {
+        val n = pcm.size
         val bytes = ByteArray(n * 2)
         for (i in 0 until n) {
-            val s = (capture.pcm[i].coerceIn(-1f, 1f) * 32767).toInt().toShort()
+            val s = (pcm[i].coerceIn(-1f, 1f) * 32767).toInt().toShort()
             bytes[2 * i] = (s.toInt() and 0xFF).toByte()
             bytes[2 * i + 1] = ((s.toInt() shr 8) and 0xFF).toByte()
         }

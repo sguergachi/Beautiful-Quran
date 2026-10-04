@@ -460,18 +460,24 @@ private fun PreviewWord(
             tremoloGain = glow?.gain ?: 0f,
             depth = InkEngine.GLINT_RESONANCE_DEPTH,
             enabled = true,
+            brightness = ui.displayKnobs.glintBrightness,
+        )
+        val hue = remember { com.beautifulquran.ui.theme.GlintColorTransition() }
+        val pulseColor = com.beautifulquran.ui.theme.glintPulseColor(
+            GlintGold, hue.next(resonance.huePeak, ui.displayKnobs.glintBrightness, System.nanoTime()),
+            inkStrength = resonance.inkStrength,
         )
         Canvas(Modifier.fillMaxSize()) {
             val amount = (0.22f * resonance.layerMult + 0.9f * resonance.peak) *
                 ui.displayKnobs.glintBrightness.coerceIn(0f, 2f)
             if (amount > 0.01f) {
                 drawCircle(
-                    color = GlintGold.copy(alpha = (amount * 0.55f).coerceIn(0f, 0.75f)),
+                    color = pulseColor.copy(alpha = (amount * 0.55f).coerceIn(0f, 0.75f)),
                     radius = size.minDimension * 0.42f,
                     center = center,
                 )
                 drawCircle(
-                    color = GlintGold.copy(alpha = (amount * 0.3f).coerceIn(0f, 0.45f)),
+                    color = pulseColor.copy(alpha = (amount * 0.3f).coerceIn(0f, 0.45f)),
                     radius = size.minDimension * 0.62f,
                     center = center,
                 )
@@ -481,7 +487,7 @@ private fun PreviewWord(
             text = ui.wordArabic,
             style = ArabicWordStyle,
             fontSize = fontSize,
-            color = GlintGold,
+            color = pulseColor,
         )
     }
 }

@@ -5,6 +5,8 @@ word, change this reciter's detector parameters, and hear and see the result.
 The word and scope always show the detector's measured output. There is no
 manual envelope or synthesized pulse. Glint brightness scales the visual effect
 without changing the measured pulse or detector acceptance.
+The preview text and glow turn toward full white on accepted pulse crests,
+then return to white-gold as the pulse falls, matching the reader's crest hue.
 
 ## Workflow
 
@@ -12,6 +14,8 @@ without changing the measured pulse or detector acceptance.
    Settings → Developer. The ‹ › arrows choose another word in the ayah.
 2. The lab captures the word muted at 1×, including 300 ms lead and 1 s tail.
    Capture progress and failures appear on the page; **Retry** repeats capture.
+   It starts playing up to 2 s earlier still: that audio is never shown or
+   looped, it only warms the detector (see *Detector context* below).
 3. The transport is a single row of 48 dp icon targets: **Rewind**, a larger
    **Play/Pause**, **Loop**, **Speed**, **Fit**, and **Help**. Play repeats the whole word.
    Loop isolates a selection with large visible drag handles; toggling Loop
@@ -75,9 +79,20 @@ but is not a tuning target in this interface.
 
 Profiles persist per reciter and write through to `InkEngine.tuning`:
 
+Applying a profile enables the same full-depth pulse shown in the lab, while
+preserving the wash settings. Live acoustic eligibility remains independent
+of the visual tajweed-pacing toggle, including in English reading modes.
+
+The supplied `tarji_7_1_7_w9.json` tuning is installed once for **Hani Ar-Rifai**
+(app reciter id 7): 200% brightness, 1.6–8 Hz, 656.6863 ms minimum hold,
+0.13819668 minimum depth, 0.38481894 periodicity, 0.3 pitch drift, 50 ms
+attack, and 1095.3691 ms release. This replaces any older Hani profile once;
+later lab edits persist normally. Other stored reciter profiles are preserved.
+
 - **Glint brightness** scales the tint and halo together from 0–200%.
   0% removes the sheen, 100% preserves the shipped look, and 200% brightens it
-  up to the renderer’s opacity limit. It affects the lab glow and reader glint
+  up to the renderer’s opacity limit and scales the crest's blend toward white.
+  It affects the lab glow and reader glint
   (including the repeat glimmer). It leaves the green trace, detection, pulse
   timing, wash, and halo size unchanged. Compare, undo/redo, reset, and sample
   export include brightness. Old samples/profiles default to 100%.
@@ -113,6 +128,27 @@ worker cannot replace a newer result with an older one. Reference creation is di
 A loop replays the captured detector history, including its lead-in, so every
 pass compares the same acoustic evidence rather than warming up at the loop
 boundary. This is tuning feedback, not synthesis or waveform authoring.
+
+## Detector context
+
+The reader's detector never meets a word cold: it arrives carrying the note
+held over from the previous word, its adaptive noise floor, and any false
+start it has already retired. A lab replay that began at the span's 300 ms
+lead started a fresh detector mid-note instead, and could accept a pulse the
+reader never paints — the graph showed tarjīʿ on a word that stayed still.
+
+So a capture keeps up to 2 s (`CAPTURE_CONTEXT_MS`, longer than the 1.3 s
+analysis window) of the hops ahead of the span as `TarjiLabCapture.leadInPcm`.
+`analyzeTarjiCapture` feeds them first and discards their output; the trace,
+waveform, loop, and timings all still begin at the span. The context shrinks
+when a long word would overrun the 12 s recording cap, and stops at the ayah's
+start. Samples carry it as `leadInPcmB64`; older samples import without it
+and replay cold, as before. `TarjiLabTraceTest` checks a warmed replay against
+continuous playback hop for hop.
+
+This bounded context cannot recover detector history older than 2 s or where
+a reader session's 20 ms hop grid happens to fall. Marginal pulses can still
+differ; the Hani 2:14 regression also tests 40 offsets of that grid.
 
 ## Playback and capture contracts
 
@@ -169,8 +205,9 @@ thread and reports unreadable documents on the page. No storage permission
 is needed.
 Leaving the lab, changing words, or starting another import cancels the pending
 read; a late result or failure cannot change tuning, the target, or playback.
-The JSON includes reciter, ayah, word, decimated PCM (16-bit LE Base64), hop
-duration, media origin, loop range, displayed detector parameters, and notes.
+The JSON includes reciter, ayah, word, decimated PCM (16-bit LE Base64), the
+detector lead-in PCM, hop duration, media origin, loop range, displayed
+detector parameters, and notes.
 Export in Compare mode saves the reference settings you are viewing without changing the live profile.
 Imported captures retain their source reciter metadata when exported again.
 

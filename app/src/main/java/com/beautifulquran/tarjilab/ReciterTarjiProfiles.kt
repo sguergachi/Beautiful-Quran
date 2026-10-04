@@ -44,15 +44,36 @@ class ReciterTarjiProfiles(context: Context) {
     }
 
     private fun load(): ReciterTarjiProfileBook {
-        val raw = prefs.getString(KEY, null) ?: return ReciterTarjiProfileBook()
-        return ReciterTarjiProfileBook.decode(raw)
+        val book = ReciterTarjiProfileBook.decode(prefs.getString(KEY, null) ?: "{}")
+        if (prefs.getBoolean(HANI_TUNING_APPLIED, false)) return book
+        // Install the supplied capture's tuning once; later lab edits remain yours.
+        val seeded = book.copy(profiles = book.profiles + ("7" to HANI_TUNING))
+        prefs.edit {
+            putString(KEY, ReciterTarjiProfileBook.encode(seeded))
+            putBoolean(HANI_TUNING_APPLIED, true)
+        }
+        return seeded
     }
 
     private companion object {
         const val PREFS = "tarji_profiles"
         const val KEY = "book"
+        const val HANI_TUNING_APPLIED = "hani_1_7_w9_tuning_applied"
     }
 }
+
+/** Exact settings exported in tarji_7_1_7_w9.json (Hani Ar-Rifai). */
+internal val HANI_TUNING = TarjiLabKnobs(
+    maxTremoloHz = 8f,
+    minTremoloHz = 1.6f,
+    holdMinMs = 656.6863f,
+    minTremoloDepth = 0.13819668f,
+    minPeriodicity = 0.38481894f,
+    maxPitchDrift = 0.3f,
+    attackMs = 50f,
+    releaseMs = 1095.3691f,
+    glintBrightness = 2f,
+)
 
 @Serializable
 data class ReciterTarjiProfileBook(

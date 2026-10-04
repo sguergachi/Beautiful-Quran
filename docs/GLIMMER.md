@@ -44,8 +44,8 @@ The glimmer has no independent sweep. It rides the active word's existing
 directional wash, with the same duration, easing, direction, and feather:
 
 1. The normal base ink remains the source of legibility.
-2. During a repeat, the glimmer itself uses the dark terracotta repeat ink;
-   white gold remains exclusive to first-pass words.
+2. During a repeat, the glimmer's base hue is the dark terracotta repeat ink;
+   white gold is the base hue of first-pass words.
 3. A glyph-shaped white-gold halo forms behind the visible ink **on the same
    directional wash as the tint** — during the bloom, not only after it.
 4. A restrained white-gold tint forms inside the glyphs above the other ink,
@@ -62,7 +62,7 @@ in the travel box made the glint much fainter than the underlying revealed ink
 early in a long hold. The mask still reaches the full halo so no unmapped
 fringe survives outside the word box. The feather profile stays unchanged.
 
-The glimmer's colour is latched when it forms and held for its full rendered
+The glimmer's base colour is latched when it forms and held for its full rendered
 lifetime. Chain release may change a repeat word back to a normal recited state
 while its glimmer is still fading; that state change must not recolour the
 drying shimmer white-gold. Conversely, when a single word moves directly from
@@ -88,7 +88,8 @@ recitation with exactly this word: يُرَجِّعُ — "his voice reverberate
 > long-press) loops captured PCM and replays this reciter’s detector as you
 > adjust its knobs. Export preserves the capture, loop, and displayed tuning.
 > **Glint brightness** scales the sheen and halo from 0–200% and saves per
-> reciter. 100% keeps the shipped look; it does not change detection, the
+> reciter. It also scales the crest's white blend: at 200%, a half-strength
+> accepted crest can reach full white. 100% keeps the shipped look; it does not change detection, the
 > pulse’s phase, the wash, or the halo’s radius.
 
 
@@ -104,11 +105,41 @@ tajweed hold of their own** — a long madd, a ghunnah (the shadda نّ of
 a wasl entry alone sustains the previous word's nūn and never qualifies) —
 and starts the moment the reverberation is detected there.
 
+Acoustic eligibility is derived from the Arabic word independently of visual
+letter pacing. Turning off the paced wash or viewing English prose must not
+disable a detected hold. All reader paint paths, including the English mushaf,
+use the same crest colour. Applying a Tarjīʿ Lab profile enables the full pulse
+auditioned in the lab; the Ink Lab can still disable it afterwards.
+
 The **wet-ink glint always rides the wash** for the whole Active word —
-mid-bloom and long waqf parks included. **Tarjīʿ turns it on and off**: the
-glimmer itself extinguishes at pulse troughs and lights with the crests —
-the voice's reverberation is the glimmer. The attack/release ramp
-(`tremoloGain`) blends the transitions so no detection edge pops.
+mid-bloom and long waqf parks included. **Tarjīʿ changes the revealed ink**
+from a darker warm gold at valleys to white at crests. Simply removing the
+sheen at a valley left bright parchment glyphs underneath, making the swing
+hard to see on the phone. The accepted gain ramp eases in opaque tint coverage
+over its first 0.25 of gain; brightness and depth scale that coverage. The
+glyphs stay opaque and the existing soft directional mask still owns reveal.
+
+On Android, accepted positive crests also turn the glint tint and halo toward
+**full white**. A full-strength crest reaches white; as it falls, the hue returns
+to a darker version of the glint's gold or repeat terracotta. Existing crest alpha
+boost and per-reciter brightness still apply. The colour shift is painted
+inside the same soft directional mask, so it lights revealed glyph ink during
+the wash and never exposes unread letters. Both shaped and layered readers
+sample the hue at draw time; the lab preview uses the same crest-to-colour map.
+Hue travel is limited to one full valley-to-white transition per 30 ms in both
+previews and live playback. The previous 120 ms limit averaged away faster
+pulses. This still softens changes between audio hops; the vocal
+alpha, wash edge, and detector timing remain on their original clocks.
+Hue follows the accepted positive crest before the gain envelope. That
+envelope controls pulse strength and opacity; it must not prevent an accepted
+soft crest from reaching white (Hani 2:14).
+
+When a phone differs from a simulator, Developer → Record performance profile
+includes `tarji tap` samples (PCM hops, live gain, sink/ear delay, enabled/depth/
+brightness) and `tarji word` samples (word/event ownership, admitted crest,
+white mix). These are captured only during the requested local profile. Replay
+the affected word during its ten-second window and share the text report to
+distinguish a missing PCM feed, rejected event, and paint signal.
 
 The shimmer is the **build to the climax**: it engages as the hold's
 reverberation starts (the hold gate is short, ~300 ms, and the minimum
@@ -169,7 +200,7 @@ trips its own gate (the troughs stay above the gate). Mid-hold detection
 lulls are bridged by the slower release so the hold breathes without
 blinking.
 
-**Tarjīʿ** is that **on/off plus a brightness crest**. Event detection uses
+**Tarjīʿ** is that **dark valley plus a white crest**. Event detection uses
 the long detrended tracks, but the visible phase comes from the current 20 ms
 RMS hop against a cycle-separated linear baseline, so a crescendo cannot bias
 the pulse. For pitch-only vibrato, the signed short-YIN residual is the
@@ -177,12 +208,14 @@ fallback. Its actual lag-derived support centre is projected locally to the
 live hop; neither path uses rate-dependent phase rotation. Positive is the
 audible swell (or higher F0 when no intensity pulse exists), negative is its
 trough.
-The layer follows one smootherstepped `−1..1 → 0..1` cycle and only the
+The underlying sheen follows one smootherstepped `−1..1 → 0..1` cycle and only the
 positive crest boosts tint/halo colour (`GLINT_RESONANCE_PEAK_BOOST`). Never
 take `abs(tremolo)`: that makes the quiet trough bright and doubles the visual
 rate relative to the voice. Depth scales both (Ink Lab **Pulse depth**; a non-zero
 `GLINT_RESONANCE_TROUGH_FLOOR` leaves residual sheen for a softer breathe).
-Idle / no detection → peak 0, full sheen (no tell that a pulse is coming).
+During an accepted pulse the tint gains enough coverage to darken the valley;
+it cannot simply disappear and expose the bright underlying ink.
+Idle / no detection → peak 0, full ordinary sheen (no tell that a pulse is coming).
 First-pass white-gold and **repeat terracotta** both take the same gate. A
 per-frame sampler on the Active strong-hold word keeps the pulse updating
 after the wash park freezes its Animatable. Each utterance admits one acoustic
@@ -222,7 +255,7 @@ even a long verse-closing waqf — keeps still gold. The gate also hard-closes
 at handoff: the dry-down dissolve after the voice moves on is never
 modulated.
 
-The modulation is **pure alpha** — the reveal edge never moves mid-animation,
+The modulation changes **ink colour and sheen strength** — the reveal edge never moves mid-animation,
 so the bloom can never appear to restart. The halo forms only with the
 directional wash (`smootherstep(glintProgress)`); there is no whole-word
 formation floor when resonance engages.
