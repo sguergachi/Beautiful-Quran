@@ -24,8 +24,11 @@ import { formatAyahNumberMark, pageFolioLayout } from '../../util/digits'
 import type { PageNumberScript } from '../../data/settings'
 import { appStore, useAppSelector } from '../../store/appStore'
 import {
+  bookArrival,
+  bookRest,
   bookRightShare,
   bookTurnDirection,
+  restBook,
   setBookAir,
   setBookPlace,
   turnMs,
@@ -48,6 +51,7 @@ import {
 import { mushafLeafModel } from './mushafLeafModel'
 import { pileTurnSchedule, playFlip, warmPageTurnSounds } from '../paper/pageTurnSounds'
 import { clearPagePictures, hasPagePicture, warmPageTurn } from '../paper/pageTurn'
+import { BookTitlePage } from '../paper/BookSpread'
 import { InkEngine, InkState, getTuning, type InkWord } from './InkEngine'
 import { MUSHAF_STILL_INK, mushafMarkWaits, mushafTokenInk, type MushafInk } from './mushafInk'
 import type { MushafToken } from '../../domain/mushafPage'
@@ -75,6 +79,9 @@ function whenIdle(work: () => void): () => void {
   const id = setTimeout(work, 200)
   return () => clearTimeout(id)
 }
+
+/** Told apart in a kept picture's key: one reader's revisions mean nothing to the next. */
+let readers = 0
 
 /** A page whose picture is wanted ahead of its turn. */
 interface WarmPage {
@@ -181,7 +188,7 @@ export function MushafReader({
   const settings = useAppSelector((state) => state.settings)
   const look = useRef({ settings, revision: 0 })
   if (look.current.settings !== settings) look.current = { settings, revision: look.current.revision + 1 }
-  useEffect(() => clearPagePictures, [])
+  const [reader] = useState(() => ++readers)
 
   const derived = ready && runtimeMushafCache
     ? runtimeMushafCache.pageOfAyah(activeSurahId, targetAyah)
@@ -290,7 +297,17 @@ export function MushafReader({
   }, [ready, facing, versoSlot])
 
   const place = facing ? mushafFacingPages(page).right : page
-  const [queue, setQueue] = useState<PageTurnQueue>({ settled: place, flight: null, queued: null })
+  // A reader is built anew for each chapter, but the book was already
+  // somewhere: on Chapters, or open at another page. It starts from there
+  // and turns what lies between (bookArrival).
+  const [found] = useState(() => (facing && ready ? bookRest() : null))
+  const stackLayer = useAppSelector((state) => state.stackLayer)
+  const [arrival] = useState(() => bookArrival(found, stackLayer))
+  const [queue, setQueue] = useState<PageTurnQueue>({
+    settled: arrival && 'from' in arrival ? arrival.from : place,
+    flight: null,
+    queued: null,
+  })
   const footing = `${ready}:${facing}:${english}:${pageNumberScript}`
   const [settledFooting, setSettledFooting] = useState(footing)
   const [motion, setMotion] = useState<{
@@ -327,7 +344,10 @@ export function MushafReader({
   const destination = queue.flight?.to ?? queue.settled
   const pair = facing ? mushafFacingPages(destination) : { right: destination, left: destination }
   const preparedFit = mushafFit(destination, facing, fits)
-  const fitReady = fontsReady && preparedFit != null
+  // A reader built for this chapter has measured neither spread: the leaf it
+  // lifts off is set in the hand that page was shown in.
+  const departure = queue.flight ? mushafFit(queue.flight.from, facing, fits) : undefined
+  const fitReady = fontsReady && preparedFit != null && (!queue.flight || departure != null)
   useLayoutEffect(() => {
     if (reset || !queue.flight || motion || !fitReady) return
     const wad = facing ? pileBetween(queue.flight.from, queue.flight.to) : 0
@@ -368,8 +388,8 @@ export function MushafReader({
   // Chapters is the book's left-most page and Settings its right-most: on
   // facing leaves each is uncovered beneath the leaf on its side, and
   // covered again by the same leaf on the way back.
-  const stackLayer = useAppSelector((state) => state.stackLayer)
-  const [seenLayer, setSeenLayer] = useState<StackLayer>(stackLayer)
+  const [seenLayer, setSeenLayer] = useState<StackLayer>(arrival && 'sheet' in arrival ? arrival.sheet : stackLayer)
+  const arrived = useRef(false)
   const [sheetTurn, setSheetTurn] = useState<{
     dir: 'on' | 'back'
     /** The pile between the open page and that end of the book. */
@@ -379,6 +399,8 @@ export function MushafReader({
     /** The share of the block on the right before the turn and after it. */
     from: number
     to: number
+    /** This reader's first turn, off the sheet the book was found on. */
+    arriving: boolean
   } | null>(null)
   // Derived while rendering, so the leaf is in the air on the same frame
   // the sheet beneath it changes.
@@ -391,8 +413,9 @@ export function MushafReader({
     const to = bookRightShare(true, stackLayer, place)
     const wad = Math.abs(to - from)
     setSheetTurn(dir && facing && !reduced && ready
-      ? { dir, wad, ms: turnMs(wad), initiatedAt: performance.now(), from, to }
+      ? { dir, wad, ms: turnMs(wad), initiatedAt: performance.now(), from, to, arriving: !arrived.current }
       : null)
+    arrived.current = true
   }
   const endSheetTurn = useCallback(() => setSheetTurn(null), [])
   useEffect(() => {
@@ -422,6 +445,9 @@ export function MushafReader({
     setBookPlace(settled)
     return () => setBookPlace(null)
   }, [facing, settled])
+  useLayoutEffect(() => {
+    if (facing) restBook({ place: settled })
+  }, [facing, settled])
   const airFrom = turning ? readingShare(motion.flight.from) : sheetTurn ? sheetTurn.from : null
   const airTo = turning ? readingShare(motion.flight.to) : sheetTurn ? sheetTurn.to : null
   useLayoutEffect(() => {
@@ -443,6 +469,7 @@ export function MushafReader({
       pageNumberScript,
       glyphWiden,
       look.current.revision,
+      reader,
     ].join('|')
   const air = useMemo(() => {
     if (!motion) return null
@@ -532,7 +559,12 @@ export function MushafReader({
   // Two incoming leaves are measured once, before the leaf lifts; a
   // neighbour's, while nothing is happening.
   const probing = !reset && queue.flight && !motion
-    ? [...new Set([pair.right, pair.left])]
+    ? [...new Set([
+        pair.right,
+        pair.left,
+        queue.flight.from,
+        ...(facing ? [mushafFacingPages(queue.flight.from).left] : []),
+      ])]
     : still ? measuring : []
   const probes = probing.some((page) => fits[page] == null) ? (
     <div className="mushaf-fit-probes" inert aria-hidden="true">
@@ -541,6 +573,15 @@ export function MushafReader({
       ))}
     </div>
   ) : null
+
+  // The next reader lifts its pile off this reader's recto: tell it which
+  // picture that is, while one is kept.
+  const restingPage = facing && !turning ? mushafFacingPages(settled).right : null
+  const restingShot = restingPage != null ? shotKey(restingPage, 'recto', fit, leafLive(restingPage)) : undefined
+  const restingKey = restingShot && hasPagePicture(restingShot) ? restingShot : null
+  useEffect(() => {
+    if (facing) restBook({ rectoKey: restingKey })
+  }, [facing, restingKey])
 
   if (!ready || !runtimeMushafCache) {
     return (
@@ -595,6 +636,17 @@ export function MushafReader({
     : null
   const rectoKey = shotKey(rectoPage, 'recto', fit, live)
   const versoKey = shotKey(versoPage, 'verso', fit, live)
+  // A reader's first turn lifts off what lay on the right before it was
+  // built: the leaf last read, or the title page. Its own recto is what the
+  // pile uncovers.
+  const arrivingFace = sheetTurn?.arriving && sheetTurn.dir === 'back'
+    ? found?.rectoKey && hasPagePicture(found.rectoKey)
+      ? { node: rectoPicture, key: found.rectoKey }
+      : found?.place == null ? { node: <BookTitlePage />, key: undefined } : null
+    : null
+  // The pictures are set in the spread's hand, which a reader just built
+  // has to measure first: the pile waits for it, in the same frame.
+  const handKnown = mushafFit(settled, facing, fits) != null
   return (
     <>
       <MushafLeaf page={rectoPage} side="recto" fit={turning && forward ? motion.fromFit : fit} leafRef={rectoRef} {...leafProps}
@@ -628,7 +680,7 @@ export function MushafReader({
           )
         : null}
       {warming && turnSlot ? createPortal(warming, turnSlot) : null}
-      {sheetTurn && !turning && turnSlot
+      {sheetTurn && !turning && handKnown && turnSlot
         ? createPortal(
             <TurningLeaf
               key={`sheet:${sheetTurn.initiatedAt}`}
@@ -639,8 +691,8 @@ export function MushafReader({
               // Both leaves keep the pages being read. Going on, the verso
               // leaf lifts and lands on the recto; going back, the recto
               // leaf lifts and lands on the verso.
-              face={sheetTurn.dir === 'on' ? versoPicture : rectoPicture}
-              faceKey={sheetTurn.dir === 'on' ? versoKey : rectoKey}
+              face={arrivingFace ? arrivingFace.node : sheetTurn.dir === 'on' ? versoPicture : rectoPicture}
+              faceKey={arrivingFace ? arrivingFace.key : sheetTurn.dir === 'on' ? versoKey : rectoKey}
               back={sheetTurn.dir === 'on' ? rectoPicture : versoPicture}
               backKey={sheetTurn.dir === 'on' ? rectoKey : versoKey}
               onEnd={endSheetTurn}

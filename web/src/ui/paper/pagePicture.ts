@@ -8,9 +8,10 @@
  * the box the browser measured for it. The same engine shapes both, so the
  * picture lands on the page it was taken from.
  *
- * It draws what a leaf is made of and no more: text, flat backgrounds
+ * It draws what a page is made of and no more: text, flat backgrounds
  * (the paper a waiting word lies under), opacity, clipping, 2D transforms,
- * and a fade at the foot of a scrolling block.
+ * a fade at the foot of a scrolling block, and the line work of an inline
+ * SVG (the title page's medallion).
  */
 
 /** A box in CSS pixels of the viewport. */
@@ -205,6 +206,10 @@ function paintElement(ctx: CanvasRenderingContext2D, el: Element, alpha: number,
   if (style.display === 'none') return
   const opacity = alpha * (Number(style.opacity) || 0)
   if (opacity <= 0.002) return
+  if (el instanceof SVGSVGElement) {
+    paintSvg(ctx, el, opacity)
+    return
+  }
   const box = el.getBoundingClientRect()
 
   ctx.save()
@@ -283,6 +288,122 @@ function paintElement(ctx: CanvasRenderingContext2D, el: Element, alpha: number,
     ctx.globalAlpha = 1
     ctx.drawImage(layer, 0, 0)
     ctx.restore()
+  }
+  ctx.restore()
+}
+
+/**
+ * Draws an inline SVG's shapes: paths, circles, ellipses, rects, lines and
+ * polygons, filled and stroked in flat colour or a linear gradient, under
+ * their own transforms. An image of the SVG would be exact, but an image
+ * decodes on a later frame and a picture is wanted on this one.
+ */
+function paintSvg(ctx: CanvasRenderingContext2D, svg: SVGSVGElement, alpha: number) {
+  const box = svg.getBoundingClientRect()
+  const view = svg.viewBox.baseVal
+  const width = view && view.width > 0 ? view.width : box.width
+  const height = view && view.height > 0 ? view.height : box.height
+  if (box.width <= 0 || box.height <= 0 || width <= 0 || height <= 0) return
+  // The default fit: the whole drawing, at one scale, centred in its box.
+  const fit = Math.min(box.width / width, box.height / height)
+  ctx.save()
+  ctx.translate(box.left + (box.width - width * fit) / 2, box.top + (box.height - height * fit) / 2)
+  ctx.scale(fit, fit)
+  ctx.translate(-(view?.x ?? 0), -(view?.y ?? 0))
+  for (const child of svg.children) paintShape(ctx, child, alpha, svg)
+  ctx.restore()
+}
+
+function svgPaint(
+  ctx: CanvasRenderingContext2D,
+  value: string,
+  shape: SVGGraphicsElement,
+  svg: SVGSVGElement,
+): string | CanvasGradient | null {
+  if (!value || value === 'none') return null
+  const reference = /^url\(["']?#([^"')]+)["']?\)/.exec(value)
+  if (!reference) return value
+  const gradient = svg.querySelector(`#${CSS.escape(reference[1])}`)
+  if (!(gradient instanceof SVGLinearGradientElement)) return null
+  const length = (at: SVGAnimatedLength) => at.baseVal.valueInSpecifiedUnits / (at.baseVal.unitType === 2 ? 100 : 1)
+  // Gradient ends are shares of the shape's own box unless it says otherwise.
+  const own = gradient.gradientUnits.baseVal !== SVGUnitTypes.SVG_UNIT_TYPE_USERSPACEONUSE
+  const bounds = own ? shape.getBBox() : null
+  const x = (share: number) => (bounds ? bounds.x + share * bounds.width : share)
+  const y = (share: number) => (bounds ? bounds.y + share * bounds.height : share)
+  const fill = ctx.createLinearGradient(
+    x(length(gradient.x1)), y(length(gradient.y1)), x(length(gradient.x2)), y(length(gradient.y2)),
+  )
+  for (const stop of gradient.querySelectorAll('stop')) {
+    const look = getComputedStyle(stop)
+    const colour = /^rgba?\(([^)]+)\)$/.exec(look.stopColor)
+    const channels = colour ? colour[1].split(/[,/\s]+/).filter(Boolean).map(Number) : [0, 0, 0]
+    const opacity = (Number(look.stopOpacity) || 0) * (channels[3] ?? 1)
+    const offset = stop.offset.baseVal
+    fill.addColorStop(Math.min(1, Math.max(0, offset)), `rgba(${channels[0]}, ${channels[1]}, ${channels[2]}, ${opacity})`)
+  }
+  return fill
+}
+
+function paintShape(ctx: CanvasRenderingContext2D, el: Element, alpha: number, svg: SVGSVGElement) {
+  if (!(el instanceof SVGGraphicsElement)) return
+  const style = getComputedStyle(el)
+  if (style.display === 'none' || style.visibility === 'collapse') return
+  const opacity = alpha * (Number(style.opacity) || 0)
+  if (opacity <= 0.002) return
+  ctx.save()
+  const placed = el.transform.baseVal.consolidate()?.matrix
+  if (placed) ctx.transform(placed.a, placed.b, placed.c, placed.d, placed.e, placed.f)
+  if (el instanceof SVGGElement) {
+    for (const child of el.children) paintShape(ctx, child, opacity, svg)
+    ctx.restore()
+    return
+  }
+
+  let path: Path2D | null = null
+  if (el instanceof SVGPathElement) {
+    path = new Path2D(el.getAttribute('d') ?? '')
+  } else if (el instanceof SVGCircleElement) {
+    path = new Path2D()
+    path.arc(el.cx.baseVal.value, el.cy.baseVal.value, el.r.baseVal.value, 0, Math.PI * 2)
+  } else if (el instanceof SVGEllipseElement) {
+    path = new Path2D()
+    path.ellipse(el.cx.baseVal.value, el.cy.baseVal.value, el.rx.baseVal.value, el.ry.baseVal.value, 0, 0, Math.PI * 2)
+  } else if (el instanceof SVGRectElement) {
+    path = new Path2D()
+    path.roundRect(el.x.baseVal.value, el.y.baseVal.value, el.width.baseVal.value, el.height.baseVal.value, el.rx.baseVal.value)
+  } else if (el instanceof SVGLineElement) {
+    path = new Path2D()
+    path.moveTo(el.x1.baseVal.value, el.y1.baseVal.value)
+    path.lineTo(el.x2.baseVal.value, el.y2.baseVal.value)
+  } else if (el instanceof SVGPolygonElement || el instanceof SVGPolylineElement) {
+    path = new Path2D()
+    const points = Array.from(el.points)
+    points.forEach((point, index) => (index ? path!.lineTo(point.x, point.y) : path!.moveTo(point.x, point.y)))
+    if (el instanceof SVGPolygonElement) path.closePath()
+  }
+  if (path) {
+    const fill = svgPaint(ctx, style.fill, el, svg)
+    if (fill) {
+      ctx.globalAlpha = opacity * (Number(style.fillOpacity) || 0)
+      ctx.fillStyle = fill
+      ctx.fill(path, style.fillRule === 'evenodd' ? 'evenodd' : 'nonzero')
+    }
+    const stroke = svgPaint(ctx, style.stroke, el, svg)
+    const weight = parseFloat(style.strokeWidth)
+    if (stroke && weight > 0) {
+      ctx.globalAlpha = opacity * (Number(style.strokeOpacity) || 0)
+      ctx.strokeStyle = stroke
+      ctx.lineWidth = weight
+      ctx.lineCap = style.strokeLinecap as CanvasLineCap
+      ctx.lineJoin = style.strokeLinejoin as CanvasLineJoin
+      // A length-normalised dash is a line being drawn in; at rest it is whole.
+      const dashes = el.hasAttribute('pathLength') || style.strokeDasharray === 'none'
+        ? []
+        : style.strokeDasharray.split(/[,\s]+/).map(parseFloat).filter((dash) => dash >= 0)
+      ctx.setLineDash(dashes)
+      ctx.stroke(path)
+    }
   }
   ctx.restore()
 }

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { bookRightShare, bookTurnDirection, bookmarkSwipeDestination, closesBook, facingPage, turnMs, leavesReader, readerVisible, spreadLayers, bookPiles } from '../bookSpread'
+import { bookRightShare, bookTurnDirection, bookmarkSwipeDestination, closesBook, facingPage, turnMs, leavesReader, readerVisible, spreadLayers, bookPiles, bookArrival, bookRest, forgetBookRest, restBook } from '../bookSpread'
 import { BOOKMARKS_LAYER, COVER_LAYER, READER_LAYER, SETTINGS_LAYER } from '../stack'
 
 describe('spreadLayers', () => {
@@ -162,5 +162,41 @@ describe('the piles while leaves are in the air', () => {
       expect(piles.left + piles.right).toBeLessThanOrEqual(1 + 1e-9)
       expect(piles.left + piles.right + Math.abs(to - from)).toBeCloseTo(1)
     }
+  })
+})
+
+describe('where a new reader finds the book', () => {
+  it('turns nothing when the book has not been anywhere', () => {
+    expect(bookArrival(null, READER_LAYER)).toBeNull()
+  })
+
+  it('turns the pile home from the sheet the book was resting on', () => {
+    // Chapters shows with the whole block turned over; a chapter is then chosen.
+    expect(bookArrival({ layer: COVER_LAYER, place: null, rectoKey: null }, READER_LAYER)).toEqual({ sheet: COVER_LAYER })
+    expect(bookArrival({ layer: COVER_LAYER, place: 311, rectoKey: 'k' }, READER_LAYER)).toEqual({ sheet: COVER_LAYER })
+    // What that pile carries is the difference between the two rests.
+    const turned = Math.abs(bookRightShare(true, READER_LAYER, 549) - bookRightShare(true, COVER_LAYER, 549))
+    expect(turned).toBeCloseTo(1 - 548 / 603)
+  })
+
+  it('turns the leaves in between when the book was open at another page', () => {
+    expect(bookArrival({ layer: READER_LAYER, place: 409, rectoKey: null }, READER_LAYER)).toEqual({ from: 409 })
+  })
+
+  it('turns nothing for a reader built under a sheet that has not changed', () => {
+    expect(bookArrival({ layer: SETTINGS_LAYER, place: 409, rectoKey: null }, SETTINGS_LAYER)).toBeNull()
+    expect(bookArrival({ layer: READER_LAYER, place: null, rectoKey: null }, READER_LAYER)).toBeNull()
+  })
+
+  it('keeps what it is told and forgets nothing else', () => {
+    forgetBookRest()
+    expect(bookRest()).toBeNull()
+    restBook({ layer: READER_LAYER })
+    restBook({ place: 12 })
+    restBook({ rectoKey: 'page' })
+    expect(bookRest()).toEqual({ layer: READER_LAYER, place: 12, rectoKey: 'page' })
+    restBook({ layer: COVER_LAYER })
+    expect(bookRest()).toEqual({ layer: COVER_LAYER, place: 12, rectoKey: 'page' })
+    forgetBookRest()
   })
 })

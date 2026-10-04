@@ -180,6 +180,60 @@ export function bookPiles(right: number, air: BookAir | null): { right: number; 
   return { right: Math.min(air.from, air.to), left: 1 - Math.max(air.from, air.to) }
 }
 
+/**
+ * Where the book lies open, kept outside the reader.
+ *
+ * A reader is built anew for every chapter, and one built with no memory of
+ * the book took it to be open already at its own page: choosing a chapter
+ * turned nothing, and the piles jumped to their new thickness. The book is
+ * one object and it is somewhere before the reader arrives. This is that
+ * place: the sheet the book rested on, the page its leaves were open at, and
+ * the picture of what lay on the right-hand page, which is the face of the
+ * pile a new reader turns to reach its chapter.
+ */
+export interface BookRest {
+  layer: StackLayer
+  /** The right-hand page of the spread last settled on; null before any chapter. */
+  place: number | null
+  /** The kept picture of the recto leaf last read (pageTurn's album), if any. */
+  rectoKey: string | null
+}
+
+let rest: BookRest | null = null
+
+export function bookRest(): BookRest | null {
+  return rest
+}
+
+export function restBook(change: Partial<BookRest>) {
+  rest = { layer: COVER_LAYER, place: null, rectoKey: null, ...rest, ...change }
+}
+
+/** For tests: the book is nowhere again. */
+export function forgetBookRest() {
+  rest = null
+}
+
+/**
+ * How a reader that has just been built finds the book, and so what it must
+ * turn to open it at its own page.
+ *
+ * - From Chapters or Settings ([sheet]): the pile turned over to show that
+ *   sheet goes home, less whatever now belongs on the far side. Its face is
+ *   what lay on the page it lifts from.
+ * - From another page of the book ([from]): the leaves in between turn, as
+ *   they do for any far page.
+ * - Nowhere yet, or already there: nothing turns.
+ */
+export function bookArrival(
+  found: BookRest | null,
+  layer: StackLayer,
+): { sheet: StackLayer } | { from: number } | null {
+  if (!found) return null
+  if (found.layer !== layer) return { sheet: found.layer }
+  return layer === READER_LAYER && found.place != null ? { from: found.place } : null
+}
+
 /** A swipe belongs to the sheet on which its pointer went down. */
 export function bookmarkSwipeDestination(layer: StackLayer, dx: number, hasBookmarks: boolean): StackLayer | null {
   if (layer === COVER_LAYER && dx > 0 && hasBookmarks) return BOOKMARKS_LAYER

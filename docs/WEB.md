@@ -479,8 +479,9 @@ two-faced leaf (`TurningLeaf`) into `BookSpread`'s turn slot (`.mushaf-flip`,
 - `pagePicture.ts` — a picture of each page, drawn on a 2D canvas from its
   DOM: every word set by the canvas's own text shaping, in the element's
   font and colour, at the box layout measured for it, plus flat backgrounds
-  (the paper cover of a waiting word), opacity, clipping, 2D transforms and
-  the English leaf's foot fade. `TurningLeaf` stages the two pages where they
+  (the paper cover of a waiting word), opacity, clipping, 2D transforms, the
+  English leaf's foot fade, and an inline SVG's line work (paths and basic
+  shapes, flat or linear-gradient paint: the title page's medallion). `TurningLeaf` stages the two pages where they
   lie on the book, hidden (`.mushaf-flip-page`, `visibility: hidden`); they
   are laid out and never painted. The picture is rounded to device pixels
   exactly as Chromium rounds the page (`pixelDrift`, `Snap`), so nothing
@@ -515,6 +516,19 @@ and nothing is taken ahead while the voice is reading, since a picture costs
 a frame or two and the word being washed would stand still for them. The
 canvas is the whole window and is sized ahead of the turn: resized as a turn
 started, it came up empty for that frame and the page beneath showed through.
+
+**The book's place outlives the reader** (`bookRest`, `bookArrival` in
+`paper/bookSpread.ts`). `ReaderScreen` is keyed by chapter, so a reader is
+built anew for each one, and one with no memory of the book took it to be
+open at its own page already: choosing a chapter turned nothing and the
+piles jumped. `BookSpread` records the sheet the book rests on and the
+reader the page it settled on and the kept picture of its recto. A reader
+just built starts from there: off Chapters it turns the pile home (its face
+the leaf last read, or the title page, `BookTitlePage`, whose medallion
+`pagePicture` draws from its SVG), and from another page it starts on that
+spread and turns the leaves in between, measuring the hand of both spreads
+first. The pile waits for the new leaves' hand in the same frame, so nothing
+is shown at the wrong size.
 
 It replaced eighteen flat strips of DOM hinged in CSS 3D (each a composited
 layer holding a slice of the page): on an RTX 3080 that ran 12–26 frames in
