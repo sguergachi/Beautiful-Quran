@@ -88,6 +88,10 @@ export function SettingsScreen({
   const reciters = useAppSelector((st) => st.reciters)
   const layer = settingsLayerFor(hasReader)
   const isTop = stackLayer === layer
+  // Once it has been laid on the page, the sheet is drawn back off it when it
+  // goes; before that it was never on the page, and has nothing to animate.
+  const [laid, setLaid] = useState(false)
+  if (isTop && !laid) setLaid(true)
   const depth = Math.max(0, stackLayer - layer)
   const [customizeOpen, setCustomizeOpen] = useState(false)
   const showReadingToggles = s.readingMode === 'arabic_english'
@@ -350,6 +354,7 @@ export function SettingsScreen({
       data-layer={layer}
       data-depth={depth}
       data-active={isTop}
+      data-laid={laid || undefined}
     >
       <NuqtaParamsContext.Provider value={nuqtaParams}>
       <div className="settings">

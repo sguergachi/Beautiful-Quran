@@ -8,10 +8,11 @@
  * the box the browser measured for it. The same engine shapes both, so the
  * picture lands on the page it was taken from.
  *
- * It draws what a page is made of and no more: text, flat backgrounds
- * (the paper a waiting word lies under), opacity, clipping, 2D transforms,
- * a fade at the foot of a scrolling block, and the line work of an inline
- * SVG (the title page's medallion).
+ * It draws what a page is made of and no more: text, backgrounds (flat or a
+ * linear gradient, square or rounded: the paper a waiting word lies under,
+ * a search field, the dissolve under a pinned bar), opacity, clipping, 2D
+ * transforms, a fade at the foot of a scrolling block, a field's text, and
+ * the line work of an inline SVG (an icon, the title page's medallion).
  */
 
 /** A box in CSS pixels of the viewport. */
@@ -58,6 +59,72 @@ export function parseFootFade(mask: string): number {
   if (!mask.startsWith('linear-gradient(')) return 0
   const match = /calc\(100% - ([\d.]+)px\)/.exec(mask)
   return match ? Number(match[1]) : 0
+}
+
+/** One layer of `linear-gradient(...)` as computed: where it runs, and its stops. */
+export interface LinearGradient {
+  /** Clockwise from straight up, in degrees: 180 runs top to bottom. */
+  angle: number
+  stops: { colour: [number, number, number, number]; at: number | null }[]
+}
+
+function splitTopLevel(text: string): string[] {
+  const parts: string[] = []
+  let depth = 0
+  let from = 0
+  for (let index = 0; index < text.length; index++) {
+    const char = text[index]
+    if (char === '(') depth++
+    else if (char === ')') depth--
+    else if (char === ',' && depth === 0) {
+      parts.push(text.slice(from, index).trim())
+      from = index + 1
+    }
+  }
+  parts.push(text.slice(from).trim())
+  return parts
+}
+
+const SIDES: Record<string, number> = { 'to top': 0, 'to right': 90, 'to bottom': 180, 'to left': 270 }
+
+/** The first `linear-gradient` of a computed `background-image`; null for anything else. */
+export function parseLinearGradient(image: string): LinearGradient | null {
+  if (!image.startsWith('linear-gradient(')) return null
+  let depth = 0
+  let end = -1
+  for (let index = 'linear-gradient'.length; index < image.length; index++) {
+    if (image[index] === '(') depth++
+    else if (image[index] === ')' && --depth === 0) { end = index; break }
+  }
+  if (end < 0) return null
+  const parts = splitTopLevel(image.slice('linear-gradient('.length, end))
+  let angle = 180
+  if (parts[0] in SIDES) angle = SIDES[parts.shift()!]
+  else if (/^-?[\d.]+deg$/.test(parts[0])) angle = parseFloat(parts.shift()!)
+  const stops = parts.map((part) => {
+    const match = /^rgba?\(([^)]+)\)\s*(?:(-?[\d.]+)%)?$/.exec(part)
+    if (!match) return null
+    const channels = match[1].split(/[,/\s]+/).filter(Boolean).map(Number)
+    return {
+      colour: [channels[0], channels[1], channels[2], channels[3] ?? 1] as [number, number, number, number],
+      at: match[2] == null ? null : Number(match[2]) / 100,
+    }
+  })
+  if (stops.length < 2 || stops.some((stop) => stop == null)) return null
+  return { angle, stops: stops as LinearGradient['stops'] }
+}
+
+/**
+ * A clear stop takes its neighbour's colour. CSS fades toward `transparent`
+ * without passing through black; a canvas gradient does not, and a dissolve
+ * of paper came out with a grey band in it.
+ */
+export function clearStops(stops: LinearGradient['stops']): LinearGradient['stops'] {
+  return stops.map((stop, index) => {
+    if (stop.colour[3] > 0) return stop
+    const near = stops[index - 1]?.colour[3] ? stops[index - 1] : stops.slice(index + 1).find((next) => next.colour[3] > 0) ?? stops[index - 1]
+    return near ? { ...stop, colour: [near.colour[0], near.colour[1], near.colour[2], 0] } : stop
+  })
 }
 
 /** The runs of a text node that are set as one piece: its words. */
@@ -146,6 +213,8 @@ interface Painting {
   placed: Map<Element, Placed>
   range: Range
   scale: number
+  /** The page being pictured: nothing outside it is drawn. */
+  frame: Frame
   /** Null where nothing is rounded. */
   snap: Snap | null
   /** How much of [snap] the canvas's own transform already carries. */
@@ -160,7 +229,7 @@ interface Painting {
  * with none it is set where layout reports, unrounded.
  */
 export function paintPage(
-  source: HTMLElement,
+  source: Element,
   frame: Frame,
   scale: number,
   paper: string,
@@ -179,7 +248,7 @@ export function paintPage(
   // Boxes are read with every transform off: a transformed box reports where
   // it ends up, and the picture applies the transform itself.
   const placed = new Map<Element, Placed>()
-  for (const el of source.querySelectorAll<HTMLElement>('*')) {
+  for (const el of source.querySelectorAll('*')) {
     const style = getComputedStyle(el)
     const matrix = parseMatrix(style.transform)
     if (!matrix) continue
@@ -188,7 +257,7 @@ export function paintPage(
   }
   source.setAttribute('data-flat', '')
   try {
-    const painting: Painting = { placed, range: document.createRange(), scale, snap: drift, carried: { x: 0, y: 0 } }
+    const painting: Painting = { placed, range: document.createRange(), scale, frame, snap: drift, carried: { x: 0, y: 0 } }
     for (const child of source.children) paintElement(ctx, child, 1, painting)
   } finally {
     source.removeAttribute('data-flat')
@@ -211,6 +280,14 @@ function paintElement(ctx: CanvasRenderingContext2D, el: Element, alpha: number,
     return
   }
   const box = el.getBoundingClientRect()
+  // A long list scrolled under a page has most of its rows off it.
+  const page = painting.frame
+  if (
+    box.width > 0 && box.height > 0 && !painting.placed.has(el) && (
+      box.bottom < page.top - REACH || box.top > page.top + page.height + REACH ||
+      box.right < page.left - REACH || box.left > page.left + page.width + REACH
+    )
+  ) return
 
   ctx.save()
   const turn = painting.placed.get(el)
@@ -228,6 +305,12 @@ function paintElement(ctx: CanvasRenderingContext2D, el: Element, alpha: number,
     ctx.transform(...turn.matrix)
     ctx.translate(within.x - x, lift - y)
     painting = { ...painting, snap: snap ? within : null, carried: { x: within.x, y: lift } }
+  }
+  // What scrolls is painted on a layer of its own, set where layout has it:
+  // the fraction a layer above dropped does not reach it (so measured: a
+  // scrolled list stood a pixel low with it).
+  if (painting.snap && /auto|scroll/.test(style.overflowX + style.overflowY)) {
+    painting = { ...painting, snap: { x: 0, y: 0 } }
   }
   const { snap, carried, scale } = painting
   const left = pixel(box.left, snap?.x, carried.x, scale)
@@ -250,12 +333,9 @@ function paintElement(ctx: CanvasRenderingContext2D, el: Element, alpha: number,
     target.textAlign = 'left'
   }
 
-  const background = style.backgroundColor
-  if (background && background !== 'transparent' && !/, 0\)$/.test(background) && right > left && bottom > top) {
-    target.globalAlpha = opacity
-    target.fillStyle = background
-    target.fillRect(left, top, right - left, bottom - top)
-  }
+  paintFill(target, style, left, top, right - left, bottom - top, opacity)
+  const positioned = style.position !== 'static'
+  if (positioned) paintPseudo(target, el, '::before', left, top, opacity)
 
   if (style.overflowX !== 'visible' || style.overflowY !== 'visible') {
     target.beginPath()
@@ -268,10 +348,21 @@ function paintElement(ctx: CanvasRenderingContext2D, el: Element, alpha: number,
     target.clip()
   }
 
+  if (el instanceof HTMLInputElement) paintField(target, el, style, left, top, bottom - top, opacity)
+  // What stands over its siblings (a bar pinned over the list it heads) is
+  // drawn after them.
+  const raised: { child: Element; z: number }[] = []
   for (const child of el.childNodes) {
     if (child.nodeType === Node.TEXT_NODE) paintText(target, child as Text, style, opacity, painting)
-    else if (child.nodeType === Node.ELEMENT_NODE) paintElement(target, child as Element, opacity, painting)
+    else if (child.nodeType === Node.ELEMENT_NODE) {
+      const look = getComputedStyle(child as Element)
+      const z = look.position === 'static' ? 0 : Number(look.zIndex) || 0
+      if (z > 0) raised.push({ child: child as Element, z })
+      else paintElement(target, child as Element, opacity, painting)
+    }
   }
+  for (const { child } of raised.sort((a, b) => a.z - b.z)) paintElement(target, child, opacity, painting)
+  if (positioned) paintPseudo(target, el, '::after', left, top, opacity)
 
   if (layer) {
     const foot = box.top + el.clientTop + el.clientHeight
@@ -290,6 +381,104 @@ function paintElement(ctx: CanvasRenderingContext2D, el: Element, alpha: number,
     ctx.restore()
   }
   ctx.restore()
+}
+
+/** How far outside the page a box may stand and still be drawn (ink overhangs its box). */
+const REACH = 48
+
+/** A box's background: its colour, then the first linear gradient over it, to its corners' radius. */
+function paintFill(
+  ctx: CanvasRenderingContext2D,
+  style: CSSStyleDeclaration,
+  left: number,
+  top: number,
+  width: number,
+  height: number,
+  alpha: number,
+) {
+  if (width <= 0 || height <= 0) return
+  const colour = style.backgroundColor
+  const flat = colour && colour !== 'transparent' && !/, 0\)$/.test(colour)
+  const gradient = style.backgroundImage === 'none' ? null : parseLinearGradient(style.backgroundImage)
+  if (!flat && !gradient) return
+  const radius = (value: string, across: number) =>
+    value.endsWith('%') ? (parseFloat(value) / 100) * across : parseFloat(value) || 0
+  const corners = [
+    radius(style.borderTopLeftRadius, width),
+    radius(style.borderTopRightRadius, width),
+    radius(style.borderBottomRightRadius, width),
+    radius(style.borderBottomLeftRadius, width),
+  ]
+  const fill = () => {
+    if (corners.some((corner) => corner > 0)) {
+      ctx.beginPath()
+      ctx.roundRect(left, top, width, height, corners)
+      ctx.fill()
+    } else {
+      ctx.fillRect(left, top, width, height)
+    }
+  }
+  ctx.globalAlpha = alpha
+  if (flat) {
+    ctx.fillStyle = colour
+    fill()
+  }
+  if (gradient) {
+    // The gradient line through the box's middle, long enough to reach its corners.
+    const turn = (gradient.angle * Math.PI) / 180
+    const dx = Math.sin(turn)
+    const dy = -Math.cos(turn)
+    const half = (Math.abs(width * dx) + Math.abs(height * dy)) / 2
+    const cx = left + width / 2
+    const cy = top + height / 2
+    const paint = ctx.createLinearGradient(cx - dx * half, cy - dy * half, cx + dx * half, cy + dy * half)
+    const stops = clearStops(gradient.stops)
+    stops.forEach((stop, index) => {
+      const at = stop.at ?? index / (stops.length - 1)
+      paint.addColorStop(Math.min(1, Math.max(0, at)), `rgba(${stop.colour.join(', ')})`)
+    })
+    ctx.fillStyle = paint
+    fill()
+  }
+}
+
+/** An element's `::before` or `::after`, where it is a placed box with a background. */
+function paintPseudo(
+  ctx: CanvasRenderingContext2D,
+  el: Element,
+  which: '::before' | '::after',
+  left: number,
+  top: number,
+  alpha: number,
+) {
+  const style = getComputedStyle(el, which)
+  if (style.content === 'none' || style.display === 'none' || style.position !== 'absolute') return
+  const [x, y, width, height] = [style.left, style.top, style.width, style.height].map(parseFloat)
+  if (![x, y, width, height].every(Number.isFinite)) return
+  const opacity = alpha * (Number(style.opacity) || 0)
+  if (opacity <= 0.002) return
+  paintFill(ctx, style, left + el.clientLeft + x, top + el.clientTop + y, width, height, opacity)
+}
+
+/** What a text field shows: what was typed into it, or its prompt. */
+function paintField(
+  ctx: CanvasRenderingContext2D,
+  field: HTMLInputElement,
+  style: CSSStyleDeclaration,
+  left: number,
+  top: number,
+  height: number,
+  alpha: number,
+) {
+  const text = field.value || field.placeholder
+  if (!text || field.type === 'password') return
+  ctx.font = fontOf(style)
+  ctx.fillStyle = field.value ? style.color : getComputedStyle(field, '::placeholder').color
+  ctx.globalAlpha = alpha * (field.value ? 1 : Number(getComputedStyle(field, '::placeholder').opacity) || 1)
+  ctx.direction = style.direction === 'rtl' ? 'rtl' : 'ltr'
+  const metrics = ctx.measureText(text)
+  const baseline = top + (height + metrics.fontBoundingBoxAscent - metrics.fontBoundingBoxDescent) / 2
+  ctx.fillText(text, left + field.clientLeft + (parseFloat(style.paddingLeft) || 0), baseline)
 }
 
 /**
