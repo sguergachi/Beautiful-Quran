@@ -218,6 +218,7 @@ export function App() {
             <BookSpread
               titlePage={state.content == null}
               versoCovered={!leaves || stack !== READER_LAYER}
+              mushaf={state.settings.readingLayout === 'mushaf'}
               leaves={leaves}
               stack={stack}
               chapterPage={state.content?.ayahs[0]?.page ?? null}

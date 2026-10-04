@@ -1,7 +1,9 @@
-import { useLayoutEffect, type CSSProperties } from 'react'
+import { useLayoutEffect, useRef, type CSSProperties } from 'react'
+import { MushafStartLeaf } from '../reader/MushafReader'
 import { GeneratedRosette } from '../theme/GeneratedOrnament'
 import { generateCoverOrnament } from '../theme/ornamentGenerator'
 import {
+  CHAPTERS_PLACE,
   bookPiles,
   bookRightShare,
   restBook,
@@ -17,8 +19,9 @@ import type { StackLayer } from './stack'
 let titleMedallion: ReturnType<typeof generateCoverOrnament>['medallion'] | null = null
 
 /**
- * The title page: what the right-hand page shows before a chapter is chosen.
- * Also the face of the pile turned to reach the first chapter (MushafReader).
+ * The title page: what the right-hand page shows before a chapter is chosen
+ * in the scrolling layout. (In Mushaf layout the book's first page stands
+ * there, opposite Chapters.)
  */
 export function BookTitlePage() {
   titleMedallion ??= generateCoverOrnament((Math.random() * 0x7fffffff) | 0).medallion
@@ -51,12 +54,15 @@ export function BookTitlePage() {
 export function BookSpread({
   titlePage,
   versoCovered,
+  mushaf,
   leaves,
   stack,
   chapterPage,
 }: {
   titlePage: boolean
   versoCovered: boolean
+  /** The book is read as its printed pages (Mushaf layout). */
+  mushaf: boolean
   /** Facing Mushaf leaves are open on the spread. */
   leaves: boolean
   stack: StackLayer
@@ -67,7 +73,8 @@ export function BookSpread({
   // the one element that draws them: the app shell does not re-render on a
   // page turn, and the eased value restyles the book alone.
   const leavesPlace = useBookPlace()
-  const right = bookRightShare(leaves, stack, leaves ? leavesPlace : chapterPage)
+  // Before a chapter is chosen in Mushaf layout the book is at its start.
+  const right = bookRightShare(leaves ? leavesPlace : mushaf ? CHAPTERS_PLACE : chapterPage)
   // Facing leaves are turned, so their piles change by the leaves that are
   // turned and when they are: no leaf is on a pile while it is in the air.
   const air = useBookAir()
@@ -78,9 +85,21 @@ export function BookSpread({
   useLayoutEffect(() => {
     restBook({ layer: stack })
   }, [stack])
+  // With no reader, nothing else says the leaves lie open at the start.
+  useLayoutEffect(() => {
+    if (mushaf && !leaves) restBook({ place: CHAPTERS_PLACE })
+  }, [mushaf, leaves])
+  // While a leaf is in the air, the shell says so: Chapters, which a pile
+  // lands as, is not shown under it until it has landed (styles.css).
+  const book = useRef<HTMLDivElement>(null)
+  const flying = air != null
+  useLayoutEffect(() => {
+    book.current?.closest('.app-shell')?.toggleAttribute('data-air', flying)
+  }, [flying])
   return (
     <>
       <div
+        ref={book}
         className="book"
         aria-hidden="true"
         style={{
@@ -90,9 +109,16 @@ export function BookSpread({
       >
         <div className="book-page book-page--verso" />
         <div className="book-page book-page--recto">
-          {titlePage ? <BookTitlePage /> : null}
+          {titlePage && !mushaf ? <BookTitlePage /> : null}
         </div>
       </div>
+      {/* Mushaf layout, no chapter chosen yet: the book's first page stands
+          opposite Chapters, as it does whenever Chapters is showing. */}
+      {titlePage && mushaf ? (
+        <div className="book-start-leaf">
+          <MushafStartLeaf fallback={<BookTitlePage />} />
+        </div>
+      ) : null}
       {/* Mushaf layout: the reader portals the facing leaf in here. */}
       <div className="book-verso-leaf" ref={setVersoLeafSlot} inert={versoCovered} aria-hidden={versoCovered || undefined} />
       {/* A loose sheet laid over either page: the root viewer. */}

@@ -6883,21 +6883,91 @@ html[data-entrance='true'] body {
   right: var(--page-outer) !important;
 }
 
-/* Settings is the right page in every layout: laid over the title page or
-   the chapter, never over Chapters. */
+/*
+ * Settings is a loose sheet laid over the right-hand page, as the word
+ * viewer is laid over the page facing its word: it comes down from above the
+ * window onto the page and is drawn back up off it. It is not a page of the
+ * book. (On facing leaves it used to be the book's last page, under the
+ * whole right-hand pile, and reaching it turned every page still to be
+ * read.) It is smaller than its page by a step of the grid on every side.
+ */
 .app-shell[data-spread='true'] .sheet[data-name='settings'] {
-  left: 50% !important;
-  right: var(--page-outer) !important;
+  --sheet-inset: calc(var(--u) * 0.382);
+  --sheet-off: calc(-100% - var(--page-y) - 2rem);
+  --sheet-skew: 1.3deg;
+  top: calc(var(--page-y) + var(--sheet-inset)) !important;
+  bottom: calc(var(--page-y) + var(--sheet-inset)) !important;
+  left: calc(50% + var(--u) * 0.618) !important;
+  right: calc(var(--page-outer) + var(--sheet-inset)) !important;
+  /* Over the sheets, under a turning leaf and the gutter's shade. */
+  z-index: 23;
+  border-radius: 2px;
+  opacity: 1;
+  transform-origin: 50% 0%;
+  transition: none;
+  content-visibility: visible;
+  contain: none;
+}
+
+.app-shell[data-spread='true'] .sheet[data-name='settings'][data-active='true'] {
+  animation: settings-sheet-in 640ms both;
+}
+
+/* Off the page above the window; drawn back there once it has been laid. */
+.app-shell[data-spread='true'] .sheet[data-name='settings'][data-active='false'] {
+  transform: translateY(var(--sheet-off));
+  visibility: hidden;
+  opacity: 1;
+}
+
+.app-shell[data-spread='true'] .sheet[data-name='settings'][data-active='false'][data-laid='true'] {
+  animation: settings-sheet-out 460ms both;
+}
+
+/* The word viewer's sheet (root-sheet-in / -out), with its own perspective:
+   this sheet stands in the shell, not in the book's loose-sheet slot. */
+@keyframes settings-sheet-in {
+  0% {
+    transform: perspective(1900px) translateY(var(--sheet-off)) rotateX(8deg) rotateZ(var(--sheet-skew));
+    animation-timing-function: cubic-bezier(0.2, 0.72, 0.3, 1);
+  }
+  64% {
+    transform: perspective(1900px) translateY(0.4rem) rotateX(1.4deg) rotateZ(calc(var(--sheet-skew) * -0.22));
+    animation-timing-function: ease-in-out;
+  }
+  84% {
+    transform: perspective(1900px) translateY(-0.1rem) rotateX(0deg) rotateZ(calc(var(--sheet-skew) * 0.06));
+    animation-timing-function: ease-out;
+  }
+  100% {
+    transform: perspective(1900px) translateY(0) rotateX(0deg) rotateZ(0deg);
+  }
+}
+
+@keyframes settings-sheet-out {
+  0% {
+    visibility: visible;
+    transform: perspective(1900px) translateY(0) rotateX(0deg) rotateZ(0deg);
+    animation-timing-function: ease-out;
+  }
+  20% {
+    visibility: visible;
+    transform: perspective(1900px) translateY(0.25rem) rotateX(2.4deg) rotateZ(calc(var(--sheet-skew) * 0.2));
+    animation-timing-function: cubic-bezier(0.5, 0, 0.85, 0.4);
+  }
+  99% {
+    visibility: visible;
+  }
+  100% {
+    visibility: hidden;
+    transform: perspective(1900px) translateY(var(--sheet-off)) rotateX(8deg) rotateZ(calc(var(--sheet-skew) * -0.8));
+  }
 }
 
 /* A page laid onto either side settles in from its own fore-edge — nothing
    slides across the desk or over the spine. */
 .app-shell[data-spread='true'] .sheet[data-name='bookmarks'][data-active='false'] {
   transform: translateX(-1.25rem);
-}
-
-.app-shell[data-spread='true'] .sheet[data-name='settings'][data-active='false'] {
-  transform: translateX(1.25rem);
 }
 
 .app-shell[data-spread='true']
@@ -7329,28 +7399,27 @@ html[data-entrance-closing]
   pointer-events: none;
 }
 
-/* On facing leaves Settings lies under the recto leaf, which is turned
-   away to show it, so it does not slide in. */
-.app-shell[data-spread='true'][data-leaves='true'] .sheet[data-name='settings'] {
-  transform: none;
-  /* Still on the page until the leaf coming back down has covered it. */
-  content-visibility: visible;
-  contain: none;
+/* Chapters is a page of the book: its first, opposite page 1. A pile of
+   leaves lands as it and lifts off as it (MushafReader), so it is never
+   shown under a leaf that is still in the air, and it comes and goes with
+   the pile, at once. */
+.app-shell[data-spread='true'][data-leaves='true'] .sheet[data-name='home'] {
+  transition: none;
 }
 
-/* Chapters and Settings are uncovered by a turning leaf (MushafReader sheet
-   turn): each is whole the moment the leaf over it lifts, and stays until
-   the leaf laid back down has covered it. */
-@media (prefers-reduced-motion: no-preference) {
-  .app-shell[data-spread='true'][data-leaves='true']
-    .sheet:is([data-name='home'], [data-name='settings'])[data-active='true'] {
-    transition: none;
-  }
+.app-shell[data-spread='true'][data-leaves='true'][data-air] .sheet[data-name='home'] {
+  opacity: 0;
+  pointer-events: none;
+}
 
-  .app-shell[data-spread='true'][data-leaves='true']
-    .sheet:is([data-name='home'], [data-name='settings'])[data-active='false'] {
-    transition: opacity 0s linear 700ms;
-  }
+/* The book's first page, opposite Chapters before any chapter is chosen. */
+.book-start-leaf {
+  position: absolute;
+  top: var(--page-y);
+  bottom: var(--page-y);
+  left: 50%;
+  right: var(--page-outer);
+  z-index: 3;
 }
 
 /* On the spread the hand starts from the page, not the window's width;
@@ -7610,7 +7679,7 @@ html[data-entrance-closing]
 
 /* A picture is measured with every transform off and applies each one
    itself (pagePicture): a transformed box reports where it ends up. */
-.mushaf-flip-page[data-flat] * {
+[data-flat] * {
   transform: none !important;
 }
 

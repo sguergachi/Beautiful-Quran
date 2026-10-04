@@ -14,6 +14,9 @@ export interface TurnRequest {
   /** What each page's picture is kept under ([keepPagePicture]), if it can be kept. */
   frontKey?: string
   backKey?: string
+  /** A page already lying on the book, pictured from there instead of from its stage. */
+  frontSource?: Element
+  backSource?: Element
 }
 
 /** Where on the book a staged page lies: a page of the spread, or a phone's one leaf. */
@@ -146,8 +149,14 @@ function pictureOf(
   place: PagePlace,
   key: string | undefined,
   scale: number,
+  source?: Element,
 ): { picture: HTMLCanvasElement; frame: Frame; fresh: boolean } | null {
   const frame = snapFrame(frameOf(stage), scale)
+  if (source) {
+    // A sheet lying on the book: its own pixels, where it lies.
+    const paper = getComputedStyle(source).backgroundColor
+    return { picture: paintPage(source, frame, scale, paper, pixelDrift(source, scale)), frame, fresh: true }
+  }
   const ready = kept(key, frame)
   if (ready) return { picture: ready, frame, fresh: false }
   if (!stage.firstElementChild) return null
@@ -198,8 +207,8 @@ export function startPageTurn(root: HTMLElement, request: TurnRequest, onEnd: ()
 
   const frontPlace: PagePlace = request.single ? 'single' : request.hinge === 'right' ? 'verso' : 'recto'
   const backPlace: PagePlace = frontPlace === 'verso' ? 'recto' : 'verso'
-  const face = pictureOf(root, front, frontPlace, request.frontKey, scale)
-  const under = back ? pictureOf(root, back, backPlace, request.backKey, scale) : null
+  const face = pictureOf(root, front, frontPlace, request.frontKey, scale, request.frontSource)
+  const under = back ? pictureOf(root, back, backPlace, request.backKey, scale, request.backSource) : null
   if (!face || (back && !under)) return skip()
 
   const probe = document.createElement('i')

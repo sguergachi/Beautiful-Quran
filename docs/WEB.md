@@ -425,8 +425,8 @@ leaves of a turn while they are in the air (`setBookAir`), so a pile shrinks
 as its leaves lift and the other grows as they land. A turn carries a pile: `TurningLeaf` takes `wad` (share
 of the block; the thickness is share × `--book-block`) and `ms` (`turnMs`),
 and above `WAD_VISIBLE` the renderer sets the underside that far behind the
-face and draws the pile's fore-edge, head and foot. Sheet turns carry the
-whole pile on that side; page turns carry the leaves between the two pages.
+face and draws the pile's fore-edge, head and foot: a turn carries the
+leaves between the two pages it joins.
 `--book-right` is set and eased on `.book`
 (`BookSpread` reads the place), not on the app shell, where it restyled the
 whole app each frame. Wheel listeners that must not be passive are bound to
@@ -480,8 +480,12 @@ two-faced leaf (`TurningLeaf`) into `BookSpread`'s turn slot (`.mushaf-flip`,
   DOM: every word set by the canvas's own text shaping, in the element's
   font and colour, at the box layout measured for it, plus flat backgrounds
   (the paper cover of a waiting word), opacity, clipping, 2D transforms, the
-  English leaf's foot fade, and an inline SVG's line work (paths and basic
-  shapes, flat or linear-gradient paint: the title page's medallion). `TurningLeaf` stages the two pages where they
+  English leaf's foot fade, an inline SVG's line work (paths and basic
+  shapes, flat or linear-gradient paint), rounded and linear-gradient
+  backgrounds, placed `::before` / `::after` boxes, a text field's value or
+  prompt, and children raised by `z-index` after their siblings. Boxes off
+  the page are skipped. What scrolls is rounded from its own layout
+  position (a scrolled list stood a pixel low with the layer drift). `TurningLeaf` stages the two pages where they
   lie on the book, hidden (`.mushaf-flip-page`, `visibility: hidden`); they
   are laid out and never painted. The picture is rounded to device pixels
   exactly as Chromium rounds the page (`pixelDrift`, `Snap`), so nothing
@@ -517,18 +521,36 @@ a frame or two and the word being washed would stand still for them. The
 canvas is the whole window and is sized ahead of the turn: resized as a turn
 started, it came up empty for that frame and the page beneath showed through.
 
-**The book's place outlives the reader** (`bookRest`, `bookArrival` in
+**The book's place outlives the reader** (`bookRest` in
 `paper/bookSpread.ts`). `ReaderScreen` is keyed by chapter, so a reader is
 built anew for each one, and one with no memory of the book took it to be
 open at its own page already: choosing a chapter turned nothing and the
 piles jumped. `BookSpread` records the sheet the book rests on and the
-reader the page it settled on and the kept picture of its recto. A reader
-just built starts from there: off Chapters it turns the pile home (its face
-the leaf last read, or the title page, `BookTitlePage`, whose medallion
-`pagePicture` draws from its SVG), and from another page it starts on that
-spread and turns the leaves in between, measuring the hand of both spreads
-first. The pile waits for the new leaves' hand in the same frame, so nothing
-is shown at the wrong size.
+reader the spread it settled on; a reader just built starts on that spread
+and turns the leaves between it and its own page, measuring the hand of both
+spreads first.
+
+**Chapters is the first spread** (`CHAPTERS_PLACE`). On facing leaves the
+reader shows spread 1 while the stack is on Chapters or Bookmarks and keeps
+the place being read for the way back, so going to Chapters and choosing a
+chapter are ordinary far-page turns through the one queue, and
+`bookRightShare(page)` is the whole pile rule. The pile that lands on the
+left lands as Chapters and the pile that leaves it lifts with Chapters on
+its face: `TurningLeaf` takes `faceFrom` / `backFrom`, an element already
+lying on the book, and `pagePicture` draws the live Home sheet where it
+lies (its scrolled list, pinned search bar, rounded field, prompt, icons).
+The sheet itself is hidden while a leaf is in the air (`data-air` on the
+shell, set by `BookSpread` from `useBookAir`), so it is never seen under a
+pile that has not landed. Nothing turns under a sheet laid over the leaves
+(Settings, the word viewer). Before a chapter is chosen `BookSpread` shows
+`MushafStartLeaf`, page 1, opposite Chapters; a word on it opens its
+chapter there.
+
+**Settings is a loose sheet on the spread** (styles.css,
+`settings-sheet-in` / `-out`): the same `.sheet` element, laid over the
+right-hand page a grid step inside it, coming down from above the window
+like the word viewer's sheet. `data-laid` marks that it has been on the
+page, so it is only drawn back off a page it was laid on.
 
 It replaced eighteen flat strips of DOM hinged in CSS 3D (each a composited
 layer holding a slice of the page): on an RTX 3080 that ran 12–26 frames in
@@ -541,11 +563,7 @@ it adds, and WebGL 2 runs everywhere the app does.
 Page models and verse-tail positions are shared across copies. The whole
 airborne subtree is inert and hidden from assistive technology. A sideways two-finger sweep on a
 trackpad turns one leaf (`wheelTurn.ts`; one sweep is one turn, momentum
-included). On facing leaves Chapters is the book's left-most page and
-Settings its right-most (Settings moves to the recto there): each is
-uncovered beneath the leaf on its side — the verso leaf lifts for Chapters,
-the recto leaf for Settings (`bookTurnDirection`) — and the same leaf is
-laid back down on the way out. From Chapters, the sweep that turns a leaf
+included). From Chapters, the sweep that turns a leaf
 back (finger or two-finger trackpad sweep moving left) closes the book
 (`closesBook`): `EntranceCover` remounts with `returning`, runs its opening
 hinge in reverse fully inked, and waits to be opened by hand (tap, Enter,
