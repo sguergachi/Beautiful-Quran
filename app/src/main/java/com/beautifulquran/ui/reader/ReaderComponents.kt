@@ -1203,15 +1203,16 @@ internal class InkMotion(
         get() = if (glintIsRepeat) repeatFeather else sweepFeather
 
     /**
-     * Wet-ink glint layer strength. Full while Active + glinting, extinguished
-     * by tarjīʿ at pulse troughs — the glimmer itself turns on and off with
-     * the voice. Idle / handoff: full sheen, no tell.
+     * Wet-ink layer strength. Accepted pulses keep tint coverage at troughs
+     * so darker ink can cover the bright base glyphs. Idle retains ordinary sheen.
      */
     val glintLayerAlpha: Float
         get() = glintAlpha.value * glintCarryAlpha(
             replacedByRepeat = glintReplacedByRepeat,
             repeatProgress = repeatProgress,
-        ) * (if (isActive) tarji.value.layerMult else 1f)
+        ) * (if (isActive) com.beautifulquran.ui.theme.glintContrastAlpha(
+            tarji.value.layerMult, tarji.value.inkStrength,
+        ) else 1f)
 
     /** 0..1 crest of the tarjīʿ pulse — boosts tint/halo colour at peaks. */
     val glintPeak: Float
@@ -1219,11 +1220,13 @@ internal class InkMotion(
 
     /** Live crest hue, read by both paint adapters inside their draw scopes. */
     fun glintColor(base: Color): Color =
-        com.beautifulquran.ui.theme.glintPulseColor(base, if (isActive) tarji.value.whiteMix else 0f)
+        com.beautifulquran.ui.theme.glintPulseColor(base, if (isActive) tarji.value.whiteMix else 0f,
+            inkStrength = if (isActive) tarji.value.inkStrength else 0f)
 
     /** Tint alpha: always-on wet strength, lifted further on tarjīʿ peaks. */
     fun glintTintColorAlpha(base: Float): Float =
-        InkEngine.glintColorAlpha(base, glintPeak)
+        com.beautifulquran.ui.theme.glintContrastAlpha(InkEngine.glintColorAlpha(base, glintPeak),
+            if (isActive) tarji.value.inkStrength else 0f)
 
     /** Halo alpha: same peak lift as the tint. */
     fun glintGlowColorAlpha(base: Float): Float =

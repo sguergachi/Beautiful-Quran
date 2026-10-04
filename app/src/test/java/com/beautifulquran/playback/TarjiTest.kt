@@ -6,7 +6,10 @@ import com.beautifulquran.tarjilab.TarjiLabCodec
 import com.beautifulquran.ui.reader.InkEngine
 import com.beautifulquran.ui.theme.glintPulseColor
 import com.beautifulquran.ui.theme.GlintColorTransition
+import com.beautifulquran.ui.theme.glintContrastAlpha
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.compositeOver
+import androidx.compose.ui.graphics.luminance
 import kotlin.math.PI
 import kotlin.math.pow
 import kotlin.math.sin
@@ -67,6 +70,7 @@ class TarjiTest {
         // the pulse must survive every phase of that grid.
         val stream = Hani214.pcm()
         var brightestHue = 0f
+        val swings = mutableListOf<Float>()
         val peaks = (0 until 40).map { phase ->
             val dropped = phase * 9
             val detector = Tarji()
@@ -75,6 +79,7 @@ class TarjiTest {
             val gate = TarjiWordGate()
             val hue = GlintColorTransition()
             var peak = 0f
+            val luminances = mutableListOf<Float>()
             var hop = 0
             var offset = dropped
             while (offset + Hani214.HOP_SAMPLES <= stream.size) {
@@ -88,12 +93,21 @@ class TarjiTest {
                     peak = maxOf(peak, detector.syncTremoloGain)
                 }
                 val pulse = InkEngine.glintResonance(allowed, detector.syncTremolo,
-                    detector.syncTremoloGain, depth = 1f, enabled = true)
-                brightestHue = maxOf(brightestHue, hue.next(pulse.huePeak, Hani214.knobs.glintBrightness,
-                    (hop * Hani214.HOP_MS * 1_000_000).toLong()))
+                    detector.syncTremoloGain, depth = 1f, enabled = true, brightness = Hani214.knobs.glintBrightness)
+                val white = hue.next(pulse.huePeak, Hani214.knobs.glintBrightness,
+                    (hop * Hani214.HOP_MS * 1_000_000).toLong())
+                brightestHue = maxOf(brightestHue, white)
+                if (allowed && detector.syncTremoloGain >= 0.15f) {
+                    val tint = glintContrastAlpha(InkEngine.glintColorAlpha(
+                        InkEngine.Tuning().glintTintAlpha, pulse.peak, Hani214.knobs.glintBrightness), pulse.inkStrength)
+                    val coverage = glintContrastAlpha(pulse.layerMult, pulse.inkStrength) * tint
+                    luminances += glintPulseColor(Color(0xFFF8E9BE), white, inkStrength = pulse.inkStrength)
+                        .copy(alpha = coverage).compositeOver(Color(0xFFE8E2D5)).luminance()
+                }
                 offset += Hani214.HOP_SAMPLES
                 hop++
             }
+            swings += if (luminances.isEmpty()) 0f else luminances.max() - luminances.min()
             peak
         }
         assertTrue("every hop phase must light the word ($peaks)", peaks.all { it > 0.15f })
@@ -101,6 +115,8 @@ class TarjiTest {
             peaks.count { it >= 0.3f } >= 32)
         assertTrue("the admitted crest must reach white through the reader's hue transition ($brightestHue)",
             brightestHue >= 0.99f)
+        assertTrue("the painted ink must have a large peak-valley swing on nearly every phase ($swings)",
+            swings.count { it >= 0.45f } >= 32)
     }
 
     @Test
