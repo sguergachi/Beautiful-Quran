@@ -148,6 +148,32 @@ class TarjiLabCodecTest {
     }
 
     @Test
+    fun `sample carries the detector lead-in and older samples import without one`() {
+        val audio = captureOf(note(0.4f))
+        val capture = audio.sliceWithLeadIn(8 until audio.hopCount, maxLeadInHops = 5)
+        val sample = TarjiLabCodec.buildSample(
+            capture = capture, firstHopMediaMs = 160.0, label = "test", reciterId = 7,
+            reciterName = "Hani", surahId = 2, ayah = 14, wordPosition = 16, wordArabic = "",
+            knobs = TarjiLabKnobs(),
+        )
+        val restored = TarjiLabCodec.toCapture(TarjiLabCodec.decode(TarjiLabCodec.encode(sample)))
+        assertEquals(5, restored.leadInHopCount)
+        assertEquals(capture.hopCount, restored.hopCount)
+        for (i in capture.leadInPcm.indices) {
+            assertEquals(capture.leadInPcm[i], restored.leadInPcm[i], 1.5f / 32767f)
+        }
+
+        val legacyFields = Json.parseToJsonElement(TarjiLabCodec.encode(sample)).jsonObject.toMutableMap()
+        legacyFields.remove("leadInPcmB64")
+        val legacy = TarjiLabCodec.toCapture(TarjiLabCodec.decode(JsonObject(legacyFields).toString()))
+        assertEquals(0, legacy.leadInHopCount)
+        assertEquals(capture.hopCount, legacy.hopCount)
+
+        val partial = java.util.Base64.getEncoder().encodeToString(ByteArray(321))
+        assertTrue(runCatching { TarjiLabCodec.toCapture(sample.copy(leadInPcmB64 = partial)) }.isFailure)
+    }
+
+    @Test
     fun `import rejects partial hops and invalid clocks before playback`() {
         val valid = TarjiLabSample(
             label = "test", reciterId = 7, reciterName = "Alafasy", surahId = 1,

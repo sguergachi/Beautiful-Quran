@@ -14,6 +14,13 @@ import com.beautifulquran.data.model.Segment
  * (see [TarjiLabTrim]) and offsetting linearly from there; the analysis is
  * hop-domain and does not need them at all.
  *
+ * [leadInPcm] is what the tap heard immediately *before* hop 0 — whole
+ * hops, contiguous with [pcm]. It is never shown, looped or timed; it only
+ * warms the detector so the word is analyzed in the state continuous
+ * playback delivers it in (a hold carried in from the previous word, the
+ * adaptive floor, a false start already retired). Without it the lab starts
+ * a fresh detector mid-note and can accept a pulse the reader never paints.
+ *
  * Pure data: produced by the audio thread, consumed (and re-analyzed) by
  * the lab — no Android dependencies.
  */
@@ -24,9 +31,15 @@ class TarjiLabCapture(
     val hopContentMs: FloatArray,
     /** Concatenated decimated hop chunks; size = [hopCount] × [hopSamples]. */
     val pcm: FloatArray,
+    /** Whole hops heard just before hop 0; analysis context only. */
+    val leadInPcm: FloatArray = FloatArray(0),
 ) {
     val hopCount: Int
         get() = hopContentMs.size
+
+    /** Whole context hops available ahead of hop 0. */
+    val leadInHopCount: Int
+        get() = if (hopSamples > 0) leadInPcm.size / hopSamples else 0
 
     /** The capture's total content duration (ms). */
     val totalContentMs: Float
@@ -57,6 +70,18 @@ class TarjiLabCapture(
         val slicedPcm = FloatArray(n * hopSamples)
         System.arraycopy(pcm, first * hopSamples, slicedPcm, 0, n * hopSamples)
         return TarjiLabCapture(sampleRate, hopSamples, slicedContent, slicedPcm)
+    }
+
+    /** [slice], keeping up to [maxLeadInHops] of the hops ahead of [range]
+     * as analysis context — the lab's word trim. */
+    fun sliceWithLeadIn(range: IntRange, maxLeadInHops: Int): TarjiLabCapture {
+        val sliced = slice(range)
+        val first = range.first.coerceIn(0, hopCount - 1)
+        val lead = minOf(first, maxLeadInHops.coerceAtLeast(0))
+        if (lead == 0) return sliced
+        val leadIn = FloatArray(lead * hopSamples)
+        System.arraycopy(pcm, (first - lead) * hopSamples, leadIn, 0, leadIn.size)
+        return TarjiLabCapture(sampleRate, hopSamples, sliced.hopContentMs, sliced.pcm, leadIn)
     }
 }
 

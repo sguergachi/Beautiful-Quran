@@ -81,6 +81,7 @@ import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.geometry.RoundRect
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.graphics.Paint
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.Shadow
@@ -1078,7 +1079,7 @@ internal fun rememberWaslProgress(
  * scrolls the sheet (see [wordUnitBehavior] / [shapedActiveWordInView]).
  * Shared with [ReaderScreen] so the focus engine's bottom guard matches. */
 internal val ActiveWordBottomMargin = 132.dp
-private val GlintLayerBleed = 14.dp
+private val GlintLayerBleed = 24.dp
 
 /** Measures a target as (top, bottom) in LazyColumn viewport pixels. */
 private typealias ViewportBoundsMeasure = () -> Pair<Float, Float>?
@@ -1202,27 +1203,42 @@ internal class InkMotion(
         get() = if (glintIsRepeat) repeatFeather else sweepFeather
 
     /**
-     * Wet-ink glint layer strength. Full while Active + glinting, extinguished
-     * by tarjīʿ at pulse troughs — the glimmer itself turns on and off with
-     * the voice. Idle / handoff: full sheen, no tell.
+     * Wet-ink layer strength. The tarjīʿ light never thins the layer — it
+     * moves the layer's colour and its halo — so the wash edge and the
+     * repeat carry are all that gate it.
      */
     val glintLayerAlpha: Float
         get() = glintAlpha.value * glintCarryAlpha(
             replacedByRepeat = glintReplacedByRepeat,
             repeatProgress = repeatProgress,
-        ) * (if (isActive) tarji.value.layerMult else 1f)
+        )
 
-    /** 0..1 crest of the tarjīʿ pulse — boosts tint/halo colour at peaks. */
-    val glintPeak: Float
-        get() = if (isActive) tarji.value.peak else 0f
+    /** Brightness of the word's light this frame: 1 at rest, a little over
+     * on a vocal crest, a little under in a trough. */
+    private val glintLevel: Float
+        get() {
+            if (!isActive) return 1f
+            val t = InkEngine.tuning
+            return com.beautifulquran.ui.theme.glintLightLevel(
+                tarji.value.glow, t.glintBrightness, t.tarjiLightRise, t.tarjiLightFall)
+        }
 
-    /** Tint alpha: always-on wet strength, lifted further on tarjīʿ peaks. */
-    fun glintTintColorAlpha(base: Float): Float =
-        InkEngine.glintColorAlpha(base, glintPeak)
+    /** Live lit colour, read by both paint adapters inside their draw scopes. */
+    fun glintColor(base: Color): Color =
+        com.beautifulquran.ui.theme.glintLightColor(base, glintLevel)
 
-    /** Halo alpha: same peak lift as the tint. */
+    /** The veil's colour: the same light, warmed toward its edge. */
+    fun glintVeilColor(base: Color): Color =
+        com.beautifulquran.ui.theme.glintVeilColor(glintColor(base), InkEngine.tuning.glintVeilWarmth)
+
+    /** Tint alpha: the wet strength. The light changes its brightness, not its cover. */
+    fun glintTintColorAlpha(base: Float): Float = InkEngine.glintRestAlpha(base)
+
+    /** A glow layer's alpha: where the eye reads brightness, so it swings
+     * further than the glyphs do. */
     fun glintGlowColorAlpha(base: Float): Float =
-        InkEngine.glintColorAlpha(base, glintPeak)
+        com.beautifulquran.ui.theme.glintGlowAlpha(
+            InkEngine.glintRestAlpha(base), glintLevel, InkEngine.tuning.tarjiGlowGain)
 
     /** Whether the orange repeat overlay still has any ink to show. */
     val showRepeatLayer: Boolean get() = repeatAlpha > 0f
@@ -1257,14 +1273,17 @@ private fun Modifier.layeredBaseInk(motion: InkMotion, rtl: Boolean): Modifier =
 
 /** Draw-phase alpha gate for a glyph layer, padded by [GlintLayerBleed] so the
  * halo's blur is not clipped at the layer edge. */
-private fun Modifier.bleedAlphaLayer(alpha: () -> Float): Modifier = drawWithContent {
+private fun Modifier.bleedAlphaLayer(alpha: () -> Float, color: () -> Color): Modifier = drawWithContent {
     val a = alpha()
     if (a <= 0f) return@drawWithContent
     val bleed = GlintLayerBleed.toPx()
     drawIntoCanvas { canvas ->
         canvas.saveLayer(
             Rect(-bleed, -bleed, size.width + bleed, size.height + bleed),
-            Paint().apply { this.alpha = a },
+            Paint().apply {
+                this.alpha = a
+                colorFilter = ColorFilter.tint(color())
+            },
         )
     }
     drawContent()
@@ -1272,21 +1291,33 @@ private fun Modifier.bleedAlphaLayer(alpha: () -> Float): Modifier = drawWithCon
 }
 
 /** Layered-word adapter for the glint tint riding the word's live wash. */
-private fun Modifier.layeredGlintInk(motion: InkMotion, rtl: Boolean): Modifier =
-    bleedAlphaLayer { motion.glintLayerAlpha }.letterFadeIn(
+private fun Modifier.layeredGlintInk(motion: InkMotion, rtl: Boolean, color: Color, tintBase: Float): Modifier =
+    bleedAlphaLayer(
+        alpha = { motion.glintLayerAlpha * motion.glintTintColorAlpha(tintBase) },
+        color = { motion.glintColor(color) },
+    ).letterFadeIn(
         progress = { motion.glintProgress },
         rtl = rtl,
         restingAlpha = 0f,
         feather = motion.glintFeather ?: InkEngine.tuning.washFeather,
     )
 
-/** Layered-word adapter for the tight glyph halo. */
-private fun Modifier.layeredGlintHalo(motion: InkMotion, rtl: Boolean): Modifier =
+/** Layered-word adapter for one layer of the glyph glow. */
+private fun Modifier.layeredGlintHalo(
+    motion: InkMotion,
+    rtl: Boolean,
+    color: Color,
+    strength: () -> Float = { InkEngine.tuning.glintGlowAlpha },
+    veil: Boolean = false,
+): Modifier =
     // Same directional wash as the tint: the halo forms *during* the bloom on
     // the revealed letters, not as a whole-word fade that only peels fully at
     // progress 1 (that made mid-wash glimmer invisible). Tarjīʿ still gates
     // strength via [glintLayerAlpha].
-    bleedAlphaLayer { motion.glintLayerAlpha }.letterFadeIn(
+    bleedAlphaLayer(
+        alpha = { motion.glintLayerAlpha * motion.glintGlowColorAlpha(strength()) },
+        color = { if (veil) motion.glintVeilColor(color) else motion.glintColor(color) },
+    ).letterFadeIn(
         progress = { motion.glintProgress },
         rtl = rtl,
         restingAlpha = 0f,
@@ -1295,9 +1326,11 @@ private fun Modifier.layeredGlintHalo(motion: InkMotion, rtl: Boolean): Modifier
 
 /**
  * Per-frame tarjīʿ draw state for one word. Idle when the word is not Active
- * or not eligible; otherwise samples [VoiceEnergy] every vsync so the glint
- * path keeps pulsing after the wash park freezes its Animatable. Only the
- * Active eligible word runs the loop.
+ * or not eligible; otherwise reads [VoiceEnergy] at the ear's position every
+ * vsync — the frame's own clock, not the PCM tap's bursts — so each flare
+ * lands with the reverberation that caused it, and the glint path keeps
+ * pulsing after the wash park freezes its Animatable. Only the Active
+ * eligible word runs the loop.
  */
 @Composable
 private fun rememberTarjiGate(
@@ -1319,26 +1352,43 @@ private fun rememberTarjiGate(
             return@LaunchedEffect
         }
         val eventGate = TarjiWordGate()
+        val light = com.beautifulquran.ui.theme.GlintLight()
+        val ear = com.beautifulquran.playback.TarjiEarSample()
+        var lastReport = 0L
         while (true) {
-            withFrameNanos {
+            withFrameNanos { now ->
                 val voice = com.beautifulquran.playback.VoiceEnergy.active
-                val g = voice?.shimmerGain ?: 0f
-                frame.value = if (
+                val smoothMs = InkEngine.tuning.tarjiLightSmoothMs
+                voice?.sampleAtEar(now, ear, leadMs = smoothMs)
+                val g = if (voice == null) 0f else ear.gain
+                val pulse = if (
                     eventGate.allows(
                         gain = g,
-                        detected = voice?.reverberating == true,
-                        eventStartMs = voice?.eventStartMediaMs
-                            ?: com.beautifulquran.playback.VoiceEnergy.NO_EVENT_MS,
+                        detected = voice != null && ear.reverberating,
+                        eventStartMs = if (voice == null) {
+                            com.beautifulquran.playback.VoiceEnergy.NO_EVENT_MS
+                        } else {
+                            ear.eventStartMediaMs
+                        },
                         wordStartMs = wordStartMs,
                     )
                 ) {
                     InkEngine.glintResonance(
                         holding = true,
-                        tremolo = voice?.tremolo ?: 0f,
+                        tremolo = ear.tremolo,
                         tremoloGain = g,
                     )
                 } else {
                     InkEngine.GlintResonance.Idle
+                }
+                frame.value = pulse.copy(glow = light.next(pulse.light, now, smoothMs))
+                if (com.beautifulquran.DevProfiling.captureStart.get() != null && now - lastReport >= 100_000_000L) {
+                    lastReport = now
+                    com.beautifulquran.DevProfiling.mark(
+                        "tarji word=$wordStartMs event=${ear.eventStartMediaMs} live=${voice?.isLive} " +
+                            "detected=${ear.reverberating} gain=$g peak=${pulse.peak} " +
+                            "light=${pulse.light} glow=${frame.value.glow}",
+                    )
                 }
             }
         }
@@ -1383,7 +1433,10 @@ internal fun rememberInkMotions(
         val glinting = glintInk != null && InkEngine.glinting(ink.state, wetInk)
         val glintIdentity = rememberGlintIdentity(glinting, ink.repeat)
         // Tarjīʿ only runs its vsync sampler on the Active strong-hold word.
-        val tarjiEligible = glinting && entryPacing?.hasStrongHold == true
+        val strongHold = remember(isActive, words[index].arabic, index == words.lastIndex) {
+            isActive && InkEngine.tarjiEligible(words[index].arabic, index == words.lastIndex)
+        }
+        val tarjiEligible = glinting && strongHold
         val sweep = rememberLetterSweep(
             active = isActive,
             finishResidual = ink.state == InkEngine.State.Recited,
@@ -1519,23 +1572,43 @@ private fun HighlightLayeredText(
     val searchHitActive = !motion.showRepeatLayer && searchHitWash != null
     val orangeWash = motion.repeatWash.takeIf { motion.showRepeatLayer }
     Box(modifier) {
-        // A restrained glyph-shaped halo sits behind the ink—no radial field.
+        // The glow is a light's falloff, glyph-shaped at every width — no
+        // radial field: a wide faint veil, the halo, and a tight bloom.
         if (glintInk != null && motion.showGlintLayer) {
+            val halo = InkEngine.tuning.glintGlowRadius
+            if (InkEngine.tuning.glintVeilAlpha > 0f) {
+                InkOverlayText(
+                    text = text,
+                    style = style.copy(
+                        shadow = Shadow(color = glimmerInk, blurRadius = halo * InkEngine.GLINT_VEIL_RADIUS),
+                    ),
+                    color = glimmerInk.copy(alpha = 0.01f),
+                    modifier = Modifier.layeredGlintHalo(
+                        motion, rtl, glimmerInk, { InkEngine.tuning.glintVeilAlpha }, veil = true),
+                )
+            }
             InkOverlayText(
                 text = text,
                 style = style.copy(
                     shadow = Shadow(
-                        color = glimmerInk.copy(
-                            alpha = motion.glintGlowColorAlpha(
-                                InkEngine.tuning.glintGlowAlpha,
-                            ),
-                        ),
-                        blurRadius = InkEngine.tuning.glintGlowRadius,
+                        color = glimmerInk,
+                        blurRadius = halo,
                     ),
                 ),
                 color = glimmerInk.copy(alpha = 0.01f),
-                modifier = Modifier.layeredGlintHalo(motion, rtl),
+                modifier = Modifier.layeredGlintHalo(motion, rtl, glimmerInk),
             )
+            if (InkEngine.tuning.glintBloomAlpha > 0f) {
+                InkOverlayText(
+                    text = text,
+                    style = style.copy(
+                        shadow = Shadow(color = glimmerInk, blurRadius = halo * InkEngine.GLINT_BLOOM_RADIUS),
+                    ),
+                    color = glimmerInk.copy(alpha = 0.01f),
+                    modifier = Modifier.layeredGlintHalo(
+                        motion, rtl, glimmerInk, { InkEngine.tuning.glintBloomAlpha }),
+                )
+            }
         }
         Text(
             text = text,
@@ -1596,7 +1669,7 @@ private fun HighlightLayeredText(
                 modifier = Modifier.repeatInkLayer(orangeWash, rtl),
             )
         }
-        // First-pass words glimmer white-gold; repeats glimmer terracotta.
+        // Base hue stays latched; accepted crests lift either hue toward white.
         if (glintInk != null && motion.showGlintLayer) {
             val tintBase = if (motion.glintIsRepeat) {
                 InkEngine.tuning.repeatInkAlpha
@@ -1606,10 +1679,8 @@ private fun HighlightLayeredText(
             InkOverlayText(
                 text = text,
                 style = style,
-                color = glimmerInk.copy(
-                    alpha = motion.glintTintColorAlpha(tintBase),
-                ),
-                modifier = Modifier.layeredGlintInk(motion, rtl),
+                color = glimmerInk,
+                modifier = Modifier.layeredGlintInk(motion, rtl, glimmerInk, tintBase),
             )
         }
     }
@@ -1807,11 +1878,11 @@ private fun MutableList<ShapedWordBloom>.addShapedInkMotionBlooms(
                 ShapedWordBloom.ColorReveal(
                     range = range,
                     progress = motion.glintProgress,
-                    color = if (motion.glintIsRepeat) {
+                    color = motion.glintColor(if (motion.glintIsRepeat) {
                         palette.repeatInkColor
                     } else {
                         glintInk
-                    },
+                    }),
                     restingAlpha = 0f,
                     layerAlpha = motion.glintLayerAlpha,
                     colorAlpha = motion.glintTintColorAlpha(tintBase),
@@ -1819,6 +1890,13 @@ private fun MutableList<ShapedWordBloom>.addShapedInkMotionBlooms(
                         InkEngine.tuning.glintGlowAlpha,
                     ),
                     glowRadius = InkEngine.tuning.glintGlowRadius,
+                    bloomAlpha = motion.glintGlowColorAlpha(InkEngine.tuning.glintBloomAlpha),
+                    veilAlpha = motion.glintGlowColorAlpha(InkEngine.tuning.glintVeilAlpha),
+                    veilColor = motion.glintVeilColor(if (motion.glintIsRepeat) {
+                        palette.repeatInkColor
+                    } else {
+                        glintInk
+                    }),
                     feather = motion.glintFeather,
                 ),
             )

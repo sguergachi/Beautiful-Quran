@@ -1,6 +1,15 @@
 package com.beautifulquran.playback
 
 import com.beautifulquran.ui.reader.TarjiWordGate
+import com.beautifulquran.tarjilab.HANI_TUNING
+import com.beautifulquran.tarjilab.TarjiLabCodec
+import com.beautifulquran.ui.reader.InkEngine
+import com.beautifulquran.ui.theme.GlintLight
+import com.beautifulquran.ui.theme.glintLightColor
+import com.beautifulquran.ui.theme.glintLightLevel
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.compositeOver
+import androidx.compose.ui.graphics.luminance
 import kotlin.math.PI
 import kotlin.math.pow
 import kotlin.math.sin
@@ -16,6 +25,135 @@ import org.junit.Test
  * fed in 20 ms hops exactly as [VoiceEnergy] decimates them.
  */
 class TarjiTest {
+
+    @Test
+    fun `supplied Hani tuning reaches a bright crest through the live word gate`() {
+        val sample = TarjiLabCodec.decode(javaClass.getResourceAsStream("/tarji/hani_1_7_w9_tuned.json")!!
+            .bufferedReader().use { it.readText() })
+        assertEquals(sample.knobs, HANI_TUNING)
+        val capture = TarjiLabCodec.toCapture(sample)
+        val detector = Tarji()
+        detector.hopSamples = capture.hopSamples
+        HANI_TUNING.applyTo(detector)
+        val gate = TarjiWordGate()
+        var admitted = 0
+        var peak = 0f
+        for (hop in 0 until capture.hopCount) {
+            val offset = hop * capture.hopSamples
+            detector.onSamples8k(capture.pcm.copyOfRange(offset, offset + capture.hopSamples))
+            val mediaMs = (sample.firstHopMediaMs + (hop + 1) * sample.hopContentDurationMs).toLong()
+            if (mediaMs !in 7610L..12727L) continue
+            val eventMs = if (detector.syncEventStartHop < 0) VoiceEnergy.NO_EVENT_MS
+                else (sample.firstHopMediaMs + detector.syncEventStartHop * sample.hopContentDurationMs).toLong()
+            if (!gate.allows(detector.syncTremoloGain, detector.syncReverberating, eventMs, 7610L)) continue
+            admitted++
+            peak = maxOf(peak, InkEngine.glintResonance(
+                holding = true,
+                tremolo = detector.syncTremolo,
+                tremoloGain = detector.syncTremoloGain,
+                depth = 1f,
+                enabled = true,
+            ).peak)
+        }
+        assertTrue("Hani's final hold must pass the live gate", admitted >= 50)
+        assertTrue("the admitted pulse must have substantial gain ($peak)", peak > 0.6f)
+    }
+
+    @Test
+    fun `Hani two fourteen - a false start does not silence the waqf hold`() {
+        // Depth alone opens a five-hop event on the syllable attack of
+        // مُسْتَهْزِءُونَ. It used to spend the hold (and the reader's one
+        // event per word), leaving the waqf reverberation dark on the phone
+        // while the lab, starting cold 300 ms before the word, showed it.
+        // The reader never chooses where a tap session's 20 ms hops fall, so
+        // the pulse must survive every phase of that grid.
+        val stream = Hani214.pcm()
+        var brightest = 0f
+        val swings = mutableListOf<Float>()
+        val brightness = Hani214.knobs.glintBrightness
+        val peaks = (0 until 40).map { phase ->
+            val dropped = phase * 9
+            val detector = Tarji()
+            detector.hopSamples = Hani214.HOP_SAMPLES
+            Hani214.knobs.applyTo(detector)
+            // The reader's own path: the tap publishes each hop, and the
+            // frame loop reads the ear a sink buffer (250 ms) behind it.
+            val track = TarjiEarTrack()
+            val ear = TarjiEarSample()
+            val gate = TarjiWordGate()
+            val flame = GlintLight()
+            var peak = 0f
+            val luminances = mutableListOf<Float>()
+            val hops = (stream.size - dropped) / Hani214.HOP_SAMPLES
+            for (hop in 0 until hops + EAR_BEHIND_HOPS) {
+                if (hop < hops) {
+                    val offset = dropped + hop * Hani214.HOP_SAMPLES
+                    detector.onSamples8k(stream.copyOfRange(offset, offset + Hani214.HOP_SAMPLES))
+                    track.publish(
+                        hop = detector.hopCount - 1,
+                        hopRms = detector.lastHopRms,
+                        pitchHz = detector.lastFoldedPitchHz,
+                        pitchLeadHops = detector.lastPitchLeadHops,
+                        rateHz = detector.lastRateHz,
+                        usesAmplitude = detector.lastVisualUsesAmplitude,
+                        gain = detector.tremoloGain,
+                        eventStartHop = if (detector.reverberating) detector.eventStartHop else -1,
+                    )
+                }
+                val earHop = hop - EAR_BEHIND_HOPS
+                if (earHop < 0) continue
+                track.read((earHop + 1) * Hani214.HOP_MS, Hani214.HOP_MS, ear)
+                val eventMs = if (ear.eventStartHop < 0) VoiceEnergy.NO_EVENT_MS
+                    else Hani214.mediaMs(ear.eventStartHop - 1, dropped)
+                val allowed = Hani214.mediaMs(earHop, dropped) >= Hani214.FINAL_WORD_START_MS &&
+                    gate.allows(ear.gain, ear.reverberating, eventMs, Hani214.FINAL_WORD_START_MS)
+                if (allowed) peak = maxOf(peak, ear.gain)
+                val pulse = InkEngine.glintResonance(allowed, ear.tremolo, ear.gain, depth = 1f, enabled = true)
+                val glow = flame.next(pulse.light, (earHop * Hani214.HOP_MS * 1_000_000).toLong(), 60f)
+                val level = glintLightLevel(glow, brightness, 0.10f, 0.06f)
+                brightest = maxOf(brightest, level)
+                if (allowed && ear.gain >= 0.15f) {
+                    luminances += glintLightColor(Color(0xFFFFF0C7), level).luminance()
+                }
+            }
+            swings += if (luminances.isEmpty()) 0f else luminances.max() - luminances.min()
+            peak
+        }
+        assertTrue("every hop phase must light the word ($peaks)", peaks.all { it > 0.15f })
+        assertTrue("the pulse must be clearly visible on nearly every phase ($peaks)",
+            peaks.count { it >= 0.3f } >= 32)
+        assertTrue("an admitted crest must lift the light ($brightest)", brightest > 1.08f)
+        assertTrue("the light must visibly move on nearly every phase ($swings)",
+            swings.count { it >= 0.03f } >= 32)
+        assertTrue("and only ever a little ($swings)", swings.all { it <= 0.3f })
+    }
+
+    @Test
+    fun `an event depth alone opened stays dark until a coherent pulse confirms it`() {
+        val stream = Hani214.pcm()
+        val detector = Tarji()
+        detector.hopSamples = Hani214.HOP_SAMPLES
+        Hani214.knobs.applyTo(detector)
+        var falseStartHops = 0
+        var offset = 0
+        var hop = 0
+        while (offset + Hani214.HOP_SAMPLES <= stream.size) {
+            detector.onSamples8k(stream.copyOfRange(offset, offset + Hani214.HOP_SAMPLES))
+            // The attack blip: open by 18.3 s, gone by 18.5 s, never coherent.
+            if (Hani214.mediaMs(hop) in 18_250L..18_500L) {
+                if (detector.reverberating) falseStartHops++
+                assertEquals(0f, detector.tremoloGain, 1e-3f)
+            }
+            offset += Hani214.HOP_SAMPLES
+            hop++
+        }
+        assertTrue("the fixture must still contain the false start", falseStartHops >= 3)
+    }
+
+    private companion object {
+        /** A 250 ms sink buffer between the tap and the ear. */
+        const val EAR_BEHIND_HOPS = 12
+    }
 
     private fun wavResource(name: String): FloatArray {
         val wav = javaClass.getResourceAsStream("/tarji/$name")

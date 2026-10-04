@@ -1,6 +1,7 @@
 package com.beautifulquran.tarjilab
 
 import com.beautifulquran.playback.Tarji
+import com.beautifulquran.playback.TarjiEarPulse
 import com.beautifulquran.playback.TarjiLabCapture
 import com.beautifulquran.ui.reader.InkEngine
 import kotlin.math.atan2
@@ -52,9 +53,11 @@ data class TarjiLabKnobs(
             glintBrightness = t.glintBrightness,
         )
 
-        /** Restore an imported sample's knobs into the Ink Lab tuning. */
+        /** Apply the lab's full pulse and knobs to live playback, preserving the wash settings. */
         fun applyToTuning(knobs: TarjiLabKnobs, t: InkEngine.Tuning): InkEngine.Tuning =
             t.copy(
+                glintResonance = true,
+                glintResonanceDepth = InkEngine.GLINT_RESONANCE_DEPTH,
                 glintResonanceMaxHz = knobs.maxTremoloHz,
                 tarjiMinHz = knobs.minTremoloHz,
                 tarjiHoldMinMs = knobs.holdMinMs,
@@ -132,6 +135,9 @@ class TarjiLabTrace internal constructor(
  * reproduces the live path exactly (same ring, same hop clock); the delay
  * history is irrelevant offline, so [Tarji.delayHops] stays zero and the
  * reported values are the ones the shimmer would render at the tap.
+ *
+ * The capture's lead-in is fed first and discarded: the reader's detector
+ * never meets a word cold, so neither may the lab's.
  */
 fun analyzeTarjiCapture(
     capture: TarjiLabCapture,
@@ -159,15 +165,35 @@ fun analyzeTarjiCapture(
     val usesAmplitude = BooleanArray(n)
     val candidate = FloatArray(n)
     var resolved = -1
+    val leadHops = capture.leadInHopCount
+    // The voice the reader's pulse is drawn from (see [TarjiEarPulse]), kept
+    // for the lead-in too: it is the level behind the capture's first hops.
+    val voiceRms = FloatArray(leadHops + n)
+    val voicePitch = FloatArray(leadHops + n)
+    val voicePitchLead = FloatArray(leadHops + n)
+    val voiceRate = FloatArray(leadHops + n)
+    val voiceUsesAmplitude = BooleanArray(leadHops + n)
+    fun keepVoice(hop: Int) {
+        voiceRms[hop] = detector.lastHopRms
+        voicePitch[hop] = detector.lastFoldedPitchHz
+        voicePitchLead[hop] = detector.lastPitchLeadHops
+        voiceRate[hop] = detector.lastRateHz
+        voiceUsesAmplitude[hop] = detector.lastVisualUsesAmplitude
+    }
+    for (i in 0 until leadHops) {
+        System.arraycopy(capture.leadInPcm, i * capture.hopSamples, scratch, 0, capture.hopSamples)
+        detector.onSamples8k(scratch)
+        keepVoice(i)
+    }
     for (i in 0 until n) {
         System.arraycopy(capture.pcm, i * capture.hopSamples, scratch, 0, capture.hopSamples)
         detector.onSamples8k(scratch)
+        keepVoice(leadHops + i)
         // The detector resolves its first hop only once the 80 ms ring (four
         // hops) is full — the same warmup the live path has.
-        if (i < DETECTOR_FRAME_HOPS - 1) continue
+        if (leadHops + i < DETECTOR_FRAME_HOPS - 1) continue
         if (resolved < 0) resolved = i
-        env[i] = frameRms(capture.pcm, i, capture.hopSamples)
-        tremolo[i] = detector.tremolo
+        env[i] = frameRms(capture, i)
         gain[i] = detector.tremoloGain
         reverberating[i] = detector.reverberating
         rate[i] = detector.lastRateHz
@@ -183,6 +209,13 @@ fun analyzeTarjiCapture(
         candidate[i] = detector.lastCandidateModulation
     }
     if (resolved < 0) resolved = DETECTOR_FRAME_HOPS - 1
+    // The pulse the reader paints: the voice around each hop's own instant,
+    // not the detector's causal estimate of it.
+    val pulse = TarjiEarPulse.series(
+        voiceRms, voicePitch, voicePitchLead, voiceRate, voiceUsesAmplitude,
+        hopDur.toDouble(), from = leadHops,
+    )
+    for (i in resolved until n) tremolo[i] = pulse[i]
     return TarjiLabTrace(
         hopCount = n,
         hopDurationMs = hopDur,
@@ -215,11 +248,17 @@ fun tarjiAcceptedPulseWave(trace: TarjiLabTrace): List<Float> =
     List(trace.hopCount) { i -> (trace.tremolo[i] * trace.gain[i]).coerceIn(-1f, 1f) }
 
 /** RMS of the 80 ms frame ending at hop [hop] (hops [hop−3]..[hop]) — the
- * detector's own envelope window. */
-private fun frameRms(pcm: FloatArray, hop: Int, hopSamples: Int): Float {
+ * detector's own envelope window, reaching back into the lead-in for the
+ * capture's first three hops. */
+private fun frameRms(capture: TarjiLabCapture, hop: Int): Float {
+    val hopSamples = capture.hopSamples
+    val lead = capture.leadInPcm
     var sum = 0f
     val start = (hop - 3) * hopSamples
-    for (j in start until start + 4 * hopSamples) sum += pcm[j] * pcm[j]
+    for (j in start until start + 4 * hopSamples) {
+        val v = if (j >= 0) capture.pcm[j] else lead[lead.size + j]
+        sum += v * v
+    }
     return sqrt(sum / (4f * hopSamples))
 }
 

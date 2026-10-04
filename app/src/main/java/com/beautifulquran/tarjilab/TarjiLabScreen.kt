@@ -461,17 +461,23 @@ private fun PreviewWord(
             depth = InkEngine.GLINT_RESONANCE_DEPTH,
             enabled = true,
         )
+        // The reader's own light and paint, so the lab shows what it will.
+        val tuning = InkEngine.tuning
+        val light = remember { com.beautifulquran.ui.theme.GlintLight() }
+        val level = com.beautifulquran.ui.theme.glintLightLevel(
+            light.next(resonance.light, System.nanoTime(), tuning.tarjiLightSmoothMs),
+            ui.displayKnobs.glintBrightness, tuning.tarjiLightRise, tuning.tarjiLightFall)
+        val pulseColor = com.beautifulquran.ui.theme.glintLightColor(GlintGold, level)
         Canvas(Modifier.fillMaxSize()) {
-            val amount = (0.22f * resonance.layerMult + 0.9f * resonance.peak) *
-                ui.displayKnobs.glintBrightness.coerceIn(0f, 2f)
+            val amount = com.beautifulquran.ui.theme.glintGlowAlpha(0.3f, level, tuning.tarjiGlowGain)
             if (amount > 0.01f) {
                 drawCircle(
-                    color = GlintGold.copy(alpha = (amount * 0.55f).coerceIn(0f, 0.75f)),
+                    color = pulseColor.copy(alpha = (amount * 0.55f).coerceIn(0f, 0.75f)),
                     radius = size.minDimension * 0.42f,
                     center = center,
                 )
                 drawCircle(
-                    color = GlintGold.copy(alpha = (amount * 0.3f).coerceIn(0f, 0.45f)),
+                    color = pulseColor.copy(alpha = (amount * 0.3f).coerceIn(0f, 0.45f)),
                     radius = size.minDimension * 0.62f,
                     center = center,
                 )
@@ -481,7 +487,7 @@ private fun PreviewWord(
             text = ui.wordArabic,
             style = ArabicWordStyle,
             fontSize = fontSize,
-            color = GlintGold,
+            color = pulseColor,
         )
     }
 }
