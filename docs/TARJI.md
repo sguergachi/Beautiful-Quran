@@ -144,6 +144,15 @@ four visible states per second cannot express a 5–10 Hz vocal pulse.
     evidence end an established event; deep AM can bridge a brief irregular
     climax only after a genuine period has been acquired.
 
+    **False starts.** Depth alone may open an event, but the event is
+    *unconfirmed* — its gain held at zero — until a coherent pulse arrives.
+    An unconfirmed event that runs out those ten hops is retired, not ended:
+    the hold stays open, and its next acquisition must come with coherent
+    evidence. Before this, a five-hop blip on a syllable attack spent the
+    whole hold (and the reader's one event per word), so the waqf
+    reverberation that followed stayed dark — Hani 2:14 `مُسْتَهْزِءُونَ`,
+    on 31 of 40 hop phases. `TarjiTest` replays that stream on every phase.
+
     The level peak begins when tarjīʿ is first detected—not at the consonant
     attack—so Hani's room echo cannot make the sustain look like a dying tail.
     A sustained fall below 0.52 of that peak ends the event. If the same pulse

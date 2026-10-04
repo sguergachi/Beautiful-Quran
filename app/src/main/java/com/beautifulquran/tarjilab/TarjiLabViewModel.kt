@@ -263,7 +263,10 @@ class TarjiLabViewModel(
         player.setVolume(0f)
         player.setSpeed(1f)
         _ui.value = st.copy(capturing = true, captureProgress = 0f, captureError = null, note = null)
-        val deadline = SystemClock.elapsedRealtime() + CAPTURE_TIMEOUT_MS + (span.last - span.first)
+        // Start ahead of the span so the detector reaches the word in the
+        // state continuous playback delivers it in (see leadInPcm).
+        val captureStart = captureStartMs(span, CAPTURE_CONTEXT_MS, CAPTURE_LIMIT_MS)
+        val deadline = SystemClock.elapsedRealtime() + CAPTURE_TIMEOUT_MS + (span.last - captureStart)
         captureJob?.cancel()
         captureJob = viewModelScope.launch {
             // A cold Settings entry may not have created the PCM tap yet.
@@ -277,7 +280,7 @@ class TarjiLabViewModel(
             val ve = VoiceEnergy.active ?: return@launch
             captureProbe = ve
             ve.armCapture()
-            player.seekToWordAndPlay(st.ayah, span.first.coerceAtLeast(0L))
+            player.seekToWordAndPlay(st.ayah, captureStart)
             var seekLanded = false
             while (true) {
                 val active = ve.captureActive
@@ -293,7 +296,7 @@ class TarjiLabViewModel(
                     seekLanded = nowPlaying?.surahId == st.surahId &&
                         nowPlaying.ayah == st.ayah &&
                         nowPlaying.reciterId == st.reciter.id &&
-                        captureSeekHasLanded(positionMs, span.first.coerceAtLeast(0L))
+                        captureSeekHasLanded(positionMs, captureStart)
                     if (!seekLanded) {
                         if (SystemClock.elapsedRealtime() > deadline) {
                             finishCapture("Could not reach the word for muted capture.")
@@ -303,8 +306,8 @@ class TarjiLabViewModel(
                         continue
                     }
                 }
-                val progress = ((positionMs - span.first).toFloat() /
-                    (spanEnd - span.first).coerceAtLeast(1L))
+                val progress = ((positionMs - captureStart).toFloat() /
+                    (spanEnd - captureStart).coerceAtLeast(1L))
                     .coerceIn(0f, 1f)
                 _ui.value = _ui.value.copy(captureProgress = progress)
                 if (nowPlaying?.surahId != st.surahId || nowPlaying.ayah != st.ayah ||
@@ -389,7 +392,10 @@ class TarjiLabViewModel(
             _ui.value = st.copy(capturing = false, captureError = "Captured audio missed the word. Retry.")
             return
         }
-        val trimmed = capture.slice(range)
+        val trimmed = capture.sliceWithLeadIn(
+            range,
+            (CAPTURE_CONTEXT_MS / capture.hopContentDurationMs()).toInt(),
+        )
         val captureMs = trimmed.hopCount * trimmed.hopContentDurationMs()
         _ui.value = st.copy(
             capturing = false,
@@ -1031,6 +1037,12 @@ class TarjiLabViewModel(
     companion object {
         private const val CAPTURE_LEAD_MS = 300L
         private const val CAPTURE_TAIL_MS = 1_000L
+        /** Audio heard before the span, for the detector only: longer than
+         * its 1.3 s analysis window, so a hold carried in from the previous
+         * word arrives exactly as the reader's detector holds it. */
+        private const val CAPTURE_CONTEXT_MS = 2_000L
+        /** The tap records at most this much per capture (see VoiceEnergy). */
+        private const val CAPTURE_LIMIT_MS = 11_500L
         private const val CAPTURE_TIMEOUT_MS = 20_000L
         private const val POLL_MS = 40L
         private const val MAX_NOTES_LENGTH = 1_000
@@ -1039,6 +1051,18 @@ class TarjiLabViewModel(
         /** Static AudioTrack buffers above this are refused (dev-lab cap). */
         private const val MAX_STATIC_BYTES = 1_048_576
     }
+}
+
+/** Where a capture of [span] starts: as much detector context ahead of it
+ * as the recording limit leaves room for, never before the ayah's start. */
+internal fun captureStartMs(
+    span: LongRange,
+    contextMs: Long,
+    limitMs: Long,
+): Long {
+    val spanStart = span.first.coerceAtLeast(0L)
+    val room = (limitMs - (span.last - spanStart)).coerceIn(0L, contextMs)
+    return (spanStart - room).coerceAtLeast(0L)
 }
 
 /** Reject the stale pre-seek clock; the first poll after landing is close to

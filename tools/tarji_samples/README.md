@@ -53,6 +53,7 @@ You can also share the saved JSON directly from the phone’s Files app.
   "hopContentDurationMs": 20,  // true content ms per hop (44.1k → 20 ms)
   "firstHopMediaMs": 12345.6,  // media-clock position of the first hop
   "pcmB64": "...",             // decimated mono PCM, 16-bit LE, Base64
+  "leadInPcmB64": "...",       // hops heard just before pcm: detector context only
   "knobs": {                   // this reciter's detector knobs
     "maxTremoloHz": 10, "minTremoloHz": 1.5, "holdMinMs": 300,
     "minTremoloDepth": 0.035, "minPeriodicity": 0.4, "maxPitchDrift": 0.12,

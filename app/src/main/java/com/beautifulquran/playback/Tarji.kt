@@ -235,6 +235,12 @@ class Tarji {
     private var eventRateHz = 0f
     private var levelTransitionGrace = 0
 
+    // Depth-only acquisition stays dark until coherent evidence confirms it.
+    // Retiring an unseen false start leaves the hold open, but re-acquisition
+    // must be coherent so the same depth-only blip cannot start again.
+    private var eventConfirmed = false
+    private var awaitingCoherentPulse = false
+
     // Swell tracker: tarjīʿ is a *build* — the shimmer must arrive soft at
     // the start of the hold and reach full depth only as the swell
     // approaches the event's peak, never as a full-strength pulse from the
@@ -290,6 +296,8 @@ class Tarji {
         steadyGap = 0
         eventRateHz = 0f
         levelTransitionGrace = 0
+        eventConfirmed = false
+        awaitingCoherentPulse = false
         eventHops = 0
         clearModulationDiagnostics()
         trackedLag = 0
@@ -352,6 +360,8 @@ class Tarji {
                 steadyGap = 0
                 eventRateHz = 0f
                 levelTransitionGrace = 0
+                eventConfirmed = false
+                awaitingCoherentPulse = false
                 endOfHold = false
                 eventHops = 0
                 trackedLag = 0
@@ -386,7 +396,7 @@ class Tarji {
         // the voice dies toward the climax gate ([CLIMAX_FULL] → [CLIMAX_OFF]
         // of the event's peak), so the word's end reads as the effect drying,
         // never as a full-strength pulse past the climax.
-        val target = if (reverberating) {
+        val target = if (reverberating && eventConfirmed) {
             eventHops++
             val ramp = (eventHops.toFloat() / SWELL_RAMP_HOPS).coerceIn(0f, 1f)
             val level = if (eventPeak > 0f) climaxLevel / eventPeak else 1f
@@ -535,6 +545,7 @@ class Tarji {
             pulseUnder = 0
             eventRateHz = 0f
             levelTransitionGrace = 0
+            eventConfirmed = false
             eventHops = 0
         }
 
@@ -546,7 +557,8 @@ class Tarji {
         val next = if (reverberating) {
             longEnough && (amKeep || fmKeep) && !endOfHold
         } else {
-            longEnough && acquisitionOpen && !endOfHold
+            longEnough && acquisitionOpen && !endOfHold &&
+                (!awaitingCoherentPulse || lifecycleCoherent)
         }
         val rateRatio = if (eventRateHz > 0f && rateHz > 0f) {
             maxOf(eventRateHz / rateHz, rateHz / eventRateHz)
@@ -579,10 +591,23 @@ class Tarji {
             else -> 0
         }
         if (levelTransitionGrace > 0) levelTransitionGrace--
-        if (climaxOver || pulseUnder >= PULSE_GAP_PERSIST) {
+        if (eventPeak > 0f && lifecycleCoherent) eventConfirmed = true
+        val falseStart = eventPeak > 0f && !eventConfirmed && !climaxOver &&
+            pulseUnder >= PULSE_GAP_PERSIST
+        if (falseStart) {
+            // An unseen syllable-attack blip must not spend the later hold
+            // (Hani 2:14 مُسْتَهْزِءُونَ). Confirmed events still end below.
+            eventPeak = 0f
+            climaxUnder = 0
+            pulseUnder = 0
+            eventRateHz = 0f
+            levelTransitionGrace = 0
+            eventHops = 0
+            awaitingCoherentPulse = true
+        } else if (climaxOver || pulseUnder >= PULSE_GAP_PERSIST) {
             endOfHold = true
         }
-        reverberating = next && !endOfHold
+        reverberating = next && !endOfHold && !falseStart
         if (eventPeak == 0f && reverberating) {
             // A reverberant room can make the consonant attack much louder
             // than the sustained voice (Hani 1:7). The climax belongs to the
@@ -591,6 +616,8 @@ class Tarji {
             eventRateHz = rateHz
             climaxUnder = 0
             eventHops = 0
+            eventConfirmed = lifecycleCoherent
+            awaitingCoherentPulse = false
         }
 
         // The long track decides the event and its slow baseline, but the

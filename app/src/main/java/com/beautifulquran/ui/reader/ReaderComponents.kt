@@ -1356,7 +1356,7 @@ private fun rememberTarjiGate(
                 } else {
                     InkEngine.GlintResonance.Idle
                 }
-                frame.value = pulse.copy(whiteMix = hue.next(pulse.peak, InkEngine.tuning.glintBrightness, now))
+                frame.value = pulse.copy(whiteMix = hue.next(pulse.huePeak, InkEngine.tuning.glintBrightness, now))
                 if (com.beautifulquran.DevProfiling.captureStart.get() != null && now - lastReport >= 100_000_000L) {
                     lastReport = now
                     com.beautifulquran.DevProfiling.mark(

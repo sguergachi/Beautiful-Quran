@@ -5,6 +5,7 @@ import com.beautifulquran.tarjilab.HANI_TUNING
 import com.beautifulquran.tarjilab.TarjiLabCodec
 import com.beautifulquran.ui.reader.InkEngine
 import com.beautifulquran.ui.theme.glintPulseColor
+import com.beautifulquran.ui.theme.GlintColorTransition
 import androidx.compose.ui.graphics.Color
 import kotlin.math.PI
 import kotlin.math.pow
@@ -54,6 +55,74 @@ class TarjiTest {
         assertTrue("Hani's final hold must pass the live gate", admitted >= 50)
         assertTrue("the admitted pulse must have substantial gain ($peak)", peak > 0.6f)
         assertEquals(Color.White, glintPulseColor(Color(0xFFF8E9BE), peak, HANI_TUNING.glintBrightness))
+    }
+
+    @Test
+    fun `Hani two fourteen - a false start does not silence the waqf hold`() {
+        // Depth alone opens a five-hop event on the syllable attack of
+        // مُسْتَهْزِءُونَ. It used to spend the hold (and the reader's one
+        // event per word), leaving the waqf reverberation dark on the phone
+        // while the lab, starting cold 300 ms before the word, showed it.
+        // The reader never chooses where a tap session's 20 ms hops fall, so
+        // the pulse must survive every phase of that grid.
+        val stream = Hani214.pcm()
+        var brightestHue = 0f
+        val peaks = (0 until 40).map { phase ->
+            val dropped = phase * 9
+            val detector = Tarji()
+            detector.hopSamples = Hani214.HOP_SAMPLES
+            Hani214.knobs.applyTo(detector)
+            val gate = TarjiWordGate()
+            val hue = GlintColorTransition()
+            var peak = 0f
+            var hop = 0
+            var offset = dropped
+            while (offset + Hani214.HOP_SAMPLES <= stream.size) {
+                detector.onSamples8k(stream.copyOfRange(offset, offset + Hani214.HOP_SAMPLES))
+                val eventMs = if (detector.syncEventStartHop < 0) VoiceEnergy.NO_EVENT_MS
+                    else Hani214.mediaMs(detector.syncEventStartHop - 1, dropped)
+                val allowed = Hani214.mediaMs(hop, dropped) >= Hani214.FINAL_WORD_START_MS && gate.allows(
+                        detector.syncTremoloGain, detector.syncReverberating, eventMs,
+                        Hani214.FINAL_WORD_START_MS)
+                if (allowed) {
+                    peak = maxOf(peak, detector.syncTremoloGain)
+                }
+                val pulse = InkEngine.glintResonance(allowed, detector.syncTremolo,
+                    detector.syncTremoloGain, depth = 1f, enabled = true)
+                brightestHue = maxOf(brightestHue, hue.next(pulse.huePeak, Hani214.knobs.glintBrightness,
+                    (hop * Hani214.HOP_MS * 1_000_000).toLong()))
+                offset += Hani214.HOP_SAMPLES
+                hop++
+            }
+            peak
+        }
+        assertTrue("every hop phase must light the word ($peaks)", peaks.all { it > 0.15f })
+        assertTrue("the pulse must be clearly visible on nearly every phase ($peaks)",
+            peaks.count { it >= 0.3f } >= 32)
+        assertTrue("the admitted crest must reach white through the reader's hue transition ($brightestHue)",
+            brightestHue >= 0.99f)
+    }
+
+    @Test
+    fun `an event depth alone opened stays dark until a coherent pulse confirms it`() {
+        val stream = Hani214.pcm()
+        val detector = Tarji()
+        detector.hopSamples = Hani214.HOP_SAMPLES
+        Hani214.knobs.applyTo(detector)
+        var falseStartHops = 0
+        var offset = 0
+        var hop = 0
+        while (offset + Hani214.HOP_SAMPLES <= stream.size) {
+            detector.onSamples8k(stream.copyOfRange(offset, offset + Hani214.HOP_SAMPLES))
+            // The attack blip: open by 18.3 s, gone by 18.5 s, never coherent.
+            if (Hani214.mediaMs(hop) in 18_250L..18_500L) {
+                if (detector.reverberating) falseStartHops++
+                assertEquals(0f, detector.tremoloGain, 1e-3f)
+            }
+            offset += Hani214.HOP_SAMPLES
+            hop++
+        }
+        assertTrue("the fixture must still contain the false start", falseStartHops >= 3)
     }
 
     private fun wavResource(name: String): FloatArray {

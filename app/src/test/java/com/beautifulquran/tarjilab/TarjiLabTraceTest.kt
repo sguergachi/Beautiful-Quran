@@ -1,6 +1,7 @@
 package com.beautifulquran.tarjilab
 
 import com.beautifulquran.data.model.Segment
+import com.beautifulquran.playback.Hani214
 import com.beautifulquran.playback.Tarji
 import com.beautifulquran.playback.TarjiLabCapture
 import com.beautifulquran.playback.TarjiLabTrim
@@ -279,6 +280,60 @@ class TarjiLabTraceTest {
         assertEquals(166, sliced.hopCount)
         assertEquals(0f, sliced.hopContentMs[0])
         assertEquals(3300f, sliced.hopContentMs[165])
+    }
+
+    @Test
+    fun `the lead-in makes the lab hear a word as continuous playback does`() {
+        val pcm = Hani214.pcm()
+        val hop = Hani214.HOP_SAMPLES
+        val hops = pcm.size / hop
+        val stream = TarjiLabCapture(
+            sampleRate = Tarji.SAMPLE_RATE,
+            hopSamples = hop,
+            hopContentMs = FloatArray(hops) { (it * Hani214.HOP_MS).toFloat() },
+            pcm = pcm.copyOf(hops * hop),
+        )
+        // The lab's span for the final word: 300 ms ahead of its first mark.
+        val first = ((Hani214.FINAL_WORD_START_MS - 300 - Hani214.START_MS) / Hani214.HOP_MS).toInt()
+        val clip = stream.sliceWithLeadIn(first until hops, maxLeadInHops = 100)
+        assertEquals(100, clip.leadInHopCount)
+        assertEquals(hops - first, clip.hopCount)
+
+        val reader = analyzeTarjiCapture(stream, Hani214.knobs)
+        val lab = analyzeTarjiCapture(clip, Hani214.knobs)
+        assertEquals("a warmed detector resolves the clip's first hop", 0, lab.firstAnalysisHop)
+        assertTrue(lab.envRms[0] > 0f)
+        for (i in 0 until clip.hopCount) {
+            assertEquals("hop $i", reader.reverberating[first + i], lab.reverberating[i])
+            assertEquals("hop $i", reader.gain[first + i], lab.gain[i], 0.01f)
+            assertEquals("hop $i", reader.holdMs[first + i], lab.holdMs[i], 0f)
+        }
+        assertTrue(lab.reverberating.any { it })
+
+        // A cold start meets the note mid-flight: the word's hold is shorter
+        // than the one the reader's detector carries, so its gates differ.
+        val cold = analyzeTarjiCapture(stream.slice(first until hops), Hani214.knobs)
+        assertFalse(cold.holdMs.contentEquals(lab.holdMs))
+    }
+
+    @Test
+    fun `lead-in is bounded by what was captured ahead of the span`() {
+        val capture = captureOf(FloatArray(8_000)) // 50 hops
+        assertEquals(10, capture.sliceWithLeadIn(10..20, maxLeadInHops = 100).leadInHopCount)
+        assertEquals(4, capture.sliceWithLeadIn(10..20, maxLeadInHops = 4).leadInHopCount)
+        val none = capture.sliceWithLeadIn(0..20, maxLeadInHops = 100)
+        assertEquals(0, none.leadInHopCount)
+        assertEquals(21, none.hopCount)
+    }
+
+    @Test
+    fun `capture starts ahead of the span within the recording limit`() {
+        assertEquals(15_030L, captureStartMs(17_030L..20_100L, contextMs = 2_000L, limitMs = 11_500L))
+        assertEquals(0L, captureStartMs(500L..3_000L, contextMs = 2_000L, limitMs = 11_500L))
+        assertEquals(0L, captureStartMs(-300L..3_000L, contextMs = 2_000L, limitMs = 11_500L))
+        // A long word leaves less room; one past the limit gets no context.
+        assertEquals(18_500L, captureStartMs(20_000L..30_000L, contextMs = 2_000L, limitMs = 11_500L))
+        assertEquals(20_000L, captureStartMs(20_000L..32_000L, contextMs = 2_000L, limitMs = 11_500L))
     }
 
     @Test

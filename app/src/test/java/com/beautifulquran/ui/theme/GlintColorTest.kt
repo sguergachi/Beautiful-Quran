@@ -11,6 +11,19 @@ class GlintColorTest {
     private val repeat = Color(0xFFE06A18)
 
     @Test
+    fun `a soft accepted crest can reach white while its gain still controls strength`() {
+        val pulse = InkEngine.glintResonance(true, 1f, 0.2f, depth = 1f, enabled = true)
+        assertEquals(0.2f, pulse.peak, 0.0001f)
+        assertEquals(1f, pulse.huePeak, 0.0001f)
+        val hue = GlintColorTransition()
+        hue.next(pulse.huePeak, 2f, 0L)
+        assertEquals(Color.White, glintPulseColor(gold, hue.next(pulse.huePeak, 2f, 120_000_000L)))
+        assertEquals(0f, InkEngine.glintResonance(false, 1f, 0.2f).huePeak, 0f)
+        assertEquals(0f, InkEngine.glintResonance(true, 1f, 0f).huePeak, 0f)
+        assertEquals(0f, InkEngine.glintResonance(true, -1f, 0.2f).huePeak, 0f)
+    }
+
+    @Test
     fun `a stepped crest travels through colour before reaching white`() {
         val hue = GlintColorTransition()
         assertEquals(0f, hue.next(0.67f, 2f, 0L), 0f)

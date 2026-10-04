@@ -592,6 +592,8 @@ object InkEngine {
         val layerMult: Float = 1f,
         /** Smoothed paint hue; the measured crest and vocal alpha remain unchanged. */
         val whiteMix: Float = 0f,
+        /** Accepted crest before the gain envelope; hue can reach white during a soft pulse. */
+        val huePeak: Float = peak,
     ) {
         companion object {
             val Idle = GlintResonance(peak = 0f)
@@ -631,7 +633,7 @@ object InkEngine {
         val d = depth.coerceIn(0f, 1f)
         val floor = troughFloor.coerceIn(0f, 1f)
         val mult = 1f - g * d * (1f - on) * (1f - floor)
-        return GlintResonance(peak = g * crest * d, layerMult = mult)
+        return GlintResonance(peak = g * crest * d, layerMult = mult, huePeak = crest * d)
     }
 
     /** Scale tint and halo together, preserving the measured pulse and its troughs. */

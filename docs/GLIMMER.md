@@ -127,6 +127,9 @@ sample the hue at draw time; the lab preview uses the same crest-to-colour map.
 Hue travel is limited to one full gold-to-white transition per 120 ms in both
 previews and live playback. This softens changes between audio hops; the vocal
 alpha, wash edge, and detector timing remain on their original clocks.
+Hue follows the accepted positive crest before the gain envelope. That
+envelope controls pulse strength and opacity; it must not prevent an accepted
+soft crest from reaching white (Hani 2:14).
 
 When a phone differs from a simulator, Developer → Record performance profile
 includes `tarji tap` samples (PCM hops, live gain, sink/ear delay, enabled/depth/
