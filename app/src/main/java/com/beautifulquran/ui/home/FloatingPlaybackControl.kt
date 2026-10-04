@@ -125,7 +125,7 @@ fun FloatingPlaybackControl(
                     Box(Modifier.fillMaxWidth()) {
                         if (inkLabOpen) {
                             InkLabPanel(
-                                modifier = Modifier.padding(start = 48.dp, end = 44.dp),
+                                modifier = Modifier.padding(start = 40.dp, end = 44.dp),
                             )
                         } else {
                             ReciterNameButton(

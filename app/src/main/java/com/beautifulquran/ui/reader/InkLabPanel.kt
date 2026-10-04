@@ -100,12 +100,6 @@ fun InkLabPanel(
                 verticalAlignment = Alignment.CenterVertically,
                 modifier = Modifier.fillMaxWidth(),
             ) {
-                Text(
-                    text = "Ink Lab",
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.primary,
-                )
-                Spacer(Modifier.width(8.dp))
                 InkLabTabs(
                     selected = tab,
                     onSelect = { tab = it },
@@ -115,7 +109,7 @@ fun InkLabPanel(
             Spacer(Modifier.height(2.dp))
             Column(
                 modifier = Modifier
-                    .heightIn(max = 96.dp)
+                    .heightIn(max = 136.dp)
                     .verticalScroll(rememberScrollState(), reverseScrolling = false),
             ) {
                 val t = InkEngine.tuning

@@ -124,7 +124,7 @@ fun PlayerBar(
                     InkLabPanel(
                         modifier = Modifier
                             .align(Alignment.Center)
-                            .padding(start = if (inkLabAvailable) 48.dp else 0.dp, end = edgePad),
+                            .padding(start = if (inkLabAvailable) 40.dp else 0.dp, end = edgePad),
                     )
                 } else {
                     val centeredInset = maxOf(edgePad, if (inkLabAvailable) 48.dp else 0.dp)
