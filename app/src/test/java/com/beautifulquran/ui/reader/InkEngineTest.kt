@@ -689,19 +689,17 @@ class InkEngineTest {
         val mid = at(0f)
         val down = at(-1f)
         assertEquals(1f, up.peak, 1e-4f)
-        assertEquals(1f, up.light, 1e-4f) // vocal crest: a full flare
-        val rest = -InkEngine.GLINT_RESONANCE_REST
+        assertEquals(1f, up.light, 1e-4f) // vocal crest: the light lifts
         assertEquals(0f, mid.peak, 1e-4f)
-        assertEquals(rest, mid.light, 1e-4f) // mean level: candle-light
+        assertEquals(0f, mid.light, 1e-4f) // mean level: the ordinary sheen
         assertEquals(0f, down.peak, 1e-4f)
-        assertEquals(-1f, down.light, 1e-4f) // vocal trough: an ember
-        // Each half is narrowed into its own beat around that rest, and the
-        // light only ever climbs with the voice.
-        assertTrue(at(0.75f).light > 0.75f)
-        assertTrue(at(0.25f).light in rest..rest + 0.25f)
-        assertTrue(at(-0.25f).light in rest - 0.1f..rest)
-        val sweep = (-10..10).map { at(it / 10f).light }
-        assertTrue(sweep.zipWithNext().all { (a, b) -> a < b })
+        assertEquals(-1f, down.light, 1e-4f) // vocal trough: it lowers
+        // The light follows the voice's own curve — odd, monotonic, and with
+        // no flat spot or step that would sharpen a swell into a beat.
+        assertEquals(-at(0.6f).light, at(-0.6f).light, 1e-5f)
+        val sweep = (-15..15).map { at(it / 10f).light }
+        assertTrue(sweep.zipWithNext().all { (a, b) -> a <= b })
+        assertTrue(sweep.zipWithNext().all { (a, b) -> b - a < 0.15f })
         // Depth scales the whole swing.
         assertEquals(0.4f, at(1f, depth = 0.4f).peak, 1e-4f)
         assertEquals(0.4f, at(1f, depth = 0.4f).light, 1e-4f)
@@ -710,13 +708,11 @@ class InkEngineTest {
         // the voice's well before its one-second swell completes.
         assertEquals(0.5f, at(1f, gain = 0.5f).peak, 1e-4f)
         assertEquals(1f, at(1f, gain = 0.5f).light, 1e-4f)
-        assertEquals(-1f, at(-1f, gain = 0.5f).light, 1e-4f)
         assertEquals(0.4f, at(1f, gain = 0.1f).light, 1e-4f)
-        assertEquals(0.4f * rest, at(0f, gain = 0.1f).light, 1e-4f)
-        // Out-of-range detector values cannot overdrive it.
+        // An over-range crest eases into the top instead of flattening.
         assertEquals(1f, at(1.5f).light, 1e-4f)
         assertEquals(-1f, at(-1.5f).light, 1e-4f)
-        // The mapping alone never animates: the frame loop owns the flame.
+        // The mapping alone never animates: the frame loop owns the light.
         assertEquals(0f, up.glow, 0f)
     }
 

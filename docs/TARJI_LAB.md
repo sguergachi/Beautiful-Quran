@@ -5,9 +5,8 @@ word, change this reciter's detector parameters, and hear and see the result.
 The word and scope always show the detector's measured output. There is no
 manual envelope or synthesized pulse. Glint brightness scales the visual effect
 without changing the measured pulse or detector acceptance.
-The preview word runs the reader's own flame: it settles to candle-light when
-a pulse is accepted, flares to white on each crest and sinks to an ember in
-each trough. The pulse it and the graph show is the reader's
+The preview word runs the reader's own light: a little brighter on each
+crest, slightly dimmer in each trough, hue unchanged. The pulse it and the graph show is the reader's
 (`TarjiEarPulse`), not the detector's causal estimate.
 
 ## Workflow

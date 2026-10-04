@@ -1,152 +1,136 @@
 package com.beautifulquran.ui.theme
 
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.compositeOver
 import androidx.compose.ui.graphics.luminance
 import com.beautifulquran.ui.reader.InkEngine
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import kotlin.math.PI
+import kotlin.math.abs
 import kotlin.math.sin
 
 class GlintColorTest {
-    private val gold = Color(0xFFF8E9BE)
-    private val repeat = Color(0xFFE06A18)
+    private val gold = Color(0xFFFFF0C7)
+    private val repeat = Color(0xFFFF8948)
+    private val shipped = InkEngine.Tuning()
 
-    /** The reader's frame loop for a pure [hz] reverberation at [gain]. */
-    private fun glows(hz: Int, fps: Int, gain: Float, seconds: Float = 1f): List<Float> {
-        val flame = GlintFlame()
-        return (0..(fps * seconds).toInt()).map { frame ->
-            val pulse = InkEngine.glintResonance(true, sin(2 * PI * hz * frame / fps).toFloat(),
-                gain, depth = 1f, enabled = true)
-            flame.next(pulse.light, frame * 1_000_000_000L / fps)
-        }
+    private fun level(glow: Float, brightness: Float = 1f) =
+        glintLightLevel(glow, brightness, shipped.tarjiLightRise, shipped.tarjiLightFall)
+
+    /** Chromaticity in linear light: what "the hue never changes" means. */
+    private fun chroma(c: Color): Pair<Float, Float> {
+        val l = c.convert(androidx.compose.ui.graphics.colorspace.ColorSpaces.LinearSrgb)
+        val sum = l.red + l.green + l.blue
+        return l.red / sum to l.green / sum
     }
 
     @Test
-    fun `a word the voice is not moving keeps its ordinary sheen`() {
+    fun `a word the voice is not moving keeps its ordinary light`() {
+        assertEquals(1f, level(0f), 0f)
+        assertEquals(1f, level(InkEngine.GlintResonance.Idle.glow), 0f)
+        assertEquals(1f, level(1f, brightness = 0f), 0f)
+        for (base in listOf(gold, repeat)) assertEquals(base, glintLightColor(base, 1f))
+        assertEquals(0.6f, glintGlowAlpha(0.6f, 1f, shipped.tarjiGlowGain), 0f)
+    }
+
+    @Test
+    fun `the light lifts a little with the voice and dips less`() {
+        assertEquals(1.10f, level(1f), 1e-4f)
+        assertEquals(0.94f, level(-1f), 1e-4f)
+        assertTrue(shipped.tarjiLightFall < shipped.tarjiLightRise)
+        // The eye catches well under 1 % at these rates; a tenth is plenty,
+        // and the whole swing stays a small part of the page's range.
+        val swing = glintLightColor(gold, level(1f)).luminance() - glintLightColor(gold, level(-1f)).luminance()
+        assertTrue("swing $swing", swing in 0.05f..0.2f)
+        // The per-reciter brightness scales the swing and nothing else.
+        assertEquals(1.20f, level(1f, brightness = 2f), 1e-4f)
+        assertEquals(1.05f, level(0.5f), 1e-4f)
+    }
+
+    @Test
+    fun `brightness changes and the hue does not`() {
         for (base in listOf(gold, repeat)) {
-            assertEquals(base, glintPulseColor(base, InkEngine.GlintResonance.Idle.light))
-            assertEquals(base, glintPulseColor(base, InkEngine.glintResonance(false, 1f, 1f).light))
-            assertEquals(0.4f, glintLitAlpha(0.4f, 0f), 0f)
-            assertEquals(0.78f, glintHaloAlpha(0.78f, 0f), 0f)
-        }
-    }
-
-    @Test
-    fun `an accepted hold lowers its light a little so its flares have room to rise`() {
-        val rest = InkEngine.glintResonance(true, 0f, 1f, depth = 1f).light
-        assertEquals(-InkEngine.GLINT_RESONANCE_REST, rest, 1e-4f)
-        val candle = glintPulseColor(gold, rest).luminance()
-        // Gold to white alone is a swing the eye does not catch.
-        assertTrue(Color.White.luminance() - gold.luminance() < 0.2f)
-        // Enough to notice the word answer the voice, never enough to pull
-        // the eye off the verse: the whole swing stays in the page's top half.
-        assertTrue("resting light $candle", candle in 0.68f..0.8f)
-        assertTrue(glintEmber(gold).luminance() in 0.5f..candle)
-        // It eases down with the detector's swell rather than stepping.
-        val entering = (1..5).map { InkEngine.glintResonance(true, 0f, it * 0.05f, depth = 1f).light }
-        assertEquals(listOf(-0.05f, -0.1f, -0.15f, -0.2f, -0.25f), entering.map { Math.round(it * 100) / 100f })
-    }
-
-    @Test
-    fun `a crest flares to white and a trough sinks to a warm ember`() {
-        for (base in listOf(gold, repeat)) {
-            val lights = listOf(-1f, -0.5f, 0f, 0.5f, 1f).map {
-                InkEngine.glintResonance(true, it, 1f, depth = 1f).light
+            val rest = chroma(base)
+            // Dimming is exact; brightening holds until a channel is full.
+            for (l in listOf(0.84f, 0.92f, 0.97f)) {
+                val c = chroma(glintLightColor(base, l))
+                assertEquals(rest.first, c.first, 2e-3f)
+                assertEquals(rest.second, c.second, 2e-3f)
             }
-            assertEquals(-1f, lights.first(), 1e-4f)
-            assertEquals(1f, lights.last(), 1e-4f)
-            val colours = lights.map { glintPulseColor(base, it) }
-            assertEquals(glintEmber(base), colours[0])
-            assertEquals(Color.White, colours[4])
-            assertTrue(colours.zipWithNext().all { (a, b) -> a.luminance() < b.luminance() })
-            // An ember is a little dimmer and redder, never grey or dark.
-            val ember = glintEmber(base)
-            assertTrue(ember.luminance() in base.luminance() * 0.6f..base.luminance() * 0.8f)
-            assertTrue(ember.blue / ember.red < base.blue / base.red)
+            val levels = listOf(0.84f, 0.92f, 1f, 1.07f, 1.14f, 1.28f).map { glintLightColor(base, it).luminance() }
+            assertTrue(levels.zipWithNext().all { (a, b) -> a < b })
+            assertTrue(glintLightColor(base, 1.28f).alpha == base.alpha)
         }
     }
 
     @Test
-    fun `the flame is the voice's a quarter of the way into the detector's swell`() {
-        assertEquals(0f, InkEngine.glintResonance(true, 1f, 0f).light, 0f)
-        assertEquals(0.4f, InkEngine.glintResonance(true, 1f, 0.1f, depth = 1f).light, 1e-4f)
-        assertEquals(1f, InkEngine.glintResonance(true, 1f, 0.25f, depth = 1f).light, 1e-4f)
-        assertEquals(-1f, InkEngine.glintResonance(true, -1f, 0.6f, depth = 1f).light, 1e-4f)
-        assertEquals(0.5f, InkEngine.glintResonance(true, 1f, 1f, depth = 0.5f).light, 1e-4f)
-        assertEquals(0f, InkEngine.glintResonance(false, 1f, 1f).light, 0f)
-        assertEquals(0f, InkEngine.glintResonance(true, 1f, 1f, enabled = false).light, 0f)
+    fun `the glow swings further than the glyphs`() {
+        val up = glintGlowAlpha(0.6f, level(1f), shipped.tarjiGlowGain)
+        val down = glintGlowAlpha(0.6f, level(-1f), shipped.tarjiGlowGain)
+        assertEquals(0.6f * 1.2f, up, 1e-4f)
+        assertEquals(0.6f * 0.88f, down, 1e-4f)
+        // It can run out of headroom but never past it, and never below dark.
+        assertEquals(1f, glintGlowAlpha(0.9f, 1.28f, 6f), 0f)
+        assertEquals(0f, glintGlowAlpha(0.5f, 0.5f, 6f), 0f)
+        assertEquals(0f, glintGlowAlpha(0f, 1.28f, 6f), 0f)
     }
 
     @Test
-    fun `the flame catches a rising pulse promptly and cools on the way down`() {
-        val flame = GlintFlame()
-        assertEquals(0f, flame.next(0f, 0L), 0f)
-        // One 60 Hz frame takes rest to a full flare; a 120 Hz frame, half.
-        assertEquals(1f, flame.next(1f, 16_666_667L), 1e-4f)
-        val fast = GlintFlame().also { it.next(0f, 0L) }
-        assertEquals(0.5556f, fast.next(1f, 8_333_333L), 1e-3f)
-        // Falling, it cools: still plainly lit after a frame, gone after a few.
-        val cooling = flame.next(0f, 33_333_333L)
-        assertTrue("one frame after the crest: $cooling", cooling in 0.6f..0.8f)
-        var late = cooling
-        for (i in 3..14) late = flame.next(0f, i * 16_666_667L)
-        assertTrue("after 230 ms: $late", late < 0.05f)
-        // And it sinks the same way.
-        val sinking = GlintFlame().also { it.next(0f, 0L) }
-        assertTrue(sinking.next(-1f, 16_666_667L) in -0.4f..-0.2f)
+    fun `the veil is the same light, warmed`() {
+        assertEquals(gold, glintVeilColor(gold, 0f))
+        val warm = glintVeilColor(gold, 0.5f)
+        assertTrue(warm.blue < gold.blue && warm.red == gold.red)
     }
 
     @Test
-    fun `the flame travels the same at either display refresh rate`() {
-        fun cooled(fps: Int): Float {
-            val flame = GlintFlame().also { it.next(0f, 0L); it.next(1f, 50_000_000L) }
-            return (1..fps / 10).map { flame.next(0f, 50_000_000L + it * 1_000_000_000L / fps) }.last()
-        }
-        assertEquals(cooled(60), cooled(120), 1e-3f)
+    fun `the light moves as a smooth swell, the same up as down`() {
+        val light = GlintLight()
+        assertEquals(0f, light.next(0f, 0L, 60f), 0f)
+        // A step is never taken in one frame…
+        val first = light.next(1f, 16_666_667L, 60f)
+        assertTrue("first frame $first", first in 0.2f..0.3f)
+        // …and coming back down retraces it.
+        var up = first
+        for (i in 2..30) up = light.next(1f, i * 16_666_667L, 60f)
+        assertEquals(1f, up, 1e-3f)
+        val back = light.next(0f, 31 * 16_666_667L, 60f)
+        assertEquals(1f - first, back, 1e-3f)
+        // No smoothing passes the voice straight through.
+        assertEquals(-0.4f, GlintLight().also { it.next(0f, 0L, 0f) }.next(-0.4f, 8_000_000L, 0f), 0f)
     }
 
     @Test
-    fun `pulses stay visible on the night page without ever going dark`() {
-        val night = Color(0xFFE8E2D5) // the bright ink the tint must cover
+    fun `no frame-to-frame step is abrupt at either refresh rate`() {
         for (fps in listOf(60, 120)) for (hz in listOf(4, 6, 10)) {
-            val lit = glows(hz, fps, gain = 0.25f).drop(fps / 4).map { glow ->
-                val tint = glintLitAlpha(InkEngine.Tuning().glintTintAlpha, glow)
-                glintPulseColor(gold, glow).copy(alpha = tint).compositeOver(night).luminance()
-            }
-            assertTrue("$hz Hz at $fps fps needs a bright flare (${lit.max()})", lit.max() > 0.93f)
-            assertTrue("$hz Hz at $fps fps must dip, gently (${lit.min()})", lit.min() in 0.5f..0.8f)
+            val light = GlintLight()
+            val lit = (0..fps).map { frame ->
+                val pulse = InkEngine.glintResonance(true, sin(2 * PI * hz * frame / fps).toFloat(),
+                    0.5f, depth = 1f, enabled = true)
+                glintLightColor(gold, level(light.next(pulse.light, frame * 1_000_000_000L / fps, 60f))).luminance()
+            }.drop(fps / 4)
+            val step = lit.zipWithNext().maxOf { (a, b) -> abs(a - b) }
+            assertTrue("$hz Hz at $fps fps steps $step a frame", step < 0.03f)
+            assertTrue("$hz Hz at $fps fps still moves", lit.max() - lit.min() > 0.02f)
         }
     }
 
     @Test
-    fun `the halo swings harder than the glyphs`() {
-        assertEquals(1f, glintHaloAlpha(0.78f, 1f), 0f)
-        assertEquals(0.39f, glintHaloAlpha(0.78f, -1f), 1e-4f)
-        assertEquals(1f, glintLitAlpha(0.88f, 1f), 0f)
-        assertEquals(1f, glintLitAlpha(0.88f, -1f), 0f)
-    }
-
-    @Test
-    fun `brightness scales the pulse's reach and never where it rests`() {
-        for (base in listOf(gold, repeat)) {
-            assertEquals(Color.White, glintPulseColor(base, 0.5f, brightness = 2f))
-            assertEquals(glintEmber(base), glintPulseColor(base, -0.5f, brightness = 2f))
-            assertEquals(base, glintPulseColor(base, 0f, brightness = 2f))
-            assertEquals(base, glintPulseColor(base, 1f, brightness = 0f))
-            assertEquals(base, glintPulseColor(base, -1f, brightness = 0f))
+    fun `the same swell at either refresh rate`() {
+        fun at(fps: Int): Float {
+            val light = GlintLight().also { it.next(0f, 0L, 60f) }
+            return (1..fps / 10).map { light.next(1f, it * 1_000_000_000L / fps, 60f) }.last()
         }
-        assertEquals(0.4f, glintLitAlpha(0.4f, 1f, brightness = 0f), 0f)
-        assertEquals(0.4f, glintHaloAlpha(0.4f, -1f, brightness = 0f), 0f)
+        assertEquals(at(60), at(120), 1e-3f)
     }
 
     @Test
     fun `a rejected hold and a fading one never pop`() {
-        assertEquals(gold, glintPulseColor(gold, InkEngine.glintResonance(false, 1f, 1f).light))
-        assertEquals(gold, glintPulseColor(gold, InkEngine.glintResonance(true, 1f, 0f).light))
-        val fading = glintPulseColor(gold, InkEngine.glintResonance(true, 1f, 0.05f, depth = 1f).light)
-        assertTrue(fading.blue > gold.blue && fading.blue < 1f)
+        assertEquals(0f, InkEngine.glintResonance(false, 1f, 1f).light, 0f)
+        assertEquals(0f, InkEngine.glintResonance(true, 1f, 0f).light, 0f)
+        assertTrue(InkEngine.glintResonance(true, 1f, 0.05f, depth = 1f).light in 0.1f..0.3f)
+        assertEquals(0f, InkEngine.glintRestAlpha(0.88f, 0f), 0f)
+        assertEquals(0.88f, InkEngine.glintRestAlpha(0.88f, 2f), 0f)
+        assertEquals(0.44f, InkEngine.glintRestAlpha(0.88f, 0.5f), 0f)
     }
 }

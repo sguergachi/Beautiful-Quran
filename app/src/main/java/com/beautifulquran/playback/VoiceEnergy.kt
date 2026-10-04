@@ -104,7 +104,7 @@ class VoiceEnergy {
      * clock), written into [out]. Main thread. False — and an idle [out] —
      * while nothing is playing or no hop has been analyzed.
      */
-    fun sampleAtEar(wallNanos: Long, out: TarjiEarSample): Boolean {
+    fun sampleAtEar(wallNanos: Long, out: TarjiEarSample, leadMs: Float = 0f): Boolean {
         out.clear()
         val hopMs = hopContentDurationMs
         if (!isLive) return false
@@ -122,7 +122,8 @@ class VoiceEnergy {
         }
         // The frame is shown a vsync after it is read; lead by that much so
         // the crest lands with the sound.
-        if (!earTrack.read(earContentMs + DISPLAY_LEAD_MS, hopMs, out)) return false
+        // [leadMs] more cancels the lag of whatever smooths the light next.
+        if (!earTrack.read(earContentMs + DISPLAY_LEAD_MS + leadMs.coerceAtLeast(0f), hopMs, out)) return false
         if (out.eventStartHop >= 0 && anchored) {
             out.eventStartMediaMs =
                 (earClock.mediaMsOfContent(out.eventStartHop * hopMs) + beyondHeadMs).roundToLong()

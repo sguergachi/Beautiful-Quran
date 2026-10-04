@@ -461,14 +461,15 @@ private fun PreviewWord(
             depth = InkEngine.GLINT_RESONANCE_DEPTH,
             enabled = true,
         )
-        // The reader's own flame and paint, so the lab shows what it will.
-        val brightness = ui.displayKnobs.glintBrightness
-        val flame = remember { com.beautifulquran.ui.theme.GlintFlame() }
-        val lit = flame.next(resonance.light, System.nanoTime())
-        val pulseColor = com.beautifulquran.ui.theme.glintPulseColor(GlintGold, lit, brightness)
+        // The reader's own light and paint, so the lab shows what it will.
+        val tuning = InkEngine.tuning
+        val light = remember { com.beautifulquran.ui.theme.GlintLight() }
+        val level = com.beautifulquran.ui.theme.glintLightLevel(
+            light.next(resonance.light, System.nanoTime(), tuning.tarjiLightSmoothMs),
+            ui.displayKnobs.glintBrightness, tuning.tarjiLightRise, tuning.tarjiLightFall)
+        val pulseColor = com.beautifulquran.ui.theme.glintLightColor(GlintGold, level)
         Canvas(Modifier.fillMaxSize()) {
-            val amount = com.beautifulquran.ui.theme.glintHaloAlpha(0.22f, lit, brightness) *
-                brightness.coerceIn(0f, 2f)
+            val amount = com.beautifulquran.ui.theme.glintGlowAlpha(0.3f, level, tuning.tarjiGlowGain)
             if (amount > 0.01f) {
                 drawCircle(
                     color = pulseColor.copy(alpha = (amount * 0.55f).coerceIn(0f, 0.75f)),

@@ -231,6 +231,12 @@ sealed class ShapedWordBloom {
         /** Subtle blurred glyph-outline halo used by Nightfall's glimmer. */
         val glowAlpha: Float = 0f,
         val glowRadius: Float = 3.5f,
+        /** The rest of a light's falloff around the halo: a tight bloom and a
+         * wide faint veil ([veilColor], else [color]), at fixed multiples of
+         * [glowRadius]. Zero leaves the single halo. */
+        val bloomAlpha: Float = 0f,
+        val veilAlpha: Float = 0f,
+        val veilColor: Color = Color.Unspecified,
         /** How much of the word the directional mask may reveal. */
         val revealFraction: Float = 1f,
     ) : ShapedWordBloom() {
@@ -548,7 +554,8 @@ fun Modifier.shapedWordBloom(
                     if (bounds.isEmpty || bounds.width <= 0f) return@forEach
                     val colorBleed = maxOf(
                         bleed,
-                        bloom.glowRadius.dp.toPx() * 3f,
+                        bloom.glowRadius.dp.toPx() * 3f *
+                            (if (bloom.veilAlpha > 0f) GLOW_VEIL_RADIUS else 1f),
                     )
                     drawIntoCanvas { canvas ->
                         canvas.saveLayer(
@@ -564,34 +571,48 @@ fun Modifier.shapedWordBloom(
                     // Glow rides the same DstIn directional wash as the tint —
                     // do not also multiply by smootherstep(p): that whole-word
                     // gate kept the halo invisible until the bloom finished.
-                    val glowAlpha = bloom.layerAlpha.coerceIn(0f, 1f) *
-                        bloom.glowAlpha.coerceIn(0f, 1f)
-                    if (glowAlpha > 0f) {
+                    // Widest first, so each tighter layer lights the one under it.
+                    for (layer in 0..2) {
+                        val strength = when (layer) {
+                            0 -> bloom.veilAlpha
+                            1 -> bloom.glowAlpha
+                            else -> bloom.bloomAlpha
+                        }
+                        val glowAlpha = bloom.layerAlpha.coerceIn(0f, 1f) * strength.coerceIn(0f, 1f)
+                        if (glowAlpha <= 0f) continue
+                        val scale = when (layer) {
+                            0 -> GLOW_VEIL_RADIUS
+                            1 -> 1f
+                            else -> GLOW_BLOOM_RADIUS
+                        }
                         val halo = glyphHaloCache.haloFor(
                             textLayout = textLayout,
                             start = start,
                             endExclusive = endExclusive,
-                            radiusPx = bloom.glowRadius.dp.toPx(),
+                            radiusPx = bloom.glowRadius.dp.toPx() * scale,
                             // Same fence as the tint: where the node holds one
                             // word, the selection path is not its silhouette.
                             clipPath = shaped?.path?.takeIf { clipped },
                             overhangPx = bleed,
                             ink = ink,
-                        )
-                        if (halo != null) {
-                            val glowPaint = android.graphics.Paint(
-                                android.graphics.Paint.ANTI_ALIAS_FLAG,
-                            ).apply {
-                                color = bloom.color.copy(alpha = glowAlpha).toArgb()
-                            }
-                            drawIntoCanvas { canvas ->
-                                canvas.nativeCanvas.drawBitmap(
-                                    halo.bitmap,
-                                    halo.left,
-                                    halo.top,
-                                    glowPaint,
-                                )
-                            }
+                        ) ?: continue
+                        val glowColor = if (layer == 0 && bloom.veilColor != Color.Unspecified) {
+                            bloom.veilColor
+                        } else {
+                            bloom.color
+                        }
+                        val glowPaint = android.graphics.Paint(
+                            android.graphics.Paint.ANTI_ALIAS_FLAG,
+                        ).apply {
+                            color = glowColor.copy(alpha = glowAlpha).toArgb()
+                        }
+                        drawIntoCanvas { canvas ->
+                            canvas.nativeCanvas.drawBitmap(
+                                halo.bitmap,
+                                halo.left,
+                                halo.top,
+                                glowPaint,
+                            )
                         }
                     }
                     val tint = bloom.color.copy(
@@ -1202,6 +1223,10 @@ private class WashBrushCache(private val rtl: Boolean, private val stops: FloatA
  * once per word/radius instead; every animation frame then draws one tiny
  * cached bitmap with only its colour and lifecycle alpha changing.
  */
+/** Bloom and veil blur as multiples of a halo's: InkEngine.GLINT_*_RADIUS. */
+private const val GLOW_BLOOM_RADIUS = 0.35f
+private const val GLOW_VEIL_RADIUS = 2.4f
+
 private class GlyphHaloCache {
     private data class Key(
         val start: Int,
@@ -1217,9 +1242,10 @@ private class GlyphHaloCache {
     )
 
     private var layout: TextLayoutResult? = null
-    private val byRange = object : LinkedHashMap<Key, Halo>(8, 0.75f, true) {
+    // Three glow layers a word, for the word glinting and the few still fading.
+    private val byRange = object : LinkedHashMap<Key, Halo>(24, 0.75f, true) {
         override fun removeEldestEntry(eldest: MutableMap.MutableEntry<Key, Halo>?): Boolean =
-            size > 8
+            size > 24
     }
 
     /**

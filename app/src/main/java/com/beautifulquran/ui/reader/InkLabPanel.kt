@@ -5,6 +5,7 @@ import android.content.ClipboardManager
 import android.content.Context
 import android.util.Log
 import androidx.compose.foundation.background
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -70,6 +71,9 @@ private enum class InkLabTab(val label: String) {
     Sweep("Sweep"),
     Repeat("Repeat"),
     Tajweed("Tajweed"),
+    /** The tarjīʿ light: how the word's glow answers the voice. Detection
+     * itself stays on the Tajweed tab and in the Tarjīʿ Lab. */
+    Tarji("Tarjīʿ"),
     Guide("Guide"),
     /** Karaoke clock: word lead + output lag + ayah fade-lead — not wash feel. */
     Highlight("Sync"),
@@ -237,11 +241,10 @@ fun InkLabPanel(
                         }
                         LabCaption(
                             "Tarjīʿ (reverberation on a held note), detected " +
-                                "live on the tapped PCM, turns the wet-ink " +
-                                "glint on and off with the voice: troughs " +
-                                "extinguish it, crests brighten peaks. No " +
-                                "reverberation, no pulse: still wet gold. Off " +
-                                "keeps still wet gold.",
+                                "live on the tapped PCM, lifts and lowers the " +
+                                "word's light with the voice. No reverberation, " +
+                                "no pulse: still wet gold. The look is tuned on " +
+                                "the Tarjīʿ tab; these are the detector's gates.",
                         )
                         TarjiStatusLine()
                         TuningSlider(
@@ -252,9 +255,8 @@ fun InkLabPanel(
                             InkEngine.tuning = t.copy(glintResonanceDepth = it)
                         }
                         LabCaption(
-                            "How deeply tarjīʿ troughs extinguish the wet " +
-                                "sheen. 1 = full on/off with the voice; " +
-                                "0 = no pulse. " +
+                            "Scales the whole swing of the tarjīʿ light. " +
+                                "1 = full; 0 = no pulse. " +
                                 "Shipped ~${"%.2f".format(InkEngine.GLINT_RESONANCE_DEPTH)}.",
                         )
                         TuningSlider(
@@ -366,6 +368,66 @@ fun InkLabPanel(
                         )
                     }
 
+                    InkLabTab.Tarji -> {
+                        TuningToggle("Tarjīʿ light", t.glintResonance) {
+                            InkEngine.tuning = t.copy(glintResonance = it)
+                        }
+                        TarjiStatusLine()
+                        LabCaption(
+                            "The word's light answers the voice: brighter on " +
+                                "each reverberation, slightly dimmer between. " +
+                                "Brightness only — the hue never changes. Aim " +
+                                "for just enough to feel it.",
+                        )
+                        TuningSlider("Brighten on crest", t.tarjiLightRise, 0f..0.4f) {
+                            InkEngine.tuning = t.copy(tarjiLightRise = it)
+                        }
+                        TuningSlider("Dim in trough", t.tarjiLightFall, 0f..0.3f) {
+                            InkEngine.tuning = t.copy(tarjiLightFall = it)
+                        }
+                        LabCaption(
+                            "How far the light lifts and falls, as a fraction " +
+                                "of its resting brightness. Keep the dim under " +
+                                "the lift so it never seems to drop out.",
+                        )
+                        TuningSlider("Smoothness ms", t.tarjiLightSmoothMs, 0f..160f, integer = true) {
+                            InkEngine.tuning = t.copy(tarjiLightSmoothMs = it)
+                        }
+                        LabCaption(
+                            "Higher is a slower, softer swell. Its lag is read " +
+                                "ahead of the voice, so sync does not move.",
+                        )
+                        TuningSlider("Glow swing ×", t.tarjiGlowGain, 0f..6f) {
+                            InkEngine.tuning = t.copy(tarjiGlowGain = it)
+                        }
+                        LabCaption(
+                            "How much further the glow moves than the glyphs. " +
+                                "The glow is where the eye reads brightness.",
+                        )
+                        TuningSlider("Pulse depth", t.glintResonanceDepth, 0f..1f) {
+                            InkEngine.tuning = t.copy(glintResonanceDepth = it)
+                        }
+                        LabCaption("The glow itself, pulse or no pulse — widest to tightest:")
+                        TuningSlider("Veil strength", t.glintVeilAlpha, 0f..0.6f) {
+                            InkEngine.tuning = t.copy(glintVeilAlpha = it)
+                        }
+                        TuningSlider("Veil warmth", t.glintVeilWarmth, 0f..1f) {
+                            InkEngine.tuning = t.copy(glintVeilWarmth = it)
+                        }
+                        TuningSlider("Halo strength", t.glintGlowAlpha, 0f..1f) {
+                            InkEngine.tuning = t.copy(glintGlowAlpha = it)
+                        }
+                        TuningSlider("Halo blur", t.glintGlowRadius, 0f..10f) {
+                            InkEngine.tuning = t.copy(glintGlowRadius = it)
+                        }
+                        TuningSlider("Bloom strength", t.glintBloomAlpha, 0f..1f) {
+                            InkEngine.tuning = t.copy(glintBloomAlpha = it)
+                        }
+                        LabCaption(
+                            "Veil is ${InkEngine.GLINT_VEIL_RADIUS}× the halo's blur and faintly " +
+                                "warm; bloom is ${InkEngine.GLINT_BLOOM_RADIUS}× and hugs the letters.",
+                        )
+                    }
                     InkLabTab.Guide -> {
                         TuningSlider("Body edge", guide.bodyEdge, 0.2f..0.5f) {
                             InkEngine.contextualGuideTuning = guide.copy(bodyEdge = it)
@@ -559,6 +621,13 @@ internal fun formatTuningCopy(t: InkEngine.Tuning): String {
         appendLine("    glintGlowAlpha = ${f(t.glintGlowAlpha)},")
         appendLine("    glintGlowRadius = ${f(t.glintGlowRadius)},")
         appendLine("    glintBrightness = ${f(t.glintBrightness)},")
+        appendLine("    glintBloomAlpha = ${f(t.glintBloomAlpha)},")
+        appendLine("    glintVeilAlpha = ${f(t.glintVeilAlpha)},")
+        appendLine("    glintVeilWarmth = ${f(t.glintVeilWarmth)},")
+        appendLine("    tarjiLightRise = ${f(t.tarjiLightRise)},")
+        appendLine("    tarjiLightFall = ${f(t.tarjiLightFall)},")
+        appendLine("    tarjiLightSmoothMs = ${f(t.tarjiLightSmoothMs)},")
+        appendLine("    tarjiGlowGain = ${f(t.tarjiGlowGain)},")
         appendLine("    washFeather = ${f(t.washFeather)},")
         appendLine("    sweepEaseX1 = ${f(t.sweepEaseX1)},")
         appendLine("    sweepEaseY1 = ${f(t.sweepEaseY1)},")
@@ -617,7 +686,9 @@ private fun InkLabTabs(selected: InkLabTab, onSelect: (InkLabTab) -> Unit) {
     Row(
         horizontalArrangement = Arrangement.spacedBy(12.dp),
         verticalAlignment = Alignment.CenterVertically,
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier
+            .fillMaxWidth()
+            .horizontalScroll(androidx.compose.foundation.rememberScrollState()),
     ) {
         InkLabTab.entries.forEach { entry ->
             val active = entry == selected

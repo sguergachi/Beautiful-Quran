@@ -4,9 +4,9 @@ import com.beautifulquran.ui.reader.TarjiWordGate
 import com.beautifulquran.tarjilab.HANI_TUNING
 import com.beautifulquran.tarjilab.TarjiLabCodec
 import com.beautifulquran.ui.reader.InkEngine
-import com.beautifulquran.ui.theme.glintPulseColor
-import com.beautifulquran.ui.theme.GlintFlame
-import com.beautifulquran.ui.theme.glintLitAlpha
+import com.beautifulquran.ui.theme.GlintLight
+import com.beautifulquran.ui.theme.glintLightColor
+import com.beautifulquran.ui.theme.glintLightLevel
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.compositeOver
 import androidx.compose.ui.graphics.luminance
@@ -57,7 +57,6 @@ class TarjiTest {
         }
         assertTrue("Hani's final hold must pass the live gate", admitted >= 50)
         assertTrue("the admitted pulse must have substantial gain ($peak)", peak > 0.6f)
-        assertEquals(Color.White, glintPulseColor(Color(0xFFF8E9BE), peak, HANI_TUNING.glintBrightness))
     }
 
     @Test
@@ -82,7 +81,7 @@ class TarjiTest {
             val track = TarjiEarTrack()
             val ear = TarjiEarSample()
             val gate = TarjiWordGate()
-            val flame = GlintFlame()
+            val flame = GlintLight()
             var peak = 0f
             val luminances = mutableListOf<Float>()
             val hops = (stream.size - dropped) / Hani214.HOP_SAMPLES
@@ -110,13 +109,11 @@ class TarjiTest {
                     gate.allows(ear.gain, ear.reverberating, eventMs, Hani214.FINAL_WORD_START_MS)
                 if (allowed) peak = maxOf(peak, ear.gain)
                 val pulse = InkEngine.glintResonance(allowed, ear.tremolo, ear.gain, depth = 1f, enabled = true)
-                val glow = flame.next(pulse.light, (earHop * Hani214.HOP_MS * 1_000_000).toLong())
-                brightest = maxOf(brightest, glow * brightness)
+                val glow = flame.next(pulse.light, (earHop * Hani214.HOP_MS * 1_000_000).toLong(), 60f)
+                val level = glintLightLevel(glow, brightness, 0.10f, 0.06f)
+                brightest = maxOf(brightest, level)
                 if (allowed && ear.gain >= 0.15f) {
-                    val tint = glintLitAlpha(InkEngine.glintColorAlpha(
-                        InkEngine.Tuning().glintTintAlpha, pulse.peak, brightness), glow, brightness)
-                    luminances += glintPulseColor(Color(0xFFF8E9BE), glow, brightness)
-                        .copy(alpha = tint).compositeOver(Color(0xFFE8E2D5)).luminance()
+                    luminances += glintLightColor(Color(0xFFFFF0C7), level).luminance()
                 }
             }
             swings += if (luminances.isEmpty()) 0f else luminances.max() - luminances.min()
@@ -125,12 +122,10 @@ class TarjiTest {
         assertTrue("every hop phase must light the word ($peaks)", peaks.all { it > 0.15f })
         assertTrue("the pulse must be clearly visible on nearly every phase ($peaks)",
             peaks.count { it >= 0.3f } >= 32)
-        assertTrue("the admitted crest must flare to white through the reader's flame ($brightest)",
-            brightest >= 0.99f)
-        assertTrue("the painted ink must visibly swing on nearly every phase ($swings)",
-            swings.count { it >= 0.25f } >= 32)
-        assertTrue("and never so far that it takes the eye off the verse ($swings)",
-            swings.all { it <= 0.5f })
+        assertTrue("an admitted crest must lift the light ($brightest)", brightest > 1.08f)
+        assertTrue("the light must visibly move on nearly every phase ($swings)",
+            swings.count { it >= 0.03f } >= 32)
+        assertTrue("and only ever a little ($swings)", swings.all { it <= 0.3f })
     }
 
     @Test

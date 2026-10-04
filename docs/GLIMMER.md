@@ -112,51 +112,51 @@ use the same crest colour. Applying a Tarjīʿ Lab profile enables the full puls
 auditioned in the lab; the Ink Lab can still disable it afterwards.
 
 The **wet-ink glint always rides the wash** for the whole Active word —
-mid-bloom and long waqf parks included. **Tarjīʿ is painted as light, not
-ink**: the word is lit by a flame the voice feeds (`GlintColor.kt`). One signed
-value, `glow`, drives everything —
+mid-bloom and long waqf parks included.
 
-| `glow` | what it is | colour | halo |
+**The glow is a light's falloff, in three glyph-shaped layers** (widest
+first; never a radial field):
+
+| Layer | Blur | Shipped strength | Role |
 |---|---|---|---|
-| `+1` | a flare, on a vocal crest | white | full |
-| `0` | the ordinary wet sheen | the glint's gold / repeat terracotta | resting |
-| `−0.25` | where an accepted hold rests | a touch toward the ember | a touch lower |
-| `−1` | an ember, in a vocal trough | a little dimmer and warmer (a low flame reddens) | halved |
+| Veil | 2.4 × the halo's | 0.16, warmed halfway to `#FFC98A` | the eye's own wide scatter — reads as light in the air |
+| Halo | `glintGlowRadius` | 0.6 | the body of the glow |
+| Bloom | 0.35 × the halo's | 0.5 | hugs the letters, so the glyph edge is lit, not outlined |
 
-**It is meant to be barely there.** The first cut swung from a dark ember to
-white with the halo going out between pulses, and it was far too much: it took
-the eye off the verse. The whole swing now stays in the top half of the page's
-brightness — the reader should only feel that the voice is touching the word's
-light, not watch a strobe. If it needs more, the per-reciter brightness is the
-knob; do not deepen the ember.
+One blur read as an outline. Glare in the eye is a sharp core with a long
+soft tail (Spencer et al., *Physically-based glare effects for digital
+images*, SIGGRAPH 95), and a glow like that is what makes a thing look bright
+at all (Yoshida et al., *Brightness of the glare illusion*, 2008).
 
-Three things make it read as light the voice is causing:
+**Tarjīʿ is that light getting a little brighter and slightly dimmer** with
+the voice (`GlintColor.kt`). Brightness only; the hue never changes.
 
-1. **Room to rise.** A fresh word's sheen is already almost white; gold to
-   white is a tenth of the page's range and the eye does not catch it. So the
-   flame lowers slightly (`GLINT_RESONANCE_REST`) as the hold is
-   accepted — easing down over the first quarter of the detector's swell —
-   and each crest lifts it to white from there. Before that, flares on top of
-   full sheen were invisible; then the whole negative half-cycle was painted
-   dark, which read as ink switching colour rather than light.
-2. **A flame's answer.** `GlintFlame` catches a rising pulse within two frames
-   and lets a falling one cool (45 ms). The sharp rise is what ties each flare to
-   the reverberation that caused it; a symmetric slew made it breathe.
-3. **The halo is the light.** The glyph tint stays opaque while the flame moves
-   (an ember must cover the bright ink under it), so the halo carries the
-   swing: full on a flare, half its resting strength in an ember.
+- One number, the **level**: 1 at rest, `1 + rise` (0.10) on a crest,
+  `1 − fall` (0.06) in a trough. The fall is less than the rise so the light
+  seems to lift with the voice rather than drop out between pulses.
+- The glyph tint is scaled by the level **in linear light**, so its
+  chromaticity holds; its cover does not change.
+- Every glow layer's alpha is scaled by `1 + gain·(level − 1)` (gain 2): glare
+  is linear in the light that causes it, and the glow is where the eye reads
+  brightness, so it carries more of the swing than the near-white glyphs can.
+- The motion is a plain low-pass (`GlintLight`, 60 ms), the same up as down,
+  and the voice's curve is not sharpened into beats. Its lag is read ahead of
+  the ear (the tap leads the speaker), so smoothing costs no sync.
 
-Brightness scales how far the same pulse travels toward white and toward the
-ember, never where it rests without a pulse; depth scales the whole swing. The
-colour is painted inside the same soft directional mask, so it lights revealed
-glyph ink during the wash and never exposes unread letters. Both shaped and
-layered readers sample it at draw time, and the lab preview runs the same
-flame.
+**It is meant to be barely there.** The eye is most sensitive to flicker at
+exactly the rates tarjīʿ lives at — under 1 % of modulation is visible around
+8 Hz (de Lange) — so earlier cuts that swung from a dark ember to white, or
+changed hue, were a strobe that took the eye off the verse. The per-reciter
+brightness above 100 % scales the swing only; it never raises the resting
+glow. All of this is live on the Ink Lab's **Tarjīʿ** tab.
+
+Both shaped and layered readers sample the level at draw time, inside the same
+soft directional mask, and the lab preview runs the same light.
 
 When a phone differs from a simulator, Developer → Record performance profile
 includes `tarji tap` samples (PCM hops, live gain, sink/ear delay, enabled/depth/
 brightness) and `tarji word` samples (word/event ownership, admitted crest,
-the light asked for and the flame's glow). These are captured only during the requested local profile. Replay
+the light asked for and its smoothed glow). These are captured only during the requested local profile. Replay
 the affected word during its ten-second window and share the text report to
 distinguish a missing PCM feed, rejected event, and paint signal.
 
@@ -219,14 +219,13 @@ trips its own gate (the troughs stay above the gate). Mid-hold detection
 lulls are bridged by the slower release so the hold breathes without
 blinking.
 
-**Tarjīʿ** is that **flame**. Event detection uses the long detrended
+**Tarjīʿ** is that **light**. Event detection uses the long detrended
 tracks, but the visible pulse is not the detector's: it is the voice's own
 flutter around its local level, read at the ear's instant with audio on both
 sides of it (`TarjiEarPulse`; see *The pulse the eye sees* in `docs/TARJI.md`).
 Intensity drives it when the hold pulses in loudness, the folded pitch when
 only the pitch moves. Positive is the audible swell (or higher F0), negative
-its trough; each half is smootherstepped into its own beat around the rest.
-Never take `abs(tremolo)`: that makes the quiet trough bright and doubles the
+its trough. Never take `abs(tremolo)`: that makes the quiet trough bright and doubles the
 visual rate relative to the voice. Depth scales the swing (Ink Lab **Pulse
 depth**).
 Idle / no detection → peak 0, full ordinary sheen (no tell that a pulse is coming).
@@ -420,7 +419,7 @@ and inspect ink; the toggle is session-only and not part of `Tuning`.
 | Halo strength | `glintGlowAlpha` | 0.78 | 0–1 | Always-on halo; tarjīʿ peaks boost further. |
 | Halo blur | `glintGlowRadius` | 10 | 0–10 | Renderer blur radius around the glyph outline; it is not a word-relative radial size. |
 | Tarjīʿ (Tajweed tab) | `glintResonance` | on | toggle | Turns the wet-ink glimmer on and off with detected tarjīʿ (first-pass gold and repeat terracotta). |
-| Pulse depth (Tajweed tab) | `glintResonanceDepth` | 1.0 | 0–1 | How far the tarjīʿ flame swings between ember and flare (1 = full). |
+| Pulse depth (Tajweed tab) | `glintResonanceDepth` | 1.0 | 0–1 | Scales the whole swing of the tarjīʿ light (1 = full). |
 | Ear delay ms (Tajweed tab) | `tarjiEarDelayMs` | 0 | 0–200 | Extra delay so the pulse lands on the ear, on top of the route preset + measured tap-to-playback-head backlog. |
 
 The scalar maps to Compose `Shadow.blurRadius` for per-word text and to dp for

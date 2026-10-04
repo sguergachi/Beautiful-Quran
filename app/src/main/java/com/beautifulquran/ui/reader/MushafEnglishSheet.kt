@@ -1213,6 +1213,8 @@ private fun MutableList<ShapedWordBloom>.addEnglishInkLayerBlooms(
                     ),
                     glowAlpha = motion.glintGlowColorAlpha(InkEngine.tuning.glintGlowAlpha),
                     glowRadius = InkEngine.tuning.glintGlowRadius,
+                    bloomAlpha = motion.glintGlowColorAlpha(InkEngine.tuning.glintBloomAlpha),
+                    veilAlpha = motion.glintGlowColorAlpha(InkEngine.tuning.glintVeilAlpha),
                 ),
             )
         }

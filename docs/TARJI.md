@@ -242,24 +242,22 @@ When all four pass, tarjīʿ **makes the word's light flicker** with the voice
 vocal swell and negative is its trough.
 
 ```
-crest    = smootherstep(clamp(tremolo, 0, 1))
-trough   = smootherstep(clamp(−tremolo, 0, 1))
-flame    = −rest + (1 + rest)·crest − (1 − rest)·trough     // rest = 0.25
-presence = min(1, 4·g)·depth                                // g = tremoloGain
-light    = presence·flame                                   // −1 ember … +1 flare
-peak     = g·depth·crest
+swing    = soft-knee(tremolo)                 // −1..1, the voice's own curve
+presence = min(1, 4·g)·depth                  // g = tremoloGain
+light    = presence·swing
+glow     = low-pass(light, 60 ms)             // GlintLight; lag read ahead
+level    = 1 + brightness·(rise·glow⁺ − fall·glow⁻)   // 1.10 … 0.94 shipped
 ```
 
-`light` is what the voice asks of the flame; `GlintFlame` follows it (rise
-within two frames, 45 ms cooling) and that `glow` is painted. Never use
-`abs(tremolo)`: it flashes on both the loud crest and quiet trough, doubling
-the visual pulse rate. At `g = 0` the light is exactly 0 — **no tell** before
-the voice actually reverberates. The halo forms only with the directional
+`level` scales the glyph tint in linear light and, twice as far, every layer
+of the glow (`docs/GLIMMER.md`). Never use `abs(tremolo)`: it brightens on
+both the loud crest and quiet trough, doubling the visual pulse rate. At
+`g = 0` the level is exactly 1 — **no tell** before the voice actually reverberates. The halo forms only with the directional
 wash (`smootherstep(glintProgress)`); there is no whole-word formation floor
 when resonance engages.
 
 **Frame gate:** the Active strong-hold word runs a vsync sampler
-(`rememberTarjiGate`) that reads the voice at the ear and writes the flame
+(`rememberTarjiGate`) that reads the voice at the ear and writes the light
 every frame. The wash's Animatable stops invalidating draw once the word
 parks; without the sampler the pulse freezes on long closers (1:7) even when
 the detector is live.
