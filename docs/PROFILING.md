@@ -195,7 +195,8 @@ use Perfetto's frame timeline for a full attribution.
 During recitation, requested profiles also sample the live tarjīʿ tap and active
 eligible word at most ten times a second. `tarji tap` records the PCM hop count,
 gain, output delays and tuning switches; `tarji word` records acoustic ownership,
-the admitted crest and the smoothed white mix. To diagnose a missing glint,
+the admitted crest, the light the voice asks for and the flame's glow — all
+read at the ear's position, as the paint is. To diagnose a missing glint,
 return to the reader and replay that word during the recording window.
 
 1. Install the APK and enable Developer by tapping the app mark three times.

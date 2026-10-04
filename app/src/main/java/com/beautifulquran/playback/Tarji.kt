@@ -90,6 +90,18 @@ class Tarji {
         private set
 
     /**
+     * The raw series the visible pulse is drawn from, one value per hop:
+     * the newest 20 ms hop's RMS, and the held note's folded pitch with the
+     * hops its estimate sits behind that hop's centre. [TarjiEarPulse] turns
+     * them into the flicker at read time, where audio on both sides of the
+     * ear's instant is already in hand.
+     */
+    val lastHopRms: Float get() = latestHopRms
+    var lastFoldedPitchHz = 0f
+        private set
+    val lastPitchLeadHops: Float get() = modulationPitchLeadHops
+
+    /**
      * Read-out delay in content hops, set from the tap-to-ear latency
      * (wall-time route × playback speed + content-time tap backlog + the
      * Sonic resampler's own content-time buffer at non-1× speed) by
@@ -285,6 +297,7 @@ class Tarji {
         misses = 0
         peak = 0f
         latestHopRms = 0f
+        lastFoldedPitchHz = 0f
         modulationPitchHz = 0f
         modulationClarity = 0f
         modulationPitchLeadHops = 0f
@@ -383,6 +396,7 @@ class Tarji {
             envCount > 1 -> pitchEnv[(envCount - 2) % ENV_HOPS]
             else -> 0f
         }
+        lastFoldedPitchHz = pitchEnv[pitchIndex]
 
         val wasReverberating = reverberating
         updateTremolo()

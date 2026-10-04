@@ -577,25 +577,25 @@ object InkEngine {
      * Draw values for the tarjīʿ pulse on the wet-ink glint. Detected on the
      * tapped PCM by [com.beautifulquran.playback.VoiceEnergy].
      *
-     * The wet glint rides the wash for the whole Active word. Tarjīʿ
-     * extinguishes its layer at pulse troughs — the glimmer itself turns on
-     * and off with the voice — and [peak] boosts tint/halo colour at crests.
+     * The wet glint rides the wash for the whole Active word. Tarjīʿ turns
+     * that sheen into a flame the voice feeds: [light] is what the voice asks
+     * of it this instant and [glow] is the flame's answer, painted by
+     * `glintPulseColor` and its alphas. Idle is always [Idle] — no tell
+     * before the voice reverberates.
      *
-     * @param layerMult multiplies the glint layer alpha (1 = full sheen,
-     * 0 = extinguished at a full-depth trough). Idle is always [Idle] — no
-     * tell before the voice reverberates.
-     * @param peak 0..1 how hard the pulse is cresting (0 = no detection /
-     * trough).
+     * @param peak 0..1 how hard the pulse is cresting, scaled by the detector's
+     * gain (0 = no detection / trough).
+     * @param light signed −1..1 around the ordinary sheen (0): a vocal crest
+     * flares to +1, a trough sinks to −1, and the mean level of a
+     * reverberating voice rests a little below the sheen
+     * ([GLINT_RESONANCE_REST]) so the flare has somewhere to rise from.
+     * @param glow [light] as the flame follows it (see `GlintFlame`); set by
+     * the frame loop, zero in a bare mapping.
      */
     data class GlintResonance(
         val peak: Float,
-        val layerMult: Float = 1f,
-        /** Smoothed paint hue; the measured crest and vocal alpha remain unchanged. */
-        val whiteMix: Float = 0f,
-        /** Accepted crest before the gain envelope; hue can reach white during a soft pulse. */
-        val huePeak: Float = peak,
-        /** Opaque pulse tint coverage; the gain ramp eases it into and out of the ordinary sheen. */
-        val inkStrength: Float = 0f,
+        val light: Float = 0f,
+        val glow: Float = 0f,
     ) {
         companion object {
             val Idle = GlintResonance(peak = 0f)
@@ -613,31 +613,31 @@ object InkEngine {
      * word (see the glint layer in ReaderComponents)
      * @param tremolo synced tarjīʿ band signal −1..1 (0 = nothing detected)
      * @param tremoloGain 0..1 attack/release ramp of the detected signal
-     * @param troughFloor remaining sheen at a full vocal trough; the reader
-     * uses the shipped constant while the Tarjīʿ Lab can audition a target
      */
     fun glintResonance(
         holding: Boolean,
         tremolo: Float = 0f,
         tremoloGain: Float = 0f,
         depth: Float = tuning.glintResonanceDepth,
-        troughFloor: Float = GLINT_RESONANCE_TROUGH_FLOOR,
         enabled: Boolean = tuning.glintResonance,
-        brightness: Float = tuning.glintBrightness,
     ): GlintResonance {
         if (!holding || !enabled || depth <= 0f) return GlintResonance.Idle
         val g = tremoloGain.coerceIn(0f, 1f)
         if (g <= 0f) return GlintResonance.Idle
-        // Map the measured envelope −1..1 to one visible 0..1 pulse. The
-        // smootherstep gives gold-on-parchment enough contrast without moving
-        // either the reveal edge or the acoustic crest.
-        val on = inkSmootherstep((tremolo.coerceIn(-1f, 1f) + 1f) * 0.5f)
-        val crest = inkSmootherstep(tremolo.coerceIn(0f, 1f))
+        // Each half of the measured envelope is shaped on its own, from a
+        // lowered rest: the crest flares up from it and the trough sinks
+        // below it. The smootherstep narrows both into distinct beats without
+        // moving the acoustic crest.
+        val swing = tremolo.coerceIn(-1f, 1f)
+        val crest = inkSmootherstep(swing.coerceAtLeast(0f))
+        val trough = inkSmootherstep((-swing).coerceAtLeast(0f))
         val d = depth.coerceIn(0f, 1f)
-        val floor = troughFloor.coerceIn(0f, 1f)
-        val mult = 1f - g * d * (1f - on) * (1f - floor)
-        return GlintResonance(peak = g * crest * d, layerMult = mult, huePeak = crest * d,
-            inkStrength = (g * 4f).coerceAtMost(1f) * d * brightness.coerceIn(0f, 1f))
+        val rest = GLINT_RESONANCE_REST
+        val flame = -rest + (1f + rest) * crest - (1f - rest) * trough
+        // The detector's gain is a one-second swell; the flame is fully the
+        // voice's a quarter of the way into it and leaves the same way.
+        val presence = (g * GLINT_RESONANCE_PRESENCE).coerceAtMost(1f) * d
+        return GlintResonance(peak = g * crest * d, light = presence * flame)
     }
 
     /** Scale tint and halo together, preserving the measured pulse and its troughs. */
@@ -652,12 +652,21 @@ object InkEngine {
     const val GLINT_RESONANCE_DEPTH = 1f
 
     /**
-     * Dimmest the wet-ink glint layer goes at a tarjīʿ trough (fraction of
-     * full sheen). Shipped 0 — the glimmer itself turns on and off with the
-     * voice at full depth; a non-zero value leaves residual sheen for a
-     * softer breathe.
+     * How fast the flame comes under the voice: its swing is full once the
+     * detector's gain reaches 1 / this. The gain builds over a second so the
+     * detector never pops; the light must not take that long to be seen.
      */
-    const val GLINT_RESONANCE_TROUGH_FLOOR = 0f
+    const val GLINT_RESONANCE_PRESENCE = 4f
+
+    /**
+     * How far the light lowers, toward the ember, while the voice
+     * reverberates. A fresh word's sheen is already almost white, so a flare
+     * laid on top of it had nowhere to go — gold to white is a tenth of the
+     * page's range and the eye does not catch it. The flame instead settles
+     * to candle-light as the hold is accepted and each crest lifts it to
+     * white from there.
+     */
+    const val GLINT_RESONANCE_REST = 0.45f
 
     /**
      * Extra tint/halo strength at a full tarjīʿ peak, as a fraction of the

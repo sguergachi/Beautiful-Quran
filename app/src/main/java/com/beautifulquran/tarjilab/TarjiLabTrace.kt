@@ -1,6 +1,7 @@
 package com.beautifulquran.tarjilab
 
 import com.beautifulquran.playback.Tarji
+import com.beautifulquran.playback.TarjiEarPulse
 import com.beautifulquran.playback.TarjiLabCapture
 import com.beautifulquran.ui.reader.InkEngine
 import kotlin.math.atan2
@@ -165,19 +166,34 @@ fun analyzeTarjiCapture(
     val candidate = FloatArray(n)
     var resolved = -1
     val leadHops = capture.leadInHopCount
+    // The voice the reader's pulse is drawn from (see [TarjiEarPulse]), kept
+    // for the lead-in too: it is the level behind the capture's first hops.
+    val voiceRms = FloatArray(leadHops + n)
+    val voicePitch = FloatArray(leadHops + n)
+    val voicePitchLead = FloatArray(leadHops + n)
+    val voiceRate = FloatArray(leadHops + n)
+    val voiceUsesAmplitude = BooleanArray(leadHops + n)
+    fun keepVoice(hop: Int) {
+        voiceRms[hop] = detector.lastHopRms
+        voicePitch[hop] = detector.lastFoldedPitchHz
+        voicePitchLead[hop] = detector.lastPitchLeadHops
+        voiceRate[hop] = detector.lastRateHz
+        voiceUsesAmplitude[hop] = detector.lastVisualUsesAmplitude
+    }
     for (i in 0 until leadHops) {
         System.arraycopy(capture.leadInPcm, i * capture.hopSamples, scratch, 0, capture.hopSamples)
         detector.onSamples8k(scratch)
+        keepVoice(i)
     }
     for (i in 0 until n) {
         System.arraycopy(capture.pcm, i * capture.hopSamples, scratch, 0, capture.hopSamples)
         detector.onSamples8k(scratch)
+        keepVoice(leadHops + i)
         // The detector resolves its first hop only once the 80 ms ring (four
         // hops) is full — the same warmup the live path has.
         if (leadHops + i < DETECTOR_FRAME_HOPS - 1) continue
         if (resolved < 0) resolved = i
         env[i] = frameRms(capture, i)
-        tremolo[i] = detector.tremolo
         gain[i] = detector.tremoloGain
         reverberating[i] = detector.reverberating
         rate[i] = detector.lastRateHz
@@ -193,6 +209,13 @@ fun analyzeTarjiCapture(
         candidate[i] = detector.lastCandidateModulation
     }
     if (resolved < 0) resolved = DETECTOR_FRAME_HOPS - 1
+    // The pulse the reader paints: the voice around each hop's own instant,
+    // not the detector's causal estimate of it.
+    val pulse = TarjiEarPulse.series(
+        voiceRms, voicePitch, voicePitchLead, voiceRate, voiceUsesAmplitude,
+        hopDur.toDouble(), from = leadHops,
+    )
+    for (i in resolved until n) tremolo[i] = pulse[i]
     return TarjiLabTrace(
         hopCount = n,
         hopDurationMs = hopDur,

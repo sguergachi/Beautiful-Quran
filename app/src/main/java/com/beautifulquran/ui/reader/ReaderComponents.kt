@@ -1203,34 +1203,37 @@ internal class InkMotion(
         get() = if (glintIsRepeat) repeatFeather else sweepFeather
 
     /**
-     * Wet-ink layer strength. Accepted pulses keep tint coverage at troughs
-     * so darker ink can cover the bright base glyphs. Idle retains ordinary sheen.
+     * Wet-ink layer strength. The tarjīʿ flame never thins the layer — it
+     * moves the layer's colour and its halo — so the wash edge and the
+     * repeat carry are all that gate it.
      */
     val glintLayerAlpha: Float
         get() = glintAlpha.value * glintCarryAlpha(
             replacedByRepeat = glintReplacedByRepeat,
             repeatProgress = repeatProgress,
-        ) * (if (isActive) com.beautifulquran.ui.theme.glintContrastAlpha(
-            tarji.value.layerMult, tarji.value.inkStrength,
-        ) else 1f)
+        )
 
     /** 0..1 crest of the tarjīʿ pulse — boosts tint/halo colour at peaks. */
     val glintPeak: Float
         get() = if (isActive) tarji.value.peak else 0f
 
-    /** Live crest hue, read by both paint adapters inside their draw scopes. */
+    /** The flame this frame: +1 a flare, −1 an ember, 0 the ordinary sheen. */
+    private val glintGlow: Float
+        get() = if (isActive) tarji.value.glow else 0f
+
+    /** Live lit colour, read by both paint adapters inside their draw scopes. */
     fun glintColor(base: Color): Color =
-        com.beautifulquran.ui.theme.glintPulseColor(base, if (isActive) tarji.value.whiteMix else 0f,
-            inkStrength = if (isActive) tarji.value.inkStrength else 0f)
+        com.beautifulquran.ui.theme.glintPulseColor(base, glintGlow, InkEngine.tuning.glintBrightness)
 
-    /** Tint alpha: always-on wet strength, lifted further on tarjīʿ peaks. */
+    /** Tint alpha: always-on wet strength, opaque while the flame moves. */
     fun glintTintColorAlpha(base: Float): Float =
-        com.beautifulquran.ui.theme.glintContrastAlpha(InkEngine.glintColorAlpha(base, glintPeak),
-            if (isActive) tarji.value.inkStrength else 0f)
+        com.beautifulquran.ui.theme.glintLitAlpha(
+            InkEngine.glintColorAlpha(base, glintPeak), glintGlow, InkEngine.tuning.glintBrightness)
 
-    /** Halo alpha: same peak lift as the tint. */
+    /** Halo alpha: the light itself — full on a flare, nearly out in an ember. */
     fun glintGlowColorAlpha(base: Float): Float =
-        InkEngine.glintColorAlpha(base, glintPeak)
+        com.beautifulquran.ui.theme.glintHaloAlpha(
+            InkEngine.glintColorAlpha(base, glintPeak), glintGlow, InkEngine.tuning.glintBrightness)
 
     /** Whether the orange repeat overlay still has any ink to show. */
     val showRepeatLayer: Boolean get() = repeatAlpha > 0f
@@ -1312,9 +1315,11 @@ private fun Modifier.layeredGlintHalo(motion: InkMotion, rtl: Boolean, color: Co
 
 /**
  * Per-frame tarjīʿ draw state for one word. Idle when the word is not Active
- * or not eligible; otherwise samples [VoiceEnergy] every vsync so the glint
- * path keeps pulsing after the wash park freezes its Animatable. Only the
- * Active eligible word runs the loop.
+ * or not eligible; otherwise reads [VoiceEnergy] at the ear's position every
+ * vsync — the frame's own clock, not the PCM tap's bursts — so each flare
+ * lands with the reverberation that caused it, and the glint path keeps
+ * pulsing after the wash park freezes its Animatable. Only the Active
+ * eligible word runs the loop.
  */
 @Composable
 private fun rememberTarjiGate(
@@ -1336,35 +1341,41 @@ private fun rememberTarjiGate(
             return@LaunchedEffect
         }
         val eventGate = TarjiWordGate()
-        val hue = com.beautifulquran.ui.theme.GlintColorTransition()
+        val flame = com.beautifulquran.ui.theme.GlintFlame()
+        val ear = com.beautifulquran.playback.TarjiEarSample()
         var lastReport = 0L
         while (true) {
             withFrameNanos { now ->
                 val voice = com.beautifulquran.playback.VoiceEnergy.active
-                val g = voice?.shimmerGain ?: 0f
+                voice?.sampleAtEar(now, ear)
+                val g = if (voice == null) 0f else ear.gain
                 val pulse = if (
                     eventGate.allows(
                         gain = g,
-                        detected = voice?.reverberating == true,
-                        eventStartMs = voice?.eventStartMediaMs
-                            ?: com.beautifulquran.playback.VoiceEnergy.NO_EVENT_MS,
+                        detected = voice != null && ear.reverberating,
+                        eventStartMs = if (voice == null) {
+                            com.beautifulquran.playback.VoiceEnergy.NO_EVENT_MS
+                        } else {
+                            ear.eventStartMediaMs
+                        },
                         wordStartMs = wordStartMs,
                     )
                 ) {
                     InkEngine.glintResonance(
                         holding = true,
-                        tremolo = voice?.tremolo ?: 0f,
+                        tremolo = ear.tremolo,
                         tremoloGain = g,
                     )
                 } else {
                     InkEngine.GlintResonance.Idle
                 }
-                frame.value = pulse.copy(whiteMix = hue.next(pulse.huePeak, InkEngine.tuning.glintBrightness, now))
+                frame.value = pulse.copy(glow = flame.next(pulse.light, now))
                 if (com.beautifulquran.DevProfiling.captureStart.get() != null && now - lastReport >= 100_000_000L) {
                     lastReport = now
                     com.beautifulquran.DevProfiling.mark(
-                        "tarji word=$wordStartMs event=${voice?.eventStartMediaMs} live=${voice?.isLive} " +
-                            "detected=${voice?.reverberating} gain=$g peak=${pulse.peak} white=${frame.value.whiteMix}",
+                        "tarji word=$wordStartMs event=${ear.eventStartMediaMs} live=${voice?.isLive} " +
+                            "detected=${ear.reverberating} gain=$g peak=${pulse.peak} " +
+                            "light=${pulse.light} glow=${frame.value.glow}",
                     )
                 }
             }

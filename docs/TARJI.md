@@ -237,30 +237,76 @@ mid-animation, so the bloom can never appear to restart):
     the active word cannot cross its boundary through output latency; only an
     event that actually starts inside the word can arm it.
 
-When all four pass, tarjīʿ **turns the glimmer on and off** with the voice
-(not a soft breath around permanent sheen). The sign is acoustic phase:
-positive is a vocal swell and negative is its trough.
+When all four pass, tarjīʿ **makes the word's light flicker** with the voice
+(`docs/GLIMMER.md` has the paint). The sign is acoustic phase: positive is a
+vocal swell and negative is its trough.
 
 ```
-pulse = smootherstep((clamp(tremolo, -1, 1) + 1) / 2)
-crest = smootherstep(clamp(tremolo, 0, 1))
-gated = 1 − depth·(1 − pulse)
-mult  = 1 + g·(gated − 1)                // g = tremoloGain
-peak  = g·depth·crest
+crest    = smootherstep(clamp(tremolo, 0, 1))
+trough   = smootherstep(clamp(−tremolo, 0, 1))
+flame    = −rest + (1 + rest)·crest − (1 − rest)·trough     // rest = 0.45
+presence = min(1, 4·g)·depth                                // g = tremoloGain
+light    = presence·flame                                   // −1 ember … +1 flare
+peak     = g·depth·crest
 ```
 
-At `depth = 1` (shipped) swells leave the sheen fully on and troughs
-extinguish it — gold-on-gold needs that contrast. `crest` alone boosts the
-colour. Never use `abs(tremolo)`: it flashes on both the loud crest and quiet
-trough, doubling the visual pulse rate. At `g = 0` the multiplier
-is exactly 1 — **no tell** before the voice actually reverberates. The halo
-forms only with the directional wash (`smootherstep(glintProgress)`); there is
-no whole-word formation floor when resonance engages.
+`light` is what the voice asks of the flame; `GlintFlame` follows it (rise
+inside a frame, 24 ms cooling) and that `glow` is painted. Never use
+`abs(tremolo)`: it flashes on both the loud crest and quiet trough, doubling
+the visual pulse rate. At `g = 0` the light is exactly 0 — **no tell** before
+the voice actually reverberates. The halo forms only with the directional
+wash (`smootherstep(glintProgress)`); there is no whole-word formation floor
+when resonance engages.
 
 **Frame gate:** the Active strong-hold word runs a vsync sampler
-(`rememberTarjiGate`) that writes the multiplier every frame. The wash's
-Animatable stops invalidating draw once the word parks; without the sampler
-the pulse freezes on long closers (1:7) even when the detector is live.
+(`rememberTarjiGate`) that reads the voice at the ear and writes the flame
+every frame. The wash's Animatable stops invalidating draw once the word
+parks; without the sampler the pulse freezes on long closers (1:7) even when
+the detector is live.
+
+### The pulse the eye sees
+
+Two things used to stand between the voice and the light, and both were
+invisible on the emulator.
+
+**It was read on the tap's clock.** The detector published "the newest hop,
+minus the backlog" each time it analysed a hop, and the frame loop painted
+whatever it found there. The emulator feeds the tap a few milliseconds at a
+time. A phone feeds it in bursts — the Pixel's profile shows ~150 ms of PCM
+every ~150 ms, with 100 ms stretches where no hop arrives — so the value on
+screen was a sample-and-hold at about one and a half samples per cycle of a
+4–6 Hz reverberation: no visible swing, and up to a burst out of step with
+the voice. The playback head, though, moves smoothly, and differs from the
+tap's content clock by a constant for the life of a sink session. So the
+detector's output is now kept as a short per-hop history (`TarjiEarTrack`),
+`TarjiEarClock` fixes that constant once the sink has filled, and **every
+frame reads the history at the playback head itself** (`VoiceEnergy.
+sampleAtEar`). A stall holds the read-out with the audio; a gapless handoff
+to the next ayah carries the offset across.
+
+**It was the wrong signal.** The detector's `tremolo` answers "is there a
+periodic reverberation on this hold" from a causal 1.3 s window. What it
+leaves after removing that window's trend is mostly the hold's slow swell —
+on Hani 1:7 one flare 400 ms long where the ear hears five ripples. But the
+tap runs a sink buffer ahead of the speaker: by the time a hop reaches the
+ear, the hops after it are already in hand. `TarjiEarPulse` uses them:
+
+```
+pulse(h) = (series(h) − mean over one pulse period centred on h)
+           ÷ the flutter's own amplitude over the period before h
+```
+
+`series` is the 20 ms hop RMS (1-2-1 blurred, to take out the pitch-period
+beat) or, for a pitch-only vibrato, the folded pitch. A mean over exactly one
+period (the detector's rate, held to 3–8 Hz so half a period plus a hop —
+180 ms at most — fits inside the tap's lead) contains none of the pulse, so
+the swell drops out and the ripple stays, **in phase**: a centred window has
+no lag to correct. The amplitude is floored (3 % of level, ~5 cents of pitch)
+so a steady note's noise is not blown up into a flicker. Gain, event identity
+and the word gate are still the detector's.
+
+The Tarjīʿ Lab's replay computes the same pulse (`TarjiEarPulse.series`), so
+its graph and preview show what the reader paints.
 
 The free-running sine that used to run inside the waqf window on steady holds
 is gone — steady holds keep still gold.

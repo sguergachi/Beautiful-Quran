@@ -91,6 +91,45 @@ class VoiceEnergy {
     var sessionContentMs = 0.0
         private set
 
+    // ── Frame-time read-out ───────────────────────────────────────────────
+    // Every analyzed hop is published undelayed; the frame loop then reads
+    // that history at the ear's own position (see [TarjiEarClock]) instead
+    // of taking whatever the last PCM burst left in the volatile mirrors.
+    private val earTrack = TarjiEarTrack()
+    private val earClock = TarjiEarClock()
+    private var earClockSession = 0L
+
+    /**
+     * The detector's signal at the listener's ear at [wallNanos] (the frame
+     * clock), written into [out]. Main thread. False — and an idle [out] —
+     * while nothing is playing or no hop has been analyzed.
+     */
+    fun sampleAtEar(wallNanos: Long, out: TarjiEarSample): Boolean {
+        out.clear()
+        val hopMs = hopContentDurationMs
+        if (!isLive) return false
+        val speed = playbackSpeed.coerceAtLeast(0f)
+        // Past the playback head lie the route preset, Sonic's own buffer and
+        // the Ink Lab's manual trim — the same terms the hop mirrors delay by.
+        val beyondHeadMs = outputLatencyMs.coerceAtLeast(0L) * speed.toDouble() +
+            sonicContentLatencyMs(speed) + earDelayMs
+        val anchored = earClock.isAnchored && earClockSession == sessionStartWall
+        val earContentMs = if (anchored) {
+            earClock.contentAtEarMs(wallNanos) - beyondHeadMs
+        } else {
+            // The sink has not filled yet: assume its whole buffer is queued.
+            sessionContentMs - sinkLatencyMs.coerceAtLeast(0L) * speed.toDouble() - beyondHeadMs
+        }
+        // The frame is shown a vsync after it is read; lead by that much so
+        // the crest lands with the sound.
+        if (!earTrack.read(earContentMs + DISPLAY_LEAD_MS, hopMs, out)) return false
+        if (out.eventStartHop >= 0 && anchored) {
+            out.eventStartMediaMs =
+                (earClock.mediaMsOfContent(out.eventStartHop * hopMs) + beyondHeadMs).roundToLong()
+        }
+        return true
+    }
+
     // ── Tarjīʿ Lab capture ────────────────────────────────────────────────
     // The lab records the decimated analysis stream itself, then re-runs the
     // pure detector offline with different knobs — no live capture needed to
@@ -155,6 +194,7 @@ class VoiceEnergy {
     fun resetTapSession() {
         capturePendingFreshStart = true
         tarji.reset()
+        earTrack.clear()
         reverberating = false
         eventStartContentMs = -1.0
         eventStartMediaMs = NO_EVENT_MS
@@ -168,7 +208,9 @@ class VoiceEnergy {
         decimSum = 0f
         decimCount = 0
         hopFill = 0
-        sessionStartWall = SystemClock.elapsedRealtime()
+        // Never reuse an identity: a flush inside the same millisecond would
+        // otherwise keep the ear clock anchored to the old stream.
+        sessionStartWall = maxOf(SystemClock.elapsedRealtime(), sessionStartWall + 1)
     }
 
     /** Total tap-to-ear delay (wall ms) as currently applied — diagnostics. */
@@ -186,6 +228,7 @@ class VoiceEnergy {
     private var decimStep = 6
     private var sourceSampleRate = 0
     private var analysisHop = FloatArray(Tarji.HOP_SAMPLES)
+    @Volatile
     private var hopContentDurationMs = Tarji.HOP_MS.toDouble()
     private var hopFill = 0
     @Volatile
@@ -262,6 +305,16 @@ class VoiceEnergy {
         tarji.releaseMs = releaseMs
         tarji.onSamples8k(analysisHop)
         sessionContentMs += hopContentDurationMs
+        earTrack.publish(
+            hop = tarji.hopCount - 1,
+            hopRms = tarji.lastHopRms,
+            pitchHz = tarji.lastFoldedPitchHz,
+            pitchLeadHops = tarji.lastPitchLeadHops,
+            rateHz = tarji.lastRateHz,
+            usesAmplitude = tarji.lastVisualUsesAmplitude,
+            gain = tarji.tremoloGain,
+            eventStartHop = if (tarji.reverberating) tarji.eventStartHop else -1,
+        )
         hopFill = 0
         if (captureArmed) captureHop(hopContentDurationMs)
         reverberating = tarji.syncReverberating
@@ -309,8 +362,20 @@ class VoiceEnergy {
         captureHopCount++
     }
 
-    /** Rebase the delayed event start onto the current media-item clock. */
-    fun updatePlaybackPosition(playbackPositionMs: Long) {
+    /** Rebase the delayed event start onto the current media-item clock, and
+     * tick the ear clock the frame loop reads by. Main thread. */
+    fun updatePlaybackPosition(playbackPositionMs: Long, wallNanos: Long = System.nanoTime()) {
+        if (earClockSession != sessionStartWall) {
+            earClockSession = sessionStartWall
+            earClock.reset()
+        }
+        earClock.onPosition(
+            positionMs = playbackPositionMs,
+            wallNanos = wallNanos,
+            tapContentMs = sessionContentMs,
+            sinkLatencyMs = sinkLatencyMs,
+            speed = playbackSpeed,
+        )
         val start = eventStartContentMs
         if (start < 0.0) {
             eventStartMediaMs = NO_EVENT_MS
@@ -346,6 +411,7 @@ class VoiceEnergy {
         captureActive = false
         captureHopCount = 0
         tarji.reset()
+        earTrack.clear()
         reverberating = false
         eventStartContentMs = -1.0
         eventStartMediaMs = NO_EVENT_MS
@@ -370,6 +436,9 @@ class VoiceEnergy {
         /** Lab capture cap: 12 s of 20 ms hops ≈ 600 hops ≈ 350 KB. */
         private const val MAX_CAPTURE_HOPS = 600
         private const val MIN_CAPTURE_HOPS = 16
+
+        /** One 120 Hz frame between reading the signal and showing it. */
+        private const val DISPLAY_LEAD_MS = 8.0
 
         /**
          * The live probe owned by [PlayerController]. Draw-phase glint reads
