@@ -810,6 +810,10 @@ verses recess to upcoming ink over ~400 ms.
 
 The reciter name above the chapter transport carries a small disclosure
 chevron: the name and cue are one quiet button leading to reciter settings.
+In developer mode a quiet tuning control shares that line. Opening it replaces
+the name with the Ink Lab tabs and selected controls inside the playbar; the
+bar grows only by the panel's measured height, and the reading column clears
+it as it does the return pill. The same control closes the panel.
 
 ## Color
 

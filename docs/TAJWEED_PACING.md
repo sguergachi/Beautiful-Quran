@@ -1,7 +1,7 @@
 # Tajweed-paced ink
 
 **Status: implemented on Android, on by default and tunable behind the Ink Lab's
-"Tajweed pacing" toggle (hold a word → Ink Lab → Tajweed tab). The web port
+"Tajweed pacing" toggle (playbar → Ink Lab → Tajweed tab). The web port
 and measured letter widths are not yet built — the design
 for those lives below.**
 

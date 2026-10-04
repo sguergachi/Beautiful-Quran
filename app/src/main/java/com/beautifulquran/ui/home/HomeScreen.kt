@@ -581,6 +581,9 @@ fun HomeScreen(
                 onRepeatClick = viewModel::cycleRepeatMode,
                 onSpeed = viewModel::cycleSpeed,
                 onClose = viewModel::dismissFloatingPlayback,
+                inkLabAvailable = host?.inkLabAvailable == true,
+                inkLabOpen = host?.inkLabOpen == true,
+                onInkLabClick = { host?.let { it.inkLabOpen = !it.inkLabOpen } },
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
                     .widthIn(max = 640.dp)

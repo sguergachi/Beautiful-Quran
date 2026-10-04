@@ -602,8 +602,10 @@ line's opening fully formed. Ink Lab exposes it as **Wasl pre-ink**.
 
 ### Ink Lab
 
-Developer mode (triple-tap the Settings logo) → hold a word → **Ink Lab** opens
-or closes the expanded slider panel over the reader (`ui/reader/InkLabPanel.kt`), bound
+Developer mode (triple-tap the Settings logo) adds a playbar toggle that opens
+or closes the inline Ink Lab controls (`ui/reader/InkLabPanel.kt`) in place of
+the reciter name. Its tabs, sliders and actions expand the measured playbar,
+so the reading column clears the taller bar automatically. The panel is bound
 directly to `InkEngine.tuning`: upcoming ink, fade timings, sweep clamps,
 repeat timings, **Repeat ink** strength, the fresh-ink **Glitter time**,
 **Glint tint**, **Halo strength**, and **Halo blur** controls, wash feather,

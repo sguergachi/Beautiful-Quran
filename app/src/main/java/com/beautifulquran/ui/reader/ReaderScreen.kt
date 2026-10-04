@@ -3562,18 +3562,6 @@ fun ReaderScreen(
                 .zIndex(1.7f),
         )
 
-        // Keep developer controls above the guide so its shader can be tuned
-        // in place; full reader ink overlays still cover the lab at z=1.8.
-        if (settings.developerModeEnabled && settings.inkLabEnabled) {
-            InkLabPanel(
-                guideActive = bookmarkNoteTipVisible || ayahRailTipVisible,
-                modifier = Modifier
-                    .align(Alignment.BottomEnd)
-                    .padding(end = 10.dp, bottom = 10.dp)
-                    .zIndex(1.75f),
-            )
-        }
-
         // The repeat question is an ink bleed on this sheet, not a dialog: the
         // shared InkRevealOverlay soaks the reader paper from the player bar's
         // repeat control, exactly as the Root Word Viewer opens. It must live

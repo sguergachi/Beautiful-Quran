@@ -54,6 +54,8 @@ class PinnedPlaybackHost {
     var onRepeatClick: () -> Unit = {}
     var onSpeed: () -> Unit = {}
     var onReciterClick: () -> Unit = {}
+    var inkLabAvailable by mutableStateOf(false)
+    var inkLabOpen by mutableStateOf(false)
 
     /** A verse is loaded and search is not covering the chapter list. */
     var coverSession by mutableStateOf(false)
@@ -135,6 +137,9 @@ internal fun PinnedChapterPlayback(
             onRepeatClick = host.onRepeatClick,
             onSpeed = host.onSpeed,
             onReciterClick = host.onReciterClick,
+            inkLabAvailable = host.inkLabAvailable,
+            inkLabOpen = host.inkLabOpen,
+            onInkLabClick = { host.inkLabOpen = !host.inkLabOpen },
             includeNavigationPadding = true,
             edgePad = edgePad,
             edgeChrome = {

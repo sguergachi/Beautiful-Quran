@@ -16,7 +16,6 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Slider
@@ -56,8 +55,8 @@ import com.beautifulquran.ui.theme.QuranTheme
  * freeze (next to Copy values) so auto-home can be parked while panning.
  * Reset does not touch it, and Focus is never persisted.
  *
- * Enabled from the developer word-hold sheet (developer mode itself unlocks
- * by tapping the Settings logo). See docs/INK_ENGINE.md.
+ * Opened from the playbar in developer mode (unlocked by tapping the Settings
+ * logo). See docs/INK_ENGINE.md.
  */
 /**
  * The panel's sections. There are far too many knobs to scroll as one list,
@@ -90,20 +89,33 @@ fun InkLabPanel(
     val context = LocalContext.current
     Column(
         horizontalAlignment = Alignment.End,
-        modifier = modifier.fillMaxWidth(),
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(horizontal = 6.dp),
     ) {
-        Spacer(Modifier.height(4.dp))
         Column(
-            modifier = Modifier
-                .clip(RoundedCornerShape(16.dp))
-                .background(MaterialTheme.colorScheme.background.copy(alpha = 0.96f))
-                .padding(horizontal = 12.dp, vertical = 8.dp),
+            modifier = Modifier.fillMaxWidth(),
         ) {
-            InkLabTabs(selected = tab, onSelect = { tab = it })
-            Spacer(Modifier.height(4.dp))
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Text(
+                    text = "Ink Lab",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.primary,
+                )
+                Spacer(Modifier.width(8.dp))
+                InkLabTabs(
+                    selected = tab,
+                    onSelect = { tab = it },
+                    modifier = Modifier.weight(1f),
+                )
+            }
+            Spacer(Modifier.height(2.dp))
             Column(
                 modifier = Modifier
-                    .heightIn(max = 260.dp)
+                    .heightIn(max = 96.dp)
                     .verticalScroll(rememberScrollState(), reverseScrolling = false),
             ) {
                 val t = InkEngine.tuning
@@ -663,11 +675,15 @@ internal fun formatHighlightCopy(): String = buildString {
  * treatment as the rest of the lab (docs/DESIGN.md).
  */
 @Composable
-private fun InkLabTabs(selected: InkLabTab, onSelect: (InkLabTab) -> Unit) {
+private fun InkLabTabs(
+    selected: InkLabTab,
+    onSelect: (InkLabTab) -> Unit,
+    modifier: Modifier = Modifier,
+) {
     Row(
         horizontalArrangement = Arrangement.spacedBy(12.dp),
         verticalAlignment = Alignment.CenterVertically,
-        modifier = Modifier
+        modifier = modifier
             .fillMaxWidth()
             .horizontalScroll(androidx.compose.foundation.rememberScrollState()),
     ) {

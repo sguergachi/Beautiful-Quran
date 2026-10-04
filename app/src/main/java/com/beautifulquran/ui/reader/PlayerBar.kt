@@ -22,6 +22,7 @@ import androidx.compose.material.icons.rounded.Pause
 import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material.icons.rounded.Repeat
 import androidx.compose.material.icons.rounded.RepeatOne
+import androidx.compose.material.icons.rounded.Tune
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -88,6 +89,9 @@ fun PlayerBar(
     onRepeatClick: () -> Unit,
     onSpeed: () -> Unit,
     onReciterClick: () -> Unit,
+    inkLabAvailable: Boolean = false,
+    inkLabOpen: Boolean = false,
+    onInkLabClick: () -> Unit = {},
     /**
      * Cover controls in the reciter row, such as Close. The scrolling play
      * bar never puts a back arrow here. The caller aligns them. The
@@ -116,16 +120,34 @@ fun PlayerBar(
                 ),
         ) {
             Box(Modifier.fillMaxWidth()) {
-                ReciterNameButton(
-                    name = reciterName,
-                    onClick = onReciterClick,
-                    enabled = enabled,
-                    disclosure = true,
-                    modifier = Modifier
-                        .align(Alignment.Center)
-                        .padding(horizontal = edgePad)
-                        .graphicsLayer { alpha = chromeAlpha() },
-                )
+                if (inkLabOpen) {
+                    InkLabPanel(
+                        modifier = Modifier
+                            .align(Alignment.Center)
+                            .padding(start = if (inkLabAvailable) 48.dp else 0.dp, end = edgePad),
+                    )
+                } else {
+                    val centeredInset = maxOf(edgePad, if (inkLabAvailable) 48.dp else 0.dp)
+                    ReciterNameButton(
+                        name = reciterName,
+                        onClick = onReciterClick,
+                        enabled = enabled,
+                        disclosure = true,
+                        modifier = Modifier
+                            .align(Alignment.Center)
+                            .padding(horizontal = centeredInset)
+                            .graphicsLayer { alpha = chromeAlpha() },
+                    )
+                }
+                if (inkLabAvailable) {
+                    InkLabToggleButton(
+                        expanded = inkLabOpen,
+                        onClick = onInkLabClick,
+                        modifier = Modifier
+                            .align(Alignment.CenterStart)
+                            .graphicsLayer { alpha = chromeAlpha() },
+                    )
+                }
                 edgeChrome()
             }
             belowReciter()
@@ -237,6 +259,22 @@ fun PlayerBar(
                 }
             }
         }
+    }
+}
+
+@Composable
+internal fun InkLabToggleButton(
+    expanded: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    IconButton(onClick = onClick, modifier = modifier.size(40.dp)) {
+        Icon(
+            imageVector = Icons.Rounded.Tune,
+            contentDescription = if (expanded) "Close Ink Lab" else "Open Ink Lab",
+            tint = if (expanded) MaterialTheme.colorScheme.primary else QuranTheme.ink.furniture,
+            modifier = Modifier.size(20.dp),
+        )
     }
 }
 
