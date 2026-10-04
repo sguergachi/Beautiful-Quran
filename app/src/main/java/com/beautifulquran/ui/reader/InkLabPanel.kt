@@ -32,6 +32,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.beautifulquran.playback.Tarji
 import com.beautifulquran.ui.theme.ContextualGuideTuning
@@ -109,7 +110,7 @@ fun InkLabPanel(
             Spacer(Modifier.height(2.dp))
             Column(
                 modifier = Modifier
-                    .heightIn(max = 136.dp)
+                    .heightIn(max = 220.dp)
                     .verticalScroll(rememberScrollState(), reverseScrolling = false),
             ) {
                 val t = InkEngine.tuning
@@ -870,6 +871,11 @@ private fun TarjiStatusLine() {
         text = "Detector: $status",
         style = MaterialTheme.typography.labelSmall,
         color = signalColor,
+        // Two lines always: the readout grows and shrinks with play and
+        // pause, and must not push the dials under the finger about.
+        minLines = 2,
+        maxLines = 2,
+        overflow = TextOverflow.Ellipsis,
         modifier = Modifier
             .fillMaxWidth()
             .padding(bottom = 4.dp),
@@ -898,6 +904,9 @@ private fun TarjiWordLine() {
         text = "Word: $status",
         style = MaterialTheme.typography.labelSmall,
         color = MaterialTheme.colorScheme.onSurfaceVariant,
+        minLines = 2,
+        maxLines = 2,
+        overflow = TextOverflow.Ellipsis,
         modifier = Modifier
             .fillMaxWidth()
             .padding(bottom = 4.dp),
