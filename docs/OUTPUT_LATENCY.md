@@ -123,6 +123,16 @@ to Auto; a manual adjustment shifts the words and shimmer by the same amount.
 4. `AudioDeviceCallback` refreshes on add/remove so mid-surah connect /
    disconnect updates the raw PCM offset.
 
+`PlaybackService` also watches changes to this preset for its entire lifetime,
+including while paused or with the reader closed. A change between speaker,
+classic Bluetooth, and LE stops and prepares an already-loaded player. Media3
+releases the old AudioTrack and its timestamp/latency state, then buffers the
+same media item at the same position with the existing play/pause intent.
+Bluetooth disconnect still pauses through Media3's noisy-output handling;
+the refresh does not call play or seek. Idle and completed playlists stay idle.
+This can briefly rebuffer an actively playing route switch. It adds no word-lag
+estimate: highlighting continues to use the fresh presentation clock directly.
+
 Classification is “BT device present among outputs,” not a full active-route
 graph. That matches the usual “headphones connected → media goes there” case
 and stays thin.
@@ -163,6 +173,8 @@ compensation is separate — see [TIMINGS_LAB.md](TIMINGS_LAB.md)).
 | `domain/OutputLatencyTest.kt` | Spec for classify + heard clamp |
 | `domain/ReciterSync.kt` | Pure reciter-specific word-clock calibration |
 | `playback/AudioOutputLatency.kt` | Android device watch → `StateFlow` latency |
+| `playback/AudioRouteRefresh.kt` | Service-lifetime route changes → fresh output clock at the same place |
+| `playback/AudioRouteRefreshTest.kt` | Disconnect/reconnect commands, idle protection, collector lifetime |
 | `ui/reader/ReaderViewModel.kt` | Applies heard clock on the poll path |
 | `web/src/domain/OutputLatency.ts` | Same pure presets + `highlightMs` (Vitest twin) |
 | `web/src/store/appStore.ts` | Applies lead (+ LOCAL lag) on the poll path |
