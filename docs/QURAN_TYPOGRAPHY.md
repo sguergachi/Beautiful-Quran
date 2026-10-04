@@ -605,11 +605,16 @@ Two ways to have them, and the book uses both. The leaf *remembers its size* —
 `SettingsRepository.rememberLeafMetrics` keeps the well and the measure with the
 window they were laid out in, so a leaf on a folded phone is never mistaken for
 the leaf on an unfolded one. And where nothing is remembered, the figures are
-*worked out*: `MushafBelowLeaf` is everything the reading sheet sets under the
-paper — folio band, dial, transport, the reserved reciter band — and the leaf is
-the window less the system bars less that, which `englishLeafSlotPx` carries the
-rest of the way through the page margin, the grid's bands and the fore-edge. The
-pager calls the same function to size the leaf it draws, so the two cannot drift.
+*worked out*: `MushafBelowLeaf` is everything the reading sheet reserves under
+the paper with Ink Lab closed — folio band, dial, transport, and the 48 dp
+reciter / Ink Lab band — and the leaf is the window less the system bars less that, which
+`englishLeafSlotPx` carries the rest of the way through the page margin, the
+grid's bands and the fore-edge. Opening Ink Lab replaces the reciter name with
+its tabs and content; that measured extra height takes space from the leaf, so
+the English book is repaginated for the open panel. Those temporary metrics are
+not remembered: the next launch starts from the closed band the root predicted.
+The pager calls the same function to size the leaf it draws, so the two cannot
+drift.
 
 Either way `MainActivity` paginates the whole book at the root, before the
 reader exists: a thousand text layouts on a background thread while the chapter

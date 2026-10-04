@@ -813,7 +813,10 @@ chevron: the name and cue are one quiet button leading to reciter settings.
 In developer mode a quiet tuning control shares that line. Opening it replaces
 the name with the Ink Lab tabs and selected controls inside the playbar; the
 bar grows only by the panel's measured height, and the reading column clears
-it as it does the return pill. The same control closes the panel.
+it as it does the return pill. In Mushaf layout, the same control lives in the
+reserved band under the transport; it replaces the reciter name there and the
+leaf gives the open panel its measured height. The same control closes the
+panel.
 
 ## Color
 

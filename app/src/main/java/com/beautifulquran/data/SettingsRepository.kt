@@ -123,8 +123,9 @@ internal fun decodeFavoriteReciterIds(stored: Set<String>?): Set<Int> =
  * from a build whose leaf was a different shape is worse than no figure at all —
  * it paginates the whole book against a leaf that no longer exists, and the
  * symptom is a leaf that stops a few words short of its own last line. **Bump
- * this whenever anything in `MushafGrid`, `MushafLeafBands` or the leaf's
- * fore-edge changes**, and the next launch measures instead of remembering.
+ * this whenever anything in `MushafGrid`, `MushafLeafBands`, the leaf's
+ * fore-edge, or its reserved footer geometry changes**, and the next launch
+ * measures instead of remembering.
  *
  * This is load-bearing. The app's root paginates the whole English book from
  * these figures before the reader exists, so a stamp that outlives the geometry
@@ -133,7 +134,7 @@ internal fun decodeFavoriteReciterIds(stored: Set<String>?): Set<Int> =
  * The leaf corrects it the moment it lays out and measures something else, but
  * the reader sees the correction as pages rearranging under them.
  */
-private const val LEAF_METRICS_VERSION = 3
+private const val LEAF_METRICS_VERSION = 4
 
 class SettingsRepository(context: Context) {
 
