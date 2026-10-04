@@ -106,8 +106,10 @@ For word gloss, transliteration, and QCF layout, both clients:
    preserves the prior token and rows. Android's short “Quran cache refreshed”
    system toast is emitted only after that successful atomic commit.
 
-Android stores authenticated rows in `qf-content-cache.db`; the browser uses
-IndexedDB. Neither cache is part of Git, the APK, or the Pages artifact. After
+Android stores authenticated rows in `qf-content-cache.db`; opening/migration
+and the launch checkpoint decision run on the background IO scope so the first
+cover frame does not wait on SQLite. The browser uses IndexedDB. Neither cache
+is part of Git, the APK, or the Pages artifact. After
 bootstrap, the saved opaque Content Sync token yields native row upserts/deletes
 or a snapshot only for an invalidated resource. Snapshot replacement, mapping,
 full-corpus validation, and checkpoint advancement share one transaction; a

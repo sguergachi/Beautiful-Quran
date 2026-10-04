@@ -52,6 +52,19 @@ The cast is recorded once at full strength and the turn changes only its layer
 alpha (`CompositingStrategy.ModulateAlpha`, so no offscreen buffer clips the
 spill past the sheet's edge).
 
+The entrance cover follows that rule too. Caption alpha stays a `State` until
+its layer reads it, and the loading rule reads its sweep only in its Canvas;
+neither animation recomposes the cover. The leather's geometric field is a
+separate, static recording whose wash changes only layer alpha with
+`ModulateAlpha`, preserving each stroke's translucency without rebuilding the
+large tiled path or re-recording the board. The medallion retains its
+stroke-by-stroke build and the titles retain their soft letter washes.
+
+The QF SQLite cache opens and migrates lazily on the first background read.
+The application launches its checkpoint/refresh decision on `Dispatchers.IO`,
+so these disk operations do not delay the first cover composition. The bundled
+database verification and existing entrance readiness checks still run.
+
 The scroll playback bar keeps one owner throughout every stack turn.
 Home covers the mounted bar before playback creates a session; its draw-phase
 transform shares the reader's reveal offset, scale, and whole-sheet pivot.

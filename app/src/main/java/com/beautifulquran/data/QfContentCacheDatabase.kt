@@ -23,64 +23,67 @@ import kotlinx.serialization.json.longOrNull
 /** On-device implementation of QF's separate cache and sync-token tables. */
 class QfContentCacheDatabase(context: Context) : QfContentSyncStore, QfRuntimeMushafStore {
     private var contentChangedInApply = false
-    private val db = SQLiteDatabase.openOrCreateDatabase(
-        File(context.noBackupFilesDir, "qf-content-cache.db"),
-        null,
-    ).apply {
-        execSQL("""
-            CREATE TABLE IF NOT EXISTS sync_state (
-                resource_filter TEXT PRIMARY KEY NOT NULL,
-                sync_token TEXT NOT NULL,
-                updated_at_ms INTEGER NOT NULL,
-                last_refresh_api_calls INTEGER
-            )
-        """.trimIndent())
-        if (!hasColumn("sync_state", "last_refresh_api_calls")) {
-            execSQL("ALTER TABLE sync_state ADD COLUMN last_refresh_api_calls INTEGER")
-            // Every successful legacy snapshot reads the same 190 chapter pages.
-            execSQL(
-                "UPDATE sync_state SET last_refresh_api_calls = 190 " +
-                    "WHERE sync_token LIKE 'legacy-%'",
-            )
-        }
-        execSQL("""
-            CREATE TABLE IF NOT EXISTS cached_rows (
-                resource_group TEXT NOT NULL,
-                resource_id INTEGER NOT NULL,
-                record_type TEXT NOT NULL,
-                record_key TEXT NOT NULL,
-                payload TEXT NOT NULL,
-                updated_at TEXT NOT NULL,
-                verse_id INTEGER,
-                position_in_verse INTEGER,
-                PRIMARY KEY (resource_group, resource_id, record_type, record_key)
-            )
-        """.trimIndent())
-        execSQL("""
-            CREATE TABLE IF NOT EXISTS reader_words (
-                surah_id INTEGER NOT NULL,
-                ayah_number INTEGER NOT NULL,
-                position INTEGER NOT NULL,
-                translation_en TEXT NOT NULL,
-                transliteration TEXT NOT NULL,
-                qcf_v2 TEXT NOT NULL,
-                qcf_page INTEGER NOT NULL,
-                qcf_line INTEGER NOT NULL,
-                qcf_span_end INTEGER NOT NULL,
-                ayah_page INTEGER NOT NULL,
-                PRIMARY KEY (surah_id, ayah_number, position)
-            )
-        """.trimIndent())
-        if (!hasColumn("cached_rows", "verse_id")) {
-            execSQL("ALTER TABLE cached_rows ADD COLUMN verse_id INTEGER")
-            execSQL("ALTER TABLE cached_rows ADD COLUMN position_in_verse INTEGER")
-        }
-        // Schema v5 adds stable QF verse ordering and the typed reader view.
-        if (version < 5) {
-            execSQL("DELETE FROM cached_rows")
-            execSQL("DELETE FROM sync_state")
-            execSQL("DELETE FROM reader_words")
-            version = 5
+    // The first background cache read owns opening and migration, not Application.onCreate.
+    private val db by lazy {
+        SQLiteDatabase.openOrCreateDatabase(
+            File(context.noBackupFilesDir, "qf-content-cache.db"),
+            null,
+        ).apply {
+            execSQL("""
+                CREATE TABLE IF NOT EXISTS sync_state (
+                    resource_filter TEXT PRIMARY KEY NOT NULL,
+                    sync_token TEXT NOT NULL,
+                    updated_at_ms INTEGER NOT NULL,
+                    last_refresh_api_calls INTEGER
+                )
+            """.trimIndent())
+            if (!hasColumn("sync_state", "last_refresh_api_calls")) {
+                execSQL("ALTER TABLE sync_state ADD COLUMN last_refresh_api_calls INTEGER")
+                // Every successful legacy snapshot reads the same 190 chapter pages.
+                execSQL(
+                    "UPDATE sync_state SET last_refresh_api_calls = 190 " +
+                        "WHERE sync_token LIKE 'legacy-%'",
+                )
+            }
+            execSQL("""
+                CREATE TABLE IF NOT EXISTS cached_rows (
+                    resource_group TEXT NOT NULL,
+                    resource_id INTEGER NOT NULL,
+                    record_type TEXT NOT NULL,
+                    record_key TEXT NOT NULL,
+                    payload TEXT NOT NULL,
+                    updated_at TEXT NOT NULL,
+                    verse_id INTEGER,
+                    position_in_verse INTEGER,
+                    PRIMARY KEY (resource_group, resource_id, record_type, record_key)
+                )
+            """.trimIndent())
+            execSQL("""
+                CREATE TABLE IF NOT EXISTS reader_words (
+                    surah_id INTEGER NOT NULL,
+                    ayah_number INTEGER NOT NULL,
+                    position INTEGER NOT NULL,
+                    translation_en TEXT NOT NULL,
+                    transliteration TEXT NOT NULL,
+                    qcf_v2 TEXT NOT NULL,
+                    qcf_page INTEGER NOT NULL,
+                    qcf_line INTEGER NOT NULL,
+                    qcf_span_end INTEGER NOT NULL,
+                    ayah_page INTEGER NOT NULL,
+                    PRIMARY KEY (surah_id, ayah_number, position)
+                )
+            """.trimIndent())
+            if (!hasColumn("cached_rows", "verse_id")) {
+                execSQL("ALTER TABLE cached_rows ADD COLUMN verse_id INTEGER")
+                execSQL("ALTER TABLE cached_rows ADD COLUMN position_in_verse INTEGER")
+            }
+            // Schema v5 adds stable QF verse ordering and the typed reader view.
+            if (version < 5) {
+                execSQL("DELETE FROM cached_rows")
+                execSQL("DELETE FROM sync_state")
+                execSQL("DELETE FROM reader_words")
+                version = 5
+            }
         }
     }
 

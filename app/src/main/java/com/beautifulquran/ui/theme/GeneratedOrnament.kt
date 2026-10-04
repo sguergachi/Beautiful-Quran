@@ -498,17 +498,14 @@ fun GeneratedBorderBand(
 }
 
 /**
- * A generated geometric field with filigree tiled at whisper ink — the cover's leather
- * tooling when [build] is given (washes in over the first half of the
- * build, re-drawing only, geometry built once per size), or a chapter's
- * static surah-header backdrop when [build] is null (fully inked from the
- * first frame, fixed typography rather than a ceremony).
+ * A generated geometric field with filigree tiled at whisper ink. Geometry
+ * is built once per size; the cover washes this static tooling in with its
+ * own layer alpha, while chapter backdrops arrive fully inked.
  */
 fun Modifier.generatedFieldWeave(
     field: FieldSpec,
     ink: Color,
     embossLight: Color,
-    build: State<Float>? = null,
 ): Modifier = clipToBounds().drawWithCache {
     // Tile one cell past every edge so the weave reads continuous at the
     // bounds, then clip so neighbouring sections never paint over each other
@@ -537,13 +534,11 @@ fun Modifier.generatedFieldWeave(
     }
     val styles = listOf(Stroke(width = 0.6.dp.toPx()), Stroke(width = 0.33.dp.toPx()))
     onDrawBehind {
-        val a = if (build == null) 1f else (build.value / 0.55f).coerceIn(0f, 1f)
-        if (a <= 0f) return@onDrawBehind
         for (i in weaves.indices) {
             translate(-0.6f, -0.6f) {
-                drawPath(weaves[i], embossLight.copy(alpha = embossLight.alpha * a), style = styles[i])
+                drawPath(weaves[i], embossLight, style = styles[i])
             }
-            drawPath(weaves[i], ink.copy(alpha = ink.alpha * a), style = styles[i])
+            drawPath(weaves[i], ink, style = styles[i])
         }
     }
 }
