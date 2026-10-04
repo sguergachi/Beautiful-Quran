@@ -167,8 +167,10 @@ clearly breathing glow. Raise one without the other and it is a strobe again.
 **Finding the words that can pulse.** **Mark candidates** on the same tab
 draws a green baseline under every word `InkEngine.tarjiEligible` admits — a
 long madd, a ghunnah or the verse's closing hold on its own letters. As the
-word is recited the baseline becomes a graph of the pulse it was given, in
-reading order across the word's span in time, and stays until the verse is
+word is recited the baseline becomes a sparkline, in reading order across
+the word's span in time: faint, the pulse the ear heard; bold over it, the
+part the word's light was given. A faint wave with nothing bold over it is a
+reverberation the detector did not admit. It stays until the verse is
 unloaded. It is a lab mark, session-only, and is not drawn on the English
 mushaf's prose.
 

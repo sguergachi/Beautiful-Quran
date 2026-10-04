@@ -1082,7 +1082,6 @@ internal fun rememberWaslProgress(
 internal val ActiveWordBottomMargin = 132.dp
 private val GlintLayerBleed = 40.dp
 private const val TARJI_TEST_PULSE_HZ = 6.0
-private const val TARJI_TRACE_DEFAULT_MS = 3_000
 
 /** Measures a target as (top, bottom) in LazyColumn viewport pixels. */
 private typealias ViewportBoundsMeasure = () -> Pair<Float, Float>?
@@ -1282,7 +1281,7 @@ private fun Modifier.layeredBaseInk(motion: InkMotion, rtl: Boolean): Modifier =
 /** The Ink Lab's pulse graph under a word that may pulse (see [ShapedWordBloom.PulseTrace]). */
 private fun Modifier.tarjiPulseTrace(trace: InkEngine.TarjiTrace, color: Color, rtl: Boolean): Modifier =
     drawBehind {
-        drawPulseTrace(0f, size.width, size.height, trace.samples, trace.filled, rtl, color)
+        drawPulseTrace(0f, size.width, size.height, trace.voice, trace.light, trace.count, trace.covered, rtl, color)
     }
 
 /** Draw-phase alpha gate for a glyph layer, padded by [GlintLayerBleed] so the
@@ -1381,18 +1380,12 @@ private fun rememberTarjiGate(
         }
         trace?.reset()
         var traceStart = 0L
-        // Through the word by the ear's place in it, or by the clock where
-        // that is not known yet.
-        fun traced(now: Long, earMediaMs: Long, value: Float) {
+        // By the frame clock from the word's first lit frame: the same clock
+        // the light itself is drawn on.
+        fun traced(now: Long, voiceNow: Float, lightNow: Float) {
             if (trace == null) return
             if (traceStart == 0L) traceStart = now
-            val span = (durationMs ?: 0).takeIf { it > 0 } ?: TARJI_TRACE_DEFAULT_MS
-            val elapsedMs = if (earMediaMs != Long.MIN_VALUE && wordStartMs != Long.MIN_VALUE) {
-                (earMediaMs - wordStartMs).toFloat()
-            } else {
-                (now - traceStart) / 1_000_000f
-            }
-            trace.record(elapsedMs / span, value)
+            trace.record((now - traceStart) / 1_000_000f, (durationMs ?: 0).toFloat(), voiceNow, lightNow)
         }
         if (test) {
             // The lab's steady pulse: the paint alone, no detector in the way.
@@ -1400,7 +1393,7 @@ private fun rememberTarjiGate(
             while (true) {
                 withFrameNanos { now ->
                     val swing = kotlin.math.sin(now / 1e9 * 2.0 * Math.PI * TARJI_TEST_PULSE_HZ).toFloat()
-                    traced(now, Long.MIN_VALUE, swing)
+                    traced(now, swing, swing)
                     val glow = light.next(swing, now, InkEngine.tuning.tarjiLightSmoothMs)
                     frame.value = InkEngine.GlintResonance(peak = 1f, light = swing, glow = glow)
                     InkEngine.TarjiProbe.admitted = true
@@ -1440,7 +1433,7 @@ private fun rememberTarjiGate(
                     InkEngine.GlintResonance.Idle
                 }
                 frame.value = pulse.copy(glow = light.next(pulse.light, now, smoothMs))
-                traced(now, ear.earMediaMs, pulse.light)
+                traced(now, ear.tremolo / 1.5f, pulse.light)
                 InkEngine.TarjiProbe.admitted = pulse !== InkEngine.GlintResonance.Idle
                 InkEngine.TarjiProbe.gain = g
                 InkEngine.TarjiProbe.glow = frame.value.glow
@@ -2053,7 +2046,8 @@ internal fun buildShapedBlooms(
     motions.forEachIndexed { index, motion ->
         val trace = motion.tarjiTrace ?: return@forEachIndexed
         val range = rendered.wordRanges.getOrNull(index) ?: return@forEachIndexed
-        blooms += ShapedWordBloom.PulseTrace(range, motion.tarjiTraceColor, trace.samples, trace.filled)
+        blooms += ShapedWordBloom.PulseTrace(
+            range, motion.tarjiTraceColor, trace.voice, trace.light, trace.count, trace.covered)
     }
     blooms.addShapedInkMotionBlooms(
         motions = motions,

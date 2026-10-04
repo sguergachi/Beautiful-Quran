@@ -224,8 +224,10 @@ sealed class ShapedWordBloom {
     class PulseTrace(
         override val range: IntRange,
         val color: Color,
-        val samples: FloatArray,
-        val filled: Int,
+        val voice: FloatArray,
+        val light: FloatArray,
+        val count: Int,
+        val covered: Float,
     ) : ShapedWordBloom()
 
     /** Tinted ink (orange repeat, white-gold glint): shaped glyphs tinted to
@@ -259,41 +261,50 @@ sealed class ShapedWordBloom {
 }
 
 /**
- * A word's pulse as a small graph under it: a faint baseline across
- * [left]..[right], and the first [filled] of [samples] (−1..1, the word's
- * span in time) drawn over it in reading order. [bottom] is the word's box.
+ * A word's pulse as a sparkline under it, in reading order across
+ * [left]..[right]: the wave the ear heard ([voice], faint) and over it the
+ * part the word's light was given ([light], bold). Both are −1..1; the first
+ * [count] samples span [covered] (0..1) of the width. [bottom] is the word's
+ * box. With nothing recorded yet it is a faint baseline: the word may pulse.
  */
 internal fun DrawScope.drawPulseTrace(
     left: Float,
     right: Float,
     bottom: Float,
-    samples: FloatArray,
-    filled: Int,
+    voice: FloatArray,
+    light: FloatArray,
+    count: Int,
+    covered: Float,
     rtl: Boolean,
     color: Color,
 ) {
     val inset = 2.dp.toPx()
     val width = right - left - inset * 2f
-    if (width <= 0f || samples.isEmpty()) return
-    val swing = 5.dp.toPx()
+    if (width <= 0f) return
+    val swing = 6.dp.toPx()
     val baseline = bottom - swing - 1.dp.toPx()
-    drawLine(
-        color = color.copy(alpha = color.alpha * 0.4f),
-        start = Offset(left + inset, baseline),
-        end = Offset(right - inset, baseline),
-        strokeWidth = 1.dp.toPx(),
-    )
+    val faint = color.copy(alpha = color.alpha * 0.4f)
+    drawLine(faint, Offset(left + inset, baseline), Offset(right - inset, baseline), 1.dp.toPx())
+    val n = count.coerceAtMost(minOf(voice.size, light.size))
+    if (n < 2) return
+    val reach = width * covered.coerceIn(0f, 1f)
     fun x(i: Int): Float {
-        val along = (i + 0.5f) / samples.size * width
+        val along = i / (n - 1f) * reach
         return if (rtl) right - inset - along else left + inset + along
     }
-    val stroke = 1.5.dp.toPx()
-    for (i in 1 until filled.coerceAtMost(samples.size)) {
+    for (i in 1 until n) {
+        drawLine(
+            color = faint,
+            start = Offset(x(i - 1), baseline - voice[i - 1] * swing),
+            end = Offset(x(i), baseline - voice[i] * swing),
+            strokeWidth = 1.dp.toPx(),
+        )
+        if (light[i - 1] == 0f && light[i] == 0f) continue
         drawLine(
             color = color,
-            start = Offset(x(i - 1), baseline - samples[i - 1].coerceIn(-1f, 1f) * swing),
-            end = Offset(x(i), baseline - samples[i].coerceIn(-1f, 1f) * swing),
-            strokeWidth = stroke,
+            start = Offset(x(i - 1), baseline - light[i - 1] * swing),
+            end = Offset(x(i), baseline - light[i] * swing),
+            strokeWidth = 1.75.dp.toPx(),
             cap = StrokeCap.Round,
         )
     }
@@ -461,7 +472,10 @@ fun Modifier.shapedWordBloom(
                 is ShapedWordBloom.PulseTrace -> {
                     val rtl = textLayout.getParagraphDirection(start) == ResolvedTextDirection.Rtl
                     lineBoundsCache.boundsFor(textLayout, start, endExclusive).forEach { bounds ->
-                        drawPulseTrace(bounds.left, bounds.right, bounds.bottom, bloom.samples, bloom.filled, rtl, bloom.color)
+                        drawPulseTrace(
+                            bounds.left, bounds.right, bounds.bottom,
+                            bloom.voice, bloom.light, bloom.count, bloom.covered, rtl, bloom.color,
+                        )
                     }
                 }
                 is ShapedWordBloom.UpcomingDim -> {

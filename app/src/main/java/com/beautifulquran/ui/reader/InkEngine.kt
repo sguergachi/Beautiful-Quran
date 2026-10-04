@@ -570,29 +570,47 @@ object InkEngine {
     var tarjiMarkCandidates by mutableStateOf(false)
 
     /**
-     * The pulse one word was given, over the word's own span in time: what the
-     * lab draws under a candidate. Main thread only.
+     * What one word's voice did while it was recited, sampled every
+     * [TARJI_TRACE_STEP_MS]: the pulse the ear heard ([voice]) and the part of
+     * it the word's light was given ([light]). The lab draws both under a
+     * candidate, so a reverberation that was heard but not admitted shows as a
+     * faint wave with nothing bold over it. Main thread only.
      */
     class TarjiTrace {
-        val samples = FloatArray(TARJI_TRACE_BINS)
-        var filled by androidx.compose.runtime.mutableIntStateOf(0)
+        val voice = FloatArray(TARJI_TRACE_SAMPLES)
+        val light = FloatArray(TARJI_TRACE_SAMPLES)
+        var count by androidx.compose.runtime.mutableIntStateOf(0)
+            private set
+        /** The time the word's width stands for: its length, or longer if it ran on. */
+        var spanMs = 0f
             private set
 
         fun reset() {
-            samples.fill(0f)
-            filled = 0
+            voice.fill(0f)
+            light.fill(0f)
+            spanMs = 0f
+            count = 0
         }
 
-        /** [value] (−1..1) at [progress] (0..1) through the word; never backwards. */
-        fun record(progress: Float, value: Float) {
-            val bin = (progress.coerceIn(0f, 1f) * samples.size).toInt().coerceAtMost(samples.lastIndex)
-            if (bin < filled - 1) return
-            for (i in (filled - 1).coerceAtLeast(0)..bin) samples[i] = value
-            if (bin + 1 > filled) filled = bin + 1
+        /** The pulse [elapsedMs] into a word [wordMs] long. Time never runs backwards. */
+        fun record(elapsedMs: Float, wordMs: Float, voiceNow: Float, lightNow: Float) {
+            val index = (elapsedMs / TARJI_TRACE_STEP_MS).toInt()
+            if (index < count - 1 || index >= voice.size) return
+            for (i in (count - 1).coerceAtLeast(0)..index) {
+                voice[i] = voiceNow.coerceIn(-1f, 1f)
+                light[i] = lightNow.coerceIn(-1f, 1f)
+            }
+            spanMs = maxOf(wordMs, (index + 1) * TARJI_TRACE_STEP_MS)
+            if (index + 1 > count) count = index + 1
         }
+
+        /** How much of the word's width the samples so far cover. */
+        val covered: Float get() = if (spanMs <= 0f) 0f else (count * TARJI_TRACE_STEP_MS / spanMs).coerceIn(0f, 1f)
     }
 
-    const val TARJI_TRACE_BINS = 64
+    const val TARJI_TRACE_STEP_MS = 25f
+    /** Ten seconds: longer than any held word. */
+    const val TARJI_TRACE_SAMPLES = 400
 
     // Keyed by the word itself and held weakly: a trace lives as long as its verse is loaded.
     private val tarjiTraces = java.util.WeakHashMap<Any, TarjiTrace>()

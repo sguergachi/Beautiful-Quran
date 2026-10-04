@@ -287,11 +287,8 @@ class TarjiEarSample {
     var eventStartHop = -1
     /** That hop on the media-item clock; [VoiceEnergy.NO_EVENT_MS] if unknown. */
     var eventStartMediaMs = Long.MIN_VALUE
-    /** Where the ear is on the media-item clock; [Long.MIN_VALUE] if unknown. */
-    var earMediaMs = Long.MIN_VALUE
 
     fun clear() {
-        earMediaMs = Long.MIN_VALUE
         tremolo = 0f
         gain = 0f
         reverberating = false
