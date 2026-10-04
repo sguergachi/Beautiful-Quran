@@ -44,6 +44,7 @@ import androidx.compose.ui.draw.drawWithCache
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.onGloballyPositioned
@@ -327,7 +328,7 @@ fun EntranceCover(
     val sheen: State<Float> = if ((tilt as? GildingTilt)?.hasSensor == false) loadSweep else tilt
     // State view of the build so renderers re-draw (never recompose) as it runs.
     val buildState = remember { derivedStateOf { build.value } }
-    val captionAlpha by animateFloatAsState(
+    val captionAlpha = animateFloatAsState(
         targetValue = if (captionVisible) 1f else 0f,
         animationSpec = tween(900),
         label = "duaCaption",
@@ -372,12 +373,6 @@ fun EntranceCover(
                     )
                     onDrawBehind { drawRect(leather) }
                 }
-                .generatedFieldWeave(
-                    field = ornament.field,
-                    ink = accents.gold.copy(alpha = 0.05f),
-                    embossLight = accents.embossLight.copy(alpha = 0.04f),
-                    build = buildState,
-                )
                 .quietClickable(
                     enabled = phase != EntrancePhase.Opening,
                     role = Role.Button,
@@ -392,6 +387,21 @@ fun EntranceCover(
                     role = Role.Button
                 },
         ) {
+            // Record the field once; its wash changes only layer alpha, so it
+            // never re-records the leather, title, or border around it.
+            Spacer(
+                Modifier
+                    .matchParentSize()
+                    .graphicsLayer {
+                        alpha = (build.value / 0.55f).coerceIn(0f, 1f)
+                        compositingStrategy = CompositingStrategy.ModulateAlpha
+                    }
+                    .generatedFieldWeave(
+                        field = ornament.field,
+                        ink = accents.gold.copy(alpha = 0.05f),
+                        embossLight = accents.embossLight.copy(alpha = 0.04f),
+                    ),
+            )
             // The gilt frame, border frieze, and corner seals share one inset
             // box so they stay concentric with each other while clearing the
             // camera and system bars. The leather beneath them still bleeds
@@ -489,7 +499,7 @@ fun EntranceCover(
                 // The isti'adha — text fade-in before the cover opens.
                 Column(
                     horizontalAlignment = Alignment.CenterHorizontally,
-                    modifier = Modifier.graphicsLayer { alpha = captionAlpha },
+                    modifier = Modifier.graphicsLayer { alpha = captionAlpha.value },
                 ) {
                     Text(
                         text = ISTIADHA_ARABIC,
@@ -515,7 +525,7 @@ fun EntranceCover(
                 }
                 // Loading occupies the lower air rather than changing the
                 // height of the du'a and moving the title mid-wash.
-                Box(Modifier.weight(0.5f).fillMaxWidth().graphicsLayer { alpha = captionAlpha }) {
+                Box(Modifier.weight(0.5f).fillMaxWidth().graphicsLayer { alpha = captionAlpha.value }) {
                     if (!contentReady) {
                         Column(
                             horizontalAlignment = Alignment.CenterHorizontally,
@@ -530,7 +540,7 @@ fun EntranceCover(
                             Spacer(Modifier.height(9.dp))
                             CoverLoadProgress(
                                 progress = loadProgress,
-                                motion = loadSweep.value,
+                                motion = loadSweep,
                                 modifier = Modifier.width(156.dp),
                             )
                         }
@@ -545,13 +555,14 @@ fun EntranceCover(
 @Composable
 private fun CoverLoadProgress(
     progress: Float?,
-    motion: Float,
+    motion: State<Float>,
     modifier: Modifier = Modifier,
 ) {
     val value = progress?.coerceIn(0f, 1f)
     Canvas(
         modifier
             .height(2.dp)
+            .graphicsLayer()
             .semantics {
                 progressBarRangeInfo = value?.let {
                     ProgressBarRangeInfo(it, 0f..1f)
@@ -570,7 +581,7 @@ private fun CoverLoadProgress(
             val segment = size.width * 0.28f
             drawRoundRect(
                 CoverAccents.goldBright.copy(alpha = 0.62f),
-                topLeft = Offset((size.width - segment) * motion, 0f),
+                topLeft = Offset((size.width - segment) * motion.value, 0f),
                 size = size.copy(width = segment),
                 cornerRadius = radius,
             )
