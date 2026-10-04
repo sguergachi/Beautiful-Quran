@@ -63,21 +63,6 @@ export function leavesReader(
 }
 
 /**
- * Facing mushaf leaves: Chapters is the left-most page of the open book and
- * Settings the right-most, each lying under the leaf on its side. Going to
- * Chapters lifts the verso leaf and swings it right ('on'); going to
- * Settings lifts the recto leaf and swings it left ('back'). Leaving either
- * lays that leaf back down over it. Bookmarks is a sheet laid over Chapters,
- * not a page of the book, so it turns nothing.
- */
-export function bookTurnDirection(from: StackLayer, to: StackLayer): 'on' | 'back' | null {
-  const start = Math.max(COVER_LAYER, from)
-  const end = Math.max(COVER_LAYER, to)
-  if (start === end) return null
-  return end > start ? 'back' : 'on'
-}
-
-/**
  * Chapters is the first page, so the sweep that turns a leaf back (a finger
  * moving left) closes the book from it. Bookmarks owns the other direction.
  */
@@ -89,21 +74,27 @@ export function closesBook(layer: StackLayer, dx: number): boolean {
 const BOOK_PAGES = 604
 
 /**
- * The share of the book's leaves lying on the right-hand pile, 0 to 1.
+ * The share of the book's leaves lying on the right-hand pile, 0 to 1, with
+ * the book open at [page].
  *
  * Pages run right to left, so each leaf read is turned over onto the right:
  * at page 1 the whole block is on the left, at the last page on the right.
- * On facing leaves, Chapters is the left-most page, under every leaf of the
- * left pile, and Settings the right-most, under every leaf of the right
- * pile. Showing either turns that whole pile over, so nothing is left on
- * its side. Before a chapter is chosen the book stands open at Chapters.
+ * The piles are how far into the book the reader is, and nothing else moves
+ * them. Chapters stands at the start, opposite page 1, so going to it turns
+ * every leaf read back onto the left, and choosing a chapter from it turns
+ * exactly the leaves that come before that chapter. Before a chapter is
+ * chosen the book is at its start. (Chapters used to lie at the far end,
+ * under the whole left pile, and Settings under the whole right one: going
+ * to either turned the pages still to be read, and choosing the first
+ * chapter turned the whole block.)
  */
-export function bookRightShare(leaves: boolean, stack: StackLayer, page: number | null): number {
-  if (leaves && stack <= COVER_LAYER) return 1
-  if (leaves && stack === SETTINGS_LAYER) return 0
-  if (page == null) return 1
+export function bookRightShare(page: number | null): number {
+  if (page == null) return 0
   return Math.min(1, Math.max(0, (page - 1) / (BOOK_PAGES - 1)))
 }
+
+/** The spread the book is open at while Chapters is showing: its first. */
+export const CHAPTERS_PLACE = 1
 
 /** One leaf turns in this long (its motion is pageTurnMotion). */
 export const LEAF_TURN_MS = 760
@@ -186,17 +177,15 @@ export function bookPiles(right: number, air: BookAir | null): { right: number; 
  * A reader is built anew for every chapter, and one built with no memory of
  * the book took it to be open already at its own page: choosing a chapter
  * turned nothing, and the piles jumped to their new thickness. The book is
- * one object and it is somewhere before the reader arrives. This is that
- * place: the sheet the book rested on, the page its leaves were open at, and
- * the picture of what lay on the right-hand page, which is the face of the
- * pile a new reader turns to reach its chapter.
+ * one object and it is somewhere before the reader arrives: this is that
+ * place. A reader just built starts on it and turns the leaves between it
+ * and its own page.
  */
 export interface BookRest {
+  /** The sheet the book rested on. */
   layer: StackLayer
-  /** The right-hand page of the spread last settled on; null before any chapter. */
+  /** The right-hand page of the spread last settled on; null before the leaves are open. */
   place: number | null
-  /** The kept picture of the recto leaf last read (pageTurn's album), if any. */
-  rectoKey: string | null
 }
 
 let rest: BookRest | null = null
@@ -206,32 +195,12 @@ export function bookRest(): BookRest | null {
 }
 
 export function restBook(change: Partial<BookRest>) {
-  rest = { layer: COVER_LAYER, place: null, rectoKey: null, ...rest, ...change }
+  rest = { layer: COVER_LAYER, place: null, ...rest, ...change }
 }
 
 /** For tests: the book is nowhere again. */
 export function forgetBookRest() {
   rest = null
-}
-
-/**
- * How a reader that has just been built finds the book, and so what it must
- * turn to open it at its own page.
- *
- * - From Chapters or Settings ([sheet]): the pile turned over to show that
- *   sheet goes home, less whatever now belongs on the far side. Its face is
- *   what lay on the page it lifts from.
- * - From another page of the book ([from]): the leaves in between turn, as
- *   they do for any far page.
- * - Nowhere yet, or already there: nothing turns.
- */
-export function bookArrival(
-  found: BookRest | null,
-  layer: StackLayer,
-): { sheet: StackLayer } | { from: number } | null {
-  if (!found) return null
-  if (found.layer !== layer) return { sheet: found.layer }
-  return layer === READER_LAYER && found.place != null ? { from: found.place } : null
 }
 
 /** A swipe belongs to the sheet on which its pointer went down. */

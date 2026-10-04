@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { bookRightShare, bookTurnDirection, bookmarkSwipeDestination, closesBook, facingPage, turnMs, leavesReader, readerVisible, spreadLayers, bookPiles, bookArrival, bookRest, forgetBookRest, restBook } from '../bookSpread'
+import { CHAPTERS_PLACE, bookRightShare, bookmarkSwipeDestination, closesBook, facingPage, turnMs, leavesReader, readerVisible, spreadLayers, bookPiles, bookRest, forgetBookRest, restBook } from '../bookSpread'
 import { BOOKMARKS_LAYER, COVER_LAYER, READER_LAYER, SETTINGS_LAYER } from '../stack'
 
 describe('spreadLayers', () => {
@@ -70,30 +70,6 @@ describe('bookmark swipe ownership', () => {
   })
 })
 
-describe('sheet turns on facing leaves', () => {
-  it('lifts the verso leaf to uncover Chapters, the left-most page', () => {
-    expect(bookTurnDirection(READER_LAYER, COVER_LAYER)).toBe('on')
-    expect(bookTurnDirection(SETTINGS_LAYER, COVER_LAYER)).toBe('on')
-  })
-
-  it('lifts the recto leaf to uncover Settings, the right-most page', () => {
-    expect(bookTurnDirection(READER_LAYER, SETTINGS_LAYER)).toBe('back')
-    expect(bookTurnDirection(COVER_LAYER, SETTINGS_LAYER)).toBe('back')
-  })
-
-  it('lays the same leaf back down on the way out', () => {
-    expect(bookTurnDirection(COVER_LAYER, READER_LAYER)).toBe('back')
-    expect(bookTurnDirection(SETTINGS_LAYER, READER_LAYER)).toBe('on')
-  })
-
-  it('turns nothing for Bookmarks, a sheet laid over Chapters', () => {
-    expect(bookTurnDirection(READER_LAYER, READER_LAYER)).toBeNull()
-    expect(bookTurnDirection(COVER_LAYER, BOOKMARKS_LAYER)).toBeNull()
-    expect(bookTurnDirection(BOOKMARKS_LAYER, COVER_LAYER)).toBeNull()
-    expect(bookTurnDirection(BOOKMARKS_LAYER, READER_LAYER)).toBe('back')
-  })
-})
-
 describe('closing the book', () => {
   it('takes the backward sweep on Chapters only', () => {
     expect(closesBook(COVER_LAYER, -80)).toBe(true)
@@ -112,24 +88,26 @@ describe('a loose sheet', () => {
 
 describe('the two piles of the page block', () => {
   it('puts the whole block on the left at the first page and on the right at the last', () => {
-    expect(bookRightShare(true, READER_LAYER, 1)).toBe(0)
-    expect(bookRightShare(true, READER_LAYER, 604)).toBe(1)
-    expect(bookRightShare(true, READER_LAYER, 302)).toBeCloseTo(0.499, 3)
-    // A scrolling chapter counts by the page it begins on.
-    expect(bookRightShare(false, READER_LAYER, 604)).toBe(1)
+    expect(bookRightShare(1)).toBe(0)
+    expect(bookRightShare(604)).toBe(1)
+    expect(bookRightShare(302)).toBeCloseTo(0.499, 3)
   })
 
-  it('turns the whole left pile over for Chapters and the whole right pile for Settings', () => {
-    expect(bookRightShare(true, COVER_LAYER, 300)).toBe(1)
-    expect(bookRightShare(true, BOOKMARKS_LAYER, 300)).toBe(1)
-    expect(bookRightShare(true, SETTINGS_LAYER, 300)).toBe(0)
-    // Beside a scrolling chapter Chapters and Settings are laid over a page; nothing turns.
-    expect(bookRightShare(false, COVER_LAYER, 300)).toBeCloseTo(299 / 603, 6)
-    expect(bookRightShare(false, SETTINGS_LAYER, 300)).toBeCloseTo(299 / 603, 6)
+  it('is at its start before a chapter is chosen, and while Chapters shows', () => {
+    expect(bookRightShare(null)).toBe(0)
+    expect(bookRightShare(CHAPTERS_PLACE)).toBe(0)
   })
 
-  it('stands open at Chapters before a chapter is chosen', () => {
-    expect(bookRightShare(false, COVER_LAYER, null)).toBe(1)
+  it('turns, from Chapters, exactly the leaves that come before the chapter chosen', () => {
+    const turned = (page: number) => Math.abs(bookRightShare(page) - bookRightShare(CHAPTERS_PLACE))
+    // Al-Baqarah begins on the first spread: nothing to turn.
+    expect(turned(1)).toBe(0)
+    // Al-Mumtahanah, on page 549: nine tenths of the book.
+    expect(turned(549)).toBeCloseTo(548 / 603)
+    // The last spread: every leaf.
+    expect(turned(603)).toBeCloseTo(602 / 603)
+    // And going back to Chapters turns the same leaves home.
+    expect(bookRightShare(CHAPTERS_PLACE) - bookRightShare(549)).toBeCloseTo(-548 / 603)
   })
 
   it('takes longer to turn a pile than a leaf', () => {
@@ -145,12 +123,12 @@ describe('the piles while leaves are in the air', () => {
   })
 
   it('take the lifted leaves off their pile at once and add them to the other only on landing', () => {
-    // Going to Settings from a quarter of the way in: the right pile is turned to the left.
-    const toSettings = bookPiles(0, { from: 0.75, to: 0 })
-    expect(toSettings.right).toBe(0)
+    // Going to Chapters from three quarters of the way in: the leaves read are turned back.
+    const toChapters = bookPiles(0, { from: 0.75, to: 0 })
+    expect(toChapters.right).toBe(0)
     // The left pile still has only what lay on it: the rest is in the air.
-    expect(toSettings.left).toBeCloseTo(0.25)
-    // Coming back, those leaves leave the left pile and have not reached the right.
+    expect(toChapters.left).toBeCloseTo(0.25)
+    // Choosing that chapter again, they leave the left pile and have not reached the right.
     const back = bookPiles(0.75, { from: 0, to: 0.75 })
     expect(back.right).toBe(0)
     expect(back.left).toBeCloseTo(0.25)
@@ -165,38 +143,15 @@ describe('the piles while leaves are in the air', () => {
   })
 })
 
-describe('where a new reader finds the book', () => {
-  it('turns nothing when the book has not been anywhere', () => {
-    expect(bookArrival(null, READER_LAYER)).toBeNull()
-  })
-
-  it('turns the pile home from the sheet the book was resting on', () => {
-    // Chapters shows with the whole block turned over; a chapter is then chosen.
-    expect(bookArrival({ layer: COVER_LAYER, place: null, rectoKey: null }, READER_LAYER)).toEqual({ sheet: COVER_LAYER })
-    expect(bookArrival({ layer: COVER_LAYER, place: 311, rectoKey: 'k' }, READER_LAYER)).toEqual({ sheet: COVER_LAYER })
-    // What that pile carries is the difference between the two rests.
-    const turned = Math.abs(bookRightShare(true, READER_LAYER, 549) - bookRightShare(true, COVER_LAYER, 549))
-    expect(turned).toBeCloseTo(1 - 548 / 603)
-  })
-
-  it('turns the leaves in between when the book was open at another page', () => {
-    expect(bookArrival({ layer: READER_LAYER, place: 409, rectoKey: null }, READER_LAYER)).toEqual({ from: 409 })
-  })
-
-  it('turns nothing for a reader built under a sheet that has not changed', () => {
-    expect(bookArrival({ layer: SETTINGS_LAYER, place: 409, rectoKey: null }, SETTINGS_LAYER)).toBeNull()
-    expect(bookArrival({ layer: READER_LAYER, place: null, rectoKey: null }, READER_LAYER)).toBeNull()
-  })
-
+describe('where the book rests', () => {
   it('keeps what it is told and forgets nothing else', () => {
     forgetBookRest()
     expect(bookRest()).toBeNull()
     restBook({ layer: READER_LAYER })
     restBook({ place: 12 })
-    restBook({ rectoKey: 'page' })
-    expect(bookRest()).toEqual({ layer: READER_LAYER, place: 12, rectoKey: 'page' })
+    expect(bookRest()).toEqual({ layer: READER_LAYER, place: 12 })
     restBook({ layer: COVER_LAYER })
-    expect(bookRest()).toEqual({ layer: COVER_LAYER, place: 12, rectoKey: 'page' })
+    expect(bookRest()).toEqual({ layer: COVER_LAYER, place: 12 })
     forgetBookRest()
   })
 })

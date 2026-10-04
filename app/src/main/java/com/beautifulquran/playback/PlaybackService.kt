@@ -38,6 +38,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.guava.future
+import kotlinx.coroutines.launch
 
 class PlaybackService : MediaLibraryService() {
 
@@ -95,6 +96,9 @@ class PlaybackService : MediaLibraryService() {
             player,
             getSystemService(AudioManager::class.java),
         )
+        serviceScope.launch {
+            refreshAudioOutputOnRouteChange(player, (application as QuranApp).outputLatency.latencyMs)
+        }
 
         // Notification / lock-screen content tap opens the app. Without this,
         // Media3 still shows transport controls but the body tap is a no-op.

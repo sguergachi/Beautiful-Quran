@@ -24,8 +24,10 @@ export const TurningLeaf = memo(function TurningLeaf({
   ms = LEAF_TURN_MS,
   face,
   faceKey,
+  faceFrom,
   back,
   backKey,
+  backFrom,
   onEnd,
 }: {
   /**
@@ -44,8 +46,14 @@ export const TurningLeaf = memo(function TurningLeaf({
   face: ReactNode
   /** What the face's picture is kept under; absent for a page that changes as it is read. */
   faceKey?: string
+  /**
+   * A page that is already on the book, pictured where it lies instead of
+   * being built here (the Chapters sheet).
+   */
+  faceFrom?: () => Element | null
   back?: ReactNode
   backKey?: string
+  backFrom?: () => Element | null
   onEnd: () => void
 }) {
   const root = useRef<HTMLDivElement>(null)
@@ -65,7 +73,17 @@ export const TurningLeaf = memo(function TurningLeaf({
     if (!el) return
     return startPageTurn(
       el,
-      { hinge, dir, single, wad: pile ? wad : 0, ms, frontKey: faceKey, backKey },
+      {
+        hinge,
+        dir,
+        single,
+        wad: pile ? wad : 0,
+        ms,
+        frontKey: faceKey,
+        backKey,
+        frontSource: faceFrom?.() ?? undefined,
+        backSource: backFrom?.() ?? undefined,
+      },
       () => ended.current(),
     )
     // A turn is one flight: a new one is a new leaf (its key).

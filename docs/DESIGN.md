@@ -26,10 +26,14 @@ the Reader on the right, the binding's boards showing past the page block and
 the paper turning down into the gutter. Every sheet has one place in the
 book. The left page is Chapters, and Bookmarks is laid over it. The right
 page is whatever was opened from it: the title page before a chapter is
-chosen, then the chapter, with Settings laid over that. Settings used to lie
-on the left beside a scrolling chapter (so the right page answered a change
-as it was made) and on the right of facing leaves; one sheet in two places
-is not a book, and Customize carries its own preview leaf. A control both
+chosen, then the chapter. **Settings is a loose sheet**, laid over the
+right-hand page as the word viewer is laid over the page facing its word: it
+comes down onto the page from above the window, a step of the grid smaller
+than the page on every side, and is drawn back up off it. It is not a page
+of the book and turns nothing. (It used to lie on the left beside a
+scrolling chapter and on the right of facing leaves, and then as the book's
+last page, under the whole right-hand pile, where reaching it turned every
+page still to be read.) Customize carries its own preview leaf. A control both
 pages would carry shows once: the page being read keeps Settings, and
 Chapters gives its own up. The book closes from Chapters: a sweep back
 across it, or the strip of its fore-edge, whose mark shows only under a
@@ -63,22 +67,26 @@ the board. So the pages themselves never move as the piles change. On
 facing leaves a pile changes only by the leaves that are turned: they leave
 it as they lift and join the other as they land, and while they are in the
 air they lie on neither. Nothing is added to a pile that was not turned onto
-it. The book is one object and it is always somewhere: choosing a
-chapter turns the leaves between where the book lies and that chapter's
-page, as one pile, off what was showing (the title page, or the leaf last
-read). From Chapters that is the pile turned over to show it, coming home
-less the leaves that now belong on the right; from another page, the leaves
-in between.
+it.
 
-On facing leaves Chapters is the left-most page, under every leaf of the left
-pile, and Settings the right-most, under every leaf of the right pile. Going
-to either turns that whole pile over, as one thick wad with its own
-fore-edge, head and foot, and coming back turns it home. A far page does the
-same with the leaves in between. A pile is stiffer and slower than a leaf:
-it barely curls, and the whole block takes half as long again to turn. It
-turns about the middle of its own thickness, so it starts and lands level
-with the pages. (Chapters at the left end is the reader's choice of where
-the book begins; in a bound mushaf that is the back board.)
+**Chapters is the book's first page.** On facing leaves it stands at the
+start, on the left, and the page opposite it is always the book's first
+(Al-Fatihah), before any chapter is chosen and whenever Chapters is turned
+to. Pages run right to left, so at the start the whole block lies on the
+left, under Chapters. Choosing a chapter turns exactly the leaves that come
+before it onto the right, as one pile: none for the first spread, nine
+tenths of the book for chapter 60, all of it for the last. Going to Chapters
+turns every leaf read back onto the left, and the pile lands *as* Chapters;
+leaving it, the pile lifts off with Chapters on its face. So the two piles
+are always how far into the book the reader is, and nothing but a turned
+leaf changes them. The place being read is kept while Chapters shows, and
+touching the page opposite it turns back there. A pile is stiffer and slower
+than a leaf: it barely curls, and the whole block takes half as long again
+to turn. It turns about the middle of its own thickness, so it starts and
+lands level with the pages. (Chapters used to lie at the far end, under the
+whole left pile, with the reading page left showing beside it: going to it
+turned the pages still to be read, and choosing the first chapter turned the
+whole block.)
 
 **The golden page.** A page is 1 : φ. Its margins run inner : head :
 fore-edge : foot = 1 : φ : φ : φ² in that same module, which leaves a text
