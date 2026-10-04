@@ -467,9 +467,9 @@ private fun PreviewWord(
         val level = com.beautifulquran.ui.theme.glintLightLevel(
             light.next(resonance.light, System.nanoTime(), tuning.tarjiLightSmoothMs),
             ui.displayKnobs.glintBrightness, tuning.tarjiLightRise, tuning.tarjiLightFall)
-        val pulseColor = com.beautifulquran.ui.theme.glintLightColor(GlintGold, level)
+        val pulseColor = com.beautifulquran.ui.theme.glintLightColor(GlintGold, level, tuning.glintRestLight)
         Canvas(Modifier.fillMaxSize()) {
-            val amount = com.beautifulquran.ui.theme.glintGlowAlpha(0.3f, level, tuning.tarjiGlowGain)
+            val amount = com.beautifulquran.ui.theme.glintGlowAlpha(0.3f, level, tuning.tarjiGlowGain, tuning.glintRestLight)
             if (amount > 0.01f) {
                 drawCircle(
                     color = pulseColor.copy(alpha = (amount * 0.55f).coerceIn(0f, 0.75f)),

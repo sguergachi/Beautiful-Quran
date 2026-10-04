@@ -30,7 +30,7 @@ import kotlin.math.pow
 /** Resting light of the glyphs, as a fraction of the glint colour: the headroom
  * a crest rises into. No channel is ever scaled past the colour itself, so the
  * hue cannot drift toward white. */
-internal const val GLINT_REST_LIGHT = 0.96f
+internal const val GLINT_REST_LIGHT = 0.94f
 
 /** Display gamma: luminance of a layer goes as its alpha to this power. */
 private const val GLOW_GAMMA = 2.2f
@@ -50,12 +50,12 @@ internal fun glintLightLevel(glow: Float, brightness: Float, rise: Float, fall: 
 }
 
 /** Linear-light scale of the glyphs at [level]; full is the colour itself. */
-internal fun glintLetterLight(level: Float): Float =
-    (GLINT_REST_LIGHT * level).coerceIn(0f, 1f)
+internal fun glintLetterLight(level: Float, rest: Float = GLINT_REST_LIGHT): Float =
+    (rest.coerceIn(0f, 1f) * level).coerceIn(0f, 1f)
 
 /** [base] at [level] times its resting light, scaled in linear light so the hue holds. */
-internal fun glintLightColor(base: Color, level: Float): Color {
-    val scale = glintLetterLight(level)
+internal fun glintLightColor(base: Color, level: Float, rest: Float = GLINT_REST_LIGHT): Color {
+    val scale = glintLetterLight(level, rest)
     if (scale == 1f) return base
     val linear = base.convert(ColorSpaces.LinearSrgb)
     return Color(
@@ -74,8 +74,9 @@ internal fun glintLightColor(base: Color, level: Float): Color {
  * alpha supplies only the rest — through the display gamma, so the swing is
  * the one stated and not its 2.2th power.
  */
-internal fun glintGlowAlpha(resting: Float, level: Float, gain: Float): Float {
-    val letters = glintLetterLight(level) / GLINT_REST_LIGHT
+internal fun glintGlowAlpha(resting: Float, level: Float, gain: Float, rest: Float = GLINT_REST_LIGHT): Float {
+    if (rest <= 0f) return 0f
+    val letters = glintLetterLight(level, rest) / rest.coerceAtMost(1f)
     if (letters <= 0f) return 0f
     val glow = (1f + gain * (level - 1f)).coerceAtLeast(0f)
     return (resting * (glow / letters).pow(1f / GLOW_GAMMA)).coerceIn(0f, 1f)

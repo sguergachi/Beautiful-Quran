@@ -1080,6 +1080,7 @@ internal fun rememberWaslProgress(
  * Shared with [ReaderScreen] so the focus engine's bottom guard matches. */
 internal val ActiveWordBottomMargin = 132.dp
 private val GlintLayerBleed = 40.dp
+private const val TARJI_TEST_PULSE_HZ = 6.0
 
 /** Measures a target as (top, bottom) in LazyColumn viewport pixels. */
 private typealias ViewportBoundsMeasure = () -> Pair<Float, Float>?
@@ -1225,7 +1226,7 @@ internal class InkMotion(
 
     /** Live lit colour, read by both paint adapters inside their draw scopes. */
     fun glintColor(base: Color): Color =
-        com.beautifulquran.ui.theme.glintLightColor(base, glintLevel)
+        com.beautifulquran.ui.theme.glintLightColor(base, glintLevel, InkEngine.tuning.glintRestLight)
 
     /** The veil's colour: the same light, warmed toward its edge. */
     fun glintVeilColor(base: Color): Color =
@@ -1238,7 +1239,8 @@ internal class InkMotion(
      * further than the glyphs do. */
     fun glintGlowColorAlpha(base: Float): Float =
         com.beautifulquran.ui.theme.glintGlowAlpha(
-            InkEngine.glintRestAlpha(base), glintLevel, InkEngine.tuning.tarjiGlowGain)
+            InkEngine.glintRestAlpha(base), glintLevel, InkEngine.tuning.tarjiGlowGain,
+            InkEngine.tuning.glintRestLight)
 
     /** Whether the orange repeat overlay still has any ink to show. */
     val showRepeatLayer: Boolean get() = repeatAlpha > 0f
@@ -1336,6 +1338,7 @@ private fun Modifier.layeredGlintHalo(
 private fun rememberTarjiGate(
     active: Boolean,
     eligible: Boolean,
+    test: Boolean,
     activation: Long,
     repeat: Boolean,
     wordStartMs: Long,
@@ -1343,13 +1346,37 @@ private fun rememberTarjiGate(
     val frame = remember {
         mutableStateOf(InkEngine.GlintResonance.Idle)
     }
-    val run = active && eligible &&
+    val run = test || (active && eligible &&
         InkEngine.tuning.glintResonance &&
-        InkEngine.tuning.glintResonanceDepth > 0f
-    LaunchedEffect(run, activation, repeat) {
+        InkEngine.tuning.glintResonanceDepth > 0f)
+    if (active) {
+        androidx.compose.runtime.SideEffect {
+            InkEngine.TarjiProbe.wordStartMs = wordStartMs
+            InkEngine.TarjiProbe.eligible = eligible
+            if (!run) {
+                InkEngine.TarjiProbe.admitted = false
+                InkEngine.TarjiProbe.glow = 0f
+            }
+        }
+    }
+    LaunchedEffect(run, test, activation, repeat) {
         if (!run) {
             frame.value = InkEngine.GlintResonance.Idle
             return@LaunchedEffect
+        }
+        if (test) {
+            // The lab's steady pulse: the paint alone, no detector in the way.
+            val light = com.beautifulquran.ui.theme.GlintLight()
+            while (true) {
+                withFrameNanos { now ->
+                    val swing = kotlin.math.sin(now / 1e9 * 2.0 * Math.PI * TARJI_TEST_PULSE_HZ).toFloat()
+                    val glow = light.next(swing, now, InkEngine.tuning.tarjiLightSmoothMs)
+                    frame.value = InkEngine.GlintResonance(peak = 1f, light = swing, glow = glow)
+                    InkEngine.TarjiProbe.admitted = true
+                    InkEngine.TarjiProbe.gain = 1f
+                    InkEngine.TarjiProbe.glow = glow
+                }
+            }
         }
         val eventGate = TarjiWordGate()
         val light = com.beautifulquran.ui.theme.GlintLight()
@@ -1382,6 +1409,9 @@ private fun rememberTarjiGate(
                     InkEngine.GlintResonance.Idle
                 }
                 frame.value = pulse.copy(glow = light.next(pulse.light, now, smoothMs))
+                InkEngine.TarjiProbe.admitted = pulse !== InkEngine.GlintResonance.Idle
+                InkEngine.TarjiProbe.gain = g
+                InkEngine.TarjiProbe.glow = frame.value.glow
                 if (com.beautifulquran.DevProfiling.captureStart.get() != null && now - lastReport >= 100_000_000L) {
                     lastReport = now
                     com.beautifulquran.DevProfiling.mark(
@@ -1470,6 +1500,7 @@ internal fun rememberInkMotions(
             tarji = rememberTarjiGate(
                 active = isActive,
                 eligible = tarjiEligible,
+                test = glinting && isActive && InkEngine.tarjiTestPulse,
                 activation = wordActivation,
                 repeat = ink.repeat,
                 wordStartMs = activeWordStartMs,

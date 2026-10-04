@@ -143,19 +143,26 @@ at all (Yoshida et al., *Brightness of the glare illusion*, 2008).
 **Tarjīʿ is that light getting a little brighter and slightly dimmer** with
 the voice (`GlintColor.kt`). Brightness only; the hue never changes.
 
-- One number, the **level**: 1 at rest, `1 + rise` (0.04) on a crest,
-  `1 − fall` (0.03) in a trough. The fall is less than the rise so the light
+- One number, the **level**: 1 at rest, `1 + rise` (0.06) on a crest,
+  `1 − fall` (0.04) in a trough. The fall is less than the rise so the light
   seems to lift with the voice rather than drop out between pulses.
 - The glyph tint is scaled by the level **in linear light**, so its
-  chromaticity holds; its cover does not change. It rests at 0.96 of the glint
-  colour (`GLINT_REST_LIGHT`) and is never scaled past the colour itself: a
+  chromaticity holds; its cover does not change. It rests at 0.94 of the glint
+  colour (`glintRestLight`) and is never scaled past the colour itself: a
   light already at full can only go white, and the first cut's crests did
   (`#FFF0C7` → `#FFFAD0`).
-- Every glow layer's **light** swings `gain` (3.5) times as far: +14 % / −10.5 %.
+- Every glow layer's **light** swings `gain` (4) times as far: +24 % / −16 %.
   Glare is linear in the light that causes it, and the glow is where the eye
   reads brightness, so it carries more of the swing than the glyphs can.
-  Stacked over one another the layers measure a little less: about 13–19 %
-  from trough to crest beside the ink, fading to nothing by 10 dp.
+  Stacked over one another the layers measure less than that beside the ink,
+  fading to nothing by 10 dp. A first cut at +4 % / −3 % and gain 3.5 measured
+  13–19 % from trough to crest and was too faint to notice on the phone.
+
+**Telling paint from detection.** The Tarjīʿ tab has a **Test pulse** (a steady
+6 Hz light on the lit word, detector bypassed) and a **Word** line saying
+whether the lit word is eligible, waiting, or pulsing and by how much. A word
+that pulses under the test but not with the voice is a detector matter
+(`docs/TARJI.md`), not a paint one.
 - **Alpha is not light.** The page is composited in gamma space, where a
   layer's luminance goes as its alpha to the 2.2: scaling alpha by 1.2 is half
   again as much light. `glintGlowAlpha` converts, so the swing is the one

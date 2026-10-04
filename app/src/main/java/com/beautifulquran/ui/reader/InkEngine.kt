@@ -122,14 +122,17 @@ object InkEngine {
         val glintBrightness: Float = 1f,
         /** How much brighter the glyphs' light gets on a vocal crest (fraction
          * of luminance). `GLINT_REST_LIGHT` is the headroom it rises into. */
-        val tarjiLightRise: Float = 0.04f,
+        val tarjiLightRise: Float = 0.06f,
+        /** Resting light of the glyphs as a fraction of the glint colour: the
+         * headroom a crest rises into (`glintLetterLight`). */
+        val glintRestLight: Float = 0.94f,
         /** How much dimmer it gets in a trough — less than the rise: the light
          * should seem to lift with the voice, not to drop out between pulses. */
-        val tarjiLightFall: Float = 0.03f,
+        val tarjiLightFall: Float = 0.04f,
         /** Smoothing of the light's motion (ms); its lag is read ahead and cancelled. */
         val tarjiLightSmoothMs: Float = 60f,
         /** How many times further the glow's light swings than the glyphs'. */
-        val tarjiGlowGain: Float = 3.5f,
+        val tarjiGlowGain: Float = 4f,
         /** Width of the ink feather relative to the word (see
          *  ui/theme/Fade.kt: the wash reads as a whole-word breath). */
         val washFeather: Float = 1.6f,
@@ -547,6 +550,26 @@ object InkEngine {
             ),
             prevArabic = prevArabic,
         )?.forWash(t.pacedFeather)
+    }
+
+    /**
+     * Ink Lab only: light the active word with a steady 6 Hz pulse, whatever
+     * the detector says, so the paint can be tuned apart from the detection.
+     * Session-only — never saved, never on outside the lab.
+     */
+    var tarjiTestPulse by mutableStateOf(false)
+
+    /**
+     * What the reader's light last did for the active word, for the Ink Lab's
+     * readout: whether the word may pulse at all, whether the detector's event
+     * was admitted, and the light it asked for. Written by the frame loop.
+     */
+    object TarjiProbe {
+        @Volatile var wordStartMs = -1L
+        @Volatile var eligible = false
+        @Volatile var admitted = false
+        @Volatile var gain = 0f
+        @Volatile var glow = 0f
     }
 
     /** Acoustic hold eligibility is independent of visual wash pacing and its lab toggles. */

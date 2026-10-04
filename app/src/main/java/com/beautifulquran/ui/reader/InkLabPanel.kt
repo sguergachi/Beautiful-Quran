@@ -360,23 +360,40 @@ fun InkLabPanel(
                             InkEngine.tuning = t.copy(glintResonance = it)
                         }
                         TarjiStatusLine()
+                        TarjiWordLine()
+                        TuningToggle("Test pulse (6 Hz)", InkEngine.tarjiTestPulse) {
+                            InkEngine.tarjiTestPulse = it
+                        }
+                        LabCaption(
+                            "Pulses the lit word steadily, whatever the " +
+                                "detector hears, so you can tune how the light " +
+                                "looks. If a word pulses here but not with the " +
+                                "voice, the detector is the cause, not these dials.",
+                        )
                         LabCaption(
                             "The word's light answers the voice: brighter on " +
                                 "each reverberation, slightly dimmer between. " +
                                 "Brightness only — the hue never changes. Aim " +
                                 "for just enough to feel it.",
                         )
-                        TuningSlider("Brighten on crest", t.tarjiLightRise, 0f..0.12f) {
+                        TuningSlider("Brighten on crest", t.tarjiLightRise, 0f..0.3f) {
                             InkEngine.tuning = t.copy(tarjiLightRise = it)
                         }
-                        TuningSlider("Dim in trough", t.tarjiLightFall, 0f..0.12f) {
+                        TuningSlider("Dim in trough", t.tarjiLightFall, 0f..0.3f) {
                             InkEngine.tuning = t.copy(tarjiLightFall = it)
                         }
                         LabCaption(
                             "How far the letters' light lifts and falls, as a " +
-                                "fraction of its resting brightness. Letters " +
-                                "have about 4% of headroom; past that only " +
-                                "the glow rises. Keep the dim under the lift.",
+                                "fraction of its resting brightness. Keep the " +
+                                "dim under the lift.",
+                        )
+                        TuningSlider("Letter rest light", t.glintRestLight, 0.7f..1f) {
+                            InkEngine.tuning = t.copy(glintRestLight = it)
+                        }
+                        LabCaption(
+                            "Letters can only brighten up to their own colour. " +
+                                "Resting lower leaves them room to rise: at " +
+                                "0.94 they have 6%; past that only the glow lifts.",
                         )
                         TuningSlider("Smoothness ms", t.tarjiLightSmoothMs, 0f..160f, integer = true) {
                             InkEngine.tuning = t.copy(tarjiLightSmoothMs = it)
@@ -385,7 +402,7 @@ fun InkLabPanel(
                             "Higher is a slower, softer swell. Its lag is read " +
                                 "ahead of the voice, so sync does not move.",
                         )
-                        TuningSlider("Glow swing ×", t.tarjiGlowGain, 0f..8f) {
+                        TuningSlider("Glow swing ×", t.tarjiGlowGain, 0f..16f) {
                             InkEngine.tuning = t.copy(tarjiGlowGain = it)
                         }
                         LabCaption(
@@ -614,6 +631,7 @@ internal fun formatTuningCopy(t: InkEngine.Tuning): String {
         appendLine("    glintVeilAlpha = ${f(t.glintVeilAlpha)},")
         appendLine("    glintVeilWarmth = ${f(t.glintVeilWarmth)},")
         appendLine("    tarjiLightRise = ${f(t.tarjiLightRise)},")
+        appendLine("    glintRestLight = ${f(t.glintRestLight)},")
         appendLine("    tarjiLightFall = ${f(t.tarjiLightFall)},")
         appendLine("    tarjiLightSmoothMs = ${f(t.tarjiLightSmoothMs)},")
         appendLine("    tarjiGlowGain = ${f(t.tarjiGlowGain)},")
@@ -856,6 +874,40 @@ private fun TarjiStatusLine() {
             .fillMaxWidth()
             .padding(bottom = 4.dp),
     )
+}
+
+/** Why the lit word is or is not pulsing: its own gates, apart from the detector's. */
+@Composable
+private fun TarjiWordLine() {
+    var status by remember { mutableStateOf("…") }
+    androidx.compose.runtime.LaunchedEffect(Unit) {
+        while (true) {
+            val p = InkEngine.TarjiProbe
+            val t = InkEngine.tuning
+            status = when {
+                p.wordStartMs < 0 -> "no word lit yet"
+                InkEngine.tarjiTestPulse -> "test pulse · light ${signedPercent(p.glow, t)}"
+                !p.eligible -> "not eligible — no madd, ghunnah or verse-end hold in its letters"
+                !p.admitted -> "eligible · waiting for a reverberation that starts inside it"
+                else -> "pulsing · gain ${"%.2f".format(p.gain)} · light ${signedPercent(p.glow, t)}"
+            }
+            kotlinx.coroutines.delay(100)
+        }
+    }
+    Text(
+        text = "Word: $status",
+        style = MaterialTheme.typography.labelSmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(bottom = 4.dp),
+    )
+}
+
+private fun signedPercent(glow: Float, t: InkEngine.Tuning): String {
+    val level = com.beautifulquran.ui.theme.glintLightLevel(
+        glow, t.glintBrightness, t.tarjiLightRise, t.tarjiLightFall)
+    return "%+.1f%%".format((level - 1f) * 100f)
 }
 
 /** Crest level of the synced tarjīʿ signal that lights the detector line

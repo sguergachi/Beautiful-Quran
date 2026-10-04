@@ -246,10 +246,10 @@ swing    = soft-knee(tremolo)                 // −1..1, the voice's own curve
 presence = min(1, 4·g)·depth                  // g = tremoloGain
 light    = presence·swing
 glow     = low-pass(light, 60 ms)             // GlintLight; lag read ahead
-level    = 1 + scale(brightness)·(rise·glow⁺ − fall·glow⁻)   // 1.04 … 0.97 shipped
+level    = 1 + scale(brightness)·(rise·glow⁺ − fall·glow⁻)   // 1.06 … 0.96 shipped
 ```
 
-`level` scales the glyph tint in linear light and, 3.5 times as far, the light
+`level` scales the glyph tint in linear light and, 4 times as far, the light
 of every glow layer (`docs/GLIMMER.md`; alpha is converted through the display
 gamma, and brightness past 100 % counts half). Never use `abs(tremolo)`: it brightens on
 both the loud crest and quiet trough, doubling the visual pulse rate. At
