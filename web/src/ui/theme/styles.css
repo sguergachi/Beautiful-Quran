@@ -2717,8 +2717,8 @@ button.ayah-mark {
   transition: opacity var(--ayah-mark-fade-ms, 400ms) var(--recede-ease);
 }
 
-/* A verse still to come waits with its words; its mark returns as the
-   verse's last word is reached. */
+/* A verse still to come waits with its words; its mark lights as the voice
+   takes the verse up (mushafMarkWaits). */
 .mushaf-mark[data-state='Upcoming'] {
   opacity: var(--upcoming-alpha, 0.2661);
   transition-duration: var(--recess-ms, 400ms);
@@ -6674,7 +6674,16 @@ html[data-entrance='true'] body {
 .app-shell[data-spread='true'] .book,
 .entrance-inside {
   --edge-r: calc(var(--book-edge-min) + var(--book-fan) * var(--book-right));
-  --edge-l: calc(var(--book-edge-min) + var(--book-fan) * (1 - var(--book-right)));
+  /* --book-left is given only with facing leaves, whose piles can both be
+     short of the block while a leaf is in the air (bookPiles). */
+  --edge-l: calc(var(--book-edge-min) + var(--book-fan) * var(--book-left, calc(1 - var(--book-right))));
+}
+
+/* Facing leaves are turned: a pile changes when a leaf is lifted off it or
+   laid on it, at once and by that much. Easing it over 900 ms grew the far
+   pile while the leaves that were to join it were still in the air. */
+.app-shell[data-spread='true'][data-leaves='true'] .book {
+  transition: opacity 520ms ease;
 }
 
 .book-page {
@@ -7465,10 +7474,9 @@ html[data-entrance-closing]
 }
 
 /* The leaf itself is one bent sheet on a canvas (paper/pageTurn). These are
-   the two pages its pictures are taken from: laid out exactly where they
-   lie on the book, the paper they stand on given as their background, and
-   never painted. The page the leaf lifts off lies on the side it is bound
-   from; the page it lands as lies on the other. */
+   the pages its pictures are taken from: laid out exactly where they lie on
+   the book (data-at), the paper they stand on given as their background,
+   and never painted. */
 .mushaf-flip-page {
   position: absolute;
   top: 0;
@@ -7478,18 +7486,16 @@ html[data-entrance-closing]
   background: var(--paper);
 }
 
-.mushaf-flip[data-hinge='right'] .mushaf-flip-page[data-face='front'],
-.mushaf-flip[data-hinge='left'] .mushaf-flip-page[data-face='back'] {
+.mushaf-flip-page[data-at='verso'] {
   left: 0;
 }
 
-.mushaf-flip[data-hinge='left'] .mushaf-flip-page[data-face='front'],
-.mushaf-flip[data-hinge='right'] .mushaf-flip-page[data-face='back'] {
+.mushaf-flip-page[data-at='recto'] {
   left: 50%;
 }
 
 /* A single leaf (phones) is the whole sheet, bound at its right edge. */
-.mushaf-flip--single .mushaf-flip-page[data-face] {
+.mushaf-flip-page[data-at='single'] {
   left: 0;
   width: 100%;
   display: flex;

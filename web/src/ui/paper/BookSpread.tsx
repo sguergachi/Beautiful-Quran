@@ -2,10 +2,12 @@ import { useMemo, type CSSProperties } from 'react'
 import { GeneratedRosette } from '../theme/GeneratedOrnament'
 import { generateCoverOrnament } from '../theme/ornamentGenerator'
 import {
+  bookPiles,
   bookRightShare,
   setLooseSheetSlot,
   setTurningLeafSlot,
   setVersoLeafSlot,
+  useBookAir,
   useBookPlace,
 } from './bookSpread'
 import type { StackLayer } from './stack'
@@ -35,13 +37,24 @@ export function BookSpread({
   // page turn, and the eased value restyles the book alone.
   const leavesPlace = useBookPlace()
   const right = bookRightShare(leaves, stack, leaves ? leavesPlace : chapterPage)
+  // Facing leaves are turned, so their piles change by the leaves that are
+  // turned and when they are: no leaf is on a pile while it is in the air.
+  const air = useBookAir()
+  const piles = bookPiles(right, leaves ? air : null)
   const medallion = useMemo(
     () => generateCoverOrnament((Math.random() * 0x7fffffff) | 0).medallion,
     [],
   )
   return (
     <>
-      <div className="book" aria-hidden="true" style={{ ['--book-right' as string]: right } as CSSProperties}>
+      <div
+        className="book"
+        aria-hidden="true"
+        style={{
+          ['--book-right' as string]: piles.right,
+          ...(leaves ? { ['--book-left' as string]: piles.left } : null),
+        } as CSSProperties}
+      >
         <div className="book-page book-page--verso" />
         <div className="book-page book-page--recto">
           {titlePage ? (

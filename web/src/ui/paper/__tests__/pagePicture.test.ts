@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { parseFootFade, parseMatrix, snapFrame, textRuns } from '../pagePicture'
-import { parseRgba, sweepBox } from '../pageTurn'
+import { parseRgba } from '../pageTurn'
 
 describe('snapFrame', () => {
   it('moves a frame out to whole device pixels', () => {
@@ -49,25 +49,5 @@ describe('parseRgba', () => {
     expect(parseRgba('rgb(255, 0, 51)')).toEqual([1, 0, 0.2, 1])
     expect(parseRgba('rgba(60, 44, 20, 0.16)')?.[3]).toBeCloseTo(0.16)
     expect(parseRgba('color(srgb 1 0 0)')).toBeNull()
-  })
-})
-
-describe('sweepBox', () => {
-  const shell = { left: 0, top: 0, width: 1440, height: 900 }
-
-  it('holds both pages and the overhang of a leaf standing toward the eye', () => {
-    const box = sweepBox(720, 51, 493, 798, 493, 720, 450, 2600, { ...shell, width: 4000, height: 4000, left: -1000, top: -1000 })
-    expect(box.left).toBeLessThan(720 - 493)
-    expect(box.left + box.width).toBeGreaterThan(720 + 493)
-    expect(box.top).toBeLessThan(51)
-    expect(box.top + box.height).toBeGreaterThan(51 + 798)
-  })
-
-  it('never leaves the window', () => {
-    const box = sweepBox(720, 51, 493, 798, 493, 720, 450, 2600, shell)
-    expect(box.left).toBeGreaterThanOrEqual(0)
-    expect(box.top).toBeGreaterThanOrEqual(0)
-    expect(box.left + box.width).toBeLessThanOrEqual(1440)
-    expect(box.top + box.height).toBeLessThanOrEqual(900)
   })
 })

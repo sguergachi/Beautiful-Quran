@@ -21,6 +21,15 @@ export interface Frame {
   height: number
 }
 
+/**
+ * [at], in CSS pixels, at the nearest whole device pixel. Layout positions
+ * are 64ths of a device pixel and reach here through a division by the
+ * scale, so a half is nudged back over the line it stood on.
+ */
+export function wholePixel(at: number, scale: number): number {
+  return Math.round(at * scale + 0.002) / scale
+}
+
 /** [frame] moved out to whole device pixels, so a texel is a pixel at rest. */
 export function snapFrame(frame: Frame, scale: number): Frame {
   const left = Math.round(frame.left * scale) / scale
@@ -64,17 +73,15 @@ export function textRuns(text: string): { start: number; end: number }[] {
  * Where the browser really paints, against where layout says: [x] and [y]
  * are added to a layout position to get the pixel it lands on.
  *
- * At one device pixel to the CSS pixel, Chromium rounds each run of text to
- * a whole pixel, paints a transformed box from a whole pixel and lays its
- * contents out from there, and does the same for a layer that is kept ready
- * to move (`will-change: transform`), without passing the fraction it
- * dropped on to what it holds. A picture that sets text on the fractions
- * layout reports stands a pixel off for about half the words of a page, and
- * they jump as the leaf lifts and lands. Rounded the same way, the picture
- * is the page (measured: 0.02% of a page's pixels differ, from 2%).
- *
- * On denser screens a word is at most half a CSS pixel off and nothing is
- * rounded: there the rule was measured not to hold.
+ * Chromium rounds each run of text to a whole device pixel, paints a
+ * transformed box from a whole pixel and lays its contents out from there,
+ * and does the same for a layer that is kept ready to move (`will-change:
+ * transform`), without passing the fraction it dropped on to what it holds.
+ * A picture that sets text on the fractions layout reports stands a pixel
+ * off for about half the words of a page, and they jump as the leaf lifts
+ * and lands. Rounded the same way, the picture is the page. Measured
+ * against Chromium's own painting, the share of a page's pixels that
+ * differ: 0.02% at 1x and 2x (from 2%), 0.3% at 1.25x (from 1.4%).
  */
 export interface Snap {
   x: number
@@ -84,10 +91,8 @@ export interface Snap {
 /**
  * How far the pixels of what [el] holds stand from where layout puts them:
  * each layer above it that is painted from a whole pixel drops a fraction.
- * Null where nothing is rounded (see [Snap]).
  */
-export function pixelDrift(el: Element | null, scale: number): Snap | null {
-  if (scale !== 1) return null
+export function pixelDrift(el: Element | null, scale: number): Snap {
   const layers: Element[] = []
   for (let at = el; at; at = at.parentElement) layers.unshift(at)
   const drift = { x: 0, y: 0 }
@@ -96,8 +101,8 @@ export function pixelDrift(el: Element | null, scale: number): Snap | null {
     const moved = style.transform !== 'none' && style.transform !== 'matrix(1, 0, 0, 1, 0, 0)'
     if (!moved && !style.willChange.includes('transform')) continue
     const box = layer.getBoundingClientRect()
-    drift.x = Math.round(box.left + drift.x) - box.left
-    drift.y = Math.round(box.top + drift.y) - box.top
+    drift.x = wholePixel(box.left + drift.x, scale) - box.left
+    drift.y = wholePixel(box.top + drift.y, scale) - box.top
   }
   return drift
 }
@@ -139,6 +144,7 @@ const spacesLetters = typeof CanvasRenderingContext2D !== 'undefined' &&
 interface Painting {
   placed: Map<Element, Placed>
   range: Range
+  scale: number
   /** Null where nothing is rounded. */
   snap: Snap | null
   /** How much of [snap] the canvas's own transform already carries. */
@@ -149,7 +155,8 @@ interface Painting {
  * Draws [source] and everything in it onto a canvas [frame] big, at [scale]
  * device pixels to the CSS pixel, on [paper]. [source] may be hidden with
  * `visibility`; it must be laid out. [drift] is that of the page this is a
- * picture of ([pixelDrift]), so the picture is rounded as that page is.
+ * picture of ([pixelDrift]), so the picture is rounded as that page is;
+ * with none it is set where layout reports, unrounded.
  */
 export function paintPage(
   source: HTMLElement,
@@ -180,7 +187,7 @@ export function paintPage(
   }
   source.setAttribute('data-flat', '')
   try {
-    const painting: Painting = { placed, range: document.createRange(), snap: drift, carried: { x: 0, y: 0 } }
+    const painting: Painting = { placed, range: document.createRange(), scale, snap: drift, carried: { x: 0, y: 0 } }
     for (const child of source.children) paintElement(ctx, child, 1, painting)
   } finally {
     source.removeAttribute('data-flat')
@@ -189,8 +196,8 @@ export function paintPage(
 }
 
 /** A layout position along one axis, as the canvas must be given it. */
-function pixel(at: number, drift: number | undefined, carried: number): number {
-  return drift == null ? at : Math.round(at + drift) - carried
+function pixel(at: number, drift: number | undefined, carried: number, scale: number): number {
+  return drift == null ? at : wholePixel(at + drift, scale) - carried
 }
 
 function paintElement(ctx: CanvasRenderingContext2D, el: Element, alpha: number, painting: Painting) {
@@ -208,7 +215,7 @@ function paintElement(ctx: CanvasRenderingContext2D, el: Element, alpha: number,
     const { snap, carried } = painting
     // Across only: down the page a run is rounded from where layout has it,
     // transformed box or not (so measured).
-    const within = snap ? { x: Math.round(box.left + snap.x) - box.left, y: snap.y } : carried
+    const within = snap ? { x: wholePixel(box.left + snap.x, painting.scale) - box.left, y: snap.y } : carried
     const lift = snap ? carried.y : within.y
     const x = box.left + within.x + turn.originX
     const y = box.top + lift + turn.originY
@@ -217,11 +224,11 @@ function paintElement(ctx: CanvasRenderingContext2D, el: Element, alpha: number,
     ctx.translate(within.x - x, lift - y)
     painting = { ...painting, snap: snap ? within : null, carried: { x: within.x, y: lift } }
   }
-  const { snap, carried } = painting
-  const left = pixel(box.left, snap?.x, carried.x)
-  const top = pixel(box.top, snap?.y, carried.y)
-  const right = pixel(box.right, snap?.x, carried.x)
-  const bottom = pixel(box.bottom, snap?.y, carried.y)
+  const { snap, carried, scale } = painting
+  const left = pixel(box.left, snap?.x, carried.x, scale)
+  const top = pixel(box.top, snap?.y, carried.y, scale)
+  const right = pixel(box.right, snap?.x, carried.x, scale)
+  const bottom = pixel(box.bottom, snap?.y, carried.y, scale)
 
   const fade = parseFootFade(style.maskImage || style.webkitMaskImage || '')
   // A faded block is drawn on a sheet of its own, so the fade takes the ink
@@ -285,7 +292,7 @@ function paintText(
   node: Text,
   style: CSSStyleDeclaration,
   alpha: number,
-  { range, snap, carried }: Painting,
+  { range, snap, carried, scale }: Painting,
 ) {
   const text = node.data
   const runs = textRuns(text)
@@ -303,16 +310,16 @@ function paintText(
     range.setEnd(node, run.end)
     const box = range.getBoundingClientRect()
     if (box.width <= 0 || box.height <= 0) continue
-    const baseline = pixel(box.top + baselineOf(node, range, font), snap?.y, carried.y)
+    const baseline = pixel(box.top + baselineOf(node, range, font), snap?.y, carried.y, scale)
     if (spacesLetters || spacing === '0px') {
-      ctx.fillText(text.slice(run.start, run.end), pixel(box.left, snap?.x, carried.x), baseline)
+      ctx.fillText(text.slice(run.start, run.end), pixel(box.left, snap?.x, carried.x, scale), baseline)
       continue
     }
     // No letter spacing on this canvas: set each letter where layout put it.
     for (let index = run.start; index < run.end; index++) {
       range.setStart(node, index)
       range.setEnd(node, index + 1)
-      ctx.fillText(text[index], pixel(range.getBoundingClientRect().left, snap?.x, carried.x), baseline)
+      ctx.fillText(text[index], pixel(range.getBoundingClientRect().left, snap?.x, carried.x, scale), baseline)
     }
   }
 }

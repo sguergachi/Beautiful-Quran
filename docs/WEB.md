@@ -418,7 +418,11 @@ eased over 900 ms) from `bookRightShare`, the share of the 302 leaves on the
 right, taken from the page the leaves are open at (`setBookPlace` from
 `MushafReader`) or where a scrolling chapter begins. `--edge-l` / `--edge-r`
 size the two fanned edges inside the fixed band; the rest of the band shows
-`--book-pastedown`. A turn carries a pile: `TurningLeaf` takes `wad` (share
+`--book-pastedown`. With facing leaves the piles are
+not eased: `bookPiles` gives each pile only the leaves that lie on it, the
+reader reports the place the book last *settled* on (`setBookPlace`) and the
+leaves of a turn while they are in the air (`setBookAir`), so a pile shrinks
+as its leaves lift and the other grows as they land. A turn carries a pile: `TurningLeaf` takes `wad` (share
 of the block; the thickness is share × `--book-block`) and `ms` (`turnMs`),
 and above `WAD_VISIBLE` the renderer sets the underside that far behind the
 face and draws the pile's fore-edge, head and foot. Sheet turns carry the
@@ -478,9 +482,9 @@ two-faced leaf (`TurningLeaf`) into `BookSpread`'s turn slot (`.mushaf-flip`,
   (the paper cover of a waiting word), opacity, clipping, 2D transforms and
   the English leaf's foot fade. `TurningLeaf` stages the two pages where they
   lie on the book, hidden (`.mushaf-flip-page`, `visibility: hidden`); they
-  are laid out and never painted. At one device pixel to the CSS pixel the
-  picture is rounded to pixels exactly as Chromium rounds the page
-  (`pixelDrift`, `Snap`), so nothing moves as the leaf lifts or lands.
+  are laid out and never painted. The picture is rounded to device pixels
+  exactly as Chromium rounds the page (`pixelDrift`, `Snap`), so nothing
+  moves as the leaf lifts or lands (checked at 1x, 1.25x and 2x).
 - `pageTurnGl.ts` — one canvas and one context kept for every turn. A
   72 × 12 mesh is bent in the vertex shader along that curve and projected
   with the CSS perspective the book was drawn in, so the page's plane is
@@ -492,12 +496,30 @@ two-faced leaf (`TurningLeaf`) into `BookSpread`'s turn slot (`.mushaf-flip`,
   `requestAnimationFrame`. The canvas covers only the box the leaf can reach
   and is in the DOM only while a leaf is in the air.
 
+**Pictures are kept ahead of the turn** (`keepPagePicture`, `LeafPicture`).
+Taking a page's picture is the slow part of a lift (the page has to be
+rendered, then some 20 ms to draw it and an upload), and done on the click it
+held the leaf still for 70–165 ms before it moved. A page that is not being
+recited looks the same until it is turned, so while nothing is happening
+`MushafReader` stages, one per idle period, the two pages that are open
+(either may lift: for a page turn, or to go to Chapters or Settings) and the
+page each neighbouring turn would land as, measuring a neighbour's hand first
+if it is not known. Each picture is kept under a key made of everything the
+leaf is drawn from (page, side, hand, leaf size, script, widening, a revision
+that any change of settings bumps; the album adds theme and pixel density)
+and is already on the GPU. `TurningLeaf` does not render a page whose
+picture is kept. The lift is then React's own work and one draw: about 20 ms
+to Settings and back, 25–40 ms for a page turn. A leaf that carries the
+voice changes word by word and has no key: its picture is taken as it lifts,
+and nothing is taken ahead while the voice is reading, since a picture costs
+a frame or two and the word being washed would stand still for them. The
+canvas is the whole window and is sized ahead of the turn: resized as a turn
+started, it came up empty for that frame and the page beneath showed through.
+
 It replaced eighteen flat strips of DOM hinged in CSS 3D (each a composited
 layer holding a slice of the page): on an RTX 3080 that ran 12–26 frames in
 1.4 s with single frames of 500–650 ms. The mesh runs every frame of the
-turn at the display's rate; the one long frame left is the lift itself
-(React rendering the two pages, about 40 ms to take their pictures, the
-upload), 70–150 ms, and the turn's clock starts after it. Where there is no
+turn at the display's rate, and the turn's clock starts after the lift. Where there is no
 WebGL 2 the turn is skipped and the pages change at once, as under reduced
 motion. WebGPU was considered and not used: one textured mesh needs nothing
 it adds, and WebGL 2 runs everywhere the app does.
@@ -538,7 +560,11 @@ Mushaf words take the same ink as the scroll reader: each is a `HafsWord`
 `ui/reader/mushafInk.ts`, a port of Android `mushafInkPackKind`. A verse that
 has had a word keeps its ink through the clip's tail (`inkAyahRead`, Android
 `playingAyahHasWord`) instead of dropping back under paper until the next
-verse takes over. The player resets `positionMs` in the same update that
+verse takes over. A verse's number belongs to the verse, not to its last
+word (`mushafMarkWaits`, Android `rememberAyahMarkAlpha`): it lights as the
+voice takes the verse up, and with the lead a moment before the hand-off,
+where taking the last word's ink held it dim until that word was reached.
+The player resets `positionMs` in the same update that
 names the next verse (`syncGapless5Index`), and skips position reads while
 the next clip is still loading (`awaitingClip`): the old clip's time under
 the new verse lit the wrong word for about 110 ms. Mushaf words do not take

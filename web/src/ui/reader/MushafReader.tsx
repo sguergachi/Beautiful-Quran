@@ -26,14 +26,15 @@ import { appStore, useAppSelector } from '../../store/appStore'
 import {
   bookRightShare,
   bookTurnDirection,
+  setBookAir,
   setBookPlace,
   turnMs,
   useBookSpread,
   useTurningLeafSlot,
   useVersoLeafSlot,
 } from '../paper/bookSpread'
-import type { StackLayer } from '../paper/stack'
-import { TurningLeaf } from './TurningLeaf'
+import { READER_LAYER, type StackLayer } from '../paper/stack'
+import { LeafPicture, TurningLeaf } from './TurningLeaf'
 import { finishPageTurn, requestPageTurn, type PageTurnQueue } from './pageTurnQueue'
 import {
   MUSHAF_MAX_CONDENSE,
@@ -46,9 +47,9 @@ import {
 } from './mushafFit'
 import { mushafLeafModel } from './mushafLeafModel'
 import { pileTurnSchedule, playFlip, warmPageTurnSounds } from '../paper/pageTurnSounds'
-import { warmPageTurn } from '../paper/pageTurn'
+import { clearPagePictures, hasPagePicture, warmPageTurn } from '../paper/pageTurn'
 import { InkEngine, InkState, getTuning, type InkWord } from './InkEngine'
-import { MUSHAF_STILL_INK, mushafTokenInk, type MushafInk } from './mushafInk'
+import { MUSHAF_STILL_INK, mushafMarkWaits, mushafTokenInk, type MushafInk } from './mushafInk'
 import type { MushafToken } from '../../domain/mushafPage'
 import { HafsWord } from '../../render/HafsWord'
 import { BASMALAH_PLAYLIST_AYAH } from '../../domain/Basmalah'
@@ -58,6 +59,29 @@ import { RepeatWashGateProvider } from '../../render/RepeatWashContext'
 /** The share of the block between two pages: the pile a turn between them carries. */
 function pileBetween(from: number, to: number): number {
   return Math.abs(to - from) / (MUSHAF_PAGE_COUNT - 1)
+}
+
+/** The share of the block on the right with the book open at [page] for reading. */
+function readingShare(page: number): number {
+  return bookRightShare(true, READER_LAYER, page)
+}
+
+/** Runs [work] when the browser has nothing else to do; returns what calls it off. */
+function whenIdle(work: () => void): () => void {
+  if ('requestIdleCallback' in window) {
+    const id = window.requestIdleCallback(work, { timeout: 1500 })
+    return () => window.cancelIdleCallback(id)
+  }
+  const id = setTimeout(work, 200)
+  return () => clearTimeout(id)
+}
+
+/** A page whose picture is wanted ahead of its turn. */
+interface WarmPage {
+  page: number
+  side: 'recto' | 'verso' | undefined
+  fit: number
+  key: string
 }
 
 /** Whether [page] carries any word of the verse that owns the voice. */
@@ -145,8 +169,19 @@ export function MushafReader({
 
   useEffect(() => {
     if (!runtimeMushafCache) return
-    return runtimeMushafCache.subscribe(() => setReady(runtimeMushafCache.layoutReady()))
+    return runtimeMushafCache.subscribe(() => {
+      // The page map may have changed under the pictures kept of its pages.
+      clearPagePictures()
+      setReady(runtimeMushafCache.layoutReady())
+    })
   }, [])
+  // A kept picture is keyed on what the reader passes a leaf. Anything else
+  // a setting changes about a page's look is not known here, so any change
+  // of settings gives every picture a new key.
+  const settings = useAppSelector((state) => state.settings)
+  const look = useRef({ settings, revision: 0 })
+  if (look.current.settings !== settings) look.current = { settings, revision: look.current.revision + 1 }
+  useEffect(() => clearPagePictures, [])
 
   const derived = ready && runtimeMushafCache
     ? runtimeMushafCache.pageOfAyah(activeSurahId, targetAyah)
@@ -255,12 +290,6 @@ export function MushafReader({
   }, [ready, facing, versoSlot])
 
   const place = facing ? mushafFacingPages(page).right : page
-  // The piles under the open pages follow the place the book is open at.
-  useEffect(() => {
-    if (!facing) return
-    setBookPlace(place)
-    return () => setBookPlace(null)
-  }, [facing, place])
   const [queue, setQueue] = useState<PageTurnQueue>({ settled: place, flight: null, queued: null })
   const footing = `${ready}:${facing}:${english}:${pageNumberScript}`
   const [settledFooting, setSettledFooting] = useState(footing)
@@ -347,6 +376,9 @@ export function MushafReader({
     wad: number
     ms: number
     initiatedAt: number
+    /** The share of the block on the right before the turn and after it. */
+    from: number
+    to: number
   } | null>(null)
   // Derived while rendering, so the leaf is in the air on the same frame
   // the sheet beneath it changes.
@@ -355,11 +387,11 @@ export function MushafReader({
     const dir = bookTurnDirection(seenLayer, stackLayer)
     // Chapters lies under the whole left pile and Settings under the whole
     // right one: the turn carries every leaf that changes sides.
-    const wad = Math.abs(
-      bookRightShare(true, stackLayer, place) - bookRightShare(true, seenLayer, place),
-    )
+    const from = bookRightShare(true, seenLayer, place)
+    const to = bookRightShare(true, stackLayer, place)
+    const wad = Math.abs(to - from)
     setSheetTurn(dir && facing && !reduced && ready
-      ? { dir, wad, ms: turnMs(wad), initiatedAt: performance.now() }
+      ? { dir, wad, ms: turnMs(wad), initiatedAt: performance.now(), from, to }
       : null)
   }
   const endSheetTurn = useCallback(() => setSheetTurn(null), [])
@@ -379,6 +411,39 @@ export function MushafReader({
   const landing = turning ? motion.flight.to : settled
   const forward = landing > settled
   const fit = turning ? motion.fit : (mushafFit(settled, facing, fits) ?? 1)
+
+  // The piles under the open pages are the leaves that lie there. A leaf
+  // leaves its pile when it is lifted and joins the other when it lands, so
+  // the piles follow the place the book last settled on, and the leaves in
+  // the air are told apart: nothing is added to a pile that was not turned
+  // onto it.
+  useLayoutEffect(() => {
+    if (!facing) return
+    setBookPlace(settled)
+    return () => setBookPlace(null)
+  }, [facing, settled])
+  const airFrom = turning ? readingShare(motion.flight.from) : sheetTurn ? sheetTurn.from : null
+  const airTo = turning ? readingShare(motion.flight.to) : sheetTurn ? sheetTurn.to : null
+  useLayoutEffect(() => {
+    if (!facing || airFrom == null || airTo == null) return
+    setBookAir({ from: airFrom, to: airTo })
+    return () => setBookAir(null)
+  }, [facing, airFrom, airTo])
+
+  // What a page's picture is kept under: everything a leaf that is not being
+  // recited is drawn from. A leaf that carries the voice changes word by
+  // word and has no key: its picture is taken as it lifts.
+  const shotKey = (leaf: number, side: 'recto' | 'verso' | undefined, leafFit: number, live: boolean) =>
+    live || !fontsReady ? undefined : [
+      leaf,
+      side ?? 'single',
+      leafFit.toFixed(5),
+      fitRevision,
+      english ? `en:${activeSurahId}:${activeAyah}` : 'ar',
+      pageNumberScript,
+      glyphWiden,
+      look.current.revision,
+    ].join('|')
   const air = useMemo(() => {
     if (!motion) return null
     const from = mushafFacingPages(motion.flight.from)
@@ -387,17 +452,91 @@ export function MushafReader({
     const props = { ...motion.props, onFit: noFit, still: true }
     const facePage = facing ? on ? from.left : from.right : Math.min(motion.flight.from, motion.flight.to)
     const backPage = on ? to.right : to.left
+    const faceFit = facing || on ? motion.fromFit : motion.fit
+    const faceSide = facing ? on ? 'verso' : 'recto' : undefined
+    const faceLive = leafLive(facePage, props.ink)
+    const backLive = leafLive(backPage, props.ink)
     return {
-      face: <MushafLeaf page={facePage} live={leafLive(facePage, props.ink)}
-        fit={facing || on ? motion.fromFit : motion.fit}
-        side={facing ? on ? 'verso' : 'recto' : undefined} style={facing ? motion.box : undefined} {...props} />,
-      back: facing ? <MushafLeaf page={backPage} live={leafLive(backPage, props.ink)} fit={motion.fit} side={on ? 'recto' : 'verso'} style={motion.box} {...props} /> : undefined,
+      face: <MushafLeaf page={facePage} live={faceLive} fit={faceFit}
+        side={faceSide} style={facing ? motion.box : undefined} {...props} />,
+      faceKey: shotKey(facePage, faceSide, faceFit, faceLive),
+      back: facing ? <MushafLeaf page={backPage} live={backLive} fit={motion.fit} side={on ? 'recto' : 'verso'} style={motion.box} {...props} /> : undefined,
+      backKey: facing ? shotKey(backPage, on ? 'recto' : 'verso', motion.fit, backLive) : undefined,
     }
+    // Frozen with the motion, like the leaf it describes.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [motion, facing])
-  // Two incoming leaves are measured once, before the leaf lifts.
-  const probes = !reset && queue.flight && !motion ? (
+
+  // Pictures taken ahead of the turn that will want them, while nothing is
+  // happening: the two pages that are open (either may lift, for a page turn
+  // or to go to Chapters or Settings), and the page each neighbouring turn
+  // would land as. Taken on the click they held the leaf still for a tenth
+  // of a second before it moved.
+  // (Also under Chapters or Settings, where the reader does not own the
+  // keys: a setting changed there should not cost the turn back. Never
+  // while the voice is reading: a picture takes a frame or two, and the
+  // word being washed would stand still for them.)
+  const still = ready && fontsReady && !reduced && settledFooting === footing &&
+    !queue.flight && !motion && !sheetTurn && !ink.reciting
+  const wanted: { page: number; side: 'recto' | 'verso' | undefined; pair: number }[] = []
+  if (still && facing) {
+    const here = mushafFacingPages(settled)
+    wanted.push({ page: here.right, side: 'recto', pair: here.right }, { page: here.left, side: 'verso', pair: here.right })
+    if (here.left < MUSHAF_PAGE_COUNT) wanted.push({ page: here.left + 1, side: 'recto', pair: here.left + 1 })
+    if (here.right > 1) wanted.push({ page: here.right - 1, side: 'verso', pair: here.right - 2 })
+  } else if (still) {
+    wanted.push({ page: settled, side: undefined, pair: settled })
+    if (settled > 1) wanted.push({ page: settled - 1, side: undefined, pair: settled - 1 })
+  }
+  // A neighbour's hand is not known until its leaves have been measured.
+  const unmeasured = [...new Set(wanted.flatMap((item) => (
+    mushafFit(item.pair, facing, fits) == null ? facing ? [item.pair, item.pair + 1] : [item.pair] : []
+  )))].filter((leaf) => fits[leaf] == null && leaf >= 1 && leaf <= MUSHAF_PAGE_COUNT)
+  const nextWarm = wanted.reduce<WarmPage | null>((found, item) => {
+    if (found) return found
+    const leafFit = mushafFit(item.pair, facing, fits)
+    if (leafFit == null) return null
+    const key = shotKey(item.page, item.side, leafFit, leafLive(item.page))
+    return key && !hasPagePicture(key) ? { page: item.page, side: item.side, fit: leafFit, key } : null
+  }, null)
+  const [warm, setWarm] = useState<WarmPage | null>(null)
+  const [measuring, setMeasuring] = useState<number[]>([])
+  const [, setWarmed] = useState(0)
+  const nextKey = nextWarm?.key ?? null
+  const unmeasuredKey = unmeasured.join(',')
+  useEffect(() => {
+    if (!still) {
+      setWarm(null)
+      setMeasuring((current) => (current.length ? [] : current))
+      return
+    }
+    if (!nextWarm && unmeasured.length === 0) return
+    return whenIdle(() => {
+      if (nextWarm) setWarm(nextWarm)
+      else setMeasuring(unmeasured)
+    })
+    // The next picture and the leaves to measure are named by their keys.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [still, nextKey, unmeasuredKey])
+  const kept = useCallback(() => {
+    setWarm(null)
+    setWarmed((count) => count + 1)
+  }, [])
+  const warming = still && warm ? (
+    <LeafPicture at={warm.side ?? 'single'} shotKey={warm.key} onKept={kept}>
+      <MushafLeaf page={warm.page} side={warm.side} fit={warm.fit} style={facing ? versoBox : undefined}
+        {...leafProps} live={false} onFit={noFit} still />
+    </LeafPicture>
+  ) : null
+
+  // Two incoming leaves are measured once, before the leaf lifts; a
+  // neighbour's, while nothing is happening.
+  const probing = !reset && queue.flight && !motion
+    ? [...new Set([pair.right, pair.left])]
+    : still ? measuring : []
+  const probes = probing.some((page) => fits[page] == null) ? (
     <div className="mushaf-fit-probes" inert aria-hidden="true">
-      {[...new Set([pair.right, pair.left])].filter((page) => fits[page] == null).map((page) => (
+      {probing.filter((page) => fits[page] == null).map((page) => (
         <MushafLeaf key={page} page={page} fit={1} {...leafProps} still />
       ))}
     </div>
@@ -422,6 +561,7 @@ export function MushafReader({
         <MushafLeaf page={under} fit={turning && !forward ? motion.fromFit : fit} leafRef={rectoRef} {...leafProps}
           live={leafLive(under)} onFit={turning ? noFit : reportFit} />
         {probes}
+        {warming}
         {turning ? (
           <TurningLeaf
             key={`${settled}:${landing}`}
@@ -429,6 +569,7 @@ export function MushafReader({
             hinge="right"
             dir={forward ? 'on' : 'back'}
             face={air?.face}
+            faceKey={air?.faceKey}
             onEnd={endTurn}
           />
         ) : null}
@@ -452,6 +593,8 @@ export function MushafReader({
   const versoPicture = sheetTurn
     ? <StillLeaf page={versoPage} side="verso" fit={fit} style={versoBox} {...leafProps} live={live} onFit={noFit} still />
     : null
+  const rectoKey = shotKey(rectoPage, 'recto', fit, live)
+  const versoKey = shotKey(versoPage, 'verso', fit, live)
   return (
     <>
       <MushafLeaf page={rectoPage} side="recto" fit={turning && forward ? motion.fromFit : fit} leafRef={rectoRef} {...leafProps}
@@ -484,6 +627,7 @@ export function MushafReader({
             versoSlot,
           )
         : null}
+      {warming && turnSlot ? createPortal(warming, turnSlot) : null}
       {sheetTurn && !turning && turnSlot
         ? createPortal(
             <TurningLeaf
@@ -496,7 +640,9 @@ export function MushafReader({
               // leaf lifts and lands on the recto; going back, the recto
               // leaf lifts and lands on the verso.
               face={sheetTurn.dir === 'on' ? versoPicture : rectoPicture}
+              faceKey={sheetTurn.dir === 'on' ? versoKey : rectoKey}
               back={sheetTurn.dir === 'on' ? rectoPicture : versoPicture}
+              backKey={sheetTurn.dir === 'on' ? rectoKey : versoKey}
               onEnd={endSheetTurn}
             />,
             turnSlot,
@@ -511,7 +657,9 @@ export function MushafReader({
               wad={motion.wad}
               ms={motion.ms}
               face={air?.face}
+              faceKey={air?.faceKey}
               back={air?.back}
+              backKey={air?.backKey}
               onEnd={endTurn}
             />,
             turnSlot,
@@ -829,7 +977,7 @@ function MushafLeaf({
                       <button
                         type="button"
                         className="mushaf-mark"
-                        data-state={wordInk.state}
+                        data-state={mushafMarkWaits(token, activeSurahId, ink, isLive) ? InkState.Upcoming : InkState.Plain}
                         aria-label={`Gather ayah ${token.ayah}`}
                         onClick={(event) => {
                           event.stopPropagation()

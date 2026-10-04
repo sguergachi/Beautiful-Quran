@@ -1,6 +1,6 @@
-import { memo, useLayoutEffect, useRef, type ReactNode } from 'react'
+import { memo, useLayoutEffect, useRef, useState, type ReactNode } from 'react'
 import { LEAF_TURN_MS } from '../paper/bookSpread'
-import { startPageTurn } from '../paper/pageTurn'
+import { hasPagePicture, keepPagePicture, startPageTurn, type PagePlace } from '../paper/pageTurn'
 
 /** The share of the block below which a turning pile is drawn as one leaf. */
 export const WAD_VISIBLE = 0.02
@@ -13,7 +13,8 @@ export const WAD_VISIBLE = 0.02
  * lands as on its back.
  *
  * What React renders here is only the two pages those pictures are taken
- * from: laid out where they lie on the book, and never painted.
+ * from: laid out where they lie on the book, and never painted. A page whose
+ * picture is already kept ([LeafPicture]) is not rendered at all.
  */
 export const TurningLeaf = memo(function TurningLeaf({
   hinge,
@@ -22,7 +23,9 @@ export const TurningLeaf = memo(function TurningLeaf({
   wad = 0,
   ms = LEAF_TURN_MS,
   face,
+  faceKey,
   back,
+  backKey,
   onEnd,
 }: {
   /**
@@ -39,7 +42,10 @@ export const TurningLeaf = memo(function TurningLeaf({
   /** One leaf with nowhere to land (phones): it lifts to edge-on. */
   single?: boolean
   face: ReactNode
+  /** What the face's picture is kept under; absent for a page that changes as it is read. */
+  faceKey?: string
   back?: ReactNode
+  backKey?: string
   onEnd: () => void
 }) {
   const root = useRef<HTMLDivElement>(null)
@@ -47,16 +53,29 @@ export const TurningLeaf = memo(function TurningLeaf({
   ended.current = onEnd
   // Below a few leaves a pile's edge is under a pixel: it is a leaf.
   const pile = !single && wad > WAD_VISIBLE
+  // Decided once, as the leaf lifts: a page with a kept picture is not built.
+  const [staged] = useState(() => ({
+    face: !(faceKey && hasPagePicture(faceKey)),
+    back: !(backKey && hasPagePicture(backKey)),
+  }))
   // A leaf's own effects run before this one, so the pages are already set
   // (their lines widened and centred) when their pictures are taken.
   useLayoutEffect(() => {
     const el = root.current
     if (!el) return
-    return startPageTurn(el, { hinge, dir, single, wad: pile ? wad : 0, ms }, () => ended.current())
+    return startPageTurn(
+      el,
+      { hinge, dir, single, wad: pile ? wad : 0, ms, frontKey: faceKey, backKey },
+      () => ended.current(),
+    )
     // A turn is one flight: a new one is a new leaf (its key).
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
+  // The page the leaf lifts off lies on the side it is bound from; the page
+  // it lands as lies on the other.
+  const from: PagePlace = single ? 'single' : hinge === 'right' ? 'verso' : 'recto'
+  const onto: PagePlace = from === 'verso' ? 'recto' : 'verso'
   return (
     <div
       ref={root}
@@ -66,8 +85,46 @@ export const TurningLeaf = memo(function TurningLeaf({
       data-hinge={hinge}
       data-dir={dir}
     >
-      <div className="mushaf-flip-page" data-face="front">{face}</div>
-      {back ? <div className="mushaf-flip-page" data-face="back">{back}</div> : null}
+      <div className="mushaf-flip-page" data-face="front" data-at={from}>{staged.face ? face : null}</div>
+      {back ? (
+        <div className="mushaf-flip-page" data-face="back" data-at={onto}>{staged.back ? back : null}</div>
+      ) : null}
     </div>
   )
 })
+
+/**
+ * A page whose picture is taken ahead of its turn, while the reader is
+ * idle, and kept: the leaf then lifts on the click with nothing to draw.
+ * Staged as a turning leaf's pages are, and never painted.
+ */
+export function LeafPicture({
+  at,
+  shotKey,
+  onKept,
+  children,
+}: {
+  at: PagePlace
+  shotKey: string
+  /** The picture is kept (or could not be taken): this may be unmounted. */
+  onKept: () => void
+  children: ReactNode
+}) {
+  const root = useRef<HTMLDivElement>(null)
+  const done = useRef(onKept)
+  done.current = onKept
+  useLayoutEffect(() => {
+    if (root.current) keepPagePicture(root.current, shotKey, at)
+    done.current()
+  }, [shotKey, at])
+  return (
+    <div
+      ref={root}
+      inert
+      aria-hidden="true"
+      className={at === 'single' ? 'mushaf-flip mushaf-flip--single' : 'mushaf-flip'}
+    >
+      <div className="mushaf-flip-page" data-at={at}>{children}</div>
+    </div>
+  )
+}

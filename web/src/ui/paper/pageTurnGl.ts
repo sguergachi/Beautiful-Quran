@@ -207,7 +207,9 @@ export class PageTurnGl {
   private readonly program: WebGLProgram
   private readonly mesh: WebGLVertexArrayObject
   private readonly uniforms = new Map<string, WebGLUniformLocation | null>()
-  private readonly pictures: [WebGLTexture, WebGLTexture]
+  /** Pictures already on the GPU: one kept ahead of its turn costs nothing at the lift. */
+  private readonly held = new Map<HTMLCanvasElement, WebGLTexture>()
+  private readonly bare: WebGLTexture
   private scene: TurnScene | null = null
   lost = false
 
@@ -237,7 +239,7 @@ export class PageTurnGl {
     gl.bindVertexArray(null)
     this.mesh = vao
 
-    this.pictures = [this.texture(), this.texture()]
+    this.bare = this.texture()
     canvas.addEventListener('webglcontextlost', (event) => {
       event.preventDefault()
       this.lost = true
@@ -298,28 +300,45 @@ export class PageTurnGl {
     return this.gl.getParameter(this.gl.MAX_TEXTURE_SIZE) as number
   }
 
-  /** Sizes the canvas to the scene and takes its pictures. */
-  load(scene: TurnScene) {
-    const gl = this.gl
+  /** Sizes the canvas to [box]. Done ahead of a turn, never as one starts. */
+  size(box: Frame, scale: number) {
     const { canvas } = this
-    this.scene = scene
-    const width = Math.max(1, Math.round(scene.box.width * scene.scale))
-    const height = Math.max(1, Math.round(scene.box.height * scene.scale))
+    const width = Math.max(1, Math.round(box.width * scale))
+    const height = Math.max(1, Math.round(box.height * scale))
     if (canvas.width !== width) canvas.width = width
     if (canvas.height !== height) canvas.height = height
-    canvas.style.width = `${width / scene.scale}px`
-    canvas.style.height = `${height / scene.scale}px`
+    canvas.style.width = `${width / scale}px`
+    canvas.style.height = `${height / scale}px`
+  }
 
+  /** Takes the scene, and its pictures if they are not held yet. */
+  load(scene: TurnScene) {
+    this.scene = scene
+    this.size(scene.box, scene.scale)
+    this.hold(scene.front.picture)
+    if (scene.back) this.hold(scene.back.picture)
+  }
+
+  /** Puts [picture] on the GPU, if it is not there yet. */
+  hold(picture: HTMLCanvasElement): WebGLTexture {
+    const kept = this.held.get(picture)
+    if (kept) return kept
+    const gl = this.gl
+    const texture = this.texture()
     gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false)
     gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, false)
-    const pictures = [scene.front.picture, scene.back?.picture ?? null]
-    pictures.forEach((picture, index) => {
-      if (!picture) return
-      gl.activeTexture(gl.TEXTURE0 + index)
-      gl.bindTexture(gl.TEXTURE_2D, this.pictures[index])
-      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, picture)
-      gl.generateMipmap(gl.TEXTURE_2D)
-    })
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, picture)
+    gl.generateMipmap(gl.TEXTURE_2D)
+    this.held.set(picture, texture)
+    return texture
+  }
+
+  /** Takes [picture] off the GPU. */
+  release(picture: HTMLCanvasElement) {
+    const texture = this.held.get(picture)
+    if (!texture) return
+    this.held.delete(picture)
+    if (!this.lost) this.gl.deleteTexture(texture)
   }
 
   draw(pose: LeafPose) {
@@ -335,6 +354,10 @@ export class PageTurnGl {
     gl.disable(gl.BLEND)
     gl.useProgram(this.program)
     gl.bindVertexArray(this.mesh)
+    gl.activeTexture(gl.TEXTURE0)
+    gl.bindTexture(gl.TEXTURE_2D, this.hold(scene.front.picture))
+    gl.activeTexture(gl.TEXTURE1)
+    gl.bindTexture(gl.TEXTURE_2D, scene.back ? this.hold(scene.back.picture) : this.bare)
 
     const frame = (name: string, at: Frame) =>
       gl.uniform4f(this.uniform(name), at.left, at.top, 1 / at.width, 1 / at.height)
@@ -389,17 +412,12 @@ export class PageTurnGl {
     gl.bindVertexArray(null)
   }
 
-  /** Empties the canvas and lets the pictures go. */
+  /** Empties the canvas. Pictures stay until they are released. */
   clear() {
     this.scene = null
     if (this.lost) return
     const gl = this.gl
     gl.clearColor(0, 0, 0, 0)
     gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT)
-    for (const [index, texture] of this.pictures.entries()) {
-      gl.activeTexture(gl.TEXTURE0 + index)
-      gl.bindTexture(gl.TEXTURE_2D, texture)
-      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, null)
-    }
   }
 }
