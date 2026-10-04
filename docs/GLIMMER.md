@@ -44,8 +44,8 @@ The glimmer has no independent sweep. It rides the active word's existing
 directional wash, with the same duration, easing, direction, and feather:
 
 1. The normal base ink remains the source of legibility.
-2. During a repeat, the glimmer itself uses the dark terracotta repeat ink;
-   white gold remains exclusive to first-pass words.
+2. During a repeat, the glimmer's base hue is the dark terracotta repeat ink;
+   white gold is the base hue of first-pass words.
 3. A glyph-shaped white-gold halo forms behind the visible ink **on the same
    directional wash as the tint** — during the bloom, not only after it.
 4. A restrained white-gold tint forms inside the glyphs above the other ink,
@@ -62,7 +62,7 @@ in the travel box made the glint much fainter than the underlying revealed ink
 early in a long hold. The mask still reaches the full halo so no unmapped
 fringe survives outside the word box. The feather profile stays unchanged.
 
-The glimmer's colour is latched when it forms and held for its full rendered
+The glimmer's base colour is latched when it forms and held for its full rendered
 lifetime. Chain release may change a repeat word back to a normal recited state
 while its glimmer is still fading; that state change must not recolour the
 drying shimmer white-gold. Conversely, when a single word moves directly from
@@ -88,7 +88,8 @@ recitation with exactly this word: يُرَجِّعُ — "his voice reverberate
 > long-press) loops captured PCM and replays this reciter’s detector as you
 > adjust its knobs. Export preserves the capture, loop, and displayed tuning.
 > **Glint brightness** scales the sheen and halo from 0–200% and saves per
-> reciter. 100% keeps the shipped look; it does not change detection, the
+> reciter. It also scales the crest's white blend: at 200%, a half-strength
+> accepted crest can reach full white. 100% keeps the shipped look; it does not change detection, the
 > pulse’s phase, the wash, or the halo’s radius.
 
 
@@ -104,11 +105,60 @@ tajweed hold of their own** — a long madd, a ghunnah (the shadda نّ of
 a wasl entry alone sustains the previous word's nūn and never qualifies) —
 and starts the moment the reverberation is detected there.
 
+Acoustic eligibility is derived from the Arabic word independently of visual
+letter pacing. Turning off the paced wash or viewing English prose must not
+disable a detected hold. All reader paint paths, including the English mushaf,
+use the same crest colour. Applying a Tarjīʿ Lab profile enables the full pulse
+auditioned in the lab; the Ink Lab can still disable it afterwards.
+
 The **wet-ink glint always rides the wash** for the whole Active word —
-mid-bloom and long waqf parks included. **Tarjīʿ turns it on and off**: the
-glimmer itself extinguishes at pulse troughs and lights with the crests —
-the voice's reverberation is the glimmer. The attack/release ramp
-(`tremoloGain`) blends the transitions so no detection edge pops.
+mid-bloom and long waqf parks included.
+
+**The glow is a light's falloff, in three glyph-shaped layers** (widest
+first; never a radial field):
+
+| Layer | Blur | Shipped strength | Role |
+|---|---|---|---|
+| Veil | 2.4 × the halo's | 0.16, warmed halfway to `#FFC98A` | the eye's own wide scatter — reads as light in the air |
+| Halo | `glintGlowRadius` | 0.6 | the body of the glow |
+| Bloom | 0.35 × the halo's | 0.5 | hugs the letters, so the glyph edge is lit, not outlined |
+
+One blur read as an outline. Glare in the eye is a sharp core with a long
+soft tail (Spencer et al., *Physically-based glare effects for digital
+images*, SIGGRAPH 95), and a glow like that is what makes a thing look bright
+at all (Yoshida et al., *Brightness of the glare illusion*, 2008).
+
+**Tarjīʿ is that light getting a little brighter and slightly dimmer** with
+the voice (`GlintColor.kt`). Brightness only; the hue never changes.
+
+- One number, the **level**: 1 at rest, `1 + rise` (0.10) on a crest,
+  `1 − fall` (0.06) in a trough. The fall is less than the rise so the light
+  seems to lift with the voice rather than drop out between pulses.
+- The glyph tint is scaled by the level **in linear light**, so its
+  chromaticity holds; its cover does not change.
+- Every glow layer's alpha is scaled by `1 + gain·(level − 1)` (gain 2): glare
+  is linear in the light that causes it, and the glow is where the eye reads
+  brightness, so it carries more of the swing than the near-white glyphs can.
+- The motion is a plain low-pass (`GlintLight`, 60 ms), the same up as down,
+  and the voice's curve is not sharpened into beats. Its lag is read ahead of
+  the ear (the tap leads the speaker), so smoothing costs no sync.
+
+**It is meant to be barely there.** The eye is most sensitive to flicker at
+exactly the rates tarjīʿ lives at — under 1 % of modulation is visible around
+8 Hz (de Lange) — so earlier cuts that swung from a dark ember to white, or
+changed hue, were a strobe that took the eye off the verse. The per-reciter
+brightness above 100 % scales the swing only; it never raises the resting
+glow. All of this is live on the Ink Lab's **Tarjīʿ** tab.
+
+Both shaped and layered readers sample the level at draw time, inside the same
+soft directional mask, and the lab preview runs the same light.
+
+When a phone differs from a simulator, Developer → Record performance profile
+includes `tarji tap` samples (PCM hops, live gain, sink/ear delay, enabled/depth/
+brightness) and `tarji word` samples (word/event ownership, admitted crest,
+the light asked for and its smoothed glow). These are captured only during the requested local profile. Replay
+the affected word during its ten-second window and share the text report to
+distinguish a missing PCM feed, rejected event, and paint signal.
 
 The shimmer is the **build to the climax**: it engages as the hold's
 reverberation starts (the hold gate is short, ~300 ms, and the minimum
@@ -169,20 +219,16 @@ trips its own gate (the troughs stay above the gate). Mid-hold detection
 lulls are bridged by the slower release so the hold breathes without
 blinking.
 
-**Tarjīʿ** is that **on/off plus a brightness crest**. Event detection uses
-the long detrended tracks, but the visible phase comes from the current 20 ms
-RMS hop against a cycle-separated linear baseline, so a crescendo cannot bias
-the pulse. For pitch-only vibrato, the signed short-YIN residual is the
-fallback. Its actual lag-derived support centre is projected locally to the
-live hop; neither path uses rate-dependent phase rotation. Positive is the
-audible swell (or higher F0 when no intensity pulse exists), negative is its
-trough.
-The layer follows one smootherstepped `−1..1 → 0..1` cycle and only the
-positive crest boosts tint/halo colour (`GLINT_RESONANCE_PEAK_BOOST`). Never
-take `abs(tremolo)`: that makes the quiet trough bright and doubles the visual
-rate relative to the voice. Depth scales both (Ink Lab **Pulse depth**; a non-zero
-`GLINT_RESONANCE_TROUGH_FLOOR` leaves residual sheen for a softer breathe).
-Idle / no detection → peak 0, full sheen (no tell that a pulse is coming).
+**Tarjīʿ** is that **light**. Event detection uses the long detrended
+tracks, but the visible pulse is not the detector's: it is the voice's own
+flutter around its local level, read at the ear's instant with audio on both
+sides of it (`TarjiEarPulse`; see *The pulse the eye sees* in `docs/TARJI.md`).
+Intensity drives it when the hold pulses in loudness, the folded pitch when
+only the pitch moves. Positive is the audible swell (or higher F0), negative
+its trough. Never take `abs(tremolo)`: that makes the quiet trough bright and doubles the
+visual rate relative to the voice. Depth scales the swing (Ink Lab **Pulse
+depth**).
+Idle / no detection → peak 0, full ordinary sheen (no tell that a pulse is coming).
 First-pass white-gold and **repeat terracotta** both take the same gate. A
 per-frame sampler on the Active strong-hold word keeps the pulse updating
 after the wash park freezes its Animatable. Each utterance admits one acoustic
@@ -222,7 +268,7 @@ even a long verse-closing waqf — keeps still gold. The gate also hard-closes
 at handoff: the dry-down dissolve after the voice moves on is never
 modulated.
 
-The modulation is **pure alpha** — the reveal edge never moves mid-animation,
+The modulation changes **ink colour and sheen strength** — the reveal edge never moves mid-animation,
 so the bloom can never appear to restart. The halo forms only with the
 directional wash (`smootherstep(glintProgress)`); there is no whole-word
 formation floor when resonance engages.
@@ -373,7 +419,7 @@ and inspect ink; the toggle is session-only and not part of `Tuning`.
 | Halo strength | `glintGlowAlpha` | 0.78 | 0–1 | Always-on halo; tarjīʿ peaks boost further. |
 | Halo blur | `glintGlowRadius` | 10 | 0–10 | Renderer blur radius around the glyph outline; it is not a word-relative radial size. |
 | Tarjīʿ (Tajweed tab) | `glintResonance` | on | toggle | Turns the wet-ink glimmer on and off with detected tarjīʿ (first-pass gold and repeat terracotta). |
-| Pulse depth (Tajweed tab) | `glintResonanceDepth` | 1.0 | 0–1 | How deeply tarjīʿ troughs extinguish the glimmer (1 = full on/off with the voice). |
+| Pulse depth (Tajweed tab) | `glintResonanceDepth` | 1.0 | 0–1 | Scales the whole swing of the tarjīʿ light (1 = full). |
 | Ear delay ms (Tajweed tab) | `tarjiEarDelayMs` | 0 | 0–200 | Extra delay so the pulse lands on the ear, on top of the route preset + measured tap-to-playback-head backlog. |
 
 The scalar maps to Compose `Shadow.blurRadius` for per-word text and to dp for

@@ -14,6 +14,20 @@ import org.junit.Test
 class InkEngineTest {
 
     @Test
+    fun `turning off visual holds cannot disable an acoustic hold`() {
+        val original = InkEngine.tuning
+        try {
+            InkEngine.tuning = original.copy(tajweedPacing = false, holdMadd = false, holdWaqf = false)
+            assertNull(InkEngine.pacing("ٱلضَّآلِّينَ", active(9, 5000), isAyahFinal = true))
+            assertTrue(InkEngine.tarjiEligible("ٱلضَّآلِّينَ", isAyahFinal = true))
+            assertFalse(InkEngine.tarjiEligible("وَلَا", isAyahFinal = false))
+            assertFalse(InkEngine.tarjiEligible("يَقُولُ", isAyahFinal = false))
+        } finally {
+            InkEngine.tuning = original
+        }
+    }
+
+    @Test
     fun `paper handoff fades outgoing shaped ink without exposing future verses`() {
         val upcomingCover = 0.73f
 
@@ -665,88 +679,41 @@ class InkEngineTest {
     fun `glint resonance follows one signed vocal envelope cycle`() {
         // Positive is the audible swell, negative the trough. The old abs()
         // mapping made both bright and therefore flickered at twice the voice.
-        val up = InkEngine.glintResonance(
+        fun at(tremolo: Float, gain: Float = 1f, depth: Float = 1f) = InkEngine.glintResonance(
             holding = true,
-            tremolo = 1f,
-            tremoloGain = 1f,
-            depth = 1f,
+            tremolo = tremolo,
+            tremoloGain = gain,
+            depth = depth,
         )
-        val mid = InkEngine.glintResonance(
-            holding = true,
-            tremolo = 0f,
-            tremoloGain = 1f,
-            depth = 1f,
-        )
-        val down = InkEngine.glintResonance(
-            holding = true,
-            tremolo = -1f,
-            tremoloGain = 1f,
-            depth = 1f,
-        )
+        val up = at(1f)
+        val mid = at(0f)
+        val down = at(-1f)
         assertEquals(1f, up.peak, 1e-4f)
-        assertEquals(1f, up.layerMult, 1e-4f) // vocal crest: full sheen
+        assertEquals(1f, up.light, 1e-4f) // vocal crest: the light lifts
         assertEquals(0f, mid.peak, 1e-4f)
-        assertEquals(0.5f, mid.layerMult, 1e-4f) // mean level: half sheen
+        assertEquals(0f, mid.light, 1e-4f) // mean level: the ordinary sheen
         assertEquals(0f, down.peak, 1e-4f)
-        assertEquals(
-            InkEngine.GLINT_RESONANCE_TROUGH_FLOOR,
-            down.layerMult,
-            1e-4f,
-        ) // vocal trough: off at full depth
-        val luminousTrough = InkEngine.glintResonance(
-            holding = true,
-            tremolo = -1f,
-            tremoloGain = 1f,
-            depth = 1f,
-            troughFloor = 0.25f,
-        )
-        assertEquals(0.25f, luminousTrough.layerMult, 1e-4f)
-        val softDepth = InkEngine.glintResonance(
-            holding = true,
-            tremolo = 1f,
-            tremoloGain = 1f,
-            depth = 0.4f,
-        )
-        assertEquals(0.4f, softDepth.peak, 1e-4f)
-        assertEquals(1f, softDepth.layerMult, 1e-4f)
-        val midSoft = InkEngine.glintResonance(
-            holding = true,
-            tremolo = -1f,
-            tremoloGain = 1f,
-            depth = 0.4f,
-        )
-        assertEquals(
-            1f - 0.4f * (1f - InkEngine.GLINT_RESONANCE_TROUGH_FLOOR),
-            midSoft.layerMult,
-            1e-4f,
-        )
-        val ramping = InkEngine.glintResonance(
-            holding = true,
-            tremolo = 1f,
-            tremoloGain = 0.5f,
-            depth = 1f,
-        )
-        assertEquals(0.5f, ramping.peak, 1e-4f)
-        assertEquals(1f, ramping.layerMult, 1e-4f)
-        val troughRamp = InkEngine.glintResonance(
-            holding = true,
-            tremolo = -1f,
-            tremoloGain = 0.5f,
-            depth = 1f,
-        )
-        assertEquals(
-            1f - 0.5f * (1f - InkEngine.GLINT_RESONANCE_TROUGH_FLOOR),
-            troughRamp.layerMult,
-            1e-4f,
-        )
-        val halfSwell = InkEngine.glintResonance(
-            holding = true,
-            tremolo = 0.75f,
-            tremoloGain = 1f,
-            depth = 1f,
-        )
-        assertTrue(halfSwell.peak > 0.75f)
-        assertTrue(halfSwell.layerMult > mid.layerMult)
+        assertEquals(-1f, down.light, 1e-4f) // vocal trough: it lowers
+        // The light follows the voice's own curve — odd, monotonic, and with
+        // no flat spot or step that would sharpen a swell into a beat.
+        assertEquals(-at(0.6f).light, at(-0.6f).light, 1e-5f)
+        val sweep = (-15..15).map { at(it / 10f).light }
+        assertTrue(sweep.zipWithNext().all { (a, b) -> a <= b })
+        assertTrue(sweep.zipWithNext().all { (a, b) -> b - a < 0.15f })
+        // Depth scales the whole swing.
+        assertEquals(0.4f, at(1f, depth = 0.4f).peak, 1e-4f)
+        assertEquals(0.4f, at(1f, depth = 0.4f).light, 1e-4f)
+        assertEquals(-0.4f, at(-1f, depth = 0.4f).light, 1e-4f)
+        // The detector's gain still reports strength, but the light is fully
+        // the voice's well before its one-second swell completes.
+        assertEquals(0.5f, at(1f, gain = 0.5f).peak, 1e-4f)
+        assertEquals(1f, at(1f, gain = 0.5f).light, 1e-4f)
+        assertEquals(0.4f, at(1f, gain = 0.1f).light, 1e-4f)
+        // An over-range crest eases into the top instead of flattening.
+        assertEquals(1f, at(1.5f).light, 1e-4f)
+        assertEquals(-1f, at(-1.5f).light, 1e-4f)
+        // The mapping alone never animates: the frame loop owns the light.
+        assertEquals(0f, up.glow, 0f)
     }
 
     @Test

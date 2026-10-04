@@ -1200,7 +1200,7 @@ private fun MutableList<ShapedWordBloom>.addEnglishInkLayerBlooms(
                     } else {
                         motion.plainSweepProgress.coerceIn(0f, 1f)
                     },
-                    color = if (onRepeat) palette.repeatInkColor else glintInk,
+                    color = motion.glintColor(if (onRepeat) palette.repeatInkColor else glintInk),
                     restingAlpha = 0f,
                     layerAlpha = motion.glintLayerAlpha,
                     feather = if (onRepeat) motion.repeatFeather else null,
@@ -1213,6 +1213,8 @@ private fun MutableList<ShapedWordBloom>.addEnglishInkLayerBlooms(
                     ),
                     glowAlpha = motion.glintGlowColorAlpha(InkEngine.tuning.glintGlowAlpha),
                     glowRadius = InkEngine.tuning.glintGlowRadius,
+                    bloomAlpha = motion.glintGlowColorAlpha(InkEngine.tuning.glintBloomAlpha),
+                    veilAlpha = motion.glintGlowColorAlpha(InkEngine.tuning.glintVeilAlpha),
                 ),
             )
         }
