@@ -366,16 +366,17 @@ fun InkLabPanel(
                                 "Brightness only — the hue never changes. Aim " +
                                 "for just enough to feel it.",
                         )
-                        TuningSlider("Brighten on crest", t.tarjiLightRise, 0f..0.4f) {
+                        TuningSlider("Brighten on crest", t.tarjiLightRise, 0f..0.12f) {
                             InkEngine.tuning = t.copy(tarjiLightRise = it)
                         }
-                        TuningSlider("Dim in trough", t.tarjiLightFall, 0f..0.3f) {
+                        TuningSlider("Dim in trough", t.tarjiLightFall, 0f..0.12f) {
                             InkEngine.tuning = t.copy(tarjiLightFall = it)
                         }
                         LabCaption(
-                            "How far the light lifts and falls, as a fraction " +
-                                "of its resting brightness. Keep the dim under " +
-                                "the lift so it never seems to drop out.",
+                            "How far the letters' light lifts and falls, as a " +
+                                "fraction of its resting brightness. Letters " +
+                                "have about 4% of headroom; past that only " +
+                                "the glow rises. Keep the dim under the lift.",
                         )
                         TuningSlider("Smoothness ms", t.tarjiLightSmoothMs, 0f..160f, integer = true) {
                             InkEngine.tuning = t.copy(tarjiLightSmoothMs = it)
@@ -384,12 +385,13 @@ fun InkLabPanel(
                             "Higher is a slower, softer swell. Its lag is read " +
                                 "ahead of the voice, so sync does not move.",
                         )
-                        TuningSlider("Glow swing ×", t.tarjiGlowGain, 0f..6f) {
+                        TuningSlider("Glow swing ×", t.tarjiGlowGain, 0f..8f) {
                             InkEngine.tuning = t.copy(tarjiGlowGain = it)
                         }
                         LabCaption(
-                            "How much further the glow moves than the glyphs. " +
-                                "The glow is where the eye reads brightness.",
+                            "How many times further the glow's light moves " +
+                                "than the letters'. The glow is where the eye " +
+                                "reads brightness.",
                         )
                         TuningSlider("Pulse depth", t.glintResonanceDepth, 0f..1f) {
                             InkEngine.tuning = t.copy(glintResonanceDepth = it)
@@ -411,7 +413,7 @@ fun InkLabPanel(
                             InkEngine.tuning = t.copy(glintBloomAlpha = it)
                         }
                         LabCaption(
-                            "Veil is ${InkEngine.GLINT_VEIL_RADIUS}× the halo's blur and faintly " +
+                            "Blur is in dp. Veil is ${InkEngine.GLINT_VEIL_RADIUS}× the halo's blur and faintly " +
                                 "warm; bloom is ${InkEngine.GLINT_BLOOM_RADIUS}× and hugs the letters.",
                         )
                     }

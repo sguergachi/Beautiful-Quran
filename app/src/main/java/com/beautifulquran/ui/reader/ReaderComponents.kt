@@ -1079,7 +1079,7 @@ internal fun rememberWaslProgress(
  * scrolls the sheet (see [wordUnitBehavior] / [shapedActiveWordInView]).
  * Shared with [ReaderScreen] so the focus engine's bottom guard matches. */
 internal val ActiveWordBottomMargin = 132.dp
-private val GlintLayerBleed = 24.dp
+private val GlintLayerBleed = 40.dp
 
 /** Measures a target as (top, bottom) in LazyColumn viewport pixels. */
 private typealias ViewportBoundsMeasure = () -> Pair<Float, Float>?
@@ -1575,7 +1575,8 @@ private fun HighlightLayeredText(
         // The glow is a light's falloff, glyph-shaped at every width — no
         // radial field: a wide faint veil, the halo, and a tight bloom.
         if (glintInk != null && motion.showGlintLayer) {
-            val halo = InkEngine.tuning.glintGlowRadius
+            // dp, as the shaped path measures it: one glow in every reading mode.
+            val halo = with(LocalDensity.current) { InkEngine.tuning.glintGlowRadius.dp.toPx() }
             if (InkEngine.tuning.glintVeilAlpha > 0f) {
                 InkOverlayText(
                     text = text,

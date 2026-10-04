@@ -103,29 +103,33 @@ object InkEngine {
          *  Must read over parchment base ink mid-wash and through long holds —
          *  the old 0.62/0.49 pair was nearly invisible gold-on-parchment. */
         val glintTintAlpha: Float = 0.88f,
-        val glintGlowAlpha: Float = 0.6f,
-        val glintGlowRadius: Float = 10f,
+        val glintGlowAlpha: Float = 0.4f,
+        /** Halo blur radius in dp, the same in every reading mode. */
+        val glintGlowRadius: Float = 5f,
         /**
          * The rest of the glow, as a light's falloff rather than one outline:
          * a tight bloom hugging the glyphs and a wide, faint, slightly warm
          * veil, either side of the halo above ([GLINT_BLOOM_RADIUS],
-         * [GLINT_VEIL_RADIUS] of its blur).
+         * [GLINT_VEIL_RADIUS] of its blur). Together the three fall away
+         * from the ink roughly as glare does — steeply, then a long thin tail.
          */
-        val glintBloomAlpha: Float = 0.5f,
-        val glintVeilAlpha: Float = 0.16f,
+        val glintBloomAlpha: Float = 0.75f,
+        val glintVeilAlpha: Float = 0.25f,
         val glintVeilWarmth: Float = 0.5f,
         /** Glint sheen: 0 = off, 1 = shipped. Above 1 it only scales how far
-         * the tarjīʿ light swings — the resting glow is already where it should be. */
+         * the tarjīʿ light swings, at half weight (`glintSwingScale`) — the
+         * resting glow is already where it should be. */
         val glintBrightness: Float = 1f,
-        /** How much brighter the word's light gets on a vocal crest (fraction). */
-        val tarjiLightRise: Float = 0.10f,
+        /** How much brighter the glyphs' light gets on a vocal crest (fraction
+         * of luminance). `GLINT_REST_LIGHT` is the headroom it rises into. */
+        val tarjiLightRise: Float = 0.04f,
         /** How much dimmer it gets in a trough — less than the rise: the light
          * should seem to lift with the voice, not to drop out between pulses. */
-        val tarjiLightFall: Float = 0.06f,
+        val tarjiLightFall: Float = 0.03f,
         /** Smoothing of the light's motion (ms); its lag is read ahead and cancelled. */
         val tarjiLightSmoothMs: Float = 60f,
-        /** How many times further the glow swings than the glyphs. */
-        val tarjiGlowGain: Float = 2f,
+        /** How many times further the glow's light swings than the glyphs'. */
+        val tarjiGlowGain: Float = 3.5f,
         /** Width of the ink feather relative to the word (see
          *  ui/theme/Fade.kt: the wash reads as a whole-word breath). */
         val washFeather: Float = 1.6f,
@@ -673,8 +677,8 @@ object InkEngine {
     const val GLINT_RESONANCE_PRESENCE = 4f
 
     /** Bloom and veil blur, as multiples of the halo's ([Tuning.glintGlowRadius]). */
-    const val GLINT_BLOOM_RADIUS = 0.35f
-    const val GLINT_VEIL_RADIUS = 2.4f
+    const val GLINT_BLOOM_RADIUS = 0.28f
+    const val GLINT_VEIL_RADIUS = 4.5f
 
     /** Resting strength of a glint layer: brightness can turn it off, never up. */
     fun glintRestAlpha(base: Float, brightness: Float = tuning.glintBrightness): Float =

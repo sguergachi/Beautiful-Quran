@@ -246,11 +246,12 @@ swing    = soft-knee(tremolo)                 // −1..1, the voice's own curve
 presence = min(1, 4·g)·depth                  // g = tremoloGain
 light    = presence·swing
 glow     = low-pass(light, 60 ms)             // GlintLight; lag read ahead
-level    = 1 + brightness·(rise·glow⁺ − fall·glow⁻)   // 1.10 … 0.94 shipped
+level    = 1 + scale(brightness)·(rise·glow⁺ − fall·glow⁻)   // 1.04 … 0.97 shipped
 ```
 
-`level` scales the glyph tint in linear light and, twice as far, every layer
-of the glow (`docs/GLIMMER.md`). Never use `abs(tremolo)`: it brightens on
+`level` scales the glyph tint in linear light and, 3.5 times as far, the light
+of every glow layer (`docs/GLIMMER.md`; alpha is converted through the display
+gamma, and brightness past 100 % counts half). Never use `abs(tremolo)`: it brightens on
 both the loud crest and quiet trough, doubling the visual pulse rate. At
 `g = 0` the level is exactly 1 — **no tell** before the voice actually reverberates. The halo forms only with the directional
 wash (`smootherstep(glintProgress)`); there is no whole-word formation floor

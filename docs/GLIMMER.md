@@ -119,9 +119,21 @@ first; never a radial field):
 
 | Layer | Blur | Shipped strength | Role |
 |---|---|---|---|
-| Veil | 2.4 × the halo's | 0.16, warmed halfway to `#FFC98A` | the eye's own wide scatter — reads as light in the air |
-| Halo | `glintGlowRadius` | 0.6 | the body of the glow |
-| Bloom | 0.35 × the halo's | 0.5 | hugs the letters, so the glyph edge is lit, not outlined |
+| Veil | 4.5 × the halo's | 0.25, warmed halfway to `#FFC98A` | the eye's own wide scatter — reads as light in the air |
+| Halo | `glintGlowRadius`, 5 dp | 0.4 | the body of the glow |
+| Bloom | 0.28 × the halo's | 0.75 | hugs the letters, so the glyph edge is lit, not outlined |
+
+The blur is in **dp in every reading mode**. The word-by-word path once passed
+the same number as px, so on a Pixel its glow was 2.6 × tighter than the
+mushaf's and one tuning could not suit both.
+
+The three are weighted so their sum falls away from the ink roughly as 1/r²
+from under 1 dp to about 24 dp — measured, within a factor of two. The first
+cut (10 dp, 0.6 / 0.5 / 0.16) had a flat shoulder out to 5 dp that read as
+smudge and fattened the letters, and a veil of four to six 8-bit steps that
+could not be seen. The veil's mask carries a fixed grain (`ditherAlphaMask`)
+so those few steps do not show as contours on a dark OLED; the word-by-word
+path draws its veil as a text shadow and has no such grain.
 
 One blur read as an outline. Glare in the eye is a sharp core with a long
 soft tail (Spencer et al., *Physically-based glare effects for digital
@@ -131,14 +143,24 @@ at all (Yoshida et al., *Brightness of the glare illusion*, 2008).
 **Tarjīʿ is that light getting a little brighter and slightly dimmer** with
 the voice (`GlintColor.kt`). Brightness only; the hue never changes.
 
-- One number, the **level**: 1 at rest, `1 + rise` (0.10) on a crest,
-  `1 − fall` (0.06) in a trough. The fall is less than the rise so the light
+- One number, the **level**: 1 at rest, `1 + rise` (0.04) on a crest,
+  `1 − fall` (0.03) in a trough. The fall is less than the rise so the light
   seems to lift with the voice rather than drop out between pulses.
 - The glyph tint is scaled by the level **in linear light**, so its
-  chromaticity holds; its cover does not change.
-- Every glow layer's alpha is scaled by `1 + gain·(level − 1)` (gain 2): glare
-  is linear in the light that causes it, and the glow is where the eye reads
-  brightness, so it carries more of the swing than the near-white glyphs can.
+  chromaticity holds; its cover does not change. It rests at 0.96 of the glint
+  colour (`GLINT_REST_LIGHT`) and is never scaled past the colour itself: a
+  light already at full can only go white, and the first cut's crests did
+  (`#FFF0C7` → `#FFFAD0`).
+- Every glow layer's **light** swings `gain` (3.5) times as far: +14 % / −10.5 %.
+  Glare is linear in the light that causes it, and the glow is where the eye
+  reads brightness, so it carries more of the swing than the glyphs can.
+  Stacked over one another the layers measure a little less: about 13–19 %
+  from trough to crest beside the ink, fading to nothing by 10 dp.
+- **Alpha is not light.** The page is composited in gamma space, where a
+  layer's luminance goes as its alpha to the 2.2: scaling alpha by 1.2 is half
+  again as much light. `glintGlowAlpha` converts, so the swing is the one
+  stated. The first cut scaled alpha directly; its "ten percent" pulse measured
+  +63–75 % in the glow, and two to three times that on a 200 % reciter.
 - The motion is a plain low-pass (`GlintLight`, 60 ms), the same up as down,
   and the voice's curve is not sharpened into beats. Its lag is read ahead of
   the ear (the tap leads the speaker), so smoothing costs no sync.
@@ -147,8 +169,8 @@ the voice (`GlintColor.kt`). Brightness only; the hue never changes.
 exactly the rates tarjīʿ lives at — under 1 % of modulation is visible around
 8 Hz (de Lange) — so earlier cuts that swung from a dark ember to white, or
 changed hue, were a strobe that took the eye off the verse. The per-reciter
-brightness above 100 % scales the swing only; it never raises the resting
-glow. All of this is live on the Ink Lab's **Tarjīʿ** tab.
+brightness above 100 % scales the swing only, at half weight (200 % is one
+and a half times); it never raises the resting glow. All of this is live on the Ink Lab's **Tarjīʿ** tab.
 
 Both shaped and layered readers sample the level at draw time, inside the same
 soft directional mask, and the lab preview runs the same light.
@@ -416,8 +438,8 @@ and inspect ink; the toggle is session-only and not part of `Tuning`.
 | Repeat ink | `repeatInkAlpha` | 1.0 | 0.2–1 | Peak strength of the orange repeat overlay (and search-hit flash). Hue stays theme-owned (`QuranAccents.repeatInk`). |
 | Glitter time ms | `glintFadeMs` | 1000 ms | 100–2400 ms | How long tint and halo recede after the word stops glimmering. |
 | Glint tint | `glintTintAlpha` | 0.88 | 0–1 | Always-on wet-ink tint (must read over parchment mid-wash). |
-| Halo strength | `glintGlowAlpha` | 0.78 | 0–1 | Always-on halo; tarjīʿ peaks boost further. |
-| Halo blur | `glintGlowRadius` | 10 | 0–10 | Renderer blur radius around the glyph outline; it is not a word-relative radial size. |
+| Halo strength | `glintGlowAlpha` | 0.4 | 0–1 | Always-on halo, the middle of three glow layers. |
+| Halo blur | `glintGlowRadius` | 5 | 0–10 | Blur radius in dp around the glyph outline; bloom and veil are fixed multiples of it. It is not a word-relative radial size. |
 | Tarjīʿ (Tajweed tab) | `glintResonance` | on | toggle | Turns the wet-ink glimmer on and off with detected tarjīʿ (first-pass gold and repeat terracotta). |
 | Pulse depth (Tajweed tab) | `glintResonanceDepth` | 1.0 | 0–1 | Scales the whole swing of the tarjīʿ light (1 = full). |
 | Ear delay ms (Tajweed tab) | `tarjiEarDelayMs` | 0 | 0–200 | Extra delay so the pulse lands on the ear, on top of the route preset + measured tap-to-playback-head backlog. |

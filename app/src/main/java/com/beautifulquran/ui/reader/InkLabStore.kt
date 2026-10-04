@@ -62,16 +62,16 @@ data class InkLabSnapshot(
     val repeatInkAlpha: Float = 1f,
     val glintFadeMs: Int = 1_000,
     val glintTintAlpha: Float = 0.88f,
-    val glintGlowAlpha: Float = 0.6f,
-    val glintGlowRadius: Float = 10f,
+    val glintGlowAlpha: Float = 0.4f,
+    val glintGlowRadius: Float = 5f,
     val glintBrightness: Float = 1f,
-    val glintBloomAlpha: Float = 0.5f,
-    val glintVeilAlpha: Float = 0.16f,
+    val glintBloomAlpha: Float = 0.75f,
+    val glintVeilAlpha: Float = 0.25f,
     val glintVeilWarmth: Float = 0.5f,
-    val tarjiLightRise: Float = 0.10f,
-    val tarjiLightFall: Float = 0.06f,
+    val tarjiLightRise: Float = 0.04f,
+    val tarjiLightFall: Float = 0.03f,
     val tarjiLightSmoothMs: Float = 60f,
-    val tarjiGlowGain: Float = 2f,
+    val tarjiGlowGain: Float = 3.5f,
     val washFeather: Float = 1.6f,
     val sweepEaseX1: Float = 0.3f,
     val sweepEaseY1: Float = 0.24f,
@@ -179,7 +179,12 @@ data class InkLabSnapshot(
     )
 
     companion object {
-        const val SCHEMA = 1
+        /**
+         * 2: the glow's numbers changed meaning — blur in dp in every reading
+         * mode, swings in linear light. A save from before is dropped back to
+         * shipped for those fields ([decode]); the rest of it is kept.
+         */
+        const val SCHEMA = 2
 
         private val json = Json {
             ignoreUnknownKeys = true
@@ -260,6 +265,19 @@ data class InkLabSnapshot(
             json.encodeToString(serializer(), snapshot)
 
         fun decode(raw: String): InkLabSnapshot? =
-            runCatching { json.decodeFromString(serializer(), raw) }.getOrNull()
+            runCatching { json.decodeFromString(serializer(), raw) }.getOrNull()?.let { saved ->
+                if (saved.schema >= 2) return@let saved
+                val shipped = InkLabSnapshot()
+                saved.copy(
+                    schema = SCHEMA,
+                    glintGlowAlpha = shipped.glintGlowAlpha,
+                    glintGlowRadius = shipped.glintGlowRadius,
+                    glintBloomAlpha = shipped.glintBloomAlpha,
+                    glintVeilAlpha = shipped.glintVeilAlpha,
+                    tarjiLightRise = shipped.tarjiLightRise,
+                    tarjiLightFall = shipped.tarjiLightFall,
+                    tarjiGlowGain = shipped.tarjiGlowGain,
+                )
+            }
     }
 }

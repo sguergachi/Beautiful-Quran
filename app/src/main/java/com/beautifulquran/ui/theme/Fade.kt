@@ -554,7 +554,9 @@ fun Modifier.shapedWordBloom(
                     if (bounds.isEmpty || bounds.width <= 0f) return@forEach
                     val colorBleed = maxOf(
                         bleed,
-                        bloom.glowRadius.dp.toPx() * 3f *
+                        // A blur's sigma is ~0.58 of its radius: twice the
+                        // radius is past three sigma, where it has run out.
+                        bloom.glowRadius.dp.toPx() * 2f *
                             (if (bloom.veilAlpha > 0f) GLOW_VEIL_RADIUS else 1f),
                     )
                     drawIntoCanvas { canvas ->
@@ -595,6 +597,7 @@ fun Modifier.shapedWordBloom(
                             clipPath = shaped?.path?.takeIf { clipped },
                             overhangPx = bleed,
                             ink = ink,
+                            grainLevels = if (layer == 0) GLOW_VEIL_GRAIN else 0f,
                         ) ?: continue
                         val glowColor = if (layer == 0 && bloom.veilColor != Color.Unspecified) {
                             bloom.veilColor
@@ -1224,8 +1227,47 @@ private class WashBrushCache(private val rtl: Boolean, private val stops: FloatA
  * cached bitmap with only its colour and lifecycle alpha changing.
  */
 /** Bloom and veil blur as multiples of a halo's: InkEngine.GLINT_*_RADIUS. */
-private const val GLOW_BLOOM_RADIUS = 0.35f
-private const val GLOW_VEIL_RADIUS = 2.4f
+private const val GLOW_BLOOM_RADIUS = 0.28f
+private const val GLOW_VEIL_RADIUS = 4.5f
+
+/**
+ * Noise baked into the veil's mask, in mask levels. The veil lifts the page by
+ * only a handful of 8-bit steps across forty dp, and on a dark OLED each step
+ * is a visible contour; at the veil's strength four mask levels are about one
+ * step of the screen's, which is what it takes to dissolve them.
+ */
+private const val GLOW_VEIL_GRAIN = 4f
+
+/**
+ * Adds triangular noise of up to ±[levels] to every lit pixel of an 8-bit alpha
+ * mask. Unlit pixels stay unlit, so the mask's reach does not grow, and the
+ * noise is the same on every call so a cached mask never shimmers.
+ */
+internal fun ditherAlphaMask(pixels: ByteArray, levels: Float) {
+    if (levels <= 0f) return
+    var state = 0x2545F491
+    for (i in pixels.indices) {
+        val v = pixels[i].toInt() and 0xFF
+        if (v == 0) continue
+        state = state xor (state shl 13); state = state xor (state ushr 17); state = state xor (state shl 5)
+        val a = (state and 0xFFFF) / 65535f
+        val b = ((state ushr 16) and 0xFFFF) / 65535f
+        // Never more noise than there is light: nothing to clamp at dark, so
+        // the grain cannot lift the mask's faint tail.
+        pixels[i] = (v + (a - b) * minOf(levels, v.toFloat())).roundToInt().coerceIn(0, 255).toByte()
+    }
+}
+
+private fun Bitmap.grained(levels: Float): Bitmap = runCatching {
+    val out = if (isMutable) this else copy(Bitmap.Config.ALPHA_8, true)
+    val bytes = ByteArray(out.rowBytes * out.height)
+    val buffer = java.nio.ByteBuffer.wrap(bytes)
+    out.copyPixelsToBuffer(buffer)
+    ditherAlphaMask(bytes, levels)
+    buffer.rewind()
+    out.copyPixelsFromBuffer(buffer)
+    out
+}.getOrDefault(this)
 
 private class GlyphHaloCache {
     private data class Key(
@@ -1233,6 +1275,7 @@ private class GlyphHaloCache {
         val endExclusive: Int,
         val radiusBits: Int,
         val clipped: Boolean,
+        val grained: Boolean,
     )
 
     data class Halo(
@@ -1270,13 +1313,14 @@ private class GlyphHaloCache {
         clipPath: Path?,
         overhangPx: Float,
         ink: WordInkCache.WordInk? = null,
+        grainLevels: Float = 0f,
     ): Halo? {
         if (radiusPx <= 0f) return null
         if (layout !== textLayout) {
             layout = textLayout
             byRange.clear()
         }
-        val key = Key(start, endExclusive, radiusPx.toBits(), clipPath != null || ink != null)
+        val key = Key(start, endExclusive, radiusPx.toBits(), clipPath != null || ink != null, grainLevels > 0f)
         byRange[key]?.let { return it }
 
         val bounds = if (ink != null) {
@@ -1321,7 +1365,7 @@ private class GlyphHaloCache {
         )
         glyphs.recycle()
         return Halo(
-            bitmap = blurred,
+            bitmap = if (grainLevels > 0f) blurred.grained(grainLevels) else blurred,
             left = (left + offset[0]).toFloat(),
             top = (top + offset[1]).toFloat(),
         ).also { byRange[key] = it }

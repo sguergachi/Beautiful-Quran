@@ -71,6 +71,7 @@ class TarjiTest {
         var brightest = 0f
         val swings = mutableListOf<Float>()
         val brightness = Hani214.knobs.glintBrightness
+        val shipped = InkEngine.Tuning()
         val peaks = (0 until 40).map { phase ->
             val dropped = phase * 9
             val detector = Tarji()
@@ -110,7 +111,7 @@ class TarjiTest {
                 if (allowed) peak = maxOf(peak, ear.gain)
                 val pulse = InkEngine.glintResonance(allowed, ear.tremolo, ear.gain, depth = 1f, enabled = true)
                 val glow = flame.next(pulse.light, (earHop * Hani214.HOP_MS * 1_000_000).toLong(), 60f)
-                val level = glintLightLevel(glow, brightness, 0.10f, 0.06f)
+                val level = glintLightLevel(glow, brightness, shipped.tarjiLightRise, shipped.tarjiLightFall)
                 brightest = maxOf(brightest, level)
                 if (allowed && ear.gain >= 0.15f) {
                     luminances += glintLightColor(Color(0xFFFFF0C7), level).luminance()
@@ -122,10 +123,10 @@ class TarjiTest {
         assertTrue("every hop phase must light the word ($peaks)", peaks.all { it > 0.15f })
         assertTrue("the pulse must be clearly visible on nearly every phase ($peaks)",
             peaks.count { it >= 0.3f } >= 32)
-        assertTrue("an admitted crest must lift the light ($brightest)", brightest > 1.08f)
+        assertTrue("an admitted crest must lift the light ($brightest)", brightest > 1.04f)
         assertTrue("the light must visibly move on nearly every phase ($swings)",
-            swings.count { it >= 0.03f } >= 32)
-        assertTrue("and only ever a little ($swings)", swings.all { it <= 0.3f })
+            swings.count { it >= 0.02f } >= 32)
+        assertTrue("and only ever a little ($swings)", swings.all { it <= 0.1f })
     }
 
     @Test
