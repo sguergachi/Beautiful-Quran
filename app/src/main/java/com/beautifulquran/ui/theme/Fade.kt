@@ -216,6 +216,13 @@ sealed class ShapedWordBloom {
         val feather: Float? = null,
     ) : ShapedWordBloom()
 
+    /** A hairline under the word: the Ink Lab's mark for a tarjīʿ candidate.
+     * Never drawn outside the lab. */
+    data class Underline(
+        override val range: IntRange,
+        val color: Color,
+    ) : ShapedWordBloom()
+
     /** Tinted ink (orange repeat, white-gold glint): shaped glyphs tinted to
      * [color], wash from [restingAlpha] → 1, then dissolve via [layerAlpha].
      * [feather] overrides the modifier-level feather when set, same as
@@ -373,6 +380,7 @@ fun Modifier.shapedWordBloom(
                 is ShapedWordBloom.UpcomingDim -> bloom.coverAlpha > 0f
                 is ShapedWordBloom.InkReveal -> bloom.progress < 1f
                 is ShapedWordBloom.ColorReveal -> false
+                is ShapedWordBloom.Underline -> false
             }
         }
         val coverBlend = paperCoverBlendMode(punchLayer)
@@ -404,6 +412,19 @@ fun Modifier.shapedWordBloom(
             // the shaped glyph path. Deriving both for every bloom meant a long
             // ayah rebuilt ~2 paths per word on every animation frame.
             when (bloom) {
+                is ShapedWordBloom.Underline -> {
+                    val inset = 2.dp.toPx()
+                    lineBoundsCache.boundsFor(textLayout, start, endExclusive).forEach { bounds ->
+                        if (bounds.width <= inset * 2f) return@forEach
+                        val y = bounds.bottom - inset
+                        drawLine(
+                            color = bloom.color,
+                            start = Offset(bounds.left + inset, y),
+                            end = Offset(bounds.right - inset, y),
+                            strokeWidth = 1.5.dp.toPx(),
+                        )
+                    }
+                }
                 is ShapedWordBloom.UpcomingDim -> {
                     val a = bloom.coverAlpha.coerceIn(0f, 1f)
                     if (a <= 0f) return@forEach

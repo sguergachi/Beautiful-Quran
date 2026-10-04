@@ -164,6 +164,11 @@ paper, but 139 ms of smoothing passes only about a fifth of a 6 Hz pulse, so
 what reaches the eye is a soft swell of a few percent in the glyphs and a
 clearly breathing glow. Raise one without the other and it is a strobe again.
 
+**Finding the words that can pulse.** **Mark candidates** on the same tab
+underlines every word `InkEngine.tarjiEligible` admits — a long madd, a
+ghunnah or the verse's closing hold on its own letters. It is a lab mark,
+session-only, and is not drawn on the English mushaf's prose.
+
 **Telling paint from detection.** The Tarjīʿ tab has a **Test pulse** (a steady
 6 Hz light on the lit word, detector bypassed) and a **Word** line saying
 whether the lit word is eligible, waiting, or pulsing and by how much. A word

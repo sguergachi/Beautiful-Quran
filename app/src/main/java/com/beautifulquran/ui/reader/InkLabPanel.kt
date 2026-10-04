@@ -362,6 +362,14 @@ fun InkLabPanel(
                         }
                         TarjiStatusLine()
                         TarjiWordLine()
+                        TuningToggle("Mark candidates", InkEngine.tarjiMarkCandidates) {
+                            InkEngine.tarjiMarkCandidates = it
+                        }
+                        LabCaption(
+                            "Underlines every word that may pulse: one whose " +
+                                "letters carry a long madd, a ghunnah or the " +
+                                "verse's closing hold. No other word ever will.",
+                        )
                         TuningToggle("Test pulse (6 Hz)", InkEngine.tarjiTestPulse) {
                             InkEngine.tarjiTestPulse = it
                         }

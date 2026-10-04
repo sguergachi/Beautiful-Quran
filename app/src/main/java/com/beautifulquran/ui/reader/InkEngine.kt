@@ -562,6 +562,16 @@ object InkEngine {
     var tarjiTestPulse by mutableStateOf(false)
 
     /**
+     * Ink Lab only: underline every word that may pulse — the ones whose own
+     * letters carry a long madd, a ghunnah or the verse's closing hold
+     * ([tarjiEligible]). Session-only, like the test pulse.
+     */
+    var tarjiMarkCandidates by mutableStateOf(false)
+
+    /** The candidate underline: the page's gold, at a strength that stays a mark. */
+    val TARJI_CANDIDATE_MARK = androidx.compose.ui.graphics.Color(0xB3CAA547)
+
+    /**
      * What the reader's light last did for the active word, for the Ink Lab's
      * readout: whether the word may pulse at all, whether the detector's event
      * was admitted, and the light it asked for. Written by the frame loop.

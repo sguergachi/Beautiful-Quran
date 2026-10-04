@@ -1167,6 +1167,8 @@ internal class InkMotion(
      * closers (1:7 الضَّالِّينَ).
      */
     private val tarji: State<InkEngine.GlintResonance>,
+    /** Ink Lab: this word may pulse, and the lab is marking the ones that may. */
+    val tarjiCandidate: Boolean = false,
 ) {
     val isActive: Boolean get() = ink.state == InkEngine.State.Active
     val repeat: Boolean get() = ink.repeat
@@ -1270,6 +1272,18 @@ private fun Modifier.layeredBaseInk(motion: InkMotion, rtl: Boolean): Modifier =
         rtl = rtl,
         restingAlpha = InkEngine.State.Upcoming.inkAlpha(),
         feather = motion.washFeather,
+    )
+}
+
+/** The Ink Lab's hairline under a word that may pulse (see [ShapedWordBloom.Underline]). */
+private fun Modifier.tarjiCandidateMark(): Modifier = drawBehind {
+    val inset = 2.dp.toPx()
+    if (size.width <= inset * 2f) return@drawBehind
+    drawLine(
+        color = InkEngine.TARJI_CANDIDATE_MARK,
+        start = Offset(inset, size.height - inset),
+        end = Offset(size.width - inset, size.height - inset),
+        strokeWidth = 1.5.dp.toPx(),
     )
 }
 
@@ -1467,6 +1481,10 @@ internal fun rememberInkMotions(
             isActive && InkEngine.tarjiEligible(words[index].arabic, index == words.lastIndex)
         }
         val tarjiEligible = glinting && strongHold
+        val tarjiCandidate = InkEngine.tarjiMarkCandidates &&
+            remember(words[index].arabic, index == words.lastIndex) {
+                InkEngine.tarjiEligible(words[index].arabic, index == words.lastIndex)
+            }
         val sweep = rememberLetterSweep(
             active = isActive,
             finishResidual = ink.state == InkEngine.State.Recited,
@@ -1505,6 +1523,7 @@ internal fun rememberInkMotions(
                 repeat = ink.repeat,
                 wordStartMs = activeWordStartMs,
             ),
+            tarjiCandidate = tarjiCandidate,
         )
         predecessor = sweep.progress
     }
@@ -1602,7 +1621,7 @@ private fun HighlightLayeredText(
     // modifier so breathing does not recompose or remeasure this word.
     val searchHitActive = !motion.showRepeatLayer && searchHitWash != null
     val orangeWash = motion.repeatWash.takeIf { motion.showRepeatLayer }
-    Box(modifier) {
+    Box(if (motion.tarjiCandidate) modifier.tarjiCandidateMark() else modifier) {
         // The glow is a light's falloff, glyph-shaped at every width — no
         // radial field: a wide faint veil, the halo, and a tight bloom.
         if (glintInk != null && motion.showGlintLayer) {
@@ -2005,6 +2024,11 @@ internal fun buildShapedBlooms(
             // The mark fades alone, so its cover may not reach. See the field.
             pad = 0.dp,
         )
+    }
+    motions.forEachIndexed { index, motion ->
+        if (!motion.tarjiCandidate) return@forEachIndexed
+        val range = rendered.wordRanges.getOrNull(index) ?: return@forEachIndexed
+        blooms += ShapedWordBloom.Underline(range, InkEngine.TARJI_CANDIDATE_MARK)
     }
     blooms.addShapedInkMotionBlooms(
         motions = motions,
