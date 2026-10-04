@@ -105,7 +105,7 @@ export function bookRightShare(leaves: boolean, stack: StackLayer, page: number 
   return Math.min(1, Math.max(0, (page - 1) / (BOOK_PAGES - 1)))
 }
 
-/** One leaf turns in this long (`mushaf-leaf-turn` in styles.css). */
+/** One leaf turns in this long (its motion is pageTurnMotion). */
 export const LEAF_TURN_MS = 760
 
 /** A pile is heavier than a leaf: the whole block takes half as long again. */
@@ -136,6 +136,103 @@ const bookPlace = (() => {
 })()
 export const setBookPlace = bookPlace.set
 export const useBookPlace = bookPlace.use
+
+/**
+ * The leaves in the air during a turn, as the share of the block that lay
+ * on the right before it and will after it. They lie on neither pile.
+ */
+export interface BookAir {
+  from: number
+  to: number
+}
+
+const bookAir = (() => {
+  let air: BookAir | null = null
+  const listeners = new Set<() => void>()
+  return {
+    set(next: BookAir | null) {
+      if (air === next || (air && next && air.from === next.from && air.to === next.to)) return
+      air = next
+      for (const listener of listeners) listener()
+    },
+    use: (): BookAir | null =>
+      useSyncExternalStore(
+        (onChange) => {
+          listeners.add(onChange)
+          return () => listeners.delete(onChange)
+        },
+        () => air,
+        () => null,
+      ),
+  }
+})()
+export const setBookAir = bookAir.set
+export const useBookAir = bookAir.use
+
+/**
+ * The two piles, as shares of the block, with [right] of it turned onto the
+ * right. A pile holds only leaves that lie on it: the leaves of a turn leave
+ * theirs as they lift and join the other as they land, and in between they
+ * are in the air. So nothing is added to a pile that was not turned onto it.
+ */
+export function bookPiles(right: number, air: BookAir | null): { right: number; left: number } {
+  if (!air) return { right, left: 1 - right }
+  return { right: Math.min(air.from, air.to), left: 1 - Math.max(air.from, air.to) }
+}
+
+/**
+ * Where the book lies open, kept outside the reader.
+ *
+ * A reader is built anew for every chapter, and one built with no memory of
+ * the book took it to be open already at its own page: choosing a chapter
+ * turned nothing, and the piles jumped to their new thickness. The book is
+ * one object and it is somewhere before the reader arrives. This is that
+ * place: the sheet the book rested on, the page its leaves were open at, and
+ * the picture of what lay on the right-hand page, which is the face of the
+ * pile a new reader turns to reach its chapter.
+ */
+export interface BookRest {
+  layer: StackLayer
+  /** The right-hand page of the spread last settled on; null before any chapter. */
+  place: number | null
+  /** The kept picture of the recto leaf last read (pageTurn's album), if any. */
+  rectoKey: string | null
+}
+
+let rest: BookRest | null = null
+
+export function bookRest(): BookRest | null {
+  return rest
+}
+
+export function restBook(change: Partial<BookRest>) {
+  rest = { layer: COVER_LAYER, place: null, rectoKey: null, ...rest, ...change }
+}
+
+/** For tests: the book is nowhere again. */
+export function forgetBookRest() {
+  rest = null
+}
+
+/**
+ * How a reader that has just been built finds the book, and so what it must
+ * turn to open it at its own page.
+ *
+ * - From Chapters or Settings ([sheet]): the pile turned over to show that
+ *   sheet goes home, less whatever now belongs on the far side. Its face is
+ *   what lay on the page it lifts from.
+ * - From another page of the book ([from]): the leaves in between turn, as
+ *   they do for any far page.
+ * - Nowhere yet, or already there: nothing turns.
+ */
+export function bookArrival(
+  found: BookRest | null,
+  layer: StackLayer,
+): { sheet: StackLayer } | { from: number } | null {
+  if (!found) return null
+  if (found.layer !== layer) return { sheet: found.layer }
+  return layer === READER_LAYER && found.place != null ? { from: found.place } : null
+}
 
 /** A swipe belongs to the sheet on which its pointer went down. */
 export function bookmarkSwipeDestination(layer: StackLayer, dx: number, hasBookmarks: boolean): StackLayer | null {

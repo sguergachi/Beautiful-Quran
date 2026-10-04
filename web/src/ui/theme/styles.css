@@ -45,6 +45,21 @@
      roman rather than that same voice leaning. Verse notes only. */
   --font-scribe: 'Cormorant Garamond', 'Times New Roman', serif;
   --sheet-pad: clamp(1.1rem, 4.5vw, 2.75rem);
+  /*
+   * The phone's grid — Android's, at 1px = 1dp (ui/paper/sheetGrid.ts).
+   * Every sheet hangs its ink on two vertical rules, and paper between two
+   * pieces of ink is a whole number of 4px steps. Each kind of sheet has
+   * its margin: an information sheet (Home, Settings, Customize) 28, a
+   * reference sheet (Bookmarks, the word viewer) 24, the scrolling chapter
+   * 38 (below); a Mushaf leaf keeps its own 10. A margin that grew with the
+   * window (4.5vw) put Settings at 16px on a 360px phone and 18.5 on a 412px
+   * one, beside a Home that stood at 28. The desktop book has its own grid
+   * (--u) and keeps --sheet-pad as it was.
+   */
+  --grid: 4px;
+  --sheet-margin: 28px;
+  --reference-margin: 24px;
+  --leaf-margin: 10px;
   /* Scroll reader grid — Android ScrollGrid, 1px = 1dp. */
   --scroll-margin: 38px;
   --verse-pad: 16px;
@@ -2342,6 +2357,17 @@ button.ayah-mark {
      over the completed word (post-handoff flicker). Recess soft-dim opts in. */
 }
 
+/* On a leaf a word's box is one em tall (the line's leading is 1), and Hafs
+   inks well outside it: a tail hangs 0.39em below, more with a mark under
+   it. The bleed above left those at full ink under a waiting word. So the
+   cover runs the whole height of its line and the line cuts it there
+   (.mushaf-line clips), as Android's cover takes its line's bounds: it
+   never reaches the lines above and below. */
+.mushaf-line .ink-paper-cover {
+  top: -2em;
+  bottom: -2em;
+}
+
 .hafs-word[data-state='Upcoming'] .ink-paper-cover,
 .word-arabic-ink[data-state='Upcoming'] .ink-paper-cover {
   opacity: var(--upcoming-cover, 0.7339);
@@ -2593,7 +2619,7 @@ button.ayah-mark {
   display: flex;
   flex-direction: column;
   /* Foot clears the transport's dissolve, so the folio is never under it. */
-  padding: max(0.4rem, env(safe-area-inset-top, 0px)) 10px 6.5rem;
+  padding: max(0.4rem, env(safe-area-inset-top, 0px)) var(--leaf-margin) 6.5rem;
   touch-action: pan-y;
 }
 
@@ -2706,8 +2732,8 @@ button.ayah-mark {
   transition: opacity var(--ayah-mark-fade-ms, 400ms) var(--recede-ease);
 }
 
-/* A verse still to come waits with its words; its mark returns as the
-   verse's last word is reached. */
+/* A verse still to come waits with its words; its mark lights as the voice
+   takes the verse up (mushafMarkWaits). */
 .mushaf-mark[data-state='Upcoming'] {
   opacity: var(--upcoming-alpha, 0.2661);
   transition-duration: var(--recess-ms, 400ms);
@@ -3167,7 +3193,8 @@ button.ayah-mark {
 
 /* —— Bookmark index —— */
 .bookmarks-frame {
-  --bookmark-pad: clamp(1.25rem, 4vw, 1.5rem);
+  /* Android BookmarksScreen: 24dp, at any width (it shrank to 20 on a phone). */
+  --bookmark-pad: var(--reference-margin);
   --bookmark-spine: 40px;
   --bookmark-rule: var(--bookmark-pad);
   width: 100%;
@@ -5366,10 +5393,102 @@ button.ayah-mark {
 }
 
 /* —— Responsive —— */
+/* The one-sheet deck (phones, and any window too small for the book) stands
+   on the grid's rules, whatever its width. */
+.app-shell:not([data-spread='true']) {
+  --sheet-pad: var(--sheet-margin);
+}
+
+.app-shell:not([data-spread='true']) .ink-bleed {
+  /* Android RootViewerScreen: 24dp. */
+  --root-inline-padding: var(--reference-margin);
+}
+
+/* Home hangs on Android's 28dp lane: the sheet's own padding comes off, so
+   the search field and the chapter rows start where the masthead does. At
+   any width of the deck: between 640px and the book this held only for the
+   masthead, and the field, the masthead and the rows began at 44, 50 and 56. */
+.app-shell:not([data-spread='true']) .sheet[data-name='home'] .scroll {
+  padding-inline: 0;
+}
+
+.app-shell:not([data-spread='true']) .home-scroll-page > .search-row {
+  padding-inline: var(--home-start-inset) var(--home-end-inset);
+}
+
+/*
+ * Settings and Customize on the grid: Android SettingsScreen's own figures,
+ * at 1px = 1dp. They were rem values near these (0.35rem for 6, 0.65rem for
+ * 10, 0.85rem for 14, 1.35rem for 22), each sensible alone and none on the
+ * step, and the sheet began 8px from the top where Android begins at 20.
+ *
+ *  20  head (under the status bar)       8  inside a row, above and below
+ *  40  the back chevron's box            4  section label to its rows
+ *   6  chevron to title                 20  one group to the next
+ *  36  title to the first label         56  to the colophon; 18; 48 foot
+ */
+.app-shell:not([data-spread='true']) .settings {
+  padding-top: calc(env(safe-area-inset-top, 0px) + 20px);
+  padding-bottom: calc(48px + env(safe-area-inset-bottom, 0px));
+}
+
+.app-shell:not([data-spread='true']) :is(.settings .back, .settings-back) {
+  margin-bottom: 6px;
+}
+
+.app-shell:not([data-spread='true']) .settings h1 {
+  margin-bottom: 36px;
+}
+
+.app-shell:not([data-spread='true']) .settings-section h2 {
+  margin-bottom: 4px;
+}
+
+.app-shell:not([data-spread='true']) .settings-caption {
+  margin: 4px 0 12px;
+}
+
+.app-shell:not([data-spread='true']) .settings-dev-block {
+  margin-top: 20px;
+}
+
+.app-shell:not([data-spread='true']) .settings-dev-primary {
+  margin-top: 4px;
+}
+
+.app-shell:not([data-spread='true']) .setting-row {
+  padding-block: 12px;
+}
+
+.app-shell:not([data-spread='true']) .paper-check-row {
+  padding-block: 8px;
+}
+
+.app-shell:not([data-spread='true']) .paper-select-trigger {
+  padding-block: 4px;
+}
+
+.app-shell:not([data-spread='true']) .paper-field-slider {
+  padding-block: 4px 8px;
+}
+
+.app-shell:not([data-spread='true']) .customize-sticky {
+  padding-bottom: 4px;
+}
+
+.app-shell:not([data-spread='true']) .customize-scroll {
+  padding-bottom: calc(48px + env(safe-area-inset-bottom, 0px));
+}
+
+.app-shell:not([data-spread='true']) .settings-colophon {
+  margin: 56px 0 18px;
+}
+
+.app-shell:not([data-spread='true']) .settings-attributions {
+  margin-bottom: 0;
+}
+
 @media (max-width: 640px) {
-  :root {
-    --sheet-pad: clamp(0.95rem, 4.5vw, 1.35rem);
-  }
 
   /* The 44px desktop target extends 16px outside the sheet on phones, leaving
    * Android's deliberate 28px Home-edge target and the same 28px content lane. */
@@ -5399,16 +5518,6 @@ button.ayah-mark {
   /* Android PlayerBar `compact`: 4dp between controls on a narrow screen. */
   .player-transport {
     gap: 4px;
-  }
-
-  /* Home hangs on Android's 28dp lane: the sheet's own padding comes off,
-     so the search field and the chapter rows start where the masthead does. */
-  .sheet[data-name='home'] .scroll {
-    padding-inline: 0;
-  }
-
-  .home-scroll-page > .search-row {
-    padding-inline: var(--home-start-inset) var(--home-end-inset);
   }
 
   .reader-top-title {
@@ -6663,7 +6772,16 @@ html[data-entrance='true'] body {
 .app-shell[data-spread='true'] .book,
 .entrance-inside {
   --edge-r: calc(var(--book-edge-min) + var(--book-fan) * var(--book-right));
-  --edge-l: calc(var(--book-edge-min) + var(--book-fan) * (1 - var(--book-right)));
+  /* --book-left is given only with facing leaves, whose piles can both be
+     short of the block while a leaf is in the air (bookPiles). */
+  --edge-l: calc(var(--book-edge-min) + var(--book-fan) * var(--book-left, calc(1 - var(--book-right))));
+}
+
+/* Facing leaves are turned: a pile changes when a leaf is lifted off it or
+   laid on it, at once and by that much. Easing it over 900 ms grew the far
+   pile while the leaves that were to join it were still in the air. */
+.app-shell[data-spread='true'][data-leaves='true'] .book {
+  transition: opacity 520ms ease;
 }
 
 .book-page {
@@ -7451,229 +7569,33 @@ html[data-entrance-closing]
   position: absolute;
   inset: 0;
   pointer-events: none;
-  perspective: 2600px;
-  /* Spread: the leaf is one page wide, on the side it lifts from. */
-  --leaf-width: 50%;
-  --turn-ms: 760ms;
-  /* How far each face laps over its joints. Strips are a fraction of a
-     pixel wide, so their edges are soft; at one pixel the page beneath
-     showed through every joint as a vertical rule. */
-  --joint: 2px;
-  /*
-   * A turn can carry more than one leaf: going to Chapters or Settings, or
-   * to a page far off, turns the whole pile between here and there.
-   * --wad-share is that pile's share of the block (TurningLeaf), and --wad
-   * its thickness. A pile is stiff: the thicker it is the less it curls.
-   */
-  --wad: calc(var(--wad-share, 0) * var(--book-block, 0px));
-  --curl: calc(52deg * (1 - 0.86 * var(--wad-share, 0)));
-  /* The whole sheet's curl, shared out among the joints. */
-  --furl-total: var(--curl);
-  --furl: calc(var(--furl-total) / (var(--strips) - 1));
 }
 
-/* Pages run right to left. Going on, the left leaf swings to the right. */
-.mushaf-flip[data-dir='on'] {
-  --turn-from: 0deg;
-  --turn-to: 180deg;
-}
-
-.mushaf-flip[data-dir='back'] {
-  --turn-from: 0deg;
-  --turn-to: -180deg;
-  --furl-total: calc(-1 * var(--curl));
-}
-
-/* A single leaf is bound at its right edge and has nowhere to land: it
-   lifts until it is edge-on, or comes down from there. */
-.mushaf-flip--single {
-  perspective: 1700px;
-  --leaf-width: 100%;
-  --furl-total: 48deg;
-}
-
-.mushaf-flip--single[data-dir='on'] {
-  --turn-from: 0deg;
-  --turn-to: 96deg;
-}
-
-.mushaf-flip--single[data-dir='back'] {
-  --turn-from: 96deg;
-  --turn-to: 0deg;
-}
-
-/* While TurningLeaf measures the page it is about to cut into strips, the
-   leaf lies flat: no turn, no curl, no face turned over or set back. */
-.mushaf-flip[data-measuring] :is(.mushaf-flip-strip, .mushaf-flip-face, .mushaf-line) {
-  animation: none !important;
-  transform: none !important;
-}
-
-/* A strip of the leaf. The first is bound to the page's edge and carries
-   the turn; each one after hangs on the strip before it and bends a little
-   at the joint, so the free edge lifts first and the sheet bows behind it. */
-.mushaf-flip-strip {
-  position: absolute;
-  top: 0;
-  bottom: 0;
-  width: 100%;
-  transform-style: preserve-3d;
-  animation: mushaf-leaf-furl var(--turn-ms) ease-in-out both;
-}
-
-.mushaf-flip[data-hinge='right'] .mushaf-flip-strip {
-  right: 100%;
-  transform-origin: right center;
-}
-
-.mushaf-flip[data-hinge='left'] .mushaf-flip-strip {
-  left: 100%;
-  transform-origin: left center;
-}
-
-.mushaf-flip-strip[data-bound] {
-  width: calc(var(--leaf-width) / var(--strips));
-  /* The bound edge follows the hand: it starts late and settles last. */
-  animation: mushaf-leaf-turn var(--turn-ms) cubic-bezier(0.5, 0.02, 0.28, 1) both;
-}
-
-.mushaf-flip[data-hinge='right'] .mushaf-flip-strip[data-bound] {
-  right: calc(100% - var(--leaf-width));
-}
-
-.mushaf-flip--single[data-hinge='right'] .mushaf-flip-strip[data-bound] {
-  right: 0;
-}
-
-.mushaf-flip[data-hinge='left'] .mushaf-flip-strip[data-bound] {
-  left: var(--leaf-width);
-}
-
-.mushaf-flip--single[data-dir='back'] .mushaf-flip-strip:not([data-bound]) {
-  animation-direction: reverse;
-}
-
-/* A pile turns about the middle of its own thickness: the face it lifted
-   by starts level with the page, and the face it lands on ends level with
-   the page it lands on. A single leaf has no thickness and only rotates. */
-@keyframes mushaf-leaf-turn {
-  from {
-    transform: translateZ(0px) rotateY(var(--turn-from));
-  }
-  to {
-    transform: translateZ(calc(-1 * var(--wad))) rotateY(var(--turn-to));
-  }
-}
-
-/* Bend at one joint: quick into the curl as the edge is picked up, slow
-   out of it as the sheet is laid flat. */
-@keyframes mushaf-leaf-furl {
-  0% {
-    transform: rotateY(0deg);
-  }
-  34% {
-    transform: rotateY(var(--furl));
-  }
-  90%,
-  100% {
-    transform: rotateY(0deg);
-  }
-}
-
-.mushaf-flip--single .mushaf-flip-strip:not([data-bound]) {
-  animation-name: mushaf-leaf-furl-lift;
-}
-
-/* A leaf that leaves stays bowed until it is gone. */
-@keyframes mushaf-leaf-furl-lift {
-  0% {
-    transform: rotateY(0deg);
-  }
-  45%,
-  100% {
-    transform: rotateY(var(--furl));
-  }
-}
-
-.mushaf-flip-face {
-  position: absolute;
-  /* Over the joint each side, so nothing shows between strips. */
-  inset: 0 calc(-1 * var(--joint));
-  overflow: hidden;
-  background: var(--paper);
-  backface-visibility: hidden;
-}
-
-.mushaf-flip-face--back {
-  /* The underside of the pile, its thickness below the face. */
-  transform: translateZ(calc(-1 * var(--wad))) rotateY(180deg);
-}
-
-/* The pile's own edges: its fore-edge on the free strip, and its head and
-   foot on every strip. Leaves seen edge-on, like the piles at rest. Only
-   drawn for a pile (TurningLeaf), never for one leaf. */
-.mushaf-flip-edge {
-  position: absolute;
-  top: 0;
-  bottom: 0;
-  width: var(--wad);
-  background:
-    linear-gradient(to right, transparent, var(--book-edge-shade)),
-    repeating-linear-gradient(to right, var(--book-edge-line) 0 1px, transparent 1px 2px),
-    var(--paper);
-}
-
-.mushaf-flip[data-hinge='right'] .mushaf-flip-edge {
-  left: calc(-1 * var(--joint));
-  transform-origin: left center;
-  transform: rotateY(90deg);
-}
-
-.mushaf-flip[data-hinge='left'] .mushaf-flip-edge {
-  right: calc(-1 * var(--joint));
-  transform-origin: right center;
-  transform: rotateY(-90deg);
-}
-
-.mushaf-flip-cap {
-  position: absolute;
-  left: calc(-1 * var(--joint));
-  right: calc(-1 * var(--joint));
-  height: var(--wad);
-  background:
-    linear-gradient(to bottom, transparent, var(--book-edge-shade)),
-    repeating-linear-gradient(to bottom, var(--book-edge-line) 0 1px, transparent 1px 2px),
-    var(--paper);
-}
-
-.mushaf-flip-cap--head {
-  top: 0;
-  transform-origin: center top;
-  transform: rotateX(-90deg);
-}
-
-.mushaf-flip-cap--foot {
-  bottom: 0;
-  transform-origin: center bottom;
-  transform: rotateX(90deg);
-  background:
-    linear-gradient(to top, transparent, var(--book-edge-shade)),
-    repeating-linear-gradient(to bottom, var(--book-edge-line) 0 1px, transparent 1px 2px),
-    var(--paper);
-}
-
-/* The whole page, laid behind the strip's window at this strip's slice. */
+/* The leaf itself is one bent sheet on a canvas (paper/pageTurn). These are
+   the pages its pictures are taken from: laid out exactly where they lie on
+   the book (data-at), the paper they stand on given as their background,
+   and never painted. */
 .mushaf-flip-page {
   position: absolute;
   top: 0;
   bottom: 0;
-  /* Percentages here are of the widened face; undo its lap so each strip's
-     slice still starts exactly where the last one ended. */
-  width: calc(var(--strips) * (100% - 2 * var(--joint)));
-  margin-left: var(--joint);
+  width: 50%;
+  visibility: hidden;
+  background: var(--paper);
 }
 
-.mushaf-flip--single .mushaf-flip-page {
+.mushaf-flip-page[data-at='verso'] {
+  left: 0;
+}
+
+.mushaf-flip-page[data-at='recto'] {
+  left: 50%;
+}
+
+/* A single leaf (phones) is the whole sheet, bound at its right edge. */
+.mushaf-flip-page[data-at='single'] {
+  left: 0;
+  width: 100%;
   display: flex;
   flex-direction: column;
 }
@@ -7686,53 +7608,25 @@ html[data-entrance-closing]
   position: static;
 }
 
-/* The leaf's own shading as it stands up out of the light — darkest toward
-   the bound edge, and one gradient across the whole page so the strips read
-   as a single bowed sheet. Paper turning, not a shadow cast beneath. */
-.mushaf-flip-page::after {
-  content: '';
+/* A picture is measured with every transform off and applies each one
+   itself (pagePicture): a transformed box reports where it ends up. */
+.mushaf-flip-page[data-flat] * {
+  transform: none !important;
+}
+
+.mushaf-flip-canvas {
   position: absolute;
-  inset: 0;
-  background: linear-gradient(
-    to right,
-    rgba(var(--book-gutter-rgb), calc(var(--book-gutter-alpha) * 0.3)),
-    var(--book-gutter-shade)
-  );
-  animation: mushaf-leaf-shade var(--turn-ms) ease-in-out both;
+  display: block;
+  pointer-events: none;
 }
 
-/* Bound on the left (or seen from behind a right-bound leaf): the dark end
-   of that gradient belongs at the other side. */
-.mushaf-flip[data-hinge='left'] .mushaf-flip-face:not(.mushaf-flip-face--back) .mushaf-flip-page::after,
-.mushaf-flip[data-hinge='right'] .mushaf-flip-face--back .mushaf-flip-page::after {
-  transform: scaleX(-1);
-}
-
-.mushaf-flip--single .mushaf-flip-page::after {
-  animation-name: mushaf-leaf-shade-lift;
-}
-
-.mushaf-flip--single[data-dir='back'] .mushaf-flip-page::after {
-  animation-direction: reverse;
-}
-
-@keyframes mushaf-leaf-shade {
-  0%,
-  100% {
-    opacity: 0;
-  }
-  50% {
-    opacity: 1;
-  }
-}
-
-@keyframes mushaf-leaf-shade-lift {
-  from {
-    opacity: 0;
-  }
-  to {
-    opacity: 1;
-  }
+/* Read once per turn: the book block's thickness, and the book's tones
+   through `color`. */
+.mushaf-flip-probe {
+  position: absolute;
+  width: var(--book-block, 0px);
+  height: 0;
+  visibility: hidden;
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -7794,14 +7688,6 @@ html[data-entrance-closing]
     background: linear-gradient(
       to right,
       rgb(from var(--book-gutter-shade) r g b / calc(alpha * 0.5)),
-      var(--book-gutter-shade)
-    );
-  }
-
-  .mushaf-flip-page::after {
-    background: linear-gradient(
-      to right,
-      rgb(from var(--book-gutter-shade) r g b / calc(alpha * 0.3)),
       var(--book-gutter-shade)
     );
   }

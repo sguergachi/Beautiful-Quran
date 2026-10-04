@@ -59,7 +59,16 @@ over onto the right: at the first page the whole block lies on the left, at
 the last on the right, and the piles trade leaves in between. Each board
 carries a band wide enough for the whole block (1 *u*, plus φ⁻⁴ for the last
 few leaves); what a pile does not cover shows the pastedown, the paper lining
-the board. So the pages themselves never move as the piles change.
+the board. So the pages themselves never move as the piles change. On
+facing leaves a pile changes only by the leaves that are turned: they leave
+it as they lift and join the other as they land, and while they are in the
+air they lie on neither. Nothing is added to a pile that was not turned onto
+it. The book is one object and it is always somewhere: choosing a
+chapter turns the leaves between where the book lies and that chapter's
+page, as one pile, off what was showing (the title page, or the leaf last
+read). From Chapters that is the pile turned over to show it, coming home
+less the leaves that now belong on the right; from another page, the leaves
+in between.
 
 On facing leaves Chapters is the left-most page, under every leaf of the left
 pile, and Settings the right-most, under every leaf of the right pile. Going
@@ -957,7 +966,32 @@ not from local `dp` literals.
   follows the verse pad (`RIBBON_TIP`), so changing the pad keeps the tip on
   the first ink line.
 
-Android only for now; the web reader still uses its own rem values.
+The web chapter hangs on the same figures (`web/src/ui/reader/scrollGrid.ts`,
+1px = 1dp).
+
+### The sheet grid
+
+The chapter's margin is one of four. Every sheet hangs its ink on two
+vertical rules, and its margin says what kind of sheet it is:
+
+| Margin | Sheets |
+|---|---|
+| 28 | information: Home (its ribbon lane), Settings, Customize, Reciters, Downloads |
+| 24 | reference: Bookmarks, the word viewer |
+| 38 | the scrolling chapter |
+| 10 | a Mushaf leaf, which is a printed page and keeps its own |
+
+A margin is fixed. It does not grow with the window: a sheet wider than
+640 dp centres its column and keeps the margin inside it. On the web's
+one-sheet deck (phones, and any window too small to lie open as a book) the
+margins were a share of the window, so Settings stood at 16 px on a 360 px
+phone and 18.5 on a 412 px one beside a Home that stood at 28, and the left
+edge moved as the sheets turned. They are Android's figures now
+(`web/src/ui/paper/sheetGrid.ts`, held to the stylesheet by its test), and
+Settings takes Android's vertical figures with them: 20 over the back
+chevron, 6 to the title, 36 to the first label, 4 from a label to its rows,
+8 inside a row, 56 to the colophon and 48 at the foot. The desktop book is
+not on this grid; it has its own (one module, *u*, above).
 
 ### Information surfaces: learned rules
 
