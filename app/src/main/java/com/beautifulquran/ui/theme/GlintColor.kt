@@ -30,7 +30,7 @@ import kotlin.math.pow
 /** Resting light of the glyphs, as a fraction of the glint colour: the headroom
  * a crest rises into. No channel is ever scaled past the colour itself, so the
  * hue cannot drift toward white. */
-internal const val GLINT_REST_LIGHT = 0.94f
+internal const val GLINT_REST_LIGHT = 0.8858f
 
 /** Display gamma: luminance of a layer goes as its alpha to this power. */
 private const val GLOW_GAMMA = 2.2f

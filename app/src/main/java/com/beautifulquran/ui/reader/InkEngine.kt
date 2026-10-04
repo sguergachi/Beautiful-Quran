@@ -103,7 +103,7 @@ object InkEngine {
          *  Must read over parchment base ink mid-wash and through long holds —
          *  the old 0.62/0.49 pair was nearly invisible gold-on-parchment. */
         val glintTintAlpha: Float = 0.88f,
-        val glintGlowAlpha: Float = 0.4f,
+        val glintGlowAlpha: Float = 0.4514f,
         /** Halo blur radius in dp, the same in every reading mode. */
         val glintGlowRadius: Float = 5f,
         /**
@@ -114,25 +114,27 @@ object InkEngine {
          * from the ink roughly as glare does — steeply, then a long thin tail.
          */
         val glintBloomAlpha: Float = 0.75f,
-        val glintVeilAlpha: Float = 0.25f,
-        val glintVeilWarmth: Float = 0.5f,
+        val glintVeilAlpha: Float = 0.6f,
+        val glintVeilWarmth: Float = 0.5195f,
         /** Glint sheen: 0 = off, 1 = shipped. Above 1 it only scales how far
          * the tarjīʿ light swings, at half weight (`glintSwingScale`) — the
          * resting glow is already where it should be. */
         val glintBrightness: Float = 1f,
         /** How much brighter the glyphs' light gets on a vocal crest (fraction
          * of luminance). `GLINT_REST_LIGHT` is the headroom it rises into. */
-        val tarjiLightRise: Float = 0.06f,
+        val tarjiLightRise: Float = 0.3f,
         /** Resting light of the glyphs as a fraction of the glint colour: the
          * headroom a crest rises into (`glintLetterLight`). */
-        val glintRestLight: Float = 0.94f,
+        val glintRestLight: Float = 0.8858f,
         /** How much dimmer it gets in a trough — less than the rise: the light
          * should seem to lift with the voice, not to drop out between pulses. */
-        val tarjiLightFall: Float = 0.04f,
-        /** Smoothing of the light's motion (ms); its lag is read ahead and cancelled. */
-        val tarjiLightSmoothMs: Float = 60f,
+        val tarjiLightFall: Float = 0.1101f,
+        /** Smoothing of the light's motion (ms); its lag is read ahead and cancelled.
+         * Tuned by eye on a Pixel with the swing above: a long smoothing takes a
+         * 6 Hz pulse down to about a fifth, so the large rise reads as a soft swell. */
+        val tarjiLightSmoothMs: Float = 139f,
         /** How many times further the glow's light swings than the glyphs'. */
-        val tarjiGlowGain: Float = 4f,
+        val tarjiGlowGain: Float = 8.6696f,
         /** Width of the ink feather relative to the word (see
          *  ui/theme/Fade.kt: the wash reads as a whole-word breath). */
         val washFeather: Float = 1.6f,

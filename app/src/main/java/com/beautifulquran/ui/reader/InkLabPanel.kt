@@ -394,7 +394,7 @@ fun InkLabPanel(
                         LabCaption(
                             "Letters can only brighten up to their own colour. " +
                                 "Resting lower leaves them room to rise: at " +
-                                "0.94 they have 6%; past that only the glow lifts.",
+                                "0.89 they have 13%; past that only the glow lifts.",
                         )
                         TuningSlider("Smoothness ms", t.tarjiLightSmoothMs, 0f..160f, integer = true) {
                             InkEngine.tuning = t.copy(tarjiLightSmoothMs = it)
@@ -415,7 +415,7 @@ fun InkLabPanel(
                             InkEngine.tuning = t.copy(glintResonanceDepth = it)
                         }
                         LabCaption("The glow itself, pulse or no pulse — widest to tightest:")
-                        TuningSlider("Veil strength", t.glintVeilAlpha, 0f..0.6f) {
+                        TuningSlider("Veil strength", t.glintVeilAlpha, 0f..1f) {
                             InkEngine.tuning = t.copy(glintVeilAlpha = it)
                         }
                         TuningSlider("Veil warmth", t.glintVeilWarmth, 0f..1f) {

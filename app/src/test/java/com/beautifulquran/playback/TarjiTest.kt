@@ -28,9 +28,16 @@ class TarjiTest {
 
     @Test
     fun `supplied Hani tuning reaches a bright crest through the live word gate`() {
+        // The tuning shipped for Hani is the one exported with 2:14 w16; it
+        // must still carry the 1:7 capture it replaced the tuning of.
+        val tuned = TarjiLabCodec.decode(javaClass.getResourceAsStream("/tarji/hani_2_14_w16_tuned.json")!!
+            .bufferedReader().use { it.readText() })
+        assertEquals(tuned.knobs, HANI_TUNING)
+        val still = com.beautifulquran.tarjilab.analyzeTarjiCapture(TarjiLabCodec.toCapture(tuned), HANI_TUNING)
+        assertTrue("2:14's closing hold must pulse", still.reverberating.count { it } >= 60)
+        assertTrue("and at full strength (${still.gain.max()})", still.gain.max() > 0.9f)
         val sample = TarjiLabCodec.decode(javaClass.getResourceAsStream("/tarji/hani_1_7_w9_tuned.json")!!
             .bufferedReader().use { it.readText() })
-        assertEquals(sample.knobs, HANI_TUNING)
         val capture = TarjiLabCodec.toCapture(sample)
         val detector = Tarji()
         detector.hopSamples = capture.hopSamples
@@ -110,7 +117,8 @@ class TarjiTest {
                     gate.allows(ear.gain, ear.reverberating, eventMs, Hani214.FINAL_WORD_START_MS)
                 if (allowed) peak = maxOf(peak, ear.gain)
                 val pulse = InkEngine.glintResonance(allowed, ear.tremolo, ear.gain, depth = 1f, enabled = true)
-                val glow = flame.next(pulse.light, (earHop * Hani214.HOP_MS * 1_000_000).toLong(), 60f)
+                val glow = flame.next(pulse.light, (earHop * Hani214.HOP_MS * 1_000_000).toLong(),
+                    shipped.tarjiLightSmoothMs)
                 val level = glintLightLevel(glow, brightness, shipped.tarjiLightRise, shipped.tarjiLightFall)
                 brightest = maxOf(brightest, level)
                 if (allowed && ear.gain >= 0.15f) {
@@ -126,7 +134,7 @@ class TarjiTest {
         assertTrue("an admitted crest must lift the light ($brightest)", brightest > 1.04f)
         assertTrue("the light must visibly move on nearly every phase ($swings)",
             swings.count { it >= 0.02f } >= 32)
-        assertTrue("and only ever a little ($swings)", swings.all { it <= 0.1f })
+        assertTrue("and never the whole of the glyphs' range ($swings)", swings.all { it <= 0.2f })
     }
 
     @Test

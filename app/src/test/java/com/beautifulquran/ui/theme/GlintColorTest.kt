@@ -41,18 +41,19 @@ class GlintColorTest {
 
     @Test
     fun `the light lifts a little with the voice and dips less`() {
-        assertEquals(1.06f, level(1f), 1e-4f)
-        assertEquals(0.96f, level(-1f), 1e-4f)
+        // Full scale, which the long smoothing never lets a real pulse reach.
+        assertEquals(1.3f, level(1f), 1e-4f)
+        assertEquals(0.8899f, level(-1f), 1e-4f)
         assertTrue(shipped.tarjiLightFall < shipped.tarjiLightRise)
-        // The eye catches well under 1 % at these rates: the glyphs move a few.
+        // The glyphs stop at their own colour: the rest of a crest is the glow's.
         val rest = glintLightColor(gold, 1f).luminance()
-        val swing = (glintLightColor(gold, level(1f)).luminance() - glintLightColor(gold, level(-1f)).luminance()) / rest
-        assertEquals(0.10f, swing, 0.012f)
-        assertEquals(1.03f, level(0.5f), 1e-4f)
+        val up = glintLightColor(gold, level(1f)).luminance() / rest
+        assertEquals(1f / shipped.glintRestLight, up, 0.02f)
+        assertEquals(1.15f, level(0.5f), 1e-4f)
         // A reciter's brightness scales the swing and nothing else, and past
         // shipped it counts half: 200 % is one and a half times, not twice.
-        assertEquals(1.09f, level(1f, brightness = 2f), 1e-4f)
-        assertEquals(1.03f, level(1f, brightness = 0.5f), 1e-4f)
+        assertEquals(1.45f, level(1f, brightness = 2f), 1e-4f)
+        assertEquals(1.15f, level(1f, brightness = 0.5f), 1e-4f)
     }
 
     @Test
@@ -78,14 +79,14 @@ class GlintColorTest {
 
     @Test
     fun `the glow swings further than the glyphs, by the stated amount of light`() {
-        // +6 % / −4 % on the glyphs is +24 % / −16 % of light in the glow —
-        // light, not alpha: scaling alpha by those made a pulse of sixty.
-        for (resting in listOf(0.25f, 0.4f, 0.75f)) {
-            assertEquals(1.24f, glowLight(resting, level(1f)), 2e-3f)
-            assertEquals(0.84f, glowLight(resting, level(-1f)), 2e-3f)
-            // Past the glyphs' headroom the glow still carries the crest.
-            assertEquals(1.36f, glowLight(resting, level(1f, brightness = 2f)), 2e-3f)
+        // The glow's light is `gain` times the glyphs' swing — light, not
+        // alpha: scaling alpha directly made a "ten percent" pulse of sixty.
+        val gain = shipped.tarjiGlowGain
+        for (resting in listOf(0.25f, 0.4f)) for (l in listOf(level(0.2f), level(-0.2f), level(1f), level(-1f))) {
+            assertEquals(1f + gain * (l - 1f), glowLight(resting, l), 0.01f)
         }
+        // Past the glyphs' headroom the glow still carries the crest.
+        assertEquals(1f + gain * 0.45f, glowLight(0.25f, level(1f, brightness = 2f)), 0.02f)
         // It can run out of headroom but never past it, and never below dark.
         assertEquals(1f, glintGlowAlpha(0.9f, 1.28f, 6f), 0f)
         assertEquals(0f, glintGlowAlpha(0.5f, 0.5f, 6f), 0f)
@@ -154,10 +155,11 @@ class GlintColorTest {
             val lit = (0..fps).map { frame ->
                 val pulse = InkEngine.glintResonance(true, sin(2 * PI * hz * frame / fps).toFloat(),
                     0.5f, depth = 1f, enabled = true)
-                glintLightColor(gold, level(light.next(pulse.light, frame * 1_000_000_000L / fps, 60f))).luminance()
+                glintLightColor(gold, level(light.next(pulse.light, frame * 1_000_000_000L / fps,
+                    shipped.tarjiLightSmoothMs))).luminance()
             }.drop(fps / 4)
             val step = lit.zipWithNext().maxOf { (a, b) -> abs(a - b) }
-            assertTrue("$hz Hz at $fps fps steps $step a frame", step < 0.02f)
+            assertTrue("$hz Hz at $fps fps steps $step a frame", step < 0.04f)
             assertTrue("$hz Hz at $fps fps still moves", lit.max() - lit.min() > 0.005f)
         }
     }
