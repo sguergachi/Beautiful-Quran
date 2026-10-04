@@ -36,7 +36,6 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import com.beautifulquran.playback.Tarji
 import com.beautifulquran.ui.theme.ContextualGuideTuning
-import com.beautifulquran.ui.theme.DisclosureChevron
 import com.beautifulquran.ui.theme.quietClickable
 import java.util.Locale
 import kotlin.math.ln
@@ -84,7 +83,6 @@ fun InkLabPanel(
     modifier: Modifier = Modifier,
     guideActive: Boolean = false,
 ) {
-    var expanded by remember { mutableStateOf(false) }
     var tab by remember(guideActive) {
         mutableStateOf(if (guideActive) InkLabTab.Guide else InkLabTab.Ink)
     }
@@ -94,23 +92,6 @@ fun InkLabPanel(
         horizontalAlignment = Alignment.End,
         modifier = modifier.fillMaxWidth(),
     ) {
-        // Collapsed the panel is just its name — a quiet ink label that
-        // expands into the sliders, so the page stays readable while tuning.
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            modifier = Modifier
-                .quietClickable { expanded = !expanded }
-                .padding(horizontal = 12.dp, vertical = 6.dp),
-        ) {
-            Text(
-                text = "Ink Lab",
-                style = MaterialTheme.typography.labelLarge,
-                color = MaterialTheme.colorScheme.primary,
-            )
-            Spacer(Modifier.width(4.dp))
-            DisclosureChevron(expanded = expanded)
-        }
-        if (!expanded) return@Column
         Spacer(Modifier.height(4.dp))
         Column(
             modifier = Modifier

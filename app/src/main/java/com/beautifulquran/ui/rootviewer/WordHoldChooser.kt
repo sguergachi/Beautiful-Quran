@@ -86,7 +86,7 @@ fun WordHoldChooser(
             )
             Spacer(Modifier.height(8.dp))
             Text(
-                text = if (inkLabEnabled) "Hide Ink Lab" else "Ink Lab",
+                text = if (inkLabEnabled) "Close Ink Lab" else "Ink Lab",
                 style = MaterialTheme.typography.headlineMedium,
                 textAlign = TextAlign.Center,
                 color = QuranTheme.ink.strong,
