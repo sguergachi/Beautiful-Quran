@@ -57,8 +57,8 @@ import com.beautifulquran.ui.theme.QuranTheme
  * freeze (next to Copy values) so auto-home can be parked while panning.
  * Reset does not touch it, and Focus is never persisted.
  *
- * Enabled from Settings → Developer → "Ink Lab overlay" (developer mode
- * itself unlocks by tapping the Settings logo). See docs/INK_ENGINE.md.
+ * Enabled from the developer word-hold sheet (developer mode itself unlocks
+ * by tapping the Settings logo). See docs/INK_ENGINE.md.
  */
 /**
  * The panel's sections. There are far too many knobs to scroll as one list,

@@ -27,6 +27,8 @@ fun WordHoldChooser(
     onOpenRootViewer: () -> Unit,
     onOpenTimingsLab: () -> Unit,
     onOpenTarjiLab: () -> Unit,
+    onOpenInkLab: () -> Unit,
+    inkLabEnabled: Boolean,
     onDismiss: () -> Unit,
 ) {
     Box(
@@ -80,6 +82,17 @@ fun WordHoldChooser(
                 modifier = Modifier
                     .fillMaxWidth()
                     .quietClickable(onClick = onOpenTarjiLab)
+                    .padding(vertical = 12.dp),
+            )
+            Spacer(Modifier.height(8.dp))
+            Text(
+                text = if (inkLabEnabled) "Hide Ink Lab" else "Ink Lab",
+                style = MaterialTheme.typography.headlineMedium,
+                textAlign = TextAlign.Center,
+                color = QuranTheme.ink.strong,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .quietClickable(onClick = onOpenInkLab)
                     .padding(vertical = 12.dp),
             )
             Spacer(Modifier.height(36.dp))

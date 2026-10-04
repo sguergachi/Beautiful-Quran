@@ -1217,6 +1217,12 @@ private fun PaperStackApp(
                                         pendingWord = null
                                         openTarjiLab(target.first, target.second, target.third)
                                     },
+                                    onOpenInkLab = {
+                                        pendingWord = null
+                                        chooserVisible = false
+                                        app.settings.update { it.copy(inkLabEnabled = !it.inkLabEnabled) }
+                                    },
+                                    inkLabEnabled = settings.inkLabEnabled,
                                     onDismiss = {
                                         chooserVisible = false
                                         pendingWord = null

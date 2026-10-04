@@ -602,8 +602,8 @@ line's opening fully formed. Ink Lab exposes it as **Wasl pre-ink**.
 
 ### Ink Lab
 
-Settings → Developer (triple-tap the logo) → **Ink Lab overlay** floats a
-collapsible slider panel over the reader (`ui/reader/InkLabPanel.kt`), bound
+Developer mode (triple-tap the Settings logo) → hold a word → **Ink Lab** opens
+or hides a collapsible slider panel over the reader (`ui/reader/InkLabPanel.kt`), bound
 directly to `InkEngine.tuning`: upcoming ink, fade timings, sweep clamps,
 repeat timings, **Repeat ink** strength, the fresh-ink **Glitter time**,
 **Glint tint**, **Halo strength**, and **Halo blur** controls, wash feather,

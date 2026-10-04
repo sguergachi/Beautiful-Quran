@@ -402,7 +402,7 @@ ink at any point.
 
 ## Ink Lab controls
 
-Enable developer mode in Settings, turn on **Ink Lab overlay**, start a
+Enable developer mode in Settings, open a word's hold sheet and choose **Ink Lab**, start a
 Nightfall recitation, and expand **Ink Lab**. These controls are Android-only
 auditioning values that persist on device until **Reset** (so multi-session
 tuning does not start from zero each launch). **Reset** restores the shipped
