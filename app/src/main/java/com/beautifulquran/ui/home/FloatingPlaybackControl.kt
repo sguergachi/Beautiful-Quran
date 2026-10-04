@@ -43,6 +43,8 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.media3.common.Player
 import com.beautifulquran.playback.PlayerUiState
+import com.beautifulquran.ui.reader.InkLabPanel
+import com.beautifulquran.ui.reader.InkLabToggleButton
 import com.beautifulquran.ui.reader.ReciterNameButton
 import com.beautifulquran.ui.theme.FloatingPaperEnter
 import com.beautifulquran.ui.theme.quietClickable
@@ -98,6 +100,9 @@ fun FloatingPlaybackControl(
     onRepeatClick: () -> Unit,
     onSpeed: () -> Unit,
     onClose: () -> Unit,
+    inkLabAvailable: Boolean = false,
+    inkLabOpen: Boolean = false,
+    onInkLabClick: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     AnimatedVisibility(
@@ -117,10 +122,28 @@ fun FloatingPlaybackControl(
                         .fillMaxWidth()
                         .navigationBarsPadding(),
                 ) {
-                    ReciterNameButton(
-                        name = reciterName,
-                        onClick = onReciterClick,
-                    )
+                    Box(Modifier.fillMaxWidth()) {
+                        if (inkLabOpen) {
+                            InkLabPanel(
+                                modifier = Modifier.padding(start = 40.dp, end = 44.dp),
+                            )
+                        } else {
+                            ReciterNameButton(
+                                name = reciterName,
+                                onClick = onReciterClick,
+                                modifier = Modifier
+                                    .align(Alignment.Center)
+                                    .padding(horizontal = if (inkLabAvailable) 48.dp else 0.dp),
+                            )
+                        }
+                        if (inkLabAvailable) {
+                            InkLabToggleButton(
+                                expanded = inkLabOpen,
+                                onClick = onInkLabClick,
+                                modifier = Modifier.align(Alignment.CenterStart),
+                            )
+                        }
+                    }
                     ReturnToAyahPill(
                         chapterLabel = chapterLabel,
                         ayahLabel = ayahLabel,

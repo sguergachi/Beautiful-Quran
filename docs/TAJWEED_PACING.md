@@ -1,8 +1,8 @@
 # Tajweed-paced ink
 
 **Status: implemented on Android, on by default and tunable behind the Ink Lab's
-"Tajweed pacing" toggle (Settings → Developer → Ink Lab overlay → Tajweed
-tab). The web port and measured letter widths are not yet built — the design
+"Tajweed pacing" toggle (playbar → Ink Lab → Tajweed tab). The web port
+and measured letter widths are not yet built — the design
 for those lives below.**
 
 The shipped model is the **gate / cruise / hold** design in §3. The first

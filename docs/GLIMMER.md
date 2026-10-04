@@ -402,8 +402,8 @@ ink at any point.
 
 ## Ink Lab controls
 
-Enable developer mode in Settings, turn on **Ink Lab overlay**, start a
-Nightfall recitation, and expand **Ink Lab**. These controls are Android-only
+Enable developer mode in Settings, open **Ink Lab** from the playbar, and start
+a Nightfall recitation. These controls are Android-only
 auditioning values that persist on device until **Reset** (so multi-session
 tuning does not start from zero each launch). **Reset** restores the shipped
 defaults and **Copy values** puts a paste-ready `InkEngine.Tuning(…)` constructor

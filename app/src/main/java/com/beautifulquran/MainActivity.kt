@@ -601,6 +601,13 @@ private fun PaperStackApp(
         labRendered || rootRendered || chooserRendered || ornamentsLabRendered || tarjiLabRendered ||
         readerInkOverlayVisible || shareUi.sendOpen || shareSendRendered
     val pinnedPlayback = remember { PinnedPlaybackHost() }
+    SideEffect {
+        val available = settings.developerModeEnabled
+        if (pinnedPlayback.inkLabAvailable != available) {
+            pinnedPlayback.inkLabAvailable = available
+            if (!available) pinnedPlayback.inkLabOpen = false
+        }
+    }
     var pinnedPlaybackHeight by remember { mutableStateOf(0.dp) }
     // Booleans, not the live page: the bar must not recompose on every
     // frame of the turn. It only changes when it appears, or when the

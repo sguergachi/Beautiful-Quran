@@ -352,9 +352,13 @@ fun ReaderScreen(
     }
     val rulerWindow = LocalWindowInfo.current.containerSize
     val leafMetrics = mushafLeafMetrics.value
+    val inkLabOpen = playbackHost?.inkLabOpen == true
+    val leafMetricsFromOpenInkLab = remember { mutableStateOf(false) }
     LaunchedEffect(
         mushafMode,
         leafMetrics,
+        inkLabOpen,
+        leafMetricsFromOpenInkLab.value,
         settings.englishLeafText,
         settings.verseNumberScript,
     ) {
@@ -363,12 +367,14 @@ fun ReaderScreen(
         if (!mushafMode || well <= 0f || measure <= 0f) return@LaunchedEffect
         // Remembered so the next launch can paginate the book at the root,
         // before the reader exists — see SettingsRepository.rememberLeafMetrics.
-        viewModel.settings.rememberLeafMetrics(
-            wellPx = well,
-            measurePx = measure,
-            windowWidthPx = rulerWindow.width,
-            windowHeightPx = rulerWindow.height,
-        )
+        if (!inkLabOpen && !leafMetricsFromOpenInkLab.value) {
+            viewModel.settings.rememberLeafMetrics(
+                wellPx = well,
+                measurePx = measure,
+                windowWidthPx = rulerWindow.width,
+                windowHeightPx = rulerWindow.height,
+            )
+        }
         viewModel.ensureMushaf(
             text = settings.englishLeafText,
             rulerFor = { translation ->
@@ -2603,6 +2609,11 @@ fun ReaderScreen(
                 if (mushafMode) {
                     MushafReadingSheet(
                         reciterName = uiState.currentReciter?.name.orEmpty(),
+                        inkLabAvailable = settings.developerModeEnabled,
+                        inkLabOpen = inkLabOpen,
+                        onInkLabClick = {
+                            playbackHost?.let { it.inkLabOpen = !it.inkLabOpen }
+                        },
                         playerState = playerState,
                         isThisSurahLoaded = isThisSurahPlaying,
                         enabled = !contextualGuideOpen,
@@ -2890,6 +2901,7 @@ fun ReaderScreen(
                             if (was == null || was[0] != well || was[1] != measure) {
                                 mushafLeafMetrics.value = floatArrayOf(well, measure)
                             }
+                            leafMetricsFromOpenInkLab.value = inkLabOpen
                         },
                         parkNeighbours = { mushafDialLanding.value },
                         onUserTurnedPage = onMushafTurnedPage,
@@ -3561,18 +3573,6 @@ fun ReaderScreen(
                 .fillMaxSize()
                 .zIndex(1.7f),
         )
-
-        // Keep developer controls above the guide so its shader can be tuned
-        // in place; full reader ink overlays still cover the lab at z=1.8.
-        if (settings.developerModeEnabled && settings.inkLabEnabled) {
-            InkLabPanel(
-                guideActive = bookmarkNoteTipVisible || ayahRailTipVisible,
-                modifier = Modifier
-                    .align(Alignment.BottomEnd)
-                    .padding(end = 10.dp, bottom = 10.dp)
-                    .zIndex(1.75f),
-            )
-        }
 
         // The repeat question is an ink bleed on this sheet, not a dialog: the
         // shared InkRevealOverlay soaks the reader paper from the player bar's

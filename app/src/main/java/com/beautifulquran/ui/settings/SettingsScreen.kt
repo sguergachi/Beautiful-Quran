@@ -487,16 +487,6 @@ private fun DeveloperSection(
     )
     Caption("Explore, design, and save seeds for the procedural star-and-cross ornament generator.")
 
-    Spacer(Modifier.height(18.dp))
-    ToggleRow(
-        label = "Ink Lab overlay",
-        checked = settings.inkLabEnabled,
-        onChange = { on -> viewModel.settings.update { it.copy(inkLabEnabled = on) } },
-        checkParams = checkParams,
-        checkPaintToken = checkPaintToken,
-    )
-    Caption("Live sliders over the reader's highlight tuning. Numbers persist until Reset.")
-
     Spacer(Modifier.height(20.dp))
     Text(
         text = "Component kit",

@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -142,30 +143,25 @@ private val MushafTransportRow = 44.dp
 private val MushafTransportAir = 2.dp
 
 /**
- * The reciter's name under the transport.
+ * The reciter's name or Ink Lab under the transport.
  *
- * A band, always reserved, and not the height of a line of text that is there
- * when a reciter is loaded and gone when one is not. The leaf takes the paper
- * this does not, so a band that comes and goes moves the well — and the well is
- * what the whole book is paginated against. It would have repaginated the
- * Qur'an on the first play.
+ * The closed band is always reserved. Opening Ink Lab replaces the name and
+ * lets the band take the panel's measured height; the leaf gets what remains.
  */
-private val MushafReciterBand = 14.dp
+private val MushafReciterBand = 48.dp
 
 /**
- * Everything the reading sheet sets under the leaf.
+ * Everything reserved under the leaf while Ink Lab is closed.
  *
- * The leaf is what is left over, so this is the leaf: `weight(1f)` is the sheet
- * height less exactly this. Every term is a constant, which is the point — the
- * app's root subtracts it from the window to learn the leaf's size before a
- * leaf has ever been composed, and paginates the English book from that on the
- * very first launch.
+ * Every term is constant, so the root can subtract it from the window to learn
+ * the closed leaf's size before a leaf has ever been composed and paginate the
+ * English book from that on the very first launch. Open Ink Lab adds measured
+ * footer height live; its temporary leaf metrics are not remembered.
  *
- * **Anything added under the leaf belongs in this sum**, and anything here that
- * is not a constant breaks it. A term that drifts shows as a book paginated for
- * a leaf a little larger than the one it is drawn on, and its last lines come
- * up short. The leaf reports what it really measured and the book is set again
- * if the two disagree, so the cost is a visible repagination, not a wrong book.
+ * **Anything permanently reserved under the leaf belongs in this sum.** A term
+ * that drifts shows as a book paginated for a leaf a little larger than the
+ * one it is drawn on, and its last lines come up short. The leaf reports what
+ * it really measured and the book is set again if the two disagree.
  */
 internal val MushafBelowLeaf: Dp =
     MushafFolioBand +
@@ -208,6 +204,9 @@ private val MushafTransportEdge =
 @Composable
 internal fun MushafReadingSheet(
     reciterName: String,
+    inkLabAvailable: Boolean = false,
+    inkLabOpen: Boolean = false,
+    onInkLabClick: () -> Unit = {},
     playerState: PlayerUiState,
     isThisSurahLoaded: Boolean,
     enabled: Boolean,
@@ -499,23 +498,44 @@ internal fun MushafReadingSheet(
                 }
             }
             }
-            // The band stands whether a name is in it or not — see
-            // MushafReciterBand. The leaf is measured against what is left.
+            // The closed band holds the name and, in developer mode, its Ink
+            // Lab toggle. Open Ink Lab replaces the name and grows this band;
+            // the leaf takes the measured remainder.
             Box(
-                Modifier.fillMaxWidth().height(MushafReciterBand),
+                Modifier.fillMaxWidth().heightIn(min = MushafReciterBand),
                 contentAlignment = Alignment.Center,
             ) {
-                if (reciterName.isNotEmpty()) {
-                    Text(
-                        text = reciterName,
-                        style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp),
-                        color = quiet.copy(alpha = 0.7f),
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
+                if (inkLabAvailable && inkLabOpen) {
+                    InkLabPanel(
                         modifier = Modifier
+                            .align(Alignment.Center)
+                            .padding(start = 40.dp),
+                    )
+                } else if (reciterName.isNotEmpty()) {
+                    Box(
+                        modifier = Modifier
+                            .align(Alignment.Center)
                             .fillMaxWidth()
+                            .height(MushafReciterBand)
+                            .padding(horizontal = if (inkLabAvailable) 48.dp else 0.dp)
                             .ownedQuietClickable(role = Role.Button, onClick = onOpenSettings),
-                        textAlign = TextAlign.Center,
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Text(
+                            text = reciterName,
+                            style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp),
+                            color = quiet.copy(alpha = 0.7f),
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            textAlign = TextAlign.Center,
+                        )
+                    }
+                }
+                if (inkLabAvailable) {
+                    InkLabToggleButton(
+                        expanded = inkLabOpen,
+                        onClick = onInkLabClick,
+                        modifier = Modifier.align(Alignment.CenterStart),
                     )
                 }
             }
