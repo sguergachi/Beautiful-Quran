@@ -38,6 +38,21 @@ class TarjiVersePulseTest {
     }
 
     @Test
+    fun `Hani's closing word of the Fatihah draws a wave under the shipped tuning`() {
+        val sample = com.beautifulquran.tarjilab.TarjiLabCodec.decode(
+            javaClass.getResourceAsStream("/tarji/hani_1_7_w9_tuned.json")!!.bufferedReader().use { it.readText() })
+        val capture = com.beautifulquran.tarjilab.TarjiLabCodec.toCapture(sample)
+        val heard = TarjiVersePulse.Decoded(capture.pcm, capture.hopSamples, sample.hopContentDurationMs.toDouble())
+        val wordStart = 7_610.0 - sample.firstHopMediaMs
+        val end = capture.hopCount * heard.hopMs
+        val line = TarjiVersePulse.lines(
+            heard, com.beautifulquran.tarjilab.HANI_TUNING, depth = 1f,
+            windows = listOf(TarjiVersePulse.Window(wordStart.coerceAtLeast(0.0), end)),
+        ).single()
+        assertTrue("crest ${line.max()} trough ${line.min()}", line.max() > 0.3f && line.min() < -0.3f)
+    }
+
+    @Test
     fun `only words that may pulse get a line, each across the span it is active`() {
         val words = listOf(
             Word(1, "قَالُوٓا۟", "", ""),

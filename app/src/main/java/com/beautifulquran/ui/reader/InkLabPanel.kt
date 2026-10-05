@@ -365,6 +365,20 @@ fun InkLabPanel(
                         TuningToggle("Mark candidates", InkEngine.tarjiMarkCandidates) {
                             InkEngine.tarjiMarkCandidates = it
                         }
+                        if (InkEngine.tarjiMarkCandidates) {
+                            // Only when there is something to say: a verse
+                            // being worked out, or one that could not be.
+                            val failure = TarjiVersePulse.lastFailure
+                            val working = TarjiVersePulse.working
+                            if (working > 0 || failure != null) {
+                                LabCaption(
+                                    listOfNotNull(
+                                        "working out $working verse(s)".takeIf { working > 0 },
+                                        failure?.let { "failed — $it" },
+                                    ).joinToString(" · "),
+                                )
+                            }
+                        }
                         TuningToggle("Test pulse (6 Hz)", InkEngine.tarjiTestPulse) {
                             InkEngine.tarjiTestPulse = it
                         }

@@ -16,6 +16,8 @@ import com.beautifulquran.playback.TarjiEarTrack
 import com.beautifulquran.playback.VoiceEnergy
 import com.beautifulquran.playback.analysisHopContentMs
 import com.beautifulquran.tarjilab.TarjiLabKnobs
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -128,13 +130,22 @@ internal object TarjiVersePulse {
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
     private val jobs = HashMap<String, Job>()
+    private val done = HashSet<String>()
+    private val failures = HashMap<String, Int>()
+
+    /** For the lab's readout: what the last verse that could not be worked out said. */
+    var lastFailure by androidx.compose.runtime.mutableStateOf<String?>(null)
+        private set
+    var working by androidx.compose.runtime.mutableIntStateOf(0)
+        private set
     /** A device has only so many decoders; a screenful of verses takes turns. */
     private val decoders = kotlinx.coroutines.sync.Semaphore(2)
 
     /**
      * Works out [ayah]'s lines once per audio and detector setting and hands
-     * them to the words' traces. Main thread; returns at once — false while
-     * the verse's reciter or timings are not loaded yet.
+     * them to the words' traces. Main thread; returns at once — false until
+     * the lines are in the traces, so the caller can ask again: the reciter
+     * or timings may not be loaded yet, and a fetch can fail and be retried.
      */
     fun ensure(context: Context, ayah: Ayah): Boolean {
         val (url, segments) = source?.invoke(ayah.surahId, ayah.number) ?: return false
@@ -143,21 +154,28 @@ internal object TarjiVersePulse {
         val knobs = TarjiLabKnobs.fromTuning(tuning)
         val depth = tuning.glintResonanceDepth
         val key = "$url|$knobs|$depth"
-        if (jobs.containsKey(key)) return true
+        if (key in done) return true
+        if (jobs.containsKey(key) || (failures[key] ?: 0) >= MAX_ATTEMPTS) return false
+        working++
         val app = context.applicationContext
         jobs[key] = scope.launch {
-            val result = runCatching {
-                val audio = decoders.withPermit { decode(app, url) } ?: return@runCatching null
+            val attempt = runCatching {
+                val audio = decoders.withPermit { decode(app, url) }
+                    ?: error("no audio track in ${url.substringAfterLast('/')}")
                 val audioMs = audio.pcm.size / audio.hopSamples * audio.hopMs
                 val windows = windows(ayah, segments, audioMs)
                 val lines = lines(audio, knobs, depth, windows.values.toList())
                 windows.keys.zip(lines).toMap() to windows
-            }.getOrNull()
+            }
             withContext(Dispatchers.Main) {
-                if (result == null) {
-                    jobs.remove(key) // let a later frame try again
+                jobs.remove(key)
+                working--
+                val result = attempt.getOrElse { cause ->
+                    failures[key] = (failures[key] ?: 0) + 1
+                    lastFailure = "${ayah.surahId}:${ayah.number} ${cause.javaClass.simpleName}: ${cause.message}"
                     return@withContext
                 }
+                done += key
                 val (lines, windows) = result
                 for (word in ayah.words) {
                     val line = lines[word.position] ?: continue
@@ -166,8 +184,10 @@ internal object TarjiVersePulse {
                 }
             }
         }
-        return true
+        return false
     }
+
+    private const val MAX_ATTEMPTS = 3
 
     /** The verse's audio through the playback cache, decoded and decimated as the tap does. */
     @androidx.annotation.OptIn(androidx.media3.common.util.UnstableApi::class)
@@ -288,5 +308,20 @@ internal object TarjiVersePulse {
             val hopSamples = ((sourceRate / step) * (Tarji.HOP_MS / 1000f)).roundToInt().coerceAtLeast(1)
             return Decoded(out.copyOf(size), hopSamples, analysisHopContentMs(sourceRate, step, hopSamples))
         }
+    }
+}
+
+/**
+ * Ink Lab: while candidates are marked, has this verse's pulse lines worked
+ * out ahead of the voice, and again when the detector is retuned. Every
+ * reader that builds ink motions for a verse calls it.
+ */
+@androidx.compose.runtime.Composable
+internal fun RequestTarjiPulseLines(ayah: Ayah) {
+    if (!InkEngine.tarjiMarkCandidates) return
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val tuning = InkEngine.tuning
+    androidx.compose.runtime.LaunchedEffect(ayah, tuning) {
+        while (!TarjiVersePulse.ensure(context, ayah)) kotlinx.coroutines.delay(750)
     }
 }

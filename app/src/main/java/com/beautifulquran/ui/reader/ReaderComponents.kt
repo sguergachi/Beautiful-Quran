@@ -3042,6 +3042,7 @@ fun AyahBlock(
 
     // The letter fade paces itself to how long the reciter dwells on the
     // word, corrected for the chosen playback speed.
+    RequestTarjiPulseLines(ayah)
     val sweepMs = InkEngine.sweepMs(activeWord, playbackSpeed)
     // Repeat washes share the same audio handoff but must not inherit the
     // ordinary sweep's visual minimum and continue past the spoken word.

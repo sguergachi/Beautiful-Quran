@@ -48,15 +48,7 @@ internal fun rememberAyahInkPack(
     /** Mushaf selection enters from the paper cover already on the ayah. */
     initiallyRecessed: Boolean = false,
 ): AyahInkPack {
-    if (InkEngine.tarjiMarkCandidates) {
-        // Ink Lab: work out this verse's pulse lines ahead of the voice, and
-        // again when the detector is retuned.
-        val context = androidx.compose.ui.platform.LocalContext.current
-        val tuning = InkEngine.tuning
-        androidx.compose.runtime.LaunchedEffect(ayah, tuning) {
-            while (!TarjiVersePulse.ensure(context, ayah)) kotlinx.coroutines.delay(1_000)
-        }
-    }
+    RequestTarjiPulseLines(ayah)
     val sweepMs = InkEngine.sweepMs(activeWord, playbackSpeed)
     val repeatDwellMs = InkEngine.repeatDwellMs(activeWord, playbackSpeed)
     val activation = activeWord?.activation ?: 0L
