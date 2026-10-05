@@ -880,6 +880,14 @@ class ReaderViewModel(
     }
 
     init {
+        // Ink Lab: where a verse's audio and word timings are, for its pulse lines.
+        TarjiVersePulse.source = { surah, ayah ->
+            if (surah != surahId) {
+                null
+            } else {
+                _uiState.value.currentReciter?.let { it.audioUrl(surah, ayah) to timings[ayah].orEmpty() }
+            }
+        }
         viewModelScope.launch {
             while (true) {
                 ensureActive()

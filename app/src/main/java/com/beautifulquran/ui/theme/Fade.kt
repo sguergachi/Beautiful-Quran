@@ -218,16 +218,13 @@ sealed class ShapedWordBloom {
         val feather: Float? = null,
     ) : ShapedWordBloom()
 
-    /** The Ink Lab's mark under a tarjīʿ candidate: a baseline, and over it the
-     * pulse the word was given as it was recited ([drawPulseTrace]). Never
-     * drawn outside the lab. */
+    /** The Ink Lab's mark under a tarjīʿ candidate: a sparkline of the pulse
+     * the word will be given ([drawPulseTrace]). Never drawn outside the lab. */
     class PulseTrace(
         override val range: IntRange,
         val color: Color,
-        val voice: FloatArray,
-        val light: FloatArray,
-        val count: Int,
-        val covered: Float,
+        val line: FloatArray?,
+        val played: Float,
     ) : ShapedWordBloom()
 
     /** Tinted ink (orange repeat, white-gold glint): shaped glyphs tinted to
@@ -262,19 +259,18 @@ sealed class ShapedWordBloom {
 
 /**
  * A word's pulse as a sparkline under it, in reading order across
- * [left]..[right]: the wave the ear heard ([voice], faint) and over it the
- * part the word's light was given ([light], bold). Both are −1..1; the first
- * [count] samples span [covered] (0..1) of the width. [bottom] is the word's
- * box. With nothing recorded yet it is a faint baseline: the word may pulse.
+ * [left]..[right]: [line] is the light the word will be given, one value
+ * (−1..1) per step of its span in time. The first [played] (0..1) of it is
+ * drawn heavier while the word is recited. [bottom] is the word's box. Until
+ * [line] is worked out it is a faint rule; a flat line is a word that may
+ * pulse and in this recitation does not.
  */
 internal fun DrawScope.drawPulseTrace(
     left: Float,
     right: Float,
     bottom: Float,
-    voice: FloatArray,
-    light: FloatArray,
-    count: Int,
-    covered: Float,
+    line: FloatArray?,
+    played: Float,
     rtl: Boolean,
     color: Color,
 ) {
@@ -283,28 +279,26 @@ internal fun DrawScope.drawPulseTrace(
     if (width <= 0f) return
     val swing = 6.dp.toPx()
     val baseline = bottom - swing - 1.dp.toPx()
-    val faint = color.copy(alpha = color.alpha * 0.4f)
-    drawLine(faint, Offset(left + inset, baseline), Offset(right - inset, baseline), 1.dp.toPx())
-    val n = count.coerceAtMost(minOf(voice.size, light.size))
-    if (n < 2) return
-    val reach = width * covered.coerceIn(0f, 1f)
+    if (line == null || line.size < 2) {
+        drawLine(
+            color.copy(alpha = color.alpha * 0.35f),
+            Offset(left + inset, baseline), Offset(right - inset, baseline), 1.dp.toPx(),
+        )
+        return
+    }
     fun x(i: Int): Float {
-        val along = i / (n - 1f) * reach
+        val along = i / (line.size - 1f) * width
         return if (rtl) right - inset - along else left + inset + along
     }
-    for (i in 1 until n) {
-        drawLine(
-            color = faint,
-            start = Offset(x(i - 1), baseline - voice[i - 1] * swing),
-            end = Offset(x(i), baseline - voice[i] * swing),
-            strokeWidth = 1.dp.toPx(),
-        )
-        if (light[i - 1] == 0f && light[i] == 0f) continue
+    val heavyTo = (played.coerceIn(0f, 1f) * (line.size - 1)).toInt()
+    val thin = 1.25.dp.toPx()
+    val heavy = 2.5.dp.toPx()
+    for (i in 1 until line.size) {
         drawLine(
             color = color,
-            start = Offset(x(i - 1), baseline - light[i - 1] * swing),
-            end = Offset(x(i), baseline - light[i] * swing),
-            strokeWidth = 1.75.dp.toPx(),
+            start = Offset(x(i - 1), baseline - line[i - 1].coerceIn(-1f, 1f) * swing),
+            end = Offset(x(i), baseline - line[i].coerceIn(-1f, 1f) * swing),
+            strokeWidth = if (i <= heavyTo) heavy else thin,
             cap = StrokeCap.Round,
         )
     }
@@ -474,7 +468,7 @@ fun Modifier.shapedWordBloom(
                     lineBoundsCache.boundsFor(textLayout, start, endExclusive).forEach { bounds ->
                         drawPulseTrace(
                             bounds.left, bounds.right, bounds.bottom,
-                            bloom.voice, bloom.light, bloom.count, bloom.covered, rtl, bloom.color,
+                            bloom.line, bloom.played, rtl, bloom.color,
                         )
                     }
                 }

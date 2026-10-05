@@ -1281,7 +1281,7 @@ private fun Modifier.layeredBaseInk(motion: InkMotion, rtl: Boolean): Modifier =
 /** The Ink Lab's pulse graph under a word that may pulse (see [ShapedWordBloom.PulseTrace]). */
 private fun Modifier.tarjiPulseTrace(trace: InkEngine.TarjiTrace, color: Color, rtl: Boolean): Modifier =
     drawBehind {
-        drawPulseTrace(0f, size.width, size.height, trace.voice, trace.light, trace.count, trace.covered, rtl, color)
+        drawPulseTrace(0f, size.width, size.height, trace.line, trace.played, rtl, color)
     }
 
 /** Draw-phase alpha gate for a glyph layer, padded by [GlintLayerBleed] so the
@@ -1353,9 +1353,8 @@ private fun rememberTarjiGate(
     activation: Long,
     repeat: Boolean,
     wordStartMs: Long,
-    /** Ink Lab: where to record this word's pulse, across [durationMs] of it. */
+    /** Ink Lab: the word's sparkline, to mark how far the voice is through it. */
     trace: InkEngine.TarjiTrace?,
-    durationMs: Int?,
 ): State<InkEngine.GlintResonance> {
     val frame = remember {
         mutableStateOf(InkEngine.GlintResonance.Idle)
@@ -1373,19 +1372,24 @@ private fun rememberTarjiGate(
             }
         }
     }
+    if (trace != null) {
+        // Back to the plain sparkline once the word is no longer being recited.
+        androidx.compose.runtime.DisposableEffect(trace, run, activation) {
+            onDispose { trace.played = 0f }
+        }
+    }
     LaunchedEffect(run, test, activation, repeat, trace) {
         if (!run) {
             frame.value = InkEngine.GlintResonance.Idle
             return@LaunchedEffect
         }
-        trace?.reset()
         var traceStart = 0L
-        // By the frame clock from the word's first lit frame: the same clock
-        // the light itself is drawn on.
-        fun traced(now: Long, voiceNow: Float, lightNow: Float) {
-            if (trace == null) return
+        // How far the voice is through the word's sparkline, by the frame clock.
+        fun traced(now: Long) {
+            val span = trace?.spanMs?.takeIf { it > 0f } ?: return
             if (traceStart == 0L) traceStart = now
-            trace.record((now - traceStart) / 1_000_000f, (durationMs ?: 0).toFloat(), voiceNow, lightNow)
+            val speed = com.beautifulquran.playback.VoiceEnergy.active?.playbackSpeed ?: 1f
+            trace.played = ((now - traceStart) / 1_000_000f * speed / span).coerceIn(0f, 1f)
         }
         if (test) {
             // The lab's steady pulse: the paint alone, no detector in the way.
@@ -1393,7 +1397,7 @@ private fun rememberTarjiGate(
             while (true) {
                 withFrameNanos { now ->
                     val swing = kotlin.math.sin(now / 1e9 * 2.0 * Math.PI * TARJI_TEST_PULSE_HZ).toFloat()
-                    traced(now, swing, swing)
+                    traced(now)
                     val glow = light.next(swing, now, InkEngine.tuning.tarjiLightSmoothMs)
                     frame.value = InkEngine.GlintResonance(peak = 1f, light = swing, glow = glow)
                     InkEngine.TarjiProbe.admitted = true
@@ -1433,7 +1437,7 @@ private fun rememberTarjiGate(
                     InkEngine.GlintResonance.Idle
                 }
                 frame.value = pulse.copy(glow = light.next(pulse.light, now, smoothMs))
-                traced(now, ear.tremolo / 1.5f, pulse.light)
+                traced(now)
                 InkEngine.TarjiProbe.admitted = pulse !== InkEngine.GlintResonance.Idle
                 InkEngine.TarjiProbe.gain = g
                 InkEngine.TarjiProbe.glow = frame.value.glow
@@ -1537,7 +1541,6 @@ internal fun rememberInkMotions(
                 repeat = ink.repeat,
                 wordStartMs = activeWordStartMs,
                 trace = tarjiTrace,
-                durationMs = activeSweepMs,
             ),
             tarjiTrace = tarjiTrace,
             tarjiTraceColor = traceInk,
@@ -2046,8 +2049,7 @@ internal fun buildShapedBlooms(
     motions.forEachIndexed { index, motion ->
         val trace = motion.tarjiTrace ?: return@forEachIndexed
         val range = rendered.wordRanges.getOrNull(index) ?: return@forEachIndexed
-        blooms += ShapedWordBloom.PulseTrace(
-            range, motion.tarjiTraceColor, trace.voice, trace.light, trace.count, trace.covered)
+        blooms += ShapedWordBloom.PulseTrace(range, motion.tarjiTraceColor, trace.line, trace.played)
     }
     blooms.addShapedInkMotionBlooms(
         motions = motions,

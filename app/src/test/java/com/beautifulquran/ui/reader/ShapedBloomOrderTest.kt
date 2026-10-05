@@ -174,37 +174,9 @@ class ShapedBloomOrderTest {
 
     @Test
     fun `the lab's pulse graph is drawn over the paper covers, never under one`() {
-        val mark = ShapedWordBloom.PulseTrace(0..3, androidx.compose.ui.graphics.Color.Green, FloatArray(4), FloatArray(4), 0, 0f)
+        val mark = ShapedWordBloom.PulseTrace(0..3, androidx.compose.ui.graphics.Color.Green, null, 0f)
         val cover = ShapedWordBloom.UpcomingDim(range = 0..3, paper = androidx.compose.ui.graphics.Color.Black, coverAlpha = 0.7f)
         assertEquals(listOf(cover, mark), listOf(mark, cover).coversFirst())
     }
 
-    @Test
-    fun `a word's pulse is recorded in time and drawn across the word`() {
-        val trace = InkEngine.TarjiTrace()
-        val step = InkEngine.TARJI_TRACE_STEP_MS
-        // A two-second word: half a second in, a quarter of its width is drawn.
-        trace.record(0f, 2_000f, 0.2f, 0f)
-        assertEquals(1, trace.count)
-        trace.record(500f - step, 2_000f, -1f, -0.5f)
-        assertEquals(20, trace.count)
-        assertEquals(0.25f, trace.covered, 1e-3f)
-        // A frame that skips samples carries its value across them: no holes,
-        // and what the ear heard is kept apart from what the light was given.
-        assertEquals(-1f, trace.voice[10], 0f)
-        assertEquals(-0.5f, trace.light[10], 0f)
-        // A late frame cannot rewrite what was drawn.
-        trace.record(100f, 2_000f, 0.9f, 0.9f)
-        assertEquals(-1f, trace.voice[10], 0f)
-        // A word that runs past its length takes the whole width and no more.
-        trace.record(4_000f - step, 2_000f, 0.3f, 0.3f)
-        assertEquals(160, trace.count)
-        assertEquals(1f, trace.covered, 1e-3f)
-        // Past the buffer nothing is written; a new recitation starts clean.
-        trace.record(60_000f, 2_000f, 1f, 1f)
-        assertEquals(160, trace.count)
-        trace.reset()
-        assertEquals(0, trace.count)
-        assertEquals(0f, trace.covered, 0f)
-    }
 }

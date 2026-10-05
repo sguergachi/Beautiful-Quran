@@ -165,14 +165,16 @@ what reaches the eye is a soft swell of a few percent in the glyphs and a
 clearly breathing glow. Raise one without the other and it is a strobe again.
 
 **Finding the words that can pulse.** **Mark candidates** on the same tab
-draws a green baseline under every word `InkEngine.tarjiEligible` admits — a
-long madd, a ghunnah or the verse's closing hold on its own letters. As the
-word is recited the baseline becomes a sparkline, in reading order across
-the word's span in time: faint, the pulse the ear heard; bold over it, the
-part the word's light was given. A faint wave with nothing bold over it is a
-reverberation the detector did not admit. It stays until the verse is
-unloaded. It is a lab mark, session-only, and is not drawn on the English
-mushaf's prose.
+draws a green sparkline under every word `InkEngine.tarjiEligible` admits — a
+long madd, a ghunnah or the verse's closing hold on its own letters. The line
+is the light the word will be given, worked out before it plays: the verse's
+audio is decoded from the playback cache and run through the reader's own
+detector, ear pulse, word gate and resonance (`TarjiVersePulse`), in reading
+order across the span the word is active. A flat line is a candidate that does
+not pulse in this recitation; a faint rule is a verse still being worked out.
+While the word is recited the part already heard is drawn heavier. It is a lab
+mark, session-only, redone when the detector is retuned, and is not drawn on
+the English mushaf's prose.
 
 **Telling paint from detection.** The Tarjīʿ tab has a **Test pulse** (a steady
 6 Hz light on the lit word, detector bypassed) and a **Word** line saying
