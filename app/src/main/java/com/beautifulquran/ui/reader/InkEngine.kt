@@ -215,6 +215,8 @@ object InkEngine {
         /** Minimum envelope autocorrelation (0–1) to call the pulse periodic. */
         val tarjiMinPeriodicity: Float =
             com.beautifulquran.playback.Tarji.MIN_PERIODICITY,
+        /** Quietest voice (RMS) a reverberation may open on; 0 is no threshold. */
+        val tarjiMinVolume: Float = com.beautifulquran.playback.Tarji.MIN_VOLUME,
         /** Pitch glide tolerance (fraction) while holding one note. */
         val tarjiPitchDrift: Float = com.beautifulquran.playback.Tarji.MAX_PITCH_DRIFT,
         /** Attack of the detection gain ramp (ms). */
@@ -263,6 +265,7 @@ object InkEngine {
         ve.holdMinMs = t.tarjiHoldMinMs
         ve.minTremoloDepth = t.tarjiMinDepth
         ve.minPeriodicity = t.tarjiMinPeriodicity
+        ve.minVolume = t.tarjiMinVolume
         ve.maxPitchDrift = t.tarjiPitchDrift
         ve.attackMs = t.tarjiAttackMs
         ve.releaseMs = t.tarjiReleaseMs

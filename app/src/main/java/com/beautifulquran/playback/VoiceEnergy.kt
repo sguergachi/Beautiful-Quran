@@ -306,6 +306,7 @@ class VoiceEnergy {
         tarji.holdMinMs = holdMinMs
         tarji.minTremoloDepth = minTremoloDepth
         tarji.minPeriodicity = minPeriodicity
+        tarji.minVolume = minVolume
         tarji.maxPitchDrift = maxPitchDrift
         tarji.attackMs = attackMs
         tarji.releaseMs = releaseMs
@@ -459,6 +460,7 @@ class VoiceEnergy {
         @Volatile var holdMinMs: Float = Tarji.HOLD_MIN_MS.toFloat()
         @Volatile var minTremoloDepth: Float = Tarji.MIN_TREMOLO_DEPTH
         @Volatile var minPeriodicity: Float = Tarji.MIN_PERIODICITY
+        @Volatile var minVolume: Float = Tarji.MIN_VOLUME
         @Volatile var maxPitchDrift: Float = Tarji.MAX_PITCH_DRIFT
         @Volatile var attackMs: Float = Tarji.ATTACK_MS
         @Volatile var releaseMs: Float = Tarji.RELEASE_MS

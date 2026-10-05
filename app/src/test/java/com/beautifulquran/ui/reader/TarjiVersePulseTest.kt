@@ -53,6 +53,24 @@ class TarjiVersePulseTest {
     }
 
     @Test
+    fun `a volume threshold keeps the pulse to a full voice`() {
+        val window = listOf(TarjiVersePulse.Window(finalStart, audioMs))
+        fun swing(minVolume: Float) = TarjiVersePulse.lines(
+            audio, Hani214.knobs.copy(minVolume = minVolume), depth = 1f, windows = window,
+        ).single().maxOf { abs(it) }
+        val open = swing(0f)
+        assertTrue("no threshold $open", open > 0.3f)
+        // Hani's closing hold is sung at about a tenth of full scale: a
+        // threshold under it changes nothing…
+        assertEquals(open, swing(0.02f), 1e-6f)
+        // …and one above anything he sings leaves the word still.
+        assertEquals(0f, swing(0.6f), 0f)
+        // Off is exactly the detector as it was.
+        assertEquals(com.beautifulquran.playback.Tarji.MIN_VOLUME, com.beautifulquran.tarjilab.TarjiLabKnobs().minVolume, 0f)
+        assertEquals(0f, InkEngine.Tuning().tarjiMinVolume, 0f)
+    }
+
+    @Test
     fun `only words that may pulse get a line, each across the span it is active`() {
         val words = listOf(
             Word(1, "قَالُوٓا۟", "", ""),

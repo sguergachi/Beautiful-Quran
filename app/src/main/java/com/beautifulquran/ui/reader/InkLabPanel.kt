@@ -677,6 +677,7 @@ internal fun formatTuningCopy(t: InkEngine.Tuning): String {
         appendLine("    tarjiHoldMinMs = ${f(t.tarjiHoldMinMs)},")
         appendLine("    tarjiMinDepth = ${f(t.tarjiMinDepth)},")
         appendLine("    tarjiMinPeriodicity = ${f(t.tarjiMinPeriodicity)},")
+        appendLine("    tarjiMinVolume = ${f(t.tarjiMinVolume)},")
         appendLine("    tarjiPitchDrift = ${f(t.tarjiPitchDrift)},")
         appendLine("    tarjiAttackMs = ${f(t.tarjiAttackMs)},")
         appendLine("    tarjiReleaseMs = ${f(t.tarjiReleaseMs)},")

@@ -786,6 +786,13 @@ private fun KnobsPanel(
             enabled = !ui.showingReference, showHelp = showHelp, onFinished = onFinished) { v ->
             onKnob { k -> k.copy(minTremoloDepth = 0.25f - v * 0.24f) }
         }
+        LabSlider("Quietest voice", knobs.minVolume, 0f..TARJI_LAB_MAX_VOLUME,
+            valueLabel = if (knobs.minVolume <= 0f) "Any" else "${(knobs.minVolume * 100).roundToInt()}%",
+            help = "Soft notes pulsing? Move right so only a full voice can. Left lets any volume pulse.",
+            enabled = !ui.showingReference, showHelp = showHelp, onFinished = onFinished) { v ->
+            // The first step of the track is "any", so it can be turned off by hand.
+            onKnob { k -> k.copy(minVolume = if (v < 0.005f) 0f else v) }
+        }
         LabSlider("Shortest note", knobs.holdMinMs, 100f..1_200f,
             valueLabel = "${knobs.holdMinMs.roundToInt()} ms",
             help = "Move left for brief holds; right to ignore short syllables.",
@@ -899,6 +906,9 @@ private fun PulseSpeedControl(
 private fun PulseThumb(color: Color) {
     Canvas(Modifier.size(20.dp)) { drawCircle(color, radius = 7.dp.toPx()) }
 }
+
+/** Top of the volume threshold: a reciter's loudest held notes sit near a quarter of full scale. */
+private const val TARJI_LAB_MAX_VOLUME = 0.25f
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable

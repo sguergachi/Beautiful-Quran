@@ -21,6 +21,8 @@ data class TarjiLabKnobs(
     val holdMinMs: Float = Tarji.HOLD_MIN_MS.toFloat(),
     val minTremoloDepth: Float = Tarji.MIN_TREMOLO_DEPTH,
     val minPeriodicity: Float = Tarji.MIN_PERIODICITY,
+    /** Quietest voice (RMS) a reverberation may open on; 0 is no threshold. */
+    val minVolume: Float = Tarji.MIN_VOLUME,
     val maxPitchDrift: Float = Tarji.MAX_PITCH_DRIFT,
     val attackMs: Float = Tarji.ATTACK_MS,
     val releaseMs: Float = Tarji.RELEASE_MS,
@@ -34,6 +36,7 @@ data class TarjiLabKnobs(
         detector.holdMinMs = holdMinMs
         detector.minTremoloDepth = minTremoloDepth
         detector.minPeriodicity = minPeriodicity
+        detector.minVolume = minVolume
         detector.maxPitchDrift = maxPitchDrift
         detector.attackMs = attackMs
         detector.releaseMs = releaseMs
@@ -47,6 +50,7 @@ data class TarjiLabKnobs(
             holdMinMs = t.tarjiHoldMinMs,
             minTremoloDepth = t.tarjiMinDepth,
             minPeriodicity = t.tarjiMinPeriodicity,
+            minVolume = t.tarjiMinVolume,
             maxPitchDrift = t.tarjiPitchDrift,
             attackMs = t.tarjiAttackMs,
             releaseMs = t.tarjiReleaseMs,
@@ -63,6 +67,7 @@ data class TarjiLabKnobs(
                 tarjiHoldMinMs = knobs.holdMinMs,
                 tarjiMinDepth = knobs.minTremoloDepth,
                 tarjiMinPeriodicity = knobs.minPeriodicity,
+                tarjiMinVolume = knobs.minVolume,
                 tarjiPitchDrift = knobs.maxPitchDrift,
                 tarjiAttackMs = knobs.attackMs,
                 tarjiReleaseMs = knobs.releaseMs,

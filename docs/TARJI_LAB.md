@@ -29,7 +29,7 @@ crest, slightly dimmer in each trough, hue unchanged. The pulse it and the graph
    no raw teal trace. The readout shows the accepted
    **Volume / Pitch** channel and its rate in Hz, **Pulse fading**, **No pulse
    here**, or **Updating**; it never invents an accepted pulse.
-5. Adjust **Glint brightness**, **Sensitivity**, **Shortest note**,
+5. Adjust **Glint brightness**, **Sensitivity**, **Quietest voice**, **Shortest note**,
    **Rhythm tolerance**, or **Pulse speed**. Each
    slider has a thin track, current value, and precise nudge buttons. The **?**
    button beside Fit reveals knob explanations and gesture help;
@@ -100,6 +100,11 @@ later lab edits persist normally. Other stored reciter profiles are preserved.
 
 - **Sensitivity** reverses the modulation-depth threshold: 0% = depth 0.25,
   100% = depth 0.01. More sensitivity accepts subtler wavering.
+- **Quietest voice** is a volume threshold (`Tarji.minVolume`): the voice's
+  smoothed level, as a fraction of full scale, that a reverberation may open
+  on. "Any" (0) is no threshold and the shipped default; held notes sit around
+  7–15 %. An open event may fall to 0.7 of it before it closes, so the pulse's
+  own troughs do not chop it. Saved with the reciter's profile.
 - **Shortest note** is the minimum stable-note duration, 100–1,200 ms.
 - **Rhythm tolerance** reverses periodicity: 0% = threshold 0.85,
   100% = threshold 0.15. More tolerance accepts uneven wavering.

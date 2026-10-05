@@ -139,6 +139,14 @@ class Tarji {
     /** Minimum envelope autocorrelation to call the pulse periodic. Ink Lab. */
     var minPeriodicity = MIN_PERIODICITY
 
+    /**
+     * Quietest voice (RMS, full scale = 1) on which a reverberation may open;
+     * 0 is no threshold. Tarjīʿ Lab. A wavering tail or a soft passing note
+     * can be periodic enough to pass every other gate and still not be the
+     * full-voiced hold the eye should answer.
+     */
+    var minVolume = MIN_VOLUME
+
     /** Pitch glide tolerance (fraction) while holding one note. Ink Lab. */
     var maxPitchDrift = MAX_PITCH_DRIFT
 
@@ -518,10 +526,14 @@ class Tarji {
         lastPitchModulationRateHz = fmScan.rateHz
         lastPitchModulationDepth = fmScan.depth
         lastPitchModulationPeriodicity = fmScan.periodicityScore
-        val amOpen = amScan.depth >= depthGate && amScan.periodic
-        val amKeep = amScan.depth >= depthGate * DEPTH_OFF_RATIO && amScan.stillPeriodic
-        val fmOpen = fmScan.depth >= MIN_PITCH_DEPTH && fmScan.periodic
-        val fmKeep = fmScan.depth >= MIN_PITCH_DEPTH * DEPTH_OFF_RATIO && fmScan.stillPeriodic
+        // The level is the smoothed one the climax is read from: the pulse's
+        // own troughs do not reach it, so a threshold does not chop the event.
+        val loud = minVolume <= 0f || climaxLevel >= minVolume
+        val loudKeep = minVolume <= 0f || climaxLevel >= minVolume * VOLUME_OFF_RATIO
+        val amOpen = loud && amScan.depth >= depthGate && amScan.periodic
+        val amKeep = loudKeep && amScan.depth >= depthGate * DEPTH_OFF_RATIO && amScan.stillPeriodic
+        val fmOpen = loud && fmScan.depth >= MIN_PITCH_DEPTH && fmScan.periodic
+        val fmKeep = loudKeep && fmScan.depth >= MIN_PITCH_DEPTH * DEPTH_OFF_RATIO && fmScan.stillPeriodic
         // A level step can forge AM residuals, but it cannot forge coherent
         // YIN pitch motion. Keep that AM-only guard out of FM acquisition and
         // phase selection.
@@ -540,8 +552,8 @@ class Tarji {
         val liveModulation = if (visualUsesAmplitude) amScan.raw else fmScan.raw
         lastCandidateModulation = liveModulation
         lastRateHz = rateHz
-        val anyCoherent = amScan.coherent || fmScan.coherent
-        val lifecycleCoherent = amScan.lifecycleCoherent || fmScan.coherent
+        val anyCoherent = loudKeep && (amScan.coherent || fmScan.coherent)
+        val lifecycleCoherent = loudKeep && (amScan.lifecycleCoherent || fmScan.coherent)
 
         val gapBefore = steadyGap
         steadyGap = when {
@@ -1046,6 +1058,10 @@ class Tarji {
         private const val MIN_PITCH_DEPTH = 0.006f
         /** Off-gate depth as a fraction of [minTremoloDepth] (hysteresis). */
         private const val DEPTH_OFF_RATIO = 0.7f
+        /** No volume threshold — Tarjīʿ Lab: [minVolume]. */
+        const val MIN_VOLUME = 0f
+        /** Level an open event may fall to, as a fraction of [minVolume] (hysteresis). */
+        private const val VOLUME_OFF_RATIO = 0.7f
         /** Envelope autocorrelation gate — Ink Lab: [minPeriodicity]. */
         const val MIN_PERIODICITY = 0.4f
         /** The tracked period is kept while it correlates at least this much

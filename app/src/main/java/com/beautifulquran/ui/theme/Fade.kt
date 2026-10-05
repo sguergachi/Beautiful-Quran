@@ -291,7 +291,7 @@ internal fun DrawScope.drawPulseTrace(
         return if (rtl) right - inset - along else left + inset + along
     }
     val heardTo = (played.coerceIn(0f, 1f) * (line.size - 1)).toInt()
-    val stroke = 1.5.dp.toPx()
+    val stroke = 1.dp.toPx()
     val ahead = color.copy(alpha = color.alpha * 0.45f)
     for (i in 1 until line.size) {
         drawLine(
