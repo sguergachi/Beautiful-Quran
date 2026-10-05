@@ -165,6 +165,34 @@ class GlintColorTest {
     }
 
     @Test
+    fun `the read-ahead is what the smoothing delays a pulse by, not its time constant`() {
+        // Measured: where the smoothed crest falls behind the voice's.
+        fun measuredLagMs(smoothMs: Float, hz: Double): Double {
+            val light = GlintLight()
+            var best = -2f
+            var bestAt = 0.0
+            val periodMs = 1000.0 / hz
+            for (step in 0..(periodMs * 12).toInt() * 10) {
+                val ms = step / 10.0
+                val out = light.next(sin(2 * PI * hz * ms / 1000).toFloat(), (ms * 1_000_000).toLong(), smoothMs)
+                if (ms >= periodMs * 11 && out > best) { best = out; bestAt = ms }
+            }
+            return (bestAt - periodMs * 11.25 + periodMs) % periodMs
+        }
+        for (smooth in listOf(60f, 139f)) for (hz in listOf(4.0, 6.0, 9.0)) {
+            assertEquals("$smooth ms at $hz Hz", measuredLagMs(smooth, hz), glintLightLagMs(smooth, hz.toFloat()).toDouble(), 1.5)
+        }
+        // 139 ms of smoothing sets a 6 Hz pulse back 37 ms: reading 139 ahead
+        // put the light a tenth of a second before the voice.
+        assertEquals(36.6f, glintLightLagMs(139f, 6f), 0.5f)
+        // A slow drift is delayed by the whole constant; no smoothing, by nothing.
+        assertEquals(139f, glintLightLagMs(139f, 0.01f), 0.5f)
+        assertEquals(0f, glintLightLagMs(0f, 6f), 0f)
+        // Before a rate is measured, a typical one is assumed.
+        assertEquals(glintLightLagMs(139f, 6f), glintLightLagMs(139f, 0f), 0f)
+    }
+
+    @Test
     fun `the same swell at either refresh rate`() {
         fun at(fps: Int): Float {
             val light = GlintLight().also { it.next(0f, 0L, 60f) }

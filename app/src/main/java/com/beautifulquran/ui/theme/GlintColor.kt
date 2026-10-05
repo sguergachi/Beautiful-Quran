@@ -3,6 +3,7 @@ package com.beautifulquran.ui.theme
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.colorspace.ColorSpaces
 import androidx.compose.ui.graphics.lerp
+import kotlin.math.atan
 import kotlin.math.exp
 import kotlin.math.pow
 
@@ -87,6 +88,23 @@ internal fun glintVeilColor(base: Color, warmth: Float): Color =
     lerp(base, GlintVeilWarm, warmth.coerceIn(0f, 1f))
 
 private val GlintVeilWarm = Color(0xFFFFC98A)
+
+/**
+ * How far [GlintLight] at [smoothMs] sets a pulse of [rateHz] back, in ms: the
+ * filter's phase delay at that rate, which is what must be read ahead for a
+ * crest of light to land on its crest of sound. It is the time constant only
+ * for a slow drift; at tarjīʿ rates it is far less (139 ms of smoothing delays
+ * a 6 Hz pulse by 37 ms), and reading the whole constant ahead put the light
+ * a tenth of a second before the voice.
+ */
+internal fun glintLightLagMs(smoothMs: Float, rateHz: Float): Float {
+    if (smoothMs <= 0f) return 0f
+    val omega = 2f * Math.PI.toFloat() * (if (rateHz > 0f) rateHz else GLINT_NOMINAL_PULSE_HZ)
+    return atan(omega * smoothMs / 1000f) / omega * 1000f
+}
+
+/** The rate assumed until the detector has measured one. */
+private const val GLINT_NOMINAL_PULSE_HZ = 6f
 
 /**
  * The light's response to the voice: a plain low-pass, the same up as down, so

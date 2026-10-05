@@ -287,8 +287,14 @@ class TarjiEarSample {
     var eventStartHop = -1
     /** That hop on the media-item clock; [VoiceEnergy.NO_EVENT_MS] if unknown. */
     var eventStartMediaMs = Long.MIN_VALUE
+    /** The pulse's rate at the ear, 0 before one is measured. */
+    var rateHz = 0f
+    /** The media-item position this sample was read at; [Long.MIN_VALUE] if unknown. */
+    var mediaMs = Long.MIN_VALUE
 
     fun clear() {
+        rateHz = 0f
+        mediaMs = Long.MIN_VALUE
         tremolo = 0f
         gain = 0f
         reverberating = false
@@ -377,6 +383,7 @@ internal class TarjiEarTrack {
         // The pulse lives at hop centres. One channel and one period for the
         // pair being interpolated, taken from the hop the event is read at.
         val mode = if (heldBefore || !heldAfter) a else b
+        out.rateHz = rateHz[mode]
         val period = TarjiEarPulse.periodHops(rateHz[mode], hopMs)
         val centre = contentMs / hopMs - 0.5 + if (usesAmplitude[mode]) 0f else pitchLead[mode]
         val at = centre.coerceIn(oldest.toDouble(), newest.toDouble())

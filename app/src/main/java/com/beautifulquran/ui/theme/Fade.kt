@@ -260,8 +260,8 @@ sealed class ShapedWordBloom {
 /**
  * A word's pulse as a sparkline under it, in reading order across
  * [left]..[right]: [line] is the light the word will be given, one value
- * (−1..1) per step of its span in time. The first [played] (0..1) of it is
- * drawn heavier while the word is recited. [bottom] is the word's box. Until
+ * (−1..1) per step of its span in time. It is drawn translucent; the first
+ * [played] (0..1) of it turns opaque as the word is recited. [bottom] is the word's box. Until
  * [line] is worked out it is a faint rule; a flat line is a word that may
  * pulse and in this recitation does not.
  */
@@ -290,15 +290,15 @@ internal fun DrawScope.drawPulseTrace(
         val along = i / (line.size - 1f) * width
         return if (rtl) right - inset - along else left + inset + along
     }
-    val heavyTo = (played.coerceIn(0f, 1f) * (line.size - 1)).toInt()
-    val thin = 1.25.dp.toPx()
-    val heavy = 2.5.dp.toPx()
+    val heardTo = (played.coerceIn(0f, 1f) * (line.size - 1)).toInt()
+    val stroke = 1.5.dp.toPx()
+    val ahead = color.copy(alpha = color.alpha * 0.45f)
     for (i in 1 until line.size) {
         drawLine(
-            color = color,
+            color = if (i <= heardTo) color else ahead,
             start = Offset(x(i - 1), baseline - line[i - 1].coerceIn(-1f, 1f) * swing),
             end = Offset(x(i), baseline - line[i].coerceIn(-1f, 1f) * swing),
-            strokeWidth = if (i <= heavyTo) heavy else thin,
+            strokeWidth = stroke,
             cap = StrokeCap.Round,
         )
     }

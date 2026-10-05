@@ -172,7 +172,7 @@ audio is decoded from the playback cache and run through the reader's own
 detector, ear pulse, word gate and resonance (`TarjiVersePulse`), in reading
 order across the span the word is active. A flat line is a candidate that does
 not pulse in this recitation; a faint rule is a verse still being worked out.
-While the word is recited the part already heard is drawn heavier. It is a lab
+The line is translucent; while the word is recited the part already heard turns opaque, placed by the ear's own position on the media clock so it moves with the light. It is a lab
 mark, session-only, redone when the detector is retuned, and is not drawn on
 the English mushaf's prose.
 
@@ -188,7 +188,10 @@ that pulses under the test but not with the voice is a detector matter
   +63–75 % in the glow, and two to three times that on a 200 % reciter.
 - The motion is a plain low-pass (`GlintLight`, 139 ms), the same up as down,
   and the voice's curve is not sharpened into beats. Its lag is read ahead of
-  the ear (the tap leads the speaker), so smoothing costs no sync.
+  the ear (the tap leads the speaker), so smoothing costs no sync. The lag is
+  the filter's phase delay at the pulse's own rate (`glintLightLagMs`): 37 ms
+  for a 6 Hz pulse through 139 ms, not 139 — reading the whole constant ahead
+  showed each crest a tenth of a second before it was heard.
 
 **It is meant to be barely there.** The eye is most sensitive to flicker at
 exactly the rates tarjīʿ lives at — under 1 % of modulation is visible around

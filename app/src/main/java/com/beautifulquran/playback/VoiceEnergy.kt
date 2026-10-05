@@ -124,6 +124,11 @@ class VoiceEnergy {
         // the crest lands with the sound.
         // [leadMs] more cancels the lag of whatever smooths the light next.
         if (!earTrack.read(earContentMs + DISPLAY_LEAD_MS + leadMs.coerceAtLeast(0f), hopMs, out)) return false
+        // What the frame shows is the voice at the ear, [leadMs] being only
+        // the smoothing's own lag taken back.
+        if (anchored) {
+            out.mediaMs = (earClock.mediaMsOfContent(earContentMs + DISPLAY_LEAD_MS) + beyondHeadMs).roundToLong()
+        }
         if (out.eventStartHop >= 0 && anchored) {
             out.eventStartMediaMs =
                 (earClock.mediaMsOfContent(out.eventStartHop * hopMs) + beyondHeadMs).roundToLong()

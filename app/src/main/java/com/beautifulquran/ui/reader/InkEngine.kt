@@ -579,12 +579,15 @@ object InkEngine {
     class TarjiTrace {
         var line by mutableStateOf<FloatArray?>(null)
             private set
-        /** The time the word's width stands for. */
+        /** Where the line begins on the media-item clock, and the time its width stands for. */
+        var startMs = 0f
+            private set
         var spanMs = 0f
             private set
         var played by androidx.compose.runtime.mutableFloatStateOf(0f)
 
-        fun set(line: FloatArray, spanMs: Float) {
+        fun set(line: FloatArray, startMs: Float, spanMs: Float) {
+            this.startMs = startMs
             this.spanMs = spanMs
             this.line = line
         }

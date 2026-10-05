@@ -180,7 +180,8 @@ internal object TarjiVersePulse {
                 for (word in ayah.words) {
                     val line = lines[word.position] ?: continue
                     val window = windows.getValue(word.position)
-                    InkEngine.tarjiTrace(word).set(line, (window.endMs - window.startMs).toFloat())
+                    InkEngine.tarjiTrace(word).set(
+                        line, window.startMs.toFloat(), (window.endMs - window.startMs).toFloat())
                 }
             }
         }

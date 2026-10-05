@@ -1384,12 +1384,19 @@ private fun rememberTarjiGate(
             return@LaunchedEffect
         }
         var traceStart = 0L
-        // How far the voice is through the word's sparkline, by the frame clock.
-        fun traced(now: Long) {
+        // How far the voice is through the word's sparkline: the ear's own
+        // place on the media clock — the instant the light is showing — or
+        // the frame clock where the ear is not placed yet.
+        fun traced(now: Long, earMediaMs: Long) {
             val span = trace?.spanMs?.takeIf { it > 0f } ?: return
             if (traceStart == 0L) traceStart = now
-            val speed = com.beautifulquran.playback.VoiceEnergy.active?.playbackSpeed ?: 1f
-            trace.played = ((now - traceStart) / 1_000_000f * speed / span).coerceIn(0f, 1f)
+            val elapsedMs = if (earMediaMs != Long.MIN_VALUE) {
+                earMediaMs - trace.startMs
+            } else {
+                val speed = com.beautifulquran.playback.VoiceEnergy.active?.playbackSpeed ?: 1f
+                (now - traceStart) / 1_000_000f * speed
+            }
+            trace.played = (elapsedMs / span).coerceIn(0f, 1f)
         }
         if (test) {
             // The lab's steady pulse: the paint alone, no detector in the way.
@@ -1397,7 +1404,7 @@ private fun rememberTarjiGate(
             while (true) {
                 withFrameNanos { now ->
                     val swing = kotlin.math.sin(now / 1e9 * 2.0 * Math.PI * TARJI_TEST_PULSE_HZ).toFloat()
-                    traced(now)
+                    traced(now, Long.MIN_VALUE)
                     val glow = light.next(swing, now, InkEngine.tuning.tarjiLightSmoothMs)
                     frame.value = InkEngine.GlintResonance(peak = 1f, light = swing, glow = glow)
                     InkEngine.TarjiProbe.admitted = true
@@ -1409,12 +1416,17 @@ private fun rememberTarjiGate(
         val eventGate = TarjiWordGate()
         val light = com.beautifulquran.ui.theme.GlintLight()
         val ear = com.beautifulquran.playback.TarjiEarSample()
+        var pulseRateHz = 0f
         var lastReport = 0L
         while (true) {
             withFrameNanos { now ->
                 val voice = com.beautifulquran.playback.VoiceEnergy.active
                 val smoothMs = InkEngine.tuning.tarjiLightSmoothMs
-                voice?.sampleAtEar(now, ear, leadMs = smoothMs)
+                // Read ahead by what the smoothing sets this pulse back — its
+                // phase delay at the pulse's own rate, not its time constant.
+                voice?.sampleAtEar(
+                    now, ear, leadMs = com.beautifulquran.ui.theme.glintLightLagMs(smoothMs, pulseRateHz))
+                pulseRateHz = ear.rateHz
                 val g = if (voice == null) 0f else ear.gain
                 val pulse = if (
                     eventGate.allows(
@@ -1437,7 +1449,7 @@ private fun rememberTarjiGate(
                     InkEngine.GlintResonance.Idle
                 }
                 frame.value = pulse.copy(glow = light.next(pulse.light, now, smoothMs))
-                traced(now)
+                traced(now, ear.mediaMs)
                 InkEngine.TarjiProbe.admitted = pulse !== InkEngine.GlintResonance.Idle
                 InkEngine.TarjiProbe.gain = g
                 InkEngine.TarjiProbe.glow = frame.value.glow
