@@ -71,6 +71,25 @@ class TarjiVersePulseTest {
     }
 
     @Test
+    fun `work no longer wanted is abandoned, and paint dials do not ask for it again`() {
+        var asked = 0
+        val abandoned = runCatching {
+            TarjiVersePulse.lines(audio, Hani214.knobs, 1f, listOf(TarjiVersePulse.Window(0.0, audioMs))) {
+                ++asked < 3
+            }
+        }
+        assertTrue(abandoned.exceptionOrNull() is java.util.concurrent.CancellationException)
+        // Given up within a couple of seconds of audio, not at the verse's end.
+        assertEquals(3, asked)
+        // A verse's lines depend on the detector alone: brightness, glow and
+        // smoothing can be dragged without one verse being redone.
+        val shipped = InkEngine.Tuning()
+        val painted = shipped.copy(glintBrightness = 2f, tarjiLightRise = 0.1f, tarjiGlowGain = 2f, tarjiLightSmoothMs = 30f)
+        assertEquals(TarjiVersePulse.detectorKnobs(shipped), TarjiVersePulse.detectorKnobs(painted))
+        assertTrue(TarjiVersePulse.detectorKnobs(shipped) != TarjiVersePulse.detectorKnobs(shipped.copy(tarjiMinVolume = 0.1f)))
+    }
+
+    @Test
     fun `only words that may pulse get a line, each across the span it is active`() {
         val words = listOf(
             Word(1, "قَالُوٓا۟", "", ""),

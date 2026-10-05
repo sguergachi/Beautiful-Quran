@@ -22,10 +22,9 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.launch
+import kotlinx.coroutines.async
 import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.withContext
-import java.io.File
 import java.nio.ByteOrder
 import kotlin.math.roundToInt
 
@@ -57,6 +56,8 @@ internal object TarjiVersePulse {
         knobs: TarjiLabKnobs,
         depth: Float,
         windows: List<Window>,
+        /** Asked every few hops; false abandons the work (the answer is no longer wanted). */
+        wanted: () -> Boolean = { true },
     ): List<FloatArray> {
         val detector = Tarji()
         detector.hopSamples = audio.hopSamples
@@ -69,6 +70,7 @@ internal object TarjiVersePulse {
         }
         val hops = audio.pcm.size / audio.hopSamples
         for (hop in 0 until hops + EAR_BEHIND_HOPS) {
+            if (hop and 63 == 0 && !wanted()) throw kotlinx.coroutines.CancellationException("retuned")
             if (hop < hops) {
                 val offset = hop * audio.hopSamples
                 detector.onSamples8k(audio.pcm.copyOfRange(offset, offset + audio.hopSamples))
@@ -128,101 +130,129 @@ internal object TarjiVersePulse {
     @Volatile
     var source: ((surahId: Int, ayah: Int) -> Pair<String, List<Segment>>?)? = null
 
-    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
-    private val jobs = HashMap<String, Job>()
-    private val done = HashSet<String>()
-    private val failures = HashMap<String, Int>()
-
-    /** For the lab's readout: what the last verse that could not be worked out said. */
-    var lastFailure by androidx.compose.runtime.mutableStateOf<String?>(null)
-        private set
+    /** For the lab's readout: verses being worked out now, and what the last failure said. */
     var working by androidx.compose.runtime.mutableIntStateOf(0)
         private set
-    /** A device has only so many decoders; a screenful of verses takes turns. */
-    private val decoders = kotlinx.coroutines.sync.Semaphore(2)
+    var lastFailure by androidx.compose.runtime.mutableStateOf<String?>(null)
+        private set
 
-    /**
-     * Works out [ayah]'s lines once per audio and detector setting and hands
-     * them to the words' traces. Main thread; returns at once — false until
-     * the lines are in the traces, so the caller can ask again: the reciter
-     * or timings may not be loaded yet, and a fetch can fail and be retried.
-     */
-    fun ensure(context: Context, ayah: Ayah): Boolean {
-        val (url, segments) = source?.invoke(ayah.surahId, ayah.number) ?: return false
-        if (segments.isEmpty()) return false
-        val tuning = InkEngine.tuning
-        val knobs = TarjiLabKnobs.fromTuning(tuning)
-        val depth = tuning.glintResonanceDepth
-        val key = "$url|$knobs|$depth"
-        if (key in done) return true
-        if (jobs.containsKey(key) || (failures[key] ?: 0) >= MAX_ATTEMPTS) return false
-        working++
-        val app = context.applicationContext
-        jobs[key] = scope.launch {
-            val attempt = runCatching {
-                val audio = decoders.withPermit { decode(app, url) }
-                    ?: error("no audio track in ${url.substringAfterLast('/')}")
-                val audioMs = audio.pcm.size / audio.hopSamples * audio.hopMs
-                val windows = windows(ayah, segments, audioMs)
-                val lines = lines(audio, knobs, depth, windows.values.toList())
-                windows.keys.zip(lines).toMap() to windows
-            }
-            withContext(Dispatchers.Main) {
-                jobs.remove(key)
-                working--
-                val result = attempt.getOrElse { cause ->
-                    failures[key] = (failures[key] ?: 0) + 1
-                    lastFailure = "${ayah.surahId}:${ayah.number} ${cause.javaClass.simpleName}: ${cause.message}"
-                    return@withContext
-                }
-                done += key
-                val (lines, windows) = result
-                for (word in ayah.words) {
-                    val line = lines[word.position] ?: continue
-                    val window = windows.getValue(word.position)
-                    InkEngine.tarjiTrace(word).set(
-                        line, window.startMs.toFloat(), (window.endMs - window.startMs).toFloat())
-                }
-            }
-        }
-        return false
+    enum class Outcome { Done, NotReady, Failed }
+
+    private class Result(val lines: Map<Int, FloatArray>, val windows: Map<Int, Window>)
+
+    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+    /** A device has only so many decoders; a screenful of verses takes turns. */
+    private val decoders = kotlinx.coroutines.sync.Semaphore(3)
+
+    // Main thread only. A verse's audio is decoded once and kept: retuning the
+    // detector reruns only the detector, which is a fraction of the work.
+    private val audio = lru<String, kotlinx.coroutines.Deferred<Decoded>>(AUDIO_KEPT)
+    private val results = lru<String, Result>(RESULTS_KEPT)
+
+    private fun <K, V> lru(limit: Int) = object : LinkedHashMap<K, V>(limit, 0.75f, true) {
+        override fun removeEldestEntry(eldest: MutableMap.MutableEntry<K, V>?) = size > limit
     }
 
-    private const val MAX_ATTEMPTS = 3
+    /**
+     * Works out [ayah]'s lines and hands them to the words' traces. Main
+     * thread; suspends, and is meant to be cancelled when the verse leaves the
+     * screen or the detector is retuned — a dial being dragged asks for a new
+     * answer every frame, and only the last one is wanted.
+     */
+    suspend fun compute(context: Context, ayah: Ayah): Outcome {
+        val (url, segments) = source?.invoke(ayah.surahId, ayah.number) ?: return Outcome.NotReady
+        if (segments.isEmpty()) return Outcome.NotReady
+        val tuning = InkEngine.tuning
+        val knobs = detectorKnobs(tuning)
+        val depth = tuning.glintResonanceDepth
+        val key = "$url|$knobs|$depth"
+        results[key]?.let { apply(ayah, it); return Outcome.Done }
+        val app = context.applicationContext
+        working++
+        try {
+            val decoded = audio.getOrPut(url) {
+                scope.async { decoders.withPermit { decode(app, url) } }
+            }
+            val heard = try {
+                decoded.await()
+            } catch (cancelled: kotlinx.coroutines.CancellationException) {
+                throw cancelled
+            } catch (failed: Throwable) {
+                audio.remove(url) // let a later request fetch it again
+                throw failed
+            }
+            val result = withContext(Dispatchers.Default) {
+                val job = coroutineContext[Job]
+                val windows = windows(ayah, segments, heard.pcm.size / heard.hopSamples * heard.hopMs)
+                val lines = lines(heard, knobs, depth, windows.values.toList()) { job?.isActive != false }
+                Result(windows.keys.zip(lines).toMap(), windows)
+            }
+            results[key] = result
+            apply(ayah, result)
+            return Outcome.Done
+        } catch (cancelled: kotlinx.coroutines.CancellationException) {
+            throw cancelled
+        } catch (failed: Throwable) {
+            lastFailure = "${ayah.surahId}:${ayah.number} ${failed.javaClass.simpleName}: ${failed.message}"
+            return Outcome.Failed
+        } finally {
+            working--
+        }
+    }
+
+    /** The detector's own settings: what a verse's lines depend on, and nothing the paint does. */
+    fun detectorKnobs(tuning: InkEngine.Tuning): TarjiLabKnobs =
+        TarjiLabKnobs.fromTuning(tuning).copy(glintBrightness = 1f)
+
+    private fun apply(ayah: Ayah, result: Result) {
+        for (word in ayah.words) {
+            val line = result.lines[word.position] ?: continue
+            val window = result.windows.getValue(word.position)
+            InkEngine.tarjiTrace(word).set(line, window.startMs.toFloat(), (window.endMs - window.startMs).toFloat())
+        }
+    }
+
+    private const val AUDIO_KEPT = 24
+    private const val RESULTS_KEPT = 160
 
     /** The verse's audio through the playback cache, decoded and decimated as the tap does. */
     @androidx.annotation.OptIn(androidx.media3.common.util.UnstableApi::class)
-    private fun decode(context: Context, url: String): Decoded? {
-        val file = File.createTempFile("tarji", ".audio", context.cacheDir)
+    private fun decode(context: Context, url: String): Decoded {
+        val bytes = java.io.ByteArrayOutputStream(512 * 1024)
+        val data = RecitationCache.playbackDataSourceFactory(
+            context,
+            DefaultHttpDataSource.Factory().setUserAgent("BeautifulQuran/1.0"),
+        ).createDataSource()
         try {
-            val data = RecitationCache.playbackDataSourceFactory(
-                context,
-                DefaultHttpDataSource.Factory().setUserAgent("BeautifulQuran/1.0"),
-            ).createDataSource()
-            try {
-                data.open(DataSpec(Uri.parse(url)))
-                file.outputStream().use { sink ->
-                    val buffer = ByteArray(64 * 1024)
-                    while (true) {
-                        val read = data.read(buffer, 0, buffer.size)
-                        if (read < 0) break
-                        sink.write(buffer, 0, read)
-                    }
-                }
-            } finally {
-                data.close()
+            data.open(DataSpec(Uri.parse(url)))
+            val buffer = ByteArray(64 * 1024)
+            while (true) {
+                val read = data.read(buffer, 0, buffer.size)
+                if (read < 0) break
+                bytes.write(buffer, 0, read)
             }
-            return decodeFile(file)
         } finally {
-            file.delete()
+            data.close()
         }
+        return decodeBytes(bytes.toByteArray()) ?: error("no audio track in ${url.substringAfterLast('/')}")
     }
 
-    private fun decodeFile(file: File): Decoded? {
+    private class Bytes(private val bytes: ByteArray) : android.media.MediaDataSource() {
+        override fun readAt(position: Long, buffer: ByteArray, offset: Int, size: Int): Int {
+            if (position >= bytes.size) return -1
+            val n = minOf(size, bytes.size - position.toInt())
+            System.arraycopy(bytes, position.toInt(), buffer, offset, n)
+            return n
+        }
+        override fun getSize(): Long = bytes.size.toLong()
+        override fun close() = Unit
+    }
+
+    private fun decodeBytes(bytes: ByteArray): Decoded? {
         val extractor = MediaExtractor()
         var codec: MediaCodec? = null
         try {
-            extractor.setDataSource(file.path)
+            extractor.setDataSource(Bytes(bytes))
             val trackIndex = (0 until extractor.trackCount).firstOrNull {
                 extractor.getTrackFormat(it).getString(MediaFormat.KEY_MIME)?.startsWith("audio/") == true
             } ?: return null
@@ -237,10 +267,14 @@ internal object TarjiVersePulse {
             val decimator = Decimator()
             val info = MediaCodec.BufferInfo()
             var inputDone = false
+            var outputDone = false
             var idle = 0
-            while (true) {
+            while (!outputDone) {
+                var progressed = false
+                // Never wait on one side while the other has work: a wait per
+                // frame made a verse take seconds that decodes in a blink.
                 if (!inputDone) {
-                    val inIndex = decoder.dequeueInputBuffer(10_000)
+                    val inIndex = decoder.dequeueInputBuffer(0)
                     if (inIndex >= 0) {
                         val size = extractor.readSampleData(decoder.getInputBuffer(inIndex)!!, 0)
                         if (size < 0) {
@@ -250,26 +284,38 @@ internal object TarjiVersePulse {
                             decoder.queueInputBuffer(inIndex, 0, size, extractor.sampleTime, 0)
                             extractor.advance()
                         }
+                        progressed = true
                     }
                 }
-                val outIndex = decoder.dequeueOutputBuffer(info, 10_000)
-                if (outIndex == MediaCodec.INFO_OUTPUT_FORMAT_CHANGED) {
-                    sampleRate = decoder.outputFormat.getInteger(MediaFormat.KEY_SAMPLE_RATE)
-                    channels = decoder.outputFormat.getInteger(MediaFormat.KEY_CHANNEL_COUNT)
-                } else if (outIndex >= 0) {
-                    val buffer = decoder.getOutputBuffer(outIndex)!!
-                    buffer.position(info.offset).limit(info.offset + info.size)
-                    val pcm = buffer.order(ByteOrder.LITTLE_ENDIAN)
+                while (true) {
+                    val outIndex = decoder.dequeueOutputBuffer(info, 0)
+                    if (outIndex == MediaCodec.INFO_OUTPUT_FORMAT_CHANGED) {
+                        sampleRate = decoder.outputFormat.getInteger(MediaFormat.KEY_SAMPLE_RATE)
+                        channels = decoder.outputFormat.getInteger(MediaFormat.KEY_CHANNEL_COUNT)
+                        continue
+                    }
+                    if (outIndex < 0) break
+                    val pcm = decoder.getOutputBuffer(outIndex)!!
+                    pcm.position(info.offset).limit(info.offset + info.size)
+                    pcm.order(ByteOrder.LITTLE_ENDIAN)
                     decimator.configure(sampleRate)
                     while (pcm.remaining() >= 2 * channels) {
                         decimator.add(pcm.short / 32768f)
                         pcm.position(pcm.position() + 2 * (channels - 1))
                     }
                     decoder.releaseOutputBuffer(outIndex, false)
+                    progressed = true
+                    if (info.flags and MediaCodec.BUFFER_FLAG_END_OF_STREAM != 0) {
+                        outputDone = true
+                        break
+                    }
+                }
+                if (progressed) {
                     idle = 0
-                    if (info.flags and MediaCodec.BUFFER_FLAG_END_OF_STREAM != 0) break
-                } else if (inputDone && ++idle > 300) {
-                    break // a decoder that never signals its end: keep what it gave
+                } else {
+                    // Both sides busy: the decoder is working. Yield briefly.
+                    Thread.sleep(1)
+                    if (++idle > 5_000) break // a decoder that never ends: keep what it gave
                 }
             }
             return decimator.finish()
@@ -322,7 +368,20 @@ internal fun RequestTarjiPulseLines(ayah: Ayah) {
     if (!InkEngine.tarjiMarkCandidates) return
     val context = androidx.compose.ui.platform.LocalContext.current
     val tuning = InkEngine.tuning
-    androidx.compose.runtime.LaunchedEffect(ayah, tuning) {
-        while (!TarjiVersePulse.ensure(context, ayah)) kotlinx.coroutines.delay(750)
+    // Only what the detector reads: a paint dial must not redo the verse.
+    val knobs = TarjiVersePulse.detectorKnobs(tuning)
+    androidx.compose.runtime.LaunchedEffect(ayah, knobs, tuning.glintResonanceDepth) {
+        // A dial being dragged changes the key every frame; wait for it to
+        // rest before doing anything, and let the restart cancel the rest.
+        kotlinx.coroutines.delay(150)
+        var failures = 0
+        while (true) {
+            when (TarjiVersePulse.compute(context, ayah)) {
+                TarjiVersePulse.Outcome.Done -> return@LaunchedEffect
+                TarjiVersePulse.Outcome.Failed -> if (++failures >= 3) return@LaunchedEffect
+                TarjiVersePulse.Outcome.NotReady -> Unit
+            }
+            kotlinx.coroutines.delay(750)
+        }
     }
 }
