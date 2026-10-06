@@ -139,7 +139,9 @@ python3 tools/test_build_db.py  # timing pipeline regressions (~1s, no Gradle)
   a different seed grows an entirely different composition.
 - To run the app in an emulator on Linux: `scripts/setup_android_emulator.sh`
   once, then `scripts/run_android_app.sh` (see README.md).
-- **Agent emulators: use `scripts/emu.sh`, never a hand-rolled `emulator`.**
+- **Agent emulators: use `scripts/emu.sh`, never a hand-rolled `emulator`, and
+  never create another AVD** (they are 5-10GB each; a pile of them once filled
+  the disk). The pool runs any number of read-only instances of one AVD.
   It is a lease-based pool of GPU-accelerated, silent, headless emulators that
   all boot from one golden snapshot (~20s, clean state each time):
 
