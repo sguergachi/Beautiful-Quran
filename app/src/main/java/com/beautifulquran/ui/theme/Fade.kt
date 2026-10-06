@@ -257,7 +257,7 @@ sealed class ShapedWordBloom {
 }
 
 /**
- * A word's pulse as a sparkline under it, left to right across
+ * A word's pulse as a sparkline under it, in ink-wipe direction across
  * [left]..[right]: [line] is the light the word will be given, one value
  * (−1..1) per step of its span in time. It is drawn translucent; the first
  * [played] (0..1) of it turns opaque as the word is recited. [bottom] is the word's box. Until
@@ -270,6 +270,7 @@ internal fun DrawScope.drawPulseTrace(
     bottom: Float,
     line: FloatArray?,
     played: Float,
+    rtl: Boolean,
     color: Color,
 ) {
     val inset = 2.dp.toPx()
@@ -291,9 +292,10 @@ internal fun DrawScope.drawPulseTrace(
         }
         return
     }
-    // Time runs left to right whatever the script: it is a graph, and the
-    // lab's graph of the same word is read against it.
-    fun x(i: Int): Float = left + inset + i / (line.size - 1f) * width
+    fun x(i: Int): Float {
+        val along = i / (line.size - 1f) * width
+        return if (rtl) right - inset - along else left + inset + along
+    }
     val heardTo = (played.coerceIn(0f, 1f) * (line.size - 1)).toInt()
     val stroke = 1.dp.toPx()
     val ahead = color.copy(alpha = color.alpha * 0.45f)
@@ -471,7 +473,7 @@ fun Modifier.shapedWordBloom(
                     lineBoundsCache.boundsFor(textLayout, start, endExclusive).forEach { bounds ->
                         drawPulseTrace(
                             bounds.left, bounds.right, bounds.bottom,
-                            bloom.line, bloom.played, bloom.color,
+                            bloom.line, bloom.played, rtl, bloom.color,
                         )
                     }
                 }

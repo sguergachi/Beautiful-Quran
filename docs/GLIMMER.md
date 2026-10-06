@@ -169,8 +169,9 @@ draws a green sparkline under every word `InkEngine.tarjiEligible` admits — a
 long madd, a ghunnah or the verse's closing hold on its own letters. The line
 is **the Tarjīʿ Lab's green graph for that word**: the detector's pulse at the
 ear times its gain (`tarjiAcceptedPulseWave`), over the span the lab shows
-(300 ms before the word's first mark to a second after its last), left to
-right. It is worked out before the verse plays: the audio is decoded from the
+(300 ms before the word's first mark to a second after its last), advancing
+in the ink wipe's direction — right to left under Arabic. It is worked out
+before the verse plays: the audio is decoded from the
 playback cache and run through the reader's own detector and ear pulse
 (`TarjiVersePulse`). Unlike the light itself it is not held to one event per
 word, exactly as the lab's graph is not.
