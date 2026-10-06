@@ -57,6 +57,7 @@
    * (--u) and keeps --sheet-pad as it was.
    */
   --grid: 4px;
+  --viewport-h: 100vh;
   --sheet-margin: 28px;
   --reference-margin: 24px;
   --leaf-margin: 10px;
@@ -275,6 +276,7 @@ body,
   #root {
     height: 100svh;
     max-height: 100svh;
+    --viewport-h: 100svh;
   }
 }
 
@@ -3499,9 +3501,9 @@ button.ayah-mark {
  * labels, nuqta selects, A—track—A text size, colophon at the foot.
  */
 .settings {
-  padding: 0.5rem var(--sheet-pad) 3rem;
-  padding-top: max(0.5rem, env(safe-area-inset-top));
-  padding-bottom: calc(3rem + env(safe-area-inset-bottom, 0px));
+  padding: 20px var(--sheet-pad) 48px;
+  padding-top: calc(20px + env(safe-area-inset-top, 0px));
+  padding-bottom: calc(48px + env(safe-area-inset-bottom, 0px));
   max-width: 40rem; /* 640dp Android measure */
   width: 100%;
   margin: 0 auto;
@@ -3514,7 +3516,7 @@ button.ayah-mark {
 .settings .back,
 .settings-back {
   color: color-mix(in srgb, var(--ink) 75%, transparent);
-  margin: 0 0 0.35rem;
+  margin: 0 0 6px;
   padding: 0;
   width: 2.5rem;
   height: 2.5rem;
@@ -3542,8 +3544,10 @@ button.ayah-mark {
 .settings h1 {
   font-family: var(--font-display);
   font-weight: 600;
-  font-size: clamp(1.65rem, 4.5vw, 1.85rem);
-  margin: 0 0 2.25rem;
+  font-size: 28px;
+  line-height: 34px;
+  letter-spacing: 0.2px;
+  margin: 0 0 36px;
   color: var(--ink);
 }
 
@@ -3576,9 +3580,9 @@ button.ayah-mark {
 }
 
 .settings-nav-note {
-  font-size: 0.8rem;
-  line-height: 1.3;
-  color: color-mix(in srgb, var(--ink-muted) 90%, transparent);
+  font-size: 12px;
+  line-height: 16px;
+  color: var(--ink-rung-quiet);
 }
 
 .settings:has(.customize) {
@@ -3794,12 +3798,14 @@ button.ayah-mark {
 }
 
 .settings-section {
-  margin-bottom: 2rem;
+  margin-bottom: 20px;
 }
 
 .settings-section-toggles {
-  margin-top: -0.5rem;
-  margin-bottom: 1.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-block: 20px;
 }
 
 .settings-section-developer {
@@ -3809,20 +3815,50 @@ button.ayah-mark {
 
 /* Letterspaced, low-ink label — never competes with the reading. */
 .settings-section h2 {
-  font-size: 0.72rem;
-  letter-spacing: 0.14em;
+  font-size: 12px;
+  letter-spacing: 2px;
   text-transform: uppercase;
-  color: color-mix(in srgb, var(--ink) 45%, transparent);
+  color: var(--ink-rung-muted);
   font-weight: 500;
-  margin: 0 0 0.65rem;
+  margin: 0 0 4px;
   font-family: var(--font-body);
 }
 
 .settings-caption {
-  margin: 0.15rem 0 0.75rem;
-  font-size: 0.8rem;
-  line-height: 1.35;
-  color: color-mix(in srgb, var(--ink-muted) 90%, transparent);
+  margin: 4px 0 12px;
+  font-size: 12px;
+  line-height: 16px;
+  color: var(--ink-rung-quiet);
+}
+
+.settings .reciters h1 {
+  margin-bottom: 10px;
+}
+
+.settings .reciters-caption {
+  margin: 0 0 32px;
+}
+
+.reciter-favorite {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  width: 48px;
+  height: 48px;
+  padding: 0;
+  border: none;
+  background: none;
+  color: color-mix(in srgb, var(--ink-muted) 35%, transparent);
+  cursor: pointer;
+}
+
+.reciter-favorite[aria-pressed='true'] {
+  color: var(--gold);
+}
+
+.reciter-favorite:focus-visible {
+  outline: 1px solid var(--accent);
+  outline-offset: 3px;
 }
 
 .settings-body-label {
@@ -4126,6 +4162,16 @@ button.ayah-mark {
   cursor: pointer;
 }
 
+.paper-choice-select {
+  display: flex;
+  align-items: center;
+  align-self: stretch;
+  gap: 16px;
+  flex: 1;
+  min-width: 0;
+  cursor: pointer;
+}
+
 /* Qalam nuqta (Android InkNuqta). The drop is drawn per frame by
  * PaperChoiceList from kit/nuqta.ts; only colour lives here. */
 .ink-nuqta {
@@ -4155,15 +4201,15 @@ button.ayah-mark {
 .paper-choice-copy {
   display: flex;
   flex-direction: column;
-  gap: 0.08rem;
+  gap: 0;
   flex: 1;
   min-width: 0;
 }
 
 .paper-choice-label {
   color: color-mix(in srgb, var(--ink) 55%, transparent);
-  font-size: 1.05rem;
-  line-height: 1.35;
+  font-size: 17px;
+  line-height: 26px;
   transition: color 180ms ease;
 }
 
@@ -4173,9 +4219,9 @@ button.ayah-mark {
 }
 
 .paper-choice-desc {
-  color: color-mix(in srgb, var(--ink-muted) 85%, transparent);
-  font-size: 0.78rem;
-  line-height: 1.3;
+  color: color-mix(in srgb, var(--ink-muted) 55%, transparent);
+  font-size: 12px;
+  line-height: 16px;
 }
 
 .paper-choice-trailing {
@@ -6699,7 +6745,8 @@ html[data-entrance='true'] body {
    * the page's own head and fore-edge margin, carried outward.
    */
   --phi: 1.618034;
-  --u: min(calc(100vh / 32.743), calc(100vw / 41.889));
+  /* Match the shell's stable viewport on Safari, including browser chrome. */
+  --u: min(calc(var(--viewport-h) / 32.743), calc(100vw / 41.889));
   /* Board and block edge keep a floor: below it they stop reading as edges. */
   --book-rim: max(5px, calc(var(--u) * 0.2361));
   /*

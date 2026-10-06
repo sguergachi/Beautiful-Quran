@@ -377,11 +377,19 @@ sets the same sizes on the same widths. Masthead 34/40, chapter rows
 48 px icon targets around 24 px glyphs, transport 48 / 56 / 48 with a 34 px
 play glyph, chapter opening as `سُورَةُ name` (32 px) · transliteration ·
 meaning · `Chapter N · Place · N ayahs`. Settings keeps Android's order:
-reciters, then Customize; text size lives in Customize (Scroll only).
+favorite reciters, All reciters, then Customize. Favorites persist separately
+from the selected voice and migrate existing installs to Android's original
+seven. All reciters shows the same 13 performances from the shared database,
+sorted by name, with Mujawwad / Muallim subtitles and independent star targets.
+Choosing a voice switches its exact audio and timing corpus; starring only
+changes which voices appear on Settings. Empty favorites have an inline prompt.
+Text size and the bilingual scrolling toggles live in Customize. Back and
+Escape return from either sub-page to Settings before peeling the sheet away.
 
-**Desktop book spread.** At `(min-width: 1100px) and (min-height: 600px)`
+**Tablet and desktop book spread.** At `(min-width: 720px) and (min-height: 600px)`
 (`ui/paper/bookSpread.ts`) the stack is laid open as a book instead of a
-centred phone column: Chapters on the verso with Bookmarks laid over it, and
+centred phone column, including iPads in portrait and landscape: Chapters on
+the verso with Bookmarks laid over it, and
 on the recto the title page, then the Reader, with Settings laid over that
 in every layout. `App` sets `data-spread` on the shell and hands
 each page the layer it should believe it is on (`spreadLayers`), so the reader
@@ -405,7 +413,7 @@ sheet returns to reading and its click is swallowed (`ReaderScreen`). Hafs stand
 in for the page faces, so each leaf measures its lines and scales the type
 until the longest fits (`--mushaf-fit`), on phones too.
 The spread is one grid: a single module `--u` in `styles.css`
-(`min(100vh / 32.743, 100vw / 41.889)`) sizes the desk margin, the board
+(`min(100svh / 32.743, 100vw / 41.889)`) sizes the desk margin, the board
 (`--book-rim`), the band the page block's edges stand in
 (`--book-fore-edge`), the page
 (`--page-w` = φ⁶u, `--page-h`), the margins and the gutter's shade
@@ -660,7 +668,8 @@ Below that size nothing changes. Rationale in
    drag uses tick-spaced wheel scrub so the visible label is the commit target);
    return-to-ayah roundel (gilt corolla, qalam arrow painted toward the
    active verse); bookmark ribbon.
-3. **Settings** — Android paper-settings parity: reciter as ink-disc choice;
+3. **Settings** — Android paper-settings parity: favorite reciters as nuqta choices,
+   a separate starred voice catalog;
    Customize sub-page (view, verse and page numbers, theme, ayah-selector
    side, word-by-word gloss, pinned faded-leaf preview with a full-bleed paper
    dissolve under the leaf and the collapsed ayah rail on the chosen edge);

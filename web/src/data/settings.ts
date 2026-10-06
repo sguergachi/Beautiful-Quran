@@ -44,6 +44,8 @@ export function nudgeFontScale(scale: number, deltaStops: number): number {
 
 export interface Settings {
   reciterId: number
+  /** Voices kept on Settings; Android starts with its original seven. */
+  favoriteReciterIds: number[]
   fontScale: number
   readingMode: ReadingMode
   readingLayout: ReadingLayout
@@ -85,6 +87,7 @@ export interface Settings {
 
 const DEFAULTS: Settings = {
   reciterId: 1,
+  favoriteReciterIds: [1, 2, 3, 4, 5, 6, 7],
   fontScale: 1,
   readingMode: 'arabic_english',
   readingLayout: 'scroll',
@@ -125,6 +128,9 @@ export function normalizeSettings(partial: Partial<Settings> = {}): Settings {
   return {
     ...DEFAULTS,
     ...partial,
+    favoriteReciterIds: Array.isArray(partial.favoriteReciterIds)
+      ? [...new Set(partial.favoriteReciterIds.filter((id) => Number.isInteger(id) && id > 0))]
+      : [...DEFAULTS.favoriteReciterIds],
     fontScale: clampFontScale(partial.fontScale ?? DEFAULTS.fontScale),
     developerMode: Boolean(partial.developerMode ?? DEFAULTS.developerMode),
     colorSystem: partial.colorSystem === 'legacy' ? 'legacy' : 'ladder',
@@ -165,10 +171,10 @@ export function normalizeSettings(partial: Partial<Settings> = {}): Settings {
 export function loadSettings(): Settings {
   try {
     const raw = localStorage.getItem(KEY)
-    if (!raw) return { ...DEFAULTS }
+    if (!raw) return normalizeSettings()
     return normalizeSettings(JSON.parse(raw) as Partial<Settings>)
   } catch {
-    return { ...DEFAULTS }
+    return normalizeSettings()
   }
 }
 
