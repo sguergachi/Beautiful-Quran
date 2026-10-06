@@ -17,7 +17,7 @@ import kotlin.math.roundToLong
  * Buffers arrive on ExoPlayer's audio thread; the glint draw path reads only
  * the volatile mirrors — no locks, no composition.
  */
-class VoiceEnergy {
+class VoiceEnergy(private val elapsedRealtimeMs: () -> Long = SystemClock::elapsedRealtime) {
 
     private val tarji = Tarji()
 
@@ -57,30 +57,23 @@ class VoiceEnergy {
     private var lastFeedMs = 0L
 
     /**
-     * Output route latency (Bluetooth etc.), pushed by the reader — the same
-     * estimate the highlight clock subtracts. The tap hears
-     * the voice before the listener does, so the reported signal is delayed
-     * by exactly this to land on what reaches the ear now.
+     * Additional manual wall-time lag, shared with word highlighting.
+     * Automatic Bluetooth and Sonic delay is already in the sink clock.
      */
     @Volatile
     var outputLatencyMs = 0L
 
-    /** The audio sink's own AudioTrack buffer (wall ms), read live by the tap
-     * so the shimmer is delayed past the app's internal output buffer too —
-     * the dominant missing term on real devices and emulators alike. Used
-     * until the reader's measured backlog ([measuredBacklogContentMs]) lands. */
+    /** AudioTrack capacity in wall ms, for diagnostics only. */
     @Volatile
     var sinkLatencyMs = 0L
 
     /**
-     * Measured tap-to-playback-head backlog (content ms), computed by the
-     * reader from this probe's hop clock against `positionMs` (the same
-     * clock the highlight uses) and pushed back here — the shimmer delay
-     * rides it once available, so the pulse is in lockstep with the word
-     * ink on any device without guessing.
+     * Actual source-content backlog ahead of the presentation timestamp.
+     * Used by hop diagnostics; frame-time sampling reads the clock directly.
      */
     @Volatile
     var measuredBacklogContentMs = -1.0
+        private set
 
     /** Identity timestamp for the current sink session. */
     @Volatile
@@ -98,42 +91,33 @@ class VoiceEnergy {
     private val earTrack = TarjiEarTrack()
     private val earClock = TarjiEarClock()
     private var earClockSession = 0L
+    val isPlaying: Boolean get() = earClock.isPlaying
+    @Volatile private var sourceOriginRendererMs = Double.NaN
+    @Volatile private var sinkPosition: TarjiSinkPosition? = null
+
+    /** First source PTS after a flush, never a buffer-capacity estimate. Audio thread. */
+    internal fun anchorSource(rendererMs: Double) {
+        if (sourceOriginRendererMs.isNaN()) sourceOriginRendererMs = rendererMs
+    }
+
+    /** The sink's output-corrected clock on its owning audio thread. */
+    internal fun updateSinkPosition(rendererMs: Double, wallNanos: Long, playing: Boolean) {
+        sinkPosition = TarjiSinkPosition(rendererMs, wallNanos, playing)
+    }
 
     /**
      * The detector's signal at the listener's ear at [wallNanos] (the frame
      * clock), written into [out]. Main thread. False — and an idle [out] —
      * while nothing is playing or no hop has been analyzed.
      */
-    fun sampleAtEar(wallNanos: Long, out: TarjiEarSample, leadMs: Float = 0f): Boolean {
-        out.clear()
-        val hopMs = hopContentDurationMs
-        if (!isLive) return false
-        val speed = playbackSpeed.coerceAtLeast(0f)
-        // Past the playback head lie the route preset, Sonic's own buffer and
-        // the Ink Lab's manual trim — the same terms the hop mirrors delay by.
-        val beyondHeadMs = outputLatencyMs.coerceAtLeast(0L) * speed.toDouble() +
-            sonicContentLatencyMs(speed) + earDelayMs
-        val anchored = earClock.isAnchored && earClockSession == sessionStartWall
-        val earContentMs = if (anchored) {
-            earClock.contentAtEarMs(wallNanos) - beyondHeadMs
-        } else {
-            // The sink has not filled yet: assume its whole buffer is queued.
-            sessionContentMs - sinkLatencyMs.coerceAtLeast(0L) * speed.toDouble() - beyondHeadMs
-        }
-        // The frame is shown a vsync after it is read; lead by that much so
-        // the crest lands with the sound.
-        // [leadMs] more cancels the lag of whatever smooths the light next.
-        if (!earTrack.read(earContentMs + DISPLAY_LEAD_MS + leadMs.coerceAtLeast(0f), hopMs, out)) return false
-        // What the frame shows is the voice at the ear, [leadMs] being only
-        // the smoothing's own lag taken back.
-        if (anchored) {
-            out.mediaMs = (earClock.mediaMsOfContent(earContentMs + DISPLAY_LEAD_MS) + beyondHeadMs).roundToLong()
-        }
-        if (out.eventStartHop >= 0 && anchored) {
-            out.eventStartMediaMs =
-                (earClock.mediaMsOfContent(out.eventStartHop * hopMs) + beyondHeadMs).roundToLong()
-        }
-        return true
+    fun sampleAtEar(wallNanos: Long, out: TarjiEarSample, leadMs: Float = 0f, displayLeadMs: Float = 8f): Boolean {
+        // Smoothing lead is cancelled by the filter; the marker excludes it.
+        return earClock.sampleAtEar(
+            wallNanos, earTrack, hopContentDurationMs, out,
+            trimWallMs = outputLatencyMs.coerceAtLeast(0L) + earDelayMs.toDouble(),
+            phaseLeadMs = leadMs, displayLeadMs = displayLeadMs,
+            readHistory = isLive && isPlaying && earClockSession == sessionStartWall,
+        )
     }
 
     // ── Tarjīʿ Lab capture ────────────────────────────────────────────────
@@ -197,7 +181,7 @@ class VoiceEnergy {
     /** Called when the sink flushes or reconfigures. A discontinuity starts a
      * fresh acoustic event: no prior hold, phase, or partial hop may leak into
      * the new media position. */
-    fun resetTapSession() {
+    fun resetTapSession(sourceOriginRendererMs: Double = Double.NaN) {
         capturePendingFreshStart = true
         tarji.reset()
         earTrack.clear()
@@ -211,12 +195,14 @@ class VoiceEnergy {
         lastFeedMs = 0L
         measuredBacklogContentMs = -1.0
         sessionContentMs = 0.0
+        this.sourceOriginRendererMs = sourceOriginRendererMs
+        sinkPosition = null
         decimSum = 0f
         decimCount = 0
         hopFill = 0
         // Never reuse an identity: a flush inside the same millisecond would
         // otherwise keep the ear clock anchored to the old stream.
-        sessionStartWall = maxOf(SystemClock.elapsedRealtime(), sessionStartWall + 1)
+        sessionStartWall = maxOf(elapsedRealtimeMs(), sessionStartWall + 1)
     }
 
     /** Total tap-to-ear delay (wall ms) as currently applied — diagnostics. */
@@ -239,8 +225,6 @@ class VoiceEnergy {
     private var hopFill = 0
     @Volatile
     private var eventStartContentMs = -1.0
-
-    private fun sonicContentMs(): Float = sonicContentLatencyMs(playbackSpeed)
 
     /**
      * Feed 16-bit PCM straight from the audio sink. Only reads [buffer]'s
@@ -286,19 +270,18 @@ class VoiceEnergy {
      * 5–10 Hz vocal pulse the renderer was meant to follow. */
     private fun analyzeHop() {
         val speed = playbackSpeed
-        val sonicMs = sonicContentLatencyMs(speed)
         val measuredContentMs = measuredBacklogContentMs.takeIf { it >= 0.0 }
         tarji.delayHops = Tarji.earDelayHops(
             routeMs = outputLatencyMs,
-            sinkMs = sinkLatencyMs,
+            sinkMs = 0L,
             speed = speed,
-            sonicContentMs = sonicMs + earDelayMs,
+            sonicContentMs = earDelayMs * speed,
             measuredSinkContentMs = measuredContentMs,
         )
         val safeSpeed = speed.coerceAtLeast(0.01f)
-        val sinkWallMs = measuredContentMs?.div(safeSpeed) ?: sinkLatencyMs.toDouble()
+        val sinkWallMs = measuredContentMs?.div(safeSpeed) ?: 0.0
         earDelayTotalMs = (
-            outputLatencyMs + sinkWallMs + (sonicMs + earDelayMs) / safeSpeed
+            outputLatencyMs + sinkWallMs + earDelayMs
             ).roundToLong()
         // Ink Lab detector knobs (pushed from InkEngine.tuning).
         tarji.maxTremoloHz = maxTremoloHz
@@ -336,7 +319,7 @@ class VoiceEnergy {
             ?.toDouble()
             ?.times(hopContentDurationMs)
             ?: -1.0
-        lastFeedMs = SystemClock.elapsedRealtime()
+        lastFeedMs = elapsedRealtimeMs()
     }
 
     /** Append on the audio thread. Only armed captures take the snapshot lock;
@@ -369,34 +352,26 @@ class VoiceEnergy {
         captureHopCount++
     }
 
-    /** Rebase the delayed event start onto the current media-item clock, and
-     * tick the ear clock the frame loop reads by. Main thread. */
-    fun updatePlaybackPosition(playbackPositionMs: Long, wallNanos: Long = System.nanoTime()) {
+    /** Match the local player clock to the sink timestamp at this same instant. Main thread. */
+    fun updatePlaybackPosition(playbackPositionMs: Long, wallNanos: Long = System.nanoTime(), playing: Boolean = true) {
         if (earClockSession != sessionStartWall) {
             earClockSession = sessionStartWall
             earClock.reset()
         }
-        earClock.onPosition(
-            positionMs = playbackPositionMs,
-            wallNanos = wallNanos,
-            tapContentMs = sessionContentMs,
-            sinkLatencyMs = sinkLatencyMs,
-            speed = playbackSpeed,
-        )
-        val start = eventStartContentMs
-        if (start < 0.0) {
-            eventStartMediaMs = NO_EVENT_MS
-            return
-        }
-        val backlog = measuredBacklogContentMs.takeIf { it >= 0.0 }
-            ?: sinkLatencyMs.toDouble() * playbackSpeed.coerceAtLeast(0f) + sonicContentMs()
-        eventStartMediaMs = mapTapContentToMediaMs(
-            playbackPositionMs = playbackPositionMs,
-            tapContentMs = sessionContentMs,
-            eventStartContentMs = start,
-            backlogContentMs = backlog,
-        )
+        val snapshot = sinkPosition
+        val audiblePlaying = playing && snapshot?.playing == true
+        val contentAtHeadMs = snapshot?.at(wallNanos, playbackSpeed, audiblePlaying)
+            ?.minus(sourceOriginRendererMs) ?: Double.NaN
+        earClock.onPosition(playbackPositionMs, wallNanos, contentAtHeadMs, playbackSpeed, audiblePlaying)
+        measuredBacklogContentMs = if (contentAtHeadMs.isFinite()) {
+            (sessionContentMs - contentAtHeadMs).coerceAtLeast(0.0)
+        } else -1.0
+        eventStartMediaMs = mediaMsOfContent(eventStartContentMs)
+            .takeIf { eventStartContentMs >= 0.0 && it.isFinite() }?.roundToLong() ?: NO_EVENT_MS
     }
+
+    /** Exact source media timestamp for lab capture; NaN while the clock is unavailable. */
+    fun mediaMsOfContent(contentMs: Double): Double = earClock.mediaMsOfContent(contentMs)
 
     /** Total content hops processed since the tap session started. */
     val hopCount: Int
@@ -405,9 +380,11 @@ class VoiceEnergy {
     /** Source PCM rate for local playback diagnostics. */
     internal val pcmSampleRate: Int get() = sourceSampleRate
 
-    /** Detection goes silent when the PCM stops (pause, track change). */
+    /** Pauses close immediately; queued audio outlives a gap between PCM feeds. */
     val isLive: Boolean
-        get() = SystemClock.elapsedRealtime() - lastFeedMs < LIVE_WINDOW_MS
+        get() = lastFeedMs > 0L && hasAudiblePcm(
+            elapsedRealtimeMs() - lastFeedMs, measuredBacklogContentMs, isPlaying,
+        )
 
     /** The gain a renderer should apply: collapses promptly when audio stops. */
     val shimmerGain: Float
@@ -430,6 +407,8 @@ class VoiceEnergy {
         sinkLatencyMs = 0L
         measuredBacklogContentMs = -1.0
         sessionContentMs = 0.0
+        sourceOriginRendererMs = Double.NaN
+        sinkPosition = null
         earDelayTotalMs = 0L
         decimSum = 0f
         decimCount = 0
@@ -438,14 +417,10 @@ class VoiceEnergy {
 
     companion object {
         const val NO_EVENT_MS = Long.MIN_VALUE
-        private const val LIVE_WINDOW_MS = 350L
 
         /** Lab capture cap: 12 s of 20 ms hops ≈ 600 hops ≈ 350 KB. */
         private const val MAX_CAPTURE_HOPS = 600
         private const val MIN_CAPTURE_HOPS = 16
-
-        /** One 120 Hz frame between reading the signal and showing it. */
-        private const val DISPLAY_LEAD_MS = 8.0
 
         /**
          * The live probe owned by [PlayerController]. Draw-phase glint reads

@@ -342,11 +342,9 @@ fun InkLabPanel(
                             InkEngine.tuning = t.copy(tarjiEarDelayMs = it)
                         }
                         LabCaption(
-                            "Extra delay so the pulse lands on the voice: the " +
-                                "shimmer already lags by the route preset + " +
-                                "measured sink buffer, in lockstep with the " +
-                                "word ink. Raise if it still trails the " +
-                                "vibration, lower if it leads. Shipped 0.",
+                            "Extra delay for the pulse and graph. Both follow the " +
+                                "audible playback clock. Raise if the light leads " +
+                                "the voice, lower if it trails. Shipped 0.",
                         )
                         LabCaption(
                                 "How fast the detection gain ramps in (attack) " +

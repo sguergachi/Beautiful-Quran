@@ -296,8 +296,8 @@ class PlayerController(private val context: Context) {
             error = if (player.isPlaying) null else _state.value.error,
         )
         voiceEnergy.playbackSpeed = player.playbackParameters.speed
-        // The PCM tap needs no lifecycle here — [VoiceEnergy.isLive] goes
-        // quiet on its own within ~350 ms of the audio stopping.
+        // The sink owns PCM lifecycle; its play/pause snapshots close the
+        // light while queued history remains available for resume.
     }
 
     fun clearError() {

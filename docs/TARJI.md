@@ -181,12 +181,13 @@ four visible states per second cannot express a 5–10 Hz vocal pulse.
     modulation-rate bin. `tremolo` is zero-centred, ~−1.5..1.5.
 
 6.  **Output latency.** The PCM tap hears the voice *before* the listener.
-    `ReaderViewModel` pushes the same route preset `HighlightClock` subtracts.
-    The AudioTrack buffer supplies the session's initial tap-to-head delay;
-    exact tap content time versus `positionMs` then tracks only queue growth or
-    drain, without falling toward zero while an EMA warms up. Measured backlog
-    is already content-time, so playback speed is applied only to wall-time
-    route/buffer values. The reported
+    Its first source PTS and the sink's actual presentation timestamp locate
+    the heard content without a buffer-capacity guess. `TarjiEarClock` maps
+    that position to the media item's clock and each frame reads the history.
+    Bluetooth and speed processing are already included in that position.
+    Manual wall-time trims scale by playback speed and move the pulse and
+    graph cursor together, while event-start timestamps keep their source
+    meaning. The reported
     `syncReverberating`/`syncTremolo`/`syncTremoloGain` are read through a
     64-hop history ring on the same playback-head reference as the word ink;
     fractional reads interpolate between hops instead of rounding the shimmer
@@ -283,10 +284,11 @@ screen was a sample-and-hold at about one and a half samples per cycle of a
 the voice. The playback head, though, moves smoothly, and differs from the
 tap's content clock by a constant for the life of a sink session. So the
 detector's output is now kept as a short per-hop history (`TarjiEarTrack`),
-`TarjiEarClock` fixes that constant once the sink has filled, and **every
+`TarjiEarClock` obtains that mapping from real source and sink timestamps, and **every
 frame reads the history at the playback head itself** (`VoiceEnergy.
 sampleAtEar`). A stall holds the read-out with the audio; a gapless handoff
-to the next ayah carries the offset across.
+to the next ayah supplies the new media-item mapping. An initial oversized
+PCM burst cannot advance the light by its excess over the sink capacity.
 
 **It was the wrong signal.** The detector's `tremolo` answers "is there a
 periodic reverberation on this hold" from a causal 1.3 s window. What it

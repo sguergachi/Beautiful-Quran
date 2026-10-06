@@ -18,8 +18,6 @@ import com.beautifulquran.playback.PlayerUiState
 import com.beautifulquran.playback.TarjiLabCapture
 import com.beautifulquran.playback.TarjiLabTrim
 import com.beautifulquran.playback.VoiceEnergy
-import com.beautifulquran.playback.mapTapContentToMediaMs
-import com.beautifulquran.playback.sonicContentLatencyMs
 import com.beautifulquran.ui.reader.InkEngine
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
@@ -291,6 +289,8 @@ class TarjiLabViewModel(
                     span.last
                 }
                 val positionMs = player.positionMs
+                // Settings entry need not have a reader polling this chapter.
+                ve.updatePlaybackPosition(positionMs, playing = player.state.value.isPlaying)
                 val nowPlaying = player.liveNowPlaying
                 if (!seekLanded) {
                     seekLanded = nowPlaying?.surahId == st.surahId &&
@@ -361,25 +361,20 @@ class TarjiLabViewModel(
         val ve = captureProbe
         captureProbe = null
         val st = _ui.value
+        ve?.updatePlaybackPosition(player.positionMs, playing = player.state.value.isPlaying)
         val capture = ve?.disarmCapture()
+        val firstHopMediaMs = capture?.hopContentMs?.firstOrNull()
+            ?.let { ve.mediaMsOfContent(it.toDouble()) } ?: Double.NaN
         restorePlayer()
-        if (error != null || capture == null) {
+        if (error != null || capture == null || !firstHopMediaMs.isFinite()) {
             _ui.value = st.copy(
                 capturing = false,
                 captureProgress = 0f,
-                captureError = error ?: "No audio was captured — playback did not run.",
+                captureError = error ?: if (capture == null) "No audio was captured — playback did not run."
+                    else "The audio clock was unavailable. Retry the capture.",
             )
             return
         }
-        val speed = 1f // Muted capture always runs at unity speed.
-        val backlog = ve.measuredBacklogContentMs.takeIf { it >= 0.0 }
-            ?: (ve.sinkLatencyMs * speed + sonicContentLatencyMs(speed)).toDouble()
-        val firstHopMediaMs = mapTapContentToMediaMs(
-            playbackPositionMs = player.positionMs,
-            tapContentMs = ve.sessionContentMs,
-            eventStartContentMs = capture.hopContentMs[0].toDouble(),
-            backlogContentMs = backlog,
-        ).toDouble()
         val span = TarjiLabTrim.wordSpanMs(
             ayahSegments,
             st.wordPosition,

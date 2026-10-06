@@ -103,8 +103,7 @@ class Tarji {
 
     /**
      * Read-out delay in content hops, set from the tap-to-ear latency
-     * (wall-time route × playback speed + content-time tap backlog + the
-     * Sonic resampler's own content-time buffer at non-1× speed) by
+     * (measured content-time tap backlog + manual wall trim × speed) by
      * [VoiceEnergy]: the PCM tap hears the voice *before* the listener does,
      * so the reported signal is delayed to match what is actually reaching
      * the ear right now.

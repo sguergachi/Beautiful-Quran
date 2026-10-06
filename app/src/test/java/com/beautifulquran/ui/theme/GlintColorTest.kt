@@ -193,6 +193,25 @@ class GlintColorTest {
     }
 
     @Test
+    fun `smoothing compensation keeps the crest on the voice at every playback speed`() {
+        for (speed in listOf(0.5f, 0.75f, 1f, 1.25f, 1.5f, 2f)) for (rate in listOf(2.7f, 4f, 6f, 9f)) {
+            val light = GlintLight()
+            val lead = glintLightLagMs(139f, rate, speed)
+            val periodMs = 1000.0 / (rate * speed)
+            var best = -2f
+            var bestAt = 0.0
+            for (step in 0..(periodMs * 120).toInt()) {
+                val ms = step / 10.0
+                val pulse = sin(2 * PI * rate * (speed * ms + lead) / 1000).toFloat()
+                val out = light.next(pulse, (ms * 1_000_000).toLong(), 139f)
+                if (ms >= periodMs * 11 && out > best) { best = out; bestAt = ms }
+            }
+            assertEquals("$rate Hz at $speed x", periodMs * 11.25, bestAt, 0.2)
+        }
+        assertEquals(0f, glintLightLagMs(139f, 6f, 0f), 0f)
+    }
+
+    @Test
     fun `the same swell at either refresh rate`() {
         fun at(fps: Int): Float {
             val light = GlintLight().also { it.next(0f, 0L, 60f) }

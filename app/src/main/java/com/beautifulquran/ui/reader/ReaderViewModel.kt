@@ -36,11 +36,9 @@ import com.beautifulquran.domain.OutputLatency
 import com.beautifulquran.domain.ReciterSync
 import com.beautifulquran.domain.SURAH_FATIHA
 import com.beautifulquran.domain.surahOpensWithBasmalahPreface
-import com.beautifulquran.playback.AudioOutputLatency
 import com.beautifulquran.playback.NowPlaying
 import com.beautifulquran.playback.PlayerController
 import com.beautifulquran.playback.PlayerUiState
-import com.beautifulquran.playback.TarjiBacklogAnchor
 import kotlin.math.abs
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -300,7 +298,6 @@ class ReaderViewModel(
     private val bookmarks: BookmarkRepository,
     val player: PlayerController,
     private val annotations: AnnotationRepository,
-    private val outputLatency: AudioOutputLatency,
     private val englishBookCache: EnglishBookCache,
 ) : ViewModel() {
 
@@ -557,11 +554,6 @@ class ReaderViewModel(
     private var lastOutputLatencyMs = -1L
     private var lastHighlightLeadMs = -1L
 
-    // Tarjīʿ backlog measurement: stable absolute sink baseline plus relative
-    // tap/playback-head content clocks for the current sink session.
-    private var latchedTapSessionStart = 0L
-    private var tapBacklogAnchor: TarjiBacklogAnchor? = null
-    private var smoothedBacklogContentMs = 0.0
     private var shimmerWasOn = false
     private var lastTarjiReport = 0L
     /** Media3 already follows presentation time; only an explicit lab lag is extra. */
@@ -583,54 +575,17 @@ class ReaderViewModel(
      */
     private fun highlightPositionMs(firstWordStartMs: Long, reciterId: Int): Long {
         val latencyMs = outputLatencyMs()
-        // The tarjīʿ shimmer delays the tapped voice signal by the
-        // route latency plus the sink buffer so it lands on the same clock the
-        // highlight uses. Once that buffer has filled, exact tap and playback
-        // content clocks track only queue growth/drain around the stable
-        // baseline; a small EMA rejects position polling jitter.
         val voice = com.beautifulquran.playback.VoiceEnergy.active
-        // Unlike Media3's playhead, the raw PCM tap has no output correction.
-        voice?.outputLatencyMs = OutputLatency.pcmLagMs(
-            outputLatency.latencyMs.value,
-            InkEngine.outputLatencyOverrideMs?.toLong(),
-        )
+        // Both the pulse and word clock already follow actual presentation.
+        voice?.outputLatencyMs = InkEngine.outputLatencyOverrideMs?.toLong()?.coerceAtLeast(0L) ?: 0L
         if (voice != null) {
-            val speed = voice.playbackSpeed
-            if (voice.sessionStartWall != latchedTapSessionStart) {
-                latchedTapSessionStart = voice.sessionStartWall
-                tapBacklogAnchor = null
-                voice.measuredBacklogContentMs = -1.0
-            }
-            var anchor = tapBacklogAnchor
-            if (
-                TarjiBacklogAnchor.isReady(
-                    tapContentMs = voice.sessionContentMs,
-                    sinkLatencyMs = voice.sinkLatencyMs,
-                    speed = speed,
-                ) &&
-                (anchor == null || abs(anchor.speed - speed) > 0.001f)
-            ) {
-                anchor = TarjiBacklogAnchor.capture(
-                    tapContentMs = voice.sessionContentMs,
-                    playbackContentMs = player.positionMs,
-                    sinkLatencyMs = voice.sinkLatencyMs,
-                    speed = speed,
-                )
-                tapBacklogAnchor = anchor
-                smoothedBacklogContentMs = anchor.backlogContentMs
-            }
-            if (anchor != null) {
-                val lagMs = anchor.estimate(voice.sessionContentMs, player.positionMs)
-                smoothedBacklogContentMs +=
-                    BACKLOG_EMA * (lagMs - smoothedBacklogContentMs)
-                voice.measuredBacklogContentMs = smoothedBacklogContentMs
-            }
-            voice.updatePlaybackPosition(player.positionMs)
+            voice.updatePlaybackPosition(player.positionMs, playing = player.state.value.isPlaying)
             val now = System.nanoTime()
             if (DevProfiling.captureStart.get() != null && now - lastTarjiReport >= 100_000_000L) {
                 lastTarjiReport = now
                 DevProfiling.mark(
                     "tarji tap media=${player.positionMs} pcm=${voice.pcmSampleRate} hops=${voice.hopCount} live=${voice.isLive} " +
+                        "origin=${voice.mediaMsOfContent(0.0)} " +
                         "gain=${voice.shimmerGain} detected=${voice.reverberating} ear=${voice.earDelayTotalMs} " +
                         "hold=${voice.holdMs} hz=${voice.rateHz} " +
                         "sink=${voice.sinkLatencyMs} enabled=${InkEngine.tuning.glintResonance} " +
@@ -1502,7 +1457,6 @@ class ReaderViewModel(
         private const val PAUSED_TICK_MS = 250L
         private const val START_SEEK_GRACE_MS = 1_500L
         /** Suppress 33 ms player-position jitter without a seconds-long drift. */
-        private const val BACKLOG_EMA = 0.2
     }
 }
 

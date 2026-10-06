@@ -90,17 +90,18 @@ internal fun glintVeilColor(base: Color, warmth: Float): Color =
 private val GlintVeilWarm = Color(0xFFFFC98A)
 
 /**
- * How far [GlintLight] at [smoothMs] sets a pulse of [rateHz] back, in ms: the
+ * Content-time lead for [GlintLight] at [smoothMs] and source [rateHz]: the
  * filter's phase delay at that rate, which is what must be read ahead for a
  * crest of light to land on its crest of sound. It is the time constant only
  * for a slow drift; at tarjīʿ rates it is far less (139 ms of smoothing delays
  * a 6 Hz pulse by 37 ms), and reading the whole constant ahead put the light
- * a tenth of a second before the voice.
+ * a tenth of a second before the voice. Convert the source rate to wall Hz
+ * before computing lag, then convert that wall lag back to content time.
  */
-internal fun glintLightLagMs(smoothMs: Float, rateHz: Float): Float {
-    if (smoothMs <= 0f) return 0f
-    val omega = 2f * Math.PI.toFloat() * (if (rateHz > 0f) rateHz else GLINT_NOMINAL_PULSE_HZ)
-    return atan(omega * smoothMs / 1000f) / omega * 1000f
+internal fun glintLightLagMs(smoothMs: Float, rateHz: Float, playbackSpeed: Float = 1f): Float {
+    if (smoothMs <= 0f || playbackSpeed <= 0f) return 0f
+    val omega = 2f * Math.PI.toFloat() * (if (rateHz > 0f) rateHz else GLINT_NOMINAL_PULSE_HZ) * playbackSpeed
+    return atan(omega * smoothMs / 1000f) / omega * 1000f * playbackSpeed
 }
 
 /** The rate assumed until the detector has measured one. */

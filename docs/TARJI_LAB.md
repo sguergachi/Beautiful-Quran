@@ -166,6 +166,11 @@ differ; the Hani 2:14 regression also tests 40 offsets of that grid.
   skips that lock. A fresh arm cannot return PCM from the preceding capture.
 - Trimming advances `firstHopMediaMs` to the first retained hop. It denotes
   that hop's **end**, matching `VoiceEnergy`'s content timestamps.
+- Capture obtains this timestamp from the live source/sink presentation-clock
+  mapping before restoring playback speed. An unavailable mapping reports a
+  retryable capture failure; buffer capacity never supplies a guessed origin.
+  The capture poll updates that clock itself, including cold Settings entry
+  and chapters that the reader has not loaded.
 - Preview uses a static `AudioTrack`, with the effective PCM rate derived
   from hop timestamps. `setLoopPoints(start, end, -1)` is available since API 3.
 - `TarjiPreviewClock` rebases the unsigned frames-played counter onto the

@@ -1393,6 +1393,7 @@ private fun rememberTarjiGate(
             val elapsedMs = if (earMediaMs != Long.MIN_VALUE) {
                 earMediaMs - trace.startMs
             } else {
+                if (!test) return
                 val speed = com.beautifulquran.playback.VoiceEnergy.active?.playbackSpeed ?: 1f
                 (now - traceStart) / 1_000_000f * speed
             }
@@ -1417,26 +1418,30 @@ private fun rememberTarjiGate(
         val light = com.beautifulquran.ui.theme.GlintLight()
         val ear = com.beautifulquran.playback.TarjiEarSample()
         var pulseRateHz = 0f
+        var lastFrameNanos = 0L
         var lastReport = 0L
         while (true) {
             withFrameNanos { now ->
                 val voice = com.beautifulquran.playback.VoiceEnergy.active
                 val smoothMs = InkEngine.tuning.tarjiLightSmoothMs
+                val displayLeadMs = if (lastFrameNanos == 0L) 8f else
+                    ((now - lastFrameNanos) / 1_000_000f).coerceIn(0f, 33f)
+                lastFrameNanos = now
                 // Read ahead by what the smoothing sets this pulse back — its
                 // phase delay at the pulse's own rate, not its time constant.
                 voice?.sampleAtEar(
-                    now, ear, leadMs = com.beautifulquran.ui.theme.glintLightLagMs(smoothMs, pulseRateHz))
+                    now, ear,
+                    leadMs = com.beautifulquran.ui.theme.glintLightLagMs(smoothMs, pulseRateHz, voice.playbackSpeed),
+                    displayLeadMs = displayLeadMs,
+                )
                 pulseRateHz = ear.rateHz
                 val g = if (voice == null) 0f else ear.gain
                 val pulse = if (
+                    voice?.isPlaying == true &&
                     eventGate.allows(
                         gain = g,
-                        detected = voice != null && ear.reverberating,
-                        eventStartMs = if (voice == null) {
-                            com.beautifulquran.playback.VoiceEnergy.NO_EVENT_MS
-                        } else {
-                            ear.eventStartMediaMs
-                        },
+                        detected = ear.reverberating,
+                        eventStartMs = ear.eventStartMediaMs,
                         wordStartMs = wordStartMs,
                     )
                 ) {

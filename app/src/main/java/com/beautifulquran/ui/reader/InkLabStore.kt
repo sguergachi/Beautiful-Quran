@@ -112,7 +112,7 @@ data class InkLabSnapshot(
     val highlightLeadMs: Int = InkEngine.DEFAULT_HIGHLIGHT_LEAD_MS,
     val fadeLeadMs: Int = InkEngine.DEFAULT_FADE_LEAD_MS,
     val scrollLeadMs: Int = InkEngine.DEFAULT_SCROLL_LEAD_MS,
-    /** Null means auto route preset; omitted on old saves → null. */
+    /** Null means the untrimmed presentation clock; omitted on old saves → null. */
     val outputLatencyOverrideMs: Int? = null,
 ) {
     fun toTuning(): InkEngine.Tuning = InkEngine.Tuning(

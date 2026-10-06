@@ -11,150 +11,86 @@ internal fun analysisHopContentMs(
     hopSamples: Int,
 ): Double = hopSamples * decimation * 1_000.0 / sourceSampleRate
 
-/** Map a tap-content timestamp onto the media-item clock at the playback head. */
-internal fun mapTapContentToMediaMs(
-    playbackPositionMs: Long,
-    tapContentMs: Double,
-    eventStartContentMs: Double,
-    backlogContentMs: Double,
-): Long = (
-    playbackPositionMs.toDouble() +
-        backlogContentMs +
-        eventStartContentMs -
-        tapContentMs
-    ).roundToLong()
-
-/** Content-time delay of Sonic's resampler away from unity playback speed. */
-internal fun sonicContentLatencyMs(speed: Float): Float =
-    if (abs(speed - 1f) > 0.001f) Tarji.SONIC_LATENCY_MS else 0f
-
-/**
- * Stable tap-to-playback-head clock for one sink session.
- *
- * The sink capacity supplies the initial absolute delay; thereafter the tap
- * and playback-head content clocks measure only queue growth or drain. This
- * avoids pretending a late UI poll happened at the beginning of the session.
- */
-internal data class TarjiBacklogAnchor(
-    val tapContentMs: Double,
-    val playbackContentMs: Long,
-    val backlogContentMs: Double,
-    val speed: Float,
-) {
-    fun estimate(tapContentMs: Double, playbackContentMs: Long): Double =
-        (
-            backlogContentMs +
-                (tapContentMs - this.tapContentMs) -
-                (playbackContentMs - this.playbackContentMs)
-            ).coerceIn(0.0, MAX_BACKLOG_CONTENT_MS)
-
-    companion object {
-        /** Wait until the tap has supplied one sink buffer before anchoring it. */
-        fun isReady(
-            tapContentMs: Double,
-            sinkLatencyMs: Long,
-            speed: Float,
-        ): Boolean = sinkLatencyMs > 0L && tapContentMs >= sinkContentMs(sinkLatencyMs, speed)
-
-        fun capture(
-            tapContentMs: Double,
-            playbackContentMs: Long,
-            sinkLatencyMs: Long,
-            speed: Float,
-        ): TarjiBacklogAnchor {
-            val safeTapMs = tapContentMs.coerceAtLeast(0.0)
-            val sinkContentMs = sinkContentMs(sinkLatencyMs, speed)
-            val initialMs = if (sinkContentMs > 0f) {
-                minOf(safeTapMs, sinkContentMs)
-            } else {
-                safeTapMs
-            }
-            return TarjiBacklogAnchor(
-                tapContentMs = safeTapMs,
-                playbackContentMs = playbackContentMs,
-                backlogContentMs = initialMs.coerceAtMost(MAX_BACKLOG_CONTENT_MS),
-                speed = speed,
-            )
-        }
-
-        private fun sinkContentMs(sinkLatencyMs: Long, speed: Float): Double =
-            sinkLatencyMs.coerceAtLeast(0L) * speed.coerceAtLeast(0f).toDouble()
-
-        private const val MAX_BACKLOG_CONTENT_MS = 400.0
-    }
+/** A real sink presentation timestamp, published on the audio thread. */
+internal data class TarjiSinkPosition(val rendererMs: Double, val wallNanos: Long, val playing: Boolean = true) {
+    fun at(wallNanos: Long, speed: Float, playing: Boolean): Double = rendererMs +
+        // Media3 can sleep for half a large output buffer between sink reads.
+        if (playing && this.playing) ((wallNanos - this.wallNanos) / 1e6).coerceAtLeast(0.0) * speed else 0.0
 }
 
+/** Carry between position ticks, never through a missing/stalled clock. */
+private fun elapsedMs(fromNanos: Long, toNanos: Long): Double =
+    ((toNanos - fromNanos) / 1e6).coerceIn(0.0, 100.0)
+
+/** Stop stale detector output, but let already queued audio reach the ear. */
+internal fun hasAudiblePcm(feedAgeMs: Long, queuedContentMs: Double, playing: Boolean): Boolean =
+    playing && (feedAgeMs in 0 until 350L || queuedContentMs > 0.0)
+
 /**
- * Where the listener's ear is in the tap session's content, at any instant.
- *
- * The tap is fed in bursts — on a phone, ~150 ms of PCM every ~150 ms — so
- * "the newest hop minus the backlog" only moves when a burst lands. Read that
- * way, a 4–6 Hz reverberation reaches the screen as a sample-and-hold at
- * about one and a half samples per cycle: no visible swing, and up to a burst
- * out of step with the voice. The playback head does move smoothly, and the
- * two clocks differ by a constant for the life of a sink session:
- *
- *     content at the ear = playback position − [offsetMs]
- *
- * so the offset is fixed once (the same full-sink baseline
- * [TarjiBacklogAnchor] uses) and every frame reads the detector's history at
- * the playback head itself. A stall holds the read-out with the audio; a
- * gapless handoff to the next ayah, where the position restarts but the PCM
- * runs on, carries the offset across.
- *
- * Main-thread only: fed by the reader's position tick, read by the frame loop.
+ * Maps source PCM to the player's media-item clock using two presentation
+ * clocks sampled at the same instant. Buffer capacity and decoded bursts
+ * never establish the origin. Both clocks already include Bluetooth and
+ * Sonic; seeks and gapless item changes simply supply their new mapping.
+ * Main-thread only.
  */
 internal class TarjiEarClock {
-    private var offsetMs = Double.NaN
+    private var contentMs = Double.NaN
     private var positionMs = 0L
     private var positionWallNanos = 0L
     private var speed = 1f
+    private var playing = false
+    private var hasPosition = false
 
-    val isAnchored: Boolean get() = !offsetMs.isNaN()
+    val isAnchored: Boolean get() = contentMs.isFinite()
+    val isPlaying: Boolean get() = playing
 
     fun reset() {
-        offsetMs = Double.NaN
+        contentMs = Double.NaN
+        hasPosition = false
     }
 
     fun onPosition(
         positionMs: Long,
         wallNanos: Long,
-        tapContentMs: Double,
-        sinkLatencyMs: Long,
+        contentAtHeadMs: Double,
         speed: Float,
+        playing: Boolean,
     ) {
-        if (isAnchored && abs(speed - this.speed) > 0.001f) reset()
-        if (isAnchored && positionMs < this.positionMs - HANDOFF_BACK_MS) {
-            // The next ayah's clock restarts while the sink plays on.
-            offsetMs += positionMs - positionAt(wallNanos)
-        } else if (!isAnchored &&
-            TarjiBacklogAnchor.isReady(tapContentMs, sinkLatencyMs, speed)
-        ) {
-            val anchor = TarjiBacklogAnchor.capture(tapContentMs, positionMs, sinkLatencyMs, speed)
-            offsetMs = positionMs + anchor.backlogContentMs - anchor.tapContentMs
-        }
+        contentMs = contentAtHeadMs
         this.positionMs = positionMs
         this.positionWallNanos = wallNanos
         this.speed = speed
+        this.playing = playing
+        hasPosition = true
     }
 
-    /** Playback position at [wallNanos], carried forward from the last tick. */
-    fun positionAt(wallNanos: Long): Double {
-        val sinceMs = ((wallNanos - positionWallNanos) / 1e6).coerceIn(0.0, MAX_CARRY_MS)
-        return positionMs + sinceMs * speed
-    }
+    /** Audible media position, held exactly while paused/buffering. */
+    fun positionAt(wallNanos: Long): Double = if (!hasPosition) Double.NaN else
+        positionMs + if (playing) elapsedMs(positionWallNanos, wallNanos) * speed else 0.0
 
-    /** Tap-session content time at the ear, or NaN before the sink has filled. */
-    fun contentAtEarMs(wallNanos: Long): Double = positionAt(wallNanos) - offsetMs
+    fun contentAtEarMs(wallNanos: Long): Double = contentMs +
+        if (playing) elapsedMs(positionWallNanos, wallNanos) * speed else 0.0
 
-    /** Media-item position at which content [contentMs] is heard. */
-    fun mediaMsOfContent(contentMs: Double): Double = contentMs + offsetMs
+    /** Source timestamp of an event; output trims never change word ownership. */
+    fun mediaMsOfContent(contentMs: Double): Double = contentMs + (positionMs - this.contentMs)
 
-    private companion object {
-        /** Ticks arrive every ~33 ms while playing; a paused clock must not run on. */
-        const val MAX_CARRY_MS = 100.0
-        /** A backward step without a sink flush is an item handoff, not jitter. */
-        const val HANDOFF_BACK_MS = 200L
+    /** Read the light and graph cursor at one corrected source instant. */
+    fun sampleAtEar(
+        wallNanos: Long, track: TarjiEarTrack, hopMs: Double, out: TarjiEarSample,
+        trimWallMs: Double, phaseLeadMs: Float, displayLeadMs: Float, readHistory: Boolean,
+    ): Boolean {
+        out.clear()
+        val trimMs = trimWallMs * speed
+        val displayMs = if (playing) displayLeadMs.coerceAtLeast(0f) * speed else 0f
+        val read = readHistory && isAnchored && track.read(
+            contentAtEarMs(wallNanos) - trimMs + displayMs + phaseLeadMs.coerceAtLeast(0f), hopMs, out,
+        )
+        val mediaMs = positionAt(wallNanos) - trimMs + displayMs
+        if (mediaMs.isFinite()) out.mediaMs = mediaMs.roundToLong()
+        if (read && out.eventStartHop >= 0) {
+            out.eventStartMediaMs = mediaMsOfContent(out.eventStartHop * hopMs).roundToLong()
+        }
+        return read
     }
 }
 

@@ -180,7 +180,9 @@ A flat line is a candidate that does not pulse in this recitation; a dashed
 rule is a verse still being worked out, or one that could not be (the tab says
 why, and reports the last verse it did). The line is translucent; while the
 word is recited the part already heard turns opaque, placed by the ear's own
-position on the media clock so it moves with the light. A verse's audio is
+position on the media clock so it moves with the light. Manual output lag and
+Tarjīʿ ear delay move both the pulse and this cursor, scaled by playback speed.
+Pause holds the cursor; an unavailable live clock leaves it unset. A verse's audio is
 decoded once and kept, so retuning reruns only the detector; a dial being
 dragged cancels the work it has made stale, and paint dials ask for none.
 Lines are kept by surah, verse and word position. It is a lab mark,
@@ -300,22 +302,25 @@ event: inherited release gain is ignored, and after the event settles a later
 consonant or echo pulse cannot relight the word. A repeated utterance gets a
 fresh gate with its terracotta wash.
 
-The pulse is **delayed to the reader's clock** — the tap sits at the audio
-sink's input, so the signal is led forward by everything downstream before
-it is read out: the route preset (the same one the highlight clock
-subtracts) and the sink's own AudioTrack buffer (read via
-`AudioSink.getAudioTrackBufferSizeUs`, typically 40–100 ms and much more
-on emulators — the term that used to leave the shimmer a quarter-second
-ahead of the voice). That lands the shimmer on the playback head
-`positionMs` tracks — the same reference the word ink rides — so the pulse
-is in lockstep with the wash, not trailing the visible word. Wall-time
-components scale by playback speed; the Sonic resampler's own buffer (only
-present off 1×) does not. The Ink Lab's **Ear delay ms** nudges the last
-device-specific millimetre on top (add it back when a route genuinely
-lags the audible vibration). The sink capacity establishes the initial
-tap-to-head backlog; exact tap content time versus `positionMs` then follows
-queue growth/drain without a slow zero-based warm-up. The history read is
-fractional, so non-multiple device latency is not rounded up to 20 ms early.
+The pulse reads **the reader's presentation clock**. The sink wrapper retains
+the first PCM buffer's source PTS after a flush and samples the sink's actual
+output-corrected position on the audio thread. Their difference gives the
+source content currently heard, which `TarjiEarClock` maps to `positionMs` at
+the same wall instant. Neither a decoded burst nor the AudioTrack's capacity
+can establish that source origin. Bluetooth and Sonic are already included
+in the sink position; no second preset or buffer estimate is subtracted.
+
+Manual output lag and the Ink Lab's **Ear delay ms** are extra wall-time
+trims, multiplied by playback speed and applied equally to the history read
+and graph cursor. Event ownership keeps its original source timestamp.
+`GlintLight` compensation uses the pulse's wall-time frequency and converts
+its phase lead back to content time; the graph excludes that paint-only lead.
+The display lead uses the observed frame interval and also scales by speed.
+Pause and buffering hold the cursor and close the light without consuming the
+word's acoustic event. The stale-feed guard lets already queued audio finish.
+Reusable gapless and speed processor flushes keep the queued history; a seek
+or new PCM format clears it.
+The history read is fractional, so device latency is not rounded to 20 ms.
 One analysis hop stays at ~20 ms of
 *content* at any source rate (44.1 kHz decimates to 8820 Hz → 176
 samples); its clock uses the exact 19.955 ms duration, pitch lags scale with
@@ -484,7 +489,7 @@ and inspect ink; the toggle is session-only and not part of `Tuning`.
 | Halo blur | `glintGlowRadius` | 5 | 0–10 | Blur radius in dp around the glyph outline; bloom and veil are fixed multiples of it. It is not a word-relative radial size. |
 | Tarjīʿ (Tajweed tab) | `glintResonance` | on | toggle | Turns the wet-ink glimmer on and off with detected tarjīʿ (first-pass gold and repeat terracotta). |
 | Pulse depth (Tajweed tab) | `glintResonanceDepth` | 1.0 | 0–1 | Scales the whole swing of the tarjīʿ light (1 = full). |
-| Ear delay ms (Tajweed tab) | `tarjiEarDelayMs` | 0 | 0–200 | Extra delay so the pulse lands on the ear, on top of the route preset + measured tap-to-playback-head backlog. |
+| Ear delay ms (Tajweed tab) | `tarjiEarDelayMs` | 0 | 0–200 | Extra wall-time trim of both pulse and graph cursor, on top of the presentation clock. |
 
 The scalar maps to Compose `Shadow.blurRadius` for per-word text and to dp for
 the shaped-path `BlurMaskFilter`; use the visual result, not physical units, as

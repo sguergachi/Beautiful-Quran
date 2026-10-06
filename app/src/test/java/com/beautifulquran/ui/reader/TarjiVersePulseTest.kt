@@ -5,6 +5,9 @@ import com.beautifulquran.data.model.Segment
 import com.beautifulquran.data.model.Word
 import com.beautifulquran.playback.Hani214
 import com.beautifulquran.playback.Tarji
+import com.beautifulquran.playback.TarjiEarClock
+import com.beautifulquran.playback.TarjiEarSample
+import com.beautifulquran.playback.TarjiEarTrack
 import com.beautifulquran.playback.TarjiLabTrim
 import com.beautifulquran.tarjilab.HANI_TUNING
 import com.beautifulquran.tarjilab.TarjiLabCodec
@@ -30,7 +33,7 @@ class TarjiVersePulseTest {
         TarjiLabCodec.decode(javaClass.getResourceAsStream("/tarji/$name")!!.bufferedReader().use { it.readText() })
 
     @Test
-    fun `the line under a word is the graph the Tarji Lab draws for it`() {
+    fun `the line retains the waveform of a legacy Lab capture with approximate timestamps`() {
         // The lab's own capture of 2:14's closing word, analysed as the lab
         // does, against the reader's line for the same word from the verse's
         // audio — same settings, same span.
@@ -46,9 +49,9 @@ class TarjiVersePulseTest {
         assertTrue(line.take(line.size * 2 / 5).all { abs(it) < 0.15f })
         // …then the same wave: crests and troughs to the edges of the graph.
         assertTrue("crest ${line.max()} trough ${line.min()}", line.max() > 0.9f && line.min() < -0.9f)
-        // Hop for hop it is the lab's trace. The capture places itself on the
-        // media clock from the tap's estimate of the playback head, which sits
-        // some 160 ms off the file's own time — a twentieth of the graph.
+        // This old export used the approximate buffer clock. This check
+        // protects its waveform only; exact phase is checked below using
+        // source timestamps, with no best-shift search.
         val n = minOf(line.size, lab.size)
         val best = (-10..10).maxOf { shift ->
             var dot = 0.0; var a = 0.0; var b = 0.0
@@ -60,6 +63,43 @@ class TarjiVersePulseTest {
             dot / sqrt(a * b)
         }
         assertTrue("the line follows the lab's graph ($best)", best > 0.85)
+    }
+
+    @Test
+    fun `Hani graph and live history match at the same source instant with no shift`() {
+        val knobs = sample("hani_2_14_w16_tuned.json").knobs
+        val line = TarjiVersePulse.lines(audio, knobs, listOf(TarjiVersePulse.Window(labStart, audioMs))).single()
+        val hops = audio.pcm.size / audio.hopSamples
+        for (queuedHops in listOf(12, 20, 40)) {
+            val detector = Tarji().also { it.hopSamples = audio.hopSamples; knobs.applyTo(it) }
+            val track = TarjiEarTrack()
+            val clock = TarjiEarClock()
+            val out = TarjiEarSample()
+            var fed = 0
+            var strongest = 0f
+            for (hop in 0 until hops) {
+                // Keep the heard hop in the live ring, with real queued audio ahead.
+                while (fed <= hop + queuedHops && fed < hops) {
+                    detector.onSamples8k(audio.pcm.copyOfRange(fed * audio.hopSamples, (fed + 1) * audio.hopSamples))
+                    track.publish(fed, detector.lastHopRms, detector.lastFoldedPitchHz, detector.lastPitchLeadHops,
+                        detector.lastRateHz, detector.lastVisualUsesAmplitude, detector.tremoloGain,
+                        if (detector.reverberating) detector.eventStartHop else -1)
+                    fed++
+                }
+                val sourceMs = (hop + 1) * audio.hopMs
+                if (sourceMs < labStart) continue
+                val index = ((sourceMs - labStart) / audio.hopMs).toInt()
+                if (index >= line.lastIndex) break
+                val mediaMs = (Hani214.START_MS + sourceMs).toLong()
+                clock.onPosition(mediaMs, 0L, sourceMs, 1f, true)
+                assertTrue(clock.sampleAtEar(0L, track, audio.hopMs, out, 0.0, 0f, 0f, true))
+                assertEquals(mediaMs, out.mediaMs)
+                val pulse = (out.tremolo * out.gain).coerceIn(-1f, 1f)
+                assertEquals("source $sourceMs ms, queued $queuedHops hops", line[index], pulse, 1e-6f)
+                strongest = maxOf(strongest, abs(pulse))
+            }
+            assertTrue("matching signals must actually pulse", strongest > 0.9f)
+        }
     }
 
     @Test

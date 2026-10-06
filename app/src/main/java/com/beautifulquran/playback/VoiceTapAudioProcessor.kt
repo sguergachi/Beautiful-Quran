@@ -4,6 +4,7 @@ import androidx.media3.common.C
 import androidx.media3.common.audio.AudioProcessor
 import androidx.media3.common.audio.BaseAudioProcessor
 import androidx.media3.exoplayer.audio.AudioSink
+import androidx.media3.exoplayer.audio.ForwardingAudioSink
 import java.nio.ByteBuffer
 
 /**
@@ -16,16 +17,48 @@ class VoiceTapAudioProcessor : BaseAudioProcessor() {
 
     private var format: AudioProcessor.AudioFormat? = null
 
-    /**
-     * The sink this processor runs in. Its AudioTrack buffer is the gap
-     * between the tap and the phone's speaker — read live so the shimmer
-     * delay lands on the ear, not on the sink's input. Set by
-     * [PlaybackService] right after the sink is built.
-     */
+    /** The sink's capacity is retained only as a diagnostic. */
     private var sink: AudioSink? = null
+    private var presentationTimeUs: Long? = null
 
-    fun attach(sink: AudioSink) {
+    /** Preserve source PTS through internal processor flushes and buffer retries. */
+    fun attach(sink: AudioSink): AudioSink {
         this.sink = sink
+        return object : ForwardingAudioSink(sink) {
+            private var playing = false
+
+            override fun handleBuffer(buffer: ByteBuffer, presentationTimeUs: Long, encodedAccessUnitCount: Int): Boolean {
+                this@VoiceTapAudioProcessor.presentationTimeUs = presentationTimeUs
+                VoiceEnergy.active?.anchorSource(presentationTimeUs / 1000.0)
+                return super.handleBuffer(buffer, presentationTimeUs, encodedAccessUnitCount)
+            }
+
+            override fun getCurrentPositionUs(sourceEnded: Boolean): Long {
+                val positionUs = super.getCurrentPositionUs(sourceEnded)
+                if (positionUs != AudioSink.CURRENT_POSITION_NOT_SET) {
+                    VoiceEnergy.active?.updateSinkPosition(positionUs / 1000.0, System.nanoTime(), playing)
+                }
+                return positionUs
+            }
+
+            override fun play() {
+                super.play()
+                playing = true
+                getCurrentPositionUs(false)
+            }
+
+            override fun pause() {
+                super.pause()
+                playing = false
+                getCurrentPositionUs(false)
+            }
+
+            override fun flush() {
+                presentationTimeUs = null
+                VoiceEnergy.active?.resetTapSession()
+                super.flush()
+            }
+        }
     }
 
     override fun onConfigure(
@@ -36,7 +69,6 @@ class VoiceTapAudioProcessor : BaseAudioProcessor() {
             // sink's processor chain.
             return AudioProcessor.AudioFormat.NOT_SET
         }
-        format = inputAudioFormat
         return inputAudioFormat
     }
 
@@ -47,9 +79,6 @@ class VoiceTapAudioProcessor : BaseAudioProcessor() {
         if (f != null) {
             val voice = VoiceEnergy.active
             if (voice != null) {
-                // The sink's track buffer is app-side wall latency the route
-                // presets never see (typically 40–100 ms, much more on
-                // emulators) — without it the shimmer rides ahead of the ear.
                 val bufferUs = sink?.getAudioTrackBufferSizeUs() ?: 0L
                 if (bufferUs > 0L) voice.sinkLatencyMs = bufferUs / 1000
                 voice.onPcm16(
@@ -63,13 +92,17 @@ class VoiceTapAudioProcessor : BaseAudioProcessor() {
     }
 
     override fun onFlush(streamMetadata: AudioProcessor.StreamMetadata) {
-        // Seek, handoff, or sink refeed: re-anchor the hop clock and clear the
-        // old acoustic event before any PCM from the new position arrives.
-        VoiceEnergy.active?.resetTapSession()
+        // Internal speed/gapless flushes can leave old audio queued in the
+        // same track. Preserve its history; actual sink flushes reset above.
+        if (format != inputAudioFormat) {
+            VoiceEnergy.active?.resetTapSession(presentationTimeUs?.div(1000.0) ?: Double.NaN)
+        }
+        format = inputAudioFormat
     }
 
     override fun onReset() {
         format = null
+        presentationTimeUs = null
         VoiceEnergy.active?.resetTapSession()
     }
 }

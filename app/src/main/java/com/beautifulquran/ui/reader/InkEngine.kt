@@ -223,12 +223,7 @@ object InkEngine {
         val tarjiAttackMs: Float = com.beautifulquran.playback.Tarji.ATTACK_MS,
         /** Release of the detection gain ramp (ms). */
         val tarjiReleaseMs: Float = com.beautifulquran.playback.Tarji.RELEASE_MS,
-        /**
-         * Extra ear delay on the shimmer, on top of the route preset, the
-         * measured sink buffer, and the output path (ms). Shipped 0 — the
-         * measured terms already land the pulse on the ear; this nudges the
-         * last device-specific millimetre when it still trails or leads.
-         */
+        /** Additional wall-time trim on the pulse and its graph (ms); shipped 0. */
         val tarjiEarDelayMs: Float = 0f,
     )
 
@@ -333,7 +328,7 @@ object InkEngine {
     /**
      * Extra wall-time lag subtracted from Media3's presentation clock, or null
      * to use that already-corrected clock directly. Adds the same delay to the
-     * raw PCM tarjīʿ tap without replacing its route preset.
+     * tarjīʿ signal and graph cursor.
      */
     private var outputLatencyOverrideState by mutableStateOf<Int?>(null)
     var outputLatencyOverrideMs: Int?
