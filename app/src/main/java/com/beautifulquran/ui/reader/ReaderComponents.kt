@@ -1478,6 +1478,8 @@ internal fun rememberInkMotions(
     waslPrefixes: List<WaslPrefix?>,
     activation: Long = 0L,
     activeWordStartMs: Long = Long.MIN_VALUE,
+    /** The verse these words belong to, for the Ink Lab's pulse lines; null draws none. */
+    verse: Ayah? = null,
     /** English prose waits for each predecessor's residual before blooming. */
     sequentialSweeps: Boolean,
     /** Layered gloss fades word ink with [animatedInkAlpha]; shaped modes dim
@@ -1514,7 +1516,7 @@ internal fun rememberInkMotions(
             remember(words[index].arabic, index == words.lastIndex) {
                 InkEngine.tarjiEligible(words[index].arabic, index == words.lastIndex)
             }
-        ) InkEngine.tarjiTrace(words[index]) else null
+        ) verse?.let { InkEngine.tarjiTrace(it.surahId, it.number, words[index].position) } else null
         val sweep = rememberLetterSweep(
             active = isActive,
             finishResidual = ink.state == InkEngine.State.Recited,
@@ -3184,6 +3186,7 @@ fun AyahBlock(
         waslPrefixes = waslPrefixes,
         activation = activation,
         activeWordStartMs = activeWordStartMs,
+        verse = ayah,
         sequentialSweeps = readingMode == ReadingMode.ENGLISH_ONLY,
         animateLyricInk =
             readingMode == ReadingMode.ARABIC_ENGLISH && showGloss,

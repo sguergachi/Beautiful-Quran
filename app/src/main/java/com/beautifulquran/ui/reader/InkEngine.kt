@@ -596,10 +596,18 @@ object InkEngine {
         }
     }
 
-    // Keyed by the word itself and held weakly: a trace lives as long as its verse is loaded.
-    private val tarjiTraces = java.util.WeakHashMap<Any, TarjiTrace>()
+    // Keyed by the word's place in the Quran, and held: a trace must outlive
+    // the objects a screen happens to hold. Keyed weakly by the word itself,
+    // a verse reloaded as equal-but-new objects lost its lines when the old
+    // ones were collected and never asked for them again — and words equal in
+    // text and position in two verses shared one line.
+    private val tarjiTraces = object : LinkedHashMap<Long, TarjiTrace>(256, 0.75f, true) {
+        override fun removeEldestEntry(eldest: MutableMap.MutableEntry<Long, TarjiTrace>?) = size > 8_192
+    }
 
-    fun tarjiTrace(word: Any): TarjiTrace = tarjiTraces.getOrPut(word) { TarjiTrace() }
+    /** The trace of word [position] of [surahId]:[ayah]. Main thread only. */
+    fun tarjiTrace(surahId: Int, ayah: Int, position: Int): TarjiTrace =
+        tarjiTraces.getOrPut(surahId * 1_000_000L + ayah * 1_000L + position) { TarjiTrace() }
 
     /**
      * What the reader's light last did for the active word, for the Ink Lab's

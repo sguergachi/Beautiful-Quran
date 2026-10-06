@@ -132,6 +132,9 @@ internal object TarjiVersePulse {
         private set
     var lastFailure by androidx.compose.runtime.mutableStateOf<String?>(null)
         private set
+    /** The last verse worked out, in a line: enough to tell a flat line from a wrong one. */
+    var lastReport by androidx.compose.runtime.mutableStateOf<String?>(null)
+        private set
 
     enum class Outcome { Done, Failed }
 
@@ -200,6 +203,14 @@ internal object TarjiVersePulse {
             }
             results[key] = result
             apply(ayah, result)
+            val strongest = result.lines.maxByOrNull { (_, line) -> line.maxOfOrNull { kotlin.math.abs(it) } ?: 0f }
+            lastReport = "$name ${reciter.name}: " +
+                "%.1f s of audio, ".format(heard.pcm.size / heard.hopSamples * heard.hopMs / 1000.0) +
+                "${segments.size} timings, ${result.lines.size} lines" +
+                (strongest?.let { (position, line) ->
+                    ", strongest %.2f on word $position".format(line.maxOfOrNull { kotlin.math.abs(it) } ?: 0f)
+                } ?: "")
+            lastFailure = null
             return Outcome.Done
         } catch (cancelled: kotlinx.coroutines.CancellationException) {
             throw cancelled
@@ -223,7 +234,7 @@ internal object TarjiVersePulse {
         for (word in ayah.words) {
             val line = result.lines[word.position] ?: continue
             val window = result.windows.getValue(word.position)
-            InkEngine.tarjiTrace(word).set(line, window.startMs.toFloat(), (window.endMs - window.startMs).toFloat())
+            InkEngine.tarjiTrace(ayah.surahId, ayah.number, word.position).set(line, window.startMs.toFloat(), (window.endMs - window.startMs).toFloat())
         }
     }
 

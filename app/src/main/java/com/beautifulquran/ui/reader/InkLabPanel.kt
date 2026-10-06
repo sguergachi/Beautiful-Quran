@@ -370,11 +370,13 @@ fun InkLabPanel(
                             // being worked out, or one that could not be.
                             val failure = TarjiVersePulse.lastFailure
                             val working = TarjiVersePulse.working
-                            if (working > 0 || failure != null) {
+                            val report = TarjiVersePulse.lastReport
+                            if (working > 0 || failure != null || report != null) {
                                 LabCaption(
                                     listOfNotNull(
                                         "working out $working verse(s)".takeIf { working > 0 },
                                         failure?.let { "failed — $it" },
+                                        report?.let { "last: $it" },
                                     ).joinToString(" · "),
                                 )
                             }

@@ -153,6 +153,7 @@ internal fun rememberAyahInkPack(
         waslPrefixes = waslPrefixes,
         activation = activation,
         activeWordStartMs = activeWordStartMs,
+        verse = ayah,
         sequentialSweeps = false,
         animateLyricInk = false,
         wetInk = wetInk,
