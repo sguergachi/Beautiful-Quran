@@ -48,22 +48,33 @@ log() { printf '==> %s\n' "$*" >&2; }
 fail() { printf 'error: %s\n' "$*" >&2; exit 1; }
 serial_of() { echo "emulator-$((BASE_PORT + 2 * $1))"; }
 port_of() { echo "${1#emulator-}"; }
-adb_s() { "$ADB" -s "$1" "${@:2}"; }
+# </dev/null: adb shell would otherwise eat the stdin of any `while read` loop around it
+adb_s() { "$ADB" -s "$1" "${@:2}" < /dev/null; }
+# On any exit, undo half-finished claims: a lease on a slot that never booted,
+# or a golden emulator still holding its AVD.
+CLAIMED="" BUILDING_GOLD=""
+cleanup() {
+  [[ -z "$CLAIMED" ]] || rm -f "$STATE/$CLAIMED.lease"
+  [[ -z "$BUILDING_GOLD" ]] || "$ADB" -s "emulator-$GOLD_PORT" emu kill >/dev/null 2>&1 || true
+}
+trap cleanup EXIT
 mem_avail_mb() { awk '/MemAvailable/ { print int($2 / 1024) }' /proc/meminfo; }
 is_up() { "$ADB" devices | grep -q "^$1[[:space:]]*device"; }
 
 # A headless host-GPU emulator still needs an X display for its GL context.
 gl_env() {
   local sock x
-  for x in "/run/user/$(id -u)"/xauth_* "$HOME/.Xauthority"; do
-    [[ -r "$x" ]] && { export XAUTHORITY="$x"; break; }
-  done
+  if [[ ! -r "${XAUTHORITY:-}" ]]; then
+    for x in "/run/user/$(id -u)"/xauth_* "$HOME/.Xauthority"; do
+      [[ -r "$x" ]] && { export XAUTHORITY="$x"; break; }
+    done
+  fi
   if [[ -z "${DISPLAY:-}" ]]; then
     for sock in /tmp/.X11-unix/X*; do
       [[ -S "$sock" ]] && { export DISPLAY=":${sock##*/X}"; break; }
     done
   fi
-  [[ -n "${DISPLAY:-}" ]] || fail "no X display for host GPU (start from the desktop or set DISPLAY)"
+  [[ -n "${DISPLAY:-}" ]] || { echo "error: no X display for host GPU (start from the desktop or set DISPLAY)" >&2; return 1; }
 }
 
 wait_boot() {
@@ -77,7 +88,10 @@ wait_boot() {
   done
   # install fails with 'Broken pipe' until the package service is up, and
   # boot_completed can precede it
-  until adb_s "$serial" shell pm path android >/dev/null 2>&1; do sleep 0.5; done
+  until adb_s "$serial" shell pm path android >/dev/null 2>&1; do
+    (( SECONDS < deadline )) || fail "$serial has no package service after ${BOOT_TIMEOUT}s; see $STATE/$serial.log"
+    sleep 0.5
+  done
   adb_s "$serial" shell input keyevent 82 >/dev/null 2>&1 || true
 }
 
@@ -87,7 +101,7 @@ launch() {  # serial, extra emulator args...
   setsid -f "$EMULATOR" -avd "$GOLD" -port "$(port_of "$serial")" \
     -no-window -no-audio -no-boot-anim -no-metrics \
     -gpu host -accel on -feature -Vulkan -netdelay none -netspeed full \
-    "$@" > "$STATE/$serial.log" 2>&1 < /dev/null
+    "$@" > "$STATE/$serial.log" 2>&1 < /dev/null 7>&- 8>&-   # the emulator must not inherit (and so pin) our locks
 }
 
 # One-time: create the golden AVD, cold boot it, park the snapshot every slot loads.
@@ -102,7 +116,9 @@ build_gold() {
   for kv in hw.gpu.enabled=yes hw.gpu.mode=host "hw.ramSize=$RAM" "hw.cpu.ncore=$CORES"; do
     if grep -q "^${kv%%=*}=" "$cfg"; then sed -i "s|^${kv%%=*}=.*|$kv|" "$cfg"; else echo "$kv" >> "$cfg"; fi
   done
-  launch "$serial" -no-snapshot-load
+  BUILDING_GOLD=1
+  # -no-snapshot-save: otherwise killing it writes a multi-GB default_boot too
+  launch "$serial" -no-snapshot-load -no-snapshot-save
   wait_boot "$serial"
   adb_s "$serial" shell 'settings put global verifier_verify_adb_installs 0
     settings put global package_verifier_enable 0
@@ -112,20 +128,26 @@ build_gold() {
   adb_s "$serial" emu avd snapshot save "$SNAPSHOT" >&2
   adb_s "$serial" emu kill >/dev/null 2>&1 || true
   while pgrep -f "qemu-system.* -port $GOLD_PORT( |\$)" >/dev/null; do sleep 1; done
+  BUILDING_GOLD=""
 }
 
 boot_slot() {
   local serial="$1"
+  is_up "$serial" && return 0
+  # Cold boots are serialized: concurrent ones would all pass the RAM check
+  # before any of them has allocated, and together swap the host.
+  exec 7> "$STATE/boot.lock"; flock 7
   is_up "$serial" && return 0
   local need=$((RAM + 1024))  # RSS runs ~0.7GB over the guest RAM (GPU buffers)
   if [[ -z "${EMU_FORCE:-}" ]] && (( $(mem_avail_mb) < need )); then
     status >&2
     fail "only $(mem_avail_mb)MB RAM available, need ~${need}MB per emulator. Release an idle one, or EMU_FORCE=1"
   fi
-  ( flock 9; build_gold ) 9> "$STATE/gold.lock" || return 1
+  build_gold
   log "Booting $serial from snapshot"
   launch "$serial" -read-only -snapshot "$SNAPSHOT" -no-snapshot-save
   wait_boot "$serial"
+  exec 7>&-
 }
 
 # Prints the serial of a free (or abandoned) slot, ready to use. Slots are
@@ -140,22 +162,24 @@ lease() {
     if is_up "$serial"; then warm="${warm:-$serial}"; else cold="${cold:-$serial}"; fi
   done
   local got="${warm:-$cold}"
-  [[ -n "$got" ]] && echo "$label" > "$STATE/$got.lease"
+  if [[ -n "$got" ]]; then echo "$label" > "$STATE/$got.lease"; CLAIMED="$got"; fi
   exec 8>&-
   [[ -n "$got" ]] || { status >&2; fail "all $SLOTS slots are leased; wait, or release one that is idle"; }
   if [[ "$got" == "$warm" ]]; then
     log "Reusing warm $got"
     adb_s "$got" shell 'am force-stop com.beautifulquran; pm clear com.beautifulquran; input keyevent 3' >/dev/null 2>&1 || true
   else
-    boot_slot "$got" || { rm -f "$STATE/$got.lease"; exit 1; }
+    boot_slot "$got"
   fi
+  CLAIMED=""
   echo "$got"
 }
 
 need_serial() {
   SERIAL="${ANDROID_SERIAL:-}"
   [[ -n "$SERIAL" ]] || fail "set ANDROID_SERIAL (use: ANDROID_SERIAL=\$(scripts/emu.sh lease) ...)"
-  touch "$STATE/$SERIAL.lease" 2>/dev/null || true   # keeps the lease alive while in use
+  # keeps a live lease alive; never resurrects a released one or adopts an unleased slot
+  [[ ! -f "$STATE/$SERIAL.lease" ]] || touch "$STATE/$SERIAL.lease"
 }
 
 status() {
@@ -233,6 +257,7 @@ cmd_doctor() {
 
 cmd_down() {  # stops free slots only; a leased one has a tenant
   local i serial f
+  exec 8> "$STATE/lease.lock"; flock 8   # not while a lease is picking a slot
   for ((i = 0; i < SLOTS; i++)); do
     serial="$(serial_of "$i")"; f="$STATE/$serial.lease"
     [[ -f "$f" ]] && (( $(date +%s) - $(stat -c %Y "$f") < LEASE_TTL )) && continue
