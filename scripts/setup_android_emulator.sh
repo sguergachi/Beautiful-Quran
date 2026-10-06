@@ -225,7 +225,7 @@ Useful overrides:
   ANDROID_AVD_NAME=$ANDROID_AVD_NAME scripts/run_android_app.sh
   ANDROID_API=$ANDROID_API ANDROID_IMAGE_ARCH=$ANDROID_IMAGE_ARCH scripts/setup_android_emulator.sh
   ANDROID_AVD_RAM=$ANDROID_AVD_RAM ANDROID_AVD_CORES=$ANDROID_AVD_CORES scripts/setup_android_emulator.sh
-Run parallel agent emulators with: scripts/emulators_up.sh [count]
+Agents share a GPU emulator pool with: scripts/emu.sh lease
 EOF
 }
 

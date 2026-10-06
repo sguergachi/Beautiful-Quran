@@ -139,16 +139,26 @@ python3 tools/test_build_db.py  # timing pipeline regressions (~1s, no Gradle)
   a different seed grows an entirely different composition.
 - To run the app in an emulator on Linux: `scripts/setup_android_emulator.sh`
   once, then `scripts/run_android_app.sh` (see README.md).
-- **Parallel emulators.** Several lean headless AVDs can run at once, one per
-  agent, each with its own adb serial. If your `scripts/run_android_app.sh`
-  run says the AVD is already in use (or you just don't want to disturb an
-  emulator another agent is using), boot your own: `scripts/emulators_up.sh N`
-  creates/starts `BeautifulQuran_API_35_0..N-1` and prints each one's agent
-  command — pick a free index and run it. `scripts/emulators_down.sh` stops
-  them all. Before stealing or killing an emulator, assume another agent may
-  be mid-test on it: prefer your own AVD index. Headless AVDs have no window;
-  drop `ANDROID_EMULATOR_HEADLESS=1` to restart yours windowed for a visual
-  check (that restarts only your own AVD).
+- **Agent emulators: use `scripts/emu.sh`, never a hand-rolled `emulator`.**
+  It is a lease-based pool of GPU-accelerated, silent, headless emulators that
+  all boot from one golden snapshot (~20s, clean state each time):
+
+  ```bash
+  S=$(scripts/emu.sh lease "<task>")      # claim + boot a free slot; prints its serial
+  ANDROID_SERIAL=$S scripts/emu.sh run    # build, install, AOT-compile, launch (--release | --apk F)
+  ANDROID_SERIAL=$S scripts/emu.sh shot /tmp/a.png   # then Read the PNG
+  ANDROID_SERIAL=$S scripts/emu.sh perf   # gfxinfo summary; `perf reset` first
+  scripts/emu.sh release "$S"             # ALWAYS when done: frees the slot and its ~4GB RAM
+  ```
+
+  `status` shows who holds what (and emulators outside the pool, which are
+  not yours: never kill those); `doctor` checks KVM/X/GPU/RAM. A lease idle for
+  2h is treated as abandoned. It refuses to boot when host RAM is short — this
+  box also runs gradle daemons and browsers, and a swapping emulator is what
+  produced the old "2-3 fps" reports; release before building if it complains.
+  Notes: pool emulators are ephemeral (the app is reinstalled each lease);
+  the 260MB APK needs the 3GB guest (2GB crashed surfaceflinger); a fresh
+  install janks until AOT-compiled, which `run` does for you.
 - CI runs on every push: verifies the DB asset exists and runs unit tests.
   On `master` only, it also builds the release APK and publishes it to the
   rolling `latest` GitHub release.

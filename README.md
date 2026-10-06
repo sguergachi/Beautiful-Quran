@@ -171,29 +171,23 @@ in your current shell:
 source scripts/android_env.sh
 ```
 
-**Parallel emulators for agents.** Each agent gets its own lean, headless
-emulator with a distinct adb serial, so several can build and test
-simultaneously:
+**Parallel emulators for agents.** `scripts/emu.sh` runs a lease-based pool of
+headless, host-GPU, silent emulators that boot from one golden snapshot, so
+several agents can build and test at once without sharing state:
 
 ```bash
-scripts/emulators_up.sh 3        # create + boot BeautifulQuran_API_35_0..2
+S=$(scripts/emu.sh lease "my-task")     # first ever call also builds the golden snapshot (~2 min)
+ANDROID_SERIAL=$S scripts/emu.sh run    # build + install + AOT-compile + launch (--release for release)
+ANDROID_SERIAL=$S scripts/emu.sh shot /tmp/a.png
+scripts/emu.sh release "$S"             # frees the slot and its RAM
 ```
 
-Each agent then targets its own AVD through the normal run script (headless
-must match, or the emulator restarts with a window):
-
-```bash
-ANDROID_AVD_NAME=BeautifulQuran_API_35_1 ANDROID_EMULATOR_HEADLESS=1 \
-  scripts/run_android_app.sh
-```
-
-`scripts/emulators_up.sh` prints that command for every AVD. Agent AVDs are
-lean by default (2 GB RAM, 2 cores — override with `ANDROID_AVD_RAM` /
-`ANDROID_AVD_CORES`); keep an eye on the memory warning it prints, since each
-emulator needs ~1-2 GB of host RAM. Stop them all with
-`scripts/emulators_down.sh`. A single interactive emulator can instead be
-created heavier: `ANDROID_AVD_RAM=4096 ANDROID_AVD_CORES=6
-scripts/setup_android_emulator.sh`.
+Also `status`, `perf [reset]` (gfxinfo), `doctor` and `down`. Slots are
+`EMU_SLOTS` (default 4) read-only instances of one AVD (`EMU_RAM`/`EMU_CORES`
+default 3072MB/3 cores), so disk cost is one AVD instead of one per agent.
+Booting refuses when host RAM is short rather than swapping. A single
+interactive emulator can instead be created heavier: `ANDROID_AVD_RAM=4096
+ANDROID_AVD_CORES=6 scripts/setup_android_emulator.sh`.
 
 **Host Vulkan.** The run script points the emulator at your GPU’s Vulkan ICD
 (NVIDIA / AMD / Intel) and the system `libvulkan`, and re-enables `Vulkan = on`
