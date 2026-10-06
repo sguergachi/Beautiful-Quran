@@ -140,9 +140,14 @@ four visible states per second cannot express a 5–10 Hz vocal pulse.
     0.7, band widened by 1 Hz) — no flapping when the reverberation breathes.
     `tremoloGain` ramps 250 ms attack / 800 ms release. Evidence readiness is
     derived from the configured slowest period and the minimum correlation
-    pairs, rather than a hard-coded timeout. Ten hops without coherent pulse
-    evidence end an established event; deep AM can bridge a brief irregular
-    climax only after a genuine period has been acquired.
+    pairs, rather than a hard-coded timeout. A confirmed event's first-second
+    buildup allows two tracked cycles without coherent evidence (at least ten
+    hops), so a short analysis lull cannot end a slow pulse inside one cycle.
+    After the buildup, ten hops without coherent evidence end the event; deep
+    AM can bridge a brief irregular climax only after a genuine period has
+    been acquired. The Hani 2:14 fixture in `TarjiVersePulseTest` checks 40 hop
+    alignments with the Pixel's 6% voice threshold, including alignments that
+    previously reduced a full wave to a 0.12 ripple.
 
     **False starts.** Depth alone may open an event, but the event is
     *unconfirmed* — its gain held at zero — until a coherent pulse arrives.
