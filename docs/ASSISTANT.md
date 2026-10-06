@@ -297,15 +297,11 @@ anyway.
 
 An AVD that never reaches `sys.boot_completed=1`, or floods the log with
 `Failed to find ColorBuffer`, is corrupt — force-killing the emulator does that.
-Build a throwaway AVD from the same image rather than debugging it:
-
-```bash
-avdmanager create avd -n BQ_API37_verify \
-  -k "system-images;android-37.0;google_apis;x86_64" -d pixel_7
-```
-
-A fresh AVD had its `package` service up in 45 seconds and logged zero
-ColorBuffer errors, where the reused one never came up at all.
+Do not leave a replacement AVD behind: delete the corrupt one and recreate the
+same name (`avdmanager delete avd -n NAME`, then `create`), or, for the pool,
+`rm -rf ~/.android/avd/BeautifulQuran_gold_35.*` so `scripts/emu.sh` rebuilds
+its golden snapshot. A fresh AVD had its `package` service up in 45 seconds and
+logged zero ColorBuffer errors, where the corrupt one never came up at all.
 
 Use `scripts/run_android_app.sh` rather than a hand-rolled `emulator` command.
 It resolves `DISPLAY` and `XAUTHORITY`, probes the host Vulkan driver, and

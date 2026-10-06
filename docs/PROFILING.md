@@ -160,8 +160,13 @@ confirms frame timing but cannot attribute Compose work — capture a Perfetto
 system trace with frame timeline (and Compose tracing where available) when you
 need to know *which* work missed the budget.
 
-Never attach a numerical frame claim collected from this repository's headless
-emulator. Its renderer terminates mid-gesture (both `swiftshader_indirect` and
+`scripts/emu.sh perf` on a pool emulator (host GPU, AOT-compiled install) now
+runs this app steadily — hundreds of frames, no renderer exits — and is good for
+comparing two revisions on the same host load. The failure
+below was seen on the old software-rendered, display-less setup. Still never attach a numerical
+frame claim from an emulator as release evidence; the CPU side is the host's.
+
+That setup's renderer terminated mid-gesture (both `swiftshader_indirect` and
 `swiftshader` have exited with status 139 after rendering, and the host backend
 cannot create an EGL display in a headless session), which yields `No process
 found` rather than a measurement. Emulator-renderer instability is not an app
