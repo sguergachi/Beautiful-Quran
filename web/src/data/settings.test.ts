@@ -8,6 +8,30 @@ import {
 } from './customizePolicy'
 import { HOME_BOOKMARK_STYLES, normalizeSettings } from './settings'
 
+describe('favorite reciters', () => {
+  it('migrates existing settings to Android\'s original seven without changing the selected voice', () => {
+    const settings = normalizeSettings({ reciterId: 9 })
+    expect(settings.favoriteReciterIds).toEqual([1, 2, 3, 4, 5, 6, 7])
+    expect(settings.reciterId).toBe(9)
+  })
+
+  it('keeps a deliberately empty list and favorites outside the original catalog', () => {
+    expect(normalizeSettings({ favoriteReciterIds: [] }).favoriteReciterIds).toEqual([])
+    expect(normalizeSettings({ favoriteReciterIds: [9, 16, 19] }).favoriteReciterIds).toEqual([9, 16, 19])
+  })
+
+  it('removes duplicate and malformed stored IDs, and falls back for a broken list', () => {
+    expect(normalizeSettings({ favoriteReciterIds: [7, 7, -1, 0, NaN, 1.5, '9' as never] }).favoriteReciterIds).toEqual([7])
+    expect(normalizeSettings({ favoriteReciterIds: '7' as never }).favoriteReciterIds).toEqual([1, 2, 3, 4, 5, 6, 7])
+  })
+
+  it('gives each settings snapshot its own favorites array', () => {
+    const settings = normalizeSettings()
+    settings.favoriteReciterIds.length = 0
+    expect(normalizeSettings().favoriteReciterIds).toHaveLength(7)
+  })
+})
+
 describe('home bookmark settings', () => {
   it('defaults removed or absent values to the top-bound ribbon', () => {
     expect(normalizeSettings().homeBookmarkStyle).toBe('top_bound')

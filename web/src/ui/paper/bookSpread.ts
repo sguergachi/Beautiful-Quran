@@ -2,13 +2,14 @@ import { useSyncExternalStore } from 'react'
 import { BOOKMARKS_LAYER, COVER_LAYER, READER_LAYER, SETTINGS_LAYER, type StackLayer } from './stack'
 
 /**
- * Desktop lays the paper stack open as a book, and every sheet has one
+ * Tablets and desktop lay the paper stack open as a book, and every sheet has one
  * place in it: Chapters is the left page (Bookmarks is laid over it), and
  * the right page is whatever was opened from it — the title page, the
  * chapter being read, or Settings laid over that.
  * Phones and narrow windows keep the one-sheet-at-a-time deck.
  */
-export const BOOK_SPREAD_QUERY = '(min-width: 1100px) and (min-height: 600px)'
+// Includes the 744px iPad mini in portrait; short phone landscapes stay a deck.
+export const BOOK_SPREAD_QUERY = '(min-width: 720px) and (min-height: 600px)'
 
 function subscribe(onChange: () => void): () => void {
   const query = window.matchMedia(BOOK_SPREAD_QUERY)

@@ -1,5 +1,6 @@
 import { appStore } from '../../store/appStore'
 import { FontSizeControl } from '../kit/FontSizeControl'
+import { BackChevron } from '../kit/BackChevron'
 import type {
   AyahSelectorSide,
   PageNumberScript,
@@ -93,22 +94,7 @@ export function CustomizeScreen({
     <div className="customize">
       <div className="customize-sticky">
       <button type="button" className="back settings-back" aria-label="Back" onClick={onBack}>
-        <svg
-          className="settings-back-icon"
-          viewBox="0 0 24 24"
-          width="24"
-          height="24"
-          fill="none"
-          aria-hidden="true"
-        >
-          <path
-            d="M19 12 H5.5 M11 6 L5 12 l6 6"
-            stroke="currentColor"
-            strokeWidth="1.9"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-        </svg>
+        <BackChevron />
       </button>
       <h1>Customize</h1>
 
@@ -194,6 +180,22 @@ export function CustomizeScreen({
 
           {settings.readingLayout === 'scroll' && showsWordGlossChrome(settings.readingMode) ? (
             <section className="settings-section settings-section-toggles">
+              <PaperSwitch
+                id="setting-translit"
+                label="Transliteration"
+                checked={settings.showTransliteration}
+                checkParams={checkParams}
+                paintToken={checkPaintToken}
+                onChange={(checked) => appStore.updateSettings({ showTransliteration: checked })}
+              />
+              <PaperSwitch
+                id="setting-translation"
+                label="Ayah translation"
+                checked={settings.showTranslation}
+                checkParams={checkParams}
+                paintToken={checkPaintToken}
+                onChange={(checked) => appStore.updateSettings({ showTranslation: checked })}
+              />
               <PaperSwitch
                 id="setting-gloss"
                 label="Word-by-word translation"
