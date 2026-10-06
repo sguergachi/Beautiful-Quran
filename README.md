@@ -179,10 +179,10 @@ several agents can build and test at once without sharing state:
 S=$(scripts/emu.sh lease "my-task")     # first ever call also builds the golden snapshot (~2 min)
 ANDROID_SERIAL=$S scripts/emu.sh run    # build + install + AOT-compile + launch (--release for release)
 ANDROID_SERIAL=$S scripts/emu.sh shot /tmp/a.png
-scripts/emu.sh release "$S"             # frees the slot and its RAM
+scripts/emu.sh release "$S"             # slot stays booted for the next agent
 ```
 
-Also `status`, `perf [reset]` (gfxinfo), `doctor` and `down`. Slots are
+Also `status`, `perf [reset]` (gfxinfo), `doctor` and `down` (stops free slots to free RAM). Slots are
 `EMU_SLOTS` (default 4) read-only instances of one AVD (`EMU_RAM`/`EMU_CORES`
 default 3072MB/3 cores), so disk cost is one AVD instead of one per agent.
 Booting refuses when host RAM is short rather than swapping. A single

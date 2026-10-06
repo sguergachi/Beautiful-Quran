@@ -4,14 +4,15 @@
 #   serial=$(scripts/emu.sh lease "my-task")   # claim (and boot) a free emulator
 #   ANDROID_SERIAL=$serial scripts/emu.sh run  # build, install, launch
 #   ANDROID_SERIAL=$serial scripts/emu.sh shot /tmp/a.png
-#   scripts/emu.sh release "$serial"           # give it back (kills it: host RAM is scarce)
+#   scripts/emu.sh release "$serial"           # give it back; it stays booted for the next agent
 #
-# Other commands: status, perf [reset], doctor, down.
+# Other commands: status, perf [reset], doctor, down (stops free slots to free RAM).
 #
 # Design (why it is fast and safe to share):
 #   * One golden AVD holds a booted snapshot. Every pool slot is a -read-only
-#     instance of it, so N agents boot in ~20s (vs ~40s cold), need no AVD of
-#     their own, and always start from a clean userdata.
+#     instance of it, so N agents boot in ~20s (vs ~40s cold) and need no AVD of
+#     their own. Slots are rented homes: they stay booted between tenants and a
+#     new tenant gets the app's data wiped, not a reboot.
 #   * Host GPU via -gpu host (NVIDIA GLES translator); Vulkan is left off, it
 #     is the path that has crashed the renderer. -no-window still needs a live
 #     X display for the GL context, so DISPLAY/XAUTHORITY are discovered.
@@ -127,23 +128,27 @@ boot_slot() {
   wait_boot "$serial"
 }
 
-# Prints the serial of a free (or abandoned) slot, freshly booted and ready.
+# Prints the serial of a free (or abandoned) slot, ready to use. Slots are
+# rented homes: they stay booted between tenants, so a warm one is preferred and
+# only its app state is wiped. A cold slot is booted only when none is warm.
 lease() {
-  local label="${1:-$(basename "$PWD")}" i serial f got=""
+  local label="${1:-$(basename "$PWD")}" i serial f warm="" cold=""
   exec 8> "$STATE/lease.lock"; flock 8
   for ((i = 0; i < SLOTS; i++)); do
     serial="$(serial_of "$i")"; f="$STATE/$serial.lease"
     [[ -f "$f" ]] && (( $(date +%s) - $(stat -c %Y "$f") < LEASE_TTL )) && continue
-    echo "$label" > "$f"; got="$serial"; break
+    if is_up "$serial"; then warm="${warm:-$serial}"; else cold="${cold:-$serial}"; fi
   done
+  local got="${warm:-$cold}"
+  [[ -n "$got" ]] && echo "$label" > "$STATE/$got.lease"
   exec 8>&-
   [[ -n "$got" ]] || { status >&2; fail "all $SLOTS slots are leased; wait, or release one that is idle"; }
-  # Up but unleased means abandoned: its app state is someone's leftovers.
-  if is_up "$got"; then
-    adb_s "$got" emu kill >/dev/null 2>&1 || true
-    while pgrep -f "qemu-system.* -port $(port_of "$got")( |\$)" >/dev/null; do sleep 0.5; done
+  if [[ "$got" == "$warm" ]]; then
+    log "Reusing warm $got"
+    adb_s "$got" shell 'am force-stop com.beautifulquran; pm clear com.beautifulquran; input keyevent 3' >/dev/null 2>&1 || true
+  else
+    boot_slot "$got" || { rm -f "$STATE/$got.lease"; exit 1; }
   fi
-  boot_slot "$got" || { rm -f "$STATE/$got.lease"; exit 1; }
   echo "$got"
 }
 
@@ -160,8 +165,8 @@ status() {
     name="$(adb_s "$s" emu avd name 2>/dev/null | head -n1 | tr -d '\r')"
     rss="$(ps -o rss= -p "$(pgrep -f "qemu-system.* -port ${s#emulator-}( |\$)" | head -n1)" 2>/dev/null | awk '{printf "%dMB", $1/1024}')"
     f="$STATE/$s.lease"
-    if [[ -f "$f" ]]; then label="$(cat "$f") ($(( ($(date +%s) - $(stat -c %Y "$f")) / 60 ))m idle)"; else label="-"; fi
-    [[ "$name" == "$GOLD" ]] || label="external${label/#-/}"
+    if [[ -f "$f" ]]; then label="$(cat "$f") ($(( ($(date +%s) - $(stat -c %Y "$f")) / 60 ))m idle)"; else label=free; fi
+    [[ "$name" == "$GOLD" ]] || label=external
     printf '%-15s %-26s %-6s %s\n' "$s" "${name:-?}" "${rss:-?}" "$label"
   done < <("$ADB" devices | awk '/^emulator-[0-9]+[[:space:]]+device$/ { print $1 }')
   printf 'host RAM available: %sMB, pool: %s slots x %sMB\n' "$(mem_avail_mb)" "$SLOTS" "$RAM"
@@ -171,8 +176,7 @@ cmd_release() {
   local serial="${1:-${ANDROID_SERIAL:-}}"
   [[ -n "$serial" ]] || fail "usage: emu.sh release <serial>"
   rm -f "$STATE/$serial.lease"
-  adb_s "$serial" emu kill >/dev/null 2>&1 || true
-  log "released $serial"
+  log "released $serial (still booted for the next tenant; \`emu.sh down\` frees its RAM)"
 }
 
 cmd_run() {  # [--release] [--apk FILE]
@@ -227,9 +231,13 @@ cmd_doctor() {
   (( ok )) || exit 1
 }
 
-cmd_down() {
-  local i
-  for ((i = 0; i < SLOTS; i++)); do cmd_release "$(serial_of "$i")" 2>/dev/null || true; done
+cmd_down() {  # stops free slots only; a leased one has a tenant
+  local i serial f
+  for ((i = 0; i < SLOTS; i++)); do
+    serial="$(serial_of "$i")"; f="$STATE/$serial.lease"
+    [[ -f "$f" ]] && (( $(date +%s) - $(stat -c %Y "$f") < LEASE_TTL )) && continue
+    rm -f "$f"; adb_s "$serial" emu kill >/dev/null 2>&1 || true
+  done
 }
 
 case "${1:-}" in

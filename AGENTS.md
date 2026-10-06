@@ -143,22 +143,23 @@ python3 tools/test_build_db.py  # timing pipeline regressions (~1s, no Gradle)
   never create another AVD** (they are 5-10GB each; a pile of them once filled
   the disk). The pool runs any number of read-only instances of one AVD.
   It is a lease-based pool of GPU-accelerated, silent, headless emulators that
-  all boot from one golden snapshot (~20s, clean state each time):
+  are rented homes cycled between agents. They all come from one golden
+  snapshot (~20s cold boot); a reused slot just gets the app data wiped:
 
   ```bash
   S=$(scripts/emu.sh lease "<task>")      # claim + boot a free slot; prints its serial
   ANDROID_SERIAL=$S scripts/emu.sh run    # build, install, AOT-compile, launch (--release | --apk F)
   ANDROID_SERIAL=$S scripts/emu.sh shot /tmp/a.png   # then Read the PNG
   ANDROID_SERIAL=$S scripts/emu.sh perf   # gfxinfo summary; `perf reset` first
-  scripts/emu.sh release "$S"             # ALWAYS when done: frees the slot and its ~4GB RAM
+  scripts/emu.sh release "$S"             # ALWAYS when done: slot stays booted for the next agent
   ```
 
   `status` shows who holds what (and emulators outside the pool, which are
   not yours: never kill those); `doctor` checks KVM/X/GPU/RAM. A lease idle for
   2h is treated as abandoned. It refuses to boot when host RAM is short — this
   box also runs gradle daemons and browsers, and a swapping emulator is what
-  produced the old "2-3 fps" reports; release before building if it complains.
-  Notes: pool emulators are ephemeral (the app is reinstalled each lease);
+  produced the old "2-3 fps" reports; if it complains, `scripts/emu.sh down` stops idle slots.
+  Notes: a lease reinstalls the app on a wiped slot, so never rely on leftover state;
   the 260MB APK needs the 3GB guest (2GB crashed surfaceflinger); a fresh
   install janks until AOT-compiled, which `run` does for you.
 - CI runs on every push: verifies the DB asset exists and runs unit tests.
