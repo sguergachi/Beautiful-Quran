@@ -1035,8 +1035,8 @@ class TarjiLabViewModel(
     }
 
     companion object {
-        private const val CAPTURE_LEAD_MS = 300L
-        private const val CAPTURE_TAIL_MS = 1_000L
+        private const val CAPTURE_LEAD_MS = TarjiLabTrim.WORD_LEAD_MS
+        private const val CAPTURE_TAIL_MS = TarjiLabTrim.WORD_TAIL_MS
         /** Audio heard before the span, for the detector only: longer than
          * its 1.3 s analysis window, so a hold carried in from the previous
          * word arrives exactly as the reader's detector holds it. */

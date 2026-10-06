@@ -24,7 +24,6 @@ import androidx.compose.ui.graphics.drawscope.clipPath
 import androidx.compose.ui.graphics.drawscope.clipRect
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.DrawScope
-import androidx.compose.ui.text.style.ResolvedTextDirection
 import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
 import androidx.compose.ui.graphics.drawscope.translate
 import androidx.compose.ui.text.TextLayoutResult
@@ -258,7 +257,7 @@ sealed class ShapedWordBloom {
 }
 
 /**
- * A word's pulse as a sparkline under it, in reading order across
+ * A word's pulse as a sparkline under it, left to right across
  * [left]..[right]: [line] is the light the word will be given, one value
  * (−1..1) per step of its span in time. It is drawn translucent; the first
  * [played] (0..1) of it turns opaque as the word is recited. [bottom] is the word's box. Until
@@ -271,7 +270,6 @@ internal fun DrawScope.drawPulseTrace(
     bottom: Float,
     line: FloatArray?,
     played: Float,
-    rtl: Boolean,
     color: Color,
 ) {
     val inset = 2.dp.toPx()
@@ -293,10 +291,9 @@ internal fun DrawScope.drawPulseTrace(
         }
         return
     }
-    fun x(i: Int): Float {
-        val along = i / (line.size - 1f) * width
-        return if (rtl) right - inset - along else left + inset + along
-    }
+    // Time runs left to right whatever the script: it is a graph, and the
+    // lab's graph of the same word is read against it.
+    fun x(i: Int): Float = left + inset + i / (line.size - 1f) * width
     val heardTo = (played.coerceIn(0f, 1f) * (line.size - 1)).toInt()
     val stroke = 1.dp.toPx()
     val ahead = color.copy(alpha = color.alpha * 0.45f)
@@ -471,11 +468,10 @@ fun Modifier.shapedWordBloom(
             // ayah rebuilt ~2 paths per word on every animation frame.
             when (bloom) {
                 is ShapedWordBloom.PulseTrace -> {
-                    val rtl = textLayout.getParagraphDirection(start) == ResolvedTextDirection.Rtl
                     lineBoundsCache.boundsFor(textLayout, start, endExclusive).forEach { bounds ->
                         drawPulseTrace(
                             bounds.left, bounds.right, bounds.bottom,
-                            bloom.line, bloom.played, rtl, bloom.color,
+                            bloom.line, bloom.played, bloom.color,
                         )
                     }
                 }

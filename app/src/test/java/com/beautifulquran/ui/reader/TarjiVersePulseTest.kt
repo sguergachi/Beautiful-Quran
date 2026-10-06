@@ -4,10 +4,18 @@ import com.beautifulquran.data.model.Ayah
 import com.beautifulquran.data.model.Segment
 import com.beautifulquran.data.model.Word
 import com.beautifulquran.playback.Hani214
+import com.beautifulquran.playback.Tarji
+import com.beautifulquran.playback.TarjiLabTrim
+import com.beautifulquran.tarjilab.HANI_TUNING
+import com.beautifulquran.tarjilab.TarjiLabCodec
+import com.beautifulquran.tarjilab.TarjiLabKnobs
+import com.beautifulquran.tarjilab.analyzeTarjiCapture
+import com.beautifulquran.tarjilab.tarjiAcceptedPulseWave
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import kotlin.math.abs
+import kotlin.math.sqrt
 
 class TarjiVersePulseTest {
 
@@ -15,48 +23,61 @@ class TarjiVersePulseTest {
     private val audioMs = audio.pcm.size / audio.hopSamples * audio.hopMs
     /** The fixture starts 12 270 ms into the verse; its final word at 17 330. */
     private val finalStart = Hani214.FINAL_WORD_START_MS - Hani214.START_MS
+    /** The lab's view of that word: 300 ms before its first mark. */
+    private val labStart = finalStart - TarjiLabTrim.WORD_LEAD_MS
+
+    private fun sample(name: String) =
+        TarjiLabCodec.decode(javaClass.getResourceAsStream("/tarji/$name")!!.bufferedReader().use { it.readText() })
 
     @Test
-    fun `the line drawn under a word ahead of time is the pulse the reader gives it`() {
-        val windows = listOf(
-            TarjiVersePulse.Window(0.0, finalStart),
-            TarjiVersePulse.Window(finalStart, audioMs),
-        )
-        val (before, closing) = TarjiVersePulse.lines(audio, Hani214.knobs, depth = 1f, windows = windows)
-        // One value per analysis hop across the word.
-        assertEquals(((audioMs - finalStart) / audio.hopMs).toInt(), closing.size)
-        // Hani's closing hold reverberates: the line swings both ways…
-        assertTrue("crest ${closing.max()}", closing.max() > 0.3f)
-        assertTrue("trough ${closing.min()}", closing.min() < -0.3f)
-        // …several times, not once: it is a wave, at a rate tarji lives at.
-        val crossings = closing.toList().zipWithNext().count { (a, b) -> a < 0f && b >= 0f }
-        assertTrue("$crossings crests", crossings in 4..40)
-        // and it is quiet before the voice has held anything long enough.
-        assertTrue(closing.take(10).all { abs(it) < 0.05f })
-        // The words before it carry a false start the reader keeps dark.
-        assertTrue("before ${before.maxOf { abs(it) }}", before.maxOf { abs(it) } < closing.maxOf { abs(it) })
+    fun `the line under a word is the graph the Tarji Lab draws for it`() {
+        // The lab's own capture of 2:14's closing word, analysed as the lab
+        // does, against the reader's line for the same word from the verse's
+        // audio — same settings, same span.
+        val exported = sample("hani_2_14_w16_tuned.json")
+        val lab = tarjiAcceptedPulseWave(analyzeTarjiCapture(TarjiLabCodec.toCapture(exported), exported.knobs))
+        val line = TarjiVersePulse.lines(
+            audio, exported.knobs, listOf(TarjiVersePulse.Window(labStart, audioMs)),
+        ).single()
+        // The lab's capture starts on the same instant, to within a hop or two.
+        val labStartMs = exported.firstHopMediaMs - Hani214.START_MS
+        assertEquals(labStart, labStartMs, 2 * audio.hopMs)
+        // Quiet through the first half, as the lab shows it…
+        assertTrue(line.take(line.size * 2 / 5).all { abs(it) < 0.15f })
+        // …then the same wave: crests and troughs to the edges of the graph.
+        assertTrue("crest ${line.max()} trough ${line.min()}", line.max() > 0.9f && line.min() < -0.9f)
+        // Hop for hop it is the lab's trace. The capture places itself on the
+        // media clock from the tap's estimate of the playback head, which sits
+        // some 160 ms off the file's own time — a twentieth of the graph.
+        val n = minOf(line.size, lab.size)
+        val best = (-10..10).maxOf { shift ->
+            var dot = 0.0; var a = 0.0; var b = 0.0
+            for (i in 0 until n) {
+                val j = i + shift
+                if (j !in 0 until n) continue
+                dot += line[i] * lab[j]; a += line[i] * line[i]; b += lab[j] * lab[j]
+            }
+            dot / sqrt(a * b)
+        }
+        assertTrue("the line follows the lab's graph ($best)", best > 0.85)
     }
 
     @Test
     fun `Hani's closing word of the Fatihah draws a wave under the shipped tuning`() {
-        val sample = com.beautifulquran.tarjilab.TarjiLabCodec.decode(
-            javaClass.getResourceAsStream("/tarji/hani_1_7_w9_tuned.json")!!.bufferedReader().use { it.readText() })
-        val capture = com.beautifulquran.tarjilab.TarjiLabCodec.toCapture(sample)
-        val heard = TarjiVersePulse.Decoded(capture.pcm, capture.hopSamples, sample.hopContentDurationMs.toDouble())
-        val wordStart = 7_610.0 - sample.firstHopMediaMs
-        val end = capture.hopCount * heard.hopMs
+        val exported = sample("hani_1_7_w9_tuned.json")
+        val capture = TarjiLabCodec.toCapture(exported)
+        val heard = TarjiVersePulse.Decoded(capture.pcm, capture.hopSamples, exported.hopContentDurationMs.toDouble())
         val line = TarjiVersePulse.lines(
-            heard, com.beautifulquran.tarjilab.HANI_TUNING, depth = 1f,
-            windows = listOf(TarjiVersePulse.Window(wordStart.coerceAtLeast(0.0), end)),
+            heard, HANI_TUNING, listOf(TarjiVersePulse.Window(0.0, capture.hopCount * heard.hopMs)),
         ).single()
         assertTrue("crest ${line.max()} trough ${line.min()}", line.max() > 0.3f && line.min() < -0.3f)
     }
 
     @Test
     fun `a volume threshold keeps the pulse to a full voice`() {
-        val window = listOf(TarjiVersePulse.Window(finalStart, audioMs))
+        val window = listOf(TarjiVersePulse.Window(labStart, audioMs))
         fun swing(minVolume: Float) = TarjiVersePulse.lines(
-            audio, Hani214.knobs.copy(minVolume = minVolume), depth = 1f, windows = window,
+            audio, Hani214.knobs.copy(minVolume = minVolume), windows = window,
         ).single().maxOf { abs(it) }
         val open = swing(0f)
         assertTrue("no threshold $open", open > 0.3f)
@@ -66,7 +87,7 @@ class TarjiVersePulseTest {
         // …and one above anything he sings leaves the word still.
         assertEquals(0f, swing(0.6f), 0f)
         // Off is exactly the detector as it was.
-        assertEquals(com.beautifulquran.playback.Tarji.MIN_VOLUME, com.beautifulquran.tarjilab.TarjiLabKnobs().minVolume, 0f)
+        assertEquals(Tarji.MIN_VOLUME, TarjiLabKnobs().minVolume, 0f)
         assertEquals(0f, InkEngine.Tuning().tarjiMinVolume, 0f)
     }
 
@@ -74,7 +95,7 @@ class TarjiVersePulseTest {
     fun `work no longer wanted is abandoned, and paint dials do not ask for it again`() {
         var asked = 0
         val abandoned = runCatching {
-            TarjiVersePulse.lines(audio, Hani214.knobs, 1f, listOf(TarjiVersePulse.Window(0.0, audioMs))) {
+            TarjiVersePulse.lines(audio, Hani214.knobs, listOf(TarjiVersePulse.Window(0.0, audioMs))) {
                 ++asked < 3
             }
         }
@@ -90,7 +111,7 @@ class TarjiVersePulseTest {
     }
 
     @Test
-    fun `only words that may pulse get a line, each across the span it is active`() {
+    fun `only words that may pulse get a line, each across the span the lab shows`() {
         val words = listOf(
             Word(1, "قَالُوٓا۟", "", ""),
             Word(2, "نَحۡنُ", "", ""),
@@ -98,17 +119,20 @@ class TarjiVersePulseTest {
         )
         val ayah = Ayah(2, 14, "", "", words = words)
         val segments = listOf(Segment(1, 0, 900), Segment(2, 1_000, 1_400), Segment(3, 1_500, 4_000))
-        val windows = TarjiVersePulse.windows(ayah, segments, audioMs = 6_000.0)
+        val windows = TarjiVersePulse.windows(ayah, segments, audioMs = 4_600.0)
         val eligible = words.filter { InkEngine.tarjiEligible(it.arabic, it.position == 3) }.map { it.position }
         assertEquals(eligible, windows.keys.toList())
         assertTrue(3 in windows.keys)
-        // The closing word is held to the end of the audio, not its segment's end.
-        assertEquals(1_500.0, windows.getValue(3).startMs, 0.0)
-        assertEquals(6_000.0, windows.getValue(3).endMs, 0.0)
-        // An earlier one runs to the next word's start.
-        windows[1]?.let { assertEquals(1_000.0, it.endMs, 0.0) }
+        // 300 ms before the word's first mark, a second after its last — and
+        // never past either end of the audio.
+        assertEquals(1_200.0, windows.getValue(3).startMs, 0.0)
+        assertEquals(4_600.0, windows.getValue(3).endMs, 0.0)
+        windows[1]?.let {
+            assertEquals(0.0, it.startMs, 0.0)
+            assertEquals(1_900.0, it.endMs, 0.0)
+        }
         // A word the timings do not cover has no line.
-        assertTrue(TarjiVersePulse.windows(ayah, segments.take(1), 6_000.0).keys.all { it == 1 })
+        assertTrue(TarjiVersePulse.windows(ayah, segments.take(1), 4_600.0).keys.all { it == 1 })
     }
 
     @Test

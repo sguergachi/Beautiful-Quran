@@ -167,16 +167,23 @@ clearly breathing glow. Raise one without the other and it is a strobe again.
 **Finding the words that can pulse.** **Mark candidates** on the same tab
 draws a green sparkline under every word `InkEngine.tarjiEligible` admits — a
 long madd, a ghunnah or the verse's closing hold on its own letters. The line
-is the light the word will be given, worked out before it plays: the verse's
-audio is decoded from the playback cache and run through the reader's own
-detector, ear pulse, word gate and resonance (`TarjiVersePulse`), in reading
-order across the span the word is active. A flat line is a candidate that does
-not pulse in this recitation; a dashed rule is a verse still being worked out, or one that could not be (the tab says why).
-The line is translucent; while the word is recited the part already heard turns opaque, placed by the ear's own position on the media clock so it moves with the light. A verse's audio is decoded once and kept, so retuning
-reruns only the detector; a dial being dragged cancels the work it has made
-stale, and paint dials ask for none. It is a lab
-mark, session-only, redone when the detector is retuned, and is not drawn on
-the English mushaf's prose.
+is **the Tarjīʿ Lab's green graph for that word**: the detector's pulse at the
+ear times its gain (`tarjiAcceptedPulseWave`), over the span the lab shows
+(300 ms before the word's first mark to a second after its last), left to
+right. It is worked out before the verse plays: the audio is decoded from the
+playback cache and run through the reader's own detector and ear pulse
+(`TarjiVersePulse`). Unlike the light itself it is not held to one event per
+word, exactly as the lab's graph is not.
+
+A flat line is a candidate that does not pulse in this recitation; a dashed
+rule is a verse still being worked out, or one that could not be (the tab says
+why, and reports the last verse it did). The line is translucent; while the
+word is recited the part already heard turns opaque, placed by the ear's own
+position on the media clock so it moves with the light. A verse's audio is
+decoded once and kept, so retuning reruns only the detector; a dial being
+dragged cancels the work it has made stale, and paint dials ask for none.
+Lines are kept by surah, verse and word position. It is a lab mark,
+session-only, and is not drawn on the English mushaf's prose.
 
 **Telling paint from detection.** The Tarjīʿ tab has a **Test pulse** (a steady
 6 Hz light on the lit word, detector bypassed) and a **Word** line saying

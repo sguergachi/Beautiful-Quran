@@ -13,7 +13,7 @@ import com.beautifulquran.playback.RecitationCache
 import com.beautifulquran.playback.Tarji
 import com.beautifulquran.playback.TarjiEarSample
 import com.beautifulquran.playback.TarjiEarTrack
-import com.beautifulquran.playback.VoiceEnergy
+import com.beautifulquran.playback.TarjiLabTrim
 import com.beautifulquran.playback.analysisHopContentMs
 import com.beautifulquran.tarjilab.TarjiLabKnobs
 import androidx.compose.runtime.collectAsState
@@ -48,14 +48,15 @@ internal object TarjiVersePulse {
     private const val EAR_BEHIND_HOPS = 12
 
     /**
-     * The light of each of [windows], one value per analysis hop across it
-     * (−1..1; all zero where nothing is admitted). Pure: the same detector,
-     * ear pulse, one-event-per-word gate and resonance the reader runs.
+     * The pulse across each of [windows], one value per analysis hop (−1..1):
+     * the detector's pulse at the ear times its gain — the very quantity the
+     * Tarjīʿ Lab draws in green as the reader's output
+     * (`tarjiAcceptedPulseWave`), so a word's line and its lab graph are one
+     * picture. Windows may overlap. Pure.
      */
     fun lines(
         audio: Decoded,
         knobs: TarjiLabKnobs,
-        depth: Float,
         windows: List<Window>,
         /** Asked every few hops; false abandons the work (the answer is no longer wanted). */
         wanted: () -> Boolean = { true },
@@ -65,7 +66,6 @@ internal object TarjiVersePulse {
         knobs.applyTo(detector)
         val track = TarjiEarTrack()
         val ear = TarjiEarSample()
-        val gates = windows.map { TarjiWordGate() }
         val out = windows.map {
             FloatArray(((it.endMs - it.startMs) / audio.hopMs).toInt().coerceAtLeast(2))
         }
@@ -89,37 +89,39 @@ internal object TarjiVersePulse {
             val earHop = hop - EAR_BEHIND_HOPS
             if (earHop < 0) continue
             val mediaMs = (earHop + 1) * audio.hopMs
-            val index = windows.indexOfFirst { mediaMs >= it.startMs && mediaMs < it.endMs }
-            if (index < 0) continue
-            track.read(mediaMs, audio.hopMs, ear)
-            val window = windows[index]
-            val eventMs = if (ear.eventStartHop < 0) {
-                VoiceEnergy.NO_EVENT_MS
-            } else {
-                ((ear.eventStartHop - 1) * audio.hopMs).toLong()
+            var read = false
+            var pulse = 0f
+            for (index in windows.indices) {
+                val window = windows[index]
+                if (mediaMs < window.startMs || mediaMs >= window.endMs) continue
+                if (!read) {
+                    track.read(mediaMs, audio.hopMs, ear)
+                    pulse = (ear.tremolo * ear.gain).coerceIn(-1f, 1f)
+                    read = true
+                }
+                val line = out[index]
+                line[((mediaMs - window.startMs) / audio.hopMs).toInt().coerceIn(0, line.lastIndex)] = pulse
             }
-            val allowed = gates[index].allows(ear.gain, ear.reverberating, eventMs, window.startMs.toLong())
-            val light = InkEngine.glintResonance(allowed, ear.tremolo, ear.gain, depth = depth, enabled = true).light
-            val line = out[index]
-            line[((mediaMs - window.startMs) / audio.hopMs).toInt().coerceIn(0, line.lastIndex)] = light
         }
         return out
     }
 
     /**
-     * Each eligible word's window: from its first segment to the next
-     * segment's start — the span the reader holds it Active — or to the end
-     * of the audio for the verse's last.
+     * Each eligible word's window: the span the Tarjīʿ Lab shows for the word
+     * ([TarjiLabTrim.wordSpanMs] with the lab's lead and tail), kept inside
+     * the audio.
      */
     fun windows(ayah: Ayah, segments: List<Segment>, audioMs: Double): Map<Int, Window> {
         val last = ayah.words.lastOrNull()?.position
         val out = LinkedHashMap<Int, Window>()
         for (word in ayah.words) {
             if (!InkEngine.tarjiEligible(word.arabic, word.position == last)) continue
-            val at = segments.indexOfFirst { it.position == word.position }
-            if (at < 0) continue
-            val start = segments[at].startMs.toDouble()
-            val end = segments.getOrNull(at + 1)?.startMs?.toDouble()?.takeIf { it > start } ?: audioMs
+            if (segments.none { it.position == word.position }) continue
+            val span = TarjiLabTrim.wordSpanMs(
+                segments, word.position, TarjiLabTrim.WORD_LEAD_MS, TarjiLabTrim.WORD_TAIL_MS,
+            ) ?: continue
+            val start = span.first.toDouble().coerceAtLeast(0.0)
+            val end = span.last.toDouble().coerceAtMost(audioMs)
             if (end - start >= 40.0) out[word.position] = Window(start, end)
         }
         return out
@@ -178,8 +180,7 @@ internal object TarjiVersePulse {
         val url = reciter.audioUrl(ayah.surahId, ayah.number)
         val tuning = InkEngine.tuning
         val knobs = detectorKnobs(tuning)
-        val depth = tuning.glintResonanceDepth
-        val key = "$url|$knobs|$depth"
+        val key = "$url|$knobs"
         results[key]?.let { apply(ayah, it); return Outcome.Done }
         val app = context.applicationContext
         working++
@@ -198,7 +199,7 @@ internal object TarjiVersePulse {
             val result = withContext(Dispatchers.Default) {
                 val job = coroutineContext[Job]
                 val windows = windows(ayah, segments, heard.pcm.size / heard.hopSamples * heard.hopMs)
-                val lines = lines(heard, knobs, depth, windows.values.toList()) { job?.isActive != false }
+                val lines = lines(heard, knobs, windows.values.toList()) { job?.isActive != false }
                 Result(windows.keys.zip(lines).toMap(), windows)
             }
             results[key] = result
@@ -398,7 +399,7 @@ internal fun RequestTarjiPulseLines(ayah: Ayah) {
     val knobs = TarjiVersePulse.detectorKnobs(tuning)
     val reciterId = (context.applicationContext as? com.beautifulquran.QuranApp)
         ?.settings?.settings?.collectAsState()?.value?.reciterId
-    androidx.compose.runtime.LaunchedEffect(ayah, knobs, tuning.glintResonanceDepth, reciterId) {
+    androidx.compose.runtime.LaunchedEffect(ayah, knobs, reciterId) {
         // A dial being dragged changes the key every frame; wait for it to
         // rest before doing anything, and let the restart cancel the rest.
         kotlinx.coroutines.delay(150)

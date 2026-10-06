@@ -1279,9 +1279,9 @@ private fun Modifier.layeredBaseInk(motion: InkMotion, rtl: Boolean): Modifier =
 }
 
 /** The Ink Lab's pulse graph under a word that may pulse (see [ShapedWordBloom.PulseTrace]). */
-private fun Modifier.tarjiPulseTrace(trace: InkEngine.TarjiTrace, color: Color, rtl: Boolean): Modifier =
+private fun Modifier.tarjiPulseTrace(trace: InkEngine.TarjiTrace, color: Color): Modifier =
     drawBehind {
-        drawPulseTrace(0f, size.width, size.height, trace.line, trace.played, rtl, color)
+        drawPulseTrace(0f, size.width, size.height, trace.line, trace.played, color)
     }
 
 /** Draw-phase alpha gate for a glyph layer, padded by [GlintLayerBleed] so the
@@ -1656,7 +1656,7 @@ private fun HighlightLayeredText(
     val searchHitActive = !motion.showRepeatLayer && searchHitWash != null
     val orangeWash = motion.repeatWash.takeIf { motion.showRepeatLayer }
     val trace = motion.tarjiTrace
-    Box(if (trace != null) modifier.tarjiPulseTrace(trace, motion.tarjiTraceColor, rtl) else modifier) {
+    Box(if (trace != null) modifier.tarjiPulseTrace(trace, motion.tarjiTraceColor) else modifier) {
         // The glow is a light's falloff, glyph-shaped at every width — no
         // radial field: a wide faint veil, the halo, and a tight bloom.
         if (glintInk != null && motion.showGlintLayer) {
