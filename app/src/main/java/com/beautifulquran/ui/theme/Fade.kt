@@ -262,7 +262,7 @@ sealed class ShapedWordBloom {
  * [left]..[right]: [line] is the light the word will be given, one value
  * (−1..1) per step of its span in time. It is drawn translucent; the first
  * [played] (0..1) of it turns opaque as the word is recited. [bottom] is the word's box. Until
- * [line] is worked out it is a faint rule; a flat line is a word that may
+ * [line] is worked out it is a faint dashed rule; a flat line is a word that may
  * pulse and in this recitation does not.
  */
 internal fun DrawScope.drawPulseTrace(
@@ -280,10 +280,17 @@ internal fun DrawScope.drawPulseTrace(
     val swing = 6.dp.toPx()
     val baseline = bottom - swing - 1.dp.toPx()
     if (line == null || line.size < 2) {
-        drawLine(
-            color.copy(alpha = color.alpha * 0.35f),
-            Offset(left + inset, baseline), Offset(right - inset, baseline), 1.dp.toPx(),
-        )
+        // Not worked out: dashes, so it is never mistaken for a word whose
+        // line was worked out and is flat.
+        val dash = 3.dp.toPx()
+        var at = left + inset
+        while (at < right - inset) {
+            drawLine(
+                color.copy(alpha = color.alpha * 0.35f),
+                Offset(at, baseline), Offset(minOf(at + dash, right - inset), baseline), 1.dp.toPx(),
+            )
+            at += dash * 2f
+        }
         return
     }
     fun x(i: Int): Float {

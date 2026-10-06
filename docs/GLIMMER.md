@@ -171,7 +171,7 @@ is the light the word will be given, worked out before it plays: the verse's
 audio is decoded from the playback cache and run through the reader's own
 detector, ear pulse, word gate and resonance (`TarjiVersePulse`), in reading
 order across the span the word is active. A flat line is a candidate that does
-not pulse in this recitation; a faint rule is a verse still being worked out.
+not pulse in this recitation; a dashed rule is a verse still being worked out, or one that could not be (the tab says why).
 The line is translucent; while the word is recited the part already heard turns opaque, placed by the ear's own position on the media clock so it moves with the light. A verse's audio is decoded once and kept, so retuning
 reruns only the detector; a dial being dragged cancels the work it has made
 stale, and paint dials ask for none. It is a lab

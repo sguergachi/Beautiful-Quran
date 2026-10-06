@@ -16,6 +16,7 @@ import com.beautifulquran.playback.TarjiEarTrack
 import com.beautifulquran.playback.VoiceEnergy
 import com.beautifulquran.playback.analysisHopContentMs
 import com.beautifulquran.tarjilab.TarjiLabKnobs
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
 import kotlinx.coroutines.CoroutineScope
@@ -126,17 +127,13 @@ internal object TarjiVersePulse {
 
     // ── On the device ────────────────────────────────────────────────────
 
-    /** Set by the reader: a verse's audio and word timings, or null if it has none loaded. */
-    @Volatile
-    var source: ((surahId: Int, ayah: Int) -> Pair<String, List<Segment>>?)? = null
-
     /** For the lab's readout: verses being worked out now, and what the last failure said. */
     var working by androidx.compose.runtime.mutableIntStateOf(0)
         private set
     var lastFailure by androidx.compose.runtime.mutableStateOf<String?>(null)
         private set
 
-    enum class Outcome { Done, NotReady, Failed }
+    enum class Outcome { Done, Failed }
 
     private class Result(val lines: Map<Int, FloatArray>, val windows: Map<Int, Window>)
 
@@ -148,6 +145,7 @@ internal object TarjiVersePulse {
     // detector reruns only the detector, which is a fraction of the work.
     private val audio = lru<String, kotlinx.coroutines.Deferred<Decoded>>(AUDIO_KEPT)
     private val results = lru<String, Result>(RESULTS_KEPT)
+    private val timings = lru<String, Map<Int, List<Segment>>>(4)
 
     private fun <K, V> lru(limit: Int) = object : LinkedHashMap<K, V>(limit, 0.75f, true) {
         override fun removeEldestEntry(eldest: MutableMap.MutableEntry<K, V>?) = size > limit
@@ -160,8 +158,21 @@ internal object TarjiVersePulse {
      * answer every frame, and only the last one is wanted.
      */
     suspend fun compute(context: Context, ayah: Ayah): Outcome {
-        val (url, segments) = source?.invoke(ayah.surahId, ayah.number) ?: return Outcome.NotReady
-        if (segments.isEmpty()) return Outcome.NotReady
+        // The verse's reciter and timings come from the app's own stores, the
+        // same the reader loads from. They once came through whichever reader
+        // screen was made last, and a second screen left every line unanswered.
+        val name = "${ayah.surahId}:${ayah.number}"
+        val quran = context.applicationContext as? com.beautifulquran.QuranApp
+            ?: return failed("$name no app")
+        val reciterId = quran.settings.settings.value.reciterId
+        val reciters = quran.repository.reciters()
+        val reciter = reciters.firstOrNull { it.id == reciterId } ?: reciters.firstOrNull()
+            ?: return failed("$name no reciter")
+        val surahTimings = timings["${reciter.id}|${ayah.surahId}"]
+            ?: quran.repository.timings(reciter.id, ayah.surahId).also { timings["${reciter.id}|${ayah.surahId}"] = it }
+        val segments = surahTimings[ayah.number].orEmpty()
+        if (segments.isEmpty()) return failed("$name has no word timings for ${reciter.name}")
+        val url = reciter.audioUrl(ayah.surahId, ayah.number)
         val tuning = InkEngine.tuning
         val knobs = detectorKnobs(tuning)
         val depth = tuning.glintResonanceDepth
@@ -193,11 +204,15 @@ internal object TarjiVersePulse {
         } catch (cancelled: kotlinx.coroutines.CancellationException) {
             throw cancelled
         } catch (failed: Throwable) {
-            lastFailure = "${ayah.surahId}:${ayah.number} ${failed.javaClass.simpleName}: ${failed.message}"
-            return Outcome.Failed
+            return failed("$name ${failed.javaClass.simpleName}: ${failed.message}")
         } finally {
             working--
         }
+    }
+
+    private fun failed(why: String): Outcome {
+        lastFailure = why
+        return Outcome.Failed
     }
 
     /** The detector's own settings: what a verse's lines depend on, and nothing the paint does. */
@@ -370,7 +385,9 @@ internal fun RequestTarjiPulseLines(ayah: Ayah) {
     val tuning = InkEngine.tuning
     // Only what the detector reads: a paint dial must not redo the verse.
     val knobs = TarjiVersePulse.detectorKnobs(tuning)
-    androidx.compose.runtime.LaunchedEffect(ayah, knobs, tuning.glintResonanceDepth) {
+    val reciterId = (context.applicationContext as? com.beautifulquran.QuranApp)
+        ?.settings?.settings?.collectAsState()?.value?.reciterId
+    androidx.compose.runtime.LaunchedEffect(ayah, knobs, tuning.glintResonanceDepth, reciterId) {
         // A dial being dragged changes the key every frame; wait for it to
         // rest before doing anything, and let the restart cancel the rest.
         kotlinx.coroutines.delay(150)
@@ -379,7 +396,6 @@ internal fun RequestTarjiPulseLines(ayah: Ayah) {
             when (TarjiVersePulse.compute(context, ayah)) {
                 TarjiVersePulse.Outcome.Done -> return@LaunchedEffect
                 TarjiVersePulse.Outcome.Failed -> if (++failures >= 3) return@LaunchedEffect
-                TarjiVersePulse.Outcome.NotReady -> Unit
             }
             kotlinx.coroutines.delay(750)
         }
