@@ -233,7 +233,11 @@ locked through the irregular crescendo: real builds
 to ~0.1–0.3 at the loudest point, so a strong amplitude modulation
 (≥ ~6% at an in-band rate, ceiling-cheat guard applied) is treated as
 self-evidently vibrating. Evidence readiness is derived from the slowest
-configured period, and ten hops without coherent pulse evidence end the event.
+configured period. During the first second of a confirmed event's buildup,
+the evidence gap allows two tracked cycles (at least ten hops); a fixed
+200 ms timeout could end Hani's slow hold inside a single cycle, turning
+the same recording's wave into a tiny ripple on a different decoder hop grid.
+After the buildup, ten hops without coherent pulse evidence end the event.
 The fallback cannot carry Alafasy's ḍād event onward through the
 later lām/nūn merely because their envelope or room echo is uneven.
 The pulse rate is **tracked with lag hysteresis** for event evidence. It does

@@ -63,6 +63,27 @@ class TarjiVersePulseTest {
     }
 
     @Test
+    fun `Hani's closing hold stays visible across decoder hop alignments`() {
+        // The Pixel's 6% volume gate and current tuning, on the same audio.
+        // Dropping 100 or 104 samples used to turn this wave into a 0.12
+        // ripple: a short FM lull permanently ended the newly acquired hold.
+        val strengths = (0 until 40).map { phase ->
+            val dropped = phase * 4
+            val offsetMs = dropped * Hani214.HOP_MS / Hani214.HOP_SAMPLES
+            val shifted = TarjiVersePulse.Decoded(
+                audio.pcm.copyOfRange(dropped, audio.pcm.size), audio.hopSamples, audio.hopMs,
+            )
+            TarjiVersePulse.lines(
+                shifted, HANI_TUNING.copy(minVolume = 0.06f),
+                listOf(TarjiVersePulse.Window(labStart - offsetMs, audioMs - offsetMs)),
+            ).single().maxOf { abs(it) }
+        }
+        assertTrue("every alignment must carry the pulse ($strengths)", strengths.all { it > 0.4f })
+        assertTrue("the reported weak alignments must reach full strength ($strengths)",
+            strengths[25] > 0.9f && strengths[26] > 0.9f)
+    }
+
+    @Test
     fun `Hani's closing word of the Fatihah draws a wave under the shipped tuning`() {
         val exported = sample("hani_1_7_w9_tuned.json")
         val capture = TarjiLabCodec.toCapture(exported)

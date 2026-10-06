@@ -618,8 +618,14 @@ class Tarji {
         }
         if (levelTransitionGrace > 0) levelTransitionGrace--
         if (eventPeak > 0f && lifecycleCoherent) eventConfirmed = true
+        // Let a confirmed slow pulse build through two missed cycles while
+        // its analysis settles. Once built, later consonants still stop it.
+        val pulseGapHops = if (eventConfirmed && eventHops < SWELL_RAMP_HOPS) {
+            maxOf(PULSE_GAP_PERSIST, ceil(2000f / (eventRateHz.coerceAtLeast(minHz) * HOP_MS)).toInt())
+        } else PULSE_GAP_PERSIST
+        val pulseLost = pulseUnder >= pulseGapHops
         val falseStart = eventPeak > 0f && !eventConfirmed && !climaxOver &&
-            pulseUnder >= PULSE_GAP_PERSIST
+            pulseLost
         if (falseStart) {
             // An unseen syllable-attack blip must not spend the later hold
             // (Hani 2:14 مُسْتَهْزِءُونَ). Confirmed events still end below.
@@ -630,7 +636,7 @@ class Tarji {
             levelTransitionGrace = 0
             eventHops = 0
             awaitingCoherentPulse = true
-        } else if (climaxOver || pulseUnder >= PULSE_GAP_PERSIST) {
+        } else if (climaxOver || pulseLost) {
             endOfHold = true
         }
         reverberating = next && !endOfHold && !falseStart
