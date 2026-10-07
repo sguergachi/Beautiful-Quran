@@ -279,8 +279,20 @@ mid-animation, so the bloom can never appear to restart):
     creates a fresh gate for the new performance event. The detector carries
     the event's start through the same delayed history as its gain and pulse,
     then maps that start to the media-item clock. A pulse whose start precedes
-    the active word cannot cross its boundary through output latency; only an
-    event that actually starts inside the word can arm it.
+    the active word cannot cross its boundary through output latency.
+
+    Two refinements, found replaying consecutive verses through this chain
+    (played on, and played afresh as a repeat does), where the graph spiked
+    and the light stayed dark until the verse was repeated:
+    - Only an event that reached gain 0.3 **spends** the word. A brief, weak
+      one — often the syllable's own attack — used to spend it, and the
+      reverberation after it was refused; whether it was depended on hop
+      phase and on what came before (Minshawi 1:7: 0.16 → 1.0).
+    - An event caught up to **600 ms before** the word's timing mark is the
+      word's own, unless another word has already shown it. Shown events are
+      kept in one `TarjiEventLedger` per reader, so one event still lights one
+      word, and a replay finds the same owner. Further back, an event still
+      belongs to an earlier utterance.
 
 When all four pass, tarjīʿ **makes the word's light flicker** with the voice
 (`docs/GLIMMER.md` has the paint). The sign is acoustic phase: positive is a

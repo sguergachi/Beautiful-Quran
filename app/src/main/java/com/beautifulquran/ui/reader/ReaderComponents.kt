@@ -1416,7 +1416,7 @@ private fun rememberTarjiGate(
                 }
             }
         }
-        val eventGate = TarjiWordGate()
+        val eventGate = TarjiWordGate(InkEngine.tarjiEventLedger)
         val light = com.beautifulquran.ui.theme.GlintLight()
         val ear = com.beautifulquran.playback.TarjiEarSample()
         var pulseRateHz = 0f

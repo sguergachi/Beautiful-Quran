@@ -579,6 +579,9 @@ object InkEngine {
      */
     var tarjiMarkCandidates by mutableStateOf(false)
 
+    /** Which word has shown which tarjīʿ event: one event lights one word. Main thread. */
+    internal val tarjiEventLedger = TarjiEventLedger()
+
     /**
      * The light one word will be given, worked out ahead from the verse's
      * audio ([TarjiVersePulse]): what the lab draws under a candidate. [line]
