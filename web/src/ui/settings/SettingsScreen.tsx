@@ -10,6 +10,7 @@ import {
 } from '../../data/settings'
 import { customizeSummary } from '../../data/customizePolicy'
 import { CustomizeScreen } from './CustomizeScreen'
+import { AcknowledgementsScreen } from './AcknowledgementsScreen'
 import { ReciterChoices, RecitersScreen } from './RecitersScreen'
 import { NuqtaLab } from './NuqtaLab'
 import { settingsLayerFor, type StackLayer } from '../paper/stack'
@@ -46,20 +47,6 @@ import { PaperSwitch } from '../kit/PaperSwitch'
 import { rearmEducation } from '../../data/education'
 import { version as APP_VERSION } from '../../../package.json'
 
-const ATTRIBUTIONS = `Quran text (Uthmani script) and Saheeh International translation via the quran-json project, from Tanzil and Al Quran Cloud.
-
-Word-by-word translation and transliteration from the Quran.com dataset.
-
-Root, lemma, and morphological annotation from the Quranic Arabic Corpus (corpus.quran.com), © Kais Dukes.
-
-Word-level audio timing data © the quran-align project contributors, CC-BY 4.0.
-
-Recitation audio streamed from everyayah.com. All rights to the recitations belong to the respective reciters.
-
-Arabic typeface: KFGQPC HAFS Uthmanic Script © King Fahd Glorious Quran Printing Complex, Madinah.
-
-This app is free, ad-free, and collects no data.`
-
 const HOME_BOOKMARK_OPTIONS: { value: HomeBookmarkStyle; label: string }[] = [
   { value: 'top_bound', label: 'Top-bound ribbon' },
   { value: 'saved_passages', label: 'Saved passages line' },
@@ -85,7 +72,7 @@ export function SettingsScreen({
   const [laid, setLaid] = useState(false)
   if (isTop && !laid) setLaid(true)
   const depth = Math.max(0, stackLayer - layer)
-  const [page, setPage] = useState<'main' | 'reciters' | 'customize'>('main')
+  const [page, setPage] = useState<'main' | 'reciters' | 'customize' | 'acknowledgements'>('main')
   const scrollRef = useRef<HTMLDivElement>(null)
   const favoriteReciters = reciters.filter((reciter) => s.favoriteReciterIds.includes(reciter.id))
 
@@ -389,6 +376,8 @@ export function SettingsScreen({
             checkPaintToken={checkPaintToken}
             onBack={() => setPage('main')}
           />
+        ) : page === 'acknowledgements' ? (
+          <AcknowledgementsScreen onBack={() => setPage('main')} />
         ) : (
           <>
         <button
@@ -430,6 +419,20 @@ export function SettingsScreen({
             <span className="settings-nav-copy">
               <span className="settings-nav-label">Customize</span>
               <span className="settings-nav-note">{customizeSummary(s)}</span>
+            </span>
+            <DisclosureChevron expanded={false} />
+          </button>
+        </section>
+
+        <section className="settings-section">
+          <button
+            type="button"
+            className="settings-nav"
+            onClick={() => setPage('acknowledgements')}
+          >
+            <span className="settings-nav-copy">
+              <span className="settings-nav-label">Acknowledgements</span>
+              <span className="settings-nav-note">Quran text, timings, audio, typeface</span>
             </span>
             <DisclosureChevron expanded={false} />
           </button>
@@ -821,8 +824,6 @@ export function SettingsScreen({
             {s.developerMode ? ' · developer mode' : ''}
           </p>
         </footer>
-
-        <p className="settings-attributions">{ATTRIBUTIONS}</p>
           </>
         )}
       </div>

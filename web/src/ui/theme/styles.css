@@ -4474,14 +4474,38 @@ button.ayah-mark {
   color: color-mix(in srgb, var(--ink-muted) 90%, transparent);
 }
 
-.settings-attributions {
-  margin: 0 auto 1.5rem;
-  max-width: 32rem;
-  color: color-mix(in srgb, var(--ink) 38%, transparent);
+.settings .acknowledgements h1 {
+  margin-bottom: 10px;
+}
+
+.settings .acknowledgements-caption {
+  margin: 0 0 12px;
+}
+
+.acknowledgements-entry {
+  margin-bottom: 28px;
+}
+
+.acknowledgements-title {
+  margin: 0 0 2px;
+  font-family: var(--font-body);
+  font-size: 1.05rem;
+  line-height: 1.35;
+  font-weight: 400;
+  letter-spacing: normal;
+  text-transform: none;
+  color: var(--ink);
+}
+
+.acknowledgements-body {
+  margin: 0;
+  font-size: 0.95rem;
   line-height: 1.55;
-  white-space: pre-line;
-  font-size: 0.9rem;
-  text-align: center;
+  color: var(--ink-rung-quiet);
+}
+
+.settings .acknowledgements-foot {
+  margin: 32px 0 48px;
 }
 
 .paper-input {
@@ -5530,7 +5554,7 @@ button.ayah-mark {
   margin: 56px 0 18px;
 }
 
-.app-shell:not([data-spread='true']) .settings-attributions {
+.app-shell:not([data-spread='true']) .settings .acknowledgements-foot {
   margin-bottom: 0;
 }
 
