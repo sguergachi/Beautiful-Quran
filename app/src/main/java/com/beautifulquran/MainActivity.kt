@@ -111,6 +111,7 @@ import com.beautifulquran.ui.reader.RootReturnTarget
 import com.beautifulquran.ui.rootviewer.RootViewerScreen
 import com.beautifulquran.ui.rootviewer.RootViewerViewModel
 import com.beautifulquran.ui.rootviewer.WordHoldChooser
+import com.beautifulquran.ui.settings.AcknowledgementsPage
 import com.beautifulquran.ui.settings.CustomizeScreen
 import com.beautifulquran.ui.settings.DownloadManagerPage
 import com.beautifulquran.ui.settings.ComponentKitScreen
@@ -1067,6 +1068,10 @@ private fun PaperStackApp(
                         settingsDetail = SettingsDetail.DOWNLOADS
                         animateTo(settingsLayer + 1)
                     },
+                    onOpenAcknowledgements = {
+                        settingsDetail = SettingsDetail.ACKNOWLEDGEMENTS
+                        animateTo(settingsLayer + 1)
+                    },
                     onOpenComponentKit = {
                         settingsDetail = SettingsDetail.COMPONENT_KIT
                         animateTo(settingsLayer + 1)
@@ -1104,6 +1109,9 @@ private fun PaperStackApp(
                         )
                         SettingsDetail.DOWNLOADS -> DownloadsSheet(
                             viewModel = settingsViewModel,
+                            onBack = { animateTo(settingsLayer) },
+                        )
+                        SettingsDetail.ACKNOWLEDGEMENTS -> AcknowledgementsSheet(
                             onBack = { animateTo(settingsLayer) },
                         )
                         SettingsDetail.COMPONENT_KIT -> ComponentKitScreen(
@@ -1482,6 +1490,11 @@ private fun DownloadsSheet(
         surahs = surahs,
         onBack = onBack,
     )
+}
+
+@Composable
+private fun AcknowledgementsSheet(onBack: () -> Unit) {
+    AcknowledgementsPage(onBack = onBack)
 }
 
 private enum class PaperLayer {

@@ -64,7 +64,6 @@ import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -102,23 +101,6 @@ import com.beautifulquran.ui.theme.verticalFadingEdges
 import kotlin.math.roundToInt
 import com.beautifulquran.ui.theme.QuranTheme
 
-private val ATTRIBUTIONS = """
-Quran text (Uthmani script) and Saheeh International translation via the
-quran-json project, from Tanzil and Al Quran Cloud.
-
-Word-by-word translation, transliteration, and QCF layout from Quran Foundation.
-
-Root, lemma, and morphological annotation from the Quranic Arabic Corpus (corpus.quran.com), © Kais Dukes.
-
-Word-level audio timing data © the quran-align project contributors, CC-BY 4.0.
-
-Recitation audio streamed from everyayah.com. All rights to the recitations belong to the respective reciters.
-
-Arabic typeface: KFGQPC HAFS Uthmanic Script © King Fahd Glorious Quran Printing Complex, Madinah.
-
-This app is free, ad-free, and collects no data.
-""".trimIndent()
-
 // Text size runs the same discrete stops the reader honours: 0.8× … 1.6×.
 private const val FONT_SCALE_MIN = 0.8f
 private const val FONT_SCALE_MAX = 1.6f
@@ -126,7 +108,7 @@ private const val FONT_SCALE_STOPS = 8 // intervals; nine tappable stops
 private val FONT_SCALE_STEP = (FONT_SCALE_MAX - FONT_SCALE_MIN) / FONT_SCALE_STOPS
 private val PINCH_SCALE_THRESHOLD = FONT_SCALE_STEP * 0.6f
 
-internal enum class SettingsDetail { RECITERS, CUSTOMIZE, DOWNLOADS, COMPONENT_KIT }
+internal enum class SettingsDetail { RECITERS, CUSTOMIZE, DOWNLOADS, COMPONENT_KIT, ACKNOWLEDGEMENTS }
 
 /** Session-only brush lab state shared by Settings and its Customize leaf. */
 internal class SettingsInkPreviewState(initialStyle: BrushCircleStyle) {
@@ -173,6 +155,7 @@ internal fun SettingsScreen(
     onOpenReciters: () -> Unit = {},
     onOpenCustomize: () -> Unit = {},
     onOpenDownloads: () -> Unit = {},
+    onOpenAcknowledgements: () -> Unit = {},
     onOpenComponentKit: () -> Unit = {},
     onOpenTimingsLab: () -> Unit = {},
     onOpenTarjiLab: () -> Unit = {},
@@ -322,6 +305,13 @@ internal fun SettingsScreen(
                 DisclosureChevron(expanded = false)
             }
 
+            Spacer(Modifier.height(20.dp))
+            NavigateRow(
+                label = "Acknowledgements",
+                note = "Quran text, timings, audio, typeface",
+                onClick = { onOpenAcknowledgements() },
+            )
+
             if (settings.developerModeEnabled) {
                 Spacer(Modifier.height(44.dp))
                 DeveloperSection(
@@ -354,14 +344,6 @@ internal fun SettingsScreen(
                 },
             )
 
-            Spacer(Modifier.height(18.dp))
-            Text(
-                text = ATTRIBUTIONS,
-                style = MaterialTheme.typography.bodyMedium,
-                textAlign = TextAlign.Center,
-                color = QuranTheme.ink.quiet,
-                modifier = Modifier.fillMaxWidth(),
-            )
             Spacer(Modifier.height(48.dp))
         }
     }
