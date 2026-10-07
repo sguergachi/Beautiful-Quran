@@ -559,6 +559,17 @@ object InkEngine {
      */
     var tarjiTestPulse by mutableStateOf(false)
 
+    private var detectorMode by mutableStateOf(com.beautifulquran.playback.TarjiDetectorMode.Current)
+    /** Developer comparison only; never persisted in reciter profiles or exports. */
+    var tarjiDetectorMode: com.beautifulquran.playback.TarjiDetectorMode
+        get() = detectorMode
+        set(value) {
+            if (value == detectorMode) return
+            detectorMode = value
+            com.beautifulquran.playback.VoiceEnergy.setDetectorMode(value)
+            clearTarjiTraces()
+        }
+
     /**
      * Ink Lab only: mark every word that may pulse — the ones whose own
      * letters carry a long madd, a ghunnah or the verse's closing hold
@@ -589,6 +600,13 @@ object InkEngine {
             this.spanMs = spanMs
             this.line = line
         }
+
+        fun clear() {
+            line = null
+            startMs = 0f
+            spanMs = 0f
+            played = 0f
+        }
     }
 
     // Keyed by the word's place in the Quran, and held: a trace must outlive
@@ -603,6 +621,13 @@ object InkEngine {
     /** The trace of word [position] of [surahId]:[ayah]. Main thread only. */
     fun tarjiTrace(surahId: Int, ayah: Int, position: Int): TarjiTrace =
         tarjiTraces.getOrPut(surahId * 1_000_000L + ayah * 1_000L + position) { TarjiTrace() }
+
+    internal fun clearTarjiTraces() = tarjiTraces.values.forEach { it.clear() }
+
+    internal fun clearTarjiTraces(surahId: Int, ayah: Int) {
+        val prefix = surahId * 1_000_000L + ayah * 1_000L
+        tarjiTraces.filterKeys { it in prefix until prefix + 1_000L }.values.forEach { it.clear() }
+    }
 
     /**
      * What the reader's light last did for the active word, for the Ink Lab's

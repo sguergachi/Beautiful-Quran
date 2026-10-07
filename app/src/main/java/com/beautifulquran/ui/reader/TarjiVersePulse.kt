@@ -14,6 +14,12 @@ import com.beautifulquran.playback.Tarji
 import com.beautifulquran.playback.TarjiEarSample
 import com.beautifulquran.playback.TarjiEarTrack
 import com.beautifulquran.playback.TarjiLabTrim
+import com.beautifulquran.playback.TarjiDetectorMode
+import com.beautifulquran.playback.TarjiExperimentalDetector
+import com.beautifulquran.playback.TarjiRecordingDetector
+import com.beautifulquran.playback.TarjiRecordingResult
+import com.beautifulquran.playback.TarjiRecordingAlignment
+import com.beautifulquran.playback.VoiceEnergy
 import com.beautifulquran.playback.analysisHopContentMs
 import com.beautifulquran.tarjilab.TarjiLabKnobs
 import androidx.compose.runtime.collectAsState
@@ -58,11 +64,18 @@ internal object TarjiVersePulse {
         audio: Decoded,
         knobs: TarjiLabKnobs,
         windows: List<Window>,
+        mode: TarjiDetectorMode = TarjiDetectorMode.Current,
         /** Asked every few hops; false abandons the work (the answer is no longer wanted). */
         wanted: () -> Boolean = { true },
-    ): List<FloatArray> {
+    ): List<FloatArray> = prepare(audio, knobs, windows, mode, wanted).lines
+
+    private class Prepared(val lines: List<FloatArray>, val recording: TarjiRecordingResult? = null)
+
+    private fun prepare(audio: Decoded, knobs: TarjiLabKnobs, windows: List<Window>,
+                        mode: TarjiDetectorMode, wanted: () -> Boolean): Prepared {
         val detector = Tarji()
         detector.hopSamples = audio.hopSamples
+        detector.hopContentDurationMs = audio.hopMs
         knobs.applyTo(detector)
         val track = TarjiEarTrack()
         val ear = TarjiEarSample()
@@ -70,20 +83,57 @@ internal object TarjiVersePulse {
             FloatArray(((it.endMs - it.startMs) / audio.hopMs).toInt().coerceAtLeast(2))
         }
         val hops = audio.pcm.size / audio.hopSamples
+        val scratch = FloatArray(audio.hopSamples)
+        val experiment = if (mode == TarjiDetectorMode.Current) null else TarjiExperimentalDetector()
+        if (mode == TarjiDetectorMode.Recording) {
+            val frames = ArrayList<com.beautifulquran.playback.TarjiFrame>(hops)
+            val pitch = FloatArray(hops)
+            val lead = FloatArray(hops)
+            for (hop in 0 until hops) {
+                if (hop and 63 == 0 && !wanted()) throw kotlinx.coroutines.CancellationException("retuned")
+                audio.pcm.copyInto(scratch, 0, hop * scratch.size, (hop + 1) * scratch.size)
+                detector.onSamples8k(scratch)
+                frames += detector.measurements.copy()
+                pitch[hop] = detector.lastFoldedPitchHz
+                lead[hop] = detector.lastPitchLeadHops
+            }
+            val recording = TarjiRecordingDetector.analyze(frames, detector, wanted)
+            // Decision timestamps are hop ends; raw RMS lives at hop centres.
+            for (hop in 0 until hops + EAR_BEHIND_HOPS) {
+                if (hop and 63 == 0 && !wanted()) throw kotlinx.coroutines.CancellationException("retuned")
+                if (hop < hops) track.publish(hop, recording.rms[hop], pitch[hop], lead[hop],
+                    recording.rate[hop], recording.amplitude[hop], recording.gain[hop], recording.eventStart[hop])
+                val earHop = hop - EAR_BEHIND_HOPS
+                if (earHop < 0) continue
+                val mediaMs = (earHop + 1) * audio.hopMs
+                track.read(mediaMs, audio.hopMs, ear)
+                val pulse = (ear.tremolo * ear.gain).coerceIn(-1f, 1f)
+                for (index in windows.indices) {
+                    val window = windows[index]
+                    if (mediaMs >= window.startMs && mediaMs < window.endMs) {
+                        val slot = ((mediaMs - window.startMs) / audio.hopMs).toInt().coerceIn(0, out[index].lastIndex)
+                        out[index][slot] = pulse
+                    }
+                }
+            }
+            return Prepared(out, recording)
+        }
         for (hop in 0 until hops + EAR_BEHIND_HOPS) {
             if (hop and 63 == 0 && !wanted()) throw kotlinx.coroutines.CancellationException("retuned")
             if (hop < hops) {
-                val offset = hop * audio.hopSamples
-                detector.onSamples8k(audio.pcm.copyOfRange(offset, offset + audio.hopSamples))
+                audio.pcm.copyInto(scratch, 0, hop * scratch.size, (hop + 1) * scratch.size)
+                detector.onSamples8k(scratch)
+                experiment?.next(detector.measurements, mode, detector)
+                val decision = experiment?.decision
                 track.publish(
                     hop = detector.hopCount - 1,
                     hopRms = detector.lastHopRms,
                     pitchHz = detector.lastFoldedPitchHz,
                     pitchLeadHops = detector.lastPitchLeadHops,
-                    rateHz = detector.lastRateHz,
-                    usesAmplitude = detector.lastVisualUsesAmplitude,
-                    gain = detector.tremoloGain,
-                    eventStartHop = if (detector.reverberating) detector.eventStartHop else -1,
+                    rateHz = decision?.rateHz ?: detector.lastRateHz,
+                    usesAmplitude = decision?.usesAmplitude ?: detector.lastVisualUsesAmplitude,
+                    gain = decision?.gain ?: detector.tremoloGain,
+                    eventStartHop = decision?.eventStartHop ?: if (detector.reverberating) detector.eventStartHop else -1,
                 )
             }
             val earHop = hop - EAR_BEHIND_HOPS
@@ -103,7 +153,7 @@ internal object TarjiVersePulse {
                 line[((mediaMs - window.startMs) / audio.hopMs).toInt().coerceIn(0, line.lastIndex)] = pulse
             }
         }
-        return out
+        return Prepared(out)
     }
 
     /**
@@ -140,7 +190,10 @@ internal object TarjiVersePulse {
 
     enum class Outcome { Done, Failed }
 
-    private class Result(val lines: Map<Int, FloatArray>, val windows: Map<Int, Window>)
+    private data class Key(val reciter: Int, val surah: Int, val ayah: Int, val url: String,
+                           val mode: TarjiDetectorMode, val knobs: TarjiLabKnobs, val version: Int = 1)
+    private class Result(val key: Key, val lines: Map<Int, FloatArray>, val windows: Map<Int, Window>,
+                         val recording: TarjiRecordingResult?)
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
     /** A device has only so many decoders; a screenful of verses takes turns. */
@@ -149,7 +202,18 @@ internal object TarjiVersePulse {
     // Main thread only. A verse's audio is decoded once and kept: retuning the
     // detector reruns only the detector, which is a fraction of the work.
     private val audio = lru<String, kotlinx.coroutines.Deferred<Decoded>>(AUDIO_KEPT)
-    private val results = lru<String, Result>(RESULTS_KEPT)
+    private val results = lru<Key, Result>(RESULTS_KEPT)
+    private val recordings = lru<com.beautifulquran.playback.NowPlaying, Result>(AUDIO_KEPT)
+    var recordingStatus by androidx.compose.runtime.mutableStateOf("Recording analysis pending")
+        private set
+    private var sampledTuning: InkEngine.Tuning? = null
+    private var sampledKnobs: TarjiLabKnobs? = null
+    private var alignedResult: Result? = null
+    private var alignedSession = 0L
+    private var alignment = TarjiRecordingAlignment()
+    private val liveRms = FloatArray(96)
+    private val rawEar = TarjiEarSample()
+    private var lastAlignmentNanos = 0L
     private val timings = lru<String, Map<Int, List<Segment>>>(4)
 
     private fun <K, V> lru(limit: Int) = object : LinkedHashMap<K, V>(limit, 0.75f, true) {
@@ -180,7 +244,9 @@ internal object TarjiVersePulse {
         val url = reciter.audioUrl(ayah.surahId, ayah.number)
         val tuning = InkEngine.tuning
         val knobs = detectorKnobs(tuning)
-        val key = "$url|$knobs"
+        val mode = InkEngine.tarjiDetectorMode
+        val key = Key(reciter.id, ayah.surahId, ayah.number, url, mode, knobs)
+        InkEngine.clearTarjiTraces(ayah.surahId, ayah.number)
         results[key]?.let { apply(ayah, it); return Outcome.Done }
         val app = context.applicationContext
         working++
@@ -199,9 +265,11 @@ internal object TarjiVersePulse {
             val result = withContext(Dispatchers.Default) {
                 val job = coroutineContext[Job]
                 val windows = windows(ayah, segments, heard.pcm.size / heard.hopSamples * heard.hopMs)
-                val lines = lines(heard, knobs, windows.values.toList()) { job?.isActive != false }
-                Result(windows.keys.zip(lines).toMap(), windows)
+                val prepared = prepare(heard, knobs, windows.values.toList(), mode) { job?.isActive != false }
+                Result(key, windows.keys.zip(prepared.lines).toMap(), windows, prepared.recording)
             }
+            if (mode != InkEngine.tarjiDetectorMode || knobs != detectorKnobs(InkEngine.tuning) ||
+                reciter.id != quran.settings.settings.value.reciterId) throw kotlinx.coroutines.CancellationException("retuned")
             results[key] = result
             apply(ayah, result)
             val strongest = result.lines.maxByOrNull { (_, line) -> line.maxOfOrNull { kotlin.math.abs(it) } ?: 0f }
@@ -232,11 +300,73 @@ internal object TarjiVersePulse {
         TarjiLabKnobs.fromTuning(tuning).copy(glintBrightness = 1f)
 
     private fun apply(ayah: Ayah, result: Result) {
+        if (result.recording != null) recordings[com.beautifulquran.playback.NowPlaying(
+            ayah.surahId, ayah.number, result.key.reciter,
+        )] = result
         for (word in ayah.words) {
             val line = result.lines[word.position] ?: continue
             val window = result.windows.getValue(word.position)
             InkEngine.tarjiTrace(ayah.surahId, ayah.number, word.position).set(line, window.startMs.toFloat(), (window.endMs - window.startMs).toFloat())
         }
+    }
+
+    /** Live decisions and measured phase share one audible clock; decoded PCM never supplies live phase. */
+    fun sampleAtEar(context: Context, voice: VoiceEnergy, now: Long, out: TarjiEarSample,
+                    leadMs: Float = 0f, displayLeadMs: Float = 8f): Boolean {
+        val heard = voice.sampleAtEar(now, out, leadMs, displayLeadMs)
+        if (InkEngine.tarjiDetectorMode != TarjiDetectorMode.Recording) return heard
+        val app = context.applicationContext as? com.beautifulquran.QuranApp
+        val playing = app?.player?.state?.value?.nowPlaying
+        val result = recordings[playing]
+        if (sampledTuning !== InkEngine.tuning) {
+            sampledTuning = InkEngine.tuning
+            sampledKnobs = detectorKnobs(InkEngine.tuning)
+        }
+        val recording = result?.recording
+        if (!heard || !voice.isPlaying || recording == null || result.key.knobs != sampledKnobs ||
+            out.mediaMs == Long.MIN_VALUE) {
+            recordingStatus = if (working > 0) "Analyzing recording…" else "Recording analysis pending"
+            return false
+        }
+        if (alignedResult !== result || alignedSession != voice.sessionStartWall) {
+            alignedResult = result
+            alignedSession = voice.sessionStartWall
+            alignment = TarjiRecordingAlignment()
+            lastAlignmentNanos = 0L
+        }
+        if (alignment.offsetMs.isNaN() && now - lastAlignmentNanos >= 200_000_000L) {
+            lastAlignmentNanos = now
+            val count = voice.copyRecentRms(liveRms)
+            alignment.match(liveRms, count, voice.recentRmsStartMediaMs, voice.analysisHopMs,
+                recording.rms, recording.hopMs)
+            recordingStatus = if (alignment.offsetMs.isFinite()) {
+                "Recording aligned " + alignment.offsetMs.toInt() + " ms"
+            } else "Aligning recording · needs 1.5 s of distinct audio"
+        }
+        if (alignment.offsetMs.isNaN()) return false
+        val mediaMs = out.mediaMs.toDouble()
+        if (!recording.sample(mediaMs + alignment.offsetMs, out)) {
+            recordingStatus = "Outside analyzed recording"
+            return false
+        }
+        val position = ((mediaMs + alignment.offsetMs) / recording.hopMs - 1.0)
+            .roundToInt().coerceIn(0, recording.amplitude.lastIndex)
+        out.eventStartMediaMs = if (out.eventStartHop >= 0)
+            (out.eventStartHop * recording.hopMs - alignment.offsetMs).toLong() else Long.MIN_VALUE
+        if (out.eventStartMediaMs != Long.MIN_VALUE && out.eventStartMediaMs < voice.detectorSwitchMediaMs) {
+            out.gain = 0f
+            out.reverberating = false
+            out.eventStartMediaMs = Long.MIN_VALUE
+            recordingStatus = "Recording aligned · replay the hold after switching"
+        }
+        if (!voice.sampleRawPulseAtEar(now, rawEar, out.rateHz, recording.amplitude[position], leadMs, displayLeadMs)) {
+            out.gain = 0f
+            out.reverberating = false
+            return false
+        }
+        out.tremolo = rawEar.tremolo
+        out.mediaMs = rawEar.mediaMs
+        return true
     }
 
     private const val AUDIO_KEPT = 24
@@ -391,15 +521,17 @@ internal object TarjiVersePulse {
  * reader that builds ink motions for a verse calls it.
  */
 @androidx.compose.runtime.Composable
-internal fun RequestTarjiPulseLines(ayah: Ayah) {
-    if (!InkEngine.tarjiMarkCandidates) return
+internal fun RequestTarjiPulseLines(ayah: Ayah, active: Boolean = false) {
+    val mode = InkEngine.tarjiDetectorMode
+    if (!InkEngine.tarjiMarkCandidates && !(active && mode == TarjiDetectorMode.Recording)) return
     val context = androidx.compose.ui.platform.LocalContext.current
     val tuning = InkEngine.tuning
     // Only what the detector reads: a paint dial must not redo the verse.
     val knobs = TarjiVersePulse.detectorKnobs(tuning)
     val reciterId = (context.applicationContext as? com.beautifulquran.QuranApp)
         ?.settings?.settings?.collectAsState()?.value?.reciterId
-    androidx.compose.runtime.LaunchedEffect(ayah, knobs, reciterId) {
+    androidx.compose.runtime.LaunchedEffect(ayah, knobs, reciterId, mode) {
+        InkEngine.clearTarjiTraces(ayah.surahId, ayah.number)
         // A dial being dragged changes the key every frame; wait for it to
         // rest before doing anything, and let the restart cancel the rest.
         kotlinx.coroutines.delay(150)

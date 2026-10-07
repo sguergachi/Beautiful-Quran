@@ -30,6 +30,11 @@ import kotlin.math.sqrt
  * path via the volatile mirrors in [VoiceEnergy].
  */
 class Tarji {
+    /** Additional read-only measurements for developer detectors; baseline DSP is unchanged. */
+    internal val measurements = TarjiFrame()
+    internal var hopContentDurationMs = HOP_MS.toDouble()
+    private var holdStartHop = -1
+    private var modulationThresholdHit = false
 
     /** True while a held note carries a detected reverberation. */
     var reverberating = false
@@ -295,6 +300,10 @@ class Tarji {
     }
 
     fun reset() {
+        measurements.hop = -1
+        measurements.f0Valid = false
+        holdStartHop = -1
+        modulationThresholdHit = false
         reverberating = false
         eventStartHop = -1
         tremolo = 0f
@@ -373,6 +382,7 @@ class Tarji {
                 // New note (or first voiced frame): the hold restarts here.
                 holdMs = HOP_MS.toFloat()
                 holdPitchHz = pitchHz
+                holdStartHop = hopCount - 1
                 holdStartEnvCount = envCount
                 eventPeak = 0f
                 climaxUnder = 0
@@ -443,6 +453,22 @@ class Tarji {
         histEventStartHop[histCount % HIST_HOPS] =
             if (reverberating) eventStartHop else -1
         histCount++
+        measurements.hop = hopCount - 1
+        measurements.hopMs = hopContentDurationMs
+        measurements.hopRms = hopRms
+        measurements.rms80 = rms
+        measurements.level = climaxLevel
+        measurements.voiced = voiced
+        measurements.holdMs = (holdMs * hopContentDurationMs / HOP_MS).toFloat()
+        measurements.holdStartHop = holdStartHop
+        measurements.holdPitchHz = holdPitchHz
+        measurements.holdClarity = clarity
+        val freshPitch = foldPitch(modulationPitchHz, holdPitchHz)
+        measurements.f0Valid = modulationThresholdHit && voiced && holdMs >= 2 * HOP_MS &&
+            freshPitch.isFinite() && freshPitch in MIN_PITCH_HZ.toFloat()..MAX_PITCH_HZ.toFloat()
+        measurements.f0Hz = if (measurements.f0Valid) freshPitch else Float.NaN
+        measurements.pitchQuality = modulationClarity.coerceIn(0f, 1f)
+        measurements.pitchLeadHops = modulationPitchLeadHops
     }
 
     /** Envelope oscillation scan over the held note's own envelope. */
@@ -946,6 +972,7 @@ class Tarji {
 
     /** Short, sub-lag YIN pitch used only for vibrato movement and phase. */
     private fun updateModulationPitch() {
+        modulationThresholdHit = false
         val pitchFrameSamples = hopSamples * PITCH_MODULATION_FRAME_HOPS
         val pitchStart = frame.size - pitchFrameSamples
         val pairs = pitchFrameSamples - maxPitchLag
@@ -974,6 +1001,7 @@ class Tarji {
         var lag = minPitchLag
         while (lag < maxPitchLag) {
             if (corrs[lag] < YIN_THRESHOLD) {
+                modulationThresholdHit = true
                 while (lag < maxPitchLag && corrs[lag + 1] < corrs[lag]) lag++
                 break
             }

@@ -3,6 +3,9 @@ package com.beautifulquran.tarjilab
 import com.beautifulquran.data.model.Segment
 import com.beautifulquran.playback.Hani214
 import com.beautifulquran.playback.Tarji
+import com.beautifulquran.playback.TarjiDetectorMode
+import com.beautifulquran.playback.TarjiEarPulse
+import com.beautifulquran.playback.TarjiExperimentalDetector
 import com.beautifulquran.playback.TarjiLabCapture
 import com.beautifulquran.playback.TarjiLabTrim
 import com.beautifulquran.ui.reader.InkEngine
@@ -12,6 +15,7 @@ import kotlin.math.sin
 import kotlin.math.pow
 import kotlin.math.sqrt
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
@@ -53,6 +57,105 @@ class TarjiLabTraceTest {
             hopContentMs = FloatArray(n) { it * Tarji.HOP_MS.toFloat() },
             pcm = FloatArray(n * hop) { pcm[it] },
         )
+    }
+
+    @Test
+    fun `Current preserves exact baseline decisions and measured pulse with lead-in`() {
+        val stream = captureOf(heldNote(3f, 130f, amHz = 5f, amDepth = 0.25f))
+        val capture = stream.sliceWithLeadIn(60 until stream.hopCount, maxLeadInHops = 60)
+        val trace = analyzeTarjiCapture(capture, TarjiLabKnobs(), TarjiDetectorMode.Current)
+        val detector = Tarji()
+        val total = capture.leadInHopCount + capture.hopCount
+        val rms = FloatArray(total)
+        val pitch = FloatArray(total)
+        val lead = FloatArray(total)
+        val rate = FloatArray(total)
+        val amplitude = BooleanArray(total)
+        val scratch = FloatArray(capture.hopSamples)
+        for (hop in 0 until total) {
+            val i = hop - capture.leadInHopCount
+            val pcm = if (i < 0) capture.leadInPcm else capture.pcm
+            val offset = if (i < 0) hop else i
+            System.arraycopy(pcm, offset * scratch.size, scratch, 0, scratch.size)
+            detector.onSamples8k(scratch)
+            rms[hop] = detector.lastHopRms
+            pitch[hop] = detector.lastFoldedPitchHz
+            lead[hop] = detector.lastPitchLeadHops
+            rate[hop] = detector.lastRateHz
+            amplitude[hop] = detector.lastVisualUsesAmplitude
+            if (i < 0) continue
+            assertEquals(detector.tremoloGain, trace.gain[i], 0f)
+            assertEquals(detector.reverberating, trace.reverberating[i])
+            assertEquals(detector.lastRateHz, trace.rateHz[i], 0f)
+            assertEquals(detector.lastVisualUsesAmplitude, trace.visualUsesAmplitude[i])
+            assertEquals(detector.eventStartHop, trace.eventStartHop[i])
+            assertEquals(detector.lastCandidateModulation, trace.candidateModulation[i], 0f)
+        }
+        assertArrayEquals(TarjiEarPulse.series(rms, pitch, lead, rate, amplitude,
+            capture.hopContentDurationMs().toDouble(), capture.leadInHopCount), trace.tremolo, 0f)
+    }
+
+    @Test
+    fun `causal lab decisions use the actual capture hop duration`() {
+        val original = captureOf(heldNote(3f, 130f, amHz = 5f, amDepth = 0.25f))
+        val capture = TarjiLabCapture(
+            original.sampleRate, original.hopSamples,
+            FloatArray(original.hopCount) { it * 19.95465f }, original.pcm,
+        )
+        for (mode in listOf(TarjiDetectorMode.Cycles, TarjiDetectorMode.Spectrum)) {
+            val trace = analyzeTarjiCapture(capture, TarjiLabKnobs(), mode)
+            val detector = Tarji().apply { hopContentDurationMs = capture.hopContentDurationMs().toDouble() }
+            val experiment = TarjiExperimentalDetector()
+            val scratch = FloatArray(capture.hopSamples)
+            for (i in 0 until capture.hopCount) {
+                System.arraycopy(capture.pcm, i * scratch.size, scratch, 0, scratch.size)
+                detector.onSamples8k(scratch)
+                if (i < trace.firstAnalysisHop) continue
+                experiment.next(detector.measurements, mode, detector)
+                assertEquals(experiment.decision.gain, trace.gain[i], 0f)
+                assertEquals(experiment.decision.eventStartHop, trace.eventStartHop[i])
+                assertEquals(experiment.decision.rateHz, trace.rateHz[i], 0f)
+                assertEquals(experiment.decision.usesAmplitude, trace.visualUsesAmplitude[i])
+            }
+            assertEquals(mode, trace.mode)
+        }
+    }
+
+    @Test
+    fun `all methods preserve the shared measured voice features`() {
+        val capture = captureOf(heldNote(3f, 130f, amHz = 5f, amDepth = 0.25f))
+        val current = analyzeTarjiCapture(capture, TarjiLabKnobs())
+        for (mode in TarjiDetectorMode.entries) {
+            val trace = analyzeTarjiCapture(capture, TarjiLabKnobs(), mode)
+            assertArrayEquals(current.envRms, trace.envRms, 0f)
+            assertArrayEquals(current.pitchHz, trace.pitchHz, 0f)
+            assertArrayEquals(current.holdMs, trace.holdMs, 0f)
+            assertEquals(mode, trace.mode)
+        }
+    }
+
+    @Test
+    fun `replaced analysis cancels every method before another 64 hops`() {
+        val capture = captureOf(heldNote(3f, 130f, amHz = 5f, amDepth = 0.25f))
+        for (mode in TarjiDetectorMode.entries) {
+            var polls = 0
+            val error = runCatching {
+                analyzeTarjiCapture(capture, TarjiLabKnobs(), mode) { ++polls < 2 }
+            }.exceptionOrNull()
+            assertTrue("$mode: $error", error is java.util.concurrent.CancellationException)
+            assertEquals(2, polls)
+        }
+    }
+
+    @Test
+    fun `Recording checks cancellation again during capture-local second pass`() {
+        val capture = captureOf(heldNote(0.6f, 130f))
+        var polls = 0
+        val error = runCatching {
+            analyzeTarjiCapture(capture, TarjiLabKnobs(), TarjiDetectorMode.Recording) { ++polls <= 2 }
+        }.exceptionOrNull()
+        assertTrue(error is java.util.concurrent.CancellationException)
+        assertEquals(3, polls)
     }
 
     @Test

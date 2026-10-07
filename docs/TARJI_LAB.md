@@ -9,6 +9,35 @@ The preview word runs the reader's own light: a little brighter on each
 crest, slightly dimmer in each trough, hue unchanged. The pulse it and the graph show is the reader's
 (`TarjiEarPulse`), not the detector's causal estimate.
 
+## Comparing detector experiments
+
+The **Detector** row chooses **Current / Cycles / Spectrum / Recording**.
+It shares the reader Ink Lab's **Tarjīʿ** tab choice: three mutually exclusive
+experiment toggles, all off for Current. **Replay the held word after each
+switch** to compare fresh evidence. The global choice lasts for this developer
+session; it is not saved per reciter, added to profiles/exports, or restored
+by import. Turning developer mode off returns to Current.
+
+Cycles checks successive peaks/troughs; Spectrum fits a periodic curve against
+a trend and compares its two halves. Both share the existing extractor and a
+separate experimental lifecycle. Recording performs two-sided seeded-cycle
+analysis, then the same forward lifecycle. Here it says **Capture-local
+recording analysis**: lead-in plus captured PCM cannot reproduce a full verse's
+noise calibration or all its acoustic context. In the live reader, Recording
+instead waits for the matching verse result and reliable decoded-to-tap
+alignment; pending/unaligned output stays off while playback continues.
+
+Experimental amplitude evidence is blurred 20 ms log-RMS; pitch is fresh,
+valid-only blurred cents F0, never carried estimates. Measured minimum depth
+is 3.5% AM or 10 cents FM, so sensitivity differs from Current. The waveform
+and preview always follow measured PCM through the existing clock, with no
+fitted oscillator. A switch clears old analysis, pending preview and comparison
+reference; it does not seek, reset capture time, or alter the audible clock.
+Results publish only for the current capture/knobs/mode. These tools compare
+acoustic hypotheses; a green trace alone does not establish accuracy or reader
+admission. See the [research report](tarji-detection/methods.md) and
+[actual Opus 5.5 critique](tarji-detection/opus-review.md).
+
 ## Workflow
 
 1. In developer mode, long-press a word → **Tarjīʿ Lab**, or open it from
@@ -124,9 +153,10 @@ Re-analysis updates the graph and word without restarting audio or moving the
 chosen loop. Release bridges brief detection gaps, while the real end of a
 hold still uses its own fast decay.
 
-Each detector edit replays the same PCM through the same pure `Tarji` implementation
-used by the live audio tap. Background analysis is canceled on a new target,
-import, or exit; a result can publish only for its original capture.
+Each detector edit replays the same PCM through the shared pure extractor and
+selected detector used by the live audio tap. Background analysis is canceled
+on a new target, mode, import, or exit; a result can publish only for its
+original capture, knobs and mode.
 During a drag, one worker coalesces edits into the latest replay instead of
 restarting a 120 ms trailing debounce on every pointer event. Completed intermediate replays update the curve during a drag; it stays
 marked Updating until the worker catches the current knobs. A single ordered
@@ -233,6 +263,15 @@ Keep reproducible captures in `tools/tarji_samples/`.
 range manipulation, selected-section matching (volume/pitch, fast cycles,
 conflicting rhythms, silence, and invalid selections), grouped undo/redo, non-mutating comparison, capture trimming, and the preview clock (nonzero starts,
 seek rebasing, unsigned rollover, looping, and stalled playback).
+
+For the experiment change, the full JVM suite passes 1,270 tests across 145
+suites, and debug assembly passes. Baseline golden hashes, explicit feature
+validity, synthetic cycle/spectral evidence, queued-mode rejection, recording
+alignment policy and stale Lab-result checks are automated contracts. The
+[four-method recording audit](../tools/tarji_samples/detector-audit.md) exercises
+26 unlabeled recordings; it measures execution and JVM cost, not listener
+precision/recall, live reader admission or Pixel/Bluetooth latency. Cross-reciter
+labels and device listening/visual comparison remain separate work.
 
 On device, check cold Settings entry, repeated word changes during capture,
 loop/whole-capture playback, paused seeking, all three speeds, knob edits while

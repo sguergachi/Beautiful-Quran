@@ -1359,6 +1359,8 @@ private fun rememberTarjiGate(
     val frame = remember {
         mutableStateOf(InkEngine.GlintResonance.Idle)
     }
+    val detectorMode = InkEngine.tarjiDetectorMode
+    val context = androidx.compose.ui.platform.LocalContext.current
     val run = test || (active && eligible &&
         InkEngine.tuning.glintResonance &&
         InkEngine.tuning.glintResonanceDepth > 0f)
@@ -1378,7 +1380,7 @@ private fun rememberTarjiGate(
             onDispose { trace.played = 0f }
         }
     }
-    LaunchedEffect(run, test, activation, repeat, trace) {
+    LaunchedEffect(run, test, activation, repeat, trace, detectorMode) {
         if (!run) {
             frame.value = InkEngine.GlintResonance.Idle
             return@LaunchedEffect
@@ -1429,11 +1431,11 @@ private fun rememberTarjiGate(
                 lastFrameNanos = now
                 // Read ahead by what the smoothing sets this pulse back — its
                 // phase delay at the pulse's own rate, not its time constant.
-                voice?.sampleAtEar(
-                    now, ear,
+                if (voice != null) TarjiVersePulse.sampleAtEar(
+                    context, voice, now, ear,
                     leadMs = com.beautifulquran.ui.theme.glintLightLagMs(smoothMs, pulseRateHz, voice.playbackSpeed),
                     displayLeadMs = displayLeadMs,
-                )
+                ) else ear.clear()
                 pulseRateHz = ear.rateHz
                 val g = if (voice == null) 0f else ear.gain
                 val pulse = if (
@@ -3061,7 +3063,7 @@ fun AyahBlock(
 
     // The letter fade paces itself to how long the reciter dwells on the
     // word, corrected for the chosen playback speed.
-    RequestTarjiPulseLines(ayah)
+    RequestTarjiPulseLines(ayah, isActiveAyah)
     val sweepMs = InkEngine.sweepMs(activeWord, playbackSpeed)
     // Repeat washes share the same audio handoff but must not inherit the
     // ordinary sweep's visual minimum and continue past the spoken word.

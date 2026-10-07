@@ -55,7 +55,46 @@ at 8 kHz directly. On device the tap decimates the sink's PCM to roughly
 The original 2,048-sample handoff updated the renderer only every ~232–256 ms:
 four visible states per second cannot express a 5–10 Hz vocal pulse.
 
-### Signal chain
+### Developer detector experiments
+
+`Current` remains the default. `InkEngine.tarjiDetectorMode` selects one
+session-only experiment globally; it is not a reciter profile or an exported
+sample setting. Turning developer mode off restores Current.
+
+* **Cycles** checks substantial alternating extrema and neighboring periods.
+* **Spectrum** compares weighted trend-only and trend-plus-sinusoid fits,
+  requiring compatible evidence in both half-windows.
+* **Recording** analyzes the decoded whole verse, extends strict cycle seeds
+  through weaker supported neighbors in both directions, then runs those
+  regions forward through the experimental event lifecycle.
+
+All three share the existing PCM/RMS/short-YIN extractor, with no second YIN.
+Evidence uses 1-2-1 blurred 20 ms log-amplitude and valid-only blurred cents F0;
+an invalid pitch centre remains invalid and never contributes carried F0.
+Their measured floors are at least 3.5% AM and 10 cents FM. The same sensitivity
+setting therefore differs from Current's 80 ms evidence. A separate small
+`TarjiEventStage` retains hold, level-step, climax/tail and channel policy;
+Current's lifecycle and `TarjiWordGate` are unchanged. Cycles and Recording
+allow at most 1% interpolation uncertainty at cycle-rate band edges, clamping
+only accepted estimates; Spectrum's fitting bands remain strict.
+
+Recording reuses the verse decode cache, raises noise floors conservatively,
+and distinguishes acoustic onset from admitted event start. Live decisions
+require the current reciter/item/knobs key and a unique decoded-to-tap RMS
+correlation of at least 0.9 within ±6 hops, measured after 1.5 s. Pending,
+unaligned, unknown-clock, failed, or stale results remain off; the Detector
+line explains readiness. Decoded audio supplies decisions, never live phase.
+
+Every method paints the same actual PCM-tap history through the existing
+audible clock, route/manual trim and smoothing lead. Mode generations reject
+queued decisions from an old choice. Switching resets experimental evidence
+and word light, while playback, tap counters, capture and source/ear clocks
+continue. These are experiments in acoustic modulation, not a religious
+classification or established all-reciter accuracy. See the
+[research report](tarji-detection/methods.md) and the actual
+[Claude Opus 5.5 review](tarji-detection/opus-review.md).
+
+### Current signal chain
 
 1.  **Frame → RMS.** An 80 ms rolling frame (4 hops) yields one RMS value
     every 20 ms, pushed into a 64-hop (≈1.3 s) evidence ring. `PEAK_DECAY`
@@ -319,6 +358,12 @@ is gone — steady holds keep still gold.
 
 ### Ink Lab
 
+In the **Tarjīʿ** tab, **Cycles / Spectrum / Recording** are mutually exclusive
+toggles; turn all three off for **Current**. Replay the held word after each
+switch so fresh evidence can acquire. The shared choice also appears as four
+labels in Tarjīʿ Lab. Recording may stay pending or unaligned while the audio
+continues; a flat trace in that state is intentional.
+
 *   **Tarjīʿ** toggle (`glintResonance`), **Pulse depth**
     (`glintResonanceDepth` 0–1, shipped 1), **rate band**
     (`tarjiMinHz` / `glintResonanceMaxHz`), **Hold before tarjīʿ ms**,
@@ -416,7 +461,7 @@ ahead of the directional reveal.
 ## 7. How to audition and verify
 
 *   Nightfall/Royal Green, 1×, Hani Ar-Rifai 2:16's closer or 4:145's
-    ghunnah hum are the canonical ear cases — open the Ink Lab Tajweed tab
+    ghunnah hum are the canonical ear cases — open the Ink Lab Tarjīʿ tab
     and watch the **Detector** line. A steady hold without an audible pulse
     stays `holding … — no tarjīʿ yet` and still gold by design; a pulsing
     hold flips to `tarjīʿ` within ~0.6 s of the reverberation's onset and the
@@ -436,6 +481,14 @@ ahead of the directional reveal.
 
     The automated engine tests prove the policy; screenshots at formation/peak/
     fade remain required for paint quality (see [GLIMMER.md](GLIMMER.md)).
+
+The experiment change passes the full JVM suite (1,270 tests, 145 suites) and
+debug assembly. The reproducible [recording audit](../tools/tarji_samples/detector-audit.md)
+checks all four methods on 26 unlabeled clips and preserves frozen Current
+digests. It does not label acoustic events, apply the reader gate, or measure
+Pixel/Bluetooth latency. Listener labels across additional recordings and
+reciters, plus device listening/visual checks, remain required before choosing
+a replacement for Current.
 
 ## 8. Known sharp edges
 

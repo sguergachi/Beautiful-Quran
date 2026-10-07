@@ -290,4 +290,66 @@ class TarjiSyncClockTest {
         assertEquals(0f, out.gain, 0f)
         assertEquals(Long.MIN_VALUE, out.eventStartMediaMs)
     }
+
+    @Test
+    fun `mode generations filter both interpolation endpoints without clearing the voice`() {
+        val track = TarjiEarTrack()
+        for (hop in 0 until 80) track.publish(hop, voiceRms(hop), 130f, 0.8f, 5f, true,
+            gain = 0.8f, eventStartHop = 20, generation = 3)
+        val unfiltered = TarjiEarSample()
+        val filtered = TarjiEarSample()
+        track.read(1_000.0, hopMs, unfiltered)
+        track.read(1_000.0, hopMs, filtered, generation = 4)
+        assertEquals(0f, filtered.gain, 0f)
+        assertEquals(false, filtered.reverberating)
+        assertEquals(-1, filtered.eventStartHop)
+        assertEquals(unfiltered.tremolo, filtered.tremolo, 0f)
+
+        track.publish(80, voiceRms(80), 130f, 0.8f, 5f, true,
+            gain = 1f, eventStartHop = 81, generation = 4)
+        track.read(1_605.0, hopMs, filtered, generation = 4)
+        assertEquals(0.25f, filtered.gain, 0f)
+        assertEquals(false, filtered.reverberating)
+        track.read(1_615.0, hopMs, filtered, generation = 4)
+        assertEquals(0.75f, filtered.gain, 0f)
+        assertEquals(81, filtered.eventStartHop)
+
+        track.publish(81, voiceRms(81), 130f, 0.8f, 5f, true,
+            gain = 0.8f, eventStartHop = 20, generation = 3)
+        track.read(1_625.0, hopMs, filtered, generation = 4)
+        assertEquals(0.75f, filtered.gain, 0f)
+        assertEquals(81, filtered.eventStartHop)
+        track.read(1_635.0, hopMs, filtered, generation = 4)
+        assertEquals(0.25f, filtered.gain, 0f)
+        assertEquals(false, filtered.reverberating)
+    }
+
+    @Test
+    fun `raw phase and media cursor use the same ear trims through mode switch and seek`() {
+        val track = TarjiEarTrack()
+        for (hop in 0 until 200) track.publish(hop, voiceRms(hop), 130f, 0.8f, 5f, true,
+            gain = 1f, eventStartHop = 10, generation = 2)
+        val clock = TarjiEarClock()
+        val selected = TarjiEarSample()
+        val raw = TarjiEarSample()
+        val expected = TarjiEarSample()
+        for (speed in listOf(0.75f, 1f, 1.5f)) {
+            clock.onPosition(12_500, 0L, 500.0, speed, true)
+            clock.sampleAtEar(0L, track, hopMs, selected, 80.0, 37f, 8f, true, generation = 3)
+            assertEquals(0f, selected.gain, 0f)
+            assertEquals(true, clock.sampleAtEar(0L, track, hopMs, raw, 80.0, 37f, 8f, true,
+                rawPulseRateHz = 5f, rawUsesAmplitude = true))
+            track.readPulse(500.0 - 80 * speed + 8 * speed + 37, hopMs, expected, 5f, true)
+            assertEquals(selected.mediaMs, raw.mediaMs)
+            assertEquals(expected.tremolo, raw.tremolo, 0f)
+            assertEquals(Long.MIN_VALUE, raw.eventStartMediaMs)
+        }
+        track.clear()
+        clock.reset()
+        clock.onPosition(17_340, 0L, 10.0, 1f, true)
+        assertEquals(false, clock.sampleAtEar(0L, track, hopMs, raw, 0.0, 0f, 0f, true,
+            rawPulseRateHz = 5f))
+        assertEquals(17_340L, raw.mediaMs)
+        assertEquals(0f, raw.tremolo, 0f)
+    }
 }

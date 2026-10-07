@@ -20,6 +20,11 @@ import kotlin.math.roundToLong
 class VoiceEnergy(private val elapsedRealtimeMs: () -> Long = SystemClock::elapsedRealtime) {
 
     private val tarji = Tarji()
+    private val experimental = TarjiExperimentalDetector()
+    private val selectedSample = TarjiEarSample()
+    @Volatile private var appliedDetectorSelection = detectorSelection
+    @Volatile private var detectorSwitchContentMs = 0.0
+    @Volatile private var hasDetectorSwitch = false
 
     /** True while a held note carries a detected reverberation (tarjīʿ). */
     @Volatile
@@ -84,6 +89,28 @@ class VoiceEnergy(private val elapsedRealtimeMs: () -> Long = SystemClock::elaps
     var sessionContentMs = 0.0
         private set
 
+    /** Discontinuity identity used to align offline recordings with this source session. */
+    val sessionGeneration: Long get() = sessionStartWall
+
+    /** Actual source-content duration of a decimated analysis hop. */
+    val analysisHopMs: Double get() = hopContentDurationMs
+
+    /** Ear-clock timestamp of the mode-switch boundary; unknown until the source is anchored. */
+    val detectorSwitchMediaMs: Long
+        get() {
+            if (earClockSession != sessionStartWall || !earClock.isAnchored) return NO_EVENT_MS
+            val applied = appliedDetectorSelection === detectorSelection
+            if (applied && !hasDetectorSwitch) return 0L
+            val content = if (applied) detectorSwitchContentMs else sessionContentMs
+            return mediaMsOfContent(content).takeIf(Double::isFinite)?.roundToLong() ?: NO_EVENT_MS
+        }
+
+    /** Source/media centres of the first sample returned by [copyRecentRms]. */
+    var recentRmsStartContentMs = Double.NaN
+        private set
+    var recentRmsStartMediaMs = Double.NaN
+        private set
+
     // ── Frame-time read-out ───────────────────────────────────────────────
     // Every analyzed hop is published undelayed; the frame loop then reads
     // that history at the ear's own position (see [TarjiEarClock]) instead
@@ -117,7 +144,30 @@ class VoiceEnergy(private val elapsedRealtimeMs: () -> Long = SystemClock::elaps
             trimWallMs = outputLatencyMs.coerceAtLeast(0L) + earDelayMs.toDouble(),
             phaseLeadMs = leadMs, displayLeadMs = displayLeadMs,
             readHistory = isLive && isPlaying && earClockSession == sessionStartWall,
+            generation = detectorGeneration,
         )
+    }
+
+    /** Measured pulse at the same corrected ear instant, without any detector's decisions. */
+    fun sampleRawPulseAtEar(
+        wallNanos: Long, out: TarjiEarSample, rateHz: Float, usesAmplitude: Boolean,
+        leadMs: Float = 0f, displayLeadMs: Float = 8f,
+    ): Boolean = earClock.sampleAtEar(
+        wallNanos, earTrack, hopContentDurationMs, out,
+        trimWallMs = outputLatencyMs.coerceAtLeast(0L) + earDelayMs.toDouble(),
+        phaseLeadMs = leadMs, displayLeadMs = displayLeadMs,
+        readHistory = isLive && isPlaying && earClockSession == sessionStartWall,
+        rawPulseRateHz = if (rateHz.isFinite()) rateHz else 0f, rawUsesAmplitude = usesAmplitude,
+    )
+
+    /** Copy recent raw hop RMS on the main thread for decode-to-tap alignment. */
+    fun copyRecentRms(destination: FloatArray): Int {
+        val count = earTrack.copyRecentRms(destination)
+        recentRmsStartContentMs = if (count > 0) (earTrack.recentRmsStartHop + 0.5) * hopContentDurationMs else Double.NaN
+        recentRmsStartMediaMs = if (earClockSession == sessionStartWall && earClock.isAnchored) {
+            mediaMsOfContent(recentRmsStartContentMs)
+        } else Double.NaN
+        return count
     }
 
     // ── Tarjīʿ Lab capture ────────────────────────────────────────────────
@@ -184,6 +234,12 @@ class VoiceEnergy(private val elapsedRealtimeMs: () -> Long = SystemClock::elaps
     fun resetTapSession(sourceOriginRendererMs: Double = Double.NaN) {
         capturePendingFreshStart = true
         tarji.reset()
+        experimental.clear()
+        detectorSwitchContentMs = 0.0
+        hasDetectorSwitch = false
+        appliedDetectorSelection = detectorSelection
+        recentRmsStartContentMs = Double.NaN
+        recentRmsStartMediaMs = Double.NaN
         earTrack.clear()
         reverberating = false
         eventStartContentMs = -1.0
@@ -269,6 +325,13 @@ class VoiceEnergy(private val elapsedRealtimeMs: () -> Long = SystemClock::elaps
      * batch exposed only ~4 detector values per second, undersampling the very
      * 5–10 Hz vocal pulse the renderer was meant to follow. */
     private fun analyzeHop() {
+        val selection = detectorSelection
+        if (selection !== appliedDetectorSelection) {
+            experimental.clear(minimumHop = tarji.hopCount + 1)
+            detectorSwitchContentMs = sessionContentMs
+            hasDetectorSwitch = true
+            appliedDetectorSelection = selection
+        }
         val speed = playbackSpeed
         val measuredContentMs = measuredBacklogContentMs.takeIf { it >= 0.0 }
         tarji.delayHops = Tarji.earDelayHops(
@@ -293,28 +356,44 @@ class VoiceEnergy(private val elapsedRealtimeMs: () -> Long = SystemClock::elaps
         tarji.maxPitchDrift = maxPitchDrift
         tarji.attackMs = attackMs
         tarji.releaseMs = releaseMs
+        tarji.hopContentDurationMs = hopContentDurationMs
         tarji.onSamples8k(analysisHop)
         sessionContentMs += hopContentDurationMs
+        val current = selection.mode == TarjiDetectorMode.Current
+        if (!current) {
+            if (selection.mode == TarjiDetectorMode.Recording) experimental.decision.clear()
+            else if (tarji.measurements.hop == tarji.hopCount - 1) {
+                experimental.next(tarji.measurements, selection.mode, tarji)
+            }
+        }
+        val decision = experimental.decision
         earTrack.publish(
             hop = tarji.hopCount - 1,
             hopRms = tarji.lastHopRms,
             pitchHz = tarji.lastFoldedPitchHz,
             pitchLeadHops = tarji.lastPitchLeadHops,
-            rateHz = tarji.lastRateHz,
-            usesAmplitude = tarji.lastVisualUsesAmplitude,
-            gain = tarji.tremoloGain,
-            eventStartHop = if (tarji.reverberating) tarji.eventStartHop else -1,
+            rateHz = if (current) tarji.lastRateHz else decision.rateHz,
+            usesAmplitude = if (current) tarji.lastVisualUsesAmplitude else decision.usesAmplitude,
+            gain = if (current) tarji.tremoloGain else decision.gain,
+            eventStartHop = if (current) {
+                if (tarji.reverberating) tarji.eventStartHop else -1
+            } else decision.eventStartHop,
+            generation = selection.generation,
         )
         hopFill = 0
         if (captureArmed) captureHop(hopContentDurationMs)
-        reverberating = tarji.syncReverberating
-        tremolo = tarji.syncTremolo
-        tremoloGain = tarji.syncTremoloGain
+        if (!current) earTrack.read(
+            (tarji.hopCount - tarji.delayHops) * hopContentDurationMs,
+            hopContentDurationMs, selectedSample, selection.generation,
+        )
+        reverberating = if (current) tarji.syncReverberating else selectedSample.reverberating
+        tremolo = if (current) tarji.syncTremolo else selectedSample.tremolo
+        tremoloGain = if (current) tarji.syncTremoloGain else selectedSample.gain
         holdMs = tarji.holdMs
-        rateHz = tarji.lastRateHz
+        rateHz = if (current) tarji.lastRateHz else decision.rateHz
         // Publish ownership after every delayed render value so the UI cannot
         // combine a new event start with the preceding event's gain.
-        eventStartContentMs = tarji.syncEventStartHop
+        eventStartContentMs = (if (current) tarji.syncEventStartHop else selectedSample.eventStartHop)
             .takeIf { it >= 0 }
             ?.toDouble()
             ?.times(hopContentDurationMs)
@@ -395,6 +474,12 @@ class VoiceEnergy(private val elapsedRealtimeMs: () -> Long = SystemClock::elaps
         captureActive = false
         captureHopCount = 0
         tarji.reset()
+        experimental.clear()
+        detectorSwitchContentMs = 0.0
+        hasDetectorSwitch = false
+        appliedDetectorSelection = detectorSelection
+        recentRmsStartContentMs = Double.NaN
+        recentRmsStartMediaMs = Double.NaN
         earTrack.clear()
         reverberating = false
         eventStartContentMs = -1.0
@@ -417,6 +502,19 @@ class VoiceEnergy(private val elapsedRealtimeMs: () -> Long = SystemClock::elaps
 
     companion object {
         const val NO_EVENT_MS = Long.MIN_VALUE
+
+        private data class DetectorSelection(val mode: TarjiDetectorMode, val generation: Int)
+        @Volatile private var detectorSelection = DetectorSelection(TarjiDetectorMode.Current, 0)
+
+        val detectorMode: TarjiDetectorMode get() = detectorSelection.mode
+        val detectorGeneration: Int get() = detectorSelection.generation
+
+        /** Publish the choice and its generation together; repeated tuning writes do not restart it. */
+        @Synchronized
+        fun setDetectorMode(mode: TarjiDetectorMode) {
+            val previous = detectorSelection
+            if (mode != previous.mode) detectorSelection = DetectorSelection(mode, previous.generation + 1)
+        }
 
         /** Lab capture cap: 12 s of 20 ms hops ≈ 600 hops ≈ 350 KB. */
         private const val MAX_CAPTURE_HOPS = 600

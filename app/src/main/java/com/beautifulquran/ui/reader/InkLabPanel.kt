@@ -358,6 +358,33 @@ fun InkLabPanel(
                         TuningToggle("Tarjīʿ light", t.glintResonance) {
                             InkEngine.tuning = t.copy(glintResonance = it)
                         }
+                        LabCaption("Detection method: " + InkEngine.tarjiDetectorMode.label)
+                        for (mode in com.beautifulquran.playback.TarjiDetectorMode.entries.drop(1)) {
+                            TuningToggle(mode.label, InkEngine.tarjiDetectorMode == mode) {
+                                InkEngine.tarjiDetectorMode = if (it) mode
+                                    else com.beautifulquran.playback.TarjiDetectorMode.Current
+                            }
+                        }
+                        LabCaption(
+                            "Turn all three off for Current. Switching starts fresh evidence; replay " +
+                                "the held word to compare. The choice lasts for this session.",
+                        )
+                        LabCaption(
+                            when (InkEngine.tarjiDetectorMode) {
+                                com.beautifulquran.playback.TarjiDetectorMode.Current ->
+                                    "Current uses the shipped detector and its existing reciter tuning."
+                                com.beautifulquran.playback.TarjiDetectorMode.Cycles ->
+                                    "Cycles checks repeated peaks and troughs in amplitude or pitch."
+                                com.beautifulquran.playback.TarjiDetectorMode.Spectrum ->
+                                    "Spectrum checks a repeating wave against a trend, including both halves."
+                                com.beautifulquran.playback.TarjiDetectorMode.Recording ->
+                                    TarjiVersePulse.recordingStatus
+                            },
+                        )
+                        if (InkEngine.tarjiDetectorMode != com.beautifulquran.playback.TarjiDetectorMode.Current) {
+                            LabCaption("Experiments use 20 ms amplitude measurements: at least 3.5% depth, " +
+                                "or 10 cents of fresh pitch movement. Sensitivity differs from Current.")
+                        }
                         TarjiStatusLine()
                         TarjiWordLine()
                         TuningToggle("Mark candidates", InkEngine.tarjiMarkCandidates) {
@@ -843,23 +870,28 @@ private fun LabCaption(text: String) {
  */
 @Composable
 private fun TarjiStatusLine() {
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val mode = InkEngine.tarjiDetectorMode
+    val sample = remember { com.beautifulquran.playback.TarjiEarSample() }
     var status by remember { mutableStateOf("…") }
     val idleColor = MaterialTheme.colorScheme.onSurfaceVariant
     var signalColor by remember { mutableStateOf(idleColor) }
     val gold = Color(0xFFF8E9BE) // the glint's white-gold
-    androidx.compose.runtime.LaunchedEffect(Unit) {
+    androidx.compose.runtime.LaunchedEffect(mode) {
         while (true) {
             val v = com.beautifulquran.playback.VoiceEnergy.active
+            if (v != null) TarjiVersePulse.sampleAtEar(context, v, System.nanoTime(), sample)
+                else sample.clear()
             status = when {
                 v == null -> "no probe (player not created)"
                 !v.isLive -> "silent — no PCM from the player"
                 else -> {
                     val ear = " · ear +${v.earDelayTotalMs} ms"
-                    val tr = " · tr ${"%.2f".format(v.tremolo)}"
+                    val tr = " · tr " + "%.2f".format(sample.tremolo)
                     val depth = " · depth ${"%.2f".format(InkEngine.tuning.glintResonanceDepth)}"
-                    if (v.reverberating) {
+                    if (sample.reverberating) {
                         "tarjīʿ · hold ${"%.1f".format(v.holdMs / 1000f)}s · " +
-                            "${"%.1f".format(v.rateHz)} Hz · gain ${"%.2f".format(v.shimmerGain)}" +
+                            "%.1f".format(sample.rateHz) + " Hz · gain " + "%.2f".format(sample.gain) +
                             ear + tr + depth
                     } else if (v.holdMs > 0f) {
                         "holding ${"%.1f".format(v.holdMs / 1000f)}s · " +
@@ -875,12 +907,14 @@ private fun TarjiStatusLine() {
     // Frame-driven flicker meter: gold on the vibration's crests, normal at
     // the troughs, gated by the rendered gain — the line pulses at exactly
     // the rate the shimmer does.
-    androidx.compose.runtime.LaunchedEffect(Unit) {
+    androidx.compose.runtime.LaunchedEffect(mode) {
+        val frame = com.beautifulquran.playback.TarjiEarSample()
         while (true) {
-            withFrameNanos {
+            withFrameNanos { now ->
                 val v = com.beautifulquran.playback.VoiceEnergy.active
-                val g = v?.shimmerGain ?: 0f
-                val tr = v?.tremolo ?: 0f
+                if (v != null) TarjiVersePulse.sampleAtEar(context, v, now, frame) else frame.clear()
+                val g = frame.gain
+                val tr = frame.tremolo
                 signalColor = if (g > 0.01f && tr >= SIGNAL_METER_THRESHOLD) gold else idleColor
             }
         }
