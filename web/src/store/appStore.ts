@@ -575,6 +575,16 @@ class AppStore {
     }
   }
 
+  /** Keep a voice on Settings without changing playback. */
+  toggleFavoriteReciter(id: number) {
+    const favorites = this.state.settings.favoriteReciterIds
+    this.updateSettings({
+      favoriteReciterIds: favorites.includes(id)
+        ? favorites.filter((favorite) => favorite !== id)
+        : [...favorites, id],
+    })
+  }
+
   private async reloadTimingsAndReciter(reciter: Reciter) {
     const content = this.state.content
     if (!content) return

@@ -18,9 +18,10 @@ one at a time. Navigation glides the next sheet in from the side (a
 quarter-width slide softened with a fade, 380 ms); nothing stacks, nothing
 floats, nothing casts a shadow.
 
-**On a desktop browser the sheets lie open as a book** (web only, windows at
-least 1100 × 600). A phone shows one sheet because one sheet is all it has
-room for; a wide window showing one phone-width column in an empty field is
+**On tablets and desktop browsers the sheets lie open as a book** (web only,
+windows at least 720 × 600, including iPad mini in portrait). A phone shows
+one sheet because one sheet is all it has room for; a wide window showing
+one phone-width column in an empty field is
 not calm, it is unused. So the stack opens flat: Chapters on the left page,
 the Reader on the right, the binding's boards showing past the page block and
 the paper turning down into the gutter. Every sheet has one place in the
@@ -47,13 +48,15 @@ right to left, so the left edge is the way on. Chapters is then laid over the
 left leaf on demand, and touching the page still being read, anywhere on it,
 puts it away and does nothing else.
 
-**One grid for the window (web, desktop spread).** Everything the book is
-made of is a power of φ times one module *u*, and *u* is the largest that
+**One grid for the window (web, tablet and desktop spread).** Everything the
+book is made of is a power of φ times one module *u*, and *u* is the largest that
 fits the window. Across: desk φ, board φ⁻³, the page block's edge φ⁻⁴ + 1,
 page φ⁶, and the same again mirrored. Down: desk φ, board φ⁻³, page φ⁷,
 board, desk. So the window is 32.743 *u* tall or 41.889 *u* wide, whichever binds
-first, and the other way the book is centred with desk to spare. The desk's
-margin is the page's own head and fore-edge margin carried outward, and the
+first, and the other way the book is centred with desk to spare. The height
+uses the same stable viewport as the shell, so Safari's browser bars leave
+the complete book in view. The desk's margin is the page's own head and
+fore-edge margin carried outward, and the
 gutter's shade is φ³ wide.
 
 **The block has its thickness.** The Quran is 604 pages, 302 leaves, and the

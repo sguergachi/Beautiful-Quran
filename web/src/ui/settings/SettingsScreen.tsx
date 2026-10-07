@@ -9,8 +9,8 @@ import {
   type MushafGlyphWiden,
 } from '../../data/settings'
 import { customizeSummary } from '../../data/customizePolicy'
-import type { Reciter } from '../../data/models'
 import { CustomizeScreen } from './CustomizeScreen'
+import { ReciterChoices, RecitersScreen } from './RecitersScreen'
 import { NuqtaLab } from './NuqtaLab'
 import { settingsLayerFor, type StackLayer } from '../paper/stack'
 import {
@@ -36,6 +36,7 @@ import {
   type BrushKnobKey,
 } from '../kit/brushMark'
 import { AlphaTag } from '../kit/AlphaTag'
+import { BackChevron } from '../kit/BackChevron'
 import { DisclosureChevron } from '../kit/DisclosureChevron'
 import { InkCheckMark } from '../kit/InkCheckMark'
 import { PaperChoiceList } from '../kit/PaperChoiceList'
@@ -67,15 +68,6 @@ const HOME_BOOKMARK_OPTIONS: { value: HomeBookmarkStyle; label: string }[] = [
 /** Triple-tap window for developer unlock — matches Android SettingsScreen. */
 const DEVELOPER_TAP_RESET_MS = 1500
 
-/** Android RecitersScreen: a style is named only when it is not Murattal. */
-function reciterDescription(reciter: Reciter): string | undefined {
-  const parts = [
-    reciter.style && reciter.style !== 'Murattal' ? reciter.style : null,
-    reciter.hasTimings ? null : 'No word highlighting',
-  ].filter(Boolean)
-  return parts.length > 0 ? parts.join(' · ') : undefined
-}
-
 export function SettingsScreen({
   stackLayer,
   hasReader,
@@ -93,8 +85,29 @@ export function SettingsScreen({
   const [laid, setLaid] = useState(false)
   if (isTop && !laid) setLaid(true)
   const depth = Math.max(0, stackLayer - layer)
-  const [customizeOpen, setCustomizeOpen] = useState(false)
-  const showReadingToggles = s.readingMode === 'arabic_english'
+  const [page, setPage] = useState<'main' | 'reciters' | 'customize'>('main')
+  const scrollRef = useRef<HTMLDivElement>(null)
+  const favoriteReciters = reciters.filter((reciter) => s.favoriteReciterIds.includes(reciter.id))
+
+  useEffect(() => {
+    if (!isTop) setPage('main')
+  }, [isTop])
+
+  useEffect(() => {
+    scrollRef.current?.scrollTo({ top: 0 })
+  }, [page])
+
+  useEffect(() => {
+    if (!isTop || page === 'main') return
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape' || event.defaultPrevented) return
+      event.preventDefault()
+      event.stopPropagation()
+      setPage('main')
+    }
+    window.addEventListener('keydown', onKey, true)
+    return () => window.removeEventListener('keydown', onKey, true)
+  }, [isTop, page])
 
   // Session-only live knobs for the brush labs (not persisted).
   const [brushParams, setBrushParams] = useState<BrushCircleParams>(() =>
@@ -357,15 +370,24 @@ export function SettingsScreen({
       data-laid={laid || undefined}
     >
       <NuqtaParamsContext.Provider value={nuqtaParams}>
-      <div className="settings">
-        {customizeOpen ? (
+      <div className="settings" ref={scrollRef}>
+        {page === 'reciters' ? (
+          <RecitersScreen
+            reciters={reciters}
+            selectedId={s.reciterId}
+            favorites={s.favoriteReciterIds}
+            onSelect={(reciterId) => appStore.updateSettings({ reciterId })}
+            onToggleFavorite={(id) => appStore.toggleFavoriteReciter(id)}
+            onBack={() => setPage('main')}
+          />
+        ) : page === 'customize' ? (
           <CustomizeScreen
             settings={s}
             brushParams={brushParams}
             paintToken={paintToken}
             checkParams={checkParams}
             checkPaintToken={checkPaintToken}
-            onBack={() => setCustomizeOpen(false)}
+            onBack={() => setPage('main')}
           />
         ) : (
           <>
@@ -381,24 +403,29 @@ export function SettingsScreen({
 
         <section className="settings-section">
           <h2>Reciter</h2>
-          <PaperChoiceList
-            aria-label="Reciter"
-            value={String(s.reciterId)}
-            options={reciters.map((r) => ({
-              value: String(r.id),
-              label: r.name,
-              description: reciterDescription(r),
-            }))}
-            onChange={(v) => appStore.updateSettings({ reciterId: Number(v) })}
+          <ReciterChoices
+            reciters={favoriteReciters}
+            selectedId={s.reciterId}
+            onSelect={(reciterId) => appStore.updateSettings({ reciterId })}
           />
+          {favoriteReciters.length === 0 ? (
+            <p className="settings-caption">No favorites yet — keep them from the full list.</p>
+          ) : null}
+          <button type="button" className="settings-nav" onClick={() => setPage('reciters')}>
+            <span className="settings-nav-copy">
+              <span className="settings-nav-label">All reciters</span>
+              <span className="settings-nav-note">{reciters.length} reciters total</span>
+            </span>
+            <DisclosureChevron expanded={false} />
+          </button>
         </section>
 
-        {/* No heading: on Android, Customize sits under the reciters and above Download manager. */}
+        {/* Android: Customize follows reciter selection, without another heading. */}
         <section className="settings-section">
           <button
             type="button"
             className="settings-nav"
-            onClick={() => setCustomizeOpen(true)}
+            onClick={() => setPage('customize')}
           >
             <span className="settings-nav-copy">
               <span className="settings-nav-label">Customize</span>
@@ -407,31 +434,6 @@ export function SettingsScreen({
             <DisclosureChevron expanded={false} />
           </button>
         </section>
-
-        {showReadingToggles ? (
-          <section className="settings-section settings-section-toggles">
-            <PaperSwitch
-              id="setting-translit"
-              label="Transliteration"
-              checked={s.showTransliteration}
-              checkParams={checkParams}
-              paintToken={checkPaintToken}
-              onChange={(checked) =>
-                appStore.updateSettings({ showTransliteration: checked })
-              }
-            />
-            <PaperSwitch
-              id="setting-translation"
-              label="Ayah translation"
-              checked={s.showTranslation}
-              checkParams={checkParams}
-              paintToken={checkPaintToken}
-              onChange={(checked) =>
-                appStore.updateSettings({ showTranslation: checked })
-              }
-            />
-          </section>
-        ) : null}
 
         {s.developerMode ? (
           <section className="settings-section settings-section-developer">
@@ -869,25 +871,4 @@ function cacheCountdown(atMs: number | null, nowMs: number): string {
   if (days > 0) return `in ${days}d ${hours}h`
   if (hours > 0) return `in ${hours}h`
   return `in ${minutes}m`
-}
-
-function BackChevron() {
-  return (
-    <svg
-      className="settings-back-icon"
-      viewBox="0 0 24 24"
-      width="24"
-      height="24"
-      fill="none"
-      aria-hidden="true"
-    >
-      <path
-        d="M19 12 H5.5 M11 6 L5 12 l6 6"
-        stroke="currentColor"
-        strokeWidth="1.9"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-    </svg>
-  )
 }

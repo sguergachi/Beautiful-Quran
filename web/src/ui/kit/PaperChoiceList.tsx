@@ -17,7 +17,7 @@ export type PaperChoiceOption<T extends string = string> = {
   label: string
   /** Quieter second line (e.g. “No word highlighting”). */
   description?: string
-  /** Optional trailing ornament (theme swatches, etc.). */
+  /** Optional ornament or action, outside the selection label. */
   trailing?: ReactNode
 }
 
@@ -53,23 +53,25 @@ export function PaperChoiceList<T extends string>({
       {options.map((opt) => {
         const selected = opt.value === value
         return (
-          <label
+          <div
             key={opt.value}
             className={`paper-choice-row${selected ? ' is-selected' : ''}`}
           >
-            <Radio.Root value={opt.value} className="paper-choice-radio ink-nuqta">
-              <InkNuqta selected={selected} />
-            </Radio.Root>
-            <span className="paper-choice-copy">
-              <span className="paper-choice-label">{opt.label}</span>
-              {opt.description ? (
-                <span className="paper-choice-desc">{opt.description}</span>
-              ) : null}
-            </span>
+            <label className="paper-choice-select">
+              <Radio.Root value={opt.value} className="paper-choice-radio ink-nuqta">
+                <InkNuqta selected={selected} />
+              </Radio.Root>
+              <span className="paper-choice-copy">
+                <span className="paper-choice-label">{opt.label}</span>
+                {opt.description ? (
+                  <span className="paper-choice-desc">{opt.description}</span>
+                ) : null}
+              </span>
+            </label>
             {opt.trailing ? (
               <span className="paper-choice-trailing">{opt.trailing}</span>
             ) : null}
-          </label>
+          </div>
         )
       })}
     </RadioGroup>
