@@ -2,6 +2,7 @@ package com.beautifulquran.ui.share
 
 import android.app.Activity
 import android.graphics.Bitmap
+import android.util.Log
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -61,6 +62,8 @@ data class ShareUiState(
     /** Quiet line on the Send page when load/format/render fails. */
     val error: String? = null,
 )
+
+private const val TAG = "ShareViewModel"
 
 class ShareViewModel(
     private val repository: QuranRepository,
@@ -237,7 +240,7 @@ class ShareViewModel(
                 if (!_ui.value.gathering) return@launch
                 if (verses.isEmpty()) {
                     _ui.update {
-                        it.copy(preparingText = false, error = "Could not load those verses.")
+                        it.copy(preparingText = false, error = "Couldn't load those verses. Please try again.")
                     }
                     return@launch
                 }
@@ -246,11 +249,11 @@ class ShareViewModel(
                 throw e
             } catch (e: Exception) {
                 if (!_ui.value.gathering) return@launch
+                Log.w(TAG, "Share failed", e)
                 _ui.update {
                     it.copy(
                         preparingText = false,
-                        error = e.message?.takeIf { msg -> msg.isNotBlank() }
-                            ?: "Could not prepare the share.",
+                        error = "Couldn't prepare the share. Please try again.",
                     )
                 }
             }
@@ -283,7 +286,7 @@ class ShareViewModel(
                 if (!_ui.value.gathering) return@launch
                 if (lines.isEmpty()) {
                     _ui.update {
-                        it.copy(preparingImage = false, error = "Could not load those verses.")
+                        it.copy(preparingImage = false, error = "Couldn't load those verses. Please try again.")
                     }
                     return@launch
                 }
@@ -330,11 +333,11 @@ class ShareViewModel(
                 throw t
             } catch (t: Throwable) {
                 if (!_ui.value.gathering) return@launch
+                Log.w(TAG, "Share failed", t)
                 _ui.update {
                     it.copy(
                         preparingImage = false,
-                        error = t.message?.takeIf { msg -> msg.isNotBlank() }
-                            ?: "Could not render the image.",
+                        error = "Couldn't create the image. Please try again.",
                     )
                 }
             } finally {
@@ -373,12 +376,14 @@ class ShareViewModel(
             try {
                 val lines = loadVerseLines(refs)
                 _ui.update { it.copy(verseLines = lines, error = null) }
+            } catch (e: CancellationException) {
+                throw e
             } catch (e: Exception) {
+                Log.w(TAG, "Share failed", e)
                 _ui.update {
                     it.copy(
                         verseLines = emptyList(),
-                        error = e.message?.takeIf { msg -> msg.isNotBlank() }
-                            ?: "Could not load those verses.",
+                        error = "Couldn't load those verses. Please try again.",
                     )
                 }
             }

@@ -185,7 +185,10 @@ export class MediaElementTransport {
         else reject(error ?? new Error('Audio failed to load'))
       }
       const onCanPlay = () => finish(true)
-      const onError = () => finish(false, new Error('Audio failed to load'))
+      // Carry the MediaError as `cause` so the reader-facing copy can tell a
+      // network drop from a missing or corrupt file.
+      const onError = () =>
+        finish(false, new Error('Audio failed to load', { cause: audio.error }))
       const timer = globalThis.setTimeout(
         () => finish(false, new Error('Audio buffer timeout')),
         timeoutMs,

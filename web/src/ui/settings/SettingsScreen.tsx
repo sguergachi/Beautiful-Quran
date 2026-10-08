@@ -1,7 +1,11 @@
 import { useEffect, useRef, useState } from 'react'
 import { assetUrl } from '../../assetUrl'
 import { appStore, useAppSelector } from '../../store/appStore'
-import { runtimeMushafCache, type RuntimeCacheStatus } from '../../data/runtimeMushaf'
+import {
+  runtimeMushafCache,
+  type RuntimeCacheFailure,
+  type RuntimeCacheStatus,
+} from '../../data/runtimeMushaf'
 import {
   MUSHAF_GLYPH_WIDENS,
   type HomeBookmarkStyle,
@@ -841,7 +845,7 @@ function formatRuntimeCache(status: RuntimeCacheStatus | null): string {
     refresh_due: 'Refresh due · retrying in the background',
     expired: 'Expired · Quran content withheld',
     refreshing: 'Refreshing in the background',
-    error: 'Refresh failed · retrying when internet returns',
+    error: "Couldn't refresh · will retry when you're back online",
   }[status.phase]
   const refreshed = status.lastRefreshApiCalls == null
     ? 'not recorded'
@@ -850,8 +854,18 @@ function formatRuntimeCache(status: RuntimeCacheStatus | null): string {
   const expiry = status.expiresAtMs == null
     ? ''
     : ` · seven-day limit ${cacheCountdown(status.expiresAtMs, now)}`
-  const error = status.lastError ? ` · last error: ${status.lastError}` : ''
+  const error = status.lastError ? lastAttempt(status.lastError) : ''
   return `${state} · last refresh ${refreshed} · this launch ${status.apiCalls} calls${updated}${expiry}${error}`
+}
+
+/** Reader-facing reason for the last failed refresh; local faults stay unspoken. */
+function lastAttempt(failure: RuntimeCacheFailure): string {
+  switch (failure) {
+    case 'offline': return ' · Last attempt: no connection'
+    case 'server': return " · Last attempt: the server didn't respond"
+    case 'revoked': return ' · Last attempt: access to this content was withdrawn'
+    case 'other': return ''
+  }
 }
 
 function cacheAge(atMs: number, nowMs: number): string {

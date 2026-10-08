@@ -451,10 +451,12 @@ class AppStore {
       // first paint cannot pin a poisoned shell in the Cache API.
       void import('../swRegistration').then((m) => m.registerServiceWorker())
     } catch (e) {
+      // The raw cause (sql.js / wasm / fetch detail) is for the console only.
+      console.warn('[boot] Quran data failed to load', e)
       this.set({
         ready: false,
         loadProgress: null,
-        error: e instanceof Error ? e.message : 'Failed to load Quran data',
+        error: "The Quran couldn't be opened. Check your connection and reload the page.",
       })
     }
   }
@@ -536,7 +538,8 @@ class AppStore {
       this.set({ shareError: null })
     } catch (error) {
       if (error instanceof DOMException && error.name === 'AbortError') return
-      this.set({ shareError: 'Could not share the image' })
+      console.warn('[share] image share failed', error)
+      this.set({ shareError: "Couldn't share the image. Please try again." })
     }
   }
 
@@ -557,7 +560,8 @@ class AppStore {
       this.set({ shareError: null })
     } catch (error) {
       if (error instanceof DOMException && error.name === 'AbortError') return
-      this.set({ shareError: 'Could not share the text' })
+      console.warn('[share] text share failed', error)
+      this.set({ shareError: "Couldn't share the text. Please try again." })
     }
   }
 

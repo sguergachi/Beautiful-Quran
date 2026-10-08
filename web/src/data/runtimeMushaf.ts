@@ -17,8 +17,26 @@ export interface RuntimeCacheStatus {
   refreshAtMs: number | null
   expiresAtMs: number | null
   apiCalls: number
-  lastError: string | null
+  /** Humane category of the last refresh failure; raw detail goes to the console. */
+  lastError: RuntimeCacheFailure | null
   lastRefreshApiCalls?: number | null
+}
+
+/**
+ * offline: the request never reached the network; server: it answered with an
+ * error or not at all; revoked: access was withdrawn; other: local failure.
+ */
+export type RuntimeCacheFailure = 'offline' | 'server' | 'revoked' | 'other'
+
+export function classifyRuntimeCacheFailure(error: unknown): RuntimeCacheFailure {
+  if (error instanceof AccessRevoked) return 'revoked'
+  if (typeof navigator !== 'undefined' && navigator.onLine === false) return 'offline'
+  if (error instanceof ServerFailure) return 'server'
+  const name = error && typeof error === 'object' ? (error as { name?: unknown }).name : null
+  if (name === 'TimeoutError') return 'server'
+  // fetch() rejects with TypeError when the network is unreachable.
+  if (error instanceof TypeError) return 'offline'
+  return 'other'
 }
 
 const MIN_WORDS = 77_429
@@ -103,7 +121,7 @@ export class RuntimeMushafCache {
   private inFlight: Promise<boolean> | null = null
   private readonly listeners = new Set<() => void>()
   private readonly diagnosticListeners = new Set<() => void>()
-  private error: string | null = null
+  private error: RuntimeCacheFailure | null = null
   private blockReadRefresh = false
   private apiCalls = 0
   private requestsSettled = false
@@ -212,7 +230,8 @@ export class RuntimeMushafCache {
     this.progressCompleted = 0
     this.progressTotal = 0
     this.inFlight = this.sync().then(() => true).catch(async (error: unknown) => {
-      this.error = error instanceof Error ? error.message : String(error)
+      console.warn('[runtime-mushaf] refresh failed', error)
+      this.error = classifyRuntimeCacheFailure(error)
       this.blockReadRefresh = true
       if (error instanceof AccessRevoked) {
         await this.store.clear()
@@ -455,7 +474,7 @@ export class RuntimeMushafCache {
     if (response.status === 403 && object(object(parsed).error).code === 'qf_access_revoked') {
       throw new AccessRevoked('QF content access was revoked')
     }
-    if (!response.ok) throw new Error(`Content API returned ${response.status}`)
+    if (!response.ok) throw new ServerFailure(`Content API returned ${response.status}`)
     return parsed
   }
 
@@ -584,6 +603,7 @@ function wordSupplements(verseKey: string, response: Record<string, unknown>) {
 
 class ResyncRequired extends Error {}
 class AccessRevoked extends Error {}
+class ServerFailure extends Error {}
 
 function mushafWord(value: unknown): RuntimeMushafWord {
   const row = object(value)

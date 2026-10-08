@@ -519,7 +519,7 @@ export function EntranceCover({
       className="entrance"
       role="dialog"
       aria-modal="true"
-      aria-label={error ? 'Failed to open the book' : 'The Noble Quran'}
+      aria-label={error ? "The book couldn't be opened" : 'The Noble Quran'}
       aria-busy={showLoading || undefined}
     >
       <div
@@ -554,7 +554,7 @@ export function EntranceCover({
         }
         aria-label={
           error
-            ? 'Failed to open the book'
+            ? "The book couldn't be opened"
             : showLoading
               ? loadLabel || 'Opening the book…'
               : 'The Noble Quran — touch to open'
