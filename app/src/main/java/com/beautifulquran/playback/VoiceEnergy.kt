@@ -504,7 +504,7 @@ class VoiceEnergy(private val elapsedRealtimeMs: () -> Long = SystemClock::elaps
         const val NO_EVENT_MS = Long.MIN_VALUE
 
         private data class DetectorSelection(val mode: TarjiDetectorMode, val generation: Int)
-        @Volatile private var detectorSelection = DetectorSelection(TarjiDetectorMode.Current, 0)
+        @Volatile private var detectorSelection = DetectorSelection(TarjiDetectorMode.DEFAULT, 0)
 
         val detectorMode: TarjiDetectorMode get() = detectorSelection.mode
         val detectorGeneration: Int get() = detectorSelection.generation

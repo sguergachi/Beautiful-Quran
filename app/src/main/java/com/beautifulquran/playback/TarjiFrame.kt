@@ -1,8 +1,14 @@
 package com.beautifulquran.playback
 
-/** Developer comparison choices. The current detector remains the default. */
+/** Developer comparison choices; [DEFAULT] is what the reader uses. */
 enum class TarjiDetectorMode(val label: String) {
-    Current("Current"), Cycles("Cycles"), Spectrum("Spectrum"), Recording("Recording"),
+    Current("Current"), Cycles("Cycles"), Spectrum("Spectrum"), Recording("Recording");
+
+    companion object {
+        /** What the reader uses unless a developer picks another: Recording, for now
+         * (it keeps only the dramatic moments — docs/tarji-detection/hani-drama.md). */
+        val DEFAULT = Recording
+    }
 }
 
 /** One reusable measurement from the existing PCM extractor; invalid F0 is never carried. */

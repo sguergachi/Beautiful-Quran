@@ -57,9 +57,10 @@ four visible states per second cannot express a 5–10 Hz vocal pulse.
 
 ### Developer detector experiments
 
-`Current` remains the default. `InkEngine.tarjiDetectorMode` selects one
-session-only experiment globally; it is not a reciter profile or an exported
-sample setting. Turning developer mode off restores Current.
+**Recording is the default for now** (`TarjiDetectorMode.DEFAULT`): it keeps
+only the dramatic moments. `InkEngine.tarjiDetectorMode` selects one method
+globally for the session; it is not a reciter profile or an exported sample
+setting. A restart, or turning developer mode off, returns to the default.
 
 * **Cycles** checks substantial alternating extrema and neighboring periods.
 

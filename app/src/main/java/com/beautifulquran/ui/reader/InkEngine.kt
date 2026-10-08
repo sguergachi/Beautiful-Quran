@@ -554,7 +554,7 @@ object InkEngine {
         )?.forWash(t.pacedFeather)
     }
 
-    private var detectorMode by mutableStateOf(com.beautifulquran.playback.TarjiDetectorMode.Current)
+    private var detectorMode by mutableStateOf(com.beautifulquran.playback.TarjiDetectorMode.DEFAULT)
     /** Developer comparison only; never persisted in reciter profiles or exports. */
     var tarjiDetectorMode: com.beautifulquran.playback.TarjiDetectorMode
         get() = detectorMode
