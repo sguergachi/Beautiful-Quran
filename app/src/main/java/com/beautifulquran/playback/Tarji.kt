@@ -158,6 +158,9 @@ class Tarji {
      */
     var minDrama = MIN_DRAMA
 
+    /** What "dramatic" means for this reciter ([TarjiDramaWeights.forReciter]). */
+    internal var dramaWeights = TarjiDramaWeights.GENERIC
+
     /** Pitch glide tolerance (fraction) while holding one note. Ink Lab. */
     var maxPitchDrift = MAX_PITCH_DRIFT
 

@@ -163,12 +163,15 @@ fun analyzeTarjiCapture(
     capture: TarjiLabCapture,
     knobs: TarjiLabKnobs,
     mode: TarjiDetectorMode = TarjiDetectorMode.Current,
+    /** The reciter, for what "dramatic" means in his voice (Recording only). */
+    reciterId: Int = 0,
     wanted: () -> Boolean = { true },
 ): TarjiLabTrace {
     val n = capture.hopCount
     val detector = Tarji()
     detector.hopSamples = capture.hopSamples
     knobs.applyTo(detector)
+    detector.dramaWeights = com.beautifulquran.playback.TarjiDramaWeights.forReciter(reciterId)
     val scratch = FloatArray(capture.hopSamples)
     val hopDur = capture.hopContentDurationMs()
     detector.hopContentDurationMs = hopDur.toDouble()

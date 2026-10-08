@@ -57,4 +57,28 @@ class TarjiDramaTest {
         assertTrue("and stays lit when only drama is kept ($closingKept)", closingKept > 0.8f)
         assertTrue("fewer events survive ($dramatic of $all)", dramatic < all)
     }
+
+    @Test
+    fun `Hani's drama is a held pulse on a louder voice, and his cadences are not`() {
+        val hani = TarjiDramaWeights.forReciter(7)
+        fun score(ms: Double, loudDb: Float, st: Float) = TarjiDrama.score(
+            eventMs = ms, holdMs = 4_000.0,
+            loudness = Math.pow(10.0, loudDb / 20.0).toFloat(),
+            pitchRatio = Math.pow(2.0, st / 12.0).toFloat(),
+            weights = hani,
+        )
+        // 33:4 — a second of pulse, his voice 10 dB above the verse.
+        assertEquals(1f, score(1_037.0, 10.5f, 0f), 1e-4f)
+        // 17:16's close: a long pulse on a quieter voice that the pitch tracker
+        // reads as +5 st. His verses fall at their end; that is not a lift.
+        assertEquals(0f, score(1_636.0, -0.4f, 5f), 1e-4f)
+        // Pitch helps only a voice that is also louder…
+        assertTrue(score(1_000.0, 1.5f, 3f) > score(1_000.0, 1.5f, 0f))
+        // …and never on its own.
+        assertEquals(0f, score(1_000.0, 0f, 3f), 1e-4f)
+        // Loud but brief is not held.
+        assertTrue(score(300.0, 6f, 0f) < Tarji.MIN_DRAMA)
+        // Every other reciter keeps the generic ranges.
+        assertEquals(TarjiDramaWeights.GENERIC, TarjiDramaWeights.forReciter(1))
+    }
 }

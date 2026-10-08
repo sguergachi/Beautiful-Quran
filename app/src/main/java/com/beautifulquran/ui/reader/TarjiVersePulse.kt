@@ -65,18 +65,20 @@ internal object TarjiVersePulse {
         knobs: TarjiLabKnobs,
         windows: List<Window>,
         mode: TarjiDetectorMode = TarjiDetectorMode.Current,
+        reciterId: Int = 0,
         /** Asked every few hops; false abandons the work (the answer is no longer wanted). */
         wanted: () -> Boolean = { true },
-    ): List<FloatArray> = prepare(audio, knobs, windows, mode, wanted).lines
+    ): List<FloatArray> = prepare(audio, knobs, windows, mode, reciterId, wanted).lines
 
     private class Prepared(val lines: List<FloatArray>, val recording: TarjiRecordingResult? = null)
 
     private fun prepare(audio: Decoded, knobs: TarjiLabKnobs, windows: List<Window>,
-                        mode: TarjiDetectorMode, wanted: () -> Boolean): Prepared {
+                        mode: TarjiDetectorMode, reciterId: Int, wanted: () -> Boolean): Prepared {
         val detector = Tarji()
         detector.hopSamples = audio.hopSamples
         detector.hopContentDurationMs = audio.hopMs
         knobs.applyTo(detector)
+        detector.dramaWeights = com.beautifulquran.playback.TarjiDramaWeights.forReciter(reciterId)
         val track = TarjiEarTrack()
         val ear = TarjiEarSample()
         val out = windows.map {
@@ -265,7 +267,7 @@ internal object TarjiVersePulse {
             val result = withContext(Dispatchers.Default) {
                 val job = coroutineContext[Job]
                 val windows = windows(ayah, segments, heard.pcm.size / heard.hopSamples * heard.hopMs)
-                val prepared = prepare(heard, knobs, windows.values.toList(), mode) { job?.isActive != false }
+                val prepared = prepare(heard, knobs, windows.values.toList(), mode, reciter.id) { job?.isActive != false }
                 Result(key, windows.keys.zip(prepared.lines).toMap(), windows, prepared.recording)
             }
             if (mode != InkEngine.tarjiDetectorMode || knobs != detectorKnobs(InkEngine.tuning) ||

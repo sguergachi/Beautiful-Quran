@@ -465,7 +465,7 @@ class TarjiLabViewModel(
                 val st = _ui.value
                 val capture = st.capture ?: return@launch
                 val trace = withContext(Dispatchers.Default) {
-                    analyzeTarjiCapture(capture, st.knobs, st.mode) {
+                    analyzeTarjiCapture(capture, st.knobs, st.mode, st.reciter?.id ?: 0) {
                         coroutineContext.ensureActive()
                         true
                     }

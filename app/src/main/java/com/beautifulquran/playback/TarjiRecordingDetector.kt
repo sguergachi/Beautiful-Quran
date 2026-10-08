@@ -127,7 +127,7 @@ internal object TarjiRecordingDetector {
             starts[i] = d.eventStartHop
             acoustic[i] = if (d.usesAmplitude) amRegion.onset[i] else fmRegion.onset[i]
         }
-        keepDramatic(frames, knobs.minDrama, gain, starts, acoustic, hopMs)
+        keepDramatic(frames, knobs.minDrama, knobs.dramaWeights, gain, starts, acoustic, hopMs)
         return TarjiRecordingResult(gain, rate, amplitude, starts, rms, acoustic, hopMs, floor, calibrated)
     }
 
@@ -136,7 +136,7 @@ internal object TarjiRecordingDetector {
      * against this recording's own voice: the whole verse is in hand, so
      * "lifted" means above how this reciter sounds in this verse.
      */
-    private fun keepDramatic(frames: List<TarjiFrame>, minDrama: Float, gain: FloatArray,
+    private fun keepDramatic(frames: List<TarjiFrame>, minDrama: Float, weights: TarjiDramaWeights, gain: FloatArray,
                              starts: IntArray, acoustic: IntArray, hopMs: Double) {
         if (minDrama <= 0f) return
         val voicedRms = frames.filter { it.voiced }.map { it.hopRms }.sorted()
@@ -145,6 +145,7 @@ internal object TarjiRecordingDetector {
         val typicalF0 = f0.getOrElse(f0.size / 2) { 0f }
         val events = LinkedHashMap<Int, MutableList<Int>>()
         for (i in starts.indices) if (starts[i] >= 0) events.getOrPut(starts[i]) { ArrayList() } += i
+        val scored = ArrayList<Pair<List<Int>, Float>>(events.size)
         for ((_, hops) in events) {
             var rmsSum = 0.0
             var hold = 0f
@@ -160,8 +161,16 @@ internal object TarjiRecordingDetector {
                 holdMs = hold.toDouble(),
                 loudness = if (typicalRms > 0f) (rmsSum / hops.size / typicalRms).toFloat() else 1f,
                 pitchRatio = if (typicalF0 > 0f && pitches.isNotEmpty()) pitches[pitches.size / 2] / typicalF0 else 1f,
+                weights = weights,
             )
-            if (drama >= minDrama) continue
+            val strong = hops.maxOf { gain[it] } >= weights.minPeak
+            scored += hops to if (strong) drama else -1f
+        }
+        // The most dramatic first, up to the verse's allowance; the rest stay dark.
+        val kept = scored.filter { it.second >= minDrama }.sortedByDescending { it.second }
+            .take(weights.maxPerVerse).map { it.first }.toSet()
+        for ((hops, _) in scored) {
+            if (hops in kept) continue
             for (i in hops) { gain[i] = 0f; starts[i] = -1; acoustic[i] = -1 }
         }
     }
@@ -275,27 +284,102 @@ internal object TarjiRecordingDetector {
 /**
  * How dramatic one reverberation is, 0..1: the moments a reciter holds a note
  * and lifts his voice into it, against the ripples of an ordinary syllable.
- * Measured on 26 recordings by 13 reciters, the closing holds and sustained
- * madds ran over a second on holds of two or more, while most events were
- * ripples under half a second.
+ * Every term is a ramp between two values of this reciter's own voice
+ * ([TarjiDramaWeights]):
  *
- *  - **Sustain** (40 %): how long the pulse itself lasts, 0.6 s → 1.5 s.
- *  - **Hold** (35 %): how long the note it rides is held, 1.2 s → 3 s.
- *  - **Lift** (25 %): how far the voice is raised above the verse's typical
- *    loudness (−2 dB → +3 dB) or pitch (−1 → +3 semitones), whichever is more.
- *    A pitch reading more than six semitones off is an octave error of the
- *    tracker, not a lift, and is ignored.
+ *  - **Sustain**: how long the pulse itself lasts.
+ *  - **Hold**: how long the note it rides is held.
+ *  - **Lift**: how far the voice is raised above the verse's typical
+ *    loudness or pitch, whichever is more. A pitch reading more than six
+ *    semitones off is an octave error of the tracker, not a lift, and is
+ *    ignored.
  */
 internal object TarjiDrama {
-    fun score(eventMs: Double, holdMs: Double, loudness: Float, pitchRatio: Float): Float {
-        val sustain = ramp(eventMs.toFloat(), 600f, 1_500f)
-        val hold = ramp(holdMs.toFloat(), 1_200f, 3_000f)
+    fun score(
+        eventMs: Double,
+        holdMs: Double,
+        loudness: Float,
+        pitchRatio: Float,
+        weights: TarjiDramaWeights = TarjiDramaWeights.GENERIC,
+    ): Float {
+        val w = weights
+        val sustain = ramp(eventMs.toFloat(), w.sustainFromMs, w.sustainToMs)
+        val hold = ramp(holdMs.toFloat(), w.holdFromMs, w.holdToMs)
         val loudDb = if (loudness > 0f) 20f * log10(loudness) else -60f
         val semitones = if (pitchRatio > 0f) 12f * log2(pitchRatio) else 0f
-        val pitchLift = if (abs(semitones) > 6f) 0f else ramp(semitones, -1f, 3f)
-        val lift = max(ramp(loudDb, -2f, 3f), pitchLift)
-        return 0.4f * sustain + 0.35f * hold + 0.25f * lift
+        val pitchTrusted = abs(semitones) <= w.pitchLimitSt && loudDb >= w.pitchNeedsLoudDb
+        val pitchLift = if (pitchTrusted) ramp(semitones, w.pitchFromSt, w.pitchToSt) else 0f
+        val loudLift = ramp(loudDb, w.loudFromDb, w.loudToDb)
+        val lift = if (w.pitchShare > 0f) (loudLift + w.pitchShare * pitchLift).coerceIn(0f, 1f)
+            else max(loudLift, pitchLift)
+        return if (w.heldAndLifted) {
+            // Both or neither: a long flat note is not drama, nor is a loud blip.
+            (1f - w.hold) * kotlin.math.sqrt(sustain * lift) + w.hold * hold
+        } else {
+            w.sustain * sustain + w.hold * hold + w.lift * lift
+        }
     }
 
     private fun ramp(x: Float, from: Float, to: Float): Float = ((x - from) / (to - from)).coerceIn(0f, 1f)
+}
+
+/**
+ * The ranges and weights behind [TarjiDrama] for one reciter. [GENERIC] was
+ * set from 26 recordings by 13 reciters; a reciter with his own was fitted to
+ * his whole recitation (docs/tarji-detection/hani-drama.md).
+ */
+internal data class TarjiDramaWeights(
+    val sustainFromMs: Float, val sustainToMs: Float,
+    val holdFromMs: Float, val holdToMs: Float,
+    val loudFromDb: Float, val loudToDb: Float,
+    val pitchFromSt: Float, val pitchToSt: Float,
+    val sustain: Float, val hold: Float, val lift: Float,
+    /** Score as held-and-lifted (geometric) plus [hold], rather than a weighted sum. */
+    val heldAndLifted: Boolean = false,
+    /** A pitch reading further off than this is a tracker error, not a lift. */
+    val pitchLimitSt: Float = 6f,
+    /** Pitch counts only when the voice is at least this much louder too. */
+    val pitchNeedsLoudDb: Float = Float.NEGATIVE_INFINITY,
+    /** 0: lift is loudness or pitch, whichever is more. Above 0: loudness plus this share of pitch. */
+    val pitchShare: Float = 0f,
+    /** Events whose detector gain never reaches this are not considered. */
+    val minPeak: Float = 0f,
+    /** At most this many events per verse, the most dramatic first. */
+    val maxPerVerse: Int = Int.MAX_VALUE,
+) {
+    companion object {
+        val GENERIC = TarjiDramaWeights(
+            sustainFromMs = 600f, sustainToMs = 1_500f,
+            holdFromMs = 1_200f, holdToMs = 3_000f,
+            loudFromDb = -2f, loudToDb = 3f,
+            pitchFromSt = -1f, pitchToSt = 3f,
+            sustain = 0.4f, hold = 0.35f, lift = 0.25f,
+        )
+
+        /**
+         * Hani Ar-Rifai (reciter 7), fitted to all 6,236 of his verses (31,019
+         * detected events) and reviewed independently
+         * (docs/tarji-detection/hani-drama.md). Held AND lifted: a pulse of
+         * 0.4 s → 1 s, with his voice 1 → 5 dB above the verse's. Pitch is
+         * supporting evidence only — within ±4 st and with the voice also
+         * louder — because his falling verse cadences read as phantom +5 st
+         * lifts. "Hold" is dropped: for him it measures the reciting tone, not
+         * a held vowel. At most two moments a verse, of real strength.
+         */
+        val HANI = TarjiDramaWeights(
+            sustainFromMs = 400f, sustainToMs = 1_000f,
+            holdFromMs = 0f, holdToMs = 1f,
+            loudFromDb = 1f, loudToDb = 5f,
+            pitchFromSt = 1f, pitchToSt = 3f,
+            sustain = 0f, hold = 0f, lift = 0f,
+            heldAndLifted = true,
+            pitchLimitSt = 4f,
+            pitchNeedsLoudDb = 0.5f,
+            pitchShare = 0.5f,
+            minPeak = 0.3f,
+            maxPerVerse = 2,
+        )
+
+        fun forReciter(reciterId: Int): TarjiDramaWeights = if (reciterId == 7) HANI else GENERIC
+    }
 }

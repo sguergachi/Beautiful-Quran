@@ -136,6 +136,9 @@ later lab edits persist normally. Other stored reciter profiles are preserved.
   darkens those under the threshold. Shipped 50 %; "Any" (0) keeps every one.
   On 26 recordings by 13 reciters it keeps 79 of 342 events, mostly closing
   holds and long madds. Saved with the reciter's profile.
+  A reciter may carry his own ranges (`TarjiDramaWeights.forReciter`); Hani's
+  were fitted to all his verses — see
+  [tarji-detection/hani-drama.md](tarji-detection/hani-drama.md).
 - **Quietest voice** is a volume threshold (`Tarji.minVolume`): the voice's
   smoothed level, as a fraction of full scale, that a reverberation may open
   on. "Any" (0) is no threshold and the shipped default; held notes sit around
