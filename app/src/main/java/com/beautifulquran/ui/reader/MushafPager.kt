@@ -39,7 +39,9 @@ import androidx.compose.runtime.snapshotFlow
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.FrameRateCategory
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.preferredFrameRate
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.geometry.Offset
@@ -973,12 +975,15 @@ internal fun MushafPager(
                 }
             }
     }
-    LaunchedEffect(pagerState, context, catalog.pageCount) {
+    LaunchedEffect(pagerState, context, catalog.pageCount, book) {
         snapshotFlow { pagerState.settledPage }
             .collect { settled ->
                 val pages = mushafFontPreloadPages(settled, catalog.pageCount)
                 withContext(Dispatchers.Default) {
                     MushafQcfFonts.preload(context, pages)
+                    if (book == null) pages.forEach { page ->
+                        warmMushafInkProfiles(catalog.page(page), MushafQcfFonts.cached(page)?.typeface)
+                    }
                 }
             }
     }
@@ -1050,6 +1055,7 @@ internal fun MushafPager(
         key = { it },
         modifier = modifier
             .fillMaxSize()
+            .preferredFrameRate(FrameRateCategory.High)
             .mushafForeEdgeFade(paper, MushafForeEdgeFade),
     ) { pageIndex ->
         val bookLeaf = book?.leaf(pageIndex)

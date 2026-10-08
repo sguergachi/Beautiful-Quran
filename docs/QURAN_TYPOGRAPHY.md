@@ -45,10 +45,13 @@ nothing sizes type per page or per line. `MUSHAF_TYPE_SCALE` applies the same
 content is then balanced over two more visual lines, so the larger type wraps
 instead of being narrowed back into the original fifteen rows. The
 seventeenth row uses the paper below the text. The Arabic folio now replaces
-the part number at the top left, so its entire former 16 dp band and 0.20-line
+the part number in the running head, so its entire former 16 dp band and 0.20-line
 foot go to the text. The height-bound hand grows with that larger well;
 leading grows with it, and the dial keeps its own 8 dp of air below the text.
-The running head keeps its gutter. English retains its 0.55-line foot and
+Both number scripts flank the centred chapter: Western at the left,
+Arabic-Indic at the right, with equal end columns. A single script stays at
+the left with the chapter at the right. The running head keeps its gutter.
+English retains its 0.55-line foot and
 30 dp folio band. Extra rows go to the densest chapter section that still has
 words to spare; a short section cannot acquire empty rows.
 

@@ -136,9 +136,9 @@ internal fun UiDevice.waitForMushafPage(page: Int) {
     error("Mushaf page $page did not reach the viewport centre")
 }
 
-/** RTL pager: a leftward swipe, sized from the display, turns toward later pages. */
+/** RTL pager: a rightward swipe, sized from the display, turns toward later pages. */
 internal fun UiDevice.turnMushafTowardLaterPages() {
-    swipeAcross(fromX = 0.80f, toX = 0.20f, y = displayHeight / 2)
+    swipeAcross(fromX = 0.20f, toX = 0.80f, y = displayHeight / 2)
     waitForIdle()
 }
 

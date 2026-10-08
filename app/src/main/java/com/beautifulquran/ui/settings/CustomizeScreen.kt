@@ -99,7 +99,7 @@ import com.beautifulquran.ui.reader.VERSE_ANNOTATION_INK_ALPHA
 import com.beautifulquran.ui.reader.collapsedStackSpanDp
 import com.beautifulquran.ui.reader.appendAyahNumberMark
 import com.beautifulquran.ui.reader.mushafCellOrigins
-import com.beautifulquran.ui.reader.mushafHeaderFolio
+import com.beautifulquran.ui.reader.mushafFolioLayout
 import com.beautifulquran.ui.reader.mushafLineCells
 import com.beautifulquran.ui.reader.symbolicAyahBarCount
 import com.beautifulquran.ui.reader.verseAnnotationStyle
@@ -781,13 +781,15 @@ private fun PreviewEnglishMushafLeaf(
 @Composable
 private fun PreviewLeafRunningHead(pageNumberScript: PageNumberScript? = null) {
     val ink = QuranTheme.ink.muted
+    val folio = pageNumberScript?.let { mushafFolioLayout(PreviewMushafPage, it) }
+    val both = folio?.western != null && folio.arabic != null
     val style = MaterialTheme.typography.labelSmall.copy(
         fontSize = PreviewLeafHeadSize,
         letterSpacing = 0.10.em,
     )
     Row(Modifier.fillMaxWidth()) {
         Text(
-            text = pageNumberScript?.let { mushafHeaderFolio(PreviewMushafPage, it) }
+            text = folio?.western ?: folio?.arabic
                 ?: "Part ${juzOf(PreviewMushafSurahId, PreviewMushafAyahFirst)}",
             style = style,
             color = ink,
@@ -798,10 +800,20 @@ private fun PreviewLeafRunningHead(pageNumberScript: PageNumberScript? = null) {
             text = PreviewMushafSurahLatin,
             style = style,
             color = ink,
-            textAlign = TextAlign.End,
+            textAlign = if (both) TextAlign.Center else TextAlign.End,
             maxLines = 1,
-            modifier = Modifier.weight(1f),
+            modifier = Modifier.weight(if (both) 3f else 1f),
         )
+        if (both) {
+            Text(
+                text = folio.arabic.orEmpty(),
+                style = style,
+                color = ink,
+                textAlign = TextAlign.End,
+                maxLines = 1,
+                modifier = Modifier.weight(1f),
+            )
+        }
     }
 }
 

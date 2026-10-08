@@ -41,9 +41,3 @@ fun mushafFolioLayout(page: Int, script: PageNumberScript): MushafFolioLayout {
         PageNumberScript.ARABIC -> MushafFolioLayout(null, arabic, diamond = false)
     }
 }
-
-/** The Arabic leaf's folio, set as one label in the running head. */
-internal fun mushafHeaderFolio(page: Int, script: PageNumberScript): String {
-    val folio = mushafFolioLayout(page, script)
-    return listOfNotNull(folio.western, folio.arabic).joinToString("  ⋄  ")
-}

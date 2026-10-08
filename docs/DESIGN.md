@@ -168,12 +168,15 @@ gutter deep enough for a circled ayah mark's medallion, which inks about half
 its own width past its advance and is sliced by anything narrower.
 
 The Arabic leaf uses seventeen display rows inside each unchanged Madinah
-page boundary. Its page number replaces the part at the top left; the chapter
-stays at the right. The former bottom folio band and its foot belong to the
+page boundary. Its page number replaces the part in the running head. Both
+scripts put Western digits at the left and Arabic-Indic digits at the right,
+with the chapter centred between equal end columns. A single script stays at
+the left and the chapter at the right. The former bottom folio band and its foot belong to the
 text, so its hand grows with the taller well. The dial retains its own air
 below the last line. English keeps the part in the head and its folio below
 the prose, with the foot its measured descenders need. Page-number script
-chooses Arabic-Indic, Western, or both with a diamond — always quiet ink.
+chooses Arabic-Indic, Western, or both — always quiet ink. The English leaf's
+bottom folio keeps its diamond between the two scripts.
 
 **The folio belongs to the leaf.** Arabic carries it in the running head;
 English carries it just below the text. Both travel with the page during a
@@ -221,9 +224,10 @@ colours anything is set in. What matters for them is the *relief* between the
 stops, which is held the same in every theme; their own contrast against the
 paper is not a meaningful number and differs widely by design.
 
-The running head is type alone: the chapter at the spine, the juzʾ at the
-fore-edge, each carrying its name twice — Arabic over a Latin gloss — so the
-two ends read as one mirrored pair. Transliteration, not translated meaning:
+The running head is type alone: the Arabic leaf's folio and the chapter's
+transliterated name. With both number scripts the chapter is centred; with
+one it sits at the right. The English leaf keeps Part at the left and the
+chapter at the right. Transliteration, not translated meaning:
 a running head is for finding a place, and the transliterated name is how the
 book names chapters in Latin everywhere else. It stands off the block by
 about a line's pitch.
@@ -1670,7 +1674,7 @@ rail, no English under the type, and its own circled QCF marks.
   stretching word gaps. The circled mark is its own cell of the line, with
   the page's word space either side, so it never collides with the last
   word. Page-number script still applies, and the preview paints the same
-  folio as the leaf: quiet ink at the top left, a single script or both
-  with a diamond. Scroll page-breaks keep the gold
+  folio as the leaf: a single script at the top left, or Western left and
+  Arabic-Indic right with the chapter centred. Scroll page-breaks keep the gold
   hairline (Western left, Arabic-Indic right; a single script centred
   between equal rules).

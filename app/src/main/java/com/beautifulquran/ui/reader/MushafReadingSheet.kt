@@ -535,7 +535,7 @@ internal fun MushafReadingSheet(
 }
 
 /**
- * The leaf's running head: chapter at the right, Arabic page number at the
+ * Both folio scripts flank a centred chapter; a single script sits at the
  * left. English keeps the part at the left and its folio below the prose.
  */
 @Composable
@@ -562,6 +562,8 @@ internal fun MushafPageHeader(
     //
     // Arabic spends the former bottom folio band on revelation instead.
     val ink = MaterialTheme.colorScheme.onBackground
+    val folio = page?.let { mushafFolioLayout(it, pageNumberScript) }
+    val both = folio?.western != null && folio.arabic != null
     Row(
         modifier = modifier
             .fillMaxWidth()
@@ -574,7 +576,7 @@ internal fun MushafPageHeader(
         verticalAlignment = Alignment.Top,
     ) {
         MushafHeadLabel(
-            text = page?.let { mushafHeaderFolio(it, pageNumberScript) } ?: "Part $juz",
+            text = folio?.western ?: folio?.arabic ?: "Part $juz",
             ink = ink,
             align = TextAlign.Start,
             glyphSize = glyphSize,
@@ -583,10 +585,19 @@ internal fun MushafPageHeader(
         MushafHeadLabel(
             text = surahNameLatin.orEmpty(),
             ink = ink,
-            align = TextAlign.End,
+            align = if (both) TextAlign.Center else TextAlign.End,
             glyphSize = glyphSize,
-            modifier = Modifier.weight(1f),
+            modifier = Modifier.weight(if (both) 3f else 1f),
         )
+        if (both) {
+            MushafHeadLabel(
+                text = folio.arabic.orEmpty(),
+                ink = ink,
+                align = TextAlign.End,
+                glyphSize = glyphSize,
+                modifier = Modifier.weight(1f),
+            )
+        }
     }
 }
 
