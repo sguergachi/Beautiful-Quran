@@ -486,12 +486,6 @@ private val LemmaGlossGap = 10.dp
 private val LemmaMetaGap = 2.dp
 /** Air between the sense stack (or bare lemma) and grammar / frequency. */
 private val LemmaToMetaGap = 20.dp
-/**
- * Single-sense elbow height above the shared baseline: the visual middle of
- * the 32sp Hafs lemma, which also splits the gloss's ascender height. 4dp
- * (English x-height) left the elbow visibly below the Arabic word's centre.
- */
-private val LemmaElbowRise = 7.dp
 
 /** Shared face for Root Form‑1 lead and Lemma dictionary glosses. */
 private val AnalysisGlossAlpha = 0.9f
@@ -1104,7 +1098,7 @@ private fun LemmaSingleSenseRow(
 ) {
     val spineHeight = with(LocalDensity.current) { AnalysisGlossLineHeight.toDp() }
     val spineWidthPx = with(LocalDensity.current) { 1.dp.toPx() }
-    val stubOffsetPx = with(LocalDensity.current) { LemmaElbowRise.toPx() }
+    val stubOffsetPx = with(LocalDensity.current) { 4.dp.toPx() }
     Row(
         modifier = Modifier
             .fillMaxWidth()
