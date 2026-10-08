@@ -75,6 +75,7 @@ import com.beautifulquran.domain.mushafLeafBands
 import com.beautifulquran.domain.MushafType
 import com.beautifulquran.domain.mushafGridSlots
 import com.beautifulquran.domain.mushafIsOpeningLeaf
+import com.beautifulquran.domain.mushafLineMayStandShort
 import com.beautifulquran.domain.mushafUniformFontPx
 import com.beautifulquran.domain.qcfTrailingMark
 import com.beautifulquran.domain.qcfWordGlyphs
@@ -1658,6 +1659,11 @@ private fun MushafPageSheet(
                                 onWordClick = onWordClick,
                                 onWordLongClick = onWordLongClick,
                                 onAyahClick = onAyahClick,
+                                allowShort = mushafLineMayStandShort(
+                                    page.page,
+                                    line.tokens.lastOrNull(),
+                                    surahsById[line.tokens.lastOrNull()?.surahId]?.ayahCount,
+                                ),
                                 pageFont = pageFont,
                             )
                         }

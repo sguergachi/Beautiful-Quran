@@ -91,6 +91,8 @@ internal val MushafGutterSlot = 44.dp
  * furniture of the frame and does not.
  */
 internal val MushafFolioBand = 30.dp
+/** The Arabic figure sits lower in a shallower band; its old paper becomes text. */
+private val MushafArabicFolioBand = 16.dp
 /** Paper between the rule and the transport it divides the leaf from. */
 private val MushafRuleTailAir = 0.dp
 
@@ -151,9 +153,10 @@ private val MushafTransportAir = 2.dp
 private val MushafReciterBand = 48.dp
 
 /**
- * Everything reserved under the leaf while Ink Lab is closed.
+ * Everything reserved under the English leaf while Ink Lab is closed.
  *
- * Every term is constant, so the root can subtract it from the window to learn
+ * Arabic measures its smaller folio band on the sheet itself. Every English
+ * term is constant, so the root can subtract it from the window to learn
  * the closed leaf's size before a leaf has ever been composed and paginate the
  * English book from that on the very first launch. Open Ink Lab adds measured
  * footer height live; its temporary leaf metrics are not remembered.
@@ -280,6 +283,7 @@ internal fun MushafReadingSheet(
     // The folio stands down while the dial is under the thumb: scrubbing, the
     // figure the dial itself is calling out does not need saying twice.
     val scrubbing = remember { mutableStateOf(false) }
+    val folioBand = if (english) MushafFolioBand else MushafArabicFolioBand
     val folioInk by animateFloatAsState(
         targetValue = if (scrubbing.value) 0f else 1f,
         animationSpec = tween(InkEngine.tuning.recessMs, easing = FastOutSlowInEasing),
@@ -315,7 +319,7 @@ internal fun MushafReadingSheet(
         BoxWithConstraints(
             Modifier
                 .fillMaxWidth()
-                .height(MushafFolioBand)
+                .height(folioBand)
                 .clipToBounds()
                 .graphicsLayer { alpha = folioInk },
         ) {

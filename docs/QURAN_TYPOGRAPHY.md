@@ -25,8 +25,8 @@ at the crown and foot, the block in the middle of the page.*
 **We follow the page boundary.** `MushafCatalog` builds the same 604 leaves
 straight from those columns, and `tools/fetch_mushaf_lines.py` cross-checks the
 words on every page against quran.com's published layout. For the reader's
-larger hand, `reflowMushafPage` balances those same words over one additional
-visual line inside each leaf; it never moves a word to another page and keeps
+larger hand, `reflowMushafPage` balances those same words over two additional
+visual lines inside each leaf; it never moves a word to another page and keeps
 every chapter opening as a hard boundary. Pages 1–2 are not reflowed: the
 print's own line breaks *are* the circle, and stretching them into even rows
 destroys it. Line geometry is cached by those reflowed words and the page
@@ -41,11 +41,15 @@ is set on its own.
 
 **We follow it.** `MUSHAF_DESIGN_LINE_EM` fixes one size for all 604 pages;
 nothing sizes type per page or per line. `MUSHAF_TYPE_SCALE` applies the same
-16/15 enlargement to that fitted hand on every leaf. Each page's unchanged
-content is then balanced over one more visual line, so the larger type wraps
+17/15 enlargement to that fitted hand on every leaf. Each page's unchanged
+content is then balanced over two more visual lines, so the larger type wraps
 instead of being narrowed back into the original fifteen rows. The
-sixteenth row takes the paper formerly reserved by the wide head and tail
-gutters; it is not squeezed into the old fifteen-row well.
+seventeenth row takes more of the paper below the text: the Arabic foot is
+0.20 of a line while the English foot remains 0.55. The running head keeps its
+own gutter. The Arabic folio band is also reduced from 30 dp to 16 dp: the text
+takes its old space and the figure sits lower, nearer the page dial. Extra
+rows go to the densest chapter section that still has words
+to spare; a short section cannot acquire empty rows.
 
 ## 3. Every full line is flush
 
@@ -58,8 +62,12 @@ justify`, i.e. flush including the final line of each element.
 
 **We follow it.** Lines reach the measure by space and by letterform (rule 4),
 and where neither alone suffices the letters are held at their bound and the
-space carries the rest. Measured, 1.2% of lines cannot reach it even so — four-
-and five-word lines, a chapter's last — and only those are centred.
+space carries the rest. A narrow glyph run does not prove a chapter has ended:
+reflowed full rows on page 5 were incorrectly centred by that heuristic.
+`mushafLineMayStandShort` checks the chapter's actual final ayah and word.
+Only a known chapter ending or an opening medallion may use the short-line
+fallback; all other rows fill both margins. The geometry cache includes that
+permission so it cannot reuse a centred ending's fit for a full row.
 
 ## 4. The line is filled by the letterform, not by the space
 
@@ -100,6 +108,15 @@ margin, the letters stop at 1.15 and the space opens to 0.45 em rather than let
 the line stand short (rule 3). Result over the same lines: 52% of the page keeps
 its letterforms exactly as drawn.
 
+The QCF renderer additionally measures each join's visible white (§6). Loose
+display rows now widen their letterforms at a white level of 0.65 em, down
+from 0.85. The 1.25 em short-line threshold remains for known chapter endings;
+full rows spend the remaining width on space after reaching the letterform
+stretch limit. These levels
+include the paper inside the two glyph profiles, not just a box gap.
+The collision floors stay at 0.24 em along a shared channel and 0.20 em at the
+closest stroke, so tightening the page does not weld neighboring words.
+
 ## 6. The space is measured between ink, not between boxes
 
 A word's advance box is not where its ink is: these faces have side bearings
@@ -119,7 +136,7 @@ is never split across a line end, and the sequence is never shuffled. If a
 display row still will not fit, rule 4 applies.
 
 What *does* move is the display row. `reflowMushafPage` regroups those same
-tokens inside the leaf so the larger hand fits one extra visual line. It never
+tokens inside the leaf so the larger hand fits two extra visual lines. It never
 moves a word to another page. Pages 1–2 are not regrouped: their printed
 breaks *are* the medallion.
 
@@ -1311,17 +1328,15 @@ does:
 
 ```
                 head   gutter   well   foot   = slots
-    Arabic      0.30     0.50     16     0.55    17.35
-    English     0.30     1.00     15     0.55    16.85
+    Arabic      0.30     0.50     17     0.20    18.00
+    English     0.30     0.30     15.70  0.55    16.85
 ```
 
-The Arabic leaf spends almost nothing on the gutter and buys a sixteenth row of
-revelation with it. It can, because the QCF faces mark 1.37 em above the
-baseline and 0.75 below, so a band of nearly nothing still leaves visible air —
-and every unit not spent on furniture is type size (§2). The English leaf has no
-sixteenth row to buy, and its ink stops *exactly* at the ascent and the
-descender, so it keeps the canonical gutter, which was sized for precisely this:
-a head that sits closer than about a line's pitch reads as part of the block.
+The Arabic leaf uses seventeen display rows, with the extra row below paid for
+in part by a smaller foot. Its type grows uniformly and loose lines spend more
+of their measure on letterforms, with less paper between words (§2, §5). It
+still keeps a real foot between the final line and the folio. English spends
+the height on continuous prose instead; its gutter and foot are independent.
 
 **The folio does not stand under the text; the foot does.** There used to be a
 tail and a folio band —
@@ -1342,7 +1357,10 @@ descenders came down to 2,076 px on a device whose folio begins its ink at
 band rather than a slack — the leaf grows by it, so the type comes down about
 three percent and the well holds the same lines, each a little longer. It is not
 the head's 1.30, because the folio and the dial stand below it with air of their
-own; measured after, the foot runs 84 to 95 px on every leaf.
+own; measured then, the foot ran 84 to 95 px. The Arabic display now keeps a
+smaller 0.20-unit foot and a 16 dp folio band, so the seventeenth row can reach
+farther down the sheet. The English foot and 30 dp folio band keep the space
+its measured prose needs.
 
 The leaf keeps the rest of the three quarters of a line. On the Arabic hand it goes into
 type size, since the well's share of the leaf rises from 16 / 17.05 to 16 /

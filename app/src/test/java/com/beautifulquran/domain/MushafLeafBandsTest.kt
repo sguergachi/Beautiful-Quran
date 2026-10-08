@@ -37,7 +37,8 @@ class MushafLeafBandsTest {
             0.0001f,
         )
         assertEquals(MushafGrid.TAIL, MUSHAF_ENGLISH_BANDS.tail, 0f)
-        assertEquals(MushafGrid.TAIL, MUSHAF_ARABIC_BANDS.tail, 0f)
+        assertTrue(MUSHAF_ARABIC_BANDS.tail > 0f)
+        assertTrue(MUSHAF_ARABIC_BANDS.tail < MushafGrid.TAIL)
         // The English leaf is still ahead of where the folio's band left it —
         // it gave up 0.40 for the folio and 0.35 for a tail, and buys the foot
         // back for 0.55. The Arabic leaf pays a little: its tail was 0.05, and
@@ -53,21 +54,21 @@ class MushafLeafBandsTest {
     }
 
     @Test
-    fun `the Arabic leaf buys a sixteenth row from its gutters`() {
+    fun `the Arabic leaf buys a seventeenth row with a smaller foot`() {
         assertEquals(
             MUSHAF_DISPLAY_LINES_PER_PAGE.toFloat(),
             MUSHAF_ARABIC_BANDS.well,
             0f,
         )
         // The English well is no longer a round fifteen — it took what the
-        // gutter gave up (ENGLISH_HEAD_GUTTER) — so the sixteenth row is the
+        // gutter gave up (ENGLISH_HEAD_GUTTER) — so the seventeenth row is the
         // thing to assert, not the difference.
         assertTrue(MUSHAF_ARABIC_BANDS.well > MUSHAF_ENGLISH_BANDS.well)
         // The English gutter used to be the wider of the two, on the reasoning
         // that Latin ink wants more air than the QCF faces' own side bearings.
         // It is now the tighter one: both leaves spend the gutter on their
         // text, and they only differ in what it buys. The Arabic leaf buys a
-        // sixteenth row with it; the English hand is solved from the well, so
+        // seventeenth row with it; the English hand is solved from the well, so
         // the English leaf buys type. Neither can spend it twice.
         assertTrue(MUSHAF_ENGLISH_BANDS.headGutter <= MUSHAF_ARABIC_BANDS.headGutter)
     }

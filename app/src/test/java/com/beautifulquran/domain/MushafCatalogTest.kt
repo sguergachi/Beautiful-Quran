@@ -84,7 +84,7 @@ class MushafCatalogTest {
     }
 
     @Test
-    fun `display reflow adds one line without moving words between pages or chapters`() {
+    fun `display reflow shares extra rows without moving words between pages or chapters`() {
         val page = buildMushafCatalog(
             listOf(
                 source(1, 7, 8, "one", page = 5, line = 1),
@@ -100,13 +100,48 @@ class MushafCatalogTest {
 
         val reflowed = reflowMushafPage(page) { if (it.surahId == 1) 10f else 1f }
 
-        assertEquals(4, reflowed.lines.size)
+        assertEquals(5, reflowed.lines.size)
         assertEquals(
             page.lines.flatMap { it.tokens }.map { it.word.arabic },
             reflowed.lines.flatMap { it.tokens }.map { it.word.arabic },
         )
         assertEquals(2, reflowed.surahStarts.single().beforeLineIndex)
         assertEquals(2, reflowed.surahStarts.single().surahId)
+    }
+
+    @Test
+    fun `a full leaf gains two rows and keeps every token in order`() {
+        val page = buildMushafCatalog(
+            (1..150).map { source(2, 17, it, "word$it", page = 4, line = (it - 1) / 10 + 1) },
+        ).page(4)!!
+        val reflowed = reflowMushafPage(page) { 1f }
+
+        assertEquals(17, reflowed.lines.size)
+        assertEquals(page.lines.flatMap { it.tokens }, reflowed.lines.flatMap { it.tokens })
+        assertTrue(reflowed.lines.all { it.tokens.isNotEmpty() })
+        val last = reflowed.lines.last().tokens.last()
+        assertTrue(!mushafLineMayStandShort(4, last, surahAyahCount = 286))
+        assertTrue(mushafLineMayStandShort(4, last, surahAyahCount = 17))
+        assertTrue(!mushafLineMayStandShort(4, last.copy(endsAyah = false), surahAyahCount = 17))
+        assertTrue(mushafLineMayStandShort(1, last, surahAyahCount = 286))
+    }
+
+    @Test
+    fun `a section with no spare words does not spend an extra row`() {
+        val page = buildMushafCatalog(
+            listOf(
+                source(112, 4, 1, "heavy", page = 600, line = 1),
+                source(113, 1, 1, "one", page = 600, line = 2),
+                source(113, 1, 2, "two", page = 600, line = 2),
+                source(113, 1, 3, "three", page = 600, line = 2),
+            ),
+        ).page(600)!!
+        val reflowed = reflowMushafPage(page) { if (it.surahId == 112) 100f else 1f }
+
+        assertEquals(4, reflowed.lines.size)
+        assertEquals(1, reflowed.surahStarts.single().beforeLineIndex)
+        assertEquals(page.lines.flatMap { it.tokens }, reflowed.lines.flatMap { it.tokens })
+        assertTrue(reflowed.lines.all { it.tokens.isNotEmpty() })
     }
 
     @Test

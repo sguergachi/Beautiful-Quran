@@ -78,8 +78,8 @@ fun mushafLineSlotPx(pageHeightPx: Float, slots: Int, fontPx: Float): Float {
 /** Every Madinah page is set on the same 15-line grid. */
 const val MUSHAF_LINES_PER_PAGE = 15
 
-/** The reader's larger hand wraps each fixed page over one additional row. */
-const val MUSHAF_DISPLAY_LINES_PER_PAGE = MUSHAF_LINES_PER_PAGE + 1
+/** The reader's larger hand wraps each fixed page over seventeen display rows. */
+const val MUSHAF_DISPLAY_LINES_PER_PAGE = MUSHAF_LINES_PER_PAGE + 2
 
 /**
  * Al-Fātiḥah and the opening of al-Baqarah: the two framed leaves. The print
@@ -89,6 +89,10 @@ const val MUSHAF_DISPLAY_LINES_PER_PAGE = MUSHAF_LINES_PER_PAGE + 1
  * destroy the circle.
  */
 fun mushafIsOpeningLeaf(page: Int): Boolean = page in 1..2
+
+/** A short row must actually end its chapter, except on the two opening medallions. */
+fun mushafLineMayStandShort(page: Int, last: MushafToken?, surahAyahCount: Int?): Boolean =
+    mushafIsOpeningLeaf(page) || last?.let { it.endsAyah && it.ayah == surahAyahCount } == true
 
 /**
  * Slots to divide the text well by. A full page fills it; a short page
@@ -149,8 +153,8 @@ const val MUSHAF_MAX_FONT_PX = 128f
  */
 const val MUSHAF_DESIGN_LINE_EM = 16.4f
 
-/** Book-wide enlargement that gives a canonical leaf one additional visual line. */
-const val MUSHAF_TYPE_SCALE = 16f / 15f
+/** Book-wide enlargement matched to the display row count. */
+const val MUSHAF_TYPE_SCALE = MUSHAF_DISPLAY_LINES_PER_PAGE.toFloat() / MUSHAF_LINES_PER_PAGE
 
 /** Applies the reader's uniform optical size without introducing page sizing. */
 fun mushafDisplayFontPx(fittedFontPx: Float): Float =
@@ -299,6 +303,7 @@ fun mushafLineFit(
     gapCount: Int,
     measureWidthPx: Float,
     fontPx: Float,
+    allowShort: Boolean = true,
 ): MushafLineFit {
     val gaps = gapCount.coerceAtLeast(0)
     val ideal = MUSHAF_WORD_GAP_EM * fontPx
@@ -336,7 +341,7 @@ fun mushafLineFit(
     // it. Without this step a line that needed a 1.19 stretch was set short
     // even though 1.15 and a wider space would have filled it.
     val stretched = (measureWidthPx - MUSHAF_MAX_LINE_SCALE * inkWidthPx) / gaps
-    if (stretched <= MUSHAF_STRETCH_WORD_GAP_EM * fontPx) {
+    if (!allowShort || stretched <= MUSHAF_STRETCH_WORD_GAP_EM * fontPx) {
         return MushafLineFit(MUSHAF_MAX_LINE_SCALE, stretched, flush = true)
     }
     // Not a full line: a chapter's last, four or five words standing alone.

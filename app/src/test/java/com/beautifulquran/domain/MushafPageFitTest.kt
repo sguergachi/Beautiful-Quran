@@ -92,9 +92,9 @@ class MushafPageFitTest {
     }
 
     @Test
-    fun `display hand grows by one fifteenth on every page`() {
-        assertEquals(16, MUSHAF_DISPLAY_LINES_PER_PAGE)
-        assertEquals(60f * MUSHAF_TYPE_SCALE, mushafDisplayFontPx(60f), 0.01f)
+    fun `display hand grows for seventeen rows on every page`() {
+        assertEquals(17, MUSHAF_DISPLAY_LINES_PER_PAGE)
+        assertEquals(68f, mushafDisplayFontPx(60f), 0.01f)
         assertEquals(MUSHAF_MAX_FONT_PX, mushafDisplayFontPx(MUSHAF_MAX_FONT_PX), 0f)
     }
 
@@ -289,6 +289,7 @@ class MushafPageFitTest {
         )
         assertEquals(1f, fit.scale, 1e-4f)
         assertEquals(MUSHAF_WORD_GAP_EM * 100f, fit.gapPx, 1e-4f)
+        assertTrue(mushafLineFit(300f, 4, 700f, 100f, allowShort = false).flush)
         assertTrue(!fit.flush)
     }
 
