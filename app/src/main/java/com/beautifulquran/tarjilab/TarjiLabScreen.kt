@@ -826,6 +826,14 @@ private fun KnobsPanel(
             // The first step of the track is "any", so it can be turned off by hand.
             onKnob { k -> k.copy(minVolume = if (v < 0.005f) 0f else v) }
         }
+        if (ui.mode == TarjiDetectorMode.Recording) {
+            LabSlider("Drama", knobs.minDrama, 0f..1f,
+                valueLabel = if (knobs.minDrama <= 0f) "Any" else "${(knobs.minDrama * 100).roundToInt()}%",
+                help = "Recording method. Right keeps only the moments the reciter holds long and lifts his voice; left lights every reverberation.",
+                enabled = !ui.showingReference, showHelp = showHelp, onFinished = onFinished) { v ->
+                onKnob { k -> k.copy(minDrama = if (v < 0.01f) 0f else v) }
+            }
+        }
         LabSlider("Shortest note", knobs.holdMinMs, 100f..1_200f,
             valueLabel = "${knobs.holdMinMs.roundToInt()} ms",
             help = "Move left for brief holds; right to ignore short syllables.",

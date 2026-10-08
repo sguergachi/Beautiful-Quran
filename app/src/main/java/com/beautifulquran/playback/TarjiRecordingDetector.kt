@@ -5,6 +5,8 @@ import kotlin.math.atanh
 import kotlin.math.ceil
 import kotlin.math.exp
 import kotlin.math.ln
+import kotlin.math.log10
+import kotlin.math.log2
 import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.roundToInt
@@ -125,7 +127,43 @@ internal object TarjiRecordingDetector {
             starts[i] = d.eventStartHop
             acoustic[i] = if (d.usesAmplitude) amRegion.onset[i] else fmRegion.onset[i]
         }
+        keepDramatic(frames, knobs.minDrama, gain, starts, acoustic, hopMs)
         return TarjiRecordingResult(gain, rate, amplitude, starts, rms, acoustic, hopMs, floor, calibrated)
+    }
+
+    /**
+     * Darkens every event less dramatic than [minDrama] ([TarjiDrama]), judged
+     * against this recording's own voice: the whole verse is in hand, so
+     * "lifted" means above how this reciter sounds in this verse.
+     */
+    private fun keepDramatic(frames: List<TarjiFrame>, minDrama: Float, gain: FloatArray,
+                             starts: IntArray, acoustic: IntArray, hopMs: Double) {
+        if (minDrama <= 0f) return
+        val voicedRms = frames.filter { it.voiced }.map { it.hopRms }.sorted()
+        val f0 = frames.filter { it.f0Valid }.map { it.f0Hz }.sorted()
+        val typicalRms = voicedRms.getOrElse(voicedRms.size / 2) { 0f }
+        val typicalF0 = f0.getOrElse(f0.size / 2) { 0f }
+        val events = LinkedHashMap<Int, MutableList<Int>>()
+        for (i in starts.indices) if (starts[i] >= 0) events.getOrPut(starts[i]) { ArrayList() } += i
+        for ((_, hops) in events) {
+            var rmsSum = 0.0
+            var hold = 0f
+            val pitches = ArrayList<Float>()
+            for (i in hops) {
+                rmsSum += frames[i].hopRms
+                hold = max(hold, frames[i].holdMs)
+                if (frames[i].f0Valid) pitches += frames[i].f0Hz
+            }
+            pitches.sort()
+            val drama = TarjiDrama.score(
+                eventMs = hops.size * hopMs,
+                holdMs = hold.toDouble(),
+                loudness = if (typicalRms > 0f) (rmsSum / hops.size / typicalRms).toFloat() else 1f,
+                pitchRatio = if (typicalF0 > 0f && pitches.isNotEmpty()) pitches[pitches.size / 2] / typicalF0 else 1f,
+            )
+            if (drama >= minDrama) continue
+            for (i in hops) { gain[i] = 0f; starts[i] = -1; acoustic[i] = -1 }
+        }
     }
 
     private class Region(n: Int) {
@@ -232,4 +270,32 @@ internal object TarjiRecordingDetector {
             }
         }
     }
+}
+
+/**
+ * How dramatic one reverberation is, 0..1: the moments a reciter holds a note
+ * and lifts his voice into it, against the ripples of an ordinary syllable.
+ * Measured on 26 recordings by 13 reciters, the closing holds and sustained
+ * madds ran over a second on holds of two or more, while most events were
+ * ripples under half a second.
+ *
+ *  - **Sustain** (40 %): how long the pulse itself lasts, 0.6 s → 1.5 s.
+ *  - **Hold** (35 %): how long the note it rides is held, 1.2 s → 3 s.
+ *  - **Lift** (25 %): how far the voice is raised above the verse's typical
+ *    loudness (−2 dB → +3 dB) or pitch (−1 → +3 semitones), whichever is more.
+ *    A pitch reading more than six semitones off is an octave error of the
+ *    tracker, not a lift, and is ignored.
+ */
+internal object TarjiDrama {
+    fun score(eventMs: Double, holdMs: Double, loudness: Float, pitchRatio: Float): Float {
+        val sustain = ramp(eventMs.toFloat(), 600f, 1_500f)
+        val hold = ramp(holdMs.toFloat(), 1_200f, 3_000f)
+        val loudDb = if (loudness > 0f) 20f * log10(loudness) else -60f
+        val semitones = if (pitchRatio > 0f) 12f * log2(pitchRatio) else 0f
+        val pitchLift = if (abs(semitones) > 6f) 0f else ramp(semitones, -1f, 3f)
+        val lift = max(ramp(loudDb, -2f, 3f), pitchLift)
+        return 0.4f * sustain + 0.35f * hold + 0.25f * lift
+    }
+
+    private fun ramp(x: Float, from: Float, to: Float): Float = ((x - from) / (to - from)).coerceIn(0f, 1f)
 }

@@ -129,6 +129,13 @@ later lab edits persist normally. Other stored reciter profiles are preserved.
 
 - **Sensitivity** reverses the modulation-depth threshold: 0% = depth 0.25,
   100% = depth 0.01. More sensitivity accepts subtler wavering.
+- **Drama** (Recording method only) keeps the reverberations a reciter makes
+  a moment of: `TarjiDrama` scores each event 0–1 against the verse's own
+  voice — how long the pulse lasts (40 %), how long the note it rides is held
+  (35 %), and how far the voice is lifted in loudness or pitch (25 %) — and
+  darkens those under the threshold. Shipped 50 %; "Any" (0) keeps every one.
+  On 26 recordings by 13 reciters it keeps 79 of 342 events, mostly closing
+  holds and long madds. Saved with the reciter's profile.
 - **Quietest voice** is a volume threshold (`Tarji.minVolume`): the voice's
   smoothed level, as a fraction of full scale, that a reverberation may open
   on. "Any" (0) is no threshold and the shipped default; held notes sit around

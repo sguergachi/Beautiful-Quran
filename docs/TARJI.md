@@ -62,6 +62,7 @@ session-only experiment globally; it is not a reciter profile or an exported
 sample setting. Turning developer mode off restores Current.
 
 * **Cycles** checks substantial alternating extrema and neighboring periods.
+
 * **Spectrum** compares weighted trend-only and trend-plus-sinusoid fits,
   requiring compatible evidence in both half-windows.
 * **Recording** analyzes the decoded whole verse, extends strict cycle seeds
@@ -74,6 +75,10 @@ an invalid pitch centre remains invalid and never contributes carried F0.
 Their measured floors are at least 3.5% AM and 10 cents FM. The same sensitivity
 setting therefore differs from Current's 80 ms evidence. A separate small
 `TarjiEventStage` retains hold, level-step, climax/tail and channel policy;
+Recording keeps only dramatic events (`TarjiDrama`, Tarjīʿ Lab **Drama**,
+shipped 0.5): sustained pulses on long holds the reciter lifts, judged against
+the verse's own loudness and pitch — the whole recording is in hand.
+
 Current's lifecycle and `TarjiWordGate` are unchanged. Cycles and Recording
 allow at most 1% interpolation uncertainty at cycle-rate band edges, clamping
 only accepted estimates; Spectrum's fitting bands remain strict.

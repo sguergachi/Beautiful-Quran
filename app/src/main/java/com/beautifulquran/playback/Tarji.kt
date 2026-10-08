@@ -151,6 +151,13 @@ class Tarji {
      */
     var minVolume = MIN_VOLUME
 
+    /**
+     * Recording method only: how dramatic a reverberation must be — held long,
+     * sustained, and lifted above the verse's own voice ([TarjiDrama]) — to
+     * light a word. 0 keeps every one. Tarjīʿ Lab.
+     */
+    var minDrama = MIN_DRAMA
+
     /** Pitch glide tolerance (fraction) while holding one note. Ink Lab. */
     var maxPitchDrift = MAX_PITCH_DRIFT
 
@@ -1091,6 +1098,8 @@ class Tarji {
         private const val MIN_PITCH_DEPTH = 0.006f
         /** Off-gate depth as a fraction of [minTremoloDepth] (hysteresis). */
         private const val DEPTH_OFF_RATIO = 0.7f
+        /** Recording keeps the verse's standout reverberations — Tarjīʿ Lab: [minDrama]. */
+        const val MIN_DRAMA = 0.5f
         /** No volume threshold — Tarjīʿ Lab: [minVolume]. */
         const val MIN_VOLUME = 0f
         /** Level an open event may fall to, as a fraction of [minVolume] (hysteresis). */
