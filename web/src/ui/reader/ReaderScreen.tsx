@@ -1808,7 +1808,9 @@ export function ReaderScreen({
               <button
                 type="button"
                 className="ctrl"
-                data-receded={receded}
+                data-receded={receded && repeatMode === 'off'}
+                data-active={repeatMode !== 'off'}
+                aria-pressed={repeatMode !== 'off'}
                 aria-label={repeatMode === 'off' ? 'Repeat off' : `Repeat ${repeatMode}`}
                 onClick={() =>
                   appStore.setRepeat(repeatMode === 'ayah' ? 'off' : 'ayah')
@@ -1859,7 +1861,8 @@ export function ReaderScreen({
               <button
                 type="button"
                 className="ctrl speed"
-                data-receded={receded}
+                data-receded={receded && state.settings.playbackSpeed === 1}
+                data-active={state.settings.playbackSpeed !== 1}
                 aria-label={`Speed ${state.settings.playbackSpeed}×`}
                 onClick={() => {
                   const speeds = [0.75, 1, 1.25, 1.5]

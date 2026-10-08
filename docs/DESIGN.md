@@ -192,8 +192,9 @@ keeps one ladder of ink weights (`QuranInk`) and everything hangs off a rung of
 it. The revelation is `scripture`, the darkest mark on the page. Back / play /
 forward carry real ink (`secondary`) because they are what a listener reaches
 for; chapters, settings, repeat and speed recede (`quiet`) because they choose
-what to hear rather than hear it — and while a chapter recites they leave the
-transport altogether. Running head and folio are `quiet` too, never gold: at
+what to hear rather than hear it. During recitation, repeat stays lit when
+enabled (including a verse range), and speed stays lit away from 1×; their
+defaults recede. Running head and folio are `quiet` too, never gold: at
 9 sp a gold folio disappears, and gold that must carry a word uses `goldInk`
 rather than being faded until it cannot be read.
 
@@ -814,9 +815,11 @@ remain synchronized to the current word's timing segment and must be treated as
 a temporary renderer-specific compromise, not a relaxation of the product
 principle.
 
-While reciting, the top bar, reciter name, repeat, and speed fade to 8 % over
-~520 ms (Material ease-in-out), leaving the words plus play/pause and
-rewind/forward controls on the page. Pause, and it breathes back. Non-active
+While reciting, the top bar, reciter name, and default repeat/speed controls
+recede over ~520 ms (Material ease-in-out): scroll/web chrome fades to 8 %,
+and mushaf secondary controls to 5 %. Enabled repeat (one verse, chapter, or
+range) and speed other than 1× stay fully lit and tappable alongside
+play/pause and rewind/forward. Pause, and the chrome breathes back. Non-active
 verses recess to upcoming ink over ~400 ms.
 
 The reciter name above the chapter transport carries a small disclosure

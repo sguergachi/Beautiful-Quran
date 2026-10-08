@@ -3035,6 +3035,10 @@ button.ayah-mark {
   min-width: 48px;
 }
 
+.player-bar .ctrl[data-active='true'] {
+  color: var(--accent);
+}
+
 .player-bar .ctrl svg,
 .player-bar .play svg,
 .floating-play svg {
