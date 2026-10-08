@@ -59,6 +59,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.em
 import androidx.compose.ui.unit.sp
 import com.beautifulquran.DevProfiling
+import com.beautifulquran.data.PageNumberScript
 import com.beautifulquran.data.VerseNumberScript
 import com.beautifulquran.data.model.Ayah
 import com.beautifulquran.data.model.Surah
@@ -689,6 +690,7 @@ internal fun MushafPager(
      */
     english: Boolean = false,
     verseNumberScript: VerseNumberScript = VerseNumberScript.ARABIC,
+    pageNumberScript: PageNumberScript = PageNumberScript.BOTH,
     /** The English leaf's well and measure, once it has laid out. */
     onLeafMetrics: (wellPx: Float, measurePx: Float) -> Unit = { _, _ -> },
     /** Whether the book's leaves were measured — see MushafUi.measured. */
@@ -1292,6 +1294,8 @@ internal fun MushafPager(
                         juz = page.juz,
                         unit = unit,
                         glyphSize = leafGlyphSize(unit),
+                        page = page.page.takeUnless { english },
+                        pageNumberScript = pageNumberScript,
                         foreEdge = foreEdge,
                     )
                     Spacer(Modifier.height(unit * bands.headGutter))
@@ -1354,9 +1358,8 @@ internal fun MushafPager(
                             modifier = wellModifier,
                         )
                     }
-                    // The leaf's foot. The folio stands below it in the dial's
-                    // own band, so this is the paper between the last line and
-                    // the page number.
+                    // English keeps a foot above its lower folio; Arabic uses
+                    // the dial's own air with its folio now in the head.
                     Spacer(Modifier.height(unit * bands.tail))
                 }
             }

@@ -251,7 +251,7 @@ tick must not remasure three pages or recreate 150 `Text` nodes.
 - QCF page fonts are held as one atomic family/typeface pair in a bounded LRU
   and preloaded on `Dispatchers.Default` for the settled page ± 2, so a swipe
   does not `Typeface.createFromAsset` on the UI thread. Line geometry is keyed
-  by page, display row, size, and measure. The page's sixteen-row reflow is a
+  by page, display row, size, and measure. The page's seventeen-row reflow is a
   linear token-width pass remembered by page + typeface; playback ticks and
   ink animation frames never repeat it. Geometry remains in the bounded
   process cache. Non-adjacent chapter and search jumps warm that same target

@@ -99,6 +99,7 @@ import com.beautifulquran.ui.reader.VERSE_ANNOTATION_INK_ALPHA
 import com.beautifulquran.ui.reader.collapsedStackSpanDp
 import com.beautifulquran.ui.reader.appendAyahNumberMark
 import com.beautifulquran.ui.reader.mushafCellOrigins
+import com.beautifulquran.ui.reader.mushafHeaderFolio
 import com.beautifulquran.ui.reader.mushafLineCells
 import com.beautifulquran.ui.reader.symbolicAyahBarCount
 import com.beautifulquran.ui.reader.verseAnnotationStyle
@@ -688,7 +689,7 @@ private fun PreviewMushafLeaf(
         }
     }
     Column(modifier = modifier) {
-        PreviewLeafRunningHead()
+        PreviewLeafRunningHead(pageNumberScript)
         Spacer(Modifier.height(8.dp))
         if (lines.size == PreviewMushafLineCount && face != null && typeface != null) {
             CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Rtl) {
@@ -700,14 +701,6 @@ private fun PreviewMushafLeaf(
             }
             Spacer(Modifier.height(line * PreviewMushafLineCount))
         }
-        MushafFolioMarks(
-            page = PreviewMushafPage,
-            glyphSize = PreviewFolioGlyph,
-            script = pageNumberScript,
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(PreviewFolioPad),
-        )
     }
 }
 
@@ -782,16 +775,11 @@ private fun PreviewEnglishMushafLeaf(
 }
 
 /**
- * The leaf's running head, miniature: part at the spine, chapter at the
- * fore-edge, in the same label the reader sees over every mushaf page.
- *
- * A centred gold caption was the wrong furniture in the wrong place —
- * page 330 is mid-chapter, where the reader sees a head, not an opening
- * band. Both language miniatures share this so switching View does not
- * change the header.
+ * The leaf's running head in miniature: Arabic numbers its page at the left;
+ * English keeps its part there and its folio below the prose.
  */
 @Composable
-private fun PreviewLeafRunningHead() {
+private fun PreviewLeafRunningHead(pageNumberScript: PageNumberScript? = null) {
     val ink = QuranTheme.ink.muted
     val style = MaterialTheme.typography.labelSmall.copy(
         fontSize = PreviewLeafHeadSize,
@@ -799,7 +787,8 @@ private fun PreviewLeafRunningHead() {
     )
     Row(Modifier.fillMaxWidth()) {
         Text(
-            text = "Part ${juzOf(PreviewMushafSurahId, PreviewMushafAyahFirst)}",
+            text = pageNumberScript?.let { mushafHeaderFolio(PreviewMushafPage, it) }
+                ?: "Part ${juzOf(PreviewMushafSurahId, PreviewMushafAyahFirst)}",
             style = style,
             color = ink,
             maxLines = 1,

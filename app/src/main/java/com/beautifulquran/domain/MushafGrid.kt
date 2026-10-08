@@ -41,7 +41,7 @@ import kotlin.math.pow
  * out.
  *
  * These constants remain the canonical fifteen-row fit. The Arabic display
- * uses seventeen rows and a smaller foot to spend more of the leaf on type;
+ * uses seventeen rows and carries its folio in the head to spend more paper on type;
  * its 604 page boundaries do not move.
  */
 object MushafGrid {
@@ -156,10 +156,10 @@ object MushafGrid {
  * to [MushafGrid.SLOTS]. The English hand is solved from the well, so a taller
  * well is also very slightly more type; both are what was asked for.
  *
- * Neither carries a folio any more: it stood under the text and has gone to the
- * dial's head air. The tail stayed behind it, because a page has a foot and the
- * text now reaches it. Each setting divides the leaf by its own [slots],
- * including its own foot, rather than by one shared total. That total was
+ * English keeps a foot above the folio in the dial's head air. Arabic moves
+ * the folio into its running head and spends its former foot on type; the
+ * dial's own air clears the last line. Each setting divides the leaf by its
+ * own [slots], rather than by one shared total. That total was
  * only ever a convenience: what a leaf must not do is spend more height than
  * it has, and its own sum is what says whether it does.
  */
@@ -208,13 +208,12 @@ val MUSHAF_ENGLISH_BANDS = MushafLeafBands(
     tail = MushafGrid.TAIL,
 )
 
-/** The Arabic foot gives more paper to the seventeenth display row. */
+/** Arabic carries its folio in the head; the dial supplies the foot's air. */
 val MUSHAF_ARABIC_BANDS = MushafLeafBands(
     runningHead = MushafGrid.RUNNING_HEAD,
     headGutter = 0.50f,
     well = MUSHAF_DISPLAY_LINES_PER_PAGE.toFloat(),
-    // Keep a foot: removing it let the last line's ink reach the folio.
-    tail = 0.20f,
+    tail = 0f,
 )
 
 fun mushafLeafBands(english: Boolean): MushafLeafBands =

@@ -2912,6 +2912,7 @@ fun ReaderScreen(
                         onBasmalahClick = onMushafBasmalahClick,
                         english = settings.readingMode == ReadingMode.ENGLISH_ONLY,
                         verseNumberScript = settings.verseNumberScript,
+                        pageNumberScript = settings.pageNumberScript,
                         leafText = leafTextForSetting,
                         book = englishBook,
                         modifier = Modifier.fillMaxSize(),

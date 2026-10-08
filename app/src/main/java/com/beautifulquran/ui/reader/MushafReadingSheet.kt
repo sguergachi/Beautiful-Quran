@@ -91,8 +91,6 @@ internal val MushafGutterSlot = 44.dp
  * furniture of the frame and does not.
  */
 internal val MushafFolioBand = 30.dp
-/** The Arabic figure sits lower in a shallower band; its old paper becomes text. */
-private val MushafArabicFolioBand = 16.dp
 /** Paper between the rule and the transport it divides the leaf from. */
 private val MushafRuleTailAir = 0.dp
 
@@ -155,7 +153,7 @@ private val MushafReciterBand = 48.dp
 /**
  * Everything reserved under the English leaf while Ink Lab is closed.
  *
- * Arabic measures its smaller folio band on the sheet itself. Every English
+ * Arabic carries its folio in the running head. Every English
  * term is constant, so the root can subtract it from the window to learn
  * the closed leaf's size before a leaf has ever been composed and paginate the
  * English book from that on the very first launch. Open Ink Lab adds measured
@@ -283,7 +281,6 @@ internal fun MushafReadingSheet(
     // The folio stands down while the dial is under the thumb: scrubbing, the
     // figure the dial itself is calling out does not need saying twice.
     val scrubbing = remember { mutableStateOf(false) }
-    val folioBand = if (english) MushafFolioBand else MushafArabicFolioBand
     val folioInk by animateFloatAsState(
         targetValue = if (scrubbing.value) 0f else 1f,
         animationSpec = tween(InkEngine.tuning.recessMs, easing = FastOutSlowInEasing),
@@ -316,10 +313,10 @@ internal fun MushafReadingSheet(
         // of this one and slides them by exactly the pager's offset, which is
         // the paper moving under the finger with nothing on the leaf paying for
         // it.
-        BoxWithConstraints(
+        if (english) BoxWithConstraints(
             Modifier
                 .fillMaxWidth()
-                .height(folioBand)
+                .height(MushafFolioBand)
                 .clipToBounds()
                 .graphicsLayer { alpha = folioInk },
         ) {
@@ -548,9 +545,8 @@ internal fun MushafReadingSheet(
 }
 
 /**
- * The printed page's own running head: surah name at the fore-edge the
- * reading starts from, juzʾ at the other. No controls — the leaf carries
- * nothing but what the mushaf prints on it.
+ * The leaf's running head: chapter at the right, Arabic page number at the
+ * left. English keeps the part at the left and its folio below the prose.
  */
 @Composable
 internal fun MushafPageHeader(
@@ -559,6 +555,8 @@ internal fun MushafPageHeader(
     juz: Int,
     unit: Dp,
     glyphSize: TextUnit,
+    page: Int? = null,
+    pageNumberScript: PageNumberScript = PageNumberScript.BOTH,
     /**
      * The leaf's fore-edge — the same one the text block is set to. A running
      * head is furniture of the measure, not of the paper: standing it at its
@@ -572,10 +570,7 @@ internal fun MushafPageHeader(
     // aid. Gold also loses what little contrast it has on cream, which is why
     // this line used to disappear on paper.
     //
-    // One label at each end, in the reader's own language: the chapter at the
-    // spine, the juzʾ at the fore-edge. It carried the Arabic above the Latin
-    // as well, which said the same thing twice and cost the leaf a whole line
-    // of paper for the saying — paper the revelation now has instead.
+    // Arabic spends the former bottom folio band on revelation instead.
     val ink = MaterialTheme.colorScheme.onBackground
     Row(
         modifier = modifier
@@ -589,7 +584,7 @@ internal fun MushafPageHeader(
         verticalAlignment = Alignment.Top,
     ) {
         MushafHeadLabel(
-            text = "Part $juz",
+            text = page?.let { mushafHeaderFolio(it, pageNumberScript) } ?: "Part $juz",
             ink = ink,
             align = TextAlign.Start,
             glyphSize = glyphSize,

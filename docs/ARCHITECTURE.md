@@ -507,7 +507,9 @@ horizontal page turn — draggable, fling-able, with page-turn audio
 - `reader/` — verse sheet (scroll) or 604-page mushaf pager (`ReadingLayout`).
   Mushaf pages keep the 604 `qcf_page` boundaries, then balance each page's
   words from `qcf_line` over two additional visual lines (17 on a full leaf)
-  for the larger hand; chapter openings remain hard boundaries. They use the same Hafs +
+  for the larger hand; chapter openings remain hard boundaries. Arabic carries
+  its page number in the left running head and spends the former lower folio
+  band on text. They use the same Hafs +
   `InkEngine` wash as Arabic-only scroll. The pager virtualizes
   to the settled page ±1; ink clocks run on the settled page and, only during
   an automatic turn, the page that owns the voice. Only the current leaf

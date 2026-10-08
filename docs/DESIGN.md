@@ -167,21 +167,17 @@ margins are a book's, not a chrome's — a single fore-edge margin plus an edge
 gutter deep enough for a circled ayah mark's medallion, which inks about half
 its own width past its advance and is sliced by anything narrower.
 
-The leaf is an eighteen-unit column of one line's pitch: running head, a whole
-unit of paper under it, the fifteen lines of revelation, and the folio band —
-so the head stands a line clear of the text and the chrome is measured in the
-same breath as the scripture. The unit a tail margin would take goes to the
-revelation instead; the folio's figure, centred in its own band, already sits
-half a line clear of the last line. Page-number script chooses the figure:
-Arabic-Indic, Western, or both with a diamond on the spine — always centred,
-never gold.
+The Arabic leaf uses seventeen display rows inside each unchanged Madinah
+page boundary. Its page number replaces the part at the top left; the chapter
+stays at the right. The former bottom folio band and its foot belong to the
+text, so its hand grows with the taller well. The dial retains its own air
+below the last line. English keeps the part in the head and its folio below
+the prose, with the foot its measured descenders need. Page-number script
+chooses Arabic-Indic, Western, or both with a diamond — always quiet ink.
 
-**The folio belongs to the leaf.** It is set nearer the last line of
-revelation than the rule beneath it, because proximity is what assigns it:
-measured against the transport instead, it drifts every time the chrome
-changes. Its gap comes out of the leaf's own tail — shrinking the folio's band
-only feeds the weighted text block above it, which pushes the last line down
-by as much as the figure rises.
+**The folio belongs to the leaf.** Arabic carries it in the running head;
+English carries it just below the text. Both travel with the page during a
+turn. The Customize miniature keeps each language's placement and scripts.
 
 **One measure.** Running head, title band and folio all hang on the text
 block's own margin. Three different edges on one leaf is the loudest
@@ -1674,7 +1670,7 @@ rail, no English under the type, and its own circled QCF marks.
   stretching word gaps. The circled mark is its own cell of the line, with
   the page's word space either side, so it never collides with the last
   word. Page-number script still applies, and the preview paints the same
-  folio as the leaf: a single script centred as quiet ink; both scripts
-  centred either side of a diamond. Scroll page-breaks keep the gold
+  folio as the leaf: quiet ink at the top left, a single script or both
+  with a diamond. Scroll page-breaks keep the gold
   hairline (Western left, Arabic-Indic right; a single script centred
   between equal rules).

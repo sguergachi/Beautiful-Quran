@@ -44,12 +44,13 @@ nothing sizes type per page or per line. `MUSHAF_TYPE_SCALE` applies the same
 17/15 enlargement to that fitted hand on every leaf. Each page's unchanged
 content is then balanced over two more visual lines, so the larger type wraps
 instead of being narrowed back into the original fifteen rows. The
-seventeenth row takes more of the paper below the text: the Arabic foot is
-0.20 of a line while the English foot remains 0.55. The running head keeps its
-own gutter. The Arabic folio band is also reduced from 30 dp to 16 dp: the text
-takes its old space and the figure sits lower, nearer the page dial. Extra
-rows go to the densest chapter section that still has words
-to spare; a short section cannot acquire empty rows.
+seventeenth row uses the paper below the text. The Arabic folio now replaces
+the part number at the top left, so its entire former 16 dp band and 0.20-line
+foot go to the text. The height-bound hand grows with that larger well;
+leading grows with it, and the dial keeps its own 8 dp of air below the text.
+The running head keeps its gutter. English retains its 0.55-line foot and
+30 dp folio band. Extra rows go to the densest chapter section that still has
+words to spare; a short section cannot acquire empty rows.
 
 ## 3. Every full line is flush
 
@@ -1328,20 +1329,22 @@ does:
 
 ```
                 head   gutter   well   foot   = slots
-    Arabic      0.30     0.50     17     0.20    18.00
+    Arabic      0.30     0.50     17     0       17.80
     English     0.30     0.30     15.70  0.55    16.85
 ```
 
-The Arabic leaf uses seventeen display rows, with the extra row below paid for
-in part by a smaller foot. Its type grows uniformly and loose lines spend more
-of their measure on letterforms, with less paper between words (§2, §5). It
-still keeps a real foot between the final line and the folio. English spends
-the height on continuous prose instead; its gutter and foot are independent.
+The Arabic leaf uses seventeen display rows and carries the folio in its
+running head, at the top left in place of the part. Its former bottom band and
+foot now enlarge the text. The number keeps the selected Western, Arabic-Indic,
+or paired scripts and travels with its leaf. The Customize miniature shows
+the same arrangement. Loose lines spend more of their measure on letterforms,
+with less paper between words (§2, §5). English spends the height on continuous
+prose instead, keeping its lower folio and the foot that clears it.
 
-**The folio does not stand under the text; the foot does.** There used to be a
+**The English folio stands below its foot.** There used to be a
 tail and a folio band —
 0.35 of a unit of paper and 0.40 for the figure, three quarters of a line spent
-below the last line of every leaf in the book — and both have gone. The folio
+below the last line of every leaf in the book — and both went. The English folio
 now stands in the air the dial already kept above its rule (`MushafDialHeadAir`,
 24 dp of pure padding, now 8), which puts the figure lower on the screen, in a
 band it shares with the transport. That is where a folio belongs on a device:
@@ -1357,9 +1360,10 @@ descenders came down to 2,076 px on a device whose folio begins its ink at
 band rather than a slack — the leaf grows by it, so the type comes down about
 three percent and the well holds the same lines, each a little longer. It is not
 the head's 1.30, because the folio and the dial stand below it with air of their
-own; measured then, the foot ran 84 to 95 px. The Arabic display now keeps a
-smaller 0.20-unit foot and a 16 dp folio band, so the seventeenth row can reach
-farther down the sheet. The English foot and 30 dp folio band keep the space
+own; measured then, the foot ran 84 to 95 px. That guard remains for English,
+whose lower folio still needs it. Arabic no longer has a figure below the last
+line: the dial's own 8 dp of air provides clearance, so its former foot and
+folio band become text. The English foot and 30 dp folio band keep the space
 its measured prose needs.
 
 The leaf keeps the rest of the three quarters of a line. On the Arabic hand it goes into
