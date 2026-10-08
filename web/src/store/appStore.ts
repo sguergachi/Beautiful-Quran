@@ -456,7 +456,7 @@ class AppStore {
       this.set({
         ready: false,
         loadProgress: null,
-        error: "The Quran couldn't be opened. Check your connection and reload the page.",
+        error: "Couldn't open the Quran · check your connection",
       })
     }
   }

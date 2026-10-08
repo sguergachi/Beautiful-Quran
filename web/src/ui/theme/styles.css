@@ -2976,6 +2976,26 @@ button.ayah-mark {
   transition: opacity var(--chrome-recede-ms) var(--recede-ease), color 180ms ease;
 }
 
+/* A playback error briefly takes the name's place in the same band, so it
+   never adds a row (Android: ReciterNameButton notice). */
+.player-bar .reciter-btn .reciter-label {
+  animation: reciter-notice-in 220ms ease;
+}
+
+.player-bar .reciter-btn[data-notice='true'] {
+  font-style: italic;
+}
+
+.player-bar .reciter-btn[data-notice='true']::after {
+  visibility: hidden;
+}
+
+@keyframes reciter-notice-in {
+  from {
+    opacity: 0;
+  }
+}
+
 @media (hover: hover) {
   .player-bar .reciter-btn:hover {
     color: var(--accent);
@@ -5455,11 +5475,14 @@ button.ayah-mark {
   }
 }
 
-.muted-error {
-  color: var(--ink-muted);
-  text-align: center;
-  padding: 0.5rem var(--sheet-pad);
-  font-size: 0.9rem;
+/* Announces the reciter-band notice to screen readers without showing twice. */
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
 }
 
 /* —— Responsive —— */

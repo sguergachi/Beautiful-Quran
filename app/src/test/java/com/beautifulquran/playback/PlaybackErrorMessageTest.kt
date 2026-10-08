@@ -16,7 +16,7 @@ class PlaybackErrorMessageTest {
             PlaybackException.ERROR_CODE_TIMEOUT,
         ).forEach {
             assertEquals(
-                "Couldn't reach the recitation. Check your connection and press play.",
+                "No connection · press play to try again",
                 playbackErrorMessage(it),
             )
         }
@@ -25,11 +25,11 @@ class PlaybackErrorMessageTest {
     @Test
     fun missingFileSaysTheVerseIsUnavailable() {
         assertEquals(
-            "This verse's recitation isn't available right now.",
+            "This verse isn't available right now",
             playbackErrorMessage(PlaybackException.ERROR_CODE_IO_BAD_HTTP_STATUS),
         )
         assertEquals(
-            "This verse's recitation isn't available right now.",
+            "This verse isn't available right now",
             playbackErrorMessage(PlaybackException.ERROR_CODE_IO_FILE_NOT_FOUND),
         )
     }
@@ -37,15 +37,15 @@ class PlaybackErrorMessageTest {
     @Test
     fun damagedAudioAndOutputFailuresStayDistinct() {
         assertEquals(
-            "This recitation couldn't be played. Press play to try again.",
+            "This verse couldn't be played",
             playbackErrorMessage(PlaybackException.ERROR_CODE_DECODING_FAILED),
         )
         assertEquals(
-            "This recitation couldn't be played. Press play to try again.",
+            "This verse couldn't be played",
             playbackErrorMessage(PlaybackException.ERROR_CODE_PARSING_CONTAINER_MALFORMED),
         )
         assertEquals(
-            "Your audio output stopped responding. Press play to try again.",
+            "Audio output stopped · press play again",
             playbackErrorMessage(PlaybackException.ERROR_CODE_AUDIO_TRACK_INIT_FAILED),
         )
     }

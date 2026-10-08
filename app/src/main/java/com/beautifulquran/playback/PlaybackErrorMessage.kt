@@ -14,12 +14,12 @@ internal fun playbackErrorMessage(errorCode: Int): String = when (errorCode) {
     PlaybackException.ERROR_CODE_IO_NETWORK_CONNECTION_FAILED,
     PlaybackException.ERROR_CODE_IO_NETWORK_CONNECTION_TIMEOUT,
     PlaybackException.ERROR_CODE_TIMEOUT,
-    -> "Couldn't reach the recitation. Check your connection and press play."
-    in IO_ERRORS -> "This verse's recitation isn't available right now."
+    -> "No connection · press play to try again"
+    in IO_ERRORS -> "This verse isn't available right now"
     in PARSING_ERRORS, in DECODING_ERRORS ->
-        "This recitation couldn't be played. Press play to try again."
-    in AUDIO_OUTPUT_ERRORS -> "Your audio output stopped responding. Press play to try again."
-    else -> "The recitation stopped unexpectedly. Press play to try again."
+        "This verse couldn't be played"
+    in AUDIO_OUTPUT_ERRORS -> "Audio output stopped · press play again"
+    else -> "Recitation stopped · press play to try again"
 }
 
 // Media3 groups its codes by thousands: 2xxx input/output, 3xxx parsing,

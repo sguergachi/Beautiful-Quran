@@ -1594,7 +1594,7 @@ fun ReaderScreen(
         lastLayoutSignature = layoutSignature
     }
 
-    // Errors surface as a quiet line on the sheet, then dissolve.
+    // Errors replace the reciter name for a moment, then dissolve.
     LaunchedEffect(playerState.error) {
         if (playerState.error != null) {
             delay(5_000)
@@ -1938,23 +1938,9 @@ fun ReaderScreen(
         bottomBar = bottomBar@{
             if (mushafMode) return@bottomBar
             Column {
-                // Errors stay a quiet line on the sheet above the player.
+                // Errors take the reciter name's place in the bar (see
+                // ReciterNameButton), so they never add a row above it.
                 // Return-to-ayah / Back-to float above the bar (see content).
-                AnimatedVisibility(
-                    visible = playerState.error != null,
-                    enter = fadeIn(),
-                    exit = fadeOut(),
-                ) {
-                    Text(
-                        text = playerState.error.orEmpty(),
-                        style = MaterialTheme.typography.labelMedium,
-                        color = QuranTheme.ink.muted,
-                        textAlign = TextAlign.Center,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(vertical = 6.dp),
-                    )
-                }
                 if (gathering) {
                     ShareRibbon(
                         count = shareCount,

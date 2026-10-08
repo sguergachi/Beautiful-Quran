@@ -1333,6 +1333,16 @@ export function ReaderScreen({
     : MUSHAF_INK_IDLE
   const reciterName =
     state.reciters.find((r) => r.id === state.settings.reciterId)?.name ?? 'Reciter'
+  // A playback error takes the reciter name's place for a moment, then the
+  // name returns (Android: ReciterNameButton notice + 5 s clear).
+  const playerError = state.player.error
+  const [playerNotice, setPlayerNotice] = useState<string | null>(null)
+  useEffect(() => {
+    setPlayerNotice(playerError)
+    if (!playerError) return
+    const timer = window.setTimeout(() => setPlayerNotice(null), 5_000)
+    return () => window.clearTimeout(timer)
+  }, [playerError])
   const matchLabel =
     searchMatches.length === 0
       ? activeQuery == null
@@ -1767,11 +1777,17 @@ export function ReaderScreen({
                 type="button"
                 className="reciter-btn"
                 data-receded={receded}
+                data-notice={playerNotice ? 'true' : undefined}
                 aria-label={`Reciter ${reciterName}. Open settings`}
                 onClick={() => appStore.setSheet('settings')}
               >
-                {reciterName}
+                <span key={playerNotice ?? 'name'} className="reciter-label">
+                  {playerNotice ?? reciterName}
+                </span>
               </button>
+              <span className="visually-hidden" role="status" aria-live="polite">
+                {playerNotice ?? ''}
+              </span>
               {coverChrome ? (
                 <button
                   type="button"
@@ -1876,8 +1892,6 @@ export function ReaderScreen({
           )}
         </div>
       </div>
-
-      {state.player.error ? <p className="muted-error">{state.player.error}</p> : null}
 
       {ayahRailTipVisible || ayahRailTipRendered ? (
         <AyahRailTip
