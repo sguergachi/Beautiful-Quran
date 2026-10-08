@@ -120,6 +120,14 @@ Arabic word. Ayah-level phrase and concept hits are resolved back to the word
 gloss behind the visible gold term before navigation, so a preview highlight
 such as `hearts` is also the word that breathes in the reader.
 
+## In-chapter search
+
+Starting recitation dismisses an open chapter search. The keyboard loses focus
+immediately, and the search field fades with the reader header over 520 ms.
+The query and match position clear after that fade, so pausing returns the
+ordinary chapter header. The same reciting-session gate holds the header
+receded across verse joins and repeat restarts on Android and web.
+
 ## Exact quotes
 
 A pair of straight or typographic double quotes around the complete query
