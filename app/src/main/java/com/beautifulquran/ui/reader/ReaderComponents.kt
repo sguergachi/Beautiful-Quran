@@ -1081,7 +1081,6 @@ internal fun rememberWaslProgress(
  * Shared with [ReaderScreen] so the focus engine's bottom guard matches. */
 internal val ActiveWordBottomMargin = 132.dp
 private val GlintLayerBleed = 40.dp
-private const val TARJI_TEST_PULSE_HZ = 6.0
 
 /** Measures a target as (top, bottom) in LazyColumn viewport pixels. */
 private typealias ViewportBoundsMeasure = () -> Pair<Float, Float>?
@@ -1349,7 +1348,6 @@ private fun Modifier.layeredGlintHalo(
 private fun rememberTarjiGate(
     active: Boolean,
     eligible: Boolean,
-    test: Boolean,
     activation: Long,
     repeat: Boolean,
     wordStartMs: Long,
@@ -1361,7 +1359,7 @@ private fun rememberTarjiGate(
     }
     val detectorMode = InkEngine.tarjiDetectorMode
     val context = androidx.compose.ui.platform.LocalContext.current
-    val run = test || (active && eligible &&
+    val run = (active && eligible &&
         InkEngine.tuning.glintResonance &&
         InkEngine.tuning.glintResonanceDepth > 0f)
     if (active) {
@@ -1380,41 +1378,17 @@ private fun rememberTarjiGate(
             onDispose { trace.played = 0f }
         }
     }
-    LaunchedEffect(run, test, activation, repeat, trace, detectorMode) {
+    LaunchedEffect(run, activation, repeat, trace, detectorMode) {
         if (!run) {
             frame.value = InkEngine.GlintResonance.Idle
             return@LaunchedEffect
         }
-        var traceStart = 0L
         // How far the voice is through the word's sparkline: the ear's own
-        // place on the media clock — the instant the light is showing — or
-        // the frame clock where the ear is not placed yet.
-        fun traced(now: Long, earMediaMs: Long) {
+        // place on the media clock, the instant the light is showing.
+        fun traced(@Suppress("UNUSED_PARAMETER") now: Long, earMediaMs: Long) {
             val span = trace?.spanMs?.takeIf { it > 0f } ?: return
-            if (traceStart == 0L) traceStart = now
-            val elapsedMs = if (earMediaMs != Long.MIN_VALUE) {
-                earMediaMs - trace.startMs
-            } else {
-                if (!test) return
-                val speed = com.beautifulquran.playback.VoiceEnergy.active?.playbackSpeed ?: 1f
-                (now - traceStart) / 1_000_000f * speed
-            }
-            trace.played = (elapsedMs / span).coerceIn(0f, 1f)
-        }
-        if (test) {
-            // The lab's steady pulse: the paint alone, no detector in the way.
-            val light = com.beautifulquran.ui.theme.GlintLight()
-            while (true) {
-                withFrameNanos { now ->
-                    val swing = kotlin.math.sin(now / 1e9 * 2.0 * Math.PI * TARJI_TEST_PULSE_HZ).toFloat()
-                    traced(now, Long.MIN_VALUE)
-                    val glow = light.next(swing, now, InkEngine.tuning.tarjiLightSmoothMs)
-                    frame.value = InkEngine.GlintResonance(peak = 1f, light = swing, glow = glow)
-                    InkEngine.TarjiProbe.admitted = true
-                    InkEngine.TarjiProbe.gain = 1f
-                    InkEngine.TarjiProbe.glow = glow
-                }
-            }
+            if (earMediaMs == Long.MIN_VALUE) return
+            trace.played = ((earMediaMs - trace.startMs) / span).coerceIn(0f, 1f)
         }
         val eventGate = TarjiWordGate(InkEngine.tarjiEventLedger)
         val light = com.beautifulquran.ui.theme.GlintLight()
@@ -1557,7 +1531,6 @@ internal fun rememberInkMotions(
             tarji = rememberTarjiGate(
                 active = isActive,
                 eligible = tarjiEligible,
-                test = glinting && isActive && InkEngine.tarjiTestPulse,
                 activation = wordActivation,
                 repeat = ink.repeat,
                 wordStartMs = activeWordStartMs,

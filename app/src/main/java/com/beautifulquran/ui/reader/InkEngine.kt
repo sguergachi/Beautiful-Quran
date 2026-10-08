@@ -554,13 +554,6 @@ object InkEngine {
         )?.forWash(t.pacedFeather)
     }
 
-    /**
-     * Ink Lab only: light the active word with a steady 6 Hz pulse, whatever
-     * the detector says, so the paint can be tuned apart from the detection.
-     * Session-only — never saved, never on outside the lab.
-     */
-    var tarjiTestPulse by mutableStateOf(false)
-
     private var detectorMode by mutableStateOf(com.beautifulquran.playback.TarjiDetectorMode.Current)
     /** Developer comparison only; never persisted in reciter profiles or exports. */
     var tarjiDetectorMode: com.beautifulquran.playback.TarjiDetectorMode

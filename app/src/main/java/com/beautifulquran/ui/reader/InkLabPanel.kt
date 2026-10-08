@@ -406,15 +406,6 @@ fun InkLabPanel(
                                 )
                             }
                         }
-                        TuningToggle("Test pulse (6 Hz)", InkEngine.tarjiTestPulse) {
-                            InkEngine.tarjiTestPulse = it
-                        }
-                        LabCaption(
-                            "Pulses the lit word steadily, whatever the " +
-                                "detector hears, so you can tune how the light " +
-                                "looks. If a word pulses here but not with the " +
-                                "voice, the detector is the cause, not these dials.",
-                        )
                         LabCaption(
                             "The word's light answers the voice: brighter on " +
                                 "each reverberation, slightly dimmer between. " +
@@ -945,7 +936,6 @@ private fun TarjiWordLine() {
             val t = InkEngine.tuning
             status = when {
                 p.wordStartMs < 0 -> "no word lit yet"
-                InkEngine.tarjiTestPulse -> "test pulse · light ${signedPercent(p.glow, t)}"
                 !p.eligible -> "not eligible — no madd, ghunnah or verse-end hold in its letters"
                 !p.admitted -> "eligible · waiting for a reverberation that starts inside it"
                 else -> "pulsing · gain ${"%.2f".format(p.gain)} · light ${signedPercent(p.glow, t)}"

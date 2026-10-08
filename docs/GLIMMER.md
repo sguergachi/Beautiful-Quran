@@ -188,11 +188,10 @@ dragged cancels the work it has made stale, and paint dials ask for none.
 Lines are kept by surah, verse and word position. It is a lab mark,
 session-only, and is not drawn on the English mushaf's prose.
 
-**Telling paint from detection.** The Tarjīʿ tab has a **Test pulse** (a steady
-6 Hz light on the lit word, detector bypassed) and a **Word** line saying
-whether the lit word is eligible, waiting, or pulsing and by how much. A word
-that pulses under the test but not with the voice is a detector matter
-(`docs/TARJI.md`), not a paint one.
+**Telling paint from detection.** The Tarjīʿ tab has a **Word** line saying
+whether the lit word is eligible, waiting, or pulsing and by how much; a word
+that is eligible but never pulses is a detector matter (`docs/TARJI.md`), not
+a paint one.
 - **Alpha is not light.** The page is composited in gamma space, where a
   layer's luminance goes as its alpha to the 2.2: scaling alpha by 1.2 is half
   again as much light. `glintGlowAlpha` converts, so the swing is the one
