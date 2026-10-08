@@ -1,5 +1,5 @@
 /**
- * First-bookmark lesson around the live ruby ribbon — Android BookmarkNoteTip.
+ * First-bookmark confirmation around the reader's real ruby ribbon.
  */
 import { ContextualFeatureTip } from '../theme/ContextualFeatureTip'
 import type { AyahSelectorSide } from '../../data/settings'
@@ -9,17 +9,17 @@ type Props = {
   ribbonSide: AyahSelectorSide
   targetCenterY: number
   surfaceWidth: number
-  surfaceHeight: number
+  actionBottom: number
   onDismiss: () => void
   onRenderedChange?: (rendered: boolean) => void
 }
 
-export function BookmarkNoteTip({
+export function BookmarkTip({
   visible,
   ribbonSide,
   targetCenterY,
   surfaceWidth,
-  surfaceHeight,
+  actionBottom,
   onDismiss,
   onRenderedChange,
 }: Props) {
@@ -27,8 +27,8 @@ export function BookmarkNoteTip({
   return (
     <ContextualFeatureTip
       visible={visible}
-      title="Add a note"
-      body="Press and hold this ribbon."
+      title="Bookmark saved"
+      body="Your ruby ribbon keeps this verse. The ribbon on Chapters opens your saved passages."
       onDismiss={onDismiss}
       onRenderedChange={onRenderedChange}
       spotlightSide={ribbonSide}
@@ -43,7 +43,7 @@ export function BookmarkNoteTip({
         x: ribbonOnLeft
           ? Math.max(52, surfaceWidth - 68)
           : 68,
-        y: Math.max(52, surfaceHeight - 72),
+        y: Math.max(52, actionBottom - 48),
       }}
       contentPadding={{
         start: ribbonOnLeft ? 18 : 32,

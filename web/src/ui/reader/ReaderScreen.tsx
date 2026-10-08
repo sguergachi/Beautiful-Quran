@@ -19,6 +19,7 @@ import {
 } from '../../store/appStore'
 import type { StackLayer } from '../paper/stack'
 import { useBookSpread } from '../paper/bookSpread'
+import type { AyahRef } from '../../share/gather'
 import { PlaybackPin } from '../paper/PlaybackPin'
 import { PaperInput } from '../kit/PaperInput'
 import {
@@ -37,17 +38,19 @@ import {
 } from '../icons/PlaybackIcons'
 import { AyahSelectorRail, type AyahSelectorRailHandle } from './AyahSelectorRail'
 import { AyahRailTip } from './AyahRailTip'
-import { BookmarkNoteTip } from './BookmarkNoteTip'
+import { BookmarkTip } from './BookmarkTip'
 import {
   dismissEducation,
+  isEducationDismissed,
   shouldShowAyahRailTip,
-  shouldShowBookmarkNoteTip,
+  shouldShowBookmarkTip,
 } from '../../data/education'
 import { OrnateSurahTitle } from './OrnateSurahTitle'
 import { NextChapterFooter } from './NextChapterFooter'
 import { PageBreak } from './PageBreak'
 import { QuranRepository } from '../../data/repository'
 import { MushafReader } from './MushafReader'
+import { CopyVerseLink } from './CopyVerseLink'
 import { MUSHAF_INK_IDLE, type MushafInk } from './mushafInk'
 import { ayahKey } from '../../share/gather'
 import { buildReaderItems, sliceReaderItems } from './readerItems'
@@ -67,6 +70,7 @@ import { chapterOrnamentSeed, generateChapterOrnament } from '../theme/ornamentG
 import { resolveTheme } from '../App'
 import type { Word } from '../../data/models'
 import { readerOpensOnTitle } from './readerOpening'
+import { scrollReadingAyah } from './readingPlace'
 import { isKeyboardControl, readerKeyboardAction, readerOwnsKeyboard } from './keyboardNavigation'
 
 const NO_SEARCH_FLASH_WORDS: number[] = []
@@ -143,6 +147,16 @@ export function ReaderScreen({
   const state = useAppState()
   const inkTuning = getTuning()
   const content = state.content
+  const mushaf = state.settings.readingLayout === 'mushaf'
+  const [leafPlace, setLeafPlace] = useState<AyahRef | null>(null)
+  const [searchTarget, setSearchTarget] = useState<AyahRef | null>(null)
+  const readerSurah = mushaf && leafPlace
+    ? state.surahs.find((surah) => surah.id === leafPlace.surahId) ?? content?.surah
+    : content?.surah
+  const onReadingPlace = useCallback((place: AyahRef) => {
+    setLeafPlace((previous) => previous?.surahId === place.surahId && previous.ayah === place.ayah ? previous : place)
+    appStore.rememberReading(place)
+  }, [])
   const scrollRef = useRef<HTMLDivElement>(null)
   const headerRef = useRef<HTMLElement>(null)
   const focusRef = useRef<ReaderFocusController | null>(null)
@@ -153,6 +167,14 @@ export function ReaderScreen({
   const focus = focusRef.current
   const initialAyah = Math.max(1, state.openAyah || 1)
   const [focusedAyah, setFocusedAyah] = useState(initialAyah)
+  const readingScrolled = useRef(false)
+  useEffect(() => { readingScrolled.current = false }, [state.readerOpenRevision])
+  const [wordHintOpen, setWordHintOpen] = useState(() => !isEducationDismissed('word_hold'))
+  useEffect(() => {
+    if (!state.rootViewer && !state.gathering) return
+    dismissEducation('word_hold')
+    setWordHintOpen(false)
+  }, [state.rootViewer, state.gathering])
   /**
    * Continuous readout for the rail marker (Android `focusedPosition`).
    *
@@ -245,28 +267,29 @@ export function ReaderScreen({
   }, [])
   const sheetRef = useRef<HTMLDivElement>(null)
   const inkReadRef = useRef<{ ayah: number | null; read: boolean }>({ ayah: null, read: false })
-  const spread = useBookSpread()
+  const spread = useBookSpread(state.settings.pagePresentation)
   // Facing leaves with Chapters lying over the left one: touching the page
   // still being read, anywhere on it, puts Chapters away, and that touch
   // does nothing else. The page's own controls keep their meaning.
   const putAwayRef = useRef(false)
-  const [sheetSize, setSheetSize] = useState({ width: 0, height: 0 })
-  const [initialFocusSettled, setInitialFocusSettled] = useState(false)
+  const [sheetSize, setSheetSize] = useState({ width: 0, height: 0, bodyHeight: 0 })
+  const [settledOpenRevision, setSettledOpenRevision] = useState<number | null>(null)
+  const initialFocusSettled = !mushaf && settledOpenRevision === state.readerOpenRevision
   const [ayahRailTipOpen, setAyahRailTipOpen] = useState(false)
   const [ayahRailTipCenterY, setAyahRailTipCenterY] = useState(Number.NaN)
-  const [bookmarkNoteTipOpen, setBookmarkNoteTipOpen] = useState(false)
-  const [bookmarkNoteTipRendered, setBookmarkNoteTipRendered] = useState(false)
-  const [bookmarkNoteTipAyah, setBookmarkNoteTipAyah] = useState(0)
-  const [bookmarkNoteTipCenterY, setBookmarkNoteTipCenterY] = useState(Number.NaN)
+  const [bookmarkTipOpen, setBookmarkTipOpen] = useState(false)
+  const [bookmarkTipRendered, setBookmarkTipRendered] = useState(false)
+  const [bookmarkTipAyah, setBookmarkTipAyah] = useState(0)
+  const [bookmarkTipCenterY, setBookmarkTipCenterY] = useState(Number.NaN)
   const [ayahRailTipRendered, setAyahRailTipRendered] = useState(false)
-  const bookmarkNoteTipOpenRef = useRef(false)
-  bookmarkNoteTipOpenRef.current = bookmarkNoteTipOpen
+  const bookmarkTipOpenRef = useRef(false)
+  bookmarkTipOpenRef.current = bookmarkTipOpen
   const ayahRailTipOpenRef = useRef(false)
   ayahRailTipOpenRef.current = ayahRailTipOpen
 
-  const dismissBookmarkNoteTip = useCallback(() => {
-    dismissEducation('bookmark_note')
-    setBookmarkNoteTipOpen(false)
+  const dismissBookmarkTip = useCallback(() => {
+    dismissEducation('bookmark_saved')
+    setBookmarkTipOpen(false)
   }, [])
   const dismissAyahRailTip = useCallback(() => {
     dismissEducation('ayah_rail')
@@ -276,10 +299,10 @@ export function ReaderScreen({
   const onToggleBookmark = useCallback(
     (n: number) => {
       const nowBookmarked = appStore.toggleBookmark(n)
+      if (bookmarkTipOpenRef.current) dismissBookmarkTip()
       const settings = appStore.getSnapshot().settings
       if (
-        shouldShowBookmarkNoteTip({
-          developerMode: settings.developerMode,
+        shouldShowBookmarkTip({
           educationGuidesEnabled: settings.educationGuidesEnabled,
           nowBookmarked,
         })
@@ -288,10 +311,10 @@ export function ReaderScreen({
           dismissEducation('ayah_rail')
           setAyahRailTipOpen(false)
         }
-        setBookmarkNoteTipCenterY(Number.NaN)
-        setBookmarkNoteTipAyah(n)
+        setBookmarkTipCenterY(Number.NaN)
+        setBookmarkTipAyah(n)
         void focusAyah(n, { animate: true, preRoll: true }).finally(() => {
-          setBookmarkNoteTipOpen(true)
+          setBookmarkTipOpen(true)
         })
       }
       return nowBookmarked
@@ -321,6 +344,12 @@ export function ReaderScreen({
   // Keep depth/active correct for the parked empty reader at app start.
   const depth = Math.max(0, stackLayer - READER_LAYER)
   const isTop = stackLayer === READER_LAYER
+  const readingAyah = scrollReadingAyah(searchTarget?.ayah ?? state.openAyah, focusedAyah, readingScrolled.current,
+    state.player.isPlaying && state.player.nowPlaying?.surahId === content?.surah.id)
+  useEffect(() => {
+    if (isTop && !mushaf && initialFocusSettled && content) appStore.rememberReading({ surahId: content.surah.id, ayah: readingAyah })
+  }, [isTop, mushaf, initialFocusSettled, content?.surah.id, readingAyah])
+  useEffect(() => setSearchTarget(null), [state.readerOpenRevision, state.player.isPlaying ? state.activeAyah : null])
   const peeking = stackLayer > READER_LAYER
   const active = isTop || peeking
   // Instant recess — hold across ayah-join buffering, release on user pause
@@ -541,14 +570,18 @@ export function ReaderScreen({
   const activeQuery = activeSearchQuery(searchActive, searchQuery)
   // Keep the input snappy — match/highlight work trails by a frame or two.
   const deferredQuery = useDeferredValue(activeQuery)
+  const searchContent = useMemo(() => {
+    if (!searchActive || !readerSurah || readerSurah.id === content?.surah.id) return content
+    return QuranRepository.surahContent(readerSurah.id)
+  }, [searchActive, readerSurah?.id, content])
   const searchableAyahs = useMemo(() => {
-    if (!content) return [] as { number: number; translationLower: string; glossLowers: string[] }[]
-    return content.ayahs.map((a) => ({
+    if (!searchContent) return [] as { number: number; translationLower: string; glossLowers: string[] }[]
+    return searchContent.ayahs.map((a) => ({
       number: a.number,
       translationLower: a.translation.toLowerCase(),
       glossLowers: a.words.map((w) => w.translation.toLowerCase()),
     }))
-  }, [content])
+  }, [searchContent])
   const searchMatches = useMemo(() => {
     if (!deferredQuery) return [] as number[]
     const q = deferredQuery.toLowerCase()
@@ -612,6 +645,12 @@ export function ReaderScreen({
     prevSearchQueryRef.current = deferredQuery
     const delay = queryChanged ? 140 : 0
     const handle = window.setTimeout(() => {
+      if (mushaf) {
+        setSearchTarget({ surahId: searchContent!.surah.id, ayah: target })
+        return
+      }
+      readingScrolled.current = false
+      setSearchTarget({ surahId: content.surah.id, ayah: target })
       pendingJumpAyah.current = target
       setFocusedAyah(target)
       focusedPositionRef.current = target
@@ -625,7 +664,7 @@ export function ReaderScreen({
     }, delay)
     return () => window.clearTimeout(handle)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [deferredQuery, matchIndex, searchMatches, isTop, content?.surah.id])
+  }, [deferredQuery, matchIndex, searchMatches, isTop, searchContent?.surah.id, mushaf])
 
   useEffect(() => {
     const el = scrollRef.current
@@ -638,14 +677,14 @@ export function ReaderScreen({
   // from playback and rail updates to openAyah.
   // Continuous next-chapter advance owns scroll/transform — only pin focus.
   useEffect(() => {
-    if (!content || !isTop) return
-    setInitialFocusSettled(false)
+    if (!content || !isTop || mushaf || initialFocusSettled) return
     if (chapterAdvancingRef.current) {
       setFocusedAyah(Math.max(1, state.openAyah || 1))
       setShowTopTitle(false)
       return
     }
-    const ayah = state.openAyah || 1
+    const ayah = state.readingPlace?.surahId === content.surah.id
+      ? state.readingPlace.ayah : state.openAyah || 1
     let cancelled = false
     const raf = requestAnimationFrame(() => {
       if (cancelled) return
@@ -657,13 +696,13 @@ export function ReaderScreen({
         const el = scrollRef.current
         if (el) el.scrollTop = 0
         setFocusedAyah(1)
-        setInitialFocusSettled(true)
+        setSettledOpenRevision(state.readerOpenRevision)
         return
       }
       void focusAyah(ayah, { animate: false, preRoll: false }).then(() => {
         if (cancelled) return
         setFocusedAyah(focus.focusedAyah())
-        setInitialFocusSettled(true)
+        setSettledOpenRevision(state.readerOpenRevision)
       })
     })
     return () => {
@@ -672,7 +711,7 @@ export function ReaderScreen({
     }
     // Explicit opens only — not playback updates to the session anchor.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [content?.surah.id, state.readerOpenRevision])
+  }, [content?.surah.id, state.readerOpenRevision, isTop, mushaf, initialFocusSettled])
 
   // Measure the reader sheet for tip placement.
   useEffect(() => {
@@ -680,30 +719,35 @@ export function ReaderScreen({
     if (!el) return
     const measure = () => {
       const rect = el.getBoundingClientRect()
-      setSheetSize({ width: rect.width, height: rect.height })
+      const bar = document.querySelector<HTMLElement>('#playback-pin .player-bar') ?? el.querySelector<HTMLElement>('.player-bar')
+      const bodyHeight = Math.min(rect.height, (bar?.getBoundingClientRect().top ?? rect.bottom) - rect.top)
+      setSheetSize({ width: rect.width, height: rect.height, bodyHeight })
     }
     measure()
     const ro = new ResizeObserver(measure)
     ro.observe(el)
+    const bar = document.querySelector<HTMLElement>('.player-bar')
+    if (bar) ro.observe(bar)
     return () => ro.disconnect()
-  }, [content?.surah.id])
+  }, [content?.surah.id, isTop, mushaf, spread, playbackPinned])
 
-  // Force-close guides when the developer gate turns off.
+  // A reader can disable lessons from Reading help.
   useEffect(() => {
     if (
-      !state.settings.developerMode ||
       !state.settings.educationGuidesEnabled
     ) {
-      setBookmarkNoteTipOpen(false)
+      setBookmarkTipOpen(false)
       setAyahRailTipOpen(false)
     }
-  }, [state.settings.developerMode, state.settings.educationGuidesEnabled])
+  }, [state.settings.educationGuidesEnabled])
 
-  // Offer the rail lesson only as a chapter settles. Enabling the developer
-  // gate over an already-open reader waits for the next chapter opening —
+  // Offer the rail lesson only as a chapter settles. Replaying hints over
+  // an already-open reader waits for the next chapter opening —
   // do not key this effect on the guides toggle itself.
   useEffect(() => {
     if (
+      !isTop ||
+      state.rootViewer != null ||
       !initialFocusSettled ||
       !Number.isFinite(ayahRailTipCenterY) ||
       chapterAdvancing ||
@@ -716,10 +760,9 @@ export function ReaderScreen({
       const settings = appStore.getSnapshot().settings
       if (
         shouldShowAyahRailTip({
-          developerMode: settings.developerMode,
           educationGuidesEnabled: settings.educationGuidesEnabled,
         }) &&
-        !bookmarkNoteTipOpenRef.current
+        !bookmarkTipOpenRef.current
       ) {
         setAyahRailTipOpen(true)
       }
@@ -727,6 +770,8 @@ export function ReaderScreen({
     return () => window.clearTimeout(timer)
   }, [
     content?.surah.id,
+    isTop,
+    state.rootViewer,
     initialFocusSettled,
     ayahRailTipCenterY,
     chapterAdvancing,
@@ -736,62 +781,62 @@ export function ReaderScreen({
 
   // Measure the live ribbon while the bookmark lesson is open.
   useEffect(() => {
-    if (!bookmarkNoteTipOpen || bookmarkNoteTipAyah <= 0) return
+    if (!bookmarkTipOpen || bookmarkTipAyah <= 0) return
     const sheet = sheetRef.current
     if (!sheet) return
     const measure = () => {
       const ribbon = sheet.querySelector(
-        `#ayah-${bookmarkNoteTipAyah} .verse-ribbon`,
+        `#ayah-${bookmarkTipAyah} .verse-ribbon`,
       )
       if (!(ribbon instanceof HTMLElement)) return
       const sheetRect = sheet.getBoundingClientRect()
       const ribbonRect = ribbon.getBoundingClientRect()
-      setBookmarkNoteTipCenterY(
+      setBookmarkTipCenterY(
         ribbonRect.top + ribbonRect.height / 2 - sheetRect.top,
       )
     }
     measure()
     const raf = requestAnimationFrame(measure)
     return () => cancelAnimationFrame(raf)
-  }, [bookmarkNoteTipOpen, bookmarkNoteTipAyah, focusedAyah])
+  }, [bookmarkTipOpen, bookmarkTipAyah, focusedAyah])
 
   // Page drag dismisses open lessons (Android listDragged parity).
   useEffect(() => {
     const el = scrollRef.current
-    if (!el || (!bookmarkNoteTipOpen && !ayahRailTipOpen)) return
+    if (!el || (!bookmarkTipOpen && !ayahRailTipOpen)) return
     let lastTop = el.scrollTop
     const onScroll = () => {
       if (Math.abs(el.scrollTop - lastTop) < 2) return
       lastTop = el.scrollTop
-      if (bookmarkNoteTipOpenRef.current) dismissBookmarkNoteTip()
+      if (bookmarkTipOpenRef.current) dismissBookmarkTip()
       if (ayahRailTipOpenRef.current) dismissAyahRailTip()
     }
     el.addEventListener('scroll', onScroll, { passive: true })
     return () => el.removeEventListener('scroll', onScroll)
   }, [
-    bookmarkNoteTipOpen,
+    bookmarkTipOpen,
     ayahRailTipOpen,
-    dismissBookmarkNoteTip,
+    dismissBookmarkTip,
     dismissAyahRailTip,
   ])
 
   // Escape dismisses an open guide before other reader shortcuts.
   useEffect(() => {
-    if (!isTop || (!bookmarkNoteTipOpen && !ayahRailTipOpen)) return
+    if (!isTop || (!bookmarkTipOpen && !ayahRailTipOpen)) return
     const onKey = (e: KeyboardEvent) => {
       if (e.key !== 'Escape') return
       e.preventDefault()
       e.stopPropagation()
-      if (bookmarkNoteTipOpenRef.current) dismissBookmarkNoteTip()
+      if (bookmarkTipOpenRef.current) dismissBookmarkTip()
       else if (ayahRailTipOpenRef.current) dismissAyahRailTip()
     }
     window.addEventListener('keydown', onKey, true)
     return () => window.removeEventListener('keydown', onKey, true)
   }, [
     isTop,
-    bookmarkNoteTipOpen,
+    bookmarkTipOpen,
     ayahRailTipOpen,
-    dismissBookmarkNoteTip,
+    dismissBookmarkTip,
     dismissAyahRailTip,
   ])
 
@@ -930,6 +975,7 @@ export function ReaderScreen({
     }
 
     const pauseFollowFromUser = () => {
+      readingScrolled.current = true
       focus.cancel()
       if (state.followEnabled) appStore.setFollowEnabled(false)
       followWasEnabled.current = false
@@ -1096,8 +1142,10 @@ export function ReaderScreen({
    * pendingJump stays set until focus *and* seek settle so an early Play still
    * routes through playLoadedFromAyah (web audio fetch can outlast the glide).
    */
-  const jumpToAyah = (ayah: number) => {
+  const jumpToAyah = (ayah: number, wordCursor = false) => {
     if (!content) return
+    readingScrolled.current = false
+    setSearchTarget(null)
     const count = content.surah.ayahCount
     const targetAyah = Math.min(count, Math.max(1, Math.round(ayah)))
     const thisSurahLoaded =
@@ -1124,6 +1172,7 @@ export function ReaderScreen({
       // Clear only if no newer jump superseded this one (Android finally guard).
       if (pendingJumpAyah.current === targetAyah) {
         pendingJumpAyah.current = null
+        if (wordCursor) scrollRef.current?.querySelector<HTMLElement>(`[data-ayah="${targetAyah}"] [data-reader-word]`)?.focus({ preventScroll: true })
       }
     })
   }
@@ -1154,17 +1203,21 @@ export function ReaderScreen({
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.defaultPrevented || event.altKey || event.ctrlKey || event.metaKey) return
       if (isKeyboardControl(event.target)) return
+      if (ayahRailTipOpen || ayahRailTipRendered || bookmarkTipOpen || bookmarkTipRendered) return
       const action = readerKeyboardAction(
         event.key,
-        pendingJumpAyah.current ?? focusedAyah,
-        content.surah.ayahCount,
+        mushaf ? leafPlace?.ayah ?? state.openAyah : pendingJumpAyah.current ?? readingAyah,
+        readerSurah?.ayahCount ?? content.surah.ayahCount,
       )
       if (!action) return
       // Holding a navigation key should glide continuously; commands such as
       // Space and B fire once per physical press.
       if (event.repeat && action.type !== 'jump') return
       event.preventDefault()
-      if (action.type === 'jump') jumpToAyah(action.ayah)
+      if (action.type === 'jump') {
+        if (mushaf) setSearchTarget({ surahId: readerSurah?.id ?? content.surah.id, ayah: action.ayah })
+        else jumpToAyah(action.ayah, event.target instanceof Element && event.target.matches('[data-reader-word]'))
+      }
       else if (action.type === 'playPause') {
         // Words are focusable so Enter can audition one. Space belongs to the
         // reader transport, even if the last Tab/click left a word focused.
@@ -1173,18 +1226,27 @@ export function ReaderScreen({
         togglePlayback()
       }
       else if (action.type === 'search') setSearchActive(true)
-      else onToggleBookmark(focusedAyah)
+      else if (mushaf && leafPlace) appStore.toggleBookmarkAt(leafPlace.surahId, leafPlace.ayah)
+      else onToggleBookmark(readingAyah)
     }
     // Capture before React's word-level key handler can audition the word.
     window.addEventListener('keydown', onKeyDown, true)
     return () => window.removeEventListener('keydown', onKeyDown, true)
   }, [
     content,
-    focusedAyah,
+    readingAyah,
     isTop,
     state.rootViewer,
     togglePlayback,
     onToggleBookmark,
+    mushaf,
+    leafPlace,
+    readerSurah,
+    state.openAyah,
+    ayahRailTipOpen,
+    ayahRailTipRendered,
+    bookmarkTipOpen,
+    bookmarkTipRendered,
   ])
 
   const closeSearch = () => {
@@ -1256,7 +1318,6 @@ export function ReaderScreen({
 
   // Keep the rail off under-sheets — when Settings (or any sheet above) is
   // open, a peek of the reader must not show the dial hanging beside it.
-  const mushaf = state.settings.readingLayout === 'mushaf'
   const ordinals = new Map(
     state.gatherSelection.map((ref, index) => [ayahKey(ref.surahId, ref.ayah), index + 1]),
   )
@@ -1280,19 +1341,20 @@ export function ReaderScreen({
   const bookmarkTipSide = side === 'left' ? 'right' : 'left'
   const ayahRailTipVisible =
     ayahRailTipOpen && Number.isFinite(ayahRailTipCenterY)
-  const bookmarkNoteTipVisible =
-    bookmarkNoteTipOpen &&
-    bookmarkNoteTipAyah > 0 &&
-    Number.isFinite(bookmarkNoteTipCenterY)
+  const bookmarkTipVisible =
+    bookmarkTipOpen &&
+    bookmarkTipAyah > 0 &&
+    Number.isFinite(bookmarkTipCenterY)
 
   const repeatMode = state.player.repeatMode
   const nowPlaying = state.player.nowPlaying
   // Cover keeps this same bar and opens the return pill and Close into it.
   const coverChrome =
     playbackPinned && stackLayer === COVER_LAYER && nowPlaying != null
-  const coverSurah = coverChrome
+  const transportSurah = nowPlaying
     ? state.surahs.find((s) => s.id === nowPlaying.surahId) ?? null
     : null
+  const coverSurah = coverChrome ? transportSurah : null
   const coverChapter = coverSurah?.nameTransliteration ?? ''
   const coverAyahLabel = coverChrome
     ? `${nowPlaying.surahId}:${Math.max(1, nowPlaying.ayah)}`
@@ -1396,20 +1458,20 @@ export function ReaderScreen({
         {!searchActive && (pinnedTopNavTitle || content) ? (
           <div
             className="reader-top-title"
-            data-visible={showTopTitle && !chapterAdvancing}
+            data-visible={(mushaf || showTopTitle) && !chapterAdvancing}
             data-advancing={chapterAdvancing && pinnedTopNavTitle != null ? true : undefined}
-            aria-hidden={!showTopTitle && !pinnedTopNavTitle}
+            aria-hidden={!mushaf && !showTopTitle && !pinnedTopNavTitle}
           >
             <OrnateSurahTitle
               chapterNumber={
-                pinnedTopNavTitle?.id ?? content!.surah.id
+                pinnedTopNavTitle?.id ?? readerSurah!.id
               }
               nameArabic={
-                pinnedTopNavTitle?.nameArabic ?? content!.surah.nameArabic
+                pinnedTopNavTitle?.nameArabic ?? readerSurah!.nameArabic
               }
               nameTransliteration={
                 pinnedTopNavTitle?.nameTransliteration ??
-                content!.surah.nameTransliteration
+                readerSurah!.nameTransliteration
               }
             />
           </div>
@@ -1424,7 +1486,7 @@ export function ReaderScreen({
               placeholder="Find an English word…"
               value={searchQuery}
               onValueChange={setSearchQuery}
-              aria-label="Search in surah"
+              aria-label={`Search in ${readerSurah?.nameTransliteration ?? 'surah'}`}
               autoFocus
               className="reader-search-input"
               onKeyDown={(e) => {
@@ -1493,12 +1555,14 @@ export function ReaderScreen({
             <MushafReader
               ownsKeyboard={readerOwnsKeyboard(isTop, state.rootViewer != null)}
               activeSurahId={content.surah.id}
-              activeAyah={state.activeAyah}
+              activeAyah={recitingActive ? state.activeAyah : null}
               openAyah={state.openAyah}
               openRevision={state.readerOpenRevision}
               english={state.settings.readingMode === 'english_only'}
               pageNumberScript={pageNumberScript}
               glyphWiden={state.settings.mushafGlyphWiden / 100}
+              searchTarget={searchTarget}
+              onReadingPlace={onReadingPlace}
               ink={mushafInk}
               onHoldWord={(surahId, ayah, position, side) => {
                 if (state.gathering) return
@@ -1627,7 +1691,7 @@ export function ReaderScreen({
                       activeWord={aw}
                       isActiveAyah={policyActive}
                       dimmed={false}
-                      focused={focusedAyah === ayah.number}
+                      focused={readingAyah === ayah.number}
                       keepActiveWordInView={keepWordInView && isFocusTarget}
                       onKeepWordInView={onKeepWordInView}
                       readingMode={state.settings.readingMode}
@@ -1635,15 +1699,10 @@ export function ReaderScreen({
                       showWordGloss={state.settings.showWordGloss}
                       showTransliteration={state.settings.showTransliteration}
                       showTranslation={state.settings.showTranslation}
-                      bookmarked={
-                        bookmarkedAyahs.has(ayah.number) ||
-                        bookmarkNoteTipAyah === ayah.number
-                      }
+                      bookmarked={bookmarkedAyahs.has(ayah.number)}
                       bookmarkSide={bookmarkTipSide}
                       bookmarkChromeAlpha={1}
-                      bookmarkInteractive={
-                        !recitingActive && bookmarkNoteTipAyah !== ayah.number
-                      }
+                      bookmarkInteractive={!recitingActive}
                       speed={state.settings.playbackSpeed}
                       fontScale={state.settings.fontScale}
                       onPlayWord={(ayahNumber, position) => {
@@ -1726,6 +1785,12 @@ export function ReaderScreen({
             />
           ) : null}
 
+          {wordHintOpen && state.settings.educationGuidesEnabled && isTop && !recitingActive && !state.rootViewer && !state.gathering && !ayahRailTipVisible && !bookmarkTipVisible ? (
+            <div className="reader-word-hint">
+              <span>Hold a word for its root. Tap a verse number to share.</span>
+              <button type="button" onClick={() => { dismissEducation('word_hold'); setWordHintOpen(false) }}>Got it</button>
+            </div>
+          ) : null}
           {state.gathering ? (
             <div className="share-ribbon" role="group" aria-label={
               state.gatherSelection.length === 1
@@ -1736,6 +1801,7 @@ export function ReaderScreen({
                 <IconClose />
               </button>
               <span className="share-ribbon-error">{state.shareError}</span>
+              <CopyVerseLink selection={state.gatherSelection} />
               <button
                 type="button"
                 className="share-ribbon-icon"
@@ -1761,7 +1827,7 @@ export function ReaderScreen({
             </div>
           ) : (
           <PlaybackPin active={playbackPinned}>
-          <div className={`player-bar${coverChrome ? ' cover-chrome' : ''}`}>
+          <div className={`player-bar${coverChrome ? ' cover-chrome' : ''}`} inert={ayahRailTipOpen || ayahRailTipRendered || bookmarkTipOpen || bookmarkTipRendered}>
             <div className="player-reciter-row">
               <button
                 type="button"
@@ -1772,6 +1838,9 @@ export function ReaderScreen({
               >
                 {reciterName}
               </button>
+              {mushaf && nowPlaying && transportSurah && transportSurah.id !== readerSurah?.id ? (
+                <span className="player-chapter">{transportSurah.nameTransliteration} · {Math.max(1, nowPlaying.ayah)}</span>
+              ) : null}
               {coverChrome ? (
                 <button
                   type="button"
@@ -1889,29 +1958,29 @@ export function ReaderScreen({
               : sheetSize.height / 2
           }
           surfaceWidth={sheetSize.width}
-          surfaceHeight={sheetSize.height}
+          actionBottom={sheetSize.bodyHeight}
           onDismiss={dismissAyahRailTip}
           onRenderedChange={setAyahRailTipRendered}
         />
       ) : null}
 
-      {bookmarkNoteTipVisible || bookmarkNoteTipRendered ? (
-        <BookmarkNoteTip
-          visible={bookmarkNoteTipVisible}
+      {bookmarkTipVisible || bookmarkTipRendered ? (
+        <BookmarkTip
+          visible={bookmarkTipVisible}
           ribbonSide={bookmarkTipSide}
           targetCenterY={
-            Number.isFinite(bookmarkNoteTipCenterY)
-              ? bookmarkNoteTipCenterY
+            Number.isFinite(bookmarkTipCenterY)
+              ? bookmarkTipCenterY
               : sheetSize.height / 2
           }
           surfaceWidth={sheetSize.width}
-          surfaceHeight={sheetSize.height}
-          onDismiss={dismissBookmarkNoteTip}
+          actionBottom={sheetSize.bodyHeight}
+          onDismiss={dismissBookmarkTip}
           onRenderedChange={(rendered) => {
-            setBookmarkNoteTipRendered(rendered)
-            if (!rendered && !bookmarkNoteTipOpen) {
-              setBookmarkNoteTipAyah(0)
-              setBookmarkNoteTipCenterY(Number.NaN)
+            setBookmarkTipRendered(rendered)
+            if (!rendered && !bookmarkTipOpen) {
+              setBookmarkTipAyah(0)
+              setBookmarkTipCenterY(Number.NaN)
             }
           }}
         />

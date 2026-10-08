@@ -72,7 +72,25 @@ export function useWordInteraction(onPlay: () => void, onHold: () => void) {
   }
 
   const onKeyDown = (event: KeyboardEvent) => {
-    if (event.key === 'Enter' || event.key === ' ') onPlay()
+    if (event.altKey || event.ctrlKey || event.metaKey || event.repeat) return
+    if (event.key === 'ArrowLeft' || event.key === 'ArrowRight') {
+      const target = event.currentTarget as HTMLElement
+      const group = target.closest('[data-word-group]')
+      const words = Array.from(group?.querySelectorAll<HTMLElement>('[data-reader-word]') ?? [])
+      const direction = (event.key === 'ArrowRight' ? 1 : -1) * (target.dataset.readerWord === 'rtl' ? -1 : 1)
+      const next = words[words.indexOf(target) + direction]
+      if (next) {
+        for (const word of words) word.tabIndex = word === next ? 0 : -1
+        next.focus({ preventScroll: true })
+      }
+      event.preventDefault()
+      event.stopPropagation()
+    } else if (event.key === 'Enter' || event.key === ' ') {
+      event.preventDefault()
+      event.stopPropagation()
+      if (event.shiftKey) onHold()
+      else onPlay()
+    }
   }
 
   return {

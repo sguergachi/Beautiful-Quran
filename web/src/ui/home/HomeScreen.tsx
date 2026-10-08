@@ -180,6 +180,9 @@ export function HomeScreen({
       ? state.surahs.find((s) => s.id === state.settings.lastSurah)
       : null
 
+  const readingSurah = !searching
+    ? state.surahs.find((surah) => surah.id === state.settings.lastReadSurah)
+    : null
   const depth = Math.max(0, stackLayer - COVER_LAYER)
   const isTop = stackLayer === COVER_LAYER
 
@@ -379,7 +382,17 @@ export function HomeScreen({
                 </div>
               </div>
 
-            {continueSurah ? (
+            {readingSurah ? (
+              <ContinueRow
+                label="Continue reading"
+                surahId={readingSurah.id}
+                ayah={state.settings.lastReadAyah}
+                transliteration={readingSurah.nameTransliteration}
+                arabic={readingSurah.nameArabic}
+                onPrepare={() => prepareChapter(readingSurah.id)}
+              />
+            ) : null}
+            {continueSurah && (continueSurah.id !== readingSurah?.id || state.settings.lastAyah !== state.settings.lastReadAyah) ? (
               <ContinueRow
                 surahId={continueSurah.id}
                 ayah={state.settings.lastAyah || 1}

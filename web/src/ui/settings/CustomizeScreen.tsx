@@ -5,26 +5,23 @@ import type {
   AyahSelectorSide,
   PageNumberScript,
   ReadingMode,
+  VerseNumberScript,
   Settings,
   ThemeMode,
-  VerseNumberScript,
 } from '../../data/settings'
 import {
   applyReadingLayout,
   applyReadingMode,
   MUSHAF_VIEW_MODES,
-  showsPreviewWordGloss,
   showsWordGlossChrome,
 } from '../../data/customizePolicy'
-import { formatAyahNumberMark } from '../../util/digits'
-import { symbolicAyahBarCount } from '../reader/ayahRailMath'
 import { PaperChoiceList } from '../kit/PaperChoiceList'
 import { PaperSegmented } from '../kit/PaperSegmented'
 import { PaperSwitch } from '../kit/PaperSwitch'
-import { PageBreak } from '../reader/PageBreak'
 import type { BrushCheckParams } from '../kit/brushCheck'
 import type { BrushCircleParams } from '../kit/brushMark'
 import { ThemeSwatches } from './themeSwatches'
+import { ReadingPreview } from './ReadingPreview'
 
 const VIEW_OPTIONS = [
   { value: 'arabic_only' as const, label: 'Arabic' },
@@ -60,21 +57,6 @@ const THEME_OPTIONS: { value: ThemeMode; label: string }[] = [
   { value: 'royal_green', label: 'Royal green' },
 ]
 
-// 56:76 ends page 536; 56:77 opens 537 — a real printed-page turn.
-const SAMPLE_ARABIC_1 = 'وَإِنَّهُۥ لَقَسَمٞ لَّوۡ تَعۡلَمُونَ عَظِيمٌ'
-const SAMPLE_ARABIC_2 = 'إِنَّهُۥ لَقُرۡءَانٞ كَرِيمٞ'
-const SAMPLE_ENGLISH =
-  'And indeed, it is an oath - if you could know - [most] great.'
-const SAMPLE_ENGLISH_2 = "Indeed, it is a noble Qur'an."
-const SAMPLE_PAGE = 536
-const SAMPLE_AYAH_1 = 76
-const SAMPLE_AYAH_2 = 77
-const SAMPLE_WORDS = [
-  { arabic: 'وَإِنَّهُۥ', gloss: 'indeed' },
-  { arabic: 'لَقَسَمٞ', gloss: 'an oath' },
-  { arabic: 'عَظِيمٌ', gloss: 'great' },
-]
-
 export function CustomizeScreen({
   settings,
   brushParams,
@@ -100,13 +82,7 @@ export function CustomizeScreen({
 
       <section className="settings-section">
         <h2>Preview</h2>
-        <ReadingPreview
-          readingMode={settings.readingMode}
-          verseNumberScript={settings.verseNumberScript}
-          pageNumberScript={settings.pageNumberScript}
-          ayahSelectorSide={settings.ayahSelectorSide}
-          showWordGloss={settings.showWordGloss}
-        />
+        <ReadingPreview settings={settings} />
       </section>
       </div>
 
@@ -124,6 +100,19 @@ export function CustomizeScreen({
                 appStore.updateSettings({ themeMode: v as ThemeMode })
               }
             />
+          </section>
+
+          <section className="settings-section">
+            <h2>Pages on larger screens</h2>
+            <PaperSegmented
+              aria-label="Pages on larger screens"
+              value={settings.pagePresentation}
+              brushParams={brushParams}
+              paintToken={paintToken}
+              options={[{ value: 'facing', label: 'Facing pages' }, { value: 'single', label: 'Single page' }]}
+              onChange={(v) => appStore.updateSettings({ pagePresentation: v === 'single' ? 'single' : 'facing' })}
+            />
+            <p className="settings-caption">A single page gives the text more room on a portrait tablet.</p>
           </section>
 
           <section className="settings-section">
@@ -255,116 +244,6 @@ export function CustomizeScreen({
         />
       </section>
 
-      </div>
-    </div>
-  )
-}
-
-const PREVIEW_RAIL_AYAHS = 7
-
-function ReadingPreview({
-  readingMode,
-  verseNumberScript,
-  pageNumberScript,
-  ayahSelectorSide = 'left',
-  showWordGloss = false,
-}: {
-  readingMode: ReadingMode
-  verseNumberScript: VerseNumberScript
-  pageNumberScript: PageNumberScript
-  ayahSelectorSide?: AyahSelectorSide
-  showWordGloss?: boolean
-}) {
-  const arabicOnly = readingMode === 'arabic_only'
-  const englishOnly = readingMode === 'english_only'
-  const showGloss = showsPreviewWordGloss(readingMode, showWordGloss)
-  const arabicMarks = verseNumberScript === 'arabic'
-  const mark1 = formatAyahNumberMark(SAMPLE_AYAH_1, arabicMarks)
-  const mark2 = formatAyahNumberMark(SAMPLE_AYAH_2, arabicMarks)
-  const markClass = arabicMarks ? 'ayah-mark' : 'ayah-mark ayah-mark--ltr'
-  const markDir = arabicMarks ? undefined : ('ltr' as const)
-  const railBars = symbolicAyahBarCount(PREVIEW_RAIL_AYAHS)
-
-  return (
-    <div
-      className={`reading-preview reading-preview--rail-${ayahSelectorSide}`}
-    >
-      <div
-        className={`reading-preview__rail reading-preview__rail--${ayahSelectorSide}`}
-        aria-hidden="true"
-      >
-        {Array.from({ length: railBars }, (_, index) => (
-          <i key={index} data-focus={index === 0 ? 'true' : undefined} />
-        ))}
-      </div>
-      <div className="reading-preview__lock">
-        <div className="reading-preview__sizer" aria-hidden="true">
-          <div className="reading-preview__words" dir="rtl">
-            {SAMPLE_WORDS.map((word) => (
-              <span key={word.arabic} className="reading-preview__word">
-                <span className="reading-preview__arabic">{word.arabic}</span>
-                <span className="reading-preview__gloss">{word.gloss}</span>
-              </span>
-            ))}
-            <span className="ayah-mark">{formatAyahNumberMark(SAMPLE_AYAH_1, true)}</span>
-          </div>
-          <p className="reading-preview__english">{SAMPLE_ENGLISH}</p>
-          <PageBreak page={SAMPLE_PAGE} script="both" />
-        </div>
-        <div className="reading-preview__live">
-          {englishOnly ? (
-            <>
-              <p className="reading-preview__english reading-preview__english--lyric" dir="ltr">
-                {SAMPLE_ENGLISH}{' '}
-                <span className={markClass} dir={markDir}>
-                  {mark1}
-                </span>
-              </p>
-              <PageBreak page={SAMPLE_PAGE} script={pageNumberScript} />
-              <p className="reading-preview__english reading-preview__english--lyric" dir="ltr">
-                {SAMPLE_ENGLISH_2}{' '}
-                <span className={markClass} dir={markDir}>
-                  {mark2}
-                </span>
-              </p>
-            </>
-          ) : (
-            <>
-              {showGloss ? (
-                <div className="reading-preview__words" dir="rtl">
-                  {SAMPLE_WORDS.map((word) => (
-                    <span key={word.arabic} className="reading-preview__word">
-                      <span className="reading-preview__arabic">{word.arabic}</span>
-                      <span className="reading-preview__gloss">{word.gloss}</span>
-                    </span>
-                  ))}
-                  <span className={markClass} dir={markDir}>
-                    {mark1}
-                  </span>
-                </div>
-              ) : (
-                <p className="reading-preview__arabic" dir="rtl">
-                  {SAMPLE_ARABIC_1}{' '}
-                  <span className={markClass} dir={markDir}>
-                    {mark1}
-                  </span>
-                </p>
-              )}
-              {!arabicOnly ? (
-                <p className="reading-preview__english">{SAMPLE_ENGLISH}</p>
-              ) : null}
-              <PageBreak page={SAMPLE_PAGE} script={pageNumberScript} />
-              {arabicOnly ? (
-                <p className="reading-preview__arabic" dir="rtl">
-                  {SAMPLE_ARABIC_2}{' '}
-                  <span className={markClass} dir={markDir}>
-                    {mark2}
-                  </span>
-                </p>
-              ) : null}
-            </>
-          )}
-        </div>
       </div>
     </div>
   )
