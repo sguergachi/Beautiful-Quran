@@ -173,6 +173,25 @@ playback does not resume the chapter-opening clip left by `openSurah` /
 `loadSurah`. Continue Listening (`settings.lastSurah` / `lastAyah`) only
 updates when a verse is actually recited — not on open, scroll, or rail jump.
 
+**Continue reading** keeps a separate `lastReadSurah` / `lastReadAyah` at the
+settled scroll verse or Mushaf leaf. It never seeks audio. When the two places
+differ, Chapters offers both reading and listening rows. A Mushaf turn reports
+its settled verse to the toolbar and in-chapter search; the loaded listening
+chapter stays identified on the transport when it differs from the paper.
+An explicitly opened verse is kept when it is on either facing leaf, so a link
+to 2:255 remains 2:255 rather than becoming the first verse on that printed page.
+Scroll likewise keeps an explicit opening, search or rail/keyboard target until
+manual scrolling or playback; a short chapter's tail readout cannot rewrite its link.
+
+**Verse links and history.** `#2:255` opens that exact verse paused, including
+a cold start. The route validates both chapter and verse against the catalog;
+`#lab` remains the ornaments route. Explicit chapter/bookmark/search opens push
+a history entry; settled scroll and leaf movement replace the current entry,
+so listening does not fill Back with word or verse ticks. Browser Back/Forward
+opens reading targets paused. Gather one verse to **Copy verse link**; a failed
+clipboard write leaves its address selected in an inline field on the share ribbon.
+A paused listening highlight cannot override a newly linked Mushaf reading target.
+
 ### 5.3 `InkEngine` (pure policy)
 
 Port exactly:
@@ -383,15 +402,21 @@ seven. All reciters shows the same 13 performances from the shared database,
 sorted by name, with Mujawwad / Muallim subtitles and independent star targets.
 Choosing a voice switches its exact audio and timing corpus; starring only
 changes which voices appear on Settings. Empty favorites have an inline prompt.
-Text size and the bilingual scrolling toggles live in Customize. Back and
+Text size and the bilingual scrolling toggles live in Customize.
+The preview applies the same font scale and text toggles; Mushaf shows printed
+paper with its folio and no Scroll rail, gloss or size scaling. Preview paper
+and theme samples have no gold control outlines. **Reading help** is its own
+Settings page with gesture instructions, keyboard shortcuts and the hints toggle. Back and
 Escape return from either sub-page to Settings before peeling the sheet away.
 
 **Tablet and desktop book spread.** At `(min-width: 720px) and (min-height: 600px)`
-(`ui/paper/bookSpread.ts`) the stack is laid open as a book instead of a
-centred phone column, including iPads in portrait and landscape: Chapters on
-the verso with Bookmarks laid over it, and
-on the recto the title page, then the Reader, with Settings laid over that
-in every layout. `App` sets `data-spread` on the shell and hands
+(`ui/paper/bookSpread.ts`) the default stack is laid open as a book instead of a
+centred phone column, including iPads in portrait and landscape. Customize →
+**Pages on larger screens** can instead choose **Single page**, giving portrait
+tablet text more room while retaining the default facing book. The preference
+also drives entrance, root-viewer and gather visibility policies. In the facing
+book, Chapters lies on the verso with Bookmarks laid over it; the recto carries
+the title page, then the Reader, with Settings laid over it in every layout. `App` sets `data-spread` on the shell and hands
 each page the layer it should believe it is on (`spreadLayers`), so the reader
 stays live — focus follow, keys, rail — while Chapters is also on top; the
 store's real stack layer is untouched. `BookSpread` draws the boards, page
@@ -401,7 +426,15 @@ block and title page under the sheets; all geometry is CSS keyed on
 into `BookSpread`'s slot, sized to the recto's own box; Chapters keeps its
 real layer and covers the verso only at layer 0 (`data-leaves`). Covered
 verso content is inert and hidden from assistive technology; the recto comes
-first in DOM and Tab order. Gathering stays active while another sheet covers
+first in DOM and Tab order. `sheetFocus.ts` makes all fully covered or parked
+sheets inert, hands focus to arriving paper, and restores its previous control
+on return. The word viewer focuses its own paper, makes the leaf beneath it
+inert, and restores the word on close; its facing origin page stays usable.
+Exposed facing pages remain usable. Only the reading verse's word,
+bookmark and verse number enter Scroll's Tab order; Mushaf has one word cursor
+per leaf. Focused words use left/right to move in their reading direction,
+Enter to listen and Shift+Enter to explore their root. Header flourishes give
+way on narrow pages so Search and Settings retain their full touch targets. Gathering stays active while another sheet covers
 the verso, and Escape cancels gathering before peeling that sheet away;
 Settings covers the chapter itself, so it ends gathering and the covered
 reader gives up the keys (`spreadLayers` hands it the Settings layer).
@@ -701,8 +734,14 @@ until the hole finishes.
 hosted on the reader sheet: an inverse royal-green progressive vellum
 spotlight around the live bookmark ribbon or collapsed ayah rail, with
 lesson copy seated on the wash’s leading feather (toward the mark) and a
-theme-paper **Got it** cutout. Off by default; Settings → Developer →
-**Contextual feature guides** / **Replay feature guides** gates them. Web
+theme-paper **Got it** cutout. New readers have hints enabled; saved opt-outs
+remain respected. Settings → **Reading help** controls them, and Developer →
+**Replay feature guides** rearms them. The web bookmark lesson confirms a saved
+passage rather than promising the Android-only note editor. A short inline hint
+teaches word holds and verse gathering. The dismiss action sits above the
+measured transport; transport is inert throughout a lesson and its exit, and
+the live rail/ribbon stays usable. Guides receive keyboard focus and restore
+it when dismissed. Web
 draws the same progressive-vellum field as Android’s AGSL shader via WebGL
 (canvas gradient fallback only when WebGL is unavailable).
 
@@ -780,8 +819,8 @@ sans.
   earlier gilded flourishes and a threshold switch).
 - ✅ Mushaf page breaks (Android `PageBreak` — gold hairline + Western /
   Arabic-Indic page numbers from `ayahs.page`).
-- ✅ Contextual feature guides (ayah-rail + bookmark-note lessons; developer
-  gated, inverse progressive vellum — see `DESIGN.md` § Contextual teaching).
+- ✅ Contextual feature guides (ayah-rail + saved-bookmark lessons; reader
+  hints, inverse progressive vellum — see `DESIGN.md` § Contextual teaching).
 - Visual QA against Android screenshots (`docs/ss*.png`).
 - CI: Vitest on every PR; optional Playwright on `master`.
 
@@ -789,7 +828,7 @@ sans.
 - Timings Lab / timing patch export
 - Mushaf layout / QCF V2 page fonts
 - Exact Media3 preload configuration
-- Verse annotations / ḥawāshī (bookmark-note guide ships; note editor pending)
+- Verse annotations / ḥawāshī (the web bookmark lesson does not promise notes)
 - Sharing / accounts / analytics (never)
 
 ## 11. Repo layout

@@ -17,6 +17,8 @@ import { OrnamentsLab } from './lab/OrnamentsLab'
 import { bookmarkSwipeDestination, closesBook, spreadLayers, useBookSpread } from './paper/bookSpread'
 import { BookSpread } from './paper/BookSpread'
 import { unlockPageTurnSounds } from './paper/pageTurnSounds'
+import { useSheetFocus } from './paper/sheetFocus'
+import { useVerseRoute } from './useVerseRoute'
 
 /** True while the URL hash routes to the Ornaments Lab (`#lab`). */
 function useLabRoute(): boolean {
@@ -68,6 +70,7 @@ export function App() {
       sheet: s.sheet,
       content: s.content,
       readerOpenRevision: s.readerOpenRevision,
+      readingPlace: s.readingPlace,
       bookmarks: s.bookmarks,
       settings: s.settings,
     }),
@@ -82,6 +85,7 @@ export function App() {
     setEntranceDone(false)
   }, [])
   const isLab = useLabRoute()
+  useVerseRoute(state.ready, state.readingPlace, state.readerOpenRevision, () => setEntranceDone(true))
   const swipeStart = useRef<{ x: number; y: number; pointerId: number; layer: StackLayer; field: boolean } | null>(null)
   const stack = state.stackLayer
   const hasReader = hasReaderOpen(state.content, state.sheet)
@@ -94,11 +98,12 @@ export function App() {
       coverSession: s.player.nowPlaying != null,
     }),
   )
-  const spread = useBookSpread()
+  const spread = useBookSpread(state.settings.pagePresentation)
   // Facing leaves: Mushaf layout in a spread, once a chapter is open.
   const leaves =
     spread && state.content != null && state.settings.readingLayout === 'mushaf'
   const pageLayers = spreadLayers(spread, stack, state.content != null, leaves)
+  useSheetFocus(state.ready && entranceDone && !isLab, spread, leaves, stack, hasReader, state.readerOpenRevision)
 
   useEffect(() => {
     void appStore.init()
@@ -124,18 +129,6 @@ export function App() {
       )
     }
   }, [state.settings.themeMode, state.settings.colorSystem, entranceDone])
-
-  // In a spread the chapter list stays on screen, so the row that opened a
-  // chapter would keep keyboard focus and swallow the reader's keys (Space,
-  // arrows). Opening hands the keyboard to the page being read.
-  const openSurahId = state.content?.surah.id
-  useEffect(() => {
-    if (!spread || openSurahId == null) return
-    const focused = document.activeElement
-    if (focused instanceof HTMLElement && focused.classList.contains('surah-row')) {
-      focused.blur()
-    }
-  }, [spread, openSurahId, state.readerOpenRevision])
 
   useEffect(() => {
     window.addEventListener('pointerdown', unlockPageTurnSounds, true)

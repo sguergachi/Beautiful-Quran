@@ -11,6 +11,7 @@ import {
 import { customizeSummary } from '../../data/customizePolicy'
 import { CustomizeScreen } from './CustomizeScreen'
 import { AcknowledgementsScreen } from './AcknowledgementsScreen'
+import { ReadingHelp } from './ReadingHelp'
 import { ReciterChoices, RecitersScreen } from './RecitersScreen'
 import { NuqtaLab } from './NuqtaLab'
 import { settingsLayerFor, type StackLayer } from '../paper/stack'
@@ -72,7 +73,7 @@ export function SettingsScreen({
   const [laid, setLaid] = useState(false)
   if (isTop && !laid) setLaid(true)
   const depth = Math.max(0, stackLayer - layer)
-  const [page, setPage] = useState<'main' | 'reciters' | 'customize' | 'acknowledgements'>('main')
+  const [page, setPage] = useState<'main' | 'reciters' | 'customize' | 'acknowledgements' | 'help'>('main')
   const scrollRef = useRef<HTMLDivElement>(null)
   const favoriteReciters = reciters.filter((reciter) => s.favoriteReciterIds.includes(reciter.id))
 
@@ -376,6 +377,8 @@ export function SettingsScreen({
             checkPaintToken={checkPaintToken}
             onBack={() => setPage('main')}
           />
+        ) : page === 'help' ? (
+          <ReadingHelp hintsEnabled={s.educationGuidesEnabled} onBack={() => setPage('main')} />
         ) : page === 'acknowledgements' ? (
           <AcknowledgementsScreen onBack={() => setPage('main')} />
         ) : (
@@ -389,7 +392,6 @@ export function SettingsScreen({
           <BackChevron />
         </button>
         <h1>Settings</h1>
-
         <section className="settings-section">
           <h2>Reciter</h2>
           <ReciterChoices
@@ -419,6 +421,16 @@ export function SettingsScreen({
             <span className="settings-nav-copy">
               <span className="settings-nav-label">Customize</span>
               <span className="settings-nav-note">{customizeSummary(s)}</span>
+            </span>
+            <DisclosureChevron expanded={false} />
+          </button>
+        </section>
+
+        <section className="settings-section">
+          <button type="button" className="settings-nav" onClick={() => setPage('help')}>
+            <span className="settings-nav-copy">
+              <span className="settings-nav-label">Reading help</span>
+              <span className="settings-nav-note">Word meanings, bookmarks, sharing and keyboard shortcuts</span>
             </span>
             <DisclosureChevron expanded={false} />
           </button>
@@ -482,28 +494,6 @@ export function SettingsScreen({
                 alphas onto 10 rungs, so each rung comes back at the weight
                 most of its call sites used to carry. Switch with a chapter
                 open to compare.
-              </p>
-            </div>
-
-            <div className="settings-dev-block">
-              <PaperSwitch
-                id="setting-education-guides"
-                label="Contextual feature guides"
-                checked={s.educationGuidesEnabled}
-                checkParams={checkParams}
-                paintToken={checkPaintToken}
-                onChange={(enabled) => {
-                  if (enabled) {
-                    rearmEducation()
-                    setEducationRearmed(true)
-                  } else {
-                    setEducationRearmed(false)
-                  }
-                  appStore.updateSettings({ educationGuidesEnabled: enabled })
-                }}
-              />
-              <p className="settings-caption">
-                Off by default. Guides appear only after their matching gesture.
               </p>
             </div>
 

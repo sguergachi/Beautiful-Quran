@@ -1,4 +1,4 @@
-import { useEffect, useId, useMemo, useState } from 'react'
+import { useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { facingPage, useBookSpread, useLooseSheetSlot } from '../paper/bookSpread'
 import { SHEET_LAY_SCHEDULE, playFlip } from '../paper/pageTurnSounds'
@@ -133,7 +133,8 @@ function ExplainedHeading({
 export function RootViewer() {
   const rv = useAppSelector((s) => s.rootViewer)
   const closing = useAppSelector((s) => s.rootViewerClosing)
-  const spread = useBookSpread()
+  const presentation = useAppSelector((s) => s.settings.pagePresentation)
+  const spread = useBookSpread(presentation)
   const slot = useLooseSheetSlot()
   const sheet = spread && slot != null
   const open = rv != null
@@ -171,6 +172,25 @@ function RootViewerBleed({
   /** The page of the spread the loose sheet lies on; absent for the phone's bleed. */
   page?: 'recto' | 'verso'
 }) {
+  const rootRef = useRef<HTMLDivElement>(null)
+  useLayoutEffect(() => {
+    const root = rootRef.current
+    if (!root) return
+    const previous = document.activeElement
+    // The facing origin page stays readable; only paper under this leaf is covered.
+    const covered: (Element | null)[] = page
+      ? [document.querySelector<HTMLElement>(page === 'verso' ? '.book-verso-leaf' : '.sheet[data-name="reader"]')]
+      : Array.from(root.parentElement?.children ?? []).filter((node) => node !== root)
+    if (page !== 'verso') covered.push(document.querySelector<HTMLElement>('#playback-pin'))
+    const saved = covered.filter((node): node is HTMLElement => node instanceof HTMLElement).map((node) => [node, node.inert] as const)
+    for (const [node] of saved) node.inert = true
+    root.focus({ preventScroll: true })
+    return () => {
+      const restore = root.contains(document.activeElement)
+      for (const [node, inert] of saved) node.inert = inert
+      if (restore && previous instanceof HTMLElement && previous.isConnected && !previous.closest('[inert]')) previous.focus({ preventScroll: true })
+    }
+  }, [page])
   const sections = useMemo(() => rootOccurrenceSections(rv.occurrences), [rv.occurrences])
   const relatedForms = useMemo(
     () => relatedRootForms(rv.lemmas, rv.lemma, rv.pos),
@@ -231,6 +251,10 @@ function RootViewerBleed({
 
   return (
     <div
+      ref={rootRef}
+      tabIndex={-1}
+      role="region"
+      aria-label="Word meanings"
       className={page ? 'ink-bleed root-sheet' : 'ink-bleed'}
       data-page={page}
       data-closing={closing ? 'true' : undefined}

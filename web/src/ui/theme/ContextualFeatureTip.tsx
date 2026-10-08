@@ -91,6 +91,16 @@ export function ContextualFeatureTip({
   }, [rendered])
 
   useEffect(() => {
+    if (!visible || !rendered) return
+    const previous = document.activeElement
+    const dismiss = rootRef.current?.querySelector<HTMLButtonElement>('.contextual-tip-dismiss')
+    dismiss?.focus({ preventScroll: true })
+    return () => {
+      if (document.activeElement === dismiss && previous instanceof HTMLElement && previous.isConnected && !previous.closest('[inert]')) previous.focus({ preventScroll: true })
+    }
+  }, [visible, rendered])
+
+  useEffect(() => {
     paperCtrl.current?.stop()
     inkCtrl.current?.stop()
     window.clearTimeout(inkDelay.current)
@@ -197,7 +207,7 @@ export function ContextualFeatureTip({
       className="contextual-feature-tip"
       data-visible={visible ? 'true' : 'false'}
       data-spotlight={spotlightSide}
-      role="dialog"
+      role="region"
       aria-label={title}
       aria-describedby="contextual-tip-body"
     >

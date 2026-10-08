@@ -55,6 +55,7 @@ interface Props {
   onPlay: () => void
   onHold: () => void
   onContextMenu?: (e: MouseEvent) => void
+  tabIndex?: number
 }
 
 /**
@@ -118,6 +119,7 @@ export function WordUnit({
   onPlay,
   onHold,
   onContextMenu,
+  tabIndex = -1,
 }: Props) {
   const localRootRef = useRef<HTMLSpanElement>(null)
   /** Base glyph layer — Active wash targets this (English) or the paper cover (Arabic). */
@@ -551,7 +553,8 @@ export function WordUnit({
       {...interaction}
       onContextMenu={onContextMenu}
       role="button"
-      tabIndex={0}
+      tabIndex={tabIndex}
+      data-reader-word={rtl ? 'rtl' : 'ltr'}
     >
       <span
         className="word-stack"
