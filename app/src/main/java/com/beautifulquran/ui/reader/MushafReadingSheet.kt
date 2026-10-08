@@ -143,7 +143,7 @@ private val MushafTransportRow = 44.dp
 private val MushafTransportAir = 2.dp
 
 /**
- * The reciter's name or Ink Lab under the transport.
+ * The reciter's name or Ink Lab above the transport.
  *
  * The closed band is always reserved. Opening Ink Lab replaces the name and
  * lets the band take the panel's measured height; the leaf gets what remains.
@@ -372,6 +372,37 @@ internal fun MushafReadingSheet(
                 .padding(horizontal = MushafTransportEdge, vertical = MushafTransportAir),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
+            // Opening Ink Lab grows the reserved name band; the leaf takes
+            // the measured remainder.
+            Box(
+                Modifier.fillMaxWidth().heightIn(min = MushafReciterBand),
+                contentAlignment = Alignment.Center,
+            ) {
+                if (inkLabAvailable && inkLabOpen) {
+                    InkLabPanel(
+                        modifier = Modifier
+                            .align(Alignment.Center)
+                            .padding(start = 40.dp),
+                    )
+                } else if (reciterName.isNotEmpty()) {
+                    ReciterNameButton(
+                        name = reciterName,
+                        onClick = onOpenSettings,
+                        enabled = enabled,
+                        disclosure = true,
+                        modifier = Modifier
+                            .align(Alignment.Center)
+                            .padding(horizontal = if (inkLabAvailable) 48.dp else 0.dp),
+                    )
+                }
+                if (inkLabAvailable) {
+                    InkLabToggleButton(
+                        expanded = inkLabOpen,
+                        onClick = onInkLabClick,
+                        modifier = Modifier.align(Alignment.CenterStart),
+                    )
+                }
+            }
             Box(
                 Modifier
                     .fillMaxWidth()
@@ -498,47 +529,6 @@ internal fun MushafReadingSheet(
                     )
                 }
             }
-            }
-            // The closed band holds the name and, in developer mode, its Ink
-            // Lab toggle. Open Ink Lab replaces the name and grows this band;
-            // the leaf takes the measured remainder.
-            Box(
-                Modifier.fillMaxWidth().heightIn(min = MushafReciterBand),
-                contentAlignment = Alignment.Center,
-            ) {
-                if (inkLabAvailable && inkLabOpen) {
-                    InkLabPanel(
-                        modifier = Modifier
-                            .align(Alignment.Center)
-                            .padding(start = 40.dp),
-                    )
-                } else if (reciterName.isNotEmpty()) {
-                    Box(
-                        modifier = Modifier
-                            .align(Alignment.Center)
-                            .fillMaxWidth()
-                            .height(MushafReciterBand)
-                            .padding(horizontal = if (inkLabAvailable) 48.dp else 0.dp)
-                            .ownedQuietClickable(role = Role.Button, onClick = onOpenSettings),
-                        contentAlignment = Alignment.Center,
-                    ) {
-                        Text(
-                            text = reciterName,
-                            style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp),
-                            color = quiet.copy(alpha = 0.7f),
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                            textAlign = TextAlign.Center,
-                        )
-                    }
-                }
-                if (inkLabAvailable) {
-                    InkLabToggleButton(
-                        expanded = inkLabOpen,
-                        onClick = onInkLabClick,
-                        modifier = Modifier.align(Alignment.CenterStart),
-                    )
-                }
             }
         }
     }

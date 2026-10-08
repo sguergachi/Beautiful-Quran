@@ -815,13 +815,13 @@ While reciting, the top bar, reciter name, repeat, and speed fade to 8 % over
 rewind/forward controls on the page. Pause, and it breathes back. Non-active
 verses recess to upcoming ink over ~400 ms.
 
-The reciter name above the chapter transport carries a small disclosure
-chevron: the name and cue are one quiet button leading to reciter settings.
+The reciter name above the transport carries a small disclosure
+chevron: Scroll and Mushaf share the same quiet button leading to reciter settings.
 In developer mode a quiet tuning control shares that line. Opening it replaces
 the name with the Ink Lab tabs and selected controls inside the playbar; the
 bar grows only by the panel's measured height, and the reading column clears
 it as it does the return pill. In Mushaf layout, the same control lives in the
-reserved band under the transport; it replaces the reciter name there and the
+reserved band above the transport; it replaces the reciter name there and the
 leaf gives the open panel its measured height. The same control closes the
 panel.
 
