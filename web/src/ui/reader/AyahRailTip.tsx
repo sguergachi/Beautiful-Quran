@@ -9,7 +9,7 @@ type Props = {
   railSide: AyahSelectorSide
   targetCenterY: number
   surfaceWidth: number
-  surfaceHeight: number
+  actionBottom: number
   onDismiss: () => void
   onRenderedChange?: (rendered: boolean) => void
 }
@@ -19,7 +19,7 @@ export function AyahRailTip({
   railSide,
   targetCenterY,
   surfaceWidth,
-  surfaceHeight,
+  actionBottom,
   onDismiss,
   onRenderedChange,
 }: Props) {
@@ -41,7 +41,7 @@ export function AyahRailTip({
       }}
       actionCenter={{
         x: railOnLeft ? Math.max(52, surfaceWidth - 68) : 68,
-        y: Math.max(52, surfaceHeight - 72),
+        y: Math.max(52, actionBottom - 48),
       }}
       contentPadding={{
         start: railOnLeft ? 18 : 32,

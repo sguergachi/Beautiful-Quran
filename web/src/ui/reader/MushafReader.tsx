@@ -14,6 +14,7 @@ import {
 import { createPortal } from 'react-dom'
 import { QuranRepository } from '../../data/repository'
 import { runtimeMushafCache } from '../../data/runtimeMushaf'
+import { readingAppearanceKey } from '../../data/customizePolicy'
 import {
   MUSHAF_LINES_PER_PAGE,
   MUSHAF_OPENING_PAGES,
@@ -53,7 +54,8 @@ import { pileTurnSchedule, playFlip, warmPageTurnSounds } from '../paper/pageTur
 import { clearPagePictures, hasPagePicture, warmPageTurn } from '../paper/pageTurn'
 import { InkEngine, InkState, getTuning, type InkWord } from './InkEngine'
 import { MUSHAF_INK_IDLE, MUSHAF_STILL_INK, mushafMarkWaits, mushafTokenInk, type MushafInk } from './mushafInk'
-import type { MushafToken } from '../../domain/mushafPage'
+import { pageReadingPlace, type MushafToken } from '../../domain/mushafPage'
+import type { AyahRef } from '../../share/gather'
 import { HafsWord } from '../../render/HafsWord'
 import { BASMALAH_PLAYLIST_AYAH } from '../../domain/Basmalah'
 import { createWheelTurn, isSidewaysWheel } from './wheelTurn'
@@ -122,6 +124,8 @@ export function MushafReader({
   ink,
   onPlayWord,
   onHoldWord,
+  onReadingPlace,
+  searchTarget,
 }: {
   glyphWiden: number
   ink: MushafInk
@@ -132,6 +136,8 @@ export function MushafReader({
   openAyah: number
   openRevision: number
   english: boolean
+  onReadingPlace: (place: AyahRef) => void
+  searchTarget: AyahRef | null
   onPlayWord: (surahId: number, ayah: number, position: number) => void
   /** [side] is the page of a spread the word stands on. */
   onHoldWord: (surahId: number, ayah: number, position: number, side?: 'recto' | 'verso') => void
@@ -146,7 +152,8 @@ export function MushafReader({
     setManualPage(null)
   }
   const [ready, setReady] = useState(() => runtimeMushafCache?.layoutReady() ?? false)
-  const spread = useBookSpread()
+  const settings = useAppSelector((state) => state.settings)
+  const spread = useBookSpread(settings.pagePresentation)
   const versoSlot = useVersoLeafSlot()
   const turnSlot = useTurningLeafSlot()
   // Two facing leaves on a desktop spread; one leaf everywhere else.
@@ -181,18 +188,22 @@ export function MushafReader({
       setReady(runtimeMushafCache.layoutReady())
     })
   }, [])
-  // A kept picture is keyed on what the reader passes a leaf. Anything else
-  // a setting changes about a page's look is not known here, so any change
-  // of settings gives every picture a new key.
-  const settings = useAppSelector((state) => state.settings)
-  const look = useRef({ settings, revision: 0 })
-  if (look.current.settings !== settings) look.current = { settings, revision: look.current.revision + 1 }
+  // Every setting except the saved reading/listening positions still gives
+  // a kept picture a new key. Remembering a turn must not discard its pictures.
+  const appearance = useMemo(() => readingAppearanceKey(settings), [settings])
+  const look = useRef({ appearance, revision: 0 })
+  if (look.current.appearance !== appearance) look.current = { appearance, revision: look.current.revision + 1 }
   const [reader] = useState(() => ++readers)
 
   const derived = ready && runtimeMushafCache
     ? runtimeMushafCache.pageOfAyah(activeSurahId, targetAyah)
     : null
   const page = manualPage ?? derived ?? 1
+  useEffect(() => {
+    if (!ready || !searchTarget) return
+    const target = runtimeMushafCache?.pageOfAyah(searchTarget.surahId, searchTarget.ayah)
+    if (target != null) setManualPage(target)
+  }, [ready, searchTarget])
 
   const stackLayer = useAppSelector((state) => state.stackLayer)
   const turn = (delta: number) => {
@@ -410,6 +421,14 @@ export function MushafReader({
 
   const turning = motion != null && !reset
   const settled = reset ? place : queue.settled
+  useEffect(() => {
+    if (!ready || turning || covered || atChapters) return
+    const pages = facing ? [settled, settled + 1] : [settled]
+    const verses = pages.flatMap((page) => runtimeMushafCache?.pageWords(page) ?? [])
+      .map((row) => ({ surahId: row.surah_id, ayah: row.ayah_number }))
+    const reading = pageReadingPlace(verses, searchTarget ?? { surahId: activeSurahId, ayah: targetAyah })
+    if (reading) onReadingPlace(reading)
+  }, [ready, turning, covered, atChapters, facing, settled, activeSurahId, targetAyah, searchTarget, onReadingPlace])
   const landing = turning ? motion.flight.to : settled
   const forward = landing > settled
   const fit = turning ? motion.fit : (mushafFit(settled, facing, fits) ?? 1)
@@ -869,6 +888,7 @@ function MushafLeaf({
   // The two opening leaves carry a few short lines, set in the middle of the
   // well; every other leaf hangs its fifteen lines from the head.
   const lines = opening ? leaf.lines.filter((line) => line.tokens.length > 0) : leaf.lines
+  const firstToken = lines.find((line) => line.tokens.length > 0)?.tokens[0]
   const isLive = live && !english
   const tuning = getTuning()
 
@@ -877,6 +897,7 @@ function MushafLeaf({
       className="mushaf"
       dir={english ? 'ltr' : 'rtl'}
       data-side={side}
+      data-word-group=""
       style={style}
       ref={leafRef}
       onPointerDown={(event) => {
@@ -992,6 +1013,7 @@ function MushafLeaf({
                     ) : (
                       <MushafWord
                         token={token}
+                        tabIndex={token === firstToken ? 0 : -1}
                         ink={wordInk}
                         sweepMs={owner ? InkEngine.sweepMs(ink.activeWord, ink.speed) : null}
                         activation={owner ? (ink.activeWord?.activation ?? 0) : 0}
@@ -1050,11 +1072,13 @@ const MushafWord = memo(function MushafWord({
   activation,
   onPlay,
   onHold,
+  tabIndex,
 }: {
   token: MushafToken
   ink: InkWord
   sweepMs: number | null
   activation: number
+  tabIndex: number
   onPlay: () => void
   onHold: () => void
 }) {
@@ -1068,6 +1092,7 @@ const MushafWord = memo(function MushafWord({
       ink={ink}
       sweepMs={sweepMs}
       activation={activation}
+      tabIndex={tabIndex}
       onPlay={onPlay}
       onHold={onHold}
       onContextMenu={(event) => {
@@ -1078,6 +1103,7 @@ const MushafWord = memo(function MushafWord({
   )
 }, (prev, next) =>
   prev.token === next.token &&
+  prev.tabIndex === next.tabIndex &&
   prev.ink.state === next.ink.state &&
   prev.ink.repeat === next.ink.repeat &&
   prev.sweepMs === next.sweepMs &&

@@ -62,7 +62,7 @@ Add an `EducationMoment` with a versioned preference key in
 `SettingsRepository`. Increment the key suffix when the lesson meaning or
 eligibility changes enough that existing readers should see it again.
 
-Keep all guides behind Developer → **Contextual feature guides** until the
+On Android, keep all guides behind Developer → **Contextual feature guides** until the
 guide system is intentionally enabled for readers. Developer replay must rearm
 the moment without changing feature data.
 
@@ -138,7 +138,7 @@ For every guide, exercise this checklist:
 - Confirm Back and page-scroll dismissal behave as documented.
 - Confirm the interaction works on both physical sides when the target side is
   configurable.
-- Confirm guides remain disabled by default outside the developer gate.
+- On Android, confirm guides remain disabled by default outside the developer gate.
 
 For the existing lessons, the acceptance actions are:
 
@@ -172,3 +172,21 @@ For the existing lessons, the acceptance actions are:
 - `ui/reader/AyahRailTip.kt` — configurable left/right rail lesson.
 - `ui/reader/ReaderScreen.kt` — trigger ownership, real target callbacks,
   completion persistence, Back/scroll dismissal, and overlay lifecycle.
+
+## Browser guides
+
+The web enables its finished lessons for new readers through Settings →
+**Reading help** → **Reading hints**; existing opt-outs remain intact. Developer
+replay rearms the same persisted moments. The rail lesson uses the real rail,
+including tap-to-open and a continuous vertical drag. The saved-bookmark lesson
+is a confirmation: the actual ribbon remains enabled, and removing that bookmark
+dismisses the lesson. It makes no claim about the Android-only note editor.
+A separate inline word-hold hint withdraws after a real root open or gathering
+operation, or **Got it**. The help page remains available after dismissal.
+
+The browser's guide action is positioned above the measured player bar. The
+transport stays inert through the closing animation, so **Got it** cannot play,
+seek or change a voice. The guide takes keyboard focus and restores it after
+dismissal; exposed paper targets remain live. Verify both rail sides, pointer
+success while the wash is visible, keyboard dismissal, and **Got it** above the
+transport on a phone as well as a facing book.

@@ -5,6 +5,7 @@ export type ThemeMode = 'system' | 'light' | 'dark' | 'royal_green'
 export type ReadingMode = 'arabic_english' | 'english_only' | 'arabic_only'
 /** Android `ReadingLayout`. A printed leaf, or the scrolling chapter. */
 export type ReadingLayout = 'scroll' | 'mushaf'
+export type PagePresentation = 'facing' | 'single'
 export type VerseNumberScript = 'arabic' | 'english'
 export type PageNumberScript = 'both' | 'arabic' | 'english'
 export type AyahSelectorSide = 'left' | 'right'
@@ -49,6 +50,8 @@ export interface Settings {
   fontScale: number
   readingMode: ReadingMode
   readingLayout: ReadingLayout
+  /** Facing pages on larger screens, or one enlarged page. */
+  pagePresentation: PagePresentation
   verseNumberScript: VerseNumberScript
   pageNumberScript: PageNumberScript
   showWordGloss: boolean
@@ -59,14 +62,17 @@ export interface Settings {
   /** Continue Listening — last verse actually recited (not mere open/scroll). */
   lastSurah: number
   lastAyah: number
+  /** Last settled reading place, independent of the verse last heard. */
+  lastReadSurah: number
+  lastReadAyah: number
   playbackSpeed: number
   /** Reveals developer tools (e.g. the Ornaments Lab). Off by default. */
   developerMode: boolean
   /** Developer A/B: the ink ladder, or the palette that preceded it. */
   colorSystem: ColorSystem
   /**
-   * Developer-only gate for contextual feature lessons. Off until their
-   * visual language is approved for readers. Enabling rearms every lesson.
+   * One-shot reader lessons. Existing explicit preferences are preserved;
+   * new readers start with hints enabled. Enabling rearms every lesson.
    */
   educationGuidesEnabled: boolean
   /**
@@ -91,6 +97,7 @@ const DEFAULTS: Settings = {
   fontScale: 1,
   readingMode: 'arabic_english',
   readingLayout: 'scroll',
+  pagePresentation: 'facing',
   verseNumberScript: 'arabic',
   pageNumberScript: 'both',
   showWordGloss: true,
@@ -100,10 +107,12 @@ const DEFAULTS: Settings = {
   ayahSelectorSide: 'left',
   lastSurah: 0,
   lastAyah: 1,
+  lastReadSurah: 0,
+  lastReadAyah: 1,
   playbackSpeed: 1,
   developerMode: false,
   colorSystem: 'ladder',
-  educationGuidesEnabled: false,
+  educationGuidesEnabled: true,
   gapless5Playback: true,
   mushafGlyphWiden: 6,
   homeBookmarkStyle: 'top_bound',
@@ -132,6 +141,11 @@ export function normalizeSettings(partial: Partial<Settings> = {}): Settings {
       ? [...new Set(partial.favoriteReciterIds.filter((id) => Number.isInteger(id) && id > 0))]
       : [...DEFAULTS.favoriteReciterIds],
     fontScale: clampFontScale(partial.fontScale ?? DEFAULTS.fontScale),
+    pagePresentation: partial.pagePresentation === 'single' ? 'single' : 'facing',
+    lastReadSurah: Number.isInteger(partial.lastReadSurah) && partial.lastReadSurah! >= 1 && partial.lastReadSurah! <= 114
+      ? partial.lastReadSurah! : 0,
+    lastReadAyah: Number.isInteger(partial.lastReadAyah) && partial.lastReadAyah! >= 1
+      ? partial.lastReadAyah! : 1,
     developerMode: Boolean(partial.developerMode ?? DEFAULTS.developerMode),
     colorSystem: partial.colorSystem === 'legacy' ? 'legacy' : 'ladder',
     educationGuidesEnabled: Boolean(

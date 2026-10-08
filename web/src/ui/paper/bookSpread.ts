@@ -1,4 +1,5 @@
 import { useSyncExternalStore } from 'react'
+import type { PagePresentation } from '../../data/settings'
 import { BOOKMARKS_LAYER, COVER_LAYER, READER_LAYER, SETTINGS_LAYER, type StackLayer } from './stack'
 
 /**
@@ -17,10 +18,14 @@ function subscribe(onChange: () => void): () => void {
   return () => query.removeEventListener('change', onChange)
 }
 
-export function useBookSpread(): boolean {
+export function bookSpreadEnabled(wide: boolean, presentation: PagePresentation): boolean {
+  return wide && presentation === 'facing'
+}
+
+export function useBookSpread(presentation: PagePresentation = 'facing'): boolean {
   return useSyncExternalStore(
     subscribe,
-    () => window.matchMedia(BOOK_SPREAD_QUERY).matches,
+    () => bookSpreadEnabled(window.matchMedia(BOOK_SPREAD_QUERY).matches, presentation),
     () => false,
   )
 }

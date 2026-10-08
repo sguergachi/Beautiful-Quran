@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   applyReadingMode,
+  readingAppearanceKey,
   customizeSummary,
   showsPreviewWordGloss,
   showsWordGlossChrome,
@@ -9,6 +10,21 @@ import {
 import { HOME_BOOKMARK_STYLES, normalizeSettings } from './settings'
 
 describe('favorite reciters', () => {
+  it('keeps page pictures across reading/listening updates and invalidates visual changes', () => {
+    const key = readingAppearanceKey(normalizeSettings())
+    expect(readingAppearanceKey(normalizeSettings({ lastSurah: 2, lastAyah: 255, lastReadSurah: 1, lastReadAyah: 5 }))).toBe(key)
+    expect(readingAppearanceKey(normalizeSettings({ themeMode: 'dark' }))).not.toBe(key)
+    expect(readingAppearanceKey(normalizeSettings({ mushafGlyphWiden: 8 }))).not.toBe(key)
+  })
+
+  it('keeps reading and listening places independent when migrating settings', () => {
+    const settings = normalizeSettings({ lastSurah: 1, lastAyah: 5, lastReadSurah: 2, lastReadAyah: 255, pagePresentation: 'single' })
+    expect([settings.lastSurah, settings.lastAyah]).toEqual([1, 5])
+    expect([settings.lastReadSurah, settings.lastReadAyah]).toEqual([2, 255])
+    expect(normalizeSettings({ lastSurah: 1 }).lastReadSurah).toBe(0)
+    expect(normalizeSettings({ pagePresentation: 'broken' as never }).pagePresentation).toBe('facing')
+  })
+
   it('migrates existing settings to Android\'s original seven without changing the selected voice', () => {
     const settings = normalizeSettings({ reciterId: 9 })
     expect(settings.favoriteReciterIds).toEqual([1, 2, 3, 4, 5, 6, 7])
@@ -71,8 +87,9 @@ describe('colorSystem setting', () => {
 })
 
 describe('educationGuidesEnabled setting', () => {
-  it('defaults off and coerces to boolean', () => {
-    expect(normalizeSettings().educationGuidesEnabled).toBe(false)
+  it('defaults on and preserves explicit opt-outs', () => {
+    expect(normalizeSettings().educationGuidesEnabled).toBe(true)
+    expect(normalizeSettings({ educationGuidesEnabled: false }).educationGuidesEnabled).toBe(false)
     expect(
       normalizeSettings({ educationGuidesEnabled: true }).educationGuidesEnabled,
     ).toBe(true)
