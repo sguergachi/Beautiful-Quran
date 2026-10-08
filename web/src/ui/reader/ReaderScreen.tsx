@@ -195,6 +195,7 @@ export function ReaderScreen({
   const [returnPointUp, setReturnPointUp] = useState(false)
   const [activeExceedsViewport, setActiveExceedsViewport] = useState(false)
   const [searchActive, setSearchActive] = useState(false)
+  const searchInputRef = useRef<HTMLInputElement>(null)
   const [searchQuery, setSearchQuery] = useState('')
   const [searchIndex, setSearchIndex] = useState(0)
   /** Android `showTopTitle` — header scrolled fully off the page. */
@@ -359,7 +360,7 @@ export function ReaderScreen({
     isPlaying: state.player.isPlaying,
     isBuffering: state.player.isBuffering,
   })
-  const receded = recitingActive && !searchActive
+  const receded = recitingActive
   // This sheet is keyed by chapter, so the ref starts false at every opening.
   const recitedSinceOpen = useRef(false)
 
@@ -1225,7 +1226,9 @@ export function ReaderScreen({
         event.stopPropagation()
         togglePlayback()
       }
-      else if (action.type === 'search') setSearchActive(true)
+      else if (action.type === 'search') {
+        if (!recitingActive) setSearchActive(true)
+      }
       else if (mushaf && leafPlace) appStore.toggleBookmarkAt(leafPlace.surahId, leafPlace.ayah)
       else onToggleBookmark(readingAyah)
     }
@@ -1237,6 +1240,7 @@ export function ReaderScreen({
     readingAyah,
     isTop,
     state.rootViewer,
+    recitingActive,
     togglePlayback,
     onToggleBookmark,
     mushaf,
@@ -1249,11 +1253,19 @@ export function ReaderScreen({
     bookmarkTipRendered,
   ])
 
-  const closeSearch = () => {
+  const closeSearch = useCallback(() => {
     setSearchActive(false)
     setSearchQuery('')
     setSearchIndex(0)
-  }
+  }, [])
+
+  useEffect(() => {
+    if (!recitingActive || !searchActive) return
+    searchInputRef.current?.blur()
+    // Match the header's --chrome-recede-ms before removing its field.
+    const timer = window.setTimeout(closeSearch, 520)
+    return () => window.clearTimeout(timer)
+  }, [recitingActive, searchActive, closeSearch])
 
   const stepSearch = (delta: number) => {
     if (searchMatches.length === 0) return
@@ -1481,6 +1493,7 @@ export function ReaderScreen({
           <div className="reader-search">
             <PaperInput
               id="surah-search"
+              inputRef={searchInputRef}
               name="surah-search"
               type="search"
               placeholder="Find an English word…"
