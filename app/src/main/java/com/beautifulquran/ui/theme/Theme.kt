@@ -491,7 +491,9 @@ private val RoyalGreenAccents = QuranAccents(
     greenWash = Color(0xFF133B32),
     embossDark = Color(0x66000000),
     embossLight = Color(0x1FFFFFFF),
-    repeatInk = Color(0xFFFF9359),
+    // Nightfall's deep orange, not a lighter one solved to this sheet: lifted
+    // to match the green's lighter paper it read as a pale peach wash.
+    repeatInk = Color(0xFFFF8948),
     bookmarkRibbon = Color(0xFFFF727B),
     annotationInk = Color(0xFFF4A4B2),
     glintInk = Color(0xFFFFF4D5),

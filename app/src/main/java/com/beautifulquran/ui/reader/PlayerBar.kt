@@ -173,14 +173,15 @@ fun PlayerBar(
                         bottom = 4.dp,
                     ),
             ) {
-                val rangeActive = state.repeatRange != null
+                val repeatActive = state.repeatMode != Player.REPEAT_MODE_OFF || state.repeatRange != null
+                val speedActive = state.speed != 1f
                 val singleAyahRange = state.repeatRange?.let { it.first == it.last } == true
                 IconButton(
                     onClick = onRepeatClick,
                     enabled = enabled,
                     modifier = Modifier
                         .size(48.dp)
-                        .graphicsLayer { alpha = chromeAlpha() },
+                        .graphicsLayer { alpha = if (repeatActive) 1f else chromeAlpha() },
                 ) {
                     Icon(
                         imageVector = if (state.repeatMode == Player.REPEAT_MODE_ONE || singleAyahRange) {
@@ -189,10 +190,10 @@ fun PlayerBar(
                             Icons.Rounded.Repeat
                         },
                         contentDescription = "Repeat",
-                        tint = if (state.repeatMode == Player.REPEAT_MODE_OFF && !rangeActive) {
-                            QuranTheme.ink.furniture
-                        } else {
+                        tint = if (repeatActive) {
                             MaterialTheme.colorScheme.primary
+                        } else {
+                            QuranTheme.ink.furniture
                         },
                         modifier = Modifier.size(22.dp),
                     )
@@ -249,7 +250,7 @@ fun PlayerBar(
                     contentPadding = PaddingValues(0.dp),
                     modifier = Modifier
                         .size(48.dp)
-                        .graphicsLayer { alpha = chromeAlpha() },
+                        .graphicsLayer { alpha = if (speedActive) 1f else chromeAlpha() },
                 ) {
                     Text(
                         text = "${if (state.speed % 1f == 0f) state.speed.toInt() else state.speed}×",
@@ -257,10 +258,10 @@ fun PlayerBar(
                             fontWeight = FontWeight.SemiBold,
                             fontSize = 15.sp,
                         ),
-                        color = if (state.speed == 1f) {
-                            QuranTheme.ink.furniture
-                        } else {
+                        color = if (speedActive) {
                             MaterialTheme.colorScheme.primary
+                        } else {
+                            QuranTheme.ink.furniture
                         },
                     )
                 }

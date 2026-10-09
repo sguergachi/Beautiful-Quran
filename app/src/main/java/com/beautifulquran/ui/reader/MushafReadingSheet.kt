@@ -265,9 +265,8 @@ internal fun MushafReadingSheet(
     val ink = MaterialTheme.colorScheme.onBackground
     val primary = ink.copy(alpha = 0.62f)
     val quiet = ink.copy(alpha = 0.34f)
-    // Reciting, the leaf keeps only what a listener reaches for: back, pause,
-    // forward. Chapters, settings, repeat and speed are for choosing what to
-    // hear, not for hearing it, so they leave the paper until playback stops.
+    // Default choosers recede during recitation. Repeat and speed stay visible
+    // when they alter playback, so the listener can see and change that state.
     val reciting = playerState.isPlaying && isThisSurahLoaded
     // Reciting, the choosers recede almost to nothing rather than blinking out
     // of the row: the same fade the scroll layout gives its chrome, so the
@@ -420,23 +419,24 @@ internal fun MushafReadingSheet(
                 horizontalArrangement = Arrangement.Center,
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                val rangeActive = playerState.repeatRange != null
+                val repeatActive = playerState.repeatMode != Player.REPEAT_MODE_OFF || playerState.repeatRange != null
+                val speedActive = playerState.speed != 1f
                 val singleAyah = playerState.repeatRange?.let { it.first == it.last } == true
                 GutterIcon(
                     onClick = onRepeatClick,
-                    enabled = secondaryEnabled,
+                    enabled = enabled && (!reciting || repeatActive),
                     image = if (playerState.repeatMode == Player.REPEAT_MODE_ONE || singleAyah) {
                         Icons.Rounded.RepeatOne
                     } else {
                         Icons.Rounded.Repeat
                     },
                     label = "Repeat",
-                    tint = if (playerState.repeatMode == Player.REPEAT_MODE_OFF && !rangeActive) {
-                        quiet
-                    } else {
+                    tint = if (repeatActive) {
                         MaterialTheme.colorScheme.primary
+                    } else {
+                        quiet
                     },
-                    modifier = Modifier.graphicsLayer { alpha = secondaryFade },
+                    modifier = Modifier.graphicsLayer { alpha = if (repeatActive) 1f else secondaryFade },
                 )
                 GutterIcon(
                     onClick = onFastBackward,
@@ -483,10 +483,10 @@ internal fun MushafReadingSheet(
                     modifier = Modifier
                         .width(MushafGutterSlot)
                         .fillMaxHeight()
-                        .graphicsLayer { alpha = secondaryFade }
+                        .graphicsLayer { alpha = if (speedActive) 1f else secondaryFade }
                         .then(
                             // Faded out of sight, and out of reach with it.
-                            if (secondaryEnabled) {
+                            if (enabled && (!reciting || speedActive)) {
                                 Modifier.ownedQuietClickable(role = Role.Button, onClick = onSpeed)
                             } else {
                                 Modifier
@@ -497,7 +497,7 @@ internal fun MushafReadingSheet(
                     Text(
                         text = "${if (playerState.speed % 1f == 0f) playerState.speed.toInt() else playerState.speed}×",
                         style = MaterialTheme.typography.labelSmall,
-                        color = if (playerState.speed == 1f) quiet else MaterialTheme.colorScheme.onBackground,
+                        color = if (speedActive) MaterialTheme.colorScheme.onBackground else quiet,
                         textAlign = TextAlign.Center,
                     )
                 }

@@ -65,7 +65,7 @@ import {
 } from '../share/gather'
 import { renderShareCard } from '../share/shareImage'
 import type { ReaderOpenIntent } from '../ui/reader/readerOpening'
-import { BOOK_SPREAD_QUERY, leavesReader, readerVisible } from '../ui/paper/bookSpread'
+import { BOOK_SPREAD_QUERY, bookSpreadEnabled, leavesReader, readerVisible } from '../ui/paper/bookSpread'
 
 export type Sheet = 'bookmarks' | 'home' | 'reader' | 'settings'
 
@@ -143,6 +143,7 @@ export interface AppState {
    * ([settings.lastSurah] / [settings.lastAyah]).
    */
   openAyah: number
+  readingPlace: AyahRef | null
   /** Bumps for each explicit reader open, including a bookmark in the current surah. */
   readerOpenRevision: number
   readerOpenIntent: ReaderOpenIntent
@@ -252,6 +253,7 @@ class AppStore {
     rootViewerClosing: false,
     followEnabled: true,
     openAyah: 1,
+    readingPlace: null,
     readerOpenRevision: 0,
     readerOpenIntent: 'chapter',
     pendingSearchFlash: null,
@@ -366,7 +368,7 @@ class AppStore {
     const stackLayer = Math.max(min, Math.min(max, Math.round(layer))) as StackLayer
     const sheet = deriveSheet(stackLayer, this.hasReader())
     const leave = onLeaveReaderSheet(this.state.gathering && leavesReader(
-      window.matchMedia(BOOK_SPREAD_QUERY).matches,
+      bookSpreadEnabled(window.matchMedia(BOOK_SPREAD_QUERY).matches, this.state.settings.pagePresentation),
       this.state.stackLayer, stackLayer, this.hasReader(),
     ))
     this.set({
@@ -384,7 +386,7 @@ class AppStore {
       return
     }
     if (this.state.gathering && readerVisible(
-      window.matchMedia(BOOK_SPREAD_QUERY).matches, this.state.stackLayer, this.hasReader(),
+      bookSpreadEnabled(window.matchMedia(BOOK_SPREAD_QUERY).matches, this.state.settings.pagePresentation), this.state.stackLayer, this.hasReader(),
     )) {
       this.exitGather()
       return
@@ -566,6 +568,7 @@ class AppStore {
   }
 
   updateSettings(patch: Partial<Settings>) {
+    const layoutChanged = patch.readingLayout != null && patch.readingLayout !== this.state.settings.readingLayout
     const settings = normalizeSettings({ ...this.state.settings, ...patch })
     saveSettings(settings)
     this.set({ settings })
@@ -576,6 +579,12 @@ class AppStore {
     if (patch.reciterId != null && this.state.content) {
       const reciter = this.state.reciters.find((r) => r.id === patch.reciterId)
       if (reciter) void this.reloadTimingsAndReciter(reciter)
+    }
+    if (layoutChanged && this.state.content && this.state.readingPlace) {
+      const { surahId, ayah } = this.state.readingPlace
+      const layer = this.state.stackLayer
+      this.openReading(surahId, ayah)
+      this.setStackLayer(layer)
     }
   }
 
@@ -642,6 +651,18 @@ class AppStore {
     this.openSurah(surahId, ayah, undefined, undefined, [], 'reading')
   }
 
+  /** Remember settled paper without moving the listening clock or loading audio. */
+  rememberReading = (place: AyahRef) => {
+    const surah = this.state.surahs.find((item) => item.id === place.surahId)
+    if (!surah || !Number.isInteger(place.ayah) || place.ayah < 1 || place.ayah > surah.ayahCount) return
+    const previous = this.state.readingPlace
+    const settings = this.state.settings
+    if (previous?.surahId === place.surahId && previous.ayah === place.ayah &&
+      settings.lastReadSurah === place.surahId && settings.lastReadAyah === place.ayah) return
+    this.updateSettings({ lastReadSurah: place.surahId, lastReadAyah: place.ayah })
+    this.set({ readingPlace: place })
+  }
+
   openSurah(
     surahId: number,
     ayah = 1,
@@ -686,6 +707,7 @@ class AppStore {
         stackLayer: READER_LAYER,
         sheet: 'reader',
         openAyah,
+        readingPlace: { surahId, ayah: openAyah },
         readerOpenRevision,
         readerOpenIntent,
         followEnabled: true,
@@ -717,6 +739,7 @@ class AppStore {
       sheet: 'reader',
       content,
       openAyah,
+      readingPlace: { surahId, ayah: openAyah },
       readerOpenRevision,
       readerOpenIntent,
       hasTimings: false,

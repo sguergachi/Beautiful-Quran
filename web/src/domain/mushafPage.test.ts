@@ -5,6 +5,7 @@ import {
   mushafFacingPages,
   mushafTokenEndsAyah,
   pageAyahs,
+  pageReadingPlace,
 } from './mushafPage'
 
 describe('spanned words', () => {
@@ -48,6 +49,13 @@ describe('mushaf page', () => {
 })
 
 describe('mushafFacingPages', () => {
+  it('keeps a linked verse on its leaf, then follows a manual turn into another chapter', () => {
+    const opened = { surahId: 1, ayah: 5 }
+    expect(pageReadingPlace([{ surahId: 1, ayah: 1 }, opened], opened)).toEqual(opened)
+    expect(pageReadingPlace([{ surahId: 2, ayah: 6 }, { surahId: 2, ayah: 7 }], opened)).toEqual({ surahId: 2, ayah: 6 })
+    expect(pageReadingPlace([], opened)).toBeNull()
+  })
+
   it('stands the odd page on the right and the next on the left', () => {
     expect(mushafFacingPages(1)).toEqual({ right: 1, left: 2 })
     expect(mushafFacingPages(2)).toEqual({ right: 1, left: 2 })

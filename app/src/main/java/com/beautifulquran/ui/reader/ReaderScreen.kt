@@ -1607,6 +1607,15 @@ fun ReaderScreen(
     LaunchedEffect(search.active) {
         if (search.active) searchFocus.requestFocus() else keyboard?.hide()
     }
+    LaunchedEffect(recitingActive, search.active) {
+        if (recitingActive && search.active) {
+            focusManager.clearFocus()
+            keyboard?.hide()
+            // Keep the field on the page until the header's ink has faded.
+            delay(ChromeRecedeMs.toLong())
+            search.close()
+        }
+    }
     val bookmarkTipSide = if (settings.ayahSelectorSide == AyahSelectorSide.RIGHT) {
         AyahSelectorSide.LEFT
     } else {
@@ -1693,7 +1702,7 @@ fun ReaderScreen(
                 if (mushafMode) 0.dp else ScrollGrid.MARGIN - ScrollGrid.TOP_BAR_END_INK
             CenterAlignedTopAppBar(
                 modifier = Modifier.graphicsLayer {
-                    alpha = if (search.active) 1f else topBarAlpha.value
+                    alpha = topBarAlpha.value
                 },
                 title = {
                     if (search.active) {

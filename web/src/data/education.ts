@@ -5,10 +5,11 @@
  * rearm lessons without rewriting every Settings field.
  */
 
-export type EducationMoment = 'bookmark_note' | 'ayah_rail'
+export type EducationMoment = 'bookmark_saved' | 'ayah_rail' | 'word_hold'
 
 const DISMISS_KEYS: Record<EducationMoment, string> = {
-  bookmark_note: 'beautiful-quran-education-bookmark-note-v1',
+  word_hold: 'beautiful-quran-education-word-hold-v1',
+  bookmark_saved: 'beautiful-quran-education-bookmark-saved-v2',
   ayah_rail: 'beautiful-quran-education-ayah-rail-v1',
 }
 
@@ -59,32 +60,24 @@ export function rearmEducation(): void {
 
 /** Whether a settled chapter opening should teach its live ayah rail. */
 export function shouldShowAyahRailTip(opts: {
-  developerMode: boolean
   educationGuidesEnabled: boolean
 }): boolean {
   return (
-    opts.developerMode &&
     opts.educationGuidesEnabled &&
     !isEducationDismissed('ayah_rail')
   )
 }
 
 /**
- * Whether the first bookmark add should teach the note gesture.
- *
- * Android also requires annotationsEnabled; web annotations are still pending,
- * so the tip is offered whenever guides are gated on — same discoverability
- * surface once notes land on the ribbon.
+ * Confirm the first saved bookmark and explain where its saved passages live.
  */
-export function shouldShowBookmarkNoteTip(opts: {
-  developerMode: boolean
+export function shouldShowBookmarkTip(opts: {
   educationGuidesEnabled: boolean
   nowBookmarked: boolean
 }): boolean {
   return (
     opts.nowBookmarked &&
-    opts.developerMode &&
     opts.educationGuidesEnabled &&
-    !isEducationDismissed('bookmark_note')
+    !isEducationDismissed('bookmark_saved')
   )
 }
