@@ -531,8 +531,17 @@ private fun analysisValueStyle(
 private fun Modifier.tightenHafsTopBearing(crop: Dp): Modifier {
     if (crop <= 0.dp) return this
     return layout { measurable, constraints ->
-        val placeable = measurable.measure(constraints)
-        val cut = crop.roundToPx().coerceIn(0, placeable.height / 2)
+        val cropPx = crop.roundToPx()
+        // A fixed-height parent (the lemma rows use IntrinsicSize.Min) hands
+        // us the already-cropped height. Give the text that height back, or
+        // it reports overflow and TextOverflow.Clip shears off the descenders.
+        val inner = if (constraints.hasBoundedHeight) {
+            constraints.copy(maxHeight = constraints.maxHeight + cropPx)
+        } else {
+            constraints
+        }
+        val placeable = measurable.measure(inner)
+        val cut = cropPx.coerceIn(0, placeable.height / 2)
         layout(placeable.width, placeable.height - cut) {
             placeable.placeRelative(0, -cut)
         }
