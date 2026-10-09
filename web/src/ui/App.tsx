@@ -4,6 +4,7 @@ import {
   BOOKMARKS_LAYER,
   COVER_LAYER,
   READER_LAYER,
+  SETTINGS_LAYER,
   hasReaderOpen,
   showPinnedChapterBar,
   type StackLayer,
@@ -88,6 +89,16 @@ export function App() {
   useVerseRoute(state.ready, state.readingPlace, state.readerOpenRevision, () => setEntranceDone(true))
   const swipeStart = useRef<{ x: number; y: number; pointerId: number; layer: StackLayer; field: boolean } | null>(null)
   const stack = state.stackLayer
+  // The layer the deck last settled from, so Chapters ↔ Settings can skip
+  // the reader sheet between them instead of sweeping it across the page.
+  const settledStack = useRef(stack)
+  const fromStack = useRef(stack)
+  if (settledStack.current !== stack) {
+    fromStack.current = settledStack.current
+    settledStack.current = stack
+  }
+  const skipReader = (fromStack.current <= COVER_LAYER && stack === SETTINGS_LAYER) ||
+    (fromStack.current === SETTINGS_LAYER && stack <= COVER_LAYER)
   const hasReader = hasReaderOpen(state.content, state.sheet)
   const playbackPinned = useAppSelector((s) =>
     showPinnedChapterBar({
@@ -191,6 +202,7 @@ export function App() {
       data-has-reader={hasReader}
       data-spread={spread ? 'true' : undefined}
       data-playback-pinned={playbackPinned && !spread ? 'true' : undefined}
+      data-skip-reader={skipReader ? 'true' : undefined}
       data-leaves={leaves ? 'true' : undefined}
       data-booting={showStack ? undefined : 'true'}
       onPointerDown={beginBookmarkSwipe}
