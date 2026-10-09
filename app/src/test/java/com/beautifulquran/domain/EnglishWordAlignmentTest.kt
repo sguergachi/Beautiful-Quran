@@ -4,6 +4,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import kotlin.math.roundToInt
 
 /**
  * The alignment is what makes the English leaf's ink land on the words the
@@ -120,10 +121,70 @@ class EnglishWordAlignmentTest {
     @Test
     fun `an inflected match still anchors`() {
         // "revealed" / "reveals", "heaven" / "heavens": the two texts differ by
-        // an ending, and a four-letter opening is enough to tie them.
+        // an ending, which must still match without the old four-letter shortcut.
         val text = "He reveals the heavens"
         val ends = EnglishWordAlignment.wordEnds(text, listOf("He", "revealed", "the heaven"))!!
         assertEquals("He reveals", text.substring(0, (ends[1] * text.length).toInt()))
+    }
+
+    @Test
+    fun `a reordered first word can wait without revealing its first letters`() {
+        val text = "Allah has set a seal"
+        val ends = EnglishWordAlignment.wordEnds(text, listOf("has set a seal", "Allah"))!!
+        assertEquals(0f, ends[0], 0f)
+        assertEquals(2, englishSeekWordPosition(2f / text.length, ends.size, ends))
+    }
+
+    @Test
+    fun `similar openings cannot trade hearing for hearts or messages for messengers`() {
+        for ((text, glosses, target) in listOf(
+            Triple("Their hearing in their hearts is sound", listOf("their hearts", "in it", "their hearing", "sound"), "hearing"),
+            Triple("The messages came to messengers", listOf("messengers", "to them", "messages"), "messages"),
+        )) {
+            val ends = EnglishWordAlignment.wordEnds(text, glosses)!!
+            val at = (text.indexOf(target) + 2f) / text.length
+            assertEquals(text, 3, englishSeekWordPosition(at, ends.size, ends))
+        }
+    }
+
+    @Test
+    fun `apostrophes and possessives keep the same lexical anchors`() {
+        val text = "They read the Qur’an with Allah’s servants"
+        val ends = EnglishWordAlignment.wordEnds(text, listOf("They", "read", "the Quran", "with Allah", "slaves"))!!
+        for ((target, position) in listOf("Qur’an" to 3, "Allah’s" to 4, "servants" to 5)) {
+            assertEquals(target, position, englishSeekWordPosition((text.indexOf(target) + 2f) / text.length, ends.size, ends))
+        }
+    }
+
+    @Test
+    fun `corpus regressions hold unheard content without stealing a different occurrence`() {
+        // Shipped Saheeh International verses and the corresponding QF glosses.
+        // '=' names a spoken owner; '<=' protects an earlier, different meaning
+        // or translator aside from being dragged to a late literal match.
+        val cases = javaClass.getResourceAsStream("/english-alignment.tsv")!!
+            .bufferedReader().use { it.readLines() }
+        for (line in cases) {
+            val (verse, text, glossText, targets) = line.split('\t')
+            val glosses = glossText.split('|')
+            val ends = EnglishWordAlignment.wordEnds(text, glosses)!!
+            val boundaries = ends.map { (it * text.length).roundToInt() }
+            assertEquals(verse, glosses.size, ends.size)
+            assertEquals(verse, text.length, boundaries.last())
+            assertTrue(verse, boundaries.zipWithNext().all { (a, b) -> a <= b })
+            for (at in boundaries) {
+                assertTrue("$verse splits a word at $at", at == 0 || at == text.length ||
+                    !text[at - 1].isLetter() || !text[at].isLetter())
+            }
+            for (target in targets.split('|')) {
+                val match = Regex("(.+?)(<=|=)(\\d+)").matchEntire(target)!!
+                val (word, operator, expected) = match.destructured
+                val token = Regex("\\b${Regex.escape(word)}\\b", RegexOption.IGNORE_CASE).find(text)!!
+                val at = (token.range.first + word.length / 2f) / text.length
+                val actual = englishSeekWordPosition(at, ends.size, ends)
+                if (operator == "=") assertEquals("$verse $word", expected.toInt(), actual)
+                else assertTrue("$verse $word moved to $actual", actual <= expected.toInt())
+            }
+        }
     }
 
     @Test
