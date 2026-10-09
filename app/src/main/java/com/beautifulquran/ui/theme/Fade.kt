@@ -687,6 +687,8 @@ fun Modifier.shapedWordBloom(
                             overhangPx = bleed,
                             ink = ink,
                             grainLevels = if (layer == 0) GLOW_VEIL_GRAIN else 0f,
+                            // No light on the words around this one.
+                            reachPx = bloom.glowRadius.dp.toPx(),
                         ) ?: continue
                         val glowColor = if (layer == 0 && bloom.veilColor != Color.Unspecified) {
                             bloom.veilColor
@@ -1347,6 +1349,68 @@ internal fun ditherAlphaMask(pixels: ByteArray, levels: Float) {
     }
 }
 
+/**
+ * Fades a glow mask to nothing within [reach] of the word's own ink box
+ * ([left]..[right] x [top]..[bottom], mask pixels). The widest glow blurs
+ * out ~45 dp, over the read words on either side and the lines above and
+ * below; lifting their paper took their contrast and read as a smoky shadow
+ * on dry text. The light belongs to the word being said. Smoothstep, so the
+ * glow still ends softly and never on a box edge (docs/GLIMMER.md).
+ */
+internal fun confineAlphaMask(
+    pixels: ByteArray,
+    rowBytes: Int,
+    width: Int,
+    height: Int,
+    left: Int,
+    top: Int,
+    right: Int,
+    bottom: Int,
+    reach: Float,
+) {
+    if (reach <= 0f) return
+    for (y in 0 until height) {
+        val dy = maxOf(top - y, y - bottom, 0).toFloat()
+        for (x in 0 until width) {
+            val i = y * rowBytes + x
+            val v = pixels[i].toInt() and 0xFF
+            if (v == 0) continue
+            val dx = maxOf(left - x, x - right, 0).toFloat()
+            val t = (kotlin.math.sqrt(dx * dx + dy * dy) / reach).coerceIn(0f, 1f)
+            val keep = 1f - t * t * (3f - 2f * t)
+            pixels[i] = (v * keep).roundToInt().toByte()
+        }
+    }
+}
+
+private fun Bitmap.confined(box: android.graphics.Rect, reach: Float): Bitmap = runCatching {
+    val out = if (isMutable) this else copy(Bitmap.Config.ALPHA_8, true)
+    val bytes = ByteArray(out.rowBytes * out.height)
+    val buffer = java.nio.ByteBuffer.wrap(bytes)
+    out.copyPixelsToBuffer(buffer)
+    confineAlphaMask(bytes, out.rowBytes, out.width, out.height, box.left, box.top, box.right, box.bottom, reach)
+    buffer.rewind()
+    out.copyPixelsFromBuffer(buffer)
+    out
+}.getOrDefault(this)
+
+/** Bounds of the pixels the glyphs actually inked, or null if none. */
+private fun Bitmap.inkExtent(): android.graphics.Rect? {
+    val row = IntArray(width)
+    var l = width; var t = height; var r = -1; var b = -1
+    for (y in 0 until height) {
+        getPixels(row, 0, width, 0, y, width, 1)
+        for (x in 0 until width) {
+            if ((row[x] ushr 24) == 0) continue
+            if (x < l) l = x
+            if (x > r) r = x
+            if (y < t) t = y
+            b = y
+        }
+    }
+    return if (r < 0) null else android.graphics.Rect(l, t, r, b)
+}
+
 private fun Bitmap.grained(levels: Float): Bitmap = runCatching {
     val out = if (isMutable) this else copy(Bitmap.Config.ALPHA_8, true)
     val bytes = ByteArray(out.rowBytes * out.height)
@@ -1365,6 +1429,7 @@ private class GlyphHaloCache {
         val radiusBits: Int,
         val clipped: Boolean,
         val grained: Boolean,
+        val reachBits: Int,
     )
 
     data class Halo(
@@ -1403,13 +1468,18 @@ private class GlyphHaloCache {
         overhangPx: Float,
         ink: WordInkCache.WordInk? = null,
         grainLevels: Float = 0f,
+        /** How far past the word's own ink the light may reach; see [confineAlphaMask]. */
+        reachPx: Float = 0f,
     ): Halo? {
         if (radiusPx <= 0f) return null
         if (layout !== textLayout) {
             layout = textLayout
             byRange.clear()
         }
-        val key = Key(start, endExclusive, radiusPx.toBits(), clipPath != null || ink != null, grainLevels > 0f)
+        val key = Key(
+            start, endExclusive, radiusPx.toBits(), clipPath != null || ink != null, grainLevels > 0f,
+            reachPx.toBits(),
+        )
         byRange[key]?.let { return it }
 
         val bounds = if (ink != null) {
@@ -1452,9 +1522,16 @@ private class GlyphHaloCache {
             },
             offset,
         )
+        val inked = if (reachPx > 0f) glyphs.inkExtent() else null
         glyphs.recycle()
+        val confined = if (inked != null) {
+            inked.offset(-offset[0], -offset[1])
+            blurred.confined(inked, reachPx)
+        } else {
+            blurred
+        }
         return Halo(
-            bitmap = if (grainLevels > 0f) blurred.grained(grainLevels) else blurred,
+            bitmap = if (grainLevels > 0f) confined.grained(grainLevels) else confined,
             left = (left + offset[0]).toFloat(),
             top = (top + offset[1]).toFloat(),
         ).also { byRange[key] = it }
