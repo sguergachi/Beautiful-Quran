@@ -373,7 +373,14 @@ internal object MushafInkProfiles {
             val face = faces[typeface]
             if (face != null && face.containsKey(text)) return face[text]
         }
-        val profile = rasters.get()!!.measure(typeface, text)
+        val raster = rasters.get()!!
+        val profile = try {
+            raster.measure(typeface, text)
+        } finally {
+            // The raster outlives this call on its thread; a face left on its
+            // paint would be pinned there and defeat the weak [faces] map.
+            raster.release()
+        }
         synchronized(faces) {
             faces.getOrPut(typeface) { HashMap() }[text] = profile
         }
@@ -390,6 +397,11 @@ private class ProfileRaster {
     private val bounds = Rect()
     private var scratch: Bitmap? = null
     private var pixels: IntArray = IntArray(0)
+
+    /** Drops the last face measured, so only [MushafQcfFonts] keeps it alive. */
+    fun release() {
+        paint.typeface = null
+    }
 
     fun measure(typeface: Typeface, text: String): MushafInkProfile? {
         paint.typeface = typeface

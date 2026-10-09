@@ -109,9 +109,14 @@ fun mushafMedallionChords(rows: Int): FloatArray {
     }
 }
 
-/** A short row must actually end its chapter, except on the two opening medallions. */
+/**
+ * A short row must actually end its chapter. Never on the two opening
+ * medallions: their rows fill the chord of the circle they are set in
+ * ([mushafMedallionChords]), and a row let stand short there — their last
+ * rows end their chapters too — flattened the circle's edge.
+ */
 fun mushafLineMayStandShort(page: Int, last: MushafToken?, surahAyahCount: Int?): Boolean =
-    mushafIsOpeningLeaf(page) || last?.let { it.endsAyah && it.ayah == surahAyahCount } == true
+    !mushafIsOpeningLeaf(page) && last?.let { it.endsAyah && it.ayah == surahAyahCount } == true
 
 /**
  * Slots to divide the text well by. A full page fills it; a short page
@@ -421,9 +426,16 @@ fun mushafGapSpacingPx(
     pageWidthPx: Float,
     gapCount: Int,
     fontPx: Float = 0f,
+    /**
+     * Whether the line may stand short — the same permission the QCF fit
+     * takes ([mushafLineMayStandShort]). A row that may not fills its measure
+     * whatever the gap, so a leaf lays out the same before its page face has
+     * loaded as after.
+     */
+    allowShort: Boolean = true,
 ): Float {
     if (gapCount <= 0 || pageWidthPx <= naturalWidthPx) return 0f
     val raw = (pageWidthPx - naturalWidthPx) / gapCount
-    if (fontPx <= 0f) return raw
+    if (fontPx <= 0f || !allowShort) return raw
     return raw.coerceAtMost(fontPx * MUSHAF_MAX_GAP_EM)
 }

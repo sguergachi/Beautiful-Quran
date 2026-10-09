@@ -177,6 +177,7 @@ internal fun MushafHafsLine(
                 pageWidthPx = measureWidthPx,
                 gapCount = (line.tokens.size - 1).coerceAtLeast(0),
                 fontPx = with(density) { fontSize.toPx() },
+                allowShort = allowShort,
             )
         }
         val gapSp = with(density) { gapPx.toSp() }
@@ -637,6 +638,25 @@ private fun mushafLineJoins(
     return List(texts.size - 1) { i ->
         mushafInkJoin(profiles[i], profiles[i + 1], texts[i].mark || texts[i + 1].mark)
     }
+}
+
+/**
+ * The narrowest [line] can be set at [fontPx]: its letters narrowed to
+ * [MUSHAF_MIN_LINE_SCALE] and every join at its fit floor — the width below
+ * which [mushafInkLineFit] gives up and the line runs past its measure. Null
+ * until the page face has loaded, when there are no joins to measure.
+ */
+internal fun mushafLineMinWidthPx(
+    line: MushafLine,
+    typeface: android.graphics.Typeface?,
+    fontPx: Float,
+): Float? {
+    if (typeface == null || fontPx <= 0f) return null
+    val texts = mushafLineTexts(line)
+    val ink = mushafLineCells(texts.map { it.text }, typeface, fontPx, condense = 1f)
+        .sumOf { it.inkWidth.toDouble() }.toFloat()
+    val tight = mushafLineJoins(texts, typeface).sumOf { it.fitFloorEm.toDouble() }.toFloat() * fontPx
+    return ink * MUSHAF_MIN_LINE_SCALE + tight
 }
 
 /** Rasterizes a leaf's ink joins before that leaf reaches composition. */

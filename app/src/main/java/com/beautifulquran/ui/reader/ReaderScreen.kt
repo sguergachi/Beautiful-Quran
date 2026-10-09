@@ -1127,8 +1127,12 @@ fun ReaderScreen(
         val catalog = mushafCatalog ?: return null
         val englishLeaf = englishBook?.leaf(mushafPagerState.currentPage)
         val leaf = catalog.page(leafPage(mushafPagerState.currentPage)) ?: return null
+        // A scrub names a chapter, not a verse: a paused verse of that same
+        // chapter on this leaf is still a resume, as on the English leaf.
+        val heldHere = isThisSurahPlaying && activeAyah?.let { (renderedSurahId to it) in leaf.ayahKeys } == true
         val scrubbedSurah = mushafSeekSurahId?.takeIf { sid ->
             englishLeaf == null &&
+                !(heldHere && sid == renderedSurahId) &&
                 (leaf.surahStarts.any { it.surahId == sid } || leaf.ayahKeys.any { it.first == sid })
         }
         if (scrubbedSurah != null) {

@@ -90,6 +90,7 @@ import com.beautifulquran.domain.qcfTrailingMark
 import com.beautifulquran.domain.qcfWordGlyphs
 import com.beautifulquran.ui.reader.AyahNumberMark
 import com.beautifulquran.ui.reader.MushafRunningHead
+import com.beautifulquran.ui.reader.mushafHeadStyle
 import com.beautifulquran.ui.reader.MushafCell
 import com.beautifulquran.ui.reader.MushafQcfFonts
 import com.beautifulquran.ui.reader.PageBreak
@@ -775,7 +776,7 @@ private fun PreviewLeafRunningHead(pageNumberScript: PageNumberScript) {
     ) { text, align, labelModifier ->
         Text(
             text = text,
-            style = style,
+            style = mushafHeadStyle(style, text),
             color = ink,
             textAlign = align,
             maxLines = 1,

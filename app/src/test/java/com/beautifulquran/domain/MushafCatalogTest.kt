@@ -138,7 +138,9 @@ class MushafCatalogTest {
         assertTrue(!mushafLineMayStandShort(4, last, surahAyahCount = 286))
         assertTrue(mushafLineMayStandShort(4, last, surahAyahCount = 17))
         assertTrue(!mushafLineMayStandShort(4, last.copy(endsAyah = false), surahAyahCount = 17))
-        assertTrue(mushafLineMayStandShort(1, last, surahAyahCount = 286))
+        // The opening medallions fill their chords, chapter ending or not.
+        assertTrue(!mushafLineMayStandShort(1, last, surahAyahCount = 286))
+        assertTrue(!mushafLineMayStandShort(1, last, surahAyahCount = 17))
     }
 
     @Test

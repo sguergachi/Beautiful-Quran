@@ -126,6 +126,8 @@ class MushafCatalog internal constructor(
     private val pagesByNumber: Map<Int, MushafPage>,
     private val firstPageBySurah: IntArray,
     private val pageByWord: Map<Long, Int>,
+    /** Each verse's last word position — its word count — by [ayahKey]. */
+    private val wordsByAyah: Map<Long, Int> = emptyMap(),
 ) {
     val pageCount: Int = MUSHAF_PAGE_COUNT
 
@@ -158,11 +160,7 @@ class MushafCatalog internal constructor(
     ): Int = pageOf(surahId, ayah, if (wholeVerses) 1 else position)
 
     /** How many words the mushaf sets for a verse; 0 when it has none. */
-    fun wordCountOf(surahId: Int, ayah: Int): Int {
-        var count = 0
-        while (pageByWord.containsKey(quranWordKey(surahId, ayah, count + 1))) count++
-        return count
-    }
+    fun wordCountOf(surahId: Int, ayah: Int): Int = wordsByAyah[ayahKey(surahId, ayah)] ?: 0
 
     fun pageOf(surahId: Int, ayah: Int, position: Int = 1): Int {
         pageByWord[quranWordKey(surahId, ayah, position)]?.let { return it }
@@ -226,7 +224,7 @@ fun buildMushafCatalog(words: List<MushafSourceWord>): MushafCatalog {
         pages[pageNumber] = MushafPage(pageNumber, lines, surahStarts)
     }
 
-    return MushafCatalog(pages, firstPageBySurah, pageByWord)
+    return MushafCatalog(pages, firstPageBySurah, pageByWord, lastPosition)
 }
 
 private fun ayahKey(surahId: Int, ayah: Int): Long =

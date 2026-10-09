@@ -3,6 +3,7 @@ package com.beautifulquran.ui.reader
 import android.graphics.Paint
 import android.graphics.Typeface
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
@@ -156,8 +157,27 @@ internal fun MushafSurahTitleBand(
     val titleSize = fontSize * if (latin) MushafLatinTitleScale else MushafArabicTitleScale
     val resolvedTypeface by LocalFontFamilyResolver.current.resolve(family)
     val density = LocalDensity.current
-    val fontPx = with(density) { titleSize.toPx() }
+    val naturalPx = with(density) { titleSize.toPx() }
     val bandPx = with(density) { bandHeight.toPx() }
+    BoxWithConstraints(
+        modifier = modifier.fillMaxWidth().height(bandHeight),
+        contentAlignment = Alignment.Center,
+    ) {
+    // The window around the name grows with it only so far: past the room
+    // between the band's ends it would run over the rules and the shamsas. A
+    // name too long for that (a long transliteration on a narrow phone or at a
+    // large font scale) is set down until it fits, never let through.
+    val roomPx = bannerNameRoomPx(style, constraints.maxWidth.toFloat(), bandPx)
+    val fontPx = remember(resolvedTypeface, naturalPx, latin, name, roomPx) {
+        val probe = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            typeface = resolvedTypeface as Typeface
+            textSize = naturalPx
+            if (latin) letterSpacing = TitleLetterSpacingEm
+        }
+        val natural = probe.measureText(name)
+        if (natural <= 0f || natural <= roomPx) naturalPx else naturalPx * (roomPx / natural).coerceAtLeast(0.5f)
+    }
+    val titleSizeFit = with(density) { fontPx.toSp() }
     val paint = remember(resolvedTypeface, fontPx, latin) {
         Paint(Paint.ANTI_ALIAS_FLAG).apply {
             typeface = resolvedTypeface as Typeface
@@ -168,10 +188,6 @@ internal fun MushafSurahTitleBand(
     val drop = remember(paint, latin, bandPx) { titleBaselineDrop(paint, latin, bandPx) }
     val advance = remember(paint, name) { paint.measureText(name) }
 
-    Box(
-        modifier = modifier.fillMaxWidth().height(bandHeight),
-        contentAlignment = Alignment.Center,
-    ) {
         // The ground is laid once and mirrored at the fold, so the panel is
         // symmetrical about its own centre — a tiling cut by the two ends at
         // whatever phase it happened to reach is not. Each style then decides
@@ -208,7 +224,7 @@ internal fun MushafSurahTitleBand(
                     name = name,
                     latin = latin,
                     family = family,
-                    fontSize = titleSize,
+                    fontSize = titleSizeFit,
                     drop = drop,
                     ink = accents.gold,
                     modifier = Modifier.padding(horizontal = bandHeight * 0.10f),
@@ -220,6 +236,17 @@ internal fun MushafSurahTitleBand(
 }
 
 private const val TitleLetterSpacingEm = 0.06f
+
+/**
+ * The widest name the band's window can hold without reaching its rules — the
+ * inverse of each style's window width in [bannerIllumination]: the cartouche
+ * caps its window at `w - 2.2h` around `advance + 1.1h`, the cloud at `w - 2h`
+ * around `advance + 0.7h`.
+ */
+private fun bannerNameRoomPx(style: MushafBannerStyle, w: Float, h: Float): Float = when (style) {
+    MushafBannerStyle.CARTOUCHE -> w - 3.3f * h
+    MushafBannerStyle.CLOUD -> w - 2.7f * h
+}.coerceAtLeast(h)
 
 /**
  * Where the baseline sits below the band's centre, in px — the same for every

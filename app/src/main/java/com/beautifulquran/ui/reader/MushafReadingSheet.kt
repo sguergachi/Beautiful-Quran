@@ -1,5 +1,6 @@
 package com.beautifulquran.ui.reader
 
+import com.beautifulquran.ui.theme.HafsFontFamily
 import com.beautifulquran.ui.theme.quietClickable
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.animateFloatAsState
@@ -45,6 +46,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.TextUnit
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.em
 import androidx.compose.ui.unit.sp
@@ -444,16 +446,21 @@ internal fun MushafReadingSheet(
                             .padding(start = 40.dp),
                     )
                 } else if (reciterName.isNotEmpty()) {
+                    // An error stands in for the name and is never faded with
+                    // it: a stream that fails mid-recitation can arrive while
+                    // the reading still counts as reciting, and the notice is
+                    // the only place the reader learns why the voice stopped.
+                    val notice = playerState.error
                     ReciterNameButton(
                         name = reciterName,
-                        notice = playerState.error,
+                        notice = notice,
                         onClick = onOpenSettings,
-                        enabled = enabled && !reciting,
+                        enabled = enabled && (!reciting || notice != null),
                         disclosure = true,
                         modifier = Modifier
                             .align(Alignment.Center)
                             .padding(horizontal = if (inkLabAvailable) 48.dp else 0.dp)
-                            .graphicsLayer { alpha = secondaryFade },
+                            .graphicsLayer { alpha = if (notice != null) 1f else secondaryFade },
                     )
                 }
                 if (inkLabAvailable) {
@@ -581,6 +588,19 @@ private const val MushafFurnitureBump = 2f
 private fun TextUnit.furnitureStep(steps: Int): TextUnit =
     (value * MushafType.RATIO.pow(steps) + MushafFurnitureBump).sp
 
+/**
+ * The running head's style for one piece of its text. Arabic-Indic figures are
+ * the page's own numerals and are set in Hafs, untracked: in the Latin label
+ * face they fell back to the system's digits with the head's Latin tracking
+ * between them, and read as a different hand from the page they number.
+ */
+internal fun mushafHeadStyle(latin: TextStyle, text: String): TextStyle =
+    if (text.any { it in '\u0660'..'\u0669' }) {
+        latin.copy(fontFamily = HafsFontFamily, letterSpacing = TextUnit.Unspecified)
+    } else {
+        latin
+    }
+
 @Composable
 private fun MushafHeadLabel(
     text: String,
@@ -595,9 +615,12 @@ private fun MushafHeadLabel(
     }
     Text(
         text = text,
-        style = MaterialTheme.typography.labelSmall.copy(
-            fontSize = glyphSize.furnitureStep(MushafType.HEAD),
-            letterSpacing = 0.10.em,
+        style = mushafHeadStyle(
+            MaterialTheme.typography.labelSmall.copy(
+                fontSize = glyphSize.furnitureStep(MushafType.HEAD),
+                letterSpacing = 0.10.em,
+            ),
+            text,
         ),
         color = ink.copy(alpha = 0.44f),
         textAlign = align,
