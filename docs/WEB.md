@@ -452,7 +452,8 @@ The spread is one grid: a single module `--u` in `styles.css`
 (`--page-w` = φ⁶u, `--page-h`), the margins and the gutter's shade
 (`--gutter-shade`). It drives the book, the cover board and every sheet; a
 Mushaf leaf is absolutely placed on `--margin-inner/head/fore/foot`. Head and
-foot are floored at `--chrome-h` / `--transport-h`; inner and fore are not.
+foot are floored at `--chrome-h` / `--transport-h` (both ride `--furn`, so the
+margins hold scaled furniture on a desk-sized page); inner and fore are not.
 The scrolling reader's column is the same block (`--reader-max`, and the
 sheet's `padding-right` of fore − inner). The block's two piles: `App` sets `--book-right` (a registered `<number>`,
 eased over 900 ms) from `bookRightShare`, the share of the 302 leaves on the
@@ -492,7 +493,7 @@ lines in a layout effect in `MushafLeaf`. The cap is the
 `mushafGlyphWiden` setting.
 Mushaf lines justify by even word spaces: words and verse marks are
 separate flex items of the line (`space-between`) inside `.mushaf-block`, so
-head, lines and folio share one measure. The minimum gap is Hafs's own word
+head and lines share one measure. The minimum gap is Hafs's own word
 space (`MUSHAF_MIN_GAP`, 0.22 em) and loose lines widen toward 0.3 em. The
 block's width is `mushafMeasure`: the widest line set at minimum spaces with
 its letters condensed by up to `MUSHAF_MAX_CONDENSE` (4%), written inline by
@@ -501,9 +502,11 @@ loosen every other line; now it is set slightly narrow instead. `mushafLeafFit` 
 shrinks the type when the widest line overruns the page; widths are read at
 the applied scale and divided back (toggling the scale to measure made the
 measurement oscillate). Rationale in `docs/DESIGN.md`.
-The leaf's folio follows the Customize page-number script (both figures
-share one centred line with a diamond between), opening leaves 1–2 centre
-their few lines in the well, and facing leaves mirror their running heads.
+The leaf's folio stands in the running head — Western figure at the left,
+the chapter centred, Arabic-Indic at the right (one script puts its figure
+at the left and the chapter at the right), Android `MushafRunningHead`
+parity, the same order on both facing leaves. Opening leaves 1–2 centre
+their few lines in the well.
 Page turns: `MushafReader` keeps the place the book last settled on,
 prepares both destination leaves at the reader’s measure, then portals a
 two-faced leaf (`TurningLeaf`) into `BookSpread`'s turn slot (`.mushaf-flip`,

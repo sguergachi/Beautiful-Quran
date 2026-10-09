@@ -94,12 +94,15 @@ whole block.)
 **The golden page.** A page is 1 : φ. Its margins run inner : head :
 fore-edge : foot = 1 : φ : φ : φ² in that same module, which leaves a text
 block that is itself 1 : φ — the page's own shape set inside it, nearer the
-spine and the head, as a bound book sits. The two inner margins make a
+spine and the head, as a bound book sits. The furniture standing in head and
+foot (controls, transport) scales with the book through `--furn` (the module
+over the phone-sized chrome, floored at 0.85), so icons and labels keep their
+drawn proportions on a desk-sized page while hit targets keep their floors.
+The two inner margins make a
 gutter of 2*u*, wider than the φ*u* fore-edge, so the pages part at the
-spine. Head and foot also carry furniture of a fixed size (the page's
-controls, the transport, which stands in the foot with no paper of its own),
-so on a small window those two deepen to hold it. Inner and fore-edge never
-do: the text keeps its width. (All four margins used to swell together below
+spine. On a small window head and foot deepen to hold phone-sized furniture
+(`--furn` never drops below 0.85). Inner and fore-edge never do: the text
+keeps its width. (All four margins used to swell together below
 a 1190px window, which kept the block golden but set a small page in margins
 sized for a large one.) A Mushaf leaf is that block; recto and verso
 mirror. The leaf's controls end on the block's edges and the transport is
