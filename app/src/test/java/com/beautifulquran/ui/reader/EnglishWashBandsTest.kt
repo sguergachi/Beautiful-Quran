@@ -99,6 +99,41 @@ class EnglishWashBandsTest {
     }
 
     @Test
+    fun `a bracket goes with the word it closes, not the word after it`() {
+        // A repeat on "that" tinted the "]" of "[think]" orange: the alignment
+        // ends "think" at its last letter, and the bracket fell to "that".
+        val prose = "created and [think] that perhaps"
+        val whole = prose.indices.first..prose.indices.last
+        val thinkEnd = prose.indexOf("]").toFloat() / prose.length
+        val thatEnd = (prose.indexOf("that") + 4).toFloat() / prose.length
+        val bands = englishWashBands(whole, thinkEnd, thatEnd, thatEnd, prose)
+        assertEquals("created and [think]", prose.substring(bands.read))
+        assertEquals(" that", prose.substring(bands.saying))
+    }
+
+    @Test
+    fun `an opening bracket and closing punctuation keep to their own words`() {
+        val prose = "leave [the company of] those, who"
+        val whole = prose.indices.first..prose.indices.last
+        // An edge between "[" and "the" goes back before the bracket.
+        val opening = englishWashBands(whole, 7f / prose.length, 1f, 1f, prose)
+        assertEquals("leave ", prose.substring(opening.read))
+        // An edge after "those" takes its comma with it.
+        val at = (prose.indexOf("those") + 5).toFloat() / prose.length
+        val comma = englishWashBands(whole, at, 1f, 1f, prose)
+        assertEquals("leave [the company of] those,", prose.substring(comma.read))
+    }
+
+    @Test
+    fun `a mark joining two words leaves the edge where it is`() {
+        val prose = "a well-known way"
+        val whole = prose.indices.first..prose.indices.last
+        val at = prose.indexOf("-").toFloat() / prose.length
+        val bands = englishWashBands(whole, at, 1f, 1f, prose)
+        assertEquals("a well", prose.substring(bands.read))
+    }
+
+    @Test
     fun `an edge already between words is left where it is`() {
         val prose = "one two three"
         val whole = prose.indices.first..prose.indices.last
