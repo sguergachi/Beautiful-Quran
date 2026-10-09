@@ -543,8 +543,7 @@ select {
 }
 
 /* Sheets above the current stack — park off to the right */
-.sheet[data-name='reader'][data-active='false']:not([data-depth='1']):not([data-depth='2']),
-.sheet[data-name='settings'][data-active='false'] {
+.sheet[data-name='reader'][data-active='false']:not([data-depth='1']):not([data-depth='2']) {
   left: 0;
   right: 0;
   transform: translateX(14%) scale(1);
@@ -555,6 +554,49 @@ select {
      even when a long surah is still mounted underneath. */
   content-visibility: hidden;
   contain: strict;
+}
+
+/*
+ * Settings lies beneath the deck, as on Android (PaperLayer.Settings): the
+ * sheets above turn away to the left, rotating a little, and Settings settles
+ * up from a touch small. Going back, they turn in over it again.
+ */
+.app-shell:not([data-spread='true']) .sheet[data-name='settings'] {
+  z-index: 0;
+}
+
+.app-shell:not([data-spread='true']) .sheet[data-name='settings'][data-active='false'] {
+  left: 0;
+  right: 0;
+  transform: scale(0.985);
+  opacity: 1;
+  pointer-events: none;
+  box-shadow: none;
+  /* Stay painted while the sheets above turn back over it, then drop out. */
+  visibility: hidden;
+  transition:
+    transform 460ms cubic-bezier(0.24, 0.02, 0.12, 1),
+    visibility 0s linear 460ms;
+}
+
+.app-shell:not([data-spread='true'])[data-stack='2'] .sheet:is([data-name='home'], [data-name='reader']),
+.app-shell:not([data-spread='true'])[data-stack='1'][data-has-reader='false'] .sheet[data-name='home'] {
+  transform: perspective(1200px) translateX(calc(-100% - 36px)) rotateY(-4deg);
+  opacity: 1;
+  pointer-events: none;
+}
+
+/* With no chapter open, Settings owns layer 1. The empty reader sheet shares
+   that layer and would lay its blank paper over Settings, which is beneath. */
+.app-shell:not([data-spread='true'])[data-has-reader='false'] .sheet[data-name='reader'] {
+  visibility: hidden;
+}
+
+/* Chapters → Settings skips the parked reader: it jumps, unseen, rather than
+   sweeping across the page from its right-hand park. Likewise on the way back. */
+.app-shell[data-skip-reader='true'] .sheet[data-name='reader'] {
+  transition: none;
+  visibility: hidden;
 }
 
 /* Left-edge hit target — desktop peek gutter only (phones have no peek). */
@@ -955,11 +997,13 @@ input[type='search']::-webkit-search-decoration {
  * Continue is one full-width line of the chapter document. Its wash reaches
  * the document edges while its bilingual ink stays on the chapter rails.
  */
+/* Full-bleed wash like Android's fillMaxWidth ContinueRow; the copy stays on
+   the chapter list's columns inside it. */
 .continue-row {
-  max-width: var(--home-max);
+  --continue-gutter: max(0px, calc((100% - var(--home-max)) / 2));
   width: 100%;
-  margin: 18px auto 16px;
-  padding: 0 calc(var(--home-end-inset) + 4px) 0 var(--home-start-inset);
+  margin: 18px 0 16px;
+  padding: 0;
 }
 
 .continue {
@@ -970,8 +1014,11 @@ input[type='search']::-webkit-search-decoration {
   gap: 1rem;
   width: 100%;
   margin: 0;
-  padding: 18px 20px 18px
-    calc(var(--home-number-column) + var(--home-column-gap));
+  padding: 18px calc(var(--continue-gutter) + var(--home-end-inset) + 4px) 18px
+    calc(
+      var(--continue-gutter) + var(--home-start-inset) +
+        var(--home-number-column) + var(--home-column-gap)
+    );
   background-color: var(--green-wash);
   color: var(--ink);
   text-align: start;
@@ -5609,8 +5656,7 @@ button.ayah-mark {
 
   /* Keep inactive sheets fully off-screen on small phones so they don't
      peek under the active sheet during the slide. */
-  .sheet[data-name='reader'][data-active='false']:not([data-depth='1']):not([data-depth='2']),
-  .sheet[data-name='settings'][data-active='false'] {
+  .sheet[data-name='reader'][data-active='false']:not([data-depth='1']):not([data-depth='2']) {
     transform: translateX(100%);
   }
 }
@@ -5655,11 +5701,17 @@ button.ayah-mark {
     right: max(0px, calc(50% - var(--sheet-half)));
   }
 
-  .sheet[data-name='reader'][data-active='false']:not([data-depth='1']):not([data-depth='2']),
-  .sheet[data-name='settings'][data-active='false'] {
+  .sheet[data-name='reader'][data-active='false']:not([data-depth='1']):not([data-depth='2']) {
     left: max(0px, calc(50% - var(--sheet-half)));
     right: max(0px, calc(50% - var(--sheet-half)));
     transform: translateX(18%);
+  }
+
+  /* Nothing is left above Settings to peek, so it takes the whole column. */
+  .app-shell:not([data-spread='true'])[data-stack='2'] .sheet[data-name='settings'][data-active='true'],
+  .app-shell:not([data-spread='true'])[data-stack='1'][data-has-reader='false'] .sheet[data-name='settings'][data-active='true'] {
+    left: max(0px, calc(50% - var(--sheet-half)));
+    right: max(0px, calc(50% - var(--sheet-half)));
   }
 }
 

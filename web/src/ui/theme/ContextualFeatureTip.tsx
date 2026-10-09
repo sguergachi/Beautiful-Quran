@@ -53,8 +53,8 @@ export function ContextualFeatureTip({
   spotlightSide,
   actionCenter = null,
   dismissLabel = 'Got it',
-  dismissPaperColor = 'var(--reader-paper, #faf3e8)',
-  dismissInkColor = 'var(--reader-ink, #1c1b18)',
+  dismissPaperColor = 'var(--reader-paper, var(--paper))',
+  dismissInkColor = 'var(--reader-ink, var(--ink))',
   onRenderedChange,
   guideWidthFraction = 0.42,
   guideHeightPx = 188,
@@ -161,25 +161,25 @@ export function ContextualFeatureTip({
     spotlight,
     surface,
   )
+  // The lane runs from the leading edge to the far paper edge, so the title
+  // keeps its line instead of wrapping inside an arbitrary fraction.
+  const spotlightOnLeft = spotlightSide === 'left'
+  const laneStart = spotlightOnLeft
+    ? Math.max(0, leadingEdge.x - contentPadding.start)
+    : Math.min(surface.width, leadingEdge.x + contentPadding.end)
   const laneWidth = Math.min(
-    surface.width * Math.min(1, Math.max(0.25, guideWidthFraction)),
-    18 * 16,
+    Math.max(
+      surface.width * Math.min(1, Math.max(0.25, guideWidthFraction)),
+      spotlightOnLeft ? surface.width - laneStart : laneStart,
+    ),
+    surface.width,
+    22 * 16,
   )
   const laneHeight = Math.min(guideHeightPx, surface.height || guideHeightPx)
   // Seat the lesson at the leading edge; type faces the spotlight.
-  const spotlightOnLeft = spotlightSide === 'left'
   const laneLeft = spotlightOnLeft
-    ? Math.min(
-        Math.max(0, leadingEdge.x - contentPadding.start),
-        Math.max(0, surface.width - laneWidth),
-      )
-    : Math.max(
-        0,
-        Math.min(
-          leadingEdge.x - laneWidth + contentPadding.end,
-          surface.width - laneWidth,
-        ),
-      )
+    ? Math.min(laneStart, Math.max(0, surface.width - laneWidth))
+    : Math.max(0, laneStart - laneWidth)
   const laneTop = Math.min(
     Math.max(0, bodyCenter.y - laneHeight / 2),
     Math.max(0, surface.height - laneHeight),

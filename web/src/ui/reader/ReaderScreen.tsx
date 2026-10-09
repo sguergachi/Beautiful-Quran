@@ -1978,43 +1978,47 @@ export function ReaderScreen({
         </div>
       </div>
 
-      {ayahRailTipVisible || ayahRailTipRendered ? (
-        <AyahRailTip
-          visible={ayahRailTipVisible}
-          railSide={side}
-          targetCenterY={
-            Number.isFinite(ayahRailTipCenterY)
-              ? ayahRailTipCenterY
-              : sheetSize.height / 2
-          }
-          surfaceWidth={sheetSize.width}
-          actionBottom={sheetSize.bodyHeight}
-          onDismiss={dismissAyahRailTip}
-          onRenderedChange={setAyahRailTipRendered}
-        />
-      ) : null}
-
-      {bookmarkTipVisible || bookmarkTipRendered ? (
-        <BookmarkTip
-          visible={bookmarkTipVisible}
-          ribbonSide={bookmarkTipSide}
-          targetCenterY={
-            Number.isFinite(bookmarkTipCenterY)
-              ? bookmarkTipCenterY
-              : sheetSize.height / 2
-          }
-          surfaceWidth={sheetSize.width}
-          actionBottom={sheetSize.bodyHeight}
-          onDismiss={dismissBookmarkTip}
-          onRenderedChange={(rendered) => {
-            setBookmarkTipRendered(rendered)
-            if (!rendered && !bookmarkTipOpen) {
-              setBookmarkTipAyah(0)
-              setBookmarkTipCenterY(Number.NaN)
+      {/* Guides are full bleed like Android's: while the bar is pinned above
+          the deck, they must sit on that same layer or the bar clips them. */}
+      <PlaybackPin active={playbackPinned}>
+        {ayahRailTipVisible || ayahRailTipRendered ? (
+          <AyahRailTip
+            visible={ayahRailTipVisible}
+            railSide={side}
+            targetCenterY={
+              Number.isFinite(ayahRailTipCenterY)
+                ? ayahRailTipCenterY
+                : sheetSize.height / 2
             }
-          }}
-        />
-      ) : null}
+            surfaceWidth={sheetSize.width}
+            actionBottom={sheetSize.height - 24}
+            onDismiss={dismissAyahRailTip}
+            onRenderedChange={setAyahRailTipRendered}
+          />
+        ) : null}
+
+        {bookmarkTipVisible || bookmarkTipRendered ? (
+          <BookmarkTip
+            visible={bookmarkTipVisible}
+            ribbonSide={bookmarkTipSide}
+            targetCenterY={
+              Number.isFinite(bookmarkTipCenterY)
+                ? bookmarkTipCenterY
+                : sheetSize.height / 2
+            }
+            surfaceWidth={sheetSize.width}
+            actionBottom={sheetSize.height - 24}
+            onDismiss={dismissBookmarkTip}
+            onRenderedChange={(rendered) => {
+              setBookmarkTipRendered(rendered)
+              if (!rendered && !bookmarkTipOpen) {
+                setBookmarkTipAyah(0)
+                setBookmarkTipCenterY(Number.NaN)
+              }
+            }}
+          />
+        ) : null}
+      </PlaybackPin>
 
       {/* Ink bleed lives on this sheet — not a full-viewport layer over the deck. */}
       <RootViewer />
