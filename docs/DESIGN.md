@@ -826,6 +826,12 @@ In Mushaf, the reciter name and its chevron share the secondary controls'
 fade to 5 % while playing and return on pause. The name cannot be tapped
 while reciting, and its reserved band keeps its height throughout the fade.
 
+Mushaf matches Scroll's transport sizes: Play/Pause is 34 dp in a 56 dp
+button, previous/next are 24 dp, repeat is 22 dp, and speed is 15 sp. The
+56 dp row gives the reciter line below it the same clearance as Scroll's
+line above. Other playback buttons use 48 dp slots, narrowed to 40 dp below
+340 dp screen width so they clear Chapters and Settings at the edges.
+
 The reciter name carries a small disclosure chevron: Scroll and Mushaf share
 the same quiet button leading to reciter settings. Scroll places it above the
 transport; Mushaf places it below, keeping Play close to the leaf's hairline.

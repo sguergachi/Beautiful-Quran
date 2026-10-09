@@ -40,7 +40,9 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
@@ -57,7 +59,7 @@ import com.beautifulquran.playback.PlayerUiState
 import com.beautifulquran.ui.theme.HafsFontFamily
 import com.beautifulquran.ui.theme.ownedQuietClickable
 
-internal val MushafGutterSlot = 44.dp
+internal val MushafGutterSlot = 48.dp
 /** Paper between the rule and the transport it divides the leaf from. */
 private val MushafRuleTailAir = 0.dp
 
@@ -106,7 +108,7 @@ internal fun mushafTurnsRightToLeft(english: Boolean): Boolean = !english
 private val MushafDialHeadAir = 8.dp
 
 /** The transport's own row of controls, and the air around the block. */
-private val MushafTransportRow = 44.dp
+private val MushafTransportRow = 56.dp
 private val MushafTransportAir = 2.dp
 
 /**
@@ -313,6 +315,7 @@ internal fun MushafReadingSheet(
                 horizontalArrangement = Arrangement.Center,
                 verticalAlignment = Alignment.CenterVertically,
             ) {
+                val controlSize = if (LocalConfiguration.current.screenWidthDp < 340) 40.dp else MushafGutterSlot
                 val repeatActive = playerState.repeatMode != Player.REPEAT_MODE_OFF || playerState.repeatRange != null
                 val speedActive = playerState.speed != 1f
                 val singleAyah = playerState.repeatRange?.let { it.first == it.last } == true
@@ -325,6 +328,8 @@ internal fun MushafReadingSheet(
                         Icons.Rounded.Repeat
                     },
                     label = "Repeat",
+                    buttonSize = controlSize,
+                    iconSize = 22.dp,
                     tint = if (repeatActive) {
                         MaterialTheme.colorScheme.primary
                     } else {
@@ -337,13 +342,15 @@ internal fun MushafReadingSheet(
                     enabled = enabled && isThisSurahLoaded,
                     image = Icons.Rounded.FastRewind,
                     label = "Previous",
+                    buttonSize = controlSize,
+                    iconSize = 24.dp,
                     tint = primary,
                 )
-                IconButton(onClick = onPlayPause, enabled = enabled, modifier = Modifier.size(44.dp)) {
+                IconButton(onClick = onPlayPause, enabled = enabled, modifier = Modifier.size(MushafTransportRow)) {
                     if (playerState.isBuffering && isThisSurahLoaded) {
                         CircularProgressIndicator(
-                            modifier = Modifier.size(18.dp),
-                            strokeWidth = 1.5.dp,
+                            modifier = Modifier.size(24.dp),
+                            strokeWidth = 2.dp,
                             color = primary,
                         )
                     } else {
@@ -362,7 +369,7 @@ internal fun MushafReadingSheet(
                                 "Play"
                             },
                             tint = primary,
-                            modifier = Modifier.size(26.dp),
+                            modifier = Modifier.size(34.dp),
                         )
                     }
                 }
@@ -371,11 +378,13 @@ internal fun MushafReadingSheet(
                     enabled = enabled && isThisSurahLoaded,
                     image = Icons.Rounded.FastForward,
                     label = "Next",
+                    buttonSize = controlSize,
+                    iconSize = 24.dp,
                     tint = primary,
                 )
                 Box(
                     modifier = Modifier
-                        .width(MushafGutterSlot)
+                        .width(controlSize)
                         .fillMaxHeight()
                         .graphicsLayer { alpha = if (speedActive) 1f else secondaryFade }
                         .then(
@@ -390,7 +399,10 @@ internal fun MushafReadingSheet(
                 ) {
                     Text(
                         text = "${if (playerState.speed % 1f == 0f) playerState.speed.toInt() else playerState.speed}×",
-                        style = MaterialTheme.typography.labelSmall,
+                        style = MaterialTheme.typography.labelMedium.copy(
+                            fontWeight = FontWeight.SemiBold,
+                            fontSize = 15.sp,
+                        ),
                         color = if (speedActive) MaterialTheme.colorScheme.onBackground else quiet,
                         textAlign = TextAlign.Center,
                     )
@@ -661,8 +673,10 @@ private fun GutterIcon(
     label: String,
     tint: androidx.compose.ui.graphics.Color,
     modifier: Modifier = Modifier,
+    buttonSize: Dp = 40.dp,
+    iconSize: Dp = 20.dp,
 ) {
-    IconButton(onClick = onClick, enabled = enabled, modifier = modifier.size(40.dp)) {
-        Icon(image, contentDescription = label, tint = tint, modifier = Modifier.size(20.dp))
+    IconButton(onClick = onClick, enabled = enabled, modifier = modifier.size(buttonSize)) {
+        Icon(image, contentDescription = label, tint = tint, modifier = Modifier.size(iconSize))
     }
 }
