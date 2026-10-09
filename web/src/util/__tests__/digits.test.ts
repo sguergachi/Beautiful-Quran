@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import {
   formatAyahNumberMark,
   formatReaderDigits,
+  mushafHeadFigures,
   pageFolioLayout,
   toArabicIndic,
 } from '../digits'
@@ -50,6 +51,32 @@ describe('formatAyahNumberMark', () => {
     const mark = formatAyahNumberMark(3, false)
     expect(mark.includes('﴾3')).toBe(false)
     expect(mark.includes('3﴿')).toBe(false)
+  })
+})
+
+describe('mushafHeadFigures', () => {
+  it('flanks a centred chapter with Western left and Arabic-Indic right', () => {
+    expect(mushafHeadFigures(12, 'both', 'Al-Baqarah')).toEqual({
+      left: '12',
+      leftLang: null,
+      center: 'Al-Baqarah',
+      right: '١٢',
+    })
+  })
+
+  it('puts a single script figure at the left and the chapter at the right', () => {
+    expect(mushafHeadFigures(12, 'english', 'Al-Baqarah')).toEqual({
+      left: '12',
+      leftLang: null,
+      center: 'Al-Baqarah',
+      right: null,
+    })
+    expect(mushafHeadFigures(12, 'arabic', 'Al-Baqarah')).toEqual({
+      left: '١٢',
+      leftLang: 'ar',
+      center: 'Al-Baqarah',
+      right: null,
+    })
   })
 })
 
