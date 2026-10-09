@@ -575,6 +575,7 @@ fun HomeScreen(
                     onOpenSurah(target.surah.id, target.ayah, null, null)
                 },
                 onReciterClick = onOpenSettings,
+                onDismissError = viewModel::clearPlaybackError,
                 onPlayPause = viewModel::togglePlayPause,
                 onFastBackward = viewModel::fastBackward,
                 onFastForward = viewModel::fastForward,
