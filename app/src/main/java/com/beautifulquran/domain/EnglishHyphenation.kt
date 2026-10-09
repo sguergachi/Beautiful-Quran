@@ -9,17 +9,28 @@ import java.util.concurrent.ConcurrentHashMap
  * A ragged page needs hyphenation — a long word the rag cannot absorb pushes
  * its neighbours into a deep hole — but the breaker's own hyphenation cannot
  * be told that *de-scends* is not a break, and Compose exposes no frequency
- * or fragment control to stop it with. Self-set soft hyphens do not help
- * either: with hyphenation off the breaker ignores them entirely, and with it
- * on they are subsumed.
+ * or fragment control to stop it with. Soft hyphens alone cannot refuse a
+ * cut: with hyphenation off the breaker ignores them entirely, and with it on
+ * the patterns' own cuts stand beside them in a word of plain letters.
  *
  * So the leaf vetoes instead of proposing. Every cut the TeX US-English
  * patterns ([HYPHEN_PATTERNS]) propose for a word is kept only where each
  * fragment it leaves behind stands [HYPHEN_MIN_FRAGMENT] letters tall; the
  * rest are joined with a word joiner (U+2060), which forbids the break
- * without showing anything. The breaker, running `Hyphens.Auto`, takes what
- * is left: *right-eous-ness*, *trans-gress* and *pro-tection* carry over,
- * while *de-scends*, *Re-pelled* and *obe-di-ence*'s middle *di* stay whole.
+ * without showing anything: *right-eous-ness*, *trans-gress* and
+ * *pro-tection* may carry over, while *de-scends*, *Re-pelled* and
+ * *obe-di-ence*'s middle *di* stay whole.
+ *
+ * **And the kept cuts are written down ([KEPT_CUT]), for the leaf to take.**
+ * The veto alone forbade far more than it meant to: the platform hyphenator
+ * consults its patterns only for a word made wholly of letters, so every word
+ * the veto touched lost *all* its cuts, good ones included — *cal-culation*
+ * never broke, and the holes the hyphenation was there to fill stood open.
+ * Nor will the platform's greedy breaker reliably take a soft hyphen, or even
+ * the break after a written one, inside such a word: measured on the leaf, it
+ * set the whole word on the next line. So the platform breaks no word at all
+ * now. The leaf's rag ([EnglishRag]) chooses which kept cut, if any, a line
+ * ends on, and writes the hyphen and the break itself.
  *
  * What the leaf deliberately does *not* do is glue short words to their
  * neighbours with no-break spaces. It was tried twice, and twice the hole a
@@ -31,7 +42,8 @@ import java.util.concurrent.ConcurrentHashMap
  *
  * Applied in [englishVerseProse] — the one choke point the ruler and the
  * drawer share, so the pagination measures exactly what the leaf draws. The
- * joiner is letters to nobody downstream: zero advance, ignored by shaping,
+ * joiner and the soft hyphen are letters to nobody downstream: zero advance
+ * unless a line breaks there, ignored by shaping,
  * and the wash alignment tokenizes on letters only.
  *
  * Pure Kotlin over immutable data, unit-tested on the JVM. The pattern trie
@@ -47,6 +59,18 @@ object EnglishHyphenation {
 
     /** Joins a vetoed cut: forbids the break, shows nothing, advances nothing. */
     const val WORD_JOINER = '\u2060'
+
+    /** Opens a kept cut; see [KEPT_CUT]. */
+    const val SOFT_HYPHEN = '\u00AD'
+
+    /**
+     * A kept cut: a soft hyphen and a joiner, two characters that show nothing
+     * and break nowhere — the joiner forbids the platform's own break. The
+     * leaf's rag (`englishRaggedProse`) ends a line here by writing the pair
+     * over as a hyphen and a line break, one character for one, so no offset
+     * moves.
+     */
+    const val KEPT_CUT = "$SOFT_HYPHEN$WORD_JOINER"
 
     private val trie: HyphenTrie by lazy { HyphenTrie(HYPHEN_PATTERNS) }
     private val remembered = ConcurrentHashMap<String, List<Int>>(4096)
@@ -89,7 +113,7 @@ object EnglishHyphenation {
     }
 
     /**
-     * The whole setting: vetoed hyphenation. Idempotent — a text already set
+     * The whole setting: the book's cuts written in, the rest refused. Idempotent — a text already set
      * passes through unchanged, so composing a leaf twice (the ruler draws
      * every leaf it measures) never doubles a veto.
      */
@@ -103,7 +127,7 @@ object EnglishHyphenation {
         var i = 0
         while (i < text.length) {
             val c = text[i]
-            if (c.isLetter() && (i == 0 || (!text[i - 1].isLetter() && text[i - 1] != WORD_JOINER))) {
+            if (c.isLetter() && (i == 0 || (!text[i - 1].isLetter() && !text[i - 1].isCut()))) {
                 var j = i
                 while (j < text.length && (text[j].isLetter() || text[j] == '\'')) j++
                 out.append(vetoWord(text.substring(i, j)))
@@ -120,15 +144,17 @@ object EnglishHyphenation {
         if (word.length < HYPHEN_MIN_WORD || word.any { !it.isLetter() }) return word
         val cuts = breaks(word)
         if (cuts.isEmpty()) return word
-        val bad = cuts.toSet() - vetted(cuts, word.length).toSet()
-        if (bad.isEmpty()) return word
-        val out = StringBuilder(word.length + bad.size)
+        val kept = vetted(cuts, word.length).toSet()
+        val out = StringBuilder(word.length + cuts.size)
         for (index in word.indices) {
-            if (index in bad) out.append(WORD_JOINER)
+            if (index in kept) out.append(KEPT_CUT)
+            else if (index in cuts) out.append(WORD_JOINER)
             out.append(word[index])
         }
         return out.toString()
     }
+
+    private fun Char.isCut() = this == WORD_JOINER || this == SOFT_HYPHEN
 }
 
 /**

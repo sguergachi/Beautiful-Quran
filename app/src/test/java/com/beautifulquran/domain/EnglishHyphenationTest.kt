@@ -6,6 +6,8 @@ import org.junit.Test
 
 class EnglishHyphenationTest {
     private val wj = EnglishHyphenation.WORD_JOINER
+    private val shy = EnglishHyphenation.SOFT_HYPHEN
+    private val cut = EnglishHyphenation.KEPT_CUT
 
     @Test
     fun `breaks long words where the table says`() {
@@ -38,9 +40,9 @@ class EnglishHyphenationTest {
     }
 
     @Test
-    fun `joins vetoed cuts and leaves the rest to the breaker`() {
+    fun `joins vetoed cuts and writes the kept ones down`() {
         val set = EnglishHyphenation.setProse("descends transgress indeed repelled")
-        assertEquals("de${wj}scend${wj}s transgress in${wj}deed re${wj}pelled", set)
+        assertEquals("de${wj}scend${wj}s trans${cut}gress in${wj}deed re${wj}pelled", set)
     }
 
     @Test
@@ -53,13 +55,18 @@ class EnglishHyphenationTest {
     }
 
     @Test
-    fun `fully vetted words pass through untouched`() {
-        // right-eous-ness: every fragment stands, so there is nothing to veto
-        // and the breaker is free to take any of the cuts.
-        assertEquals("righteousness", EnglishHyphenation.setProse("righteousness"))
-        assertEquals("transgress", EnglishHyphenation.setProse("transgress"))
-        // ...while descends is joined at both its bad cuts.
+    fun `kept cuts are written down, so a vetoed word still breaks well`() {
+        // right-eous-ness: every fragment stands, so every cut is written down.
+        assertEquals("right${cut}eous${cut}ness", EnglishHyphenation.setProse("righteousness"))
+        assertEquals("trans${cut}gress", EnglishHyphenation.setProse("transgress"))
+        // descends has no cut worth keeping: joined at both, open nowhere.
         assertEquals("de${wj}scend${wj}s", EnglishHyphenation.setProse("descends"))
+        // fulfillment keeps two cuts and refuses one. The platform hyphenator
+        // breaks no word with a joiner in it, so without these the refusal
+        // took the good cuts down with it; the leaf's rag takes them instead.
+        val set = EnglishHyphenation.setProse("fulfillment")
+        assertEquals(2, set.count { it == shy })
+        assertEquals("two kept and one refused", 3, set.count { it == wj })
     }
 
     @Test
@@ -75,18 +82,27 @@ class EnglishHyphenationTest {
         )
         words.forEach { word ->
             val set = EnglishHyphenation.setProse(word)
-            // The joiners add nothing visible.
-            assertEquals(word, set.replace(EnglishHyphenation.WORD_JOINER.toString(), ""))
+            // The marks add nothing visible.
+            assertEquals(word, set.filter { it != wj && it != shy })
             val cuts = EnglishHyphenation.breaks(word)
             val kept = EnglishHyphenation.vetted(cuts, word.length).toSet()
-            // Each refused cut is joined, and only refused cuts are: walk the
-            // set word, reading each joiner as a veto at its source boundary.
+            // Each refused cut is joined and each kept one is a soft hyphen:
+            // walk the set word, reading each mark at its source boundary.
             val vetoed = HashSet<Int>()
+            val written = HashSet<Int>()
             var source = 0
+            var afterShy = false
             set.forEach { c ->
-                if (c == EnglishHyphenation.WORD_JOINER) vetoed += source else source++
+                when (c) {
+                    // A joiner straight after a soft hyphen closes a kept cut.
+                    wj -> if (!afterShy) vetoed += source
+                    shy -> written += source
+                    else -> source++
+                }
+                afterShy = c == shy
             }
             assertEquals(word to (cuts.toSet() - kept), word to vetoed)
+            assertEquals(word to kept, word to written)
         }
     }
 }
