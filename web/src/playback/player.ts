@@ -37,6 +37,7 @@ import { peekPlaylistNextIndex } from './playlistNext'
 import { MediaSessionBridge, browserMediaSession } from './mediaSessionBridge'
 import { wantsGapless5Transport } from './gaplessPolicy'
 import { buildPlaylist, type PlaylistItem } from './playlistPlan'
+import { PLAYBACK_MESSAGES, describePlaybackError } from './playbackErrors'
 
 export { wantsGapless5Transport } from './gaplessPolicy'
 
@@ -205,7 +206,10 @@ export class PlayerController {
       void this.playIndex(this.index + 1)
       return
     }
-    this.patch({ error: 'Audio failed to load', isPlaying: false })
+    this.patch({
+      error: describePlaybackError(this.active.error, 'media element error'),
+      isPlaying: false,
+    })
   }
 
   private setBuffering(isBuffering: boolean) {
@@ -330,7 +334,7 @@ export class PlayerController {
         this.gapless5?.dispose()
         this.gapless5 = null
         this.patch({
-          error: e instanceof Error ? e.message : 'Gapless-5 failed to load',
+          error: describePlaybackError(e, 'gapless module failed to load'),
           isPlaying: false,
         })
         return
@@ -528,7 +532,7 @@ export class PlayerController {
       this.setBuffering(false)
       this.patch({
         isPlaying: false,
-        error: 'Playback stalled',
+        error: PLAYBACK_MESSAGES.stalled,
       })
     } finally {
       this.recoveringStall = false
@@ -834,7 +838,7 @@ export class PlayerController {
         this.active.volume = 1
         this.setBuffering(false)
         this.patch({
-          error: e instanceof Error ? e.message : 'Playback blocked',
+          error: describePlaybackError(e, 'play failed'),
           isPlaying: false,
         })
       }
@@ -955,7 +959,7 @@ export class PlayerController {
           return
         }
         this.patch({
-          error: e instanceof Error ? e.message : 'Playback blocked',
+          error: describePlaybackError(e, 'play failed'),
           isPlaying: false,
         })
       }
@@ -1050,7 +1054,7 @@ export class PlayerController {
       if (token !== this.playToken) return
       this.setBuffering(false)
       this.patch({
-        error: e instanceof Error ? e.message : 'Playback blocked',
+        error: describePlaybackError(e, 'play failed'),
         isPlaying: false,
       })
     }
@@ -1136,7 +1140,7 @@ export class PlayerController {
           this.stopTick()
           this.patch({
             isPlaying: false,
-            error: e instanceof Error ? e.message : 'Playback blocked',
+            error: describePlaybackError(e, 'play failed'),
           })
         }
         return
@@ -1169,7 +1173,7 @@ export class PlayerController {
       this.stopTick()
       this.patch({
         isPlaying: false,
-        error: e instanceof Error ? e.message : 'Playback blocked',
+        error: describePlaybackError(e, 'play failed'),
       })
     }
   }

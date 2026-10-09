@@ -3,6 +3,7 @@ import {
   QF_MAX_CACHE_AGE_MS,
   QF_REVALIDATE_AFTER_MS,
   RuntimeMushafCache,
+  classifyRuntimeCacheFailure,
   type RuntimeMushafStore,
   type StoredMushaf,
 } from './runtimeMushaf'
@@ -273,6 +274,16 @@ describe('RuntimeMushafCache', () => {
 
     expect(cache.word(5, 1, 1)?.translation_en).toBe('O')
     expect(cache.status().phase).toBe('error')
+    // Raw exception text stays in the console, never in the status.
+    expect(cache.status().lastError).toBe('other')
+  })
+
+  it('reports refresh failures as reader-safe categories', () => {
+    expect(classifyRuntimeCacheFailure(new TypeError('Failed to fetch'))).toBe('offline')
+    const timeout = new Error('signal timed out')
+    timeout.name = 'TimeoutError'
+    expect(classifyRuntimeCacheFailure(timeout)).toBe('server')
+    expect(classifyRuntimeCacheFailure(new Error('QF snapshot resource mismatch'))).toBe('other')
   })
 
   it('purges readable QF content when access is revoked', async () => {
@@ -288,6 +299,7 @@ describe('RuntimeMushafCache', () => {
     expect(first.store.value).toBeNull()
     expect(cache.word(5, 1, 1)).toBeNull()
     expect(cache.status().phase).toBe('error')
+    expect(cache.status().lastError).toBe('revoked')
   })
 
   it('never exposes authentication material in client requests', async () => {

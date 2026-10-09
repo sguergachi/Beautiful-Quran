@@ -1,5 +1,10 @@
 package com.beautifulquran.ui.reader
 
+import androidx.compose.animation.togetherWith
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.ui.text.font.FontStyle
 import com.beautifulquran.ui.theme.quietClickable
 import androidx.compose.foundation.Canvas
 import androidx.compose.animation.core.FastOutSlowInEasing
@@ -521,14 +526,26 @@ internal fun MushafReadingSheet(
                             .ownedQuietClickable(role = Role.Button, onClick = onOpenSettings),
                         contentAlignment = Alignment.Center,
                     ) {
-                        Text(
-                            text = reciterName,
-                            style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp),
-                            color = quiet.copy(alpha = 0.7f),
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                            textAlign = TextAlign.Center,
-                        )
+                        // A playback error briefly takes the name's place,
+                        // as in the Scroll bar, so the band never grows.
+                        AnimatedContent(
+                            targetState = playerState.error,
+                            contentAlignment = Alignment.Center,
+                            transitionSpec = { fadeIn() togetherWith fadeOut() using null },
+                            label = "mushafReciterNotice",
+                        ) { notice ->
+                            Text(
+                                text = notice ?: reciterName,
+                                style = MaterialTheme.typography.labelSmall.copy(
+                                    fontSize = 10.sp,
+                                    fontStyle = if (notice != null) FontStyle.Italic else FontStyle.Normal,
+                                ),
+                                color = quiet.copy(alpha = 0.7f),
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                                textAlign = TextAlign.Center,
+                            )
+                        }
                     }
                 }
                 if (inkLabAvailable) {

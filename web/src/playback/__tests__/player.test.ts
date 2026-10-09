@@ -3,6 +3,7 @@ import type { Reciter, SurahContent } from '../../data/models'
 import type { AudioPrefetcher } from '../audioPrefetch'
 import { wantsGapless5Transport } from '../gaplessPolicy'
 import { FakeAudio } from './fakeAudio'
+import { PLAYBACK_MESSAGES } from '../playbackErrors'
 
 let PlayerController: typeof import('../player').PlayerController
 
@@ -247,7 +248,7 @@ describe('PlayerController event sequences', () => {
     await recovery
 
     expect(player.getState().isPlaying).toBe(false)
-    expect(player.getState().error).toMatch(/stall|NotAllowed|Playback/i)
+    expect(player.getState().error).toBe(PLAYBACK_MESSAGES.stalled)
     expect(playCalls).toBeGreaterThanOrEqual(3)
     vi.useRealTimers()
   })
