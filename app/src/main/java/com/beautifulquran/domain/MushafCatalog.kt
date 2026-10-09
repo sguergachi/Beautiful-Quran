@@ -62,9 +62,14 @@ fun reflowMushafPage(
     val counts = IntArray(sections.size) { sections[it].second - sections[it].first }
     val weights = tokens.map { row -> row.sumOf { tokenWeight(it).coerceAtLeast(0.001f).toDouble() } }
     val extraRows = MUSHAF_DISPLAY_LINES_PER_PAGE - MUSHAF_LINES_PER_PAGE
+    // A spare row goes where the rows are still fullest *with* it. Judged by
+    // the rows a section has now, a chapter's two-line opening outbid its
+    // neighbour's eleven, and page 520's six short verses of al-Dhāriyāt were
+    // split over three rows that a full justification could only open into
+    // gaps half a word wide.
     repeat(extraRows) {
         val expanded = sections.indices.filter { counts[it] < tokens[it].size }
-            .maxByOrNull { weights[it] / counts[it] } ?: return@repeat
+            .maxByOrNull { weights[it] / (counts[it] + 1) } ?: return@repeat
         counts[expanded]++
     }
     val rows = ArrayList<MushafLine>(page.lines.size + extraRows)
