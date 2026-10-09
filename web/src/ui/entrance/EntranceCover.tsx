@@ -13,7 +13,8 @@ import {
   useState,
   type PointerEvent as ReactPointerEvent,
 } from 'react'
-import { BOOK_SPREAD_QUERY } from '../paper/bookSpread'
+import { BOOK_SPREAD_QUERY, bookSpreadEnabled } from '../paper/bookSpread'
+import { loadSettings } from '../../data/settings'
 import {
   BOOK_CLOSE_SCHEDULE,
   BOOK_OPEN_SCHEDULE,
@@ -218,7 +219,7 @@ export function EntranceCover({
   const [skipped, setSkipped] = useState(false)
   // Closing swings on the same hinge as opening, so it takes the same mode.
   const [openingMode, setOpeningMode] = useState<'phone' | 'spread' | null>(() =>
-    returning ? (window.matchMedia(BOOK_SPREAD_QUERY).matches ? 'spread' : 'phone') : null)
+    returning ? (bookSpreadEnabled(window.matchMedia(BOOK_SPREAD_QUERY).matches, loadSettings().pagePresentation) ? 'spread' : 'phone') : null)
   const [openingStyle, setOpeningStyle] = useState({})
   const openingRef = useRef(false)
   const arrivalAcRef = useRef<AbortController | null>(null)
@@ -312,7 +313,7 @@ export function EntranceCover({
     if (openingRef.current || finishedRef.current) return
     openingRef.current = true
     openingAtRef.current = performance.now()
-    const spread = window.matchMedia(BOOK_SPREAD_QUERY).matches
+    const spread = bookSpreadEnabled(window.matchMedia(BOOK_SPREAD_QUERY).matches, loadSettings().pagePresentation)
     if (spread) pictureLeftPage(insidePageRef.current)
     const el = boardRef.current
     if (el) {
@@ -519,7 +520,7 @@ export function EntranceCover({
       className="entrance"
       role="dialog"
       aria-modal="true"
-      aria-label={error ? 'Failed to open the book' : 'The Noble Quran'}
+      aria-label={error ? "The book couldn't be opened" : 'The Noble Quran'}
       aria-busy={showLoading || undefined}
     >
       <div
@@ -554,7 +555,7 @@ export function EntranceCover({
         }
         aria-label={
           error
-            ? 'Failed to open the book'
+            ? "The book couldn't be opened"
             : showLoading
               ? loadLabel || 'Opening the book…'
               : 'The Noble Quran — touch to open'

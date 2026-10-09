@@ -1,5 +1,9 @@
 package com.beautifulquran.ui.reader
 
+import androidx.compose.animation.togetherWith
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.AnimatedContent
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
@@ -40,7 +44,9 @@ import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -130,6 +136,7 @@ fun PlayerBar(
                     val centeredInset = maxOf(edgePad, if (inkLabAvailable) 48.dp else 0.dp)
                     ReciterNameButton(
                         name = reciterName,
+                        notice = state.error,
                         onClick = onReciterClick,
                         enabled = enabled,
                         disclosure = true,
@@ -166,14 +173,15 @@ fun PlayerBar(
                         bottom = 4.dp,
                     ),
             ) {
-                val rangeActive = state.repeatRange != null
+                val repeatActive = state.repeatMode != Player.REPEAT_MODE_OFF || state.repeatRange != null
+                val speedActive = state.speed != 1f
                 val singleAyahRange = state.repeatRange?.let { it.first == it.last } == true
                 IconButton(
                     onClick = onRepeatClick,
                     enabled = enabled,
                     modifier = Modifier
                         .size(48.dp)
-                        .graphicsLayer { alpha = chromeAlpha() },
+                        .graphicsLayer { alpha = if (repeatActive) 1f else chromeAlpha() },
                 ) {
                     Icon(
                         imageVector = if (state.repeatMode == Player.REPEAT_MODE_ONE || singleAyahRange) {
@@ -182,10 +190,10 @@ fun PlayerBar(
                             Icons.Rounded.Repeat
                         },
                         contentDescription = "Repeat",
-                        tint = if (state.repeatMode == Player.REPEAT_MODE_OFF && !rangeActive) {
-                            QuranTheme.ink.furniture
-                        } else {
+                        tint = if (repeatActive) {
                             MaterialTheme.colorScheme.primary
+                        } else {
+                            QuranTheme.ink.furniture
                         },
                         modifier = Modifier.size(22.dp),
                     )
@@ -242,7 +250,7 @@ fun PlayerBar(
                     contentPadding = PaddingValues(0.dp),
                     modifier = Modifier
                         .size(48.dp)
-                        .graphicsLayer { alpha = chromeAlpha() },
+                        .graphicsLayer { alpha = if (speedActive) 1f else chromeAlpha() },
                 ) {
                     Text(
                         text = "${if (state.speed % 1f == 0f) state.speed.toInt() else state.speed}×",
@@ -250,10 +258,10 @@ fun PlayerBar(
                             fontWeight = FontWeight.SemiBold,
                             fontSize = 15.sp,
                         ),
-                        color = if (state.speed == 1f) {
-                            QuranTheme.ink.furniture
-                        } else {
+                        color = if (speedActive) {
                             MaterialTheme.colorScheme.primary
+                        } else {
+                            QuranTheme.ink.furniture
                         },
                     )
                 }
@@ -282,6 +290,10 @@ internal fun InkLabToggleButton(
  * Opens reciter settings. The press wash hugs the name and, when [disclosure]
  * is set, the chevron. The hit target stays 48dp. The name stays on the page
  * center; the chevron hangs to its right.
+ *
+ * A playback [notice] (an error) briefly takes the name's place in the same
+ * band, so it never adds a row or shifts the page; the name fades back once
+ * the notice clears.
  */
 @Composable
 internal fun ReciterNameButton(
@@ -290,6 +302,7 @@ internal fun ReciterNameButton(
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
     disclosure: Boolean = false,
+    notice: String? = null,
 ) {
     val interactions = remember { MutableInteractionSource() }
     val pressed by interactions.collectIsPressedAsState()
@@ -307,30 +320,53 @@ internal fun ReciterNameButton(
                 onClick = onClick,
             ),
     ) {
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            modifier = Modifier
-                .drawBehind {
-                    if (!pressed) return@drawBehind
-                    drawRoundRect(
-                        color = press,
-                        cornerRadius = CornerRadius(size.minDimension / 2f),
+        AnimatedContent(
+            targetState = notice,
+            // Centred, so the name never slides while the two cross.
+            contentAlignment = Alignment.Center,
+            transitionSpec = { fadeIn() togetherWith fadeOut() using null },
+            label = "reciterNotice",
+        ) { shown ->
+            if (shown != null) {
+                Text(
+                    text = shown,
+                    style = MaterialTheme.typography.labelMedium.copy(fontStyle = FontStyle.Italic),
+                    color = QuranTheme.ink.muted,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    textAlign = TextAlign.Center,
+                    // Undo the chevron offset so the notice sits on the page centre.
+                    modifier = Modifier
+                        .offset(x = if (disclosure) -chevronFootprint / 2 else 0.dp)
+                        .padding(horizontal = 8.dp, vertical = 4.dp),
+                )
+                return@AnimatedContent
+            }
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier
+                    .drawBehind {
+                        if (!pressed) return@drawBehind
+                        drawRoundRect(
+                            color = press,
+                            cornerRadius = CornerRadius(size.minDimension / 2f),
+                        )
+                    }
+                    .padding(horizontal = 8.dp, vertical = 4.dp),
+            ) {
+                Text(
+                    text = name,
+                    style = MaterialTheme.typography.labelMedium,
+                    color = QuranTheme.ink.muted,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                if (disclosure) {
+                    DisclosureChevron(
+                        expanded = false,
+                        modifier = Modifier.padding(start = ReciterChevronGap).size(ReciterChevronSize),
                     )
                 }
-                .padding(horizontal = 8.dp, vertical = 4.dp),
-        ) {
-            Text(
-                text = name,
-                style = MaterialTheme.typography.labelMedium,
-                color = QuranTheme.ink.muted,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
-            if (disclosure) {
-                DisclosureChevron(
-                    expanded = false,
-                    modifier = Modifier.padding(start = ReciterChevronGap).size(ReciterChevronSize),
-                )
             }
         }
     }

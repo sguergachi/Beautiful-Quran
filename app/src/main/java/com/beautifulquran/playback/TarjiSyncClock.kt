@@ -11,150 +11,90 @@ internal fun analysisHopContentMs(
     hopSamples: Int,
 ): Double = hopSamples * decimation * 1_000.0 / sourceSampleRate
 
-/** Map a tap-content timestamp onto the media-item clock at the playback head. */
-internal fun mapTapContentToMediaMs(
-    playbackPositionMs: Long,
-    tapContentMs: Double,
-    eventStartContentMs: Double,
-    backlogContentMs: Double,
-): Long = (
-    playbackPositionMs.toDouble() +
-        backlogContentMs +
-        eventStartContentMs -
-        tapContentMs
-    ).roundToLong()
-
-/** Content-time delay of Sonic's resampler away from unity playback speed. */
-internal fun sonicContentLatencyMs(speed: Float): Float =
-    if (abs(speed - 1f) > 0.001f) Tarji.SONIC_LATENCY_MS else 0f
-
-/**
- * Stable tap-to-playback-head clock for one sink session.
- *
- * The sink capacity supplies the initial absolute delay; thereafter the tap
- * and playback-head content clocks measure only queue growth or drain. This
- * avoids pretending a late UI poll happened at the beginning of the session.
- */
-internal data class TarjiBacklogAnchor(
-    val tapContentMs: Double,
-    val playbackContentMs: Long,
-    val backlogContentMs: Double,
-    val speed: Float,
-) {
-    fun estimate(tapContentMs: Double, playbackContentMs: Long): Double =
-        (
-            backlogContentMs +
-                (tapContentMs - this.tapContentMs) -
-                (playbackContentMs - this.playbackContentMs)
-            ).coerceIn(0.0, MAX_BACKLOG_CONTENT_MS)
-
-    companion object {
-        /** Wait until the tap has supplied one sink buffer before anchoring it. */
-        fun isReady(
-            tapContentMs: Double,
-            sinkLatencyMs: Long,
-            speed: Float,
-        ): Boolean = sinkLatencyMs > 0L && tapContentMs >= sinkContentMs(sinkLatencyMs, speed)
-
-        fun capture(
-            tapContentMs: Double,
-            playbackContentMs: Long,
-            sinkLatencyMs: Long,
-            speed: Float,
-        ): TarjiBacklogAnchor {
-            val safeTapMs = tapContentMs.coerceAtLeast(0.0)
-            val sinkContentMs = sinkContentMs(sinkLatencyMs, speed)
-            val initialMs = if (sinkContentMs > 0f) {
-                minOf(safeTapMs, sinkContentMs)
-            } else {
-                safeTapMs
-            }
-            return TarjiBacklogAnchor(
-                tapContentMs = safeTapMs,
-                playbackContentMs = playbackContentMs,
-                backlogContentMs = initialMs.coerceAtMost(MAX_BACKLOG_CONTENT_MS),
-                speed = speed,
-            )
-        }
-
-        private fun sinkContentMs(sinkLatencyMs: Long, speed: Float): Double =
-            sinkLatencyMs.coerceAtLeast(0L) * speed.coerceAtLeast(0f).toDouble()
-
-        private const val MAX_BACKLOG_CONTENT_MS = 400.0
-    }
+/** A real sink presentation timestamp, published on the audio thread. */
+internal data class TarjiSinkPosition(val rendererMs: Double, val wallNanos: Long, val playing: Boolean = true) {
+    fun at(wallNanos: Long, speed: Float, playing: Boolean): Double = rendererMs +
+        // Media3 can sleep for half a large output buffer between sink reads.
+        if (playing && this.playing) ((wallNanos - this.wallNanos) / 1e6).coerceAtLeast(0.0) * speed else 0.0
 }
 
+/** Carry between position ticks, never through a missing/stalled clock. */
+private fun elapsedMs(fromNanos: Long, toNanos: Long): Double =
+    ((toNanos - fromNanos) / 1e6).coerceIn(0.0, 100.0)
+
+/** Stop stale detector output, but let already queued audio reach the ear. */
+internal fun hasAudiblePcm(feedAgeMs: Long, queuedContentMs: Double, playing: Boolean): Boolean =
+    playing && (feedAgeMs in 0 until 350L || queuedContentMs > 0.0)
+
 /**
- * Where the listener's ear is in the tap session's content, at any instant.
- *
- * The tap is fed in bursts — on a phone, ~150 ms of PCM every ~150 ms — so
- * "the newest hop minus the backlog" only moves when a burst lands. Read that
- * way, a 4–6 Hz reverberation reaches the screen as a sample-and-hold at
- * about one and a half samples per cycle: no visible swing, and up to a burst
- * out of step with the voice. The playback head does move smoothly, and the
- * two clocks differ by a constant for the life of a sink session:
- *
- *     content at the ear = playback position − [offsetMs]
- *
- * so the offset is fixed once (the same full-sink baseline
- * [TarjiBacklogAnchor] uses) and every frame reads the detector's history at
- * the playback head itself. A stall holds the read-out with the audio; a
- * gapless handoff to the next ayah, where the position restarts but the PCM
- * runs on, carries the offset across.
- *
- * Main-thread only: fed by the reader's position tick, read by the frame loop.
+ * Maps source PCM to the player's media-item clock using two presentation
+ * clocks sampled at the same instant. Buffer capacity and decoded bursts
+ * never establish the origin. Both clocks already include Bluetooth and
+ * Sonic; seeks and gapless item changes simply supply their new mapping.
+ * Main-thread only.
  */
 internal class TarjiEarClock {
-    private var offsetMs = Double.NaN
+    private var contentMs = Double.NaN
     private var positionMs = 0L
     private var positionWallNanos = 0L
     private var speed = 1f
+    private var playing = false
+    private var hasPosition = false
 
-    val isAnchored: Boolean get() = !offsetMs.isNaN()
+    val isAnchored: Boolean get() = contentMs.isFinite()
+    val isPlaying: Boolean get() = playing
 
     fun reset() {
-        offsetMs = Double.NaN
+        contentMs = Double.NaN
+        hasPosition = false
     }
 
     fun onPosition(
         positionMs: Long,
         wallNanos: Long,
-        tapContentMs: Double,
-        sinkLatencyMs: Long,
+        contentAtHeadMs: Double,
         speed: Float,
+        playing: Boolean,
     ) {
-        if (isAnchored && abs(speed - this.speed) > 0.001f) reset()
-        if (isAnchored && positionMs < this.positionMs - HANDOFF_BACK_MS) {
-            // The next ayah's clock restarts while the sink plays on.
-            offsetMs += positionMs - positionAt(wallNanos)
-        } else if (!isAnchored &&
-            TarjiBacklogAnchor.isReady(tapContentMs, sinkLatencyMs, speed)
-        ) {
-            val anchor = TarjiBacklogAnchor.capture(tapContentMs, positionMs, sinkLatencyMs, speed)
-            offsetMs = positionMs + anchor.backlogContentMs - anchor.tapContentMs
-        }
+        contentMs = contentAtHeadMs
         this.positionMs = positionMs
         this.positionWallNanos = wallNanos
         this.speed = speed
+        this.playing = playing
+        hasPosition = true
     }
 
-    /** Playback position at [wallNanos], carried forward from the last tick. */
-    fun positionAt(wallNanos: Long): Double {
-        val sinceMs = ((wallNanos - positionWallNanos) / 1e6).coerceIn(0.0, MAX_CARRY_MS)
-        return positionMs + sinceMs * speed
-    }
+    /** Audible media position, held exactly while paused/buffering. */
+    fun positionAt(wallNanos: Long): Double = if (!hasPosition) Double.NaN else
+        positionMs + if (playing) elapsedMs(positionWallNanos, wallNanos) * speed else 0.0
 
-    /** Tap-session content time at the ear, or NaN before the sink has filled. */
-    fun contentAtEarMs(wallNanos: Long): Double = positionAt(wallNanos) - offsetMs
+    fun contentAtEarMs(wallNanos: Long): Double = contentMs +
+        if (playing) elapsedMs(positionWallNanos, wallNanos) * speed else 0.0
 
-    /** Media-item position at which content [contentMs] is heard. */
-    fun mediaMsOfContent(contentMs: Double): Double = contentMs + offsetMs
+    /** Source timestamp of an event; output trims never change word ownership. */
+    fun mediaMsOfContent(contentMs: Double): Double = contentMs + (positionMs - this.contentMs)
 
-    private companion object {
-        /** Ticks arrive every ~33 ms while playing; a paused clock must not run on. */
-        const val MAX_CARRY_MS = 100.0
-        /** A backward step without a sink flush is an item handoff, not jitter. */
-        const val HANDOFF_BACK_MS = 200L
+    /** Read the light and graph cursor at one corrected source instant. */
+    fun sampleAtEar(
+        wallNanos: Long, track: TarjiEarTrack, hopMs: Double, out: TarjiEarSample,
+        trimWallMs: Double, phaseLeadMs: Float, displayLeadMs: Float, readHistory: Boolean,
+        generation: Int = -1, rawPulseRateHz: Float = Float.NaN, rawUsesAmplitude: Boolean = true,
+    ): Boolean {
+        out.clear()
+        val trimMs = trimWallMs * speed
+        val displayMs = if (playing) displayLeadMs.coerceAtLeast(0f) * speed else 0f
+        val content = contentAtEarMs(wallNanos) - trimMs + displayMs + phaseLeadMs.coerceAtLeast(0f)
+        val read = readHistory && isAnchored && if (rawPulseRateHz.isNaN()) {
+            track.read(content, hopMs, out, generation)
+        } else {
+            track.readPulse(content, hopMs, out, rawPulseRateHz, rawUsesAmplitude)
+        }
+        val mediaMs = positionAt(wallNanos) - trimMs + displayMs
+        if (mediaMs.isFinite()) out.mediaMs = mediaMs.roundToLong()
+        if (read && out.eventStartHop >= 0) {
+            out.eventStartMediaMs = mediaMsOfContent(out.eventStartHop * hopMs).roundToLong()
+        }
+        return read
     }
 }
 
@@ -287,8 +227,14 @@ class TarjiEarSample {
     var eventStartHop = -1
     /** That hop on the media-item clock; [VoiceEnergy.NO_EVENT_MS] if unknown. */
     var eventStartMediaMs = Long.MIN_VALUE
+    /** The pulse's rate at the ear, 0 before one is measured. */
+    var rateHz = 0f
+    /** The media-item position this sample was read at; [Long.MIN_VALUE] if unknown. */
+    var mediaMs = Long.MIN_VALUE
 
     fun clear() {
+        rateHz = 0f
+        mediaMs = Long.MIN_VALUE
         tremolo = 0f
         gain = 0f
         reverberating = false
@@ -314,6 +260,11 @@ internal class TarjiEarTrack {
     private val usesAmplitude = BooleanArray(HOPS)
     private val gain = FloatArray(HOPS)
     private val eventStartHop = IntArray(HOPS)
+    private val generation = IntArray(HOPS)
+
+    /** Centre of the first hop returned by [copyRecentRms], or -1 if empty. */
+    var recentRmsStartHop = -1
+        private set
 
     @Volatile
     var published = 0
@@ -321,6 +272,7 @@ internal class TarjiEarTrack {
 
     fun clear() {
         published = 0
+        recentRmsStartHop = -1
     }
 
     /** Record zero-based [hop]; [eventStartHop] is -1 unless reverberating. */
@@ -333,6 +285,7 @@ internal class TarjiEarTrack {
         usesAmplitude: Boolean,
         gain: Float,
         eventStartHop: Int,
+        generation: Int = 0,
     ) {
         if (hop < 0) return
         val slot = hop % HOPS
@@ -343,6 +296,7 @@ internal class TarjiEarTrack {
         this.usesAmplitude[slot] = usesAmplitude
         this.gain[slot] = gain
         this.eventStartHop[slot] = eventStartHop
+        this.generation[slot] = generation
         published = hop + 1
     }
 
@@ -352,7 +306,7 @@ internal class TarjiEarTrack {
      * voice itself at that instant (see [TarjiEarPulse]). Clamped to what is
      * held; false while nothing is.
      */
-    fun read(contentMs: Double, hopMs: Double, out: TarjiEarSample): Boolean {
+    fun read(contentMs: Double, hopMs: Double, out: TarjiEarSample, generation: Int = -1): Boolean {
         out.clear()
         val count = published
         if (count == 0 || hopMs <= 0.0) return false
@@ -364,11 +318,15 @@ internal class TarjiEarTrack {
         val fraction = (position - before).toFloat()
         val a = before % HOPS
         val b = after % HOPS
-        out.gain = gain[a] + fraction * (gain[b] - gain[a])
+        val currentA = generation < 0 || this.generation[a] == generation
+        val currentB = generation < 0 || this.generation[b] == generation
+        val gainA = if (currentA) gain[a] else 0f
+        val gainB = if (currentB) gain[b] else 0f
+        out.gain = gainA + fraction * (gainB - gainA)
         // Same edge rule as the hop mirrors: the event switches where the
         // interpolated read-out crosses the midpoint between two hops.
-        val heldBefore = eventStartHop[a] >= 0
-        val heldAfter = eventStartHop[b] >= 0
+        val heldBefore = currentA && eventStartHop[a] >= 0
+        val heldAfter = currentB && eventStartHop[b] >= 0
         val held = if (heldBefore == heldAfter) heldBefore
             else if (heldAfter) fraction >= 0.5f else fraction < 0.5f
         out.reverberating = held
@@ -377,16 +335,47 @@ internal class TarjiEarTrack {
         // The pulse lives at hop centres. One channel and one period for the
         // pair being interpolated, taken from the hop the event is read at.
         val mode = if (heldBefore || !heldAfter) a else b
+        out.rateHz = if (generation < 0 || this.generation[mode] == generation) rateHz[mode] else 0f
         val period = TarjiEarPulse.periodHops(rateHz[mode], hopMs)
-        val centre = contentMs / hopMs - 0.5 + if (usesAmplitude[mode]) 0f else pitchLead[mode]
+        out.tremolo = pulseAt(contentMs, hopMs, oldest, newest, period, usesAmplitude[mode], pitchLead[mode])
+        return true
+    }
+
+    /** Read only the measured voice; offline decisions never replace the tap's phase. */
+    fun readPulse(contentMs: Double, hopMs: Double, out: TarjiEarSample, rateHz: Float, usesAmplitude: Boolean): Boolean {
+        out.clear()
+        val count = published
+        if (count == 0 || hopMs <= 0.0) return false
+        val oldest = maxOf(0, count - HOPS + 1)
+        val newest = count - 1
+        val slot = (contentMs / hopMs - 1.0).coerceIn(oldest.toDouble(), newest.toDouble()).toInt() % HOPS
+        out.rateHz = rateHz
+        out.tremolo = pulseAt(contentMs, hopMs, oldest, newest,
+            TarjiEarPulse.periodHops(rateHz, hopMs), usesAmplitude, pitchLead[slot])
+        return true
+    }
+
+    /** Most-recent contiguous voice samples, ordered oldest to newest. Main thread. */
+    fun copyRecentRms(destination: FloatArray): Int {
+        val count = published
+        val size = minOf(destination.size, count, HOPS - 1)
+        recentRmsStartHop = if (size > 0) count - size else -1
+        for (i in 0 until size) destination[i] = hopRms[(count - size + i) % HOPS]
+        return size
+    }
+
+    private fun pulseAt(
+        contentMs: Double, hopMs: Double, oldest: Int, newest: Int,
+        period: Int, amplitude: Boolean, pitchLeadHops: Float,
+    ): Float {
+        val centre = contentMs / hopMs - 0.5 + if (amplitude) 0f else pitchLeadHops
         val at = centre.coerceIn(oldest.toDouble(), newest.toDouble())
         val first = at.toInt()
         val second = minOf(first + 1, newest)
-        val firstPulse = pulse(first, oldest, newest, period, usesAmplitude[mode])
+        val firstPulse = pulse(first, oldest, newest, period, amplitude)
         val secondPulse = if (second == first) firstPulse
-            else pulse(second, oldest, newest, period, usesAmplitude[mode])
-        out.tremolo = firstPulse + (at - first).toFloat() * (secondPulse - firstPulse)
-        return true
+            else pulse(second, oldest, newest, period, amplitude)
+        return firstPulse + (at - first).toFloat() * (secondPulse - firstPulse)
     }
 
     private fun pulse(hop: Int, oldest: Int, newest: Int, period: Int, amplitude: Boolean): Float =

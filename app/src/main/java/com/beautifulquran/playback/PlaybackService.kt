@@ -4,6 +4,7 @@ import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
 import android.media.AudioManager
+import android.media.AudioTrack
 import android.net.ConnectivityManager
 import androidx.core.content.getSystemService
 import androidx.media3.common.AudioAttributes
@@ -97,7 +98,7 @@ class PlaybackService : MediaLibraryService() {
             getSystemService(AudioManager::class.java),
         )
         serviceScope.launch {
-            refreshAudioOutputOnRouteChange(player, (application as QuranApp).outputLatency.latencyMs)
+            refreshAudioOutputOnRouteChange(player, (application as QuranApp).outputRoutes.deviceId)
         }
 
         // Notification / lock-screen content tap opens the app. Without this,
@@ -116,10 +117,11 @@ class PlaybackService : MediaLibraryService() {
     /**
      * The player's renderers, with [VoiceTapAudioProcessor] tapped into the
      * audio sink so [VoiceEnergy] sees the PCM the listener hears — no mic or
-     * Visualizer permission needed. The tap is handed the sink it runs in so
-     * it can read the real AudioTrack buffer for the ear delay.
+     * Visualizer permission needed. The sink wrapper publishes both source
+     * PTS and actual presentation time, without guessing an output delay.
      */
     @androidx.annotation.OptIn(androidx.media3.common.util.UnstableApi::class)
+    @Suppress("DEPRECATION") // Media3's public factory is the hook that exposes the actual AudioTrack.
     private fun tarjiRenderersFactory(context: Context): DefaultRenderersFactory =
         object : DefaultRenderersFactory(context) {
             override fun buildAudioSink(
@@ -128,13 +130,19 @@ class PlaybackService : MediaLibraryService() {
                 enableAudioTrackPlaybackParams: Boolean,
             ): AudioSink {
                 val tap = VoiceTapAudioProcessor()
+                val routes = (application as QuranApp).outputRoutes
                 val sink = DefaultAudioSink.Builder(context)
                     .setEnableFloatOutput(enableFloatOutput)
                     .setEnableAudioTrackPlaybackParams(enableAudioTrackPlaybackParams)
                     .setAudioProcessors(arrayOf(VerseSeamAudioProcessor(), tap))
+                    .setAudioTrackProvider(object : DefaultAudioSink.AudioTrackProvider {
+                        override fun getAudioTrack(config: AudioSink.AudioTrackConfig, attributes: AudioAttributes,
+                            audioSessionId: Int, context: Context?): AudioTrack =
+                            DefaultAudioSink.AudioTrackProvider.DEFAULT
+                                .getAudioTrack(config, attributes, audioSessionId, context).also(routes::attach)
+                    })
                     .build()
-                tap.attach(sink)
-                return sink
+                return tap.attach(sink)
             }
         }
 
@@ -384,6 +392,7 @@ class PlaybackService : MediaLibraryService() {
 
     override fun onDestroy() {
         serviceScope.cancel()
+        (application as QuranApp).outputRoutes.detach()
         prefetcher?.release()
         prefetcher = null
         assistantAudioResume?.release()

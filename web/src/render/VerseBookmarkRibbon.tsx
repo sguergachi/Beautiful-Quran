@@ -46,6 +46,7 @@ type Props = {
   ariaLabel?: string
   /** Paint-only use inside a larger navigation target. */
   decorative?: boolean
+  tabIndex?: number
 }
 
 function parseRuby(cssColor: string): { r: number; g: number; b: number } {
@@ -81,6 +82,7 @@ export function VerseBookmarkRibbon({
   bottomGap = BOTTOM_GAP,
   ariaLabel,
   decorative = false,
+  tabIndex,
 }: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const wrapRef = useRef<HTMLButtonElement>(null)
@@ -409,7 +411,7 @@ export function VerseBookmarkRibbon({
       }
       aria-hidden={decorative || undefined}
       aria-pressed={decorative ? undefined : bookmarked}
-      tabIndex={decorative ? -1 : undefined}
+      tabIndex={decorative ? -1 : tabIndex}
       onClick={onClick}
       onFocus={() => setRibbonFocused(true)}
       onBlur={() => setRibbonFocused(false)}

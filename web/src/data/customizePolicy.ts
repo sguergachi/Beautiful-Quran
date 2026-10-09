@@ -8,6 +8,11 @@ import type { WordSearchSources } from '../domain/WordSearch'
 
 export const MUSHAF_VIEW_MODES: ReadingMode[] = ['arabic_only', 'english_only']
 
+/** Navigation preferences cannot change a kept leaf's ink or paper. */
+export function readingAppearanceKey(settings: Settings): string {
+  return JSON.stringify({ ...settings, lastSurah: 0, lastAyah: 0, lastReadSurah: 0, lastReadAyah: 0 })
+}
+
 /** Bilingual has no printed leaf, so entering mushaf from it lands on Arabic. */
 export function applyReadingLayout(
   settings: Settings,

@@ -17,9 +17,8 @@ import com.beautifulquran.playback.PlayerController
 import com.beautifulquran.playback.PlayerUiState
 import com.beautifulquran.playback.TarjiLabCapture
 import com.beautifulquran.playback.TarjiLabTrim
+import com.beautifulquran.playback.TarjiDetectorMode
 import com.beautifulquran.playback.VoiceEnergy
-import com.beautifulquran.playback.mapTapContentToMediaMs
-import com.beautifulquran.playback.sonicContentLatencyMs
 import com.beautifulquran.ui.reader.InkEngine
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
@@ -35,8 +34,8 @@ import kotlin.math.roundToInt
 
 /**
  * Capture one word and tune the live detector against it. The loop plays
- * the selected window. Knob edits re-run the
- * pure [com.beautifulquran.playback.Tarji] detector over the same PCM.
+ * the selected window. Method and knob edits re-run pure detection over the
+ * same PCM, while the shared voice waveform supplies the light's phase.
  */
 class TarjiLabViewModel(
     private val repository: QuranRepository,
@@ -62,6 +61,8 @@ class TarjiLabViewModel(
         val capture: TarjiLabCapture? = null,
         val firstHopMediaMs: Double = 0.0,
         val trace: TarjiLabTrace? = null,
+        /** Session-only developer choice; excluded from samples and reciter profiles. */
+        val mode: TarjiDetectorMode = InkEngine.tarjiDetectorMode,
         val knobs: TarjiLabKnobs = TarjiLabKnobs(),
         val reference: TarjiLabReference? = null,
         val showingReference: Boolean = false,
@@ -94,6 +95,17 @@ class TarjiLabViewModel(
     ) {
         val displayTrace: TarjiLabTrace? get() = if (showingReference) reference?.trace else trace
         val displayKnobs: TarjiLabKnobs get() = if (showingReference) reference?.knobs ?: knobs else knobs
+
+        /** A result belongs to one capture, method and detector tuning. Brightness is paint-only. */
+        internal fun acceptsAnalysis(capture: TarjiLabCapture, knobs: TarjiLabKnobs, mode: TarjiDetectorMode): Boolean =
+            this.capture === capture && this.mode == mode &&
+                this.knobs.copy(glintBrightness = knobs.glintBrightness) == knobs
+
+        /** Change admission without stopping the audio or reusing another method's decisions. */
+        internal fun forMode(mode: TarjiDetectorMode): TarjiLabUiState = copy(
+            mode = mode, trace = null, reference = null, showingReference = false,
+            analyzing = capture != null, note = null,
+        )
 
         /** Freeze this capture and displayed tuning before opening the system save picker. */
         fun sampleForExport(): TarjiLabSample? {
@@ -291,6 +303,8 @@ class TarjiLabViewModel(
                     span.last
                 }
                 val positionMs = player.positionMs
+                // Settings entry need not have a reader polling this chapter.
+                ve.updatePlaybackPosition(positionMs, playing = player.state.value.isPlaying)
                 val nowPlaying = player.liveNowPlaying
                 if (!seekLanded) {
                     seekLanded = nowPlaying?.surahId == st.surahId &&
@@ -361,25 +375,20 @@ class TarjiLabViewModel(
         val ve = captureProbe
         captureProbe = null
         val st = _ui.value
+        ve?.updatePlaybackPosition(player.positionMs, playing = player.state.value.isPlaying)
         val capture = ve?.disarmCapture()
+        val firstHopMediaMs = capture?.hopContentMs?.firstOrNull()
+            ?.let { ve.mediaMsOfContent(it.toDouble()) } ?: Double.NaN
         restorePlayer()
-        if (error != null || capture == null) {
+        if (error != null || capture == null || !firstHopMediaMs.isFinite()) {
             _ui.value = st.copy(
                 capturing = false,
                 captureProgress = 0f,
-                captureError = error ?: "No audio was captured — playback did not run.",
+                captureError = error ?: if (capture == null) "No audio was captured — playback did not run."
+                    else "The audio clock was unavailable. Retry the capture.",
             )
             return
         }
-        val speed = 1f // Muted capture always runs at unity speed.
-        val backlog = ve.measuredBacklogContentMs.takeIf { it >= 0.0 }
-            ?: (ve.sinkLatencyMs * speed + sonicContentLatencyMs(speed)).toDouble()
-        val firstHopMediaMs = mapTapContentToMediaMs(
-            playbackPositionMs = player.positionMs,
-            tapContentMs = ve.sessionContentMs,
-            eventStartContentMs = capture.hopContentMs[0].toDouble(),
-            backlogContentMs = backlog,
-        ).toDouble()
         val span = TarjiLabTrim.wordSpanMs(
             ayahSegments,
             st.wordPosition,
@@ -436,31 +445,42 @@ class TarjiLabViewModel(
 
     // ── Offline analysis ───────────────────────────────────────────────────
 
+    /** One global developer method, with a fresh capture analysis and uninterrupted preview audio. */
+    fun selectMode(mode: TarjiDetectorMode) {
+        if (_ui.value.mode == mode) return
+        cancelPulseMatch()
+        InkEngine.tarjiDetectorMode = mode
+        _ui.value = _ui.value.forMode(mode)
+        reanalyze()
+    }
+
     /** Re-run the detector over the captured stream with the current knobs.
      * Pure DSP on a background thread; the preview keeps playing under it. */
     private fun reanalyze() {
         if (_ui.value.capture == null) return
         analyzeJob?.cancel()
-        _ui.value = _ui.value.copy(analyzing = true)
+        _ui.value = _ui.value.copy(trace = null, analyzing = true)
         analyzeJob = viewModelScope.launch {
             while (true) {
                 val st = _ui.value
                 val capture = st.capture ?: return@launch
                 val trace = withContext(Dispatchers.Default) {
-                    analyzeTarjiCapture(capture, st.knobs)
+                    analyzeTarjiCapture(capture, st.knobs, st.mode, st.reciter?.id ?: 0) {
+                        coroutineContext.ensureActive()
+                        true
+                    }
                 }
+                coroutineContext.ensureActive()
                 val live = _ui.value
                 if (live.capture !== capture) return@launch
-                // Brightness is render-only; every detector edit still needs a replay.
-                val pending = live.knobs.copy(glintBrightness = st.knobs.glintBrightness) != st.knobs
+                // Coalesce edits, but never paint a completed result under newer knobs or a new method.
+                if (!live.acceptsAnalysis(capture, st.knobs, st.mode)) continue
                 _ui.value = live.copy(
                     trace = trace,
                     reference = live.reference ?: TarjiLabReference(st.knobs, trace),
-                    analyzing = pending,
+                    analyzing = false,
                 )
-                if (!pending) return@launch
-                // Edits coalesce into the next replay rather than canceling
-                // every frame or waiting for the finger to stop moving.
+                return@launch
             }
         }
     }
@@ -477,7 +497,7 @@ class TarjiLabViewModel(
             val match = withContext(Dispatchers.Default) { matchTarjiPulse(capture, window, st.knobs) }
             matchJob = null
             _ui.value = _ui.value.copy(matchingPulse = false)
-            if (_ui.value.capture !== capture || _ui.value.knobs != st.knobs) return@launch
+            if (_ui.value.capture !== capture || _ui.value.knobs != st.knobs || _ui.value.mode != st.mode) return@launch
             if (match == null) {
                 _ui.value = _ui.value.copy(note = "No clear pulse · select a longer, steady section")
                 return@launch
@@ -508,6 +528,7 @@ class TarjiLabViewModel(
         cancelPulseMatch()
         persistKnobs(knobs)
         _ui.value = _ui.value.copy(knobs = knobs, showingReference = false, note = null,
+            trace = if (detectorChanged) null else _ui.value.trace,
             canUndo = knobHistory.canUndo, canRedo = knobHistory.canRedo,
             analyzing = _ui.value.analyzing || (detectorChanged && _ui.value.capture != null))
         if (detectorChanged && analyzeJob?.isActive != true) reanalyze()
@@ -997,6 +1018,9 @@ class TarjiLabViewModel(
 
     /** Refresh analysis after returning from the background; audio stays paused. */
     fun onResume() {
+        if (_ui.value.mode != InkEngine.tarjiDetectorMode) {
+            _ui.value = _ui.value.forMode(InkEngine.tarjiDetectorMode)
+        }
         if (_ui.value.capture != null) reanalyze()
     }
 
@@ -1011,6 +1035,9 @@ class TarjiLabViewModel(
         val interruptedCapture = _ui.value.capturing || _ui.value.isLoading
         abortCapture()
         _ui.value = _ui.value.copy(
+            trace = null,
+            reference = null,
+            showingReference = false,
             analyzing = false,
             isLoading = false,
             captureError = if (interruptedCapture) "Capture interrupted. Retry this word." else _ui.value.captureError,
@@ -1035,8 +1062,8 @@ class TarjiLabViewModel(
     }
 
     companion object {
-        private const val CAPTURE_LEAD_MS = 300L
-        private const val CAPTURE_TAIL_MS = 1_000L
+        private const val CAPTURE_LEAD_MS = TarjiLabTrim.WORD_LEAD_MS
+        private const val CAPTURE_TAIL_MS = TarjiLabTrim.WORD_TAIL_MS
         /** Audio heard before the span, for the detector only: longer than
          * its 1.3 s analysis window, so a hold carried in from the previous
          * word arrives exactly as the reader's detector holds it. */

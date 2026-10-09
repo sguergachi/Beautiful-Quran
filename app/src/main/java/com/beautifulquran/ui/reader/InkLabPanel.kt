@@ -32,6 +32,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.beautifulquran.playback.Tarji
 import com.beautifulquran.ui.theme.ContextualGuideTuning
@@ -109,7 +110,7 @@ fun InkLabPanel(
             Spacer(Modifier.height(2.dp))
             Column(
                 modifier = Modifier
-                    .heightIn(max = 136.dp)
+                    .heightIn(max = 220.dp)
                     .verticalScroll(rememberScrollState(), reverseScrolling = false),
             ) {
                 val t = InkEngine.tuning
@@ -341,11 +342,9 @@ fun InkLabPanel(
                             InkEngine.tuning = t.copy(tarjiEarDelayMs = it)
                         }
                         LabCaption(
-                            "Extra delay so the pulse lands on the voice: the " +
-                                "shimmer already lags by the route preset + " +
-                                "measured sink buffer, in lockstep with the " +
-                                "word ink. Raise if it still trails the " +
-                                "vibration, lower if it leads. Shipped 0.",
+                            "Extra delay for the pulse and graph. Both follow the " +
+                                "audible playback clock. Raise if the light leads " +
+                                "the voice, lower if it trails. Shipped 0.",
                         )
                         LabCaption(
                                 "How fast the detection gain ramps in (attack) " +
@@ -359,23 +358,78 @@ fun InkLabPanel(
                         TuningToggle("Tarjīʿ light", t.glintResonance) {
                             InkEngine.tuning = t.copy(glintResonance = it)
                         }
+                        LabCaption("Detection method: " + InkEngine.tarjiDetectorMode.label)
+                        for (mode in com.beautifulquran.playback.TarjiDetectorMode.entries.drop(1)) {
+                            TuningToggle(mode.label, InkEngine.tarjiDetectorMode == mode) {
+                                InkEngine.tarjiDetectorMode = if (it) mode
+                                    else com.beautifulquran.playback.TarjiDetectorMode.Current
+                            }
+                        }
+                        LabCaption(
+                            "Turn all three off for Current. Switching starts fresh evidence; replay " +
+                                "the held word to compare. The choice lasts for this session.",
+                        )
+                        LabCaption(
+                            when (InkEngine.tarjiDetectorMode) {
+                                com.beautifulquran.playback.TarjiDetectorMode.Current ->
+                                    "Current uses the shipped detector and its existing reciter tuning."
+                                com.beautifulquran.playback.TarjiDetectorMode.Cycles ->
+                                    "Cycles checks repeated peaks and troughs in amplitude or pitch."
+                                com.beautifulquran.playback.TarjiDetectorMode.Spectrum ->
+                                    "Spectrum checks a repeating wave against a trend, including both halves."
+                                com.beautifulquran.playback.TarjiDetectorMode.Recording ->
+                                    TarjiVersePulse.recordingStatus
+                            },
+                        )
+                        if (InkEngine.tarjiDetectorMode != com.beautifulquran.playback.TarjiDetectorMode.Current) {
+                            LabCaption("Experiments use 20 ms amplitude measurements: at least 3.5% depth, " +
+                                "or 10 cents of fresh pitch movement. Sensitivity differs from Current.")
+                        }
                         TarjiStatusLine()
+                        TarjiWordLine()
+                        TuningToggle("Mark candidates", InkEngine.tarjiMarkCandidates) {
+                            InkEngine.tarjiMarkCandidates = it
+                        }
+                        if (InkEngine.tarjiMarkCandidates) {
+                            // Only when there is something to say: a verse
+                            // being worked out, or one that could not be.
+                            val failure = TarjiVersePulse.lastFailure
+                            val working = TarjiVersePulse.working
+                            val report = TarjiVersePulse.lastReport
+                            if (working > 0 || failure != null || report != null) {
+                                LabCaption(
+                                    listOfNotNull(
+                                        "working out $working verse(s)".takeIf { working > 0 },
+                                        failure?.let { "failed — $it" },
+                                        report?.let { "last: $it" },
+                                    ).joinToString(" · "),
+                                )
+                            }
+                        }
                         LabCaption(
                             "The word's light answers the voice: brighter on " +
                                 "each reverberation, slightly dimmer between. " +
                                 "Brightness only — the hue never changes. Aim " +
                                 "for just enough to feel it.",
                         )
-                        TuningSlider("Brighten on crest", t.tarjiLightRise, 0f..0.4f) {
+                        TuningSlider("Brighten on crest", t.tarjiLightRise, 0f..0.3f) {
                             InkEngine.tuning = t.copy(tarjiLightRise = it)
                         }
                         TuningSlider("Dim in trough", t.tarjiLightFall, 0f..0.3f) {
                             InkEngine.tuning = t.copy(tarjiLightFall = it)
                         }
                         LabCaption(
-                            "How far the light lifts and falls, as a fraction " +
-                                "of its resting brightness. Keep the dim under " +
-                                "the lift so it never seems to drop out.",
+                            "How far the letters' light lifts and falls, as a " +
+                                "fraction of its resting brightness. Keep the " +
+                                "dim under the lift.",
+                        )
+                        TuningSlider("Letter rest light", t.glintRestLight, 0.7f..1f) {
+                            InkEngine.tuning = t.copy(glintRestLight = it)
+                        }
+                        LabCaption(
+                            "Letters can only brighten up to their own colour. " +
+                                "Resting lower leaves them room to rise: at " +
+                                "0.89 they have 13%; past that only the glow lifts.",
                         )
                         TuningSlider("Smoothness ms", t.tarjiLightSmoothMs, 0f..160f, integer = true) {
                             InkEngine.tuning = t.copy(tarjiLightSmoothMs = it)
@@ -384,18 +438,19 @@ fun InkLabPanel(
                             "Higher is a slower, softer swell. Its lag is read " +
                                 "ahead of the voice, so sync does not move.",
                         )
-                        TuningSlider("Glow swing ×", t.tarjiGlowGain, 0f..6f) {
+                        TuningSlider("Glow swing ×", t.tarjiGlowGain, 0f..16f) {
                             InkEngine.tuning = t.copy(tarjiGlowGain = it)
                         }
                         LabCaption(
-                            "How much further the glow moves than the glyphs. " +
-                                "The glow is where the eye reads brightness.",
+                            "How many times further the glow's light moves " +
+                                "than the letters'. The glow is where the eye " +
+                                "reads brightness.",
                         )
                         TuningSlider("Pulse depth", t.glintResonanceDepth, 0f..1f) {
                             InkEngine.tuning = t.copy(glintResonanceDepth = it)
                         }
                         LabCaption("The glow itself, pulse or no pulse — widest to tightest:")
-                        TuningSlider("Veil strength", t.glintVeilAlpha, 0f..0.6f) {
+                        TuningSlider("Veil strength", t.glintVeilAlpha, 0f..1f) {
                             InkEngine.tuning = t.copy(glintVeilAlpha = it)
                         }
                         TuningSlider("Veil warmth", t.glintVeilWarmth, 0f..1f) {
@@ -411,7 +466,7 @@ fun InkLabPanel(
                             InkEngine.tuning = t.copy(glintBloomAlpha = it)
                         }
                         LabCaption(
-                            "Veil is ${InkEngine.GLINT_VEIL_RADIUS}× the halo's blur and faintly " +
+                            "Blur is in dp. Veil is ${InkEngine.GLINT_VEIL_RADIUS}× the halo's blur and faintly " +
                                 "warm; bloom is ${InkEngine.GLINT_BLOOM_RADIUS}× and hugs the letters.",
                         )
                     }
@@ -612,6 +667,7 @@ internal fun formatTuningCopy(t: InkEngine.Tuning): String {
         appendLine("    glintVeilAlpha = ${f(t.glintVeilAlpha)},")
         appendLine("    glintVeilWarmth = ${f(t.glintVeilWarmth)},")
         appendLine("    tarjiLightRise = ${f(t.tarjiLightRise)},")
+        appendLine("    glintRestLight = ${f(t.glintRestLight)},")
         appendLine("    tarjiLightFall = ${f(t.tarjiLightFall)},")
         appendLine("    tarjiLightSmoothMs = ${f(t.tarjiLightSmoothMs)},")
         appendLine("    tarjiGlowGain = ${f(t.tarjiGlowGain)},")
@@ -639,6 +695,8 @@ internal fun formatTuningCopy(t: InkEngine.Tuning): String {
         appendLine("    tarjiHoldMinMs = ${f(t.tarjiHoldMinMs)},")
         appendLine("    tarjiMinDepth = ${f(t.tarjiMinDepth)},")
         appendLine("    tarjiMinPeriodicity = ${f(t.tarjiMinPeriodicity)},")
+        appendLine("    tarjiMinVolume = ${f(t.tarjiMinVolume)},")
+        appendLine("    tarjiMinDrama = ${f(t.tarjiMinDrama)},")
         appendLine("    tarjiPitchDrift = ${f(t.tarjiPitchDrift)},")
         appendLine("    tarjiAttackMs = ${f(t.tarjiAttackMs)},")
         appendLine("    tarjiReleaseMs = ${f(t.tarjiReleaseMs)},")
@@ -804,23 +862,28 @@ private fun LabCaption(text: String) {
  */
 @Composable
 private fun TarjiStatusLine() {
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val mode = InkEngine.tarjiDetectorMode
+    val sample = remember { com.beautifulquran.playback.TarjiEarSample() }
     var status by remember { mutableStateOf("…") }
     val idleColor = MaterialTheme.colorScheme.onSurfaceVariant
     var signalColor by remember { mutableStateOf(idleColor) }
     val gold = Color(0xFFF8E9BE) // the glint's white-gold
-    androidx.compose.runtime.LaunchedEffect(Unit) {
+    androidx.compose.runtime.LaunchedEffect(mode) {
         while (true) {
             val v = com.beautifulquran.playback.VoiceEnergy.active
+            if (v != null) TarjiVersePulse.sampleAtEar(context, v, System.nanoTime(), sample)
+                else sample.clear()
             status = when {
                 v == null -> "no probe (player not created)"
                 !v.isLive -> "silent — no PCM from the player"
                 else -> {
                     val ear = " · ear +${v.earDelayTotalMs} ms"
-                    val tr = " · tr ${"%.2f".format(v.tremolo)}"
+                    val tr = " · tr " + "%.2f".format(sample.tremolo)
                     val depth = " · depth ${"%.2f".format(InkEngine.tuning.glintResonanceDepth)}"
-                    if (v.reverberating) {
+                    if (sample.reverberating) {
                         "tarjīʿ · hold ${"%.1f".format(v.holdMs / 1000f)}s · " +
-                            "${"%.1f".format(v.rateHz)} Hz · gain ${"%.2f".format(v.shimmerGain)}" +
+                            "%.1f".format(sample.rateHz) + " Hz · gain " + "%.2f".format(sample.gain) +
                             ear + tr + depth
                     } else if (v.holdMs > 0f) {
                         "holding ${"%.1f".format(v.holdMs / 1000f)}s · " +
@@ -836,12 +899,14 @@ private fun TarjiStatusLine() {
     // Frame-driven flicker meter: gold on the vibration's crests, normal at
     // the troughs, gated by the rendered gain — the line pulses at exactly
     // the rate the shimmer does.
-    androidx.compose.runtime.LaunchedEffect(Unit) {
+    androidx.compose.runtime.LaunchedEffect(mode) {
+        val frame = com.beautifulquran.playback.TarjiEarSample()
         while (true) {
-            withFrameNanos {
+            withFrameNanos { now ->
                 val v = com.beautifulquran.playback.VoiceEnergy.active
-                val g = v?.shimmerGain ?: 0f
-                val tr = v?.tremolo ?: 0f
+                if (v != null) TarjiVersePulse.sampleAtEar(context, v, now, frame) else frame.clear()
+                val g = frame.gain
+                val tr = frame.tremolo
                 signalColor = if (g > 0.01f && tr >= SIGNAL_METER_THRESHOLD) gold else idleColor
             }
         }
@@ -850,10 +915,51 @@ private fun TarjiStatusLine() {
         text = "Detector: $status",
         style = MaterialTheme.typography.labelSmall,
         color = signalColor,
+        // Two lines always: the readout grows and shrinks with play and
+        // pause, and must not push the dials under the finger about.
+        minLines = 2,
+        maxLines = 2,
+        overflow = TextOverflow.Ellipsis,
         modifier = Modifier
             .fillMaxWidth()
             .padding(bottom = 4.dp),
     )
+}
+
+/** Why the lit word is or is not pulsing: its own gates, apart from the detector's. */
+@Composable
+private fun TarjiWordLine() {
+    var status by remember { mutableStateOf("…") }
+    androidx.compose.runtime.LaunchedEffect(Unit) {
+        while (true) {
+            val p = InkEngine.TarjiProbe
+            val t = InkEngine.tuning
+            status = when {
+                p.wordStartMs < 0 -> "no word lit yet"
+                !p.eligible -> "not eligible — no madd, ghunnah or verse-end hold in its letters"
+                !p.admitted -> "eligible · waiting for a reverberation that starts inside it"
+                else -> "pulsing · gain ${"%.2f".format(p.gain)} · light ${signedPercent(p.glow, t)}"
+            }
+            kotlinx.coroutines.delay(100)
+        }
+    }
+    Text(
+        text = "Word: $status",
+        style = MaterialTheme.typography.labelSmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        minLines = 2,
+        maxLines = 2,
+        overflow = TextOverflow.Ellipsis,
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(bottom = 4.dp),
+    )
+}
+
+private fun signedPercent(glow: Float, t: InkEngine.Tuning): String {
+    val level = com.beautifulquran.ui.theme.glintLightLevel(
+        glow, t.glintBrightness, t.tarjiLightRise, t.tarjiLightFall)
+    return "%+.1f%%".format((level - 1f) * 100f)
 }
 
 /** Crest level of the synced tarjīʿ signal that lights the detector line

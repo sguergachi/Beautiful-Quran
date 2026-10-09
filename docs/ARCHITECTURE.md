@@ -25,7 +25,8 @@ app (runtime)                                           ▼
    PlayerController ─┬─ MediaController → PlaybackService (ExoPlayer + cache)
                      └─ PlayerUiState StateFlow (what's playing, where)
    HighlightEngine ── pure: (segments, positionMs) → active word position
-   OutputLatency ── manual clock correction + PCM presets; AudioOutputLatency watches BT/speaker
+   OutputLatency ── manual clock correction; AudioOutputRoutes watches the track's actual device
+   VoiceTapAudioProcessor → VoiceEnergy ── source PTS + sink presentation clock → frame-time pulse
    ViewModels ── HomeViewModel, ReaderViewModel, SettingsViewModel, …
    UI ── four sheets (Bookmarks, Home, Reader, Settings) + ink-bleed overlays
          (notification prompt, Root Word Viewer, Timings Lab)

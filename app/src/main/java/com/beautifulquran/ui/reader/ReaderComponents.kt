@@ -135,6 +135,7 @@ import com.beautifulquran.domain.EnglishTypography
 import com.beautifulquran.domain.TajweedPacing
 import com.beautifulquran.ui.reader.focus.FocusEngine
 import com.beautifulquran.ui.theme.ArabicTitleStyle
+import com.beautifulquran.ui.theme.drawPulseTrace
 import com.beautifulquran.ui.theme.ArabicWordStyle
 import com.beautifulquran.ui.theme.GeneratedChapterRosette
 import com.beautifulquran.ui.theme.HafsFontFamily
@@ -1079,7 +1080,7 @@ internal fun rememberWaslProgress(
  * scrolls the sheet (see [wordUnitBehavior] / [shapedActiveWordInView]).
  * Shared with [ReaderScreen] so the focus engine's bottom guard matches. */
 internal val ActiveWordBottomMargin = 132.dp
-private val GlintLayerBleed = 24.dp
+private val GlintLayerBleed = 40.dp
 
 /** Measures a target as (top, bottom) in LazyColumn viewport pixels. */
 private typealias ViewportBoundsMeasure = () -> Pair<Float, Float>?
@@ -1166,6 +1167,10 @@ internal class InkMotion(
      * closers (1:7 الضَّالِّينَ).
      */
     private val tarji: State<InkEngine.GlintResonance>,
+    /** Ink Lab: this word may pulse and the lab is marking the ones that may —
+     * its recorded pulse, and the green to draw it in. */
+    val tarjiTrace: InkEngine.TarjiTrace? = null,
+    val tarjiTraceColor: Color = Color.Unspecified,
 ) {
     val isActive: Boolean get() = ink.state == InkEngine.State.Active
     val repeat: Boolean get() = ink.repeat
@@ -1225,7 +1230,7 @@ internal class InkMotion(
 
     /** Live lit colour, read by both paint adapters inside their draw scopes. */
     fun glintColor(base: Color): Color =
-        com.beautifulquran.ui.theme.glintLightColor(base, glintLevel)
+        com.beautifulquran.ui.theme.glintLightColor(base, glintLevel, InkEngine.tuning.glintRestLight)
 
     /** The veil's colour: the same light, warmed toward its edge. */
     fun glintVeilColor(base: Color): Color =
@@ -1238,7 +1243,8 @@ internal class InkMotion(
      * further than the glyphs do. */
     fun glintGlowColorAlpha(base: Float): Float =
         com.beautifulquran.ui.theme.glintGlowAlpha(
-            InkEngine.glintRestAlpha(base), glintLevel, InkEngine.tuning.tarjiGlowGain)
+            InkEngine.glintRestAlpha(base), glintLevel, InkEngine.tuning.tarjiGlowGain,
+            InkEngine.tuning.glintRestLight)
 
     /** Whether the orange repeat overlay still has any ink to show. */
     val showRepeatLayer: Boolean get() = repeatAlpha > 0f
@@ -1270,6 +1276,12 @@ private fun Modifier.layeredBaseInk(motion: InkMotion, rtl: Boolean): Modifier =
         feather = motion.washFeather,
     )
 }
+
+/** The Ink Lab's pulse graph under a word that may pulse (see [ShapedWordBloom.PulseTrace]). */
+private fun Modifier.tarjiPulseTrace(trace: InkEngine.TarjiTrace, rtl: Boolean, color: Color): Modifier =
+    drawBehind {
+        drawPulseTrace(0f, size.width, size.height, trace.line, trace.played, rtl, color)
+    }
 
 /** Draw-phase alpha gate for a glyph layer, padded by [GlintLayerBleed] so the
  * halo's blur is not clipped at the layer edge. */
@@ -1339,37 +1351,73 @@ private fun rememberTarjiGate(
     activation: Long,
     repeat: Boolean,
     wordStartMs: Long,
+    /** Ink Lab: the word's sparkline, to mark how far the voice is through it. */
+    trace: InkEngine.TarjiTrace?,
 ): State<InkEngine.GlintResonance> {
     val frame = remember {
         mutableStateOf(InkEngine.GlintResonance.Idle)
     }
-    val run = active && eligible &&
+    val detectorMode = InkEngine.tarjiDetectorMode
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val run = (active && eligible &&
         InkEngine.tuning.glintResonance &&
-        InkEngine.tuning.glintResonanceDepth > 0f
-    LaunchedEffect(run, activation, repeat) {
+        InkEngine.tuning.glintResonanceDepth > 0f)
+    if (active) {
+        androidx.compose.runtime.SideEffect {
+            InkEngine.TarjiProbe.wordStartMs = wordStartMs
+            InkEngine.TarjiProbe.eligible = eligible
+            if (!run) {
+                InkEngine.TarjiProbe.admitted = false
+                InkEngine.TarjiProbe.glow = 0f
+            }
+        }
+    }
+    if (trace != null) {
+        // Back to the plain sparkline once the word is no longer being recited.
+        androidx.compose.runtime.DisposableEffect(trace, run, activation) {
+            onDispose { trace.played = 0f }
+        }
+    }
+    LaunchedEffect(run, activation, repeat, trace, detectorMode) {
         if (!run) {
             frame.value = InkEngine.GlintResonance.Idle
             return@LaunchedEffect
         }
-        val eventGate = TarjiWordGate()
+        // How far the voice is through the word's sparkline: the ear's own
+        // place on the media clock, the instant the light is showing.
+        fun traced(@Suppress("UNUSED_PARAMETER") now: Long, earMediaMs: Long) {
+            val span = trace?.spanMs?.takeIf { it > 0f } ?: return
+            if (earMediaMs == Long.MIN_VALUE) return
+            trace.played = ((earMediaMs - trace.startMs) / span).coerceIn(0f, 1f)
+        }
+        val eventGate = TarjiWordGate(InkEngine.tarjiEventLedger)
         val light = com.beautifulquran.ui.theme.GlintLight()
         val ear = com.beautifulquran.playback.TarjiEarSample()
+        var pulseRateHz = 0f
+        var lastFrameNanos = 0L
         var lastReport = 0L
         while (true) {
             withFrameNanos { now ->
                 val voice = com.beautifulquran.playback.VoiceEnergy.active
                 val smoothMs = InkEngine.tuning.tarjiLightSmoothMs
-                voice?.sampleAtEar(now, ear, leadMs = smoothMs)
+                val displayLeadMs = if (lastFrameNanos == 0L) 8f else
+                    ((now - lastFrameNanos) / 1_000_000f).coerceIn(0f, 33f)
+                lastFrameNanos = now
+                // Read ahead by what the smoothing sets this pulse back — its
+                // phase delay at the pulse's own rate, not its time constant.
+                if (voice != null) TarjiVersePulse.sampleAtEar(
+                    context, voice, now, ear,
+                    leadMs = com.beautifulquran.ui.theme.glintLightLagMs(smoothMs, pulseRateHz, voice.playbackSpeed),
+                    displayLeadMs = displayLeadMs,
+                ) else ear.clear()
+                pulseRateHz = ear.rateHz
                 val g = if (voice == null) 0f else ear.gain
                 val pulse = if (
+                    voice?.isPlaying == true &&
                     eventGate.allows(
                         gain = g,
-                        detected = voice != null && ear.reverberating,
-                        eventStartMs = if (voice == null) {
-                            com.beautifulquran.playback.VoiceEnergy.NO_EVENT_MS
-                        } else {
-                            ear.eventStartMediaMs
-                        },
+                        detected = ear.reverberating,
+                        eventStartMs = ear.eventStartMediaMs,
                         wordStartMs = wordStartMs,
                     )
                 ) {
@@ -1382,6 +1430,10 @@ private fun rememberTarjiGate(
                     InkEngine.GlintResonance.Idle
                 }
                 frame.value = pulse.copy(glow = light.next(pulse.light, now, smoothMs))
+                traced(now, ear.mediaMs)
+                InkEngine.TarjiProbe.admitted = pulse !== InkEngine.GlintResonance.Idle
+                InkEngine.TarjiProbe.gain = g
+                InkEngine.TarjiProbe.glow = frame.value.glow
                 if (com.beautifulquran.DevProfiling.captureStart.get() != null && now - lastReport >= 100_000_000L) {
                     lastReport = now
                     com.beautifulquran.DevProfiling.mark(
@@ -1407,6 +1459,8 @@ internal fun rememberInkMotions(
     waslPrefixes: List<WaslPrefix?>,
     activation: Long = 0L,
     activeWordStartMs: Long = Long.MIN_VALUE,
+    /** The verse these words belong to, for the Ink Lab's pulse lines; null draws none. */
+    verse: Ayah? = null,
     /** English prose waits for each predecessor's residual before blooming. */
     sequentialSweeps: Boolean,
     /** Layered gloss fades word ink with [animatedInkAlpha]; shaped modes dim
@@ -1420,6 +1474,7 @@ internal fun rememberInkMotions(
         "words, inks, and wasl prefixes must align"
     }
     val glintInk = LocalQuranAccents.current.glintInk
+    val traceInk = LocalQuranAccents.current.greenInk
     val motions = ArrayList<InkMotion>(inks.size)
     var predecessor: State<Float>? = null
     inks.forEachIndexed { index, ink ->
@@ -1437,6 +1492,12 @@ internal fun rememberInkMotions(
             isActive && InkEngine.tarjiEligible(words[index].arabic, index == words.lastIndex)
         }
         val tarjiEligible = glinting && strongHold
+        val tarjiTrace = if (
+            InkEngine.tarjiMarkCandidates &&
+            remember(words[index].arabic, index == words.lastIndex) {
+                InkEngine.tarjiEligible(words[index].arabic, index == words.lastIndex)
+            }
+        ) verse?.let { InkEngine.tarjiTrace(it.surahId, it.number, words[index].position) } else null
         val sweep = rememberLetterSweep(
             active = isActive,
             finishResidual = ink.state == InkEngine.State.Recited,
@@ -1473,7 +1534,10 @@ internal fun rememberInkMotions(
                 activation = wordActivation,
                 repeat = ink.repeat,
                 wordStartMs = activeWordStartMs,
+                trace = tarjiTrace,
             ),
+            tarjiTrace = tarjiTrace,
+            tarjiTraceColor = traceInk,
         )
         predecessor = sweep.progress
     }
@@ -1571,11 +1635,13 @@ private fun HighlightLayeredText(
     // modifier so breathing does not recompose or remeasure this word.
     val searchHitActive = !motion.showRepeatLayer && searchHitWash != null
     val orangeWash = motion.repeatWash.takeIf { motion.showRepeatLayer }
-    Box(modifier) {
+    val trace = motion.tarjiTrace
+    Box(if (trace != null) modifier.tarjiPulseTrace(trace, rtl, motion.tarjiTraceColor) else modifier) {
         // The glow is a light's falloff, glyph-shaped at every width — no
         // radial field: a wide faint veil, the halo, and a tight bloom.
         if (glintInk != null && motion.showGlintLayer) {
-            val halo = InkEngine.tuning.glintGlowRadius
+            // dp, as the shaped path measures it: one glow in every reading mode.
+            val halo = with(LocalDensity.current) { InkEngine.tuning.glintGlowRadius.dp.toPx() }
             if (InkEngine.tuning.glintVeilAlpha > 0f) {
                 InkOverlayText(
                     text = text,
@@ -1973,6 +2039,11 @@ internal fun buildShapedBlooms(
             // The mark fades alone, so its cover may not reach. See the field.
             pad = 0.dp,
         )
+    }
+    motions.forEachIndexed { index, motion ->
+        val trace = motion.tarjiTrace ?: return@forEachIndexed
+        val range = rendered.wordRanges.getOrNull(index) ?: return@forEachIndexed
+        blooms += ShapedWordBloom.PulseTrace(range, motion.tarjiTraceColor, trace.line, trace.played)
     }
     blooms.addShapedInkMotionBlooms(
         motions = motions,
@@ -2965,6 +3036,7 @@ fun AyahBlock(
 
     // The letter fade paces itself to how long the reciter dwells on the
     // word, corrected for the chosen playback speed.
+    RequestTarjiPulseLines(ayah, isActiveAyah)
     val sweepMs = InkEngine.sweepMs(activeWord, playbackSpeed)
     // Repeat washes share the same audio handoff but must not inherit the
     // ordinary sweep's visual minimum and continue past the spoken word.
@@ -3094,6 +3166,7 @@ fun AyahBlock(
         waslPrefixes = waslPrefixes,
         activation = activation,
         activeWordStartMs = activeWordStartMs,
+        verse = ayah,
         sequentialSweeps = readingMode == ReadingMode.ENGLISH_ONLY,
         animateLyricInk =
             readingMode == ReadingMode.ARABIC_ENGLISH && showGloss,

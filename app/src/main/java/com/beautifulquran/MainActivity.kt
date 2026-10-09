@@ -608,6 +608,10 @@ private fun PaperStackApp(
     val pinnedPlayback = remember { PinnedPlaybackHost() }
     SideEffect {
         val available = settings.developerModeEnabled
+        if (!available) {
+            com.beautifulquran.ui.reader.InkEngine.tarjiDetectorMode = com.beautifulquran.playback.TarjiDetectorMode.DEFAULT
+            com.beautifulquran.ui.reader.InkEngine.tarjiMarkCandidates = false
+        }
         if (pinnedPlayback.inkLabAvailable != available) {
             pinnedPlayback.inkLabAvailable = available
             if (!available) pinnedPlayback.inkLabOpen = false

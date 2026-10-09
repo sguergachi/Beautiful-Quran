@@ -55,7 +55,52 @@ at 8 kHz directly. On device the tap decimates the sink's PCM to roughly
 The original 2,048-sample handoff updated the renderer only every ~232–256 ms:
 four visible states per second cannot express a 5–10 Hz vocal pulse.
 
-### Signal chain
+### Developer detector experiments
+
+**Recording is the default for now** (`TarjiDetectorMode.DEFAULT`): it keeps
+only the dramatic moments. `InkEngine.tarjiDetectorMode` selects one method
+globally for the session; it is not a reciter profile or an exported sample
+setting. A restart, or turning developer mode off, returns to the default.
+
+* **Cycles** checks substantial alternating extrema and neighboring periods.
+
+* **Spectrum** compares weighted trend-only and trend-plus-sinusoid fits,
+  requiring compatible evidence in both half-windows.
+* **Recording** analyzes the decoded whole verse, extends strict cycle seeds
+  through weaker supported neighbors in both directions, then runs those
+  regions forward through the experimental event lifecycle.
+
+All three share the existing PCM/RMS/short-YIN extractor, with no second YIN.
+Evidence uses 1-2-1 blurred 20 ms log-amplitude and valid-only blurred cents F0;
+an invalid pitch centre remains invalid and never contributes carried F0.
+Their measured floors are at least 3.5% AM and 10 cents FM. The same sensitivity
+setting therefore differs from Current's 80 ms evidence. A separate small
+`TarjiEventStage` retains hold, level-step, climax/tail and channel policy;
+Recording keeps only dramatic events (`TarjiDrama`, Tarjīʿ Lab **Drama**,
+shipped 0.5): sustained pulses on long holds the reciter lifts, judged against
+the verse's own loudness and pitch — the whole recording is in hand.
+
+Current's lifecycle and `TarjiWordGate` are unchanged. Cycles and Recording
+allow at most 1% interpolation uncertainty at cycle-rate band edges, clamping
+only accepted estimates; Spectrum's fitting bands remain strict.
+
+Recording reuses the verse decode cache, raises noise floors conservatively,
+and distinguishes acoustic onset from admitted event start. Live decisions
+require the current reciter/item/knobs key and a unique decoded-to-tap RMS
+correlation of at least 0.9 within ±6 hops, measured after 1.5 s. Pending,
+unaligned, unknown-clock, failed, or stale results remain off; the Detector
+line explains readiness. Decoded audio supplies decisions, never live phase.
+
+Every method paints the same actual PCM-tap history through the existing
+audible clock, route/manual trim and smoothing lead. Mode generations reject
+queued decisions from an old choice. Switching resets experimental evidence
+and word light, while playback, tap counters, capture and source/ear clocks
+continue. These are experiments in acoustic modulation, not a religious
+classification or established all-reciter accuracy. See the
+[research report](tarji-detection/methods.md) and the actual
+[Claude Opus 5.5 review](tarji-detection/opus-review.md).
+
+### Current signal chain
 
 1.  **Frame → RMS.** An 80 ms rolling frame (4 hops) yields one RMS value
     every 20 ms, pushed into a 64-hop (≈1.3 s) evidence ring. `PEAK_DECAY`
@@ -140,9 +185,14 @@ four visible states per second cannot express a 5–10 Hz vocal pulse.
     0.7, band widened by 1 Hz) — no flapping when the reverberation breathes.
     `tremoloGain` ramps 250 ms attack / 800 ms release. Evidence readiness is
     derived from the configured slowest period and the minimum correlation
-    pairs, rather than a hard-coded timeout. Ten hops without coherent pulse
-    evidence end an established event; deep AM can bridge a brief irregular
-    climax only after a genuine period has been acquired.
+    pairs, rather than a hard-coded timeout. A confirmed event's first-second
+    buildup allows two tracked cycles without coherent evidence (at least ten
+    hops), so a short analysis lull cannot end a slow pulse inside one cycle.
+    After the buildup, ten hops without coherent evidence end the event; deep
+    AM can bridge a brief irregular climax only after a genuine period has
+    been acquired. The Hani 2:14 fixture in `TarjiVersePulseTest` checks 40 hop
+    alignments with the Pixel's 6% voice threshold, including alignments that
+    previously reduced a full wave to a 0.12 ripple.
 
     **False starts.** Depth alone may open an event, but the event is
     *unconfirmed* — its gain held at zero — until a coherent pulse arrives.
@@ -176,12 +226,13 @@ four visible states per second cannot express a 5–10 Hz vocal pulse.
     modulation-rate bin. `tremolo` is zero-centred, ~−1.5..1.5.
 
 6.  **Output latency.** The PCM tap hears the voice *before* the listener.
-    `ReaderViewModel` pushes the same route preset `HighlightClock` subtracts.
-    The AudioTrack buffer supplies the session's initial tap-to-head delay;
-    exact tap content time versus `positionMs` then tracks only queue growth or
-    drain, without falling toward zero while an EMA warms up. Measured backlog
-    is already content-time, so playback speed is applied only to wall-time
-    route/buffer values. The reported
+    Its first source PTS and the sink's actual presentation timestamp locate
+    the heard content without a buffer-capacity guess. `TarjiEarClock` maps
+    that position to the media item's clock and each frame reads the history.
+    Bluetooth and speed processing are already included in that position.
+    Manual wall-time trims scale by playback speed and move the pulse and
+    graph cursor together, while event-start timestamps keep their source
+    meaning. The reported
     `syncReverberating`/`syncTremolo`/`syncTremoloGain` are read through a
     64-hop history ring on the same playback-head reference as the word ink;
     fractional reads interpolate between hops instead of rounding the shimmer
@@ -234,8 +285,20 @@ mid-animation, so the bloom can never appear to restart):
     creates a fresh gate for the new performance event. The detector carries
     the event's start through the same delayed history as its gain and pulse,
     then maps that start to the media-item clock. A pulse whose start precedes
-    the active word cannot cross its boundary through output latency; only an
-    event that actually starts inside the word can arm it.
+    the active word cannot cross its boundary through output latency.
+
+    Two refinements, found replaying consecutive verses through this chain
+    (played on, and played afresh as a repeat does), where the graph spiked
+    and the light stayed dark until the verse was repeated:
+    - Only an event that reached gain 0.3 **spends** the word. A brief, weak
+      one — often the syllable's own attack — used to spend it, and the
+      reverberation after it was refused; whether it was depended on hop
+      phase and on what came before (Minshawi 1:7: 0.16 → 1.0).
+    - An event caught up to **600 ms before** the word's timing mark is the
+      word's own, unless another word has already shown it. Shown events are
+      kept in one `TarjiEventLedger` per reader, so one event still lights one
+      word, and a replay finds the same owner. Further back, an event still
+      belongs to an earlier utterance.
 
 When all four pass, tarjīʿ **makes the word's light flicker** with the voice
 (`docs/GLIMMER.md` has the paint). The sign is acoustic phase: positive is a
@@ -245,12 +308,13 @@ vocal swell and negative is its trough.
 swing    = soft-knee(tremolo)                 // −1..1, the voice's own curve
 presence = min(1, 4·g)·depth                  // g = tremoloGain
 light    = presence·swing
-glow     = low-pass(light, 60 ms)             // GlintLight; lag read ahead
-level    = 1 + brightness·(rise·glow⁺ − fall·glow⁻)   // 1.10 … 0.94 shipped
+glow     = low-pass(light, 139 ms)             // GlintLight; lag read ahead
+level    = 1 + scale(brightness)·(rise·glow⁺ − fall·glow⁻)   // 1.30 … 0.89 at full scale
 ```
 
-`level` scales the glyph tint in linear light and, twice as far, every layer
-of the glow (`docs/GLIMMER.md`). Never use `abs(tremolo)`: it brightens on
+`level` scales the glyph tint in linear light and, 8.67 times as far, the light
+of every glow layer (`docs/GLIMMER.md`; alpha is converted through the display
+gamma, and brightness past 100 % counts half). Never use `abs(tremolo)`: it brightens on
 both the loud crest and quiet trough, doubling the visual pulse rate. At
 `g = 0` the level is exactly 1 — **no tell** before the voice actually reverberates. The halo forms only with the directional
 wash (`smootherstep(glintProgress)`); there is no whole-word formation floor
@@ -277,10 +341,11 @@ screen was a sample-and-hold at about one and a half samples per cycle of a
 the voice. The playback head, though, moves smoothly, and differs from the
 tap's content clock by a constant for the life of a sink session. So the
 detector's output is now kept as a short per-hop history (`TarjiEarTrack`),
-`TarjiEarClock` fixes that constant once the sink has filled, and **every
+`TarjiEarClock` obtains that mapping from real source and sink timestamps, and **every
 frame reads the history at the playback head itself** (`VoiceEnergy.
 sampleAtEar`). A stall holds the read-out with the audio; a gapless handoff
-to the next ayah carries the offset across.
+to the next ayah supplies the new media-item mapping. An initial oversized
+PCM burst cannot advance the light by its excess over the sink capacity.
 
 **It was the wrong signal.** The detector's `tremolo` answers "is there a
 periodic reverberation on this hold" from a causal 1.3 s window. What it
@@ -310,6 +375,12 @@ The free-running sine that used to run inside the waqf window on steady holds
 is gone — steady holds keep still gold.
 
 ### Ink Lab
+
+In the **Tarjīʿ** tab, **Cycles / Spectrum / Recording** are mutually exclusive
+toggles; turn all three off for **Current**. Replay the held word after each
+switch so fresh evidence can acquire. The shared choice also appears as four
+labels in Tarjīʿ Lab. Recording may stay pending or unaligned while the audio
+continues; a flat trace in that state is intentional.
 
 *   **Tarjīʿ** toggle (`glintResonance`), **Pulse depth**
     (`glintResonanceDepth` 0–1, shipped 1), **rate band**
@@ -408,7 +479,7 @@ ahead of the directional reveal.
 ## 7. How to audition and verify
 
 *   Nightfall/Royal Green, 1×, Hani Ar-Rifai 2:16's closer or 4:145's
-    ghunnah hum are the canonical ear cases — open the Ink Lab Tajweed tab
+    ghunnah hum are the canonical ear cases — open the Ink Lab Tarjīʿ tab
     and watch the **Detector** line. A steady hold without an audible pulse
     stays `holding … — no tarjīʿ yet` and still gold by design; a pulsing
     hold flips to `tarjīʿ` within ~0.6 s of the reverberation's onset and the
@@ -428,6 +499,14 @@ ahead of the directional reveal.
 
     The automated engine tests prove the policy; screenshots at formation/peak/
     fade remain required for paint quality (see [GLIMMER.md](GLIMMER.md)).
+
+The experiment change passes the full JVM suite (1,270 tests, 145 suites) and
+debug assembly. The reproducible [recording audit](../tools/tarji_samples/detector-audit.md)
+checks all four methods on 26 unlabeled clips and preserves frozen Current
+digests. It does not label acoustic events, apply the reader gate, or measure
+Pixel/Bluetooth latency. Listener labels across additional recordings and
+reciters, plus device listening/visual checks, remain required before choosing
+a replacement for Current.
 
 ## 8. Known sharp edges
 

@@ -2,6 +2,7 @@ package com.beautifulquran.playback
 
 import android.content.ComponentName
 import android.content.Context
+import android.util.Log
 import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
 import androidx.media3.session.MediaController
@@ -261,20 +262,10 @@ class PlayerController(private val context: Context) {
         }
 
         override fun onPlayerError(error: PlaybackException) {
-            _state.value = _state.value.copy(
-                error = if (error.errorCode in networkErrorCodes) {
-                    "No connection — check your network and try again"
-                } else {
-                    "Playback failed (${error.errorCodeName})"
-                },
-            )
+            Log.w(TAG, "Playback error ${error.errorCodeName}", error)
+            _state.value = _state.value.copy(error = playbackErrorMessage(error.errorCode))
         }
     }
-
-    private val networkErrorCodes = setOf(
-        PlaybackException.ERROR_CODE_IO_NETWORK_CONNECTION_FAILED,
-        PlaybackException.ERROR_CODE_IO_NETWORK_CONNECTION_TIMEOUT,
-    )
 
     private fun syncFromController(player: Player, forcePlaying: Boolean = false) {
         basmalahLeadIn = player.mediaItemCount > 0 &&
@@ -296,8 +287,8 @@ class PlayerController(private val context: Context) {
             error = if (player.isPlaying) null else _state.value.error,
         )
         voiceEnergy.playbackSpeed = player.playbackParameters.speed
-        // The PCM tap needs no lifecycle here — [VoiceEnergy.isLive] goes
-        // quiet on its own within ~350 ms of the audio stopping.
+        // The sink owns PCM lifecycle; its play/pause snapshots close the
+        // light while queued history remains available for resume.
     }
 
     fun clearError() {
@@ -599,6 +590,7 @@ class PlayerController(private val context: Context) {
     }
 
     companion object {
+        private const val TAG = "PlayerController"
         private const val REPEAT_BOUNDARY_POLL_MS = 16L
         private const val REPEAT_BOUNDARY_PAUSED_POLL_MS = 250L
         private const val REPEAT_SEEK_SETTLE_MS = 120L

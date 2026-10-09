@@ -1593,7 +1593,7 @@ fun ReaderScreen(
         lastLayoutSignature = layoutSignature
     }
 
-    // Errors surface as a quiet line on the sheet, then dissolve.
+    // Errors replace the reciter name for a moment, then dissolve.
     LaunchedEffect(playerState.error) {
         if (playerState.error != null) {
             delay(5_000)
@@ -1605,6 +1605,15 @@ fun ReaderScreen(
     val searchFocus = remember { FocusRequester() }
     LaunchedEffect(search.active) {
         if (search.active) searchFocus.requestFocus() else keyboard?.hide()
+    }
+    LaunchedEffect(recitingActive, search.active) {
+        if (recitingActive && search.active) {
+            focusManager.clearFocus()
+            keyboard?.hide()
+            // Keep the field on the page until the header's ink has faded.
+            delay(ChromeRecedeMs.toLong())
+            search.close()
+        }
     }
     val bookmarkTipSide = if (settings.ayahSelectorSide == AyahSelectorSide.RIGHT) {
         AyahSelectorSide.LEFT
@@ -1692,7 +1701,7 @@ fun ReaderScreen(
                 if (mushafMode) 0.dp else ScrollGrid.MARGIN - ScrollGrid.TOP_BAR_END_INK
             CenterAlignedTopAppBar(
                 modifier = Modifier.graphicsLayer {
-                    alpha = if (search.active) 1f else topBarAlpha.value
+                    alpha = topBarAlpha.value
                 },
                 title = {
                     if (search.active) {
@@ -1937,23 +1946,9 @@ fun ReaderScreen(
         bottomBar = bottomBar@{
             if (mushafMode) return@bottomBar
             Column {
-                // Errors stay a quiet line on the sheet above the player.
+                // Errors take the reciter name's place in the bar (see
+                // ReciterNameButton), so they never add a row above it.
                 // Return-to-ayah / Back-to float above the bar (see content).
-                AnimatedVisibility(
-                    visible = playerState.error != null,
-                    enter = fadeIn(),
-                    exit = fadeOut(),
-                ) {
-                    Text(
-                        text = playerState.error.orEmpty(),
-                        style = MaterialTheme.typography.labelMedium,
-                        color = QuranTheme.ink.muted,
-                        textAlign = TextAlign.Center,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(vertical = 6.dp),
-                    )
-                }
                 if (gathering) {
                     ShareRibbon(
                         count = shareCount,

@@ -62,16 +62,17 @@ data class InkLabSnapshot(
     val repeatInkAlpha: Float = 1f,
     val glintFadeMs: Int = 1_000,
     val glintTintAlpha: Float = 0.88f,
-    val glintGlowAlpha: Float = 0.6f,
-    val glintGlowRadius: Float = 10f,
+    val glintGlowAlpha: Float = 0.4514f,
+    val glintGlowRadius: Float = 5f,
     val glintBrightness: Float = 1f,
-    val glintBloomAlpha: Float = 0.5f,
-    val glintVeilAlpha: Float = 0.16f,
-    val glintVeilWarmth: Float = 0.5f,
-    val tarjiLightRise: Float = 0.10f,
-    val tarjiLightFall: Float = 0.06f,
-    val tarjiLightSmoothMs: Float = 60f,
-    val tarjiGlowGain: Float = 2f,
+    val glintBloomAlpha: Float = 0.75f,
+    val glintVeilAlpha: Float = 0.6f,
+    val glintVeilWarmth: Float = 0.5195f,
+    val tarjiLightRise: Float = 0.3f,
+    val tarjiLightFall: Float = 0.1101f,
+    val glintRestLight: Float = 0.8858f,
+    val tarjiLightSmoothMs: Float = 139f,
+    val tarjiGlowGain: Float = 8.6696f,
     val washFeather: Float = 1.6f,
     val sweepEaseX1: Float = 0.3f,
     val sweepEaseY1: Float = 0.24f,
@@ -96,6 +97,8 @@ data class InkLabSnapshot(
     val tarjiHoldMinMs: Float = Tarji.HOLD_MIN_MS.toFloat(),
     val tarjiMinDepth: Float = Tarji.MIN_TREMOLO_DEPTH,
     val tarjiMinPeriodicity: Float = Tarji.MIN_PERIODICITY,
+    val tarjiMinVolume: Float = Tarji.MIN_VOLUME,
+    val tarjiMinDrama: Float = Tarji.MIN_DRAMA,
     val tarjiPitchDrift: Float = Tarji.MAX_PITCH_DRIFT,
     val tarjiAttackMs: Float = Tarji.ATTACK_MS,
     val tarjiReleaseMs: Float = Tarji.RELEASE_MS,
@@ -110,7 +113,7 @@ data class InkLabSnapshot(
     val highlightLeadMs: Int = InkEngine.DEFAULT_HIGHLIGHT_LEAD_MS,
     val fadeLeadMs: Int = InkEngine.DEFAULT_FADE_LEAD_MS,
     val scrollLeadMs: Int = InkEngine.DEFAULT_SCROLL_LEAD_MS,
-    /** Null means auto route preset; omitted on old saves → null. */
+    /** Null means the untrimmed presentation clock; omitted on old saves → null. */
     val outputLatencyOverrideMs: Int? = null,
 ) {
     fun toTuning(): InkEngine.Tuning = InkEngine.Tuning(
@@ -132,6 +135,7 @@ data class InkLabSnapshot(
         glintVeilAlpha = glintVeilAlpha,
         glintVeilWarmth = glintVeilWarmth,
         tarjiLightRise = tarjiLightRise,
+        glintRestLight = glintRestLight,
         tarjiLightFall = tarjiLightFall,
         tarjiLightSmoothMs = tarjiLightSmoothMs,
         tarjiGlowGain = tarjiGlowGain,
@@ -162,6 +166,8 @@ data class InkLabSnapshot(
         tarjiHoldMinMs = tarjiHoldMinMs,
         tarjiMinDepth = tarjiMinDepth,
         tarjiMinPeriodicity = tarjiMinPeriodicity,
+        tarjiMinVolume = tarjiMinVolume,
+        tarjiMinDrama = tarjiMinDrama,
         tarjiPitchDrift = tarjiPitchDrift,
         tarjiAttackMs = tarjiAttackMs,
         tarjiReleaseMs = tarjiReleaseMs,
@@ -179,7 +185,12 @@ data class InkLabSnapshot(
     )
 
     companion object {
-        const val SCHEMA = 1
+        /**
+         * 2: the glow's numbers changed meaning — blur in dp in every reading
+         * mode, swings in linear light. A save from before is dropped back to
+         * shipped for those fields ([decode]); the rest of it is kept.
+         */
+        const val SCHEMA = 2
 
         private val json = Json {
             ignoreUnknownKeys = true
@@ -212,6 +223,7 @@ data class InkLabSnapshot(
             glintVeilAlpha = tuning.glintVeilAlpha,
             glintVeilWarmth = tuning.glintVeilWarmth,
             tarjiLightRise = tuning.tarjiLightRise,
+            glintRestLight = tuning.glintRestLight,
             tarjiLightFall = tuning.tarjiLightFall,
             tarjiLightSmoothMs = tuning.tarjiLightSmoothMs,
             tarjiGlowGain = tuning.tarjiGlowGain,
@@ -239,6 +251,8 @@ data class InkLabSnapshot(
             tarjiHoldMinMs = tuning.tarjiHoldMinMs,
             tarjiMinDepth = tuning.tarjiMinDepth,
             tarjiMinPeriodicity = tuning.tarjiMinPeriodicity,
+            tarjiMinVolume = tuning.tarjiMinVolume,
+            tarjiMinDrama = tuning.tarjiMinDrama,
             tarjiPitchDrift = tuning.tarjiPitchDrift,
         tarjiAttackMs = tuning.tarjiAttackMs,
         tarjiReleaseMs = tuning.tarjiReleaseMs,
@@ -260,6 +274,19 @@ data class InkLabSnapshot(
             json.encodeToString(serializer(), snapshot)
 
         fun decode(raw: String): InkLabSnapshot? =
-            runCatching { json.decodeFromString(serializer(), raw) }.getOrNull()
+            runCatching { json.decodeFromString(serializer(), raw) }.getOrNull()?.let { saved ->
+                if (saved.schema >= 2) return@let saved
+                val shipped = InkLabSnapshot()
+                saved.copy(
+                    schema = SCHEMA,
+                    glintGlowAlpha = shipped.glintGlowAlpha,
+                    glintGlowRadius = shipped.glintGlowRadius,
+                    glintBloomAlpha = shipped.glintBloomAlpha,
+                    glintVeilAlpha = shipped.glintVeilAlpha,
+                    tarjiLightRise = shipped.tarjiLightRise,
+                    tarjiLightFall = shipped.tarjiLightFall,
+                    tarjiGlowGain = shipped.tarjiGlowGain,
+                )
+            }
     }
 }

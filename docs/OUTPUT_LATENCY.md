@@ -31,8 +31,9 @@ Sources: [Media3 1.10.1 position tracker](https://github.com/androidx/media/blob
 |---|---|
 | `HighlightEngine` | **No** — stays pure: segments + time *t* → word |
 | Word timing segments / DB | **No** — lag is a device path, not reciter data |
-| `OutputLatency` (pure policy) | **Yes** — manual wall lag → media lag; route presets for PCM |
-| `AudioOutputLatency` (Android) | Watch devices for the raw PCM tarjīʿ delay only |
+| `OutputLatency` (pure policy) | Manual wall lag → media lag |
+| `AudioOutputRoutes` (Android) | Watch the AudioTrack's actual routed device; refresh stale output state |
+| `VoiceEnergy` / `TarjiEarClock` | Map source PCM onto the same presentation clock as the words |
 | `ReaderViewModel` poll | `heardMs = positionMs − manualLagMs × speed` before `HighlightClock` |
 
 ```
@@ -91,41 +92,42 @@ visible instead of being skipped. Timing rows, ayah handoff, basmalah wash, and
 every other reciter stay on their existing clocks. Android and web share the
 same policy.
 
-## Raw PCM presets
+## PCM on the presentation clock
 
-| Route | When | Offset |
-|---|---|---|
-| Local | Phone speaker, wired, USB | **0 ms** |
-| Bluetooth LE | BLE headset / speaker / broadcast among outputs | **80 ms** |
-| Bluetooth A2DP | Classic A2DP or hearing-aid among outputs | **180 ms** |
+`VoiceTapAudioProcessor` wraps the sink to retain the first input buffer's
+presentation timestamp after each flush and sample `getCurrentPositionUs` on
+the audio thread. Both timestamps use Media3's renderer timeline. Subtracting
+the source origin gives the content position currently presented;
+`TarjiEarClock` matches it to the player's media-item position at the same
+wall time. Each display frame reads the per-hop history at that position.
+Decoded bursts and AudioTrack buffer capacity never establish the origin.
 
-If several outputs are listed at once (common: built-in speaker **and** A2DP
-headset connected), **higher-latency wins** so a connected headset is not
-ignored.
+The sink position already accounts for Bluetooth output and playback-speed
+processing. No route preset or second Sonic correction is added. Capacity is
+kept only in diagnostics. Pause and buffering hold the clock and close the
+light; queued audio keeps its history alive after the last PCM feed. Internal
+processor flushes for speed or reusable gapless playback retain that history;
+actual sink flushes and format changes start a fresh source session.
+The wrapper publishes play/pause state with its timestamps, so an optimistic
+controller resume cannot extrapolate an old snapshot through a long pause.
 
-These presets only delay the PCM-tapped tarjīʿ signal, which has not passed
-through Media3's presentation clock. Its sink-buffer correction remains separate.
-They never delay word selection, ayah fade, or basmalah wash automatically.
-
-Manual output lag is **additional** on both paths: the word clock subtracts
-`manualLagMs × speed`, while the PCM tap uses `routePresetMs + manualLagMs`
-in wall time before its existing content-hop conversion. Manual 0 is identical
-to Auto; a manual adjustment shifts the words and shimmer by the same amount.
+Manual output lag is **additional** on both paths: words, pulse, and graph
+cursor subtract `manualLagMs × speed`. Tarjīʿ's **Ear delay ms** similarly
+delays its pulse and cursor. Event-start timestamps retain their source time
+so adjusting delay cannot hand an acoustic event to another word. The paint
+filter's phase compensation advances only its input, not the graph cursor.
 
 ## Route detection
 
-`playback/AudioOutputLatency` (app-lifetime, from `QuranApp`):
+`playback/AudioOutputRoutes` (app-lifetime, from `QuranApp`) observes the
+service's AudioTrack through `AudioRouting.OnRoutingChangedListener` and
+publishes `routedDevice.id`. A connected but inactive headset does not change
+the route. Distinct devices are tracked even when they share a device type.
+An unknown route and the initial discovery do not restart playback.
 
-1. Reads `AudioManager.getDevices(GET_DEVICES_OUTPUTS)`.
-2. Maps each `AudioDeviceInfo.type` to an `OutputLatency.OutputKind`
-   (A2DP / LE / local; unknown types ignored).
-3. `OutputLatency.classify` → preset ms.
-4. `AudioDeviceCallback` refreshes on add/remove so mid-surah connect /
-   disconnect updates the raw PCM offset.
-
-`PlaybackService` also watches changes to this preset for its entire lifetime,
-including while paused or with the reader closed. A change between speaker,
-classic Bluetooth, and LE stops and prepares an already-loaded player. Media3
+`PlaybackService` watches subsequent device-ID changes for its entire lifetime,
+including while paused or with the reader closed. A real route change stops
+and prepares an already-loaded player. Media3
 releases the old AudioTrack and its timestamp/latency state, then buffers the
 same media item at the same position with the existing play/pause intent.
 Bluetooth disconnect still pauses through Media3's noisy-output handling;
@@ -133,9 +135,9 @@ the refresh does not call play or seek. Idle and completed playlists stay idle.
 This can briefly rebuffer an actively playing route switch. It adds no word-lag
 estimate: highlighting continues to use the fresh presentation clock directly.
 
-Classification is “BT device present among outputs,” not a full active-route
-graph. That matches the usual “headphones connected → media goes there” case
-and stays thin.
+The old `AudioManager.getDevices` scan listed connected outputs, which cannot
+identify the track's chosen route. The replacement uses Android's actual
+[routed-device API](https://developer.android.com/reference/android/media/AudioRouting#getRoutedDevice()).
 
 ## Reader wiring
 
@@ -143,7 +145,7 @@ In `ReaderViewModel`:
 
 - Normal word polls: `highlightPositionMs(firstWordStartMs, reciterId)` →
   `OutputLatency.highlightMs(player.positionMs, manualLagMs × speed, highlightLeadMs)`.
-  Automatic lag is zero; the raw PCM route preset is not fed to this clock.
+  Automatic extra lag is zero.
 - **Forced word seeks** (tap-to-play): keep the **media** timeline target so
   ink jumps to the sought word immediately; do not re-delay a deliberate seek.
 - On a **manual media-lag change**, call `HighlightClock.acceptNextSample()` so the
@@ -162,17 +164,19 @@ compensation is separate — see [TIMINGS_LAB.md](TIMINGS_LAB.md)).
 - Not FocusEngine scroll pacing.
 - Not tajweed letter pacing ([TAJWEED_PACING.md](TAJWEED_PACING.md)).
 - No new user-facing sync slider; residual correction stays in Ink Lab.
-- Not codec fingerprinting (SBC/aptX/LDAC) — high complexity, weak gain over
-  the A2DP/LE split.
+- No codec fingerprinting or device-specific delay table; the output clock
+  supplies the route correction.
 
 ## Files
 
 | File | Role |
 |---|---|
-| `domain/OutputLatency.kt` | Pure kinds, PCM presets, `mediaLagMs`, `heardMs` |
-| `domain/OutputLatencyTest.kt` | Spec for classify + heard clamp |
+| `domain/OutputLatency.kt` | Pure `mediaLagMs`, `heardMs`, `highlightMs` |
+| `domain/OutputLatencyTest.kt` | Manual wall/media conversion + heard clamp |
 | `domain/ReciterSync.kt` | Pure reciter-specific word-clock calibration |
-| `playback/AudioOutputLatency.kt` | Android device watch → `StateFlow` latency |
+| `playback/AudioOutputRoutes.kt` | AudioTrack routed device → `StateFlow` device ID |
+| `playback/VoiceTapAudioProcessor.kt` | PCM source PTS + sink presentation timestamps |
+| `playback/TarjiSyncClock.kt` | Shared frame-time pulse and graph clock |
 | `playback/AudioRouteRefresh.kt` | Service-lifetime route changes → fresh output clock at the same place |
 | `playback/AudioRouteRefreshTest.kt` | Disconnect/reconnect commands, idle protection, collector lifetime |
 | `ui/reader/ReaderViewModel.kt` | Applies heard clock on the poll path |
@@ -181,6 +185,9 @@ compensation is separate — see [TIMINGS_LAB.md](TIMINGS_LAB.md)).
 
 ## Tuning
 
-Change the raw PCM presets in `OutputLatency` only after ear-checking speaker **and**
-at least one classic A2DP pair. Prefer small integer presets; do not push
-device-specific tables into the engine.
+Check speaker and the intended Bluetooth headset. Use the manual wall-time
+trim for residual physical output error; do not replace presentation timestamps
+with connected-device presets or buffer-capacity guesses. JVM regressions
+cover burst startup, manual trims, pause, seek, gapless handoff, actual route
+changes, and phase compensation at different speeds. These checks establish
+software clock alignment; physical acoustic latency still needs a device check.

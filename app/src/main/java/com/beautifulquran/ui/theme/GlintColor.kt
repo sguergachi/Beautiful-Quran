@@ -3,7 +3,9 @@ package com.beautifulquran.ui.theme
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.colorspace.ColorSpaces
 import androidx.compose.ui.graphics.lerp
+import kotlin.math.atan
 import kotlin.math.exp
+import kotlin.math.pow
 
 /*
  * The tarjīʿ pulse is light, and only light: the word's brightness rises a
@@ -17,42 +19,93 @@ import kotlin.math.exp
  *  - What makes a thing look bright is the glow around it, not its own
  *    colour — the glyphs are near white already. So the glow carries more of
  *    the swing than the glyphs do.
- *  - Glare is linear in the light that causes it: every layer of the glow
- *    scales by the same level, in linear light, at a constant hue.
+ *  - Glare is linear in the light that causes it. The page is composited in
+ *    gamma space, where a layer's alpha is not its light: twenty percent more
+ *    alpha is about fifty percent more luminance. So every swing here is
+ *    stated in linear light and converted ([glintGlowAlpha]) — the first cut
+ *    scaled alpha directly and a "ten percent" pulse measured sixty.
+ *  - A light at full has nowhere to go but white. The glint rests a breath
+ *    under its colour ([GLINT_REST_LIGHT]) so a crest is the same hue, brighter.
  */
+
+/** Resting light of the glyphs, as a fraction of the glint colour: the headroom
+ * a crest rises into. No channel is ever scaled past the colour itself, so the
+ * hue cannot drift toward white. */
+internal const val GLINT_REST_LIGHT = 0.8858f
+
+/** Display gamma: luminance of a layer goes as its alpha to this power. */
+private const val GLOW_GAMMA = 2.2f
+
+/** How far the swing may be pushed past shipped: [brightness] above 1 counts half. */
+internal fun glintSwingScale(brightness: Float): Float {
+    val b = brightness.coerceIn(0f, 2f)
+    return if (b <= 1f) b else 1f + (b - 1f) * 0.5f
+}
 
 /** Brightness of the word's light for [glow] (−1..1, the smoothed pulse):
  * 1 at rest, up to 1 + [rise] on a crest, down to 1 − [fall] in a trough.
  * [brightness] is the per-reciter scale of the swing; it never moves rest. */
 internal fun glintLightLevel(glow: Float, brightness: Float, rise: Float, fall: Float): Float {
     val swing = if (glow >= 0f) rise * glow else fall * glow
-    return 1f + brightness.coerceIn(0f, 2f) * swing
+    return 1f + glintSwingScale(brightness) * swing
 }
 
-/** [base] at [level] times its light, scaled in linear light so the hue holds
- * (a channel that reaches full simply stays there, as an overexposed light does). */
-internal fun glintLightColor(base: Color, level: Float): Color {
-    if (level == 1f) return base
+/** Linear-light scale of the glyphs at [level]; full is the colour itself. */
+internal fun glintLetterLight(level: Float, rest: Float = GLINT_REST_LIGHT): Float =
+    (rest.coerceIn(0f, 1f) * level).coerceIn(0f, 1f)
+
+/** [base] at [level] times its resting light, scaled in linear light so the hue holds. */
+internal fun glintLightColor(base: Color, level: Float, rest: Float = GLINT_REST_LIGHT): Color {
+    val scale = glintLetterLight(level, rest)
+    if (scale == 1f) return base
     val linear = base.convert(ColorSpaces.LinearSrgb)
     return Color(
-        red = (linear.red * level).coerceIn(0f, 1f),
-        green = (linear.green * level).coerceIn(0f, 1f),
-        blue = (linear.blue * level).coerceIn(0f, 1f),
+        red = linear.red * scale,
+        green = linear.green * scale,
+        blue = linear.blue * scale,
         alpha = base.alpha,
         colorSpace = ColorSpaces.LinearSrgb,
     ).convert(ColorSpaces.Srgb)
 }
 
-/** Strength of one glow layer at [level]. The glow swings [gain] times as far
- * as the glyphs: it is where the eye reads brightness. */
-internal fun glintGlowAlpha(resting: Float, level: Float, gain: Float): Float =
-    (resting * (1f + gain * (level - 1f))).coerceIn(0f, 1f)
+/**
+ * Strength of one glow layer at [level]. The glow's light swings [gain] times
+ * as far as the glyphs': it is where the eye reads brightness. The layer is
+ * drawn in [glintLightColor], which already carries the glyphs' share, so the
+ * alpha supplies only the rest — through the display gamma, so the swing is
+ * the one stated and not its 2.2th power.
+ */
+internal fun glintGlowAlpha(resting: Float, level: Float, gain: Float, rest: Float = GLINT_REST_LIGHT): Float {
+    if (rest <= 0f) return 0f
+    val letters = glintLetterLight(level, rest) / rest.coerceAtMost(1f)
+    if (letters <= 0f) return 0f
+    val glow = (1f + gain * (level - 1f)).coerceAtLeast(0f)
+    return (resting * (glow / letters).pow(1f / GLOW_GAMMA)).coerceIn(0f, 1f)
+}
 
 /** The widest glow layer's colour: the eye's own scatter warms toward its edge. */
 internal fun glintVeilColor(base: Color, warmth: Float): Color =
     lerp(base, GlintVeilWarm, warmth.coerceIn(0f, 1f))
 
 private val GlintVeilWarm = Color(0xFFFFC98A)
+
+/**
+ * Content-time lead for [GlintLight] at [smoothMs] and source [rateHz]: the
+ * filter's phase delay at that rate, which is what must be read ahead for a
+ * crest of light to land on its crest of sound. It is the time constant only
+ * for a slow drift; at tarjīʿ rates it is far less (139 ms of smoothing delays
+ * a 6 Hz pulse by 37 ms), and reading the whole constant ahead put the light
+ * a tenth of a second before the voice. Convert the source rate to wall Hz
+ * before computing lag, then convert that wall lag back to content time.
+ */
+internal fun glintLightLagMs(smoothMs: Float, rateHz: Float, playbackSpeed: Float = 1f): Float {
+    if (smoothMs <= 0f || playbackSpeed <= 0f) return 0f
+    val omega = 2f * Math.PI.toFloat() * (if (rateHz > 0f) rateHz else GLINT_NOMINAL_PULSE_HZ) * playbackSpeed
+    return atan(omega * smoothMs / 1000f) / omega * 1000f * playbackSpeed
+}
+
+/** The rate assumed until the detector has measured one. */
+private const val GLINT_NOMINAL_PULSE_HZ = 6f
 
 /**
  * The light's response to the voice: a plain low-pass, the same up as down, so

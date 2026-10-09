@@ -58,20 +58,23 @@ class ReciterTarjiProfiles(context: Context) {
     private companion object {
         const val PREFS = "tarji_profiles"
         const val KEY = "book"
-        const val HANI_TUNING_APPLIED = "hani_1_7_w9_tuning_applied"
+        const val HANI_TUNING_APPLIED = "hani_2_14_w16_tuning_applied"
     }
 }
 
-/** Exact settings exported in tarji_7_1_7_w9.json (Hani Ar-Rifai). */
+/**
+ * Exact settings exported in tarji_7_2_14_w16.json (Hani Ar-Rifai). They
+ * replace the ones tuned on 1:7 w9 alone, and pulse harder on both captures.
+ */
 internal val HANI_TUNING = TarjiLabKnobs(
-    maxTremoloHz = 8f,
-    minTremoloHz = 1.6f,
-    holdMinMs = 656.6863f,
-    minTremoloDepth = 0.13819668f,
-    minPeriodicity = 0.38481894f,
+    maxTremoloHz = 8.3f,
+    minTremoloHz = 2.6999998f,
+    holdMinMs = 1200f,
+    minTremoloDepth = 0.12308814f,
+    minPeriodicity = 0.15000004f,
     maxPitchDrift = 0.3f,
     attackMs = 50f,
-    releaseMs = 1095.3691f,
+    releaseMs = 100f,
     glintBrightness = 2f,
 )
 

@@ -17,6 +17,7 @@
  */
 import type { AudioPrefetcher } from './audioPrefetch'
 import type { PlaylistItem } from './playlistPlan'
+import { describePlaybackError } from './playbackErrors'
 
 /** Keep a small decoded window warm without holding a whole surah in PCM. */
 const LOAD_LIMIT = 5
@@ -27,6 +28,7 @@ export interface Gapless5BackendHandlers {
   onPause(): void
   onIndex(index: number): void
   onFinishedAll(): void
+  /** `message` is reader-facing copy; the raw error is already logged. */
   onError(message: string): void
   onBuffering(buffering: boolean): void
 }
@@ -176,13 +178,7 @@ export class Gapless5Backend {
     player.onprev = () => this.handlers.onIndex(player.getIndex())
     player.onfinishedall = () => this.handlers.onFinishedAll()
     player.onerror = (_path, error) => {
-      const message =
-        typeof error === 'string'
-          ? error
-          : error instanceof Error
-            ? error.message
-            : 'Audio failed to load'
-      this.handlers.onError(message)
+      this.handlers.onError(describePlaybackError(error, 'gapless track failed'))
     }
     player.onloadstart = () => this.handlers.onBuffering(true)
     player.onload = () => this.handlers.onBuffering(false)

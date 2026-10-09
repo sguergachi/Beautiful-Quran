@@ -15,14 +15,7 @@ function mainColor(mode: ThemeMode, systemDark: boolean): string {
   }
 }
 
-/** Gilt rim — paper gold on light surfaces, warmer gold on dark. */
-function giltColor(mode: ThemeMode, systemDark: boolean): string {
-  const dark =
-    mode === 'dark' || mode === 'royal_green' || (mode === 'system' && systemDark)
-  return dark ? '#D9B44A' : '#C9A227'
-}
-
-/** Single rounded rect: main theme fill + gilded gold border. */
+/** A small sample of the theme's paper. */
 export function ThemeSwatches({ mode }: { mode: ThemeMode }) {
   const [systemDark, setSystemDark] = useState(() =>
     typeof window !== 'undefined'
@@ -43,7 +36,6 @@ export function ThemeSwatches({ mode }: { mode: ThemeMode }) {
       aria-hidden="true"
       style={{
         background: mainColor(mode, systemDark),
-        borderColor: giltColor(mode, systemDark),
       }}
     />
   )

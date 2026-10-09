@@ -171,4 +171,12 @@ class ShapedBloomOrderTest {
             reveals.map { it.range.first } == reveals.map { it.range.first }.sorted(),
         )
     }
+
+    @Test
+    fun `the lab's pulse graph is drawn over the paper covers, never under one`() {
+        val mark = ShapedWordBloom.PulseTrace(0..3, androidx.compose.ui.graphics.Color.Green, null, 0f)
+        val cover = ShapedWordBloom.UpcomingDim(range = 0..3, paper = androidx.compose.ui.graphics.Color.Black, coverAlpha = 0.7f)
+        assertEquals(listOf(cover, mark), listOf(mark, cover).coversFirst())
+    }
+
 }

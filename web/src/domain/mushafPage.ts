@@ -18,6 +18,14 @@ export interface MushafPage {
 }
 
 export const MUSHAF_PAGE_COUNT = 604
+/** Keep an explicitly opened verse on these leaves; otherwise start at their head. */
+export function pageReadingPlace(
+  verses: readonly { surahId: number; ayah: number }[],
+  preferred: { surahId: number; ayah: number },
+): { surahId: number; ayah: number } | null {
+  return verses.find((verse) => verse.surahId === preferred.surahId && verse.ayah === preferred.ayah) ?? verses[0] ?? null
+}
+
 export const MUSHAF_LINES_PER_PAGE = 15
 /** Al-Fātiḥah and the opening of al-Baqarah: short leaves, centred in the well. */
 export const MUSHAF_OPENING_PAGES = 2

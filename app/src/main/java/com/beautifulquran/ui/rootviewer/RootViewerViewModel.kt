@@ -115,7 +115,7 @@ class RootViewerViewModel(
                 occurrences = summary?.occurrences.orEmpty(),
                 lemmas = summary?.lemmas.orEmpty(),
                 error = when {
-                    word == null -> "Word not found"
+                    word == null -> "This word couldn't be found."
                     else -> null
                 },
             )

@@ -30,6 +30,11 @@ import kotlin.math.sqrt
  * path via the volatile mirrors in [VoiceEnergy].
  */
 class Tarji {
+    /** Additional read-only measurements for developer detectors; baseline DSP is unchanged. */
+    internal val measurements = TarjiFrame()
+    internal var hopContentDurationMs = HOP_MS.toDouble()
+    private var holdStartHop = -1
+    private var modulationThresholdHit = false
 
     /** True while a held note carries a detected reverberation. */
     var reverberating = false
@@ -103,8 +108,7 @@ class Tarji {
 
     /**
      * Read-out delay in content hops, set from the tap-to-ear latency
-     * (wall-time route × playback speed + content-time tap backlog + the
-     * Sonic resampler's own content-time buffer at non-1× speed) by
+     * (measured content-time tap backlog + manual wall trim × speed) by
      * [VoiceEnergy]: the PCM tap hears the voice *before* the listener does,
      * so the reported signal is delayed to match what is actually reaching
      * the ear right now.
@@ -138,6 +142,24 @@ class Tarji {
 
     /** Minimum envelope autocorrelation to call the pulse periodic. Ink Lab. */
     var minPeriodicity = MIN_PERIODICITY
+
+    /**
+     * Quietest voice (RMS, full scale = 1) on which a reverberation may open;
+     * 0 is no threshold. Tarjīʿ Lab. A wavering tail or a soft passing note
+     * can be periodic enough to pass every other gate and still not be the
+     * full-voiced hold the eye should answer.
+     */
+    var minVolume = MIN_VOLUME
+
+    /**
+     * Recording method only: how dramatic a reverberation must be — held long,
+     * sustained, and lifted above the verse's own voice ([TarjiDrama]) — to
+     * light a word. 0 keeps every one. Tarjīʿ Lab.
+     */
+    var minDrama = MIN_DRAMA
+
+    /** What "dramatic" means for this reciter ([TarjiDramaWeights.forReciter]). */
+    internal var dramaWeights = TarjiDramaWeights.GENERIC
 
     /** Pitch glide tolerance (fraction) while holding one note. Ink Lab. */
     var maxPitchDrift = MAX_PITCH_DRIFT
@@ -288,6 +310,10 @@ class Tarji {
     }
 
     fun reset() {
+        measurements.hop = -1
+        measurements.f0Valid = false
+        holdStartHop = -1
+        modulationThresholdHit = false
         reverberating = false
         eventStartHop = -1
         tremolo = 0f
@@ -366,6 +392,7 @@ class Tarji {
                 // New note (or first voiced frame): the hold restarts here.
                 holdMs = HOP_MS.toFloat()
                 holdPitchHz = pitchHz
+                holdStartHop = hopCount - 1
                 holdStartEnvCount = envCount
                 eventPeak = 0f
                 climaxUnder = 0
@@ -436,6 +463,22 @@ class Tarji {
         histEventStartHop[histCount % HIST_HOPS] =
             if (reverberating) eventStartHop else -1
         histCount++
+        measurements.hop = hopCount - 1
+        measurements.hopMs = hopContentDurationMs
+        measurements.hopRms = hopRms
+        measurements.rms80 = rms
+        measurements.level = climaxLevel
+        measurements.voiced = voiced
+        measurements.holdMs = (holdMs * hopContentDurationMs / HOP_MS).toFloat()
+        measurements.holdStartHop = holdStartHop
+        measurements.holdPitchHz = holdPitchHz
+        measurements.holdClarity = clarity
+        val freshPitch = foldPitch(modulationPitchHz, holdPitchHz)
+        measurements.f0Valid = modulationThresholdHit && voiced && holdMs >= 2 * HOP_MS &&
+            freshPitch.isFinite() && freshPitch in MIN_PITCH_HZ.toFloat()..MAX_PITCH_HZ.toFloat()
+        measurements.f0Hz = if (measurements.f0Valid) freshPitch else Float.NaN
+        measurements.pitchQuality = modulationClarity.coerceIn(0f, 1f)
+        measurements.pitchLeadHops = modulationPitchLeadHops
     }
 
     /** Envelope oscillation scan over the held note's own envelope. */
@@ -518,10 +561,14 @@ class Tarji {
         lastPitchModulationRateHz = fmScan.rateHz
         lastPitchModulationDepth = fmScan.depth
         lastPitchModulationPeriodicity = fmScan.periodicityScore
-        val amOpen = amScan.depth >= depthGate && amScan.periodic
-        val amKeep = amScan.depth >= depthGate * DEPTH_OFF_RATIO && amScan.stillPeriodic
-        val fmOpen = fmScan.depth >= MIN_PITCH_DEPTH && fmScan.periodic
-        val fmKeep = fmScan.depth >= MIN_PITCH_DEPTH * DEPTH_OFF_RATIO && fmScan.stillPeriodic
+        // The level is the smoothed one the climax is read from: the pulse's
+        // own troughs do not reach it, so a threshold does not chop the event.
+        val loud = minVolume <= 0f || climaxLevel >= minVolume
+        val loudKeep = minVolume <= 0f || climaxLevel >= minVolume * VOLUME_OFF_RATIO
+        val amOpen = loud && amScan.depth >= depthGate && amScan.periodic
+        val amKeep = loudKeep && amScan.depth >= depthGate * DEPTH_OFF_RATIO && amScan.stillPeriodic
+        val fmOpen = loud && fmScan.depth >= MIN_PITCH_DEPTH && fmScan.periodic
+        val fmKeep = loudKeep && fmScan.depth >= MIN_PITCH_DEPTH * DEPTH_OFF_RATIO && fmScan.stillPeriodic
         // A level step can forge AM residuals, but it cannot forge coherent
         // YIN pitch motion. Keep that AM-only guard out of FM acquisition and
         // phase selection.
@@ -540,8 +587,8 @@ class Tarji {
         val liveModulation = if (visualUsesAmplitude) amScan.raw else fmScan.raw
         lastCandidateModulation = liveModulation
         lastRateHz = rateHz
-        val anyCoherent = amScan.coherent || fmScan.coherent
-        val lifecycleCoherent = amScan.lifecycleCoherent || fmScan.coherent
+        val anyCoherent = loudKeep && (amScan.coherent || fmScan.coherent)
+        val lifecycleCoherent = loudKeep && (amScan.lifecycleCoherent || fmScan.coherent)
 
         val gapBefore = steadyGap
         steadyGap = when {
@@ -606,8 +653,14 @@ class Tarji {
         }
         if (levelTransitionGrace > 0) levelTransitionGrace--
         if (eventPeak > 0f && lifecycleCoherent) eventConfirmed = true
+        // Let a confirmed slow pulse build through two missed cycles while
+        // its analysis settles. Once built, later consonants still stop it.
+        val pulseGapHops = if (eventConfirmed && eventHops < SWELL_RAMP_HOPS) {
+            maxOf(PULSE_GAP_PERSIST, ceil(2000f / (eventRateHz.coerceAtLeast(minHz) * HOP_MS)).toInt())
+        } else PULSE_GAP_PERSIST
+        val pulseLost = pulseUnder >= pulseGapHops
         val falseStart = eventPeak > 0f && !eventConfirmed && !climaxOver &&
-            pulseUnder >= PULSE_GAP_PERSIST
+            pulseLost
         if (falseStart) {
             // An unseen syllable-attack blip must not spend the later hold
             // (Hani 2:14 مُسْتَهْزِءُونَ). Confirmed events still end below.
@@ -618,7 +671,7 @@ class Tarji {
             levelTransitionGrace = 0
             eventHops = 0
             awaitingCoherentPulse = true
-        } else if (climaxOver || pulseUnder >= PULSE_GAP_PERSIST) {
+        } else if (climaxOver || pulseLost) {
             endOfHold = true
         }
         reverberating = next && !endOfHold && !falseStart
@@ -929,6 +982,7 @@ class Tarji {
 
     /** Short, sub-lag YIN pitch used only for vibrato movement and phase. */
     private fun updateModulationPitch() {
+        modulationThresholdHit = false
         val pitchFrameSamples = hopSamples * PITCH_MODULATION_FRAME_HOPS
         val pitchStart = frame.size - pitchFrameSamples
         val pairs = pitchFrameSamples - maxPitchLag
@@ -957,6 +1011,7 @@ class Tarji {
         var lag = minPitchLag
         while (lag < maxPitchLag) {
             if (corrs[lag] < YIN_THRESHOLD) {
+                modulationThresholdHit = true
                 while (lag < maxPitchLag && corrs[lag + 1] < corrs[lag]) lag++
                 break
             }
@@ -1046,6 +1101,12 @@ class Tarji {
         private const val MIN_PITCH_DEPTH = 0.006f
         /** Off-gate depth as a fraction of [minTremoloDepth] (hysteresis). */
         private const val DEPTH_OFF_RATIO = 0.7f
+        /** Recording keeps the verse's standout reverberations — Tarjīʿ Lab: [minDrama]. */
+        const val MIN_DRAMA = 0.5f
+        /** No volume threshold — Tarjīʿ Lab: [minVolume]. */
+        const val MIN_VOLUME = 0f
+        /** Level an open event may fall to, as a fraction of [minVolume] (hysteresis). */
+        private const val VOLUME_OFF_RATIO = 0.7f
         /** Envelope autocorrelation gate — Ink Lab: [minPeriodicity]. */
         const val MIN_PERIODICITY = 0.4f
         /** The tracked period is kept while it correlates at least this much

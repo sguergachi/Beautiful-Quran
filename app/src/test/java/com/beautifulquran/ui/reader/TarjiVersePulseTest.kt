@@ -1,0 +1,210 @@
+package com.beautifulquran.ui.reader
+
+import com.beautifulquran.data.model.Ayah
+import com.beautifulquran.data.model.Segment
+import com.beautifulquran.data.model.Word
+import com.beautifulquran.playback.Hani214
+import com.beautifulquran.playback.Tarji
+import com.beautifulquran.playback.TarjiEarClock
+import com.beautifulquran.playback.TarjiEarSample
+import com.beautifulquran.playback.TarjiEarTrack
+import com.beautifulquran.playback.TarjiLabTrim
+import com.beautifulquran.tarjilab.HANI_TUNING
+import com.beautifulquran.tarjilab.TarjiLabCodec
+import com.beautifulquran.tarjilab.TarjiLabKnobs
+import com.beautifulquran.tarjilab.analyzeTarjiCapture
+import com.beautifulquran.tarjilab.tarjiAcceptedPulseWave
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
+import org.junit.Test
+import kotlin.math.abs
+import kotlin.math.sqrt
+
+class TarjiVersePulseTest {
+
+    private val audio = TarjiVersePulse.Decoded(Hani214.pcm(), Hani214.HOP_SAMPLES, Hani214.HOP_MS)
+    private val audioMs = audio.pcm.size / audio.hopSamples * audio.hopMs
+    /** The fixture starts 12 270 ms into the verse; its final word at 17 330. */
+    private val finalStart = Hani214.FINAL_WORD_START_MS - Hani214.START_MS
+    /** The lab's view of that word: 300 ms before its first mark. */
+    private val labStart = finalStart - TarjiLabTrim.WORD_LEAD_MS
+
+    private fun sample(name: String) =
+        TarjiLabCodec.decode(javaClass.getResourceAsStream("/tarji/$name")!!.bufferedReader().use { it.readText() })
+
+    @Test
+    fun `the line retains the waveform of a legacy Lab capture with approximate timestamps`() {
+        // The lab's own capture of 2:14's closing word, analysed as the lab
+        // does, against the reader's line for the same word from the verse's
+        // audio — same settings, same span.
+        val exported = sample("hani_2_14_w16_tuned.json")
+        val lab = tarjiAcceptedPulseWave(analyzeTarjiCapture(TarjiLabCodec.toCapture(exported), exported.knobs))
+        val line = TarjiVersePulse.lines(
+            audio, exported.knobs, listOf(TarjiVersePulse.Window(labStart, audioMs)),
+        ).single()
+        // The lab's capture starts on the same instant, to within a hop or two.
+        val labStartMs = exported.firstHopMediaMs - Hani214.START_MS
+        assertEquals(labStart, labStartMs, 2 * audio.hopMs)
+        // Quiet through the first half, as the lab shows it…
+        assertTrue(line.take(line.size * 2 / 5).all { abs(it) < 0.15f })
+        // …then the same wave: crests and troughs to the edges of the graph.
+        assertTrue("crest ${line.max()} trough ${line.min()}", line.max() > 0.9f && line.min() < -0.9f)
+        // This old export used the approximate buffer clock. This check
+        // protects its waveform only; exact phase is checked below using
+        // source timestamps, with no best-shift search.
+        val n = minOf(line.size, lab.size)
+        val best = (-10..10).maxOf { shift ->
+            var dot = 0.0; var a = 0.0; var b = 0.0
+            for (i in 0 until n) {
+                val j = i + shift
+                if (j !in 0 until n) continue
+                dot += line[i] * lab[j]; a += line[i] * line[i]; b += lab[j] * lab[j]
+            }
+            dot / sqrt(a * b)
+        }
+        assertTrue("the line follows the lab's graph ($best)", best > 0.85)
+    }
+
+    @Test
+    fun `Hani graph and live history match at the same source instant with no shift`() {
+        val knobs = sample("hani_2_14_w16_tuned.json").knobs
+        val line = TarjiVersePulse.lines(audio, knobs, listOf(TarjiVersePulse.Window(labStart, audioMs))).single()
+        val hops = audio.pcm.size / audio.hopSamples
+        for (queuedHops in listOf(12, 20, 40)) {
+            val detector = Tarji().also { it.hopSamples = audio.hopSamples; knobs.applyTo(it) }
+            val track = TarjiEarTrack()
+            val clock = TarjiEarClock()
+            val out = TarjiEarSample()
+            var fed = 0
+            var strongest = 0f
+            for (hop in 0 until hops) {
+                // Keep the heard hop in the live ring, with real queued audio ahead.
+                while (fed <= hop + queuedHops && fed < hops) {
+                    detector.onSamples8k(audio.pcm.copyOfRange(fed * audio.hopSamples, (fed + 1) * audio.hopSamples))
+                    track.publish(fed, detector.lastHopRms, detector.lastFoldedPitchHz, detector.lastPitchLeadHops,
+                        detector.lastRateHz, detector.lastVisualUsesAmplitude, detector.tremoloGain,
+                        if (detector.reverberating) detector.eventStartHop else -1)
+                    fed++
+                }
+                val sourceMs = (hop + 1) * audio.hopMs
+                if (sourceMs < labStart) continue
+                val index = ((sourceMs - labStart) / audio.hopMs).toInt()
+                if (index >= line.lastIndex) break
+                val mediaMs = (Hani214.START_MS + sourceMs).toLong()
+                clock.onPosition(mediaMs, 0L, sourceMs, 1f, true)
+                assertTrue(clock.sampleAtEar(0L, track, audio.hopMs, out, 0.0, 0f, 0f, true))
+                assertEquals(mediaMs, out.mediaMs)
+                val pulse = (out.tremolo * out.gain).coerceIn(-1f, 1f)
+                assertEquals("source $sourceMs ms, queued $queuedHops hops", line[index], pulse, 1e-6f)
+                strongest = maxOf(strongest, abs(pulse))
+            }
+            assertTrue("matching signals must actually pulse", strongest > 0.9f)
+        }
+    }
+
+    @Test
+    fun `Hani's closing hold stays visible across decoder hop alignments`() {
+        // The Pixel's 6% volume gate and current tuning, on the same audio.
+        // Dropping 100 or 104 samples used to turn this wave into a 0.12
+        // ripple: a short FM lull permanently ended the newly acquired hold.
+        val strengths = (0 until 40).map { phase ->
+            val dropped = phase * 4
+            val offsetMs = dropped * Hani214.HOP_MS / Hani214.HOP_SAMPLES
+            val shifted = TarjiVersePulse.Decoded(
+                audio.pcm.copyOfRange(dropped, audio.pcm.size), audio.hopSamples, audio.hopMs,
+            )
+            TarjiVersePulse.lines(
+                shifted, HANI_TUNING.copy(minVolume = 0.06f),
+                listOf(TarjiVersePulse.Window(labStart - offsetMs, audioMs - offsetMs)),
+            ).single().maxOf { abs(it) }
+        }
+        assertTrue("every alignment must carry the pulse ($strengths)", strengths.all { it > 0.4f })
+        assertTrue("the reported weak alignments must reach full strength ($strengths)",
+            strengths[25] > 0.9f && strengths[26] > 0.9f)
+    }
+
+    @Test
+    fun `Hani's closing word of the Fatihah draws a wave under the shipped tuning`() {
+        val exported = sample("hani_1_7_w9_tuned.json")
+        val capture = TarjiLabCodec.toCapture(exported)
+        val heard = TarjiVersePulse.Decoded(capture.pcm, capture.hopSamples, exported.hopContentDurationMs.toDouble())
+        val line = TarjiVersePulse.lines(
+            heard, HANI_TUNING, listOf(TarjiVersePulse.Window(0.0, capture.hopCount * heard.hopMs)),
+        ).single()
+        assertTrue("crest ${line.max()} trough ${line.min()}", line.max() > 0.3f && line.min() < -0.3f)
+    }
+
+    @Test
+    fun `a volume threshold keeps the pulse to a full voice`() {
+        val window = listOf(TarjiVersePulse.Window(labStart, audioMs))
+        fun swing(minVolume: Float) = TarjiVersePulse.lines(
+            audio, Hani214.knobs.copy(minVolume = minVolume), windows = window,
+        ).single().maxOf { abs(it) }
+        val open = swing(0f)
+        assertTrue("no threshold $open", open > 0.3f)
+        // Hani's closing hold is sung at about a tenth of full scale: a
+        // threshold under it changes nothing…
+        assertEquals(open, swing(0.02f), 1e-6f)
+        // …and one above anything he sings leaves the word still.
+        assertEquals(0f, swing(0.6f), 0f)
+        // Off is exactly the detector as it was.
+        assertEquals(Tarji.MIN_VOLUME, TarjiLabKnobs().minVolume, 0f)
+        assertEquals(0f, InkEngine.Tuning().tarjiMinVolume, 0f)
+    }
+
+    @Test
+    fun `work no longer wanted is abandoned, and paint dials do not ask for it again`() {
+        var asked = 0
+        val abandoned = runCatching {
+            TarjiVersePulse.lines(audio, Hani214.knobs, listOf(TarjiVersePulse.Window(0.0, audioMs))) {
+                ++asked < 3
+            }
+        }
+        assertTrue(abandoned.exceptionOrNull() is java.util.concurrent.CancellationException)
+        // Given up within a couple of seconds of audio, not at the verse's end.
+        assertEquals(3, asked)
+        // A verse's lines depend on the detector alone: brightness, glow and
+        // smoothing can be dragged without one verse being redone.
+        val shipped = InkEngine.Tuning()
+        val painted = shipped.copy(glintBrightness = 2f, tarjiLightRise = 0.1f, tarjiGlowGain = 2f, tarjiLightSmoothMs = 30f)
+        assertEquals(TarjiVersePulse.detectorKnobs(shipped), TarjiVersePulse.detectorKnobs(painted))
+        assertTrue(TarjiVersePulse.detectorKnobs(shipped) != TarjiVersePulse.detectorKnobs(shipped.copy(tarjiMinVolume = 0.1f)))
+    }
+
+    @Test
+    fun `only words that may pulse get a line, each across the span the lab shows`() {
+        val words = listOf(
+            Word(1, "قَالُوٓا۟", "", ""),
+            Word(2, "نَحۡنُ", "", ""),
+            Word(3, "مُسۡتَهۡزِءُونَ", "", ""),
+        )
+        val ayah = Ayah(2, 14, "", "", words = words)
+        val segments = listOf(Segment(1, 0, 900), Segment(2, 1_000, 1_400), Segment(3, 1_500, 4_000))
+        val windows = TarjiVersePulse.windows(ayah, segments, audioMs = 4_600.0)
+        val eligible = words.filter { InkEngine.tarjiEligible(it.arabic, it.position == 3) }.map { it.position }
+        assertEquals(eligible, windows.keys.toList())
+        assertTrue(3 in windows.keys)
+        // 300 ms before the word's first mark, a second after its last — and
+        // never past either end of the audio.
+        assertEquals(1_200.0, windows.getValue(3).startMs, 0.0)
+        assertEquals(4_600.0, windows.getValue(3).endMs, 0.0)
+        windows[1]?.let {
+            assertEquals(0.0, it.startMs, 0.0)
+            assertEquals(1_900.0, it.endMs, 0.0)
+        }
+        // A word the timings do not cover has no line.
+        assertTrue(TarjiVersePulse.windows(ayah, segments.take(1), 4_600.0).keys.all { it == 1 })
+    }
+
+    @Test
+    fun `the decimator is the tap's own`() {
+        val d = TarjiVersePulse.Decimator()
+        d.configure(44_100)
+        repeat(44_100) { d.add(if (it % 5 == 0) 1f else 0f) }
+        val out = d.finish()!!
+        assertEquals(176, out.hopSamples)
+        assertEquals(8_820, out.pcm.size)
+        assertEquals(0.2f, out.pcm[100], 1e-6f)
+        assertEquals(Hani214.HOP_MS, out.hopMs, 1e-9)
+    }
+}

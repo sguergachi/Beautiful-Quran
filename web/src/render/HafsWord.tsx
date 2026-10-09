@@ -46,6 +46,7 @@ interface Props {
   onPlay: () => void
   onHold: () => void
   onContextMenu?: (e: MouseEvent) => void
+  tabIndex?: number
 }
 
 export function HafsWord({
@@ -59,6 +60,7 @@ export function HafsWord({
   onPlay,
   onHold,
   onContextMenu,
+  tabIndex = -1,
 }: Props) {
   const localRootRef = useRef<HTMLSpanElement>(null)
   const coverRef = useRef<HTMLSpanElement>(null)
@@ -338,7 +340,8 @@ export function HafsWord({
       {...interaction}
       onContextMenu={onContextMenu}
       role="button"
-      tabIndex={0}
+      tabIndex={tabIndex}
+      data-reader-word="rtl"
       lang="ar"
       translate="no"
     >

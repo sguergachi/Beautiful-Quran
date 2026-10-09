@@ -125,6 +125,10 @@ function AyahBlockInner({
     InkEngine.word(word.position, activeWord, isActiveAyah, dimmed),
   )
   const activeWordRef = useRef<HTMLElement | null>(null)
+  const ayahRef = useRef<HTMLElement | null>(null)
+  useEffect(() => {
+    if (!focused) ayahRef.current?.querySelectorAll<HTMLElement>('[data-reader-word]').forEach((word) => { word.tabIndex = -1 })
+  }, [focused])
   const [hovered, setHovered] = useState(false)
   const query = searchQuery?.toLowerCase() ?? null
   const translationHit =
@@ -177,6 +181,7 @@ function AyahBlockInner({
       className={verseNumberScript === 'arabic' ? 'ayah-mark' : 'ayah-mark ayah-mark--ltr'}
       dir={verseNumberScript === 'arabic' ? undefined : 'ltr'}
       aria-label={`Gather ayah ${ayah.number}`}
+      tabIndex={focused ? 0 : -1}
       onClick={(event) => {
         event.stopPropagation()
         onMarkTap?.()
@@ -191,8 +196,10 @@ function AyahBlockInner({
   return (
     <RepeatWashGateProvider>
     <article
+      ref={ayahRef}
       className="ayah-block"
       data-ayah={ayah.number}
+      data-word-group=""
       data-gathered={gatherOrdinal != null || undefined}
       onClick={
         gathering
@@ -231,6 +238,7 @@ function AyahBlockInner({
           side={bookmarkSide}
           chromeAlpha={bookmarkChromeAlpha}
           interactive={bookmarkInteractive}
+          tabIndex={focused ? 0 : -1}
           onToggle={() => onToggleBookmark(ayah.number)}
         />
       )}
@@ -243,6 +251,7 @@ function AyahBlockInner({
             return (
               <HafsWord
                 key={w.position}
+                tabIndex={focused && index === 0 ? 0 : -1}
                 word={w}
                 ink={ink}
                 sweepMs={isActive ? activeSweepMs : null}
@@ -282,6 +291,7 @@ function AyahBlockInner({
               >
                 <WordUnit
                   word={w}
+                  tabIndex={focused && index === (englishOnly ? englishWords.findIndex(Boolean) : 0) ? 0 : -1}
                   englishText={englishOnly ? englishWords[index] : undefined}
                   ink={ink}
                   sweepMs={isActive ? activeSweepMs : null}

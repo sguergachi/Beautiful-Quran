@@ -7,12 +7,14 @@ export function ContinueRow({
   transliteration,
   arabic,
   onPrepare,
+  label = 'Continue listening',
 }: {
   surahId: number
   ayah: number
   transliteration: string
   arabic: string
   onPrepare: () => void
+  label?: string
 }) {
   return (
     <div className="continue-row">
@@ -25,7 +27,7 @@ export function ContinueRow({
         onClick={() => appStore.openReading(surahId, ayah || 1)}
       >
         <span className="continue-copy">
-          <span className="continue-label">Continue listening</span>
+          <span className="continue-label">{label}</span>
           <span className="continue-target">
             {transliteration}
             {ayah > 0 ? ` · Ayah ${ayah}` : ''}

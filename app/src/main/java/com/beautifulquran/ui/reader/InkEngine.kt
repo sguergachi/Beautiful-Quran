@@ -103,29 +103,38 @@ object InkEngine {
          *  Must read over parchment base ink mid-wash and through long holds —
          *  the old 0.62/0.49 pair was nearly invisible gold-on-parchment. */
         val glintTintAlpha: Float = 0.88f,
-        val glintGlowAlpha: Float = 0.6f,
-        val glintGlowRadius: Float = 10f,
+        val glintGlowAlpha: Float = 0.4514f,
+        /** Halo blur radius in dp, the same in every reading mode. */
+        val glintGlowRadius: Float = 5f,
         /**
          * The rest of the glow, as a light's falloff rather than one outline:
          * a tight bloom hugging the glyphs and a wide, faint, slightly warm
          * veil, either side of the halo above ([GLINT_BLOOM_RADIUS],
-         * [GLINT_VEIL_RADIUS] of its blur).
+         * [GLINT_VEIL_RADIUS] of its blur). Together the three fall away
+         * from the ink roughly as glare does — steeply, then a long thin tail.
          */
-        val glintBloomAlpha: Float = 0.5f,
-        val glintVeilAlpha: Float = 0.16f,
-        val glintVeilWarmth: Float = 0.5f,
+        val glintBloomAlpha: Float = 0.75f,
+        val glintVeilAlpha: Float = 0.6f,
+        val glintVeilWarmth: Float = 0.5195f,
         /** Glint sheen: 0 = off, 1 = shipped. Above 1 it only scales how far
-         * the tarjīʿ light swings — the resting glow is already where it should be. */
+         * the tarjīʿ light swings, at half weight (`glintSwingScale`) — the
+         * resting glow is already where it should be. */
         val glintBrightness: Float = 1f,
-        /** How much brighter the word's light gets on a vocal crest (fraction). */
-        val tarjiLightRise: Float = 0.10f,
+        /** How much brighter the glyphs' light gets on a vocal crest (fraction
+         * of luminance). `GLINT_REST_LIGHT` is the headroom it rises into. */
+        val tarjiLightRise: Float = 0.3f,
+        /** Resting light of the glyphs as a fraction of the glint colour: the
+         * headroom a crest rises into (`glintLetterLight`). */
+        val glintRestLight: Float = 0.8858f,
         /** How much dimmer it gets in a trough — less than the rise: the light
          * should seem to lift with the voice, not to drop out between pulses. */
-        val tarjiLightFall: Float = 0.06f,
-        /** Smoothing of the light's motion (ms); its lag is read ahead and cancelled. */
-        val tarjiLightSmoothMs: Float = 60f,
-        /** How many times further the glow swings than the glyphs. */
-        val tarjiGlowGain: Float = 2f,
+        val tarjiLightFall: Float = 0.1101f,
+        /** Smoothing of the light's motion (ms); its lag is read ahead and cancelled.
+         * Tuned by eye on a Pixel with the swing above: a long smoothing takes a
+         * 6 Hz pulse down to about a fifth, so the large rise reads as a soft swell. */
+        val tarjiLightSmoothMs: Float = 139f,
+        /** How many times further the glow's light swings than the glyphs'. */
+        val tarjiGlowGain: Float = 8.6696f,
         /** Width of the ink feather relative to the word (see
          *  ui/theme/Fade.kt: the wash reads as a whole-word breath). */
         val washFeather: Float = 1.6f,
@@ -206,18 +215,17 @@ object InkEngine {
         /** Minimum envelope autocorrelation (0–1) to call the pulse periodic. */
         val tarjiMinPeriodicity: Float =
             com.beautifulquran.playback.Tarji.MIN_PERIODICITY,
+        /** Quietest voice (RMS) a reverberation may open on; 0 is no threshold. */
+        val tarjiMinVolume: Float = com.beautifulquran.playback.Tarji.MIN_VOLUME,
+        /** Recording method: how dramatic a reverberation must be to light a word. */
+        val tarjiMinDrama: Float = com.beautifulquran.playback.Tarji.MIN_DRAMA,
         /** Pitch glide tolerance (fraction) while holding one note. */
         val tarjiPitchDrift: Float = com.beautifulquran.playback.Tarji.MAX_PITCH_DRIFT,
         /** Attack of the detection gain ramp (ms). */
         val tarjiAttackMs: Float = com.beautifulquran.playback.Tarji.ATTACK_MS,
         /** Release of the detection gain ramp (ms). */
         val tarjiReleaseMs: Float = com.beautifulquran.playback.Tarji.RELEASE_MS,
-        /**
-         * Extra ear delay on the shimmer, on top of the route preset, the
-         * measured sink buffer, and the output path (ms). Shipped 0 — the
-         * measured terms already land the pulse on the ear; this nudges the
-         * last device-specific millimetre when it still trails or leads.
-         */
+        /** Additional wall-time trim on the pulse and its graph (ms); shipped 0. */
         val tarjiEarDelayMs: Float = 0f,
     )
 
@@ -254,6 +262,7 @@ object InkEngine {
         ve.holdMinMs = t.tarjiHoldMinMs
         ve.minTremoloDepth = t.tarjiMinDepth
         ve.minPeriodicity = t.tarjiMinPeriodicity
+        ve.minVolume = t.tarjiMinVolume
         ve.maxPitchDrift = t.tarjiPitchDrift
         ve.attackMs = t.tarjiAttackMs
         ve.releaseMs = t.tarjiReleaseMs
@@ -321,7 +330,7 @@ object InkEngine {
     /**
      * Extra wall-time lag subtracted from Media3's presentation clock, or null
      * to use that already-corrected clock directly. Adds the same delay to the
-     * raw PCM tarjīʿ tap without replacing its route preset.
+     * tarjīʿ signal and graph cursor.
      */
     private var outputLatencyOverrideState by mutableStateOf<Int?>(null)
     var outputLatencyOverrideMs: Int?
@@ -545,6 +554,92 @@ object InkEngine {
         )?.forWash(t.pacedFeather)
     }
 
+    private var detectorMode by mutableStateOf(com.beautifulquran.playback.TarjiDetectorMode.DEFAULT)
+    /** Developer comparison only; never persisted in reciter profiles or exports. */
+    var tarjiDetectorMode: com.beautifulquran.playback.TarjiDetectorMode
+        get() = detectorMode
+        set(value) {
+            if (value == detectorMode) return
+            detectorMode = value
+            com.beautifulquran.playback.VoiceEnergy.setDetectorMode(value)
+            clearTarjiTraces()
+        }
+
+    /**
+     * Ink Lab only: mark every word that may pulse — the ones whose own
+     * letters carry a long madd, a ghunnah or the verse's closing hold
+     * ([tarjiEligible]) — with a sparkline of the pulse it will be given,
+     * worked out from the verse's audio before it plays. Session-only, like
+     * the test pulse.
+     */
+    var tarjiMarkCandidates by mutableStateOf(false)
+
+    /** Which word has shown which tarjīʿ event: one event lights one word. Main thread. */
+    internal val tarjiEventLedger = TarjiEventLedger()
+
+    /**
+     * The light one word will be given, worked out ahead from the verse's
+     * audio ([TarjiVersePulse]): what the lab draws under a candidate. [line]
+     * is null until that is done. [played] is how far the voice is through it
+     * while the word is being recited, 0 otherwise. Main thread only.
+     */
+    class TarjiTrace {
+        var line by mutableStateOf<FloatArray?>(null)
+            private set
+        /** Where the line begins on the media-item clock, and the time its width stands for. */
+        var startMs = 0f
+            private set
+        var spanMs = 0f
+            private set
+        var played by androidx.compose.runtime.mutableFloatStateOf(0f)
+
+        fun set(line: FloatArray, startMs: Float, spanMs: Float) {
+            this.startMs = startMs
+            this.spanMs = spanMs
+            this.line = line
+        }
+
+        fun clear() {
+            line = null
+            startMs = 0f
+            spanMs = 0f
+            played = 0f
+        }
+    }
+
+    // Keyed by the word's place in the Quran, and held: a trace must outlive
+    // the objects a screen happens to hold. Keyed weakly by the word itself,
+    // a verse reloaded as equal-but-new objects lost its lines when the old
+    // ones were collected and never asked for them again — and words equal in
+    // text and position in two verses shared one line.
+    private val tarjiTraces = object : LinkedHashMap<Long, TarjiTrace>(256, 0.75f, true) {
+        override fun removeEldestEntry(eldest: MutableMap.MutableEntry<Long, TarjiTrace>?) = size > 8_192
+    }
+
+    /** The trace of word [position] of [surahId]:[ayah]. Main thread only. */
+    fun tarjiTrace(surahId: Int, ayah: Int, position: Int): TarjiTrace =
+        tarjiTraces.getOrPut(surahId * 1_000_000L + ayah * 1_000L + position) { TarjiTrace() }
+
+    internal fun clearTarjiTraces() = tarjiTraces.values.forEach { it.clear() }
+
+    internal fun clearTarjiTraces(surahId: Int, ayah: Int) {
+        val prefix = surahId * 1_000_000L + ayah * 1_000L
+        tarjiTraces.filterKeys { it in prefix until prefix + 1_000L }.values.forEach { it.clear() }
+    }
+
+    /**
+     * What the reader's light last did for the active word, for the Ink Lab's
+     * readout: whether the word may pulse at all, whether the detector's event
+     * was admitted, and the light it asked for. Written by the frame loop.
+     */
+    object TarjiProbe {
+        @Volatile var wordStartMs = -1L
+        @Volatile var eligible = false
+        @Volatile var admitted = false
+        @Volatile var gain = 0f
+        @Volatile var glow = 0f
+    }
+
     /** Acoustic hold eligibility is independent of visual wash pacing and its lab toggles. */
     fun tarjiEligible(arabic: String, isAyahFinal: Boolean): Boolean =
         TajweedPacing.curve(
@@ -673,8 +768,8 @@ object InkEngine {
     const val GLINT_RESONANCE_PRESENCE = 4f
 
     /** Bloom and veil blur, as multiples of the halo's ([Tuning.glintGlowRadius]). */
-    const val GLINT_BLOOM_RADIUS = 0.35f
-    const val GLINT_VEIL_RADIUS = 2.4f
+    const val GLINT_BLOOM_RADIUS = 0.28f
+    const val GLINT_VEIL_RADIUS = 4.5f
 
     /** Resting strength of a glint layer: brightness can turn it off, never up. */
     fun glintRestAlpha(base: Float, brightness: Float = tuning.glintBrightness): Float =
