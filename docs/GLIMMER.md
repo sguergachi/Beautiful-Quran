@@ -119,9 +119,21 @@ first; never a radial field):
 
 | Layer | Blur | Shipped strength | Role |
 |---|---|---|---|
-| Veil | 2.4 × the halo's | 0.16, warmed halfway to `#FFC98A` | the eye's own wide scatter — reads as light in the air |
-| Halo | `glintGlowRadius` | 0.6 | the body of the glow |
-| Bloom | 0.35 × the halo's | 0.5 | hugs the letters, so the glyph edge is lit, not outlined |
+| Veil | 4.5 × the halo's | 0.6, warmed halfway to `#FFC98A` | the eye's own wide scatter — reads as light in the air |
+| Halo | `glintGlowRadius`, 5 dp | 0.45 | the body of the glow |
+| Bloom | 0.28 × the halo's | 0.75 | hugs the letters, so the glyph edge is lit, not outlined |
+
+The blur is in **dp in every reading mode**. The word-by-word path once passed
+the same number as px, so on a Pixel its glow was 2.6 × tighter than the
+mushaf's and one tuning could not suit both.
+
+The three are weighted so their sum falls away from the ink roughly as 1/r²
+from under 1 dp to about 24 dp — measured, within a factor of two. The first
+cut (10 dp, 0.6 / 0.5 / 0.16) had a flat shoulder out to 5 dp that read as
+smudge and fattened the letters, and a veil of four to six 8-bit steps that
+could not be seen. The veil's mask carries a fixed grain (`ditherAlphaMask`)
+so those few steps do not show as contours on a dark OLED; the word-by-word
+path draws its veil as a text shadow and has no such grain.
 
 One blur read as an outline. Glare in the eye is a sharp core with a long
 soft tail (Spencer et al., *Physically-based glare effects for digital
@@ -131,24 +143,73 @@ at all (Yoshida et al., *Brightness of the glare illusion*, 2008).
 **Tarjīʿ is that light getting a little brighter and slightly dimmer** with
 the voice (`GlintColor.kt`). Brightness only; the hue never changes.
 
-- One number, the **level**: 1 at rest, `1 + rise` (0.10) on a crest,
-  `1 − fall` (0.06) in a trough. The fall is less than the rise so the light
+- One number, the **level**: 1 at rest, `1 + rise` (0.30) on a crest,
+  `1 − fall` (0.11) in a trough, at full scale. The fall is less than the rise so the light
   seems to lift with the voice rather than drop out between pulses.
 - The glyph tint is scaled by the level **in linear light**, so its
-  chromaticity holds; its cover does not change.
-- Every glow layer's alpha is scaled by `1 + gain·(level − 1)` (gain 2): glare
-  is linear in the light that causes it, and the glow is where the eye reads
-  brightness, so it carries more of the swing than the near-white glyphs can.
-- The motion is a plain low-pass (`GlintLight`, 60 ms), the same up as down,
+  chromaticity holds; its cover does not change. It rests at 0.886 of the glint
+  colour (`glintRestLight`) and is never scaled past the colour itself: a
+  light already at full can only go white, and the first cut's crests did
+  (`#FFF0C7` → `#FFFAD0`).
+- Every glow layer's **light** swings `gain` (8.67) times as far.
+  Glare is linear in the light that causes it, and the glow is where the eye
+  reads brightness, so it carries more of the swing than the glyphs can.
+  Stacked over one another the layers measure less than that beside the ink,
+  fading to nothing by 10 dp. A first cut at +4 % / −3 % and gain 3.5 measured
+  13–19 % from trough to crest and was too faint to notice on the phone.
+
+**The shipped numbers were tuned by eye on a Pixel 10** (Ink Lab export,
+2026-10-04, Hani Ar-Rifai 2:14) and work as a pair: the swing is large on
+paper, but 139 ms of smoothing passes only about a fifth of a 6 Hz pulse, so
+what reaches the eye is a soft swell of a few percent in the glyphs and a
+clearly breathing glow. Raise one without the other and it is a strobe again.
+
+**Finding the words that can pulse.** **Mark candidates** on the same tab
+draws a green sparkline under every word `InkEngine.tarjiEligible` admits — a
+long madd, a ghunnah or the verse's closing hold on its own letters. The line
+is **the Tarjīʿ Lab's green graph for that word**: the detector's pulse at the
+ear times its gain (`tarjiAcceptedPulseWave`), over the span the lab shows
+(300 ms before the word's first mark to a second after its last), advancing
+in the ink wipe's direction — right to left under Arabic. It is worked out
+before the verse plays: the audio is decoded from the
+playback cache and run through the reader's own detector and ear pulse
+(`TarjiVersePulse`). Unlike the light itself it is not held to one event per
+word, exactly as the lab's graph is not.
+
+A flat line is a candidate that does not pulse in this recitation; a dashed
+rule is a verse still being worked out, or one that could not be (the tab says
+why, and reports the last verse it did). The line is translucent; while the
+word is recited the part already heard turns opaque, placed by the ear's own
+position on the media clock so it moves with the light. Manual output lag and
+Tarjīʿ ear delay move both the pulse and this cursor, scaled by playback speed.
+Pause holds the cursor; an unavailable live clock leaves it unset. A verse's audio is
+decoded once and kept, so retuning reruns only the detector; a dial being
+dragged cancels the work it has made stale, and paint dials ask for none.
+Lines are kept by surah, verse and word position. It is a lab mark,
+session-only, and is not drawn on the English mushaf's prose.
+
+**Telling paint from detection.** The Tarjīʿ tab has a **Word** line saying
+whether the lit word is eligible, waiting, or pulsing and by how much; a word
+that is eligible but never pulses is a detector matter (`docs/TARJI.md`), not
+a paint one.
+- **Alpha is not light.** The page is composited in gamma space, where a
+  layer's luminance goes as its alpha to the 2.2: scaling alpha by 1.2 is half
+  again as much light. `glintGlowAlpha` converts, so the swing is the one
+  stated. The first cut scaled alpha directly; its "ten percent" pulse measured
+  +63–75 % in the glow, and two to three times that on a 200 % reciter.
+- The motion is a plain low-pass (`GlintLight`, 139 ms), the same up as down,
   and the voice's curve is not sharpened into beats. Its lag is read ahead of
-  the ear (the tap leads the speaker), so smoothing costs no sync.
+  the ear (the tap leads the speaker), so smoothing costs no sync. The lag is
+  the filter's phase delay at the pulse's own rate (`glintLightLagMs`): 37 ms
+  for a 6 Hz pulse through 139 ms, not 139 — reading the whole constant ahead
+  showed each crest a tenth of a second before it was heard.
 
 **It is meant to be barely there.** The eye is most sensitive to flicker at
 exactly the rates tarjīʿ lives at — under 1 % of modulation is visible around
 8 Hz (de Lange) — so earlier cuts that swung from a dark ember to white, or
 changed hue, were a strobe that took the eye off the verse. The per-reciter
-brightness above 100 % scales the swing only; it never raises the resting
-glow. All of this is live on the Ink Lab's **Tarjīʿ** tab.
+brightness above 100 % scales the swing only, at half weight (200 % is one
+and a half times); it never raises the resting glow. All of this is live on the Ink Lab's **Tarjīʿ** tab.
 
 Both shaped and layered readers sample the level at draw time, inside the same
 soft directional mask, and the lab preview runs the same light.
@@ -174,7 +235,11 @@ locked through the irregular crescendo: real builds
 to ~0.1–0.3 at the loudest point, so a strong amplitude modulation
 (≥ ~6% at an in-band rate, ceiling-cheat guard applied) is treated as
 self-evidently vibrating. Evidence readiness is derived from the slowest
-configured period, and ten hops without coherent pulse evidence end the event.
+configured period. During the first second of a confirmed event's buildup,
+the evidence gap allows two tracked cycles (at least ten hops); a fixed
+200 ms timeout could end Hani's slow hold inside a single cycle, turning
+the same recording's wave into a tiny ripple on a different decoder hop grid.
+After the buildup, ten hops without coherent pulse evidence end the event.
 The fallback cannot carry Alafasy's ḍād event onward through the
 later lām/nūn merely because their envelope or room echo is uneven.
 The pulse rate is **tracked with lag hysteresis** for event evidence. It does
@@ -236,22 +301,25 @@ event: inherited release gain is ignored, and after the event settles a later
 consonant or echo pulse cannot relight the word. A repeated utterance gets a
 fresh gate with its terracotta wash.
 
-The pulse is **delayed to the reader's clock** — the tap sits at the audio
-sink's input, so the signal is led forward by everything downstream before
-it is read out: the route preset (the same one the highlight clock
-subtracts) and the sink's own AudioTrack buffer (read via
-`AudioSink.getAudioTrackBufferSizeUs`, typically 40–100 ms and much more
-on emulators — the term that used to leave the shimmer a quarter-second
-ahead of the voice). That lands the shimmer on the playback head
-`positionMs` tracks — the same reference the word ink rides — so the pulse
-is in lockstep with the wash, not trailing the visible word. Wall-time
-components scale by playback speed; the Sonic resampler's own buffer (only
-present off 1×) does not. The Ink Lab's **Ear delay ms** nudges the last
-device-specific millimetre on top (add it back when a route genuinely
-lags the audible vibration). The sink capacity establishes the initial
-tap-to-head backlog; exact tap content time versus `positionMs` then follows
-queue growth/drain without a slow zero-based warm-up. The history read is
-fractional, so non-multiple device latency is not rounded up to 20 ms early.
+The pulse reads **the reader's presentation clock**. The sink wrapper retains
+the first PCM buffer's source PTS after a flush and samples the sink's actual
+output-corrected position on the audio thread. Their difference gives the
+source content currently heard, which `TarjiEarClock` maps to `positionMs` at
+the same wall instant. Neither a decoded burst nor the AudioTrack's capacity
+can establish that source origin. Bluetooth and Sonic are already included
+in the sink position; no second preset or buffer estimate is subtracted.
+
+Manual output lag and the Ink Lab's **Ear delay ms** are extra wall-time
+trims, multiplied by playback speed and applied equally to the history read
+and graph cursor. Event ownership keeps its original source timestamp.
+`GlintLight` compensation uses the pulse's wall-time frequency and converts
+its phase lead back to content time; the graph excludes that paint-only lead.
+The display lead uses the observed frame interval and also scales by speed.
+Pause and buffering hold the cursor and close the light without consuming the
+word's acoustic event. The stale-feed guard lets already queued audio finish.
+Reusable gapless and speed processor flushes keep the queued history; a seek
+or new PCM format clears it.
+The history read is fractional, so device latency is not rounded to 20 ms.
 One analysis hop stays at ~20 ms of
 *content* at any source rate (44.1 kHz decimates to 8820 Hz → 176
 samples); its clock uses the exact 19.955 ms duration, pitch lags scale with
@@ -416,11 +484,11 @@ and inspect ink; the toggle is session-only and not part of `Tuning`.
 | Repeat ink | `repeatInkAlpha` | 1.0 | 0.2–1 | Peak strength of the orange repeat overlay (and search-hit flash). Hue stays theme-owned (`QuranAccents.repeatInk`). |
 | Glitter time ms | `glintFadeMs` | 1000 ms | 100–2400 ms | How long tint and halo recede after the word stops glimmering. |
 | Glint tint | `glintTintAlpha` | 0.88 | 0–1 | Always-on wet-ink tint (must read over parchment mid-wash). |
-| Halo strength | `glintGlowAlpha` | 0.78 | 0–1 | Always-on halo; tarjīʿ peaks boost further. |
-| Halo blur | `glintGlowRadius` | 10 | 0–10 | Renderer blur radius around the glyph outline; it is not a word-relative radial size. |
+| Halo strength | `glintGlowAlpha` | 0.4 | 0–1 | Always-on halo, the middle of three glow layers. |
+| Halo blur | `glintGlowRadius` | 5 | 0–10 | Blur radius in dp around the glyph outline; bloom and veil are fixed multiples of it. It is not a word-relative radial size. |
 | Tarjīʿ (Tajweed tab) | `glintResonance` | on | toggle | Turns the wet-ink glimmer on and off with detected tarjīʿ (first-pass gold and repeat terracotta). |
 | Pulse depth (Tajweed tab) | `glintResonanceDepth` | 1.0 | 0–1 | Scales the whole swing of the tarjīʿ light (1 = full). |
-| Ear delay ms (Tajweed tab) | `tarjiEarDelayMs` | 0 | 0–200 | Extra delay so the pulse lands on the ear, on top of the route preset + measured tap-to-playback-head backlog. |
+| Ear delay ms (Tajweed tab) | `tarjiEarDelayMs` | 0 | 0–200 | Extra wall-time trim of both pulse and graph cursor, on top of the presentation clock. |
 
 The scalar maps to Compose `Shadow.blurRadius` for per-word text and to dp for
 the shaped-path `BlurMaskFilter`; use the visual result, not physical units, as

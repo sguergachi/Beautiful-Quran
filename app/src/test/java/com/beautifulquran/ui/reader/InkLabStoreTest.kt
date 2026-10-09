@@ -91,6 +91,31 @@ class InkLabStoreTest {
     }
 
     @Test
+    fun aGlowSavedBeforeItsNumbersChangedMeaning_returnsToShipped() {
+        // Schema 1 measured the word-by-word blur in px and scaled alpha, not
+        // light: carried over, an old save is a different and far wider glow.
+        val old = """{"schema":1,"inkFadeMs":700,"glintGlowRadius":10.0,"glintGlowAlpha":0.78,
+            "glintBloomAlpha":0.5,"glintVeilAlpha":0.16,"tarjiLightRise":0.1,"tarjiLightFall":0.06,
+            "tarjiGlowGain":2.0,"glintVeilWarmth":0.8}"""
+        val snap = InkLabSnapshot.decode(old)!!
+        val shipped = InkEngine.Tuning()
+        assertEquals(InkLabSnapshot.SCHEMA, snap.schema)
+        assertEquals(shipped.glintGlowRadius, snap.glintGlowRadius, 0f)
+        assertEquals(shipped.glintGlowAlpha, snap.glintGlowAlpha, 0f)
+        assertEquals(shipped.glintBloomAlpha, snap.glintBloomAlpha, 0f)
+        assertEquals(shipped.glintVeilAlpha, snap.glintVeilAlpha, 0f)
+        assertEquals(shipped.tarjiLightRise, snap.tarjiLightRise, 0f)
+        assertEquals(shipped.tarjiLightFall, snap.tarjiLightFall, 0f)
+        assertEquals(shipped.tarjiGlowGain, snap.tarjiGlowGain, 0f)
+        // Everything else in the save is the user's and stays.
+        assertEquals(700, snap.inkFadeMs)
+        assertEquals(0.8f, snap.glintVeilWarmth, 0f)
+        // A save made since is taken as it is.
+        val kept = InkLabSnapshot.decode(InkLabSnapshot.encode(snap.copy(glintGlowRadius = 8f)))!!
+        assertEquals(8f, kept.glintGlowRadius, 0f)
+    }
+
+    @Test
     fun staleTarjiCeiling_isClampedWhenRestored() {
         val tuning = InkLabSnapshot(glintResonanceMaxHz = 25f).toTuning()
 

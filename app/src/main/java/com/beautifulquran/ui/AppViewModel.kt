@@ -32,7 +32,6 @@ object AppViewModelFactory : ViewModelProvider.Factory {
                     app.bookmarks,
                     app.player,
                     app.annotations,
-                    app.outputLatency,
                     app.englishBookCache,
                 ) as T
             modelClass.isAssignableFrom(SettingsViewModel::class.java) ->

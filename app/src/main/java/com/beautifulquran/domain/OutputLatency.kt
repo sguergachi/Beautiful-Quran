@@ -1,61 +1,7 @@
 package com.beautifulquran.domain
 
-/**
- * Route-based output-latency presets for the karaoke clock.
- *
- * [HighlightEngine] is pure: it answers "which word at time *t*?". Bluetooth
- * (and similar) delay is a property of the *playback path*, not of the
- * segments. Media3 already corrects its playhead for output latency, so these
- * route presets are for the PCM-tapped tarjīʿ signal, not the word clock.
- *
- * Android never exposes a reliable end-to-end "ms until the ear" number for
- * A2DP. These PCM presets remain coarse estimates without baking device
- * delay into timing data or the engine.
- */
+/** Manual wall-time corrections shared by the presentation and highlight clocks. */
 object OutputLatency {
-
-    /** Connected output kinds the monitor can report. Multiple may be present. */
-    enum class OutputKind {
-        /** Phone speaker, wired, USB — treat as near-zero extra lag. */
-        LOCAL,
-        /** Classic Bluetooth A2DP (and hearing-aid media). */
-        BLUETOOTH_A2DP,
-        /** LE Audio / BLE headset or speaker. */
-        BLUETOOTH_LE,
-    }
-
-    /** The single route used for the preset table (highest-latency wins). */
-    enum class Route {
-        LOCAL,
-        BLUETOOTH_A2DP,
-        BLUETOOTH_LE,
-    }
-
-    const val LOCAL_MS = 0L
-    /** Typical classic A2DP stack delay; devices vary ~100–300 ms. */
-    const val A2DP_MS = 180L
-    /** LE Audio is usually lower-latency than classic A2DP. */
-    const val LE_MS = 80L
-
-    /**
-     * Pick one route from the set of currently available output kinds.
-     * Prefer A2DP over LE over local so a connected BT headset is not
-     * ignored when the built-in speaker is still listed as an output.
-     */
-    fun classify(kinds: Set<OutputKind>): Route = when {
-        OutputKind.BLUETOOTH_A2DP in kinds -> Route.BLUETOOTH_A2DP
-        OutputKind.BLUETOOTH_LE in kinds -> Route.BLUETOOTH_LE
-        else -> Route.LOCAL
-    }
-
-    fun latencyMs(route: Route): Long = when (route) {
-        Route.LOCAL -> LOCAL_MS
-        Route.BLUETOOTH_A2DP -> A2DP_MS
-        Route.BLUETOOTH_LE -> LE_MS
-    }
-
-    fun latencyMs(kinds: Set<OutputKind>): Long = latencyMs(classify(kinds))
-
     /**
      * Extra correction for Media3's presentation clock. Automatic mode adds
      * none: subtracting a Bluetooth preset again makes the ink late. A manual
@@ -63,10 +9,6 @@ object OutputLatency {
      */
     fun mediaLagMs(additionalLagMs: Long?, playbackSpeed: Float): Long =
         ((additionalLagMs ?: 0L).coerceAtLeast(0L) * playbackSpeed).toLong()
-
-    /** Raw PCM needs its route delay plus the same additional manual wall lag. */
-    fun pcmLagMs(routeLagMs: Long, additionalLagMs: Long?): Long =
-        routeLagMs + (additionalLagMs ?: 0L).coerceAtLeast(0L)
 
     /**
      * Media-timeline position adjusted so the highlight tracks what the

@@ -1,9 +1,14 @@
 package com.beautifulquran.tarjilab
 
 import com.beautifulquran.playback.Tarji
+import com.beautifulquran.playback.TarjiDetectorMode
 import com.beautifulquran.playback.TarjiEarPulse
+import com.beautifulquran.playback.TarjiExperimentalDetector
+import com.beautifulquran.playback.TarjiFrame
 import com.beautifulquran.playback.TarjiLabCapture
+import com.beautifulquran.playback.TarjiRecordingDetector
 import com.beautifulquran.ui.reader.InkEngine
+import java.util.concurrent.CancellationException
 import kotlin.math.atan2
 import kotlin.math.cos
 import kotlin.math.sin
@@ -21,6 +26,10 @@ data class TarjiLabKnobs(
     val holdMinMs: Float = Tarji.HOLD_MIN_MS.toFloat(),
     val minTremoloDepth: Float = Tarji.MIN_TREMOLO_DEPTH,
     val minPeriodicity: Float = Tarji.MIN_PERIODICITY,
+    /** Quietest voice (RMS) a reverberation may open on; 0 is no threshold. */
+    val minVolume: Float = Tarji.MIN_VOLUME,
+    /** Recording method only: how dramatic a reverberation must be (`TarjiDrama`). */
+    val minDrama: Float = Tarji.MIN_DRAMA,
     val maxPitchDrift: Float = Tarji.MAX_PITCH_DRIFT,
     val attackMs: Float = Tarji.ATTACK_MS,
     val releaseMs: Float = Tarji.RELEASE_MS,
@@ -34,6 +43,8 @@ data class TarjiLabKnobs(
         detector.holdMinMs = holdMinMs
         detector.minTremoloDepth = minTremoloDepth
         detector.minPeriodicity = minPeriodicity
+        detector.minVolume = minVolume
+        detector.minDrama = minDrama
         detector.maxPitchDrift = maxPitchDrift
         detector.attackMs = attackMs
         detector.releaseMs = releaseMs
@@ -47,6 +58,8 @@ data class TarjiLabKnobs(
             holdMinMs = t.tarjiHoldMinMs,
             minTremoloDepth = t.tarjiMinDepth,
             minPeriodicity = t.tarjiMinPeriodicity,
+            minVolume = t.tarjiMinVolume,
+            minDrama = t.tarjiMinDrama,
             maxPitchDrift = t.tarjiPitchDrift,
             attackMs = t.tarjiAttackMs,
             releaseMs = t.tarjiReleaseMs,
@@ -63,6 +76,8 @@ data class TarjiLabKnobs(
                 tarjiHoldMinMs = knobs.holdMinMs,
                 tarjiMinDepth = knobs.minTremoloDepth,
                 tarjiMinPeriodicity = knobs.minPeriodicity,
+                tarjiMinVolume = knobs.minVolume,
+                tarjiMinDrama = knobs.minDrama,
                 tarjiPitchDrift = knobs.maxPitchDrift,
                 tarjiAttackMs = knobs.attackMs,
                 tarjiReleaseMs = knobs.releaseMs,
@@ -73,9 +88,9 @@ data class TarjiLabKnobs(
 
 /**
  * Per-hop detector output for one [TarjiLabCapture], computed by replaying
- * the captured hops through a fresh [Tarji] — the same pure DSP that runs
- * live on the tap, with the knobs fixed at analysis time. Every array is
- * hop-aligned with the capture.
+ * the captured hops through the shared [Tarji] extractor and chosen method,
+ * with the knobs fixed at analysis time. Every array is hop-aligned with the
+ * capture; visual phase always comes from the measured voice.
  */
 class TarjiLabTrace internal constructor(
     val hopCount: Int,
@@ -98,6 +113,9 @@ class TarjiLabTrace internal constructor(
     val pitchModulationPeriodicity: FloatArray = FloatArray(hopCount),
     val visualUsesAmplitude: BooleanArray = BooleanArray(hopCount),
     val candidateModulation: FloatArray = FloatArray(hopCount),
+    val mode: TarjiDetectorMode = TarjiDetectorMode.Current,
+    /** Source analysis-hop clock, including the capture's lead-in. */
+    val eventStartHop: IntArray = IntArray(hopCount) { -1 },
 ) {
     /** The closed span of hops where the detector held a reverberation. */
     val reverberatingSpan: IntRange?
@@ -138,17 +156,28 @@ class TarjiLabTrace internal constructor(
  *
  * The capture's lead-in is fed first and discarded: the reader's detector
  * never meets a word cold, so neither may the lab's.
+ * Recording is capture-local analysis of that lead-in and capture, not a
+ * whole-verse verdict. [wanted] is polled at least every 64 extraction hops.
  */
 fun analyzeTarjiCapture(
     capture: TarjiLabCapture,
     knobs: TarjiLabKnobs,
+    mode: TarjiDetectorMode = TarjiDetectorMode.Current,
+    /** The reciter, for what "dramatic" means in his voice (Recording only). */
+    reciterId: Int = 0,
+    wanted: () -> Boolean = { true },
 ): TarjiLabTrace {
     val n = capture.hopCount
     val detector = Tarji()
     detector.hopSamples = capture.hopSamples
     knobs.applyTo(detector)
+    detector.dramaWeights = com.beautifulquran.playback.TarjiDramaWeights.forReciter(reciterId)
     val scratch = FloatArray(capture.hopSamples)
     val hopDur = capture.hopContentDurationMs()
+    detector.hopContentDurationMs = hopDur.toDouble()
+    val experiment = if (mode == TarjiDetectorMode.Cycles || mode == TarjiDetectorMode.Spectrum)
+        TarjiExperimentalDetector() else null
+    val frames = if (mode == TarjiDetectorMode.Recording) ArrayList<TarjiFrame>() else null
     val env = FloatArray(n)
     val tremolo = FloatArray(n)
     val gain = FloatArray(n)
@@ -164,6 +193,7 @@ fun analyzeTarjiCapture(
     val fmPeriodicity = FloatArray(n)
     val usesAmplitude = BooleanArray(n)
     val candidate = FloatArray(n)
+    val eventStart = IntArray(n) { -1 }
     var resolved = -1
     val leadHops = capture.leadInHopCount
     // The voice the reader's pulse is drawn from (see [TarjiEarPulse]), kept
@@ -173,19 +203,27 @@ fun analyzeTarjiCapture(
     val voicePitchLead = FloatArray(leadHops + n)
     val voiceRate = FloatArray(leadHops + n)
     val voiceUsesAmplitude = BooleanArray(leadHops + n)
+    fun checkWanted() {
+        if (!wanted()) throw CancellationException("Lab analysis replaced")
+    }
     fun keepVoice(hop: Int) {
+        val frame = detector.measurements
+        if (frame.hop >= 0) experiment?.next(frame, mode, detector)
+        frames?.add(if (frame.hop >= 0) frame.copy() else TarjiFrame(hop = hop, hopMs = hopDur.toDouble()))
         voiceRms[hop] = detector.lastHopRms
         voicePitch[hop] = detector.lastFoldedPitchHz
         voicePitchLead[hop] = detector.lastPitchLeadHops
-        voiceRate[hop] = detector.lastRateHz
-        voiceUsesAmplitude[hop] = detector.lastVisualUsesAmplitude
+        voiceRate[hop] = experiment?.decision?.rateHz ?: detector.lastRateHz
+        voiceUsesAmplitude[hop] = experiment?.decision?.usesAmplitude ?: detector.lastVisualUsesAmplitude
     }
     for (i in 0 until leadHops) {
+        if (i and 63 == 0) checkWanted()
         System.arraycopy(capture.leadInPcm, i * capture.hopSamples, scratch, 0, capture.hopSamples)
         detector.onSamples8k(scratch)
         keepVoice(i)
     }
     for (i in 0 until n) {
+        if (i and 63 == 0) checkWanted()
         System.arraycopy(capture.pcm, i * capture.hopSamples, scratch, 0, capture.hopSamples)
         detector.onSamples8k(scratch)
         keepVoice(leadHops + i)
@@ -207,15 +245,56 @@ fun analyzeTarjiCapture(
         fmPeriodicity[i] = detector.lastPitchModulationPeriodicity
         usesAmplitude[i] = detector.lastVisualUsesAmplitude
         candidate[i] = detector.lastCandidateModulation
+        eventStart[i] = detector.eventStartHop
+        experiment?.let {
+            val decision = it.decision
+            gain[i] = decision.gain
+            reverberating[i] = decision.reverberating
+            rate[i] = decision.rateHz
+            usesAmplitude[i] = decision.usesAmplitude
+            eventStart[i] = decision.eventStartHop
+            amRate[i] = it.modulation.am.rateHz
+            fmRate[i] = it.modulation.fm.rateHz
+            amDepth[i] = it.modulation.am.depth
+            fmDepth[i] = it.modulation.fm.depth
+            amPeriodicity[i] = it.modulation.am.score
+            fmPeriodicity[i] = it.modulation.fm.score
+        }
     }
     if (resolved < 0) resolved = DETECTOR_FRAME_HOPS - 1
+    frames?.let {
+        checkWanted()
+        val recording = TarjiRecordingDetector.analyze(it, detector, wanted)
+        for (hop in voiceRate.indices) {
+            if (hop and 63 == 0) checkWanted()
+            voiceRate[hop] = recording.rate[hop]
+            voiceUsesAmplitude[hop] = recording.amplitude[hop]
+            val i = hop - leadHops
+            if (i < resolved) continue
+            gain[i] = recording.gain[hop]
+            rate[i] = recording.rate[hop]
+            usesAmplitude[i] = recording.amplitude[hop]
+            eventStart[i] = recording.eventStart[hop]
+            reverberating[i] = recording.eventStart[hop] >= 0
+            amRate[i] = if (usesAmplitude[i]) rate[i] else 0f
+            fmRate[i] = if (usesAmplitude[i]) 0f else rate[i]
+            amDepth[i] = 0f
+            fmDepth[i] = 0f
+            amPeriodicity[i] = 0f
+            fmPeriodicity[i] = 0f
+        }
+    }
     // The pulse the reader paints: the voice around each hop's own instant,
     // not the detector's causal estimate of it.
     val pulse = TarjiEarPulse.series(
         voiceRms, voicePitch, voicePitchLead, voiceRate, voiceUsesAmplitude,
         hopDur.toDouble(), from = leadHops,
     )
-    for (i in resolved until n) tremolo[i] = pulse[i]
+    for (i in resolved until n) {
+        tremolo[i] = pulse[i]
+        if (mode != TarjiDetectorMode.Current) candidate[i] = pulse[i]
+    }
+    checkWanted()
     return TarjiLabTrace(
         hopCount = n,
         hopDurationMs = hopDur,
@@ -235,6 +314,8 @@ fun analyzeTarjiCapture(
         pitchModulationPeriodicity = fmPeriodicity,
         visualUsesAmplitude = usesAmplitude,
         candidateModulation = candidate,
+        mode = mode,
+        eventStartHop = eventStart,
     )
 }
 

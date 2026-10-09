@@ -1,8 +1,6 @@
 package com.beautifulquran.domain
 
 import com.beautifulquran.data.model.Segment
-import com.beautifulquran.domain.OutputLatency.OutputKind
-import com.beautifulquran.domain.OutputLatency.Route
 import com.beautifulquran.playback.Tarji
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -11,49 +9,12 @@ import org.junit.Test
 class OutputLatencyTest {
 
     @Test
-    fun `manual zero preserves Bluetooth shimmer timing`() {
-        for (route in Route.entries) {
-            val preset = OutputLatency.latencyMs(route)
-            for (speed in listOf(0.5f, 1f, 2f)) {
-                val autoHops = Tarji.earDelayHops(
-                    routeMs = OutputLatency.pcmLagMs(preset, null),
-                    sinkMs = 80L,
-                    speed = speed,
-                )
-                val manualHops = Tarji.earDelayHops(
-                    routeMs = OutputLatency.pcmLagMs(preset, 0L),
-                    sinkMs = 80L,
-                    speed = speed,
-                )
-                assertEquals(autoHops, manualHops, 0.001f)
-                assertEquals(0L, OutputLatency.mediaLagMs(0L, speed))
-            }
-        }
-    }
-
-    @Test
-    fun `manual lag shifts shimmer and word clock by the same content duration`() {
-        for (route in Route.entries) {
-            val preset = OutputLatency.latencyMs(route)
-            for (speed in listOf(0.5f, 1f, 2f)) {
-                val autoHops = Tarji.earDelayHops(
-                    routeMs = OutputLatency.pcmLagMs(preset, null),
-                    sinkMs = 80L,
-                    speed = speed,
-                    measuredSinkContentMs = 100.0,
-                )
-                val manualHops = Tarji.earDelayHops(
-                    routeMs = OutputLatency.pcmLagMs(preset, 120L),
-                    sinkMs = 80L,
-                    speed = speed,
-                    measuredSinkContentMs = 100.0,
-                )
-                assertEquals(
-                    OutputLatency.mediaLagMs(120L, speed).toFloat(),
-                    (manualHops - autoHops) * Tarji.HOP_MS,
-                    0.001f,
-                )
-            }
+    fun `manual zero preserves presentation timing`() {
+        for (speed in listOf(0.5f, 0.75f, 1f, 1.5f, 2f)) {
+            assertEquals(OutputLatency.mediaLagMs(null, speed), OutputLatency.mediaLagMs(0L, speed))
+            val auto = Tarji.earDelayHops(0L, 0L, speed, measuredSinkContentMs = 250.0)
+            val manual = Tarji.earDelayHops(120L, 0L, speed, measuredSinkContentMs = 250.0)
+            assertEquals(OutputLatency.mediaLagMs(120L, speed).toFloat(), (manual - auto) * Tarji.HOP_MS, 0.001f)
         }
     }
 
@@ -95,43 +56,6 @@ class OutputLatencyTest {
                 segments, OutputLatency.heardMs(mediaPositionMs, lag),
             ))
         }
-    }
-
-    @Test
-    fun `empty kinds are local with zero latency`() {
-        assertEquals(Route.LOCAL, OutputLatency.classify(emptySet()))
-        assertEquals(0L, OutputLatency.latencyMs(emptySet()))
-    }
-
-    @Test
-    fun `local only is zero latency`() {
-        assertEquals(Route.LOCAL, OutputLatency.classify(setOf(OutputKind.LOCAL)))
-        assertEquals(OutputLatency.LOCAL_MS, OutputLatency.latencyMs(Route.LOCAL))
-    }
-
-    @Test
-    fun `A2DP wins over speaker still listed as an output`() {
-        val kinds = setOf(OutputKind.LOCAL, OutputKind.BLUETOOTH_A2DP)
-        assertEquals(Route.BLUETOOTH_A2DP, OutputLatency.classify(kinds))
-        assertEquals(OutputLatency.A2DP_MS, OutputLatency.latencyMs(kinds))
-    }
-
-    @Test
-    fun `LE is used when no classic A2DP is present`() {
-        val kinds = setOf(OutputKind.LOCAL, OutputKind.BLUETOOTH_LE)
-        assertEquals(Route.BLUETOOTH_LE, OutputLatency.classify(kinds))
-        assertEquals(OutputLatency.LE_MS, OutputLatency.latencyMs(kinds))
-    }
-
-    @Test
-    fun `A2DP wins over LE when both are present`() {
-        val kinds = setOf(
-            OutputKind.BLUETOOTH_A2DP,
-            OutputKind.BLUETOOTH_LE,
-            OutputKind.LOCAL,
-        )
-        assertEquals(Route.BLUETOOTH_A2DP, OutputLatency.classify(kinds))
-        assertEquals(OutputLatency.A2DP_MS, OutputLatency.latencyMs(kinds))
     }
 
     @Test
@@ -246,10 +170,4 @@ class OutputLatencyTest {
         assertEquals(1, firstLit)
     }
 
-    @Test
-    fun `preset values are the documented table`() {
-        assertEquals(0L, OutputLatency.LOCAL_MS)
-        assertEquals(180L, OutputLatency.A2DP_MS)
-        assertEquals(80L, OutputLatency.LE_MS)
-    }
 }

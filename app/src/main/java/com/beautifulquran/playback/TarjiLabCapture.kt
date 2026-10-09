@@ -91,6 +91,10 @@ class TarjiLabCapture(
  */
 object TarjiLabTrim {
 
+    /** How far the lab shows before a word's first mark and after its last. */
+    const val WORD_LEAD_MS = 300L
+    const val WORD_TAIL_MS = 1_000L
+
     /** The word's full spoken span on the media clock: from its first mark's
      * start to its last mark's end, widened by [leadMs] before and [tailMs]
      * after. Repeats of the same word are included (the whole re-say).

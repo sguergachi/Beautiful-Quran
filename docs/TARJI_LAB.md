@@ -9,6 +9,35 @@ The preview word runs the reader's own light: a little brighter on each
 crest, slightly dimmer in each trough, hue unchanged. The pulse it and the graph show is the reader's
 (`TarjiEarPulse`), not the detector's causal estimate.
 
+## Comparing detector experiments
+
+The **Detector** row chooses **Current / Cycles / Spectrum / Recording**.
+It shares the reader Ink Lab's **Tarjīʿ** tab choice: three mutually exclusive
+experiment toggles, all off for Current. **Replay the held word after each
+switch** to compare fresh evidence. The global choice lasts for this developer
+session; it is not saved per reciter, added to profiles/exports, or restored
+by import. Turning developer mode off returns to Current.
+
+Cycles checks successive peaks/troughs; Spectrum fits a periodic curve against
+a trend and compares its two halves. Both share the existing extractor and a
+separate experimental lifecycle. Recording performs two-sided seeded-cycle
+analysis, then the same forward lifecycle. Here it says **Capture-local
+recording analysis**: lead-in plus captured PCM cannot reproduce a full verse's
+noise calibration or all its acoustic context. In the live reader, Recording
+instead waits for the matching verse result and reliable decoded-to-tap
+alignment; pending/unaligned output stays off while playback continues.
+
+Experimental amplitude evidence is blurred 20 ms log-RMS; pitch is fresh,
+valid-only blurred cents F0, never carried estimates. Measured minimum depth
+is 3.5% AM or 10 cents FM, so sensitivity differs from Current. The waveform
+and preview always follow measured PCM through the existing clock, with no
+fitted oscillator. A switch clears old analysis, pending preview and comparison
+reference; it does not seek, reset capture time, or alter the audible clock.
+Results publish only for the current capture/knobs/mode. These tools compare
+acoustic hypotheses; a green trace alone does not establish accuracy or reader
+admission. See the [research report](tarji-detection/methods.md) and
+[actual Opus 5.5 critique](tarji-detection/opus-review.md).
+
 ## Workflow
 
 1. In developer mode, long-press a word → **Tarjīʿ Lab**, or open it from
@@ -29,7 +58,7 @@ crest, slightly dimmer in each trough, hue unchanged. The pulse it and the graph
    no raw teal trace. The readout shows the accepted
    **Volume / Pitch** channel and its rate in Hz, **Pulse fading**, **No pulse
    here**, or **Updating**; it never invents an accepted pulse.
-5. Adjust **Glint brightness**, **Sensitivity**, **Shortest note**,
+5. Adjust **Glint brightness**, **Sensitivity**, **Quietest voice**, **Shortest note**,
    **Rhythm tolerance**, or **Pulse speed**. Each
    slider has a thin track, current value, and precise nudge buttons. The **?**
    button beside Fit reveals knob explanations and gesture help;
@@ -100,6 +129,21 @@ later lab edits persist normally. Other stored reciter profiles are preserved.
 
 - **Sensitivity** reverses the modulation-depth threshold: 0% = depth 0.25,
   100% = depth 0.01. More sensitivity accepts subtler wavering.
+- **Drama** (Recording method only) keeps the reverberations a reciter makes
+  a moment of: `TarjiDrama` scores each event 0–1 against the verse's own
+  voice — how long the pulse lasts (40 %), how long the note it rides is held
+  (35 %), and how far the voice is lifted in loudness or pitch (25 %) — and
+  darkens those under the threshold. Shipped 50 %; "Any" (0) keeps every one.
+  On 26 recordings by 13 reciters it keeps 79 of 342 events, mostly closing
+  holds and long madds. Saved with the reciter's profile.
+  A reciter may carry his own ranges (`TarjiDramaWeights.forReciter`); Hani's
+  were fitted to all his verses — see
+  [tarji-detection/hani-drama.md](tarji-detection/hani-drama.md).
+- **Quietest voice** is a volume threshold (`Tarji.minVolume`): the voice's
+  smoothed level, as a fraction of full scale, that a reverberation may open
+  on. "Any" (0) is no threshold and the shipped default; held notes sit around
+  7–15 %. An open event may fall to 0.7 of it before it closes, so the pulse's
+  own troughs do not chop it. Saved with the reciter's profile.
 - **Shortest note** is the minimum stable-note duration, 100–1,200 ms.
 - **Rhythm tolerance** reverses periodicity: 0% = threshold 0.85,
   100% = threshold 0.15. More tolerance accepts uneven wavering.
@@ -119,9 +163,10 @@ Re-analysis updates the graph and word without restarting audio or moving the
 chosen loop. Release bridges brief detection gaps, while the real end of a
 hold still uses its own fast decay.
 
-Each detector edit replays the same PCM through the same pure `Tarji` implementation
-used by the live audio tap. Background analysis is canceled on a new target,
-import, or exit; a result can publish only for its original capture.
+Each detector edit replays the same PCM through the shared pure extractor and
+selected detector used by the live audio tap. Background analysis is canceled
+on a new target, mode, import, or exit; a result can publish only for its
+original capture, knobs and mode.
 During a drag, one worker coalesces edits into the latest replay instead of
 restarting a 120 ms trailing debounce on every pointer event. Completed intermediate replays update the curve during a drag; it stays
 marked Updating until the worker catches the current knobs. A single ordered
@@ -161,6 +206,11 @@ differ; the Hani 2:14 regression also tests 40 offsets of that grid.
   skips that lock. A fresh arm cannot return PCM from the preceding capture.
 - Trimming advances `firstHopMediaMs` to the first retained hop. It denotes
   that hop's **end**, matching `VoiceEnergy`'s content timestamps.
+- Capture obtains this timestamp from the live source/sink presentation-clock
+  mapping before restoring playback speed. An unavailable mapping reports a
+  retryable capture failure; buffer capacity never supplies a guessed origin.
+  The capture poll updates that clock itself, including cold Settings entry
+  and chapters that the reader has not loaded.
 - Preview uses a static `AudioTrack`, with the effective PCM rate derived
   from hop timestamps. `setLoopPoints(start, end, -1)` is available since API 3.
 - `TarjiPreviewClock` rebases the unsigned frames-played counter onto the
@@ -223,6 +273,15 @@ Keep reproducible captures in `tools/tarji_samples/`.
 range manipulation, selected-section matching (volume/pitch, fast cycles,
 conflicting rhythms, silence, and invalid selections), grouped undo/redo, non-mutating comparison, capture trimming, and the preview clock (nonzero starts,
 seek rebasing, unsigned rollover, looping, and stalled playback).
+
+For the experiment change, the full JVM suite passes 1,270 tests across 145
+suites, and debug assembly passes. Baseline golden hashes, explicit feature
+validity, synthetic cycle/spectral evidence, queued-mode rejection, recording
+alignment policy and stale Lab-result checks are automated contracts. The
+[four-method recording audit](../tools/tarji_samples/detector-audit.md) exercises
+26 unlabeled recordings; it measures execution and JVM cost, not listener
+precision/recall, live reader admission or Pixel/Bluetooth latency. Cross-reciter
+labels and device listening/visual comparison remain separate work.
 
 On device, check cold Settings entry, repeated word changes during capture,
 loop/whole-capture playback, paused seeking, all three speeds, knob edits while

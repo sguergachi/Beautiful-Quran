@@ -48,6 +48,7 @@ internal fun rememberAyahInkPack(
     /** Mushaf selection enters from the paper cover already on the ayah. */
     initiallyRecessed: Boolean = false,
 ): AyahInkPack {
+    RequestTarjiPulseLines(ayah)
     val sweepMs = InkEngine.sweepMs(activeWord, playbackSpeed)
     val repeatDwellMs = InkEngine.repeatDwellMs(activeWord, playbackSpeed)
     val activation = activeWord?.activation ?: 0L
@@ -152,6 +153,7 @@ internal fun rememberAyahInkPack(
         waslPrefixes = waslPrefixes,
         activation = activation,
         activeWordStartMs = activeWordStartMs,
+        verse = ayah,
         sequentialSweeps = false,
         animateLyricInk = false,
         wetInk = wetInk,

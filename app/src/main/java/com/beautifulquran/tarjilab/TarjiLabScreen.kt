@@ -92,7 +92,9 @@ import androidx.compose.ui.unit.sp
 import androidx.core.view.WindowCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.beautifulquran.ui.reader.InkEngine
+import com.beautifulquran.playback.TarjiDetectorMode
 import com.beautifulquran.ui.theme.ArabicWordStyle
+import com.beautifulquran.ui.theme.InkCircledChoiceRow
 import com.beautifulquran.ui.theme.quietClickable
 import kotlin.math.abs
 import kotlin.math.max
@@ -234,6 +236,7 @@ fun TarjiLabScreen(
                         .verticalScroll(rememberScrollState())
                         .padding(bottom = 16.dp),
                 ) {
+                    DetectorModePanel(ui, viewModel::selectMode)
                     KnobsPanel(
                         ui = ui,
                         showHelp = showHelp,
@@ -463,13 +466,13 @@ private fun PreviewWord(
         )
         // The reader's own light and paint, so the lab shows what it will.
         val tuning = InkEngine.tuning
-        val light = remember { com.beautifulquran.ui.theme.GlintLight() }
+        val light = remember(ui.mode, ui.capture, ui.analyzing) { com.beautifulquran.ui.theme.GlintLight() }
         val level = com.beautifulquran.ui.theme.glintLightLevel(
             light.next(resonance.light, System.nanoTime(), tuning.tarjiLightSmoothMs),
             ui.displayKnobs.glintBrightness, tuning.tarjiLightRise, tuning.tarjiLightFall)
-        val pulseColor = com.beautifulquran.ui.theme.glintLightColor(GlintGold, level)
+        val pulseColor = com.beautifulquran.ui.theme.glintLightColor(GlintGold, level, tuning.glintRestLight)
         Canvas(Modifier.fillMaxSize()) {
-            val amount = com.beautifulquran.ui.theme.glintGlowAlpha(0.3f, level, tuning.tarjiGlowGain)
+            val amount = com.beautifulquran.ui.theme.glintGlowAlpha(0.3f, level, tuning.tarjiGlowGain, tuning.glintRestLight)
             if (amount > 0.01f) {
                 drawCircle(
                     color = pulseColor.copy(alpha = (amount * 0.55f).coerceIn(0f, 0.75f)),
@@ -728,11 +731,37 @@ private fun StatusSlot(
 
 /** Values at the same content position as the audible loop. */
 @Composable
+private fun DetectorModePanel(ui: TarjiLabViewModel.TarjiLabUiState, onSelect: (TarjiDetectorMode) -> Unit) {
+    Text("Detector", style = MaterialTheme.typography.labelSmall, color = QuranTheme.ink.secondary)
+    InkCircledChoiceRow(
+        entries = TarjiDetectorMode.entries,
+        selected = ui.mode,
+        label = { it.label },
+        onSelect = onSelect,
+        textStyle = MaterialTheme.typography.labelLarge,
+        spacing = 12.dp,
+        modifier = Modifier.padding(vertical = 8.dp),
+    )
+    if (ui.mode == TarjiDetectorMode.Recording) Text(
+        "Capture-local recording analysis",
+        style = MaterialTheme.typography.bodySmall, color = QuranTheme.ink.secondary,
+        modifier = Modifier.padding(bottom = 8.dp),
+    )
+    if (ui.mode != TarjiDetectorMode.Current) Text(
+        "Measured volume floor ≥ 3.5% · pitch ≥ 10¢. Sensitivity differs from Current.",
+        style = MaterialTheme.typography.bodySmall, color = QuranTheme.ink.quiet,
+        modifier = Modifier.padding(bottom = 8.dp),
+    )
+}
+
+@Composable
 private fun DetectorReadout(ui: TarjiLabViewModel.TarjiLabUiState, playheadMs: Float, modifier: Modifier) {
-    val point = ui.displayTrace?.let { tracePointAt(it, playheadMs.coerceAtLeast(0f)) }
+    val trace = ui.displayTrace
+    val point = trace?.let { tracePointAt(it, playheadMs.coerceAtLeast(0f)) }
     val status = when {
         ui.matchingPulse -> "Matching…"
-        ui.analyzing && !ui.showingReference -> "Updating…"
+        ui.analyzing && !ui.showingReference -> "${ui.mode.label} · pending"
+        trace != null && playheadMs.coerceAtLeast(0f) < trace.firstAnalysisHop * trace.hopDurationMs -> "${ui.mode.label} · warming up"
         point == null -> "Waiting for audio"
         point.gain > 0.001f && point.rateHz > 0f -> "${if (point.visualUsesAmplitude) "Volume" else "Pitch"} · %.1f Hz".format(point.rateHz)
         point.gain > 0.001f -> "Pulse fading"
@@ -780,11 +809,30 @@ private fun KnobsPanel(
             enabled = !ui.showingReference, showHelp = showHelp, onFinished = onFinished) { v ->
             onKnob { it.copy(glintBrightness = v * 2f) }
         }
-        LabSlider("Sensitivity", (0.25f - knobs.minTremoloDepth) / 0.24f, 0f..1f,
-            valueLabel = "${((0.25f - knobs.minTremoloDepth) / 0.24f * 100).roundToInt()}%",
-            help = "Missing a pulse? Move right. Speech pulsing? Move left.",
+        LabSlider(if (ui.mode == TarjiDetectorMode.Current) "Sensitivity" else "Pulse depth floor",
+            (0.25f - knobs.minTremoloDepth) / 0.24f, 0f..1f,
+            valueLabel = if (ui.mode == TarjiDetectorMode.Current)
+                "${((0.25f - knobs.minTremoloDepth) / 0.24f * 100).roundToInt()}%"
+            else "%.1f%% measured".format(maxOf(0.035f, knobs.minTremoloDepth) * 100f),
+            help = if (ui.mode == TarjiDetectorMode.Current) "Missing a pulse? Move right. Speech pulsing? Move left."
+            else "Move right for shallower volume pulses, left for deeper ones. The measured floor stops at 3.5%; pitch pulses need at least 10 cents.",
             enabled = !ui.showingReference, showHelp = showHelp, onFinished = onFinished) { v ->
             onKnob { k -> k.copy(minTremoloDepth = 0.25f - v * 0.24f) }
+        }
+        LabSlider("Quietest voice", knobs.minVolume, 0f..TARJI_LAB_MAX_VOLUME,
+            valueLabel = if (knobs.minVolume <= 0f) "Any" else "${(knobs.minVolume * 100).roundToInt()}%",
+            help = "Soft notes pulsing? Move right so only a full voice can. Left lets any volume pulse.",
+            enabled = !ui.showingReference, showHelp = showHelp, onFinished = onFinished) { v ->
+            // The first step of the track is "any", so it can be turned off by hand.
+            onKnob { k -> k.copy(minVolume = if (v < 0.005f) 0f else v) }
+        }
+        if (ui.mode == TarjiDetectorMode.Recording) {
+            LabSlider("Drama", knobs.minDrama, 0f..1f,
+                valueLabel = if (knobs.minDrama <= 0f) "Any" else "${(knobs.minDrama * 100).roundToInt()}%",
+                help = "Recording method. Right keeps only the moments the reciter holds long and lifts his voice; left lights every reverberation.",
+                enabled = !ui.showingReference, showHelp = showHelp, onFinished = onFinished) { v ->
+                onKnob { k -> k.copy(minDrama = if (v < 0.01f) 0f else v) }
+            }
         }
         LabSlider("Shortest note", knobs.holdMinMs, 100f..1_200f,
             valueLabel = "${knobs.holdMinMs.roundToInt()} ms",
@@ -794,8 +842,9 @@ private fun KnobsPanel(
         }
         LabSlider("Rhythm tolerance", (0.85f - knobs.minPeriodicity) / 0.70f, 0f..1f,
             valueLabel = "${((0.85f - knobs.minPeriodicity) / 0.70f * 100).roundToInt()}%",
-            help = "Move right for uneven wavering; left for a steady rhythm.",
-            enabled = !ui.showingReference, showHelp = showHelp, onFinished = onFinished) { v ->
+            help = "Current only: move right for uneven wavering; left for a steady rhythm. The other methods use their own quality checks.",
+            enabled = !ui.showingReference && ui.mode == TarjiDetectorMode.Current,
+            showHelp = showHelp, onFinished = onFinished) { v ->
             onKnob { k -> k.copy(minPeriodicity = 0.85f - v * 0.70f) }
         }
         PulseSpeedControl(knobs, !ui.showingReference, showHelp, onFinished, onMatch,
@@ -899,6 +948,9 @@ private fun PulseSpeedControl(
 private fun PulseThumb(color: Color) {
     Canvas(Modifier.size(20.dp)) { drawCircle(color, radius = 7.dp.toPx()) }
 }
+
+/** Top of the volume threshold: a reciter's loudest held notes sit near a quarter of full scale. */
+private const val TARJI_LAB_MAX_VOLUME = 0.25f
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable

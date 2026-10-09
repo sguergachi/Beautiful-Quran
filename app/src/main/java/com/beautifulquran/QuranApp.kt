@@ -21,7 +21,7 @@ import com.beautifulquran.data.readCanonicalWords
 import com.beautifulquran.data.SearchConceptRepository
 import com.beautifulquran.data.SettingsRepository
 import com.beautifulquran.ornamentslab.OrnamentSeedStore
-import com.beautifulquran.playback.AudioOutputLatency
+import com.beautifulquran.playback.AudioOutputRoutes
 import com.beautifulquran.playback.PlayerController
 import com.beautifulquran.playback.RecitationCache
 import com.beautifulquran.timingslab.TimingOverrides
@@ -59,7 +59,7 @@ class QuranApp : Application() {
     lateinit var player: PlayerController
         private set
     /** Route-based output delay for the karaoke clock (BT A2DP / LE presets). */
-    lateinit var outputLatency: AudioOutputLatency
+    lateinit var outputRoutes: AudioOutputRoutes
         private set
     lateinit var timingOverrides: TimingOverrides
         private set
@@ -111,7 +111,7 @@ class QuranApp : Application() {
         bookmarks = DevProfiling.trace("bookmarksInit") { BookmarkRepository(this) }
         annotations = AnnotationRepository(this)
         player = PlayerController(this)
-        outputLatency = AudioOutputLatency(this)
+        outputRoutes = AudioOutputRoutes()
         timingOverrides = overrides
         ornamentSeeds = OrnamentSeedStore(this)
         inkLab = InkLabStore(this)

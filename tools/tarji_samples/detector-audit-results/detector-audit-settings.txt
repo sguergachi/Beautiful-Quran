@@ -1,0 +1,1 @@
+UNLABELED execution only; warmup=5; measured_runs=10; minHz=1.5; maxHz=10.0; holdMs=300.0; depth=0.035; volume=0.0; periodicity=0.4; JVM=21.0.12.1; os=Linux; arch=amd64

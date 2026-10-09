@@ -2,6 +2,7 @@ package com.beautifulquran.playback
 
 import org.junit.Assert.assertEquals
 import org.junit.Test
+import kotlin.math.roundToLong
 
 class TarjiSyncClockTest {
 
@@ -20,73 +21,35 @@ class TarjiSyncClockTest {
     }
 
     @Test
-    fun `backlog anchor starts from filled content and follows only clock drift`() {
-        assertEquals(false, TarjiBacklogAnchor.isReady(251.9, sinkLatencyMs = 252, speed = 1f))
-        assertEquals(true, TarjiBacklogAnchor.isReady(252.0, sinkLatencyMs = 252, speed = 1f))
-        assertEquals(false, TarjiBacklogAnchor.isReady(0.0, sinkLatencyMs = 0, speed = 1f))
-
-        val filling = TarjiBacklogAnchor.capture(
-            tapContentMs = 40.0,
-            playbackContentMs = 0,
-            sinkLatencyMs = 252,
-            speed = 1f,
-        )
-        assertEquals(40.0, filling.backlogContentMs, 0.0)
-        assertEquals(120.0, filling.estimate(tapContentMs = 120.0, playbackContentMs = 0), 0.0)
-
-        val filled = TarjiBacklogAnchor.capture(
-            tapContentMs = 500.0,
-            playbackContentMs = 248,
-            sinkLatencyMs = 252,
-            speed = 1f,
-        )
-        assertEquals(252.0, filled.backlogContentMs, 0.0)
-        assertEquals(252.0, filled.estimate(tapContentMs = 700.0, playbackContentMs = 448), 0.0)
+    fun `sink timestamps carry in content time and hold during pause`() {
+        val sink = TarjiSinkPosition(rendererMs = 10_000.0, wallNanos = 1_000_000_000L)
+        for (speed in listOf(0.75f, 1f, 1.25f, 1.5f)) {
+            assertEquals(10_000.0 + 33 * speed, sink.at(1_033_000_000L, speed, true), 1e-6)
+            assertEquals(10_000.0, sink.at(2_000_000_000L, speed, false), 0.0)
+            assertEquals(10_000.0 + 132 * speed, sink.at(1_132_000_000L, speed, true), 1e-6)
+            assertEquals(10_000.0 + 1000 * speed, sink.at(2_000_000_000L, speed, true), 1e-6)
+        }
     }
 
     @Test
-    fun `sink baseline converts wall time to content time once`() {
-        val anchor = TarjiBacklogAnchor.capture(
-            tapContentMs = 300.0,
-            playbackContentMs = 100,
-            sinkLatencyMs = 100,
-            speed = 1.5f,
-        )
-
-        assertEquals(150.0, anchor.backlogContentMs, 0.0)
-        assertEquals(150.0, anchor.estimate(tapContentMs = 450.0, playbackContentMs = 250), 0.0)
-    }
-
-    @Test
-    fun `tap event start maps back to the media item clock`() {
-        assertEquals(
-            58_220L,
-            mapTapContentToMediaMs(
-                playbackPositionMs = 57_970L,
-                tapContentMs = 58_220.0,
-                eventStartContentMs = 58_220.0,
-                backlogContentMs = 250.0,
-            ),
-        )
-        assertEquals(
-            58_300L,
-            mapTapContentToMediaMs(
-                playbackPositionMs = 57_970L,
-                tapContentMs = 58_220.0,
-                eventStartContentMs = 58_300.0,
-                backlogContentMs = 250.0,
-            ),
-        )
-    }
-
-    @Test
-    fun `sonic content latency is only added away from unity speed`() {
-        assertEquals(0f, sonicContentLatencyMs(1f), 0f)
-        assertEquals(Tarji.SONIC_LATENCY_MS, sonicContentLatencyMs(0.75f), 0f)
-        assertEquals(Tarji.SONIC_LATENCY_MS, sonicContentLatencyMs(1.25f), 0f)
+    fun `an optimistic resume cannot advance a paused sink snapshot through the pause`() {
+        val paused = TarjiSinkPosition(500.0, 1_000_000_000L, playing = false)
+        assertEquals(500.0, paused.at(11_000_000_000L, 1f, playing = true), 0.0)
+        val resumed = TarjiSinkPosition(500.0, 11_000_000_000L, playing = true)
+        assertEquals(533.0, resumed.at(11_033_000_000L, 1f, playing = true), 1e-6)
     }
 
     // ── Frame-time read-out ───────────────────────────────────────────────
+
+    @Test
+    fun `queued audio survives the stale feed guard but pause and drain close it`() {
+        assertEquals(true, hasAudiblePcm(800L, queuedContentMs = 200.0, playing = true))
+        assertEquals(false, hasAudiblePcm(800L, queuedContentMs = 0.0, playing = true))
+        assertEquals(false, hasAudiblePcm(0L, queuedContentMs = 1000.0, playing = false))
+        assertEquals(false, hasAudiblePcm(800L, queuedContentMs = -1.0, playing = true))
+        assertEquals(true, hasAudiblePcm(349L, queuedContentMs = 0.0, playing = true))
+        assertEquals(false, hasAudiblePcm(350L, queuedContentMs = 0.0, playing = true))
+    }
 
     private val hopMs = 20.0
 
@@ -241,19 +204,19 @@ class TarjiSyncClockTest {
                 clock.onPosition(
                     positionMs = (12_270 + wallMs).toLong(),
                     wallNanos = (wallMs * 1e6).toLong(),
-                    tapContentMs = hops * hopMs,
-                    sinkLatencyMs = 250,
+                    contentAtHeadMs = wallMs,
                     speed = 1f,
+                    playing = true,
                 )
             }
             assertEquals(true, clock.isAnchored)
             val earMs = clock.contentAtEarMs((wallMs * 1e6).toLong())
             track.read(earMs, hopMs, out)
             if (wallMs < 800) continue
-            // The first tick found the tap 400 ms in with a full 250 ms sink
-            // behind it, so content at the ear leads the wall by 150 ms.
-            assertEquals(wallMs + 150.0, earMs, 1.0)
-            worst = maxOf(worst, kotlin.math.abs(out.tremolo - ripple(earMs)))
+            // A 400 ms burst against a 250 ms buffer must NOT place the
+            // voice 150 ms early. The source PTS and presentation clock win.
+            assertEquals(wallMs, earMs, 1e-6)
+            worst = maxOf(worst, kotlin.math.abs(out.tremolo - ripple(wallMs)))
             frames++
             if (out.tremolo != last) moved++
             last = out.tremolo
@@ -265,39 +228,128 @@ class TarjiSyncClockTest {
     }
 
     @Test
-    fun `ear clock holds through a stall and carries its offset across a handoff`() {
+    fun `ear clock maps source timestamps through pause seek speed and gapless handoff`() {
         val clock = TarjiEarClock()
-        fun tick(positionMs: Long, wallMs: Long, tapMs: Double) = clock.onPosition(
-            positionMs, wallMs * 1_000_000L, tapMs, sinkLatencyMs = 250, speed = 1f)
+        assertEquals(true, clock.positionAt(0).isNaN())
+        fun tick(media: Long, wall: Long, content: Double, speed: Float = 1f, playing: Boolean = true) =
+            clock.onPosition(media, wall * 1_000_000L, content, speed, playing)
 
-        tick(positionMs = 0, wallMs = 0, tapMs = 100.0)
-        assertEquals(false, clock.isAnchored)
-        assertEquals(true, clock.contentAtEarMs(0L).isNaN())
-        tick(positionMs = 50, wallMs = 50, tapMs = 300.0) // the sink has filled
-        assertEquals(50.0, clock.contentAtEarMs(50_000_000L), 1e-9)
-        // Between ticks it runs with the wall clock…
+        // The first decoded PCM frame was at media 12 270, despite a late
+        // first UI tick and 400 ms of PCM being decoded already.
+        tick(12_320, 50, 50.0)
         assertEquals(70.0, clock.contentAtEarMs(70_000_000L), 1e-9)
-        // …but a tick that never comes (pause) cannot run it on.
-        assertEquals(150.0, clock.contentAtEarMs(5_000_000_000L), 1e-9)
-        // A stall: the wall moves, the head does not, and neither does the ear.
-        tick(positionMs = 400, wallMs = 400, tapMs = 650.0)
-        tick(positionMs = 400, wallMs = 500, tapMs = 650.0)
-        assertEquals(400.0, clock.contentAtEarMs(500_000_000L), 1e-9)
-        // The event that began at content 300 ms is heard at media 300 ms.
-        assertEquals(300.0, clock.mediaMsOfContent(300.0), 1e-9)
+        assertEquals(12_570.0, clock.mediaMsOfContent(300.0), 1e-9)
+        tick(12_670, 400, 400.0, playing = false)
+        assertEquals(400.0, clock.contentAtEarMs(5_000_000_000L), 1e-9)
 
-        // Gapless handoff: the next ayah's position restarts, the PCM runs on.
-        tick(positionMs = 6_000, wallMs = 6_100, tapMs = 6_250.0)
-        tick(positionMs = 3, wallMs = 6_133, tapMs = 6_410.0)
-        assertEquals(6_033.0, clock.contentAtEarMs(6_133_000_000L), 1e-9)
-        assertEquals(6_053.0, clock.contentAtEarMs(6_153_000_000L), 1e-9)
-        // Content 6 100 ms now sits 67 ms into the new item.
-        assertEquals(70.0, clock.mediaMsOfContent(6_100.0), 1e-9)
-
-        // A speed change re-anchors against the newly scaled sink.
-        clock.onPosition(1_000, 7_000_000_000L, 7_500.0, sinkLatencyMs = 250, speed = 1.5f)
-        assertEquals(1_000.0 - (1_000.0 + 375.0 - 7_500.0), clock.contentAtEarMs(7_000_000_000L), 1e-9)
+        // The sink timestamp supplies the exact next-item boundary; no
+        // extrapolated previous-item time invents the source offset.
+        tick(3, 6_133, 6_003.0)
+        assertEquals(6_003.0, clock.contentAtEarMs(6_133_000_000L), 1e-9)
+        assertEquals(100.0, clock.mediaMsOfContent(6_100.0), 1e-9)
+        tick(1_000, 7_000, 7_000.0, speed = 1.5f)
+        assertEquals(7_030.0, clock.contentAtEarMs(7_020_000_000L), 1e-9)
+        // A seek starts a new source session on its actual decoded PTS.
         clock.reset()
-        assertEquals(false, clock.isAnchored)
+        tick(17_340, 8_000, 10.0)
+        assertEquals(17_330.0, clock.mediaMsOfContent(0.0), 1e-9)
+    }
+
+    @Test
+    fun `manual delay shifts graph and pulse together without moving event ownership`() {
+        val track = TarjiEarTrack()
+        for (hop in 0..199) track.publishVoice(hop, gain = hop / 200f, eventStartHop = 10)
+        val clock = TarjiEarClock()
+        val out = TarjiEarSample()
+        val expected = TarjiEarSample()
+        for (speed in listOf(0.75f, 1f, 1.25f, 1.5f)) {
+            clock.onPosition(12_500, 0L, 500.0, speed, true)
+            for (lag in listOf(0.0, 80.0, 180.0, 250.0)) {
+                val content = 500.0 - lag * speed
+                assertEquals(true, clock.sampleAtEar(0L, track, hopMs, out, lag, 0f, 0f, true))
+                track.read(content, hopMs, expected)
+                assertEquals((12_500 - lag * speed).roundToLong(), out.mediaMs)
+                assertEquals(expected.tremolo, out.tremolo, 1e-6f)
+                assertEquals(expected.gain, out.gain, 1e-6f)
+                assertEquals(12_200L, out.eventStartMediaMs)
+            }
+            // Reading ahead for paint never moves the graph or event's timestamp.
+            clock.sampleAtEar(0L, track, hopMs, out, 180.0, 37f, 16f, true)
+            assertEquals((12_500 - 180 * speed + 16 * speed).roundToLong(), out.mediaMs)
+            assertEquals(12_200L, out.eventStartMediaMs)
+        }
+    }
+
+    @Test
+    fun `graph follows the paused presentation clock when history is unavailable`() {
+        val clock = TarjiEarClock()
+        val out = TarjiEarSample()
+        clock.onPosition(1_000, 0L, Double.NaN, 1f, false)
+        assertEquals(false, clock.sampleAtEar(2_000_000_000L, TarjiEarTrack(), hopMs, out, 180.0, 0f, 16f, false))
+        assertEquals(820L, out.mediaMs)
+        assertEquals(0f, out.gain, 0f)
+        assertEquals(Long.MIN_VALUE, out.eventStartMediaMs)
+    }
+
+    @Test
+    fun `mode generations filter both interpolation endpoints without clearing the voice`() {
+        val track = TarjiEarTrack()
+        for (hop in 0 until 80) track.publish(hop, voiceRms(hop), 130f, 0.8f, 5f, true,
+            gain = 0.8f, eventStartHop = 20, generation = 3)
+        val unfiltered = TarjiEarSample()
+        val filtered = TarjiEarSample()
+        track.read(1_000.0, hopMs, unfiltered)
+        track.read(1_000.0, hopMs, filtered, generation = 4)
+        assertEquals(0f, filtered.gain, 0f)
+        assertEquals(false, filtered.reverberating)
+        assertEquals(-1, filtered.eventStartHop)
+        assertEquals(unfiltered.tremolo, filtered.tremolo, 0f)
+
+        track.publish(80, voiceRms(80), 130f, 0.8f, 5f, true,
+            gain = 1f, eventStartHop = 81, generation = 4)
+        track.read(1_605.0, hopMs, filtered, generation = 4)
+        assertEquals(0.25f, filtered.gain, 0f)
+        assertEquals(false, filtered.reverberating)
+        track.read(1_615.0, hopMs, filtered, generation = 4)
+        assertEquals(0.75f, filtered.gain, 0f)
+        assertEquals(81, filtered.eventStartHop)
+
+        track.publish(81, voiceRms(81), 130f, 0.8f, 5f, true,
+            gain = 0.8f, eventStartHop = 20, generation = 3)
+        track.read(1_625.0, hopMs, filtered, generation = 4)
+        assertEquals(0.75f, filtered.gain, 0f)
+        assertEquals(81, filtered.eventStartHop)
+        track.read(1_635.0, hopMs, filtered, generation = 4)
+        assertEquals(0.25f, filtered.gain, 0f)
+        assertEquals(false, filtered.reverberating)
+    }
+
+    @Test
+    fun `raw phase and media cursor use the same ear trims through mode switch and seek`() {
+        val track = TarjiEarTrack()
+        for (hop in 0 until 200) track.publish(hop, voiceRms(hop), 130f, 0.8f, 5f, true,
+            gain = 1f, eventStartHop = 10, generation = 2)
+        val clock = TarjiEarClock()
+        val selected = TarjiEarSample()
+        val raw = TarjiEarSample()
+        val expected = TarjiEarSample()
+        for (speed in listOf(0.75f, 1f, 1.5f)) {
+            clock.onPosition(12_500, 0L, 500.0, speed, true)
+            clock.sampleAtEar(0L, track, hopMs, selected, 80.0, 37f, 8f, true, generation = 3)
+            assertEquals(0f, selected.gain, 0f)
+            assertEquals(true, clock.sampleAtEar(0L, track, hopMs, raw, 80.0, 37f, 8f, true,
+                rawPulseRateHz = 5f, rawUsesAmplitude = true))
+            track.readPulse(500.0 - 80 * speed + 8 * speed + 37, hopMs, expected, 5f, true)
+            assertEquals(selected.mediaMs, raw.mediaMs)
+            assertEquals(expected.tremolo, raw.tremolo, 0f)
+            assertEquals(Long.MIN_VALUE, raw.eventStartMediaMs)
+        }
+        track.clear()
+        clock.reset()
+        clock.onPosition(17_340, 0L, 10.0, 1f, true)
+        assertEquals(false, clock.sampleAtEar(0L, track, hopMs, raw, 0.0, 0f, 0f, true,
+            rawPulseRateHz = 5f))
+        assertEquals(17_340L, raw.mediaMs)
+        assertEquals(0f, raw.tremolo, 0f)
     }
 }
