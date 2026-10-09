@@ -4,87 +4,33 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/**
- * The leaf's grid. Whatever a setting does with the paper, it has to spend all
- * of it and no more: a leaf whose bands sum over its height runs its last line
- * off the page, and one that sums under it leaves a strip nothing accounts for.
- * Each setting spends against its own total, since the folio left the leaf and
- * the two no longer come to the same figure.
- */
+/** Both hands spend the same leaf without overflow or unaccounted paper. */
 class MushafLeafBandsTest {
-
     @Test
-    fun `each setting spends its own leaf exactly`() {
-        val leaf = 2004f
-        for (bands in listOf(MUSHAF_ARABIC_BANDS, MUSHAF_ENGLISH_BANDS)) {
-            val unit = bands.unitPx(leaf)
-            val spent = (bands.runningHead + bands.headGutter + bands.well + bands.tail) * unit
-            assertEquals(leaf, spent, 0.5f)
+    fun `each hand spends its leaf exactly across window heights`() {
+        for (english in listOf(false, true)) {
+            val bands = mushafLeafBands(english)
+            for (height in listOf(1600f, 2004f, 2300f)) {
+                val spent = bands.slots * bands.unitPx(height)
+                assertEquals(height, spent, 0.5f)
+            }
         }
-        // The English leaf is the canonical grid; the Arabic one buys a row.
-        assertEquals(MushafGrid.SLOTS, MUSHAF_ENGLISH_BANDS.slots, 0.0001f)
     }
 
     @Test
-    fun `English protects its lower folio while Arabic spends that paper on type`() {
-        assertEquals(
-            MushafGrid.RUNNING_HEAD + MushafGrid.HEAD_GUTTER + MushafGrid.TEXT_LINES +
-                MushafGrid.TAIL,
-            MUSHAF_ENGLISH_BANDS.slots,
-            0.0001f,
-        )
-        assertEquals(MushafGrid.TAIL, MUSHAF_ENGLISH_BANDS.tail, 0f)
-        assertEquals(0f, MUSHAF_ARABIC_BANDS.tail, 0f)
-        assertTrue(MUSHAF_ENGLISH_BANDS.well / MUSHAF_ENGLISH_BANDS.slots > 15f / 17.05f)
+    fun `English and Arabic share their running head gutter well and foot`() {
+        assertEquals(MUSHAF_ARABIC_BANDS, MUSHAF_ENGLISH_BANDS)
+        assertEquals(mushafLeafBands(false), mushafLeafBands(true))
+        assertEquals(MushafGrid.RUNNING_HEAD, MUSHAF_ENGLISH_BANDS.runningHead, 0f)
+        assertEquals(0.50f, MUSHAF_ENGLISH_BANDS.headGutter, 0f)
     }
 
     @Test
-    fun `the running head is the same band in both, so the language does not move it`() {
-        assertEquals(MUSHAF_ARABIC_BANDS.runningHead, MUSHAF_ENGLISH_BANDS.runningHead, 0f)
-        assertEquals(MushafGrid.RUNNING_HEAD, MUSHAF_ARABIC_BANDS.runningHead, 0f)
-    }
-
-    @Test
-    fun `the Arabic leaf buys a seventeenth row with a smaller foot`() {
-        assertEquals(
-            MUSHAF_DISPLAY_LINES_PER_PAGE.toFloat(),
-            MUSHAF_ARABIC_BANDS.well,
-            0f,
-        )
-        // The English well is no longer a round fifteen — it took what the
-        // gutter gave up (ENGLISH_HEAD_GUTTER) — so the seventeenth row is the
-        // thing to assert, not the difference.
-        assertTrue(MUSHAF_ARABIC_BANDS.well > MUSHAF_ENGLISH_BANDS.well)
-        // The English gutter used to be the wider of the two, on the reasoning
-        // that Latin ink wants more air than the QCF faces' own side bearings.
-        // It is now the tighter one: both leaves spend the gutter on their
-        // text, and they only differ in what it buys. The Arabic leaf buys a
-        // seventeenth row with it; the English hand is solved from the well, so
-        // the English leaf buys type. Neither can spend it twice.
-        assertTrue(MUSHAF_ENGLISH_BANDS.headGutter <= MUSHAF_ARABIC_BANDS.headGutter)
-    }
-
-    @Test
-    fun `the English gutter is spent on type, not on air under the head`() {
-        // A full unit was the Arabic line's pitch standing over English prose,
-        // whose line is smaller — 1.7 lines of air, which read as a hole. It
-        // is now down to the running head's own band: the head's ink fits
-        // inside that band, so what is left is clear air, and every unit not
-        // spent here is set in the block instead.
-        assertEquals(ENGLISH_HEAD_GUTTER, MUSHAF_ENGLISH_BANDS.headGutter, 0f)
-        assertTrue(MUSHAF_ENGLISH_BANDS.headGutter < MushafGrid.HEAD_GUTTER)
-        // Whatever the gutter gave up, the well took: the leaf is the same leaf.
-        assertEquals(
-            MushafGrid.HEAD_GUTTER - ENGLISH_HEAD_GUTTER,
-            MUSHAF_ENGLISH_BANDS.well - MushafGrid.TEXT_LINES,
-            0.0001f,
-        )
-        assertTrue(MUSHAF_ENGLISH_BANDS.well > MushafGrid.TEXT_LINES)
-    }
-
-    @Test
-    fun `the leaf picks its bands by the language it is set in`() {
-        assertEquals(MUSHAF_ENGLISH_BANDS, mushafLeafBands(english = true))
-        assertEquals(MUSHAF_ARABIC_BANDS, mushafLeafBands(english = false))
+    fun `both hands spend the old lower folio and foot on type`() {
+        for (bands in listOf(MUSHAF_ARABIC_BANDS, MUSHAF_ENGLISH_BANDS)) {
+            assertEquals(0f, bands.tail, 0f)
+            assertEquals(MUSHAF_DISPLAY_LINES_PER_PAGE.toFloat(), bands.well, 0f)
+            assertTrue(bands.well / bands.slots > MushafGrid.TEXT_LINES / MushafGrid.SLOTS)
+        }
     }
 }

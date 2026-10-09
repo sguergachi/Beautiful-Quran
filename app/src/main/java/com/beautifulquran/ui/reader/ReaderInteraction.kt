@@ -245,6 +245,8 @@ object ReaderInteraction {
      * verse (of [loadedSurahId]); null means the paused position is elsewhere,
      * or nothing is loaded to be paused.
      *
+     * English supplies [englishAyahs] from its own leaf, which can span several
+     * Madinah pages. Its first verse, not the printed leaf number, starts play.
      * Returns null when the transport should simply resume.
      */
     fun mushafPlayTarget(
@@ -253,14 +255,26 @@ object ReaderInteraction {
         heldAyah: Int?,
         leafFirstWord: MushafPlayTarget?,
         leafAyahs: Set<Pair<Int, Int>>,
+        englishAyahs: List<Pair<Int, Int>>? = null,
+        scrubbedSurahId: Int? = null,
     ): MushafPlayTarget? {
+        // English leaf numbers are not Madinah page numbers, and a leaf may
+        // carry verses from several source pages. Its own verses decide play.
+        fun englishTarget(key: Pair<Int, Int>) = MushafPlayTarget(key.first, key.second, null)
+        englishAyahs?.firstOrNull { it.first == scrubbedSurahId }?.let {
+            return englishTarget(it)
+        }
         // A chapter opened from the index has already named its verse; the leaf
         // it lands on is that request's consequence, not a competing one.
         if (pendingJumpAyah > 0) {
             return MushafPlayTarget(loadedSurahId, pendingJumpAyah, null)
         }
-        val leaf = leafFirstWord ?: return null
-        if (heldAyah != null && (loadedSurahId to heldAyah) in leafAyahs) return null
+        val leaf = if (englishAyahs != null) {
+            englishAyahs.firstOrNull()?.let(::englishTarget)
+        } else leafFirstWord
+        if (leaf == null) return null
+        val ayahs = englishAyahs?.toSet() ?: leafAyahs
+        if (heldAyah != null && (loadedSurahId to heldAyah) in ayahs) return null
         return leaf
     }
 }

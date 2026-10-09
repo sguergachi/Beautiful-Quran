@@ -85,7 +85,6 @@ import com.beautifulquran.domain.MUSHAF_WORD_GAP_EM
 import com.beautifulquran.domain.MushafLine
 import com.beautifulquran.domain.MushafPage
 import com.beautifulquran.domain.ENGLISH_LEAF_LEADING_EM
-import com.beautifulquran.domain.juzOf
 import com.beautifulquran.domain.mushafLineFit
 import com.beautifulquran.domain.qcfTrailingMark
 import com.beautifulquran.domain.qcfWordGlyphs
@@ -601,8 +600,6 @@ internal fun ReadingPreview(
 }
 
 private val PreviewQcfSize = 20.sp
-/** Page hand for the miniature folio, so the figures read at ~10 sp. */
-private val PreviewFolioGlyph = 22.sp
 /**
  * 21:91–93 occupy four exclusive Madinah lines (page 330, lines 1–4).
  *
@@ -745,14 +742,8 @@ private fun PreviewEnglishMushafLeaf(
         }
     }
     Column(modifier = modifier) {
-        PreviewLeafRunningHead()
+        PreviewLeafRunningHead(pageNumberScript)
         Spacer(Modifier.height(8.dp))
-        // Sized by its own prose, not by a reserved block: the miniature's
-        // height is already locked from outside (PreviewHeightLock), and a
-        // fixed well here left the folio a few pixels of slot, in which its
-        // figures measured to nothing and only the diamond — which draws past
-        // its box — survived.
-        //
         // The style is the leaf's own [englishProseStyle], not a copy of it.
         // The copy had drifted into justified, unhyphenated text set on 1.5 em
         // — three things the leaf is not — so the miniature advertised a page
@@ -764,33 +755,24 @@ private fun PreviewEnglishMushafLeaf(
                 lineHeight = PreviewEnglishLeafSize * ENGLISH_LEAF_LEADING_EM,
             ),
         )
-        Spacer(Modifier.height(6.dp))
-        MushafFolioMarks(
-            page = PreviewMushafPage,
-            glyphSize = PreviewFolioGlyph,
-            script = pageNumberScript,
-            modifier = Modifier.fillMaxWidth().padding(PreviewFolioPad),
-        )
     }
 }
 
 /**
- * The leaf's running head in miniature: Arabic numbers its page at the left;
- * English keeps its part there and its folio below the prose.
+ * Both Mushaf hands number their leaf in the same running-head arrangement.
  */
 @Composable
-private fun PreviewLeafRunningHead(pageNumberScript: PageNumberScript? = null) {
+private fun PreviewLeafRunningHead(pageNumberScript: PageNumberScript) {
     val ink = QuranTheme.ink.muted
-    val folio = pageNumberScript?.let { mushafFolioLayout(PreviewMushafPage, it) }
-    val both = folio?.western != null && folio.arabic != null
+    val folio = mushafFolioLayout(PreviewMushafPage, pageNumberScript)
+    val both = folio.western != null && folio.arabic != null
     val style = MaterialTheme.typography.labelSmall.copy(
         fontSize = PreviewLeafHeadSize,
         letterSpacing = 0.10.em,
     )
     Row(Modifier.fillMaxWidth()) {
         Text(
-            text = folio?.western ?: folio?.arabic
-                ?: "Part ${juzOf(PreviewMushafSurahId, PreviewMushafAyahFirst)}",
+            text = folio.western ?: requireNotNull(folio.arabic),
             style = style,
             color = ink,
             maxLines = 1,

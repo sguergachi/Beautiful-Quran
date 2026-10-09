@@ -51,9 +51,10 @@ leading grows with it, and the dial keeps its own 8 dp of air below the text.
 Both number scripts flank the centred chapter: Western at the left,
 Arabic-Indic at the right, with equal end columns. A single script stays at
 the left with the chapter at the right. The running head keeps its gutter.
-English retains its 0.55-line foot and
-30 dp folio band. Extra rows go to the densest chapter section that still has
-words to spare; a short section cannot acquire empty rows.
+English shares the same full-height frame and running-head folio; its hand
+grows into the reclaimed well while its verses keep their own pagination.
+Extra Arabic rows go to the densest chapter section that still has words to
+spare; a short section cannot acquire empty rows.
 
 ## 3. Every full line is flush
 
@@ -220,11 +221,14 @@ own hand rather than the step above it the deeper band could carry), because the
 cartouche is a quarter shallower and a name set larger than its band stops
 fitting inside it.
 
-The title is measured at its full natural line height and placed by the
-midpoint of that name's visible ink bounds. Clamping Hafs's line box to the
-short band pushed Maryam toward the lower rule; a fixed lift cannot also
-centre names with tall ascenders. Visible overflow still protects descenders;
-the panel and the page's grid keep their existing dimensions.
+The title is measured at its full natural line height and hung from one
+shared writing line: the zone from alef top to baseline is centred for Arabic,
+and the capital-height zone for Latin. A shared tail allowance keeps the line
+clear of its neighbours. Long descenders hang into open paper rather than
+raising each name by its own ink bounds. Visible overflow protects the full
+glyphs. No top or bottom rule crosses the name: developer settings offer
+Cartouche panel, Cloud collar and Open heading, all in the same chapter slot.
+See [the banner research and geometry](MUSHAF_BANNERS.md).
 
 Nothing else moves. The slot is the same slot, so an opening still costs the
 grid one line and the hand is still the one hand of all 604 pages (§2); only the
@@ -1330,65 +1334,39 @@ really does stop mid-sentence, so that is where the lead belongs.
 
 The leaf is one grid, and everything on it lands on the grid.
 
-**Vertically**, each setting divides the leaf into three bands and
-`MushafLeafBands` holds it to its own total — the bands must sum to `slots`, or
-the last line runs off the paper at one end and a strip of nothing is
-unaccounted for at the other. They spend the leaf differently because their ink
-does:
+**Vertically**, both hands share the same frame. `MushafLeafBands` accounts
+for its whole height; the text cannot spend a band twice or leave unaccounted
+paper at the foot.
 
 ```
                 head   gutter   well   foot   = slots
     Arabic      0.30     0.50     17     0       17.80
-    English     0.30     0.30     15.70  0.55    16.85
+    English     0.30     0.50     17     0       17.80
 ```
 
-The Arabic leaf uses seventeen display rows and carries the folio in its
-running head, at the top left in place of the part. Its former bottom band and
-foot now enlarge the text. The number keeps the selected Western, Arabic-Indic,
-or paired scripts and travels with its leaf. The Customize miniature shows
-the same arrangement. Loose lines spend more of their measure on letterforms,
-with less paper between words (§2, §5). English spends the height on continuous
-prose instead, keeping its lower folio and the foot that clears it.
+Arabic balances each unchanged Madinah page over seventeen display rows.
+English uses the same well for continuous prose and still paginates whole
+verses into its own book. Its larger measured well enlarges the hand; the
+shared seventeen-unit well does not turn the prose into seventeen Arabic rows.
 
-**The English folio stands below its foot.** There used to be a
-tail and a folio band —
-0.35 of a unit of paper and 0.40 for the figure, three quarters of a line spent
-below the last line of every leaf in the book — and both went. The English folio
-now stands in the air the dial already kept above its rule (`MushafDialHeadAir`,
-24 dp of pure padding, now 8), which puts the figure lower on the screen, in a
-band it shares with the transport. That is where a folio belongs on a device:
-the page number is furniture of the frame, not of the paper, and the reader's
-thumb is already down there.
+**Both folios stand in the running head.** Western digits sit at the top left
+and Arabic-Indic digits at the top right when both are selected, with the
+chapter centred. A single script stays at the left with the chapter at the
+right. Each English figure is that leaf's number in the English book, not its
+source Madinah page. The number travels with the page and Customize previews
+the same placement.
 
-The tail came back, and it took the leaf being *measured* to show why it had to.
-While the pagination counted characters into a leaf it always left a line or so
-unspent, and that unspent line was doing the work of a foot margin without
-anyone having asked it to. The ruler took the accident away and the last line's
-descenders came down to 2,076 px on a device whose folio begins its ink at
-2,064: the page number was being set into the text. So 0.55 of a unit, a real
-band rather than a slack — the leaf grows by it, so the type comes down about
-three percent and the well holds the same lines, each a little longer. It is not
-the head's 1.30, because the folio and the dial stand below it with air of their
-own; measured then, the foot ran 84 to 95 px. That guard remains for English,
-whose lower folio still needs it. Arabic no longer has a figure below the last
-line: the dial's own 8 dp of air provides clearance, so its former foot and
-folio band become text. The English foot and 30 dp folio band keep the space
-its measured prose needs.
+The old English foot protected a lower folio from the measured last line's
+descenders: the original report had a 12 px overlap. With that figure moved to
+the head, its 30 dp band and the 0.55-unit foot now go to type, as on Arabic.
+The dial retains its 8 dp head air, and the English fit retains its 2 dp
+rounding allowance. The root's reserved-footer sum matches the reading sheet;
+the remembered leaf-metrics version is bumped when that frame changes so an
+existing install repaginates against the new well.
 
-The leaf keeps the rest of the three quarters of a line. On the Arabic hand it goes into
-type size, since the well's share of the leaf rises from 16 / 17.05 to 16 /
-16.80. On the English hand, whose type is solved from the well, it is a whole
-extra line: the well's share rises from 15 / 17.05 to 15 / 16.30, 4.6 % more
-paper, and 4.6 % of twenty-two lines is one — so `ENGLISH_LEAF_CAPACITY_CHARS`
-goes from 900 to 940 and `ENGLISH_LEAF_LINE_CHARS` divides it by 23 rather than
-22. It is the only change here that a reader will count. (Both figures have
-moved since, to 1,250 and 26, for the reason in §13.5; the arithmetic above is
-the one that set them at the time.)
-
-The two settings no longer sum to the same figure, which is why each divides by
-its own `slots` rather than by one shared `SLOTS`. The shared total was always a
-convenience: what a leaf must not do is spend more height than it has, and its
-own sum is the thing that says whether it does.
+Transport playback uses the English leaf's own verse keys, including carried
+verses and shared chapter openings. Its printed leaf number never indexes the
+Madinah catalogue to choose a chapter.
 
 That last point is why the block is set `LineHeightStyle.Trim.Both`. Untrimmed,
 a line box carries half its leading above the first ascent and half below the
@@ -1400,15 +1378,11 @@ own edges are the ink, and the first line and the last land on the same paper on
 every leaf in the book. It also makes the block's height exactly `(n − 1)`
 pitches plus one line's ink, which is what the leading is solved from.
 
-**Horizontally**, there is one measure, and the running head and the folio are
-set to it. They are furniture *of the text block*, not of the paper: standing
-them at their own inset put the head a finger's width outside the block it
-names. The Arabic leaf's measure keeps its bare 10 dp fore-edge, because every
-unit of paper it does not spend is type size and the QCF measure is what caps
-that type. The English leaf's is 5.5% of the leaf — the hand is solved from the
-measure there, so paper given to the margin comes back as a shorter, more
-readable line rather than as smaller type, and a book with no outer margin reads
-as a printout.
+**Horizontally**, both running heads use the same 10 dp inset for their
+folio and chapter labels. The Arabic text measure keeps that bare fore-edge,
+because the QCF measure caps its type. English prose retains its 5.5% fore-edge:
+its hand is solved from the well, so the margin buys a shorter, more readable
+line. The chapter ornament follows its text measure in each hand.
 
 **The chapter's panel is one line of the page, with a line's air around it.**
 The band is one line's own type box, so it stands exactly as deep as a line of

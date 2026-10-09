@@ -410,11 +410,6 @@ fun ReaderScreen(
     val leafPage = remember(englishBook) {
         { index: Int -> englishBook?.leaf(index)?.page ?: (index + 1) }
     }
-    // The figure printed on a leaf: its own number in the English book, and the
-    // Madinah page on the Arabic one — the same figure the dial counts.
-    val mushafFolioAt = remember(englishBook) {
-        { index: Int -> if (englishBook != null) index + 1 else leafPage(index) }
-    }
     val pageLeaf = remember(englishBook) {
         { page: Int -> englishBook?.firstLeafOf(page) ?: (page - 1) }
     }
@@ -1130,9 +1125,11 @@ fun ReaderScreen(
      */
     fun mushafPlayTarget(): ReaderInteraction.MushafPlayTarget? {
         val catalog = mushafCatalog ?: return null
-        val leaf = catalog.page(mushafPagerState.currentPage + 1) ?: return null
+        val englishLeaf = englishBook?.leaf(mushafPagerState.currentPage)
+        val leaf = catalog.page(leafPage(mushafPagerState.currentPage)) ?: return null
         val scrubbedSurah = mushafSeekSurahId?.takeIf { sid ->
-            leaf.surahStarts.any { it.surahId == sid } || leaf.ayahKeys.any { it.first == sid }
+            englishLeaf == null &&
+                (leaf.surahStarts.any { it.surahId == sid } || leaf.ayahKeys.any { it.first == sid })
         }
         if (scrubbedSurah != null) {
             val firstOfScrubbed = leaf.lines
@@ -1156,6 +1153,8 @@ fun ReaderScreen(
                 ReaderInteraction.MushafPlayTarget(it.surahId, it.ayah, it.word.position)
             },
             leafAyahs = leaf.ayahKeys,
+            englishAyahs = englishLeaf?.verses,
+            scrubbedSurahId = mushafSeekSurahId,
         )
     }
 
@@ -2662,12 +2661,6 @@ fun ReaderScreen(
                         // leaf is set in, not whether an English book exists —
                         // it exists in both settings.
                         english = settings.readingMode == ReadingMode.ENGLISH_ONLY,
-                        pageNumberScript = settings.pageNumberScript,
-                        // The folio rides the leaf: the band is centred on the
-                        // pager's own page and slid by its own offset.
-                        pageIndex = { mushafPagerState.currentPage },
-                        pageOffset = { mushafPagerState.currentPageOffsetFraction },
-                        folioAt = mushafFolioAt,
                         // Whatever the rule is counting: leaves on the English
                         // book, Madinah pages on the Arabic one.
                         pageCount = mushafBookLength(

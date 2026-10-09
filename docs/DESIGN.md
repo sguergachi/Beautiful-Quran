@@ -168,23 +168,21 @@ gutter deep enough for a circled ayah mark's medallion, which inks about half
 its own width past its advance and is sliced by anything narrower.
 
 The Arabic leaf uses seventeen display rows inside each unchanged Madinah
-page boundary. Its page number replaces the part in the running head. Both
-scripts put Western digits at the left and Arabic-Indic digits at the right,
-with the chapter centred between equal end columns. A single script stays at
-the left and the chapter at the right. The former bottom folio band and its foot belong to the
-text, so its hand grows with the taller well. The dial retains its own air
-below the last line. English keeps the part in the head and its folio below
-the prose, with the foot its measured descenders need. Page-number script
-chooses Arabic-Indic, Western, or both — always quiet ink. The English leaf's
-bottom folio keeps its diamond between the two scripts.
+page boundary. English uses the same full-height frame for independently
+paginated prose. In both, the page number replaces the part in the running
+head. Both scripts put Western digits at the left and Arabic-Indic digits at
+the right, with the chapter centred between equal end columns. A single script
+stays at the left and the chapter at the right. The former bottom folio band
+and foot go to the text; the dial retains its own air below the last line.
+Page-number script chooses Arabic-Indic, Western, or both, always quiet ink.
 
-**The folio belongs to the leaf.** Arabic carries it in the running head;
-English carries it just below the text. Both travel with the page during a
-turn. The Customize miniature keeps each language's placement and scripts.
+**The folio belongs to the leaf.** Both carry it in the running head, and it
+travels with the page during a turn. The English figure counts English leaves.
+Customize uses the same placement and scripts.
 
-**One measure.** Running head, title band and folio all hang on the text
-block's own margin. Three different edges on one leaf is the loudest
-typographic fault the page can carry.
+**The frame is shared.** Running-head labels use the same inset in both hands.
+Arabic keeps its bare text margin; English prose retains its wider book
+measure. Each chapter ornament follows the text block it opens.
 
 **Rank by role, not by taste.** Weight says what a thing is for, so the app
 keeps one ladder of ink weights (`QuranInk`) and everything hangs off a rung of
@@ -232,13 +230,15 @@ a running head is for finding a place, and the transliterated name is how the
 book names chapters in Latin everywhere else. It stands off the block by
 about a line's pitch.
 
-A chapter opening carries the one illumination allowed on the leaf: an ʿunwān
-panel — a capsule tapering to a point at either end, doubled gilt rule, the
-chapter's own ground tooled fine inside it, a shamsa drawn (never gilded) at
-each end, and the name on a tapered paper cartouche. Rectangles and gilded
-studs both read as UI; a drawn capsule reads as a plate set into the page. The
-panel takes one line of the page's grid, as the basmalah beneath it does, so
-the fifteen-line rhythm still holds.
+A chapter opening carries the leaf's illumination: a chapter-seeded tooled
+ground and drawn shamsas around a gold title. Three treatments are available
+under Developer → Chapter banner: Cartouche panel (the default), Cloud collar,
+and Open heading. Their centre stays open above and below the writing, so no
+rule crowds an ascender or descender. All names share one writing line at a
+size, and a long tail hangs naturally instead of lifting its word. The fixed
+chapter slot, full glyphs and basmalah position are shared by the variants and
+both reading languages. [The research brief](MUSHAF_BANNERS.md) records the
+precedents and geometry.
 
 The page fonts carry no space glyph, so the air between a verse's closing
 letter and its circled mark is let out of that letter's own advance (0.10 em).
@@ -814,10 +814,14 @@ remain synchronized to the current word's timing segment and must be treated as
 a temporary renderer-specific compromise, not a relaxation of the product
 principle.
 
-While reciting, the top bar, reciter name, repeat, and speed fade to 8 % over
-~520 ms (Material ease-in-out), leaving the words plus play/pause and
+In Scroll, while reciting, the top bar, reciter name, repeat, and speed fade
+to 8 % over ~520 ms (Material ease-in-out), leaving the words plus play/pause and
 rewind/forward controls on the page. Pause, and it breathes back. Non-active
 verses recess to upcoming ink over ~400 ms.
+
+In Mushaf, the reciter name and its chevron share the secondary controls'
+fade to 5 % while playing and return on pause. The name cannot be tapped
+while reciting, and its reserved band keeps its height throughout the fade.
 
 The reciter name above the transport carries a small disclosure
 chevron: Scroll and Mushaf share the same quiet button leading to reciter settings.

@@ -1297,12 +1297,10 @@ internal fun MushafPager(
                     MushafPageHeader(
                         surahNameArabic = surahsById[leafSurahId]?.nameArabic,
                         surahNameLatin = surahsById[leafSurahId]?.nameTransliteration,
-                        juz = page.juz,
                         unit = unit,
                         glyphSize = leafGlyphSize(unit),
-                        page = page.page.takeUnless { english },
+                        page = if (english) pageIndex + 1 else page.page,
                         pageNumberScript = pageNumberScript,
-                        foreEdge = foreEdge,
                     )
                     Spacer(Modifier.height(unit * bands.headGutter))
                     val wellModifier = Modifier
