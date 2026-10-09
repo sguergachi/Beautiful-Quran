@@ -74,6 +74,16 @@ private const val MushafPanelCornerPx = 3f
  */
 private const val MushafLatinTitleScale = 0.95f
 
+/**
+ * The Arabic name against the page's hand, set to read as large as the English
+ * leaf's name. Matched by eye, not by em: at the same size an alef stands as
+ * tall as a Latin capital, but the letters' bodies sit about half as high, so
+ * the name read a size smaller than its English counterpart. The writing line
+ * the band centres (alef head to baseline) still fits well inside the band, and
+ * the shared tail guard keeps the deepest tails in its leading.
+ */
+private const val MushafArabicTitleScale = 1.35f
+
 /** Shamsa inset from the band's ends and its diameter, in band heights. */
 private const val MushafShamsaInset = 0.14f
 private const val MushafShamsaSize = 0.60f
@@ -143,7 +153,7 @@ internal fun MushafSurahTitleBand(
 
     val name = if (latin) surah?.nameTransliteration.orEmpty() else surah?.nameArabic.orEmpty()
     val family = if (latin) SerifFontFamily else HafsFontFamily
-    val titleSize = if (latin) fontSize * MushafLatinTitleScale else fontSize
+    val titleSize = fontSize * if (latin) MushafLatinTitleScale else MushafArabicTitleScale
     val resolvedTypeface by LocalFontFamilyResolver.current.resolve(family)
     val density = LocalDensity.current
     val fontPx = with(density) { titleSize.toPx() }
