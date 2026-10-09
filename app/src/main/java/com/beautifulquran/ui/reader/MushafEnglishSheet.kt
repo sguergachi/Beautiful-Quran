@@ -1269,12 +1269,39 @@ internal fun englishWashBands(
  */
 private fun englishBandEdge(at: Int, range: IntRange, text: CharSequence): Int {
     if (text.isEmpty() || at <= range.first || at > range.last) return at
-    if (!text[at - 1].isLetter() || !text[at].isLetter()) return at
+    if (!text[at - 1].isLetter() || !text[at].isLetter()) return englishMarkEdge(at, range, text)
     for (step in 1..EnglishBandEdgeReach) {
         val back = at - step
-        if (back > range.first && !text[back - 1].isLetter()) return back
+        if (back > range.first && !text[back - 1].isLetter()) return englishMarkEdge(back, range, text)
         val on = at + step
-        if (on <= range.last && !text[on].isLetter()) return on + 1
+        if (on <= range.last && !text[on].isLetter()) return englishMarkEdge(on + 1, range, text)
+    }
+    return at
+}
+
+/**
+ * Moves a band's edge off the marks a word wears, so they take its ink.
+ *
+ * The alignment's boundaries are *letter* ends, and the translation's brackets
+ * and punctuation are not letters: left there, the `]` of "[think]" fell into
+ * the next word's band and took the orange of a repeat that was never on it.
+ * A run of marks touching a word belongs to that word — trailing marks to the
+ * word before them, opening ones to the word after — and the edge goes to the
+ * space beside the run. A run that joins two words (`well-known`) has no space
+ * to go to, and the edge stays.
+ */
+private fun englishMarkEdge(at: Int, range: IntRange, text: CharSequence): Int {
+    fun isMark(c: Char) = !c.isLetterOrDigit() && !c.isWhitespace()
+    if (at <= range.first || at > range.last) return at
+    if (!text[at - 1].isWhitespace() && isMark(text[at])) {
+        var on = at
+        while (on <= range.last && isMark(text[on])) on++
+        if (on > range.last || text[on].isWhitespace()) return on
+    }
+    if (isMark(text[at - 1]) && !text[at].isWhitespace()) {
+        var back = at
+        while (back > range.first && isMark(text[back - 1])) back--
+        if (back == range.first || text[back - 1].isWhitespace()) return back
     }
     return at
 }
