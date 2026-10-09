@@ -144,6 +144,21 @@ class MushafCatalogTest {
     }
 
     @Test
+    fun `spare rows go to the long section, not a short chapter opening`() {
+        // Page 520: eleven full lines of Qaf, then al-Dhariyat 1-6 on two.
+        val page = buildMushafCatalog(
+            (1..110).map { source(50, 36, it, "qaf$it", page = 520, line = (it - 1) / 10 + 1) } +
+                (1..12).map { source(51, 1, it, "dh$it", page = 520, line = 14 + (it - 1) / 6) },
+        ).page(520)!!
+        // Its print rows are a little fuller than Qaf's, as on the real page.
+        val reflowed = reflowMushafPage(page) { if (it.surahId == 51) 3f else 1.7f }
+
+        assertEquals(13, reflowed.surahStarts.single().beforeLineIndex)
+        assertEquals(15, reflowed.lines.size)
+        assertEquals(listOf(6, 6), reflowed.lines.drop(13).map { it.tokens.size })
+    }
+
+    @Test
     fun `a section with no spare words does not spend an extra row`() {
         val page = buildMushafCatalog(
             listOf(
