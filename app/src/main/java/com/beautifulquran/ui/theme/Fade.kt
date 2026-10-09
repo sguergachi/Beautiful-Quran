@@ -31,6 +31,7 @@ import androidx.compose.ui.text.drawText
 import androidx.compose.ui.text.TextMeasurer
 import androidx.compose.ui.text.style.TextIndent
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.text.style.ResolvedTextDirection
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntSize
@@ -419,6 +420,13 @@ fun Modifier.shapedWordBloom(
      * Only a [justified] and hyphenating caller needs it; see [justifyShift].
      */
     hyphenPx: Float = 0f,
+    /**
+     * How far a paper cover reaches past the start or end of a line it closes;
+     * see [lineEndReach]. Only for text whose lines share one layout: on a
+     * per-word node every cover "ends a line", and the reach would paper over
+     * the neighbouring word, the reason those callers zero [coverPad].
+     */
+    lineEndPad: Dp = 0.dp,
 ): Modifier {
     val stops = FloatArray(InkProfileStops) { i -> i / (InkProfileStops - 1f) }
     val lineBoundsCache = LineBoundsCache(justified, hyphenPx)
@@ -489,7 +497,13 @@ fun Modifier.shapedWordBloom(
                     // and fade a read word's descender (g/j/p/q/y).
                     val pad = (bloom.pad ?: coverPad).toPx()
                     lineBounds.forEach { bounds ->
-                        val cover = linePaperCoverBounds(bounds, pad)
+                        val cover = lineEndReach(
+                            textLayout,
+                            linePaperCoverBounds(bounds, pad),
+                            start,
+                            endExclusive,
+                            lineEndPad.toPx(),
+                        )
                         clipRect(
                             left = cover.left,
                             top = cover.top,
@@ -1661,6 +1675,35 @@ internal fun glowLayerBleed(glowRadius: Float): Dp =
 internal val PaperCoverPad = 4.dp
 
 /** Expands a word mask for horizontal glyph overhang without crossing its line. */
+/**
+ * Widens a cover where its range meets the start or end of its line. A glyph
+ * can ink past its advance (EB Garamond's "f" hooks out to the right), and
+ * at a line's end nothing else will cover that overhang: an unread "of" left
+ * its hook at full strength beside the dimmed word. Nothing on the same line
+ * lies beyond those edges, so the reach cannot paper over a neighbour.
+ */
+internal fun lineEndReach(
+    textLayout: TextLayoutResult,
+    cover: Rect,
+    start: Int,
+    endExclusive: Int,
+    reach: Float,
+): Rect {
+    if (reach <= 0f) return cover
+    val line = textLayout.getLineForVerticalPosition(cover.center.y)
+    val opensLine = start <= textLayout.getLineStart(line)
+    val closesLine = endExclusive >= textLayout.getLineEnd(line, visibleEnd = true)
+    if (!opensLine && !closesLine) return cover
+    val rtl = textLayout.getParagraphDirection(start) == ResolvedTextDirection.Rtl
+    val (leftOpen, rightOpen) = if (rtl) closesLine to opensLine else opensLine to closesLine
+    return Rect(
+        left = if (leftOpen) cover.left - reach else cover.left,
+        top = cover.top,
+        right = if (rightOpen) cover.right + reach else cover.right,
+        bottom = cover.bottom,
+    )
+}
+
 internal fun linePaperCoverBounds(lineBounds: Rect, horizontalPad: Float): Rect =
     Rect(
         left = lineBounds.left - horizontalPad,

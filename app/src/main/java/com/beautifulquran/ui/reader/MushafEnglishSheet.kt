@@ -78,6 +78,7 @@ import com.beautifulquran.domain.EnglishLeafVerse
 import com.beautifulquran.domain.EnglishRulerCut
 import com.beautifulquran.domain.mushafLeafBands
 import com.beautifulquran.domain.quranWordKey
+import com.beautifulquran.ui.theme.PaperCoverPad
 import com.beautifulquran.ui.theme.LocalQuranAccents
 import com.beautifulquran.ui.theme.SerifFontFamily
 import com.beautifulquran.ui.theme.ShapedWordBloom
@@ -997,6 +998,8 @@ private fun EnglishProseBlock(
                 // Modifier.shapedWordBloom.
                 justified = false,
                 hyphenPx = hyphenPx,
+                // A line-end "f" hooks past the abutting bands; see lineEndReach.
+                lineEndPad = PaperCoverPad,
             )
             .pointerInput(block, layoutResult) {
                 // The sentence is the unit of this page, as the word is the
