@@ -220,6 +220,12 @@ own hand rather than the step above it the deeper band could carry), because the
 cartouche is a quarter shallower and a name set larger than its band stops
 fitting inside it.
 
+The title is measured at its full natural line height and placed by the
+midpoint of that name's visible ink bounds. Clamping Hafs's line box to the
+short band pushed Maryam toward the lower rule; a fixed lift cannot also
+centre names with tall ascenders. Visible overflow still protects descenders;
+the panel and the page's grid keep their existing dimensions.
+
 Nothing else moves. The slot is the same slot, so an opening still costs the
 grid one line and the hand is still the one hand of all 604 pages (§2); only the
 rules inside the slot come in. This is the same law the English leaf sets the

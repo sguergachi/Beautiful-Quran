@@ -1,5 +1,8 @@
 package com.beautifulquran.ui.reader
 
+import android.graphics.Paint
+import android.graphics.Rect
+import android.graphics.Typeface
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
@@ -7,7 +10,6 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -25,14 +27,19 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.drawscope.inset
+import androidx.compose.ui.layout.FirstBaseline
+import androidx.compose.ui.layout.layout
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalFontFamilyResolver
 import androidx.compose.ui.text.PlatformTextStyle
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.style.LineHeightStyle
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.TextUnit
+import androidx.compose.ui.unit.constrainHeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.em
 import androidx.compose.ui.unit.times
@@ -44,9 +51,7 @@ import com.beautifulquran.ui.theme.LocalQuranAccents
 import com.beautifulquran.ui.theme.generatedFieldWeave
 import com.beautifulquran.ui.theme.ornament.chapterOrnamentSeed
 import com.beautifulquran.ui.theme.ornament.generateChapterOrnament
-
-/** How far the chapter's name rides above its line box, in ems of itself. */
-private const val MushafNameLift = 0.30f
+import kotlin.math.roundToInt
 
 /** Corner easing anywhere on the leaf: a hairline, never a curve. */
 private const val MushafPanelCornerPx = 3f
@@ -215,11 +220,16 @@ private fun MushafTitleCartouche(
     rule: Color,
     ink: Color,
 ) {
-    // The Hafs em box keeps headroom for marks a chapter's name does not
-    // carry, so its ink hangs below the cartouche's centre line and has to be
-    // raised. EB Garamond's box is even about its own baseline and needs none.
-    val nameLift = with(LocalDensity.current) {
-        if (latin) 0.dp else (fontSize.toPx() * MushafNameLift).toDp()
+    val family = if (latin) SerifFontFamily else HafsFontFamily
+    val titleSize = if (latin) fontSize * MushafLatinTitleScale else fontSize
+    val resolvedTypeface by LocalFontFamilyResolver.current.resolve(family)
+    val fontPx = with(LocalDensity.current) { titleSize.toPx() }
+    val inkMid = remember(name, resolvedTypeface, fontPx) {
+        val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            typeface = resolvedTypeface as Typeface
+            textSize = fontPx
+        }
+        Rect().also { paint.getTextBounds(name, 0, name.length, it) }.exactCenterY()
     }
     Box(contentAlignment = Alignment.Center) {
         Canvas(Modifier.matchParentSize()) {
@@ -230,14 +240,9 @@ private fun MushafTitleCartouche(
         }
         Text(
             text = name,
-            // Centred on its ink, not on its line box: the Hafs face carries
-            // more space above the baseline than below, so a name laid in a
-            // default line box sits low in the cartouche however evenly it is
-            // padded. Trimming the leading and centring what is left puts the
-            // letters themselves on the panel's centre line.
             style = TextStyle(
-                fontFamily = if (latin) SerifFontFamily else HafsFontFamily,
-                fontSize = if (latin) fontSize * MushafLatinTitleScale else fontSize,
+                fontFamily = family,
+                fontSize = titleSize,
                 letterSpacing = if (latin) 0.06.em else TextUnit.Unspecified,
                 color = ink,
                 textAlign = TextAlign.Center,
@@ -257,13 +262,16 @@ private fun MushafTitleCartouche(
             // The taper eats into the cartouche from both ends, so the name
             // needs its margin measured past the point where the sides start
             // drawing in — otherwise the letters sit in the closing wedge.
-            //
-            // The lift is the last of it: even trimmed, the Hafs em box keeps
-            // headroom for marks this name does not carry, so its ink hangs
-            // below the centre line. Raise it by that much and the letters sit
-            // on the panel's own centre.
             modifier = Modifier
-                .offset(y = -nameLift)
+                .layout { measurable, constraints ->
+                    // Measure the full line, then centre this name's ink rather
+                    // than font headroom or a baseline clamped by the band.
+                    val text = measurable.measure(constraints.copy(maxHeight = Constraints.Infinity))
+                    val boxHeight = constraints.constrainHeight(text.height)
+                    layout(text.width, boxHeight) {
+                        text.placeRelative(0, (boxHeight / 2f - text[FirstBaseline] - inkMid).roundToInt())
+                    }
+                }
                 .padding(horizontal = height * 1.45f, vertical = height * 0.26f),
         )
     }
