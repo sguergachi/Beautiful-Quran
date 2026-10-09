@@ -656,7 +656,10 @@ fun Modifier.shapedWordBloom(
                                 bounds.right + colorBleed,
                                 bounds.bottom + colorBleed,
                             ),
-                            Paint(),
+                            // Fade the finished tint and halo together. SrcIn
+                            // below also reaches the halo inside the range;
+                            // fading its source would dry that light twice.
+                            Paint().apply { alpha = bloom.layerAlpha.coerceIn(0f, 1f) },
                         )
                     }
                     // Glow rides the same DstIn directional wash as the tint —
@@ -669,7 +672,7 @@ fun Modifier.shapedWordBloom(
                             1 -> bloom.glowAlpha
                             else -> bloom.bloomAlpha
                         }
-                        val glowAlpha = bloom.layerAlpha.coerceIn(0f, 1f) * strength.coerceIn(0f, 1f)
+                        val glowAlpha = strength.coerceIn(0f, 1f)
                         if (glowAlpha <= 0f) continue
                         val scale = when (layer) {
                             0 -> GLOW_VEIL_RADIUS
@@ -710,8 +713,7 @@ fun Modifier.shapedWordBloom(
                         }
                     }
                     val tint = bloom.color.copy(
-                        alpha = bloom.layerAlpha.coerceIn(0f, 1f) *
-                            bloom.colorAlpha.coerceIn(0f, 1f),
+                        alpha = bloom.colorAlpha.coerceIn(0f, 1f),
                     )
                     if (clipped) {
                         clipPath(shaped!!.path) {
