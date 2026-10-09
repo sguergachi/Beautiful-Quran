@@ -250,9 +250,12 @@ tick must not remasure three pages or recreate 150 `Text` nodes.
   `State`; its fade does not recompose or relayout the leaf per frame.
 - QCF page fonts are held as one atomic family/typeface pair in a bounded LRU
   and preloaded on `Dispatchers.Default` for the settled page ± 2, so a swipe
-  does not `Typeface.createFromAsset` on the UI thread. Line geometry is keyed
-  by page, display row, size, and measure. The page's sixteen-row reflow is a
-  linear token-width pass remembered by page + typeface; playback ticks and
+  does not `Typeface.createFromAsset` on the UI thread. For Arabic, that same
+  window warms the existing glyph-ink profiles off the UI thread; a cold page
+  otherwise rasterized and scanned each word during the pager's prefetch measure.
+  The cache, reference resolution, and spacing calculations are unchanged.
+  Line geometry is keyed by page, display row, size, and measure. The page's
+  seventeen-row reflow is a linear token-width pass remembered by page + typeface; playback ticks and
   ink animation frames never repeat it. Geometry remains in the bounded
   process cache. Non-adjacent chapter and search jumps warm that same target
   window before moving the pager. The dial warms only the target that rests
@@ -268,16 +271,31 @@ tick must not remasure three pages or recreate 150 `Text` nodes.
   return only once the dot is full-sized, avoiding cold leaf work on the
   animation clock.
 - Each Madinah line owns one pointer-input node, not one per word. Its QCF word
-  nodes retain the directional `shapedWordBloom`, while the leaf itself owns an
-  offscreen layer so a fling transforms a recorded page. The settled page runs
-  live ink; during an automatic turn the voice's page may join it so a short
-  opening word does not restart its wash when the leaf lands. Other neighbours
+  nodes retain the directional `shapedWordBloom`, while the leaf itself owns a
+  recorded graphics layer using the default compositing strategy, so a fling
+  transforms the display list without re-recording the word nodes.
+  The pager requests `FrameRateCategory.High` while
+  drawing on platforms supporting [adaptive refresh rate](https://developer.android.com/develop/ui/views/animations/adaptive-refresh-rate),
+  allowing the display's high refresh rate without a permanent window override.
+  The settled page runs live ink; during an automatic turn the voice's page
+  may join it so a short opening word does not restart its wash when the leaf
+  lands. Other neighbours
   keep static ink. On the voice's page, only the active ayah owns word motions:
   completed ayahs use a static full-ink pack and later ayahs share a motionless
   recess pack. One page-level accessibility node exposes the canonical
   Arabic instead of hundreds of private-use glyphs.
 - Chrome (`MushafReadingSheet`) keys the gilt seed on `settledPage`, not
   `currentPage`, so a fling does not regenerate ornaments mid-turn.
+
+The 2026-10-08 emulator comparison used release APKs, AOT compilation, a
+settled page 5, and twelve rightward swipes to page 17 with 600 ms pauses.
+Against `0c3df7c5`, background profile preparation reduced the 95th-percentile
+frame time from 61 to 44 ms and missed deadlines from 41/338 to 33/348 frames.
+Prefetch measure averaged 42.8 → 37.0 ms, with its maximum 83.2 → 45.8 ms.
+Page 5's text and controls were pixel-identical below the changed running
+head. Forced `Offscreen` page caching was rejected: its 95th percentile rose
+to 113 ms. These are a same-host 60 Hz comparison, not a physical-device
+120 Hz result; cold page measure still exceeds the 8.3 ms frame budget.
 
 ### 6. R8 release builds are what ships
 

@@ -1,15 +1,12 @@
 package com.beautifulquran.ui.reader
 
-import androidx.compose.animation.togetherWith
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.AnimatedContent
+import com.beautifulquran.ui.theme.HafsFontFamily
 import com.beautifulquran.ui.theme.quietClickable
-import androidx.compose.foundation.Canvas
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.text.TextAutoSize
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
@@ -19,7 +16,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
-import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -39,62 +35,30 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.Path
-import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.TextUnit
-import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.em
 import androidx.compose.ui.unit.sp
 import androidx.media3.common.Player
 import com.beautifulquran.data.PageNumberScript
-import com.beautifulquran.domain.MUSHAF_LINE_PITCH_EM
-import kotlin.math.roundToInt
 import com.beautifulquran.domain.MushafGrid
-import com.beautifulquran.domain.mushafLeafBands
 import com.beautifulquran.domain.MushafType
 import kotlin.math.pow
 import com.beautifulquran.playback.PlayerUiState
-import com.beautifulquran.ui.theme.HafsFontFamily
 import com.beautifulquran.ui.theme.ownedQuietClickable
 
-internal val MushafGutterSlot = 44.dp
-/**
- * Folio band, with the figure centred in it.
- *
- * The page number belongs to the leaf, so it must sit nearer the last line of
- * revelation than the rule below it — proximity is what assigns it. Measured
- * against the transport instead, it drifted every time the chrome changed:
- * when the progress rule arrived between them it left the folio 120px under
- * the text and 64px over the rule, reading as part of the controls.
- *
- * And it is fixed, which is the one figure on this page deliberately *off* the
- * leaf's grid. It was `leafUnit * MushafGrid.FOLIO` for a while, and that is a
- * loop: the leaf's height is what is left after this band, and this band was a
- * fraction of the leaf's height. The first pass measures with the unit still
- * zero, so the leaf comes out a band too tall — and that is the size the ruler
- * paginates the whole book against ([EnglishLeafRuler]). The leaf then settles
- * a band shorter and holds a line less than it was given text for, which reads
- * as a leaf stopping a few words short of its own last line, on every leaf in
- * the book. The figure inside the band is still set from the leaf's hand,
- * because that is type and belongs on the grid; the paper it stands on is
- * furniture of the frame and does not.
- */
-internal val MushafFolioBand = 30.dp
+internal val MushafGutterSlot = 48.dp
 /** Paper between the rule and the transport it divides the leaf from. */
 private val MushafRuleTailAir = 0.dp
 
@@ -143,11 +107,15 @@ internal fun mushafTurnsRightToLeft(english: Boolean): Boolean = !english
 private val MushafDialHeadAir = 8.dp
 
 /** The transport's own row of controls, and the air around the block. */
-private val MushafTransportRow = 44.dp
+private val MushafTransportRow = 56.dp
 private val MushafTransportAir = 2.dp
+/** Chapters and Settings at the row's fore-edges. */
+private val MushafEdgeControl = 40.dp
+/** The narrowest a centre control may get before it stops being a target. */
+private val MushafMinControl = 32.dp
 
 /**
- * The reciter's name or Ink Lab under the transport.
+ * The reciter's name or Ink Lab below the transport.
  *
  * The closed band is always reserved. Opening Ink Lab replaces the name and
  * lets the band take the panel's measured height; the leaf gets what remains.
@@ -155,9 +123,10 @@ private val MushafTransportAir = 2.dp
 private val MushafReciterBand = 48.dp
 
 /**
- * Everything reserved under the leaf while Ink Lab is closed.
+ * Everything reserved under the English leaf while Ink Lab is closed.
  *
- * Every term is constant, so the root can subtract it from the window to learn
+ * Both hands carry their folio in the running head. Every
+ * term is constant, so the root can subtract it from the window to learn
  * the closed leaf's size before a leaf has ever been composed and paginate the
  * English book from that on the very first launch. Open Ink Lab adds measured
  * footer height live; its temporary leaf metrics are not remembered.
@@ -168,16 +137,9 @@ private val MushafReciterBand = 48.dp
  * it really measured and the book is set again if the two disagree.
  */
 internal val MushafBelowLeaf: Dp =
-    MushafFolioBand +
-        MushafDialHeadAir + MushafDialSlot + MushafDialBelowGrab + MushafRuleTailAir +
+    MushafDialHeadAir + MushafDialSlot + MushafDialBelowGrab + MushafRuleTailAir +
         MushafTransportAir * 2 + MushafTransportRow + MushafReciterBand
 
-/** Each folio figure's column, equal either side of the centre line. */
-private val MushafFolioColumn = 40.dp
-/** Paper between the two figures. */
-private val MushafFolioSpread = 28.dp
-/** The lozenge set between them. */
-private val MushafFolioDiamond = 5.dp
 
 /**
  * Paper outside the mark gutter.
@@ -246,15 +208,8 @@ internal fun MushafReadingSheet(
     modifier: Modifier = Modifier,
     /** Sits on the leaf's foot, above the dial and the play bar. */
     leafFooter: @Composable () -> Unit = {},
-    /** Which hand the leaf is set in — the two divide their height differently. */
+    /** Which hand the leaf is set in, determining the dial's direction. */
     english: Boolean = false,
-    pageNumberScript: PageNumberScript = PageNumberScript.BOTH,
-    /** The pager's own page, 0-based — the leaf the folio band is centred on. */
-    pageIndex: () -> Int = { 0 },
-    /** How far the leaf has been dragged, in leaves: the pager's offset. */
-    pageOffset: () -> Float = { 0f },
-    /** The figure printed on the leaf at an index — its folio. */
-    folioAt: (index: Int) -> Int = { it + 1 },
     content: @Composable () -> Unit,
 ) {
     // Rank by role, not by taste. Back / play / forward are what a listener
@@ -276,25 +231,8 @@ internal fun MushafReadingSheet(
         animationSpec = tween(InkEngine.tuning.recessMs, easing = FastOutSlowInEasing),
         label = "mushafSecondaryFade",
     )
-    // The leaf's own pitch, kept so the folio below it can be set on the same
-    // grid as the lines it numbers. The leaf is this Box, so its height is the
-    // only place the figure can be read from.
-    val leafUnit = remember { mutableStateOf(0.dp) }
-    val density = LocalDensity.current
-    // The folio stands down while the dial is under the thumb: scrubbing, the
-    // figure the dial itself is calling out does not need saying twice.
-    val scrubbing = remember { mutableStateOf(false) }
-    val folioInk by animateFloatAsState(
-        targetValue = if (scrubbing.value) 0f else 1f,
-        animationSpec = tween(InkEngine.tuning.recessMs, easing = FastOutSlowInEasing),
-        label = "mushafFolioStandDown",
-    )
     Column(modifier.fillMaxSize()) {
-        BoxWithConstraints(Modifier.weight(1f).fillMaxWidth()) {
-            val unit = with(density) {
-                mushafLeafBands(english).unitPx(constraints.maxHeight.toFloat()).toDp()
-            }
-            SideEffect { leafUnit.value = unit }
+        Box(Modifier.weight(1f).fillMaxWidth()) {
             content()
             Box(
                 Modifier
@@ -302,48 +240,6 @@ internal fun MushafReadingSheet(
                     .padding(bottom = 8.dp),
             ) {
                 leafFooter()
-            }
-        }
-        // The folio, off the paper but not off the leaf.
-        //
-        // It used to be the leaf's last band, and the leaf paid for it twice
-        // over — the figure and the tail above it — for a number that belongs
-        // to the frame as much as to the page. Standing it in the dial's head
-        // air costs the text nothing. But a page number is *printed on the
-        // page*, and one that snaps to the new leaf after the turn instead of
-        // travelling with it reads as a label on the frame rather than as the
-        // leaf's own. So it travels: the band carries the leaf on either side
-        // of this one and slides them by exactly the pager's offset, which is
-        // the paper moving under the finger with nothing on the leaf paying for
-        // it.
-        BoxWithConstraints(
-            Modifier
-                .fillMaxWidth()
-                .height(MushafFolioBand)
-                .clipToBounds()
-                .graphicsLayer { alpha = folioInk },
-        ) {
-            val trackPx = constraints.maxWidth.toFloat()
-            val glyph = with(density) { (leafUnit.value.toPx() / MUSHAF_LINE_PITCH_EM).toSp() }
-            val centre = pageIndex()
-            for (index in (centre - 1)..(centre + 1)) {
-                if (index < 0 || index >= pageCount) continue
-                MushafFolioMarks(
-                    page = folioAt(index),
-                    glyphSize = glyph,
-                    script = pageNumberScript,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .offset {
-                            // Read here rather than in composition: a turn
-                            // moves the figure without recomposing the sheet.
-                            val away = index - centre - pageOffset()
-                            val x = if (mushafTurnsRightToLeft(english)) -away else away
-                            IntOffset((x * trackPx).roundToInt(), 0)
-                        }
-                        .padding(horizontal = MushafPageMargin + MushafEdgeGutter)
-                        .wrapContentHeight(align = Alignment.CenterVertically, unbounded = true),
-                )
             }
         }
         MushafPageDial(
@@ -355,13 +251,11 @@ internal fun MushafReadingSheet(
             onSeekPage = onSeekPage,
             onSeekSurah = onSeekSurah,
             onWarmPage = onWarmPage,
-            onScrubbing = { scrubbing.value = it; onScrubbing(it) },
+            onScrubbing = onScrubbing,
             rightToLeft = mushafTurnsRightToLeft(english),
             onLanding = onLanding,
             reciting = reciting,
-            // Paper between the folio and the rule. The figure now stands in
-            // this band rather than on the leaf, so the air above it is the
-            // leaf's foot and the air below is the dial's own.
+            // The dial's head air clears the leaf's last line.
             modifier = Modifier.padding(
                 start = MushafPageMargin + MushafEdgeGutter,
                 end = MushafPageMargin + MushafEdgeGutter,
@@ -375,11 +269,17 @@ internal fun MushafReadingSheet(
                 .padding(horizontal = MushafTransportEdge, vertical = MushafTransportAir),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
-            Box(
+            BoxWithConstraints(
                 Modifier
                     .fillMaxWidth()
                     .height(MushafTransportRow),
             ) {
+            // The centre row shares the width with Chapters and Settings at the
+            // edges, so its slots come from what is left between them. A fixed
+            // compact width keyed on the screen let the edges cover Repeat and
+            // Speed on ordinary 360dp phones.
+            val controlSize = ((maxWidth - MushafEdgeControl * 2 - MushafTransportRow) / 4)
+                .coerceIn(MushafMinControl, MushafGutterSlot)
             // Faded to 5% while reciting — and untouchable with it. Alpha
             // alone left an invisible Chapters button under the thumb at the
             // fore-edge, which walked the reader out of the page mid-recitation.
@@ -397,7 +297,7 @@ internal fun MushafReadingSheet(
                     contentAlignment = Alignment.Center,
                     modifier = Modifier
                         .align(Alignment.CenterEnd)
-                        .size(40.dp)
+                        .size(MushafEdgeControl)
                         .quietClickable(
                             enabled = secondaryEnabled,
                             role = Role.Button,
@@ -431,6 +331,8 @@ internal fun MushafReadingSheet(
                         Icons.Rounded.Repeat
                     },
                     label = "Repeat",
+                    buttonSize = controlSize,
+                    iconSize = 22.dp,
                     tint = if (repeatActive) {
                         MaterialTheme.colorScheme.primary
                     } else {
@@ -443,13 +345,15 @@ internal fun MushafReadingSheet(
                     enabled = enabled && isThisSurahLoaded,
                     image = Icons.Rounded.FastRewind,
                     label = "Previous",
+                    buttonSize = controlSize,
+                    iconSize = 24.dp,
                     tint = primary,
                 )
-                IconButton(onClick = onPlayPause, enabled = enabled, modifier = Modifier.size(44.dp)) {
+                IconButton(onClick = onPlayPause, enabled = enabled, modifier = Modifier.size(MushafTransportRow)) {
                     if (playerState.isBuffering && isThisSurahLoaded) {
                         CircularProgressIndicator(
-                            modifier = Modifier.size(18.dp),
-                            strokeWidth = 1.5.dp,
+                            modifier = Modifier.size(24.dp),
+                            strokeWidth = 2.dp,
                             color = primary,
                         )
                     } else {
@@ -468,7 +372,7 @@ internal fun MushafReadingSheet(
                                 "Play"
                             },
                             tint = primary,
-                            modifier = Modifier.size(26.dp),
+                            modifier = Modifier.size(34.dp),
                         )
                     }
                 }
@@ -477,11 +381,13 @@ internal fun MushafReadingSheet(
                     enabled = enabled && isThisSurahLoaded,
                     image = Icons.Rounded.FastForward,
                     label = "Next",
+                    buttonSize = controlSize,
+                    iconSize = 24.dp,
                     tint = primary,
                 )
                 Box(
                     modifier = Modifier
-                        .width(MushafGutterSlot)
+                        .width(controlSize)
                         .fillMaxHeight()
                         .graphicsLayer { alpha = if (speedActive) 1f else secondaryFade }
                         .then(
@@ -496,65 +402,68 @@ internal fun MushafReadingSheet(
                 ) {
                     Text(
                         text = "${if (playerState.speed % 1f == 0f) playerState.speed.toInt() else playerState.speed}×",
-                        style = MaterialTheme.typography.labelSmall,
+                        style = MaterialTheme.typography.labelMedium.copy(
+                            fontWeight = FontWeight.SemiBold,
+                            fontSize = 15.sp,
+                        ),
                         color = if (speedActive) MaterialTheme.colorScheme.onBackground else quiet,
                         textAlign = TextAlign.Center,
+                        // "0.75×" is wider than a narrow slot at 15sp, and at a
+                        // large font scale wider than any. One line, set down
+                        // until it fits, never wrapped under itself.
+                        maxLines = 1,
+                        softWrap = false,
+                        autoSize = TextAutoSize.StepBased(
+                            minFontSize = 9.sp,
+                            maxFontSize = 15.sp,
+                            stepSize = 0.5.sp,
+                        ),
                     )
                 }
             }
             }
-            // The closed band holds the name and, in developer mode, its Ink
-            // Lab toggle. Open Ink Lab replaces the name and grows this band;
-            // the leaf takes the measured remainder.
+            // Opening Ink Lab grows the reserved name band; the leaf takes
+            // the measured remainder. Closed, the band is exactly what
+            // MushafBelowLeaf reserves for it: the English book is paginated
+            // against that constant, and a name grown by the system font
+            // scale would leave every leaf set for paper it does not have.
+            val labOpen = inkLabAvailable && inkLabOpen && playerState.error == null
             Box(
-                Modifier.fillMaxWidth().heightIn(min = MushafReciterBand),
+                Modifier
+                    .fillMaxWidth()
+                    .then(
+                        if (labOpen) {
+                            Modifier.heightIn(min = MushafReciterBand)
+                        } else {
+                            Modifier.height(MushafReciterBand)
+                        },
+                    ),
                 contentAlignment = Alignment.Center,
             ) {
-                if (inkLabAvailable && inkLabOpen && playerState.error == null) {
+                if (labOpen) {
                     InkLabPanel(
                         modifier = Modifier
                             .align(Alignment.Center)
                             .padding(start = 40.dp),
                     )
                 } else if (reciterName.isNotEmpty() || playerState.error != null) {
-                    Box(
+                    // An error stands in for the name and is never faded with
+                    // it: a stream that fails mid-recitation can arrive while
+                    // the reading still counts as reciting, and the notice is
+                    // the only place the reader learns why the voice stopped.
+                    val notice = playerState.error
+                    ReciterNameButton(
+                        name = reciterName,
+                        notice = notice,
+                        onDismissNotice = onDismissError,
+                        onClick = onOpenSettings,
+                        enabled = enabled && (!reciting || notice != null),
+                        disclosure = true,
                         modifier = Modifier
                             .align(Alignment.Center)
-                            .fillMaxWidth()
-                            .height(MushafReciterBand)
                             .padding(horizontal = if (inkLabAvailable) 48.dp else 0.dp)
-                            .then(if (playerState.error == null) {
-                                Modifier.ownedQuietClickable(role = Role.Button, onClick = onOpenSettings)
-                            } else Modifier),
-                        contentAlignment = Alignment.Center,
-                    ) {
-                        // Errors share the Scroll bar's dismiss control and fixed band.
-                        AnimatedContent(
-                            targetState = playerState.error,
-                            contentAlignment = Alignment.Center,
-                            transitionSpec = { fadeIn() togetherWith fadeOut() using null },
-                            label = "mushafReciterNotice",
-                        ) { notice ->
-                            if (notice != null) {
-                                PlaybackErrorNotice(
-                                    message = notice,
-                                    onDismiss = onDismissError,
-                                    enabled = enabled,
-                                )
-                                return@AnimatedContent
-                            }
-                            Text(
-                                text = reciterName,
-                                style = MaterialTheme.typography.labelSmall.copy(
-                                    fontSize = 10.sp,
-                                ),
-                                color = quiet.copy(alpha = 0.7f),
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis,
-                                textAlign = TextAlign.Center,
-                            )
-                        }
-                    }
+                            .graphicsLayer { alpha = if (notice != null) 1f else secondaryFade },
+                    )
                 }
                 if (inkLabAvailable) {
                     InkLabToggleButton(
@@ -569,23 +478,17 @@ internal fun MushafReadingSheet(
 }
 
 /**
- * The printed page's own running head: surah name at the fore-edge the
- * reading starts from, juzʾ at the other. No controls — the leaf carries
- * nothing but what the mushaf prints on it.
+ * Both folio scripts flank a centred chapter; a single script sits at the
+ * left. English numbers its own leaves in the same frame as Arabic.
  */
 @Composable
 internal fun MushafPageHeader(
     surahNameArabic: String?,
     surahNameLatin: String?,
-    juz: Int,
     unit: Dp,
     glyphSize: TextUnit,
-    /**
-     * The leaf's fore-edge — the same one the text block is set to. A running
-     * head is furniture of the measure, not of the paper: standing it at its
-     * own inset put it a finger's width outside the block it names.
-     */
-    foreEdge: Dp = MushafEdgeGutter,
+    page: Int,
+    pageNumberScript: PageNumberScript = PageNumberScript.BOTH,
     modifier: Modifier = Modifier,
 ) {
     // Type alone up here, and in ink rather than gold: gold is illumination —
@@ -593,36 +496,65 @@ internal fun MushafPageHeader(
     // aid. Gold also loses what little contrast it has on cream, which is why
     // this line used to disappear on paper.
     //
-    // One label at each end, in the reader's own language: the chapter at the
-    // spine, the juzʾ at the fore-edge. It carried the Arabic above the Latin
-    // as well, which said the same thing twice and cost the leaf a whole line
-    // of paper for the saying — paper the revelation now has instead.
+    // Both hands spend the former bottom folio band on the text instead.
     val ink = MaterialTheme.colorScheme.onBackground
-    Row(
+    MushafRunningHead(
+        page = page,
+        pageNumberScript = pageNumberScript,
+        chapter = surahNameLatin.orEmpty(),
+        // The running head and the text share the same inset.
         modifier = modifier
             .fillMaxWidth()
-            .padding(horizontal = foreEdge)
+            .padding(horizontal = MushafEdgeGutter)
             .height(unit * MushafGrid.RUNNING_HEAD),
         // Hard against the top of the leaf. Centred, the label carried a strip
         // of air above it, and the leaf already begins below the status bar —
         // the phone's forehead is the margin, and buying a second one came out
         // of the text well.
         verticalAlignment = Alignment.Top,
-    ) {
+    ) { text, align, labelModifier ->
         MushafHeadLabel(
-            text = "Part $juz",
+            text = text,
             ink = ink,
-            align = TextAlign.Start,
+            align = align,
             glyphSize = glyphSize,
-            modifier = Modifier.weight(1f),
+            modifier = labelModifier,
         )
-        MushafHeadLabel(
-            text = surahNameLatin.orEmpty(),
-            ink = ink,
-            align = TextAlign.End,
-            glyphSize = glyphSize,
-            modifier = Modifier.weight(1f),
+    }
+}
+
+/**
+ * The running head's arrangement, shared by the leaf and the Customize
+ * miniature so the two cannot drift: with both scripts, Western at the left,
+ * the chapter centred and Arabic-Indic at the right, on equal end columns; with
+ * one, the figure at the left and the chapter at the right. [label] sets each
+ * piece of text in its caller's own type.
+ */
+@Composable
+internal fun MushafRunningHead(
+    page: Int,
+    pageNumberScript: PageNumberScript,
+    chapter: String,
+    modifier: Modifier = Modifier,
+    verticalAlignment: Alignment.Vertical = Alignment.Top,
+    label: @Composable (text: String, align: TextAlign, modifier: Modifier) -> Unit,
+) {
+    val folio = mushafFolioLayout(page, pageNumberScript)
+    val both = folio.western != null && folio.arabic != null
+    Row(modifier = modifier, verticalAlignment = verticalAlignment) {
+        label(
+            folio.western ?: requireNotNull(folio.arabic),
+            TextAlign.Start,
+            Modifier.weight(1f),
         )
+        label(
+            chapter,
+            if (both) TextAlign.Center else TextAlign.End,
+            Modifier.weight(if (both) 3f else 1f),
+        )
+        if (both) {
+            label(folio.arabic.orEmpty(), TextAlign.End, Modifier.weight(1f))
+        }
     }
 }
 
@@ -658,6 +590,19 @@ private const val MushafFurnitureBump = 2f
 private fun TextUnit.furnitureStep(steps: Int): TextUnit =
     (value * MushafType.RATIO.pow(steps) + MushafFurnitureBump).sp
 
+/**
+ * The running head's style for one piece of its text. Arabic-Indic figures are
+ * the page's own numerals and are set in Hafs, untracked: in the Latin label
+ * face they fell back to the system's digits with the head's Latin tracking
+ * between them, and read as a different hand from the page they number.
+ */
+internal fun mushafHeadStyle(latin: TextStyle, text: String): TextStyle =
+    if (text.any { it in '\u0660'..'\u0669' }) {
+        latin.copy(fontFamily = HafsFontFamily, letterSpacing = TextUnit.Unspecified)
+    } else {
+        latin
+    }
+
 @Composable
 private fun MushafHeadLabel(
     text: String,
@@ -672,9 +617,12 @@ private fun MushafHeadLabel(
     }
     Text(
         text = text,
-        style = MaterialTheme.typography.labelSmall.copy(
-            fontSize = glyphSize.furnitureStep(MushafType.HEAD),
-            letterSpacing = 0.10.em,
+        style = mushafHeadStyle(
+            MaterialTheme.typography.labelSmall.copy(
+                fontSize = glyphSize.furnitureStep(MushafType.HEAD),
+                letterSpacing = 0.10.em,
+            ),
+            text,
         ),
         color = ink.copy(alpha = 0.44f),
         textAlign = align,
@@ -696,91 +644,6 @@ private fun MushafHeadLabel(
 }
 
 
-/**
- * The folio figures, without the leaf's band. Customize's miniature uses
- * this so the preview and the pager share one layout.
- */
-@Composable
-internal fun MushafFolioMarks(
-    page: Int,
-    glyphSize: TextUnit,
-    script: PageNumberScript = PageNumberScript.BOTH,
-    modifier: Modifier = Modifier,
-) {
-    // The pair sits on one baseline, not on one centre line. Two scripts at
-    // two sizes have boxes of very different depth — Hafs carries an ascent
-    // half again as tall as the Latin face's — so centring the boxes stood
-    // the numerals a few pixels apart and the folio read as a typo.
-    val ink = MaterialTheme.colorScheme.onBackground
-    val folio = mushafFolioLayout(page, script)
-    val westernStyle = MaterialTheme.typography.labelSmall.copy(
-        fontSize = glyphSize.furnitureStep(MushafType.FOLIO_GLOSS),
-        letterSpacing = 0.14.em,
-    )
-    val westernColor = ink.copy(alpha = 0.50f)
-    val arabicSize = glyphSize.furnitureStep(MushafType.FOLIO_FIGURE)
-    val arabicColor = ink.copy(alpha = 0.54f)
-    Row(
-        modifier = modifier,
-        horizontalArrangement = Arrangement.Center,
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        if (folio.western != null) {
-            Text(
-                text = folio.western,
-                style = westernStyle,
-                color = westernColor,
-                textAlign = if (folio.diamond) TextAlign.End else TextAlign.Center,
-                maxLines = 1,
-                modifier = if (folio.diamond) {
-                    Modifier.width(MushafFolioColumn).alignByBaseline()
-                } else {
-                    Modifier.alignByBaseline()
-                },
-            )
-        }
-        if (folio.diamond) {
-            Box(
-                Modifier.width(MushafFolioSpread),
-                contentAlignment = Alignment.Center,
-            ) {
-                // A lozenge between the two figures: the mark a compositor sets
-                // between a pair, so the folio reads as one thing rather than two
-                // numbers that happen to share a line.
-                Canvas(Modifier.size(MushafFolioDiamond)) {
-                    val r = size.minDimension / 2f
-                    val c = Offset(size.width / 2f, size.height / 2f)
-                    drawPath(
-                        Path().apply {
-                            moveTo(c.x, c.y - r)
-                            lineTo(c.x + r * 0.62f, c.y)
-                            lineTo(c.x, c.y + r)
-                            lineTo(c.x - r * 0.62f, c.y)
-                            close()
-                        },
-                        color = ink.copy(alpha = 0.34f),
-                    )
-                }
-            }
-        }
-        if (folio.arabic != null) {
-            Text(
-                text = folio.arabic,
-                fontFamily = HafsFontFamily,
-                fontSize = arabicSize,
-                color = arabicColor,
-                textAlign = if (folio.diamond) TextAlign.Start else TextAlign.Center,
-                maxLines = 1,
-                modifier = if (folio.diamond) {
-                    Modifier.width(MushafFolioColumn).alignByBaseline()
-                } else {
-                    Modifier.alignByBaseline()
-                },
-            )
-        }
-    }
-}
-
 @Composable
 private fun GutterIcon(
     onClick: () -> Unit,
@@ -789,8 +652,10 @@ private fun GutterIcon(
     label: String,
     tint: androidx.compose.ui.graphics.Color,
     modifier: Modifier = Modifier,
+    buttonSize: Dp = 40.dp,
+    iconSize: Dp = 20.dp,
 ) {
-    IconButton(onClick = onClick, enabled = enabled, modifier = modifier.size(40.dp)) {
-        Icon(image, contentDescription = label, tint = tint, modifier = Modifier.size(20.dp))
+    IconButton(onClick = onClick, enabled = enabled, modifier = modifier.size(buttonSize)) {
+        Icon(image, contentDescription = label, tint = tint, modifier = Modifier.size(iconSize))
     }
 }

@@ -102,6 +102,7 @@ import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.text.TextMeasurer
 import com.beautifulquran.ui.reader.MushafBelowLeaf
+import com.beautifulquran.ui.reader.LocalMushafBannerStyle
 import com.beautifulquran.ui.reader.MushafPageMargin
 import com.beautifulquran.ui.reader.englishLeafSlotPx
 import com.beautifulquran.ui.reader.englishLeafRuler
@@ -304,7 +305,10 @@ class MainActivity : ComponentActivity() {
                 }
             }
 
-            CompositionLocalProvider(LocalGildingTilt provides rememberGildingTilt()) {
+            CompositionLocalProvider(
+                LocalGildingTilt provides rememberGildingTilt(),
+                LocalMushafBannerStyle provides settings.mushafBannerStyle,
+            ) {
                 BeautifulQuranTheme(
                     themeMode = settings.themeMode,
                 ) {

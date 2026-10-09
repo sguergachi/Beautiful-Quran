@@ -46,8 +46,8 @@ data class MushafPage(
 }
 
 /**
- * Keeps a leaf's words and page boundary, but balances them over one more
- * visual line. Chapter openings remain hard boundaries so their title and
+ * Keeps a leaf's words and page boundary, but balances them over the larger
+ * display grid. Chapter openings remain hard boundaries so their title and
  * basmalah never drift into the preceding chapter's tail.
  */
 fun reflowMushafPage(
@@ -58,20 +58,23 @@ fun reflowMushafPage(
     val boundaries = (listOf(0) + page.surahStarts.map { it.beforeLineIndex } + page.lines.size)
         .distinct().sorted()
     val sections = boundaries.zipWithNext().filter { (start, end) -> start < end }
-    val expanded = sections.indices.maxByOrNull { index ->
-        val (start, end) = sections[index]
-        page.lines.subList(start, end).flatMap { it.tokens }
-            .sumOf { tokenWeight(it).coerceAtLeast(0.001f).toDouble() } / (end - start)
-    } ?: return page
-    val rows = ArrayList<MushafLine>(page.lines.size + 1)
+    val tokens = sections.map { (start, end) -> page.lines.subList(start, end).flatMap { it.tokens } }
+    val counts = IntArray(sections.size) { sections[it].second - sections[it].first }
+    val weights = tokens.map { row -> row.sumOf { tokenWeight(it).coerceAtLeast(0.001f).toDouble() } }
+    val extraRows = MUSHAF_DISPLAY_LINES_PER_PAGE - MUSHAF_LINES_PER_PAGE
+    repeat(extraRows) {
+        val expanded = sections.indices.filter { counts[it] < tokens[it].size }
+            .maxByOrNull { weights[it] / counts[it] } ?: return@repeat
+        counts[expanded]++
+    }
+    val rows = ArrayList<MushafLine>(page.lines.size + extraRows)
     val starts = ArrayList<MushafSurahStart>(page.surahStarts.size)
-    sections.forEachIndexed { index, (start, end) ->
+    sections.forEachIndexed { index, (start, _) ->
         page.surahStarts.filter { it.beforeLineIndex == start }.forEach {
             starts += it.copy(beforeLineIndex = rows.size)
         }
-        val tokens = page.lines.subList(start, end).flatMap { it.tokens }
-        val count = ((end - start) + if (index == expanded) 1 else 0).coerceAtMost(tokens.size)
-        balancedMushafRows(tokens, count, tokenWeight).forEach { row ->
+        val count = counts[index].coerceAtMost(tokens[index].size)
+        balancedMushafRows(tokens[index], count, tokenWeight).forEach { row ->
             rows += MushafLine(number = rows.size + 1, tokens = row)
         }
     }
@@ -123,6 +126,8 @@ class MushafCatalog internal constructor(
     private val pagesByNumber: Map<Int, MushafPage>,
     private val firstPageBySurah: IntArray,
     private val pageByWord: Map<Long, Int>,
+    /** Each verse's last word position — its word count — by [ayahKey]. */
+    private val wordsByAyah: Map<Long, Int> = emptyMap(),
 ) {
     val pageCount: Int = MUSHAF_PAGE_COUNT
 
@@ -153,6 +158,9 @@ class MushafCatalog internal constructor(
         position: Int,
         wholeVerses: Boolean,
     ): Int = pageOf(surahId, ayah, if (wholeVerses) 1 else position)
+
+    /** How many words the mushaf sets for a verse; 0 when it has none. */
+    fun wordCountOf(surahId: Int, ayah: Int): Int = wordsByAyah[ayahKey(surahId, ayah)] ?: 0
 
     fun pageOf(surahId: Int, ayah: Int, position: Int = 1): Int {
         pageByWord[quranWordKey(surahId, ayah, position)]?.let { return it }
@@ -216,7 +224,7 @@ fun buildMushafCatalog(words: List<MushafSourceWord>): MushafCatalog {
         pages[pageNumber] = MushafPage(pageNumber, lines, surahStarts)
     }
 
-    return MushafCatalog(pages, firstPageBySurah, pageByWord)
+    return MushafCatalog(pages, firstPageBySurah, pageByWord, lastPosition)
 }
 
 private fun ayahKey(surahId: Int, ayah: Int): Long =

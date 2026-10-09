@@ -71,6 +71,7 @@ import com.beautifulquran.BuildConfig
 import com.beautifulquran.QuranApp
 import com.beautifulquran.R
 import com.beautifulquran.data.BrushCircleStyle
+import com.beautifulquran.data.MushafBannerStyle
 import com.beautifulquran.data.RuntimeCachePhase
 import com.beautifulquran.data.RuntimeMushafCache
 import com.beautifulquran.data.Settings
@@ -369,6 +370,17 @@ private fun DeveloperSection(
     SectionLabel("Developer")
     Spacer(Modifier.height(2.dp))
     Caption("Tools for testing work in progress.")
+
+    Spacer(Modifier.height(20.dp))
+    SectionLabel("Chapter banner")
+    MushafBannerStyle.entries.forEach { style ->
+        SelectRow(
+            label = style.label,
+            selected = settings.mushafBannerStyle == style,
+            onClick = { viewModel.settings.update { it.copy(mushafBannerStyle = style) } },
+        )
+    }
+    Caption("Shared by Arabic and English Mushaf.")
 
     Spacer(Modifier.height(20.dp))
     val app = context.applicationContext as QuranApp

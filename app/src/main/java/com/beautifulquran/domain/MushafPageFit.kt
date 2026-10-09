@@ -78,8 +78,8 @@ fun mushafLineSlotPx(pageHeightPx: Float, slots: Int, fontPx: Float): Float {
 /** Every Madinah page is set on the same 15-line grid. */
 const val MUSHAF_LINES_PER_PAGE = 15
 
-/** The reader's larger hand wraps each fixed page over one additional row. */
-const val MUSHAF_DISPLAY_LINES_PER_PAGE = MUSHAF_LINES_PER_PAGE + 1
+/** The reader's larger hand wraps each fixed page over seventeen display rows. */
+const val MUSHAF_DISPLAY_LINES_PER_PAGE = MUSHAF_LINES_PER_PAGE + 2
 
 /**
  * Al-Fātiḥah and the opening of al-Baqarah: the two framed leaves. The print
@@ -91,6 +91,34 @@ const val MUSHAF_DISPLAY_LINES_PER_PAGE = MUSHAF_LINES_PER_PAGE + 1
 fun mushafIsOpeningLeaf(page: Int): Boolean = page in 1..2
 
 /**
+ * Each row's share of the measure on an opening medallion, head to foot.
+ *
+ * The print sets al-Fātiḥah and the opening of al-Baqarah inside a circle:
+ * every line is drawn to the chord of that circle at its own height, so the
+ * block's edge *is* the circle. Justified to the full measure instead, the
+ * middle rows stood flush with the page and the medallion read as a square
+ * with its corners knocked off.
+ *
+ * The rows tile the circle's height, so row k's chord is taken at its centre.
+ */
+fun mushafMedallionChords(rows: Int): FloatArray {
+    if (rows <= 0) return FloatArray(0)
+    return FloatArray(rows) { k ->
+        val y = (k + 0.5f) / rows * 2f - 1f
+        kotlin.math.sqrt((1f - y * y).coerceAtLeast(0f))
+    }
+}
+
+/**
+ * A short row must actually end its chapter. Never on the two opening
+ * medallions: their rows fill the chord of the circle they are set in
+ * ([mushafMedallionChords]), and a row let stand short there — their last
+ * rows end their chapters too — flattened the circle's edge.
+ */
+fun mushafLineMayStandShort(page: Int, last: MushafToken?, surahAyahCount: Int?): Boolean =
+    !mushafIsOpeningLeaf(page) && last?.let { it.endsAyah && it.ayah == surahAyahCount } == true
+
+/**
  * Slots to divide the text well by. A full page fills it; a short page
  * (al-Fātiḥah, a surah's last lines) keeps the *same* leading as a full
  * page and sits in the middle of the well rather than stretching across
@@ -99,6 +127,14 @@ fun mushafIsOpeningLeaf(page: Int): Boolean = page in 1..2
  */
 fun mushafGridSlots(slotCount: Int): Int =
     maxOf(slotCount, MUSHAF_LINES_PER_PAGE).coerceAtLeast(1)
+
+/**
+ * The same rule on the reader's display grid. A leaf whose reflow could not
+ * spend both extra rows (too few words to spare) still keeps a full leaf's
+ * leading; floored at fifteen it was set about 13% looser than its neighbours.
+ */
+fun mushafDisplayGridSlots(slotCount: Int): Int =
+    maxOf(slotCount, MUSHAF_DISPLAY_LINES_PER_PAGE).coerceAtLeast(1)
 
 /** Smallest / largest fitted page size, in px, so a short page never balloons. */
 const val MUSHAF_MIN_FONT_PX = 28f
@@ -149,10 +185,22 @@ const val MUSHAF_MAX_FONT_PX = 128f
  */
 const val MUSHAF_DESIGN_LINE_EM = 16.4f
 
-/** Book-wide enlargement that gives a canonical leaf one additional visual line. */
-const val MUSHAF_TYPE_SCALE = 16f / 15f
+/** Book-wide enlargement matched to the display row count. */
+const val MUSHAF_TYPE_SCALE = MUSHAF_DISPLAY_LINES_PER_PAGE.toFloat() / MUSHAF_LINES_PER_PAGE
 
-/** Applies the reader's uniform optical size without introducing page sizing. */
+/**
+ * Applies the reader's uniform optical size without introducing page sizing.
+ *
+ * Deliberately *after* [mushafUniformFontPx]'s height guard, not inside it. On
+ * a height-bound phone this sets the hand about 13% past what fifteen rows of
+ * [MUSHAF_LINE_INK_EM] would allow: rows sit about 1.76 em apart, not 1.99.
+ * That is the enlargement the reader asked for, and a known trade: 1.99 em is
+ * the 99th percentile clearance of the *printed* line pairs, so the tallest
+ * marks over the deepest descenders may now touch, where the reflowed rows
+ * happen to stack them. It was accepted by eye on a Pixel at 16/15 and 17/15.
+ * Moving the scale inside the guard would cancel it on exactly the phones it
+ * was for. Check dense leaves by eye before raising it further.
+ */
 fun mushafDisplayFontPx(fittedFontPx: Float): Float =
     (fittedFontPx * MUSHAF_TYPE_SCALE)
         .coerceIn(MUSHAF_MIN_FONT_PX, MUSHAF_MAX_FONT_PX)
@@ -299,6 +347,7 @@ fun mushafLineFit(
     gapCount: Int,
     measureWidthPx: Float,
     fontPx: Float,
+    allowShort: Boolean = true,
 ): MushafLineFit {
     val gaps = gapCount.coerceAtLeast(0)
     val ideal = MUSHAF_WORD_GAP_EM * fontPx
@@ -336,7 +385,7 @@ fun mushafLineFit(
     // it. Without this step a line that needed a 1.19 stretch was set short
     // even though 1.15 and a wider space would have filled it.
     val stretched = (measureWidthPx - MUSHAF_MAX_LINE_SCALE * inkWidthPx) / gaps
-    if (stretched <= MUSHAF_STRETCH_WORD_GAP_EM * fontPx) {
+    if (!allowShort || stretched <= MUSHAF_STRETCH_WORD_GAP_EM * fontPx) {
         return MushafLineFit(MUSHAF_MAX_LINE_SCALE, stretched, flush = true)
     }
     // Not a full line: a chapter's last, four or five words standing alone.
@@ -377,9 +426,16 @@ fun mushafGapSpacingPx(
     pageWidthPx: Float,
     gapCount: Int,
     fontPx: Float = 0f,
+    /**
+     * Whether the line may stand short — the same permission the QCF fit
+     * takes ([mushafLineMayStandShort]). A row that may not fills its measure
+     * whatever the gap, so a leaf lays out the same before its page face has
+     * loaded as after.
+     */
+    allowShort: Boolean = true,
 ): Float {
     if (gapCount <= 0 || pageWidthPx <= naturalWidthPx) return 0f
     val raw = (pageWidthPx - naturalWidthPx) / gapCount
-    if (fontPx <= 0f) return raw
+    if (fontPx <= 0f || !allowShort) return raw
     return raw.coerceAtMost(fontPx * MUSHAF_MAX_GAP_EM)
 }
