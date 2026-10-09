@@ -1185,6 +1185,15 @@ Three rules make it usable:
   ask). If the page turn read the cut with a different map than the ink, it
   would turn away from a wash still running.
 
+The gloss and translation also differ in vocabulary: the gloss's "slaves" is
+the translation's "servants". Those singular and plural forms share a lexical
+anchor, while the auxiliary "will" carries only grammatical weight. In 76:6,
+Arabic puts "will drink" before "servants of Allah" and the translation puts it
+after. Missing the noun match let the early verb consume the whole subject;
+the shared anchor now keeps "servants" on عِبَادُ and "Allah" on ٱللَّهِ. The
+continuous wash still approximates the reordered verb; choosing word-by-word
+gloss text gives the recitation's exact word order.
+
 Measured on 2:2 (Alafasy) with the app playing: tap "no" and the reciter starts
 at 1,776 ms against لَا's 1,760; "doubt" → 2,142 against رَيْبَ's 2,140;
 "guidance" → 4,989 against هُدًى's 4,970; "the Book" → 862 against ٱلْكِتَٰبُ's

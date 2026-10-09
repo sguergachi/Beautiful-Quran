@@ -223,10 +223,12 @@ object EnglishWordAlignment {
      * grammatical one is worth a third of that, because "the" and "of" appear
      * everywhere and would otherwise anchor a verse to its own noise. A shared
      * four-letter opening covers the inflections the two texts differ by
-     * (`revealed` / `reveals`, `heaven` / `heavens`).
+     * (`revealed` / `reveals`, `heaven` / `heavens`). The gloss's "slaves" and
+     * the translation's "servants" also name the same Arabic words.
      */
     private fun similarity(gloss: String, prose: String): Float {
         if (gloss == prose) return if (gloss in GRAMMAR) GRAMMAR_MATCH else EXACT_MATCH
+        if (gloss in SERVANT_WORDS && prose in SERVANT_WORDS) return STEM_MATCH
         if (gloss.length >= STEM && prose.length >= STEM &&
             gloss.regionMatches(0, prose, 0, STEM)
         ) {
@@ -240,6 +242,8 @@ object EnglishWordAlignment {
     private const val GRAMMAR_MATCH = 1f
     private const val STEM = 4
 
+    private val SERVANT_WORDS = setOf("slave", "slaves", "servant", "servants")
+
     private const val SKIP_GLOSS: Byte = 0
     private const val SKIP_PROSE: Byte = 1
     private const val MATCH: Byte = 2
@@ -250,7 +254,7 @@ object EnglishWordAlignment {
         "did", "do", "does", "for", "from", "he", "her", "his", "i", "if", "in",
         "is", "it", "its", "no", "nor", "not", "of", "on", "or", "she", "so",
         "that", "the", "their", "them", "these", "they", "this", "those", "to",
-        "was", "we", "were", "with", "you",
+        "was", "we", "were", "will", "with", "you",
     )
 }
 

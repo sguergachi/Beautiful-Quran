@@ -42,6 +42,38 @@ class EnglishWordAlignmentTest {
     }
 
     @Test
+    fun `a reordered verb cannot wash over servants of Allah before they are said`() {
+        // 76:6: Arabic puts "will drink" before the subject; the translation
+        // puts it after. The gloss also calls the servants "slaves".
+        val text = "A spring of which the [righteous] servants of Allah will drink; " +
+            "they will make it gush forth in force [and abundance]"
+        val glosses = listOf(
+            "A spring", "will drink", "from it", "(the) slaves", "(of) Allah",
+            "causing it to gush forth", "abundantly",
+        )
+        val ends = EnglishWordAlignment.wordEnds(text, glosses)!!
+        val parts = shares(text, glosses)
+        assertTrue("early verb took ${parts[1]}", ends[1] * text.length <= text.indexOf("servants"))
+        assertTrue("servants took ${parts[3]}", parts[3].contains("servants"))
+        assertTrue("Allah took ${parts[4]}", parts[4].contains("Allah"))
+        val subject = (text.indexOf("servants") + 3f) / text.length
+        assertEquals(4, englishSeekWordPosition(subject, glosses.size, ends))
+        val at = (text.indexOf("Allah") + 2f) / text.length
+        assertEquals(5, englishSeekWordPosition(at, glosses.size, ends))
+    }
+
+    @Test
+    fun `singular and plural servant glosses keep a reordered subject anchored`() {
+        for (gloss in listOf("slave", "slaves", "servant", "servants")) {
+            val text = "Our servants will drink from a spring"
+            val glosses = listOf("will drink", "Our $gloss", "from a spring")
+            val ends = EnglishWordAlignment.wordEnds(text, glosses)!!
+            val subject = (text.indexOf("servants") + 3f) / text.length
+            assertEquals(gloss, 2, englishSeekWordPosition(subject, glosses.size, ends))
+        }
+    }
+
+    @Test
     fun `the shares tile the sentence, in order, to the end`() {
         val ends = EnglishWordAlignment.wordEnds(baqarah2, baqarah2Glosses)!!
         assertEquals(baqarah2Glosses.size, ends.size)
