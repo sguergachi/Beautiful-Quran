@@ -66,11 +66,13 @@ internal val LocalMushafBannerStyle = staticCompositionLocalOf { MushafBannerSty
 private const val MushafPanelCornerPx = 3f
 
 /**
- * A Latin name set at the Arabic name's size overruns the cartouche: Hafs
- * writes a chapter's name in three or four letters where the Latin spells it
- * out. The panel is the same panel, so the writing comes down to fit it.
+ * The Latin name against the hand it is handed. The window around the name is
+ * sized to the name's own advance, so a long transliteration widens the
+ * cartouche rather than overrunning it; the only limit is the band's height,
+ * which the shared tail guard already keeps. At 0.62 the name came out a
+ * little over half the prose under it and read as a caption, not a title.
  */
-private const val MushafLatinTitleScale = 0.62f
+private const val MushafLatinTitleScale = 0.95f
 
 /** Shamsa inset from the band's ends and its diameter, in band heights. */
 private const val MushafShamsaInset = 0.14f
