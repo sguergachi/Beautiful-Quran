@@ -143,15 +143,13 @@ fun PlayerBar(
                         name = reciterName,
                         notice = state.error,
                         onDismissNotice = onDismissError,
+                        noticeDismissAtStart = edgePad > 0.dp,
                         onClick = onReciterClick,
                         enabled = enabled,
                         disclosure = true,
                         modifier = Modifier
                             .align(Alignment.Center)
-                            .padding(
-                                start = if (state.error != null) 0.dp else centeredInset,
-                                end = if (state.error != null) edgePad else centeredInset,
-                            )
+                            .padding(horizontal = if (state.error != null) 0.dp else centeredInset)
                             .graphicsLayer { alpha = if (state.error != null) 1f else chromeAlpha() },
                     )
                 }
@@ -312,6 +310,8 @@ internal fun ReciterNameButton(
     disclosure: Boolean = false,
     notice: String? = null,
     onDismissNotice: () -> Unit = {},
+    /** Cover bars keep error dismissal opposite their session Close control. */
+    noticeDismissAtStart: Boolean = false,
 ) {
     val interactions = remember { MutableInteractionSource() }
     val pressed by interactions.collectIsPressedAsState()
@@ -341,6 +341,7 @@ internal fun ReciterNameButton(
                     message = shown,
                     onDismiss = onDismissNotice,
                     enabled = enabled,
+                    dismissAtStart = noticeDismissAtStart,
                     // Undo the chevron offset so the notice sits on the page centre.
                     modifier = Modifier
                         .offset(x = if (disclosure) -chevronFootprint / 2 else 0.dp),
@@ -384,10 +385,11 @@ internal fun PlaybackErrorNotice(
     onDismiss: () -> Unit,
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
+    dismissAtStart: Boolean = false,
 ) {
-    Row(
+    Box(
         modifier = modifier.fillMaxWidth(),
-        verticalAlignment = Alignment.CenterVertically,
+        contentAlignment = Alignment.Center,
     ) {
         Text(
             text = message,
@@ -405,11 +407,16 @@ internal fun PlaybackErrorNotice(
             ),
             overflow = TextOverflow.Ellipsis,
             textAlign = TextAlign.Center,
-            modifier = Modifier.weight(1f).semantics { liveRegion = LiveRegionMode.Polite },
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 48.dp)
+                .semantics { liveRegion = LiveRegionMode.Polite },
         )
         Box(
             contentAlignment = Alignment.Center,
-            modifier = Modifier.size(48.dp).quietClickable(
+            modifier = Modifier
+                .align(if (dismissAtStart) Alignment.CenterStart else Alignment.CenterEnd)
+                .size(48.dp).quietClickable(
                 enabled = enabled,
                 role = Role.Button,
                 onClick = onDismiss,

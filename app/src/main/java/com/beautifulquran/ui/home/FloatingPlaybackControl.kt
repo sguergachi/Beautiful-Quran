@@ -133,10 +133,11 @@ fun FloatingPlaybackControl(
                                 name = reciterName,
                                 notice = state.error,
                                 onDismissNotice = onDismissError,
+                                noticeDismissAtStart = true,
                                 onClick = onReciterClick,
                                 modifier = Modifier
                                     .align(Alignment.Center)
-                                    .padding(start = if (state.error != null) 0.dp else 48.dp, end = 48.dp),
+                                    .padding(horizontal = if (state.error != null) 0.dp else 48.dp),
                             )
                         }
                         if (inkLabAvailable && state.error == null) {

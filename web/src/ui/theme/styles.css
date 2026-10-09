@@ -3039,18 +3039,15 @@ button.ayah-mark {
   width: calc(100% + 2 * var(--sheet-pad));
   min-height: 32px;
   margin-inline: calc(-1 * var(--sheet-pad));
-  padding-inline: 0 44px;
+  padding-inline: 44px;
   color: var(--ink-rung-quiet);
   font-size: 13px;
   font-weight: 600;
 }
 
-.player-bar.cover-chrome .player-error {
-  padding-inline-end: 84px;
-}
-
 .player-bar.cover-chrome .player-error-dismiss {
-  right: 44px;
+  left: 4px;
+  right: auto;
 }
 
 .player-error-text {
