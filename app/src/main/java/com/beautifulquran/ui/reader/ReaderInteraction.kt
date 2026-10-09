@@ -261,8 +261,14 @@ object ReaderInteraction {
         // English leaf numbers are not Madinah page numbers, and a leaf may
         // carry verses from several source pages. Its own verses decide play.
         fun englishTarget(key: Pair<Int, Int>) = MushafPlayTarget(key.first, key.second, null)
-        englishAyahs?.firstOrNull { it.first == scrubbedSurahId }?.let {
-            return englishTarget(it)
+        val englishHeld = englishAyahs != null && heldAyah != null &&
+            (loadedSurahId to heldAyah) in englishAyahs
+        // A scrub names a chapter, not a verse. If the paused verse is already
+        // in that chapter on this leaf, play is still a resume.
+        if (!(englishHeld && loadedSurahId == scrubbedSurahId)) {
+            englishAyahs?.firstOrNull { it.first == scrubbedSurahId }?.let {
+                return englishTarget(it)
+            }
         }
         // A chapter opened from the index has already named its verse; the leaf
         // it lands on is that request's consequence, not a competing one.

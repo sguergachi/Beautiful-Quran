@@ -53,6 +53,20 @@ class ReaderInteractionTest {
         assertEquals(ReaderInteraction.MushafPlayTarget(19, 1, null), target)
     }
 
+    @Test
+    fun `English pause resumes inside the chapter it scrubbed to`() {
+        val target = ReaderInteraction.mushafPlayTarget(
+            pendingJumpAyah = 0,
+            loadedSurahId = 18,
+            heldAyah = 30,
+            leafFirstWord = ReaderInteraction.MushafPlayTarget(18, 28, 1),
+            leafAyahs = setOf(18 to 28, 18 to 30),
+            englishAyahs = listOf(18 to 28, 18 to 29, 18 to 30, 18 to 31),
+            scrubbedSurahId = 18,
+        )
+        assertEquals(null, target)
+    }
+
     private data class ReflowCase(
         val changed: Boolean,
         val ownsPlayback: Boolean,

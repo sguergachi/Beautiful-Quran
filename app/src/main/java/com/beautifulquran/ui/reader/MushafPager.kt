@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.animateFloatAsState
@@ -75,8 +76,10 @@ import com.beautifulquran.domain.mushafFontPreloadPages
 import com.beautifulquran.domain.MushafGrid
 import com.beautifulquran.domain.mushafLeafBands
 import com.beautifulquran.domain.MushafType
+import com.beautifulquran.domain.mushafDisplayGridSlots
 import com.beautifulquran.domain.mushafGridSlots
 import com.beautifulquran.domain.mushafIsOpeningLeaf
+import com.beautifulquran.domain.mushafMedallionChords
 import com.beautifulquran.domain.mushafLineMayStandShort
 import com.beautifulquran.domain.mushafUniformFontPx
 import com.beautifulquran.domain.qcfTrailingMark
@@ -1055,7 +1058,17 @@ internal fun MushafPager(
         key = { it },
         modifier = modifier
             .fillMaxSize()
-            .preferredFrameRate(FrameRateCategory.High)
+            // High only while the leaf moves. Recitation redraws the wash
+            // every frame, and a standing vote kept the panel at its top rate
+            // through a whole listening session for a page that was not
+            // turning.
+            .then(
+                if (pagerState.isScrollInProgress) {
+                    Modifier.preferredFrameRate(FrameRateCategory.High)
+                } else {
+                    Modifier
+                },
+            )
             .mushafForeEdgeFade(paper, MushafForeEdgeFade),
     ) { pageIndex ->
         val bookLeaf = book?.leaf(pageIndex)
@@ -1343,8 +1356,9 @@ internal fun MushafPager(
                             modifier = wellModifier,
                         )
                     }
-                    // English keeps a foot above its lower folio; Arabic uses
-                    // the dial's own air with its folio now in the head.
+                    // Zero on both hands now: the folio is in the running
+                    // head, the well runs to the leaf's bottom edge and the
+                    // dial's own head air is the foot (see clipLeafSides).
                     Spacer(Modifier.height(unit * bands.tail))
                 }
             }
@@ -1577,7 +1591,29 @@ private fun MushafPageSheet(
                 .coerceAtLeast(1f)
             // One slot is one unit of the leaf's grid, whatever the page holds.
             val lineSlot = with(density) {
-                (availableH / mushafGridSlots(displaySlotCount)).toDp()
+                (availableH / mushafDisplayGridSlots(displaySlotCount)).toDp()
+            }
+            // The two opening leaves are set in a circle (see
+            // mushafMedallionChords): each row drawn to its chord, and the rows
+            // spaced so the block is as tall as it is wide — a medallion, not
+            // a short page on the book's leading. Never shorter than that
+            // leading, and never taller than the well can hold.
+            val medallion = mushafIsOpeningLeaf(page.page)
+            val medallionChords = remember(medallion, displayPage.lines.size) {
+                if (medallion) mushafMedallionChords(displayPage.lines.size) else null
+            }
+            val textSlot = if (medallionChords != null && medallionChords.isNotEmpty()) {
+                val rows = medallionChords.size
+                val furniture = displaySlotCount - rows
+                val slotPx = availableH / mushafDisplayGridSlots(displaySlotCount)
+                val roomPx = availableH - furniture * slotPx
+                with(density) {
+                    (lineMeasurePx / rows).coerceAtMost(roomPx / rows)
+                        .coerceAtLeast(slotPx)
+                        .toDp()
+                }
+            } else {
+                lineSlot
             }
             CompositionLocalProvider(
                 LocalLayoutDirection provides LayoutDirection.Rtl,
@@ -1630,24 +1666,33 @@ private fun MushafPageSheet(
                                 }
                             }
                         }
+                        val chord = medallionChords?.getOrNull(index)
+                        val rowMeasurePx = if (chord != null) lineMeasurePx * chord else lineMeasurePx
                         Box(
                             Modifier
                                 .fillMaxWidth()
-                                .height(lineSlot),
+                                .height(textSlot),
                             contentAlignment = Alignment.Center,
                         ) {
                             MushafHafsLine(
+                                modifier = if (chord != null) {
+                                    Modifier.width(with(density) { rowMeasurePx.toDp() })
+                                } else {
+                                    Modifier
+                                },
                                 line = line,
                                 page = page.page,
                                 packs = packsState,
                                 fontSize = fontSp,
-                                measureWidthPx = lineMeasurePx,
+                                measureWidthPx = rowMeasurePx,
                                 pageTypeface = pageTypeface,
                                 liveInk = liveInk,
                                 onWordClick = onWordClick,
                                 onWordLongClick = onWordLongClick,
                                 onAyahClick = onAyahClick,
-                                allowShort = mushafLineMayStandShort(
+                                // A medallion row fills its chord: standing
+                                // short is what flattened the circle's edge.
+                                allowShort = chord == null && mushafLineMayStandShort(
                                     page.page,
                                     line.tokens.lastOrNull(),
                                     surahsById[line.tokens.lastOrNull()?.surahId]?.ayahCount,

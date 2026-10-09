@@ -89,7 +89,7 @@ import com.beautifulquran.domain.mushafLineFit
 import com.beautifulquran.domain.qcfTrailingMark
 import com.beautifulquran.domain.qcfWordGlyphs
 import com.beautifulquran.ui.reader.AyahNumberMark
-import com.beautifulquran.ui.reader.MushafFolioMarks
+import com.beautifulquran.ui.reader.MushafRunningHead
 import com.beautifulquran.ui.reader.MushafCell
 import com.beautifulquran.ui.reader.MushafQcfFonts
 import com.beautifulquran.ui.reader.PageBreak
@@ -98,7 +98,6 @@ import com.beautifulquran.ui.reader.VERSE_ANNOTATION_INK_ALPHA
 import com.beautifulquran.ui.reader.collapsedStackSpanDp
 import com.beautifulquran.ui.reader.appendAyahNumberMark
 import com.beautifulquran.ui.reader.mushafCellOrigins
-import com.beautifulquran.ui.reader.mushafFolioLayout
 import com.beautifulquran.ui.reader.mushafLineCells
 import com.beautifulquran.ui.reader.symbolicAyahBarCount
 import com.beautifulquran.ui.reader.verseAnnotationStyle
@@ -764,38 +763,24 @@ private fun PreviewEnglishMushafLeaf(
 @Composable
 private fun PreviewLeafRunningHead(pageNumberScript: PageNumberScript) {
     val ink = QuranTheme.ink.muted
-    val folio = mushafFolioLayout(PreviewMushafPage, pageNumberScript)
-    val both = folio.western != null && folio.arabic != null
     val style = MaterialTheme.typography.labelSmall.copy(
         fontSize = PreviewLeafHeadSize,
         letterSpacing = 0.10.em,
     )
-    Row(Modifier.fillMaxWidth()) {
+    MushafRunningHead(
+        page = PreviewMushafPage,
+        pageNumberScript = pageNumberScript,
+        chapter = PreviewMushafSurahLatin,
+        modifier = Modifier.fillMaxWidth(),
+    ) { text, align, labelModifier ->
         Text(
-            text = folio.western ?: requireNotNull(folio.arabic),
+            text = text,
             style = style,
             color = ink,
+            textAlign = align,
             maxLines = 1,
-            modifier = Modifier.weight(1f),
+            modifier = labelModifier,
         )
-        Text(
-            text = PreviewMushafSurahLatin,
-            style = style,
-            color = ink,
-            textAlign = if (both) TextAlign.Center else TextAlign.End,
-            maxLines = 1,
-            modifier = Modifier.weight(if (both) 3f else 1f),
-        )
-        if (both) {
-            Text(
-                text = folio.arabic.orEmpty(),
-                style = style,
-                color = ink,
-                textAlign = TextAlign.End,
-                maxLines = 1,
-                modifier = Modifier.weight(1f),
-            )
-        }
     }
 }
 

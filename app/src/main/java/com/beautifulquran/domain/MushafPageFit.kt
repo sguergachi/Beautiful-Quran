@@ -90,6 +90,25 @@ const val MUSHAF_DISPLAY_LINES_PER_PAGE = MUSHAF_LINES_PER_PAGE + 2
  */
 fun mushafIsOpeningLeaf(page: Int): Boolean = page in 1..2
 
+/**
+ * Each row's share of the measure on an opening medallion, head to foot.
+ *
+ * The print sets al-Fātiḥah and the opening of al-Baqarah inside a circle:
+ * every line is drawn to the chord of that circle at its own height, so the
+ * block's edge *is* the circle. Justified to the full measure instead, the
+ * middle rows stood flush with the page and the medallion read as a square
+ * with its corners knocked off.
+ *
+ * The rows tile the circle's height, so row k's chord is taken at its centre.
+ */
+fun mushafMedallionChords(rows: Int): FloatArray {
+    if (rows <= 0) return FloatArray(0)
+    return FloatArray(rows) { k ->
+        val y = (k + 0.5f) / rows * 2f - 1f
+        kotlin.math.sqrt((1f - y * y).coerceAtLeast(0f))
+    }
+}
+
 /** A short row must actually end its chapter, except on the two opening medallions. */
 fun mushafLineMayStandShort(page: Int, last: MushafToken?, surahAyahCount: Int?): Boolean =
     mushafIsOpeningLeaf(page) || last?.let { it.endsAyah && it.ayah == surahAyahCount } == true
@@ -103,6 +122,14 @@ fun mushafLineMayStandShort(page: Int, last: MushafToken?, surahAyahCount: Int?)
  */
 fun mushafGridSlots(slotCount: Int): Int =
     maxOf(slotCount, MUSHAF_LINES_PER_PAGE).coerceAtLeast(1)
+
+/**
+ * The same rule on the reader's display grid. A leaf whose reflow could not
+ * spend both extra rows (too few words to spare) still keeps a full leaf's
+ * leading; floored at fifteen it was set about 13% looser than its neighbours.
+ */
+fun mushafDisplayGridSlots(slotCount: Int): Int =
+    maxOf(slotCount, MUSHAF_DISPLAY_LINES_PER_PAGE).coerceAtLeast(1)
 
 /** Smallest / largest fitted page size, in px, so a short page never balloons. */
 const val MUSHAF_MIN_FONT_PX = 28f
@@ -156,7 +183,19 @@ const val MUSHAF_DESIGN_LINE_EM = 16.4f
 /** Book-wide enlargement matched to the display row count. */
 const val MUSHAF_TYPE_SCALE = MUSHAF_DISPLAY_LINES_PER_PAGE.toFloat() / MUSHAF_LINES_PER_PAGE
 
-/** Applies the reader's uniform optical size without introducing page sizing. */
+/**
+ * Applies the reader's uniform optical size without introducing page sizing.
+ *
+ * Deliberately *after* [mushafUniformFontPx]'s height guard, not inside it. On
+ * a height-bound phone this sets the hand about 13% past what fifteen rows of
+ * [MUSHAF_LINE_INK_EM] would allow: rows sit about 1.76 em apart, not 1.99.
+ * That is the enlargement the reader asked for, and a known trade: 1.99 em is
+ * the 99th percentile clearance of the *printed* line pairs, so the tallest
+ * marks over the deepest descenders may now touch, where the reflowed rows
+ * happen to stack them. It was accepted by eye on a Pixel at 16/15 and 17/15.
+ * Moving the scale inside the guard would cancel it on exactly the phones it
+ * was for. Check dense leaves by eye before raising it further.
+ */
 fun mushafDisplayFontPx(fittedFontPx: Float): Float =
     (fittedFontPx * MUSHAF_TYPE_SCALE)
         .coerceIn(MUSHAF_MIN_FONT_PX, MUSHAF_MAX_FONT_PX)

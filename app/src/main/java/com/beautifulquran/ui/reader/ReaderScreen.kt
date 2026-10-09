@@ -2627,6 +2627,11 @@ fun ReaderScreen(
                             } else {
                                 dispatch(ReaderInteractionEvent.EnableFollow)
                                 val target = mushafPlayTarget()
+                                // A scrub's chapter choice is spent by the play
+                                // it chose. Kept, it outlived the reading that
+                                // followed and threw a later pause-then-play
+                                // back to that chapter's first verse.
+                                mushafSeekSurahId = null
                                 when {
                                     target == null -> if (isThisSurahPlaying) {
                                         viewModel.player.togglePlayPause()

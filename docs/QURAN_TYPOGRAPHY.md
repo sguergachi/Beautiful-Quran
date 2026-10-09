@@ -637,8 +637,8 @@ Two ways to have them, and the book uses both. The leaf *remembers its size* —
 window they were laid out in, so a leaf on a folded phone is never mistaken for
 the leaf on an unfolded one. And where nothing is remembered, the figures are
 *worked out*: `MushafBelowLeaf` is everything the reading sheet reserves under
-the paper with Ink Lab closed — folio band, dial, the 48 dp reciter / Ink Lab
-band, and transport — and the leaf is the window less the system bars less that, which
+the paper with Ink Lab closed — dial, transport and the fixed 48 dp
+reciter / Ink Lab band — and the leaf is the window less the system bars less that, which
 `englishLeafSlotPx` carries the rest of the way through the page margin, the
 grid's bands and the fore-edge. Opening Ink Lab replaces the reciter name with
 its tabs and content; that measured extra height takes space from the leaf, so

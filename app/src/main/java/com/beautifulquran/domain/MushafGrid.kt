@@ -78,7 +78,9 @@ object MushafGrid {
     const val HEAD_GUTTER = 1.00f
     const val TEXT_LINES = MUSHAF_LINES_PER_PAGE
     /**
-     * Paper under the last line of the leaf.
+     * Paper under the last line of the canonical leaf. The reader's leaves no
+     * longer spend it — see [MushafLeafBands.tail] — and what follows is why
+     * the canonical grid has one.
      *
      * It was taken out with the folio, on the reasoning that nothing stands
      * under the text any more — and that was true only for as long as the text
@@ -98,17 +100,6 @@ object MushafGrid {
      * enough that the last line and the page number are two things.
      */
     const val TAIL = 0.55f
-
-    /**
-     * The folio's band — no longer a band *of the leaf*. The figure stands in
-     * the air above the dial's rule, so the leaf's own height ends with the
-     * last line of text and the folio is furniture of the sheet, sitting with
-     * the dial and the transport rather than on the paper.
-     *
-     * It is still a unit of the leaf's grid, because it is still the same
-     * book: the figure keeps the pitch of the lines it numbers.
-     */
-    const val FOLIO = 0.40f
 
     /** The whole leaf, in units. */
     const val SLOTS = RUNNING_HEAD + HEAD_GUTTER + TEXT_LINES + TAIL
@@ -131,7 +122,11 @@ data class MushafLeafBands(
     val runningHead: Float,
     val headGutter: Float,
     val well: Float,
-    /** Paper under the last line — see [MushafGrid.TAIL]. */
+    /**
+     * Paper under the last line. Zero on both reader hands: their folio moved
+     * into the running head and the dial's own head air is the foot.
+     * [MushafGrid.TAIL] is the canonical grid's figure, and its history.
+     */
     val tail: Float,
 ) {
     val slots: Float get() = runningHead + headGutter + well + tail
