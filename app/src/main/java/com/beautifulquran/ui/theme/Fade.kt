@@ -790,20 +790,38 @@ fun Modifier.shapedWordBloom(
                                 openTop = i == 0,
                                 openBottom = i == tintBounds.lastIndex,
                             )
-                            clipRect(
-                                left = mask.left,
-                                top = mask.top,
-                                right = mask.right,
-                                bottom = mask.bottom,
-                            ) {
-                                translate(left = headX, top = 0f) {
-                                    drawRect(
-                                        brush = brush,
-                                        topLeft = Offset(mask.left - headX, mask.top),
-                                        size = Size(mask.width, mask.height),
-                                        blendMode = BlendMode.DstIn,
-                                    )
+                            fun wash(rect: Rect) {
+                                clipRect(
+                                    left = rect.left,
+                                    top = rect.top,
+                                    right = rect.right,
+                                    bottom = rect.bottom,
+                                ) {
+                                    translate(left = headX, top = 0f) {
+                                        drawRect(
+                                            brush = brush,
+                                            topLeft = Offset(rect.left - headX, rect.top),
+                                            size = Size(rect.width, rect.height),
+                                            blendMode = BlendMode.DstIn,
+                                        )
+                                    }
                                 }
+                            }
+                            wash(mask)
+                            // An inner edge stays shut only where the next
+                            // line's own mask is there to take over. Past it,
+                            // nothing else washes this line's spill, and the
+                            // halo of words not yet said lay under them as a
+                            // lit strip with a hard top edge.
+                            if (i > 0) {
+                                val above = bloom.washBounds(tintBounds[i - 1], washPad)
+                                washMaskSpill(cover, colorBleed, above, below = false)
+                                    .forEach(::wash)
+                            }
+                            if (i < tintBounds.lastIndex) {
+                                val below = bloom.washBounds(tintBounds[i + 1], washPad)
+                                washMaskSpill(cover, colorBleed, below, below = true)
+                                    .forEach(::wash)
                             }
                         }
                     }
@@ -1466,6 +1484,41 @@ internal fun washMaskRect(
     right = cover.right + bleed,
     bottom = if (openBottom) cover.bottom + bleed else cover.bottom,
 )
+
+/**
+ * Where an inner edge of a wrapped word's wash has to open after all.
+ *
+ * [washMaskRect] keeps a line's mask out of its neighbour's band so the two
+ * passes never wash the same light twice. But the neighbour's mask only spans
+ * the neighbour's own words: a word whose English runs from the middle of one
+ * line to the start of the next has a second line a few letters wide. Under
+ * the rest of the first line nothing washed the halo at all, and a word not
+ * yet said lit a strip of the leading under its dark letters, cut square along
+ * the line box. The English leaf, which sets one Arabic word's English across a
+ * line break as a matter of course, showed it on every such word.
+ *
+ * The spill is this line's band reach past [cover]'s edge toward [neighbour] —
+ * below it when [below], above otherwise — less the columns the neighbour's own
+ * mask covers there. Zero, one or two strips; never overlapping the neighbour.
+ */
+internal fun washMaskSpill(
+    cover: Rect,
+    bleed: Float,
+    neighbour: Rect,
+    below: Boolean,
+): List<Rect> {
+    if (bleed <= 0f) return emptyList()
+    val top = if (below) cover.bottom else cover.top - bleed
+    val bottom = if (below) cover.bottom + bleed else cover.top
+    val left = cover.left - bleed
+    val right = cover.right + bleed
+    val takenLeft = neighbour.left - bleed
+    val takenRight = neighbour.right + bleed
+    return buildList {
+        if (takenLeft > left) add(Rect(left, top, minOf(right, takenLeft), bottom))
+        if (takenRight < right) add(Rect(maxOf(left, takenRight), top, right, bottom))
+    }.filter { it.width > 0f }
+}
 
 /** Word-local horizontal bounds per line, at the layout's full line height. */
 private fun computeLineBounds(
