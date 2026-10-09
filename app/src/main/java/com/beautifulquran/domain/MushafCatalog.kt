@@ -157,6 +157,13 @@ class MushafCatalog internal constructor(
         wholeVerses: Boolean,
     ): Int = pageOf(surahId, ayah, if (wholeVerses) 1 else position)
 
+    /** How many words the mushaf sets for a verse; 0 when it has none. */
+    fun wordCountOf(surahId: Int, ayah: Int): Int {
+        var count = 0
+        while (pageByWord.containsKey(quranWordKey(surahId, ayah, count + 1))) count++
+        return count
+    }
+
     fun pageOf(surahId: Int, ayah: Int, position: Int = 1): Int {
         pageByWord[quranWordKey(surahId, ayah, position)]?.let { return it }
         pageByWord[quranWordKey(surahId, ayah, 1)]?.let { return it }

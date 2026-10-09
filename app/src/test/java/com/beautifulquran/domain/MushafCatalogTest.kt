@@ -10,6 +10,21 @@ import org.junit.Test
 class MushafCatalogTest {
 
     @Test
+    fun `word count spans a verse carried over a page`() {
+        val catalog = buildMushafCatalog(
+            listOf(
+                source(2, 5, 1, "a", page = 2, line = 15),
+                source(2, 5, 2, "b", page = 2, line = 15),
+                source(2, 5, 3, "c", page = 3, line = 1),
+                source(2, 6, 1, "d", page = 3, line = 1),
+            ),
+        )
+        assertEquals(3, catalog.wordCountOf(2, 5))
+        assertEquals(1, catalog.wordCountOf(2, 6))
+        assertEquals(0, catalog.wordCountOf(2, 7))
+    }
+
+    @Test
     fun `drops unmatched page 0 and builds 1-based pages`() {
         val catalog = buildMushafCatalog(
             listOf(

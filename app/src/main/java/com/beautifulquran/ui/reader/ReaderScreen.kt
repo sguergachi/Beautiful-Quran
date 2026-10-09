@@ -2856,6 +2856,39 @@ fun ReaderScreen(
                             }
                         }
                     }
+                    // A hold opens the Root Word Viewer on the Arabic word
+                    // under the English, as a hold on a word does everywhere
+                    // else. The loaded chapter resolves it through the same
+                    // alignment as a tap; a verse of a chapter that is not
+                    // loaded has no alignment here, so the share is split
+                    // evenly over the words the mushaf sets for it.
+                    val onMushafVerseLongPress = remember(
+                        mushafSurahId,
+                        content,
+                        seekAlignments,
+                        mushafReady.catalog,
+                        haptics,
+                    ) {
+                        { surahId: Int, ayah: Int, through: Float ->
+                            val verse = content.ayahs
+                                .firstOrNull { it.number == ayah }
+                                ?.takeIf { surahId == mushafSurahId }
+                            val position = if (verse != null) {
+                                englishSeekWordPosition(
+                                    through,
+                                    verse.words.size,
+                                    seekAlignments.of(verse.number),
+                                )
+                            } else {
+                                englishSeekWordPosition(
+                                    through,
+                                    mushafReady.catalog.wordCountOf(surahId, ayah),
+                                )
+                            }
+                            haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+                            mushafOpenRoot.value(surahId, ayah, position)
+                        }
+                    }
                     val onMushafBasmalahClick = remember(mushafSurahId, viewModel) {
                         { surahId: Int ->
                             mushafDispatch.value(ReaderInteractionEvent.EnableFollow)
@@ -2902,6 +2935,7 @@ fun ReaderScreen(
                         onWordLongClick = onMushafWordLongClick,
                         onAyahClick = onMushafAyahClick,
                         onVerseSeek = onMushafVerseSeek,
+                        onVerseLongPress = onMushafVerseLongPress,
                         onBasmalahClick = onMushafBasmalahClick,
                         english = settings.readingMode == ReadingMode.ENGLISH_ONLY,
                         verseNumberScript = settings.verseNumberScript,

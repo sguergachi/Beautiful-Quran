@@ -688,6 +688,8 @@ internal fun MushafPager(
      * that into a word. See `englishSeekWordPosition`.
      */
     onVerseSeek: (surahId: Int, ayah: Int, through: Float) -> Unit = { _, _, _ -> },
+    /** A hold on the English leaf's prose: the verse and share it landed on. */
+    onVerseLongPress: (surahId: Int, ayah: Int, through: Float) -> Unit = { _, _, _ -> },
     onBasmalahClick: (Int) -> Unit,
     /**
      * Sets the leaf in English instead of the page's own hand — the same 604
@@ -998,6 +1000,7 @@ internal fun MushafPager(
     val onWordLongClickNow = rememberUpdatedState(onWordLongClick)
     val onAyahClickNow = rememberUpdatedState(onAyahClick)
     val onVerseSeekNow = rememberUpdatedState(onVerseSeek)
+    val onVerseLongPressNow = rememberUpdatedState(onVerseLongPress)
     val onBasmalahClickNow = rememberUpdatedState(onBasmalahClick)
     val onTappedLeafNow = rememberUpdatedState(onTappedLeaf)
     val leafTextNow = rememberUpdatedState(leafText)
@@ -1079,7 +1082,13 @@ internal fun MushafPager(
             val settled by remember {
                 derivedStateOf { pageIndex == pagerState.settledPage }
             }
-            val pageOwnsVoice by remember(pageIndex) {
+            // Keyed on [voiceLeaf] itself: it is rebuilt when the loaded chapter
+            // changes, and a derivation remembered on the page alone kept
+            // reading the old chapter's. Playing an unloaded chapter from its
+            // leaf then left that leaf disowned through the basmalah and in
+            // every gap between verses — the whole page at full ink, with no
+            // wash — until the leaf was composed again.
+            val pageOwnsVoice by remember(pageIndex, voiceLeaf) {
                 derivedStateOf { voiceLeaf.value == pageIndex + 1 }
             }
             val pageHasActiveWord by remember(pageIndex, catalog, loadedSurahId, english, book) {
@@ -1113,7 +1122,10 @@ internal fun MushafPager(
                     )
                 }
             }
-            val liveInk by remember(pageIndex) {
+            // Every input's own state object is a key: each of them is
+            // remembered on keys of its own, and a capture of a replaced one
+            // goes on answering for a chapter that is no longer loaded.
+            val liveInk by remember(pageIndex, voiceLeaf, catalog, loadedSurahId, english, book, heldPage) {
                 derivedStateOf {
                     mushafUsesLiveInk(
                         settled,
@@ -1154,6 +1166,13 @@ internal fun MushafPager(
                         waitingPage = pageIndex + 1
                         onTappedLeafNow.value(pageIndex + 1)
                         onVerseSeekNow.value(surahId, ayah, through)
+                    }
+                }
+            }
+            val leafVerseLongPress = remember(pageIndex) {
+                { surahId: Int, ayah: Int, through: Float ->
+                    if (mushafLeafAcceptsTap(pageIndex, currentPageNow.value)) {
+                        onVerseLongPressNow.value(surahId, ayah, through)
                     }
                 }
             }
@@ -1328,6 +1347,7 @@ internal fun MushafPager(
                             leafTokens = leafTokens,
                             alignments = alignments,
                             onVerseSeek = leafVerseSeek,
+                            onVerseLongPress = leafVerseLongPress,
                             onBasmalahClick = leafBasmalahClick,
                             modifier = wellModifier,
                         )
