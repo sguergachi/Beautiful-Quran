@@ -42,7 +42,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.FrameRateCategory
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.preferredFrameRate
-import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
@@ -89,6 +88,7 @@ import com.beautifulquran.domain.reflowMushafPage
 import com.beautifulquran.domain.surahOpensWithBasmalahPreface
 import androidx.compose.foundation.Canvas
 import androidx.core.content.res.ResourcesCompat
+import androidx.compose.ui.graphics.drawscope.clipRect
 import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
 import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.graphics.toArgb
@@ -1255,7 +1255,7 @@ internal fun MushafPager(
                     // of the hitch — 99th percentile 101ms against 38 with it,
                     // and half as many frames blamed on the UI thread.
                     .graphicsLayer { }
-                    .clipToBounds()
+                    .clipLeafSides()
                     .padding(horizontal = MushafPageMargin),
             ) {
                 val density = LocalDensity.current
@@ -1908,3 +1908,21 @@ private fun MushafBasmalahLine(
         }
     }
 }
+
+/**
+ * Clips a leaf at its fore-edges only.
+ *
+ * The sides keep a neighbouring leaf's ink off this one through a swipe. The
+ * foot must not be clipped: the well runs to the leaf's bottom edge, and the
+ * last line's descenders (g, p, y) hang a few pixels past it into the air
+ * over the dial. A whole-box clip cut the feet off the English leaf's last
+ * line.
+ */
+private fun Modifier.clipLeafSides(): Modifier = drawWithContent {
+    val bleed = LeafFootBleed.toPx()
+    clipRect(top = -bleed, bottom = size.height + bleed) {
+        this@drawWithContent.drawContent()
+    }
+}
+
+private val LeafFootBleed = 48.dp
