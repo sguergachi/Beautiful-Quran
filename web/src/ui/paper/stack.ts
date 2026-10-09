@@ -49,6 +49,37 @@ export function settingsLayerFor(hasReader: boolean): StackLayer {
   return hasReader ? SETTINGS_LAYER : READER_LAYER
 }
 
+/**
+ * Settings remembers where it was opened from: arriving records the origin,
+ * leaving forgets it, and staying (sub-pages, setting changes) keeps it.
+ */
+export function nextSettingsReturn(
+  from: StackLayer,
+  to: StackLayer,
+  hasReader: boolean,
+  current: StackLayer | null,
+): StackLayer | null {
+  if (to !== settingsLayerFor(hasReader)) return null
+  return from === settingsLayerFor(hasReader) ? current : from
+}
+
+/**
+ * Back from Settings returns to its origin sheet — Chapters → Settings →
+ * Back lands on Chapters, not the reader one layer down. Anywhere else, or
+ * with no recorded origin, Back peels one layer (Bookmarks → Chapters).
+ */
+export function backDestination(
+  stackLayer: StackLayer,
+  hasReader: boolean,
+  settingsReturn: StackLayer | null,
+): StackLayer {
+  if (stackLayer === BOOKMARKS_LAYER) return COVER_LAYER
+  if (stackLayer === settingsLayerFor(hasReader) && settingsReturn != null) {
+    return settingsReturn
+  }
+  return (stackLayer - 1) as StackLayer
+}
+
 export function sheetAtLayer(
   layer: StackLayer,
   hasReader: boolean,

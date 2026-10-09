@@ -4,7 +4,9 @@ import {
   COVER_LAYER,
   READER_LAYER,
   SETTINGS_LAYER,
+  backDestination,
   hasReaderOpen,
+  nextSettingsReturn,
   settingsLayerFor,
   sheetAtLayer,
   showPinnedChapterBar,
@@ -54,5 +56,33 @@ describe('hasReaderOpen', () => {
     // Documents the bug: content-null peel with hasReader=false maps layer 1 → settings.
     expect(sheetAtLayer(READER_LAYER, false)).toBe('settings')
     expect(settingsLayerFor(false)).toBe(READER_LAYER)
+  })
+})
+
+describe('settings origin and back', () => {
+  it('records where Settings was opened from and forgets it on the way out', () => {
+    expect(nextSettingsReturn(COVER_LAYER, SETTINGS_LAYER, true, null)).toBe(COVER_LAYER)
+    expect(nextSettingsReturn(READER_LAYER, SETTINGS_LAYER, true, null)).toBe(READER_LAYER)
+    expect(nextSettingsReturn(BOOKMARKS_LAYER, SETTINGS_LAYER, true, null)).toBe(BOOKMARKS_LAYER)
+    // Staying on Settings (sub-pages, setting changes) keeps the origin.
+    expect(nextSettingsReturn(SETTINGS_LAYER, SETTINGS_LAYER, true, COVER_LAYER)).toBe(COVER_LAYER)
+    // Leaving Settings forgets it.
+    expect(nextSettingsReturn(SETTINGS_LAYER, READER_LAYER, true, COVER_LAYER)).toBe(null)
+    expect(nextSettingsReturn(SETTINGS_LAYER, COVER_LAYER, true, COVER_LAYER)).toBe(null)
+    // Other moves never record.
+    expect(nextSettingsReturn(COVER_LAYER, READER_LAYER, true, null)).toBe(null)
+    // Without a reader, Settings owns layer 1.
+    expect(nextSettingsReturn(COVER_LAYER, READER_LAYER, false, null)).toBe(COVER_LAYER)
+  })
+
+  it('returns Back from Settings to its origin sheet', () => {
+    expect(backDestination(SETTINGS_LAYER, true, COVER_LAYER)).toBe(COVER_LAYER)
+    expect(backDestination(SETTINGS_LAYER, true, READER_LAYER)).toBe(READER_LAYER)
+    expect(backDestination(SETTINGS_LAYER, true, BOOKMARKS_LAYER)).toBe(BOOKMARKS_LAYER)
+    // No recorded origin peels one layer, as before.
+    expect(backDestination(SETTINGS_LAYER, true, null)).toBe(READER_LAYER)
+    expect(backDestination(READER_LAYER, true, null)).toBe(COVER_LAYER)
+    expect(backDestination(BOOKMARKS_LAYER, true, null)).toBe(COVER_LAYER)
+    expect(backDestination(READER_LAYER, false, null)).toBe(COVER_LAYER)
   })
 })
