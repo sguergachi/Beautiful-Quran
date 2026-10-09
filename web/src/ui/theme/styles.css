@@ -3041,8 +3041,7 @@ button.ayah-mark {
   padding-inline: 40px;
   color: var(--ink-rung-quiet);
   font-size: 13px;
-  font-weight: 500;
-  font-style: italic;
+  font-weight: 600;
 }
 
 .player-bar.cover-chrome .player-error {
@@ -3050,11 +3049,11 @@ button.ayah-mark {
 }
 
 .player-error-text {
-  max-height: 32px;
   overflow: hidden;
   line-height: 16px;
   text-align: center;
-  white-space: normal;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .player-error-dismiss {

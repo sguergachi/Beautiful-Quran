@@ -5,12 +5,12 @@
  * Wording matches the Android app.
  */
 export const PLAYBACK_MESSAGES = {
-  network: "No connection · press play to try again",
-  unavailable: "This verse isn't available right now",
-  decode: "This verse couldn't be played",
-  autoplay: 'Press play to begin',
-  stalled: 'Still loading · press play to continue',
-  generic: 'Recitation stopped · press play to try again',
+  network: 'No connection · tap Play',
+  unavailable: 'Verse unavailable',
+  decode: 'Cannot play this verse',
+  autoplay: 'Tap Play to begin',
+  stalled: 'Still loading · tap Play',
+  generic: 'Stopped · tap Play',
 } as const
 
 export type PlaybackErrorKind = keyof typeof PLAYBACK_MESSAGES

@@ -833,8 +833,9 @@ leaf gives the open panel its measured height. The same control closes the
 panel.
 
 Playback errors replace the reciter name in that same band on Scroll, Mushaf,
-and the cover controls, including web. The italic notice stays readable until
-playback recovers or its × (**Dismiss playback error**) is tapped. Dismissal
+and the cover controls, including web. Short copy fits one line, set in
+semibold type with the same ink strength as its × (**Dismiss playback error**).
+The notice stays until playback recovers or the × is tapped. Dismissal
 restores the normal band without changing playback or the selected verse;
 the notice never adds a row or opens reciter settings.
 
