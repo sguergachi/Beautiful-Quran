@@ -1259,31 +1259,13 @@ internal fun MushafPager(
                     .padding(horizontal = MushafPageMargin),
             ) {
                 val density = LocalDensity.current
-                // How this leaf spends its height. The two settings divide it
-                // differently because their ink does, so each divides by its
-                // own total. See MushafLeafBands.
+                // Both hands spend the same frame; English fills it with prose.
                 val bands = mushafLeafBands(english)
                 // One unit for the whole leaf — see MushafGrid. Both bands below
                 // are a whole number of them, so the head and the well sit on the
                 // same rhythm as the lines of revelation.
                 val unit = with(density) {
                     bands.unitPx(constraints.maxHeight.toFloat()).toDp()
-                }
-                // One measure for the whole leaf. The running head and the
-                // folio are furniture *of the text block* — in any book they
-                // stand over and under the measure, not over and under the
-                // paper — so all three take the same fore-edge.
-                //
-                // The Arabic leaf's is 10dp because every unit of paper it does
-                // not spend is type size and the QCF measure is what caps that
-                // type (see MushafEdgeGutter). The English hand is solved from
-                // the measure instead, so paper given to the margin comes back
-                // as a shorter line rather than as smaller type — and a book
-                // with no outer margin reads as a printout.
-                val foreEdge = if (english) {
-                    englishLeafForeEdge(maxWidth)
-                } else {
-                    MushafEdgeGutter
                 }
                 // The leaf's own size, from the paper it is set on — the same
                 // chain the app's root walks before any of this is composed, so
@@ -1327,7 +1309,6 @@ internal fun MushafPager(
                             onMetrics = onLeafMetrics,
                             measured = bookMeasured,
                             verseNumberScript = verseNumberScript,
-                            foreEdge = foreEdge,
                             wellPx = englishSlot?.get(0) ?: 1f,
                             measurePx = englishSlot?.get(1) ?: 1f,
                             leafRuns = leafRuns,

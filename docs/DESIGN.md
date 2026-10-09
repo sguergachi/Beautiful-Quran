@@ -180,9 +180,9 @@ Page-number script chooses Arabic-Indic, Western, or both, always quiet ink.
 travels with the page during a turn. The English figure counts English leaves.
 Customize uses the same placement and scripts.
 
-**The frame is shared.** Running-head labels use the same inset in both hands.
-Arabic keeps its bare text margin; English prose retains its wider book
-measure. Each chapter ornament follows the text block it opens.
+**The frame is shared.** Running-head labels and text use the same 10 dp inset
+in both hands. Each chapter ornament follows the text block it opens. English
+pagination measures that same wider column.
 
 **Rank by role, not by taste.** Weight says what a thing is for, so the app
 keeps one ladder of ink weights (`QuranInk`) and everything hangs off a rung of
@@ -223,19 +223,19 @@ colours anything is set in. What matters for them is the *relief* between the
 stops, which is held the same in every theme; their own contrast against the
 paper is not a meaningful number and differs widely by design.
 
-The running head is type alone: the Arabic leaf's folio and the chapter's
+The running head is type alone: the leaf's folio and the chapter's
 transliterated name. With both number scripts the chapter is centred; with
-one it sits at the right. The English leaf keeps Part at the left and the
-chapter at the right. Transliteration, not translated meaning:
+one it sits at the right. Arabic and English share this arrangement, each
+numbering its own leaves. Transliteration, not translated meaning:
 a running head is for finding a place, and the transliterated name is how the
 book names chapters in Latin everywhere else. It stands off the block by
 about a line's pitch.
 
 A chapter opening carries the leaf's illumination: a chapter-seeded tooled
-ground and drawn shamsas around a gold title. Three treatments are available
-under Developer → Chapter banner: Cartouche panel (the default), Cloud collar,
-and Open heading. Their centre stays open above and below the writing, so no
-rule crowds an ascender or descender. All names share one writing line at a
+ground and drawn shamsas around a gold title. Developer → Chapter banner offers
+Cartouche panel (the default) and Cloud collar. Their centre stays open above
+and below the writing, so no rule crowds an ascender or descender. All names
+share one writing line at a
 size, and a long tail hangs naturally instead of lifting its word. The fixed
 chapter slot, full glyphs and basmalah position are shared by the variants and
 both reading languages. [The research brief](MUSHAF_BANNERS.md) records the
@@ -826,13 +826,14 @@ In Mushaf, the reciter name and its chevron share the secondary controls'
 fade to 5 % while playing and return on pause. The name cannot be tapped
 while reciting, and its reserved band keeps its height throughout the fade.
 
-The reciter name above the transport carries a small disclosure
-chevron: Scroll and Mushaf share the same quiet button leading to reciter settings.
+The reciter name carries a small disclosure chevron: Scroll and Mushaf share
+the same quiet button leading to reciter settings. Scroll places it above the
+transport; Mushaf places it below, keeping Play close to the leaf's hairline.
 In developer mode a quiet tuning control shares that line. Opening it replaces
 the name with the Ink Lab tabs and selected controls inside the playbar; the
 bar grows only by the panel's measured height, and the reading column clears
 it as it does the return pill. In Mushaf layout, the same control lives in the
-reserved band above the transport; it replaces the reciter name there and the
+reserved band below the transport; it replaces the reciter name there and the
 leaf gives the open panel its measured height. The same control closes the
 panel.
 

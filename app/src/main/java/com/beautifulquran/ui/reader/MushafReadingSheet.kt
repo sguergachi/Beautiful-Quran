@@ -110,7 +110,7 @@ private val MushafTransportRow = 44.dp
 private val MushafTransportAir = 2.dp
 
 /**
- * The reciter's name or Ink Lab above the transport.
+ * The reciter's name or Ink Lab below the transport.
  *
  * The closed band is always reserved. Opening Ink Lab replaces the name and
  * lets the band take the panel's measured height; the leaf gets what remains.
@@ -269,39 +269,6 @@ internal fun MushafReadingSheet(
                 .padding(horizontal = MushafTransportEdge, vertical = MushafTransportAir),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
-            // Opening Ink Lab grows the reserved name band; the leaf takes
-            // the measured remainder.
-            Box(
-                Modifier.fillMaxWidth().heightIn(min = MushafReciterBand),
-                contentAlignment = Alignment.Center,
-            ) {
-                if (inkLabAvailable && inkLabOpen) {
-                    InkLabPanel(
-                        modifier = Modifier
-                            .align(Alignment.Center)
-                            .padding(start = 40.dp),
-                    )
-                } else if (reciterName.isNotEmpty()) {
-                    ReciterNameButton(
-                        name = reciterName,
-                        notice = playerState.error,
-                        onClick = onOpenSettings,
-                        enabled = enabled && !reciting,
-                        disclosure = true,
-                        modifier = Modifier
-                            .align(Alignment.Center)
-                            .padding(horizontal = if (inkLabAvailable) 48.dp else 0.dp)
-                            .graphicsLayer { alpha = secondaryFade },
-                    )
-                }
-                if (inkLabAvailable) {
-                    InkLabToggleButton(
-                        expanded = inkLabOpen,
-                        onClick = onInkLabClick,
-                        modifier = Modifier.align(Alignment.CenterStart),
-                    )
-                }
-            }
             Box(
                 Modifier
                     .fillMaxWidth()
@@ -430,6 +397,39 @@ internal fun MushafReadingSheet(
                 }
             }
             }
+            // Opening Ink Lab grows the reserved name band; the leaf takes
+            // the measured remainder.
+            Box(
+                Modifier.fillMaxWidth().heightIn(min = MushafReciterBand),
+                contentAlignment = Alignment.Center,
+            ) {
+                if (inkLabAvailable && inkLabOpen) {
+                    InkLabPanel(
+                        modifier = Modifier
+                            .align(Alignment.Center)
+                            .padding(start = 40.dp),
+                    )
+                } else if (reciterName.isNotEmpty()) {
+                    ReciterNameButton(
+                        name = reciterName,
+                        notice = playerState.error,
+                        onClick = onOpenSettings,
+                        enabled = enabled && !reciting,
+                        disclosure = true,
+                        modifier = Modifier
+                            .align(Alignment.Center)
+                            .padding(horizontal = if (inkLabAvailable) 48.dp else 0.dp)
+                            .graphicsLayer { alpha = secondaryFade },
+                    )
+                }
+                if (inkLabAvailable) {
+                    InkLabToggleButton(
+                        expanded = inkLabOpen,
+                        onClick = onInkLabClick,
+                        modifier = Modifier.align(Alignment.CenterStart),
+                    )
+                }
+            }
         }
     }
 }
@@ -447,7 +447,7 @@ internal fun MushafPageHeader(
     page: Int,
     pageNumberScript: PageNumberScript = PageNumberScript.BOTH,
     /**
-     * The shared running-head inset, independent of the prose's wider measure.
+     * The running head and text share the same inset.
      */
     foreEdge: Dp = MushafEdgeGutter,
     modifier: Modifier = Modifier,

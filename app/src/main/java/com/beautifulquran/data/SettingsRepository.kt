@@ -136,7 +136,7 @@ internal fun decodeFavoriteReciterIds(stored: Set<String>?): Set<Int> =
  * The leaf corrects it the moment it lays out and measures something else, but
  * the reader sees the correction as pages rearranging under them.
  */
-private const val LEAF_METRICS_VERSION = 5
+private const val LEAF_METRICS_VERSION = 6
 
 class SettingsRepository(context: Context) {
 

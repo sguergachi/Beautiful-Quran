@@ -147,8 +147,6 @@ internal fun MushafEnglishSheet(
      */
     measured: Boolean = true,
     verseNumberScript: VerseNumberScript,
-    /** The leaf's fore-edge, shared with the running head and the folio. */
-    foreEdge: Dp,
     /** The leaf's own size — see [englishLeafSlotPx], which is where it is from. */
     wellPx: Float,
     measurePx: Float,
@@ -298,7 +296,7 @@ internal fun MushafEnglishSheet(
             modifier = Modifier
                 .graphicsLayer { alpha = inked }
                 .fillMaxSize()
-                .padding(horizontal = foreEdge),
+                .padding(horizontal = MushafEdgeGutter),
             // A leaf whose content will not reach the foot hangs from the
             // head, as a book's last page of a chapter does — the paper simply
             // runs out under it. Every leaf, al-Fatihah's included.
@@ -392,15 +390,10 @@ internal fun englishLeafSlotPx(
     // rounding must not put the last line's descenders past the foot.
     val wellPx = ((unit * bands.well).roundToPx() - EnglishLeafFitSlack.roundToPx())
         .toFloat().coerceAtLeast(1f)
-    val measurePx = (paperWidthPx - englishLeafForeEdge(paperWidthPx.toDp()).roundToPx() * 2)
+    val measurePx = (paperWidthPx - MushafEdgeGutter.roundToPx() * 2)
         .toFloat().coerceAtLeast(1f)
     floatArrayOf(wellPx, measurePx)
 }
-
-internal fun englishLeafForeEdge(leafWidth: Dp): Dp =
-    (leafWidth * EnglishLeafForeEdgeFraction).coerceAtLeast(MushafEdgeGutter)
-
-private const val EnglishLeafForeEdgeFraction = 0.055f
 
 private val EnglishLeafFitSlack = 2.dp
 

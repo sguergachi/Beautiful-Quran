@@ -227,7 +227,7 @@ and the capital-height zone for Latin. A shared tail allowance keeps the line
 clear of its neighbours. Long descenders hang into open paper rather than
 raising each name by its own ink bounds. Visible overflow protects the full
 glyphs. No top or bottom rule crosses the name: developer settings offer
-Cartouche panel, Cloud collar and Open heading, all in the same chapter slot.
+Cartouche panel (the default) and Cloud collar, both in the same chapter slot.
 See [the banner research and geometry](MUSHAF_BANNERS.md).
 
 Nothing else moves. The slot is the same slot, so an opening still costs the
@@ -1378,11 +1378,12 @@ own edges are the ink, and the first line and the last land on the same paper on
 every leaf in the book. It also makes the block's height exactly `(n − 1)`
 pitches plus one line's ink, which is what the leading is solved from.
 
-**Horizontally**, both running heads use the same 10 dp inset for their
-folio and chapter labels. The Arabic text measure keeps that bare fore-edge,
-because the QCF measure caps its type. English prose retains its 5.5% fore-edge:
-its hand is solved from the well, so the margin buys a shorter, more readable
-line. The chapter ornament follows its text measure in each hand.
+**Horizontally**, both hands use the same 10 dp inset for their folio, chapter
+labels and text. English's former 5.5% side margins made its column narrower
+than the Mushaf grid; it now fills the same measure as Arabic. The root's
+pagination and the drawn prose subtract the same inset, and the saved-metrics
+version is bumped when the width changes. The chapter ornament follows that
+shared text measure.
 
 **The chapter's panel is one line of the page, with a line's air around it.**
 The band is one line's own type box, so it stands exactly as deep as a line of

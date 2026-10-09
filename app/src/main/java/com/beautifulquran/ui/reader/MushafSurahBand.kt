@@ -98,9 +98,7 @@ private const val MushafTailRoom = 0.62f
  * - [MushafBannerStyle.CARTOUCHE]: the Mamluk and Ottoman ruled panel, its
  *   doubled rule broken by a central window with pointed ends;
  * - [MushafBannerStyle.CLOUD]: the Ilkhanid "writing within clouds" — ground
- *   across the band, a lobed collar knocked out of it around the name;
- * - [MushafBannerStyle.OPEN]: the early Abbasid heading — gold on the page,
- *   hairlines extending its own baseline out to the palmettes.
+ *   across the band, a lobed collar knocked out of it around the name.
  *
  * Each name hangs from one book-wide writing line ([titleBaselineDrop]), not
  * from the middle of its own ink: a final ميم sweeping under the line must not
@@ -169,7 +167,7 @@ internal fun MushafSurahTitleBand(
         Row(
             Modifier
                 .fillMaxSize()
-                .bannerIllumination(style, advance, drop, rule, hair),
+                .bannerIllumination(style, advance, rule, hair),
         ) {
             val ground = Modifier
                 .weight(1f)
@@ -191,7 +189,7 @@ internal fun MushafSurahTitleBand(
             Modifier.fillMaxSize().padding(horizontal = bandHeight * MushafShamsaInset),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            val shamsaAlpha = groundAlpha * if (style == MushafBannerStyle.OPEN) 3.0f else 2.4f
+            val shamsaAlpha = groundAlpha * 2.4f
             MushafShamsa(ornament, bandHeight, shamsaAlpha)
             Box(Modifier.weight(1f).fillMaxHeight()) {
                 MushafTitle(
@@ -239,7 +237,6 @@ private fun titleBaselineDrop(paint: Paint, latin: Boolean, bandPx: Float): Floa
 private fun Modifier.bannerIllumination(
     style: MushafBannerStyle,
     advance: Float,
-    drop: Float,
     rule: Color,
     hair: Color,
 ): Modifier = drawWithCache {
@@ -346,39 +343,6 @@ private fun Modifier.bannerIllumination(
             onDrawWithContent {
                 clipPath(ground) { this@onDrawWithContent.drawContent() }
                 drawPath(scallops, color = scallop, style = stroke)
-            }
-        }
-        MushafBannerStyle.OPEN -> {
-            // Only a short tab of ground under each palmette, and a gold
-            // hairline on the writing line itself between them — extending
-            // the name's baseline, never enclosing it.
-            val tab = (MushafShamsaInset + MushafShamsaSize) * h + 0.5f * h
-            val ground = Path().apply {
-                addRect(Rect(0f, cy - 0.25f * h, tab, cy + 0.25f * h))
-                addRect(Rect(w - tab, cy - 0.25f * h, w, cy + 0.25f * h))
-            }
-            val y = cy + drop
-            val outerX = tab + 0.06f * h
-            val innerX = cx - advance / 2f - 0.4f * h
-            val thick = 0.4.dp.toPx()
-            val thin = 0.15.dp.toPx()
-            val lines = Path().apply {
-                if (innerX - outerX >= 0.5f * h) {
-                    for (s in listOf(-1f, 1f)) {
-                        val a = cx + s * (cx - innerX)
-                        val b = cx + s * (cx - outerX)
-                        moveTo(a, y - thick)
-                        lineTo(b, y - thin)
-                        lineTo(b, y + thin)
-                        lineTo(a, y + thick)
-                        close()
-                    }
-                }
-            }
-            val line = rule.copy(alpha = 0.45f * rule.alpha / 0.50f)
-            onDrawWithContent {
-                clipPath(ground) { this@onDrawWithContent.drawContent() }
-                drawPath(lines, color = line)
             }
         }
     }
