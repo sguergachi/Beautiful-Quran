@@ -3025,18 +3025,51 @@ button.ayah-mark {
   transition: opacity var(--chrome-recede-ms) var(--recede-ease), color 180ms ease;
 }
 
-/* A playback error briefly takes the name's place in the same band, so it
-   never adds a row (Android: ReciterNameButton notice). */
-.player-bar .reciter-btn .reciter-label {
+/* Errors occupy the name's band until dismissed or playback recovers. */
+.player-bar .reciter-label,
+.player-error-text {
   animation: reciter-notice-in 220ms ease;
 }
 
-.player-bar .reciter-btn[data-notice='true'] {
+.player-error {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  min-height: 32px;
+  padding-inline: 40px;
+  color: var(--ink-rung-quiet);
+  font-size: 13px;
+  font-weight: 500;
   font-style: italic;
 }
 
-.player-bar .reciter-btn[data-notice='true']::after {
-  visibility: hidden;
+.player-bar.cover-chrome .player-error {
+  width: calc(100% - 80px);
+}
+
+.player-error-text {
+  max-height: 32px;
+  overflow: hidden;
+  line-height: 16px;
+  text-align: center;
+  white-space: normal;
+}
+
+.player-error-dismiss {
+  position: absolute;
+  right: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  min-width: 40px;
+  min-height: 40px;
+  padding: 0.45rem;
+}
+
+.player-error-dismiss svg {
+  width: 20px;
+  height: 20px;
 }
 
 @keyframes reciter-notice-in {

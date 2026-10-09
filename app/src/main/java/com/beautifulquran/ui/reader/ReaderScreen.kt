@@ -1594,14 +1594,6 @@ fun ReaderScreen(
         lastLayoutSignature = layoutSignature
     }
 
-    // Errors replace the reciter name for a moment, then dissolve.
-    LaunchedEffect(playerState.error) {
-        if (playerState.error != null) {
-            delay(5_000)
-            viewModel.player.clearError()
-        }
-    }
-
     val keyboard = LocalSoftwareKeyboardController.current
     val searchFocus = remember { FocusRequester() }
     LaunchedEffect(search.active) {
@@ -1672,6 +1664,7 @@ fun ReaderScreen(
                 host.onRepeatClick = { showRepeatDialog = true }
                 host.onSpeed = viewModel::cycleSpeed
                 host.onReciterClick = onOpenSettings
+                host.onDismissError = viewModel.player::clearError
             }
         }
     }
@@ -1985,6 +1978,7 @@ fun ReaderScreen(
                         onRepeatClick = { showRepeatDialog = true },
                         onSpeed = viewModel::cycleSpeed,
                         onReciterClick = onOpenSettings,
+                        onDismissError = viewModel.player::clearError,
                     )
                 }
             }
@@ -2610,6 +2604,7 @@ fun ReaderScreen(
                             playbackHost?.let { it.inkLabOpen = !it.inkLabOpen }
                         },
                         playerState = playerState,
+                        onDismissError = viewModel.player::clearError,
                         isThisSurahLoaded = isThisSurahPlaying,
                         enabled = !contextualGuideOpen,
                         onOpenChapters = onBack,

@@ -832,6 +832,12 @@ reserved band under the transport; it replaces the reciter name there and the
 leaf gives the open panel its measured height. The same control closes the
 panel.
 
+Playback errors replace the reciter name in that same band on Scroll, Mushaf,
+and the cover controls, including web. The italic notice stays readable until
+playback recovers or its × (**Dismiss playback error**) is tapped. Dismissal
+restores the normal band without changing playback or the selected verse;
+the notice never adds a row or opens reciter settings.
+
 ## Color
 
 Two themes, both "paper":

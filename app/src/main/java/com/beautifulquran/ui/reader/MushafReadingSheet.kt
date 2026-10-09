@@ -4,7 +4,6 @@ import androidx.compose.animation.togetherWith
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.AnimatedContent
-import androidx.compose.ui.text.font.FontStyle
 import com.beautifulquran.ui.theme.quietClickable
 import androidx.compose.foundation.Canvas
 import androidx.compose.animation.core.FastOutSlowInEasing
@@ -222,6 +221,7 @@ internal fun MushafReadingSheet(
     onFastForward: () -> Unit,
     onRepeatClick: () -> Unit,
     onSpeed: () -> Unit,
+    onDismissError: () -> Unit,
     /** The leaf in view, 1-based. A lambda, so turning a page redraws the
      * dial rather than recomposing the reader that hosts this sheet. */
     pageAt: () -> Int,
@@ -510,35 +510,43 @@ internal fun MushafReadingSheet(
                 Modifier.fillMaxWidth().heightIn(min = MushafReciterBand),
                 contentAlignment = Alignment.Center,
             ) {
-                if (inkLabAvailable && inkLabOpen) {
+                if (inkLabAvailable && inkLabOpen && playerState.error == null) {
                     InkLabPanel(
                         modifier = Modifier
                             .align(Alignment.Center)
                             .padding(start = 40.dp),
                     )
-                } else if (reciterName.isNotEmpty()) {
+                } else if (reciterName.isNotEmpty() || playerState.error != null) {
                     Box(
                         modifier = Modifier
                             .align(Alignment.Center)
                             .fillMaxWidth()
                             .height(MushafReciterBand)
                             .padding(horizontal = if (inkLabAvailable) 48.dp else 0.dp)
-                            .ownedQuietClickable(role = Role.Button, onClick = onOpenSettings),
+                            .then(if (playerState.error == null) {
+                                Modifier.ownedQuietClickable(role = Role.Button, onClick = onOpenSettings)
+                            } else Modifier),
                         contentAlignment = Alignment.Center,
                     ) {
-                        // A playback error briefly takes the name's place,
-                        // as in the Scroll bar, so the band never grows.
+                        // Errors share the Scroll bar's dismiss control and fixed band.
                         AnimatedContent(
                             targetState = playerState.error,
                             contentAlignment = Alignment.Center,
                             transitionSpec = { fadeIn() togetherWith fadeOut() using null },
                             label = "mushafReciterNotice",
                         ) { notice ->
+                            if (notice != null) {
+                                PlaybackErrorNotice(
+                                    message = notice,
+                                    onDismiss = onDismissError,
+                                    enabled = enabled,
+                                )
+                                return@AnimatedContent
+                            }
                             Text(
-                                text = notice ?: reciterName,
+                                text = reciterName,
                                 style = MaterialTheme.typography.labelSmall.copy(
                                     fontSize = 10.sp,
-                                    fontStyle = if (notice != null) FontStyle.Italic else FontStyle.Normal,
                                 ),
                                 color = quiet.copy(alpha = 0.7f),
                                 maxLines = 1,

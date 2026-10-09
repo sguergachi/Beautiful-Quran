@@ -1008,6 +1008,10 @@ class AppStore {
     player.stop()
   }
 
+  clearPlaybackError() {
+    player.clearError()
+  }
+
   setRepeat(mode: PlayerState['repeatMode'], range: PlayerState['repeatRange'] = null) {
     player.setRepeatMode(mode, range)
   }

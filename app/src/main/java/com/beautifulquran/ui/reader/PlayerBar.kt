@@ -20,6 +20,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.FastForward
 import androidx.compose.material.icons.rounded.FastRewind
 import androidx.compose.material.icons.rounded.Pause
@@ -44,6 +45,9 @@ import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.liveRegion
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -95,6 +99,7 @@ fun PlayerBar(
     onRepeatClick: () -> Unit,
     onSpeed: () -> Unit,
     onReciterClick: () -> Unit,
+    onDismissError: () -> Unit,
     inkLabAvailable: Boolean = false,
     inkLabOpen: Boolean = false,
     onInkLabClick: () -> Unit = {},
@@ -126,7 +131,7 @@ fun PlayerBar(
                 ),
         ) {
             Box(Modifier.fillMaxWidth()) {
-                if (inkLabOpen) {
+                if (inkLabOpen && state.error == null) {
                     InkLabPanel(
                         modifier = Modifier
                             .align(Alignment.Center)
@@ -137,13 +142,14 @@ fun PlayerBar(
                     ReciterNameButton(
                         name = reciterName,
                         notice = state.error,
+                        onDismissNotice = onDismissError,
                         onClick = onReciterClick,
                         enabled = enabled,
                         disclosure = true,
                         modifier = Modifier
                             .align(Alignment.Center)
                             .padding(horizontal = centeredInset)
-                            .graphicsLayer { alpha = chromeAlpha() },
+                            .graphicsLayer { alpha = if (state.error != null) 1f else chromeAlpha() },
                     )
                 }
                 if (inkLabAvailable) {
@@ -291,9 +297,8 @@ internal fun InkLabToggleButton(
  * is set, the chevron. The hit target stays 48dp. The name stays on the page
  * center; the chevron hangs to its right.
  *
- * A playback [notice] (an error) briefly takes the name's place in the same
- * band, so it never adds a row or shifts the page; the name fades back once
- * the notice clears.
+ * A playback [notice] takes the name's place until dismissed or recovered,
+ * using the same band so it never shifts the page.
  */
 @Composable
 internal fun ReciterNameButton(
@@ -303,6 +308,7 @@ internal fun ReciterNameButton(
     enabled: Boolean = true,
     disclosure: Boolean = false,
     notice: String? = null,
+    onDismissNotice: () -> Unit = {},
 ) {
     val interactions = remember { MutableInteractionSource() }
     val pressed by interactions.collectIsPressedAsState()
@@ -313,12 +319,12 @@ internal fun ReciterNameButton(
         modifier = modifier
             .offset(x = if (disclosure) chevronFootprint / 2 else 0.dp)
             .defaultMinSize(minWidth = 48.dp, minHeight = 48.dp)
-            .quietClickable(
+            .then(if (notice == null) Modifier.quietClickable(
                 enabled = enabled,
                 role = Role.Button,
                 interactionSource = interactions,
                 onClick = onClick,
-            ),
+            ) else Modifier),
     ) {
         AnimatedContent(
             targetState = notice,
@@ -328,17 +334,13 @@ internal fun ReciterNameButton(
             label = "reciterNotice",
         ) { shown ->
             if (shown != null) {
-                Text(
-                    text = shown,
-                    style = MaterialTheme.typography.labelMedium.copy(fontStyle = FontStyle.Italic),
-                    color = QuranTheme.ink.muted,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    textAlign = TextAlign.Center,
+                PlaybackErrorNotice(
+                    message = shown,
+                    onDismiss = onDismissNotice,
+                    enabled = enabled,
                     // Undo the chevron offset so the notice sits on the page centre.
                     modifier = Modifier
-                        .offset(x = if (disclosure) -chevronFootprint / 2 else 0.dp)
-                        .padding(horizontal = 8.dp, vertical = 4.dp),
+                        .offset(x = if (disclosure) -chevronFootprint / 2 else 0.dp),
                 )
                 return@AnimatedContent
             }
@@ -368,6 +370,45 @@ internal fun ReciterNameButton(
                     )
                 }
             }
+        }
+    }
+}
+
+/** An error in the reciter band; only its close control is actionable. */
+@Composable
+internal fun PlaybackErrorNotice(
+    message: String,
+    onDismiss: () -> Unit,
+    modifier: Modifier = Modifier,
+    enabled: Boolean = true,
+) {
+    Row(
+        modifier = modifier.fillMaxWidth().padding(start = 48.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            text = message,
+            style = MaterialTheme.typography.labelMedium.copy(fontStyle = FontStyle.Italic),
+            color = QuranTheme.ink.muted,
+            maxLines = 2,
+            overflow = TextOverflow.Ellipsis,
+            textAlign = TextAlign.Center,
+            modifier = Modifier.weight(1f).semantics { liveRegion = LiveRegionMode.Polite },
+        )
+        Box(
+            contentAlignment = Alignment.Center,
+            modifier = Modifier.size(48.dp).quietClickable(
+                enabled = enabled,
+                role = Role.Button,
+                onClick = onDismiss,
+            ),
+        ) {
+            Icon(
+                imageVector = Icons.Rounded.Close,
+                contentDescription = "Dismiss playback error",
+                tint = QuranTheme.ink.muted,
+                modifier = Modifier.size(20.dp),
+            )
         }
     }
 }
