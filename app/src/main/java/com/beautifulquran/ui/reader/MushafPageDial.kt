@@ -1546,6 +1546,7 @@ internal fun MushafPageDial(
                     result = combDrawnXs,
                     rightToLeft = rightToLeft,
                 )
+                val originIdx = mushafDialChapterIndex(chapterMarks, settled)
                 for (idx in chapterMarks.indices) {
                     val mark = chapterMarks[idx]
                     val x = drawnXs[idx]
@@ -1594,8 +1595,15 @@ internal fun MushafPageDial(
                         // The chapter the hand is in is set in gold, the ink
                         // chapter numbers are labelled in, so the tick the HUD
                         // is naming can be found among its neighbours.
+                        //
+                        // The chapter the reader came from keeps a tick of its
+                        // own, in the app's green, so the way back is findable
+                        // while the hand is far off. Gold wins where the two
+                        // are the same chapter.
                         color = if (isLensed && idx == hudChapterIdx) {
                             accents.gold.copy(alpha = combInk)
+                        } else if (isLensed && idx == originIdx) {
+                            accents.greenInk.copy(alpha = combInk)
                         } else {
                             ink.copy(alpha = 0.54f * combInk)
                         },
