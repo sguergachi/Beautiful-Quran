@@ -131,6 +131,7 @@ import com.beautifulquran.data.RuntimeCachePhase
 import com.beautifulquran.data.model.Surah
 import com.beautifulquran.domain.BASMALAH_PLAYLIST_AYAH
 import com.beautifulquran.domain.EnglishVerseAlignments
+import com.beautifulquran.domain.EnglishWordAlignment
 import com.beautifulquran.domain.MushafToken
 import com.beautifulquran.domain.englishSeekWordPosition
 import com.beautifulquran.domain.mushafFontPreloadPages
@@ -156,6 +157,7 @@ import com.beautifulquran.ui.theme.quietClickable
 import com.beautifulquran.ui.theme.verticalFadingEdges
 import kotlin.math.PI
 import kotlin.math.abs
+import kotlin.math.roundToInt
 import kotlin.math.sin
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -2873,7 +2875,13 @@ fun ReaderScreen(
                                 .firstOrNull { it.number == ayah }
                                 ?.takeIf { surahId == mushafSurahId }
                             val position = if (verse != null) {
-                                englishSeekWordPosition(
+                                // The word whose gloss names the one held,
+                                // before the wash's monotone share of it.
+                                EnglishWordAlignment.ownerAt(
+                                    verse.translation,
+                                    verse.words.map { it.translation },
+                                    (through * verse.translation.length).roundToInt(),
+                                )?.plus(1) ?: englishSeekWordPosition(
                                     through,
                                     verse.words.size,
                                     seekAlignments.of(verse.number),

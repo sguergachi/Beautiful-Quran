@@ -1003,17 +1003,25 @@ private fun EnglishProseBlock(
                 // unit of the Arabic one — but a touch still says *where* in
                 // the sentence, and that share of the verse names a word. See
                 // englishSeekWordPosition.
-                fun at(point: Offset, act: (Int, Int, Float) -> Unit) {
+                fun at(point: Offset, wordMiddle: Boolean, act: (Int, Int, Float) -> Unit) {
                     val layout = layoutResult ?: return
                     val verse = block.verses
                         .firstOrNull { layout.rangeContains(point, it.range, hitSlopPx) }
                         ?: return
-                    val offset = layout.getOffsetForPosition(point) - verse.range.first
+                    var caret = layout.getOffsetForPosition(point)
+                    // A hold names a word, and the caret sits at its edge
+                    // when the finger is on the word's first or last letter,
+                    // which a share of the verse reads as its neighbour.
+                    if (wordMiddle) {
+                        val word = layout.getWordBoundary(caret)
+                        if (!word.collapsed) caret = (word.start + word.end) / 2
+                    }
+                    val offset = caret - verse.range.first
                     act(verse.surahId, verse.ayah, verse.verseFractionAt(offset.coerceAtLeast(0)))
                 }
                 detectTapGestures(
-                    onLongPress = { press -> at(press, onVerseLongPress) },
-                    onTap = { tap -> at(tap, onVerseSeek) },
+                    onLongPress = { press -> at(press, true, onVerseLongPress) },
+                    onTap = { tap -> at(tap, false, onVerseSeek) },
                 )
             },
         onTextLayout = { layoutResult = it },

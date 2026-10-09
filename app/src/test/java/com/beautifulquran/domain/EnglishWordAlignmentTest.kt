@@ -208,4 +208,28 @@ class EnglishWordAlignmentTest {
         assertEquals(6, at("guidance"))
         assertEquals(7, at("conscious"))
     }
+
+    @Test
+    fun `a hold names the word its gloss names, not the wash's neighbour`() {
+        val text = "In their hearts is disease, so Allah has increased their disease; " +
+            "and for them is a painful punishment because they [habitually] used to lie"
+        val glosses = listOf(
+            "In", "their hearts", "(is) a disease", "so has increased them", "Allah",
+            "(in) disease", "and for them", "(is) a punishment", "painful", "because",
+            "they used to", "[they] lie",
+        )
+        fun held(word: String, nth: Int = 0): Int? {
+            var at = -1
+            repeat(nth + 1) { at = text.indexOf(word, at + 1) }
+            return EnglishWordAlignment.ownerAt(text, glosses, at + word.length / 2)
+        }
+        assertEquals(8, held("painful"))
+        assertEquals(7, held("punishment"))
+        assertEquals(4, held("Allah"))
+        // Said twice, glossed twice: each occurrence keeps its own word.
+        assertEquals(2, held("disease"))
+        assertEquals(5, held("disease", 1))
+        assertNull(held("them"))
+        assertNull(held("habitually"))
+    }
 }

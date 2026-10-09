@@ -64,6 +64,30 @@ object EnglishWordAlignment {
         return FloatArray(ends.size) { (ends[it].toFloat() / translation.length).coerceIn(0f, 1f) }
     }
 
+    /**
+     * The Arabic word (0-based) whose gloss names the English word at [offset]
+     * of [translation], in any order. A hold means the word under the finger,
+     * but [wordEnds] is monotone and absorbs reordering, so a hold read off it
+     * lands on a neighbour: "painful punishment" said "punishment painful".
+     * Null when no gloss names the word (grammar, synonyms, translator
+     * additions, or repeats the glosses do not mirror); the caller falls back.
+     */
+    fun ownerAt(translation: String, glosses: List<String>, offset: Int): Int? {
+        val prose = words(translation)
+        val held = prose.indexOfFirst { offset <= it.end }
+        val word = prose.getOrNull(held) ?: return null
+        if (offset < word.end - word.text.length || word.added || word.text in GRAMMAR) return null
+        val owners = ArrayList<Int>()
+        glosses.forEachIndexed { index, text ->
+            words(text).forEach { if (it.text !in GRAMMAR && it.key == word.key) owners += index }
+        }
+        if (owners.distinct().size == 1) return owners[0]
+        // Said more than once: the n-th in the sentence is the n-th in the glosses.
+        val said = prose.filter { !it.added && it.key == word.key }
+        if (said.size != owners.size) return null
+        return owners[said.indexOf(word)]
+    }
+
     /** One word of a sentence: its text, lowercased, and where it ends. */
     private class ProseWord(val text: String, val end: Int, val added: Boolean, val sentence: Int) {
         var key = inflection(text)
