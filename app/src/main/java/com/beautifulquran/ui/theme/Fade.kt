@@ -66,6 +66,8 @@ fun Modifier.letterFadeIn(
     feather: Float = InkWashFeather,
     /** How much of the word the wash may reveal; 1 reveals the whole word. */
     revealFraction: Float = 1f,
+    /** Room the offscreen wash layer keeps past the word; see [glowLayerBleed]. */
+    bleed: Dp = FadeLayerBleed,
 ): Modifier {
     // Alpha profile across the feathered edge, sampled into gradient stops.
     // The seam-free smootherstep shape lives in [inkSmootherstep].
@@ -90,10 +92,10 @@ fun Modifier.letterFadeIn(
             drawContent()
             return@drawWithContent
         }
-        val bleed = FadeLayerBleed.toPx()
+        val bleedPx = bleed.toPx()
         drawIntoCanvas { canvas ->
             canvas.saveLayer(
-                Rect(-bleed, -bleed, size.width + bleed, size.height + bleed),
+                Rect(-bleedPx, -bleedPx, size.width + bleedPx, size.height + bleedPx),
                 Paint(),
             )
         }
@@ -122,8 +124,8 @@ fun Modifier.letterFadeIn(
         translate(left = headX, top = 0f) {
             drawRect(
                 brush = brush,
-                topLeft = Offset(-bleed - headX, -bleed),
-                size = Size(size.width + bleed * 2f, size.height + bleed * 2f),
+                topLeft = Offset(-bleedPx - headX, -bleedPx),
+                size = Size(size.width + bleedPx * 2f, size.height + bleedPx * 2f),
                 blendMode = BlendMode.DstIn,
             )
         }
@@ -1640,6 +1642,16 @@ private const val InkProfileStops = 9
  * clipped by the offscreen [letterFadeIn] / [shapedWordBloom] mask. Local to
  * the word's draw scope — does not paint onto neighbours. */
 private val FadeLayerBleed = 14.dp
+
+/**
+ * Room a word's [letterFadeIn] layer needs when a glimmer's halo is drawn
+ * inside it: the reach [ShapedWordBloom.ColorReveal] gives its own glow layer.
+ * At [FadeLayerBleed] the veil was cut off square around the word, a box of
+ * light round a lit or drying word on the dark leaf (docs/GLIMMER.md forbids
+ * that edge).
+ */
+internal fun glowLayerBleed(glowRadius: Float): Dp =
+    maxOf(FadeLayerBleed, (glowRadius * 2f * GLOW_VEIL_RADIUS).dp)
 
 /** Visible but still ink-like halo around Nightfall's active glimmer. */
 /** Horizontal pad beyond [TextLayoutResult.getPathForRange] when painting
