@@ -104,7 +104,7 @@ sets **layout + Arabic view + Mishary Rashid Alafasy**. Scroll is ready on `Back
 | Test | Layout | Setup ready | Measured |
 |---|---|---|---|
 | `longAyahRecitation` | Scroll | `2:282` playing (`Pause` = `isPlaying`), network off | ~2 s karaoke frames |
-| `mushafPageTurn` | Mushaf | page description present | swipe; assert page N changes |
+| `mushafPageTurn` | Mushaf | page description present | four rightward swipes, through full text leaves; assert each advances exactly one page |
 | `distantDialJump` | Mushaf | page description present | dial swipe; assert the visible page moves at least 10 pages |
 | `coldSearch` | Scroll | cover already open, process-cold index | focused field, type `peace` → `In the Quran`; auxiliary latency log |
 

@@ -58,10 +58,13 @@ class ReaderBenchmark {
             device.waitForMushafReader()
         },
     ) {
-        val from = device.mushafPageNumber()
-        device.turnMushafTowardLaterPages()
-        val to = device.waitUntilMushafPageChanges(from)
-        logBenchmark("mushafPageTurn $from -> $to")
+        repeat(4) {
+            val from = device.mushafPageNumber()
+            device.turnMushafTowardLaterPages()
+            val to = device.waitUntilMushafPageChanges(from)
+            check(to == from + 1) { "Expected the next leaf after $from, got $to" }
+            logBenchmark("mushafPageTurn $from -> $to")
+        }
     }
 
     @Test

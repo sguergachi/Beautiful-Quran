@@ -410,11 +410,6 @@ fun ReaderScreen(
     val leafPage = remember(englishBook) {
         { index: Int -> englishBook?.leaf(index)?.page ?: (index + 1) }
     }
-    // The figure printed on a leaf: its own number in the English book, and the
-    // Madinah page on the Arabic one — the same figure the dial counts.
-    val mushafFolioAt = remember(englishBook) {
-        { index: Int -> if (englishBook != null) index + 1 else leafPage(index) }
-    }
     val pageLeaf = remember(englishBook) {
         { page: Int -> englishBook?.firstLeafOf(page) ?: (page - 1) }
     }
@@ -1130,9 +1125,15 @@ fun ReaderScreen(
      */
     fun mushafPlayTarget(): ReaderInteraction.MushafPlayTarget? {
         val catalog = mushafCatalog ?: return null
-        val leaf = catalog.page(mushafPagerState.currentPage + 1) ?: return null
+        val englishLeaf = englishBook?.leaf(mushafPagerState.currentPage)
+        val leaf = catalog.page(leafPage(mushafPagerState.currentPage)) ?: return null
+        // A scrub names a chapter, not a verse: a paused verse of that same
+        // chapter on this leaf is still a resume, as on the English leaf.
+        val heldHere = isThisSurahPlaying && activeAyah?.let { (renderedSurahId to it) in leaf.ayahKeys } == true
         val scrubbedSurah = mushafSeekSurahId?.takeIf { sid ->
-            leaf.surahStarts.any { it.surahId == sid } || leaf.ayahKeys.any { it.first == sid }
+            englishLeaf == null &&
+                !(heldHere && sid == renderedSurahId) &&
+                (leaf.surahStarts.any { it.surahId == sid } || leaf.ayahKeys.any { it.first == sid })
         }
         if (scrubbedSurah != null) {
             val firstOfScrubbed = leaf.lines
@@ -1156,6 +1157,8 @@ fun ReaderScreen(
                 ReaderInteraction.MushafPlayTarget(it.surahId, it.ayah, it.word.position)
             },
             leafAyahs = leaf.ayahKeys,
+            englishAyahs = englishLeaf?.verses,
+            scrubbedSurahId = mushafSeekSurahId,
         )
     }
 
@@ -2628,6 +2631,11 @@ fun ReaderScreen(
                             } else {
                                 dispatch(ReaderInteractionEvent.EnableFollow)
                                 val target = mushafPlayTarget()
+                                // A scrub's chapter choice is spent by the play
+                                // it chose. Kept, it outlived the reading that
+                                // followed and threw a later pause-then-play
+                                // back to that chapter's first verse.
+                                mushafSeekSurahId = null
                                 when {
                                     target == null -> if (isThisSurahPlaying) {
                                         viewModel.player.togglePlayPause()
@@ -2657,12 +2665,6 @@ fun ReaderScreen(
                         // leaf is set in, not whether an English book exists —
                         // it exists in both settings.
                         english = settings.readingMode == ReadingMode.ENGLISH_ONLY,
-                        pageNumberScript = settings.pageNumberScript,
-                        // The folio rides the leaf: the band is centred on the
-                        // pager's own page and slid by its own offset.
-                        pageIndex = { mushafPagerState.currentPage },
-                        pageOffset = { mushafPagerState.currentPageOffsetFraction },
-                        folioAt = mushafFolioAt,
                         // Whatever the rule is counting: leaves on the English
                         // book, Madinah pages on the Arabic one.
                         pageCount = mushafBookLength(
@@ -2858,6 +2860,39 @@ fun ReaderScreen(
                             }
                         }
                     }
+                    // A hold opens the Root Word Viewer on the Arabic word
+                    // under the English, as a hold on a word does everywhere
+                    // else. The loaded chapter resolves it through the same
+                    // alignment as a tap; a verse of a chapter that is not
+                    // loaded has no alignment here, so the share is split
+                    // evenly over the words the mushaf sets for it.
+                    val onMushafVerseLongPress = remember(
+                        mushafSurahId,
+                        content,
+                        seekAlignments,
+                        mushafReady.catalog,
+                        haptics,
+                    ) {
+                        { surahId: Int, ayah: Int, through: Float ->
+                            val verse = content.ayahs
+                                .firstOrNull { it.number == ayah }
+                                ?.takeIf { surahId == mushafSurahId }
+                            val position = if (verse != null) {
+                                englishSeekWordPosition(
+                                    through,
+                                    verse.words.size,
+                                    seekAlignments.of(verse.number),
+                                )
+                            } else {
+                                englishSeekWordPosition(
+                                    through,
+                                    mushafReady.catalog.wordCountOf(surahId, ayah),
+                                )
+                            }
+                            haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+                            mushafOpenRoot.value(surahId, ayah, position)
+                        }
+                    }
                     val onMushafBasmalahClick = remember(mushafSurahId, viewModel) {
                         { surahId: Int ->
                             mushafDispatch.value(ReaderInteractionEvent.EnableFollow)
@@ -2904,9 +2939,11 @@ fun ReaderScreen(
                         onWordLongClick = onMushafWordLongClick,
                         onAyahClick = onMushafAyahClick,
                         onVerseSeek = onMushafVerseSeek,
+                        onVerseLongPress = onMushafVerseLongPress,
                         onBasmalahClick = onMushafBasmalahClick,
                         english = settings.readingMode == ReadingMode.ENGLISH_ONLY,
                         verseNumberScript = settings.verseNumberScript,
+                        pageNumberScript = settings.pageNumberScript,
                         leafText = leafTextForSetting,
                         book = englishBook,
                         modifier = Modifier.fillMaxSize(),

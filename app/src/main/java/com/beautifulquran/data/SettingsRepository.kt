@@ -77,6 +77,8 @@ data class Settings(
     val readingLayout: ReadingLayout = ReadingLayout.SCROLL,
     val verseNumberScript: VerseNumberScript = VerseNumberScript.ARABIC,
     val pageNumberScript: PageNumberScript = PageNumberScript.BOTH,
+    /** Developer-selected chapter illumination, shared by both Mushaf hands. */
+    val mushafBannerStyle: MushafBannerStyle = MushafBannerStyle.CARTOUCHE,
     /** Which English the mushaf's English leaf is set from. */
     val englishLeafText: EnglishLeafText = EnglishLeafText.TRANSLATION,
     val showWordGloss: Boolean = true,
@@ -134,7 +136,7 @@ internal fun decodeFavoriteReciterIds(stored: Set<String>?): Set<Int> =
  * The leaf corrects it the moment it lays out and measures something else, but
  * the reader sees the correction as pages rearranging under them.
  */
-private const val LEAF_METRICS_VERSION = 4
+private const val LEAF_METRICS_VERSION = 7
 
 class SettingsRepository(context: Context) {
 
@@ -154,6 +156,7 @@ class SettingsRepository(context: Context) {
         readingLayout = prefs.enum("readingLayout", ReadingLayout.SCROLL),
         verseNumberScript = prefs.enum("verseNumberScript", VerseNumberScript.ARABIC),
         pageNumberScript = prefs.enum("pageNumberScript", PageNumberScript.BOTH),
+        mushafBannerStyle = prefs.enum("mushafBannerStyle", MushafBannerStyle.CARTOUCHE),
         englishLeafText = prefs.enum("englishLeafText", EnglishLeafText.TRANSLATION),
         showWordGloss = prefs.getBoolean("showWordGloss", true),
         showTransliteration = prefs.getBoolean("showTransliteration", false),
@@ -258,6 +261,7 @@ class SettingsRepository(context: Context) {
             putInt("readingLayout", next.readingLayout.ordinal)
             putInt("verseNumberScript", next.verseNumberScript.ordinal)
             putInt("pageNumberScript", next.pageNumberScript.ordinal)
+            putInt("mushafBannerStyle", next.mushafBannerStyle.ordinal)
             putInt("englishLeafText", next.englishLeafText.ordinal)
             putBoolean("showWordGloss", next.showWordGloss)
             putBoolean("showTransliteration", next.showTransliteration)

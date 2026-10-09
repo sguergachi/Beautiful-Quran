@@ -58,6 +58,24 @@ class MushafPageFitTest {
         // A basmalah preface can push a page past the grid; it packs tighter.
         assertEquals(16, mushafGridSlots(16))
         assertEquals(15, mushafGridSlots(0))
+        // The display grid floors at its own seventeen rows.
+        assertEquals(17, mushafDisplayGridSlots(15))
+        assertEquals(17, mushafDisplayGridSlots(16))
+        assertEquals(18, mushafDisplayGridSlots(18))
+    }
+
+    @Test
+    fun `opening medallion rows follow the chords of one circle`() {
+        val chords = mushafMedallionChords(7)
+        assertEquals(7, chords.size)
+        // Widest at the middle, narrowing symmetrically to the crown and foot.
+        assertEquals(1f, chords[3], 0.001f)
+        for (k in 0 until 3) {
+            assertEquals(chords[k], chords[6 - k], 0.0001f)
+            assertTrue(chords[k] < chords[k + 1])
+        }
+        assertEquals(0.515f, chords[0], 0.01f)
+        assertEquals(0, mushafMedallionChords(0).size)
     }
 
     @Test
@@ -92,9 +110,9 @@ class MushafPageFitTest {
     }
 
     @Test
-    fun `display hand grows by one fifteenth on every page`() {
-        assertEquals(16, MUSHAF_DISPLAY_LINES_PER_PAGE)
-        assertEquals(60f * MUSHAF_TYPE_SCALE, mushafDisplayFontPx(60f), 0.01f)
+    fun `display hand grows for seventeen rows on every page`() {
+        assertEquals(17, MUSHAF_DISPLAY_LINES_PER_PAGE)
+        assertEquals(68f, mushafDisplayFontPx(60f), 0.01f)
         assertEquals(MUSHAF_MAX_FONT_PX, mushafDisplayFontPx(MUSHAF_MAX_FONT_PX), 0f)
     }
 
@@ -289,6 +307,7 @@ class MushafPageFitTest {
         )
         assertEquals(1f, fit.scale, 1e-4f)
         assertEquals(MUSHAF_WORD_GAP_EM * 100f, fit.gapPx, 1e-4f)
+        assertTrue(mushafLineFit(300f, 4, 700f, 100f, allowShort = false).flush)
         assertTrue(!fit.flush)
     }
 
