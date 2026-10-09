@@ -13,6 +13,60 @@ class ReaderInteractionTest {
 
     private val idle = ReaderInteractionState()
 
+    @Test
+    fun `English leaf numbers never choose a different Madinah chapter`() {
+        val target = ReaderInteraction.mushafPlayTarget(
+            pendingJumpAyah = 0,
+            loadedSurahId = 19,
+            heldAyah = null,
+            leafFirstWord = ReaderInteraction.MushafPlayTarget(25, 68, 1),
+            leafAyahs = setOf(25 to 68, 25 to 69),
+            englishAyahs = listOf(19 to 1, 19 to 2),
+        )
+        assertEquals(ReaderInteraction.MushafPlayTarget(19, 1, null), target)
+    }
+
+    @Test
+    fun `English pause resumes a verse carried by its own leaf`() {
+        val target = ReaderInteraction.mushafPlayTarget(
+            pendingJumpAyah = 0,
+            loadedSurahId = 19,
+            heldAyah = 12,
+            leafFirstWord = ReaderInteraction.MushafPlayTarget(19, 1, 1),
+            leafAyahs = setOf(19 to 1, 19 to 2),
+            englishAyahs = listOf(19 to 11, 19 to 12),
+        )
+        assertEquals(null, target)
+    }
+
+    @Test
+    fun `English chapter scrub starts that chapter on a shared leaf`() {
+        val target = ReaderInteraction.mushafPlayTarget(
+            pendingJumpAyah = 0,
+            loadedSurahId = 18,
+            heldAyah = 111,
+            leafFirstWord = ReaderInteraction.MushafPlayTarget(18, 110, 4),
+            leafAyahs = setOf(18 to 110, 18 to 111),
+            englishAyahs = listOf(18 to 111, 19 to 1, 19 to 2),
+            scrubbedSurahId = 19,
+        )
+        assertEquals(ReaderInteraction.MushafPlayTarget(19, 1, null), target)
+    }
+
+    @Test
+    fun `English pause resumes inside the chapter it scrubbed to`() {
+        val target = ReaderInteraction.mushafPlayTarget(
+            pendingJumpAyah = 0,
+            loadedSurahId = 18,
+            heldAyah = 30,
+            leafFirstWord = ReaderInteraction.MushafPlayTarget(18, 28, 1),
+            leafAyahs = setOf(18 to 28, 18 to 30),
+            englishAyahs = listOf(18 to 28, 18 to 29, 18 to 30, 18 to 31),
+            scrubbedSurahId = 18,
+        )
+        assertEquals(null, target)
+    }
+
     private data class ReflowCase(
         val changed: Boolean,
         val ownsPlayback: Boolean,

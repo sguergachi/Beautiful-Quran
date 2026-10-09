@@ -167,25 +167,22 @@ margins are a book's, not a chrome's — a single fore-edge margin plus an edge
 gutter deep enough for a circled ayah mark's medallion, which inks about half
 its own width past its advance and is sliced by anything narrower.
 
-The leaf is an eighteen-unit column of one line's pitch: running head, a whole
-unit of paper under it, the fifteen lines of revelation, and the folio band —
-so the head stands a line clear of the text and the chrome is measured in the
-same breath as the scripture. The unit a tail margin would take goes to the
-revelation instead; the folio's figure, centred in its own band, already sits
-half a line clear of the last line. Page-number script chooses the figure:
-Arabic-Indic, Western, or both with a diamond on the spine — always centred,
-never gold.
+The Arabic leaf uses seventeen display rows inside each unchanged Madinah
+page boundary. English uses the same full-height frame for independently
+paginated prose. In both, the page number replaces the part in the running
+head. Both scripts put Western digits at the left and Arabic-Indic digits at
+the right, with the chapter centred between equal end columns. A single script
+stays at the left and the chapter at the right. The former bottom folio band
+and foot go to the text; the dial retains its own air below the last line.
+Page-number script chooses Arabic-Indic, Western, or both, always quiet ink.
 
-**The folio belongs to the leaf.** It is set nearer the last line of
-revelation than the rule beneath it, because proximity is what assigns it:
-measured against the transport instead, it drifts every time the chrome
-changes. Its gap comes out of the leaf's own tail — shrinking the folio's band
-only feeds the weighted text block above it, which pushes the last line down
-by as much as the figure rises.
+**The folio belongs to the leaf.** Both carry it in the running head, and it
+travels with the page during a turn. The English figure counts English leaves.
+Customize uses the same placement and scripts.
 
-**One measure.** Running head, title band and folio all hang on the text
-block's own margin. Three different edges on one leaf is the loudest
-typographic fault the page can carry.
+**The frame is shared.** Running-head labels and text use the same 10 dp inset
+in both hands. Each chapter ornament follows the text block it opens. English
+pagination measures that same wider column.
 
 **Rank by role, not by taste.** Weight says what a thing is for, so the app
 keeps one ladder of ink weights (`QuranInk`) and everything hangs off a rung of
@@ -226,20 +223,23 @@ colours anything is set in. What matters for them is the *relief* between the
 stops, which is held the same in every theme; their own contrast against the
 paper is not a meaningful number and differs widely by design.
 
-The running head is type alone: the chapter at the spine, the juzʾ at the
-fore-edge, each carrying its name twice — Arabic over a Latin gloss — so the
-two ends read as one mirrored pair. Transliteration, not translated meaning:
+The running head is type alone: the leaf's folio and the chapter's
+transliterated name. With both number scripts the chapter is centred; with
+one it sits at the right. Arabic and English share this arrangement, each
+numbering its own leaves. Transliteration, not translated meaning:
 a running head is for finding a place, and the transliterated name is how the
 book names chapters in Latin everywhere else. It stands off the block by
 about a line's pitch.
 
-A chapter opening carries the one illumination allowed on the leaf: an ʿunwān
-panel — a capsule tapering to a point at either end, doubled gilt rule, the
-chapter's own ground tooled fine inside it, a shamsa drawn (never gilded) at
-each end, and the name on a tapered paper cartouche. Rectangles and gilded
-studs both read as UI; a drawn capsule reads as a plate set into the page. The
-panel takes one line of the page's grid, as the basmalah beneath it does, so
-the fifteen-line rhythm still holds.
+A chapter opening carries the leaf's illumination: a chapter-seeded tooled
+ground and drawn shamsas around a gold title. Developer → Chapter banner offers
+Cartouche panel (the default) and Cloud collar. Their centre stays open above
+and below the writing, so no rule crowds an ascender or descender. All names
+share one writing line at a
+size, and a long tail hangs naturally instead of lifting its word. The fixed
+chapter slot, full glyphs and basmalah position are shared by the variants and
+both reading languages. [The research brief](MUSHAF_BANNERS.md) records the
+precedents and geometry.
 
 The page fonts carry no space glyph, so the air between a verse's closing
 letter and its circled mark is let out of that letter's own advance (0.10 em).
@@ -822,15 +822,39 @@ range) and speed other than 1× stay fully lit and tappable alongside
 play/pause and rewind/forward. Pause, and the chrome breathes back. Non-active
 verses recess to upcoming ink over ~400 ms.
 
-The reciter name above the chapter transport carries a small disclosure
-chevron: the name and cue are one quiet button leading to reciter settings.
+In Mushaf, the reciter name and its chevron share the secondary controls'
+fade to 5 % while playing and return on pause. The name cannot be tapped
+while reciting, and its reserved band keeps its height throughout the fade.
+
+Mushaf matches Scroll's transport sizes: Play/Pause is 34 dp in a 56 dp
+button, previous/next are 24 dp, repeat is 22 dp, and speed is 15 sp. The
+56 dp row gives the reciter line below it the same clearance as Scroll's
+line above. Other playback buttons use 48 dp slots, narrowed to 40 dp below
+340 dp screen width so they clear Chapters and Settings at the edges.
+
+The reciter name carries a small disclosure chevron: Scroll and Mushaf share
+the same quiet button leading to reciter settings. Scroll places it above the
+transport; Mushaf places it below, keeping Play close to the leaf's hairline.
 In developer mode a quiet tuning control shares that line. Opening it replaces
 the name with the Ink Lab tabs and selected controls inside the playbar; the
 bar grows only by the panel's measured height, and the reading column clears
 it as it does the return pill. In Mushaf layout, the same control lives in the
-reserved band under the transport; it replaces the reciter name there and the
+reserved band below the transport; it replaces the reciter name there and the
 leaf gives the open panel its measured height. The same control closes the
 panel.
+
+Playback errors replace the reciter name in that same band on Scroll, Mushaf,
+and the cover controls, including web. The message explains the failure and,
+where retrying helps, how to resume. It uses the full band, temporarily taking
+the developer tuning control's space, with equal space reserved on both sides
+so the text stays centered on the page. On the cover, error dismissal sits at
+the left edge opposite the session Close, keeping the full message clear of
+both controls. It stays on one line, set in semibold type with
+the same ink strength as its × (**Dismiss playback error**); Android sizes the
+type down slightly on narrow screens rather than abbreviating the explanation.
+The notice stays until playback recovers or the × is tapped. Dismissal
+restores the normal band without changing playback or the selected verse;
+the notice never adds a row or opens reciter settings.
 
 ## Color
 
@@ -1677,7 +1701,7 @@ rail, no English under the type, and its own circled QCF marks.
   stretching word gaps. The circled mark is its own cell of the line, with
   the page's word space either side, so it never collides with the last
   word. Page-number script still applies, and the preview paints the same
-  folio as the leaf: a single script centred as quiet ink; both scripts
-  centred either side of a diamond. Scroll page-breaks keep the gold
+  folio as the leaf: a single script at the top left, or Western left and
+  Arabic-Indic right with the chapter centred. Scroll page-breaks keep the gold
   hairline (Western left, Arabic-Indic right; a single script centred
   between equal rules).

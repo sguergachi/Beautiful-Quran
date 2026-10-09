@@ -85,9 +85,9 @@ package com.beautifulquran.domain
  * **The measure is fixed, so the line and the type are the same paper twice.**
  * Characters to the line go as `1/hand` exactly, and that is the whole trade —
  * there is no setting on a 938 px measure that gives both a 19 sp hand and a
- * fifty-character line, and the margin is not a way out (see
- * `englishLeafForeEdge`: both the hand and the line go as the *square root* of
- * the measure, so a fore-edge worth taking buys about a percent of each).
+ * fifty-character line, and the margin is not a way out: both the hand and
+ * the line go as the *square root* of the measure, so changing the inset
+ * changes both together.
  *
  * 1,400 was set first, on the line alone, and read as too small in the hand.
  * 1,250 is where the two complaints meet: 18.2 sp is type a reader asked for
@@ -780,4 +780,3 @@ private fun englishLeafAt(
     kept[kept.lastIndex] = EnglishVerseRun(last.surahId, last.ayah, last.from, to)
     return kept
 }
-

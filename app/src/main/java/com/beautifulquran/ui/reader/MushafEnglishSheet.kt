@@ -26,6 +26,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
@@ -147,8 +148,6 @@ internal fun MushafEnglishSheet(
      */
     measured: Boolean = true,
     verseNumberScript: VerseNumberScript,
-    /** The leaf's fore-edge, shared with the running head and the folio. */
-    foreEdge: Dp,
     /** The leaf's own size — see [englishLeafSlotPx], which is where it is from. */
     wellPx: Float,
     measurePx: Float,
@@ -172,6 +171,12 @@ internal fun MushafEnglishSheet(
      * (`englishSeekWordPosition`).
      */
     onVerseSeek: (surahId: Int, ayah: Int, through: Float) -> Unit,
+    /**
+     * A hold on the prose: the same verse and share as a tap, which the reader
+     * turns into the Arabic word under that English for the Root Word Viewer —
+     * what a hold on a word does on every other surface.
+     */
+    onVerseLongPress: (surahId: Int, ayah: Int, through: Float) -> Unit,
     onBasmalahClick: (Int) -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -298,7 +303,7 @@ internal fun MushafEnglishSheet(
             modifier = Modifier
                 .graphicsLayer { alpha = inked }
                 .fillMaxSize()
-                .padding(horizontal = foreEdge),
+                .padding(horizontal = MushafEdgeGutter),
             // A leaf whose content will not reach the foot hangs from the
             // head, as a book's last page of a chapter does — the paper simply
             // runs out under it. Every leaf, al-Fatihah's included.
@@ -350,6 +355,7 @@ internal fun MushafEnglishSheet(
                         lineHeight = pitch,
                         liveInk = liveInk,
                         onVerseSeek = onVerseSeek,
+                        onVerseLongPress = onVerseLongPress,
                     )
                 }
             }
@@ -392,15 +398,10 @@ internal fun englishLeafSlotPx(
     // rounding must not put the last line's descenders past the foot.
     val wellPx = ((unit * bands.well).roundToPx() - EnglishLeafFitSlack.roundToPx())
         .toFloat().coerceAtLeast(1f)
-    val measurePx = (paperWidthPx - englishLeafForeEdge(paperWidthPx.toDp()).roundToPx() * 2)
+    val measurePx = (paperWidthPx - MushafEdgeGutter.roundToPx() * 2)
         .toFloat().coerceAtLeast(1f)
     floatArrayOf(wellPx, measurePx)
 }
-
-internal fun englishLeafForeEdge(leafWidth: Dp): Dp =
-    (leafWidth * EnglishLeafForeEdgeFraction).coerceAtLeast(MushafEdgeGutter)
-
-private const val EnglishLeafForeEdgeFraction = 0.055f
 
 private val EnglishLeafFitSlack = 2.dp
 
@@ -932,6 +933,7 @@ private fun EnglishProseBlock(
     lineHeight: TextUnit,
     liveInk: Boolean,
     onVerseSeek: (surahId: Int, ayah: Int, through: Float) -> Unit,
+    onVerseLongPress: (surahId: Int, ayah: Int, through: Float) -> Unit,
 ) {
     val palette = rememberWordInkPalette()
     // Null on Paper, which does not define the accent and so does not glimmer.
@@ -997,22 +999,22 @@ private fun EnglishProseBlock(
                 hyphenPx = hyphenPx,
             )
             .pointerInput(block, layoutResult) {
-                detectTapGestures { tap ->
-                    val layout = layoutResult ?: return@detectTapGestures
-                    // The sentence is the unit of this page, as the word is the
-                    // unit of the Arabic one — but a tap still says *where* in
-                    // the sentence, and the reciter can be sent to the same
-                    // share of the verse. See englishSeekWordPosition.
+                // The sentence is the unit of this page, as the word is the
+                // unit of the Arabic one — but a touch still says *where* in
+                // the sentence, and that share of the verse names a word. See
+                // englishSeekWordPosition.
+                fun at(point: Offset, act: (Int, Int, Float) -> Unit) {
+                    val layout = layoutResult ?: return
                     val verse = block.verses
-                        .firstOrNull { layout.rangeContains(tap, it.range, hitSlopPx) }
-                        ?: return@detectTapGestures
-                    val at = layout.getOffsetForPosition(tap) - verse.range.first
-                    onVerseSeek(
-                        verse.surahId,
-                        verse.ayah,
-                        verse.verseFractionAt(at.coerceAtLeast(0)),
-                    )
+                        .firstOrNull { layout.rangeContains(point, it.range, hitSlopPx) }
+                        ?: return
+                    val offset = layout.getOffsetForPosition(point) - verse.range.first
+                    act(verse.surahId, verse.ayah, verse.verseFractionAt(offset.coerceAtLeast(0)))
                 }
+                detectTapGestures(
+                    onLongPress = { press -> at(press, onVerseLongPress) },
+                    onTap = { tap -> at(tap, onVerseSeek) },
+                )
             },
         onTextLayout = { layoutResult = it },
     )

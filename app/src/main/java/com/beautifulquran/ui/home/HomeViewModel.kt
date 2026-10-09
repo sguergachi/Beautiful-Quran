@@ -275,6 +275,8 @@ class HomeViewModel(
 
     fun togglePlayPause() = player.togglePlayPause()
 
+    fun clearPlaybackError() = player.clearError()
+
     fun fastForward() = player.next()
 
     fun fastBackward() = player.previous()

@@ -75,6 +75,22 @@ describe('PlayerController event sequences', () => {
 
   afterAll(() => vi.unstubAllGlobals())
 
+  it('dismisses an error without changing the verse or playback, then reports another failure', () => {
+    const audio = new FakeAudio()
+    const player = new PlayerController(instantPrefetcher(), true, null, () => audio.asAudio())
+    player.loadSurah(content, reciter, 1, { quiet: true, warm: false })
+    audio.emit('error')
+    const failed = player.getState()
+    expect(failed.error).not.toBeNull()
+
+    player.clearError()
+    expect(player.getState()).toEqual({ ...failed, error: null })
+    expect(audio.play).not.toHaveBeenCalled()
+
+    audio.emit('error')
+    expect(player.getState().error).toBe(failed.error)
+  })
+
   it('does not resume when pause wins while play is waiting for canplay', async () => {
     const audio = new FakeAudio()
     audio.readyState = 0

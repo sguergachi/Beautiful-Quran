@@ -40,10 +40,10 @@ import kotlin.math.pow
  * a bare 10dp; fourteen percent of the leaf on vertical chrome was the odd one
  * out.
  *
- * These constants remain the canonical fifteen-row fit and the total 17.05
- * unit budget. The pager's larger display hand reassigns one unit of that same
- * budget from head/tail furniture to a sixteenth visual row; the leaf itself
- * does not grow and its 604 page boundaries do not move.
+ * These constants remain the canonical fifteen-row fit. The Arabic display
+ * uses seventeen rows and carries its folio in the head to spend more paper on type;
+ * its 604 page boundaries do not move. English shares that frame and fills its
+ * well with independently paginated prose.
  */
 object MushafGrid {
     /**
@@ -78,7 +78,9 @@ object MushafGrid {
     const val HEAD_GUTTER = 1.00f
     const val TEXT_LINES = MUSHAF_LINES_PER_PAGE
     /**
-     * Paper under the last line of the leaf.
+     * Paper under the last line of the canonical leaf. The reader's leaves no
+     * longer spend it — see [MushafLeafBands.tail] — and what follows is why
+     * the canonical grid has one.
      *
      * It was taken out with the folio, on the reasoning that nothing stands
      * under the text any more — and that was true only for as long as the text
@@ -99,17 +101,6 @@ object MushafGrid {
      */
     const val TAIL = 0.55f
 
-    /**
-     * The folio's band — no longer a band *of the leaf*. The figure stands in
-     * the air above the dial's rule, so the leaf's own height ends with the
-     * last line of text and the folio is furniture of the sheet, sitting with
-     * the dial and the transport rather than on the paper.
-     *
-     * It is still a unit of the leaf's grid, because it is still the same
-     * book: the figure keeps the pitch of the lines it numbers.
-     */
-    const val FOLIO = 0.40f
-
     /** The whole leaf, in units. */
     const val SLOTS = RUNNING_HEAD + HEAD_GUTTER + TEXT_LINES + TAIL
 
@@ -122,55 +113,20 @@ object MushafGrid {
 }
 
 /**
- * How a leaf divides its height, in units of [MushafGrid].
- *
- * The three bands always sum to [MushafGrid.SLOTS] — that is the whole point of
- * a grid, and the one thing a test can hold: a leaf whose bands sum to more
- * than its height runs its last line off the paper, and one that sums to less
- * leaves a strip of dead paper at the foot that nothing accounts for.
- *
- * The two settings spend the budget differently because their ink does.
- *
- * The Arabic leaf spends almost nothing on the gutter and the tail and buys a
- * sixteenth row of revelation with it. It can: the QCF faces mark 1.37 em above
- * the baseline and 0.75 below, so a nominal band of nearly nothing still leaves
- * visible air, and every unit not spent on furniture is type size (see
- * `MUSHAF_DESIGN_LINE_EM`).
- *
- * The English leaf has no sixteenth row to buy — its well is continuous prose —
- * and its ink stops exactly at the ascent and the descender, because the block
- * is set `Trim.Both`. A band of nothing there is nothing. So it keeps a gutter
- * sized by the rule the canonical one was sized by: "a head that sits closer
- * than about a line's pitch reads as part of the block".
- *
- * *Whose* line's pitch is the whole question, and the canonical unit is the
- * wrong one. The unit is the Arabic leaf's line, and this gutter stands over an
- * English block whose line is smaller: measured on device the unit runs about
- * 114 px against the prose's 66. A full unit of gutter is therefore not one
- * line of air over the block it separates, it is **1.7**, which reads as a hole
- * under the head rather than as a gutter — and it was reported as one. So the
- * gutter is [ENGLISH_HEAD_GUTTER]: the same rule, measured against the block it
- * actually stands over.
- *
- * The reclaimed height goes to the well, which is why the well is derived here
- * rather than declared — the leaf is the same leaf and its bands must still sum
- * to [MushafGrid.SLOTS]. The English hand is solved from the well, so a taller
- * well is also very slightly more type; both are what was asked for.
- *
- * Neither carries a folio any more: it stood under the text and has gone to the
- * dial's head air. The tail stayed behind it, because a page has a foot and the
- * text now reaches it. The two settings still do not sum to the same figure —
- * the
- * English gutter is half a unit wider than the Arabic one — so each divides
- * the leaf by its own [slots] rather than by one shared total. That total was
- * only ever a convenience: what a leaf must not do is spend more height than
- * it has, and its own sum is what says whether it does.
+ * The shared frame of both Mushaf hands. Each band spends a share of [slots];
+ * the sum must account for the whole leaf so text cannot run off its foot.
+ * Both hands put their folio in the running head and use the former lower
+ * folio space for type. English still paginates its own continuous prose.
  */
 data class MushafLeafBands(
     val runningHead: Float,
     val headGutter: Float,
     val well: Float,
-    /** Paper under the last line — see [MushafGrid.TAIL]. */
+    /**
+     * Paper under the last line. Zero on both reader hands: their folio moved
+     * into the running head and the dial's own head air is the foot.
+     * [MushafGrid.TAIL] is the canonical grid's figure, and its history.
+     */
     val tail: Float,
 ) {
     val slots: Float get() = runningHead + headGutter + well + tail
@@ -179,49 +135,16 @@ data class MushafLeafBands(
     fun unitPx(leafHeightPx: Float): Float = (leafHeightPx / slots).coerceAtLeast(1f)
 }
 
-/**
- * The English leaf's gutter, in units — one line of the *prose*, not one unit.
- *
- * It was a full unit, which is the *Arabic* line's pitch (about 114 px on a
- * phone) standing over prose whose line is 66 — 1.7 lines of air, and it read
- * as a hole under the head. It went to 0.58, one line of the prose it actually
- * stands over.
- *
- * It is now 0.30, which is under that rule, deliberately and on instruction:
- * the height was wanted for type. The English hand is solved from the well, so
- * every unit not spent here is set in the block instead. What is left is the
- * running head's own band over again — and the head's ink fits inside its band
- * with a couple of pixels to spare, so this is clear air below the letters
- * rather than a figure that touches the block.
- *
- * It cannot go much below this: the head's descenders hang past the band into
- * this gutter (see `MushafHeadLabel`), and a gutter of nothing would set the
- * tail of a *y* on the first line of the revelation.
- */
-const val ENGLISH_HEAD_GUTTER = 0.30f
-
-/** One line of prose for a gutter, and the rest of the leaf is well. */
-val MUSHAF_ENGLISH_BANDS = MushafLeafBands(
-    runningHead = MushafGrid.RUNNING_HEAD,
-    headGutter = ENGLISH_HEAD_GUTTER,
-    // Derived, so the leaf still spends exactly its height: whatever the
-    // gutter gives up, the well takes.
-    well = MushafGrid.SLOTS - MushafGrid.RUNNING_HEAD - ENGLISH_HEAD_GUTTER -
-        MushafGrid.TAIL,
-    tail = MushafGrid.TAIL,
-)
-
-/** The display bands: the furniture gives a unit up for a sixteenth row. */
+/** Arabic carries its folio in the head; the dial supplies the foot's air. */
 val MUSHAF_ARABIC_BANDS = MushafLeafBands(
     runningHead = MushafGrid.RUNNING_HEAD,
-    // The sixteenth row is bought out of the gutter, so this stays the tighter
-    // of the two: the QCF faces mark 1.37 em above the baseline, so the head
-    // stands off the revelation on half a unit that would read as crowded
-    // under an English block.
     headGutter = 0.50f,
     well = MUSHAF_DISPLAY_LINES_PER_PAGE.toFloat(),
-    tail = MushafGrid.TAIL,
+    tail = 0f,
 )
+
+/** English uses the same head, gutter and full-height well as Arabic. */
+val MUSHAF_ENGLISH_BANDS = MUSHAF_ARABIC_BANDS
 
 fun mushafLeafBands(english: Boolean): MushafLeafBands =
     if (english) MUSHAF_ENGLISH_BANDS else MUSHAF_ARABIC_BANDS

@@ -255,6 +255,11 @@ export class PlayerController {
     return this.state
   }
 
+  /** Dismiss the notice without changing playback or the selected verse. */
+  clearError() {
+    this.patch({ error: null })
+  }
+
   get positionMs(): number {
     if (this.gapless5Enabled && this.gapless5) {
       return this.gapless5.getPositionMs()

@@ -305,7 +305,7 @@ private const val MUSHAF_MARK_WHITE_SLOPE = 0.45f
 private const val MUSHAF_FIT_WHITE_K = 1.20f
 
 /** Past this level of paper a line is set with wider letters, not wider spaces. */
-internal const val MUSHAF_MAX_WHITE_LEVEL_EM = 0.85f
+internal const val MUSHAF_MAX_WHITE_LEVEL_EM = 0.65f
 
 /** The last setting before a line is left standing short and centred. */
 internal const val MUSHAF_STRETCH_WHITE_LEVEL_EM = 1.25f
@@ -356,6 +356,40 @@ private const val MUSHAF_PROFILE_INK = 40
 internal object MushafInkProfiles {
 
     private val faces = WeakHashMap<Typeface, HashMap<String, MushafInkProfile?>>()
+
+    /**
+     * Each thread rasterises on its own scratch, so the lock covers the map
+     * only. Held across the raster, the background warm-up of the next pages
+     * made the incoming leaf's composition wait on the main thread for words
+     * it did not even share — stalls in the very turn the warm-up is for. Two
+     * threads measuring the same word both get the same answer; the second
+     * simply finds it already stored.
+     */
+    private val rasters = ThreadLocal.withInitial { ProfileRaster() }
+
+    fun of(typeface: Typeface?, text: String): MushafInkProfile? {
+        if (typeface == null || text.isEmpty()) return null
+        synchronized(faces) {
+            val face = faces[typeface]
+            if (face != null && face.containsKey(text)) return face[text]
+        }
+        val raster = rasters.get()!!
+        val profile = try {
+            raster.measure(typeface, text)
+        } finally {
+            // The raster outlives this call on its thread; a face left on its
+            // paint would be pinned there and defeat the weak [faces] map.
+            raster.release()
+        }
+        synchronized(faces) {
+            faces.getOrPut(typeface) { HashMap() }[text] = profile
+        }
+        return profile
+    }
+}
+
+/** One thread's paint and scratch bitmap for [MushafInkProfiles]. */
+private class ProfileRaster {
     private val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         textSize = MUSHAF_PROFILE_REF_PX
         color = Color.WHITE
@@ -364,17 +398,12 @@ internal object MushafInkProfiles {
     private var scratch: Bitmap? = null
     private var pixels: IntArray = IntArray(0)
 
-    @Synchronized
-    fun of(typeface: Typeface?, text: String): MushafInkProfile? {
-        if (typeface == null || text.isEmpty()) return null
-        val face = faces.getOrPut(typeface) { HashMap() }
-        if (face.containsKey(text)) return face[text]
-        val profile = measure(typeface, text)
-        face[text] = profile
-        return profile
+    /** Drops the last face measured, so only [MushafQcfFonts] keeps it alive. */
+    fun release() {
+        paint.typeface = null
     }
 
-    private fun measure(typeface: Typeface, text: String): MushafInkProfile? {
+    fun measure(typeface: Typeface, text: String): MushafInkProfile? {
         paint.typeface = typeface
         paint.textScaleX = 1f
         paint.getTextBounds(text, 0, text.length, bounds)

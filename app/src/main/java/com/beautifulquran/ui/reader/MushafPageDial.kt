@@ -1401,6 +1401,7 @@ internal fun MushafPageDial(
             .height(MushafDialSlot + MushafDialBelowGrab)
             .onSizeChanged { widthPx = it.width },
     ) {
+        val paper = MaterialTheme.colorScheme.background
         Canvas(Modifier.fillMaxWidth().height(MushafDialSlot)) {
             val ruleY = MushafDialRuleY.toPx()
             val at = if (scrubbing || handed) dialPage.floatValue else resting.value
@@ -1417,6 +1418,26 @@ internal fun MushafPageDial(
             // reader has taken hold of the rule, not of a knob on it.
             val rule = MushafDialRuleWeightPx +
                 (MushafDialRuleHeldWeightPx - MushafDialRuleWeightPx) * lift
+            // The HUD plate's skirt. The plate stands clear of the ticks, and
+            // the strip between its foot and the rule was bare leaf: the last
+            // line's script showed through under the chapter's name. Paper
+            // runs on down to the hairline, drawn here — beneath the rule and
+            // the comb — so the ticks still stand on it.
+            if (hudShown) {
+                val plateFoot = ruleY -
+                    MushafDialPageTick.toPx() -
+                    MushafDialHudAir.toPx() -
+                    MushafDialHudLift.toPx() +
+                    hudPull.value
+                val skirtFoot = ruleY - rule / 2f
+                if (plateFoot < skirtFoot) {
+                    drawRect(
+                        color = paper,
+                        topLeft = Offset(0f, plateFoot),
+                        size = Size(size.width, skirtFoot - plateFoot),
+                    )
+                }
+            }
             drawRoundRect(
                 color = ink.copy(alpha = 0.10f + 0.06f * lift),
                 // The rule ends where the comb ends: the first and last
@@ -1525,6 +1546,7 @@ internal fun MushafPageDial(
                     result = combDrawnXs,
                     rightToLeft = rightToLeft,
                 )
+                val originIdx = mushafDialChapterIndex(chapterMarks, settled)
                 for (idx in chapterMarks.indices) {
                     val mark = chapterMarks[idx]
                     val x = drawnXs[idx]
@@ -1569,7 +1591,22 @@ internal fun MushafPageDial(
                         // than as marks a reader could count and aim between,
                         // which is the only thing it is for. Height shows the
                         // lens: closer is taller, denser tail is taller still.
-                        color = ink.copy(alpha = 0.54f * combInk),
+                        //
+                        // The chapter the hand is in is set in gold, the ink
+                        // chapter numbers are labelled in, so the tick the HUD
+                        // is naming can be found among its neighbours.
+                        //
+                        // The chapter the reader came from keeps a tick of its
+                        // own, in the app's green, so the way back is findable
+                        // while the hand is far off. Gold wins where the two
+                        // are the same chapter.
+                        color = if (isLensed && idx == hudChapterIdx) {
+                            accents.gold.copy(alpha = combInk)
+                        } else if (isLensed && idx == originIdx) {
+                            accents.greenInk.copy(alpha = combInk)
+                        } else {
+                            ink.copy(alpha = 0.54f * combInk)
+                        },
                         topLeft = Offset(x - rule / 2f, ruleY - length),
                         size = Size(rule, length),
                         cornerRadius = CornerRadius(rule, rule),
@@ -1661,7 +1698,6 @@ internal fun MushafPageDial(
                     letterSpacing = 0.08.em,
                 )
             }
-            val paper = MaterialTheme.colorScheme.background
             // Which wall the type is parked against, if either: -1 left,
             // +1 right, 0 riding free with the hand. The plate itself is the
             // whole measure — a band of the page's own paper — so only the

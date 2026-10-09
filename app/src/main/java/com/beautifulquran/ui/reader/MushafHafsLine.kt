@@ -106,6 +106,8 @@ internal fun MushafHafsLine(
     onWordClick: (MushafToken) -> Unit,
     onWordLongClick: (MushafToken) -> Unit,
     onAyahClick: (MushafToken) -> Unit,
+    /** Only a chapter ending or an opening medallion may stand short. */
+    allowShort: Boolean = false,
     pageFont: FontFamily? = null,
     modifier: Modifier = Modifier,
 ) {
@@ -129,6 +131,7 @@ internal fun MushafHafsLine(
             onWordClick = onWordClick,
             onWordLongClick = onWordLongClick,
             onAyahClick = onAyahClick,
+            allowShort = allowShort,
             modifier = modifier,
         )
         return
@@ -174,6 +177,7 @@ internal fun MushafHafsLine(
                 pageWidthPx = measureWidthPx,
                 gapCount = (line.tokens.size - 1).coerceAtLeast(0),
                 fontPx = with(density) { fontSize.toPx() },
+                allowShort = allowShort,
             )
         }
         val gapSp = with(density) { gapPx.toSp() }
@@ -257,6 +261,7 @@ private data class MushafLineGeometryKey(
     val measureWidthPxBits: Int,
     val typefaceId: Int,
     val contentKey: Int,
+    val allowShort: Boolean,
 )
 
 private val lineGeometryCache =
@@ -284,6 +289,7 @@ private fun lineGeometryKey(
     pageTypeface: android.graphics.Typeface?,
     fontPx: Float,
     measureWidthPx: Float,
+    allowShort: Boolean,
 ): MushafLineGeometryKey = MushafLineGeometryKey(
     page = page,
     line = line.number,
@@ -291,6 +297,7 @@ private fun lineGeometryKey(
     measureWidthPxBits = measureWidthPx.toRawBits(),
     typefaceId = System.identityHashCode(pageTypeface),
     contentKey = mushafLineContentKey(line),
+    allowShort = allowShort,
 )
 
 @Composable
@@ -301,8 +308,9 @@ private fun lineGeometry(
     linePx: Float,
     measureWidthPx: Float,
     justify: Boolean,
+    allowShort: Boolean,
 ): MushafLineGeometry {
-    val key = lineGeometryKey(page, line, pageTypeface, linePx, measureWidthPx)
+    val key = lineGeometryKey(page, line, pageTypeface, linePx, measureWidthPx, allowShort)
     return remember(key) {
         lineGeometryCache.getOrPut(key) {
             com.beautifulquran.DevProfiling.trace("lineGeometryMiss") {
@@ -322,6 +330,7 @@ private fun lineGeometry(
                         joins = joinsEm,
                         measureWidthPx = measureWidthPx,
                         fontPx = linePx,
+                        allowShort = allowShort,
                     )
                 } else {
                     mushafLineFit(
@@ -329,6 +338,7 @@ private fun lineGeometry(
                         gapCount = (rawCells.size - 1).coerceAtLeast(0),
                         measureWidthPx = measureWidthPx,
                         fontPx = linePx,
+                        allowShort = allowShort,
                     )
                 }
                 MushafLineGeometry(rawCells, joinsEm, fit)
@@ -353,6 +363,7 @@ private fun MushafQcfPageLine(
     onWordClick: (MushafToken) -> Unit,
     onWordLongClick: (MushafToken) -> Unit,
     onAyahClick: (MushafToken) -> Unit,
+    allowShort: Boolean,
     modifier: Modifier = Modifier,
 ) {
     val density = LocalDensity.current
@@ -369,7 +380,7 @@ private fun MushafQcfPageLine(
     // re-composing mid-swipe (returning to a visited page) re-measures on
     // the UI thread otherwise — ink profiles render each word to a bitmap,
     // and the fit runs a bisection per line. See [lineGeometry].
-    val geometry = lineGeometry(page, line, pageTypeface, linePx, measureWidthPx, justify)
+    val geometry = lineGeometry(page, line, pageTypeface, linePx, measureWidthPx, justify, allowShort)
     val rawCells = geometry.cells
     val joinsEm = geometry.joinsEm
     val fit = geometry.fit
@@ -629,6 +640,25 @@ private fun mushafLineJoins(
     }
 }
 
+/**
+ * The narrowest [line] can be set at [fontPx]: its letters narrowed to
+ * [MUSHAF_MIN_LINE_SCALE] and every join at its fit floor — the width below
+ * which [mushafInkLineFit] gives up and the line runs past its measure. Null
+ * until the page face has loaded, when there are no joins to measure.
+ */
+internal fun mushafLineMinWidthPx(
+    line: MushafLine,
+    typeface: android.graphics.Typeface?,
+    fontPx: Float,
+): Float? {
+    if (typeface == null || fontPx <= 0f) return null
+    val texts = mushafLineTexts(line)
+    val ink = mushafLineCells(texts.map { it.text }, typeface, fontPx, condense = 1f)
+        .sumOf { it.inkWidth.toDouble() }.toFloat()
+    val tight = mushafLineJoins(texts, typeface).sumOf { it.fitFloorEm.toDouble() }.toFloat() * fontPx
+    return ink * MUSHAF_MIN_LINE_SCALE + tight
+}
+
 /** Rasterizes a leaf's ink joins before that leaf reaches composition. */
 internal fun warmMushafInkProfiles(
     page: MushafPage?,
@@ -810,6 +840,7 @@ internal fun mushafInkLineFit(
     joins: List<MushafInkJoin>,
     measureWidthPx: Float,
     fontPx: Float,
+    allowShort: Boolean = false,
 ): MushafLineFit {
     if (inkWidthPx <= 0f || measureWidthPx <= 0f || fontPx <= 0f || joins.isEmpty()) {
         return MushafLineFit(scale = 1f, gapPx = MUSHAF_WORD_GAP_EM * fontPx, flush = false)
@@ -836,12 +867,11 @@ internal fun mushafInkLineFit(
     if (needed <= MUSHAF_MAX_LINE_SCALE) {
         return MushafLineFit(scale = needed, gapPx = 0f, flush = true)
     }
-    // Neither the letters at their bound nor the white at its own reaches the
-    // margin alone. Take both, and if the white still has to open past what
-    // reads as one line of text, leave the line short and centred instead —
-    // which is how the print sets a line that will not fill.
+    // Width cannot tell a full row from a chapter's last. Only a known ending
+    // may stand short; every other row keeps its margins after the letters
+    // have reached their stretch limit.
     val stretched = mushafWhiteLevel(joins, measure / MUSHAF_MAX_LINE_SCALE - ink)
-    if (stretched <= MUSHAF_STRETCH_WHITE_LEVEL_EM) {
+    if (!allowShort || stretched <= MUSHAF_STRETCH_WHITE_LEVEL_EM) {
         return MushafLineFit(scale = MUSHAF_MAX_LINE_SCALE, gapPx = 0f, flush = true)
     }
     return MushafLineFit(scale = 1f, gapPx = MUSHAF_WORD_GAP_EM * fontPx, flush = false)

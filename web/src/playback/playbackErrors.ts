@@ -5,7 +5,7 @@
  * Wording matches the Android app.
  */
 export const PLAYBACK_MESSAGES = {
-  network: "No connection · press play to try again",
+  network: 'No connection · press play to try again',
   unavailable: "This verse isn't available right now",
   decode: "This verse couldn't be played",
   autoplay: 'Press play to begin',
