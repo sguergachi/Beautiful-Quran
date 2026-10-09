@@ -94,6 +94,7 @@ fun FloatingPlaybackControl(
     reciterName: String,
     onOpenNowPlaying: () -> Unit,
     onReciterClick: () -> Unit,
+    onDismissError: () -> Unit,
     onPlayPause: () -> Unit,
     onFastBackward: () -> Unit,
     onFastForward: () -> Unit,
@@ -123,20 +124,23 @@ fun FloatingPlaybackControl(
                         .navigationBarsPadding(),
                 ) {
                     Box(Modifier.fillMaxWidth()) {
-                        if (inkLabOpen) {
+                        if (inkLabOpen && state.error == null) {
                             InkLabPanel(
                                 modifier = Modifier.padding(start = 40.dp, end = 44.dp),
                             )
                         } else {
                             ReciterNameButton(
                                 name = reciterName,
+                                notice = state.error,
+                                onDismissNotice = onDismissError,
+                                noticeDismissAtStart = true,
                                 onClick = onReciterClick,
                                 modifier = Modifier
                                     .align(Alignment.Center)
-                                    .padding(horizontal = if (inkLabAvailable) 48.dp else 0.dp),
+                                    .padding(horizontal = if (state.error != null) 0.dp else 48.dp),
                             )
                         }
-                        if (inkLabAvailable) {
+                        if (inkLabAvailable && state.error == null) {
                             InkLabToggleButton(
                                 expanded = inkLabOpen,
                                 onClick = onInkLabClick,

@@ -54,6 +54,7 @@ class PinnedPlaybackHost {
     var onRepeatClick: () -> Unit = {}
     var onSpeed: () -> Unit = {}
     var onReciterClick: () -> Unit = {}
+    var onDismissError: () -> Unit = {}
     var inkLabAvailable by mutableStateOf(false)
     var inkLabOpen by mutableStateOf(false)
 
@@ -137,6 +138,7 @@ internal fun PinnedChapterPlayback(
             onRepeatClick = host.onRepeatClick,
             onSpeed = host.onSpeed,
             onReciterClick = host.onReciterClick,
+            onDismissError = host.onDismissError,
             inkLabAvailable = host.inkLabAvailable,
             inkLabOpen = host.inkLabOpen,
             onInkLabClick = { host.inkLabOpen = !host.inkLabOpen },

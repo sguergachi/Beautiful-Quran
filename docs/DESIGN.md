@@ -843,6 +843,19 @@ reserved band below the transport; it replaces the reciter name there and the
 leaf gives the open panel its measured height. The same control closes the
 panel.
 
+Playback errors replace the reciter name in that same band on Scroll, Mushaf,
+and the cover controls, including web. The message explains the failure and,
+where retrying helps, how to resume. It uses the full band, temporarily taking
+the developer tuning control's space, with equal space reserved on both sides
+so the text stays centered on the page. On the cover, error dismissal sits at
+the left edge opposite the session Close, keeping the full message clear of
+both controls. It stays on one line, set in semibold type with
+the same ink strength as its × (**Dismiss playback error**); Android sizes the
+type down slightly on narrow screens rather than abbreviating the explanation.
+The notice stays until playback recovers or the × is tapped. Dismissal
+restores the normal band without changing playback or the selected verse;
+the notice never adds a row or opens reciter settings.
+
 ## Color
 
 Two themes, both "paper":

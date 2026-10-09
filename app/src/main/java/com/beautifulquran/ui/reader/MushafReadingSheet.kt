@@ -183,6 +183,7 @@ internal fun MushafReadingSheet(
     onFastForward: () -> Unit,
     onRepeatClick: () -> Unit,
     onSpeed: () -> Unit,
+    onDismissError: () -> Unit,
     /** The leaf in view, 1-based. A lambda, so turning a page redraws the
      * dial rather than recomposing the reader that hosts this sheet. */
     pageAt: () -> Int,
@@ -426,7 +427,7 @@ internal fun MushafReadingSheet(
             // MushafBelowLeaf reserves for it: the English book is paginated
             // against that constant, and a name grown by the system font
             // scale would leave every leaf set for paper it does not have.
-            val labOpen = inkLabAvailable && inkLabOpen
+            val labOpen = inkLabAvailable && inkLabOpen && playerState.error == null
             Box(
                 Modifier
                     .fillMaxWidth()
@@ -445,7 +446,7 @@ internal fun MushafReadingSheet(
                             .align(Alignment.Center)
                             .padding(start = 40.dp),
                     )
-                } else if (reciterName.isNotEmpty()) {
+                } else if (reciterName.isNotEmpty() || playerState.error != null) {
                     // An error stands in for the name and is never faded with
                     // it: a stream that fails mid-recitation can arrive while
                     // the reading still counts as reciting, and the notice is
@@ -454,16 +455,17 @@ internal fun MushafReadingSheet(
                     ReciterNameButton(
                         name = reciterName,
                         notice = notice,
+                        onDismissNotice = onDismissError,
                         onClick = onOpenSettings,
                         enabled = enabled && (!reciting || notice != null),
                         disclosure = true,
                         modifier = Modifier
                             .align(Alignment.Center)
-                            .padding(horizontal = if (inkLabAvailable) 48.dp else 0.dp)
+                            .padding(horizontal = if (inkLabAvailable && notice == null) 48.dp else 0.dp)
                             .graphicsLayer { alpha = if (notice != null) 1f else secondaryFade },
                     )
                 }
-                if (inkLabAvailable) {
+                if (inkLabAvailable && playerState.error == null) {
                     InkLabToggleButton(
                         expanded = inkLabOpen,
                         onClick = onInkLabClick,
