@@ -162,6 +162,19 @@ class MushafFollowTurnTest {
     }
 
     @Test
+    fun `the verse the voice just left keeps its clocks while its glimmer dries`() {
+        assertEquals(
+            MushafInkPackKind.ACTIVE_WORD,
+            mushafInkPackKind(true, 4, 5, 5, false, false, drying = true),
+        )
+        // A verse the reciter has gone back behind still waits under paper.
+        assertEquals(
+            MushafInkPackKind.UPCOMING,
+            mushafInkPackKind(true, 6, 5, 5, false, false, drying = true),
+        )
+    }
+
+    @Test
     fun `a manually browsed page remains fully readable`() {
         assertEquals(
             MushafInkPackKind.STATIC,
