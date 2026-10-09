@@ -16,7 +16,7 @@ class PlaybackErrorMessageTest {
             PlaybackException.ERROR_CODE_TIMEOUT,
         ).forEach {
             assertEquals(
-                "No connection · tap Play",
+                "No connection · press play to try again",
                 playbackErrorMessage(it),
             )
         }
@@ -25,11 +25,11 @@ class PlaybackErrorMessageTest {
     @Test
     fun missingFileSaysTheVerseIsUnavailable() {
         assertEquals(
-            "Verse unavailable",
+            "This verse isn't available right now",
             playbackErrorMessage(PlaybackException.ERROR_CODE_IO_BAD_HTTP_STATUS),
         )
         assertEquals(
-            "Verse unavailable",
+            "This verse isn't available right now",
             playbackErrorMessage(PlaybackException.ERROR_CODE_IO_FILE_NOT_FOUND),
         )
     }
@@ -37,15 +37,15 @@ class PlaybackErrorMessageTest {
     @Test
     fun damagedAudioAndOutputFailuresStayDistinct() {
         assertEquals(
-            "Cannot play this verse",
+            "This verse couldn't be played",
             playbackErrorMessage(PlaybackException.ERROR_CODE_DECODING_FAILED),
         )
         assertEquals(
-            "Cannot play this verse",
+            "This verse couldn't be played",
             playbackErrorMessage(PlaybackException.ERROR_CODE_PARSING_CONTAINER_MALFORMED),
         )
         assertEquals(
-            "Audio stopped · tap Play",
+            "Audio output stopped · press play again",
             playbackErrorMessage(PlaybackException.ERROR_CODE_AUDIO_TRACK_INIT_FAILED),
         )
     }

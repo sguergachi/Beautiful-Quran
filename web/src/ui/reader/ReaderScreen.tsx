@@ -1868,7 +1868,7 @@ export function ReaderScreen({
                   </span>
                 </button>
               )}
-              {mushaf && nowPlaying && transportSurah && transportSurah.id !== readerSurah?.id ? (
+              {!playerNotice && mushaf && nowPlaying && transportSurah && transportSurah.id !== readerSurah?.id ? (
                 <span className="player-chapter">{transportSurah.nameTransliteration} · {Math.max(1, nowPlaying.ayah)}</span>
               ) : null}
               {coverChrome ? (

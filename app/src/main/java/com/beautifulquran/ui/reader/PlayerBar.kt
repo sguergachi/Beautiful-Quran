@@ -19,6 +19,7 @@ import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.text.TextAutoSize
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.FastForward
@@ -147,11 +148,14 @@ fun PlayerBar(
                         disclosure = true,
                         modifier = Modifier
                             .align(Alignment.Center)
-                            .padding(horizontal = centeredInset)
+                            .padding(
+                                start = if (state.error != null) 0.dp else centeredInset,
+                                end = if (state.error != null) edgePad else centeredInset,
+                            )
                             .graphicsLayer { alpha = if (state.error != null) 1f else chromeAlpha() },
                     )
                 }
-                if (inkLabAvailable) {
+                if (inkLabAvailable && state.error == null) {
                     InkLabToggleButton(
                         expanded = inkLabOpen,
                         onClick = onInkLabClick,
@@ -382,7 +386,7 @@ internal fun PlaybackErrorNotice(
     enabled: Boolean = true,
 ) {
     Row(
-        modifier = modifier.fillMaxWidth().padding(start = 48.dp),
+        modifier = modifier.fillMaxWidth(),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Text(
@@ -393,6 +397,12 @@ internal fun PlaybackErrorNotice(
             ),
             color = QuranTheme.ink.muted,
             maxLines = 1,
+            softWrap = false,
+            autoSize = TextAutoSize.StepBased(
+                minFontSize = 11.sp,
+                maxFontSize = 13.sp,
+                stepSize = 0.5.sp,
+            ),
             overflow = TextOverflow.Ellipsis,
             textAlign = TextAlign.Center,
             modifier = Modifier.weight(1f).semantics { liveRegion = LiveRegionMode.Polite },

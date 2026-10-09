@@ -136,10 +136,10 @@ fun FloatingPlaybackControl(
                                 onClick = onReciterClick,
                                 modifier = Modifier
                                     .align(Alignment.Center)
-                                    .padding(horizontal = 48.dp),
+                                    .padding(start = if (state.error != null) 0.dp else 48.dp, end = 48.dp),
                             )
                         }
-                        if (inkLabAvailable) {
+                        if (inkLabAvailable && state.error == null) {
                             InkLabToggleButton(
                                 expanded = inkLabOpen,
                                 onClick = onInkLabClick,

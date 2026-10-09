@@ -461,11 +461,11 @@ internal fun MushafReadingSheet(
                         disclosure = true,
                         modifier = Modifier
                             .align(Alignment.Center)
-                            .padding(horizontal = if (inkLabAvailable) 48.dp else 0.dp)
+                            .padding(horizontal = if (inkLabAvailable && notice == null) 48.dp else 0.dp)
                             .graphicsLayer { alpha = if (notice != null) 1f else secondaryFade },
                     )
                 }
-                if (inkLabAvailable) {
+                if (inkLabAvailable && playerState.error == null) {
                     InkLabToggleButton(
                         expanded = inkLabOpen,
                         onClick = onInkLabClick,

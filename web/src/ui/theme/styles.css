@@ -3036,16 +3036,21 @@ button.ayah-mark {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 100%;
+  width: calc(100% + 2 * var(--sheet-pad));
   min-height: 32px;
-  padding-inline: 40px;
+  margin-inline: calc(-1 * var(--sheet-pad));
+  padding-inline: 0 44px;
   color: var(--ink-rung-quiet);
   font-size: 13px;
   font-weight: 600;
 }
 
 .player-bar.cover-chrome .player-error {
-  width: calc(100% - 80px);
+  padding-inline-end: 84px;
+}
+
+.player-bar.cover-chrome .player-error-dismiss {
+  right: 44px;
 }
 
 .player-error-text {
@@ -3058,7 +3063,7 @@ button.ayah-mark {
 
 .player-error-dismiss {
   position: absolute;
-  right: 0;
+  right: 4px;
   top: 50%;
   transform: translateY(-50%);
   min-width: 40px;
