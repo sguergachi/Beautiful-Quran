@@ -33,6 +33,21 @@ data class TypographyTuning(
     ),
     val note: TypefaceTuning = TypefaceTuning(weight = 500, italic = 100f),
 ) {
+    /**
+     * The same tuning for light ink on dark paper. Light type spreads into the
+     * dark around it and reads heavier than the same weight in dark ink on
+     * cream, so every role eases by [DARK_PAPER_WEIGHT_EASE] — wght 370 where
+     * paper has 400. The variable axis makes that a continuous step; a static
+     * cut could only jump a whole weight. Applied on top of whatever Ink Lab
+     * has tuned, so the lab's numbers stay the paper-side values.
+     */
+    internal fun forDarkPaper(): TypographyTuning = copy(
+        book = book.eased(), bookItalic = bookItalic.eased(), title = title.eased(),
+        ui = ui.eased(), note = note.eased(),
+    )
+
+    private fun TypefaceTuning.eased() = copy(weight = weight - DARK_PAPER_WEIGHT_EASE)
+
     internal fun face(role: TypeRole): TypefaceTuning = when (role) {
         TypeRole.Book -> book
         TypeRole.BookItalic -> bookItalic
@@ -106,3 +121,6 @@ internal fun timelessFeatures(sans: Boolean, italic: Boolean): List<TypeFeature>
         )
     }
 }
+
+/** How far light-on-dark ink's weight eases against dark-on-paper ink; see [TypographyTuning.forDarkPaper]. */
+internal const val DARK_PAPER_WEIGHT_EASE = 30

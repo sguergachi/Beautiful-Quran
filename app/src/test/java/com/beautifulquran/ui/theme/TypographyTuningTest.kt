@@ -15,6 +15,17 @@ class TypographyTuningTest {
     }
 
     @Test
+    fun darkPaperEasesEveryRolesWeightAndNothingElse() {
+        val paper = TypographyTuning()
+        val dark = paper.forDarkPaper()
+        TypeRole.entries.forEach { role ->
+            assertEquals(paper.face(role).weight - DARK_PAPER_WEIGHT_EASE, dark.face(role).weight)
+            assertEquals(paper.face(role).copy(weight = 0), dark.face(role).copy(weight = 0))
+        }
+        assertEquals(370, dark.book.weight)
+    }
+
+    @Test
     fun eachRoleKeepsItsOwnSettings() {
         val shipped = TypographyTuning()
         TypeRole.entries.forEach { role ->

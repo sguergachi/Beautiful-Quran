@@ -600,8 +600,13 @@ fun BeautifulQuranTheme(
         night -> NightSettingsSheet
         else -> LightSettingsSheet
     }
-    val typePalette = androidx.compose.runtime.remember(timelessTypography, typographyTuning) {
-        quranTypePalette(timelessTypography, typographyTuning)
+    // Light ink on dark paper (Nightfall, Royal Green) runs a touch lighter.
+    val darkPaper = night || themeMode == ThemeMode.ROYAL_GREEN
+    val typePalette = androidx.compose.runtime.remember(timelessTypography, typographyTuning, darkPaper) {
+        quranTypePalette(
+            timelessTypography,
+            if (darkPaper) typographyTuning.forDarkPaper() else typographyTuning,
+        )
     }
     androidx.compose.runtime.CompositionLocalProvider(
         LocalQuranAccents provides accents,

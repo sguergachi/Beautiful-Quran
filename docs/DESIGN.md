@@ -975,6 +975,10 @@ not the app's.
 - **Supplied words**: Sahih International's [brackets] sit at 40 % of the
   text's ink (`SUPPLIED_BRACKET_INK`); the words inside keep full ink, because
   they carry meaning.
+- **Weight on dark paper** (Android): light ink on Nightfall and Royal Green
+  runs 30 lighter on the variable axis (wght 370 where paper has 400), every
+  role — light type spreads into the dark and reads heavier. The web serves
+  static cuts and keeps one weight.
 - **English leaf leading**: 1.46 em in Timeless (1.40 em was set for
   Garamond's smaller x-height).
 - **UI text**: the same serif at small sizes with reduced alpha, set solid —
