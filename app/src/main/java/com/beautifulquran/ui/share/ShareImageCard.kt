@@ -16,6 +16,7 @@ import androidx.compose.ui.text.style.TextDirection
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.beautifulquran.ui.theme.suppliedWordsText
 import com.beautifulquran.ui.theme.HafsFontFamily
 import com.beautifulquran.ui.theme.LocalQuranAccents
 import com.beautifulquran.ui.theme.TranslationFontFamily
@@ -102,7 +103,7 @@ fun ShareImageVerseStrip(
         if (includeTranslation && verse.translation.isNotBlank()) {
             Spacer(Modifier.height(12.dp))
             Text(
-                text = verse.translation,
+                text = suppliedWordsText(verse.translation, ink.copy(alpha = 0.66f)),
                 style = MaterialTheme.typography.bodyLarge.copy(
                     fontFamily = TranslationFontFamily,
                     fontSize = typeScale(14.sp, 16.sp),

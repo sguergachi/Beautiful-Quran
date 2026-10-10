@@ -1,5 +1,6 @@
 package com.beautifulquran.ui.reader
 
+import com.beautifulquran.domain.EnglishTypography
 import android.app.Activity
 import android.content.Context
 import android.content.ContextWrapper
@@ -686,8 +687,8 @@ fun ReaderScreen(
             emptyList()
         } else {
             content.ayahs.filter { a ->
-                a.translation.contains(activeQuery, ignoreCase = true) ||
-                    a.words.any { it.translation.contains(activeQuery, ignoreCase = true) }
+                EnglishTypography.fold(a.translation).contains(activeQuery, ignoreCase = true) ||
+                    a.words.any { EnglishTypography.fold(it.translation).contains(activeQuery, ignoreCase = true) }
             }.map { it.number }
         }
     }

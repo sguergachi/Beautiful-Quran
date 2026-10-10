@@ -1,3 +1,4 @@
+import { suppliedWords } from '../../render/suppliedWords'
 import {
   useEffect,
   useMemo,
@@ -645,7 +646,7 @@ function WordSearchSection({
                       {span.text}
                     </mark>
                   ) : (
-                    <span key={i}>{span.text}</span>
+                    <span key={i}>{suppliedWords(span.text, `s${i}`)}</span>
                   ),
                 )}
               </span>

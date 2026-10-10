@@ -1,3 +1,4 @@
+import { foldEnglish } from '../../domain/EnglishTypography'
 import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from 'react'
 import { AyahBlock } from '../../render/AyahBlock'
 import { BasmalahCalligraphy } from '../../render/BasmalahCalligraphy'
@@ -579,8 +580,8 @@ export function ReaderScreen({
     if (!searchContent) return [] as { number: number; translationLower: string; glossLowers: string[] }[]
     return searchContent.ayahs.map((a) => ({
       number: a.number,
-      translationLower: a.translation.toLowerCase(),
-      glossLowers: a.words.map((w) => w.translation.toLowerCase()),
+      translationLower: foldEnglish(a.translation).toLowerCase(),
+      glossLowers: a.words.map((w) => foldEnglish(w.translation).toLowerCase()),
     }))
   }, [searchContent])
   const searchMatches = useMemo(() => {

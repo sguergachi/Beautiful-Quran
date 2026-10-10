@@ -1,5 +1,7 @@
 import { normalizeArabicForSearch } from './WordSearch'
 
+export { foldEnglish } from './WordSearch'
+
 const TERMINAL_PUNCTUATION = /[.!?…]["'’”)]*$/u
 
 /**
@@ -46,3 +48,52 @@ export function coalescedGlossOwnerIndex(
   }
   return owner
 }
+
+const OPENING_CONTEXT = '([{–—-“‘'
+const opensAfter = (prev: string | undefined) =>
+  prev === undefined || /\s/u.test(prev) || OPENING_CONTEXT.includes(prev)
+const isWordChar = (c: string | undefined) => c !== undefined && /[\p{L}\p{N}]/u.test(c)
+
+/**
+ * The translation as a typographer would set it: curled quotes and
+ * apostrophes, and a spaced en dash where the source typed " - ". Display-only
+ * and one character for one, so search ranges and word spans measured on the
+ * stored text land on the same letters. The only addition is at the very end:
+ * the source dropped each verse's final punctuation, closing quotes included,
+ * so the closers of a still-open quotation are restored there — unless it
+ * runs on into the next verse (`quoteContinues`). Mirrors Android's
+ * `EnglishTypography.typeset`.
+ */
+export function typesetEnglish(raw: string, quoteContinues = false): string {
+  let out = ''
+  let doubles = 0
+  let singles = 0
+  for (let i = 0; i < raw.length; i++) {
+    const c = raw[i]!
+    const prev = raw[i - 1]
+    const next = raw[i + 1]
+    if (c === '"') {
+      if (opensAfter(prev)) { out += '“'; doubles++ } else { out += '”'; doubles-- }
+    } else if (c === "'") {
+      if (isWordChar(prev) && isWordChar(next)) out += '’'
+      else if (opensAfter(prev)) { out += '‘'; singles++ } else { out += '’'; if (singles > 0) singles-- }
+    } else if (c === '-' && prev === ' ' && next === ' ') {
+      out += '–'
+    } else {
+      out += c
+    }
+  }
+  if (!quoteContinues) out += '’'.repeat(singles) + '”'.repeat(Math.max(0, doubles))
+  return out
+}
+
+/** Whether a quotation open at a verse's end carries on: `next`'s first double quote closes. */
+export function quoteContinuesInto(next: string | null | undefined): boolean {
+  if (!next) return false
+  const at = next.indexOf('"')
+  return at >= 0 && !opensAfter(next[at - 1])
+}
+
+/** A surah name or gloss: apostrophes curled, nothing else touched. */
+export const typesetEnglishName = (raw: string): string => raw.replaceAll("'", '’')
+

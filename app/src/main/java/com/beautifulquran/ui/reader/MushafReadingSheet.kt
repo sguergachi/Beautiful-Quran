@@ -1,5 +1,6 @@
 package com.beautifulquran.ui.reader
 
+import com.beautifulquran.ui.theme.mixedCaseTrackingEm
 import com.beautifulquran.ui.theme.HafsFontFamily
 import com.beautifulquran.ui.theme.quietClickable
 import com.beautifulquran.ui.theme.typeScale
@@ -621,7 +622,7 @@ private fun MushafHeadLabel(
         style = mushafHeadStyle(
             MaterialTheme.typography.labelSmall.copy(
                 fontSize = glyphSize.furnitureStep(MushafType.HEAD),
-                letterSpacing = 0.10.em,
+                letterSpacing = mixedCaseTrackingEm(0.10f).em,
             ),
             text,
         ),

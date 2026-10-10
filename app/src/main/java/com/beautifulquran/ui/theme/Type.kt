@@ -19,6 +19,7 @@ import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.em
 import androidx.compose.ui.unit.sp
 import com.beautifulquran.R
+import com.beautifulquran.domain.ENGLISH_LEAF_LEADING_EM
 
 /** KFGQPC HAFS Uthmanic Script — the reference typeface for the Quran text. */
 val HafsFontFamily = FontFamily(Font(R.font.hafs_uthmanic))
@@ -312,6 +313,22 @@ internal val BookTextMotion: TextMotion
     }
 
 /**
+ * Letterspacing for a mixed-case Latin line, in em. Timeless Text is spaced
+ * for small sizes already, and tracked lowercase falls apart into letters, so
+ * it is set all but solid (DESIGN.md: lowercase never past 0.02 em). Only
+ * ALL-CAPS labels are tracked. The classic profile keeps its [classicEm].
+ */
+@Composable
+internal fun mixedCaseTrackingEm(classicEm: Float): Float =
+    if (LocalQuranTypePalette.current.profile == QuranTypeProfile.TIMELESS) {
+        minOf(classicEm, MIXED_CASE_TRACKING_EM)
+    } else {
+        classicEm
+    }
+
+private const val MIXED_CASE_TRACKING_EM = 0.02f
+
+/**
  * [BookTextMotion]'s flags for text drawn straight onto a canvas: linear
  * metrics and subpixel positioning, so canvas widths match what Compose draws.
  */
@@ -391,7 +408,7 @@ private val TimelessQuranTypography = Typography(
         fontWeight = FontWeight.Medium,
         fontSize = 11.5.sp,
         lineHeight = 15.sp,
-        letterSpacing = 0.6.sp,
+        letterSpacing = 0.sp,
         fontFeatureSettings = liningFigures(BOOK_FEATURES),
         textMotion = TextMotion.Animated,
     ),
@@ -400,7 +417,7 @@ private val TimelessQuranTypography = Typography(
         fontWeight = FontWeight.Medium,
         fontSize = 10.5.sp,
         lineHeight = 14.sp,
-        letterSpacing = 0.8.sp,
+        letterSpacing = 0.sp,
         fontFeatureSettings = liningFigures(BOOK_FEATURES),
         textMotion = TextMotion.Animated,
     ),
@@ -477,6 +494,17 @@ private val ClassicTypePalette = QuranTypePalette(
 )
 
 internal val LocalQuranTypePalette = staticCompositionLocalOf { TimelessTypePalette }
+
+/**
+ * The English leaf's leading. [ENGLISH_LEAF_LEADING_EM] was set for EB
+ * Garamond's 0.40 em x-height; Timeless stands at 0.52, so the same leading
+ * left less white between its lines than between Garamond's. A little more
+ * air costs the leaf a slightly smaller hand, which fits its page either way.
+ */
+internal val QuranTypePalette.leafLeadingEm: Float
+    get() = if (profile == QuranTypeProfile.TIMELESS) TIMELESS_LEAF_LEADING_EM else ENGLISH_LEAF_LEADING_EM
+
+private const val TIMELESS_LEAF_LEADING_EM = 1.46f
 
 internal fun quranTypePalette(
     timeless: Boolean,

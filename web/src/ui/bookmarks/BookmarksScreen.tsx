@@ -1,3 +1,4 @@
+import { suppliedWords } from '../../render/suppliedWords'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { QuranRepository } from '../../data/repository'
 import { VerseBookmarkRibbon } from '../../render/VerseBookmarkRibbon'
@@ -241,7 +242,7 @@ function BookmarkVerse({
         <span className="bookmark-verse-ar" lang="ar" dir="rtl">
           {ayah.text}
         </span>
-        <span className="bookmark-verse-translation">{ayah.translation}</span>
+        <span className="bookmark-verse-translation">{suppliedWords(ayah.translation)}</span>
       </button>
       <VerseBookmarkRibbon
         bookmarked

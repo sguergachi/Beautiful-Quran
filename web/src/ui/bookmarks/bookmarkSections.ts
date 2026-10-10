@@ -1,3 +1,4 @@
+import { foldEnglish } from '../../domain/EnglishTypography'
 import type { Ayah, Surah } from '../../data/models'
 import { normalizeArabicForSearch } from '../../domain/WordSearch'
 
@@ -53,11 +54,11 @@ export function filterBookmarkSections(
   const arabicNeedle = normalizeArabicForSearch(needle)
   const matches = needle
     ? verses.filter(({ surah, ayah }) =>
-        surah.nameTransliteration.toLocaleLowerCase().includes(lowerNeedle) ||
+        foldEnglish(surah.nameTransliteration).toLocaleLowerCase().includes(lowerNeedle) ||
         surah.nameTranslation.toLocaleLowerCase().includes(lowerNeedle) ||
         surah.nameArabic.includes(needle) ||
         String(surah.id) === needle ||
-        ayah.translation.toLocaleLowerCase().includes(lowerNeedle) ||
+        foldEnglish(ayah.translation).toLocaleLowerCase().includes(lowerNeedle) ||
         (arabicNeedle.length > 0 &&
           normalizeArabicForSearch(ayah.text).includes(arabicNeedle)) ||
         `${surah.id}:${ayah.number}` === needle,

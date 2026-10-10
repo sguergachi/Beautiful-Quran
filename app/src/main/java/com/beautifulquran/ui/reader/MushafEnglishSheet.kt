@@ -38,6 +38,8 @@ import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.text.TextMeasurer
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.buildAnnotatedString
+import com.beautifulquran.ui.theme.leafLeadingEm
+import com.beautifulquran.ui.theme.quietSuppliedBrackets
 import com.beautifulquran.ui.theme.QuranTypePalette
 import com.beautifulquran.ui.theme.LocalQuranTypePalette
 import androidx.compose.ui.text.font.FontStyle
@@ -74,7 +76,6 @@ import com.beautifulquran.domain.englishLeafBreak
 import com.beautifulquran.domain.englishLeafFittedLeadingEm
 import com.beautifulquran.domain.englishLeafOverflowHandPx
 import com.beautifulquran.domain.englishLeafHandPx
-import com.beautifulquran.domain.ENGLISH_LEAF_LEADING_EM
 import com.beautifulquran.domain.EnglishLeafFill
 import com.beautifulquran.domain.EnglishLeafRuler
 import com.beautifulquran.domain.EnglishLeafVerse
@@ -567,6 +568,7 @@ private fun englishLeafBlockTexts(
                     if (length > 0) append(" ")
                     val start = length
                     withStyle(SpanStyle(color = ink)) { append(verse.text) }
+                    quietSuppliedBrackets(verse.text, start, ink)
                     val range = start until length
                     // Only the fragment that ends the verse carries its mark: a
                     // carried sentence is numbered where it finishes, as a
@@ -663,7 +665,7 @@ private fun setEnglishLeaf(
     measurer: TextMeasurer,
     typePalette: QuranTypePalette,
 ): EnglishLeafSetting {
-    val requestedLeading = ENGLISH_LEAF_LEADING_EM * typePalette.tuning.book.leading
+    val requestedLeading = typePalette.leafLeadingEm * typePalette.tuning.book.leading
     var handPx = englishBookHandPx(wellPx, measurePx, density, measurer, typePalette)
     // Three passes at most, and all but one leaf in the book settles on the
     // first: the hand is the book's, the leading is the book's, and the leaf
@@ -845,7 +847,7 @@ private fun englishBookHandPx(
             text = block,
             style = englishProseStyle(
                 with(density) { handPx.toSp() },
-                with(density) { (handPx * ENGLISH_LEAF_LEADING_EM).toSp() },
+                with(density) { (handPx * typePalette.leafLeadingEm).toSp() },
                 typePalette,
             ).copy(letterSpacing = 0.em),
             constraints = Constraints(maxWidth = measurePx.toInt().coerceAtLeast(1)),
@@ -1642,7 +1644,7 @@ internal fun englishLeafRuler(
     translation: (surahId: Int, ayah: Int) -> String,
 ): EnglishLeafRuler {
     val handPx = englishBookHandPx(wellPx, measurePx, density, measurer, typePalette)
-    val pitchPx = handPx * ENGLISH_LEAF_LEADING_EM * typePalette.tuning.book.leading
+    val pitchPx = handPx * typePalette.leafLeadingEm * typePalette.tuning.book.leading
     val inkPx = englishLineInkPx(handPx, density, measurer, typePalette)
     val basmalahPx = englishBasmalahPx(handPx, measurePx, density, measurer, typePalette)
     val style = with(density) {

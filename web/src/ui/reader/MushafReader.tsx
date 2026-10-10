@@ -1,3 +1,4 @@
+import { suppliedWords } from '../../render/suppliedWords'
 import {
   Fragment,
   memo,
@@ -978,7 +979,7 @@ function MushafLeaf({
                     onPlayWord(item.surahId, item.ayah, 1)
                   }}
                 >
-                  {item.translation}
+                  {suppliedWords(item.translation ?? '')}
                 </span>
                 {/* No-break space: the number never starts a line alone. */}
                 {'\u00A0'}

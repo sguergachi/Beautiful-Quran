@@ -1307,7 +1307,7 @@ input[type='search']::-webkit-search-decoration {
   font-size: 13px;
   line-height: 17px;
   font-weight: 500;
-  letter-spacing: 0.6px;
+  letter-spacing: 0;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -1686,7 +1686,7 @@ input[type='search']::-webkit-search-decoration {
   font-size: 13px;
   line-height: 17px;
   font-weight: 500;
-  letter-spacing: 0.6px;
+  letter-spacing: 0;
 }
 
 /* End-of-chapter invitation: invitation chrome around a real .surah-header
@@ -2735,7 +2735,7 @@ button.ayah-mark {
 .mushaf-head-figure {
   flex: 1;
   text-align: left;
-  letter-spacing: 0.1em;
+  letter-spacing: 0.02em;
   font-variant-numeric: lining-nums;
   white-space: nowrap;
 }
@@ -2749,7 +2749,7 @@ button.ayah-mark {
   flex: 3;
   min-width: 0;
   text-align: center;
-  letter-spacing: 0.1em;
+  letter-spacing: 0.02em;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -3022,7 +3022,7 @@ button.ayah-mark {
   /* Android labelMedium. */
   font-size: 13px;
   font-weight: 500;
-  letter-spacing: 0.6px;
+  letter-spacing: 0;
   padding: 0.2rem 1rem;
   min-height: 32px;
   max-width: min(100%, 22rem);
@@ -8354,3 +8354,9 @@ html[data-entrance-closing]
 .verse-link-field { order: 1; flex-basis: 100%; min-width: 0; min-height: 44px; padding: 0.5rem 1rem; border: 0; background: none; color: var(--on-accent); }
 .verse-link-field:focus-visible { outline: 1px solid var(--on-accent); outline-offset: -2px; }
 .player-chapter { color: var(--ink-rung-muted); font-size: 0.75rem; text-align: end; }
+
+/* The translator's [supplied words]: the brackets recede, the words keep their
+   voice. Mirrors Android's SUPPLIED_BRACKET_INK. */
+.supplied-bracket {
+  color: color-mix(in srgb, currentColor 40%, transparent);
+}

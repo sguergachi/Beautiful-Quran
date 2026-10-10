@@ -86,7 +86,6 @@ import com.beautifulquran.domain.MUSHAF_LINE_PITCH_EM
 import com.beautifulquran.domain.MUSHAF_WORD_GAP_EM
 import com.beautifulquran.domain.MushafLine
 import com.beautifulquran.domain.MushafPage
-import com.beautifulquran.domain.ENGLISH_LEAF_LEADING_EM
 import com.beautifulquran.domain.mushafLineFit
 import com.beautifulquran.domain.qcfTrailingMark
 import com.beautifulquran.domain.qcfWordGlyphs
@@ -107,6 +106,8 @@ import com.beautifulquran.ui.reader.symbolicAyahBarCount
 import com.beautifulquran.ui.reader.verseAnnotationStyle
 import kotlin.math.abs
 import kotlin.math.roundToInt
+import com.beautifulquran.ui.theme.leafLeadingEm
+import com.beautifulquran.ui.theme.mixedCaseTrackingEm
 import com.beautifulquran.ui.theme.BrushCheckParams
 import com.beautifulquran.ui.theme.BrushCircleParams
 import com.beautifulquran.ui.theme.HafsFontFamily
@@ -768,7 +769,7 @@ private fun PreviewEnglishMushafLeaf(
             val measurePx = with(density) { maxWidth.toPx() }
             val style = englishProseStyle(
                 fontSize = leafSize,
-                lineHeight = leafSize * ENGLISH_LEAF_LEADING_EM * typePalette.tuning.book.leading,
+                lineHeight = leafSize * typePalette.leafLeadingEm * typePalette.tuning.book.leading,
                 typePalette = typePalette,
             )
             val set = remember(text, style, measurePx, density, measurer) {
@@ -787,7 +788,7 @@ private fun PreviewLeafRunningHead(pageNumberScript: PageNumberScript) {
     val ink = QuranTheme.ink.muted
     val style = MaterialTheme.typography.labelSmall.copy(
         fontSize = PreviewLeafHeadSize,
-        letterSpacing = 0.10.em,
+        letterSpacing = mixedCaseTrackingEm(0.10f).em,
     )
     MushafRunningHead(
         page = PreviewMushafPage,

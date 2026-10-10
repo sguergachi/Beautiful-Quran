@@ -77,6 +77,7 @@ import com.beautifulquran.data.model.Surah
 import com.beautifulquran.ui.reader.VerseBookmarkRibbon
 import com.beautifulquran.ui.reader.VERSE_ANNOTATION_INK_ALPHA
 import com.beautifulquran.ui.reader.verseAnnotationStyle
+import com.beautifulquran.ui.theme.suppliedWordsText
 import com.beautifulquran.ui.theme.ArabicTitleStyle
 import com.beautifulquran.ui.theme.PaperSearchField
 import com.beautifulquran.ui.theme.DisclosureChevron
@@ -444,7 +445,7 @@ private fun BookmarkAyahRow(
             )
             Spacer(Modifier.height(8.dp))
             Text(
-                text = bookmark.translation,
+                text = suppliedWordsText(bookmark.translation, QuranTheme.ink.strong),
                 style = MaterialTheme.typography.bodyLarge.copy(
                     fontSize = typeScale(15.sp, 17.sp),
                     lineHeight = typeLeading(23.sp, 25.sp),

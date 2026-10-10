@@ -47,6 +47,7 @@ import androidx.compose.ui.unit.em
 import androidx.compose.ui.unit.times
 import com.beautifulquran.data.MushafBannerStyle
 import com.beautifulquran.data.model.Surah
+import com.beautifulquran.ui.theme.mixedCaseTrackingEm
 import com.beautifulquran.ui.theme.DisplayFontFamily
 import com.beautifulquran.ui.theme.BookTextMotion
 import com.beautifulquran.ui.theme.TEXT_PAINT_FLAGS
@@ -161,6 +162,7 @@ internal fun MushafSurahTitleBand(
     val titleSize = fontSize * if (latin) MushafLatinTitleScale else MushafArabicTitleScale
     val resolvedTypeface by LocalFontFamilyResolver.current.resolve(family)
     val density = LocalDensity.current
+    val titleTrackingEm = mixedCaseTrackingEm(TitleLetterSpacingEm)
     val naturalPx = with(density) { titleSize.toPx() }
     val bandPx = with(density) { bandHeight.toPx() }
     BoxWithConstraints(
@@ -172,21 +174,21 @@ internal fun MushafSurahTitleBand(
     // name too long for that (a long transliteration on a narrow phone or at a
     // large font scale) is set down until it fits, never let through.
     val roomPx = bannerNameRoomPx(style, constraints.maxWidth.toFloat(), bandPx)
-    val fontPx = remember(resolvedTypeface, naturalPx, latin, name, roomPx) {
+    val fontPx = remember(resolvedTypeface, naturalPx, latin, name, roomPx, titleTrackingEm) {
         val probe = Paint(TEXT_PAINT_FLAGS).apply {
             typeface = resolvedTypeface as Typeface
             textSize = naturalPx
-            if (latin) letterSpacing = TitleLetterSpacingEm
+            if (latin) letterSpacing = titleTrackingEm
         }
         val natural = probe.measureText(name)
         if (natural <= 0f || natural <= roomPx) naturalPx else naturalPx * (roomPx / natural).coerceAtLeast(0.5f)
     }
     val titleSizeFit = with(density) { fontPx.toSp() }
-    val paint = remember(resolvedTypeface, fontPx, latin) {
+    val paint = remember(resolvedTypeface, fontPx, latin, titleTrackingEm) {
         Paint(TEXT_PAINT_FLAGS).apply {
             typeface = resolvedTypeface as Typeface
             textSize = fontPx
-            if (latin) letterSpacing = TitleLetterSpacingEm
+            if (latin) letterSpacing = titleTrackingEm
         }
     }
     val drop = remember(paint, latin, bandPx) { titleBaselineDrop(paint, latin, bandPx) }
@@ -432,7 +434,7 @@ private fun MushafTitle(
         style = TextStyle(
             fontFamily = family,
             fontSize = fontSize,
-            letterSpacing = if (latin) TitleLetterSpacingEm.em else TextUnit.Unspecified,
+            letterSpacing = if (latin) mixedCaseTrackingEm(TitleLetterSpacingEm).em else TextUnit.Unspecified,
             textMotion = if (latin) BookTextMotion else null,
             color = ink,
             textAlign = TextAlign.Center,

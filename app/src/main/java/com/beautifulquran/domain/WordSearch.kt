@@ -238,7 +238,7 @@ fun matchWordSearch(
                     fuzzyWordMatch(normalizeArabicForSearch(anchor.ayahText), arabic)
                 } else {
                     (if (sources.verseTranslation) {
-                        fuzzyWordMatch(anchor.ayahTranslation.lowercase(), latin.text)
+                        fuzzyWordMatch(EnglishTypography.fold(anchor.ayahTranslation).lowercase(), latin.text)
                     } else null) ?: (if (sources.wordGloss) {
                         fuzzyWordMatch(sameAyahGlossLine(index, at).lowercase(), latin.text)
                     } else null) ?: if (sources.transliteration) {
@@ -985,12 +985,15 @@ private fun highlightNeedleSpecs(
 }
 
 private fun firstOccurrence(
-    text: String,
-    term: String,
+    typeset: String,
+    rawTerm: String,
     wholeWord: Boolean,
     wordPrefix: Boolean = false,
     startIndex: Int = 0,
 ): Int {
+    // Folded character for character: an index here is an index in [typeset].
+    val text = EnglishTypography.fold(typeset)
+    val term = EnglishTypography.fold(rawTerm)
     var at = text.indexOf(term, startIndex, ignoreCase = true)
     while (at >= 0) {
         val end = at + term.length

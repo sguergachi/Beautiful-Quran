@@ -965,8 +965,21 @@ not the app's.
   an inferred sentence boundary. This policy never mutates the database text
   or the timing/search identity of a word.
 - **Translations**: Timeless Serif, 15 sp, 24 sp leading, at 66 % ink.
-- **UI text**: the same serif at small sizes with letterspacing and reduced
-  alpha; labels never compete with scripture. One deliberate exception on
+- **Typographer's punctuation** (`EnglishTypography.typeset`, web
+  `typesetEnglish`): straight quotes and apostrophes are curled, a spaced
+  hyphen becomes a spaced en dash, and a quotation the source left open at a
+  verse's end is closed — unless the next verse opens by closing it. Display
+  only and one character for one, so search ranges and word spans measured on
+  the stored text still land; matching folds the marks back
+  (`fold` / `foldEnglish`). Surah names and glosses get the curled apostrophe.
+- **Supplied words**: Sahih International's [brackets] sit at 40 % of the
+  text's ink (`SUPPLIED_BRACKET_INK`); the words inside keep full ink, because
+  they carry meaning.
+- **English leaf leading**: 1.46 em in Timeless (1.40 em was set for
+  Garamond's smaller x-height).
+- **UI text**: the same serif at small sizes with reduced alpha, set solid —
+  mixed-case labels, facts, banner names and running heads are never tracked
+  past 0.02 em; only ALL-CAPS labels are letterspaced; labels never compete with scripture. One deliberate exception on
   Android: interactive UI labels that use Material's `labelLarge` — search
   section labels, "Show N more", the search dial's Open, the chapter
   Continue / Open pill — stay in the sans (Timeless Sans). Set against the serif page

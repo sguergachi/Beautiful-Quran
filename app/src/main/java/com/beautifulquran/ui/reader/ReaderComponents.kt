@@ -134,6 +134,7 @@ import com.beautifulquran.data.model.Word
 import com.beautifulquran.domain.EnglishTypography
 import com.beautifulquran.domain.TajweedPacing
 import com.beautifulquran.ui.reader.focus.FocusEngine
+import com.beautifulquran.ui.theme.quietSuppliedBrackets
 import com.beautifulquran.ui.theme.forCaps
 import com.beautifulquran.ui.theme.liningFigures
 import com.beautifulquran.ui.theme.BookTextMotion
@@ -2191,7 +2192,7 @@ private fun ResponsiveEnglishAyah(
                     SpanStyle(
                         color = if (
                             searchQuery != null &&
-                            word.translation.contains(searchQuery, ignoreCase = true)
+                            EnglishTypography.fold(word.translation).contains(searchQuery, ignoreCase = true)
                         ) {
                             gold
                         } else {
@@ -2525,14 +2526,16 @@ private fun ResponsiveHafsAyah(
 }
 
 /** Marks every occurrence of [query] in [text] with a soft gold wash. */
-private fun highlightMatches(text: String, query: String?, mark: Color): AnnotatedString =
+private fun highlightMatches(text: String, query: String?, mark: Color, ink: Color): AnnotatedString =
     buildAnnotatedString {
         append(text)
+        quietSuppliedBrackets(text, 0, ink)
         if (query.isNullOrEmpty()) return@buildAnnotatedString
-        var i = text.indexOf(query, ignoreCase = true)
+        val folded = EnglishTypography.fold(text)
+        var i = folded.indexOf(query, ignoreCase = true)
         while (i >= 0) {
             addStyle(SpanStyle(background = mark), i, i + query.length)
-            i = text.indexOf(query, i + query.length, ignoreCase = true)
+            i = folded.indexOf(query, i + query.length, ignoreCase = true)
         }
     }
 
@@ -3022,7 +3025,7 @@ fun AyahBlock(
     }
     val searchTargetAyah = flashWordPosition != null
     fun hits(word: Word) =
-        searchQuery != null && word.translation.contains(searchQuery, ignoreCase = true)
+        searchQuery != null && EnglishTypography.fold(word.translation).contains(searchQuery, ignoreCase = true)
     // Non-active ayahs recede while another is being recited. Dim is applied
     // at the word level (Upcoming ink / paper cover) in every mode so ayah
     // handoff does not brighten the verse — block alpha stays at 1 except
@@ -3396,6 +3399,7 @@ fun AyahBlock(
                         text = ayah.translation,
                         query = searchQuery,
                         mark = LocalQuranAccents.current.gold.copy(alpha = 0.28f),
+                        ink = QuranTheme.ink.secondary,
                     ),
                     style = MaterialTheme.typography.bodyLarge.copy(
                         fontFamily = TranslationFontFamily,
