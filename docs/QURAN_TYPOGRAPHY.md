@@ -899,10 +899,21 @@ percent of type on that leaf alone. That breaks §13.3 knowingly — on 2:282 th
 alternatives are overlapping lines or revelation clipped off the foot, and a page
 set a little small is the only one of the three a reader can still read.
 
-### 13.5 Ragged right, hyphenated at the book's minima
+### 13.5 Ragged right, with whole words
 
-`TextAlign.Start` with `LineBreak.Paragraph` broken greedily, the book face's
-kerning, ligatures and old-style figures — and hyphenation.
+`TextAlign.Start` with word-space breaks chosen by `EnglishRag`, the book
+face's kerning, ligatures and old-style figures. `Hyphens.None`: words stay
+whole, with no inserted soft hyphens or word joiners. Prose tracks at −0.025 em;
+the verse ornaments keep natural spacing. The book's hand is calibrated at
+natural spacing too, so tightening the letters does not change its type size.
+The measurements below record the earlier settings as well as the reasons
+for the current one.
+
+The developer font comparison keeps these whole-word rules for both Timeless
+and the classic Garamond profile. The book cache includes the profile, and the
+paragraph-break cache includes the full text style and annotated spans. A font
+change therefore cannot reuse the other face's measurements or chosen breaks.
+Customize uses the same rag setter as the live leaf.
 
 The mushaf's own rule is that every full line reaches both margins (rule 3) —
 but that is a rule about Arabic, which fills a line by the letterform, and it
@@ -1018,7 +1029,8 @@ a request for one of two other things:
 - **More words to a line** — a smaller hand, or a wider measure. Both are
   changes to §13.2/§13.3, not to line breaking.
 
-It is not a line-breaking problem, and no breaker will fix it.
+It is not a line-breaking problem, and no breaker will fix it — the *evenness*.
+The *holes* were a line-breaking problem; see below.
 
 #### And an even rag was the wrong thing to want
 
@@ -1053,6 +1065,74 @@ the margin and moves the right edge. The price is 3 px of mean shortfall and
 eight more deep holes — and that is the right way round. A deep hole is legible
 as a hole; a phantom margin is not legible as anything, it just makes the page
 look pinned to the left.
+
+#### Then the holes, refused one at a time
+
+Greedy was right about the rag and wrong about the holes, and a reader said so
+of Ar-Rahman's first leaf: *why does the edge have so many holes, especially in
+the first three lines?* Line three, *The sun and the moon [move] by precise*,
+stopped a quarter of the measure short, because *calculation* bound to its
+verse mark just missed — and the platform would not hyphenate it.
+
+Two faults, and both were real:
+
+- **The veto had switched hyphenation off.** The platform hyphenator reads its
+  patterns only in a word made wholly of letters; a word with a joiner in it
+  breaks at soft hyphens or nowhere. So every word the veto touched lost *all*
+  its cuts, the good ones with the bad: *cal-culation*, *Cre-ated*,
+  *bal-ance*. And the greedy breaker would not take a cut inside such a word
+  even when one was written there — a soft hyphen, or a hard one, the word went
+  whole to the next line.
+- **Greedy cannot look one line ahead.** Where a long word just misses, a
+  compositor carries a short word down from the line above and shares the white
+  between two lines. Greedy leaves it all in one.
+
+So the leaf breaks its own lines (`EnglishRag`, `englishRaggedProse`), on a
+cost that keeps what greedy got right:
+
+1. **Fewest lines first** — with whole words, the same minimum count greedy
+   sets, so pagination and its bisection stand on the same arithmetic.
+2. **A shortfall under 1.65 em is free.** Only past that does a line cost, as
+   the square of the excess. A line that was fine is never moved to even it
+   with its neighbours, which is what drew `Balanced`'s phantom margin.
+3. **Ties go to the fuller line**, top down: among equal settings, greedy's.
+
+The breaks replace word spaces with newlines, one character for one, so the
+wash and tap offsets stay on the same letters. A long word stays whole even
+when breaking it would fill a hole. The ruler and rag reserve the same one
+pixel for rounding, and the platform draws the chosen lines at the full measure.
+
+Choosing the rag for every pagination probe made the whole book take tens of
+seconds to rebuild while the English leaf waited without ink. With whole
+words, greedy wrapping already gives the minimum line count the rag preserves.
+The ruler now measures that count directly for its fill and prefix search; the
+rag is chosen only when setting a visible leaf. The measured-book gate stays.
+Cache format 26 discards pagination made before the tighter prose spacing.
+
+Whole-word breaks alone still left Ar-Rahman's *…by precise* line 216 px short
+on a 1,006 px measure: sharing that hole created a worse one above it. The
+reader chose slightly tighter letters while keeping the type size. At the
+same 51.16 px hand, −0.025 em lets *Created* fit on line one and keeps
+*precise calculation* together. The opening leaf's deepest gap falls from
+216 to 119 px, without hyphenation, enlarged word spaces, or smaller type.
+The chosen setting is measured once before its breaks are cached. If platform
+rounding changes the line count, that paragraph keeps the platform's breaks;
+the ruler and the drawn page therefore retain the same count.
+
+The earlier hyphenating prototype was measured on the device's own metrics
+(EB Garamond at the leaf's hand, the real translation, 88–145 lines a chapter):
+
+```
+                         worst hole   holes > 1/8    reach the     hyphens
+                           (px)        measure       margin
+    greedy, as shipped     186–272      6–16          18–24           0
+    the rag                 123–150      0–3          12–23         0–4
+```
+
+On the emulator Ar-Rahman's first leaf lost its three-line hole
+(*…by precise calcula- / tion ⟨5⟩…*), took most of a line more text, and the
+book came out nine leaves shorter. Line one stays short: *Created* does not fit
+after *Qur'an ⟨2⟩*, and no arrangement of the lines below it helps.
 
 #### A chapter's last leaf carries two lines, or the break moves
 
@@ -1109,7 +1189,10 @@ none to tighten. Measured on the page, the gap either side of a mark is 12–13 
 against an ordinary word gap of 12 — the Hafs cups carry no slack, and shrinking
 the mark was never the lever.
 
-What fills the deep holes greedy breaking leaves is hyphenation: a long word the rag cannot absorb — *righteousness*,
+#### Earlier hyphenation experiments
+
+Hyphenation was also tried to fill greedy's deep holes: a long word the rag
+cannot absorb — *righteousness*,
 *[fulfillment]*, *obedience* — pushes its neighbours into a deep hole at the
 line's end (*…and does* / *righteousness…*, a seventh of the measure empty on
 the Ta-Ha leaf that prompted this).
@@ -1117,10 +1200,9 @@ the Ta-Ha leaf that prompted this).
 But the breaker's own hyphenation cannot be told that *de-scends* is not a
 break, and Compose exposes no frequency or fragment control — while self-set
 soft hyphens are ignored with hyphenation off and subsumed with it on. So the
-leaf vetoes instead of proposing (`EnglishHyphenation`): the TeX US-English
-patterns (`HyphenTable`, extracted by `tools/build_hyphen_table.py`) propose
-every cut, each cut with fewer than three letters on either side is joined
-with a word joiner, and the breaker takes the rest under `Hyphens.Auto`.
+earlier leaf vetoed instead of proposing: TeX US-English patterns proposed
+every cut, each cut with fewer than three letters on either side was joined
+with a word joiner, and the breaker took the rest under `Hyphens.Auto`.
 *right-eous-ness* and *pro-tection* carry over; *de-scends*, *Re-pelled* and
 *obe-di-ence*'s middle *di* stay whole.
 
@@ -1137,9 +1219,10 @@ rule, and excluded):
 
 Good breaks only, and no short end the setting did not already have — while
 unvetoed hyphenation, measured alongside, breaks *Re-pelled* and *de-scends*
-after two letters on the same leaves. The table implementation is checked against its own source: the trie reproduces
-pyphen's raw cuts exactly over 400 corpus words, and the vetoes are locked
-word by word in `EnglishHyphenationTest`.
+after two letters on the same leaves. The former table implementation was checked against its own source: the trie
+reproduced pyphen's raw cuts over 400 corpus words, with word-level veto tests.
+That implementation, its pattern table, generator and tests have been removed;
+the reader chose whole words.
 
 Two things were tried and reverted, and the leaf records them so nobody
 re-tries them blind:
@@ -1177,7 +1260,7 @@ at once. `lineSelectionBounds` keeps only what is inside the line's own band.
 
 Then the hyphen itself, which is drawn without being written: no verse's range
 reaches it, so the cover that ends a hyphenated line stopped one glyph short and
-left the hyphen at full ink over dimmed prose. Its advance is measured in the
+left the hyphen at full ink over dimmed prose. Its advance was measured in the
 leaf's own hand and added to that cover — the hyphen belongs to the word it
 broke, and to the ink over it. The same figure is subtracted from the stretch in
 `justifyShift`, which is dormant while the page is ragged and correct if it is
@@ -1420,7 +1503,12 @@ it is set to the measure: the hand comes down until the line fits, which is the
 Latin form of §4's "a line that will not fit is made to fit", by the only lever
 this script gives. It is still one size for the whole book, because the measure
 does not change from leaf to leaf, and a display line set smaller than the body
-is what a printed translation does with it anyway. Its slot is measured too, and
+is what a printed translation does with it anyway. The size is fitted in two
+measured passes using fractional caret advances and subpixel rendering, so the
+final line fills the column to within a pixel rather than trusting a rounded
+body-size estimate. Half a pixel of slack absorbs shaping's remaining rounding.
+The size follows the column width without a body-size cap. Its slot is measured
+with the same style and one-line constraint as the drawing, and
 all of its air falls below it — centred, half of it landed above instead, under
 the chapter's panel.
 

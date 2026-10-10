@@ -99,6 +99,7 @@ import com.beautifulquran.ui.theme.quietClickable
 import com.beautifulquran.ui.theme.shippedCheckParams
 import com.beautifulquran.ui.theme.themePreviewColors
 import com.beautifulquran.ui.theme.verticalFadingEdges
+import com.beautifulquran.ui.theme.typeScale
 import kotlin.math.roundToInt
 import com.beautifulquran.ui.theme.QuranTheme
 
@@ -370,6 +371,18 @@ private fun DeveloperSection(
     SectionLabel("Developer")
     Spacer(Modifier.height(2.dp))
     Caption("Tools for testing work in progress.")
+
+    Spacer(Modifier.height(20.dp))
+    ToggleRow(
+        label = "Timeless typography",
+        checked = settings.timelessTypographyEnabled,
+        onChange = { enabled ->
+            viewModel.settings.update { it.copy(timelessTypographyEnabled = enabled) }
+        },
+        checkParams = checkParams,
+        checkPaintToken = checkPaintToken,
+    )
+    Caption("Turn off to compare EB Garamond, Cormorant, and their previous type scale.")
 
     Spacer(Modifier.height(20.dp))
     SectionLabel("Chapter banner")
@@ -1095,7 +1108,7 @@ internal fun TextSizeControl(scale: Float, onScale: (Float) -> Unit) {
     Row(verticalAlignment = Alignment.CenterVertically) {
         Text(
             text = "A",
-            fontSize = 13.sp,
+            fontSize = typeScale(13.sp, 15.sp),
             fontFamily = MaterialTheme.typography.bodyLarge.fontFamily,
             color = glyphInk,
             modifier = Modifier
@@ -1130,7 +1143,7 @@ internal fun TextSizeControl(scale: Float, onScale: (Float) -> Unit) {
         }
         Text(
             text = "A",
-            fontSize = 23.sp,
+            fontSize = typeScale(23.sp, 26.sp),
             fontFamily = MaterialTheme.typography.bodyLarge.fontFamily,
             color = glyphInk,
             modifier = Modifier

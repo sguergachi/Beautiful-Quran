@@ -145,6 +145,7 @@ import kotlinx.coroutines.launch
 import kotlin.math.abs
 import kotlin.math.roundToInt
 import com.beautifulquran.ui.theme.LocalQuranInk
+import com.beautifulquran.ui.theme.SerifFontFamily
 import com.beautifulquran.ui.theme.contrastingOverlayInk
 import com.beautifulquran.ui.theme.contrastingOverlayAccents
 
@@ -311,6 +312,8 @@ class MainActivity : ComponentActivity() {
             ) {
                 BeautifulQuranTheme(
                     themeMode = settings.themeMode,
+                    timelessTypography =
+                        !settings.developerModeEnabled || settings.timelessTypographyEnabled,
                 ) {
                     // Cold start paints the closed mushaf first; the paper stack
                     // mounts under it after two board frames (onWarmStack),
@@ -416,6 +419,9 @@ private fun PaperStackApp(
     val rootViewerViewModel: RootViewerViewModel = viewModel(factory = AppViewModelFactory)
     val shareViewModel: ShareViewModel = viewModel(factory = AppViewModelFactory)
     val settings by app.settings.settings.collectAsStateWithLifecycle()
+    val classicTypographyActive = settings.developerModeEnabled &&
+        !settings.timelessTypographyEnabled
+    val serifFontFamily = SerifFontFamily
     val settingsInkPreview = remember {
         SettingsInkPreviewState(settings.brushCircleStyle)
     }
@@ -461,6 +467,7 @@ private fun PaperStackApp(
         windowSize,
         settings.englishLeafText,
         settings.verseNumberScript,
+        classicTypographyActive,
     ) {
         // Nothing remembered — a first launch, or a window this app has not
         // been this size in. Work the leaf's size out instead of waiting for a
@@ -491,6 +498,7 @@ private fun PaperStackApp(
                     measurePx = metrics[1],
                     density = leafDensity,
                     measurer = leafMeasurer,
+                    serifFontFamily = serifFontFamily,
                     verseNumberScript = settings.verseNumberScript,
                     translation = translation,
                 )
@@ -499,6 +507,7 @@ private fun PaperStackApp(
                 metrics[0],
                 metrics[1],
                 settings.verseNumberScript,
+                classicTypographyActive,
             ),
             cacheKey = app.englishBookCache.key(
                 wellPx = metrics[0],
@@ -506,7 +515,7 @@ private fun PaperStackApp(
                 verseNumberScript = settings.verseNumberScript.ordinal,
                 leafText = settings.englishLeafText.ordinal,
                 database = QuranDatabase.DB_FILE_NAME,
-                ),
+            ) + if (classicTypographyActive) "|classic" else "|timeless",
         )
     }
     val bookmarkCount by bookmarksViewModel.bookmarkCount.collectAsStateWithLifecycle()
@@ -1193,7 +1202,11 @@ private fun PaperStackApp(
                         onShareCancel = shareViewModel::onChromeCancel,
                         onShareText = { shareViewModel.shareAsText() },
                         onShareImage = {
-                            if (activity != null) shareViewModel.shareAsImage(activity)
+                            if (activity != null) {
+                                shareViewModel.shareAsImage(
+                                    activity, timelessTypography = !classicTypographyActive,
+                                )
+                            }
                         },
                         playbackHost = pinnedPlayback,
                         playbackPinned = playbackPinned,

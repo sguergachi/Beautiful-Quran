@@ -44,6 +44,7 @@ object ShareImageRenderer {
     suspend fun renderSegments(
         activity: Activity,
         segmentCount: Int,
+        timelessTypography: Boolean = true,
         content: @Composable (index: Int) -> Unit,
     ): Bitmap {
         require(segmentCount > 0)
@@ -145,7 +146,10 @@ object ShareImageRenderer {
                             ViewCompositionStrategy.DisposeOnDetachedFromWindow,
                         )
                         setContent {
-                            BeautifulQuranTheme(themeMode = ThemeMode.LIGHT) {
+                            BeautifulQuranTheme(
+                                themeMode = ThemeMode.LIGHT,
+                                timelessTypography = timelessTypography,
+                            ) {
                                 content(index)
                             }
                         }
@@ -164,8 +168,9 @@ object ShareImageRenderer {
 
     suspend fun render(
         activity: Activity,
+        timelessTypography: Boolean = true,
         content: @Composable () -> Unit,
-    ): Bitmap = renderSegments(activity, 1) { content() }
+    ): Bitmap = renderSegments(activity, 1, timelessTypography) { content() }
 }
 
 /** Combined sheet height from per-strip wrap heights. */

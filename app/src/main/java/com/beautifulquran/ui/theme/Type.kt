@@ -4,6 +4,8 @@ import android.content.Context
 import android.graphics.Typeface
 import androidx.annotation.FontRes
 import androidx.compose.material3.Typography
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.AndroidFont
 import androidx.compose.ui.text.font.Font
@@ -12,6 +14,7 @@ import androidx.compose.ui.text.font.FontLoadingStrategy
 import androidx.compose.ui.text.font.FontVariation
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.em
 import androidx.compose.ui.unit.sp
 import com.beautifulquran.R
@@ -70,8 +73,8 @@ const val MUSHAF_BASMALAH_INK_MID_EM = 0.3101f
 /**
  * Timeless Serif Text — the book face. Everything English that is *read* is
  * set in it: translations, glosses, lists, names, facts. The Text cuts are
- * its small-size optical master, with a true italic so emphasis never falls
- * back to a synthetic slant.
+ * its small-size optical master. Italics use the family's real Timeless
+ * Serif Italic cut; the archive has no separate Text Italic optical master.
  *
  * Timeless has no ḍ ḥ ẓ ʾ ʿ, which transliterations and the dictionary use,
  * so each cut falls back to the matching EB Garamond — the book face before
@@ -81,7 +84,7 @@ const val MUSHAF_BASMALAH_INK_MID_EM = 0.3101f
  * about an eighth larger: sizes across the app sit at ~0.88 of what they were
  * in Garamond, which keeps every line's apparent size and the page's density.
  */
-val SerifFontFamily = FontFamily(
+private val TimelessSerifFontFamily = FontFamily(
     bookFont(R.font.timeless_serif_text_regular, R.font.eb_garamond_regular, FontWeight.Normal),
     bookFont(R.font.timeless_serif_italic, R.font.eb_garamond_italic, FontWeight.Normal, FontStyle.Italic),
     bookFont(R.font.timeless_serif_text_medium, R.font.eb_garamond_medium, FontWeight.Medium),
@@ -95,7 +98,7 @@ val SerifFontFamily = FontFamily(
  * replaced, so each weight the app asks for is served by the cut one step
  * lighter: Medium by Regular, SemiBold by Medium. The web maps the same.
  */
-val DisplayFontFamily = FontFamily(
+private val TimelessDisplayFontFamily = FontFamily(
     bookFont(R.font.timeless_serif_regular, R.font.eb_garamond_regular, FontWeight.Medium),
     bookFont(R.font.timeless_serif_medium, R.font.eb_garamond_medium, FontWeight.SemiBold),
 )
@@ -104,12 +107,50 @@ val DisplayFontFamily = FontFamily(
  * Timeless Sans — the controls' face: Material's sans slots ([QuranTypography]
  * keeps `labelLarge` & co. sans on purpose; see docs/DESIGN.md, "UI text").
  */
-val SansFontFamily = FontFamily(
+private val TimelessSansFontFamily = FontFamily(
     Font(R.font.timeless_sans_regular, FontWeight.Normal),
     Font(R.font.timeless_sans_medium, FontWeight.Medium),
 )
 
-val TranslationFontFamily = SerifFontFamily
+private val ClassicSerifFontFamily = FontFamily(
+    Font(R.font.eb_garamond_regular, FontWeight.Normal),
+    Font(R.font.eb_garamond_italic, FontWeight.Normal, FontStyle.Italic),
+    Font(R.font.eb_garamond_medium, FontWeight.Medium),
+    Font(R.font.eb_garamond_semibold, FontWeight.SemiBold),
+)
+
+private val ClassicDisplayFontFamily = FontFamily(
+    Font(R.font.cormorant_garamond_medium, FontWeight.Medium),
+    Font(R.font.cormorant_garamond_semibold, FontWeight.SemiBold),
+)
+
+private val ClassicSansFontFamily = FontFamily.Default
+
+internal enum class QuranTypeProfile { TIMELESS, CLASSIC }
+
+internal data class QuranTypePalette(
+    val profile: QuranTypeProfile,
+    val serif: FontFamily,
+    val display: FontFamily,
+    val sans: FontFamily,
+    val typography: Typography,
+)
+
+val SerifFontFamily: FontFamily
+    @Composable get() = LocalQuranTypePalette.current.serif
+
+val DisplayFontFamily: FontFamily
+    @Composable get() = LocalQuranTypePalette.current.display
+
+val SansFontFamily: FontFamily
+    @Composable get() = LocalQuranTypePalette.current.sans
+
+val TranslationFontFamily: FontFamily
+    @Composable get() = SerifFontFamily
+
+@Composable
+internal fun typeScale(timeless: TextUnit, classic: TextUnit): TextUnit =
+    if (LocalQuranTypePalette.current.profile == QuranTypeProfile.TIMELESS) timeless else classic
 
 /**
  * A Timeless cut that falls back to [fallback] — an EB Garamond of the same
@@ -190,68 +231,143 @@ private const val BOOK_FEATURES = "'kern' 1, 'liga' 1, 'onum' 1"
 private val MaterialSans = Typography()
 
 /**
- * Full serif scale, ~0.88 of its Garamond sizes (see [SerifFontFamily]).
- * The slots left at Material's sizes are the sans ones: the controls'
- * labels, in [SansFontFamily].
+ * The shipped scale: serif sizes are ~0.88 of the previous Garamond values,
+ * while Material's sans slots take Timeless Sans.
  */
-val QuranTypography = Typography(
-    displayLarge = MaterialSans.displayLarge.copy(fontFamily = SansFontFamily),
-    displayMedium = MaterialSans.displayMedium.copy(fontFamily = SansFontFamily),
-    displaySmall = MaterialSans.displaySmall.copy(fontFamily = SansFontFamily),
-    headlineLarge = MaterialSans.headlineLarge.copy(fontFamily = SansFontFamily),
+private val TimelessQuranTypography = Typography(
+    displayLarge = MaterialSans.displayLarge.copy(fontFamily = TimelessSansFontFamily),
+    displayMedium = MaterialSans.displayMedium.copy(fontFamily = TimelessSansFontFamily),
+    displaySmall = MaterialSans.displaySmall.copy(fontFamily = TimelessSansFontFamily),
+    headlineLarge = MaterialSans.headlineLarge.copy(fontFamily = TimelessSansFontFamily),
     headlineMedium = TextStyle(
-        fontFamily = DisplayFontFamily,
+        fontFamily = TimelessDisplayFontFamily,
         fontWeight = FontWeight.SemiBold,
         fontSize = 24.sp,
         lineHeight = 30.sp,
         letterSpacing = 0.2.sp,
     ),
-    headlineSmall = MaterialSans.headlineSmall.copy(fontFamily = SansFontFamily),
+    headlineSmall = MaterialSans.headlineSmall.copy(fontFamily = TimelessSansFontFamily),
     titleLarge = TextStyle(
-        fontFamily = DisplayFontFamily,
+        fontFamily = TimelessDisplayFontFamily,
         fontWeight = FontWeight.SemiBold,
         fontSize = 19.5.sp,
         lineHeight = 25.sp,
         letterSpacing = 0.2.sp,
     ),
     titleMedium = TextStyle(
-        fontFamily = SerifFontFamily,
+        fontFamily = TimelessSerifFontFamily,
         fontWeight = FontWeight.Medium,
         fontSize = 15.sp,
         lineHeight = 21.sp,
         letterSpacing = 0.15.sp,
         fontFeatureSettings = BOOK_FEATURES,
     ),
-    titleSmall = MaterialSans.titleSmall.copy(fontFamily = SansFontFamily),
+    titleSmall = MaterialSans.titleSmall.copy(fontFamily = TimelessSansFontFamily),
     bodyLarge = TextStyle(
-        fontFamily = SerifFontFamily,
+        fontFamily = TimelessSerifFontFamily,
         fontSize = 15.sp,
         lineHeight = 24.sp,
         fontFeatureSettings = BOOK_FEATURES,
     ),
     bodyMedium = TextStyle(
-        fontFamily = SerifFontFamily,
+        fontFamily = TimelessSerifFontFamily,
         fontSize = 13.sp,
         lineHeight = 20.sp,
         fontFeatureSettings = BOOK_FEATURES,
     ),
-    bodySmall = MaterialSans.bodySmall.copy(fontFamily = SansFontFamily),
-    labelLarge = MaterialSans.labelLarge.copy(fontFamily = SansFontFamily),
+    bodySmall = MaterialSans.bodySmall.copy(fontFamily = TimelessSansFontFamily),
+    labelLarge = MaterialSans.labelLarge.copy(fontFamily = TimelessSansFontFamily),
     labelMedium = TextStyle(
-        fontFamily = SerifFontFamily,
+        fontFamily = TimelessSerifFontFamily,
         fontWeight = FontWeight.Medium,
         fontSize = 11.5.sp,
         lineHeight = 15.sp,
         letterSpacing = 0.6.sp,
     ),
     labelSmall = TextStyle(
-        fontFamily = SerifFontFamily,
+        fontFamily = TimelessSerifFontFamily,
         fontWeight = FontWeight.Medium,
         fontSize = 10.5.sp,
         lineHeight = 14.sp,
         letterSpacing = 0.8.sp,
     ),
 )
+
+/** The exact pre-Timeless Material + Garamond/Cormorant scale for comparison. */
+private val ClassicQuranTypography = Typography(
+    headlineMedium = TextStyle(
+        fontFamily = ClassicDisplayFontFamily,
+        fontWeight = FontWeight.SemiBold,
+        fontSize = 28.sp,
+        lineHeight = 34.sp,
+        letterSpacing = 0.2.sp,
+    ),
+    titleLarge = TextStyle(
+        fontFamily = ClassicDisplayFontFamily,
+        fontWeight = FontWeight.SemiBold,
+        fontSize = 22.sp,
+        lineHeight = 28.sp,
+        letterSpacing = 0.2.sp,
+    ),
+    titleMedium = TextStyle(
+        fontFamily = ClassicSerifFontFamily,
+        fontWeight = FontWeight.Medium,
+        fontSize = 17.sp,
+        lineHeight = 23.sp,
+        letterSpacing = 0.15.sp,
+        fontFeatureSettings = BOOK_FEATURES,
+    ),
+    bodyLarge = TextStyle(
+        fontFamily = ClassicSerifFontFamily,
+        fontSize = 17.sp,
+        lineHeight = 26.sp,
+        fontFeatureSettings = BOOK_FEATURES,
+    ),
+    bodyMedium = TextStyle(
+        fontFamily = ClassicSerifFontFamily,
+        fontSize = 15.sp,
+        lineHeight = 22.sp,
+        fontFeatureSettings = BOOK_FEATURES,
+    ),
+    labelMedium = TextStyle(
+        fontFamily = ClassicSerifFontFamily,
+        fontWeight = FontWeight.Medium,
+        fontSize = 13.sp,
+        lineHeight = 17.sp,
+        letterSpacing = 0.6.sp,
+    ),
+    labelSmall = TextStyle(
+        fontFamily = ClassicSerifFontFamily,
+        fontWeight = FontWeight.Medium,
+        fontSize = 12.sp,
+        lineHeight = 16.sp,
+        letterSpacing = 0.8.sp,
+    ),
+)
+
+private val TimelessTypePalette = QuranTypePalette(
+    profile = QuranTypeProfile.TIMELESS,
+    serif = TimelessSerifFontFamily,
+    display = TimelessDisplayFontFamily,
+    sans = TimelessSansFontFamily,
+    typography = TimelessQuranTypography,
+)
+
+private val ClassicTypePalette = QuranTypePalette(
+    profile = QuranTypeProfile.CLASSIC,
+    serif = ClassicSerifFontFamily,
+    display = ClassicDisplayFontFamily,
+    sans = ClassicSansFontFamily,
+    typography = ClassicQuranTypography,
+)
+
+internal val LocalQuranTypePalette = staticCompositionLocalOf { TimelessTypePalette }
+
+internal fun quranTypePalette(timeless: Boolean): QuranTypePalette =
+    if (timeless) TimelessTypePalette else ClassicTypePalette
+
+val QuranTypography: Typography
+    @Composable get() = LocalQuranTypePalette.current.typography
 
 /** Base style for a single Arabic word in the follow-along view. */
 val ArabicWordStyle = TextStyle(

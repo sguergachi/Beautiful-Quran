@@ -97,6 +97,8 @@ data class Settings(
      *  repeatedly tapping the Settings logo; persisted so the reader can
      *  honour it. See docs/ROOT_VIEWER.md and docs/TIMINGS_LAB.md. */
     val developerModeEnabled: Boolean = false,
+    /** Developer A/B: false selects the pre-Timeless typefaces and sizes. */
+    val timelessTypographyEnabled: Boolean = true,
     /** Developer-only gate for contextual feature lessons. Off until their
      * visual language is approved for readers. Enabling rearms every lesson. */
     val educationGuidesEnabled: Boolean = false,
@@ -167,6 +169,7 @@ class SettingsRepository(context: Context) {
         lastSurah = prefs.getInt("lastSurah", 0),
         lastAyah = prefs.getInt("lastAyah", 1),
         developerModeEnabled = prefs.getBoolean("developerModeEnabled", false),
+        timelessTypographyEnabled = prefs.getBoolean("timelessTypographyEnabled", true),
         educationGuidesEnabled = prefs.getBoolean("educationGuidesEnabled", false),
         brushCircleStyle = prefs.enum("brushCircleStyle", BrushCircleStyle.BASELINE),
     )
@@ -272,6 +275,7 @@ class SettingsRepository(context: Context) {
             putInt("lastSurah", next.lastSurah)
             putInt("lastAyah", next.lastAyah)
             putBoolean("developerModeEnabled", next.developerModeEnabled)
+            putBoolean("timelessTypographyEnabled", next.timelessTypographyEnabled)
             putBoolean("educationGuidesEnabled", next.educationGuidesEnabled)
             remove("inkLabEnabled")
             // Developer experiments that have been taken out: clear what

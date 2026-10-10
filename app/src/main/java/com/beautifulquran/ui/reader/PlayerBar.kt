@@ -60,6 +60,7 @@ import com.beautifulquran.playback.PlayerUiState
 import com.beautifulquran.ui.theme.DisclosureChevron
 import com.beautifulquran.ui.theme.QuranTheme
 import com.beautifulquran.ui.theme.quietClickable
+import com.beautifulquran.ui.theme.typeScale
 
 /** Gap before the disclosure chevron, matched by [ReciterNameButton]'s centering offset. */
 private val ReciterChevronGap = 2.dp
@@ -263,7 +264,7 @@ fun PlayerBar(
                         text = "${if (state.speed % 1f == 0f) state.speed.toInt() else state.speed}×",
                         style = MaterialTheme.typography.labelMedium.copy(
                             fontWeight = FontWeight.SemiBold,
-                            fontSize = 13.sp,
+                            fontSize = typeScale(13.sp, 15.sp),
                         ),
                         color = if (speedActive) {
                             MaterialTheme.colorScheme.primary
@@ -401,8 +402,8 @@ internal fun PlaybackErrorNotice(
             maxLines = 1,
             softWrap = false,
             autoSize = TextAutoSize.StepBased(
-                minFontSize = 9.5.sp,
-                maxFontSize = 11.5.sp,
+                minFontSize = typeScale(9.5.sp, 11.sp),
+                maxFontSize = typeScale(11.5.sp, 13.sp),
                 stepSize = 0.5.sp,
             ),
             overflow = TextOverflow.Ellipsis,

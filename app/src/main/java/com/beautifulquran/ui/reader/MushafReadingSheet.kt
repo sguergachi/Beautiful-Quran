@@ -2,6 +2,7 @@ package com.beautifulquran.ui.reader
 
 import com.beautifulquran.ui.theme.HafsFontFamily
 import com.beautifulquran.ui.theme.quietClickable
+import com.beautifulquran.ui.theme.typeScale
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
@@ -404,7 +405,7 @@ internal fun MushafReadingSheet(
                         text = "${if (playerState.speed % 1f == 0f) playerState.speed.toInt() else playerState.speed}×",
                         style = MaterialTheme.typography.labelMedium.copy(
                             fontWeight = FontWeight.SemiBold,
-                            fontSize = 13.sp,
+                            fontSize = typeScale(13.sp, 15.sp),
                         ),
                         color = if (speedActive) MaterialTheme.colorScheme.onBackground else quiet,
                         textAlign = TextAlign.Center,
@@ -414,8 +415,8 @@ internal fun MushafReadingSheet(
                         maxLines = 1,
                         softWrap = false,
                         autoSize = TextAutoSize.StepBased(
-                            minFontSize = 8.sp,
-                            maxFontSize = 13.sp,
+                            minFontSize = typeScale(8.sp, 9.sp),
+                            maxFontSize = typeScale(13.sp, 15.sp),
                             stepSize = 0.5.sp,
                         ),
                     )

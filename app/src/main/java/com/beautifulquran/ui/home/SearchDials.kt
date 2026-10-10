@@ -46,6 +46,7 @@ import androidx.compose.ui.unit.sp
 import com.beautifulquran.data.model.Surah
 import com.beautifulquran.ui.theme.ArabicTitleStyle
 import com.beautifulquran.ui.theme.LocalQuranAccents
+import com.beautifulquran.ui.theme.typeScale
 import com.beautifulquran.ui.theme.quietClickable
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlin.math.abs
@@ -216,7 +217,9 @@ private fun SurahItem(surah: Surah, selected: Boolean) {
         Spacer(Modifier.width(SurahNameGap))
         Text(
             text = surah.nameTransliteration,
-            style = MaterialTheme.typography.titleMedium.copy(fontSize = 14.sp),
+            style = MaterialTheme.typography.titleMedium.copy(
+                fontSize = typeScale(14.sp, 16.sp),
+            ),
             color = if (selected) {
                 MaterialTheme.colorScheme.onSurface
             } else {

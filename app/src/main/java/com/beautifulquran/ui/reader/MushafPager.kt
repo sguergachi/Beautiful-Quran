@@ -394,6 +394,12 @@ internal fun mushafInkPackKind(
      */
     pageHasActiveWord: Boolean = false,
     hasSearchFocus: Boolean = false,
+    /**
+     * The voice has just left this verse and its last word's glimmer is
+     * still drying ([InkEngine.Tuning.glintFadeMs]). Its clocks stay, so the
+     * glow recedes instead of vanishing with a pack that has no motions.
+     */
+    drying: Boolean = false,
 ): MushafInkPackKind = when {
     pageOwnsVoice && basmalahActive -> MushafInkPackKind.UPCOMING
     // Own the wash wherever the word is, not only once Media3 or the
@@ -411,6 +417,7 @@ internal fun mushafInkPackKind(
         MushafInkPackKind.UPCOMING
     waitingForVoice && (activeWordAyah == null || ayah > activeWordAyah) ->
         MushafInkPackKind.UPCOMING
+    drying -> MushafInkPackKind.ACTIVE_WORD
     else -> MushafInkPackKind.STATIC
 }
 
@@ -1778,6 +1785,19 @@ internal fun MushafPageInkClocks(
             val activeWord by remember(ayah.number) {
                 derivedStateOf { activeWordState.value?.takeIf { it.ayah == ayah.number } }
             }
+            // Swapping to the motionless recess pack the frame the voice
+            // moves on threw the last word's glimmer away mid-glow. Hold the
+            // clocks while it dries, as the scrolling reader's do.
+            val voiced = activeWord != null
+            var drying by remember { mutableStateOf(false) }
+            LaunchedEffect(voiced) {
+                if (voiced) {
+                    drying = true
+                } else if (drying) {
+                    delay(InkEngine.tuning.glintFadeMs.toLong())
+                    drying = false
+                }
+            }
             val recitingActive = voice.reciting
             val flashHere = flashAyah == ayah.number && flashWordPosition != null
             val searchFocusPositions = if (searchFocusActive) {
@@ -1796,13 +1816,15 @@ internal fun MushafPageInkClocks(
                 waitingForVoice = waitingForVoice,
                 pageHasActiveWord = pageHasActiveWord,
                 hasSearchFocus = searchFocusActive,
+                drying = drying,
             )
             val pack = when (kind) {
                 MushafInkPackKind.ACTIVE_WORD -> rememberAyahInkPack(
                     ayah = ayah,
                     activeWord = activeWord,
                     playbackSpeed = playbackSpeed,
-                    isActiveAyah = true,
+                    // A drying verse is read: Plain, full ink, glint receding.
+                    isActiveAyah = voiced,
                     dimmed = false,
                     flashWordPosition = flashWordPosition?.takeIf { flashHere },
                     flashWordPositions = flashWordPositions.takeIf { flashHere }.orEmpty(),

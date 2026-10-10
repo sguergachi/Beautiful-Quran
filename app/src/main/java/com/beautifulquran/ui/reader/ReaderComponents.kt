@@ -160,6 +160,7 @@ import com.beautifulquran.ui.theme.quietClickable
 import com.beautifulquran.ui.theme.shapedWordBloom
 import com.beautifulquran.ui.theme.inkSmootherstep
 import com.beautifulquran.ui.theme.verticalFadingEdges
+import com.beautifulquran.ui.theme.typeScale
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.first
@@ -217,6 +218,7 @@ internal fun AnnotatedString.Builder.appendAyahNumberMark(
     number: Int,
     useArabicIndicDigits: Boolean,
     style: SpanStyle,
+    bookFontFamily: FontFamily,
     ltr: Boolean = !useArabicIndicDigits,
 ) {
     val start = length
@@ -224,7 +226,7 @@ internal fun AnnotatedString.Builder.appendAyahNumberMark(
         append(formatAyahNumberMark(number, useArabicIndicDigits, ltr = ltr))
     }
     if (!useArabicIndicDigits) {
-        val digitStyle = style.copy(fontFamily = TranslationFontFamily)
+        val digitStyle = style.copy(fontFamily = bookFontFamily)
         // The isolate and the cup each take a character and a word joiner, so
         // the LTR form opens its digits two units further in than the plain one.
         val digitsAt = if (ltr) 4 else 2
@@ -1798,8 +1800,8 @@ private fun WordUnit(
             Box {
                 Text(
                     text = word.translation,
-                    fontSize = 10.5.sp * fontScale,
-                    lineHeight = 13.sp * fontScale,
+                    fontSize = typeScale(10.5.sp, 12.sp) * fontScale,
+                    lineHeight = typeScale(13.sp, 15.sp) * fontScale,
                     fontWeight = glossWeight,
                     color = if (searchHit) {
                         LocalQuranAccents.current.gold
@@ -1815,8 +1817,8 @@ private fun WordUnit(
                 if (searchHitWash != null) {
                     Text(
                         text = word.translation,
-                        fontSize = 10.5.sp * fontScale,
-                        lineHeight = 13.sp * fontScale,
+                        fontSize = typeScale(10.5.sp, 12.sp) * fontScale,
+                        lineHeight = typeScale(13.sp, 15.sp) * fontScale,
                         fontWeight = FontWeight.Bold,
                         color = repeatInk.copy(alpha = InkEngine.tuning.repeatInkAlpha),
                         textAlign = TextAlign.Center,
@@ -1830,8 +1832,8 @@ private fun WordUnit(
         if (showTransliteration) {
             Text(
                 text = word.transliteration,
-                fontSize = 9.5.sp * fontScale,
-                lineHeight = 12.5.sp * fontScale,
+                fontSize = typeScale(9.5.sp, 11.sp) * fontScale,
+                lineHeight = typeScale(12.5.sp, 14.sp) * fontScale,
                 color = QuranTheme.ink.quiet,
                 textAlign = TextAlign.Center,
                 modifier = Modifier.glyphLayerAlpha {
@@ -2126,13 +2128,14 @@ private fun ResponsiveEnglishAyah(
     useArabicIndicDigits: Boolean = false,
 ) {
     val palette = rememberWordInkPalette()
+    val translationFontFamily = TranslationFontFamily
     val gold = LocalQuranAccents.current.gold
     val glintInk = LocalQuranAccents.current.glintInk
     val activeIndex = motions.indexOfFirst { it.isActive }
     val style = MaterialTheme.typography.bodyLarge.copy(
-        fontFamily = TranslationFontFamily,
+        fontFamily = translationFontFamily,
         fontWeight = FontWeight.Normal,
-        fontSize = 19.5.sp * fontScale,
+        fontSize = typeScale(19.5.sp, 22.sp) * fontScale,
         lineHeight = 1.5.em,
         letterSpacing = 0.sp,
         textAlign = TextAlign.Start,
@@ -2166,6 +2169,7 @@ private fun ResponsiveEnglishAyah(
         fontScale,
         lyricGlosses,
         useArabicIndicDigits,
+        translationFontFamily,
     ) {
         val ranges = ArrayList<IntRange>(ayah.words.size)
         var markRange = 0..-1
@@ -2206,6 +2210,7 @@ private fun ResponsiveEnglishAyah(
                 number = ayah.number,
                 useArabicIndicDigits = useArabicIndicDigits,
                 style = SpanStyle(color = gold, fontSize = 17.sp * fontScale),
+                bookFontFamily = translationFontFamily,
                 ltr = true,
             )
             markRange = markStart until length
@@ -2402,6 +2407,7 @@ private fun ResponsiveHafsAyah(
     onMarkLongClick: (() -> Unit)? = null,
 ) {
     val palette = rememberWordInkPalette()
+    val translationFontFamily = TranslationFontFamily
     val ayahMarkInk = LocalQuranAccents.current.gold
     val glintInk = LocalQuranAccents.current.glintInk
     val activeIndex = motions.indexOfFirst { it.isActive }
@@ -2422,7 +2428,14 @@ private fun ResponsiveHafsAyah(
     // Full-ink spans only — never bake upcoming/active into the annotated
     // string. Dim, bloom, and orange are draw-phase overlays, so word and
     // ayah boundaries do not reshape or flash the run.
-    val rendered = remember(ayah, palette.fullInkColor, ayahMarkInk, fontSize, useArabicIndicDigits) {
+    val rendered = remember(
+        ayah,
+        palette.fullInkColor,
+        ayahMarkInk,
+        fontSize,
+        useArabicIndicDigits,
+        translationFontFamily,
+    ) {
         val ranges = ArrayList<IntRange>(ayah.words.size)
         var markRange = 0..-1
         val text = buildAnnotatedString {
@@ -2448,6 +2461,7 @@ private fun ResponsiveHafsAyah(
                     color = ayahMarkInk,
                     fontSize = fontSize * AYAH_MARK_SIZE_RATIO,
                 ),
+                bookFontFamily = translationFontFamily,
             )
             markRange = markStart until length
         }
@@ -2526,12 +2540,14 @@ fun AyahNumberMark(
     useArabicIndicDigits: Boolean = true,
 ) {
     val accents = LocalQuranAccents.current
-    val text = remember(number, fontScale, useArabicIndicDigits, accents.gold) {
+    val translationFontFamily = TranslationFontFamily
+    val text = remember(number, fontScale, useArabicIndicDigits, accents.gold, translationFontFamily) {
         buildAnnotatedString {
             appendAyahNumberMark(
                 number = number,
                 useArabicIndicDigits = useArabicIndicDigits,
                 style = SpanStyle(color = accents.gold, fontSize = 20.sp * fontScale),
+                bookFontFamily = translationFontFamily,
             )
         }
     }
@@ -2594,8 +2610,10 @@ private fun Modifier.hangTileAir(): Modifier = layout { measurable, constraints 
  * line. 9 sp keeps the caps legible at whisper ink; 0.22 em is small-caps
  * tracking — wide enough to open the capitals, not so wide the word falls apart.
  */
-internal val CAPS_LABEL_SIZE = 9.sp
-internal val CAPS_TRACKING = 2.sp
+internal val CAPS_LABEL_SIZE: TextUnit
+    @Composable get() = typeScale(9.sp, 10.sp)
+internal val CAPS_TRACKING: TextUnit
+    @Composable get() = typeScale(2.sp, 2.2.sp)
 
 @Composable
 private fun ArabicAyahNumberUnit(
@@ -3911,7 +3929,8 @@ private fun folioArabicStyle(): TextStyle = TextStyle(
 )
 
 /** Timeless' lining figures stand 0.72 em: ~7.6 dp, as Garamond's did at 12 sp. */
-private val FOLIO_WESTERN_SIZE = 10.5.sp
+private val FOLIO_WESTERN_SIZE: TextUnit
+    @Composable get() = typeScale(10.5.sp, 12.sp)
 
 /**
  * Hafs' Arabic-Indic figures ink shorter than the lining ones: ٣ stands

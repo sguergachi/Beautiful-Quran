@@ -16,6 +16,25 @@ draw phase.
 
 ## Techniques in use
 
+### English leaf pagination
+
+The English rag chooses breaks only at word spaces and preserves the minimum
+line count. Greedy wrapping gives the same count, so the book's ruler uses it
+for its fill and prefix search. Choosing the rag for every candidate leaf
+previously spent tens of seconds measuring word positions across the corpus,
+leaving the English page without ink until the measured book arrived.
+
+`measureEnglishProse` shares one rounding pixel between the ruler and rag.
+Visible leaves still choose the rag, retain the soft directional wash, and
+wait for the measured book; pagination no longer chooses every candidate's rag.
+Tighter prose spacing changed the cuts in format 26; the hand still calibrates
+at natural spacing to preserve the type size. Format 27 also remeasures the
+basmalah's slot after fitting its final size to the column with subpixel advances.
+On the pooled emulator, format 25's cold rebuild reached the cache 5.7 seconds
+after launch. With tighter spacing and English verse numbers, all 746 leaves
+and 6,843 fragments remain byte-identical to the full-rag reference at the same
+geometry and settings, covering all 6,236 verses.
+
 ### 1. Draw-phase-only animations (zero recomposition fades)
 
 Every fade in the app — word highlights, recited-word settling, ayah
@@ -332,7 +351,7 @@ janky", first ask: is this the release APK?
 - Surah and reciter lists are cached in memory after first read.
 - The English book's measured leaves stay on disk under
   `EnglishBookCache`. Four most-recently-read configs are retained so
-  flipping translation, gloss, or type size does not remeasure; in-progress
+  flipping translation, gloss, or typography profile does not remeasure; in-progress
   writes publish atomically and failed writes remove their own temporary
   files. Successful writes also reclaim temporary files abandoned for a day.
   Access/pruning is serialized; the just-written book is retained even when

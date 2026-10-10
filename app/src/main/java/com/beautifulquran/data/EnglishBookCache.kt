@@ -195,8 +195,18 @@ class EnglishBookCache internal constructor(private val dir: File) {
          * 22: the head gutter is one line of prose rather than one Arabic
          * unit, so the well is taller and the hand solved from it a hair
          * bigger. The leaf holds a little more.
+         *
+         * 24: the rag (`EnglishRag`) breaks the lines, hyphenating at the
+         * book's kept cuts. Lines end somewhere new and a paragraph can set a
+         * line shorter, so leaves cut anew.
+         *
+         * 25: words stay whole. The rag chooses only word-space breaks;
+         * pagination uses their equivalent greedy minimum line count.
+         * 26: tighter prose letter spacing, with the same book hand.
+         * 27: the basmalah's size is fitted to the column by subpixel advances;
+         * its measured one-line slot follows that size.
          */
-        const val FORMAT = 23
+        const val FORMAT = 27
         const val MAX_LEAVES = 10_000
         const val MAX_RUNS = 20_000
     }

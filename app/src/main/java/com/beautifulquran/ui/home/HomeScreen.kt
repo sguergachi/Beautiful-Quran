@@ -94,6 +94,7 @@ import com.beautifulquran.ui.reader.VerseBookmarkRibbon
 import com.beautifulquran.ui.reader.remainingUnfurlSignal
 import com.beautifulquran.ui.theme.ArabicTitleStyle
 import com.beautifulquran.ui.theme.LocalQuranAccents
+import com.beautifulquran.ui.theme.typeScale
 import com.beautifulquran.ui.theme.PaperSearchField
 import com.beautifulquran.ui.theme.paperBottomFeather
 import com.beautifulquran.ui.theme.quietClickable
@@ -618,8 +619,8 @@ private fun HomeHeader(
                 Text(
                     text = "Beautiful Quran",
                     style = MaterialTheme.typography.headlineMedium.copy(
-                        fontSize = 30.sp,
-                        lineHeight = 35.sp,
+                        fontSize = typeScale(30.sp, 34.sp),
+                        lineHeight = typeScale(35.sp, 40.sp),
                     ),
                     color = MaterialTheme.colorScheme.onBackground,
                 )
@@ -776,7 +777,9 @@ private fun SurahRow(
         Column(Modifier.weight(1f)) {
             Text(
                 text = surah.nameTransliteration,
-                style = MaterialTheme.typography.titleMedium.copy(fontSize = 15.sp),
+                style = MaterialTheme.typography.titleMedium.copy(
+                    fontSize = typeScale(15.sp, 17.sp),
+                ),
                 color = MaterialTheme.colorScheme.onBackground,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
@@ -883,7 +886,9 @@ private fun WordSearchSurahHeader(section: SurahWordSearchSection) {
     ) {
         Text(
             text = section.surahNameTransliteration,
-            style = MaterialTheme.typography.titleMedium.copy(fontSize = 14.sp),
+            style = MaterialTheme.typography.titleMedium.copy(
+                fontSize = typeScale(14.sp, 16.sp),
+            ),
             color = MaterialTheme.colorScheme.onBackground,
             modifier = Modifier.weight(1f),
             maxLines = 1,

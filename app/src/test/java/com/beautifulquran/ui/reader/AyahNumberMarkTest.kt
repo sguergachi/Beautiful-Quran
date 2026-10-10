@@ -4,7 +4,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
-import com.beautifulquran.ui.theme.TranslationFontFamily
+import com.beautifulquran.ui.theme.quranTypePalette
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -102,16 +102,18 @@ class AyahNumberMarkTest {
     }
 
     @Test
-    fun `English mark gives Western digits an explicit Garamond span`() {
-        val mark = buildAnnotatedString {
-            appendAyahNumberMark(12, useArabicIndicDigits = false, style = SpanStyle())
+    fun `English mark gives Western digits the selected book face`() {
+        for (timeless in listOf(false, true)) {
+            val family = quranTypePalette(timeless).serif
+            val mark = buildAnnotatedString {
+                appendAyahNumberMark(
+                    12, useArabicIndicDigits = false, style = SpanStyle(), bookFontFamily = family,
+                )
+            }
+            assertEquals(
+                listOf(4 to 5, 6 to 7),
+                mark.spanStyles.filter { it.item.fontFamily == family }.map { it.start to it.end },
+            )
         }
-
-        assertEquals(
-            listOf(4 to 5, 6 to 7),
-            mark.spanStyles
-                .filter { it.item.fontFamily == TranslationFontFamily }
-                .map { it.start to it.end },
-        )
     }
 }

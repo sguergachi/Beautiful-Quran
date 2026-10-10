@@ -70,6 +70,7 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.util.lerp
 import android.view.HapticFeedbackConstants
 import com.beautifulquran.ui.theme.LocalQuranAccents
+import com.beautifulquran.ui.theme.typeScale
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -1691,10 +1692,12 @@ internal fun MushafPageDial(
             // border, no shadow — a full-width band of paper dissolving into
             // the leaf at the top, not a card floating on it.
             val labelSmall = MaterialTheme.typography.labelSmall
-            val hudType = remember(labelSmall) {
+            val hudFontSize = typeScale(12.5.sp, 14.sp)
+            val hudLineHeight = typeScale(14.sp, 16.sp)
+            val hudType = remember(labelSmall, hudFontSize, hudLineHeight) {
                 labelSmall.copy(
-                    fontSize = 12.5.sp,
-                    lineHeight = 14.sp,
+                    fontSize = hudFontSize,
+                    lineHeight = hudLineHeight,
                     letterSpacing = 0.08.em,
                 )
             }

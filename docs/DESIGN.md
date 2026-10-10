@@ -904,7 +904,8 @@ not the app's.
 - **Arabic**: KFGQPC HAFS Uthmanic Script — the King Fahd Complex reference
   typeface — at 30 sp base with 1.9 em leading (Uthmani diacritics need air).
 - **English text face**: Timeless Serif Text (timeless.co), the small-size
-  optical master: regular, medium, semibold, bold, true italic. Kerning,
+  optical master: regular, medium, semibold, bold. Italics use the real
+  Timeless Serif Italic cut; the archive has no separate Text Italic. Kerning,
   ligatures, and old-style figures on in running text (`'kern', 'liga',
   'onum'`). Timeless has no ḍ ḥ ẓ ʾ ʿ, so each cut falls back glyph by glyph
   to the matching EB Garamond (Android `CustomFallbackBuilder`, web
@@ -920,6 +921,12 @@ not the app's.
   headlines. It sets darker than the Cormorant it replaced, so each weight is
   served by the cut one step lighter (Medium→Regular, SemiBold→Medium).
 - **UI sans**: Timeless Sans for Material's sans slots (see UI text below).
+- **Developer comparison**: Settings → Developer can switch to the previous
+  EB Garamond / Cormorant / Material Sans profile and its original type sizes
+  and leading. The English leaf measures and paginates against the selected
+  book face, using the current whole-word rag and full-column bismillah fit.
+  Customize previews and share images follow the selected profile too.
+  Arabic typefaces and sizing stay the same.
 - **The reader's hand**: Cormorant Garamond *Italic* at weight 500 for verse
   notes, and nothing else — the chancery cursive Renaissance scribes wrote
   marginal glosses in, and the hand italic type was cut from. It is

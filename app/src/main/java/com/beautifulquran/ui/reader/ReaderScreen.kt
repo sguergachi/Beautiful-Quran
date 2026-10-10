@@ -146,6 +146,7 @@ import com.beautifulquran.ui.theme.LocalQuranAccents
 import com.beautifulquran.ui.theme.LocalQuranInk
 import com.beautifulquran.ui.theme.QuranTheme
 import com.beautifulquran.ui.theme.ReturnArrowHeading
+import com.beautifulquran.ui.theme.SerifFontFamily
 import com.beautifulquran.ui.theme.absorbPointerEvents
 import com.beautifulquran.ui.theme.contextualGuideProgressiveBlur
 import com.beautifulquran.ui.theme.contrastingOverlayAccents
@@ -302,6 +303,9 @@ fun ReaderScreen(
     // one ayah block — never the whole screen.
     val activeWordState = viewModel.activeWord.collectAsStateWithLifecycle()
     val settings by viewModel.settings.settings.collectAsStateWithLifecycle()
+    val classicTypographyActive = settings.developerModeEnabled &&
+        !settings.timelessTypographyEnabled
+    val serifFontFamily = SerifFontFamily
     // Snapshot the shared Continue / green-ribbon target for this visit. A
     // deliberate pause moves this local marker and persists the same target.
     var parkedPlace by remember(surahId) {
@@ -361,6 +365,7 @@ fun ReaderScreen(
         leafMetricsFromOpenInkLab.value,
         settings.englishLeafText,
         settings.verseNumberScript,
+        classicTypographyActive,
     ) {
         val well = leafMetrics?.getOrNull(0) ?: return@LaunchedEffect
         val measure = leafMetrics.getOrNull(1) ?: return@LaunchedEffect
@@ -383,6 +388,7 @@ fun ReaderScreen(
                     measurePx = measure,
                     density = rulerDensity,
                     measurer = rulerMeasurer,
+                    serifFontFamily = serifFontFamily,
                     verseNumberScript = settings.verseNumberScript,
                     translation = translation,
                 )
@@ -391,13 +397,14 @@ fun ReaderScreen(
                 well,
                 measure,
                 settings.verseNumberScript,
+                classicTypographyActive,
             ),
             cacheKey = viewModel.englishBookCacheKey(
                 wellPx = well,
                 measurePx = measure,
                 verseNumberScript = settings.verseNumberScript.ordinal,
                 leafText = settings.englishLeafText.ordinal,
-            ),
+            ) + if (classicTypographyActive) "|classic" else "|timeless",
         )
     }
     val mushafCatalog = mushafUi?.catalog

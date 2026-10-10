@@ -50,13 +50,17 @@ import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInRoot
 import androidx.compose.ui.platform.LocalFontFamilyResolver
 import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.beautifulquran.data.AyahSelectorSide
 import com.beautifulquran.data.model.Ayah
 import com.beautifulquran.ui.theme.LocalQuranAccents
+import com.beautifulquran.ui.theme.LocalQuranTypePalette
+import com.beautifulquran.ui.theme.QuranTypeProfile
 import com.beautifulquran.ui.theme.SerifFontFamily
+import com.beautifulquran.ui.theme.typeScale
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import kotlin.math.abs
@@ -326,14 +330,23 @@ internal fun AyahSelectorRail(
     val accents = LocalQuranAccents.current
     val onSurface = MaterialTheme.colorScheme.onSurface
     val currentPlaceGreen = MaterialTheme.colorScheme.primary
-    // The rail's figures are the book face's, not the system serif.
+    // Classic retains the rail's original system serif figures.
     val fontResolver = LocalFontFamilyResolver.current
-    val numberFace = remember(fontResolver) {
-        fontResolver.resolve(SerifFontFamily, FontWeight.Bold).value as Typeface
+    val serifFontFamily = if (LocalQuranTypePalette.current.profile == QuranTypeProfile.TIMELESS) {
+        SerifFontFamily
+    } else {
+        FontFamily.Serif
     }
-    val pageFace = remember(fontResolver) {
-        fontResolver.resolve(SerifFontFamily).value as Typeface
+    val numberFace = remember(fontResolver, serifFontFamily) {
+        fontResolver.resolve(serifFontFamily, FontWeight.Bold).value as Typeface
     }
+    val pageFace = remember(fontResolver, serifFontFamily) {
+        fontResolver.resolve(serifFontFamily).value as Typeface
+    }
+    val collapsedNumberSize = typeScale(8.sp, 9.sp)
+    val collapsedPageSize = typeScale(6.5.sp, 7.5.sp)
+    val selectedNumberSize = typeScale(9.5.sp, 11.sp)
+    val unselectedNumberSize = typeScale(7.5.sp, 8.5.sp)
 
     Box(
         modifier = modifier
@@ -371,12 +384,12 @@ internal fun AyahSelectorRail(
             val collapsedAlpha = 1f - expand
             val numberPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
                 textAlign = if (mirrored) Paint.Align.RIGHT else Paint.Align.LEFT
-                textSize = 8.sp.toPx()
+                textSize = collapsedNumberSize.toPx()
                 typeface = numberFace
             }
             val pagePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
                 textAlign = if (mirrored) Paint.Align.RIGHT else Paint.Align.LEFT
-                textSize = 6.5.sp.toPx()
+                textSize = collapsedPageSize.toPx()
                 typeface = pageFace
             }
 
@@ -557,7 +570,11 @@ internal fun AyahSelectorRail(
                             .copy(alpha = (0.18f + 0.46f * focus) * arrival * edgeFade)
                             .toArgb()
                     }
-                    numberPaint.textSize = if (isSelected) 9.5.sp.toPx() else 7.5.sp.toPx()
+                    numberPaint.textSize = if (isSelected) {
+                        selectedNumberSize.toPx()
+                    } else {
+                        unselectedNumberSize.toPx()
+                    }
                     drawIntoCanvas { canvas ->
                         canvas.nativeCanvas.drawText(
                             ayah.toString(),

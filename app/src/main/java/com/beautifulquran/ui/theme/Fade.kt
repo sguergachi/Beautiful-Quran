@@ -31,6 +31,7 @@ import androidx.compose.ui.text.drawText
 import androidx.compose.ui.text.TextMeasurer
 import androidx.compose.ui.text.style.TextIndent
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.text.style.ResolvedTextDirection
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntSize
@@ -66,6 +67,8 @@ fun Modifier.letterFadeIn(
     feather: Float = InkWashFeather,
     /** How much of the word the wash may reveal; 1 reveals the whole word. */
     revealFraction: Float = 1f,
+    /** Room the offscreen wash layer keeps past the word; see [glowLayerBleed]. */
+    bleed: Dp = FadeLayerBleed,
 ): Modifier {
     // Alpha profile across the feathered edge, sampled into gradient stops.
     // The seam-free smootherstep shape lives in [inkSmootherstep].
@@ -90,10 +93,10 @@ fun Modifier.letterFadeIn(
             drawContent()
             return@drawWithContent
         }
-        val bleed = FadeLayerBleed.toPx()
+        val bleedPx = bleed.toPx()
         drawIntoCanvas { canvas ->
             canvas.saveLayer(
-                Rect(-bleed, -bleed, size.width + bleed, size.height + bleed),
+                Rect(-bleedPx, -bleedPx, size.width + bleedPx, size.height + bleedPx),
                 Paint(),
             )
         }
@@ -122,8 +125,8 @@ fun Modifier.letterFadeIn(
         translate(left = headX, top = 0f) {
             drawRect(
                 brush = brush,
-                topLeft = Offset(-bleed - headX, -bleed),
-                size = Size(size.width + bleed * 2f, size.height + bleed * 2f),
+                topLeft = Offset(-bleedPx - headX, -bleedPx),
+                size = Size(size.width + bleedPx * 2f, size.height + bleedPx * 2f),
                 blendMode = BlendMode.DstIn,
             )
         }
@@ -417,6 +420,13 @@ fun Modifier.shapedWordBloom(
      * Only a [justified] and hyphenating caller needs it; see [justifyShift].
      */
     hyphenPx: Float = 0f,
+    /**
+     * How far a paper cover reaches past the start or end of a line it closes;
+     * see [lineEndReach]. Only for text whose lines share one layout: on a
+     * per-word node every cover "ends a line", and the reach would paper over
+     * the neighbouring word, the reason those callers zero [coverPad].
+     */
+    lineEndPad: Dp = 0.dp,
 ): Modifier {
     val stops = FloatArray(InkProfileStops) { i -> i / (InkProfileStops - 1f) }
     val lineBoundsCache = LineBoundsCache(justified, hyphenPx)
@@ -487,7 +497,13 @@ fun Modifier.shapedWordBloom(
                     // and fade a read word's descender (g/j/p/q/y).
                     val pad = (bloom.pad ?: coverPad).toPx()
                     lineBounds.forEach { bounds ->
-                        val cover = linePaperCoverBounds(bounds, pad)
+                        val cover = lineEndReach(
+                            textLayout,
+                            linePaperCoverBounds(bounds, pad),
+                            start,
+                            endExclusive,
+                            lineEndPad.toPx(),
+                        )
                         clipRect(
                             left = cover.left,
                             top = cover.top,
@@ -640,7 +656,10 @@ fun Modifier.shapedWordBloom(
                                 bounds.right + colorBleed,
                                 bounds.bottom + colorBleed,
                             ),
-                            Paint(),
+                            // Fade the finished tint and halo together. SrcIn
+                            // below also reaches the halo inside the range;
+                            // fading its source would dry that light twice.
+                            Paint().apply { alpha = bloom.layerAlpha.coerceIn(0f, 1f) },
                         )
                     }
                     // Glow rides the same DstIn directional wash as the tint —
@@ -653,7 +672,7 @@ fun Modifier.shapedWordBloom(
                             1 -> bloom.glowAlpha
                             else -> bloom.bloomAlpha
                         }
-                        val glowAlpha = bloom.layerAlpha.coerceIn(0f, 1f) * strength.coerceIn(0f, 1f)
+                        val glowAlpha = strength.coerceIn(0f, 1f)
                         if (glowAlpha <= 0f) continue
                         val scale = when (layer) {
                             0 -> GLOW_VEIL_RADIUS
@@ -671,6 +690,8 @@ fun Modifier.shapedWordBloom(
                             overhangPx = bleed,
                             ink = ink,
                             grainLevels = if (layer == 0) GLOW_VEIL_GRAIN else 0f,
+                            // No light on the words around this one.
+                            reachPx = bloom.glowRadius.dp.toPx(),
                         ) ?: continue
                         val glowColor = if (layer == 0 && bloom.veilColor != Color.Unspecified) {
                             bloom.veilColor
@@ -692,8 +713,7 @@ fun Modifier.shapedWordBloom(
                         }
                     }
                     val tint = bloom.color.copy(
-                        alpha = bloom.layerAlpha.coerceIn(0f, 1f) *
-                            bloom.colorAlpha.coerceIn(0f, 1f),
+                        alpha = bloom.colorAlpha.coerceIn(0f, 1f),
                     )
                     if (clipped) {
                         clipPath(shaped!!.path) {
@@ -790,20 +810,38 @@ fun Modifier.shapedWordBloom(
                                 openTop = i == 0,
                                 openBottom = i == tintBounds.lastIndex,
                             )
-                            clipRect(
-                                left = mask.left,
-                                top = mask.top,
-                                right = mask.right,
-                                bottom = mask.bottom,
-                            ) {
-                                translate(left = headX, top = 0f) {
-                                    drawRect(
-                                        brush = brush,
-                                        topLeft = Offset(mask.left - headX, mask.top),
-                                        size = Size(mask.width, mask.height),
-                                        blendMode = BlendMode.DstIn,
-                                    )
+                            fun wash(rect: Rect) {
+                                clipRect(
+                                    left = rect.left,
+                                    top = rect.top,
+                                    right = rect.right,
+                                    bottom = rect.bottom,
+                                ) {
+                                    translate(left = headX, top = 0f) {
+                                        drawRect(
+                                            brush = brush,
+                                            topLeft = Offset(rect.left - headX, rect.top),
+                                            size = Size(rect.width, rect.height),
+                                            blendMode = BlendMode.DstIn,
+                                        )
+                                    }
                                 }
+                            }
+                            wash(mask)
+                            // An inner edge stays shut only where the next
+                            // line's own mask is there to take over. Past it,
+                            // nothing else washes this line's spill, and the
+                            // halo of words not yet said lay under them as a
+                            // lit strip with a hard top edge.
+                            if (i > 0) {
+                                val above = bloom.washBounds(tintBounds[i - 1], washPad)
+                                washMaskSpill(cover, colorBleed, above, below = false)
+                                    .forEach(::wash)
+                            }
+                            if (i < tintBounds.lastIndex) {
+                                val below = bloom.washBounds(tintBounds[i + 1], washPad)
+                                washMaskSpill(cover, colorBleed, below, below = true)
+                                    .forEach(::wash)
                             }
                         }
                     }
@@ -1331,6 +1369,68 @@ internal fun ditherAlphaMask(pixels: ByteArray, levels: Float) {
     }
 }
 
+/**
+ * Fades a glow mask to nothing within [reach] of the word's own ink box
+ * ([left]..[right] x [top]..[bottom], mask pixels). The widest glow blurs
+ * out ~45 dp, over the read words on either side and the lines above and
+ * below; lifting their paper took their contrast and read as a smoky shadow
+ * on dry text. The light belongs to the word being said. Smoothstep, so the
+ * glow still ends softly and never on a box edge (docs/GLIMMER.md).
+ */
+internal fun confineAlphaMask(
+    pixels: ByteArray,
+    rowBytes: Int,
+    width: Int,
+    height: Int,
+    left: Int,
+    top: Int,
+    right: Int,
+    bottom: Int,
+    reach: Float,
+) {
+    if (reach <= 0f) return
+    for (y in 0 until height) {
+        val dy = maxOf(top - y, y - bottom, 0).toFloat()
+        for (x in 0 until width) {
+            val i = y * rowBytes + x
+            val v = pixels[i].toInt() and 0xFF
+            if (v == 0) continue
+            val dx = maxOf(left - x, x - right, 0).toFloat()
+            val t = (kotlin.math.sqrt(dx * dx + dy * dy) / reach).coerceIn(0f, 1f)
+            val keep = 1f - t * t * (3f - 2f * t)
+            pixels[i] = (v * keep).roundToInt().toByte()
+        }
+    }
+}
+
+private fun Bitmap.confined(box: android.graphics.Rect, reach: Float): Bitmap = runCatching {
+    val out = if (isMutable) this else copy(Bitmap.Config.ALPHA_8, true)
+    val bytes = ByteArray(out.rowBytes * out.height)
+    val buffer = java.nio.ByteBuffer.wrap(bytes)
+    out.copyPixelsToBuffer(buffer)
+    confineAlphaMask(bytes, out.rowBytes, out.width, out.height, box.left, box.top, box.right, box.bottom, reach)
+    buffer.rewind()
+    out.copyPixelsFromBuffer(buffer)
+    out
+}.getOrDefault(this)
+
+/** Bounds of the pixels the glyphs actually inked, or null if none. */
+private fun Bitmap.inkExtent(): android.graphics.Rect? {
+    val row = IntArray(width)
+    var l = width; var t = height; var r = -1; var b = -1
+    for (y in 0 until height) {
+        getPixels(row, 0, width, 0, y, width, 1)
+        for (x in 0 until width) {
+            if ((row[x] ushr 24) == 0) continue
+            if (x < l) l = x
+            if (x > r) r = x
+            if (y < t) t = y
+            b = y
+        }
+    }
+    return if (r < 0) null else android.graphics.Rect(l, t, r, b)
+}
+
 private fun Bitmap.grained(levels: Float): Bitmap = runCatching {
     val out = if (isMutable) this else copy(Bitmap.Config.ALPHA_8, true)
     val bytes = ByteArray(out.rowBytes * out.height)
@@ -1349,6 +1449,7 @@ private class GlyphHaloCache {
         val radiusBits: Int,
         val clipped: Boolean,
         val grained: Boolean,
+        val reachBits: Int,
     )
 
     data class Halo(
@@ -1387,13 +1488,18 @@ private class GlyphHaloCache {
         overhangPx: Float,
         ink: WordInkCache.WordInk? = null,
         grainLevels: Float = 0f,
+        /** How far past the word's own ink the light may reach; see [confineAlphaMask]. */
+        reachPx: Float = 0f,
     ): Halo? {
         if (radiusPx <= 0f) return null
         if (layout !== textLayout) {
             layout = textLayout
             byRange.clear()
         }
-        val key = Key(start, endExclusive, radiusPx.toBits(), clipPath != null || ink != null, grainLevels > 0f)
+        val key = Key(
+            start, endExclusive, radiusPx.toBits(), clipPath != null || ink != null, grainLevels > 0f,
+            reachPx.toBits(),
+        )
         byRange[key]?.let { return it }
 
         val bounds = if (ink != null) {
@@ -1436,9 +1542,16 @@ private class GlyphHaloCache {
             },
             offset,
         )
+        val inked = if (reachPx > 0f) glyphs.inkExtent() else null
         glyphs.recycle()
+        val confined = if (inked != null) {
+            inked.offset(-offset[0], -offset[1])
+            blurred.confined(inked, reachPx)
+        } else {
+            blurred
+        }
         return Halo(
-            bitmap = if (grainLevels > 0f) blurred.grained(grainLevels) else blurred,
+            bitmap = if (grainLevels > 0f) confined.grained(grainLevels) else confined,
             left = (left + offset[0]).toFloat(),
             top = (top + offset[1]).toFloat(),
         ).also { byRange[key] = it }
@@ -1466,6 +1579,41 @@ internal fun washMaskRect(
     right = cover.right + bleed,
     bottom = if (openBottom) cover.bottom + bleed else cover.bottom,
 )
+
+/**
+ * Where an inner edge of a wrapped word's wash has to open after all.
+ *
+ * [washMaskRect] keeps a line's mask out of its neighbour's band so the two
+ * passes never wash the same light twice. But the neighbour's mask only spans
+ * the neighbour's own words: a word whose English runs from the middle of one
+ * line to the start of the next has a second line a few letters wide. Under
+ * the rest of the first line nothing washed the halo at all, and a word not
+ * yet said lit a strip of the leading under its dark letters, cut square along
+ * the line box. The English leaf, which sets one Arabic word's English across a
+ * line break as a matter of course, showed it on every such word.
+ *
+ * The spill is this line's band reach past [cover]'s edge toward [neighbour] —
+ * below it when [below], above otherwise — less the columns the neighbour's own
+ * mask covers there. Zero, one or two strips; never overlapping the neighbour.
+ */
+internal fun washMaskSpill(
+    cover: Rect,
+    bleed: Float,
+    neighbour: Rect,
+    below: Boolean,
+): List<Rect> {
+    if (bleed <= 0f) return emptyList()
+    val top = if (below) cover.bottom else cover.top - bleed
+    val bottom = if (below) cover.bottom + bleed else cover.top
+    val left = cover.left - bleed
+    val right = cover.right + bleed
+    val takenLeft = neighbour.left - bleed
+    val takenRight = neighbour.right + bleed
+    return buildList {
+        if (takenLeft > left) add(Rect(left, top, minOf(right, takenLeft), bottom))
+        if (takenRight < right) add(Rect(maxOf(left, takenRight), top, right, bottom))
+    }.filter { it.width > 0f }
+}
 
 /** Word-local horizontal bounds per line, at the layout's full line height. */
 private fun computeLineBounds(
@@ -1641,6 +1789,16 @@ private const val InkProfileStops = 9
  * the word's draw scope — does not paint onto neighbours. */
 private val FadeLayerBleed = 14.dp
 
+/**
+ * Room a word's [letterFadeIn] layer needs when a glimmer's halo is drawn
+ * inside it: the reach [ShapedWordBloom.ColorReveal] gives its own glow layer.
+ * At [FadeLayerBleed] the veil was cut off square around the word, a box of
+ * light round a lit or drying word on the dark leaf (docs/GLIMMER.md forbids
+ * that edge).
+ */
+internal fun glowLayerBleed(glowRadius: Float): Dp =
+    maxOf(FadeLayerBleed, (glowRadius * 2f * GLOW_VEIL_RADIUS).dp)
+
 /** Visible but still ink-like halo around Nightfall's active glimmer. */
 /** Horizontal pad beyond [TextLayoutResult.getPathForRange] when painting
  * paper covers. Vertical expansion is forbidden because it masks glyphs on
@@ -1649,6 +1807,35 @@ private val FadeLayerBleed = 14.dp
 internal val PaperCoverPad = 4.dp
 
 /** Expands a word mask for horizontal glyph overhang without crossing its line. */
+/**
+ * Widens a cover where its range meets the start or end of its line. A glyph
+ * can ink past its advance (EB Garamond's "f" hooks out to the right), and
+ * at a line's end nothing else will cover that overhang: an unread "of" left
+ * its hook at full strength beside the dimmed word. Nothing on the same line
+ * lies beyond those edges, so the reach cannot paper over a neighbour.
+ */
+internal fun lineEndReach(
+    textLayout: TextLayoutResult,
+    cover: Rect,
+    start: Int,
+    endExclusive: Int,
+    reach: Float,
+): Rect {
+    if (reach <= 0f) return cover
+    val line = textLayout.getLineForVerticalPosition(cover.center.y)
+    val opensLine = start <= textLayout.getLineStart(line)
+    val closesLine = endExclusive >= textLayout.getLineEnd(line, visibleEnd = true)
+    if (!opensLine && !closesLine) return cover
+    val rtl = textLayout.getParagraphDirection(start) == ResolvedTextDirection.Rtl
+    val (leftOpen, rightOpen) = if (rtl) closesLine to opensLine else opensLine to closesLine
+    return Rect(
+        left = if (leftOpen) cover.left - reach else cover.left,
+        top = cover.top,
+        right = if (rightOpen) cover.right + reach else cover.right,
+        bottom = cover.bottom,
+    )
+}
+
 internal fun linePaperCoverBounds(lineBounds: Rect, horizontalPad: Float): Rect =
     Rect(
         left = lineBounds.left - horizontalPad,

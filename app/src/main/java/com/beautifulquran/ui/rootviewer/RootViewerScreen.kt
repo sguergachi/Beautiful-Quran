@@ -71,6 +71,7 @@ import androidx.compose.ui.text.style.LineHeightStyle
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -85,6 +86,7 @@ import com.beautifulquran.ui.theme.DisplayFontFamily
 import com.beautifulquran.ui.theme.HafsFontFamily
 import com.beautifulquran.ui.theme.LocalQuranAccents
 import com.beautifulquran.ui.theme.SerifFontFamily
+import com.beautifulquran.ui.theme.typeScale
 import com.beautifulquran.ui.theme.quietClickable
 import com.beautifulquran.ui.theme.verticalFadingEdges
 import com.beautifulquran.ui.theme.QuranTheme
@@ -489,13 +491,10 @@ private val LemmaToMetaGap = 20.dp
 
 /** Shared face for Root Form‑1 lead and Lemma dictionary glosses. */
 private val AnalysisGlossAlpha = 0.9f
-private val AnalysisGlossSize = 16.sp
-private val AnalysisGlossLineHeight = 20.sp
-
 @Composable
 private fun analysisGlossStyle(): TextStyle = MaterialTheme.typography.bodyLarge.copy(
-    fontSize = AnalysisGlossSize,
-    lineHeight = AnalysisGlossLineHeight,
+    fontSize = typeScale(16.sp, 18.sp),
+    lineHeight = typeScale(20.sp, 22.sp),
     fontWeight = FontWeight.Medium,
     platformStyle = PlatformTextStyle(includeFontPadding = false),
     lineHeightStyle = LineHeightStyle(
@@ -595,8 +594,9 @@ private fun WordAnalysis(
                 if (rootSense != null) {
                     val bodyColor = MaterialTheme.colorScheme.onSurface.copy(alpha = AnalysisGlossAlpha)
                     val citationColor = QuranTheme.ink.quiet
-                    val annotated = remember(rootSense, bodyColor, citationColor) {
-                        lexiconAnnotated(rootSense, bodyColor, citationColor)
+                    val citationSize = typeScale(13.sp, 15.sp)
+                    val annotated = remember(rootSense, bodyColor, citationColor, citationSize) {
+                        lexiconAnnotated(rootSense, bodyColor, citationColor, citationSize)
                     }
                     Text(
                         text = annotated,
@@ -716,10 +716,10 @@ private fun RootLabel(
                 // so CenterVertically stays even between ROOT and LEMMA.
                 style = TextStyle(
                     fontFamily = SerifFontFamily,
-                    fontSize = 10.5.sp,
-                    lineHeight = 14.sp,
+                    fontSize = typeScale(10.5.sp, 12.sp),
+                    lineHeight = typeScale(14.sp, 16.sp),
                     fontWeight = FontWeight.SemiBold,
-                    letterSpacing = 1.4.sp,
+                    letterSpacing = typeScale(1.4.sp, 1.56.sp),
                     platformStyle = PlatformTextStyle(includeFontPadding = false),
                     lineHeightStyle = LineHeightStyle(
                         alignment = LineHeightStyle.Alignment.Center,
@@ -741,8 +741,8 @@ private fun RootSectionTitle(text: String, explanation: String? = null) {
                 text = it,
                 fontFamily = DisplayFontFamily,
                 fontWeight = FontWeight.SemiBold,
-                fontSize = 21.sp,
-                lineHeight = 26.sp,
+                fontSize = typeScale(21.sp, 24.sp),
+                lineHeight = typeScale(26.sp, 29.sp),
                 color = MaterialTheme.colorScheme.onSurface,
             )
         },
@@ -899,8 +899,8 @@ private fun ChapterHeading(section: RootOccurrenceSection, open: Boolean, onClic
             Text(
                 text = section.surahName,
                 fontFamily = DisplayFontFamily,
-                fontSize = 16.sp,
-                lineHeight = 21.sp,
+                fontSize = typeScale(16.sp, 18.sp),
+                lineHeight = typeScale(21.sp, 24.sp),
                 color = QuranTheme.ink.strong,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
@@ -1096,7 +1096,8 @@ private fun LemmaSingleSenseRow(
     glossStyle: TextStyle,
     glossColor: Color,
 ) {
-    val spineHeight = with(LocalDensity.current) { AnalysisGlossLineHeight.toDp() }
+    val glossLineHeight = typeScale(20.sp, 22.sp)
+    val spineHeight = with(LocalDensity.current) { glossLineHeight.toDp() }
     val spineWidthPx = with(LocalDensity.current) { 1.dp.toPx() }
     val stubOffsetPx = with(LocalDensity.current) { 4.dp.toPx() }
     Row(
@@ -1288,8 +1289,8 @@ private fun LemmaMeta(
 
 @Composable
 private fun lemmaMetaStyle(): TextStyle = MaterialTheme.typography.bodyMedium.copy(
-    fontSize = 12.5.sp,
-    lineHeight = 16.sp,
+    fontSize = typeScale(12.5.sp, 14.sp),
+    lineHeight = typeScale(16.sp, 18.sp),
     platformStyle = PlatformTextStyle(includeFontPadding = false),
     lineHeightStyle = LineHeightStyle(
         alignment = LineHeightStyle.Alignment.Top,
@@ -1367,21 +1368,22 @@ private fun LexiconBlockView(
     modifier: Modifier = Modifier,
 ) {
     val gold = LocalQuranAccents.current.gold
+    val citationSize = typeScale(13.sp, 15.sp)
     Column(modifier.fillMaxWidth()) {
         block.form?.let { form ->
             Text(
                 text = form,
                 fontFamily = DisplayFontFamily,
                 fontWeight = FontWeight.Medium,
-                fontSize = 16.sp,
-                lineHeight = 20.sp,
+                fontSize = typeScale(16.sp, 18.sp),
+                lineHeight = typeScale(20.sp, 22.sp),
                 color = gold,
                 modifier = Modifier.padding(bottom = 8.dp),
             )
         }
         if (block.text.isNotEmpty()) {
-            val annotated = remember(block.text, bodyColor, citationColor) {
-                lexiconAnnotated(block.text, bodyColor, citationColor)
+            val annotated = remember(block.text, bodyColor, citationColor, citationSize) {
+                lexiconAnnotated(block.text, bodyColor, citationColor, citationSize)
             }
             Text(
                 text = annotated,
@@ -1398,6 +1400,7 @@ private fun lexiconAnnotated(
     text: String,
     bodyColor: Color,
     citationColor: Color,
+    citationSize: TextUnit,
 ): AnnotatedString =
     buildAnnotatedString {
         val runs = lexiconRuns(text)
@@ -1406,7 +1409,9 @@ private fun lexiconAnnotated(
                 run.isArabic -> withStyle(
                     SpanStyle(fontFamily = HafsFontFamily, fontSize = 19.sp, color = bodyColor),
                 ) { append(run.text) }
-                run.isCitation -> withStyle(SpanStyle(color = citationColor, fontSize = 13.sp)) {
+                run.isCitation -> withStyle(
+                    SpanStyle(color = citationColor, fontSize = citationSize),
+                ) {
                     append(run.text)
                 }
                 else -> append(run.text)
@@ -1479,8 +1484,8 @@ private fun WordHeader(word: Word, isPlaying: Boolean, onPlay: () -> Unit) {
     if (word.translation.isNotBlank()) {
         Text(
             text = word.translation,
-            fontSize = 17.5.sp,
-            lineHeight = 25.sp,
+            fontSize = typeScale(17.5.sp, 20.sp),
+            lineHeight = typeScale(25.sp, 28.sp),
             fontStyle = FontStyle.Italic,
             textAlign = TextAlign.Center,
             color = MaterialTheme.colorScheme.onSurface,

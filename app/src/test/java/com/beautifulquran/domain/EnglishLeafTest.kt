@@ -227,22 +227,19 @@ class EnglishLeafTest {
             runs = listOf(EnglishVerseRun(67, 2, from = 0, to = Int.MAX_VALUE)),
         ) { _, _ -> source }.verses.single()
 
-    /** The printed text up to where a share of the verse lands, joiners dropped. */
+    /** The printed text up to where a share of the verse lands. */
     private fun EnglishLeafVerse.inkedThrough(source: String, sourceEnd: Int): String {
         val at = (fragmentInkProgress(sourceEnd.toFloat() / source.length) * text.length)
             .roundToInt()
-        return text.substring(0, at).replace("⁠", "")
+        return text.substring(0, at)
     }
 
     @Test
-    fun `the ink lands on the word the alignment names despite the hyphenation joiners`() {
-        // 67:2. The vetoes thread invisible joiners through the printed words,
-        // and scaling the source's share onto that longer string inked
-        // "created" as "creat" and "death" as "ed death".
+    fun `the leaf keeps whole words and the ink lands on the word the alignment names`() {
         val source = "[He] who created death and life to test you [as to] which of you is " +
             "best in deed - and He is the Exalted in Might, the Forgiving"
         val verse = setVerse(source)
-        assertTrue("fixture needs joiners to mean anything", "⁠" in verse.text)
+        assertEquals(source, verse.text)
         for (word in listOf("created", "death", "which of you", "Exalted in Might")) {
             val end = source.indexOf(word) + word.length
             assertEquals(source.substring(0, end), verse.inkedThrough(source, end))
