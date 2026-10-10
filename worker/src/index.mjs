@@ -1,3 +1,5 @@
+import { createTimingService } from './timings.mjs'
+
 const RESOURCES = 'mushafs:1;word_by_word_translations:59;word_by_word_transliterations:60'
 const SNAPSHOTS = new Set([
   '/api/v4/resources/snapshots/mushafs/1',
@@ -9,8 +11,8 @@ const ALLOWED_SYNC_KEYS = new Set(['bootstrap', 'resources', 'sync_token', 'curs
 
 /**
  * A deliberately narrow browser/mobile-safe proxy for QF Content Sync.
- * It holds only the short-lived OAuth token in Worker memory; Quran content
- * passes through to the device cache and is never stored by this service.
+ * Word/QCF content passes through to the device cache. Reviewed timings use a
+ * separate private source checkpoint and canonical view maintained by Python.
  */
 export function createQfProxy(fetchImpl = fetch) {
   let cachedToken = null
@@ -73,7 +75,12 @@ export function createQfProxy(fetchImpl = fetch) {
     throw new ProxyFailure(503, 'qf_content_unavailable')
   }
 
+  const timings = createTimingService()
   return {
+    // The Durable Object reuses this OAuth implementation for timing sources
+    // and word responses behind the same global authorization latch.
+    qfResponse,
+    scheduled: (event, env) => timings.scheduled(event, env),
     async fetch(request, env) {
       const url = new URL(request.url)
       const origin = request.headers.get('Origin')
@@ -83,6 +90,8 @@ export function createQfProxy(fetchImpl = fetch) {
       if (request.method === 'OPTIONS') {
         return new Response(null, { status: 204, headers: cors })
       }
+      const timingResponse = await timings.fetch(request, env, cors)
+      if (timingResponse) return timingResponse
       if (request.method !== 'GET') return failure(405, 'method_not_allowed', cors)
       if (url.pathname === '/healthz') {
         return json({ ok: true, environment: qfEnvironment(env) }, 200, cors)
@@ -91,9 +100,11 @@ export function createQfProxy(fetchImpl = fetch) {
       const path = allowedContentPath(url)
       if (!path) return failure(404, 'not_found', cors)
       try {
+        if (env.QF_TIMING_CONTROL) return await timings.content(env, path, cors)
         const upstream = await qfResponse(env, path)
         if (!upstream.ok) {
           if (upstream.status === 401 || upstream.status === 403) {
+            await timings.revoke(env)
             return failure(403, 'qf_access_revoked', cors)
           }
           if (upstream.status === 410) {
@@ -113,6 +124,7 @@ export function createQfProxy(fetchImpl = fetch) {
           },
         })
       } catch (error) {
+        if (error.status === 403) await timings.revoke(env)
         if (error instanceof ProxyFailure) return failure(error.status, error.code, cors)
         return failure(503, 'qf_content_unavailable', cors)
       }
@@ -208,4 +220,5 @@ class ProxyFailure extends Error {
 const proxy = createQfProxy()
 export default {
   fetch: (request, env) => proxy.fetch(request, env),
+  scheduled: (event, env, ctx) => ctx.waitUntil(proxy.scheduled(event, env)),
 }

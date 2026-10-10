@@ -1,8 +1,10 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { ensureTimings, parseSegments, timings } from './repository'
+import { runtimeTimingsCache, type RuntimeTimingResource } from './runtimeTimings'
 
 afterEach(() => {
   vi.unstubAllGlobals()
+  vi.restoreAllMocks()
 })
 
 describe('parseSegments', () => {
@@ -19,6 +21,23 @@ describe('parseSegments', () => {
 })
 
 describe('lazy timing corpora', () => {
+  it('uses the authenticated resource for QF reciters and keeps repeats and basmalah', async () => {
+    const ensure = vi.spyOn(runtimeTimingsCache, 'ensure').mockResolvedValueOnce(undefined)
+    vi.spyOn(runtimeTimingsCache, 'resource').mockReturnValue({
+      rows: [
+        [1, 1, [[1, 10, 20]], 10],
+        [114, 1, [[1, 10, 20], [2, 20, 30], [1, 40, 50]], 10],
+      ],
+    } as RuntimeTimingResource)
+    const fetch = vi.fn()
+    vi.stubGlobal('fetch', fetch)
+    await ensureTimings(7)
+    expect(ensure).toHaveBeenCalledExactlyOnceWith(7)
+    expect(fetch).not.toHaveBeenCalled()
+    expect(timings(7, 114).get(1)?.map((segment) => segment.position)).toEqual([1, 2, 1])
+    expect(timings(7, 1).get(1)).toEqual([{ position: 1, startMs: 10, endMs: 20 }])
+  })
+
   it('fetches one reciter corpus and materializes only the requested surah', async () => {
     const fetch = vi.fn(async () => new Response(JSON.stringify({
       1: { 1: [[1, 20, 300]] },

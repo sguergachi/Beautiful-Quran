@@ -23,10 +23,10 @@ Sources (all fetched over HTTPS, cached in tools/.cache):
                         the offline pipeline before an app release.
 
 Output: data/quran.db (the canonical asset consumed by Android and web builds).
-A normal rebuild excludes Quran.com-derived word/QCF fields while preserving
-the reviewed repeat-aware timing table byte-for-byte. ``--refresh-qdc-timings``
-explicitly regenerates that table for corpus review; ``--quran-align-only`` is
-an audit/fallback build. Neither explicit mode is the committed reader database.
+A normal rebuild excludes Quran.com-derived word/QCF fields and preserves the
+asset's reviewed independent timing rows. QF repeats live in the runtime cache.
+``--qf-snapshots`` builds their reviewed canonical data privately;
+``--refresh-qdc-timings`` reproduces legacy inputs for a private corpus audit.
 
 The word segmentation canon is the space-split of the Uthmani text; the WBW
 gloss and the timing data are mapped onto it by position and clamped when a
@@ -34,11 +34,13 @@ source disagrees (10 known ayahs differ by one word — logged, not fatal).
 """
 
 import argparse
+import difflib
 from difflib import SequenceMatcher
 import gzip
 import hashlib
 import io
 import json
+import math
 import re
 import sqlite3
 import sys
@@ -214,6 +216,50 @@ QDC_SOURCE_SHA256 = {
     7: "f6249a65b9c0aeedb99a5ae8594d415d77828265f8085b4a7392d7036fb1a36e",
     9: "692f055e3898784da093f948dd765b25403cfdd021f555d00b4d5c19d4b96562",
 }
+
+# Authenticated Content Sync is a separate reviewed source profile. These pins
+# never replace the legacy locks: both inputs remain reproducible for audits.
+QF_SOURCE_SHA256 = {
+    2: "1893d19fcf91d60ee0011b22855bd4d232acdafb06fc3520a87836f16fb0237a",
+    3: "cef161c719204cb5a571631e9af68fb2eb121fb77abe9b196a774bc0882afd6e",
+    5: "aac71cabf2c73163d7793d71edc7e6adcc9acf840a0b7c7a2c80feb56ca4d79c",
+    6: "60b81b993afbdc60843de545a0c148bf5d885d93bc5b8b5bbb03b8b68f7f6656",
+    7: "ee3d429dbdd9ab80e2310e9bf770cf7b7f4cbdc6cfe2a90257ef6072fa4010c0",
+    9: "a145f59301feca42b727d43456368e1c7f2f87465325dd4104c863060c7eaeb2",
+}
+QF_TIMING_BASELINE_SHA256 = "3489bd89a91177d2701a2bbc3e8e414d957e308a539c6ec71122a568015f7c8d"
+QF_VERDICTS_FILE = ROOT / "tools/timing_verdicts/qf-source-transition.json"
+QF_RUNTIME_DELIVERY = "authenticated Content Sync runtime cache; no bundled QF timings"
+
+
+def load_qf_timings(snapshots_dir, qf_id):
+    """Read one authenticated snapshot, preserving and pinning every occurrence."""
+    from qf_timing_parity import snapshot_rows, source_hash
+
+    rows = snapshot_rows(
+        json.loads((snapshots_dir / f"snapshot-{qf_id}.json").read_text()), qf_id
+    )
+    digest = source_hash(rows)
+    if digest != QF_SOURCE_SHA256[qf_id]:
+        raise SystemExit(
+            f"authenticated QF reciter {qf_id} changed: {digest}; "
+            "review the full source and canonical delta before updating its lock"
+        )
+    return {tuple(map(int, key.split(":"))): row for key, row in rows.items()}
+
+
+def retire_authenticated_edit(edit, row, source_profile):
+    """Retire an obsolete edit only on its exact acoustically-reviewed QF input."""
+    if source_profile not in ("legacy", "authenticated"):
+        raise ValueError(f"unknown timing source profile {source_profile!r}")
+    retirement = edit.get("authenticatedRetirement")
+    if source_profile != "authenticated" or retirement is None:
+        return False
+    digest = hashlib.sha256(json.dumps(row, separators=(",", ":")).encode()).hexdigest()
+    if (digest != retirement.get("inputSegmentsSha256") or
+            not retirement.get("evidence")):
+        raise ValueError("authenticated correction retirement input/evidence is stale")
+    return True
 
 
 def verify_source(path, expected_sha256, label):
@@ -2046,6 +2092,7 @@ def apply_timing_corrections(
     timing_rows,
     corrections_dir=CORRECTIONS_DIR,
     only_reciter_ids=None,
+    source_profile="legacy",
 ):
     """Apply narrow typed verdicts that cannot be inferred from row topology."""
     by_key = {
@@ -2077,6 +2124,8 @@ def apply_timing_corrections(
                 sys.exit(1)
             op = edit.get("op")
             try:
+                if retire_authenticated_edit(edit, by_key[key], source_profile):
+                    continue
                 if op == "one_utterance":
                     by_key[key] = apply_one_utterance(
                         by_key[key], [int(p) for p in edit.get("positions") or []]
@@ -2124,6 +2173,7 @@ def apply_timing_repairs(
     only_reciter_ids=None,
     references=None,
     file_clock_keys=None,
+    source_profile="legacy",
 ):
     """Apply auto-generated CTC-arbitrated repairs (tools/timing_repairs/*.json)
     on top of the current source rows. Structural differences and their
@@ -2187,6 +2237,9 @@ def apply_timing_repairs(
             if only_keys is not None and key not in only_keys:
                 continue
             if only_kinds is not None and kind not in only_kinds:
+                continue
+            pre = json.loads(pre_raw) if isinstance(pre_raw, str) else pre_raw
+            if retire_authenticated_edit(edit, pre, source_profile):
                 continue
             # A boundary repair cannot create a missing position either. Defer
             # it when this row has a validated singleton-gap fallback; it is
@@ -3003,11 +3056,14 @@ def load_reviewed_timing_baseline(path=OUT):
     db = sqlite3.connect(f"file:{path}?mode=ro", uri=True)
     try:
         provenance = dict(db.execute("SELECT key,value FROM data_provenance"))
-        if not provenance.get("timings", "").startswith("QDC-derived repeat timings"):
+        runtime = provenance.get("qdc_delivery") == QF_RUNTIME_DELIVERY
+        if not runtime and not provenance.get("timings", "").startswith("QDC-derived repeat timings"):
             return None
         timing_rows = list(db.execute(
             "SELECT reciter_id,surah_id,ayah_number,segments FROM timings"
         ))
+        if runtime and any(row[0] in QDC_REPEAT_RECITERS for row in timing_rows):
+            raise SystemExit("runtime timing asset must not contain the QF repeat corpus")
         audio_onsets = {
             (rid, surah, ayah): onset
             for rid, surah, ayah, onset in db.execute(
@@ -3021,16 +3077,126 @@ def load_reviewed_timing_baseline(path=OUT):
         db.close()
 
 
-def declared_reciter_rows(timing_rows):
+def declared_reciter_rows(timing_rows, runtime_reciter_ids=()):
     """Materialize the declared catalog and derive highlight support."""
     timed_ids = {row[0] for row in timing_rows}
     return [
-        (rid, slug, name, style, int(rid in timed_ids))
+        (rid, slug, name, style, int(rid in timed_ids or rid in runtime_reciter_ids))
         for rid, slug, name, style in RECITERS
     ]
 
 
-def main():
+def authenticated_evidence_problem(change):
+    """Enforce the acoustic criteria used to review this source transition."""
+    before, after = change["old"], change["new"]
+    evidence = change["verdict"]["evidence"]
+    models = evidence["models"]
+    topology = change["kinds"] == ["topology"]
+    metric = "viterbiLogProbabilityPerFrame" if topology else "meanAbsStartResidualMs"
+
+    def finite(value):
+        return isinstance(value, (int, float)) and not isinstance(value, bool) and math.isfinite(value)
+
+    if before is None or after is None or change["kinds"] not in (["topology"], ["timestamp"]):
+        return "new, withheld, or onset changes need a separate review"
+    if (len(models) != 2 or
+            {model.get("name") for model in models} != {"arabic-xlsr-ctc", "mms-uroman-ctc"} or
+            any(model.get("metric") != metric or
+                not all(finite(model.get(field)) for field in ("baselineScore", "candidateScore")) or
+                model["candidateScore"] < model["baselineScore"] for model in models)):
+        return "independent model witnesses regress or use the wrong metric"
+    if topology:
+        opcodes = difflib.SequenceMatcher(
+            a=[s[0] for s in before["segments"]], b=[s[0] for s in after["segments"]],
+            autojunk=False,
+        ).get_opcodes()
+        has_new_occurrence = any(tag != "equal" and start < end for tag, _, _, start, end in opcodes)
+        if any(model["candidateScore"] - model["baselineScore"] <= 0.001 or
+               (has_new_occurrence and
+                (not finite(model.get("newOccurrenceMinLabelProbability")) or
+                 not 0.5 <= model["newOccurrenceMinLabelProbability"] <= 1)) for model in models):
+            return "topology preference or new-occurrence confidence is insufficient"
+    elif (all(old[1] == new[1] for old, new in zip(before["segments"], after["segments"])) or
+          any(not finite(model.get(field)) or model[field] < 0
+              for model in models for field in ("baselineResidualMs", "candidateResidualMs")) or
+          any(model["baselineScore"] != -model["baselineResidualMs"] or
+              model["candidateScore"] != -model["candidateResidualMs"] for model in models)):
+        return "end-only changes or invalid start residuals lack boundary evidence"
+    waveform = evidence.get("waveform", {})
+    duration = waveform.get("decodedDurationMs")
+    if (not finite(duration) or duration <= 0 or
+            waveform.get("boundsWithinTolerance") is not True or
+            waveform.get("durationToleranceMs") != 50 or
+            waveform.get("voicedEndToleranceMs") != 250 or
+            waveform.get("voicedTailCutRisks") != [] or
+            not all(0 <= seg[1] < seg[2] <= duration + 50 for seg in after["segments"])):
+        return "decoded waveform physics are missing or veto the candidate"
+    return None
+
+
+def apply_authenticated_verdicts(timing_rows, onsets, baseline_path):
+    """Accept reviewed deltas; restore every rejected row from the private baseline."""
+    from timing_delta import (
+        build_delta, load_verdict_ledger, make_payload, payload_hash,
+        read_timing_rows, rejected_changes, topology_hash,
+    )
+
+    baseline = read_timing_rows(baseline_path)
+    slug_by_id = {rid: slug for rid, slug, _, _ in RECITERS}
+    id_by_slug = {slug: rid for rid, slug in slug_by_id.items()}
+    candidate = {}
+    for rid, surah, ayah, value in timing_rows:
+        row = json.loads(value) if isinstance(value, str) else value
+        key = (slug_by_id[rid], surah, ayah)
+        if key in candidate:
+            raise SystemExit(f"duplicate authenticated timing row: {key}")
+        payload = make_payload(row, int(onsets.get((rid, surah, ayah), 0)))
+        candidate[key] = {
+            **payload, "payloadHash": payload_hash(payload),
+            "topologyHash": topology_hash(row),
+        }
+    metadata = json.loads(QF_VERDICTS_FILE.read_text())
+    if (metadata.get("schemaVersion") != 1 or metadata.get("sourceProfile") != "authenticated" or
+            metadata.get("baselineDbSha256") != QF_TIMING_BASELINE_SHA256 or
+            metadata.get("sourceHashes") != {str(key): value for key, value in QF_SOURCE_SHA256.items()}):
+        raise SystemExit("authenticated verdict source profile or baseline is stale")
+    ledger = load_verdict_ledger(QF_VERDICTS_FILE)
+    changes = build_delta(baseline, candidate, ledger)["changes"]
+    rejected = {change["key"]: reason for change, reason in rejected_changes(changes)}
+    held = 0
+    for change in changes:
+        entry = change["verdict"]
+        before, after = change["old"], change["new"]
+        if (not entry or entry.get("kinds") != change["kinds"] or
+                entry.get("baselinePayloadHash") != (before["payloadHash"] if before else None) or
+                entry.get("candidatePayloadHash") != (after["payloadHash"] if after else None)):
+            raise SystemExit(f"unreviewed or stale authenticated timing delta: {change['key']}")
+        if entry["verdict"] == "accept":
+            if change["key"] in rejected:
+                raise SystemExit(f"invalid authenticated verdict: {change['key']}: {rejected[change['key']]}")
+            if problem := authenticated_evidence_problem(change):
+                raise SystemExit(f"invalid authenticated acoustic verdict: {change['key']}: {problem}")
+            continue
+        if entry["verdict"] != "hold" or not entry.get("reason"):
+            raise SystemExit(f"authenticated rejected row needs a reviewed hold: {change['key']}")
+        key = (change["reciter"], change["surah"], change["ayah"])
+        if key in baseline:
+            candidate[key] = baseline[key]
+        else:
+            candidate.pop(key, None)
+        held += 1
+    rows, accepted_onsets = [], {}
+    for (slug, surah, ayah), payload in sorted(candidate.items()):
+        rid = id_by_slug[slug]
+        rows.append((rid, surah, ayah, json.dumps(payload["segments"], separators=(",", ":"))))
+        if payload["audioOnsetMs"]:
+            accepted_onsets[(rid, surah, ayah)] = payload["audioOnsetMs"]
+    print(f"[authenticated verdicts] {len(changes) - held} accepted, {held} held at the exact baseline")
+    return sorted(rows), accepted_onsets
+
+
+def main(argv=None):
+    global CACHE
     ap = argparse.ArgumentParser()
     ap.add_argument("--skip-timings", action="store_true")
     timing_mode = ap.add_mutually_exclusive_group()
@@ -3044,13 +3210,37 @@ def main():
         action="store_true",
         help="regenerate repeat rows for explicit full-corpus review",
     )
+    timing_mode.add_argument(
+        "--qf-snapshots", type=Path,
+        help="private backend build from reviewed authenticated Content Sync snapshots",
+    )
+    ap.add_argument("--output", type=Path, help="explicit candidate output database")
+    ap.add_argument("--timing-baseline", type=Path, help="private reviewed timing baseline for authenticated builds")
+    ap.add_argument("--source-cache", type=Path, help="local cache of pinned build-time sources")
     ap.add_argument(
         "--include-quran-com-content",
         action="store_true",
         help="build a local parity candidate with Quran.com word/QCF fields",
     )
-    args = ap.parse_args()
-    include_qdc_timings = args.refresh_qdc_timings
+    args = ap.parse_args(argv)
+    if args.source_cache:
+        CACHE = args.source_cache
+    output = args.output or OUT
+    source_profile = "authenticated" if args.qf_snapshots else "legacy"
+    if args.qf_snapshots:
+        if args.skip_timings or args.output is None or args.timing_baseline is None:
+            ap.error("--qf-snapshots requires --output and --timing-baseline, with timings enabled")
+        if (ROOT.resolve() in output.resolve().parents or output.resolve() == ROOT.resolve() or
+                output.resolve() == args.timing_baseline.resolve()):
+            ap.error("authenticated timing output must be private, outside the repository and baseline")
+        verify_source(args.timing_baseline, QF_TIMING_BASELINE_SHA256, "reviewed private timing baseline")
+    elif args.timing_baseline:
+        ap.error("--timing-baseline requires --qf-snapshots")
+    if ((args.refresh_qdc_timings or args.quran_align_only) and
+            (args.output is None or ROOT.resolve() in output.resolve().parents or
+             output.resolve() == ROOT.resolve())):
+        ap.error("timing audits require an explicit private --output outside the repository")
+    include_qdc_timings = args.refresh_qdc_timings or bool(args.qf_snapshots)
 
     print("[1/6] fetching text + metadata (quran-json)")
     qj = fetch(QURAN_JSON_TGZ, "quran-json.tgz")
@@ -3118,16 +3308,16 @@ def main():
     audio_onsets = load_audio_onsets()
     reviewed_baseline = (
         None
-        if args.skip_timings or args.quran_align_only or args.refresh_qdc_timings
+        if args.skip_timings or args.quran_align_only or include_qdc_timings
         else load_reviewed_timing_baseline()
     )
     if reviewed_baseline is not None:
         timing_rows, reciter_rows, audio_onsets = reviewed_baseline
         print(f"[5/6] preserving {len(timing_rows)} reviewed repeat timing rows")
-    elif not (args.skip_timings or args.quran_align_only or args.refresh_qdc_timings):
+    elif not (args.skip_timings or args.quran_align_only or include_qdc_timings):
         sys.exit(
-            "no reviewed repeat timing baseline found; use --refresh-qdc-timings "
-            "for an explicit candidate or --quran-align-only for the fallback"
+            "no reviewed timing asset found; use --qf-snapshots for private runtime "
+            "data or --quran-align-only for the fallback"
         )
     elif args.skip_timings:
         print("[5/6] SKIPPING timings (--skip-timings)")
@@ -3144,8 +3334,11 @@ def main():
             qdc_id = QDC_REPEAT_RECITERS.get(rid)
             if qdc_id is not None and include_qdc_timings:
                 # Repeat-aware timings from quran.com instead of quran-align.
-                print(f"  {slug}: repeat-aware timings from quran.com (qdc {qdc_id})")
-                data = load_qdc_timings(qdc_id)
+                print(f"  {slug}: repeat-aware timings ({source_profile} source {qdc_id})")
+                data = (
+                    load_qf_timings(args.qf_snapshots, qdc_id)
+                    if args.qf_snapshots else load_qdc_timings(qdc_id)
+                )
                 stats = {
                     "zero_len": 0, "clamped": 0, "repeats": 0, "missing": 0,
                     "opening_shift": 0,
@@ -3269,7 +3462,7 @@ def main():
 
         if include_qdc_timings:
             print("[typed corrections] applying irreducible timing verdicts")
-            timing_rows = apply_timing_corrections(timing_rows)
+            timing_rows = apply_timing_corrections(timing_rows, source_profile=source_profile)
 
             # A boundary repair cannot create the singleton gap itself. Hold
             # this candidate row's boundary edits until its coverage fallback
@@ -3285,6 +3478,7 @@ def main():
                 word_text=word_text,
                 references=alignment_references,
                 file_clock_keys=file_clock_rows,
+                source_profile=source_profile,
             )
 
         print("[overrides] applying tools/timing_overrides/*.json")
@@ -3320,6 +3514,7 @@ def main():
                 only_keys=rescued_keys,
                 only_kinds={"boundary"},
                 word_text=word_text,
+                source_profile=source_profile,
             )
 
         if audio_durations:
@@ -3352,12 +3547,20 @@ def main():
             audio_durations,
             include_yasser_qua=not args.quran_align_only,
         )
+    if args.qf_snapshots:
+        timing_rows, audio_onsets = apply_authenticated_verdicts(
+            timing_rows, audio_onsets, args.timing_baseline
+        )
 
-    reciter_rows = declared_reciter_rows(timing_rows)
-    OUT.parent.mkdir(parents=True, exist_ok=True)
-    if OUT.exists():
-        OUT.unlink()
-    db = sqlite3.connect(OUT)
+    runtime_reciter_ids = (
+        QDC_REPEAT_RECITERS if reviewed_baseline is not None and
+        not any(row[0] in QDC_REPEAT_RECITERS for row in timing_rows) else ()
+    )
+    reciter_rows = declared_reciter_rows(timing_rows, runtime_reciter_ids)
+    output.parent.mkdir(parents=True, exist_ok=True)
+    if output.exists():
+        output.unlink()
+    db = sqlite3.connect(output)
     db.executescript(DDL)
     db.executemany("INSERT INTO surahs VALUES (?,?,?,?,?,?)", surahs)
     db.executemany(
@@ -3406,14 +3609,23 @@ def main():
             ),
         ],
     )
+    if args.qf_snapshots:
+        db.execute("UPDATE data_provenance SET value=? WHERE key='timings'", (
+            "QF authenticated Content Sync; canonical EveryAyah clock; private runtime cache",))
+        db.execute("UPDATE data_provenance SET value=? WHERE key='qdc_delivery'", (
+            "runtime Content Sync; no build-time bundle",))
+    elif runtime_reciter_ids:
+        db.execute("UPDATE data_provenance SET value=? WHERE key='timings'", (
+            "Independent CC-BY timings; QF repeat timings excluded from the asset",))
+        db.execute("UPDATE data_provenance SET value=? WHERE key='qdc_delivery'", (QF_RUNTIME_DELIVERY,))
     write_morphology(db, morph_rows, roots_rows, occ_rows)
     db.execute("CREATE INDEX idx_words_ayah ON words(surah_id, ayah_number)")
     db.execute("CREATE INDEX idx_timings ON timings(reciter_id, surah_id)")
     db.commit()
     db.execute("VACUUM")
     db.close()
-    size_mb = OUT.stat().st_size / 1e6
-    print(f"OK -> {OUT} ({size_mb:.1f} MB, {len(timing_rows)} timing rows, {len(morph_rows)} morph rows)")
+    size_mb = output.stat().st_size / 1e6
+    print(f"OK -> {output} ({size_mb:.1f} MB, {len(timing_rows)} timing rows, {len(morph_rows)} morph rows)")
 
 
 if __name__ == "__main__":

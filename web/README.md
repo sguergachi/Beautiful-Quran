@@ -92,8 +92,10 @@ Engines are DOM-free and unit-tested against the Android JVM suites. See
   hard abut — no crossfade). Word highlight still uses the same per-ayah
   `positionMs` clock. Developer mode can disable it to A/B the legacy
   dual-`<audio>` transport.
-- Repeat-aware timings are build-generated from the canonical database and
-  cached after the selected reciter's first chapter open.
+- Six QF voices fetch complete reviewed timing views from authenticated Content
+  Sync through the Worker, then retain them atomically in IndexedDB. They refresh
+  after six days and remain available through provider outages. The other seven
+  voices keep their packaged lazy timing corpora.
 - The QF word/QCF cache bootstraps once, refreshes from its saved checkpoint
   after six days, and withholds those fields after seven days until it can sync.
 - Click a word to play from there; right-click / long-press opens the Root Word Viewer.

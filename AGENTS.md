@@ -205,9 +205,13 @@ python3 tools/test_build_db.py  # timing pipeline regressions (~1s, no Gradle)
    `QuranDatabase`), no navigation library (the three sheets are a hand-rolled
    paper stack in `MainActivity`). Do not introduce a framework to solve a
    problem the existing hand-rolled piece already solves.
-6. **Offline-first, no backend.** No accounts, no analytics, no API keys. Only
-   recitation audio touches the network at runtime (listening uses a 1 GB LRU
-   in cacheDir; explicit downloads are kept in filesDir).
+6. **Offline-first, no accounts or analytics.** Clients contain no API keys.
+   Authenticated QF word/QCF content and six reviewed timing resources use the
+   narrow Worker and separate device caches; normalization stays in the Python
+   pipeline. QF credentials remain server-side. Timing copies stay available
+   through provider outages, with withdrawal/revocation purging the appropriate
+   content. Recitation audio uses a 1 GB listening LRU in cacheDir; explicit
+   downloads are kept in filesDir. See `docs/QF_CONTENT_SYNC.md`.
 7. **Ink / karaoke fidelity is non-negotiable (Android + web).** The signature
    product moment is the soft directional ink wash: each word reveals with a
    **visible faded leading edge** (smootherstep `letterFadeIn` /

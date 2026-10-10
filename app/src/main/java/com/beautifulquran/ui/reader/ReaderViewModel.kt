@@ -7,6 +7,10 @@ import com.beautifulquran.data.BookmarkRepository
 import com.beautifulquran.data.AnnotationRepository
 import com.beautifulquran.data.EducationMoment
 import com.beautifulquran.data.QuranRepository
+import com.beautifulquran.data.RuntimeTimingRead
+import com.beautifulquran.data.readStableTimingGeneration
+import com.beautifulquran.data.readStableTimingSelection
+import com.beautifulquran.data.observeTimingGeneration
 import com.beautifulquran.DevProfiling
 import com.beautifulquran.data.EnglishBookCache
 import com.beautifulquran.data.englishBookContentKey
@@ -51,9 +55,11 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.merge
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.currentCoroutineContext
@@ -255,6 +261,8 @@ data class PreparedSurah(
      * install cannot cancel and override a newer [load].
      */
     val originGeneration: Long = 0L,
+    /** Accepted runtime timing generation, independently of navigation. */
+    val timingGeneration: Long = 0L,
 )
 
 /** Reading-session state temporarily displaced by an in-page surface such as
@@ -480,8 +488,11 @@ class ReaderViewModel(
      * allocate nothing (see [HighlightEngine.PreparedTimings]). */
     private var preparedTimings: Map<Int, HighlightEngine.PreparedTimings> = emptyMap()
     private var loadJob: Job? = null
+    private var installedTimingGeneration = 0L
 
     private fun installTimings(loaded: Map<Int, List<Segment>>) {
+        tapInk.value = null
+        tapSeed = null
         timings = loaded
         preparedTimings = loaded.mapValues { (_, segs) ->
             HighlightEngine.PreparedTimings.prepare(segs)
@@ -496,11 +507,29 @@ class ReaderViewModel(
     private suspend fun timingsWithBasmalahLeadIn(
         reciterId: Int,
         surahId: Int,
-    ): Map<Int, List<Segment>> {
+    ): RuntimeTimingRead = readStableTimingGeneration({ repository.runtimeTimingGeneration(reciterId) }) {
         val loaded = repository.timings(reciterId, surahId)
-        if (!surahOpensWithBasmalahPreface(surahId)) return loaded
-        val basmalah = repository.timings(reciterId, SURAH_FATIHA)[1] ?: return loaded
-        return loaded + (BASMALAH_PLAYLIST_AYAH to basmalah)
+        val basmalah = if (surahOpensWithBasmalahPreface(surahId)) {
+            repository.timings(reciterId, SURAH_FATIHA)[1]
+        } else null
+        if (basmalah == null) loaded else loaded + (BASMALAH_PLAYLIST_AYAH to basmalah)
+    }
+
+    private suspend fun reloadCurrentTimings() {
+        val gen = sessions.generation
+        val id = sessions.surahId.takeIf { it != 0 } ?: return
+        val reciter = _uiState.value.currentReciter ?: return
+        tapInk.value = null
+        tapSeed = null
+        if (!repository.timingProviderAvailable(reciter.id)) {
+            installTimings(emptyMap())
+            _uiState.value = _uiState.value.copy(hasTimings = false)
+        }
+        val refreshed = timingsWithBasmalahLeadIn(reciter.id, id)
+        if (!sessions.isCurrent(gen, id) || _uiState.value.currentReciter?.id != reciter.id) return
+        installTimings(refreshed.segments)
+        installedTimingGeneration = refreshed.generation
+        _uiState.value = _uiState.value.copy(hasTimings = refreshed.segments.isNotEmpty())
     }
 
     /**
@@ -874,19 +903,16 @@ class ReaderViewModel(
                 .drop(1)
                 .collect { onReciterChanged() }
         }
-        // Timings Lab corrections land immediately: whenever the override
-        // store changes, re-pull this surah's fused timings so the highlight
-        // follows the edit the moment the Lab sheet is lowered.
+        // Lab edits and accepted runtime generations replace prepared timings together.
         viewModelScope.launch {
-            repository.timingOverridesChanged?.drop(1)?.collect {
-                val gen = sessions.generation
-                val id = sessions.surahId.takeIf { it != 0 } ?: return@collect
-                val reciter = _uiState.value.currentReciter ?: return@collect
-                val refreshed = timingsWithBasmalahLeadIn(reciter.id, id)
-                // Drop if navigation moved on while the DB re-read ran.
-                if (!sessions.isCurrent(gen, id)) return@collect
-                installTimings(refreshed)
-                _uiState.value = _uiState.value.copy(hasTimings = refreshed.isNotEmpty())
+            merge(*listOfNotNull(
+                repository.timingOverridesChanged?.drop(1)?.map { Unit },
+                repository.runtimeTimingsChanged
+                    ?.observeTimingGeneration(_uiState.map { it.currentReciter?.id })
+                    ?.filter { (_, generation) -> generation != installedTimingGeneration }
+                    ?.map { Unit },
+            ).toTypedArray()).collect {
+                reloadCurrentTimings()
             }
         }
         // Word glosses and QCF layout arrive as one atomic runtime snapshot.
@@ -992,14 +1018,28 @@ class ReaderViewModel(
         val surahs = repository.surahs()
         val nextSurah = surahs.firstOrNull { it.id == surahId + 1 }
         val previousSurah = surahs.firstOrNull { it.id == surahId - 1 }
-        return PreparedSurah(
+        return freshenPreparedTimings(PreparedSurah(
             content = content,
             nextSurah = nextSurah,
             previousSurah = previousSurah,
             reciters = reciters,
             reciter = reciter,
-            timings = loadedTimings,
+            timings = loadedTimings.segments,
             originGeneration = originGeneration,
+            timingGeneration = loadedTimings.generation,
+        ))
+    }
+
+    private suspend fun freshenPreparedTimings(prepared: PreparedSurah): PreparedSurah {
+        if (prepared.reciter.id == currentReciter(prepared.reciters).id &&
+            prepared.timingGeneration == repository.runtimeTimingGeneration(prepared.reciter.id)) return prepared
+        val (reciterId, current) = readStableTimingSelection({ currentReciter(prepared.reciters).id }) {
+            timingsWithBasmalahLeadIn(it, prepared.content.surah.id)
+        }
+        return prepared.copy(
+            reciter = prepared.reciters.first { it.id == reciterId },
+            timings = current.segments,
+            timingGeneration = current.generation,
         )
     }
 
@@ -1010,12 +1050,14 @@ class ReaderViewModel(
      * When still current, cancels any in-flight [load] for the same session
      * window and starts a new generation for the committed chapter.
      */
-    fun installPrepared(prepared: PreparedSurah) {
+    suspend fun installPrepared(prepared: PreparedSurah) {
+        if (!sessions.isCurrent(prepared.originGeneration)) return
+        val current = freshenPreparedTimings(prepared)
         if (!sessions.isCurrent(prepared.originGeneration)) return
         loadJob?.cancel()
         loadJob = null
         sessions.begin(prepared.content.surah.id, pendingPlayAyah = null)
-        commitPrepared(prepared)
+        commitPrepared(current)
     }
 
     /** Applies [prepared] to UI + timings. Caller must already own the live session. */
@@ -1024,6 +1066,7 @@ class ReaderViewModel(
         focusedAyah = 1
         longAyahMidpointConsumed = 0
         installTimings(prepared.timings)
+        installedTimingGeneration = prepared.timingGeneration
         _uiState.value = ReaderUiState(
             content = prepared.content,
             nextSurah = prepared.nextSurah,
@@ -1051,10 +1094,13 @@ class ReaderViewModel(
         val id = sessions.surahId
         if (id == 0) return
         val reciters = _uiState.value.reciters.ifEmpty { repository.reciters() }
-        val reciter = currentReciter(reciters)
-        val refreshed = timingsWithBasmalahLeadIn(reciter.id, id)
+        val (reciterId, refreshed) = readStableTimingSelection({ currentReciter(reciters).id }) {
+            timingsWithBasmalahLeadIn(it, id)
+        }
+        val reciter = reciters.first { it.id == reciterId }
         if (!sessions.isCurrent(gen, id)) return
-        installTimings(refreshed)
+        installTimings(refreshed.segments)
+        installedTimingGeneration = refreshed.generation
         _uiState.value = _uiState.value.copy(
             currentReciter = reciter,
             hasTimings = timings.isNotEmpty(),

@@ -38,7 +38,7 @@ Steps 2 and 3 need the qasr venv (torch, uroman) and the cached EveryAyah MP3s:
     ~/qasr/venv/bin/python tools/find_flattened_resays.py score \\
         /tmp/resay-candidates.json --out /tmp/resay-scores.jsonl --resume
     python3 tools/find_flattened_resays.py write /tmp/resay-scores.jsonl
-    python3 tools/build_db.py --refresh-qdc-timings
+    python3 tools/build_db.py --refresh-qdc-timings --output /tmp/legacy-candidate.db
     git show "$(git merge-base HEAD origin/master)":data/quran.db > /tmp/base.db
     python3 tools/find_flattened_resays.py verdicts /tmp/resay-scores.jsonl \\
         --baseline-db /tmp/base.db
@@ -144,7 +144,7 @@ def pipeline_rows():
         build_db.apply_timing_repairs = repairs
         build_db.OUT = Path(tmp) / "quran.db"
         argv = sys.argv
-        sys.argv = ["build_db.py", "--refresh-qdc-timings"]
+        sys.argv = ["build_db.py", "--refresh-qdc-timings", "--output", str(build_db.OUT)]
         try:
             build_db.main()
         finally:

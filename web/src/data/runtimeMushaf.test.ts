@@ -307,4 +307,69 @@ describe('RuntimeMushafCache', () => {
     expect(calls.every((url) => !url.includes('_='))).toBe(true)
     expect(calls.every((url) => !/client_secret|access_token/i.test(url))).toBe(true)
   })
+
+  it('purges word content when the timing endpoint rejects shared credentials', async () => {
+    const { cache, store } = await seeded()
+    await cache.revoke()
+    expect(store.value).toBeNull()
+    expect(cache.word(5, 1, 1)).toBeNull()
+    expect(cache.status().lastError).toBe('revoked')
+  })
+
+  it('cannot publish an in-flight word refresh after another QF resource revokes access', async () => {
+    const first = await seeded()
+    const calls: string[] = []
+    const normal = fetcher(calls)
+    let respond!: () => void
+    const waiting = new Promise<void>((resolve) => { respond = resolve })
+    const cache = new RuntimeMushafCache(
+      'https://content.example', first.store, (async (input: RequestInfo | URL) => {
+        if (String(input).includes('sync_token=')) await waiting
+        return normal(input)
+      }) as typeof fetch, () => 100, 2, () => canonical, [106],
+    )
+    await cache.restore()
+    const pending = cache.refresh()
+    await cache.revoke()
+    respond()
+    expect(await pending).toBe(false)
+    expect(first.store.value).toBeNull()
+    expect(cache.word(5, 1, 1)).toBeNull()
+    expect(cache.status().lastError).toBe('revoked')
+  })
+
+  it('cannot restore the retained word copy while another resource is persisting its purge', async () => {
+    const { cache, store } = await seeded()
+    let release!: () => void
+    let started!: () => void
+    const clearing = new Promise<void>((resolve) => { started = resolve })
+    const blocked = new Promise<void>((resolve) => { release = resolve })
+    store.clear = async () => { started(); await blocked; store.value = null }
+    const purging = cache.revoke()
+    await clearing
+    await cache.restore()
+    expect(cache.word(5, 1, 1)).toBeNull()
+    expect(cache.status().lastError).toBe('revoked')
+    release()
+    await purging
+    expect(store.value).toBeNull()
+  })
+
+  it('a reconnect cannot persist a new word generation ahead of a pending purge', async () => {
+    const { cache, store } = await seeded()
+    let release!: () => void
+    let started!: () => void
+    const clearing = new Promise<void>((resolve) => { started = resolve })
+    const blocked = new Promise<void>((resolve) => { release = resolve })
+    store.clear = async () => { started(); await blocked; store.value = null }
+    const purging = cache.revoke()
+    await clearing
+    const reconnect = cache.refreshIfNeeded()
+    expect(cache.word(5, 1, 1)).toBeNull()
+    release()
+    await purging
+    expect(await reconnect).toBe(true)
+    expect(store.value?.token).toBe('boot-token')
+    expect(cache.word(5, 1, 1)?.translation_en).toBe('O')
+  })
 })

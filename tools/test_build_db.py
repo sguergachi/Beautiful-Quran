@@ -26,6 +26,7 @@ from build_db import (  # noqa: E402
     AUDIO_ONSETS_DIR,
     QCF_V2_FIRST_CODEPOINT,
     QURAN_ALIGN_ADDITIONS,
+    QDC_REPEAT_RECITERS,
     RECITERS,
     adjust_qdc_segments,
     apply_boundary_repair,
@@ -62,6 +63,7 @@ from build_db import (  # noqa: E402
     trim_to_next_start,
 )
 import detect_audio_onsets as onset_detector  # noqa: E402
+from qf_timing_assets import RUNTIME_DELIVERY, verify_asset_transition  # noqa: E402
 from timing_delta import (  # noqa: E402
     build_delta,
     load_corpus_bootstraps,
@@ -492,8 +494,8 @@ def check_completion_pipeline():
     )
 
 
-def audit_bundled_db():
-    db = sqlite3.connect(ROOT / "data/quran.db")
+def audit_bundled_db(database_path=ROOT / "data/quran.db"):
+    db = sqlite3.connect(database_path)
     counts = {
         (s, a): n for s, a, n in db.execute(
             "SELECT surah_id,ayah_number,COUNT(*) FROM words GROUP BY 1,2"
@@ -533,92 +535,99 @@ def audit_bundled_db():
         ).fetchone()
         ayah_pages = db.execute("SELECT SUM(page) FROM ayahs").fetchone()[0]
         provider_ok = provider_values == (0, 0, 0, 0, 0, 0) and ayah_pages == 0
-    row = db.execute(
-        "SELECT segments FROM timings WHERE reciter_id=1 "
-        "AND surah_id=2 AND ayah_number=214"
-    ).fetchone()
-    starts = {x[0]: x[1] for x in json.loads(row[0])}
-    exact = [starts[p] for p in (25, 26, 27, 28)] == [
-        24_940, 27_160, 29_190, 30_270
-    ]
-    row = db.execute(
-        "SELECT segments FROM timings WHERE reciter_id=1 "
-        "AND surah_id=5 AND ayah_number=52"
-    ).fetchone()
-    starts = {x[0]: x[1] for x in json.loads(row[0])}
-    exact &= [starts[p] for p in (11, 12)] == [14_360, 15_600]
-    repaired = {}
-    for s, a in ((2, 229), (2, 235), (4, 19), (5, 66), (6, 145)):
+    runtime_delivery = provenance.get("qdc_delivery") == RUNTIME_DELIVERY
+    exact = True
+    # Legacy source goldens remain available for the private v65 baseline audit.
+    # The release asset has no QF rows; its full independent corpus and the
+    # exact removed QF corpus are hash-bound in the delivery delta gate.
+    if not runtime_delivery:
         row = db.execute(
             "SELECT segments FROM timings WHERE reciter_id=1 "
-            "AND surah_id=? AND ayah_number=?",
-            (s, a),
+            "AND surah_id=2 AND ayah_number=214"
         ).fetchone()
-        repaired[(s, a)] = json.loads(row[0])
-    exact &= order(repaired[(2, 229)]) == list(range(1, 47))
-    exact &= [s for s in repaired[(2, 229)] if s[0] in (16, 17)] == [
-        [16, 20_310, 21_140], [17, 22_715, 23_740]
-    ]
-    exact &= order(repaired[(2, 235)]) == list(range(1, 48))
-    exact &= [s for s in repaired[(2, 235)] if s[0] in (22, 23)] == [
-        [22, 23_230, 24_001], [23, 26_235, 27_010]
-    ]
-    exact &= [s for s in repaired[(5, 66)] if s[0] == 13] == [
-        [13, 14_791, 15_870]
-    ]
-    exact &= not any(
-        order(repaired[(4, 19)])[i : i + 4] == [17, 18, 17, 18]
-        for i in range(len(repaired[(4, 19)]) - 3)
-    )
-    exact &= order(repaired[(6, 145)]) == list(range(1, 40))
-    exact &= timings[(1, 2, 253)][:8] == [
-        [1, 1_179, 1_650],
-        [2, 1_650, 2_370],
-        [3, 2_370, 3_500],
-        [4, 3_500, 4_400],
-        [5, 4_400, 4_970],
-        [6, 4_970, 5_970],
-        [7, 5_970, 6_710],
-        [8, 6_710, 7_540],
-    ]
-    # The onset (1951 ms) still clamps word 1 alone and does not translate the
-    # row (#626). Words 2-3 moved +100 ms in quran-v54 when the database was
-    # rebuilt from its own pipeline: an evidenced boundary improvement, not an
-    # onset delay — mean |start residual| falls 331 ms -> 248 ms against both
-    # forced aligners (tools/timing_verdicts/v54-pipeline-resync.json).
-    exact &= timings[(7, 4, 148)][:3] == [
-        [1, 1_951, 4_790],
-        [2, 4_790, 5_510],
-        [3, 5_510, 6_390],
-    ]
-    exact &= {
-        key: timings[key][0][1]
-        for key in ((4, 3, 113), (4, 4, 88), (7, 5, 109))
-    } == {
-        (4, 3, 113): 6_009,
-        (4, 4, 88): 5_968,
-        (7, 5, 109): 6_636,
-    }
-    # This is the phrase from Hani 5:2 that regressed to one long held word in
-    # quran-v54. Pin both passes so a one-pass fallback can never ship again.
-    exact &= [segment for segment in timings[(7, 5, 2)] if 19 <= segment[0] <= 23] == [
-        [19, 19_670, 20_970],
-        [20, 20_970, 21_600],
-        [21, 21_600, 22_100],
-        [22, 22_100, 23_570],
-        [19, 23_590, 25_300],
-        [20, 25_300, 25_980],
-        [21, 25_980, 26_620],
-        [22, 26_620, 27_890],
-        [23, 27_890, 29_810],
-    ]
+        starts = {x[0]: x[1] for x in json.loads(row[0])}
+        exact &= [starts[p] for p in (25, 26, 27, 28)] == [
+            24_940, 27_160, 29_190, 30_270
+        ]
+        row = db.execute(
+            "SELECT segments FROM timings WHERE reciter_id=1 "
+            "AND surah_id=5 AND ayah_number=52"
+        ).fetchone()
+        starts = {x[0]: x[1] for x in json.loads(row[0])}
+        exact &= [starts[p] for p in (11, 12)] == [14_360, 15_600]
+        repaired = {}
+        for s, a in ((2, 229), (2, 235), (4, 19), (5, 66), (6, 145)):
+            row = db.execute(
+                "SELECT segments FROM timings WHERE reciter_id=1 "
+                "AND surah_id=? AND ayah_number=?",
+                (s, a),
+            ).fetchone()
+            repaired[(s, a)] = json.loads(row[0])
+        exact &= order(repaired[(2, 229)]) == list(range(1, 47))
+        exact &= [s for s in repaired[(2, 229)] if s[0] in (16, 17)] == [
+            [16, 20_310, 21_140], [17, 22_715, 23_740]
+        ]
+        exact &= order(repaired[(2, 235)]) == list(range(1, 48))
+        exact &= [s for s in repaired[(2, 235)] if s[0] in (22, 23)] == [
+            [22, 23_230, 24_001], [23, 26_235, 27_010]
+        ]
+        exact &= [s for s in repaired[(5, 66)] if s[0] == 13] == [
+            [13, 14_791, 15_870]
+        ]
+        exact &= not any(
+            order(repaired[(4, 19)])[i : i + 4] == [17, 18, 17, 18]
+            for i in range(len(repaired[(4, 19)]) - 3)
+        )
+        exact &= order(repaired[(6, 145)]) == list(range(1, 40))
+        exact &= timings[(1, 2, 253)][:8] == [
+            [1, 1_179, 1_650],
+            [2, 1_650, 2_370],
+            [3, 2_370, 3_500],
+            [4, 3_500, 4_400],
+            [5, 4_400, 4_970],
+            [6, 4_970, 5_970],
+            [7, 5_970, 6_710],
+            [8, 6_710, 7_540],
+        ]
+        # The onset (1951 ms) still clamps word 1 alone and does not translate the
+        # row (#626). Words 2-3 moved +100 ms in quran-v54 when the database was
+        # rebuilt from its own pipeline: an evidenced boundary improvement, not an
+        # onset delay — mean |start residual| falls 331 ms -> 248 ms against both
+        # forced aligners (tools/timing_verdicts/v54-pipeline-resync.json).
+        exact &= timings[(7, 4, 148)][:3] == [
+            [1, 1_951, 4_790],
+            [2, 4_790, 5_510],
+            [3, 5_510, 6_390],
+        ]
+        exact &= {
+            key: timings[key][0][1]
+            for key in ((4, 3, 113), (4, 4, 88), (7, 5, 109))
+        } == {
+            (4, 3, 113): 6_009,
+            (4, 4, 88): 5_968,
+            (7, 5, 109): 6_636,
+        }
+        # This is the phrase from Hani 5:2 that regressed to one long held word in
+        # quran-v54. Pin both passes so a one-pass fallback can never ship again.
+        exact &= [segment for segment in timings[(7, 5, 2)] if 19 <= segment[0] <= 23] == [
+            [19, 19_670, 20_970],
+            [20, 20_970, 21_600],
+            [21, 21_600, 22_100],
+            [22, 22_100, 23_570],
+            [19, 23_590, 25_300],
+            [20, 25_300, 25_980],
+            [21, 25_980, 26_620],
+            [22, 26_620, 27_890],
+            [23, 27_890, 29_810],
+        ]
     exact &= dict(db.execute("SELECT key,value FROM data_provenance")) == {
         "quran_com_content": "excluded from committed database; runtime cache only",
         "timings": (
-            "QDC-derived repeat timings over everyayah recordings; "
-            "bundled app-release dataset"
+            "independent reciters bundled; six QF voices from reviewed authenticated Content Sync runtime cache"
+            if runtime_delivery else
+            "QDC-derived repeat timings over everyayah recordings; bundled app-release dataset"
         ),
-        "qdc_delivery": "bundled; updated through app releases",
+        "qdc_delivery": RUNTIME_DELIVERY if runtime_delivery else "bundled; updated through app releases",
     }
     # A withheld row is an intentional whole-ayah fallback only when neither
     # source can describe the streamed recording safely. Pin every reciter's
@@ -645,22 +654,24 @@ def audit_bundled_db():
         set(counts) - {(s, a) for rid_, s, a in timings if rid_ == rid}
         == withheld
         for rid, withheld in expected_withheld.items()
+        if not runtime_delivery or rid not in QDC_REPEAT_RECITERS
     )
-    for key, subsequence in {
-        (7, 9, 33): [13, 9, 10, 14],
-        (7, 22, 55): [15, 7, 8, 16],
-        (7, 44, 22): [6, 1, 2, 3],
-        (7, 74, 52): [7, 4, 8],
-        (7, 4, 4): [12, 12],
-        # This incomplete QDC row omits canonical word 23. Interpolating it
-        # would alter the repeat order, so the monotonic witness must remain.
-        (3, 7, 155): list(range(1, 42)),
-    }.items():
-        positions = order(timings[key])
-        exact &= any(
-            positions[i : i + len(subsequence)] == subsequence
-            for i in range(len(positions) - len(subsequence) + 1)
-        )
+    if not runtime_delivery:
+        for key, subsequence in {
+            (7, 9, 33): [13, 9, 10, 14],
+            (7, 22, 55): [15, 7, 8, 16],
+            (7, 44, 22): [6, 1, 2, 3],
+            (7, 74, 52): [7, 4, 8],
+            (7, 4, 4): [12, 12],
+            # This incomplete QDC row omits canonical word 23. Interpolating it
+            # would alter the repeat order, so the monotonic witness must remain.
+            (3, 7, 155): list(range(1, 42)),
+        }.items():
+            positions = order(timings[key])
+            exact &= any(
+                positions[i : i + len(subsequence)] == subsequence
+                for i in range(len(positions) - len(subsequence) + 1)
+            )
     for path in AUDIO_ONSETS_DIR.glob("*.json"):
         payload = json.loads(path.read_text(encoding="utf-8"))
         exact &= payload["detector"] == {
@@ -724,8 +735,10 @@ def check_reciter_catalog():
         timing_rows = list(db.execute(
             "SELECT reciter_id,surah_id,ayah_number,segments FROM timings"
         ))
+        provenance = dict(db.execute("SELECT key,value FROM data_provenance"))
+    runtime = QDC_REPEAT_RECITERS if provenance.get("qdc_delivery") == RUNTIME_DELIVERY else ()
     return (
-        actual == declared_reciter_rows(timing_rows)
+        actual == declared_reciter_rows(timing_rows, runtime_reciter_ids=runtime)
         and len(actual) == len(RECITERS)
         and all(row[4] == 1 for row in actual)
     )
@@ -934,15 +947,24 @@ def check_timing_delta():
             capture_output=True,
             check=True,
         ).stdout.strip()
+        before = read_git_timing_rows(base)
+        after = read_timing_rows(ROOT / "data" / "quran.db")
+        runtime_delivery = provenance.get("qdc_delivery") == RUNTIME_DELIVERY
+        if runtime_delivery:
+            manifest = json.loads((ROOT / "data/qf-timing-transition.json").read_text())
+            before = verify_asset_transition(before, after, manifest)
         ledger = {}
         for path in sorted(VERDICTS_DIR.glob("*.json")):
+            if path.name == "qf-source-transition.json":
+                # This ledger gates the private runtime view, never bundled data.
+                continue
             entries = load_verdict_ledger(path)
             duplicate = set(ledger) & set(entries)
             if duplicate:
                 raise ValueError(f"duplicate timing verdict(s): {sorted(duplicate)}")
             ledger.update(entries)
         report = build_delta(
-            read_git_timing_rows(base), read_timing_rows(ROOT / "data" / "quran.db"), ledger
+            before, after, ledger
         )
         bootstraps = [
             entry
