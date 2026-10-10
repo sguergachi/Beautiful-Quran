@@ -231,12 +231,12 @@ class EnglishLeafTest {
     private fun EnglishLeafVerse.inkedThrough(source: String, sourceEnd: Int): String {
         val at = (fragmentInkProgress(sourceEnd.toFloat() / source.length) * text.length)
             .roundToInt()
-        return text.substring(0, at).replace("⁠", "")
+        return text.substring(0, at).replace("⁠", "").replace("\u00AD", "")
     }
 
     @Test
-    fun `the ink lands on the word the alignment names despite the hyphenation joiners`() {
-        // 67:2. The vetoes thread invisible joiners through the printed words,
+    fun `the ink lands on the word the alignment names despite the hyphenation marks`() {
+        // 67:2. The hyphenation threads invisible joiners and soft hyphens through the printed words,
         // and scaling the source's share onto that longer string inked
         // "created" as "creat" and "death" as "ed death".
         val source = "[He] who created death and life to test you [as to] which of you is " +

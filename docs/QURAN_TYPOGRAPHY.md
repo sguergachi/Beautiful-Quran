@@ -1018,7 +1018,8 @@ a request for one of two other things:
 - **More words to a line** — a smaller hand, or a wider measure. Both are
   changes to §13.2/§13.3, not to line breaking.
 
-It is not a line-breaking problem, and no breaker will fix it.
+It is not a line-breaking problem, and no breaker will fix it — the *evenness*.
+The *holes* were a line-breaking problem; see below.
 
 #### And an even rag was the wrong thing to want
 
@@ -1053,6 +1054,59 @@ the margin and moves the right edge. The price is 3 px of mean shortfall and
 eight more deep holes — and that is the right way round. A deep hole is legible
 as a hole; a phantom margin is not legible as anything, it just makes the page
 look pinned to the left.
+
+#### Then the holes, refused one at a time
+
+Greedy was right about the rag and wrong about the holes, and a reader said so
+of Ar-Rahman's first leaf: *why does the edge have so many holes, especially in
+the first three lines?* Line three, *The sun and the moon [move] by precise*,
+stopped a quarter of the measure short, because *calculation* bound to its
+verse mark just missed — and the platform would not hyphenate it.
+
+Two faults, and both were real:
+
+- **The veto had switched hyphenation off.** The platform hyphenator reads its
+  patterns only in a word made wholly of letters; a word with a joiner in it
+  breaks at soft hyphens or nowhere. So every word the veto touched lost *all*
+  its cuts, the good ones with the bad: *cal-culation*, *Cre-ated*,
+  *bal-ance*. And the greedy breaker would not take a cut inside such a word
+  even when one was written there — a soft hyphen, or a hard one, the word went
+  whole to the next line.
+- **Greedy cannot look one line ahead.** Where a long word just misses, a
+  compositor carries a short word down from the line above and shares the white
+  between two lines. Greedy leaves it all in one.
+
+So the leaf breaks its own lines (`EnglishRag`, `englishRaggedProse`), on a
+cost that keeps what greedy got right:
+
+1. **Fewest lines first** — the same count greedy sets or fewer, so the
+   pagination and its bisection stand on the same arithmetic.
+2. **A shortfall under 1.65 em is free.** Only past that does a line cost, as
+   the square of the excess. A line that was fine is never moved to even it
+   with its neighbours, which is what drew `Balanced`'s phantom margin.
+3. **A hyphen costs about a two-em hole**, so it is taken where it fills one,
+   at the book's kept cuts only (three letters a side, as before).
+4. **Ties go to the fuller line**, top down: among equal settings, greedy's.
+
+The breaks are written into the text, one character for one so no offset
+moves: a word space becomes a line break, and a kept cut — stored as a soft
+hyphen and a joiner, so the platform can never break there itself — becomes a
+hyphen and a line break. The platform then only sets lines that already fit.
+
+Prototyped on the device's own metrics before it was built (EB Garamond at the
+leaf's hand, the real translation, 88–145 lines a chapter):
+
+```
+                         worst hole   holes > 1/8    reach the     hyphens
+                           (px)        measure       margin
+    greedy, as shipped     186–272      6–16          18–24           0
+    the rag                 123–150      0–3          12–23         0–4
+```
+
+On the emulator Ar-Rahman's first leaf lost its three-line hole
+(*…by precise calcula- / tion ⟨5⟩…*), took most of a line more text, and the
+book came out nine leaves shorter. Line one stays short: *Created* does not fit
+after *Qur'an ⟨2⟩*, and no arrangement of the lines below it helps.
 
 #### A chapter's last leaf carries two lines, or the break moves
 
