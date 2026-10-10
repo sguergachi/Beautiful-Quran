@@ -139,6 +139,11 @@ later lab edits persist normally. Other stored reciter profiles are preserved.
   A reciter may carry his own ranges (`TarjiDramaWeights.forReciter`); Hani's
   were fitted to all his verses — see
   [tarji-detection/hani-drama.md](tarji-detection/hani-drama.md).
+  The lab's capture is only part of a verse, so it judges drama against the
+  whole verse (`TarjiVoiceReference`: its typical loudness and pitch, and the
+  bar its two-moment allowance sets), decoded once like the reader's lines.
+  Judged against the capture alone, a quiet closing cadence such as 2:14's
+  looked ordinary and lit in the lab while staying dark in the reader.
 - **Quietest voice** is a volume threshold (`Tarji.minVolume`): the voice's
   smoothed level, as a fraction of full scale, that a reverberation may open
   on. "Any" (0) is no threshold and the shipped default; held notes sit around
