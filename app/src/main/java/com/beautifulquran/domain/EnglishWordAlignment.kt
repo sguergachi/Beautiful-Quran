@@ -16,19 +16,17 @@ import java.util.concurrent.ConcurrentHashMap
  * There *is* enough in the data to do better. Every Arabic word carries its own
  * gloss (`Word.translation`, the interlinear crib the scrolling reader
  * lyricizes), and the translation is a translation of the same sentence — so
- * the two share most of their content words. Aligning the gloss stream to the
- * translation, monotonically, anchors each Arabic word to the English words it
- * is actually about: over all 6,236 verses, 84 % of Arabic words land on a
- * lexical anchor, and the rest are interpolated between their neighbours.
+ * the two share most of their content words. A weighted lexical alignment
+ * anchors their common words; unmatched runs interpolate between neighbours.
  *
  * **Monotone on purpose.** Arabic is not English word order — لَا رَيْبَ فِيهِ is
  * "no doubt in it" and Sahih International sets "about which there is no
  * doubt" — so a faithful alignment would sometimes run backwards. The wash
- * cannot: ink already laid never lifts (docs/INK_ENGINE.md). So the alignment
- * is constrained to advance, and a reordered clause is absorbed by sliding a
- * word or two rather than by jumping the wash back. The result is never worse
- * than the proportion it replaces — with no anchors at all it *is* that
- * proportion — and where the anchors are dense it is exact.
+ * cannot: ink already laid never lifts (docs/INK_ENGINE.md). Recognizable
+ * content holds the forward wash until its Arabic owner speaks: "painful
+ * punishment" waits for the adjective, even though the noun was said first.
+ * Synonyms outside the small shared vocabulary, ambiguous repetitions and
+ * translator additions still use an approximate share, not an exact timing.
  *
  * Pure Kotlin over immutable data, unit-tested on the JVM, computed once per
  * verse and remembered. The largest verse in the book (2:282) is a 258 × 255
@@ -48,24 +46,52 @@ object EnglishWordAlignment {
         if (glosses.isEmpty() || translation.isEmpty()) return null
         val prose = words(translation)
         if (prose.isEmpty()) return null
-        val gloss = ArrayList<String>(glosses.size * 3)
+        val gloss = ArrayList<ProseWord>(glosses.size * 3)
         val owner = ArrayList<Int>(glosses.size * 3)
         glosses.forEachIndexed { index, text ->
             words(text).forEach { word ->
-                gloss += word.text
+                gloss += word
                 owner += index
             }
         }
         if (gloss.isEmpty()) return null
 
-        val anchor = anchors(gloss, owner, prose, glosses.size)
+        val claimed = IntArray(prose.size) { -1 }
+        val anchor = anchors(gloss, owner, prose, glosses.size, claimed)
         val ends = spanEnds(anchor, prose, glosses.size, translation.length)
+        holdUnheardWords(ends, gloss, owner, prose, claimed)
         snapToWords(ends, prose, translation.length)
         return FloatArray(ends.size) { (ends[it].toFloat() / translation.length).coerceIn(0f, 1f) }
     }
 
+    /**
+     * The Arabic word (0-based) whose gloss names the English word at [offset]
+     * of [translation], in any order. A hold means the word under the finger,
+     * but [wordEnds] is monotone and absorbs reordering, so a hold read off it
+     * lands on a neighbour: "painful punishment" said "punishment painful".
+     * Null when no gloss names the word (grammar, synonyms, translator
+     * additions, or repeats the glosses do not mirror); the caller falls back.
+     */
+    fun ownerAt(translation: String, glosses: List<String>, offset: Int): Int? {
+        val prose = words(translation)
+        val held = prose.indexOfFirst { offset <= it.end }
+        val word = prose.getOrNull(held) ?: return null
+        if (offset < word.end - word.text.length || word.added || word.text in GRAMMAR) return null
+        val owners = ArrayList<Int>()
+        glosses.forEachIndexed { index, text ->
+            words(text).forEach { if (it.text !in GRAMMAR && it.key == word.key) owners += index }
+        }
+        if (owners.distinct().size == 1) return owners[0]
+        // Said more than once: the n-th in the sentence is the n-th in the glosses.
+        val said = prose.filter { !it.added && it.key == word.key }
+        if (said.size != owners.size) return null
+        return owners[said.indexOf(word)]
+    }
+
     /** One word of a sentence: its text, lowercased, and where it ends. */
-    private class ProseWord(val text: String, val end: Int)
+    private class ProseWord(val text: String, val end: Int, val added: Boolean, val sentence: Int) {
+        var key = inflection(text)
+    }
 
     /**
      * The sentence's words. Letters and the apostrophe only: the translation is
@@ -75,14 +101,23 @@ object EnglishWordAlignment {
     private fun words(text: String): List<ProseWord> {
         val out = ArrayList<ProseWord>(text.length / 5 + 1)
         var i = 0
+        var added = false
+        var sentence = 0
         while (i < text.length) {
             if (!text[i].isLetter()) {
+                if (text[i] == '[' || text[i] == '(') added = true
+                if (text[i] == ']' || text[i] == ')') added = false
+                if (text[i] in ".?!;") sentence++
                 i++
                 continue
             }
             val start = i
-            while (i < text.length && (text[i].isLetter() || text[i] == '\'')) i++
-            out += ProseWord(text.substring(start, i).lowercase(), i)
+            while (i < text.length && (text[i].isLetter() || text[i] == '\'' || text[i] == '’')) i++
+            out += ProseWord(text.substring(start, i).lowercase(), i, added, sentence)
+        }
+        // "Glad" means "good" in this phrase, not wherever either adjective occurs.
+        for (j in 0 until out.lastIndex) {
+            if (out[j].text == "glad" && out[j + 1].text in setOf("tiding", "tidings")) out[j].key = "good"
         }
         return out
     }
@@ -94,10 +129,11 @@ object EnglishWordAlignment {
      * a stray "the" cannot pull a word to the far end of a long verse.
      */
     private fun anchors(
-        gloss: List<String>,
+        gloss: List<ProseWord>,
         owner: List<Int>,
         prose: List<ProseWord>,
         wordCount: Int,
+        claimed: IntArray,
     ): IntArray {
         val n = gloss.size
         val m = prose.size
@@ -115,7 +151,7 @@ object EnglishWordAlignment {
                     best = current[j - 1]
                     step = SKIP_PROSE
                 }
-                val match = similarity(g, prose[j - 1].text)
+                val match = similarity(g, prose[j - 1])
                 if (match > 0f && previous[j - 1] + match > best) {
                     best = previous[j - 1] + match
                     step = MATCH
@@ -135,6 +171,7 @@ object EnglishWordAlignment {
             when (back[i * stride + j]) {
                 MATCH -> {
                     val word = owner[i - 1]
+                    claimed[j - 1] = word
                     // Walking back, so the first hit is this word's furthest.
                     if (anchor[word] < j - 1) anchor[word] = j - 1
                     i--
@@ -193,6 +230,86 @@ object EnglishWordAlignment {
     }
 
     /**
+     * An unambiguous content word is a barrier until its Arabic owner speaks.
+     * LCS alone drops one side of an inversion ("punishment painful" becomes
+     * "painful punishment"), letting an earlier anchor wash straight over it.
+     * Hold the forward wash at that word instead. LCS claims resolve repeats;
+     * extra matches need a recognizable gloss and the surrounding anchors'
+     * sentence context. Translator additions do not establish a barrier.
+     */
+    private fun holdUnheardWords(
+        ends: IntArray,
+        gloss: List<ProseWord>,
+        owner: List<Int>,
+        prose: List<ProseWord>,
+        claimed: IntArray,
+    ) {
+        val original = ends.copyOf()
+        val counts = prose.filter { !it.added && it.text !in GRAMMAR }.groupingBy { it.key }.eachCount()
+        val exactCounts = prose.groupingBy { it.text }.eachCount()
+        val uniqueOwner = HashMap<String, Int>()
+        val exactOwner = HashMap<String, Int>()
+        val content = Array(ends.size) { HashSet<String>() }
+        val complete = BooleanArray(ends.size) { true }
+        val firstSentence = IntArray(ends.size) { -1 }
+        val lastSentence = IntArray(ends.size) { -1 }
+        var complementOwner = -1
+        for (i in prose.indices) {
+            val at = claimed[i]
+            if (at < 0 || prose[i].text in GRAMMAR) continue
+            if (firstSentence[at] < 0) firstSentence[at] = prose[i].sentence
+            lastSentence[at] = prose[i].sentence
+        }
+        for (g in gloss.indices) {
+            val word = gloss[g]
+            if (word.text == "of") complementOwner = owner[g]
+            if (word.text in GRAMMAR) continue
+            content[owner[g]] += word.key
+            if (!word.added && complementOwner != owner[g] && word.key !in counts && word.text !in GLOSS_SUPPLEMENTS) {
+                complete[owner[g]] = false
+            }
+            val previous = uniqueOwner[word.key]
+            uniqueOwner[word.key] = if (previous == null || previous == owner[g]) owner[g] else -1
+            val exact = exactOwner[word.text]
+            exactOwner[word.text] = if (exact == null || exact == owner[g]) owner[g] else -1
+        }
+        for ((index, word) in prose.withIndex()) {
+            if (word.text in GRAMMAR) continue
+            // A supplied qualifier can follow a literal head from the same
+            // gloss ("[pure] wine"); an unrelated aside cannot anchor itself.
+            val head = if (word.added) (index + 1 until prose.size).firstOrNull {
+                !prose[it].added
+            }?.takeIf { prose[it].text !in GRAMMAR }?.let { claimed[it] } ?: -1 else -1
+            if (word.added && (head < 0 || word.key !in content[head])) continue
+            val exact = exactOwner[word.text] ?: -1
+            val at = when {
+                word.added -> head
+                claimed[index] >= 0 -> claimed[index]
+                counts[word.key] == 1 -> uniqueOwner[word.key] ?: -1
+                exact >= 0 && exactCounts[word.text] == 1 && (content[exact].size == 1 ||
+                    word.sentence in firstSentence[exact]..lastSentence[exact]) -> exact
+                else -> -1
+            }
+            if (at <= 0) continue
+            val before = if (index == 0) 0 else prose[index - 1].end
+            // Partial glosses can protect a direct match from interpolation
+            // through grammar, but cannot pull it across other content words.
+            if (!word.added && !complete[at] && (claimed[index] != at || (at > 1 && original[at - 2] > before &&
+                    (0 until at).any { original[it] > before && content[it].isNotEmpty() }))) continue
+            if (claimed[index] < 0) {
+                if (prose.indices.any { claimed[it] == at && prose[it].key == word.key }) continue
+                val left = (at - 1 downTo 0).firstOrNull { lastSentence[it] >= 0 }
+                val right = (at + 1 until ends.size).firstOrNull { firstSentence[it] >= 0 }
+                val start = if (firstSentence[at] >= 0) firstSentence[at] else left?.let { lastSentence[it] } ?: 0
+                val end = if (lastSentence[at] >= 0) lastSentence[at] else right?.let { firstSentence[it] } ?: prose.last().sentence
+                if (word.sentence !in start..end) continue
+            }
+            ends[at - 1] = minOf(ends[at - 1], before)
+        }
+        for (i in ends.lastIndex - 1 downTo 0) ends[i] = minOf(ends[i], ends[i + 1])
+    }
+
+    /**
      * Moves every boundary onto a word end of the sentence, so the wash never
      * stops halfway through an English word — an interpolated boundary lands
      * wherever the arithmetic put it, and "slumbe|r" is not a place ink rests.
@@ -203,7 +320,7 @@ object EnglishWordAlignment {
         var run = 0
         for (i in ends.indices) {
             var best = 0
-            var bestGap = Int.MAX_VALUE
+            var bestGap = ends[i]
             for (word in prose) {
                 val gap = kotlin.math.abs(word.end - ends[i])
                 if (gap < bestGap) {
@@ -220,25 +337,59 @@ object EnglishWordAlignment {
 
     /**
      * How much two words agree. A content word carries the alignment; a
-     * grammatical one is worth a third of that, because "the" and "of" appear
-     * everywhere and would otherwise anchor a verse to its own noise. A shared
-     * four-letter opening covers the inflections the two texts differ by
-     * (`revealed` / `reveals`, `heaven` / `heavens`).
+     * grammatical one carries little weight, because auxiliaries and pronouns
+     * otherwise outvote the content of a reordered phrase. Match inflections,
+     * not arbitrary four-letter prefixes ("hearing" is not "hearts").
      */
-    private fun similarity(gloss: String, prose: String): Float {
-        if (gloss == prose) return if (gloss in GRAMMAR) GRAMMAR_MATCH else EXACT_MATCH
-        if (gloss.length >= STEM && prose.length >= STEM &&
-            gloss.regionMatches(0, prose, 0, STEM)
-        ) {
-            return STEM_MATCH
-        }
+    private fun similarity(gloss: ProseWord, prose: ProseWord): Float {
+        if (prose.added) return 0f
+        if (gloss.text == prose.text) return if (gloss.text in GRAMMAR) GRAMMAR_MATCH else EXACT_MATCH
+        if (gloss.text in GRAMMAR || prose.text in GRAMMAR) return 0f
+        if (gloss.key == prose.key) return STEM_MATCH
         return 0f
+    }
+
+    /** Conservative English inflections, normalized once rather than in each DP cell. */
+    private fun inflection(text: String): String {
+        var word = text.replace('’', '\'').removeSuffix("'s").replace("'", "")
+        EQUIVALENT_WORDS[word]?.let { return it }
+        if (word.length > 4) {
+            word = when {
+                word.endsWith("ies") -> word.dropLast(3) + "y"
+                word.endsWith("ing") -> word.dropLast(3)
+                word.endsWith("ed") -> word.dropLast(2)
+                word.endsWith("es") -> word.dropLast(2)
+                word.endsWith("s") && !word.endsWith("ss") -> word.dropLast(1)
+                else -> word
+            }
+        }
+        if (word.length > 3 && word.endsWith("e")) word = word.dropLast(1)
+        if (word.length > 3 && word.last() == word[word.lastIndex - 1] && word.last() in "bdgmnprt") {
+            word = word.dropLast(1)
+        }
+        return EQUIVALENT_WORDS[word] ?: word
     }
 
     private const val EXACT_MATCH = 3f
     private const val STEM_MATCH = 2f
-    private const val GRAMMAR_MATCH = 1f
-    private const val STEM = 4
+    private const val GRAMMAR_MATCH = 0.25f
+
+    private val EQUIVALENT_WORDS = mapOf(
+        "slave" to "servant", "slaves" to "servant", "servants" to "servant",
+        "poor" to "needy", "needy" to "needy",
+        "forever" to "eternal", "eternally" to "eternal",
+        "sorrow" to "grief",
+        "single" to "one",
+        "said" to "say", "says" to "say", "sent" to "send",
+        "died" to "die", "dying" to "die", "die" to "die",
+        "came" to "com", "come" to "com", "coming" to "com",
+        "made" to "mak", "took" to "tak", "taken" to "tak",
+        "gave" to "giv", "given" to "giv", "knew" to "know", "known" to "know",
+        "spread" to "spread",
+    )
+
+    /** Complements/intensity the prose can leave implicit in the matched gloss head. */
+    private val GLOSS_SUPPLEMENTS = setOf("one", "thing", "things", "partners", "existence", "abundantly")
 
     private const val SKIP_GLOSS: Byte = 0
     private const val SKIP_PROSE: Byte = 1
@@ -250,7 +401,21 @@ object EnglishWordAlignment {
         "did", "do", "does", "for", "from", "he", "her", "his", "i", "if", "in",
         "is", "it", "its", "no", "nor", "not", "of", "on", "or", "she", "so",
         "that", "the", "their", "them", "these", "they", "this", "those", "to",
-        "was", "we", "were", "with", "you",
+        "was", "we", "were", "will", "with", "you",
+        "can", "could", "had", "has", "have", "may", "might", "must", "our",
+        "shall", "should", "there", "then", "what", "when", "where", "which",
+        "who", "whom", "whose", "would", "your", "my",
+        "any", "both", "each", "every", "even", "more", "most", "oft",
+        "ones", "only", "other", "others", "over", "surely", "well",
+        "down", "forth", "up",
+        "about", "above", "after", "against", "along", "among", "around",
+        "before", "behind", "below", "beside", "besides", "between", "concerning",
+        "during", "into", "off", "out", "through", "toward", "towards", "under",
+        "until", "upon", "while", "within", "without",
+        "him", "me", "us", "ours", "yours", "yourself", "yourselves",
+        "ourselves", "himself", "herself", "itself", "themselves",
+        "although", "because", "hence", "however", "otherwise", "therefore",
+        "though", "used", "whatever", "whenever", "wherever", "whether", "whoever",
     )
 }
 

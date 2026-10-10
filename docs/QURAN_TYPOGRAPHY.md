@@ -1249,26 +1249,60 @@ The link is recoverable. Every Arabic word carries its own gloss — the
 interlinear crib the scrolling reader lyricizes — and the translation is a
 translation of the same sentence, so the two share most of their content words.
 `EnglishWordAlignment` aligns the gloss stream to the translation and hands back
-the share of the sentence each Arabic word ends at. Over all 6,236 verses **84 %
-of Arabic words land on a lexical anchor**; an unanchored run is spread between
-the anchors around it, which is the old proportion applied locally, so the map is
-never worse than what it replaces and with no anchors at all it *is* that.
+the share of the sentence each Arabic word ends at. Content words carry the
+alignment; auxiliaries, pronouns and other grammatical words carry little
+weight. Inflections share a key, while unrelated openings such as "hearing" /
+"hearts" and "messages" / "messengers" do not. An unanchored run is spread
+between the anchors around it; with no anchors it falls back to proportion.
 
 Three rules make it usable:
 
 - **Monotone.** Arabic is not English word order — لَا رَيْبَ فِيهِ is "no doubt
   in it", and Sahih International sets "about which there is no doubt". A
   faithful alignment would run backwards there, and the wash cannot: laid ink
-  never lifts (`docs/INK_ENGINE.md`). So the alignment is constrained to advance
-  and a reordered clause is absorbed by sliding a word or two.
+  never lifts (`docs/INK_ENGINE.md`). The alignment advances, but recognizable
+  content holds the wash until its Arabic owner is spoken. "Painful punishment"
+  waits for the adjective when Arabic says "punishment painful"; the noun and
+  adjective then share a forward wash. A reordered subject can similarly hold
+  an earlier verb's English rather than lighting the subject before the voice.
 - **Snapped to word ends.** An interpolated boundary lands wherever the
   arithmetic put it, and "slumbe|r" is not a place ink rests. Boundaries that
   collapse onto each other are correct: the English has no separate words for
-  that Arabic one.
+  that Arabic one. Zero is also a valid boundary: if the first printed word is
+  spoken later, its first letters wait too.
 - **One map for everything.** The wash, the tap, and the leaf a carried verse's
   voice is on all read it (`EnglishVerseAlignments`, solved per verse on first
   ask). If the page turn read the cut with a different map than the ink, it
   would turn away from a wash still running.
+
+The gloss and translation also differ in vocabulary: the gloss's "slaves" is
+the translation's "servants". Those singular and plural forms share a lexical
+anchor, while the auxiliary "will" carries only grammatical weight. In 76:6,
+Arabic puts "will drink" before "servants of Allah" and the translation puts it
+after. Missing the noun match let the early verb consume the whole subject;
+the shared anchor now keeps "servants" on عِبَادُ and "Allah" on ٱللَّهِ. The
+continuous wash still approximates the reordered verb; choosing word-by-word
+gloss text gives the recitation's exact word order.
+
+The same policy applies across the book. Existing lexical anchors protect
+interpolated gaps; a distinct singular/plural form or a unique recognizable
+gloss can also recover a match dropped by the forward alignment. Extra matches
+stay within the sentence context of nearby lexical anchors and cannot claim
+another occurrence already assigned to that gloss. "Glad tidings" shares a
+key with "good tidings" within that phrase. Bracketed/parenthesized translator
+additions cannot pull lexical anchors away from the ordinary prose. A supplied
+qualifier such as "[pure]" waits with its literal head "wine" when both belong
+to the same gloss. Partly
+matched glosses can stop interpolation leaking into a direct match, but cannot
+pull it across other content. These safeguards keep "send" with the earlier
+"sent down" in 36:28 and "brought" with Mary's arrival in 19:27, rather than
+holding either for a later literal gloss that translates differently.
+
+The map remains approximate when the translation supplies an explanation or
+uses vocabulary the gloss does not share. The JVM regressions include 58 real
+verses, reordered adjectives/subjects, repeated forms, and these negative
+controls; the corpus audit checks all 6,236 verses. It does not certify a
+word-for-word semantic alignment where the source data supplies none.
 
 Measured on 2:2 (Alafasy) with the app playing: tap "no" and the reciter starts
 at 1,776 ms against لَا's 1,760; "doubt" → 2,142 against رَيْبَ's 2,140;
