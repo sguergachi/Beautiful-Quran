@@ -47,6 +47,9 @@ import androidx.compose.ui.unit.em
 import androidx.compose.ui.unit.times
 import com.beautifulquran.data.MushafBannerStyle
 import com.beautifulquran.data.model.Surah
+import com.beautifulquran.ui.theme.DisplayFontFamily
+import com.beautifulquran.ui.theme.BookTextMotion
+import com.beautifulquran.ui.theme.TEXT_PAINT_FLAGS
 import com.beautifulquran.ui.theme.GeneratedInkRosette
 import com.beautifulquran.ui.theme.HafsFontFamily
 import com.beautifulquran.ui.theme.SerifFontFamily
@@ -153,7 +156,8 @@ internal fun MushafSurahTitleBand(
     val groundAlpha = if (style == MushafBannerStyle.CLOUD) baseGround * 1.2f else baseGround
 
     val name = if (latin) surah?.nameTransliteration.orEmpty() else surah?.nameArabic.orEmpty()
-    val family = if (latin) SerifFontFamily else HafsFontFamily
+    // A banner name is display-sized: the display master, not the Text one.
+    val family = if (latin) DisplayFontFamily else HafsFontFamily
     val titleSize = fontSize * if (latin) MushafLatinTitleScale else MushafArabicTitleScale
     val resolvedTypeface by LocalFontFamilyResolver.current.resolve(family)
     val density = LocalDensity.current
@@ -169,7 +173,7 @@ internal fun MushafSurahTitleBand(
     // large font scale) is set down until it fits, never let through.
     val roomPx = bannerNameRoomPx(style, constraints.maxWidth.toFloat(), bandPx)
     val fontPx = remember(resolvedTypeface, naturalPx, latin, name, roomPx) {
-        val probe = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        val probe = Paint(TEXT_PAINT_FLAGS).apply {
             typeface = resolvedTypeface as Typeface
             textSize = naturalPx
             if (latin) letterSpacing = TitleLetterSpacingEm
@@ -179,7 +183,7 @@ internal fun MushafSurahTitleBand(
     }
     val titleSizeFit = with(density) { fontPx.toSp() }
     val paint = remember(resolvedTypeface, fontPx, latin) {
-        Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        Paint(TEXT_PAINT_FLAGS).apply {
             typeface = resolvedTypeface as Typeface
             textSize = fontPx
             if (latin) letterSpacing = TitleLetterSpacingEm
@@ -429,6 +433,7 @@ private fun MushafTitle(
             fontFamily = family,
             fontSize = fontSize,
             letterSpacing = if (latin) TitleLetterSpacingEm.em else TextUnit.Unspecified,
+            textMotion = if (latin) BookTextMotion else null,
             color = ink,
             textAlign = TextAlign.Center,
             platformStyle = PlatformTextStyle(includeFontPadding = false),

@@ -56,6 +56,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.beautifulquran.data.AyahSelectorSide
 import com.beautifulquran.data.model.Ayah
+import com.beautifulquran.ui.theme.TEXT_PAINT_FLAGS
 import com.beautifulquran.ui.theme.LocalQuranAccents
 import com.beautifulquran.ui.theme.LocalQuranTypePalette
 import com.beautifulquran.ui.theme.QuranTypeProfile
@@ -382,12 +383,12 @@ internal fun AyahSelectorRail(
             val collapsedX = 0f
             val centerY = size.height * 0.5f
             val collapsedAlpha = 1f - expand
-            val numberPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            val numberPaint = Paint(TEXT_PAINT_FLAGS).apply {
                 textAlign = if (mirrored) Paint.Align.RIGHT else Paint.Align.LEFT
                 textSize = collapsedNumberSize.toPx()
                 typeface = numberFace
             }
-            val pagePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            val pagePaint = Paint(TEXT_PAINT_FLAGS).apply {
                 textAlign = if (mirrored) Paint.Align.RIGHT else Paint.Align.LEFT
                 textSize = collapsedPageSize.toPx()
                 typeface = pageFace

@@ -79,6 +79,7 @@ import com.beautifulquran.data.ThemeMode
 import com.beautifulquran.playback.RecitationCache
 import com.beautifulquran.playback.RecitationUsage
 import com.beautifulquran.playback.formatUsage
+import com.beautifulquran.ui.theme.forCaps
 import com.beautifulquran.ui.theme.AlphaTag
 import com.beautifulquran.ui.theme.BrushCheckParams
 import com.beautifulquran.ui.theme.BrushCircleParams
@@ -1280,7 +1281,7 @@ internal fun Section(text: String) {
 internal fun SectionLabel(text: String) {
     Text(
         text = text.uppercase(),
-        style = MaterialTheme.typography.labelSmall,
+        style = MaterialTheme.typography.labelSmall.forCaps(),
         letterSpacing = 2.sp,
         color = QuranTheme.ink.muted,
     )

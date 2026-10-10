@@ -917,6 +917,10 @@ not the app's.
   `scripts/timeless-fonts.json` (Gradle `fetchTimelessFonts`,
   `web/scripts/fetch-timeless-fonts.mjs`) and only embedded in the APK and
   site. Never commit them.
+  Android Latin styles use `TextMotion.Animated` consistently: linear metrics
+  and subpixel glyph placement keep advances stable under stretch overscroll
+  and page transforms. Do not switch rendering modes during a gesture, which
+  would reshape the text. The classic profile retains its previous rendering.
 - **Display face**: Timeless Serif's display master for surah titles and
   headlines. It sets darker than the Cormorant it replaced, so each weight is
   served by the cut one step lighter (Medium→Regular, SemiBold→Medium).
@@ -927,15 +931,22 @@ not the app's.
   book face, using the current whole-word rag and full-column bismillah fit.
   Customize previews and share images follow the selected profile too.
   Arabic typefaces and sizing stay the same.
-- **The reader's hand**: Cormorant Garamond *Italic* at weight 500 for verse
-  notes, and nothing else — the chancery cursive Renaissance scribes wrote
-  marginal glosses in, and the hand italic type was cut from. It is
-  deliberately not the book face's italic: the app's prose is Timeless Serif, so its
-  own italic reads as **emphasis** — the same voice leaning — instead of a
-  second person writing on the page. This is a narrow, recorded exception to
-  Cormorant's display-only rule; the 500 weight plus the note's 62 % ink keep
-  the fine strokes from going wispy at note size. The roman Cormorant stays
-  display-only. See [ANNOTATIONS.md](ANNOTATIONS.md).
+- **The reader's hand**: real Timeless Serif *Italic* at weight 500 for verse
+  notes, keeping the book and annotations in one family. The note's colour,
+  placement and slant distinguish the reader's words. The classic developer
+  profile restores Cormorant Garamond Italic and its original 16 sp / 23 sp
+  settings. See [ANNOTATIONS.md](ANNOTATIONS.md).
+- **Typography lab**: Ink Lab → Typography tunes Book, Italic, Titles, UI and
+  Notes independently. Android embeds the three variable fonts: Serif has
+  weight 200–700 and the Display→Text `STYL` axis; real Serif Italic has weight
+  300–700; Sans has weight 300–800, Grotesk→Sans `STYL`, and `ital` 0–100.
+  Size, leading and tracking supplement those axes. All 20 Roman, 10 Italic
+  and 14 Sans stylistic sets have default/alternate glyph previews, alongside
+  numeral and ligature switches and `aalt` indices 0–6. Values persist in the
+  lab snapshot; Copy values includes their JSON and Typography Reset restores
+  just the type settings. These overrides apply only in developer mode with
+  Timeless selected. Control labels keep the shipped typography while preview
+  glyphs and the app use the tuned faces. The bismillah still fits its column.
 - **English lyric mode**: Timeless Serif regular, 19.5 sp with 1.5 em leading.
   It is one flush-left, ragged-right inline paragraph — never a flex/flow row
   of padded word tiles. Natural font spaces, kerning, common ligatures, and

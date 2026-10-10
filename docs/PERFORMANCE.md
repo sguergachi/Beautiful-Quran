@@ -359,6 +359,13 @@ janky", first ask: is this the release APK?
   `checkCancelled` callback checks the coroutine before each layout attempt.
   This also stops work on ViewModel teardown. Generation gates still protect
   publication and writes.
+  Developer typography edits wait 250 ms after a slider settles before asking
+  for a new measured book; on-page faces and lab specimens update immediately.
+  Only Roman/Italic book settings join the pagination key, so tuning UI,
+  headings or notes does not rebuild the 6,236-verse book.
+  A developer edit retains the current measured book while its replacement
+  paginates, so the leaf remains available for live comparison. Cold starts
+  and content changes still hold English until measured leaves exist.
 
 ### 7b. The word-search index is a memory budget, not just a cache
 

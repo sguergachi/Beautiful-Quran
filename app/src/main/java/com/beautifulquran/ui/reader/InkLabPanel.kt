@@ -42,6 +42,20 @@ import kotlin.math.ln
 import kotlin.math.pow
 import kotlin.math.roundToInt
 import com.beautifulquran.ui.theme.QuranTheme
+import com.beautifulquran.ui.theme.LocalQuranTypePalette
+import com.beautifulquran.ui.theme.QuranTypeProfile
+import com.beautifulquran.ui.theme.TypeRole
+import com.beautifulquran.ui.theme.TypographyTuning
+import com.beautifulquran.ui.theme.TypefaceTuning
+import com.beautifulquran.ui.theme.quranTypePalette
+import com.beautifulquran.ui.theme.timelessFeatures
+import androidx.compose.ui.text.font.FontStyle
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.em
+import androidx.compose.ui.unit.sp
+import kotlinx.serialization.json.Json
+
+private val TypographyCopyJson = Json { encodeDefaults = true }
 
 /**
  * Developer-mode overlay for tuning the highlight feel live: sliders bound
@@ -67,6 +81,7 @@ import com.beautifulquran.ui.theme.QuranTheme
  */
 private enum class InkLabTab(val label: String) {
     Ink("Ink"),
+    Typography("Typography"),
     Sweep("Sweep"),
     Repeat("Repeat"),
     Tajweed("Tajweed"),
@@ -82,6 +97,18 @@ private enum class InkLabTab(val label: String) {
 fun InkLabPanel(
     modifier: Modifier = Modifier,
     guideActive: Boolean = false,
+) {
+    // Keep the controls readable while the user auditions the UI face itself.
+    val controls = remember { quranTypePalette(true).typography }
+    MaterialTheme(typography = controls) {
+        InkLabPanelContent(modifier, guideActive)
+    }
+}
+
+@Composable
+private fun InkLabPanelContent(
+    modifier: Modifier,
+    guideActive: Boolean,
 ) {
     var tab by remember(guideActive) {
         mutableStateOf(if (guideActive) InkLabTab.Guide else InkLabTab.Ink)
@@ -116,6 +143,7 @@ fun InkLabPanel(
                 val t = InkEngine.tuning
                 val guide = InkEngine.contextualGuideTuning
                 when (tab) {
+                    InkLabTab.Typography -> TypographyControls()
                     InkLabTab.Ink -> {
                         TuningSlider("Upcoming ink", t.upcomingAlpha, 0.05f..0.6f) {
                             InkEngine.tuning = t.copy(upcomingAlpha = it)
@@ -575,7 +603,9 @@ fun InkLabPanel(
                         .quietClickable {
                             // Clears on-device overrides so future shipped
                             // default changes apply; Focus freeze stays put.
-                            InkEngine.resetLabToShippedDefaults()
+                            if (tab == InkLabTab.Typography) {
+                                InkEngine.typographyTuning = TypographyTuning()
+                            } else InkEngine.resetLabToShippedDefaults()
                             copyNote = null
                         }
                         .padding(vertical = 4.dp),
@@ -589,7 +619,10 @@ fun InkLabPanel(
                             val text = formatTuningCopy(InkEngine.tuning) +
                                 "\n" +
                                 formatContextualGuideCopy(InkEngine.contextualGuideTuning) +
-                                "\n" + formatHighlightCopy()
+                                "\n" + formatHighlightCopy() + "\n// Timeless typography\n" +
+                                TypographyCopyJson.encodeToString(
+                                    TypographyTuning.serializer(), InkEngine.typographyTuning,
+                                )
                             val cm = context.getSystemService(Context.CLIPBOARD_SERVICE)
                                 as? ClipboardManager
                             cm?.setPrimaryClip(ClipData.newPlainText("Ink Lab tuning", text))
@@ -610,6 +643,90 @@ fun InkLabPanel(
                     style = MaterialTheme.typography.labelMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
+            }
+        }
+    }
+}
+
+/** Every optional GSUB alternate in Timeless, with the actual glyphs beside its switch. */
+@Composable
+private fun TypographyControls() {
+    var role by remember { mutableStateOf(TypeRole.Book) }
+    val palette = LocalQuranTypePalette.current
+    val app = LocalContext.current.applicationContext as com.beautifulquran.QuranApp
+    TuningToggle("Timeless", palette.profile == QuranTypeProfile.TIMELESS) { enabled ->
+        app.settings.update { it.copy(timelessTypographyEnabled = enabled) }
+    }
+    Row(
+        horizontalArrangement = Arrangement.spacedBy(14.dp),
+        modifier = Modifier.horizontalScroll(rememberScrollState()),
+    ) {
+        TypeRole.entries.forEach { entry ->
+            Text(
+                entry.label, style = MaterialTheme.typography.labelLarge,
+                color = if (role == entry) MaterialTheme.colorScheme.primary else QuranTheme.ink.secondary,
+                modifier = Modifier.quietClickable { role = entry }.padding(vertical = 6.dp),
+            )
+        }
+    }
+    if (palette.profile != QuranTypeProfile.TIMELESS) {
+        LabCaption("Classic fonts and their original settings. Enable Timeless to audition its axes and alternates.")
+        return
+    }
+    val tuning = InkEngine.typographyTuning
+    val face = tuning.face(role)
+    fun edit(next: TypefaceTuning) { InkEngine.typographyTuning = tuning.withFace(role, next) }
+    val sans = role == TypeRole.Ui
+    val italic = !sans && (role == TypeRole.BookItalic || face.italic >= 50f)
+    val family = when (role) {
+        TypeRole.Book, TypeRole.BookItalic -> palette.serif
+        TypeRole.Title -> palette.display
+        TypeRole.Ui -> palette.sans
+        TypeRole.Note -> palette.scribe
+    }
+    val specimenStyle = androidx.compose.ui.text.TextStyle(
+        fontFamily = family, fontSize = 22.sp * face.size, lineHeight = 28.sp * face.size * face.leading,
+        letterSpacing = face.tracking.em,
+        fontWeight = when (role) { TypeRole.Title, TypeRole.Note -> FontWeight.Medium; else -> FontWeight.Normal },
+        fontStyle = if (role == TypeRole.BookItalic || role == TypeRole.Note) FontStyle.Italic else FontStyle.Normal,
+        fontFeatureSettings = face.featureSettings,
+        textMotion = androidx.compose.ui.text.style.TextMotion.Animated,
+    )
+    Text("The quick brown fox · Aa agcjfyr & CGKMQRW 0123456789", style = specimenStyle)
+    TuningSlider("Weight", face.weight.toFloat(), (if (sans || italic) 300f else 200f)..(if (sans) 800f else 700f), integer = true) {
+        edit(face.copy(weight = it.roundToInt()))
+    }
+    if (!italic) {
+        TuningSlider(if (sans) "Grotesk → Sans" else "Serif → Text", face.style, 0f..100f) {
+            edit(face.copy(style = it))
+        }
+    }
+    if (sans) {
+        TuningSlider("Italic axis", face.italic, 0f..100f) { edit(face.copy(italic = it)) }
+    } else if (role != TypeRole.BookItalic) {
+        TuningToggle("Italic", face.italic >= 50f) { edit(face.copy(italic = if (it) 100f else 0f)) }
+    }
+    TuningSlider("Size ×", face.size, 0.7f..1.5f) { edit(face.copy(size = it)) }
+    TuningSlider("Leading ×", face.leading, 0.9f..1.6f) { edit(face.copy(leading = it)) }
+    TuningSlider("Tracking em", face.tracking, -0.06f..0.12f) { edit(face.copy(tracking = it)) }
+    TuningSlider("Alternate index", (face.features["aalt"] ?: 0).toFloat(), 0f..6f, integer = true) {
+        edit(face.copy(features = face.features + ("aalt" to it.roundToInt())))
+    }
+    if (role == TypeRole.BookItalic) LabCaption("The bismillah always fits the text column; its size is measured automatically.")
+    LabCaption("Built-in glyph alternates. Left: default · right: alternate. Tap a name to apply it. Alternate index exposes up to six choices per glyph.")
+    timelessFeatures(sans, italic).forEach { feature ->
+        val active = (face.features[feature.tag] ?: if (feature.tag in setOf("kern", "liga", "calt")) 1 else 0) > 0
+        Column(Modifier.fillMaxWidth().quietClickable {
+            edit(face.copy(features = face.features + (feature.tag to if (active) 0 else 1)))
+        }.padding(vertical = 4.dp)) {
+            Text(
+                "${feature.tag} · ${feature.label} · ${if (active) "on" else "off"}",
+                style = MaterialTheme.typography.labelMedium,
+                color = if (active) MaterialTheme.colorScheme.primary else QuranTheme.ink.secondary,
+            )
+            Row(Modifier.fillMaxWidth()) {
+                Text(feature.specimen, style = specimenStyle.copy(fontFeatureSettings = "'kern' 1, '${feature.tag}' 0"), modifier = Modifier.weight(1f))
+                Text(feature.specimen, style = specimenStyle.copy(fontFeatureSettings = "'kern' 1, '${feature.tag}' 1"), modifier = Modifier.weight(1f))
             }
         }
     }

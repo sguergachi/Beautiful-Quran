@@ -145,7 +145,7 @@ import kotlinx.coroutines.launch
 import kotlin.math.abs
 import kotlin.math.roundToInt
 import com.beautifulquran.ui.theme.LocalQuranInk
-import com.beautifulquran.ui.theme.SerifFontFamily
+import com.beautifulquran.ui.theme.LocalQuranTypePalette
 import com.beautifulquran.ui.theme.contrastingOverlayInk
 import com.beautifulquran.ui.theme.contrastingOverlayAccents
 
@@ -314,6 +314,9 @@ class MainActivity : ComponentActivity() {
                     themeMode = settings.themeMode,
                     timelessTypography =
                         !settings.developerModeEnabled || settings.timelessTypographyEnabled,
+                    typographyTuning = if (settings.developerModeEnabled) {
+                        com.beautifulquran.ui.reader.InkEngine.typographyTuning
+                    } else com.beautifulquran.ui.theme.TypographyTuning(),
                 ) {
                     // Cold start paints the closed mushaf first; the paper stack
                     // mounts under it after two board frames (onWarmStack),
@@ -421,7 +424,7 @@ private fun PaperStackApp(
     val settings by app.settings.settings.collectAsStateWithLifecycle()
     val classicTypographyActive = settings.developerModeEnabled &&
         !settings.timelessTypographyEnabled
-    val serifFontFamily = SerifFontFamily
+    val typePalette = LocalQuranTypePalette.current
     val settingsInkPreview = remember {
         SettingsInkPreviewState(settings.brushCircleStyle)
     }
@@ -468,7 +471,10 @@ private fun PaperStackApp(
         settings.englishLeafText,
         settings.verseNumberScript,
         classicTypographyActive,
+        typePalette.tuning.bookCacheKey,
     ) {
+        // Preview immediately; wait for the typography slider to settle before paginating.
+        if (settings.developerModeEnabled) delay(250)
         // Nothing remembered — a first launch, or a window this app has not
         // been this size in. Work the leaf's size out instead of waiting for a
         // leaf: MushafBelowLeaf is everything the reading sheet sets under the
@@ -492,13 +498,14 @@ private fun PaperStackApp(
             ?: return@LaunchedEffect
         readerViewModel.ensureMushaf(
             text = settings.englishLeafText,
+            retainMeasuredBook = settings.developerModeEnabled,
             rulerFor = { translation ->
                 englishLeafRuler(
                     wellPx = metrics[0],
                     measurePx = metrics[1],
                     density = leafDensity,
                     measurer = leafMeasurer,
-                    serifFontFamily = serifFontFamily,
+                    typePalette = typePalette,
                     verseNumberScript = settings.verseNumberScript,
                     translation = translation,
                 )
@@ -508,6 +515,7 @@ private fun PaperStackApp(
                 metrics[1],
                 settings.verseNumberScript,
                 classicTypographyActive,
+                typePalette.tuning.bookCacheKey,
             ),
             cacheKey = app.englishBookCache.key(
                 wellPx = metrics[0],
@@ -515,7 +523,7 @@ private fun PaperStackApp(
                 verseNumberScript = settings.verseNumberScript.ordinal,
                 leafText = settings.englishLeafText.ordinal,
                 database = QuranDatabase.DB_FILE_NAME,
-            ) + if (classicTypographyActive) "|classic" else "|timeless",
+            ) + if (classicTypographyActive) "|classic" else "|timeless|${typePalette.tuning.bookCacheKey}",
         )
     }
     val bookmarkCount by bookmarksViewModel.bookmarkCount.collectAsStateWithLifecycle()
@@ -1205,6 +1213,7 @@ private fun PaperStackApp(
                             if (activity != null) {
                                 shareViewModel.shareAsImage(
                                     activity, timelessTypography = !classicTypographyActive,
+                                    typographyTuning = typePalette.tuning,
                                 )
                             }
                         },

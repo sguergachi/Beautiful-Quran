@@ -116,6 +116,8 @@ import com.beautifulquran.ui.theme.LocalQuranAccents
 import com.beautifulquran.ui.theme.LocalReadingPaper
 import com.beautifulquran.ui.theme.TranslationFontFamily
 import com.beautifulquran.ui.theme.typeScale
+import com.beautifulquran.ui.theme.LocalQuranTypePalette
+import com.beautifulquran.ui.theme.typeLeading
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import com.beautifulquran.ui.theme.shippedCheckParams
@@ -563,7 +565,8 @@ internal fun ReadingPreview(
                                 text = SAMPLE_TRANSLIT,
                                 fontFamily = TranslationFontFamily,
                                 fontSize = PreviewLyricSize * 13f / 18f,
-                                lineHeight = 1.4.em,
+                                lineHeight = (1.4f * LocalQuranTypePalette.current.tuning.book.leading).em,
+                                style = MaterialTheme.typography.bodyLarge,
                                 color = QuranTheme.ink.tertiary,
                             )
                         }
@@ -730,6 +733,7 @@ private fun PreviewEnglishMushafLeaf(
     val gold = LocalQuranAccents.current.gold
     val ink = QuranTheme.ink.strong
     val leafSize = PreviewEnglishLeafSize
+    val typePalette = com.beautifulquran.ui.theme.LocalQuranTypePalette.current
     val bookFontFamily = TranslationFontFamily
     val text = buildAnnotatedString {
         listOf(
@@ -764,8 +768,8 @@ private fun PreviewEnglishMushafLeaf(
             val measurePx = with(density) { maxWidth.toPx() }
             val style = englishProseStyle(
                 fontSize = leafSize,
-                lineHeight = leafSize * ENGLISH_LEAF_LEADING_EM,
-                serifFontFamily = bookFontFamily,
+                lineHeight = leafSize * ENGLISH_LEAF_LEADING_EM * typePalette.tuning.book.leading,
+                typePalette = typePalette,
             )
             val set = remember(text, style, measurePx, density, measurer) {
                 englishRaggedProse(text, style, measurePx, density, measurer)
@@ -948,7 +952,7 @@ private fun PreviewArabicLine(
                         Text(
                             text = gloss,
                             fontSize = PreviewGlossSize,
-                            lineHeight = typeScale(11.5.sp, 13.sp),
+                            lineHeight = typeLeading(11.5.sp, 13.sp),
                             color = ink.copy(alpha = 0.62f),
                             textAlign = TextAlign.Center,
                             modifier = Modifier.alpha(if (glossVisible) 1f else 0f),
@@ -1025,8 +1029,11 @@ private fun PreviewEnglishLyric(
             text = text,
             fontFamily = TranslationFontFamily,
             fontSize = lyricSize,
-            lineHeight = 1.5.em,
-            style = TextStyle(textDirection = TextDirection.Ltr),
+            lineHeight = (1.5f * LocalQuranTypePalette.current.tuning.book.leading).em,
+            style = MaterialTheme.typography.bodyLarge.copy(
+                textDirection = TextDirection.Ltr,
+                letterSpacing = LocalQuranTypePalette.current.tuning.book.tracking.em,
+            ),
         )
     }
 }
@@ -1098,7 +1105,7 @@ private fun PreviewTranslation() {
         text = SAMPLE_ENGLISH,
         fontFamily = TranslationFontFamily,
         fontSize = PreviewTranslationSize,
-        lineHeight = typeScale(19.sp, 21.sp),
+        lineHeight = typeLeading(19.sp, 21.sp),
         color = QuranTheme.ink.secondary,
     )
 }

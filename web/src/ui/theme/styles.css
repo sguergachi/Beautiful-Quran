@@ -43,7 +43,7 @@
   --font-arabic: 'Hafs Uthmanic', 'Noto Naskh Arabic', serif;
   /* The reader's hand: chancery italic, a different hand from --font-body's
      roman rather than that same voice leaning. Verse notes only. */
-  --font-scribe: 'Cormorant Garamond', 'Times New Roman', serif;
+  --font-scribe: 'Timeless Serif', 'EB Garamond', 'Times New Roman', serif;
   --sheet-pad: clamp(1.1rem, 4.5vw, 2.75rem);
   /*
    * The phone's grid — Android's, at 1px = 1dp (ui/paper/sheetGrid.ts).
@@ -289,7 +289,7 @@ body {
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
   font-variant-numeric: oldstyle-nums;
-  font-feature-settings: 'kern' 1, 'liga' 1, 'onum' 1;
+  font-feature-settings: 'kern' 1, 'liga' 1;
   overflow: hidden;
   /* Stop iOS rubber-band scrolling the whole page behind the sheets. */
   overscroll-behavior: none;
@@ -726,6 +726,8 @@ select {
   font-size: 0.95rem;
   letter-spacing: 0.12em;
   text-transform: uppercase;
+  font-variant-numeric: lining-nums;
+  font-feature-settings: 'kern' 1, 'case' 1;
   cursor: pointer;
   -webkit-tap-highlight-color: transparent;
   touch-action: manipulation;
@@ -887,6 +889,8 @@ input[type='search']::-webkit-search-decoration {
   font-size: 0.72rem;
   letter-spacing: 0.14em;
   text-transform: uppercase;
+  font-variant-numeric: lining-nums;
+  font-feature-settings: 'kern' 1, 'case' 1;
   color: color-mix(in srgb, var(--ink) 45%, transparent);
   line-height: 1;
   white-space: nowrap;
@@ -1408,6 +1412,8 @@ input[type='search']::-webkit-search-decoration {
   font-size: 0.56rem;
   letter-spacing: 0.14em;
   text-transform: uppercase;
+  font-variant-numeric: lining-nums;
+  font-feature-settings: 'kern' 1, 'case' 1;
   color: var(--ink-rung-quiet);
   white-space: nowrap;
   overflow: hidden;
@@ -1715,6 +1721,8 @@ input[type='search']::-webkit-search-decoration {
   font-weight: 500;
   letter-spacing: 0.22em;
   text-transform: uppercase;
+  font-variant-numeric: lining-nums;
+  font-feature-settings: 'kern' 1, 'case' 1;
   color: var(--gold-ink);
   margin: 0;
 }
@@ -2073,7 +2081,7 @@ button.ayah-mark {
   font-kerning: normal;
   font-variant-ligatures: common-ligatures;
   font-variant-numeric: oldstyle-nums;
-  font-feature-settings: 'kern' 1, 'liga' 1, 'onum' 1;
+  font-feature-settings: 'kern' 1, 'liga' 1;
   line-height: 1.5;
   letter-spacing: normal;
   word-spacing: normal;
@@ -3897,6 +3905,8 @@ button.ayah-mark {
   font-size: 12px;
   letter-spacing: 2px;
   text-transform: uppercase;
+  font-variant-numeric: lining-nums;
+  font-feature-settings: 'kern' 1, 'case' 1;
   color: var(--ink-rung-muted);
   font-weight: 500;
   margin: 0 0 4px;
@@ -4841,6 +4851,8 @@ button.ayah-mark {
   letter-spacing: 0.13em;
   line-height: 1.35;
   text-transform: uppercase;
+  font-variant-numeric: lining-nums;
+  font-feature-settings: 'kern' 1, 'case' 1;
 }
 
 .root-info-button {
@@ -5079,6 +5091,8 @@ button.ayah-mark {
   letter-spacing: 0.04em;
   line-height: 1.3;
   text-transform: uppercase;
+  font-variant-numeric: lining-nums;
+  font-feature-settings: 'kern' 1, 'case' 1;
 }
 
 /* Lemma column: same .root-sense face, no extra top margin in the stack. */
@@ -6203,6 +6217,8 @@ button.ayah-mark {
   font-size: var(--cover-load-label);
   letter-spacing: 0.14em;
   text-transform: uppercase;
+  font-variant-numeric: lining-nums;
+  font-feature-settings: 'kern' 1, 'case' 1;
   text-align: center;
   color: rgba(232, 226, 213, 0.55);
 }
@@ -6246,6 +6262,8 @@ button.ayah-mark {
   font-size: var(--cover-load-label);
   letter-spacing: 0.16em;
   text-transform: uppercase;
+  font-variant-numeric: lining-nums;
+  font-feature-settings: 'kern' 1, 'case' 1;
   color: rgba(237, 209, 136, 0.85);
   background: none;
   border: none;

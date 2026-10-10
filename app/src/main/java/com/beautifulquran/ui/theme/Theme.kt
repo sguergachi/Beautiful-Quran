@@ -572,6 +572,7 @@ val CoverParchment = Parchment
 fun BeautifulQuranTheme(
     themeMode: ThemeMode = ThemeMode.SYSTEM,
     timelessTypography: Boolean = true,
+    typographyTuning: TypographyTuning = TypographyTuning(),
     content: @Composable () -> Unit,
 ) {
     val systemDark = isSystemInDarkTheme()
@@ -599,7 +600,9 @@ fun BeautifulQuranTheme(
         night -> NightSettingsSheet
         else -> LightSettingsSheet
     }
-    val typePalette = quranTypePalette(timelessTypography)
+    val typePalette = androidx.compose.runtime.remember(timelessTypography, typographyTuning) {
+        quranTypePalette(timelessTypography, typographyTuning)
+    }
     androidx.compose.runtime.CompositionLocalProvider(
         LocalQuranAccents provides accents,
         LocalQuranInk provides ink,

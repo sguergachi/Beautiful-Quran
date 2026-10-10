@@ -82,6 +82,7 @@ import com.beautifulquran.ui.theme.PaperSearchField
 import com.beautifulquran.ui.theme.DisclosureChevron
 import com.beautifulquran.ui.theme.LocalQuranAccents
 import com.beautifulquran.ui.theme.typeScale
+import com.beautifulquran.ui.theme.typeLeading
 import com.beautifulquran.ui.theme.quietClickable
 import com.beautifulquran.ui.theme.verticalFadingEdges
 import kotlinx.coroutines.flow.first
@@ -307,7 +308,7 @@ private fun BookmarksHeader(onClose: () -> Unit) {
                 text = "Bookmarks",
                 style = MaterialTheme.typography.headlineMedium.copy(
                     fontSize = typeScale(31.sp, 36.sp),
-                    lineHeight = typeScale(38.sp, 44.sp),
+                    lineHeight = typeLeading(38.sp, 44.sp),
                 ),
                 color = MaterialTheme.colorScheme.onBackground,
             )
@@ -367,9 +368,9 @@ private fun BookmarkSectionHeader(
             text = surah.id.toString(),
             style = MaterialTheme.typography.bodyMedium.copy(
                 fontSize = typeScale(12.5.sp, 14.sp),
-                lineHeight = typeScale(18.sp, 20.sp),
+                lineHeight = typeLeading(18.sp, 20.sp),
                 fontWeight = FontWeight.Medium,
-                fontFeatureSettings = "'kern' 1, 'liga' 1, 'lnum' 1, 'tnum' 1",
+                fontFeatureSettings = "${MaterialTheme.typography.bodyMedium.fontFeatureSettings.orEmpty()}, 'onum' 0, 'lnum' 1, 'tnum' 1",
             ),
             color = gold,
             modifier = Modifier
@@ -380,7 +381,7 @@ private fun BookmarkSectionHeader(
             text = surah.nameTransliteration,
             style = MaterialTheme.typography.titleMedium.copy(
                 fontSize = typeScale(16.sp, 18.sp),
-                lineHeight = typeScale(22.sp, 24.sp),
+                lineHeight = typeLeading(22.sp, 24.sp),
             ),
             color = MaterialTheme.colorScheme.onBackground,
             modifier = Modifier.weight(1f),
@@ -446,7 +447,7 @@ private fun BookmarkAyahRow(
                 text = bookmark.translation,
                 style = MaterialTheme.typography.bodyLarge.copy(
                     fontSize = typeScale(15.sp, 17.sp),
-                    lineHeight = typeScale(23.sp, 25.sp),
+                    lineHeight = typeLeading(23.sp, 25.sp),
                 ),
                 color = QuranTheme.ink.strong,
                 maxLines = 2,
@@ -654,7 +655,7 @@ private fun BookmarkDisclosure(hiddenCount: Int, expanded: Boolean, onClick: () 
         text = bookmarkDisclosureLabel(hiddenCount, expanded),
         style = MaterialTheme.typography.bodyMedium.copy(
             fontSize = typeScale(15.sp, 17.sp),
-            lineHeight = typeScale(23.sp, 25.sp),
+            lineHeight = typeLeading(23.sp, 25.sp),
             fontWeight = FontWeight.Medium,
         ),
         color = MaterialTheme.colorScheme.primary,
@@ -679,7 +680,7 @@ private fun BookmarkEmptyState(query: String) {
             },
             style = MaterialTheme.typography.bodyLarge.copy(
                 fontSize = typeScale(15.sp, 17.sp),
-                lineHeight = typeScale(23.sp, 25.sp),
+                lineHeight = typeLeading(23.sp, 25.sp),
             ),
             color = QuranTheme.ink.strong,
             textAlign = TextAlign.Center,
@@ -703,10 +704,10 @@ private fun bookmarkMetadataStyle(
 ): TextStyle =
     MaterialTheme.typography.bodyMedium.copy(
         fontSize = typeScale(12.5.sp, 14.sp),
-        lineHeight = typeScale(18.sp, 20.sp),
+        lineHeight = typeLeading(18.sp, 20.sp),
         fontWeight = weight,
         fontFeatureSettings = if (numeric) {
-            "'kern' 1, 'liga' 1, 'lnum' 1, 'tnum' 1"
+            "${MaterialTheme.typography.bodyMedium.fontFeatureSettings.orEmpty()}, 'onum' 0, 'lnum' 1, 'tnum' 1"
         } else {
             MaterialTheme.typography.bodyMedium.fontFeatureSettings
         },

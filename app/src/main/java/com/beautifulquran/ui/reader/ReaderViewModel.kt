@@ -336,6 +336,8 @@ class ReaderViewModel(
         rulerKey: Any? = null,
         /** Everything the leaves depend on — see [EnglishBookCache.key]. */
         cacheKey: String = "",
+        /** Keep the current leaf visible while the developer auditions its type. */
+        retainMeasuredBook: Boolean = false,
     ) {
         if (_mushaf.value != null && mushafLeafText == text && mushafRulerKey == rulerKey) return
         // Never fall back. A book already paginated by measuring a leaf is not
@@ -343,6 +345,7 @@ class ReaderViewModel(
         // mushaf after the app has loaded, and its own first call carries no
         // ruler.
         if (rulerFor == null && mushafRulerKey != null && mushafLeafText == text) return
+        val retain = retainMeasuredBook && _mushaf.value?.measured == true && mushafLeafText == text
         mushafLeafText = text
         mushafRulerKey = rulerKey
         // Retained so a runtime word/QCF refresh can repaginate the same book
@@ -370,7 +373,10 @@ class ReaderViewModel(
                 // thousand-layout measure below must never hold them. The
                 // English leaf waits for measured=true before setting a word,
                 // and the gate holds English until the measured book lands.
-                if (generation == mushafGeneration) {
+                // A lab edit has a valid measured book to draw with the new
+                // face while it repaginates. Cold starts still publish the
+                // catalog immediately and hold English for a measured book.
+                if (generation == mushafGeneration && !retain) {
                     val prose = repository.englishVerseProse(text)
                     _mushaf.value = MushafUi(
                         catalog,

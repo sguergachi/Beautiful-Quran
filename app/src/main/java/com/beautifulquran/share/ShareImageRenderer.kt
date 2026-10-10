@@ -11,6 +11,7 @@ import androidx.compose.ui.platform.ComposeView
 import androidx.compose.ui.platform.ViewCompositionStrategy
 import com.beautifulquran.data.ThemeMode
 import com.beautifulquran.ui.theme.BeautifulQuranTheme
+import com.beautifulquran.ui.theme.TypographyTuning
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
@@ -45,6 +46,7 @@ object ShareImageRenderer {
         activity: Activity,
         segmentCount: Int,
         timelessTypography: Boolean = true,
+        typographyTuning: TypographyTuning = TypographyTuning(),
         content: @Composable (index: Int) -> Unit,
     ): Bitmap {
         require(segmentCount > 0)
@@ -149,6 +151,7 @@ object ShareImageRenderer {
                             BeautifulQuranTheme(
                                 themeMode = ThemeMode.LIGHT,
                                 timelessTypography = timelessTypography,
+                                typographyTuning = typographyTuning,
                             ) {
                                 content(index)
                             }
@@ -169,8 +172,9 @@ object ShareImageRenderer {
     suspend fun render(
         activity: Activity,
         timelessTypography: Boolean = true,
+        typographyTuning: TypographyTuning = TypographyTuning(),
         content: @Composable () -> Unit,
-    ): Bitmap = renderSegments(activity, 1, timelessTypography) { content() }
+    ): Bitmap = renderSegments(activity, 1, timelessTypography, typographyTuning) { content() }
 }
 
 /** Combined sheet height from per-strip wrap heights. */

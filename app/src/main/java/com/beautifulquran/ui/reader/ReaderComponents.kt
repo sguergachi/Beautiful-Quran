@@ -134,6 +134,9 @@ import com.beautifulquran.data.model.Word
 import com.beautifulquran.domain.EnglishTypography
 import com.beautifulquran.domain.TajweedPacing
 import com.beautifulquran.ui.reader.focus.FocusEngine
+import com.beautifulquran.ui.theme.forCaps
+import com.beautifulquran.ui.theme.liningFigures
+import com.beautifulquran.ui.theme.BookTextMotion
 import com.beautifulquran.ui.theme.ArabicTitleStyle
 import com.beautifulquran.ui.theme.drawPulseTrace
 import com.beautifulquran.ui.theme.ArabicWordStyle
@@ -161,6 +164,7 @@ import com.beautifulquran.ui.theme.shapedWordBloom
 import com.beautifulquran.ui.theme.inkSmootherstep
 import com.beautifulquran.ui.theme.verticalFadingEdges
 import com.beautifulquran.ui.theme.typeScale
+import com.beautifulquran.ui.theme.typeLeading
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.first
@@ -226,7 +230,8 @@ internal fun AnnotatedString.Builder.appendAyahNumberMark(
         append(formatAyahNumberMark(number, useArabicIndicDigits, ltr = ltr))
     }
     if (!useArabicIndicDigits) {
-        val digitStyle = style.copy(fontFamily = bookFontFamily)
+        // Lining: old-style 3 4 5 7 9 hang below the cups' centre.
+        val digitStyle = style.copy(fontFamily = bookFontFamily, fontFeatureSettings = liningFigures(null))
         // The isolate and the cup each take a character and a word joiner, so
         // the LTR form opens its digits two units further in than the plain one.
         val digitsAt = if (ltr) 4 else 2
@@ -1801,7 +1806,7 @@ private fun WordUnit(
                 Text(
                     text = word.translation,
                     fontSize = typeScale(10.5.sp, 12.sp) * fontScale,
-                    lineHeight = typeScale(13.sp, 15.sp) * fontScale,
+                    lineHeight = typeLeading(13.sp, 15.sp) * fontScale,
                     fontWeight = glossWeight,
                     color = if (searchHit) {
                         LocalQuranAccents.current.gold
@@ -1818,7 +1823,7 @@ private fun WordUnit(
                     Text(
                         text = word.translation,
                         fontSize = typeScale(10.5.sp, 12.sp) * fontScale,
-                        lineHeight = typeScale(13.sp, 15.sp) * fontScale,
+                        lineHeight = typeLeading(13.sp, 15.sp) * fontScale,
                         fontWeight = FontWeight.Bold,
                         color = repeatInk.copy(alpha = InkEngine.tuning.repeatInkAlpha),
                         textAlign = TextAlign.Center,
@@ -1833,7 +1838,7 @@ private fun WordUnit(
             Text(
                 text = word.transliteration,
                 fontSize = typeScale(9.5.sp, 11.sp) * fontScale,
-                lineHeight = typeScale(12.5.sp, 14.sp) * fontScale,
+                lineHeight = typeLeading(12.5.sp, 14.sp) * fontScale,
                 color = QuranTheme.ink.quiet,
                 textAlign = TextAlign.Center,
                 modifier = Modifier.glyphLayerAlpha {
@@ -2136,8 +2141,8 @@ private fun ResponsiveEnglishAyah(
         fontFamily = translationFontFamily,
         fontWeight = FontWeight.Normal,
         fontSize = typeScale(19.5.sp, 22.sp) * fontScale,
-        lineHeight = 1.5.em,
-        letterSpacing = 0.sp,
+        lineHeight = (1.5f * com.beautifulquran.ui.theme.LocalQuranTypePalette.current.tuning.book.leading).em,
+        letterSpacing = com.beautifulquran.ui.theme.LocalQuranTypePalette.current.tuning.book.tracking.em,
         textAlign = TextAlign.Start,
         textDirection = TextDirection.Ltr,
     )
@@ -2660,13 +2665,8 @@ private fun ArabicAyahNumberUnit(
  * the reader writes in place. Tap away to commit; empty text = no note.
  */
 /**
- * The reader's own hand: Cormorant Garamond Italic, a chancery cursive that is
- * a genuinely *different* hand from the app's Timeless Serif prose — not the same
- * voice leaning into emphasis. See [ScribeFontFamily] for why.
- *
- * Set a touch larger than the old EB italic (16 sp) because Cormorant runs
- * small on the body, and with slightly open letterspacing so the fine strokes
- * keep their air. Shared by the reader's verse note and the Bookmarks index.
+ * The book family's real italic in Timeless mode, with Cormorant restored by
+ * the classic profile. Shared by the reader, Customize and the Bookmarks index.
  *
  * [fontScale] mirrors the translation's damped scaling so the note grows with
  * the page instead of staying pinned at one size when the reader sizes type up.
@@ -2678,14 +2678,17 @@ internal fun verseAnnotationStyle(
     fontScale: Float = 1f,
 ): TextStyle {
     val damped = 0.9f + 0.1f * fontScale
+    val type = com.beautifulquran.ui.theme.LocalQuranTypePalette.current
+    val timeless = type.profile == com.beautifulquran.ui.theme.QuranTypeProfile.TIMELESS
+    val note = type.tuning.note
     return MaterialTheme.typography.bodyMedium.copy(
         fontFamily = ScribeFontFamily,
         fontWeight = FontWeight.Medium,
         fontStyle = FontStyle.Italic,
-        fontSize = fontSize * damped,
-        lineHeight = lineHeight * damped,
-        letterSpacing = 0.15.sp,
-        fontFeatureSettings = "'kern' 1, 'liga' 1, 'onum' 1",
+        fontSize = fontSize * damped * if (timeless) 0.88f * note.size else 1f,
+        lineHeight = lineHeight * damped * if (timeless) 0.88f * note.size * note.leading else 1f,
+        letterSpacing = if (timeless) (0.15f / fontSize.value + note.tracking).em else 0.15.sp,
+        fontFeatureSettings = if (timeless) note.featureSettings else "'kern' 1, 'liga' 1, 'onum' 1",
     )
 }
 
@@ -3595,6 +3598,8 @@ private fun GatherOrdinalMark(
                     fontSize = GatherOrdinalSp.sp,
                     lineHeight = GatherOrdinalSp.sp,
                     fontWeight = FontWeight.Bold,
+                    fontFeatureSettings = liningFigures(null),
+                    textMotion = BookTextMotion,
                     textAlign = TextAlign.Center,
                     platformStyle = PlatformTextStyle(includeFontPadding = false),
                     lineHeightStyle = LineHeightStyle(
@@ -3875,7 +3880,7 @@ fun OrnateSurahTitle(
                 text = "$chapterNumber · ${nameTransliteration.uppercase()}",
                 style = MaterialTheme.typography.labelSmall.copy(
                     letterSpacing = transliterationSpacing,
-                ),
+                ).forCaps(),
                 fontSize = CAPS_LABEL_SIZE,
                 color = QuranTheme.ink.quiet,
                 textAlign = TextAlign.Center,
@@ -3912,7 +3917,7 @@ private val TOP_BAR_ROSETTE_STROKE = 0.45.dp
 @Composable
 private fun folioWesternStyle(): TextStyle = MaterialTheme.typography.labelSmall.copy(
     fontSize = FOLIO_WESTERN_SIZE,
-    fontFeatureSettings = "'lnum' 1",
+    fontFeatureSettings = "${MaterialTheme.typography.labelSmall.fontFeatureSettings.orEmpty()}, 'onum' 0, 'lnum' 1",
 )
 
 /**
@@ -4045,7 +4050,7 @@ fun NextChapterFooter(
             Spacer(Modifier.height(ScrollGrid.INVITE_LABEL_TOP))
             Text(
                 text = "NEXT",
-                style = MaterialTheme.typography.labelSmall.copy(letterSpacing = CAPS_TRACKING),
+                style = MaterialTheme.typography.labelSmall.copy(letterSpacing = CAPS_TRACKING).forCaps(),
                 fontSize = CAPS_LABEL_SIZE,
                 color = accents.goldInk,
             )
@@ -4212,7 +4217,7 @@ fun PreviousChapterPullChrome(
     ) {
         Text(
             text = "PREVIOUS",
-            style = MaterialTheme.typography.labelSmall.copy(letterSpacing = CAPS_TRACKING),
+            style = MaterialTheme.typography.labelSmall.copy(letterSpacing = CAPS_TRACKING).forCaps(),
             fontSize = CAPS_LABEL_SIZE,
             color = accents.goldInk,
         )

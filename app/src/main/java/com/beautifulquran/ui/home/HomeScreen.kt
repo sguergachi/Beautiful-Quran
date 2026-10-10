@@ -95,6 +95,7 @@ import com.beautifulquran.ui.reader.remainingUnfurlSignal
 import com.beautifulquran.ui.theme.ArabicTitleStyle
 import com.beautifulquran.ui.theme.LocalQuranAccents
 import com.beautifulquran.ui.theme.typeScale
+import com.beautifulquran.ui.theme.typeLeading
 import com.beautifulquran.ui.theme.PaperSearchField
 import com.beautifulquran.ui.theme.paperBottomFeather
 import com.beautifulquran.ui.theme.quietClickable
@@ -620,7 +621,7 @@ private fun HomeHeader(
                     text = "Beautiful Quran",
                     style = MaterialTheme.typography.headlineMedium.copy(
                         fontSize = typeScale(30.sp, 34.sp),
-                        lineHeight = typeScale(35.sp, 40.sp),
+                        lineHeight = typeLeading(35.sp, 40.sp),
                     ),
                     color = MaterialTheme.colorScheme.onBackground,
                 )
