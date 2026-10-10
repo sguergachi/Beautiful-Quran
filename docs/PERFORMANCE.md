@@ -16,6 +16,22 @@ draw phase.
 
 ## Techniques in use
 
+### English leaf pagination
+
+The English rag chooses breaks only at word spaces and preserves the minimum
+line count. Greedy wrapping gives the same count, so the book's ruler uses it
+for its fill and prefix search. Choosing the rag for every candidate leaf
+previously spent tens of seconds measuring word positions across the corpus,
+leaving the English page without ink until the measured book arrived.
+
+`measureEnglishProse` shares one rounding pixel between the ruler and rag.
+Visible leaves still choose the rag, retain the soft directional wash, and
+wait for the measured book; pagination no longer chooses every candidate's rag.
+The cached book uses format 25 because removing hyphenation changes its cuts.
+On the pooled emulator, a cold rebuild reached the cache 5.7 seconds after
+launch. Its 791 leaves and 6,891 verse fragments, covering all 6,236 verses,
+were byte-identical to the full-rag reference at the same geometry and settings.
+
 ### 1. Draw-phase-only animations (zero recomposition fades)
 
 Every fade in the app — word highlights, recited-word settling, ayah

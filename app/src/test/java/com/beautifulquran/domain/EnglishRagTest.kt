@@ -10,10 +10,7 @@ class EnglishRagTest {
     private val em = 50f
     private val space = 10f
 
-    /**
-     * A paragraph of words of these widths, joined by spaces, with hyphen
-     * hyphen cuts at the given (word, width-into-word) places.
-     */
+    /** A paragraph of whole words of these widths, joined by spaces. */
     private class Para(
         val candidates: EnglishRag.Candidates,
         /** Which candidate each word's following space is; -1 for the last. */
@@ -22,26 +19,17 @@ class EnglishRagTest {
 
     private fun para(
         widths: List<Float>,
-        cuts: Map<Int, List<Float>> = emptyMap(),
-        hyphen: Float = 12f,
     ): Para {
         val ends = ArrayList<Float>()
         val starts = ArrayList<Float>()
-        val hyphens = ArrayList<Float>()
         val spaceOf = IntArray(widths.size) { -1 }
         var x = 0f
         widths.forEachIndexed { i, w ->
-            cuts[i].orEmpty().forEach { into ->
-                ends += x + into
-                starts += x + into
-                hyphens += hyphen
-            }
             x += w
             if (i < widths.lastIndex) {
                 spaceOf[i] = ends.size
                 ends += x
                 starts += x + space
-                hyphens += 0f
                 x += space
             }
         }
@@ -49,14 +37,13 @@ class EnglishRagTest {
             EnglishRag.Candidates(
                 contentEnd = ends.toFloatArray(),
                 nextStart = starts.toFloatArray(),
-                hyphenPx = hyphens.toFloatArray(),
                 textEnd = x,
             ),
             spaceOf,
         )
     }
 
-    /** Greedy, as the platform breaks with no hyphen: the old leaf. */
+    /** Greedy wrapping is the minimum line count when words stay whole. */
     private fun greedyLines(widths: List<Float>, measure: Float): Int {
         var lines = 1
         var x = 0f
@@ -89,11 +76,17 @@ class EnglishRagTest {
     }
 
     @Test
-    fun `never sets more lines than greedy`() {
+    fun `whole word rag has the same line count as greedy for every prefix`() {
         val widths = List(120) { i -> listOf(40f, 90f, 160f, 30f, 220f, 70f)[i % 6] }
         listOf(600f, 800f, 1000f).forEach { measure ->
-            val breaks = EnglishRag.breaks(para(widths).candidates, measure, em)!!
-            assertTrue(breaks.size + 1 <= greedyLines(widths, measure))
+            var previous = 0
+            for (end in 1..widths.size) {
+                val prefix = widths.take(end)
+                val count = EnglishRag.breaks(para(prefix).candidates, measure, em)!!.size + 1
+                assertEquals(greedyLines(prefix, measure), count)
+                assertTrue(count >= previous)
+                previous = count
+            }
         }
     }
 
@@ -110,20 +103,13 @@ class EnglishRagTest {
     }
 
     @Test
-    fun `hyphenates to fill a hole only when no space can`() {
+    fun `a long word stays whole even when splitting it would fill a hole`() {
         // Line one ends on 400 px of room and a 400 px word follows: no
-        // arrangement of spaces fills it, a cut 200 px into the word does.
+        // arrangement of spaces fills it. The long word still stays whole.
         val widths = listOf(600f, 400f, 500f)
-        val p = para(widths, cuts = mapOf(1 to listOf(200f)))
+        val p = para(widths)
         val breaks = EnglishRag.breaks(p.candidates, 1000f, em)!!
-        assertTrue(
-            "the hyphen is taken",
-            breaks.any { p.candidates.hyphenPx[it] > 0f },
-        )
-        // ...and not where the word fits whole.
-        val roomy = para(listOf(600f, 300f, 500f), cuts = mapOf(1 to listOf(150f)))
-        val easy = EnglishRag.breaks(roomy.candidates, 1000f, em)!!
-        assertTrue(easy.none { roomy.candidates.hyphenPx[it] > 0f })
+        assertArrayEquals(intArrayOf(p.spaceOf[0]), breaks)
     }
 
     @Test

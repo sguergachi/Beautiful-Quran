@@ -899,10 +899,12 @@ percent of type on that leaf alone. That breaks §13.3 knowingly — on 2:282 th
 alternatives are overlapping lines or revelation clipped off the foot, and a page
 set a little small is the only one of the three a reader can still read.
 
-### 13.5 Ragged right, hyphenated at the book's minima
+### 13.5 Ragged right, with whole words
 
-`TextAlign.Start` with `LineBreak.Paragraph` broken greedily, the book face's
-kerning, ligatures and old-style figures — and hyphenation.
+`TextAlign.Start` with word-space breaks chosen by `EnglishRag`, the book
+face's kerning, ligatures and old-style figures. `Hyphens.None`: words stay
+whole, with no inserted soft hyphens or word joiners. The measurements below
+record the earlier settings as well as the reasons for the current one.
 
 The mushaf's own rule is that every full line reaches both margins (rule 3) —
 but that is a rule about Arabic, which fills a line by the letterform, and it
@@ -1079,22 +1081,27 @@ Two faults, and both were real:
 So the leaf breaks its own lines (`EnglishRag`, `englishRaggedProse`), on a
 cost that keeps what greedy got right:
 
-1. **Fewest lines first** — the same count greedy sets or fewer, so the
-   pagination and its bisection stand on the same arithmetic.
+1. **Fewest lines first** — with whole words, the same minimum count greedy
+   sets, so pagination and its bisection stand on the same arithmetic.
 2. **A shortfall under 1.65 em is free.** Only past that does a line cost, as
    the square of the excess. A line that was fine is never moved to even it
    with its neighbours, which is what drew `Balanced`'s phantom margin.
-3. **A hyphen costs about a two-em hole**, so it is taken where it fills one,
-   at the book's kept cuts only (three letters a side, as before).
-4. **Ties go to the fuller line**, top down: among equal settings, greedy's.
+3. **Ties go to the fuller line**, top down: among equal settings, greedy's.
 
-The breaks are written into the text, one character for one so no offset
-moves: a word space becomes a line break, and a kept cut — stored as a soft
-hyphen and a joiner, so the platform can never break there itself — becomes a
-hyphen and a line break. The platform then only sets lines that already fit.
+The breaks replace word spaces with newlines, one character for one, so the
+wash and tap offsets stay on the same letters. A long word stays whole even
+when breaking it would fill a hole. The ruler and rag reserve the same one
+pixel for rounding, and the platform draws the chosen lines at the full measure.
 
-Prototyped on the device's own metrics before it was built (EB Garamond at the
-leaf's hand, the real translation, 88–145 lines a chapter):
+Choosing the rag for every pagination probe made the whole book take tens of
+seconds to rebuild while the English leaf waited without ink. With whole
+words, greedy wrapping already gives the minimum line count the rag preserves.
+The ruler now measures that count directly for its fill and prefix search; the
+rag is chosen only when setting a visible leaf. The measured-book gate stays,
+and cache format 25 discards pagination made with hyphenation.
+
+The earlier hyphenating prototype was measured on the device's own metrics
+(EB Garamond at the leaf's hand, the real translation, 88–145 lines a chapter):
 
 ```
                          worst hole   holes > 1/8    reach the     hyphens
@@ -1163,7 +1170,10 @@ none to tighten. Measured on the page, the gap either side of a mark is 12–13 
 against an ordinary word gap of 12 — the Hafs cups carry no slack, and shrinking
 the mark was never the lever.
 
-What fills the deep holes greedy breaking leaves is hyphenation: a long word the rag cannot absorb — *righteousness*,
+#### Earlier hyphenation experiments
+
+Hyphenation was also tried to fill greedy's deep holes: a long word the rag
+cannot absorb — *righteousness*,
 *[fulfillment]*, *obedience* — pushes its neighbours into a deep hole at the
 line's end (*…and does* / *righteousness…*, a seventh of the measure empty on
 the Ta-Ha leaf that prompted this).
@@ -1171,10 +1181,9 @@ the Ta-Ha leaf that prompted this).
 But the breaker's own hyphenation cannot be told that *de-scends* is not a
 break, and Compose exposes no frequency or fragment control — while self-set
 soft hyphens are ignored with hyphenation off and subsumed with it on. So the
-leaf vetoes instead of proposing (`EnglishHyphenation`): the TeX US-English
-patterns (`HyphenTable`, extracted by `tools/build_hyphen_table.py`) propose
-every cut, each cut with fewer than three letters on either side is joined
-with a word joiner, and the breaker takes the rest under `Hyphens.Auto`.
+earlier leaf vetoed instead of proposing: TeX US-English patterns proposed
+every cut, each cut with fewer than three letters on either side was joined
+with a word joiner, and the breaker took the rest under `Hyphens.Auto`.
 *right-eous-ness* and *pro-tection* carry over; *de-scends*, *Re-pelled* and
 *obe-di-ence*'s middle *di* stay whole.
 
@@ -1191,9 +1200,10 @@ rule, and excluded):
 
 Good breaks only, and no short end the setting did not already have — while
 unvetoed hyphenation, measured alongside, breaks *Re-pelled* and *de-scends*
-after two letters on the same leaves. The table implementation is checked against its own source: the trie reproduces
-pyphen's raw cuts exactly over 400 corpus words, and the vetoes are locked
-word by word in `EnglishHyphenationTest`.
+after two letters on the same leaves. The former table implementation was checked against its own source: the trie
+reproduced pyphen's raw cuts over 400 corpus words, with word-level veto tests.
+That implementation, its pattern table, generator and tests have been removed;
+the reader chose whole words.
 
 Two things were tried and reverted, and the leaf records them so nobody
 re-tries them blind:
@@ -1231,7 +1241,7 @@ at once. `lineSelectionBounds` keeps only what is inside the line's own band.
 
 Then the hyphen itself, which is drawn without being written: no verse's range
 reaches it, so the cover that ends a hyphenated line stopped one glyph short and
-left the hyphen at full ink over dimmed prose. Its advance is measured in the
+left the hyphen at full ink over dimmed prose. Its advance was measured in the
 leaf's own hand and added to that cover — the hyphen belongs to the word it
 broke, and to the ink over it. The same figure is subtracted from the stretch in
 `justifyShift`, which is dormant while the page is ragged and correct if it is
