@@ -2,6 +2,7 @@ package com.beautifulquran.ui.reader
 
 import com.beautifulquran.playback.Tarji
 import com.beautifulquran.ui.theme.ContextualGuideTuning
+import com.beautifulquran.ui.theme.TypographyTuning
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
@@ -55,6 +56,9 @@ class InkLabStoreTest {
             fadeLeadMs = 333,
             scrollLeadMs = 444,
             outputLatencyOverrideMs = 180,
+            typography = TypographyTuning().let {
+                it.copy(book = it.book.copy(weight = 456, tracking = -0.01f, features = mapOf("ss01" to 1, "aalt" to 3)))
+            },
         )
         val restored = InkLabSnapshot.decode(InkLabSnapshot.encode(original))
         assertEquals(original, restored)
@@ -88,6 +92,7 @@ class InkLabStoreTest {
         assertEquals(defaults.tajweedPacing, snap.tajweedPacing)
         assertEquals(defaults.waslHandoff, snap.waslHandoff, 0.0001f)
         assertEquals(ContextualGuideTuning(), snap.toContextualGuideTuning())
+        assertEquals(TypographyTuning(), snap.typography)
     }
 
     @Test
@@ -138,6 +143,7 @@ class InkLabStoreTest {
                 highlightLeadMs = 1_100,
                 fadeLeadMs = 250,
                 outputLatencyOverrideMs = 90,
+                typography = TypographyTuning().let { it.copy(note = it.note.copy(weight = 612)) },
             )
             InkEngine.applyLabSnapshot(snap, persist = false)
             assertEquals(0.44f, InkEngine.tuning.upcomingAlpha, 0.0001f)
@@ -147,6 +153,7 @@ class InkLabStoreTest {
             assertEquals(1_100, InkEngine.highlightLeadMs)
             assertEquals(250, InkEngine.fadeLeadMs)
             assertEquals(90, InkEngine.outputLatencyOverrideMs)
+            assertEquals(snap.typography, InkEngine.typographyTuning)
         } finally {
             InkEngine.applyLabSnapshot(prev, persist = false)
         }
@@ -167,6 +174,7 @@ class InkLabStoreTest {
             assertEquals(InkEngine.DEFAULT_HIGHLIGHT_LEAD_MS, InkEngine.highlightLeadMs)
             assertEquals(InkEngine.DEFAULT_FADE_LEAD_MS, InkEngine.fadeLeadMs)
             assertNull(InkEngine.outputLatencyOverrideMs)
+            assertEquals(TypographyTuning(), InkEngine.typographyTuning)
         } finally {
             InkEngine.applyLabSnapshot(prev, persist = false)
         }

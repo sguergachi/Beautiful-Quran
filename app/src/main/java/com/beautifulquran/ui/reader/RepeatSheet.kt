@@ -31,6 +31,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.media3.common.Player
 import com.beautifulquran.ui.home.SearchDialWheel
+import com.beautifulquran.ui.theme.lining
 import com.beautifulquran.ui.theme.InkCircledChoiceColumn
 import com.beautifulquran.ui.theme.UnselectedChoiceInk
 import com.beautifulquran.ui.theme.quietClickable
@@ -475,7 +476,7 @@ private fun RepeatFromHereDial(
     // 286" and push the whole block off centre.
     val measurer = rememberTextMeasurer()
     val density = LocalDensity.current
-    val numberStyle = MaterialTheme.typography.titleMedium
+    val numberStyle = MaterialTheme.typography.titleMedium.lining()
     val joinStyle = MaterialTheme.typography.bodyMedium
     val labelWidth = remember(ayahCount, numberStyle, joinStyle, measurer, density) {
         val widestFigure = measurer.measure(ayahCount.toString(), numberStyle).size.width
@@ -544,7 +545,7 @@ private fun RepeatRangeLabel(from: Int, to: Int) {
     Row(verticalAlignment = Alignment.CenterVertically) {
         Text(
             text = from.toString(),
-            style = MaterialTheme.typography.titleMedium,
+            style = MaterialTheme.typography.titleMedium.lining(),
             color = MaterialTheme.colorScheme.primary,
         )
         if (to != from) {
@@ -555,7 +556,7 @@ private fun RepeatRangeLabel(from: Int, to: Int) {
             )
             Text(
                 text = to.toString(),
-                style = MaterialTheme.typography.titleMedium,
+                style = MaterialTheme.typography.titleMedium.lining(),
                 color = MaterialTheme.colorScheme.primary,
             )
         }
@@ -570,7 +571,7 @@ private fun RepeatNumberItem(value: Int, selected: Boolean) {
     ) {
         Text(
             text = value.toString(),
-            style = MaterialTheme.typography.titleMedium,
+            style = MaterialTheme.typography.titleMedium.lining(),
             color = if (selected) {
                 MaterialTheme.colorScheme.primary
             } else {

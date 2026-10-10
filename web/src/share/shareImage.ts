@@ -33,13 +33,14 @@ function cssColor(name: string, fallback: string): string {
  */
 export async function renderShareCard(verses: readonly ShareVerse[]): Promise<Blob> {
   await document.fonts.load("28px 'Hafs Uthmanic'")
-  await document.fonts.load("16px 'EB Garamond'")
+  await document.fonts.load("16px 'Timeless Serif'")
+  await document.fonts.load("500 28px 'Timeless Serif Display'")
   const measure = document.createElement('canvas').getContext('2d')
   if (!measure) throw new Error('No canvas')
   const maxWidth = WIDTH - PAD_X * 2
   measure.font = "28px 'Hafs Uthmanic', serif"
   const arabicLines = verses.map((verse) => wrap(measure, verse.arabic, maxWidth))
-  measure.font = "16px 'EB Garamond', serif"
+  measure.font = "16px 'Timeless Serif', 'EB Garamond', serif"
   const englishLines = verses.map((verse) =>
     verse.translation.trim() ? wrap(measure, verse.translation, maxWidth) : [],
   )
@@ -81,7 +82,7 @@ export async function renderShareCard(verses: readonly ShareVerse[]): Promise<Bl
     if (englishLines[index]!.length > 0) {
       y += 12
       ctx.direction = 'ltr'
-      ctx.font = "16px 'EB Garamond', serif"
+      ctx.font = "16px 'Timeless Serif', 'EB Garamond', serif"
       ctx.fillStyle = ink
       ctx.globalAlpha = 0.74
       for (const line of englishLines[index]!) {
@@ -103,11 +104,11 @@ export async function renderShareCard(verses: readonly ShareVerse[]): Promise<Bl
   ctx.globalAlpha = 1
   ctx.direction = 'ltr'
   ctx.fillStyle = gold
-  ctx.font = "28px 'Cormorant Garamond', serif"
+  ctx.font = "500 28px 'Timeless Serif Display', serif"
   y += 40
   ctx.fillText(footer.chapter, WIDTH / 2, y)
   ctx.globalAlpha = 0.72
-  ctx.font = "16px 'EB Garamond', serif"
+  ctx.font = "16px 'Timeless Serif', 'EB Garamond', serif"
   y += 28
   ctx.fillText(footer.verses, WIDTH / 2, y)
   ctx.globalAlpha = 1

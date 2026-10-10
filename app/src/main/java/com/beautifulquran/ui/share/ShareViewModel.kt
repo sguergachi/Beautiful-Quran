@@ -265,7 +265,12 @@ class ShareViewModel(
      * content:// URI for ACTION_SEND. Needs a live [Activity] for Compose
      * measure/layout.
      */
-    fun shareAsImage(activity: Activity, includeTranslation: Boolean = true) {
+    fun shareAsImage(
+        activity: Activity,
+        includeTranslation: Boolean = true,
+        timelessTypography: Boolean = true,
+        typographyTuning: com.beautifulquran.ui.theme.TypographyTuning = com.beautifulquran.ui.theme.TypographyTuning(),
+    ) {
         if (!_ui.value.gathering) return
         if (_ui.value.preparingText || _ui.value.preparingImage) return
         if (_ui.value.selection.isEmpty()) return
@@ -296,6 +301,8 @@ class ShareViewModel(
                     versesBmp = ShareImageRenderer.renderSegments(
                         activity = activity,
                         segmentCount = lines.size,
+                        timelessTypography = timelessTypography,
+                        typographyTuning = typographyTuning,
                     ) { index ->
                         ShareImageVerseStrip(
                             verse = lines[index],
@@ -312,7 +319,7 @@ class ShareViewModel(
                             },
                         )
                     }
-                    footerBmp = ShareImageRenderer.render(activity) {
+                    footerBmp = ShareImageRenderer.render(activity, timelessTypography, typographyTuning) {
                         ShareImageFooterStrip(shareFooterCopy(lines))
                     }
                     bitmap = stitchBitmaps(listOf(versesBmp, footerBmp))

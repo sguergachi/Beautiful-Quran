@@ -44,8 +44,10 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.beautifulquran.data.model.Surah
+import com.beautifulquran.ui.theme.lining
 import com.beautifulquran.ui.theme.ArabicTitleStyle
 import com.beautifulquran.ui.theme.LocalQuranAccents
+import com.beautifulquran.ui.theme.typeScale
 import com.beautifulquran.ui.theme.quietClickable
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlin.math.abs
@@ -216,7 +218,9 @@ private fun SurahItem(surah: Surah, selected: Boolean) {
         Spacer(Modifier.width(SurahNameGap))
         Text(
             text = surah.nameTransliteration,
-            style = MaterialTheme.typography.titleMedium.copy(fontSize = 16.sp),
+            style = MaterialTheme.typography.titleMedium.copy(
+                fontSize = typeScale(14.sp, 16.sp),
+            ),
             color = if (selected) {
                 MaterialTheme.colorScheme.onSurface
             } else {
@@ -246,7 +250,7 @@ private fun NumberItem(value: Int, selected: Boolean) {
     ) {
         Text(
             text = value.toString(),
-            style = MaterialTheme.typography.titleMedium,
+            style = MaterialTheme.typography.titleMedium.lining(),
             color = if (selected) {
                 MaterialTheme.colorScheme.primary
             } else {
@@ -266,7 +270,7 @@ private fun GoRow(surah: Surah, ayah: Int, onClick: () -> Unit) {
     ) {
         Text(
             text = "${surah.nameTransliteration} · Ayah $ayah",
-            style = MaterialTheme.typography.bodyMedium,
+            style = MaterialTheme.typography.bodyMedium.lining(),
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,

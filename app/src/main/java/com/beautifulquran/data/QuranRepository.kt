@@ -169,6 +169,25 @@ class QuranRepository(
     private var englishVerseTextCache: Map<Long, String>? = null
     private var englishVerseGlossText: Map<Long, String>? = null
 
+    /** Verses whose open quotation runs on into the next ([EnglishTypography.typeset]). */
+    @Volatile
+    private var quoteContinues: Set<Long>? = null
+
+    private fun quoteContinues(): Set<Long> = quoteContinues ?: queryList(
+        "SELECT surah_id, ayah_number, translation_en FROM ayahs ORDER BY surah_id, ayah_number",
+    ) { c -> Triple(c.getInt(0), c.getInt(1), c.getString(2)) }.let { rows ->
+        buildSet {
+            rows.forEachIndexed { i, (surah, ayah, _) ->
+                val next = rows.getOrNull(i + 1)?.takeIf { it.first == surah }?.third
+                if (EnglishTypography.quoteContinuesInto(next)) add(quranWordKey(surah, ayah, 1))
+            }
+        }
+    }.also { quoteContinues = it }
+
+    /** A verse's translation as the reader sees it; storage and search keep the raw text. */
+    private fun translation(surah: Int, ayah: Int, raw: String): String =
+        EnglishTypography.typeset(raw, quranWordKey(surah, ayah, 1) in quoteContinues())
+
     /**
      * Verse translations for the English leaf, a page at a time.
      *
@@ -209,7 +228,7 @@ class QuranRepository(
         surahsCache ?: queryList(
             "SELECT id, name_arabic, name_transliteration, name_translation, revelation_place, ayah_count FROM surahs ORDER BY id",
         ) { c ->
-            Surah(c.getInt(0), c.getString(1), c.getString(2), c.getString(3), c.getString(4), c.getInt(5))
+            Surah(c.getInt(0), c.getString(1), EnglishTypography.typesetName(c.getString(2)), c.getString(3), c.getString(4), c.getInt(5))
         }.also { surahsCache = it }
     }
 
@@ -243,7 +262,7 @@ class QuranRepository(
                         Word(
                             position = position,
                             arabic = c.getString(2),
-                            translation = cached?.translation.orEmpty(),
+                            translation = EnglishTypography.typesetName(cached?.translation.orEmpty()),
                             transliteration = cached?.transliteration.orEmpty(),
                             qcfV2 = cached?.qcfV2.orEmpty(),
                             qcfPage = cached?.qcfPage ?: 0,
@@ -260,7 +279,7 @@ class QuranRepository(
         ) { c ->
             val n = c.getInt(0)
             Ayah(
-                surahId, n, c.getString(1), c.getString(2),
+                surahId, n, c.getString(1), translation(surahId, n, c.getString(2)),
                 runtime[n to 1]?.ayahPage ?: 0,
                 words[n].orEmpty(),
             )
@@ -333,7 +352,8 @@ class QuranRepository(
                 EnglishLeafText.TRANSLATION -> englishVerseProse ?: queryList(
                     "SELECT surah_id, ayah_number, translation_en FROM ayahs",
                 ) { c ->
-                    quranWordKey(c.getInt(0), c.getInt(1), 1) to measure(c.getString(2))
+                    quranWordKey(c.getInt(0), c.getInt(1), 1) to
+                        measure(translation(c.getInt(0), c.getInt(1), c.getString(2)))
                 }.toMap().also { englishVerseProse = it }
 
                 // The gloss chain has to be built to be measured — lyricize
@@ -424,7 +444,8 @@ class QuranRepository(
                 EnglishLeafText.TRANSLATION -> englishVerseTextCache ?: queryList(
                     "SELECT surah_id, ayah_number, translation_en FROM ayahs",
                 ) { c ->
-                    quranWordKey(c.getInt(0), c.getInt(1), 1) to c.getString(2)
+                    quranWordKey(c.getInt(0), c.getInt(1), 1) to
+                        translation(c.getInt(0), c.getInt(1), c.getString(2))
                 }.toMap().also { englishVerseTextCache = it }
 
                 EnglishLeafText.GLOSS -> runtimeViews.getOrBuild(
@@ -483,7 +504,8 @@ class QuranRepository(
                         """.trimIndent(),
                         arrayOf(page.toString()),
                     ) { c ->
-                        quranWordKey(c.getInt(0), c.getInt(1), 1) to c.getString(2)
+                        quranWordKey(c.getInt(0), c.getInt(1), 1) to
+                            translation(c.getInt(0), c.getInt(1), c.getString(2))
                     }.toMap()
                 } else {
                     val begun = runtime.values.asSequence()
@@ -498,7 +520,8 @@ class QuranRepository(
                         """.trimIndent(),
                         begun.flatMap { listOf(it.first.toString(), it.second.toString()) }.toTypedArray(),
                     ) { c ->
-                        quranWordKey(c.getInt(0), c.getInt(1), 1) to c.getString(2)
+                        quranWordKey(c.getInt(0), c.getInt(1), 1) to
+                            translation(c.getInt(0), c.getInt(1), c.getString(2))
                     }.toMap()
                 }
                 verses
@@ -533,7 +556,7 @@ class QuranRepository(
                     val surah = Surah(
                         id = c.getInt(0),
                         nameArabic = c.getString(1),
-                        nameTransliteration = c.getString(2),
+                        nameTransliteration = EnglishTypography.typesetName(c.getString(2)),
                         nameTranslation = c.getString(3),
                         revelationPlace = c.getString(4),
                         ayahCount = c.getInt(5),
@@ -543,7 +566,7 @@ class QuranRepository(
                         surah = surah,
                         ayahNumber = ayah,
                         text = c.getString(7),
-                        translation = c.getString(8),
+                        translation = translation(surah.id, ayah, c.getString(8)),
                         createdAt = createdAtByKey[surah.id to ayah] ?: 0L,
                     )
                 }
@@ -756,8 +779,8 @@ class QuranRepository(
                 val ayahNumber = c.getInt(1)
                 contexts[surahId * 1_000 + ayahNumber] = WordSearchAyahContext(
                     ayahText = "",
-                    ayahTranslation = c.getString(2),
-                    surahNameTransliteration = c.getString(3),
+                    ayahTranslation = translation(surahId, ayahNumber, c.getString(2)),
+                    surahNameTransliteration = EnglishTypography.typesetName(c.getString(3)),
                     surahNameArabic = c.getString(4),
                 )
             }
@@ -830,9 +853,10 @@ class QuranRepository(
                 ayahNumber = c.getInt(1),
                 position = c.getInt(2),
                 arabic = c.getString(3),
-                translation = runtime["${c.getInt(0)}:${c.getInt(1)}:${c.getInt(2)}"]?.translation
-                    ?: c.getString(4),
-                surahNameTransliteration = c.getString(5),
+                translation = EnglishTypography.typesetName(
+                    runtime["${c.getInt(0)}:${c.getInt(1)}:${c.getInt(2)}"]?.translation ?: c.getString(4),
+                ),
+                surahNameTransliteration = EnglishTypography.typesetName(c.getString(5)),
             )
         }
         // Every rendering of every form under this root: the counts add up to

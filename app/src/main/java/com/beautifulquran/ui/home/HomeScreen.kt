@@ -86,14 +86,18 @@ import com.beautifulquran.data.model.Surah
 import com.beautifulquran.data.model.SurahWordSearchSection
 import com.beautifulquran.data.model.WordSearchHit
 import com.beautifulquran.data.AyahSelectorSide
+import com.beautifulquran.domain.EnglishTypography
 import com.beautifulquran.domain.WORD_SEARCH_PREVIEW_LIMIT
 import com.beautifulquran.domain.englishTranslationHighlightSpans
 import com.beautifulquran.domain.parseSearchQuery
 import com.beautifulquran.domain.spellingCorrection
 import com.beautifulquran.ui.reader.VerseBookmarkRibbon
 import com.beautifulquran.ui.reader.remainingUnfurlSignal
+import com.beautifulquran.ui.theme.quietSuppliedBrackets
 import com.beautifulquran.ui.theme.ArabicTitleStyle
 import com.beautifulquran.ui.theme.LocalQuranAccents
+import com.beautifulquran.ui.theme.typeScale
+import com.beautifulquran.ui.theme.typeLeading
 import com.beautifulquran.ui.theme.PaperSearchField
 import com.beautifulquran.ui.theme.paperBottomFeather
 import com.beautifulquran.ui.theme.quietClickable
@@ -618,8 +622,8 @@ private fun HomeHeader(
                 Text(
                     text = "Beautiful Quran",
                     style = MaterialTheme.typography.headlineMedium.copy(
-                        fontSize = 34.sp,
-                        lineHeight = 40.sp,
+                        fontSize = typeScale(30.sp, 34.sp),
+                        lineHeight = typeLeading(35.sp, 40.sp),
                     ),
                     color = MaterialTheme.colorScheme.onBackground,
                 )
@@ -776,7 +780,9 @@ private fun SurahRow(
         Column(Modifier.weight(1f)) {
             Text(
                 text = surah.nameTransliteration,
-                style = MaterialTheme.typography.titleMedium.copy(fontSize = 17.sp),
+                style = MaterialTheme.typography.titleMedium.copy(
+                    fontSize = typeScale(15.sp, 17.sp),
+                ),
                 color = MaterialTheme.colorScheme.onBackground,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
@@ -883,7 +889,9 @@ private fun WordSearchSurahHeader(section: SurahWordSearchSection) {
     ) {
         Text(
             text = section.surahNameTransliteration,
-            style = MaterialTheme.typography.titleMedium.copy(fontSize = 16.sp),
+            style = MaterialTheme.typography.titleMedium.copy(
+                fontSize = typeScale(14.sp, 16.sp),
+            ),
             color = MaterialTheme.colorScheme.onBackground,
             modifier = Modifier.weight(1f),
             maxLines = 1,
@@ -912,6 +920,7 @@ private fun WordSearchHitRow(
 ) {
     val accents = LocalQuranAccents.current
     val highlightColor = accents.gold
+    val translationInk = QuranTheme.ink.strong
     val displayQuery = remember(query) { parseSearchQuery(query).text }
     val translation = remember(
         hit.displayText,
@@ -920,12 +929,13 @@ private fun WordSearchHitRow(
         hit.matchLabel,
         displayQuery,
         highlightColor,
+        translationInk,
     ) {
         buildAnnotatedString {
             for (span in englishTranslationHighlightSpans(
                 ayahTranslation = hit.displayText,
                 query = displayQuery,
-                wordGloss = hit.translation,
+                wordGloss = EnglishTypography.typesetName(hit.translation),
                 semanticLabel = hit.matchLabel.orEmpty(),
                 semanticTerms = hit.matchTerms,
             )) {
@@ -942,6 +952,7 @@ private fun WordSearchHitRow(
                     append(span.text)
                 }
             }
+            quietSuppliedBrackets(toAnnotatedString().text, 0, translationInk)
         }
     }
     Column(

@@ -30,8 +30,8 @@
   --phone-rim: rgba(28, 27, 24, 0.08);
   --phone-shadow: 0 28px 60px -28px rgba(28, 27, 24, 0.28);
 
-  --body: 'EB Garamond', Georgia, 'Times New Roman', serif;
-  --display: 'Cormorant Garamond', Georgia, 'Times New Roman', serif;
+  --body: 'Timeless Serif', 'EB Garamond', Georgia, 'Times New Roman', serif;
+  --display: 'Timeless Serif Display', 'EB Garamond', Georgia, 'Times New Roman', serif;
   --arabic: 'Hafs Uthmanic', 'Amiri', 'Scheherazade New', 'Times New Roman', serif;
 
   --text-xs: 0.78rem;
@@ -155,8 +155,7 @@ body {
   background: var(--paper);
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
-  font-variant-numeric: oldstyle-nums;
-  font-feature-settings: 'kern' 1, 'liga' 1, 'onum' 1;
+  font-feature-settings: 'kern' 1, 'liga' 1;
 }
 
 a {

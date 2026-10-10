@@ -1,0 +1,22 @@
+{
+  "_comment": "Timeless type family (timeless.co, Timeless Free Font License 1.2). Its license forbids putting the font files in a public repository, so they are never committed: Gradle (app/build.gradle.kts, fetchTimelessFonts) and the web build (web/scripts/fetch-timeless-fonts.mjs) download this exact archive, verify it, and embed only the cuts below. Maps output file -> entry inside the archive.",
+  "url": "https://media.timeless.co/type/Timeless-Type-Family-1.094.zip",
+  "sha256": "510685dfce6010b74a1a250af7de1204e1b9901be152a39f5dd6be85fc6d6084",
+  "android": {
+    "timeless_serif_variable.ttf": "Timeless-Type-Family-1.094/Serif-Text/TimelessSerifVF.ttf",
+    "timeless_serif_italic_variable.ttf": "Timeless-Type-Family-1.094/Serif-Text/TimelessSerifItalicVF.ttf",
+    "timeless_sans_variable.ttf": "Timeless-Type-Family-1.094/Sans-Grotesk/TimelessSansVF.ttf"
+  },
+  "web": {
+    "TimelessSerif-TextRegular.woff2": "Timeless-Type-Family-1.094/Serif-Text/static/woff2/TimelessSerif-TextRegular.woff2",
+    "TimelessSerif-TextMedium.woff2": "Timeless-Type-Family-1.094/Serif-Text/static/woff2/TimelessSerif-TextMedium.woff2",
+    "TimelessSerif-TextSemibold.woff2": "Timeless-Type-Family-1.094/Serif-Text/static/woff2/TimelessSerif-TextSemibold.woff2",
+    "TimelessSerif-TextBold.woff2": "Timeless-Type-Family-1.094/Serif-Text/static/woff2/TimelessSerif-TextBold.woff2",
+    "TimelessSerif-RegularItalic.woff2": "Timeless-Type-Family-1.094/Serif-Text/static/woff2/TimelessSerif-RegularItalic.woff2",
+    "TimelessSerif-Regular.woff2": "Timeless-Type-Family-1.094/Serif-Text/static/woff2/TimelessSerif-Regular.woff2",
+    "TimelessSerif-Medium.woff2": "Timeless-Type-Family-1.094/Serif-Text/static/woff2/TimelessSerif-Medium.woff2",
+    "TimelessSans-SansRegular.woff2": "Timeless-Type-Family-1.094/Sans-Grotesk/static/woff2/TimelessSans-SansRegular.woff2",
+    "TimelessSans-SansMedium.woff2": "Timeless-Type-Family-1.094/Sans-Grotesk/static/woff2/TimelessSans-SansMedium.woff2",
+    "TimelessSerif-MediumItalic.woff2": "Timeless-Type-Family-1.094/Serif-Text/static/woff2/TimelessSerif-MediumItalic.woff2"
+  }
+}

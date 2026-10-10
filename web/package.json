@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "postinstall": "cp node_modules/sql.js/dist/sql-wasm.wasm public/sql-wasm.wasm && cp node_modules/sql.js/dist/sql-wasm-browser.wasm public/sql-wasm-browser.wasm",
-    "sync:data": "node scripts/sync-data.mjs",
+    "sync:data": "node scripts/sync-data.mjs && node scripts/fetch-timeless-fonts.mjs",
     "build:ornaments": "node scripts/build-marketing-ornaments.mjs",
     "predev": "npm run sync:data",
     "prebuild": "npm run sync:data",

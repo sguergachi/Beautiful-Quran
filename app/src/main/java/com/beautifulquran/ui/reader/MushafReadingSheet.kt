@@ -1,7 +1,9 @@
 package com.beautifulquran.ui.reader
 
+import com.beautifulquran.ui.theme.mixedCaseTrackingEm
 import com.beautifulquran.ui.theme.HafsFontFamily
 import com.beautifulquran.ui.theme.quietClickable
+import com.beautifulquran.ui.theme.typeScale
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
@@ -404,18 +406,18 @@ internal fun MushafReadingSheet(
                         text = "${if (playerState.speed % 1f == 0f) playerState.speed.toInt() else playerState.speed}×",
                         style = MaterialTheme.typography.labelMedium.copy(
                             fontWeight = FontWeight.SemiBold,
-                            fontSize = 15.sp,
+                            fontSize = typeScale(13.sp, 15.sp),
                         ),
                         color = if (speedActive) MaterialTheme.colorScheme.onBackground else quiet,
                         textAlign = TextAlign.Center,
-                        // "0.75×" is wider than a narrow slot at 15sp, and at a
+                        // "0.75×" is wider than a narrow slot at 13sp, and at a
                         // large font scale wider than any. One line, set down
                         // until it fits, never wrapped under itself.
                         maxLines = 1,
                         softWrap = false,
                         autoSize = TextAutoSize.StepBased(
-                            minFontSize = 9.sp,
-                            maxFontSize = 15.sp,
+                            minFontSize = typeScale(8.sp, 9.sp),
+                            maxFontSize = typeScale(13.sp, 15.sp),
                             stepSize = 0.5.sp,
                         ),
                     )
@@ -620,7 +622,7 @@ private fun MushafHeadLabel(
         style = mushafHeadStyle(
             MaterialTheme.typography.labelSmall.copy(
                 fontSize = glyphSize.furnitureStep(MushafType.HEAD),
-                letterSpacing = 0.10.em,
+                letterSpacing = mixedCaseTrackingEm(0.10f).em,
             ),
             text,
         ),

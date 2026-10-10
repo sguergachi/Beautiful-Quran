@@ -63,7 +63,7 @@ import kotlin.math.sqrt
 /**
  * The leading the whole book is set on.
  *
- * One number, for every leaf. EB Garamond runs a small x-height and would take
+ * One number, for every leaf. A small-x-height face would take
  * more air on a long measure; this one is about fifty characters, which wants
  * less. 1.40 em is where a serif book of this measure sits, and every 0.05 em
  * added to it comes straight off the type — the heaviest leaf has to fit
@@ -202,8 +202,8 @@ const val ENGLISH_LEAF_REFERENCE_MARGIN = 1.04f
 /**
  * A block of the mass a leaf holds, for the hand to be cut against.
  */
-fun englishLeafReferenceBlock(): String {
-    val target = (ENGLISH_LEAF_CAPACITY_CHARS * ENGLISH_LEAF_REFERENCE_MARGIN).toInt()
+fun englishLeafReferenceBlock(capacityChars: Int = ENGLISH_LEAF_CAPACITY_CHARS): String {
+    val target = (capacityChars * ENGLISH_LEAF_REFERENCE_MARGIN).toInt()
     val out = StringBuilder(target + ENGLISH_LEAF_SPECIMEN.length)
     while (out.length < target) out.append(ENGLISH_LEAF_SPECIMEN)
     return out.substring(0, target)

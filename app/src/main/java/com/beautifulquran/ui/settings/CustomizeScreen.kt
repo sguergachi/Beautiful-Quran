@@ -60,6 +60,7 @@ import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.PlatformTextStyle
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.style.TextAlign
@@ -68,6 +69,7 @@ import androidx.compose.ui.text.style.TextGeometricTransform
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.LayoutDirection
+import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.em
 import androidx.compose.ui.unit.sp
@@ -84,7 +86,6 @@ import com.beautifulquran.domain.MUSHAF_LINE_PITCH_EM
 import com.beautifulquran.domain.MUSHAF_WORD_GAP_EM
 import com.beautifulquran.domain.MushafLine
 import com.beautifulquran.domain.MushafPage
-import com.beautifulquran.domain.ENGLISH_LEAF_LEADING_EM
 import com.beautifulquran.domain.mushafLineFit
 import com.beautifulquran.domain.qcfTrailingMark
 import com.beautifulquran.domain.qcfWordGlyphs
@@ -95,6 +96,7 @@ import com.beautifulquran.ui.reader.MushafCell
 import com.beautifulquran.ui.reader.MushafQcfFonts
 import com.beautifulquran.ui.reader.PageBreak
 import com.beautifulquran.ui.reader.englishProseStyle
+import com.beautifulquran.ui.reader.englishRaggedProse
 import com.beautifulquran.ui.reader.VERSE_ANNOTATION_INK_ALPHA
 import com.beautifulquran.ui.reader.collapsedStackSpanDp
 import com.beautifulquran.ui.reader.appendAyahNumberMark
@@ -104,6 +106,8 @@ import com.beautifulquran.ui.reader.symbolicAyahBarCount
 import com.beautifulquran.ui.reader.verseAnnotationStyle
 import kotlin.math.abs
 import kotlin.math.roundToInt
+import com.beautifulquran.ui.theme.leafLeadingEm
+import com.beautifulquran.ui.theme.mixedCaseTrackingEm
 import com.beautifulquran.ui.theme.BrushCheckParams
 import com.beautifulquran.ui.theme.BrushCircleParams
 import com.beautifulquran.ui.theme.HafsFontFamily
@@ -112,6 +116,9 @@ import com.beautifulquran.ui.theme.InkExpandEasing
 import com.beautifulquran.ui.theme.LocalQuranAccents
 import com.beautifulquran.ui.theme.LocalReadingPaper
 import com.beautifulquran.ui.theme.TranslationFontFamily
+import com.beautifulquran.ui.theme.typeScale
+import com.beautifulquran.ui.theme.LocalQuranTypePalette
+import com.beautifulquran.ui.theme.typeLeading
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import com.beautifulquran.ui.theme.shippedCheckParams
@@ -440,14 +447,17 @@ internal fun CustomizeScreen(
 private val PreviewLeaf = RoundedCornerShape(3.dp)
 // Miniature of the reader: ~0.8 of the live sizes, same ratios.
 private val PreviewArabicSize = 24.sp
-private val PreviewLyricSize = 18.sp
-private val PreviewTranslationSize = 13.sp
-private val PreviewGlossSize = 10.sp
+private val PreviewLyricSize: TextUnit
+    @Composable get() = typeScale(16.sp, 18.sp)
+private val PreviewTranslationSize: TextUnit
+    @Composable get() = typeScale(11.5.sp, 13.sp)
+private val PreviewGlossSize: TextUnit
+    @Composable get() = typeScale(9.sp, 10.sp)
 private val PreviewFolioPad = PaddingValues(horizontal = 0.dp, vertical = 6.dp)
 
 /**
  * A live miniature of the reader: a faded leaf with a gold hairline, carrying
- * the same Hafs, Garamond, gold marks, and folio the sheet itself will use.
+ * the same Hafs, Timeless Serif, gold marks, and folio the sheet itself will use.
  */
 @Composable
 internal fun ReadingPreview(
@@ -556,7 +566,8 @@ internal fun ReadingPreview(
                                 text = SAMPLE_TRANSLIT,
                                 fontFamily = TranslationFontFamily,
                                 fontSize = PreviewLyricSize * 13f / 18f,
-                                lineHeight = 1.4.em,
+                                lineHeight = (1.4f * LocalQuranTypePalette.current.tuning.book.leading).em,
+                                style = MaterialTheme.typography.bodyLarge,
                                 color = QuranTheme.ink.tertiary,
                             )
                         }
@@ -628,12 +639,14 @@ private const val PreviewMushafAyahLast = 93
 /** The English leaf sets a smaller hand than the Arabic one — see EnglishLeafFit. */
 // The miniature is a scale model, so its hand follows its measure. The preview
 // card is ~0.9 of the reader's own measure, and the leaf sets ~53 characters to
-// the line; at 11.sp this block ran to ~75, which is not a page anyone is shown
+// the line; at 11.sp of Garamond this block ran to ~75, which is not a page anyone is shown
 // — it read as dense grey and, as reported, simply too small to see.
-private val PreviewEnglishLeafSize = 15.sp
+private val PreviewEnglishLeafSize: TextUnit
+    @Composable get() = typeScale(13.sp, 15.sp)
 
 /** The running head's label, a step under the prose as it is on the leaf. */
-private val PreviewLeafHeadSize = 9.sp
+private val PreviewLeafHeadSize: TextUnit
+    @Composable get() = typeScale(8.sp, 9.sp)
 
 /**
  * 21:91–92 exactly as `data/quran.db` carries them — the same two verses the
@@ -703,7 +716,7 @@ private fun PreviewMushafLeaf(
 
 /**
  * The same leaf, in the reader's own language: the page's three verses set as
- * one ragged, hyphenated paragraph in the book's hand, under the leaf's own
+ * one ragged, whole-word paragraph in the book's hand, under the leaf's own
  * running head.
  *
  * It is the reader's rule in miniature — the sentence is the unit of the
@@ -720,6 +733,9 @@ private fun PreviewEnglishMushafLeaf(
 ) {
     val gold = LocalQuranAccents.current.gold
     val ink = QuranTheme.ink.strong
+    val leafSize = PreviewEnglishLeafSize
+    val typePalette = com.beautifulquran.ui.theme.LocalQuranTypePalette.current
+    val bookFontFamily = TranslationFontFamily
     val text = buildAnnotatedString {
         listOf(
             SAMPLE_ENGLISH_LEAF_1 to PreviewMushafAyahFirst,
@@ -735,7 +751,10 @@ private fun PreviewEnglishMushafLeaf(
             appendAyahNumberMark(
                 number = number,
                 useArabicIndicDigits = arabicMarks,
-                style = SpanStyle(color = gold, fontSize = PreviewEnglishLeafSize * 17f / 22f),
+                style = SpanStyle(
+                    color = gold, fontSize = leafSize * 17f / 22f, letterSpacing = 0.em,
+                ),
+                bookFontFamily = bookFontFamily,
                 // The leaf is set left to right whichever digits are chosen.
                 ltr = true,
             )
@@ -744,17 +763,20 @@ private fun PreviewEnglishMushafLeaf(
     Column(modifier = modifier) {
         PreviewLeafRunningHead(pageNumberScript)
         Spacer(Modifier.height(8.dp))
-        // The style is the leaf's own [englishProseStyle], not a copy of it.
-        // The copy had drifted into justified, unhyphenated text set on 1.5 em
-        // — three things the leaf is not — so the miniature advertised a page
-        // the reader would never be shown.
-        Text(
-            text = text,
-            style = englishProseStyle(
-                fontSize = PreviewEnglishLeafSize,
-                lineHeight = PreviewEnglishLeafSize * ENGLISH_LEAF_LEADING_EM,
-            ),
-        )
+        BoxWithConstraints(Modifier.fillMaxWidth()) {
+            val density = LocalDensity.current
+            val measurer = rememberTextMeasurer()
+            val measurePx = with(density) { maxWidth.toPx() }
+            val style = englishProseStyle(
+                fontSize = leafSize,
+                lineHeight = leafSize * typePalette.leafLeadingEm * typePalette.tuning.leaf.leading,
+                typePalette = typePalette,
+            )
+            val set = remember(text, style, measurePx, density, measurer) {
+                englishRaggedProse(text, style, measurePx, density, measurer)
+            }
+            Text(text = set, style = style)
+        }
     }
 }
 
@@ -766,7 +788,7 @@ private fun PreviewLeafRunningHead(pageNumberScript: PageNumberScript) {
     val ink = QuranTheme.ink.muted
     val style = MaterialTheme.typography.labelSmall.copy(
         fontSize = PreviewLeafHeadSize,
-        letterSpacing = 0.10.em,
+        letterSpacing = mixedCaseTrackingEm(0.10f).em,
     )
     MushafRunningHead(
         page = PreviewMushafPage,
@@ -910,6 +932,7 @@ private fun PreviewArabicLine(
 ) {
     val gold = LocalQuranAccents.current.gold
     val ink = MaterialTheme.colorScheme.onSurface
+    val bookFontFamily = TranslationFontFamily
     if (showGloss) {
         val markBox = with(LocalDensity.current) { (PreviewArabicSize * 1.9f).toDp() }
         CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Rtl) {
@@ -930,7 +953,7 @@ private fun PreviewArabicLine(
                         Text(
                             text = gloss,
                             fontSize = PreviewGlossSize,
-                            lineHeight = 13.sp,
+                            lineHeight = typeLeading(11.5.sp, 13.sp),
                             color = ink.copy(alpha = 0.62f),
                             textAlign = TextAlign.Center,
                             modifier = Modifier.alpha(if (glossVisible) 1f else 0f),
@@ -961,6 +984,7 @@ private fun PreviewArabicLine(
                 color = gold,
                 fontSize = PreviewArabicSize * 20f / 30f,
             ),
+            bookFontFamily = bookFontFamily,
         )
     }
     CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Rtl) {
@@ -984,6 +1008,9 @@ private fun PreviewEnglishLyric(
 ) {
     val gold = LocalQuranAccents.current.gold
     val ink = QuranTheme.ink.strong
+    val lyricSize = PreviewLyricSize
+    val markSize = lyricSize * 17f / typeScale(19.5.sp, 22.sp).value
+    val bookFontFamily = TranslationFontFamily
     val text = buildAnnotatedString {
         withStyle(SpanStyle(color = ink)) { append(verse) }
         append(" ")
@@ -992,8 +1019,9 @@ private fun PreviewEnglishLyric(
             useArabicIndicDigits = arabicMarks,
             style = SpanStyle(
                 color = gold,
-                fontSize = PreviewLyricSize * 17f / 22f,
+                fontSize = markSize,
             ),
+            bookFontFamily = bookFontFamily,
             ltr = true,
         )
     }
@@ -1001,9 +1029,12 @@ private fun PreviewEnglishLyric(
         Text(
             text = text,
             fontFamily = TranslationFontFamily,
-            fontSize = PreviewLyricSize,
-            lineHeight = 1.5.em,
-            style = TextStyle(textDirection = TextDirection.Ltr),
+            fontSize = lyricSize,
+            lineHeight = (1.5f * LocalQuranTypePalette.current.tuning.book.leading).em,
+            style = MaterialTheme.typography.bodyLarge.copy(
+                textDirection = TextDirection.Ltr,
+                letterSpacing = LocalQuranTypePalette.current.tuning.book.tracking.em,
+            ),
         )
     }
 }
@@ -1075,7 +1106,7 @@ private fun PreviewTranslation() {
         text = SAMPLE_ENGLISH,
         fontFamily = TranslationFontFamily,
         fontSize = PreviewTranslationSize,
-        lineHeight = 21.sp,
+        lineHeight = typeLeading(19.sp, 21.sp),
         color = QuranTheme.ink.secondary,
     )
 }

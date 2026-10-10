@@ -50,26 +50,18 @@ voice, and the two must never be confusable.
 | Note is long | The text truncates to three lines with a quiet ink ellipsis; tapping the note opens it in place (see "Writing"). |
 | Another ayah is reciting | The ribbon vanishes with the rest of the chrome; the text recesses to upcoming ink with its verse, exactly like the translation. |
 
-**Type.** **Cormorant Garamond Italic at weight 500**, 16 sp / 23 sp, a very
-light red at 85 % opacity, on the inner spine, 12 dp/px below the translation.
-No quotation marks, no "Note:" label, no attribution — the hand says it.
+**Type.** **Timeless Serif Italic at weight 500**, 14.08 sp / 20.24 sp before
+the existing damped reader size setting, with 0.15 sp tracking. This is the
+family's real italic, keeping translation and note in one serif family.
+The note's maroon ink, slant and placement distinguish the reader's words:
+on the inner spine, 12 dp/px below the translation, with no quotation marks,
+"Note:" label or attribution. Colour follows the existing theme ink policy.
 
-The face is the point. Italic alone is not enough: setting the note in the
-app's *own* EB Garamond italic reads as **emphasis**, the same voice leaning,
-because it is literally the same typeface as the translation above it.
-Cormorant's italic is a genuinely different hand — looser `a` and `e`,
-calligraphic `f` and `y`, higher stroke contrast, a wider pen — so the eye
-reads a second person on the page rather than the app raising its voice. It is
-also the historically right one: chancery cursive is what scribes actually
-wrote ḥawāshī in, and what italic type was first cut from.
-
-Two constraints make it work at reading size. Cormorant is a display face and
-goes wispy small, so the note uses **weight 500** (a static instance cut from
-the variable font, subset to latin + latin-ext at 132 KB) and sits a step
-larger than the old EB italic at 16 sp with 0.15 sp letterspacing. Its dark
-maroon inky red keeps the reader's own hand distinct from the scripture even
-at 85 % opacity. This is a narrow, recorded exception to Cormorant's display-only rule
-in [DESIGN.md](DESIGN.md) — do not generalise it to body copy.
+The classic developer profile restores **Cormorant Garamond Italic at weight
+500**, 16 sp / 23 sp and its original tracking. Ink Lab → Typography → Notes
+tunes Timeless's weight, glyph alternates, size, leading and tracking separately
+from the book. The same selected hand and settings appear in the reader,
+note editor, Bookmarks index and Customize preview.
 
 **The ribbon.** Tap keeps its existing mark/unmark action. Press and hold on
 an exposed saved ribbon opens the verse's note. The same 44 dp target serves
@@ -294,7 +286,7 @@ resize handle.
   text rather than a margin glyph.
 - `ui/reader/ReaderComponents.kt` — `verseAnnotationStyle` (the reader's hand, shared
   with the Bookmarks index) and `VerseAnnotationField`.
-- `ui/theme/Type.kt` — `ScribeFontFamily`, and why it is not the EB italic.
-  The face is OFL (same licence as every other bundled font); the Android cut
-  is `res/font/cormorant_garamond_italic.ttf`, mirrored for web in
-  `web/public/fonts/` with a `--font-scribe` variable already wired.
+- `ui/theme/Type.kt` — selected `ScribeFontFamily`: Timeless's variable Serif
+  Italic, or the classic OFL `res/font/cormorant_garamond_italic.ttf`.
+  Timeless is fetched from the pinned licensed archive at build time; web's
+  `--font-scribe` uses its Medium Italic static cut.

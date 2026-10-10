@@ -4,48 +4,115 @@
   src: url('./fonts/hafs_uthmanic.ttf') format('truetype');
   font-display: swap;
 }
+/*
+ * Timeless (timeless.co) — fetched at build time by
+ * scripts/fetch-timeless-fonts.mjs; its license forbids committing the files.
+ *
+ * Timeless Serif's x-height is 0.52 em against EB Garamond's 0.40, so the
+ * serif faces carry size-adjust: 88%. Every size in the stylesheet keeps the
+ * apparent size it was tuned at in Garamond; Android retunes its sp instead.
+ */
+@font-face {
+  font-family: 'Timeless Serif';
+  src: url('./fonts/timeless/TimelessSerif-TextRegular.woff2') format('woff2');
+  font-weight: 400;
+  size-adjust: 88%;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Timeless Serif';
+  src: url('./fonts/timeless/TimelessSerif-RegularItalic.woff2') format('woff2');
+  font-weight: 400;
+  font-style: italic;
+  size-adjust: 88%;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Timeless Serif';
+  src: url('./fonts/timeless/TimelessSerif-TextMedium.woff2') format('woff2');
+  font-weight: 500;
+  size-adjust: 88%;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Timeless Serif';
+  src: url('./fonts/timeless/TimelessSerif-TextSemibold.woff2') format('woff2');
+  font-weight: 600;
+  size-adjust: 88%;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Timeless Serif';
+  src: url('./fonts/timeless/TimelessSerif-TextBold.woff2') format('woff2');
+  font-weight: 700;
+  size-adjust: 88%;
+  font-display: swap;
+}
+/* The display master sets darker than the Cormorant it replaced, so each
+   weight is served by the cut one step lighter — as on Android. */
+@font-face {
+  font-family: 'Timeless Serif Display';
+  src: url('./fonts/timeless/TimelessSerif-Regular.woff2') format('woff2');
+  font-weight: 500;
+  size-adjust: 88%;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Timeless Serif Display';
+  src: url('./fonts/timeless/TimelessSerif-Medium.woff2') format('woff2');
+  font-weight: 600;
+  size-adjust: 88%;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Timeless Sans';
+  src: url('./fonts/timeless/TimelessSans-SansRegular.woff2') format('woff2');
+  font-weight: 400;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Timeless Sans';
+  src: url('./fonts/timeless/TimelessSans-SansMedium.woff2') format('woff2');
+  font-weight: 500;
+  font-display: swap;
+}
+/* Timeless has no ḍ ḥ ẓ ʾ ʿ; the stacks fall back to the previous book face
+   for those glyphs alone (latin-ext only, so it is fetched only when needed). */
 @font-face {
   font-family: 'EB Garamond';
   src: url('./fonts/eb_garamond_regular.ttf') format('truetype');
   font-weight: 400;
+  unicode-range: U+0100-024F, U+02B0-02FF, U+1E00-1EFF;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'EB Garamond';
+  src: url('./fonts/eb_garamond_italic.ttf') format('truetype');
+  font-weight: 400;
+  font-style: italic;
+  unicode-range: U+0100-024F, U+02B0-02FF, U+1E00-1EFF;
   font-display: swap;
 }
 @font-face {
   font-family: 'EB Garamond';
   src: url('./fonts/eb_garamond_medium.ttf') format('truetype');
   font-weight: 500;
+  unicode-range: U+0100-024F, U+02B0-02FF, U+1E00-1EFF;
   font-display: swap;
 }
 @font-face {
   font-family: 'EB Garamond';
   src: url('./fonts/eb_garamond_semibold.ttf') format('truetype');
-  font-weight: 600;
+  font-weight: 600 700;
+  unicode-range: U+0100-024F, U+02B0-02FF, U+1E00-1EFF;
   font-display: swap;
 }
+/* Real medium italic for the reader's notes. */
 @font-face {
-  font-family: 'EB Garamond';
-  src: url('./fonts/eb_garamond_italic.ttf') format('truetype');
-  font-style: italic;
-  font-weight: 400;
-  font-display: swap;
-}
-@font-face {
-  font-family: 'Cormorant Garamond';
-  src: url('./fonts/cormorant_garamond_medium.ttf') format('truetype');
-  font-weight: 500;
-  font-display: swap;
-}
-@font-face {
-  font-family: 'Cormorant Garamond';
-  src: url('./fonts/cormorant_garamond_semibold.ttf') format('truetype');
-  font-weight: 600;
-  font-display: swap;
-}
-/* The reader's hand — chancery italic for verse notes. See docs/NOTES.md. */
-@font-face {
-  font-family: 'Cormorant Garamond';
-  src: url('./fonts/cormorant_garamond_italic.ttf') format('truetype');
+  font-family: 'Timeless Serif';
+  src: url('./fonts/timeless/TimelessSerif-MediumItalic.woff2') format('woff2');
   font-weight: 500;
   font-style: italic;
+  size-adjust: 88%;
   font-display: swap;
 }

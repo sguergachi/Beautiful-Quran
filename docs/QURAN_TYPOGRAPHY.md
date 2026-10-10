@@ -909,6 +909,18 @@ natural spacing too, so tightening the letters does not change its type size.
 The measurements below record the earlier settings as well as the reasons
 for the current one.
 
+The developer font comparison keeps these whole-word rules for both Timeless
+and the classic Garamond profile. The book cache includes the profile, and the
+paragraph-break cache includes the full text style and annotated spans. A font
+change therefore cannot reuse the other face's measurements or chosen breaks.
+Customize uses the same rag setter as the live leaf.
+
+Ink Lab's Timeless book settings include variable weight, optical style, size,
+leading, tracking and the built-in glyph alternates. Both Roman and Italic
+settings are hashed into the pagination key; the full measured style keys
+the rag cache. Title, UI and note edits do not invalidate the book. Bismillah
+uses the selected real italic and its features, then fits to the full column.
+
 The mushaf's own rule is that every full line reaches both margins (rule 3) —
 but that is a rule about Arabic, which fills a line by the letterform, and it
 is the calligrapher's art. Latin has only the word space to fill with, and on

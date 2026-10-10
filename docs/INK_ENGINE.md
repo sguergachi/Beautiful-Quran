@@ -611,7 +611,8 @@ repeat timings, **Repeat ink** strength, the fresh-ink **Glitter time**,
 **Glint tint**, **Halo strength**, and **Halo blur** controls, wash feather,
 and the experimental tajweed hold (see
 [TAJWEED_PACING.md](TAJWEED_PACING.md)). There are enough knobs now that the
-panel is split into **Ink / Sweep / Repeat / Tajweed / Guide / Sync** tabs —
+panel is split into **Ink / Typography / Sweep / Repeat / Tajweed / Tarjīʿ /
+Guide / Sync** tabs —
 quiet ink names with a hairline under the live one, no tab-bar chrome. Guide
 exposes the contextual lesson's body edge, feather width, fade softness,
 progressive-blur radius/strength, vellum grain, and vertical taper. Each guide
@@ -634,3 +635,13 @@ starts above zero; more precision near the floor when it includes zero) so
 small values stay fine-grained while large ends stay reachable. Slider
 meanings, defaults, ranges, and the halo artifact stress check are documented
 in [GLIMMER.md](GLIMMER.md#ink-lab-controls).
+
+**Typography** controls Timeless's variable axes, size, leading, tracking and
+built-in OpenType alternates independently for Book, Italic, Titles, UI and
+Notes. Each stylistic set shows its actual default and alternate glyphs;
+`aalt` exposes further alternate indices, and figures and ligatures have their
+own switches. Its comparison toggle selects Timeless or the original complete
+classic typography. These settings persist in `InkLabSnapshot`; Copy values
+includes their JSON. Reset on this tab restores only typography. The lab's
+labels use the shipped scale while specimens and page text use the live type.
+See [DESIGN.md](DESIGN.md#type) for the available axes and set counts.
