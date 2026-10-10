@@ -48,7 +48,9 @@ internal fun rememberAyahInkPack(
     /** Mushaf selection enters from the paper cover already on the ayah. */
     initiallyRecessed: Boolean = false,
 ): AyahInkPack {
-    RequestTarjiPulseLines(ayah)
+    // The Recording detector reads pulse lines worked out for the verse under
+    // the voice only; without `active` the page's glimmer never pulsed.
+    RequestTarjiPulseLines(ayah, active = isActiveAyah)
     val sweepMs = InkEngine.sweepMs(activeWord, playbackSpeed)
     val repeatDwellMs = InkEngine.repeatDwellMs(activeWord, playbackSpeed)
     val activation = activeWord?.activation ?: 0L
