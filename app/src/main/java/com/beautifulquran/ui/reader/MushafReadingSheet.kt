@@ -404,18 +404,18 @@ internal fun MushafReadingSheet(
                         text = "${if (playerState.speed % 1f == 0f) playerState.speed.toInt() else playerState.speed}×",
                         style = MaterialTheme.typography.labelMedium.copy(
                             fontWeight = FontWeight.SemiBold,
-                            fontSize = 15.sp,
+                            fontSize = 13.sp,
                         ),
                         color = if (speedActive) MaterialTheme.colorScheme.onBackground else quiet,
                         textAlign = TextAlign.Center,
-                        // "0.75×" is wider than a narrow slot at 15sp, and at a
+                        // "0.75×" is wider than a narrow slot at 13sp, and at a
                         // large font scale wider than any. One line, set down
                         // until it fits, never wrapped under itself.
                         maxLines = 1,
                         softWrap = false,
                         autoSize = TextAutoSize.StepBased(
-                            minFontSize = 9.sp,
-                            maxFontSize = 15.sp,
+                            minFontSize = 8.sp,
+                            maxFontSize = 13.sp,
                             stepSize = 0.5.sp,
                         ),
                     )

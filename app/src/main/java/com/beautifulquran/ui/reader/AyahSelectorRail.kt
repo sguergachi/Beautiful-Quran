@@ -48,12 +48,15 @@ import androidx.compose.ui.input.pointer.positionChange
 import androidx.compose.ui.input.pointer.util.VelocityTracker
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInRoot
+import androidx.compose.ui.platform.LocalFontFamilyResolver
 import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.beautifulquran.data.AyahSelectorSide
 import com.beautifulquran.data.model.Ayah
 import com.beautifulquran.ui.theme.LocalQuranAccents
+import com.beautifulquran.ui.theme.SerifFontFamily
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import kotlin.math.abs
@@ -323,6 +326,14 @@ internal fun AyahSelectorRail(
     val accents = LocalQuranAccents.current
     val onSurface = MaterialTheme.colorScheme.onSurface
     val currentPlaceGreen = MaterialTheme.colorScheme.primary
+    // The rail's figures are the book face's, not the system serif.
+    val fontResolver = LocalFontFamilyResolver.current
+    val numberFace = remember(fontResolver) {
+        fontResolver.resolve(SerifFontFamily, FontWeight.Bold).value as Typeface
+    }
+    val pageFace = remember(fontResolver) {
+        fontResolver.resolve(SerifFontFamily).value as Typeface
+    }
 
     Box(
         modifier = modifier
@@ -360,13 +371,13 @@ internal fun AyahSelectorRail(
             val collapsedAlpha = 1f - expand
             val numberPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
                 textAlign = if (mirrored) Paint.Align.RIGHT else Paint.Align.LEFT
-                textSize = 9.sp.toPx()
-                typeface = Typeface.create(Typeface.SERIF, Typeface.BOLD)
+                textSize = 8.sp.toPx()
+                typeface = numberFace
             }
             val pagePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
                 textAlign = if (mirrored) Paint.Align.RIGHT else Paint.Align.LEFT
-                textSize = 7.5.sp.toPx()
-                typeface = Typeface.create(Typeface.SERIF, Typeface.NORMAL)
+                textSize = 6.5.sp.toPx()
+                typeface = pageFace
             }
 
             // Collapsed-stack metrics live outside the pass because the
@@ -546,7 +557,7 @@ internal fun AyahSelectorRail(
                             .copy(alpha = (0.18f + 0.46f * focus) * arrival * edgeFade)
                             .toArgb()
                     }
-                    numberPaint.textSize = if (isSelected) 11.sp.toPx() else 8.5.sp.toPx()
+                    numberPaint.textSize = if (isSelected) 9.5.sp.toPx() else 7.5.sp.toPx()
                     drawIntoCanvas { canvas ->
                         canvas.nativeCanvas.drawText(
                             ayah.toString(),

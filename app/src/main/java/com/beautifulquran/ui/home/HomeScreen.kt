@@ -618,8 +618,8 @@ private fun HomeHeader(
                 Text(
                     text = "Beautiful Quran",
                     style = MaterialTheme.typography.headlineMedium.copy(
-                        fontSize = 34.sp,
-                        lineHeight = 40.sp,
+                        fontSize = 30.sp,
+                        lineHeight = 35.sp,
                     ),
                     color = MaterialTheme.colorScheme.onBackground,
                 )
@@ -776,7 +776,7 @@ private fun SurahRow(
         Column(Modifier.weight(1f)) {
             Text(
                 text = surah.nameTransliteration,
-                style = MaterialTheme.typography.titleMedium.copy(fontSize = 17.sp),
+                style = MaterialTheme.typography.titleMedium.copy(fontSize = 15.sp),
                 color = MaterialTheme.colorScheme.onBackground,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
@@ -883,7 +883,7 @@ private fun WordSearchSurahHeader(section: SurahWordSearchSection) {
     ) {
         Text(
             text = section.surahNameTransliteration,
-            style = MaterialTheme.typography.titleMedium.copy(fontSize = 16.sp),
+            style = MaterialTheme.typography.titleMedium.copy(fontSize = 14.sp),
             color = MaterialTheme.colorScheme.onBackground,
             modifier = Modifier.weight(1f),
             maxLines = 1,

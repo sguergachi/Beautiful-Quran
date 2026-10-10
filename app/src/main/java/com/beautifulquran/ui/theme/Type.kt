@@ -1,9 +1,15 @@
 package com.beautifulquran.ui.theme
 
+import android.content.Context
+import android.graphics.Typeface
+import androidx.annotation.FontRes
 import androidx.compose.material3.Typography
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.font.AndroidFont
 import androidx.compose.ui.text.font.Font
 import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.font.FontLoadingStrategy
+import androidx.compose.ui.text.font.FontVariation
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.em
@@ -62,35 +68,104 @@ const val MUSHAF_BASMALAH_INK_MID_EM = 0.3101f
 
 
 /**
- * EB Garamond — the book face. Everything English is set in it: translations,
- * glosses, lists, labels, even the speed chip. Bundled with true italics and
- * optical weights so emphasis never falls back to a synthetic slant.
+ * Timeless Serif Text — the book face. Everything English that is *read* is
+ * set in it: translations, glosses, lists, names, facts. The Text cuts are
+ * its small-size optical master, with a true italic so emphasis never falls
+ * back to a synthetic slant.
+ *
+ * Timeless has no ḍ ḥ ẓ ʾ ʿ, which transliterations and the dictionary use,
+ * so each cut falls back to the matching EB Garamond — the book face before
+ * it — glyph by glyph rather than to the system's sans. See [bookFont].
+ *
+ * Its x-height is 0.52 em against EB Garamond's 0.40, so the same size reads
+ * about an eighth larger: sizes across the app sit at ~0.88 of what they were
+ * in Garamond, which keeps every line's apparent size and the page's density.
  */
 val SerifFontFamily = FontFamily(
-    Font(R.font.eb_garamond_regular, FontWeight.Normal),
-    Font(R.font.eb_garamond_italic, FontWeight.Normal, FontStyle.Italic),
-    Font(R.font.eb_garamond_medium, FontWeight.Medium),
-    Font(R.font.eb_garamond_semibold, FontWeight.SemiBold),
+    bookFont(R.font.timeless_serif_text_regular, R.font.eb_garamond_regular, FontWeight.Normal),
+    bookFont(R.font.timeless_serif_italic, R.font.eb_garamond_italic, FontWeight.Normal, FontStyle.Italic),
+    bookFont(R.font.timeless_serif_text_medium, R.font.eb_garamond_medium, FontWeight.Medium),
+    bookFont(R.font.timeless_serif_text_semibold, R.font.eb_garamond_semibold, FontWeight.SemiBold),
+    bookFont(R.font.timeless_serif_text_bold, R.font.eb_garamond_semibold, FontWeight.Bold),
 )
 
 /**
- * Cormorant Garamond — the display face for surah titles and headlines,
- * where its tall, fine-stroked capitals can breathe at large sizes.
+ * Timeless Serif's display master — surah titles and headlines; its finer
+ * contrast is cut for large sizes. It sets darker than the Cormorant it
+ * replaced, so each weight the app asks for is served by the cut one step
+ * lighter: Medium by Regular, SemiBold by Medium. The web maps the same.
  */
 val DisplayFontFamily = FontFamily(
-    Font(R.font.cormorant_garamond_medium, FontWeight.Medium),
-    Font(R.font.cormorant_garamond_semibold, FontWeight.SemiBold),
+    bookFont(R.font.timeless_serif_regular, R.font.eb_garamond_regular, FontWeight.Medium),
+    bookFont(R.font.timeless_serif_medium, R.font.eb_garamond_medium, FontWeight.SemiBold),
+)
+
+/**
+ * Timeless Sans — the controls' face: Material's sans slots ([QuranTypography]
+ * keeps `labelLarge` & co. sans on purpose; see docs/DESIGN.md, "UI text").
+ */
+val SansFontFamily = FontFamily(
+    Font(R.font.timeless_sans_regular, FontWeight.Normal),
+    Font(R.font.timeless_sans_medium, FontWeight.Medium),
 )
 
 val TranslationFontFamily = SerifFontFamily
+
+/**
+ * A Timeless cut that falls back to [fallback] — an EB Garamond of the same
+ * weight — for the glyphs Timeless lacks, then to the system serif.
+ *
+ * A plain resource [Font] falls back to the system *sans*, so a dictionary
+ * entry's ḥ landed in Roboto mid-word. `Typeface.CustomFallbackBuilder` is the
+ * only way to chain a second bundled face, and Compose reaches it through an
+ * [AndroidFont] with its own loader.
+ */
+private fun bookFont(
+    @FontRes primary: Int,
+    @FontRes fallback: Int,
+    weight: FontWeight,
+    style: FontStyle = FontStyle.Normal,
+): Font = BookFont(primary, fallback, weight, style)
+
+private data class BookFont(
+    @FontRes val primary: Int,
+    @FontRes val fallback: Int,
+    override val weight: FontWeight,
+    override val style: FontStyle,
+) : AndroidFont(FontLoadingStrategy.Blocking, BookFontLoader, FontVariation.Settings())
+
+private object BookFontLoader : AndroidFont.TypefaceLoader {
+    override fun loadBlocking(context: Context, font: AndroidFont): Typeface {
+        font as BookFont
+        val slant = if (font.style == FontStyle.Italic) {
+            android.graphics.fonts.FontStyle.FONT_SLANT_ITALIC
+        } else {
+            android.graphics.fonts.FontStyle.FONT_SLANT_UPRIGHT
+        }
+        fun family(@FontRes id: Int) = android.graphics.fonts.FontFamily.Builder(
+            android.graphics.fonts.Font.Builder(context.resources, id)
+                .setWeight(font.weight.weight)
+                .setSlant(slant)
+                .build(),
+        ).build()
+        return Typeface.CustomFallbackBuilder(family(font.primary))
+            .addCustomFallback(family(font.fallback))
+            .setSystemFallback("serif")
+            .setStyle(android.graphics.fonts.FontStyle(font.weight.weight, slant))
+            .build()
+    }
+
+    override suspend fun awaitLoad(context: Context, font: AndroidFont): Typeface =
+        loadBlocking(context, font)
+}
 
 /**
  * **The reader's hand.** Cormorant Garamond Italic, instanced at weight 500 —
  * the chancery cursive that Renaissance scribes actually wrote marginal glosses
  * in, and the hand italic type was cut from in the first place.
  *
- * It is deliberately *not* EB Garamond Italic. The app's prose is EB Garamond,
- * so its own italic reads as **emphasis** — the same voice leaning — rather
+ * It is deliberately *not* the book face's italic. The app's prose is Timeless
+ * Serif, so its own italic reads as **emphasis** — the same voice leaning — rather
  * than as a second person writing on the page. Cormorant's italic is a
  * different, more pen-driven hand: looser 'a' and 'e', calligraphic 'f' and
  * 'y', a wider stroke contrast. At note size the reader sees someone else's
@@ -112,57 +187,68 @@ val ScribeFontFamily = FontFamily(
  */
 private const val BOOK_FEATURES = "'kern' 1, 'liga' 1, 'onum' 1"
 
+private val MaterialSans = Typography()
+
 /**
- * Full serif scale. EB Garamond runs a small x-height, so sizes sit ~1sp
- * above the Material defaults to keep the same apparent size.
+ * Full serif scale, ~0.88 of its Garamond sizes (see [SerifFontFamily]).
+ * The slots left at Material's sizes are the sans ones: the controls'
+ * labels, in [SansFontFamily].
  */
 val QuranTypography = Typography(
+    displayLarge = MaterialSans.displayLarge.copy(fontFamily = SansFontFamily),
+    displayMedium = MaterialSans.displayMedium.copy(fontFamily = SansFontFamily),
+    displaySmall = MaterialSans.displaySmall.copy(fontFamily = SansFontFamily),
+    headlineLarge = MaterialSans.headlineLarge.copy(fontFamily = SansFontFamily),
     headlineMedium = TextStyle(
         fontFamily = DisplayFontFamily,
         fontWeight = FontWeight.SemiBold,
-        fontSize = 28.sp,
-        lineHeight = 34.sp,
+        fontSize = 24.sp,
+        lineHeight = 30.sp,
         letterSpacing = 0.2.sp,
     ),
+    headlineSmall = MaterialSans.headlineSmall.copy(fontFamily = SansFontFamily),
     titleLarge = TextStyle(
         fontFamily = DisplayFontFamily,
         fontWeight = FontWeight.SemiBold,
-        fontSize = 22.sp,
-        lineHeight = 28.sp,
+        fontSize = 19.5.sp,
+        lineHeight = 25.sp,
         letterSpacing = 0.2.sp,
     ),
     titleMedium = TextStyle(
         fontFamily = SerifFontFamily,
         fontWeight = FontWeight.Medium,
-        fontSize = 17.sp,
-        lineHeight = 23.sp,
+        fontSize = 15.sp,
+        lineHeight = 21.sp,
         letterSpacing = 0.15.sp,
         fontFeatureSettings = BOOK_FEATURES,
     ),
+    titleSmall = MaterialSans.titleSmall.copy(fontFamily = SansFontFamily),
     bodyLarge = TextStyle(
         fontFamily = SerifFontFamily,
-        fontSize = 17.sp,
-        lineHeight = 26.sp,
+        fontSize = 15.sp,
+        lineHeight = 24.sp,
         fontFeatureSettings = BOOK_FEATURES,
     ),
     bodyMedium = TextStyle(
         fontFamily = SerifFontFamily,
-        fontSize = 15.sp,
-        lineHeight = 22.sp,
+        fontSize = 13.sp,
+        lineHeight = 20.sp,
         fontFeatureSettings = BOOK_FEATURES,
     ),
+    bodySmall = MaterialSans.bodySmall.copy(fontFamily = SansFontFamily),
+    labelLarge = MaterialSans.labelLarge.copy(fontFamily = SansFontFamily),
     labelMedium = TextStyle(
         fontFamily = SerifFontFamily,
         fontWeight = FontWeight.Medium,
-        fontSize = 13.sp,
-        lineHeight = 17.sp,
+        fontSize = 11.5.sp,
+        lineHeight = 15.sp,
         letterSpacing = 0.6.sp,
     ),
     labelSmall = TextStyle(
         fontFamily = SerifFontFamily,
         fontWeight = FontWeight.Medium,
-        fontSize = 12.sp,
-        lineHeight = 16.sp,
+        fontSize = 10.5.sp,
+        lineHeight = 14.sp,
         letterSpacing = 0.8.sp,
     ),
 )

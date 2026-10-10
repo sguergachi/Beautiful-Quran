@@ -283,7 +283,7 @@ export const AyahSelectorRail = forwardRef<AyahSelectorRailHandle, Props>(
 
       // Reserve room for the longest ayah label at the selected (largest) size
       // so numbers never clip against the canvas edge on narrow mobile rails.
-      ctx.font = '700 11px "EB Garamond", "Times New Roman", serif'
+      ctx.font = '700 11px "Timeless Serif", "EB Garamond", "Times New Roman", serif'
       const labelWidth = ctx.measureText(String(ayahCount)).width
       const layout = railExpandedLayout(cssW, side, labelWidth, growFrom)
       const { maxBarLen, majorBonus } = layout
@@ -292,7 +292,7 @@ export const AyahSelectorRail = forwardRef<AyahSelectorRailHandle, Props>(
       const numbersTowardPage = side === 'left'
       ctx.textAlign = numbersTowardPage ? 'left' : 'right'
       ctx.textBaseline = 'middle'
-      ctx.font = '600 8.5px "EB Garamond", "Times New Roman", serif'
+      ctx.font = '600 8.5px "Timeless Serif", "EB Garamond", "Times New Roman", serif'
 
       for (let ayah = first; ayah <= last; ayah++) {
         const offset = ayah - dial
@@ -334,8 +334,8 @@ export const AyahSelectorRail = forwardRef<AyahSelectorRailHandle, Props>(
               ? withAlpha(ruby, labelAlpha)
               : withAlpha(ink, labelAlpha)
           ctx.font = isSelected
-            ? '700 11px "EB Garamond", "Times New Roman", serif'
-            : '600 8.5px "EB Garamond", "Times New Roman", serif'
+            ? '700 11px "Timeless Serif", "EB Garamond", "Times New Roman", serif'
+            : '600 8.5px "Timeless Serif", "EB Garamond", "Times New Roman", serif'
           ctx.fillText(String(ayah), railTickLabelX(layout, side, length), y)
         }
       }

@@ -305,8 +305,8 @@ private fun BookmarksHeader(onClose: () -> Unit) {
             Text(
                 text = "Bookmarks",
                 style = MaterialTheme.typography.headlineMedium.copy(
-                    fontSize = 36.sp,
-                    lineHeight = 44.sp,
+                    fontSize = 31.sp,
+                    lineHeight = 38.sp,
                 ),
                 color = MaterialTheme.colorScheme.onBackground,
             )
@@ -365,8 +365,8 @@ private fun BookmarkSectionHeader(
         Text(
             text = surah.id.toString(),
             style = MaterialTheme.typography.bodyMedium.copy(
-                fontSize = 14.sp,
-                lineHeight = 20.sp,
+                fontSize = 12.5.sp,
+                lineHeight = 18.sp,
                 fontWeight = FontWeight.Medium,
                 fontFeatureSettings = "'kern' 1, 'liga' 1, 'lnum' 1, 'tnum' 1",
             ),
@@ -377,7 +377,7 @@ private fun BookmarkSectionHeader(
         )
         Text(
             text = surah.nameTransliteration,
-            style = MaterialTheme.typography.titleMedium.copy(fontSize = 18.sp, lineHeight = 24.sp),
+            style = MaterialTheme.typography.titleMedium.copy(fontSize = 16.sp, lineHeight = 22.sp),
             color = MaterialTheme.colorScheme.onBackground,
             modifier = Modifier.weight(1f),
             maxLines = 1,
@@ -440,7 +440,7 @@ private fun BookmarkAyahRow(
             Spacer(Modifier.height(8.dp))
             Text(
                 text = bookmark.translation,
-                style = MaterialTheme.typography.bodyLarge.copy(fontSize = 17.sp, lineHeight = 25.sp),
+                style = MaterialTheme.typography.bodyLarge.copy(fontSize = 15.sp, lineHeight = 23.sp),
                 color = QuranTheme.ink.strong,
                 maxLines = 2,
                 overflow = TextOverflow.Ellipsis,
@@ -646,8 +646,8 @@ private fun BookmarkDisclosure(hiddenCount: Int, expanded: Boolean, onClick: () 
     Text(
         text = bookmarkDisclosureLabel(hiddenCount, expanded),
         style = MaterialTheme.typography.bodyMedium.copy(
-            fontSize = 17.sp,
-            lineHeight = 25.sp,
+            fontSize = 15.sp,
+            lineHeight = 23.sp,
             fontWeight = FontWeight.Medium,
         ),
         color = MaterialTheme.colorScheme.primary,
@@ -670,7 +670,7 @@ private fun BookmarkEmptyState(query: String) {
             } else {
                 "No marked verse matches “${query.trim()}”."
             },
-            style = MaterialTheme.typography.bodyLarge.copy(fontSize = 17.sp, lineHeight = 25.sp),
+            style = MaterialTheme.typography.bodyLarge.copy(fontSize = 15.sp, lineHeight = 23.sp),
             color = QuranTheme.ink.strong,
             textAlign = TextAlign.Center,
         )
@@ -692,8 +692,8 @@ private fun bookmarkMetadataStyle(
     numeric: Boolean = false,
 ): TextStyle =
     MaterialTheme.typography.bodyMedium.copy(
-        fontSize = 14.sp,
-        lineHeight = 20.sp,
+        fontSize = 12.5.sp,
+        lineHeight = 18.sp,
         fontWeight = weight,
         fontFeatureSettings = if (numeric) {
             "'kern' 1, 'liga' 1, 'lnum' 1, 'tnum' 1"

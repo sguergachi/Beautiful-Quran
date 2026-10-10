@@ -37,9 +37,9 @@
   --repeat: #b4551e;
   --bookmark: #b3122f;
   --annotation: #6b2838;
-  --font-ui: system-ui, sans-serif;
-  --font-display: 'Cormorant Garamond', 'Times New Roman', serif;
-  --font-body: 'EB Garamond', 'Times New Roman', serif;
+  --font-ui: 'Timeless Sans', system-ui, sans-serif;
+  --font-display: 'Timeless Serif Display', 'EB Garamond', 'Times New Roman', serif;
+  --font-body: 'Timeless Serif', 'EB Garamond', 'Times New Roman', serif;
   --font-arabic: 'Hafs Uthmanic', 'Noto Naskh Arabic', serif;
   /* The reader's hand: chancery italic, a different hand from --font-body's
      roman rather than that same voice leaning. Verse notes only. */
@@ -2224,8 +2224,8 @@ button.ayah-mark {
 }
 
 /*
- * EB Garamond strokes can hang past a word's advance (notably the right arm
- * of “f”). Give every masked English layer the same layout-neutral canvas so
+ * Serif strokes can hang past a word's advance (notably the right arm of
+ * “f”). Give every masked English layer the same layout-neutral canvas so
  * the temporary paint containment cannot shear that overhang mid-wash.
  */
 .words[data-lyric='english'] .word-ink-slot > .word-gloss:not(.word-repeat-overlay) {

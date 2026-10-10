@@ -63,7 +63,7 @@ import kotlin.math.sqrt
 /**
  * The leading the whole book is set on.
  *
- * One number, for every leaf. EB Garamond runs a small x-height and would take
+ * One number, for every leaf. A small-x-height face would take
  * more air on a long measure; this one is about fifty characters, which wants
  * less. 1.40 em is where a serif book of this measure sits, and every 0.05 em
  * added to it comes straight off the type — the heaviest leaf has to fit

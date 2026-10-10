@@ -440,14 +440,14 @@ internal fun CustomizeScreen(
 private val PreviewLeaf = RoundedCornerShape(3.dp)
 // Miniature of the reader: ~0.8 of the live sizes, same ratios.
 private val PreviewArabicSize = 24.sp
-private val PreviewLyricSize = 18.sp
-private val PreviewTranslationSize = 13.sp
-private val PreviewGlossSize = 10.sp
+private val PreviewLyricSize = 16.sp
+private val PreviewTranslationSize = 11.5.sp
+private val PreviewGlossSize = 9.sp
 private val PreviewFolioPad = PaddingValues(horizontal = 0.dp, vertical = 6.dp)
 
 /**
  * A live miniature of the reader: a faded leaf with a gold hairline, carrying
- * the same Hafs, Garamond, gold marks, and folio the sheet itself will use.
+ * the same Hafs, Timeless Serif, gold marks, and folio the sheet itself will use.
  */
 @Composable
 internal fun ReadingPreview(
@@ -628,12 +628,12 @@ private const val PreviewMushafAyahLast = 93
 /** The English leaf sets a smaller hand than the Arabic one — see EnglishLeafFit. */
 // The miniature is a scale model, so its hand follows its measure. The preview
 // card is ~0.9 of the reader's own measure, and the leaf sets ~53 characters to
-// the line; at 11.sp this block ran to ~75, which is not a page anyone is shown
+// the line; at 11.sp of Garamond this block ran to ~75, which is not a page anyone is shown
 // — it read as dense grey and, as reported, simply too small to see.
-private val PreviewEnglishLeafSize = 15.sp
+private val PreviewEnglishLeafSize = 13.sp
 
 /** The running head's label, a step under the prose as it is on the leaf. */
-private val PreviewLeafHeadSize = 9.sp
+private val PreviewLeafHeadSize = 8.sp
 
 /**
  * 21:91–92 exactly as `data/quran.db` carries them — the same two verses the
@@ -930,7 +930,7 @@ private fun PreviewArabicLine(
                         Text(
                             text = gloss,
                             fontSize = PreviewGlossSize,
-                            lineHeight = 13.sp,
+                            lineHeight = 11.5.sp,
                             color = ink.copy(alpha = 0.62f),
                             textAlign = TextAlign.Center,
                             modifier = Modifier.alpha(if (glossVisible) 1f else 0f),
@@ -992,7 +992,7 @@ private fun PreviewEnglishLyric(
             useArabicIndicDigits = arabicMarks,
             style = SpanStyle(
                 color = gold,
-                fontSize = PreviewLyricSize * 17f / 22f,
+                fontSize = PreviewLyricSize * 17f / 19.5f,
             ),
             ltr = true,
         )
@@ -1075,7 +1075,7 @@ private fun PreviewTranslation() {
         text = SAMPLE_ENGLISH,
         fontFamily = TranslationFontFamily,
         fontSize = PreviewTranslationSize,
-        lineHeight = 21.sp,
+        lineHeight = 19.sp,
         color = QuranTheme.ink.secondary,
     )
 }

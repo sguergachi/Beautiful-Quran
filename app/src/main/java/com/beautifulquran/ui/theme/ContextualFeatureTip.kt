@@ -227,8 +227,8 @@ private fun LessonCopy(title: String, body: String) {
         Text(
             text = title,
             style = MaterialTheme.typography.titleLarge.copy(
-                fontSize = 28.sp,
-                lineHeight = 32.sp,
+                fontSize = 24.sp,
+                lineHeight = 28.sp,
             ),
             color = MaterialTheme.colorScheme.onSurface,
         )
@@ -236,8 +236,8 @@ private fun LessonCopy(title: String, body: String) {
         Text(
             text = body,
             style = MaterialTheme.typography.bodyLarge.copy(
-                fontSize = 19.sp,
-                lineHeight = 24.sp,
+                fontSize = 16.5.sp,
+                lineHeight = 22.sp,
             ),
             color = QuranTheme.ink.body,
         )

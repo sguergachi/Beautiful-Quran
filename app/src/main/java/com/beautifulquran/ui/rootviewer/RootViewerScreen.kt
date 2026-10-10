@@ -489,8 +489,8 @@ private val LemmaToMetaGap = 20.dp
 
 /** Shared face for Root Form‑1 lead and Lemma dictionary glosses. */
 private val AnalysisGlossAlpha = 0.9f
-private val AnalysisGlossSize = 18.sp
-private val AnalysisGlossLineHeight = 22.sp
+private val AnalysisGlossSize = 16.sp
+private val AnalysisGlossLineHeight = 20.sp
 
 @Composable
 private fun analysisGlossStyle(): TextStyle = MaterialTheme.typography.bodyLarge.copy(
@@ -711,15 +711,15 @@ private fun RootLabel(
             Text(
                 text = it,
                 color = QuranTheme.ink.body,
-                // Keep EB Garamond (a bare TextStyle drops LocalTextStyle's
+                // Keep the book face (a bare TextStyle drops LocalTextStyle's
                 // serif and falls back to system sans). Trim matches the ⓘ
                 // so CenterVertically stays even between ROOT and LEMMA.
                 style = TextStyle(
                     fontFamily = SerifFontFamily,
-                    fontSize = 12.sp,
-                    lineHeight = 16.sp,
+                    fontSize = 10.5.sp,
+                    lineHeight = 14.sp,
                     fontWeight = FontWeight.SemiBold,
-                    letterSpacing = 1.56.sp,
+                    letterSpacing = 1.4.sp,
                     platformStyle = PlatformTextStyle(includeFontPadding = false),
                     lineHeightStyle = LineHeightStyle(
                         alignment = LineHeightStyle.Alignment.Center,
@@ -741,8 +741,8 @@ private fun RootSectionTitle(text: String, explanation: String? = null) {
                 text = it,
                 fontFamily = DisplayFontFamily,
                 fontWeight = FontWeight.SemiBold,
-                fontSize = 24.sp,
-                lineHeight = 29.sp,
+                fontSize = 21.sp,
+                lineHeight = 26.sp,
                 color = MaterialTheme.colorScheme.onSurface,
             )
         },
@@ -899,8 +899,8 @@ private fun ChapterHeading(section: RootOccurrenceSection, open: Boolean, onClic
             Text(
                 text = section.surahName,
                 fontFamily = DisplayFontFamily,
-                fontSize = 18.sp,
-                lineHeight = 24.sp,
+                fontSize = 16.sp,
+                lineHeight = 21.sp,
                 color = QuranTheme.ink.strong,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
@@ -1288,8 +1288,8 @@ private fun LemmaMeta(
 
 @Composable
 private fun lemmaMetaStyle(): TextStyle = MaterialTheme.typography.bodyMedium.copy(
-    fontSize = 14.sp,
-    lineHeight = 18.sp,
+    fontSize = 12.5.sp,
+    lineHeight = 16.sp,
     platformStyle = PlatformTextStyle(includeFontPadding = false),
     lineHeightStyle = LineHeightStyle(
         alignment = LineHeightStyle.Alignment.Top,
@@ -1373,8 +1373,8 @@ private fun LexiconBlockView(
                 text = form,
                 fontFamily = DisplayFontFamily,
                 fontWeight = FontWeight.Medium,
-                fontSize = 18.sp,
-                lineHeight = 22.sp,
+                fontSize = 16.sp,
+                lineHeight = 20.sp,
                 color = gold,
                 modifier = Modifier.padding(bottom = 8.dp),
             )
@@ -1406,7 +1406,7 @@ private fun lexiconAnnotated(
                 run.isArabic -> withStyle(
                     SpanStyle(fontFamily = HafsFontFamily, fontSize = 19.sp, color = bodyColor),
                 ) { append(run.text) }
-                run.isCitation -> withStyle(SpanStyle(color = citationColor, fontSize = 15.sp)) {
+                run.isCitation -> withStyle(SpanStyle(color = citationColor, fontSize = 13.sp)) {
                     append(run.text)
                 }
                 else -> append(run.text)
@@ -1479,8 +1479,8 @@ private fun WordHeader(word: Word, isPlaying: Boolean, onPlay: () -> Unit) {
     if (word.translation.isNotBlank()) {
         Text(
             text = word.translation,
-            fontSize = 20.sp,
-            lineHeight = 28.sp,
+            fontSize = 17.5.sp,
+            lineHeight = 25.sp,
             fontStyle = FontStyle.Italic,
             textAlign = TextAlign.Center,
             color = MaterialTheme.colorScheme.onSurface,

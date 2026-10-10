@@ -1095,7 +1095,7 @@ internal fun TextSizeControl(scale: Float, onScale: (Float) -> Unit) {
     Row(verticalAlignment = Alignment.CenterVertically) {
         Text(
             text = "A",
-            fontSize = 15.sp,
+            fontSize = 13.sp,
             fontFamily = MaterialTheme.typography.bodyLarge.fontFamily,
             color = glyphInk,
             modifier = Modifier
@@ -1130,7 +1130,7 @@ internal fun TextSizeControl(scale: Float, onScale: (Float) -> Unit) {
         }
         Text(
             text = "A",
-            fontSize = 26.sp,
+            fontSize = 23.sp,
             fontFamily = MaterialTheme.typography.bodyLarge.fontFamily,
             color = glyphInk,
             modifier = Modifier

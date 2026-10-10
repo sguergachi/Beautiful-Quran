@@ -1693,8 +1693,8 @@ internal fun MushafPageDial(
             val labelSmall = MaterialTheme.typography.labelSmall
             val hudType = remember(labelSmall) {
                 labelSmall.copy(
-                    fontSize = 14.sp,
-                    lineHeight = 16.sp,
+                    fontSize = 12.5.sp,
+                    lineHeight = 14.sp,
                     letterSpacing = 0.08.em,
                 )
             }

@@ -212,7 +212,7 @@ internal fun formatAyahNumberMark(
     return raw.toCharArray().joinToString("\u2060")
 }
 
-/** Appends a mark with Hafs cups and, for Western digits, explicitly Garamond ones. */
+/** Appends a mark with Hafs cups and, for Western digits, explicitly book-face ones. */
 internal fun AnnotatedString.Builder.appendAyahNumberMark(
     number: Int,
     useArabicIndicDigits: Boolean,
@@ -1798,8 +1798,8 @@ private fun WordUnit(
             Box {
                 Text(
                     text = word.translation,
-                    fontSize = 12.sp * fontScale,
-                    lineHeight = 15.sp * fontScale,
+                    fontSize = 10.5.sp * fontScale,
+                    lineHeight = 13.sp * fontScale,
                     fontWeight = glossWeight,
                     color = if (searchHit) {
                         LocalQuranAccents.current.gold
@@ -1815,8 +1815,8 @@ private fun WordUnit(
                 if (searchHitWash != null) {
                     Text(
                         text = word.translation,
-                        fontSize = 12.sp * fontScale,
-                        lineHeight = 15.sp * fontScale,
+                        fontSize = 10.5.sp * fontScale,
+                        lineHeight = 13.sp * fontScale,
                         fontWeight = FontWeight.Bold,
                         color = repeatInk.copy(alpha = InkEngine.tuning.repeatInkAlpha),
                         textAlign = TextAlign.Center,
@@ -1830,8 +1830,8 @@ private fun WordUnit(
         if (showTransliteration) {
             Text(
                 text = word.transliteration,
-                fontSize = 11.sp * fontScale,
-                lineHeight = 14.sp * fontScale,
+                fontSize = 9.5.sp * fontScale,
+                lineHeight = 12.5.sp * fontScale,
                 color = QuranTheme.ink.quiet,
                 textAlign = TextAlign.Center,
                 modifier = Modifier.glyphLayerAlpha {
@@ -2132,7 +2132,7 @@ private fun ResponsiveEnglishAyah(
     val style = MaterialTheme.typography.bodyLarge.copy(
         fontFamily = TranslationFontFamily,
         fontWeight = FontWeight.Normal,
-        fontSize = 22.sp * fontScale,
+        fontSize = 19.5.sp * fontScale,
         lineHeight = 1.5.em,
         letterSpacing = 0.sp,
         textAlign = TextAlign.Start,
@@ -2591,11 +2591,11 @@ private fun Modifier.hangTileAir(): Modifier = layout { measurable, constraints 
 
 /**
  * The chapter view's one caps label: NEXT, PREVIOUS and the top bar's chapter
- * line. 10 sp keeps the caps legible at whisper ink; 0.22 em is small-caps
+ * line. 9 sp keeps the caps legible at whisper ink; 0.22 em is small-caps
  * tracking — wide enough to open the capitals, not so wide the word falls apart.
  */
-internal val CAPS_LABEL_SIZE = 10.sp
-internal val CAPS_TRACKING = 2.2.sp
+internal val CAPS_LABEL_SIZE = 9.sp
+internal val CAPS_TRACKING = 2.sp
 
 @Composable
 private fun ArabicAyahNumberUnit(
@@ -2637,13 +2637,13 @@ private fun ArabicAyahNumberUnit(
 }
 
 /**
- * The reader's marginal note for one verse: italic EB Garamond below the
+ * The reader's marginal note for one verse, in the reader's hand below the
  * translation. When [isEditing], a chromeless [BasicTextField] takes focus so
  * the reader writes in place. Tap away to commit; empty text = no note.
  */
 /**
  * The reader's own hand: Cormorant Garamond Italic, a chancery cursive that is
- * a genuinely *different* hand from the app's EB Garamond prose — not the same
+ * a genuinely *different* hand from the app's Timeless Serif prose — not the same
  * voice leaning into emphasis. See [ScribeFontFamily] for why.
  *
  * Set a touch larger than the old EB italic (16 sp) because Cormorant runs
@@ -3886,8 +3886,8 @@ private val TOP_BAR_ROSETTE_STROKE = 0.45.dp
  * figure between equal rules.
  */
 /**
- * The folio's Western figures: EB Garamond *lining* figures. The book face
- * defaults to old-style, whose 3, 4, 5, 7 and 9 hang below the baseline — right
+ * The folio's Western figures: Timeless *lining* figures. Running text asks
+ * for old-style, whose 3, 4, 5, 7 and 9 hang below the baseline — right
  * in prose, wrong beside a rule, where a figure must stand level with its
  * partner across the page.
  */
@@ -3910,12 +3910,13 @@ private fun folioArabicStyle(): TextStyle = TextStyle(
     platformStyle = PlatformTextStyle(includeFontPadding = false),
 )
 
-private val FOLIO_WESTERN_SIZE = 12.sp
+/** Timeless' lining figures stand 0.72 em: ~7.6 dp, as Garamond's did at 12 sp. */
+private val FOLIO_WESTERN_SIZE = 10.5.sp
 
 /**
- * Hafs' Arabic-Indic figures ink shorter than Garamond's lining ones: at the
- * same 12 sp, ٣ stood 5.8 dp against 3's 7.6. 14 sp brings it to ~6.8 dp — a
- * pair across the rule, with the Arabic figure keeping its own proportion.
+ * Hafs' Arabic-Indic figures ink shorter than the lining ones: ٣ stands
+ * 5.8 dp at 12 sp against 3's 7.6. 14 sp brings it to ~6.8 dp — a pair across
+ * the rule, with the Arabic figure keeping its own proportion.
  */
 private val FOLIO_ARABIC_SIZE = 14.sp
 

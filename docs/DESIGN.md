@@ -903,22 +903,33 @@ not the app's.
 
 - **Arabic**: KFGQPC HAFS Uthmanic Script — the King Fahd Complex reference
   typeface — at 30 sp base with 1.9 em leading (Uthmani diacritics need air).
-- **English text face**: EB Garamond, bundled (regular, medium, semibold,
-  true italic; latin + latin-ext merged so transliteration diacritics — ḥ, ā,
-  ū — never fall back to a system face). Kerning, ligatures, and old-style
-  figures on in running text (`'kern', 'liga', 'onum'`).
-- **Display face**: Cormorant Garamond semibold for surah titles and
-  headlines, where its tall fine-stroked capitals can breathe.
+- **English text face**: Timeless Serif Text (timeless.co), the small-size
+  optical master: regular, medium, semibold, bold, true italic. Kerning,
+  ligatures, and old-style figures on in running text (`'kern', 'liga',
+  'onum'`). Timeless has no ḍ ḥ ẓ ʾ ʿ, so each cut falls back glyph by glyph
+  to the matching EB Garamond (Android `CustomFallbackBuilder`, web
+  `unicode-range` face), never to a system sans. Its x-height is 0.52 em
+  against Garamond's 0.40, so sizes sit at ~0.88 of their Garamond values:
+  Android retunes its sp, the web keeps its sizes and sets `size-adjust: 88%`.
+  **Licensing:** the Timeless license forbids committing its files to a public
+  repository. They are fetched at build time from the archive pinned in
+  `scripts/timeless-fonts.json` (Gradle `fetchTimelessFonts`,
+  `web/scripts/fetch-timeless-fonts.mjs`) and only embedded in the APK and
+  site. Never commit them.
+- **Display face**: Timeless Serif's display master for surah titles and
+  headlines. It sets darker than the Cormorant it replaced, so each weight is
+  served by the cut one step lighter (Medium→Regular, SemiBold→Medium).
+- **UI sans**: Timeless Sans for Material's sans slots (see UI text below).
 - **The reader's hand**: Cormorant Garamond *Italic* at weight 500 for verse
   notes, and nothing else — the chancery cursive Renaissance scribes wrote
   marginal glosses in, and the hand italic type was cut from. It is
-  deliberately not EB Garamond Italic: the app's prose is EB Garamond, so its
+  deliberately not the book face's italic: the app's prose is Timeless Serif, so its
   own italic reads as **emphasis** — the same voice leaning — instead of a
   second person writing on the page. This is a narrow, recorded exception to
   Cormorant's display-only rule; the 500 weight plus the note's 62 % ink keep
   the fine strokes from going wispy at note size. The roman Cormorant stays
   display-only. See [ANNOTATIONS.md](ANNOTATIONS.md).
-- **English lyric mode**: EB Garamond regular, 22 sp with 1.5 em leading.
+- **English lyric mode**: Timeless Serif regular, 19.5 sp with 1.5 em leading.
   It is one flush-left, ragged-right inline paragraph — never a flex/flow row
   of padded word tiles. Natural font spaces, kerning, common ligatures, and
   old-style figures remain intact across the 45–75-character target measure;
@@ -928,25 +939,25 @@ not the app's.
   0.78 em. Web uses a calibrated paint lift for its browser font metrics;
   Compose shares the English prose baseline because Android reports different
   metrics for the verse ornament.
-- **English verse marks**: the Western digits are explicitly EB Garamond; the
+- **English verse marks**: the Western digits are explicitly the book face; the
   ornamental brackets remain Hafs, which supplies their correct cups. Arabic
   verse marks remain entirely in Hafs.
 - **English gloss punctuation**: a display-only period closes each ayah.
   Existing source punctuation is preserved, but capitalization never creates
   an inferred sentence boundary. This policy never mutates the database text
   or the timing/search identity of a word.
-- **Translations**: EB Garamond, 17 sp, 26 sp leading, at 66 % ink.
+- **Translations**: Timeless Serif, 15 sp, 24 sp leading, at 66 % ink.
 - **UI text**: the same serif at small sizes with letterspacing and reduced
   alpha; labels never compete with scripture. One deliberate exception on
   Android: interactive UI labels that use Material's `labelLarge` — search
   section labels, "Show N more", the search dial's Open, the chapter
-  Continue / Open pill — stay in Material's sans. Set against the serif page
+  Continue / Open pill — stay in the sans (Timeless Sans). Set against the serif page
   they read as controls, not as text, and the pairing looked better than an
   all-serif scale (tried and declined in #773). Everything that is read —
   scripture, translation, names, facts, captions — stays serif. Do not "fix"
-  the sans slots back to Garamond.
-  Settings rows and the Download manager share one scale: **17 / 26**
-  bodyLarge for names, **12 / 16** labelSmall for facts and every verb
+  the sans slots back to the serif.
+  Settings rows and the Download manager share one scale: **15 / 24**
+  bodyLarge for names, **10.5 / 14** labelSmall for facts and every verb
   (Download, Resume, Pause, Delete, Keep). Reciter verbs sit 16 dp
   after the facts. Chapter verbs trail in a reserved slot; Pause flips
   in place to Resume (right edge), Delete to its left. Fetch verbs are green;
@@ -968,9 +979,9 @@ not the app's.
 - **Glossed Arabic ink stands on the column rule**, like the Arabic-only line and
   the translation: the outermost tiles hang their 5 dp side air into the margin.
 - **One caps label** in the chapter view — NEXT, PREVIOUS and the top bar's
-  chapter line: 10 sp EB Garamond, 0.22 em tracking. Lowercase is never tracked
+  chapter line: 9 sp Timeless Serif, 0.22 em tracking. Lowercase is never tracked
   beyond 0.02 em.
-- **The Continue / Open pill** keeps Material's sans `labelLarge` (see UI
+- **The Continue / Open pill** keeps the sans `labelLarge` (see UI
   text above); its chevron's 1.6 dp stroke matches the label's stem weight.
 
 Reference points: **Unread** (iOS RSS reader) for chrome-free typographic
@@ -999,7 +1010,7 @@ not from local `dp` literals.
   Arabic folio figure. The rail and ribbon live in the margins; text never
   does. Top-bar icons are *placed* onto the rules (offset, not padding), so the
   title slot stays centred; the mushaf leaf keeps its own margins.
-- **Folio figures.** Garamond *lining* figures (old-style 3, 4, 5, 7, 9 hang
+- **Folio figures.** Timeless *lining* figures (old-style 3, 4, 5, 7, 9 hang
   below a rule) and Hafs Arabic-Indic at 14 sp, level with them; the rule runs
   through both figures' ink centre.
 - **Verse rhythm.** 16 dp pad inside each verse, 12 dp between voices within
@@ -1114,7 +1125,7 @@ into empty stages and pushes the answer below the fold.
 
 Arabic and English occupy separate bidi-isolated elements. The Hafs scale is
 44–52 for the held word, 32 for radicals, and 24 for forms and occurrences;
-English uses 24 Cormorant section headings, 17 EB Garamond body/actions, and
+English uses 21 Timeless display section headings, 15 Timeless Serif body/actions, and
 12–14 labels/metadata. Gold identifies Quran references, green identifies
 actions, and neither substitutes for a textual current/open state.
 
@@ -1675,7 +1686,7 @@ same nine stops as Customize and keeps the current verse on its reading line.
 The mushaf does not respond: its hand is a property of the fixed page grid, not
 a reader preference.
 A live miniature at the top is a faded leaf with a gold hairline — Hafs,
-Garamond, gold verse marks, and the folio — so each choice shows what the
+Timeless Serif, gold verse marks, and the folio — so each choice shows what the
 sheet will look like. The leaf stays pinned at the top while the choices
 scroll; a paper dissolve feathers the scroll edge under the leaf, edge to
 edge across the sheet, so rising rows never clip hard. With verse annotations on, it carries a sample ḥāshiya in the

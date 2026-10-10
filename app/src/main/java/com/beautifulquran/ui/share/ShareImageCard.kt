@@ -103,8 +103,8 @@ fun ShareImageVerseStrip(
                 text = verse.translation,
                 style = MaterialTheme.typography.bodyLarge.copy(
                     fontFamily = TranslationFontFamily,
-                    fontSize = 16.sp,
-                    lineHeight = 24.sp,
+                    fontSize = 14.sp,
+                    lineHeight = 22.sp,
                 ),
                 color = ink.copy(alpha = 0.66f),
                 textAlign = TextAlign.Center,

@@ -817,7 +817,7 @@ private fun englishBookHandPx(
 }
 
 /**
- * The book's hand: EB Garamond, ragged right, hyphenated.
+ * The book's hand: Timeless Serif, ragged right, hyphenated.
  *
  * **Ragged, not justified.** The mushaf's own rule is that every full line
  * reaches both margins (`QURAN_TYPOGRAPHY.md` §3) — but that is a rule about
