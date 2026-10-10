@@ -48,7 +48,9 @@ import {
   COVER_LAYER,
   READER_LAYER,
   SETTINGS_LAYER,
+  backDestination,
   hasReaderOpen,
+  nextSettingsReturn,
   settingsLayerFor,
   sheetAtLayer,
   type StackLayer,
@@ -121,6 +123,12 @@ export interface AppState {
   loadProgress: number | null
   /** Paper-stack position: -1 Bookmarks · 0 Chapters · 1 Reader · 2 Settings. */
   stackLayer: StackLayer
+  /**
+   * Where Settings was opened from — Back returns there instead of peeling
+   * one layer, so Chapters → Settings → Back lands on Chapters, not the
+   * reader. Null outside Settings.
+   */
+  settingsReturn: StackLayer | null
   /** Derived top sheet name (for labels / legacy checks). */
   sheet: Sheet
   surahs: Surah[]
@@ -238,6 +246,7 @@ class AppStore {
     loadLabel: 'Opening the book…',
     loadProgress: null,
     stackLayer: COVER_LAYER,
+    settingsReturn: null,
     sheet: 'home',
     surahs: [],
     reciters: [],
@@ -367,12 +376,16 @@ class AppStore {
     const min = this.state.bookmarks.length > 0 ? BOOKMARKS_LAYER : COVER_LAYER
     const stackLayer = Math.max(min, Math.min(max, Math.round(layer))) as StackLayer
     const sheet = deriveSheet(stackLayer, this.hasReader())
+    const from = this.state.stackLayer
+    // Remember where Settings was opened from; forget it on the way out.
+    const settingsReturn = nextSettingsReturn(from, stackLayer, this.hasReader(), this.state.settingsReturn)
     const leave = onLeaveReaderSheet(this.state.gathering && leavesReader(
       bookSpreadEnabled(window.matchMedia(BOOK_SPREAD_QUERY).matches, this.state.settings.pagePresentation),
       this.state.stackLayer, stackLayer, this.hasReader(),
     ))
     this.set({
       stackLayer,
+      settingsReturn,
       sheet,
       ...(leave.type === 'exit' ? { gathering: false, gatherSelection: [], shareError: null } : {}),
     })
@@ -391,11 +404,7 @@ class AppStore {
       this.exitGather()
       return
     }
-    if (this.state.stackLayer === BOOKMARKS_LAYER) {
-      this.setStackLayer(COVER_LAYER)
-    } else {
-      this.setStackLayer(this.state.stackLayer - 1)
-    }
+    this.setStackLayer(backDestination(this.state.stackLayer, this.hasReader(), this.state.settingsReturn))
   }
 
   /** Jump to a specific sheet by clicking its peek. */
