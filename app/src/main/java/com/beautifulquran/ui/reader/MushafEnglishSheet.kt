@@ -580,7 +580,10 @@ private fun englishLeafBlockTexts(
                             number = verse.ayah,
                             useArabicIndicDigits =
                                 verseNumberScript == VerseNumberScript.ARABIC,
-                            style = SpanStyle(color = gold, fontSize = EnglishLeafMarkType.em),
+                            style = SpanStyle(
+                                color = gold, fontSize = EnglishLeafMarkType.em,
+                                letterSpacing = 0.em,
+                            ),
                             // The leaf is set left to right whichever digits the
                             // reader has chosen, so the cups are always the LTR
                             // pair.
@@ -804,13 +807,14 @@ private fun englishBookHandPx(
 ): Float {
     val block = AnnotatedString(englishLeafReferenceBlock())
     var handPx = ENGLISH_LEAF_PROBE_FONT_PX
+    // Calibrate at natural spacing so tighter prose keeps the book's type size.
     repeat(2) {
         val stands = measurer.measure(
             text = block,
             style = englishProseStyle(
                 with(density) { handPx.toSp() },
                 with(density) { (handPx * ENGLISH_LEAF_LEADING_EM).toSp() },
-            ),
+            ).copy(letterSpacing = 0.em),
             constraints = Constraints(maxWidth = measurePx.toInt().coerceAtLeast(1)),
             density = density,
         ).size.height.toFloat()
@@ -835,6 +839,8 @@ private fun englishBookHandPx(
 internal fun englishProseStyle(fontSize: TextUnit, lineHeight: TextUnit) = TextStyle(
     fontFamily = SerifFontFamily,
     fontSize = fontSize,
+    // Tighter prose fits whole words without reducing the book's type size.
+    letterSpacing = (-0.025f).em,
     lineHeight = lineHeight,
     textAlign = TextAlign.Start,
     // Greedy, deliberately. Balanced and HighQuality both even the lines out,
@@ -911,12 +917,15 @@ internal fun englishRaggedProse(
     measurePx: Float,
     density: Density,
     measurer: TextMeasurer,
-): AnnotatedString {
-    val breaks = englishRagBreaks(text, style, measurePx, density, measurer)
-    if (breaks.isEmpty()) return text
-    val chars = text.text.toCharArray()
+): AnnotatedString = text.withEnglishBreaks(
+    englishRagBreaks(text, style, measurePx, density, measurer),
+)
+
+private fun AnnotatedString.withEnglishBreaks(breaks: IntArray): AnnotatedString {
+    if (breaks.isEmpty()) return this
+    val chars = text.toCharArray()
     breaks.forEach { at -> chars[at] = '\n' }
-    return AnnotatedString(String(chars), text.spanStyles, text.paragraphStyles)
+    return AnnotatedString(String(chars), spanStyles, paragraphStyles)
 }
 
 private fun englishRagBreaks(
@@ -987,6 +996,13 @@ private fun englishRagBreaks(
         emPx = with(density) { style.fontSize.toPx() },
     ) ?: return memo(key, NoBreaks)
     val set = IntArray(chosen.size) { offsets[chosen[it]] }
+    // Tight tracking can round a chosen line wider than its chained positions.
+    // Keep the ruler's line count rather than spending another line on the page.
+    val shaped = measurer.measure(
+        text = text.withEnglishBreaks(set), style = style,
+        constraints = englishProseConstraints(measurePx), density = density,
+    )
+    if (shaped.lineCount != laid.lineCount) return memo(key, NoBreaks)
     return memo(key, set)
 }
 

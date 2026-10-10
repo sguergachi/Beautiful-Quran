@@ -903,8 +903,11 @@ set a little small is the only one of the three a reader can still read.
 
 `TextAlign.Start` with word-space breaks chosen by `EnglishRag`, the book
 face's kerning, ligatures and old-style figures. `Hyphens.None`: words stay
-whole, with no inserted soft hyphens or word joiners. The measurements below
-record the earlier settings as well as the reasons for the current one.
+whole, with no inserted soft hyphens or word joiners. Prose tracks at −0.025 em;
+the verse ornaments keep natural spacing. The book's hand is calibrated at
+natural spacing too, so tightening the letters does not change its type size.
+The measurements below record the earlier settings as well as the reasons
+for the current one.
 
 The mushaf's own rule is that every full line reaches both margins (rule 3) —
 but that is a rule about Arabic, which fills a line by the letterform, and it
@@ -1097,8 +1100,18 @@ Choosing the rag for every pagination probe made the whole book take tens of
 seconds to rebuild while the English leaf waited without ink. With whole
 words, greedy wrapping already gives the minimum line count the rag preserves.
 The ruler now measures that count directly for its fill and prefix search; the
-rag is chosen only when setting a visible leaf. The measured-book gate stays,
-and cache format 25 discards pagination made with hyphenation.
+rag is chosen only when setting a visible leaf. The measured-book gate stays.
+Cache format 26 discards pagination made before the tighter prose spacing.
+
+Whole-word breaks alone still left Ar-Rahman's *…by precise* line 216 px short
+on a 1,006 px measure: sharing that hole created a worse one above it. The
+reader chose slightly tighter letters while keeping the type size. At the
+same 51.16 px hand, −0.025 em lets *Created* fit on line one and keeps
+*precise calculation* together. The opening leaf's deepest gap falls from
+216 to 119 px, without hyphenation, enlarged word spaces, or smaller type.
+The chosen setting is measured once before its breaks are cached. If platform
+rounding changes the line count, that paragraph keeps the platform's breaks;
+the ruler and the drawn page therefore retain the same count.
 
 The earlier hyphenating prototype was measured on the device's own metrics
 (EB Garamond at the leaf's hand, the real translation, 88–145 lines a chapter):

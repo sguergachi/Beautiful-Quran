@@ -27,10 +27,12 @@ leaving the English page without ink until the measured book arrived.
 `measureEnglishProse` shares one rounding pixel between the ruler and rag.
 Visible leaves still choose the rag, retain the soft directional wash, and
 wait for the measured book; pagination no longer chooses every candidate's rag.
-The cached book uses format 25 because removing hyphenation changes its cuts.
-On the pooled emulator, a cold rebuild reached the cache 5.7 seconds after
-launch. Its 791 leaves and 6,891 verse fragments, covering all 6,236 verses,
-were byte-identical to the full-rag reference at the same geometry and settings.
+The cached book uses format 26 because tighter prose spacing changes its cuts;
+the hand still calibrates at natural spacing to preserve the type size.
+On the pooled emulator, format 25's cold rebuild reached the cache 5.7 seconds
+after launch. With tighter spacing and English verse numbers, all 746 leaves
+and 6,843 fragments remain byte-identical to the full-rag reference at the same
+geometry and settings, covering all 6,236 verses.
 
 ### 1. Draw-phase-only animations (zero recomposition fades)
 
