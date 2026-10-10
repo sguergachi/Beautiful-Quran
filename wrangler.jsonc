@@ -1,8 +1,12 @@
 {
   "name": "beautiful-quran",
-  "main": "worker/src/index.mjs",
+  "main": "worker/src/entry.mjs",
   "compatibility_date": "2026-09-05",
   "workers_dev": true,
+  "kv_namespaces": [{ "binding": "QF_TIMING_STORE", "id": "db034d26f3b44109a6c059ff71dd0a02" }],
+  "durable_objects": { "bindings": [{ "name": "QF_TIMING_CONTROL", "class_name": "QfTimingControl" }] },
+  "migrations": [{ "tag": "qf-timing-control-v1", "new_sqlite_classes": ["QfTimingControl"] }],
+  "triggers": { "crons": ["0 1,5,9,13,17,21 * * *"] },
   "vars": {
     "QF_ENV": "production",
     "ALLOWED_ORIGIN": "https://sguergachi.github.io"

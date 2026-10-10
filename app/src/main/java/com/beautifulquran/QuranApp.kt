@@ -17,6 +17,10 @@ import com.beautifulquran.data.QfContentSyncHttpApi
 import com.beautifulquran.data.QuranDatabase
 import com.beautifulquran.data.QuranRepository
 import com.beautifulquran.data.RuntimeMushafCache
+import com.beautifulquran.data.RuntimeTimingCache
+import com.beautifulquran.data.RuntimeTimingDatabase
+import com.beautifulquran.data.RuntimeTimingHttpApi
+import com.beautifulquran.data.readCanonicalTimingCounts
 import com.beautifulquran.data.readCanonicalWords
 import com.beautifulquran.data.SearchConceptRepository
 import com.beautifulquran.data.SettingsRepository
@@ -74,6 +78,9 @@ class QuranApp : Application() {
     /** Authenticated QF word/QCF fields live here, never in the bundled database. */
     var runtimeMushaf: RuntimeMushafCache? = null
         private set
+    /** Reviewed QF repeat timing is maintained separately from the packaged content. */
+    lateinit var runtimeTimings: RuntimeTimingCache
+        private set
 
     override fun onCreate() {
         super.onCreate()
@@ -82,24 +89,39 @@ class QuranApp : Application() {
         val appScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
         val database = QuranDatabase(this)
         val store = QfContentCacheDatabase(this)
+        runtimeTimings = RuntimeTimingCache(
+            RuntimeTimingHttpApi(BuildConfig.QF_CONTENT_BASE_URL),
+            RuntimeTimingDatabase(this),
+            appScope,
+            wordCounts = { readCanonicalTimingCounts(database) },
+            onAccessRevoked = { runtimeMushaf?.clearRevokedContent() },
+        )
         runtimeMushaf = RuntimeMushafCache(
             QfContentSyncHttpApi(BuildConfig.QF_CONTENT_BASE_URL, cacheDir),
             store,
             appScope,
             canonicalWords = { readCanonicalWords(database) },
+            onAccessRevoked = { runtimeTimings.clearRevokedContent() },
         )
         repository = QuranRepository(
             database,
             overrides,
             SearchConceptRepository(this),
             runtimeMushaf,
+            runtimeTimings,
         )
-        appScope.launch { runtimeMushaf?.refreshIfNeeded() }
+        appScope.launch {
+            runtimeMushaf?.refreshIfNeeded()
+            runtimeTimings.refreshIfNeeded()
+        }
         if (runtimeMushaf != null) {
             getSystemService(ConnectivityManager::class.java).registerDefaultNetworkCallback(
                 object : ConnectivityManager.NetworkCallback() {
                     override fun onAvailable(network: Network) {
-                        runtimeMushaf?.refreshIfNeeded()
+                        appScope.launch {
+                            runtimeMushaf?.refreshIfNeeded()
+                            runtimeTimings.refreshIfNeeded()
+                        }
                     }
                 },
             )

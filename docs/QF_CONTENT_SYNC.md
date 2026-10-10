@@ -37,15 +37,25 @@ Android / web
         -> five fixed by-verse transliteration supplements
   -> atomic device cache + opaque sync checkpoint
 
+private timing backend
+  -> authenticated Content Sync: chapter_recitations:2,3,5,6,7,9
+  -> maintained raw snapshots (private KV)
+  -> Python canonical normalization + per-row acoustic verdicts
+  -> immutable reviewed timing views (private KV)
+  -> Durable Object: source checkpoints, accepted views, revocation
+  -> GET /api/timings/<appReciterId> -> separate atomic device timing cache
+
 offline build
-  -> canonical Quran text + quran-align clock + reviewed repeat topology
-  -> bundled quran.db (no QF word gloss, transliteration, or QCF layout)
+  -> canonical Quran text + independent reviewed timing corpora
+  -> bundled quran.db (no QF reader fields or timing rows)
 ```
 
-The Worker is a credential boundary, not a content host. It stores no Quran
-content, user data, or device cache. It caches only the short-lived OAuth token
-in memory, retries one rejected token once, streams `no-store` responses, and
-allows only the exact paths above. Browser requests are additionally restricted
+The Worker is a credential boundary and private timing content service. Word/QCF
+responses pass through to the device cache. Timing snapshots and reviewed views
+are privately retained, with a separate small control store for checkpoints and
+withdrawal. It stores no user data or device cache. It caches the short-lived
+OAuth token in memory, retries one rejected token once, streams `no-store`
+responses, and allows only the exact paths above. Browser requests are additionally restricted
 to the GitHub Pages origin. No account, reading position, bookmark, note, search
 query, analytics identifier, or device identifier is sent to the Worker or QF.
 
@@ -162,17 +172,85 @@ succeeds.
 - [ ] Retain architecture and redacted operational evidence needed for a QF
   compliance audit; report any suspected API security incident within 24 hours.
 
-## Separate unresolved content questions
+## Runtime repeat timing
 
-Authenticated word/QCF caching does not resolve the bundled timing question:
+App IDs `1,2,3,4,5,7` correspond to QF chapter-recitation IDs `7,6,2,9,3,5`.
+Each device downloads a complete reciter through `/api/timings/<appReciterId>`.
+The response contains schema/reciter/audio identity, the `everyayah-ms` clock,
+assembled source hash, native snapshot sequence and last successful source-sync
+time, normalizer fingerprint, ordered occurrences, audio onsets, explicit withheld
+verse keys, and a SHA-256 of compact JSON `{rows,withheldVerseKeys}`.
+Clients validate the complete 6,236-verse contract before atomic publication;
+they never clean or repair source timings.
 
-`quran.db` contains repeat topology derived offline from the legacy QDC audio
-endpoint and updated only through app releases. Written QF permission to
-redistribute that dataset has not been obtained. The
-[authenticated timing audit](QF_TIMING_PARITY.md) confirms that Content Sync
-exposes repeats, but three reciters differ from the pinned inputs and the
-canonical replay stops at a stale Alafasy correction. Preserve the reviewed
-baseline while that migration is audited; quran-align alone loses repeats.
+The backend maintains each native source daily using an independent opaque
+Content Sync checkpoint. It follows native pages, obtains a full replacement for
+any row/snapshot change or rejected checkpoint, and advances only after storage
+succeeds. The source copy and accepted canonical view are separate. A changed
+source returns `503 qf_timing_review_required` until the maintainer completes
+normalization and acoustic review. Successful unchanged checks advance source
+freshness with the same canonical revision. Provider outages retain the previous
+permitted copy without inventing a successful check.
+
+SQLite-backed Durable Object control state serializes checkpoints, accepted
+manifests, tombstones, and global revocation. KV holds only large immutable
+source/view payloads; its eventual consistency never decides access or freshness.
+Every accepted manifest names its exact current source and content revision.
+An overtaken publication fails with 409. Source refreshes and streamed responses
+are fenced against concurrent withdrawal or access rejection.
+
+Timing copies refresh after six days. A first online download is required;
+afterward they remain available through outages beyond seven days. Resource
+withdrawal returns `410 qf_timing_resource_deleted` and removes that voice.
+`403 qf_access_revoked` purges all QF timing and word/QCF copies. Android keeps
+timings in `noBackupFilesDir`; web uses a separate IndexedDB store. Accepted
+generation changes invalidate active reader preparations and Lab defaults.
+
+Release assets exclude all 37,411 QF timing rows. The seven independent voices'
+43,648 rows are unchanged, with exact hashes in
+`data/qf-timing-transition.json`. The original v65 database remains a private
+review reference. It is never uploaded as a runtime resource or release asset.
+
+### Maintain and publish reviewed views
+
+`tools/sync_qf_timings.py` requests a native refresh, downloads private snapshots,
+runs the existing canonical pipeline into a private database, validates the full
+timing clock/coverage, and exports immutable view payloads. `--publish` uploads
+the payloads before accepting exact-source manifests. Keep the work directory
+outside the checkout with mode 0700 and the maintenance key file at mode 0600.
+The key permits only timing maintenance; QF credentials stay in Cloudflare.
+
+```bash
+python3 tools/sync_qf_timings.py \
+  --key-file ~/.config/beautiful-quran/timing-maintenance.key \
+  --work-dir ~/.local/share/beautiful-quran/timings/runtime \
+  --timing-baseline /path/to/private/reviewed-v65.db \
+  --source-cache /path/to/existing/tools/.cache \
+  --wrangler /path/to/installed/wrangler/bin/wrangler.js \
+  --publish
+```
+
+Unknown assembled source hashes fail closed. Review and pin their complete
+canonical delta with two independent acoustic models before publication;
+rejected/ambiguous candidates retain exact reviewed baseline rows. No raw timing
+snapshot, canonical pack, opaque checkpoint, maintenance key, or QF credential
+belongs in Git or release artifacts. The
+[transition report](QF_TIMING_PARITY.md) and source-profile ledger contain only
+hashes, verse identities, and review metadata.
+
+The v65 reference is the baseline for this first transition. For a later source
+transition, retain the latest accepted private database and rebase the source
+profile and acoustic ledger onto that generation before publishing. Keep each
+accepted database, source snapshot, and review summary together outside Git.
+
+Resource deletion remains tombstoned until a reviewed replacement is accepted.
+Shared access rejection latches revocation and purges the private source/view
+store; scheduled cleanup retries removal of uploads that KV exposes late. After
+QF access has been restored, the operator can add `--regrant` to the maintenance
+command. Recovery refuses to proceed while a purge is incomplete, then requires
+fresh native sources and reviewed packs. Recovery is never automatic.
+
+### Rendering assets
 
 The Developer Terms updated 2026-10-04 separately permit integrated app
 caching or bundling of font files and Mushaf images obtained through QF APIs
@@ -181,5 +259,5 @@ credit. Content Sync itself supplies neither font files nor images. Check the
 asset's source and these conditions rather than treating the timing dataset
 and rendering assets as one permission question.
 
-The timing audit does not change the authenticated runtime cache architecture
-or production Worker allowlist. Bundled timing distribution remains unresolved.
+Written permission to redistribute a prepackaged legacy timing dataset has not
+been obtained. The runtime transition removes that dataset from release assets.

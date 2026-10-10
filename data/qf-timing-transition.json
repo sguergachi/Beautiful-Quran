@@ -1,0 +1,17 @@
+{
+  "schemaVersion": 1,
+  "baselineDbSha256": "3489bd89a91177d2701a2bbc3e8e414d957e308a539c6ec71122a568015f7c8d",
+  "runtimeReciters": [
+    1,
+    2,
+    3,
+    4,
+    5,
+    7
+  ],
+  "delivery": "authenticated Content Sync runtime cache; no bundled QF timings",
+  "removedTimingRows": 37411,
+  "removedTimingsSha256": "0ed28f23ad0bb1f2a81753376626a4a2b2f57b5105f64cf657dd953780dec2a5",
+  "retainedTimingRows": 43648,
+  "retainedTimingsSha256": "53c2ccd40758cdc049be3410cfdafc5eb86cefa33ad8ff13fbb3d9145e2ec53a"
+}
