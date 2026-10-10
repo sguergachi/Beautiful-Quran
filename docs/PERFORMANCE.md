@@ -27,8 +27,9 @@ leaving the English page without ink until the measured book arrived.
 `measureEnglishProse` shares one rounding pixel between the ruler and rag.
 Visible leaves still choose the rag, retain the soft directional wash, and
 wait for the measured book; pagination no longer chooses every candidate's rag.
-The cached book uses format 26 because tighter prose spacing changes its cuts;
-the hand still calibrates at natural spacing to preserve the type size.
+Tighter prose spacing changed the cuts in format 26; the hand still calibrates
+at natural spacing to preserve the type size. Format 27 also remeasures the
+basmalah's slot after fitting its final size to the column with subpixel advances.
 On the pooled emulator, format 25's cold rebuild reached the cache 5.7 seconds
 after launch. With tighter spacing and English verse numbers, all 746 leaves
 and 6,843 fragments remain byte-identical to the full-rag reference at the same

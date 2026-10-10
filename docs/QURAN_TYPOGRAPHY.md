@@ -1497,7 +1497,12 @@ it is set to the measure: the hand comes down until the line fits, which is the
 Latin form of §4's "a line that will not fit is made to fit", by the only lever
 this script gives. It is still one size for the whole book, because the measure
 does not change from leaf to leaf, and a display line set smaller than the body
-is what a printed translation does with it anyway. Its slot is measured too, and
+is what a printed translation does with it anyway. The size is fitted in two
+measured passes using fractional caret advances and subpixel rendering, so the
+final line fills the column to within a pixel rather than trusting a rounded
+body-size estimate. Half a pixel of slack absorbs shaping's remaining rounding.
+The size follows the column width without a body-size cap. Its slot is measured
+with the same style and one-line constraint as the drawing, and
 all of its air falls below it — centred, half of it landed above instead, under
 the chapter's panel.
 

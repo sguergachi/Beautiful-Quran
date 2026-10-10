@@ -44,6 +44,7 @@ import androidx.compose.ui.text.style.Hyphens
 import androidx.compose.ui.text.style.LineBreak
 import androidx.compose.ui.text.style.LineHeightStyle
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextMotion
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.Constraints
@@ -1501,14 +1502,14 @@ private fun EnglishBasmalahLine(
 /**
  * The basmalah's own hand: the book's italic, centred.
  *
- * A display line, but not necessarily *one* line — on a phone measure it takes
- * two, and the leaf has to give it the paper it actually needs. Assuming a slot
- * for it put its second line on top of the chapter's first verse.
+ * Subpixel advances keep the measured fit and the drawn line at the same width.
  */
 private fun englishBasmalahStyle(fontSize: TextUnit) = TextStyle(
     fontFamily = SerifFontFamily,
     fontStyle = FontStyle.Italic,
     fontSize = fontSize,
+    letterSpacing = 0.em,
+    textMotion = TextMotion.Animated,
     textAlign = TextAlign.Center,
     platformStyle = PlatformTextStyle(includeFontPadding = false),
     // Trimmed like the prose, so the line begins at its ascent. Untrimmed, the
@@ -1521,19 +1522,8 @@ private fun englishBasmalahStyle(fontSize: TextUnit) = TextStyle(
 )
 
 /**
- * The hand the basmalah is set in: the page's, brought down until the line fits
- * the measure.
- *
- * It is one line. Set at the page's own hand it took two on a phone, and a
- * basmalah broken across a line-end is not a display line — it is a paragraph
- * of one sentence sitting where a heading should be. This is the Latin form of
- * what the Arabic leaf does when a line will not reach its measure
- * (`QURAN_TYPOGRAPHY.md` §4): the line is made to fit, by the only lever the
- * script gives, which here is the size rather than the letterform.
- *
- * It is still one size for the whole book — the measure does not change from
- * leaf to leaf, so neither does this — and a display line set smaller than the
- * body is what a printed translation does with it anyway.
+ * Fits the italic's size to the column. A second measured pass corrects the
+ * initial estimate; fractional caret advances avoid rounding the line's width.
  */
 private fun englishBasmalahHandPx(
     handPx: Float,
@@ -1541,34 +1531,24 @@ private fun englishBasmalahHandPx(
     density: Density,
     measurer: TextMeasurer,
 ): Float {
-    val natural = measurer.measure(
-        text = AnnotatedString(ENGLISH_BASMALAH),
-        style = englishBasmalahStyle(with(density) { handPx.toSp() }),
-        constraints = Constraints(),
-        density = density,
-    ).size.width
-    if (natural <= 0) return handPx
-    // Fit the exact pixel width the line is laid out in: the composable and
-    // englishBasmalahPx both constrain to measurePx.toInt(), so fitting the
-    // float measure could overshoot by that truncation and clip a pixel off
-    // the italic's overhang (maxLines = 1, softWrap = false clips, not wraps).
-    val targetPx = measurePx.toInt().coerceAtLeast(1).toFloat()
-    val fits = targetPx * EnglishBasmalahMeasureFill / natural
-    return handPx * fits.coerceIn(EnglishBasmalahMinHand, 1f)
+    // Shaping still rounds fractions; half a pixel keeps the fitted line inside.
+    val targetPx = (measurePx.toInt() - 0.5f).coerceAtLeast(1f)
+    var fittedPx = handPx
+    repeat(2) {
+        val laid = measurer.measure(
+            text = AnnotatedString(ENGLISH_BASMALAH),
+            style = englishBasmalahStyle(with(density) { fittedPx.toSp() }),
+            softWrap = false,
+            maxLines = 1,
+            density = density,
+        )
+        val width = laid.getHorizontalPosition(ENGLISH_BASMALAH.length, true) -
+            laid.getHorizontalPosition(0, true)
+        if (width <= 0f) return fittedPx
+        fittedPx *= targetPx / width
+    }
+    return fittedPx
 }
-
-/**
- * How much of the measure the basmalah fills. All of it: the line is sized to
- * sit edge to edge with the chapter's panel above it and the leaf below it.
- *
- * One guard stays: the hand never grows past the page's own. On a measure wide
- * enough that the line already fits at body size, it stands at body size,
- * centred — a display line set larger than the body is not a heading.
- */
-private const val EnglishBasmalahMeasureFill = 1f
-
-/** Never smaller than this share of the page's hand, whatever the measure. */
-private const val EnglishBasmalahMinHand = 0.62f
 
 /** What the basmalah stands at, plus the air a display line takes under it. */
 private fun englishBasmalahPx(
@@ -1582,6 +1562,8 @@ private fun englishBasmalahPx(
         with(density) { englishBasmalahHandPx(handPx, measurePx, density, measurer).toSp() },
     ),
     constraints = Constraints(maxWidth = measurePx.toInt().coerceAtLeast(1)),
+    softWrap = false,
+    maxLines = 1,
     density = density,
 ).size.height + handPx * EnglishLeafBasmalahAirEm
 
