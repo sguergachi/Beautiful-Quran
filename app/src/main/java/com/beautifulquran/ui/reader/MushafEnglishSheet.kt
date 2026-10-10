@@ -38,6 +38,7 @@ import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.text.TextMeasurer
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.buildAnnotatedString
+import com.beautifulquran.ui.theme.leafCapacityChars
 import com.beautifulquran.ui.theme.leafLeadingEm
 import com.beautifulquran.ui.theme.quietSuppliedBrackets
 import com.beautifulquran.ui.theme.QuranTypePalette
@@ -665,7 +666,7 @@ private fun setEnglishLeaf(
     measurer: TextMeasurer,
     typePalette: QuranTypePalette,
 ): EnglishLeafSetting {
-    val requestedLeading = typePalette.leafLeadingEm * typePalette.tuning.book.leading
+    val requestedLeading = typePalette.leafLeadingEm * typePalette.tuning.leaf.leading
     var handPx = englishBookHandPx(wellPx, measurePx, density, measurer, typePalette)
     // Three passes at most, and all but one leaf in the book settles on the
     // first: the hand is the book's, the leading is the book's, and the leaf
@@ -839,7 +840,7 @@ private fun englishBookHandPx(
     measurer: TextMeasurer,
     typePalette: QuranTypePalette,
 ): Float {
-    val block = AnnotatedString(englishLeafReferenceBlock())
+    val block = AnnotatedString(englishLeafReferenceBlock(typePalette.leafCapacityChars))
     var handPx = ENGLISH_LEAF_PROBE_FONT_PX
     // Calibrate at natural spacing so tighter prose keeps the book's type size.
     repeat(2) {
@@ -855,7 +856,7 @@ private fun englishBookHandPx(
         ).size.height.toFloat()
         handPx = englishLeafHandPx(handPx, stands, wellPx)
     }
-    return handPx * typePalette.tuning.book.size
+    return handPx * typePalette.tuning.leaf.size
 }
 
 /**
@@ -876,10 +877,12 @@ internal fun englishProseStyle(
     lineHeight: TextUnit,
     typePalette: QuranTypePalette,
 ) = TextStyle(
-    fontFamily = typePalette.serif,
+    fontFamily = typePalette.leaf,
     fontSize = fontSize,
-    // Tighter prose fits whole words without reducing the book's type size.
-    letterSpacing = (-0.025f + typePalette.tuning.book.tracking).em,
+    // Tighter prose fits whole words without reducing the book's type size. The
+    // squeeze was set for Garamond; Timeless, drawn for screens, is eased to
+    // -0.0125 em by its leaf tuning's tracking (docs/ENGLISH_LEAF_TYPE.md).
+    letterSpacing = (-0.025f + typePalette.tuning.leaf.tracking).em,
     lineHeight = lineHeight,
     textAlign = TextAlign.Start,
     // Greedy, deliberately. Balanced and HighQuality both even the lines out,
@@ -901,7 +904,7 @@ internal fun englishProseStyle(
     // The book face's refinements: kerning and ligatures on, old-style figures
     // so the prose (and its brackets and quotes) sets with an even colour —
     // the same features the web leaf and every other English surface set.
-    fontFeatureSettings = typePalette.tuning.book.featureSettings,
+    fontFeatureSettings = typePalette.tuning.leaf.featureSettings,
     textMotion = if (typePalette.profile == com.beautifulquran.ui.theme.QuranTypeProfile.TIMELESS) {
         TextMotion.Animated
     } else TextMotion.Static,
@@ -1644,7 +1647,7 @@ internal fun englishLeafRuler(
     translation: (surahId: Int, ayah: Int) -> String,
 ): EnglishLeafRuler {
     val handPx = englishBookHandPx(wellPx, measurePx, density, measurer, typePalette)
-    val pitchPx = handPx * typePalette.leafLeadingEm * typePalette.tuning.book.leading
+    val pitchPx = handPx * typePalette.leafLeadingEm * typePalette.tuning.leaf.leading
     val inkPx = englishLineInkPx(handPx, density, measurer, typePalette)
     val basmalahPx = englishBasmalahPx(handPx, measurePx, density, measurer, typePalette)
     val style = with(density) {

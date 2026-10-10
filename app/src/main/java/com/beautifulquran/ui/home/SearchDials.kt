@@ -44,6 +44,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.beautifulquran.data.model.Surah
+import com.beautifulquran.ui.theme.lining
 import com.beautifulquran.ui.theme.ArabicTitleStyle
 import com.beautifulquran.ui.theme.LocalQuranAccents
 import com.beautifulquran.ui.theme.typeScale
@@ -249,7 +250,7 @@ private fun NumberItem(value: Int, selected: Boolean) {
     ) {
         Text(
             text = value.toString(),
-            style = MaterialTheme.typography.titleMedium,
+            style = MaterialTheme.typography.titleMedium.lining(),
             color = if (selected) {
                 MaterialTheme.colorScheme.primary
             } else {
@@ -269,7 +270,7 @@ private fun GoRow(surah: Surah, ayah: Int, onClick: () -> Unit) {
     ) {
         Text(
             text = "${surah.nameTransliteration} · Ayah $ayah",
-            style = MaterialTheme.typography.bodyMedium,
+            style = MaterialTheme.typography.bodyMedium.lining(),
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,

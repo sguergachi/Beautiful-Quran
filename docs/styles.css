@@ -155,8 +155,7 @@ body {
   background: var(--paper);
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
-  font-variant-numeric: oldstyle-nums;
-  font-feature-settings: 'kern' 1, 'liga' 1, 'onum' 1;
+  font-feature-settings: 'kern' 1, 'liga' 1;
 }
 
 a {

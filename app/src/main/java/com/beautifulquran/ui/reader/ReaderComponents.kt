@@ -2691,7 +2691,7 @@ internal fun verseAnnotationStyle(
         fontSize = fontSize * damped * if (timeless) 0.88f * note.size else 1f,
         lineHeight = lineHeight * damped * if (timeless) 0.88f * note.size * note.leading else 1f,
         letterSpacing = if (timeless) (0.15f / fontSize.value + note.tracking).em else 0.15.sp,
-        fontFeatureSettings = if (timeless) note.featureSettings else "'kern' 1, 'liga' 1, 'onum' 1",
+        fontFeatureSettings = if (timeless) note.featureSettings else "'kern' 1, 'liga' 1",
     )
 }
 

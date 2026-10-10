@@ -769,7 +769,7 @@ private fun PreviewEnglishMushafLeaf(
             val measurePx = with(density) { maxWidth.toPx() }
             val style = englishProseStyle(
                 fontSize = leafSize,
-                lineHeight = leafSize * typePalette.leafLeadingEm * typePalette.tuning.book.leading,
+                lineHeight = leafSize * typePalette.leafLeadingEm * typePalette.tuning.leaf.leading,
                 typePalette = typePalette,
             )
             val set = remember(text, style, measurePx, density, measurer) {

@@ -207,8 +207,11 @@ class EnglishBookCache internal constructor(private val dir: File) {
          * its measured one-line slot follows that size.
          * 28: Timeless leaf leading 1.46 em; typeset punctuation and
          * restored closing quotes change the verses' text.
+         * 29: lining figures in the book face (old-style is opt-in).
+         * 30: the leaf is Timeless at its own tuning (weight 365, tracking -0.0125 em),
+         * leading 1.62, capacity 1130: a larger hand and a different line count.
          */
-        const val FORMAT = 28
+        const val FORMAT = 30
         const val MAX_LEAVES = 10_000
         const val MAX_RUNS = 20_000
     }

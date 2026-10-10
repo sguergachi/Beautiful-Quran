@@ -680,6 +680,7 @@ private fun TypographyControls() {
     val italic = !sans && (role == TypeRole.BookItalic || face.italic >= 50f)
     val family = when (role) {
         TypeRole.Book, TypeRole.BookItalic -> palette.serif
+        TypeRole.Leaf -> palette.leaf
         TypeRole.Title -> palette.display
         TypeRole.Ui -> palette.sans
         TypeRole.Note -> palette.scribe
@@ -713,6 +714,10 @@ private fun TypographyControls() {
         edit(face.copy(features = face.features + ("aalt" to it.roundToInt())))
     }
     if (role == TypeRole.BookItalic) LabCaption("The bismillah always fits the text column; its size is measured automatically.")
+    if (role == TypeRole.Leaf) LabCaption(
+        "The English Mushaf leaf. Tracking is added to the leaf's −0.025 em squeeze, so +0.0125 sets it at −0.0125. " +
+            "The page re-solves its hand and line count around whatever you set — see docs/ENGLISH_LEAF_TYPE.md.",
+    )
     LabCaption("Built-in glyph alternates. Left: default · right: alternate. Tap a name to apply it. Alternate index exposes up to six choices per glyph.")
     timelessFeatures(sans, italic).forEach { feature ->
         val active = (face.features[feature.tag] ?: if (feature.tag in setOf("kern", "liga", "calt")) 1 else 0) > 0

@@ -906,8 +906,9 @@ not the app's.
 - **English text face**: Timeless Serif Text (timeless.co), the small-size
   optical master: regular, medium, semibold, bold. Italics use the real
   Timeless Serif Italic cut; the archive has no separate Text Italic. Kerning,
-  ligatures, and old-style figures on in running text (`'kern', 'liga',
-  'onum'`). Timeless has no ḍ ḥ ẓ ʾ ʿ, so each cut falls back glyph by glyph
+  ligatures on in running text (`'kern', 'liga'`). Figures are lining
+  everywhere: Timeless's old-style 1 is a small-cap I, so "2:15" read "2:I5".
+  Old-style stays an Ink Lab option. Timeless has no ḍ ḥ ẓ ʾ ʿ, so each cut falls back glyph by glyph
   to the matching EB Garamond (Android `CustomFallbackBuilder`, web
   `unicode-range` face), never to a system sans. Its x-height is 0.52 em
   against Garamond's 0.40, so sizes sit at ~0.88 of their Garamond values:
@@ -950,7 +951,7 @@ not the app's.
 - **English lyric mode**: Timeless Serif regular, 19.5 sp with 1.5 em leading.
   It is one flush-left, ragged-right inline paragraph — never a flex/flow row
   of padded word tiles. Natural font spaces, kerning, common ligatures, and
-  old-style figures remain intact across the 45–75-character target measure;
+  figures stay lining across the 45–75-character target measure;
   the word spans exist only for karaoke paint and interaction. Web uses
   `text-wrap: pretty` as a progressive enhancement and never justifies or
   hyphenates this word-addressable text. Its trailing Hafs verse mark is about

@@ -4,7 +4,7 @@ import kotlinx.serialization.Serializable
 
 /** The Latin voices that can be auditioned independently in Ink Lab. */
 internal enum class TypeRole(val label: String) {
-    Book("Book"), BookItalic("Italic"), Title("Titles"), Ui("UI"), Note("Notes")
+    Book("Book"), Leaf("Leaf"), BookItalic("Italic"), Title("Titles"), Ui("UI"), Note("Notes")
 }
 
 /** Variable axes, spacing and OpenType overrides for one Timeless face. */
@@ -16,7 +16,7 @@ data class TypefaceTuning(
     val size: Float = 1f,
     val leading: Float = 1f,
     val tracking: Float = 0f,
-    val features: Map<String, Int> = mapOf("kern" to 1, "liga" to 1, "onum" to 1),
+    val features: Map<String, Int> = mapOf("kern" to 1, "liga" to 1),
 ) {
     val featureSettings: String
         get() = features.toSortedMap().entries.joinToString(", ") { "'${it.key}' ${it.value}" }
@@ -32,6 +32,15 @@ data class TypographyTuning(
         weight = 420, features = mapOf("kern" to 1, "calt" to 1),
     ),
     val note: TypefaceTuning = TypefaceTuning(weight = 500, italic = 100f),
+    /**
+     * The English Mushaf leaf's hand, tuned apart from [book] because the leaf is
+     * read for long stretches at one size while the rest of the app sets short
+     * lines at many. Worked out in ten measured rounds against Garamond
+     * (docs/ENGLISH_LEAF_TYPE.md): weight 365 matches Garamond's page colour and
+     * stem thickness; contrast 25 gives hairlines of 1.6 px, as Garamond's;
+     * [tracking] is added to the leaf's −0.025 em squeeze, easing it to −0.0125.
+     */
+    val leaf: TypefaceTuning = LEAF_DEFAULT,
 ) {
     /**
      * The same tuning for light ink on dark paper. Light type spreads into the
@@ -43,13 +52,14 @@ data class TypographyTuning(
      */
     internal fun forDarkPaper(): TypographyTuning = copy(
         book = book.eased(), bookItalic = bookItalic.eased(), title = title.eased(),
-        ui = ui.eased(), note = note.eased(),
+        ui = ui.eased(), note = note.eased(), leaf = leaf.eased(),
     )
 
     private fun TypefaceTuning.eased() = copy(weight = weight - DARK_PAPER_WEIGHT_EASE)
 
     internal fun face(role: TypeRole): TypefaceTuning = when (role) {
         TypeRole.Book -> book
+        TypeRole.Leaf -> leaf
         TypeRole.BookItalic -> bookItalic
         TypeRole.Title -> title
         TypeRole.Ui -> ui
@@ -58,16 +68,17 @@ data class TypographyTuning(
 
     internal fun withFace(role: TypeRole, face: TypefaceTuning): TypographyTuning = when (role) {
         TypeRole.Book -> copy(book = face)
+        TypeRole.Leaf -> copy(leaf = face)
         TypeRole.BookItalic -> copy(bookItalic = face)
         TypeRole.Title -> copy(title = face)
         TypeRole.Ui -> copy(ui = face)
         TypeRole.Note -> copy(note = face)
     }
 
-    /** Includes every book metric and feature; excludes unrelated title/UI/note edits. */
+    /** Includes every book and leaf metric and feature; excludes unrelated title/UI/note edits. */
     internal val bookCacheKey: String
         get() = java.security.MessageDigest.getInstance("SHA-256")
-            .digest("vf2-$book-$bookItalic".toByteArray())
+            .digest("vf3-$book-$bookItalic-$leaf".toByteArray())
             .joinToString("") { (it.toInt() and 255).toString(16).padStart(2, '0') }
 }
 
@@ -121,6 +132,9 @@ internal fun timelessFeatures(sans: Boolean, italic: Boolean): List<TypeFeature>
         )
     }
 }
+
+/** The leaf's shipped hand; see [TypographyTuning.leaf]. */
+internal val LEAF_DEFAULT = TypefaceTuning(weight = 365, style = 25f, tracking = 0.0125f)
 
 /** How far light-on-dark ink's weight eases against dark-on-paper ink; see [TypographyTuning.forDarkPaper]. */
 internal const val DARK_PAPER_WEIGHT_EASE = 30

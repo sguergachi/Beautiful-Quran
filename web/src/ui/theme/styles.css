@@ -288,7 +288,6 @@ body {
   color: var(--ink);
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
-  font-variant-numeric: oldstyle-nums;
   font-feature-settings: 'kern' 1, 'liga' 1;
   overflow: hidden;
   /* Stop iOS rubber-band scrolling the whole page behind the sheets. */
@@ -1283,7 +1282,6 @@ input[type='search']::-webkit-search-decoration {
 .surah-num {
   font-weight: 500;
   letter-spacing: 0.6px;
-  font-variant-numeric: oldstyle-nums;
   color: var(--gold-ink);
   font-size: 13px;
 }
@@ -2080,7 +2078,6 @@ button.ayah-mark {
   font-weight: 400;
   font-kerning: normal;
   font-variant-ligatures: common-ligatures;
-  font-variant-numeric: oldstyle-nums;
   font-feature-settings: 'kern' 1, 'liga' 1;
   line-height: 1.5;
   letter-spacing: normal;

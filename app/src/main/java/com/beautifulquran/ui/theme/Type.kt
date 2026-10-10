@@ -19,6 +19,7 @@ import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.em
 import androidx.compose.ui.unit.sp
 import com.beautifulquran.R
+import com.beautifulquran.domain.ENGLISH_LEAF_CAPACITY_CHARS
 import com.beautifulquran.domain.ENGLISH_LEAF_LEADING_EM
 
 /** KFGQPC HAFS Uthmanic Script — the reference typeface for the Quran text. */
@@ -180,6 +181,8 @@ internal data class QuranTypePalette(
     val typography: Typography,
     val scribe: FontFamily,
     val tuning: TypographyTuning = TypographyTuning(),
+    /** The English Mushaf leaf's hand ([TypographyTuning.leaf]); the book face for classic. */
+    val leaf: FontFamily = serif,
 )
 
 val SerifFontFamily: FontFamily
@@ -276,21 +279,24 @@ val ScribeFontFamily: FontFamily
 
 /**
  * Discretionary refinements applied to running serif text: kerning and
- * ligatures on, old-style (text) figures so ayah counts sit inside prose
- * without shouting. Fonts that lack a feature simply ignore it.
+ * ligatures on. Figures stay lining, the face's default: Timeless's old-style
+ * 1 is a small-cap I, which turned "2:15" into "2:I5" and a count of 215 into
+ * "2I5" in a book of verse references. Old-style remains an Ink Lab option.
+ * Fonts that lack a feature simply ignore it.
  */
-private const val BOOK_FEATURES = "'kern' 1, 'liga' 1, 'onum' 1"
+private const val BOOK_FEATURES = "'kern' 1, 'liga' 1"
 private const val UI_FEATURES = "'kern' 1, 'calt' 1"
 
 /**
  * Figures that stand on their own — labels, facts, counters, verse marks,
- * folios — are lining. Old-style figures belong to running prose, where they
- * sit among lowercase; beside a capital, a rule or inside a mark cup their
- * hanging 3 4 5 7 9 read as misaligned. Timeless defaults to lining, so this
- * only has to undo the book face's `onum`.
+ * folios — are lining. Timeless defaults to lining, so this only has to undo
+ * an `onum` an Ink Lab tuning has turned on.
  */
 internal fun liningFigures(features: String?): String =
     listOfNotNull(features?.takeIf(String::isNotBlank), "'onum' 0, 'lnum' 1").joinToString(", ")
+
+/** A figure that stands on its own — a count, a number in a list, a reference like 2:7 — lining. */
+internal fun TextStyle.lining(): TextStyle = copy(fontFeatureSettings = liningFigures(fontFeatureSettings))
 
 /** All-caps labels: lining figures, and `case` lifts punctuation to the capitals. */
 internal fun TextStyle.forCaps(): TextStyle =
@@ -482,6 +488,7 @@ private val TimelessTypePalette = QuranTypePalette(
     sans = TimelessSansFontFamily,
     typography = TimelessQuranTypography,
     scribe = timelessNotes(TypographyTuning().note),
+    leaf = timelessSerif(TypographyTuning().leaf, TypographyTuning().bookItalic),
 )
 
 private val ClassicTypePalette = QuranTypePalette(
@@ -491,6 +498,8 @@ private val ClassicTypePalette = QuranTypePalette(
     sans = ClassicSansFontFamily,
     typography = ClassicQuranTypography,
     scribe = ClassicScribeFontFamily,
+    // Classic keeps its own leaf exactly as it was: the new Timeless defaults must not reach it.
+    tuning = TypographyTuning(leaf = TypefaceTuning()),
 )
 
 internal val LocalQuranTypePalette = staticCompositionLocalOf { TimelessTypePalette }
@@ -504,7 +513,18 @@ internal val LocalQuranTypePalette = staticCompositionLocalOf { TimelessTypePale
 internal val QuranTypePalette.leafLeadingEm: Float
     get() = if (profile == QuranTypeProfile.TIMELESS) TIMELESS_LEAF_LEADING_EM else ENGLISH_LEAF_LEADING_EM
 
-private const val TIMELESS_LEAF_LEADING_EM = 1.46f
+/**
+ * What the leaf's hand is solved against: how many characters a full leaf holds.
+ * Timeless sets 18 % wider than Garamond, so at Garamond's 1,180 the hand came
+ * out 11 % smaller and the lines 2.8 x-heights apart (Garamond: 3.5). Holding
+ * 1,130 buys a hand whose lowercase stands 9 % over Garamond's and lines 3.15
+ * x-heights apart, for 4 % more leaves.
+ */
+internal val QuranTypePalette.leafCapacityChars: Int
+    get() = if (profile == QuranTypeProfile.TIMELESS) TIMELESS_LEAF_CAPACITY_CHARS else ENGLISH_LEAF_CAPACITY_CHARS
+
+private const val TIMELESS_LEAF_LEADING_EM = 1.62f
+private const val TIMELESS_LEAF_CAPACITY_CHARS = 1130
 
 internal fun quranTypePalette(
     timeless: Boolean,
@@ -546,6 +566,7 @@ internal fun quranTypePalette(
             labelSmall = tune(base.labelSmall, book, tuning.book, lining = true),
         ),
         timelessNotes(tuning.note), tuning,
+        leaf = timelessSerif(tuning.leaf, tuning.bookItalic),
     )
 }
 

@@ -69,6 +69,7 @@ import androidx.compose.ui.unit.em
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.util.lerp
 import android.view.HapticFeedbackConstants
+import com.beautifulquran.ui.theme.mixedCaseTrackingEm
 import com.beautifulquran.ui.theme.LocalQuranAccents
 import com.beautifulquran.ui.theme.typeScale
 import kotlinx.coroutines.Dispatchers
@@ -1694,11 +1695,12 @@ internal fun MushafPageDial(
             val labelSmall = MaterialTheme.typography.labelSmall
             val hudFontSize = typeScale(12.5.sp, 14.sp)
             val hudLineHeight = typeScale(14.sp, 16.sp)
-            val hudType = remember(labelSmall, hudFontSize, hudLineHeight) {
+            val hudTrackingEm = mixedCaseTrackingEm(0.08f)
+            val hudType = remember(labelSmall, hudFontSize, hudLineHeight, hudTrackingEm) {
                 labelSmall.copy(
                     fontSize = hudFontSize,
                     lineHeight = hudLineHeight,
-                    letterSpacing = 0.08.em,
+                    letterSpacing = hudTrackingEm.em,
                 )
             }
             // Which wall the type is parked against, if either: -1 left,

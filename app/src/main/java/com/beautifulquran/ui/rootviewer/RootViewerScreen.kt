@@ -82,6 +82,7 @@ import androidx.compose.ui.text.withStyle
 import com.beautifulquran.data.model.RootLemmaSummary
 import com.beautifulquran.data.model.RootOccurrence
 import com.beautifulquran.data.model.Word
+import com.beautifulquran.ui.theme.lining
 import com.beautifulquran.ui.theme.SmallTitleFontFamily
 import com.beautifulquran.ui.theme.liningFigures
 import com.beautifulquran.ui.theme.BookTextMotion
@@ -899,7 +900,7 @@ private fun ChapterHeading(section: RootOccurrenceSection, open: Boolean, onClic
         ) {
             Text(
                 text = section.surahId.toString(),
-                style = MaterialTheme.typography.bodyMedium,
+                style = MaterialTheme.typography.bodyMedium.lining(),
                 color = gold,
                 textAlign = TextAlign.End,
                 modifier = Modifier.width(24.dp),
@@ -922,7 +923,7 @@ private fun ChapterHeading(section: RootOccurrenceSection, open: Boolean, onClic
         ) {
             Text(
                 text = section.occurrences.size.toString(),
-                style = MaterialTheme.typography.bodyMedium,
+                style = MaterialTheme.typography.bodyMedium.lining(),
                 color = QuranTheme.ink.secondary,
             )
             Spacer(Modifier.width(8.dp))
@@ -951,7 +952,7 @@ private fun OccurrenceRow(occurrence: RootOccurrence, isCurrent: Boolean, onClic
     ) {
         Text(
             text = "${occurrence.surahId}:${occurrence.ayahNumber}${if (isCurrent) " · Here" else ""}",
-            style = MaterialTheme.typography.bodyMedium,
+            style = MaterialTheme.typography.bodyMedium.lining(),
             color = if (isCurrent) {
                 MaterialTheme.colorScheme.onSurface
             } else {
