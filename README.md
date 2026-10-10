@@ -223,6 +223,10 @@ If host Vulkan is broken on your machine, you can still fall back with
 | Root / lemma / morphology | [Quranic Arabic Corpus](http://corpus.quran.com) v0.4 | free with attribution + link |
 | Word timing clock/fallback | [cpfair/quran-align](https://github.com/cpfair/quran-align) | CC-BY 4.0 |
 | Yasser Al-Dosari word timings | [Qur'anic Universal Audio](https://github.com/Wider-Community/quranic-universal-audio) | CC-BY 4.0 |
-| Bundled repeat topology | [quran.com](https://quran.com) legacy `qdc` audio API, normalized offline | written QF permission requested before release |
+| Bundled repeat topology | [quran.com](https://quran.com) legacy `qdc` audio API, normalized offline | written QF redistribution permission has not been obtained |
 | Recitation audio | [everyayah.com](https://everyayah.com) | free; rights remain with reciters |
 | Arabic typeface | KFGQPC HAFS Uthmanic Script, King Fahd Complex | redistribution permission/official license confirmation pending |
+
+The [authenticated repeat-timing audit](docs/QF_TIMING_PARITY.md) confirms QF
+Content Sync exposes repeats. The source switch remains blocked by changed
+inputs and a stale reviewed correction; the shipped timings are unchanged.

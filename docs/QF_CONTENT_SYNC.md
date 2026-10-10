@@ -164,15 +164,22 @@ succeeds.
 
 ## Separate unresolved content questions
 
-Authenticated word/QCF caching does not resolve two independently sourced
-release questions:
+Authenticated word/QCF caching does not resolve the bundled timing question:
 
-1. `quran.db` contains repeat topology derived offline from the legacy QDC audio
-   endpoint and updated only through app releases. Obtain written QF permission
-   to redistribute that derived dataset, or ship the quran-align-only fallback.
-2. Content Sync's offline exception does not license Mushaf font files or page
-   images. Keep or distribute KFGQPC/QCF font assets only under permission from
-   the provider identified by QF's Mushaf Fonts and Images documentation.
+`quran.db` contains repeat topology derived offline from the legacy QDC audio
+endpoint and updated only through app releases. Written QF permission to
+redistribute that dataset has not been obtained. The
+[authenticated timing audit](QF_TIMING_PARITY.md) confirms that Content Sync
+exposes repeats, but three reciters differ from the pinned inputs and the
+canonical replay stops at a stale Alafasy correction. Preserve the reviewed
+baseline while that migration is audited; quran-align alone loses repeats.
 
-These questions do not change the authenticated runtime cache architecture, but
-they remain release/compliance gates for the corresponding bundled assets.
+The Developer Terms updated 2026-10-04 separately permit integrated app
+caching or bundling of font files and Mushaf images obtained through QF APIs
+or documented CDN URLs, with an active Developer Console account and QF
+credit. Content Sync itself supplies neither font files nor images. Check the
+asset's source and these conditions rather than treating the timing dataset
+and rendering assets as one permission question.
+
+The timing audit does not change the authenticated runtime cache architecture
+or production Worker allowlist. Bundled timing distribution remains unresolved.

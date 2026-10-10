@@ -29,7 +29,7 @@ export const ACKNOWLEDGEMENTS: Acknowledgement[] = [
   },
   {
     title: 'Repeat-aware timings',
-    body: 'Bundled repeat topology from the quran.com legacy qdc audio API, normalized offline. Written QF permission requested before release.',
+    body: 'Bundled repeat topology from the quran.com legacy qdc audio API, normalized offline. Written QF permission to redistribute this data has not been obtained.',
   },
   {
     title: 'Recitation audio',
