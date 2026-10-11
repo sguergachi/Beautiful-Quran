@@ -1812,7 +1812,7 @@ internal fun MushafPageInkClocks(
         derivedStateOf { activeWordState.value?.ayah }
     }
     val voice = playback.value
-    val frontierAyah = activeWordAyah ?: voice.activeAyah
+    val frontierAyah = mushafInkFrontier(activeWordAyah, voice.activeAyah, voice.playingAyah)
     var playingAyahHasWord by remember(voice.playingAyah) { mutableStateOf(false) }
     if (!playingAyahHasWord && activeWordAyah != null && activeWordAyah == voice.playingAyah) {
         SideEffect { playingAyahHasWord = true }
