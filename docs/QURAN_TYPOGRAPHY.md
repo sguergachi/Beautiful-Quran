@@ -1275,7 +1275,11 @@ translation of the same sentence, so the two share most of their content words.
 printed spans with their spoken Arabic owners. Inflections share a key; a small
 vocabulary bridges differences such as gaze/vision, slaves/servants and
 bosoms/chests. “Private parts,” “head covers” and “All-Aware”/“Acquainted”
-remain whole meanings.
+remain whole meanings. The vocabulary also covers irregular verbs, divine
+titles and transliterated names. A printed compound joins only when the gloss
+names that single meaning: “Accepting of repentance” can name one Tawwab,
+while “acceptor” and “of repentance” remain separate when Arabic says two
+words. Rahman and Rahim retain distinct owners when both occur.
 
 Three rules make it usable:
 
@@ -1294,7 +1298,8 @@ Three rules make it usable:
   follows the wash without returning to an already advanced word.
 
 Repeated content must keep its occurrence. Equal counts within a sentence pair
-matching forms in occurrence order, including possessives; “sons” cannot steal
+exact forms first, then inflected or equivalent forms in occurrence order,
+including possessives; “sons” cannot steal
 another “sons” later in the family list. Different forms such as “approached”
 and “Approaching” stay distinct. A duplicated gloss consisting of a grammatical
 prefix and one printed head is a shared phrase: 24:30's duplicated “their gaze”
@@ -1303,12 +1308,17 @@ assigns “vision” to Arabic word 5. Real printed repetitions stay separate.
 Unmatched text still uses the guarded, interpolated forward alignment.
 Translator additions cannot claim literal anchors. Existing context and
 partial-gloss guards keep differently translated meanings from being dragged
-onto a later literal occurrence. Ambiguous repeated forms, omitted meanings
+onto a later literal occurrence. A unique meaning reused in English can match
+within its surrounding anchors' sentence, without acquiring another clause's
+word. Reflexive objects retain their named owner; an implicit noun in “evil
+deeds” travels with the verified noun meaning only if no separate deed is
+named in that clause. Ambiguous repeated forms, omitted meanings
 and vocabulary outside the shared keys remain approximate. The published
 translation therefore does not promise exact semantic timing for every word.
 
 Verification combines annotated verse regressions, an independent literal-word
-diagnostic over the live QF cache's 6,236 verses, and actual Android playback.
+diagnostic over the live QF cache's 6,236 verses, QAC root/lemma meaning checks,
+and actual Android playback.
 The diagnostic is agreement on recognizable literal correspondences, not a
 semantic accuracy certificate. See [ENGLISH_ALIGNMENT.md](ENGLISH_ALIGNMENT.md)
 for the measured result and its limits.

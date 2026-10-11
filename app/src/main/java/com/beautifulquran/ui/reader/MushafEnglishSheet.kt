@@ -1132,8 +1132,9 @@ private fun EnglishProseBlock(
                 // englishSeekWordPosition.
                 fun at(point: Offset, wordMiddle: Boolean, act: (Int, Int, Float) -> Unit) {
                     val layout = layoutResult ?: return
-                    val verse = block.verses
-                        .firstOrNull { layout.rangeContains(point, it.range, hitSlopPx) }
+                    val verse = block.verses.getOrNull(
+                        layout.wordIndexAt(point, block.verses.map { it.range }, hitSlopPx),
+                    )
                         ?: return
                     var caret = layout.getOffsetForPosition(point)
                     // A hold names a word, and the caret sits at its edge

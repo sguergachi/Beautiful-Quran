@@ -102,6 +102,23 @@ class AyahNumberMarkTest {
     }
 
     @Test
+    fun `a shared line selects the touched verse instead of the earlier wrapped rectangle`() {
+        assertEquals(1, inlineRangeIndexAt(32, listOf(0..19, 21..47), 48) { 0 })
+        assertEquals(0, inlineRangeIndexAt(12, listOf(0..19, 21..47), 48) { 1 })
+    }
+
+    @Test
+    fun `inline whitespace keeps the geometric hit slop fallback`() {
+        assertEquals(0, inlineRangeIndexAt(20, listOf(0..19, 21..47), 48) { 0 })
+        assertEquals(-1, inlineRangeIndexAt(20, listOf(0..19, 21..47), 48) { -1 })
+    }
+
+    @Test
+    fun `a shared line's final caret belongs to its final verse`() {
+        assertEquals(1, inlineRangeIndexAt(48, listOf(0..19, 21..47), 48) { 0 })
+    }
+
+    @Test
     fun `English mark gives Western digits an explicit Garamond span`() {
         val mark = buildAnnotatedString {
             appendAyahNumberMark(12, useArabicIndicDigits = false, style = SpanStyle())

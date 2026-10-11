@@ -25,9 +25,30 @@ high-water words keep their fade during a genuine repeat.
 The vocabulary also connects tell/say and apparent/appears. Wrap/draw is scoped
 to a verse's headcover phrase, rather than applied to unrelated uses of “draw.”
 
+The full-corpus follow-up also fixes irregular verbs, causative/passive glosses,
+reflexive objects, inflected repetitions, divine titles and transliterated
+names. Examples include “became divided” → “become divided” (98:4), “cause to
+hear” → “make ... hear” (27:80), and Rahman's “Most Gracious” → “Most Merciful.”
+Rahman and Rahim stay distinct when both occur. Printed compounds join only
+when a gloss names that single meaning; separately spoken “acceptor” and
+“repentance” (40:3) retain separate heads. This prevents phrase matching from
+delaying the first word of a phrase. The existing partial-gloss fence remains
+intact; a unique match can use the neighbouring anchors' sentence context,
+without pulling a differently translated word from another clause.
+Scoped compounds also cover “seems suitable” → “please,” “seek to hasten” →
+“impatient,” and “My way” → “My cause.” Conditional “you come” can match
+“brought” when the verse has no literal bring gloss; a real bring gloss stays
+distinct. These rules fix the audited one-word delays in 2:145, 4:3, 27:46 and
+60:1 without equating every use of come/bring or way/cause.
+
+On a line shared by two verses, taps and holds prefer the caret's actual range
+before the geometric hit-slop fallback. A wrapped verse's broad bounding
+rectangle can overlap the next verse's words; it must not seek to the previous
+verse. Lyric word taps use the same policy, retaining the whitespace fallback.
+
 ## Verification on 2026-10-11
 
-Three methods were used:
+Four methods were used:
 
 1. JVM regressions cover 58 real verses, including the reported 24:30/31,
    reordered subjects/adjectives, possessives, repeated verb forms, compounds,
@@ -35,6 +56,11 @@ Three methods were used:
    semantic fixture checks all 44 Khabeer/Acquainted correspondences, including
    24:30 word 13. Another 52 selected content-head checks across both reported verses cover
    tell/say, apparent/appears and the headcover's wrap/draw meaning.
+   A further frozen fixture checks 77 heard meanings in 56 audited verses.
+   These checks require the full printed meaning to have washed by its Arabic
+   owner; earlier inclusion is allowed by the forward-wash rule. Negative
+   controls keep separately spoken phrase heads, Rahman/Rahim, and incomplete
+   glosses distinct.
    Projection tests check page fragments and punctuation;
    source-selection and follow tests
    check continuous washes, semantic taps and forward follow.
@@ -47,18 +73,27 @@ Three methods were used:
    before it, with no skipped word and no delayed recognized meaning.
    The literal comparator uses its own tokenization, possessive/plural
    normalization, unique/equal occurrence counts and sentence restriction.
-3. Android API 35 playback with Alafasy confirms the reported ink visually and
+3. A separate reference manifest matches printed names/titles to QAC roots or
+   lemmas and independently specified gloss cues, rather than importing the
+   mapper's vocabulary. It covers 1,392 correspondences and checks the final
+   character of each printed meaning. Ambiguous occurrence counts and added
+   bracketed words are excluded; every manifest rule must cover actual cases.
+   There are zero delayed washes. Semantic owners agree in 1,357 cases; the
+   remaining 35 are earlier estimates, with the meaning already included.
+4. Android API 35 playback with Alafasy confirms the reported ink visually and
    checks Media3's paused position against the bundled timing segments.
 
-| Check | Previous PR head `c6c33253` | This change |
+| Check | Before full-corpus follow-up `973a2ce1` | Follow-up |
 | --- | ---: | ---: |
-| Literal comparisons on their assigned owner | 35,245 / 37,310 | 37,226 / 37,310 |
-| Literal agreement | 94.465% | 99.775% |
-| Flagged comparisons | 2,065 | 84 |
-| Structurally valid verse span maps | — | 6,236 / 6,236 |
-| Continuous prefix checks | — | 77,429 / 77,429 |
-| Annotated Khabeer/Acquainted owners | — | 44 / 44 |
-| Annotated heads in the reported verses | — | 52 / 52 |
+| Literal comparisons on their assigned owner | 37,226 / 37,310 | 37,271 / 37,310 |
+| Literal agreement | 99.775% | 99.895% |
+| Flagged comparisons | 84 | 39 |
+| Delayed washes in QAC meaning checks | 563 / 1,392 | 0 / 1,392 |
+| Structurally valid verse span maps | 6,236 / 6,236 | 6,236 / 6,236 |
+| Continuous prefix checks | 77,429 / 77,429 | 77,429 / 77,429 |
+| Annotated Khabeer/Acquainted owners | 44 / 44 | 44 / 44 |
+| Annotated heads in the reported verses | 52 / 52 | 52 / 52 |
+| Further annotated heard-meaning checks | — | 77 / 77 |
 
 The corpus export SHA-256 is
 `bc2f381494642ae7ed8950b3b77117f6a5d617becc11b51fd12516916f390449`.
@@ -74,23 +109,38 @@ reported 24:30/31 fixtures use the live cache.
 | Backward seek from fathers to vision leaves no old glimmer ahead, 24:31 | 4,433 ms | new word 5: 3,820–6,170 ms |
 | Wrap lit before headcovers, 24:31 | 17,630 ms | word 15: 16,090–18,100 ms |
 | Backward seek from wrap to appears leaves no old glimmer ahead, 24:31 | 14,795 ms | new word 13: 14,300–15,120 ms |
+| Divided lit; until after still dim, 98:4 | 1,460 ms | word 2: 700–1,740 ms |
+| First hear lit; nor will still dim, 27:80 | 2,439 ms | word 3: 2,080–2,940 ms |
+| Second hear lit; the call still dim, 27:80 | 5,252 ms | word 6: 4,670–5,530 ms |
+| Most Merciful lit; disobedient still dim, 19:44 | 12,048 ms | word 8: 10,880–12,580 ms |
+| Shared-line tap selects 19:44 rather than 19:43; first Satan lit, later clause dim | 6,004 ms | word 4: 4,080–7,030 ms |
+| Rebuilt release: Acquainted lit; with what still dim, 24:30 | 14,025 ms | word 13: 12,860–14,470 ms |
+| Please lit; you and the later suitable still dim, 4:3 | 7,384 ms | word 9: 6,870–7,710 ms |
+
+A backward seek from the second “hear” to the first in 27:80 also leaves the
+later phrase fully dim, with no old glimmer surviving ahead of the new prefix.
 
 The word positions also agree with the
 [Quranic Arabic Corpus, 24:31](https://corpus.quran.com/wordbyword.jsp?chapter=24&verse=31).
 The new Khabeer correspondence is Arabic word 13 in the
 [Quranic Arabic Corpus, 24:30](https://corpus.quran.com/wordbyword.jsp?chapter=24&verse=30).
+The full-corpus verb cases also agree with the
+[QAC analysis of 98:4](https://corpus.quran.com/wordbyword.jsp?chapter=98&verse=4)
+and [27:80](https://corpus.quran.com/wordbyword.jsp?chapter=27&verse=80).
 The soft edge and fresh-ink glimmer remain visible; repeat color uses the same
-semantic ranges. All 1,320 JVM tests and release assembly passed; the
+semantic ranges. All 1,329 JVM tests and release assembly passed; the
 unchanged timing pipeline passes all 104 patch cases.
 
 ## What the percentage means
 
-**99.775% is literal agreement on the selected comparisons, not semantic
+**99.895% is literal agreement on the selected comparisons, not semantic
 accuracy over every translated word or every playback instant.** The diagnostic
 cannot judge synonyms it does not recognize, translator explanations, omitted
-meanings, shared phrases or ambiguous repetitions. Some of its remaining 84
-flags are grammatical words or differently translated meanings, rather than
-proven mapping errors. For example, the literal diagnostic pairs “conduct”
+meanings, shared phrases or ambiguous repetitions. The remaining 39
+flags are reviewed in [the audit ledger](english-alignment-audit.tsv). They
+include grammatical phrases, different senses and approximate semantic owners
+whose meaning is already included by the continuous wash. For example, the
+literal diagnostic pairs “conduct”
 in 2:282 with the later gloss “sinful conduct”; the annotated regression
 requires the earlier business meaning. Reusing the original context guards
 preserves that earlier owner, and lowers this literal proxy's score compared
@@ -99,8 +149,10 @@ and other non-literal correspondences separately. The continuous-prefix checks e
 the no-gap policy, not exact timing for English words advanced by reordering.
 Audio-boundary accuracy is also separate from translation ownership.
 
-Exact global 99.9% semantic accuracy would need an independently annotated
-benchmark covering these cases. This change retains approximation where the
+The QAC manifest and frozen examples check heard-meaning coverage, not a random
+sample of every translated word. Exact global 99.9% semantic accuracy would
+need an independently annotated benchmark covering the remaining vocabulary,
+ambiguity and audio boundaries. This change retains approximation where the
 word-card data does not establish a reliable owner.
 
 ## Repeat the corpus diagnostic
@@ -115,7 +167,9 @@ no network requests:
 ```sh
 python3 tools/audit_english_alignment.py /tmp/qf-corpus.tsv --output-dir /tmp/english-audit \
   --semantic-cases app/src/test/resources/english-semantic-alignment.tsv \
-  --semantic-cases app/src/test/resources/english-semantic-heads.tsv
+  --semantic-cases app/src/test/resources/english-semantic-heads.tsv \
+  --spoken-cases app/src/test/resources/english-semantic-patterns.tsv \
+  --meaning-cases app/src/test/resources/english-meaning-cues.tsv
 ```
 
 It compiles the actual mapper, emits semantic and wash character spans,

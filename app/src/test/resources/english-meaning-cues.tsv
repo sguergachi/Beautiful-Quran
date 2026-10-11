@@ -1,0 +1,40 @@
+# Printed regex	QAC root	QAC lemma without diacritics	Independent word-card cue
+Moses	*	موسى	\bMusa\b
+Noah	*	نوح	\bNuh\b
+Abraham	*	إبراهيم	\bIbrahim\b
+Pharaoh	*	فرعون	\bFiraun\b
+Mary	*	مريم	\bMaryam\b
+Jesus	*	عيسى	\bIsa\b
+Joseph	*	يوسف	\bYusuf\b
+Lot	*	لوط	\bLut\b
+David	*	داود	\bDaw(?:ud|ood)\b
+Solomon	*	سليمن	\bSulaiman\b
+Jonah	*	يونس	\bYunus\b
+Isaac	*	إسحاق	\b(?:Ishaq|Isaac)\b
+Jacob	*	يعقوب	\bYaqub\b
+Ishmael	*	إسماعيل	\b(?:Ismail|Ishmael)\b
+Aaron	*	هرون	\bHarun\b
+Zechariah	*	زكريا	\bZakariya\b
+John	*	يحيى	\bYahya\b
+(?:Elijah|Elias)	*	إلياس	\b(?:Ilyas|Elijah)\b
+Job	*	أيوب	\bAyyub\b
+Torah	*	تورىة	\bTaur(?:at|ah)\b
+Gospel	*	إنجيل	\bInjeel\b
+Knowing	علم	*	\bAll[- ](?:Knower|Knowing)\b
+Acquainted	خبر	*	\bAll[- ]Aware\b
+Hearing	سمع	*	\bAll[- ]Hearer\b
+Seeing	بصر	*	\bAll[- ]Seer\b
+Exalted in Might	عزز	*	\bAll[- ]Mighty\b
+Entirely Merciful	رحم	رحمن	\bMost Gracious\b
+Most Merciful	رحم	رحمن	\bMost Gracious\b
+Especially Merciful	رحم	رحيم	\bMost Merciful\b
+competent	قدر	*	\bAll[- ](?:Powerful|Able)\b
+Accepting of repentance	توب	*	\b(?:Oft[- ]Returning|Acceptor of Repentance)\b
+acceptor	قبل	*	\bAcceptor\b
+(?:Scripture|Book)	كتب	*	\b(?:Book|Scripture)\b
+deit(?:y|ies)	اله	*	\bGods?\b
+Satan	شطن	*	\b(?:Shaitaan|Shaitan|Shaytan)\b
+brought	اتي	*	\byou come\b
+please	طيب	*	\bseems suitable\b
+impatient	عجل	*	\bseek to hasten\b
+My cause	سبل	*	\bMy way\b

@@ -8,8 +8,10 @@ import argparse
 import collections
 import json
 import re
+import sqlite3
 import subprocess
 import tempfile
+import unicodedata
 from pathlib import Path
 
 parser = argparse.ArgumentParser(description=__doc__)
@@ -17,6 +19,8 @@ parser.add_argument("corpus", type=Path)
 parser.add_argument("--output-dir", type=Path, required=True)
 parser.add_argument("--baseline-ends", type=Path, help="Optional TSV of verse_key and comma-separated character ends")
 parser.add_argument("--semantic-cases", type=Path, action="append", help="Annotated TSV: verse_key, translation, glosses, word=owner; repeatable")
+parser.add_argument("--spoken-cases", type=Path, action="append", help="Same TSV, checking the full printed meaning has washed by its Arabic owner")
+parser.add_argument("--meaning-cases", type=Path, help="TSV of printed regex, Arabic root, lemma, and gloss cue; * means unrestricted")
 args = parser.parse_args()
 root = args.output_dir
 root.mkdir(parents=True, exist_ok=True)
@@ -115,9 +119,10 @@ for key,text,gs in rows:
             else:
                 counts['early' if actual<expected else 'late']+=1
                 issues.append((key,word,expected,actual))
-if args.semantic_cases:
+for paths,exact in ((args.semantic_cases,True),(args.spoken_cases,False)):
+    if not paths: continue
     corpus={key:(text,glosses) for key,text,glosses in rows}
-    for path in args.semantic_cases:
+    for path in paths:
         for line in path.read_text().splitlines():
             key,text,glosses,targets=line.split('\t')
             assert corpus[key]==(text,glosses),(key,'fixture differs from frozen corpus')
@@ -127,11 +132,50 @@ if args.semantic_cases:
                 middle=(at.start()+at.end())//2
                 owned,wash=maps[key]
                 actual=next(p for a,b,p in owned if a<=middle<b)
-                assert actual==int(position),(key,word,'semantic owner',actual,position)
-                assert next(p for a,b,p in wash if a<=middle<b)<=int(position),(key,word,'semantic wash delayed')
-                counts['annotated_semantic_cases']+=1
+                if exact: assert actual==int(position),(key,word,'semantic owner',actual,position)
+                assert next(p for a,b,p in wash if a<=at.end()-1<b)<=int(position),(key,word,'spoken meaning wash delayed')
+                counts['annotated_semantic_cases' if exact else 'annotated_spoken_cases']+=1
+
+meaning_issues=[]
+if args.meaning_cases:
+    counts['meaning_wash_delays']=0
+    def bare_arabic(text):
+        return ''.join(c for c in text if unicodedata.category(c)!='Mn' and c!='ـ')
+    database=sqlite3.connect(f'file:{source.parents[5]/"data/quran.db"}?mode=ro',uri=True)
+    morphology={(f'{s}:{a}',p):(root,bare_arabic(lemma)) for s,a,p,root,lemma in
+                database.execute('select surah_id,ayah_number,position,root,lemma from word_morphology')}
+    database.close()
+    meaning_coverage={}
+    for line in args.meaning_cases.read_text().splitlines():
+        if not line or line.startswith('#'): continue
+        printed,meaning_root,lemma,cue=line.split('\t')
+        pattern=re.compile(r'\b(?:'+printed+r')\b',re.I)
+        covered=0
+        for key,text,gs in rows:
+            added=[(a,b) for _,a,b,is_added in tokens(text) if is_added]
+            matches=[m for m in pattern.finditer(text) if not any(a<=m.start()<b for a,b in added)]
+            owners=[p for p,g in enumerate(gs.split('|'),1) if re.search(cue,g,re.I) and
+                    (meaning_root=='*' or morphology.get((key,p),('',''))[0]==meaning_root) and
+                    (lemma=='*' or morphology.get((key,p),('',''))[1]==lemma)]
+            if not matches or len(matches)!=len(owners): continue
+            for match,expected in zip(matches,owners):
+                middle=(match.start()+match.end())//2
+                owned,wash=maps[key]
+                actual=next(p for a,b,p in owned if a<=middle<b)
+                washed=next(p for a,b,p in wash if a<=match.end()-1<b)
+                counts['morphology_meaning_cases']+=1
+                covered+=1
+                counts['meaning_on_owner' if actual==expected else 'meaning_owner_disagreement']+=1
+                if washed>expected: counts['meaning_wash_delays']+=1
+                if actual!=expected or washed>expected: meaning_issues.append((key,match.group(),expected,actual,washed))
+        assert covered, (printed, 'meaning rule covers no cases')
+        meaning_coverage[f'{printed}:{meaning_root}:{lemma}']=covered
+    (root/'meaning-coverage.json').write_text(json.dumps(meaning_coverage,indent=2)+'\n')
 
 (root/'ownership-audit.json').write_text(json.dumps(dict(counts),indent=2)+'\n')
 (root/'ownership-issues.tsv').write_text('\n'.join('\t'.join(map(str,r)) for r in issues)+'\n')
+(root/'meaning-issues.tsv').write_text('\n'.join('\t'.join(map(str,r)) for r in meaning_issues)+'\n')
 print('OWNERSHIP (literal diagnostic, not semantic accuracy):', dict(counts))
 print(f"Literal agreement: {counts['on_owner']/counts['literal_correspondences']:.3%}; semantic accuracy unverified")
+if counts['meaning_wash_delays']:
+    raise SystemExit(f"{counts['meaning_wash_delays']} meanings highlighted late; see meaning-issues.tsv")
