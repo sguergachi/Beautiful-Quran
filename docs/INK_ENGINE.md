@@ -477,7 +477,12 @@ tween-vs-snap rules, sweep entry and residual rules, repeat wash timing, the
 - **Mushaf progression is page-local.** The leaf carrying the voice begins
   beneath the Upcoming paper cover; its active word uses the same motion pack
   as the scrolling reader, completed ayahs retain full ink, and later ayahs use
-  a motionless recess pack. A leaf reached by hand stays fully readable, even
+  a motionless recess pack. Between word polls, the ink frontier comes from
+  Media3's playing verse, before the fade-led focus. Those updates can arrive
+  separately: a missing focus used to re-cover every completed verse, and a
+  stale focus could re-cover the outgoing verse or uncover future verses at a
+  repeat. The first-word cover gate still holds the incoming verse until its
+  timing arrives. A leaf reached by hand stays fully readable, even
   while playback continues elsewhere. A leaf follow is about to turn onto
   waits under Upcoming paper *before* the paper moves, so the turn never
   reveals a finished page; once the voice arrives the usual wash fills it.
