@@ -30,3 +30,18 @@ describe('typesetEnglish', () => {
     expect(typesetEnglishName("Ali 'Imran")).toBe('Ali ’Imran')
   })
 })
+
+describe('typesetEnglish · ʿayn and stray closers', () => {
+  it('reads a word-initial ʿayn as an apostrophe, not a quotation', () => {
+    expect(typesetEnglish("the family of 'Imran over the worlds")).toBe('the family of ’Imran over the worlds')
+    expect(typesetEnglish("Kaf, Ha, Ya, 'Ayn, Sad")).toBe('Kaf, Ha, Ya, ’Ayn, Sad')
+    expect(typesetEnglish("the wife of al-'Azeez")).toBe('the wife of al-’Azeez')
+    expect(typesetEnglish("the righteous is in 'illiyyun")).toBe('the righteous is in ’illiyyun')
+    expect(typesetEnglish("say, 'We are")).toBe('say, ‘We are’')
+    expect(typesetEnglish("your 'partners' that")).toBe('your ‘partners’ that')
+  })
+
+  it('a verse that opens by closing still closes its own quotation', () => {
+    expect(typesetEnglish('religion." Say, "Indeed, the bounty')).toBe('religion.” Say, “Indeed, the bounty”')
+  })
+})

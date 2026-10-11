@@ -86,6 +86,8 @@ import com.beautifulquran.ui.theme.lining
 import com.beautifulquran.ui.theme.SmallTitleFontFamily
 import com.beautifulquran.ui.theme.liningFigures
 import com.beautifulquran.ui.theme.BookTextMotion
+import com.beautifulquran.ui.theme.LocalQuranTypePalette
+import androidx.compose.ui.unit.em
 import com.beautifulquran.ui.theme.DisplayFontFamily
 import com.beautifulquran.ui.theme.HafsFontFamily
 import com.beautifulquran.ui.theme.LocalQuranAccents
@@ -752,7 +754,10 @@ private fun RootSectionTitle(text: String, explanation: String? = null) {
                 fontWeight = FontWeight.SemiBold,
                 fontSize = typeScale(21.sp, 24.sp, TypeRole.Title),
                 lineHeight = typeLeading(26.sp, 29.sp, TypeRole.Title),
-                style = MaterialTheme.typography.titleLarge.copy(fontFeatureSettings = typeFeatures(TypeRole.Title)),
+                style = MaterialTheme.typography.bodyLarge.copy(
+                    letterSpacing = LocalQuranTypePalette.current.tuning.title.tracking.em,
+                    fontFeatureSettings = typeFeatures(TypeRole.Title),
+                ),
                 color = MaterialTheme.colorScheme.onSurface,
             )
         },
@@ -911,7 +916,10 @@ private fun ChapterHeading(section: RootOccurrenceSection, open: Boolean, onClic
                 fontFamily = SmallTitleFontFamily,
                 fontSize = typeScale(16.sp, 18.sp, TypeRole.Title),
                 lineHeight = typeLeading(21.sp, 24.sp, TypeRole.Title),
-                style = MaterialTheme.typography.titleLarge.copy(fontFeatureSettings = typeFeatures(TypeRole.Title)),
+                style = MaterialTheme.typography.bodyLarge.copy(
+                    letterSpacing = LocalQuranTypePalette.current.tuning.title.tracking.em,
+                    fontFeatureSettings = typeFeatures(TypeRole.Title),
+                ),
                 color = QuranTheme.ink.strong,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
@@ -1107,7 +1115,7 @@ private fun LemmaSingleSenseRow(
     glossStyle: TextStyle,
     glossColor: Color,
 ) {
-    val glossLineHeight = typeScale(20.sp, 22.sp)
+    val glossLineHeight = glossStyle.lineHeight
     val spineHeight = with(LocalDensity.current) { glossLineHeight.toDp() }
     val spineWidthPx = with(LocalDensity.current) { 1.dp.toPx() }
     val stubOffsetPx = with(LocalDensity.current) { 4.dp.toPx() }
@@ -1388,7 +1396,10 @@ private fun LexiconBlockView(
                 fontWeight = FontWeight.Medium,
                 fontSize = typeScale(16.sp, 18.sp, TypeRole.Title),
                 lineHeight = typeLeading(20.sp, 22.sp, TypeRole.Title),
-                style = MaterialTheme.typography.titleLarge.copy(fontFeatureSettings = typeFeatures(TypeRole.Title)),
+                style = MaterialTheme.typography.bodyLarge.copy(
+                    letterSpacing = LocalQuranTypePalette.current.tuning.title.tracking.em,
+                    fontFeatureSettings = typeFeatures(TypeRole.Title),
+                ),
                 color = gold,
                 modifier = Modifier.padding(bottom = 8.dp),
             )
@@ -1501,7 +1512,7 @@ private fun WordHeader(word: Word, isPlaying: Boolean, onPlay: () -> Unit) {
                 25.sp, 28.sp, com.beautifulquran.ui.theme.TypeRole.BookItalic,
             ),
             fontStyle = FontStyle.Italic,
-            style = androidx.compose.ui.text.TextStyle(
+            style = MaterialTheme.typography.bodyLarge.copy(
                 fontFeatureSettings = com.beautifulquran.ui.theme.typeFeatures(
                     com.beautifulquran.ui.theme.TypeRole.BookItalic,
                 ),

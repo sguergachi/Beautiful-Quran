@@ -6,26 +6,29 @@
 // cuts. The archive is cached outside the repo, so worktrees and repeat builds
 // share one download. Android does the same in app/build.gradle.kts.
 import { createHash } from 'node:crypto'
-import { access, mkdir, readFile, rename, writeFile } from 'node:fs/promises'
+import { access, cp, mkdir, readFile, rename, rm, writeFile } from 'node:fs/promises'
 import { homedir } from 'node:os'
 import { basename, dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { inflateRawSync } from 'node:zlib'
 
 const webRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..')
-const manifest = JSON.parse(
-  await readFile(resolve(webRoot, '..', 'scripts', 'timeless-fonts.json'), 'utf8'),
-)
+await cp(resolve(webRoot, '..', 'licenses'), resolve(webRoot, 'public'), { recursive: true })
+const manifestText = await readFile(resolve(webRoot, '..', 'scripts', 'timeless-fonts.json'), 'utf8')
+const manifest = JSON.parse(manifestText)
 const outDir = resolve(webRoot, 'public', 'fonts', 'timeless')
 const outputs = Object.keys(manifest.web).map((name) => resolve(outDir, name))
+const sha256 = (bytes) => createHash('sha256').update(bytes).digest('hex')
+const stampPath = resolve(webRoot, 'node_modules', '.cache', 'timeless-fonts.sha256')
+const stamp = sha256(manifestText)
 
 const exists = (path) => access(path).then(() => true, () => false)
-if ((await Promise.all(outputs.map(exists))).every(Boolean)) {
+if (await readFile(stampPath, 'utf8').catch(() => null) === stamp &&
+    (await Promise.all(outputs.map(exists))).every(Boolean)) {
   console.log('fetch-timeless-fonts: up to date')
   process.exit(0)
 }
 
-const sha256 = (bytes) => createHash('sha256').update(bytes).digest('hex')
 const cacheDir = resolve(process.env.XDG_CACHE_HOME || resolve(homedir(), '.cache'), 'beautiful-quran')
 const archivePath = resolve(cacheDir, basename(new URL(manifest.url).pathname))
 
@@ -42,8 +45,9 @@ if (!archive || sha256(archive) !== manifest.sha256) {
     )
   }
   await mkdir(cacheDir, { recursive: true })
-  await writeFile(`${archivePath}.tmp`, archive)
-  await rename(`${archivePath}.tmp`, archivePath)
+  const partial = `${archivePath}.${process.pid}.tmp`
+  await writeFile(partial, archive)
+  await rename(partial, archivePath)
 }
 
 // Read entries through the zip central directory, which carries the sizes
@@ -76,10 +80,13 @@ function zipEntries(zip) {
 }
 
 const entries = zipEntries(archive)
+await rm(outDir, { recursive: true, force: true })
 await mkdir(outDir, { recursive: true })
 for (const [name, entry] of Object.entries(manifest.web)) {
   const read = entries.get(entry)
   if (!read) throw new Error(`Timeless archive has no ${entry}`)
   await writeFile(resolve(outDir, name), read())
 }
+await mkdir(dirname(stampPath), { recursive: true })
+await writeFile(stampPath, stamp)
 console.log(`fetch-timeless-fonts: wrote ${outputs.length} fonts to public/fonts/timeless`)

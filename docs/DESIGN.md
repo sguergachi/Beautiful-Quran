@@ -937,8 +937,8 @@ not the app's.
   placement and slant distinguish the reader's words. The classic developer
   profile restores Cormorant Garamond Italic and its original 16 sp / 23 sp
   settings. See [ANNOTATIONS.md](ANNOTATIONS.md).
-- **Typography lab**: Ink Lab → Typography tunes Book, Italic, Titles, UI and
-  Notes independently. Android embeds the three variable fonts: Serif has
+- **Typography lab**: Ink Lab → Typography tunes Book, Leaf, Italic, Titles, UI
+  and Notes independently. Android embeds the three variable fonts: Serif has
   weight 200–700 and the Display→Text `STYL` axis; real Serif Italic has weight
   300–700; Sans has weight 300–800, Grotesk→Sans `STYL`, and `ital` 0–100.
   Size, leading and tracking supplement those axes. All 20 Roman, 10 Italic
@@ -948,6 +948,8 @@ not the app's.
   just the type settings. These overrides apply only in developer mode with
   Timeless selected. Control labels keep the shipped typography while preview
   glyphs and the app use the tuned faces. The bismillah still fits its column.
+  Saved values remain the user's settings across updates; Reset loads the
+  current shipped defaults.
 - **English lyric mode**: Timeless Serif regular, 19.5 sp with 1.5 em leading.
   It is one flush-left, ragged-right inline paragraph — never a flex/flow row
   of padded word tiles. Natural font spaces, kerning, common ligatures, and
@@ -973,15 +975,23 @@ not the app's.
   only and one character for one, so search ranges and word spans measured on
   the stored text still land; matching folds the marks back
   (`fold` / `foldEnglish`). Surah names and glosses get the curled apostrophe.
+  Word-initial ʿayn marks in names such as ’Imran and ’Aad are apostrophes,
+  never opening quotations. Word alignment accepts straight and curled
+  apostrophes as the same character within a word.
 - **Supplied words**: Sahih International's [brackets] sit at 40 % of the
   text's ink (`SUPPLIED_BRACKET_INK`); the words inside keep full ink, because
   they carry meaning.
 - **Weight on dark paper** (Android): light ink on Nightfall and Royal Green
-  runs 30 lighter on the variable axis (wght 370 where paper has 400), every
-  role — light type spreads into the dark and reads heavier. The web serves
-  static cuts and keeps one weight.
-- **English leaf leading**: 1.46 em in Timeless (1.40 em was set for
-  Garamond's smaller x-height).
+  runs 30 lighter on the variable axis (wght 370 where paper has 400) in the
+  app and scroll reader. The measured English leaf, its verse figures, and its
+  italic basmalah keep the same weights on every theme: changing advances
+  would change pagination. Palette tuning retains the paper-side values, so
+  sharing onto cream restores those weights. The web serves static cuts and
+  keeps one weight.
+- **English leaf**: weight 365, optical style 25, −0.0125 em tracking, 1.62 em
+  leading and a 1,130-character reference page. See
+  [ENGLISH_LEAF_TYPE.md](ENGLISH_LEAF_TYPE.md) for the measured tuning. Classic
+  keeps Garamond's 1.40 em leading and 1,180-character reference page.
 - **UI text**: the same serif at small sizes with reduced alpha, set solid —
   mixed-case labels, facts, banner names and running heads are never tracked
   past 0.02 em; only ALL-CAPS labels are letterspaced; labels never compete with scripture. One deliberate exception on
@@ -1172,7 +1182,7 @@ divider: it never reaches the sheet edge, never appears between rows, and
 never uses gold.
 
 Classical lexicon (Lane) is still one reading spine, never a card grid: Form
-labels sit as quiet Cormorant lines with ~28 dp before each new Form and
+labels sit as quiet Timeless Text lines (Cormorant in Classic) with ~28 dp before each new Form and
 ~12 dp between senses inside one Form — no bullet marks. Parenthetical source
 marks (`(S, K)`, `(Msb,)`), editorial tags (`(tropical:)`), and bare
 `see …` cross-refs drop to ~38% ink so the English gloss can be scanned. Do
@@ -1559,7 +1569,7 @@ the Bookmarks index keep their full 44 dp targets and 11 dp cloth.
 
 On Android, that lane is fixed to the viewport: scrolling the chapter list
 must never move the ribbon. It begins beside, and slightly below the top of,
-the single Cormorant “Beautiful Quran” masthead and keeps a small, optically
+the single Timeless Display “Beautiful Quran” masthead (Cormorant in Classic) and keeps a small, optically
 balanced paper gutter on both sides of the ruby cloth. The Chapters masthead
 and settings rosette remain fixed above the scrolling chapter document,
 matching the web composition. The masthead does not repeat the Arabic app

@@ -81,8 +81,10 @@ object EnglishWordAlignment {
                 continue
             }
             val start = i
-            while (i < text.length && (text[i].isLetter() || text[i] == '\'')) i++
-            out += ProseWord(text.substring(start, i).lowercase(), i)
+            // The translation is typeset with curled apostrophes (Qur’an); one
+            // word either way, and spelled straight so it matches the glosses.
+            while (i < text.length && (text[i].isLetter() || text[i] == '\'' || text[i] == '’')) i++
+            out += ProseWord(text.substring(start, i).replace('’', '\'').lowercase(), i)
         }
         return out
     }

@@ -687,7 +687,7 @@ private fun TypographyControls() {
     }
     val specimenStyle = androidx.compose.ui.text.TextStyle(
         fontFamily = family, fontSize = 22.sp * face.size, lineHeight = 28.sp * face.size * face.leading,
-        letterSpacing = face.tracking.em,
+        letterSpacing = (face.tracking + if (role == TypeRole.Leaf) -0.025f else 0f).em,
         fontWeight = when (role) { TypeRole.Title, TypeRole.Note -> FontWeight.Medium; else -> FontWeight.Normal },
         fontStyle = if (role == TypeRole.BookItalic || role == TypeRole.Note) FontStyle.Italic else FontStyle.Normal,
         fontFeatureSettings = face.featureSettings,

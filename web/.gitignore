@@ -5,3 +5,4 @@ dist/
 
 # Timeless fonts are fetched at build time (license forbids committing them).
 public/fonts/timeless/
+/public/font-licenses/

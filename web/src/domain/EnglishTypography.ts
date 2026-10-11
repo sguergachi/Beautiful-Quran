@@ -73,9 +73,11 @@ export function typesetEnglish(raw: string, quoteContinues = false): string {
     const prev = raw[i - 1]
     const next = raw[i + 1]
     if (c === '"') {
-      if (opensAfter(prev)) { out += '“'; doubles++ } else { out += '”'; doubles-- }
+      // Never below zero: a verse opening by closing the last one's quotation still closes its own (3:73).
+      if (opensAfter(prev)) { out += '“'; doubles++ } else { out += '”'; if (doubles > 0) doubles-- }
     } else if (c === "'") {
       if (isWordChar(prev) && isWordChar(next)) out += '’'
+      else if (isAynApostrophe(raw, i)) out += '’'
       else if (opensAfter(prev)) { out += '‘'; singles++ } else { out += '’'; if (singles > 0) singles-- }
     } else if (c === '-' && prev === ' ' && next === ' ') {
       out += '–'
@@ -85,6 +87,39 @@ export function typesetEnglish(raw: string, quoteContinues = false): string {
   }
   if (!quoteContinues) out += '’'.repeat(singles) + '”'.repeat(Math.max(0, doubles))
   return out
+}
+
+const AYN_NAMES = new Set(['Aad', 'Ayn'])
+const SPEECH_CONTEXT = ',:"“([{'
+const isLetter = (c: string | undefined) => c !== undefined && /\p{L}/u.test(c)
+
+/** A later `'` that closes a quotation: after a word or stop, before a non-letter. */
+function closesLater(raw: string, from: number): boolean {
+  for (let j = from; j < raw.length; j++) {
+    if (raw[j] !== "'") continue
+    const p = raw[j - 1]!
+    if ((isWordChar(p) || '.,!?;:'.includes(p)) && !isWordChar(raw[j + 1])) return true
+  }
+  return false
+}
+
+/**
+ * Whether the `'` opening a word is the transliterated ʿayn (al-'Azeez, 'Imran,
+ * 'Aad, 'umrah, "Allah 's") rather than an opening quote. Mirrors Android's
+ * `EnglishTypography.isAynApostrophe`; see there for the reasoning.
+ */
+function isAynApostrophe(raw: string, i: number): boolean {
+  const next = raw[i + 1]
+  if (!isLetter(next)) return false
+  if (raw[i - 1] === '-') return true
+  let end = i + 1
+  while (end < raw.length && isLetter(raw[end])) end++
+  if (AYN_NAMES.has(raw.slice(i + 1, end))) return true
+  if (closesLater(raw, end)) return false
+  if (next !== next!.toUpperCase()) return true
+  let k = i - 1
+  while (k >= 0 && raw[k] === ' ') k--
+  return k >= 0 && !SPEECH_CONTEXT.includes(raw[k]!)
 }
 
 /** Whether a quotation open at a verse's end carries on: `next`'s first double quote closes. */

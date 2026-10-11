@@ -15,14 +15,27 @@ class TypographyTuningTest {
     }
 
     @Test
-    fun darkPaperEasesEveryRolesWeightAndNothingElse() {
+    fun darkPaperEasesAppWeightsAndPreservesTheMeasuredLeaf() {
         val paper = TypographyTuning()
         val dark = paper.forDarkPaper()
         TypeRole.entries.forEach { role ->
-            assertEquals(paper.face(role).weight - DARK_PAPER_WEIGHT_EASE, dark.face(role).weight)
+            val ease = if (role == TypeRole.Leaf || role == TypeRole.BookItalic) 0 else DARK_PAPER_WEIGHT_EASE
+            assertEquals(paper.face(role).weight - ease, dark.face(role).weight)
             assertEquals(paper.face(role).copy(weight = 0), dark.face(role).copy(weight = 0))
         }
         assertEquals(370, dark.book.weight)
+    }
+
+    @Test
+    fun darkPaletteKeepsPaperTuningForPaginationAndSharing() {
+        val paper = TypographyTuning()
+        val light = quranTypePalette(true, paper)
+        val dark = quranTypePalette(true, paper, fontTuning = paper.forDarkPaper())
+        assertEquals(paper, dark.tuning)
+        assertEquals(light.tuning.bookCacheKey, dark.tuning.bookCacheKey)
+        assertEquals(light.leaf, dark.leaf)
+        assertNotEquals(light.serif, dark.serif)
+        assertEquals(quranTypePalette(false), quranTypePalette(false, paper, paper.forDarkPaper()))
     }
 
     @Test
@@ -44,6 +57,7 @@ class TypographyTuningTest {
         assertEquals(64, shipped.bookCacheKey.length)
         assertNotEquals(shipped.bookCacheKey, shipped.copy(book = shipped.book.copy(weight = 401)).bookCacheKey)
         assertNotEquals(shipped.bookCacheKey, shipped.copy(bookItalic = shipped.bookItalic.copy(features = mapOf("ss01" to 1))).bookCacheKey)
+        assertNotEquals(shipped.bookCacheKey, shipped.copy(leaf = shipped.leaf.copy(weight = 400)).bookCacheKey)
         for (role in listOf(TypeRole.Title, TypeRole.Ui, TypeRole.Note)) {
             assertEquals(shipped.bookCacheKey, shipped.withFace(role, shipped.face(role).copy(size = 1.2f)).bookCacheKey)
         }

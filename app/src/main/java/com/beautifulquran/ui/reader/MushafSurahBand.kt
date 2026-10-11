@@ -50,7 +50,11 @@ import com.beautifulquran.data.model.Surah
 import com.beautifulquran.ui.theme.mixedCaseTrackingEm
 import com.beautifulquran.ui.theme.DisplayFontFamily
 import com.beautifulquran.ui.theme.BookTextMotion
-import com.beautifulquran.ui.theme.TEXT_PAINT_FLAGS
+import com.beautifulquran.ui.theme.BookTextPaintFlags
+import com.beautifulquran.ui.theme.LocalQuranTypePalette
+import com.beautifulquran.ui.theme.QuranTypeProfile
+import com.beautifulquran.ui.theme.TypeRole
+import com.beautifulquran.ui.theme.typeFeatures
 import com.beautifulquran.ui.theme.GeneratedInkRosette
 import com.beautifulquran.ui.theme.HafsFontFamily
 import com.beautifulquran.ui.theme.SerifFontFamily
@@ -158,7 +162,13 @@ internal fun MushafSurahTitleBand(
 
     val name = if (latin) surah?.nameTransliteration.orEmpty() else surah?.nameArabic.orEmpty()
     // A banner name is display-sized: the display master, not the Text one.
-    val family = if (latin) DisplayFontFamily else HafsFontFamily
+    val family = when {
+        !latin -> HafsFontFamily
+        LocalQuranTypePalette.current.profile == QuranTypeProfile.TIMELESS -> DisplayFontFamily
+        else -> SerifFontFamily
+    }
+    val paintFlags = if (latin) BookTextPaintFlags else Paint.ANTI_ALIAS_FLAG
+    val titleFeatures = if (latin) typeFeatures(TypeRole.Title) else null
     val titleSize = fontSize * if (latin) MushafLatinTitleScale else MushafArabicTitleScale
     val resolvedTypeface by LocalFontFamilyResolver.current.resolve(family)
     val density = LocalDensity.current
@@ -174,21 +184,23 @@ internal fun MushafSurahTitleBand(
     // name too long for that (a long transliteration on a narrow phone or at a
     // large font scale) is set down until it fits, never let through.
     val roomPx = bannerNameRoomPx(style, constraints.maxWidth.toFloat(), bandPx)
-    val fontPx = remember(resolvedTypeface, naturalPx, latin, name, roomPx, titleTrackingEm) {
-        val probe = Paint(TEXT_PAINT_FLAGS).apply {
+    val fontPx = remember(resolvedTypeface, naturalPx, latin, name, roomPx, titleTrackingEm, paintFlags, titleFeatures) {
+        val probe = Paint(paintFlags).apply {
             typeface = resolvedTypeface as Typeface
             textSize = naturalPx
             if (latin) letterSpacing = titleTrackingEm
+            fontFeatureSettings = titleFeatures
         }
         val natural = probe.measureText(name)
         if (natural <= 0f || natural <= roomPx) naturalPx else naturalPx * (roomPx / natural).coerceAtLeast(0.5f)
     }
     val titleSizeFit = with(density) { fontPx.toSp() }
-    val paint = remember(resolvedTypeface, fontPx, latin, titleTrackingEm) {
-        Paint(TEXT_PAINT_FLAGS).apply {
+    val paint = remember(resolvedTypeface, fontPx, latin, titleTrackingEm, paintFlags, titleFeatures) {
+        Paint(paintFlags).apply {
             typeface = resolvedTypeface as Typeface
             textSize = fontPx
             if (latin) letterSpacing = titleTrackingEm
+            fontFeatureSettings = titleFeatures
         }
     }
     val drop = remember(paint, latin, bandPx) { titleBaselineDrop(paint, latin, bandPx) }
@@ -436,6 +448,7 @@ private fun MushafTitle(
             fontSize = fontSize,
             letterSpacing = if (latin) mixedCaseTrackingEm(TitleLetterSpacingEm).em else TextUnit.Unspecified,
             textMotion = if (latin) BookTextMotion else null,
+            fontFeatureSettings = if (latin) typeFeatures(TypeRole.Title) else null,
             color = ink,
             textAlign = TextAlign.Center,
             platformStyle = PlatformTextStyle(includeFontPadding = false),

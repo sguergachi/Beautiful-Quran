@@ -28,13 +28,13 @@ The cause is not "Timeless is wrong for screens". Two things were different:
 |---|----------|---------|
 | 1 | Baselines | Garamond / Timeless shipped / the tuning pasted by the owner. The owner's weight 375 + contrast 25 already cut colour 9 %. |
 | 2 | Letter-spacing | −0.025 em squeezed Timeless: letter gap 2.2 px vs 2.8 at 0. Ease it to −0.0125 em; the word/letter ratio stays > 5. |
-| 3 | Weight | 350 reaches Garamond's page colour at full ink; 365 is the shipped hand. Weight changes stems, not widths. |
+| 3 | Weight | 350 reaches Garamond's page colour at full ink; 365 is the shipped hand. Weight primarily changes stems, but also shifts advances. |
 | 4 | Contrast axis | Moving Text→Display thins hairlines 1.91 → 1.49 px (contrast 1.88 → 2.47). 25 gives 1.7 px, as Garamond's. |
 | 5 | Leading | Leading is paid for in hand: the page re-fits. 1.62 em gives 3.15 x-heights, near Garamond's 3.46. |
 | 6 | Capacity | Holding fewer characters per leaf gives a larger hand at a cost in leaves. 1,130 gives a hand 9 % over Garamond's x-height for 4 % more leaves. |
 | 7 | Ink | Softer ink lowers contrast (15.6 → 8.5:1) and cuts colour, but it also costs the dignity the owner asked for. Kept at full ink. |
 | 8 | Word space | Rivers are lowest at +0.03 em; the difference is inside noise, so the default stays. |
-| 9 | Dark paper | Weight eases 30 on dark paper (see DESIGN.md); the leaf's tuning inherits it. |
+| 9 | Dark paper | Tested weight easing of 30. Final review keeps the fitted leaf and its basmalah at the same weight across themes: the changed advances otherwise repaginate the book. App and Scroll roles still ease. |
 | 10 | Integration | Four leaves (2:57–61, 2:254–257, 112, 55:1–13): the refined hand sits within 2 % of Garamond's colour on every one, and beats the shipped Timeless on evenness. |
 
 ## What shipped
@@ -46,6 +46,8 @@ The cause is not "Timeless is wrong for screens". Two things were different:
 * leading 1.62 em (`TIMELESS_LEAF_LEADING_EM`);
 * capacity 1,130 characters (`leafCapacityChars`), against Garamond's 1,180;
 * the classic profile keeps its Garamond values untouched.
+* the leaf and basmalah keep their weights when paper changes, so a System
+  theme change keeps the same measured book and reading position.
 
 ## Redoing it
 

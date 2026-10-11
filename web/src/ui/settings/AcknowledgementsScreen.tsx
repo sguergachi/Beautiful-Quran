@@ -37,7 +37,7 @@ export const ACKNOWLEDGEMENTS: Acknowledgement[] = [
   },
   {
     title: 'English typeface',
-    body: 'Timeless Serif and Timeless Sans © Timeless Ventures Private Limited, Chennai (timeless.co), used under the Timeless Free Font License. EB Garamond and Cormorant Garamond (SIL OFL 1.1) set the few transliteration letters Timeless lacks.',
+    body: 'Timeless Serif and Timeless Sans © Timeless Ventures Private Limited, Chennai (timeless.co), used under the Timeless Free Font License. EB Garamond (SIL OFL 1.1) supplies the missing transliteration letters. Font licenses accompany the reader.',
   },
   {
     title: 'Arabic typeface',

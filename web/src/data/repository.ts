@@ -273,10 +273,10 @@ export function rootSummary(root: string): RootSummary | null {
       ayahNumber: Number(r.ayah_number),
       position: Number(r.position),
       arabic: String(r.arabic),
-      translation: runtimeMushafCache?.word(
+      translation: typesetEnglishName(runtimeMushafCache?.word(
         Number(r.surah_id), Number(r.ayah_number), Number(r.position),
-      )?.translation_en ?? String(r.translation_en),
-      surahNameTransliteration: String(r.name_transliteration),
+      )?.translation_en ?? String(r.translation_en)),
+      surahNameTransliteration: typesetEnglishName(String(r.name_transliteration)),
     }),
   )
 

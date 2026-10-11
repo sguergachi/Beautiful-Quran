@@ -45,14 +45,19 @@ data class TypographyTuning(
     /**
      * The same tuning for light ink on dark paper. Light type spreads into the
      * dark around it and reads heavier than the same weight in dark ink on
-     * cream, so every role eases by [DARK_PAPER_WEIGHT_EASE] — wght 370 where
-     * paper has 400. The variable axis makes that a continuous step; a static
-     * cut could only jump a whole weight. Applied on top of whatever Ink Lab
-     * has tuned, so the lab's numbers stay the paper-side values.
+     * cream, so the scroll reader's and the app's roles ease by
+     * [DARK_PAPER_WEIGHT_EASE] — wght 370 where paper has 400. The variable axis
+     * makes that a continuous step; a static cut could only jump a whole weight.
+     * Applied on top of whatever Ink Lab has tuned, so the lab's numbers stay
+     * the paper-side values.
+     *
+     * The English leaf and its italic (the basmalah) are **not** eased: weight
+     * moves advance widths (~0.6 % for 30), and the leaf is paginated. Easing it
+     * gave each theme its own book, so a System theme turning dark mid-reading
+     * blanked the leaf and moved verses onto different leaves.
      */
     internal fun forDarkPaper(): TypographyTuning = copy(
-        book = book.eased(), bookItalic = bookItalic.eased(), title = title.eased(),
-        ui = ui.eased(), note = note.eased(), leaf = leaf.eased(),
+        book = book.eased(), title = title.eased(), ui = ui.eased(), note = note.eased(),
     )
 
     private fun TypefaceTuning.eased() = copy(weight = weight - DARK_PAPER_WEIGHT_EASE)

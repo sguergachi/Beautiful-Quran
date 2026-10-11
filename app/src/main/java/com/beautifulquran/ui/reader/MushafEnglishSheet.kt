@@ -605,7 +605,7 @@ private fun englishLeafBlockTexts(
                                 color = gold, fontSize = EnglishLeafMarkType.em,
                                 letterSpacing = 0.em,
                             ),
-                            bookFontFamily = typePalette.serif,
+                            bookFontFamily = typePalette.leaf,
                             // The leaf is set left to right whichever digits the
                             // reader has chosen, so the cups are always the LTR
                             // pair.

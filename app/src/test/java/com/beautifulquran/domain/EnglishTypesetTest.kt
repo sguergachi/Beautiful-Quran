@@ -95,4 +95,26 @@ class EnglishTypesetTest {
         }
         error("Could not find $path above ${File("").absolutePath}")
     }
+
+    @Test
+    fun `word initial ayn stays an apostrophe without adding a closer`() {
+        listOf(
+            "the family of 'Imran over the worlds" to "the family of ’Imran over the worlds",
+            "Kaf, Ha, Ya, 'Ayn, Sad" to "Kaf, Ha, Ya, ’Ayn, Sad",
+            "Unquestionably, 'Aad denied their Lord" to "Unquestionably, ’Aad denied their Lord",
+            "the wife of al-'Azeez" to "the wife of al-’Azeez",
+            "the righteous is in 'illiyyun" to "the righteous is in ’illiyyun",
+            "Allah 's favour" to "Allah ’s favour",
+            "say, 'We are" to "say, ‘We are’",
+            "your 'partners' that" to "your ‘partners’ that",
+        ).forEach { (raw, expected) -> assertEquals(expected, EnglishTypography.typeset(raw)) }
+    }
+
+    @Test
+    fun `a leading closer does not cancel a later open quotation`() {
+        assertEquals(
+            "religion.” Say, “Indeed, the bounty”",
+            EnglishTypography.typeset("religion.\" Say, \"Indeed, the bounty"),
+        )
+    }
 }

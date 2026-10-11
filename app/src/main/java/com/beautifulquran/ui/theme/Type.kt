@@ -343,6 +343,14 @@ const val TEXT_PAINT_FLAGS =
         android.graphics.Paint.SUBPIXEL_TEXT_FLAG or
         android.graphics.Paint.LINEAR_TEXT_FLAG
 
+/** Canvas text must use the selected profile's Compose rendering mode. */
+internal val BookTextPaintFlags: Int
+    @Composable get() = if (BookTextMotion == TextMotion.Animated) {
+        TEXT_PAINT_FLAGS
+    } else {
+        android.graphics.Paint.ANTI_ALIAS_FLAG
+    }
+
 /**
  * Small titles (≤ 18 sp) are set in the Text master, not the display one:
  * the display master's hairlines are drawn for large sizes, and unhinted they
@@ -526,15 +534,22 @@ internal val QuranTypePalette.leafCapacityChars: Int
 private const val TIMELESS_LEAF_LEADING_EM = 1.62f
 private const val TIMELESS_LEAF_CAPACITY_CHARS = 1130
 
+/**
+ * The palette for [tuning] — the paper-side values, which the palette carries
+ * as [QuranTypePalette.tuning] (so cache keys and share images never see a
+ * theme's easing) — with its fonts cut from [fontTuning] (the same, eased on
+ * dark paper; see [TypographyTuning.forDarkPaper]).
+ */
 internal fun quranTypePalette(
     timeless: Boolean,
     tuning: TypographyTuning = TypographyTuning(),
+    fontTuning: TypographyTuning = tuning,
 ): QuranTypePalette {
     if (!timeless) return ClassicTypePalette
-    if (tuning == TypographyTuning()) return TimelessTypePalette
-    val book = timelessSerif(tuning.book, tuning.bookItalic)
-    val title = timelessSerif(tuning.title, display = true)
-    val ui = timelessSans(tuning.ui)
+    if (tuning == TypographyTuning() && fontTuning == tuning) return TimelessTypePalette
+    val book = timelessSerif(fontTuning.book, fontTuning.bookItalic)
+    val title = timelessSerif(fontTuning.title, display = true)
+    val ui = timelessSans(fontTuning.ui)
     fun tune(style: TextStyle, family: FontFamily, face: TypefaceTuning, lining: Boolean = false) = style.copy(
         fontFamily = family,
         fontSize = style.fontSize * face.size,
@@ -565,7 +580,7 @@ internal fun quranTypePalette(
             labelMedium = tune(base.labelMedium, book, tuning.book, lining = true),
             labelSmall = tune(base.labelSmall, book, tuning.book, lining = true),
         ),
-        timelessNotes(tuning.note), tuning,
+        timelessNotes(fontTuning.note), tuning,
         leaf = timelessSerif(tuning.leaf, tuning.bookItalic),
     )
 }

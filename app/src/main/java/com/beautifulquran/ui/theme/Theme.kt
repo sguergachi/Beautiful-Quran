@@ -605,7 +605,8 @@ fun BeautifulQuranTheme(
     val typePalette = androidx.compose.runtime.remember(timelessTypography, typographyTuning, darkPaper) {
         quranTypePalette(
             timelessTypography,
-            if (darkPaper) typographyTuning.forDarkPaper() else typographyTuning,
+            typographyTuning,
+            fontTuning = if (darkPaper) typographyTuning.forDarkPaper() else typographyTuning,
         )
     }
     androidx.compose.runtime.CompositionLocalProvider(

@@ -2691,7 +2691,7 @@ internal fun verseAnnotationStyle(
         fontSize = fontSize * damped * if (timeless) 0.88f * note.size else 1f,
         lineHeight = lineHeight * damped * if (timeless) 0.88f * note.size * note.leading else 1f,
         letterSpacing = if (timeless) (0.15f / fontSize.value + note.tracking).em else 0.15.sp,
-        fontFeatureSettings = if (timeless) note.featureSettings else "'kern' 1, 'liga' 1",
+        fontFeatureSettings = if (timeless) note.featureSettings else "'kern' 1, 'liga' 1, 'onum' 1",
     )
 }
 
@@ -3913,10 +3913,8 @@ private val TOP_BAR_ROSETTE_STROKE = 0.45.dp
  * figure between equal rules.
  */
 /**
- * The folio's Western figures: Timeless *lining* figures. Running text asks
- * for old-style, whose 3, 4, 5, 7 and 9 hang below the baseline — right
- * in prose, wrong beside a rule, where a figure must stand level with its
- * partner across the page.
+ * The folio's Western figures stay lining even when Ink Lab selects old-style
+ * figures for prose: each figure must stand level with its partner across the page.
  */
 @Composable
 private fun folioWesternStyle(): TextStyle = MaterialTheme.typography.labelSmall.copy(

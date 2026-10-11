@@ -135,6 +135,7 @@ android {
         noCompress += "xz"
     }
     sourceSets.named("main") {
+        assets.directories.add(rootProject.file("licenses").absolutePath)
         // preBuild owns generation; a concrete path keeps Android Studio's
         // source-set model deterministic while the task dependency stays explicit.
         assets.directories.add(
@@ -307,19 +308,23 @@ val fetchTimelessFonts by tasks.registering {
         if (!archive.isFile || digest(archive) != sha256) {
             logger.lifecycle("Downloading Timeless fonts from $url")
             cacheDir.mkdirs()
-            val partial = archive.resolveSibling("${archive.name}.tmp")
-            URI(url).toURL().openStream().use { input ->
-                partial.outputStream().use { input.copyTo(it) }
-            }
-            val got = digest(partial)
-            if (got != sha256) {
-                partial.delete()
-                throw GradleException(
+            val partial = File.createTempFile("timeless-", ".zip", cacheDir)
+            try {
+                URI(url).toURL().openConnection().apply {
+                    connectTimeout = 30_000
+                    readTimeout = 60_000
+                }.getInputStream().use { input ->
+                    partial.outputStream().use { input.copyTo(it) }
+                }
+                val got = digest(partial)
+                if (got != sha256) throw GradleException(
                     "Timeless archive checksum mismatch: got $got, want $sha256. If " +
                         "timeless.co replaced the release, update scripts/timeless-fonts.json deliberately.",
                 )
+                check(partial.renameTo(archive)) { "Failed to move $partial into place" }
+            } finally {
+                partial.delete()
             }
-            check(partial.renameTo(archive)) { "Failed to move $partial into place" }
         }
 
         val dest = outDir.get().asFile

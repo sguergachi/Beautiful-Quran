@@ -69,8 +69,9 @@ internal val ACKNOWLEDGEMENTS = listOf(
     Acknowledgement(
         title = "English typeface",
         body = "Timeless Serif and Timeless Sans © Timeless Ventures Private Limited, Chennai " +
-            "(timeless.co), used under the Timeless Free Font License. EB Garamond and " +
-            "Cormorant Garamond (SIL OFL 1.1) set the few transliteration letters Timeless lacks.",
+            "(timeless.co), used under the Timeless Free Font License. EB Garamond " +
+            "supplies the missing transliteration letters. The classic profile uses EB Garamond " +
+            "and Cormorant Garamond (SIL OFL 1.1). Font licenses accompany the app.",
     ),
     Acknowledgement(
         title = "Arabic typeface",

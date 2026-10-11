@@ -9,6 +9,8 @@ on:
       - 'data/lexicon.db'
       - 'data/dictionary.db'
       - 'docs/**'
+      - 'scripts/timeless-fonts.json'
+      - 'licenses/**'
       - '.github/workflows/web.yml'
   pull_request:
     paths:
@@ -17,6 +19,8 @@ on:
       - 'data/lexicon.db'
       - 'data/dictionary.db'
       - 'docs/**'
+      - 'scripts/timeless-fonts.json'
+      - 'licenses/**'
       - '.github/workflows/web.yml'
 
 concurrency:
