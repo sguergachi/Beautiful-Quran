@@ -99,7 +99,7 @@ internal object TarjiVersePulse {
                 pitch[hop] = detector.lastFoldedPitchHz
                 lead[hop] = detector.lastPitchLeadHops
             }
-            val recording = TarjiRecordingDetector.analyze(frames, detector, wanted)
+            val recording = TarjiRecordingDetector.analyze(frames, detector, wanted = wanted)
             // Decision timestamps are hop ends; raw RMS lives at hop centres.
             for (hop in 0 until hops + EAR_BEHIND_HOPS) {
                 if (hop and 63 == 0 && !wanted()) throw kotlinx.coroutines.CancellationException("retuned")
@@ -220,6 +220,44 @@ internal object TarjiVersePulse {
 
     private fun <K, V> lru(limit: Int) = object : LinkedHashMap<K, V>(limit, 0.75f, true) {
         override fun removeEldestEntry(eldest: MutableMap.MutableEntry<K, V>?) = size > limit
+    }
+
+    private val references = lru<String, com.beautifulquran.playback.TarjiVoiceReference>(RESULTS_KEPT)
+
+    /**
+     * The bar a whole verse sets for the Recording method's drama: what the
+     * Tarjīʿ Lab, which holds only part of the verse, must judge against so
+     * its graph and the reader's agree. Main thread; null if the verse's
+     * audio cannot be had.
+     */
+    suspend fun recordingReference(
+        context: Context,
+        reciter: com.beautifulquran.data.model.Reciter,
+        surahId: Int,
+        ayah: Int,
+        knobs: TarjiLabKnobs,
+    ): com.beautifulquran.playback.TarjiVoiceReference? {
+        val url = reciter.audioUrl(surahId, ayah)
+        val key = "$url|${knobs.copy(glintBrightness = 1f)}"
+        references[key]?.let { return it }
+        val app = context.applicationContext
+        val decoded = audio.getOrPut(url) { scope.async { decoders.withPermit { decode(app, url) } } }
+        val heard = try {
+            decoded.await()
+        } catch (cancelled: kotlinx.coroutines.CancellationException) {
+            throw cancelled
+        } catch (failed: Throwable) {
+            audio.remove(url)
+            return null
+        }
+        val reference = withContext(Dispatchers.Default) {
+            val job = coroutineContext[Job]
+            prepare(heard, knobs.copy(glintBrightness = 1f), emptyList(), TarjiDetectorMode.Recording, reciter.id) {
+                job?.isActive != false
+            }.recording?.reference
+        } ?: return null
+        references[key] = reference
+        return reference
     }
 
     /**
