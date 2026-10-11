@@ -9,7 +9,6 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.background
-import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.waitForUpOrCancellation
@@ -100,10 +99,10 @@ import com.beautifulquran.ui.theme.quietClickable
 import com.beautifulquran.ui.theme.verticalFadingEdges
 import com.beautifulquran.ui.theme.QuranTheme
 
-/** The search field leads the scrolling document beneath the fixed masthead. */
+/** The chapter list's first content item — focusing search returns here. */
 private const val SEARCH_ITEM_INDEX = 0
 
-/** How far (px) the list must move past the lifted search before a scroll counts as "dismiss". */
+/** How far (px) the list must move before a scroll counts as "dismiss". */
 internal const val DISMISS_SCROLL_THRESHOLD_PX = 24
 
 private val HomeRibbonLane = 28.dp
@@ -123,7 +122,6 @@ private val TopBoundRibbonHeight = 96.dp
 private val SearchBottomBreath = 10.dp
 private val SearchBottomFeather = 24.dp
 
-@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun HomeScreen(
     viewModel: HomeViewModel,
@@ -157,8 +155,8 @@ fun HomeScreen(
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val focusManager = LocalFocusManager.current
     val floatingPlayback = uiState.floatingPlayback
-    // Bottom dissolve only — the search bar owns the top of this list, so a
-    // top fade would sit on the field. ContentPadding matches the bottom
+    // Bottom dissolve only — the fixed top bar owns the top edge, so a
+    // top fade would sit on the feather. ContentPadding matches the bottom
     // fade so the last ink sits clear of it at rest.
     val listFadeBottom = 48.dp
     // Measured height of the floating transport; falls back to the clearance
@@ -286,10 +284,10 @@ fun HomeScreen(
         }
     }
 
-    // Lift the focused search to the top of its scrolling document, then
-    // dismiss the keyboard on a deliberate scroll. Results stay: searchActive
-    // covers a query without focus, so the field keeps its sticky seat while
-    // the keyboard and dials go away. Back still dismisses without scrolling.
+    // Lift the results to the top on focus, then dismiss the keyboard
+    // on a deliberate scroll. Results stay: searchActive covers a query
+    // without focus, so the field keeps its fixed seat while the keyboard
+    // and dials go away. Back still dismisses without scrolling.
     LaunchedEffect(searchFocused) {
         if (!searchFocused) return@LaunchedEffect
         listState.animateScrollToItem(SEARCH_ITEM_INDEX)
@@ -356,15 +354,53 @@ fun HomeScreen(
                     .widthIn(max = 640.dp)
                     .fillMaxWidth(),
             ) {
+                // Single fixed top bar: masthead + search + feather never
+                // scroll, so the field can never be caught half-cut mid-list.
                 // Focused search claims the top of the sheet: the masthead
                 // recedes so the field sits higher above the keyboard.
-                AnimatedVisibility(
-                    visible = !searchFocused,
-                    enter = fadeIn(tween(180)) + expandVertically(tween(220)),
-                    exit = fadeOut(tween(140)) + shrinkVertically(tween(200)),
+                val paper = MaterialTheme.colorScheme.background
+                Column(
+                    Modifier
+                        .fillMaxWidth()
+                        .background(paper),
                 ) {
-                    HomeHeader(onOpenSettings = onOpenSettings)
+                    AnimatedVisibility(
+                        visible = !searchFocused,
+                        enter = fadeIn(tween(180)) + expandVertically(tween(220)),
+                        exit = fadeOut(tween(140)) + shrinkVertically(tween(200)),
+                    ) {
+                        HomeHeader(onOpenSettings = onOpenSettings)
+                    }
+                    // Small top breath when the masthead is gone so the
+                    // field is not hard against the status-bar padding.
+                    if (searchFocused) {
+                        Spacer(Modifier.height(8.dp))
+                    }
+                    PaperSearchField(
+                        value = uiState.query,
+                        onValueChange = viewModel::onQueryChange,
+                        placeholder = "Search concept, “exact phrase”, or 2:255",
+                        contentDescription = "Search",
+                        onFocusChanged = { focused ->
+                            searchFocused = focused
+                            if (focused) viewModel.onSearchFocused()
+                        },
+                        modifier = Modifier
+                            .padding(start = HomeStartInset, end = HomeEndInset)
+                            .fillMaxWidth()
+                            .onGloballyPositioned {
+                                searchBottom = it.boundsInWindow().bottom
+                                searchBounds = it.boundsInRoot()
+                            },
+                    )
+                    Spacer(Modifier.height(SearchBottomBreath))
                 }
+                Spacer(
+                    Modifier
+                        .fillMaxWidth()
+                        .height(SearchBottomFeather)
+                        .paperBottomFeather(paper),
+                )
                 LazyColumn(
                     state = listState,
                     modifier = Modifier
@@ -382,46 +418,6 @@ fun HomeScreen(
                         bottom = listBottomPadding,
                     ),
                 ) {
-                    stickyHeader(key = "search") {
-                        val paper = MaterialTheme.colorScheme.background
-                        Column(Modifier.fillMaxWidth()) {
-                            Column(
-                                Modifier
-                                    .fillMaxWidth()
-                                    .background(paper),
-                            ) {
-                                // Small top breath when the masthead is gone so the
-                                // field is not hard against the status-bar padding.
-                                if (searchFocused) {
-                                    Spacer(Modifier.height(8.dp))
-                                }
-                                PaperSearchField(
-                                    value = uiState.query,
-                                    onValueChange = viewModel::onQueryChange,
-                                    placeholder = "Search concept, “exact phrase”, or 2:255",
-                                    contentDescription = "Search",
-                                    onFocusChanged = { focused ->
-                                        searchFocused = focused
-                                        if (focused) viewModel.onSearchFocused()
-                                    },
-                                    modifier = Modifier
-                                        .padding(start = HomeStartInset, end = HomeEndInset)
-                                        .fillMaxWidth()
-                                        .onGloballyPositioned {
-                                            searchBottom = it.boundsInWindow().bottom
-                                            searchBounds = it.boundsInRoot()
-                                        },
-                                )
-                                Spacer(Modifier.height(SearchBottomBreath))
-                            }
-                            Spacer(
-                                Modifier
-                                    .fillMaxWidth()
-                                    .height(SearchBottomFeather)
-                                    .paperBottomFeather(paper),
-                            )
-                        }
-                    }
             item(key = "chapter-page") {
                 Box(Modifier.fillMaxWidth()) {
                     Column(Modifier.fillMaxWidth()) {
@@ -805,7 +801,7 @@ internal fun shouldUnfurlReadingPlaceRibbon(
     currentPlacePresent: Boolean,
 ): Boolean = pendingReturn && chapterRibbonReady && currentPlacePresent
 
-/** A deliberate list scroll past the lifted search dismisses the keyboard. */
+/** A deliberate list scroll under the fixed search dismisses the keyboard. */
 internal fun shouldDismissSearchOnScroll(
     isScrolling: Boolean,
     firstVisibleItemIndex: Int,
