@@ -3,9 +3,12 @@ package com.beautifulquran.ui.reader
 import com.beautifulquran.data.model.Word
 import com.beautifulquran.domain.MushafSourceWord
 import com.beautifulquran.domain.EnglishWordAlignment
+import com.beautifulquran.domain.ENGLISH_LEAF_CAPACITY_CHARS
+import com.beautifulquran.domain.buildEnglishBook
 import com.beautifulquran.domain.buildMushafCatalog
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
@@ -35,6 +38,26 @@ class MushafVoicePageTest {
             source(2, 3, 1, page = 4, line = 1),
         ),
     )
+
+    @Test
+    fun `previous verse starts on its opening Arabic page despite its carried last word`() {
+        assertEquals(4, catalog.pageOf(2, 2, 2))
+        assertEquals(2, mushafVerseStartLeaf(catalog, null, 2, 2))
+    }
+
+    @Test
+    fun `restarting a carried English verse returns to its opening leaf`() {
+        val catalog = buildMushafCatalog(listOf(
+            source(2, 2, 1, page = 3, line = 1),
+            source(2, 3, 1, page = 3, line = 2),
+        ))
+        val cap = ENGLISH_LEAF_CAPACITY_CHARS
+        val book = buildEnglishBook(catalog) { _, ayah -> if (ayah == 2) cap / 2 else cap }
+        val opening = mushafVerseStartLeaf(catalog, book, 2, 3)
+        val tail = mushafLeafNumber(book, 2, 3, page = 3, through = 0.99f) - 1
+        assertTrue(tail > opening)
+        assertEquals(book.firstLeafOf(3), opening)
+    }
 
     @Test
     fun `a voice on another reading owns no leaf here`() {

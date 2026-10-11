@@ -461,6 +461,7 @@ fun ReaderScreen(
     // last writer of the pager's position.
     var mushafSeekPage by remember { mutableStateOf<Int?>(null) }
     var mushafSeekSurahId by remember { mutableStateOf<Int?>(null) }
+    var mushafBackwardAyah by remember(surahId) { mutableStateOf<Int?>(null) }
     // Separate physical contact from landing work: every hand fades the folio,
     // but only a confirmed distant landing parks expensive neighbour leaves.
     val mushafScrubbing = remember { mutableStateOf(false) }
@@ -1648,6 +1649,10 @@ fun ReaderScreen(
             viewModel.playFromAyah(selectedPlaybackAyah())
         }
     }
+    fun stepBackwardFromBar() {
+        val ayah = viewModel.fastBackward() ?: return
+        if (mushafMode) mushafBackwardAyah = ayah
+    }
     val host = playbackHost
     if (host != null) {
         val pinHere = playbackPinned && !mushafMode && !gathering
@@ -1664,7 +1669,7 @@ fun ReaderScreen(
                 // The float is read when the bar draws, not while this sheet composes.
                 host.chromeAlpha = { chromeAlpha.value }
                 host.onPlayPause = ::playFromBar
-                host.onFastBackward = viewModel::fastBackward
+                host.onFastBackward = ::stepBackwardFromBar
                 host.onFastForward = viewModel::fastForward
                 host.onRepeatClick = { showRepeatDialog = true }
                 host.onSpeed = viewModel::cycleSpeed
@@ -1978,7 +1983,7 @@ fun ReaderScreen(
                         chromeAlpha = { chromeAlpha.value },
                         reciterName = uiState.currentReciter?.name.orEmpty(),
                         onPlayPause = ::playFromBar,
-                        onFastBackward = viewModel::fastBackward,
+                        onFastBackward = ::stepBackwardFromBar,
                         onFastForward = viewModel::fastForward,
                         onRepeatClick = { showRepeatDialog = true },
                         onSpeed = viewModel::cycleSpeed,
@@ -2649,7 +2654,7 @@ fun ReaderScreen(
                                 }
                             }
                         },
-                        onFastBackward = viewModel::fastBackward,
+                        onFastBackward = ::stepBackwardFromBar,
                         onFastForward = viewModel::fastForward,
                         onRepeatClick = { showRepeatDialog = true },
                         onSpeed = viewModel::cycleSpeed,
@@ -2922,6 +2927,10 @@ fun ReaderScreen(
                         searchFocusActive = searchFocusActive,
                         heldPage = mushafTappedPage,
                         onTappedLeaf = { mushafTappedPage = it },
+                        backwardAyah = mushafBackwardAyah,
+                        onBackwardAyahShown = { ayah ->
+                            if (mushafBackwardAyah == ayah) mushafBackwardAyah = null
+                        },
                         bookMeasured = mushafUi?.measured != false,
                         onLeafMetrics = { well, measure ->
                             val was = mushafLeafMetrics.value

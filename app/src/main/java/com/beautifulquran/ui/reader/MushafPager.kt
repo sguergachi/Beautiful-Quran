@@ -266,6 +266,14 @@ internal fun mushafLeafNumber(
     else -> book.leafOfVerse(surahId, ayah, page, through) + 1
 }
 
+/** Explicit verse restarts land on its opening leaf, including a carried English verse. */
+internal fun mushafVerseStartLeaf(
+    catalog: MushafCatalog,
+    book: EnglishBook?,
+    surahId: Int,
+    ayah: Int,
+): Int = mushafLeafNumber(book, surahId, ayah, catalog.pageOf(surahId, ayah)) - 1
+
 /**
  * How far through its verse the reciter's word stands, as a fraction — what
  * [mushafLeafNumber] needs to tell one half of a carried verse from the other.
@@ -683,6 +691,9 @@ internal fun MushafPager(
     heldPage: Int?,
     /** The leaf the pointer actually hit — not a word-to-page lookup. */
     onTappedLeaf: (Int) -> Unit,
+    /** A transport command turns at once, before Media3 reports its new verse. */
+    backwardAyah: Int? = null,
+    onBackwardAyahShown: (Int) -> Unit = {},
     flashAyah: Int?,
     flashWordPosition: Int?,
     flashWordPositions: Set<Int>,
@@ -746,9 +757,23 @@ internal fun MushafPager(
     val alignments = remember(content, wordByWord) { EnglishVerseAlignments(content, wordByWord) }
     val alignmentsNow = rememberUpdatedState(alignments)
     val heldPageNow = rememberUpdatedState(heldPage)
+    LaunchedEffect(backwardAyah) {
+        val ayah = backwardAyah ?: return@LaunchedEffect
+        val index = mushafLeafIndex(
+            mushafVerseStartLeaf(catalog, book, loadedSurahId, ayah), pagerState.pageCount,
+        )
+        followPage = index
+        waitingPage = if (playback.value.isPlaying) index + 1 else 0
+        onTappedLeaf(index + 1)
+        try {
+            pagerState.scrollToPage(index)
+        } finally {
+            onBackwardAyahShown(ayah)
+        }
+    }
     // heldPage is read, not keyed: keying it restarted this collector on
     // every tap and cancelled in-flight work. The hold is checked per tick.
-    LaunchedEffect(followEnabled, loadedSurahId, catalog, pagerState, english) {
+    LaunchedEffect(followEnabled, loadedSurahId, catalog, pagerState, english, backwardAyah) {
         snapshotFlow {
             val voice = playback.value
             MushafFollowMoment(
@@ -760,6 +785,7 @@ internal fun MushafPager(
             )
         }
             .collect { moment ->
+                if (backwardAyah != null) return@collect
                 if (!followEnabled || !moment.playingHere || !moment.isPlaying) return@collect
                 val word = moment.word
                 // The active word carries no surah of its own. Right after a

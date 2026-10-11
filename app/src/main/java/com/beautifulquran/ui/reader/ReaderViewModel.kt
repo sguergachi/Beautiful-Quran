@@ -1152,23 +1152,27 @@ class ReaderViewModel(
         }
     }
 
-    fun fastBackward() {
-        val np = playerState.value.nowPlaying?.takeIf { it.surahId == surahId } ?: return
+    /** Returns the verse the command sought, so the page can move before the clock lands. */
+    fun fastBackward(): Int? {
+        val np = playerState.value.nowPlaying?.takeIf { it.surahId == surahId } ?: return null
         if (np.ayah == BASMALAH_PLAYLIST_AYAH) {
             player.seekToBasmalah()
-            return
+            return 1
         }
         if (player.positionMs > START_SEEK_GRACE_MS) {
             player.seekToAyah(np.ayah)
-            return
+            return np.ayah
         }
 
         if (np.ayah > 1) {
             player.seekToAyah(np.ayah - 1)
+            return np.ayah - 1
         } else if (np.ayah == 1) {
             // Restart from the basmalah lead-in when present.
             player.playLoadedFromAyah(1)
+            return 1
         }
+        return null
     }
 
     private fun midpointForLongAyah(ayah: Int): Long? =
