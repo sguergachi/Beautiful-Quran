@@ -44,6 +44,7 @@ import androidx.compose.ui.text.style.Hyphens
 import androidx.compose.ui.text.style.LineBreak
 import androidx.compose.ui.text.style.LineHeightStyle
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextMotion
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.Constraints
@@ -75,9 +76,11 @@ import com.beautifulquran.domain.ENGLISH_LEAF_LEADING_EM
 import com.beautifulquran.domain.EnglishLeafFill
 import com.beautifulquran.domain.EnglishLeafRuler
 import com.beautifulquran.domain.EnglishLeafVerse
+import com.beautifulquran.domain.EnglishRag
 import com.beautifulquran.domain.EnglishRulerCut
 import com.beautifulquran.domain.mushafLeafBands
 import com.beautifulquran.domain.quranWordKey
+import com.beautifulquran.ui.theme.PaperCoverPad
 import com.beautifulquran.ui.theme.LocalQuranAccents
 import com.beautifulquran.ui.theme.SerifFontFamily
 import com.beautifulquran.ui.theme.ShapedWordBloom
@@ -353,6 +356,7 @@ internal fun MushafEnglishSheet(
                         packs = packsState,
                         fontSize = fontSize,
                         lineHeight = pitch,
+                        measurePx = measurePx,
                         liveInk = liveInk,
                         onVerseSeek = onVerseSeek,
                         onVerseLongPress = onVerseLongPress,
@@ -507,7 +511,7 @@ internal data class EnglishProseVerse(
      * Where the reciter is inside *this* fragment's printed text, given where
      * they are inside the verse — carried across by letters, not proportion
      * (`EnglishLeafVerse.fragmentInkProgress`), so a band edge lands on the
-     * word it names however many joiners the hyphenation threaded in.
+     * word it names after whitespace and asides have been removed.
      */
     val fragmentProgress: (Float) -> Float = { it },
     /**
@@ -577,7 +581,10 @@ private fun englishLeafBlockTexts(
                             number = verse.ayah,
                             useArabicIndicDigits =
                                 verseNumberScript == VerseNumberScript.ARABIC,
-                            style = SpanStyle(color = gold, fontSize = EnglishLeafMarkType.em),
+                            style = SpanStyle(
+                                color = gold, fontSize = EnglishLeafMarkType.em,
+                                letterSpacing = 0.em,
+                            ),
                             // The leaf is set left to right whichever digits the
                             // reader has chosen, so the cups are always the LTR
                             // pair.
@@ -707,13 +714,13 @@ private fun englishLeafPitches(
             is EnglishLeafBlockText.Opening -> pitches += EnglishLeafPanelAir * 2f
             is EnglishLeafBlockText.Prose -> {
                 val lines = measurer
-                    .measure(
+                    .measureEnglishProse(
                         text = block.text,
                         style = englishProseStyle(
                             with(density) { handPx.toSp() },
                             TextUnit.Unspecified,
                         ),
-                        constraints = Constraints(maxWidth = measurePx.toInt().coerceAtLeast(1)),
+                        measurePx = measurePx,
                         density = density,
                     )
                     .lineCount
@@ -771,10 +778,10 @@ private fun englishLeafHeightPx(
                 .heightPx(handPx * leadingEm, inkPx, basmalahPx)
                 .toDouble()
             is EnglishLeafBlockText.Prose -> measurer
-                .measure(
+                .measureEnglishProse(
                     text = block.text,
                     style = style,
-                    constraints = Constraints(maxWidth = measurePx.toInt().coerceAtLeast(1)),
+                    measurePx = measurePx,
                     density = density,
                 )
                 .size
@@ -801,13 +808,14 @@ private fun englishBookHandPx(
 ): Float {
     val block = AnnotatedString(englishLeafReferenceBlock())
     var handPx = ENGLISH_LEAF_PROBE_FONT_PX
+    // Calibrate at natural spacing so tighter prose keeps the book's type size.
     repeat(2) {
         val stands = measurer.measure(
             text = block,
             style = englishProseStyle(
                 with(density) { handPx.toSp() },
                 with(density) { (handPx * ENGLISH_LEAF_LEADING_EM).toSp() },
-            ),
+            ).copy(letterSpacing = 0.em),
             constraints = Constraints(maxWidth = measurePx.toInt().coerceAtLeast(1)),
             density = density,
         ).size.height.toFloat()
@@ -817,82 +825,23 @@ private fun englishBookHandPx(
 }
 
 /**
- * The book's hand: EB Garamond, ragged right, hyphenated.
+ * The book's hand: ragged right, with whole words.
  *
- * **Ragged, not justified.** The mushaf's own rule is that every full line
- * reaches both margins (`QURAN_TYPOGRAPHY.md` §3) — but that is a rule about
- * Arabic, which fills a line by the letterform, and it is the calligrapher's
- * art. Latin has only the word space to fill with, and on a measure of about
- * fifty characters that is not enough of a lever: the spaces open unevenly,
- * the same line's colour changes from one page to the next, and the reader
- * pays for a straight right edge with rivers of white. Justification was
- * tried on this leaf and taken back out: it does make both margins straight
- * — every line within 3 px of the last — but the loosest line on the
- * Ad-Dukhan leaf (`We were to warn [mankind] ⟨3⟩ On that`) ran three times
- * the natural word space to buy it, because *night* has nowhere to break.
+ * The rag chooses word-space breaks that share deep holes between neighbouring
+ * lines, while keeping the minimum line count and preferring fuller lines on
+ * ties. It leaves ordinary shortfalls alone, so the edge still moves rather
+ * than forming the second margin Balanced produced. See §13.5 of
+ * `docs/QURAN_TYPOGRAPHY.md` for the measured tradeoffs.
  *
- * **How even the rag can be, measured.** The rag looks left-heavy and it is:
- * on the Ta-Ha leaf the right edge falls short of the measure by 57 px on
- * average and 90 px at worst, out of 942, so the optical right margin is half
- * again the left. That is very close to the floor, and the floor was measured
- * rather than assumed — a minimum-raggedness optimizer run over the same
- * words, into the same number of lines, with this leaf's own vetted
- * hyphenation points as extra break candidates, reaches mean 50 and worst 78,
- * and aimed at any target rag depth from 10 px to 190 px it never gets the
- * spread below 75 px against the breaker's 78. The lurch is the width of a
- * word: from a given line start the next candidate is a whole word further
- * on, so the achievable line lengths are quantized in ~70 px steps and no
- * arrangement of them lands them all in a narrow band. Hyphenation is the
- * only thing that subdivides that quantum, and at the book's minima this
- * translation offers too few cuts to matter. Anyone who wants an even rag
- * here is asking for either looser minima (which is *de-scends*, refused
- * twice) or more words to a line — a smaller hand, or a wider measure. It is
- * not a line-breaking problem.
- *
- * **And evening the rag was the wrong thing to want.** The leaf was set
- * `Balanced` on exactly that reasoning and the reader read the result back
- * correctly: *the right rag is a straight edge and the text is left heavy*.
- * It is what an evened rag does. Over eight leaves and 116 lines, `Balanced`
- * (and `HighQuality`, which breaks identically) put 39% of lines within 20 px
- * of the mean shortfall and let only 10% reach the margin — so the line ends
- * pile into one band about a word's width inside the measure, the eye reads
- * that band as a second margin, and the block hangs to the left of it. A rag
- * has to be *active* to read as a rag at all.
- *
- * **So the leaf breaks greedily.** `LineBreak.Strategy.Simple` fills each
- * line as far as the next word allows and takes what is left: 20% of lines
- * reach the margin, the mean cluster falls to 29%, and the right edge moves.
- * It costs 3 px of mean shortfall (70 → 73 of 942) and eight more deep holes
- * (11 → 19 past an eighth of the measure). That is the real trade, and it is
- * the right way round — the deep holes are legible as holes, the phantom
- * margin was not legible as anything, it just made the page look pinned.
- *
- * **Hyphenated, at the book's minima.** A long word the rag cannot absorb —
- * *righteousness*, *[fulfillment]*, *obedience* — pushes the words around it
- * into a deep hole at the line's end. With `Hyphens.Auto` the breaker may
- * carry the word over instead — but it breaks *de-scends* after two letters,
- * which no book does, and Compose exposes no minima to stop it with. So the
- * leaf vetoes (`EnglishHyphenation`): every cut the TeX patterns propose with
- * fewer than three letters on either side is joined with a word joiner, and
- * the breaker takes the rest. Measured on glass (Ta-Ha, Baqarah's opening,
- * As-Saffat): the Ta-Ha mean shortfall 53 → 43 px of a 935 px measure with
- * its worst hole filled by a good break (`…and does right-` / `eousness…`),
- * As-Saffat's mean 68 → 64 with `won-der` its only hyphen, Baqarah untouched
- * (its holes are short-word pileups no hyphen reaches), and no bad fragment
- * anywhere — unvetoed hyphenation breaks *Re-pelled* and *de-scends* on the
- * same leaves. Gluing short words to their neighbours was tried twice and
- * reverted twice: the keep-hole stands even hyphenated.
- *
- * This was load-bearing off until `ShapedWordBloom.ColorReveal` learned the
- * same multi-line wash `InkReveal` already paints: a tinted wash over a
- * broken word used to sweep the width of the whole line from the union bounds
- * of its range. Both washes now advance one head across the fragments in
- * order. The paper masks had two more lessons to learn from the hyphen —
- * see `lineSelectionBounds` and `justifyShift`.
+ * Hyphenation is off for both the ruler and the page. The chosen breaks replace
+ * spaces in place, so the wash, paper covers and taps keep their character
+ * offsets. Simple wrapping is the fallback for paragraphs the rag cannot set.
  */
 internal fun englishProseStyle(fontSize: TextUnit, lineHeight: TextUnit) = TextStyle(
     fontFamily = SerifFontFamily,
     fontSize = fontSize,
+    // Tighter prose fits whole words without reducing the book's type size.
+    letterSpacing = (-0.025f).em,
     lineHeight = lineHeight,
     textAlign = TextAlign.Start,
     // Greedy, deliberately. Balanced and HighQuality both even the lines out,
@@ -904,8 +853,13 @@ internal fun englishProseStyle(fontSize: TextUnit, lineHeight: TextUnit) = TextS
     // 29%, for 3 px more mean shortfall and eight more deep holes. The holes
     // are the price of an active rag; the phantom edge was not worth avoiding
     // them. See docs/QURAN_TYPOGRAPHY.md §13.5.
+    //
+    // The leaf no longer pays it: englishRaggedProse breaks its lines first,
+    // greedy wherever greedy was fine and not where it left a hole, and writes
+    // the breaks into the text. This is the fallback for a paragraph it
+    // declines.
     lineBreak = LineBreak.Paragraph.copy(strategy = LineBreak.Strategy.Simple),
-    hyphens = Hyphens.Auto,
+    hyphens = Hyphens.None,
     // The book face's refinements: kerning and ligatures on, old-style figures
     // so the prose (and its brackets and quotes) sets with an even colour —
     // the same features the web leaf and every other English surface set.
@@ -924,6 +878,156 @@ internal fun englishProseStyle(fontSize: TextUnit, lineHeight: TextUnit) = TextS
     ),
 )
 
+/**
+ * A paragraph on the leaf's measure. Whole-word greedy wrapping and
+ * [EnglishRag] have the same minimum line count; pagination can skip choosing
+ * the rag and measuring every word position for thousands of candidate leaves.
+ */
+private fun TextMeasurer.measureEnglishProse(
+    text: AnnotatedString,
+    style: TextStyle,
+    measurePx: Float,
+    density: Density,
+    chooseRag: Boolean = true,
+): TextLayoutResult = measure(
+    text = if (chooseRag) englishRaggedProse(text, style, measurePx, density, this) else text,
+    style = style,
+    constraints = englishProseConstraints(measurePx),
+    density = density,
+)
+
+/** Leave one pixel for rounding when the chosen lines are drawn at the full measure. */
+private fun englishProseConstraints(measurePx: Float) =
+    Constraints(maxWidth = (measurePx.toInt() - 1).coerceAtLeast(1))
+
+/**
+ * The paragraph with its lines broken where [EnglishRag] sets them.
+ *
+ * Each word space the rag ends a line at becomes a line break *in place*,
+ * one character for one, so every offset the wash, the paper covers
+ * and the taps hold still names the same letter. The platform then only sets
+ * lines that already fit, and breaks nothing itself.
+ *
+ * The positions come from the paragraph set on the measure, chained line to
+ * line into one unbroken coordinate, and the answer is remembered: the leaf is
+ * measured several times at the same hand while the leaf is fitted.
+ */
+internal fun englishRaggedProse(
+    text: AnnotatedString,
+    style: TextStyle,
+    measurePx: Float,
+    density: Density,
+    measurer: TextMeasurer,
+): AnnotatedString = text.withEnglishBreaks(
+    englishRagBreaks(text, style, measurePx, density, measurer),
+)
+
+private fun AnnotatedString.withEnglishBreaks(breaks: IntArray): AnnotatedString {
+    if (breaks.isEmpty()) return this
+    val chars = text.toCharArray()
+    breaks.forEach { at -> chars[at] = '\n' }
+    return AnnotatedString(String(chars), spanStyles, paragraphStyles)
+}
+
+private fun englishRagBreaks(
+    text: AnnotatedString,
+    style: TextStyle,
+    measurePx: Float,
+    density: Density,
+    measurer: TextMeasurer,
+): IntArray {
+    val source = text.text
+    val n = source.length
+    if (n < 2 || measurePx <= 1f) return NoBreaks
+    val key = EnglishRagKey(source, style.fontSize, measurePx, density.density, density.fontScale)
+    synchronized(EnglishRagMemo) { EnglishRagMemo[key]?.let { return it } }
+
+    // Where every offset would sit on one unbroken line. Read off the
+    // paragraph set on the measure, not off an unbroken layout: a position on
+    // a platform line costs a walk from that line's start, so on one line of
+    // a whole leaf reading every candidate was quadratic, and the book took
+    // minutes to paginate. Line by line it is a walk of one line each, and the
+    // lines are chained by their advances into the one coordinate.
+    val laid = measurer.measure(
+        text = text,
+        style = style,
+        constraints = englishProseConstraints(measurePx),
+        density = density,
+    )
+    val spacePx = measurer.measure(AnnotatedString("  "), style, density = density)
+        .multiParagraph.getHorizontalPosition(1, true)
+    val base = FloatArray(laid.lineCount)
+    for (line in 1 until laid.lineCount) {
+        // The advance of the line before, as if it had not broken: through its
+        // last character, which is a space (trailing, so not reliably boxed),
+        // or anything else (its own box).
+        val last = laid.getLineEnd(line - 1) - 1
+        val advance = when (source[last]) {
+            ' ' -> laid.getHorizontalPosition(last, true) + spacePx
+            else -> laid.getBoundingBox(last).right
+        }
+        base[line] = base[line - 1] + advance
+    }
+    fun x(offset: Int): Float {
+        val line = laid.getLineForOffset(offset)
+        return base[line] + laid.getHorizontalPosition(offset, true)
+    }
+    val offsets = ArrayList<Int>()
+    val ends = ArrayList<Float>()
+    val starts = ArrayList<Float>()
+    for (i in 1 until n - 1) {
+        if (source[i] == ' ') {
+            offsets += i
+            ends += x(i)
+            starts += x(i + 1)
+        }
+    }
+    // One left-to-right line, read left to right. Anything else (a bidi run
+    // the boxes do not order) is not this paragraph, and the platform breaks it.
+    for (k in 1 until ends.size) {
+        if (ends[k] < ends[k - 1] - 0.5f) return memo(key, NoBreaks)
+    }
+    val chosen = EnglishRag.breaks(
+        EnglishRag.Candidates(
+            contentEnd = ends.toFloatArray(),
+            nextStart = starts.toFloatArray(),
+            textEnd = x(n),
+        ),
+        measurePx = measurePx.toInt().toFloat(),
+        emPx = with(density) { style.fontSize.toPx() },
+    ) ?: return memo(key, NoBreaks)
+    val set = IntArray(chosen.size) { offsets[chosen[it]] }
+    // Tight tracking can round a chosen line wider than its chained positions.
+    // Keep the ruler's line count rather than spending another line on the page.
+    val shaped = measurer.measure(
+        text = text.withEnglishBreaks(set), style = style,
+        constraints = englishProseConstraints(measurePx), density = density,
+    )
+    if (shaped.lineCount != laid.lineCount) return memo(key, NoBreaks)
+    return memo(key, set)
+}
+
+private data class EnglishRagKey(
+    val text: String,
+    val fontSize: TextUnit,
+    val measurePx: Float,
+    val density: Float,
+    val fontScale: Float,
+)
+
+private val NoBreaks = IntArray(0)
+
+/** Recent paragraphs' breaks: fitting and drawing ask for the same text repeatedly. */
+private val EnglishRagMemo = object : LinkedHashMap<EnglishRagKey, IntArray>(64, 0.75f, true) {
+    override fun removeEldestEntry(eldest: MutableMap.MutableEntry<EnglishRagKey, IntArray>?) =
+        size > 96
+}
+
+private fun memo(key: EnglishRagKey, breaks: IntArray): IntArray {
+    synchronized(EnglishRagMemo) { EnglishRagMemo[key] = breaks }
+    return breaks
+}
+
 /** One paragraph of the leaf, with the reciter's ink over it. */
 @Composable
 private fun EnglishProseBlock(
@@ -931,6 +1035,8 @@ private fun EnglishProseBlock(
     packs: Map<Pair<Int, Int>, AyahInkPack>,
     fontSize: TextUnit,
     lineHeight: TextUnit,
+    /** The measure the ruler paginated against, which the lines are broken to. */
+    measurePx: Float,
     liveInk: Boolean,
     onVerseSeek: (surahId: Int, ayah: Int, through: Float) -> Unit,
     onVerseLongPress: (surahId: Int, ayah: Int, through: Float) -> Unit,
@@ -941,16 +1047,15 @@ private fun EnglishProseBlock(
     var layoutResult by remember { mutableStateOf<TextLayoutResult?>(null) }
     val hitSlopPx = with(LocalDensity.current) { 6.dp.toPx() }
     val style = englishProseStyle(fontSize, lineHeight)
-    // What the breaker's hyphen costs the line, in this leaf's own hand. The
-    // paper masks need it: the hyphen is drawn without being written, so no
-    // verse's range reaches it and the cover that ends a hyphenated line would
-    // leave it at full ink over dimmed prose. See Modifier.shapedWordBloom.
     val measurer = rememberTextMeasurer()
-    val hyphenPx = remember(style) {
-        measurer.measure(AnnotatedString("-"), style).size.width.toFloat()
+    // The rag keeps the ruler's line count and block.text's offsets, so the
+    // verses' ranges still name the same words.
+    val density = LocalDensity.current
+    val set = remember(block.text, style, measurePx, density) {
+        englishRaggedProse(block.text, style, measurePx, density, measurer)
     }
     Text(
-        text = block.text,
+        text = set,
         style = style,
         // Never clip. The leading is solved to fill the well exactly, and the
         // pitch's px→sp rounding across a full leaf can leave the block a few
@@ -991,12 +1096,9 @@ private fun EnglishProseBlock(
                 // text travelled along with the voice. The bands tile the
                 // sentence exactly, so they need no reach to close over it.
                 coverPad = 0.dp,
-                // Ragged: a line is drawn where it was measured, so the paper
-                // masks need no justification correction. They do need the
-                // hyphen, which is drawn where nothing was measured. See
-                // Modifier.shapedWordBloom.
                 justified = false,
-                hyphenPx = hyphenPx,
+                // A line-end "f" hooks past the abutting bands; see lineEndReach.
+                lineEndPad = PaperCoverPad,
             )
             .pointerInput(block, layoutResult) {
                 // The sentence is the unit of this page, as the word is the
@@ -1408,14 +1510,14 @@ private fun EnglishBasmalahLine(
 /**
  * The basmalah's own hand: the book's italic, centred.
  *
- * A display line, but not necessarily *one* line — on a phone measure it takes
- * two, and the leaf has to give it the paper it actually needs. Assuming a slot
- * for it put its second line on top of the chapter's first verse.
+ * Subpixel advances keep the measured fit and the drawn line at the same width.
  */
 private fun englishBasmalahStyle(fontSize: TextUnit) = TextStyle(
     fontFamily = SerifFontFamily,
     fontStyle = FontStyle.Italic,
     fontSize = fontSize,
+    letterSpacing = 0.em,
+    textMotion = TextMotion.Animated,
     textAlign = TextAlign.Center,
     platformStyle = PlatformTextStyle(includeFontPadding = false),
     // Trimmed like the prose, so the line begins at its ascent. Untrimmed, the
@@ -1428,19 +1530,8 @@ private fun englishBasmalahStyle(fontSize: TextUnit) = TextStyle(
 )
 
 /**
- * The hand the basmalah is set in: the page's, brought down until the line fits
- * the measure.
- *
- * It is one line. Set at the page's own hand it took two on a phone, and a
- * basmalah broken across a line-end is not a display line — it is a paragraph
- * of one sentence sitting where a heading should be. This is the Latin form of
- * what the Arabic leaf does when a line will not reach its measure
- * (`QURAN_TYPOGRAPHY.md` §4): the line is made to fit, by the only lever the
- * script gives, which here is the size rather than the letterform.
- *
- * It is still one size for the whole book — the measure does not change from
- * leaf to leaf, so neither does this — and a display line set smaller than the
- * body is what a printed translation does with it anyway.
+ * Fits the italic's size to the column. A second measured pass corrects the
+ * initial estimate; fractional caret advances avoid rounding the line's width.
  */
 private fun englishBasmalahHandPx(
     handPx: Float,
@@ -1448,34 +1539,24 @@ private fun englishBasmalahHandPx(
     density: Density,
     measurer: TextMeasurer,
 ): Float {
-    val natural = measurer.measure(
-        text = AnnotatedString(ENGLISH_BASMALAH),
-        style = englishBasmalahStyle(with(density) { handPx.toSp() }),
-        constraints = Constraints(),
-        density = density,
-    ).size.width
-    if (natural <= 0) return handPx
-    // Fit the exact pixel width the line is laid out in: the composable and
-    // englishBasmalahPx both constrain to measurePx.toInt(), so fitting the
-    // float measure could overshoot by that truncation and clip a pixel off
-    // the italic's overhang (maxLines = 1, softWrap = false clips, not wraps).
-    val targetPx = measurePx.toInt().coerceAtLeast(1).toFloat()
-    val fits = targetPx * EnglishBasmalahMeasureFill / natural
-    return handPx * fits.coerceIn(EnglishBasmalahMinHand, 1f)
+    // Shaping still rounds fractions; half a pixel keeps the fitted line inside.
+    val targetPx = (measurePx.toInt() - 0.5f).coerceAtLeast(1f)
+    var fittedPx = handPx
+    repeat(2) {
+        val laid = measurer.measure(
+            text = AnnotatedString(ENGLISH_BASMALAH),
+            style = englishBasmalahStyle(with(density) { fittedPx.toSp() }),
+            softWrap = false,
+            maxLines = 1,
+            density = density,
+        )
+        val width = laid.getHorizontalPosition(ENGLISH_BASMALAH.length, true) -
+            laid.getHorizontalPosition(0, true)
+        if (width <= 0f) return fittedPx
+        fittedPx *= targetPx / width
+    }
+    return fittedPx
 }
-
-/**
- * How much of the measure the basmalah fills. All of it: the line is sized to
- * sit edge to edge with the chapter's panel above it and the leaf below it.
- *
- * One guard stays: the hand never grows past the page's own. On a measure wide
- * enough that the line already fits at body size, it stands at body size,
- * centred — a display line set larger than the body is not a heading.
- */
-private const val EnglishBasmalahMeasureFill = 1f
-
-/** Never smaller than this share of the page's hand, whatever the measure. */
-private const val EnglishBasmalahMinHand = 0.62f
 
 /** What the basmalah stands at, plus the air a display line takes under it. */
 private fun englishBasmalahPx(
@@ -1489,6 +1570,8 @@ private fun englishBasmalahPx(
         with(density) { englishBasmalahHandPx(handPx, measurePx, density, measurer).toSp() },
     ),
     constraints = Constraints(maxWidth = measurePx.toInt().coerceAtLeast(1)),
+    softWrap = false,
+    maxLines = 1,
     density = density,
 ).size.height + handPx * EnglishLeafBasmalahAirEm
 
@@ -1525,7 +1608,6 @@ internal fun englishLeafRuler(
     val inkPx = englishLineInkPx(handPx, density, measurer)
     val basmalahPx = englishBasmalahPx(handPx, measurePx, density, measurer)
     val style = with(density) { englishProseStyle(handPx.toSp(), pitchPx.toSp()) }
-    val constraints = Constraints(maxWidth = measurePx.toInt().coerceAtLeast(1))
     return EnglishLeafRuler { page, runs ->
         val leaf = englishLeaf(page, runs, translation)
         val blocks = englishLeafBlockTexts(
@@ -1546,11 +1628,8 @@ internal fun englishLeafRuler(
         if (prose == null) {
             EnglishLeafFill(null)
         } else {
-            val laid = measurer.measure(
-                prose.text,
-                style,
-                constraints = constraints,
-                density = density,
+            val laid = measurer.measureEnglishProse(
+                prose.text, style, measurePx, density, chooseRag = false,
             )
             // How many lines the well holds. A property of the well, the
             // leading and a line's ink — not of any particular text, and
@@ -1596,7 +1675,7 @@ internal fun englishLeafRuler(
                 // search rests on and could settle it below the answer.
                 fun fits(at: Int): Boolean = englishLeafLineCount(
                     page, runs, stops[at], translation,
-                    verseNumberScript, style, constraints, density, measurer,
+                    verseNumberScript, style, measurePx, density, measurer,
                 ) <= lines
                 // Straddle: `lo` fits, `hi` does not, and the answer is the
                 // last stop before `hi`.
@@ -1723,7 +1802,7 @@ private fun englishLeafLineCount(
     translation: (Int, Int) -> String,
     verseNumberScript: VerseNumberScript,
     style: TextStyle,
-    constraints: Constraints,
+    measurePx: Float,
     density: Density,
     measurer: TextMeasurer,
 ): Int {
@@ -1739,6 +1818,7 @@ private fun englishLeafLineCount(
         gold = Color.Black,
         verseNumberScript = verseNumberScript,
     ).filterIsInstance<EnglishLeafBlockText.Prose>().firstOrNull() ?: return 0
-    return measurer.measure(prose.text, style, constraints = constraints, density = density)
-        .lineCount
+    return measurer.measureEnglishProse(
+        prose.text, style, measurePx, density, chooseRag = false,
+    ).lineCount
 }

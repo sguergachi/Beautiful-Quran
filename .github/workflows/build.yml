@@ -81,11 +81,17 @@ jobs:
         if: github.ref == 'refs/heads/master'
         run: |
           apksigner="$(find "$ANDROID_HOME/build-tools" -type f -name apksigner -print | sort -V | tail -n 1)"
-          actual="$("$apksigner" verify --print-certs app/build/outputs/apk/release/app-release.apk \
-            | sed -n 's/^Signer #1 certificate SHA-256 digest: //p')"
+          echo "Using $apksigner"
+          # Current apksigner labels each scheme's signer ("V2 Signer: …"), so
+          # match any scheme's SHA-256 digest line instead of the old
+          # "Signer #1" form. Keep stderr in the capture so a verification
+          # failure prints its reason instead of a bare "none".
+          certs="$("$apksigner" verify --print-certs app/build/outputs/apk/release/app-release.apk 2>&1)" || true
+          actual="$(printf '%s\n' "$certs" | sed -n 's/^.*certificate SHA-256 digest: //p' | head -n 1)"
           expected="519ff7bc0c11ff7677c3e8fcdb4a73adacdc325cd4def42549be29219471e8b0"
           if [ "$actual" != "$expected" ]; then
             echo "Unexpected APK signing certificate: ${actual:-none}" >&2
+            printf '%s\n' "$certs" >&2
             exit 1
           fi
 

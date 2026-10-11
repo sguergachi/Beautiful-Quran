@@ -22,7 +22,7 @@ import {
   mushafFacingPages,
   mushafTokenEndsAyah,
 } from '../../domain/mushafPage'
-import { formatAyahNumberMark, pageFolioLayout } from '../../util/digits'
+import { formatAyahNumberMark, mushafHeadFigures } from '../../util/digits'
 import type { PageNumberScript } from '../../data/settings'
 import { appStore, useAppSelector } from '../../store/appStore'
 import {
@@ -716,7 +716,38 @@ export function MushafStartLeaf({ fallback }: { fallback: ReactNode }) {
   )
 }
 
-/** One printed page: running head, fifteen lines (or its translation), folio. */
+/** Running head with the folio in-head: Western figure at the left, the chapter
+    centred, the Arabic-Indic figure at the right; one script puts its figure
+    at the left and the chapter at the right. Android `MushafRunningHead`. */
+function MushafHead({
+  page,
+  script,
+  chapter,
+}: {
+  page: number
+  script: PageNumberScript
+  chapter: string
+}) {
+  const figures = mushafHeadFigures(page, script, chapter)
+  return (
+    <div className="mushaf-head" data-both={figures.right != null || undefined}>
+      <span
+        className="mushaf-head-figure"
+        lang={figures.leftLang ?? undefined}
+      >
+        {figures.left}
+      </span>
+      <span className="mushaf-head-chapter">{figures.center}</span>
+      {figures.right != null ? (
+        <span className="mushaf-head-figure" lang="ar">
+          {figures.right}
+        </span>
+      ) : null}
+    </div>
+  )
+}
+
+/** One printed page: running head and fifteen lines (or its translation). */
 function MushafLeaf({
   page,
   fitRevision,
@@ -884,7 +915,6 @@ function MushafLeaf({
   if (!runtimeMushafCache) return null
   const rows = runtimeMushafCache.pageWords(page) ?? []
   const { leaf, headSurah, englishAyahs, lastPositions } = mushafLeafModel(page, rows, QuranRepository.surahContent)
-  const folio = pageFolioLayout(page, english ? 'english' : pageNumberScript)
   // The two opening leaves carry a few short lines, set in the middle of the
   // well; every other leaf hangs its fifteen lines from the head.
   const lines = opening ? leaf.lines.filter((line) => line.tokens.length > 0) : leaf.lines
@@ -917,12 +947,13 @@ function MushafLeaf({
         drag.current = null
       }}
     >
-      {/* One measure: head, text and folio share the text block's width. */}
+      {/* One measure: head and text share the text block's width. */}
       <div className="mushaf-block" ref={blockRef}>
-      <div className="mushaf-head">
-        <span>{headSurah?.nameTransliteration ?? ''}</span>
-        <span>{headSurah?.nameArabic ?? ''}</span>
-      </div>
+      <MushafHead
+        page={page}
+        script={english ? 'english' : pageNumberScript}
+        chapter={headSurah?.nameTransliteration ?? ''}
+      />
       {english ? (
         <div className="mushaf-english">
           {englishAyahs.map((item) => {
@@ -1043,17 +1074,6 @@ function MushafLeaf({
         </div>
         </RepeatWashGateProvider>
       )}
-      <div className="mushaf-folio">
-        {folio.trailing != null ? (
-          <>
-            <span lang="ar">{folio.trailing}</span>
-            <span className="mushaf-folio-diamond" aria-hidden="true" />
-            <span>{folio.leading}</span>
-          </>
-        ) : (
-          <span lang={pageNumberScript === 'arabic' ? 'ar' : undefined}>{folio.leading}</span>
-        )}
-      </div>
       </div>
     </div>
   )

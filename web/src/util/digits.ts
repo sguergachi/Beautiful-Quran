@@ -30,6 +30,44 @@ export type PageFolioLayout = {
   centered: boolean
 }
 
+export type MushafHeadFigures = {
+  /** Left figure: Western digits, or the single script's own figure. */
+  left: string
+  /** lang tag — the Arabic-Indic figure is set in Hafs, untracked. */
+  leftLang: 'ar' | null
+  /** The chapter, centred; at the right with one script. */
+  center: string
+  /** Right figure: Arabic-Indic, only with both scripts. */
+  right: string | null
+}
+
+/**
+ * Running-head figures: Western at the left, the chapter centred and
+ * Arabic-Indic at the right; one script puts its figure at the left and the
+ * chapter at the right. Matching Android `MushafRunningHead`.
+ */
+export function mushafHeadFigures(
+  page: number,
+  script: 'both' | 'arabic' | 'english',
+  chapter: string,
+): MushafHeadFigures {
+  const folio = pageFolioLayout(page, script)
+  if (folio.trailing == null) {
+    return {
+      left: folio.leading,
+      leftLang: script === 'arabic' ? 'ar' : null,
+      center: chapter,
+      right: null,
+    }
+  }
+  return {
+    left: String(page),
+    leftLang: null,
+    center: chapter,
+    right: folio.trailing,
+  }
+}
+
 /** Which folio figures a page break paints, matching Android `pageFolioLayout`. */
 export function pageFolioLayout(
   page: number,

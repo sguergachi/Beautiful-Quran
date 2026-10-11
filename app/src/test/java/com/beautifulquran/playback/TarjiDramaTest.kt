@@ -81,4 +81,38 @@ class TarjiDramaTest {
         // Every other reciter keeps the generic ranges.
         assertEquals(TarjiDramaWeights.GENERIC, TarjiDramaWeights.forReciter(1))
     }
+
+    @Test
+    fun `part of a verse is judged against the whole verse, as the reader judges it`() {
+        // The Tarji Lab holds only a capture around one word. Judged against
+        // itself, a quiet closing cadence looks ordinary and passes while the
+        // reader, judging the whole verse, keeps it dark.
+        val stream = Hani214.pcm()
+        val detector = Tarji()
+        detector.hopSamples = Hani214.HOP_SAMPLES
+        detector.hopContentDurationMs = Hani214.HOP_MS
+        Hani214.knobs.applyTo(detector)
+        detector.minDrama = Tarji.MIN_DRAMA
+        detector.dramaWeights = TarjiDramaWeights.forReciter(7)
+        val frames = ArrayList<TarjiFrame>()
+        val scratch = FloatArray(Hani214.HOP_SAMPLES)
+        for (hop in 0 until stream.size / Hani214.HOP_SAMPLES) {
+            stream.copyInto(scratch, 0, hop * scratch.size, (hop + 1) * scratch.size)
+            detector.onSamples8k(scratch)
+            frames += detector.measurements.copy()
+        }
+        val whole = TarjiRecordingDetector.analyze(frames, detector)
+        val word = ((Hani214.FINAL_WORD_START_MS - Hani214.START_MS) / Hani214.HOP_MS).toInt()
+        val from = word - (2_000 / Hani214.HOP_MS).toInt()
+        val part = frames.subList(from, frames.size)
+        val alone = TarjiRecordingDetector.analyze(part, detector)
+        val judged = TarjiRecordingDetector.analyze(part, detector, verse = whole.reference)
+        fun lit(gain: FloatArray, offset: Int) = (word - offset until word - offset + 100).any { gain.getOrElse(it) { 0f } > 0.05f }
+        val reader = lit(whole.gain, 0)
+        assertEquals("the lab agrees with the reader", reader, lit(judged.gain, from))
+        // This is the case that disagreed: 2:14's closing word is a falling
+        // cadence, dark in the reader, yet it passed against the capture alone.
+        assertTrue("the reader keeps the cadence dark", !reader)
+        assertTrue("judged against itself, the capture lit it", lit(alone.gain, from))
+    }
 }

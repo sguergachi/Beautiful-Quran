@@ -63,6 +63,7 @@ import com.beautifulquran.ui.theme.MushafFontFamily
 import com.beautifulquran.ui.theme.PaperCoverPad
 import com.beautifulquran.ui.theme.ShapedWordBloom
 import com.beautifulquran.ui.theme.glyphLayerAlpha
+import com.beautifulquran.ui.theme.glowLayerBleed
 import com.beautifulquran.ui.theme.letterFadeIn
 import com.beautifulquran.ui.theme.shapedWordBloom
 
@@ -1036,6 +1037,10 @@ private fun MushafQcfWord(
                                 rtl = true,
                                 restingAlpha = InkEngine.State.Upcoming.inkAlpha(),
                                 feather = wordFeather(),
+                                // The glimmer's halo is drawn inside this layer.
+                                bleed = glowLayerBleed(
+                                    if (glintInk != null) InkEngine.tuning.glintGlowRadius else 0f,
+                                ),
                             )
                     }
                     hasWholeAyahRecess -> Modifier.glyphLayerAlpha { recessAlpha() }

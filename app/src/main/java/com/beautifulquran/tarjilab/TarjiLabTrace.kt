@@ -165,6 +165,8 @@ fun analyzeTarjiCapture(
     mode: TarjiDetectorMode = TarjiDetectorMode.Current,
     /** The reciter, for what "dramatic" means in his voice (Recording only). */
     reciterId: Int = 0,
+    /** The whole verse's bar for drama (Recording only): a capture is only part of it. */
+    reference: com.beautifulquran.playback.TarjiVoiceReference? = null,
     wanted: () -> Boolean = { true },
 ): TarjiLabTrace {
     val n = capture.hopCount
@@ -264,7 +266,7 @@ fun analyzeTarjiCapture(
     if (resolved < 0) resolved = DETECTOR_FRAME_HOPS - 1
     frames?.let {
         checkWanted()
-        val recording = TarjiRecordingDetector.analyze(it, detector, wanted)
+        val recording = TarjiRecordingDetector.analyze(it, detector, reference, wanted)
         for (hop in voiceRate.indices) {
             if (hop and 63 == 0) checkWanted()
             voiceRate[hop] = recording.rate[hop]

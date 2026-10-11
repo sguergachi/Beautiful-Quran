@@ -2679,7 +2679,7 @@ button.ayah-mark {
    words. The text block is instead as wide as its widest line set with
    minimum word spaces and slightly condensed letters (mushafMeasure, written
    inline once the lines are measured), and every other line justifies to
-   that. Running head and folio hang on the same block. */
+   that. The running head hangs on the same block; the folio stands in it. */
 .mushaf-block {
   flex: 1;
   min-height: 0;
@@ -2711,19 +2711,45 @@ button.ayah-mark {
   gap: 0.3em;
 }
 
+/* Folio figures in-head, one direction on both leaves: Western at the left,
+   the chapter centred, Arabic-Indic at the right; one script puts its
+   figure at the left and the chapter at the right. Ink, not gold, at the
+   finding-aid rung. Android `MushafRunningHead`. */
 .mushaf-head {
   display: flex;
-  justify-content: space-between;
   align-items: baseline;
-  font-size: 0.72rem;
-  letter-spacing: 0.04em;
-  color: var(--ink-rung-quiet);
+  direction: ltr;
+  font-size: 0.75rem;
+  line-height: 1.4;
+  color: color-mix(in srgb, var(--ink) 44%, transparent);
 }
 
-.mushaf-head span:last-child {
+.mushaf-head-figure {
+  flex: 1;
+  text-align: left;
+  letter-spacing: 0.1em;
+  font-variant-numeric: lining-nums;
+  white-space: nowrap;
+}
+
+.mushaf-head-figure[lang='ar'] {
   font-family: var(--font-arabic);
-  font-size: 1rem;
   letter-spacing: 0;
+}
+
+.mushaf-head-chapter {
+  flex: 3;
+  min-width: 0;
+  text-align: center;
+  letter-spacing: 0.1em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.mushaf-head:not([data-both]) .mushaf-head-chapter {
+  flex: 1;
+  text-align: right;
 }
 
 .mushaf-lines {
@@ -2739,8 +2765,7 @@ button.ayah-mark {
   max-height: calc(15 * 2.15em);
 }
 
-.mushaf-head,
-.mushaf-folio {
+.mushaf-head {
   flex: none;
 }
 
@@ -2835,32 +2860,6 @@ button.ayah-mark {
 
 .mushaf-english::-webkit-scrollbar {
   display: none;
-}
-
-.mushaf-folio {
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  gap: 0.55em;
-  /* Figures only: one direction, so the pair never reorders on an RTL leaf. */
-  direction: ltr;
-  font-variant-numeric: lining-nums;
-  color: var(--ink-rung-quiet);
-  font-size: 0.8rem;
-  line-height: 1;
-  padding: 0.55rem 0 0.2rem;
-}
-
-.mushaf-folio [lang='ar'] {
-  font-family: var(--font-arabic);
-  font-size: 1.2em;
-}
-
-.mushaf-folio-diamond {
-  width: 0.3em;
-  height: 0.3em;
-  background: var(--ink-rung-furniture);
-  transform: rotate(45deg);
 }
 
 /* Opening leaves: the few lines keep the page's pitch and sit centred, each
@@ -6879,16 +6878,23 @@ html[data-entrance='true'] body {
    * Golden page: 1 : φ, φ⁶ u wide. Margins run inner : head : fore-edge :
    * foot = 1 : φ : φ : φ², which leaves a text block that is itself 1 : φ.
    * The two inner margins make a gutter of 2u, wider than the φu fore-edge
-   * so the pages part at the spine. Head and foot also carry furniture of
-   * a fixed size (the page's controls, the transport), so on a small
-   * window those two deepen to hold it; inner and fore-edge never do, and
-   * the text keeps its width. (All four used to swell together, which kept
-   * the block golden but set a small page in margins sized for a large one.)
+   * so the pages part at the spine. Head and foot also carry the furniture,
+   * which scales with the book through --furn below; inner and fore-edge
+   * never scale with it, and the text keeps its width. (All four used to
+   * swell together, which kept the block golden but set a small page in
+   * margins sized for a large one.)
    */
   --page-w: calc(var(--u) * 17.944);
   --page-h: calc(var(--page-w) * var(--phi));
-  --chrome-h: 3.6rem;
-  --transport-h: 5.6rem;
+  /*
+   * Furniture scale: the chrome was drawn phone-sized at u ≈ 27.5px, so on
+   * the spread every glyph, label and gap multiplies by u over that instead
+   * of staying small on a desk-sized page. Never below 0.85 — on a small
+   * window the head and foot deepen to hold phone-sized furniture, as above.
+   */
+  --furn: max(0.85, calc(var(--u) / 27.5px));
+  --chrome-h: calc(3.6rem * var(--furn));
+  --transport-h: calc(5.6rem * var(--furn));
   --margin-inner: var(--u);
   --margin-fore: calc(var(--u) * var(--phi));
   --margin-head: max(calc(var(--u) * var(--phi)), var(--chrome-h));
@@ -7120,6 +7126,141 @@ html[data-entrance='true'] body {
     visibility: hidden;
     transform: perspective(1900px) translateY(var(--sheet-off)) rotateX(8deg) rotateZ(calc(var(--sheet-skew) * -0.8));
   }
+}
+
+/* Book furniture stands on the grid: glyphs, labels and gaps scale with
+   --furn (the book's own module over the phone-sized chrome), while hit
+   targets keep their 44–48px floors. The title's centring fudge and width
+   reservation scale with the buttons they compensate for. */
+.app-shell[data-spread='true'] .reader-top {
+  min-height: calc(2.85rem * var(--furn));
+  gap: calc(0.75rem * var(--furn));
+  padding-top: max(calc(0.65rem * var(--furn)), env(safe-area-inset-top));
+  padding-bottom: calc(0.25rem * var(--furn));
+}
+
+.app-shell[data-spread='true'] .reader-top .back {
+  font-size: calc(26px * var(--furn));
+  min-width: max(44px, calc(44px * var(--furn)));
+  min-height: max(48px, calc(48px * var(--furn)));
+}
+
+.app-shell[data-spread='true'] .reader-actions {
+  gap: calc(0.15rem * var(--furn));
+}
+
+.app-shell[data-spread='true'] .reader-top .icon-btn {
+  min-width: max(48px, calc(48px * var(--furn)));
+  min-height: max(48px, calc(48px * var(--furn)));
+}
+
+.app-shell[data-spread='true'] .reader-top .icon-btn svg {
+  width: calc(24px * var(--furn));
+  height: calc(24px * var(--furn));
+}
+
+.app-shell[data-spread='true'] .reader-top .settings-button svg {
+  width: calc(26px * var(--furn));
+  height: calc(26px * var(--furn));
+}
+
+.app-shell[data-spread='true'] .reader-top-title {
+  left: calc(50% - calc(1.375rem * var(--furn)));
+  width: min(calc(18rem * var(--furn)), calc(100% - calc(13.5rem * var(--furn))));
+}
+
+.app-shell[data-spread='true'] .ornate-surah-title .ornate-ar {
+  font-size: calc(1.15rem * var(--furn));
+}
+
+.app-shell[data-spread='true'] .ornate-surah-title .ornate-en {
+  font-size: calc(0.56rem * var(--furn));
+}
+
+.app-shell[data-spread='true'] .reader-search-input {
+  font-size: calc(1rem * var(--furn));
+}
+
+.app-shell[data-spread='true'] .reader-search-count {
+  font-size: calc(0.85rem * var(--furn));
+}
+
+.app-shell[data-spread='true'] .player-transport {
+  gap: calc(12px * var(--furn));
+}
+
+.app-shell[data-spread='true'] .player-bar .ctrl {
+  width: max(48px, calc(48px * var(--furn)));
+  height: max(48px, calc(48px * var(--furn)));
+}
+
+.app-shell[data-spread='true'] .player-bar .ctrl.speed {
+  font-size: calc(15px * var(--furn));
+  min-width: max(48px, calc(48px * var(--furn)));
+}
+
+.app-shell[data-spread='true'] .player-bar .ctrl svg {
+  width: calc(24px * var(--furn));
+  height: calc(24px * var(--furn));
+}
+
+.app-shell[data-spread='true'] .player-bar .ctrl:first-child svg {
+  width: calc(22px * var(--furn));
+  height: calc(22px * var(--furn));
+}
+
+.app-shell[data-spread='true'] .player-bar .play {
+  width: max(56px, calc(56px * var(--furn)));
+  height: max(56px, calc(56px * var(--furn)));
+}
+
+.app-shell[data-spread='true'] .player-bar .play svg {
+  width: calc(34px * var(--furn));
+  height: calc(34px * var(--furn));
+}
+
+.app-shell[data-spread='true'] :is(.player-bar .reciter-btn, .player-error) {
+  font-size: calc(13px * var(--furn));
+  min-height: max(32px, calc(32px * var(--furn)));
+}
+
+.app-shell[data-spread='true'] .player-bar .reciter-btn {
+  padding: calc(0.2rem * var(--furn)) calc(1rem * var(--furn));
+  max-width: min(100%, calc(22rem * var(--furn)));
+}
+
+.app-shell[data-spread='true'] .player-bar .reciter-btn::after {
+  width: calc(16px * var(--furn));
+  font-size: calc(16px * var(--furn));
+}
+
+.app-shell[data-spread='true'] .player-bar .reciter-btn::before {
+  width: calc(18px * var(--furn));
+}
+
+.app-shell[data-spread='true'] :is(.player-bar .player-close, .player-error-dismiss) {
+  min-width: max(40px, calc(40px * var(--furn)));
+  min-height: max(40px, calc(40px * var(--furn)));
+  padding: calc(0.45rem * var(--furn));
+}
+
+.app-shell[data-spread='true'] :is(.player-bar .player-close svg, .player-error-dismiss svg) {
+  width: calc(20px * var(--furn));
+  height: calc(20px * var(--furn));
+}
+
+.app-shell[data-spread='true'] .player-return {
+  font-size: calc(1rem * var(--furn));
+  padding: calc(0.45rem * var(--furn)) calc(1.125rem * var(--furn));
+}
+
+.app-shell[data-spread='true'] .player-return-chapter {
+  max-width: calc(12rem * var(--furn));
+}
+
+.app-shell[data-spread='true'] .player-return-arrow {
+  width: calc(18px * var(--furn));
+  height: calc(18px * var(--furn));
 }
 
 /* A page laid onto either side settles in from its own fore-edge — nothing
@@ -7627,12 +7768,6 @@ html[data-entrance-closing]
 .app-shell[data-spread='true'][data-leaves='true'] .sheet[data-name='reader'] :is(.reader-body, .reader-main) {
   position: static;
   max-width: none;
-}
-
-/* Facing leaves mirror: each carries the chapter's Latin name at its
-   fore-edge and the Arabic at the spine. */
-.mushaf[data-side='verso'] .mushaf-head {
-  flex-direction: row-reverse;
 }
 
 /* Turning: a strip of each fore-edge. Pages run right to left, so the way

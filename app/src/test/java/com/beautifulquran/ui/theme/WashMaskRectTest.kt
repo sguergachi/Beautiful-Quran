@@ -124,4 +124,53 @@ class WashMaskRectTest {
     fun `zero bleed is the identity`() {
         assertEquals(lineBox, washMaskRect(lineBox, 0f, openTop = true, openBottom = true))
     }
+
+    @Test
+    fun `a wrapped word's first line washes its spill where the next line is not`() {
+        // 52:13 on the English leaf: "with a [violent] thrust, [its angels will"
+        // ends one line and "say]" opens the next. The second line's mask spans
+        // only "say]", so the first line's halo spilling into the leading had
+        // nothing to wash it and lit a strip under unsaid words.
+        val first = Rect(228f, 200f, 951f, 270f)
+        val second = Rect(0f, 270f, 110f, 340f)
+        val bleed = 40f
+        val spill = washMaskSpill(first, bleed, second, below = true)
+        assertEquals(1, spill.size)
+        val strip = spill.single()
+        assertEquals(first.bottom, strip.top, 0f)
+        assertEquals(first.bottom + bleed, strip.bottom, 0f)
+        // The next line's mask stops well short of this line, so the strip is
+        // this line's whole reach.
+        assertEquals(first.left - bleed, strip.left, 0f)
+        assertEquals(first.right + bleed, strip.right, 0f)
+        // And the second line's spill upward is everything right of its mask,
+        // which never reaches into the first line's own columns twice.
+        val up = washMaskSpill(second, bleed, first, below = false).single()
+        assertEquals(first.bottom - bleed, up.top, 0f)
+        assertEquals(first.bottom, up.bottom, 0f)
+        assertTrue(up.right <= first.left - bleed)
+    }
+
+    @Test
+    fun `spill strips never overlap the neighbour's mask`() {
+        val line = Rect(100f, 200f, 900f, 260f)
+        val bleed = 30f
+        val neighbours = listOf(
+            Rect(0f, 260f, 1000f, 320f), // wider: nothing to spill
+            Rect(300f, 260f, 500f, 320f), // inside: both sides spill
+            Rect(0f, 260f, 50f, 320f), // far left
+            Rect(950f, 260f, 1000f, 320f), // far right
+        )
+        neighbours.forEach { n ->
+            val nMask = washMaskRect(n, bleed, openTop = false, openBottom = false)
+            washMaskSpill(line, bleed, n, below = true).forEach { strip ->
+                val overlapX = minOf(strip.right, nMask.right) - maxOf(strip.left, nMask.left)
+                assertTrue("strip $strip overlaps $nMask", overlapX <= 0f)
+                assertTrue(strip.left >= line.left - bleed && strip.right <= line.right + bleed)
+            }
+        }
+        assertTrue(washMaskSpill(line, bleed, neighbours[0], below = true).isEmpty())
+        assertEquals(2, washMaskSpill(line, bleed, neighbours[1], below = true).size)
+        assertTrue(washMaskSpill(line, 0f, neighbours[1], below = true).isEmpty())
+    }
 }

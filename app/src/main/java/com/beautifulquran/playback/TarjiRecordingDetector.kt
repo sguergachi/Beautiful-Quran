@@ -12,6 +12,17 @@ import kotlin.math.min
 import kotlin.math.roundToInt
 import kotlin.math.tanh
 
+/**
+ * What a whole verse sets the bar by: its typical loudness and pitch, which
+ * "lifted" is measured against, and the score of the last moment its
+ * allowance keeps ([TarjiDramaWeights.maxPerVerse]).
+ */
+class TarjiVoiceReference internal constructor(
+    internal val typicalRms: Float,
+    internal val typicalF0: Float,
+    internal val allowanceScore: Float,
+)
+
 /** Immutable decisions on the decoded source clock. Live phase is deliberately absent. */
 internal class TarjiRecordingResult(
     val gain: FloatArray,
@@ -23,6 +34,8 @@ internal class TarjiRecordingResult(
     val hopMs: Double,
     val volumeFloor: Float,
     val calibrated: Boolean,
+    /** The bar this analysis set, for judging part of the same verse alike. */
+    val reference: TarjiVoiceReference? = null,
 ) {
     fun sample(mediaMs: Double, out: TarjiEarSample): Boolean {
         out.gain = 0f
@@ -47,7 +60,17 @@ internal class TarjiRecordingResult(
 
 /** Two-sided cycles with strict seeds, conservative recording noise calibration and forward admission. */
 internal object TarjiRecordingDetector {
-    fun analyze(frames: List<TarjiFrame>, knobs: Tarji, wanted: () -> Boolean = { true }): TarjiRecordingResult {
+    /**
+     * [verse] judges drama against a whole verse when [frames] are only
+     * part of one (the Tarjīʿ Lab's capture). Without it, [frames] are the
+     * verse, and the result carries the reference they make.
+     */
+    fun analyze(
+        frames: List<TarjiFrame>,
+        knobs: Tarji,
+        verse: TarjiVoiceReference? = null,
+        wanted: () -> Boolean = { true },
+    ): TarjiRecordingResult {
         val n = frames.size
         val hopMs = frames.firstOrNull()?.hopMs ?: 20.0
         val rms = FloatArray(n) { frames[it].hopRms }
@@ -127,8 +150,8 @@ internal object TarjiRecordingDetector {
             starts[i] = d.eventStartHop
             acoustic[i] = if (d.usesAmplitude) amRegion.onset[i] else fmRegion.onset[i]
         }
-        keepDramatic(frames, knobs.minDrama, knobs.dramaWeights, gain, starts, acoustic, hopMs)
-        return TarjiRecordingResult(gain, rate, amplitude, starts, rms, acoustic, hopMs, floor, calibrated)
+        val made = keepDramatic(frames, knobs.minDrama, knobs.dramaWeights, gain, starts, acoustic, hopMs, verse)
+        return TarjiRecordingResult(gain, rate, amplitude, starts, rms, acoustic, hopMs, floor, calibrated, made)
     }
 
     /**
@@ -137,12 +160,13 @@ internal object TarjiRecordingDetector {
      * "lifted" means above how this reciter sounds in this verse.
      */
     private fun keepDramatic(frames: List<TarjiFrame>, minDrama: Float, weights: TarjiDramaWeights, gain: FloatArray,
-                             starts: IntArray, acoustic: IntArray, hopMs: Double) {
-        if (minDrama <= 0f) return
+                             starts: IntArray, acoustic: IntArray, hopMs: Double,
+                             reference: TarjiVoiceReference?): TarjiVoiceReference {
         val voicedRms = frames.filter { it.voiced }.map { it.hopRms }.sorted()
         val f0 = frames.filter { it.f0Valid }.map { it.f0Hz }.sorted()
-        val typicalRms = voicedRms.getOrElse(voicedRms.size / 2) { 0f }
-        val typicalF0 = f0.getOrElse(f0.size / 2) { 0f }
+        val typicalRms = reference?.typicalRms ?: voicedRms.getOrElse(voicedRms.size / 2) { 0f }
+        val typicalF0 = reference?.typicalF0 ?: f0.getOrElse(f0.size / 2) { 0f }
+        if (minDrama <= 0f) return TarjiVoiceReference(typicalRms, typicalF0, Float.NEGATIVE_INFINITY)
         val events = LinkedHashMap<Int, MutableList<Int>>()
         for (i in starts.indices) if (starts[i] >= 0) events.getOrPut(starts[i]) { ArrayList() } += i
         val scored = ArrayList<Pair<List<Int>, Float>>(events.size)
@@ -166,13 +190,17 @@ internal object TarjiRecordingDetector {
             val strong = hops.maxOf { gain[it] } >= weights.minPeak
             scored += hops to if (strong) drama else -1f
         }
-        // The most dramatic first, up to the verse's allowance; the rest stay dark.
-        val kept = scored.filter { it.second >= minDrama }.sortedByDescending { it.second }
-            .take(weights.maxPerVerse).map { it.first }.toSet()
+        // The most dramatic first, up to the verse's allowance; the rest stay
+        // dark. Part of a verse is held to the bar its whole verse set.
+        val ranked = scored.filter { it.second >= minDrama }.sortedByDescending { it.second }
+        val bar = reference?.allowanceScore
+            ?: ranked.getOrNull(weights.maxPerVerse - 1)?.second ?: Float.NEGATIVE_INFINITY
+        val kept = ranked.filter { it.second >= bar }.take(weights.maxPerVerse).map { it.first }.toSet()
         for ((hops, _) in scored) {
             if (hops in kept) continue
             for (i in hops) { gain[i] = 0f; starts[i] = -1; acoustic[i] = -1 }
         }
+        return TarjiVoiceReference(typicalRms, typicalF0, bar)
     }
 
     private class Region(n: Int) {

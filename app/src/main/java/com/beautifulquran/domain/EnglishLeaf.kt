@@ -82,10 +82,9 @@ data class EnglishLeafVerse(
      * were taken off on the way. Null where the caller has no source, and the
      * ink falls back to plain proportion.
      *
-     * The alignment names offsets in *this* string, and [text] is not it: the
-     * hyphenation vetoes thread invisible word joiners through it, whitespace
-     * is closed up, and the asides may be gone. Scaling a share of the source
-     * onto [text] let the difference pile up along the sentence — on Al-Mulk's
+     * The alignment names offsets in *this* string, and [text] is not it:
+     * whitespace is closed up, and the asides may be gone. Scaling a share of
+     * the source onto [text] let the difference pile up along the sentence — on Al-Mulk's
      * second verse "created" inked as `creat` and "death" as `ed death`, and on
      * a long verse the band ran a word or two behind the voice. Letters are the
      * one thing all three leave alone, so offsets are carried across by
@@ -412,10 +411,7 @@ fun englishLeaf(
  * sentence in the middle for them.
  */
 private fun englishVerseProse(text: String): String {
-    // The vetoed cuts: bad hyphen breaks joined before the breaker sees the
-    // text. The ruler composes through this same function, so the pagination
-    // measures exactly what the leaf draws.
-    return EnglishHyphenation.setProse(text.replace(WHITESPACE_RUN, " ").trim())
+    return text.replace(WHITESPACE_RUN, " ").trim()
 }
 
 private val WHITESPACE_RUN = Regex("\\s+")
