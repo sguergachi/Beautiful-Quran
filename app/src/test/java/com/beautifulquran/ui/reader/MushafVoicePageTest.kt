@@ -15,13 +15,13 @@ import org.junit.Test
 class MushafVoicePageTest {
 
     @Test
-    fun `carried English follows the spoken span even when it precedes its adjective`() {
+    fun `carried English follows the continuous wash without returning to advanced words`() {
         val text = "painful punishment"
         val alignment = EnglishWordAlignment.align(text, listOf("punishment", "painful"))!!
-        assertEquals(7f / text.length, mushafVerseThrough(
+        assertEquals(0f, mushafVerseThrough(
             ActiveWord(ayah = 10, wordPosition = 1, durationMs = 100), 2, alignment = alignment,
         ), 0.00001f)
-        assertEquals(0f, mushafVerseThrough(
+        assertEquals(1f, mushafVerseThrough(
             ActiveWord(ayah = 10, wordPosition = 2, durationMs = 100), 2, alignment = alignment,
         ), 0f)
     }

@@ -36,10 +36,12 @@ and 6,843 fragments remain byte-identical to the full-rag reference at the same
 geometry and settings, covering all 6,236 verses.
 
 English ownership is solved lazily per verse and cached for the selected text
-source. Printed ranges are projected once when the paragraph is built. Frames
-read the existing Arabic motions; adjacent paper covers with equal alpha merge,
-while reordered active spans retain their own soft wash. Geometry stays cached
-by layout and range, and only repeat/glint layers request shaped paths.
+source. Semantic ranges and continuous forward wash bands are projected once
+when the paragraph is built. Frames read the existing Arabic motions; adjacent
+paper covers with equal alpha merge, and one band carries the active soft edge.
+First-pass glimmer shares that band; repeats keep the semantic ranges. Geometry
+stays cached by layout and range, and only repeat/glint layers request shaped
+paths.
 
 ### 1. Draw-phase-only animations (zero recomposition fades)
 

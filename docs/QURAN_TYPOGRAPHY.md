@@ -1274,22 +1274,24 @@ translation of the same sentence, so the two share most of their content words.
 `EnglishWordAlignment` aligns the gloss stream to the translation and returns
 printed spans with their spoken Arabic owners. Inflections share a key; a small
 vocabulary bridges differences such as gaze/vision, slaves/servants and
-bosoms/chests. “Private parts” and “head covers” remain whole meanings.
+bosoms/chests. “Private parts,” “head covers” and “All-Aware”/“Acquainted”
+remain whole meanings.
 
 Three rules make it usable:
 
-- **Spoken ownership wins over printed order.** Each span washes left to right
-  when its Arabic owner speaks, even when it sits ahead of an unspoken English
-  word. “Painful punishment” inks “punishment” first when Arabic says the noun
-  first, then inks “painful.” In 76:6, “will drink” can ink ahead of “servants of
-  Allah.” Gaps are intentional; ink already laid never lifts.
+- **One continuous forward wash, with no skipped words.** When Arabic names a
+  later English meaning, every intervening word joins its left-to-right wash.
+  “Painful punishment” washes together when Arabic says the noun first; later
+  hearing the adjective never moves the front backwards. In 24:31, “husbands'
+  fathers” washes together on “fathers.” Ink already laid never lifts.
 - **Boundaries sit between words.** Adjacent ranges tile the printed sentence,
   including punctuation. A missing English equivalent can own no span. A page
   cut projects the ranges onto its fragment without changing their owners.
-- **One map for wash, tap, hold and follow.** `EnglishVerseAlignments` caches
-  ownership for the selected text source. Tapping or holding a reordered word
-  names the same Arabic owner as its ink. Carried-leaf follow uses that owner's
-  printed location.
+- **One alignment for wash, tap, hold and follow.** `EnglishVerseAlignments`
+  caches semantic owners and the continuous wash derived from them for the
+  selected text source. Tapping or holding a word names its semantic Arabic
+  owner, even if the forward wash included it earlier. Carried-leaf follow
+  follows the wash without returning to an already advanced word.
 
 Repeated content must keep its occurrence. Equal counts within a sentence pair
 matching forms in occurrence order, including possessives; “sons” cannot steal
@@ -1331,12 +1333,15 @@ word blooming, however narrow its edge is made. Two attempts at the edge width
 (a line of the page, then 1.6 word-widths of the sentence) both missed for the
 same reason: the shape was wrong, not the size.
 
-The states belong to Arabic positions rather than English order. Each printed
-span reads its owner's `InkMotion`; one Arabic word may wash separate English
-ranges. Adjacent covers with the same alpha are merged, while active ranges
-retain their own soft edge. Range projection is cached with the paragraph; the
-frame loop only reads motion and builds paint layers. Every wash uses
-`Tuning.washFeather` unmodified, exactly as the scrolling reader does.
+The base wash bands follow English order, driven by Arabic `InkMotion` clocks.
+Each band's owner is the earliest spoken meaning at or beyond its English
+range, so all text before the active edge is included. Adjacent bands with the
+same owner merge, leaving one active soft edge. First-pass glimmer uses those
+same bands and cannot jump ahead of the wash. Repeat tint and repeat glimmer
+retain the semantic owners over the prefix already laid. Range projection is
+cached with the paragraph; frames only read motion and build paint layers.
+Every wash uses `Tuning.washFeather` unmodified, exactly as the scrolling reader
+does.
 
 **Bands that abut must not reach past their boxes.** A paper cover is drawn
 `PaperCoverPad` (4 dp) wider than its own line box, to catch ink that overhangs
@@ -1353,8 +1358,8 @@ string than the shares were measured against.
 
 The owned ranges also give the recess its place. **A verse seeked into rises out
 of the paper rather than appearing on it:** tapping the middle of a sentence
-retains spans whose Arabic owners precede the tapped owner, and drawing them at full strength
-on the next frame made the sentence flash on. The cover rides those retained ranges and
+retains the continuous prefix already reached, and drawing it at full strength
+on the next frame made the sentence flash on. The cover rides that prefix and
 lifts over `Tuning.recessMs`, which is precisely what the Arabic leaf does with
 its already-read words; the word being said never carries it, because it is
 revealed by its own bloom. Measured on device: a mid-sentence tap that used to

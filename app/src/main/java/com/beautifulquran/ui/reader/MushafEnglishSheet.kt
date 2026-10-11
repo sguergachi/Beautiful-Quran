@@ -522,18 +522,24 @@ internal data class EnglishProseVerse(
     val verseFractionAt: (Int) -> Float = { 0f },
     /** Printed ranges owned by spoken words, projected once onto this fragment. */
     val wordSpans: List<EnglishInkSpan>? = null,
+    /** Continuous forward ranges; a reordered meaning includes all words before it. */
+    val washSpans: List<EnglishInkSpan>? = null,
 )
 
 /** A range in the paragraph, owned by a 1-based Arabic word position. */
 internal data class EnglishInkSpan(val range: IntRange, val position: Int)
 
-/** Carries word ownership through removed asides and the book's page cuts. */
+/** A fading tint after a backward seek must not reveal words beyond the new prefix. */
+internal fun englishInkLayerAllowed(state: InkEngine.State): Boolean = state != InkEngine.State.Upcoming
+
+/** Projects the continuous wash or semantic ownership through asides and page cuts. */
 internal fun englishOwnedSpans(
     range: IntRange,
     alignment: EnglishAlignment,
     fragmentProgress: (Float) -> Float = { it },
     text: CharSequence = "",
-): List<EnglishInkSpan> = alignment.spans.mapNotNull { span ->
+    forwardWash: Boolean = true,
+): List<EnglishInkSpan> = (if (forwardWash) alignment.washSpans else alignment.spans).mapNotNull { span ->
     val printed = englishWashBands(
         range, fragmentProgress(span.from), fragmentProgress(span.to), 1f, text,
     ).saying
@@ -607,6 +613,11 @@ private fun englishLeafBlockTexts(
                     } else {
                         IntRange.EMPTY
                     }
+                    fun printedSpans(forwardWash: Boolean) = alignments[verse.surahId to verse.ayah]?.let { alignment ->
+                        englishOwnedSpans(
+                            0 until verse.text.length, alignment, verse::fragmentInkProgress, verse.text, forwardWash,
+                        ).map { it.copy(range = (start + it.range.first)..(start + it.range.last)) }
+                    }
                     verses += EnglishProseVerse(
                         surahId = verse.surahId,
                         ayah = verse.ayah,
@@ -617,11 +628,8 @@ private fun englishLeafBlockTexts(
                         verseFractionAt = { at ->
                             verse.verseFractionAt(at, verse.text.length)
                         },
-                        wordSpans = alignments[verse.surahId to verse.ayah]?.let { alignment ->
-                            englishOwnedSpans(
-                                0 until verse.text.length, alignment, verse::fragmentInkProgress, verse.text,
-                            ).map { it.copy(range = (start + it.range.first)..(start + it.range.last)) }
-                        },
+                        wordSpans = printedSpans(forwardWash = false),
+                        washSpans = printedSpans(forwardWash = true),
                     )
                 }
             }
@@ -1161,10 +1169,12 @@ private fun EnglishProseBlock(
  * however narrow its edge is made, and it read as the page brightening rather
  * than as words being said.
  *
- * Each span reads its Arabic owner's motion, even across gaps in English.
- * Adjacent paper covers with the same alpha merge; active ranges keep their
- * own soft wash. Already spoken ranges retain the Arabic high-water state
- * and rise through the shared recess cover after a seek.
+ * The base wash is one continuous prefix. A reordered meaning takes every
+ * intervening English word into its wash, so there can be no dim hole before
+ * the leading edge. First-pass glimmer follows that edge; repeat layers keep
+ * the semantic owners.
+ * Already laid ink retains the Arabic high-water state and rises through the
+ * shared recess cover after a seek.
  */
 private fun englishVerseBlooms(
     verse: EnglishProseVerse,
@@ -1189,11 +1199,12 @@ private fun englishVerseBlooms(
         ).saying
         span.takeUnless { it.isEmpty() }?.let { EnglishInkSpan(it, index + 1) }
     }
+    val washSpans = verse.washSpans ?: spans
     if (motions.isEmpty()) {
         // No clock of its own: a leaf the voice is not on, waiting or settled.
         if (cover > 0f) blooms += cover(verse.range, paper, cover)
     } else {
-        for (span in spans) {
+        for (span in washSpans) {
             val motion = motions.getOrNull(span.position - 1) ?: continue
             if (motion.isActive && !motion.repeat) {
                 blooms += ShapedWordBloom.InkReveal(
@@ -1206,8 +1217,8 @@ private fun englishVerseBlooms(
                     feather = null,
                 )
             } else {
-                // Use the Arabic high-water state, never printed order: a
-                // repeat retains every English span already spoken.
+                // Arabic high-water state retains the continuous prefix
+                // already reached, including words advanced by reordering.
                 val alpha = if (motion.ink.state == InkEngine.State.Upcoming) waiting else cover
                 if (alpha <= 0f) continue
                 val previous = blooms.lastOrNull() as? ShapedWordBloom.UpcomingDim
@@ -1225,7 +1236,8 @@ private fun englishVerseBlooms(
         blooms += cover(verse.markRange, paper, markCover)
     }
     if (motions.isNotEmpty()) {
-        blooms.addEnglishInkLayerBlooms(spans, motions, palette, glintInk)
+        blooms.addEnglishInkLayerBlooms(washSpans, motions, palette, glintInk, repeatLayers = false)
+        blooms.addEnglishInkLayerBlooms(spans, motions, palette, glintInk, repeatLayers = true)
     }
     return blooms
 }
@@ -1261,21 +1273,23 @@ private fun englishVerseBlooms(
  * here. A repeat's glimmer rides the repeat wash instead, as it does everywhere
  * else, and takes the terracotta with it.
  *
- * Both layers are drawn per word in one pass so a word that carries both pays
- * for its span once, and so the sheen stays above the orange rather than under
- * it.
+ * First-pass sheen uses the continuous wash bands, so it cannot light a word
+ * beyond their leading edge. Repeat layers use the semantic spans: all of that
+ * prefix is already laid, and the tint still names the meaning being repeated.
  */
 private fun MutableList<ShapedWordBloom>.addEnglishInkLayerBlooms(
     spans: List<EnglishInkSpan>,
     motions: List<InkMotion>,
     palette: WordInkPalette,
     glintInk: Color?,
+    repeatLayers: Boolean,
 ) {
     spans.forEach { owned ->
         val motion = motions.getOrNull(owned.position - 1) ?: return@forEach
-        val repeating = motion.repeatAlpha > 0f
+        if (!englishInkLayerAllowed(motion.ink.state)) return@forEach
+        val repeating = repeatLayers && motion.repeatAlpha > 0f
         val glinting = glintInk != null && motion.showGlintLayer &&
-            motion.glintLayerAlpha > 0f
+            motion.glintLayerAlpha > 0f && motion.glintIsRepeat == repeatLayers
         if (!repeating && !glinting) return@forEach
         val span = owned.range
         if (repeating) {

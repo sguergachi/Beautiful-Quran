@@ -6,15 +6,27 @@ import java.util.concurrent.ConcurrentHashMap
 /** A printed English span and the 1-based Arabic word that speaks its meaning. */
 data class EnglishWordSpan(val from: Float, val to: Float, val position: Int)
 
-/** Word ownership for ink and taps, plus a monotone frontier for legacy page callers. */
+/** Semantic owners for taps, and a continuous forward wash derived from those owners. */
 data class EnglishAlignment(val wordEnds: FloatArray, val spans: List<EnglishWordSpan>) {
+    /** A later spoken meaning brings every preceding English word into the same wash. */
+    val washSpans: List<EnglishWordSpan> = buildList {
+        var position = Int.MAX_VALUE
+        for (span in spans.asReversed()) {
+            position = minOf(position, span.position)
+            val previous = lastOrNull()
+            if (previous?.position == position) {
+                this[lastIndex] = previous.copy(from = span.from)
+            } else add(span.copy(position = position))
+        }
+        reverse()
+    }
+
     /** The Arabic owner of a point in the printed English, including reordered words. */
     fun positionAt(through: Float): Int =
         spans.firstOrNull { through.coerceIn(0f, 1f) < it.to }?.position ?: spans.lastOrNull()?.position ?: 1
 
-    /** Where the spoken word is printed; a missing English equivalent uses the frontier. */
-    fun through(position: Int): Float = spans.firstOrNull { it.position == position }?.from
-        ?: wordEnds.getOrElse(position - 2) { 0f }
+    /** Where the forward wash begins; words already included never move it backwards. */
+    fun through(position: Int): Float = washSpans.firstOrNull { it.position >= position }?.from ?: 1f
 }
 
 /**
@@ -34,10 +46,10 @@ data class EnglishAlignment(val wordEnds: FloatArray, val spans: List<EnglishWor
  * anchors their common words; unmatched runs interpolate between neighbours.
  *
  * Arabic is not English word order. Each recognized English span keeps its
- * Arabic owner, and washes forward when that owner speaks, even across gaps
- * in the English sentence. Ink already laid never lifts (docs/INK_ENGINE.md).
- * The monotone frontier remains the fallback for unmatched text, rather than
- * forcing recognized words to wait for their printed neighbours.
+ * Arabic owner for interaction. The wash reaches that meaning when it is
+ * spoken, including all intervening English words in one continuous prefix.
+ * Ink already laid never lifts (docs/INK_ENGINE.md). Unmatched text uses the
+ * guarded, interpolated alignment between recognized neighbours.
  * Synonyms outside the small shared vocabulary, ambiguous repetitions and
  * translator additions still use an approximate share, not an exact timing.
  *
@@ -192,7 +204,7 @@ object EnglishWordAlignment {
             val next = out[at + 1]
             val key = PHRASES["${first.text} ${next.text}"]
             if (key != null && first.added == next.added && first.sentence == next.sentence &&
-                text.substring(first.end, next.end - next.text.length).all { it.isWhitespace() }) {
+                text.substring(first.end, next.end - next.text.length).all { it.isWhitespace() || it == '-' }) {
                 out[at] = ProseWord(
                     text.substring(first.end - first.text.length, next.end).lowercase(),
                     next.end, first.added, first.sentence,
@@ -204,6 +216,11 @@ object EnglishWordAlignment {
         // "Glad" means "good" in this phrase, not wherever either adjective occurs.
         for (j in 0 until out.lastIndex) {
             if (out[j].text == "glad" && out[j + 1].text in setOf("tiding", "tidings")) out[j].key = "good"
+        }
+        // Drawing a headcover over the chest is translated as wrapping it;
+        // "draw" and "wrap" are not interchangeable outside that phrase.
+        if (out.any { it.key == "headcover" }) {
+            out.filter { it.text == "wrap" }.forEach { it.key = "draw" }
         }
         return out
     }
@@ -494,6 +511,7 @@ object EnglishWordAlignment {
         "slave" to "servant", "slaves" to "servant", "servants" to "servant",
         "gaze" to "vision", "gaz" to "vision",
         "bosom" to "chest",
+        "tell" to "say", "apparent" to "appear",
         "poor" to "needy", "needy" to "needy",
         "forever" to "eternal", "eternally" to "eternal",
         "sorrow" to "grief",
@@ -506,7 +524,9 @@ object EnglishWordAlignment {
         "spread" to "spread",
     )
 
-    private val PHRASES = mapOf("private parts" to "chastity", "head covers" to "headcover")
+    private val PHRASES = mapOf(
+        "private parts" to "chastity", "head covers" to "headcover", "all aware" to "acquaint",
+    )
 
     /** Complements/intensity the prose can leave implicit in the matched gloss head. */
     private val GLOSS_SUPPLEMENTS = setOf("one", "thing", "things", "partners", "existence", "abundantly")
