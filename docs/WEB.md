@@ -279,6 +279,10 @@ Renderers consume these; they do not re-derive curves.
 
 ### 6.3 Settings / bookmarks
 
+- **Cross-device transport experiment.** [PeerJS trial](../tools/peerjs-lab/README.md)
+  is a separate browser lab and native Android probe for sample personal data
+  and playback checkpoints. It records direct/relayed transfers and reconnects;
+  it does not wire syncing into either production app.
 - `localStorage` (or IndexedDB) for settings and bookmarks — never write into
   `quran.db`.
 - **Ribbon tip on hover (web).** Unlike Android’s always-visible faint tip, the
