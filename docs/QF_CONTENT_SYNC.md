@@ -47,7 +47,10 @@ content, user data, or device cache. It caches only the short-lived OAuth token
 in memory, retries one rejected token once, streams `no-store` responses, and
 allows only the exact paths above. Browser requests are additionally restricted
 to the GitHub Pages origin. No account, reading position, bookmark, note, search
-query, analytics identifier, or device identifier is sent to the Worker or QF.
+query, analytics identifier, or device identifier is sent through this Content
+Sync path. Optional [account bookmarks](QF_ACCOUNT_SYNC.md) use a separate
+public OAuth/User API path directly to QF, after consent; it is disabled
+pending account-client approval.
 
 The Production transliteration snapshot currently has three missing QCF word
 owners and one triplicated owner. Five small authenticated by-verse responses

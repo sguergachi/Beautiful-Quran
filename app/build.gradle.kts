@@ -64,6 +64,7 @@ android {
         versionCode = 11
         versionName = "0.10"
         buildConfigField("String", "QF_CONTENT_BASE_URL", "\"$qfContentBaseUrl\"")
+        manifestPlaceholders["appAuthRedirectScheme"] = "com.beautifulquran"
     }
 
     signingConfigs {
@@ -165,6 +166,7 @@ kotlin {
 }
 
 val syncQuranDbAsset by tasks.registering(Sync::class) {
+    from(rootProject.file("data/qf_account.json"))
     val dbAsset = rootProject.layout.projectDirectory.file("data/quran.db")
     val lexiconAsset = rootProject.layout.projectDirectory.file("data/lexicon.db")
     val dictionaryAsset = rootProject.layout.projectDirectory.file("data/dictionary.db")
@@ -293,6 +295,7 @@ tasks.withType<Test>().configureEach {
 }
 
 dependencies {
+    implementation("net.openid:appauth:0.11.1")
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.splashscreen)
     implementation(libs.androidx.lifecycle.runtime.compose)

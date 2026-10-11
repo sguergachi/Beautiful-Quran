@@ -14,15 +14,13 @@ import { lexiconEntry, type LexiconEntry } from '../data/lexicon'
 import { QuranRepository } from '../data/repository'
 import { runtimeMushafCache } from '../data/runtimeMushaf'
 import {
-  loadBookmarks,
   loadSettings,
   normalizeSettings,
-  saveBookmarks,
   saveSettings,
-  toggleBookmark,
   type Bookmark,
   type Settings,
 } from '../data/settings'
+import { qfAccount } from '../account/qfAccount'
 import { HighlightEngine, PreparedTimings } from '../domain/HighlightEngine'
 import {
   BASMALAH_PLAYLIST_AYAH,
@@ -242,7 +240,7 @@ class AppStore {
     surahs: [],
     reciters: [],
     settings: loadSettings(),
-    bookmarks: loadBookmarks(),
+    bookmarks: qfAccount.bookmarks(),
     content: null,
     player: player.getState(),
     activeWord: null,
@@ -263,6 +261,10 @@ class AppStore {
   }
 
   constructor() {
+    qfAccount.subscribe(() => {
+      const bookmarks = qfAccount.bookmarks()
+      if (bookmarks !== this.state.bookmarks) this.set({ bookmarks })
+    })
     runtimeMushafCache?.subscribe(() => {
       QuranRepository.invalidateRuntimeMushafViews()
       const current = this.state.content
@@ -441,6 +443,7 @@ class AppStore {
         loadProgress: 1,
       })
       player.setSpeed(this.state.settings.playbackSpeed)
+      void qfAccount.retry()
       if (this.state.settings.gapless5Playback) {
         // Prefetch the Gapless-5 chunk at boot so the first Play can construct
         // AudioContext synchronously under the click (Firefox autoplay policy).
@@ -1024,12 +1027,8 @@ class AppStore {
 
   /** Toggle any saved verse, including rows in the global bookmark index. */
   toggleBookmarkAt(surahId: number, ayah: number): boolean {
-    const bookmarks = toggleBookmark(
-      this.state.bookmarks,
-      surahId,
-      ayah,
-    )
-    saveBookmarks(bookmarks)
+    qfAccount.toggle(surahId, ayah)
+    const bookmarks = qfAccount.bookmarks()
     const removingLast = bookmarks.length === 0 && this.state.stackLayer === BOOKMARKS_LAYER
     this.set({
       bookmarks,

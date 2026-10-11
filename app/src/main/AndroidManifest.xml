@@ -23,6 +23,11 @@
              the process. Costs nothing at runtime and exposes no data to apps. -->
         <profileable android:shell="true" />
 
+        <activity
+            android:name=".data.account.QfSignInActivity"
+            android:exported="false"
+            android:theme="@style/Theme.BeautifulQuran" />
+
         <!-- Android 17 foreground AppFunctions. This activity-scoped metadata
              lets Gemini associate "bookmark this" with this exact reader. -->
         <property

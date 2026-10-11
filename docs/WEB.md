@@ -35,8 +35,10 @@ chords.
 
 Ship a browser app that feels like the Android reader: one sheet of paper,
 words written onto the page in time with the reciter, butter-smooth scroll
-and ink — offline-first, no accounts or client secrets, with only a narrow
-optional timing-content backend.
+and ink — offline-first guest reading, no client secrets, with a narrow
+optional timing-content backend. Optional QF bookmark accounts use a separate
+public OAuth path; see [QF_ACCOUNT_SYNC.md](QF_ACCOUNT_SYNC.md) for the disabled
+configuration, consent, durable outbox, one writer tab and live launch gates.
 
 ## 2. What already exists (do not reinvent)
 
@@ -832,7 +834,7 @@ sans.
 - Mushaf layout / QCF V2 page fonts
 - Exact Media3 preload configuration
 - Verse annotations / ḥawāshī (the web bookmark lesson does not promise notes)
-- Sharing / accounts / analytics (never)
+- Analytics (never); optional QF accounts are now scoped to bookmark sync only.
 
 ## 11. Repo layout
 

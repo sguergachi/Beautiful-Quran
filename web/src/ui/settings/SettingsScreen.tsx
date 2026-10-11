@@ -16,6 +16,7 @@ import { customizeSummary } from '../../data/customizePolicy'
 import { CustomizeScreen } from './CustomizeScreen'
 import { AcknowledgementsScreen } from './AcknowledgementsScreen'
 import { ReadingHelp } from './ReadingHelp'
+import { QfAccountScreen } from './QfAccountScreen'
 import { ReciterChoices, RecitersScreen } from './RecitersScreen'
 import { NuqtaLab } from './NuqtaLab'
 import { settingsLayerFor, type StackLayer } from '../paper/stack'
@@ -77,7 +78,7 @@ export function SettingsScreen({
   const [laid, setLaid] = useState(false)
   if (isTop && !laid) setLaid(true)
   const depth = Math.max(0, stackLayer - layer)
-  const [page, setPage] = useState<'main' | 'reciters' | 'customize' | 'acknowledgements' | 'help'>('main')
+  const [page, setPage] = useState<'main' | 'reciters' | 'customize' | 'acknowledgements' | 'help' | 'account'>('main')
   const scrollRef = useRef<HTMLDivElement>(null)
   const favoriteReciters = reciters.filter((reciter) => s.favoriteReciterIds.includes(reciter.id))
 
@@ -383,6 +384,8 @@ export function SettingsScreen({
           />
         ) : page === 'help' ? (
           <ReadingHelp hintsEnabled={s.educationGuidesEnabled} onBack={() => setPage('main')} />
+        ) : page === 'account' ? (
+          <QfAccountScreen onBack={() => setPage('main')} />
         ) : page === 'acknowledgements' ? (
           <AcknowledgementsScreen onBack={() => setPage('main')} />
         ) : (
@@ -425,6 +428,16 @@ export function SettingsScreen({
             <span className="settings-nav-copy">
               <span className="settings-nav-label">Customize</span>
               <span className="settings-nav-note">{customizeSummary(s)}</span>
+            </span>
+            <DisclosureChevron expanded={false} />
+          </button>
+        </section>
+
+        <section className="settings-section">
+          <button type="button" className="settings-nav" onClick={() => setPage('account')}>
+            <span className="settings-nav-copy">
+              <span className="settings-nav-label">Quran Foundation</span>
+              <span className="settings-nav-note">Optional bookmark sync</span>
             </span>
             <DisclosureChevron expanded={false} />
           </button>

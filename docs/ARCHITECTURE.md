@@ -34,10 +34,14 @@ app (runtime)                                           ▼
 
 ## Principles
 
-1. **Offline-first reader.** The released reader still has no accounts,
-   analytics, or client API keys and works in airplane mode using the verified
+1. **Offline-first reader.** Guest reading needs no account; the app has no
+   analytics or client secrets and works in airplane mode using the verified
    bundled repeat-aware timing dataset and cached audio. Recitation audio uses
    a 1 GB listening cache; explicit downloads keep chapters on the phone.
+   Optional QF public OAuth and bookmark sync are a separate, consented path.
+   The implementation is disabled pending public-client configuration and
+   approvals; see [QF_ACCOUNT_SYNC.md](QF_ACCOUNT_SYNC.md). Guest and account
+   libraries remain separate, and notes/settings/playback stay local.
 2. **The data pipeline is a build step, not app code.** Everything fragile
    about data (different word segmentations, a diagnostic prefix in an upstream
    release, basmalah offsets) is resolved by the canonical Python pipeline with
@@ -69,7 +73,8 @@ repeat timing: offline build pipeline ── normalize + verify ── quran.db
 ```
 
 The Worker sends no account, reading position, search, bookmark, note, or device
-identifier. It exposes only three fixed Content Sync resources and five fixed
+identifier. Optional account bookmarks go directly to the QF User API using
+public OAuth; they never enter this Worker. It exposes only three fixed Content Sync resources and five fixed
 verse supplements. Each client validates all 77,429 records and every QCF
 page-font codepoint run before one atomic cache publication.
 

@@ -122,6 +122,8 @@ self.addEventListener('fetch', (event) => {
 
   const url = new URL(req.url)
   if (!url.href.startsWith(BASE)) return
+  // Never cache OAuth callbacks or serve a cached callback containing a previous authorization code.
+  if (url.searchParams.has('code') || url.searchParams.has('state') || url.searchParams.has('error')) return
 
   // Always hit the network for the worker script so updates are not pinned.
   if (isServiceWorkerScript(url)) {
