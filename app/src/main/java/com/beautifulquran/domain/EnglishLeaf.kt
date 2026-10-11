@@ -41,9 +41,9 @@ import kotlin.math.roundToInt
  * rather than doing without it: each Arabic word carries its own gloss, and
  * `EnglishWordAlignment` aligns that gloss stream to the translation, so the
  * wash crosses the English the reciter is actually saying — say ٱلْكِتَٰبُ and
- * "the Book" inks. 84 % of Arabic words land on a lexical anchor; the rest are
- * spread between their neighbours, which is the plain proportion the leaf used
- * before and is what an unalignable verse still gets. The recess and the
+ * "the Book" inks. Reordered English spans keep their Arabic owners and wash
+ * forward separately. Unmatched text is spread between its neighbours, which
+ * is the plain proportion an unalignable verse still gets. The recess and the
  * retained ink are the Arabic leaf's. See `ui/reader/MushafEnglishSheet.kt`.
  */
 

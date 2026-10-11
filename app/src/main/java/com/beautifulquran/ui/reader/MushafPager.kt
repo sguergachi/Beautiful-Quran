@@ -86,6 +86,7 @@ import com.beautifulquran.domain.qcfTrailingMark
 import com.beautifulquran.domain.qcfWordGlyphs
 import com.beautifulquran.domain.EnglishBook
 import com.beautifulquran.domain.EnglishVerseAlignments
+import com.beautifulquran.domain.EnglishAlignment
 import com.beautifulquran.domain.quranWordKey
 import com.beautifulquran.domain.reflowMushafPage
 import com.beautifulquran.domain.surahOpensWithBasmalahPreface
@@ -279,9 +280,11 @@ internal fun mushafVerseThrough(
     word: ActiveWord?,
     wordCount: Int,
     wordEnds: FloatArray? = null,
+    alignment: EnglishAlignment? = null,
 ): Float {
     if (word == null || wordCount <= 0) return 0f
     val index = (word.wordPosition - 1).coerceIn(0, wordCount - 1)
+    if (alignment != null) return alignment.through(index + 1)
     val ends = wordEnds?.takeIf { it.size == wordCount }
         ?: return (index.toFloat() / wordCount).coerceIn(0f, 1f)
     return if (index == 0) 0f else ends[index - 1].coerceIn(0f, 1f)
@@ -310,6 +313,7 @@ internal fun mushafLeadCarriedTurn(
     words: Int,
     leafNow: Int,
     wordEnds: FloatArray? = null,
+    alignment: EnglishAlignment? = null,
 ): Int? {
     if (book == null || ayah == null || word == null || words <= 0) return null
     val index = (word.wordPosition - 1).coerceIn(0, words - 1)
@@ -321,7 +325,7 @@ internal fun mushafLeadCarriedTurn(
         page = onPage,
         // Where the voice will be one word from now — in the same units the
         // wash reads, so the lead fires exactly at the cut.
-        through = ends?.get(index)?.coerceIn(0f, 1f)
+        through = alignment?.through(index + 2) ?: ends?.get(index)?.coerceIn(0f, 1f)
             ?: (word.wordPosition.toFloat() / words).coerceIn(0f, 1f),
     )
     return next.takeIf { it > leafNow }
@@ -703,6 +707,7 @@ internal fun MushafPager(
      * leaves, read in the reader's language. See [MushafEnglishSheet].
      */
     english: Boolean = false,
+    wordByWord: Boolean = false,
     verseNumberScript: VerseNumberScript = VerseNumberScript.ARABIC,
     pageNumberScript: PageNumberScript = PageNumberScript.BOTH,
     /** The English leaf's well and measure, once it has laid out. */
@@ -738,7 +743,7 @@ internal fun MushafPager(
     // ask and kept. The English leaf's wash, the leaf a carried verse's voice
     // is on, and the lead onto the book's own cut all read the same map — if
     // they disagreed, the page would turn away from ink still running.
-    val alignments = remember(content) { EnglishVerseAlignments(content) }
+    val alignments = remember(content, wordByWord) { EnglishVerseAlignments(content, wordByWord) }
     val alignmentsNow = rememberUpdatedState(alignments)
     val heldPageNow = rememberUpdatedState(heldPage)
     // heldPage is read, not keyed: keying it restarted this collector on
@@ -788,7 +793,7 @@ internal fun MushafPager(
                     through = mushafVerseThrough(
                         word,
                         contentNow.value.wordsIn(followAyah),
-                        if (english) alignmentsNow.value.of(followAyah) else null,
+                        alignment = if (english) alignmentsNow.value.alignment(followAyah) else null,
                     ),
                 )
                 // Still hearing the word from before the tap, or sitting on the
@@ -878,7 +883,7 @@ internal fun MushafPager(
                         word = word,
                         words = contentNow.value.wordsIn(followAyah),
                         leafNow = page,
-                        wordEnds = alignmentsNow.value.of(followAyah),
+                        alignment = alignmentsNow.value.alignment(followAyah),
                     ) ?: return@collect
                     val leadIndex = mushafLeafIndex(lead - 1, pagerState.pageCount)
                     // Cover the incoming leaf before the paper moves, so the
@@ -1050,7 +1055,7 @@ internal fun MushafPager(
                 through = mushafVerseThrough(
                     word,
                     contentNow.value.wordsIn(ayah),
-                    if (english) alignments.of(ayah) else null,
+                    alignment = if (english) alignments.alignment(ayah) else null,
                 ),
             )
         }
@@ -1115,7 +1120,7 @@ internal fun MushafPager(
                             through = mushafVerseThrough(
                                 word,
                                 contentNow.value.wordsIn(word.ayah),
-                                if (english) alignments.of(word.ayah) else null,
+                                alignment = if (english) alignments.alignment(word.ayah) else null,
                             ),
                         ) == pageIndex + 1
                     }

@@ -2,6 +2,7 @@ package com.beautifulquran.ui.reader
 
 import com.beautifulquran.data.model.Word
 import com.beautifulquran.domain.MushafSourceWord
+import com.beautifulquran.domain.EnglishWordAlignment
 import com.beautifulquran.domain.buildMushafCatalog
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
@@ -12,6 +13,18 @@ import org.junit.Test
  * never do is lose the voice while the voice is plainly here.
  */
 class MushafVoicePageTest {
+
+    @Test
+    fun `carried English follows the spoken span even when it precedes its adjective`() {
+        val text = "painful punishment"
+        val alignment = EnglishWordAlignment.align(text, listOf("punishment", "painful"))!!
+        assertEquals(7f / text.length, mushafVerseThrough(
+            ActiveWord(ayah = 10, wordPosition = 1, durationMs = 100), 2, alignment = alignment,
+        ), 0.00001f)
+        assertEquals(0f, mushafVerseThrough(
+            ActiveWord(ayah = 10, wordPosition = 2, durationMs = 100), 2, alignment = alignment,
+        ), 0f)
+    }
 
     // 2:2 opens page 3 and runs onto page 4; 2:3 opens page 4.
     private val catalog = buildMushafCatalog(

@@ -126,12 +126,12 @@ import com.beautifulquran.DevProfiling
 import com.beautifulquran.QuranApp
 import com.beautifulquran.data.AyahSelectorSide
 import com.beautifulquran.data.ReadingLayout
+import com.beautifulquran.data.EnglishLeafText
 import com.beautifulquran.data.ReadingMode
 import com.beautifulquran.data.RuntimeCachePhase
 import com.beautifulquran.data.model.Surah
 import com.beautifulquran.domain.BASMALAH_PLAYLIST_AYAH
 import com.beautifulquran.domain.EnglishVerseAlignments
-import com.beautifulquran.domain.EnglishWordAlignment
 import com.beautifulquran.domain.MushafToken
 import com.beautifulquran.domain.englishSeekWordPosition
 import com.beautifulquran.domain.mushafFontPreloadPages
@@ -2836,7 +2836,9 @@ fun ReaderScreen(
                         remember(viewModel, leafTextSource) {
                             { page -> viewModel.leafText(page, leafTextSource) }
                         }
-                    val seekAlignments = remember(content) { EnglishVerseAlignments(content) }
+                    val seekAlignments = remember(content, leafTextSource) {
+                        EnglishVerseAlignments(content, leafTextSource == EnglishLeafText.GLOSS)
+                    }
                     val onMushafVerseSeek = remember(mushafSurahId, viewModel, content, seekAlignments) {
                         { surahId: Int, ayah: Int, through: Float ->
                             mushafDispatch.value(ReaderInteractionEvent.WordPlayRequested)
@@ -2844,8 +2846,9 @@ fun ReaderScreen(
                                 .firstOrNull { it.number == ayah }
                                 ?.takeIf { surahId == mushafSurahId }
                             val words = verse?.words?.size ?: 0
-                            val wordEnds = verse?.let { seekAlignments.of(it.number) }
-                            val position = englishSeekWordPosition(through, words, wordEnds)
+                            val alignment = verse?.let { seekAlignments.alignment(it.number) }
+                            val position = alignment?.positionAt(through)
+                                ?: englishSeekWordPosition(through, words)
                             if (surahId == mushafSurahId) {
                                 viewModel.playFromAyahWord(ayah, position)
                             } else {
@@ -2875,17 +2878,8 @@ fun ReaderScreen(
                                 .firstOrNull { it.number == ayah }
                                 ?.takeIf { surahId == mushafSurahId }
                             val position = if (verse != null) {
-                                // The word whose gloss names the one held,
-                                // before the wash's monotone share of it.
-                                EnglishWordAlignment.ownerAt(
-                                    verse.translation,
-                                    verse.words.map { it.translation },
-                                    (through * verse.translation.length).roundToInt(),
-                                )?.plus(1) ?: englishSeekWordPosition(
-                                    through,
-                                    verse.words.size,
-                                    seekAlignments.of(verse.number),
-                                )
+                                seekAlignments.alignment(verse.number)?.positionAt(through)
+                                    ?: englishSeekWordPosition(through, verse.words.size)
                             } else {
                                 englishSeekWordPosition(
                                     through,
@@ -2945,6 +2939,7 @@ fun ReaderScreen(
                         onVerseLongPress = onMushafVerseLongPress,
                         onBasmalahClick = onMushafBasmalahClick,
                         english = settings.readingMode == ReadingMode.ENGLISH_ONLY,
+                        wordByWord = leafTextSource == EnglishLeafText.GLOSS,
                         verseNumberScript = settings.verseNumberScript,
                         pageNumberScript = settings.pageNumberScript,
                         leafText = leafTextForSetting,

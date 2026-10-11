@@ -1271,61 +1271,45 @@ the ink is somewhere in the middle of "about which".
 The link is recoverable. Every Arabic word carries its own gloss — the
 interlinear crib the scrolling reader lyricizes — and the translation is a
 translation of the same sentence, so the two share most of their content words.
-`EnglishWordAlignment` aligns the gloss stream to the translation and hands back
-the share of the sentence each Arabic word ends at. Content words carry the
-alignment; auxiliaries, pronouns and other grammatical words carry little
-weight. Inflections share a key, while unrelated openings such as "hearing" /
-"hearts" and "messages" / "messengers" do not. An unanchored run is spread
-between the anchors around it; with no anchors it falls back to proportion.
+`EnglishWordAlignment` aligns the gloss stream to the translation and returns
+printed spans with their spoken Arabic owners. Inflections share a key; a small
+vocabulary bridges differences such as gaze/vision, slaves/servants and
+bosoms/chests. “Private parts” and “head covers” remain whole meanings.
 
 Three rules make it usable:
 
-- **Monotone.** Arabic is not English word order — لَا رَيْبَ فِيهِ is "no doubt
-  in it", and Sahih International sets "about which there is no doubt". A
-  faithful alignment would run backwards there, and the wash cannot: laid ink
-  never lifts (`docs/INK_ENGINE.md`). The alignment advances, but recognizable
-  content holds the wash until its Arabic owner is spoken. "Painful punishment"
-  waits for the adjective when Arabic says "punishment painful"; the noun and
-  adjective then share a forward wash. A reordered subject can similarly hold
-  an earlier verb's English rather than lighting the subject before the voice.
-- **Snapped to word ends.** An interpolated boundary lands wherever the
-  arithmetic put it, and "slumbe|r" is not a place ink rests. Boundaries that
-  collapse onto each other are correct: the English has no separate words for
-  that Arabic one. Zero is also a valid boundary: if the first printed word is
-  spoken later, its first letters wait too.
-- **One map for everything.** The wash, the tap, and the leaf a carried verse's
-  voice is on all read it (`EnglishVerseAlignments`, solved per verse on first
-  ask). If the page turn read the cut with a different map than the ink, it
-  would turn away from a wash still running.
+- **Spoken ownership wins over printed order.** Each span washes left to right
+  when its Arabic owner speaks, even when it sits ahead of an unspoken English
+  word. “Painful punishment” inks “punishment” first when Arabic says the noun
+  first, then inks “painful.” In 76:6, “will drink” can ink ahead of “servants of
+  Allah.” Gaps are intentional; ink already laid never lifts.
+- **Boundaries sit between words.** Adjacent ranges tile the printed sentence,
+  including punctuation. A missing English equivalent can own no span. A page
+  cut projects the ranges onto its fragment without changing their owners.
+- **One map for wash, tap, hold and follow.** `EnglishVerseAlignments` caches
+  ownership for the selected text source. Tapping or holding a reordered word
+  names the same Arabic owner as its ink. Carried-leaf follow uses that owner's
+  printed location.
 
-The gloss and translation also differ in vocabulary: the gloss's "slaves" is
-the translation's "servants". Those singular and plural forms share a lexical
-anchor, while the auxiliary "will" carries only grammatical weight. In 76:6,
-Arabic puts "will drink" before "servants of Allah" and the translation puts it
-after. Missing the noun match let the early verb consume the whole subject;
-the shared anchor now keeps "servants" on عِبَادُ and "Allah" on ٱللَّهِ. The
-continuous wash still approximates the reordered verb; choosing word-by-word
-gloss text gives the recitation's exact word order.
+Repeated content must keep its occurrence. Equal counts within a sentence pair
+matching forms in occurrence order, including possessives; “sons” cannot steal
+another “sons” later in the family list. Different forms such as “approached”
+and “Approaching” stay distinct. A duplicated gloss consisting of a grammatical
+prefix and one printed head is a shared phrase: 24:30's duplicated “their gaze”
+assigns “vision” to Arabic word 5. Real printed repetitions stay separate.
 
-The same policy applies across the book. Existing lexical anchors protect
-interpolated gaps; a distinct singular/plural form or a unique recognizable
-gloss can also recover a match dropped by the forward alignment. Extra matches
-stay within the sentence context of nearby lexical anchors and cannot claim
-another occurrence already assigned to that gloss. "Glad tidings" shares a
-key with "good tidings" within that phrase. Bracketed/parenthesized translator
-additions cannot pull lexical anchors away from the ordinary prose. A supplied
-qualifier such as "[pure]" waits with its literal head "wine" when both belong
-to the same gloss. Partly
-matched glosses can stop interpolation leaking into a direct match, but cannot
-pull it across other content. These safeguards keep "send" with the earlier
-"sent down" in 36:28 and "brought" with Mary's arrival in 19:27, rather than
-holding either for a later literal gloss that translates differently.
+Unmatched text still uses the guarded, interpolated forward alignment.
+Translator additions cannot claim literal anchors. Existing context and
+partial-gloss guards keep differently translated meanings from being dragged
+onto a later literal occurrence. Ambiguous repeated forms, omitted meanings
+and vocabulary outside the shared keys remain approximate. The published
+translation therefore does not promise exact semantic timing for every word.
 
-The map remains approximate when the translation supplies an explanation or
-uses vocabulary the gloss does not share. The JVM regressions include 58 real
-verses, reordered adjectives/subjects, repeated forms, and these negative
-controls; the corpus audit checks all 6,236 verses. It does not certify a
-word-for-word semantic alignment where the source data supplies none.
+Verification combines annotated verse regressions, an independent literal-word
+diagnostic over the live QF cache's 6,236 verses, and actual Android playback.
+The diagnostic is agreement on recognizable literal correspondences, not a
+semantic accuracy certificate. See [ENGLISH_ALIGNMENT.md](ENGLISH_ALIGNMENT.md)
+for the measured result and its limits.
 
 Measured on 2:2 (Alafasy) with the app playing: tap "no" and the reciter starts
 at 1,776 ms against لَا's 1,760; "doubt" → 2,142 against رَيْبَ's 2,140;
@@ -1347,13 +1331,12 @@ word blooming, however narrow its edge is made. Two attempts at the edge width
 (a line of the page, then 1.6 word-widths of the sentence) both missed for the
 same reason: the shape was wrong, not the size.
 
-With an alignment it is a direct copy, because the states are contiguous —
-everything before the word being said is read, everything after is not. So the
-sentence is drawn as three bands rather than one bloom per word
-(`englishWashBands`): the read band, the word being said, and the band still to
-come. Same picture as fifty per-word blooms, at three. The bloom's range *is* a
-word now, so it takes `Tuning.washFeather` unmodified, exactly as the scrolling
-reader does.
+The states belong to Arabic positions rather than English order. Each printed
+span reads its owner's `InkMotion`; one Arabic word may wash separate English
+ranges. Adjacent covers with the same alpha are merged, while active ranges
+retain their own soft edge. Range projection is cached with the paragraph; the
+frame loop only reads motion and builds paint layers. Every wash uses
+`Tuning.washFeather` unmodified, exactly as the scrolling reader does.
 
 **Bands that abut must not reach past their boxes.** A paper cover is drawn
 `PaperCoverPad` (4 dp) wider than its own line box, to catch ink that overhangs
@@ -1368,10 +1351,10 @@ inside a letter is a hard cut down it — the alignment's own boundaries are wor
 ends already, but a carried verse or one with its asides hidden is a shorter
 string than the shares were measured against.
 
-The three bands also give the recess its place. **A verse seeked into rises out
+The owned ranges also give the recess its place. **A verse seeked into rises out
 of the paper rather than appearing on it:** tapping the middle of a sentence
-makes everything before the tap already read, and drawing that at full strength
-on the next frame made the sentence flash on. The cover rides the read band and
+retains spans whose Arabic owners precede the tapped owner, and drawing them at full strength
+on the next frame made the sentence flash on. The cover rides those retained ranges and
 lifts over `Tuning.recessMs`, which is precisely what the Arabic leaf does with
 its already-read words; the word being said never carries it, because it is
 revealed by its own bloom. Measured on device: a mid-sentence tap that used to

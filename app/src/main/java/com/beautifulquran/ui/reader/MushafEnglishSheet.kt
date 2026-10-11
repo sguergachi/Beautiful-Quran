@@ -65,6 +65,7 @@ import com.beautifulquran.domain.EnglishLeaf
 import com.beautifulquran.domain.EnglishLeafBlock
 import com.beautifulquran.domain.EnglishVerseRun
 import com.beautifulquran.domain.EnglishVerseAlignments
+import com.beautifulquran.domain.EnglishAlignment
 import com.beautifulquran.domain.MushafPage
 import com.beautifulquran.domain.MushafToken
 import com.beautifulquran.domain.englishLeaf
@@ -235,10 +236,10 @@ internal fun MushafEnglishSheet(
     }
     // The alignment for every verse this leaf sets, gathered once: the wash
     // reads it every frame, and the shared memo solves each verse only once.
-    val leafWordEnds = remember(ayahsOnPage, alignments) {
+    val leafAlignments = remember(ayahsOnPage, alignments) {
         buildMap {
             ayahsOnPage.forEach { ayah ->
-                alignments.of(ayah.number)?.let { put(ayah.surahId to ayah.number, it) }
+                alignments.alignment(ayah.number)?.let { put(ayah.surahId to ayah.number, it) }
             }
         }
     }
@@ -267,12 +268,12 @@ internal fun MushafEnglishSheet(
             gold,
             verseNumberScript,
             leafTokens,
-            leafWordEnds,
+            leafAlignments,
         ) {
             englishLeafBlockTexts(
                 leaf,
                 leafTokens,
-                leafWordEnds,
+                leafAlignments,
                 palette.fullInkColor,
                 gold,
                 verseNumberScript,
@@ -519,13 +520,25 @@ internal data class EnglishProseVerse(
      * at — what a tap seeks by. Identity-ish for a verse set whole.
      */
     val verseFractionAt: (Int) -> Float = { 0f },
-    /**
-     * Where each Arabic word of the verse ends inside the *whole* translation,
-     * as a share of it (`EnglishWordAlignment`). Null when the verse could not
-     * be aligned, and the wash divides the sentence evenly instead.
-     */
-    val wordEnds: FloatArray? = null,
+    /** Printed ranges owned by spoken words, projected once onto this fragment. */
+    val wordSpans: List<EnglishInkSpan>? = null,
 )
+
+/** A range in the paragraph, owned by a 1-based Arabic word position. */
+internal data class EnglishInkSpan(val range: IntRange, val position: Int)
+
+/** Carries word ownership through removed asides and the book's page cuts. */
+internal fun englishOwnedSpans(
+    range: IntRange,
+    alignment: EnglishAlignment,
+    fragmentProgress: (Float) -> Float = { it },
+    text: CharSequence = "",
+): List<EnglishInkSpan> = alignment.spans.mapNotNull { span ->
+    val printed = englishWashBands(
+        range, fragmentProgress(span.from), fragmentProgress(span.to), 1f, text,
+    ).saying
+    printed.takeUnless { it.isEmpty() }?.let { EnglishInkSpan(it, span.position) }
+}
 
 /**
  * Builds every block's text once. The ranges are recorded as the string is
@@ -534,7 +547,7 @@ internal data class EnglishProseVerse(
 private fun englishLeafBlockTexts(
     leaf: EnglishLeaf,
     openingTokens: Map<Pair<Int, Int>, MushafToken>,
-    wordEnds: Map<Pair<Int, Int>, FloatArray>,
+    alignments: Map<Pair<Int, Int>, EnglishAlignment>,
     ink: Color,
     gold: Color,
     verseNumberScript: VerseNumberScript,
@@ -604,7 +617,11 @@ private fun englishLeafBlockTexts(
                         verseFractionAt = { at ->
                             verse.verseFractionAt(at, verse.text.length)
                         },
-                        wordEnds = wordEnds[verse.surahId to verse.ayah],
+                        wordSpans = alignments[verse.surahId to verse.ayah]?.let { alignment ->
+                            englishOwnedSpans(
+                                0 until verse.text.length, alignment, verse::fragmentInkProgress, verse.text,
+                            ).map { it.copy(range = (start + it.range.first)..(start + it.range.last)) }
+                        },
                     )
                 }
             }
@@ -1144,15 +1161,10 @@ private fun EnglishProseBlock(
  * however narrow its edge is made, and it read as the page brightening rather
  * than as words being said.
  *
- * With an alignment the leaf can copy it exactly, because the states are
- * contiguous: everything before the word being said is read, everything after
- * is not. So it is three ranges rather than one bloom per word
- * ([englishWashBands]) — the same picture, at three blooms instead of fifty.
- *
- * The recess cover rides the read band, which is what the Arabic leaf does with
- * its already-read words: a verse seeked into rises out of the paper over
- * `recessMs` rather than appearing on it. The word being said never carries the
- * cover — it is revealed by its own bloom, exactly as on the Arabic leaf.
+ * Each span reads its Arabic owner's motion, even across gaps in English.
+ * Adjacent paper covers with the same alpha merge; active ranges keep their
+ * own soft wash. Already spoken ranges retain the Arabic high-water state
+ * and rise through the shared recess cover after a seek.
  */
 private fun englishVerseBlooms(
     verse: EnglishProseVerse,
@@ -1170,56 +1182,41 @@ private fun englishVerseBlooms(
     val resting = InkEngine.State.Upcoming.inkAlpha()
     val waiting = maxOf(cover, 1f - resting)
     val motions = pack.motions
-    val active = motions.indexOfFirst { it.isActive }
-    // Where the words nobody has said yet begin. Not "after the active word":
-    // a reciter going back over a phrase leaves everything they already said
-    // Recited (InkEngine.wordState holds it to activeWord.highWater), and ink
-    // once laid never lifts. Reading the paper cover off the active index put
-    // it back over words the voice had already crossed, so a repeat dimmed the
-    // phrase it should have been tinting.
-    val unread = motions.indexOfFirst { it.ink.state == InkEngine.State.Upcoming }
-    // Where each word's English sits on this leaf. Without an alignment the
-    // words divide the sentence evenly, which is the proportion the leaf used
-    // before it had one.
-    val ends = if (motions.isEmpty()) {
-        null
-    } else {
-        verse.wordEnds?.takeIf { it.size == motions.size }
-            ?: FloatArray(motions.size) { (it + 1f) / motions.size }
+    val spans = verse.wordSpans ?: motions.indices.mapNotNull { index ->
+        val span = englishWashBands(
+            verse.range, verse.fragmentProgress(index.toFloat() / motions.size),
+            verse.fragmentProgress((index + 1f) / motions.size), 1f, text,
+        ).saying
+        span.takeUnless { it.isEmpty() }?.let { EnglishInkSpan(it, index + 1) }
     }
-    if (ends == null) {
+    if (motions.isEmpty()) {
         // No clock of its own: a leaf the voice is not on, waiting or settled.
         if (cover > 0f) blooms += cover(verse.range, paper, cover)
     } else {
-        fun opensAt(word: Int) = verse.fragmentProgress(if (word <= 0) 0f else ends[word - 1])
-        val bands = englishWashBands(
-            range = verse.range,
-            from = if (active < 0) 0f else opensAt(active),
-            to = if (active < 0) 0f else verse.fragmentProgress(ends[active]),
-            unread = if (unread < 0) 1f else opensAt(unread),
-            text = text,
-        )
-        if (cover > 0f) {
-            if (!bands.read.isEmpty()) blooms += cover(bands.read, paper, cover)
-            if (!bands.retained.isEmpty()) blooms += cover(bands.retained, paper, cover)
+        for (span in spans) {
+            val motion = motions.getOrNull(span.position - 1) ?: continue
+            if (motion.isActive && !motion.repeat) {
+                blooms += ShapedWordBloom.InkReveal(
+                    range = span.range,
+                    // Tajweed pacing places ink on Arabic letters; English
+                    // takes the same word's unpaced clock and soft feather.
+                    progress = motion.plainSweepProgress.coerceIn(0f, 1f),
+                    paper = paper,
+                    restingAlpha = resting,
+                    feather = null,
+                )
+            } else {
+                // Use the Arabic high-water state, never printed order: a
+                // repeat retains every English span already spoken.
+                val alpha = if (motion.ink.state == InkEngine.State.Upcoming) waiting else cover
+                if (alpha <= 0f) continue
+                val previous = blooms.lastOrNull() as? ShapedWordBloom.UpcomingDim
+                if (previous != null && previous.coverAlpha == alpha &&
+                    previous.range.last + 1 == span.range.first) {
+                    blooms[blooms.lastIndex] = cover(previous.range.first..span.range.last, paper, alpha)
+                } else blooms += cover(span.range, paper, alpha)
+            }
         }
-        // A word the reciter has gone back over takes the orange instead of
-        // the first-pass wash, exactly as it does everywhere else — running
-        // both over the same span would wash it white and tint it at once.
-        if (active >= 0 && !bands.saying.isEmpty() && !motions[active].repeat) {
-            blooms += ShapedWordBloom.InkReveal(
-                range = bands.saying,
-                // The linear clock, never the tajweed-paced one: pacing places
-                // ink on Arabic letters, and there are none here.
-                progress = motions[active].plainSweepProgress.coerceIn(0f, 1f),
-                paper = paper,
-                restingAlpha = resting,
-                // No override: the bloom's range *is* a word now, so the
-                // engine's own figure is the right edge for it.
-                feather = null,
-            )
-        }
-        if (!bands.ahead.isEmpty()) blooms += cover(bands.ahead, paper, waiting)
     }
     // The mark's cover is paper, so it goes down before any ink — left after
     // the ink layers it landed on the last word's glint halo and cut it.
@@ -1227,8 +1224,8 @@ private fun englishVerseBlooms(
     if (markCover > 0f && !verse.markRange.isEmpty()) {
         blooms += cover(verse.markRange, paper, markCover)
     }
-    if (ends != null) {
-        blooms.addEnglishInkLayerBlooms(verse, motions, ends, palette, glintInk, text)
+    if (motions.isNotEmpty()) {
+        blooms.addEnglishInkLayerBlooms(spans, motions, palette, glintInk)
     }
     return blooms
 }
@@ -1269,26 +1266,18 @@ private fun englishVerseBlooms(
  * it.
  */
 private fun MutableList<ShapedWordBloom>.addEnglishInkLayerBlooms(
-    verse: EnglishProseVerse,
+    spans: List<EnglishInkSpan>,
     motions: List<InkMotion>,
-    ends: FloatArray,
     palette: WordInkPalette,
     glintInk: Color?,
-    text: CharSequence,
 ) {
-    motions.forEachIndexed { index, motion ->
+    spans.forEach { owned ->
+        val motion = motions.getOrNull(owned.position - 1) ?: return@forEach
         val repeating = motion.repeatAlpha > 0f
         val glinting = glintInk != null && motion.showGlintLayer &&
             motion.glintLayerAlpha > 0f
-        if (!repeating && !glinting) return@forEachIndexed
-        val span = englishWashBands(
-            range = verse.range,
-            from = verse.fragmentProgress(if (index == 0) 0f else ends[index - 1]),
-            to = verse.fragmentProgress(ends[index]),
-            unread = 1f,
-            text = text,
-        ).saying
-        if (span.isEmpty()) return@forEachIndexed
+        if (!repeating && !glinting) return@forEach
+        val span = owned.range
         if (repeating) {
             add(
                 ShapedWordBloom.ColorReveal(
@@ -1613,7 +1602,7 @@ internal fun englishLeafRuler(
         val blocks = englishLeafBlockTexts(
             leaf = leaf,
             openingTokens = emptyMap(),
-            wordEnds = emptyMap(),
+            alignments = emptyMap(),
             ink = Color.Black,
             gold = Color.Black,
             verseNumberScript = verseNumberScript,
@@ -1813,7 +1802,7 @@ private fun englishLeafLineCount(
     val prose = englishLeafBlockTexts(
         leaf = englishLeaf(page, kept, translation),
         openingTokens = emptyMap(),
-        wordEnds = emptyMap(),
+        alignments = emptyMap(),
         ink = Color.Black,
         gold = Color.Black,
         verseNumberScript = verseNumberScript,

@@ -1,5 +1,7 @@
 package com.beautifulquran.ui.reader
 
+import com.beautifulquran.domain.EnglishWordAlignment
+import com.beautifulquran.domain.EnglishLeafVerse
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -13,6 +15,34 @@ class EnglishWashBandsTest {
 
     /** A sentence occupying characters 10..109 of the paragraph. */
     private val sentence = 10..109
+
+    @Test
+    fun `ownership projects onto printed ranges without restoring English order`() {
+        val text = "Allah has set a seal"
+        val alignment = EnglishWordAlignment.align(text, listOf("has set a seal", "Allah"))!!
+        val spans = englishOwnedSpans(text.indices, alignment, text = text)
+        assertEquals(listOf(2, 1), spans.map { it.position })
+        assertEquals(text.indices.toList(), spans.flatMap { it.range.toList() })
+        assertEquals("Allah", text.substring(spans.first().range))
+        assertEquals(" has set a seal", text.substring(spans.last().range))
+    }
+
+    @Test
+    fun `ownership survives removed asides and a carried fragment`() {
+        val source = "a [very] painful punishment"
+        val alignment = EnglishWordAlignment.align(source, listOf("a punishment", "painful"))!!
+        val whole = EnglishLeafVerse(2, 10, "a painful punishment", source = source)
+        val spans = englishOwnedSpans(whole.text.indices, alignment, whole::fragmentInkProgress, whole.text)
+        val punishment = spans.first { it.position == 1 && whole.text.substring(it.range).contains("punishment") }
+        assertTrue(whole.text.substring(punishment.range).contains("punishment"))
+        val carried = EnglishLeafVerse(
+            2, 10, "punishment", from = source.indexOf("punishment"), to = source.length,
+            verseLength = source.length, textFrom = source.indexOf("punishment"), source = source,
+        )
+        val overleaf = englishOwnedSpans(carried.text.indices, alignment, carried::fragmentInkProgress, carried.text)
+        assertEquals(listOf(1), overleaf.map { it.position })
+        assertEquals(carried.text.indices, overleaf.single().range)
+    }
 
     @Test
     fun `the bands tile the sentence with no gap and no overlap`() {

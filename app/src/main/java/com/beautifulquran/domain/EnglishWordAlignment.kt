@@ -3,6 +3,20 @@ package com.beautifulquran.domain
 import com.beautifulquran.data.model.SurahContent
 import java.util.concurrent.ConcurrentHashMap
 
+/** A printed English span and the 1-based Arabic word that speaks its meaning. */
+data class EnglishWordSpan(val from: Float, val to: Float, val position: Int)
+
+/** Word ownership for ink and taps, plus a monotone frontier for legacy page callers. */
+data class EnglishAlignment(val wordEnds: FloatArray, val spans: List<EnglishWordSpan>) {
+    /** The Arabic owner of a point in the printed English, including reordered words. */
+    fun positionAt(through: Float): Int =
+        spans.firstOrNull { through.coerceIn(0f, 1f) < it.to }?.position ?: spans.lastOrNull()?.position ?: 1
+
+    /** Where the spoken word is printed; a missing English equivalent uses the frontier. */
+    fun through(position: Int): Float = spans.firstOrNull { it.position == position }?.from
+        ?: wordEnds.getOrElse(position - 2) { 0f }
+}
+
 /**
  * Where each Arabic word of a verse lands inside its English translation.
  *
@@ -19,12 +33,11 @@ import java.util.concurrent.ConcurrentHashMap
  * the two share most of their content words. A weighted lexical alignment
  * anchors their common words; unmatched runs interpolate between neighbours.
  *
- * **Monotone on purpose.** Arabic is not English word order — لَا رَيْبَ فِيهِ is
- * "no doubt in it" and Sahih International sets "about which there is no
- * doubt" — so a faithful alignment would sometimes run backwards. The wash
- * cannot: ink already laid never lifts (docs/INK_ENGINE.md). Recognizable
- * content holds the forward wash until its Arabic owner speaks: "painful
- * punishment" waits for the adjective, even though the noun was said first.
+ * Arabic is not English word order. Each recognized English span keeps its
+ * Arabic owner, and washes forward when that owner speaks, even across gaps
+ * in the English sentence. Ink already laid never lifts (docs/INK_ENGINE.md).
+ * The monotone frontier remains the fallback for unmatched text, rather than
+ * forcing recognized words to wait for their printed neighbours.
  * Synonyms outside the small shared vocabulary, ambiguous repetitions and
  * translator additions still use an approximate share, not an exact timing.
  *
@@ -42,26 +55,56 @@ object EnglishWordAlignment {
      * [glosses] must be the verse's Arabic words in recitation order — the
      * same order and count as the timing segments the ink is driven from.
      */
-    fun wordEnds(translation: String, glosses: List<String>): FloatArray? {
+    fun wordEnds(translation: String, glosses: List<String>): FloatArray? =
+        align(translation, glosses)?.wordEnds
+
+    /** English spans keep their spoken owners even when the sentence reorders them. */
+    fun align(translation: String, glosses: List<String>): EnglishAlignment? {
         if (glosses.isEmpty() || translation.isEmpty()) return null
         val prose = words(translation)
         if (prose.isEmpty()) return null
-        val gloss = ArrayList<ProseWord>(glosses.size * 3)
-        val owner = ArrayList<Int>(glosses.size * 3)
-        glosses.forEachIndexed { index, text ->
-            words(text).forEach { word ->
-                gloss += word
-                owner += index
-            }
-        }
-        if (gloss.isEmpty()) return null
+        val spoken = glossWords(glosses, prose)
+        if (spoken.isEmpty()) return null
+        val gloss = spoken.map { it.first }
+        val owner = spoken.map { it.second }
 
+        pairOccurrences(gloss, owner, prose)
         val claimed = IntArray(prose.size) { -1 }
         val anchor = anchors(gloss, owner, prose, glosses.size, claimed)
         val ends = spanEnds(anchor, prose, glosses.size, translation.length)
-        holdUnheardWords(ends, gloss, owner, prose, claimed)
+        val verified = holdUnheardWords(ends, gloss, owner, prose, claimed)
         snapToWords(ends, prose, translation.length)
-        return FloatArray(ends.size) { (ends[it].toFloat() / translation.length).coerceIn(0f, 1f) }
+        val shares = FloatArray(ends.size) { (ends[it].toFloat() / translation.length).coerceIn(0f, 1f) }
+        val positions = IntArray(prose.size) { index ->
+            val word = prose[index]
+            val fallback = ends.indexOfFirst { word.end <= it }.coerceAtLeast(0)
+            if (word.added) fallback else if (word.text in GRAMMAR) {
+                claimed[index].takeIf { it >= 0 } ?: fallback
+            } else verified[index].takeIf { it >= 0 } ?: fallback
+        }
+        // A possessive or auxiliary travels with its printed head when that
+        // head's gloss says it too: "Our servants" cannot split across owners.
+        val grammar = glosses.map { words(it).map { word -> word.text }.toSet() }
+        var head = -1
+        for (index in prose.indices.reversed()) {
+            val word = prose[index]
+            if (word.added) continue
+            if (word.text !in GRAMMAR) head = index
+            else if (head >= 0 && word.sentence == prose[head].sentence &&
+                word.text in grammar[positions[head]]) positions[index] = positions[head]
+        }
+        val spans = ArrayList<EnglishWordSpan>(prose.size)
+        prose.forEachIndexed { index, word ->
+            val span = EnglishWordSpan(
+                from = if (index == 0) 0f else prose[index - 1].end.toFloat() / translation.length,
+                to = if (index == prose.lastIndex) 1f else word.end.toFloat() / translation.length,
+                position = positions[index] + 1,
+            )
+            if (spans.lastOrNull()?.position == span.position) {
+                spans[spans.lastIndex] = spans.last().copy(to = span.to)
+            } else spans += span
+        }
+        return EnglishAlignment(shares, spans)
     }
 
     /**
@@ -77,15 +120,41 @@ object EnglishWordAlignment {
         val held = prose.indexOfFirst { offset <= it.end }
         val word = prose.getOrNull(held) ?: return null
         if (offset < word.end - word.text.length || word.added || word.text in GRAMMAR) return null
-        val owners = ArrayList<Int>()
-        glosses.forEachIndexed { index, text ->
-            words(text).forEach { if (it.text !in GRAMMAR && it.key == word.key) owners += index }
-        }
+        val owners = glossWords(glosses, prose).filter { (text, _) ->
+            text.text !in GRAMMAR && text.key == word.key
+        }.map { it.second }
         if (owners.distinct().size == 1) return owners[0]
         // Said more than once: the n-th in the sentence is the n-th in the glosses.
         val said = prose.filter { !it.added && it.key == word.key }
         if (said.size != owners.size) return null
         return owners[said.indexOf(word)]
+    }
+
+    /**
+     * A multiword gloss copied onto adjacent Arabic words names one phrase,
+     * not several utterances. Divide that phrase over its owners; its final
+     * token belongs to the final word ("their gaze" on مِنْ أَبْصَارِهِمْ).
+     * Single-token duplicates remain separate, since they can be real repeats.
+     */
+    private fun glossWords(glosses: List<String>, prose: List<ProseWord>): List<Pair<ProseWord, Int>> = buildList {
+        val counts = prose.filter { !it.added }.groupingBy { it.key }.eachCount()
+        var first = 0
+        while (first < glosses.size) {
+            val tokens = words(glosses[first])
+            var next = first + 1
+            if (tokens.size > 1) {
+                while (next < glosses.size && glosses[next] == glosses[first]) next++
+                // Repeated verbs such as "you do good, you do good" are real
+                // repeats. Only a grammatical prefix plus one printed head
+                // identifies a shared phrase without Arabic syntax evidence.
+                if (tokens.dropLast(1).any { it.text !in GRAMMAR && !it.added } ||
+                    counts[tokens.last().key] != 1) next = first + 1
+            }
+            tokens.forEachIndexed { index, word ->
+                add(word to first + ((index + 1) * (next - first) - 1) / tokens.size)
+            }
+            first = next
+        }
     }
 
     /** One word of a sentence: its text, lowercased, and where it ends. */
@@ -115,11 +184,51 @@ object EnglishWordAlignment {
             while (i < text.length && (text[i].isLetter() || text[i] == '\'' || text[i] == '’')) i++
             out += ProseWord(text.substring(start, i).lowercase(), i, added, sentence)
         }
+        // These are single meanings written as two words in one source and
+        // one in the other. Keep the phrase whole so "parts" cannot lag.
+        var at = 0
+        while (at < out.lastIndex) {
+            val first = out[at]
+            val next = out[at + 1]
+            val key = PHRASES["${first.text} ${next.text}"]
+            if (key != null && first.added == next.added && first.sentence == next.sentence &&
+                text.substring(first.end, next.end - next.text.length).all { it.isWhitespace() }) {
+                out[at] = ProseWord(
+                    text.substring(first.end - first.text.length, next.end).lowercase(),
+                    next.end, first.added, first.sentence,
+                ).apply { this.key = key }
+                out.removeAt(at + 1)
+            }
+            at++
+        }
         // "Glad" means "good" in this phrase, not wherever either adjective occurs.
         for (j in 0 until out.lastIndex) {
             if (out[j].text == "glad" && out[j + 1].text in setOf("tiding", "tidings")) out[j].key = "good"
         }
         return out
+    }
+
+    /**
+     * Equal repetition counts give each occurrence its own anchor. Otherwise
+     * LCS can spend a later "sons" on an earlier possessive and drag the
+     * intervening "brothers" along with it. Unequal or shared gloss counts
+     * remain ambiguous and keep the ordinary contextual alignment.
+     */
+    private fun pairOccurrences(gloss: List<ProseWord>, owner: List<Int>, prose: List<ProseWord>) {
+        val spoken = gloss.indices.filter { !gloss[it].added && gloss[it].text !in GRAMMAR }
+            .groupBy { literal(gloss[it].text) }
+        val printed = prose.filter { !it.added && it.text !in GRAMMAR }.groupBy { literal(it.text) }
+        for ((key, indices) in spoken) {
+            val matches = printed[key] ?: continue
+            if (indices.size < 2 || indices.size != matches.size ||
+                indices.map { owner[it] }.distinct().size != indices.size ||
+                matches.map { it.sentence }.distinct().size != 1) continue
+            indices.forEachIndexed { occurrence, index ->
+                val paired = "${gloss[index].key}#$key#$occurrence"
+                gloss[index].key = paired
+                matches[occurrence].key = paired
+            }
+        }
     }
 
     /**
@@ -243,7 +352,8 @@ object EnglishWordAlignment {
         owner: List<Int>,
         prose: List<ProseWord>,
         claimed: IntArray,
-    ) {
+    ): IntArray {
+        val verified = IntArray(prose.size) { -1 }
         val original = ends.copyOf()
         val counts = prose.filter { !it.added && it.text !in GRAMMAR }.groupingBy { it.key }.eachCount()
         val exactCounts = prose.groupingBy { it.text }.eachCount()
@@ -290,7 +400,7 @@ object EnglishWordAlignment {
                     word.sentence in firstSentence[exact]..lastSentence[exact]) -> exact
                 else -> -1
             }
-            if (at <= 0) continue
+            if (at < 0) continue
             val before = if (index == 0) 0 else prose[index - 1].end
             // Partial glosses can protect a direct match from interpolation
             // through grammar, but cannot pull it across other content words.
@@ -304,9 +414,11 @@ object EnglishWordAlignment {
                 val end = if (lastSentence[at] >= 0) lastSentence[at] else right?.let { firstSentence[it] } ?: prose.last().sentence
                 if (word.sentence !in start..end) continue
             }
-            ends[at - 1] = minOf(ends[at - 1], before)
+            verified[index] = at
+            if (at > 0) ends[at - 1] = minOf(ends[at - 1], before)
         }
         for (i in ends.lastIndex - 1 downTo 0) ends[i] = minOf(ends[i], ends[i + 1])
+        return verified
     }
 
     /**
@@ -342,7 +454,7 @@ object EnglishWordAlignment {
      * not arbitrary four-letter prefixes ("hearing" is not "hearts").
      */
     private fun similarity(gloss: ProseWord, prose: ProseWord): Float {
-        if (prose.added) return 0f
+        if (prose.added || gloss.key != prose.key) return 0f
         if (gloss.text == prose.text) return if (gloss.text in GRAMMAR) GRAMMAR_MATCH else EXACT_MATCH
         if (gloss.text in GRAMMAR || prose.text in GRAMMAR) return 0f
         if (gloss.key == prose.key) return STEM_MATCH
@@ -356,6 +468,8 @@ object EnglishWordAlignment {
         if (word.length > 4) {
             word = when {
                 word.endsWith("ies") -> word.dropLast(3) + "y"
+                word.endsWith("ings") -> word.dropLast(4)
+                word.endsWith("ees") -> word.dropLast(1)
                 word.endsWith("ing") -> word.dropLast(3)
                 word.endsWith("ed") -> word.dropLast(2)
                 word.endsWith("es") -> word.dropLast(2)
@@ -374,8 +488,12 @@ object EnglishWordAlignment {
     private const val STEM_MATCH = 2f
     private const val GRAMMAR_MATCH = 0.25f
 
+    private fun literal(text: String) = text.removeSuffix("'s").removeSuffix("’s").trimEnd('\'', '’')
+
     private val EQUIVALENT_WORDS = mapOf(
         "slave" to "servant", "slaves" to "servant", "servants" to "servant",
+        "gaze" to "vision", "gaz" to "vision",
+        "bosom" to "chest",
         "poor" to "needy", "needy" to "needy",
         "forever" to "eternal", "eternally" to "eternal",
         "sorrow" to "grief",
@@ -388,6 +506,8 @@ object EnglishWordAlignment {
         "spread" to "spread",
     )
 
+    private val PHRASES = mapOf("private parts" to "chastity", "head covers" to "headcover")
+
     /** Complements/intensity the prose can leave implicit in the matched gloss head. */
     private val GLOSS_SUPPLEMENTS = setOf("one", "thing", "things", "partners", "existence", "abundantly")
 
@@ -397,7 +517,7 @@ object EnglishWordAlignment {
 
     /** Words too common to anchor on their own. */
     private val GRAMMAR = setOf(
-        "a", "all", "an", "and", "are", "as", "at", "be", "been", "but", "by",
+        "a", "all", "an", "and", "are", "as", "at", "be", "been", "but", "by", "o",
         "did", "do", "does", "for", "from", "he", "her", "his", "i", "if", "in",
         "is", "it", "its", "no", "nor", "not", "of", "on", "or", "she", "so",
         "that", "the", "their", "them", "these", "they", "this", "those", "to",
@@ -434,19 +554,24 @@ object EnglishWordAlignment {
  * [NONE] rather than not stored, so an unalignable verse is not re-solved on
  * every frame that asks.
  */
-class EnglishVerseAlignments(private val content: SurahContent) {
+class EnglishVerseAlignments(private val content: SurahContent, private val wordByWord: Boolean = false) {
 
-    private val solved = ConcurrentHashMap<Int, FloatArray>()
+    private val solved = ConcurrentHashMap<Int, EnglishAlignment>()
 
     /** Where each Arabic word of [ayah] ends in its English, or null. */
-    fun of(ayah: Int?): FloatArray? {
+    fun of(ayah: Int?): FloatArray? = alignment(ayah)?.wordEnds
+
+    /** The same cached ownership map read by the wash, tap and carried-leaf follow. */
+    fun alignment(ayah: Int?): EnglishAlignment? {
         if (ayah == null) return null
         val ends = solved.computeIfAbsent(ayah) { number ->
             content.ayahs
                 .firstOrNull { it.number == number }
                 ?.let { verse ->
-                    EnglishWordAlignment.wordEnds(
-                        verse.translation,
+                    EnglishWordAlignment.align(
+                        if (wordByWord) EnglishTypography.lyricize(
+                            verse.words.map { it.translation }, verse.words.map { it.arabic },
+                        ).filter { it.isNotBlank() }.joinToString(" ") else verse.translation,
                         verse.words.map { it.translation },
                     )
                 }
@@ -457,6 +582,6 @@ class EnglishVerseAlignments(private val content: SurahContent) {
 
     private companion object {
         /** Solved, and there is no alignment — distinct from "not solved". */
-        val NONE = FloatArray(0)
+        val NONE = EnglishAlignment(FloatArray(0), emptyList())
     }
 }
