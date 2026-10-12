@@ -39,6 +39,16 @@ class TypographyTuningTest {
     }
 
     @Test
+    fun onlyTitlesAndUiCarryStylisticSets() {
+        val t = TypographyTuning()
+        assertEquals(1, t.title.features["ss16"])
+        assertEquals(1, t.ui.features["ss07"])
+        listOf(t.book, t.leaf, t.bookItalic, t.note).forEach { face ->
+            assertEquals(emptyList<String>(), face.features.keys.filter { it.startsWith("ss") })
+        }
+    }
+
+    @Test
     fun eachRoleKeepsItsOwnSettings() {
         val shipped = TypographyTuning()
         TypeRole.entries.forEach { role ->

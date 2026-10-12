@@ -926,6 +926,14 @@ not the app's.
   headlines. It sets darker than the Cormorant it replaced, so each weight is
   served by the cut one step lighter (Medium→Regular, SemiBold→Medium).
 - **UI sans**: Timeless Sans for Material's sans slots (see UI text below).
+- **Stylistic sets** (reviewed set by set in context; `TITLE_ALTERNATES`,
+  `UI_ALTERNATES` in `TypographyTuning.kt`): titles take **ss16**, the
+  long-tailed Q that sweeps under the next letter (the masthead's "Quran",
+  Al-Qamar, Qaf); the UI sans takes **ss07**, round quotes and punctuation
+  that match the serif's. Everything else stays at the foundry's default: the
+  lowercase sets trade the Text master's ball terminals for flat ones (colder
+  on a long page), the plain & would replace the italic's calligraphic one,
+  and circled figures are ornament the paper has no place for.
 - **Developer comparison**: Settings → Developer can switch to the previous
   EB Garamond / Cormorant / Material Sans profile and its original type sizes
   and leading. The English leaf measures and paginates against the selected

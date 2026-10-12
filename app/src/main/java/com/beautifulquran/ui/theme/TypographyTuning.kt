@@ -27,10 +27,10 @@ data class TypefaceTuning(
 data class TypographyTuning(
     val book: TypefaceTuning = TypefaceTuning(),
     val bookItalic: TypefaceTuning = TypefaceTuning(style = 0f, italic = 100f),
-    val title: TypefaceTuning = TypefaceTuning(style = 0f),
-    val ui: TypefaceTuning = TypefaceTuning(
-        weight = 420, features = mapOf("kern" to 1, "calt" to 1),
-    ),
+    /** Titles carry the long-tailed Q (ss16); see [TITLE_ALTERNATES]. */
+    val title: TypefaceTuning = TypefaceTuning(style = 0f, features = TITLE_ALTERNATES),
+    /** The UI sans takes round quotes and punctuation (ss07); see [UI_ALTERNATES]. */
+    val ui: TypefaceTuning = TypefaceTuning(weight = 420, features = UI_ALTERNATES),
     val note: TypefaceTuning = TypefaceTuning(weight = 500, italic = 100f),
     /**
      * The English Mushaf leaf's hand, tuned apart from [book] because the leaf is
@@ -137,6 +137,29 @@ internal fun timelessFeatures(sans: Boolean, italic: Boolean): List<TypeFeature>
         )
     }
 }
+
+/**
+ * Timeless's stylistic sets were reviewed one by one in context
+ * (docs/DESIGN.md, "Type"). Two earn their place:
+ *
+ * * **ss16, the long-tailed Q, in titles.** The tail sweeps under the next
+ *   letter, the classical book capital; it carries "Quran" in the masthead
+ *   and Al-Qamar, Qaf, Al-Qasas in their banners. Display sizes only — at
+ *   reading size it reads as a flourish in the line.
+ * * **ss07, round quotes and punctuation, in the UI sans.** The sans's default
+ *   quotes are slanted ticks; round ones (and round dots on . : ; ! ? i j)
+ *   match the serif's, so “exact phrase” in a search field reads as the same
+ *   voice as the page.
+ *
+ * Kept off: the lowercase sets (ss01–ss10) swap the Text master's ball
+ * terminals on a, c, f, g, j, r, y for flat ones — crisper and colder, the
+ * opposite of what the long reading surfaces need; ss11/italic ss09 replace
+ * the italic's calligraphic & with a plain one; the capital sets (K, M, R, W,
+ * C, G) are near-invisible at title size; circled figures (ss19/ss20) are
+ * ornaments the paper metaphor has no place for.
+ */
+internal val TITLE_ALTERNATES = mapOf("kern" to 1, "liga" to 1, "ss16" to 1)
+internal val UI_ALTERNATES = mapOf("kern" to 1, "calt" to 1, "ss07" to 1)
 
 /** The leaf's shipped hand; see [TypographyTuning.leaf]. */
 internal val LEAF_DEFAULT = TypefaceTuning(weight = 365, style = 25f, tracking = 0.0125f)

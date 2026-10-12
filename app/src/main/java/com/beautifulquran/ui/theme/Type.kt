@@ -285,7 +285,8 @@ val ScribeFontFamily: FontFamily
  * Fonts that lack a feature simply ignore it.
  */
 private const val BOOK_FEATURES = "'kern' 1, 'liga' 1"
-private const val UI_FEATURES = "'kern' 1, 'calt' 1"
+private val UI_FEATURES = TypefaceTuning(features = UI_ALTERNATES).featureSettings
+private val TITLE_FEATURES = TypefaceTuning(features = TITLE_ALTERNATES).featureSettings
 
 /**
  * Figures that stand on their own — labels, facts, counters, verse marks,
@@ -378,7 +379,7 @@ private val TimelessQuranTypography = Typography(
         fontSize = 24.sp,
         lineHeight = 30.sp,
         letterSpacing = 0.2.sp,
-        fontFeatureSettings = BOOK_FEATURES,
+        fontFeatureSettings = TITLE_FEATURES,
         textMotion = TextMotion.Animated,
     ),
     headlineSmall = MaterialSans.headlineSmall.copy(fontFamily = TimelessSansFontFamily, fontFeatureSettings = UI_FEATURES, textMotion = TextMotion.Animated),
@@ -388,7 +389,7 @@ private val TimelessQuranTypography = Typography(
         fontSize = 19.5.sp,
         lineHeight = 25.sp,
         letterSpacing = 0.2.sp,
-        fontFeatureSettings = BOOK_FEATURES,
+        fontFeatureSettings = TITLE_FEATURES,
         textMotion = TextMotion.Animated,
     ),
     titleMedium = TextStyle(
