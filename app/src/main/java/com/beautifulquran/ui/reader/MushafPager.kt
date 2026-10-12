@@ -122,6 +122,8 @@ internal data class MushafPlayback(
     val isPlaying: Boolean = false,
     /** Media3's actual playlist ayah, before the fade-led ink frontier. */
     val playingAyah: Int? = null,
+    /** Seek/repeat generation: a new performance releases the previous location. */
+    val inkId: Long = 0L,
 )
 
 /** Stable equality key for the small set of voice changes follow reacts to. */
@@ -131,6 +133,8 @@ private data class MushafFollowMoment(
     val basmalahActive: Boolean,
     val playingHere: Boolean,
     val isPlaying: Boolean,
+    val playingAyah: Int?,
+    val inkId: Long,
 )
 
 /**
@@ -491,6 +495,10 @@ internal fun mushafWaitingLeafReleased(
     fromTap: Boolean,
 ): Boolean = waitingPage != 0 && voicePage == waitingPage && !fromTap
 
+/** A font wait cannot finish a turn inherited by another verse, seek, or repeat. */
+internal fun mushafSamePlayback(ayah: Int?, inkId: Long, current: MushafPlayback): Boolean =
+    current.playingAyah == ayah && current.inkId == inkId
+
 /** Delayed turns retain ownership only while the exact activation survives. */
 internal fun mushafSameActivation(expected: ActiveWord, current: ActiveWord?): Boolean =
     current != null &&
@@ -794,6 +802,8 @@ internal fun MushafPager(
                 basmalahActive = voice.basmalahActive,
                 playingHere = voice.playingHere,
                 isPlaying = voice.isPlaying,
+                playingAyah = voice.playingAyah,
+                inkId = voice.inkId,
             )
         }
             .collect { moment ->
@@ -879,6 +889,9 @@ internal fun MushafPager(
                         return@collect
                     }
                     if (word == null) {
+                        if (!mushafSamePlayback(moment.playingAyah, moment.inkId, currentVoice)) {
+                            return@collect
+                        }
                         if (currentVoice.basmalahActive != moment.basmalahActive) {
                             return@collect
                         }

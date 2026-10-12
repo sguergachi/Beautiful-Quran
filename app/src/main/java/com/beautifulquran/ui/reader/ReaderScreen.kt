@@ -2756,6 +2756,7 @@ fun ReaderScreen(
                             isPlaying = isThisSurahPlaying && playerState.isPlaying,
                             playingAyah = playerState.nowPlaying?.ayah
                                 ?.takeIf { isThisSurahPlaying },
+                            inkId = playerState.positionEvents.inkId,
                         )
                     }
                     val mushafDispatch = rememberUpdatedState(

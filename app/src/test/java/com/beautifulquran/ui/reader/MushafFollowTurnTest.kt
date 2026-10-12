@@ -382,6 +382,19 @@ class MushafFollowTurnTest {
     }
 
     @Test
+    fun `a font wait cannot turn onto a stale leaf while fade-led focus stays unchanged`() {
+        val waiting = MushafPlayback(
+            activeAyah = 11, reciting = true, playingHere = true,
+            playingAyah = 11, inkId = 4,
+        )
+        assertTrue(mushafSamePlayback(11, 4, waiting))
+        // Media3 advances to the next leaf before the focus poll catches up.
+        assertFalse(mushafSamePlayback(11, 4, waiting.copy(playingAyah = 12, inkId = 5)))
+        // A restart or repeat changes the performance even within the same verse.
+        assertFalse(mushafSamePlayback(11, 4, waiting.copy(inkId = 5)))
+    }
+
+    @Test
     fun `mushaf return points toward the playing leaf, left or right`() {
         // reverseLayout: later pages sit to the left of the leaf in view.
         // A mushaf is bound on the right, so a later leaf lies leftward.

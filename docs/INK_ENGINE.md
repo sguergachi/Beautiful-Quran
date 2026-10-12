@@ -481,6 +481,8 @@ tween-vs-snap rules, sweep entry and residual rules, repeat wash timing, the
   including while paused before its first word. The selected verse and those
   after it still wait for the wash. Between word polls, Media3's playlist verse
   supplies the frontier rather than the fade-led focus.
+  A follow turn that waits for a font rechecks the actual playlist verse and
+  seek/repeat generation afterward, so unchanged focus cannot finish a stale turn.
   A leaf reached by hand stays fully readable, even
   while playback continues elsewhere. A leaf follow is about to turn onto
   waits under Upcoming paper *before* the paper moves, so the turn never
