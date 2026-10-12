@@ -36,9 +36,10 @@ function fixture(t, upstream = () => assert.fail('current cache must not fetch')
   }
   const control = new SqlTimingStore(storage)
   const env = { QF_TIMING_STORE: new MemoryKV(), TIMING_MAINTENANCE_KEY: 'private-key' }
-  const controller = new TimingController(control, env, upstream, now)
+  const logs = []
+  const controller = new TimingController(control, env, upstream, now, (event) => logs.push(event))
   env.QF_TIMING_CONTROL = { getByName: (name) => { assert.equal(name, 'qf-content-access'); return controller } }
-  return { control, env, controller, service: createTimingService() }
+  return { storage, control, env, controller, logs, service: createTimingService() }
 }
 
 const page = (mutations = [], token = 'checkpoint') => Response.json({ sync: { mutations, has_more: false, next_sync_token: token, next_page_url: null } })
@@ -61,6 +62,204 @@ async function reviewed(f) {
   f.control.put(`blob:${accepted.payloadKey}`, true)
   return accepted
 }
+
+function integratedFixture(t, fetchImpl, now = () => 200) {
+  const proxy = createQfProxy(fetchImpl)
+  const f = fixture(t, proxy.qfResponse, now)
+  Object.assign(f.env, { QF_CLIENT_ID: 'client-id', QF_CLIENT_SECRET: 'client-secret', QF_ENV: 'prelive' })
+  return { ...f, proxy, restart() {
+    const controller = new TimingController(new SqlTimingStore(f.storage), f.env,
+      createQfProxy(fetchImpl).qfResponse, now, (event) => f.logs.push(event))
+    f.env.QF_TIMING_CONTROL = { getByName: () => controller }
+    return controller
+  } }
+}
+
+const wordPath = '/api/v4/resources/snapshots/mushafs/1'
+const healthyQf = (url) => url.includes('/oauth2/token')
+  ? Response.json({ access_token: 'healthy-token', expires_in: 3_600 })
+  : url.includes('/resources/sync') ? page([], 'recovered-checkpoint') : Response.json({ records: [] })
+
+for (const status of [400, 404, 410]) {
+  test(`SQLite proxy preserves sync ${status}, recovers word content, and retains all timing copies`, async (t) => {
+    const resources = 'mushafs:1;word_by_word_translations:59;word_by_word_transliterations:60'
+    const bootstrap = '/api/v4/resources/sync?' + new URLSearchParams({ resources, bootstrap: 'true' })
+    const incremental = '/api/v4/resources/sync?' + new URLSearchParams({ resources, sync_token: 'expired-word-checkpoint' })
+    const f = integratedFixture(t, async (url) => {
+      if (url.includes('/oauth2/token')) return healthyQf(url)
+      const upstream = new URL(url)
+      if (upstream.pathname === '/content/api/v4/resources/sync') {
+        assert.equal(upstream.searchParams.get('resources'), resources)
+        if (upstream.searchParams.get('sync_token') === 'expired-word-checkpoint') {
+          return Response.json({ error: { code: status === 410 ? 'resync_required' : 'checkpoint_rejected' } }, { status })
+        }
+        assert.equal(upstream.searchParams.get('bootstrap'), 'true')
+        return page([{ type: 'RESOURCE_CREATE', resource_group: 'mushafs', resource_id: 1, snapshot_url: wordPath }], 'recovered-word-checkpoint')
+      }
+      assert.equal(upstream.pathname, '/content' + wordPath)
+      return Response.json({ records: [{ record_key: 'word', data: { text: 'current word' } }] })
+    })
+    const accepted = await reviewed(f)
+    await f.env.QF_TIMING_STORE.put('timings/2/view/other', 'other reviewed copy')
+    const state = f.controller.state(1)
+    const copies = new Map(f.env.QF_TIMING_STORE.values)
+    const rejected = await f.proxy.fetch(request(incremental), f.env)
+    assert.equal(rejected.status, status)
+    assert.notEqual((await rejected.json()).error.code, 'qf_access_revoked')
+    assert.deepEqual(f.env.QF_TIMING_STORE.values, copies)
+    const recovery = await f.proxy.fetch(request(bootstrap), f.env)
+    assert.equal(recovery.status, 200)
+    const sync = (await recovery.json()).sync
+    assert.equal(sync.next_sync_token, 'recovered-word-checkpoint')
+    const snapshot = await f.proxy.fetch(request(sync.mutations[0].snapshot_url), f.env)
+    assert.equal(snapshot.status, 200)
+    assert.equal((await snapshot.json()).records[0].data.text, 'current word')
+    assert.deepEqual(f.controller.state(1), state)
+    assert.deepEqual(f.env.QF_TIMING_STORE.values, copies)
+    assert.equal(f.controller.global().generation, 0)
+    assert.equal((await (await f.proxy.fetch(request(), f.env)).json()).revision, accepted.metadata.revision)
+  })
+}
+
+test('temporary OAuth/content errors recover through the real proxy and SQLite without regrant', async (t) => {
+  const json = (status, body) => () => Response.json(body, { status })
+  const exception = () => { throw Object.assign(new Error('edge error'), { status: 403, code: 'edge_error' }) }
+  const outages = [
+    ['oauth', json(429, { error: 'rate_limited' })], ['oauth', json(400, { error: 'invalid_request' })],
+    ['oauth', json(403, { error: 'invalid_client' })], ['oauth', json(422, { error: 'unauthorized_client' })],
+    ['oauth', () => new Response(null, { status: 408 })], ['oauth', exception],
+    ['content', () => new Response(null, { status: 403 })],
+    ['content', () => new Response('<html>blocked</html>', { status: 403, headers: { 'Content-Type': 'text/html' } })],
+    ['content', () => new Response('{broken', { status: 403, headers: { 'Content-Type': 'application/json' } })],
+    ['content', json(403, { message: 'forbidden' })], ['content', json(403, { type: 'forbidden' })],
+    ['content', json(403, { success: true, type: 'forbidden' })],
+    ['content', json(403, { success: false, type: 'rate_limit_exceeded' })], ['content', json(403, ['forbidden'])],
+    ['content', json(400, { success: false, type: 'invalid_request' })],
+    ['content', json(404, { success: false, type: 'not_found' })], ['content', json(422, { error: { code: 'invalid_resources' } })],
+    ['content', json(429, { success: false, type: 'rate_limit_exceeded' })], ['content', json(503, { success: false, type: 'service_unavailable' })],
+    ['content', exception],
+  ]
+  for (const [stage, outage] of outages) {
+    let temporary = true
+    const f = integratedFixture(t, async (url) => temporary && (url.includes('/oauth2/token') ? stage === 'oauth' : stage === 'content')
+      ? outage() : healthyQf(url))
+    const accepted = await reviewed(f)
+    await f.env.QF_TIMING_STORE.put('timings/2/view/other', 'other permitted copy')
+    const before = f.controller.state(1)
+    const copies = new Map(f.env.QF_TIMING_STORE.values)
+    const response = await f.proxy.fetch(request(wordPath), f.env)
+    assert.equal(response.status, 503, `${stage} outage must be temporary`)
+    assert.notEqual((await response.json()).error.code, 'qf_access_revoked')
+    const refresh = await f.proxy.fetch(privateRequest('/internal/timings/1/refresh', {}), f.env)
+    assert.equal(refresh.status, 503)
+    assert.equal(f.controller.global().revoked, false)
+    assert.deepEqual(f.controller.state(1), before)
+    assert.deepEqual(f.env.QF_TIMING_STORE.values, copies)
+    assert.equal((await f.proxy.fetch(request(), f.env)).status, 200)
+    temporary = false
+    const restarted = f.restart()
+    assert.equal((await f.proxy.fetch(request(wordPath), f.env)).status, 200)
+    await restarted.refresh(1)
+    assert.equal(restarted.state(1).syncToken, 'recovered-checkpoint')
+    assert.equal((await (await f.proxy.fetch(request(), f.env)).json()).revision, accepted.metadata.revision)
+    assert.equal(restarted.global().generation, 0)
+    assert.deepEqual(f.env.QF_TIMING_STORE.values, copies)
+  }
+})
+
+test('only confirmed authorization failures persist revocation across a real proxy/controller restart', async (t) => {
+  const cases = [
+    ['oauth', () => new Response(null, { status: 401 })],
+    ['oauth', () => Response.json({ error: 'invalid_client' }, { status: 400 })],
+    ['oauth', () => Response.json({ error: 'unauthorized_client' }, { status: 400 })],
+    ['content', () => new Response(null, { status: 401 })],
+    ...['forbidden', 'unauthorized', 'insufficient_scope'].map((type) =>
+      ['content', () => Response.json({ success: false, type, message: 'authorization rejected' }, { status: 403 })]),
+  ]
+  for (const [stage, failure] of cases) {
+    let rejected = true
+    let upstreamCalls = 0
+    let contentCalls = 0
+    const f = integratedFixture(t, async (url) => {
+      upstreamCalls += 1
+      if (!url.includes('/oauth2/token')) contentCalls += 1
+      return rejected && (url.includes('/oauth2/token') ? stage === 'oauth' : stage === 'content') ? failure() : healthyQf(url)
+    })
+    await reviewed(f)
+    await f.env.QF_TIMING_STORE.put('timings/2/view/other', 'other permitted copy')
+    const response = await f.proxy.fetch(request(wordPath), f.env)
+    assert.equal(response.status, 403)
+    assert.deepEqual(await response.json(), { error: { code: 'qf_access_revoked' } })
+    assert.equal(f.controller.global().revoked, true)
+    assert.equal(f.controller.global().purgeComplete, true)
+    assert.equal(f.controller.state(1), null)
+    assert.equal(f.env.QF_TIMING_STORE.values.size, 0)
+    if (stage === 'content') assert.equal(contentCalls, failure().status === 401 ? 2 : 1)
+    rejected = false
+    const callsBeforeRestart = upstreamCalls
+    const restarted = f.restart()
+    assert.equal((await f.proxy.fetch(request(wordPath), f.env)).status, 403)
+    assert.equal((await f.proxy.fetch(request(), f.env)).status, 403)
+    assert.equal(restarted.global().generation, 1)
+    assert.equal(upstreamCalls, callsBeforeRestart)
+  }
+})
+
+test('identical-source rebootstrap stays held, logs pending age, and clears only after reviewed acceptance', async (t) => {
+  let now = 1_000
+  let calls = 0
+  const f = fixture(t, async (_env, path) => {
+    calls += 1
+    if (calls === 1) return Response.json({ error: { code: 'resync_required' } }, { status: 410 })
+    if (path.includes('/snapshots/')) return Response.json({ records: [] })
+    return page(calls === 2 ? [change('RESOURCE_CREATE')] : [])
+  }, () => now)
+  const accepted = await reviewed(f)
+  const previousBytes = await f.env.QF_TIMING_STORE.get(accepted.sourceKey)
+  const state = await f.controller.refresh(1)
+  assert.equal(await f.env.QF_TIMING_STORE.get(state.sourceKey), previousBytes)
+  assert.notEqual(state.sourceKey, accepted.sourceKey)
+  assert.equal((await f.service.fetch(request(), f.env)).status, 503)
+  assert.equal(state.reviewPendingSinceMs, 1_000)
+  assert.deepEqual(f.logs, [{ event: 'qf_timing_review_required', reciterId: 1, qfReciterId: 7,
+    pendingSinceMs: 1_000, pendingForMs: 0, sourceSyncedAtMs: 1_000, reminder: false }])
+  const restarted = new TimingController(new SqlTimingStore(f.storage), f.env, async () => page(), () => now, (event) => f.logs.push(event))
+  now += 24 * 60 * 60 * 1_000 - 1
+  await restarted.maintain(1)
+  assert.equal(f.logs.length, 1)
+  now += 1
+  await restarted.maintain(1)
+  assert.equal(f.logs.length, 2)
+  assert.equal(f.logs[1].pendingForMs, 24 * 60 * 60 * 1_000)
+  assert.equal(f.logs[1].reminder, true)
+  assert.equal(restarted.state(1).reviewPendingSinceMs, 1_000)
+  await restarted.accept(1, { ...accepted, sourceKey: state.sourceKey })
+  assert.equal(restarted.state(1).reviewPendingSinceMs, null)
+  now += 24 * 60 * 60 * 1_000
+  await restarted.maintain(1)
+  assert.equal(f.logs.length, 2)
+  assert.equal((await restarted.response(1)).status, 200)
+})
+
+test('successive pending source edits retain their first review time and outages still emit maintenance reminders', async (t) => {
+  let now = 1_000
+  let outage = false
+  const f = fixture(t, async (_env, path) => outage ? new Response(null, { status: 503 })
+    : path.includes('/snapshots/') ? Response.json({ records: [] }) : page([change('RESOURCE_INVALIDATE')]), () => now)
+  await reviewed(f)
+  await f.controller.refresh(1)
+  now += 1_000
+  await f.controller.refresh(1)
+  assert.equal(f.controller.state(1).reviewPendingSinceMs, 1_000)
+  assert.equal(f.logs.length, 1)
+  now = 1_000 + 24 * 60 * 60 * 1_000
+  outage = true
+  await assert.rejects(f.controller.maintain(1))
+  assert.equal(f.logs.length, 2)
+  assert.equal(f.logs[1].reminder, true)
+  assert.equal(f.logs[1].pendingSinceMs, 1_000)
+  assert.equal((await f.service.fetch(request(), f.env)).status, 503)
+})
 
 test('serves a reviewed streamed view without its private source or checkpoint', async (t) => {
   const f = fixture(t)
@@ -146,7 +345,7 @@ test('OAuth and content rejection persist global revocation and purge all voices
   for (const oauthFailure of [false, true]) {
     const f = fixture(t, async () => {
       if (oauthFailure) throw Object.assign(new Error('qf_access_revoked'), { status: 403, code: 'qf_access_revoked' })
-      return new Response(null, { status: 403 })
+      return Response.json({ success: false, type: 'forbidden', message: 'forbidden' }, { status: 403 })
     }, () => 1_000)
     await reviewed(f)
     await f.env.QF_TIMING_STORE.put('timings/2/view/other', 'other voice')
@@ -156,6 +355,28 @@ test('OAuth and content rejection persist global revocation and purge all voices
     const restarted = new TimingController(f.control, f.env, () => assert.fail('revoked state must not fetch'))
     assert.equal((await restarted.response(1)).status, 403)
     assert.equal((await restarted.content('/api/v4/resources/snapshots/mushafs/1')).status, 403)
+  }
+})
+
+test('throttling and bare edge blocks never latch the destructive global revocation', async (t) => {
+  const outages = [
+    // OAuth throttled, timing out or rejecting a malformed request.
+    () => { throw Object.assign(new Error('qf_auth_unavailable'), { status: 503, code: 'qf_auth_unavailable' }) },
+    // Content API behind a WAF/edge block: HTML or empty 403, plus a 429.
+    () => new Response('<html>blocked</html>', { status: 403, headers: { 'Content-Type': 'text/html' } }),
+    () => new Response(null, { status: 403 }),
+    () => Response.json({ message: 'slow down' }, { status: 429 }),
+  ]
+  for (const outage of outages) {
+    const f = fixture(t, async () => outage(), () => 1_000)
+    const accepted = await reviewed(f)
+    await assert.rejects(f.controller.refresh(1))
+    assert.equal(f.controller.global().revoked, false)
+    assert.notEqual(await f.env.QF_TIMING_STORE.get(accepted.payloadKey), null)
+    assert.equal((await f.service.fetch(request(), f.env)).status, 200)
+    const content = await f.controller.content('/api/v4/resources/snapshots/mushafs/1')
+    assert.notEqual(content.status, 403)
+    assert.notEqual((await content.json()).error?.code, 'qf_access_revoked')
   }
 })
 

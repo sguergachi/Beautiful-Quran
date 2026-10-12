@@ -1,4 +1,4 @@
-import { createTimingService } from './timings.mjs'
+import { createTimingService, qfRejectedAccess, qfRejectedClient, qfContentFailureStatus } from './timings.mjs'
 
 const RESOURCES = 'mushafs:1;word_by_word_translations:59;word_by_word_transliterations:60'
 const SNAPSHOTS = new Set([
@@ -36,9 +36,9 @@ export function createQfProxy(fetchImpl = fetch) {
         body: 'grant_type=client_credentials&scope=content',
       })
       if (!response.ok) {
-        if (response.status >= 400 && response.status < 500) {
-          throw new ProxyFailure(403, 'qf_access_revoked')
-        }
+        // Throttling (429), timeouts and malformed requests are outages, not
+        // revocation: only a definite client rejection may purge every cache.
+        if (await qfRejectedClient(response)) throw new ProxyFailure(403, 'qf_access_revoked')
         throw new ProxyFailure(503, 'qf_auth_unavailable')
       }
       const body = await response.json()
@@ -103,7 +103,7 @@ export function createQfProxy(fetchImpl = fetch) {
         if (env.QF_TIMING_CONTROL) return await timings.content(env, path, cors)
         const upstream = await qfResponse(env, path)
         if (!upstream.ok) {
-          if (upstream.status === 401 || upstream.status === 403) {
+          if (await qfRejectedAccess(upstream)) {
             await timings.revoke(env)
             return failure(403, 'qf_access_revoked', cors)
           }
@@ -113,7 +113,7 @@ export function createQfProxy(fetchImpl = fetch) {
               return failure(410, 'resync_required', cors)
             }
           }
-          return failure(upstream.status, 'qf_content_unavailable', cors)
+          return failure(qfContentFailureStatus(path, upstream.status), 'qf_content_unavailable', cors)
         }
         return new Response(upstream.body, {
           status: upstream.status,
@@ -124,7 +124,7 @@ export function createQfProxy(fetchImpl = fetch) {
           },
         })
       } catch (error) {
-        if (error.status === 403) await timings.revoke(env)
+        if (error.status === 403 && error.code === 'qf_access_revoked') await timings.revoke(env)
         if (error instanceof ProxyFailure) return failure(error.status, error.code, cors)
         return failure(503, 'qf_content_unavailable', cors)
       }

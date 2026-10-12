@@ -32,6 +32,7 @@ import com.beautifulquran.timingslab.TimingOverrides
 import com.beautifulquran.tarjilab.ReciterTarjiProfiles
 import com.beautifulquran.ui.reader.InkEngine
 import com.beautifulquran.ui.reader.InkLabStore
+import com.beautifulquran.ui.reader.TarjiVersePulse
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -138,6 +139,9 @@ class QuranApp : Application() {
         ornamentSeeds = OrnamentSeedStore(this)
         inkLab = InkLabStore(this)
         tarjiProfiles = ReciterTarjiProfiles(this)
+        appScope.launch(Dispatchers.Main.immediate) {
+            runtimeTimings.changes.collect { TarjiVersePulse.timingsChanged(it) }
+        }
         // Restore last lab audition before any reader opens.
         InkEngine.attachLabStore(inkLab)
         tarjiProfiles.applyToEngine(settings.settings.value.reciterId)

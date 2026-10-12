@@ -6,9 +6,37 @@ const AUDIO_SLUGS = new Map([[1, 'Alafasy_128kbps'], [2, 'Husary_64kbps'],
   [5, 'Abdurrahmaan_As-Sudais_192kbps'], [7, 'Hani_Rifai_192kbps']])
 const PREFIX = 'timings/'
 const REFRESH_MS = 6 * 24 * 60 * 60 * 1_000
+const REVIEW_REMINDER_MS = 24 * 60 * 60 * 1_000
 const HASH = /^[a-f0-9]{64}$/
 const METADATA_KEYS = ['schemaVersion', 'reciterId', 'qfReciterId', 'audioSlug', 'clock',
   'sourceSha256', 'sourceSyncSequence', 'sourceSyncedAtMs', 'normalizerSha256', 'revision']
+
+/**
+ * Revocation is durable and destructive (every view and cache is purged until
+ * an operator regrants), so only a definite credential rejection may trigger
+ * it: a 401 after the token retry, or QF's documented authorization-error 403.
+ * Edge blocks and throttling are outages that recover on the next request.
+ */
+export async function qfRejectedAccess(response) {
+  if (response.status === 401) return true
+  if (response.status !== 403) return false
+  if (!/json/i.test(response.headers.get('Content-Type') || '')) return false
+  const body = await response.clone().json().catch(() => null)
+  return body?.success === false && ['forbidden', 'unauthorized', 'insufficient_scope'].includes(body?.type)
+}
+
+/** The OAuth token endpoint's definite rejections: 401, or 400 invalid/unauthorized client. */
+export async function qfRejectedClient(response) {
+  if (response.status === 401) return true
+  if (response.status !== 400) return false
+  const body = await response.clone().json().catch(() => null)
+  return ['invalid_client', 'unauthorized_client'].includes(body?.error)
+}
+
+/** Existing clients rebootstrap rejected sync checkpoints; other errors retain their copies. */
+export function qfContentFailureStatus(path, status) {
+  return path.startsWith('/api/v4/resources/sync?') && [400, 404].includes(status) ? status : 503
+}
 
 /** Small synchronous SQLite records are the strong publication/revocation gate. */
 export class SqlTimingStore {
@@ -33,11 +61,12 @@ export class SqlTimingStore {
 
 /** One atom owns the six fixed resources and their shared QF authorization. */
 export class TimingController {
-  constructor(control, env, qfResponse, now = Date.now) {
+  constructor(control, env, qfResponse, now = Date.now, log = (event) => console.warn(event)) {
     this.control = control
     this.env = env
     this.qfResponse = qfResponse
     this.now = now
+    this.log = log
     this.refreshes = new Map()
     this.writes = new Map()
     this.purgeRequest = null
@@ -61,10 +90,10 @@ export class TimingController {
     try {
       response = await this.qfResponse(this.env, path)
     } catch (error) {
-      if (error.status === 403 && this.global().generation === generation) await this.revoke()
+      if (error.status === 403 && error.code === 'qf_access_revoked' && this.global().generation === generation) await this.revoke()
       throw error
     }
-    if (response.status === 401 || response.status === 403) {
+    if (await qfRejectedAccess(response)) {
       if (this.global().generation === generation) await this.revoke()
       throw new TimingFailure(403, 'qf_access_revoked')
     }
@@ -148,7 +177,7 @@ export class TimingController {
   async withdraw(id, generation, epoch) {
     this.current(id, generation, epoch)
     const previous = this.state(id)
-    const next = { ...previous, epoch: epoch + 1, sourceKey: null, accepted: null, deleted: true, tombstoned: true }
+    const next = { ...previous, epoch: epoch + 1, sourceKey: null, accepted: null, deleted: true, tombstoned: true, reviewPendingSinceMs: null }
     this.control.put(`resource:${id}`, next)
     await this.purge(`${PREFIX}${id}/`)
     this.current(id, generation, next.epoch)
@@ -168,7 +197,18 @@ export class TimingController {
     // visible to KV's eventual listing only after the first purge completed.
     if (this.global().revoked) return this.revoke()
     await this.retireViews(id).catch(() => {})
-    return this.refresh(id)
+    try { return await this.refresh(id) } finally {
+      const state = this.state(id)
+      if (state?.reviewPendingSinceMs != null && this.now() - state.reviewPendingSinceMs >= REVIEW_REMINDER_MS) {
+        this.logReview(id, state, true)
+      }
+    }
+  }
+
+  logReview(id, state, reminder = false) {
+    this.log({ event: 'qf_timing_review_required', reciterId: id, qfReciterId: TIMING_RECITERS.get(id),
+      pendingSinceMs: state.reviewPendingSinceMs, pendingForMs: this.now() - state.reviewPendingSinceMs,
+      sourceSyncedAtMs: state.syncedAtMs, reminder })
   }
 
   async retireViews(id) {
@@ -268,9 +308,13 @@ export class TimingController {
     }
     this.current(id, generation, epoch)
     const state = this.state(id)
+    const syncedAtMs = this.now()
+    const reviewPendingSinceMs = sourceKey && !deleted && state?.accepted?.sourceKey !== sourceKey
+      ? state?.reviewPendingSinceMs ?? syncedAtMs : null
     const replacement = { ...state, epoch: epoch + (sourceKey !== state?.sourceKey ? 1 : 0),
-      syncToken, sourceKey: sourceKey || null, deleted, tombstoned: state?.tombstoned || false, syncedAtMs: this.now() }
+      syncToken, sourceKey: sourceKey || null, deleted, tombstoned: state?.tombstoned || false, syncedAtMs, reviewPendingSinceMs }
     this.control.put(`resource:${id}`, replacement)
+    if (reviewPendingSinceMs != null && state?.reviewPendingSinceMs == null) this.logReview(id, replacement)
     if (state?.sourceKey && state.sourceKey !== sourceKey) {
       await this.env.QF_TIMING_STORE.delete(state.sourceKey)
       this.control.delete(`blob:${state.sourceKey}`)
@@ -304,7 +348,7 @@ export class TimingController {
     this.current(id, generation, state.epoch)
     this.control.atomic(() => {
       this.control.put(`blob:${manifest.payloadKey}`, true)
-      this.control.put(`resource:${id}`, { ...this.state(id), epoch: state.epoch + 1, accepted: manifest, tombstoned: false })
+      this.control.put(`resource:${id}`, { ...this.state(id), epoch: state.epoch + 1, accepted: manifest, tombstoned: false, reviewPendingSinceMs: null })
       if (state.accepted?.payloadKey && state.accepted.payloadKey !== manifest.payloadKey) {
         this.control.put(`retire:${state.accepted.payloadKey}`, true)
       }
@@ -335,7 +379,7 @@ export class TimingController {
       if (operation === 'state') return Response.json({ state, accepted: state?.accepted || null, global: this.global() }, { headers: headers(cors) })
       if (!operation && (!state || this.now() - state.syncedAtMs >= REFRESH_MS)) {
         try { state = await this.refresh(id) } catch (error) {
-          if (error.status === 403) throw error
+          if (error.status === 403 && error.code === 'qf_access_revoked') throw error
           // A temporary outage cannot expire a permitted offline copy.
         }
       }
@@ -358,7 +402,7 @@ export class TimingController {
       if (!body) throw new TimingFailure(503, 'qf_timing_unavailable')
       const metadata = { ...accepted.metadata, sourceSyncedAtMs: this.state(id).syncedAtMs }
       return new Response(guardedStream(body, guard, metadata), { headers: headers(cors) })
-    } catch (error) { return reply(error.status || 503, error.code || 'qf_timing_unavailable', cors) }
+    } catch (error) { return caughtFailure(error, cors) }
   }
 
   async content(path, cors = {}) {
@@ -371,11 +415,14 @@ export class TimingController {
           return reply(410, 'resync_required', cors)
         }
         this.active(generation)
-        return reply(response.status, 'qf_content_unavailable', cors)
+        return reply(qfContentFailureStatus(path, response.status), 'qf_content_unavailable', cors)
       }
       return new Response(response.body && guardedStream(response.body, () => this.active(generation)),
         { status: response.status, headers: headers(cors) })
-    } catch (error) { return reply(error.status || 503, error.code || 'qf_content_unavailable', cors) }
+    } catch (error) {
+      const revoked = error.status === 403 && error.code === 'qf_access_revoked'
+      return reply(revoked ? 403 : 503, revoked ? 'qf_access_revoked' : 'qf_content_unavailable', cors)
+    }
   }
 }
 
@@ -440,7 +487,7 @@ export function createTimingService() {
           try { manifest = JSON.parse(body) } catch { throw new TimingFailure(400, 'qf_timing_manifest_invalid') }
         }
         return await stub(env).response(regrant ? null : Number(match[2]), operation, manifest, cors)
-      } catch (error) { return reply(error.status || 503, error.code || 'qf_timing_unavailable', cors) }
+      } catch (error) { return caughtFailure(error, cors) }
     },
     content: (env, path, cors) => stub(env).content(path, cors),
     revoke: (env) => env.QF_TIMING_CONTROL ? stub(env).revoke() : Promise.resolve(),
@@ -465,6 +512,12 @@ function authorized(request, env) {
 }
 function headers(cors) { return { 'Content-Type': 'application/json', 'Cache-Control': 'no-store', ...cors } }
 function reply(status, code, cors) { return Response.json({ error: { code } }, { status, headers: headers(cors) }) }
+function caughtFailure(error, cors) {
+  if (error instanceof TimingFailure || (error.status === 403 && error.code === 'qf_access_revoked')) {
+    return reply(error.status, error.code, cors)
+  }
+  return reply(503, 'qf_timing_unavailable', cors)
+}
 class TimingFailure extends Error {
   constructor(status, code) { super(code); this.status = status; this.code = code }
 }

@@ -78,27 +78,33 @@ The complete normalized candidate differed from the private v65 reference in
 853 rows. Arabic XLSR and independent MMS/uroman witnesses scored every row;
 both runs completed without errors. Changed topologies require improvement on
 both models and sufficient confidence for inserted/relabelled occurrences.
+Every removed occurrence must also have baseline label probability below 0.5
+on both models; a confident baseline occurrence on either model retains the row.
 Boundary changes use mean absolute start residual on both models. End-only
 changes are held because start residuals cannot justify them. Duration and
 model-voiced/PCM checks veto premature cutoffs.
 
 | Canonical change | Accepted | Exact baseline retained |
 |---|---:|---:|
-| Occurrence sequence | 53 | 132 |
+| Occurrence sequence | 32 | 153 |
 | Timing boundaries | 509 | 158 |
 | Added row | 0 | 1 |
-| Total | 562 | 291 |
+| Total | 541 | 312 |
 
 All holds restore the complete baseline payload, including audio onset. Alafasy
-37:152 remains withheld. Alafasy 2:229 accepts the real same-word repeat;
-2:235 retains its prior reviewed row after the confidence veto. See
+37:152 remains withheld. Alafasy 2:229 retains its prior reviewed row because
+the near-threshold candidate conflicts with the maintainer's #594 boundary;
+no new ear verdict is claimed. 2:235 also retains its prior reviewed row.
+Of 40 initially accepted rows with fewer occurrences, 19 now remain at baseline.
+The other 21 meet the symmetric confidence gate. One additional occurrence
+replacement is held by that gate. See
 [`qf-source-transition.json`](../tools/timing_verdicts/qf-source-transition.json)
 for per-row hashes, metrics, vetoes, and verdicts. Full model and PCM evidence is
 retained privately with digest provenance; the ledger contains no timing rows.
 
 The immutable review reference is `quran-v65.db`, SHA-256
 `3489bd89a91177d2701a2bbc3e8e414d957e308a539c6ec71122a568015f7c8d`.
-The reviewed private output has 37,411 QF timing rows. Public `quran-v66.db`
+The reviewed private output has 37,411 QF timing rows. Public `quran-v67.db`
 contains only the 43,648 unchanged independent timing rows. The exact removed
 and retained corpora are hash-bound in
 [`qf-timing-transition.json`](../data/qf-timing-transition.json); the ordinary
@@ -161,13 +167,16 @@ with a 192 MB Java heap. Its first download matched all six reviewed corpora. Af
 connectivity and stopping the process, all six cache states and every timing
 row remained unchanged. Opening Alafasy 2:229 and tapping word 16 sought to
 20,310 ms; cached playback showed the orange wash on its second occurrence
-with no active network.
+with no active network. This checked rendering and cache delivery, rather than
+whether that occurrence was acoustically correct. The October 12 review restores
+the prior 2:229 timing and boundary.
 
 The web client downloaded all six packs into a clean IndexedDB timing store.
 A new cache instance restored their exact revisions with provider requests
 failing and an eight-day outage simulated. The live reader recognized the
 second word-16 occurrence as a repeat, sought to its 21,660 ms start, and
-retained the chapter's four-segment basmalah preface.
+retained the chapter's four-segment basmalah preface. That 2:229 repeat was
+subsequently held; these initial checks establish delivery and rendering only.
 
 All 1,325 Android JVM tests and the release build passed; all 669 web tests and
 the production build passed. The 104 timing patch cases, 12 flattened re-say
@@ -176,3 +185,55 @@ tests, and 3 release-exclusion tests passed. All 34 Worker tests passed, coverin
 pagination, withdrawal, shared revocation, delayed streams, and competing
 publications. Inspection of the actual APK and web output confirms zero bundled
 QF timing rows and unchanged independent timing data.
+
+## Opus review follow-up — 2026-10-12
+
+The independent Opus 5.5 review identified an overly broad destructive access
+latch and a conflict with the previously reviewed Alafasy 2:229 boundary.
+Temporary OAuth failures, throttling, and bare or unrelated edge 403 responses
+now preserve cached content. Persistent revocation requires a confirmed client
+rejection, a content 401 after token retry, or QF's documented authorization-error
+JSON. See the [QF error contract](https://api-docs.quran.foundation/docs/content_apis_versioned/4.0.0/resources-sync/).
+
+The additional baseline-occurrence confidence audit holds 20 more topology
+changes, alongside 2:229. The rebuilt private database differs from the initial
+published corpus in exactly those 21 rows, each restored completely to v65.
+All 853 verdicts can be reproduced from the preserved model outputs using the
+private archive's `REVIEW_FOLLOWUP.md`; original evidence remains preserved.
+
+The release builder now writes the committed provenance text directly. The v67
+asset packages that direct rebuild with a new extraction version and fingerprint;
+every table, including provenance and all 43,648 timing rows, equals v66. Pending
+timing review is reported through structured Worker logs, with a persisted age
+and repeated maintenance reporting after 24 hours. Authenticated snapshots are
+checked before publication; the cache explicitly includes 312 retained baseline
+corrections from the legacy-derived v65 reference. Those rows are maintained
+runtime corrections and are excluded from release assets, along with all other
+QF timings. Their provenance is documented in [QF_CONTENT_SYNC.md](QF_CONTENT_SYNC.md).
+
+The follow-up review also restored word/QCF checkpoint recovery: HTTP 400/404
+remain visible for sync requests, with the existing `410 resync_required`
+contract intact. Snapshot errors, throttling, and edge blocks remain temporary
+failures. The 47 Worker tests cover both proxy paths, subsequent bootstrap,
+cache retention, confirmed revocation, and the earlier publication races.
+
+Worker version `74565328-7081-4966-9090-78f8542a1ebd` serves the corrected packs.
+A fresh live comparison verified every occurrence and onset in all 37,411 rows
+against the reviewed private database, every revision and normalizer hash,
+and all 312 holds against the exact v65 baseline. No voice is awaiting review.
+Word/QCF bootstrap, origin restrictions, and private-route authorization also
+passed. The two public rebuilds are byte-identical, including provenance.
+
+Ink Lab's chapter timings, detected results, recordings, and active traces now
+follow the selected timing generation. Withdrawal/revocation purges affected
+voices even while the Lab is hidden; delayed reads, decoding, and detection
+cannot restore an old result. Independent audio/reference caches and peer
+voices remain available. Five regression tests exercise the actual computation
+through replacement, withdrawal, global purge, and delayed read/decode races.
+
+The final Opus 5.5 review closed both follow-up findings and found no remaining
+blockers. The full 1,396 Android JVM tests and `assembleRelease` pass, including
+all 13 Tarji pulse tests. The 669 web tests and production build also pass, as
+do the Python suites above with 12 authenticated build tests. Inspection of
+the final 177,089,186-byte APK and static web timing files confirms zero bundled
+QF timing rows and the unchanged independent corpus.

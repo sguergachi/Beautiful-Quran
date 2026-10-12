@@ -188,8 +188,10 @@ Content Sync checkpoint. It follows native pages, obtains a full replacement for
 any row/snapshot change or rejected checkpoint, and advances only after storage
 succeeds. The source copy and accepted canonical view are separate. A changed
 source returns `503 qf_timing_review_required` until the maintainer completes
-normalization and acoustic review. Successful unchanged checks advance source
-freshness with the same canonical revision. Provider outages retain the previous
+normalization and acoustic review. Successful unchanged incremental checks
+advance source freshness with the same canonical revision. A full snapshot after
+invalidation or checkpoint recovery still needs the maintenance command, even
+when its assembled timing content is unchanged. Provider outages retain the previous
 permitted copy without inventing a successful check.
 
 SQLite-backed Durable Object control state serializes checkpoints, accepted
@@ -205,11 +207,27 @@ withdrawal returns `410 qf_timing_resource_deleted` and removes that voice.
 `403 qf_access_revoked` purges all QF timing and word/QCF copies. Android keeps
 timings in `noBackupFilesDir`; web uses a separate IndexedDB store. Accepted
 generation changes invalidate active reader preparations and Lab defaults.
+Ink Lab also purges affected timing windows, candidate traces, and recording
+analysis, including while hidden; in-flight analysis cannot publish an older
+generation. Decoded recitation audio and timing-independent voice references
+remain cached.
+The Worker emits the purge signal only for confirmed credential rejection,
+a content 401 after token retry, or QF's documented authorization-error JSON.
+Throttling and edge blocks return a temporary failure. Sync checkpoint errors
+retain HTTP 400/404 and `410 resync_required` so word/QCF clients can recover by bootstrapping;
+snapshot and supplement failures do not trigger that recovery.
 
 Release assets exclude all 37,411 QF timing rows. The seven independent voices'
 43,648 rows are unchanged, with exact hashes in
 `data/qf-timing-transition.json`. The original v65 database remains a private
 review reference. It is never uploaded as a runtime resource or release asset.
+
+The normalized runtime packs retain 312 complete rows from that legacy-derived
+v65 reference where a new candidate is ambiguous or conflicts with a reviewed
+correction. These values are previous baseline corrections, rather than a claim
+that every returned boundary is identical to the current authenticated source.
+Current source checkpoints remain maintained, and withdrawal/revocation applies
+to these retained corrections just as it does to the rest of each timing cache.
 
 ### Maintain and publish reviewed views
 
@@ -237,6 +255,16 @@ snapshot, canonical pack, opaque checkpoint, maintenance key, or QF credential
 belongs in Git or release artifacts. The
 [transition report](QF_TIMING_PARITY.md) and source-profile ledger contain only
 hashes, verse identities, and review metadata.
+
+Review holds emit metadata-only `qf_timing_review_required` Worker logs when
+they begin and on maintenance checks after 24 hours. The pending age survives
+Worker restarts and clears on accepted publication. The operator target is to
+run the maintenance command within 24 hours; a changed source needs acoustic
+review before it can publish, so this is an operational target, not a guaranteed
+turnaround. If content hashes are unchanged, the existing pinned pipeline and
+ledger allow the command to re-accept it without a new acoustic review. Ordinary
+provider outages and unconfirmed edge errors preserve caches; only confirmed
+QF authorization rejection triggers the destructive shared revocation latch.
 
 The v65 reference is the baseline for this first transition. For a later source
 transition, retain the latest accepted private database and rebase the source

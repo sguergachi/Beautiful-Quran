@@ -181,6 +181,28 @@ class AuthenticatedTimingBuildTest(unittest.TestCase):
                 with self.assertRaises(SystemExit):
                     build.apply_authenticated_verdicts([(1, 1, 1, new)], {}, before)
 
+    def test_repeat_removal_requires_low_baseline_confidence_on_both_models(self):
+        old = [[1, 0, 300], [2, 300, 600], [1, 600, 1000], [2, 1000, 1400]]
+        new = [[1, 0, 600], [2, 600, 1400]]
+        before, after = self.database("before.db", old), self.database("after.db", new)
+        ledger = self.ledger(before, after, "accept")
+        payload = json.loads(ledger.read_text())
+        models = next(iter(payload["verdicts"].values()))["evidence"]["models"]
+        for model in models:
+            model["removedOccurrenceMaxLabelProbability"] = 0.2
+        ledger.write_text(json.dumps(payload))
+        with patch.object(build, "QF_VERDICTS_FILE", ledger):
+            rows, _ = build.apply_authenticated_verdicts([(1, 1, 1, new)], {}, before)
+            self.assertEqual(json.loads(rows[0][3]), new)
+            for model in models:
+                for confidence in (0.5, 0.99, None, -0.1, float("nan")):
+                    with self.subTest(model=model["name"], confidence=confidence):
+                        model["removedOccurrenceMaxLabelProbability"] = confidence
+                        ledger.write_text(json.dumps(payload))
+                        with self.assertRaises(SystemExit):
+                            build.apply_authenticated_verdicts([(1, 1, 1, new)], {}, before)
+                model["removedOccurrenceMaxLabelProbability"] = 0.2
+
     def test_end_only_and_unmeasured_waveform_changes_cannot_be_accepted(self):
         old = [[1, 0, 1000]]
         before = self.database("before.db", old)

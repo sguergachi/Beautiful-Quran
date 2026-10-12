@@ -3111,11 +3111,16 @@ def authenticated_evidence_problem(change):
             autojunk=False,
         ).get_opcodes()
         has_new_occurrence = any(tag != "equal" and start < end for tag, _, _, start, end in opcodes)
+        has_removed_occurrence = any(tag != "equal" and start < end for tag, start, end, _, _ in opcodes)
         if any(model["candidateScore"] - model["baselineScore"] <= 0.001 or
                (has_new_occurrence and
                 (not finite(model.get("newOccurrenceMinLabelProbability")) or
                  not 0.5 <= model["newOccurrenceMinLabelProbability"] <= 1)) for model in models):
             return "topology preference or new-occurrence confidence is insufficient"
+        if has_removed_occurrence and any(
+                not finite(model.get("removedOccurrenceMaxLabelProbability")) or
+                not 0 <= model["removedOccurrenceMaxLabelProbability"] < 0.5 for model in models):
+            return "a removed occurrence is heard or lacks baseline confidence on either model"
     elif (all(old[1] == new[1] for old, new in zip(before["segments"], after["segments"])) or
           any(not finite(model.get(field)) or model[field] < 0
               for model in models for field in ("baselineResidualMs", "candidateResidualMs")) or
@@ -3616,7 +3621,8 @@ def main(argv=None):
             "runtime Content Sync; no build-time bundle",))
     elif runtime_reciter_ids:
         db.execute("UPDATE data_provenance SET value=? WHERE key='timings'", (
-            "Independent CC-BY timings; QF repeat timings excluded from the asset",))
+            "independent reciters bundled; six QF voices from reviewed authenticated "
+            "Content Sync runtime cache",))
         db.execute("UPDATE data_provenance SET value=? WHERE key='qdc_delivery'", (QF_RUNTIME_DELIVERY,))
     write_morphology(db, morph_rows, roots_rows, occ_rows)
     db.execute("CREATE INDEX idx_words_ayah ON words(surah_id, ayah_number)")
