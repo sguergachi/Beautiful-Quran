@@ -1157,10 +1157,11 @@ image, so it is crisp at any density and nearly free to render.
   structure across all 114 chapters; verse count varies their safe
   proportions. The same chapter always regrows the same ornament. Border
   friezes (cover
-  only) come from five band grammars of tooled bindings: a zigzag lattice
-  with pearls in its diamonds, a two-strand cable with pearl eyes, a Hankin
+  only) come from five band grammars of tooled bindings: interlocking
+  scallops (fish-scale) with a pearl in each scale, a two-strand cable with pearl eyes, a Hankin
   strip, a nested lozenge chain, and a khatam chain of small eight-fold
-  stars linked by diamonds. On the cover, the **medallion and field build
+  stars linked by diamonds. No grammar uses straight zigzags or X crossings:
+  they read as typed ASCII (`<xXx>`), not tooling. On the cover, the **medallion and field build
   in real time** — strokes ink themselves in along their length across
   ~3.4 s, field first, then medallion outside-in — so the illumination is
   drawn before the reader's eyes, not stamped; the **border and corner

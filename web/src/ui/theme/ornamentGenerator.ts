@@ -420,7 +420,7 @@ function generateSeal(rng: Mulberry32, fold: number): RosetteSpec {
 
 /**
  * The border band — one of five frieze grammars found on tooled mushaf
- * bindings: a zigzag lattice with pearls in its diamonds, an interlaced
+ * bindings: interlocking scallops with a pearl in each scale, an interlaced
  * two-strand cable with pearl eyes (guilloche), a Hankin star-and-cross
  * strip, a nested lozenge chain, or a khatam chain — small eight-fold
  * stars linked by diamonds. Historical bindings run exactly these between
@@ -435,25 +435,42 @@ function generateBorder(rng: Mulberry32): BorderSpec {
   let period: number
   const recipe = rng.int(5)
   if (recipe === 0) {
-    // Zigzag lattice — two zigzags half a period out of phase make an
-    // X-crossing diamond trellis; a pearl rests in each diamond.
-    period = rng.range(1.2, 1.7)
-    const zig = (a: number, b: number): OrnamentStroke => ({
-      points: [
-        { x: 0, y: a },
-        { x: period / 2, y: b },
-        { x: period, y: a },
-      ],
+    // Interlocking scallops — a row of pointed scales hangs from the top
+    // rail while a second row, half a period out of phase, rises from the
+    // bottom rail; where they overlap they weave a fish-scale (imbricated)
+    // border, and a pearl rests in each scale's open heart. Curved on every
+    // line: nothing here reads as typed "<", ">" or "X" marks the way a
+    // straight zigzag lattice did.
+    period = rng.range(1.0, 1.4)
+    const h = 0.74
+    const samples = 16
+    const scale = (apexX: number, fromTop: boolean, x0: number, x1: number): OrnamentPoint[] => {
+      const pts: OrnamentPoint[] = []
+      for (let i = 0; i <= samples; i++) {
+        const x = x0 + ((x1 - x0) * i) / samples
+        const u = (x - apexX) / (period / 2)
+        const depth = h * Math.pow(Math.max(1 - u * u, 0), 0.75)
+        pts.push({ x, y: fromTop ? depth : 1 - depth })
+      }
+      return pts
+    }
+    strokes.push({
+      points: scale(period / 2, true, 0, period),
       closed: false,
       weight: 'hairline',
       birth: 0,
       span: 1,
     })
-    strokes.push(zig(0.86, 0.14))
-    strokes.push(zig(0.14, 0.86))
+    strokes.push({
+      points: [...scale(0, false, 0, period / 2), ...scale(period, false, period / 2, period)],
+      closed: false,
+      weight: 'hairline',
+      birth: 0,
+      span: 1,
+    })
     const pearl = rng.range(0.05, 0.075)
-    dots.push({ x: period / 4, y: 0.5, radius: pearl, birth: 0 })
-    dots.push({ x: (3 * period) / 4, y: 0.5, radius: pearl, birth: 0 })
+    dots.push({ x: period / 2, y: 0.3, radius: pearl, birth: 0 })
+    dots.push({ x: 0, y: 0.7, radius: pearl, birth: 0 })
   } else if (recipe === 1) {
     // Cable: two phase-opposed strands, a pearl in each eye.
     period = rng.range(1.8, 2.6)
