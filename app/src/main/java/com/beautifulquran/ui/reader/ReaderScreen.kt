@@ -2731,6 +2731,7 @@ fun ReaderScreen(
                         Box(Modifier.fillMaxSize())
                     } else {
                     val mushafSurahId = content.surah.id
+                    val seekAlignments = remember(content) { EnglishVerseAlignments(content) }
                     // Deferred: the leaf reads playback where it uses it, so a
                     // play or a pause never recomposes the pages themselves.
                     val mushafPlayback = remember { mutableStateOf(MushafPlayback(null, false, false)) }
@@ -2743,6 +2744,7 @@ fun ReaderScreen(
                             isPlaying = isThisSurahPlaying && playerState.isPlaying,
                             playingAyah = playerState.nowPlaying?.ayah
                                 ?.takeIf { isThisSurahPlaying },
+                            inkId = playerState.positionEvents.inkId,
                         )
                     }
                     val mushafDispatch = rememberUpdatedState(
@@ -2763,6 +2765,7 @@ fun ReaderScreen(
                         mushafSurahId,
                         mushafWholeVerses,
                         englishBook,
+                        seekAlignments,
                     ) {
                         val held = mushafTappedPage ?: return@LaunchedEffect
                         val catalog = mushafReady.catalog
@@ -2774,7 +2777,13 @@ fun ReaderScreen(
                                 word.wordPosition,
                                 wholeVerses = mushafWholeVerses,
                             )
-                            if (mushafLeafNumber(englishBook, mushafSurahId, word.ayah, on) == held) {
+                            val leaf = mushafWordLeafNumber(
+                                englishBook, mushafSurahId, word, on,
+                                wordCount = content.ayahs.firstOrNull { it.number == word.ayah }
+                                    ?.words?.size ?: 0,
+                                wordEnds = if (mushafWholeVerses) seekAlignments.of(word.ayah) else null,
+                            )
+                            if (mushafWaitingLeafReleased(held, leaf, word.fromTap)) {
                                 mushafTappedPage = null
                             }
                         }
@@ -2834,7 +2843,6 @@ fun ReaderScreen(
                         remember(viewModel, leafTextSource) {
                             { page -> viewModel.leafText(page, leafTextSource) }
                         }
-                    val seekAlignments = remember(content) { EnglishVerseAlignments(content) }
                     val onMushafVerseSeek = remember(mushafSurahId, viewModel, content, seekAlignments) {
                         { surahId: Int, ayah: Int, through: Float ->
                             mushafDispatch.value(ReaderInteractionEvent.WordPlayRequested)
