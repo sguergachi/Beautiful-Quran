@@ -7,6 +7,25 @@ import org.junit.Test
 /** Fixed meaning correspondences, including words a literal diagnostic cannot judge. */
 class EnglishSemanticAlignmentTest {
     @Test
+    fun `prayer performance and establishment keep their separately spoken heads`() {
+        verifyCases("english-prayer-alignment.tsv", 2)
+    }
+
+    @Test
+    fun `a performance outside the prayer phrase does not mean establishing`() {
+        assertNull(EnglishWordAlignment.ownerAt(
+            "performance of work and prayer", listOf("establishing", "of work", "and", "prayer"), 3,
+        ))
+    }
+
+    @Test
+    fun `commerce and sale keep distinct owners when reordered`() {
+        val alignment = EnglishWordAlignment.align("commerce and sale", listOf("sale", "trade"))!!
+        assertEquals(2, alignment.positionAt(0.1f))
+        assertEquals(1, alignment.positionAt(0.9f))
+    }
+
+    @Test
     fun `reported verses keep the Arabic owners of their clear content heads`() {
         verifyCases("english-semantic-heads.tsv", 2)
     }

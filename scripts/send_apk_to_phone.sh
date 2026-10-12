@@ -27,6 +27,7 @@ REPO_ROOT="$(cd -- "$SCRIPT_DIR/.." && pwd)"
 SKIP_BUILD=0
 WAIT=0
 RELEASE=0
+ZIP=0
 LABEL=""
 KEEP_OLD=0
 WAIT_SECONDS="${KDECONNECT_WAIT_SECONDS:-300}"
@@ -36,15 +37,16 @@ STAGE_DIR="${BQ_APK_STAGE:-${TMPDIR:-/tmp}/beautiful-quran-apks}"
 
 usage() {
   cat <<'EOF'
-Usage: scripts/send_apk_to_phone.sh [--release] [--label TEXT] [--skip-build]
+Usage: scripts/send_apk_to_phone.sh [--release] [--zip] [--label TEXT] [--skip-build]
                                     [--wait] [--name NAME] [--keep-old]
 
   --release      Build/send the release APK (default: debug)
+  --zip          Zip the staged build (store only) and share the ZIP instead
   --label TEXT   What this build is, for the filename (default: the branch)
   --skip-build   Use the APK already in app/build/outputs
   --wait         Poll until a paired phone is reachable (default 300s)
   --name NAME    KDE Connect device name (default: first available)
-  --keep-old     Do not delete previously staged APKs after a successful send
+  --keep-old     Do not delete previously staged builds after a successful send
 
 Env: KDECONNECT_DEVICE_ID, KDECONNECT_DEVICE_NAME, KDECONNECT_WAIT_SECONDS,
      BQ_APK_STAGE (where named builds are staged; default $TMPDIR/beautiful-quran-apks)
@@ -55,6 +57,7 @@ while [[ $# -gt 0 ]]; do
   case "$1" in
     --skip-build) SKIP_BUILD=1 ;;
     --release) RELEASE=1 ;;
+    --zip) ZIP=1 ;;
     --keep-old) KEEP_OLD=1 ;;
     --label)
       shift
@@ -134,6 +137,27 @@ cmp -s -- "$APK" "$STAGED" || {
 }
 APK="$STAGED"
 
+# Zip for the slow link: APKs are already compressed, so store without
+# recompressing. The phone verifies with `unzip -l`.
+if [[ "$ZIP" -eq 1 ]]; then
+  ZIPPED="${STAGED%.apk}.zip"
+  [[ ! -e "$ZIPPED" ]] || ZIPPED="${ZIPPED%.zip}-$(date +%H%M).zip"
+  rm -f -- "$ZIPPED"
+  if command -v zip >/dev/null 2>&1; then
+    (cd -- "$STAGE_DIR" && zip -j -0 -q "$ZIPPED" "$(basename -- "$STAGED")")
+  else
+    # No `zip` binary (e.g. minimal containers): stdlib fallback, still stored.
+    python3 - "$STAGED" "$ZIPPED" <<'EOF'
+import sys, zipfile, os
+src, dst = sys.argv[1], sys.argv[2]
+with zipfile.ZipFile(dst, "w", zipfile.ZIP_STORED) as z:
+    z.write(src, os.path.basename(src))
+EOF
+  fi
+  printf 'Zipped %s (%s bytes)\n' "$(basename -- "$ZIPPED")" "$(stat -c%s -- "$ZIPPED")"
+  APK="$ZIPPED"
+fi
+
 pick_device() {
   local available id name
   available="$(kdeconnect-cli -a --id-name-only 2>/dev/null || true)"
@@ -184,7 +208,30 @@ fi
 DEVICE_ID="${LINE%% *}"
 DEVICE_LABEL="${LINE#* }"
 printf 'Sending %s\n  → %s (%s)\n' "$APK" "$DEVICE_LABEL" "$DEVICE_ID"
-kdeconnect-cli -d "$DEVICE_ID" --share "$APK"
+# The share fails often enough (phone asleep, link drop) that the script
+# retries it 3 times on its own: 10s, then 30s, then 60s.
+SHARE_DELAYS=(${BQ_SHARE_RETRY_DELAYS:-10 30 60})
+attempt=0
+while true; do
+  if kdeconnect-cli -d "$DEVICE_ID" --share "$APK"; then
+    break
+  fi
+  attempt=$((attempt + 1))
+  if (( attempt > 3 )); then
+    printf 'error: share failed after 4 attempts; keeping %s\n' "$APK" >&2
+    exit 1
+  fi
+  delay="${SHARE_DELAYS[$((attempt - 1))]:-60}"
+  printf 'Share failed (attempt %d/4); retrying in %ss…\n' "$attempt" "$delay"
+  sleep "$delay"
+  kdeconnect-cli --refresh >/dev/null 2>&1 || true
+  if refreshed="$(pick_device || true)"; then
+    if [[ -n "$refreshed" ]]; then
+      DEVICE_ID="${refreshed%% *}"
+      DEVICE_LABEL="${refreshed#* }"
+    fi
+  fi
+done
 printf 'Shared. Accept the file on the phone if prompted.\n'
 
 # The new build has gone; the ones before it are landfill. Scoped to the
@@ -194,8 +241,8 @@ if [[ "$KEEP_OLD" -eq 0 ]]; then
   removed=0
   while IFS= read -r -d '' old; do
     rm -f -- "$old" && removed=$((removed + 1))
-  done < <(find "$STAGE_DIR" -maxdepth 1 -type f -name '*.apk' ! -name "$(basename -- "$APK")" -print0)
-  (( removed == 0 )) || printf 'Deleted %d older staged APK(s) from %s\n' "$removed" "$STAGE_DIR"
+  done < <(find "$STAGE_DIR" -maxdepth 1 -type f \( -name '*.apk' -o -name '*.zip' \) ! -name "$(basename -- "$APK")" -print0)
+  (( removed == 0 )) || printf 'Deleted %d older staged build(s) from %s\n' "$removed" "$STAGE_DIR"
 fi
 
 printf 'Kept: %s\n' "$APK"

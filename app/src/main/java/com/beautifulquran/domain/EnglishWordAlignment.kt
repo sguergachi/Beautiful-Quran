@@ -237,6 +237,9 @@ object EnglishWordAlignment {
         // "Glad" means "good" in this phrase, not wherever either adjective occurs.
         for (j in 0 until out.lastIndex) {
             if (out[j].text == "glad" && out[j + 1].text in setOf("tiding", "tidings")) out[j].key = "good"
+            // Iqamah is printed "performance of prayer"; prayer keeps its own head.
+            if (out[j].text == "performance" && out[j + 1].text == "of" &&
+                out.getOrNull(j + 2)?.key == "prayer") out[j].key = "establish"
         }
         // Drawing a headcover over the chest is translated as wrapping it;
         // "draw" and "wrap" are not interchangeable outside that phrase.
@@ -576,6 +579,7 @@ object EnglishWordAlignment {
     private val EQUIVALENT_WORDS = mapOf(
         "slave" to "servant", "slaves" to "servant", "servants" to "servant",
         "gaze" to "vision", "gaz" to "vision",
+        "commerce" to "trade",
         "bosom" to "chest",
         "tell" to "say", "apparent" to "appear",
         "poor" to "needy", "needy" to "needy",

@@ -454,7 +454,7 @@ internal fun mushafInkPackKind(
         (frontierAyah == null || ayah > frontierAyah ||
             ayah == frontierAyah && frontierWaitingForFirstWord) ->
         MushafInkPackKind.UPCOMING
-    waitingForVoice && (activeWordAyah == null || ayah > activeWordAyah) ->
+    waitingForVoice && (frontierAyah == null || ayah >= frontierAyah) ->
         MushafInkPackKind.UPCOMING
     drying -> MushafInkPackKind.ACTIVE_WORD
     else -> MushafInkPackKind.STATIC
@@ -509,6 +509,10 @@ internal fun mushafWaitingLeafReleased(
     fromTap: Boolean,
 ): Boolean = waitingPage != 0 && voicePage == waitingPage && !fromTap
 
+/** A font wait cannot finish a turn inherited by another verse, seek, or repeat. */
+internal fun mushafSamePlayback(ayah: Int?, inkId: Long, current: MushafPlayback): Boolean =
+    current.playingAyah == ayah && current.inkId == inkId
+
 /** Delayed turns retain ownership only while the exact activation survives. */
 internal fun mushafSameActivation(expected: ActiveWord, current: ActiveWord?): Boolean =
     current != null &&
@@ -529,8 +533,7 @@ internal fun mushafNullWordFollowStillCurrent(
     currentWord == null &&
         currentVoice.activeAyah == activeAyah &&
         currentVoice.basmalahActive == basmalahActive &&
-        currentVoice.playingAyah == playingAyah &&
-        currentVoice.inkId == inkId
+        mushafSamePlayback(playingAyah, inkId, currentVoice)
 
 /**
  * A last-word lead turn puts the paper on [waitingPage] while the voice is

@@ -156,6 +156,34 @@ The soft edge and fresh-ink glimmer remain visible; repeat color uses the same
 semantic ranges. All 1,339 JVM tests and release assembly passed; the
 unchanged timing pipeline passes all 104 patch cases.
 
+## Iqamah ownership regression (2026-10-12)
+
+In 24:37, the printed “performance” fell back to Arabic word 9 (Allah)
+instead of word 10, wa-iqāmi. Its gloss is “establishing.” This exposed a miss
+the no-delay checks cannot catch: the first wash arrived early, while the
+repeat of word 10 had no English range to tint. The new equivalent applies
+only to “performance of prayer”; “prayer” retains word 11. Performances
+outside that phrase remain distinct from establishing.
+The same verse's “commerce” now matches “trade” at word 4; “sale” remains
+word 6, including when the two meanings are reordered.
+
+The exact-owner and repeat regressions both fail before the fix. The repeat
+test uses the shipped Alafasy intervals: iqamah at 10,040–11,160 ms and its
+repeat at 13,520–15,300 ms, with the prayer word retained in the continuous
+prefix. A second fixture checks “establishment of prayer” in 21:73. Their
+separate spoken heads agree with the [QAC analysis of 24:37](https://corpus.quran.com/wordbyword.jsp?chapter=24&verse=37)
+and [21:73](https://corpus.quran.com/wordbyword.jsp?chapter=21&verse=73).
+
+All 6,236 verses and 77,429 prefix checks pass. The mapping changes only
+24:37; the other 6,235 semantic and wash maps are identical. The frozen
+semantic checks now cover 106 owners, and the independent root/lemma
+manifest covers 1,396 meanings with zero delayed washes. The literal
+diagnostic remains 99.895%; it does not measure this synonym miss.
+
+Alafasy release playback confirms the corrected range: at 9,710 ms, during
+Allah, “performance” stays covered; its first wash appears at 10,837 ms, and
+the repeat tints it orange at 14,514 ms while “prayer” retains its read ink.
+
 ## What the percentage means
 
 **99.895% is literal agreement on the selected comparisons, not semantic
@@ -193,6 +221,7 @@ no network requests:
 python3 tools/audit_english_alignment.py /tmp/qf-corpus.tsv --output-dir /tmp/english-audit \
   --semantic-cases app/src/test/resources/english-semantic-alignment.tsv \
   --semantic-cases app/src/test/resources/english-semantic-heads.tsv \
+  --semantic-cases app/src/test/resources/english-prayer-alignment.tsv \
   --spoken-cases app/src/test/resources/english-semantic-patterns.tsv \
   --meaning-cases app/src/test/resources/english-meaning-cues.tsv
 ```
