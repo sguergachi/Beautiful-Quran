@@ -241,6 +241,16 @@ python3 tools/test_build_db.py  # timing pipeline regressions (~1s, no Gradle)
    is a good outcome; quietly relaxing it is not. Worked example — a check that
    looks wrong and isn't: [docs/CHESTERTON.md](docs/CHESTERTON.md).
 
+10. **Never skip highlighting words.** This is a core product rule for Arabic
+    and English, on Android and web. The forward wash must remain continuous:
+    never highlight a later word while leaving an intervening word unhighlighted.
+    When spoken Arabic maps to a later English word because of sentence order,
+    advance the wash through that meaning and every English word before it.
+    Prioritize the meaning being heard; preserve the soft leading edge required
+    by invariant #7. Glimmer, repeat tint, seeks, and page transitions must never
+    create gaps in the underlying wash. Any highlighting change must preserve
+    this rule and test reordered phrases and interrupted playback.
+
 ## Landing Timings Lab / GitHub timing patches
 
 When the user asks to "fix the timing issue", "apply the timings patch", or
@@ -365,18 +375,20 @@ this document combined: `ReaderComponents.kt` (~36k tokens),
   open PR on its actual head branch; if that PR has merged, follow the fresh-PR
   rule below instead.
 - Send a clearly named APK to the Pixel 10 after every completed code change,
-  and **delete the previous one once the new one has gone**. Use
-  `scripts/send_apk_to_phone.sh --label "<the work>"` (add `--release` for a
-  release build): it stages the build under a name made from the work and the
+  and **delete local staged copies once the phone confirms receipt**. Always
+  delegate this to the cheap `apk-sender` subagent (haiku) following
+  `docs/APK_DELIVERY.md` — do not run the send inline in the main session.
+  It stages the build under a name made from the work and the
   commit, verifies the copy, shares it, and then removes every older staged
-  APK. Three rules are baked into it and hold whether or not you use it:
+  build. Three rules are baked into it and hold whether or not you use it:
   - Never send a generic `app-debug.apk` / `app-release.apk`. A phone full of
     identically-named builds is a phone you cannot test from, and KDE Connect
     drops a repeat of the same filename to its notification rate limit — so a
     generic name is a send that silently does not arrive.
-  - Delete the older builds after the new one is away. They are a quarter of a
-    gigabyte each; left to pile up they filled `/tmp`, which truncated a copy
-    mid-send and shipped a broken APK to the phone. Scope any hand-rolled
+  - Delete the older builds after the new one is away, and delete the new
+    one's local copy too once the phone confirms receipt. They are a quarter
+    of a gigabyte each; left to pile up they filled `/tmp`, which truncated a
+    copy mid-send and shipped a broken APK to the phone. Scope any hand-rolled
     cleanup to files you staged yourself — never a bare `/tmp/*.apk`.
   - Verify the transfer completed rather than trusting the sender's exit code,
     and do not connect to port 1739 to "check" — that steals the payload from
