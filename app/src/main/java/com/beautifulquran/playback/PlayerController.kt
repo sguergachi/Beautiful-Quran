@@ -246,6 +246,7 @@ class PlayerController(private val context: Context) {
             val keepInk = reason == Player.DISCONTINUITY_REASON_SEEK &&
                 silenceInk.claims(newPosition.positionMs, itemChanged)
             _state.value = _state.value.copy(
+                nowPlaying = newPosition.mediaItem?.mediaId?.let(::parseMediaId),
                 positionEvents = _state.value.positionEvents.afterDiscontinuity(
                     reason = reason,
                     itemChanged = itemChanged,

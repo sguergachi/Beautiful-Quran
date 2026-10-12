@@ -478,11 +478,26 @@ tween-vs-snap rules, sweep entry and residual rules, repeat wash timing, the
   beneath the Upcoming paper cover; its active word uses the same motion pack
   as the scrolling reader, completed ayahs retain full ink, and later ayahs use
   a motionless recess pack. Back retains full ink before the selected verse,
-  including while paused before its first word. The selected verse and those
-  after it still wait for the wash. Between word polls, Media3's playlist verse
-  supplies the frontier rather than the fade-led focus.
-  A follow turn that waits for a font rechecks the actual playlist verse and
-  seek/repeat generation afterward, so unchanged focus cannot finish a stale turn.
+  including while paused before its first word; the selected verse and those
+  after it still wait for the wash. Between word polls, Media3's playing verse
+  supplies the ink frontier ahead of fade-led focus. A missing or stale focus
+  used to re-cover completed or outgoing verses, or uncover future verses at a
+  repeat, so the first-word cover gate still holds the incoming verse until its
+  timing arrives. Voice ownership and follow retain the last heard word's
+  location through the silent tail, so a carried verse does not jump back to
+  its opening leaf when the live word becomes null. That location is released
+  on a playlist change or a new seek/repeat generation; the wash still reads
+  only the live word. A tap can pin the wash's activation to its optimistic
+  seed; location retention checks the heard word's original playback generation
+  instead. Media3 publishes the verse and discontinuity generation together,
+  so the next verse never briefly inherits the outgoing verse's opening leaf.
+  Finishing a carried verse, its silent tail, and the next verse beginning on
+  the same leaf must all name that leaf; there is no turn back to the completed
+  verse's opening leaf. Word-to-leaf lookup uses the same English alignment for
+  follow, voice ownership, and tap-hold release, including when the animated
+  Back/Next transport is present. A delayed follow turn rechecks the playlist
+  ayah and seek/repeat generation after its font wait, and is discarded if a
+  word arrives during that wait.
   A leaf reached by hand stays fully readable, even
   while playback continues elsewhere. A leaf follow is about to turn onto
   waits under Upcoming paper *before* the paper moves, so the turn never
@@ -493,8 +508,12 @@ tween-vs-snap rules, sweep entry and residual rules, repeat wash timing, the
   Only the current pager leaf owns a tap;
   a hold then blocks auto-follow (including the last-word lead turn) until the
   seek's word is on that leaf, so a slow seek cannot yank the paper to the
-  verse that was playing before the tap. The tapped leaf itself waits under
-  Upcoming paper until that word arrives — a dialed page is fully inked, and
+  verse that was playing before the tap. On a carried English verse, arrival
+  uses the word's aligned progress through the verse, just as voice ownership
+  does. Checking only the verse's opening leaf left the tail leaf held after
+  the seek arrived: the final null word then re-covered the completed verse
+  and rebuilt its entry fade at the next verse. The tapped leaf itself waits
+  under Upcoming paper until that word arrives — a dialed page is fully inked, and
   without the cover the wash has nothing to fill. The tapped ayah is Active as
   soon as the word is known, even before the pager names the leaf, so the
   letter wash is not stuck under a blanket Upcoming cover. The seed is not

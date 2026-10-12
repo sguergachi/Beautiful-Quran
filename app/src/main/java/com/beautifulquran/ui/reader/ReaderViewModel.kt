@@ -95,6 +95,8 @@ data class ActiveWord(
      * before Media3 owns the leaf and disposes the wash Animatable.
      */
     val fromTap: Boolean = false,
+    /** Media3's generation, retained when a tap pins [activation] for the wash. */
+    val playbackActivation: Long = activation,
 )
 
 /**

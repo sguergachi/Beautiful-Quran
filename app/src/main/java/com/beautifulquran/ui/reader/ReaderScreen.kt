@@ -2793,12 +2793,13 @@ fun ReaderScreen(
                                 word.wordPosition,
                                 wholeVerses = mushafWholeVerses,
                             )
-                            val through = mushafVerseThrough(
-                                word.wordPosition,
-                                content.ayahs.firstOrNull { it.number == word.ayah }?.words?.size ?: 0,
-                                alignment = if (englishBook != null) seekAlignments.alignment(word.ayah) else null,
+                            val leaf = mushafWordLeafNumber(
+                                englishBook, mushafSurahId, word, on,
+                                wordCount = content.ayahs.firstOrNull { it.number == word.ayah }
+                                    ?.words?.size ?: 0,
+                                alignment = if (mushafWholeVerses) seekAlignments.alignment(word.ayah) else null,
                             )
-                            if (mushafLeafNumber(englishBook, mushafSurahId, word.ayah, on, through) == held) {
+                            if (mushafWaitingLeafReleased(held, leaf, word.fromTap)) {
                                 mushafTappedPage = null
                             }
                         }

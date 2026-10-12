@@ -280,6 +280,9 @@ tick must not remasure three pages or recreate 150 `Text` nodes.
   does not `Typeface.createFromAsset` on the UI thread. For Arabic, that same
   window warms the existing glyph-ink profiles off the UI thread; a cold page
   otherwise rasterized and scanned each word during the pager's prefetch measure.
+  A delayed playback turn rechecks the captured ink frontier, playlist ayah,
+  playback generation, and word state after the target face loads, discarding a
+  stale turn before its animation starts.
   The cache, reference resolution, and spacing calculations are unchanged.
   Line geometry is keyed by page, display row, size, and measure. The page's
   seventeen-row reflow is a linear token-width pass remembered by page + typeface; playback ticks and
