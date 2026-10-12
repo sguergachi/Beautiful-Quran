@@ -361,7 +361,7 @@ this document combined: `ReaderComponents.kt` (~36k tokens),
   open PR on its actual head branch; if that PR has merged, follow the fresh-PR
   rule below instead.
 - Send a clearly named APK to the Pixel 10 after every completed code change,
-  and **delete the previous one once the new one has gone**. Use
+  and **delete local staged copies once the phone confirms receipt**. Use
   `scripts/send_apk_to_phone.sh --label "<the work>"` (add `--release` for a
   release build): it stages the build under a name made from the work and the
   commit, verifies the copy, shares it, and then removes every older staged
@@ -370,9 +370,10 @@ this document combined: `ReaderComponents.kt` (~36k tokens),
     identically-named builds is a phone you cannot test from, and KDE Connect
     drops a repeat of the same filename to its notification rate limit — so a
     generic name is a send that silently does not arrive.
-  - Delete the older builds after the new one is away. They are a quarter of a
-    gigabyte each; left to pile up they filled `/tmp`, which truncated a copy
-    mid-send and shipped a broken APK to the phone. Scope any hand-rolled
+  - Delete the older builds after the new one is away, and delete the new
+    one's local copy too once the phone confirms receipt. They are a quarter
+    of a gigabyte each; left to pile up they filled `/tmp`, which truncated a
+    copy mid-send and shipped a broken APK to the phone. Scope any hand-rolled
     cleanup to files you staged yourself — never a bare `/tmp/*.apk`.
   - Verify the transfer completed rather than trusting the sender's exit code,
     and do not connect to port 1739 to "check" — that steals the payload from
