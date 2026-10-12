@@ -517,6 +517,21 @@ internal fun mushafSameActivation(expected: ActiveWord, current: ActiveWord?): B
         expected.startMs == current.startMs &&
         expected.activation == current.activation
 
+/** A null-word turn is still valid only for the same playback snapshot. */
+internal fun mushafNullWordFollowStillCurrent(
+    activeAyah: Int?,
+    basmalahActive: Boolean,
+    playingAyah: Int?,
+    inkId: Long,
+    currentVoice: MushafPlayback,
+    currentWord: ActiveWord?,
+): Boolean =
+    currentWord == null &&
+        currentVoice.activeAyah == activeAyah &&
+        currentVoice.basmalahActive == basmalahActive &&
+        currentVoice.playingAyah == playingAyah &&
+        currentVoice.inkId == inkId
+
 /**
  * A last-word lead turn puts the paper on [waitingPage] while the voice is
  * still on the previous leaf. Catch-up that rewinds to the spoken leaf is the
@@ -908,15 +923,16 @@ internal fun MushafPager(
                     if (word != null && !mushafSameActivation(word, activeWordState.value)) {
                         return@collect
                     }
-                    if (word == null) {
-                        if (currentVoice.basmalahActive != moment.basmalahActive) {
-                            return@collect
-                        }
-                        if (!moment.basmalahActive &&
-                            currentVoice.activeAyah != moment.activeAyah
-                        ) {
-                            return@collect
-                        }
+                    if (word == null && !mushafNullWordFollowStillCurrent(
+                            activeAyah = moment.activeAyah,
+                            basmalahActive = moment.basmalahActive,
+                            playingAyah = moment.playingAyah,
+                            inkId = moment.inkId,
+                            currentVoice = currentVoice,
+                            currentWord = activeWordState.value,
+                        )
+                    ) {
+                        return@collect
                     }
                     if (pagerState.isScrollInProgress) return@collect
                     followPage = index

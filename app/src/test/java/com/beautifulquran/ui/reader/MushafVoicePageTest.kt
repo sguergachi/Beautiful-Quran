@@ -8,6 +8,7 @@ import com.beautifulquran.domain.buildEnglishBook
 import com.beautifulquran.domain.buildMushafCatalog
 import com.beautifulquran.ui.reader.ReaderInteraction.MushafPlayTarget
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -124,6 +125,53 @@ class MushafVoicePageTest {
         assertNull(page(playback(activeAyah = null, playingAyah = null)))
     }
 
+    @Test
+    fun `a cold font turn is discarded when the playlist advances under the same ink frontier`() {
+        val current = playback(activeAyah = 12, playingAyah = 12, inkId = 5)
+
+        assertEquals(12, current.activeAyah)
+        assertTrue(mushafNullWordFollowStillCurrent(
+            activeAyah = 12,
+            basmalahActive = false,
+            playingAyah = 12,
+            inkId = 5,
+            currentVoice = current,
+            currentWord = null,
+        ))
+        assertFalse(mushafNullWordFollowStillCurrent(
+            activeAyah = 12,
+            basmalahActive = false,
+            playingAyah = 11,
+            inkId = 4,
+            currentVoice = current,
+            currentWord = null,
+        ))
+    }
+
+    @Test
+    fun `a null word turn is discarded when the same ayah starts a new playback generation`() {
+        assertFalse(mushafNullWordFollowStillCurrent(
+            activeAyah = 12,
+            basmalahActive = false,
+            playingAyah = 12,
+            inkId = 4,
+            currentVoice = playback(activeAyah = 12, playingAyah = 12, inkId = 5),
+            currentWord = null,
+        ))
+    }
+
+    @Test
+    fun `a null word turn is discarded when a word arrives during font loading`() {
+        assertFalse(mushafNullWordFollowStillCurrent(
+            activeAyah = 12,
+            basmalahActive = false,
+            playingAyah = 12,
+            inkId = 5,
+            currentVoice = playback(activeAyah = 12, playingAyah = 12, inkId = 5),
+            currentWord = ActiveWord(ayah = 12, wordPosition = 3, durationMs = 600),
+        ))
+    }
+
     private fun page(
         voice: MushafPlayback,
         word: ActiveWord? = null,
@@ -141,6 +189,7 @@ class MushafVoicePageTest {
         basmalahActive: Boolean = false,
         activeAyah: Int? = 2,
         playingAyah: Int? = 2,
+        inkId: Long = 0L,
     ) = MushafPlayback(
         activeAyah = activeAyah,
         reciting = true,
@@ -148,6 +197,7 @@ class MushafVoicePageTest {
         basmalahActive = basmalahActive,
         isPlaying = true,
         playingAyah = playingAyah,
+        inkId = inkId,
     )
 }
 
