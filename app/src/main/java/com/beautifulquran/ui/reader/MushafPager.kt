@@ -436,7 +436,7 @@ internal fun mushafInkPackKind(
         (frontierAyah == null || ayah > frontierAyah ||
             ayah == frontierAyah && frontierWaitingForFirstWord) ->
         MushafInkPackKind.UPCOMING
-    waitingForVoice && (activeWordAyah == null || ayah > activeWordAyah) ->
+    waitingForVoice && (frontierAyah == null || ayah >= frontierAyah) ->
         MushafInkPackKind.UPCOMING
     drying -> MushafInkPackKind.ACTIVE_WORD
     else -> MushafInkPackKind.STATIC
@@ -1812,7 +1812,7 @@ internal fun MushafPageInkClocks(
         derivedStateOf { activeWordState.value?.ayah }
     }
     val voice = playback.value
-    val frontierAyah = activeWordAyah ?: voice.activeAyah
+    val frontierAyah = activeWordAyah ?: voice.playingAyah ?: voice.activeAyah
     var playingAyahHasWord by remember(voice.playingAyah) { mutableStateOf(false) }
     if (!playingAyahHasWord && activeWordAyah != null && activeWordAyah == voice.playingAyah) {
         SideEffect { playingAyahHasWord = true }

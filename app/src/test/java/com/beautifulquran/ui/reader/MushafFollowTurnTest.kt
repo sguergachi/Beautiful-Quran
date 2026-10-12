@@ -162,6 +162,40 @@ class MushafFollowTurnTest {
     }
 
     @Test
+    fun `Back retains earlier verses while the returned verse waits for its first word`() {
+        for (ownsVoice in listOf(false, true)) {
+            val packs = (1..12).map { ayah ->
+                mushafInkPackKind(
+                    pageOwnsVoice = ownsVoice,
+                    ayah = ayah,
+                    activeWordAyah = null,
+                    frontierAyah = 11,
+                    basmalahActive = false,
+                    hasSearchFlash = false,
+                    frontierWaitingForFirstWord = true,
+                    waitingForVoice = true,
+                )
+            }
+            assertEquals(
+                List(10) { MushafInkPackKind.STATIC } + List(2) { MushafInkPackKind.UPCOMING },
+                packs,
+            )
+        }
+    }
+
+    @Test
+    fun `a waiting leaf without a known verse still cannot flash full ink`() {
+        assertEquals(
+            MushafInkPackKind.UPCOMING,
+            mushafInkPackKind(false, 11, null, null, false, false, waitingForVoice = true),
+        )
+        assertEquals(
+            MushafInkPackKind.UPCOMING,
+            mushafInkPackKind(false, 11, null, 11, false, false, waitingForVoice = true),
+        )
+    }
+
+    @Test
     fun `the verse the voice just left keeps its clocks while its glimmer dries`() {
         assertEquals(
             MushafInkPackKind.ACTIVE_WORD,

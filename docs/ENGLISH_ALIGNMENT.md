@@ -180,6 +180,10 @@ semantic checks now cover 106 owners, and the independent root/lemma
 manifest covers 1,396 meanings with zero delayed washes. The literal
 diagnostic remains 99.895%; it does not measure this synonym miss.
 
+Alafasy release playback confirms the corrected range: at 9,710 ms, during
+Allah, “performance” stays covered; its first wash appears at 10,837 ms, and
+the repeat tints it orange at 14,514 ms while “prayer” retains its read ink.
+
 ## What the percentage means
 
 **99.895% is literal agreement on the selected comparisons, not semantic
