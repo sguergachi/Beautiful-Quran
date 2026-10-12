@@ -1,4 +1,6 @@
 # Printed regex	QAC root	QAC lemma without diacritics	Independent word-card cue
+(?:performance|establishment)(?= of prayer\b)	قوم	*	\bestablish(?:ing|ment)\b
+commerce	تجر	*	\b(?:trade|commerce)\b
 Moses	*	موسى	\bMusa\b
 Noah	*	نوح	\bNuh\b
 Abraham	*	إبراهيم	\bIbrahim\b
