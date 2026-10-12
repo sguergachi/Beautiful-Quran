@@ -19,11 +19,13 @@ import org.junit.Test
 class EnglishWashBandsTest {
     @Test
     fun `reported meanings keep their owners at every eligible carried leaf cut`() {
-        val resources = listOf("english-prayer-alignment.tsv", "english-semantic-heads.tsv", "english-identity-owners.tsv")
+        val resources = listOf("english-prayer-alignment.tsv", "english-semantic-heads.tsv", "english-identity-owners.tsv",
+            "english-shared-owners.tsv")
         for (resource in resources) for (row in javaClass.getResourceAsStream("/$resource")!!
             .bufferedReader().use { it.readLines() }) {
-            val (key, source, glosses, targets) = row.split('\t')
-            val alignment = EnglishWordAlignment.align(source, glosses.split('|'))!!
+            val columns = row.split('\t')
+            val (key, source, glosses, targets) = columns
+            val alignment = EnglishWordAlignment.align(source, glosses.split('|'), columns.getOrNull(4)?.split('|').orEmpty())!!
             val cuts = source.indices.filter { source[it].isWhitespace() }
                 .map { englishLeafBreak(source, it) }.distinct().filter { it in 1 until source.length }
             for (cut in cuts) for ((from, to) in listOf(0 to cut, cut to source.length)) {

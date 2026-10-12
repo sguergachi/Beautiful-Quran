@@ -1,11 +1,40 @@
 package com.beautifulquran.domain
 
+import com.beautifulquran.data.model.Ayah
+import com.beautifulquran.data.model.Surah
+import com.beautifulquran.data.model.SurahContent
+import com.beautifulquran.data.model.Word
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Test
 
 /** Fixed meaning correspondences, including words a literal diagnostic cannot judge. */
 class EnglishSemanticAlignmentTest {
+    @Test
+    fun `different Arabic burdens retain the sentence guard with morphology present`() {
+        verifyCases("english-distinct-owners.tsv", 1)
+    }
+
+    @Test
+    fun `a book lemma is distinct from a writing lemma with the same bare letters`() {
+        val text = "Book written"
+        val glosses = listOf("Book written", "Book written")
+        val alignment = EnglishWordAlignment.align(text, glosses, listOf("كَتَبَ", "كِتَٰب"))!!
+        assertEquals(2, alignment.positionAt(0.1f))
+        assertEquals(1, alignment.positionAt(0.9f))
+        assertNull(EnglishWordAlignment.ownerAt(text, glosses, 2, listOf("كَتَبَ", "كَتَبَ")))
+    }
+
+    @Test
+    fun `earth sky truth and mosque spellings keep their spoken owners`() {
+        verifyCases("english-lexical-owners.tsv", 31)
+    }
+
+    @Test
+    fun `same Arabic heads survive clause reordering and supplementary mentions of Allah`() {
+        verifyCases("english-repeated-owners.tsv", 8)
+    }
+
     @Test
     fun `reordered names across clauses and a title beside knows keep their exact owners`() {
         verifyCases("english-identity-owners.tsv", 14)
@@ -19,8 +48,55 @@ class EnglishSemanticAlignmentTest {
     }
 
     @Test
+    fun `Arabic lemmas resolve every shared name phrase without guessing its order`() {
+        verifyCases("english-shared-owners.tsv", 21)
+    }
+
+    @Test
+    fun `a shared phrase resolves either Arabic order and keeps real repeated verbs`() {
+        val text = "Moses said"
+        val glosses = listOf("Musa said", "Musa said")
+        for (lemmas in listOf(listOf("قَالَ", "مُوسَىٰ"), listOf("مُوسَىٰ", "قَالَ"))) {
+            val alignment = EnglishWordAlignment.align(text, glosses, lemmas)!!
+            val name = lemmas.indexOf("مُوسَىٰ")
+            assertEquals(name + 1, alignment.positionAt(0.1f))
+            assertEquals(2 - name, alignment.positionAt(0.9f))
+            assertEquals(name, EnglishWordAlignment.ownerAt(text, glosses, 2, lemmas))
+            assertEquals(1 - name, EnglishWordAlignment.ownerAt(text, glosses, 8, lemmas))
+            assertEquals(1, alignment.washSpans.first().position)
+            assertEquals(2 - name, alignment.washSpans.last().position)
+        }
+        val repeated = EnglishWordAlignment.align("you do good, you do good",
+            listOf("you do good", "you do good"), listOf("أَحْسَنَ", "أَحْسَنَ"))!!
+        assertEquals(1, repeated.positionAt(0.3f))
+        assertEquals(2, repeated.positionAt(0.8f))
+    }
+
+    @Test
+    fun `reader cache uses the Arabic evidence in both English text sources`() {
+        val content = SurahContent(Surah(10, "", "", "", "", 1), listOf(
+            Ayah(10, 1, "قَالَ مُوسَىٰ", "Moses said", words = listOf(
+                Word(1, "قَالَ", "Musa said", "", lemma = "قَالَ"),
+                Word(2, "مُوسَىٰ", "Musa said", "", lemma = "مُوسَىٰ"),
+            )),
+        ))
+        for (wordByWord in listOf(false, true)) {
+            val alignment = EnglishVerseAlignments(content, wordByWord).alignment(1)!!
+            assertEquals(2, alignment.positionAt(0.1f))
+            assertEquals(1, alignment.positionAt(0.9f))
+        }
+    }
+
+    @Test
+    fun `partial or unknown Arabic evidence cannot invent a shared head owner`() {
+        for (lemmas in listOf(emptyList(), listOf("مُوسَىٰ"), listOf("", ""))) {
+            assertNull(EnglishWordAlignment.ownerAt("Moses said", listOf("Musa said", "Musa said"), 2, lemmas))
+        }
+    }
+
+    @Test
     fun `shared source phrases stay visible in the audit without inventing exact tap owners`() {
-        verifyCases("english-shared-owners.tsv", 21, exact = false)
+        verifyCases("english-shared-owners.tsv", 21, exact = false, withLemmas = false)
         for (row in javaClass.getResourceAsStream("/english-shared-owners.tsv")!!.bufferedReader().use { it.readLines() }) {
             val (_, text, glosses, targets) = row.split('\t')
             for (target in targets.split('|')) {
@@ -140,14 +216,16 @@ class EnglishSemanticAlignmentTest {
         assertEquals(1, alignment.positionAt(0.8f))
     }
 
-    private fun verifyCases(resource: String, verses: Int, exact: Boolean = true) {
+    private fun verifyCases(resource: String, verses: Int, exact: Boolean = true, withLemmas: Boolean = true) {
         val cases = javaClass.getResourceAsStream("/$resource")!!
             .bufferedReader().use { it.readLines() }
         assertEquals(verses, cases.size)
         val failures = mutableListOf<String>()
         for (line in cases) {
-            val (verse, text, glosses, targets) = line.split('\t')
-            val alignment = EnglishWordAlignment.align(text, glosses.split('|'))!!
+            val columns = line.split('\t')
+            val (verse, text, glosses, targets) = columns
+            val lemmas = if (withLemmas) columns.getOrNull(4)?.split('|').orEmpty() else emptyList()
+            val alignment = EnglishWordAlignment.align(text, glosses.split('|'), lemmas)!!
             for (target in targets.split('|')) {
                 val match = Regex("(.+?)(?:#(\\d+))?=(\\d+)").matchEntire(target)!!
                 val (word, occurrence, position) = match.destructured

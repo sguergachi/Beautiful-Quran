@@ -489,6 +489,11 @@ tween-vs-snap rules, sweep entry and residual rules, repeat wash timing, the
   Web publishes its ink activation even with no active word and applies the
   same generation rule. Reproducible timing, ownership and page-cut checks
   are recorded in [ENGLISH_ALIGNMENT_COVERAGE.md](ENGLISH_ALIGNMENT_COVERAGE.md).
+  English ownership also reads the loaded words' vocalized QAC lemmas. Shared
+  phrase cards retain their lexical heads; equal repeated heads can cross
+  clauses when their Arabic lemma is identical. Different meanings keep the
+  sentence guard. Full semantic certification requires a separate reviewed
+  reference; timing/frame counts do not supply those labels.
   Voice ownership and follow retain the last heard word's
   location through the silent tail, so a carried verse does not jump back to
   its opening leaf when the live word becomes null. That location is released
