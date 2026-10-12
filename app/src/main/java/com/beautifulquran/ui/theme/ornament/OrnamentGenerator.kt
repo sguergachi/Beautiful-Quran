@@ -4,6 +4,7 @@ import kotlin.math.PI
 import kotlin.math.abs
 import kotlin.math.cos
 import kotlin.math.min
+import kotlin.math.pow
 import kotlin.math.sin
 import kotlin.math.roundToInt
 
@@ -470,7 +471,7 @@ private fun generateSeal(rng: Mulberry32, fold: Int): RosetteSpec {
 
 /**
  * The border band — one of the five frieze grammars found on tooled mushaf
- * bindings: a zigzag lattice with pearls in its diamonds, an interlaced
+ * bindings: interlocking scallops with a pearl in each scale, an interlaced
  * two-strand cable with pearl eyes (guilloche), a Hankin star-and-cross
  * strip, a nested lozenge chain, or a khatam chain — small eight-fold
  * stars linked by diamonds. Historical bindings run exactly these between
@@ -485,25 +486,40 @@ private fun generateBorder(rng: Mulberry32): BorderSpec {
     val period: Double
     when (rng.int(5)) {
         0 -> {
-            // Zigzag lattice — two zigzags half a period out of phase make
-            // an X-crossing diamond trellis; a pearl rests in each diamond.
-            period = rng.range(1.2, 1.7)
-            fun zig(a: Double, b: Double) = OrnamentStroke(
-                listOf(
-                    OrnamentPoint(0.0, a),
-                    OrnamentPoint(period / 2.0, b),
-                    OrnamentPoint(period, a),
+            // Interlocking scallops — a row of pointed scales hangs from the
+            // top rail while a second row, half a period out of phase, rises
+            // from the bottom rail; where they overlap they weave a fish-scale
+            // (imbricated) border, and a pearl rests in each scale's open
+            // heart. Curved on every line: nothing here reads as typed
+            // "<", ">" or "X" marks the way a straight zigzag lattice did.
+            period = rng.range(1.0, 1.4)
+            val h = 0.74
+            val samples = 16
+            fun scale(apexX: Double, fromTop: Boolean, x0: Double, x1: Double): List<OrnamentPoint> {
+                val pts = ArrayList<OrnamentPoint>(samples + 1)
+                for (i in 0..samples) {
+                    val x = x0 + (x1 - x0) * i / samples
+                    val u = (x - apexX) / (period / 2.0)
+                    val depth = h * (1.0 - u * u).coerceAtLeast(0.0).pow(0.75)
+                    pts.add(OrnamentPoint(x, if (fromTop) depth else 1.0 - depth))
+                }
+                return pts
+            }
+            strokes.add(
+                OrnamentStroke(
+                    scale(period / 2.0, true, 0.0, period),
+                    closed = false, weight = StrokeWeight.Hairline, birth = 0.0, span = 1.0,
                 ),
-                closed = false,
-                weight = StrokeWeight.Hairline,
-                birth = 0.0,
-                span = 1.0,
             )
-            strokes.add(zig(0.86, 0.14))
-            strokes.add(zig(0.14, 0.86))
+            strokes.add(
+                OrnamentStroke(
+                    scale(0.0, false, 0.0, period / 2.0) + scale(period, false, period / 2.0, period),
+                    closed = false, weight = StrokeWeight.Hairline, birth = 0.0, span = 1.0,
+                ),
+            )
             val pearl = rng.range(0.05, 0.075)
-            dots.add(OrnamentDot(period / 4.0, 0.5, pearl, 0.0))
-            dots.add(OrnamentDot(3.0 * period / 4.0, 0.5, pearl, 0.0))
+            dots.add(OrnamentDot(period / 2.0, 0.3, pearl, 0.0))
+            dots.add(OrnamentDot(0.0, 0.7, pearl, 0.0))
         }
         1 -> {
             // Cable: two phase-opposed strands crossing twice per period,
