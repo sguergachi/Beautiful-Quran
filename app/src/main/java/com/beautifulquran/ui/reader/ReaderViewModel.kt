@@ -479,6 +479,7 @@ class ReaderViewModel(
     /** Per-ayah repeat/high-water tables built once at load — hot-path lookups
      * allocate nothing (see [HighlightEngine.PreparedTimings]). */
     private var preparedTimings: Map<Int, HighlightEngine.PreparedTimings> = emptyMap()
+    private val transportCursor = ReaderTransportCursor()
     private var loadJob: Job? = null
 
     private fun installTimings(loaded: Map<Int, List<Segment>>) {
@@ -1023,6 +1024,7 @@ class ReaderViewModel(
         loadedSurah.value = prepared.content.surah.id
         focusedAyah = 1
         longAyahMidpointConsumed = 0
+        transportCursor.clear()
         installTimings(prepared.timings)
         _uiState.value = ReaderUiState(
             content = prepared.content,
@@ -1124,55 +1126,67 @@ class ReaderViewModel(
      */
     private var longAyahMidpointConsumed: Int = 0
 
-    fun fastForward() {
-        val content = _uiState.value.content ?: return
-        val np = playerState.value.nowPlaying?.takeIf { it.surahId == surahId } ?: return
+    private fun transportPosition(): ReaderTransportCursor.Position? {
+        val np = (player.liveNowPlaying ?: playerState.value.nowPlaying)
+            ?.takeIf { it.surahId == surahId } ?: return null
+        return transportCursor.current(np.ayah, player.positionMs, playerState.value.positionEvents)
+    }
+
+    /** Returns the seek target so its leaf can start turning before the clock lands. */
+    fun fastForward(): ReaderInteraction.MushafPlayTarget? {
+        val content = _uiState.value.content ?: return null
+        val np = transportPosition() ?: return null
         // During the basmalah lead-in, skip ahead into ayah 1.
         if (np.ayah == BASMALAH_PLAYLIST_AYAH) {
             longAyahMidpointConsumed = 0
-            player.seekToAyah(1)
-            return
+            return transportTarget(1).also { player.seekToAyah(1) }
         }
         val action = FastForwardPolicy.action(
             ayah = np.ayah,
-            positionMs = player.positionMs,
+            positionMs = np.positionMs,
             ayahCount = content.surah.ayahCount,
             midpointMs = midpointForLongAyah(np.ayah),
             midpointConsumedForAyah = longAyahMidpointConsumed,
         )
         longAyahMidpointConsumed = FastForwardPolicy.nextConsumedAyah(action)
-        when (action) {
+        return when (action) {
             is FastForwardPolicy.Action.SeekToMidpoint -> {
-                player.seekToWord(action.ayah, action.positionMs)
+                transportTarget(action.ayah, action.positionMs).also {
+                    player.seekToWord(action.ayah, action.positionMs)
+                }
             }
             is FastForwardPolicy.Action.SeekToAyah -> {
-                player.seekToAyah(action.ayah)
+                transportTarget(action.ayah).also { player.seekToAyah(action.ayah) }
             }
-            FastForwardPolicy.Action.None -> Unit
+            FastForwardPolicy.Action.None -> null
         }
     }
 
-    /** Returns the verse the command sought, so the page can move before the clock lands. */
-    fun fastBackward(): Int? {
-        val np = playerState.value.nowPlaying?.takeIf { it.surahId == surahId } ?: return null
+    /** Returns the verse restart so its leaf can start turning before the clock lands. */
+    fun fastBackward(): ReaderInteraction.MushafPlayTarget? {
+        val np = transportPosition() ?: return null
         if (np.ayah == BASMALAH_PLAYLIST_AYAH) {
-            player.seekToBasmalah()
-            return 1
+            return transportTarget(BASMALAH_PLAYLIST_AYAH).also { player.seekToBasmalah() }
         }
-        if (player.positionMs > START_SEEK_GRACE_MS) {
-            player.seekToAyah(np.ayah)
-            return np.ayah
+        if (np.positionMs > START_SEEK_GRACE_MS) {
+            return transportTarget(np.ayah).also { player.seekToAyah(np.ayah) }
         }
 
         if (np.ayah > 1) {
-            player.seekToAyah(np.ayah - 1)
-            return np.ayah - 1
+            return transportTarget(np.ayah - 1).also { player.seekToAyah(np.ayah - 1) }
         } else if (np.ayah == 1) {
             // Restart from the basmalah lead-in when present.
-            player.playLoadedFromAyah(1)
-            return 1
+            return transportTarget(player.chapterOpeningAyah).also { player.playLoadedFromAyah(1) }
         }
         return null
+    }
+
+    private fun transportTarget(ayah: Int, positionMs: Long = 0L): ReaderInteraction.MushafPlayTarget {
+        transportCursor.seek(ayah, positionMs, playerState.value.positionEvents.clockId)
+        return ReaderInteraction.MushafPlayTarget(
+            surahId, ayah.coerceAtLeast(1),
+            if (positionMs == 0L) null else preparedTimings[ayah]?.activeInfo(positionMs)?.position,
+        )
     }
 
     private fun midpointForLongAyah(ayah: Int): Long? =
@@ -1191,6 +1205,7 @@ class ReaderViewModel(
     ): Boolean {
         val content = _uiState.value.content ?: return false
         val reciter = _uiState.value.currentReciter ?: return false
+        transportCursor.clear()
         player.playSurah(
             surahId = content.surah.id,
             ayahCount = content.surah.ayahCount,
@@ -1298,6 +1313,7 @@ class ReaderViewModel(
 
     fun playFromWord(ayah: Int, positionMs: Long) {
         val reciter = _uiState.value.currentReciter ?: return
+        transportCursor.clear()
         val np = playerState.value.nowPlaying
         // Keep the loop when the tapped verse is inside the active range;
         // only abandon it when the user jumps outside.
@@ -1317,6 +1333,7 @@ class ReaderViewModel(
 
     /** Resume a loaded playlist from [ayah] and mark it as listened. */
     fun playLoadedFromAyah(ayah: Int) {
+        transportCursor.clear()
         player.playLoadedFromAyah(ayah)
         rememberListened(ayah)
     }

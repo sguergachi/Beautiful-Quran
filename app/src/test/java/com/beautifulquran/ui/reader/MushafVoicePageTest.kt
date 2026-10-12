@@ -6,6 +6,7 @@ import com.beautifulquran.domain.EnglishWordAlignment
 import com.beautifulquran.domain.ENGLISH_LEAF_CAPACITY_CHARS
 import com.beautifulquran.domain.buildEnglishBook
 import com.beautifulquran.domain.buildMushafCatalog
+import com.beautifulquran.ui.reader.ReaderInteraction.MushafPlayTarget
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
@@ -22,10 +23,10 @@ class MushafVoicePageTest {
         val text = "painful punishment"
         val alignment = EnglishWordAlignment.align(text, listOf("punishment", "painful"))!!
         assertEquals(0f, mushafVerseThrough(
-            ActiveWord(ayah = 10, wordPosition = 1, durationMs = 100), 2, alignment = alignment,
+            1, 2, alignment = alignment,
         ), 0.00001f)
         assertEquals(1f, mushafVerseThrough(
-            ActiveWord(ayah = 10, wordPosition = 2, durationMs = 100), 2, alignment = alignment,
+            2, 2, alignment = alignment,
         ), 0f)
     }
 
@@ -42,7 +43,12 @@ class MushafVoicePageTest {
     @Test
     fun `previous verse starts on its opening Arabic page despite its carried last word`() {
         assertEquals(4, catalog.pageOf(2, 2, 2))
-        assertEquals(2, mushafVerseStartLeaf(catalog, null, 2, 2))
+        assertEquals(2, mushafTransportLeaf(catalog, null, MushafPlayTarget(2, 2, null)))
+    }
+
+    @Test
+    fun `midpoint forward lands on the Arabic word's page rather than the verse's opening`() {
+        assertEquals(3, mushafTransportLeaf(catalog, null, MushafPlayTarget(2, 2, 2)))
     }
 
     @Test
@@ -53,10 +59,26 @@ class MushafVoicePageTest {
         ))
         val cap = ENGLISH_LEAF_CAPACITY_CHARS
         val book = buildEnglishBook(catalog) { _, ayah -> if (ayah == 2) cap / 2 else cap }
-        val opening = mushafVerseStartLeaf(catalog, book, 2, 3)
+        val opening = mushafTransportLeaf(catalog, book, MushafPlayTarget(2, 3, null))
         val tail = mushafLeafNumber(book, 2, 3, page = 3, through = 0.99f) - 1
         assertTrue(tail > opening)
         assertEquals(book.firstLeafOf(3), opening)
+    }
+
+    @Test
+    fun `midpoint forward finds a carried English leaf through the continuous wash`() {
+        val catalog = buildMushafCatalog(listOf(
+            source(2, 2, 1, page = 3, line = 1),
+            source(2, 3, 1, page = 3, line = 2),
+        ))
+        val cap = ENGLISH_LEAF_CAPACITY_CHARS
+        val book = buildEnglishBook(catalog) { _, ayah -> if (ayah == 2) cap / 2 else cap }
+        val alignment = EnglishWordAlignment.align("painful punishment", listOf("punishment", "painful"))!!
+        val target = MushafPlayTarget(2, 3, 2)
+        val opening = mushafTransportLeaf(catalog, book, target.copy(word = null))
+        val next = mushafTransportLeaf(catalog, book, target, 2, alignment)
+        assertTrue(next > opening)
+        assertEquals(mushafLeafNumber(book, 2, 3, page = 3, through = 1f) - 1, next)
     }
 
     @Test

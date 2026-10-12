@@ -461,7 +461,9 @@ fun ReaderScreen(
     // last writer of the pager's position.
     var mushafSeekPage by remember { mutableStateOf<Int?>(null) }
     var mushafSeekSurahId by remember { mutableStateOf<Int?>(null) }
-    var mushafBackwardAyah by remember(surahId) { mutableStateOf<Int?>(null) }
+    var mushafTransportTarget by remember(surahId) {
+        mutableStateOf<ReaderInteraction.MushafPlayTarget?>(null)
+    }
     // Separate physical contact from landing work: every hand fades the folio,
     // but only a confirmed distant landing parks expensive neighbour leaves.
     val mushafScrubbing = remember { mutableStateOf(false) }
@@ -1650,8 +1652,12 @@ fun ReaderScreen(
         }
     }
     fun stepBackwardFromBar() {
-        val ayah = viewModel.fastBackward() ?: return
-        if (mushafMode) mushafBackwardAyah = ayah
+        val target = viewModel.fastBackward() ?: return
+        if (mushafMode) mushafTransportTarget = target
+    }
+    fun stepForwardFromBar() {
+        val target = viewModel.fastForward() ?: return
+        if (mushafMode) mushafTransportTarget = target
     }
     val host = playbackHost
     if (host != null) {
@@ -1670,7 +1676,7 @@ fun ReaderScreen(
                 host.chromeAlpha = { chromeAlpha.value }
                 host.onPlayPause = ::playFromBar
                 host.onFastBackward = ::stepBackwardFromBar
-                host.onFastForward = viewModel::fastForward
+                host.onFastForward = ::stepForwardFromBar
                 host.onRepeatClick = { showRepeatDialog = true }
                 host.onSpeed = viewModel::cycleSpeed
                 host.onReciterClick = onOpenSettings
@@ -1984,7 +1990,7 @@ fun ReaderScreen(
                         reciterName = uiState.currentReciter?.name.orEmpty(),
                         onPlayPause = ::playFromBar,
                         onFastBackward = ::stepBackwardFromBar,
-                        onFastForward = viewModel::fastForward,
+                        onFastForward = ::stepForwardFromBar,
                         onRepeatClick = { showRepeatDialog = true },
                         onSpeed = viewModel::cycleSpeed,
                         onReciterClick = onOpenSettings,
@@ -2655,7 +2661,7 @@ fun ReaderScreen(
                             }
                         },
                         onFastBackward = ::stepBackwardFromBar,
-                        onFastForward = viewModel::fastForward,
+                        onFastForward = ::stepForwardFromBar,
                         onRepeatClick = { showRepeatDialog = true },
                         onSpeed = viewModel::cycleSpeed,
                         // Where the reader is in the book, by leaf — so the
@@ -2757,6 +2763,10 @@ fun ReaderScreen(
                     )
                     val mushafRootMoved = rememberUpdatedState(onRootReturnUserMoved)
                     val mushafOpenRoot = rememberUpdatedState(onOpenRootViewer)
+                    val leafTextSource = settings.englishLeafText
+                    val seekAlignments = remember(content, leafTextSource) {
+                        EnglishVerseAlignments(content, leafTextSource == EnglishLeafText.GLOSS)
+                    }
                     // The leaf the reader tapped on. The active word carries no
                     // page of its own and the position poll can still be
                     // reporting the word from before the seek, which used to
@@ -2770,6 +2780,7 @@ fun ReaderScreen(
                         mushafSurahId,
                         mushafWholeVerses,
                         englishBook,
+                        seekAlignments,
                     ) {
                         val held = mushafTappedPage ?: return@LaunchedEffect
                         val catalog = mushafReady.catalog
@@ -2781,7 +2792,12 @@ fun ReaderScreen(
                                 word.wordPosition,
                                 wholeVerses = mushafWholeVerses,
                             )
-                            if (mushafLeafNumber(englishBook, mushafSurahId, word.ayah, on) == held) {
+                            val through = mushafVerseThrough(
+                                word.wordPosition,
+                                content.ayahs.firstOrNull { it.number == word.ayah }?.words?.size ?: 0,
+                                alignment = if (englishBook != null) seekAlignments.alignment(word.ayah) else null,
+                            )
+                            if (mushafLeafNumber(englishBook, mushafSurahId, word.ayah, on, through) == held) {
                                 mushafTappedPage = null
                             }
                         }
@@ -2836,14 +2852,10 @@ fun ReaderScreen(
                     // which verse and how far into it. Resolving that to a word
                     // needs the verse itself, which lives here: its word count,
                     // and where each of those words lands in its English.
-                    val leafTextSource = settings.englishLeafText
                     val leafTextForSetting: suspend (Int) -> Map<Long, String> =
                         remember(viewModel, leafTextSource) {
                             { page -> viewModel.leafText(page, leafTextSource) }
                         }
-                    val seekAlignments = remember(content, leafTextSource) {
-                        EnglishVerseAlignments(content, leafTextSource == EnglishLeafText.GLOSS)
-                    }
                     val onMushafVerseSeek = remember(mushafSurahId, viewModel, content, seekAlignments) {
                         { surahId: Int, ayah: Int, through: Float ->
                             mushafDispatch.value(ReaderInteractionEvent.WordPlayRequested)
@@ -2927,9 +2939,9 @@ fun ReaderScreen(
                         searchFocusActive = searchFocusActive,
                         heldPage = mushafTappedPage,
                         onTappedLeaf = { mushafTappedPage = it },
-                        backwardAyah = mushafBackwardAyah,
-                        onBackwardAyahShown = { ayah ->
-                            if (mushafBackwardAyah == ayah) mushafBackwardAyah = null
+                        transportTarget = mushafTransportTarget,
+                        onTransportTargetShown = { target ->
+                            if (mushafTransportTarget == target) mushafTransportTarget = null
                         },
                         bookMeasured = mushafUi?.measured != false,
                         onLeafMetrics = { well, measure ->

@@ -46,12 +46,17 @@ before the geometric hit-slop fallback. A wrapped verse's broad bounding
 rectangle can overlap the next verse's words; it must not seek to the previous
 verse. Lyric word taps use the same policy, retaining the whitespace fallback.
 
-The previous-verse transport turns directly to the target verse's opening
-leaf, including a restart from the carried half of a verse. It works while
-paused and does not wait for the word poll, a font load or the playback turn
-animation. The target leaf is held until the seek arrives, so a stale word
-cannot turn it back; ordinary playback lead turns and hand swipes keep their
-existing ownership rules.
+Previous and Next start the page-swipe animation as soon as they seek onto
+another leaf, including while paused. Verse restarts open the first leaf of a
+carried verse; a long-verse midpoint skip uses the target word's leaf and the
+same continuous English wash as playback. Neither command waits for the word
+poll or a font load before starting the turn. The target leaf is held until
+the seek arrives, so a stale word cannot turn it back; ordinary playback lead
+turns and hand swipes keep their existing ownership rules.
+Quick opposite presses chain from the pending seek until Media3 reports its
+landing, rather than skipping a verse from stale playback state. A held
+carried English leaf releases on the word's aligned leaf, not the verse's
+opening leaf.
 
 ## Verification on 2026-10-11
 
@@ -127,12 +132,18 @@ reported 24:30/31 fixtures use the live cache.
 A backward seek from the second “hear” to the first in 27:80 also leaves the
 later phrase fully dim, with no old glimmer surviving ahead of the new prefix.
 
-The previous-verse transport was also checked in the release build:
+Additional transport checks in the release build on 2026-10-12 confirm the
+visible swipe in both directions:
 
 | Reading | Playback state | Previous command | Visible leaf |
 | --- | --- | --- | --- |
-| Arabic | Paused and playing | 2:6 → 2:5 | 3 → 2 |
-| English | Paused and playing | 2:21 → 2:20 | 4 → 3, where the carried verse begins |
+| Arabic | Paused and playing | 2:6 → 2:5 → 2:6 | 3 → 2 → 3 |
+| English | Paused and playing | 2:12 → 2:11 → 2:12 | 3 → 2 → 3 |
+| English | Paused | 2:26 midpoint, word 21 at 21,790 ms | 4 → 5, the carried leaf |
+
+Rapid Back → Next during the first swipe also returns to the original verse
+and leaf in both readings. The earlier 2:21 → 2:20 check confirms that Back
+opens the carried verse on leaf 3, rather than its tail on leaf 4.
 
 The word positions also agree with the
 [Quranic Arabic Corpus, 24:31](https://corpus.quran.com/wordbyword.jsp?chapter=24&verse=31).
@@ -142,7 +153,7 @@ The full-corpus verb cases also agree with the
 [QAC analysis of 98:4](https://corpus.quran.com/wordbyword.jsp?chapter=98&verse=4)
 and [27:80](https://corpus.quran.com/wordbyword.jsp?chapter=27&verse=80).
 The soft edge and fresh-ink glimmer remain visible; repeat color uses the same
-semantic ranges. All 1,331 JVM tests and release assembly passed; the
+semantic ranges. All 1,339 JVM tests and release assembly passed; the
 unchanged timing pipeline passes all 104 patch cases.
 
 ## What the percentage means
