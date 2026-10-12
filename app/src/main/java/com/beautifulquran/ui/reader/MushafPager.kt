@@ -122,6 +122,8 @@ internal data class MushafPlayback(
     val isPlaying: Boolean = false,
     /** Media3's actual playlist ayah, before the fade-led ink frontier. */
     val playingAyah: Int? = null,
+    /** Seek/repeat generation: a new performance releases the previous location. */
+    val inkId: Long = 0L,
 )
 
 /** Stable equality key for the small set of voice changes follow reacts to. */
@@ -131,6 +133,8 @@ private data class MushafFollowMoment(
     val basmalahActive: Boolean,
     val playingHere: Boolean,
     val isPlaying: Boolean,
+    val playingAyah: Int?,
+    val inkId: Long,
 )
 
 /**
@@ -306,6 +310,20 @@ internal fun mushafVerseThrough(
         ?: return (index.toFloat() / wordCount).coerceIn(0f, 1f)
     return if (index == 0) 0f else ends[index - 1].coerceIn(0f, 1f)
 }
+
+/** The word's leaf, shared by voice ownership and release of a tapped leaf. */
+internal fun mushafWordLeafNumber(
+    book: EnglishBook?,
+    surahId: Int,
+    word: ActiveWord,
+    page: Int,
+    wordCount: Int,
+    wordEnds: FloatArray? = null,
+    alignment: EnglishAlignment? = null,
+): Int = mushafLeafNumber(
+    book, surahId, word.ayah, page,
+    through = mushafVerseThrough(word.wordPosition, wordCount, wordEnds, alignment),
+)
 
 /**
  * The leaf to lead onto when the reciter is on the last word before the book's
@@ -783,6 +801,13 @@ internal fun MushafPager(
             onTransportTargetShown(target)
         }
     }
+    val lastVoiceWord = remember(loadedSurahId) { mutableStateOf<ActiveWord?>(null) }
+    LaunchedEffect(loadedSurahId, activeWordState, playback) {
+        snapshotFlow { activeWordState.value?.takeIf { playback.value.playingHere } }
+            .collect { word ->
+                if (word != null && !word.fromTap) lastVoiceWord.value = word
+            }
+    }
     // heldPage is read, not keyed: keying it restarted this collector on
     // every tap and cancelled in-flight work. The hold is checked per tick.
     LaunchedEffect(followEnabled, loadedSurahId, catalog, pagerState, english, transportTarget) {
@@ -794,24 +819,29 @@ internal fun MushafPager(
                 basmalahActive = voice.basmalahActive,
                 playingHere = voice.playingHere,
                 isPlaying = voice.isPlaying,
+                playingAyah = voice.playingAyah,
+                inkId = voice.inkId,
             )
         }
             .collect { moment ->
                 if (transportTarget != null) return@collect
                 if (!followEnabled || !moment.playingHere || !moment.isPlaying) return@collect
                 val word = moment.word
+                val locationWord = mushafLocationWord(
+                    word, lastVoiceWord.value, moment.playingAyah, moment.inkId,
+                )
                 // The active word carries no surah of its own. Right after a
                 // tap that loaded another chapter, the word still belongs to
                 // the outgoing one — following it would turn the leaf out from
                 // under the reader, to whatever page that verse number happens
                 // to fall on in the new surah. Wait for the player to arrive.
-                val focusAyah = word?.ayah ?: moment.activeAyah
+                val focusAyah = locationWord?.ayah ?: moment.playingAyah ?: moment.activeAyah
                 val onPage = when {
                     moment.basmalahActive -> catalog.firstPageOf(loadedSurahId)
-                    word != null -> catalog.readingPageOf(
+                    locationWord != null -> catalog.readingPageOf(
                         loadedSurahId,
-                        word.ayah,
-                        word.wordPosition,
+                        locationWord.ayah,
+                        locationWord.wordPosition,
                         wholeVerses = english,
                     )
                     focusAyah != null -> catalog.pageOf(loadedSurahId, focusAyah, 1)
@@ -829,7 +859,7 @@ internal fun MushafPager(
                     ayah = followAyah,
                     page = onPage,
                     through = mushafVerseThrough(
-                        word?.wordPosition,
+                        locationWord?.wordPosition,
                         contentNow.value.wordsIn(followAyah),
                         alignment = if (english) alignmentsNow.value.alignment(followAyah) else null,
                     ),
@@ -1069,10 +1099,12 @@ internal fun MushafPager(
     }
     // The leaf the voice is on, 1-based, or null. A Madinah page may be two
     // leaves, so which of them holds the verse is a question the book answers.
-    val voiceLeaf = remember(catalog, loadedSurahId, english, book) {
+    val voiceLeaf = remember(catalog, loadedSurahId, english, book, lastVoiceWord) {
         derivedStateOf {
             val voice = playback.value
-            val word = activeWordState.value
+            val word = mushafLocationWord(
+                activeWordState.value, lastVoiceWord.value, voice.playingAyah, voice.inkId,
+            )
             val page = mushafVoicePage(
                 catalog = catalog,
                 surahId = loadedSurahId,
@@ -1084,7 +1116,8 @@ internal fun MushafPager(
             // puts it on the leaf that opens the chapter. Without this the
             // preface had no verse at all and the leaf carrying it never owned
             // the voice, so it was read with no ink running across it.
-            val ayah = if (voice.basmalahActive) 1 else word?.ayah ?: voice.activeAyah
+            val ayah = if (voice.basmalahActive) 1 else
+                word?.ayah ?: voice.playingAyah ?: voice.activeAyah
             mushafLeafNumber(
                 book = book,
                 surahId = loadedSurahId,
@@ -1150,16 +1183,13 @@ internal fun MushafPager(
                             word.wordPosition,
                             wholeVerses = english,
                         )
-                        mushafLeafNumber(
+                        mushafWordLeafNumber(
                             book = book,
                             surahId = loadedSurahId,
-                            ayah = word.ayah,
+                            word = word,
                             page = page,
-                            through = mushafVerseThrough(
-                                word.wordPosition,
-                                contentNow.value.wordsIn(word.ayah),
-                                alignment = if (english) alignments.alignment(word.ayah) else null,
-                            ),
+                            wordCount = contentNow.value.wordsIn(word.ayah),
+                            alignment = if (english) alignments.alignment(word.ayah) else null,
                         ) == pageIndex + 1
                     }
                 }

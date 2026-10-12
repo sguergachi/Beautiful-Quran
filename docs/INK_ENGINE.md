@@ -482,7 +482,11 @@ tween-vs-snap rules, sweep entry and residual rules, repeat wash timing, the
   separately: a missing focus used to re-cover every completed verse, and a
   stale focus could re-cover the outgoing verse or uncover future verses at a
   repeat. The first-word cover gate still holds the incoming verse until its
-  timing arrives. A leaf reached by hand stays fully readable, even
+  timing arrives. Voice ownership and follow retain the last heard word's
+  location through the silent tail, so a carried verse does not jump back to
+  its opening leaf when the live word becomes null. That location is released
+  on a playlist change or a new seek/repeat generation; the wash still reads
+  only the live word. A leaf reached by hand stays fully readable, even
   while playback continues elsewhere. A leaf follow is about to turn onto
   waits under Upcoming paper *before* the paper moves, so the turn never
   reveals a finished page; once the voice arrives the usual wash fills it.
@@ -492,8 +496,12 @@ tween-vs-snap rules, sweep entry and residual rules, repeat wash timing, the
   Only the current pager leaf owns a tap;
   a hold then blocks auto-follow (including the last-word lead turn) until the
   seek's word is on that leaf, so a slow seek cannot yank the paper to the
-  verse that was playing before the tap. The tapped leaf itself waits under
-  Upcoming paper until that word arrives — a dialed page is fully inked, and
+  verse that was playing before the tap. On a carried English verse, arrival
+  uses the word's aligned progress through the verse, just as voice ownership
+  does. Checking only the verse's opening leaf left the tail leaf held after
+  the seek arrived: the final null word then re-covered the completed verse
+  and rebuilt its entry fade at the next verse. The tapped leaf itself waits
+  under Upcoming paper until that word arrives — a dialed page is fully inked, and
   without the cover the wash has nothing to fill. The tapped ayah is Active as
   soon as the word is known, even before the pager names the leaf, so the
   letter wash is not stuck under a blanket Upcoming cover. The seed is not

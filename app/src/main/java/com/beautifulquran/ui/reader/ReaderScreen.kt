@@ -2756,6 +2756,7 @@ fun ReaderScreen(
                             isPlaying = isThisSurahPlaying && playerState.isPlaying,
                             playingAyah = playerState.nowPlaying?.ayah
                                 ?.takeIf { isThisSurahPlaying },
+                            inkId = playerState.positionEvents.inkId,
                         )
                     }
                     val mushafDispatch = rememberUpdatedState(
@@ -2792,12 +2793,13 @@ fun ReaderScreen(
                                 word.wordPosition,
                                 wholeVerses = mushafWholeVerses,
                             )
-                            val through = mushafVerseThrough(
-                                word.wordPosition,
-                                content.ayahs.firstOrNull { it.number == word.ayah }?.words?.size ?: 0,
+                            val leaf = mushafWordLeafNumber(
+                                englishBook, mushafSurahId, word, on,
+                                wordCount = content.ayahs.firstOrNull { it.number == word.ayah }
+                                    ?.words?.size ?: 0,
                                 alignment = if (englishBook != null) seekAlignments.alignment(word.ayah) else null,
                             )
-                            if (mushafLeafNumber(englishBook, mushafSurahId, word.ayah, on, through) == held) {
+                            if (mushafWaitingLeafReleased(held, leaf, word.fromTap)) {
                                 mushafTappedPage = null
                             }
                         }
