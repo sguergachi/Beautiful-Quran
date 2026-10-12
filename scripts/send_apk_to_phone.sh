@@ -144,7 +144,7 @@ if [[ "$ZIP" -eq 1 ]]; then
   [[ ! -e "$ZIPPED" ]] || ZIPPED="${ZIPPED%.zip}-$(date +%H%M).zip"
   rm -f -- "$ZIPPED"
   if command -v zip >/dev/null 2>&1; then
-    (cd -- "$STAGE_DIR" && zip -j -0 -q -- "$ZIPPED" "$(basename -- "$STAGED")")
+    (cd -- "$STAGE_DIR" && zip -j -0 -q "$ZIPPED" "$(basename -- "$STAGED")")
   else
     # No `zip` binary (e.g. minimal containers): stdlib fallback, still stored.
     python3 - "$STAGED" "$ZIPPED" <<'EOF'
