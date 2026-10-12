@@ -148,6 +148,7 @@ import com.beautifulquran.ui.theme.LocalQuranInk
 import com.beautifulquran.ui.theme.QuranTheme
 import com.beautifulquran.ui.theme.ReturnArrowHeading
 import com.beautifulquran.ui.theme.LocalQuranTypePalette
+import com.beautifulquran.ui.theme.bookCacheSuffix
 import com.beautifulquran.ui.theme.absorbPointerEvents
 import com.beautifulquran.ui.theme.contextualGuideProgressiveBlur
 import com.beautifulquran.ui.theme.contrastingOverlayAccents
@@ -304,8 +305,7 @@ fun ReaderScreen(
     // one ayah block — never the whole screen.
     val activeWordState = viewModel.activeWord.collectAsStateWithLifecycle()
     val settings by viewModel.settings.settings.collectAsStateWithLifecycle()
-    val classicTypographyActive = settings.developerModeEnabled &&
-        !settings.timelessTypographyEnabled
+    val bookTypeface = settings.activeBookTypeface
     val typePalette = LocalQuranTypePalette.current
     // Snapshot the shared Continue / green-ribbon target for this visit. A
     // deliberate pause moves this local marker and persists the same target.
@@ -366,7 +366,7 @@ fun ReaderScreen(
         leafMetricsFromOpenInkLab.value,
         settings.englishLeafText,
         settings.verseNumberScript,
-        classicTypographyActive,
+        bookTypeface,
         typePalette.tuning.bookCacheKey,
     ) {
         if (settings.developerModeEnabled) delay(250)
@@ -401,7 +401,7 @@ fun ReaderScreen(
                 well,
                 measure,
                 settings.verseNumberScript,
-                classicTypographyActive,
+                bookTypeface,
                 typePalette.tuning.bookCacheKey,
             ),
             cacheKey = viewModel.englishBookCacheKey(
@@ -409,7 +409,7 @@ fun ReaderScreen(
                 measurePx = measure,
                 verseNumberScript = settings.verseNumberScript.ordinal,
                 leafText = settings.englishLeafText.ordinal,
-            ) + if (classicTypographyActive) "|classic" else "|timeless|${typePalette.tuning.bookCacheKey}",
+            ) + typePalette.bookCacheSuffix,
         )
     }
     val mushafCatalog = mushafUi?.catalog

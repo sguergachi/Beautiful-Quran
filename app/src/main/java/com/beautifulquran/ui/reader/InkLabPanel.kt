@@ -99,7 +99,7 @@ fun InkLabPanel(
     guideActive: Boolean = false,
 ) {
     // Keep the controls readable while the user auditions the UI face itself.
-    val controls = remember { quranTypePalette(true).typography }
+    val controls = remember { quranTypePalette(QuranTypeProfile.TIMELESS).typography }
     MaterialTheme(typography = controls) {
         InkLabPanelContent(modifier, guideActive)
     }
@@ -654,8 +654,18 @@ private fun TypographyControls() {
     var role by remember { mutableStateOf(TypeRole.Book) }
     val palette = LocalQuranTypePalette.current
     val app = LocalContext.current.applicationContext as com.beautifulquran.QuranApp
-    TuningToggle("Timeless", palette.profile == QuranTypeProfile.TIMELESS) { enabled ->
-        app.settings.update { it.copy(timelessTypographyEnabled = enabled) }
+    Row(
+        horizontalArrangement = Arrangement.spacedBy(14.dp),
+        modifier = Modifier.horizontalScroll(rememberScrollState()),
+    ) {
+        com.beautifulquran.data.BookTypeface.entries.forEach { face ->
+            Text(
+                face.label, style = MaterialTheme.typography.labelLarge,
+                color = if (palette.profile == face) MaterialTheme.colorScheme.primary else QuranTheme.ink.secondary,
+                modifier = Modifier.quietClickable { app.settings.update { it.copy(bookTypeface = face) } }
+                    .padding(vertical = 6.dp),
+            )
+        }
     }
     Row(
         horizontalArrangement = Arrangement.spacedBy(14.dp),
@@ -670,7 +680,13 @@ private fun TypographyControls() {
         }
     }
     if (palette.profile != QuranTypeProfile.TIMELESS) {
-        LabCaption("Classic fonts and their original settings. Enable Timeless to audition its axes and alternates.")
+        LabCaption(
+            if (palette.profile == QuranTypeProfile.JUNICODE) {
+                "Junicode at its fixed Garamond match (docs/DESIGN.md, \"Type\"). Choose Timeless to audition its axes and alternates."
+            } else {
+                "Classic fonts and their original settings. Choose Timeless to audition its axes and alternates."
+            },
+        )
         return
     }
     val tuning = InkEngine.typographyTuning

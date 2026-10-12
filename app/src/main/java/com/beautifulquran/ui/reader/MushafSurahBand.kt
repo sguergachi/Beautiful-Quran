@@ -164,8 +164,8 @@ internal fun MushafSurahTitleBand(
     // A banner name is display-sized: the display master, not the Text one.
     val family = when {
         !latin -> HafsFontFamily
-        LocalQuranTypePalette.current.profile == QuranTypeProfile.TIMELESS -> DisplayFontFamily
-        else -> SerifFontFamily
+        LocalQuranTypePalette.current.profile == QuranTypeProfile.CLASSIC -> SerifFontFamily
+        else -> DisplayFontFamily
     }
     val paintFlags = if (latin) BookTextPaintFlags else Paint.ANTI_ALIAS_FLAG
     val titleFeatures = if (latin) typeFeatures(TypeRole.Title) else null

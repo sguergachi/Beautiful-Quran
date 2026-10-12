@@ -940,6 +940,24 @@ not the app's.
   book face, using the current whole-word rag and full-column bismillah fit.
   Customize previews and share images follow the selected profile too.
   Arabic typefaces and sizing stay the same.
+- **Junicode, set as Garamond** (third developer profile): Junicode 2.226 by
+  Peter S. Baker (OFL), a Renaissance roman in Garamond's line that is not a
+  Google font, tuned so a page of it measures as a page of EB Garamond. Each
+  number was measured against EB Garamond, unhinted, as Android draws:
+  - *Size* 0.969 of Garamond's scale (`JUNICODE_SIZE`): x-heights 0.405 /
+    0.418 em. Garamond's leading is kept, so the lines keep Garamond's pitch.
+  - *Measure*: Junicode's letters set 2 % narrow and its word space (0.244 em)
+    18 % wide, which made equal-length lines that read loose. The bundled cut
+    (`tools/build_junicode_fonts.py`) pins width 104 (italic 113) and gives the
+    space Garamond's 0.200 em; a sentence then sets within 0.05 % of
+    Garamond's length.
+  - *Colour* (ink per advance × x-height): Regular 400, Medium 520, SemiBold
+    680, Italic 420. Titles take one step lighter; dark paper eases 30, leaf
+    excepted, as Timeless does.
+  - Always lining figures: Junicode defaults to old-style, whose 1 reads "I".
+  - The English leaf takes the hand Garamond's leaf solves to, × 0.969: solved
+    in its own metrics the two-pass fit landed 2 % smaller and a line longer.
+  The controls keep Timeless Sans. Junicode has no Ink Lab tuning.
 - **The reader's hand**: real Timeless Serif *Italic* at weight 500 for verse
   notes, keeping the book and annotations in one family. The note's colour,
   placement and slant distinguish the reader's words. The classic developer

@@ -1,5 +1,6 @@
 package com.beautifulquran.share
 
+import com.beautifulquran.data.BookTypeface
 import android.app.Activity
 import android.graphics.Bitmap
 import android.graphics.Canvas
@@ -45,7 +46,7 @@ object ShareImageRenderer {
     suspend fun renderSegments(
         activity: Activity,
         segmentCount: Int,
-        timelessTypography: Boolean = true,
+        typeface: BookTypeface = BookTypeface.TIMELESS,
         typographyTuning: TypographyTuning = TypographyTuning(),
         content: @Composable (index: Int) -> Unit,
     ): Bitmap {
@@ -150,7 +151,7 @@ object ShareImageRenderer {
                         setContent {
                             BeautifulQuranTheme(
                                 themeMode = ThemeMode.LIGHT,
-                                timelessTypography = timelessTypography,
+                                typeface = typeface,
                                 typographyTuning = typographyTuning,
                             ) {
                                 content(index)
@@ -171,10 +172,10 @@ object ShareImageRenderer {
 
     suspend fun render(
         activity: Activity,
-        timelessTypography: Boolean = true,
+        typeface: BookTypeface = BookTypeface.TIMELESS,
         typographyTuning: TypographyTuning = TypographyTuning(),
         content: @Composable () -> Unit,
-    ): Bitmap = renderSegments(activity, 1, timelessTypography, typographyTuning) { content() }
+    ): Bitmap = renderSegments(activity, 1, typeface, typographyTuning) { content() }
 }
 
 /** Combined sheet height from per-strip wrap heights. */

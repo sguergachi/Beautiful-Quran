@@ -333,10 +333,10 @@ internal fun AyahSelectorRail(
     val currentPlaceGreen = MaterialTheme.colorScheme.primary
     // Classic retains the rail's original system serif figures.
     val fontResolver = LocalFontFamilyResolver.current
-    val serifFontFamily = if (LocalQuranTypePalette.current.profile == QuranTypeProfile.TIMELESS) {
-        SerifFontFamily
-    } else {
+    val serifFontFamily = if (LocalQuranTypePalette.current.profile == QuranTypeProfile.CLASSIC) {
         FontFamily.Serif
+    } else {
+        SerifFontFamily
     }
     val numberFace = remember(fontResolver, serifFontFamily) {
         fontResolver.resolve(serifFontFamily, FontWeight.Bold).value as Typeface
@@ -388,11 +388,14 @@ internal fun AyahSelectorRail(
                 textAlign = if (mirrored) Paint.Align.RIGHT else Paint.Align.LEFT
                 textSize = collapsedNumberSize.toPx()
                 typeface = numberFace
+                // Junicode's default figures are old-style; a verse number is lining.
+                fontFeatureSettings = "'lnum' 1"
             }
             val pagePaint = Paint(paintFlags).apply {
                 textAlign = if (mirrored) Paint.Align.RIGHT else Paint.Align.LEFT
                 textSize = collapsedPageSize.toPx()
                 typeface = pageFace
+                fontFeatureSettings = "'lnum' 1"
             }
 
             // Collapsed-stack metrics live outside the pass because the

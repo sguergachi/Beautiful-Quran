@@ -571,7 +571,7 @@ val CoverParchment = Parchment
 @Composable
 fun BeautifulQuranTheme(
     themeMode: ThemeMode = ThemeMode.SYSTEM,
-    timelessTypography: Boolean = true,
+    typeface: com.beautifulquran.data.BookTypeface = com.beautifulquran.data.BookTypeface.TIMELESS,
     typographyTuning: TypographyTuning = TypographyTuning(),
     content: @Composable () -> Unit,
 ) {
@@ -602,9 +602,9 @@ fun BeautifulQuranTheme(
     }
     // Light ink on dark paper (Nightfall, Royal Green) runs a touch lighter.
     val darkPaper = night || themeMode == ThemeMode.ROYAL_GREEN
-    val typePalette = androidx.compose.runtime.remember(timelessTypography, typographyTuning, darkPaper) {
+    val typePalette = androidx.compose.runtime.remember(typeface, typographyTuning, darkPaper) {
         quranTypePalette(
-            timelessTypography,
+            typeface,
             typographyTuning,
             fontTuning = if (darkPaper) typographyTuning.forDarkPaper() else typographyTuning,
         )

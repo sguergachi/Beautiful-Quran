@@ -40,6 +40,7 @@ import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import com.beautifulquran.ui.theme.leafCapacityChars
 import com.beautifulquran.ui.theme.leafLeadingEm
+import com.beautifulquran.ui.theme.bookTextMotion
 import com.beautifulquran.ui.theme.quietSuppliedBrackets
 import com.beautifulquran.ui.theme.QuranTypePalette
 import com.beautifulquran.ui.theme.LocalQuranTypePalette
@@ -840,6 +841,14 @@ private fun englishBookHandPx(
     measurer: TextMeasurer,
     typePalette: QuranTypePalette,
 ): Float {
+    // Junicode is set as Garamond: the hand Garamond's leaf solves to, at
+    // Junicode's size. Solved in its own metrics the two-pass estimate landed
+    // 2 % smaller and a line longer, a different page from the same measure.
+    if (typePalette.profile == com.beautifulquran.ui.theme.QuranTypeProfile.JUNICODE) {
+        val garamond = com.beautifulquran.ui.theme.quranTypePalette(com.beautifulquran.ui.theme.QuranTypeProfile.CLASSIC)
+        return englishBookHandPx(wellPx, measurePx, density, measurer, garamond) *
+            com.beautifulquran.ui.theme.JUNICODE_SIZE
+    }
     val block = AnnotatedString(englishLeafReferenceBlock(typePalette.leafCapacityChars))
     var handPx = ENGLISH_LEAF_PROBE_FONT_PX
     // Calibrate at natural spacing so tighter prose keeps the book's type size.
@@ -905,9 +914,7 @@ internal fun englishProseStyle(
     // so the prose (and its brackets and quotes) sets with an even colour —
     // the same features the web leaf and every other English surface set.
     fontFeatureSettings = typePalette.tuning.leaf.featureSettings,
-    textMotion = if (typePalette.profile == com.beautifulquran.ui.theme.QuranTypeProfile.TIMELESS) {
-        TextMotion.Animated
-    } else TextMotion.Static,
+    textMotion = typePalette.bookTextMotion,
     platformStyle = PlatformTextStyle(includeFontPadding = false),
     // Trim.Both puts the block's own edges on the grid: the first line starts
     // at its ascent and the last stops at its descender, instead of half a

@@ -129,6 +129,7 @@ import com.beautifulquran.timingslab.TimingsLabViewModel
 import com.beautifulquran.tarjilab.TarjiLabScreen
 import com.beautifulquran.tarjilab.TarjiLabViewModel
 import com.beautifulquran.ui.theme.BeautifulQuranTheme
+import com.beautifulquran.ui.theme.bookCacheSuffix
 import com.beautifulquran.ui.theme.FloatingPaperControl
 import com.beautifulquran.ui.theme.LocalGildingTilt
 import com.beautifulquran.ui.theme.rememberGildingTilt
@@ -312,8 +313,7 @@ class MainActivity : ComponentActivity() {
             ) {
                 BeautifulQuranTheme(
                     themeMode = settings.themeMode,
-                    timelessTypography =
-                        !settings.developerModeEnabled || settings.timelessTypographyEnabled,
+                    typeface = settings.activeBookTypeface,
                     typographyTuning = if (settings.developerModeEnabled) {
                         com.beautifulquran.ui.reader.InkEngine.typographyTuning
                     } else com.beautifulquran.ui.theme.TypographyTuning(),
@@ -422,8 +422,7 @@ private fun PaperStackApp(
     val rootViewerViewModel: RootViewerViewModel = viewModel(factory = AppViewModelFactory)
     val shareViewModel: ShareViewModel = viewModel(factory = AppViewModelFactory)
     val settings by app.settings.settings.collectAsStateWithLifecycle()
-    val classicTypographyActive = settings.developerModeEnabled &&
-        !settings.timelessTypographyEnabled
+    val bookTypeface = settings.activeBookTypeface
     val typePalette = LocalQuranTypePalette.current
     val settingsInkPreview = remember {
         SettingsInkPreviewState(settings.brushCircleStyle)
@@ -470,7 +469,7 @@ private fun PaperStackApp(
         windowSize,
         settings.englishLeafText,
         settings.verseNumberScript,
-        classicTypographyActive,
+        bookTypeface,
         typePalette.tuning.bookCacheKey,
     ) {
         // Preview immediately; wait for the typography slider to settle before paginating.
@@ -514,7 +513,7 @@ private fun PaperStackApp(
                 metrics[0],
                 metrics[1],
                 settings.verseNumberScript,
-                classicTypographyActive,
+                bookTypeface,
                 typePalette.tuning.bookCacheKey,
             ),
             cacheKey = app.englishBookCache.key(
@@ -523,7 +522,7 @@ private fun PaperStackApp(
                 verseNumberScript = settings.verseNumberScript.ordinal,
                 leafText = settings.englishLeafText.ordinal,
                 database = QuranDatabase.DB_FILE_NAME,
-            ) + if (classicTypographyActive) "|classic" else "|timeless|${typePalette.tuning.bookCacheKey}",
+            ) + typePalette.bookCacheSuffix,
         )
     }
     val bookmarkCount by bookmarksViewModel.bookmarkCount.collectAsStateWithLifecycle()
@@ -1212,7 +1211,7 @@ private fun PaperStackApp(
                         onShareImage = {
                             if (activity != null) {
                                 shareViewModel.shareAsImage(
-                                    activity, timelessTypography = !classicTypographyActive,
+                                    activity, typeface = bookTypeface,
                                     typographyTuning = typePalette.tuning,
                                 )
                             }

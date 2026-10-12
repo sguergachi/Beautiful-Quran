@@ -4,6 +4,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
+import com.beautifulquran.ui.theme.QuranTypeProfile
 import com.beautifulquran.ui.theme.quranTypePalette
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -103,8 +104,8 @@ class AyahNumberMarkTest {
 
     @Test
     fun `English mark gives Western digits the selected book face`() {
-        for (timeless in listOf(false, true)) {
-            val family = quranTypePalette(timeless).serif
+        for (profile in QuranTypeProfile.entries) {
+            val family = quranTypePalette(profile).serif
             val mark = buildAnnotatedString {
                 appendAyahNumberMark(
                     12, useArabicIndicDigits = false, style = SpanStyle(), bookFontFamily = family,

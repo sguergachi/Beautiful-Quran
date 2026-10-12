@@ -70,6 +70,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.beautifulquran.BuildConfig
 import com.beautifulquran.QuranApp
 import com.beautifulquran.R
+import com.beautifulquran.data.BookTypeface
 import com.beautifulquran.data.BrushCircleStyle
 import com.beautifulquran.data.MushafBannerStyle
 import com.beautifulquran.data.RuntimeCachePhase
@@ -374,16 +375,15 @@ private fun DeveloperSection(
     Caption("Tools for testing work in progress.")
 
     Spacer(Modifier.height(20.dp))
-    ToggleRow(
-        label = "Timeless typography",
-        checked = settings.timelessTypographyEnabled,
-        onChange = { enabled ->
-            viewModel.settings.update { it.copy(timelessTypographyEnabled = enabled) }
-        },
-        checkParams = checkParams,
-        checkPaintToken = checkPaintToken,
-    )
-    Caption("Turn off to compare EB Garamond, Cormorant, and their previous type scale.")
+    SectionLabel("English type")
+    BookTypeface.entries.forEach { face ->
+        SelectRow(
+            label = face.label,
+            selected = settings.bookTypeface == face,
+            onClick = { viewModel.settings.update { it.copy(bookTypeface = face) } },
+        )
+    }
+    Caption("Readers get Timeless. EB Garamond is the previous type and scale; Junicode is set to Garamond's size, measure and colour.")
 
     Spacer(Modifier.height(20.dp))
     SectionLabel("Chapter banner")

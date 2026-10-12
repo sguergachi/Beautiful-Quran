@@ -2683,15 +2683,20 @@ internal fun verseAnnotationStyle(
     val damped = 0.9f + 0.1f * fontScale
     val type = com.beautifulquran.ui.theme.LocalQuranTypePalette.current
     val timeless = type.profile == com.beautifulquran.ui.theme.QuranTypeProfile.TIMELESS
+    val junicode = type.profile == com.beautifulquran.ui.theme.QuranTypeProfile.JUNICODE
     val note = type.tuning.note
     return MaterialTheme.typography.bodyMedium.copy(
         fontFamily = ScribeFontFamily,
         fontWeight = FontWeight.Medium,
         fontStyle = FontStyle.Italic,
-        fontSize = fontSize * damped * if (timeless) 0.88f * note.size else 1f,
+        fontSize = fontSize * damped * when {
+            timeless -> 0.88f * note.size
+            junicode -> com.beautifulquran.ui.theme.JUNICODE_SIZE
+            else -> 1f
+        },
         lineHeight = lineHeight * damped * if (timeless) 0.88f * note.size * note.leading else 1f,
         letterSpacing = if (timeless) (0.15f / fontSize.value + note.tracking).em else 0.15.sp,
-        fontFeatureSettings = if (timeless) note.featureSettings else "'kern' 1, 'liga' 1, 'onum' 1",
+        fontFeatureSettings = if (timeless || junicode) note.featureSettings else "'kern' 1, 'liga' 1, 'onum' 1",
     )
 }
 

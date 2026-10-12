@@ -29,13 +29,37 @@ class TypographyTuningTest {
     @Test
     fun darkPaletteKeepsPaperTuningForPaginationAndSharing() {
         val paper = TypographyTuning()
-        val light = quranTypePalette(true, paper)
-        val dark = quranTypePalette(true, paper, fontTuning = paper.forDarkPaper())
+        val light = quranTypePalette(QuranTypeProfile.TIMELESS, paper)
+        val dark = quranTypePalette(QuranTypeProfile.TIMELESS, paper, fontTuning = paper.forDarkPaper())
         assertEquals(paper, dark.tuning)
         assertEquals(light.tuning.bookCacheKey, dark.tuning.bookCacheKey)
         assertEquals(light.leaf, dark.leaf)
         assertNotEquals(light.serif, dark.serif)
-        assertEquals(quranTypePalette(false), quranTypePalette(false, paper, paper.forDarkPaper()))
+        assertEquals(quranTypePalette(QuranTypeProfile.CLASSIC), quranTypePalette(QuranTypeProfile.CLASSIC, paper, paper.forDarkPaper()))
+    }
+
+    @Test
+    fun junicodeIgnoresInkLabTuningButEasesOnDarkPaperExceptTheLeaf() {
+        val tuned = TypographyTuning(book = TypefaceTuning(weight = 650))
+        val paper = quranTypePalette(QuranTypeProfile.JUNICODE)
+        assertEquals(paper, quranTypePalette(QuranTypeProfile.JUNICODE, tuned))
+        val dark = quranTypePalette(QuranTypeProfile.JUNICODE, fontTuning = TypographyTuning().forDarkPaper())
+        assertNotEquals(paper.serif, dark.serif)
+        assertEquals(paper.leaf, dark.leaf)
+        assertEquals(paper.tuning, dark.tuning)
+        assertEquals(paper.bookCacheSuffix, dark.bookCacheSuffix)
+    }
+
+    @Test
+    fun junicodeIsAlwaysSetWithLiningFigures() {
+        val t = quranTypePalette(QuranTypeProfile.JUNICODE).tuning
+        listOf(TypeRole.Book, TypeRole.Leaf, TypeRole.BookItalic, TypeRole.Title, TypeRole.Note).forEach {
+            assertEquals(1, t.face(it).features["lnum"])
+        }
+        assertEquals(listOf(400, 420, 520, 680, 700), listOf(
+            junicodeWeight(400), junicodeWeight(400, italic = true),
+            junicodeWeight(500), junicodeWeight(600), junicodeWeight(700),
+        ))
     }
 
     @Test

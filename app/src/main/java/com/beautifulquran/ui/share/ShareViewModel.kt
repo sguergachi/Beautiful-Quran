@@ -1,5 +1,6 @@
 package com.beautifulquran.ui.share
 
+import com.beautifulquran.data.BookTypeface
 import android.app.Activity
 import android.graphics.Bitmap
 import android.util.Log
@@ -268,7 +269,7 @@ class ShareViewModel(
     fun shareAsImage(
         activity: Activity,
         includeTranslation: Boolean = true,
-        timelessTypography: Boolean = true,
+        typeface: BookTypeface = BookTypeface.TIMELESS,
         typographyTuning: com.beautifulquran.ui.theme.TypographyTuning = com.beautifulquran.ui.theme.TypographyTuning(),
     ) {
         if (!_ui.value.gathering) return
@@ -301,7 +302,7 @@ class ShareViewModel(
                     versesBmp = ShareImageRenderer.renderSegments(
                         activity = activity,
                         segmentCount = lines.size,
-                        timelessTypography = timelessTypography,
+                        typeface = typeface,
                         typographyTuning = typographyTuning,
                     ) { index ->
                         ShareImageVerseStrip(
@@ -319,7 +320,7 @@ class ShareViewModel(
                             },
                         )
                     }
-                    footerBmp = ShareImageRenderer.render(activity, timelessTypography, typographyTuning) {
+                    footerBmp = ShareImageRenderer.render(activity, typeface, typographyTuning) {
                         ShareImageFooterStrip(shareFooterCopy(lines))
                     }
                     bitmap = stitchBitmaps(listOf(versesBmp, footerBmp))

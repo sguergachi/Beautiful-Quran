@@ -8,6 +8,16 @@ import kotlinx.coroutines.flow.StateFlow
 
 enum class ThemeMode { SYSTEM, LIGHT, DARK, ROYAL_GREEN }
 
+/**
+ * The developer A/B of the app's English type. Persisted by ordinal: append,
+ * never reorder. See `ui/theme/Type.kt`.
+ */
+enum class BookTypeface(val label: String) {
+    TIMELESS("Timeless"),
+    CLASSIC("EB Garamond (previous)"),
+    JUNICODE("Junicode, set as Garamond"),
+}
+
 /** What flows on the sheet: Arabic with English under each word, English only, or Arabic only. */
 enum class ReadingMode { ARABIC_ENGLISH, ENGLISH_ONLY, ARABIC_ONLY }
 
@@ -97,14 +107,18 @@ data class Settings(
      *  repeatedly tapping the Settings logo; persisted so the reader can
      *  honour it. See docs/ROOT_VIEWER.md and docs/TIMINGS_LAB.md. */
     val developerModeEnabled: Boolean = false,
-    /** Developer A/B: false selects the pre-Timeless typefaces and sizes. */
-    val timelessTypographyEnabled: Boolean = true,
+    /** Developer A/B of the English type; readers always get [BookTypeface.TIMELESS]. */
+    val bookTypeface: BookTypeface = BookTypeface.TIMELESS,
     /** Developer-only gate for contextual feature lessons. Off until their
      * visual language is approved for readers. Enabling rearms every lesson. */
     val educationGuidesEnabled: Boolean = false,
     /** Developer-only: which ink-brush circle to paint around selected enums. */
     val brushCircleStyle: BrushCircleStyle = BrushCircleStyle.BASELINE,
-)
+) {
+    /** The typeface actually set: the A/B choice only counts in developer mode. */
+    val activeBookTypeface: BookTypeface
+        get() = if (developerModeEnabled) bookTypeface else BookTypeface.TIMELESS
+}
 
 /** Maps a persisted ordinal back to an enum entry, falling back to [default]
  * when it no longer maps (e.g. after an entry was removed in an update). */
@@ -169,7 +183,14 @@ class SettingsRepository(context: Context) {
         lastSurah = prefs.getInt("lastSurah", 0),
         lastAyah = prefs.getInt("lastAyah", 1),
         developerModeEnabled = prefs.getBoolean("developerModeEnabled", false),
-        timelessTypographyEnabled = prefs.getBoolean("timelessTypographyEnabled", true),
+        // Before the third face, the A/B was a Timeless on/off switch.
+        bookTypeface = if (prefs.contains("bookTypeface")) {
+            prefs.enum("bookTypeface", BookTypeface.TIMELESS)
+        } else if (prefs.getBoolean("timelessTypographyEnabled", true)) {
+            BookTypeface.TIMELESS
+        } else {
+            BookTypeface.CLASSIC
+        },
         educationGuidesEnabled = prefs.getBoolean("educationGuidesEnabled", false),
         brushCircleStyle = prefs.enum("brushCircleStyle", BrushCircleStyle.BASELINE),
     )
@@ -275,7 +296,8 @@ class SettingsRepository(context: Context) {
             putInt("lastSurah", next.lastSurah)
             putInt("lastAyah", next.lastAyah)
             putBoolean("developerModeEnabled", next.developerModeEnabled)
-            putBoolean("timelessTypographyEnabled", next.timelessTypographyEnabled)
+            putInt("bookTypeface", next.bookTypeface.ordinal)
+            remove("timelessTypographyEnabled")
             putBoolean("educationGuidesEnabled", next.educationGuidesEnabled)
             remove("inkLabEnabled")
             // Developer experiments that have been taken out: clear what
