@@ -8,8 +8,8 @@ the correct owner for repeat tint or a tap. These checks do not establish
 | Check | Result on the frozen runtime corpus and shipped database |
 |---|---|
 | Published English and actual lyricized word-card English | 6,236 verses and 77,429 Arabic steps each; ranges tile, boundaries do not split words, and every heard meaning advances a continuous prefix |
-| Timing rows, all 13 reciters | 81,059 rows, 1,023,997 segments, 17,758 repeat occurrences |
-| Boundary and seek queries, each English source | 12,382,926 checks in forward, backward and scrambled order; same clock gives the same word, high-water ink, repeat chain and handoff |
+| Timing rows, all 13 reciters | 81,059 rows from the public DB plus six hash-verified runtime packs; 1,023,989 segments, 17,748 repeat occurrences |
+| Boundary and seek queries, each English source | 12,384,384 checks in forward, backward and scrambled order; same clock gives the same word, high-water ink, repeat chain and handoff |
 | Independent root/lemma meaning cues | 1,403 correspondences: all exact owners, no delayed washes |
 | Annotated exact meaning fixtures | 194 heads, including all 44 Acquainted occurrences, vision/brothers, prayer action/commerce, shared phrases, repeated clauses and lexical variants |
 | Gloss-independent QAC candidates | 12,011 additional checks using exact vocalized lemmas and POS; combined rules flag 80 disagreements for review, not a semantic accuracy score |
@@ -84,7 +84,12 @@ Run the existing ownership audit on a locally exported, frozen runtime TSV
 Pass the annotated exact fixtures with `--semantic-cases`, the spoken fixtures
 with `--spoken-cases`, and `english-meaning-cues.tsv` with `--meaning-cases`.
 Add `--strict-meaning-owners` to require exact owners; it currently reports the
-shared-card ambiguities (now none in that original cue set). Then run:
+shared-card ambiguities (now none in that original cue set). For the current public database, supply all six reviewed runtime packs to
+`audit_reader_sync.py` with repeated `--runtime-pack /path/to/pack.json` flags.
+The audit checks their revision hashes and rejects overlapping generations;
+37,411 runtime rows plus 43,648 independent bundled rows recover the full
+81,059-row listening corpus. Keep those packs outside Git and packaged assets.
+Then run:
 
 ```bash
 python3 tools/audit_reader_sync.py "$BQ_CORPUS" /tmp/published/ownership.tsv --output /tmp/published-timings.json
@@ -96,6 +101,7 @@ npm test
 npm run build
 ```
 
+The timing commands below need those `--runtime-pack` flags on v67.
 These tools compile the production Kotlin mapper/timing engine, use a linear
 timing oracle, retain diagnostic disagreements and read the database without
 changing it. Keep the full runtime corpus outside Git and packaged assets.

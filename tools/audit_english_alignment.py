@@ -265,7 +265,8 @@ certificate={'corpus_sha256':hashlib.sha256(((root/'corpus.tsv') if args.word_by
 (root/'semantic-reference-template.tsv').write_text('\n'.join(template)+'\n')
 (root/'semantic-reference-disagreements.tsv').write_text('\n'.join('\t'.join(map(str,r)) for r in wrong)+'\n')
 print('OWNERSHIP (literal diagnostic, not semantic accuracy):', dict(counts))
-print(f"Literal agreement: {counts['on_owner']/counts['literal_correspondences']:.3%}; semantic accuracy unverified")
+print(f"Literal agreement (diagnostic only): {counts['on_owner']/counts['literal_correspondences']:.3%}")
+print('SEMANTIC REFERENCE:', {k:v for k,v in certificate.items() if not k.endswith('_sha256')})
 if target is not None and not certificate['established']:
     raise SystemExit(f'{target}% semantic accuracy not established: {reviewed}/{denominator} reviewed, {len(wrong)} disagreements')
 if counts['meaning_wash_delays']:

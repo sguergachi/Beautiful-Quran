@@ -7,6 +7,7 @@ This verifies timing/ink properties, not acoustic or translation accuracy.
 """
 import argparse
 import collections
+import hashlib
 import json
 import sqlite3
 import subprocess
@@ -17,6 +18,7 @@ parser = argparse.ArgumentParser(description=__doc__)
 parser.add_argument("corpus", type=Path)
 parser.add_argument("ownership", type=Path)
 parser.add_argument("--output", type=Path, required=True)
+parser.add_argument("--runtime-pack", type=Path, action="append", default=[], help="Reviewed canonical QF timing pack, kept outside Git; repeat for all six resources")
 args = parser.parse_args()
 repo = Path(__file__).resolve().parents[1]
 source = repo / "app/src/main/java/com/beautifulquran"
@@ -99,6 +101,22 @@ fun main(args: Array<String>) {
 '''
 with sqlite3.connect(f"file:{repo / 'data/quran.db'}?mode=ro", uri=True) as database:
     rows = database.execute("SELECT reciter_id,surah_id,ayah_number,segments FROM timings ORDER BY reciter_id,surah_id,ayah_number").fetchall()
+pack_revisions={}
+occupied={row[:3] for row in rows}
+for path in args.runtime_pack:
+    pack=json.loads(path.read_text())
+    reciter=pack['reciterId']
+    assert pack['schemaVersion']==1 and pack['clock']=='everyayah-ms' and reciter in {1,2,3,4,5,7}
+    assert reciter not in pack_revisions,(reciter,'duplicate runtime resource')
+    canonical=json.dumps({'rows':pack['rows'],'withheldVerseKeys':pack['withheldVerseKeys']},separators=(',',':'))
+    assert hashlib.sha256(canonical.encode()).hexdigest()==pack['revision'],(reciter,'runtime revision mismatch')
+    pack_revisions[reciter]=pack['revision']
+    for surah,ayah,segments,onset in pack['rows']:
+        key=(reciter,surah,ayah)
+        assert key not in occupied,(key,'mixed timing generations')
+        assert segments and segments[0][1]>=onset>=0,(key,'runtime onset')
+        occupied.add(key)
+        rows.append((*key,json.dumps(segments)))
 reciters = sorted({row[0] for row in rows})
 assert len(reciters) == 13
 present = {row[:3] for row in rows}
@@ -124,6 +142,7 @@ with tempfile.TemporaryDirectory(prefix="reader-sync-audit-") as temporary:
 summary['reciters'] = reciters
 summary['unavailable_timing_rows'] = missing
 summary['rows_per_reciter'] = dict(collections.Counter(row[0] for row in rows))
+summary['runtime_pack_revisions'] = pack_revisions
 args.output.parent.mkdir(parents=True, exist_ok=True)
 args.output.write_text(json.dumps(summary, indent=2) + '\n')
 print(json.dumps(summary, indent=2))
