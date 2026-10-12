@@ -226,7 +226,7 @@ object ReaderInteraction {
         return chosen.coerceIn(1, ayahCount.coerceAtLeast(1))
     }
 
-    /** Where pressing play on a leaf starts. */
+    /** Where a reader transport command starts or seeks on a leaf. */
     data class MushafPlayTarget(val surahId: Int, val ayah: Int, val word: Int?)
 
     /**

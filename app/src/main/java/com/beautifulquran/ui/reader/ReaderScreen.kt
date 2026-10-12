@@ -126,6 +126,7 @@ import com.beautifulquran.DevProfiling
 import com.beautifulquran.QuranApp
 import com.beautifulquran.data.AyahSelectorSide
 import com.beautifulquran.data.ReadingLayout
+import com.beautifulquran.data.EnglishLeafText
 import com.beautifulquran.data.ReadingMode
 import com.beautifulquran.data.RuntimeCachePhase
 import com.beautifulquran.data.model.Surah
@@ -156,6 +157,7 @@ import com.beautifulquran.ui.theme.quietClickable
 import com.beautifulquran.ui.theme.verticalFadingEdges
 import kotlin.math.PI
 import kotlin.math.abs
+import kotlin.math.roundToInt
 import kotlin.math.sin
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -459,6 +461,9 @@ fun ReaderScreen(
     // last writer of the pager's position.
     var mushafSeekPage by remember { mutableStateOf<Int?>(null) }
     var mushafSeekSurahId by remember { mutableStateOf<Int?>(null) }
+    var mushafTransportTarget by remember(surahId) {
+        mutableStateOf<ReaderInteraction.MushafPlayTarget?>(null)
+    }
     // Separate physical contact from landing work: every hand fades the folio,
     // but only a confirmed distant landing parks expensive neighbour leaves.
     val mushafScrubbing = remember { mutableStateOf(false) }
@@ -1646,6 +1651,14 @@ fun ReaderScreen(
             viewModel.playFromAyah(selectedPlaybackAyah())
         }
     }
+    fun stepBackwardFromBar() {
+        val target = viewModel.fastBackward() ?: return
+        if (mushafMode) mushafTransportTarget = target
+    }
+    fun stepForwardFromBar() {
+        val target = viewModel.fastForward() ?: return
+        if (mushafMode) mushafTransportTarget = target
+    }
     val host = playbackHost
     if (host != null) {
         val pinHere = playbackPinned && !mushafMode && !gathering
@@ -1662,8 +1675,8 @@ fun ReaderScreen(
                 // The float is read when the bar draws, not while this sheet composes.
                 host.chromeAlpha = { chromeAlpha.value }
                 host.onPlayPause = ::playFromBar
-                host.onFastBackward = viewModel::fastBackward
-                host.onFastForward = viewModel::fastForward
+                host.onFastBackward = ::stepBackwardFromBar
+                host.onFastForward = ::stepForwardFromBar
                 host.onRepeatClick = { showRepeatDialog = true }
                 host.onSpeed = viewModel::cycleSpeed
                 host.onReciterClick = onOpenSettings
@@ -1976,8 +1989,8 @@ fun ReaderScreen(
                         chromeAlpha = { chromeAlpha.value },
                         reciterName = uiState.currentReciter?.name.orEmpty(),
                         onPlayPause = ::playFromBar,
-                        onFastBackward = viewModel::fastBackward,
-                        onFastForward = viewModel::fastForward,
+                        onFastBackward = ::stepBackwardFromBar,
+                        onFastForward = ::stepForwardFromBar,
                         onRepeatClick = { showRepeatDialog = true },
                         onSpeed = viewModel::cycleSpeed,
                         onReciterClick = onOpenSettings,
@@ -2647,8 +2660,8 @@ fun ReaderScreen(
                                 }
                             }
                         },
-                        onFastBackward = viewModel::fastBackward,
-                        onFastForward = viewModel::fastForward,
+                        onFastBackward = ::stepBackwardFromBar,
+                        onFastForward = ::stepForwardFromBar,
                         onRepeatClick = { showRepeatDialog = true },
                         onSpeed = viewModel::cycleSpeed,
                         // Where the reader is in the book, by leaf — so the
@@ -2743,6 +2756,7 @@ fun ReaderScreen(
                             isPlaying = isThisSurahPlaying && playerState.isPlaying,
                             playingAyah = playerState.nowPlaying?.ayah
                                 ?.takeIf { isThisSurahPlaying },
+                            inkId = playerState.positionEvents.inkId,
                         )
                     }
                     val mushafDispatch = rememberUpdatedState(
@@ -2750,6 +2764,10 @@ fun ReaderScreen(
                     )
                     val mushafRootMoved = rememberUpdatedState(onRootReturnUserMoved)
                     val mushafOpenRoot = rememberUpdatedState(onOpenRootViewer)
+                    val leafTextSource = settings.englishLeafText
+                    val seekAlignments = remember(content, leafTextSource) {
+                        EnglishVerseAlignments(content, leafTextSource == EnglishLeafText.GLOSS)
+                    }
                     // The leaf the reader tapped on. The active word carries no
                     // page of its own and the position poll can still be
                     // reporting the word from before the seek, which used to
@@ -2763,6 +2781,7 @@ fun ReaderScreen(
                         mushafSurahId,
                         mushafWholeVerses,
                         englishBook,
+                        seekAlignments,
                     ) {
                         val held = mushafTappedPage ?: return@LaunchedEffect
                         val catalog = mushafReady.catalog
@@ -2774,7 +2793,12 @@ fun ReaderScreen(
                                 word.wordPosition,
                                 wholeVerses = mushafWholeVerses,
                             )
-                            if (mushafLeafNumber(englishBook, mushafSurahId, word.ayah, on) == held) {
+                            val through = mushafVerseThrough(
+                                word.wordPosition,
+                                content.ayahs.firstOrNull { it.number == word.ayah }?.words?.size ?: 0,
+                                alignment = if (englishBook != null) seekAlignments.alignment(word.ayah) else null,
+                            )
+                            if (mushafLeafNumber(englishBook, mushafSurahId, word.ayah, on, through) == held) {
                                 mushafTappedPage = null
                             }
                         }
@@ -2829,12 +2853,10 @@ fun ReaderScreen(
                     // which verse and how far into it. Resolving that to a word
                     // needs the verse itself, which lives here: its word count,
                     // and where each of those words lands in its English.
-                    val leafTextSource = settings.englishLeafText
                     val leafTextForSetting: suspend (Int) -> Map<Long, String> =
                         remember(viewModel, leafTextSource) {
                             { page -> viewModel.leafText(page, leafTextSource) }
                         }
-                    val seekAlignments = remember(content) { EnglishVerseAlignments(content) }
                     val onMushafVerseSeek = remember(mushafSurahId, viewModel, content, seekAlignments) {
                         { surahId: Int, ayah: Int, through: Float ->
                             mushafDispatch.value(ReaderInteractionEvent.WordPlayRequested)
@@ -2842,8 +2864,9 @@ fun ReaderScreen(
                                 .firstOrNull { it.number == ayah }
                                 ?.takeIf { surahId == mushafSurahId }
                             val words = verse?.words?.size ?: 0
-                            val wordEnds = verse?.let { seekAlignments.of(it.number) }
-                            val position = englishSeekWordPosition(through, words, wordEnds)
+                            val alignment = verse?.let { seekAlignments.alignment(it.number) }
+                            val position = alignment?.positionAt(through)
+                                ?: englishSeekWordPosition(through, words)
                             if (surahId == mushafSurahId) {
                                 viewModel.playFromAyahWord(ayah, position)
                             } else {
@@ -2873,11 +2896,8 @@ fun ReaderScreen(
                                 .firstOrNull { it.number == ayah }
                                 ?.takeIf { surahId == mushafSurahId }
                             val position = if (verse != null) {
-                                englishSeekWordPosition(
-                                    through,
-                                    verse.words.size,
-                                    seekAlignments.of(verse.number),
-                                )
+                                seekAlignments.alignment(verse.number)?.positionAt(through)
+                                    ?: englishSeekWordPosition(through, verse.words.size)
                             } else {
                                 englishSeekWordPosition(
                                     through,
@@ -2920,6 +2940,10 @@ fun ReaderScreen(
                         searchFocusActive = searchFocusActive,
                         heldPage = mushafTappedPage,
                         onTappedLeaf = { mushafTappedPage = it },
+                        transportTarget = mushafTransportTarget,
+                        onTransportTargetShown = { target ->
+                            if (mushafTransportTarget == target) mushafTransportTarget = null
+                        },
                         bookMeasured = mushafUi?.measured != false,
                         onLeafMetrics = { well, measure ->
                             val was = mushafLeafMetrics.value
@@ -2937,6 +2961,7 @@ fun ReaderScreen(
                         onVerseLongPress = onMushafVerseLongPress,
                         onBasmalahClick = onMushafBasmalahClick,
                         english = settings.readingMode == ReadingMode.ENGLISH_ONLY,
+                        wordByWord = leafTextSource == EnglishLeafText.GLOSS,
                         verseNumberScript = settings.verseNumberScript,
                         pageNumberScript = settings.pageNumberScript,
                         leafText = leafTextForSetting,

@@ -116,11 +116,11 @@ class MushafBookLengthTest {
         // to be measured the way the wash measures it. Word 4's English begins
         // three tenths of the way in, not three fifths.
         val ends = floatArrayOf(0.1f, 0.2f, 0.3f, 0.9f, 1f)
-        assertEquals(0.3f, mushafVerseThrough(activeWord(4), 5, ends), 1e-6f)
-        assertEquals(0f, mushafVerseThrough(activeWord(1), 5, ends), 1e-6f)
+        assertEquals(0.3f, mushafVerseThrough(4, 5, ends), 1e-6f)
+        assertEquals(0f, mushafVerseThrough(1, 5, ends), 1e-6f)
         // No map, or one for a different verse: even shares, as before.
-        assertEquals(0.6f, mushafVerseThrough(activeWord(4), 5), 1e-6f)
-        assertEquals(0.6f, mushafVerseThrough(activeWord(4), 5, floatArrayOf(1f)), 1e-6f)
+        assertEquals(0.6f, mushafVerseThrough(4, 5), 1e-6f)
+        assertEquals(0.6f, mushafVerseThrough(4, 5, floatArrayOf(1f)), 1e-6f)
     }
 
     @Test
