@@ -124,6 +124,7 @@ class QuranRepository(
      * carries none of them. Null keeps this class usable from JVM unit tests
      * that don't ship a cache. */
     private val runtimeMushaf: RuntimeMushafCache? = null,
+    private val runtimeTimings: RuntimeTimingCache? = null,
 ) {
 
     /** Change signal for the Lab's on-device corrections: emits whenever the
@@ -134,6 +135,11 @@ class QuranRepository(
 
     /** Emits whenever the runtime word/QCF snapshot is replaced. */
     val runtimeMushafChanged get() = runtimeMushaf?.changes
+    /** Durable provider generations include accepted timing changes and withdrawals/revocation. */
+    val runtimeTimingsChanged get() = runtimeTimings?.changes
+    internal fun runtimeTimingGeneration(reciterId: Int): Long = runtimeTimings?.generation(reciterId) ?: 0L
+    internal fun timingProviderAvailable(reciterId: Int): Boolean =
+        runtimeTimings == null || reciterId !in RUNTIME_TIMING_PROFILES || runtimeTimings.available(reciterId)
 
     private val runtimeViews = CacheGeneration()
 
@@ -885,13 +891,17 @@ class QuranRepository(
         )
     }
 
-    private data class BundledTimingRows(
+    private data class DefaultTimingRows(
         val segments: Map<Int, List<Segment>>,
         val audioOnsets: Map<Int, Long>,
     )
 
-    private fun bundledTimingRows(reciterId: Int, surahId: Int): BundledTimingRows =
-        database.db.rawQuery(
+    private fun defaultTimingRows(reciterId: Int, surahId: Int): DefaultTimingRows {
+        if (runtimeTimings != null && reciterId in RUNTIME_TIMING_PROFILES) {
+            val chapter = runtimeTimings.chapter(reciterId, surahId)
+            return DefaultTimingRows(chapter?.segments.orEmpty(), chapter?.audioOnsets.orEmpty())
+        }
+        return database.db.rawQuery(
             "SELECT ayah_number, segments, audio_onset_ms FROM timings " +
                 "WHERE reciter_id = ? AND surah_id = ?",
             arrayOf(reciterId.toString(), surahId.toString()),
@@ -903,27 +913,29 @@ class QuranRepository(
                 segments[ayah] = parseSegments(c.getString(1))
                 c.getLong(2).takeIf { it > 0L }?.let { audioOnsets[ayah] = it }
             }
-            BundledTimingRows(segments, audioOnsets)
+            DefaultTimingRows(segments, audioOnsets)
         }
+    }
 
-    /** The bundled DB timings for a reciter+surah, with **no** Lab overrides
-     * fused in — the shipped defaults. The Lab uses this to reset a single word
-     * back to how the app shipped it. */
-    suspend fun bundledTimings(reciterId: Int, surahId: Int): Map<Int, List<Segment>> =
+    /** Reviewed provider timings with no Lab overrides; reset uses the same current baseline as listening. */
+    suspend fun defaultTimings(reciterId: Int, surahId: Int): Map<Int, List<Segment>> =
         withContext(Dispatchers.IO) {
-            bundledTimingRows(reciterId, surahId).segments
+            defaultTimingRows(reciterId, surahId).segments
         }
 
     /** ayah number -> word segments, for one reciter and surah. Any
      * hand-corrected override from the Timings Lab takes precedence over the
-     * bundled DB row, so the reader immediately reflects edits. The MP3 voice
+     * provider row, so the reader immediately reflects edits. The MP3 voice
      * onset remains authoritative; only legacy clock versions are rebased as
      * a whole, while current Lab boundaries remain exact. A rebased row is
      * written back once, so the Lab, the reader and an exported patch all
      * describe the same marks. */
     suspend fun timings(reciterId: Int, surahId: Int): Map<Int, List<Segment>> =
         withContext(Dispatchers.IO) {
-            val bundled = bundledTimingRows(reciterId, surahId)
+            val bundled = defaultTimingRows(reciterId, surahId)
+            if (runtimeTimings != null && reciterId in RUNTIME_TIMING_PROFILES && !runtimeTimings.available(reciterId)) {
+                return@withContext emptyMap()
+            }
             if (timingOverrides == null) return@withContext bundled.segments
             val overrides = timingOverrides.overrides.value
             if (overrides.isEmpty() || !overrides.keys.any { it.reciterId == reciterId && it.surahId == surahId }) {

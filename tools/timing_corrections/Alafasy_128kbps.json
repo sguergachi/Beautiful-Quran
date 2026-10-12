@@ -9,7 +9,11 @@
       "op": "one_utterance",
       "positions": [16, 17],
       "evidence": ["ear", "CTC", "quran-align"],
-      "refs": ["GitHub issue #594"]
+      "refs": ["GitHub issue #594"],
+      "authenticatedRetirement": {
+        "inputSegmentsSha256": "a5cef62eed2b26b6e37334a3d6df54ff427acbdf7fa63d2e7115c4ff2ca867c5",
+        "evidence": "tools/timing_verdicts/qf-source-transition.json"
+      }
     },
     {
       "reciterId": 1,
@@ -18,7 +22,11 @@
       "op": "one_utterance",
       "positions": [22, 23],
       "evidence": ["ear", "CTC", "quran-align"],
-      "refs": ["GitHub issue #598"]
+      "refs": ["GitHub issue #598"],
+      "authenticatedRetirement": {
+        "inputSegmentsSha256": "5a69c80eee109dbeff0c6550838bc2e5dd6d35415ff0fb2b620d7c6fb326a20f",
+        "evidence": "tools/timing_verdicts/qf-source-transition.json"
+      }
     },
     {
       "reciterId": 1,

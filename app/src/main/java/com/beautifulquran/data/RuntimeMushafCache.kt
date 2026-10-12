@@ -50,6 +50,7 @@ class RuntimeMushafCache(
     private val minimumWords: Int = 77_429,
     private val expectedQcfPages: IntRange = 1..604,
     private val canonicalWords: () -> Map<Int, Map<Int, List<String>>> = { emptyMap() },
+    private val onAccessRevoked: () -> Unit = {},
 ) {
     private val _diagnostics = MutableStateFlow(RuntimeCacheDiagnostics())
     val diagnostics: StateFlow<RuntimeCacheDiagnostics> = _diagnostics
@@ -59,6 +60,8 @@ class RuntimeMushafCache(
         validate = ::validateAppliedContent, nowMs = nowMs,
     )
     private var syncing = false
+    @Volatile private var cacheGeneration = 0L
+    private var activeCacheGeneration = 0L
     @Volatile private var cachedState: QfSyncState? = null
     @Volatile private var parsedToken: String? = null
     @Volatile private var unreadableToken: String? = null
@@ -145,6 +148,7 @@ class RuntimeMushafCache(
         synchronized(this) {
             if (syncing) return
             syncing = true
+            activeCacheGeneration = cacheGeneration
             if (resetBackoff) {
                 retryJob?.cancel()
                 retryJob = null
@@ -162,9 +166,12 @@ class RuntimeMushafCache(
                 validatedWords = null
                 val contentChanged = syncer.sync(FILTER) { _diagnostics.value.apiCalls }
                 val state = requireNotNull(store.state(FILTER)) { "QF sync did not save its checkpoint" }
-                cachedState = state
-                validatedWords?.let { installParsed(state, it) } ?: run {
-                    if (parsedToken != null) parsedToken = state.token
+                synchronized(this@RuntimeMushafCache) {
+                    checkAccessGeneration()
+                    cachedState = state
+                    validatedWords?.let { installParsed(state, it) } ?: run {
+                        if (parsedToken != null) parsedToken = state.token
+                    }
                 }
                 unreadableToken = null
                 purgedSupplementToken = null
@@ -178,19 +185,11 @@ class RuntimeMushafCache(
                 _refreshes.tryEmit(Unit)
             } catch (error: Exception) {
                 validatedWords = null
+                if (error is CancellationException) throw error
                 blockReadRefresh = true
                 if (error is QfAccessRevokedException) {
-                    retryJob?.cancel()
-                    retryJob = null
-                    store.clear()
-                    cachedState = null
-                    parsedToken = null
-                    unreadableToken = null
-                    parsedWords = emptyMap()
-                    parsedBySurah = emptyMap()
-                    _diagnostics.update { it.copy(cachedWords = 0) }
-                    updateResource { RuntimeCacheResource(lastError = error.message) }
-                    _changes.tryEmit(Unit)
+                    clearRevokedContent()
+                    onAccessRevoked()
                 } else {
                     cachedState = store.state(FILTER)
                     updateResource { it.copy(lastError = error.message ?: error::class.simpleName) }
@@ -201,6 +200,30 @@ class RuntimeMushafCache(
                 updateResource { it.copy(refreshing = false) }
             }
         }
+    }
+
+    /** Credential revocation applies to every QF-derived runtime resource. */
+    internal fun clearRevokedContent() = synchronized(this) {
+        cacheGeneration++
+        blockReadRefresh = true
+        validatedWords = null
+        retryJob?.cancel()
+        retryJob = null
+        refreshJob?.cancel()
+        expiryJob?.cancel()
+        store.clear()
+        cachedState = null
+        parsedToken = null
+        unreadableToken = null
+        parsedWords = emptyMap()
+        parsedBySurah = emptyMap()
+        _diagnostics.update { it.copy(cachedWords = 0) }
+        updateResource { RuntimeCacheResource(lastError = "QF content access was revoked") }
+        _changes.tryEmit(Unit)
+    }
+
+    private fun checkAccessGeneration() {
+        if (activeCacheGeneration != cacheGeneration) throw CancellationException("QF cache was purged during refresh")
     }
 
     private fun currentWords(): Map<String, RuntimeMushafWord>? {
@@ -241,10 +264,13 @@ class RuntimeMushafCache(
             return null
         }
         installParsed(expected, parsed)
-        return parsed.byKey
+        return synchronized(this) {
+            if (cachedState?.token == expected.token && parsedToken == expected.token) parsedWords else null
+        }
     }
 
     private fun validateAppliedContent(changes: List<QfContentChange>) {
+        checkAccessGeneration()
         if (changes.any { it !is QfContentChange.FreshnessMarker }) {
             (store as? QfRuntimeMushafStore)?.rebuildReaderWords(canonicalWords(), expectedQcfPages)
             validatedWords = parseStoredContent()
@@ -306,7 +332,7 @@ class RuntimeMushafCache(
         }
     }
 
-    private fun rememberedState(): QfSyncState? {
+    private fun rememberedState(): QfSyncState? = synchronized(this) {
         cachedState?.let { return it }
         return store.state(FILTER).also { cachedState = it }
     }
@@ -346,6 +372,7 @@ class RuntimeMushafCache(
     }
 
     private fun markRequestsSettled() {
+        checkAccessGeneration()
         _diagnostics.update { it.copy(requestsSettled = true) }
     }
 

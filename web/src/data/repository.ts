@@ -1,6 +1,7 @@
 import { openDatabase, queryAll, queryOne, type LoadProgress } from './database'
 import { pickLemmaGloss, type GlossVote } from './lemmaGloss'
 import { runtimeMushafCache } from './runtimeMushaf'
+import { QF_TIMING_RECITERS, runtimeTimingsCache } from './runtimeTimings'
 import type {
   Ayah,
   Reciter,
@@ -40,6 +41,12 @@ const timingsCache = new Map<string, Map<number, Segment[]>>()
 type TimingCorpus = Record<string, Record<string, number[][]>>
 const timingCorpora = new Map<number, TimingCorpus>()
 const timingCorpusLoads = new Map<number, Promise<void>>()
+runtimeTimingsCache.subscribe((reciterId) => {
+  for (const key of timingsCache.keys()) {
+    if (reciterId == null ? QF_TIMING_RECITERS[Number(key.split(':')[0])]
+      : key.startsWith(`${reciterId}:`)) timingsCache.delete(key)
+  }
+})
 
 export async function ensureReady(
   onProgress?: (p: LoadProgress) => void,
@@ -179,6 +186,7 @@ function mapSegments(rows: number[][]): Segment[] {
 
 /** Fetch one reciter's corpus only when the reader needs highlighting. */
 export function ensureTimings(reciterId: number): Promise<void> {
+  if (QF_TIMING_RECITERS[reciterId]) return runtimeTimingsCache.ensure(reciterId)
   if (timingCorpora.has(reciterId)) return Promise.resolve()
   const pending = timingCorpusLoads.get(reciterId)
   if (pending) return pending
@@ -211,7 +219,10 @@ export function timings(reciterId: number, surahId: number): Map<number, Segment
   if (cached) return cached
 
   const map = new Map<number, Segment[]>()
-  const rows = timingCorpora.get(reciterId)?.[String(surahId)] ?? {}
+  const rows = QF_TIMING_RECITERS[reciterId]
+    ? Object.fromEntries((runtimeTimingsCache.resource(reciterId)?.rows ?? [])
+      .filter((row) => row[0] === surahId).map((row) => [row[1], row[2]]))
+    : timingCorpora.get(reciterId)?.[String(surahId)] ?? {}
   for (const [ayah, segments] of Object.entries(rows)) {
     map.set(Number(ayah), mapSegments(segments))
   }
