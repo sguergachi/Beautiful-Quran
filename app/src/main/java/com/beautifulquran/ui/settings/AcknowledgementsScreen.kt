@@ -58,8 +58,8 @@ internal val ACKNOWLEDGEMENTS = listOf(
     ),
     Acknowledgement(
         title = "Repeat-aware timings",
-        body = "Bundled repeat topology from the quran.com legacy qdc audio API, normalized offline. " +
-            "Written QF permission requested before release.",
+        body = "Quran Foundation authenticated Content Sync, normalized and reviewed " +
+            "against the recitation audio. Kept in a maintained offline cache.",
     ),
     Acknowledgement(
         title = "Recitation audio",

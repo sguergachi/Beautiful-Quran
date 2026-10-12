@@ -214,6 +214,7 @@ class MainActivity : ComponentActivity() {
             }
             val settings by app.settings.settings.collectAsStateWithLifecycle()
             val mushafDiagnostics by app.runtimeMushaf!!.diagnostics.collectAsStateWithLifecycle()
+            val timingStatus by app.runtimeTimings.status.collectAsStateWithLifecycle()
             val mushafStatus = remember(mushafDiagnostics) { app.runtimeMushaf!!.status() }
             val mushafReady = runtimeMushafEntranceReady(mushafStatus, System.currentTimeMillis())
             val mushafProgress = mushafDiagnostics.syncProgress
@@ -244,9 +245,8 @@ class MainActivity : ComponentActivity() {
                         englishOnly = settings.readingMode == ReadingMode.ENGLISH_ONLY,
                     )
             }
-            // The splash releases on the bundled database alone — local work,
-            // seconds on any device. The QF fill streams in behind it from
-            // process start and the leaves pick it up live.
+            // The first authenticated timing fill joins local database warming.
+            // Retained timing copies release immediately on later offline launches.
             //
             // One exception: a mushaf layout that has never held content has
             // no leaf to show until the first fill lands, so the cover holds
@@ -258,9 +258,11 @@ class MainActivity : ComponentActivity() {
                 (mushafStatus.phase == RuntimeCachePhase.EMPTY ||
                     mushafStatus.phase == RuntimeCachePhase.REFRESHING) &&
                 !mushafBookReady
-            val contentReady = databaseReady && !mushafFirstFill
+            val timingFirstFill = !timingStatus.entranceReady
+            val contentReady = databaseReady && !mushafFirstFill && !timingFirstFill
             val contentLoadLabel = when {
                 !databaseReady -> "Caching Quran database"
+                timingFirstFill -> "Downloading recitation timings · ${timingStatus.completed} of ${timingStatus.totalReciters}"
                 else -> when (mushafStatus.phase) {
                     RuntimeCachePhase.REFRESHING -> when {
                         mushafDiagnostics.requestsSettled && mushafStatus.apiCalls > 0 ->
@@ -342,6 +344,7 @@ class MainActivity : ComponentActivity() {
                                 contentReady = contentReady,
                                 loadLabel = contentLoadLabel,
                                 loadProgress = when {
+                                    timingFirstFill -> timingStatus.completed.toFloat() / timingStatus.totalReciters
                                     mushafDiagnostics.requestsSettled -> 1f
                                     else -> mushafProgress?.fraction
                                 },

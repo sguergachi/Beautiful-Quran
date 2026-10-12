@@ -8,7 +8,10 @@ import android.net.Uri
 import androidx.media3.datasource.DataSpec
 import androidx.media3.datasource.DefaultHttpDataSource
 import com.beautifulquran.data.model.Ayah
+import com.beautifulquran.data.model.Reciter
 import com.beautifulquran.data.model.Segment
+import com.beautifulquran.data.observeTimingGeneration
+import com.beautifulquran.data.readStableTimingGeneration
 import com.beautifulquran.playback.RecitationCache
 import com.beautifulquran.playback.Tarji
 import com.beautifulquran.playback.TarjiEarSample
@@ -30,6 +33,8 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.async
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.withContext
 import java.nio.ByteOrder
@@ -193,7 +198,9 @@ internal object TarjiVersePulse {
     enum class Outcome { Done, Failed }
 
     private data class Key(val reciter: Int, val surah: Int, val ayah: Int, val url: String,
-                           val mode: TarjiDetectorMode, val knobs: TarjiLabKnobs, val version: Int = 1)
+                           val mode: TarjiDetectorMode, val knobs: TarjiLabKnobs,
+                           val timingGeneration: Long, val version: Int = 1)
+    private data class ChapterKey(val reciter: Int, val surah: Int, val generation: Long)
     private class Result(val key: Key, val lines: Map<Int, FloatArray>, val windows: Map<Int, Window>,
                          val recording: TarjiRecordingResult?)
 
@@ -216,7 +223,36 @@ internal object TarjiVersePulse {
     private val liveRms = FloatArray(96)
     private val rawEar = TarjiEarSample()
     private var lastAlignmentNanos = 0L
-    private val timings = lru<String, Map<Int, List<Segment>>>(4)
+    private val timings = lru<ChapterKey, Map<Int, List<Segment>>>(4)
+    private val timingGenerations = mutableMapOf<Int, Long>()
+    private val displayed = mutableMapOf<Pair<Int, Int>, Int>()
+
+    /** Main thread: purge only the changed voices, even while their candidate graphs are hidden. */
+    fun timingsChanged(generations: Map<Int, Long>) {
+        val changed = generations.filter { (reciter, generation) -> generation > (timingGenerations[reciter] ?: 0L) }
+        if (changed.isEmpty()) return
+        timingGenerations.putAll(changed)
+        timings.keys.removeAll { it.generation < (changed[it.reciter] ?: it.generation) }
+        results.keys.removeAll { it.timingGeneration < (changed[it.reciter] ?: it.timingGeneration) }
+        recordings.values.removeAll { it.key.timingGeneration < (changed[it.key.reciter] ?: it.key.timingGeneration) }
+        displayed.entries.removeAll { (verse, reciter) ->
+            if (reciter !in changed) false else {
+                InkEngine.clearTarjiTraces(verse.first, verse.second)
+                true
+            }
+        }
+        if (alignedResult?.key?.reciter in changed) {
+            alignedResult = null
+            alignedSession = 0L
+            alignment = TarjiRecordingAlignment()
+            lastAlignmentNanos = 0L
+            recordingStatus = "Recording analysis pending"
+        }
+    }
+
+    /** No recording decisions from an earlier timing generation may reach the live light. */
+    internal fun recordingFor(playing: com.beautifulquran.playback.NowPlaying?, generation: Long): TarjiRecordingResult? =
+        recordings[playing]?.takeIf { it.key.timingGeneration == generation }?.recording
 
     private fun <K, V> lru(limit: Int) = object : LinkedHashMap<K, V>(limit, 0.75f, true) {
         override fun removeEldestEntry(eldest: MutableMap.MutableEntry<K, V>?) = size > limit
@@ -277,39 +313,67 @@ internal object TarjiVersePulse {
         val reciters = quran.repository.reciters()
         val reciter = reciters.firstOrNull { it.id == reciterId } ?: reciters.firstOrNull()
             ?: return failed("$name no reciter")
-        val surahTimings = timings["${reciter.id}|${ayah.surahId}"]
-            ?: quran.repository.timings(reciter.id, ayah.surahId).also { timings["${reciter.id}|${ayah.surahId}"] = it }
-        val segments = surahTimings[ayah.number].orEmpty()
+        return compute(ayah, reciter, { quran.repository.runtimeTimingGeneration(reciter.id) },
+            { quran.repository.timings(reciter.id, ayah.surahId) }, {
+                val url = reciter.audioUrl(ayah.surahId, ayah.number)
+                try {
+                    audio.getOrPut(url) { scope.async { decoders.withPermit { decode(quran, url) } } }.await()
+                } catch (cancelled: kotlinx.coroutines.CancellationException) {
+                    throw cancelled
+                } catch (failed: Throwable) {
+                    audio.remove(url)
+                    throw failed
+                }
+            }, { reciter.id == quran.settings.settings.value.reciterId })
+    }
+
+    /** The production computation with its timing/audio boundaries explicit for JVM regression checks. */
+    internal suspend fun compute(
+        ayah: Ayah,
+        reciter: Reciter,
+        generation: () -> Long,
+        readTimings: suspend () -> Map<Int, List<Segment>>,
+        decodeAudio: suspend () -> Decoded,
+        wanted: () -> Boolean = { true },
+    ): Outcome {
+        if (!wanted()) throw kotlinx.coroutines.CancellationException("retuned")
+        val name = "${ayah.surahId}:${ayah.number}"
+        displayed.remove(ayah.surahId to ayah.number)
+        InkEngine.clearTarjiTraces(ayah.surahId, ayah.number)
+        val timingRead = readStableTimingGeneration(generation) {
+            val chapter = ChapterKey(reciter.id, ayah.surahId, generation())
+            (timings[chapter] ?: readTimings()).also {
+                if (chapter.generation == generation()) timings[chapter] = it
+            }
+        }
+        if (!wanted()) throw kotlinx.coroutines.CancellationException("retuned")
+        timingsChanged(mapOf(reciter.id to timingRead.generation))
+        val segments = timingRead.segments[ayah.number].orEmpty()
         if (segments.isEmpty()) return failed("$name has no word timings for ${reciter.name}")
         val url = reciter.audioUrl(ayah.surahId, ayah.number)
         val tuning = InkEngine.tuning
         val knobs = detectorKnobs(tuning)
         val mode = InkEngine.tarjiDetectorMode
-        val key = Key(reciter.id, ayah.surahId, ayah.number, url, mode, knobs)
-        InkEngine.clearTarjiTraces(ayah.surahId, ayah.number)
+        val key = Key(reciter.id, ayah.surahId, ayah.number, url, mode, knobs, timingRead.generation)
+        fun checkCurrent() {
+            if (!wanted() || generation() != key.timingGeneration || mode != InkEngine.tarjiDetectorMode ||
+                knobs != detectorKnobs(InkEngine.tuning)) throw kotlinx.coroutines.CancellationException("retuned")
+        }
+        checkCurrent()
         results[key]?.let { apply(ayah, it); return Outcome.Done }
-        val app = context.applicationContext
         working++
         try {
-            val decoded = audio.getOrPut(url) {
-                scope.async { decoders.withPermit { decode(app, url) } }
-            }
-            val heard = try {
-                decoded.await()
-            } catch (cancelled: kotlinx.coroutines.CancellationException) {
-                throw cancelled
-            } catch (failed: Throwable) {
-                audio.remove(url) // let a later request fetch it again
-                throw failed
-            }
+            val heard = decodeAudio()
+            checkCurrent()
             val result = withContext(Dispatchers.Default) {
                 val job = coroutineContext[Job]
                 val windows = windows(ayah, segments, heard.pcm.size / heard.hopSamples * heard.hopMs)
-                val prepared = prepare(heard, knobs, windows.values.toList(), mode, reciter.id) { job?.isActive != false }
+                val prepared = prepare(heard, knobs, windows.values.toList(), mode, reciter.id) {
+                    job?.isActive != false && wanted() && generation() == key.timingGeneration
+                }
                 Result(key, windows.keys.zip(prepared.lines).toMap(), windows, prepared.recording)
             }
-            if (mode != InkEngine.tarjiDetectorMode || knobs != detectorKnobs(InkEngine.tuning) ||
-                reciter.id != quran.settings.settings.value.reciterId) throw kotlinx.coroutines.CancellationException("retuned")
+            checkCurrent()
             results[key] = result
             apply(ayah, result)
             val strongest = result.lines.maxByOrNull { (_, line) -> line.maxOfOrNull { kotlin.math.abs(it) } ?: 0f }
@@ -324,6 +388,7 @@ internal object TarjiVersePulse {
         } catch (cancelled: kotlinx.coroutines.CancellationException) {
             throw cancelled
         } catch (failed: Throwable) {
+            checkCurrent()
             return failed("$name ${failed.javaClass.simpleName}: ${failed.message}")
         } finally {
             working--
@@ -340,6 +405,7 @@ internal object TarjiVersePulse {
         TarjiLabKnobs.fromTuning(tuning).copy(glintBrightness = 1f)
 
     private fun apply(ayah: Ayah, result: Result) {
+        if (result.lines.isNotEmpty()) displayed[ayah.surahId to ayah.number] = result.key.reciter
         if (result.recording != null) recordings[com.beautifulquran.playback.NowPlaying(
             ayah.surahId, ayah.number, result.key.reciter,
         )] = result
@@ -362,8 +428,8 @@ internal object TarjiVersePulse {
             sampledTuning = InkEngine.tuning
             sampledKnobs = detectorKnobs(InkEngine.tuning)
         }
-        val recording = result?.recording
-        if (!heard || !voice.isPlaying || recording == null || result.key.knobs != sampledKnobs ||
+        val recording = recordingFor(playing, playing?.let { app.repository.runtimeTimingGeneration(it.reciterId) } ?: 0L)
+        if (!heard || !voice.isPlaying || result == null || recording == null || result.key.knobs != sampledKnobs ||
             out.mediaMs == Long.MIN_VALUE) {
             recordingStatus = if (working > 0) "Analyzing recording…" else "Recording analysis pending"
             return false
@@ -568,9 +634,13 @@ internal fun RequestTarjiPulseLines(ayah: Ayah, active: Boolean = false) {
     val tuning = InkEngine.tuning
     // Only what the detector reads: a paint dial must not redo the verse.
     val knobs = TarjiVersePulse.detectorKnobs(tuning)
-    val reciterId = (context.applicationContext as? com.beautifulquran.QuranApp)
-        ?.settings?.settings?.collectAsState()?.value?.reciterId
-    androidx.compose.runtime.LaunchedEffect(ayah, knobs, reciterId, mode) {
+    val app = context.applicationContext as? com.beautifulquran.QuranApp
+    val reciterId = app?.settings?.settings?.collectAsState()?.value?.reciterId
+    val timingGeneration = androidx.compose.runtime.remember(app) {
+        app?.runtimeTimings?.changes?.observeTimingGeneration(app.settings.settings.map { it.reciterId })
+            ?.map { it.second } ?: flowOf(0L)
+    }.collectAsState(app?.repository?.runtimeTimingGeneration(reciterId ?: 0) ?: 0L).value
+    androidx.compose.runtime.LaunchedEffect(ayah, knobs, reciterId, mode, timingGeneration) {
         InkEngine.clearTarjiTraces(ayah.surahId, ayah.number)
         // A dial being dragged changes the key every frame; wait for it to
         // rest before doing anything, and let the restart cancel the rest.
