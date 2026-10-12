@@ -1,5 +1,7 @@
 package com.beautifulquran.ui.reader
 
+import com.beautifulquran.domain.EnglishWordAlignment
+import com.beautifulquran.domain.EnglishLeafVerse
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -13,6 +15,75 @@ class EnglishWashBandsTest {
 
     /** A sentence occupying characters 10..109 of the paragraph. */
     private val sentence = 10..109
+
+    @Test
+    fun `stale glow cannot survive ahead of a backward seek but repeat history can`() {
+        fun visible(word: ActiveWord, fadingPositions: List<Int>) = fadingPositions.filter { position ->
+            englishInkLayerAllowed(InkEngine.word(position, word, isActiveAyah = true, dimmed = false).state)
+        }
+        val seek = ActiveWord(ayah = 31, wordPosition = 5, durationMs = 100, activation = 1)
+        assertEquals(listOf(5), visible(seek, listOf(5, 27)))
+        val repeat = seek.copy(wordPosition = 34, highWater = 35, isRepeat = true, repeatStart = 34)
+        assertEquals(listOf(34, 35), visible(repeat, listOf(34, 35, 37)))
+    }
+
+    @Test
+    fun `a later spoken meaning fills every intervening English word`() {
+        val reported = javaClass.getResourceAsStream("/english-alignment.tsv")!!.bufferedReader()
+            .use { it.readLines().first { line -> line.startsWith("24:31\t") } }.split('\t')
+        for ((text, glosses) in listOf(
+            "Allah has set a seal" to listOf("has set a seal", "Allah"),
+            "their husbands' fathers, their husbands' sons" to
+                listOf("fathers", "of their husbands", "sons", "of their husbands"),
+            reported[1] to reported[2].split('|'),
+        )) {
+            val alignment = EnglishWordAlignment.align(text, glosses)!!
+            val spans = englishOwnedSpans(text.indices, alignment, text = text)
+            for (position in glosses.indices) {
+                val lit = spans.filter { it.position <= position + 1 }.flatMap { it.range.toList() }
+                assertEquals("$text at Arabic word ${position + 1}",
+                    text.indices.take((lit.lastOrNull() ?: -1) + 1), lit)
+            }
+        }
+    }
+
+    @Test
+    fun `a reordered wash remains continuous when asides are hidden and a verse is carried`() {
+        val source = "a [very] painful punishment"
+        val alignment = EnglishWordAlignment.align(source, listOf("a punishment", "painful"))!!
+        val whole = EnglishLeafVerse(2, 10, "a painful punishment", source = source)
+        val spans = englishOwnedSpans(whole.text.indices, alignment, whole::fragmentInkProgress, whole.text)
+        assertEquals(whole.text.indices, spans.single().range)
+        assertEquals(1, spans.single().position)
+    }
+
+    @Test
+    fun `ownership projects onto printed ranges without restoring English order`() {
+        val text = "Allah has set a seal"
+        val alignment = EnglishWordAlignment.align(text, listOf("has set a seal", "Allah"))!!
+        val spans = englishOwnedSpans(text.indices, alignment, text = text, forwardWash = false)
+        assertEquals(listOf(2, 1), spans.map { it.position })
+        assertEquals(text.indices.toList(), spans.flatMap { it.range.toList() })
+        assertEquals("Allah", text.substring(spans.first().range))
+        assertEquals(" has set a seal", text.substring(spans.last().range))
+    }
+
+    @Test
+    fun `ownership survives removed asides and a carried fragment`() {
+        val source = "a [very] painful punishment"
+        val alignment = EnglishWordAlignment.align(source, listOf("a punishment", "painful"))!!
+        val whole = EnglishLeafVerse(2, 10, "a painful punishment", source = source)
+        val spans = englishOwnedSpans(whole.text.indices, alignment, whole::fragmentInkProgress, whole.text, forwardWash = false)
+        val punishment = spans.first { it.position == 1 && whole.text.substring(it.range).contains("punishment") }
+        assertTrue(whole.text.substring(punishment.range).contains("punishment"))
+        val carried = EnglishLeafVerse(
+            2, 10, "punishment", from = source.indexOf("punishment"), to = source.length,
+            verseLength = source.length, textFrom = source.indexOf("punishment"), source = source,
+        )
+        val overleaf = englishOwnedSpans(carried.text.indices, alignment, carried::fragmentInkProgress, carried.text)
+        assertEquals(listOf(1), overleaf.map { it.position })
+        assertEquals(carried.text.indices, overleaf.single().range)
+    }
 
     @Test
     fun `the bands tile the sentence with no gap and no overlap`() {

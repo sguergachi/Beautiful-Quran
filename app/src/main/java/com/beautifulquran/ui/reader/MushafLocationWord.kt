@@ -8,5 +8,5 @@ internal fun mushafLocationWord(
     playingAyah: Int?,
     inkId: Long,
 ): ActiveWord? = word ?: lastWord?.takeIf {
-    !it.fromTap && it.ayah == playingAyah && it.activation == inkId
+    !it.fromTap && it.ayah == playingAyah && it.playbackActivation == inkId
 }

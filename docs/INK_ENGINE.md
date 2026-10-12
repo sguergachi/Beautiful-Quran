@@ -486,7 +486,16 @@ tween-vs-snap rules, sweep entry and residual rules, repeat wash timing, the
   location through the silent tail, so a carried verse does not jump back to
   its opening leaf when the live word becomes null. That location is released
   on a playlist change or a new seek/repeat generation; the wash still reads
-  only the live word. A leaf reached by hand stays fully readable, even
+  only the live word. A tap can pin the wash's activation to its optimistic
+  seed; location retention checks the heard word's original playback generation
+  instead. Media3 publishes the verse and discontinuity generation together,
+  so the next verse never briefly inherits the outgoing verse's opening leaf.
+  Finishing a carried verse, its silent tail, and the next
+  verse beginning on the same leaf must all name that leaf; there is no turn
+  back to the completed verse's opening leaf. Word-to-leaf lookup uses the same
+  English alignment for follow, voice ownership, and tap-hold release, including
+  when the animated Back/Next transport is present.
+  A leaf reached by hand stays fully readable, even
   while playback continues elsewhere. A leaf follow is about to turn onto
   waits under Upcoming paper *before* the paper moves, so the turn never
   reveals a finished page; once the voice arrives the usual wash fills it.

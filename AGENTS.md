@@ -237,6 +237,16 @@ python3 tools/test_build_db.py  # timing pipeline regressions (~1s, no Gradle)
    is a good outcome; quietly relaxing it is not. Worked example — a check that
    looks wrong and isn't: [docs/CHESTERTON.md](docs/CHESTERTON.md).
 
+10. **Never skip highlighting words.** This is a core product rule for Arabic
+    and English, on Android and web. The forward wash must remain continuous:
+    never highlight a later word while leaving an intervening word unhighlighted.
+    When spoken Arabic maps to a later English word because of sentence order,
+    advance the wash through that meaning and every English word before it.
+    Prioritize the meaning being heard; preserve the soft leading edge required
+    by invariant #7. Glimmer, repeat tint, seeks, and page transitions must never
+    create gaps in the underlying wash. Any highlighting change must preserve
+    this rule and test reordered phrases and interrupted playback.
+
 ## Landing Timings Lab / GitHub timing patches
 
 When the user asks to "fix the timing issue", "apply the timings patch", or

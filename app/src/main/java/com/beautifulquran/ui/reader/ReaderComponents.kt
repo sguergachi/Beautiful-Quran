@@ -284,6 +284,15 @@ internal fun tapHitsRange(offset: Int, range: IntRange, textLength: Int): Boolea
     return offset == textLength && range.last == textLength - 1
 }
 
+/** A wrapped range's bounding rectangle must not steal another range's glyph. */
+internal fun inlineRangeIndexAt(
+    offset: Int,
+    ranges: List<IntRange>,
+    textLength: Int,
+    geometricHit: () -> Int,
+): Int = ranges.indexOfFirst { tapHitsRange(offset, it, textLength) }
+    .takeIf { it >= 0 } ?: geometricHit()
+
 /** True when [tap] falls inside the glyph bounds of [range], inflated by [hitSlopPx]. */
 internal fun TextLayoutResult.rangeContains(
     tap: Offset,
@@ -333,7 +342,9 @@ internal fun TextLayoutResult.wordIndexAt(
     tap: Offset,
     ranges: List<IntRange>,
     hitSlopPx: Float,
-): Int = ranges.indexOfFirst { rangeContains(tap, it, hitSlopPx) }
+): Int = inlineRangeIndexAt(getOffsetForPosition(tap), ranges, layoutInput.text.length) {
+    ranges.indexOfFirst { rangeContains(tap, it, hitSlopPx) }
+}
 
 private fun Rect.expandToInclude(other: Rect): Rect =
     Rect(

@@ -25,8 +25,18 @@ class MushafLocationWordTest {
     }
 
     @Test
+    fun `the last word keeps its player generation when a tap pins its wash generation`() {
+        val polled = ActiveWord(ayah = 29, wordPosition = 17, durationMs = 500, activation = 9)
+        val shown = resolveActiveWord(polled, null, last)!!
+        assertEquals(8, shown.activation)
+        assertEquals(9, shown.playbackActivation)
+        assertEquals(shown, mushafLocationWord(null, shown, 29, 9))
+        assertNull(mushafLocationWord(null, shown, 29, 10))
+    }
+
+    @Test
     fun `the live word still owns the location during a seek handoff`() {
-        val current = last.copy(wordPosition = 2, activation = 9, fromTap = true)
+        val current = last.copy(wordPosition = 2, activation = 9, playbackActivation = 9, fromTap = true)
         assertEquals(current, mushafLocationWord(current, last, 29, 8))
     }
 }
