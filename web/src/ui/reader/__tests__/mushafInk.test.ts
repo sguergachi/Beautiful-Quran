@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { ActiveWord } from '../../../data/models'
 import { InkState } from '../InkEngine'
-import { MUSHAF_INK_IDLE, mushafMarkWaits, mushafTokenInk, type MushafInk } from '../mushafInk'
+import { MUSHAF_INK_IDLE, mushafMarkWaits, mushafReadHistory, mushafTokenInk, type MushafInk } from '../mushafInk'
 
 const word = (ayah: number, wordPosition: number, extra: Partial<ActiveWord> = {}): ActiveWord => ({
   ayah,
@@ -29,6 +29,24 @@ const state = (token: ReturnType<typeof at>, ink: MushafInk, live = true) =>
   mushafTokenInk(token, 2, ink, live).state
 
 describe('mushaf leaf ink', () => {
+  it('retains earlier verses but covers a restarted verse before its new first word', () => {
+    for (let target = 2; target <= 12; target++) {
+      let history = mushafReadHistory({ ayah: null, activation: 0, read: false }, target, 7, true)
+      history = mushafReadHistory(history, target, 7, false)
+      expect(state(at(target, 1), voice({ inkAyah: target, leadAyah: target, activeWord: null, inkAyahRead: history.read })))
+        .toBe(InkState.Recited)
+      history = mushafReadHistory(history, target, 8, false)
+      const restarted = voice({ inkAyah: target, leadAyah: target, activeWord: null, inkAyahRead: history.read })
+      for (let ayah = 1; ayah <= 13; ayah++) {
+        expect(state(at(ayah, 1), restarted)).toBe(ayah < target ? InkState.Plain : InkState.Upcoming)
+      }
+      history = mushafReadHistory(history, target, 8, true)
+      history = mushafReadHistory(history, target, 8, false)
+      expect(history.read).toBe(true)
+      expect(mushafReadHistory(history, target + 1, 8, false).read).toBe(false)
+    }
+  })
+
   it('runs the karaoke wash through the voiced verse', () => {
     const ink = voice({})
     expect(state(at(5, 2), ink)).toBe(InkState.Recited)

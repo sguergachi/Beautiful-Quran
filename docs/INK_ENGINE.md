@@ -483,7 +483,13 @@ tween-vs-snap rules, sweep entry and residual rules, repeat wash timing, the
   supplies the ink frontier ahead of fade-led focus. A missing or stale focus
   used to re-cover completed or outgoing verses, or uncover future verses at a
   repeat, so the first-word cover gate still holds the incoming verse until its
-  timing arrives. Voice ownership and follow retain the last heard word's
+  timing arrives. The first-word gate remembers the heard
+  playback generation, so a seek or repeat of the same verse waits anew;
+  an optimistic tap seed cannot establish that the new voice has arrived.
+  Web publishes its ink activation even with no active word and applies the
+  same generation rule. Reproducible timing, ownership and page-cut checks
+  are recorded in [ENGLISH_ALIGNMENT_COVERAGE.md](ENGLISH_ALIGNMENT_COVERAGE.md).
+  Voice ownership and follow retain the last heard word's
   location through the silent tail, so a carried verse does not jump back to
   its opening leaf when the live word becomes null. That location is released
   on a playlist change or a new seek/repeat generation; the wash still reads

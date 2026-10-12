@@ -9,3 +9,13 @@ internal fun mushafInkFrontier(
     fadeLedAyah: Int?,
     playingAyah: Int?,
 ): Int? = activeWordAyah ?: playingAyah ?: fadeLedAyah
+
+/** A null word is a completed tail only after this playback generation spoke. */
+internal fun mushafAwaitingFirstWord(
+    activeWordAyah: Int?,
+    frontierAyah: Int?,
+    playingAyah: Int?,
+    inkId: Long,
+    heardInkId: Long?,
+): Boolean = activeWordAyah == null &&
+    (frontierAyah != playingAyah || heardInkId != inkId)

@@ -1862,16 +1862,24 @@ internal fun MushafPageInkClocks(
     }
     val voice = playback.value
     val frontierAyah = mushafInkFrontier(activeWordAyah, voice.activeAyah, voice.playingAyah)
-    var playingAyahHasWord by remember(voice.playingAyah) { mutableStateOf(false) }
-    if (!playingAyahHasWord && activeWordAyah != null && activeWordAyah == voice.playingAyah) {
-        SideEffect { playingAyahHasWord = true }
+    val arrivedInkId by remember {
+        derivedStateOf {
+            activeWordState.value?.takeIf {
+                !it.fromTap && it.ayah == playback.value.playingAyah
+            }?.playbackActivation
+        }
+    }
+    var heardInkId by remember(voice.playingAyah) { mutableStateOf<Long?>(null) }
+    if (arrivedInkId == voice.inkId && heardInkId != arrivedInkId) {
+        SideEffect { heardInkId = arrivedInkId }
     }
     // Media3 advances the playlist item before the 33 ms word poll reaches
     // that item's first timing. Keep its frontier under Upcoming paper during
     // that silence. Once a word has appeared, a later null is the audio tail
     // and the completed ayah must retain full ink instead of dimming again.
-    val frontierWaitingForFirstWord = activeWordAyah == null &&
-        (frontierAyah != voice.playingAyah || !playingAyahHasWord)
+    val frontierWaitingForFirstWord = mushafAwaitingFirstWord(
+        activeWordAyah, frontierAyah, voice.playingAyah, voice.inkId, heardInkId,
+    )
     ayahs.forEach { ayah ->
         key(ayah.surahId, ayah.number) {
             val activeWord by remember(ayah.number) {

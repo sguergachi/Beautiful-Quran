@@ -237,9 +237,6 @@ object EnglishWordAlignment {
         // "Glad" means "good" in this phrase, not wherever either adjective occurs.
         for (j in 0 until out.lastIndex) {
             if (out[j].text == "glad" && out[j + 1].text in setOf("tiding", "tidings")) out[j].key = "good"
-            // Iqamah is printed "performance of prayer"; prayer keeps its own head.
-            if (out[j].text == "performance" && out[j + 1].text == "of" &&
-                out.getOrNull(j + 2)?.key == "prayer") out[j].key = "establish"
         }
         // Drawing a headcover over the chest is translated as wrapping it;
         // "draw" and "wrap" are not interchangeable outside that phrase.
@@ -264,6 +261,22 @@ object EnglishWordAlignment {
             }
         }.map { it.first }.toSet()
         return words(text, phrases).also { prose ->
+            // The divine title is distinct from a nearby verb "knows".
+            if ("omniscient" in keys && spoken.none { it.text in setOf("knowing", "knower") }) {
+                prose.filter { it.text in setOf("knowing", "knower") }.forEach { it.key = "omniscient" }
+            }
+            // Iqamah can be printed "performance of prayer". Keep a literal
+            // performance when supplied, and leave prayer with its own head.
+            val literalPerformance = glosses.any { gloss ->
+                words(gloss).filter { !it.added && it.text !in GRAMMAR }
+                    .singleOrNull()?.key == inflection("performance")
+            }
+            if ("establish" in keys && !literalPerformance) {
+                for (j in 0 until prose.lastIndex) {
+                    if (prose[j].text == "performance" && prose[j + 1].text == "of" &&
+                        prose.getOrNull(j + 2)?.key == "prayer") prose[j].key = "establish"
+                }
+            }
             // The conditional "you come" can be printed "you brought".
             // A literal bring gloss must keep its own meaning and context.
             if (inflection("come") in keys && inflection("bring") !in keys) {
@@ -288,7 +301,8 @@ object EnglishWordAlignment {
                 val matches = printed[key] ?: continue
                 if (indices.size < 2 || indices.size != matches.size ||
                     indices.map { owner[it] }.distinct().size != indices.size ||
-                    matches.map { it.sentence }.distinct().size != 1) continue
+                    (matches.map { it.sentence }.distinct().size != 1 &&
+                        gloss[indices.first()].key !in NAMED_MEANINGS)) continue
                 // Exact distinct forms already distinguish an inversion:
                 // "approached the Approaching Day" must keep those forms.
                 if (byMeaning && indices.groupingBy { literal(gloss[it].text) }.eachCount() ==
@@ -600,6 +614,7 @@ object EnglishWordAlignment {
         "scripture" to "book", "manifest" to "evident",
         "deity" to "god", "deities" to "god", "gods" to "god",
         "work" to "deed", "forceful" to "firm", "appropriate" to "suitable",
+        "establishment" to "establish",
         "scoff" to "mock", "ridicule" to "mock", "ridicul" to "mock", "purest" to "best",
         "faction" to "group", "party" to "group",
         "shaitaan" to "satan", "shaitan" to "satan", "shaytan" to "satan",
@@ -614,6 +629,7 @@ object EnglishWordAlignment {
 
     private val PHRASES = mapOf(
         "private parts" to "chastity", "head covers" to "headcover", "all aware" to "acquaint",
+        "all knower" to "omniscient", "all knowing" to "omniscient",
         "exalted in might" to "mighty", "all mighty" to "mighty",
         "entirely merciful" to "gracious", "most gracious" to "gracious",
         "especially merciful" to "merciful", "most merciful" to "merciful",
@@ -632,6 +648,14 @@ object EnglishWordAlignment {
         "seems suitable" to "please", "seek to hasten" to "impatient",
         "my way" to "mycause", "my cause" to "mycause",
     ).map { (phrase, key) -> phrase.split(' ') to inflection(key) }
+
+    // Names retain their identity across clauses; ordinary repeated content
+    // remains sentence-bounded (the two different burdens in 2:286).
+    private val NAMED_MEANINGS = setOf(
+        "moses", "noah", "abraham", "pharaoh", "mary", "jesus", "joseph", "lot", "david",
+        "solomon", "jonah", "isaac", "jacob", "ishmael", "aaron", "zechariah", "john",
+        "elijah", "job", "torah", "gospel", "satan", "god",
+    ).map(::inflection).toSet()
 
     /** Complements/intensity the prose can leave implicit in the matched gloss head. */
     private val GLOSS_SUPPLEMENTS = setOf(

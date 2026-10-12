@@ -130,6 +130,8 @@ export interface AppState {
   content: SurahContent | null
   player: PlayerState
   activeWord: ActiveWord | null
+  /** Playback generation, available even before the first word of a restart. */
+  inkActivation: number
   activeAyah: number | null
   activeBasmalah: boolean
   hasTimings: boolean
@@ -246,6 +248,7 @@ class AppStore {
     content: null,
     player: player.getState(),
     activeWord: null,
+    inkActivation: 0,
     activeAyah: null,
     activeBasmalah: false,
     hasTimings: false,
@@ -1343,6 +1346,9 @@ class AppStore {
       this.inkActivation++
     }
     this.lastInkClockMs = highlightPositionMs
+    if (this.state.inkActivation !== this.inkActivation) {
+      this.state = { ...this.state, inkActivation: this.inkActivation }
+    }
     const next = readerHighlightState(
       {
         ayah: np.ayah,

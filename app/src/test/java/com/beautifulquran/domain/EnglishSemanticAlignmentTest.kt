@@ -7,6 +7,32 @@ import org.junit.Test
 /** Fixed meaning correspondences, including words a literal diagnostic cannot judge. */
 class EnglishSemanticAlignmentTest {
     @Test
+    fun `reordered names across clauses and a title beside knows keep their exact owners`() {
+        verifyCases("english-identity-owners.tsv", 14)
+    }
+
+    @Test
+    fun `a divine title cannot absorb an ordinary knowing head`() {
+        val text = "Knowing and those knowing"
+        val alignment = EnglishWordAlignment.align(text, listOf("All-Knower", "and", "those knowing"))!!
+        assertEquals(3, alignment.positionAt(0.9f))
+    }
+
+    @Test
+    fun `shared source phrases stay visible in the audit without inventing exact tap owners`() {
+        verifyCases("english-shared-owners.tsv", 21, exact = false)
+        for (row in javaClass.getResourceAsStream("/english-shared-owners.tsv")!!.bufferedReader().use { it.readLines() }) {
+            val (_, text, glosses, targets) = row.split('\t')
+            for (target in targets.split('|')) {
+                val (word, occurrence, _) = Regex("(.+?)(?:#(\\d+))?=(\\d+)").matchEntire(target)!!.destructured
+                val at = Regex("\\b${Regex.escape(word)}\\b", RegexOption.IGNORE_CASE).findAll(text)
+                    .elementAt((occurrence.toIntOrNull() ?: 1) - 1).range.first
+                assertNull(target, EnglishWordAlignment.ownerAt(text, glosses.split('|'), at + word.length / 2))
+            }
+        }
+    }
+
+    @Test
     fun `prayer performance and establishment keep their separately spoken heads`() {
         verifyCases("english-prayer-alignment.tsv", 2)
     }
@@ -16,6 +42,18 @@ class EnglishSemanticAlignmentTest {
         assertNull(EnglishWordAlignment.ownerAt(
             "performance of work and prayer", listOf("establishing", "of work", "and", "prayer"), 3,
         ))
+    }
+
+    @Test
+    fun `prayer performance recognizes action glosses and preserves a literal performance`() {
+        val text = "performance of prayer"
+        for (action in listOf("establishing", "establishment", "performance")) {
+            val glosses = listOf(action, "the prayer")
+            assertEquals(action, 0, EnglishWordAlignment.ownerAt(text, glosses, 3))
+            val alignment = EnglishWordAlignment.align(text, glosses)!!
+            assertEquals(action, 1, alignment.positionAt(0.1f))
+            assertEquals(action, 2, alignment.positionAt(0.9f))
+        }
     }
 
     @Test

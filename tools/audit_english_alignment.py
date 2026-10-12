@@ -21,6 +21,8 @@ parser.add_argument("--baseline-ends", type=Path, help="Optional TSV of verse_ke
 parser.add_argument("--semantic-cases", type=Path, action="append", help="Annotated TSV: verse_key, translation, glosses, word=owner; repeatable")
 parser.add_argument("--spoken-cases", type=Path, action="append", help="Same TSV, checking the full printed meaning has washed by its Arabic owner")
 parser.add_argument("--meaning-cases", type=Path, help="TSV of printed regex, Arabic root, lemma, and gloss cue; * means unrestricted")
+parser.add_argument("--strict-meaning-owners", action="store_true", help="Fail on any QAC meaning-owner disagreement, even if the wash reaches it early")
+parser.add_argument("--word-by-word", action="store_true", help="Audit the actual lyricized word-card text as the second English source")
 args = parser.parse_args()
 root = args.output_dir
 root.mkdir(parents=True, exist_ok=True)
@@ -31,24 +33,42 @@ import java.io.File
 import kotlin.math.roundToInt
 fun main(args: Array<String>) {
     File(args[0]).forEachLine { line ->
-        val (key, text, gloss) = line.split('\t')
+        val columns = line.split('\t')
+        val (key, published, gloss) = columns
+        val text = if (args.size > 1) com.beautifulquran.domain.EnglishTypography.lyricize(
+            gloss.split('|'), columns[3].split('|'),
+        ).filter { it.isNotBlank() }.joinToString(" ") else published
         val alignment = EnglishWordAlignment.align(text, gloss.split('|')) ?: error(key)
         fun encode(spans: List<com.beautifulquran.domain.EnglishWordSpan>) = spans.joinToString(";") {
             "${(it.from * text.length).roundToInt()},${(it.to * text.length).roundToInt()},${it.position}"
         }
-        println(key + "\t" + encode(alignment.spans) + "\t" + encode(alignment.washSpans))
+        println(key + (if (args.size > 1) "\t$text\t$gloss" else "") +
+            "\t" + encode(alignment.spans) + "\t" + encode(alignment.washSpans))
     }
 }
 '''
 with tempfile.TemporaryDirectory(prefix="english-alignment-audit-") as temporary:
     directory = Path(temporary)
+    input_corpus = args.corpus
+    if args.word_by_word:
+        with sqlite3.connect(f'file:{source.parents[5]/"data/quran.db"}?mode=ro', uri=True) as db:
+            arabic = collections.defaultdict(list)
+            for surah, ayah, text in db.execute('select surah_id,ayah_number,arabic from words order by surah_id,ayah_number,position'):
+                arabic[f'{surah}:{ayah}'].append(text)
+        input_corpus = directory / 'input.tsv'
+        input_corpus.write_text('\n'.join(line + '\t' + '|'.join(arabic[line.split('\t')[0]])
+                                         for line in args.corpus.read_text().splitlines()) + '\n')
     (directory / "Probe.kt").write_text(probe)
     sources = [source / f for f in ("domain/EnglishWordAlignment.kt", "domain/EnglishTypography.kt",
                                    "domain/ArabicNormalize.kt", "data/model/Models.kt")]
     subprocess.run(["kotlinc", *map(str, sources), str(directory / "Probe.kt"),
                     "-include-runtime", "-d", str(directory / "probe.jar")], check=True)
-    result = subprocess.run(["java", "-jar", str(directory / "probe.jar"), str(args.corpus)],
+    result = subprocess.run(["java", "-jar", str(directory / "probe.jar"), str(input_corpus), *(["lyricize"] if args.word_by_word else [])],
                             capture_output=True, text=True, check=True)
+    if args.word_by_word:
+        rows = [line.split('\t') for line in result.stdout.splitlines()]
+        (root / 'corpus.tsv').write_text('\n'.join('\t'.join(row[:3]) for row in rows) + '\n')
+        result.stdout = '\n'.join('\t'.join((row[0], *row[3:])) for row in rows) + '\n'
     (root / "ownership.tsv").write_text(result.stdout)
 
 stop = set("""
@@ -74,7 +94,7 @@ def tokens(text):
         out.append((k,match.start(),match.end(),depth>0))
     return out
 
-rows=[line.split('\t') for line in args.corpus.read_text().splitlines()]
+rows=[line.split('\t') for line in ((root / 'corpus.tsv') if args.word_by_word else args.corpus).read_text().splitlines()]
 def decode(encoded):
     return [tuple(map(int,span.split(','))) for span in encoded.split(';')]
 
@@ -179,3 +199,5 @@ print('OWNERSHIP (literal diagnostic, not semantic accuracy):', dict(counts))
 print(f"Literal agreement: {counts['on_owner']/counts['literal_correspondences']:.3%}; semantic accuracy unverified")
 if counts['meaning_wash_delays']:
     raise SystemExit(f"{counts['meaning_wash_delays']} meanings highlighted late; see meaning-issues.tsv")
+if args.strict_meaning_owners and counts['meaning_owner_disagreement']:
+    raise SystemExit(f"{counts['meaning_owner_disagreement']} meanings have approximate owners; see meaning-issues.tsv")

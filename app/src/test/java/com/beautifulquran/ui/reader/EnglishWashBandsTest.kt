@@ -2,6 +2,9 @@ package com.beautifulquran.ui.reader
 
 import com.beautifulquran.domain.EnglishWordAlignment
 import com.beautifulquran.domain.EnglishLeafVerse
+import com.beautifulquran.domain.EnglishVerseRun
+import com.beautifulquran.domain.englishLeaf
+import com.beautifulquran.domain.englishLeafBreak
 import com.beautifulquran.domain.HighlightEngine
 import com.beautifulquran.data.model.Segment
 import org.junit.Assert.assertEquals
@@ -14,6 +17,45 @@ import org.junit.Test
  * `englishVerseBlooms`.
  */
 class EnglishWashBandsTest {
+    @Test
+    fun `reported meanings keep their owners at every eligible carried leaf cut`() {
+        val resources = listOf("english-prayer-alignment.tsv", "english-semantic-heads.tsv", "english-identity-owners.tsv")
+        for (resource in resources) for (row in javaClass.getResourceAsStream("/$resource")!!
+            .bufferedReader().use { it.readLines() }) {
+            val (key, source, glosses, targets) = row.split('\t')
+            val alignment = EnglishWordAlignment.align(source, glosses.split('|'))!!
+            val cuts = source.indices.filter { source[it].isWhitespace() }
+                .map { englishLeafBreak(source, it) }.distinct().filter { it in 1 until source.length }
+            for (cut in cuts) for ((from, to) in listOf(0 to cut, cut to source.length)) {
+                val fragment = englishLeaf(1, listOf(EnglishVerseRun(2, 1, from, to))) { _, _ -> source }
+                    .verses.single()
+                val owned = englishOwnedSpans(fragment.text.indices, alignment, fragment::fragmentInkProgress,
+                    fragment.text, forwardWash = false)
+                val wash = englishOwnedSpans(fragment.text.indices, alignment, fragment::fragmentInkProgress, fragment.text)
+                for (spans in listOf(owned, wash)) {
+                    assertEquals("$key cut=$cut", 0, spans.first().range.first)
+                    assertEquals(fragment.text.lastIndex, spans.last().range.last)
+                    spans.zipWithNext().forEach { (a, b) -> assertEquals(a.range.last + 1, b.range.first) }
+                }
+                for (position in 1..glosses.split('|').size) {
+                    val lit = wash.filter { it.position <= position }
+                    if (lit.isNotEmpty()) assertEquals("$key cut=$cut at=$position", 0, lit.first().range.first)
+                }
+                for (target in targets.split('|')) {
+                    val (word, occurrence, owner) = Regex("(.+?)(?:#(\\d+))?=(\\d+)").matchEntire(target)!!.destructured
+                    val pattern = Regex("\\b${Regex.escape(word)}\\b", RegexOption.IGNORE_CASE)
+                    val matches = pattern.findAll(source).toList()
+                    val expected = matches[(occurrence.toIntOrNull() ?: 1) - 1]
+                    if (expected.range.first < from || expected.range.last >= to) continue
+                    val index = matches.filter { it.range.first >= from && it.range.last < to }.indexOf(expected)
+                    val printed = pattern.findAll(fragment.text).elementAt(index)
+                    val middle = printed.range.first + word.length / 2
+                    assertEquals("$key $target cut=$cut", owner.toInt(), owned.single { middle in it.range }.position)
+                }
+            }
+        }
+    }
+
 
     /** A sentence occupying characters 10..109 of the paragraph. */
     private val sentence = 10..109
