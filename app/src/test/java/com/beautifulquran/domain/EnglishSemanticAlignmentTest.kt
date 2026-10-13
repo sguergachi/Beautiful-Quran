@@ -11,6 +11,56 @@ import org.junit.Test
 /** Fixed meaning correspondences, including words a literal diagnostic cannot judge. */
 class EnglishSemanticAlignmentTest {
     @Test
+    fun `a paraphrased shared verb phrase cannot be pushed beyond its subject`() {
+        val text = "Allah has already given you victory in many regions"
+        val alignment = EnglishWordAlignment.align(text,
+            listOf("Verily", "Allah helped you", "Allah helped you", "in", "regions", "many"),
+            listOf("قَد", "نَصَرَ", "ٱللَّه", "فِى", "مَوَاطِن", "كَثِيرَة"),
+            listOf("لَقَدۡ", "نَصَرَكُمُ", "ٱللَّهُ", "فِي", "مَوَاطِنَ", "كَثِيرَةٖ"),
+        )!!
+        for (word in listOf("has", "already", "given", "you", "victory")) {
+            val owner = alignment.positionAt((text.indexOf(word) + 1f) / text.length)
+            org.junit.Assert.assertTrue("$word must not move to the following preposition", owner <= 3)
+        }
+        assertEquals(3, alignment.positionAt(1f / text.length))
+        assertEquals(4, alignment.positionAt((text.indexOf(" in ") + 2f) / text.length))
+    }
+
+    @Test
+    fun `a sentence closure respects a separately spoken grammar phrase`() {
+        val text = "stays against you. Next"
+        val alignment = EnglishWordAlignment.align(text, listOf("against you", "stays", "next"))!!
+        assertEquals(1, alignment.positionAt((text.indexOf("against") + 1f) / text.length))
+        assertEquals(1, alignment.positionAt((text.indexOf("you") + 1f) / text.length))
+    }
+
+    @Test
+    fun `reviewed negative cases retain contextual verbs and literal grammar tails`() {
+        val rows = javaClass.getResourceAsStream("/english-review-regressions.tsv")!!
+            .bufferedReader().use { it.readLines() }.associate { line ->
+                val columns = line.split('\t')
+                columns[0] to columns
+            }
+        for ((key, phrase, expected) in listOf(
+            Triple("9:4", "against you", 12), Triple("23:83", "before", 5),
+        )) {
+            val (_, text, glosses, lemmas, arabic) = rows.getValue(key)
+            val alignment = EnglishWordAlignment.align(text, glosses.split('|'), lemmas.split('|'), arabic.split('|'))!!
+            phrase.split(' ').forEach { token ->
+                val start = text.indexOf(phrase) + phrase.indexOf(token)
+                assertEquals("$key $token", expected, alignment.positionAt((start + 0.5f) / text.length))
+            }
+        }
+        val (_, text, glosses, lemmas, arabic) = rows.getValue("9:25")
+        val alignment = EnglishWordAlignment.align(text, glosses.split('|'), lemmas.split('|'), arabic.split('|'))!!
+        assertEquals(3, alignment.positionAt(0.01f))
+        for (token in listOf("has", "already", "given", "you", "victory")) {
+            val offset = (text.indexOf(token) + 0.5f) / text.length
+            org.junit.Assert.assertTrue("$token stranded after the shared verb and subject", alignment.positionAt(offset) <= 3)
+        }
+    }
+
+    @Test
     fun `ever after keeps the complete abadan meaning`() {
         verifyCases("english-ever-after-owners.tsv", 1, checkTaps = true)
         for (phrase in listOf("ever after", "ever afterwards")) {

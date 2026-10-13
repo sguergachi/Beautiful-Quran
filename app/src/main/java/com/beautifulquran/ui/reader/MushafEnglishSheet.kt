@@ -574,11 +574,12 @@ private fun rememberAnimatedEnglishWashClock(clock: State<EnglishWashClock?>): S
         snapshotFlow { clock.value }
             .distinctUntilChanged { prior, next -> next?.runsWith(prior) == true || next == prior }
             .collectLatest { next ->
-                sample.value = next
-                if (next?.isPlaying != true || next.sampledAtNanos == 0L) return@collectLatest
+                val anchor = next?.after(sample.value)
+                sample.value = anchor
+                if (anchor?.isPlaying != true || anchor.sampledAtNanos == 0L) return@collectLatest
                 do {
-                    sample.value = withFrameNanos { next.frameAt(it) }
-                } while (sample.value!!.positionMs < (next.segments.lastOrNull()?.endMs ?: next.positionMs))
+                    sample.value = withFrameNanos { anchor.frameAt(it) }
+                } while (sample.value!!.positionMs < (anchor.segments.lastOrNull()?.endMs ?: anchor.positionMs))
             }
     }
     return sample

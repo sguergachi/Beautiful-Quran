@@ -491,7 +491,10 @@ tween-vs-snap rules, sweep entry and residual rules, repeat wash timing, the
   are recorded in [ENGLISH_ALIGNMENT_COVERAGE.md](ENGLISH_ALIGNMENT_COVERAGE.md).
   English ownership also reads the loaded words' vocalized QAC lemmas. Shared
   phrase cards retain their lexical heads; equal repeated heads can cross
-  clauses when their Arabic lemma is identical. Different meanings keep the
+  clauses when their Arabic lemma is identical. Heads can also cross
+  print order. Unclaimed shared-phrase text stays before the following Arabic
+  anchor, so a resolved subject cannot strand a preceding verb in that next
+  word. Different meanings keep the
   sentence guard. Scoped gloss variants and reciprocal adjacent head cues
   preserve noun/verb ownership. Recovering a head missing from a grammatical
   card also requires the actual Arabic word to corroborate the lemma.
@@ -502,6 +505,8 @@ tween-vs-snap rules, sweep entry and residual rules, repeat wash timing, the
   An unclaimed grammar tail stays with its closing sentence between adjacent
   Arabic anchors: 24:4 “ever after” finishes together on word 16. Explicit
   matches and earlier owners remain intact; unmatched content is not absorbed.
+  A literal grammar-only gloss outranks sentence closure; ambiguous copies
+  keep their existing contextual owner (23:83 “before”).
   A gendered offender expanded as a woman/man recognizes its source card
   only when no literal gender or printed offender head competes. This keeps
   the opening phrase of 24:2 active on Arabic word 1. Its expanded offender
@@ -650,6 +655,9 @@ first wash: Alafasy's 24:1 “clear evidence” is fully laid when he returns to
 from the calibrated media position at the playback speed to the known spoken
 end. Ordinary position polls never stop or restart it. Pause, buffering, speed,
 seek, source and output-correction changes re-anchor it to the media clock.
+Re-anchoring retains the last drawn frame within one performance, so a lagging
+pause/speed poll cannot lift ink. Long-run drift against the media clock has
+not been measured; the continuous clock still ignores ordinary position polls.
 The painted edge uses `EnglishLeafVerse.fragmentWashProgress`, interpolating
 between cached letter anchors. The exact integer mapping still places owned
 ranges and taps. Applying that integer mapping on each animation frame made

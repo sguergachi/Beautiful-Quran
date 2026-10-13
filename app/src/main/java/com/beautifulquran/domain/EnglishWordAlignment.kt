@@ -85,6 +85,8 @@ object EnglishWordAlignment {
         val claimed = IntArray(prose.size) { -1 }
         val anchor = anchors(gloss, owner, prose, glosses.size, claimed)
         val ends = spanEnds(anchor, prose, glosses.size, translation.length)
+        val contextualEnds = ends.copyOf().also { snapToWords(it, prose, translation.length) }
+        val sharedGroups = spoken.mapNotNull { it.first.sharedGroup }.distinct()
         val verified = holdUnheardWords(ends, gloss, owner, prose, claimed)
         snapToWords(ends, prose, translation.length)
         val shares = FloatArray(ends.size) { (ends[it].toFloat() / translation.length).coerceIn(0f, 1f) }
@@ -92,7 +94,13 @@ object EnglishWordAlignment {
             .groupBy({ it.first.text }, { it.second })
         val positions = IntArray(prose.size) { index ->
             val word = prose[index]
-            val fallback = ends.indexOfFirst { word.end <= it }.coerceAtLeast(0)
+            var fallback = ends.indexOfFirst { word.end <= it }.coerceAtLeast(0)
+            val contextual = contextualEnds.indexOfFirst { word.end <= it }.coerceAtLeast(0)
+            // An explicit reordered head can trim the interpolation before
+            // it; that must not exile the shared phrase's unclaimed remainder.
+            sharedGroups.firstOrNull {
+                contextual in it || (contextual == it.last + 1 && index < anchor.getOrElse(contextual) { -1 })
+            }?.let { fallback = minOf(fallback, it.last) }
             if (word.added) fallback else if (word.text in GRAMMAR) {
                 // "Wronging themselves" reverses Arabic's object and verb.
                 reflexives[word.text]?.distinct()?.singleOrNull()
@@ -100,7 +108,7 @@ object EnglishWordAlignment {
                     ?: claimed[index].takeIf { it >= 0 } ?: fallback
             } else verified[index].takeIf { it >= 0 } ?: fallback
         }
-        closeAnchoredSentences(anchor, claimed, prose, positions)
+        closeAnchoredSentences(anchor, claimed, prose, positions, glosses)
         // A possessive or auxiliary travels with its printed head when that
         // head's gloss says it too: "Our servants" cannot split across owners.
         val grammar = glosses.map { words(it).map { word -> word.text }.toSet() }
@@ -187,6 +195,9 @@ object EnglishWordAlignment {
                     counts[tokens.last().key] != 1)) next = first + 1
             }
             tokens.forEachIndexed { index, word ->
+                if (headOwners.isNotEmpty() && remainder.size == 1) {
+                    word.sharedGroup = first until next
+                }
                 val at = if (headOwners.isNotEmpty() && remainder.size == 1) headOwners[word.key] ?: remainder.single()
                     else first + ((index + 1) * (next - first) - 1) / tokens.size
                 add(word to at)
@@ -206,6 +217,7 @@ object EnglishWordAlignment {
     private class ProseWord(val text: String, val end: Int, val added: Boolean, val sentence: Int) {
         var key = inflection(text)
         var arabicOwner = -1
+        var sharedGroup: IntRange? = null
     }
 
     /**
@@ -427,13 +439,19 @@ object EnglishWordAlignment {
     }
 
     /** Unspoken grammar tails stay in their sentence between adjacent Arabic anchors. */
-    private fun closeAnchoredSentences(anchor: IntArray, claimed: IntArray, prose: List<ProseWord>, positions: IntArray) {
+    private fun closeAnchoredSentences(anchor: IntArray, claimed: IntArray, prose: List<ProseWord>, positions: IntArray, glosses: List<String>) {
+        val grammarGlosses = glosses.map { words(it).map { word -> word.text } }
         for (position in 0 until anchor.lastIndex) {
             val at = anchor[position]
             val next = anchor[position + 1]
             if (at < 0 || next <= at || prose[at].sentence == prose[next].sentence) continue
             val tail = (at + 1 until next).takeWhile { prose[it].sentence == prose[at].sentence }
             if (tail.any { claimed[it] >= 0 || positions[it] <= position || prose[it].added || prose[it].text !in GRAMMAR }) continue
+            val literal = grammarGlosses.indices.filter { grammarGlosses[it] == tail.map { index -> prose[index].text } }
+            if (literal.isNotEmpty()) {
+                literal.singleOrNull()?.let { owner -> tail.forEach { positions[it] = owner } }
+                continue
+            }
             tail.forEach { positions[it] = position }
         }
     }

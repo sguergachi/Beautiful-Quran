@@ -135,6 +135,18 @@ class EnglishWashClockTest {
     }
 
     @Test
+    fun `pause and speed reanchors retain the last drawn frame but seeks reset it`() {
+        val running = runningClock()
+        val drawn = running.frameAt(1_150_000_000L)
+        val poll = running.copy(positionMs = 1100, sampledAtNanos = 1_150_000_000L)
+        val paused = poll.copy(isPlaying = false).after(drawn)
+        assertEquals(1150L, paused.frameAt(99_000_000_000L).positionMs)
+        val faster = poll.copy(speed = 1.25f).after(drawn)
+        assertEquals(1275L, faster.frameAt(1_250_000_000L).positionMs)
+        assertEquals(1100L, poll.copy(activation = 9).after(drawn).positionMs)
+    }
+
+    @Test
     fun `paused samples freeze and changing speed changes the frame slope`() {
         val playing = runningClock()
         val paused = playing.copy(isPlaying = false, positionMs = 4000)
