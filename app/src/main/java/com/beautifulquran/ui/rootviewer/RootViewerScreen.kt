@@ -71,6 +71,7 @@ import androidx.compose.ui.text.style.LineHeightStyle
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -81,10 +82,17 @@ import androidx.compose.ui.text.withStyle
 import com.beautifulquran.data.model.RootLemmaSummary
 import com.beautifulquran.data.model.RootOccurrence
 import com.beautifulquran.data.model.Word
+import com.beautifulquran.ui.theme.lining
+import com.beautifulquran.ui.theme.SmallTitleFontFamily
+import com.beautifulquran.ui.theme.liningFigures
+import com.beautifulquran.ui.theme.BookTextMotion
 import com.beautifulquran.ui.theme.DisplayFontFamily
 import com.beautifulquran.ui.theme.HafsFontFamily
 import com.beautifulquran.ui.theme.LocalQuranAccents
 import com.beautifulquran.ui.theme.SerifFontFamily
+import com.beautifulquran.ui.theme.typeScale
+import com.beautifulquran.ui.theme.BookFeatures
+import com.beautifulquran.ui.theme.TitleFeatures
 import com.beautifulquran.ui.theme.quietClickable
 import com.beautifulquran.ui.theme.verticalFadingEdges
 import com.beautifulquran.ui.theme.QuranTheme
@@ -489,13 +497,10 @@ private val LemmaToMetaGap = 20.dp
 
 /** Shared face for Root Form‑1 lead and Lemma dictionary glosses. */
 private val AnalysisGlossAlpha = 0.9f
-private val AnalysisGlossSize = 18.sp
-private val AnalysisGlossLineHeight = 22.sp
-
 @Composable
 private fun analysisGlossStyle(): TextStyle = MaterialTheme.typography.bodyLarge.copy(
-    fontSize = AnalysisGlossSize,
-    lineHeight = AnalysisGlossLineHeight,
+    fontSize = typeScale(18.sp),
+    lineHeight = 22.sp,
     fontWeight = FontWeight.Medium,
     platformStyle = PlatformTextStyle(includeFontPadding = false),
     lineHeightStyle = LineHeightStyle(
@@ -595,8 +600,9 @@ private fun WordAnalysis(
                 if (rootSense != null) {
                     val bodyColor = MaterialTheme.colorScheme.onSurface.copy(alpha = AnalysisGlossAlpha)
                     val citationColor = QuranTheme.ink.quiet
-                    val annotated = remember(rootSense, bodyColor, citationColor) {
-                        lexiconAnnotated(rootSense, bodyColor, citationColor)
+                    val citationSize = typeScale(15.sp)
+                    val annotated = remember(rootSense, bodyColor, citationColor, citationSize) {
+                        lexiconAnnotated(rootSense, bodyColor, citationColor, citationSize)
                     }
                     Text(
                         text = annotated,
@@ -711,15 +717,17 @@ private fun RootLabel(
             Text(
                 text = it,
                 color = QuranTheme.ink.body,
-                // Keep EB Garamond (a bare TextStyle drops LocalTextStyle's
+                // Keep the book face (a bare TextStyle drops LocalTextStyle's
                 // serif and falls back to system sans). Trim matches the ⓘ
                 // so CenterVertically stays even between ROOT and LEMMA.
                 style = TextStyle(
                     fontFamily = SerifFontFamily,
-                    fontSize = 12.sp,
+                    fontSize = typeScale(12.sp),
                     lineHeight = 16.sp,
                     fontWeight = FontWeight.SemiBold,
-                    letterSpacing = 1.56.sp,
+                    letterSpacing = typeScale(1.56.sp),
+                    fontFeatureSettings = liningFigures(null) + ", 'case' 1",
+                    textMotion = BookTextMotion,
                     platformStyle = PlatformTextStyle(includeFontPadding = false),
                     lineHeightStyle = LineHeightStyle(
                         alignment = LineHeightStyle.Alignment.Center,
@@ -741,8 +749,11 @@ private fun RootSectionTitle(text: String, explanation: String? = null) {
                 text = it,
                 fontFamily = DisplayFontFamily,
                 fontWeight = FontWeight.SemiBold,
-                fontSize = 24.sp,
+                fontSize = typeScale(24.sp),
                 lineHeight = 29.sp,
+                style = MaterialTheme.typography.bodyLarge.copy(
+                    fontFeatureSettings = TitleFeatures,
+                ),
                 color = MaterialTheme.colorScheme.onSurface,
             )
         },
@@ -890,7 +901,7 @@ private fun ChapterHeading(section: RootOccurrenceSection, open: Boolean, onClic
         ) {
             Text(
                 text = section.surahId.toString(),
-                style = MaterialTheme.typography.bodyMedium,
+                style = MaterialTheme.typography.bodyMedium.lining(),
                 color = gold,
                 textAlign = TextAlign.End,
                 modifier = Modifier.width(24.dp),
@@ -898,9 +909,12 @@ private fun ChapterHeading(section: RootOccurrenceSection, open: Boolean, onClic
             Spacer(Modifier.width(8.dp))
             Text(
                 text = section.surahName,
-                fontFamily = DisplayFontFamily,
-                fontSize = 18.sp,
+                fontFamily = SmallTitleFontFamily,
+                fontSize = typeScale(18.sp),
                 lineHeight = 24.sp,
+                style = MaterialTheme.typography.bodyLarge.copy(
+                    fontFeatureSettings = TitleFeatures,
+                ),
                 color = QuranTheme.ink.strong,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
@@ -912,7 +926,7 @@ private fun ChapterHeading(section: RootOccurrenceSection, open: Boolean, onClic
         ) {
             Text(
                 text = section.occurrences.size.toString(),
-                style = MaterialTheme.typography.bodyMedium,
+                style = MaterialTheme.typography.bodyMedium.lining(),
                 color = QuranTheme.ink.secondary,
             )
             Spacer(Modifier.width(8.dp))
@@ -941,7 +955,7 @@ private fun OccurrenceRow(occurrence: RootOccurrence, isCurrent: Boolean, onClic
     ) {
         Text(
             text = "${occurrence.surahId}:${occurrence.ayahNumber}${if (isCurrent) " · Here" else ""}",
-            style = MaterialTheme.typography.bodyMedium,
+            style = MaterialTheme.typography.bodyMedium.lining(),
             color = if (isCurrent) {
                 MaterialTheme.colorScheme.onSurface
             } else {
@@ -1096,7 +1110,8 @@ private fun LemmaSingleSenseRow(
     glossStyle: TextStyle,
     glossColor: Color,
 ) {
-    val spineHeight = with(LocalDensity.current) { AnalysisGlossLineHeight.toDp() }
+    val glossLineHeight = glossStyle.lineHeight
+    val spineHeight = with(LocalDensity.current) { glossLineHeight.toDp() }
     val spineWidthPx = with(LocalDensity.current) { 1.dp.toPx() }
     val stubOffsetPx = with(LocalDensity.current) { 4.dp.toPx() }
     Row(
@@ -1288,7 +1303,7 @@ private fun LemmaMeta(
 
 @Composable
 private fun lemmaMetaStyle(): TextStyle = MaterialTheme.typography.bodyMedium.copy(
-    fontSize = 14.sp,
+    fontSize = typeScale(14.sp),
     lineHeight = 18.sp,
     platformStyle = PlatformTextStyle(includeFontPadding = false),
     lineHeightStyle = LineHeightStyle(
@@ -1367,21 +1382,25 @@ private fun LexiconBlockView(
     modifier: Modifier = Modifier,
 ) {
     val gold = LocalQuranAccents.current.gold
+    val citationSize = typeScale(15.sp)
     Column(modifier.fillMaxWidth()) {
         block.form?.let { form ->
             Text(
                 text = form,
-                fontFamily = DisplayFontFamily,
+                fontFamily = SmallTitleFontFamily,
                 fontWeight = FontWeight.Medium,
-                fontSize = 18.sp,
+                fontSize = typeScale(18.sp),
                 lineHeight = 22.sp,
+                style = MaterialTheme.typography.bodyLarge.copy(
+                    fontFeatureSettings = TitleFeatures,
+                ),
                 color = gold,
                 modifier = Modifier.padding(bottom = 8.dp),
             )
         }
         if (block.text.isNotEmpty()) {
-            val annotated = remember(block.text, bodyColor, citationColor) {
-                lexiconAnnotated(block.text, bodyColor, citationColor)
+            val annotated = remember(block.text, bodyColor, citationColor, citationSize) {
+                lexiconAnnotated(block.text, bodyColor, citationColor, citationSize)
             }
             Text(
                 text = annotated,
@@ -1398,6 +1417,7 @@ private fun lexiconAnnotated(
     text: String,
     bodyColor: Color,
     citationColor: Color,
+    citationSize: TextUnit,
 ): AnnotatedString =
     buildAnnotatedString {
         val runs = lexiconRuns(text)
@@ -1406,7 +1426,9 @@ private fun lexiconAnnotated(
                 run.isArabic -> withStyle(
                     SpanStyle(fontFamily = HafsFontFamily, fontSize = 19.sp, color = bodyColor),
                 ) { append(run.text) }
-                run.isCitation -> withStyle(SpanStyle(color = citationColor, fontSize = 15.sp)) {
+                run.isCitation -> withStyle(
+                    SpanStyle(color = citationColor, fontSize = citationSize),
+                ) {
                     append(run.text)
                 }
                 else -> append(run.text)
@@ -1479,9 +1501,12 @@ private fun WordHeader(word: Word, isPlaying: Boolean, onPlay: () -> Unit) {
     if (word.translation.isNotBlank()) {
         Text(
             text = word.translation,
-            fontSize = 20.sp,
+            fontSize = typeScale(20.sp),
             lineHeight = 28.sp,
             fontStyle = FontStyle.Italic,
+            style = MaterialTheme.typography.bodyLarge.copy(
+                fontFeatureSettings = BookFeatures,
+            ),
             textAlign = TextAlign.Center,
             color = MaterialTheme.colorScheme.onSurface,
             modifier = Modifier

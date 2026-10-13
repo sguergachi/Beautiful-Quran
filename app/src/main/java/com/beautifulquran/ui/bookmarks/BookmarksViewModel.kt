@@ -1,5 +1,6 @@
 package com.beautifulquran.ui.bookmarks
 
+import com.beautifulquran.domain.EnglishTypography
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.beautifulquran.data.BookmarkRepository
@@ -71,11 +72,11 @@ internal fun bookmarkSections(
         ayahs
     } else {
         ayahs.filter { bookmark ->
-            bookmark.surah.nameTransliteration.contains(needle, ignoreCase = true) ||
+            EnglishTypography.fold(bookmark.surah.nameTransliteration).contains(needle, ignoreCase = true) ||
                 bookmark.surah.nameTranslation.contains(needle, ignoreCase = true) ||
                 bookmark.surah.nameArabic.contains(needle) ||
                 bookmark.surah.id.toString() == needle ||
-                bookmark.translation.contains(needle, ignoreCase = true) ||
+                EnglishTypography.fold(bookmark.translation).contains(needle, ignoreCase = true) ||
                 (normalizedArabic.isNotEmpty() &&
                     normalizeArabicForSearch(bookmark.text).contains(normalizedArabic)) ||
                 "${bookmark.surah.id}:${bookmark.ayahNumber}" == needle

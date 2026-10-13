@@ -85,16 +85,18 @@ import com.beautifulquran.data.model.Surah
 import com.beautifulquran.data.model.SurahWordSearchSection
 import com.beautifulquran.data.model.WordSearchHit
 import com.beautifulquran.data.AyahSelectorSide
+import com.beautifulquran.domain.EnglishTypography
 import com.beautifulquran.domain.WORD_SEARCH_PREVIEW_LIMIT
 import com.beautifulquran.domain.englishTranslationHighlightSpans
 import com.beautifulquran.domain.parseSearchQuery
 import com.beautifulquran.domain.spellingCorrection
 import com.beautifulquran.ui.reader.VerseBookmarkRibbon
 import com.beautifulquran.ui.reader.remainingUnfurlSignal
+import com.beautifulquran.ui.theme.quietSuppliedBrackets
 import com.beautifulquran.ui.theme.ArabicTitleStyle
 import com.beautifulquran.ui.theme.LocalQuranAccents
+import com.beautifulquran.ui.theme.typeScale
 import com.beautifulquran.ui.theme.PaperSearchField
-import com.beautifulquran.ui.theme.paperBottomFeather
 import com.beautifulquran.ui.theme.quietClickable
 import com.beautifulquran.ui.theme.verticalFadingEdges
 import com.beautifulquran.ui.theme.QuranTheme
@@ -155,9 +157,8 @@ fun HomeScreen(
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val focusManager = LocalFocusManager.current
     val floatingPlayback = uiState.floatingPlayback
-    // Bottom dissolve only — the fixed top bar owns the top edge, so a
-    // top fade would sit on the feather. ContentPadding matches the bottom
-    // fade so the last ink sits clear of it at rest.
+    // ContentPadding matches each fade so the first and last ink sit clear of
+    // them at rest; rows only dissolve once they scroll into one.
     val listFadeBottom = 48.dp
     // Measured height of the floating transport; falls back to the clearance
     // estimate until the first layout pass. Used as bottomInset so the soft
@@ -395,12 +396,6 @@ fun HomeScreen(
                     )
                     Spacer(Modifier.height(SearchBottomBreath))
                 }
-                Spacer(
-                    Modifier
-                        .fillMaxWidth()
-                        .height(SearchBottomFeather)
-                        .paperBottomFeather(paper),
-                )
                 LazyColumn(
                     state = listState,
                     modifier = Modifier
@@ -408,13 +403,19 @@ fun HomeScreen(
                     .fillMaxWidth()
                     .verticalFadingEdges(
                         color = MaterialTheme.colorScheme.background,
-                        top = 0.dp,
+                        // The feather under the search field. It is the list's
+                        // own top edge, not a strip above the list: a strip
+                        // has nothing passing under it, so once the field
+                        // left the list (#853) it faded paper into paper and
+                        // the rows met the bar on a hard line.
+                        top = SearchBottomFeather,
                         bottom = listFadeBottom,
                         // Opaque band over the float's footprint so the soft
                         // edge dissolves just above the player, not through it.
                         bottomInset = listBottomInset,
                     ),
                     contentPadding = PaddingValues(
+                        top = SearchBottomFeather,
                         bottom = listBottomPadding,
                     ),
                 ) {
@@ -614,7 +615,7 @@ private fun HomeHeader(
                 Text(
                     text = "Beautiful Quran",
                     style = MaterialTheme.typography.headlineMedium.copy(
-                        fontSize = 34.sp,
+                        fontSize = typeScale(34.sp),
                         lineHeight = 40.sp,
                     ),
                     color = MaterialTheme.colorScheme.onBackground,
@@ -772,7 +773,9 @@ private fun SurahRow(
         Column(Modifier.weight(1f)) {
             Text(
                 text = surah.nameTransliteration,
-                style = MaterialTheme.typography.titleMedium.copy(fontSize = 17.sp),
+                style = MaterialTheme.typography.titleMedium.copy(
+                    fontSize = typeScale(17.sp),
+                ),
                 color = MaterialTheme.colorScheme.onBackground,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
@@ -879,7 +882,9 @@ private fun WordSearchSurahHeader(section: SurahWordSearchSection) {
     ) {
         Text(
             text = section.surahNameTransliteration,
-            style = MaterialTheme.typography.titleMedium.copy(fontSize = 16.sp),
+            style = MaterialTheme.typography.titleMedium.copy(
+                fontSize = typeScale(16.sp),
+            ),
             color = MaterialTheme.colorScheme.onBackground,
             modifier = Modifier.weight(1f),
             maxLines = 1,
@@ -908,6 +913,7 @@ private fun WordSearchHitRow(
 ) {
     val accents = LocalQuranAccents.current
     val highlightColor = accents.gold
+    val translationInk = QuranTheme.ink.strong
     val displayQuery = remember(query) { parseSearchQuery(query).text }
     val translation = remember(
         hit.displayText,
@@ -916,12 +922,13 @@ private fun WordSearchHitRow(
         hit.matchLabel,
         displayQuery,
         highlightColor,
+        translationInk,
     ) {
         buildAnnotatedString {
             for (span in englishTranslationHighlightSpans(
                 ayahTranslation = hit.displayText,
                 query = displayQuery,
-                wordGloss = hit.translation,
+                wordGloss = EnglishTypography.typesetName(hit.translation),
                 semanticLabel = hit.matchLabel.orEmpty(),
                 semanticTerms = hit.matchTerms,
             )) {
@@ -938,6 +945,7 @@ private fun WordSearchHitRow(
                     append(span.text)
                 }
             }
+            quietSuppliedBrackets(toAnnotatedString().text, 0, translationInk)
         }
     }
     Column(

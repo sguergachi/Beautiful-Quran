@@ -38,6 +38,12 @@ import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.text.TextMeasurer
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.buildAnnotatedString
+import com.beautifulquran.ui.theme.leafCapacityChars
+import com.beautifulquran.ui.theme.leafLeadingEm
+import com.beautifulquran.ui.theme.bookTextMotion
+import com.beautifulquran.ui.theme.quietSuppliedBrackets
+import com.beautifulquran.ui.theme.QuranTypePalette
+import com.beautifulquran.ui.theme.LocalQuranTypePalette
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.style.Hyphens
@@ -73,7 +79,6 @@ import com.beautifulquran.domain.englishLeafBreak
 import com.beautifulquran.domain.englishLeafFittedLeadingEm
 import com.beautifulquran.domain.englishLeafOverflowHandPx
 import com.beautifulquran.domain.englishLeafHandPx
-import com.beautifulquran.domain.ENGLISH_LEAF_LEADING_EM
 import com.beautifulquran.domain.EnglishLeafFill
 import com.beautifulquran.domain.EnglishLeafRuler
 import com.beautifulquran.domain.EnglishLeafVerse
@@ -83,7 +88,6 @@ import com.beautifulquran.domain.mushafLeafBands
 import com.beautifulquran.domain.quranWordKey
 import com.beautifulquran.ui.theme.PaperCoverPad
 import com.beautifulquran.ui.theme.LocalQuranAccents
-import com.beautifulquran.ui.theme.SerifFontFamily
 import com.beautifulquran.ui.theme.ShapedWordBloom
 import com.beautifulquran.ui.theme.letterFadeIn
 import com.beautifulquran.ui.theme.quietClickable
@@ -184,6 +188,7 @@ internal fun MushafEnglishSheet(
     onBasmalahClick: (Int) -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val typePalette = LocalQuranTypePalette.current
     // The verses this leaf actually sets. The ink clocks what is on the paper,
     // which since the book paginates itself is not what is on any one page —
     // and a carried verse is on two leaves, so this is the distinct set.
@@ -269,6 +274,7 @@ internal fun MushafEnglishSheet(
             verseNumberScript,
             leafTokens,
             leafAlignments,
+            typePalette,
         ) {
             englishLeafBlockTexts(
                 leaf,
@@ -277,21 +283,34 @@ internal fun MushafEnglishSheet(
                 palette.fullInkColor,
                 gold,
                 verseNumberScript,
+                typePalette,
             )
         }
-        val setting = remember(blocks, wellPx, measurePx, density, measurer) {
-            setEnglishLeaf(blocks, wellPx, measurePx, density, measurer)
+        val setting = remember(blocks, wellPx, measurePx, density, measurer, typePalette) {
+            setEnglishLeaf(blocks, wellPx, measurePx, density, measurer, typePalette)
         }
         val fontSize = with(density) { setting.handPx.toSp() }
         val pitchDp = with(density) { (setting.handPx * setting.leadingEm).toDp() }
-        val basmalahDp = remember(setting.handPx, measurePx, density, measurer) {
+        val basmalahDp = remember(setting.handPx, measurePx, density, measurer, typePalette) {
             with(density) {
-                englishBasmalahPx(setting.handPx, measurePx, density, measurer).toDp()
+                englishBasmalahPx(
+                    setting.handPx,
+                    measurePx,
+                    density,
+                    measurer,
+                    typePalette,
+                ).toDp()
             }
         }
-        val basmalahFontSize = remember(setting.handPx, measurePx, density, measurer) {
+        val basmalahFontSize = remember(setting.handPx, measurePx, density, measurer, typePalette) {
             with(density) {
-                englishBasmalahHandPx(setting.handPx, measurePx, density, measurer).toSp()
+                englishBasmalahHandPx(
+                    setting.handPx,
+                    measurePx,
+                    density,
+                    measurer,
+                    typePalette,
+                ).toSp()
             }
         }
         val pitch = with(density) { (setting.handPx * setting.leadingEm).toSp() }
@@ -557,6 +576,7 @@ private fun englishLeafBlockTexts(
     ink: Color,
     gold: Color,
     verseNumberScript: VerseNumberScript,
+    typePalette: QuranTypePalette,
 ): List<EnglishLeafBlockText> = leaf.blocks.map { block ->
     when (block) {
         is EnglishLeafBlock.ChapterOpening ->
@@ -569,6 +589,7 @@ private fun englishLeafBlockTexts(
                     if (length > 0) append(" ")
                     val start = length
                     withStyle(SpanStyle(color = ink)) { append(verse.text) }
+                    quietSuppliedBrackets(verse.text, start, ink)
                     val range = start until length
                     // Only the fragment that ends the verse carries its mark: a
                     // carried sentence is numbered where it finishes, as a
@@ -604,6 +625,7 @@ private fun englishLeafBlockTexts(
                                 color = gold, fontSize = EnglishLeafMarkType.em,
                                 letterSpacing = 0.em,
                             ),
+                            bookFontFamily = typePalette.leaf,
                             // The leaf is set left to right whichever digits the
                             // reader has chosen, so the cups are always the LTR
                             // pair.
@@ -668,27 +690,30 @@ private fun setEnglishLeaf(
     measurePx: Float,
     density: Density,
     measurer: TextMeasurer,
+    typePalette: QuranTypePalette,
 ): EnglishLeafSetting {
-    var handPx = englishBookHandPx(wellPx, measurePx, density, measurer)
+    val requestedLeading = typePalette.leafLeadingEm
+    var handPx = englishBookHandPx(wellPx, measurePx, density, measurer, typePalette)
     // Three passes at most, and all but one leaf in the book settles on the
     // first: the hand is the book's, the leading is the book's, and the leaf
     // fits. The rest is the rescue — close the leading to its floor, and if the
     // block still stands past the foot, give up a little of the hand. See
     // englishLeafOverflowHandPx for why that order and not the other.
     repeat(3) { pass ->
-        val basmalahPx = englishBasmalahPx(handPx, measurePx, density, measurer)
-        val pitches = englishLeafPitches(blocks, handPx, measurePx, density, measurer)
+        val basmalahPx = englishBasmalahPx(handPx, measurePx, density, measurer, typePalette)
+        val pitches = englishLeafPitches(blocks, handPx, measurePx, density, measurer, typePalette)
         val stands = englishLeafHeightPx(
             blocks,
             handPx,
             basmalahPx,
-            ENGLISH_LEAF_LEADING_EM,
+            requestedLeading,
             measurePx,
             density,
             measurer,
+            typePalette,
         )
         val leadingEm = englishLeafFittedLeadingEm(
-            leadingEm = ENGLISH_LEAF_LEADING_EM,
+            leadingEm = requestedLeading,
             measuredHeightPx = stands,
             wellHeightPx = wellPx,
             pitchesPx = (pitches * handPx).coerceAtLeast(1f),
@@ -702,13 +727,13 @@ private fun setEnglishLeaf(
         // a line short, its last line half empty. The rescue is for leaves that
         // run past the foot; a leaf carded to reach the foot has not.
         val closed = stands -
-            (ENGLISH_LEAF_LEADING_EM - minOf(leadingEm, ENGLISH_LEAF_LEADING_EM)) *
+            (requestedLeading - minOf(leadingEm, requestedLeading)) *
             pitches * handPx
         val next = englishLeafOverflowHandPx(handPx, closed, wellPx)
         if (next >= handPx || pass == 2) {
             return EnglishLeafSetting(
                 handPx = handPx,
-                lineInkPx = englishLineInkPx(handPx, density, measurer),
+                lineInkPx = englishLineInkPx(handPx, density, measurer, typePalette),
                 leadingEm = leadingEm,
             )
         }
@@ -732,6 +757,7 @@ private fun englishLeafPitches(
     measurePx: Float,
     density: Density,
     measurer: TextMeasurer,
+    typePalette: QuranTypePalette,
 ): Float {
     var pitches = 0f
     blocks.forEach { block ->
@@ -744,6 +770,7 @@ private fun englishLeafPitches(
                         style = englishProseStyle(
                             with(density) { handPx.toSp() },
                             TextUnit.Unspecified,
+                            typePalette,
                         ),
                         measurePx = measurePx,
                         density = density,
@@ -768,9 +795,14 @@ private fun englishLineInkPx(
     handPx: Float,
     density: Density,
     measurer: TextMeasurer,
+    typePalette: QuranTypePalette,
 ): Float = measurer.measure(
     text = AnnotatedString(ENGLISH_LEAF_SPECIMEN),
-    style = englishProseStyle(with(density) { handPx.toSp() }, TextUnit.Unspecified),
+    style = englishProseStyle(
+        with(density) { handPx.toSp() },
+        TextUnit.Unspecified,
+        typePalette,
+    ),
     constraints = Constraints(),
     density = density,
 ).size.height.toFloat()
@@ -791,11 +823,13 @@ private fun englishLeafHeightPx(
     measurePx: Float,
     density: Density,
     measurer: TextMeasurer,
+    typePalette: QuranTypePalette,
 ): Float {
-    val inkPx = englishLineInkPx(handPx, density, measurer)
+    val inkPx = englishLineInkPx(handPx, density, measurer, typePalette)
     val style = englishProseStyle(
         with(density) { handPx.toSp() },
         with(density) { (handPx * leadingEm).toSp() },
+        typePalette,
     )
     return blocks.sumOf { block ->
         when (block) {
@@ -830,8 +864,17 @@ private fun englishBookHandPx(
     measurePx: Float,
     density: Density,
     measurer: TextMeasurer,
+    typePalette: QuranTypePalette,
 ): Float {
-    val block = AnnotatedString(englishLeafReferenceBlock())
+    // Junicode is set as Garamond: the hand Garamond's leaf solves to, at
+    // Junicode's size. Solved in its own metrics the two-pass estimate landed
+    // 2 % smaller and a line longer, a different page from the same measure.
+    if (typePalette.profile == com.beautifulquran.ui.theme.QuranTypeProfile.JUNICODE) {
+        val garamond = com.beautifulquran.ui.theme.quranTypePalette(com.beautifulquran.ui.theme.QuranTypeProfile.CLASSIC)
+        return englishBookHandPx(wellPx, measurePx, density, measurer, garamond) *
+            com.beautifulquran.ui.theme.JUNICODE_SIZE
+    }
+    val block = AnnotatedString(englishLeafReferenceBlock(typePalette.leafCapacityChars))
     var handPx = ENGLISH_LEAF_PROBE_FONT_PX
     // Calibrate at natural spacing so tighter prose keeps the book's type size.
     repeat(2) {
@@ -839,7 +882,8 @@ private fun englishBookHandPx(
             text = block,
             style = englishProseStyle(
                 with(density) { handPx.toSp() },
-                with(density) { (handPx * ENGLISH_LEAF_LEADING_EM).toSp() },
+                with(density) { (handPx * typePalette.leafLeadingEm).toSp() },
+                typePalette,
             ).copy(letterSpacing = 0.em),
             constraints = Constraints(maxWidth = measurePx.toInt().coerceAtLeast(1)),
             density = density,
@@ -862,8 +906,12 @@ private fun englishBookHandPx(
  * spaces in place, so the wash, paper covers and taps keep their character
  * offsets. Simple wrapping is the fallback for paragraphs the rag cannot set.
  */
-internal fun englishProseStyle(fontSize: TextUnit, lineHeight: TextUnit) = TextStyle(
-    fontFamily = SerifFontFamily,
+internal fun englishProseStyle(
+    fontSize: TextUnit,
+    lineHeight: TextUnit,
+    typePalette: QuranTypePalette,
+) = TextStyle(
+    fontFamily = typePalette.leaf,
     fontSize = fontSize,
     // Tighter prose fits whole words without reducing the book's type size.
     letterSpacing = (-0.025f).em,
@@ -888,7 +936,8 @@ internal fun englishProseStyle(fontSize: TextUnit, lineHeight: TextUnit) = TextS
     // The book face's refinements: kerning and ligatures on, old-style figures
     // so the prose (and its brackets and quotes) sets with an even colour —
     // the same features the web leaf and every other English surface set.
-    fontFeatureSettings = "'kern' 1, 'liga' 1, 'onum' 1",
+    fontFeatureSettings = typePalette.bookFeatures,
+    textMotion = typePalette.bookTextMotion,
     platformStyle = PlatformTextStyle(includeFontPadding = false),
     // Trim.Both puts the block's own edges on the grid: the first line starts
     // at its ascent and the last stops at its descender, instead of half a
@@ -964,7 +1013,7 @@ private fun englishRagBreaks(
     val source = text.text
     val n = source.length
     if (n < 2 || measurePx <= 1f) return NoBreaks
-    val key = EnglishRagKey(source, style.fontSize, measurePx, density.density, density.fontScale)
+    val key = EnglishRagKey(text, style, measurePx, density.density, density.fontScale)
     synchronized(EnglishRagMemo) { EnglishRagMemo[key]?.let { return it } }
 
     // Where every offset would sit on one unbroken line. Read off the
@@ -1033,8 +1082,8 @@ private fun englishRagBreaks(
 }
 
 private data class EnglishRagKey(
-    val text: String,
-    val fontSize: TextUnit,
+    val text: AnnotatedString,
+    val style: TextStyle,
     val measurePx: Float,
     val density: Float,
     val fontScale: Float,
@@ -1071,7 +1120,7 @@ private fun EnglishProseBlock(
     val glintInk = LocalQuranAccents.current.glintInk
     var layoutResult by remember { mutableStateOf<TextLayoutResult?>(null) }
     val hitSlopPx = with(LocalDensity.current) { 6.dp.toPx() }
-    val style = englishProseStyle(fontSize, lineHeight)
+    val style = englishProseStyle(fontSize, lineHeight, LocalQuranTypePalette.current)
     val measurer = rememberTextMeasurer()
     // The rag keeps the ruler's line count and block.text's offsets, so the
     // verses' ranges still name the same words.
@@ -1482,7 +1531,7 @@ private fun EnglishBasmalahLine(
     ) {
         Text(
             text = ENGLISH_BASMALAH,
-            style = englishBasmalahStyle(fontSize),
+            style = englishBasmalahStyle(fontSize, LocalQuranTypePalette.current),
             color = MaterialTheme.colorScheme.onBackground,
             // Sized to the measure by englishBasmalahHandPx; held to one line
             // here so a pixel of rounding can never break it across two.
@@ -1516,11 +1565,11 @@ private fun EnglishBasmalahLine(
  *
  * Subpixel advances keep the measured fit and the drawn line at the same width.
  */
-private fun englishBasmalahStyle(fontSize: TextUnit) = TextStyle(
-    fontFamily = SerifFontFamily,
+private fun englishBasmalahStyle(fontSize: TextUnit, typePalette: QuranTypePalette) = TextStyle(
+    fontFamily = typePalette.serif,
     fontStyle = FontStyle.Italic,
     fontSize = fontSize,
-    letterSpacing = 0.em,
+    fontFeatureSettings = typePalette.bookFeatures,
     textMotion = TextMotion.Animated,
     textAlign = TextAlign.Center,
     platformStyle = PlatformTextStyle(includeFontPadding = false),
@@ -1542,6 +1591,7 @@ private fun englishBasmalahHandPx(
     measurePx: Float,
     density: Density,
     measurer: TextMeasurer,
+    typePalette: QuranTypePalette,
 ): Float {
     // Shaping still rounds fractions; half a pixel keeps the fitted line inside.
     val targetPx = (measurePx.toInt() - 0.5f).coerceAtLeast(1f)
@@ -1549,7 +1599,7 @@ private fun englishBasmalahHandPx(
     repeat(2) {
         val laid = measurer.measure(
             text = AnnotatedString(ENGLISH_BASMALAH),
-            style = englishBasmalahStyle(with(density) { fittedPx.toSp() }),
+            style = englishBasmalahStyle(with(density) { fittedPx.toSp() }, typePalette),
             softWrap = false,
             maxLines = 1,
             density = density,
@@ -1568,10 +1618,14 @@ private fun englishBasmalahPx(
     measurePx: Float,
     density: Density,
     measurer: TextMeasurer,
+    typePalette: QuranTypePalette,
 ): Float = measurer.measure(
     text = AnnotatedString(ENGLISH_BASMALAH),
     style = englishBasmalahStyle(
-        with(density) { englishBasmalahHandPx(handPx, measurePx, density, measurer).toSp() },
+        with(density) {
+            englishBasmalahHandPx(handPx, measurePx, density, measurer, typePalette).toSp()
+        },
+        typePalette,
     ),
     constraints = Constraints(maxWidth = measurePx.toInt().coerceAtLeast(1)),
     softWrap = false,
@@ -1604,14 +1658,17 @@ internal fun englishLeafRuler(
     measurePx: Float,
     density: Density,
     measurer: TextMeasurer,
+    typePalette: QuranTypePalette,
     verseNumberScript: VerseNumberScript,
     translation: (surahId: Int, ayah: Int) -> String,
 ): EnglishLeafRuler {
-    val handPx = englishBookHandPx(wellPx, measurePx, density, measurer)
-    val pitchPx = handPx * ENGLISH_LEAF_LEADING_EM
-    val inkPx = englishLineInkPx(handPx, density, measurer)
-    val basmalahPx = englishBasmalahPx(handPx, measurePx, density, measurer)
-    val style = with(density) { englishProseStyle(handPx.toSp(), pitchPx.toSp()) }
+    val handPx = englishBookHandPx(wellPx, measurePx, density, measurer, typePalette)
+    val pitchPx = handPx * typePalette.leafLeadingEm
+    val inkPx = englishLineInkPx(handPx, density, measurer, typePalette)
+    val basmalahPx = englishBasmalahPx(handPx, measurePx, density, measurer, typePalette)
+    val style = with(density) {
+        englishProseStyle(handPx.toSp(), pitchPx.toSp(), typePalette)
+    }
     return EnglishLeafRuler { page, runs ->
         val leaf = englishLeaf(page, runs, translation)
         val blocks = englishLeafBlockTexts(
@@ -1621,6 +1678,7 @@ internal fun englishLeafRuler(
             ink = Color.Black,
             gold = Color.Black,
             verseNumberScript = verseNumberScript,
+            typePalette = typePalette,
         )
         // What the chapter's panel and basmalah take before a word is set —
         // the block's own figure, not a second guess at it.
@@ -1679,7 +1737,7 @@ internal fun englishLeafRuler(
                 // search rests on and could settle it below the answer.
                 fun fits(at: Int): Boolean = englishLeafLineCount(
                     page, runs, stops[at], translation,
-                    verseNumberScript, style, measurePx, density, measurer,
+                    verseNumberScript, style, measurePx, density, measurer, typePalette,
                 ) <= lines
                 // Straddle: `lo` fits, `hi` does not, and the answer is the
                 // last stop before `hi`.
@@ -1809,6 +1867,7 @@ private fun englishLeafLineCount(
     measurePx: Float,
     density: Density,
     measurer: TextMeasurer,
+    typePalette: QuranTypePalette,
 ): Int {
     val kept = runs.subList(0, cut.runIndex + 1).toMutableList()
     kept[kept.lastIndex] = kept.last().let {
@@ -1821,6 +1880,7 @@ private fun englishLeafLineCount(
         ink = Color.Black,
         gold = Color.Black,
         verseNumberScript = verseNumberScript,
+        typePalette = typePalette,
     ).filterIsInstance<EnglishLeafBlockText.Prose>().firstOrNull() ?: return 0
     return measurer.measureEnglishProse(
         prose.text, style, measurePx, density, chooseRag = false,
