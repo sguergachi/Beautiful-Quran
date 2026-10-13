@@ -1609,10 +1609,21 @@ that genuinely earned a result may take the gold accent; connective or merely
 similar words remain ordinary ink. Literal word hits still open with the word
 flash; ayah-level concept and quoted-phrase hits open the verse without
 inventing an Arabic word to highlight.
-Continue listening is the one full-bleed row in the scrolling chapter
-document: its quiet green wash and tap target reach both sheet edges, while
-its bilingual text remains on the same inner English and Arabic rails as the
-chapter rows. Both platforms keep the 28 dp/px outer lane, 26 dp/px number
+**Android:** continue listening no longer takes a persistent top band in the
+scrolling chapter document: the reading place lives in its chapter row, marked
+by the place ribbon in situ. While that row is scrolled out of view a quiet
+green-wash pill — the place ribbon, gold number, and a small-caps CONTINUE flag
+over the chapter row's bilingual identity, set in a rounded wash on the rows'
+own Arabic rail — floats at the bottom (above the gesture inset). It stands
+down entirely while the playback bar is up; the bar owns the bottom paper and
+the two never stack. Once the row sits fully in view for half a second the
+pill — which holds its seat through the wait instead of fading early — flies
+up to the row — resizing onto its exact bounds, squaring its corners, settling
+every inset, then fading to reveal the row — so the row owns the tap, and
+scrolling back down peels it off the top and settles it home again. Flights
+only ever arm off a fully-visible row and cancel the moment it leaves, so
+flings pass through untouched. *Web still shows the persistent Continue band;
+porting the pill is pending.* Both platforms keep the 28 dp/px outer lane, 26 dp/px number
 column, and 4 dp/px name gap; the fixed masthead pairs its title with the same
 30 dp/px gilded rosette Settings affordance.
 
