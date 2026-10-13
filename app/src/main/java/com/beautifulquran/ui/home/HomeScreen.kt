@@ -98,7 +98,6 @@ import com.beautifulquran.ui.theme.LocalQuranAccents
 import com.beautifulquran.ui.theme.typeScale
 import com.beautifulquran.ui.theme.typeLeading
 import com.beautifulquran.ui.theme.PaperSearchField
-import com.beautifulquran.ui.theme.paperBottomFeather
 import com.beautifulquran.ui.theme.quietClickable
 import com.beautifulquran.ui.theme.verticalFadingEdges
 import com.beautifulquran.ui.theme.QuranTheme
@@ -159,9 +158,8 @@ fun HomeScreen(
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val focusManager = LocalFocusManager.current
     val floatingPlayback = uiState.floatingPlayback
-    // Bottom dissolve only — the fixed top bar owns the top edge, so a
-    // top fade would sit on the feather. ContentPadding matches the bottom
-    // fade so the last ink sits clear of it at rest.
+    // ContentPadding matches each fade so the first and last ink sit clear of
+    // them at rest; rows only dissolve once they scroll into one.
     val listFadeBottom = 48.dp
     // Measured height of the floating transport; falls back to the clearance
     // estimate until the first layout pass. Used as bottomInset so the soft
@@ -399,12 +397,6 @@ fun HomeScreen(
                     )
                     Spacer(Modifier.height(SearchBottomBreath))
                 }
-                Spacer(
-                    Modifier
-                        .fillMaxWidth()
-                        .height(SearchBottomFeather)
-                        .paperBottomFeather(paper),
-                )
                 LazyColumn(
                     state = listState,
                     modifier = Modifier
@@ -412,13 +404,19 @@ fun HomeScreen(
                     .fillMaxWidth()
                     .verticalFadingEdges(
                         color = MaterialTheme.colorScheme.background,
-                        top = 0.dp,
+                        // The feather under the search field. It is the list's
+                        // own top edge, not a strip above the list: a strip
+                        // has nothing passing under it, so once the field
+                        // left the list (#853) it faded paper into paper and
+                        // the rows met the bar on a hard line.
+                        top = SearchBottomFeather,
                         bottom = listFadeBottom,
                         // Opaque band over the float's footprint so the soft
                         // edge dissolves just above the player, not through it.
                         bottomInset = listBottomInset,
                     ),
                     contentPadding = PaddingValues(
+                        top = SearchBottomFeather,
                         bottom = listBottomPadding,
                     ),
                 ) {
