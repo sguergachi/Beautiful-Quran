@@ -145,7 +145,20 @@ class ContinuePillVisibilityTest {
 
     @Test
     fun dockWaitsForASettledRow() {
-        assertEquals(1000L, ContinueDockDwellMs)
+        assertEquals(500L, ContinueDockDwellMs)
+    }
+
+    @Test
+    fun hiddenWhileTransportOwnsThePaper() {
+        assertFalse(
+            shouldShowContinuePill(
+                continuePresent = true,
+                searchActive = false,
+                coverVisible = true,
+                continueRowVisible = false,
+                transportVisible = true,
+            ),
+        )
     }
 
     @Test

@@ -147,7 +147,7 @@ internal fun undockFlightReady(docked: Boolean): Boolean = docked
 
 /** Grace so fast scrolls never flap the pill: the row must sit fully in
  * view a beat before the dock flight runs. */
-internal const val ContinueDockDwellMs = 1000L
+internal const val ContinueDockDwellMs = 500L
 
 /** Raw flight progress where the docked pill starts fading into its row. */
 internal const val ContinueDockFadeFrom = 0.5f
@@ -253,6 +253,9 @@ fun HomeScreen(
     // the paper: holding the inset through the slide reads as a second
     // bar sliding behind the first.)
     val pinnedSession = playbackPinned && !searchActive && floatingPlayback != null
+    // The transport owns the bottom paper while it is up: the pill stands
+    // down entirely instead of stacking above it.
+    val transportOnScreen = !playbackPinned && showFloatingPlayback
     // The reading place lives in its chapter row. While that row is
     // scrolled out of view the pill floats at the bottom; once the row
     // itself is visible the pill docks away so the row owns the tap.
@@ -277,6 +280,7 @@ fun HomeScreen(
         searchActive = searchActive,
         coverVisible = coverSheetVisible,
         continueRowVisible = continueRowVisible,
+        transportVisible = transportOnScreen,
     )
     var continuePillHeight by remember { mutableStateOf(0.dp) }
     // Window bounds of the resting pill and its chapter row, for the dock
@@ -297,6 +301,18 @@ fun HomeScreen(
     var undockArrived by remember { mutableStateOf(false) }
     /** True once a dock flight has landed and the row owns the place. */
     var docked by remember { mutableStateOf(false) }
+    // The transport owns the bottom paper while it is up: stand the pill
+    // down and forget its flight history so nothing launches from a stale
+    // seat or lands on the transport's paper.
+    if (transportOnScreen) {
+        pillWasShown = false
+        rowWasVisible = false
+        docked = false
+        docking = false
+        dockStart = null
+        undocking = false
+        undockStart = null
+    }
     // The pill holds its seat through the dwell so the flight launches
     // from the visible pill instead of chasing a three-second-old fade —
     // and keeps its list clearance, so arrival never shifts rows under
@@ -618,9 +634,6 @@ fun HomeScreen(
                     // its chapter row carries the place ribbon in situ, and
                     // the floating pill below stands in only while that row
                     // is scrolled out of view.
-                    item(key = "top-breath") {
-                        Spacer(Modifier.height(16.dp))
-                    }
                     if (showSurahMatches) {
                         item(key = "surahs-label") {
                             SearchSectionLabel(text = "Surahs")
@@ -759,16 +772,11 @@ fun HomeScreen(
                     .onGloballyPositioned { searchPaneBounds = it.boundsInRoot() },
             )
 
-            // Bottom stack: the continue pill docks above the transport so
-            // both floats clear the paper together. The pill takes the
-            // system's navigation-bars pad itself while the transport is
-            // off, so it always sits above the gesture inset; when the
-            // transport is up that bar owns the pad and the pill just
-            // stacks above it. While the reader sheet is open the chapter
-            // bar is pinned above the stack and carries the transport
-            // itself; the continue pill is cover-gated, so it is already
-            // gone there and needs no pinned copy.
-            val transportOnScreen = !playbackPinned && showFloatingPlayback
+            // Bottom stack: the pill stands down entirely while the
+            // transport is up (no stacking). While the reader sheet is open
+            // the chapter bar is pinned above the stack and carries the
+            // transport itself; the continue pill is cover-gated, so it is
+            // already gone there and needs no pinned copy.
             Column(
                 horizontalAlignment = Alignment.CenterHorizontally,
                 modifier = Modifier
@@ -782,10 +790,9 @@ fun HomeScreen(
                         enter = if (undockArrived) EnterTransition.None else FloatingPaperEnter,
                         modifier = Modifier
                             .fillMaxWidth()
-                            .then(
-                                if (!transportOnScreen) Modifier.navigationBarsPadding()
-                                else Modifier,
-                            )
+                            // The pill only ever shows while the transport is
+                            // off, so it always carries its own gesture pad.
+                            .navigationBarsPadding()
                             .onGloballyPositioned { coords ->
                                 continuePillHeight = with(density) {
                                     coords.size.height.toDp()
@@ -1049,7 +1056,9 @@ internal fun shouldShowContinuePill(
     searchActive: Boolean = false,
     coverVisible: Boolean = true,
     continueRowVisible: Boolean = false,
-): Boolean = continuePresent && !searchActive && coverVisible && !continueRowVisible
+    /** The transport owns the bottom paper while it is up: no stacking. */
+    transportVisible: Boolean = false,
+): Boolean = continuePresent && !searchActive && coverVisible && !continueRowVisible && !transportVisible
 
 /**
  * Pill-shaped stand-in for the chapter row: the green place ribbon and a
