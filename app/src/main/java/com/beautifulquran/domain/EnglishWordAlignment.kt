@@ -282,6 +282,18 @@ object EnglishWordAlignment {
             }
         }.map { it.first }.toSet()
         return words(text, phrases).also { prose ->
+            // A gendered offender can be printed as a woman/man followed by
+            // an explanation. Literal gender or offender heads keep priority.
+            for ((gender, names) in listOf("woman" to listOf("fornicatress", "adulteress"), "man" to listOf("fornicator", "adulterer"))) {
+                val head = names.map(::inflection).filter { it in keys }.singleOrNull() ?: continue
+                if (gender !in keys && prose.none { it.key == head }) {
+                    prose.filter { it.text == gender }.forEach { it.key = head }
+                }
+                if (gender == "woman") prose.zipWithNext().filter { (before, word) ->
+                    before.text == "female" && !word.added &&
+                        word.key in setOf(inflection("fornicator"), inflection("adulterer"))
+                }.forEach { (_, word) -> word.key = head }
+            }
             // The divine title is distinct from a nearby verb "knows".
             if ("omniscient" in keys && spoken.none { it.text in setOf("knowing", "knower") }) {
                 prose.filter { it.text in setOf("knowing", "knower") }.forEach { it.key = "omniscient" }
@@ -634,6 +646,7 @@ object EnglishWordAlignment {
         "path" to "way", "days" to "day", "eats" to "eat", "dies" to "die", "heard" to "hear",
         "denied" to "deny", "decreed" to "decree",
         "slay" to "kill", "slays" to "kill", "slain" to "kill", "thankful" to "grateful",
+        "flog" to "lash",
         "commerce" to "trade",
         "bosom" to "chest",
         "tell" to "say", "apparent" to "appear",
@@ -669,6 +682,8 @@ object EnglishWordAlignment {
     )
 
     private val PHRASES = mapOf(
+        "woman found guilty of sexual intercourse" to "fornicatress",
+        "man found guilty of sexual intercourse" to "fornicator",
         "private parts" to "chastity", "head covers" to "headcover", "all aware" to "acquaint",
         "all knower" to "omniscient", "all knowing" to "omniscient",
         "most knowing" to "omniscient",

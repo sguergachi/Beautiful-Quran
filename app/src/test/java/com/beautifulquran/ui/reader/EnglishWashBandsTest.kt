@@ -20,7 +20,7 @@ class EnglishWashBandsTest {
     @Test
     fun `reported meanings keep their owners at every eligible carried leaf cut`() {
         val resources = listOf("english-prayer-alignment.tsv", "english-semantic-heads.tsv", "english-identity-owners.tsv",
-            "english-shared-owners.tsv")
+            "english-shared-owners.tsv", "english-quran-ai-opening-owners.tsv")
         for (resource in resources) for (row in javaClass.getResourceAsStream("/$resource")!!
             .bufferedReader().use { it.readLines() }) {
             val columns = row.split('\t')
@@ -61,6 +61,25 @@ class EnglishWashBandsTest {
 
     /** A sentence occupying characters 10..109 of the paragraph. */
     private val sentence = 10..109
+
+    @Test
+    fun `first word reveals the opening woman phrase before the man`() {
+        val (_, text, glosses) = javaClass.getResourceAsStream("/english-quran-ai-opening-owners.tsv")!!
+            .bufferedReader().use { it.readLines().first { row -> row.startsWith("24:2\t") } }.split('\t')
+        val alignment = EnglishWordAlignment.align(text, glosses.split('|'))!!
+        val spans = englishOwnedSpans(text.indices, alignment, text = text)
+        val woman = spans.single { text.indexOf("woman") in it.range }
+        val man = spans.single { text.indexOf(" man") + 1 in it.range }
+        val word = ActiveWord(ayah = 2, wordPosition = 1, durationMs = 1200, activation = 0)
+        assertEquals(0, woman.range.first)
+        assertEquals(InkEngine.State.Active, InkEngine.word(woman.position, word, isActiveAyah = true, dimmed = false).state)
+        assertEquals(InkEngine.State.Upcoming, InkEngine.word(man.position, word, isActiveAyah = true, dimmed = false).state)
+        assertTrue(alignment.through(2) * text.length >= text.indexOf("woman") + "woman".length)
+        val explanation = spans.single { text.indexOf("sexual") in it.range }
+        val action = spans.single { text.indexOf(" lash") + 1 in it.range }
+        assertEquals(InkEngine.State.Active, InkEngine.word(explanation.position, word.copy(wordPosition = 2, highWater = 2), isActiveAyah = true, dimmed = false).state)
+        assertEquals(InkEngine.State.Upcoming, InkEngine.word(action.position, word.copy(wordPosition = 2, highWater = 2), isActiveAyah = true, dimmed = false).state)
+    }
 
     @Test
     fun `iqamah first pass and Alafasy repeat use the performance ink range`() {

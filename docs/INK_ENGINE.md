@@ -496,6 +496,11 @@ tween-vs-snap rules, sweep entry and residual rules, repeat wash timing, the
   preserve noun/verb ownership. Recovering a head missing from a grammatical
   card also requires the actual Arabic word to corroborate the lemma.
   Latin accent folding affects matching keys, preserving printed glyphs.
+  A gendered offender expanded as a woman/man recognizes its source card
+  only when no literal gender or printed offender head competes. This keeps
+  the opening phrase of 24:2 active on Arabic word 1. Its expanded offender
+  description travels with that head; flog/lash cues keep the action separate
+  from the later lashes noun.
   Full semantic certification requires a separate reviewed
   reference; timing/frame counts do not supply those labels.
   Voice ownership and follow retain the last heard word's

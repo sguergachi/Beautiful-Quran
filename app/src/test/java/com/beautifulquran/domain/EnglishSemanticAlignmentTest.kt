@@ -11,6 +11,34 @@ import org.junit.Test
 /** Fixed meaning correspondences, including words a literal diagnostic cannot judge. */
 class EnglishSemanticAlignmentTest {
     @Test
+    fun `expanded gendered opening starts on the first Arabic word`() {
+        verifyCases("english-quran-ai-opening-owners.tsv", 2, checkTaps = true)
+    }
+
+    @Test
+    fun `literal gender and offender heads keep their own meanings`() {
+        for ((gender, names) in listOf("woman" to listOf("fornicatress", "adulteress"), "man" to listOf("fornicator", "adulterer"))) {
+            for (name in names) {
+                val text = "$gender and $name"
+                assertEquals(1, EnglishWordAlignment.ownerAt(text, listOf(name, "and a $gender"), 2))
+                assertEquals(0, EnglishWordAlignment.ownerAt(text, listOf(name, "and a $gender"), text.length - 2))
+                assertEquals(0, EnglishWordAlignment.ownerAt("$gender first", listOf(name, "first"), 2))
+                assertNull(EnglishWordAlignment.ownerAt("$name and $gender", listOf(name, "a person"), name.length + 6))
+            }
+        }
+    }
+
+    @Test
+    fun `a female qualifier needs its own source head and preserves the male head`() {
+        for (female in listOf("fornicatress", "adulteress")) for (male in listOf("fornicator", "adulterer")) {
+            val text = "[female] $male and $male"
+            assertEquals(0, EnglishWordAlignment.ownerAt(text, listOf(female, male), 11))
+            assertEquals(1, EnglishWordAlignment.ownerAt(text, listOf(female, male), text.length - 2))
+            assertEquals(0, EnglishWordAlignment.ownerAt("[female] $male", listOf(male), 11))
+        }
+    }
+
+    @Test
     fun `quran ai reviewed owners distinguish synonyms shared heads and false reference cues`() {
         verifyCases("english-quran-ai-owners.tsv", 74, checkTaps = true)
     }

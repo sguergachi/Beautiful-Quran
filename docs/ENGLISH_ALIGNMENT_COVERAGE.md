@@ -1,6 +1,6 @@
 # English alignment and reader ink coverage
 
-The October 12 audit separates exact meaning ownership, continuous ink, and
+The October 12–13 audit separates exact meaning ownership, continuous ink, and
 rendered playback. The requested 99.99% semantic accuracy is not established. A passing timing lookup or an early prefix does not prove
 the correct owner for repeat tint or a tap. These checks do not establish
 99.99% accuracy over all possible recitations, translations or UI sequences.
@@ -13,8 +13,8 @@ the correct owner for repeat tint or a tap. These checks do not establish
 | Independent root/lemma meaning cues | 1,403 correspondences: all exact owners, no delayed washes |
 | Annotated exact meaning fixtures | 194 heads, including all 44 Acquainted occurrences, vision/brothers, prayer action/commerce, shared phrases, repeated clauses and lexical variants |
 | Gloss-independent QAC candidates | 12,011 additional checks using vocalized lemmas and POS; all 13,413 combined correspondences pass with twelve reference guesses corrected by the reviewed labels |
-| Quran.ai MCP review | 80 selected targets in 74 verses pass: 70 owner errors corrected, ten already-correct owners preserved; six modern-spelling targets and five word-card guard targets also pass |
-| Full semantic reference | 80 of 56,224 content tokens have model-reviewed, source-supported labels; 56,144 remain unreviewed and a complete independent benchmark is absent, so the 99.99% gate fails |
+| Quran.ai MCP review | The original 80 selected targets in 74 verses pass: 70 owner errors corrected, ten already-correct owners preserved; seven additional heads in 24:2–3, opening/female qualifiers, expanded descriptions, six modern-spelling targets and five word-card guard targets also pass |
+| Full semantic reference | 87 of 56,224 content tokens have model-reviewed, source-supported labels; 56,137 remain unreviewed and a complete independent benchmark is absent, so the 99.99% gate fails |
 | Six distinct meaning heads | All 720 Arabic orders check exact owners, taps and continuous prefix completion |
 | Reader transitions | Back to targets 2–12 with absent/stale/ahead focus, paused first-word waits, old/current generations, held/voice leaves; completed tails, same-verse seeks/repeats and playlist advances |
 | Carried English | Every eligible word-space cut in the prayer, reported-head and identity fixtures checks semantic owners and range/prefix continuity on both fragments |
@@ -87,8 +87,30 @@ owner is 45 and the wash remains continuous. Literal agreement is a diagnostic,
 including when it exceeds 99.99%; it does not certify semantic accuracy.
 
 These are model-adjudicated, selected labels grounded in fetched evidence.
-Quran.ai and this app share Quran.com/Quran Foundation data, and these 80
+Quran.ai and this app share Quran.com/Quran Foundation data, and these 87
 cases are not an independent representative sample or a complete gold corpus.
+
+The October 13 report exposed an uncovered opening in 24:2. Its word card
+names the female head as “fornicatress,” while Sahih International prints
+“woman” with a longer explanation. The old fixture checked only `lash<=4`,
+which neither required the correct verb owner nor checked the opening ink.
+New tests first reproduced an Upcoming opening during Arabic word 1 and a
+lash tap on the later noun. Scoped gender-head variants now recognize the
+expanded wording while preserving literal gender and offender heads; flog
+and lash share their action cue. The first phrase belongs to word 1, man to
+word 2 together with its expanded description, the lash action to word 3
+and lashes to word 8. The fetched
+[Sahih International translation](https://quran.com/24:2?translations=20),
+Arabic morphology and [Jalalayn](https://quran.com/24:2/tafsirs/926) support
+the reviewed labels. Exact ownership, active/upcoming ink and every eligible
+carried cut of the new fixture are regression tested.
+
+The adjacent 24:3 fixture checks all three printed fornicator heads. Its
+“[female] fornicator” belongs to Arabic word 5, rather than the following
+conjunction at word 6. A female qualifier recognizes the retrieved feminine
+source head without changing the male head. The rule requires that source
+head and preserves a wholly bracketed addition. These labels use the fetched
+[24:3 translation](https://quran.com/24:3?translations=20) and morphology.
 
 ## Establishing a semantic accuracy claim
 

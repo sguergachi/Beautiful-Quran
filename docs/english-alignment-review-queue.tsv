@@ -81,3 +81,10 @@
 56:70	58	66	grateful	6	6	5	تَشْكُرُونَ	شَكَرَ	then why are you not grateful	confirmed-owner-error	https://quran.com/56:70?translations=20
 7:145	7	12	wrote	1	1	2	وَكَتَبْنَا	كَتَبَ	And We ordained (laws)	confirmed-owner-error	https://quran.com/7:145?translations=20
 58:21	10	17	written	1	1	3	كَتَبَ	كَتَبَ	Allah has decreed	confirmed-owner-error	https://quran.com/58:21?translations=20
+24:2	16	21	woman	1	not-scanned	2	ٱلزَّانِيَةُ	زَانِيَة	The fornicatress	user-reported-owner-error	https://quran.com/24:2?translations=20
+24:2	37	40	man	2	not-scanned	3	وَٱلزَّانِى	زَان	and the fornicator	user-reported-owner-error	https://quran.com/24:2?translations=20
+24:2	78	82	lash	3	not-scanned	4	فَٱجْلِدُوا۟	اجْلِدُ	[then] flog	user-reported-owner-error	https://quran.com/24:2?translations=20
+24:2	115	121	lashes	8	not-scanned	8	جَلْدَةٍۢ ۖ	جَلْدَة	lash(es)	user-report-neighbour-preserved	https://quran.com/24:2?translations=20
+24:3	4	14	fornicator	1	not-scanned	1	ٱلزَّانِى	زَان	The fornicator	adjacent-gender-owner-preserved	https://quran.com/24:3?translations=20
+24:3	48	58	fornicator	5	not-scanned	6	زَانِيَةً	زَانِيَة	a fornicatress	adjacent-gender-owner-error	https://quran.com/24:3?translations=20
+24:3	104	114	fornicator	12	not-scanned	12	زَانٍ	زَان	a fornicator	adjacent-gender-owner-preserved	https://quran.com/24:3?translations=20
