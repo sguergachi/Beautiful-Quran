@@ -968,8 +968,9 @@ not the app's.
   weight 200–700 and the Display→Text `STYL` axis; real Serif Italic has weight
   300–700; Sans has weight 300–800, Grotesk→Sans `STYL`, and `ital` 0–100.
   Size, leading and tracking supplement those axes. All 20 Roman, 10 Italic
-  and 14 Sans stylistic sets have default/alternate glyph previews, alongside
-  numeral and ligature switches and `aalt` indices 0–6. Values persist in the
+  and 14 Sans stylistic sets are named switches (no glyph specimens: they
+  took most of the tab; the app itself shows the change), alongside numeral
+  and ligature switches and `aalt` indices 0–6. Values persist in the
   lab snapshot; Copy values includes their JSON and Typography Reset restores
   just the type settings. These overrides apply only in developer mode with
   Timeless selected. Control labels keep the shipped typography while preview

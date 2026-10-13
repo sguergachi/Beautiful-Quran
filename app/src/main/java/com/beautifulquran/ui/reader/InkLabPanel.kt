@@ -694,22 +694,6 @@ private fun TypographyControls() {
     fun edit(next: TypefaceTuning) { InkEngine.typographyTuning = tuning.withFace(role, next) }
     val sans = role == TypeRole.Ui
     val italic = !sans && (role == TypeRole.BookItalic || face.italic >= 50f)
-    val family = when (role) {
-        TypeRole.Book, TypeRole.BookItalic -> palette.serif
-        TypeRole.Leaf -> palette.leaf
-        TypeRole.Title -> palette.display
-        TypeRole.Ui -> palette.sans
-        TypeRole.Note -> palette.scribe
-    }
-    val specimenStyle = androidx.compose.ui.text.TextStyle(
-        fontFamily = family, fontSize = 22.sp * face.size, lineHeight = 28.sp * face.size * face.leading,
-        letterSpacing = (face.tracking + if (role == TypeRole.Leaf) -0.025f else 0f).em,
-        fontWeight = when (role) { TypeRole.Title, TypeRole.Note -> FontWeight.Medium; else -> FontWeight.Normal },
-        fontStyle = if (role == TypeRole.BookItalic || role == TypeRole.Note) FontStyle.Italic else FontStyle.Normal,
-        fontFeatureSettings = face.featureSettings,
-        textMotion = androidx.compose.ui.text.style.TextMotion.Animated,
-    )
-    Text("The quick brown fox · Aa agcjfyr & CGKMQRW 0123456789", style = specimenStyle)
     TuningSlider("Weight", face.weight.toFloat(), (if (sans || italic) 300f else 200f)..(if (sans) 800f else 700f), integer = true) {
         edit(face.copy(weight = it.roundToInt()))
     }
@@ -734,22 +718,17 @@ private fun TypographyControls() {
         "The English Mushaf leaf. Tracking is added to the leaf's −0.025 em squeeze, so +0.0125 sets it at −0.0125. " +
             "The page re-solves its hand and line count around whatever you set — see docs/ENGLISH_LEAF_TYPE.md.",
     )
-    LabCaption("Built-in glyph alternates. Left: default · right: alternate. Tap a name to apply it. Alternate index exposes up to six choices per glyph.")
+    LabCaption("Built-in glyph alternates; tap a name to switch it, and watch the page. Alternate index exposes up to six choices per glyph.")
     timelessFeatures(sans, italic).forEach { feature ->
         val active = (face.features[feature.tag] ?: if (feature.tag in setOf("kern", "liga", "calt")) 1 else 0) > 0
-        Column(Modifier.fillMaxWidth().quietClickable {
-            edit(face.copy(features = face.features + (feature.tag to if (active) 0 else 1)))
-        }.padding(vertical = 4.dp)) {
-            Text(
-                "${feature.tag} · ${feature.label} · ${if (active) "on" else "off"}",
-                style = MaterialTheme.typography.labelMedium,
-                color = if (active) MaterialTheme.colorScheme.primary else QuranTheme.ink.secondary,
-            )
-            Row(Modifier.fillMaxWidth()) {
-                Text(feature.specimen, style = specimenStyle.copy(fontFeatureSettings = "'kern' 1, '${feature.tag}' 0"), modifier = Modifier.weight(1f))
-                Text(feature.specimen, style = specimenStyle.copy(fontFeatureSettings = "'kern' 1, '${feature.tag}' 1"), modifier = Modifier.weight(1f))
-            }
-        }
+        Text(
+            "${feature.tag} · ${feature.label} · ${if (active) "on" else "off"}",
+            style = MaterialTheme.typography.labelMedium,
+            color = if (active) MaterialTheme.colorScheme.primary else QuranTheme.ink.secondary,
+            modifier = Modifier.fillMaxWidth().quietClickable {
+                edit(face.copy(features = face.features + (feature.tag to if (active) 0 else 1)))
+            }.padding(vertical = 4.dp),
+        )
     }
 }
 
