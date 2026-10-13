@@ -411,10 +411,14 @@ class OrnamentGeneratorTest {
                     } > 0.02)
                 }
             }
-            for (i in edges.indices) for (j in i + 1 until edges.size) {
-                assertFalse("seed $seed: accidental crossing", crosses(
-                    edges[i].first, edges[i].second, edges[j].first, edges[j].second,
-                ))
+            for (i in edges.indices) {
+                val (a, b) = edges[i]
+                for (j in i + 1 until edges.size) {
+                    val (c, d) = edges[j]
+                    if (maxOf(a.x, b.x) < minOf(c.x, d.x) || maxOf(c.x, d.x) < minOf(a.x, b.x) ||
+                        maxOf(a.y, b.y) < minOf(c.y, d.y) || maxOf(c.y, d.y) < minOf(a.y, b.y)) continue
+                    assertFalse("seed $seed: accidental crossing", crosses(a, b, c, d))
+                }
             }
         }
     }
