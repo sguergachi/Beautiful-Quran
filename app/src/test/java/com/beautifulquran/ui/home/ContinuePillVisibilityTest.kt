@@ -103,22 +103,6 @@ class ContinuePillVisibilityTest {
     }
 
     @Test
-    fun continueStacksAboveFloatingTransport() {
-        assertEquals(
-            104.dp + 64.dp + ContinuePillGap,
-            homeListBottomInset(
-                pinnedSession = false,
-                pinnedHeight = 0.dp,
-                floatingVisible = true,
-                floatingHeight = 104.dp,
-                navigationBottom = 20.dp,
-                continueVisible = true,
-                continueHeight = 64.dp,
-            ),
-        )
-    }
-
-    @Test
     fun dockHoldsOpaqueThenFadesIntoRow() {
         assertEquals(1f, continueDockAlpha(0f), 0.001f)
         assertEquals(1f, continueDockAlpha(ContinueDockFadeFrom), 0.001f)
@@ -159,12 +143,6 @@ class ContinuePillVisibilityTest {
                 transportVisible = true,
             ),
         )
-    }
-
-    @Test
-    fun undockNeedsACompletedDock() {
-        assertFalse(undockFlightReady(false))
-        assertTrue(undockFlightReady(true))
     }
 
     @Test

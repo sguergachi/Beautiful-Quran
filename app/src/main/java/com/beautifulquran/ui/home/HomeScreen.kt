@@ -138,13 +138,6 @@ internal const val ContinueUndockMs = 500
  */
 internal val ContinueFlightEase = CubicBezierEasing(0.77f, 0f, 0.175f, 1f)
 
-/**
- * The undock flight may run only off a completed dock: once the pill has
- * landed, leaving always earns the flight home. No extra delay — the dock
- * already required arriving fully in view, so any departure is contextual.
- */
-internal fun undockFlightReady(docked: Boolean): Boolean = docked
-
 /** Grace so fast scrolls never flap the pill: the row must sit fully in
  * view a beat before the dock flight runs. */
 internal const val ContinueDockDwellMs = 500L
@@ -314,7 +307,7 @@ fun HomeScreen(
         undockStart = null
     }
     // The pill holds its seat through the dwell so the flight launches
-    // from the visible pill instead of chasing a three-second-old fade —
+    // from the visible pill instead of chasing a half-second-old fade —
     // and keeps its list clearance, so arrival never shifts rows under
     // the waiting row and flaps the visibility guard.
     val dwellHolding = continueRowVisible && pillWasShown && !searchActive && coverSheetVisible
@@ -345,7 +338,7 @@ fun HomeScreen(
         val start = continueRowRect
         if (seat != null && start != null && !searchActive && coverSheetVisible &&
             continueIndex >= 0 && listState.firstVisibleItemIndex >= continueIndex &&
-            undockFlightReady(docked)
+            docked
         ) {
             undockStart = start
             undocking = true

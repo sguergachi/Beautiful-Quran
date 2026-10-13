@@ -326,14 +326,14 @@ internal fun shouldShowFloatingPlayback(
 /**
  * Bottom paper the chapter list keeps clear of the transport. The pinned
  * chapter session wins while it owns a verse (or is sliding away); else
- * the floating bar while it is up, plus the continue pill while it is
- * docked off-screen; else just the gesture inset. The caller animates
+ * the continue pill while it floats (it only ever shows with the bar
+ * down); else the floating bar while it is up; else just the gesture
+ * inset. The caller animates
  * toward this target over the sweep length, so bar, fade band, and rows
  * travel as one instead of popping.
  *
- * The continue pill never stacks on the pinned session: it is gated on
- * the cover sheet, so it is already gone while the reader sheet owns
- * the paper.
+ * The continue pill never stacks on the bar or the pinned session: it
+ * stands down while either owns the paper.
  */
 internal fun homeListBottomInset(
     pinnedSession: Boolean,
@@ -350,14 +350,10 @@ internal fun homeListBottomInset(
     if (!continueVisible) {
         return if (floatingVisible) floatingHeight else navigationBottom
     }
-    // The pill carries its own navigation-bars pad while the transport is
-    // off, so its measured height already clears the gesture inset — only
-    // stack the pill above the transport when that bar owns the pad.
+    // The pill only shows with the transport off, so it carries its own
+    // navigation-bars pad: its measured height already clears the gesture
+    // inset.
     val pill = continueHeight.takeIf { it > 0.dp }
-        ?: (ContinuePillListClearance + if (!floatingVisible) navigationBottom else 0.dp)
-    return if (floatingVisible) {
-        floatingHeight + pill + ContinuePillGap
-    } else {
-        pill + ContinuePillGap
-    }
+        ?: (ContinuePillListClearance + navigationBottom)
+    return pill + ContinuePillGap
 }
