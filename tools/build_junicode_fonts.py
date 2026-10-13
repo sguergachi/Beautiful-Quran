@@ -10,11 +10,12 @@ junicode_italic_variable.ttf:
 
 * subset to Latin, its extensions and the transliteration marks, unhinted;
 * the decorative enlargement axis (ENLA) pinned off;
-* the width axis pinned where a sentence of letters sets to EB Garamond's
-  length at the app's size for Junicode (JUNICODE_SIZE in ui/theme/Type.kt):
-  104 roman, 113 italic;
-* the word space set to Garamond's 0.200 em at that size. Junicode's own is
-  0.244 em, 18 % wider, and at matched letter widths it opened every line.
+* the width axis pinned, and the word space set, so a leaf holds what the
+  EB Garamond leaf holds as Android draws it (hinted whole-pixel advances,
+  about 1.5 % narrower than Garamond's design): width 102 roman, 113 italic,
+  space 0.199 em at Junicode's own em. Junicode's own space is 0.244 em, 18 %
+  wider than Garamond's, and opened every line. Checked by whole-book leaf
+  count on a Pixel 10: 753 leaves to Garamond's 751.
 
 Only weight stays variable. Why each number: docs/DESIGN.md, "Type".
 """
@@ -27,10 +28,9 @@ from fontTools.varLib.instancer import instantiateVariableFont
 
 ROOT = Path(__file__).resolve().parent.parent
 FONTS = ROOT / "app/src/main/res/font"
-JUNICODE_SIZE = 0.969
-SPACE = round(200 / JUNICODE_SIZE)
+SPACE = 199
 CUTS = {
-    "JunicodeVF-Roman.ttf": ("junicode_variable.ttf", 104),
+    "JunicodeVF-Roman.ttf": ("junicode_variable.ttf", 102),
     "JunicodeVF-Italic.ttf": ("junicode_italic_variable.ttf", 113),
 }
 FEATURES = [

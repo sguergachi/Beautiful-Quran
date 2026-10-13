@@ -165,12 +165,15 @@ private fun timelessNotes(face: TypefaceTuning): FontFamily = FontFamily(
  *
  * * **Size.** Its x-height is 0.418 em to Garamond's 0.405, so it is set at
  *   [JUNICODE_SIZE] of Garamond's sizes and its lowercase stands as tall.
- * * **Measure.** Its letters set 2 % narrower than Garamond's and its word
- *   space 18 % wider, so lines came out the same length but loose. The bundled
- *   cut (tools/build_junicode_fonts.py) pins the width axis where the letters
- *   match — 104, the italic 113 — and gives the space Garamond's 0.200 em. A
- *   sentence then sets to Garamond's length within 0.05 %, word gaps included,
- *   so lines break where Garamond's did.
+ * * **Measure.** Its letters set 2 % narrower than Garamond's design and its
+ *   word space 18 % wider, so lines came out the same length but loose. The
+ *   bundled cut (tools/build_junicode_fonts.py) pins the width axis and the
+ *   space to Garamond *as Android draws it*: the classic profile draws with
+ *   hinted whole-pixel advances, which set Garamond about 1.5 % narrower than
+ *   its design, and Junicode, drawn at exact advances, matched to the design
+ *   still fitted a leaf 1.7 % shorter (764 leaves to 751). Width 102 (the
+ *   italic 113) and a 0.199 em space give 753 leaves to Garamond's 751 on a
+ *   Pixel 10, with the same lines broken in the same places.
  * * **Colour.** Weight is matched by the ink a sentence lays down per unit of
  *   advance and x-height, unhinted as Android draws it: Regular 400 (0.358 to
  *   0.356), Medium 520, SemiBold 680, the italic 420.
@@ -682,7 +685,7 @@ internal val QuranTypePalette.bookCacheSuffix: String
     get() = when (profile) {
         QuranTypeProfile.TIMELESS -> "|timeless|${tuning.bookCacheKey}"
         QuranTypeProfile.CLASSIC -> "|classic"
-        QuranTypeProfile.JUNICODE -> "|junicode-2.226-w104"
+        QuranTypeProfile.JUNICODE -> "|junicode-2.226-w102"
     }
 
 private const val TIMELESS_LEAF_LEADING_EM = 1.62f

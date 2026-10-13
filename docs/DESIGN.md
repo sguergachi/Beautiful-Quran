@@ -946,11 +946,14 @@ not the app's.
   number was measured against EB Garamond, unhinted, as Android draws:
   - *Size* 0.969 of Garamond's scale (`JUNICODE_SIZE`): x-heights 0.405 /
     0.418 em. Garamond's leading is kept, so the lines keep Garamond's pitch.
-  - *Measure*: Junicode's letters set 2 % narrow and its word space (0.244 em)
-    18 % wide, which made equal-length lines that read loose. The bundled cut
-    (`tools/build_junicode_fonts.py`) pins width 104 (italic 113) and gives the
-    space Garamond's 0.200 em; a sentence then sets within 0.05 % of
-    Garamond's length.
+  - *Measure*: Junicode's letters set 2 % narrow of Garamond's design and its
+    word space (0.244 em) 18 % wide, which made equal-length lines that read
+    loose. The target is Garamond *as drawn*: the classic profile uses hinted
+    whole-pixel advances, which set it ~1.5 % narrower than its design, so a
+    design match still fitted 1.7 % less per leaf (764 leaves to 751). The
+    bundled cut (`tools/build_junicode_fonts.py`) pins width 102 (italic 113)
+    and a 0.199 em space: 753 leaves to 751 on a Pixel 10, lines breaking
+    where Garamond's do.
   - *Colour* (ink per advance × x-height): Regular 400, Medium 520, SemiBold
     680, Italic 420. Titles take one step lighter; dark paper eases 30, leaf
     excepted, as Timeless does.
