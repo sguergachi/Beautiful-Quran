@@ -426,7 +426,6 @@ fun EntranceCover(
                 )
                 GeneratedBorderBand(
                     spec = ornament.border,
-                    seal = ornament.cornerSeal,
                     geometry = frameGeometry,
                     brightGold = accents.goldBright,
                     deepGold = accents.goldDeep,

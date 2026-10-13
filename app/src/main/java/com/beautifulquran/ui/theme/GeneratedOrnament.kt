@@ -9,7 +9,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.draw.drawWithCache
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.ClipOp
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.PathMeasure
@@ -17,6 +19,7 @@ import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.drawscope.clipPath
 import androidx.compose.ui.graphics.drawscope.translate
 import androidx.compose.ui.graphics.layer.drawLayer
 import androidx.compose.ui.graphics.rememberGraphicsLayer
@@ -36,6 +39,7 @@ import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.roundToInt
 import kotlin.math.sin
+import kotlin.math.sqrt
 
 /*
  * Renderers for the generated cover ornament (ui/theme/ornament/
@@ -279,6 +283,9 @@ fun GeneratedChapterRosette(
     )
 }
 
+/** Where the border rails meet a seal, as a fraction of the seal's reserved radius. */
+private const val SEAL_RING_FRACTION = 0.92f
+
 /** The relief never thins below this (px): a hairline rosette still reads as pressed. */
 private const val RELIEF_FLOOR_PX = 0.6f
 
@@ -472,12 +479,11 @@ fun GeneratedCornerSeals(
  * fits a whole number of periods (the period stretches a little to fit),
  * so the pattern arrives at every seal at the same phase. The band is
  * the binding's tooling, not illumination — it is complete from the first
- * frame, never animated. [seal] supplies the petal-tip radius.
+ * frame, never animated.
  */
 @Composable
 fun GeneratedBorderBand(
     spec: BorderSpec,
-    seal: RosetteSpec,
     geometry: CoverFrameGeometry,
     brightGold: Color,
     deepGold: Color,
@@ -498,15 +504,15 @@ fun GeneratedBorderBand(
                 val w = size.width
                 val h = size.height
                 // Each run starts at one corner seal and ends at the next,
-                // carrying the pattern round the corner arc into the seal
-                // (no gap, no abrupt end). The channel mouth tapers onto the
-                // seal's petal tip, so the run owns only what lies between
-                // the two tips; whole periods fit that span, the period
-                // stretching a little, so every run meets its seals at the
-                // same phase.
-                val tipU = sealBoxPx(geometry, seal) * seal.tipRadius.toFloat() * 0.9f
-                val taper = bandH * 0.8f
-                val bandStart = tipU + taper
+                // carrying the pattern round the corner arc into the seal.
+                // The band is clipped by each seal's ring (no arrowhead
+                // tapering to a point short of it), so the channel runs
+                // under the star and reads as one piece with it. Whole
+                // periods fit between the two rings, the period stretching a
+                // little, so every run meets its seals at the same phase.
+                val ringR = geometry.starRadiusPx * SEAL_RING_FRACTION
+                val half = bandH / 2f
+                val bandStart = sqrt(max(ringR * ringR - half * half, 0f))
                 val periodPx = (spec.period * bandH).toFloat()
                 val maxStep = 2.5.dp.toPx()
                 val oc = geometry.outerCorners
@@ -514,6 +520,19 @@ fun GeneratedBorderBand(
                 val rTr = screenRadius(geometry, oc.topRight)
                 val rBl = screenRadius(geometry, oc.bottomLeft)
                 val rBr = screenRadius(geometry, oc.bottomRight)
+                // Same seats as [GeneratedCornerSeals].
+                val sealRings = Path().apply {
+                    val tl = sealCenterPx(geometry, rTl)
+                    val tr = sealCenterPx(geometry, rTr)
+                    val bl = sealCenterPx(geometry, rBl)
+                    val br = sealCenterPx(geometry, rBr)
+                    for (centre in listOf(
+                        Offset(tl, tl),
+                        Offset(w - tr, tr),
+                        Offset(bl, h - bl),
+                        Offset(w - br, h - br),
+                    )) addOval(Rect(centre, ringR))
+                }
 
                 // A run in the canonical top-edge frame → screen, per side;
                 // inward stays inward on every side so the pattern faces in.
@@ -556,33 +575,20 @@ fun GeneratedBorderBand(
                             )
                         }
                     }
-                    // Channel mouths: both rails converge onto the petal tip.
-                    for ((mouth, point) in listOf(
-                        bandStart to tipU,
-                        run.length - bandStart to run.length - tipU,
-                    )) {
-                        for (v in floatArrayOf(-0.5f, 0.5f)) {
-                            run.trace(
-                                ruleBand,
-                                listOf(Offset(mouth, v * bandH), Offset(point, 0f)),
-                                false,
-                                side.toScreen,
-                                maxStep,
-                            )
-                        }
-                    }
                 }
                 val hairStroke = Stroke(width = 1.dp.toPx(), cap = StrokeCap.Round, join = StrokeJoin.Round)
                 val ruleStroke = Stroke(width = 1.5.dp.toPx(), cap = StrokeCap.Round, join = StrokeJoin.Round)
 
                 onDrawBehind {
                     val gold = goldBrush(brightGold, deepGold, sheen.value.coerceIn(0f, 1f))
-                    for ((band, stroke) in listOf(hairBand to hairStroke, ruleBand to ruleStroke)) {
-                        translate(0.6f, 0.6f) { drawPath(band, embossDark, style = stroke, alpha = 0.7f) }
-                        translate(-0.6f, -0.6f) { drawPath(band, embossLight, style = stroke, alpha = 0.7f) }
-                        drawPath(band, gold, style = stroke)
+                    clipPath(sealRings, ClipOp.Difference) {
+                        for ((band, stroke) in listOf(hairBand to hairStroke, ruleBand to ruleStroke)) {
+                            translate(0.6f, 0.6f) { drawPath(band, embossDark, style = stroke, alpha = 0.7f) }
+                            translate(-0.6f, -0.6f) { drawPath(band, embossLight, style = stroke, alpha = 0.7f) }
+                            drawPath(band, gold, style = stroke)
+                        }
+                        for ((center, r) in dotCenters) drawCircle(gold, radius = r, center = center)
                     }
-                    for ((center, r) in dotCenters) drawCircle(gold, radius = r, center = center)
                 }
             },
     )
