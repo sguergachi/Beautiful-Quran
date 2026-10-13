@@ -69,9 +69,11 @@ class ContinuePillVisibilityTest {
     }
 
     @Test
-    fun continueOnlyClearsPillAboveGestureInset() {
+    fun continueCarriesItsOwnGestureInset() {
+        // Measured while the transport is off, so the pill height already
+        // includes the navigation-bars pad — no second gesture inset.
         assertEquals(
-            20.dp + ContinuePillListClearance + ContinuePillGap,
+            ContinuePillListClearance + ContinuePillGap,
             homeListBottomInset(
                 pinnedSession = false,
                 pinnedHeight = 0.dp,
@@ -80,6 +82,22 @@ class ContinuePillVisibilityTest {
                 navigationBottom = 20.dp,
                 continueVisible = true,
                 continueHeight = ContinuePillListClearance,
+            ),
+        )
+    }
+
+    @Test
+    fun continueFallbackKeepsGestureInsetBeforeFirstMeasure() {
+        assertEquals(
+            ContinuePillListClearance + 20.dp + ContinuePillGap,
+            homeListBottomInset(
+                pinnedSession = false,
+                pinnedHeight = 0.dp,
+                floatingVisible = false,
+                floatingHeight = 104.dp,
+                navigationBottom = 20.dp,
+                continueVisible = true,
+                continueHeight = 0.dp,
             ),
         )
     }

@@ -27,6 +27,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.layout.navigationBars
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.padding
@@ -585,10 +586,15 @@ fun HomeScreen(
             )
 
             // Bottom stack: the continue pill docks above the transport so
-            // both floats clear the paper together. While the reader sheet
-            // is open the chapter bar is pinned above the stack and carries
-            // the transport itself; the continue pill is cover-gated, so it
-            // is already gone there and needs no pinned copy.
+            // both floats clear the paper together. The pill takes the
+            // system's navigation-bars pad itself while the transport is
+            // off, so it always sits above the gesture inset; when the
+            // transport is up that bar owns the pad and the pill just
+            // stacks above it. While the reader sheet is open the chapter
+            // bar is pinned above the stack and carries the transport
+            // itself; the continue pill is cover-gated, so it is already
+            // gone there and needs no pinned copy.
+            val transportOnScreen = !playbackPinned && showFloatingPlayback
             Column(
                 horizontalAlignment = Alignment.CenterHorizontally,
                 modifier = Modifier
@@ -601,6 +607,10 @@ fun HomeScreen(
                         visible = showContinuePill,
                         modifier = Modifier
                             .fillMaxWidth()
+                            .then(
+                                if (!transportOnScreen) Modifier.navigationBarsPadding()
+                                else Modifier,
+                            )
                             .onGloballyPositioned { coords ->
                                 continuePillHeight = with(density) {
                                     coords.size.height.toDp()
