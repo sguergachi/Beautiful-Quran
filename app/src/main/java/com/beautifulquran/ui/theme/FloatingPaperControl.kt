@@ -50,12 +50,13 @@ fun FloatingPaperControl(
     visible: Boolean,
     modifier: Modifier = Modifier,
     enter: EnterTransition = FloatingPaperEnter,
+    exit: ExitTransition = FloatingPaperExit,
     content: @Composable () -> Unit,
 ) {
     AnimatedVisibility(
         visible = visible,
         enter = enter,
-        exit = FloatingPaperExit,
+        exit = exit,
         modifier = modifier,
     ) {
         Box(

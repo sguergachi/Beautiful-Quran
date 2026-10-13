@@ -1,11 +1,13 @@
 package com.beautifulquran.ui.home
 
+import android.provider.Settings
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.EnterTransition
+import androidx.compose.animation.ExitTransition
+import androidx.compose.animation.core.CubicBezierEasing
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animate
-import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
@@ -70,6 +72,7 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.boundsInRoot
 import androidx.compose.ui.layout.boundsInWindow
 import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalLayoutDirection
@@ -111,6 +114,7 @@ import com.beautifulquran.ui.theme.quietSuppliedBrackets
 import com.beautifulquran.ui.theme.ArabicTitleStyle
 import com.beautifulquran.ui.theme.FloatingPaperControl
 import com.beautifulquran.ui.theme.FloatingPaperEnter
+import com.beautifulquran.ui.theme.FloatingPaperExit
 import com.beautifulquran.ui.theme.LocalQuranAccents
 import com.beautifulquran.ui.theme.typeScale
 import com.beautifulquran.ui.theme.PaperSearchField
@@ -124,11 +128,18 @@ private const val SEARCH_ITEM_INDEX = 0
 /** How far (px) the list must move before a scroll counts as "dismiss". */
 internal const val DISMISS_SCROLL_THRESHOLD_PX = 24
 
-/** The pill's flight up to its row: slow move, resize, and square off as one. */
-internal const val ContinueDockMs = 700
+/** The pill's flight up to its row: far enough to travel that it earns a
+ * drawer-scale duration; the strong ease-in-out keeps both ends graceful. */
+internal const val ContinueDockMs = 500
 
 /** The return flight settles at the same graceful pace. */
-internal const val ContinueUndockMs = 700
+internal const val ContinueUndockMs = 500
+
+/**
+ * Strong ease-in-out for on-screen movement: the flight leaves and lands
+ * gently instead of snapping at either end.
+ */
+internal val ContinueFlightEase = CubicBezierEasing(0.77f, 0f, 0.175f, 1f)
 
 /** Grace so fast scrolls never flap the pill: the row must sit fully in
  * view this long before the dock flight runs. */
@@ -294,11 +305,14 @@ fun HomeScreen(
     var undockArrived by remember { mutableStateOf(false) }
     /** Uptime of the last completed dock landing; zero when no dock owns the row. */
     var dockedAtMs by remember { mutableLongStateOf(0L) }
+    // Dock flights never run under reduced motion: the pill simply shows
+    // and hides with no travel.
+    val reducedMotion = rememberReducedMotion()
     // The row sat fully in view through the dwell while the pill was up:
     // fly the pill to the row — resize, square off, fade — instead of
     // popping it away. Fast scrolls never arm the flight.
     if (showContinuePill) pillWasShown = true
-    if (continueRowVisible && pillWasShown && !docking && !undocking && dockReady) {
+    if (continueRowVisible && pillWasShown && !docking && !undocking && dockReady && !reducedMotion) {
         val start = continuePillRect
         val end = if (!searching && coverSheetVisible) continueRowRect else null
         if (start != null && end != null) {
@@ -316,7 +330,7 @@ fun HomeScreen(
         continueSurahId,
         searching,
     )
-    if (!continueRowVisible && rowWasVisible && !docking && !undocking) {
+    if (!continueRowVisible && rowWasVisible && !docking && !undocking && !reducedMotion) {
         val seat = continuePillRect
         val start = continueRowRect
         if (seat != null && start != null && !searchActive && coverSheetVisible &&
@@ -346,7 +360,7 @@ fun HomeScreen(
             animate(
                 initialValue = 0f,
                 targetValue = 1f,
-                animationSpec = tween(ContinueDockMs, easing = FastOutSlowInEasing),
+                animationSpec = tween(ContinueDockMs, easing = ContinueFlightEase),
             ) { value, _ -> dockProgress = value }
             dockedAtMs = System.currentTimeMillis()
             docking = false
@@ -359,7 +373,7 @@ fun HomeScreen(
             animate(
                 initialValue = 0f,
                 targetValue = 1f,
-                animationSpec = tween(ContinueUndockMs, easing = FastOutSlowInEasing),
+                animationSpec = tween(ContinueUndockMs, easing = ContinueFlightEase),
             ) { value, _ -> undockProgress = value }
             dockedAtMs = 0L
             undocking = false
@@ -769,7 +783,12 @@ fun HomeScreen(
                 uiState.continueTarget?.let { target ->
                     FloatingPaperControl(
                         visible = showContinuePill && !docking && !undocking,
-                        enter = if (undockArrived) EnterTransition.None else FloatingPaperEnter,
+                        enter = if (undockArrived || reducedMotion) {
+                            EnterTransition.None
+                        } else {
+                            FloatingPaperEnter
+                        },
+                        exit = if (reducedMotion) ExitTransition.None else FloatingPaperExit,
                         modifier = Modifier
                             .fillMaxWidth()
                             .then(
@@ -823,30 +842,43 @@ fun HomeScreen(
                         },
                 )
             }
-            // Dock flights: a live copy of the pill travels between its
-            // resting seat and the chapter row — resizing, squaring its
-            // corners, then fading to reveal the row beneath (or landing
-            // back on its seat, seamless, on the way out). The landing end
-            // tracks live bounds so flights still connect while the list
-            // moves. Undock reverses the morph instead of fading.
+            // Dock flights: a fixed-size copy of the pill glides between its
+            // resting seat and the chapter row on transform + opacity only —
+            // center-scaled to the row's bounds, corners squaring off, then
+            // fading to reveal the row (or landing whole on the way home).
+            // No width/height/padding work per frame; the landing end tracks
+            // live bounds so flights still connect while the list moves.
             if (docking || undocking) {
                 val start = if (docking) dockStart else undockStart
                 val end = if (docking) continueRowRect else continuePillRect
                 val target = uiState.continueTarget
                 val raw = if (docking) dockProgress else undockProgress
-                if (start != null && end != null && target != null) {
-                    val flight = FastOutSlowInEasing.transform(raw.coerceIn(0f, 1f))
+                if (start != null && end != null && target != null &&
+                    start.width > 0f && start.height > 0f
+                ) {
+                    val flight = ContinueFlightEase.transform(raw.coerceIn(0f, 1f))
                     val settled = if (docking) flight else 1f - flight
-                    val left = lerp(start.left, end.left, flight) - boxLeft
-                    val top = lerp(start.top, end.top, flight) - boxTop
-                    val width = with(density) { lerp(start.width, end.width, flight).toDp() }
-                    val height = with(density) { lerp(start.height, end.height, flight).toDp() }
+                    // Scale about the layer's own center: translation lands
+                    // the center on the target, scale lands the bounds.
+                    val scaleToX = end.width / start.width
+                    val scaleToY = end.height / start.height
+                    val dx = lerp(start.center.x, end.center.x, flight) - start.center.x
+                    val dy = lerp(start.center.y, end.center.y, flight) - start.center.y
                     Box(
                         modifier = Modifier
-                            .offset { IntOffset(left.roundToInt(), top.roundToInt()) }
-                            .width(width)
-                            .height(height)
+                            .offset {
+                                IntOffset(
+                                    (start.left - boxLeft).roundToInt(),
+                                    (start.top - boxTop).roundToInt(),
+                                )
+                            }
+                            .width(with(density) { start.width.toDp() })
+                            .height(with(density) { start.height.toDp() })
                             .graphicsLayer {
+                                translationX = dx
+                                translationY = dy
+                                scaleX = scaleToX
+                                scaleY = scaleToY
                                 shape = RoundedCornerShape(continueDockRadius(settled))
                                 clip = true
                                 alpha = if (docking) continueDockAlpha(raw) else 1f
@@ -859,7 +891,6 @@ fun HomeScreen(
                                 focusManager.clearFocus()
                                 onOpenSurah(target.surah.id, target.ayah, null, null)
                             },
-                            docked = settled,
                         )
                     }
                 }
@@ -954,8 +985,9 @@ private fun HomeBookmarkOverlay(
 
 /** The pill's wash: a calm fixed radius the ribbon's straight-cut ends sit inside. */
 internal val ContinuePillRadius: Dp = 28.dp
+internal val ContinuePillShape = RoundedCornerShape(ContinuePillRadius)
 
-/** Resting geometry the dock flight morphs away from. */
+/** Resting pill geometry. */
 internal val ContinuePillMargin: Dp = 16.dp
 internal val ContinuePillStartInset: Dp = 8.dp
 internal val ContinuePillEndInset: Dp = 16.dp
@@ -963,10 +995,9 @@ internal val ContinuePillVertical: Dp = 12.dp
 internal val ContinuePillRibbonHeight: Dp = 40.dp
 internal val ContinuePillArabicSize: TextUnit = 20.sp
 
-/** The chapter row geometry the flight settles onto. */
+/** The chapter row geometry the flight lands on. */
 internal val ContinueRowVertical: Dp = 15.dp
 internal val ContinueRowRibbonHeight: Dp = 44.dp
-internal val ContinueRowEndInset: Dp = HomeEndInset + HomeArabicOpticalInset
 
 /** Wash-to-row corner collapse over the dock flight (pill radius → rectangle). */
 internal fun continueDockRadius(flight: Float): Dp =
@@ -975,18 +1006,6 @@ internal fun continueDockRadius(flight: Float): Dp =
 /** The docked pill holds opaque through the flight, then fades into its row. */
 internal fun continueDockAlpha(progress: Float): Float =
     1f - ((progress - ContinueDockFadeFrom) / (1f - ContinueDockFadeFrom)).coerceIn(0f, 1f)
-
-/** Outer margin melts so the wash lands full-bleed on the row's width. */
-internal fun continueDockMargin(docked: Float): Dp =
-    ContinuePillMargin * (1f - docked.coerceIn(0f, 1f))
-
-/** Ribbon lane slides to the row's lane so the cloths coincide on landing. */
-internal fun continueDockStartInset(docked: Float): Dp =
-    ContinuePillStartInset * (1f - docked.coerceIn(0f, 1f))
-
-/** Trailing inset glides out so the Arabic lands on the row's Arabic rail. */
-internal fun continueDockEndInset(docked: Float): Dp =
-    ContinuePillEndInset + (ContinueRowEndInset - ContinuePillEndInset) * docked.coerceIn(0f, 1f)
 
 /**
  * Lazy-column index of the reading-place row: the top breath, then every
@@ -1005,6 +1024,23 @@ internal fun continueLazyIndex(
 
 /** The CONTINUE flag dissolves across the flight; the row has none. */
 internal fun continueDockCapsAlpha(docked: Float): Float = 1f - docked.coerceIn(0f, 1f)
+
+/**
+ * Android's reduced-motion signal: the global animator scale the user (or
+ * the system) zeroes to remove movement. Flights never run under it; the
+ * pill simply shows and hides.
+ */
+@Composable
+private fun rememberReducedMotion(): Boolean {
+    val context = LocalContext.current
+    return remember {
+        Settings.Global.getFloat(
+            context.contentResolver,
+            Settings.Global.ANIMATOR_DURATION_SCALE,
+            1f,
+        ) == 0f
+    }
+}
 
 /**
  * The reading place floats only while its chapter row is scrolled out of
@@ -1030,30 +1066,22 @@ internal fun shouldShowContinuePill(
  * where chapter Arabic ends.
  */
 @Composable
-private fun ContinuePill(
-    target: ContinueTarget,
-    onClick: () -> Unit,
-    /** Dock flight progress: 0 resting, 1 settled onto the chapter row. */
-    docked: Float = 0f,
-) {
+private fun ContinuePill(target: ContinueTarget, onClick: () -> Unit) {
     val colors = MaterialTheme.colorScheme
-    val settled = docked.coerceIn(0f, 1f)
-    val vertical = ContinuePillVertical + (ContinueRowVertical - ContinuePillVertical) * settled
-    val shape = RoundedCornerShape(continueDockRadius(settled))
     Row(
         verticalAlignment = Alignment.CenterVertically,
         modifier = Modifier
-            .padding(horizontal = continueDockMargin(settled))
-            .background(QuranTheme.accents.greenWash, shape)
+            .padding(horizontal = ContinuePillMargin)
+            .background(QuranTheme.accents.greenWash, ContinuePillShape)
             // Clip the cloth to the wash so the ribbon's straight-cut ends
             // can never poke past the curve.
-            .clip(shape)
+            .clip(ContinuePillShape)
             .quietClickable(onClick = onClick)
             .padding(
-                start = continueDockStartInset(settled),
-                end = continueDockEndInset(settled),
-                top = vertical,
-                bottom = vertical,
+                start = ContinuePillStartInset,
+                end = ContinuePillEndInset,
+                top = ContinuePillVertical,
+                bottom = ContinuePillVertical,
             )
             .semantics {
                 contentDescription =
@@ -1075,10 +1103,7 @@ private fun ContinuePill(
             bottomGap = 0.dp,
             modifier = Modifier
                 .width(HomeRibbonLane)
-                .height(
-                    ContinuePillRibbonHeight +
-                        (ContinueRowRibbonHeight - ContinuePillRibbonHeight) * settled,
-                ),
+                .height(ContinuePillRibbonHeight),
         )
         // Row order, compacted: ribbon, gold number, then the name —
         // the pill keeps the chapter row's structure, not its rails.
@@ -1096,7 +1121,7 @@ private fun ContinuePill(
                 text = "CONTINUE",
                 style = MaterialTheme.typography.labelSmall.copy(letterSpacing = CAPS_TRACKING),
                 fontSize = 10.sp,
-                color = QuranTheme.accents.greenQuiet.copy(alpha = continueDockCapsAlpha(settled)),
+                color = QuranTheme.accents.greenQuiet,
                 maxLines = 1,
             )
             Spacer(Modifier.height(2.dp))
@@ -1122,10 +1147,7 @@ private fun ContinuePill(
         Text(
             text = target.surah.nameArabic,
             style = ArabicTitleStyle,
-            fontSize = (
-                ContinuePillArabicSize.value +
-                    (ArabicTitleStyle.fontSize.value - ContinuePillArabicSize.value) * settled
-                ).sp,
+            fontSize = ContinuePillArabicSize,
             color = QuranTheme.accents.greenInk,
             maxLines = 1,
         )
