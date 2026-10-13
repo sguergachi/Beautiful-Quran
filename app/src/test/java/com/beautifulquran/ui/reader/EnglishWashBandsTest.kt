@@ -10,6 +10,7 @@ import com.beautifulquran.data.model.Segment
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import kotlin.math.roundToInt
 
 /**
  * The English leaf blooms one word at a time, as the scrolling reader does. The
@@ -20,7 +21,7 @@ class EnglishWashBandsTest {
     @Test
     fun `reported meanings keep their owners at every eligible carried leaf cut`() {
         val resources = listOf("english-prayer-alignment.tsv", "english-semantic-heads.tsv", "english-identity-owners.tsv",
-            "english-shared-owners.tsv", "english-quran-ai-opening-owners.tsv")
+            "english-shared-owners.tsv", "english-quran-ai-opening-owners.tsv", "english-clear-evidence-owners.tsv")
         for (resource in resources) for (row in javaClass.getResourceAsStream("/$resource")!!
             .bufferedReader().use { it.readLines() }) {
             val columns = row.split('\t')
@@ -61,6 +62,23 @@ class EnglishWashBandsTest {
 
     /** A sentence occupying characters 10..109 of the paragraph. */
     private val sentence = 10..109
+
+    @Test
+    fun `clear evidence reveals together with bayyinat`() {
+        val (_, text, glosses) = javaClass.getResourceAsStream("/english-quran-ai-opening-owners.tsv")!!
+            .bufferedReader().use { it.readLines().first { row -> row.startsWith("24:1\t") } }.split('\t')
+        val alignment = EnglishWordAlignment.align(text, glosses.split('|'))!!
+        val spans = englishOwnedSpans(text.indices, alignment, text = text)
+        val word = ActiveWord(ayah = 1, wordPosition = 7, durationMs = 1200, activation = 0)
+        for (head in listOf("clear", "evidence")) {
+            val span = spans.single { text.indexOf(head) in it.range }
+            assertEquals(head, 7, span.position)
+            assertEquals(InkEngine.State.Active, InkEngine.word(span.position, word, isActiveAyah = true, dimmed = false).state)
+        }
+        assertTrue((alignment.through(8) * text.length).roundToInt() >= text.indexOf("evidence") + "evidence".length)
+        val remember = spans.single { text.indexOf("remember") in it.range }
+        assertEquals(InkEngine.State.Upcoming, InkEngine.word(remember.position, word, isActiveAyah = true, dimmed = false).state)
+    }
 
     @Test
     fun `first word reveals the opening woman phrase before the man`() {

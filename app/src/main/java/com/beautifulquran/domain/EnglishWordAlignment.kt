@@ -684,6 +684,7 @@ object EnglishWordAlignment {
     )
 
     private val PHRASES = mapOf(
+        "clear evidence" to "clear", "clear evidences" to "clear",
         "woman found guilty of sexual intercourse" to "fornicatress",
         "man found guilty of sexual intercourse" to "fornicator",
         "private parts" to "chastity", "head covers" to "headcover", "all aware" to "acquaint",
@@ -739,6 +740,7 @@ object EnglishWordAlignment {
         "سَقَىٰ" to "water", "لَيْل" to "night", "لَيْلَة" to "night", "مَال" to "wealth",
         "بَيْت" to "home", "دَار" to "home", "قَوْم" to "people", "سَبِيل" to "way", "صِرَٰط" to "way",
         "سَوَآء" to "soundness",
+        "بَيِّنَة" to "clear", "مُّبِين" to "clear",
         "مُسْمَع" to "hear", "أَعْلَم" to "omniscient", "شَكَرَ" to "grateful",
     ).mapValues { (_, meaning) -> inflection(meaning) }
 
@@ -771,6 +773,7 @@ object EnglishWordAlignment {
         "know" to setOf("evident"), "forgive" to setOf("forgiveness"), "die" to setOf("dead"),
         "write" to setOf("ordain", "decree"), "punishment" to setOf("punish"),
         "soundness" to setOf("right"),
+        "clear" to setOf("evidence"),
     ).mapKeys { (head, _) -> inflection(head) }.mapValues { (_, variants) -> variants.map(::inflection).toSet() }
 
     /** Complements/intensity the prose can leave implicit in the matched gloss head. */

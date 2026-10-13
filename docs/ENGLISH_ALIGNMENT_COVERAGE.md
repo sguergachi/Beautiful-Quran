@@ -13,11 +13,11 @@ the correct owner for repeat tint or a tap. These checks do not establish
 | Independent root/lemma meaning cues | 1,403 correspondences: all exact owners, no delayed washes |
 | Annotated exact meaning fixtures | 194 heads, including all 44 Acquainted occurrences, vision/brothers, prayer action/commerce, shared phrases, repeated clauses and lexical variants |
 | Gloss-independent QAC candidates | 12,011 additional checks using vocalized lemmas and POS; all 13,413 combined correspondences pass with twelve reference guesses corrected by the reviewed labels |
-| Quran.ai MCP review | The original 80 selected targets in 74 verses pass: 70 owner errors corrected, ten already-correct owners preserved; seven additional heads in 24:2–3, opening/female qualifiers, expanded descriptions, six modern-spelling targets and five word-card guard targets also pass |
-| Full semantic reference | 87 of 56,224 content tokens have model-reviewed, source-supported labels; 56,137 remain unreviewed and a complete independent benchmark is absent, so the 99.99% gate fails |
+| Quran.ai MCP review | The original 80 selected targets in 74 verses pass: 70 owner errors corrected, ten already-correct owners preserved; seven additional heads in 24:2–3, every “clear evidence/evidences” phrase in 32 verses, all main heads in 24:1, opening/female qualifiers, expanded descriptions, six modern-spelling targets and five word-card guard targets also pass |
+| Full semantic reference | 158 of 56,224 content tokens have model-reviewed, source-supported labels; 56,066 remain unreviewed and a complete independent benchmark is absent, so the 99.99% gate fails |
 | Six distinct meaning heads | All 720 Arabic orders check exact owners, taps and continuous prefix completion |
 | Reader transitions | Back to targets 2–12 with absent/stale/ahead focus, paused first-word waits, old/current generations, held/voice leaves; completed tails, same-verse seeks/repeats and playlist advances |
-| Carried English | Every eligible word-space cut in the prayer, reported-head and identity fixtures checks semantic owners and range/prefix continuity on both fragments |
+| Carried English | Every eligible word-space cut in the prayer, reported-head, identity, An-Nur opening and 32 clear-evidence fixtures checks semantic owners and range/prefix continuity on both fragments |
 
 Twelve root/lemma owner disagreements were corrected by distinguishing the
 divine Knower title from a nearby verb and preserving names across clauses.
@@ -87,7 +87,7 @@ owner is 45 and the wash remains continuous. Literal agreement is a diagnostic,
 including when it exceeds 99.99%; it does not certify semantic accuracy.
 
 These are model-adjudicated, selected labels grounded in fetched evidence.
-Quran.ai and this app share Quran.com/Quran Foundation data, and these 87
+Quran.ai and this app share Quran.com/Quran Foundation data, and these 158
 cases are not an independent representative sample or a complete gold corpus.
 
 The October 13 report exposed an uncovered opening in 24:2. Its word card
@@ -111,6 +111,22 @@ conjunction at word 6. A female qualifier recognizes the retrieved feminine
 source head without changing the male head. The rule requires that source
 head and preserves a wholly bracketed addition. These labels use the fetched
 [24:3 translation](https://quran.com/24:3?translations=20) and morphology.
+
+The further 24:1 report exposed an incomplete phrase: “clear” belonged to
+bayyināt at word 7, but “evidence” waited for word 8. The production mapper
+now treats “clear evidence/evidences” as a single printed meaning when the
+source names that meaning; separate literal adjective and noun cards keep
+separate owners. Bayyina and mubīn lexical heads distinguish repeated
+“clear” phrases, including the later clear authority in 4:153. The full
+frozen corpus has 32 occurrences: MCP Arabic, both translations and full
+morphology were retrieved for every verse, with verse-number tokens excluded
+when checking actual Arabic slots. Reviewed labels identified 28 wrong owners
+across 27 verses; all 64 phrase-token labels and every eligible carried cut
+now pass. The nine main heads of 24:1 also have exact-owner and tap tests, and
+its entire phrase has active ink before the following meaning. These are
+source-supported model reviews, including
+[Jalalayn on 24:1](https://quran.com/24:1/tafsirs/926), rather than a full
+independent benchmark.
 
 ## Establishing a semantic accuracy claim
 

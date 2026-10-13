@@ -11,8 +11,22 @@ import org.junit.Test
 /** Fixed meaning correspondences, including words a literal diagnostic cannot judge. */
 class EnglishSemanticAlignmentTest {
     @Test
+    fun `clear evidence and evidences keep their bayyinat owners across the Quran`() {
+        verifyCases("english-clear-evidence-owners.tsv", 32, checkTaps = true)
+    }
+
+    @Test
+    fun `a literal clear adjective and evidence noun retain separate owners`() {
+        val text = "clear evidence"
+        for (glosses in listOf(listOf("clear", "evidence"), listOf("evidence", "clear"))) {
+            assertEquals(glosses.indexOf("clear"), EnglishWordAlignment.ownerAt(text, glosses, 2))
+            assertEquals(glosses.indexOf("evidence"), EnglishWordAlignment.ownerAt(text, glosses, 8))
+        }
+    }
+
+    @Test
     fun `expanded gendered opening starts on the first Arabic word`() {
-        verifyCases("english-quran-ai-opening-owners.tsv", 2, checkTaps = true)
+        verifyCases("english-quran-ai-opening-owners.tsv", 3, checkTaps = true)
     }
 
     @Test

@@ -496,6 +496,9 @@ tween-vs-snap rules, sweep entry and residual rules, repeat wash timing, the
   preserve noun/verb ownership. Recovering a head missing from a grammatical
   card also requires the actual Arabic word to corroborate the lemma.
   Latin accent folding affects matching keys, preserving printed glyphs.
+  “Clear evidence/evidences” stays with its single source meaning (24:1
+  bayyināt: word 7); distinct literal adjective and noun cards retain their
+  separate owners. Bayyina/mubīn heads resolve repeated “clear” phrases.
   A gendered offender expanded as a woman/man recognizes its source card
   only when no literal gender or printed offender head competes. This keeps
   the opening phrase of 24:2 active on Arabic word 1. Its expanded offender
