@@ -865,6 +865,15 @@ fun HomeScreen(
                 ) {
                     val flight = ContinueFlightEase.transform(raw.coerceIn(0f, 1f))
                     val settled = if (docking) flight else 1f - flight
+                    // The ghost lives in the outer Box's content area, so
+                    // subtract the Scaffold padding the Box itself carries:
+                    // window bounds alone would land every flight low.
+                    val contentLeftPx = boxLeft + with(density) {
+                        padding.calculateStartPadding(layoutDirection).toPx()
+                    }
+                    val contentTopPx = boxTop + with(density) {
+                        padding.calculateTopPadding().toPx()
+                    }
                     // Scale about the layer's own center: translation lands
                     // the center on the target, scale grows 1 → bounds fit.
                     val scaleToX = lerp(1f, end.width / start.width, flight)
@@ -875,8 +884,8 @@ fun HomeScreen(
                         modifier = Modifier
                             .offset {
                                 IntOffset(
-                                    (start.left - boxLeft).roundToInt(),
-                                    (start.top - boxTop).roundToInt(),
+                                    (start.left - contentLeftPx).roundToInt(),
+                                    (start.top - contentTopPx).roundToInt(),
                                 )
                             }
                             .width(with(density) { start.width.toDp() })
