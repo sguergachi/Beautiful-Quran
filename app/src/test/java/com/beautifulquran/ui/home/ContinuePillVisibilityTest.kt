@@ -168,11 +168,11 @@ class ContinuePillVisibilityTest {
     }
 
     @Test
-    fun continueRowSitsAfterTopBreath() {
+    fun continueRowIndexIsItsSurahPosition() {
         val ids = (1..114).toList()
-        assertEquals(1, continueLazyIndex(ids, 1, false))
-        assertEquals(1 + 17, continueLazyIndex(ids, 18, false))
-        assertEquals(114, continueLazyIndex(ids, 114, false))
+        assertEquals(0, continueLazyIndex(ids, 1, false))
+        assertEquals(17, continueLazyIndex(ids, 18, false))
+        assertEquals(113, continueLazyIndex(ids, 114, false))
     }
 
     @Test

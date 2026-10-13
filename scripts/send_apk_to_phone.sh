@@ -45,8 +45,9 @@ Usage: scripts/send_apk_to_phone.sh [--release] [--zip] [--label TEXT] [--skip-b
   --zip          Zip the staged build (store only) and share the ZIP instead
   --label TEXT   What this build is, for the filename (default: the branch)
   --skip-build   Use the APK already in app/build/outputs
-  --published    Send the APK already at this worktree's known location
-                 (scripts/publish_apk.sh); build + publish only if none exists
+  --published    Send the APK at this worktree's known location
+                 (scripts/publish_apk.sh) when it matches HEAD on a clean
+                 tree; otherwise rebuild and republish it first
   --wait         Poll until a paired phone is reachable (default 300s)
   --name NAME    KDE Connect device name (default: first available)
   --keep-old     Do not delete previously staged builds after a successful send
@@ -101,11 +102,24 @@ PUBLISH=("$SCRIPT_DIR/publish_apk.sh" "--$KIND")
 
 # Every send goes through the worktree's known APK location (publish_apk.sh):
 # a build is published there, then the phone gets a named copy of it. With
-# --published an APK already there is sent as-is; only a missing one is built.
+# --published an APK already there is reused when it is current.
 if [[ "$PUBLISHED" -eq 1 ]]; then
-  if APK="$("${PUBLISH[@]}" --print)"; then :; else
-    APK="$("${PUBLISH[@]}" | tail -n 1)"
+  APK="$("${PUBLISH[@]}" --print || true)"
+  # Only an APK built from exactly this commit on a clean tree is sent as-is.
+  # Anything else is republished (gradle is a no-op when nothing changed): the
+  # action runs unattended, so a warning nobody reads would ship the old build.
+  if [[ -f "$APK" ]]; then
+    published_sha="$(sed -n 's/^sha=//p' "${APK%.apk}.info" 2>/dev/null | head -n 1)"
+    published_dirty="$(sed -n 's/^dirty=//p' "${APK%.apk}.info" 2>/dev/null | head -n 1)"
+    head_sha="$(cd "$REPO_ROOT" && git rev-parse --short=8 HEAD 2>/dev/null || true)"
+    dirty_now=0
+    [[ -z "$(cd "$REPO_ROOT" && git status --porcelain 2>/dev/null)" ]] || dirty_now=1
+    if [[ "$published_sha" != "$head_sha" || "$published_dirty" != 0 || "$dirty_now" -eq 1 ]]; then
+      printf 'Published APK is from %s (HEAD %s); republishing.\n' "${published_sha:-unknown}" "$head_sha" >&2
+      APK=""
+    fi
   fi
+  [[ -f "$APK" ]] || APK="$("${PUBLISH[@]}" | tail -n 1)"
 elif [[ "$SKIP_BUILD" -eq 1 ]]; then
   APK="$("${PUBLISH[@]}" --skip-build | tail -n 1)"
 else
@@ -117,17 +131,8 @@ fi
   exit 1
 }
 
-# What the published APK was built from. A name and a staleness check both
-# come from it, rather than from whatever HEAD happens to be at send time.
-info_value() { sed -n "s/^$1=//p" "${APK%.apk}.info" 2>/dev/null | head -n 1; }
-BUILT_SHA="$(info_value sha)"
-if [[ -n "$BUILT_SHA" ]]; then
-  HEAD_SHA="$(cd "$REPO_ROOT" && git rev-parse --short=8 HEAD 2>/dev/null || true)"
-  if [[ "$BUILT_SHA" != "$HEAD_SHA" || "$(info_value dirty)" == 1 ]]; then
-    printf 'warning: published APK was built at %s%s (HEAD is %s) — rebuild without --published if that is not what you want.\n' \
-      "$BUILT_SHA" "$([[ "$(info_value dirty)" == 1 ]] && echo ' with uncommitted changes')" "$HEAD_SHA" >&2
-  fi
-fi
+# The commit the published APK was built from names the file on the phone.
+BUILT_SHA="$(sed -n 's/^sha=//p' "${APK%.apk}.info" 2>/dev/null | head -n 1)"
 
 # Name it after the work, so the phone can tell one build from the next.
 slug() {

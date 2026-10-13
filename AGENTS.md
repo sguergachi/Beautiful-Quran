@@ -391,8 +391,8 @@ this document combined: `ReaderComponents.kt` (~36k tokens),
   it only in `app/build/outputs` or a `/tmp` name. `send_apk_to_phone.sh`
   always goes through it, and the **Send APK** action in T3 Code runs
   `send_apk_to_phone.sh --release --zip --published --wait`, which shares
-  what's there (building only if nothing is). Publish the APK for your final
-  commit before you hand back, so that button sends the right build.
+  the APK there when it matches HEAD on a clean tree, and rebuilds it first
+  otherwise.
 - Send a clearly named APK to the Pixel 10 after every completed code change,
   and **delete local staged copies once the phone confirms receipt**. Always
   delegate this to the cheap `apk-sender` subagent (haiku) following

@@ -18,8 +18,9 @@ Main session stays on code. Hand the subagent label + commit SHA only:
 built from. `send_apk_to_phone.sh` builds through it, so the sent file is
 always the published one. The T3 Code **Send APK** action runs
 `scripts/send_apk_to_phone.sh --release --zip --published --wait`: it sends the
-published APK as-is (building only if none exists) and warns when it was built
-from a different commit than HEAD or from a dirty tree.
+published APK as-is when it was built from HEAD on a clean tree, and
+republishes (rebuilds) first when it is missing, from another commit, or from a
+dirty tree — so the button never ships a stale build.
 
 ## Run
 

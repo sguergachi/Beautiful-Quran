@@ -1032,8 +1032,8 @@ internal fun continueDockEndInset(docked: Float): Dp =
 internal fun continueDockCapsAlpha(docked: Float): Float = 1f - docked.coerceIn(0f, 1f)
 
 /**
- * Lazy-column index of the reading-place row: the top breath, then every
- * surah in order (no section label outside search). Negative when the row
+ * Lazy-column index of the reading-place row: the surahs lead the list in
+ * order (no section label outside search, no spacer above them). Negative when the row
  * is not on the sheet — searching, or no reading place at all.
  */
 internal fun continueLazyIndex(
@@ -1043,7 +1043,7 @@ internal fun continueLazyIndex(
 ): Int {
     if (searching || continueId == null) return -1
     val position = surahIds.indexOf(continueId)
-    return if (position < 0) -1 else 1 + position
+    return if (position < 0) -1 else position
 }
 
 /**
