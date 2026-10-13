@@ -492,7 +492,11 @@ tween-vs-snap rules, sweep entry and residual rules, repeat wash timing, the
   English ownership also reads the loaded words' vocalized QAC lemmas. Shared
   phrase cards retain their lexical heads; equal repeated heads can cross
   clauses when their Arabic lemma is identical. Different meanings keep the
-  sentence guard. Full semantic certification requires a separate reviewed
+  sentence guard. Scoped gloss variants and reciprocal adjacent head cues
+  preserve noun/verb ownership. Recovering a head missing from a grammatical
+  card also requires the actual Arabic word to corroborate the lemma.
+  Latin accent folding affects matching keys, preserving printed glyphs.
+  Full semantic certification requires a separate reviewed
   reference; timing/frame counts do not supply those labels.
   Voice ownership and follow retain the last heard word's
   location through the silent tail, so a carried verse does not jump back to

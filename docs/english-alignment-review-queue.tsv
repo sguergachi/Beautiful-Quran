@@ -1,82 +1,83 @@
-# Candidate QAC correspondences, not reviewed gold labels. Frozen published corpus bc2f381494642ae7ed8950b3b77117f6a5d617becc11b51fd12516916f390449
-# verse	printed_head	QAC_candidate_owner	mapper_owner	wash_owner
-72:4	saying	3	6	6
-9:74	punishment	34	36	36
-88:24	punishment	3	4	4
-17:14	Day	5	7	7
-41:9	days	8	9	9
-41:12	days	5	6	6
-46:20	Day	14	15	15
-2:253	disbelieved	42	43	43
-3:70	disbelieve	4	5	5
-4:162	believers	19	20	20
-9:51	believers	14	13	13
-45:23	knowledge	9	8	8
-11:9	mercy	5	4	4
-18:2	reward	14	15	15
-28:25	reward	11	10	10
-39:35	reward	8	7	7
-12:76	religion	19	20	20
-28:23	water	3	20	20
-2:187	night	47	3	3
-10:27	night	20	21	21
-2:35	wife	5	6	6
-2:102	wife	42	43	43
-9:24	wives	7	8	8
-23:6	wives	3	4	4
-24:6	wives	3	4	4
-25:74	wives	7	8	8
-64:14	wives	6	7	7
-70:30	wives	3	4	4
-2:188	wealth	3	5	5
-29:41	home	11	12	12
-29:41	homes	14	15	15
-29:41	home	15	16	16
-18:107	Paradise	8	9	9
-4:90	people	5	6	6
-11:89	people	16	14	14
-18:86	people	13	14	14
-18:90	people	9	10	10
-18:93	people	9	10	10
-5:12	way	45	44	44
-5:16	path	7	18	18
-6:153	path	8	3	3
-6:153	way	12	13	13
-13:33	way	32	33	33
-14:3	way	9	10	10
-14:30	way	6	7	7
-29:38	path	14	15	15
-31:6	way	9	10	10
-31:15	way	19	20	20
-39:8	way	26	27	27
-40:29	way	25	26	26
-43:37	way	4	5	5
-47:34	path	6	7	7
-53:30	way	12	13	13
-12:14	eat	3	5	5
-25:7	eats	5	6	6
-25:8	eats	9	10	10
-2:285	hear	22	23	23
-4:46	heard	23	13	13
-4:46	hear	25	23	23
-5:7	hear	11	12	12
-5:83	hear	2	3	3
-6:36	hear	4	2	2
-7:198	hear	6	7	7
-3:167	known	1	15	15
-3:167	Knowing	15	31	31
-72:28	know	1	2	2
-28:72	see	2	21	21
-66:8	forgive	39	40	40
-9:84	died	6	7	7
-23:35	died	4	5	5
-23:82	died	3	4	4
-37:16	died	2	3	3
-2:154	killed	4	5	5
-5:32	slain	19	20	20
-9:111	kill	15	16	16
-9:111	killed	16	17	17
-14:7	grateful	5	6	6
-56:70	grateful	6	5	5
-7:145	wrote	1	2	2
-58:21	written	1	3	3
+# Quran.ai MCP 0.1.9 review of selected candidates; retrieved morphology, Sahih International, Abdel Haleem and Jalalayn for lexical evidence. Model adjudication, not a full independent benchmark.
+# Frozen app corpus SHA256: bc2f381494642ae7ed8950b3b77117f6a5d617becc11b51fd12516916f390449
+# verse	start	end	token	reviewed_owner	old_candidate	old_mapper	Arabic_word	lemma	WBW_translation	verdict	translation_source
+72:4	34	40	saying	3	3	6	يَقُولُ	قَالَ	speak 	confirmed-owner-error	https://quran.com/72:4?translations=20
+9:74	426	436	punishment	34	34	36	عَذَابًا	عَذَاب	(with) a punishment	confirmed-owner-error	https://quran.com/9:74?translations=20
+88:24	45	55	punishment	3	3	4	ٱلْعَذَابَ	عَذَاب	(with) the punishment	confirmed-owner-error	https://quran.com/88:24?translations=20
+17:14	78	81	Day	5	5	7	ٱلْيَوْمَ	يَوْم	today	confirmed-owner-error	https://quran.com/17:14?translations=20
+41:9	66	70	days	8	8	9	يَوْمَيْنِ	يَوْم	two periods	confirmed-owner-error	https://quran.com/41:9?translations=20
+41:12	50	54	days	5	5	6	يَوْمَيْنِ	يَوْم	two periods	confirmed-owner-error	https://quran.com/41:12?translations=20
+46:20	158	161	Day	14	14	15	فَٱلْيَوْمَ	يَوْم	So today	confirmed-owner-error	https://quran.com/46:20?translations=20
+2:253	427	438	disbelieved	42	42	43	كَفَرَ ۚ	كَفَرَ	denied	confirmed-owner-error	https://quran.com/2:253?translations=20
+3:70	38	48	disbelieve	4	4	5	تَكْفُرُونَ	كَفَرَ	you deny	confirmed-owner-error	https://quran.com/3:70?translations=20
+4:162	223	232	believers	19	19	20	وَٱلْمُؤْمِنُونَ	مُؤْمِن	and the ones who believe	confirmed-owner-error	https://quran.com/4:162?translations=20
+9:51	116	125	believers	14	14	13	ٱلْمُؤْمِنُونَ	مُؤْمِن	[so] let the believers put (their) trust	confirmed-owner-error	https://quran.com/9:51?translations=20
+45:23	97	106	knowledge	9	9	8	عِلْمٍۢ	عِلْم	knowingly	confirmed-owner-error	https://quran.com/45:23?translations=20
+11:9	30	35	mercy	5	5	4	رَحْمَةًۭ	رَحْمَة	(of) Mercy from Us	confirmed-owner-error	https://quran.com/11:9?translations=20
+18:2	157	163	reward	14	14	15	أَجْرًا	أَجْر	(is) a good reward	confirmed-owner-error	https://quran.com/18:2?translations=20
+28:25	113	119	reward	10	11	10	لِيَجْزِيَكَ	جَزَىٰ	that he may reward you	candidate-reference-error	https://quran.com/28:25?translations=20
+39:35	63	69	reward	7	8	7	وَيَجْزِيَهُمْ	جَزَىٰ	and reward them	candidate-reference-error	https://quran.com/39:35?translations=20
+12:76	198	206	religion	19	19	20	دِينِ	دِين	the law	confirmed-owner-error	https://quran.com/12:76?translations=20
+28:23	226	231	water	21	3	20	نَسْقِى	سَقَىٰ	We cannot water	confirmed-owner-error	https://quran.com/28:23?translations=20
+2:187	41	46	night	3	47	3	لَيْلَةَ	لَيْلَة	(in the) nights	candidate-reference-error	https://quran.com/2:187?translations=20
+10:27	234	239	night	20	20	21	ٱلَّيْلِ	لَيْل	the darkness (of) night	confirmed-owner-error	https://quran.com/10:27?translations=20
+2:35	42	46	wife	5	5	6	وَزَوْجُكَ	زَوْج	and your spouse	confirmed-owner-error	https://quran.com/2:35?translations=20
+2:102	453	457	wife	42	42	43	وَزَوْجِهِۦ ۚ	زَوْج	and his spouse	confirmed-owner-error	https://quran.com/2:102?translations=20
+9:24	68	73	wives	7	7	8	وَأَزْوَٰجُكُمْ	زَوْج	and your spouses	confirmed-owner-error	https://quran.com/9:24?translations=20
+23:6	18	23	wives	3	3	4	أَزْوَٰجِهِمْ	زَوْج	their spouses	confirmed-owner-error	https://quran.com/23:6?translations=20
+24:6	27	32	wives	3	3	4	أَزْوَٰجَهُمْ	زَوْج	their spouses	confirmed-owner-error	https://quran.com/24:6?translations=20
+25:74	54	59	wives	7	7	8	أَزْوَٰجِنَا	زَوْج	our spouses	confirmed-owner-error	https://quran.com/25:74?translations=20
+64:14	44	49	wives	6	6	7	أَزْوَٰجِكُمْ	زَوْج	your spouses	confirmed-owner-error	https://quran.com/64:14?translations=20
+70:30	18	23	wives	3	3	4	أَزْوَٰجِهِمْ	زَوْج	their spouses	confirmed-owner-error	https://quran.com/70:30?translations=20
+2:188	33	39	wealth	3	3	5	أَمْوَٰلَكُم	مَال	your properties	confirmed-owner-error	https://quran.com/2:188?translations=20
+29:41	93	97	home	11	11	12	بَيْتًۭا ۖ	بَيْت	a house	confirmed-owner-error	https://quran.com/29:41?translations=20
+29:41	126	131	homes	14	14	15	ٱلْبُيُوتِ	بَيْت	(of) houses	confirmed-owner-error	https://quran.com/29:41?translations=20
+29:41	139	143	home	15	15	16	لَبَيْتُ	بَيْت	(is) surely (the) house	confirmed-owner-error	https://quran.com/29:41?translations=20
+18:107	89	97	Paradise	9	8	9	ٱلْفِرْدَوْسِ	فِرْدَوْس	(of) the Paradise	candidate-reference-error	https://quran.com/18:107?translations=20
+4:90	40	46	people	5	5	6	قَوْمٍۭ	قَوْم	a group	confirmed-owner-error	https://quran.com/4:90?translations=20
+11:89	152	158	people	16	16	14	قَوْمَ	قَوْم	people of Salih	confirmed-owner-error	https://quran.com/11:89?translations=20
+18:86	123	129	people	13	13	14	قَوْمًۭا ۗ	قَوْم	a community	confirmed-owner-error	https://quran.com/18:86?translations=20
+18:90	70	76	people	9	9	10	قَوْمٍۢ	قَوْم	a community	confirmed-owner-error	https://quran.com/18:90?translations=20
+18:93	78	84	people	9	9	10	قَوْمًۭا	قَوْم	a community	confirmed-owner-error	https://quran.com/18:93?translations=20
+5:12	450	453	way	45	45	44	ٱلسَّبِيلِ	سَبِيل	the right	confirmed-owner-error	https://quran.com/5:12?translations=20
+5:16	174	178	path	17	7	18	صِرَٰطٍۢ	صِرَٰط	(the) way	confirmed-owner-error	https://quran.com/5:16?translations=20
+6:153	28	32	path	3	8	3	صِرَٰطِى	صِرَٰط	(is) My path	candidate-reference-error	https://quran.com/6:153?translations=20
+6:153	134	137	way	12	12	13	سَبِيلِهِۦ ۚ	سَبِيل	His path	confirmed-owner-error	https://quran.com/6:153?translations=20
+13:33	364	367	way	32	32	33	ٱلسَّبِيلِ ۗ	سَبِيل	the Path	confirmed-owner-error	https://quran.com/13:33?translations=20
+14:3	84	87	way	9	9	10	سَبِيلِ	سَبِيل	(the) Path	confirmed-owner-error	https://quran.com/14:3?translations=20
+14:30	70	73	way	6	6	7	سَبِيلِهِۦ ۗ	سَبِيل	His Path	confirmed-owner-error	https://quran.com/14:30?translations=20
+29:38	172	176	path	14	14	15	ٱلسَّبِيلِ	سَبِيل	the Way	confirmed-owner-error	https://quran.com/29:38?translations=20
+31:6	86	89	way	9	9	10	سَبِيلِ	سَبِيل	(the) path	confirmed-owner-error	https://quran.com/31:6?translations=20
+31:15	181	184	way	19	19	20	سَبِيلَ	سَبِيل	(the) path	confirmed-owner-error	https://quran.com/31:15?translations=20
+39:8	236	239	way	26	26	27	سَبِيلِهِۦ ۚ	سَبِيل	His Path	confirmed-owner-error	https://quran.com/39:8?translations=20
+40:29	238	241	way	25	25	26	سَبِيلَ	سَبِيل	(to the) path	confirmed-owner-error	https://quran.com/40:29?translations=20
+43:37	43	46	way	4	4	5	ٱلسَّبِيلِ	سَبِيل	the Path	confirmed-owner-error	https://quran.com/43:37?translations=20
+47:34	60	64	path	6	6	7	سَبِيلِ	سَبِيل	(the) way	confirmed-owner-error	https://quran.com/47:34?translations=20
+53:30	89	92	way	12	12	13	سَبِيلِهِۦ	سَبِيل	His Path	confirmed-owner-error	https://quran.com/53:30?translations=20
+12:14	29	32	eat	3	3	5	أَكَلَهُ	أَكَلَ	eats him	confirmed-owner-error	https://quran.com/12:14?translations=20
+25:7	43	47	eats	5	5	6	يَأْكُلُ	أَكَلَ	eat	confirmed-owner-error	https://quran.com/25:7?translations=20
+25:8	104	108	eats	9	9	10	يَأْكُلُ	أَكَلَ	he may eat	confirmed-owner-error	https://quran.com/25:8?translations=20
+2:285	267	271	hear	22	22	23	سَمِعْنَا	سَمِعَ	We heard	confirmed-owner-error	https://quran.com/2:285?translations=20
+4:46	122	127	heard	13	23	13	مُسْمَعٍۢ	مُسْمَع	to be heard	candidate-reference-error	https://quran.com/4:46?translations=20
+4:46	229	233	hear	23	25	23	سَمِعْنَا	سَمِعَ	We hear[d]	candidate-reference-error	https://quran.com/4:46?translations=20
+5:7	101	105	hear	11	11	12	سَمِعْنَا	سَمِعَ	We heard	confirmed-owner-error	https://quran.com/5:7?translations=20
+5:83	14	18	hear	2	2	3	سَمِعُوا۟	سَمِعَ	they listen	confirmed-owner-error	https://quran.com/5:83?translations=20
+6:36	15	19	hear	4	4	2	يَسْمَعُونَ ۘ	سَمِعَ	listen	confirmed-owner-error	https://quran.com/6:36?translations=20
+7:198	48	52	hear	6	6	7	يَسْمَعُوا۟ ۖ	سَمِعَ	do they not	confirmed-owner-error	https://quran.com/7:198?translations=20
+3:167	160	165	known	15	1	15	نَعْلَمُ	عَلِمَ	we knew	candidate-reference-error	https://quran.com/3:167?translations=20
+3:167	349	356	Knowing	31	15	31	أَعْلَمُ	أَعْلَم	(is) Most Knowing	candidate-reference-error	https://quran.com/3:167?translations=20
+72:28	12	16	know	1	1	2	لِّيَعْلَمَ	عَلِمَ	That He may make evident	confirmed-owner-error	https://quran.com/72:28?translations=20
+28:72	199	202	see	21	2	21	تُبْصِرُونَ	أَبْصَرَ	you see	candidate-reference-error	https://quran.com/28:72?translations=20
+66:8	371	378	forgive	39	39	40	وَٱغْفِرْ	غَفَرَ	and grant forgiveness	confirmed-owner-error	https://quran.com/66:8?translations=20
+9:84	75	79	died	6	6	7	مَّاتَ	مَّاتَ	who dies	confirmed-owner-error	https://quran.com/9:84?translations=20
+23:35	39	43	died	4	4	5	مِتُّمْ	مَّاتَ	you are dead	confirmed-owner-error	https://quran.com/23:35?translations=20
+23:82	25	29	died	3	3	4	مِتْنَا	مَّاتَ	we are dead	confirmed-owner-error	https://quran.com/23:82?translations=20
+37:16	13	17	died	2	2	3	مِتْنَا	مَّاتَ	we are dead	confirmed-owner-error	https://quran.com/37:16?translations=20
+2:154	35	41	killed	4	4	5	يُقْتَلُ	قَتَلَ	are slain	confirmed-owner-error	https://quran.com/2:154?translations=20
+5:32	158	163	slain	19	19	20	قَتَلَ	قَتَلَ	he has killed	confirmed-owner-error	https://quran.com/5:32?translations=20
+9:111	170	174	kill	15	15	16	فَيَقْتُلُونَ	قَتَلَ	they slay	confirmed-owner-error	https://quran.com/9:111?translations=20
+9:111	183	189	killed	16	16	17	وَيُقْتَلُونَ ۖ	قَتَلَ	and they are slain	confirmed-owner-error	https://quran.com/9:111?translations=20
+14:7	54	62	grateful	5	5	6	شَكَرْتُمْ	شَكَرَ	you are thankful	confirmed-owner-error	https://quran.com/14:7?translations=20
+56:70	58	66	grateful	6	6	5	تَشْكُرُونَ	شَكَرَ	then why are you not grateful	confirmed-owner-error	https://quran.com/56:70?translations=20
+7:145	7	12	wrote	1	1	2	وَكَتَبْنَا	كَتَبَ	And We ordained (laws)	confirmed-owner-error	https://quran.com/7:145?translations=20
+58:21	10	17	written	1	1	3	كَتَبَ	كَتَبَ	Allah has decreed	confirmed-owner-error	https://quran.com/58:21?translations=20

@@ -11,6 +11,49 @@ import org.junit.Test
 /** Fixed meaning correspondences, including words a literal diagnostic cannot judge. */
 class EnglishSemanticAlignmentTest {
     @Test
+    fun `quran ai reviewed owners distinguish synonyms shared heads and false reference cues`() {
+        verifyCases("english-quran-ai-owners.tsv", 74, checkTaps = true)
+    }
+
+    @Test
+    fun `word cards reject clamped lemma positions and keep home distinct from house`() {
+        verifyCases("english-quran-ai-word-card-owners.tsv", 3, checkTaps = true)
+    }
+
+    @Test
+    fun `modern quran ai translation spelling keeps named heads in place`() {
+        verifyCases("english-quran-ai-modern-owners.tsv", 2, checkTaps = true)
+    }
+
+    @Test
+    fun `decomposed Latin accents stay inside the printed word`() {
+        val text = "Alla\u0304h"
+        val alignment = EnglishWordAlignment.align(text, listOf("Allah"), listOf("ٱللَّه"))!!
+        assertEquals(1, alignment.spans.single().position)
+        assertEquals(0, EnglishWordAlignment.ownerAt(text, listOf("Allah"), 3, listOf("ٱللَّه")))
+    }
+
+    @Test
+    fun `reversed neighbouring heads require reciprocal lexical evidence`() {
+        val text = "soundness of the way"
+        val lemmas = listOf("سَوَآء", "سَبِيل")
+        val glosses = listOf("the way", "the right")
+        assertEquals(0, EnglishWordAlignment.ownerAt(text, glosses, 3, lemmas))
+        assertEquals(1, EnglishWordAlignment.ownerAt(text, glosses, text.length - 2, lemmas))
+        assertNull(EnglishWordAlignment.ownerAt(text, listOf("song", "the right"), text.length - 2, lemmas))
+    }
+
+    @Test
+    fun `a grammatical negative card needs complete Arabic evidence for its missing verb`() {
+        val text = "we do not hear"
+        val glosses = listOf("we do not", "and")
+        assertEquals(0, EnglishWordAlignment.ownerAt(text, glosses, text.length - 2, listOf("سَمِعَ", "و"), listOf("يَسْمَعُوا", "و")))
+        assertNull(EnglishWordAlignment.ownerAt(text, glosses, text.length - 2, listOf("سَمِعَ", "و")))
+        assertNull(EnglishWordAlignment.ownerAt(text, glosses, text.length - 2, listOf("سَمِعَ")))
+        assertNull(EnglishWordAlignment.ownerAt(text, glosses, text.length - 2))
+    }
+
+    @Test
     fun `different Arabic burdens retain the sentence guard with morphology present`() {
         verifyCases("english-distinct-owners.tsv", 1)
     }
@@ -216,7 +259,7 @@ class EnglishSemanticAlignmentTest {
         assertEquals(1, alignment.positionAt(0.8f))
     }
 
-    private fun verifyCases(resource: String, verses: Int, exact: Boolean = true, withLemmas: Boolean = true) {
+    private fun verifyCases(resource: String, verses: Int, exact: Boolean = true, withLemmas: Boolean = true, checkTaps: Boolean = false) {
         val cases = javaClass.getResourceAsStream("/$resource")!!
             .bufferedReader().use { it.readLines() }
         assertEquals(verses, cases.size)
@@ -225,17 +268,22 @@ class EnglishSemanticAlignmentTest {
             val columns = line.split('\t')
             val (verse, text, glosses, targets) = columns
             val lemmas = if (withLemmas) columns.getOrNull(4)?.split('|').orEmpty() else emptyList()
-            val alignment = EnglishWordAlignment.align(text, glosses.split('|'), lemmas)!!
+            val arabic = columns.getOrNull(5)?.split('|').orEmpty()
+            val alignment = EnglishWordAlignment.align(text, glosses.split('|'), lemmas, arabic)!!
             for (target in targets.split('|')) {
                 val match = Regex("(.+?)(?:#(\\d+))?=(\\d+)").matchEntire(target)!!
                 val (word, occurrence, position) = match.destructured
-                val at = Regex("\\b${Regex.escape(word)}\\b", RegexOption.IGNORE_CASE)
+                val at = Regex("(?U)\\b${Regex.escape(word)}\\b", RegexOption.IGNORE_CASE)
                     .findAll(text).elementAt((occurrence.toIntOrNull() ?: 1) - 1).range.first
                 val actual = alignment.positionAt((at + word.length / 2f) / text.length)
                 if (exact && actual != position.toInt()) failures += "$verse $target was $actual"
                 val end = (at + word.length - 0.5f) / text.length
                 val washed = alignment.washSpans.single { end >= it.from && end < it.to }.position
                 if (washed > position.toInt()) failures += "$verse $target wash was $washed"
+                if (checkTaps) {
+                    val tap = EnglishWordAlignment.ownerAt(text, glosses.split('|'), at + word.length / 2, lemmas, arabic)
+                    if (tap != null && tap + 1 != position.toInt()) failures += "$verse $target tap was ${tap + 1}"
+                }
             }
         }
         assertEquals(emptyList<String>(), failures)

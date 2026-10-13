@@ -44,7 +44,7 @@ fun main(args: Array<String>) {
         val text = if (args.size > 1) com.beautifulquran.domain.EnglishTypography.lyricize(
             gloss.split('|'), columns[4].split('|'),
         ).filter { it.isNotBlank() }.joinToString(" ") else published
-        val alignment = EnglishWordAlignment.align(text, gloss.split('|'), columns[3].split('|')) ?: error(key)
+        val alignment = EnglishWordAlignment.align(text, gloss.split('|'), columns[3].split('|'), columns[4].split('|')) ?: error(key)
         fun encode(spans: List<com.beautifulquran.domain.EnglishWordSpan>) = spans.joinToString(";") {
             "${(it.from * text.length).roundToInt()},${(it.to * text.length).roundToInt()},${it.position}"
         }
@@ -110,7 +110,20 @@ def decode(encoded):
     return [tuple(map(int,span.split(','))) for span in encoded.split(';')]
 
 maps={k:(decode(owned),decode(wash)) for k,owned,wash in (l.split('\t') for l in (root/'ownership.tsv').read_text().splitlines())}
-counts=collections.Counter();issues=[]
+# Validate reviewed labels before using them to adjudicate dictionary guesses.
+population={(key,a,b):(text[a:b],len(gs.split('|'))) for key,text,gs in rows
+            for word,a,b,added in tokens(text) if not added and word not in stop}
+reference={}
+if args.semantic_reference:
+    for line in args.semantic_reference.read_text().splitlines():
+        if not line or line.startswith('#'): continue
+        key,start,end,word,expected=line.split('\t')
+        point=(key,int(start),int(end))
+        assert point in population and population[point][0]==word,(point,'reference differs from frozen corpus')
+        assert point not in reference,(point,'duplicate label cannot increase accuracy')
+        reference[point]=int(expected) if expected else None
+        assert reference[point] is None or 1<=reference[point]<=population[point][1],(point,'invalid Arabic owner')
+counts=collections.Counter();issues=[];candidate_reference_issues=[]
 prior={k:list(map(int,e.split(','))) for k,e in (line.split('\t') for line in args.baseline_ends.read_text().splitlines())} if args.baseline_ends else {}
 for key,text,gs in rows:
     glosses=gs.split('|'); owned,wash=maps[key]
@@ -212,6 +225,11 @@ if args.meaning_cases or args.arabic_cases:
                 owned,wash=maps[key]
                 actual=next(p for a,b,p in owned if a<=middle<b)
                 washed=next(p for a,b,p in wash if a<=match.end()-1<b)
+                reviewed=reference.get((key,match.start(),match.end()))
+                if reviewed is not None and reviewed!=expected:
+                    candidate_reference_issues.append((key,match.group(),expected,reviewed,actual))
+                    counts['candidate_reference_disagreement']+=1
+                    expected=reviewed
                 counts['morphology_meaning_cases']+=1
                 if not uses_gloss: counts['independent_arabic_cases']+=1
                 covered+=1
@@ -225,20 +243,9 @@ if args.meaning_cases or args.arabic_cases:
 (root/'ownership-audit.json').write_text(json.dumps(dict(counts),indent=2)+'\n')
 (root/'ownership-issues.tsv').write_text('\n'.join('\t'.join(map(str,r)) for r in issues)+'\n')
 (root/'meaning-issues.tsv').write_text('\n'.join('\t'.join(map(str,r)) for r in meaning_issues)+'\n')
+(root/'candidate-reference-issues.tsv').write_text('\n'.join('\t'.join(map(str,r)) for r in candidate_reference_issues)+'\n')
 
 # Repeated timing/frame checks and dictionary candidates cannot fill in gold labels.
-population={(key,a,b):(text[a:b],len(gs.split('|'))) for key,text,gs in rows
-            for word,a,b,added in tokens(text) if not added and word not in stop}
-reference={}
-if args.semantic_reference:
-    for line in args.semantic_reference.read_text().splitlines():
-        if not line or line.startswith('#'): continue
-        key,start,end,word,expected=line.split('\t')
-        point=(key,int(start),int(end))
-        assert point in population and population[point][0]==word,(point,'reference differs from frozen corpus')
-        assert point not in reference,(point,'duplicate label cannot increase accuracy')
-        reference[point]=int(expected) if expected else None
-        assert reference[point] is None or 1<=reference[point]<=population[point][1],(point,'invalid Arabic owner')
 correct=0; reviewed=0; wrong=[]
 template=[]
 for (key,start,end),(word,_) in population.items():
@@ -255,6 +262,7 @@ denominator=len(population)
 lower=decimal.Decimal(100)*correct/denominator if denominator else decimal.Decimal(0)
 certificate={'corpus_sha256':hashlib.sha256(((root/'corpus.tsv') if args.word_by_word else args.corpus).read_bytes()).hexdigest(),
              'mapper_sha256':hashlib.sha256((source/'domain/EnglishWordAlignment.kt').read_bytes()).hexdigest(),
+             'reference_sha256':hashlib.sha256(args.semantic_reference.read_bytes()).hexdigest() if args.semantic_reference else None,
              'text_source':'word-cards' if args.word_by_word else 'published',
              'population_content_tokens':denominator,'reviewed':reviewed,'correct':correct,
              'disagreements':len(wrong),'unreviewed':denominator-reviewed,

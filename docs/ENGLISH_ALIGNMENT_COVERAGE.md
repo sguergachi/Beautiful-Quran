@@ -12,8 +12,9 @@ the correct owner for repeat tint or a tap. These checks do not establish
 | Boundary and seek queries, each English source | 12,384,384 checks in forward, backward and scrambled order; same clock gives the same word, high-water ink, repeat chain and handoff |
 | Independent root/lemma meaning cues | 1,403 correspondences: all exact owners, no delayed washes |
 | Annotated exact meaning fixtures | 194 heads, including all 44 Acquainted occurrences, vision/brothers, prayer action/commerce, shared phrases, repeated clauses and lexical variants |
-| Gloss-independent QAC candidates | 12,011 additional checks using exact vocalized lemmas and POS; combined rules flag 80 disagreements for review, not a semantic accuracy score |
-| Full semantic reference | 56,224 non-added English content tokens; a complete independent reference is absent, so the 99.99% gate fails |
+| Gloss-independent QAC candidates | 12,011 additional checks using vocalized lemmas and POS; all 13,413 combined correspondences pass with twelve reference guesses corrected by the reviewed labels |
+| Quran.ai MCP review | 80 selected targets in 74 verses pass: 70 owner errors corrected, ten already-correct owners preserved; six modern-spelling targets and five word-card guard targets also pass |
+| Full semantic reference | 80 of 56,224 content tokens have model-reviewed, source-supported labels; 56,144 remain unreviewed and a complete independent benchmark is absent, so the 99.99% gate fails |
 | Six distinct meaning heads | All 720 Arabic orders check exact owners, taps and continuous prefix completion |
 | Reader transitions | Back to targets 2–12 with absent/stale/ahead focus, paused first-word waits, old/current generations, held/voice leaves; completed tails, same-verse seeks/repeats and playlist advances |
 | Carried English | Every eligible word-space cut in the prayer, reported-head and identity fixtures checks semantic owners and range/prefix continuity on both fragments |
@@ -47,8 +48,47 @@ candidates for linguistic review, not automatically gold labels. The source
 word counts reject ten verses whose bundled QAC positions are clamped against
 a different segmentation. `untrusted-morphology.tsv` preserves their keys and
 counts. Counts alone cannot resolve translation expansion, omitted nouns,
-pronoun references or alternate senses; all 80 remaining candidate
-disagreements stay in `meaning-issues.tsv` for review.
+pronoun references or alternate senses.
+
+The 80 October 12 flags were reviewed through the official Quran.ai MCP
+(`https://mcp.quran.ai`, server 0.1.9), after `fetch_grounding_rules`.
+`fetch_word_morphology` and `fetch_quran` supplied Arabic evidence;
+`fetch_translation` supplied Sahih International and Abdel Haleem. Jalalayn
+was selected from `list_editions` for concise word-level parsing and fetched
+for the adjacent phrase in [5:12](https://quran.com/5:12/tafsirs/926). All returned verse keys were checked against
+the request. Raw responses and the full corpus stay in private audit scratch.
+
+The review found 70 owner errors and ten already-correct owners. Twelve
+dictionary guesses were wrong: ten were false alarms, while two identified
+an error but proposed the wrong correction. Noun/verb ambiguity and different
+translation wording caused these mistakes. The complete selected review is
+in [english-alignment-review-queue.tsv](english-alignment-review-queue.tsv),
+and its character-bound labels are in
+[english-alignment-reviewed-owners.tsv](english-alignment-reviewed-owners.tsv).
+The audit uses reviewed labels ahead of dictionary guesses and retains every
+conflict in `candidate-reference-issues.tsv`.
+
+The mapper now distinguishes punishment from its verb, recognizes scoped
+gloss variants, and keeps repeated night/home/reward families from stealing
+a differently worded head. Reversed adjacent gloss heads require reciprocal
+Arabic identities. A grammatical card with no head requires the actual
+Arabic word to corroborate its lemma; this prevents three clamped-position
+regressions exposed by the full word-card scan. Latin accents are normalized
+only in matching keys, preserving printed words and combining marks.
+
+On the R8 release emulator, holding “punishment” in 88:24 opens `العذاب`,
+while “punish” opens `فيعذبه`. Holding “hear” in 7:198 opens `يسمعوا`, even
+though its input word card says only “do they not.” These checks exercise
+the production reader's Arabic-evidence wiring as well as the pure mapper.
+
+The word-card literal diagnostic has one discrepancy: the card labels “way”
+at 5:12 as word 44, while Arabic `السبيل` is word 45. The reviewed semantic
+owner is 45 and the wash remains continuous. Literal agreement is a diagnostic,
+including when it exceeds 99.99%; it does not certify semantic accuracy.
+
+These are model-adjudicated, selected labels grounded in fetched evidence.
+Quran.ai and this app share Quran.com/Quran Foundation data, and these 80
+cases are not an independent representative sample or a complete gold corpus.
 
 ## Establishing a semantic accuracy claim
 
@@ -83,6 +123,8 @@ Run the existing ownership audit on a locally exported, frozen runtime TSV
 (`verse_key`, published translation, Arabic-ordered glosses joined by `|`).
 Pass the annotated exact fixtures with `--semantic-cases`, the spoken fixtures
 with `--spoken-cases`, and `english-meaning-cues.tsv` with `--meaning-cases`.
+Use `--semantic-reference docs/english-alignment-reviewed-owners.tsv` with
+the additional Arabic rules to apply and expose the selected adjudications.
 Add `--strict-meaning-owners` to require exact owners; it currently reports the
 shared-card ambiguities (now none in that original cue set). For the current public database, supply all six reviewed runtime packs to
 `audit_reader_sync.py` with repeated `--runtime-pack /path/to/pack.json` flags.
