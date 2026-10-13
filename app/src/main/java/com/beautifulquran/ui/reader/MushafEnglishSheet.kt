@@ -99,6 +99,7 @@ import com.beautifulquran.ui.theme.shapedWordBloom
 import kotlin.math.roundToInt
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.distinctUntilChanged
 
 /**
  * The English leaf — the same Madinah page, set as a page of a book.
@@ -563,23 +564,20 @@ internal data class EnglishInkSpan(val range: IntRange, val position: Int, val f
 /** A fading tint after a backward seek must not reveal words beyond the new prefix. */
 internal fun englishInkLayerAllowed(state: InkEngine.State): Boolean = state != InkEngine.State.Upcoming
 
-/** Animate between media polls on every frame; pause or a seek abandons the previous motion. */
+/** Run continuously like scroll ink; only transport changes interrupt the spoken clock. */
 @Composable
 private fun rememberAnimatedEnglishWashClock(clock: State<EnglishWashClock?>): State<EnglishWashClock?> {
     val sample = remember { mutableStateOf<EnglishWashClock?>(null) }
     LaunchedEffect(clock) {
-        var previous: EnglishWashClock? = null
-        snapshotFlow { clock.value }.collectLatest { next ->
-            val prior = previous
-            previous = next
-            if (next == null || !next.samePerformanceAs(prior) || next.positionMs == prior?.positionMs) {
+        snapshotFlow { clock.value }
+            .distinctUntilChanged { prior, next -> next?.runsWith(prior) == true || next == prior }
+            .collectLatest { next ->
                 sample.value = next
-            } else {
+                if (next?.isPlaying != true || next.sampledAtNanos == 0L) return@collectLatest
                 do {
-                    sample.value = withFrameNanos { next.frameAt(it, prior) }
-                } while (sample.value!!.positionMs < next.positionMs)
+                    sample.value = withFrameNanos { next.frameAt(it) }
+                } while (sample.value!!.positionMs < (next.segments.lastOrNull()?.endMs ?: next.positionMs))
             }
-        }
     }
     return sample
 }
@@ -1333,9 +1331,6 @@ private fun englishVerseBlooms(
             else -> 1f
         }
     var washEdge = verse.range.first.toFloat()
-    val repeatProgress = performing?.takeIf { it.isRepeat }?.let {
-        EnglishWashWindow(it.startMs, it.startMs + it.durationMs).progress(positionMs ?: it.startMs)
-    } ?: 1f
     if (motions.isEmpty()) {
         // No clock of its own: a leaf the voice is not on, waiting or settled.
         if (cover > 0f) blooms += cover(verse.range, paper, cover)
@@ -1372,8 +1367,8 @@ private fun englishVerseBlooms(
         blooms += cover(verse.markRange, paper, markCover)
     }
     if (motions.isNotEmpty()) {
-        blooms.addEnglishInkLayerBlooms(washSpans, motions, palette, glintInk, repeatLayers = false, washEdge, repeatProgress)
-        blooms.addEnglishInkLayerBlooms(spans, motions, palette, glintInk, repeatLayers = true, washEdge, repeatProgress)
+        blooms.addEnglishInkLayerBlooms(washSpans, motions, palette, glintInk, repeatLayers = false, washEdge)
+        blooms.addEnglishInkLayerBlooms(spans, motions, palette, glintInk, repeatLayers = true, washEdge)
     }
     return blooms
 }
@@ -1420,7 +1415,6 @@ private fun MutableList<ShapedWordBloom>.addEnglishInkLayerBlooms(
     glintInk: Color?,
     repeatLayers: Boolean,
     washEdge: Float,
-    activeRepeatProgress: Float,
 ) {
     spans.forEach { owned ->
         val motion = motions.getOrNull(owned.position - 1) ?: return@forEach
@@ -1432,7 +1426,7 @@ private fun MutableList<ShapedWordBloom>.addEnglishInkLayerBlooms(
         val span = owned.range
         val laid = englishInkLayerProgress(span, washEdge)
         if (laid <= 0f) return@forEach
-        val repeatProgress = minOf(motion.repeatProgress, if (motion.isActive) activeRepeatProgress else 1f)
+        val repeatProgress = motion.repeatProgress
         if (repeating) {
             add(
                 ShapedWordBloom.ColorReveal(

@@ -686,6 +686,10 @@ class ReaderViewModel(
             val clockMs = highlightClock.sample(np, rawMs)
             _englishWashClock.value = EnglishWashClock(
                 np.surahId, np.ayah, events.inkId, clockMs, voiceMs, segments, sampledAtNanos = System.nanoTime(),
+                isPlaying = player.state.value.isPlaying && !player.state.value.isBuffering,
+                speed = player.state.value.speed,
+                clockId = events.clockId,
+                correctionMs = lastHighlightLeadMs - lastOutputLatencyMs,
             )
                 .after(_englishWashClock.value)
             val info = prepared?.activeInfo(clockMs)

@@ -1392,8 +1392,9 @@ complete in a single frame takes ~370 ms of rise.
 clock runs from its first Arabic owner to the next band's first occurrence,
 the first repeat, or the final spoken segment's end. First-pass ink
 finishes before a re-say starts its tint; it does not stretch across that
-repeat. Media samples are interpolated on every display frame, one 33 ms poll
-behind, with no extrapolation or restarting tween. This includes source words reordered into
+repeat. As in scroll view, one continuous animation follows the spoken duration
+at the playback speed, bounded by the known spoken end. Position polls never
+interrupt it; transport changes re-anchor it. This includes source words reordered into
 earlier English: in 24:2 the last English band keeps washing while Arabic
 finishes “a group of the believers.” Pauses freeze the edge, speed changes
 follow the media clock, and a carried band crosses its first fragment before

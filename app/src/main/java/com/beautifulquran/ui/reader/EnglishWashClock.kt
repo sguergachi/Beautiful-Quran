@@ -12,18 +12,27 @@ internal data class EnglishWashClock(
     val voiceStartMs: Long,
     val segments: List<Segment> = emptyList(),
     val sampledAtNanos: Long = 0L,
+    val isPlaying: Boolean = false,
+    val speed: Float = 1f,
+    val clockId: Long = 0L,
+    val correctionMs: Long = 0L,
 ) {
     /** Position samples may interpolate only within one audible performance. */
     fun samePerformanceAs(other: EnglishWashClock?): Boolean =
         other != null && surahId == other.surahId && ayah == other.ayah && activation == other.activation
 
-    /** Resample one poll behind the voice at vsync; never guess future audio or restart a tween. */
-    fun frameAt(frameNanos: Long, previous: EnglishWashClock?): EnglishWashClock {
-        if (previous == null || !samePerformanceAs(previous) || positionMs <= previous.positionMs ||
-            sampledAtNanos <= previous.sampledAtNanos) return this
-        val progress = ((frameNanos - 33_000_000L - previous.sampledAtNanos).toDouble() /
-            (sampledAtNanos - previous.sampledAtNanos)).coerceIn(0.0, 1.0)
-        return copy(positionMs = previous.positionMs + ((positionMs - previous.positionMs) * progress).toLong())
+    /** Ordinary position polls do not interrupt a spoken-duration animation. */
+    fun runsWith(other: EnglishWashClock?): Boolean = other != null && samePerformanceAs(other) &&
+        isPlaying == other.isPlaying && speed == other.speed && clockId == other.clockId &&
+        correctionMs == other.correctionMs && segments === other.segments
+
+    /** The scroll reader's continuous linear clock, bounded by the known spoken end. */
+    fun frameAt(frameNanos: Long): EnglishWashClock {
+        if (!isPlaying || sampledAtNanos == 0L) return this
+        val elapsedMs = (frameNanos - sampledAtNanos).coerceAtLeast(0L) / 1_000_000.0
+        val end = segments.lastOrNull()?.endMs ?: positionMs
+        return copy(positionMs = (positionMs + elapsedMs * speed).toLong()
+            .coerceIn(positionMs, maxOf(positionMs, end)))
     }
 
     fun matches(word: ActiveWord, surahId: Int): Boolean =

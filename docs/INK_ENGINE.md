@@ -643,16 +643,17 @@ page on each tick. Each continuous English band lasts from its first Arabic
 owner until the next band's first occurrence, the first repeat, or
 the last spoken segment ends, whichever comes first. Re-says never extend the
 first wash: Alafasy's 24:1 “clear evidence” is fully laid when he returns to
-“and We revealed.” Media samples are interpolated on every display frame,
-one 33 ms poll behind, rather than painted as steps or restarted tweens. The
-active word's onset closes preceding ink before its repeat tint begins. No
-future audio is extrapolated. In 24:2, “their punishment” starts on word 23 but
+“and We revealed.” Like scroll ink, a single continuous linear animation runs
+from the calibrated media position at the playback speed to the known spoken
+end. Ordinary position polls never stop or restart it. Pause, buffering, speed,
+seek, source and output-correction changes re-anchor it to the media clock.
+The active word's onset closes preceding ink before its repeat tint begins. In 24:2, “their punishment” starts on word 23 but
 keeps washing through the reordered Arabic “a group of the believers,” words
 24–26. It finishes at 36.25 s rather than 28.49 s for Alafasy. Pauses freeze
 the edge; speed changes and holds longer than the visual animation cap still
 follow media time. A carried band projects its progress through the page cut,
 so the second fragment waits for the first. Glimmer and repeat tint are clipped
-to laid ink, and the active repeat wash also waits for its spoken clock. Seek
+to laid ink; repeat tint uses the scrolling reader's uninterrupted repeat sweep. Seek
 generations reject stale samples; calibration changes cannot rewind laid ink.
 Carried-leaf ownership and follow read that same edge. Follow previews 500 ms
 at the current playback speed, preserving the existing turn lead and waiting

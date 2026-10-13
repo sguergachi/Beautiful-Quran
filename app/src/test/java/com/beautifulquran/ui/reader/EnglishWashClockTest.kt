@@ -61,35 +61,71 @@ class EnglishWashClockTest {
     }
 
     @Test
-    fun `frame interpolation resets on a new verse chapter or seek`() {
+    fun `continuous motion resets on a new verse chapter or seek`() {
         val sample = EnglishWashClock(24, 1, 8, 15000, 0)
         assertTrue(sample.copy(positionMs = 15033).samePerformanceAs(sample))
         assertTrue(!sample.samePerformanceAs(null))
         assertTrue(!sample.copy(activation = 9).samePerformanceAs(sample))
         assertTrue(!sample.copy(ayah = 2).samePerformanceAs(sample))
         assertTrue(!sample.copy(surahId = 25).samePerformanceAs(sample))
-        assertEquals(sample, sample.frameAt(20_000_000_000L, sample.copy(activation = 9)))
+        assertTrue(!sample.runsWith(sample.copy(activation = 9)))
+        assertTrue(!sample.runsWith(sample.copy(ayah = 2)))
+        assertTrue(!sample.runsWith(sample.copy(surahId = 25)))
     }
 
     @Test
-    fun `every frame moves between polls without restarting or guessing future audio`() {
-        val previous = EnglishWashClock(24, 1, 8, 1000, 0, sampledAtNanos = 1_000_000_000L)
-        val next = previous.copy(positionMs = 1033, sampledAtNanos = 1_033_000_000L)
-        val frames = listOf(1041L, 1049L, 1057L, 1065L).map { next.frameAt(it * 1_000_000, previous).positionMs }
-        assertEquals(listOf(1008L, 1016L, 1024L, 1032L), frames)
-        val following = next.copy(positionMs = 1066, sampledAtNanos = 1_066_000_000L)
-        assertEquals(1040L, following.frameAt(1_073_000_000L, next).positionMs)
-        assertEquals(next.positionMs, next.frameAt(9_000_000_000L, previous).positionMs)
+    fun `every frame moves continuously across irregular playback polls`() {
+        val anchor = runningClock()
+        val frames = listOf(1041L, 1049L, 1057L, 1065L, 1145L).map { anchor.frameAt(it * 1_000_000).positionMs }
+        assertEquals(listOf(1041L, 1049L, 1057L, 1065L, 1145L), frames)
+        listOf(1033L, 1097L, 1200L).forEach {
+            assertTrue("poll must not cancel the running sweep", anchor.runsWith(
+                anchor.copy(positionMs = it, sampledAtNanos = it * 1_000_000),
+            ))
+        }
+    }
+
+    @Test
+    fun `a late playback poll must not stop a spoken wash`() {
+        val sample = runningClock().copy(positionMs = 1033, sampledAtNanos = 1_033_000_000L)
+        assertEquals(1081L, sample.frameAt(1_081_000_000L).positionMs)
+        assertEquals(1250L, sample.frameAt(1_250_000_000L).positionMs)
     }
 
     @Test
     fun `paused samples freeze and changing speed changes the frame slope`() {
-        val previous = EnglishWashClock(24, 1, 8, 1000, 0, sampledAtNanos = 1_000_000_000L)
-        val paused = previous.copy(sampledAtNanos = 1_033_000_000L)
-        assertEquals(1000L, paused.frameAt(9_000_000_000L, previous).positionMs)
-        val faster = paused.copy(positionMs = 1066)
-        assertEquals(1032L, faster.frameAt(1_049_000_000L, previous).positionMs)
+        val playing = runningClock()
+        val paused = playing.copy(isPlaying = false, positionMs = 4000)
+        assertEquals(4000L, paused.frameAt(99_000_000_000L).positionMs)
+        assertTrue(!paused.runsWith(playing))
+        val resumed = paused.copy(isPlaying = true, speed = 1.25f, sampledAtNanos = 99_000_000_000L)
+        assertEquals(5250L, resumed.frameAt(100_000_000_000L).positionMs)
+        assertTrue(!resumed.runsWith(playing))
     }
+
+    @Test
+    fun `continuous motion ends with the reciter without a visual duration cap`() {
+        val anchor = runningClock()
+        assertEquals(12999L, anchor.frameAt(12_999_000_000L).positionMs)
+        assertEquals(13000L, anchor.frameAt(13_000_000_000L).positionMs)
+        assertEquals(13000L, anchor.frameAt(99_000_000_000L).positionMs)
+        assertEquals(1000L, anchor.frameAt(0L).positionMs)
+    }
+
+    @Test
+    fun `buffering source discontinuities and output corrections interrupt the clock`() {
+        val anchor = runningClock()
+        assertTrue(!anchor.runsWith(anchor.copy(isPlaying = false)))
+        assertTrue(!anchor.runsWith(anchor.copy(clockId = 1)))
+        assertTrue(!anchor.runsWith(anchor.copy(correctionMs = 200)))
+        assertTrue(!anchor.runsWith(anchor.copy(segments = listOf(Segment(1, 0, 14000)))))
+        assertTrue(!anchor.runsWith(null))
+    }
+
+    private fun runningClock() = EnglishWashClock(
+        24, 1, 8, 1000, 0, listOf(Segment(1, 0, 13000)),
+        sampledAtNanos = 1_000_000_000L, isPlaying = true,
+    )
 
     @Test
     fun `a repeat completes prior ink even while the frame animation trails its poll`() {
