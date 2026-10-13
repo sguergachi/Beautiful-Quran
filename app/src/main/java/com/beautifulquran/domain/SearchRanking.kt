@@ -58,8 +58,9 @@ fun searchTextRelevance(
     query: ParsedSearchQuery,
     allowFuzzy: Boolean = true,
 ): Int = searchLowerTextRelevance(
-    text.lowercase(),
-    query.text.lowercase(),
+    // Display text is typeset (curled quotes, en dashes); match it as typed.
+    EnglishTypography.fold(text).lowercase(),
+    EnglishTypography.fold(query.text).lowercase(),
     query.exactOnly,
     allowFuzzy,
 )

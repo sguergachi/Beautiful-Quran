@@ -132,6 +132,9 @@ export class RuntimeMushafCache {
   private expiryTimer: number | null = null
   private retryTimer: number | null = null
   private retryAttempt = 0
+  private generation = 0
+  private revoked = false
+  private writes: Promise<void> = Promise.resolve()
 
   constructor(
     baseUrl: string,
@@ -185,25 +188,37 @@ export class RuntimeMushafCache {
   }
 
   async restore(): Promise<void> {
+    if (this.revoked) return
+    const generation = this.generation
     try {
       const saved = await this.store.get()
+      if (generation !== this.generation) return
       if (saved) {
         validateCacheState(saved)
         if (fresh(saved.updatedAtMs, this.now())) {
           this.state = validateStored(saved, this.minimumRecords)
           this.install(this.state)
         } else {
-          this.state = withoutExpiringSupplements(saved)
-          await this.store.put(this.state)
+          const expired = withoutExpiringSupplements(saved)
+          await this.write(async () => {
+            if (generation !== this.generation) return
+            await this.store.put(expired)
+            if (generation === this.generation) this.state = expired
+          })
         }
       }
     } catch {
       // A corrupt retained object cannot be repaired by an incremental no-op.
-      await this.store.clear().catch(() => undefined)
-      this.state = null
-      this.resource = null
-      this.byKey.clear()
+      await this.write(async () => {
+        if (generation !== this.generation) return
+        await this.store.clear().catch(() => undefined)
+        if (generation !== this.generation) return
+        this.state = null
+        this.resource = null
+        this.byKey.clear()
+      })
     }
+    if (generation !== this.generation) return
     this.notifyDiagnostics()
     if (!this.state || !fresh(this.state.updatedAtMs, this.now())) {
       await this.refresh()
@@ -234,11 +249,7 @@ export class RuntimeMushafCache {
       this.error = classifyRuntimeCacheFailure(error)
       this.blockReadRefresh = true
       if (error instanceof AccessRevoked) {
-        await this.store.clear()
-        this.state = null
-        this.resource = null
-        this.byKey.clear()
-        for (const listener of this.listeners) listener()
+        await this.revoke()
       } else this.scheduleRetry()
       return false
     }).finally(() => {
@@ -257,7 +268,30 @@ export class RuntimeMushafCache {
     return this.byKey.get(`${surah}:${ayah}:${position}`) ?? null
   }
 
+  /** Shared QF credential rejection also purges other authenticated resources. */
+  async revoke(): Promise<void> {
+    if (this.revoked) return
+    this.revoked = true
+    this.generation += 1
+    this.error = 'revoked'
+    this.blockReadRefresh = true
+    this.state = null
+    this.resource = null
+    this.byKey.clear()
+    this.cancelRetry()
+    for (const listener of this.listeners) listener()
+    this.notifyDiagnostics()
+    await this.write(() => this.store.clear())
+  }
+
+  private write(action: () => Promise<void>): Promise<void> {
+    const next = this.writes.then(action)
+    this.writes = next.catch(() => undefined)
+    return next
+  }
+
   private async sync(): Promise<void> {
+    const generation = this.generation
     const callsBefore = this.apiCalls
     const incremental = this.state
       ? `/api/v4/resources/sync?sync_token=${encodeURIComponent(this.state.token)}&resources=${encodeURIComponent(QF_RESOURCES)}`
@@ -272,24 +306,30 @@ export class RuntimeMushafCache {
     }
     const { next, changed } = result
     this.markRequestsSettled()
-    await this.store.put(next)
-    this.state = next
-    this.error = null
-    this.cancelRetry()
-    this.retryAttempt = 0
-    if (!changed) {
-      this.resource = next
-      this.scheduleChecks(next)
-    } else this.install(next)
+    await this.write(async () => {
+      if (generation !== this.generation) throw new AccessRevoked('QF content access was revoked')
+      await this.store.put(next)
+      if (generation !== this.generation) throw new AccessRevoked('QF content access was revoked')
+      this.state = next
+      this.revoked = false
+      this.error = null
+      this.cancelRetry()
+      this.retryAttempt = 0
+      if (!changed) {
+        this.resource = next
+        this.scheduleChecks(next)
+      } else this.install(next)
+    })
   }
 
   private async syncFrom(
     firstPath: string,
     callsBefore: number,
   ): Promise<{ next: StoredMushaf; changed: boolean }> {
+    const previous = this.state
     let resources = firstPath.includes('bootstrap=true')
-      ? [] : cloneResources(this.state?.resources ?? [])
-    let changed = !this.state
+      ? [] : cloneResources(previous?.resources ?? [])
+    let changed = !previous
     let path = firstPath
     let token: string | null = null
     for (let page = 0; page < 100; page += 1) {
@@ -342,7 +382,7 @@ export class RuntimeMushafCache {
     resources = replaceLocalResource(resources, 'word_supplements', 1, supplementRows)
     const records = changed
       ? normalizeQfMushaf(this.loadCanonical(), resources, this.expectedQcfPages)
-      : this.state!.records
+      : previous!.records
     return {
       next: validateStored({
         id: 1,
@@ -431,7 +471,10 @@ export class RuntimeMushafCache {
       this.resource = null
       this.byKey.clear()
       for (const listener of this.listeners) listener()
-      void this.store.put(expired).then(() => this.refreshIfNeeded())
+      const generation = this.generation
+      void this.write(async () => {
+        if (generation === this.generation && this.state === expired) await this.store.put(expired)
+      }).then(() => this.refreshIfNeeded())
     }, expiryDelay)
   }
 

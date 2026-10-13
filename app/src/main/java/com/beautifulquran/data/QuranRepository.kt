@@ -124,6 +124,7 @@ class QuranRepository(
      * carries none of them. Null keeps this class usable from JVM unit tests
      * that don't ship a cache. */
     private val runtimeMushaf: RuntimeMushafCache? = null,
+    private val runtimeTimings: RuntimeTimingCache? = null,
 ) {
 
     /** Change signal for the Lab's on-device corrections: emits whenever the
@@ -134,6 +135,11 @@ class QuranRepository(
 
     /** Emits whenever the runtime word/QCF snapshot is replaced. */
     val runtimeMushafChanged get() = runtimeMushaf?.changes
+    /** Durable provider generations include accepted timing changes and withdrawals/revocation. */
+    val runtimeTimingsChanged get() = runtimeTimings?.changes
+    internal fun runtimeTimingGeneration(reciterId: Int): Long = runtimeTimings?.generation(reciterId) ?: 0L
+    internal fun timingProviderAvailable(reciterId: Int): Boolean =
+        runtimeTimings == null || reciterId !in RUNTIME_TIMING_PROFILES || runtimeTimings.available(reciterId)
 
     private val runtimeViews = CacheGeneration()
 
@@ -168,6 +174,25 @@ class QuranRepository(
     private var englishVerseGloss: Map<Long, Int>? = null
     private var englishVerseTextCache: Map<Long, String>? = null
     private var englishVerseGlossText: Map<Long, String>? = null
+
+    /** Verses whose open quotation runs on into the next ([EnglishTypography.typeset]). */
+    @Volatile
+    private var quoteContinues: Set<Long>? = null
+
+    private fun quoteContinues(): Set<Long> = quoteContinues ?: queryList(
+        "SELECT surah_id, ayah_number, translation_en FROM ayahs ORDER BY surah_id, ayah_number",
+    ) { c -> Triple(c.getInt(0), c.getInt(1), c.getString(2)) }.let { rows ->
+        buildSet {
+            rows.forEachIndexed { i, (surah, ayah, _) ->
+                val next = rows.getOrNull(i + 1)?.takeIf { it.first == surah }?.third
+                if (EnglishTypography.quoteContinuesInto(next)) add(quranWordKey(surah, ayah, 1))
+            }
+        }
+    }.also { quoteContinues = it }
+
+    /** A verse's translation as the reader sees it; storage and search keep the raw text. */
+    private fun translation(surah: Int, ayah: Int, raw: String): String =
+        EnglishTypography.typeset(raw, quranWordKey(surah, ayah, 1) in quoteContinues())
 
     /**
      * Verse translations for the English leaf, a page at a time.
@@ -209,7 +234,7 @@ class QuranRepository(
         surahsCache ?: queryList(
             "SELECT id, name_arabic, name_transliteration, name_translation, revelation_place, ayah_count FROM surahs ORDER BY id",
         ) { c ->
-            Surah(c.getInt(0), c.getString(1), c.getString(2), c.getString(3), c.getString(4), c.getInt(5))
+            Surah(c.getInt(0), c.getString(1), EnglishTypography.typesetName(c.getString(2)), c.getString(3), c.getString(4), c.getInt(5))
         }.also { surahsCache = it }
     }
 
@@ -243,7 +268,7 @@ class QuranRepository(
                         Word(
                             position = position,
                             arabic = c.getString(2),
-                            translation = cached?.translation.orEmpty(),
+                            translation = EnglishTypography.typesetName(cached?.translation.orEmpty()),
                             transliteration = cached?.transliteration.orEmpty(),
                             qcfV2 = cached?.qcfV2.orEmpty(),
                             qcfPage = cached?.qcfPage ?: 0,
@@ -260,7 +285,7 @@ class QuranRepository(
         ) { c ->
             val n = c.getInt(0)
             Ayah(
-                surahId, n, c.getString(1), c.getString(2),
+                surahId, n, c.getString(1), translation(surahId, n, c.getString(2)),
                 runtime[n to 1]?.ayahPage ?: 0,
                 words[n].orEmpty(),
             )
@@ -333,7 +358,8 @@ class QuranRepository(
                 EnglishLeafText.TRANSLATION -> englishVerseProse ?: queryList(
                     "SELECT surah_id, ayah_number, translation_en FROM ayahs",
                 ) { c ->
-                    quranWordKey(c.getInt(0), c.getInt(1), 1) to measure(c.getString(2))
+                    quranWordKey(c.getInt(0), c.getInt(1), 1) to
+                        measure(translation(c.getInt(0), c.getInt(1), c.getString(2)))
                 }.toMap().also { englishVerseProse = it }
 
                 // The gloss chain has to be built to be measured — lyricize
@@ -424,7 +450,8 @@ class QuranRepository(
                 EnglishLeafText.TRANSLATION -> englishVerseTextCache ?: queryList(
                     "SELECT surah_id, ayah_number, translation_en FROM ayahs",
                 ) { c ->
-                    quranWordKey(c.getInt(0), c.getInt(1), 1) to c.getString(2)
+                    quranWordKey(c.getInt(0), c.getInt(1), 1) to
+                        translation(c.getInt(0), c.getInt(1), c.getString(2))
                 }.toMap().also { englishVerseTextCache = it }
 
                 EnglishLeafText.GLOSS -> runtimeViews.getOrBuild(
@@ -483,7 +510,8 @@ class QuranRepository(
                         """.trimIndent(),
                         arrayOf(page.toString()),
                     ) { c ->
-                        quranWordKey(c.getInt(0), c.getInt(1), 1) to c.getString(2)
+                        quranWordKey(c.getInt(0), c.getInt(1), 1) to
+                            translation(c.getInt(0), c.getInt(1), c.getString(2))
                     }.toMap()
                 } else {
                     val begun = runtime.values.asSequence()
@@ -498,7 +526,8 @@ class QuranRepository(
                         """.trimIndent(),
                         begun.flatMap { listOf(it.first.toString(), it.second.toString()) }.toTypedArray(),
                     ) { c ->
-                        quranWordKey(c.getInt(0), c.getInt(1), 1) to c.getString(2)
+                        quranWordKey(c.getInt(0), c.getInt(1), 1) to
+                            translation(c.getInt(0), c.getInt(1), c.getString(2))
                     }.toMap()
                 }
                 verses
@@ -533,7 +562,7 @@ class QuranRepository(
                     val surah = Surah(
                         id = c.getInt(0),
                         nameArabic = c.getString(1),
-                        nameTransliteration = c.getString(2),
+                        nameTransliteration = EnglishTypography.typesetName(c.getString(2)),
                         nameTranslation = c.getString(3),
                         revelationPlace = c.getString(4),
                         ayahCount = c.getInt(5),
@@ -543,7 +572,7 @@ class QuranRepository(
                         surah = surah,
                         ayahNumber = ayah,
                         text = c.getString(7),
-                        translation = c.getString(8),
+                        translation = translation(surah.id, ayah, c.getString(8)),
                         createdAt = createdAtByKey[surah.id to ayah] ?: 0L,
                     )
                 }
@@ -756,8 +785,8 @@ class QuranRepository(
                 val ayahNumber = c.getInt(1)
                 contexts[surahId * 1_000 + ayahNumber] = WordSearchAyahContext(
                     ayahText = "",
-                    ayahTranslation = c.getString(2),
-                    surahNameTransliteration = c.getString(3),
+                    ayahTranslation = translation(surahId, ayahNumber, c.getString(2)),
+                    surahNameTransliteration = EnglishTypography.typesetName(c.getString(3)),
                     surahNameArabic = c.getString(4),
                 )
             }
@@ -830,9 +859,10 @@ class QuranRepository(
                 ayahNumber = c.getInt(1),
                 position = c.getInt(2),
                 arabic = c.getString(3),
-                translation = runtime["${c.getInt(0)}:${c.getInt(1)}:${c.getInt(2)}"]?.translation
-                    ?: c.getString(4),
-                surahNameTransliteration = c.getString(5),
+                translation = EnglishTypography.typesetName(
+                    runtime["${c.getInt(0)}:${c.getInt(1)}:${c.getInt(2)}"]?.translation ?: c.getString(4),
+                ),
+                surahNameTransliteration = EnglishTypography.typesetName(c.getString(5)),
             )
         }
         // Every rendering of every form under this root: the counts add up to
@@ -885,13 +915,17 @@ class QuranRepository(
         )
     }
 
-    private data class BundledTimingRows(
+    private data class DefaultTimingRows(
         val segments: Map<Int, List<Segment>>,
         val audioOnsets: Map<Int, Long>,
     )
 
-    private fun bundledTimingRows(reciterId: Int, surahId: Int): BundledTimingRows =
-        database.db.rawQuery(
+    private fun defaultTimingRows(reciterId: Int, surahId: Int): DefaultTimingRows {
+        if (runtimeTimings != null && reciterId in RUNTIME_TIMING_PROFILES) {
+            val chapter = runtimeTimings.chapter(reciterId, surahId)
+            return DefaultTimingRows(chapter?.segments.orEmpty(), chapter?.audioOnsets.orEmpty())
+        }
+        return database.db.rawQuery(
             "SELECT ayah_number, segments, audio_onset_ms FROM timings " +
                 "WHERE reciter_id = ? AND surah_id = ?",
             arrayOf(reciterId.toString(), surahId.toString()),
@@ -903,27 +937,29 @@ class QuranRepository(
                 segments[ayah] = parseSegments(c.getString(1))
                 c.getLong(2).takeIf { it > 0L }?.let { audioOnsets[ayah] = it }
             }
-            BundledTimingRows(segments, audioOnsets)
+            DefaultTimingRows(segments, audioOnsets)
         }
+    }
 
-    /** The bundled DB timings for a reciter+surah, with **no** Lab overrides
-     * fused in — the shipped defaults. The Lab uses this to reset a single word
-     * back to how the app shipped it. */
-    suspend fun bundledTimings(reciterId: Int, surahId: Int): Map<Int, List<Segment>> =
+    /** Reviewed provider timings with no Lab overrides; reset uses the same current baseline as listening. */
+    suspend fun defaultTimings(reciterId: Int, surahId: Int): Map<Int, List<Segment>> =
         withContext(Dispatchers.IO) {
-            bundledTimingRows(reciterId, surahId).segments
+            defaultTimingRows(reciterId, surahId).segments
         }
 
     /** ayah number -> word segments, for one reciter and surah. Any
      * hand-corrected override from the Timings Lab takes precedence over the
-     * bundled DB row, so the reader immediately reflects edits. The MP3 voice
+     * provider row, so the reader immediately reflects edits. The MP3 voice
      * onset remains authoritative; only legacy clock versions are rebased as
      * a whole, while current Lab boundaries remain exact. A rebased row is
      * written back once, so the Lab, the reader and an exported patch all
      * describe the same marks. */
     suspend fun timings(reciterId: Int, surahId: Int): Map<Int, List<Segment>> =
         withContext(Dispatchers.IO) {
-            val bundled = bundledTimingRows(reciterId, surahId)
+            val bundled = defaultTimingRows(reciterId, surahId)
+            if (runtimeTimings != null && reciterId in RUNTIME_TIMING_PROFILES && !runtimeTimings.available(reciterId)) {
+                return@withContext emptyMap()
+            }
             if (timingOverrides == null) return@withContext bundled.segments
             val overrides = timingOverrides.overrides.value
             if (overrides.isEmpty() || !overrides.keys.any { it.reciterId == reciterId && it.surahId == surahId }) {

@@ -124,6 +124,8 @@ android {
         noCompress += "xz"
     }
     sourceSets.named("main") {
+        // Font licenses ship with the app (Settings → Acknowledgements).
+        assets.directories.add(rootProject.file("licenses").absolutePath)
         // preBuild owns generation; a concrete path keeps Android Studio's
         // source-set model deterministic while the task dependency stays explicit.
         assets.directories.add(

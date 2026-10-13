@@ -16,8 +16,11 @@ viewer, and a PWA shell. Production build is published to GitHub Pages at
 `web/README.md` for run instructions. The sections
 below remain the design record and quality bar.
 
-The current data layer mirrors Android: reviewed repeat-aware timings come from
-the shared database and are exported per reciter for lazy web loading, while
+The current data layer mirrors Android: the seven independent voices use
+packaged lazy timing corpora; six QF voices load complete reviewed timing views
+from the authenticated Worker into separate IndexedDB resources. Timing copies
+refresh after six days and survive provider outages, with explicit withdrawal
+and shared QF revocation purging their prepared reader state. Separately,
 authenticated Quran Foundation word/QCF fields live in a separate IndexedDB
 cache with six-day revalidation, a seven-day hard freshness limit, and
 automatic retry when the browser comes back online.
@@ -230,8 +233,10 @@ Renderers consume these; they do not re-derive curves.
   This keeps the main-thread sql.js work from freezing the cover or paper
   peel. Timings remain lazy and hydrate after the reader's first frame.
 - **Do not** add data-repair logic in the web app (Android invariant #2).
-- The generated timing corpora contain the exact reviewed repeat-aware rows
-  Android uses. They are static first-party assets, not a timing API.
+- Generated timing corpora include only the seven independent voices. IDs
+  `1,2,3,4,5,7` use the reviewed runtime timing endpoint and are forbidden in
+  the Pages artifact. Source normalization and acoustic review stay in Python;
+  web validates identity, canonical coverage, chronology, and the exact digest.
 
 ### 6.2 Audio
 

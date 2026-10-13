@@ -4,6 +4,29 @@
   src: url('./fonts/hafs_uthmanic.ttf') format('truetype');
   font-display: swap;
 }
+/*
+ * Junicode 2 (Peter S. Baker, SIL OFL 1.1), set as Garamond — the English
+ * face, the same cut Android ships (tools/build_junicode_fonts.py). Its
+ * x-height is 0.418 em to EB Garamond's 0.405, so size-adjust sets it at
+ * 96.9 %: every size in the stylesheet keeps the size it was tuned at in
+ * Garamond. Weight varies; width and word space are pinned in the file.
+ * Glyphs it lacks fall back to EB Garamond through the font stacks.
+ */
+@font-face {
+  font-family: 'Junicode';
+  src: url('./fonts/junicode_variable.woff2') format('woff2');
+  font-weight: 300 700;
+  size-adjust: 96.9%;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Junicode';
+  src: url('./fonts/junicode_italic_variable.woff2') format('woff2');
+  font-weight: 300 700;
+  font-style: italic;
+  size-adjust: 96.9%;
+  font-display: swap;
+}
 @font-face {
   font-family: 'EB Garamond';
   src: url('./fonts/eb_garamond_regular.ttf') format('truetype');

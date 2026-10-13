@@ -2,9 +2,15 @@ package com.beautifulquran.ui.reader
 
 import com.beautifulquran.data.model.Word
 import com.beautifulquran.domain.MushafSourceWord
+import com.beautifulquran.domain.EnglishWordAlignment
+import com.beautifulquran.domain.ENGLISH_LEAF_CAPACITY_CHARS
+import com.beautifulquran.domain.buildEnglishBook
 import com.beautifulquran.domain.buildMushafCatalog
+import com.beautifulquran.ui.reader.ReaderInteraction.MushafPlayTarget
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
@@ -12,6 +18,18 @@ import org.junit.Test
  * never do is lose the voice while the voice is plainly here.
  */
 class MushafVoicePageTest {
+
+    @Test
+    fun `carried English follows the continuous wash without returning to advanced words`() {
+        val text = "painful punishment"
+        val alignment = EnglishWordAlignment.align(text, listOf("punishment", "painful"))!!
+        assertEquals(0f, mushafVerseThrough(
+            1, 2, alignment = alignment,
+        ), 0.00001f)
+        assertEquals(1f, mushafVerseThrough(
+            2, 2, alignment = alignment,
+        ), 0f)
+    }
 
     // 2:2 opens page 3 and runs onto page 4; 2:3 opens page 4.
     private val catalog = buildMushafCatalog(
@@ -22,6 +40,47 @@ class MushafVoicePageTest {
             source(2, 3, 1, page = 4, line = 1),
         ),
     )
+
+    @Test
+    fun `previous verse starts on its opening Arabic page despite its carried last word`() {
+        assertEquals(4, catalog.pageOf(2, 2, 2))
+        assertEquals(2, mushafTransportLeaf(catalog, null, MushafPlayTarget(2, 2, null)))
+    }
+
+    @Test
+    fun `midpoint forward lands on the Arabic word's page rather than the verse's opening`() {
+        assertEquals(3, mushafTransportLeaf(catalog, null, MushafPlayTarget(2, 2, 2)))
+    }
+
+    @Test
+    fun `restarting a carried English verse returns to its opening leaf`() {
+        val catalog = buildMushafCatalog(listOf(
+            source(2, 2, 1, page = 3, line = 1),
+            source(2, 3, 1, page = 3, line = 2),
+        ))
+        val cap = ENGLISH_LEAF_CAPACITY_CHARS
+        val book = buildEnglishBook(catalog) { _, ayah -> if (ayah == 2) cap / 2 else cap }
+        val opening = mushafTransportLeaf(catalog, book, MushafPlayTarget(2, 3, null))
+        val tail = mushafLeafNumber(book, 2, 3, page = 3, through = 0.99f) - 1
+        assertTrue(tail > opening)
+        assertEquals(book.firstLeafOf(3), opening)
+    }
+
+    @Test
+    fun `midpoint forward finds a carried English leaf through the continuous wash`() {
+        val catalog = buildMushafCatalog(listOf(
+            source(2, 2, 1, page = 3, line = 1),
+            source(2, 3, 1, page = 3, line = 2),
+        ))
+        val cap = ENGLISH_LEAF_CAPACITY_CHARS
+        val book = buildEnglishBook(catalog) { _, ayah -> if (ayah == 2) cap / 2 else cap }
+        val alignment = EnglishWordAlignment.align("painful punishment", listOf("punishment", "painful"))!!
+        val target = MushafPlayTarget(2, 3, 2)
+        val opening = mushafTransportLeaf(catalog, book, target.copy(word = null))
+        val next = mushafTransportLeaf(catalog, book, target, 2, alignment)
+        assertTrue(next > opening)
+        assertEquals(mushafLeafNumber(book, 2, 3, page = 3, through = 1f) - 1, next)
+    }
 
     @Test
     fun `a voice on another reading owns no leaf here`() {
@@ -66,6 +125,53 @@ class MushafVoicePageTest {
         assertNull(page(playback(activeAyah = null, playingAyah = null)))
     }
 
+    @Test
+    fun `a cold font turn is discarded when the playlist advances under the same ink frontier`() {
+        val current = playback(activeAyah = 12, playingAyah = 12, inkId = 5)
+
+        assertEquals(12, current.activeAyah)
+        assertTrue(mushafNullWordFollowStillCurrent(
+            activeAyah = 12,
+            basmalahActive = false,
+            playingAyah = 12,
+            inkId = 5,
+            currentVoice = current,
+            currentWord = null,
+        ))
+        assertFalse(mushafNullWordFollowStillCurrent(
+            activeAyah = 12,
+            basmalahActive = false,
+            playingAyah = 11,
+            inkId = 4,
+            currentVoice = current,
+            currentWord = null,
+        ))
+    }
+
+    @Test
+    fun `a null word turn is discarded when the same ayah starts a new playback generation`() {
+        assertFalse(mushafNullWordFollowStillCurrent(
+            activeAyah = 12,
+            basmalahActive = false,
+            playingAyah = 12,
+            inkId = 4,
+            currentVoice = playback(activeAyah = 12, playingAyah = 12, inkId = 5),
+            currentWord = null,
+        ))
+    }
+
+    @Test
+    fun `a null word turn is discarded when a word arrives during font loading`() {
+        assertFalse(mushafNullWordFollowStillCurrent(
+            activeAyah = 12,
+            basmalahActive = false,
+            playingAyah = 12,
+            inkId = 5,
+            currentVoice = playback(activeAyah = 12, playingAyah = 12, inkId = 5),
+            currentWord = ActiveWord(ayah = 12, wordPosition = 3, durationMs = 600),
+        ))
+    }
+
     private fun page(
         voice: MushafPlayback,
         word: ActiveWord? = null,
@@ -83,6 +189,7 @@ class MushafVoicePageTest {
         basmalahActive: Boolean = false,
         activeAyah: Int? = 2,
         playingAyah: Int? = 2,
+        inkId: Long = 0L,
     ) = MushafPlayback(
         activeAyah = activeAyah,
         reciting = true,
@@ -90,6 +197,7 @@ class MushafVoicePageTest {
         basmalahActive = basmalahActive,
         isPlaying = true,
         playingAyah = playingAyah,
+        inkId = inkId,
     )
 }
 

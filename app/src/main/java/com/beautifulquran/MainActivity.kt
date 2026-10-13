@@ -129,6 +129,7 @@ import com.beautifulquran.timingslab.TimingsLabViewModel
 import com.beautifulquran.tarjilab.TarjiLabScreen
 import com.beautifulquran.tarjilab.TarjiLabViewModel
 import com.beautifulquran.ui.theme.BeautifulQuranTheme
+import com.beautifulquran.ui.theme.bookCacheSuffix
 import com.beautifulquran.ui.theme.FloatingPaperControl
 import com.beautifulquran.ui.theme.LocalGildingTilt
 import com.beautifulquran.ui.theme.rememberGildingTilt
@@ -145,6 +146,7 @@ import kotlinx.coroutines.launch
 import kotlin.math.abs
 import kotlin.math.roundToInt
 import com.beautifulquran.ui.theme.LocalQuranInk
+import com.beautifulquran.ui.theme.LocalQuranTypePalette
 import com.beautifulquran.ui.theme.contrastingOverlayInk
 import com.beautifulquran.ui.theme.contrastingOverlayAccents
 
@@ -214,6 +216,7 @@ class MainActivity : ComponentActivity() {
             }
             val settings by app.settings.settings.collectAsStateWithLifecycle()
             val mushafDiagnostics by app.runtimeMushaf!!.diagnostics.collectAsStateWithLifecycle()
+            val timingStatus by app.runtimeTimings.status.collectAsStateWithLifecycle()
             val mushafStatus = remember(mushafDiagnostics) { app.runtimeMushaf!!.status() }
             val mushafReady = runtimeMushafEntranceReady(mushafStatus, System.currentTimeMillis())
             val mushafProgress = mushafDiagnostics.syncProgress
@@ -244,9 +247,8 @@ class MainActivity : ComponentActivity() {
                         englishOnly = settings.readingMode == ReadingMode.ENGLISH_ONLY,
                     )
             }
-            // The splash releases on the bundled database alone — local work,
-            // seconds on any device. The QF fill streams in behind it from
-            // process start and the leaves pick it up live.
+            // The first authenticated timing fill joins local database warming.
+            // Retained timing copies release immediately on later offline launches.
             //
             // One exception: a mushaf layout that has never held content has
             // no leaf to show until the first fill lands, so the cover holds
@@ -258,9 +260,11 @@ class MainActivity : ComponentActivity() {
                 (mushafStatus.phase == RuntimeCachePhase.EMPTY ||
                     mushafStatus.phase == RuntimeCachePhase.REFRESHING) &&
                 !mushafBookReady
-            val contentReady = databaseReady && !mushafFirstFill
+            val timingFirstFill = !timingStatus.entranceReady
+            val contentReady = databaseReady && !mushafFirstFill && !timingFirstFill
             val contentLoadLabel = when {
                 !databaseReady -> "Caching Quran database"
+                timingFirstFill -> "Downloading recitation timings · ${timingStatus.completed} of ${timingStatus.totalReciters}"
                 else -> when (mushafStatus.phase) {
                     RuntimeCachePhase.REFRESHING -> when {
                         mushafDiagnostics.requestsSettled && mushafStatus.apiCalls > 0 ->
@@ -311,6 +315,8 @@ class MainActivity : ComponentActivity() {
             ) {
                 BeautifulQuranTheme(
                     themeMode = settings.themeMode,
+                    typeface = settings.activeBookTypeface,
+                    scrollArabicFace = settings.activeScrollArabicFace,
                 ) {
                     // Cold start paints the closed mushaf first; the paper stack
                     // mounts under it after two board frames (onWarmStack),
@@ -342,6 +348,7 @@ class MainActivity : ComponentActivity() {
                                 contentReady = contentReady,
                                 loadLabel = contentLoadLabel,
                                 loadProgress = when {
+                                    timingFirstFill -> timingStatus.completed.toFloat() / timingStatus.totalReciters
                                     mushafDiagnostics.requestsSettled -> 1f
                                     else -> mushafProgress?.fraction
                                 },
@@ -416,6 +423,8 @@ private fun PaperStackApp(
     val rootViewerViewModel: RootViewerViewModel = viewModel(factory = AppViewModelFactory)
     val shareViewModel: ShareViewModel = viewModel(factory = AppViewModelFactory)
     val settings by app.settings.settings.collectAsStateWithLifecycle()
+    val bookTypeface = settings.activeBookTypeface
+    val typePalette = LocalQuranTypePalette.current
     val settingsInkPreview = remember {
         SettingsInkPreviewState(settings.brushCircleStyle)
     }
@@ -461,7 +470,11 @@ private fun PaperStackApp(
         windowSize,
         settings.englishLeafText,
         settings.verseNumberScript,
+        bookTypeface,
+        typePalette.bookCacheSuffix,
     ) {
+        // Preview immediately; wait for the typography slider to settle before paginating.
+        if (settings.developerModeEnabled) delay(250)
         // Nothing remembered — a first launch, or a window this app has not
         // been this size in. Work the leaf's size out instead of waiting for a
         // leaf: MushafBelowLeaf is everything the reading sheet sets under the
@@ -485,12 +498,14 @@ private fun PaperStackApp(
             ?: return@LaunchedEffect
         readerViewModel.ensureMushaf(
             text = settings.englishLeafText,
+            retainMeasuredBook = settings.developerModeEnabled,
             rulerFor = { translation ->
                 englishLeafRuler(
                     wellPx = metrics[0],
                     measurePx = metrics[1],
                     density = leafDensity,
                     measurer = leafMeasurer,
+                    typePalette = typePalette,
                     verseNumberScript = settings.verseNumberScript,
                     translation = translation,
                 )
@@ -499,6 +514,8 @@ private fun PaperStackApp(
                 metrics[0],
                 metrics[1],
                 settings.verseNumberScript,
+                bookTypeface,
+                typePalette.bookCacheSuffix,
             ),
             cacheKey = app.englishBookCache.key(
                 wellPx = metrics[0],
@@ -506,7 +523,7 @@ private fun PaperStackApp(
                 verseNumberScript = settings.verseNumberScript.ordinal,
                 leafText = settings.englishLeafText.ordinal,
                 database = QuranDatabase.DB_FILE_NAME,
-                ),
+            ) + typePalette.bookCacheSuffix,
         )
     }
     val bookmarkCount by bookmarksViewModel.bookmarkCount.collectAsStateWithLifecycle()
@@ -1193,7 +1210,11 @@ private fun PaperStackApp(
                         onShareCancel = shareViewModel::onChromeCancel,
                         onShareText = { shareViewModel.shareAsText() },
                         onShareImage = {
-                            if (activity != null) shareViewModel.shareAsImage(activity)
+                            if (activity != null) {
+                                shareViewModel.shareAsImage(
+                                    activity, typeface = bookTypeface,
+                                )
+                            }
                         },
                         playbackHost = pinnedPlayback,
                         playbackPinned = playbackPinned,

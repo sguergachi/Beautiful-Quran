@@ -35,6 +35,14 @@ after launch. With tighter spacing and English verse numbers, all 746 leaves
 and 6,843 fragments remain byte-identical to the full-rag reference at the same
 geometry and settings, covering all 6,236 verses.
 
+English ownership is solved lazily per verse and cached for the selected text
+source. Semantic ranges and continuous forward wash bands are projected once
+when the paragraph is built. Frames read the existing Arabic motions; adjacent
+paper covers with equal alpha merge, and one band carries the active soft edge.
+First-pass glimmer shares that band; repeats keep the semantic ranges. Geometry
+stays cached by layout and range, and only repeat/glint layers request shaped
+paths.
+
 ### 1. Draw-phase-only animations (zero recomposition fades)
 
 Every fade in the app — word highlights, recited-word settling, ayah
@@ -272,6 +280,9 @@ tick must not remasure three pages or recreate 150 `Text` nodes.
   does not `Typeface.createFromAsset` on the UI thread. For Arabic, that same
   window warms the existing glyph-ink profiles off the UI thread; a cold page
   otherwise rasterized and scanned each word during the pager's prefetch measure.
+  A delayed playback turn rechecks the captured ink frontier, playlist ayah,
+  playback generation, and word state after the target face loads, discarding a
+  stale turn before its animation starts.
   The cache, reference resolution, and spacing calculations are unchanged.
   Line geometry is keyed by page, display row, size, and measure. The page's
   seventeen-row reflow is a linear token-width pass remembered by page + typeface; playback ticks and
@@ -351,7 +362,7 @@ janky", first ask: is this the release APK?
 - Surah and reciter lists are cached in memory after first read.
 - The English book's measured leaves stay on disk under
   `EnglishBookCache`. Four most-recently-read configs are retained so
-  flipping translation, gloss, or type size does not remeasure; in-progress
+  flipping translation, gloss, or typography profile does not remeasure; in-progress
   writes publish atomically and failed writes remove their own temporary
   files. Successful writes also reclaim temporary files abandoned for a day.
   Access/pruning is serialized; the just-written book is retained even when
@@ -359,6 +370,12 @@ janky", first ask: is this the release APK?
   `checkCancelled` callback checks the coroutine before each layout attempt.
   This also stops work on ViewModel teardown. Generation gates still protect
   publication and writes.
+  Each typeface keys its own book (`bookCacheSuffix`: the face, its font
+  files' hashes and every constant that moves a line), so switching the
+  developer comparison does not reuse the other face's measurements. A
+  developer switch retains the current measured book while its replacement
+  paginates, so the leaf remains available for live comparison. Cold starts
+  and content changes still hold English until measured leaves exist.
 
 ### 7b. The word-search index is a memory budget, not just a cache
 

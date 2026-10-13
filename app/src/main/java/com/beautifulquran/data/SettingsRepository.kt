@@ -8,6 +8,44 @@ import kotlinx.coroutines.flow.StateFlow
 
 enum class ThemeMode { SYSTEM, LIGHT, DARK, ROYAL_GREEN }
 
+/**
+ * The app's English type. Readers get [JUNICODE]; [CLASSIC] stays as the
+ * developer comparison. Persisted by [code], not ordinal: code 0 was Timeless,
+ * since removed, and must keep reading as the shipped face. See
+ * `ui/theme/Type.kt`.
+ */
+enum class BookTypeface(val label: String, val code: Int) {
+    CLASSIC("EB Garamond (previous)", 1),
+    JUNICODE("Junicode, set as Garamond", 2),
+}
+
+/**
+ * The persisted [BookTypeface]: [storedCode] when present, else the pre-enum
+ * Timeless switch ([legacyTimeless], whose "on" meant the shipped face). Any
+ * other code — Timeless's 0, or one from a later version — is the shipped face.
+ */
+internal fun bookTypefaceFor(storedCode: Int?, legacyTimeless: Boolean?): BookTypeface = when {
+    storedCode != null -> BookTypeface.entries.firstOrNull { it.code == storedCode } ?: BookTypeface.JUNICODE
+    legacyTimeless == false -> BookTypeface.CLASSIC
+    else -> BookTypeface.JUNICODE
+}
+
+/**
+ * The Scroll's Arabic face. Readers get [HAFS]; the others are developer
+ * comparisons. Persisted by [code]; an unknown code reads as [HAFS]. Mushaf
+ * leaves keep their own page faces whatever is chosen here. See
+ * `ui/theme/Type.kt`.
+ */
+enum class ScrollArabicFace(val label: String, val code: Int) {
+    HAFS("KFGQPC Hafs", 0),
+    SCHEHERAZADE("Scheherazade New", 2),
+    ;
+
+    companion object {
+        fun forCode(code: Int): ScrollArabicFace = entries.firstOrNull { it.code == code } ?: HAFS
+    }
+}
+
 /** What flows on the sheet: Arabic with English under each word, English only, or Arabic only. */
 enum class ReadingMode { ARABIC_ENGLISH, ENGLISH_ONLY, ARABIC_ONLY }
 
@@ -25,11 +63,10 @@ enum class VerseNumberScript { ARABIC, ENGLISH }
  * Which English the leaf is set from.
  *
  * [TRANSLATION] is the published verse translation, which reads as a book but
- * only lines up with the recitation approximately — Arabic word order is not
- * English word order, so `EnglishWordAlignment` has to bridge the two and
- * anchors about 84 % of words. [GLOSS] is the word-by-word crib the scrolling
- * reader sets, stitched into a line: it reads less well, and every Arabic word
- * lights exactly its own English, because there is nothing to align.
+ * uses `EnglishWordAlignment` to recover spoken ownership, including reordered
+ * words. Unmatched meanings remain approximate. [GLOSS] is the word-by-word
+ * crib the scrolling reader sets, stitched into a line with shared phrases
+ * coalesced. The ownership map follows whichever source the reader chooses.
  *
  * A reading preference rather than a right answer, so it is the reader's.
  */
@@ -97,12 +134,24 @@ data class Settings(
      *  repeatedly tapping the Settings logo; persisted so the reader can
      *  honour it. See docs/ROOT_VIEWER.md and docs/TIMINGS_LAB.md. */
     val developerModeEnabled: Boolean = false,
+    /** Developer A/B of the English type; readers always get [BookTypeface.JUNICODE]. */
+    val bookTypeface: BookTypeface = BookTypeface.JUNICODE,
+    /** Developer A/B of the Scroll's Arabic; readers always get [ScrollArabicFace.HAFS]. */
+    val scrollArabicFace: ScrollArabicFace = ScrollArabicFace.HAFS,
     /** Developer-only gate for contextual feature lessons. Off until their
      * visual language is approved for readers. Enabling rearms every lesson. */
     val educationGuidesEnabled: Boolean = false,
     /** Developer-only: which ink-brush circle to paint around selected enums. */
     val brushCircleStyle: BrushCircleStyle = BrushCircleStyle.BASELINE,
-)
+) {
+    /** The typeface actually set: the A/B choice only counts in developer mode. */
+    val activeBookTypeface: BookTypeface
+        get() = if (developerModeEnabled) bookTypeface else BookTypeface.JUNICODE
+
+    /** The Scroll's Arabic actually set: the A/B choice only counts in developer mode. */
+    val activeScrollArabicFace: ScrollArabicFace
+        get() = if (developerModeEnabled) scrollArabicFace else ScrollArabicFace.HAFS
+}
 
 /** Maps a persisted ordinal back to an enum entry, falling back to [default]
  * when it no longer maps (e.g. after an entry was removed in an update). */
@@ -167,6 +216,15 @@ class SettingsRepository(context: Context) {
         lastSurah = prefs.getInt("lastSurah", 0),
         lastAyah = prefs.getInt("lastAyah", 1),
         developerModeEnabled = prefs.getBoolean("developerModeEnabled", false),
+        bookTypeface = bookTypefaceFor(
+            storedCode = if (prefs.contains("bookTypeface")) prefs.getInt("bookTypeface", 0) else null,
+            legacyTimeless = if (prefs.contains("timelessTypographyEnabled")) {
+                prefs.getBoolean("timelessTypographyEnabled", true)
+            } else {
+                null
+            },
+        ),
+        scrollArabicFace = ScrollArabicFace.forCode(prefs.getInt("scrollArabicFace", ScrollArabicFace.HAFS.code)),
         educationGuidesEnabled = prefs.getBoolean("educationGuidesEnabled", false),
         brushCircleStyle = prefs.enum("brushCircleStyle", BrushCircleStyle.BASELINE),
     )
@@ -272,6 +330,9 @@ class SettingsRepository(context: Context) {
             putInt("lastSurah", next.lastSurah)
             putInt("lastAyah", next.lastAyah)
             putBoolean("developerModeEnabled", next.developerModeEnabled)
+            putInt("bookTypeface", next.bookTypeface.code)
+            remove("timelessTypographyEnabled")
+            putInt("scrollArabicFace", next.scrollArabicFace.code)
             putBoolean("educationGuidesEnabled", next.educationGuidesEnabled)
             remove("inkLabEnabled")
             // Developer experiments that have been taken out: clear what

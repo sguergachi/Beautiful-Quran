@@ -49,11 +49,12 @@ val FloatingPaperExit: ExitTransition =
 fun FloatingPaperControl(
     visible: Boolean,
     modifier: Modifier = Modifier,
+    enter: EnterTransition = FloatingPaperEnter,
     content: @Composable () -> Unit,
 ) {
     AnimatedVisibility(
         visible = visible,
-        enter = FloatingPaperEnter,
+        enter = enter,
         exit = FloatingPaperExit,
         modifier = modifier,
     ) {
