@@ -53,6 +53,12 @@ import com.beautifulquran.ui.theme.QuranTheme
 /** Extra list padding so the last surah rows clear the floating transport. */
 val FloatingPlaybackListClearance: Dp = 96.dp
 
+/** Fallback paper kept clear for the continue pill before its first measure. */
+val ContinuePillListClearance: Dp = 64.dp
+
+/** Air between the continue pill and the transport (or gesture inset) below it. */
+val ContinuePillGap: Dp = 8.dp
+
 /**
  * Dismissal sweep, matching the shared enter's full travel. The transport
  * leaves as one opaque sheet instead of dissolving in place, so it uncovers
@@ -320,9 +326,14 @@ internal fun shouldShowFloatingPlayback(
 /**
  * Bottom paper the chapter list keeps clear of the transport. The pinned
  * chapter session wins while it owns a verse (or is sliding away); else
- * the floating bar while it is up; else just the gesture inset. The caller
- * animates toward this target over the sweep length, so bar, fade band,
- * and rows travel as one instead of popping.
+ * the floating bar while it is up, plus the continue pill while it is
+ * docked off-screen; else just the gesture inset. The caller animates
+ * toward this target over the sweep length, so bar, fade band, and rows
+ * travel as one instead of popping.
+ *
+ * The continue pill never stacks on the pinned session: it is gated on
+ * the cover sheet, so it is already gone while the reader sheet owns
+ * the paper.
  */
 internal fun homeListBottomInset(
     pinnedSession: Boolean,
@@ -330,8 +341,14 @@ internal fun homeListBottomInset(
     floatingVisible: Boolean,
     floatingHeight: Dp,
     navigationBottom: Dp,
-): Dp = when {
-    pinnedSession -> pinnedHeight.takeIf { it > 0.dp } ?: FloatingPlaybackListClearance
-    floatingVisible -> floatingHeight
-    else -> navigationBottom
+    continueVisible: Boolean = false,
+    continueHeight: Dp = 0.dp,
+): Dp {
+    if (pinnedSession) {
+        return pinnedHeight.takeIf { it > 0.dp } ?: FloatingPlaybackListClearance
+    }
+    val base = if (floatingVisible) floatingHeight else navigationBottom
+    if (!continueVisible) return base
+    val pill = continueHeight.takeIf { it > 0.dp } ?: ContinuePillListClearance
+    return base + pill + ContinuePillGap
 }
