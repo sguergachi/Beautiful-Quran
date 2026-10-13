@@ -647,6 +647,10 @@ first wash: Alafasy's 24:1 “clear evidence” is fully laid when he returns to
 from the calibrated media position at the playback speed to the known spoken
 end. Ordinary position polls never stop or restart it. Pause, buffering, speed,
 seek, source and output-correction changes re-anchor it to the media clock.
+The painted edge uses `EnglishLeafVerse.fragmentWashProgress`, interpolating
+between cached letter anchors. The exact integer mapping still places owned
+ranges and taps. Applying that integer mapping on each animation frame made
+the edge wait for a whole letter and then jump, despite a continuous clock.
 The active word's onset closes preceding ink before its repeat tint begins. In 24:2, “their punishment” starts on word 23 but
 keeps washing through the reordered Arabic “a group of the believers,” words
 24–26. It finishes at 36.25 s rather than 28.49 s for Alafasy. Pauses freeze

@@ -547,6 +547,8 @@ internal data class EnglishProseVerse(
      * word it names after whitespace and asides have been removed.
      */
     val fragmentProgress: (Float) -> Float = { it },
+    /** Continuous travel between source letters, without changing the owned ranges. */
+    val washProgress: (Float) -> Float = fragmentProgress,
     /**
      * The share of the verse a point this many characters into [range] stands
      * at — what a tap seeks by. Identity-ish for a verse set whole.
@@ -696,6 +698,7 @@ private fun englishLeafBlockTexts(
                         markRange = markRange,
                         token = openingTokens[verse.surahId to verse.ayah],
                         fragmentProgress = verse::fragmentInkProgress,
+                        washProgress = verse::fragmentWashProgress,
                         verseFractionAt = { at ->
                             verse.verseFractionAt(at, verse.text.length)
                         },
@@ -1322,7 +1325,7 @@ private fun englishVerseBlooms(
             englishWashFragmentProgress(span, windows.getValue(span.position).progress(
                 positionMs,
                 if (span.position == 1) sample?.voiceStartMs ?: performing.startMs else Long.MIN_VALUE,
-            ), verse.fragmentProgress)
+            ), verse.washProgress)
         } else when (motion.ink.state) {
             InkEngine.State.Upcoming -> 0f
             InkEngine.State.Active -> if (motion.repeat) 1f else performing?.let {

@@ -1363,6 +1363,9 @@ same owner merge, leaving one active soft edge. First-pass glimmer uses those
 same bands and cannot jump ahead of the wash. Repeat tint and repeat glimmer
 retain the semantic owners over the prefix already laid. Range projection is
 cached with the paragraph; frames only read clocks and build paint layers.
+Owned ranges retain the exact letter-count map; the animated edge interpolates
+between those letter anchors. Rounding the moving edge to source characters
+and then to printed letter ends made even a continuous clock paint in jumps.
 Every wash uses `Tuning.washFeather` unmodified, exactly as the scrolling reader
 does.
 

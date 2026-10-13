@@ -6,6 +6,7 @@ import com.beautifulquran.domain.EnglishAlignment
 import com.beautifulquran.domain.EnglishWordSpan
 import com.beautifulquran.domain.EnglishVerseRun
 import com.beautifulquran.domain.englishBookOf
+import com.beautifulquran.domain.englishLeaf
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -15,6 +16,24 @@ class EnglishWashClockTest {
         Segment(22, 25530, 26800), Segment(23, 26800, 28490),
         Segment(24, 28490, 32560), Segment(25, 32560, 32930), Segment(26, 32930, 36250),
     )
+
+    @Test
+    fun `An Nur clear evidence painted edge moves between letters on every frame`() {
+        val (_, text, glosses) = javaClass.getResourceAsStream("/english-clear-evidence-owners.tsv")!!
+            .bufferedReader().use { it.readLines().first { row -> row.startsWith("24:1\t") } }.split('\t')
+        val owned = EnglishWordAlignment.align(text, glosses.split('|'))!!.washSpans.first { it.position == 7 }
+        val span = EnglishInkSpan(0..13, 7, owned.from, owned.to)
+        val verse = englishLeaf(403, listOf(EnglishVerseRun(24, 1, 0, Int.MAX_VALUE))) { _, _ -> text }
+            .verses.single()
+        val frames = (0..2960 step 8).map {
+            englishWashFragmentProgress(span, it / 2960f, verse::fragmentWashProgress)
+        }
+        val steps = frames.zipWithNext { a, b -> b - a }
+        assertEquals("whole-letter projection freezes a smooth animation", 0, steps.count { it == 0f })
+        assertTrue("a letter must not appear in one jump", steps.max() < 0.01f)
+        assertEquals(0f, frames.first(), 0f)
+        assertEquals(1f, frames.last(), 0f)
+    }
 
     @Test
     fun `An Nur punishment wash continues until the group of believers finishes`() {
