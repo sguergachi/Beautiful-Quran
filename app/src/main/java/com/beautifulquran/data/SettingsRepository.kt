@@ -38,7 +38,6 @@ internal fun bookTypefaceFor(storedCode: Int?, legacyTimeless: Boolean?): BookTy
  */
 enum class ScrollArabicFace(val label: String, val code: Int) {
     HAFS("KFGQPC Hafs", 0),
-    NOTO_NASKH("Noto Naskh Arabic", 1),
     SCHEHERAZADE("Scheherazade New", 2),
     ;
 
