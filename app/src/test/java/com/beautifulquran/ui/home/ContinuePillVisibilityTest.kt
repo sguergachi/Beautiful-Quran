@@ -122,10 +122,9 @@ class ContinuePillVisibilityTest {
     fun dockHoldsOpaqueThenFadesIntoRow() {
         assertEquals(1f, continueDockAlpha(0f), 0.001f)
         assertEquals(1f, continueDockAlpha(ContinueDockFadeFrom), 0.001f)
-        assertEquals(0.5f, continueDockAlpha(0.85f), 0.001f)
+        assertEquals(0.3f, continueDockAlpha(0.85f), 0.001f)
         assertEquals(0f, continueDockAlpha(1f), 0.001f)
     }
-
     @Test
     fun dockCollapsesPillRadiusToRow() {
         assertEquals(ContinuePillRadius, continueDockRadius(0f))
@@ -151,8 +150,8 @@ class ContinuePillVisibilityTest {
 
     @Test
     fun undockNeedsACompletedDock() {
-        assertFalse(undockFlightReady(0L))
-        assertTrue(undockFlightReady(10_000L))
+        assertFalse(undockFlightReady(false))
+        assertTrue(undockFlightReady(true))
     }
 
     @Test

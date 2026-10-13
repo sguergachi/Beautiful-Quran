@@ -4,6 +4,7 @@ import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.EnterTransition
 import androidx.compose.animation.core.CubicBezierEasing
+import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animate
 import androidx.compose.animation.core.tween
@@ -31,6 +32,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.absoluteOffset
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.padding
@@ -53,7 +55,6 @@ import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
-import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -142,14 +143,14 @@ internal val ContinueFlightEase = CubicBezierEasing(0.77f, 0f, 0.175f, 1f)
  * landed, leaving always earns the flight home. No extra delay — the dock
  * already required arriving fully in view, so any departure is contextual.
  */
-internal fun undockFlightReady(dockedAtMs: Long): Boolean = dockedAtMs != 0L
+internal fun undockFlightReady(docked: Boolean): Boolean = docked
 
 /** Grace so fast scrolls never flap the pill: the row must sit fully in
  * view this long before the dock flight runs. */
 internal const val ContinueDockDwellMs = 3000L
 
 /** Raw flight progress where the docked pill starts fading into its row. */
-internal const val ContinueDockFadeFrom = 0.7f
+internal const val ContinueDockFadeFrom = 0.5f
 
 private val HomeRibbonLane = 28.dp
 private val HomeRibbonWidth = 13.dp
@@ -294,8 +295,13 @@ fun HomeScreen(
     var rowWasVisible by remember { mutableStateOf(false) }
     var dockReady by remember { mutableStateOf(false) }
     var undockArrived by remember { mutableStateOf(false) }
-    /** Uptime of the last completed dock landing; zero when no dock owns the row. */
-    var dockedAtMs by remember { mutableLongStateOf(0L) }
+    /** True once a dock flight has landed and the row owns the place. */
+    var docked by remember { mutableStateOf(false) }
+    // The pill holds its seat through the dwell so the flight launches
+    // from the visible pill instead of chasing a three-second-old fade —
+    // and keeps its list clearance, so arrival never shifts rows under
+    // the waiting row and flaps the visibility guard.
+    val dwellHolding = continueRowVisible && pillWasShown && !searchActive && coverSheetVisible
     // Dock flights run once the row has sat fully in view through the
     // dwell: fly the pill to the row — morphing onto its exact bounds —
     // instead of fading it away. Fast scrolls never arm the flight.
@@ -323,14 +329,14 @@ fun HomeScreen(
         val start = continueRowRect
         if (seat != null && start != null && !searchActive && coverSheetVisible &&
             continueIndex >= 0 && listState.firstVisibleItemIndex >= continueIndex &&
-            undockFlightReady(dockedAtMs)
+            undockFlightReady(docked)
         ) {
             undockStart = start
             undocking = true
         } else {
-            // Too soon after landing, a bottom exit, or nowhere to fly
+            // No landing owns the row, a bottom exit, or nowhere to fly
             // from: the pill returns on its plain enter, flightless.
-            dockedAtMs = 0L
+            docked = false
         }
         rowWasVisible = false
     }
@@ -350,9 +356,9 @@ fun HomeScreen(
             animate(
                 initialValue = 0f,
                 targetValue = 1f,
-                animationSpec = tween(ContinueDockMs, easing = ContinueFlightEase),
+                animationSpec = tween(ContinueDockMs, easing = LinearEasing),
             ) { value, _ -> dockProgress = value }
-            dockedAtMs = System.currentTimeMillis()
+            docked = true
             docking = false
             dockStart = null
         }
@@ -363,9 +369,9 @@ fun HomeScreen(
             animate(
                 initialValue = 0f,
                 targetValue = 1f,
-                animationSpec = tween(ContinueUndockMs, easing = ContinueFlightEase),
+                animationSpec = tween(ContinueUndockMs, easing = LinearEasing),
             ) { value, _ -> undockProgress = value }
-            dockedAtMs = 0L
+            docked = false
             undocking = false
             undockStart = null
             undockArrived = true
@@ -385,7 +391,7 @@ fun HomeScreen(
         if (searchActive || !coverSheetVisible) {
             pillWasShown = false
             rowWasVisible = false
-            dockedAtMs = 0L
+            docked = false
         }
     }
     // The undocked pill lands exactly on its seat: skip its enter so the
@@ -399,7 +405,7 @@ fun HomeScreen(
         floatingVisible = showFloatingPlayback,
         floatingHeight = floatingPlaybackHeight,
         navigationBottom = navigationBottom,
-        continueVisible = showContinuePill,
+        continueVisible = showContinuePill || dwellHolding,
         continueHeight = continuePillHeight,
     )
     // One motion, not two: the sweep and the inset share duration and
@@ -772,7 +778,7 @@ fun HomeScreen(
             ) {
                 uiState.continueTarget?.let { target ->
                     FloatingPaperControl(
-                        visible = showContinuePill && !docking && !undocking,
+                        visible = (showContinuePill || dwellHolding) && !docking && !undocking,
                         enter = if (undockArrived) EnterTransition.None else FloatingPaperEnter,
                         modifier = Modifier
                             .fillMaxWidth()
@@ -781,23 +787,32 @@ fun HomeScreen(
                                 else Modifier,
                             )
                             .onGloballyPositioned { coords ->
-                                // Freeze the seat while the pill is up; its
-                                // exit slide must not move the launch point.
-                                if (showContinuePill) {
-                                    pillSeatRect = coords.boundsInWindow()
-                                }
                                 continuePillHeight = with(density) {
                                     coords.size.height.toDp()
                                 }
                             },
                     ) {
-                        ContinuePill(
-                            target = target,
-                            onClick = {
-                                focusManager.clearFocus()
-                                onOpenSurah(target.surah.id, target.ayah, null, null)
-                            },
-                        )
+                        // Seat on the ink, not the host: the AnimatedVisibility
+                        // wrapper carries the bottom clearance and nav pad,
+                        // which would launch every flight tall and drift it.
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .onGloballyPositioned { coords ->
+                                    if (showContinuePill || dwellHolding) {
+                                        pillSeatRect = coords.boundsInWindow()
+                                    }
+                                },
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            ContinuePill(
+                                target = target,
+                                onClick = {
+                                    focusManager.clearFocus()
+                                    onOpenSurah(target.surah.id, target.ayah, null, null)
+                                },
+                            )
+                        }
                     }
                 }
                 if (!playbackPinned) FloatingPlaybackControl(
@@ -850,22 +865,17 @@ fun HomeScreen(
                 ) {
                     val flight = ContinueFlightEase.transform(raw.coerceIn(0f, 1f))
                     val settled = if (docking) flight else 1f - flight
-                    // The ghost lives in the outer Box's content area, so
-                    // subtract the Scaffold padding the Box itself carries:
-                    // window bounds alone would land every flight low.
-                    val contentLeftPx = boxLeft + with(density) {
-                        padding.calculateStartPadding(layoutDirection).toPx()
-                    }
-                    val contentTopPx = boxTop + with(density) {
-                        padding.calculateTopPadding().toPx()
-                    }
-                    val left = lerp(start.left, end.left, flight) - contentLeftPx
-                    val top = lerp(start.top, end.top, flight) - contentTopPx
+                    // The Box origin is already the content origin: the
+                    // onGloballyPositioned feeding boxLeft/boxTop sits after
+                    // the Scaffold padding in the chain, so no padding math
+                    // belongs here (subtracting it lands every flight high).
+                    val left = lerp(start.left, end.left, flight) - boxLeft
+                    val top = lerp(start.top, end.top, flight) - boxTop
                     val width = with(density) { lerp(start.width, end.width, flight).toDp() }
                     val height = with(density) { lerp(start.height, end.height, flight).toDp() }
                     Box(
                         modifier = Modifier
-                            .offset { IntOffset(left.roundToInt(), top.roundToInt()) }
+                            .absoluteOffset { IntOffset(left.roundToInt(), top.roundToInt()) }
                             .width(width)
                             .height(height)
                             .graphicsLayer {
