@@ -53,6 +53,7 @@ import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -132,6 +133,19 @@ internal const val ContinueUndockMs = 700
 /** Grace so fast scrolls never flap the pill: the row must sit fully in
  * view this long before the dock flight runs. */
 internal const val ContinueDockDwellMs = 3000L
+
+/** Grace after landing: the row must stay docked this long before the
+ * flight home may run — scrolling straight past just brings the pill
+ * back on its plain enter. */
+internal const val ContinueUndockDelayMs = 3000L
+
+/**
+ * The undock flight may run only off a settled dock: a completed landing
+ * at least [ContinueUndockDelayMs] ago. Anything sooner returns the pill
+ * without a flight.
+ */
+internal fun undockFlightReady(nowMs: Long, dockedAtMs: Long): Boolean =
+    dockedAtMs != 0L && nowMs - dockedAtMs >= ContinueUndockDelayMs
 
 /** Raw flight progress where the docked pill starts fading into its row. */
 internal const val ContinueDockFadeFrom = 0.7f
@@ -278,6 +292,8 @@ fun HomeScreen(
     var rowWasVisible by remember { mutableStateOf(false) }
     var dockReady by remember { mutableStateOf(false) }
     var undockArrived by remember { mutableStateOf(false) }
+    /** Uptime of the last completed dock landing; zero when no dock owns the row. */
+    var dockedAtMs by remember { mutableLongStateOf(0L) }
     // The row sat fully in view through the dwell while the pill was up:
     // fly the pill to the row — resize, square off, fade — instead of
     // popping it away. Fast scrolls never arm the flight.
@@ -304,10 +320,15 @@ fun HomeScreen(
         val seat = continuePillRect
         val start = continueRowRect
         if (seat != null && start != null && !searchActive && coverSheetVisible &&
-            continueIndex >= 0 && listState.firstVisibleItemIndex >= continueIndex
+            continueIndex >= 0 && listState.firstVisibleItemIndex >= continueIndex &&
+            undockFlightReady(System.currentTimeMillis(), dockedAtMs)
         ) {
             undockStart = start
             undocking = true
+        } else {
+            // Too soon after landing, a bottom exit, or nowhere to fly
+            // from: the pill returns on its plain enter, flightless.
+            dockedAtMs = 0L
         }
         rowWasVisible = false
     }
@@ -327,6 +348,7 @@ fun HomeScreen(
                 targetValue = 1f,
                 animationSpec = tween(ContinueDockMs, easing = FastOutSlowInEasing),
             ) { value, _ -> dockProgress = value }
+            dockedAtMs = System.currentTimeMillis()
             docking = false
             dockStart = null
         }
@@ -339,6 +361,7 @@ fun HomeScreen(
                 targetValue = 1f,
                 animationSpec = tween(ContinueUndockMs, easing = FastOutSlowInEasing),
             ) { value, _ -> undockProgress = value }
+            dockedAtMs = 0L
             undocking = false
             undockStart = null
             undockArrived = true
@@ -358,6 +381,7 @@ fun HomeScreen(
         if (searchActive || !coverSheetVisible) {
             pillWasShown = false
             rowWasVisible = false
+            dockedAtMs = 0L
         }
     }
     // The undocked pill lands exactly on its seat: skip its enter so the
