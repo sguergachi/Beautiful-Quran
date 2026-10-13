@@ -10,6 +10,18 @@ Main session stays on code. Hand the subagent label + commit SHA only:
 > Send a release APK for `<work>` at `<sha>` following `docs/APK_DELIVERY.md`.
 > You are a subagent. Don't run memo.
 
+## Where the APK lives
+
+`scripts/publish_apk.sh` puts the built APK at one fixed place per worktree
+(= per T3 Code thread): `~/.t3/artifacts/Beautiful-Quran/apks/<worktree-dir>/release.apk`
+(or `debug.apk`) with a `release.info` beside it recording the commit it was
+built from. `send_apk_to_phone.sh` builds through it, so the sent file is
+always the published one. The T3 Code **Send APK** action runs
+`scripts/send_apk_to_phone.sh --release --zip --published --wait`: it sends the
+published APK as-is when it was built from HEAD on a clean tree, and
+republishes (rebuilds) first when it is missing, from another commit, or from a
+dirty tree — so the button never ships a stale build.
+
 ## Run
 
 ```bash

@@ -25,6 +25,7 @@ SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd -- "$SCRIPT_DIR/.." && pwd)"
 
 SKIP_BUILD=0
+PUBLISHED=0
 WAIT=0
 RELEASE=0
 ZIP=0
@@ -38,12 +39,15 @@ STAGE_DIR="${BQ_APK_STAGE:-${TMPDIR:-/tmp}/beautiful-quran-apks}"
 usage() {
   cat <<'EOF'
 Usage: scripts/send_apk_to_phone.sh [--release] [--zip] [--label TEXT] [--skip-build]
-                                    [--wait] [--name NAME] [--keep-old]
+                                    [--published] [--wait] [--name NAME] [--keep-old]
 
   --release      Build/send the release APK (default: debug)
   --zip          Zip the staged build (store only) and share the ZIP instead
   --label TEXT   What this build is, for the filename (default: the branch)
   --skip-build   Use the APK already in app/build/outputs
+  --published    Send the APK at this worktree's known location
+                 (scripts/publish_apk.sh) when it matches HEAD on a clean
+                 tree; otherwise rebuild and republish it first
   --wait         Poll until a paired phone is reachable (default 300s)
   --name NAME    KDE Connect device name (default: first available)
   --keep-old     Do not delete previously staged builds after a successful send
@@ -56,6 +60,7 @@ EOF
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --skip-build) SKIP_BUILD=1 ;;
+    --published) PUBLISHED=1 ;;
     --release) RELEASE=1 ;;
     --zip) ZIP=1 ;;
     --keep-old) KEEP_OLD=1 ;;
@@ -92,26 +97,42 @@ require_cmd() {
 
 require_cmd kdeconnect-cli
 
-if [[ "$RELEASE" -eq 1 ]]; then
-  APK="$REPO_ROOT/app/build/outputs/apk/release/app-release.apk"
-  GRADLE_TASK=assembleRelease
-else
-  APK="$REPO_ROOT/app/build/outputs/apk/debug/app-debug.apk"
-  GRADLE_TASK=assembleDebug
-fi
+KIND=$([[ "$RELEASE" -eq 1 ]] && echo release || echo debug)
+PUBLISH=("$SCRIPT_DIR/publish_apk.sh" "--$KIND")
 
-if [[ "$SKIP_BUILD" -eq 0 ]]; then
-  require_android_java_21
-  if [[ ! -f "$REPO_ROOT/data/quran.db" ]]; then
-    (cd "$REPO_ROOT" && python3 tools/build_db.py)
+# Every send goes through the worktree's known APK location (publish_apk.sh):
+# a build is published there, then the phone gets a named copy of it. With
+# --published an APK already there is reused when it is current.
+if [[ "$PUBLISHED" -eq 1 ]]; then
+  APK="$("${PUBLISH[@]}" --print || true)"
+  # Only an APK built from exactly this commit on a clean tree is sent as-is.
+  # Anything else is republished (gradle is a no-op when nothing changed): the
+  # action runs unattended, so a warning nobody reads would ship the old build.
+  if [[ -f "$APK" ]]; then
+    published_sha="$(sed -n 's/^sha=//p' "${APK%.apk}.info" 2>/dev/null | head -n 1)"
+    published_dirty="$(sed -n 's/^dirty=//p' "${APK%.apk}.info" 2>/dev/null | head -n 1)"
+    head_sha="$(cd "$REPO_ROOT" && git rev-parse --short=8 HEAD 2>/dev/null || true)"
+    dirty_now=0
+    [[ -z "$(cd "$REPO_ROOT" && git status --porcelain 2>/dev/null)" ]] || dirty_now=1
+    if [[ "$published_sha" != "$head_sha" || "$published_dirty" != 0 || "$dirty_now" -eq 1 ]]; then
+      printf 'Published APK is from %s (HEAD %s); republishing.\n' "${published_sha:-unknown}" "$head_sha" >&2
+      APK=""
+    fi
   fi
-  (cd "$REPO_ROOT" && ./gradlew "$GRADLE_TASK")
+  [[ -f "$APK" ]] || APK="$("${PUBLISH[@]}" | tail -n 1)"
+elif [[ "$SKIP_BUILD" -eq 1 ]]; then
+  APK="$("${PUBLISH[@]}" --skip-build | tail -n 1)"
+else
+  APK="$("${PUBLISH[@]}" | tail -n 1)"
 fi
 
 [[ -f "$APK" ]] || {
-  printf 'error: no APK at %s (run without --skip-build)\n' "$APK" >&2
+  printf 'error: no APK at %s\n' "$APK" >&2
   exit 1
 }
+
+# The commit the published APK was built from names the file on the phone.
+BUILT_SHA="$(sed -n 's/^sha=//p' "${APK%.apk}.info" 2>/dev/null | head -n 1)"
 
 # Name it after the work, so the phone can tell one build from the next.
 slug() {
@@ -119,8 +140,7 @@ slug() {
     sed -e 's#[^a-z0-9]\+#-#g' -e 's#^-*##' -e 's#-*$##' | cut -c1-48
 }
 [[ -n "$LABEL" ]] || LABEL="$(cd "$REPO_ROOT" && git rev-parse --abbrev-ref HEAD 2>/dev/null || echo build)"
-SHA="$(cd "$REPO_ROOT" && git rev-parse --short=8 HEAD 2>/dev/null || date +%H%M)"
-KIND=$([[ "$RELEASE" -eq 1 ]] && echo release || echo debug)
+SHA="${BUILT_SHA:-$(cd "$REPO_ROOT" && git rev-parse --short=8 HEAD 2>/dev/null || date +%H%M)}"
 STAGED="$STAGE_DIR/Beautiful-Quran-$(slug "$LABEL")-$SHA-$KIND.apk"
 
 mkdir -p "$STAGE_DIR"
