@@ -133,17 +133,9 @@ class ContinuePillVisibilityTest {
     }
 
     @Test
-    fun dockWaitsForASettledRow() {
-        assertEquals(3000L, ContinueDockDwellMs)
-    }
-
-    @Test
-    fun undockWaitsForSettledDock() {
-        assertFalse(undockFlightReady(10_000L, 0L))
-        assertFalse(undockFlightReady(11_000L, 10_000L))
-        assertFalse(undockFlightReady(12_999L, 10_000L))
-        assertTrue(undockFlightReady(13_000L, 10_000L))
-        assertTrue(undockFlightReady(20_000L, 10_000L))
+    fun undockNeedsACompletedDock() {
+        assertFalse(undockFlightReady(0L))
+        assertTrue(undockFlightReady(10_000L))
     }
 
     @Test

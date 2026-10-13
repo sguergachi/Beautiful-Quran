@@ -1615,12 +1615,13 @@ place ribbon in situ. While that row is scrolled out of view a quiet green-wash
 pill — the place ribbon, gold number, and a small-caps CONTINUE flag over the
 chapter row's bilingual identity, set in a rounded wash on the rows' own
 Arabic rail — floats above the bottom transport (or gesture inset); once the
-row has sat fully in view for a few seconds the pill glides a scaled copy up
+row sits fully in view the pill glides a scaled copy up
 to the row's bounds on transform and opacity alone — squaring its corners,
 then fading to reveal the row — so the row owns the tap, and scrolling back
-down peels it off the top and settles it home again — but only off a settled
-dock, so scrolling straight past brings the pill home flightless. Fast scrolls
-never flap either flight; reduced motion removes the travel entirely. Both platforms keep the 28 dp/px outer lane, 26 dp/px number
+down peels it off the top and settles it home again. Flights only ever arm
+off a fully-visible row and cancel the moment it leaves, so flings pass
+through untouched; reduced motion is not separately gated because no other
+motion in the app honors the animator scale either. Both platforms keep the 28 dp/px outer lane, 26 dp/px number
 column, and 4 dp/px name gap; the fixed masthead pairs its title with the same
 30 dp/px gilded rosette Settings affordance.
 

@@ -1,10 +1,8 @@
 package com.beautifulquran.ui.home
 
-import android.provider.Settings
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.EnterTransition
-import androidx.compose.animation.ExitTransition
 import androidx.compose.animation.core.CubicBezierEasing
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animate
@@ -72,7 +70,6 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.boundsInRoot
 import androidx.compose.ui.layout.boundsInWindow
 import androidx.compose.ui.layout.onGloballyPositioned
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalLayoutDirection
@@ -92,7 +89,6 @@ import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.util.lerp
-import kotlinx.coroutines.delay
 import kotlin.math.roundToInt
 import kotlinx.coroutines.flow.drop
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -114,7 +110,6 @@ import com.beautifulquran.ui.theme.quietSuppliedBrackets
 import com.beautifulquran.ui.theme.ArabicTitleStyle
 import com.beautifulquran.ui.theme.FloatingPaperControl
 import com.beautifulquran.ui.theme.FloatingPaperEnter
-import com.beautifulquran.ui.theme.FloatingPaperExit
 import com.beautifulquran.ui.theme.LocalQuranAccents
 import com.beautifulquran.ui.theme.typeScale
 import com.beautifulquran.ui.theme.PaperSearchField
@@ -141,22 +136,12 @@ internal const val ContinueUndockMs = 500
  */
 internal val ContinueFlightEase = CubicBezierEasing(0.77f, 0f, 0.175f, 1f)
 
-/** Grace so fast scrolls never flap the pill: the row must sit fully in
- * view this long before the dock flight runs. */
-internal const val ContinueDockDwellMs = 3000L
-
-/** Grace after landing: the row must stay docked this long before the
- * flight home may run — scrolling straight past just brings the pill
- * back on its plain enter. */
-internal const val ContinueUndockDelayMs = 3000L
-
 /**
- * The undock flight may run only off a settled dock: a completed landing
- * at least [ContinueUndockDelayMs] ago. Anything sooner returns the pill
- * without a flight.
+ * The undock flight may run only off a completed dock: once the pill has
+ * landed, leaving always earns the flight home. No extra delay — the dock
+ * already required arriving fully in view, so any departure is contextual.
  */
-internal fun undockFlightReady(nowMs: Long, dockedAtMs: Long): Boolean =
-    dockedAtMs != 0L && nowMs - dockedAtMs >= ContinueUndockDelayMs
+internal fun undockFlightReady(dockedAtMs: Long): Boolean = dockedAtMs != 0L
 
 /** Raw flight progress where the docked pill starts fading into its row. */
 internal const val ContinueDockFadeFrom = 0.7f
@@ -302,18 +287,15 @@ fun HomeScreen(
     var undocking by remember { mutableStateOf(false) }
     var undockProgress by remember { mutableFloatStateOf(0f) }
     var rowWasVisible by remember { mutableStateOf(false) }
-    var dockReady by remember { mutableStateOf(false) }
     var undockArrived by remember { mutableStateOf(false) }
     /** Uptime of the last completed dock landing; zero when no dock owns the row. */
     var dockedAtMs by remember { mutableLongStateOf(0L) }
-    // Dock flights never run under reduced motion: the pill simply shows
-    // and hides with no travel.
-    val reducedMotion = rememberReducedMotion()
-    // The row sat fully in view through the dwell while the pill was up:
-    // fly the pill to the row — resize, square off, fade — instead of
-    // popping it away. Fast scrolls never arm the flight.
+    // Dock flights run whenever the row sits fully in view — no dwell.
+    // A fling passes a row in well under 100ms and never rests fully on
+    // it; anything that arrives fully is being read, so the flight fires
+    // at once instead of hiding behind a timer.
     if (showContinuePill) pillWasShown = true
-    if (continueRowVisible && pillWasShown && !docking && !undocking && dockReady && !reducedMotion) {
+    if (continueRowVisible && pillWasShown && !docking && !undocking) {
         val start = pillSeatRect
         val end = if (!searching && coverSheetVisible) continueRowRect else null
         if (start != null && end != null) {
@@ -331,12 +313,12 @@ fun HomeScreen(
         continueSurahId,
         searching,
     )
-    if (!continueRowVisible && rowWasVisible && !docking && !undocking && !reducedMotion) {
+    if (!continueRowVisible && rowWasVisible && !docking && !undocking) {
         val seat = pillSeatRect
         val start = continueRowRect
         if (seat != null && start != null && !searchActive && coverSheetVisible &&
             continueIndex >= 0 && listState.firstVisibleItemIndex >= continueIndex &&
-            undockFlightReady(System.currentTimeMillis(), dockedAtMs)
+            undockFlightReady(dockedAtMs)
         ) {
             undockStart = start
             undocking = true
@@ -346,16 +328,6 @@ fun HomeScreen(
             dockedAtMs = 0L
         }
         rowWasVisible = false
-    }
-    LaunchedEffect(continueRowVisible, pillWasShown, searchActive, coverSheetVisible) {
-        // showContinuePill is already false once the row is visible, so the
-        // dwell watches pillWasShown (the pill was up when the row arrived).
-        if (continueRowVisible && pillWasShown && !searchActive && coverSheetVisible) {
-            delay(ContinueDockDwellMs)
-            dockReady = true
-        } else {
-            dockReady = false
-        }
     }
     LaunchedEffect(docking) {
         if (docking) {
@@ -786,12 +758,7 @@ fun HomeScreen(
                 uiState.continueTarget?.let { target ->
                     FloatingPaperControl(
                         visible = showContinuePill && !docking && !undocking,
-                        enter = if (undockArrived || reducedMotion) {
-                            EnterTransition.None
-                        } else {
-                            FloatingPaperEnter
-                        },
-                        exit = if (reducedMotion) ExitTransition.None else FloatingPaperExit,
+                        enter = if (undockArrived) EnterTransition.None else FloatingPaperEnter,
                         modifier = Modifier
                             .fillMaxWidth()
                             .then(
@@ -1040,23 +1007,6 @@ internal fun continueLazyIndex(
 
 /** The CONTINUE flag dissolves across the flight; the row has none. */
 internal fun continueDockCapsAlpha(docked: Float): Float = 1f - docked.coerceIn(0f, 1f)
-
-/**
- * Android's reduced-motion signal: the global animator scale the user (or
- * the system) zeroes to remove movement. Flights never run under it; the
- * pill simply shows and hides.
- */
-@Composable
-private fun rememberReducedMotion(): Boolean {
-    val context = LocalContext.current
-    return remember {
-        Settings.Global.getFloat(
-            context.contentResolver,
-            Settings.Global.ANIMATOR_DURATION_SCALE,
-            1f,
-        ) == 0f
-    }
-}
 
 /**
  * The reading place floats only while its chapter row is scrolled out of
