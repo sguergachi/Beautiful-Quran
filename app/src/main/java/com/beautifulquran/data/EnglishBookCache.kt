@@ -213,8 +213,10 @@ class EnglishBookCache internal constructor(private val dir: File) {
          * 31: the typeface profiles key their own books (bookCacheSuffix).
          * 32: Timeless removed; Junicode is the book face. Its suffix now
          * carries the font files' hashes and every constant that moves a line.
+         * 33: the basmalah's slot is set on the page's pitch (shorter), and the
+         * opening charges 42 for it instead of 68.
          */
-        const val FORMAT = 32
+        const val FORMAT = 33
         const val MAX_LEAVES = 10_000
         const val MAX_RUNS = 20_000
     }

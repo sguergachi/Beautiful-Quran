@@ -125,10 +125,16 @@ const val ENGLISH_LEAF_CAPACITY_CHARS = 1180
  * These are *measured*, off a screen capture of an opening leaf, and not
  * reasoned about. `MushafEnglishSheet` builds the panel's slot from the line's
  * ink and [EnglishLeafPanelAir] on each side and the basmalah's from its own
- * line and [EnglishLeafBasmalahAirEm] under it, and on the reference leaf those
- * come to 126 px and 113 px against a line pitch of 80 — 1.58 lines and 1.41,
+ * line and a fixed 0.9 em of air under it, and on the reference leaf those
+ * came to 126 px and 113 px against a line pitch of 80 — 1.58 lines and 1.41,
  * three lines together. A line of this book is [ENGLISH_LEAF_LINE_CHARS], so
- * they are 76 characters and 68.
+ * they were 76 characters and 68.
+ *
+ * The basmalah has since been put on the page's pitch (`englishBasmalahPx`):
+ * its slot now runs from its head to one pitch under its baseline, less the
+ * first prose line's ascent. With Junicode's ascent of 0.86 em and the basmalah
+ * fitted at about 0.79 of the prose hand, that is about 0.87 of a line — 42
+ * characters at the same rate.
  *
  * The measurement is in *lines*, and it stays 1.58 and 1.41 when the hand
  * moves: the panel is built from the line's ink and an air in line pitches, so
@@ -146,7 +152,7 @@ const val ENGLISH_LEAF_CAPACITY_CHARS = 1180
  * the leading.
  */
 const val ENGLISH_LEAF_OPENING_CHARS = 76
-const val ENGLISH_LEAF_BASMALAH_CHARS = 68
+const val ENGLISH_LEAF_BASMALAH_CHARS = 42
 
 /** What a verse costs the leaf: its prose, and the opening it may bring. */
 fun englishLeafVerseMass(surahId: Int, ayah: Int, prose: Int): Int = when {
