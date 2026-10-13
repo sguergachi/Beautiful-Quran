@@ -633,12 +633,26 @@ latched edge.
 **The plain clock.** Both the tajweed map and the wasl continuation are claims
 about where inside an Arabic *word* the time is going, so `LetterSweep` also
 publishes `plainProgress` — the same Animatable with neither applied — surfaced
-as `InkMotion.plainSweepProgress`. A renderer with no Arabic letters under its
-wash must read that one: the mushaf's English leaf blooms the English span of
-the word being said (`englishVerseBlooms`), and the paced value parks that
-bloom wherever the reciter sustains a madd. The scrolling reader's English mode gets the same
-result at the source, by passing `pacing = null` to `rememberInkMotions`; the
-mushaf cannot, because one `AyahInkPack` draws both leaves.
+as `InkMotion.plainSweepProgress`. English never applies the Arabic letter map
+or wasl carry-in: either would park English ink where only an Arabic letter is
+held. The scrolling reader passes `pacing = null` to `rememberInkMotions`.
+
+**English leaf pacing.** `EnglishWashClock` receives the same calibrated,
+seek-aware media samples that select the Arabic word, without recomposing the
+page on each tick. Each continuous English band lasts from its first Arabic
+owner until the next band's first occurrence; the final band lasts until the
+last spoken segment ends. In 24:2, “their punishment” starts on word 23 but
+keeps washing through the reordered Arabic “a group of the believers,” words
+24–26. It finishes at 36.25 s rather than 28.49 s for Alafasy. Pauses freeze
+the edge; speed changes and holds longer than the visual animation cap still
+follow media time. A carried band projects its progress through the page cut,
+so the second fragment waits for the first. Glimmer and repeat tint are clipped
+to laid ink, and the active repeat wash also waits for its spoken clock. Seek
+generations reject stale samples; calibration changes cannot rewind laid ink.
+Carried-leaf ownership and follow read that same edge. Follow previews 500 ms
+at the current playback speed, preserving the existing turn lead and waiting
+cover; it no longer assumes that the next Arabic word starts the next leaf.
+Semantic ownership for taps, holds, and repeat labels stays in the alignment.
 
 **Short wasl donors** (`مَن يَشْرِى`, `مِن رَّبِّكُم`, …) need a **speed
 ceiling** on that early bloom so the next opening does not race: details and

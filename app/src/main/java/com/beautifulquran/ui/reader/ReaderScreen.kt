@@ -2943,6 +2943,7 @@ fun ReaderScreen(
                         surahsById = mushafReady.surahsById,
                         pagerState = mushafPagerState,
                         activeWordState = activeWordState,
+                        englishWashClock = viewModel.englishWashClock,
                         playback = mushafPlayback,
                         playbackSpeed = playerState.speed,
                         followEnabled = followPlayback,

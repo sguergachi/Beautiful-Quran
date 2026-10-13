@@ -587,6 +587,10 @@ class ReaderViewModel(
     private val highlightClock = HighlightClock()
     private val activeWordPollCache = ActiveWordPollCache()
 
+    // Draw-only media samples: word snapshots still publish once per word.
+    private val _englishWashClock = MutableStateFlow<EnglishWashClock?>(null)
+    internal val englishWashClock: StateFlow<EnglishWashClock?> = _englishWashClock
+
     private var lastClockEventId = player.state.value.positionEvents.clockId
     /** Last applied lag/lead so a lab or route change can reset the clock. */
     private var lastOutputLatencyMs = -1L
@@ -680,6 +684,8 @@ class ReaderViewModel(
             val voiceMs = firstWordVoiceMs(np.ayah, np.reciterId, segments)
             val rawMs = highlightPositionMs(voiceMs, np.reciterId)
             val clockMs = highlightClock.sample(np, rawMs)
+            _englishWashClock.value = EnglishWashClock(np.surahId, np.ayah, events.inkId, clockMs, voiceMs, segments)
+                .after(_englishWashClock.value)
             val info = prepared?.activeInfo(clockMs)
             val washStart = if (info == null) {
                 null

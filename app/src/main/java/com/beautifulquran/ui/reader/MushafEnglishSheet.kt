@@ -19,11 +19,13 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.State
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.structuralEqualityPolicy
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
@@ -136,6 +138,7 @@ internal fun MushafEnglishSheet(
     waitingForVoice: Boolean,
     pageHasActiveWord: Boolean,
     activeWordState: State<ActiveWord?>,
+    washClock: StateFlow<EnglishWashClock?>,
     playback: State<MushafPlayback>,
     playbackSpeed: Float,
     flashAyah: Int?,
@@ -248,6 +251,8 @@ internal fun MushafEnglishSheet(
             }
         }
     }
+    val clock = washClock.collectAsStateWithLifecycle()
+    val washWindows = rememberEnglishWashWindows(clock, alignments, content)
     // The leaf comes up on the same short fade the Arabic one uses while its
     // page face loads: a page settling into the light rather than text
     // appearing on paper that was already there.
@@ -374,6 +379,10 @@ internal fun MushafEnglishSheet(
                     is EnglishLeafBlockText.Prose -> EnglishProseBlock(
                         block = block,
                         packs = packsState,
+                        activeWord = activeWordState,
+                        activeSurahId = content.surah.id,
+                        clock = clock,
+                        washWindows = washWindows,
                         fontSize = fontSize,
                         lineHeight = pitch,
                         measurePx = measurePx,
@@ -546,10 +555,28 @@ internal data class EnglishProseVerse(
 )
 
 /** A range in the paragraph, owned by a 1-based Arabic word position. */
-internal data class EnglishInkSpan(val range: IntRange, val position: Int)
+internal data class EnglishInkSpan(val range: IntRange, val position: Int, val from: Float = 0f, val to: Float = 1f)
 
 /** A fading tint after a backward seek must not reveal words beyond the new prefix. */
 internal fun englishInkLayerAllowed(state: InkEngine.State): Boolean = state != InkEngine.State.Upcoming
+
+/** Cache windows on source changes; frame ticks invalidate drawing and leaf thresholds only. */
+@Composable
+internal fun rememberEnglishWashWindows(
+    clock: State<EnglishWashClock?>,
+    alignments: EnglishVerseAlignments,
+    content: SurahContent,
+): Map<Pair<Int, Int>, Map<Int, EnglishWashWindow>> {
+    val segments by remember { derivedStateOf(structuralEqualityPolicy()) { clock.value?.segments.orEmpty() } }
+    val verse by remember { derivedStateOf(structuralEqualityPolicy()) { clock.value?.let { it.surahId to it.ayah } } }
+    return remember(alignments, segments, verse, content) {
+        verse?.takeIf { it.first == content.surah.id }?.let { key ->
+            val positions = alignments.alignment(key.second)?.washSpans?.map { it.position }
+                ?: content.ayahs.firstOrNull { it.number == key.second }?.words?.map { it.position }.orEmpty()
+            mapOf(key to englishWashWindows(positions, segments))
+        }.orEmpty()
+    }
+}
 
 /** Projects the continuous wash or semantic ownership through asides and page cuts. */
 internal fun englishOwnedSpans(
@@ -562,7 +589,7 @@ internal fun englishOwnedSpans(
     val printed = englishWashBands(
         range, fragmentProgress(span.from), fragmentProgress(span.to), 1f, text,
     ).saying
-    printed.takeUnless { it.isEmpty() }?.let { EnglishInkSpan(it, span.position) }
+    printed.takeUnless { it.isEmpty() }?.let { EnglishInkSpan(it, span.position, span.from, span.to) }
 }
 
 /**
@@ -1107,6 +1134,10 @@ private fun memo(key: EnglishRagKey, breaks: IntArray): IntArray {
 private fun EnglishProseBlock(
     block: EnglishLeafBlockText.Prose,
     packs: Map<Pair<Int, Int>, AyahInkPack>,
+    activeWord: State<ActiveWord?>,
+    activeSurahId: Int,
+    clock: State<EnglishWashClock?>,
+    washWindows: Map<Pair<Int, Int>, Map<Int, EnglishWashWindow>>,
     fontSize: TextUnit,
     lineHeight: TextUnit,
     /** The measure the ruler paginated against, which the lines are broken to. */
@@ -1153,6 +1184,11 @@ private fun EnglishProseBlock(
                                 palette = palette,
                                 glintInk = glintInk,
                                 text = block.text,
+                                word = activeWord.value?.takeIf {
+                                    it.ayah == verse.ayah && activeSurahId == verse.surahId
+                                },
+                                clock = clock.value,
+                                windows = washWindows[verse.surahId to verse.ayah].orEmpty(),
                             )
                         }
                     }
@@ -1221,10 +1257,10 @@ private fun EnglishProseBlock(
  *
  * The base wash is one continuous prefix. A reordered meaning takes every
  * intervening English word into its wash, so there can be no dim hole before
- * the leading edge. First-pass glimmer follows that edge; repeat layers keep
- * the semantic owners.
- * Already laid ink retains the Arabic high-water state and rises through the
- * shared recess cover after a seek.
+ * the leading edge. Each band follows the calibrated media clock until the
+ * next band starts, or until the final spoken segment ends. Pauses hold the
+ * edge and reordered Arabic tails keep it moving. Glimmer and repeat tint
+ * cannot pass that edge; the shared pack retains repeat owners and seek recess.
  */
 private fun englishVerseBlooms(
     verse: EnglishProseVerse,
@@ -1234,6 +1270,9 @@ private fun englishVerseBlooms(
     glintInk: Color?,
     /** The paragraph, so a band's edge can be kept out of the middle of a word. */
     text: CharSequence,
+    word: ActiveWord?,
+    clock: EnglishWashClock?,
+    windows: Map<Int, EnglishWashWindow>,
 ): List<ShapedWordBloom> {
     if (pack == null) return emptyList()
     val paper = palette.paperColor
@@ -1247,21 +1286,43 @@ private fun englishVerseBlooms(
             verse.range, verse.fragmentProgress(index.toFloat() / motions.size),
             verse.fragmentProgress((index + 1f) / motions.size), 1f, text,
         ).saying
-        span.takeUnless { it.isEmpty() }?.let { EnglishInkSpan(it, index + 1) }
+        span.takeUnless { it.isEmpty() }?.let {
+            EnglishInkSpan(it, index + 1, index.toFloat() / motions.size, (index + 1f) / motions.size)
+        }
     }
     val washSpans = verse.washSpans ?: spans
+    val performing = word?.takeIf { motions.any { motion -> motion.isActive } }
+    val sample = performing?.let { active -> clock?.takeIf { it.matches(active, verse.surahId) } }
+    val positionMs = performing?.let { englishWashPositionMs(it, sample, verse.surahId) }
+    fun progress(span: EnglishInkSpan, motion: InkMotion): Float =
+        if (positionMs != null && windows[span.position] != null) {
+            englishWashFragmentProgress(span, windows.getValue(span.position).progress(
+                positionMs,
+                if (span.position == 1) sample?.voiceStartMs ?: performing.startMs else Long.MIN_VALUE,
+            ), verse.fragmentProgress)
+        } else when (motion.ink.state) {
+            InkEngine.State.Upcoming -> 0f
+            InkEngine.State.Active -> if (motion.repeat) 1f else performing?.let {
+                EnglishWashWindow(it.startMs, it.startMs + it.durationMs).progress(positionMs ?: it.startMs)
+            } ?: motion.plainSweepProgress.coerceIn(0f, 1f)
+            else -> 1f
+        }
+    var washEdge = verse.range.first.toFloat()
+    val repeatProgress = performing?.takeIf { it.isRepeat }?.let {
+        EnglishWashWindow(it.startMs, it.startMs + it.durationMs).progress(positionMs ?: it.startMs)
+    } ?: 1f
     if (motions.isEmpty()) {
         // No clock of its own: a leaf the voice is not on, waiting or settled.
         if (cover > 0f) blooms += cover(verse.range, paper, cover)
     } else {
         for (span in washSpans) {
             val motion = motions.getOrNull(span.position - 1) ?: continue
-            if (motion.isActive && !motion.repeat) {
+            val progress = progress(span, motion)
+            if (progress > 0f) washEdge = span.range.first + (span.range.last + 1 - span.range.first) * progress
+            if (progress > 0f && progress < 1f) {
                 blooms += ShapedWordBloom.InkReveal(
                     range = span.range,
-                    // Tajweed pacing places ink on Arabic letters; English
-                    // takes the same word's unpaced clock and soft feather.
-                    progress = motion.plainSweepProgress.coerceIn(0f, 1f),
+                    progress = progress,
                     paper = paper,
                     restingAlpha = resting,
                     feather = null,
@@ -1269,7 +1330,7 @@ private fun englishVerseBlooms(
             } else {
                 // Arabic high-water state retains the continuous prefix
                 // already reached, including words advanced by reordering.
-                val alpha = if (motion.ink.state == InkEngine.State.Upcoming) waiting else cover
+                val alpha = if (progress == 0f) waiting else cover
                 if (alpha <= 0f) continue
                 val previous = blooms.lastOrNull() as? ShapedWordBloom.UpcomingDim
                 if (previous != null && previous.coverAlpha == alpha &&
@@ -1286,8 +1347,8 @@ private fun englishVerseBlooms(
         blooms += cover(verse.markRange, paper, markCover)
     }
     if (motions.isNotEmpty()) {
-        blooms.addEnglishInkLayerBlooms(washSpans, motions, palette, glintInk, repeatLayers = false)
-        blooms.addEnglishInkLayerBlooms(spans, motions, palette, glintInk, repeatLayers = true)
+        blooms.addEnglishInkLayerBlooms(washSpans, motions, palette, glintInk, repeatLayers = false, washEdge, repeatProgress)
+        blooms.addEnglishInkLayerBlooms(spans, motions, palette, glintInk, repeatLayers = true, washEdge, repeatProgress)
     }
     return blooms
 }
@@ -1333,6 +1394,8 @@ private fun MutableList<ShapedWordBloom>.addEnglishInkLayerBlooms(
     palette: WordInkPalette,
     glintInk: Color?,
     repeatLayers: Boolean,
+    washEdge: Float,
+    activeRepeatProgress: Float,
 ) {
     spans.forEach { owned ->
         val motion = motions.getOrNull(owned.position - 1) ?: return@forEach
@@ -1342,11 +1405,14 @@ private fun MutableList<ShapedWordBloom>.addEnglishInkLayerBlooms(
             motion.glintLayerAlpha > 0f && motion.glintIsRepeat == repeatLayers
         if (!repeating && !glinting) return@forEach
         val span = owned.range
+        val laid = englishInkLayerProgress(span, washEdge)
+        if (laid <= 0f) return@forEach
+        val repeatProgress = minOf(motion.repeatProgress, if (motion.isActive) activeRepeatProgress else 1f)
         if (repeating) {
             add(
                 ShapedWordBloom.ColorReveal(
                     range = span,
-                    progress = motion.repeatProgress,
+                    progress = minOf(repeatProgress, laid),
                     color = palette.repeatInkColor,
                     restingAlpha = 0f,
                     layerAlpha = motion.repeatAlpha,
@@ -1360,11 +1426,11 @@ private fun MutableList<ShapedWordBloom>.addEnglishInkLayerBlooms(
             add(
                 ShapedWordBloom.ColorReveal(
                     range = span,
-                    progress = if (onRepeat) {
-                        motion.repeatProgress
+                    progress = minOf(laid, if (onRepeat) {
+                        repeatProgress
                     } else {
                         motion.plainSweepProgress.coerceIn(0f, 1f)
-                    },
+                    }),
                     color = motion.glintColor(if (onRepeat) palette.repeatInkColor else glintInk),
                     restingAlpha = 0f,
                     layerAlpha = motion.glintLayerAlpha,
