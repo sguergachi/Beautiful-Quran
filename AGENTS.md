@@ -103,6 +103,7 @@ Requires **JDK 21**. No Android device/emulator is needed for tests.
 ./gradlew testDebugUnitTest     # unit tests — run these before committing
 ./gradlew assembleDebug         # debug APK
 ./gradlew assembleRelease       # what CI ships (R8-minified; falls back to debug keystore)
+scripts/publish_apk.sh --release                  # build, then put the APK at this worktree's known path
 scripts/send_apk_to_phone.sh --label "the work"   # name it, share it, delete the last one
 python3 tools/test_build_db.py  # timing pipeline regressions (~1s, no Gradle)
 ```
@@ -381,6 +382,17 @@ this document combined: `ReaderComponents.kt` (~36k tokens),
 - Finish every requested code change by committing and pushing it. Continue an
   open PR on its actual head branch; if that PR has merged, follow the fresh-PR
   rule below instead.
+- **Where the built APK lives.** Each worktree (= each T3 Code thread) has one
+  known APK location: `~/.t3/artifacts/Beautiful-Quran/apks/<worktree-dir>/`
+  holding `release.apk` / `debug.apk` plus a `.info` file (`sha`, `branch`,
+  `dirty`, `built_at`, `bytes`). `scripts/publish_apk.sh [--release]` builds
+  and writes it; `scripts/publish_apk.sh --release --print` prints the path
+  (exit 1 if none). Any APK you build for this thread goes there — don't leave
+  it only in `app/build/outputs` or a `/tmp` name. `send_apk_to_phone.sh`
+  always goes through it, and the **Send APK** action in T3 Code runs
+  `send_apk_to_phone.sh --release --zip --published --wait`, which shares
+  what's there (building only if nothing is). Publish the APK for your final
+  commit before you hand back, so that button sends the right build.
 - Send a clearly named APK to the Pixel 10 after every completed code change,
   and **delete local staged copies once the phone confirms receipt**. Always
   delegate this to the cheap `apk-sender` subagent (haiku) following
