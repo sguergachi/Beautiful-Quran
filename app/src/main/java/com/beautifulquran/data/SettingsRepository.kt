@@ -30,6 +30,23 @@ internal fun bookTypefaceFor(storedCode: Int?, legacyTimeless: Boolean?): BookTy
     else -> BookTypeface.JUNICODE
 }
 
+/**
+ * The Scroll's Arabic face. Readers get [HAFS]; the others are developer
+ * comparisons. Persisted by [code]; an unknown code reads as [HAFS]. Mushaf
+ * leaves keep their own page faces whatever is chosen here. See
+ * `ui/theme/Type.kt`.
+ */
+enum class ScrollArabicFace(val label: String, val code: Int) {
+    HAFS("KFGQPC Hafs", 0),
+    NOTO_NASKH("Noto Naskh Arabic", 1),
+    SCHEHERAZADE("Scheherazade New", 2),
+    ;
+
+    companion object {
+        fun forCode(code: Int): ScrollArabicFace = entries.firstOrNull { it.code == code } ?: HAFS
+    }
+}
+
 /** What flows on the sheet: Arabic with English under each word, English only, or Arabic only. */
 enum class ReadingMode { ARABIC_ENGLISH, ENGLISH_ONLY, ARABIC_ONLY }
 
@@ -120,6 +137,8 @@ data class Settings(
     val developerModeEnabled: Boolean = false,
     /** Developer A/B of the English type; readers always get [BookTypeface.JUNICODE]. */
     val bookTypeface: BookTypeface = BookTypeface.JUNICODE,
+    /** Developer A/B of the Scroll's Arabic; readers always get [ScrollArabicFace.HAFS]. */
+    val scrollArabicFace: ScrollArabicFace = ScrollArabicFace.HAFS,
     /** Developer-only gate for contextual feature lessons. Off until their
      * visual language is approved for readers. Enabling rearms every lesson. */
     val educationGuidesEnabled: Boolean = false,
@@ -129,6 +148,10 @@ data class Settings(
     /** The typeface actually set: the A/B choice only counts in developer mode. */
     val activeBookTypeface: BookTypeface
         get() = if (developerModeEnabled) bookTypeface else BookTypeface.JUNICODE
+
+    /** The Scroll's Arabic actually set: the A/B choice only counts in developer mode. */
+    val activeScrollArabicFace: ScrollArabicFace
+        get() = if (developerModeEnabled) scrollArabicFace else ScrollArabicFace.HAFS
 }
 
 /** Maps a persisted ordinal back to an enum entry, falling back to [default]
@@ -202,6 +225,7 @@ class SettingsRepository(context: Context) {
                 null
             },
         ),
+        scrollArabicFace = ScrollArabicFace.forCode(prefs.getInt("scrollArabicFace", ScrollArabicFace.HAFS.code)),
         educationGuidesEnabled = prefs.getBoolean("educationGuidesEnabled", false),
         brushCircleStyle = prefs.enum("brushCircleStyle", BrushCircleStyle.BASELINE),
     )
@@ -309,6 +333,7 @@ class SettingsRepository(context: Context) {
             putBoolean("developerModeEnabled", next.developerModeEnabled)
             putInt("bookTypeface", next.bookTypeface.code)
             remove("timelessTypographyEnabled")
+            putInt("scrollArabicFace", next.scrollArabicFace.code)
             putBoolean("educationGuidesEnabled", next.educationGuidesEnabled)
             remove("inkLabEnabled")
             // Developer experiments that have been taken out: clear what

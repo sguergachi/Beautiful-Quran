@@ -143,6 +143,7 @@ import com.beautifulquran.ui.theme.drawPulseTrace
 import com.beautifulquran.ui.theme.ArabicWordStyle
 import com.beautifulquran.ui.theme.GeneratedChapterRosette
 import com.beautifulquran.ui.theme.HafsFontFamily
+import com.beautifulquran.ui.theme.LocalScrollArabicType
 import com.beautifulquran.ui.theme.IslamicBackToOriginCapsule
 import com.beautifulquran.ui.theme.LocalQuranAccents
 import com.beautifulquran.ui.theme.ShapedWordBloom
@@ -1807,7 +1808,12 @@ private fun WordUnit(
             motion = motion,
             rtl = true,
             color = MaterialTheme.colorScheme.onBackground,
-            style = ArabicWordStyle.copy(fontSize = ArabicWordStyle.fontSize * fontScale),
+            style = LocalScrollArabicType.current.let { face ->
+                ArabicWordStyle.copy(
+                    fontFamily = face.fontFamily,
+                    fontSize = ArabicWordStyle.fontSize * fontScale * face.sizeScale,
+                )
+            },
             searchHitWash = searchHitWash,
             recessedForSearch = recessedForSearch,
             searchBackgroundAlpha = searchBackgroundAlpha,
@@ -2426,10 +2432,12 @@ private fun ResponsiveHafsAyah(
     val ayahMarkInk = LocalQuranAccents.current.gold
     val glintInk = LocalQuranAccents.current.glintInk
     val activeIndex = motions.indexOfFirst { it.isActive }
+    val arabicType = LocalScrollArabicType.current
     val style = ArabicWordStyle.merge(
         TextStyle(
-            fontFamily = HafsFontFamily,
-            fontSize = fontSize,
+            fontFamily = arabicType.fontFamily,
+            // The mark below sizes itself from [fontSize], not this.
+            fontSize = fontSize * arabicType.sizeScale,
             lineHeight = 1.95.em,
             // Arabic verse copy owns the sheet's far-right rule; its position
             // must not visually depend on the LTR translation below it.

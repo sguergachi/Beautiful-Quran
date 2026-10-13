@@ -26,6 +26,36 @@ import com.beautifulquran.domain.ENGLISH_LEAF_LEADING_EM
 val HafsFontFamily = FontFamily(Font(R.font.hafs_uthmanic))
 
 /**
+ * The Scroll's Arabic: a face and the multiple that sets it at Hafs's hand.
+ * [sizeScale] matches the alef's height to Hafs's (0.633 em), so a face that
+ * draws large in its em does not read as a size change. The verse mark keeps
+ * Hafs's cups and its own size whatever face the words are in.
+ */
+@androidx.compose.runtime.Immutable
+data class ScrollArabicType(val fontFamily: FontFamily, val sizeScale: Float)
+
+/** Variable, wght 400–700; its default instance is the Regular. */
+private val NotoNaskhFontFamily = FontFamily(Font(R.font.noto_naskh_arabic_variable))
+private val ScheherazadeFontFamily = FontFamily(Font(R.font.scheherazade_new_regular))
+
+/** Noto Naskh Arabic (SIL OFL 1.1); alef 0.671 em. */
+private val NotoNaskhScrollType = ScrollArabicType(NotoNaskhFontFamily, 0.633f / 0.671f)
+
+/** Scheherazade New (SIL Global, SIL OFL 1.1); alef 0.700 em. */
+private val ScheherazadeScrollType = ScrollArabicType(ScheherazadeFontFamily, 0.633f / 0.700f)
+
+val HafsScrollType = ScrollArabicType(HafsFontFamily, 1f)
+
+fun scrollArabicType(face: com.beautifulquran.data.ScrollArabicFace): ScrollArabicType = when (face) {
+    com.beautifulquran.data.ScrollArabicFace.HAFS -> HafsScrollType
+    com.beautifulquran.data.ScrollArabicFace.NOTO_NASKH -> NotoNaskhScrollType
+    com.beautifulquran.data.ScrollArabicFace.SCHEHERAZADE -> ScheherazadeScrollType
+}
+
+/** The Scroll's Arabic face; developer mode may swap it. See [scrollArabicType]. */
+val LocalScrollArabicType = staticCompositionLocalOf { HafsScrollType }
+
+/**
  * Digital Khatt New Madina — Unicode Madinah-1420 face with real joining
  * (init/medi/fina/rlig/curs). Mushaf pages only; the scroll reader keeps
  * [HafsFontFamily]. SIL OFL 1.1.
