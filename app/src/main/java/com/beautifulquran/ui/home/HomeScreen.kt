@@ -96,6 +96,7 @@ import com.beautifulquran.domain.englishTranslationHighlightSpans
 import com.beautifulquran.domain.parseSearchQuery
 import com.beautifulquran.domain.spellingCorrection
 import com.beautifulquran.ui.reader.VerseBookmarkRibbon
+import com.beautifulquran.ui.reader.CAPS_TRACKING
 import com.beautifulquran.ui.reader.remainingUnfurlSignal
 import com.beautifulquran.ui.theme.ArabicTitleStyle
 import com.beautifulquran.ui.theme.FloatingPaperControl
@@ -758,49 +759,71 @@ internal fun shouldShowContinuePill(
 ): Boolean = continuePresent && !searchActive && coverVisible && !continueRowVisible
 
 /**
- * Pill-shaped stand-in for the chapter row: the same bilingual identity
- * (gold number, transliterated name, ayah place, Arabic name) on the quiet
- * green wash, floating over the paper until its row scrolls into view and
- * the pill docks away. No card, elevation, or border — the wash is the
- * container, matching [ReturnToAyahPill].
+ * Pill-shaped stand-in for the chapter row: the green place ribbon and a
+ * small-caps CONTINUE flag over the same bilingual identity
+ * (transliterated name, ayah place, Arabic name) on the quiet green wash,
+ * floating over the paper until its row scrolls into view and the pill
+ * docks away. No card, elevation, or border — the wash is the container,
+ * matching [ReturnToAyahPill]. The ribbon is the shared
+ * [VerseBookmarkRibbon] place cloth, not a bespoke mark.
  */
 @Composable
 private fun ContinuePill(target: ContinueTarget, onClick: () -> Unit) {
     val colors = MaterialTheme.colorScheme
-    val accents = LocalQuranAccents.current
     Row(
         verticalAlignment = Alignment.CenterVertically,
         modifier = Modifier
             .padding(horizontal = 16.dp)
             .background(QuranTheme.accents.greenWash, RoundedCornerShape(50))
             .quietClickable(onClick = onClick)
-            .padding(horizontal = 16.dp, vertical = 10.dp)
+            .padding(start = 4.dp, end = 16.dp, top = 8.dp, bottom = 8.dp)
             .semantics {
                 contentDescription =
                     "Continue listening: ${target.surah.nameTransliteration}, ayah ${target.ayah}"
                 role = Role.Button
             },
     ) {
-        Text(
-            text = target.surah.id.toString(),
-            style = MaterialTheme.typography.labelMedium,
-            color = accents.goldInk,
+        VerseBookmarkRibbon(
+            bookmarked = false,
+            placeMarked = true,
+            side = AyahSelectorSide.LEFT,
+            chromeAlpha = { 1f },
+            interactive = false,
+            onToggle = { false },
+            bookmarkTipVisible = false,
+            edgeInset = HomeRibbonGutter,
+            ribbonWidth = HomeRibbonWidth,
+            topInset = 0.dp,
+            bottomGap = 0.dp,
+            modifier = Modifier
+                .width(HomeRibbonLane)
+                .height(44.dp),
         )
-        Spacer(Modifier.width(8.dp))
-        Text(
-            text = target.surah.nameTransliteration,
-            style = MaterialTheme.typography.titleMedium,
-            color = colors.primary,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.weight(1f, fill = false),
-        )
-        Text(
-            text = " · Ayah ${target.ayah}",
-            style = MaterialTheme.typography.titleMedium,
-            color = QuranTheme.accents.greenInk,
-            maxLines = 1,
-        )
+        Column(Modifier.weight(1f)) {
+            Text(
+                text = "CONTINUE",
+                style = MaterialTheme.typography.labelSmall.copy(letterSpacing = CAPS_TRACKING),
+                fontSize = 10.sp,
+                color = QuranTheme.accents.greenQuiet,
+                maxLines = 1,
+            )
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    text = target.surah.nameTransliteration,
+                    style = MaterialTheme.typography.titleMedium,
+                    color = colors.primary,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f, fill = false),
+                )
+                Text(
+                    text = " · Ayah ${target.ayah}",
+                    style = MaterialTheme.typography.titleMedium,
+                    color = QuranTheme.accents.greenInk,
+                    maxLines = 1,
+                )
+            }
+        }
         Spacer(Modifier.width(10.dp))
         Text(
             text = target.surah.nameArabic,
