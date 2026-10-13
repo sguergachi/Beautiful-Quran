@@ -214,15 +214,41 @@ internal fun junicodeWeight(requested: Int, italic: Boolean = false): Int = when
 /** Junicode's size against Garamond's: their x-heights, 0.405 / 0.418 em. */
 internal const val JUNICODE_SIZE = 0.969f
 
-/** Kerning, ligatures, and the lining figures Junicode does not default to. */
-private val JUNICODE_FACE = TypefaceTuning(features = mapOf("kern" to 1, "liga" to 1, "lnum" to 1))
+/**
+ * Junicode's OpenType features, reviewed in context (docs/DESIGN.md, "Type").
+ * Most of its 20 sets and 99 variants serve medieval scholarship — runes,
+ * insular letterforms, scribal abbreviations — and stay off. Three earn a place:
+ *
+ * * **ss09, old-style figures with a flagged 1.** Junicode's default figures are
+ *   old-style, and their 1 is a small-cap I: "2:15" read "2:I5". ss09 gives
+ *   the 1 its flag, so running prose can set book figures again. Figures that
+ *   stand alone (labels, counts, references, verse marks) stay lining through
+ *   [liningFigures]; ss09 keeps the flagged 1 there too.
+ * * **cv33 = 3, the long-tailed Q, in titles.** Its tail sweeps under the next
+ *   letter — the masthead's "Quran", Al-Qamar, Qaf. Timeless's titles carried
+ *   the same Q (ss16).
+ * * **c2sc, true small caps, for tracked capitals** ([forCaps]): a chapter line
+ *   in small caps with old-style figures, as a book sets it, instead of shrunk
+ *   full capitals.
+ *
+ * Kept off: the italic swashes (a flourish on every word end), the ct/st
+ * ligatures (medieval, not Renaissance), the alternate punctuation spacing.
+ */
+private val JUNICODE_PROSE = mapOf("kern" to 1, "liga" to 1, "onum" to 1, "ss09" to 1)
+private val JUNICODE_FACE = TypefaceTuning(features = JUNICODE_PROSE)
 private val JUNICODE_FEATURES = JUNICODE_FACE.featureSettings
+private val JUNICODE_TITLE = TypefaceTuning(features = mapOf("kern" to 1, "liga" to 1, "lnum" to 1, "ss09" to 1, "cv33" to 3))
+private val JUNICODE_TITLE_FEATURES = JUNICODE_TITLE.featureSettings
 
 /** Junicode is not tuned in Ink Lab: every role carries its fixed Garamond match. */
 private val JUNICODE_TUNING = TypographyTuning(
-    book = JUNICODE_FACE, bookItalic = JUNICODE_FACE, title = JUNICODE_FACE,
+    book = JUNICODE_FACE, bookItalic = JUNICODE_FACE,
+    title = JUNICODE_TITLE,
     note = JUNICODE_FACE, leaf = JUNICODE_FACE,
 )
+
+/** How much larger Junicode's small caps are set than the capitals they replace. */
+private const val JUNICODE_SMALL_CAPS_SIZE = 1.15f
 
 private val ClassicSerifFontFamily = FontFamily(
     Font(R.font.eb_garamond_regular, FontWeight.Normal),
@@ -376,9 +402,21 @@ internal fun liningFigures(features: String?): String =
 /** A figure that stands on its own — a count, a number in a list, a reference like 2:7 — lining. */
 internal fun TextStyle.lining(): TextStyle = copy(fontFeatureSettings = liningFigures(fontFeatureSettings))
 
-/** All-caps labels: lining figures, and `case` lifts punctuation to the capitals. */
+/**
+ * All-caps labels: lining figures, and `case` lifts punctuation to the
+ * capitals. Junicode sets them as true small caps (`c2sc`) with old-style
+ * figures, a little larger so the small caps (0.457 em) keep a label legible.
+ */
+@Composable
 internal fun TextStyle.forCaps(): TextStyle =
-    copy(fontFeatureSettings = liningFigures(fontFeatureSettings) + ", 'case' 1")
+    if (LocalQuranTypePalette.current.profile == QuranTypeProfile.JUNICODE) {
+        copy(
+            fontSize = fontSize * JUNICODE_SMALL_CAPS_SIZE,
+            fontFeatureSettings = "'kern' 1, 'c2sc' 1, 'onum' 1, 'ss09' 1",
+        )
+    } else {
+        copy(fontFeatureSettings = liningFigures(fontFeatureSettings) + ", 'case' 1")
+    }
 
 /**
  * How Timeless text is positioned. The variable fonts are unhinted and carry
@@ -399,11 +437,12 @@ internal val QuranTypePalette.bookTextMotion: TextMotion
  * Letterspacing for a mixed-case Latin line, in em. Timeless Text is spaced
  * for small sizes already, and tracked lowercase falls apart into letters, so
  * it is set all but solid (DESIGN.md: lowercase never past 0.02 em). Only
- * ALL-CAPS labels are tracked. Classic and Junicode keep Garamond's [classicEm].
+ * ALL-CAPS labels are tracked. Junicode follows the same rule; the classic
+ * profile keeps its [classicEm].
  */
 @Composable
 internal fun mixedCaseTrackingEm(classicEm: Float): Float =
-    if (LocalQuranTypePalette.current.profile == QuranTypeProfile.TIMELESS) {
+    if (LocalQuranTypePalette.current.profile != QuranTypeProfile.CLASSIC) {
         minOf(classicEm, MIXED_CASE_TRACKING_EM)
     } else {
         classicEm
@@ -572,10 +611,10 @@ private val ClassicQuranTypography = Typography(
  * keep Timeless Sans: the A/B is of the book face.
  */
 private fun junicodeTypography(serif: FontFamily, display: FontFamily, sans: FontFamily): Typography {
-    fun set(style: TextStyle, family: FontFamily) = style.copy(
+    fun set(style: TextStyle, family: FontFamily, features: String = JUNICODE_FEATURES) = style.copy(
         fontFamily = family,
         fontSize = style.fontSize * JUNICODE_SIZE,
-        fontFeatureSettings = JUNICODE_FEATURES,
+        fontFeatureSettings = features,
         textMotion = TextMotion.Animated,
     )
     val garamond = ClassicQuranTypography
@@ -586,17 +625,19 @@ private fun junicodeTypography(serif: FontFamily, display: FontFamily, sans: Fon
         displayMedium = ui(timeless.displayMedium),
         displaySmall = ui(timeless.displaySmall),
         headlineLarge = ui(timeless.headlineLarge),
-        headlineMedium = set(garamond.headlineMedium, display),
+        headlineMedium = set(garamond.headlineMedium, display, JUNICODE_TITLE_FEATURES),
         headlineSmall = ui(timeless.headlineSmall),
-        titleLarge = set(garamond.titleLarge, display),
+        titleLarge = set(garamond.titleLarge, display, JUNICODE_TITLE_FEATURES),
         titleMedium = set(garamond.titleMedium, serif),
         titleSmall = ui(timeless.titleSmall),
         bodyLarge = set(garamond.bodyLarge, serif),
         bodyMedium = set(garamond.bodyMedium, serif),
         bodySmall = ui(timeless.bodySmall),
         labelLarge = ui(timeless.labelLarge),
-        labelMedium = set(garamond.labelMedium, serif),
-        labelSmall = set(garamond.labelSmall, serif),
+        // Garamond's labels were tracked 0.6–0.8 sp; lowercase is never tracked
+        // past 0.02 em (docs/DESIGN.md), so these are set solid, as Timeless's.
+        labelMedium = set(garamond.labelMedium, serif, liningFigures(JUNICODE_FEATURES)).copy(letterSpacing = 0.sp),
+        labelSmall = set(garamond.labelSmall, serif, liningFigures(JUNICODE_FEATURES)).copy(letterSpacing = 0.sp),
     )
 }
 
@@ -651,7 +692,7 @@ private val ClassicTypePalette = QuranTypePalette(
     tuning = TypographyTuning(leaf = TypefaceTuning()),
 )
 
-internal val LocalQuranTypePalette = staticCompositionLocalOf { TimelessTypePalette }
+internal val LocalQuranTypePalette = staticCompositionLocalOf { JunicodeTypePalette }
 
 /**
  * The English leaf's leading. [ENGLISH_LEAF_LEADING_EM] was set for EB
@@ -685,7 +726,7 @@ internal val QuranTypePalette.bookCacheSuffix: String
     get() = when (profile) {
         QuranTypeProfile.TIMELESS -> "|timeless|${tuning.bookCacheKey}"
         QuranTypeProfile.CLASSIC -> "|classic"
-        QuranTypeProfile.JUNICODE -> "|junicode-2.226-w102"
+        QuranTypeProfile.JUNICODE -> "|junicode-2.226-w102-f2"
     }
 
 private const val TIMELESS_LEAF_LEADING_EM = 1.62f

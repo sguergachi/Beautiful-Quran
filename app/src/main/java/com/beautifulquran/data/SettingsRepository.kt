@@ -9,8 +9,9 @@ import kotlinx.coroutines.flow.StateFlow
 enum class ThemeMode { SYSTEM, LIGHT, DARK, ROYAL_GREEN }
 
 /**
- * The developer A/B of the app's English type. Persisted by ordinal: append,
- * never reorder. See `ui/theme/Type.kt`.
+ * The app's English type. Readers get [JUNICODE]; the others stay as the
+ * developer A/B. Persisted by ordinal: append, never reorder. See
+ * `ui/theme/Type.kt`.
  */
 enum class BookTypeface(val label: String) {
     TIMELESS("Timeless"),
@@ -106,8 +107,8 @@ data class Settings(
      *  repeatedly tapping the Settings logo; persisted so the reader can
      *  honour it. See docs/ROOT_VIEWER.md and docs/TIMINGS_LAB.md. */
     val developerModeEnabled: Boolean = false,
-    /** Developer A/B of the English type; readers always get [BookTypeface.TIMELESS]. */
-    val bookTypeface: BookTypeface = BookTypeface.TIMELESS,
+    /** Developer A/B of the English type; readers always get [BookTypeface.JUNICODE]. */
+    val bookTypeface: BookTypeface = BookTypeface.JUNICODE,
     /** Developer-only gate for contextual feature lessons. Off until their
      * visual language is approved for readers. Enabling rearms every lesson. */
     val educationGuidesEnabled: Boolean = false,
@@ -116,7 +117,7 @@ data class Settings(
 ) {
     /** The typeface actually set: the A/B choice only counts in developer mode. */
     val activeBookTypeface: BookTypeface
-        get() = if (developerModeEnabled) bookTypeface else BookTypeface.TIMELESS
+        get() = if (developerModeEnabled) bookTypeface else BookTypeface.JUNICODE
 }
 
 /** Maps a persisted ordinal back to an enum entry, falling back to [default]
@@ -182,11 +183,12 @@ class SettingsRepository(context: Context) {
         lastSurah = prefs.getInt("lastSurah", 0),
         lastAyah = prefs.getInt("lastAyah", 1),
         developerModeEnabled = prefs.getBoolean("developerModeEnabled", false),
-        // Before the third face, the A/B was a Timeless on/off switch.
+        // Before the third face, the A/B was a Timeless on/off switch whose
+        // "on" meant the shipped face, which is now Junicode.
         bookTypeface = if (prefs.contains("bookTypeface")) {
-            prefs.enum("bookTypeface", BookTypeface.TIMELESS)
+            prefs.enum("bookTypeface", BookTypeface.JUNICODE)
         } else if (prefs.getBoolean("timelessTypographyEnabled", true)) {
-            BookTypeface.TIMELESS
+            BookTypeface.JUNICODE
         } else {
             BookTypeface.CLASSIC
         },

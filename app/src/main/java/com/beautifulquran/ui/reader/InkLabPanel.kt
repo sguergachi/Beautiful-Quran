@@ -99,7 +99,7 @@ fun InkLabPanel(
     guideActive: Boolean = false,
 ) {
     // Keep the controls readable while the user auditions the UI face itself.
-    val controls = remember { quranTypePalette(QuranTypeProfile.TIMELESS).typography }
+    val controls = remember { quranTypePalette(QuranTypeProfile.JUNICODE).typography }
     MaterialTheme(typography = controls) {
         InkLabPanelContent(modifier, guideActive)
     }

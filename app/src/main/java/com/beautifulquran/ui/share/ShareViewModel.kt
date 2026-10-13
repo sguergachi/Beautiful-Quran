@@ -269,7 +269,7 @@ class ShareViewModel(
     fun shareAsImage(
         activity: Activity,
         includeTranslation: Boolean = true,
-        typeface: BookTypeface = BookTypeface.TIMELESS,
+        typeface: BookTypeface = BookTypeface.JUNICODE,
         typographyTuning: com.beautifulquran.ui.theme.TypographyTuning = com.beautifulquran.ui.theme.TypographyTuning(),
     ) {
         if (!_ui.value.gathering) return

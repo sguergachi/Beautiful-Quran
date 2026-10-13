@@ -51,11 +51,16 @@ class TypographyTuningTest {
     }
 
     @Test
-    fun junicodeIsAlwaysSetWithLiningFigures() {
+    fun junicodeNeverSetsTheOldStyleOneThatReadsAsI() {
         val t = quranTypePalette(QuranTypeProfile.JUNICODE).tuning
         listOf(TypeRole.Book, TypeRole.Leaf, TypeRole.BookItalic, TypeRole.Title, TypeRole.Note).forEach {
-            assertEquals(1, t.face(it).features["lnum"])
+            assertEquals("$it carries the flagged 1", 1, t.face(it).features["ss09"])
         }
+        listOf(TypeRole.Book, TypeRole.Leaf, TypeRole.BookItalic, TypeRole.Note).forEach {
+            assertEquals("$it prose sets book figures", 1, t.face(it).features["onum"])
+        }
+        assertEquals(1, t.title.features["lnum"])
+        assertEquals(3, t.title.features["cv33"])
         assertEquals(listOf(400, 420, 520, 680, 700), listOf(
             junicodeWeight(400), junicodeWeight(400, italic = true),
             junicodeWeight(500), junicodeWeight(600), junicodeWeight(700),

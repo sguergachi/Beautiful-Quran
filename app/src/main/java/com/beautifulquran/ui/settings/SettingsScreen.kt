@@ -384,7 +384,7 @@ private fun DeveloperSection(
             onClick = { viewModel.settings.update { it.copy(bookTypeface = face) } },
         )
     }
-    Caption("Readers get Timeless. EB Garamond is the previous type and scale; Junicode is set to Garamond's size, measure and colour.")
+    Caption("Readers get Junicode, set to Garamond's size, measure and colour. Timeless and the earlier EB Garamond stay for comparison.")
 
     Spacer(Modifier.height(20.dp))
     SectionLabel("Chapter banner")

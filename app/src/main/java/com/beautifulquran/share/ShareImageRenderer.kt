@@ -46,7 +46,7 @@ object ShareImageRenderer {
     suspend fun renderSegments(
         activity: Activity,
         segmentCount: Int,
-        typeface: BookTypeface = BookTypeface.TIMELESS,
+        typeface: BookTypeface = BookTypeface.JUNICODE,
         typographyTuning: TypographyTuning = TypographyTuning(),
         content: @Composable (index: Int) -> Unit,
     ): Bitmap {
@@ -172,7 +172,7 @@ object ShareImageRenderer {
 
     suspend fun render(
         activity: Activity,
-        typeface: BookTypeface = BookTypeface.TIMELESS,
+        typeface: BookTypeface = BookTypeface.JUNICODE,
         typographyTuning: TypographyTuning = TypographyTuning(),
         content: @Composable () -> Unit,
     ): Bitmap = renderSegments(activity, 1, typeface, typographyTuning) { content() }

@@ -571,7 +571,7 @@ val CoverParchment = Parchment
 @Composable
 fun BeautifulQuranTheme(
     themeMode: ThemeMode = ThemeMode.SYSTEM,
-    typeface: com.beautifulquran.data.BookTypeface = com.beautifulquran.data.BookTypeface.TIMELESS,
+    typeface: com.beautifulquran.data.BookTypeface = com.beautifulquran.data.BookTypeface.JUNICODE,
     typographyTuning: TypographyTuning = TypographyTuning(),
     content: @Composable () -> Unit,
 ) {

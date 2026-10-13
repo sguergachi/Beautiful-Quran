@@ -36,6 +36,8 @@ CUTS = {
 FEATURES = [
     "kern", "liga", "clig", "ccmp", "locl", "mark", "mkmk", "calt", "rlig", "rclt",
     "lnum", "onum", "pnum", "tnum", "case", "frac", "numr", "dnom", "sups", "subs", "ordn",
+    # The three reviewed into use (ui/theme/Type.kt, JUNICODE_PROSE).
+    "ss09", "cv33", "c2sc", "smcp",
 ]
 
 

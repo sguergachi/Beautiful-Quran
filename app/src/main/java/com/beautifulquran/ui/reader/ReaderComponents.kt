@@ -3898,10 +3898,11 @@ fun OrnateSurahTitle(
             )
             Text(
                 text = "$chapterNumber · ${nameTransliteration.uppercase()}",
+                // Size before forCaps, which sets Junicode's small caps a step up.
                 style = MaterialTheme.typography.labelSmall.copy(
+                    fontSize = CAPS_LABEL_SIZE,
                     letterSpacing = transliterationSpacing,
                 ).forCaps(),
-                fontSize = CAPS_LABEL_SIZE,
                 color = QuranTheme.ink.quiet,
                 textAlign = TextAlign.Center,
                 maxLines = 1,
@@ -4068,8 +4069,8 @@ fun NextChapterFooter(
             Spacer(Modifier.height(ScrollGrid.INVITE_LABEL_TOP))
             Text(
                 text = "NEXT",
-                style = MaterialTheme.typography.labelSmall.copy(letterSpacing = CAPS_TRACKING).forCaps(),
-                fontSize = CAPS_LABEL_SIZE,
+                style = MaterialTheme.typography.labelSmall
+                    .copy(fontSize = CAPS_LABEL_SIZE, letterSpacing = CAPS_TRACKING).forCaps(),
                 color = accents.goldInk,
             )
         }
@@ -4235,8 +4236,8 @@ fun PreviousChapterPullChrome(
     ) {
         Text(
             text = "PREVIOUS",
-            style = MaterialTheme.typography.labelSmall.copy(letterSpacing = CAPS_TRACKING).forCaps(),
-            fontSize = CAPS_LABEL_SIZE,
+            style = MaterialTheme.typography.labelSmall
+                .copy(fontSize = CAPS_LABEL_SIZE, letterSpacing = CAPS_TRACKING).forCaps(),
             color = accents.goldInk,
         )
         Spacer(Modifier.height(ScrollGrid.PULL_LABEL_GAP))

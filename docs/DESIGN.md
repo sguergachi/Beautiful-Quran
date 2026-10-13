@@ -903,7 +903,12 @@ not the app's.
 
 - **Arabic**: KFGQPC HAFS Uthmanic Script — the King Fahd Complex reference
   typeface — at 30 sp base with 1.9 em leading (Uthmani diacritics need air).
-- **English text face**: Timeless Serif Text (timeless.co), the small-size
+- **Shipped English face (Android): Junicode, set as Garamond.** Readers get
+  Junicode for every serif role (see the Junicode entry below for how it is
+  matched to EB Garamond, and its feature choices); controls stay in Timeless
+  Sans. Timeless Serif, described next, and the earlier EB Garamond remain as
+  developer comparison profiles. The web still sets Timeless.
+- **English text face (Timeless profile)**: Timeless Serif Text (timeless.co), the small-size
   optical master: regular, medium, semibold, bold. Italics use the real
   Timeless Serif Italic cut; the archive has no separate Text Italic. Kerning,
   ligatures on in running text (`'kern', 'liga'`). Figures are lining
@@ -940,7 +945,7 @@ not the app's.
   book face, using the current whole-word rag and full-column bismillah fit.
   Customize previews and share images follow the selected profile too.
   Arabic typefaces and sizing stay the same.
-- **Junicode, set as Garamond** (third developer profile): Junicode 2.226 by
+- **Junicode, set as Garamond** (the shipped face): Junicode 2.226 by
   Peter S. Baker (OFL), a Renaissance roman in Garamond's line that is not a
   Google font, tuned so a page of it measures as a page of EB Garamond. Each
   number was measured against EB Garamond, unhinted, as Android draws:
@@ -958,6 +963,15 @@ not the app's.
     680, Italic 420. Titles take one step lighter; dark paper eases 30, leaf
     excepted, as Timeless does.
   - Always lining figures: Junicode defaults to old-style, whose 1 reads "I".
+  - Features, reviewed set by set (`JUNICODE_PROSE` in `Type.kt`): **ss09**
+    old-style figures with a flagged 1 in prose (the default old-style 1 is a
+    small-cap I — "2:I5"); labels, counts, references and verse marks stay
+    lining. **cv33 = 3**, the long-tailed Q, in titles ("Beautiful Quran",
+    Al-Qamar). **c2sc** true small caps with old-style figures for tracked
+    capitals (`forCaps`: chapter line, section labels, ALPHA), set 1.15× so
+    the 0.457 em small caps stay legible. Off: italic swashes (a flourish on
+    every word end), ct/st ligatures (medieval), the runic, insular and
+    abbreviation sets. Lowercase labels are set solid, as Timeless's.
   - The English leaf takes the hand Garamond's leaf solves to, × 0.969: solved
     in its own metrics the two-pass fit landed 2 % smaller and a line longer.
   The controls keep Timeless Sans. Junicode has no Ink Lab tuning.
