@@ -119,8 +119,21 @@ class ContinuePillVisibilityTest {
     }
 
     @Test
-    fun pinnedSessionNeverStacksContinue() {
-        assertEquals(
+    fun dockHoldsOpaqueThenFadesIntoRow() {
+        assertEquals(1f, continueDockAlpha(0f), 0.001f)
+        assertEquals(1f, continueDockAlpha(ContinueDockFadeFrom), 0.001f)
+        assertEquals(0.5f, continueDockAlpha(0.85f), 0.001f)
+        assertEquals(0f, continueDockAlpha(1f), 0.001f)
+    }
+
+    @Test
+    fun dockCollapsesPillRadiusToRow() {
+        assertEquals(ContinuePillRadius, continueDockRadius(0f))
+        assertEquals(0.dp, continueDockRadius(1f))
+    }
+
+    @Test
+    fun pinnedSessionNeverStacksContinue() {        assertEquals(
             128.dp,
             homeListBottomInset(
                 pinnedSession = true,

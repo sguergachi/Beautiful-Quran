@@ -3,6 +3,8 @@ package com.beautifulquran.ui.home
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.animate
+import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
@@ -60,6 +62,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.boundsInRoot
@@ -69,6 +72,7 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
@@ -81,6 +85,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.util.lerp
 import kotlin.math.roundToInt
 import kotlinx.coroutines.flow.drop
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -113,6 +118,12 @@ private const val SEARCH_ITEM_INDEX = 0
 
 /** How far (px) the list must move before a scroll counts as "dismiss". */
 internal const val DISMISS_SCROLL_THRESHOLD_PX = 24
+
+/** The pill's flight up to its row: move, resize, and square off as one. */
+internal const val ContinueDockMs = 420
+
+/** Raw flight progress where the docked pill starts fading into its row. */
+internal const val ContinueDockFadeFrom = 0.7f
 
 private val HomeRibbonLane = 28.dp
 private val HomeRibbonWidth = 13.dp
@@ -176,6 +187,7 @@ fun HomeScreen(
     // field, floating over the surah list.
     var searchFocused by remember { mutableStateOf(false) }
     var boxTop by remember { mutableFloatStateOf(0f) }
+    var boxLeft by remember { mutableFloatStateOf(0f) }
     var boxHeight by remember { mutableFloatStateOf(0f) }
     var searchBottom by remember { mutableFloatStateOf(0f) }
     var searchBounds by remember { mutableStateOf<Rect?>(null) }
@@ -234,6 +246,48 @@ fun HomeScreen(
         continueRowVisible = continueRowVisible,
     )
     var continuePillHeight by remember { mutableStateOf(0.dp) }
+    // Window bounds of the resting pill and its chapter row, for the dock
+    // flight. The row rect tracks live so the ghost homes onto the row even
+    // while the list is still moving under it.
+    var continuePillRect by remember { mutableStateOf<Rect?>(null) }
+    var continueRowRect by remember { mutableStateOf<Rect?>(null) }
+    var pillWasShown by remember { mutableStateOf(false) }
+    var dockStart by remember { mutableStateOf<Rect?>(null) }
+    var docking by remember { mutableStateOf(false) }
+    var dockProgress by remember { mutableFloatStateOf(0f) }
+    // The row scrolled into view while the pill was up: fly the pill to
+    // the row — resize, square off, fade — instead of popping it away.
+    if (showContinuePill) pillWasShown = true
+    if (continueRowVisible && pillWasShown && !docking) {
+        val start = continuePillRect
+        val end = if (!searching && coverSheetVisible) continueRowRect else null
+        if (start != null && end != null) {
+            dockStart = start
+            docking = true
+            pillWasShown = false
+        }
+    }
+    LaunchedEffect(docking) {
+        if (docking) {
+            dockProgress = 0f
+            animate(
+                initialValue = 0f,
+                targetValue = 1f,
+                animationSpec = tween(ContinueDockMs, easing = FastOutSlowInEasing),
+            ) { value, _ -> dockProgress = value }
+            docking = false
+            dockStart = null
+        }
+    }
+    // The row left again, or search/cover took the sheet: abandon the
+    // flight and let the pill's own enter bring it back.
+    LaunchedEffect(continueRowVisible, searchActive, coverSheetVisible) {
+        if (!continueRowVisible || searchActive || !coverSheetVisible) {
+            docking = false
+            dockStart = null
+        }
+        if (searchActive || !coverSheetVisible) pillWasShown = false
+    }
     val listBottomInsetTarget = homeListBottomInset(
         pinnedSession = pinnedSession,
         pinnedHeight = if (pinnedSession) pinnedPlaybackHeight() else 0.dp,
@@ -374,6 +428,7 @@ fun HomeScreen(
                 }
                 .onGloballyPositioned {
                     boxTop = it.boundsInWindow().top
+                    boxLeft = it.boundsInWindow().left
                     boxHeight = it.size.height.toFloat()
                 },
         ) {
@@ -483,6 +538,13 @@ fun HomeScreen(
                                     null,
                                     null,
                                 )
+                            },
+                            modifier = if (!searching && continueSurahId == surah.id) {
+                                Modifier.onGloballyPositioned {
+                                    continueRowRect = it.boundsInWindow()
+                                }
+                            } else {
+                                Modifier
                             },
                         )
                     }
@@ -605,7 +667,7 @@ fun HomeScreen(
             ) {
                 uiState.continueTarget?.let { target ->
                     FloatingPaperControl(
-                        visible = showContinuePill,
+                        visible = showContinuePill && !docking,
                         modifier = Modifier
                             .fillMaxWidth()
                             .then(
@@ -613,6 +675,7 @@ fun HomeScreen(
                                 else Modifier,
                             )
                             .onGloballyPositioned { coords ->
+                                continuePillRect = coords.boundsInWindow()
                                 continuePillHeight = with(density) {
                                     coords.size.height.toDp()
                                 }
@@ -657,6 +720,42 @@ fun HomeScreen(
                             }
                         },
                 )
+            }
+            // Dock flight: a live copy of the pill travels from its resting
+            // seat to the chapter row — resizing, squaring its corners, then
+            // fading to reveal the row beneath. The end tracks the row's
+            // live bounds so the flight still lands while the list moves.
+            if (docking) {
+                val start = dockStart
+                val end = continueRowRect
+                val target = uiState.continueTarget
+                if (start != null && end != null && target != null) {
+                    val flight = FastOutSlowInEasing.transform(dockProgress.coerceIn(0f, 1f))
+                    val left = lerp(start.left, end.left, flight) - boxLeft
+                    val top = lerp(start.top, end.top, flight) - boxTop
+                    val width = with(density) { lerp(start.width, end.width, flight).toDp() }
+                    val height = with(density) { lerp(start.height, end.height, flight).toDp() }
+                    Box(
+                        modifier = Modifier
+                            .offset { IntOffset(left.roundToInt(), top.roundToInt()) }
+                            .width(width)
+                            .height(height)
+                            .graphicsLayer {
+                                shape = RoundedCornerShape(continueDockRadius(flight))
+                                clip = true
+                                alpha = continueDockAlpha(dockProgress)
+                            }
+                            .clearAndSetSemantics {},
+                    ) {
+                        ContinuePill(
+                            target = target,
+                            onClick = {
+                                focusManager.clearFocus()
+                                onOpenSurah(target.surah.id, target.ayah, null, null)
+                            },
+                        )
+                    }
+                }
             }
         }
     }
@@ -746,6 +845,18 @@ private fun HomeBookmarkOverlay(
     }
 }
 
+/** The pill's wash: a calm fixed radius the ribbon's straight-cut ends sit inside. */
+internal val ContinuePillRadius: Dp = 28.dp
+internal val ContinuePillShape = RoundedCornerShape(ContinuePillRadius)
+
+/** Wash-to-row corner collapse over the dock flight (pill radius → rectangle). */
+internal fun continueDockRadius(flight: Float): Dp =
+    ContinuePillRadius * (1f - flight.coerceIn(0f, 1f))
+
+/** The docked pill holds opaque through the flight, then fades into its row. */
+internal fun continueDockAlpha(progress: Float): Float =
+    1f - ((progress - ContinueDockFadeFrom) / (1f - ContinueDockFadeFrom)).coerceIn(0f, 1f)
+
 /**
  * The reading place floats only while its chapter row is scrolled out of
  * view. Search owns the sheet while active, and the pill is cover-gated
@@ -765,8 +876,8 @@ internal fun shouldShowContinuePill(
  * floating over the paper until its row scrolls into view and the pill
  * docks away. No card, elevation, or border — the wash is the container,
  * matching [ReturnToAyahPill]. The ribbon is the shared
- * [VerseBookmarkRibbon] place cloth, not a bespoke mark. Content sits on
- * the rows' rails: English opens where chapter names open, Arabic ends
+ * [VerseBookmarkRibbon] place cloth, not a bespoke mark. Ribbon, gold
+ * number, and bilingual name keep the chapter row's order; Arabic ends
  * where chapter Arabic ends.
  */
 @Composable
@@ -776,9 +887,12 @@ private fun ContinuePill(target: ContinueTarget, onClick: () -> Unit) {
         verticalAlignment = Alignment.CenterVertically,
         modifier = Modifier
             .padding(horizontal = 16.dp)
-            .background(QuranTheme.accents.greenWash, RoundedCornerShape(50))
+            .background(QuranTheme.accents.greenWash, ContinuePillShape)
+            // Clip the cloth to the wash so the ribbon's straight-cut ends
+            // can never poke past the curve.
+            .clip(ContinuePillShape)
             .quietClickable(onClick = onClick)
-            .padding(start = 4.dp, end = 16.dp, top = 8.dp, bottom = 8.dp)
+            .padding(start = 8.dp, end = 16.dp, top = 12.dp, bottom = 12.dp)
             .semantics {
                 contentDescription =
                     "Continue listening: ${target.surah.nameTransliteration}, ayah ${target.ayah}"
@@ -799,11 +913,19 @@ private fun ContinuePill(target: ContinueTarget, onClick: () -> Unit) {
             bottomGap = 0.dp,
             modifier = Modifier
                 .width(HomeRibbonLane)
-                .height(44.dp),
+                .height(40.dp),
         )
-        // 16 margin + 4 inset + 28 lane + 10 air = 58, the rows' English
-        // rail (28 lane + 26 number + 4 gap).
-        Spacer(Modifier.width(10.dp))
+        // Row order, compacted: ribbon, gold number, then the name —
+        // the pill keeps the chapter row's structure, not its rails.
+        Box(Modifier.width(HomeNumberColumn)) {
+            Text(
+                text = target.surah.id.toString(),
+                style = MaterialTheme.typography.labelMedium,
+                color = LocalQuranAccents.current.goldInk,
+                maxLines = 1,
+            )
+        }
+        Spacer(Modifier.width(HomeColumnGap))
         Column(Modifier.weight(1f)) {
             Text(
                 text = "CONTINUE",
@@ -812,6 +934,7 @@ private fun ContinuePill(target: ContinueTarget, onClick: () -> Unit) {
                 color = QuranTheme.accents.greenQuiet,
                 maxLines = 1,
             )
+            Spacer(Modifier.height(2.dp))
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
                     text = target.surah.nameTransliteration,
@@ -848,11 +971,12 @@ private fun SurahRow(
     placeUnfurlSignal: Int,
     onPlaceUnfurlConsumed: (Int) -> Unit,
     onClick: () -> Unit,
+    modifier: Modifier = Modifier,
 ) {
     val accents = LocalQuranAccents.current
     Row(
         verticalAlignment = Alignment.CenterVertically,
-        modifier = Modifier
+        modifier = modifier
             .fillMaxWidth()
             .quietClickable(onClick = onClick)
             .padding(
