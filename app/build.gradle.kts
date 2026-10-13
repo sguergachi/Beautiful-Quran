@@ -180,9 +180,11 @@ val syncQuranDbAsset by tasks.registering(Sync::class) {
     from(dictionaryAsset) { rename { "dictionary.sqlite" } }
     from(searchConceptAsset)
     from(searchCandidateAsset)
+    from(rootProject.layout.projectDirectory.file("data/english-alignments.tsv"))
     into(layout.buildDirectory.dir("generated/quranAssets"))
 
     doLast {
+        check(rootProject.file("data/english-alignments.tsv").isFile) { "Missing compiled English alignment asset" }
         if (!dbAsset.asFile.isFile) {
             throw GradleException(
                 "Missing canonical Quran database: ${dbAsset.asFile}. " +
@@ -286,6 +288,7 @@ tasks.withType<Test>().configureEach {
         "dictionary.db", "dictionary.db.sha256",
         "search_concepts.json",
         "search_concept_candidates.json",
+        "english-alignments.tsv", "english_alignment_manifest.json", "english_alignment_coverage.json",
     )
         .forEach { asset ->
             inputs.file(rootProject.layout.projectDirectory.file("data/$asset"))

@@ -8,26 +8,32 @@ import java.util.concurrent.ConcurrentHashMap
 data class EnglishWordSpan(val from: Float, val to: Float, val position: Int)
 
 /** Semantic owners for taps, and a continuous forward wash derived from those owners. */
-data class EnglishAlignment(val wordEnds: FloatArray, val spans: List<EnglishWordSpan>) {
-    /** A later spoken meaning brings every preceding English word into the same wash. */
-    val washSpans: List<EnglishWordSpan> = buildList {
-        var position = Int.MAX_VALUE
-        for (span in spans.asReversed()) {
-            position = minOf(position, span.position)
-            val previous = lastOrNull()
-            if (previous?.position == position) {
-                this[lastIndex] = previous.copy(from = span.from)
-            } else add(span.copy(position = position))
-        }
-        reverse()
-    }
-
+data class EnglishAlignment(
+    val wordEnds: FloatArray,
+    val spans: List<EnglishWordSpan>,
+    val washSpans: List<EnglishWordSpan> = continuousEnglishWash(spans),
+    /** False denotes the heuristic mapper; approval is review coverage, not certification. */
+    val usesApprovedRecord: Boolean = false,
+) {
     /** The Arabic owner of a point in the printed English, including reordered words. */
     fun positionAt(through: Float): Int =
         spans.firstOrNull { through.coerceIn(0f, 1f) < it.to }?.position ?: spans.lastOrNull()?.position ?: 1
 
     /** Where the forward wash begins; words already included never move it backwards. */
     fun through(position: Int): Float = washSpans.firstOrNull { it.position >= position }?.from ?: 1f
+}
+
+/** A later spoken meaning brings every preceding English word into the same wash. */
+internal fun continuousEnglishWash(spans: List<EnglishWordSpan>): List<EnglishWordSpan> = buildList {
+    var position = Int.MAX_VALUE
+    for (span in spans.asReversed()) {
+        position = minOf(position, span.position)
+        val previous = lastOrNull()
+        if (previous?.position == position) {
+            this[lastIndex] = previous.copy(from = span.from)
+        } else add(span.copy(position = position))
+    }
+    reverse()
 }
 
 /**
@@ -869,7 +875,10 @@ class EnglishVerseAlignments(private val content: SurahContent, private val word
             content.ayahs
                 .firstOrNull { it.number == number }
                 ?.let { verse ->
-                    EnglishWordAlignment.align(
+                    val approved = if (wordByWord) null else content.englishAlignmentRecords[number]?.let { record ->
+                        ReviewedEnglishAlignment.alignment(verse.translation, verse.words.map { it.arabic }, record)
+                    }
+                    approved ?: EnglishWordAlignment.align(
                         if (wordByWord) EnglishTypography.lyricize(
                             verse.words.map { it.translation }, verse.words.map { it.arabic },
                         ).filter { it.isNotBlank() }.joinToString(" ") else verse.translation,
