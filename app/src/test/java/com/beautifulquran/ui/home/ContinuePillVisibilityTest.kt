@@ -133,6 +133,23 @@ class ContinuePillVisibilityTest {
     }
 
     @Test
+    fun dockSettlesOntoRowGeometry() {
+        assertEquals(16.dp, continueDockMargin(0f))
+        assertEquals(0.dp, continueDockMargin(1f))
+        assertEquals(8.dp, continueDockStartInset(0f))
+        assertEquals(0.dp, continueDockStartInset(1f))
+        assertEquals(16.dp, continueDockEndInset(0f))
+        assertEquals(28.dp + 4.dp, continueDockEndInset(1f))
+        assertEquals(1f, continueDockCapsAlpha(0f), 0.001f)
+        assertEquals(0f, continueDockCapsAlpha(1f), 0.001f)
+    }
+
+    @Test
+    fun dockWaitsForASettledRow() {
+        assertEquals(3000L, ContinueDockDwellMs)
+    }
+
+    @Test
     fun undockNeedsACompletedDock() {
         assertFalse(undockFlightReady(0L))
         assertTrue(undockFlightReady(10_000L))
