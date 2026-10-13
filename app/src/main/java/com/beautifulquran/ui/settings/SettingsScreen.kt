@@ -71,6 +71,7 @@ import com.beautifulquran.BuildConfig
 import com.beautifulquran.QuranApp
 import com.beautifulquran.R
 import com.beautifulquran.data.BookTypeface
+import com.beautifulquran.data.ScrollArabicFace
 import com.beautifulquran.data.BrushCircleStyle
 import com.beautifulquran.data.MushafBannerStyle
 import com.beautifulquran.data.RuntimeCachePhase
@@ -385,6 +386,17 @@ private fun DeveloperSection(
         )
     }
     Caption("Readers get Junicode, set to Garamond's size, measure and colour. The earlier EB Garamond stays for comparison.")
+
+    Spacer(Modifier.height(20.dp))
+    SectionLabel("Scroll Arabic")
+    ScrollArabicFace.entries.forEach { face ->
+        SelectRow(
+            label = face.label,
+            selected = settings.scrollArabicFace == face,
+            onClick = { viewModel.settings.update { it.copy(scrollArabicFace = face) } },
+        )
+    }
+    Caption("Readers get Hafs. The others are set to Hafs's letter height; verse marks stay in Hafs, and Mushaf leaves keep their own faces.")
 
     Spacer(Modifier.height(20.dp))
     SectionLabel("Chapter banner")
