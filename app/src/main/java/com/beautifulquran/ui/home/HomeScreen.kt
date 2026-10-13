@@ -146,8 +146,8 @@ internal val ContinueFlightEase = CubicBezierEasing(0.77f, 0f, 0.175f, 1f)
 internal fun undockFlightReady(docked: Boolean): Boolean = docked
 
 /** Grace so fast scrolls never flap the pill: the row must sit fully in
- * view this long before the dock flight runs. */
-internal const val ContinueDockDwellMs = 3000L
+ * view a beat before the dock flight runs. */
+internal const val ContinueDockDwellMs = 1000L
 
 /** Raw flight progress where the docked pill starts fading into its row. */
 internal const val ContinueDockFadeFrom = 0.5f

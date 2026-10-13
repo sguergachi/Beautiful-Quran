@@ -1615,7 +1615,7 @@ place ribbon in situ. While that row is scrolled out of view a quiet green-wash
 pill — the place ribbon, gold number, and a small-caps CONTINUE flag over the
 chapter row's bilingual identity, set in a rounded wash on the rows' own
 Arabic rail — floats above the bottom transport (or gesture inset); once the
-row sits fully in view for a few seconds the pill — which holds its seat
+row sits fully in view for a beat the pill — which holds its seat
 through the wait instead of fading early — flies up
 to the row — resizing onto its exact bounds, squaring its corners, settling
 every inset, then fading to reveal the row — so the row owns the tap, and

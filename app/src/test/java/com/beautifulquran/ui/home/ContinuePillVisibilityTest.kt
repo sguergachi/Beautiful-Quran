@@ -145,7 +145,7 @@ class ContinuePillVisibilityTest {
 
     @Test
     fun dockWaitsForASettledRow() {
-        assertEquals(3000L, ContinueDockDwellMs)
+        assertEquals(1000L, ContinueDockDwellMs)
     }
 
     @Test
