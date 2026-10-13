@@ -1612,10 +1612,10 @@ inventing an Arabic word to highlight.
 Continue listening no longer takes a persistent top band in the scrolling
 chapter document: the reading place lives in its chapter row, marked by the
 place ribbon in situ. While that row is scrolled out of view a quiet green-wash
-pill — the chapter row's bilingual identity (gold number, transliterated name,
-ayah place, Arabic name) set as a stadium — floats above the bottom transport
-(or gesture inset); once the row itself is visible the pill docks away so the
-row owns the tap. Both platforms keep the 28 dp/px outer lane, 26 dp/px number
+pill — the place ribbon and a small-caps CONTINUE flag over the chapter row's
+bilingual identity, set as a stadium on the rows' own English and Arabic
+rails — floats above the bottom transport (or gesture inset); once the row
+itself is visible the pill docks away so the row owns the tap. Both platforms keep the 28 dp/px outer lane, 26 dp/px number
 column, and 4 dp/px name gap; the fixed masthead pairs its title with the same
 30 dp/px gilded rosette Settings affordance.
 

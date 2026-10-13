@@ -38,7 +38,6 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.rounded.ArrowForward
 import androidx.compose.material.icons.rounded.Tune
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -766,7 +765,9 @@ internal fun shouldShowContinuePill(
  * floating over the paper until its row scrolls into view and the pill
  * docks away. No card, elevation, or border — the wash is the container,
  * matching [ReturnToAyahPill]. The ribbon is the shared
- * [VerseBookmarkRibbon] place cloth, not a bespoke mark.
+ * [VerseBookmarkRibbon] place cloth, not a bespoke mark. Content sits on
+ * the rows' rails: English opens where chapter names open, Arabic ends
+ * where chapter Arabic ends.
  */
 @Composable
 private fun ContinuePill(target: ContinueTarget, onClick: () -> Unit) {
@@ -800,6 +801,9 @@ private fun ContinuePill(target: ContinueTarget, onClick: () -> Unit) {
                 .width(HomeRibbonLane)
                 .height(44.dp),
         )
+        // 16 margin + 4 inset + 28 lane + 10 air = 58, the rows' English
+        // rail (28 lane + 26 number + 4 gap).
+        Spacer(Modifier.width(10.dp))
         Column(Modifier.weight(1f)) {
             Text(
                 text = "CONTINUE",
@@ -825,21 +829,14 @@ private fun ContinuePill(target: ContinueTarget, onClick: () -> Unit) {
                 )
             }
         }
-        Spacer(Modifier.width(10.dp))
+        Spacer(Modifier.width(12.dp))
+        // 16 margin + 16 inset = 32, the rows' Arabic rail (28 + 4 optical).
         Text(
             text = target.surah.nameArabic,
             style = ArabicTitleStyle,
             fontSize = 20.sp,
-            color = colors.primary,
+            color = QuranTheme.accents.greenInk,
             maxLines = 1,
-        )
-        Icon(
-            imageVector = Icons.AutoMirrored.Rounded.ArrowForward,
-            contentDescription = null,
-            tint = colors.primary,
-            modifier = Modifier
-                .padding(start = 8.dp)
-                .size(18.dp),
         )
     }
 }
