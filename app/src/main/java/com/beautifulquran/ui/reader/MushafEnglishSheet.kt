@@ -359,28 +359,34 @@ internal fun MushafEnglishSheet(
                             )
                         }
                         if (block.basmalah) {
-                            EnglishBasmalahLine(
-                                fontSize = basmalahFontSize,
-                                slotHeight = basmalahDp,
-                                active = pageOwnsVoice &&
-                                    block.surahId == content.surah.id &&
-                                    playback.value.basmalahActive,
-                                wash = basmalahWash,
-                                onClick = { onBasmalahClick(block.surahId) },
-                            )
+                            Box(Modifier.padding(start = EnglishLeafOpticalIndent)) {
+                                EnglishBasmalahLine(
+                                    fontSize = basmalahFontSize,
+                                    slotHeight = basmalahDp,
+                                    active = pageOwnsVoice &&
+                                        block.surahId == content.surah.id &&
+                                        playback.value.basmalahActive,
+                                    wash = basmalahWash,
+                                    onClick = { onBasmalahClick(block.surahId) },
+                                )
+                            }
                         }
                     }
 
-                    is EnglishLeafBlockText.Prose -> EnglishProseBlock(
-                        block = block,
-                        packs = packsState,
-                        fontSize = fontSize,
-                        lineHeight = pitch,
-                        measurePx = measurePx,
-                        liveInk = liveInk,
-                        onVerseSeek = onVerseSeek,
-                        onVerseLongPress = onVerseLongPress,
-                    )
+                    is EnglishLeafBlockText.Prose -> Box(
+                        Modifier.padding(start = EnglishLeafOpticalIndent),
+                    ) {
+                        EnglishProseBlock(
+                            block = block,
+                            packs = packsState,
+                            fontSize = fontSize,
+                            lineHeight = pitch,
+                            measurePx = measurePx,
+                            liveInk = liveInk,
+                            onVerseSeek = onVerseSeek,
+                            onVerseLongPress = onVerseLongPress,
+                        )
+                    }
                 }
             }
         }
@@ -422,10 +428,24 @@ internal fun englishLeafSlotPx(
     // rounding must not put the last line's descenders past the foot.
     val wellPx = ((unit * bands.well).roundToPx() - EnglishLeafFitSlack.roundToPx())
         .toFloat().coerceAtLeast(1f)
-    val measurePx = (paperWidthPx - MushafEdgeGutter.roundToPx() * 2)
-        .toFloat().coerceAtLeast(1f)
+    val measurePx = (
+        paperWidthPx - MushafEdgeGutter.roundToPx() * 2 - EnglishLeafOpticalIndent.roundToPx()
+        ).toFloat().coerceAtLeast(1f)
     floatArrayOf(wellPx, measurePx)
 }
+
+/**
+ * Extra paper at the head of every line of the English text block, and only
+ * there — the chapter band, the running head and the folio keep the leaf's
+ * symmetric frame.
+ *
+ * The prose sets ragged-right, so its right edge averages well short of the
+ * frame the band draws while its left edge sits flush on it: the leaf weighed
+ * to the left. Moving the block's start in, and leaving full lines ending on
+ * the band's right edge, is the old printer's optical correction for a rag.
+ * It narrows the measure, so the book repaginates (the cache keys on it).
+ */
+internal val EnglishLeafOpticalIndent = 8.dp
 
 private val EnglishLeafFitSlack = 2.dp
 
