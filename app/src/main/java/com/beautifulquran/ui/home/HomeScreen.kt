@@ -119,8 +119,8 @@ private const val SEARCH_ITEM_INDEX = 0
 /** How far (px) the list must move before a scroll counts as "dismiss". */
 internal const val DISMISS_SCROLL_THRESHOLD_PX = 24
 
-/** The pill's flight up to its row: move, resize, and square off as one. */
-internal const val ContinueDockMs = 420
+/** The pill's flight up to its row: slow move, resize, and square off as one. */
+internal const val ContinueDockMs = 700
 
 /** Raw flight progress where the docked pill starts fading into its row. */
 internal const val ContinueDockFadeFrom = 0.7f
@@ -230,12 +230,18 @@ fun HomeScreen(
     // scrolled out of view the pill floats at the bottom; once the row
     // itself is visible the pill docks away so the row owns the tap.
     val continueSurahId = uiState.continueTarget?.surah?.id
+    // Dock only once the row is fully in view — flying to a sliver reads
+    // as a miss. The row then owns the tap; the pill lands on its bounds.
     val continueRowVisible by remember(continueSurahId, searching) {
         derivedStateOf {
             if (continueSurahId == null || searching) {
                 false
             } else {
-                listState.layoutInfo.visibleItemsInfo.any { it.key == "surah-$continueSurahId" }
+                val info = listState.layoutInfo
+                info.visibleItemsInfo.firstOrNull { it.key == "surah-$continueSurahId" }?.let { item ->
+                    item.offset >= info.viewportStartOffset &&
+                        item.offset + item.size <= info.viewportEndOffset
+                } == true
             }
         }
     }
@@ -753,6 +759,7 @@ fun HomeScreen(
                                 focusManager.clearFocus()
                                 onOpenSurah(target.surah.id, target.ayah, null, null)
                             },
+                            docked = flight,
                         )
                     }
                 }
@@ -847,7 +854,16 @@ private fun HomeBookmarkOverlay(
 
 /** The pill's wash: a calm fixed radius the ribbon's straight-cut ends sit inside. */
 internal val ContinuePillRadius: Dp = 28.dp
-internal val ContinuePillShape = RoundedCornerShape(ContinuePillRadius)
+
+/** Resting geometry the dock flight morphs away from. */
+internal val ContinuePillMargin: Dp = 16.dp
+internal val ContinuePillStartInset: Dp = 8.dp
+internal val ContinuePillVertical: Dp = 12.dp
+internal val ContinuePillRibbonHeight: Dp = 40.dp
+
+/** The chapter row geometry the flight settles onto. */
+internal val ContinueRowVertical: Dp = 15.dp
+internal val ContinueRowRibbonHeight: Dp = 44.dp
 
 /** Wash-to-row corner collapse over the dock flight (pill radius → rectangle). */
 internal fun continueDockRadius(flight: Float): Dp =
@@ -856,6 +872,17 @@ internal fun continueDockRadius(flight: Float): Dp =
 /** The docked pill holds opaque through the flight, then fades into its row. */
 internal fun continueDockAlpha(progress: Float): Float =
     1f - ((progress - ContinueDockFadeFrom) / (1f - ContinueDockFadeFrom)).coerceIn(0f, 1f)
+
+/** Outer margin melts so the wash lands full-bleed on the row's width. */
+internal fun continueDockMargin(docked: Float): Dp =
+    ContinuePillMargin * (1f - docked.coerceIn(0f, 1f))
+
+/** Ribbon lane slides to the row's lane so the cloths coincide on landing. */
+internal fun continueDockStartInset(docked: Float): Dp =
+    ContinuePillStartInset * (1f - docked.coerceIn(0f, 1f))
+
+/** The CONTINUE flag dissolves across the flight; the row has none. */
+internal fun continueDockCapsAlpha(docked: Float): Float = 1f - docked.coerceIn(0f, 1f)
 
 /**
  * The reading place floats only while its chapter row is scrolled out of
@@ -881,18 +908,31 @@ internal fun shouldShowContinuePill(
  * where chapter Arabic ends.
  */
 @Composable
-private fun ContinuePill(target: ContinueTarget, onClick: () -> Unit) {
+private fun ContinuePill(
+    target: ContinueTarget,
+    onClick: () -> Unit,
+    /** Dock flight progress: 0 resting, 1 settled onto the chapter row. */
+    docked: Float = 0f,
+) {
     val colors = MaterialTheme.colorScheme
+    val settled = docked.coerceIn(0f, 1f)
+    val vertical = ContinuePillVertical + (ContinueRowVertical - ContinuePillVertical) * settled
+    val shape = RoundedCornerShape(continueDockRadius(settled))
     Row(
         verticalAlignment = Alignment.CenterVertically,
         modifier = Modifier
-            .padding(horizontal = 16.dp)
-            .background(QuranTheme.accents.greenWash, ContinuePillShape)
+            .padding(horizontal = continueDockMargin(settled))
+            .background(QuranTheme.accents.greenWash, shape)
             // Clip the cloth to the wash so the ribbon's straight-cut ends
             // can never poke past the curve.
-            .clip(ContinuePillShape)
+            .clip(shape)
             .quietClickable(onClick = onClick)
-            .padding(start = 8.dp, end = 16.dp, top = 12.dp, bottom = 12.dp)
+            .padding(
+                start = continueDockStartInset(settled),
+                end = 16.dp,
+                top = vertical,
+                bottom = vertical,
+            )
             .semantics {
                 contentDescription =
                     "Continue listening: ${target.surah.nameTransliteration}, ayah ${target.ayah}"
@@ -913,7 +953,10 @@ private fun ContinuePill(target: ContinueTarget, onClick: () -> Unit) {
             bottomGap = 0.dp,
             modifier = Modifier
                 .width(HomeRibbonLane)
-                .height(40.dp),
+                .height(
+                    ContinuePillRibbonHeight +
+                        (ContinueRowRibbonHeight - ContinuePillRibbonHeight) * settled,
+                ),
         )
         // Row order, compacted: ribbon, gold number, then the name —
         // the pill keeps the chapter row's structure, not its rails.
@@ -931,7 +974,7 @@ private fun ContinuePill(target: ContinueTarget, onClick: () -> Unit) {
                 text = "CONTINUE",
                 style = MaterialTheme.typography.labelSmall.copy(letterSpacing = CAPS_TRACKING),
                 fontSize = 10.sp,
-                color = QuranTheme.accents.greenQuiet,
+                color = QuranTheme.accents.greenQuiet.copy(alpha = continueDockCapsAlpha(settled)),
                 maxLines = 1,
             )
             Spacer(Modifier.height(2.dp))
@@ -981,8 +1024,8 @@ private fun SurahRow(
             .quietClickable(onClick = onClick)
             .padding(
                 end = HomeEndInset,
-                top = 15.dp,
-                bottom = 15.dp,
+                top = ContinueRowVertical,
+                bottom = ContinueRowVertical,
             ),
     ) {
         if (currentAyah != null) {
@@ -1002,7 +1045,7 @@ private fun SurahRow(
                 bottomGap = 0.dp,
                 modifier = Modifier
                     .width(HomeRibbonLane)
-                    .height(44.dp)
+                    .height(ContinueRowRibbonHeight)
                     .semantics {
                         contentDescription = "Current place, ayah $currentAyah"
                     },

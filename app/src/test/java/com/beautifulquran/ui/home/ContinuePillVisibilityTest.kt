@@ -133,6 +133,16 @@ class ContinuePillVisibilityTest {
     }
 
     @Test
+    fun dockSettlesOntoRowGeometry() {
+        assertEquals(16.dp, continueDockMargin(0f))
+        assertEquals(0.dp, continueDockMargin(1f))
+        assertEquals(8.dp, continueDockStartInset(0f))
+        assertEquals(0.dp, continueDockStartInset(1f))
+        assertEquals(1f, continueDockCapsAlpha(0f), 0.001f)
+        assertEquals(0f, continueDockCapsAlpha(1f), 0.001f)
+    }
+
+    @Test
     fun pinnedSessionNeverStacksContinue() {        assertEquals(
             128.dp,
             homeListBottomInset(
