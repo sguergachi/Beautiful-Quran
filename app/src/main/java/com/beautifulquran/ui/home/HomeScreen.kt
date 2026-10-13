@@ -96,7 +96,6 @@ import com.beautifulquran.ui.theme.quietSuppliedBrackets
 import com.beautifulquran.ui.theme.ArabicTitleStyle
 import com.beautifulquran.ui.theme.LocalQuranAccents
 import com.beautifulquran.ui.theme.typeScale
-import com.beautifulquran.ui.theme.typeLeading
 import com.beautifulquran.ui.theme.PaperSearchField
 import com.beautifulquran.ui.theme.quietClickable
 import com.beautifulquran.ui.theme.verticalFadingEdges
@@ -616,8 +615,8 @@ private fun HomeHeader(
                 Text(
                     text = "Beautiful Quran",
                     style = MaterialTheme.typography.headlineMedium.copy(
-                        fontSize = typeScale(30.sp, 34.sp),
-                        lineHeight = typeLeading(35.sp, 40.sp),
+                        fontSize = typeScale(34.sp),
+                        lineHeight = 40.sp,
                     ),
                     color = MaterialTheme.colorScheme.onBackground,
                 )
@@ -775,7 +774,7 @@ private fun SurahRow(
             Text(
                 text = surah.nameTransliteration,
                 style = MaterialTheme.typography.titleMedium.copy(
-                    fontSize = typeScale(15.sp, 17.sp),
+                    fontSize = typeScale(17.sp),
                 ),
                 color = MaterialTheme.colorScheme.onBackground,
                 maxLines = 1,
@@ -884,7 +883,7 @@ private fun WordSearchSurahHeader(section: SurahWordSearchSection) {
         Text(
             text = section.surahNameTransliteration,
             style = MaterialTheme.typography.titleMedium.copy(
-                fontSize = typeScale(14.sp, 16.sp),
+                fontSize = typeScale(16.sp),
             ),
             color = MaterialTheme.colorScheme.onBackground,
             modifier = Modifier.weight(1f),

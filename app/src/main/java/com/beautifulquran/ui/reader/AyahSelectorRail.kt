@@ -344,10 +344,10 @@ internal fun AyahSelectorRail(
     val pageFace = remember(fontResolver, serifFontFamily) {
         fontResolver.resolve(serifFontFamily).value as Typeface
     }
-    val collapsedNumberSize = typeScale(8.sp, 9.sp)
-    val collapsedPageSize = typeScale(6.5.sp, 7.5.sp)
-    val selectedNumberSize = typeScale(9.5.sp, 11.sp)
-    val unselectedNumberSize = typeScale(7.5.sp, 8.5.sp)
+    val collapsedNumberSize = typeScale(9.sp)
+    val collapsedPageSize = typeScale(7.5.sp)
+    val selectedNumberSize = typeScale(11.sp)
+    val unselectedNumberSize = typeScale(8.5.sp)
     val paintFlags = BookTextPaintFlags
 
     Box(

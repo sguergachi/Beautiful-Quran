@@ -21,7 +21,6 @@ import com.beautifulquran.ui.theme.HafsFontFamily
 import com.beautifulquran.ui.theme.LocalQuranAccents
 import com.beautifulquran.ui.theme.TranslationFontFamily
 import com.beautifulquran.ui.theme.typeScale
-import com.beautifulquran.ui.theme.typeLeading
 
 internal val ShareImagePadH = 48.dp
 internal val ShareImagePadTop = 56.dp
@@ -106,8 +105,8 @@ fun ShareImageVerseStrip(
                 text = suppliedWordsText(verse.translation, ink.copy(alpha = 0.66f)),
                 style = MaterialTheme.typography.bodyLarge.copy(
                     fontFamily = TranslationFontFamily,
-                    fontSize = typeScale(14.sp, 16.sp),
-                    lineHeight = typeLeading(22.sp, 24.sp),
+                    fontSize = typeScale(16.sp),
+                    lineHeight = 24.sp,
                 ),
                 color = ink.copy(alpha = 0.66f),
                 textAlign = TextAlign.Center,

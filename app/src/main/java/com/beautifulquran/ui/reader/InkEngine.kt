@@ -245,15 +245,6 @@ object InkEngine {
      * without one (tests, or before [attachLabStore]), values are in-memory.
      */
     private var tuningState by mutableStateOf(Tuning())
-    private var typographyState by mutableStateOf(com.beautifulquran.ui.theme.TypographyTuning())
-
-    /** Variable Latin typography, saved with the other developer lab values. */
-    var typographyTuning: com.beautifulquran.ui.theme.TypographyTuning
-        get() = typographyState
-        set(value) {
-            typographyState = value
-            persistLab()
-        }
     var tuning: Tuning
         get() = tuningState
         set(value) {
@@ -389,7 +380,6 @@ object InkEngine {
         suppressLabPersist = true
         try {
             tuningState = snapshot.toTuning()
-            typographyState = snapshot.typography
             ContextualGuideStyle.tuning = snapshot.toContextualGuideTuning()
             highlightLeadState = snapshot.highlightLeadMs
             fadeLeadState = snapshot.fadeLeadMs
@@ -412,7 +402,6 @@ object InkEngine {
         suppressLabPersist = true
         try {
             tuningState = Tuning()
-            typographyState = com.beautifulquran.ui.theme.TypographyTuning()
             ContextualGuideStyle.tuning = ContextualGuideTuning()
             highlightLeadState = DEFAULT_HIGHLIGHT_LEAD_MS
             fadeLeadState = DEFAULT_FADE_LEAD_MS

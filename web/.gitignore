@@ -3,6 +3,5 @@ dist/
 *.local
 .DS_Store
 
-# Timeless fonts are fetched at build time (license forbids committing them).
-public/fonts/timeless/
+# Font licenses, copied from ../licenses by scripts/copy-licenses.mjs.
 /public/font-licenses/

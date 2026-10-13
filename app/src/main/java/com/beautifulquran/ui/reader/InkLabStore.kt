@@ -51,8 +51,6 @@ class InkLabStore(context: Context) {
 @Serializable
 data class InkLabSnapshot(
     val schema: Int = SCHEMA,
-    val typography: com.beautifulquran.ui.theme.TypographyTuning =
-        com.beautifulquran.ui.theme.TypographyTuning(),
     val upcomingAlpha: Float = 0.2661f,
     val inkFadeMs: Int = 400,
     val ayahMarkFadeMs: Int = 400,
@@ -207,7 +205,6 @@ data class InkLabSnapshot(
             scrollLeadMs: Int = InkEngine.scrollLeadMs,
             outputLatencyOverrideMs: Int? = InkEngine.outputLatencyOverrideMs,
         ): InkLabSnapshot = InkLabSnapshot(
-            typography = InkEngine.typographyTuning,
             upcomingAlpha = tuning.upcomingAlpha,
             inkFadeMs = tuning.inkFadeMs,
             ayahMarkFadeMs = tuning.ayahMarkFadeMs,

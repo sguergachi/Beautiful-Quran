@@ -69,10 +69,8 @@ internal val ACKNOWLEDGEMENTS = listOf(
     Acknowledgement(
         title = "English typeface",
         body = "Junicode by Peter S. Baker (SIL OFL 1.1), with EB Garamond supplying the " +
-            "letters it lacks. Timeless Sans and Timeless Serif © Timeless Ventures Private " +
-            "Limited, Chennai (timeless.co), used under the Timeless Free Font License. The " +
-            "comparison profiles also use Cormorant Garamond (SIL OFL 1.1). Font licenses " +
-            "accompany the app.",
+            "letters it lacks. The comparison profile uses EB Garamond and Cormorant " +
+            "Garamond (SIL OFL 1.1). Font licenses accompany the app.",
     ),
     Acknowledgement(
         title = "Arabic typeface",

@@ -86,16 +86,13 @@ import com.beautifulquran.ui.theme.lining
 import com.beautifulquran.ui.theme.SmallTitleFontFamily
 import com.beautifulquran.ui.theme.liningFigures
 import com.beautifulquran.ui.theme.BookTextMotion
-import com.beautifulquran.ui.theme.LocalQuranTypePalette
-import androidx.compose.ui.unit.em
 import com.beautifulquran.ui.theme.DisplayFontFamily
 import com.beautifulquran.ui.theme.HafsFontFamily
 import com.beautifulquran.ui.theme.LocalQuranAccents
 import com.beautifulquran.ui.theme.SerifFontFamily
 import com.beautifulquran.ui.theme.typeScale
-import com.beautifulquran.ui.theme.TypeRole
-import com.beautifulquran.ui.theme.typeFeatures
-import com.beautifulquran.ui.theme.typeLeading
+import com.beautifulquran.ui.theme.BookFeatures
+import com.beautifulquran.ui.theme.TitleFeatures
 import com.beautifulquran.ui.theme.quietClickable
 import com.beautifulquran.ui.theme.verticalFadingEdges
 import com.beautifulquran.ui.theme.QuranTheme
@@ -502,8 +499,8 @@ private val LemmaToMetaGap = 20.dp
 private val AnalysisGlossAlpha = 0.9f
 @Composable
 private fun analysisGlossStyle(): TextStyle = MaterialTheme.typography.bodyLarge.copy(
-    fontSize = typeScale(16.sp, 18.sp),
-    lineHeight = typeLeading(20.sp, 22.sp),
+    fontSize = typeScale(18.sp),
+    lineHeight = 22.sp,
     fontWeight = FontWeight.Medium,
     platformStyle = PlatformTextStyle(includeFontPadding = false),
     lineHeightStyle = LineHeightStyle(
@@ -603,7 +600,7 @@ private fun WordAnalysis(
                 if (rootSense != null) {
                     val bodyColor = MaterialTheme.colorScheme.onSurface.copy(alpha = AnalysisGlossAlpha)
                     val citationColor = QuranTheme.ink.quiet
-                    val citationSize = typeScale(13.sp, 15.sp)
+                    val citationSize = typeScale(15.sp)
                     val annotated = remember(rootSense, bodyColor, citationColor, citationSize) {
                         lexiconAnnotated(rootSense, bodyColor, citationColor, citationSize)
                     }
@@ -725,10 +722,10 @@ private fun RootLabel(
                 // so CenterVertically stays even between ROOT and LEMMA.
                 style = TextStyle(
                     fontFamily = SerifFontFamily,
-                    fontSize = typeScale(10.5.sp, 12.sp),
-                    lineHeight = typeLeading(14.sp, 16.sp),
+                    fontSize = typeScale(12.sp),
+                    lineHeight = 16.sp,
                     fontWeight = FontWeight.SemiBold,
-                    letterSpacing = typeScale(1.4.sp, 1.56.sp),
+                    letterSpacing = typeScale(1.56.sp),
                     fontFeatureSettings = liningFigures(null) + ", 'case' 1",
                     textMotion = BookTextMotion,
                     platformStyle = PlatformTextStyle(includeFontPadding = false),
@@ -752,11 +749,10 @@ private fun RootSectionTitle(text: String, explanation: String? = null) {
                 text = it,
                 fontFamily = DisplayFontFamily,
                 fontWeight = FontWeight.SemiBold,
-                fontSize = typeScale(21.sp, 24.sp, TypeRole.Title),
-                lineHeight = typeLeading(26.sp, 29.sp, TypeRole.Title),
+                fontSize = typeScale(24.sp),
+                lineHeight = 29.sp,
                 style = MaterialTheme.typography.bodyLarge.copy(
-                    letterSpacing = LocalQuranTypePalette.current.tuning.title.tracking.em,
-                    fontFeatureSettings = typeFeatures(TypeRole.Title),
+                    fontFeatureSettings = TitleFeatures,
                 ),
                 color = MaterialTheme.colorScheme.onSurface,
             )
@@ -914,11 +910,10 @@ private fun ChapterHeading(section: RootOccurrenceSection, open: Boolean, onClic
             Text(
                 text = section.surahName,
                 fontFamily = SmallTitleFontFamily,
-                fontSize = typeScale(16.sp, 18.sp, TypeRole.Title),
-                lineHeight = typeLeading(21.sp, 24.sp, TypeRole.Title),
+                fontSize = typeScale(18.sp),
+                lineHeight = 24.sp,
                 style = MaterialTheme.typography.bodyLarge.copy(
-                    letterSpacing = LocalQuranTypePalette.current.tuning.title.tracking.em,
-                    fontFeatureSettings = typeFeatures(TypeRole.Title),
+                    fontFeatureSettings = TitleFeatures,
                 ),
                 color = QuranTheme.ink.strong,
                 maxLines = 1,
@@ -1308,8 +1303,8 @@ private fun LemmaMeta(
 
 @Composable
 private fun lemmaMetaStyle(): TextStyle = MaterialTheme.typography.bodyMedium.copy(
-    fontSize = typeScale(12.5.sp, 14.sp),
-    lineHeight = typeLeading(16.sp, 18.sp),
+    fontSize = typeScale(14.sp),
+    lineHeight = 18.sp,
     platformStyle = PlatformTextStyle(includeFontPadding = false),
     lineHeightStyle = LineHeightStyle(
         alignment = LineHeightStyle.Alignment.Top,
@@ -1387,18 +1382,17 @@ private fun LexiconBlockView(
     modifier: Modifier = Modifier,
 ) {
     val gold = LocalQuranAccents.current.gold
-    val citationSize = typeScale(13.sp, 15.sp)
+    val citationSize = typeScale(15.sp)
     Column(modifier.fillMaxWidth()) {
         block.form?.let { form ->
             Text(
                 text = form,
                 fontFamily = SmallTitleFontFamily,
                 fontWeight = FontWeight.Medium,
-                fontSize = typeScale(16.sp, 18.sp, TypeRole.Title),
-                lineHeight = typeLeading(20.sp, 22.sp, TypeRole.Title),
+                fontSize = typeScale(18.sp),
+                lineHeight = 22.sp,
                 style = MaterialTheme.typography.bodyLarge.copy(
-                    letterSpacing = LocalQuranTypePalette.current.tuning.title.tracking.em,
-                    fontFeatureSettings = typeFeatures(TypeRole.Title),
+                    fontFeatureSettings = TitleFeatures,
                 ),
                 color = gold,
                 modifier = Modifier.padding(bottom = 8.dp),
@@ -1507,15 +1501,11 @@ private fun WordHeader(word: Word, isPlaying: Boolean, onPlay: () -> Unit) {
     if (word.translation.isNotBlank()) {
         Text(
             text = word.translation,
-            fontSize = typeScale(17.5.sp, 20.sp, com.beautifulquran.ui.theme.TypeRole.BookItalic),
-            lineHeight = com.beautifulquran.ui.theme.typeLeading(
-                25.sp, 28.sp, com.beautifulquran.ui.theme.TypeRole.BookItalic,
-            ),
+            fontSize = typeScale(20.sp),
+            lineHeight = 28.sp,
             fontStyle = FontStyle.Italic,
             style = MaterialTheme.typography.bodyLarge.copy(
-                fontFeatureSettings = com.beautifulquran.ui.theme.typeFeatures(
-                    com.beautifulquran.ui.theme.TypeRole.BookItalic,
-                ),
+                fontFeatureSettings = BookFeatures,
             ),
             textAlign = TextAlign.Center,
             color = MaterialTheme.colorScheme.onSurface,

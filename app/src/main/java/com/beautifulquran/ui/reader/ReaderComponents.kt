@@ -165,7 +165,6 @@ import com.beautifulquran.ui.theme.shapedWordBloom
 import com.beautifulquran.ui.theme.inkSmootherstep
 import com.beautifulquran.ui.theme.verticalFadingEdges
 import com.beautifulquran.ui.theme.typeScale
-import com.beautifulquran.ui.theme.typeLeading
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.first
@@ -1817,8 +1816,8 @@ private fun WordUnit(
             Box {
                 Text(
                     text = word.translation,
-                    fontSize = typeScale(10.5.sp, 12.sp) * fontScale,
-                    lineHeight = typeLeading(13.sp, 15.sp) * fontScale,
+                    fontSize = typeScale(12.sp) * fontScale,
+                    lineHeight = 15.sp * fontScale,
                     fontWeight = glossWeight,
                     color = if (searchHit) {
                         LocalQuranAccents.current.gold
@@ -1834,8 +1833,8 @@ private fun WordUnit(
                 if (searchHitWash != null) {
                     Text(
                         text = word.translation,
-                        fontSize = typeScale(10.5.sp, 12.sp) * fontScale,
-                        lineHeight = typeLeading(13.sp, 15.sp) * fontScale,
+                        fontSize = typeScale(12.sp) * fontScale,
+                        lineHeight = 15.sp * fontScale,
                         fontWeight = FontWeight.Bold,
                         color = repeatInk.copy(alpha = InkEngine.tuning.repeatInkAlpha),
                         textAlign = TextAlign.Center,
@@ -1849,8 +1848,8 @@ private fun WordUnit(
         if (showTransliteration) {
             Text(
                 text = word.transliteration,
-                fontSize = typeScale(9.5.sp, 11.sp) * fontScale,
-                lineHeight = typeLeading(12.5.sp, 14.sp) * fontScale,
+                fontSize = typeScale(11.sp) * fontScale,
+                lineHeight = 14.sp * fontScale,
                 color = QuranTheme.ink.quiet,
                 textAlign = TextAlign.Center,
                 modifier = Modifier.glyphLayerAlpha {
@@ -2152,9 +2151,8 @@ private fun ResponsiveEnglishAyah(
     val style = MaterialTheme.typography.bodyLarge.copy(
         fontFamily = translationFontFamily,
         fontWeight = FontWeight.Normal,
-        fontSize = typeScale(19.5.sp, 22.sp) * fontScale,
-        lineHeight = (1.5f * com.beautifulquran.ui.theme.LocalQuranTypePalette.current.tuning.book.leading).em,
-        letterSpacing = com.beautifulquran.ui.theme.LocalQuranTypePalette.current.tuning.book.tracking.em,
+        fontSize = typeScale(22.sp) * fontScale,
+        lineHeight = 1.5.em,
         textAlign = TextAlign.Start,
         textDirection = TextDirection.Ltr,
     )
@@ -2630,9 +2628,9 @@ private fun Modifier.hangTileAir(): Modifier = layout { measurable, constraints 
  * tracking — wide enough to open the capitals, not so wide the word falls apart.
  */
 internal val CAPS_LABEL_SIZE: TextUnit
-    @Composable get() = typeScale(9.sp, 10.sp)
+    @Composable get() = typeScale(10.sp)
 internal val CAPS_TRACKING: TextUnit
-    @Composable get() = typeScale(2.sp, 2.2.sp)
+    @Composable get() = typeScale(2.2.sp)
 
 @Composable
 private fun ArabicAyahNumberUnit(
@@ -2679,8 +2677,8 @@ private fun ArabicAyahNumberUnit(
  * the reader writes in place. Tap away to commit; empty text = no note.
  */
 /**
- * The book family's real italic in Timeless mode, with Cormorant restored by
- * the classic profile. Shared by the reader, Customize and the Bookmarks index.
+ * Junicode's real italic, with Cormorant restored by the classic profile.
+ * Shared by the reader, Customize and the Bookmarks index.
  *
  * [fontScale] mirrors the translation's damped scaling so the note grows with
  * the page instead of staying pinned at one size when the reader sizes type up.
@@ -2693,21 +2691,15 @@ internal fun verseAnnotationStyle(
 ): TextStyle {
     val damped = 0.9f + 0.1f * fontScale
     val type = com.beautifulquran.ui.theme.LocalQuranTypePalette.current
-    val timeless = type.profile == com.beautifulquran.ui.theme.QuranTypeProfile.TIMELESS
     val junicode = type.profile == com.beautifulquran.ui.theme.QuranTypeProfile.JUNICODE
-    val note = type.tuning.note
     return MaterialTheme.typography.bodyMedium.copy(
         fontFamily = ScribeFontFamily,
         fontWeight = FontWeight.Medium,
         fontStyle = FontStyle.Italic,
-        fontSize = fontSize * damped * when {
-            timeless -> 0.88f * note.size
-            junicode -> com.beautifulquran.ui.theme.JUNICODE_SIZE
-            else -> 1f
-        },
-        lineHeight = lineHeight * damped * if (timeless) 0.88f * note.size * note.leading else 1f,
-        letterSpacing = if (timeless) (0.15f / fontSize.value + note.tracking).em else 0.15.sp,
-        fontFeatureSettings = if (timeless || junicode) note.featureSettings else "'kern' 1, 'liga' 1, 'onum' 1",
+        fontSize = fontSize * damped * if (junicode) com.beautifulquran.ui.theme.JUNICODE_SIZE else 1f,
+        lineHeight = lineHeight * damped,
+        letterSpacing = 0.15.sp,
+        fontFeatureSettings = if (junicode) type.bookFeatures else "'kern' 1, 'liga' 1, 'onum' 1",
     )
 }
 
@@ -3952,9 +3944,9 @@ private fun folioArabicStyle(): TextStyle = TextStyle(
     platformStyle = PlatformTextStyle(includeFontPadding = false),
 )
 
-/** Timeless' lining figures stand 0.72 em: ~7.6 dp, as Garamond's did at 12 sp. */
+/** Folio figures at Garamond's 12 sp, scaled for the face being set. */
 private val FOLIO_WESTERN_SIZE: TextUnit
-    @Composable get() = typeScale(10.5.sp, 12.sp)
+    @Composable get() = typeScale(12.sp)
 
 /**
  * Hafs' Arabic-Indic figures ink shorter than the lining ones: ٣ stands

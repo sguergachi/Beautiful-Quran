@@ -369,7 +369,7 @@ fun ReaderScreen(
         settings.englishLeafText,
         settings.verseNumberScript,
         bookTypeface,
-        typePalette.tuning.bookCacheKey,
+        typePalette.bookCacheSuffix,
     ) {
         if (settings.developerModeEnabled) delay(250)
         val well = leafMetrics?.getOrNull(0) ?: return@LaunchedEffect
@@ -404,7 +404,7 @@ fun ReaderScreen(
                 measure,
                 settings.verseNumberScript,
                 bookTypeface,
-                typePalette.tuning.bookCacheKey,
+                typePalette.bookCacheSuffix,
             ),
             cacheKey = viewModel.englishBookCacheKey(
                 wellPx = well,

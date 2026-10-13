@@ -37,13 +37,13 @@
   --repeat: #b4551e;
   --bookmark: #b3122f;
   --annotation: #6b2838;
-  --font-ui: 'Timeless Sans', system-ui, sans-serif;
-  --font-display: 'Timeless Serif Display', 'EB Garamond', 'Times New Roman', serif;
-  --font-body: 'Timeless Serif', 'EB Garamond', 'Times New Roman', serif;
+  --font-ui: system-ui, sans-serif;
+  --font-display: 'Junicode', 'EB Garamond', 'Times New Roman', serif;
+  --font-body: 'Junicode', 'EB Garamond', 'Times New Roman', serif;
   --font-arabic: 'Hafs Uthmanic', 'Noto Naskh Arabic', serif;
   /* The reader's hand: chancery italic, a different hand from --font-body's
      roman rather than that same voice leaning. Verse notes only. */
-  --font-scribe: 'Timeless Serif', 'EB Garamond', 'Times New Roman', serif;
+  --font-scribe: 'Junicode', 'EB Garamond', 'Times New Roman', serif;
   --sheet-pad: clamp(1.1rem, 4.5vw, 2.75rem);
   /*
    * The phone's grid — Android's, at 1px = 1dp (ui/paper/sheetGrid.ts).
@@ -288,7 +288,8 @@ body {
   color: var(--ink);
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
-  font-feature-settings: 'kern' 1, 'liga' 1;
+  font-variant-numeric: oldstyle-nums;
+  font-feature-settings: 'kern' 1, 'liga' 1, 'onum' 1, 'ss09' 1;
   overflow: hidden;
   /* Stop iOS rubber-band scrolling the whole page behind the sheets. */
   overscroll-behavior: none;
@@ -706,6 +707,7 @@ select {
   font-weight: 600;
   font-size: clamp(2rem, 6vw, 3rem);
   margin: 0 0 0.5rem;
+  font-feature-settings: 'kern' 1, 'liga' 1, 'lnum' 1, 'ss09' 1, 'cv33' 3;
 }
 
 .boot p {
@@ -722,11 +724,10 @@ select {
   background: transparent;
   color: var(--ink);
   font-family: var(--font-body);
-  font-size: 0.95rem;
+  font-size: calc(0.95rem * 1.15);
   letter-spacing: 0.12em;
   text-transform: uppercase;
-  font-variant-numeric: lining-nums;
-  font-feature-settings: 'kern' 1, 'case' 1;
+  font-feature-settings: 'kern' 1, 'c2sc' 1, 'onum' 1, 'ss09' 1;
   cursor: pointer;
   -webkit-tap-highlight-color: transparent;
   touch-action: manipulation;
@@ -878,6 +879,7 @@ input[type='search']::-webkit-search-decoration {
   align-items: center;
   flex-wrap: wrap;
   gap: 0.55em 0.7em;
+  font-feature-settings: 'kern' 1, 'liga' 1, 'lnum' 1, 'ss09' 1, 'cv33' 3;
 }
 
 /* Product-stage whisper — same letterspaced label as a settings section,
@@ -885,11 +887,10 @@ input[type='search']::-webkit-search-decoration {
 .alpha-tag {
   font-family: var(--font-body);
   font-weight: 500;
-  font-size: 0.72rem;
+  font-size: calc(0.72rem * 1.15);
   letter-spacing: 0.14em;
   text-transform: uppercase;
-  font-variant-numeric: lining-nums;
-  font-feature-settings: 'kern' 1, 'case' 1;
+  font-feature-settings: 'kern' 1, 'c2sc' 1, 'onum' 1, 'ss09' 1;
   color: color-mix(in srgb, var(--ink) 45%, transparent);
   line-height: 1;
   white-space: nowrap;
@@ -1407,11 +1408,10 @@ input[type='search']::-webkit-search-decoration {
 .ornate-surah-title .ornate-en {
   margin: 0;
   font-family: var(--font-body);
-  font-size: 0.56rem;
+  font-size: calc(0.56rem * 1.15);
   letter-spacing: 0.14em;
   text-transform: uppercase;
-  font-variant-numeric: lining-nums;
-  font-feature-settings: 'kern' 1, 'case' 1;
+  font-feature-settings: 'kern' 1, 'c2sc' 1, 'onum' 1, 'ss09' 1;
   color: var(--ink-rung-quiet);
   white-space: nowrap;
   overflow: hidden;
@@ -1715,12 +1715,11 @@ input[type='search']::-webkit-search-decoration {
 
 .next-chapter-label {
   font-family: var(--font-ui);
-  font-size: 0.6875rem;
+  font-size: calc(0.6875rem * 1.15);
   font-weight: 500;
   letter-spacing: 0.22em;
   text-transform: uppercase;
-  font-variant-numeric: lining-nums;
-  font-feature-settings: 'kern' 1, 'case' 1;
+  font-feature-settings: 'kern' 1, 'c2sc' 1, 'onum' 1, 'ss09' 1;
   color: var(--gold-ink);
   margin: 0;
 }
@@ -2078,7 +2077,7 @@ button.ayah-mark {
   font-weight: 400;
   font-kerning: normal;
   font-variant-ligatures: common-ligatures;
-  font-feature-settings: 'kern' 1, 'liga' 1;
+  font-feature-settings: 'kern' 1, 'liga' 1, 'ss09' 1;
   line-height: 1.5;
   letter-spacing: normal;
   word-spacing: normal;
@@ -2663,6 +2662,7 @@ button.ayah-mark {
   font-family: var(--font-display);
   font-size: 1.4rem;
   cursor: pointer;
+  font-feature-settings: 'kern' 1, 'liga' 1, 'lnum' 1, 'ss09' 1, 'cv33' 3;
 }
 
 .share-ribbon-icon:disabled {
@@ -2962,6 +2962,7 @@ button.ayah-mark {
   line-height: 1.35;
   letter-spacing: 0.01em;
   white-space: nowrap;
+  font-feature-settings: 'kern' 1, 'liga' 1, 'lnum' 1, 'ss09' 1, 'cv33' 3;
 }
 
 .player-bar.cover-chrome .player-return {
@@ -3338,6 +3339,7 @@ button.ayah-mark {
   font-size: 2.5rem;
   font-weight: 600;
   line-height: 3rem;
+  font-feature-settings: 'kern' 1, 'liga' 1, 'lnum' 1, 'ss09' 1, 'cv33' 3;
 }
 
 .bookmarks-header button {
@@ -3660,6 +3662,7 @@ button.ayah-mark {
   letter-spacing: 0.2px;
   margin: 0 0 36px;
   color: var(--ink);
+  font-feature-settings: 'kern' 1, 'liga' 1, 'lnum' 1, 'ss09' 1, 'cv33' 3;
 }
 
 .settings-nav {
@@ -3899,11 +3902,10 @@ button.ayah-mark {
 
 /* Letterspaced, low-ink label — never competes with the reading. */
 .settings-section h2 {
-  font-size: 12px;
+  font-size: calc(12px * 1.15);
   letter-spacing: 2px;
   text-transform: uppercase;
-  font-variant-numeric: lining-nums;
-  font-feature-settings: 'kern' 1, 'case' 1;
+  font-feature-settings: 'kern' 1, 'c2sc' 1, 'onum' 1, 'ss09' 1;
   color: var(--ink-rung-muted);
   font-weight: 500;
   margin: 0 0 4px;
@@ -4549,6 +4551,7 @@ button.ayah-mark {
   align-items: center;
   justify-content: center;
   gap: 0.55em;
+  font-feature-settings: 'kern' 1, 'liga' 1, 'lnum' 1, 'ss09' 1, 'cv33' 3;
 }
 
 .settings-colophon-version {
@@ -4843,13 +4846,12 @@ button.ayah-mark {
   margin: 0;
   color: color-mix(in srgb, var(--ink) 72%, transparent);
   font-family: var(--font-body);
-  font-size: 0.75rem;
+  font-size: calc(0.75rem * 1.15);
   font-weight: 600;
   letter-spacing: 0.13em;
   line-height: 1.35;
   text-transform: uppercase;
-  font-variant-numeric: lining-nums;
-  font-feature-settings: 'kern' 1, 'case' 1;
+  font-feature-settings: 'kern' 1, 'c2sc' 1, 'onum' 1, 'ss09' 1;
 }
 
 .root-info-button {
@@ -5035,6 +5037,7 @@ button.ayah-mark {
   font-size: 1.5rem;
   font-weight: 600;
   line-height: 1.2;
+  font-feature-settings: 'kern' 1, 'liga' 1, 'lnum' 1, 'ss09' 1, 'cv33' 3;
 }
 
 .root-section-title::after {
@@ -5083,13 +5086,12 @@ button.ayah-mark {
 .root-lemma-pos {
   margin: 0 0 0.25rem !important;
   color: color-mix(in srgb, var(--ink) 55%, transparent);
-  font-size: 0.75rem;
+  font-size: calc(0.75rem * 1.15);
   font-weight: 600;
   letter-spacing: 0.04em;
   line-height: 1.3;
   text-transform: uppercase;
-  font-variant-numeric: lining-nums;
-  font-feature-settings: 'kern' 1, 'case' 1;
+  font-feature-settings: 'kern' 1, 'c2sc' 1, 'onum' 1, 'ss09' 1;
 }
 
 /* Lemma column: same .root-sense face, no extra top margin in the stack. */
@@ -5148,6 +5150,7 @@ button.ayah-mark {
   font-weight: 500;
   line-height: 1.3;
   letter-spacing: 0.01em;
+  font-feature-settings: 'kern' 1, 'liga' 1, 'lnum' 1, 'ss09' 1, 'cv33' 3;
 }
 
 .root-lexicon-arabic {
@@ -5199,6 +5202,7 @@ button.ayah-mark {
   font-family: var(--font-display);
   font-size: 1.125rem;
   line-height: 1.3;
+  font-feature-settings: 'kern' 1, 'liga' 1, 'lnum' 1, 'ss09' 1, 'cv33' 3;
 }
 
 .root-chapter-name i {
@@ -5497,6 +5501,7 @@ button.ayah-mark {
   font-size: 1.05rem;
   line-height: 1.2;
   white-space: nowrap;
+  font-feature-settings: 'kern' 1, 'liga' 1, 'lnum' 1, 'ss09' 1, 'cv33' 3;
 }
 
 .floating-play .float-chapter {
@@ -6167,6 +6172,7 @@ button.ayah-mark {
   text-align: center;
   color: rgba(232, 226, 213, 0.58);
   opacity: 0;
+  font-feature-settings: 'kern' 1, 'liga' 1, 'lnum' 1, 'ss09' 1, 'cv33' 3;
 }
 
 .entrance-dua {
@@ -6211,11 +6217,10 @@ button.ayah-mark {
 .entrance-load-label {
   margin: 0;
   font-family: var(--font-body);
-  font-size: var(--cover-load-label);
+  font-size: calc(var(--cover-load-label) * 1.15);
   letter-spacing: 0.14em;
   text-transform: uppercase;
-  font-variant-numeric: lining-nums;
-  font-feature-settings: 'kern' 1, 'case' 1;
+  font-feature-settings: 'kern' 1, 'c2sc' 1, 'onum' 1, 'ss09' 1;
   text-align: center;
   color: rgba(232, 226, 213, 0.55);
 }
@@ -6256,11 +6261,10 @@ button.ayah-mark {
   padding: 0.55rem 0.15rem;
   min-height: 44px;
   font-family: var(--font-body);
-  font-size: var(--cover-load-label);
+  font-size: calc(var(--cover-load-label) * 1.15);
   letter-spacing: 0.16em;
   text-transform: uppercase;
-  font-variant-numeric: lining-nums;
-  font-feature-settings: 'kern' 1, 'case' 1;
+  font-feature-settings: 'kern' 1, 'c2sc' 1, 'onum' 1, 'ss09' 1;
   color: rgba(237, 209, 136, 0.85);
   background: none;
   border: none;
@@ -6336,6 +6340,7 @@ html[data-entrance='true'] body {
   font-size: 1.15rem;
   color: var(--ink);
   font-weight: 600;
+  font-feature-settings: 'kern' 1, 'liga' 1, 'lnum' 1, 'ss09' 1, 'cv33' 3;
 }
 
 .lab-seed,
@@ -6408,6 +6413,7 @@ html[data-entrance='true'] body {
   font-size: 0.95rem;
   font-weight: 500;
   color: var(--ink-muted);
+  font-feature-settings: 'kern' 1, 'liga' 1, 'lnum' 1, 'ss09' 1, 'cv33' 3;
 }
 
 .lab-center {
@@ -6725,6 +6731,7 @@ html[data-entrance='true'] body {
   font-size: 1.75rem;
   line-height: 2rem;
   color: var(--tip-ink);
+  font-feature-settings: 'kern' 1, 'liga' 1, 'lnum' 1, 'ss09' 1, 'cv33' 3;
 }
 
 .contextual-tip-body {
@@ -7582,6 +7589,7 @@ html[data-entrance-closing]
   font-size: 1.3rem;
   letter-spacing: 0.2em;
   color: var(--ink-rung-tertiary);
+  font-feature-settings: 'kern' 1, 'liga' 1, 'lnum' 1, 'ss09' 1, 'cv33' 3;
 }
 
 .book-title-hint {
@@ -7664,6 +7672,7 @@ html[data-entrance-closing]
   font-family: var(--font-display);
   font-size: 1.6rem;
   color: var(--ink-rung-furniture);
+  font-feature-settings: 'kern' 1, 'liga' 1, 'lnum' 1, 'ss09' 1, 'cv33' 3;
 }
 
 .app-shell[data-spread='true'] .book-close span {
@@ -7802,6 +7811,7 @@ html[data-entrance-closing]
   font-family: var(--font-display);
   font-size: 1.6rem;
   color: var(--ink-rung-furniture);
+  font-feature-settings: 'kern' 1, 'liga' 1, 'lnum' 1, 'ss09' 1, 'cv33' 3;
 }
 
 .app-shell[data-spread='true'] .mushaf-turn span {

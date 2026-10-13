@@ -270,7 +270,6 @@ class ShareViewModel(
         activity: Activity,
         includeTranslation: Boolean = true,
         typeface: BookTypeface = BookTypeface.JUNICODE,
-        typographyTuning: com.beautifulquran.ui.theme.TypographyTuning = com.beautifulquran.ui.theme.TypographyTuning(),
     ) {
         if (!_ui.value.gathering) return
         if (_ui.value.preparingText || _ui.value.preparingImage) return
@@ -303,7 +302,6 @@ class ShareViewModel(
                         activity = activity,
                         segmentCount = lines.size,
                         typeface = typeface,
-                        typographyTuning = typographyTuning,
                     ) { index ->
                         ShareImageVerseStrip(
                             verse = lines[index],
@@ -320,7 +318,7 @@ class ShareViewModel(
                             },
                         )
                     }
-                    footerBmp = ShareImageRenderer.render(activity, typeface, typographyTuning) {
+                    footerBmp = ShareImageRenderer.render(activity, typeface) {
                         ShareImageFooterStrip(shareFooterCopy(lines))
                     }
                     bitmap = stitchBitmaps(listOf(versesBmp, footerBmp))

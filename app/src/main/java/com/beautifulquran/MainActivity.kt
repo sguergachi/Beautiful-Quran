@@ -316,9 +316,6 @@ class MainActivity : ComponentActivity() {
                 BeautifulQuranTheme(
                     themeMode = settings.themeMode,
                     typeface = settings.activeBookTypeface,
-                    typographyTuning = if (settings.developerModeEnabled) {
-                        com.beautifulquran.ui.reader.InkEngine.typographyTuning
-                    } else com.beautifulquran.ui.theme.TypographyTuning(),
                 ) {
                     // Cold start paints the closed mushaf first; the paper stack
                     // mounts under it after two board frames (onWarmStack),
@@ -473,7 +470,7 @@ private fun PaperStackApp(
         settings.englishLeafText,
         settings.verseNumberScript,
         bookTypeface,
-        typePalette.tuning.bookCacheKey,
+        typePalette.bookCacheSuffix,
     ) {
         // Preview immediately; wait for the typography slider to settle before paginating.
         if (settings.developerModeEnabled) delay(250)
@@ -517,7 +514,7 @@ private fun PaperStackApp(
                 metrics[1],
                 settings.verseNumberScript,
                 bookTypeface,
-                typePalette.tuning.bookCacheKey,
+                typePalette.bookCacheSuffix,
             ),
             cacheKey = app.englishBookCache.key(
                 wellPx = metrics[0],
@@ -1215,7 +1212,6 @@ private fun PaperStackApp(
                             if (activity != null) {
                                 shareViewModel.shareAsImage(
                                     activity, typeface = bookTypeface,
-                                    typographyTuning = typePalette.tuning,
                                 )
                             }
                         },

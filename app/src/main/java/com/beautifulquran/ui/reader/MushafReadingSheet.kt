@@ -406,7 +406,7 @@ internal fun MushafReadingSheet(
                         text = "${if (playerState.speed % 1f == 0f) playerState.speed.toInt() else playerState.speed}×",
                         style = MaterialTheme.typography.labelMedium.copy(
                             fontWeight = FontWeight.SemiBold,
-                            fontSize = typeScale(13.sp, 15.sp),
+                            fontSize = typeScale(15.sp),
                         ),
                         color = if (speedActive) MaterialTheme.colorScheme.onBackground else quiet,
                         textAlign = TextAlign.Center,
@@ -416,8 +416,8 @@ internal fun MushafReadingSheet(
                         maxLines = 1,
                         softWrap = false,
                         autoSize = TextAutoSize.StepBased(
-                            minFontSize = typeScale(8.sp, 9.sp),
-                            maxFontSize = typeScale(13.sp, 15.sp),
+                            minFontSize = typeScale(9.sp),
+                            maxFontSize = typeScale(15.sp),
                             stepSize = 0.5.sp,
                         ),
                     )

@@ -11,8 +11,8 @@ import androidx.compose.ui.text.font.AndroidFont
 import androidx.compose.ui.text.font.Font
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontLoadingStrategy
-import androidx.compose.ui.text.font.FontVariation
 import androidx.compose.ui.text.font.FontStyle
+import androidx.compose.ui.text.font.FontVariation
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextMotion
 import androidx.compose.ui.unit.TextUnit
@@ -74,94 +74,10 @@ const val MUSHAF_BASMALAH_INK_MID_EM = 0.3101f
 
 
 /**
- * Timeless Serif Text — the book face. Everything English that is *read* is
- * set in it: translations, glosses, lists, names, facts. The Text cuts are
- * its small-size optical master. Italics use the family's real Timeless
- * Serif Italic cut; the archive has no separate Text Italic optical master.
- *
- * Timeless has no ḍ ḥ ẓ ʾ ʿ, which transliterations and the dictionary use,
- * so each cut falls back to the matching EB Garamond — the book face before
- * it — glyph by glyph rather than to the system's sans. See [bookFont].
- *
- * Its x-height is 0.52 em against EB Garamond's 0.40, so the same size reads
- * about an eighth larger: sizes across the app sit at ~0.88 of what they were
- * in Garamond, which keeps every line's apparent size and the page's density.
- */
-private val TimelessSerifFontFamily = timelessSerif(TypefaceTuning(), TypographyTuning().bookItalic)
-
-/**
- * Timeless Serif's display master — surah titles and headlines; its finer
- * contrast is cut for large sizes. It sets darker than the Cormorant it
- * replaced, so each weight the app asks for is served by the cut one step
- * lighter: Medium by Regular, SemiBold by Medium. The web maps the same.
- */
-private val TimelessDisplayFontFamily = timelessSerif(TypefaceTuning(style = 0f), display = true)
-
-/**
- * Timeless Sans — the controls' face: Material's sans slots ([QuranTypography]
- * keeps `labelLarge` & co. sans on purpose; see docs/DESIGN.md, "UI text").
- */
-private val TimelessSansFontFamily = timelessSans(TypographyTuning().ui)
-
-private fun timelessSerif(
-    face: TypefaceTuning,
-    italicFace: TypefaceTuning = face,
-    display: Boolean = false,
-): FontFamily {
-    val weights = listOf(400, 500, 600, 700)
-    return FontFamily(weights.flatMap { requested ->
-        listOf(FontStyle.Normal, FontStyle.Italic).map { style ->
-            val selected = if (style == FontStyle.Italic) italicFace else face
-            val italic = style == FontStyle.Italic || selected.italic >= 50f
-            val weight = (selected.weight + if (display && requested == 400) 0 else
-                requested - if (display) 500 else 400)
-                .coerceIn(if (italic) 300 else 200, 700)
-            bookFont(
-                if (italic) R.font.timeless_serif_italic_variable else R.font.timeless_serif_variable,
-                if (italic) R.font.eb_garamond_italic else when (requested) {
-                    500 -> R.font.eb_garamond_medium
-                    600, 700 -> R.font.eb_garamond_semibold
-                    else -> R.font.eb_garamond_regular
-                },
-                FontWeight(requested), style,
-                "'wght' $weight" + if (italic) "" else ", 'STYL' ${selected.style}",
-                italic,
-            )
-        }
-    })
-}
-
-@OptIn(androidx.compose.ui.text.ExperimentalTextApi::class)
-private fun timelessSans(face: TypefaceTuning): FontFamily = FontFamily(
-    listOf(400, 500, 600, 700, 800).map { requested ->
-        Font(
-            R.font.timeless_sans_variable, FontWeight(requested),
-            variationSettings = FontVariation.Settings(
-                FontVariation.weight(
-                    (face.weight + if (requested == 400) 0 else requested - 420).coerceIn(300, 800),
-                ),
-                FontVariation.Setting("STYL", face.style),
-                FontVariation.Setting("ital", face.italic),
-            ),
-        )
-    },
-)
-
-private fun timelessNotes(face: TypefaceTuning): FontFamily = FontFamily(
-    bookFont(
-        if (face.italic >= 50f) R.font.timeless_serif_italic_variable else R.font.timeless_serif_variable,
-        R.font.eb_garamond_italic, FontWeight.Medium, FontStyle.Italic,
-        "'wght' ${face.weight.coerceIn(if (face.italic >= 50f) 300 else 200, 700)}" +
-            if (face.italic >= 50f) "" else ", 'STYL' ${face.style}",
-        face.italic >= 50f,
-    ),
-)
-
-/**
- * Junicode 2 (Peter S. Baker, SIL OFL 1.1), set as Garamond — the third face of
- * the developer A/B: a Renaissance roman in Garamond's line, and not a Google
- * font. A page of it is tuned to measure as a page of EB Garamond
- * (docs/DESIGN.md, "Type"):
+ * Junicode 2 (Peter S. Baker, SIL OFL 1.1), set as Garamond: the app's English
+ * face. Everything English that is *read* is set in it — translations, glosses,
+ * lists, names, titles, notes. A Renaissance roman in Garamond's line, tuned so
+ * a page of it measures as a page of EB Garamond (docs/DESIGN.md, "Type"):
  *
  * * **Size.** Its x-height is 0.418 em to Garamond's 0.405, so it is set at
  *   [JUNICODE_SIZE] of Garamond's sizes and its lowercase stands as tall.
@@ -180,15 +96,15 @@ private fun timelessNotes(face: TypefaceTuning): FontFamily = FontFamily(
  *
  * The bundled files are subset to Latin, its extensions and the
  * transliteration marks, with the decorative enlargement axis pinned off; only
- * weight still varies. Junicode's default figures are old-style, whose 1 is a small-cap I ("2:I5"),
- * so it is always set with lining figures, as Garamond's are. Glyphs it lacks
- * fall back to EB Garamond, as Timeless's do.
+ * weight still varies. Glyphs it lacks fall back to EB Garamond (see
+ * [bookFont]). Its figures and alternates: [JUNICODE_PROSE].
  */
 private fun junicode(display: Boolean = false, ease: Int = 0): FontFamily =
     FontFamily(listOf(400, 500, 600, 700).flatMap { requested ->
         listOf(FontStyle.Normal, FontStyle.Italic).map { style ->
             val italic = style == FontStyle.Italic
-            // Titles, like Timeless's, take the cut one step lighter than asked.
+            // Titles take the cut one step lighter than asked: at display
+            // sizes the matched SemiBold reads heavy beside Garamond's.
             val step = if (display && requested > 400) requested - 100 else requested
             bookFont(
                 if (italic) R.font.junicode_italic_variable else R.font.junicode_variable,
@@ -215,6 +131,16 @@ internal fun junicodeWeight(requested: Int, italic: Boolean = false): Int = when
 internal const val JUNICODE_SIZE = 0.969f
 
 /**
+ * Light ink on dark paper spreads into the dark around it and reads heavier
+ * than the same weight in dark ink on cream, so on dark paper every role but
+ * the leaf sets this much lighter. The leaf is not eased: weight moves
+ * Junicode's advances, and the leaf is paginated — easing it gave each theme
+ * its own book, so a System theme turning dark mid-reading moved verses onto
+ * different leaves.
+ */
+internal const val DARK_PAPER_WEIGHT_EASE = 30
+
+/**
  * Junicode's OpenType features, reviewed in context (docs/DESIGN.md, "Type").
  * Most of its 20 sets and 99 variants serve medieval scholarship — runes,
  * insular letterforms, scribal abbreviations — and stay off. Three earn a place:
@@ -224,9 +150,8 @@ internal const val JUNICODE_SIZE = 0.969f
  *   the 1 its flag, so running prose can set book figures again. Figures that
  *   stand alone (labels, counts, references, verse marks) stay lining through
  *   [liningFigures]; ss09 keeps the flagged 1 there too.
- * * **cv33 = 3, the long-tailed Q, in titles.** Its tail sweeps under the next
- *   letter — the masthead's "Quran", Al-Qamar, Qaf. Timeless's titles carried
- *   the same Q (ss16).
+ * * **cv33 = 3, the long-tailed Q, in titles** ([JUNICODE_TITLE]). Its tail
+ *   sweeps under the next letter — the masthead's "Quran", Al-Qamar, Qaf.
  * * **c2sc, true small caps, for tracked capitals** ([forCaps]): a chapter line
  *   in small caps with old-style figures, as a book sets it, instead of shrunk
  *   full capitals.
@@ -234,18 +159,9 @@ internal const val JUNICODE_SIZE = 0.969f
  * Kept off: the italic swashes (a flourish on every word end), the ct/st
  * ligatures (medieval, not Renaissance), the alternate punctuation spacing.
  */
-private val JUNICODE_PROSE = mapOf("kern" to 1, "liga" to 1, "onum" to 1, "ss09" to 1)
-private val JUNICODE_FACE = TypefaceTuning(features = JUNICODE_PROSE)
-private val JUNICODE_FEATURES = JUNICODE_FACE.featureSettings
-private val JUNICODE_TITLE = TypefaceTuning(features = mapOf("kern" to 1, "liga" to 1, "lnum" to 1, "ss09" to 1, "cv33" to 3))
-private val JUNICODE_TITLE_FEATURES = JUNICODE_TITLE.featureSettings
-
-/** Junicode is not tuned in Ink Lab: every role carries its fixed Garamond match. */
-private val JUNICODE_TUNING = TypographyTuning(
-    book = JUNICODE_FACE, bookItalic = JUNICODE_FACE,
-    title = JUNICODE_TITLE,
-    note = JUNICODE_FACE, leaf = JUNICODE_FACE,
-)
+private const val JUNICODE_PROSE = "'kern' 1, 'liga' 1, 'onum' 1, 'ss09' 1"
+private const val JUNICODE_TITLE = "'kern' 1, 'liga' 1, 'lnum' 1, 'ss09' 1, 'cv33' 3"
+private const val JUNICODE_SMALL_CAPS = "'kern' 1, 'c2sc' 1, 'onum' 1, 'ss09' 1"
 
 /** How much larger Junicode's small caps are set than the capitals they replace. */
 private const val JUNICODE_SMALL_CAPS_SIZE = 1.15f
@@ -262,9 +178,10 @@ private val ClassicDisplayFontFamily = FontFamily(
     Font(R.font.cormorant_garamond_semibold, FontWeight.SemiBold),
 )
 
-private val ClassicSansFontFamily = FontFamily.Default
+/** The controls' face: the system sans, in Material's sans slots (docs/DESIGN.md, "UI text"). */
+private val SystemSansFontFamily = FontFamily.Default
 
-/** The developer A/B's three faces; readers always get [QuranTypeProfile.TIMELESS]. */
+/** The English type the app is set in; readers always get [QuranTypeProfile.JUNICODE]. */
 internal typealias QuranTypeProfile = com.beautifulquran.data.BookTypeface
 
 internal data class QuranTypePalette(
@@ -274,9 +191,12 @@ internal data class QuranTypePalette(
     val sans: FontFamily,
     val typography: Typography,
     val scribe: FontFamily,
-    val tuning: TypographyTuning = TypographyTuning(),
-    /** The English Mushaf leaf's hand ([TypographyTuning.leaf]); the book face for classic. */
-    val leaf: FontFamily = serif,
+    /** The English Mushaf leaf's hand: the book face, never eased for dark paper. */
+    val leaf: FontFamily,
+    /** OpenType features for running serif text. */
+    val bookFeatures: String?,
+    /** OpenType features for serif titles set outside [typography]'s title slots. */
+    val titleFeatures: String?,
 )
 
 val SerifFontFamily: FontFamily
@@ -291,42 +211,31 @@ val SansFontFamily: FontFamily
 val TranslationFontFamily: FontFamily
     @Composable get() = SerifFontFamily
 
+/**
+ * A size given at Garamond's scale, for the face being set: Junicode stands
+ * [JUNICODE_SIZE] of it. Leading needs no such call — Junicode keeps
+ * Garamond's, the same x-height on the same line pitch.
+ */
 @Composable
-internal fun typeScale(
-    timeless: TextUnit,
-    classic: TextUnit,
-    role: TypeRole = TypeRole.Book,
-): TextUnit = LocalQuranTypePalette.current.let {
-    when (it.profile) {
-        QuranTypeProfile.TIMELESS -> timeless * it.tuning.face(role).size
-        QuranTypeProfile.CLASSIC -> classic
-        QuranTypeProfile.JUNICODE -> classic * JUNICODE_SIZE
-    }
-}
+internal fun typeScale(classic: TextUnit): TextUnit =
+    if (LocalQuranTypePalette.current.profile == QuranTypeProfile.JUNICODE) classic * JUNICODE_SIZE else classic
 
-/** Junicode keeps Garamond's leading: the same x-height on the same line pitch. */
-@Composable
-internal fun typeLeading(timeless: TextUnit, classic: TextUnit, role: TypeRole = TypeRole.Book): TextUnit =
-    if (LocalQuranTypePalette.current.profile == QuranTypeProfile.JUNICODE) classic
-    else typeScale(timeless, classic, role) * LocalQuranTypePalette.current.tuning.face(role).leading
+/** Features for running serif text in the face being set. */
+internal val BookFeatures: String?
+    @Composable get() = LocalQuranTypePalette.current.bookFeatures
 
-@Composable
-internal fun typeFeatures(role: TypeRole): String? = LocalQuranTypePalette.current.let {
-    when (it.profile) {
-        QuranTypeProfile.TIMELESS -> it.tuning.face(role).featureSettings
-        QuranTypeProfile.JUNICODE -> it.tuning.face(role).featureSettings
-        QuranTypeProfile.CLASSIC -> if (role == TypeRole.Title || role == TypeRole.Ui) null else BOOK_FEATURES
-    }
-}
+/** Features for a serif title set by hand (banners, lexicon headings). */
+internal val TitleFeatures: String?
+    @Composable get() = LocalQuranTypePalette.current.titleFeatures
 
 /**
- * A Timeless cut that falls back to [fallback] — an EB Garamond of the same
- * weight — for the glyphs Timeless lacks, then to the system serif.
+ * A bundled face that falls back to [fallback] — an EB Garamond of the same
+ * weight — for the glyphs it lacks, then to the system serif.
  *
  * A plain resource [Font] falls back to the system *sans*, so a dictionary
- * entry's ḥ landed in Roboto mid-word. `Typeface.CustomFallbackBuilder` is the
- * only way to chain a second bundled face, and Compose reaches it through an
- * [AndroidFont] with its own loader.
+ * entry's ḥ landed in Roboto mid-word. `Typeface.CustomFallbackBuilder` (API
+ * 29; minSdk is 30) is the only way to chain a second bundled face, and
+ * Compose reaches it through an [AndroidFont] with its own loader.
  */
 private fun bookFont(
     @FontRes primary: Int,
@@ -376,25 +285,16 @@ private val ClassicScribeFontFamily = FontFamily(
     Font(R.font.cormorant_garamond_italic, FontWeight.Medium, FontStyle.Italic),
 )
 
-/** Timeless Italic notes in the new profile; Cormorant in the classic profile. */
+/** The reader's own notes: Junicode Italic; Cormorant in the classic profile. */
 val ScribeFontFamily: FontFamily
     @Composable get() = LocalQuranTypePalette.current.scribe
 
-/**
- * Discretionary refinements applied to running serif text: kerning and
- * ligatures on. Figures stay lining, the face's default: Timeless's old-style
- * 1 is a small-cap I, which turned "2:15" into "2:I5" and a count of 215 into
- * "2I5" in a book of verse references. Old-style remains an Ink Lab option.
- * Fonts that lack a feature simply ignore it.
- */
+/** Kerning and ligatures, Garamond's book features in the classic profile. */
 private const val BOOK_FEATURES = "'kern' 1, 'liga' 1"
-private val UI_FEATURES = TypefaceTuning(features = UI_ALTERNATES).featureSettings
-private val TITLE_FEATURES = TypefaceTuning(features = TITLE_ALTERNATES).featureSettings
 
 /**
  * Figures that stand on their own — labels, facts, counters, verse marks,
- * folios — are lining. Timeless defaults to lining, so this only has to undo
- * an `onum` an Ink Lab tuning has turned on.
+ * folios — are lining, whatever the running text sets.
  */
 internal fun liningFigures(features: String?): String =
     listOfNotNull(features?.takeIf(String::isNotBlank), "'onum' 0, 'lnum' 1").joinToString(", ")
@@ -403,28 +303,25 @@ internal fun liningFigures(features: String?): String =
 internal fun TextStyle.lining(): TextStyle = copy(fontFeatureSettings = liningFigures(fontFeatureSettings))
 
 /**
- * All-caps labels: lining figures, and `case` lifts punctuation to the
- * capitals. Junicode sets them as true small caps (`c2sc`) with old-style
- * figures, a little larger so the small caps (0.457 em) keep a label legible.
+ * All-caps labels. Junicode sets them as true small caps (`c2sc`) with
+ * old-style figures, a step larger so the small caps (0.457 em) keep a label
+ * legible; set the size *before* calling this. Classic keeps shrunk capitals
+ * with lining figures, `case` lifting punctuation to the capitals.
  */
 @Composable
 internal fun TextStyle.forCaps(): TextStyle =
     if (LocalQuranTypePalette.current.profile == QuranTypeProfile.JUNICODE) {
-        copy(
-            fontSize = fontSize * JUNICODE_SMALL_CAPS_SIZE,
-            fontFeatureSettings = "'kern' 1, 'c2sc' 1, 'onum' 1, 'ss09' 1",
-        )
+        copy(fontSize = fontSize * JUNICODE_SMALL_CAPS_SIZE, fontFeatureSettings = JUNICODE_SMALL_CAPS)
     } else {
         copy(fontFeatureSettings = liningFigures(fontFeatureSettings) + ", 'case' 1")
     }
 
 /**
- * How Timeless text is positioned. The variable fonts are unhinted and carry
- * no `gasp` table, so Android's default static mode — whole-pixel advances —
- * rounds each glyph differently at every scale, and letter spacing visibly
- * jitters while a sheet stretches or a page turns. Linear metrics with
- * subpixel positioning (`TextMotion.Animated`) keep the designed spacing at
- * any size or transform. Junicode is variable too and is set the same way.
+ * How book text is positioned. Junicode is a variable font drawn unhinted, and
+ * Android's default static mode — whole-pixel advances — rounds each glyph
+ * differently at every scale, so letter spacing visibly jitters while a sheet
+ * stretches or a page turns. Linear metrics with subpixel positioning
+ * (`TextMotion.Animated`) keep the designed spacing at any size or transform.
  * The classic profile keeps the platform default it was compared at.
  */
 internal val BookTextMotion: TextMotion
@@ -434,18 +331,17 @@ internal val QuranTypePalette.bookTextMotion: TextMotion
     get() = if (profile == QuranTypeProfile.CLASSIC) TextMotion.Static else TextMotion.Animated
 
 /**
- * Letterspacing for a mixed-case Latin line, in em. Timeless Text is spaced
- * for small sizes already, and tracked lowercase falls apart into letters, so
- * it is set all but solid (DESIGN.md: lowercase never past 0.02 em). Only
- * ALL-CAPS labels are tracked. Junicode follows the same rule; the classic
- * profile keeps its [classicEm].
+ * Letterspacing for a mixed-case Latin line, in em. Tracked lowercase falls
+ * apart into letters, so it is set all but solid (DESIGN.md: lowercase never
+ * past 0.02 em); only ALL-CAPS labels are tracked. The classic profile keeps
+ * its [classicEm].
  */
 @Composable
 internal fun mixedCaseTrackingEm(classicEm: Float): Float =
-    if (LocalQuranTypePalette.current.profile != QuranTypeProfile.CLASSIC) {
-        minOf(classicEm, MIXED_CASE_TRACKING_EM)
-    } else {
+    if (LocalQuranTypePalette.current.profile == QuranTypeProfile.CLASSIC) {
         classicEm
+    } else {
+        minOf(classicEm, MIXED_CASE_TRACKING_EM)
     }
 
 private const val MIXED_CASE_TRACKING_EM = 0.02f
@@ -467,93 +363,13 @@ internal val BookTextPaintFlags: Int
         android.graphics.Paint.ANTI_ALIAS_FLAG
     }
 
-/**
- * Small titles (≤ 18 sp) are set in the Text master, not the display one:
- * the display master's hairlines are drawn for large sizes, and unhinted they
- * break up at reading size. Classic keeps Cormorant.
- */
+/** Small titles (≤ 18 sp) are set in the book face; classic keeps Cormorant. */
 val SmallTitleFontFamily: FontFamily
     @Composable get() = LocalQuranTypePalette.current.let {
         if (it.profile == QuranTypeProfile.CLASSIC) it.display else it.serif
     }
 
-private val MaterialSans = Typography()
-
-/**
- * The shipped scale: serif sizes are ~0.88 of the previous Garamond values,
- * while Material's sans slots take Timeless Sans.
- */
-private val TimelessQuranTypography = Typography(
-    displayLarge = MaterialSans.displayLarge.copy(fontFamily = TimelessSansFontFamily, fontFeatureSettings = UI_FEATURES, textMotion = TextMotion.Animated),
-    displayMedium = MaterialSans.displayMedium.copy(fontFamily = TimelessSansFontFamily, fontFeatureSettings = UI_FEATURES, textMotion = TextMotion.Animated),
-    displaySmall = MaterialSans.displaySmall.copy(fontFamily = TimelessSansFontFamily, fontFeatureSettings = UI_FEATURES, textMotion = TextMotion.Animated),
-    headlineLarge = MaterialSans.headlineLarge.copy(fontFamily = TimelessSansFontFamily, fontFeatureSettings = UI_FEATURES, textMotion = TextMotion.Animated),
-    headlineMedium = TextStyle(
-        fontFamily = TimelessDisplayFontFamily,
-        fontWeight = FontWeight.SemiBold,
-        fontSize = 24.sp,
-        lineHeight = 30.sp,
-        letterSpacing = 0.2.sp,
-        fontFeatureSettings = TITLE_FEATURES,
-        textMotion = TextMotion.Animated,
-    ),
-    headlineSmall = MaterialSans.headlineSmall.copy(fontFamily = TimelessSansFontFamily, fontFeatureSettings = UI_FEATURES, textMotion = TextMotion.Animated),
-    titleLarge = TextStyle(
-        fontFamily = TimelessDisplayFontFamily,
-        fontWeight = FontWeight.SemiBold,
-        fontSize = 19.5.sp,
-        lineHeight = 25.sp,
-        letterSpacing = 0.2.sp,
-        fontFeatureSettings = TITLE_FEATURES,
-        textMotion = TextMotion.Animated,
-    ),
-    titleMedium = TextStyle(
-        fontFamily = TimelessSerifFontFamily,
-        fontWeight = FontWeight.Medium,
-        fontSize = 15.sp,
-        lineHeight = 21.sp,
-        letterSpacing = 0.15.sp,
-        fontFeatureSettings = BOOK_FEATURES,
-        textMotion = TextMotion.Animated,
-    ),
-    titleSmall = MaterialSans.titleSmall.copy(fontFamily = TimelessSansFontFamily, fontFeatureSettings = UI_FEATURES, textMotion = TextMotion.Animated),
-    bodyLarge = TextStyle(
-        fontFamily = TimelessSerifFontFamily,
-        fontSize = 15.sp,
-        lineHeight = 24.sp,
-        fontFeatureSettings = BOOK_FEATURES,
-        textMotion = TextMotion.Animated,
-    ),
-    bodyMedium = TextStyle(
-        fontFamily = TimelessSerifFontFamily,
-        fontSize = 13.sp,
-        lineHeight = 20.sp,
-        fontFeatureSettings = BOOK_FEATURES,
-        textMotion = TextMotion.Animated,
-    ),
-    bodySmall = MaterialSans.bodySmall.copy(fontFamily = TimelessSansFontFamily, fontFeatureSettings = UI_FEATURES, textMotion = TextMotion.Animated),
-    labelLarge = MaterialSans.labelLarge.copy(fontFamily = TimelessSansFontFamily, fontFeatureSettings = UI_FEATURES, textMotion = TextMotion.Animated),
-    labelMedium = TextStyle(
-        fontFamily = TimelessSerifFontFamily,
-        fontWeight = FontWeight.Medium,
-        fontSize = 11.5.sp,
-        lineHeight = 15.sp,
-        letterSpacing = 0.sp,
-        fontFeatureSettings = liningFigures(BOOK_FEATURES),
-        textMotion = TextMotion.Animated,
-    ),
-    labelSmall = TextStyle(
-        fontFamily = TimelessSerifFontFamily,
-        fontWeight = FontWeight.Medium,
-        fontSize = 10.5.sp,
-        lineHeight = 14.sp,
-        letterSpacing = 0.sp,
-        fontFeatureSettings = liningFigures(BOOK_FEATURES),
-        textMotion = TextMotion.Animated,
-    ),
-)
-
-/** The exact pre-Timeless Material + Garamond/Cormorant scale for comparison. */
+/** The exact pre-Junicode Material + Garamond/Cormorant scale, for comparison. */
 private val ClassicQuranTypography = Typography(
     headlineMedium = TextStyle(
         fontFamily = ClassicDisplayFontFamily,
@@ -607,63 +423,58 @@ private val ClassicQuranTypography = Typography(
 
 /**
  * Garamond's scale — [ClassicQuranTypography]'s serif slots — set in Junicode
- * at [JUNICODE_SIZE], keeping Garamond's leading and tracking. The controls
- * keep Timeless Sans: the A/B is of the book face.
+ * at [JUNICODE_SIZE], keeping Garamond's leading. Material's sans slots stay in
+ * the system sans.
  */
 private fun junicodeTypography(serif: FontFamily, display: FontFamily, sans: FontFamily): Typography {
-    fun set(style: TextStyle, family: FontFamily, features: String = JUNICODE_FEATURES) = style.copy(
+    fun set(style: TextStyle, family: FontFamily, features: String = JUNICODE_PROSE) = style.copy(
         fontFamily = family,
         fontSize = style.fontSize * JUNICODE_SIZE,
         fontFeatureSettings = features,
         textMotion = TextMotion.Animated,
     )
     val garamond = ClassicQuranTypography
-    val timeless = TimelessQuranTypography
     fun ui(style: TextStyle) = style.copy(fontFamily = sans)
-    return timeless.copy(
-        displayLarge = ui(timeless.displayLarge),
-        displayMedium = ui(timeless.displayMedium),
-        displaySmall = ui(timeless.displaySmall),
-        headlineLarge = ui(timeless.headlineLarge),
-        headlineMedium = set(garamond.headlineMedium, display, JUNICODE_TITLE_FEATURES),
-        headlineSmall = ui(timeless.headlineSmall),
-        titleLarge = set(garamond.titleLarge, display, JUNICODE_TITLE_FEATURES),
+    return garamond.copy(
+        displayLarge = ui(garamond.displayLarge),
+        displayMedium = ui(garamond.displayMedium),
+        displaySmall = ui(garamond.displaySmall),
+        headlineLarge = ui(garamond.headlineLarge),
+        headlineMedium = set(garamond.headlineMedium, display, JUNICODE_TITLE),
+        headlineSmall = ui(garamond.headlineSmall),
+        titleLarge = set(garamond.titleLarge, display, JUNICODE_TITLE),
         titleMedium = set(garamond.titleMedium, serif),
-        titleSmall = ui(timeless.titleSmall),
+        titleSmall = ui(garamond.titleSmall),
         bodyLarge = set(garamond.bodyLarge, serif),
         bodyMedium = set(garamond.bodyMedium, serif),
-        bodySmall = ui(timeless.bodySmall),
-        labelLarge = ui(timeless.labelLarge),
+        bodySmall = ui(garamond.bodySmall),
+        labelLarge = ui(garamond.labelLarge),
         // Garamond's labels were tracked 0.6–0.8 sp; lowercase is never tracked
-        // past 0.02 em (docs/DESIGN.md), so these are set solid, as Timeless's.
-        labelMedium = set(garamond.labelMedium, serif, liningFigures(JUNICODE_FEATURES)).copy(letterSpacing = 0.sp),
-        labelSmall = set(garamond.labelSmall, serif, liningFigures(JUNICODE_FEATURES)).copy(letterSpacing = 0.sp),
+        // past 0.02 em (docs/DESIGN.md), so these are set solid.
+        labelMedium = set(garamond.labelMedium, serif, liningFigures(JUNICODE_PROSE)).copy(letterSpacing = 0.sp),
+        labelSmall = set(garamond.labelSmall, serif, liningFigures(JUNICODE_PROSE)).copy(letterSpacing = 0.sp),
     )
 }
 
-/**
- * [ease] lightens every role but the leaf on dark paper, as Timeless's
- * [TypographyTuning.forDarkPaper] does and for the same reasons: light ink
- * spreads, and the leaf is paginated while weight moves Junicode's advances.
- */
+/** Junicode, its every role but the leaf lightened by [ease] (see [DARK_PAPER_WEIGHT_EASE]). */
 private fun junicodePalette(ease: Int): QuranTypePalette {
     val serif = junicode(ease = ease)
     val display = junicode(display = true, ease = ease)
-    val sans = if (ease == 0) TimelessSansFontFamily else timelessSans(TypographyTuning().forDarkPaper().ui)
     return QuranTypePalette(
         profile = QuranTypeProfile.JUNICODE,
         serif = serif,
         display = display,
-        sans = sans,
-        typography = junicodeTypography(serif, display, sans),
+        sans = SystemSansFontFamily,
+        typography = junicodeTypography(serif, display, SystemSansFontFamily),
         scribe = FontFamily(
             bookFont(
                 R.font.junicode_italic_variable, R.font.eb_garamond_italic, FontWeight.Medium,
                 FontStyle.Italic, "'wght' ${junicodeWeight(500, italic = true) - ease}",
             ),
         ),
-        tuning = JUNICODE_TUNING,
         leaf = JunicodeLeafFontFamily,
+        bookFeatures = JUNICODE_PROSE,
+        titleFeatures = JUNICODE_TITLE,
     )
 }
 
@@ -671,126 +482,64 @@ private val JunicodeLeafFontFamily = junicode()
 private val JunicodeTypePalette = junicodePalette(ease = 0)
 private val JunicodeDarkTypePalette = junicodePalette(ease = DARK_PAPER_WEIGHT_EASE)
 
-private val TimelessTypePalette = QuranTypePalette(
-    profile = QuranTypeProfile.TIMELESS,
-    serif = TimelessSerifFontFamily,
-    display = TimelessDisplayFontFamily,
-    sans = TimelessSansFontFamily,
-    typography = TimelessQuranTypography,
-    scribe = timelessNotes(TypographyTuning().note),
-    leaf = timelessSerif(TypographyTuning().leaf, TypographyTuning().bookItalic),
-)
-
 private val ClassicTypePalette = QuranTypePalette(
     profile = QuranTypeProfile.CLASSIC,
     serif = ClassicSerifFontFamily,
     display = ClassicDisplayFontFamily,
-    sans = ClassicSansFontFamily,
+    sans = SystemSansFontFamily,
     typography = ClassicQuranTypography,
     scribe = ClassicScribeFontFamily,
-    // Classic keeps its own leaf exactly as it was: the new Timeless defaults must not reach it.
-    tuning = TypographyTuning(leaf = TypefaceTuning()),
+    leaf = ClassicSerifFontFamily,
+    bookFeatures = BOOK_FEATURES,
+    titleFeatures = null,
 )
 
 internal val LocalQuranTypePalette = staticCompositionLocalOf { JunicodeTypePalette }
 
 /**
- * The English leaf's leading. [ENGLISH_LEAF_LEADING_EM] was set for EB
- * Garamond's 0.40 em x-height; Timeless stands at 0.52, so the same leading
- * left less white between its lines than between Garamond's. A little more
- * air costs the leaf a slightly smaller hand, which fits its page either way.
+ * The English leaf's leading. Junicode's hand comes out at [JUNICODE_SIZE] of
+ * Garamond's (see `englishBookHandPx`), so its leading in em is Garamond's
+ * divided by that: the lines keep Garamond's pitch.
  */
 internal val QuranTypePalette.leafLeadingEm: Float
     get() = when (profile) {
-        QuranTypeProfile.TIMELESS -> TIMELESS_LEAF_LEADING_EM
         QuranTypeProfile.CLASSIC -> ENGLISH_LEAF_LEADING_EM
-        // Its hand comes out at JUNICODE_SIZE of Garamond's; the lines keep Garamond's pitch.
         QuranTypeProfile.JUNICODE -> ENGLISH_LEAF_LEADING_EM / JUNICODE_SIZE
     }
 
-/**
- * What the leaf's hand is solved against: how many characters a full leaf holds.
- * Timeless sets 18 % wider than Garamond, so at Garamond's 1,180 the hand came
- * out 11 % smaller and the lines 2.8 x-heights apart (Garamond: 3.5). Holding
- * 1,130 buys a hand whose lowercase stands 9 % over Garamond's and lines 3.15
- * x-heights apart, for 4 % more leaves.
- */
+/** What the leaf's hand is solved against: how many characters a full leaf holds. */
 internal val QuranTypePalette.leafCapacityChars: Int
-    get() = if (profile == QuranTypeProfile.TIMELESS) TIMELESS_LEAF_CAPACITY_CHARS else ENGLISH_LEAF_CAPACITY_CHARS
+    get() = ENGLISH_LEAF_CAPACITY_CHARS
 
 /**
- * What the English book's pagination cache is keyed by beyond the window: the
- * face, and for Timeless every tuning that moves a line.
+ * The bundled Junicode cut, by the SHA-256 of each file — the first 16 hex
+ * digits. A font rebuilt without updating these fails `JunicodeTypeTest`, and
+ * they are part of [bookCacheSuffix], so a new cut can never be paginated from
+ * the last one's cache.
+ */
+internal const val JUNICODE_ROMAN_SHA = "f6af8d5939e92e8a"
+internal const val JUNICODE_ITALIC_SHA = "e30d8716a75abeae"
+
+/**
+ * What the English book's pagination cache is keyed by beyond the window and
+ * the text: the face and everything about it that moves a line — the font
+ * files, size, leading, capacity and weights.
  */
 internal val QuranTypePalette.bookCacheSuffix: String
     get() = when (profile) {
-        QuranTypeProfile.TIMELESS -> "|timeless|${tuning.bookCacheKey}"
-        QuranTypeProfile.CLASSIC -> "|classic"
-        QuranTypeProfile.JUNICODE -> "|junicode-2.226-w102-f2"
+        QuranTypeProfile.CLASSIC -> "|classic|$leafCapacityChars|$leafLeadingEm"
+        QuranTypeProfile.JUNICODE -> listOf(
+            "|junicode", JUNICODE_ROMAN_SHA, JUNICODE_ITALIC_SHA, JUNICODE_SIZE, leafLeadingEm,
+            leafCapacityChars, junicodeWeight(400), junicodeWeight(400, italic = true), bookFeatures,
+        ).joinToString("|")
     }
 
-private const val TIMELESS_LEAF_LEADING_EM = 1.62f
-private const val TIMELESS_LEAF_CAPACITY_CHARS = 1130
-
-/**
- * The palette for [tuning] — the paper-side values, which the palette carries
- * as [QuranTypePalette.tuning] (so cache keys and share images never see a
- * theme's easing) — with its fonts cut from [fontTuning] (the same, eased on
- * dark paper; see [TypographyTuning.forDarkPaper]).
- */
-internal fun quranTypePalette(
-    profile: QuranTypeProfile,
-    tuning: TypographyTuning = TypographyTuning(),
-    fontTuning: TypographyTuning = tuning,
-): QuranTypePalette {
+/** The palette for [profile]; Junicode lightened on dark paper ([DARK_PAPER_WEIGHT_EASE]). */
+internal fun quranTypePalette(profile: QuranTypeProfile, darkPaper: Boolean = false): QuranTypePalette =
     when (profile) {
-        QuranTypeProfile.CLASSIC -> return ClassicTypePalette
-        // Junicode has no Ink Lab tuning; it follows only the dark-paper ease.
-        QuranTypeProfile.JUNICODE -> return if (fontTuning.book.weight < tuning.book.weight) {
-            JunicodeDarkTypePalette
-        } else {
-            JunicodeTypePalette
-        }
-        QuranTypeProfile.TIMELESS -> Unit
+        QuranTypeProfile.CLASSIC -> ClassicTypePalette
+        QuranTypeProfile.JUNICODE -> if (darkPaper) JunicodeDarkTypePalette else JunicodeTypePalette
     }
-    if (tuning == TypographyTuning() && fontTuning == tuning) return TimelessTypePalette
-    val book = timelessSerif(fontTuning.book, fontTuning.bookItalic)
-    val title = timelessSerif(fontTuning.title, display = true)
-    val ui = timelessSans(fontTuning.ui)
-    fun tune(style: TextStyle, family: FontFamily, face: TypefaceTuning, lining: Boolean = false) = style.copy(
-        fontFamily = family,
-        fontSize = style.fontSize * face.size,
-        lineHeight = style.lineHeight * face.size * face.leading,
-        letterSpacing = (if (style.letterSpacing.isEm) style.letterSpacing.value else
-            style.letterSpacing.value / style.fontSize.value).let {
-            ((if (it.isFinite()) it else 0f) + face.tracking).em
-        },
-        fontFeatureSettings = if (lining) liningFigures(face.featureSettings) else face.featureSettings,
-    )
-    val base = TimelessQuranTypography
-    return QuranTypePalette(
-        QuranTypeProfile.TIMELESS, book, title, ui,
-        base.copy(
-            displayLarge = tune(base.displayLarge, ui, tuning.ui),
-            displayMedium = tune(base.displayMedium, ui, tuning.ui),
-            displaySmall = tune(base.displaySmall, ui, tuning.ui),
-            headlineLarge = tune(base.headlineLarge, ui, tuning.ui),
-            headlineMedium = tune(base.headlineMedium, title, tuning.title),
-            headlineSmall = tune(base.headlineSmall, ui, tuning.ui),
-            titleLarge = tune(base.titleLarge, title, tuning.title),
-            titleMedium = tune(base.titleMedium, book, tuning.book),
-            titleSmall = tune(base.titleSmall, ui, tuning.ui),
-            bodyLarge = tune(base.bodyLarge, book, tuning.book),
-            bodyMedium = tune(base.bodyMedium, book, tuning.book),
-            bodySmall = tune(base.bodySmall, ui, tuning.ui),
-            labelLarge = tune(base.labelLarge, ui, tuning.ui),
-            labelMedium = tune(base.labelMedium, book, tuning.book, lining = true),
-            labelSmall = tune(base.labelSmall, book, tuning.book, lining = true),
-        ),
-        timelessNotes(fontTuning.note), tuning,
-        leaf = timelessSerif(tuning.leaf, tuning.bookItalic),
-    )
-}
 
 val QuranTypography: Typography
     @Composable get() = LocalQuranTypePalette.current.typography

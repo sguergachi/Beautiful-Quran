@@ -264,7 +264,7 @@ fun PlayerBar(
                         text = "${if (state.speed % 1f == 0f) state.speed.toInt() else state.speed}×",
                         style = MaterialTheme.typography.labelMedium.copy(
                             fontWeight = FontWeight.SemiBold,
-                            fontSize = typeScale(13.sp, 15.sp),
+                            fontSize = typeScale(15.sp),
                         ),
                         color = if (speedActive) {
                             MaterialTheme.colorScheme.primary
@@ -402,8 +402,8 @@ internal fun PlaybackErrorNotice(
             maxLines = 1,
             softWrap = false,
             autoSize = TextAutoSize.StepBased(
-                minFontSize = typeScale(9.5.sp, 11.sp),
-                maxFontSize = typeScale(11.5.sp, 13.sp),
+                minFontSize = typeScale(11.sp),
+                maxFontSize = typeScale(13.sp),
                 stepSize = 0.5.sp,
             ),
             overflow = TextOverflow.Ellipsis,

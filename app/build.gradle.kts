@@ -1,7 +1,3 @@
-import java.net.URI
-import java.security.MessageDigest
-import java.util.zip.ZipFile
-
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.androidx.baselineprofile)
@@ -51,13 +47,6 @@ val qfContentBaseUrl = providers.gradleProperty("qfContentBaseUrl")
 // every mushaf page mis-set. Separate trees cannot race.
 val qcfFontCount = 604
 val qcfAssetsDir = layout.buildDirectory.dir("generated/qcfAssets/qcf-v2-fonts")
-
-// The Timeless type family's license forbids putting its files in a public
-// repository, so they are never committed: fetchTimelessFonts downloads the
-// archive pinned in scripts/timeless-fonts.json, checks its SHA-256 and
-// unpacks the Android cuts into this generated res tree. The web build does
-// the same (web/scripts/fetch-timeless-fonts.mjs).
-val timelessResDir = layout.buildDirectory.dir("generated/timelessRes")
 
 android {
     namespace = "com.beautifulquran"
@@ -135,6 +124,7 @@ android {
         noCompress += "xz"
     }
     sourceSets.named("main") {
+        // Font licenses ship with the app (Settings → Acknowledgements).
         assets.directories.add(rootProject.file("licenses").absolutePath)
         // preBuild owns generation; a concrete path keeps Android Studio's
         // source-set model deterministic while the task dependency stays explicit.
@@ -153,7 +143,6 @@ android {
         assets.directories.add(
             qcfAssetsDir.get().asFile.parentFile.absolutePath,
         )
-        res.directories.add(timelessResDir.get().asFile.absolutePath)
     }
     lint {
         // Media3's @UnstableApi opt-in trips lintVital on release builds; the
@@ -282,68 +271,8 @@ val syncQcfFonts by tasks.registering {
     }
 }
 
-val fetchTimelessFonts by tasks.registering {
-    val manifestFile = rootProject.layout.projectDirectory.file("scripts/timeless-fonts.json")
-    val outDir = timelessResDir.map { it.dir("font") }
-    inputs.file(manifestFile)
-    outputs.dir(outDir)
-    doLast {
-        @Suppress("UNCHECKED_CAST")
-        val manifest = groovy.json.JsonSlurper().parse(manifestFile.asFile) as Map<String, Any>
-        val url = manifest.getValue("url") as String
-        val sha256 = manifest.getValue("sha256") as String
-        @Suppress("UNCHECKED_CAST")
-        val cuts = manifest.getValue("android") as Map<String, String>
-
-        fun digest(file: File): String = MessageDigest.getInstance("SHA-256")
-            .digest(file.readBytes())
-            .joinToString("") { "%02x".format(it) }
-
-        // Cached outside the repo so every worktree shares one download.
-        val cacheDir = File(
-            System.getenv("XDG_CACHE_HOME") ?: "${System.getProperty("user.home")}/.cache",
-            "beautiful-quran",
-        )
-        val archive = cacheDir.resolve(url.substringAfterLast('/'))
-        if (!archive.isFile || digest(archive) != sha256) {
-            logger.lifecycle("Downloading Timeless fonts from $url")
-            cacheDir.mkdirs()
-            val partial = File.createTempFile("timeless-", ".zip", cacheDir)
-            try {
-                URI(url).toURL().openConnection().apply {
-                    connectTimeout = 30_000
-                    readTimeout = 60_000
-                }.getInputStream().use { input ->
-                    partial.outputStream().use { input.copyTo(it) }
-                }
-                val got = digest(partial)
-                if (got != sha256) throw GradleException(
-                    "Timeless archive checksum mismatch: got $got, want $sha256. If " +
-                        "timeless.co replaced the release, update scripts/timeless-fonts.json deliberately.",
-                )
-                check(partial.renameTo(archive)) { "Failed to move $partial into place" }
-            } finally {
-                partial.delete()
-            }
-        }
-
-        val dest = outDir.get().asFile
-        dest.deleteRecursively()
-        dest.mkdirs()
-        ZipFile(archive).use { zip ->
-            cuts.forEach { (name, entryName) ->
-                val entry = zip.getEntry(entryName)
-                    ?: throw GradleException("Timeless archive has no $entryName")
-                zip.getInputStream(entry).use { input ->
-                    dest.resolve(name).outputStream().use { input.copyTo(it) }
-                }
-            }
-        }
-    }
-}
-
 tasks.named("preBuild") {
-    dependsOn(syncQuranDbAsset, syncQcfFonts, fetchTimelessFonts)
+    dependsOn(syncQuranDbAsset, syncQcfFonts)
 }
 
 // DatabaseFingerprintTest reads these straight off disk, outside anything

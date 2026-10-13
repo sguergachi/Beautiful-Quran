@@ -53,8 +53,7 @@ import com.beautifulquran.ui.theme.BookTextMotion
 import com.beautifulquran.ui.theme.BookTextPaintFlags
 import com.beautifulquran.ui.theme.LocalQuranTypePalette
 import com.beautifulquran.ui.theme.QuranTypeProfile
-import com.beautifulquran.ui.theme.TypeRole
-import com.beautifulquran.ui.theme.typeFeatures
+import com.beautifulquran.ui.theme.TitleFeatures
 import com.beautifulquran.ui.theme.GeneratedInkRosette
 import com.beautifulquran.ui.theme.HafsFontFamily
 import com.beautifulquran.ui.theme.SerifFontFamily
@@ -168,7 +167,7 @@ internal fun MushafSurahTitleBand(
         else -> DisplayFontFamily
     }
     val paintFlags = if (latin) BookTextPaintFlags else Paint.ANTI_ALIAS_FLAG
-    val titleFeatures = if (latin) typeFeatures(TypeRole.Title) else null
+    val titleFeatures = if (latin) TitleFeatures else null
     val titleSize = fontSize * if (latin) MushafLatinTitleScale else MushafArabicTitleScale
     val resolvedTypeface by LocalFontFamilyResolver.current.resolve(family)
     val density = LocalDensity.current
@@ -448,7 +447,7 @@ private fun MushafTitle(
             fontSize = fontSize,
             letterSpacing = if (latin) mixedCaseTrackingEm(TitleLetterSpacingEm).em else TextUnit.Unspecified,
             textMotion = if (latin) BookTextMotion else null,
-            fontFeatureSettings = if (latin) typeFeatures(TypeRole.Title) else null,
+            fontFeatureSettings = if (latin) TitleFeatures else null,
             color = ink,
             textAlign = TextAlign.Center,
             platformStyle = PlatformTextStyle(includeFontPadding = false),

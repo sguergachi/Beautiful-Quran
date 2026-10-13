@@ -8,7 +8,7 @@ import androidx.compose.ui.text.SpanStyle
  * How much of the text's own ink the translator's brackets keep.
  *
  * Sahih International marks every word it supplies — [All] praise is [due] —
- * and nearly half the verses carry them. Timeless draws its brackets tall and
+ * and nearly half the verses carry them. Book brackets stand tall and
  * dark, so at full ink they punctuated the page more than the words did. The
  * marks recede; the supplied words keep their voice, because they carry the
  * meaning.

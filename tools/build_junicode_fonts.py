@@ -6,7 +6,8 @@
 Takes the variable fonts of the Junicode 2.226 release
 (github.com/psb1558/Junicode-font, SIL OFL 1.1, no Reserved Font Name) and
 writes app/src/main/res/font/junicode_variable.ttf and
-junicode_italic_variable.ttf:
+junicode_italic_variable.ttf, and the same cuts as WOFF2 for the web
+(web/public/fonts/junicode_variable.woff2, junicode_italic_variable.woff2):
 
 * subset to Latin, its extensions and the transliteration marks, unhinted;
 * the decorative enlargement axis (ENLA) pinned off;
@@ -19,8 +20,15 @@ junicode_italic_variable.ttf:
 
 Only weight stays variable. Why each number: docs/DESIGN.md, "Type".
 """
+import os
 import sys
 from pathlib import Path
+
+# Reproducible output: fontTools stamps head.modified with the build time
+# unless SOURCE_DATE_EPOCH is set, and a new stamp is a new file hash — which
+# would repaginate every reader's English book (JUNICODE_*_SHA in Type.kt).
+# Pinned to the Junicode 2.226 release.
+os.environ.setdefault("SOURCE_DATE_EPOCH", "1750398660")
 
 from fontTools import subset
 from fontTools.ttLib import TTFont
@@ -28,6 +36,7 @@ from fontTools.varLib.instancer import instantiateVariableFont
 
 ROOT = Path(__file__).resolve().parent.parent
 FONTS = ROOT / "app/src/main/res/font"
+WEB_FONTS = ROOT / "web/public/fonts"
 SPACE = 199
 CUTS = {
     "JunicodeVF-Roman.ttf": ("junicode_variable.ttf", 102),
@@ -72,6 +81,8 @@ def build(source: Path, target: Path, width: int, cps) -> None:
     # HVAR would vary the old space; advances fall back to gvar's phantom points.
     del font["HVAR"]
     font.save(target)
+    font.flavor = "woff2"
+    font.save(WEB_FONTS / target.with_suffix(".woff2").name)
 
 
 def _round_trip(font):
@@ -90,6 +101,7 @@ def main() -> None:
     for source, (target, width) in CUTS.items():
         build(var / source, FONTS / target, width, cps)
         print(f"{target}: wdth {width}, space {SPACE}, {(FONTS / target).stat().st_size} bytes")
+    print("Rebuilt? Update JUNICODE_ROMAN_SHA / JUNICODE_ITALIC_SHA in ui/theme/Type.kt (JunicodeTypeTest).")
 
 
 if __name__ == "__main__":

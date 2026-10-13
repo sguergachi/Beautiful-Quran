@@ -9,14 +9,25 @@ import kotlinx.coroutines.flow.StateFlow
 enum class ThemeMode { SYSTEM, LIGHT, DARK, ROYAL_GREEN }
 
 /**
- * The app's English type. Readers get [JUNICODE]; the others stay as the
- * developer A/B. Persisted by ordinal: append, never reorder. See
+ * The app's English type. Readers get [JUNICODE]; [CLASSIC] stays as the
+ * developer comparison. Persisted by [code], not ordinal: code 0 was Timeless,
+ * since removed, and must keep reading as the shipped face. See
  * `ui/theme/Type.kt`.
  */
-enum class BookTypeface(val label: String) {
-    TIMELESS("Timeless"),
-    CLASSIC("EB Garamond (previous)"),
-    JUNICODE("Junicode, set as Garamond"),
+enum class BookTypeface(val label: String, val code: Int) {
+    CLASSIC("EB Garamond (previous)", 1),
+    JUNICODE("Junicode, set as Garamond", 2),
+}
+
+/**
+ * The persisted [BookTypeface]: [storedCode] when present, else the pre-enum
+ * Timeless switch ([legacyTimeless], whose "on" meant the shipped face). Any
+ * other code — Timeless's 0, or one from a later version — is the shipped face.
+ */
+internal fun bookTypefaceFor(storedCode: Int?, legacyTimeless: Boolean?): BookTypeface = when {
+    storedCode != null -> BookTypeface.entries.firstOrNull { it.code == storedCode } ?: BookTypeface.JUNICODE
+    legacyTimeless == false -> BookTypeface.CLASSIC
+    else -> BookTypeface.JUNICODE
 }
 
 /** What flows on the sheet: Arabic with English under each word, English only, or Arabic only. */
@@ -183,15 +194,14 @@ class SettingsRepository(context: Context) {
         lastSurah = prefs.getInt("lastSurah", 0),
         lastAyah = prefs.getInt("lastAyah", 1),
         developerModeEnabled = prefs.getBoolean("developerModeEnabled", false),
-        // Before the third face, the A/B was a Timeless on/off switch whose
-        // "on" meant the shipped face, which is now Junicode.
-        bookTypeface = if (prefs.contains("bookTypeface")) {
-            prefs.enum("bookTypeface", BookTypeface.JUNICODE)
-        } else if (prefs.getBoolean("timelessTypographyEnabled", true)) {
-            BookTypeface.JUNICODE
-        } else {
-            BookTypeface.CLASSIC
-        },
+        bookTypeface = bookTypefaceFor(
+            storedCode = if (prefs.contains("bookTypeface")) prefs.getInt("bookTypeface", 0) else null,
+            legacyTimeless = if (prefs.contains("timelessTypographyEnabled")) {
+                prefs.getBoolean("timelessTypographyEnabled", true)
+            } else {
+                null
+            },
+        ),
         educationGuidesEnabled = prefs.getBoolean("educationGuidesEnabled", false),
         brushCircleStyle = prefs.enum("brushCircleStyle", BrushCircleStyle.BASELINE),
     )
@@ -297,7 +307,7 @@ class SettingsRepository(context: Context) {
             putInt("lastSurah", next.lastSurah)
             putInt("lastAyah", next.lastAyah)
             putBoolean("developerModeEnabled", next.developerModeEnabled)
-            putInt("bookTypeface", next.bookTypeface.ordinal)
+            putInt("bookTypeface", next.bookTypeface.code)
             remove("timelessTypographyEnabled")
             putBoolean("educationGuidesEnabled", next.educationGuidesEnabled)
             remove("inkLabEnabled")

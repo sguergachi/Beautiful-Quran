@@ -384,7 +384,7 @@ private fun DeveloperSection(
             onClick = { viewModel.settings.update { it.copy(bookTypeface = face) } },
         )
     }
-    Caption("Readers get Junicode, set to Garamond's size, measure and colour. Timeless and the earlier EB Garamond stay for comparison.")
+    Caption("Readers get Junicode, set to Garamond's size, measure and colour. The earlier EB Garamond stays for comparison.")
 
     Spacer(Modifier.height(20.dp))
     SectionLabel("Chapter banner")
@@ -1110,7 +1110,7 @@ internal fun TextSizeControl(scale: Float, onScale: (Float) -> Unit) {
     Row(verticalAlignment = Alignment.CenterVertically) {
         Text(
             text = "A",
-            fontSize = typeScale(13.sp, 15.sp),
+            fontSize = typeScale(15.sp),
             fontFamily = MaterialTheme.typography.bodyLarge.fontFamily,
             color = glyphInk,
             modifier = Modifier
@@ -1145,7 +1145,7 @@ internal fun TextSizeControl(scale: Float, onScale: (Float) -> Unit) {
         }
         Text(
             text = "A",
-            fontSize = typeScale(23.sp, 26.sp),
+            fontSize = typeScale(26.sp),
             fontFamily = MaterialTheme.typography.bodyLarge.fontFamily,
             color = glyphInk,
             modifier = Modifier

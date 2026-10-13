@@ -118,7 +118,6 @@ import com.beautifulquran.ui.theme.LocalReadingPaper
 import com.beautifulquran.ui.theme.TranslationFontFamily
 import com.beautifulquran.ui.theme.typeScale
 import com.beautifulquran.ui.theme.LocalQuranTypePalette
-import com.beautifulquran.ui.theme.typeLeading
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import com.beautifulquran.ui.theme.shippedCheckParams
@@ -448,16 +447,16 @@ private val PreviewLeaf = RoundedCornerShape(3.dp)
 // Miniature of the reader: ~0.8 of the live sizes, same ratios.
 private val PreviewArabicSize = 24.sp
 private val PreviewLyricSize: TextUnit
-    @Composable get() = typeScale(16.sp, 18.sp)
+    @Composable get() = typeScale(18.sp)
 private val PreviewTranslationSize: TextUnit
-    @Composable get() = typeScale(11.5.sp, 13.sp)
+    @Composable get() = typeScale(13.sp)
 private val PreviewGlossSize: TextUnit
-    @Composable get() = typeScale(9.sp, 10.sp)
+    @Composable get() = typeScale(10.sp)
 private val PreviewFolioPad = PaddingValues(horizontal = 0.dp, vertical = 6.dp)
 
 /**
  * A live miniature of the reader: a faded leaf with a gold hairline, carrying
- * the same Hafs, Timeless Serif, gold marks, and folio the sheet itself will use.
+ * the same Hafs, Junicode, gold marks, and folio the sheet itself will use.
  */
 @Composable
 internal fun ReadingPreview(
@@ -566,7 +565,7 @@ internal fun ReadingPreview(
                                 text = SAMPLE_TRANSLIT,
                                 fontFamily = TranslationFontFamily,
                                 fontSize = PreviewLyricSize * 13f / 18f,
-                                lineHeight = (1.4f * LocalQuranTypePalette.current.tuning.book.leading).em,
+                                lineHeight = 1.4.em,
                                 style = MaterialTheme.typography.bodyLarge,
                                 color = QuranTheme.ink.tertiary,
                             )
@@ -642,11 +641,11 @@ private const val PreviewMushafAyahLast = 93
 // the line; at 11.sp of Garamond this block ran to ~75, which is not a page anyone is shown
 // — it read as dense grey and, as reported, simply too small to see.
 private val PreviewEnglishLeafSize: TextUnit
-    @Composable get() = typeScale(13.sp, 15.sp)
+    @Composable get() = typeScale(15.sp)
 
 /** The running head's label, a step under the prose as it is on the leaf. */
 private val PreviewLeafHeadSize: TextUnit
-    @Composable get() = typeScale(8.sp, 9.sp)
+    @Composable get() = typeScale(9.sp)
 
 /**
  * 21:91–92 exactly as `data/quran.db` carries them — the same two verses the
@@ -769,7 +768,7 @@ private fun PreviewEnglishMushafLeaf(
             val measurePx = with(density) { maxWidth.toPx() }
             val style = englishProseStyle(
                 fontSize = leafSize,
-                lineHeight = leafSize * typePalette.leafLeadingEm * typePalette.tuning.leaf.leading,
+                lineHeight = leafSize * typePalette.leafLeadingEm,
                 typePalette = typePalette,
             )
             val set = remember(text, style, measurePx, density, measurer) {
@@ -953,7 +952,7 @@ private fun PreviewArabicLine(
                         Text(
                             text = gloss,
                             fontSize = PreviewGlossSize,
-                            lineHeight = typeLeading(11.5.sp, 13.sp),
+                            lineHeight = 13.sp,
                             color = ink.copy(alpha = 0.62f),
                             textAlign = TextAlign.Center,
                             modifier = Modifier.alpha(if (glossVisible) 1f else 0f),
@@ -1009,7 +1008,7 @@ private fun PreviewEnglishLyric(
     val gold = LocalQuranAccents.current.gold
     val ink = QuranTheme.ink.strong
     val lyricSize = PreviewLyricSize
-    val markSize = lyricSize * 17f / typeScale(19.5.sp, 22.sp).value
+    val markSize = lyricSize * 17f / typeScale(22.sp).value
     val bookFontFamily = TranslationFontFamily
     val text = buildAnnotatedString {
         withStyle(SpanStyle(color = ink)) { append(verse) }
@@ -1030,10 +1029,9 @@ private fun PreviewEnglishLyric(
             text = text,
             fontFamily = TranslationFontFamily,
             fontSize = lyricSize,
-            lineHeight = (1.5f * LocalQuranTypePalette.current.tuning.book.leading).em,
+            lineHeight = 1.5.em,
             style = MaterialTheme.typography.bodyLarge.copy(
                 textDirection = TextDirection.Ltr,
-                letterSpacing = LocalQuranTypePalette.current.tuning.book.tracking.em,
             ),
         )
     }
@@ -1106,7 +1104,7 @@ private fun PreviewTranslation() {
         text = SAMPLE_ENGLISH,
         fontFamily = TranslationFontFamily,
         fontSize = PreviewTranslationSize,
-        lineHeight = typeLeading(19.sp, 21.sp),
+        lineHeight = 21.sp,
         color = QuranTheme.ink.secondary,
     )
 }

@@ -219,7 +219,7 @@ private fun SurahItem(surah: Surah, selected: Boolean) {
         Text(
             text = surah.nameTransliteration,
             style = MaterialTheme.typography.titleMedium.copy(
-                fontSize = typeScale(14.sp, 16.sp),
+                fontSize = typeScale(16.sp),
             ),
             color = if (selected) {
                 MaterialTheme.colorScheme.onSurface

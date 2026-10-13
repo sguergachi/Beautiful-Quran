@@ -50,18 +50,18 @@ voice, and the two must never be confusable.
 | Note is long | The text truncates to three lines with a quiet ink ellipsis; tapping the note opens it in place (see "Writing"). |
 | Another ayah is reciting | The ribbon vanishes with the rest of the chrome; the text recesses to upcoming ink with its verse, exactly like the translation. |
 
-**Type.** **Timeless Serif Italic at weight 500**, 14.08 sp / 20.24 sp before
-the existing damped reader size setting, with 0.15 sp tracking. This is the
-family's real italic, keeping translation and note in one serif family.
-The note's maroon ink, slant and placement distinguish the reader's words:
-on the inner spine, 12 dp/px below the translation, with no quotation marks,
-"Note:" label or attribution. Colour follows the existing theme ink policy.
+**Type.** **Junicode Italic, Medium (weight 520)**, at 16 sp / 23 sp scaled to
+Junicode's size (×0.969, so its lowercase stands as Garamond's did) before the
+existing damped reader size setting, with 0.15 sp tracking. This is the book
+face's real italic, keeping translation and note in one serif family. The
+note's maroon ink, slant and placement distinguish the reader's words: on the
+inner spine, 12 dp/px below the translation, with no quotation marks, "Note:"
+label or attribution. Colour follows the existing theme ink policy.
 
 The classic developer profile restores **Cormorant Garamond Italic at weight
-500**, 16 sp / 23 sp and its original tracking. Ink Lab → Typography → Notes
-tunes Timeless's weight, glyph alternates, size, leading and tracking separately
-from the book. The same selected hand and settings appear in the reader,
-note editor, Bookmarks index and Customize preview.
+500**, 16 sp / 23 sp and its original tracking. The same selected hand and
+settings appear in the reader, note editor, Bookmarks index and Customize
+preview.
 
 **The ribbon.** Tap keeps its existing mark/unmark action. Press and hold on
 an exposed saved ribbon opens the verse's note. The same 44 dp target serves
@@ -286,7 +286,7 @@ resize handle.
   text rather than a margin glyph.
 - `ui/reader/ReaderComponents.kt` — `verseAnnotationStyle` (the reader's hand, shared
   with the Bookmarks index) and `VerseAnnotationField`.
-- `ui/theme/Type.kt` — selected `ScribeFontFamily`: Timeless's variable Serif
-  Italic, or the classic OFL `res/font/cormorant_garamond_italic.ttf`.
-  Timeless is fetched from the pinned licensed archive at build time; web's
-  `--font-scribe` uses its Medium Italic static cut.
+- `ui/theme/Type.kt` — selected `ScribeFontFamily`: Junicode's variable
+  Italic (`res/font/junicode_italic_variable.ttf`, OFL), or the classic
+  `res/font/cormorant_garamond_italic.ttf`. Web's `--font-scribe` uses the same
+  Junicode cut as WOFF2.

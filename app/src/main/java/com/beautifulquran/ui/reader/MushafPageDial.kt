@@ -1693,8 +1693,8 @@ internal fun MushafPageDial(
             // border, no shadow — a full-width band of paper dissolving into
             // the leaf at the top, not a card floating on it.
             val labelSmall = MaterialTheme.typography.labelSmall
-            val hudFontSize = typeScale(12.5.sp, 14.sp)
-            val hudLineHeight = typeScale(14.sp, 16.sp)
+            val hudFontSize = typeScale(14.sp)
+            val hudLineHeight = typeScale(16.sp)
             val hudTrackingEm = mixedCaseTrackingEm(0.08f)
             val hudType = remember(labelSmall, hudFontSize, hudLineHeight, hudTrackingEm) {
                 labelSmall.copy(
