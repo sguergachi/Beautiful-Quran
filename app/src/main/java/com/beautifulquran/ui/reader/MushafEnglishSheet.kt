@@ -25,6 +25,8 @@ import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.runtime.structuralEqualityPolicy
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -96,6 +98,7 @@ import com.beautifulquran.ui.theme.quietClickable
 import com.beautifulquran.ui.theme.shapedWordBloom
 import kotlin.math.roundToInt
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.collectLatest
 
 /**
  * The English leaf — the same Madinah page, set as a page of a book.
@@ -251,7 +254,7 @@ internal fun MushafEnglishSheet(
             }
         }
     }
-    val clock = washClock.collectAsStateWithLifecycle()
+    val clock = rememberAnimatedEnglishWashClock(washClock.collectAsStateWithLifecycle())
     val washWindows = rememberEnglishWashWindows(clock, alignments, content)
     // The leaf comes up on the same short fade the Arabic one uses while its
     // page face loads: a page settling into the light rather than text
@@ -559,6 +562,27 @@ internal data class EnglishInkSpan(val range: IntRange, val position: Int, val f
 
 /** A fading tint after a backward seek must not reveal words beyond the new prefix. */
 internal fun englishInkLayerAllowed(state: InkEngine.State): Boolean = state != InkEngine.State.Upcoming
+
+/** Animate between media polls on every frame; pause or a seek abandons the previous motion. */
+@Composable
+private fun rememberAnimatedEnglishWashClock(clock: State<EnglishWashClock?>): State<EnglishWashClock?> {
+    val sample = remember { mutableStateOf<EnglishWashClock?>(null) }
+    LaunchedEffect(clock) {
+        var previous: EnglishWashClock? = null
+        snapshotFlow { clock.value }.collectLatest { next ->
+            val prior = previous
+            previous = next
+            if (next == null || !next.samePerformanceAs(prior) || next.positionMs == prior?.positionMs) {
+                sample.value = next
+            } else {
+                do {
+                    sample.value = withFrameNanos { next.frameAt(it, prior) }
+                } while (sample.value!!.positionMs < next.positionMs)
+            }
+        }
+    }
+    return sample
+}
 
 /** Cache windows on source changes; frame ticks invalidate drawing and leaf thresholds only. */
 @Composable
@@ -1259,7 +1283,8 @@ private fun EnglishProseBlock(
  * intervening English word into its wash, so there can be no dim hole before
  * the leading edge. Each band follows the calibrated media clock until the
  * next band starts, or until the final spoken segment ends. Pauses hold the
- * edge and reordered Arabic tails keep it moving. Glimmer and repeat tint
+ * edge and reordered Arabic tails keep it moving. Each first wash completes
+ * before a backward repeat begins. Glimmer and repeat tint
  * cannot pass that edge; the shared pack retains repeat owners and seek recess.
  */
 private fun englishVerseBlooms(

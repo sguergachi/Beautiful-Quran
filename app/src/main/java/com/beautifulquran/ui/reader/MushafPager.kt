@@ -811,7 +811,7 @@ internal fun MushafPager(
     val washWindowsNow = rememberUpdatedState(washWindows)
     fun timedThrough(word: ActiveWord?, aheadMs: Long = 0L): Float? {
         if (!english || book == null || word == null || word.fromTap) return null
-        val clock = washClock.value?.takeIf { it.matches(word, loadedSurahId) } ?: return null
+        val clock = washClock.value?.takeIf { it.followsFirstWash(word, loadedSurahId) } ?: return null
         val alignment = alignmentsNow.value.alignment(word.ayah) ?: return null
         val windows = washWindowsNow.value[loadedSurahId to word.ayah] ?: return null
         return englishWashThrough(alignment, windows, clock.positionMs + aheadMs, clock.voiceStartMs)

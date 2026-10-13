@@ -640,8 +640,13 @@ held. The scrolling reader passes `pacing = null` to `rememberInkMotions`.
 **English leaf pacing.** `EnglishWashClock` receives the same calibrated,
 seek-aware media samples that select the Arabic word, without recomposing the
 page on each tick. Each continuous English band lasts from its first Arabic
-owner until the next band's first occurrence; the final band lasts until the
-last spoken segment ends. In 24:2, “their punishment” starts on word 23 but
+owner until the next band's first occurrence, the first repeat, or
+the last spoken segment ends, whichever comes first. Re-says never extend the
+first wash: Alafasy's 24:1 “clear evidence” is fully laid when he returns to
+“and We revealed.” Media samples are interpolated on every display frame,
+one 33 ms poll behind, rather than painted as steps or restarted tweens. The
+active word's onset closes preceding ink before its repeat tint begins. No
+future audio is extrapolated. In 24:2, “their punishment” starts on word 23 but
 keeps washing through the reordered Arabic “a group of the believers,” words
 24–26. It finishes at 36.25 s rather than 28.49 s for Alafasy. Pauses freeze
 the edge; speed changes and holds longer than the visual animation cap still
@@ -652,7 +657,9 @@ generations reject stale samples; calibration changes cannot rewind laid ink.
 Carried-leaf ownership and follow read that same edge. Follow previews 500 ms
 at the current playback speed, preserving the existing turn lead and waiting
 cover; it no longer assumes that the next Arabic word starts the next leaf.
-Semantic ownership for taps, holds, and repeat labels stays in the alignment.
+Re-says use the existing semantic word location for carried leaves; completing
+the first wash cannot carry the voice away from its repeated phrase. Semantic
+ownership for taps, holds, and repeat labels stays in the alignment.
 
 **Short wasl donors** (`مَن يَشْرِى`, `مِن رَّبِّكُم`, …) need a **speed
 ceiling** on that early bloom so the next opening does not race: details and

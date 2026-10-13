@@ -1389,13 +1389,18 @@ revealed by its own bloom. Measured on device: a mid-sentence tap that used to
 complete in a single frame takes ~370 ms of rise.
 
 **English follows spoken time, without Arabic letter pacing.** Each band's
-clock runs from its first Arabic owner to the next band's first occurrence, or
-to the final spoken segment's end. This includes source words reordered into
+clock runs from its first Arabic owner to the next band's first occurrence,
+the first repeat, or the final spoken segment's end. First-pass ink
+finishes before a re-say starts its tint; it does not stretch across that
+repeat. Media samples are interpolated on every display frame, one 33 ms poll
+behind, with no extrapolation or restarting tween. This includes source words reordered into
 earlier English: in 24:2 the last English band keeps washing while Arabic
 finishes “a group of the believers.” Pauses freeze the edge, speed changes
 follow the media clock, and a carried band crosses its first fragment before
 its second. Voice ownership follows that edge; the carried-page turn previews
 the same clock by its existing 500 ms lead at the current playback speed.
+Re-says keep their semantic word location, independently of the retained first
+wash, so the voice stays on the leaf carrying the repeated phrase.
 The leaf never reads `sweepProgress`, which carries the two corrections
 that make the Arabic wash right and the English one wrong: the tajweed letter
 map (`TajweedPacing.Curve`) and the wasl carry-in. Both are statements about

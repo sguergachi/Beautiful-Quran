@@ -61,6 +61,70 @@ class EnglishWashClockTest {
     }
 
     @Test
+    fun `frame interpolation resets on a new verse chapter or seek`() {
+        val sample = EnglishWashClock(24, 1, 8, 15000, 0)
+        assertTrue(sample.copy(positionMs = 15033).samePerformanceAs(sample))
+        assertTrue(!sample.samePerformanceAs(null))
+        assertTrue(!sample.copy(activation = 9).samePerformanceAs(sample))
+        assertTrue(!sample.copy(ayah = 2).samePerformanceAs(sample))
+        assertTrue(!sample.copy(surahId = 25).samePerformanceAs(sample))
+        assertEquals(sample, sample.frameAt(20_000_000_000L, sample.copy(activation = 9)))
+    }
+
+    @Test
+    fun `every frame moves between polls without restarting or guessing future audio`() {
+        val previous = EnglishWashClock(24, 1, 8, 1000, 0, sampledAtNanos = 1_000_000_000L)
+        val next = previous.copy(positionMs = 1033, sampledAtNanos = 1_033_000_000L)
+        val frames = listOf(1041L, 1049L, 1057L, 1065L).map { next.frameAt(it * 1_000_000, previous).positionMs }
+        assertEquals(listOf(1008L, 1016L, 1024L, 1032L), frames)
+        val following = next.copy(positionMs = 1066, sampledAtNanos = 1_066_000_000L)
+        assertEquals(1040L, following.frameAt(1_073_000_000L, next).positionMs)
+        assertEquals(next.positionMs, next.frameAt(9_000_000_000L, previous).positionMs)
+    }
+
+    @Test
+    fun `paused samples freeze and changing speed changes the frame slope`() {
+        val previous = EnglishWashClock(24, 1, 8, 1000, 0, sampledAtNanos = 1_000_000_000L)
+        val paused = previous.copy(sampledAtNanos = 1_033_000_000L)
+        assertEquals(1000L, paused.frameAt(9_000_000_000L, previous).positionMs)
+        val faster = paused.copy(positionMs = 1066)
+        assertEquals(1032L, faster.frameAt(1_049_000_000L, previous).positionMs)
+    }
+
+    @Test
+    fun `a repeat completes prior ink even while the frame animation trails its poll`() {
+        val repeated = ActiveWord(1, 4, startMs = 15640, durationMs = 3250, activation = 8, isRepeat = true, highWater = 7)
+        val frame = EnglishWashClock(24, 1, 8, 15620, 0)
+        val position = englishWashPositionMs(repeated, frame, 24)
+        assertEquals(15640L, position)
+        assertEquals(1f, EnglishWashWindow(12680, 15640).progress(position), 0f)
+        assertEquals(0f, EnglishWashWindow(15640, 18890).progress(position), 0f)
+    }
+
+    @Test
+    fun `completing a carried first wash does not move the repeat away from its phrase`() {
+        val alignment = EnglishAlignment(FloatArray(9), listOf(
+            EnglishWordSpan(0f, 0.4f, 4), EnglishWordSpan(0.4f, 0.8f, 7), EnglishWordSpan(0.8f, 1f, 8),
+        ))
+        val segments = listOf(
+            Segment(4, 0, 1000), Segment(7, 1000, 2000), Segment(4, 2000, 3000),
+            Segment(7, 3000, 4000), Segment(8, 4000, 5000),
+        )
+        val clock = EnglishWashClock(24, 1, 8, 2200, 0, segments)
+        val repeated = ActiveWord(1, 4, startMs = 2000, durationMs = 1000, activation = 8, isRepeat = true, highWater = 7)
+        val windows = englishWashWindows(alignment.washSpans.map { it.position }, segments)
+        val book = englishBookOf(listOf(
+            listOf(EnglishVerseRun(24, 1, 0, 5)), listOf(EnglishVerseRun(24, 1, 5, 10)),
+        ), { _, _ -> 350 }, { _, _ -> "abcdefghij" })
+        val laid = englishWashThrough(alignment, windows, clock.positionMs, clock.voiceStartMs)!!
+        assertEquals(2, mushafLeafNumber(book, 24, 1, 350, laid))
+        val voice = if (clock.followsFirstWash(repeated, 24)) laid else
+            mushafVerseThrough(repeated.wordPosition, 9, alignment = alignment)
+        assertEquals(1, mushafLeafNumber(book, 24, 1, 350, voice))
+        assertTrue(clock.followsFirstWash(repeated.copy(isRepeat = false), 24))
+    }
+
+    @Test
     fun `opening silence does not consume the wash and final audio silence does not extend it`() {
         val windows = englishWashWindows(listOf(1, 2), listOf(Segment(1, 0, 4000), Segment(2, 4000, 6000)))
         assertEquals(0f, windows.getValue(1).progress(3000, voiceStartMs = 3000), 0f)
@@ -69,16 +133,17 @@ class EnglishWashClockTest {
     }
 
     @Test
-    fun `repeated words inside a portion extend its time without reversing the wash`() {
+    fun `the first wash completes before repeats inside its portion`() {
         val windows = englishWashWindows(listOf(1, 3), listOf(
             Segment(1, 0, 500), Segment(2, 500, 1000), Segment(1, 1000, 1500),
             Segment(2, 1500, 2000), Segment(3, 2000, 2500), Segment(2, 2500, 3000), Segment(3, 3000, 3500),
         ))
-        assertEquals(EnglishWashWindow(0, 2000), windows.getValue(1))
-        assertEquals(EnglishWashWindow(2000, 3500), windows.getValue(3))
-        assertEquals(0.5f, windows.getValue(1).progress(1000), 0f)
+        assertEquals(EnglishWashWindow(0, 1000), windows.getValue(1))
+        assertEquals(EnglishWashWindow(2000, 2500), windows.getValue(3))
+        assertEquals(0.5f, windows.getValue(1).progress(500), 0f)
+        assertEquals(1f, windows.getValue(1).progress(1000), 0f)
         assertEquals(1f, windows.getValue(1).progress(2500), 0f)
-        assertTrue(windows.getValue(3).progress(3000) < 1f)
+        assertEquals(1f, windows.getValue(3).progress(2500), 0f)
     }
 
     @Test
@@ -117,9 +182,28 @@ class EnglishWashClockTest {
             Segment(8, 10190, 11060), Segment(9, 11060, 11440),
         ))
         assertEquals(EnglishWashWindow(7290, 7290), windows.getValue(7))
-        assertEquals(EnglishWashWindow(7290, 11060), windows.getValue(8))
+        assertEquals(EnglishWashWindow(7290, 9150), windows.getValue(8))
         assertEquals(1f, windows.getValue(7).progress(7290), 0f)
-        assertTrue(windows.getValue(8).progress(9150) < 1f)
+        assertEquals(1f, windows.getValue(8).progress(9150), 0f)
+    }
+
+    @Test
+    fun `An Nur clear evidence is fully inked before and revealed repeats`() {
+        val (_, text, glosses) = javaClass.getResourceAsStream("/english-clear-evidence-owners.tsv")!!
+            .bufferedReader().use { it.readLines().first { row -> row.startsWith("24:1\t") } }.split('\t')
+        val alignment = EnglishWordAlignment.align(text, glosses.split('|'))!!
+        // Alafasy's 1..7,4..7,8,9 topology on a synthetic one-second clock.
+        val segments = listOf(1, 2, 3, 4, 5, 6, 7, 4, 5, 6, 7, 8, 9).mapIndexed { index, position ->
+            Segment(position, index * 1000L, (index + 1) * 1000L)
+        }
+        val windows = englishWashWindows(alignment.washSpans.map { it.position }, segments)
+        assertEquals(EnglishWashWindow(6000, 7000), windows.getValue(7))
+        assertTrue(windows.getValue(7).progress(6999) < 1f)
+        alignment.washSpans.filter { it.position <= 7 }.forEach {
+            assertEquals("unfinished band ${it.position} under repeat", 1f, windows.getValue(it.position).progress(7000), 0f)
+        }
+        assertEquals(0f, windows.getValue(8).progress(7000), 0f)
+        assertEquals(1f, windows.getValue(7).progress(10000), 0f)
     }
 
     @Test

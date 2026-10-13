@@ -11,19 +11,35 @@ internal data class EnglishWashClock(
     val positionMs: Long,
     val voiceStartMs: Long,
     val segments: List<Segment> = emptyList(),
+    val sampledAtNanos: Long = 0L,
 ) {
+    /** Position samples may interpolate only within one audible performance. */
+    fun samePerformanceAs(other: EnglishWashClock?): Boolean =
+        other != null && surahId == other.surahId && ayah == other.ayah && activation == other.activation
+
+    /** Resample one poll behind the voice at vsync; never guess future audio or restart a tween. */
+    fun frameAt(frameNanos: Long, previous: EnglishWashClock?): EnglishWashClock {
+        if (previous == null || !samePerformanceAs(previous) || positionMs <= previous.positionMs ||
+            sampledAtNanos <= previous.sampledAtNanos) return this
+        val progress = ((frameNanos - 33_000_000L - previous.sampledAtNanos).toDouble() /
+            (sampledAtNanos - previous.sampledAtNanos)).coerceIn(0.0, 1.0)
+        return copy(positionMs = previous.positionMs + ((positionMs - previous.positionMs) * progress).toLong())
+    }
+
     fun matches(word: ActiveWord, surahId: Int): Boolean =
         this.surahId == surahId && ayah == word.ayah && activation == word.playbackActivation
 
+    /** Re-says locate their semantic word, rather than the retained forward prefix. */
+    fun followsFirstWash(word: ActiveWord, surahId: Int): Boolean = matches(word, surahId) && !word.isRepeat
+
     /** A calibration change cannot lift laid ink; a new seek generation can. */
     fun after(previous: EnglishWashClock?): EnglishWashClock =
-        if (previous != null && previous.surahId == surahId && previous.ayah == ayah &&
-            previous.activation == activation && previous.segments === segments) {
+        if (previous != null && samePerformanceAs(previous) && previous.segments === segments) {
             copy(positionMs = maxOf(previous.positionMs, positionMs))
         } else this
 }
 
-/** One continuous English band lasts until the next band, or the recitation's end. */
+/** A first wash ends before a repeat, the next band, or the recitation's end. */
 internal data class EnglishWashWindow(val startMs: Long, val endMs: Long) {
     fun progress(positionMs: Long, voiceStartMs: Long = startMs): Float {
         val start = maxOf(startMs, voiceStartMs).coerceAtMost(endMs)
@@ -36,25 +52,36 @@ internal data class EnglishWashWindow(val startMs: Long, val endMs: Long) {
 /**
  * Reordering can exhaust English bands before Arabic words (24:2 ends in
  * punishment, then Arabic continues with a group of believers). Keep the final
- * band moving through that tail. Repeats inside a band are part of its time;
- * later re-says cannot lift ink already laid. Ownership for taps is unchanged.
+ * band moving through that tail. A backward repeat starts a second wash, so
+ * the first wash must have finished before it. Ownership for taps is unchanged.
  */
 internal fun englishWashWindows(
     positions: List<Int>,
     segments: List<Segment>,
 ): Map<Int, EnglishWashWindow> = buildMap {
+    var highWater = -1
+    val repeats = segments.map {
+        val repeated = it.position <= highWater
+        highWater = maxOf(highWater, it.position)
+        repeated
+    }
     positions.forEachIndexed { index, position ->
-        val start = segments.firstOrNull { it.position >= position }?.startMs ?: return@forEachIndexed
-        val next = positions.getOrNull(index + 1)
-        val end = next?.let { boundary -> segments.firstOrNull { it.position >= boundary }?.startMs }
-            ?: segments.lastOrNull()?.endMs ?: return@forEachIndexed
+        val first = segments.indexOfFirst { it.position >= position }
+        if (first < 0) return@forEachIndexed
+        val start = segments[first].startMs
+        val next = positions.getOrNull(index + 1)?.let { boundary ->
+            segments.indexOfFirst { it.position >= boundary }.takeIf { it >= 0 }
+        } ?: segments.size
+        val repeat = (first + 1 until next).firstOrNull { repeats[it] }
+        val end = repeat?.let { segments[it].startMs }
+            ?: segments.getOrNull(next)?.startMs ?: segments.last().endMs
         if (end >= start) put(position, EnglishWashWindow(start, end))
     }
 }
 
-/** A tap waits for its own clock generation; a stale seek sample cannot finish its wash. */
+/** A word onset closes preceding ink before its repeat; stale seek samples still wait. */
 internal fun englishWashPositionMs(word: ActiveWord, clock: EnglishWashClock?, surahId: Int): Long =
-    clock?.takeIf { it.matches(word, surahId) }?.positionMs ?: word.startMs
+    maxOf(word.startMs, clock?.takeIf { it.matches(word, surahId) }?.positionMs ?: word.startMs)
 
 /** The same edge in whole-verse coordinates, for carried-leaf ownership and follow. */
 internal fun englishWashThrough(

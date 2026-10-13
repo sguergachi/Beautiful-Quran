@@ -684,7 +684,9 @@ class ReaderViewModel(
             val voiceMs = firstWordVoiceMs(np.ayah, np.reciterId, segments)
             val rawMs = highlightPositionMs(voiceMs, np.reciterId)
             val clockMs = highlightClock.sample(np, rawMs)
-            _englishWashClock.value = EnglishWashClock(np.surahId, np.ayah, events.inkId, clockMs, voiceMs, segments)
+            _englishWashClock.value = EnglishWashClock(
+                np.surahId, np.ayah, events.inkId, clockMs, voiceMs, segments, sampledAtNanos = System.nanoTime(),
+            )
                 .after(_englishWashClock.value)
             val info = prepared?.activeInfo(clockMs)
             val washStart = if (info == null) {
