@@ -1614,9 +1614,11 @@ chapter document: the reading place lives in its chapter row, marked by the
 place ribbon in situ. While that row is scrolled out of view a quiet green-wash
 pill — the place ribbon, gold number, and a small-caps CONTINUE flag over the
 chapter row's bilingual identity, set in a rounded wash on the rows' own
-Arabic rail — floats above the bottom transport (or gesture inset); scrolling
-the row into view flies the pill up to it — resizing, squaring its corners,
-then fading to reveal the row — so the row owns the tap. Both platforms keep the 28 dp/px outer lane, 26 dp/px number
+Arabic rail — floats above the bottom transport (or gesture inset); once the
+row has sat fully in view for a few seconds the pill flies up to it —
+resizing, squaring its corners, then fading to reveal the row — so the row
+owns the tap, and scrolling back down peels it off the top and settles it
+home again. Fast scrolls never flap either flight. Both platforms keep the 28 dp/px outer lane, 26 dp/px number
 column, and 4 dp/px name gap; the fixed masthead pairs its title with the same
 30 dp/px gilded rosette Settings affordance.
 

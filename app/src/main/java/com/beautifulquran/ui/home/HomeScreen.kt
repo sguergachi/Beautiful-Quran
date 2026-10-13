@@ -2,6 +2,7 @@ package com.beautifulquran.ui.home
 
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.EnterTransition
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animate
 import androidx.compose.animation.core.FastOutSlowInEasing
@@ -83,9 +84,11 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.util.lerp
+import kotlinx.coroutines.delay
 import kotlin.math.roundToInt
 import kotlinx.coroutines.flow.drop
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -106,6 +109,7 @@ import com.beautifulquran.ui.reader.remainingUnfurlSignal
 import com.beautifulquran.ui.theme.quietSuppliedBrackets
 import com.beautifulquran.ui.theme.ArabicTitleStyle
 import com.beautifulquran.ui.theme.FloatingPaperControl
+import com.beautifulquran.ui.theme.FloatingPaperEnter
 import com.beautifulquran.ui.theme.LocalQuranAccents
 import com.beautifulquran.ui.theme.typeScale
 import com.beautifulquran.ui.theme.PaperSearchField
@@ -121,6 +125,13 @@ internal const val DISMISS_SCROLL_THRESHOLD_PX = 24
 
 /** The pill's flight up to its row: slow move, resize, and square off as one. */
 internal const val ContinueDockMs = 700
+
+/** The return flight settles at the same graceful pace. */
+internal const val ContinueUndockMs = 700
+
+/** Grace so fast scrolls never flap the pill: the row must sit fully in
+ * view this long before the dock flight runs. */
+internal const val ContinueDockDwellMs = 3000L
 
 /** Raw flight progress where the docked pill starts fading into its row. */
 internal const val ContinueDockFadeFrom = 0.7f
@@ -261,16 +272,51 @@ fun HomeScreen(
     var dockStart by remember { mutableStateOf<Rect?>(null) }
     var docking by remember { mutableStateOf(false) }
     var dockProgress by remember { mutableFloatStateOf(0f) }
-    // The row scrolled into view while the pill was up: fly the pill to
-    // the row — resize, square off, fade — instead of popping it away.
+    var undockStart by remember { mutableStateOf<Rect?>(null) }
+    var undocking by remember { mutableStateOf(false) }
+    var undockProgress by remember { mutableFloatStateOf(0f) }
+    var rowWasVisible by remember { mutableStateOf(false) }
+    var dockReady by remember { mutableStateOf(false) }
+    var undockArrived by remember { mutableStateOf(false) }
+    // The row sat fully in view through the dwell while the pill was up:
+    // fly the pill to the row — resize, square off, fade — instead of
+    // popping it away. Fast scrolls never arm the flight.
     if (showContinuePill) pillWasShown = true
-    if (continueRowVisible && pillWasShown && !docking) {
+    if (continueRowVisible && pillWasShown && !docking && !undocking && dockReady) {
         val start = continuePillRect
         val end = if (!searching && coverSheetVisible) continueRowRect else null
         if (start != null && end != null) {
             dockStart = start
             docking = true
             pillWasShown = false
+        }
+    }
+    if (continueRowVisible) rowWasVisible = true
+    // The row left through the top while it owned the place: peel a copy
+    // off the row and fly it back down to the pill's seat. A bottom exit
+    // just lets the pill slide up on its own enter.
+    val continueIndex = continueLazyIndex(
+        uiState.surahs.map { it.id },
+        continueSurahId,
+        searching,
+    )
+    if (!continueRowVisible && rowWasVisible && !docking && !undocking) {
+        val seat = continuePillRect
+        val start = continueRowRect
+        if (seat != null && start != null && !searchActive && coverSheetVisible &&
+            continueIndex >= 0 && listState.firstVisibleItemIndex >= continueIndex
+        ) {
+            undockStart = start
+            undocking = true
+        }
+        rowWasVisible = false
+    }
+    LaunchedEffect(continueRowVisible, showContinuePill) {
+        if (continueRowVisible && showContinuePill) {
+            delay(ContinueDockDwellMs)
+            dockReady = true
+        } else {
+            dockReady = false
         }
     }
     LaunchedEffect(docking) {
@@ -285,14 +331,39 @@ fun HomeScreen(
             dockStart = null
         }
     }
-    // The row left again, or search/cover took the sheet: abandon the
-    // flight and let the pill's own enter bring it back.
+    LaunchedEffect(undocking) {
+        if (undocking) {
+            undockProgress = 0f
+            animate(
+                initialValue = 0f,
+                targetValue = 1f,
+                animationSpec = tween(ContinueUndockMs, easing = FastOutSlowInEasing),
+            ) { value, _ -> undockProgress = value }
+            undocking = false
+            undockStart = null
+            undockArrived = true
+        }
+    }
+    // The row came back, or search/cover took the sheet: abandon any
+    // flight and let the floats' own enters bring them back.
     LaunchedEffect(continueRowVisible, searchActive, coverSheetVisible) {
         if (!continueRowVisible || searchActive || !coverSheetVisible) {
             docking = false
             dockStart = null
         }
-        if (searchActive || !coverSheetVisible) pillWasShown = false
+        if (continueRowVisible || searchActive || !coverSheetVisible) {
+            undocking = false
+            undockStart = null
+        }
+        if (searchActive || !coverSheetVisible) {
+            pillWasShown = false
+            rowWasVisible = false
+        }
+    }
+    // The undocked pill lands exactly on its seat: skip its enter so the
+    // handoff from the ghost is seamless. Any later hide re-arms it.
+    LaunchedEffect(showContinuePill) {
+        if (!showContinuePill) undockArrived = false
     }
     val listBottomInsetTarget = homeListBottomInset(
         pinnedSession = pinnedSession,
@@ -673,7 +744,8 @@ fun HomeScreen(
             ) {
                 uiState.continueTarget?.let { target ->
                     FloatingPaperControl(
-                        visible = showContinuePill && !docking,
+                        visible = showContinuePill && !docking && !undocking,
+                        enter = if (undockArrived) EnterTransition.None else FloatingPaperEnter,
                         modifier = Modifier
                             .fillMaxWidth()
                             .then(
@@ -727,16 +799,20 @@ fun HomeScreen(
                         },
                 )
             }
-            // Dock flight: a live copy of the pill travels from its resting
-            // seat to the chapter row — resizing, squaring its corners, then
-            // fading to reveal the row beneath. The end tracks the row's
-            // live bounds so the flight still lands while the list moves.
-            if (docking) {
-                val start = dockStart
-                val end = continueRowRect
+            // Dock flights: a live copy of the pill travels between its
+            // resting seat and the chapter row — resizing, squaring its
+            // corners, then fading to reveal the row beneath (or landing
+            // back on its seat, seamless, on the way out). The landing end
+            // tracks live bounds so flights still connect while the list
+            // moves. Undock reverses the morph instead of fading.
+            if (docking || undocking) {
+                val start = if (docking) dockStart else undockStart
+                val end = if (docking) continueRowRect else continuePillRect
                 val target = uiState.continueTarget
+                val raw = if (docking) dockProgress else undockProgress
                 if (start != null && end != null && target != null) {
-                    val flight = FastOutSlowInEasing.transform(dockProgress.coerceIn(0f, 1f))
+                    val flight = FastOutSlowInEasing.transform(raw.coerceIn(0f, 1f))
+                    val settled = if (docking) flight else 1f - flight
                     val left = lerp(start.left, end.left, flight) - boxLeft
                     val top = lerp(start.top, end.top, flight) - boxTop
                     val width = with(density) { lerp(start.width, end.width, flight).toDp() }
@@ -747,9 +823,9 @@ fun HomeScreen(
                             .width(width)
                             .height(height)
                             .graphicsLayer {
-                                shape = RoundedCornerShape(continueDockRadius(flight))
+                                shape = RoundedCornerShape(continueDockRadius(settled))
                                 clip = true
-                                alpha = continueDockAlpha(dockProgress)
+                                alpha = if (docking) continueDockAlpha(raw) else 1f
                             }
                             .clearAndSetSemantics {},
                     ) {
@@ -759,7 +835,7 @@ fun HomeScreen(
                                 focusManager.clearFocus()
                                 onOpenSurah(target.surah.id, target.ayah, null, null)
                             },
-                            docked = flight,
+                            docked = settled,
                         )
                     }
                 }
@@ -858,12 +934,15 @@ internal val ContinuePillRadius: Dp = 28.dp
 /** Resting geometry the dock flight morphs away from. */
 internal val ContinuePillMargin: Dp = 16.dp
 internal val ContinuePillStartInset: Dp = 8.dp
+internal val ContinuePillEndInset: Dp = 16.dp
 internal val ContinuePillVertical: Dp = 12.dp
 internal val ContinuePillRibbonHeight: Dp = 40.dp
+internal val ContinuePillArabicSize: TextUnit = 20.sp
 
 /** The chapter row geometry the flight settles onto. */
 internal val ContinueRowVertical: Dp = 15.dp
 internal val ContinueRowRibbonHeight: Dp = 44.dp
+internal val ContinueRowEndInset: Dp = HomeEndInset + HomeArabicOpticalInset
 
 /** Wash-to-row corner collapse over the dock flight (pill radius → rectangle). */
 internal fun continueDockRadius(flight: Float): Dp =
@@ -880,6 +959,25 @@ internal fun continueDockMargin(docked: Float): Dp =
 /** Ribbon lane slides to the row's lane so the cloths coincide on landing. */
 internal fun continueDockStartInset(docked: Float): Dp =
     ContinuePillStartInset * (1f - docked.coerceIn(0f, 1f))
+
+/** Trailing inset glides out so the Arabic lands on the row's Arabic rail. */
+internal fun continueDockEndInset(docked: Float): Dp =
+    ContinuePillEndInset + (ContinueRowEndInset - ContinuePillEndInset) * docked.coerceIn(0f, 1f)
+
+/**
+ * Lazy-column index of the reading-place row: the top breath, then every
+ * surah in order (no section label outside search). Negative when the row
+ * is not on the sheet — searching, or no reading place at all.
+ */
+internal fun continueLazyIndex(
+    surahIds: List<Int>,
+    continueId: Int?,
+    searching: Boolean,
+): Int {
+    if (searching || continueId == null) return -1
+    val position = surahIds.indexOf(continueId)
+    return if (position < 0) -1 else 1 + position
+}
 
 /** The CONTINUE flag dissolves across the flight; the row has none. */
 internal fun continueDockCapsAlpha(docked: Float): Float = 1f - docked.coerceIn(0f, 1f)
@@ -929,7 +1027,7 @@ private fun ContinuePill(
             .quietClickable(onClick = onClick)
             .padding(
                 start = continueDockStartInset(settled),
-                end = 16.dp,
+                end = continueDockEndInset(settled),
                 top = vertical,
                 bottom = vertical,
             )
@@ -1000,7 +1098,10 @@ private fun ContinuePill(
         Text(
             text = target.surah.nameArabic,
             style = ArabicTitleStyle,
-            fontSize = 20.sp,
+            fontSize = (
+                ContinuePillArabicSize.value +
+                    (ArabicTitleStyle.fontSize.value - ContinuePillArabicSize.value) * settled
+                ).sp,
             color = QuranTheme.accents.greenInk,
             maxLines = 1,
         )
