@@ -131,10 +131,10 @@ const val ENGLISH_LEAF_CAPACITY_CHARS = 1180
  * they were 76 characters and 68.
  *
  * The basmalah has since been put on the page's pitch (`englishBasmalahPx`):
- * its slot now runs from its head to one pitch under its baseline, less the
- * first prose line's ascent. With Junicode's ascent of 0.86 em and the basmalah
- * fitted at about 0.79 of the prose hand, that is about 0.87 of a line — 42
- * characters at the same rate.
+ * a quarter pitch of air over it, and its slot runs down to one and a quarter
+ * pitches under its baseline, less the first prose line's ascent. With
+ * Junicode's ascent of 0.86 em and the basmalah fitted at about 0.79 of the
+ * prose hand, that is about 1.37 lines — 66 characters at the same rate.
  *
  * The measurement is in *lines*, and it stays 1.58 and 1.41 when the hand
  * moves: the panel is built from the line's ink and an air in line pitches, so
@@ -152,7 +152,7 @@ const val ENGLISH_LEAF_CAPACITY_CHARS = 1180
  * the leading.
  */
 const val ENGLISH_LEAF_OPENING_CHARS = 76
-const val ENGLISH_LEAF_BASMALAH_CHARS = 42
+const val ENGLISH_LEAF_BASMALAH_CHARS = 66
 
 /** What a verse costs the leaf: its prose, and the opening it may bring. */
 fun englishLeafVerseMass(surahId: Int, ayah: Int, prose: Int): Int = when {
