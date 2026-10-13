@@ -572,6 +572,7 @@ val CoverParchment = Parchment
 fun BeautifulQuranTheme(
     themeMode: ThemeMode = ThemeMode.SYSTEM,
     typeface: com.beautifulquran.data.BookTypeface = com.beautifulquran.data.BookTypeface.JUNICODE,
+    scrollArabicFace: com.beautifulquran.data.ScrollArabicFace = com.beautifulquran.data.ScrollArabicFace.HAFS,
     content: @Composable () -> Unit,
 ) {
     val systemDark = isSystemInDarkTheme()
@@ -608,6 +609,7 @@ fun BeautifulQuranTheme(
         LocalSettingsSheet provides settingsSheet,
         LocalReadingPaper provides colors.background,
         LocalQuranTypePalette provides typePalette,
+        LocalScrollArabicType provides scrollArabicType(scrollArabicFace),
     ) {
         MaterialTheme(
             colorScheme = colors,

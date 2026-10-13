@@ -316,6 +316,7 @@ class MainActivity : ComponentActivity() {
                 BeautifulQuranTheme(
                     themeMode = settings.themeMode,
                     typeface = settings.activeBookTypeface,
+                    scrollArabicFace = settings.activeScrollArabicFace,
                 ) {
                     // Cold start paints the closed mushaf first; the paper stack
                     // mounts under it after two board frames (onWarmStack),
