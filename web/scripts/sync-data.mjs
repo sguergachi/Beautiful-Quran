@@ -5,9 +5,11 @@ import initSqlJs from 'sql.js'
 
 const webRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 
-// The canonical database remains Android's complete offline asset. The web
-// build strips its large timing table from the boot database and emits one
-// lazy timing corpus per reciter.
+// Both apps consume the canonical core database. The web boot database omits
+// the timing table and emits lazy corpora for independently sourced reciters.
+// QF repeat data is obtained through authenticated Content Sync at runtime,
+// never packaged here.
+const runtimeTimingReciters = new Set([1, 2, 3, 4, 5, 7])
 const assets = [
   { name: 'lexicon.db', label: "Lane's lexicon database", required: false },
   { name: 'dictionary.db', label: 'Wiktionary dictionary database', required: false },
@@ -64,6 +66,7 @@ const timingRows = canonical.exec(
 const corpora = new Map()
 
 for (const [reciterId, surahId, ayahNumber, segments] of timingRows) {
+  if (runtimeTimingReciters.has(Number(reciterId))) continue
   const corpus = corpora.get(reciterId) ?? {}
   const surah = corpus[surahId] ?? {}
   surah[ayahNumber] = JSON.parse(segments)
@@ -75,7 +78,7 @@ const highlightedReciters = canonical.exec(
   'SELECT id FROM reciters WHERE has_timings = 1 ORDER BY id',
 )[0]?.values.flat() ?? []
 for (const reciterId of highlightedReciters) {
-  if (!corpora.has(reciterId)) {
+  if (!runtimeTimingReciters.has(Number(reciterId)) && !corpora.has(reciterId)) {
     throw new Error(`Missing timing corpus for highlighted reciter ${reciterId}`)
   }
 }

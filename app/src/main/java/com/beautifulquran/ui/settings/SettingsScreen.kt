@@ -75,6 +75,7 @@ import com.beautifulquran.data.BrushCircleStyle
 import com.beautifulquran.data.MushafBannerStyle
 import com.beautifulquran.data.RuntimeCachePhase
 import com.beautifulquran.data.RuntimeMushafCache
+import com.beautifulquran.data.RuntimeTimingCache
 import com.beautifulquran.data.Settings
 import com.beautifulquran.data.ThemeMode
 import com.beautifulquran.playback.RecitationCache
@@ -398,7 +399,7 @@ private fun DeveloperSection(
 
     Spacer(Modifier.height(20.dp))
     val app = context.applicationContext as QuranApp
-    MushafRuntimeCacheStatus(app.runtimeMushaf)
+    MushafRuntimeCacheStatus(app.runtimeMushaf, app.runtimeTimings)
 
     Spacer(Modifier.height(20.dp))
     ToggleRow(
@@ -1182,7 +1183,7 @@ internal val ThemeMode.label: String
 // ── Quiet typographic helpers ──────────────────────────────────────────────
 
 @Composable
-private fun MushafRuntimeCacheStatus(cache: RuntimeMushafCache?) {
+private fun MushafRuntimeCacheStatus(cache: RuntimeMushafCache?, timings: RuntimeTimingCache) {
     Text(
         text = "Quran Foundation word & QCF cache",
         style = MaterialTheme.typography.bodyLarge,
@@ -1193,6 +1194,7 @@ private fun MushafRuntimeCacheStatus(cache: RuntimeMushafCache?) {
         return
     }
     val diagnostics by cache.diagnostics.collectAsStateWithLifecycle()
+    val timingStatus by timings.status.collectAsStateWithLifecycle()
     var now by remember { mutableLongStateOf(System.currentTimeMillis()) }
     LaunchedEffect(Unit) {
         while (true) {
@@ -1218,11 +1220,13 @@ private fun MushafRuntimeCacheStatus(cache: RuntimeMushafCache?) {
         Caption("Updated ${cacheAge(it, now)} · seven-day limit ${cacheCountdown(status.expiresAtMs, now)}")
     }
     status.lastError?.let { Caption("Last error · $it") }
+    Caption("Recitation timings · ${timingStatus.settledReciters} of ${timingStatus.totalReciters} providers checked")
+    timingStatus.lastError?.let { Caption("Timing refresh · $it") }
     Text(
         text = if (status.phase == RuntimeCachePhase.REFRESHING) {
             "Updating Quran cache…"
         } else {
-            "Force seven-day cache update"
+            "Force Quran cache update"
         },
         style = MaterialTheme.typography.bodyLarge,
         modifier = Modifier
@@ -1230,7 +1234,10 @@ private fun MushafRuntimeCacheStatus(cache: RuntimeMushafCache?) {
             .quietClickable(
                 enabled = status.phase != RuntimeCachePhase.REFRESHING,
                 role = Role.Button,
-                onClick = cache::refresh,
+                onClick = {
+                    cache.refresh()
+                    timings.refresh()
+                },
             )
             .padding(vertical = 6.dp),
         color = MaterialTheme.colorScheme.primary.copy(
@@ -1238,8 +1245,7 @@ private fun MushafRuntimeCacheStatus(cache: RuntimeMushafCache?) {
         ),
     )
     Caption(
-        "Forces the authenticated Content Sync used when the cache is due. " +
-            "Only QF changes are applied from the saved checkpoint.",
+        "Refreshes authenticated Content Sync and reviewed recitation timings.",
     )
 }
 

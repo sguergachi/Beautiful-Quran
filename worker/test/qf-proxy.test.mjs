@@ -135,14 +135,82 @@ test('preserves the resync-required machine code', async () => {
   assert.deepEqual(await response.json(), { error: { code: 'resync_required' } })
 })
 
+for (const status of [400, 404, 410]) {
+  test(`direct proxy preserves sync ${status} and recovers with bootstrap`, async () => {
+    const paths = []
+    const proxy = createQfProxy(async (url) => {
+      if (url.includes('/oauth2/token')) return Response.json({ access_token: 'token', expires_in: 3_600 })
+      const upstream = new URL(url)
+      paths.push(upstream.pathname + upstream.search)
+      if (upstream.searchParams.get('sync_token') === 'expired-checkpoint') {
+        return Response.json({ error: { code: status === 410 ? 'resync_required' : 'checkpoint_rejected' } }, { status })
+      }
+      if (upstream.pathname === '/content/api/v4/resources/sync') {
+        assert.equal(upstream.searchParams.get('bootstrap'), 'true')
+        return Response.json({ sync: { mutations: [], has_more: false, next_sync_token: 'recovered-checkpoint' } })
+      }
+      return Response.json({ records: [{ record_key: 'word', data: { text: 'retained word' } }] })
+    })
+    const rejected = await proxy.fetch(new Request(`https://worker.example${bootstrap.replace('bootstrap=true', 'sync_token=expired-checkpoint')}`), env)
+    assert.equal(rejected.status, status)
+    assert.deepEqual(await rejected.json(), { error: { code: status === 410 ? 'resync_required' : 'qf_content_unavailable' } })
+    const recovery = await proxy.fetch(new Request(`https://worker.example${bootstrap}`), env)
+    assert.equal(recovery.status, 200)
+    assert.equal((await recovery.json()).sync.next_sync_token, 'recovered-checkpoint')
+    const snapshot = await proxy.fetch(new Request('https://worker.example/api/v4/resources/snapshots/mushafs/1'), env)
+    assert.equal(snapshot.status, 200)
+    assert.equal((await snapshot.json()).records[0].data.text, 'retained word')
+    assert.equal(paths.length, 3)
+  })
+}
+
+test('snapshot and word-supplement errors remain temporary rather than checkpoint-recovery signals', async () => {
+  for (const status of [400, 404, 403, 429]) {
+    const proxy = createQfProxy(async (url) => url.includes('/oauth2/token')
+      ? Response.json({ access_token: 'token', expires_in: 3_600 }) : new Response(null, { status }))
+    for (const path of ['/api/v4/resources/snapshots/mushafs/1', '/api/v4/verses/by_key/1:1?words=true&language=en']) {
+      const response = await proxy.fetch(new Request(`https://worker.example${path}`), env)
+      assert.equal(response.status, 503)
+      assert.deepEqual(await response.json(), { error: { code: 'qf_content_unavailable' } })
+    }
+  }
+})
+
 test('turns rejected content access into the cache-purge signal', async () => {
   const proxy = createQfProxy(async (url) => {
     if (url.includes('/oauth2/token')) return Response.json({ access_token: 'token', expires_in: 3_600 })
-    return new Response(null, { status: 403 })
+    return Response.json({ success: false, type: 'forbidden', message: 'forbidden' }, { status: 403 })
   })
   const response = await proxy.fetch(new Request(`https://worker.example${bootstrap}`), env)
   assert.equal(response.status, 403)
   assert.deepEqual(await response.json(), { error: { code: 'qf_access_revoked' } })
+})
+
+test('a throttled token endpoint or bare edge 403 is an outage, not a revocation', async () => {
+  const tokenOutages = [
+    () => Response.json({ error: 'rate_limited' }, { status: 429 }),
+    () => Response.json({ error: 'invalid_request' }, { status: 400 }),
+    () => new Response(null, { status: 408 }),
+  ]
+  for (const outage of tokenOutages) {
+    const proxy = createQfProxy(async () => outage())
+    const response = await proxy.fetch(new Request(`https://worker.example${bootstrap}`), env)
+    assert.equal(response.status, 503)
+    assert.deepEqual(await response.json(), { error: { code: 'qf_auth_unavailable' } })
+  }
+  const rejected = createQfProxy(async () => Response.json({ error: 'invalid_client' }, { status: 400 }))
+  assert.equal((await rejected.fetch(new Request(`https://worker.example${bootstrap}`), env)).status, 403)
+
+  for (const blocked of [
+    () => new Response('<html>blocked</html>', { status: 403, headers: { 'Content-Type': 'text/html' } }),
+    () => new Response(null, { status: 403 }),
+  ]) {
+    const proxy = createQfProxy(async (url) =>
+      url.includes('/oauth2/token') ? Response.json({ access_token: 'token', expires_in: 3_600 }) : blocked())
+    const response = await proxy.fetch(new Request(`https://worker.example${bootstrap}`), env)
+    assert.equal(response.status, 503)
+    assert.deepEqual(await response.json(), { error: { code: 'qf_content_unavailable' } })
+  }
 })
 
 test('rejects ambiguous sync queries before contacting QF', async () => {

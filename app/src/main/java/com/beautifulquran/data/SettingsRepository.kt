@@ -35,11 +35,10 @@ enum class VerseNumberScript { ARABIC, ENGLISH }
  * Which English the leaf is set from.
  *
  * [TRANSLATION] is the published verse translation, which reads as a book but
- * only lines up with the recitation approximately — Arabic word order is not
- * English word order, so `EnglishWordAlignment` has to bridge the two and
- * anchors about 84 % of words. [GLOSS] is the word-by-word crib the scrolling
- * reader sets, stitched into a line: it reads less well, and every Arabic word
- * lights exactly its own English, because there is nothing to align.
+ * uses `EnglishWordAlignment` to recover spoken ownership, including reordered
+ * words. Unmatched meanings remain approximate. [GLOSS] is the word-by-word
+ * crib the scrolling reader sets, stitched into a line with shared phrases
+ * coalesced. The ownership map follows whichever source the reader chooses.
  *
  * A reading preference rather than a right answer, so it is the reader's.
  */

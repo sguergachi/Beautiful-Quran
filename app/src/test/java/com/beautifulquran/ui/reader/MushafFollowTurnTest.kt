@@ -162,6 +162,40 @@ class MushafFollowTurnTest {
     }
 
     @Test
+    fun `Back retains earlier verses while the returned verse waits for its first word`() {
+        for (ownsVoice in listOf(false, true)) {
+            val packs = (1..12).map { ayah ->
+                mushafInkPackKind(
+                    pageOwnsVoice = ownsVoice,
+                    ayah = ayah,
+                    activeWordAyah = null,
+                    frontierAyah = 11,
+                    basmalahActive = false,
+                    hasSearchFlash = false,
+                    frontierWaitingForFirstWord = true,
+                    waitingForVoice = true,
+                )
+            }
+            assertEquals(
+                List(10) { MushafInkPackKind.STATIC } + List(2) { MushafInkPackKind.UPCOMING },
+                packs,
+            )
+        }
+    }
+
+    @Test
+    fun `a waiting leaf without a known verse still cannot flash full ink`() {
+        assertEquals(
+            MushafInkPackKind.UPCOMING,
+            mushafInkPackKind(false, 11, null, null, false, false, waitingForVoice = true),
+        )
+        assertEquals(
+            MushafInkPackKind.UPCOMING,
+            mushafInkPackKind(false, 11, null, 11, false, false, waitingForVoice = true),
+        )
+    }
+
+    @Test
     fun `the verse the voice just left keeps its clocks while its glimmer dries`() {
         assertEquals(
             MushafInkPackKind.ACTIVE_WORD,
@@ -345,6 +379,19 @@ class MushafFollowTurnTest {
         assertFalse(mushafSameActivation(expected, expected.copy(wordPosition = 25)))
         assertFalse(mushafSameActivation(expected, expected.copy(activation = 5)))
         assertFalse(mushafSameActivation(expected, null))
+    }
+
+    @Test
+    fun `a font wait cannot turn onto a stale leaf while fade-led focus stays unchanged`() {
+        val waiting = MushafPlayback(
+            activeAyah = 11, reciting = true, playingHere = true,
+            playingAyah = 11, inkId = 4,
+        )
+        assertTrue(mushafSamePlayback(11, 4, waiting))
+        // Media3 advances to the next leaf before the focus poll catches up.
+        assertFalse(mushafSamePlayback(11, 4, waiting.copy(playingAyah = 12, inkId = 5)))
+        // A restart or repeat changes the performance even within the same verse.
+        assertFalse(mushafSamePlayback(11, 4, waiting.copy(inkId = 5)))
     }
 
     @Test

@@ -13,6 +13,7 @@ import { dictionaryEntry, type DictionaryEntry } from '../data/dictionary'
 import { lexiconEntry, type LexiconEntry } from '../data/lexicon'
 import { QuranRepository } from '../data/repository'
 import { runtimeMushafCache } from '../data/runtimeMushaf'
+import { QF_TIMING_RECITERS, runtimeTimingsCache } from '../data/runtimeTimings'
 import {
   loadBookmarks,
   loadSettings,
@@ -263,12 +264,34 @@ class AppStore {
   }
 
   constructor() {
+    runtimeTimingsCache.subscribe((reciterId) => {
+      if (reciterId == null) void runtimeMushafCache.revoke().catch(() => undefined)
+      const currentReciter = this.state.reciters.find((reciter) => reciter.id === this.state.settings.reciterId)
+        ?? this.state.reciters[0]
+      if (!currentReciter || !QF_TIMING_RECITERS[currentReciter.id] ||
+          (reciterId != null && reciterId !== currentReciter.id)) return
+      ++this.timingLoadToken
+      this.stopWordAudition(true)
+      this.prepared.clear()
+      this.forcedHighlight = null
+      this.lastActiveKey = ''
+      const content = this.state.content
+      this.timingSegments = content
+        ? withBasmalahLeadIn(QuranRepository.timings(currentReciter.id, content.surah.id),
+          currentReciter.id, content.surah.id)
+        : new Map()
+      this.recomputeActive(this.state.player)
+      this.set({ hasTimings: currentReciter.hasTimings && this.timingSegments.size > 0 })
+    })
     runtimeMushafCache?.subscribe(() => {
       QuranRepository.invalidateRuntimeMushafViews()
       const current = this.state.content
       if (current) this.set({ content: QuranRepository.surahContent(current.surah.id) })
     })
     runtimeMushafCache?.subscribeDiagnostics(() => {
+      if (runtimeMushafCache.status().lastError === 'revoked') {
+        void runtimeTimingsCache.revoke().catch(() => undefined)
+      }
       if (this.state.ready) return
       const status = runtimeMushafCache.status()
       if (status.phase === 'refreshing') {
@@ -290,6 +313,7 @@ class AppStore {
     })
     window.addEventListener('online', () => {
       void runtimeMushafCache?.refreshIfNeeded()
+      void runtimeTimingsCache.refreshLoaded()
     })
     player.subscribe((ps) => {
       const prev = this.state.player
