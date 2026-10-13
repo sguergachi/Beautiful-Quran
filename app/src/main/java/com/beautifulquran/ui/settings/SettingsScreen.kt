@@ -70,6 +70,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.beautifulquran.BuildConfig
 import com.beautifulquran.QuranApp
 import com.beautifulquran.R
+import com.beautifulquran.data.BookTypeface
 import com.beautifulquran.data.BrushCircleStyle
 import com.beautifulquran.data.MushafBannerStyle
 import com.beautifulquran.data.RuntimeCachePhase
@@ -80,6 +81,7 @@ import com.beautifulquran.data.ThemeMode
 import com.beautifulquran.playback.RecitationCache
 import com.beautifulquran.playback.RecitationUsage
 import com.beautifulquran.playback.formatUsage
+import com.beautifulquran.ui.theme.forCaps
 import com.beautifulquran.ui.theme.AlphaTag
 import com.beautifulquran.ui.theme.BrushCheckParams
 import com.beautifulquran.ui.theme.BrushCircleParams
@@ -100,6 +102,7 @@ import com.beautifulquran.ui.theme.quietClickable
 import com.beautifulquran.ui.theme.shippedCheckParams
 import com.beautifulquran.ui.theme.themePreviewColors
 import com.beautifulquran.ui.theme.verticalFadingEdges
+import com.beautifulquran.ui.theme.typeScale
 import kotlin.math.roundToInt
 import com.beautifulquran.ui.theme.QuranTheme
 
@@ -371,6 +374,17 @@ private fun DeveloperSection(
     SectionLabel("Developer")
     Spacer(Modifier.height(2.dp))
     Caption("Tools for testing work in progress.")
+
+    Spacer(Modifier.height(20.dp))
+    SectionLabel("English type")
+    BookTypeface.entries.forEach { face ->
+        SelectRow(
+            label = face.label,
+            selected = settings.bookTypeface == face,
+            onClick = { viewModel.settings.update { it.copy(bookTypeface = face) } },
+        )
+    }
+    Caption("Readers get Junicode, set to Garamond's size, measure and colour. The earlier EB Garamond stays for comparison.")
 
     Spacer(Modifier.height(20.dp))
     SectionLabel("Chapter banner")
@@ -1096,7 +1110,7 @@ internal fun TextSizeControl(scale: Float, onScale: (Float) -> Unit) {
     Row(verticalAlignment = Alignment.CenterVertically) {
         Text(
             text = "A",
-            fontSize = 15.sp,
+            fontSize = typeScale(15.sp),
             fontFamily = MaterialTheme.typography.bodyLarge.fontFamily,
             color = glyphInk,
             modifier = Modifier
@@ -1131,7 +1145,7 @@ internal fun TextSizeControl(scale: Float, onScale: (Float) -> Unit) {
         }
         Text(
             text = "A",
-            fontSize = 26.sp,
+            fontSize = typeScale(26.sp),
             fontFamily = MaterialTheme.typography.bodyLarge.fontFamily,
             color = glyphInk,
             modifier = Modifier
@@ -1273,7 +1287,7 @@ internal fun Section(text: String) {
 internal fun SectionLabel(text: String) {
     Text(
         text = text.uppercase(),
-        style = MaterialTheme.typography.labelSmall,
+        style = MaterialTheme.typography.labelSmall.forCaps(),
         letterSpacing = 2.sp,
         color = QuranTheme.ink.muted,
     )

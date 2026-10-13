@@ -47,6 +47,13 @@ import androidx.compose.ui.unit.em
 import androidx.compose.ui.unit.times
 import com.beautifulquran.data.MushafBannerStyle
 import com.beautifulquran.data.model.Surah
+import com.beautifulquran.ui.theme.mixedCaseTrackingEm
+import com.beautifulquran.ui.theme.DisplayFontFamily
+import com.beautifulquran.ui.theme.BookTextMotion
+import com.beautifulquran.ui.theme.BookTextPaintFlags
+import com.beautifulquran.ui.theme.LocalQuranTypePalette
+import com.beautifulquran.ui.theme.QuranTypeProfile
+import com.beautifulquran.ui.theme.TitleFeatures
 import com.beautifulquran.ui.theme.GeneratedInkRosette
 import com.beautifulquran.ui.theme.HafsFontFamily
 import com.beautifulquran.ui.theme.SerifFontFamily
@@ -153,10 +160,18 @@ internal fun MushafSurahTitleBand(
     val groundAlpha = if (style == MushafBannerStyle.CLOUD) baseGround * 1.2f else baseGround
 
     val name = if (latin) surah?.nameTransliteration.orEmpty() else surah?.nameArabic.orEmpty()
-    val family = if (latin) SerifFontFamily else HafsFontFamily
+    // A banner name is display-sized: the display master, not the Text one.
+    val family = when {
+        !latin -> HafsFontFamily
+        LocalQuranTypePalette.current.profile == QuranTypeProfile.CLASSIC -> SerifFontFamily
+        else -> DisplayFontFamily
+    }
+    val paintFlags = if (latin) BookTextPaintFlags else Paint.ANTI_ALIAS_FLAG
+    val titleFeatures = if (latin) TitleFeatures else null
     val titleSize = fontSize * if (latin) MushafLatinTitleScale else MushafArabicTitleScale
     val resolvedTypeface by LocalFontFamilyResolver.current.resolve(family)
     val density = LocalDensity.current
+    val titleTrackingEm = mixedCaseTrackingEm(TitleLetterSpacingEm)
     val naturalPx = with(density) { titleSize.toPx() }
     val bandPx = with(density) { bandHeight.toPx() }
     BoxWithConstraints(
@@ -168,21 +183,23 @@ internal fun MushafSurahTitleBand(
     // name too long for that (a long transliteration on a narrow phone or at a
     // large font scale) is set down until it fits, never let through.
     val roomPx = bannerNameRoomPx(style, constraints.maxWidth.toFloat(), bandPx)
-    val fontPx = remember(resolvedTypeface, naturalPx, latin, name, roomPx) {
-        val probe = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+    val fontPx = remember(resolvedTypeface, naturalPx, latin, name, roomPx, titleTrackingEm, paintFlags, titleFeatures) {
+        val probe = Paint(paintFlags).apply {
             typeface = resolvedTypeface as Typeface
             textSize = naturalPx
-            if (latin) letterSpacing = TitleLetterSpacingEm
+            if (latin) letterSpacing = titleTrackingEm
+            fontFeatureSettings = titleFeatures
         }
         val natural = probe.measureText(name)
         if (natural <= 0f || natural <= roomPx) naturalPx else naturalPx * (roomPx / natural).coerceAtLeast(0.5f)
     }
     val titleSizeFit = with(density) { fontPx.toSp() }
-    val paint = remember(resolvedTypeface, fontPx, latin) {
-        Paint(Paint.ANTI_ALIAS_FLAG).apply {
+    val paint = remember(resolvedTypeface, fontPx, latin, titleTrackingEm, paintFlags, titleFeatures) {
+        Paint(paintFlags).apply {
             typeface = resolvedTypeface as Typeface
             textSize = fontPx
-            if (latin) letterSpacing = TitleLetterSpacingEm
+            if (latin) letterSpacing = titleTrackingEm
+            fontFeatureSettings = titleFeatures
         }
     }
     val drop = remember(paint, latin, bandPx) { titleBaselineDrop(paint, latin, bandPx) }
@@ -428,7 +445,9 @@ private fun MushafTitle(
         style = TextStyle(
             fontFamily = family,
             fontSize = fontSize,
-            letterSpacing = if (latin) TitleLetterSpacingEm.em else TextUnit.Unspecified,
+            letterSpacing = if (latin) mixedCaseTrackingEm(TitleLetterSpacingEm).em else TextUnit.Unspecified,
+            textMotion = if (latin) BookTextMotion else null,
+            fontFeatureSettings = if (latin) TitleFeatures else null,
             color = ink,
             textAlign = TextAlign.Center,
             platformStyle = PlatformTextStyle(includeFontPadding = false),

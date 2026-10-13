@@ -1,5 +1,6 @@
 package com.beautifulquran.ui.reader
 
+import com.beautifulquran.domain.EnglishTypography
 import android.app.Activity
 import android.content.Context
 import android.content.ContextWrapper
@@ -147,6 +148,8 @@ import com.beautifulquran.ui.theme.LocalQuranAccents
 import com.beautifulquran.ui.theme.LocalQuranInk
 import com.beautifulquran.ui.theme.QuranTheme
 import com.beautifulquran.ui.theme.ReturnArrowHeading
+import com.beautifulquran.ui.theme.LocalQuranTypePalette
+import com.beautifulquran.ui.theme.bookCacheSuffix
 import com.beautifulquran.ui.theme.absorbPointerEvents
 import com.beautifulquran.ui.theme.contextualGuideProgressiveBlur
 import com.beautifulquran.ui.theme.contrastingOverlayAccents
@@ -304,6 +307,8 @@ fun ReaderScreen(
     // one ayah block — never the whole screen.
     val activeWordState = viewModel.activeWord.collectAsStateWithLifecycle()
     val settings by viewModel.settings.settings.collectAsStateWithLifecycle()
+    val bookTypeface = settings.activeBookTypeface
+    val typePalette = LocalQuranTypePalette.current
     // Snapshot the shared Continue / green-ribbon target for this visit. A
     // deliberate pause moves this local marker and persists the same target.
     var parkedPlace by remember(surahId) {
@@ -363,7 +368,10 @@ fun ReaderScreen(
         leafMetricsFromOpenInkLab.value,
         settings.englishLeafText,
         settings.verseNumberScript,
+        bookTypeface,
+        typePalette.bookCacheSuffix,
     ) {
+        if (settings.developerModeEnabled) delay(250)
         val well = leafMetrics?.getOrNull(0) ?: return@LaunchedEffect
         val measure = leafMetrics.getOrNull(1) ?: return@LaunchedEffect
         if (!mushafMode || well <= 0f || measure <= 0f) return@LaunchedEffect
@@ -379,12 +387,14 @@ fun ReaderScreen(
         }
         viewModel.ensureMushaf(
             text = settings.englishLeafText,
+            retainMeasuredBook = settings.developerModeEnabled,
             rulerFor = { translation ->
                 englishLeafRuler(
                     wellPx = well,
                     measurePx = measure,
                     density = rulerDensity,
                     measurer = rulerMeasurer,
+                    typePalette = typePalette,
                     verseNumberScript = settings.verseNumberScript,
                     translation = translation,
                 )
@@ -393,13 +403,15 @@ fun ReaderScreen(
                 well,
                 measure,
                 settings.verseNumberScript,
+                bookTypeface,
+                typePalette.bookCacheSuffix,
             ),
             cacheKey = viewModel.englishBookCacheKey(
                 wellPx = well,
                 measurePx = measure,
                 verseNumberScript = settings.verseNumberScript.ordinal,
                 leafText = settings.englishLeafText.ordinal,
-            ),
+            ) + typePalette.bookCacheSuffix,
         )
     }
     val mushafCatalog = mushafUi?.catalog
@@ -680,8 +692,8 @@ fun ReaderScreen(
             emptyList()
         } else {
             content.ayahs.filter { a ->
-                a.translation.contains(activeQuery, ignoreCase = true) ||
-                    a.words.any { it.translation.contains(activeQuery, ignoreCase = true) }
+                EnglishTypography.fold(a.translation).contains(activeQuery, ignoreCase = true) ||
+                    a.words.any { EnglishTypography.fold(it.translation).contains(activeQuery, ignoreCase = true) }
             }.map { it.number }
         }
     }

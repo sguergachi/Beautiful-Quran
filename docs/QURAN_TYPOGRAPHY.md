@@ -909,6 +909,19 @@ natural spacing too, so tightening the letters does not change its type size.
 The measurements below record the earlier settings as well as the reasons
 for the current one.
 
+The leaf is set in Junicode, matched to the EB Garamond these rules were
+measured in (docs/DESIGN.md, "Type"): it takes the hand Garamond's leaf solves
+to, scaled to Junicode's size, with Garamond's line pitch, and its width and
+word space are pinned so a leaf holds what Garamond's does (753 leaves to 751
+on a Pixel 10). The developer comparison keeps these whole-word rules for both
+faces. The book cache includes the face, its font hashes and the constants
+that move a line, and the paragraph-break cache includes the full text style
+and annotated spans, so a font change cannot reuse the other face's
+measurements or chosen breaks. Customize uses the same rag setter as the live
+leaf. The leaf's fonts, including verse figures and basmalah, stay the same
+across light and dark themes so pagination stays fixed. The measurements below
+record the classic Garamond settings.
+
 The mushaf's own rule is that every full line reaches both margins (rule 3) —
 but that is a rule about Arabic, which fills a line by the letterform, and it
 is the calligrapher's art. Latin has only the word space to fill with, and on

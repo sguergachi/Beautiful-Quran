@@ -2,3 +2,6 @@ node_modules/
 dist/
 *.local
 .DS_Store
+
+# Font licenses, copied from ../licenses by scripts/copy-licenses.mjs.
+/public/font-licenses/

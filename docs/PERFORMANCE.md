@@ -362,7 +362,7 @@ janky", first ask: is this the release APK?
 - Surah and reciter lists are cached in memory after first read.
 - The English book's measured leaves stay on disk under
   `EnglishBookCache`. Four most-recently-read configs are retained so
-  flipping translation, gloss, or type size does not remeasure; in-progress
+  flipping translation, gloss, or typography profile does not remeasure; in-progress
   writes publish atomically and failed writes remove their own temporary
   files. Successful writes also reclaim temporary files abandoned for a day.
   Access/pruning is serialized; the just-written book is retained even when
@@ -370,6 +370,12 @@ janky", first ask: is this the release APK?
   `checkCancelled` callback checks the coroutine before each layout attempt.
   This also stops work on ViewModel teardown. Generation gates still protect
   publication and writes.
+  Each typeface keys its own book (`bookCacheSuffix`: the face, its font
+  files' hashes and every constant that moves a line), so switching the
+  developer comparison does not reuse the other face's measurements. A
+  developer switch retains the current measured book while its replacement
+  paginates, so the leaf remains available for live comparison. Cold starts
+  and content changes still hold English until measured leaves exist.
 
 ### 7b. The word-search index is a memory budget, not just a cache
 
