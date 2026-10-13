@@ -34,6 +34,19 @@ class EnglishWordAlignmentTest {
     }
 
     @Test
+    fun `curled apostrophes keep the same anchors and whole word boundaries`() {
+        val raw = "The Qur'an doesn't change Allah's words"
+        val set = EnglishTypography.typeset(raw)
+        val glosses = listOf("The Qur'an", "doesn't change", "Allah's words")
+        assertTrue(
+            EnglishWordAlignment.wordEnds(raw, glosses)!!.contentEquals(
+                EnglishWordAlignment.wordEnds(set, glosses.map(EnglishTypography::typesetName))!!,
+            ),
+        )
+        assertEquals(listOf("The Qur’an", " doesn’t change", " Allah’s words"), shares(set, glosses))
+    }
+
+    @Test
     fun `each Arabic word takes the English it is about`() {
         val shares = shares(baqarah2, baqarah2Glosses)
         assertEquals("This is", shares[0])

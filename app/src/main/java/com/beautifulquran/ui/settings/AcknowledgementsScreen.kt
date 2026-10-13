@@ -54,7 +54,7 @@ internal val ACKNOWLEDGEMENTS = listOf(
     ),
     Acknowledgement(
         title = "Yasser Al-Dosari timings",
-        body = "Word timings from Qur'anic Universal Audio, CC-BY 4.0.",
+        body = "Word timings from Qur’anic Universal Audio, CC-BY 4.0.",
     ),
     Acknowledgement(
         title = "Repeat-aware timings",
@@ -65,6 +65,12 @@ internal val ACKNOWLEDGEMENTS = listOf(
         title = "Recitation audio",
         body = "Streamed from everyayah.com. Free; all rights to the recitations " +
             "belong to the respective reciters.",
+    ),
+    Acknowledgement(
+        title = "English typeface",
+        body = "Junicode by Peter S. Baker (SIL OFL 1.1), with EB Garamond supplying the " +
+            "letters it lacks. The comparison profile uses EB Garamond and Cormorant " +
+            "Garamond (SIL OFL 1.1). Font licenses accompany the app.",
     ),
     Acknowledgement(
         title = "Arabic typeface",

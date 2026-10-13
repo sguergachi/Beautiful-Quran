@@ -205,8 +205,10 @@ object EnglishWordAlignment {
                 continue
             }
             val start = i
+            // The translation is typeset with curled apostrophes (Qur’an); one
+            // word either way, and spelled straight so it matches the glosses.
             while (i < text.length && (text[i].isLetter() || text[i] == '\'' || text[i] == '’')) i++
-            out += ProseWord(text.substring(start, i).lowercase(), i, added, sentence)
+            out += ProseWord(text.substring(start, i).replace('’', '\'').lowercase(), i, added, sentence)
         }
         // One meaning can span several printed words: "Exalted in Might"
         // and "All-Mighty", or "give life" and "life".

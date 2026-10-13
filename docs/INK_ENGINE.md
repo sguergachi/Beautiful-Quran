@@ -636,7 +636,8 @@ repeat timings, **Repeat ink** strength, the fresh-ink **Glitter time**,
 **Glint tint**, **Halo strength**, and **Halo blur** controls, wash feather,
 and the experimental tajweed hold (see
 [TAJWEED_PACING.md](TAJWEED_PACING.md)). There are enough knobs now that the
-panel is split into **Ink / Sweep / Repeat / Tajweed / Guide / Sync** tabs —
+panel is split into **Ink / Sweep / Repeat / Tajweed / Tarjīʿ / Guide / Sync**
+tabs —
 quiet ink names with a hairline under the live one, no tab-bar chrome. Guide
 exposes the contextual lesson's body edge, feather width, fade softness,
 progressive-blur radius/strength, vellum grain, and vertical taper. Each guide

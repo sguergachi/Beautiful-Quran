@@ -33,13 +33,14 @@ function cssColor(name: string, fallback: string): string {
  */
 export async function renderShareCard(verses: readonly ShareVerse[]): Promise<Blob> {
   await document.fonts.load("28px 'Hafs Uthmanic'")
+  await document.fonts.load("16px 'Junicode'")
   await document.fonts.load("16px 'EB Garamond'")
   const measure = document.createElement('canvas').getContext('2d')
   if (!measure) throw new Error('No canvas')
   const maxWidth = WIDTH - PAD_X * 2
   measure.font = "28px 'Hafs Uthmanic', serif"
   const arabicLines = verses.map((verse) => wrap(measure, verse.arabic, maxWidth))
-  measure.font = "16px 'EB Garamond', serif"
+  measure.font = "16px 'Junicode', 'EB Garamond', serif"
   const englishLines = verses.map((verse) =>
     verse.translation.trim() ? wrap(measure, verse.translation, maxWidth) : [],
   )
@@ -81,7 +82,7 @@ export async function renderShareCard(verses: readonly ShareVerse[]): Promise<Bl
     if (englishLines[index]!.length > 0) {
       y += 12
       ctx.direction = 'ltr'
-      ctx.font = "16px 'EB Garamond', serif"
+      ctx.font = "16px 'Junicode', 'EB Garamond', serif"
       ctx.fillStyle = ink
       ctx.globalAlpha = 0.74
       for (const line of englishLines[index]!) {
@@ -103,10 +104,12 @@ export async function renderShareCard(verses: readonly ShareVerse[]): Promise<Bl
   ctx.globalAlpha = 1
   ctx.direction = 'ltr'
   ctx.fillStyle = gold
-  ctx.font = "28px 'Cormorant Garamond', serif"
+  ctx.font = "500 28px 'Junicode', 'EB Garamond', serif"
   y += 40
   ctx.fillText(footer.chapter, WIDTH / 2, y)
   ctx.globalAlpha = 0.72
+  // The references stay in EB Garamond: canvas text takes no OpenType
+  // features, and Junicode's default old-style 1 reads as I ("2:I5").
   ctx.font = "16px 'EB Garamond', serif"
   y += 28
   ctx.fillText(footer.verses, WIDTH / 2, y)

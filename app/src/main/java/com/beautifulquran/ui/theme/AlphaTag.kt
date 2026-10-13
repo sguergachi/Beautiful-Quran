@@ -20,7 +20,7 @@ fun AlphaTag(modifier: Modifier = Modifier) {
     val description = stringResource(R.string.alpha_tag_description)
     Text(
         text = stringResource(R.string.alpha_tag).uppercase(),
-        style = MaterialTheme.typography.labelSmall,
+        style = MaterialTheme.typography.labelSmall.forCaps(),
         letterSpacing = 2.sp,
         color = QuranTheme.ink.muted,
         modifier = modifier.semantics { contentDescription = description },

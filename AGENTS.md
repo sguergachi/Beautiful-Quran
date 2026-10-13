@@ -127,6 +127,13 @@ python3 tools/test_build_db.py  # timing pipeline regressions (~1s, no Gradle)
   `python3 tools/build_dictionary_db.py` (caches ~485 MB kaikki Arabic JSONL
   under `tools/.cache/`, emits a ~1 MB QAC-lemma subset). Bump
   `DictionaryDatabase.DB_FILE_NAME` when its content changes.
+- The English face, Junicode, is committed as one subset cut for both apps
+  (`app/src/main/res/font/junicode_*.ttf`, `web/public/fonts/junicode_*.woff2`).
+  Rebuild only to change the cut: `python3 tools/build_junicode_fonts.py
+  <Junicode 2.226 release>/VAR` (reproducible), then update
+  `JUNICODE_ROMAN_SHA` / `JUNICODE_ITALIC_SHA` in `ui/theme/Type.kt` —
+  `JunicodeTypeTest` fails until you do, and they key the English book cache.
+  No font is downloaded at build time. See `docs/DESIGN.md` "Type".
 - `data/search_concepts.json` is committed and read directly (not extracted or
   cached under a versioned filename). Rebuild it only with
   `python3 tools/build_search_concepts.py`; the script verifies its pinned QSAC

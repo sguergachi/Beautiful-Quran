@@ -25,7 +25,7 @@ export const ACKNOWLEDGEMENTS: Acknowledgement[] = [
   },
   {
     title: 'Yasser Al-Dosari timings',
-    body: "Word timings from Qur'anic Universal Audio, CC-BY 4.0.",
+    body: 'Word timings from Qur’anic Universal Audio, CC-BY 4.0.',
   },
   {
     title: 'Repeat-aware timings',
@@ -34,6 +34,10 @@ export const ACKNOWLEDGEMENTS: Acknowledgement[] = [
   {
     title: 'Recitation audio',
     body: 'Streamed from everyayah.com. Free; all rights to the recitations belong to the respective reciters.',
+  },
+  {
+    title: 'English typeface',
+    body: 'Junicode by Peter S. Baker (SIL OFL 1.1), with EB Garamond (SIL OFL 1.1) supplying the letters it lacks. Font licenses accompany the reader.',
   },
   {
     title: 'Arabic typeface',
