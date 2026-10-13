@@ -140,8 +140,10 @@ tails; it does not add a verse-specific phrase or change the wash clock.
 The fetched [Sahih International](https://quran.com/24:4?translations=20),
 [Abdel Haleem](https://quran.com/24:4?translations=85), full morphology and
 [Jalalayn](https://quran.com/24:4/tafsirs/926) ground the reviewed 24:4 labels.
-Its two printed words, every eligible carried cut, and the Alafasy
-19,480–20,850 ms completion window are tested. General regressions cover
+Its two printed words, every eligible carried cut, the Alafasy
+21,830–23,550 ms and Hani 19,480–20,850 ms completion windows are tested.
+App reciter 1 is Alafasy (QF 7); app reciter 7 is Hani (QF 5), so source
+and app IDs must not be interchanged. General regressions cover
 sentence punctuation, separately spoken tails, missing anchors and reflexives.
 
 ## Establishing a semantic accuracy claim

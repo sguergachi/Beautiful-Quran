@@ -18,18 +18,26 @@ class EnglishWashClockTest {
     )
 
     @Test
-    fun `ever after completes with the Alafasy abadan timing`() {
+    fun `ever after completes with each reciters actual abadan timing`() {
         val (_, text, glosses) = javaClass.getResourceAsStream("/english-ever-after-owners.tsv")!!
             .bufferedReader().use { it.readLines().single() }.split('\t')
         val spans = EnglishWordAlignment.align(text, glosses.split('|'))!!.washSpans
-        val timings = listOf(Segment(15, 18170, 19480), Segment(16, 19480, 20850),
-            Segment(17, 20850, 23820), Segment(18, 23820, 24170), Segment(19, 24170, 26275))
-        val window = englishWashWindows(spans.map { it.position }, timings).getValue(16)
-        assertEquals(EnglishWashWindow(19480, 20850), window)
         val owned = spans.single { it.position == 16 }
         assertTrue(owned.to * text.length >= text.indexOf("after") + "after".length)
-        assertTrue(window.progress(20849) < 1f)
-        assertEquals(1f, window.progress(20850), 0f)
+        // App reciter 1 is Alafasy (QF 7); app reciter 7 is Hani (QF 5).
+        val reciters = listOf(
+            listOf(Segment(15, 20390, 21830), Segment(16, 21830, 23550),
+                Segment(17, 23550, 26490), Segment(18, 26490, 26890), Segment(19, 26890, 31335)),
+            listOf(Segment(15, 18170, 19480), Segment(16, 19480, 20850),
+                Segment(17, 20850, 23820), Segment(18, 23820, 24170), Segment(19, 24170, 26275)),
+        )
+        for (timings in reciters) {
+            val spoken = timings.single { it.position == 16 }
+            val window = englishWashWindows(spans.map { it.position }, timings).getValue(16)
+            assertEquals(EnglishWashWindow(spoken.startMs, spoken.endMs), window)
+            assertTrue(window.progress(spoken.endMs - 1) < 1f)
+            assertEquals(1f, window.progress(spoken.endMs), 0f)
+        }
     }
 
     @Test
