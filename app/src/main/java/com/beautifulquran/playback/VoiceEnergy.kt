@@ -517,7 +517,7 @@ class VoiceEnergy(private val elapsedRealtimeMs: () -> Long = SystemClock::elaps
         }
 
         /** Lab capture cap: 12 s of 20 ms hops ≈ 600 hops ≈ 350 KB. */
-        private const val MAX_CAPTURE_HOPS = 600
+        private const val MAX_CAPTURE_HOPS = 2400
         private const val MIN_CAPTURE_HOPS = 16
 
         /**
