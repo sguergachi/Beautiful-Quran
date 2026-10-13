@@ -28,9 +28,14 @@ import com.beautifulquran.ui.theme.ornament.FieldSpec
 import com.beautifulquran.ui.theme.ornament.fittedFieldCellWidth
 import com.beautifulquran.ui.theme.ornament.RosetteSpec
 import com.beautifulquran.ui.theme.ornament.StrokeWeight
+import kotlin.math.PI
+import kotlin.math.ceil
+import kotlin.math.cos
+import kotlin.math.hypot
 import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.roundToInt
+import kotlin.math.sin
 
 /*
  * Renderers for the generated cover ornament (ui/theme/ornament/
@@ -328,6 +333,82 @@ internal fun sealCenterPx(geometry: CoverFrameGeometry, screenRadiusPx: Float): 
 }
 
 /**
+ * One side's border run in a canonical frame: the band's centreline from the
+ * seal at one end, round its corner arc, along the straight, and round the
+ * far corner arc into the seal at the other end. [u] is arc length from the
+ * first seal's centre; [point] places a cross-band offset (positive = inward)
+ * on that line, so a pattern laid by (u, offset) bends round each corner
+ * instead of stopping where the straight ends.
+ *
+ * The frame is the top edge: x along it, y in from it. The other three sides
+ * reuse it through a flip or swap. [radius0]/[radius1] are the display's
+ * corner radii at the two ends; a corner with no arc left (square display, or
+ * a radius the inset has used up) collapses to the miter, exactly as
+ * [sealCenterPx] does, so the two meet at u = 0.
+ */
+internal class BandRun(
+    private val sideLen: Float,
+    private val centre: Float,
+    radius0: Float,
+    radius1: Float,
+) {
+    private val r0 = max(radius0 - centre, 0f)
+    private val r1 = max(radius1 - centre, 0f)
+    private val x0 = centre + r0
+    private val x1 = centre + r1
+    private val arc0 = QUARTER_OF_QUARTER * r0
+    private val straight = max(sideLen - x0 - x1, 0f)
+    private val arc1 = QUARTER_OF_QUARTER * r1
+
+    /** Seal centre to seal centre, along the centreline. */
+    val length: Float = arc0 + straight + arc1
+
+    fun point(u: Float, inward: Float): Offset {
+        if (u < arc0 && r0 > 0f) {
+            val phi = (arc0 - u) / r0
+            val rho = max(r0 - inward, 0f)
+            return Offset(x0 - rho * sin(phi), x0 - rho * cos(phi))
+        }
+        if (u > arc0 + straight && r1 > 0f) {
+            val phi = (u - arc0 - straight) / r1
+            val rho = max(r1 - inward, 0f)
+            return Offset(sideLen - x1 + rho * sin(phi), x1 - rho * cos(phi))
+        }
+        return Offset(x0 + (u - arc0), centre + inward)
+    }
+
+    /** [pts] are (u, inward) pairs; the polyline is subdivided so it follows
+     *  the arcs rather than cutting a chord across them. */
+    fun trace(
+        path: Path,
+        pts: List<Offset>,
+        closed: Boolean,
+        toScreen: (Offset) -> Offset,
+        maxStep: Float,
+    ) {
+        val count = if (closed) pts.size + 1 else pts.size
+        var prev = pts[0]
+        val start = toScreen(point(prev.x, prev.y))
+        path.moveTo(start.x, start.y)
+        for (i in 1 until count) {
+            val next = pts[i % pts.size]
+            val steps = max(1, ceil(hypot(next.x - prev.x, next.y - prev.y) / maxStep).toInt())
+            for (k in 1..steps) {
+                val t = k / steps.toFloat()
+                val q = toScreen(point(prev.x + (next.x - prev.x) * t, prev.y + (next.y - prev.y) * t))
+                path.lineTo(q.x, q.y)
+            }
+            prev = next
+        }
+        if (closed) path.close()
+    }
+
+    private companion object {
+        const val QUARTER_OF_QUARTER = (PI / 4).toFloat()
+    }
+}
+
+/**
  * The four corner seals — small stars of the medallion's family, the hubs
  * the border band's channels taper onto. Part of the tooled binding, so
  * they are complete from the first frame: the board arrives already bound,
@@ -383,13 +464,13 @@ fun GeneratedCornerSeals(
 }
 
 /**
- * The generated border frieze: the band pattern runs along the straight
- * part of all four sides, between the two gilt rules, as a railed channel
- * whose mouth tapers open where the band leaves the corner — the seal is
- * seated on that corner's arc, so border and corner ornament read as one
- * continuous piece of tooling rather than a stamp over a strip. Each run
+ * The generated border frieze: the band pattern runs the whole way round,
+ * between the two gilt rules, as a railed channel — along each straight and
+ * round each corner arc until its mouth tapers onto the corner seal's petal
+ * tip. The seal is seated on that arc, so border and corner ornament read as
+ * one continuous piece of tooling rather than a stamp over a strip. Each run
  * fits a whole number of periods (the period stretches a little to fit),
- * so the pattern arrives at every corner at the same phase. The band is
+ * so the pattern arrives at every seal at the same phase. The band is
  * the binding's tooling, not illumination — it is complete from the first
  * frame, never animated. [seal] supplies the petal-tip radius.
  */
@@ -416,27 +497,32 @@ fun GeneratedBorderBand(
                 val c = bandCenter(geometry)
                 val w = size.width
                 val h = size.height
-                // The frieze only runs along the straight part of the band:
-                // past the corner arc (where the seal is seated) and past
-                // the seal's own reach, whichever is further out. The
-                // channel mouth then tapers into the run from there. All
-                // four runs share one start so the pattern stays in phase,
-                // so the widest corner sets it.
-                val arcEnd = screenRadius(geometry, geometry.outerCorners.max)
-                val sealU = sealCenterPx(geometry, arcEnd) +
-                    sealBoxPx(geometry, seal) * seal.tipRadius.toFloat()
+                // Each run starts at one corner seal and ends at the next,
+                // carrying the pattern round the corner arc into the seal
+                // (no gap, no abrupt end). The channel mouth tapers onto the
+                // seal's petal tip, so the run owns only what lies between
+                // the two tips; whole periods fit that span, the period
+                // stretching a little, so every run meets its seals at the
+                // same phase.
+                val tipU = sealBoxPx(geometry, seal) * seal.tipRadius.toFloat() * 0.9f
                 val taper = bandH * 0.8f
-                val bandStart = max(sealU, arcEnd) + taper
-                val tipU = bandStart - taper
+                val bandStart = tipU + taper
                 val periodPx = (spec.period * bandH).toFloat()
+                val maxStep = 2.5.dp.toPx()
+                val oc = geometry.outerCorners
+                val rTl = screenRadius(geometry, oc.topLeft)
+                val rTr = screenRadius(geometry, oc.topRight)
+                val rBl = screenRadius(geometry, oc.bottomLeft)
+                val rBr = screenRadius(geometry, oc.bottomRight)
 
-                // (u along the side, v across the band) → screen, per side;
-                // v mirrored on the far sides so the pattern faces inward.
-                val sides = listOf<Pair<Float, (Float, Float) -> Offset>>(
-                    w to { u, v -> Offset(u, c + (v - 0.5f) * bandH) },
-                    w to { u, v -> Offset(u, h - c - (v - 0.5f) * bandH) },
-                    h to { u, v -> Offset(c + (v - 0.5f) * bandH, u) },
-                    h to { u, v -> Offset(w - c - (v - 0.5f) * bandH, u) },
+                // A run in the canonical top-edge frame → screen, per side;
+                // inward stays inward on every side so the pattern faces in.
+                class Side(val run: BandRun, val toScreen: (Offset) -> Offset)
+                val sides = listOf(
+                    Side(BandRun(w, c, rTl, rTr)) { Offset(it.x, it.y) },
+                    Side(BandRun(w, c, rBl, rBr)) { Offset(it.x, h - it.y) },
+                    Side(BandRun(h, c, rTl, rBl)) { Offset(it.y, it.x) },
+                    Side(BandRun(h, c, rTr, rBr)) { Offset(w - it.y, it.x) },
                 )
 
                 // Pattern strokes stay hairline; rails and channel mouths
@@ -444,40 +530,45 @@ fun GeneratedBorderBand(
                 val hairBand = Path()
                 val ruleBand = Path()
                 val dotCenters = ArrayList<Pair<Offset, Float>>()
-                for ((sideLen, place) in sides) {
-                    // Whole periods between the two seals; the period
-                    // stretches to fit so both ends land on the same phase.
-                    val run = sideLen - 2f * bandStart
-                    if (run < periodPx / 2f) continue
-                    val tiles = max(1, (run / periodPx).roundToInt())
-                    val stretch = (run / tiles) / spec.period.toFloat()
+                for (side in sides) {
+                    val run = side.run
+                    val span = run.length - 2f * bandStart
+                    if (span < periodPx / 2f) continue
+                    val tiles = max(1, (span / periodPx).roundToInt())
+                    val stretch = (span / tiles) / spec.period.toFloat()
                     for (k in 0 until tiles) {
-                        val u0 = bandStart + k * (run / tiles)
+                        val u0 = bandStart + k * (span / tiles)
                         for (s in spec.strokes) {
                             val path = if (s.weight == StrokeWeight.Rule) ruleBand else hairBand
-                            s.points.forEachIndexed { i, p ->
-                                val pt = place(u0 + (p.x * stretch).toFloat(), p.y.toFloat())
-                                if (i == 0) path.moveTo(pt.x, pt.y) else path.lineTo(pt.x, pt.y)
+                            val pts = s.points.map {
+                                Offset(u0 + (it.x * stretch).toFloat(), ((it.y.toFloat() - 0.5f) * bandH))
                             }
-                            if (s.closed) path.close()
+                            run.trace(path, pts, s.closed, side.toScreen, maxStep)
                         }
                         for (d in spec.dots) {
                             dotCenters.add(
-                                place(u0 + (d.x * stretch).toFloat(), d.y.toFloat()) to
-                                    (d.radius * bandH).toFloat(),
+                                side.toScreen(
+                                    run.point(
+                                        u0 + (d.x * stretch).toFloat(),
+                                        (d.y.toFloat() - 0.5f) * bandH,
+                                    ),
+                                ) to (d.radius * bandH).toFloat(),
                             )
                         }
                     }
                     // Channel mouths: both rails converge onto the petal tip.
                     for ((mouth, point) in listOf(
                         bandStart to tipU,
-                        sideLen - bandStart to sideLen - tipU,
+                        run.length - bandStart to run.length - tipU,
                     )) {
-                        val tipAt = place(point, 0.5f)
-                        for (v in floatArrayOf(0f, 1f)) {
-                            val railEnd = place(mouth, v)
-                            ruleBand.moveTo(railEnd.x, railEnd.y)
-                            ruleBand.lineTo(tipAt.x, tipAt.y)
+                        for (v in floatArrayOf(-0.5f, 0.5f)) {
+                            run.trace(
+                                ruleBand,
+                                listOf(Offset(mouth, v * bandH), Offset(point, 0f)),
+                                false,
+                                side.toScreen,
+                                maxStep,
+                            )
                         }
                     }
                 }
