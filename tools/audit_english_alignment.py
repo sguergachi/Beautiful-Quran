@@ -26,10 +26,12 @@ parser.add_argument("--meaning-cases", type=Path, help="TSV of printed regex, Ar
 parser.add_argument("--arabic-cases", type=Path, help="TSV of printed regex, Arabic root, lemma, and POS; independent of input English glosses")
 parser.add_argument("--qac-source", type=Path, help="Original QAC 0.4 morphology; required for independent Arabic checks to reject mismatched word counts")
 parser.add_argument("--semantic-reference", type=Path, help="Reviewed TSV: verse_key, English token start, end, text, Arabic owner; unknown owners stay blank")
-parser.add_argument("--require-semantic-accuracy", type=decimal.Decimal, help="Required percent over every non-added English content token, including unreviewed tokens")
+parser.add_argument("--require-semantic-accuracy", type=decimal.Decimal, help="Required percent over every printed word, including grammar, additions and unreviewed words")
+parser.add_argument("--all-printed-words", action="store_true", help="Include grammar and translator additions; automatic with a semantic reference or required accuracy")
 parser.add_argument("--strict-meaning-owners", action="store_true", help="Fail on any QAC meaning-owner disagreement, even if the wash reaches it early")
 parser.add_argument("--word-by-word", action="store_true", help="Audit the actual lyricized word-card text as the second English source")
 args = parser.parse_args()
+args.all_printed_words |= args.require_semantic_accuracy is not None or args.semantic_reference is not None
 root = args.output_dir
 root.mkdir(parents=True, exist_ok=True)
 source = Path(__file__).resolve().parents[1] / "app/src/main/java/com/beautifulquran"
@@ -112,7 +114,7 @@ def decode(encoded):
 maps={k:(decode(owned),decode(wash)) for k,owned,wash in (l.split('\t') for l in (root/'ownership.tsv').read_text().splitlines())}
 # Validate reviewed labels before using them to adjudicate dictionary guesses.
 population={(key,a,b):(text[a:b],len(gs.split('|'))) for key,text,gs in rows
-            for word,a,b,added in tokens(text) if not added and word not in stop}
+            for word,a,b,added in tokens(text) if args.all_printed_words or (not added and word not in stop)}
 reference={}
 if args.semantic_reference:
     for line in args.semantic_reference.read_text().splitlines():
@@ -264,7 +266,9 @@ certificate={'corpus_sha256':hashlib.sha256(((root/'corpus.tsv') if args.word_by
              'mapper_sha256':hashlib.sha256((source/'domain/EnglishWordAlignment.kt').read_bytes()).hexdigest(),
              'reference_sha256':hashlib.sha256(args.semantic_reference.read_bytes()).hexdigest() if args.semantic_reference else None,
              'text_source':'word-cards' if args.word_by_word else 'published',
-             'population_content_tokens':denominator,'reviewed':reviewed,'correct':correct,
+             ('population_printed_tokens' if args.all_printed_words else 'population_content_tokens'):denominator,
+             'includes_grammar':args.all_printed_words,'includes_additions':args.all_printed_words,
+             'reviewed':reviewed,'correct':correct,
              'disagreements':len(wrong),'unreviewed':denominator-reviewed,
              'verified_percent_of_full_population':str(lower),
              'required_percent':str(target) if target is not None else None,

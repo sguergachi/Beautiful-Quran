@@ -18,6 +18,21 @@ class EnglishWashClockTest {
     )
 
     @Test
+    fun `ever after completes with the Alafasy abadan timing`() {
+        val (_, text, glosses) = javaClass.getResourceAsStream("/english-ever-after-owners.tsv")!!
+            .bufferedReader().use { it.readLines().single() }.split('\t')
+        val spans = EnglishWordAlignment.align(text, glosses.split('|'))!!.washSpans
+        val timings = listOf(Segment(15, 18170, 19480), Segment(16, 19480, 20850),
+            Segment(17, 20850, 23820), Segment(18, 23820, 24170), Segment(19, 24170, 26275))
+        val window = englishWashWindows(spans.map { it.position }, timings).getValue(16)
+        assertEquals(EnglishWashWindow(19480, 20850), window)
+        val owned = spans.single { it.position == 16 }
+        assertTrue(owned.to * text.length >= text.indexOf("after") + "after".length)
+        assertTrue(window.progress(20849) < 1f)
+        assertEquals(1f, window.progress(20850), 0f)
+    }
+
+    @Test
     fun `An Nur clear evidence painted edge moves between letters on every frame`() {
         val (_, text, glosses) = javaClass.getResourceAsStream("/english-clear-evidence-owners.tsv")!!
             .bufferedReader().use { it.readLines().first { row -> row.startsWith("24:1\t") } }.split('\t')

@@ -499,6 +499,9 @@ tween-vs-snap rules, sweep entry and residual rules, repeat wash timing, the
   “Clear evidence/evidences” stays with its single source meaning (24:1
   bayyināt: word 7); distinct literal adjective and noun cards retain their
   separate owners. Bayyina/mubīn heads resolve repeated “clear” phrases.
+  An unclaimed grammar tail stays with its closing sentence between adjacent
+  Arabic anchors: 24:4 “ever after” finishes together on word 16. Explicit
+  matches and earlier owners remain intact; unmatched content is not absorbed.
   A gendered offender expanded as a woman/man recognizes its source card
   only when no literal gender or printed offender head competes. This keeps
   the opening phrase of 24:2 active on Arabic word 1. Its expanded offender

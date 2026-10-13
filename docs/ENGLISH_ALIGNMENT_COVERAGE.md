@@ -1,7 +1,8 @@
 # English alignment and reader ink coverage
 
 The October 12–13 audit separates exact meaning ownership, continuous ink, and
-rendered playback. The requested 99.99% semantic accuracy is not established. A passing timing lookup or an early prefix does not prove
+rendered playback. Neither the requested 99.9% confidence nor the earlier
+99.99% semantic accuracy is established. A passing timing lookup or an early prefix does not prove
 the correct owner for repeat tint or a tap. These checks do not establish
 99.99% accuracy over all possible recitations, translations or UI sequences.
 
@@ -11,10 +12,10 @@ the correct owner for repeat tint or a tap. These checks do not establish
 | Timing rows, all 13 reciters | 81,059 rows from the public DB plus six hash-verified runtime packs; 1,023,989 segments, 17,748 repeat occurrences |
 | Boundary and seek queries, each English source | 12,384,384 checks in forward, backward and scrambled order; same clock gives the same word, high-water ink, repeat chain and handoff |
 | Independent root/lemma meaning cues | 1,403 correspondences: all exact owners, no delayed washes |
-| Annotated exact meaning fixtures | 194 heads, including all 44 Acquainted occurrences, vision/brothers, prayer action/commerce, shared phrases, repeated clauses and lexical variants |
+| Annotated exact meaning fixtures | The existing 194 heads plus both words of 24:4 “ever after,” including grammar and sentence-tail completion |
 | Gloss-independent QAC candidates | 12,011 additional checks using vocalized lemmas and POS; all 13,413 combined correspondences pass with twelve reference guesses corrected by the reviewed labels |
 | Quran.ai MCP review | The original 80 selected targets in 74 verses pass: 70 owner errors corrected, ten already-correct owners preserved; seven additional heads in 24:2–3, every “clear evidence/evidences” phrase in 32 verses, all main heads in 24:1, opening/female qualifiers, expanded descriptions, six modern-spelling targets and five word-card guard targets also pass |
-| Full semantic reference | 158 of 56,224 content tokens have model-reviewed, source-supported labels; 56,066 remain unreviewed and a complete independent benchmark is absent, so the 99.99% gate fails |
+| Full semantic reference | 160 of 158,066 printed words have model-reviewed, source-supported labels; 157,906 remain unreviewed. Grammar and translator additions count. The 99.9% gate fails; a complete independent benchmark is absent |
 | Six distinct meaning heads | All 720 Arabic orders check exact owners, taps and continuous prefix completion |
 | Reader transitions | Back to targets 2–12 with absent/stale/ahead focus, paused first-word waits, old/current generations, held/voice leaves; completed tails, same-verse seeks/repeats and playlist advances |
 | Carried English | Every eligible word-space cut in the prayer, reported-head, identity, An-Nur opening and 32 clear-evidence fixtures checks semantic owners and range/prefix continuity on both fragments |
@@ -87,7 +88,7 @@ owner is 45 and the wash remains continuous. Literal agreement is a diagnostic,
 including when it exceeds 99.99%; it does not certify semantic accuracy.
 
 These are model-adjudicated, selected labels grounded in fetched evidence.
-Quran.ai and this app share Quran.com/Quran Foundation data, and these 158
+Quran.ai and this app share Quran.com/Quran Foundation data, and these 160
 cases are not an independent representative sample or a complete gold corpus.
 
 The October 13 report exposed an uncovered opening in 24:2. Its word card
@@ -128,13 +129,30 @@ source-supported model reviews, including
 [Jalalayn on 24:1](https://quran.com/24:1/tafsirs/926), rather than a full
 independent benchmark.
 
+The 24:4 report exposed a coverage hole in the metric itself: “ever” matched
+Arabic word 16, but “after” was classified as grammar and fell back to word 17.
+The literal diagnostic and the old content-only reference excluded “after.”
+Their scores therefore could not detect this error. A general sentence rule
+now keeps an unclaimed grammar tail with its sentence's final Arabic anchor
+when the immediately following Arabic word anchors the next sentence. It
+preserves explicit matches, earlier owners, additions and unresolved content
+tails; it does not add a verse-specific phrase or change the wash clock.
+The fetched [Sahih International](https://quran.com/24:4?translations=20),
+[Abdel Haleem](https://quran.com/24:4?translations=85), full morphology and
+[Jalalayn](https://quran.com/24:4/tafsirs/926) ground the reviewed 24:4 labels.
+Its two printed words, every eligible carried cut, and the Alafasy
+19,480–20,850 ms completion window are tested. General regressions cover
+sentence punctuation, separately spoken tails, missing anchors and reflexives.
+
 ## Establishing a semantic accuracy claim
 
-`--require-semantic-accuracy 99.99` measures the full, frozen published-English
-population: 56,224 unbracketed content tokens, using the audit's documented
-English token/grammar filter. This is a definition of content-word ownership,
-not every aspect of listening accuracy or every possible future translation.
-At most five tokens may be wrong **or unreviewed** to meet that threshold.
+Any `--require-semantic-accuracy` threshold or `--semantic-reference` now
+automatically includes **every printed word**, including grammar and bracketed
+translator additions. `--all-printed-words` selects that population without
+requiring a threshold. The frozen published corpus has 158,066 words; at most
+158 may be wrong **or unreviewed** to meet 99.9%, or 15 to meet 99.99%.
+An audit without these options retains the old content-only diagnostic; its
+report explicitly identifies that scope. Literal agreement is never the gate.
 
 `--semantic-reference reviewed.tsv` accepts one independently reviewed row per
 token: verse key, character start, exclusive end, exact printed token, and
@@ -149,9 +167,15 @@ Automated QAC candidates, literal agreement and passing regression fixtures
 are kept separate from this reference. They have uncovered real bugs, but
 cannot validate the remaining unreviewed meanings. The finite gold-reference
 score also does not establish a statistical claim about unseen inputs. A
-95% one-sided bound of 99.99% would need at least 29,956 independent,
-representative zero-error observations; these selected checks and repeated
-frames are not that sample.
+95% one-sided bound of 99.9% would need at least 2,995 independent,
+representative zero-error observations; 99.99% needs 29,956. These selected
+checks and repeated frames are not that sample. A passing finite-reference
+accuracy gate does not itself establish the independence of that reference.
+
+`python3 tools/test_audit_english_alignment.py` exercises the production
+mapper and gate with hand-labelled synthetic input: an unreviewed grammar
+word, an unreviewed addition and a wrong owner each fail; a complete correct
+reference passes. CI runs these regressions alongside the JVM tests.
 
 The nine unavailable timing rows are Alafasy 37:152; As-Sudais 2:198, 2:223,
 13:37, 73:4; and Ash-Shuraym 12:50, 12:75, 12:76, 91:15. The audit lists them

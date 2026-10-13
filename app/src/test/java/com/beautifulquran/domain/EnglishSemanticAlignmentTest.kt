@@ -11,6 +11,49 @@ import org.junit.Test
 /** Fixed meaning correspondences, including words a literal diagnostic cannot judge. */
 class EnglishSemanticAlignmentTest {
     @Test
+    fun `ever after keeps the complete abadan meaning`() {
+        verifyCases("english-ever-after-owners.tsv", 1, checkTaps = true)
+        for (phrase in listOf("ever after", "ever afterwards")) {
+            val text = "$phrase. And those"
+            val glosses = listOf("ever", "And those")
+            val alignment = EnglishWordAlignment.align(text, glosses)!!
+            for (offset in listOf(1, phrase.length - 2)) {
+                assertEquals(phrase, 1, alignment.positionAt(offset / text.length.toFloat()))
+            }
+        }
+    }
+
+    @Test
+    fun `unspoken tails close with their sentence only between adjacent Arabic anchors`() {
+        for (stop in listOf(".", "?", "!", ";")) {
+            val text = "stays from then on$stop Next"
+            val alignment = EnglishWordAlignment.align(text, listOf("stays", "next"))!!
+            assertEquals(stop, 1, alignment.positionAt(text.indexOf(" on") / text.length.toFloat()))
+            assertEquals(stop, 2, alignment.positionAt(text.indexOf("Next") / text.length.toFloat()))
+        }
+        val separate = EnglishWordAlignment.align("ever after. Next", listOf("ever", "after", "next"))!!
+        assertEquals(2, separate.positionAt(8f / 16))
+        val unknown = EnglishWordAlignment.align("ever after. Next", listOf("ever", "unmatched", "next"))!!
+        assertEquals(2, unknown.positionAt(8f / 16))
+    }
+
+    @Test
+    fun `a sentence tail retains its earlier reflexive meaning`() {
+        val text = "he took his brother to himself. Next"
+        val alignment = EnglishWordAlignment.align(text, listOf("he took himself", "his brother", "next"))!!
+        assertEquals(1, alignment.positionAt(text.indexOf("himself") / text.length.toFloat()))
+    }
+
+    @Test
+    fun `a separately spoken after retains its owner`() {
+        val text = "ever after"
+        val glosses = listOf("ever", "after")
+        val alignment = EnglishWordAlignment.align(text, glosses)!!
+        assertEquals(1, alignment.positionAt(0.1f))
+        assertEquals(2, alignment.positionAt(0.9f))
+    }
+
+    @Test
     fun `clear evidence and evidences keep their bayyinat owners across the Quran`() {
         verifyCases("english-clear-evidence-owners.tsv", 32, checkTaps = true)
     }

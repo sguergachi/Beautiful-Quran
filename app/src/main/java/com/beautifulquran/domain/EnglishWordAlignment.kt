@@ -100,6 +100,7 @@ object EnglishWordAlignment {
                     ?: claimed[index].takeIf { it >= 0 } ?: fallback
             } else verified[index].takeIf { it >= 0 } ?: fallback
         }
+        closeAnchoredSentences(anchor, claimed, prose, positions)
         // A possessive or auxiliary travels with its printed head when that
         // head's gloss says it too: "Our servants" cannot split across owners.
         val grammar = glosses.map { words(it).map { word -> word.text }.toSet() }
@@ -423,6 +424,18 @@ object EnglishWordAlignment {
             }
         }
         return anchor
+    }
+
+    /** Unspoken grammar tails stay in their sentence between adjacent Arabic anchors. */
+    private fun closeAnchoredSentences(anchor: IntArray, claimed: IntArray, prose: List<ProseWord>, positions: IntArray) {
+        for (position in 0 until anchor.lastIndex) {
+            val at = anchor[position]
+            val next = anchor[position + 1]
+            if (at < 0 || next <= at || prose[at].sentence == prose[next].sentence) continue
+            val tail = (at + 1 until next).takeWhile { prose[it].sentence == prose[at].sentence }
+            if (tail.any { claimed[it] >= 0 || positions[it] <= position || prose[it].added || prose[it].text !in GRAMMAR }) continue
+            tail.forEach { positions[it] = position }
+        }
     }
 
     /**
@@ -798,7 +811,7 @@ object EnglishWordAlignment {
         "any", "both", "each", "every", "even", "more", "most", "oft",
         "ones", "only", "other", "others", "over", "surely", "well",
         "down", "forth", "up",
-        "about", "above", "after", "against", "along", "among", "around",
+        "about", "above", "after", "afterwards", "against", "along", "among", "around",
         "before", "behind", "below", "beside", "besides", "between", "concerning",
         "during", "into", "off", "out", "through", "toward", "towards", "under",
         "until", "upon", "while", "within", "without",

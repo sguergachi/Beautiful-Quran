@@ -21,7 +21,8 @@ class EnglishWashBandsTest {
     @Test
     fun `reported meanings keep their owners at every eligible carried leaf cut`() {
         val resources = listOf("english-prayer-alignment.tsv", "english-semantic-heads.tsv", "english-identity-owners.tsv",
-            "english-shared-owners.tsv", "english-quran-ai-opening-owners.tsv", "english-clear-evidence-owners.tsv")
+            "english-shared-owners.tsv", "english-quran-ai-opening-owners.tsv", "english-clear-evidence-owners.tsv",
+            "english-ever-after-owners.tsv")
         for (resource in resources) for (row in javaClass.getResourceAsStream("/$resource")!!
             .bufferedReader().use { it.readLines() }) {
             val columns = row.split('\t')
@@ -62,6 +63,23 @@ class EnglishWashBandsTest {
 
     /** A sentence occupying characters 10..109 of the paragraph. */
     private val sentence = 10..109
+
+    @Test
+    fun `ever after washes together before the next Arabic word`() {
+        val (_, text, glosses) = javaClass.getResourceAsStream("/english-ever-after-owners.tsv")!!
+            .bufferedReader().use { it.readLines().single() }.split('\t')
+        val alignment = EnglishWordAlignment.align(text, glosses.split('|'))!!
+        val spans = englishOwnedSpans(text.indices, alignment, text = text)
+        val word = ActiveWord(ayah = 4, wordPosition = 16, durationMs = 1200, activation = 0)
+        for (head in listOf("ever", "after")) {
+            val span = spans.single { text.indexOf(head) in it.range }
+            assertEquals(head, 16, span.position)
+            assertEquals(InkEngine.State.Active, InkEngine.word(span.position, word, isActiveAyah = true, dimmed = false).state)
+        }
+        assertTrue(alignment.through(17) * text.length >= text.indexOf("after") + "after".length)
+        val next = spans.single { text.indexOf("those", text.indexOf("after")) in it.range }
+        assertEquals(InkEngine.State.Upcoming, InkEngine.word(next.position, word, isActiveAyah = true, dimmed = false).state)
+    }
 
     @Test
     fun `clear evidence reveals together with bayyinat`() {
