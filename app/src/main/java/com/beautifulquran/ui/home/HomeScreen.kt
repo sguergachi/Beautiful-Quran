@@ -289,9 +289,10 @@ fun HomeScreen(
     )
     var continuePillHeight by remember { mutableStateOf(0.dp) }
     // Window bounds of the resting pill and its chapter row, for the dock
-    // flight. The row rect tracks live so the ghost homes onto the row even
-    // while the list is still moving under it.
-    var continuePillRect by remember { mutableStateOf<Rect?>(null) }
+    // flight. The seat freezes while the pill is up: exit frames must not
+    // shift the launch point. The row rect tracks live so the ghost homes
+    // onto the row even while the list is still moving under it.
+    var pillSeatRect by remember { mutableStateOf<Rect?>(null) }
     var continueRowRect by remember { mutableStateOf<Rect?>(null) }
     var pillWasShown by remember { mutableStateOf(false) }
     var dockStart by remember { mutableStateOf<Rect?>(null) }
@@ -313,7 +314,7 @@ fun HomeScreen(
     // popping it away. Fast scrolls never arm the flight.
     if (showContinuePill) pillWasShown = true
     if (continueRowVisible && pillWasShown && !docking && !undocking && dockReady && !reducedMotion) {
-        val start = continuePillRect
+        val start = pillSeatRect
         val end = if (!searching && coverSheetVisible) continueRowRect else null
         if (start != null && end != null) {
             dockStart = start
@@ -331,7 +332,7 @@ fun HomeScreen(
         searching,
     )
     if (!continueRowVisible && rowWasVisible && !docking && !undocking && !reducedMotion) {
-        val seat = continuePillRect
+        val seat = pillSeatRect
         val start = continueRowRect
         if (seat != null && start != null && !searchActive && coverSheetVisible &&
             continueIndex >= 0 && listState.firstVisibleItemIndex >= continueIndex &&
@@ -346,8 +347,10 @@ fun HomeScreen(
         }
         rowWasVisible = false
     }
-    LaunchedEffect(continueRowVisible, showContinuePill) {
-        if (continueRowVisible && showContinuePill) {
+    LaunchedEffect(continueRowVisible, pillWasShown, searchActive, coverSheetVisible) {
+        // showContinuePill is already false once the row is visible, so the
+        // dwell watches pillWasShown (the pill was up when the row arrived).
+        if (continueRowVisible && pillWasShown && !searchActive && coverSheetVisible) {
             delay(ContinueDockDwellMs)
             dockReady = true
         } else {
@@ -796,7 +799,11 @@ fun HomeScreen(
                                 else Modifier,
                             )
                             .onGloballyPositioned { coords ->
-                                continuePillRect = coords.boundsInWindow()
+                                // Freeze the seat while the pill is up; its
+                                // exit slide must not move the launch point.
+                                if (showContinuePill) {
+                                    pillSeatRect = coords.boundsInWindow()
+                                }
                                 continuePillHeight = with(density) {
                                     coords.size.height.toDp()
                                 }
@@ -850,7 +857,7 @@ fun HomeScreen(
             // live bounds so flights still connect while the list moves.
             if (docking || undocking) {
                 val start = if (docking) dockStart else undockStart
-                val end = if (docking) continueRowRect else continuePillRect
+                val end = if (docking) continueRowRect else pillSeatRect
                 val target = uiState.continueTarget
                 val raw = if (docking) dockProgress else undockProgress
                 if (start != null && end != null && target != null &&
@@ -859,9 +866,9 @@ fun HomeScreen(
                     val flight = ContinueFlightEase.transform(raw.coerceIn(0f, 1f))
                     val settled = if (docking) flight else 1f - flight
                     // Scale about the layer's own center: translation lands
-                    // the center on the target, scale lands the bounds.
-                    val scaleToX = end.width / start.width
-                    val scaleToY = end.height / start.height
+                    // the center on the target, scale grows 1 → bounds fit.
+                    val scaleToX = lerp(1f, end.width / start.width, flight)
+                    val scaleToY = lerp(1f, end.height / start.height, flight)
                     val dx = lerp(start.center.x, end.center.x, flight) - start.center.x
                     val dy = lerp(start.center.y, end.center.y, flight) - start.center.y
                     Box(
