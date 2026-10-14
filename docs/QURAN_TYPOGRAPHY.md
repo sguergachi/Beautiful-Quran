@@ -922,6 +922,8 @@ micro-typography sets a narrow measure:
   it stops only when a conservative width bound rules out every longer prefix.
   The height fitter uses the same carried-line setting as the ruler and the
   drawing, so it adjusts the spacing for exactly the lines the leaf displays.
+  A line without stretchable gaps keeps its natural width; an oversized lone
+  word cannot be counted as fitting by shrink the renderer will not apply.
 - **Letters take part of the slack.** Each line may widen or narrow its
   letters by up to 3 % (`TextGeometricTransform.scaleX` — pdfTeX's font
   expansion, Zapf's hz) and open or close their spacing by up to 0.0075 em, so
@@ -964,9 +966,11 @@ How it is drawn, and why each piece is load-bearing:
   platform's line breaker measures a styled run — a quiet bracket, a verse
   mark's isolated figures — a few px wider than it draws it, and broke full
   justified lines early.
-- **The pagination cache is keyed by the tuning** (`EnglishJustify.cacheKey`
-  in `bookCacheSuffix`): a change to it repaginates rather than drawing a
-  leaf cut for another setting.
+- **The pagination cache is keyed by the tuning and algorithm version**
+  (`EnglishJustify.cacheKey` in `bookCacheSuffix`): a change to it repaginates
+  rather than drawing a leaf cut for another setting. The complete layout and
+  prose identity is hashed into a fixed-length filename so the font and tuning
+  details cannot exceed the filesystem's name limit.
 
 The ragged setting below is what it replaced, and stays as the fallback for a
 paragraph the justifier declines (none in the current book). Its measurements

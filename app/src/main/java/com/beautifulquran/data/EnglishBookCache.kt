@@ -225,16 +225,18 @@ class EnglishBookCache internal constructor(private val dir: File) {
     }
 }
 
-/** Adds the exact prose to the pagination identity without putting QF text in a file name. */
+/** Hashes the complete layout and prose identity into a bounded cache filename. */
 internal fun englishBookContentKey(base: String, verses: Map<Long, String>): String {
     val digest = MessageDigest.getInstance("SHA-256")
+    digest.update(base.toByteArray(StandardCharsets.UTF_8))
+    digest.update(0)
     verses.toSortedMap().forEach { (key, text) ->
         digest.update(key.toString().toByteArray(StandardCharsets.UTF_8))
         digest.update(0)
         digest.update(text.toByteArray(StandardCharsets.UTF_8))
         digest.update(0)
     }
-    return "$base-${digest.digest().joinToString("") { byte ->
+    return digest.digest().joinToString("") { byte ->
         byte.toUByte().toString(16).padStart(2, '0')
-    }}"
+    }
 }

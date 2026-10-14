@@ -108,7 +108,7 @@ object EnglishJustify {
      * Bump whenever how a paragraph breaks changes in a way [LEAF] does not
      * show: the book's pagination cache is keyed by this and [LEAF].
      */
-    const val VERSION = 1
+    const val VERSION = 2
 
     /** What the book's pagination cache is keyed by for the leaf's justification. */
     val cacheKey: String get() = "|justify$VERSION|$LEAF"
@@ -172,7 +172,7 @@ object EnglishJustify {
         fun ratio(width: Float, state: Int, at: Int) =
             ratioOf(width, gaps(state, at), letters(state, at), fit, spacePx, emPx, tuning)
         fun fits(width: Float, state: Int, at: Int): Boolean =
-            width <= fit || (!tuning.keepLineCount && ratio(width, state, at) >= -1f)
+            width <= fit || (!tuning.keepLineCount && gaps(state, at) > 0 && ratio(width, state, at) >= -1f)
 
         for (state in n downTo 0) {
             val start = startOf(state)
@@ -205,7 +205,11 @@ object EnglishJustify {
             var bestRatio = Float.NaN
             for (at in state until n) {
                 val width = candidates.contentEnd[at] - start
-                if (!fits(width, state, at)) break
+                if (!fits(width, state, at)) {
+                    // A lone word cannot shrink, but a longer line with a gap can.
+                    if (gaps(state, at) == 0) continue
+                    break
+                }
                 val after = at + 1
                 if (!settable[after]) continue
                 val r = ratio(width, state, at)

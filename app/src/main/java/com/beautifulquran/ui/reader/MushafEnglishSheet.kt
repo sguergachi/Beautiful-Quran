@@ -1340,10 +1340,6 @@ private const val EnglishJustifyEdgePx = 0.5f
 /** Measured passes over the modelled setting: two close on the edge to well under a pixel. */
 private const val EnglishJustifyPasses = 2
 
-
-/** Tries in the real box; each doubles what the broken line gives back (1, 2, 4 … px). */
-
-
 /** How the leaf justifies: see [EnglishJustify.LEAF]. */
 internal val EnglishJustifyTuning = EnglishJustify.LEAF
 

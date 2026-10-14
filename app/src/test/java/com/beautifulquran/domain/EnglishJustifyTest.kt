@@ -224,5 +224,25 @@ class EnglishJustifyTest {
         assertEquals(null, lines)
         assertNotNull(EnglishJustify.set(candidates(listOf(100f, 100f)), 1000f, space))
     }
+
+    @Test
+    fun `a wide word cannot borrow shrink that its line will not draw`() {
+        for (widths in listOf(listOf(1010f), listOf(100f, 1010f, 100f))) {
+            assertEquals(
+                null,
+                EnglishJustify.set(candidates(widths), 1000f, space, tuning = EnglishJustify.LEAF),
+            )
+        }
+        assertNotNull(EnglishJustify.set(candidates(listOf(999f)), 1000f, space, tuning = EnglishJustify.LEAF))
+    }
+
+    @Test
+    fun `a wide word can still share a shrinking line with its neighbour`() {
+        val c = candidates(listOf(1005f, 1f, 900f))
+        val lines = EnglishJustify.set(c, 1000f, space, tuning = EnglishJustify.LEAF)!!
+        assertEquals(2, lines.size)
+        assertEquals(1, lines.first().end)
+        drawnWidths(c, lines).forEach { assertTrue(it <= 999.01f) }
+    }
 }
 

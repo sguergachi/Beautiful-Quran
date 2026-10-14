@@ -18,22 +18,24 @@ draw phase.
 
 ### English leaf pagination
 
-The English rag chooses breaks only at word spaces and preserves the minimum
-line count. Greedy wrapping gives the same count, so the book's ruler uses it
-for its fill and prefix search. Choosing the rag for every candidate leaf
-previously spent tens of seconds measuring word positions across the corpus,
-leaving the English page without ink until the measured book arrived.
+The English leaf uses `EnglishJustify` to choose breaks and share line width
+between glyph expansion, tracking and word spaces. Its line count can differ
+from greedy wrapping and can fall as a prefix grows. The ruler therefore
+counts each candidate's justified setting and searches past an overflow until
+the offer's width bound excludes later fits.
 
-`measureEnglishProse` shares one rounding pixel between the ruler and rag.
-Visible leaves still choose the rag, retain the soft directional wash, and
-wait for the measured book; pagination no longer chooses every candidate's rag.
-Tighter prose spacing changed the cuts in format 26; the hand still calibrates
-at natural spacing to preserve the type size. Format 27 also remeasures the
-basmalah's slot after fitting its final size to the column with subpixel advances.
-On the pooled emulator, format 25's cold rebuild reached the cache 5.7 seconds
-after launch. With tighter spacing and English verse numbers, all 746 leaves
-and 6,843 fragments remain byte-identical to the full-rag reference at the same
-geometry and settings, covering all 6,236 verses.
+Word advances are remembered across the book; prefix probes reuse the offer's
+positions rather than laying out every candidate again. Only visible leaves
+fit spans against the actual drawn edges, with two measurement passes. The
+ruler, height fitter and renderer use the same carried-line setting. A line
+without gaps keeps its natural width, so the model cannot count it as fitting
+by shrink alone. The hand still calibrates at natural spacing.
+
+Pagination runs off the main thread and is written to `EnglishBookCache`.
+The cache key includes the justification tuning and algorithm version; a
+SHA-256 digest of the complete layout and prose identity keeps filenames
+within the filesystem limit. A changed line-breaking rule invalidates the old
+book. The leaf waits for the measured book and retains the soft directional wash.
 
 English ownership is solved lazily per verse and cached for the selected text
 source. Semantic ranges and continuous forward wash bands are projected once
