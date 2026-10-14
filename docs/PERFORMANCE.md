@@ -27,7 +27,11 @@ the offer's width bound excludes later fits.
 Word advances are remembered across the book; prefix probes reuse the offer's
 positions rather than laying out every candidate again. Only visible leaves
 fit spans against the actual drawn edges, with two measurement passes. The
-ruler, height fitter and renderer use the same carried-line setting. A line
+horizontal cache keys omit vertical `lineHeight`: the line-count probe, height
+probe and drawing share the same justified paragraph and word advances while
+each still measures with its own leading. Font size, face, tracking, spans,
+measure and carried-line setting remain in the keys.
+The ruler, height fitter and renderer use the same carried-line setting. A line
 without gaps keeps its natural width, so the model cannot count it as fitting
 by shrink alone. The hand still calibrates at natural spacing.
 
@@ -36,6 +40,13 @@ The cache key includes the justification tuning and algorithm version; a
 SHA-256 digest of the complete layout and prose identity keeps filenames
 within the filesystem limit. A changed line-breaking rule invalidates the old
 book. The leaf waits for the measured book and retains the soft directional wash.
+
+The 2026-10-14 comparison used the same pooled emulator, debug probes and
+eight leftward swipes from An-Nur's opening. Ten paragraphs required 29 → 10
+cold justification passes and 1,743 → 475 word layouts on the UI thread;
+total justification CPU time fell from 1,668 → 651 ms. The same paragraphs and
+leading were rendered. These are measurements of duplicate layout work on
+one host, not physical-device frame rates. Temporary probes were removed.
 
 English ownership is solved lazily per verse and cached for the selected text
 source. Semantic ranges and continuous forward wash bands are projected once

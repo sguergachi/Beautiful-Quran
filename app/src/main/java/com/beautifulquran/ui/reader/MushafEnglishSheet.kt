@@ -1095,7 +1095,7 @@ internal fun englishSetProse(
     val source = text.text
     val n = source.length
     if (n < 2 || measurePx <= 1f) return text
-    val key = EnglishRagKey(text, style, measurePx, density.density, density.fontScale, justifyLast)
+    val key = EnglishRagKey(text, style.englishWidthStyle, measurePx, density.density, density.fontScale, justifyLast)
     synchronized(EnglishRagMemo) { EnglishRagMemo[key]?.let { return it } }
 
     val constraints = englishProseConstraints(measurePx)
@@ -1284,7 +1284,7 @@ private fun englishWordWidth(
     density: Density,
     measurer: TextMeasurer,
 ): Float {
-    val key = EnglishWordKey(word, style, density.density, density.fontScale)
+    val key = EnglishWordKey(word, style.englishWidthStyle, density.density, density.fontScale)
     synchronized(EnglishWordWidths) { EnglishWordWidths[key]?.let { return it } }
     // Measured with a space after it, and read where the space begins: the
     // advance the word has inside a line. Alone, its last letter loses the
@@ -1303,7 +1303,7 @@ private fun englishWordWidth(
  * specimen set both ways and taken off every word.
  */
 private fun englishWordBias(style: TextStyle, density: Density, measurer: TextMeasurer): Float {
-    val key = EnglishWordKey(AnnotatedString(ENGLISH_LEAF_SPECIMEN), style, density.density, density.fontScale)
+    val key = EnglishWordKey(AnnotatedString(ENGLISH_LEAF_SPECIMEN), style.englishWidthStyle, density.density, density.fontScale)
     synchronized(EnglishWordWidths) { EnglishWordBiases[key]?.let { return it } }
     val words = ENGLISH_LEAF_SPECIMEN.split(' ').filter { it.isNotEmpty() }
     val set = words.joinToString(" ")
@@ -1318,6 +1318,10 @@ private fun englishWordBias(style: TextStyle, density: Density, measurer: TextMe
 }
 
 private val EnglishWordBiases = HashMap<EnglishWordKey, Float>()
+
+/** Horizontal layout is shared across leading changes; measurement keeps the caller's full style. */
+private val TextStyle.englishWidthStyle: TextStyle
+    get() = copy(lineHeight = TextUnit.Unspecified)
 
 private data class EnglishWordKey(
     val word: AnnotatedString,
