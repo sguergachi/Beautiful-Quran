@@ -6644,6 +6644,28 @@ html[data-entrance='true'] body {
   outline-offset: 3px;
 }
 
+.qf-account-heading { line-height: 0; }
+.qf-brand {
+  display: inline-flex;
+  align-items: center;
+  width: 335px;
+  max-width: 100%;
+  height: 61px;
+  flex-shrink: 0;
+  vertical-align: middle;
+}
+.qf-brand img {
+  width: auto;
+  height: auto;
+  max-width: 100%;
+  max-height: 100%;
+}
+.qf-brand .qf-brand-white { display: none; }
+:is([data-theme='dark'], [data-theme='royal_green']) .qf-brand-dark { display: none; }
+:is([data-theme='dark'], [data-theme='royal_green']) .qf-brand .qf-brand-white { display: block; }
+.qf-sign-in { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; min-height: 48px; }
+.qf-sign-in .qf-brand { width: 168px; height: 30px; }
+
 /* ── Contextual feature guides (Android ContextualFeatureTip) ─────────
  * Inverse paper spotlight: royal-green vellum over unused paper, clear
  * window on the live feature. Not a dialog, card, or dark scrim. */

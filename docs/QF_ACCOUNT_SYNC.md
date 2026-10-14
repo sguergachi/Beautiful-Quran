@@ -52,6 +52,12 @@ the research is not evidence that QF has received or approved a request.
 
 ## Authentication and consent
 
+The account heading and “Continue with” action use QF's official dark/white
+wordmarks, bundled locally for offline display. Their original proportions and
+colors are retained on Android and web; source assets and provenance are in
+`data/branding/`. These identify the account provider, not QF ownership or
+endorsement of Beautiful Quran.
+
 Settings → Quran Foundation explains the religious information involved and
 links the app's privacy notice plus Quran.com account terms/privacy. The reader
 must affirm being 18 or older and separately consent to sending bookmark

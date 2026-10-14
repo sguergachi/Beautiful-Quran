@@ -4,13 +4,17 @@ import android.content.Intent
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.systemBars
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.windowInsetsPadding
@@ -24,11 +28,19 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.beautifulquran.QuranApp
+import com.beautifulquran.R
 import com.beautifulquran.data.account.QfAccount
 import com.beautifulquran.data.account.QfSignInActivity
 import com.beautifulquran.ui.theme.QuranTheme
@@ -74,7 +86,7 @@ internal fun QfAccountPage(account: QfAccount, onBack: () -> Unit) {
         Spacer(Modifier.height(20.dp))
         BackChevron { if (confirmation != null) confirmation = null else onBack() }
         Spacer(Modifier.height(6.dp))
-        Text("Quran Foundation", style = MaterialTheme.typography.headlineMedium)
+        QfLogo(Modifier.size(width = 335.dp, height = 61.dp).semantics { heading() })
         Spacer(Modifier.height(20.dp))
         if (confirmation != null) {
             val erasing = confirmation == "erase"
@@ -125,9 +137,15 @@ internal fun QfAccountPage(account: QfAccount, onBack: () -> Unit) {
                 Spacer(Modifier.height(16.dp))
                 ToggleRow("I am 18 or older", adult, { adult = it })
                 ToggleRow("I agree to send my bookmark activity to QF", consent, { consent = it })
-                AccountAction("Continue with Quran Foundation",
-                    enabled = status.available && adult && consent && !status.busy) {
+                val canConnect = status.available && adult && consent && !status.busy
+                Row(Modifier.fillMaxWidth().quietClickable(enabled = canConnect, role = Role.Button) {
                     context.startActivity(Intent(context, QfSignInActivity::class.java))
+                }.padding(vertical = 12.dp), verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Text("Continue with", modifier = Modifier.weight(1f, fill = false),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = if (canConnect) MaterialTheme.colorScheme.onSurface else QuranTheme.ink.quiet)
+                    QfLogo(Modifier.size(width = 168.dp, height = 30.dp).alpha(if (canConnect) 1f else 0.4f))
                 }
                 if (!status.available) Caption("Account sync is awaiting approved public-client configuration.")
             }
@@ -145,6 +163,14 @@ internal fun QfAccountPage(account: QfAccount, onBack: () -> Unit) {
         }
         Spacer(Modifier.height(40.dp))
     }
+}
+
+@Composable
+private fun QfLogo(modifier: Modifier) {
+    val resource = if (MaterialTheme.colorScheme.background.luminance() < 0.5f)
+        R.drawable.quran_foundation_white else R.drawable.quran_foundation_dark
+    Image(painterResource(resource), contentDescription = "Quran Foundation",
+        alignment = Alignment.CenterStart, modifier = modifier)
 }
 
 @Composable

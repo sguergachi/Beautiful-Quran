@@ -2,6 +2,7 @@ import { useState, useSyncExternalStore } from 'react'
 import { qfAccount } from '../../account/qfAccount'
 import { BackChevron } from '../kit/BackChevron'
 import { PaperSwitch } from '../kit/PaperSwitch'
+import { QfLogo } from './QfLogo'
 
 export function QfAccountScreen({ onBack }: { onBack: () => void }) {
   const status = useSyncExternalStore(qfAccount.subscribe, qfAccount.getSnapshot, qfAccount.getSnapshot)
@@ -21,7 +22,7 @@ export function QfAccountScreen({ onBack }: { onBack: () => void }) {
     <>
       <button type="button" className="back settings-back" aria-label="Back"
         onClick={() => confirmation ? setConfirmation(null) : onBack()}><BackChevron /></button>
-      <h1>Quran Foundation</h1>
+      <h1 className="qf-account-heading"><QfLogo /></h1>
       <section className="settings-section">
         {confirmation ? (
           <>
@@ -78,9 +79,10 @@ export function QfAccountScreen({ onBack }: { onBack: () => void }) {
               <>
                 <PaperSwitch label="I am 18 or older" checked={adult} onChange={setAdult} />
                 <PaperSwitch label="I agree to send my bookmark activity to QF" checked={consent} onChange={setConsent} />
-                <button type="button" className="settings-dev-link settings-dev-primary"
+                <button type="button" className="settings-dev-link settings-dev-primary qf-sign-in"
+                  aria-label="Continue with Quran Foundation"
                   disabled={!status.available || !adult || !consent || status.busy}
-                  onClick={() => void qfAccount.signIn()}>Continue with Quran Foundation</button>
+                  onClick={() => void qfAccount.signIn()}><span>Continue with</span><QfLogo alt="" /></button>
                 {!status.available ? <p className="settings-caption">Account sync is awaiting approved public-client configuration.</p> : null}
               </>
             ) : null}
