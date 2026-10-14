@@ -1,6 +1,7 @@
 package com.beautifulquran.domain
 
 import com.beautifulquran.data.model.SurahContent
+import java.text.Normalizer
 import java.util.concurrent.ConcurrentHashMap
 
 /** A printed English span and the 1-based Arabic word that speaks its meaning. */
@@ -67,23 +68,25 @@ object EnglishWordAlignment {
      * [glosses] must be the verse's Arabic words in recitation order — the
      * same order and count as the timing segments the ink is driven from.
      */
-    fun wordEnds(translation: String, glosses: List<String>): FloatArray? =
-        align(translation, glosses)?.wordEnds
+    fun wordEnds(translation: String, glosses: List<String>, lemmas: List<String> = emptyList(), arabic: List<String> = emptyList()): FloatArray? =
+        align(translation, glosses, lemmas, arabic)?.wordEnds
 
-    /** English spans keep their spoken owners even when the sentence reorders them. */
-    fun align(translation: String, glosses: List<String>): EnglishAlignment? {
+    /** QAC [lemmas] resolve shared heads; [arabic] corroborates heads omitted from grammatical cards. */
+    fun align(translation: String, glosses: List<String>, lemmas: List<String> = emptyList(), arabic: List<String> = emptyList()): EnglishAlignment? {
         if (glosses.isEmpty() || translation.isEmpty()) return null
         val prose = proseWords(translation, glosses)
         if (prose.isEmpty()) return null
-        val spoken = glossWords(glosses, prose)
+        val spoken = glossWords(glosses, prose, lemmas)
         if (spoken.isEmpty()) return null
         val gloss = spoken.map { it.first }
         val owner = spoken.map { it.second }
 
-        pairOccurrences(gloss, owner, prose)
+        pairOccurrences(gloss, owner, prose, lemmas.takeIf { it.size == glosses.size }.orEmpty(), arabic)
         val claimed = IntArray(prose.size) { -1 }
         val anchor = anchors(gloss, owner, prose, glosses.size, claimed)
         val ends = spanEnds(anchor, prose, glosses.size, translation.length)
+        val contextualEnds = ends.copyOf().also { snapToWords(it, prose, translation.length) }
+        val sharedGroups = spoken.mapNotNull { it.first.sharedGroup }.distinct()
         val verified = holdUnheardWords(ends, gloss, owner, prose, claimed)
         snapToWords(ends, prose, translation.length)
         val shares = FloatArray(ends.size) { (ends[it].toFloat() / translation.length).coerceIn(0f, 1f) }
@@ -91,7 +94,13 @@ object EnglishWordAlignment {
             .groupBy({ it.first.text }, { it.second })
         val positions = IntArray(prose.size) { index ->
             val word = prose[index]
-            val fallback = ends.indexOfFirst { word.end <= it }.coerceAtLeast(0)
+            var fallback = ends.indexOfFirst { word.end <= it }.coerceAtLeast(0)
+            val contextual = contextualEnds.indexOfFirst { word.end <= it }.coerceAtLeast(0)
+            // An explicit reordered head can trim the interpolation before
+            // it; that must not exile the shared phrase's unclaimed remainder.
+            sharedGroups.firstOrNull {
+                contextual in it || (contextual == it.last + 1 && index < anchor.getOrElse(contextual) { -1 })
+            }?.let { fallback = minOf(fallback, it.last) }
             if (word.added) fallback else if (word.text in GRAMMAR) {
                 // "Wronging themselves" reverses Arabic's object and verb.
                 reflexives[word.text]?.distinct()?.singleOrNull()
@@ -99,6 +108,7 @@ object EnglishWordAlignment {
                     ?: claimed[index].takeIf { it >= 0 } ?: fallback
             } else verified[index].takeIf { it >= 0 } ?: fallback
         }
+        closeAnchoredSentences(anchor, claimed, prose, positions, glosses)
         // A possessive or auxiliary travels with its printed head when that
         // head's gloss says it too: "Our servants" cannot split across owners.
         val grammar = glosses.map { words(it).map { word -> word.text }.toSet() }
@@ -129,15 +139,19 @@ object EnglishWordAlignment {
      * of [translation], in any order. A hold means the word under the finger,
      * but [wordEnds] is monotone and absorbs reordering, so a hold read off it
      * lands on a neighbour: "painful punishment" said "punishment painful".
-     * Null when no gloss names the word (grammar, synonyms, translator
-     * additions, or repeats the glosses do not mirror); the caller falls back.
+     * Null when neither the glosses nor corroborated Arabic evidence identifies
+     * the word (grammar, additions, or ambiguous repeats); the caller falls back.
      */
-    fun ownerAt(translation: String, glosses: List<String>, offset: Int): Int? {
+    fun ownerAt(translation: String, glosses: List<String>, offset: Int, lemmas: List<String> = emptyList(), arabic: List<String> = emptyList()): Int? {
         val prose = proseWords(translation, glosses)
         val held = prose.indexOfFirst { offset <= it.end }
         val word = prose.getOrNull(held) ?: return null
         if (offset < word.end - word.text.length || word.added || word.text in GRAMMAR) return null
-        val owners = glossWords(glosses, prose).filter { (text, _) ->
+        val spoken = glossWords(glosses, prose, lemmas)
+        pairOccurrences(spoken.map { it.first }, spoken.map { it.second }, prose,
+            lemmas.takeIf { it.size == glosses.size }.orEmpty(), arabic)
+        if (word.arabicOwner >= 0) return word.arabicOwner
+        val owners = spoken.filter { (text, _) ->
             text.text !in GRAMMAR && text.key == word.key
         }.map { it.second }
         if (owners.distinct().size == 1) return owners[0]
@@ -153,26 +167,44 @@ object EnglishWordAlignment {
      * token belongs to the final word ("their gaze" on مِنْ أَبْصَارِهِمْ).
      * Single-token duplicates remain separate, since they can be real repeats.
      */
-    private fun glossWords(glosses: List<String>, prose: List<ProseWord>): List<Pair<ProseWord, Int>> = buildList {
+    private fun glossWords(glosses: List<String>, prose: List<ProseWord>, lemmas: List<String>): List<Pair<ProseWord, Int>> = buildList {
         val counts = prose.filter { !it.added }.groupingBy { it.key }.eachCount()
         var first = 0
         while (first < glosses.size) {
             val tokens = words(glosses[first])
             var next = first + 1
+            var headOwners = emptyMap<String, Int>()
+            var remainder = emptyList<Int>()
             if (tokens.size > 1) {
                 while (next < glosses.size && glosses[next] == glosses[first]) next++
+                // "Musa said" can be copied onto both Arabic words. QAC
+                // identifies Musa independently; the other word speaks the verb.
+                if (lemmas.size == glosses.size && next - first == 2) {
+                    headOwners = tokens.mapNotNull { word ->
+                        (first until next).singleOrNull { at ->
+                            namesHead(word.key, lemmas.getOrElse(at) { "" })
+                        }?.let { word.key to it }
+                    }.toMap()
+                    remainder = (first until next).filter { it !in headOwners.values }
+                }
+                val resolved = headOwners.isNotEmpty() && remainder.size == 1
                 // Repeated verbs such as "you do good, you do good" are real
                 // repeats. Only a grammatical prefix plus one printed head
                 // identifies a shared phrase without Arabic syntax evidence.
-                if (tokens.dropLast(1).any { it.text !in GRAMMAR && !it.added } ||
-                    counts[tokens.last().key] != 1) next = first + 1
+                if (!resolved && (tokens.dropLast(1).any { it.text !in GRAMMAR && !it.added } ||
+                    counts[tokens.last().key] != 1)) next = first + 1
             }
             tokens.forEachIndexed { index, word ->
-                add(word to first + ((index + 1) * (next - first) - 1) / tokens.size)
+                if (headOwners.isNotEmpty() && remainder.size == 1) {
+                    word.sharedGroup = first until next
+                }
+                val at = if (headOwners.isNotEmpty() && remainder.size == 1) headOwners[word.key] ?: remainder.single()
+                    else first + ((index + 1) * (next - first) - 1) / tokens.size
+                add(word to at)
             }
             first = next
         }
-    }.also { spoken ->
+    }.sortedBy { it.second }.also { spoken ->
         // Sahih calls Rahman "Most Merciful" outside the opening chapter.
         // Keep Rahman and Rahim distinct when both occur in this verse.
         if (spoken.any { it.first.key == inflection("gracious") } &&
@@ -184,6 +216,8 @@ object EnglishWordAlignment {
     /** One word of a sentence: its text, lowercased, and where it ends. */
     private class ProseWord(val text: String, val end: Int, val added: Boolean, val sentence: Int) {
         var key = inflection(text)
+        var arabicOwner = -1
+        var sharedGroup: IntRange? = null
     }
 
     /**
@@ -207,7 +241,7 @@ object EnglishWordAlignment {
             val start = i
             // The translation is typeset with curled apostrophes (Qur’an); one
             // word either way, and spelled straight so it matches the glosses.
-            while (i < text.length && (text[i].isLetter() || text[i] == '\'' || text[i] == '’')) i++
+            while (i < text.length && (text[i].isLetter() || text[i] in '\u0300'..'\u036f' || text[i] == '\'' || text[i] == '’')) i++
             out += ProseWord(text.substring(start, i).replace('’', '\'').lowercase(), i, added, sentence)
         }
         // One meaning can span several printed words: "Exalted in Might"
@@ -239,9 +273,6 @@ object EnglishWordAlignment {
         // "Glad" means "good" in this phrase, not wherever either adjective occurs.
         for (j in 0 until out.lastIndex) {
             if (out[j].text == "glad" && out[j + 1].text in setOf("tiding", "tidings")) out[j].key = "good"
-            // Iqamah is printed "performance of prayer"; prayer keeps its own head.
-            if (out[j].text == "performance" && out[j + 1].text == "of" &&
-                out.getOrNull(j + 2)?.key == "prayer") out[j].key = "establish"
         }
         // Drawing a headcover over the chest is translated as wrapping it;
         // "draw" and "wrap" are not interchangeable outside that phrase.
@@ -266,6 +297,34 @@ object EnglishWordAlignment {
             }
         }.map { it.first }.toSet()
         return words(text, phrases).also { prose ->
+            // A gendered offender can be printed as a woman/man followed by
+            // an explanation. Literal gender or offender heads keep priority.
+            for ((gender, names) in listOf("woman" to listOf("fornicatress", "adulteress"), "man" to listOf("fornicator", "adulterer"))) {
+                val head = names.map(::inflection).filter { it in keys }.singleOrNull() ?: continue
+                if (gender !in keys && prose.none { it.key == head }) {
+                    prose.filter { it.text == gender }.forEach { it.key = head }
+                }
+                if (gender == "woman") prose.zipWithNext().filter { (before, word) ->
+                    before.text == "female" && !word.added &&
+                        word.key in setOf(inflection("fornicator"), inflection("adulterer"))
+                }.forEach { (_, word) -> word.key = head }
+            }
+            // The divine title is distinct from a nearby verb "knows".
+            if ("omniscient" in keys && spoken.none { it.text in setOf("knowing", "knower") }) {
+                prose.filter { it.text in setOf("knowing", "knower") }.forEach { it.key = "omniscient" }
+            }
+            // Iqamah can be printed "performance of prayer". Keep a literal
+            // performance when supplied, and leave prayer with its own head.
+            val literalPerformance = glosses.any { gloss ->
+                words(gloss).filter { !it.added && it.text !in GRAMMAR }
+                    .singleOrNull()?.key == inflection("performance")
+            }
+            if ("establish" in keys && !literalPerformance) {
+                for (j in 0 until prose.lastIndex) {
+                    if (prose[j].text == "performance" && prose[j + 1].text == "of" &&
+                        prose.getOrNull(j + 2)?.key == "prayer") prose[j].key = "establish"
+                }
+            }
             // The conditional "you come" can be printed "you brought".
             // A literal bring gloss must keep its own meaning and context.
             if (inflection("come") in keys && inflection("bring") !in keys) {
@@ -280,7 +339,16 @@ object EnglishWordAlignment {
      * intervening "brothers" along with it. Unequal or shared gloss counts
      * remain ambiguous and keep the ordinary contextual alignment.
      */
-    private fun pairOccurrences(gloss: List<ProseWord>, owner: List<Int>, prose: List<ProseWord>) {
+    private fun pairOccurrences(gloss: List<ProseWord>, owner: List<Int>, prose: List<ProseWord>, lemmas: List<String>, arabic: List<String>) {
+        // An explicit Arabic name outranks a gloss mentioning that name as
+        // a complement ("fear Allah"). Require both sources to name the head.
+        for ((key, positions) in lemmas.indices.filter { lemmas[it] in ARABIC_HEADS }
+            .groupBy { ARABIC_HEADS[lemmas[it]] }) {
+            val matches = prose.filter { !it.added && it.key == key }
+            if (matches.size == positions.size && positions.all { at ->
+                sourceNamesHead(at, gloss, owner, lemmas, arabic)
+            }) matches.zip(positions).forEach { (word, at) -> word.arabicOwner = at }
+        }
         for (byMeaning in listOf(false, true)) {
             fun form(word: ProseWord) = if (byMeaning) word.key else literal(word.text)
             val spoken = gloss.indices.filter { !gloss[it].added && gloss[it].text !in GRAMMAR }
@@ -290,7 +358,11 @@ object EnglishWordAlignment {
                 val matches = printed[key] ?: continue
                 if (indices.size < 2 || indices.size != matches.size ||
                     indices.map { owner[it] }.distinct().size != indices.size ||
-                    matches.map { it.sentence }.distinct().size != 1) continue
+                    (matches.map { it.sentence }.distinct().size != 1 &&
+                        gloss[indices.first()].key !in NAMED_MEANINGS &&
+                        indices.map { lemmas.getOrElse(owner[it]) { "" } }.let { heads ->
+                            heads.any { it.isEmpty() } || heads.distinct().size != 1
+                        })) continue
                 // Exact distinct forms already distinguish an inversion:
                 // "approached the Approaching Day" must keep those forms.
                 if (byMeaning && indices.groupingBy { literal(gloss[it].text) }.eachCount() ==
@@ -364,6 +436,24 @@ object EnglishWordAlignment {
             }
         }
         return anchor
+    }
+
+    /** Unspoken grammar tails stay in their sentence between adjacent Arabic anchors. */
+    private fun closeAnchoredSentences(anchor: IntArray, claimed: IntArray, prose: List<ProseWord>, positions: IntArray, glosses: List<String>) {
+        val grammarGlosses = glosses.map { words(it).map { word -> word.text } }
+        for (position in 0 until anchor.lastIndex) {
+            val at = anchor[position]
+            val next = anchor[position + 1]
+            if (at < 0 || next <= at || prose[at].sentence == prose[next].sentence) continue
+            val tail = (at + 1 until next).takeWhile { prose[it].sentence == prose[at].sentence }
+            if (tail.any { claimed[it] >= 0 || positions[it] <= position || prose[it].added || prose[it].text !in GRAMMAR }) continue
+            val literal = grammarGlosses.indices.filter { grammarGlosses[it] == tail.map { index -> prose[index].text } }
+            if (literal.isNotEmpty()) {
+                literal.singleOrNull()?.let { owner -> tail.forEach { positions[it] = owner } }
+                continue
+            }
+            tail.forEach { positions[it] = position }
+        }
     }
 
     /**
@@ -474,6 +564,7 @@ object EnglishWordAlignment {
             val exact = exactOwner[word.text] ?: -1
             val unique = uniqueOwner[word.key] ?: -1
             val at = when {
+                word.arabicOwner >= 0 -> word.arabicOwner
                 word.added -> head
                 claimed[index] >= 0 -> claimed[index]
                 unique >= 0 && (counts[word.key] == 1 || prose.count {
@@ -487,9 +578,9 @@ object EnglishWordAlignment {
             val before = if (index == 0) 0 else prose[index - 1].end
             // Partial glosses can protect a direct match from interpolation
             // through grammar, but cannot pull it across other content words.
-            if (!word.added && !complete[at] && (claimed[index] != at || (at > 1 && original[at - 2] > before &&
+            if (word.arabicOwner < 0 && !word.added && !complete[at] && (claimed[index] != at || (at > 1 && original[at - 2] > before &&
                     (0 until at).any { original[it] > before && content[it].isNotEmpty() }))) continue
-            if (claimed[index] < 0) {
+            if (word.arabicOwner < 0 && claimed[index] < 0) {
                 if (prose.indices.any { claimed[it] == at && prose[it].key == word.key }) continue
                 if (word.sentence !in sentenceRange(at)) continue
             }
@@ -551,7 +642,9 @@ object EnglishWordAlignment {
 
     /** Conservative English inflections, normalized once rather than in each DP cell. */
     private fun inflection(text: String): String {
-        var word = text.replace('’', '\'').removeSuffix("'s").replace("'", "")
+        val latin = if (text.any { it.code > 127 }) Normalizer.normalize(text, Normalizer.Form.NFD)
+            .filterNot { it in '\u0300'..'\u036f' || it == '\u02be' || it == '\u02bf' } else text
+        var word = latin.replace('’', '\'').removeSuffix("'s").replace("'", "")
         word = EQUIVALENT_WORDS[word] ?: word
         if (word.length > 4) {
             word = when {
@@ -581,6 +674,12 @@ object EnglishWordAlignment {
     private val EQUIVALENT_WORDS = mapOf(
         "slave" to "servant", "slaves" to "servant", "servants" to "servant",
         "gaze" to "vision", "gaz" to "vision",
+        "sky" to "heaven", "land" to "earth", "true" to "truth", "tru" to "truth",
+        "masjid" to "mosque", "masajid" to "mosque", "wives" to "wife", "wiv" to "wif",
+        "path" to "way", "days" to "day", "eats" to "eat", "dies" to "die", "heard" to "hear",
+        "denied" to "deny", "decreed" to "decree",
+        "slay" to "kill", "slays" to "kill", "slain" to "kill", "thankful" to "grateful",
+        "flog" to "lash",
         "commerce" to "trade",
         "bosom" to "chest",
         "tell" to "say", "apparent" to "appear",
@@ -602,6 +701,7 @@ object EnglishWordAlignment {
         "scripture" to "book", "manifest" to "evident",
         "deity" to "god", "deities" to "god", "gods" to "god",
         "work" to "deed", "forceful" to "firm", "appropriate" to "suitable",
+        "establishment" to "establish",
         "scoff" to "mock", "ridicule" to "mock", "ridicul" to "mock", "purest" to "best",
         "faction" to "group", "party" to "group",
         "shaitaan" to "satan", "shaitan" to "satan", "shaytan" to "satan",
@@ -615,7 +715,12 @@ object EnglishWordAlignment {
     )
 
     private val PHRASES = mapOf(
+        "clear evidence" to "clear", "clear evidences" to "clear",
+        "woman found guilty of sexual intercourse" to "fornicatress",
+        "man found guilty of sexual intercourse" to "fornicator",
         "private parts" to "chastity", "head covers" to "headcover", "all aware" to "acquaint",
+        "all knower" to "omniscient", "all knowing" to "omniscient",
+        "most knowing" to "omniscient",
         "exalted in might" to "mighty", "all mighty" to "mighty",
         "entirely merciful" to "gracious", "most gracious" to "gracious",
         "especially merciful" to "merciful", "most merciful" to "merciful",
@@ -634,6 +739,73 @@ object EnglishWordAlignment {
         "seems suitable" to "please", "seek to hasten" to "impatient",
         "my way" to "mycause", "my cause" to "mycause",
     ).map { (phrase, key) -> phrase.split(' ') to inflection(key) }
+
+    // Names retain their identity across clauses; ordinary repeated content
+    // remains sentence-bounded (the two different burdens in 2:286).
+    private val NAMED_MEANINGS = setOf(
+        "moses", "noah", "abraham", "pharaoh", "mary", "jesus", "joseph", "lot", "david",
+        "solomon", "jonah", "isaac", "jacob", "ishmael", "aaron", "zechariah", "john",
+        "elijah", "job", "hud", "salih", "torah", "gospel", "satan", "god", "allah",
+    ).map(::inflection).toSet()
+
+    /** QAC identities: vocalization distinguishes a book from writing, or an angel from a king. */
+    private val ARABIC_HEADS = mapOf(
+        "مُوسَىٰ" to "moses", "نُوح" to "noah", "إِبْرَاهِيم" to "abraham",
+        "فِرْعَوْن" to "pharaoh", "مَرْيَم" to "mary", "عِيسَى" to "jesus",
+        "يُوسُف" to "joseph", "لُوط" to "lot", "دَاوُد" to "david",
+        "سُلَيْمَٰن" to "solomon", "يُونُس" to "jonah", "إِسْحَاق" to "isaac",
+        "يَعْقُوب" to "jacob", "إِسْمَاعِيل" to "ishmael", "هَٰرُون" to "aaron",
+        "زَكَرِيَّا" to "zechariah", "يَحْيَىٰ" to "john", "إِلْيَاس" to "elijah",
+        "أَيُّوب" to "job", "هُود" to "hud", "صَٰلِح" to "salih",
+        "تَّوْرَىٰة" to "torah", "إِنجِيل" to "gospel",
+        "شَيْطَٰن" to "satan", "كِتَٰب" to "book", "ٱللَّه" to "allah",
+        "رَبّ" to "lord",
+        "قَالَ" to "say", "ءَامَنَ" to "believe", "سَمِعَ" to "hear",
+        "مَاتَ" to "die", "مَّاتَ" to "die", "قَتَلَ" to "kill", "خَلَقَ" to "create",
+        "عَلِمَ" to "know", "أَكَلَ" to "eat", "كَتَبَ" to "write",
+        "عَبَدَ" to "worship", "غَفَرَ" to "forgive", "حَقّ" to "truth",
+        "أَرْض" to "earth", "سَمَآء" to "heaven", "مَسْجِد" to "mosque",
+        "عَذَاب" to "punishment", "زَوْج" to "wife", "يَوْم" to "day",
+        "كَفَرَ" to "disbelieve", "مُؤْمِن" to "believer", "عِلْم" to "knowledge",
+        "رَحْمَة" to "mercy", "أَجْر" to "reward", "جَزَىٰ" to "reward", "دِين" to "religion",
+        "سَقَىٰ" to "water", "لَيْل" to "night", "لَيْلَة" to "night", "مَال" to "wealth",
+        "بَيْت" to "home", "دَار" to "home", "قَوْم" to "people", "سَبِيل" to "way", "صِرَٰط" to "way",
+        "سَوَآء" to "soundness",
+        "بَيِّنَة" to "clear", "مُّبِين" to "clear",
+        "مُسْمَع" to "hear", "أَعْلَم" to "omniscient", "شَكَرَ" to "grateful",
+    ).mapValues { (_, meaning) -> inflection(meaning) }
+
+    /** Gloss variants are evidence for a head only when its Arabic lemma agrees. */
+    private fun namesHead(key: String, lemma: String): Boolean = ARABIC_HEADS[lemma]?.let { head ->
+        key == head || key in HEAD_GLOSS_VARIANTS[head].orEmpty()
+    } ?: false
+
+    /** An adjacent reversed phrase needs both lexical heads, not one stray matching word. */
+    private fun sourceNamesHead(at: Int, gloss: List<ProseWord>, owner: List<Int>, lemmas: List<String>, arabic: List<String>): Boolean {
+        val own = gloss.indices.filter { owner[it] == at }
+        // Clamped QAC positions can put a noun's lemma on a neighbouring
+        // preposition. A missing gloss head needs the actual Arabic word too.
+        if (own.isNotEmpty() && own.all { gloss[it].added || gloss[it].text in GRAMMAR } &&
+            arabic.size == lemmas.size && normalizeArabicForSearch(arabic[at]).contains(normalizeArabicForSearch(lemmas[at]))) return true
+        return gloss.indices.any { i ->
+            val other = owner[i]
+            namesHead(gloss[i].key, lemmas[at]) && (other == at ||
+                ((other == at - 1 || other == at + 1) && ARABIC_HEADS[lemmas[other]] != ARABIC_HEADS[lemmas[at]] &&
+                    own.any { namesHead(gloss[it].key, lemmas[other]) }))
+        }
+    }
+
+    private val HEAD_GLOSS_VARIANTS = mapOf(
+        "say" to setOf("speak"), "day" to setOf("today", "period"),
+        "disbelieve" to setOf("deny"), "believer" to setOf("believe"),
+        "knowledge" to setOf("knowingly"), "religion" to setOf("law"),
+        "wife" to setOf("spouse"), "wealth" to setOf("property"), "home" to setOf("house"),
+        "people" to setOf("group", "community"), "hear" to setOf("listen"),
+        "know" to setOf("evident"), "forgive" to setOf("forgiveness"), "die" to setOf("dead"),
+        "write" to setOf("ordain", "decree"), "punishment" to setOf("punish"),
+        "soundness" to setOf("right"),
+        "clear" to setOf("evidence"),
+    ).mapKeys { (head, _) -> inflection(head) }.mapValues { (_, variants) -> variants.map(::inflection).toSet() }
 
     /** Complements/intensity the prose can leave implicit in the matched gloss head. */
     private val GLOSS_SUPPLEMENTS = setOf(
@@ -657,7 +829,7 @@ object EnglishWordAlignment {
         "any", "both", "each", "every", "even", "more", "most", "oft",
         "ones", "only", "other", "others", "over", "surely", "well",
         "down", "forth", "up",
-        "about", "above", "after", "against", "along", "among", "around",
+        "about", "above", "after", "afterwards", "against", "along", "among", "around",
         "before", "behind", "below", "beside", "besides", "between", "concerning",
         "during", "into", "off", "out", "through", "toward", "towards", "under",
         "until", "upon", "while", "within", "without",
@@ -702,6 +874,8 @@ class EnglishVerseAlignments(private val content: SurahContent, private val word
                             verse.words.map { it.translation }, verse.words.map { it.arabic },
                         ).filter { it.isNotBlank() }.joinToString(" ") else verse.translation,
                         verse.words.map { it.translation },
+                        verse.words.map { it.lemma },
+                        verse.words.map { it.arabic },
                     )
                 }
                 ?: NONE

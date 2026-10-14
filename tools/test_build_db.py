@@ -63,7 +63,7 @@ from build_db import (  # noqa: E402
     trim_to_next_start,
 )
 import detect_audio_onsets as onset_detector  # noqa: E402
-from qf_timing_assets import RUNTIME_DELIVERY, verify_asset_transition  # noqa: E402
+from qf_timing_assets import QF_TIMING_SLUGS, RUNTIME_DELIVERY, verify_asset_transition  # noqa: E402
 from timing_delta import (  # noqa: E402
     build_delta,
     load_corpus_bootstraps,
@@ -817,7 +817,7 @@ def check_audit_holds():
     """A hold may only restore a row the baseline ships, never invent one."""
     from build_db import AUDIT_HOLDS_FILE
 
-    # 1. Every committed hold must match the merge-base database byte for byte.
+    # 1. Every committed hold must match its shipped baseline byte for byte.
     #    That is what keeps a hold out of the timing delta entirely: it cannot
     #    smuggle a new payload past the dual-model gate.
     parity = True
@@ -828,6 +828,14 @@ def check_audit_holds():
             cwd=ROOT, text=True, capture_output=True, check=True,
         ).stdout.strip()
         baseline = read_git_timing_rows(base)
+        if not any(key[0] in QF_TIMING_SLUGS for key in baseline):
+            # Public assets now omit these corpora. Keep checking legacy holds
+            # against the exact removed corpus, never an arbitrary older row.
+            manifest = json.loads((ROOT / "data/qf-timing-transition.json").read_text())
+            archived = read_git_timing_rows(manifest["baselineCommit"])
+            verify_asset_transition(archived, baseline, manifest)
+            baseline.update({key: row for key, row in archived.items()
+                             if key[0] in QF_TIMING_SLUGS})
         for row in payload.get("rows") or []:
             key = (row["reciterSlug"], row["surahId"], row["ayah"])
             shipped = baseline.get(key)

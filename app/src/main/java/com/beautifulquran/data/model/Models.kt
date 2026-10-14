@@ -18,6 +18,8 @@ data class Word(
     val qcfPage: Int = 0,
     val qcfLine: Int = 0,
     val qcfSpanEnd: Int = position,
+    /** Bundled QAC head, independent of the runtime English word card. */
+    val lemma: String = "",
 )
 
 data class Ayah(

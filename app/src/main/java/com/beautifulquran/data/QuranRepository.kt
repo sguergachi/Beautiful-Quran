@@ -251,10 +251,11 @@ class QuranRepository(
         val runtime = runtimeMushaf?.words(surahId).orEmpty()
         val words = database.db.rawQuery(
             """
-            SELECT ayah_number, position, arabic
-            FROM words
-            WHERE surah_id = ?
-            ORDER BY ayah_number, position
+            SELECT w.ayah_number, w.position, w.arabic, m.lemma
+            FROM words w
+            LEFT JOIN word_morphology m USING (surah_id, ayah_number, position)
+            WHERE w.surah_id = ?
+            ORDER BY w.ayah_number, w.position
             """.trimIndent(),
             arrayOf(surahId.toString()),
         ).use { c ->
@@ -274,6 +275,7 @@ class QuranRepository(
                             qcfPage = cached?.qcfPage ?: 0,
                             qcfLine = cached?.qcfLine ?: 0,
                             qcfSpanEnd = cached?.qcfSpanEnd ?: position,
+                            lemma = c.getString(3).orEmpty(),
                         ),
                     )
             }
