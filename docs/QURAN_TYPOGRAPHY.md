@@ -920,6 +920,8 @@ micro-typography sets a narrow measure:
   paginates counts the lines of exactly this setting. The page-fit search keeps
   looking after a prefix overflows, since adding a word can close a line again;
   it stops only when a conservative width bound rules out every longer prefix.
+  The height fitter uses the same carried-line setting as the ruler and the
+  drawing, so it adjusts the spacing for exactly the lines the leaf displays.
 - **Letters take part of the slack.** Each line may widen or narrow its
   letters by up to 3 % (`TextGeometricTransform.scaleX` — pdfTeX's font
   expansion, Zapf's hz) and open or close their spacing by up to 0.0075 em, so

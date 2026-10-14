@@ -298,8 +298,10 @@ internal fun MushafEnglishSheet(
                 typePalette,
             )
         }
-        val setting = remember(blocks, wellPx, measurePx, density, measurer, typePalette) {
-            setEnglishLeaf(blocks, wellPx, measurePx, density, measurer, typePalette)
+        val justifyLast = (blocks.lastOrNull() as? EnglishLeafBlockText.Prose)
+            ?.proseRunsOn(surahsById) == true
+        val setting = remember(blocks, wellPx, measurePx, density, measurer, typePalette, justifyLast) {
+            setEnglishLeaf(blocks, wellPx, measurePx, density, measurer, typePalette, justifyLast)
         }
         val fontSize = with(density) { setting.handPx.toSp() }
         val pitchDp = with(density) { (setting.handPx * setting.leadingEm).toDp() }
@@ -404,7 +406,7 @@ internal fun MushafEnglishSheet(
                         // The leaf's last paragraph runs on to the next leaf
                         // unless its chapter ends here: its last line is then
                         // a line like any other, and set like one.
-                        justifyLast = block === blocks.last() && block.proseRunsOn(surahsById),
+                        justifyLast = block === blocks.last() && justifyLast,
                         liveInk = liveInk,
                         onVerseSeek = onVerseSeek,
                         onVerseLongPress = onVerseLongPress,
@@ -763,6 +765,7 @@ private fun setEnglishLeaf(
     density: Density,
     measurer: TextMeasurer,
     typePalette: QuranTypePalette,
+    justifyLast: Boolean,
 ): EnglishLeafSetting {
     val requestedLeading = typePalette.leafLeadingEm
     var handPx = englishBookHandPx(wellPx, measurePx, density, measurer, typePalette)
@@ -773,7 +776,7 @@ private fun setEnglishLeaf(
     // englishLeafOverflowHandPx for why that order and not the other.
     repeat(3) { pass ->
         val basmalahPx = englishBasmalahPx(handPx, measurePx, density, measurer, typePalette)
-        val pitches = englishLeafPitches(blocks, handPx, measurePx, density, measurer, typePalette)
+        val pitches = englishLeafPitches(blocks, handPx, measurePx, density, measurer, typePalette, justifyLast)
         val stands = englishLeafHeightPx(
             blocks,
             handPx,
@@ -783,6 +786,7 @@ private fun setEnglishLeaf(
             density,
             measurer,
             typePalette,
+            justifyLast,
         )
         val leadingEm = englishLeafFittedLeadingEm(
             leadingEm = requestedLeading,
@@ -830,6 +834,7 @@ private fun englishLeafPitches(
     density: Density,
     measurer: TextMeasurer,
     typePalette: QuranTypePalette,
+    justifyLast: Boolean,
 ): Float {
     var pitches = 0f
     blocks.forEach { block ->
@@ -846,6 +851,7 @@ private fun englishLeafPitches(
                         ),
                         measurePx = measurePx,
                         density = density,
+                        justifyLast = block === blocks.last() && justifyLast,
                     )
                     .lineCount
                 pitches += (lines - 1).coerceAtLeast(0).toFloat()
@@ -896,6 +902,7 @@ private fun englishLeafHeightPx(
     density: Density,
     measurer: TextMeasurer,
     typePalette: QuranTypePalette,
+    justifyLast: Boolean,
 ): Float {
     val inkPx = englishLineInkPx(handPx, density, measurer, typePalette)
     val style = englishProseStyle(
@@ -914,6 +921,7 @@ private fun englishLeafHeightPx(
                     style = style,
                     measurePx = measurePx,
                     density = density,
+                    justifyLast = block === blocks.last() && justifyLast,
                 )
                 .size
                 .height
@@ -1032,8 +1040,9 @@ private fun TextMeasurer.measureEnglishProse(
     measurePx: Float,
     density: Density,
     setLines: Boolean = true,
+    justifyLast: Boolean = false,
 ): TextLayoutResult {
-    val set = if (setLines) englishSetProse(text, style, measurePx, density, this) else text
+    val set = if (setLines) englishSetProse(text, style, measurePx, density, this, justifyLast) else text
     return measure(
         text = set,
         style = style,
