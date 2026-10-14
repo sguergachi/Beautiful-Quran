@@ -284,6 +284,7 @@ tasks.named("preBuild") {
 // a database leaves the task UP-TO-DATE and the guard never runs — which is
 // precisely the case it exists to catch.
 tasks.withType<Test>().configureEach {
+    maxParallelForks = Runtime.getRuntime().availableProcessors().coerceAtMost(4)
     listOf(
         "quran.db", "quran.db.sha256",
         "lexicon.db", "lexicon.db.sha256",
