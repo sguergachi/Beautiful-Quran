@@ -2866,10 +2866,6 @@ fun ReaderScreen(
                     // which verse and how far into it. Resolving that to a word
                     // needs the verse itself, which lives here: its word count,
                     // and where each of those words lands in its English.
-                    val leafTextForSetting: suspend (Int) -> Map<Long, String> =
-                        remember(viewModel, leafTextSource) {
-                            { page -> viewModel.leafText(page, leafTextSource) }
-                        }
                     val onMushafVerseSeek = remember(mushafSurahId, viewModel, content, seekAlignments) {
                         { surahId: Int, ayah: Int, through: Float ->
                             mushafDispatch.value(ReaderInteractionEvent.WordPlayRequested)
@@ -2978,7 +2974,7 @@ fun ReaderScreen(
                         wordByWord = leafTextSource == EnglishLeafText.GLOSS,
                         verseNumberScript = settings.verseNumberScript,
                         pageNumberScript = settings.pageNumberScript,
-                        leafText = leafTextForSetting,
+                        leafText = mushafReady.englishText,
                         book = englishBook,
                         modifier = Modifier.fillMaxSize(),
                     )
