@@ -42,6 +42,9 @@ paper covers with equal alpha merge, and one band carries the active soft edge.
 First-pass glimmer shares that band; repeats keep the semantic ranges. Geometry
 stays cached by layout and range, and only repeat/glint layers request shaped
 paths.
+The moving English leaf edge interpolates between cached source/printed letter
+anchors with one binary search. Exact word boundaries retain their integer map;
+animation never rounds its position to a whole letter.
 
 ### 1. Draw-phase-only animations (zero recomposition fades)
 

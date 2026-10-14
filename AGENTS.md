@@ -95,6 +95,33 @@ web/                    Browser port (Vite + React): Focus / Highlight / Ink + p
 .github/workflows/web.yml     CI: Vitest + web build; deploys a Pages artifact on master
 ```
 
+## Quran.ai MCP — reliable Quran reference
+
+Use [quran.ai MCP](https://mcp.quran.ai) as a reliable canonical reference for
+Quran text, translations, Arabic morphology and tafsir when investigating
+meanings, roots or English highlighting. Its public endpoint uses Streamable
+HTTP; follow the [official usage guide](https://github.com/quran/mcp.quran.ai/blob/master/skills/quran.ai-MCP-usage/SKILL.md).
+
+1. Call `fetch_grounding_rules` first and follow its attribution and
+   faithfulness rules. Pass its nonce only where the live tool schema accepts it.
+2. Retrieve the actual passage with `fetch_quran` and `fetch_translation`.
+   Discover editions through `list_editions`; ground interpretations in
+   `fetch_tafsir`, selecting a suitable edition before fetching it.
+3. Use `fetch_word_morphology` for lexical evidence. Prefer the Arabic word
+   within its verse; verify positions against the app's actual Arabic words,
+   since MCP/QAC segmentation can differ from the reader's word slots.
+4. Verify every returned verse key, follow pagination, and retain edition and
+   citation URLs with the evidence. Use unique JSON-RPC IDs for concurrent
+   requests; reject missing or mismatched responses.
+5. Turn reviewed ownership decisions into exact-owner and continuous-prefix
+   regressions. Distinguish fetched evidence from model adjudication: quran.ai
+   shares Quran.com/Quran Foundation upstream data with this app, so agreement
+   alone cannot certify 99.99% accuracy or replace independent coverage.
+
+Keep this an agent-side reference. If unavailable, report that and do not claim
+memory-based content was MCP-verified. See [docs/ENGLISH_ALIGNMENT_COVERAGE.md](docs/ENGLISH_ALIGNMENT_COVERAGE.md)
+for the existing review and its limits.
+
 ## Build, test, run
 
 Requires **JDK 21**. No Android device/emulator is needed for tests.

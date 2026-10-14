@@ -483,7 +483,38 @@ tween-vs-snap rules, sweep entry and residual rules, repeat wash timing, the
   supplies the ink frontier ahead of fade-led focus. A missing or stale focus
   used to re-cover completed or outgoing verses, or uncover future verses at a
   repeat, so the first-word cover gate still holds the incoming verse until its
-  timing arrives. Voice ownership and follow retain the last heard word's
+  timing arrives. The first-word gate remembers the heard
+  playback generation, so a seek or repeat of the same verse waits anew;
+  an optimistic tap seed cannot establish that the new voice has arrived.
+  Web publishes its ink activation even with no active word and applies the
+  same generation rule. Reproducible timing, ownership and page-cut checks
+  are recorded in [ENGLISH_ALIGNMENT_COVERAGE.md](ENGLISH_ALIGNMENT_COVERAGE.md).
+  English ownership also reads the loaded words' vocalized QAC lemmas. Shared
+  phrase cards retain their lexical heads; equal repeated heads can cross
+  clauses when their Arabic lemma is identical. Heads can also cross
+  print order. Unclaimed shared-phrase text stays before the following Arabic
+  anchor, so a resolved subject cannot strand a preceding verb in that next
+  word. Different meanings keep the
+  sentence guard. Scoped gloss variants and reciprocal adjacent head cues
+  preserve noun/verb ownership. Recovering a head missing from a grammatical
+  card also requires the actual Arabic word to corroborate the lemma.
+  Latin accent folding affects matching keys, preserving printed glyphs.
+  “Clear evidence/evidences” stays with its single source meaning (24:1
+  bayyināt: word 7); distinct literal adjective and noun cards retain their
+  separate owners. Bayyina/mubīn heads resolve repeated “clear” phrases.
+  An unclaimed grammar tail stays with its closing sentence between adjacent
+  Arabic anchors: 24:4 “ever after” finishes together on word 16. Explicit
+  matches and earlier owners remain intact; unmatched content is not absorbed.
+  A literal grammar-only gloss outranks sentence closure; ambiguous copies
+  keep their existing contextual owner (23:83 “before”).
+  A gendered offender expanded as a woman/man recognizes its source card
+  only when no literal gender or printed offender head competes. This keeps
+  the opening phrase of 24:2 active on Arabic word 1. Its expanded offender
+  description travels with that head; flog/lash cues keep the action separate
+  from the later lashes noun.
+  Full semantic certification requires a separate reviewed
+  reference; timing/frame counts do not supply those labels.
+  Voice ownership and follow retain the last heard word's
   location through the silent tail, so a carried verse does not jump back to
   its opening leaf when the live word becomes null. That location is released
   on a playlist change or a new seek/repeat generation; the wash still reads
@@ -610,12 +641,41 @@ latched edge.
 **The plain clock.** Both the tajweed map and the wasl continuation are claims
 about where inside an Arabic *word* the time is going, so `LetterSweep` also
 publishes `plainProgress` — the same Animatable with neither applied — surfaced
-as `InkMotion.plainSweepProgress`. A renderer with no Arabic letters under its
-wash must read that one: the mushaf's English leaf blooms the English span of
-the word being said (`englishVerseBlooms`), and the paced value parks that
-bloom wherever the reciter sustains a madd. The scrolling reader's English mode gets the same
-result at the source, by passing `pacing = null` to `rememberInkMotions`; the
-mushaf cannot, because one `AyahInkPack` draws both leaves.
+as `InkMotion.plainSweepProgress`. English never applies the Arabic letter map
+or wasl carry-in: either would park English ink where only an Arabic letter is
+held. The scrolling reader passes `pacing = null` to `rememberInkMotions`.
+
+**English leaf pacing.** `EnglishWashClock` receives the same calibrated,
+seek-aware media samples that select the Arabic word, without recomposing the
+page on each tick. Each continuous English band lasts from its first Arabic
+owner until the next band's first occurrence, the first repeat, or
+the last spoken segment ends, whichever comes first. Re-says never extend the
+first wash: Alafasy's 24:1 “clear evidence” is fully laid when he returns to
+“and We revealed.” Like scroll ink, a single continuous linear animation runs
+from the calibrated media position at the playback speed to the known spoken
+end. Ordinary position polls never stop or restart it. Pause, buffering, speed,
+seek, source and output-correction changes re-anchor it to the media clock.
+Re-anchoring retains the last drawn frame within one performance, so a lagging
+pause/speed poll cannot lift ink. Long-run drift against the media clock has
+not been measured; the continuous clock still ignores ordinary position polls.
+The painted edge uses `EnglishLeafVerse.fragmentWashProgress`, interpolating
+between cached letter anchors. The exact integer mapping still places owned
+ranges and taps. Applying that integer mapping on each animation frame made
+the edge wait for a whole letter and then jump, despite a continuous clock.
+The active word's onset closes preceding ink before its repeat tint begins. In 24:2, “their punishment” starts on word 23 but
+keeps washing through the reordered Arabic “a group of the believers,” words
+24–26. It finishes at 36.25 s rather than 28.49 s for Alafasy. Pauses freeze
+the edge; speed changes and holds longer than the visual animation cap still
+follow media time. A carried band projects its progress through the page cut,
+so the second fragment waits for the first. Glimmer and repeat tint are clipped
+to laid ink; repeat tint uses the scrolling reader's uninterrupted repeat sweep. Seek
+generations reject stale samples; calibration changes cannot rewind laid ink.
+Carried-leaf ownership and follow read that same edge. Follow previews 500 ms
+at the current playback speed, preserving the existing turn lead and waiting
+cover; it no longer assumes that the next Arabic word starts the next leaf.
+Re-says use the existing semantic word location for carried leaves; completing
+the first wash cannot carry the voice away from its repeated phrase. Semantic
+ownership for taps, holds, and repeat labels stays in the alignment.
 
 **Short wasl donors** (`مَن يَشْرِى`, `مِن رَّبِّكُم`, …) need a **speed
 ceiling** on that early bloom so the next opening does not race: details and

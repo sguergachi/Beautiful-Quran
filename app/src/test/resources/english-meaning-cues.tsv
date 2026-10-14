@@ -22,7 +22,7 @@ John	*	يحيى	\bYahya\b
 Job	*	أيوب	\bAyyub\b
 Torah	*	تورىة	\bTaur(?:at|ah)\b
 Gospel	*	إنجيل	\bInjeel\b
-Knowing	علم	*	\bAll[- ](?:Knower|Knowing)\b
+(?:Knowing|Knower)	علم	*	\bAll[- ](?:Knower|Knowing)\b
 Acquainted	خبر	*	\bAll[- ]Aware\b
 Hearing	سمع	*	\bAll[- ]Hearer\b
 Seeing	بصر	*	\bAll[- ]Seer\b

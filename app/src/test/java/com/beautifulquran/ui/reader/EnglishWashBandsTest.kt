@@ -2,11 +2,15 @@ package com.beautifulquran.ui.reader
 
 import com.beautifulquran.domain.EnglishWordAlignment
 import com.beautifulquran.domain.EnglishLeafVerse
+import com.beautifulquran.domain.EnglishVerseRun
+import com.beautifulquran.domain.englishLeaf
+import com.beautifulquran.domain.englishLeafBreak
 import com.beautifulquran.domain.HighlightEngine
 import com.beautifulquran.data.model.Segment
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import kotlin.math.roundToInt
 
 /**
  * The English leaf blooms one word at a time, as the scrolling reader does. The
@@ -14,9 +18,104 @@ import org.junit.Test
  * `englishVerseBlooms`.
  */
 class EnglishWashBandsTest {
+    @Test
+    fun `reported meanings keep their owners at every eligible carried leaf cut`() {
+        val resources = listOf("english-prayer-alignment.tsv", "english-semantic-heads.tsv", "english-identity-owners.tsv",
+            "english-shared-owners.tsv", "english-quran-ai-opening-owners.tsv", "english-clear-evidence-owners.tsv",
+            "english-ever-after-owners.tsv")
+        for (resource in resources) for (row in javaClass.getResourceAsStream("/$resource")!!
+            .bufferedReader().use { it.readLines() }) {
+            val columns = row.split('\t')
+            val (key, source, glosses, targets) = columns
+            val alignment = EnglishWordAlignment.align(source, glosses.split('|'), columns.getOrNull(4)?.split('|').orEmpty())!!
+            val cuts = source.indices.filter { source[it].isWhitespace() }
+                .map { englishLeafBreak(source, it) }.distinct().filter { it in 1 until source.length }
+            for (cut in cuts) for ((from, to) in listOf(0 to cut, cut to source.length)) {
+                val fragment = englishLeaf(1, listOf(EnglishVerseRun(2, 1, from, to))) { _, _ -> source }
+                    .verses.single()
+                val owned = englishOwnedSpans(fragment.text.indices, alignment, fragment::fragmentInkProgress,
+                    fragment.text, forwardWash = false)
+                val wash = englishOwnedSpans(fragment.text.indices, alignment, fragment::fragmentInkProgress, fragment.text)
+                for (spans in listOf(owned, wash)) {
+                    assertEquals("$key cut=$cut", 0, spans.first().range.first)
+                    assertEquals(fragment.text.lastIndex, spans.last().range.last)
+                    spans.zipWithNext().forEach { (a, b) -> assertEquals(a.range.last + 1, b.range.first) }
+                }
+                for (position in 1..glosses.split('|').size) {
+                    val lit = wash.filter { it.position <= position }
+                    if (lit.isNotEmpty()) assertEquals("$key cut=$cut at=$position", 0, lit.first().range.first)
+                }
+                for (target in targets.split('|')) {
+                    val (word, occurrence, owner) = Regex("(.+?)(?:#(\\d+))?=(\\d+)").matchEntire(target)!!.destructured
+                    val pattern = Regex("\\b${Regex.escape(word)}\\b", RegexOption.IGNORE_CASE)
+                    val matches = pattern.findAll(source).toList()
+                    val expected = matches[(occurrence.toIntOrNull() ?: 1) - 1]
+                    if (expected.range.first < from || expected.range.last >= to) continue
+                    val index = matches.filter { it.range.first >= from && it.range.last < to }.indexOf(expected)
+                    val printed = pattern.findAll(fragment.text).elementAt(index)
+                    val middle = printed.range.first + word.length / 2
+                    assertEquals("$key $target cut=$cut", owner.toInt(), owned.single { middle in it.range }.position)
+                }
+            }
+        }
+    }
+
 
     /** A sentence occupying characters 10..109 of the paragraph. */
     private val sentence = 10..109
+
+    @Test
+    fun `ever after washes together before the next Arabic word`() {
+        val (_, text, glosses) = javaClass.getResourceAsStream("/english-ever-after-owners.tsv")!!
+            .bufferedReader().use { it.readLines().single() }.split('\t')
+        val alignment = EnglishWordAlignment.align(text, glosses.split('|'))!!
+        val spans = englishOwnedSpans(text.indices, alignment, text = text)
+        val word = ActiveWord(ayah = 4, wordPosition = 16, durationMs = 1200, activation = 0)
+        for (head in listOf("ever", "after")) {
+            val span = spans.single { text.indexOf(head) in it.range }
+            assertEquals(head, 16, span.position)
+            assertEquals(InkEngine.State.Active, InkEngine.word(span.position, word, isActiveAyah = true, dimmed = false).state)
+        }
+        assertTrue(alignment.through(17) * text.length >= text.indexOf("after") + "after".length)
+        val next = spans.single { text.indexOf("those", text.indexOf("after")) in it.range }
+        assertEquals(InkEngine.State.Upcoming, InkEngine.word(next.position, word, isActiveAyah = true, dimmed = false).state)
+    }
+
+    @Test
+    fun `clear evidence reveals together with bayyinat`() {
+        val (_, text, glosses) = javaClass.getResourceAsStream("/english-quran-ai-opening-owners.tsv")!!
+            .bufferedReader().use { it.readLines().first { row -> row.startsWith("24:1\t") } }.split('\t')
+        val alignment = EnglishWordAlignment.align(text, glosses.split('|'))!!
+        val spans = englishOwnedSpans(text.indices, alignment, text = text)
+        val word = ActiveWord(ayah = 1, wordPosition = 7, durationMs = 1200, activation = 0)
+        for (head in listOf("clear", "evidence")) {
+            val span = spans.single { text.indexOf(head) in it.range }
+            assertEquals(head, 7, span.position)
+            assertEquals(InkEngine.State.Active, InkEngine.word(span.position, word, isActiveAyah = true, dimmed = false).state)
+        }
+        assertTrue((alignment.through(8) * text.length).roundToInt() >= text.indexOf("evidence") + "evidence".length)
+        val remember = spans.single { text.indexOf("remember") in it.range }
+        assertEquals(InkEngine.State.Upcoming, InkEngine.word(remember.position, word, isActiveAyah = true, dimmed = false).state)
+    }
+
+    @Test
+    fun `first word reveals the opening woman phrase before the man`() {
+        val (_, text, glosses) = javaClass.getResourceAsStream("/english-quran-ai-opening-owners.tsv")!!
+            .bufferedReader().use { it.readLines().first { row -> row.startsWith("24:2\t") } }.split('\t')
+        val alignment = EnglishWordAlignment.align(text, glosses.split('|'))!!
+        val spans = englishOwnedSpans(text.indices, alignment, text = text)
+        val woman = spans.single { text.indexOf("woman") in it.range }
+        val man = spans.single { text.indexOf(" man") + 1 in it.range }
+        val word = ActiveWord(ayah = 2, wordPosition = 1, durationMs = 1200, activation = 0)
+        assertEquals(0, woman.range.first)
+        assertEquals(InkEngine.State.Active, InkEngine.word(woman.position, word, isActiveAyah = true, dimmed = false).state)
+        assertEquals(InkEngine.State.Upcoming, InkEngine.word(man.position, word, isActiveAyah = true, dimmed = false).state)
+        assertTrue(alignment.through(2) * text.length >= text.indexOf("woman") + "woman".length)
+        val explanation = spans.single { text.indexOf("sexual") in it.range }
+        val action = spans.single { text.indexOf(" lash") + 1 in it.range }
+        assertEquals(InkEngine.State.Active, InkEngine.word(explanation.position, word.copy(wordPosition = 2, highWater = 2), isActiveAyah = true, dimmed = false).state)
+        assertEquals(InkEngine.State.Upcoming, InkEngine.word(action.position, word.copy(wordPosition = 2, highWater = 2), isActiveAyah = true, dimmed = false).state)
+    }
 
     @Test
     fun `iqamah first pass and Alafasy repeat use the performance ink range`() {

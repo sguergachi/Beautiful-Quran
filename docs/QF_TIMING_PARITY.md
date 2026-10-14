@@ -111,6 +111,11 @@ and retained corpora are hash-bound in
 acoustic delta gate still applies to every independent change. Highlight and
 ink engines remain unchanged.
 
+The manifest also pins the v65 Git commit. Legacy audit holds are compared
+against that exact removed corpus after the public transition; its complete
+corpus digest must match before any archived row can serve as the reference.
+Holds for independent reciters still compare against the merge-base asset.
+
 ## Repeat the source gate
 
 Fetch authenticated Content Sync snapshots into private local scratch as

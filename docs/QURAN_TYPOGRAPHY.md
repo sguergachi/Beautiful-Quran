@@ -1356,13 +1356,16 @@ word blooming, however narrow its edge is made. Two attempts at the edge width
 (a line of the page, then 1.6 word-widths of the sentence) both missed for the
 same reason: the shape was wrong, not the size.
 
-The base wash bands follow English order, driven by Arabic `InkMotion` clocks.
+The base wash bands follow English order, driven by the calibrated media clock.
 Each band's owner is the earliest spoken meaning at or beyond its English
 range, so all text before the active edge is included. Adjacent bands with the
 same owner merge, leaving one active soft edge. First-pass glimmer uses those
 same bands and cannot jump ahead of the wash. Repeat tint and repeat glimmer
 retain the semantic owners over the prefix already laid. Range projection is
-cached with the paragraph; frames only read motion and build paint layers.
+cached with the paragraph; frames only read clocks and build paint layers.
+Owned ranges retain the exact letter-count map; the animated edge interpolates
+between those letter anchors. Rounding the moving edge to source characters
+and then to printed letter ends made even a continuous clock paint in jumps.
 Every wash uses `Tuning.washFeather` unmodified, exactly as the scrolling reader
 does.
 
@@ -1388,9 +1391,21 @@ its already-read words; the word being said never carries it, because it is
 revealed by its own bloom. Measured on device: a mid-sentence tap that used to
 complete in a single frame takes ~370 ms of rise.
 
-**But it reads the plain clock out of them, not the paced one.** The word's own
-share comes from `InkMotion.plainSweepProgress` — linear across the word's
-karaoke hold — and never from `sweepProgress`, which carries the two corrections
+**English follows spoken time, without Arabic letter pacing.** Each band's
+clock runs from its first Arabic owner to the next band's first occurrence,
+the first repeat, or the final spoken segment's end. First-pass ink
+finishes before a re-say starts its tint; it does not stretch across that
+repeat. As in scroll view, one continuous animation follows the spoken duration
+at the playback speed, bounded by the known spoken end. Position polls never
+interrupt it; transport changes re-anchor it. This includes source words reordered into
+earlier English: in 24:2 the last English band keeps washing while Arabic
+finishes “a group of the believers.” Pauses freeze the edge, speed changes
+follow the media clock, and a carried band crosses its first fragment before
+its second. Voice ownership follows that edge; the carried-page turn previews
+the same clock by its existing 500 ms lead at the current playback speed.
+Re-says keep their semantic word location, independently of the retained first
+wash, so the voice stays on the leaf carrying the repeated phrase.
+The leaf never reads `sweepProgress`, which carries the two corrections
 that make the Arabic wash right and the English one wrong: the tajweed letter
 map (`TajweedPacing.Curve`) and the wasl carry-in. Both are statements about
 where inside an Arabic *word* the time is going. A word holding a madd spends
@@ -1401,7 +1416,8 @@ up, which is exactly what "the ink is behind the voice" looks like. The
 scrolling reader's English mode refuses the same curve at the source
 (`rememberInkMotions(pacing = null)`); the mushaf cannot, because one pack draws
 both leaves — so the correction is refused at the *reader*, which is why the
-plain clock exists.
+plain clock exists. The shared pack still owns glimmer and semantic repeat
+layers; neither can pass the media-driven edge.
 
 The chapter-opening basmalah takes the same rule twice over
 (`BasmalahWash.plainProgress`). Its calligraphy wash is doubly Arabic: tajweed

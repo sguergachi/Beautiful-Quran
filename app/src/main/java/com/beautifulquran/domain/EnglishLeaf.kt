@@ -163,6 +163,19 @@ data class EnglishLeafVerse(
         return (textOffsetOf(offset).toFloat() / text.length).coerceIn(0f, 1f)
     }
 
+    /** Animated ink travels between letter anchors; owned ranges still use [fragmentInkProgress]. */
+    fun fragmentWashProgress(verseProgress: Float): Float {
+        if (!lettersMap || text.isEmpty()) return fragmentProgress(verseProgress)
+        val offset = verseProgress.coerceIn(0f, 1f) * verseLength
+        val next = countAtOrBelow(sourceLetterEnds, offset.toInt())
+        val start = sourceLetterEnds.getOrNull(next - 1) ?: textFrom
+        val end = sourceLetterEnds.getOrNull(next) ?: to
+        val fromText = textLetterEnds.getOrNull(next - 1) ?: 0
+        val toText = textLetterEnds.getOrNull(next) ?: text.length
+        val progress = if (end > start) ((offset - start) / (end - start)).coerceIn(0f, 1f) else 1f
+        return ((fromText + (toText - fromText) * progress) / text.length).coerceIn(0f, 1f)
+    }
+
     /**
      * The share of the *verse* that a point [at] characters into this fragment
      * stands at — the inverse of [fragmentInkProgress], and what a tap uses to
