@@ -216,8 +216,10 @@ class EnglishBookCache internal constructor(private val dir: File) {
          * 33: (reserved: the basmalah on the line pitch, a separate change.)
          * 34: the leaf is justified (EnglishJustify), and the ruler counts the
          * justified setting's lines, which hold more than ragged ones.
+         * 35: the ruler searches past an overflowing prefix when later words
+         * can close a line in the justified setting.
          */
-        const val FORMAT = 34
+        const val FORMAT = 35
         const val MAX_LEAVES = 10_000
         const val MAX_RUNS = 20_000
     }

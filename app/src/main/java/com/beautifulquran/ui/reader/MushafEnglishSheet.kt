@@ -2054,6 +2054,7 @@ internal fun englishLeafRuler(
             val offerFound = englishRagCandidates(prose.text, style, density, measurer)
             val fontPx = with(density) { style.fontSize.toPx() }
             val measure = measurePx.toInt().toFloat()
+            val offerMetrics = offerFound?.let { englishJustifyText(offerText, it.offsets, fontPx) }
             // The whole offer runs to its chapter's end: its last line is the
             // paragraph's own.
             val offerLines = offerFound
@@ -2111,29 +2112,53 @@ internal fun englishLeafRuler(
                     verseNumberScript, style, measurePx, density, measurer, typePalette,
                     justifyLast = at < stops.lastIndex,
                 )
-                fun fits(at: Int): Boolean {
+                // The optimum's line count can dip as a prefix grows. Keep
+                // searching past an overflow, but stop once the seen prefix
+                // exceeds the offer-wide capacity after maximum shrink.
+                val tuning = EnglishJustifyTuning
+                val minimumWidthFactor = minOf(
+                    1f - tuning.expansion * tuning.letterShrink,
+                    tuning.idealSpace * (1f - tuning.shrink),
+                )
+                val lineFit = measure - 1f
+                val maximumOfferWidth = offerMetrics?.let { metrics ->
+                    if (minimumWidthFactor > 0f) {
+                        val allLetters = metrics.lettersBefore[offerText.length]
+                        (lines * lineFit + allLetters * tuning.tracking * tuning.letterShrink * fontPx) /
+                            minimumWidthFactor + 1f
+                    } else {
+                        Float.POSITIVE_INFINITY
+                    }
+                } ?: Float.POSITIVE_INFINITY
+                fun probe(at: Int): Pair<Boolean, Boolean> {
                     val carried = at < stops.lastIndex
                     val cut = englishLeafCutProse(page, runs, stops[at], translation, verseNumberScript, typePalette)
-                        ?: return true
+                        ?: return true to true
                     val text = cut.text.text
                     if (offerFound == null || !offerText.startsWith(text) || text.length < 2) {
-                        return exactLines(at) <= lines
+                        return (exactLines(at) <= lines) to true
                     }
-                    val prefix = offerFound.prefix(text.length) ?: return exactLines(at) <= lines
-                    val count = englishJustifyModel(prefix, text, measure, fontPx, carried)?.size
-                        ?: return exactLines(at) <= lines
-                    return count <= lines
+                    val prefix = offerFound.prefix(text.length) ?: return (exactLines(at) <= lines) to true
+                    if (offerMetrics == null) return (exactLines(at) <= lines) to true
+                    val count = englishJustifyModel(prefix, text, measure, fontPx, carried)
+                        ?.size ?: return (exactLines(at) <= lines) to true
+                    // This bound gives even this prefix every tracking slot
+                    // in the whole offer, so it cannot stop before a later
+                    // prefix merely gains more letter-spacing allowance.
+                    val canFitLater = prefix.candidates.textEnd <= maximumOfferWidth
+                    if (!canFitLater) return false to false
+                    return (count <= lines) to true
                 }
-                // Walk from the seed a word at a time: on while the leaf still
-                // fits, back while it does not. Not a bisection: a justified
-                // paragraph's line count can dip as words are added — a new
-                // word lets a line close that was stretched — so the cut must
-                // not depend on which stops a search happened to try.
+                // Find the latest fit before the seed if needed, then keep the
+                // latest fitting stop as the non-monotone setting is sampled.
                 var lo = seed.coerceIn(0, stops.lastIndex)
-                if (fits(lo)) {
-                    while (lo < stops.lastIndex && fits(lo + 1)) lo++
-                } else {
-                    while (lo >= 0 && !fits(lo)) lo--
+                while (lo >= 0 && !probe(lo).first) lo--
+                var probeAt = seed + 1
+                while (probeAt <= stops.lastIndex) {
+                    val (fits, canFitLater) = probe(probeAt)
+                    if (fits) lo = probeAt
+                    if (!canFitLater) break
+                    probeAt++
                 }
                 // Every stop fitted, offer and all. The candidate said the
                 // offer overflows and the leaf, drawn, says it does not — they
