@@ -12,8 +12,10 @@ data class EnglishAlignment(
     val wordEnds: FloatArray,
     val spans: List<EnglishWordSpan>,
     val washSpans: List<EnglishWordSpan> = continuousEnglishWash(spans),
-    /** False denotes the heuristic mapper; approval is review coverage, not certification. */
+    /** Human review coverage, not semantic certification. AI review has its own flag. */
     val usesApprovedRecord: Boolean = false,
+    /** The developer experiment; it never impersonates human approval. */
+    val usesAiReviewedRecord: Boolean = false,
 ) {
     /** The Arabic owner of a point in the printed English, including reordered words. */
     fun positionAt(through: Float): Int =
@@ -861,7 +863,11 @@ object EnglishWordAlignment {
  * [NONE] rather than not stored, so an unalignable verse is not re-solved on
  * every frame that asks.
  */
-class EnglishVerseAlignments(private val content: SurahContent, private val wordByWord: Boolean = false) {
+class EnglishVerseAlignments(
+    private val content: SurahContent,
+    private val wordByWord: Boolean = false,
+    private val useAiReviewed: Boolean = false,
+) {
 
     private val solved = ConcurrentHashMap<Int, EnglishAlignment>()
 
@@ -878,7 +884,12 @@ class EnglishVerseAlignments(private val content: SurahContent, private val word
                     val approved = if (wordByWord) null else content.englishAlignmentRecords[number]?.let { record ->
                         ReviewedEnglishAlignment.alignment(verse.translation, verse.words.map { it.arabic }, record)
                     }
-                    approved ?: EnglishWordAlignment.align(
+                    val aiReviewed = if (wordByWord || !useAiReviewed || approved != null) null else
+                        content.aiEnglishAlignmentRecords[number]?.let { record ->
+                            ReviewedEnglishAlignment.alignment(verse.translation, verse.words.map { it.arabic }, record)
+                                ?.copy(usesApprovedRecord = false, usesAiReviewedRecord = true)
+                        }
+                    approved ?: aiReviewed ?: EnglishWordAlignment.align(
                         if (wordByWord) EnglishTypography.lyricize(
                             verse.words.map { it.translation }, verse.words.map { it.arabic },
                         ).filter { it.isNotBlank() }.joinToString(" ") else verse.translation,

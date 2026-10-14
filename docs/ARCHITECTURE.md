@@ -59,6 +59,12 @@ exact typeset text and Arabic slots before caching it. The initial artifact
 is empty: every verse remains a mapper fallback and semantic accuracy is
 unestablished. Word-card English is a separate corpus.
 
+The separate AI-reviewed artifact is a developer experiment, off by default.
+Settings → Developer → AI-approved English mappings enables it only while
+developer mode is active. Valid human-reviewed records take precedence; absent
+or stale AI rows retain the mapper. Both English wash and tap/follow use the
+same selection. AI decisions never count as human review or blind gold.
+
 > **Quran Foundation Content API.** Android and web use authenticated
 > Production Content Sync through a narrow Cloudflare Worker. QF credentials
 > remain server-side; the clients retain only local content and an opaque

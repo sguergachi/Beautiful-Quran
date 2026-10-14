@@ -142,7 +142,7 @@ def export_corpus(output, draft_corpus=None):
     return manifest
 
 
-def compile_verse(row, binding):
+def compile_verse(row, binding, ai_reviewed=False):
     require(isinstance(row, dict) and {"verse", "text", "arabic", "tokens", "fingerprint"} <= row.keys(), "Incomplete verse record")
     text, arabic, tokens = row["text"], row["arabic"], row["tokens"]
     require(isinstance(tokens, list) and all(isinstance(t, dict) and
@@ -151,12 +151,13 @@ def compile_verse(row, binding):
     require("\0" not in text and digest("\0".join([FORMAT, text, *arabic]).encode()) == binding["fingerprint"] == row["fingerprint"], "Stale printed text or surfaces")
     require(len(tokens) == binding["printed_tokens"] and digest(encoded([[t["start"], t["end"], t["text"]] for t in tokens])) == binding["tokens_sha256"], "Token offsets/text differ")
     require(all(t["status"] in STATUSES for t in tokens), "Unknown review status")
+    eligible = APPROVED | ({"model_reviewed"} if ai_reviewed else set())
     units = collections.defaultdict(list)
     for index, token in enumerate(tokens):
         for field in ("head", "ink_anchor"):
             value = token[field]
             require(value is None or (type(value) is int and 1 <= value <= len(arabic)), f"Invalid {field}")
-        if token["status"] not in APPROVED:
+        if token["status"] not in eligible:
             continue
         require(token["head"] is not None and token["ink_anchor"] is not None, "Approved token has no interaction/wash anchor")
         contributors = token["contributors"]
@@ -166,12 +167,15 @@ def compile_verse(row, binding):
         require(not contributors or token["head"] in contributors, "Interaction head is outside the meaning contributors")
         require(isinstance(token["meaning"], str) and token["meaning"].strip() and isinstance(token["unit"], str) and token["unit"].strip(), "Missing meaning/unit decision")
         review = token["review"]
-        method = "blind_adjudication" if token["status"] == "blind_gold" else "human_review"
+        model = token["status"] == "model_reviewed"
+        if model:
+            require(row.get("qac_trust") == "surface_verified", "AI review needs the actual Arabic surface crosswalk")
+        method = "model_review" if model else "blind_adjudication" if token["status"] == "blind_gold" else "human_review"
         require(isinstance(review, dict) and review.get("method") == method and isinstance(review.get("reviewer"), str) and review["reviewer"].strip() and
             isinstance(review.get("evidence"), list) and review["evidence"] and
-            all(isinstance(e, str) and e.strip() for e in review["evidence"]), "Missing human review provenance")
+            all(isinstance(e, str) and e.strip() for e in review["evidence"]), "Missing review provenance")
         units[token["unit"]].append(index)
-    if not all(t["status"] in APPROVED for t in tokens):
+    if not all(t["status"] in eligible for t in tokens):
         return None
     for indices in units.values():
         unit = [tokens[i] for i in indices]
@@ -184,7 +188,7 @@ def compile_verse(row, binding):
     return "\t".join([row["verse"], row["fingerprint"], ink, "=" if heads == ink else heads])
 
 
-def compile_ledger(ledger, manifest, allow_partial=False):
+def compile_ledger(ledger, manifest, allow_partial=False, ai_reviewed=False):
     validate_manifest(manifest)
     manifest_hash = digest(encoded(manifest))
     rows = {}; compiled = []; statuses = collections.Counter()
@@ -200,7 +204,7 @@ def compile_ledger(ledger, manifest, allow_partial=False):
         if row is None:
             statuses["unresolved"] += binding["printed_tokens"]
             continue
-        result = compile_verse(row, binding)
+        result = compile_verse(row, binding, ai_reviewed)
         statuses.update(t["status"] for t in row["tokens"])
         if result:
             compiled.append(result)
@@ -208,6 +212,8 @@ def compile_ledger(ledger, manifest, allow_partial=False):
     coverage = {**manifest["counts"], "manifest_sha256": manifest_hash, "approved_verses": len(compiled),
         "approved_tokens": sum(manifest["verses"][k]["printed_tokens"] for k in approved_keys),
         "fallback_verses": len(manifest["verses"]) - len(compiled), "statuses": dict(statuses),
+        "approval_policy": "ai_reviewed" if ai_reviewed else "human_review",
+        "ai_reviewed_verses": sum(any(t["status"] == "model_reviewed" for t in rows[k]["tokens"]) for k in approved_keys),
         "semantic_accuracy_established": False}
     require(allow_partial or coverage["fallback_verses"] == 0, f"{coverage['fallback_verses']} fallback verses; use --allow-partial for a development pilot")
     artifact = "# " + FORMAT + "\n" + "".join(line + "\n" for line in compiled)
@@ -227,11 +233,13 @@ def main():
     compile.add_argument("--output", type=Path, required=True)
     compile.add_argument("--coverage", type=Path, required=True)
     compile.add_argument("--allow-partial", action="store_true")
+    compile.add_argument("--ai-reviewed", action="store_true", help="Developer artifact only: also accept fully model-reviewed verses")
     args = parser.parse_args()
     if args.command == "export":
         print(json.dumps(export_corpus(args.output_dir, args.draft_corpus)["counts"]))
     else:
-        artifact, coverage = compile_ledger(args.ledger, json.loads(args.manifest.read_text()), args.allow_partial)
+        require(not args.ai_reviewed or args.output.name != "english-alignments.tsv", "AI policy needs the separate developer artifact")
+        artifact, coverage = compile_ledger(args.ledger, json.loads(args.manifest.read_text()), args.allow_partial, args.ai_reviewed)
         args.output.write_text(artifact)
         args.coverage.write_text(json.dumps(coverage, indent=2) + "\n")
         print(json.dumps(coverage))

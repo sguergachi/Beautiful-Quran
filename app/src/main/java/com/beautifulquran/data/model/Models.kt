@@ -65,6 +65,8 @@ data class SurahContent(
     val ayahs: List<Ayah>,
     /** Approved prose records; word-card English remains a separate corpus. */
     val englishAlignmentRecords: Map<Int, EnglishAlignmentRecord> = emptyMap(),
+    /** AI review stays separate and is used only by the developer toggle. */
+    val aiEnglishAlignmentRecords: Map<Int, EnglishAlignmentRecord> = emptyMap(),
 )
 
 /** Compiled review decisions; exact text/surface binding is checked before use. */

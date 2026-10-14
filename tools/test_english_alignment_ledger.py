@@ -68,6 +68,40 @@ class LedgerTest(unittest.TestCase):
         self.row["tokens"][1]["unit"] = "translator addition"
         self.assertIsNotNone(ledger.compile_verse(self.row, self.binding))
 
+    def test_ai_review_is_explicit_and_requires_source_crosswalk_and_model_provenance(self):
+        for token in self.row["tokens"]:
+            token.update(status="model_reviewed", review={"method": "model_review", "reviewer": "TEST AI", "evidence": ["synthetic evidence"]})
+        self.assertIsNone(ledger.compile_verse(self.row, self.binding))
+        with self.assertRaisesRegex(ValueError, "crosswalk"):
+            ledger.compile_verse(self.row, self.binding, ai_reviewed=True)
+        self.row["qac_trust"] = "surface_verified"
+        self.assertIsNotNone(ledger.compile_verse(self.row, self.binding, ai_reviewed=True))
+        self.row["tokens"][1]["status"] = "consensus_silver"
+        self.assertIsNone(ledger.compile_verse(self.row, self.binding, ai_reviewed=True))
+        self.row["tokens"][1]["status"] = "model_reviewed"
+        self.row["tokens"][0]["review"]["method"] = "human_review"
+        with self.assertRaisesRegex(ValueError, "provenance"):
+            ledger.compile_verse(self.row, self.binding, ai_reviewed=True)
+
+    def test_ai_pilot_reproduces_with_full_population_and_keeps_problem_meanings(self):
+        data = ledger.REPO / "data"
+        manifest = json.loads((data / "english_alignment_manifest.json").read_text())
+        source = data / "english_ai_alignment_ledger.jsonl"
+        artifact, coverage = ledger.compile_ledger(source, manifest, allow_partial=True, ai_reviewed=True)
+        self.assertEqual((data / "english-ai-alignments.tsv").read_text(), artifact)
+        self.assertEqual(json.loads((data / "english_ai_alignment_coverage.json").read_text()), coverage)
+        self.assertEqual((7, 325, 6229), (coverage["ai_reviewed_verses"], coverage["approved_tokens"], coverage["fallback_verses"]))
+        self.assertFalse(coverage["semantic_accuracy_established"])
+        _, human = ledger.compile_ledger(source, manifest, allow_partial=True)
+        self.assertEqual(0, human["approved_verses"])
+        rows = {r["verse"]: r for r in map(json.loads, source.read_text().splitlines())}
+        for key, text, owners in [("24:30", "vision", [5]), ("24:31", "vision", [5]),
+                ("24:31", "brothers", [35, 38]), ("24:37", "performance", [10]),
+                ("24:37", "prayer", [11]), ("23:83", "before", [7]), ("9:25", "victory", [2])]:
+            self.assertEqual(owners, [t["head"] for t in rows[key]["tokens"] if t["text"] == text])
+        against = [t for t in rows["9:4"]["tokens"] if t["text"] == "against"]
+        self.assertEqual(12, against[0]["head"])
+
     def test_units_cannot_mix_sources_or_skip_intervening_tokens(self):
         self.row["tokens"][1].update(head=1, contributors=[1])
         with self.assertRaisesRegex(ValueError, "mixes"):

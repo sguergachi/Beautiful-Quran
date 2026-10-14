@@ -1,8 +1,8 @@
 # Offline English alignment ledger — v1
 
 This implements the integrity and pilot stage of the offline mapping proposal.
-The initial compiled artifact has **zero approved verses**; all 6,236 verses
-still use the mapper. The existing 160 selected model adjudications are not
+The human-reviewed compiled artifact has **zero approved verses**; all 6,236
+verses still use the mapper by default. The existing 160 selected model adjudications are not
 human review or independent gold. There is no new semantic accuracy claim.
 
 ## Export
@@ -52,7 +52,7 @@ trust. Qualified reviewers use the actual Arabic slots and independent evidence.
   qualifications, independence or linguistic correctness.
 
 Only reviewed/blind_gold tokens with complete provenance can compile, and the
-whole verse must qualify. Partially reviewed verses never silently mix approval
+whole verse must qualify in the default human-review policy. Partially reviewed verses never silently mix approval
 and guesses. V1 retains the existing band-duration policy: first wash ends at
 the next band, first repeat or spoken end. Independent arbitrary completion
 clocks are outside this format. Unit identifiers must be contiguous and use
@@ -88,6 +88,47 @@ assets also fall back and log the problem. Word-card mode remains a
 separate corpus and always uses its own mapper. Soft wash, page cuts, repeat
 clipping and frame interpolation remain shared. Metadata is read directly from
 assets; no SQLite extraction version bump or DB content change is needed.
+
+## Developer AI approval
+
+The user requested a separate opt-in path while a qualified reviewer is
+unavailable. Settings → Developer → **AI-approved English mappings** is off by
+default. Triple-tap the Settings logo to expose Developer; disabling developer
+mode also disables the experiment without forgetting its preference.
+
+`--ai-reviewed` permits fully `model_reviewed` verses in a separate artifact:
+
+```bash
+python3 tools/english_alignment_ledger.py compile \
+  --ledger data/english_ai_alignment_ledger.jsonl \
+  --manifest data/english_alignment_manifest.json \
+  --output data/english-ai-alignments.tsv \
+  --coverage data/english_ai_alignment_coverage.json --allow-partial --ai-reviewed
+```
+
+Every token needs meaning, contributors, ink/head decisions and model-review
+evidence. `qac_trust: surface_verified` attests that the returned word surfaces
+match the app's ordered slots after Arabic normalization, excluding the verse
+number marker. It is not inferred from counts. The compiler enforces structural
+completeness and binding; linguistic correctness and this source attestation
+remain AI judgments. Silver agreement, drafts, disputed or unresolved decisions
+do not qualify. The default compiler still rejects model review as human approval.
+
+The initial targeted pilot has **7 verses / 325 tokens**: 9:4, 9:25, 23:83,
+24:1, 24:30–31 and 24:37. One Codex model (`gpt-6.1-sol`) annotated them using
+fetched Quran.ai Arabic text, Sahih International, word morphology and Jalalayn
+commentary. This was not an independent second-model review or a blind sample.
+`english_ai_review_evidence.json` retains source digests and fetched citation URLs;
+raw replies remain in the private artifact archive. The ledger stores the model's
+decisions, including explicit cues for null-linked additions. Review every token
+against the actual printed edition; bracketed wording can have an Arabic source.
+
+The APK carries only a thin second lookup. Valid human-reviewed rows win; the
+toggle selects AI rows for prose only, with **6,229 fallback verses**. Word cards
+and web remain unchanged. Wash, tapping, repeat and carried-leaf following share
+the selected mapping and preserve the continuous prefix. No model or Quran.ai
+request runs on the phone. Coverage records the AI policy explicitly and keeps
+semantic accuracy unestablished. The complete corpus has not been AI-reviewed.
 
 ## Evidence still needed
 

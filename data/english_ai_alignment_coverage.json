@@ -1,0 +1,17 @@
+{
+  "verses": 6236,
+  "arabic_slots": 77429,
+  "printed_tokens": 158066,
+  "manifest_sha256": "86eef80b40775775e71bcbae4ec6902d463a736398c1e3d6566e55bc535a2cae",
+  "approved_verses": 7,
+  "approved_tokens": 325,
+  "fallback_verses": 6229,
+  "statuses": {
+    "unresolved": 157741,
+    "model_reviewed": 325
+  },
+  "approval_policy": "ai_reviewed",
+  "ai_reviewed_verses": 7,
+  "semantic_accuracy_established": false,
+  "artifact_sha256": "38267a073466ffa30d1b0604bb288134d05257f882e174b73bdfc8ebd28729fc"
+}

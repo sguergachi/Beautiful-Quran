@@ -9,6 +9,8 @@
   "statuses": {
     "unresolved": 158066
   },
+  "approval_policy": "human_review",
+  "ai_reviewed_verses": 0,
   "semantic_accuracy_established": false,
   "artifact_sha256": "18a96f5453dcce35094fd8af630f8ceea274ce3349f1a00cb07338534c75ef28"
 }

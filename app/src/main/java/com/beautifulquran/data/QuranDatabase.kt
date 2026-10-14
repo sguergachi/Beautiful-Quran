@@ -17,13 +17,14 @@ class QuranDatabase(private val context: Context) {
     private var warmed = false
 
     /** Loaded once by surahContent on IO; no extraction cache or database bump. */
-    internal val englishAlignmentRecords by lazy {
-        try {
-            context.assets.open("english-alignments.tsv").bufferedReader().use { ReviewedEnglishAlignment.read(it.lineSequence()) }
-        } catch (error: Exception) {
-            android.util.Log.w("EnglishAlignment", "Approved mappings unavailable; using mapper", error)
-            emptyMap()
-        }
+    internal val englishAlignmentRecords by lazy { readEnglishAlignments("english-alignments.tsv") }
+    internal val aiEnglishAlignmentRecords by lazy { readEnglishAlignments("english-ai-alignments.tsv") }
+
+    private fun readEnglishAlignments(asset: String) = try {
+        context.assets.open(asset).bufferedReader().use { ReviewedEnglishAlignment.read(it.lineSequence()) }
+    } catch (error: Exception) {
+        android.util.Log.w("EnglishAlignment", "$asset unavailable; using mapper", error)
+        emptyMap()
     }
 
     val db: SQLiteDatabase by lazy {

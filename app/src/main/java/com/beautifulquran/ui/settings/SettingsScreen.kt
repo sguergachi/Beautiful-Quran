@@ -377,6 +377,16 @@ private fun DeveloperSection(
     Caption("Tools for testing work in progress.")
 
     Spacer(Modifier.height(20.dp))
+    ToggleRow(
+        label = "AI-approved English mappings",
+        checked = settings.aiEnglishAlignmentEnabled,
+        onChange = { enabled -> viewModel.settings.update { it.copy(aiEnglishAlignmentEnabled = enabled) } },
+        checkParams = checkParams,
+        checkPaintToken = checkPaintToken,
+    )
+    Caption("Experimental prose highlighting. Only AI-reviewed verses use it; the rest keep the mapper. Accuracy is not independently certified.")
+
+    Spacer(Modifier.height(20.dp))
     SectionLabel("English type")
     BookTypeface.entries.forEach { face ->
         SelectRow(

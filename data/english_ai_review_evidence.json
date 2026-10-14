@@ -1,0 +1,76 @@
+{
+  "reviewer": "gpt-6.1-sol",
+  "method": "source-grounded model review; structural compiler checks",
+  "date": "2026-10-14",
+  "independent_gold": false,
+  "sources": {
+    "quran.json": "85663826fe698c24b072c07a6da5c79ad7521d16f2f31d9287c8ef0681945c16",
+    "translation.json": "953bccdfaa3b8aeae519d87513848a5736b57cd41519bec3c8ed993069f7eac3",
+    "tafsir.json": "ded68cec592b808c5bcdc4819bfd4c95fea5933d64b97b969098973a06622237",
+    "morphology-9-4.json": "f254a0c114315bf1ab94992fb46fb39b36e9755ffc27fc0a626392c862830ba5",
+    "morphology-9-25.json": "8a0e9013c156d5fca6d63a5af28e383eb7da13893c1f595b9badfcc30c74ab44",
+    "morphology-23-83.json": "24732f8e295ba257182252155525fef55f9ef16ebca7c4c0a08bd5902b7d30a1",
+    "morphology-24-1.json": "ec833a3a2a1ff49664c1b1b7c1b2c2037f91a407e1905cf4fd6deada77b29377",
+    "morphology-24-30.json": "8ae04c2b75dd90ec46fcbcf57da942176d13f18be6ad68c0d6c4353b435f27d0",
+    "morphology-24-31.json": "ba2823bf3ce0333273a8663aa9e1c25d62802adb09686f9c91cf50706d187572",
+    "morphology-24-37.json": "6a84db4ffd91cf308aa6b5d52a6d1f6d63742b9410976a7334da6b5f1a4d3b3f"
+  },
+  "verses": {
+    "9:4": {
+      "printed_tokens": 47,
+      "arabic_slots": 22,
+      "head_changes_from_mapper": 7,
+      "surface_crosswalk": "all normalized surfaces matched in order, verse-number marker excluded",
+      "translation": "https://quran.com/9:4?translations=20",
+      "tafsir": "https://quran.com/9:4/tafsirs/926"
+    },
+    "9:25": {
+      "printed_tokens": 45,
+      "arabic_slots": 23,
+      "head_changes_from_mapper": 16,
+      "surface_crosswalk": "all normalized surfaces matched in order, verse-number marker excluded",
+      "translation": "https://quran.com/9:25?translations=20",
+      "tafsir": "https://quran.com/9:25/tafsirs/926"
+    },
+    "23:83": {
+      "printed_tokens": 19,
+      "arabic_slots": 12,
+      "head_changes_from_mapper": 4,
+      "surface_crosswalk": "all normalized surfaces matched in order, verse-number marker excluded",
+      "translation": "https://quran.com/23:83?translations=20",
+      "tafsir": "https://quran.com/23:83/tafsirs/926"
+    },
+    "24:1": {
+      "printed_tokens": 26,
+      "arabic_slots": 9,
+      "head_changes_from_mapper": 1,
+      "surface_crosswalk": "all normalized surfaces matched in order, verse-number marker excluded",
+      "translation": "https://quran.com/24:1?translations=20",
+      "tafsir": "https://quran.com/24:1/tafsirs/926"
+    },
+    "24:30": {
+      "printed_tokens": 28,
+      "arabic_slots": 15,
+      "head_changes_from_mapper": 0,
+      "surface_crosswalk": "all normalized surfaces matched in order, verse-number marker excluded",
+      "translation": "https://quran.com/24:30?translations=20",
+      "tafsir": "https://quran.com/24:30/tafsirs/926"
+    },
+    "24:31": {
+      "printed_tokens": 125,
+      "arabic_slots": 78,
+      "head_changes_from_mapper": 14,
+      "surface_crosswalk": "all normalized surfaces matched in order, verse-number marker excluded",
+      "translation": "https://quran.com/24:31?translations=20",
+      "tafsir": "https://quran.com/24:31/tafsirs/926"
+    },
+    "24:37": {
+      "printed_tokens": 35,
+      "arabic_slots": 19,
+      "head_changes_from_mapper": 5,
+      "surface_crosswalk": "all normalized surfaces matched in order, verse-number marker excluded",
+      "translation": "https://quran.com/24:37?translations=20",
+      "tafsir": "https://quran.com/24:37/tafsirs/926"
+    }
+  }
+}

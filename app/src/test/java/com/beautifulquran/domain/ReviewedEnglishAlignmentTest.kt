@@ -62,6 +62,32 @@ class ReviewedEnglishAlignmentTest {
     }
 
     @Test
+    fun `AI maps are opt in and human records take precedence`() {
+        val verse = Ayah(1, 1, arabic.joinToString(" "), text,
+            words = arabic.mapIndexed { index, surface -> Word(index + 1, surface, listOf("helped us", "Allah")[index], "") })
+        val content = SurahContent(Surah(1, "", "", "", "", 1), listOf(verse), aiEnglishAlignmentRecords = mapOf(1 to record))
+        assertFalse(EnglishVerseAlignments(content).alignment(1)!!.usesAiReviewedRecord)
+        val experiment = EnglishVerseAlignments(content, useAiReviewed = true)
+        val alignment = experiment.alignment(1)!!
+        assertTrue(alignment.usesAiReviewedRecord)
+        assertFalse(alignment.usesApprovedRecord)
+        val offline = content.copy(ayahs = listOf(verse.copy(words = verse.words.map { it.copy(translation = "") })))
+        assertTrue(EnglishVerseAlignments(offline, useAiReviewed = true).alignment(1)!!.usesAiReviewedRecord)
+        assertSame(alignment, experiment.alignment(1))
+        assertEquals(2, alignment.positionAt(0.1f))
+        assertEquals(listOf(EnglishWordSpan(0f, 1f, 1)), alignment.washSpans)
+        assertFalse(EnglishVerseAlignments(content, wordByWord = true, useAiReviewed = true).alignment(1)!!.usesAiReviewedRecord)
+        val stale = content.copy(aiEnglishAlignmentRecords = mapOf(1 to record.copy(fingerprint = "stale")))
+        assertFalse(EnglishVerseAlignments(stale, useAiReviewed = true).alignment(1)!!.usesAiReviewedRecord)
+        val human = EnglishVerseAlignments(content.copy(englishAlignmentRecords = mapOf(1 to record)), useAiReviewed = true).alignment(1)!!
+        assertTrue(human.usesApprovedRecord)
+        assertFalse(human.usesAiReviewedRecord)
+        java.io.File("../data/english-ai-alignments.tsv").bufferedReader().use { reader ->
+            assertEquals(7, ReviewedEnglishAlignment.read(reader.lineSequence()).size)
+        }
+    }
+
+    @Test
     fun `tokenizer counts additions grammar apostrophes accents and UTF16 offsets`() {
         val text = "[And] Allāh’s 𐐀name"
         val tokens = ReviewedEnglishAlignment.tokens(text)

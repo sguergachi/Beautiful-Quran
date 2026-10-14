@@ -294,6 +294,8 @@ class QuranRepository(
         }
         SurahContent(surah, ayahs, ayahs.mapNotNull { verse ->
             database.englishAlignmentRecords["$surahId:${verse.number}"]?.let { verse.number to it }
+        }.toMap(), ayahs.mapNotNull { verse ->
+            database.aiEnglishAlignmentRecords["$surahId:${verse.number}"]?.let { verse.number to it }
         }.toMap())
     }
 
