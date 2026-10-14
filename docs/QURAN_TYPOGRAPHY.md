@@ -1641,9 +1641,11 @@ measured passes using fractional caret advances and subpixel rendering, so the
 final line fills the column to within a pixel rather than trusting a rounded
 body-size estimate. Half a pixel of slack absorbs shaping's remaining rounding.
 The size follows the column width without a body-size cap. Its slot is measured
-with the same style and one-line constraint as the drawing, and
-all of its air falls below it — centred, half of it landed above instead, under
-the chapter's panel.
+with the same style and one-line constraint as the drawing. A quarter pitch
+of paper separates it from the panel, and its slot places the first prose
+baseline one pitch plus that same air below the basmalah's baseline. Cache
+format 36 combines this opening with the justified book and discards leaves
+measured with the earlier fixed-air slot.
 
 Everything else is unchanged: the page dial, the chapter ornament, the fore-edge
 fade, and the right-to-left page turn. It is the same book — only the writing is

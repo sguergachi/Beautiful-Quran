@@ -12,7 +12,6 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -390,17 +389,12 @@ internal fun MushafEnglishSheet(
                             )
                         }
                         if (block.basmalah) {
-                            val basmalahTopOffset = with(density) {
-                                ((EnglishLeafBasmalahAirEm -
-                                    EnglishLeafPanelAir * setting.leadingEm) *
-                                    setting.handPx / 2f)
-                                    .coerceAtLeast(0f)
-                                    .toDp()
-                            }
                             EnglishBasmalahLine(
                                 fontSize = basmalahFontSize,
                                 slotHeight = basmalahDp,
-                                topOffset = basmalahTopOffset,
+                                topAir = with(density) {
+                                    englishBasmalahAirPx(setting.handPx, typePalette).toDp()
+                                },
                                 active = pageOwnsVoice &&
                                     block.surahId == content.surah.id &&
                                     playback.value.basmalahActive,
@@ -512,12 +506,6 @@ private val EnglishLeafFitSlack = 2.dp
  */
 private const val EnglishLeafPanelAir = 0.3f
 
-/**
- * Air reserved below the line. The line is offset within this fixed slot so
- * the combined gap from the panel above and the first verse below is split
- * evenly around the basmalah without changing the opening's measured height.
- */
-private const val EnglishLeafBasmalahAirEm = 0.9f
 
 /**
  * The chapter's name inside the panel.
@@ -1882,7 +1870,8 @@ internal data class EnglishWashBands(
 private fun EnglishBasmalahLine(
     fontSize: TextUnit,
     slotHeight: Dp,
-    topOffset: Dp,
+    /** The paper over the line, inside its slot: see [englishBasmalahPx]. */
+    topAir: Dp,
     active: Boolean,
     wash: StateFlow<Float?>,
     onClick: () -> Unit,
@@ -1903,8 +1892,8 @@ private fun EnglishBasmalahLine(
             .fillMaxWidth()
             .height(slotHeight)
             .quietClickable(onClick = onClick),
-        // Keep the line's measured slot intact; its offset splits the available
-        // air above and below the display line equally.
+        // Held off the head of the slot by its own air, and the rest of the
+        // slot is the air under it. See englishBasmalahPx.
         contentAlignment = Alignment.TopCenter,
     ) {
         Text(
@@ -1916,8 +1905,8 @@ private fun EnglishBasmalahLine(
             maxLines = 1,
             softWrap = false,
             modifier = Modifier
+                .padding(top = topAir)
                 .fillMaxWidth()
-                .offset(y = topOffset)
                 .then(
                     if (active) {
                         Modifier.letterFadeIn(
@@ -1991,26 +1980,69 @@ private fun englishBasmalahHandPx(
     return fittedPx
 }
 
-/** What the basmalah stands at, plus the air a display line takes under it. */
+/**
+ * The basmalah's slot: [englishBasmalahAirPx] of paper over it, the line, and
+ * paper under it down to where the chapter's first line begins — so that
+ * line's baseline falls one pitch and the same air under the basmalah's. Air
+ * over and under alike: the basmalah is a line of its own, set apart from the
+ * panel above and the verse below by equal paper.
+ *
+ * A fixed 0.9 em under the line and nothing over it put the first verse a line
+ * and a third below it and left the basmalah crowding the panel. Exactly one
+ * pitch read as the chapter's first line of prose, crowded on both sides.
+ *
+ * Never shorter than the basmalah's own ink, so a tight leading cannot run
+ * the first verse's ascenders into its descenders.
+ */
 private fun englishBasmalahPx(
     handPx: Float,
     measurePx: Float,
     density: Density,
     measurer: TextMeasurer,
     typePalette: QuranTypePalette,
-): Float = measurer.measure(
-    text = AnnotatedString(ENGLISH_BASMALAH),
-    style = englishBasmalahStyle(
-        with(density) {
-            englishBasmalahHandPx(handPx, measurePx, density, measurer, typePalette).toSp()
-        },
-        typePalette,
-    ),
-    constraints = Constraints(maxWidth = measurePx.toInt().coerceAtLeast(1)),
-    softWrap = false,
-    maxLines = 1,
-    density = density,
-).size.height + handPx * EnglishLeafBasmalahAirEm
+): Float {
+    val basmalah = measurer.measure(
+        text = AnnotatedString(ENGLISH_BASMALAH),
+        style = englishBasmalahStyle(
+            with(density) {
+                englishBasmalahHandPx(handPx, measurePx, density, measurer, typePalette).toSp()
+            },
+            typePalette,
+        ),
+        constraints = Constraints(maxWidth = measurePx.toInt().coerceAtLeast(1)),
+        softWrap = false,
+        maxLines = 1,
+        density = density,
+    )
+    // Where the first prose line's baseline sits under the top of its block;
+    // the block is trimmed, so this is the line's ascent.
+    val proseAscentPx = measurer.measure(
+        text = AnnotatedString(ENGLISH_LEAF_SPECIMEN),
+        style = englishProseStyle(
+            with(density) { handPx.toSp() },
+            TextUnit.Unspecified,
+            typePalette,
+        ),
+        constraints = Constraints(),
+        density = density,
+    ).firstBaseline
+    val pitchPx = handPx * typePalette.leafLeadingEm
+    val airPx = englishBasmalahAirPx(handPx, typePalette)
+    return airPx + maxOf(
+        basmalah.firstBaseline + pitchPx + airPx - proseAscentPx,
+        basmalah.size.height.toFloat(),
+    )
+}
+
+/** The paper over the basmalah, and the extra under it: a share of the pitch. */
+private fun englishBasmalahAirPx(handPx: Float, typePalette: QuranTypePalette): Float =
+    handPx * typePalette.leafLeadingEm * EnglishLeafBasmalahAir
+
+/**
+ * The basmalah's air either side, in line pitches — like [EnglishLeafPanelAir],
+ * so it rides the leading.
+ */
+private const val EnglishLeafBasmalahAir = 0.25f
 
 /** Saheeh International's rendering — the translation the book is set in. */
 private const val ENGLISH_BASMALAH =

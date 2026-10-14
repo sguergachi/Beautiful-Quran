@@ -213,13 +213,15 @@ class EnglishBookCache internal constructor(private val dir: File) {
          * 31: the typeface profiles key their own books (bookCacheSuffix).
          * 32: Timeless removed; Junicode is the book face. Its suffix now
          * carries the font files' hashes and every constant that moves a line.
-         * 33: (reserved: the basmalah on the line pitch, a separate change.)
+         * 33: the basmalah is set on the page pitch with quarter-pitch air.
          * 34: the leaf is justified (EnglishJustify), and the ruler counts the
          * justified setting's lines, which hold more than ragged ones.
          * 35: the ruler searches past an overflowing prefix when later words
          * can close a line in the justified setting.
+         * 36: combine the justified book with 33's basmalah slot; the old 35
+         * book was measured with the previous fixed-air opening.
          */
-        const val FORMAT = 35
+        const val FORMAT = 36
         const val MAX_LEAVES = 10_000
         const val MAX_RUNS = 20_000
     }

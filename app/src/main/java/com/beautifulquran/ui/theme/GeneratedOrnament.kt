@@ -576,7 +576,8 @@ fun GeneratedBorderBand(
                         }
                     }
                 }
-                val hairStroke = Stroke(width = 1.dp.toPx(), cap = StrokeCap.Round, join = StrokeJoin.Round)
+                // 0.8dp keeps the rumi leaves' outline and vein open at band size.
+                val hairStroke = Stroke(width = 0.8.dp.toPx(), cap = StrokeCap.Round, join = StrokeJoin.Round)
                 val ruleStroke = Stroke(width = 1.5.dp.toPx(), cap = StrokeCap.Round, join = StrokeJoin.Round)
 
                 onDrawBehind {

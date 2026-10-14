@@ -106,14 +106,12 @@ describe('ornamentGenerator', () => {
           )
         }
       }
-      // The khatam chain's link diamond straddles the period boundary by
-      // design (its far half is completed by the neighbouring tile when
-      // the band repeats), so the x margin allows for it; y always stays
-      // inside the band.
+      // The rumi scroll lies inside one period (its tiles butt without
+      // overlap), and always inside the band.
       for (const s of o.border.strokes) {
         for (const p of s.points) {
           check(
-            p.x >= -0.2 && p.x <= o.border.period + 0.2 && p.y >= -0.001 && p.y <= 1.001,
+            p.x >= -0.001 && p.x <= o.border.period + 0.001 && p.y >= -0.001 && p.y <= 1.001,
             `${at}: border point outside band (${p.x}, ${p.y})`,
           )
         }
@@ -248,7 +246,7 @@ describe('ornamentGenerator', () => {
       coverPatterns.add(o.field.pattern)
       chapterPatterns.add(generateChapterOrnament(seed).field.pattern)
       frames.add(o.field.strokes[0]!.points.length)
-      borders.add(`${o.border.strokes.length}/${o.border.dots.length}`)
+      borders.add(o.border.period.toFixed(6))
     }
     expect([...folds].sort((a, b) => a - b)).toEqual([8, 10, 12, 16])
     expect(fieldStyles.size).toBeGreaterThanOrEqual(3)
