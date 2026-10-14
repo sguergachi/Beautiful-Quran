@@ -36,6 +36,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalFontFamilyResolver
+import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.PlatformTextStyle
 import androidx.compose.ui.text.SpanStyle
@@ -100,6 +102,8 @@ import com.beautifulquran.ui.theme.letterFadeIn
 import com.beautifulquran.ui.theme.quietClickable
 import com.beautifulquran.ui.theme.shapedWordBloom
 import kotlin.math.roundToInt
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.distinctUntilChanged
@@ -300,9 +304,22 @@ internal fun MushafEnglishSheet(
         }
         val justifyLast = (blocks.lastOrNull() as? EnglishLeafBlockText.Prose)
             ?.proseRunsOn(surahsById) == true
-        val setting = remember(blocks, wellPx, measurePx, density, measurer, typePalette, justifyLast) {
-            setEnglishLeaf(blocks, wellPx, measurePx, density, measurer, typePalette, justifyLast)
+        val resolver = LocalFontFamilyResolver.current
+        val direction = LocalLayoutDirection.current
+        val settingState = remember(blocks, wellPx, measurePx, density, resolver, direction, typePalette, justifyLast) {
+            mutableStateOf<EnglishLeafSetting?>(null)
         }
+        // The pager holds both neighbours. Fit them without blocking a swipe,
+        // with a worker-owned measurer rather than the drawing cache below.
+        LaunchedEffect(settingState) {
+            settingState.value = withContext(Dispatchers.Default) {
+                setEnglishLeaf(
+                    blocks, wellPx, measurePx, density,
+                    TextMeasurer(resolver, density, direction), typePalette, justifyLast,
+                )
+            }
+        }
+        val setting = settingState.value ?: return@BoxWithConstraints
         val fontSize = with(density) { setting.handPx.toSp() }
         val pitchDp = with(density) { (setting.handPx * setting.leadingEm).toDp() }
         val basmalahDp = remember(setting.handPx, measurePx, density, measurer, typePalette) {

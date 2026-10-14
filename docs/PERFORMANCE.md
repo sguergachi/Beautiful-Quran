@@ -59,6 +59,14 @@ The moving English leaf edge interpolates between cached source/printed letter
 anchors with one binary search. Exact word boundaries retain their integer map;
 animation never rounds its position to a whole letter.
 
+The pager retains the previous and next English leaves with their loaded prose.
+Each leaf fits its paragraphs on `Dispatchers.Default` with its own text
+measurer, then publishes the finished setting for drawing. Preparing a new
+neighbour therefore does not run paragraph justification on the swipe's UI
+thread. Changing the prose, geometry, type or carried-line setting starts a new
+fit; cancelled work cannot publish over it. The initial opening and distant
+dial landing still defer neighbour composition to protect their first frames.
+
 ### 1. Draw-phase-only animations (zero recomposition fades)
 
 Every fade in the app — word highlights, recited-word settling, ayah
