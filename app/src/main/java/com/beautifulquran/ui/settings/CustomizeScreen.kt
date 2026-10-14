@@ -96,7 +96,8 @@ import com.beautifulquran.ui.reader.MushafCell
 import com.beautifulquran.ui.reader.MushafQcfFonts
 import com.beautifulquran.ui.reader.PageBreak
 import com.beautifulquran.ui.reader.englishProseStyle
-import com.beautifulquran.ui.reader.englishRaggedProse
+import com.beautifulquran.ui.reader.englishSetProse
+import com.beautifulquran.ui.reader.englishSoftWrap
 import com.beautifulquran.ui.reader.VERSE_ANNOTATION_INK_ALPHA
 import com.beautifulquran.ui.reader.collapsedStackSpanDp
 import com.beautifulquran.ui.reader.appendAyahNumberMark
@@ -772,9 +773,9 @@ private fun PreviewEnglishMushafLeaf(
                 typePalette = typePalette,
             )
             val set = remember(text, style, measurePx, density, measurer) {
-                englishRaggedProse(text, style, measurePx, density, measurer)
+                englishSetProse(text, style, measurePx, density, measurer)
             }
-            Text(text = set, style = style)
+            Text(text = set, style = style, softWrap = set.englishSoftWrap)
         }
     }
 }
