@@ -18,22 +18,35 @@ draw phase.
 
 ### English leaf pagination
 
-The English rag chooses breaks only at word spaces and preserves the minimum
-line count. Greedy wrapping gives the same count, so the book's ruler uses it
-for its fill and prefix search. Choosing the rag for every candidate leaf
-previously spent tens of seconds measuring word positions across the corpus,
-leaving the English page without ink until the measured book arrived.
+The English leaf uses `EnglishJustify` to choose breaks and share line width
+between glyph expansion, tracking and word spaces. Its line count can differ
+from greedy wrapping and can fall as a prefix grows. The ruler therefore
+counts each candidate's justified setting and searches past an overflow until
+the offer's width bound excludes later fits.
 
-`measureEnglishProse` shares one rounding pixel between the ruler and rag.
-Visible leaves still choose the rag, retain the soft directional wash, and
-wait for the measured book; pagination no longer chooses every candidate's rag.
-Tighter prose spacing changed the cuts in format 26; the hand still calibrates
-at natural spacing to preserve the type size. Format 27 also remeasures the
-basmalah's slot after fitting its final size to the column with subpixel advances.
-On the pooled emulator, format 25's cold rebuild reached the cache 5.7 seconds
-after launch. With tighter spacing and English verse numbers, all 746 leaves
-and 6,843 fragments remain byte-identical to the full-rag reference at the same
-geometry and settings, covering all 6,236 verses.
+Word advances are remembered across the book; prefix probes reuse the offer's
+positions rather than laying out every candidate again. Only visible leaves
+fit spans against the actual drawn edges, with two measurement passes. The
+horizontal cache keys omit vertical `lineHeight`: the line-count probe, height
+probe and drawing share the same justified paragraph and word advances while
+each still measures with its own leading. Font size, face, tracking, spans,
+measure and carried-line setting remain in the keys.
+The ruler, height fitter and renderer use the same carried-line setting. A line
+without gaps keeps its natural width, so the model cannot count it as fitting
+by shrink alone. The hand still calibrates at natural spacing.
+
+Pagination runs off the main thread and is written to `EnglishBookCache`.
+The cache key includes the justification tuning and algorithm version; a
+SHA-256 digest of the complete layout and prose identity keeps filenames
+within the filesystem limit. A changed line-breaking rule invalidates the old
+book. The leaf waits for the measured book and retains the soft directional wash.
+
+The 2026-10-14 comparison used the same pooled emulator, debug probes and
+eight leftward swipes from An-Nur's opening. Ten paragraphs required 29 → 10
+cold justification passes and 1,743 → 475 word layouts on the UI thread;
+total justification CPU time fell from 1,668 → 651 ms. The same paragraphs and
+leading were rendered. These are measurements of duplicate layout work on
+one host, not physical-device frame rates. Temporary probes were removed.
 
 English ownership is solved lazily per verse and cached for the selected text
 source. Semantic ranges and continuous forward wash bands are projected once
@@ -45,6 +58,14 @@ paths.
 The moving English leaf edge interpolates between cached source/printed letter
 anchors with one binary search. Exact word boundaries retain their integer map;
 animation never rounds its position to a whole letter.
+
+The pager retains the previous and next English leaves with their loaded prose.
+Each leaf fits its paragraphs on `Dispatchers.Default` with its own text
+measurer, then publishes the finished setting for drawing. Preparing a new
+neighbour therefore does not run paragraph justification on the swipe's UI
+thread. Changing the prose, geometry, type or carried-line setting starts a new
+fit; cancelled work cannot publish over it. The initial opening and distant
+dial landing still defer neighbour composition to protect their first frames.
 
 ### 1. Draw-phase-only animations (zero recomposition fades)
 

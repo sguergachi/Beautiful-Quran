@@ -338,6 +338,11 @@ caller takes a second for the rounding that discrete line counts leave behind.
 It takes no page: the type depends on the leaf's geometry and the face, and on
 nothing the page happens to carry.
 
+At a chapter opening, the English basmalah is placed within its measured slot
+so the air from the panel above and to the first prose line below is equal. The
+line moves within the slot; its total height stays fixed, so page fit does not
+change.
+
 ### 13.4 One hand, one leading — and the leaf is not the page
 
 While the page boundary came from the Arabic leaf, a page's mass was fixed at
@@ -899,15 +904,85 @@ percent of type on that leaf alone. That breaks §13.3 knowingly — on 2:282 th
 alternatives are overlapping lines or revelation clipped off the foot, and a page
 set a little small is the only one of the three a reader can still read.
 
-### 13.5 Ragged right, with whole words
+### 13.5 Justified, with whole words
+
+Every full line reaches both margins; words stay whole (`Hyphens.None`, no
+soft hyphens or word joiners). `EnglishJustify` sets it, the way TeX's
+micro-typography sets a narrow measure:
+
+- **The whole paragraph is broken at once** (Knuth–Plass). Every setting is
+  weighed and the one whose lines stretch least, and most alike, is taken; a
+  continuous cost on the change in tightness from one line to the next keeps a
+  loose line from sitting on a tight one, which is what the eye reads as a
+  river.
+- **The line count is the optimum's own.** Lines may close as well as open,
+  so a line can take one more word rather than open its spaces; the ruler that
+  paginates counts the lines of exactly this setting. The page-fit search keeps
+  looking after a prefix overflows, since adding a word can close a line again;
+  it stops only when a conservative width bound rules out every longer prefix.
+  The height fitter uses the same carried-line setting as the ruler and the
+  drawing, so it adjusts the spacing for exactly the lines the leaf displays.
+  A line without stretchable gaps keeps its natural width; an oversized lone
+  word cannot be counted as fitting by shrink the renderer will not apply.
+- **Letters take part of the slack.** Each line may widen or narrow its
+  letters by up to 3 % (`TextGeometricTransform.scaleX` — pdfTeX's font
+  expansion, Zapf's hz) and open or close their spacing by up to 0.0075 em, so
+  a line's slack is shared over its forty letters as well as its seven
+  spaces. The space binding a verse mark to its verse stretches with the word
+  spaces; it never breaks.
+- **A dash never opens a line**; it stays with the word before it.
+- **A leaf's last line** is drawn out when the next leaf carries the paragraph
+  on, and stands where it ends only at the chapter's end.
+
+The tuning is `EnglishJustify.LEAF`: word spaces aim at 1.2 × the natural
+0.186 em, may open 40 % and close 25 % of that before a line counts as loose
+or tight. Measured over the whole book on the emulator (`englishJustifyAudit`,
+debug builds: `run-as … touch files/justify_audit`), word spaces come to
+0.187 / 0.223 / 0.281 / 0.340 em at the 10th / 50th / 90th / 99th percentile,
+57 of 15,623 justified lines open past 0.4 em, and every line ends on the
+measure to the pixel. Under the first attempt (below) the same book ran
+0.212 / 0.288 / 0.423 / 0.575 em with 2,368 lines past 0.4 em; the levers,
+in order of what they bought: letting the line count follow the optimum,
+letter tracking, then glyph expansion. Letters that may only widen, not
+narrow, cost more evenness in the spaces than they save in the letters.
+
+How it is drawn, and why each piece is load-bearing:
+
+- **Breaks and stretch are spans over the text, not a re-layout.** Each break
+  replaces its space in place and each line's stretch is a `SpanStyle`
+  (`scaleX` over the line, `letterSpacing` on its letters and gaps), so every
+  offset the wash, the paper covers and the taps hold still names the same
+  letter, and the ink reads its positions off the drawn layout — no
+  `justifyShift` correction (that was for platform justification).
+- **Positions are words laid end to end**, each word's in-line advance read
+  once for the book and corrected by a per-style bias calibrated off
+  `ENGLISH_LEAF_SPECIMEN` (a word alone measures ~1.5 px wider than among
+  others: kerning and tracking at its edges). A word measures the same
+  wherever it falls, so the ruler cutting a leaf out of a longer offer reads
+  exactly the positions the leaf cut there will read — the two cannot
+  disagree about how many lines a leaf holds.
+- **Each drawn line is measured and closed onto the edge** (two passes over
+  an unbounded layout) and **the set paragraph never soft-wraps**: the
+  platform's line breaker measures a styled run — a quiet bracket, a verse
+  mark's isolated figures — a few px wider than it draws it, and broke full
+  justified lines early.
+- **The pagination cache is keyed by the tuning and algorithm version**
+  (`EnglishJustify.cacheKey` in `bookCacheSuffix`): a change to it repaginates
+  rather than drawing a leaf cut for another setting. The complete layout and
+  prose identity is hashed into a fixed-length filename so the font and tuning
+  details cannot exceed the filesystem's name limit.
+
+The ragged setting below is what it replaced, and stays as the fallback for a
+paragraph the justifier declines (none in the current book). Its measurements
+are the record of why the first justification was taken out, and of what a
+rag on this measure can and cannot do.
+
+#### The ragged leaf it replaced
 
 `TextAlign.Start` with word-space breaks chosen by `EnglishRag`, the book
-face's kerning, ligatures and old-style figures. `Hyphens.None`: words stay
-whole, with no inserted soft hyphens or word joiners. Prose tracks at −0.025 em;
+face's kerning, ligatures and old-style figures. Prose tracks at −0.025 em;
 the verse ornaments keep natural spacing. The book's hand is calibrated at
 natural spacing too, so tightening the letters does not change its type size.
-The measurements below record the earlier settings as well as the reasons
-for the current one.
 
 The leaf is set in Junicode, matched to the EB Garamond these rules were
 measured in (docs/DESIGN.md, "Type"): it takes the hand Garamond's leaf solves
@@ -917,7 +992,7 @@ on a Pixel 10). The developer comparison keeps these whole-word rules for both
 faces. The book cache includes the face, its font hashes and the constants
 that move a line, and the paragraph-break cache includes the full text style
 and annotated spans, so a font change cannot reuse the other face's
-measurements or chosen breaks. Customize uses the same rag setter as the live
+measurements or chosen breaks. Customize uses the same setter as the live
 leaf. The leaf's fonts, including verse figures and basmalah, stay the same
 across light and dark themes so pagination stays fixed. The measurements below
 record the classic Garamond settings.
@@ -930,7 +1005,10 @@ open unevenly, the same line's colour changes from one page to the next, and
 the reader pays for a straight right edge with rivers of white running down
 the page.
 
-**Justification was tried here and taken back out.** It does what it promises:
+**Justification was tried here and taken back out** — the first time, with
+the platform's own line-at-a-time justification and only the word space to
+stretch. What follows is why; the setting above answers each point. It does
+what it promises:
 every line on the Ta-Ha leaf ended within 3 px of the last, glyph side bearings
 and nothing more. It is paid for by the word space — the loosest line on the
 Ad-Dukhan leaf (*We were to warn [mankind] ⟨3⟩ On that*) ran three times the
@@ -1563,9 +1641,11 @@ measured passes using fractional caret advances and subpixel rendering, so the
 final line fills the column to within a pixel rather than trusting a rounded
 body-size estimate. Half a pixel of slack absorbs shaping's remaining rounding.
 The size follows the column width without a body-size cap. Its slot is measured
-with the same style and one-line constraint as the drawing, and
-all of its air falls below it — centred, half of it landed above instead, under
-the chapter's panel.
+with the same style and one-line constraint as the drawing. A quarter pitch
+of paper separates it from the panel, and its slot places the first prose
+baseline one pitch plus that same air below the basmalah's baseline. Cache
+format 36 combines this opening with the justified book and discards leaves
+measured with the earlier fixed-air slot.
 
 Everything else is unchanged: the page dial, the chapter ornament, the fore-edge
 fade, and the right-to-left page turn. It is the same book — only the writing is

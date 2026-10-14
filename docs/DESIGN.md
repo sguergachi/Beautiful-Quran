@@ -1040,7 +1040,9 @@ lists and reading view; **Apple Music lyrics** for the word illumination and
 the recede-while-playing behavior. Running-text rules follow Bringhurst's
 *Elements of Typographic Style* (45–75 character measure, natural word space,
 ragged-right setting, leading proportional to type size) and WCAG's text
-spacing / visual-presentation guidance.
+spacing / visual-presentation guidance. The English mushaf leaf is the
+exception: it is a book page and sets justified, with whole words and
+TeX-style micro-typography (QURAN_TYPOGRAPHY.md §13.5).
 
 ### The scroll grid
 
