@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -370,9 +371,17 @@ internal fun MushafEnglishSheet(
                             )
                         }
                         if (block.basmalah) {
+                            val basmalahTopOffset = with(density) {
+                                ((EnglishLeafBasmalahAirEm -
+                                    EnglishLeafPanelAir * setting.leadingEm) *
+                                    setting.handPx / 2f)
+                                    .coerceAtLeast(0f)
+                                    .toDp()
+                            }
                             EnglishBasmalahLine(
                                 fontSize = basmalahFontSize,
                                 slotHeight = basmalahDp,
+                                topOffset = basmalahTopOffset,
                                 active = pageOwnsVoice &&
                                     block.surahId == content.surah.id &&
                                     playback.value.basmalahActive,
@@ -485,14 +494,9 @@ private val EnglishLeafFitSlack = 2.dp
 private const val EnglishLeafPanelAir = 0.3f
 
 /**
- * Air under the basmalah, so the chapter's first verse does not run into it.
- *
- * Under it, all of it — the line sits at the head of its slot. Centred there,
- * half of this fell *above* the basmalah instead, where it landed under the
- * chapter's panel and made the space below the panel five times the space
- * above it. The panel's own air is what stands it off its neighbours, on both
- * sides and equally; this is the separation between a display line and the
- * body text that follows it.
+ * Air reserved below the line. The line is offset within this fixed slot so
+ * the combined gap from the panel above and the first verse below is split
+ * evenly around the basmalah without changing the opening's measured height.
  */
 private const val EnglishLeafBasmalahAirEm = 0.9f
 
@@ -1852,6 +1856,7 @@ internal data class EnglishWashBands(
 private fun EnglishBasmalahLine(
     fontSize: TextUnit,
     slotHeight: Dp,
+    topOffset: Dp,
     active: Boolean,
     wash: StateFlow<Float?>,
     onClick: () -> Unit,
@@ -1872,9 +1877,8 @@ private fun EnglishBasmalahLine(
             .fillMaxWidth()
             .height(slotHeight)
             .quietClickable(onClick = onClick),
-        // At the head of the slot: every bit of the slot's air belongs below
-        // the line, between it and the chapter's first verse. See
-        // EnglishLeafBasmalahAirEm.
+        // Keep the line's measured slot intact; its offset splits the available
+        // air above and below the display line equally.
         contentAlignment = Alignment.TopCenter,
     ) {
         Text(
@@ -1887,6 +1891,7 @@ private fun EnglishBasmalahLine(
             softWrap = false,
             modifier = Modifier
                 .fillMaxWidth()
+                .offset(y = topOffset)
                 .then(
                     if (active) {
                         Modifier.letterFadeIn(

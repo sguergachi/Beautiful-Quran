@@ -338,6 +338,11 @@ caller takes a second for the rounding that discrete line counts leave behind.
 It takes no page: the type depends on the leaf's geometry and the face, and on
 nothing the page happens to carry.
 
+At a chapter opening, the English basmalah is placed within its measured slot
+so the air from the panel above and to the first prose line below is equal. The
+line moves within the slot; its total height stays fixed, so page fit does not
+change.
+
 ### 13.4 One hand, one leading — and the leaf is not the page
 
 While the page boundary came from the Arabic leaf, a page's mass was fixed at
