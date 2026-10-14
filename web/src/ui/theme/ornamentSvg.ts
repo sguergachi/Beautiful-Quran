@@ -98,9 +98,10 @@ export function borderBandBackground(
   backgroundImage: string
 } {
   const p = border.period
-  // Pattern strokes stay hairline; the rule-weight edge rails run heavier
-  // so the band reads as a tooled channel (Android: 1dp vs 1.5dp).
-  const hairW = 0.09
+  // Pattern strokes stay hairline, fine enough that the rumi's outline and
+  // vein stay open; the rule-weight edge rails run heavier so the band
+  // reads as a tooled channel (Android: 0.8dp vs 1.5dp on a ~16dp band).
+  const hairW = 0.05
   const ruleW = 0.135
   const map = (x: number, y: number) =>
     vertical ? `${y.toFixed(4)} ${x.toFixed(4)}` : `${x.toFixed(4)} ${y.toFixed(4)}`
@@ -131,9 +132,15 @@ export function borderBandBackground(
     }
   }
   const svg =
-    `<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 ${w} ${h}'>` +
-    `<defs><g id='b' fill='none' stroke-linejoin='round' stroke-linecap='round'>${paths}${dots}</g></defs>` +
+    // The caller fits a whole number of periods, so a tile's box is a
+    // little off the viewBox's aspect; stretch rather than letterbox, or
+    // the vine jogs at every seam.
+    `<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 ${w} ${h}' preserveAspectRatio='none'>` +
+    `<defs><g id='b' fill='none' stroke-linejoin='round' stroke-linecap='round'>${paths}</g></defs>` +
     uses.join('') +
+    // Pearls are struck once in gold, as on Android: stamped with the
+    // emboss passes, a pearl smeared into a diagonal dash.
+    dots +
     `</svg>`
   return { backgroundImage: svgDataUri(svg) }
 }

@@ -1,5 +1,6 @@
 package com.beautifulquran.ui.reader
 
+import com.beautifulquran.domain.EnglishTypography
 import androidx.compose.animation.core.CubicBezierEasing
 
 /**
@@ -52,7 +53,9 @@ object SearchHitFlash {
     }
 
     /** Exact text ranges for a translator-only hit; prefix matches own the full word. */
-    internal fun textRanges(text: String, rawQuery: String?): List<IntRange> {
+    internal fun textRanges(typeset: String, rawQuery: String?): List<IntRange> {
+        // Folded character for character, so ranges found here mark the typeset text.
+        val text = EnglishTypography.fold(typeset)
         val query = rawQuery?.trim()?.let { value ->
             if (value.length >= 2 && value.first() in setOf('"', '“') &&
                 value.last() in setOf('"', '”')

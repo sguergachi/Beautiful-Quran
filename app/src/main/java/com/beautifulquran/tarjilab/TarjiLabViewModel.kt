@@ -382,7 +382,12 @@ class TarjiLabViewModel(
         val firstHopMediaMs = capture?.hopContentMs?.firstOrNull()
             ?.let { ve.mediaMsOfContent(it.toDouble()) } ?: Double.NaN
         restorePlayer()
-        if (error != null || capture == null || !firstHopMediaMs.isFinite()) {
+        val outOfAudio = error == "Audio stopped before the word's end."
+        // A capture that hit the internal hop cap, or whose audio ended a
+        // little early, still carries usable PCM. Keep it rather than failing.
+        val usable = capture != null && capture.hopCount > 0 && firstHopMediaMs.isFinite() &&
+            (error == null || outOfAudio)
+        if (!usable) {
             _ui.value = st.copy(
                 capturing = false,
                 captureProgress = 0f,

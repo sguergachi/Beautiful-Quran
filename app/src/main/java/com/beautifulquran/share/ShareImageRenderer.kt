@@ -1,5 +1,6 @@
 package com.beautifulquran.share
 
+import com.beautifulquran.data.BookTypeface
 import android.app.Activity
 import android.graphics.Bitmap
 import android.graphics.Canvas
@@ -44,6 +45,7 @@ object ShareImageRenderer {
     suspend fun renderSegments(
         activity: Activity,
         segmentCount: Int,
+        typeface: BookTypeface = BookTypeface.JUNICODE,
         content: @Composable (index: Int) -> Unit,
     ): Bitmap {
         require(segmentCount > 0)
@@ -145,7 +147,10 @@ object ShareImageRenderer {
                             ViewCompositionStrategy.DisposeOnDetachedFromWindow,
                         )
                         setContent {
-                            BeautifulQuranTheme(themeMode = ThemeMode.LIGHT) {
+                            BeautifulQuranTheme(
+                                themeMode = ThemeMode.LIGHT,
+                                typeface = typeface,
+                            ) {
                                 content(index)
                             }
                         }
@@ -164,8 +169,9 @@ object ShareImageRenderer {
 
     suspend fun render(
         activity: Activity,
+        typeface: BookTypeface = BookTypeface.JUNICODE,
         content: @Composable () -> Unit,
-    ): Bitmap = renderSegments(activity, 1) { content() }
+    ): Bitmap = renderSegments(activity, 1, typeface) { content() }
 }
 
 /** Combined sheet height from per-strip wrap heights. */

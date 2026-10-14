@@ -1,3 +1,4 @@
+import { foldEnglish } from '../../domain/EnglishTypography'
 import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from 'react'
 import { AyahBlock } from '../../render/AyahBlock'
 import { BasmalahCalligraphy } from '../../render/BasmalahCalligraphy'
@@ -51,7 +52,7 @@ import { PageBreak } from './PageBreak'
 import { QuranRepository } from '../../data/repository'
 import { MushafReader } from './MushafReader'
 import { CopyVerseLink } from './CopyVerseLink'
-import { MUSHAF_INK_IDLE, type MushafInk } from './mushafInk'
+import { MUSHAF_INK_IDLE, mushafReadHistory, type MushafInk, type MushafReadHistory } from './mushafInk'
 import { ayahKey } from '../../share/gather'
 import { buildReaderItems, sliceReaderItems } from './readerItems'
 import { ReaderFocusController } from './focus/ReaderFocusController'
@@ -267,7 +268,7 @@ export function ReaderScreen({
     void appStore.playFromWord(ayah, pos)
   }, [])
   const sheetRef = useRef<HTMLDivElement>(null)
-  const inkReadRef = useRef<{ ayah: number | null; read: boolean }>({ ayah: null, read: false })
+  const inkReadRef = useRef<MushafReadHistory>({ ayah: null, activation: 0, read: false })
   const spread = useBookSpread(state.settings.pagePresentation)
   // Facing leaves with Chapters lying over the left one: touching the page
   // still being read, anywhere on it, puts Chapters away, and that touch
@@ -579,8 +580,8 @@ export function ReaderScreen({
     if (!searchContent) return [] as { number: number; translationLower: string; glossLowers: string[] }[]
     return searchContent.ayahs.map((a) => ({
       number: a.number,
-      translationLower: a.translation.toLowerCase(),
-      glossLowers: a.words.map((w) => w.translation.toLowerCase()),
+      translationLower: foldEnglish(a.translation).toLowerCase(),
+      glossLowers: a.words.map((w) => foldEnglish(w.translation).toLowerCase()),
     }))
   }, [searchContent])
   const searchMatches = useMemo(() => {
@@ -1393,8 +1394,9 @@ export function ReaderScreen({
     inkAyah != null && state.activeWord?.ayah === inkAyah ? state.activeWord : null
   // Whether the voiced verse has had a word yet: after that, no active word
   // means its tail, not its lead-in. Reset when the voice moves on.
-  if (inkReadRef.current.ayah !== inkAyah) inkReadRef.current = { ayah: inkAyah, read: false }
-  if (mushafInkActiveWord) inkReadRef.current.read = true
+  inkReadRef.current = mushafReadHistory(
+    inkReadRef.current, inkAyah, state.inkActivation, mushafInkActiveWord != null,
+  )
   const mushafInk: MushafInk = recitingActive
     ? {
         reciting: true,

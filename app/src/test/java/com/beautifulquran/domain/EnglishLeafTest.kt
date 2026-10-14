@@ -235,6 +235,49 @@ class EnglishLeafTest {
     }
 
     @Test
+    fun `wash travels through fractional letters spaces brackets and closing punctuation`() {
+        val text = "[This is] clear evidence, the believers' reward."
+        val verse = setVerse(text)
+        for (quarter in 0..text.length * 4) {
+            val progress = quarter / (text.length * 4f)
+            assertEquals("frame $quarter", progress, verse.fragmentWashProgress(progress), 0.000001f)
+        }
+        assertTrue("the closing punctuation must finish with the wash", verse.fragmentWashProgress(0.999f) < 1f)
+        assertEquals(1f, verse.fragmentWashProgress(1f), 0f)
+    }
+
+    @Test
+    fun `collapsed whitespace and joiners retain a continuous wash and exact word owners`() {
+        val source = "clear   evidence"
+        val verse = EnglishLeafVerse(24, 1, "clear evidence", verseLength = source.length,
+            to = source.length, source = source)
+        val frames = (0..source.length * 8).map { verse.fragmentWashProgress(it / (source.length * 8f)) }
+        assertTrue(frames.zipWithNext().all { (a, b) -> b > a })
+        assertEquals(5, verse.textOffsetOf(5))
+        assertEquals(5, verse.textOffsetOf(8))
+        assertEquals(1f, frames.last(), 0f)
+        val joined = verse.copy(text = "clear\u2060 evidence")
+        assertEquals(5f / joined.text.length, joined.fragmentWashProgress(5f / source.length), 0.000001f)
+        assertTrue(joined.fragmentWashProgress(5.25f / source.length) > joined.fragmentWashProgress(5f / source.length))
+    }
+
+    @Test
+    fun `carried wash waits for its own fragment and then advances between letters`() {
+        val source = "clear evidence for you."
+        val start = source.indexOf("evidence")
+        val verse = EnglishLeafVerse(24, 1, source.substring(start), from = start - 1,
+            textFrom = start, to = source.length, verseLength = source.length, source = source)
+        assertEquals(0f, verse.fragmentWashProgress((start - 0.25f) / source.length), 0f)
+        for (quarter in 1..verse.text.length * 4) {
+            val progress = (start + quarter / 4f) / source.length
+            assertEquals(quarter / (verse.text.length * 4f), verse.fragmentWashProgress(progress), 0.000001f)
+        }
+        assertEquals(1f, verse.fragmentWashProgress(1f), 0f)
+        assertEquals(0.5f, verse.copy(source = null).fragmentWashProgress(
+            (verse.from + (verse.to - verse.from) / 2f) / source.length), 0.000001f)
+    }
+
+    @Test
     fun `the leaf keeps whole words and the ink lands on the word the alignment names`() {
         val source = "[He] who created death and life to test you [as to] which of you is " +
             "best in deed - and He is the Exalted in Might, the Forgiving"

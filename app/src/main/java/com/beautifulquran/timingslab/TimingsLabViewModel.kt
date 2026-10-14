@@ -6,6 +6,7 @@ import androidx.lifecycle.viewModelScope
 import com.beautifulquran.data.QuranRepository
 import com.beautifulquran.data.Settings
 import com.beautifulquran.data.SettingsRepository
+import com.beautifulquran.data.observeTimingGeneration
 import com.beautifulquran.data.model.Ayah
 import com.beautifulquran.data.model.Reciter
 import com.beautifulquran.data.model.Segment
@@ -18,6 +19,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import kotlin.math.abs
 
@@ -38,7 +40,7 @@ data class TimingsLabUiState(
      * preview runs HighlightEngine straight over this list, so edits are
      * visible before they persist. */
     val passes: List<Segment> = emptyList(),
-    /** The bundled (shipped) marks for this ayah, with no overrides — the
+    /** The reviewed provider marks for this ayah, with no overrides — the
      * target of a per-word "Reset to default". */
     val defaultPasses: List<Segment> = emptyList(),
     val mode: LabMode = LabMode.LISTEN,
@@ -124,6 +126,35 @@ class TimingsLabViewModel(
             overrides.overrides.collect { map ->
                 _ui.value = _ui.value.copy(overrideCount = map.size)
             }
+        }
+        viewModelScope.launch {
+            repository.runtimeTimingsChanged
+                ?.observeTimingGeneration(_ui.map { it.reciter?.id })?.collect { (reciterId, _) ->
+                    val before = _ui.value
+                    val reciter = before.reciter ?: return@collect
+                    if (reciterId != reciter.id) return@collect
+                    val defaults = repository.defaultTimings(reciter.id, before.surahId)[before.ayah].orEmpty()
+                    val current = repository.timings(reciter.id, before.surahId)[before.ayah].orEmpty()
+                    val latest = _ui.value
+                    if (latest.reciter?.id != reciter.id || latest.surahId != before.surahId || latest.ayah != before.ayah) return@collect
+                    val passes = if (edited && current.isNotEmpty()) latest.passes else current
+                    val selectedPosition = latest.selectedPass?.let { latest.passes.getOrNull(it)?.position }
+                    _ui.value = latest.copy(
+                        defaultPasses = defaults,
+                        passes = passes,
+                        selectedPass = passes.indexOfFirst { it.position == selectedPosition }.takeIf { it >= 0 },
+                    )
+                    if (current.isEmpty()) {
+                        auditionJob?.cancel()
+                        saveJob?.cancel()
+                        recordMarks.clear()
+                        recordBackup = emptyList()
+                        recordPlaybackSeen = false
+                        _ui.value = _ui.value.copy(mode = LabMode.LISTEN, recordedMarks = 0)
+                        _activeWord.value = null
+                        edited = false
+                    }
+                }
         }
     }
 
@@ -224,10 +255,9 @@ class TimingsLabViewModel(
             val content = repository.surahContent(surahId)
             if (surahId != _ui.value.surahId || ayah != _ui.value.ayah) return@launch
             val ayahRow = content.ayahs[(ayah - 1).coerceIn(0, content.ayahs.lastIndex)]
-            // timings() already fuses saved overrides over the DB row;
-            // bundledTimings() is the un-overridden shipped default, for reset.
+            // Reset and listening use the same reviewed provider baseline.
             val segs = repository.timings(reciter.id, surahId)[ayahRow.number].orEmpty()
-            val defaults = repository.bundledTimings(reciter.id, surahId)[ayahRow.number].orEmpty()
+            val defaults = repository.defaultTimings(reciter.id, surahId)[ayahRow.number].orEmpty()
             val key = OverrideKey(reciter.id, surahId, ayahRow.number)
             _ui.value = TimingsLabUiState(
                 isLoading = false,
@@ -456,18 +486,16 @@ class TimingsLabViewModel(
         seekTo((pass.startMs - AUDITION_LEAD_MS).coerceAtLeast(0L), play = true)
     }
 
-    // ── Reset a word to its bundled default ─────────────────────────────────
+    // ── Reset a word to its provider default ────────────────────────────────
 
-    /** The marks the selected word shipped with (may be empty if the word had
-     * no bundled timing). Null when nothing is selected. */
+    /** The current provider marks, or none for a withheld row. Null when nothing is selected. */
     private fun selectedWordDefault(): Pair<Int, List<Segment>>? {
         val st = _ui.value
         val pos = st.selectedPass?.let { st.passes.getOrNull(it)?.position } ?: return null
         return pos to st.defaultPasses.filter { it.position == pos }
     }
 
-    /** Reverts just the selected word to its bundled default — its adjusted
-     * mark(s) are replaced by the shipped one(s), every other word untouched. */
+    /** Reverts the selected word to its provider marks, leaving other words untouched. */
     fun resetSelectedWordToDefault() {
         val st = _ui.value
         val (pos, def) = selectedWordDefault() ?: return
@@ -594,14 +622,14 @@ class TimingsLabViewModel(
         _ui.value = _ui.value.copy(isOverridden = segs.isNotEmpty())
     }
 
-    /** Reverts this ayah to the bundled DB timings. */
+    /** Reverts this ayah to the current reviewed provider timings. */
     fun resetOverride() {
         val st = _ui.value
         val reciter = st.reciter ?: return
         overrides.clear(OverrideKey(reciter.id, st.surahId, st.ayah))
         edited = false
         viewModelScope.launch {
-            // With the override gone, timings() serves the DB row again.
+            // With the override gone, timings() serves the provider row again.
             val segs = repository.timings(reciter.id, st.surahId)[st.ayah].orEmpty()
             _ui.value = _ui.value.copy(passes = segs, isOverridden = false, selectedPass = null)
         }

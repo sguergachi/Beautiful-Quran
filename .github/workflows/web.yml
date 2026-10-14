@@ -9,6 +9,7 @@ on:
       - 'data/lexicon.db'
       - 'data/dictionary.db'
       - 'docs/**'
+      - 'licenses/**'
       - '.github/workflows/web.yml'
   pull_request:
     paths:
@@ -17,6 +18,7 @@ on:
       - 'data/lexicon.db'
       - 'data/dictionary.db'
       - 'docs/**'
+      - 'licenses/**'
       - '.github/workflows/web.yml'
 
 concurrency:
@@ -42,7 +44,10 @@ jobs:
       - name: Verify canonical and built databases
         run: |
           test -s ../data/quran.db && test -s dist/quran.db
-          test -s dist/timings/1.json && test -s dist/timings/19.json
+          test -s dist/timings/6.json && test -s dist/timings/19.json
+          for reciter in 1 2 3 4 5 7; do
+            test ! -e "dist/timings/$reciter.json"
+          done
           test -s ../data/lexicon.db && test -s dist/lexicon.db
           test -s ../data/dictionary.db && test -s dist/dictionary.db
 

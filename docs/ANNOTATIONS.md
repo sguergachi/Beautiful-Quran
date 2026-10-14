@@ -50,26 +50,18 @@ voice, and the two must never be confusable.
 | Note is long | The text truncates to three lines with a quiet ink ellipsis; tapping the note opens it in place (see "Writing"). |
 | Another ayah is reciting | The ribbon vanishes with the rest of the chrome; the text recesses to upcoming ink with its verse, exactly like the translation. |
 
-**Type.** **Cormorant Garamond Italic at weight 500**, 16 sp / 23 sp, a very
-light red at 85 % opacity, on the inner spine, 12 dp/px below the translation.
-No quotation marks, no "Note:" label, no attribution — the hand says it.
+**Type.** **Junicode Italic, Medium (weight 520)**, at 16 sp / 23 sp scaled to
+Junicode's size (×0.969, so its lowercase stands as Garamond's did) before the
+existing damped reader size setting, with 0.15 sp tracking. This is the book
+face's real italic, keeping translation and note in one serif family. The
+note's maroon ink, slant and placement distinguish the reader's words: on the
+inner spine, 12 dp/px below the translation, with no quotation marks, "Note:"
+label or attribution. Colour follows the existing theme ink policy.
 
-The face is the point. Italic alone is not enough: setting the note in the
-app's *own* EB Garamond italic reads as **emphasis**, the same voice leaning,
-because it is literally the same typeface as the translation above it.
-Cormorant's italic is a genuinely different hand — looser `a` and `e`,
-calligraphic `f` and `y`, higher stroke contrast, a wider pen — so the eye
-reads a second person on the page rather than the app raising its voice. It is
-also the historically right one: chancery cursive is what scribes actually
-wrote ḥawāshī in, and what italic type was first cut from.
-
-Two constraints make it work at reading size. Cormorant is a display face and
-goes wispy small, so the note uses **weight 500** (a static instance cut from
-the variable font, subset to latin + latin-ext at 132 KB) and sits a step
-larger than the old EB italic at 16 sp with 0.15 sp letterspacing. Its dark
-maroon inky red keeps the reader's own hand distinct from the scripture even
-at 85 % opacity. This is a narrow, recorded exception to Cormorant's display-only rule
-in [DESIGN.md](DESIGN.md) — do not generalise it to body copy.
+The classic developer profile restores **Cormorant Garamond Italic at weight
+500**, 16 sp / 23 sp and its original tracking. The same selected hand and
+settings appear in the reader, note editor, Bookmarks index and Customize
+preview.
 
 **The ribbon.** Tap keeps its existing mark/unmark action. Press and hold on
 an exposed saved ribbon opens the verse's note. The same 44 dp target serves
@@ -238,7 +230,7 @@ must be refusable too.
 ## Export *(not yet built)*
 
 Notes are the only user data with no recovery path: the app is offline-first
-with no accounts and no backend (invariant #6), so a lost device is a lost
+with no accounts or user-data backend (invariant #6), so a lost device is a lost
 hand. This is the highest-priority follow-up.
 
 Settings → a quiet *Export notes* line writes a plain-text file through the
@@ -294,7 +286,7 @@ resize handle.
   text rather than a margin glyph.
 - `ui/reader/ReaderComponents.kt` — `verseAnnotationStyle` (the reader's hand, shared
   with the Bookmarks index) and `VerseAnnotationField`.
-- `ui/theme/Type.kt` — `ScribeFontFamily`, and why it is not the EB italic.
-  The face is OFL (same licence as every other bundled font); the Android cut
-  is `res/font/cormorant_garamond_italic.ttf`, mirrored for web in
-  `web/public/fonts/` with a `--font-scribe` variable already wired.
+- `ui/theme/Type.kt` — selected `ScribeFontFamily`: Junicode's variable
+  Italic (`res/font/junicode_italic_variable.ttf`, OFL), or the classic
+  `res/font/cormorant_garamond_italic.ttf`. Web's `--font-scribe` uses the same
+  Junicode cut as WOFF2.

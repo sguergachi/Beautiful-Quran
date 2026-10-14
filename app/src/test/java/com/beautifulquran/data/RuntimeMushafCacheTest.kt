@@ -247,6 +247,23 @@ class RuntimeMushafCacheTest {
     }
 
     @Test
+    fun `shared timing revocation prevents an in-flight word snapshot from restoring QF data`() = runTest {
+        val started = CompletableDeferred<Unit>()
+        val release = CompletableDeferred<Unit>()
+        val store = Store(QfSyncState(filter, "old", 90L), listOf(row))
+        val cache = RuntimeMushafCache(ReportingApi(1, started, release), store, backgroundScope, { 100L }, minimumWords = 1)
+        cache.refresh()
+        runCurrent()
+        assertTrue(started.isCompleted)
+        cache.clearRevokedContent()
+        release.complete(Unit)
+        runCurrent()
+        assertFalse(store.hasState())
+        assertNull(cache.word(5, 2, 19))
+        assertEquals(0, cache.cachedWordCount())
+    }
+
+    @Test
     fun `revoked QF access purges the readable cache immediately`() = runTest {
         val store = Store(QfSyncState(filter, "old", 90L), listOf(row))
         val cache = RuntimeMushafCache(

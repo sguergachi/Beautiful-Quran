@@ -1,8 +1,11 @@
 package com.beautifulquran.domain
 
 /**
- * Where the English leaf's lines break: as a compositor sets a ragged page,
- * not as a typewriter does.
+ * Where the English leaf's lines break when it is set ragged: as a compositor
+ * sets a ragged page, not as a typewriter does.
+ *
+ * The leaf is now justified ([EnglishJustify]); this is the fallback for a
+ * paragraph the justifier declines, and [Candidates] is the shape both read.
  *
  * The leaf used to break greedily (`LineBreak.Strategy.Simple`): fill each line
  * as far as the next word allows and take what is left. That keeps the rag

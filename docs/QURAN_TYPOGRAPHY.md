@@ -338,6 +338,11 @@ caller takes a second for the rounding that discrete line counts leave behind.
 It takes no page: the type depends on the leaf's geometry and the face, and on
 nothing the page happens to carry.
 
+At a chapter opening, the English basmalah is placed within its measured slot
+so the air from the panel above and to the first prose line below is equal. The
+line moves within the slot; its total height stays fixed, so page fit does not
+change.
+
 ### 13.4 One hand, one leading — and the leaf is not the page
 
 While the page boundary came from the Arabic leaf, a page's mass was fixed at
@@ -899,15 +904,98 @@ percent of type on that leaf alone. That breaks §13.3 knowingly — on 2:282 th
 alternatives are overlapping lines or revelation clipped off the foot, and a page
 set a little small is the only one of the three a reader can still read.
 
-### 13.5 Ragged right, with whole words
+### 13.5 Justified, with whole words
+
+Every full line reaches both margins; words stay whole (`Hyphens.None`, no
+soft hyphens or word joiners). `EnglishJustify` sets it, the way TeX's
+micro-typography sets a narrow measure:
+
+- **The whole paragraph is broken at once** (Knuth–Plass). Every setting is
+  weighed and the one whose lines stretch least, and most alike, is taken; a
+  continuous cost on the change in tightness from one line to the next keeps a
+  loose line from sitting on a tight one, which is what the eye reads as a
+  river.
+- **The line count is the optimum's own.** Lines may close as well as open,
+  so a line can take one more word rather than open its spaces; the ruler that
+  paginates counts the lines of exactly this setting. The page-fit search keeps
+  looking after a prefix overflows, since adding a word can close a line again;
+  it stops only when a conservative width bound rules out every longer prefix.
+  The height fitter uses the same carried-line setting as the ruler and the
+  drawing, so it adjusts the spacing for exactly the lines the leaf displays.
+  A line without stretchable gaps keeps its natural width; an oversized lone
+  word cannot be counted as fitting by shrink the renderer will not apply.
+- **Letters take part of the slack.** Each line may widen or narrow its
+  letters by up to 3 % (`TextGeometricTransform.scaleX` — pdfTeX's font
+  expansion, Zapf's hz) and open or close their spacing by up to 0.0075 em, so
+  a line's slack is shared over its forty letters as well as its seven
+  spaces. The space binding a verse mark to its verse stretches with the word
+  spaces; it never breaks.
+- **A dash never opens a line**; it stays with the word before it.
+- **A leaf's last line** is drawn out when the next leaf carries the paragraph
+  on, and stands where it ends only at the chapter's end.
+
+The tuning is `EnglishJustify.LEAF`: word spaces aim at 1.2 × the natural
+0.186 em, may open 40 % and close 25 % of that before a line counts as loose
+or tight. Measured over the whole book on the emulator (`englishJustifyAudit`,
+debug builds: `run-as … touch files/justify_audit`), word spaces come to
+0.187 / 0.223 / 0.281 / 0.340 em at the 10th / 50th / 90th / 99th percentile,
+57 of 15,623 justified lines open past 0.4 em, and every line ends on the
+measure to the pixel. Under the first attempt (below) the same book ran
+0.212 / 0.288 / 0.423 / 0.575 em with 2,368 lines past 0.4 em; the levers,
+in order of what they bought: letting the line count follow the optimum,
+letter tracking, then glyph expansion. Letters that may only widen, not
+narrow, cost more evenness in the spaces than they save in the letters.
+
+How it is drawn, and why each piece is load-bearing:
+
+- **Breaks and stretch are spans over the text, not a re-layout.** Each break
+  replaces its space in place and each line's stretch is a `SpanStyle`
+  (`scaleX` over the line, `letterSpacing` on its letters and gaps), so every
+  offset the wash, the paper covers and the taps hold still names the same
+  letter, and the ink reads its positions off the drawn layout — no
+  `justifyShift` correction (that was for platform justification).
+- **Positions are words laid end to end**, each word's in-line advance read
+  once for the book and corrected by a per-style bias calibrated off
+  `ENGLISH_LEAF_SPECIMEN` (a word alone measures ~1.5 px wider than among
+  others: kerning and tracking at its edges). A word measures the same
+  wherever it falls, so the ruler cutting a leaf out of a longer offer reads
+  exactly the positions the leaf cut there will read — the two cannot
+  disagree about how many lines a leaf holds.
+- **Each drawn line is measured and closed onto the edge** (two passes over
+  an unbounded layout) and **the set paragraph never soft-wraps**: the
+  platform's line breaker measures a styled run — a quiet bracket, a verse
+  mark's isolated figures — a few px wider than it draws it, and broke full
+  justified lines early.
+- **The pagination cache is keyed by the tuning and algorithm version**
+  (`EnglishJustify.cacheKey` in `bookCacheSuffix`): a change to it repaginates
+  rather than drawing a leaf cut for another setting. The complete layout and
+  prose identity is hashed into a fixed-length filename so the font and tuning
+  details cannot exceed the filesystem's name limit.
+
+The ragged setting below is what it replaced, and stays as the fallback for a
+paragraph the justifier declines (none in the current book). Its measurements
+are the record of why the first justification was taken out, and of what a
+rag on this measure can and cannot do.
+
+#### The ragged leaf it replaced
 
 `TextAlign.Start` with word-space breaks chosen by `EnglishRag`, the book
-face's kerning, ligatures and old-style figures. `Hyphens.None`: words stay
-whole, with no inserted soft hyphens or word joiners. Prose tracks at −0.025 em;
+face's kerning, ligatures and old-style figures. Prose tracks at −0.025 em;
 the verse ornaments keep natural spacing. The book's hand is calibrated at
 natural spacing too, so tightening the letters does not change its type size.
-The measurements below record the earlier settings as well as the reasons
-for the current one.
+
+The leaf is set in Junicode, matched to the EB Garamond these rules were
+measured in (docs/DESIGN.md, "Type"): it takes the hand Garamond's leaf solves
+to, scaled to Junicode's size, with Garamond's line pitch, and its width and
+word space are pinned so a leaf holds what Garamond's does (753 leaves to 751
+on a Pixel 10). The developer comparison keeps these whole-word rules for both
+faces. The book cache includes the face, its font hashes and the constants
+that move a line, and the paragraph-break cache includes the full text style
+and annotated spans, so a font change cannot reuse the other face's
+measurements or chosen breaks. Customize uses the same setter as the live
+leaf. The leaf's fonts, including verse figures and basmalah, stay the same
+across light and dark themes so pagination stays fixed. The measurements below
+record the classic Garamond settings.
 
 The mushaf's own rule is that every full line reaches both margins (rule 3) —
 but that is a rule about Arabic, which fills a line by the letterform, and it
@@ -917,7 +1005,10 @@ open unevenly, the same line's colour changes from one page to the next, and
 the reader pays for a straight right edge with rivers of white running down
 the page.
 
-**Justification was tried here and taken back out.** It does what it promises:
+**Justification was tried here and taken back out** — the first time, with
+the platform's own line-at-a-time justification and only the word space to
+stretch. What follows is why; the setting above answers each point. It does
+what it promises:
 every line on the Ta-Ha leaf ended within 3 px of the last, glyph side bearings
 and nothing more. It is paid for by the word space — the loosest line on the
 Ad-Dukhan leaf (*We were to warn [mankind] ⟨3⟩ On that*) ran three times the
@@ -1271,27 +1362,57 @@ the ink is somewhere in the middle of "about which".
 The link is recoverable. Every Arabic word carries its own gloss — the
 interlinear crib the scrolling reader lyricizes — and the translation is a
 translation of the same sentence, so the two share most of their content words.
-`EnglishWordAlignment` aligns the gloss stream to the translation and hands back
-the share of the sentence each Arabic word ends at. Over all 6,236 verses **84 %
-of Arabic words land on a lexical anchor**; an unanchored run is spread between
-the anchors around it, which is the old proportion applied locally, so the map is
-never worse than what it replaces and with no anchors at all it *is* that.
+`EnglishWordAlignment` aligns the gloss stream to the translation and returns
+printed spans with their spoken Arabic owners. Inflections share a key; a small
+vocabulary bridges differences such as gaze/vision, slaves/servants and
+bosoms/chests. “Private parts,” “head covers” and “All-Aware”/“Acquainted”
+remain whole meanings. The vocabulary also covers irregular verbs, divine
+titles and transliterated names. A printed compound joins only when the gloss
+names that single meaning: “Accepting of repentance” can name one Tawwab,
+while “acceptor” and “of repentance” remain separate when Arabic says two
+words. Rahman and Rahim retain distinct owners when both occur.
 
 Three rules make it usable:
 
-- **Monotone.** Arabic is not English word order — لَا رَيْبَ فِيهِ is "no doubt
-  in it", and Sahih International sets "about which there is no doubt". A
-  faithful alignment would run backwards there, and the wash cannot: laid ink
-  never lifts (`docs/INK_ENGINE.md`). So the alignment is constrained to advance
-  and a reordered clause is absorbed by sliding a word or two.
-- **Snapped to word ends.** An interpolated boundary lands wherever the
-  arithmetic put it, and "slumbe|r" is not a place ink rests. Boundaries that
-  collapse onto each other are correct: the English has no separate words for
-  that Arabic one.
-- **One map for everything.** The wash, the tap, and the leaf a carried verse's
-  voice is on all read it (`EnglishVerseAlignments`, solved per verse on first
-  ask). If the page turn read the cut with a different map than the ink, it
-  would turn away from a wash still running.
+- **One continuous forward wash, with no skipped words.** When Arabic names a
+  later English meaning, every intervening word joins its left-to-right wash.
+  “Painful punishment” washes together when Arabic says the noun first; later
+  hearing the adjective never moves the front backwards. In 24:31, “husbands'
+  fathers” washes together on “fathers.” Ink already laid never lifts.
+- **Boundaries sit between words.** Adjacent ranges tile the printed sentence,
+  including punctuation. A missing English equivalent can own no span. A page
+  cut projects the ranges onto its fragment without changing their owners.
+- **One alignment for wash, tap, hold and follow.** `EnglishVerseAlignments`
+  caches semantic owners and the continuous wash derived from them for the
+  selected text source. Tapping or holding a word names its semantic Arabic
+  owner, even if the forward wash included it earlier. Carried-leaf follow
+  follows the wash without returning to an already advanced word.
+
+Repeated content must keep its occurrence. Equal counts within a sentence pair
+exact forms first, then inflected or equivalent forms in occurrence order,
+including possessives; “sons” cannot steal
+another “sons” later in the family list. Different forms such as “approached”
+and “Approaching” stay distinct. A duplicated gloss consisting of a grammatical
+prefix and one printed head is a shared phrase: 24:30's duplicated “their gaze”
+assigns “vision” to Arabic word 5. Real printed repetitions stay separate.
+
+Unmatched text still uses the guarded, interpolated forward alignment.
+Translator additions cannot claim literal anchors. Existing context and
+partial-gloss guards keep differently translated meanings from being dragged
+onto a later literal occurrence. A unique meaning reused in English can match
+within its surrounding anchors' sentence, without acquiring another clause's
+word. Reflexive objects retain their named owner; an implicit noun in “evil
+deeds” travels with the verified noun meaning only if no separate deed is
+named in that clause. Ambiguous repeated forms, omitted meanings
+and vocabulary outside the shared keys remain approximate. The published
+translation therefore does not promise exact semantic timing for every word.
+
+Verification combines annotated verse regressions, an independent literal-word
+diagnostic over the live QF cache's 6,236 verses, QAC root/lemma meaning checks,
+and actual Android playback.
+The diagnostic is agreement on recognizable literal correspondences, not a
+semantic accuracy certificate. See [ENGLISH_ALIGNMENT.md](ENGLISH_ALIGNMENT.md)
+for the measured result and its limits.
 
 Measured on 2:2 (Alafasy) with the app playing: tap "no" and the reciter starts
 at 1,776 ms against لَا's 1,760; "doubt" → 2,142 against رَيْبَ's 2,140;
@@ -1313,13 +1434,18 @@ word blooming, however narrow its edge is made. Two attempts at the edge width
 (a line of the page, then 1.6 word-widths of the sentence) both missed for the
 same reason: the shape was wrong, not the size.
 
-With an alignment it is a direct copy, because the states are contiguous —
-everything before the word being said is read, everything after is not. So the
-sentence is drawn as three bands rather than one bloom per word
-(`englishWashBands`): the read band, the word being said, and the band still to
-come. Same picture as fifty per-word blooms, at three. The bloom's range *is* a
-word now, so it takes `Tuning.washFeather` unmodified, exactly as the scrolling
-reader does.
+The base wash bands follow English order, driven by the calibrated media clock.
+Each band's owner is the earliest spoken meaning at or beyond its English
+range, so all text before the active edge is included. Adjacent bands with the
+same owner merge, leaving one active soft edge. First-pass glimmer uses those
+same bands and cannot jump ahead of the wash. Repeat tint and repeat glimmer
+retain the semantic owners over the prefix already laid. Range projection is
+cached with the paragraph; frames only read clocks and build paint layers.
+Owned ranges retain the exact letter-count map; the animated edge interpolates
+between those letter anchors. Rounding the moving edge to source characters
+and then to printed letter ends made even a continuous clock paint in jumps.
+Every wash uses `Tuning.washFeather` unmodified, exactly as the scrolling reader
+does.
 
 **Bands that abut must not reach past their boxes.** A paper cover is drawn
 `PaperCoverPad` (4 dp) wider than its own line box, to catch ink that overhangs
@@ -1334,18 +1460,30 @@ inside a letter is a hard cut down it — the alignment's own boundaries are wor
 ends already, but a carried verse or one with its asides hidden is a shorter
 string than the shares were measured against.
 
-The three bands also give the recess its place. **A verse seeked into rises out
+The owned ranges also give the recess its place. **A verse seeked into rises out
 of the paper rather than appearing on it:** tapping the middle of a sentence
-makes everything before the tap already read, and drawing that at full strength
-on the next frame made the sentence flash on. The cover rides the read band and
+retains the continuous prefix already reached, and drawing it at full strength
+on the next frame made the sentence flash on. The cover rides that prefix and
 lifts over `Tuning.recessMs`, which is precisely what the Arabic leaf does with
 its already-read words; the word being said never carries it, because it is
 revealed by its own bloom. Measured on device: a mid-sentence tap that used to
 complete in a single frame takes ~370 ms of rise.
 
-**But it reads the plain clock out of them, not the paced one.** The word's own
-share comes from `InkMotion.plainSweepProgress` — linear across the word's
-karaoke hold — and never from `sweepProgress`, which carries the two corrections
+**English follows spoken time, without Arabic letter pacing.** Each band's
+clock runs from its first Arabic owner to the next band's first occurrence,
+the first repeat, or the final spoken segment's end. First-pass ink
+finishes before a re-say starts its tint; it does not stretch across that
+repeat. As in scroll view, one continuous animation follows the spoken duration
+at the playback speed, bounded by the known spoken end. Position polls never
+interrupt it; transport changes re-anchor it. This includes source words reordered into
+earlier English: in 24:2 the last English band keeps washing while Arabic
+finishes “a group of the believers.” Pauses freeze the edge, speed changes
+follow the media clock, and a carried band crosses its first fragment before
+its second. Voice ownership follows that edge; the carried-page turn previews
+the same clock by its existing 500 ms lead at the current playback speed.
+Re-says keep their semantic word location, independently of the retained first
+wash, so the voice stays on the leaf carrying the repeated phrase.
+The leaf never reads `sweepProgress`, which carries the two corrections
 that make the Arabic wash right and the English one wrong: the tajweed letter
 map (`TajweedPacing.Curve`) and the wasl carry-in. Both are statements about
 where inside an Arabic *word* the time is going. A word holding a madd spends
@@ -1356,7 +1494,8 @@ up, which is exactly what "the ink is behind the voice" looks like. The
 scrolling reader's English mode refuses the same curve at the source
 (`rememberInkMotions(pacing = null)`); the mushaf cannot, because one pack draws
 both leaves — so the correction is refused at the *reader*, which is why the
-plain clock exists.
+plain clock exists. The shared pack still owns glimmer and semantic repeat
+layers; neither can pass the media-driven edge.
 
 The chapter-opening basmalah takes the same rule twice over
 (`BasmalahWash.plainProgress`). Its calligraphy wash is doubly Arabic: tajweed
@@ -1502,9 +1641,11 @@ measured passes using fractional caret advances and subpixel rendering, so the
 final line fills the column to within a pixel rather than trusting a rounded
 body-size estimate. Half a pixel of slack absorbs shaping's remaining rounding.
 The size follows the column width without a body-size cap. Its slot is measured
-with the same style and one-line constraint as the drawing, and
-all of its air falls below it — centred, half of it landed above instead, under
-the chapter's panel.
+with the same style and one-line constraint as the drawing. A quarter pitch
+of paper separates it from the panel, and its slot places the first prose
+baseline one pitch plus that same air below the basmalah's baseline. Cache
+format 36 combines this opening with the justified book and discards leaves
+measured with the earlier fixed-air slot.
 
 Everything else is unchanged: the page dial, the chapter ornament, the fore-edge
 fade, and the right-to-left page turn. It is the same book — only the writing is

@@ -134,11 +134,16 @@ import com.beautifulquran.data.model.Word
 import com.beautifulquran.domain.EnglishTypography
 import com.beautifulquran.domain.TajweedPacing
 import com.beautifulquran.ui.reader.focus.FocusEngine
+import com.beautifulquran.ui.theme.quietSuppliedBrackets
+import com.beautifulquran.ui.theme.forCaps
+import com.beautifulquran.ui.theme.liningFigures
+import com.beautifulquran.ui.theme.BookTextMotion
 import com.beautifulquran.ui.theme.ArabicTitleStyle
 import com.beautifulquran.ui.theme.drawPulseTrace
 import com.beautifulquran.ui.theme.ArabicWordStyle
 import com.beautifulquran.ui.theme.GeneratedChapterRosette
 import com.beautifulquran.ui.theme.HafsFontFamily
+import com.beautifulquran.ui.theme.LocalScrollArabicType
 import com.beautifulquran.ui.theme.IslamicBackToOriginCapsule
 import com.beautifulquran.ui.theme.LocalQuranAccents
 import com.beautifulquran.ui.theme.ShapedWordBloom
@@ -160,6 +165,7 @@ import com.beautifulquran.ui.theme.quietClickable
 import com.beautifulquran.ui.theme.shapedWordBloom
 import com.beautifulquran.ui.theme.inkSmootherstep
 import com.beautifulquran.ui.theme.verticalFadingEdges
+import com.beautifulquran.ui.theme.typeScale
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.first
@@ -212,11 +218,12 @@ internal fun formatAyahNumberMark(
     return raw.toCharArray().joinToString("\u2060")
 }
 
-/** Appends a mark with Hafs cups and, for Western digits, explicitly Garamond ones. */
+/** Appends a mark with Hafs cups and, for Western digits, explicitly book-face ones. */
 internal fun AnnotatedString.Builder.appendAyahNumberMark(
     number: Int,
     useArabicIndicDigits: Boolean,
     style: SpanStyle,
+    bookFontFamily: FontFamily,
     ltr: Boolean = !useArabicIndicDigits,
 ) {
     val start = length
@@ -224,7 +231,8 @@ internal fun AnnotatedString.Builder.appendAyahNumberMark(
         append(formatAyahNumberMark(number, useArabicIndicDigits, ltr = ltr))
     }
     if (!useArabicIndicDigits) {
-        val digitStyle = style.copy(fontFamily = TranslationFontFamily)
+        // Lining: old-style 3 4 5 7 9 hang below the cups' centre.
+        val digitStyle = style.copy(fontFamily = bookFontFamily, fontFeatureSettings = liningFigures(null))
         // The isolate and the cup each take a character and a word joiner, so
         // the LTR form opens its digits two units further in than the plain one.
         val digitsAt = if (ltr) 4 else 2
@@ -284,6 +292,15 @@ internal fun tapHitsRange(offset: Int, range: IntRange, textLength: Int): Boolea
     return offset == textLength && range.last == textLength - 1
 }
 
+/** A wrapped range's bounding rectangle must not steal another range's glyph. */
+internal fun inlineRangeIndexAt(
+    offset: Int,
+    ranges: List<IntRange>,
+    textLength: Int,
+    geometricHit: () -> Int,
+): Int = ranges.indexOfFirst { tapHitsRange(offset, it, textLength) }
+    .takeIf { it >= 0 } ?: geometricHit()
+
 /** True when [tap] falls inside the glyph bounds of [range], inflated by [hitSlopPx]. */
 internal fun TextLayoutResult.rangeContains(
     tap: Offset,
@@ -333,7 +350,9 @@ internal fun TextLayoutResult.wordIndexAt(
     tap: Offset,
     ranges: List<IntRange>,
     hitSlopPx: Float,
-): Int = ranges.indexOfFirst { rangeContains(tap, it, hitSlopPx) }
+): Int = inlineRangeIndexAt(getOffsetForPosition(tap), ranges, layoutInput.text.length) {
+    ranges.indexOfFirst { rangeContains(tap, it, hitSlopPx) }
+}
 
 private fun Rect.expandToInclude(other: Rect): Rect =
     Rect(
@@ -1789,7 +1808,12 @@ private fun WordUnit(
             motion = motion,
             rtl = true,
             color = MaterialTheme.colorScheme.onBackground,
-            style = ArabicWordStyle.copy(fontSize = ArabicWordStyle.fontSize * fontScale),
+            style = LocalScrollArabicType.current.let { face ->
+                ArabicWordStyle.copy(
+                    fontFamily = face.fontFamily,
+                    fontSize = ArabicWordStyle.fontSize * fontScale * face.sizeScale,
+                )
+            },
             searchHitWash = searchHitWash,
             recessedForSearch = recessedForSearch,
             searchBackgroundAlpha = searchBackgroundAlpha,
@@ -1798,7 +1822,7 @@ private fun WordUnit(
             Box {
                 Text(
                     text = word.translation,
-                    fontSize = 12.sp * fontScale,
+                    fontSize = typeScale(12.sp) * fontScale,
                     lineHeight = 15.sp * fontScale,
                     fontWeight = glossWeight,
                     color = if (searchHit) {
@@ -1815,7 +1839,7 @@ private fun WordUnit(
                 if (searchHitWash != null) {
                     Text(
                         text = word.translation,
-                        fontSize = 12.sp * fontScale,
+                        fontSize = typeScale(12.sp) * fontScale,
                         lineHeight = 15.sp * fontScale,
                         fontWeight = FontWeight.Bold,
                         color = repeatInk.copy(alpha = InkEngine.tuning.repeatInkAlpha),
@@ -1830,7 +1854,7 @@ private fun WordUnit(
         if (showTransliteration) {
             Text(
                 text = word.transliteration,
-                fontSize = 11.sp * fontScale,
+                fontSize = typeScale(11.sp) * fontScale,
                 lineHeight = 14.sp * fontScale,
                 color = QuranTheme.ink.quiet,
                 textAlign = TextAlign.Center,
@@ -2126,15 +2150,15 @@ private fun ResponsiveEnglishAyah(
     useArabicIndicDigits: Boolean = false,
 ) {
     val palette = rememberWordInkPalette()
+    val translationFontFamily = TranslationFontFamily
     val gold = LocalQuranAccents.current.gold
     val glintInk = LocalQuranAccents.current.glintInk
     val activeIndex = motions.indexOfFirst { it.isActive }
     val style = MaterialTheme.typography.bodyLarge.copy(
-        fontFamily = TranslationFontFamily,
+        fontFamily = translationFontFamily,
         fontWeight = FontWeight.Normal,
-        fontSize = 22.sp * fontScale,
+        fontSize = typeScale(22.sp) * fontScale,
         lineHeight = 1.5.em,
-        letterSpacing = 0.sp,
         textAlign = TextAlign.Start,
         textDirection = TextDirection.Ltr,
     )
@@ -2166,6 +2190,7 @@ private fun ResponsiveEnglishAyah(
         fontScale,
         lyricGlosses,
         useArabicIndicDigits,
+        translationFontFamily,
     ) {
         val ranges = ArrayList<IntRange>(ayah.words.size)
         var markRange = 0..-1
@@ -2182,7 +2207,7 @@ private fun ResponsiveEnglishAyah(
                     SpanStyle(
                         color = if (
                             searchQuery != null &&
-                            word.translation.contains(searchQuery, ignoreCase = true)
+                            EnglishTypography.fold(word.translation).contains(searchQuery, ignoreCase = true)
                         ) {
                             gold
                         } else {
@@ -2206,6 +2231,7 @@ private fun ResponsiveEnglishAyah(
                 number = ayah.number,
                 useArabicIndicDigits = useArabicIndicDigits,
                 style = SpanStyle(color = gold, fontSize = 17.sp * fontScale),
+                bookFontFamily = translationFontFamily,
                 ltr = true,
             )
             markRange = markStart until length
@@ -2402,13 +2428,16 @@ private fun ResponsiveHafsAyah(
     onMarkLongClick: (() -> Unit)? = null,
 ) {
     val palette = rememberWordInkPalette()
+    val translationFontFamily = TranslationFontFamily
     val ayahMarkInk = LocalQuranAccents.current.gold
     val glintInk = LocalQuranAccents.current.glintInk
     val activeIndex = motions.indexOfFirst { it.isActive }
+    val arabicType = LocalScrollArabicType.current
     val style = ArabicWordStyle.merge(
         TextStyle(
-            fontFamily = HafsFontFamily,
-            fontSize = fontSize,
+            fontFamily = arabicType.fontFamily,
+            // The mark below sizes itself from [fontSize], not this.
+            fontSize = fontSize * arabicType.sizeScale,
             lineHeight = 1.95.em,
             // Arabic verse copy owns the sheet's far-right rule; its position
             // must not visually depend on the LTR translation below it.
@@ -2422,7 +2451,14 @@ private fun ResponsiveHafsAyah(
     // Full-ink spans only — never bake upcoming/active into the annotated
     // string. Dim, bloom, and orange are draw-phase overlays, so word and
     // ayah boundaries do not reshape or flash the run.
-    val rendered = remember(ayah, palette.fullInkColor, ayahMarkInk, fontSize, useArabicIndicDigits) {
+    val rendered = remember(
+        ayah,
+        palette.fullInkColor,
+        ayahMarkInk,
+        fontSize,
+        useArabicIndicDigits,
+        translationFontFamily,
+    ) {
         val ranges = ArrayList<IntRange>(ayah.words.size)
         var markRange = 0..-1
         val text = buildAnnotatedString {
@@ -2448,6 +2484,7 @@ private fun ResponsiveHafsAyah(
                     color = ayahMarkInk,
                     fontSize = fontSize * AYAH_MARK_SIZE_RATIO,
                 ),
+                bookFontFamily = translationFontFamily,
             )
             markRange = markStart until length
         }
@@ -2506,14 +2543,16 @@ private fun ResponsiveHafsAyah(
 }
 
 /** Marks every occurrence of [query] in [text] with a soft gold wash. */
-private fun highlightMatches(text: String, query: String?, mark: Color): AnnotatedString =
+private fun highlightMatches(text: String, query: String?, mark: Color, ink: Color): AnnotatedString =
     buildAnnotatedString {
         append(text)
+        quietSuppliedBrackets(text, 0, ink)
         if (query.isNullOrEmpty()) return@buildAnnotatedString
-        var i = text.indexOf(query, ignoreCase = true)
+        val folded = EnglishTypography.fold(text)
+        var i = folded.indexOf(query, ignoreCase = true)
         while (i >= 0) {
             addStyle(SpanStyle(background = mark), i, i + query.length)
-            i = text.indexOf(query, i + query.length, ignoreCase = true)
+            i = folded.indexOf(query, i + query.length, ignoreCase = true)
         }
     }
 
@@ -2526,12 +2565,14 @@ fun AyahNumberMark(
     useArabicIndicDigits: Boolean = true,
 ) {
     val accents = LocalQuranAccents.current
-    val text = remember(number, fontScale, useArabicIndicDigits, accents.gold) {
+    val translationFontFamily = TranslationFontFamily
+    val text = remember(number, fontScale, useArabicIndicDigits, accents.gold, translationFontFamily) {
         buildAnnotatedString {
             appendAyahNumberMark(
                 number = number,
                 useArabicIndicDigits = useArabicIndicDigits,
                 style = SpanStyle(color = accents.gold, fontSize = 20.sp * fontScale),
+                bookFontFamily = translationFontFamily,
             )
         }
     }
@@ -2591,11 +2632,13 @@ private fun Modifier.hangTileAir(): Modifier = layout { measurable, constraints 
 
 /**
  * The chapter view's one caps label: NEXT, PREVIOUS and the top bar's chapter
- * line. 10 sp keeps the caps legible at whisper ink; 0.22 em is small-caps
+ * line. 9 sp keeps the caps legible at whisper ink; 0.22 em is small-caps
  * tracking — wide enough to open the capitals, not so wide the word falls apart.
  */
-internal val CAPS_LABEL_SIZE = 10.sp
-internal val CAPS_TRACKING = 2.2.sp
+internal val CAPS_LABEL_SIZE: TextUnit
+    @Composable get() = typeScale(10.sp)
+internal val CAPS_TRACKING: TextUnit
+    @Composable get() = typeScale(2.2.sp)
 
 @Composable
 private fun ArabicAyahNumberUnit(
@@ -2637,18 +2680,13 @@ private fun ArabicAyahNumberUnit(
 }
 
 /**
- * The reader's marginal note for one verse: italic EB Garamond below the
+ * The reader's marginal note for one verse, in the reader's hand below the
  * translation. When [isEditing], a chromeless [BasicTextField] takes focus so
  * the reader writes in place. Tap away to commit; empty text = no note.
  */
 /**
- * The reader's own hand: Cormorant Garamond Italic, a chancery cursive that is
- * a genuinely *different* hand from the app's EB Garamond prose — not the same
- * voice leaning into emphasis. See [ScribeFontFamily] for why.
- *
- * Set a touch larger than the old EB italic (16 sp) because Cormorant runs
- * small on the body, and with slightly open letterspacing so the fine strokes
- * keep their air. Shared by the reader's verse note and the Bookmarks index.
+ * Junicode's real italic, with Cormorant restored by the classic profile.
+ * Shared by the reader, Customize and the Bookmarks index.
  *
  * [fontScale] mirrors the translation's damped scaling so the note grows with
  * the page instead of staying pinned at one size when the reader sizes type up.
@@ -2660,14 +2698,16 @@ internal fun verseAnnotationStyle(
     fontScale: Float = 1f,
 ): TextStyle {
     val damped = 0.9f + 0.1f * fontScale
+    val type = com.beautifulquran.ui.theme.LocalQuranTypePalette.current
+    val junicode = type.profile == com.beautifulquran.ui.theme.QuranTypeProfile.JUNICODE
     return MaterialTheme.typography.bodyMedium.copy(
         fontFamily = ScribeFontFamily,
         fontWeight = FontWeight.Medium,
         fontStyle = FontStyle.Italic,
-        fontSize = fontSize * damped,
+        fontSize = fontSize * damped * if (junicode) com.beautifulquran.ui.theme.JUNICODE_SIZE else 1f,
         lineHeight = lineHeight * damped,
         letterSpacing = 0.15.sp,
-        fontFeatureSettings = "'kern' 1, 'liga' 1, 'onum' 1",
+        fontFeatureSettings = if (junicode) type.bookFeatures else "'kern' 1, 'liga' 1, 'onum' 1",
     )
 }
 
@@ -3001,7 +3041,7 @@ fun AyahBlock(
     }
     val searchTargetAyah = flashWordPosition != null
     fun hits(word: Word) =
-        searchQuery != null && word.translation.contains(searchQuery, ignoreCase = true)
+        searchQuery != null && EnglishTypography.fold(word.translation).contains(searchQuery, ignoreCase = true)
     // Non-active ayahs recede while another is being recited. Dim is applied
     // at the word level (Upcoming ink / paper cover) in every mode so ayah
     // handoff does not brighten the verse — block alpha stays at 1 except
@@ -3375,6 +3415,7 @@ fun AyahBlock(
                         text = ayah.translation,
                         query = searchQuery,
                         mark = LocalQuranAccents.current.gold.copy(alpha = 0.28f),
+                        ink = QuranTheme.ink.secondary,
                     ),
                     style = MaterialTheme.typography.bodyLarge.copy(
                         fontFamily = TranslationFontFamily,
@@ -3577,6 +3618,8 @@ private fun GatherOrdinalMark(
                     fontSize = GatherOrdinalSp.sp,
                     lineHeight = GatherOrdinalSp.sp,
                     fontWeight = FontWeight.Bold,
+                    fontFeatureSettings = liningFigures(null),
+                    textMotion = BookTextMotion,
                     textAlign = TextAlign.Center,
                     platformStyle = PlatformTextStyle(includeFontPadding = false),
                     lineHeightStyle = LineHeightStyle(
@@ -3855,10 +3898,11 @@ fun OrnateSurahTitle(
             )
             Text(
                 text = "$chapterNumber · ${nameTransliteration.uppercase()}",
+                // Size before forCaps, which sets Junicode's small caps a step up.
                 style = MaterialTheme.typography.labelSmall.copy(
+                    fontSize = CAPS_LABEL_SIZE,
                     letterSpacing = transliterationSpacing,
-                ),
-                fontSize = CAPS_LABEL_SIZE,
+                ).forCaps(),
                 color = QuranTheme.ink.quiet,
                 textAlign = TextAlign.Center,
                 maxLines = 1,
@@ -3886,15 +3930,13 @@ private val TOP_BAR_ROSETTE_STROKE = 0.45.dp
  * figure between equal rules.
  */
 /**
- * The folio's Western figures: EB Garamond *lining* figures. The book face
- * defaults to old-style, whose 3, 4, 5, 7 and 9 hang below the baseline — right
- * in prose, wrong beside a rule, where a figure must stand level with its
- * partner across the page.
+ * The folio's Western figures stay lining even when Ink Lab selects old-style
+ * figures for prose: each figure must stand level with its partner across the page.
  */
 @Composable
 private fun folioWesternStyle(): TextStyle = MaterialTheme.typography.labelSmall.copy(
     fontSize = FOLIO_WESTERN_SIZE,
-    fontFeatureSettings = "'lnum' 1",
+    fontFeatureSettings = "${MaterialTheme.typography.labelSmall.fontFeatureSettings.orEmpty()}, 'onum' 0, 'lnum' 1",
 )
 
 /**
@@ -3910,12 +3952,14 @@ private fun folioArabicStyle(): TextStyle = TextStyle(
     platformStyle = PlatformTextStyle(includeFontPadding = false),
 )
 
-private val FOLIO_WESTERN_SIZE = 12.sp
+/** Folio figures at Garamond's 12 sp, scaled for the face being set. */
+private val FOLIO_WESTERN_SIZE: TextUnit
+    @Composable get() = typeScale(12.sp)
 
 /**
- * Hafs' Arabic-Indic figures ink shorter than Garamond's lining ones: at the
- * same 12 sp, ٣ stood 5.8 dp against 3's 7.6. 14 sp brings it to ~6.8 dp — a
- * pair across the rule, with the Arabic figure keeping its own proportion.
+ * Hafs' Arabic-Indic figures ink shorter than the lining ones: ٣ stands
+ * 5.8 dp at 12 sp against 3's 7.6. 14 sp brings it to ~6.8 dp — a pair across
+ * the rule, with the Arabic figure keeping its own proportion.
  */
 private val FOLIO_ARABIC_SIZE = 14.sp
 
@@ -4025,8 +4069,8 @@ fun NextChapterFooter(
             Spacer(Modifier.height(ScrollGrid.INVITE_LABEL_TOP))
             Text(
                 text = "NEXT",
-                style = MaterialTheme.typography.labelSmall.copy(letterSpacing = CAPS_TRACKING),
-                fontSize = CAPS_LABEL_SIZE,
+                style = MaterialTheme.typography.labelSmall
+                    .copy(fontSize = CAPS_LABEL_SIZE, letterSpacing = CAPS_TRACKING).forCaps(),
                 color = accents.goldInk,
             )
         }
@@ -4192,8 +4236,8 @@ fun PreviousChapterPullChrome(
     ) {
         Text(
             text = "PREVIOUS",
-            style = MaterialTheme.typography.labelSmall.copy(letterSpacing = CAPS_TRACKING),
-            fontSize = CAPS_LABEL_SIZE,
+            style = MaterialTheme.typography.labelSmall
+                .copy(fontSize = CAPS_LABEL_SIZE, letterSpacing = CAPS_TRACKING).forCaps(),
             color = accents.goldInk,
         )
         Spacer(Modifier.height(ScrollGrid.PULL_LABEL_GAP))

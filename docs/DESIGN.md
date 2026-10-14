@@ -903,48 +903,110 @@ not the app's.
 
 - **Arabic**: KFGQPC HAFS Uthmanic Script — the King Fahd Complex reference
   typeface — at 30 sp base with 1.9 em leading (Uthmani diacritics need air).
-- **English text face**: EB Garamond, bundled (regular, medium, semibold,
-  true italic; latin + latin-ext merged so transliteration diacritics — ḥ, ā,
-  ū — never fall back to a system face). Kerning, ligatures, and old-style
-  figures on in running text (`'kern', 'liga', 'onum'`).
-- **Display face**: Cormorant Garamond semibold for surah titles and
-  headlines, where its tall fine-stroked capitals can breathe.
-- **The reader's hand**: Cormorant Garamond *Italic* at weight 500 for verse
-  notes, and nothing else — the chancery cursive Renaissance scribes wrote
-  marginal glosses in, and the hand italic type was cut from. It is
-  deliberately not EB Garamond Italic: the app's prose is EB Garamond, so its
-  own italic reads as **emphasis** — the same voice leaning — instead of a
-  second person writing on the page. This is a narrow, recorded exception to
-  Cormorant's display-only rule; the 500 weight plus the note's 62 % ink keep
-  the fine strokes from going wispy at note size. The roman Cormorant stays
-  display-only. See [ANNOTATIONS.md](ANNOTATIONS.md).
-- **English lyric mode**: EB Garamond regular, 22 sp with 1.5 em leading.
+- **English text face**: **Junicode 2.226** by Peter S. Baker (SIL OFL 1.1),
+  set as Garamond — a Renaissance roman in Garamond's line, and not a Google
+  font. Timeless was tried before it and removed. Bundled as a subset variable
+  font built by `tools/build_junicode_fonts.py`, one cut for Android (TTF) and
+  web (WOFF2); glyphs it lacks fall back glyph by glyph to EB Garamond (Android
+  `CustomFallbackBuilder`, web font stack), never to a system sans. A page of it
+  is tuned to measure as a page of EB Garamond, unhinted, as Android draws:
+  - *Size* 0.969 of Garamond's scale (`JUNICODE_SIZE`; web `size-adjust:
+    96.9%`): x-heights 0.405 / 0.418 em. Garamond's leading is kept, so the
+    lines keep Garamond's pitch.
+  - *Measure*: Junicode's letters set 2 % narrow of Garamond's design and its
+    word space (0.244 em) 18 % wide, which made equal-length lines that read
+    loose. The target is Garamond *as drawn*: the classic profile uses hinted
+    whole-pixel advances, which set it ~1.5 % narrower than its design, so a
+    design match still fitted 1.7 % less per leaf (764 leaves to 751). The
+    bundled cut pins width 102 (italic 113) and a 0.199 em space: 753 leaves
+    to 751 on a Pixel 10, lines breaking where Garamond's do.
+  - *Colour* (ink per advance × x-height): Regular 400, Medium 520, SemiBold
+    680, Italic 420. Titles take one step lighter.
+  - *Features*, reviewed set by set (`JUNICODE_PROSE` in `Type.kt`): **ss09**
+    old-style figures with a flagged 1 in prose (the default old-style 1 is a
+    small-cap I — "2:I5"); labels, counts, references and verse marks stay
+    lining. **cv33 = 3**, the long-tailed Q, in titles ("Beautiful Quran",
+    Al-Qamar). **c2sc** true small caps with old-style figures for tracked
+    capitals (`forCaps`: chapter line, section labels, ALPHA), set 1.15× so
+    the 0.457 em small caps stay legible. Off: italic swashes (a flourish on
+    every word end), ct/st ligatures (medieval), the runic, insular and
+    abbreviation sets. On the web every rule that sets its own
+    `font-feature-settings` carries `'ss09' 1` (the property replaces, not
+    merges), and canvas text that cannot take features — the rail's verse
+    numbers, the share card's references — stays in EB Garamond.
+  - The font files are reproducible (pinned `SOURCE_DATE_EPOCH`) and their
+    hashes (`JUNICODE_*_SHA`, checked by `JunicodeTypeTest`) key the English
+    book cache, so a new cut is never paginated from the last one's book.
+  Android Latin styles use `TextMotion.Animated` consistently: linear metrics
+  and subpixel glyph placement keep advances stable under stretch overscroll
+  and page transforms. Do not switch rendering modes during a gesture, which
+  would reshape the text. The classic profile retains its previous rendering.
+- **Display face**: Junicode, served one weight step lighter than asked
+  (SemiBold by Medium's 520), with the long-tailed Q.
+- **UI sans**: the system sans for Material's sans slots (see UI text below).
+- **Developer comparison**: Settings → Developer can switch to the previous
+  EB Garamond / Cormorant / system-sans profile and its original type sizes
+  and leading. The English leaf measures and paginates against the selected
+  book face, using the current whole-word rag and full-column bismillah fit.
+  Customize previews and share images follow the selected profile too.
+  Arabic typefaces and sizing stay the same.
+- **The reader's hand**: Junicode's real *Italic* at Medium for verse notes,
+  keeping the book and annotations in one family. The note's colour,
+  placement and slant distinguish the reader's words. The classic developer
+  profile restores Cormorant Garamond Italic and its original 16 sp / 23 sp
+  settings. See [ANNOTATIONS.md](ANNOTATIONS.md).
+- **English lyric mode**: Junicode regular, Garamond's 22 sp at 0.969, with 1.5 em leading.
   It is one flush-left, ragged-right inline paragraph — never a flex/flow row
   of padded word tiles. Natural font spaces, kerning, common ligatures, and
-  old-style figures remain intact across the 45–75-character target measure;
+  old-style figures (flagged 1) remain intact across the 45–75-character target measure;
   the word spans exist only for karaoke paint and interaction. Web uses
   `text-wrap: pretty` as a progressive enhancement and never justifies or
   hyphenates this word-addressable text. Its trailing Hafs verse mark is about
   0.78 em. Web uses a calibrated paint lift for its browser font metrics;
   Compose shares the English prose baseline because Android reports different
   metrics for the verse ornament.
-- **English verse marks**: the Western digits are explicitly EB Garamond; the
+- **English verse marks**: the Western digits are explicitly the book face; the
   ornamental brackets remain Hafs, which supplies their correct cups. Arabic
   verse marks remain entirely in Hafs.
 - **English gloss punctuation**: a display-only period closes each ayah.
   Existing source punctuation is preserved, but capitalization never creates
   an inferred sentence boundary. This policy never mutates the database text
   or the timing/search identity of a word.
-- **Translations**: EB Garamond, 17 sp, 26 sp leading, at 66 % ink.
-- **UI text**: the same serif at small sizes with letterspacing and reduced
-  alpha; labels never compete with scripture. One deliberate exception on
+- **Translations**: Junicode, Garamond's 17 sp at 0.969, 26 sp leading, at 66 % ink.
+- **Typographer's punctuation** (`EnglishTypography.typeset`, web
+  `typesetEnglish`): straight quotes and apostrophes are curled, a spaced
+  hyphen becomes a spaced en dash, and a quotation the source left open at a
+  verse's end is closed — unless the next verse opens by closing it. Display
+  only and one character for one, so search ranges and word spans measured on
+  the stored text still land; matching folds the marks back
+  (`fold` / `foldEnglish`). Surah names and glosses get the curled apostrophe.
+  Word-initial ʿayn marks in names such as ’Imran and ’Aad are apostrophes,
+  never opening quotations. Word alignment accepts straight and curled
+  apostrophes as the same character within a word.
+- **Supplied words**: Sahih International's [brackets] sit at 40 % of the
+  text's ink (`SUPPLIED_BRACKET_INK`); the words inside keep full ink, because
+  they carry meaning.
+- **Weight on dark paper** (Android): light ink on Nightfall and Royal Green
+  runs 30 lighter on the variable axis (wght 370 where paper has 400) in the
+  app and scroll reader (`DARK_PAPER_WEIGHT_EASE`). The measured English leaf,
+  its verse figures, and its italic basmalah keep the same weights on every
+  theme: changing advances would change pagination. Share images are drawn on
+  cream, at paper weights. The web keeps one weight.
+- **English leaf**: Junicode at the hand Garamond's leaf solves to, × 0.969
+  (solved in its own metrics the two-pass fit landed 2 % smaller and a line
+  longer), Garamond's 1.40 em leading divided by 0.969 so the pitch is
+  Garamond's, the 1,180-character reference page and the −0.025 em squeeze.
+  Classic keeps Garamond's own.
+- **UI text**: the same serif at small sizes with reduced alpha, set solid —
+  mixed-case labels, facts, banner names and running heads are never tracked
+  past 0.02 em; only ALL-CAPS labels are letterspaced; labels never compete with scripture. One deliberate exception on
   Android: interactive UI labels that use Material's `labelLarge` — search
   section labels, "Show N more", the search dial's Open, the chapter
-  Continue / Open pill — stay in Material's sans. Set against the serif page
+  Continue / Open pill — stay in the system sans. Set against the serif page
   they read as controls, not as text, and the pairing looked better than an
   all-serif scale (tried and declined in #773). Everything that is read —
   scripture, translation, names, facts, captions — stays serif. Do not "fix"
-  the sans slots back to Garamond.
+  the sans slots back to the serif.
   Settings rows and the Download manager share one scale: **17 / 26**
   bodyLarge for names, **12 / 16** labelSmall for facts and every verb
   (Download, Resume, Pause, Delete, Keep). Reciter verbs sit 16 dp
@@ -968,9 +1030,9 @@ not the app's.
 - **Glossed Arabic ink stands on the column rule**, like the Arabic-only line and
   the translation: the outermost tiles hang their 5 dp side air into the margin.
 - **One caps label** in the chapter view — NEXT, PREVIOUS and the top bar's
-  chapter line: 10 sp EB Garamond, 0.22 em tracking. Lowercase is never tracked
+  chapter line: 10 sp, in Junicode small caps, 0.22 em tracking. Lowercase is never tracked
   beyond 0.02 em.
-- **The Continue / Open pill** keeps Material's sans `labelLarge` (see UI
+- **The Continue / Open pill** keeps the sans `labelLarge` (see UI
   text above); its chevron's 1.6 dp stroke matches the label's stem weight.
 
 Reference points: **Unread** (iOS RSS reader) for chrome-free typographic
@@ -978,7 +1040,9 @@ lists and reading view; **Apple Music lyrics** for the word illumination and
 the recede-while-playing behavior. Running-text rules follow Bringhurst's
 *Elements of Typographic Style* (45–75 character measure, natural word space,
 ragged-right setting, leading proportional to type size) and WCAG's text
-spacing / visual-presentation guidance.
+spacing / visual-presentation guidance. The English mushaf leaf is the
+exception: it is a book page and sets justified, with whole words and
+TeX-style micro-typography (QURAN_TYPOGRAPHY.md §13.5).
 
 ### The scroll grid
 
@@ -999,7 +1063,7 @@ not from local `dp` literals.
   Arabic folio figure. The rail and ribbon live in the margins; text never
   does. Top-bar icons are *placed* onto the rules (offset, not padding), so the
   title slot stays centred; the mushaf leaf keeps its own margins.
-- **Folio figures.** Garamond *lining* figures (old-style 3, 4, 5, 7, 9 hang
+- **Folio figures.** *Lining* figures (old-style 3, 4, 5, 7, 9 hang
   below a rule) and Hafs Arabic-Indic at 14 sp, level with them; the rule runs
   through both figures' ink centre.
 - **Verse rhythm.** 16 dp pad inside each verse, 12 dp between voices within
@@ -1114,7 +1178,7 @@ into empty stages and pushes the answer below the fold.
 
 Arabic and English occupy separate bidi-isolated elements. The Hafs scale is
 44–52 for the held word, 32 for radicals, and 24 for forms and occurrences;
-English uses 24 Cormorant section headings, 17 EB Garamond body/actions, and
+English uses 24 Junicode display section headings, 17 Junicode body/actions, and
 12–14 labels/metadata. Gold identifies Quran references, green identifies
 actions, and neither substitutes for a textual current/open state.
 
@@ -1125,7 +1189,7 @@ divider: it never reaches the sheet edge, never appears between rows, and
 never uses gold.
 
 Classical lexicon (Lane) is still one reading spine, never a card grid: Form
-labels sit as quiet Cormorant lines with ~28 dp before each new Form and
+labels sit as quiet Junicode lines (Cormorant in Classic) with ~28 dp before each new Form and
 ~12 dp between senses inside one Form — no bullet marks. Parenthetical source
 marks (`(S, K)`, `(Msb,)`), editorial tags (`(tropical:)`), and bare
 `see …` cross-refs drop to ~38% ink so the English gloss can be scanned. Do
@@ -1155,12 +1219,16 @@ image, so it is crisp at any density and nearly free to render.
   so the header's whole ornament is this chapter's own. Chapter number
   assigns a distinct frame/interior/corner recipe and a distinct medallion
   structure across all 114 chapters; verse count varies their safe
-  proportions. The same chapter always regrows the same ornament. Border
-  friezes (cover
-  only) come from five band grammars of tooled bindings: a zigzag lattice
-  with pearls in its diamonds, a two-strand cable with pearl eyes, a Hankin
-  strip, a nested lozenge chain, and a khatam chain of small eight-fold
-  stars linked by diamonds. On the cover, the **medallion and field build
+  proportions. The same chapter always regrows the same ornament. The cover's
+  border frieze is one grammar, a **rumi scroll** after the running gold
+  borders of Ottoman and Mamluk illuminated Qur'ans: a vine waves along the
+  band, a split palmette (rumi) springs under each crest and ends in a beak
+  curling back over its own body, vein down its middle, glide-mirrored
+  under each trough, with a pearl between crest and rail. The seed only
+  nudges its proportions. It replaced five geometric grammars (scallops,
+  cable, Hankin strip, lozenge and khatam chains) whose straight crossings
+  and diamonds read as typed ASCII (`x`, `<>`) at band size; keep border
+  line work curved. On the cover, the **medallion and field build
   in real time** — strokes ink themselves in along their length across
   ~3.4 s, field first, then medallion outside-in — so the illumination is
   drawn before the reader's eyes, not stamped; the **border and corner
@@ -1512,7 +1580,7 @@ the Bookmarks index keep their full 44 dp targets and 11 dp cloth.
 
 On Android, that lane is fixed to the viewport: scrolling the chapter list
 must never move the ribbon. It begins beside, and slightly below the top of,
-the single Cormorant “Beautiful Quran” masthead and keeps a small, optically
+the single Junicode “Beautiful Quran” masthead, long-tailed Q (Cormorant in Classic), and keeps a small, optically
 balanced paper gutter on both sides of the ruby cloth. The Chapters masthead
 and settings rosette remain fixed above the scrolling chapter document,
 matching the web composition. The masthead does not repeat the Arabic app
@@ -1546,10 +1614,21 @@ that genuinely earned a result may take the gold accent; connective or merely
 similar words remain ordinary ink. Literal word hits still open with the word
 flash; ayah-level concept and quoted-phrase hits open the verse without
 inventing an Arabic word to highlight.
-Continue listening is the one full-bleed row in the scrolling chapter
-document: its quiet green wash and tap target reach both sheet edges, while
-its bilingual text remains on the same inner English and Arabic rails as the
-chapter rows. Both platforms keep the 28 dp/px outer lane, 26 dp/px number
+**Android:** continue listening no longer takes a persistent top band in the
+scrolling chapter document: the reading place lives in its chapter row, marked
+by the place ribbon in situ. While that row is scrolled out of view a quiet
+green-wash pill — the place ribbon, gold number, and a small-caps CONTINUE flag
+over the chapter row's bilingual identity, set in a rounded wash on the rows'
+own Arabic rail — floats at the bottom (above the gesture inset). It stands
+down entirely while the playback bar is up; the bar owns the bottom paper and
+the two never stack. Once the row sits fully in view for half a second the
+pill — which holds its seat through the wait instead of fading early — flies
+up to the row — resizing onto its exact bounds, squaring its corners, settling
+every inset, then fading to reveal the row — so the row owns the tap, and
+scrolling back down peels it off the top and settles it home again. Flights
+only ever arm off a fully-visible row and cancel the moment it leaves, so
+flings pass through untouched. *Web still shows the persistent Continue band;
+porting the pill is pending.* Both platforms keep the 28 dp/px outer lane, 26 dp/px number
 column, and 4 dp/px name gap; the fixed masthead pairs its title with the same
 30 dp/px gilded rosette Settings affordance.
 
@@ -1675,7 +1754,7 @@ same nine stops as Customize and keeps the current verse on its reading line.
 The mushaf does not respond: its hand is a property of the fixed page grid, not
 a reader preference.
 A live miniature at the top is a faded leaf with a gold hairline — Hafs,
-Garamond, gold verse marks, and the folio — so each choice shows what the
+Junicode, gold verse marks, and the folio — so each choice shows what the
 sheet will look like. The leaf stays pinned at the top while the choices
 scroll; a paper dissolve feathers the scroll edge under the leaf, edge to
 edge across the sheet, so rising rows never clip hard. With verse annotations on, it carries a sample ḥāshiya in the

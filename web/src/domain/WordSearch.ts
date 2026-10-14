@@ -1,6 +1,14 @@
 /** Quran-wide word search — mirrors Android `domain/WordSearch.kt`. */
 
 export const WORD_SEARCH_MAX_HITS = 400
+
+/** `typesetEnglish` (EnglishTypography) undone character for character, for matching typed queries. */
+export function foldEnglish(text: string): string {
+  return /[“”‘’–]/u.test(text)
+    ? text.replace(/[“”]/gu, '"').replace(/[‘’]/gu, "'").replace(/–/gu, '-')
+    : text
+}
+
 export const WORD_SEARCH_MIN_QUERY_LENGTH = 2
 export const WORD_SEARCH_PREVIEW_LIMIT = 3
 
@@ -129,9 +137,10 @@ export function searchTextRelevance(
   query: ParsedSearchQuery,
   allowFuzzy = true,
 ): number {
+  // Display text is typeset (curled quotes, en dashes); match it as typed.
   return searchLowerTextRelevance(
-    text.toLowerCase(),
-    query.text.toLowerCase(),
+    foldEnglish(text).toLowerCase(),
+    foldEnglish(query.text).toLowerCase(),
     query.exactOnly,
     allowFuzzy,
   )
@@ -1351,8 +1360,9 @@ function firstOccurrence(
   wordPrefix = false,
   startAt = 0,
 ): number {
-  const lowerText = text.toLowerCase()
-  const lowerTerm = term.toLowerCase()
+  // Folded character for character: an index here is an index in `text`.
+  const lowerText = foldEnglish(text).toLowerCase()
+  const lowerTerm = foldEnglish(term).toLowerCase()
   let at = lowerText.indexOf(lowerTerm, startAt)
   while (at >= 0) {
     const end = at + term.length

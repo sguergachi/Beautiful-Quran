@@ -192,13 +192,11 @@ class OrnamentGeneratorTest {
                     assertTrue("seal point too far out: $p", p.y in -0.2..1.2)
                 }
             }
-            // The khatam chain's link diamond straddles the period
-            // boundary by design (its far half is completed by the
-            // neighbouring tile when the band repeats), so the x margin
-            // allows for it; y always stays inside the band.
+            // The rumi scroll lies inside one period (its tiles butt
+            // without overlap), and always inside the band.
             for (s in o.border.strokes) {
                 for (p in s.points) {
-                    assertTrue("border x outside period: $p", p.x in -0.2..o.border.period + 0.2)
+                    assertTrue("border x outside period: $p", p.x in -0.001..o.border.period + 0.001)
                     assertTrue("border y outside band: $p", p.y in -0.001..1.001)
                 }
             }
@@ -341,7 +339,7 @@ class OrnamentGeneratorTest {
         val fieldStyles = HashSet<List<OrnamentPoint>>()
         val coverPatterns = HashSet<String>(); val chapterPatterns = HashSet<String>()
         val frames = HashSet<Int>()
-        val borderShapes = HashSet<Int>()
+        val borderPeriods = HashSet<Double>()
         for (seed in 0 until 200) {
             val o = generateCoverOrnament(seed)
             folds.add(o.medallion.fold)
@@ -349,14 +347,14 @@ class OrnamentGeneratorTest {
             coverPatterns.add(o.field.pattern)
             chapterPatterns.add(generateChapterOrnament(seed).field.pattern)
             frames.add(o.field.strokes.first().points.size)
-            borderShapes.add(o.border.strokes.size * 31 + o.border.dots.size)
+            borderPeriods.add(o.border.period)
         }
         assertEquals(setOf(8, 10, 12, 16), folds)
         assertEquals(FIELD_PATTERNS.toSet(), coverPatterns)
         assertEquals((FIELD_PATTERNS + "chamfered lattice").toSet(), chapterPatterns)
         assertEquals(setOf(4, 8, 16), frames)
         assertTrue("expected varied filigree geometry, got $fieldStyles", fieldStyles.size >= 3)
-        assertTrue("expected several border grammars, got $borderShapes", borderShapes.size >= 3)
+        assertTrue("expected the seed to vary the border's proportions", borderPeriods.size >= 3)
     }
 
     @Test
@@ -411,10 +409,14 @@ class OrnamentGeneratorTest {
                     } > 0.02)
                 }
             }
-            for (i in edges.indices) for (j in i + 1 until edges.size) {
-                assertFalse("seed $seed: accidental crossing", crosses(
-                    edges[i].first, edges[i].second, edges[j].first, edges[j].second,
-                ))
+            for (i in edges.indices) {
+                val (a, b) = edges[i]
+                for (j in i + 1 until edges.size) {
+                    val (c, d) = edges[j]
+                    if (maxOf(a.x, b.x) < minOf(c.x, d.x) || maxOf(c.x, d.x) < minOf(a.x, b.x) ||
+                        maxOf(a.y, b.y) < minOf(c.y, d.y) || maxOf(c.y, d.y) < minOf(a.y, b.y)) continue
+                    assertFalse("seed $seed: accidental crossing", crosses(a, b, c, d))
+                }
             }
         }
     }
