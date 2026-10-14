@@ -83,21 +83,26 @@ class LedgerTest(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "provenance"):
             ledger.compile_verse(self.row, self.binding, ai_reviewed=True)
 
-    def test_ai_pilot_reproduces_with_full_population_and_keeps_problem_meanings(self):
+    def test_ai_chapter_reproduces_with_full_population_and_keeps_problem_meanings(self):
         data = ledger.REPO / "data"
         manifest = json.loads((data / "english_alignment_manifest.json").read_text())
         source = data / "english_ai_alignment_ledger.jsonl"
         artifact, coverage = ledger.compile_ledger(source, manifest, allow_partial=True, ai_reviewed=True)
         self.assertEqual((data / "english-ai-alignments.tsv").read_text(), artifact)
         self.assertEqual(json.loads((data / "english_ai_alignment_coverage.json").read_text()), coverage)
-        self.assertEqual((7, 325, 6229), (coverage["ai_reviewed_verses"], coverage["approved_tokens"], coverage["fallback_verses"]))
+        self.assertEqual((67, 2724, 6169), (coverage["ai_reviewed_verses"], coverage["approved_tokens"], coverage["fallback_verses"]))
         self.assertFalse(coverage["semantic_accuracy_established"])
         _, human = ledger.compile_ledger(source, manifest, allow_partial=True)
         self.assertEqual(0, human["approved_verses"])
         rows = {r["verse"]: r for r in map(json.loads, source.read_text().splitlines())}
+        chapter = {k: v for k, v in rows.items() if k.startswith("24:")}
+        self.assertEqual({f"24:{i}" for i in range(1, 65)}, set(chapter))
+        self.assertEqual(2613, sum(len(r["tokens"]) for r in chapter.values()))
         for key, text, owners in [("24:30", "vision", [5]), ("24:31", "vision", [5]),
                 ("24:31", "brothers", [35, 38]), ("24:37", "performance", [10]),
-                ("24:37", "prayer", [11]), ("23:83", "before", [7]), ("9:25", "victory", [2])]:
+                ("24:37", "prayer", [11]), ("24:43", "rain", [14]),
+                ("24:43", "eyesight", [38]), ("24:58", "prayer", [17, 26]),
+                ("24:64", "Knowing", [22]), ("23:83", "before", [7]), ("9:25", "victory", [2])]:
             self.assertEqual(owners, [t["head"] for t in rows[key]["tokens"] if t["text"] == text])
         against = [t for t in rows["9:4"]["tokens"] if t["text"] == "against"]
         self.assertEqual(12, against[0]["head"])
