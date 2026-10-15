@@ -150,7 +150,7 @@ typesetting, lookup selection and wash functions. Every verse loads offline;
 word-card mappings are identical with the toggle on and off. The 832 An-Nur
 timing rows across 13 reciters pass 2,669,366 wash-edge queries, the same number
 of reverse-seek queries and 6,428 repeat-window checks. These verify continuous
-ink and integration, not linguistic accuracy. The 1,504 JVM tests, 12 ledger
+ink and integration, not linguistic accuracy. The JVM suite, 12 ledger
 tests and semantic-gate regression pass.
 
 Al-Furqan adds 1,001 timing rows across the same 13 reciters, passing 1,620,211
