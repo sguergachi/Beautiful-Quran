@@ -3,15 +3,15 @@
   "arabic_slots": 77429,
   "printed_tokens": 158066,
   "manifest_sha256": "86eef80b40775775e71bcbae4ec6902d463a736398c1e3d6566e55bc535a2cae",
-  "approved_verses": 67,
-  "approved_tokens": 2724,
-  "fallback_verses": 6169,
+  "approved_verses": 144,
+  "approved_tokens": 4571,
+  "fallback_verses": 6092,
   "statuses": {
-    "unresolved": 155342,
-    "model_reviewed": 2724
+    "unresolved": 153495,
+    "model_reviewed": 4571
   },
   "approval_policy": "ai_reviewed",
-  "ai_reviewed_verses": 67,
+  "ai_reviewed_verses": 144,
   "semantic_accuracy_established": false,
-  "artifact_sha256": "2924d241ba2f548e0f862548e310e0687a6da62e66abb19756a82a7f7f16abc5"
+  "artifact_sha256": "d46fbe518c70c6ff0501e40cee23568161099b2766268bdee7384314d6c5de14"
 }

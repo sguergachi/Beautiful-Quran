@@ -1,7 +1,7 @@
 # Offline English alignment ledger — v1
 
 This implements the integrity stage of the offline mapping proposal and an
-opt-in AI-reviewed An-Nur translation corpus.
+opt-in AI-reviewed An-Nur and Al-Furqan translation corpus.
 The human-reviewed compiled artifact has **zero approved verses**; all 6,236
 verses still use the mapper by default. The existing 160 selected model adjudications are not
 human review or independent gold. There is no new semantic accuracy claim.
@@ -115,8 +115,9 @@ completeness and binding; linguistic correctness and this source attestation
 remain AI judgments. Silver agreement, drafts, disputed or unresolved decisions
 do not qualify. The default compiler still rejects model review as human approval.
 
-The AI artifact covers **all 64 An-Nur verses / 2,613 printed tokens**, plus
-the retained regression verses 9:4, 9:25 and 23:83: **67 verses / 2,724 tokens**
+The AI artifact covers **all 64 An-Nur verses / 2,613 printed tokens** and
+**all 77 Al-Furqan verses / 1,847 tokens**, plus the retained regression verses
+9:4, 9:25 and 23:83: **144 verses / 4,571 tokens**
 in total. One Codex model (`gpt-6.1-sol`) annotated every token using
 fetched Quran.ai Arabic text, Sahih International, word morphology and Jalalayn
 commentary. This was not an independent second-model review or a blind sample.
@@ -125,19 +126,24 @@ raw replies remain in the private artifact archive. The ledger stores the model'
 decisions, including explicit cues for null-linked additions. Review every token
 against the actual printed edition; bracketed wording can have an Arabic source.
 
-The full chapter's 1,316 actual reader slots were cross-checked in order with
-the fetched surfaces. Source comparison decomposes canonical Unicode forms
+The chapters' 1,316 and 893 actual reader slots were cross-checked in order
+with the fetched surfaces. Source comparison decomposes canonical Unicode forms
 before removing marks and normalizing alef/ya variants; this handles the
 decomposed hamza in 24:11 slot 16. Runtime normalization is unchanged and record
 fingerprints still bind the exact app text and surfaces.
 
 The APK carries only a thin second lookup. Valid human-reviewed rows win; the
-toggle selects AI rows for prose only, with **6,169 fallback verses**. Word cards
+toggle selects AI rows for prose only, with **6,092 fallback verses**. Word cards
 and web remain unchanged. Wash, tapping, repeat and carried-leaf following share
 the selected mapping and preserve the continuous prefix. No model or Quran.ai
 request runs on the phone. Coverage records the AI policy explicitly and keeps
 semantic accuracy unestablished. The other chapters have not been AI-reviewed
 in full.
+
+Al-Furqan's model notes preserve edition-specific additions: 25:22's bracketed
+speaker and 25:77's supplied subject have explicit null links and timing cues.
+The fetched Jalalayn commentary supplies different referents; the ledger binds
+the printed Sahih International edition without resolving that disagreement.
 
 Chapter validation uses the actual DB text with production quote continuation,
 typesetting, lookup selection and wash functions. Every verse loads offline;
@@ -146,6 +152,11 @@ timing rows across 13 reciters pass 2,669,366 wash-edge queries, the same number
 of reverse-seek queries and 6,428 repeat-window checks. These verify continuous
 ink and integration, not linguistic accuracy. The 1,504 JVM tests, 12 ledger
 tests and semantic-gate regression pass.
+
+Al-Furqan adds 1,001 timing rows across the same 13 reciters, passing 1,620,211
+wash-edge queries, the same number of reverse-seek queries and 1,329
+repeat-window checks. All 77 lookup records load from the actual printed text
+offline; word-card mappings again remain identical with the toggle on and off.
 
 ## Evidence still needed
 

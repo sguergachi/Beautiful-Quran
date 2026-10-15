@@ -64,8 +64,8 @@ Settings → Developer → AI-approved English mappings enables it only while
 developer mode is active. Valid human-reviewed records take precedence; absent
 or stale AI rows retain the mapper. Both English wash and tap/follow use the
 same selection. AI decisions never count as human review or blind gold.
-The AI corpus covers every An-Nur translation verse, plus three retained
-regression verses (67 verses / 2,724 printed tokens). Word-by-word mode keeps
+The AI corpus covers every An-Nur and Al-Furqan translation verse, plus three
+retained regression verses (144 verses / 4,571 printed tokens). Word-by-word mode keeps
 its existing mapping path.
 
 > **Quran Foundation Content API.** Android and web use authenticated
