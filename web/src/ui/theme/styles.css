@@ -997,38 +997,35 @@ input[type='search']::-webkit-search-decoration {
   stroke-linecap: round;
 }
 
-/*
- * Continue is one full-width line of the chapter document. Its wash reaches
- * the document edges while its bilingual ink stays on the chapter rails.
- */
-/* Full-bleed wash like Android's fillMaxWidth ContinueRow; the copy stays on
-   the chapter list's columns inside it. */
+/* Android ContinuePill: ribbon, gold number, compact copy and Arabic name
+   inside a quiet 28px wash, inset 16px from the chapter document. */
 .continue-row {
-  --continue-gutter: max(0px, calc((100% - var(--home-max)) / 2));
   width: 100%;
-  margin: 18px 0 16px;
-  padding: 0;
+  max-width: var(--home-max);
+  margin: 18px auto 16px;
+  padding: 0 16px;
 }
 
 .continue {
   position: relative;
-  display: flex;
+  display: grid;
+  grid-template-columns: 28px 26px minmax(0, 1fr) auto;
   align-items: center;
-  justify-content: space-between;
-  gap: 1rem;
+  gap: 4px;
   width: 100%;
   margin: 0;
-  padding: 18px calc(var(--continue-gutter) + var(--home-end-inset) + 4px) 18px
-    calc(
-      var(--continue-gutter) + var(--home-start-inset) +
-        var(--home-number-column) + var(--home-column-gap)
-    );
+  padding: 12px 16px 12px 8px;
   background-color: var(--green-wash);
   color: var(--ink);
   text-align: start;
   min-height: 44px;
-  border-radius: 0;
+  border-radius: 28px;
+  overflow: hidden;
 }
+
+.continue-ribbon { position: relative; width: 28px; height: 40px; }
+.continue-ribbon .verse-ribbon { width: 28px; }
+.continue-number { color: var(--gold-ink); font-size: 13px; }
 
 .continue-copy {
   display: flex;
@@ -1040,19 +1037,30 @@ input[type='search']::-webkit-search-decoration {
 
 .continue-label {
   color: var(--green-quiet);
-  font-size: 0.88rem;
+  font-size: 10px;
+  line-height: 1.2;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
 }
 
 .continue-target {
-  font-size: 1.08rem;
+  display: flex;
+  min-width: 0;
+  white-space: nowrap;
+  font-size: 17px;
+  line-height: 1.4;
   color: var(--ink);
 }
 
+.continue-name { overflow: hidden; text-overflow: ellipsis; }
+.continue-ayah { flex-shrink: 0; color: var(--green-ink); white-space: pre; }
+
 .continue-ar {
   font-family: var(--font-arabic);
-  font-size: clamp(1.2rem, 3.5vw, 1.45rem);
-  color: var(--accent);
-  flex-shrink: 0;
+  font-size: 20px;
+  color: var(--green-ink);
+  margin-inline-start: 8px;
+  white-space: nowrap;
   line-height: 1.2;
 }
 
@@ -1114,7 +1122,7 @@ input[type='search']::-webkit-search-decoration {
 
 @media (hover: hover) {
   .continue:hover {
-    background-color: color-mix(in srgb, var(--green-wash) 82%, var(--accent));
+    background-color: color-mix(in srgb, var(--green-wash) 92%, var(--green-ink));
   }
 }
 

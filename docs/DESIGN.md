@@ -1626,8 +1626,11 @@ up to the row — resizing onto its exact bounds, squaring its corners, settling
 every inset, then fading to reveal the row — so the row owns the tap, and
 scrolling back down peels it off the top and settles it home again. Flights
 only ever arm off a fully-visible row and cancel the moment it leaves, so
-flings pass through untouched. *Web still shows the persistent Continue band;
-porting the pill is pending.* Both platforms keep the 28 dp/px outer lane, 26 dp/px number
+flings pass through untouched. Web uses the same rounded pill in its top
+continue area: a 28 px radius, 16 px outer inset, 40 px green place cloth,
+gold chapter number, CONTINUE flag, and compact bilingual chapter and ayah.
+The shared ribbon is decorative inside one accessible resume button; reading
+and listening retain their separate saved targets. Both platforms keep the 28 dp/px outer lane, 26 dp/px number
 column, and 4 dp/px name gap; the fixed masthead pairs its title with the same
 30 dp/px gilded rosette Settings affordance.
 

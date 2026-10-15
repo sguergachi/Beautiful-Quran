@@ -700,9 +700,14 @@ Below that size nothing changes. Rationale in
    builds its slim in-memory index on demand (never during chapter browsing),
    and scans cooperatively with cancellation so typing stays responsive.
    Its fixed masthead, 30 px gilded Settings rosette, rounded search field,
-   full-width continue wash, and compact 28 / 26 / 4 px chapter grid mirror
+   Android-style continue pills, and compact 28 / 26 / 4 px chapter grid mirror
    the Android Home sheet while the whole composition remains centred at a
    640 px maximum measure.
+   The top continue area uses Android's resting pill geometry: 28 px corners,
+   16 px outer insets, a passive green place ribbon, gold chapter number,
+   small CONTINUE flag, and bilingual chapter identity with the saved ayah.
+   Each pill is one accessible button; long chapter names ellipsize while the
+   ayah stays visible. Reading and listening preserve their separate targets.
    Developer settings expose the same two persisted bookmark treatments as
    Android—a 96 px top-bound ribbon and the *Saved passages* line—while both
    open the same left-hand Bookmarks sheet. The inline line follows the
