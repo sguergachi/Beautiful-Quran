@@ -21,13 +21,18 @@ marketing files and overwrites `/app/` with a 404.
 ## Repeat in the book
 
 The playback repeat button opens a paper modal sheet, matching Settings: a
-right-page sheet on desktop and a full sheet on phones. It offers Android’s
+left-page sheet on desktop and a full sheet on phones. It offers Android’s
 Off, This ayah, Whole surah, A range of ayahs, and From this ayah modes.
 From this ayah counts the opening ayah in the requested number. Done applies
 the choice; Cancel or Escape discards edits and returns focus to the button.
 An active ayah inside a new range continues uninterrupted; a range selected
 while paused or outside its bounds starts at its first ayah. Whole-surah
 repeat includes the chapter’s beginning even when playback began later.
+
+In facing Mushaf mode, Chapters faces a blank page with a return link to the
+kept chapter and ayah. Returning resumes the mounted reader at its previous
+folio. Settings, repeat, and word details always overlay the left page;
+Settings keeps the spread it opened over and returns to it when dismissed.
 
 ## Quick start
 
@@ -40,6 +45,11 @@ npm run typecheck    # tsc alone
 npm run build    # static site → dist/
 npm run build:pages  # → ../_site/app (CI does this on master)
 ```
+
+With Playwright installed, `node scripts/check-book-browser.mjs` checks the
+return page, overlay placement, keyboard ownership, and Settings navigation
+against a running dev server. It uses canonical English verses on synthetic
+folios and does not need the live printed-page service.
 
 Builds and tests are kept short: the type check is incremental (its cache is
 in `node_modules/.cache`) and runs beside the bundle (`scripts/parallel.mjs`);

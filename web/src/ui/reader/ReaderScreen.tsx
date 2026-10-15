@@ -348,6 +348,10 @@ export function ReaderScreen({
   // Keep depth/active correct for the parked empty reader at app start.
   const depth = Math.max(0, stackLayer - READER_LAYER)
   const isTop = stackLayer === READER_LAYER
+  const ownsReaderKeyboard = readerOwnsKeyboard(
+    isTop && !(spread && mushaf && state.stackLayer <= COVER_LAYER),
+    state.rootViewer != null,
+  )
   const readingAyah = scrollReadingAyah(searchTarget?.ayah ?? state.openAyah, focusedAyah, readingScrolled.current,
     state.player.isPlaying && state.player.nowPlaying?.surahId === content?.surah.id)
   useEffect(() => {
@@ -1203,7 +1207,7 @@ export function ReaderScreen({
   // The reading line is the keyboard cursor. Reuse rail jumps so keys get the
   // same progressive mount, focus glide, playback parking, and follow policy.
   useEffect(() => {
-    if (!readerOwnsKeyboard(isTop, state.rootViewer != null) || !content) return
+    if (!ownsReaderKeyboard || !content) return
     const onKeyDown = (event: KeyboardEvent) => {
       if (document.querySelector('dialog[open]')) return
       if (event.defaultPrevented || event.altKey || event.ctrlKey || event.metaKey) return
@@ -1242,8 +1246,7 @@ export function ReaderScreen({
   }, [
     content,
     readingAyah,
-    isTop,
-    state.rootViewer,
+    ownsReaderKeyboard,
     recitingActive,
     togglePlayback,
     onToggleBookmark,
@@ -1574,7 +1577,7 @@ export function ReaderScreen({
         <div className="reader-main">
           {mushaf ? (
             <MushafReader
-              ownsKeyboard={readerOwnsKeyboard(isTop, state.rootViewer != null)}
+              ownsKeyboard={ownsReaderKeyboard}
               activeSurahId={content.surah.id}
               activeAyah={recitingActive ? state.activeAyah : null}
               openAyah={state.openAyah}

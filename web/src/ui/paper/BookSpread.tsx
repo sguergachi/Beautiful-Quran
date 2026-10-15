@@ -1,5 +1,4 @@
 import { useLayoutEffect, useRef, type CSSProperties } from 'react'
-import { MushafStartLeaf } from '../reader/MushafReader'
 import { GeneratedRosette } from '../theme/GeneratedOrnament'
 import { generateCoverOrnament } from '../theme/ornamentGenerator'
 import {
@@ -20,8 +19,7 @@ let titleMedallion: ReturnType<typeof generateCoverOrnament>['medallion'] | null
 
 /**
  * The title page: what the right-hand page shows before a chapter is chosen
- * in the scrolling layout. (In Mushaf layout the book's first page stands
- * there, opposite Chapters.)
+ * in the scrolling layout. Mushaf keeps a quiet return page there.
  */
 export function BookTitlePage() {
   titleMedallion ??= generateCoverOrnament((Math.random() * 0x7fffffff) | 0).medallion
@@ -58,6 +56,9 @@ export function BookSpread({
   leaves,
   stack,
   chapterPage,
+  chaptersPage,
+  returnPageInert,
+  returnPlace,
 }: {
   titlePage: boolean
   versoCovered: boolean
@@ -68,6 +69,10 @@ export function BookSpread({
   stack: StackLayer
   /** Where a scrolling chapter begins; the leaves report their own place. */
   chapterPage: number | null
+  /** Chapters has a blank facing page instead of unrelated scripture. */
+  chaptersPage: boolean
+  returnPageInert: boolean
+  returnPlace: { chapter: string; ayah: number; onReturn: () => void } | null
 }) {
   // How the block's leaves are shared between the two piles. Read here, by
   // the one element that draws them: the app shell does not re-render on a
@@ -112,12 +117,23 @@ export function BookSpread({
           {titlePage && !mushaf ? <BookTitlePage /> : null}
         </div>
       </div>
-      {/* Mushaf layout, no chapter chosen yet: the book's first page stands
-          opposite Chapters, as it does whenever Chapters is showing. */}
-      {titlePage && mushaf ? (
-        <div className="book-start-leaf">
-          <MushafStartLeaf fallback={<BookTitlePage />} />
-        </div>
+      {chaptersPage ? (
+        <section
+          className="book-return-page"
+          aria-label="Reading place"
+          inert={returnPageInert}
+        >
+          {returnPlace ? (
+            <button
+              type="button"
+              className="book-return"
+              onClick={returnPlace.onReturn}
+            >
+              <span>Return to {returnPlace.chapter}</span>
+              <span className="book-return-place">Ayah {returnPlace.ayah}</span>
+            </button>
+          ) : <p>Choose a chapter to begin reading</p>}
+        </section>
       ) : null}
       {/* Mushaf layout: the reader portals the facing leaf in here. */}
       <div className="book-verso-leaf" ref={setVersoLeafSlot} inert={versoCovered} aria-hidden={versoCovered || undefined} />

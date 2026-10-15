@@ -598,15 +598,21 @@ lies (its scrolled list, pinned search bar, rounded field, prompt, icons).
 The sheet itself is hidden while a leaf is in the air (`data-air` on the
 shell, set by `BookSpread` from `useBookAir`), so it is never seen under a
 pile that has not landed. Nothing turns under a sheet laid over the leaves
-(Settings, the word viewer). Before a chapter is chosen `BookSpread` shows
-`MushafStartLeaf`, page 1, opposite Chapters; a word on it opens its
-chapter there.
+(Settings, the word viewer). While Chapters or Bookmarks shows, `BookSpread`
+covers the right page with quiet paper and a return link to the kept chapter
+and ayah. The mounted Mushaf reader keeps its place and is inert and hidden
+under this page. Before any chapter has been read, a short prompt takes the
+return link's place. A saved reading place can reopen its chapter after reload.
 
 **Settings is a loose sheet on the spread** (styles.css,
 `settings-sheet-in` / `-out`): the same `.sheet` element, laid over the
-right-hand page a grid step inside it, coming down from above the window
+left-hand page a grid step inside it, coming down from above the window
 like the word viewer's sheet. `data-laid` marks that it has been on the
-page, so it is only drawn back off a page it was laid on.
+page, so it is only drawn back off a page it was laid on. `settingsOrigin`
+keeps the paper beneath it: Chapters, Bookmarks, or the reader. `underlyingLayer`
+preserves that spread while Settings is open, including when changing reading
+layout. Back and Escape return to that paper. Covered sheets leave the focus
+tree, and repeat uses the same left-page placement.
 
 It replaced eighteen flat strips of DOM hinged in CSS 3D (each a composited
 layer holding a slice of the page): on an RTX 3080 that ran 12–26 frames in
@@ -632,9 +638,8 @@ the mouse (`.entrance-glint`): a difference layer then a dodge layer, tuned
 so the leather is returned unchanged and only gold flares. They need
 `.entrance-front` to be an isolated group.
 Root viewer on the spread: right-clicking a word lays the viewer as a loose
-sheet on the page facing that word (`facingPage`; the leaf passes its side
-through `onHoldWord` into `RootViewerState.origin`), so the word stays in
-sight. `RootViewer` portals into `BookSpread`'s `.book-loose` slot and the
+sheet on the left page, whether the word came from the right or left leaf.
+`RootViewer` portals into `BookSpread`'s `.book-loose` slot and the
 sheet slides down from above the window (`root-sheet-in` / `root-sheet-out`):
 leading edge lifted, a slight skew, a small overrun and settle. No shadow.
 Phones keep the ink bleed inside the reader sheet.

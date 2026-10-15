@@ -8,9 +8,17 @@ import {
   settingsLayerFor,
   sheetAtLayer,
   showPinnedChapterBar,
+  underlyingLayer,
 } from '../stack'
 
 describe('hasReaderOpen', () => {
+  it('keeps Settings on its opening paper, with and without a loaded reader', () => {
+    expect(underlyingLayer(SETTINGS_LAYER, true, COVER_LAYER)).toBe(COVER_LAYER)
+    expect(underlyingLayer(SETTINGS_LAYER, true, READER_LAYER)).toBe(READER_LAYER)
+    expect(underlyingLayer(READER_LAYER, false, COVER_LAYER)).toBe(COVER_LAYER)
+    expect(underlyingLayer(READER_LAYER, true, COVER_LAYER)).toBe(READER_LAYER)
+    expect(underlyingLayer(BOOKMARKS_LAYER, true, READER_LAYER)).toBe(BOOKMARKS_LAYER)
+  })
   it('maps the left-hand layer to the bookmark sheet', () => {
     expect(sheetAtLayer(BOOKMARKS_LAYER, false)).toBe('bookmarks')
     expect(sheetAtLayer(BOOKMARKS_LAYER, true)).toBe('bookmarks')

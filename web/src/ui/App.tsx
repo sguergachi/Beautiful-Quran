@@ -7,6 +7,7 @@ import {
   SETTINGS_LAYER,
   hasReaderOpen,
   showPinnedChapterBar,
+  underlyingLayer,
   type StackLayer,
 } from './paper/stack'
 import { HomeScreen } from './home/HomeScreen'
@@ -68,8 +69,10 @@ export function App() {
       loadLabel: s.loadLabel,
       loadProgress: s.loadProgress,
       stackLayer: s.stackLayer,
+      settingsOrigin: s.settingsOrigin,
       sheet: s.sheet,
       content: s.content,
+      surahs: s.surahs,
       readerOpenRevision: s.readerOpenRevision,
       readingPlace: s.readingPlace,
       bookmarks: s.bookmarks,
@@ -113,7 +116,12 @@ export function App() {
   // Facing leaves: Mushaf layout in a spread, once a chapter is open.
   const leaves =
     spread && state.content != null && state.settings.readingLayout === 'mushaf'
-  const pageLayers = spreadLayers(spread, stack, state.content != null, leaves)
+  const underlay = underlyingLayer(stack, hasReader, state.settingsOrigin)
+  const pageLayers = spreadLayers(spread, stack, state.content != null, leaves, underlay)
+  const returnPlace = state.readingPlace ?? (state.content
+    ? { surahId: state.content.surah.id, ayah: 1 }
+    : { surahId: state.settings.lastReadSurah, ayah: state.settings.lastReadAyah })
+  const returnChapter = state.surahs.find(surah => surah.id === returnPlace.surahId)
   useSheetFocus(state.ready && entranceDone && !isLab, spread, leaves, stack, hasReader, state.readerOpenRevision)
 
   useEffect(() => {
@@ -199,6 +207,7 @@ export function App() {
     <div
       className="app-shell"
       data-stack={stack}
+      data-underlay={underlay}
       data-has-reader={hasReader}
       data-spread={spread ? 'true' : undefined}
       data-playback-pinned={playbackPinned && !spread ? 'true' : undefined}
@@ -227,9 +236,19 @@ export function App() {
               leaves={leaves}
               stack={stack}
               chapterPage={state.content?.ayahs[0]?.page ?? null}
+              chaptersPage={state.settings.readingLayout === 'mushaf' && underlay <= COVER_LAYER}
+              returnPageInert={!entranceDone || stack > COVER_LAYER}
+              returnPlace={returnChapter ? {
+                chapter: returnChapter.nameTransliteration,
+                ayah: returnPlace.ayah,
+                onReturn: () => {
+                  if (state.content) appStore.revealLayer(READER_LAYER)
+                  else appStore.openReading(returnPlace.surahId, returnPlace.ayah)
+                },
+              } : null}
             />
           ) : null}
-          <BookmarksScreen stackLayer={stack} />
+          <BookmarksScreen stackLayer={spread ? underlay : stack} />
           <HomeScreen
             stackLayer={pageLayers.home}
             playbackPinned={playbackPinned && !spread}

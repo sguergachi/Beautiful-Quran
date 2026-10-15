@@ -51,6 +51,7 @@ import {
   SETTINGS_LAYER,
   hasReaderOpen,
   settingsLayerFor,
+  underlyingLayer,
   sheetAtLayer,
   type StackLayer,
 } from '../ui/paper/stack'
@@ -122,6 +123,8 @@ export interface AppState {
   loadProgress: number | null
   /** Paper-stack position: -1 Bookmarks · 0 Chapters · 1 Reader · 2 Settings. */
   stackLayer: StackLayer
+  /** Paper beneath Settings; closing the sheet returns here. */
+  settingsOrigin: StackLayer
   /** Derived top sheet name (for labels / legacy checks). */
   sheet: Sheet
   surahs: Surah[]
@@ -241,6 +244,7 @@ class AppStore {
     loadLabel: 'Opening the book…',
     loadProgress: null,
     stackLayer: COVER_LAYER,
+    settingsOrigin: COVER_LAYER,
     sheet: 'home',
     surahs: [],
     reciters: [],
@@ -389,7 +393,7 @@ class AppStore {
   }
 
   /** Animate / snap the paper stack to a layer. */
-  setStackLayer(layer: number) {
+  setStackLayer(layer: number, settingsOrigin?: StackLayer) {
     const max = settingsLayerFor(this.hasReader())
     const min = this.state.bookmarks.length > 0 ? BOOKMARKS_LAYER : COVER_LAYER
     const stackLayer = Math.max(min, Math.min(max, Math.round(layer))) as StackLayer
@@ -397,16 +401,24 @@ class AppStore {
     const leave = onLeaveReaderSheet(this.state.gathering && leavesReader(
       bookSpreadEnabled(window.matchMedia(BOOK_SPREAD_QUERY).matches, this.state.settings.pagePresentation),
       this.state.stackLayer, stackLayer, this.hasReader(),
+      this.state.settings.readingLayout === 'mushaf',
     ))
     this.set({
       stackLayer,
       sheet,
+      ...(sheet === 'settings' && this.state.sheet !== 'settings'
+        ? { settingsOrigin: settingsOrigin ?? this.state.stackLayer } : {}),
       ...(leave.type === 'exit' ? { gathering: false, gatherSelection: [], shareError: null } : {}),
     })
   }
 
   /** Peel one sheet back (Settings → Reader → Chapters). */
   goBack() {
+    // Settings lies above any word sheet already on the opening page.
+    if (this.state.sheet === 'settings') {
+      this.setStackLayer(underlyingLayer(this.state.stackLayer, this.hasReader(), this.state.settingsOrigin))
+      return
+    }
     // Match Android: only consume back while the bleed is open (not mid-exit).
     if (this.state.rootViewer && !this.state.rootViewerClosing) {
       this.closeRootViewer()
@@ -414,6 +426,7 @@ class AppStore {
     }
     if (this.state.gathering && readerVisible(
       bookSpreadEnabled(window.matchMedia(BOOK_SPREAD_QUERY).matches, this.state.settings.pagePresentation), this.state.stackLayer, this.hasReader(),
+      this.state.settings.readingLayout === 'mushaf',
     )) {
       this.exitGather()
       return
@@ -610,8 +623,9 @@ class AppStore {
     if (layoutChanged && this.state.content && this.state.readingPlace) {
       const { surahId, ayah } = this.state.readingPlace
       const layer = this.state.stackLayer
+      const origin = this.state.settingsOrigin
       this.openReading(surahId, ayah)
-      this.setStackLayer(layer)
+      this.setStackLayer(layer, origin)
     }
   }
 

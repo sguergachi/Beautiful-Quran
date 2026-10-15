@@ -11,7 +11,7 @@ describe('visible paper and keyboard ownership', () => {
 
   it('keeps exposed facing pages usable', () => {
     expect(visibleSheets(true, false, 1, true)).toEqual(['home', 'reader'])
-    expect(visibleSheets(true, false, 2, true)).toEqual(['home', 'settings'])
+    expect(visibleSheets(true, false, 2, true)).toEqual(['settings'])
     expect(visibleSheets(true, false, -1, true)).toEqual(['reader', 'bookmarks'])
   })
 
@@ -24,5 +24,11 @@ describe('visible paper and keyboard ownership', () => {
     expect(bookSpreadEnabled(true, 'facing')).toBe(true)
     expect(bookSpreadEnabled(true, 'single')).toBe(false)
     expect(bookSpreadEnabled(false, 'facing')).toBe(false)
+  })
+
+  it('parks Mushaf scripture while Chapters or Bookmarks faces the return page', () => {
+    expect(visibleSheets(true, true, 0, true)).toEqual(['home'])
+    expect(visibleSheets(true, true, -1, true)).toEqual(['bookmarks'])
+    expect(visibleSheets(true, false, 1, false)).toEqual(['settings'])
   })
 })

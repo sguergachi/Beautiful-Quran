@@ -1,6 +1,6 @@
 import { useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { facingPage, useBookSpread, useLooseSheetSlot } from '../paper/bookSpread'
+import { useBookSpread, useLooseSheetSlot } from '../paper/bookSpread'
 import { SHEET_LAY_SCHEDULE, playFlip } from '../paper/pageTurnSounds'
 import { appStore, useAppSelector, type RootViewerState } from '../../store/appStore'
 import { IconClose, IconVolumeUp } from '../icons/PlaybackIcons'
@@ -128,7 +128,7 @@ function ExplainedHeading({
 /**
  * Root lexicon. On a phone it is an ink bleed over the reader sheet. On the
  * desktop spread it is a loose sheet slid down from the head of the book
- * onto the page facing the word, which stays in sight beside it.
+ * onto the left page, from either leaf.
  */
 export function RootViewer() {
   const rv = useAppSelector((s) => s.rootViewer)
@@ -158,7 +158,7 @@ export function RootViewer() {
 
   if (!rv) return null
   return sheet
-    ? createPortal(<RootViewerBleed closing={closing} rv={rv} page={facingPage(rv.origin)} />, slot)
+    ? createPortal(<RootViewerBleed closing={closing} rv={rv} page="verso" />, slot)
     : <RootViewerBleed closing={closing} rv={rv} />
 }
 
@@ -177,9 +177,11 @@ function RootViewerBleed({
     const root = rootRef.current
     if (!root) return
     const previous = document.activeElement
-    // The facing origin page stays readable; only paper under this leaf is covered.
+    // Loose sheets always cover the left page; the right page stays readable.
     const covered: (Element | null)[] = page
-      ? [document.querySelector<HTMLElement>(page === 'verso' ? '.book-verso-leaf' : '.sheet[data-name="reader"]')]
+      ? [document.querySelector<HTMLElement>('.book-verso-leaf'),
+        document.querySelector<HTMLElement>('.sheet[data-name="home"]'),
+        document.querySelector<HTMLElement>('.sheet[data-name="bookmarks"]')]
       : Array.from(root.parentElement?.children ?? []).filter((node) => node !== root)
     if (page !== 'verso') covered.push(document.querySelector<HTMLElement>('#playback-pin'))
     const saved = covered.filter((node): node is HTMLElement => node instanceof HTMLElement).map((node) => [node, node.inert] as const)

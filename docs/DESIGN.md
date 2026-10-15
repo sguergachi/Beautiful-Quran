@@ -28,16 +28,15 @@ the paper turning down into the gutter. Every sheet has one place in the
 book. The left page is Chapters, and Bookmarks is laid over it. The right
 page is whatever was opened from it: the title page before a chapter is
 chosen, then the chapter. **Settings is a loose sheet**, laid over the
-right-hand page as the word viewer is laid over the page facing its word: it
+left-hand page, as are repeat and the word viewer, from either leaf: it
 comes down onto the page from above the window, a step of the grid smaller
 than the page on every side, and is drawn back up off it. It is not a page
-of the book and turns nothing. (It used to lie on the left beside a
-scrolling chapter and on the right of facing leaves, and then as the book's
-last page, under the whole right-hand pile, where reaching it turned every
-page still to be read.) Customize carries its own preview leaf. A control both
-pages would carry shows once: the page being read keeps Settings, and
-Chapters gives its own up. The book closes from Chapters: a sweep back
-across it, or the strip of its fore-edge, whose mark shows only under a
+of the book and turns nothing. The paper beneath stays where it was, and
+closing Settings returns to that paper. Customize carries its own preview
+leaf. A control both pages would carry shows once: the page being read keeps
+Settings; when Chapters faces its return page, Chapters keeps it. The book
+closes from Chapters: a sweep back across it, or the strip of its fore-edge,
+whose mark shows only under a
 pointer, like the leaves' own.
 
 In **Mushaf** layout the spread is the bound book itself: two facing leaves,
@@ -45,8 +44,8 @@ the odd page on the right and the next on the left (1|2 … 603|604), their
 fifteen lines on one grid. They turn together — the arrow keys, a drag, or a
 strip of either fore-edge whose mark shows only under a pointer; pages run
 right to left, so the left edge is the way on. Chapters is then laid over the
-left leaf on demand, and touching the page still being read, anywhere on it,
-puts it away and does nothing else.
+left leaf on demand. Its facing page is quiet paper with a return link to
+the chapter and ayah being read; choosing that link restores the kept folio.
 
 **One grid for the window (web, tablet and desktop spread).** Everything the
 book is made of is a power of φ times one module *u*, and *u* is the largest that
@@ -73,18 +72,18 @@ air they lie on neither. Nothing is added to a pile that was not turned onto
 it.
 
 **Chapters is the book's first page.** On facing leaves it stands at the
-start, on the left, and the page opposite it is always the book's first
-(Al-Fatihah), before any chapter is chosen and whenever Chapters is turned
-to. Pages run right to left, so at the start the whole block lies on the
-left, under Chapters. Choosing a chapter turns exactly the leaves that come
+start, on the left. The page opposite is blank except for the way back to
+the kept reading place, or a short invitation to choose a chapter before
+the first reading. Pages run right to left, so at the start the whole block
+lies on the left, under Chapters. Choosing a chapter turns exactly the leaves that come
 before it onto the right, as one pile: none for the first spread, nine
 tenths of the book for chapter 60, all of it for the last. Going to Chapters
 turns every leaf read back onto the left, and the pile lands *as* Chapters;
 leaving it, the pile lifts off with Chapters on its face. So the two piles
 are always how far into the book the reader is, and nothing but a turned
 leaf changes them. The place being read is kept while Chapters shows, and
-touching the page opposite it turns back there. A pile is stiffer and slower
-than a leaf: it barely curls, and the whole block takes half as long again
+the return link on the page opposite it turns back there. A pile is stiffer
+and slower than a leaf: it barely curls, and the whole block takes half as long again
 to turn. It turns about the middle of its own thickness, so it starts and
 lands level with the pages. (Chapters used to lie at the far end, under the
 whole left pile, with the reading page left showing beside it: going to it

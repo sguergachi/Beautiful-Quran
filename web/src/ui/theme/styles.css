@@ -7076,8 +7076,8 @@ html[data-entrance='true'] body {
 }
 
 /*
- * Settings is a loose sheet laid over the right-hand page, as the word
- * viewer is laid over the page facing its word: it comes down from above the
+ * Settings is a loose sheet laid over the left-hand page, like every other
+ * overlay: it comes down from above the
  * window onto the page and is drawn back up off it. It is not a page of the
  * book. (On facing leaves it used to be the book's last page, under the
  * whole right-hand pile, and reaching it turned every page still to be
@@ -7086,11 +7086,11 @@ html[data-entrance='true'] body {
 .app-shell[data-spread='true'] .sheet[data-name='settings'] {
   --sheet-inset: calc(var(--u) * 0.382);
   --sheet-off: calc(-100% - var(--page-y) - 2rem);
-  --sheet-skew: 1.3deg;
+  --sheet-skew: -1.3deg;
   top: calc(var(--page-y) + var(--sheet-inset)) !important;
   bottom: calc(var(--page-y) + var(--sheet-inset)) !important;
-  left: calc(50% + var(--u) * 0.618) !important;
-  right: calc(var(--page-outer) + var(--sheet-inset)) !important;
+  left: calc(var(--page-outer) + var(--sheet-inset)) !important;
+  right: calc(50% + var(--u) * 0.618) !important;
   /* Over the sheets, under a turning leaf and the gutter's shade. */
   z-index: 23;
   border-radius: 2px;
@@ -7627,15 +7627,15 @@ html[data-entrance-closing]
   --home-header-top: var(--margin-head);
 }
 
-/* Settings is a right-hand page: spine on its left, fore-edge on its right. */
+/* Settings is a left-hand sheet: fore-edge on its left, spine on its right. */
 .app-shell[data-spread='true'] .sheet[data-name='settings'] .settings {
-  padding-inline: var(--margin-inner) var(--margin-fore);
+  padding-inline: var(--margin-fore) var(--margin-inner);
 }
 
 /* —— One of each thing on a spread ——
  * Both pages are open at once, so a control that both sheets carry shows
  * twice. The page being read keeps Settings; Chapters gives its own up. */
-.app-shell[data-spread='true'][data-has-reader='true'] .home-settings {
+.app-shell[data-spread='true'][data-has-reader='true']:not([data-leaves='true']) .home-settings {
   /* Hidden, not removed: the masthead keeps its height, so Chapters does
      not shift when a chapter is opened beside it. */
   visibility: hidden;
@@ -7741,14 +7741,29 @@ html[data-entrance-closing]
   pointer-events: none;
 }
 
-/* The book's first page, opposite Chapters before any chapter is chosen. */
-.book-start-leaf {
+/* Chapters faces quiet paper and a way back to the kept reading place. */
+.book-return-page {
   position: absolute;
   top: var(--page-y);
   bottom: var(--page-y);
   left: 50%;
   right: var(--page-outer);
   z-index: 3;
+  display: grid;
+  place-content: center;
+  padding: var(--margin-head) var(--margin-fore) var(--margin-foot) var(--margin-inner);
+  background: var(--paper);
+  color: var(--ink-muted);
+  text-align: center;
+}
+
+.book-return { display: grid; gap: 0.75rem; padding: 1rem; font: inherit; color: var(--ink); }
+.book-return-place { color: var(--ink-muted); font-size: 0.9em; }
+
+/* Keep the mounted reader's place, with its controls and scripture covered. */
+.app-shell[data-spread='true'][data-leaves='true']:is([data-underlay='0'], [data-underlay='-1']) .sheet[data-name='reader'] {
+  visibility: hidden;
+  pointer-events: none;
 }
 
 /* On the spread the hand starts from the page, not the window's width;
@@ -7849,7 +7864,7 @@ html[data-entrance-closing]
 
 /* —— Root viewer as a loose sheet (desktop spread) ——
  * Right-clicking a word slides a sheet down from the head of the book onto
- * the page facing that word, so the word stays in sight beside it. The
+ * the left-hand page, from either leaf. The
  * sheet is the root viewer's own contrasting stock, a little smaller than
  * the page it lies on. Nothing casts a shadow: it reads as a sheet by how
  * it moves. It is fed in by its top edge with the leading edge lifted off
@@ -8262,9 +8277,14 @@ html[data-entrance-closing]
     direction: ltr;
   }
 
-  /* Right page. Customize scrolls inside Settings and has its own rule. */
+  /* Settings scrolls at its left fore-edge, including its nested pages. */
   .app-shell[data-spread='true'] .sheet[data-name='settings'] .settings:not(:has(.customize)) {
-    padding-right: calc(var(--margin-fore) - var(--sb));
+    direction: rtl;
+    padding-left: calc(var(--margin-fore) - var(--sb));
+  }
+
+  .app-shell[data-spread='true'] .sheet[data-name='settings'] .settings:not(:has(.customize)) > * {
+    direction: ltr;
   }
 
   /* A scrolling chapter's scroller is only as wide as the text block, which
@@ -8329,12 +8349,15 @@ html[data-entrance-closing]
 }
 
 .app-shell[data-spread='true'] .sheet[data-name='settings'] .customize-sticky {
-  padding-inline: var(--margin-inner) var(--margin-fore);
+  padding-inline: var(--margin-fore) var(--margin-inner);
 }
 
 .app-shell[data-spread='true'] .sheet[data-name='settings'] .customize-scroll {
-  padding-inline: var(--margin-inner) calc(var(--margin-fore) - var(--sb));
+  direction: rtl;
+  padding-inline: calc(var(--margin-fore) - var(--sb)) var(--margin-inner);
 }
+
+.app-shell[data-spread='true'] .sheet[data-name='settings'] .customize-scroll > * { direction: ltr; }
 
 /* Guidance and sharing are lines of ink on the existing page. */
 .sheet:focus, .ink-bleed:focus { outline: none; }
@@ -8411,8 +8434,8 @@ html[data-entrance-closing]
 .app-shell[data-spread='true'] .repeat-sheet {
   --sheet-inset: calc(var(--u) * 0.382);
   --sheet-off: calc(-100% - var(--page-y) - 2rem);
-  --sheet-skew: 1.3deg;
-  inset: calc(var(--page-y) + var(--sheet-inset)) calc(var(--page-outer) + var(--sheet-inset)) calc(var(--page-y) + var(--sheet-inset)) calc(50% + var(--u) * 0.618);
+  --sheet-skew: -1.3deg;
+  inset: calc(var(--page-y) + var(--sheet-inset)) calc(50% + var(--u) * 0.618) calc(var(--page-y) + var(--sheet-inset)) calc(var(--page-outer) + var(--sheet-inset));
   border-radius: 2px;
   transform-origin: 50% 0;
   animation: settings-sheet-in 640ms both;

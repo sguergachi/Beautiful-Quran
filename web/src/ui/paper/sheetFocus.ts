@@ -4,11 +4,11 @@ import { BOOKMARKS_LAYER, COVER_LAYER, settingsLayerFor, sheetAtLayer, type Stac
 
 /** Exposed facing pages stay usable; covered and parked paper leaves the focus tree. */
 export function visibleSheets(spread: boolean, leaves: boolean, stack: StackLayer, hasReader: boolean): string[] {
+  if (stack === settingsLayerFor(hasReader)) return ['settings']
   const names: string[] = []
   if (spreadLayers(spread, stack, hasReader, leaves).home === COVER_LAYER) names.push('home')
-  if (readerVisible(spread, stack, hasReader)) names.push('reader')
+  if (readerVisible(spread, stack, hasReader, leaves)) names.push('reader')
   if (stack === BOOKMARKS_LAYER) names.push('bookmarks')
-  if (stack === settingsLayerFor(hasReader)) names.push('settings')
   return names
 }
 

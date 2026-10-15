@@ -6,7 +6,7 @@ import { BOOKMARKS_LAYER, COVER_LAYER, READER_LAYER, SETTINGS_LAYER, type StackL
  * Tablets and desktop lay the paper stack open as a book, and every sheet has one
  * place in it: Chapters is the left page (Bookmarks is laid over it), and
  * the right page is whatever was opened from it — the title page, the
- * chapter being read, or Settings laid over that.
+ * chapter being read. Loose sheets always lie over the left page.
  * Phones and narrow windows keep the one-sheet-at-a-time deck.
  */
 // Includes the 744px iPad mini in portrait; short phone landscapes stay a deck.
@@ -32,31 +32,37 @@ export function useBookSpread(presentation: PagePresentation = 'facing'): boolea
 
 /**
  * The layer each page believes the stack is on. In a spread the two pages
- * are both on top: Chapters owns the verso until Bookmarks is laid over it,
- * and an open chapter owns the recto until Settings is laid over it.
+ * can both be exposed. Settings keeps the opening spread mounted beneath
+ * its left-hand sheet; covered paper gives up keyboard ownership.
  */
 export function spreadLayers(
   spread: boolean,
   stack: StackLayer,
   hasReader: boolean,
   leaves = false,
+  underlay: StackLayer = stack,
 ): { home: StackLayer; reader: StackLayer } {
   if (!spread) return { home: stack, reader: stack }
   // Mushaf layout fills both pages with facing leaves, so Chapters keeps
   // its real layer there: laid over the verso at layer 0, gone above it.
   // Otherwise nothing above Chapters' own layer covers the left page.
-  const home = !leaves && stack > COVER_LAYER ? COVER_LAYER : stack
+  const home = !leaves && underlay > COVER_LAYER ? COVER_LAYER : underlay
   if (!hasReader) return { home, reader: stack }
   return {
     home,
-    // Under Settings the chapter is a covered page: it gives up the keys.
+    // Settings owns the keys even though the right page remains in sight.
     reader: stack === SETTINGS_LAYER ? SETTINGS_LAYER : READER_LAYER,
   }
 }
 
-/** In a spread the chapter is in sight beside Chapters and Bookmarks; Settings covers it. */
-export function readerVisible(spread: boolean, stack: StackLayer, hasReader: boolean): boolean {
-  return hasReader && (stack === READER_LAYER || (spread && stack < READER_LAYER))
+/** Facing Mushaf leaves give way to the return page while Chapters shows. */
+export function readerVisible(
+  spread: boolean,
+  stack: StackLayer,
+  hasReader: boolean,
+  leaves = false,
+): boolean {
+  return hasReader && (stack === READER_LAYER || (spread && !leaves && stack < READER_LAYER))
 }
 
 export function leavesReader(
@@ -64,8 +70,9 @@ export function leavesReader(
   from: StackLayer,
   to: StackLayer,
   hasReader: boolean,
+  leaves = false,
 ): boolean {
-  return readerVisible(spread, from, hasReader) && !readerVisible(spread, to, hasReader)
+  return readerVisible(spread, from, hasReader, leaves) && !readerVisible(spread, to, hasReader, leaves)
 }
 
 /**
@@ -246,11 +253,6 @@ export const useVersoLeafSlot = versoLeaf.use
 const looseSheet = createSlot()
 export const setLooseSheetSlot = looseSheet.set
 export const useLooseSheetSlot = looseSheet.use
-
-/** A loose sheet is laid on the page facing the one it was called from. */
-export function facingPage(origin: 'recto' | 'verso'): 'recto' | 'verso' {
-  return origin === 'recto' ? 'verso' : 'recto'
-}
 
 /** The leaf in the air during a page turn: across both pages, over the sheets. */
 const turningLeaf = createSlot()
