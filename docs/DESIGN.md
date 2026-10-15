@@ -1615,8 +1615,9 @@ flash; ayah-level concept and quoted-phrase hits open the verse without
 inventing an Arabic word to highlight.
 **Android:** continue listening no longer takes a persistent top band in the
 scrolling chapter document: the reading place lives in its chapter row, marked
-by the place ribbon in situ. While that row is scrolled out of view a quiet
-green-wash pill — the place ribbon, gold number, and a small-caps CONTINUE flag
+by the place ribbon in situ. While that row is scrolled out of view a mint
+pill (`continueWash`, the #774 mint — bands keep the paper-faint `greenWash`,
+but a pill floating over the list must read apart from it) — the place ribbon, gold number, and a small-caps CONTINUE flag
 over the chapter row's bilingual identity, set in a rounded wash on the rows'
 own Arabic rail — floats at the bottom (above the gesture inset). It stands
 down entirely while the playback bar is up; the bar owns the bottom paper and
