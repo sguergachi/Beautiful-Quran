@@ -85,7 +85,7 @@ const { chromium } = await import(process.env.PLAYWRIGHT_MODULE ?? 'playwright')
       cache.pageOfAyah = (s, a) =>
         s === 36 ? 441 + Math.floor((a - 1) / 3) : 1
     })
-    // Settings without a chapter covers Chapters on the left, leaving blank paper right.
+    // Settings without a chapter covers Chapters on the left, keeping the resume page on the right.
     await page.locator('.home-settings').click()
     const settings = page.locator('.sheet[data-name="settings"]')
     await page.waitForTimeout(750)
@@ -300,7 +300,7 @@ const { chromium } = await import(process.env.PLAYWRIGHT_MODULE ?? 'playwright')
         original,
         originalPlace,
         desktop:
-          'blank return page, same folio and ayah, Settings context, all overlays left',
+          'resume page, same folio and ayah, Settings context, all overlays left',
         mobile: 'full page Settings and return to reader',
         errors,
       }),

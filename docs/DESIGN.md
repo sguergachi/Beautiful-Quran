@@ -44,8 +44,8 @@ the odd page on the right and the next on the left (1|2 … 603|604), their
 fifteen lines on one grid. They turn together — the arrow keys, a drag, or a
 strip of either fore-edge whose mark shows only under a pointer; pages run
 right to left, so the left edge is the way on. Chapters is then laid over the
-left leaf on demand. Its facing page is quiet paper with a return link to
-the chapter and ayah being read; choosing that link restores the kept folio.
+left leaf on demand. Its facing page is quiet paper with a gilded medallion,
+bilingual chapter title, kept ayah, and return link; choosing it restores the kept folio.
 
 **One grid for the window (web, tablet and desktop spread).** Everything the
 book is made of is a power of φ times one module *u*, and *u* is the largest that
@@ -72,9 +72,9 @@ air they lie on neither. Nothing is added to a pile that was not turned onto
 it.
 
 **Chapters is the book's first page.** On facing leaves it stands at the
-start, on the left. The page opposite is blank except for the way back to
-the kept reading place, or a short invitation to choose a chapter before
-the first reading. Pages run right to left, so at the start the whole block
+start, on the left. The page opposite presents the kept reading place with
+gilding, the chapter's Arabic and English names, and the ayah. Before the
+first reading it carries the book's title page. Pages run right to left, so at the start the whole block
 lies on the left, under Chapters. Choosing a chapter turns exactly the leaves that come
 before it onto the right, as one pile: none for the first spread, nine
 tenths of the book for chapter 60, all of it for the last. Going to Chapters
@@ -1627,7 +1627,7 @@ up to the row — resizing onto its exact bounds, squaring its corners, settling
 every inset, then fading to reveal the row — so the row owns the tap, and
 scrolling back down peels it off the top and settles it home again. Flights
 only ever arm off a fully-visible row and cancel the moment it leaves, so
-flings pass through untouched. Web uses the same rounded pill in its top
+flings pass through untouched. Web uses the same mint pill in its top
 continue area: a 28 px radius, 16 px outer inset, 40 px green place cloth,
 gold chapter number, CONTINUE flag, and compact bilingual chapter and ayah.
 The shared ribbon is decorative inside one accessible resume button. Only one

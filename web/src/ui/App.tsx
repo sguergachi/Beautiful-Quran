@@ -240,7 +240,9 @@ export function App() {
               returnPageInert={!entranceDone || stack > COVER_LAYER}
               returnPlace={returnChapter ? {
                 chapter: returnChapter.nameTransliteration,
+                arabic: returnChapter.nameArabic,
                 ayah: returnPlace.ayah,
+                ayahCount: returnChapter.ayahCount,
                 onReturn: () => {
                   if (state.content) appStore.revealLayer(READER_LAYER)
                   else appStore.openReading(returnPlace.surahId, returnPlace.ayah)

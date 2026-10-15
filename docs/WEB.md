@@ -600,10 +600,11 @@ The sheet itself is hidden while a leaf is in the air (`data-air` on the
 shell, set by `BookSpread` from `useBookAir`), so it is never seen under a
 pile that has not landed. Nothing turns under a sheet laid over the leaves
 (Settings, the word viewer). While Chapters or Bookmarks shows, `BookSpread`
-covers the right page with quiet paper and a return link to the kept chapter
-and ayah. The mounted Mushaf reader keeps its place and is inert and hidden
-under this page. Before any chapter has been read, a short prompt takes the
-return link's place. A saved reading place can reopen its chapter after reload.
+covers the right page with a quiet resume page: a gilded medallion, Arabic
+chapter title, English name, saved ayah and return link. The mounted Mushaf
+reader keeps its place and is inert and hidden
+under this page. Before any chapter has been read, the book's title page
+invites a chapter choice. A saved reading place can reopen its chapter after reload.
 
 **Settings is a loose sheet on the spread** (styles.css,
 `settings-sheet-in` / `-out`): the same `.sheet` element, laid over the
@@ -707,6 +708,8 @@ Below that size nothing changes. Rationale in
    The top continue area uses Android's resting pill geometry: 28 px corners,
    16 px outer insets, a passive green place ribbon, gold chapter number,
    small CONTINUE flag, and bilingual chapter identity with the saved ayah.
+   Its dedicated `--continue-wash` follows Android PR #871: Paper `#B8EDDB`,
+   Nightfall `#134738`, Royal Green `#1F5141`.
    The single pill is one accessible button; long chapter names ellipsize while
    the ayah stays visible. Reading and listening retain separate saved places,
    with the last-heard place taking priority in the pill.

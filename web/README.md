@@ -29,8 +29,8 @@ An active ayah inside a new range continues uninterrupted; a range selected
 while paused or outside its bounds starts at its first ayah. Whole-surah
 repeat includes the chapter’s beginning even when playback began later.
 
-In facing Mushaf mode, Chapters faces a blank page with a return link to the
-kept chapter and ayah. Returning resumes the mounted reader at its previous
+In facing Mushaf mode, Chapters faces a gilded resume page with the chapter's
+Arabic and English names, kept ayah, and return link. Returning resumes the mounted reader at its previous
 folio. Settings, repeat, and word details always overlay the left page;
 Settings keeps the spread it opened over and returns to it when dismissed.
 
