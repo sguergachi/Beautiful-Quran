@@ -153,6 +153,13 @@ data class QuranAccents(
      * saturated mint. Its chroma belongs to the paper it tints.
      */
     val greenWash: Color,
+    /**
+     * The Continue pill's ground — the #774 mint [greenWash] once was. Too
+     * loud for a full-bleed band (#778 put the band back on paper), but the
+     * pill floats over the chapter list and must read apart from it; at
+     * [greenWash] it was barely a step off the sheet.
+     */
+    val continueWash: Color,
     val embossDark: Color,
     val embossLight: Color,
     /** Warm ink for words the reciter is repeating — a second, orange fade that
@@ -437,6 +444,7 @@ private val LightAccents = QuranAccents(
     greenInk = Color(0xFF2B725F),
     greenQuiet = Color(0xFF5F9C8A),
     greenWash = Color(0xFFE2E4D8),
+    continueWash = Color(0xFFB8EDDB),
     embossDark = Color(0x24000000),
     embossLight = Color(0x59FFFFFF),
     repeatInk = Color(0xFFB4551E),
@@ -454,6 +462,7 @@ private val DarkAccents = QuranAccents(
     greenInk = Color(0xFF8FD3BC),
     greenQuiet = Color(0xFF72AF9A),
     greenWash = Color(0xFF181D19),
+    continueWash = Color(0xFF134738),
     embossDark = Color(0x66000000),
     embossLight = Color(0x1FFFFFFF),
     // Deep saturated orange — reads as warm ink on charcoal/green, not a pale
@@ -489,6 +498,7 @@ private val RoyalGreenAccents = QuranAccents(
     greenInk = Color(0xFF95D9C1),
     greenQuiet = Color(0xFF78B49F),
     greenWash = Color(0xFF133B32),
+    continueWash = Color(0xFF1F5141),
     embossDark = Color(0x66000000),
     embossLight = Color(0x1FFFFFFF),
     // Nightfall's deep orange, not a lighter one solved to this sheet: lifted
