@@ -177,8 +177,9 @@ playback does not resume the chapter-opening clip left by `openSurah` /
 updates when a verse is actually recited — not on open, scroll, or rail jump.
 
 **Continue reading** keeps a separate `lastReadSurah` / `lastReadAyah` at the
-settled scroll verse or Mushaf leaf. It never seeks audio. When the two places
-differ, Chapters offers both reading and listening rows. A Mushaf turn reports
+settled scroll verse or Mushaf leaf. It never seeks audio. Chapters shows one
+green-ribbon continue pill: the last-heard place, matching Android, with the
+reading place as its fallback before any listening. A Mushaf turn reports
 its settled verse to the toolbar and in-chapter search; the loaded listening
 chapter stays identified on the transport when it differs from the paper.
 An explicitly opened verse is kept when it is on either facing leaf, so a link
@@ -700,14 +701,15 @@ Below that size nothing changes. Rationale in
    builds its slim in-memory index on demand (never during chapter browsing),
    and scans cooperatively with cancellation so typing stays responsive.
    Its fixed masthead, 30 px gilded Settings rosette, rounded search field,
-   Android-style continue pills, and compact 28 / 26 / 4 px chapter grid mirror
+   Android-style continue pill, and compact 28 / 26 / 4 px chapter grid mirror
    the Android Home sheet while the whole composition remains centred at a
    640 px maximum measure.
    The top continue area uses Android's resting pill geometry: 28 px corners,
    16 px outer insets, a passive green place ribbon, gold chapter number,
    small CONTINUE flag, and bilingual chapter identity with the saved ayah.
-   Each pill is one accessible button; long chapter names ellipsize while the
-   ayah stays visible. Reading and listening preserve their separate targets.
+   The single pill is one accessible button; long chapter names ellipsize while
+   the ayah stays visible. Reading and listening retain separate saved places,
+   with the last-heard place taking priority in the pill.
    Developer settings expose the same two persisted bookmark treatments as
    Android—a 96 px top-bound ribbon and the *Saved passages* line—while both
    open the same left-hand Bookmarks sheet. The inline line follows the

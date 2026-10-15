@@ -184,6 +184,9 @@ export function HomeScreen({
   const readingSurah = !searching
     ? state.surahs.find((surah) => surah.id === state.settings.lastReadSurah)
     : null
+  // One Android-style place marker: last heard, or reading before any listening.
+  const resumeSurah = continueSurah ?? readingSurah
+  const resumeAyah = continueSurah ? state.settings.lastAyah : state.settings.lastReadAyah
   const depth = Math.max(0, stackLayer - COVER_LAYER)
   const isTop = stackLayer === COVER_LAYER
 
@@ -383,23 +386,14 @@ export function HomeScreen({
                 </div>
               </div>
 
-            {readingSurah ? (
+            {resumeSurah ? (
               <ContinueRow
-                label="Continue reading"
-                surahId={readingSurah.id}
-                ayah={state.settings.lastReadAyah}
-                transliteration={readingSurah.nameTransliteration}
-                arabic={readingSurah.nameArabic}
-                onPrepare={() => prepareChapter(readingSurah.id)}
-              />
-            ) : null}
-            {continueSurah && (continueSurah.id !== readingSurah?.id || state.settings.lastAyah !== state.settings.lastReadAyah) ? (
-              <ContinueRow
-                surahId={continueSurah.id}
-                ayah={state.settings.lastAyah || 1}
-                transliteration={continueSurah.nameTransliteration}
-                arabic={continueSurah.nameArabic}
-                onPrepare={() => prepareChapter(continueSurah.id)}
+                label={continueSurah ? 'Continue listening' : 'Continue reading'}
+                surahId={resumeSurah.id}
+                ayah={resumeAyah}
+                transliteration={resumeSurah.nameTransliteration}
+                arabic={resumeSurah.nameArabic}
+                onPrepare={() => prepareChapter(resumeSurah.id)}
               />
             ) : null}
 
