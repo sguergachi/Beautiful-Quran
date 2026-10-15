@@ -51,6 +51,7 @@ import com.beautifulquran.ui.theme.quietSuppliedBrackets
 import com.beautifulquran.ui.theme.QuranTypePalette
 import com.beautifulquran.ui.theme.LocalQuranTypePalette
 import androidx.compose.ui.text.font.FontStyle
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.style.Hyphens
 import androidx.compose.ui.text.style.LineBreak
@@ -63,6 +64,7 @@ import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.em
@@ -305,17 +307,24 @@ internal fun MushafEnglishSheet(
             ?.proseRunsOn(surahsById) == true
         val resolver = LocalFontFamilyResolver.current
         val direction = LocalLayoutDirection.current
-        val settingState = remember(blocks, wellPx, measurePx, density, resolver, direction, typePalette, justifyLast) {
-            mutableStateOf<EnglishLeafSetting?>(null)
+        val settingKey = remember(blocks, wellPx, measurePx, density, resolver, direction, typePalette, justifyLast) {
+            EnglishLeafSettingKey(
+                blocks.map { if (it is EnglishLeafBlockText.Prose) it.copy(verses = emptyList()) else it },
+                wellPx, measurePx, density, resolver, direction, typePalette, justifyLast,
+            )
+        }
+        val settingState = remember(settingKey) {
+            mutableStateOf(synchronized(EnglishLeafSettings) { EnglishLeafSettings[settingKey] })
         }
         // The pager holds both neighbours. Fit them without blocking a swipe,
         // with a worker-owned measurer rather than the drawing cache below.
         LaunchedEffect(settingState) {
+            if (settingState.value != null) return@LaunchedEffect
             settingState.value = withContext(Dispatchers.Default) {
                 setEnglishLeaf(
                     blocks, wellPx, measurePx, density,
                     TextMeasurer(resolver, density, direction), typePalette, justifyLast,
-                )
+                ).also { synchronized(EnglishLeafSettings) { EnglishLeafSettings[settingKey] = it } }
             }
         }
         val setting = settingState.value ?: return@BoxWithConstraints
@@ -748,6 +757,24 @@ private data class EnglishLeafSetting(
     val leadingEm: Float,
     val lineInkPx: Float,
 )
+
+/** Geometry only: verse tap/wash callbacks belong to this visit, not its measured fit. */
+private data class EnglishLeafSettingKey(
+    val blocks: List<EnglishLeafBlockText>,
+    val wellPx: Float,
+    val measurePx: Float,
+    val density: Density,
+    val resolver: FontFamily.Resolver,
+    val direction: LayoutDirection,
+    val typePalette: QuranTypePalette,
+    val justifyLast: Boolean,
+)
+
+/** Reopening a recent leaf reuses its completed fit; old leaves never retain a whole book. */
+private val EnglishLeafSettings = object : LinkedHashMap<EnglishLeafSettingKey, EnglishLeafSetting>(12, 0.75f, true) {
+    override fun removeEldestEntry(eldest: MutableMap.MutableEntry<EnglishLeafSettingKey, EnglishLeafSetting>?) =
+        size > 12
+}
 
 /**
  * Sets the leaf: the book's hand and the book's leading, then a measurement to

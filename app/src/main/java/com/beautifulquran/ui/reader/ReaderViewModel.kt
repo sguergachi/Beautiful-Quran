@@ -214,6 +214,8 @@ data class MushafUi(
      * notices one moving.
      */
     val measured: Boolean = false,
+    /** The same immutable prose used to paginate this book, already held by the repository. */
+    val englishText: Map<Long, String> = emptyMap(),
 )
 
 /**
@@ -317,13 +319,6 @@ class ReaderViewModel(
     private val _mushaf = MutableStateFlow<MushafUi?>(null)
     val mushaf: StateFlow<MushafUi?> = _mushaf
 
-    /**
-     * The verses that begin on one mushaf leaf — what the English leaf is set
-     * from. A page at a time, and windowed in the repository.
-     */
-    suspend fun leafText(page: Int, text: EnglishLeafText): Map<Long, String> =
-        repository.mushafPageTranslations(page, text)
-
     /** Which English the book in [_mushaf] was paginated for. */
     private var mushafLeafText: EnglishLeafText? = null
 
@@ -372,8 +367,10 @@ class ReaderViewModel(
         mushafJob = viewModelScope.launch {
             val catalog = repository.mushafCatalog()
             val surahs = repository.surahs().associateBy { it.id }
+            val words: Map<Long, String>
             val book = if (rulerFor == null) {
                 val prose = repository.englishVerseProse(text)
+                words = repository.englishVerseText(text)
                 buildEnglishBook(catalog) { surahId, ayah ->
                     prose[quranWordKey(surahId, ayah, 1)] ?: 0
                 }
@@ -397,7 +394,7 @@ class ReaderViewModel(
                         measured = false,
                     )
                 }
-                val words = repository.englishVerseText(text)
+                words = repository.englishVerseText(text)
                 val contentCacheKey = englishBookContentKey(cacheKey, words)
                 val verse = { surahId: Int, ayah: Int ->
                     words[quranWordKey(surahId, ayah, 1)].orEmpty()
@@ -433,7 +430,7 @@ class ReaderViewModel(
                 }
             }
             if (generation != mushafGeneration) return@launch
-            _mushaf.value = MushafUi(catalog, surahs, book, measured = rulerFor != null)
+            _mushaf.value = MushafUi(catalog, surahs, book, measured = rulerFor != null, englishText = words)
         }
     }
 

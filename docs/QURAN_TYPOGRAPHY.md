@@ -666,6 +666,13 @@ Which is what an ebook *is*. A printed book breaks in the same place in every
 copy because every copy is the same size; a book on a screen breaks where that
 screen breaks it, and remembers the screen.
 
+The leaf also keeps its completed fit across visits within the same process.
+It reads the exact prose map that paginated the book instead of loading the
+same verses again per page. A bounded cache holds twelve fits for their styled
+text and layout inputs; it retains no verse tap or wash callbacks. Returning
+to a recent leaf therefore does not wait for a new fit. A different hand,
+measure, well or text still earns its own measurement.
+
 **And the leaf does not ink until its leaves are the right ones.** `MushafUi`
 carries whether the book was measured or counted, and the English sheet fades in
 on it. The leaf still *lays out* while it is false — that is how the well and

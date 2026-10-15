@@ -59,13 +59,22 @@ The moving English leaf edge interpolates between cached source/printed letter
 anchors with one binary search. Exact word boundaries retain their integer map;
 animation never rounds its position to a whole letter.
 
-The pager retains the previous and next English leaves with their loaded prose.
+The measured book carries the repository's existing immutable prose map into
+the pager, so opening a leaf never reloads its text or scans the runtime corpus
+for page membership. The pager retains the previous and next English leaves.
 Each leaf fits its paragraphs on `Dispatchers.Default` with its own text
 measurer, then publishes the finished setting for drawing. Preparing a new
 neighbour therefore does not run paragraph justification on the swipe's UI
 thread. Changing the prose, geometry, type or carried-line setting starts a new
 fit; cancelled work cannot publish over it. The initial opening and distant
 dial landing still defer neighbour composition to protect their first frames.
+
+Twelve recent completed leaf fits stay in a process-local LRU, keyed by the
+styled prose, chapter openings, well, measure, density, font resolver, direction,
+type palette and carried-line setting. Reopening one uses its fit immediately.
+Verse ownership and tap/wash callbacks are rebuilt for the current visit and
+are excluded from this cache. A process restart still restores the book from
+disk and fits its first leaves; a changed layout or text must be measured again.
 
 ### 1. Draw-phase-only animations (zero recomposition fades)
 
