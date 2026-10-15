@@ -15,6 +15,18 @@ describe('visible paper and keyboard ownership', () => {
     expect(visibleSheets(true, false, -1, true)).toEqual(['reader', 'bookmarks'])
   })
 
+  it('keeps left-page controls covered by a word sheet through Settings', () => {
+    expect(visibleSheets(true, false, 1, true, true)).toEqual(['reader'])
+    expect(visibleSheets(true, false, 2, true, true)).toEqual(['settings'])
+    expect(visibleSheets(true, false, -1, true, true)).toEqual(['reader'])
+    expect(visibleSheets(true, true, 1, true, true)).toEqual(['reader'])
+  })
+
+  it('keeps the phone reader available as the word bleed host', () => {
+    expect(visibleSheets(false, false, 1, true, true)).toEqual(['reader'])
+    expect(visibleSheets(false, false, 2, true, true)).toEqual(['settings'])
+  })
+
   it('covers both Mushaf leaves with Settings, and keeps Chapters off an open verso', () => {
     expect(visibleSheets(true, true, 1, true)).toEqual(['reader'])
     expect(visibleSheets(true, true, 2, true)).toEqual(['settings'])

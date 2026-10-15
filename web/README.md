@@ -51,6 +51,12 @@ return page, overlay placement, keyboard ownership, and Settings navigation
 against a running dev server. It uses canonical English verses on synthetic
 folios and does not need the live printed-page service.
 
+`node scripts/check-ui-navigation-browser.mjs` checks live System theme changes,
+word-sheet focus across Settings and screen resizing, and overlay dismissal
+when navigating through chapter controls or browser history.
+It also checks that a Repeat dialog above a word sheet stays usable when
+resizing from facing pages to a phone layout.
+
 Builds and tests are kept short: the type check is incremental (its cache is
 in `node_modules/.cache`) and runs beside the bundle (`scripts/parallel.mjs`);
 `sync-data` does nothing when the canonical files are unchanged; tests share
@@ -143,7 +149,8 @@ reciters when network access is available. No client credentials are needed.
 - The QF word/QCF cache bootstraps once, refreshes from its saved checkpoint
   after six days, and withholds those fields after seven days until it can sync.
 - Click a word to play from there; right-click / long-press opens the Root Word Viewer.
-- Themes: Paper / Nightfall / Royal green (Settings).
+- Themes: Paper / Nightfall / Royal green (Settings). System follows live OS
+  appearance changes, including the browser's theme color.
 - Form controls use [Base UI](https://base-ui.com) primitives (`Select`,
   `Switch`, `Slider`, `Input`) styled to the paper kit in `ui/kit/`.
 - Escape returns through Settings → Reader → Chapters.

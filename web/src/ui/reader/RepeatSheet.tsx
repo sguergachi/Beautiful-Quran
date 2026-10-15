@@ -46,8 +46,20 @@ export function RepeatSheet({
     sheet.showModal()
     return () => {
       sheet.close()
-      if (previous instanceof HTMLElement && previous.isConnected)
+      if (
+        previous instanceof HTMLElement &&
+        previous.isConnected &&
+        !previous.closest('[inert]')
+      ) {
         previous.focus({ preventScroll: true })
+      } else {
+        // A resize may have moved the trigger under the phone's word sheet.
+        const word = document.querySelector<HTMLElement>(
+          '[aria-label="Word meanings"]:not([data-closing="true"])',
+        )
+        if (word && !word.closest('[inert]'))
+          word.focus({ preventScroll: true })
+      }
     }
   }, [])
   const apply = () => {

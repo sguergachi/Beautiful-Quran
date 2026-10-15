@@ -398,6 +398,10 @@ class AppStore {
     const min = this.state.bookmarks.length > 0 ? BOOKMARKS_LAYER : COVER_LAYER
     const stackLayer = Math.max(min, Math.min(max, Math.round(layer))) as StackLayer
     const sheet = deriveSheet(stackLayer, this.hasReader())
+    // Popping Settings reveals its original paper, including an open word sheet.
+    if (this.state.sheet !== 'settings' && (sheet === 'home' || sheet === 'bookmarks')) {
+      this.closeRootViewer(false)
+    }
     const leave = onLeaveReaderSheet(this.state.gathering && leavesReader(
       bookSpreadEnabled(window.matchMedia(BOOK_SPREAD_QUERY).matches, this.state.settings.pagePresentation),
       this.state.stackLayer, stackLayer, this.hasReader(),

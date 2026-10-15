@@ -77,6 +77,7 @@ export function App() {
       readingPlace: s.readingPlace,
       bookmarks: s.bookmarks,
       settings: s.settings,
+      wordSheetOpen: s.rootViewer != null,
     }),
     shallowEqual,
   )
@@ -122,31 +123,38 @@ export function App() {
     ? { surahId: state.content.surah.id, ayah: 1 }
     : { surahId: state.settings.lastReadSurah, ayah: state.settings.lastReadAyah })
   const returnChapter = state.surahs.find(surah => surah.id === returnPlace.surahId)
-  useSheetFocus(state.ready && entranceDone && !isLab, spread, leaves, stack, hasReader, state.readerOpenRevision)
+  useSheetFocus(state.ready && entranceDone && !isLab, spread, leaves, stack, hasReader, state.readerOpenRevision, state.wordSheetOpen)
 
   useEffect(() => {
     void appStore.init()
   }, [])
 
   useEffect(() => {
-    const resolved = resolveTheme(state.settings.themeMode)
-    if (resolved === 'light') document.documentElement.removeAttribute('data-theme')
-    else document.documentElement.setAttribute('data-theme', resolved)
-    if (state.settings.colorSystem === 'legacy') {
-      document.documentElement.dataset.colors = 'legacy'
-    } else {
-      delete document.documentElement.dataset.colors
-    }
+    const apply = () => {
+      const resolved = resolveTheme(state.settings.themeMode)
+      if (resolved === 'light') document.documentElement.removeAttribute('data-theme')
+      else document.documentElement.setAttribute('data-theme', resolved)
+      if (state.settings.colorSystem === 'legacy') {
+        document.documentElement.dataset.colors = 'legacy'
+      } else {
+        delete document.documentElement.dataset.colors
+      }
 
-    // Cover owns theme-color while the leather is up.
-    if (!entranceDone) return
-    const meta = document.querySelector('meta[name="theme-color"]')
-    if (meta) {
-      meta.setAttribute(
-        'content',
-        resolved === 'light' ? '#FAF3E8' : resolved === 'royal_green' ? '#062C24' : state.settings.colorSystem === 'legacy' ? '#0A0B0C' : '#0C0B09',
-      )
+      // Cover owns theme-color while the leather is up.
+      if (!entranceDone) return
+      const meta = document.querySelector('meta[name="theme-color"]')
+      if (meta) {
+        meta.setAttribute(
+          'content',
+          resolved === 'light' ? '#FAF3E8' : resolved === 'royal_green' ? '#062C24' : state.settings.colorSystem === 'legacy' ? '#0A0B0C' : '#0C0B09',
+        )
+      }
     }
+    apply()
+    if (state.settings.themeMode !== 'system') return
+    const preference = window.matchMedia('(prefers-color-scheme: dark)')
+    preference.addEventListener('change', apply)
+    return () => preference.removeEventListener('change', apply)
   }, [state.settings.themeMode, state.settings.colorSystem, entranceDone])
 
   useEffect(() => {
@@ -231,7 +239,7 @@ export function App() {
           {spread ? (
             <BookSpread
               titlePage={state.content == null}
-              versoCovered={!leaves || stack !== READER_LAYER}
+              versoCovered={!leaves || stack !== READER_LAYER || state.wordSheetOpen}
               mushaf={state.settings.readingLayout === 'mushaf'}
               leaves={leaves}
               stack={stack}

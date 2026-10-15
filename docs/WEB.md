@@ -429,7 +429,8 @@ centred phone column, including iPads in portrait and landscape. Customize →
 tablet text more room while retaining the default facing book. The preference
 also drives entrance, root-viewer and gather visibility policies. In the facing
 book, Chapters lies on the verso with Bookmarks laid over it; the recto carries
-the title page, then the Reader, with Settings laid over it in every layout. `App` sets `data-spread` on the shell and hands
+the title page, then the Reader; Settings overlays the left page in every layout.
+`App` sets `data-spread` on the shell and hands
 each page the layer it should believe it is on (`spreadLayers`), so the reader
 stays live — focus follow, keys, rail — while Chapters is also on top; the
 store's real stack layer is untouched. `BookSpread` draws the boards, page
@@ -441,8 +442,14 @@ real layer and covers the verso only at layer 0 (`data-leaves`). Covered
 verso content is inert and hidden from assistive technology; the recto comes
 first in DOM and Tab order. `sheetFocus.ts` makes all fully covered or parked
 sheets inert, hands focus to arriving paper, and restores its previous control
-on return. The word viewer focuses its own paper, makes the leaf beneath it
-inert, and restores the word on close; its facing origin page stays usable.
+on return. It also owns the desktop word sheet's covered pages and portal
+slot, so opening and closing Settings cannot re-enable controls beneath the
+word sheet. The word viewer manages its inline siblings on phones and keeps
+the first focus origin across Strict Mode's effect replay. On close it waits
+until the page is uncovered before restoring focus; navigation to another
+chapter instead focuses the arriving page.
+Native Repeat dialogs stay above the word sheet across screen resizing;
+closing Repeat restores the word sheet if its old trigger is now covered.
 Exposed facing pages remain usable. Only the reading verse's word,
 bookmark and verse number enter Scroll's Tab order; Mushaf has one word cursor
 per leaf. Focused words use left/right to move in their reading direction,
