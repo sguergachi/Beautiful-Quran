@@ -1056,7 +1056,7 @@ internal fun shouldShowContinuePill(
 /**
  * Pill-shaped stand-in for the chapter row: the green place ribbon and a
  * small-caps CONTINUE flag over the same bilingual identity
- * (transliterated name, ayah place, Arabic name) on the quiet green wash,
+ * (transliterated name, ayah place, Arabic name) on the mint [QuranAccents.continueWash],
  * floating over the paper until its row scrolls into view and the pill
  * docks away. No card, elevation, or border — the wash is the container,
  * matching [ReturnToAyahPill]. The ribbon is the shared
@@ -1079,7 +1079,7 @@ private fun ContinuePill(
         verticalAlignment = Alignment.CenterVertically,
         modifier = Modifier
             .padding(horizontal = continueDockMargin(settled))
-            .background(QuranTheme.accents.greenWash, shape)
+            .background(QuranTheme.accents.continueWash, shape)
             // Clip the cloth to the wash so the ribbon's straight-cut ends
             // can never poke past the curve.
             .clip(shape)
