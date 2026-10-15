@@ -57,7 +57,30 @@ src/ui/         paper stack plus Android-mirrored reader/focus/Ink/Fade policy
 src/store/      hand-rolled app store (boundary-only React updates)
 ```
 
-Engines are DOM-free and unit-tested against the Android JVM suites. See
+The ink stack includes Android's gate/cruise/hold tajweed curves (madd,
+ghunnah, waqf and wasl carry-in), ordered English residuals and audio-bound
+orange repeat washes. Tarjīʿ analyzes decoded 8 kHz PCM in a worker: two-sided
+AM/FM cycles, event ownership, per-reciter drama admission and the Hani capture
+profile. Glyph light and the three-radius halo use Android's light-smoothing
+and gamma math. Missing analysis keeps still ink; it never invents a pulse.
+Analysis prepares the current and next clip without delaying playback and
+retains at most twelve feature tracks. Letter widths use Android's uniform
+v1 approximation; exact shaped-letter measurement remains future work.
+
+Pure engines are tested with Android JVM numeric fixtures. An optional native
+browser regression check covers viewport occupancy, pause/seek/residual ink,
+concurrent repeats, audio decoding/worker analysis and a two-clip handoff:
+
+```bash
+# With the dev server running and Playwright available to Node:
+node scripts/check-ink-browser.mjs
+# PLAYWRIGHT_MODULE can point to an installed Playwright index.mjs;
+# CHROMIUM_EXECUTABLE can select a system Chromium.
+```
+
+The browser check uses controlled local audio, so separately audition real
+reciters when network access is available. No client credentials are needed.
+ See
 [`docs/WEB.md`](../docs/WEB.md) for the full plan and quality bar.
 
 ## Notes

@@ -2291,6 +2291,7 @@ button.ayah-mark {
    rules as the orange repeat twin. `--glint` is defined on those themes; the
    transparent fallback keeps a mid-fade overlay invisible if the theme flips. */
 .word-glint-overlay {
+  filter: brightness(var(--glint-light, 1));
   position: absolute;
   inset: 0;
   pointer-events: none;
@@ -2302,11 +2303,11 @@ button.ayah-mark {
 .word-glint-overlay > .word-gloss {
   display: block;
   position: static;
-  color: color-mix(in srgb, var(--glint, transparent) 62%, transparent);
+  color: color-mix(in srgb, var(--glint, transparent) 88%, transparent);
 }
 
 .words[data-lyric='english'] .word-glint-overlay > .word-gloss {
-  color: color-mix(in srgb, var(--glint, transparent) 62%, transparent);
+  color: color-mix(in srgb, var(--glint, transparent) 88%, transparent);
 }
 
 /* Composite the roomy wrapper, never the Arabic glyph itself. Hafs letters
@@ -2326,6 +2327,7 @@ button.ayah-mark {
 /* Tight white-gold outline halo. The wrapper owns animated opacity; only its
    glyph child casts light, so there is no rectangular light layer. */
 .word-glint-halo {
+  filter: brightness(var(--glint-light, 1));
   position: absolute;
   inset: 0;
   pointer-events: none;
@@ -2340,8 +2342,9 @@ button.ayah-mark {
   position: static;
   color: transparent;
   text-shadow:
-    0 0 0.055em color-mix(in srgb, var(--glint, transparent) 36%, transparent),
-    0 0 0.15em color-mix(in srgb, var(--glint, transparent) 18%, transparent);
+    0 0 1.4px color-mix(in srgb, var(--glint, transparent) var(--glint-bloom-alpha, 75%), transparent),
+    0 0 5px color-mix(in srgb, var(--glint, transparent) var(--glint-halo-alpha, 45.14%), transparent),
+    0 0 22.5px color-mix(in srgb, color-mix(in srgb, var(--glint, transparent), #ffc98a 51.95%) var(--glint-veil-alpha, 60%), transparent);
 }
 
 .words[data-lyric='english'] .word-glint-halo > .word-gloss {
@@ -6897,7 +6900,10 @@ html[data-entrance='true'] body {
   /* The whole block's thickness, for the pile in the air during a turn. */
   --book-block: calc(var(--u) * 2);
   /*
-   * Golden page: 1 : φ, φ⁶ u wide. Margins run inner : head : fore-edge :
+   * Pages use at least 80% of the viewport together. Height stays on the
+   * viewport grid independently so wide screens gain reading space without
+   * pushing the head and foot offscreen. At narrower ratios the page is
+   * still golden: 1 : φ, φ⁶ u wide. Margins run inner : head : fore-edge :
    * foot = 1 : φ : φ : φ², which leaves a text block that is itself 1 : φ.
    * The two inner margins make a gutter of 2u, wider than the φu fore-edge
    * so the pages part at the spine. Head and foot also carry the furniture,
@@ -6906,8 +6912,8 @@ html[data-entrance='true'] body {
    * swell together, which kept the block golden but set a small page in
    * margins sized for a large one.)
    */
-  --page-w: calc(var(--u) * 17.944);
-  --page-h: calc(var(--page-w) * var(--phi));
+  --page-w: max(40vw, calc(var(--u) * 17.944));
+  --page-h: calc(var(--u) * 29.034);
   /*
    * Furniture scale: the chrome was drawn phone-sized at u ≈ 27.5px, so on
    * the spread every glyph, label and gap multiplies by u over that instead

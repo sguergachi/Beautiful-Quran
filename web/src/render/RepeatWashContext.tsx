@@ -1,3 +1,4 @@
+import { WordMotionProvider } from './WordMotionContext'
 import { createContext, useContext, type ReactNode } from 'react'
 import { createRepeatWashGate, type RepeatWashGate } from './repeatWashGate'
 import { useMemo } from 'react'
@@ -9,7 +10,7 @@ export function RepeatWashGateProvider({ children }: { children: ReactNode }) {
   const gate = useMemo(() => createRepeatWashGate(), [])
   return (
     <RepeatWashGateContext.Provider value={gate}>
-      {children}
+      <WordMotionProvider>{children}</WordMotionProvider>
     </RepeatWashGateContext.Provider>
   )
 }

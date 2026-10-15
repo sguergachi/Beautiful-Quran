@@ -375,19 +375,26 @@ bounds and never reaches the lines above and below.
 Repeat orange wash: second overlay on the same wash curve; dissolve when
 the repeat chain releases (`InkEngine` + `REPEAT_HIGHLIGHTING.md`).
 
-Fresh-ink glint (Nightfall + Royal Green): a third overlay twin in white gold
-(`--glint`, defined on `[data-theme='dark']` and `[data-theme='royal_green']`)
-that washes in alongside a genuinely new word's first-pass ink — same duration,
-easing, and directional mask — then dissolves to plain recited ink over
-`glintFadeMs` (1 s) once the voice moves on. Gate: `InkEngine.glinting` (word
-half) × `glintEnabled()` in `render/inkWash.ts` (theme half). Repeat events
-always retrigger the glimmer, including when the word starts already revealed;
-an ordinary backward-seek re-entry does not. A transparent duplicate glyph
-supplies the tight two-radius `text-shadow` halo while the crisp overlay keeps
-the directional mask. The halo has no background, box shadow, or filter, and
-overflow remains visible so its edge cannot expose the word box. Same policy
-and color as Android (`QuranAccents.glintInk`); see [GLIMMER.md](GLIMMER.md) for
-the complete layer and visual-verification contract.
+Fresh-ink glint (Nightfall + Royal Green) follows the word's wash and dries
+over `glintFadeMs` after handoff. Arabic tints its single authoritative glyph;
+English uses a masked tint twin. An outline-only halo has Android's tight
+bloom, 5 px halo and warm 22.5 px veil. Acoustic tarjīʿ comes from worker-side
+8 kHz PCM analysis: AM/FM cycle admission, held-note lifecycle, recording
+noise calibration, per-reciter drama and one-event/one-word ownership. The
+pulse is measured from PCM at hop centres, while gain and event identity use
+hop ends. Light uses the 139 ms smoothing filter with speed-aware phase
+compensation, linear-light tint and gamma-correct glow alpha. Pausing dries
+wet ink without spending the word's event gate; unavailable analysis leaves
+still ink. There is no free-running sine fallback.
+
+`useWordWash` and `useRepeatWash` share the lifecycle between Hafs and word
+blocks. The former retains a short residual only into Recited, carries a wasl
+prefix into the next activation, and waits for English predecessors. Repeat
+orange follows each live word's measured dwell and paced feather; residuals
+finish concurrently, and a seek's already-spoken chain is complete immediately.
+This matches Android's newer audio-bound repeat policy rather than the older
+position-queued orange wash. JVM-generated numeric fixtures and the optional
+`web/scripts/check-ink-browser.mjs` check cover the port.
 
 ## 9. UI surface (paper metaphor)
 

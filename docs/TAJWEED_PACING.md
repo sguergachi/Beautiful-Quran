@@ -1,9 +1,9 @@
 # Tajweed-paced ink
 
 **Status: implemented on Android, on by default and tunable behind the Ink Lab's
-"Tajweed pacing" toggle (playbar → Ink Lab → Tajweed tab). The web port
-and measured letter widths are not yet built — the design
-for those lives below.**
+"Tajweed pacing" toggle (playbar → Ink Lab → Tajweed tab). The web port now uses the same gate/cruise/hold engine and tuned defaults,
+including basmalah bands and connected-word carry-in. Measured letter widths
+remain a follow-up on both platforms.**
 
 The shipped model is the **gate / cruise / hold** design in §3. The first
 revision spread every letter by its raw tajweed counts; because word timings
@@ -53,11 +53,11 @@ correct each other: measured total, rule-based shape.
 ## Architecture
 
 One new **pure** module, mirrored on both platforms like the other engines
-(the web port is still to do):
+(implemented on both platforms):
 
 ```
 app/src/main/java/com/beautifulquran/domain/TajweedPacing.kt   (implemented)
-web/src/domain/tajweedPacing.ts                                (pending)
+web/src/domain/tajweedPacing.ts                                (implemented)
 ```
 
 It sits beside `HighlightEngine` (which word, for how long) and feeds

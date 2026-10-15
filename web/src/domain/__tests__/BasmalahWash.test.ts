@@ -7,6 +7,7 @@ import {
   basmalahWashProgress,
 } from '../BasmalahWash'
 import {
+  getTuning,
   prefaceFeather,
   prefaceRampProgress,
   prefaceWashProgress,
@@ -165,7 +166,13 @@ describe('BasmalahWash', () => {
 
   it('is what the preface wash uses, with the clip ramp as fallback', () => {
     expect(prefaceWashProgress(3000, 7000, alafasy)).toBe(
-      basmalahWashProgress(3000, alafasy, 7000),
+      basmalahWashProgress(3000, alafasy, 7000, {
+        madd: getTuning().holdMadd, ghunnah: getTuning().holdGhunnah,
+        waqf: getTuning().holdWaqf, connect: getTuning().holdConnect,
+        cruiseCap: getTuning().cruiseCap, waqfShare: getTuning().waqfShare,
+        waqfLengthScale: getTuning().waqfLengthScale, creep: getTuning().holdCreep,
+        maddAaridWaqf: true,
+      }),
     )
     expect(prefaceWashProgress(3000, 7000, alafasy.slice(0, 3))).toBe(
       prefaceRampProgress(3000, 7000),

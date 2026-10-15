@@ -94,7 +94,7 @@ export interface Settings {
 const DEFAULTS: Settings = {
   reciterId: 1,
   favoriteReciterIds: [1, 2, 3, 4, 5, 6, 7],
-  fontScale: 1,
+  fontScale: 0.95,
   readingMode: 'arabic_english',
   readingLayout: 'scroll',
   pagePresentation: 'facing',

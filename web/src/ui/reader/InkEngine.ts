@@ -1,3 +1,4 @@
+import { tajweedCurve, type PacingCurve } from '../../domain/tajweedPacing'
 /**
  * Visual word-ink policy — port of Android `ui/reader/InkEngine.kt`.
  * Pure decision functions; no DOM.
@@ -18,6 +19,18 @@ export interface InkWord {
 }
 
 export interface InkTuning {
+  tajweedPacing: boolean
+  pacedFeather: number
+  holdMadd: boolean
+  holdGhunnah: boolean
+  holdWaqf: boolean
+  holdConnect: boolean
+  cruiseCap: number
+  waqfShare: number
+  waqfLengthScale: number
+  holdCreep: number
+  waslPrefixMs: number
+  waslHandoff: number
   upcomingAlpha: number
   inkFadeMs: number
   ayahMarkFadeMs: number
@@ -37,6 +50,18 @@ export interface InkTuning {
 }
 
 export const DEFAULT_TUNING: InkTuning = {
+  tajweedPacing: true,
+  pacedFeather: 1.1092,
+  holdMadd: true,
+  holdGhunnah: true,
+  holdWaqf: true,
+  holdConnect: true,
+  cruiseCap: 1.4185,
+  waqfShare: 0.5932,
+  waqfLengthScale: 1,
+  holdCreep: 0.3,
+  waslPrefixMs: 120,
+  waslHandoff: 0.45,
   upcomingAlpha: 0.2661,
   inkFadeMs: 400,
   ayahMarkFadeMs: 400,
@@ -148,6 +173,17 @@ export function sweepMs(
   return Math.min(tuning.maxSweepMs, Math.max(floor, raw))
 }
 
+/** Android InkEngine.pacing: capture the tuned curve once at Active entry. */
+export function pacing(arabic: string, word: ActiveWord, isAyahFinal: boolean, prevArabic?: string, feather?: number): PacingCurve | null {
+  const t = getTuning()
+  if (!t.tajweedPacing) return null
+  return tajweedCurve(arabic, word.durationMs > 0 ? (word.spokenMs ?? word.durationMs) / word.durationMs : 1, {
+    madd: t.holdMadd, ghunnah: t.holdGhunnah, waqf: t.holdWaqf, connect: t.holdConnect,
+    isAyahFinal, cruiseCap: t.cruiseCap, waqfShare: t.waqfShare, waqfLengthScale: t.waqfLengthScale,
+    creep: t.holdCreep,
+  }, prevArabic)?.forWash(feather ?? t.pacedFeather) ?? null
+}
+
 /**
  * Whether the word should wear the fresh-ink glint. Being Active *is* the
  * whole word-side gate — every Active entry re-runs the wash (including
@@ -157,48 +193,6 @@ export function sweepMs(
  */
 export function glinting(state: InkState): boolean {
   return state === InkState.Active
-}
-
-/** How hard live voice energy can swing the glint. Port of Android depth. */
-export const GLINT_RESONANCE_DEPTH = 0.42
-
-/**
- * Free-running carrier under the voice signal (visible without Analyser).
- * Port of Android `InkEngine.GLINT_RESONANCE_SINE`.
- */
-export const GLINT_RESONANCE_SINE = 0.22
-
-/**
- * Soft resonance rate in Hz — mid vocal-vibrato range.
- * Port of Android `InkEngine.GLINT_RESONANCE_HZ`.
- */
-export const GLINT_RESONANCE_HZ = 5.5
-
-/** @deprecated Use GLINT_RESONANCE_SINE. */
-export const GLINT_RESONANCE_AMP = GLINT_RESONANCE_SINE
-
-/**
- * Multiplier for wet-ink glint while a long hold is sustained.
- * Voice energy (vs resting) is primary; free sine keeps a visible floor.
- * Port of Android `InkEngine.glintResonance`.
- */
-export function glintResonance(
-  holding: boolean,
-  phaseSec: number,
-  voiceLevel = 0,
-  resting = 0,
-  depth = GLINT_RESONANCE_DEPTH,
-  sineAmp = GLINT_RESONANCE_SINE,
-  hz = GLINT_RESONANCE_HZ,
-): number {
-  if (!holding) return 1
-  const sine = sineAmp > 0 && hz > 0 ? Math.sin(2 * Math.PI * hz * phaseSec) : 0
-  // Silence must not dim the gold (Visualizer/Analyser unavailable).
-  const voiceDelta =
-    voiceLevel < 0.02 && resting < 0.02
-      ? 0
-      : Math.max(-1, Math.min(1, (voiceLevel - resting) / Math.max(0.04, resting)))
-  return Math.max(0.35, Math.min(1.65, 1 + depth * voiceDelta + sineAmp * sine))
 }
 
 export function prefaceState(isActive: boolean, dimmed: boolean): InkState {
@@ -223,7 +217,12 @@ export function prefaceWashProgress(
   durationMs: number,
   segments?: Segment[] | null,
 ): number {
-  const paced = basmalahWashProgress(positionMs, segments, durationMs)
+  const t = getTuning()
+  const paced = basmalahWashProgress(positionMs, segments, durationMs, t.tajweedPacing ? {
+    madd: t.holdMadd, ghunnah: t.holdGhunnah, waqf: t.holdWaqf, connect: t.holdConnect,
+    cruiseCap: t.cruiseCap, waqfShare: t.waqfShare, waqfLengthScale: t.waqfLengthScale,
+    creep: t.holdCreep, maddAaridWaqf: true,
+  } : null)
   if (paced != null) return paced
   return prefaceRampProgress(positionMs, durationMs)
 }
@@ -271,6 +270,7 @@ export const InkEngine = {
     setTuning(v)
   },
   wordState,
+  pacing,
   inRepeatChain,
   word,
   minSweepFloorMs,

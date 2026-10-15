@@ -1,3 +1,5 @@
+import { WordMotionProvider } from '../../render/WordMotionContext'
+import type { WordMotion } from '../../render/useWordWash'
 import { suppliedWords } from '../../render/suppliedWords'
 import {
   Fragment,
@@ -622,7 +624,7 @@ export function MushafReader({
   const versoPage = turning && !forward ? was.left : now.left
   const live = leafLive(rectoPage)
   return (
-    <>
+    <WordMotionProvider>
       <MushafLeaf page={rectoPage} side="recto" fit={turning && forward ? motion.fromFit : fit} leafRef={rectoRef} {...leafProps}
         live={live} onFit={turning ? noFit : reportFit} />
       {probes}
@@ -673,7 +675,7 @@ export function MushafReader({
             turnSlot,
           )
         : null}
-    </>
+    </WordMotionProvider>
   )
 }
 
@@ -915,7 +917,7 @@ function MushafLeaf({
 
   if (!runtimeMushafCache) return null
   const rows = runtimeMushafCache.pageWords(page) ?? []
-  const { leaf, headSurah, englishAyahs, lastPositions } = mushafLeafModel(page, rows, QuranRepository.surahContent)
+  const { leaf, headSurah, englishAyahs, lastPositions, verseWords } = mushafLeafModel(page, rows, QuranRepository.surahContent)
   // The two opening leaves carry a few short lines, set in the middle of the
   // well; every other leaf hangs its fifteen lines from the head.
   const lines = opening ? leaf.lines.filter((line) => line.tokens.length > 0) : leaf.lines
@@ -1045,6 +1047,10 @@ function MushafLeaf({
                     ) : (
                       <MushafWord
                         token={token}
+                        motion={{ key: `${surahId}:${ayah}:${position}`, timing: owner ? ink.activeWord : null,
+                          isAyahFinal: position === lastPositions.get(`${surahId}:${ayah}`),
+                          previousArabic: verseWords.get(`${surahId}:${ayah}`)?.find(w => w.position === position - 1)?.arabic,
+                          nextArabic: verseWords.get(`${surahId}:${ayah}`)?.find(w => w.position === position + 1)?.arabic }}
                         tabIndex={token === firstToken ? 0 : -1}
                         ink={wordInk}
                         sweepMs={owner ? InkEngine.sweepMs(ink.activeWord, ink.speed) : null}
@@ -1088,6 +1094,7 @@ function MushafLeaf({
  */
 const MushafWord = memo(function MushafWord({
   token,
+  motion,
   ink,
   sweepMs,
   activation,
@@ -1096,6 +1103,7 @@ const MushafWord = memo(function MushafWord({
   tabIndex,
 }: {
   token: MushafToken
+  motion: WordMotion
   ink: InkWord
   sweepMs: number | null
   activation: number
@@ -1112,6 +1120,7 @@ const MushafWord = memo(function MushafWord({
       word={word}
       ink={ink}
       sweepMs={sweepMs}
+      motion={motion}
       activation={activation}
       tabIndex={tabIndex}
       onPlay={onPlay}
@@ -1128,4 +1137,8 @@ const MushafWord = memo(function MushafWord({
   prev.ink.state === next.ink.state &&
   prev.ink.repeat === next.ink.repeat &&
   prev.sweepMs === next.sweepMs &&
-  prev.activation === next.activation)
+  prev.activation === next.activation &&
+  prev.motion.timing === next.motion.timing &&
+  prev.motion.previousArabic === next.motion.previousArabic &&
+  prev.motion.nextArabic === next.motion.nextArabic &&
+  prev.motion.isAyahFinal === next.motion.isAyahFinal)

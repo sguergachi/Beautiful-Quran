@@ -1,4 +1,13 @@
-import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
+import {
+  afterAll,
+  afterEach,
+  beforeAll,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  vi,
+} from 'vitest'
 import type { Reciter, SurahContent } from '../../data/models'
 import type { AudioPrefetcher } from '../audioPrefetch'
 import { wantsGapless5Transport } from '../gaplessPolicy'
@@ -77,7 +86,9 @@ describe('PlayerController event sequences', () => {
 
   it('dismisses an error without changing the verse or playback, then reports another failure', () => {
     const audio = new FakeAudio()
-    const player = new PlayerController(instantPrefetcher(), true, null, () => audio.asAudio())
+    const player = new PlayerController(instantPrefetcher(), true, null, () =>
+      audio.asAudio(),
+    )
     player.loadSurah(content, reciter, 1, { quiet: true, warm: false })
     audio.emit('error')
     const failed = player.getState()
@@ -94,31 +105,31 @@ describe('PlayerController event sequences', () => {
   it('does not resume when pause wins while play is waiting for canplay', async () => {
     const audio = new FakeAudio()
     audio.readyState = 0
-    const player = new PlayerController(
-      instantPrefetcher(),
-      true,
-      null,
-      () => audio.asAudio(),
+    const player = new PlayerController(instantPrefetcher(), true, null, () =>
+      audio.asAudio(),
     )
     player.loadSurah(content, reciter, 1, { quiet: true, warm: false })
 
     const pendingPlay = player.play()
-    expect(player.getState()).toMatchObject({ isPlaying: true, isBuffering: true })
+    expect(player.getState()).toMatchObject({
+      isPlaying: true,
+      isBuffering: true,
+    })
     player.pause()
     audio.emit('canplay')
     await pendingPlay
 
-    expect(player.getState()).toMatchObject({ isPlaying: false, isBuffering: false })
+    expect(player.getState()).toMatchObject({
+      isPlaying: false,
+      isBuffering: false,
+    })
     expect(audio.play).not.toHaveBeenCalled()
   })
 
   it('resumes mid-ayah after pause without rewinding the clip', async () => {
     const audio = new FakeAudio()
-    const player = new PlayerController(
-      instantPrefetcher(),
-      true,
-      null,
-      () => audio.asAudio(),
+    const player = new PlayerController(instantPrefetcher(), true, null, () =>
+      audio.asAudio(),
     )
     player.loadSurah(content, reciter, 1, { quiet: true, warm: false })
     await player.play()
@@ -134,11 +145,8 @@ describe('PlayerController event sequences', () => {
 
   it('keeps Gapless-5 off at non-1× even when the join preference is on', async () => {
     const audio = new FakeAudio()
-    const player = new PlayerController(
-      instantPrefetcher(),
-      true,
-      null,
-      () => audio.asAudio(),
+    const player = new PlayerController(instantPrefetcher(), true, null, () =>
+      audio.asAudio(),
     )
     player.setSpeed(0.75)
     await player.setGapless5Enabled(true)
@@ -162,11 +170,8 @@ describe('PlayerController event sequences', () => {
     audio.load.mockImplementation(() => {
       audio.playbackRate = audio.defaultPlaybackRate
     })
-    const player = new PlayerController(
-      instantPrefetcher(),
-      true,
-      null,
-      () => audio.asAudio(),
+    const player = new PlayerController(instantPrefetcher(), true, null, () =>
+      audio.asAudio(),
     )
     // Preference applied before any clip is loaded (boot path).
     player.setSpeed(0.75)
@@ -202,11 +207,8 @@ describe('PlayerController event sequences', () => {
 
   it('suppresses multiple pause events during an autoplay src swap', async () => {
     const audio = new FakeAudio()
-    const player = new PlayerController(
-      instantPrefetcher(),
-      true,
-      null,
-      () => audio.asAudio(),
+    const player = new PlayerController(instantPrefetcher(), true, null, () =>
+      audio.asAudio(),
     )
     player.loadSurah(content, reciter, 1, { quiet: true, warm: false })
     await player.play()
@@ -246,11 +248,8 @@ describe('PlayerController event sequences', () => {
       throw new Error('NotAllowedError')
     })
 
-    const player = new PlayerController(
-      instantPrefetcher(),
-      true,
-      null,
-      () => audio.asAudio(),
+    const player = new PlayerController(instantPrefetcher(), true, null, () =>
+      audio.asAudio(),
     )
     player.loadSurah(content, reciter, 1, { quiet: true, warm: false })
     await player.play()
@@ -269,17 +268,22 @@ describe('PlayerController event sequences', () => {
     vi.useRealTimers()
   })
 
-  it('does not publish the old clip\'s position under the next verse while its clip loads', async () => {
+  it("does not publish the old clip's position under the next verse while its clip loads", async () => {
     const audio = new FakeAudio()
     const prefetcher = instantPrefetcher()
-    const player = new PlayerController(prefetcher, true, null, () => audio.asAudio())
+    const player = new PlayerController(prefetcher, true, null, () =>
+      audio.asAudio(),
+    )
     player.loadSurah(content, reciter, 1, { quiet: true, warm: false })
     await player.play()
 
     // The next clip is slow to arrive.
     let arrive: (src: string) => void = () => {}
     vi.mocked(prefetcher.ensure).mockImplementationOnce(
-      () => new Promise<string>((resolve) => { arrive = resolve }),
+      () =>
+        new Promise<string>((resolve) => {
+          arrive = resolve
+        }),
     )
     audio.currentTime = 4.5
     audio.ended = true
@@ -288,7 +292,10 @@ describe('PlayerController event sequences', () => {
 
     // The element still holds verse 1, 4.5 s in. That is not verse 2's time.
     audio.emit('timeupdate')
-    expect(player.getState()).toMatchObject({ nowPlaying: { ayah: 2 }, positionMs: 0 })
+    expect(player.getState()).toMatchObject({
+      nowPlaying: { ayah: 2 },
+      positionMs: 0,
+    })
 
     audio.ended = false
     audio.currentTime = 0
@@ -296,16 +303,16 @@ describe('PlayerController event sequences', () => {
     await vi.waitFor(() => expect(audio.play).toHaveBeenCalledTimes(2))
     audio.currentTime = 0.3
     audio.emit('timeupdate')
-    expect(player.getState()).toMatchObject({ nowPlaying: { ayah: 2 }, positionMs: 300 })
+    expect(player.getState()).toMatchObject({
+      nowPlaying: { ayah: 2 },
+      positionMs: 300,
+    })
   })
 
   it('advances on natural ended when gapless path is not used', async () => {
     const audio = new FakeAudio()
-    const player = new PlayerController(
-      instantPrefetcher(),
-      true,
-      null,
-      () => audio.asAudio(),
+    const player = new PlayerController(instantPrefetcher(), true, null, () =>
+      audio.asAudio(),
     )
     player.loadSurah(content, reciter, 1, { quiet: true, warm: false })
     await player.play()
@@ -326,5 +333,38 @@ describe('wantsGapless5Transport', () => {
     expect(wantsGapless5Transport(true, 1.25)).toBe(false)
     expect(wantsGapless5Transport(true, 1.5)).toBe(false)
     expect(wantsGapless5Transport(false, 1)).toBe(false)
+  })
+})
+
+// Exercise the actual controller callbacks without loading a browser-only UMD
+// transport. Every subscriber must receive a coherent verse/clock pair.
+describe('gapless verse-clock publication', () => {
+  it('publishes the new verse, position and duration in one notification', async () => {
+    vi.stubGlobal('Audio', FakeAudio)
+    vi.stubGlobal('navigator', {})
+    const { PlayerController } = await import('../player')
+    const p = new PlayerController(instantPrefetcher(), true, null, () =>
+      new FakeAudio().asAudio(),
+    )
+    p.loadSurah(content, reciter, 1, { quiet: true, warm: false })
+    const internal = p as unknown as {
+      gapless5Enabled: boolean
+      createGapless5Backend(): {
+        handlers: { onTime(ms: number, duration: number, index: number): void }
+      }
+    }
+    internal.gapless5Enabled = true
+    const states: unknown[] = []
+    const unsubscribe = p.subscribe((s) => states.push(s))
+    states.length = 0
+    internal.createGapless5Backend().handlers.onTime(24, 4100, 1)
+    expect(states).toHaveLength(1)
+    expect(states[0]).toMatchObject({
+      nowPlaying: { ayah: 2 },
+      positionMs: 24,
+      durationMs: 4100,
+    })
+    unsubscribe()
+    vi.unstubAllGlobals()
   })
 })
