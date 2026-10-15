@@ -774,8 +774,8 @@ internal fun MushafPager(
     onLeafMetrics: (wellPx: Float, measurePx: Float) -> Unit = { _, _ -> },
     /** Whether the book's leaves were measured — see MushafUi.measured. */
     bookMeasured: Boolean = true,
-    /** The verses that begin on one leaf, a page at a time. English only. */
-    leafText: suspend (Int) -> Map<Long, String> = { emptyMap() },
+    /** The prose the book was paginated from. English only. */
+    leafText: Map<Long, String> = emptyMap(),
     /**
      * The English book's leaves. A Madinah page takes more than one where its
      * English will not fit a leaf at a legible size, so the pager's index is
@@ -1169,7 +1169,6 @@ internal fun MushafPager(
     val onVerseLongPressNow = rememberUpdatedState(onVerseLongPress)
     val onBasmalahClickNow = rememberUpdatedState(onBasmalahClick)
     val onTappedLeafNow = rememberUpdatedState(onTappedLeaf)
-    val leafTextNow = rememberUpdatedState(leafText)
     val paper = MaterialTheme.colorScheme.background
     // Opening a chapter should cost one leaf, not three. Holding a neighbour
     // composed either side is what makes a page turn smooth, but doing it
@@ -1320,30 +1319,10 @@ internal fun MushafPager(
                         }
                     }
                 }
-                // Fetched at the leaf, not inside the sheet, so the two
-                // neighbours the pager already holds have their text in hand
-                // before they are swiped to — and so the leaf's one accessibility
-                // description can be written in the language it is set in.
                 // Every Madinah page the leaf draws from — two or three, since the
                 // English book paginates itself and its leaves do not stop where
                 // the Arabic ones do.
                 val leafPages = bookLeaf?.pages ?: page.page..page.page
-                // Keyed on the loader itself, not only on the leaf: the reader can
-                // change which English the leaf is set from
-                // (`Settings.englishLeafText`), and that hands down a new lambda.
-                // Keyed on the pages alone, the leaf kept the text it had loaded
-                // and the choice did nothing until the page was turned away from
-                // and back.
-                var leafText by remember(leafPages, leafTextNow.value) {
-                    mutableStateOf<Map<Long, String>?>(null)
-                }
-                LaunchedEffect(leafPages, english, leafTextNow.value) {
-                    if (english) {
-                        leafText = buildMap {
-                            leafPages.forEach { putAll(leafTextNow.value(it)) }
-                        }
-                    }
-                }
                 val leafRuns = bookLeaf?.runs.orEmpty()
                 val leafVerses = bookLeaf?.verses.orEmpty()
                 // The Arabic word each verse of the leaf opens with — what a tap on
@@ -1392,7 +1371,7 @@ internal fun MushafPager(
                         append(", Juz ")
                         append(page.juz)
                         val verses = leafText
-                        if (english && verses != null) {
+                        if (english) {
                             leafVerses.forEach { (surahId, ayah) ->
                                 append(". ")
                                 append(verses[quranWordKey(surahId, ayah, 1)].orEmpty())

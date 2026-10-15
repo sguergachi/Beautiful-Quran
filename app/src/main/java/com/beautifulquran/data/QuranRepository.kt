@@ -43,10 +43,6 @@ import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
 import kotlin.math.abs
 
-/** Leaves whose English text is held resident — the page and its neighbours,
- * matching the QCF face window. */
-private const val MUSHAF_LEAF_TEXT_CACHE = 12
-
 private fun Segment.shiftBy(ms: Long) = copy(startMs = startMs + ms, endMs = endMs + ms)
 
 /** Move a legacy edit onto the bundled MP3 clock, keeping its word spacing.
@@ -149,7 +145,6 @@ class QuranRepository(
         mushafCatalog = null
         englishVerseGloss = null
         englishVerseGlossText = null
-        leafTranslationCache.clear()
     }
 
     // @Volatile: read/written from Dispatchers.IO workers. Worst case without
@@ -193,24 +188,6 @@ class QuranRepository(
     /** A verse's translation as the reader sees it; storage and search keep the raw text. */
     private fun translation(surah: Int, ayah: Int, raw: String): String =
         EnglishTypography.typeset(raw, quranWordKey(surah, ayah, 1) in quoteContinues())
-
-    /**
-     * Verse translations for the English leaf, a page at a time.
-     *
-     * Only the chapter the reader opened is loaded ([surahContent]), and a leaf
-     * routinely carries verses of another — juz' 30 puts three chapters on one
-     * page. Held for the whole book these are 6,236 strings retained for the
-     * process lifetime for text no Arabic leaf ever draws, so they are fetched
-     * per page and kept in a window the size of the QCF face cache.
-     */
-    private val leafTranslationCache = object : LinkedHashMap<Int, Map<Long, String>>(
-        /* initialCapacity = */ 16,
-        /* loadFactor = */ 0.75f,
-        /* accessOrder = */ true,
-    ) {
-        override fun removeEldestEntry(eldest: MutableMap.MutableEntry<Int, Map<Long, String>>) =
-            size > MUSHAF_LEAF_TEXT_CACHE
-    }
 
     /** Runs [sql] and maps every row with [map] — the shape of every query here. */
     private fun <T> queryList(sql: String, args: Array<String>? = null, map: (Cursor) -> T): List<T> =
@@ -375,7 +352,7 @@ class QuranRepository(
                 EnglishLeafText.GLOSS -> runtimeViews.getOrBuild(
                     { englishVerseGloss }, { englishVerseGloss = it },
                 ) {
-                    buildMap { forEachGlossVerse(null) { key, chain -> put(key, measure(chain)) } }
+                    buildMap { forEachGlossVerse { key, chain -> put(key, measure(chain)) } }
                 }
             }
         }
@@ -384,40 +361,23 @@ class QuranRepository(
      * The word-by-word gloss of every verse, stitched into a line the way the
      * scrolling reader stitches it ([EnglishTypography.lyricize]) — every
      * Arabic word's own English, in the recitation's own order.
-     *
-     * [page] restricts it to the verses that *begin* on one Madinah leaf, the
-     * same rule [mushafPageTranslations] uses; null walks the whole book, which
-     * is what the pagination needs.
      */
-    private fun forEachGlossVerse(page: Int?, out: (Long, String) -> Unit) {
+    private fun forEachGlossVerse(out: (Long, String) -> Unit) {
         // Word gloss lives in the runtime cache, never in the bundled database.
         val runtime = runtimeMushaf?.snapshotWords().orEmpty()
-        // Page membership also lives there: the bundled qcf_page column is
-        // withheld, so the legacy join below would match nothing. When the
-        // snapshot is fresh the verse set comes from it instead.
-        val pageVerses: Set<Pair<Int, Int>>? = if (page == null || runtime.isEmpty()) null else
-            runtime.values.asSequence()
-                .filter { it.position == 1 && it.qcfPage == page }
-                .map { it.surahId to it.ayahNumber }
-                .toSet()
-        val where = if (page == null || pageVerses != null) "" else
-            "JOIN words f ON f.surah_id = w.surah_id AND f.ayah_number = w.ayah_number " +
-                "AND f.position = 1 AND f.qcf_page = ?"
         val rows = queryList(
             """
             SELECT w.surah_id, w.ayah_number, w.position, w.arabic, w.translation_en
             FROM words w
-            $where
             ORDER BY w.surah_id, w.ayah_number, w.position
             """.trimIndent(),
-            if (pageVerses != null) null else page?.let { arrayOf(it.toString()) },
         ) { c ->
             val key = "${c.getInt(0)}:${c.getInt(1)}:${c.getInt(2)}"
             GlossRow(
                 c.getInt(0), c.getInt(1), c.getString(3),
                 runtime[key]?.translation ?: c.getString(4),
             )
-        }.filter { pageVerses == null || (it.surah to it.ayah) in pageVerses }
+        }
         var surah = -1
         var ayah = -1
         val arabic = ArrayList<String>()
@@ -463,7 +423,7 @@ class QuranRepository(
                 EnglishLeafText.GLOSS -> runtimeViews.getOrBuild(
                     { englishVerseGlossText }, { englishVerseGlossText = it },
                 ) {
-                    buildMap { forEachGlossVerse(null) { key, chain -> put(key, chain) } }
+                    buildMap { forEachGlossVerse { key, chain -> put(key, chain) } }
                 }
             }
         }
@@ -477,68 +437,6 @@ class QuranRepository(
         val arabic: String,
         val gloss: String,
     )
-
-    /**
-     * The translation of every verse that *begins* on one Madinah page, keyed
-     * by [quranWordKey] at position 1.
-     *
-     * This is what the English leaf is set from, and the join says the rule:
-     * a verse belongs to the leaf its first word falls on, because a sentence
-     * cannot be cut at a page break (see `domain/EnglishLeaf.kt`). At most
-     * forty rows, so the query is small; the window is what keeps a swipe from
-     * going back to SQLite for a leaf the reader has just turned away from and
-     * is about to turn back to.
-     */
-    suspend fun mushafPageTranslations(
-        page: Int,
-        text: EnglishLeafText = EnglishLeafText.TRANSLATION,
-    ): Map<Long, String> =
-        withContext(Dispatchers.IO) {
-            if (text == EnglishLeafText.GLOSS) {
-                return@withContext buildMap { forEachGlossVerse(page) { k, v -> put(k, v) } }
-            }
-            runtimeViews.getOrBuild(
-                { leafTranslationCache[page] }, { leafTranslationCache[page] = it },
-            ) {
-                // A verse belongs to the leaf its first word falls on, and that
-                // page membership lives in the runtime QCF snapshot: the bundled
-                // qcf_page column is withheld. Fall back to the legacy join only
-                // when no snapshot is fresh (a bundling test database).
-                val runtime = runtimeMushaf?.snapshotWords().orEmpty()
-                val verses = if (runtime.isEmpty()) {
-                    queryList(
-                        """
-                        SELECT a.surah_id, a.ayah_number, a.translation_en
-                        FROM ayahs a
-                        JOIN words w
-                          ON w.surah_id = a.surah_id AND w.ayah_number = a.ayah_number
-                        WHERE w.position = 1 AND w.qcf_page = ?
-                        """.trimIndent(),
-                        arrayOf(page.toString()),
-                    ) { c ->
-                        quranWordKey(c.getInt(0), c.getInt(1), 1) to
-                            translation(c.getInt(0), c.getInt(1), c.getString(2))
-                    }.toMap()
-                } else {
-                    val begun = runtime.values.asSequence()
-                        .filter { it.position == 1 && it.qcfPage == page }
-                        .map { it.surahId to it.ayahNumber }
-                        .toList()
-                    if (begun.isEmpty()) emptyMap() else queryList(
-                        """
-                        SELECT a.surah_id, a.ayah_number, a.translation_en
-                        FROM ayahs a
-                        WHERE (a.surah_id, a.ayah_number) IN (${begun.joinToString(",") { "(?,?)" }})
-                        """.trimIndent(),
-                        begun.flatMap { listOf(it.first.toString(), it.second.toString()) }.toTypedArray(),
-                    ) { c ->
-                        quranWordKey(c.getInt(0), c.getInt(1), 1) to
-                            translation(c.getInt(0), c.getInt(1), c.getString(2))
-                    }.toMap()
-                }
-                verses
-            }
-        }
 
     /**
      * Resolves user bookmark keys to their immutable Quran text and chapter

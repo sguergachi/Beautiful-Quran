@@ -213,23 +213,32 @@ class EnglishBookCache internal constructor(private val dir: File) {
          * 31: the typeface profiles key their own books (bookCacheSuffix).
          * 32: Timeless removed; Junicode is the book face. Its suffix now
          * carries the font files' hashes and every constant that moves a line.
+         * 33: the basmalah is set on the page pitch with quarter-pitch air.
+         * 34: the leaf is justified (EnglishJustify), and the ruler counts the
+         * justified setting's lines, which hold more than ragged ones.
+         * 35: the ruler searches past an overflowing prefix when later words
+         * can close a line in the justified setting.
+         * 36: combine the justified book with 33's basmalah slot; the old 35
+         * book was measured with the previous fixed-air opening.
          */
-        const val FORMAT = 32
+        const val FORMAT = 36
         const val MAX_LEAVES = 10_000
         const val MAX_RUNS = 20_000
     }
 }
 
-/** Adds the exact prose to the pagination identity without putting QF text in a file name. */
+/** Hashes the complete layout and prose identity into a bounded cache filename. */
 internal fun englishBookContentKey(base: String, verses: Map<Long, String>): String {
     val digest = MessageDigest.getInstance("SHA-256")
+    digest.update(base.toByteArray(StandardCharsets.UTF_8))
+    digest.update(0)
     verses.toSortedMap().forEach { (key, text) ->
         digest.update(key.toString().toByteArray(StandardCharsets.UTF_8))
         digest.update(0)
         digest.update(text.toByteArray(StandardCharsets.UTF_8))
         digest.update(0)
     }
-    return "$base-${digest.digest().joinToString("") { byte ->
+    return digest.digest().joinToString("") { byte ->
         byte.toUByte().toString(16).padStart(2, '0')
-    }}"
+    }
 }

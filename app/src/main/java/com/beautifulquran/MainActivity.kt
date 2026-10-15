@@ -104,6 +104,7 @@ import androidx.compose.ui.text.TextMeasurer
 import com.beautifulquran.ui.reader.MushafBelowLeaf
 import com.beautifulquran.ui.reader.LocalMushafBannerStyle
 import com.beautifulquran.ui.reader.MushafPageMargin
+import com.beautifulquran.ui.reader.englishJustifyAudit
 import com.beautifulquran.ui.reader.englishLeafSlotPx
 import com.beautifulquran.ui.reader.englishLeafRuler
 import com.beautifulquran.data.QuranDatabase
@@ -525,6 +526,35 @@ private fun PaperStackApp(
                 database = QuranDatabase.DB_FILE_NAME,
             ) + typePalette.bookCacheSuffix,
         )
+    }
+    // Debug only: `run-as … touch files/justify_audit` and the measured book
+    // is audited once for how evenly the leaf justifies (englishJustifyAudit).
+    if (BuildConfig.DEBUG) {
+        val auditUi by readerViewModel.mushaf.collectAsStateWithLifecycle()
+        LaunchedEffect(auditUi?.measured, bookTypeface) {
+            val ui = auditUi ?: return@LaunchedEffect
+            val flag = java.io.File(app.filesDir, "justify_audit")
+            if (!ui.measured || !flag.exists()) return@LaunchedEffect
+            val metrics = app.settings.leafMetrics(windowSize.width, windowSize.height)
+                ?: return@LaunchedEffect
+            val words = app.repository.englishVerseText(settings.englishLeafText)
+            flag.delete()
+            val report = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) {
+                englishJustifyAudit(
+                    book = ui.englishBook,
+                    surahsById = ui.surahsById,
+                    wellPx = metrics[0],
+                    measurePx = metrics[1],
+                    density = leafDensity,
+                    measurer = leafMeasurer,
+                    typePalette = typePalette,
+                    verseNumberScript = settings.verseNumberScript,
+                    translation = { s, a -> words[com.beautifulquran.domain.quranWordKey(s, a, 1)].orEmpty() },
+                )
+            }
+            java.io.File(app.filesDir, "justify_audit.txt").writeText(report)
+            report.lines().forEach { android.util.Log.i("BQJustify", it) }
+        }
     }
     val bookmarkCount by bookmarksViewModel.bookmarkCount.collectAsStateWithLifecycle()
     val shareUi by shareViewModel.ui.collectAsStateWithLifecycle()

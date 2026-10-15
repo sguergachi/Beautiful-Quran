@@ -547,7 +547,7 @@ internal const val JUNICODE_ITALIC_SHA = "e30d8716a75abeae"
 /**
  * What the English book's pagination cache is keyed by beyond the window and
  * the text: the face and everything about it that moves a line — the font
- * files, size, leading, capacity and weights.
+ * files, size, leading, capacity and weights — and how the leaf justifies.
  */
 internal val QuranTypePalette.bookCacheSuffix: String
     get() = when (profile) {
@@ -556,7 +556,7 @@ internal val QuranTypePalette.bookCacheSuffix: String
             "|junicode", JUNICODE_ROMAN_SHA, JUNICODE_ITALIC_SHA, JUNICODE_SIZE, leafLeadingEm,
             leafCapacityChars, junicodeWeight(400), junicodeWeight(400, italic = true), bookFeatures,
         ).joinToString("|")
-    }
+    } + com.beautifulquran.domain.EnglishJustify.cacheKey
 
 /** The palette for [profile]; Junicode lightened on dark paper ([DARK_PAPER_WEIGHT_EASE]). */
 internal fun quranTypePalette(profile: QuranTypeProfile, darkPaper: Boolean = false): QuranTypePalette =

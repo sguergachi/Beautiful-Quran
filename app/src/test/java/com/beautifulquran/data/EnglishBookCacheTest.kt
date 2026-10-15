@@ -1,5 +1,6 @@
 package com.beautifulquran.data
 
+import com.beautifulquran.domain.EnglishJustify
 import com.beautifulquran.domain.EnglishVerseRun
 import com.beautifulquran.domain.englishBookOf
 import java.io.File
@@ -27,6 +28,23 @@ class EnglishBookCacheTest {
         assertEquals(listOf(EnglishVerseRun(1, 1, 0, 4)), read.leaf(0)!!.runs)
         assertNull(cache.read("missing", { _, _ -> 1 }, { _, _ -> "abcd" }))
         assertTrue(tmp.root.listFiles()!!.none { it.name.endsWith(".writing") })
+    }
+
+    @Test
+    fun longLayoutIdentityStillPersistsAndReadsBack() {
+        val cache = EnglishBookCache(tmp.root)
+        val base = cache.key(1700f, 1000f, 1, 0, "quran_v67.db") +
+            "|junicode|" + "font-and-layout-setting|".repeat(12) + EnglishJustify.cacheKey
+        val key = englishBookContentKey(base, mapOf(1L to "x"))
+        cache.write(key, book())
+
+        assertNotNull(cache.read(key, { _, _ -> 1 }, { _, _ -> "x" }))
+        assertTrue(tmp.root.listFiles()!!.single().name.toByteArray(Charsets.UTF_8).size <= 255)
+        assertNull(cache.read(
+            englishBookContentKey(base + "changed", mapOf(1L to "x")),
+            { _, _ -> 1 },
+            { _, _ -> "x" },
+        ))
     }
 
     @Test

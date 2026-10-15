@@ -35,6 +35,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalFontFamilyResolver
+import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.PlatformTextStyle
 import androidx.compose.ui.text.SpanStyle
@@ -49,17 +51,20 @@ import com.beautifulquran.ui.theme.quietSuppliedBrackets
 import com.beautifulquran.ui.theme.QuranTypePalette
 import com.beautifulquran.ui.theme.LocalQuranTypePalette
 import androidx.compose.ui.text.font.FontStyle
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.style.Hyphens
 import androidx.compose.ui.text.style.LineBreak
 import androidx.compose.ui.text.style.LineHeightStyle
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextGeometricTransform
 import androidx.compose.ui.text.style.TextMotion
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.em
@@ -86,6 +91,7 @@ import com.beautifulquran.domain.englishLeafHandPx
 import com.beautifulquran.domain.EnglishLeafFill
 import com.beautifulquran.domain.EnglishLeafRuler
 import com.beautifulquran.domain.EnglishLeafVerse
+import com.beautifulquran.domain.EnglishJustify
 import com.beautifulquran.domain.EnglishRag
 import com.beautifulquran.domain.EnglishRulerCut
 import com.beautifulquran.domain.mushafLeafBands
@@ -97,6 +103,8 @@ import com.beautifulquran.ui.theme.letterFadeIn
 import com.beautifulquran.ui.theme.quietClickable
 import com.beautifulquran.ui.theme.shapedWordBloom
 import kotlin.math.roundToInt
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.distinctUntilChanged
@@ -295,9 +303,31 @@ internal fun MushafEnglishSheet(
                 typePalette,
             )
         }
-        val setting = remember(blocks, wellPx, measurePx, density, measurer, typePalette) {
-            setEnglishLeaf(blocks, wellPx, measurePx, density, measurer, typePalette)
+        val justifyLast = (blocks.lastOrNull() as? EnglishLeafBlockText.Prose)
+            ?.proseRunsOn(surahsById) == true
+        val resolver = LocalFontFamilyResolver.current
+        val direction = LocalLayoutDirection.current
+        val settingKey = remember(blocks, wellPx, measurePx, density, resolver, direction, typePalette, justifyLast) {
+            EnglishLeafSettingKey(
+                blocks.map { if (it is EnglishLeafBlockText.Prose) it.copy(verses = emptyList()) else it },
+                wellPx, measurePx, density, resolver, direction, typePalette, justifyLast,
+            )
         }
+        val settingState = remember(settingKey) {
+            mutableStateOf(synchronized(EnglishLeafSettings) { EnglishLeafSettings[settingKey] })
+        }
+        // The pager holds both neighbours. Fit them without blocking a swipe,
+        // with a worker-owned measurer rather than the drawing cache below.
+        LaunchedEffect(settingState) {
+            if (settingState.value != null) return@LaunchedEffect
+            settingState.value = withContext(Dispatchers.Default) {
+                setEnglishLeaf(
+                    blocks, wellPx, measurePx, density,
+                    TextMeasurer(resolver, density, direction), typePalette, justifyLast,
+                ).also { synchronized(EnglishLeafSettings) { EnglishLeafSettings[settingKey] = it } }
+            }
+        }
+        val setting = settingState.value ?: return@BoxWithConstraints
         val fontSize = with(density) { setting.handPx.toSp() }
         val pitchDp = with(density) { (setting.handPx * setting.leadingEm).toDp() }
         val basmalahDp = remember(setting.handPx, measurePx, density, measurer, typePalette) {
@@ -371,6 +401,9 @@ internal fun MushafEnglishSheet(
                             EnglishBasmalahLine(
                                 fontSize = basmalahFontSize,
                                 slotHeight = basmalahDp,
+                                topAir = with(density) {
+                                    englishBasmalahAirPx(setting.handPx, typePalette).toDp()
+                                },
                                 active = pageOwnsVoice &&
                                     block.surahId == content.surah.id &&
                                     playback.value.basmalahActive,
@@ -390,6 +423,10 @@ internal fun MushafEnglishSheet(
                         fontSize = fontSize,
                         lineHeight = pitch,
                         measurePx = measurePx,
+                        // The leaf's last paragraph runs on to the next leaf
+                        // unless its chapter ends here: its last line is then
+                        // a line like any other, and set like one.
+                        justifyLast = block === blocks.last() && justifyLast,
                         liveInk = liveInk,
                         onVerseSeek = onVerseSeek,
                         onVerseLongPress = onVerseLongPress,
@@ -478,17 +515,6 @@ private val EnglishLeafFitSlack = 2.dp
  */
 private const val EnglishLeafPanelAir = 0.3f
 
-/**
- * Air under the basmalah, so the chapter's first verse does not run into it.
- *
- * Under it, all of it — the line sits at the head of its slot. Centred there,
- * half of this fell *above* the basmalah instead, where it landed under the
- * chapter's panel and made the space below the panel five times the space
- * above it. The panel's own air is what stands it off its neighbours, on both
- * sides and equally; this is the separation between a display line and the
- * body text that follows it.
- */
-private const val EnglishLeafBasmalahAirEm = 0.9f
 
 /**
  * The chapter's name inside the panel.
@@ -528,6 +554,15 @@ private sealed class EnglishLeafBlockText {
         val verses: List<EnglishProseVerse>,
     ) : EnglishLeafBlockText()
 }
+
+/**
+ * Whether this paragraph carries on past its leaf: its last verse is broken off,
+ * or ends without ending its chapter.
+ */
+private fun EnglishLeafBlockText.Prose.proseRunsOn(surahsById: Map<Int, Surah>): Boolean =
+    verses.lastOrNull()?.let { last ->
+        last.markRange.isEmpty() || last.ayah < (surahsById[last.surahId]?.ayahCount ?: 0)
+    } == true
 
 /** Where one verse sits in the paragraph, and what a tap on it means. */
 @Immutable
@@ -723,6 +758,24 @@ private data class EnglishLeafSetting(
     val lineInkPx: Float,
 )
 
+/** Geometry only: verse tap/wash callbacks belong to this visit, not its measured fit. */
+private data class EnglishLeafSettingKey(
+    val blocks: List<EnglishLeafBlockText>,
+    val wellPx: Float,
+    val measurePx: Float,
+    val density: Density,
+    val resolver: FontFamily.Resolver,
+    val direction: LayoutDirection,
+    val typePalette: QuranTypePalette,
+    val justifyLast: Boolean,
+)
+
+/** Reopening a recent leaf reuses its completed fit; old leaves never retain a whole book. */
+private val EnglishLeafSettings = object : LinkedHashMap<EnglishLeafSettingKey, EnglishLeafSetting>(12, 0.75f, true) {
+    override fun removeEldestEntry(eldest: MutableMap.MutableEntry<EnglishLeafSettingKey, EnglishLeafSetting>?) =
+        size > 12
+}
+
 /**
  * Sets the leaf: the book's hand and the book's leading, then a measurement to
  * make sure the block really does fit the well.
@@ -744,6 +797,7 @@ private fun setEnglishLeaf(
     density: Density,
     measurer: TextMeasurer,
     typePalette: QuranTypePalette,
+    justifyLast: Boolean,
 ): EnglishLeafSetting {
     val requestedLeading = typePalette.leafLeadingEm
     var handPx = englishBookHandPx(wellPx, measurePx, density, measurer, typePalette)
@@ -754,7 +808,7 @@ private fun setEnglishLeaf(
     // englishLeafOverflowHandPx for why that order and not the other.
     repeat(3) { pass ->
         val basmalahPx = englishBasmalahPx(handPx, measurePx, density, measurer, typePalette)
-        val pitches = englishLeafPitches(blocks, handPx, measurePx, density, measurer, typePalette)
+        val pitches = englishLeafPitches(blocks, handPx, measurePx, density, measurer, typePalette, justifyLast)
         val stands = englishLeafHeightPx(
             blocks,
             handPx,
@@ -764,6 +818,7 @@ private fun setEnglishLeaf(
             density,
             measurer,
             typePalette,
+            justifyLast,
         )
         val leadingEm = englishLeafFittedLeadingEm(
             leadingEm = requestedLeading,
@@ -811,6 +866,7 @@ private fun englishLeafPitches(
     density: Density,
     measurer: TextMeasurer,
     typePalette: QuranTypePalette,
+    justifyLast: Boolean,
 ): Float {
     var pitches = 0f
     blocks.forEach { block ->
@@ -827,6 +883,7 @@ private fun englishLeafPitches(
                         ),
                         measurePx = measurePx,
                         density = density,
+                        justifyLast = block === blocks.last() && justifyLast,
                     )
                     .lineCount
                 pitches += (lines - 1).coerceAtLeast(0).toFloat()
@@ -877,6 +934,7 @@ private fun englishLeafHeightPx(
     density: Density,
     measurer: TextMeasurer,
     typePalette: QuranTypePalette,
+    justifyLast: Boolean,
 ): Float {
     val inkPx = englishLineInkPx(handPx, density, measurer, typePalette)
     val style = englishProseStyle(
@@ -895,6 +953,7 @@ private fun englishLeafHeightPx(
                     style = style,
                     measurePx = measurePx,
                     density = density,
+                    justifyLast = block === blocks.last() && justifyLast,
                 )
                 .size
                 .height
@@ -947,17 +1006,15 @@ private fun englishBookHandPx(
 }
 
 /**
- * The book's hand: ragged right, with whole words.
+ * The book's hand: justified, with whole words.
  *
- * The rag chooses word-space breaks that share deep holes between neighbouring
- * lines, while keeping the minimum line count and preferring fuller lines on
- * ties. It leaves ordinary shortfalls alone, so the edge still moves rather
- * than forming the second margin Balanced produced. See §13.5 of
- * `docs/QURAN_TYPOGRAPHY.md` for the measured tradeoffs.
+ * [englishSetProse] chooses the breaks ([EnglishJustify]) and draws each line
+ * out to the measure with spans; this style is what it sets them in. See §13.5
+ * of `docs/QURAN_TYPOGRAPHY.md` for the measured tradeoffs.
  *
  * Hyphenation is off for both the ruler and the page. The chosen breaks replace
  * spaces in place, so the wash, paper covers and taps keep their character
- * offsets. Simple wrapping is the fallback for paragraphs the rag cannot set.
+ * offsets. Simple wrapping is the fallback for paragraphs the setter declines.
  */
 internal fun englishProseStyle(
     fontSize: TextUnit,
@@ -980,10 +1037,9 @@ internal fun englishProseStyle(
     // are the price of an active rag; the phantom edge was not worth avoiding
     // them. See docs/QURAN_TYPOGRAPHY.md §13.5.
     //
-    // The leaf no longer pays it: englishRaggedProse breaks its lines first,
-    // greedy wherever greedy was fine and not where it left a hole, and writes
-    // the breaks into the text. This is the fallback for a paragraph it
-    // declines.
+    // The leaf no longer pays it: englishSetProse breaks and justifies its
+    // lines itself and writes the breaks into the text. This is the fallback
+    // for a paragraph it declines.
     lineBreak = LineBreak.Paragraph.copy(strategy = LineBreak.Strategy.Simple),
     hyphens = Hyphens.None,
     // The book face's refinements: kerning and ligatures on, old-style figures
@@ -1006,48 +1062,337 @@ internal fun englishProseStyle(
 )
 
 /**
- * A paragraph on the leaf's measure. Whole-word greedy wrapping and
- * [EnglishRag] have the same minimum line count; pagination can skip choosing
- * the rag and measuring every word position for thousands of candidate leaves.
+ * A paragraph on the leaf's measure, set as the leaf sets it — or, with
+ * [setLines] off, as the platform wraps it, which the ruler reads only as a
+ * fallback (it counts justified lines: [englishProseLineCount]).
  */
 private fun TextMeasurer.measureEnglishProse(
     text: AnnotatedString,
     style: TextStyle,
     measurePx: Float,
     density: Density,
-    chooseRag: Boolean = true,
-): TextLayoutResult = measure(
-    text = if (chooseRag) englishRaggedProse(text, style, measurePx, density, this) else text,
-    style = style,
-    constraints = englishProseConstraints(measurePx),
-    density = density,
-)
+    setLines: Boolean = true,
+    justifyLast: Boolean = false,
+): TextLayoutResult {
+    val set = if (setLines) englishSetProse(text, style, measurePx, density, this, justifyLast) else text
+    return measure(
+        text = set,
+        style = style,
+        constraints = englishProseConstraints(measurePx),
+        softWrap = set.englishSoftWrap,
+        density = density,
+    )
+}
+
+/**
+ * Whether the platform may still wrap a set paragraph. Not where its lines are
+ * already broken: those lines are known to fit, and the platform's own line
+ * breaker measures a styled run — a quiet bracket, a verse mark's isolated
+ * figures — a few px wider than it draws it, and would break a full justified
+ * line early.
+ */
+internal val AnnotatedString.englishSoftWrap: Boolean get() = '\n' !in text
 
 /** Leave one pixel for rounding when the chosen lines are drawn at the full measure. */
 private fun englishProseConstraints(measurePx: Float) =
     Constraints(maxWidth = (measurePx.toInt() - 1).coerceAtLeast(1))
 
 /**
- * The paragraph with its lines broken where [EnglishRag] sets them.
+ * The paragraph as the leaf sets it: its lines broken where [EnglishJustify]
+ * chooses, and each drawn out to the measure.
  *
- * Each word space the rag ends a line at becomes a line break *in place*,
- * one character for one, so every offset the wash, the paper covers
- * and the taps hold still names the same letter. The platform then only sets
- * lines that already fit, and breaks nothing itself.
+ * Each word space a line ends at becomes a line break *in place*, one
+ * character for one, and the drawing-out is spans over the text — the line's
+ * letters set a little wider, its word spaces a little looser — so every offset
+ * the wash, the paper covers and the taps hold still names the same letter. The
+ * platform then only sets lines that already fit, and breaks nothing itself.
  *
- * The positions come from the paragraph set on the measure, chained line to
- * line into one unbroken coordinate, and the answer is remembered: the leaf is
- * measured several times at the same hand while the leaf is fitted.
+ * The positions are its words' own widths laid end to end
+ * ([englishRagCandidates]), and the answer is remembered: the leaf is measured
+ * several times at the same hand while the leaf is fitted.
+ *
+ * [justifyLast] draws the last line out too, for a paragraph the leaf breaks
+ * off and the next leaf carries on. Where the setting cannot be trusted to keep
+ * the ruler's line count, the paragraph falls back to [EnglishRag]'s ragged
+ * breaks, and failing those to the platform's own.
  */
-internal fun englishRaggedProse(
+internal fun englishSetProse(
     text: AnnotatedString,
     style: TextStyle,
     measurePx: Float,
     density: Density,
     measurer: TextMeasurer,
-): AnnotatedString = text.withEnglishBreaks(
-    englishRagBreaks(text, style, measurePx, density, measurer),
+    justifyLast: Boolean = false,
+): AnnotatedString {
+    val source = text.text
+    val n = source.length
+    if (n < 2 || measurePx <= 1f) return text
+    val key = EnglishRagKey(text, style.englishWidthStyle, measurePx, density.density, density.fontScale, justifyLast)
+    synchronized(EnglishRagMemo) { EnglishRagMemo[key]?.let { return it } }
+
+    val constraints = englishProseConstraints(measurePx)
+    // The platform's own wrapping: only the ragged fallback's line count.
+    val laid by lazy(LazyThreadSafetyMode.NONE) {
+        measurer.measure(text = text, style = style, constraints = constraints, density = density)
+    }
+    val found = englishRagCandidates(text, style, density, measurer) ?: return memo(key, text)
+    val candidates = found.candidates
+    val offsets = found.offsets
+    val spacePx = found.spacePx
+    val measure = measurePx.toInt().toFloat()
+    val fontPx = with(density) { style.fontSize.toPx() }
+    fun boxed(set: AnnotatedString) =
+        measurer.measure(text = set, style = style, constraints = constraints, density = density)
+
+    englishJustifyModel(found, source, measure, fontPx, justifyLast)?.let { lines ->
+        val breaks = lines.filter { it.end >= 0 }.map { offsets[it.end] }.toIntArray()
+        val broken = text.withEnglishBreaks(breaks)
+        // The model's widths are chained positions; the platform rounds, and
+        // a widened line's own spaces widen with it. So the paragraph is set,
+        // each line's drawn right edge read back, and what is left over shared
+        // among that line's spaces again. The lines are already broken, so it
+        // is measured unbounded — nothing can wrap while it converges — and
+        // only the final setting is tried in the real box.
+        val target = constraints.maxWidth - EnglishJustifyEdgePx
+        val extras = FloatArray(lines.size) { lines[it].spaceExtraPx }
+        var set = broken.justifiedBy(lines, extras, style, fontPx)
+        repeat(EnglishJustifyPasses) {
+            val free = measurer.measure(set, style, density = density)
+            if (free.lineCount != lines.size) return@let
+            for (i in lines.indices) {
+                val line = lines[i]
+                if (!line.justified) continue
+                val residual = target - free.getLineRight(i)
+                extras[i] = extras[i] + residual / (line.spaces * (1f + line.expansion))
+            }
+            set = broken.justifiedBy(lines, extras, style, fontPx)
+        }
+        return memo(key, set)
+    }
+    // The ragged setting, where the justified one could not be trusted.
+    val chosen = EnglishRag.breaks(
+        candidates,
+        measurePx = measure,
+        emPx = with(density) { style.fontSize.toPx() },
+    ) ?: return memo(key, text)
+    val ragged = text.withEnglishBreaks(IntArray(chosen.size) { offsets[chosen[it]] })
+    // Tight tracking can round a chosen line wider than its chained positions.
+    // Keep the ruler's line count rather than spending another line on the page.
+    return memo(key, if (boxed(ragged).lineCount == laid.lineCount) ragged else text)
+}
+
+/**
+ * The justified setting of a paragraph whose candidates are [found]: the one
+ * model the ruler counts lines with and the leaf draws, so the two can never
+ * disagree about how many lines a leaf holds.
+ */
+private fun englishJustifyModel(
+    found: EnglishRagFound,
+    source: String,
+    measure: Float,
+    fontPx: Float,
+    justifyLast: Boolean = false,
+): List<EnglishJustify.Line>? = EnglishJustify.set(
+    found.candidates, measure, found.spacePx, justifyLast,
+    tuning = EnglishJustifyTuning,
+    text = englishJustifyText(source, found.offsets, fontPx),
 )
+
+/**
+ * How many lines the leaf sets [text] in, justified: what the ruler paginates
+ * by. The platform's own wrapping where the paragraph is not one the
+ * justifier sets.
+ */
+private fun TextMeasurer.englishProseLineCount(
+    text: AnnotatedString,
+    style: TextStyle,
+    measurePx: Float,
+    density: Density,
+    /** Whether the next leaf carries this one on; see [englishSetProse]. */
+    justifyLast: Boolean,
+): Int {
+    fun platform() = measure(
+        text = text, style = style, constraints = englishProseConstraints(measurePx), density = density,
+    ).lineCount
+    if (text.length < 2) return platform()
+    val found = englishRagCandidates(text, style, density, this) ?: return platform()
+    val fontPx = with(density) { style.fontSize.toPx() }
+    return englishJustifyModel(found, text.text, measurePx.toInt().toFloat(), fontPx, justifyLast)?.size
+        ?: platform()
+}
+
+/** A paragraph's break candidates on one unbroken line: see [englishRagCandidates]. */
+private class EnglishRagFound(
+    val candidates: EnglishRag.Candidates,
+    /** The text offset of each candidate's word space. */
+    val offsets: IntArray,
+    val spacePx: Float,
+    /** Where the word ending at an offset ends on the one line; NaN inside a word. */
+    val positionOf: (Int) -> Float,
+) {
+    /**
+     * The same paragraph cut to its first [length] characters, without
+     * measuring it again: positions are words laid end to end, so a prefix's
+     * are the whole's up to the cut — exactly the ones the leaf cut there will
+     * read for itself. Null when the cut is not at a word's end.
+     */
+    fun prefix(length: Int): EnglishRagFound? {
+        val end = positionOf(length).takeUnless { it.isNaN() } ?: return null
+        var m = 0
+        while (m < offsets.size && offsets[m] < length - 1) m++
+        return EnglishRagFound(
+            EnglishRag.Candidates(
+                candidates.contentEnd.copyOf(m),
+                candidates.nextStart.copyOf(m),
+                end,
+            ),
+            offsets.copyOf(m),
+            spacePx,
+            positionOf,
+        )
+    }
+}
+
+/**
+ * Where a paragraph may break, and where each break falls on one unbroken
+ * line: its words' widths laid end to end, a word space between.
+ *
+ * Every word space is a candidate except the one before a dash, which stays
+ * with the word before it. A no-break space (the one binding a verse mark to
+ * its verse) is a gap that stretches, never a break.
+ */
+private fun englishRagCandidates(
+    text: AnnotatedString,
+    style: TextStyle,
+    density: Density,
+    measurer: TextMeasurer,
+): EnglishRagFound? {
+    val source = text.text
+    val n = source.length
+    if (n < 2) return null
+    val spacePx = englishWordWidth(AnnotatedString(" "), style, density, measurer)
+    // The paragraph as words laid end to end: each word's own width, read once
+    // for the whole book, and a word space between. A word measures the same
+    // wherever it falls, so the ruler that cuts a leaf from a longer offer and
+    // the leaf that sets only itself read the same positions — the line count
+    // the ruler pays for is the one the leaf draws. The leaf then measures each
+    // line it actually draws and closes on the edge from there.
+    val offsets = ArrayList<Int>()
+    val ends = ArrayList<Float>()
+    val starts = ArrayList<Float>()
+    // Where each word ends, by the offset it ends at: what a prefix's end is.
+    val wordEnds = HashMap<Int, Float>()
+    var x = 0f
+    var wordStart = 0
+    val bias = englishWordBias(style, density, measurer)
+    fun word(end: Int) {
+        x += englishWordWidth(text.subSequence(wordStart, end), style, density, measurer) - bias
+        wordEnds[end] = x
+    }
+    for (i in 1 until n - 1) {
+        // A dash stays with the word before it: a line never opens on one.
+        if (source[i] == ' ' && source[i + 1] != '\u2013' && source[i + 1] != '\u2014') {
+            word(i)
+            offsets += i
+            ends += x
+            x += spacePx
+            starts += x
+            wordStart = i + 1
+        }
+    }
+    word(n)
+    val textEnd = x
+    return EnglishRagFound(
+        EnglishRag.Candidates(ends.toFloatArray(), starts.toFloatArray(), textEnd),
+        offsets.toIntArray(),
+        spacePx,
+    ) { at -> wordEnds[at] ?: Float.NaN }
+}
+
+/** A word's advance in [style], remembered: the book sets the same words over and over. */
+private fun englishWordWidth(
+    word: AnnotatedString,
+    style: TextStyle,
+    density: Density,
+    measurer: TextMeasurer,
+): Float {
+    val key = EnglishWordKey(word, style.englishWidthStyle, density.density, density.fontScale)
+    synchronized(EnglishWordWidths) { EnglishWordWidths[key]?.let { return it } }
+    // Measured with a space after it, and read where the space begins: the
+    // advance the word has inside a line. Alone, its last letter loses the
+    // tracking it carries mid-line, and every word came out a pixel wide.
+    val laid = measurer.measure(word + AnnotatedString(" "), style, softWrap = false, maxLines = 1, density = density)
+    val width = if (word.isEmpty()) 0f else laid.getHorizontalPosition(word.length, true)
+    synchronized(EnglishWordWidths) { EnglishWordWidths[key] = width }
+    return width
+}
+
+/**
+ * How much wider a word measures on its own than it sets among others, in px:
+ * kerning against the spaces either side and the tracking at its edges, which
+ * a word alone never meets. Steady to a fraction of a pixel across the book
+ * (1.4–1.7 px a word at the leaf's hand), so it is read once per style off a
+ * specimen set both ways and taken off every word.
+ */
+private fun englishWordBias(style: TextStyle, density: Density, measurer: TextMeasurer): Float {
+    val key = EnglishWordKey(AnnotatedString(ENGLISH_LEAF_SPECIMEN), style.englishWidthStyle, density.density, density.fontScale)
+    synchronized(EnglishWordWidths) { EnglishWordBiases[key]?.let { return it } }
+    val words = ENGLISH_LEAF_SPECIMEN.split(' ').filter { it.isNotEmpty() }
+    val set = words.joinToString(" ")
+    val real = measurer.measure(AnnotatedString(set), style, softWrap = false, maxLines = 1, density = density)
+        .getLineRight(0)
+    val space = englishWordWidth(AnnotatedString(" "), style, density, measurer)
+    val model = words.sumOf { englishWordWidth(AnnotatedString(it), style, density, measurer).toDouble() }.toFloat() +
+        space * (words.size - 1)
+    val bias = (model - real) / words.size
+    synchronized(EnglishWordWidths) { EnglishWordBiases[key] = bias }
+    return bias
+}
+
+private val EnglishWordBiases = HashMap<EnglishWordKey, Float>()
+
+/** Horizontal layout is shared across leading changes; measurement keeps the caller's full style. */
+private val TextStyle.englishWidthStyle: TextStyle
+    get() = copy(lineHeight = TextUnit.Unspecified)
+
+private data class EnglishWordKey(
+    val word: AnnotatedString,
+    val style: TextStyle,
+    val density: Float,
+    val fontScale: Float,
+)
+
+private val EnglishWordWidths = object : LinkedHashMap<EnglishWordKey, Float>(4096, 0.75f, true) {
+    override fun removeEldestEntry(eldest: MutableMap.MutableEntry<EnglishWordKey, Float>?) =
+        size > 60_000
+}
+
+/**
+ * How far inside the box a drawn-out line stops, in px: a line set exactly to
+ * the box's width can measure a hair over it and wrap.
+ */
+private const val EnglishJustifyEdgePx = 0.5f
+
+/** Measured passes over the modelled setting: two close on the edge to well under a pixel. */
+private const val EnglishJustifyPasses = 2
+
+/** How the leaf justifies: see [EnglishJustify.LEAF]. */
+internal val EnglishJustifyTuning = EnglishJustify.LEAF
+
+/** A word space, or the bound space before a verse mark: what a line stretches. */
+private fun Char.isEnglishJustifyGap() = this == ' ' || this == '\u202F'
+
+/** The paragraph's gaps and letters, by offset, for [EnglishJustify]. */
+private fun englishJustifyText(source: String, offsets: IntArray, emPx: Float): EnglishJustify.Text {
+    val gaps = IntArray(source.length + 1)
+    val letters = IntArray(source.length + 1)
+    source.forEachIndexed { i, c ->
+        gaps[i + 1] = gaps[i] + if (c.isEnglishJustifyGap()) 1 else 0
+        val advances = !c.isEnglishJustifyGap() && Character.getType(c) != Character.FORMAT.toInt()
+        letters[i + 1] = letters[i] + if (advances) 1 else 0
+    }
+    return EnglishJustify.Text(gaps, letters, offsets, emPx)
+}
 
 private fun AnnotatedString.withEnglishBreaks(breaks: IntArray): AnnotatedString {
     if (breaks.isEmpty()) return this
@@ -1056,82 +1401,39 @@ private fun AnnotatedString.withEnglishBreaks(breaks: IntArray): AnnotatedString
     return AnnotatedString(String(chars), spanStyles, paragraphStyles)
 }
 
-private fun englishRagBreaks(
-    text: AnnotatedString,
+/**
+ * [lines] drawn out: each justified line's letters widened by its expansion,
+ * and its word spaces each [extras] px looser, as spans over the text.
+ */
+private fun AnnotatedString.justifiedBy(
+    lines: List<EnglishJustify.Line>,
+    extras: FloatArray,
     style: TextStyle,
-    measurePx: Float,
-    density: Density,
-    measurer: TextMeasurer,
-): IntArray {
-    val source = text.text
-    val n = source.length
-    if (n < 2 || measurePx <= 1f) return NoBreaks
-    val key = EnglishRagKey(text, style, measurePx, density.density, density.fontScale)
-    synchronized(EnglishRagMemo) { EnglishRagMemo[key]?.let { return it } }
-
-    // Where every offset would sit on one unbroken line. Read off the
-    // paragraph set on the measure, not off an unbroken layout: a position on
-    // a platform line costs a walk from that line's start, so on one line of
-    // a whole leaf reading every candidate was quadratic, and the book took
-    // minutes to paginate. Line by line it is a walk of one line each, and the
-    // lines are chained by their advances into the one coordinate.
-    val laid = measurer.measure(
-        text = text,
-        style = style,
-        constraints = englishProseConstraints(measurePx),
-        density = density,
-    )
-    val spacePx = measurer.measure(AnnotatedString("  "), style, density = density)
-        .multiParagraph.getHorizontalPosition(1, true)
-    val base = FloatArray(laid.lineCount)
-    for (line in 1 until laid.lineCount) {
-        // The advance of the line before, as if it had not broken: through its
-        // last character, which is a space (trailing, so not reliably boxed),
-        // or anything else (its own box).
-        val last = laid.getLineEnd(line - 1) - 1
-        val advance = when (source[last]) {
-            ' ' -> laid.getHorizontalPosition(last, true) + spacePx
-            else -> laid.getBoundingBox(last).right
+    fontPx: Float,
+): AnnotatedString = buildAnnotatedString {
+    append(this@justifiedBy)
+    val tracking = if (style.letterSpacing.isEm) style.letterSpacing.value else 0f
+    var start = 0
+    lines.forEachIndexed { i, line ->
+        var end = start
+        while (end < length && text[end] != '\n') end++
+        if (line.justified && end > start) {
+            if (line.expansion != 0f) {
+                addStyle(
+                    SpanStyle(textGeometricTransform = TextGeometricTransform(scaleX = 1f + line.expansion)),
+                    start,
+                    end,
+                )
+            }
+            val letters = tracking + line.trackingPx / fontPx
+            if (line.trackingPx != 0f) addStyle(SpanStyle(letterSpacing = letters.em), start, end)
+            val gap = SpanStyle(letterSpacing = (letters + extras[i] / fontPx).em)
+            for (at in start until end) {
+                if (text[at].isEnglishJustifyGap()) addStyle(gap, at, at + 1)
+            }
         }
-        base[line] = base[line - 1] + advance
+        start = end + 1
     }
-    fun x(offset: Int): Float {
-        val line = laid.getLineForOffset(offset)
-        return base[line] + laid.getHorizontalPosition(offset, true)
-    }
-    val offsets = ArrayList<Int>()
-    val ends = ArrayList<Float>()
-    val starts = ArrayList<Float>()
-    for (i in 1 until n - 1) {
-        if (source[i] == ' ') {
-            offsets += i
-            ends += x(i)
-            starts += x(i + 1)
-        }
-    }
-    // One left-to-right line, read left to right. Anything else (a bidi run
-    // the boxes do not order) is not this paragraph, and the platform breaks it.
-    for (k in 1 until ends.size) {
-        if (ends[k] < ends[k - 1] - 0.5f) return memo(key, NoBreaks)
-    }
-    val chosen = EnglishRag.breaks(
-        EnglishRag.Candidates(
-            contentEnd = ends.toFloatArray(),
-            nextStart = starts.toFloatArray(),
-            textEnd = x(n),
-        ),
-        measurePx = measurePx.toInt().toFloat(),
-        emPx = with(density) { style.fontSize.toPx() },
-    ) ?: return memo(key, NoBreaks)
-    val set = IntArray(chosen.size) { offsets[chosen[it]] }
-    // Tight tracking can round a chosen line wider than its chained positions.
-    // Keep the ruler's line count rather than spending another line on the page.
-    val shaped = measurer.measure(
-        text = text.withEnglishBreaks(set), style = style,
-        constraints = englishProseConstraints(measurePx), density = density,
-    )
-    if (shaped.lineCount != laid.lineCount) return memo(key, NoBreaks)
-    return memo(key, set)
 }
 
 private data class EnglishRagKey(
@@ -1140,19 +1442,18 @@ private data class EnglishRagKey(
     val measurePx: Float,
     val density: Float,
     val fontScale: Float,
+    val justifyLast: Boolean,
 )
 
-private val NoBreaks = IntArray(0)
-
-/** Recent paragraphs' breaks: fitting and drawing ask for the same text repeatedly. */
-private val EnglishRagMemo = object : LinkedHashMap<EnglishRagKey, IntArray>(64, 0.75f, true) {
-    override fun removeEldestEntry(eldest: MutableMap.MutableEntry<EnglishRagKey, IntArray>?) =
+/** Recent paragraphs' settings: fitting and drawing ask for the same text repeatedly. */
+private val EnglishRagMemo = object : LinkedHashMap<EnglishRagKey, AnnotatedString>(64, 0.75f, true) {
+    override fun removeEldestEntry(eldest: MutableMap.MutableEntry<EnglishRagKey, AnnotatedString>?) =
         size > 96
 }
 
-private fun memo(key: EnglishRagKey, breaks: IntArray): IntArray {
-    synchronized(EnglishRagMemo) { EnglishRagMemo[key] = breaks }
-    return breaks
+private fun memo(key: EnglishRagKey, set: AnnotatedString): AnnotatedString {
+    synchronized(EnglishRagMemo) { EnglishRagMemo[key] = set }
+    return set
 }
 
 /** One paragraph of the leaf, with the reciter's ink over it. */
@@ -1168,6 +1469,8 @@ private fun EnglishProseBlock(
     lineHeight: TextUnit,
     /** The measure the ruler paginated against, which the lines are broken to. */
     measurePx: Float,
+    /** Whether the paragraph runs on past this leaf; see [englishSetProse]. */
+    justifyLast: Boolean,
     liveInk: Boolean,
     onVerseSeek: (surahId: Int, ayah: Int, through: Float) -> Unit,
     onVerseLongPress: (surahId: Int, ayah: Int, through: Float) -> Unit,
@@ -1179,15 +1482,16 @@ private fun EnglishProseBlock(
     val hitSlopPx = with(LocalDensity.current) { 6.dp.toPx() }
     val style = englishProseStyle(fontSize, lineHeight, LocalQuranTypePalette.current)
     val measurer = rememberTextMeasurer()
-    // The rag keeps the ruler's line count and block.text's offsets, so the
-    // verses' ranges still name the same words.
+    // The setting keeps the ruler's line count and block.text's offsets, so
+    // the verses' ranges still name the same words.
     val density = LocalDensity.current
-    val set = remember(block.text, style, measurePx, density) {
-        englishRaggedProse(block.text, style, measurePx, density, measurer)
+    val set = remember(block.text, style, measurePx, density, justifyLast) {
+        englishSetProse(block.text, style, measurePx, density, measurer, justifyLast)
     }
     Text(
         text = set,
         style = style,
+        softWrap = set.englishSoftWrap,
         // Never clip. The leading is solved to fill the well exactly, and the
         // pitch's px→sp rounding across a full leaf can leave the block a few
         // pixels taller than the room the column has left. Text's default Clip
@@ -1593,6 +1897,8 @@ internal data class EnglishWashBands(
 private fun EnglishBasmalahLine(
     fontSize: TextUnit,
     slotHeight: Dp,
+    /** The paper over the line, inside its slot: see [englishBasmalahPx]. */
+    topAir: Dp,
     active: Boolean,
     wash: StateFlow<Float?>,
     onClick: () -> Unit,
@@ -1613,9 +1919,8 @@ private fun EnglishBasmalahLine(
             .fillMaxWidth()
             .height(slotHeight)
             .quietClickable(onClick = onClick),
-        // At the head of the slot: every bit of the slot's air belongs below
-        // the line, between it and the chapter's first verse. See
-        // EnglishLeafBasmalahAirEm.
+        // Held off the head of the slot by its own air, and the rest of the
+        // slot is the air under it. See englishBasmalahPx.
         contentAlignment = Alignment.TopCenter,
     ) {
         Text(
@@ -1627,6 +1932,7 @@ private fun EnglishBasmalahLine(
             maxLines = 1,
             softWrap = false,
             modifier = Modifier
+                .padding(top = topAir)
                 .fillMaxWidth()
                 .then(
                     if (active) {
@@ -1701,26 +2007,69 @@ private fun englishBasmalahHandPx(
     return fittedPx
 }
 
-/** What the basmalah stands at, plus the air a display line takes under it. */
+/**
+ * The basmalah's slot: [englishBasmalahAirPx] of paper over it, the line, and
+ * paper under it down to where the chapter's first line begins — so that
+ * line's baseline falls one pitch and the same air under the basmalah's. Air
+ * over and under alike: the basmalah is a line of its own, set apart from the
+ * panel above and the verse below by equal paper.
+ *
+ * A fixed 0.9 em under the line and nothing over it put the first verse a line
+ * and a third below it and left the basmalah crowding the panel. Exactly one
+ * pitch read as the chapter's first line of prose, crowded on both sides.
+ *
+ * Never shorter than the basmalah's own ink, so a tight leading cannot run
+ * the first verse's ascenders into its descenders.
+ */
 private fun englishBasmalahPx(
     handPx: Float,
     measurePx: Float,
     density: Density,
     measurer: TextMeasurer,
     typePalette: QuranTypePalette,
-): Float = measurer.measure(
-    text = AnnotatedString(ENGLISH_BASMALAH),
-    style = englishBasmalahStyle(
-        with(density) {
-            englishBasmalahHandPx(handPx, measurePx, density, measurer, typePalette).toSp()
-        },
-        typePalette,
-    ),
-    constraints = Constraints(maxWidth = measurePx.toInt().coerceAtLeast(1)),
-    softWrap = false,
-    maxLines = 1,
-    density = density,
-).size.height + handPx * EnglishLeafBasmalahAirEm
+): Float {
+    val basmalah = measurer.measure(
+        text = AnnotatedString(ENGLISH_BASMALAH),
+        style = englishBasmalahStyle(
+            with(density) {
+                englishBasmalahHandPx(handPx, measurePx, density, measurer, typePalette).toSp()
+            },
+            typePalette,
+        ),
+        constraints = Constraints(maxWidth = measurePx.toInt().coerceAtLeast(1)),
+        softWrap = false,
+        maxLines = 1,
+        density = density,
+    )
+    // Where the first prose line's baseline sits under the top of its block;
+    // the block is trimmed, so this is the line's ascent.
+    val proseAscentPx = measurer.measure(
+        text = AnnotatedString(ENGLISH_LEAF_SPECIMEN),
+        style = englishProseStyle(
+            with(density) { handPx.toSp() },
+            TextUnit.Unspecified,
+            typePalette,
+        ),
+        constraints = Constraints(),
+        density = density,
+    ).firstBaseline
+    val pitchPx = handPx * typePalette.leafLeadingEm
+    val airPx = englishBasmalahAirPx(handPx, typePalette)
+    return airPx + maxOf(
+        basmalah.firstBaseline + pitchPx + airPx - proseAscentPx,
+        basmalah.size.height.toFloat(),
+    )
+}
+
+/** The paper over the basmalah, and the extra under it: a share of the pitch. */
+private fun englishBasmalahAirPx(handPx: Float, typePalette: QuranTypePalette): Float =
+    handPx * typePalette.leafLeadingEm * EnglishLeafBasmalahAir
+
+/**
+ * The basmalah's air either side, in line pitches — like [EnglishLeafPanelAir],
+ * so it rides the leading.
+ */
+private const val EnglishLeafBasmalahAir = 0.25f
 
 /** Saheeh International's rendering — the translation the book is set in. */
 private const val ENGLISH_BASMALAH =
@@ -1779,16 +2128,30 @@ internal fun englishLeafRuler(
         if (prose == null) {
             EnglishLeafFill(null)
         } else {
-            val laid = measurer.measureEnglishProse(
-                prose.text, style, measurePx, density, chooseRag = false,
-            )
+            // The platform's own wrapping of the offer: only a fallback now,
+            // for a seed or a paragraph the justifier cannot read.
+            val laid by lazy(LazyThreadSafetyMode.NONE) {
+                measurer.measureEnglishProse(prose.text, style, measurePx, density, setLines = false)
+            }
+            // The offer's break candidates, read once: every prefix the search
+            // below tries is cut from them rather than laid out again.
+            val offerText = prose.text.text
+            val offerFound = englishRagCandidates(prose.text, style, density, measurer)
+            val fontPx = with(density) { style.fontSize.toPx() }
+            val measure = measurePx.toInt().toFloat()
+            val offerMetrics = offerFound?.let { englishJustifyText(offerText, it.offsets, fontPx) }
+            // The whole offer runs to its chapter's end: its last line is the
+            // paragraph's own.
+            val offerLines = offerFound
+                ?.let { englishJustifyModel(it, offerText, measure, fontPx, justifyLast = false)?.size }
+                ?: measurer.englishProseLineCount(prose.text, style, measurePx, density, justifyLast = false)
             // How many lines the well holds. A property of the well, the
             // leading and a line's ink — not of any particular text, and
             // deliberately so: it used to be read off the candidate's own line
             // bottoms, which made the target depend on the page being measured
             // rather than on the page being filled.
             val lines = (((room - inkPx) / pitchPx).toInt() + 1).coerceAtLeast(1)
-            if (laid.lineCount <= lines) {
+            if (offerLines <= lines) {
                 EnglishLeafFill(null)
             } else {
                 // Then *find* the cut instead of inferring it.
@@ -1804,57 +2167,83 @@ internal fun englishLeafRuler(
                 // drawn, measured, and the answer searched for.
                 //
                 // The search runs over the offer's word boundaries — the only
-                // places a leaf may break — and the leaf's line count rises
-                // along them, so it bisects. Nine measurements a leaf, once for
-                // the whole book, written to disk after (EnglishBookCache).
-                // It is the one formulation that cannot come out a word short,
-                // because a word short is a cut the search steps past.
-                // The candidate is a poor authority and an excellent guess:
-                // where the leaf and it agree — almost everywhere — its answer
-                // *is* the answer, and where they differ it is a word or two
-                // out. So the search starts there and grows outwards by
-                // doubling until it has straddled the truth, then bisects what
-                // is left. Same answer as searching the whole offer, in three
-                // or four measurements instead of nine.
+                // places a leaf may break — once for the whole book, written to
+                // disk after (EnglishBookCache). Each stop is counted the way
+                // the leaf will set it: the justified setting of that prefix,
+                // cut from the offer's own word positions rather than measured
+                // again, which is exactly what the leaf cut there reads.
+                // The offer set whole is an excellent guess at the cut: the
+                // search starts where its well's last line ends and walks a
+                // word at a time from there.
                 val stops = englishLeafCutStops(runs, translation)
-                val seed = englishLeafSeedStop(stops, runs, laid, prose, leaf.verses, lines)
+                // The justified setting holds more to a line than the
+                // platform's wrapping, so the seed is read off the offer as the
+                // leaf will set it, carried on: where its `lines`th line ends.
+                val heldEnd = offerFound?.let { found ->
+                    englishJustifyModel(found, offerText, measure, fontPx, justifyLast = true)
+                        ?.getOrNull(lines - 1)?.end?.takeIf { it >= 0 }?.let { found.offsets[it] }
+                }
+                val seed = englishLeafSeedStop(stops, runs, { laid }, prose, leaf.verses, lines, heldEnd)
                 // Fewer lines than the well holds — *including none*. A leaf
                 // can measure empty: englishLeaf drops a run whose text comes
                 // out blank, which a run that is nothing but a translator's
                 // aside does when the reader has asked for those to come off.
-                // Reading that as "too long" would break the monotonicity the
-                // search rests on and could settle it below the answer.
-                fun fits(at: Int): Boolean = englishLeafLineCount(
+                // Reading that as "too long" could settle the walk below the
+                // answer.
+                // A cut short of the offer's end leaves its last line for the
+                // next leaf to carry on, and the leaf draws it as a full line.
+                fun exactLines(at: Int): Int = englishLeafLineCount(
                     page, runs, stops[at], translation,
                     verseNumberScript, style, measurePx, density, measurer, typePalette,
-                ) <= lines
-                // Straddle: `lo` fits, `hi` does not, and the answer is the
-                // last stop before `hi`.
-                var lo: Int
-                var hi: Int
-                if (fits(seed)) {
-                    lo = seed
-                    var step = 1
-                    while (true) {
-                        val probe = seed + step
-                        if (probe > stops.lastIndex) { hi = stops.size; break }
-                        if (fits(probe)) { lo = probe; step *= 2 } else { hi = probe; break }
+                    justifyLast = at < stops.lastIndex,
+                )
+                // The optimum's line count can dip as a prefix grows. Keep
+                // searching past an overflow, but stop once the seen prefix
+                // exceeds the offer-wide capacity after maximum shrink.
+                val tuning = EnglishJustifyTuning
+                val minimumWidthFactor = minOf(
+                    1f - tuning.expansion * tuning.letterShrink,
+                    tuning.idealSpace * (1f - tuning.shrink),
+                )
+                val lineFit = measure - 1f
+                val maximumOfferWidth = offerMetrics?.let { metrics ->
+                    if (minimumWidthFactor > 0f) {
+                        val allLetters = metrics.lettersBefore[offerText.length]
+                        (lines * lineFit + allLetters * tuning.tracking * tuning.letterShrink * fontPx) /
+                            minimumWidthFactor + 1f
+                    } else {
+                        Float.POSITIVE_INFINITY
                     }
-                } else {
-                    hi = seed
-                    var step = 1
-                    lo = -1
-                    while (true) {
-                        val probe = seed - step
-                        if (probe < 0) break
-                        if (fits(probe)) { lo = probe; break }
-                        hi = probe
-                        step *= 2
+                } ?: Float.POSITIVE_INFINITY
+                fun probe(at: Int): Pair<Boolean, Boolean> {
+                    val carried = at < stops.lastIndex
+                    val cut = englishLeafCutProse(page, runs, stops[at], translation, verseNumberScript, typePalette)
+                        ?: return true to true
+                    val text = cut.text.text
+                    if (offerFound == null || !offerText.startsWith(text) || text.length < 2) {
+                        return (exactLines(at) <= lines) to true
                     }
+                    val prefix = offerFound.prefix(text.length) ?: return (exactLines(at) <= lines) to true
+                    if (offerMetrics == null) return (exactLines(at) <= lines) to true
+                    val count = englishJustifyModel(prefix, text, measure, fontPx, carried)
+                        ?.size ?: return (exactLines(at) <= lines) to true
+                    // This bound gives even this prefix every tracking slot
+                    // in the whole offer, so it cannot stop before a later
+                    // prefix merely gains more letter-spacing allowance.
+                    val canFitLater = prefix.candidates.textEnd <= maximumOfferWidth
+                    if (!canFitLater) return false to false
+                    return (count <= lines) to true
                 }
-                while (hi - lo > 1) {
-                    val mid = (lo + hi) / 2
-                    if (fits(mid)) lo = mid else hi = mid
+                // Find the latest fit before the seed if needed, then keep the
+                // latest fitting stop as the non-monotone setting is sampled.
+                var lo = seed.coerceIn(0, stops.lastIndex)
+                while (lo >= 0 && !probe(lo).first) lo--
+                var probeAt = seed + 1
+                while (probeAt <= stops.lastIndex) {
+                    val (fits, canFitLater) = probe(probeAt)
+                    if (fits) lo = probeAt
+                    if (!canFitLater) break
+                    probeAt++
                 }
                 // Every stop fitted, offer and all. The candidate said the
                 // offer overflows and the leaf, drawn, says it does not — they
@@ -1881,13 +2270,16 @@ internal fun englishLeafRuler(
 private fun englishLeafSeedStop(
     stops: List<EnglishRulerCut>,
     runs: List<EnglishVerseRun>,
-    laid: TextLayoutResult,
+    /** The offer laid out whole, read only when [heldEnd] is not known. */
+    laid: () -> TextLayoutResult,
     prose: EnglishLeafBlockText.Prose,
     verses: List<EnglishLeafVerse>,
     lines: Int,
+    /** Where the justified setting ends the well's last line, when known. */
+    heldEnd: Int? = null,
 ): Int {
     // Where the last line the well holds ends, in the paragraph's own string.
-    val at = laid.getLineEnd(lines.coerceAtLeast(1) - 1, visibleEnd = true)
+    val at = heldEnd ?: laid().getLineEnd(lines.coerceAtLeast(1) - 1, visibleEnd = true)
     val held = prose.verses.firstOrNull { at <= it.range.last + 1 }
         ?: prose.verses.lastOrNull()
         ?: return stops.lastIndex / 2
@@ -1920,8 +2312,7 @@ private fun englishLeafSeedStop(
  * Every place the leaf may break, in order: the word boundaries of the offer.
  *
  * A leaf breaks between words and nowhere else — `englishLeafBreak` sees to
- * that — so these are the only cuts worth measuring, and the leaf's line count
- * rises along them, which is what lets the search bisect. Never the very start
+ * that — so these are the only cuts worth measuring. Never the very start
  * of the offer: a leaf that took nothing would never advance.
  */
 private fun englishLeafCutStops(
@@ -1957,12 +2348,26 @@ private fun englishLeafLineCount(
     density: Density,
     measurer: TextMeasurer,
     typePalette: QuranTypePalette,
+    justifyLast: Boolean,
 ): Int {
+    val prose = englishLeafCutProse(page, runs, cut, translation, verseNumberScript, typePalette) ?: return 0
+    return measurer.englishProseLineCount(prose.text, style, measurePx, density, justifyLast)
+}
+
+/** The leaf's paragraph, cut here, as the ruler builds it. */
+private fun englishLeafCutProse(
+    page: Int,
+    runs: List<EnglishVerseRun>,
+    cut: EnglishRulerCut,
+    translation: (Int, Int) -> String,
+    verseNumberScript: VerseNumberScript,
+    typePalette: QuranTypePalette,
+): EnglishLeafBlockText.Prose? {
     val kept = runs.subList(0, cut.runIndex + 1).toMutableList()
     kept[kept.lastIndex] = kept.last().let {
         EnglishVerseRun(it.surahId, it.ayah, it.from, cut.to)
     }
-    val prose = englishLeafBlockTexts(
+    return englishLeafBlockTexts(
         leaf = englishLeaf(page, kept, translation),
         openingTokens = emptyMap(),
         alignments = emptyMap(),
@@ -1970,8 +2375,103 @@ private fun englishLeafLineCount(
         gold = Color.Black,
         verseNumberScript = verseNumberScript,
         typePalette = typePalette,
-    ).filterIsInstance<EnglishLeafBlockText.Prose>().firstOrNull() ?: return 0
-    return measurer.measureEnglishProse(
-        prose.text, style, measurePx, density, chooseRag = false,
-    ).lineCount
+    ).filterIsInstance<EnglishLeafBlockText.Prose>().firstOrNull()
+}
+
+/**
+ * Debug only: every leaf of [book] set as the leaf sets it, and a report of how
+ * evenly its lines were drawn out — the word space each justified line ends up
+ * with, in ems, and how far its letters were widened. The number a justified
+ * page lives or dies by is the loosest word space, so the worst lines are
+ * listed with their text.
+ */
+internal fun englishJustifyAudit(
+    book: com.beautifulquran.domain.EnglishBook,
+    surahsById: Map<Int, Surah>,
+    wellPx: Float,
+    measurePx: Float,
+    density: Density,
+    measurer: TextMeasurer,
+    typePalette: QuranTypePalette,
+    verseNumberScript: VerseNumberScript,
+    translation: (surahId: Int, ayah: Int) -> String,
+): String {
+    val handPx = englishBookHandPx(wellPx, measurePx, density, measurer, typePalette)
+    val pitchPx = handPx * typePalette.leafLeadingEm
+    val style = with(density) { englishProseStyle(handPx.toSp(), pitchPx.toSp(), typePalette) }
+    val spacePx = measurer.measure(AnnotatedString("  "), style, density = density)
+        .multiParagraph.getHorizontalPosition(1, true)
+    val tracking = style.letterSpacing.value
+    val box = englishProseConstraints(measurePx).maxWidth - EnglishJustifyEdgePx
+    class Seen(val leaf: Int, val spaceEm: Float, val text: String)
+    val seen = ArrayList<Seen>()
+    val widths = ArrayList<Float>()
+    val jumps = ArrayList<Float>()
+    var lines = 0
+    var unjustified = 0
+    var ragged = 0
+    var edgeMisses = 0
+    synchronized(EnglishRagMemo) { EnglishRagMemo.clear() }
+    book.leaves.forEachIndexed { index, bookLeaf ->
+        val blocks = englishLeafBlockTexts(
+            englishLeaf(bookLeaf.page, bookLeaf.runs, translation),
+            emptyMap(), emptyMap(), Color.Black, Color.Black, verseNumberScript, typePalette,
+        )
+        blocks.forEach { block ->
+            if (block !is EnglishLeafBlockText.Prose) return@forEach
+            val justifyLast = block === blocks.last() && block.proseRunsOn(surahsById)
+            val set = englishSetProse(block.text, style, measurePx, density, measurer, justifyLast)
+            val laid = measurer.measure(
+                set, style, constraints = englishProseConstraints(measurePx),
+                softWrap = set.englishSoftWrap, density = density,
+            )
+            val drawnOut = set.spanStyles.any { it.item.textGeometricTransform != null || it.item.letterSpacing.let { l -> l.isEm && l.value != tracking } }
+            if (!drawnOut && laid.lineCount > 1) ragged++
+            var previous = Float.NaN
+            for (line in 0 until laid.lineCount) {
+                lines++
+                val start = laid.getLineStart(line)
+                val end = laid.getLineEnd(line, visibleEnd = true)
+                val last = line == laid.lineCount - 1
+                val gap = set.spanStyles.firstOrNull {
+                    it.start in start until end && set.text[it.start].isEnglishJustifyGap() &&
+                        it.item.letterSpacing.isEm && it.item.letterSpacing.value != tracking
+                }
+                if (gap == null) {
+                    if (!last || justifyLast) unjustified++
+                    previous = Float.NaN
+                    continue
+                }
+                if (kotlin.math.abs(box - laid.getLineRight(line)) > 1f) edgeMisses++
+                val scale = set.spanStyles.firstOrNull {
+                    it.start == start && it.item.textGeometricTransform != null
+                }?.item?.textGeometricTransform?.scaleX ?: 1f
+                val em = (spacePx / handPx + gap.item.letterSpacing.value - tracking) * scale
+                seen += Seen(index, em, set.text.substring(start, end))
+                widths += kotlin.math.abs(scale - 1f)
+                if (!previous.isNaN()) jumps += kotlin.math.abs(em - previous)
+                previous = em
+            }
+        }
+    }
+    fun List<Float>.q(p: Double) = if (isEmpty()) 0f else sorted()[((size - 1) * p).toInt()]
+    val spaces = seen.map { it.spaceEm }
+    return buildString {
+        appendLine(
+            "leaves=${book.leaves.size} lines=$lines justified=${seen.size} unjustified=$unjustified " +
+                "raggedParagraphs=$ragged edgeMisses=$edgeMisses",
+        )
+        appendLine(
+            "word space em: p10=%.3f p50=%.3f p90=%.3f p99=%.3f max=%.3f; over 0.4em: %d, over 0.5em: %d".format(
+                spaces.q(0.10), spaces.q(0.50), spaces.q(0.90), spaces.q(0.99), spaces.maxOrNull() ?: 0f,
+                spaces.count { it > 0.4f }, spaces.count { it > 0.5f },
+            ),
+        )
+        appendLine("line-to-line space change em: p50=%.3f p90=%.3f".format(jumps.q(0.5), jumps.q(0.9)))
+        appendLine("|glyph width change|: p50=%.4f p90=%.4f".format(widths.q(0.5), widths.q(0.9)))
+        appendLine("loosest lines:")
+        seen.sortedByDescending { it.spaceEm }.take(20).forEach {
+            appendLine("  leaf ${it.leaf + 1} %.3fem | ${it.text}".format(it.spaceEm))
+        }
+    }
 }

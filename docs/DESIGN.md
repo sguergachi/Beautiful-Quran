@@ -1040,7 +1040,9 @@ lists and reading view; **Apple Music lyrics** for the word illumination and
 the recede-while-playing behavior. Running-text rules follow Bringhurst's
 *Elements of Typographic Style* (45–75 character measure, natural word space,
 ragged-right setting, leading proportional to type size) and WCAG's text
-spacing / visual-presentation guidance.
+spacing / visual-presentation guidance. The English mushaf leaf is the
+exception: it is a book page and sets justified, with whole words and
+TeX-style micro-typography (QURAN_TYPOGRAPHY.md §13.5).
 
 ### The scroll grid
 
@@ -1217,13 +1219,16 @@ image, so it is crisp at any density and nearly free to render.
   so the header's whole ornament is this chapter's own. Chapter number
   assigns a distinct frame/interior/corner recipe and a distinct medallion
   structure across all 114 chapters; verse count varies their safe
-  proportions. The same chapter always regrows the same ornament. Border
-  friezes (cover
-  only) come from five band grammars of tooled bindings: interlocking
-  scallops (fish-scale) with a pearl in each scale, a two-strand cable with pearl eyes, a Hankin
-  strip, a nested lozenge chain, and a khatam chain of small eight-fold
-  stars linked by diamonds. No grammar uses straight zigzags or X crossings:
-  they read as typed ASCII (`<xXx>`), not tooling. On the cover, the **medallion and field build
+  proportions. The same chapter always regrows the same ornament. The cover's
+  border frieze is one grammar, a **rumi scroll** after the running gold
+  borders of Ottoman and Mamluk illuminated Qur'ans: a vine waves along the
+  band, a split palmette (rumi) springs under each crest and ends in a beak
+  curling back over its own body, vein down its middle, glide-mirrored
+  under each trough, with a pearl between crest and rail. The seed only
+  nudges its proportions. It replaced five geometric grammars (scallops,
+  cable, Hankin strip, lozenge and khatam chains) whose straight crossings
+  and diamonds read as typed ASCII (`x`, `<>`) at band size; keep border
+  line work curved. On the cover, the **medallion and field build
   in real time** — strokes ink themselves in along their length across
   ~3.4 s, field first, then medallion outside-in — so the illumination is
   drawn before the reader's eyes, not stamped; the **border and corner
