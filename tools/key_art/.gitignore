@@ -1,1 +1,6 @@
 node_modules
+__pycache__
+reel/node_modules
+reel/public
+reel/output
+reel/package-lock.json

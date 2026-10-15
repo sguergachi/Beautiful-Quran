@@ -3,7 +3,7 @@
 Marketing art for Beautiful Quran, starting with the Instagram Reel series
 *Rain carriage*. [DESIGN.md](DESIGN.md) governs the app; this file governs
 everything we show *around* the app. The app is never redrawn for marketing:
-every screen in key art is a real capture of the reader (see
+every screen in key art is a real recording of the Android app (see
 [Producing the assets](#producing-the-assets)).
 
 ## The brief, in one sentence
@@ -81,15 +81,14 @@ The app's rule is *one sheet of paper, calm and pure*. In key art:
 - **The recitation leads**: Mishary Rashid Alafasy, the app's default
   reciter, the same EveryAyah recordings and order the app plays (basmalah,
   then 55:1–10), placed to the frame where the capture played them.
-- **Ambience under it**: rain on glass, the low rumble of the carriage, the
-  slow pulse of rail joints. All are synthesised, so there is no licensing
-  question and no music.
+- **Ambience, only where the picture has weather**: the rain carriage pieces
+  may carry rain on glass and carriage rumble (synthesised or royalty-free),
+  never music. The intro and mockups are recitation alone.
 - **No music, no lofi beat.** Much of the audience avoids instruments under
   Quran. A beat would also fight the reciter's own rhythm, which the ink is
   following. The rain is the texture.
 - Mix: recitation about −16 LUFS integrated with peaks under −1 dBTP;
-  ambience 14–18 dB beneath it. Ambience fades in from the first frame so
-  the open is never silent.
+  any ambience 14–18 dB beneath it.
 
 ## Why Ar-Rahman 1–10
 
@@ -106,75 +105,73 @@ staged to answer the verses, never to illustrate them literally:
 
 The light-break is timed to land on 55:5 in every variant.
 
-## The three variants
+## The intro Reel: "Every word, as it is recited"
 
-All three share one composition, so they A/B on palette and place alone.
+29 s, 1080 × 1920, 60 fps. The recitation (basmalah, 55:1–4) runs
+unbroken; every cut lands on a verse boundary, and the phone changes theme
+across cuts, because all takes share one timeline (see the tools README).
+
+| Time | Verse | Shot | Caption |
+|---|---|---|---|
+| 0.0–6.6 | basmalah | Full-bleed screen, Royal green, large text: the basmalah writes itself in white-gold; slow push-in pivoting on it | none |
+| 6.6 | 55:1 | Cut to the phone, Royal green, settling from 1.10× | *Every word, as it is recited.* |
+| 11.2 | 55:2 | Cut, Paper phone on paper | *Its meaning, word by word, beneath.* |
+| 15.9 | 55:3 | Cut, Nightfall phone on near-black | *Paper, nightfall, or royal green.* |
+| 21.4 | 55:4 | Cut, Royal green, slow push | *Free and open source.* |
+| 25.9–29 | tail | End card: icon, *Beautiful Quran*, ANDROID · WEB · LINK IN BIO | |
+
+Captions are Cormorant Garamond italic (the product page's voice); the end
+card uses Junicode, the app's English face. Captions sit above the phone,
+clear of Instagram's top bar; the active verse always sits in the screen's
+upper third, clear of the caption and action rail at the bottom.
+
+**Rules learned making it:**
+
+- Every screen is the Android app. Web-reader footage and redrawn
+  screens were rejected.
+- No stylised or vector hands. A hand on screen must be photographic.
+- Smoothness is part of fidelity: wash footage is captured slowed and
+  conformed (≥ 60 distinct frames per second of recitation), never upsampled.
+
+## Device mockups
+
+Full-length (basmalah + 55:1–10, 69 s), one theme each: the phone
+centred on its theme's ground, a quiet italic wordmark beneath. For
+posting as-is, or as source for shorter cuts.
+
+## The rain carriage (photoreal, in progress)
+
+The rain-window concept above, made photoreal: an image model renders a
+first-person hand holding a phone with a flat chroma-green screen in a
+rainy train window. `composite_screen.py` keys that screen, fits its edges
+and lays the real take in, with edge unmixing and skin-aware despill (the
+models paint green light onto the fingers). Three plates exist (dawn coast,
+night countryside, mountain valley). Moving versions need a video model
+(Runway's Veo/Seedance/Kling: a paid plan) or free stock footage of a
+green-screen phone (Pexels), which `composite_video.py` tracks frame by
+frame. The palettes per variant:
 
 | | **A · Paper dawn** | **B · Nightfall line** | **C · Royal valley** |
 |---|---|---|---|
 | App theme | Paper | Nightfall | Royal green |
 | Hour | Grey morning rain, breaking to pale gold | Blue hour into night | Late afternoon under storm cloud |
 | The view | Misted coast; the sea opens under the break | Wet countryside, distant town lights, the moon | Deep green mountain valley; sun shafts on the valley floor |
-| Passing world | Pale birches, catenary masts | Lamp-lit crossings, masts, black hedges | Pines, masts, a river glint |
 | Sleeve | Oat knit | Charcoal knit | Moss knit |
-| Interior light | Cool daylight | Warm lamp, screen glow on the thumb | Neutral, green-tinted bounce |
-| Mood word | *clean* | *intimate* | *awe* |
-
-## Composition (1080 × 1920, 9:16)
-
-- **Phone**: the screen at 0.56 of capture scale (606 × 1345 px), its top
-  at y = 500 so the view peeks over it, and its foot just inside the frame.
-  It is tilted −2.6° and swaying, and stays upright enough that the Arabic
-  reads at phone size.
-- **Hand**: a right hand from the lower right. The thumb lies over the
-  screen's lower right, where only upcoming verses and the receded transport
-  sit, never over the active line. Four fingers wrap the left edge from
-  behind, and the heel of the palm and a knit cuff close the lower right.
-  The hand is drawn once per variant and only moves with the phone.
-- **Window**: fills the frame behind the phone. The frame and sill read only
-  as soft dark shapes at the edges.
-- **Focus**: the phone and hand are sharp. The glass droplets are slightly
-  soft, and the world outside is very soft, with motion blur growing toward
-  the foreground.
-- **Instagram safe zones**: the reader's active line must stay between
-  y ≈ 260 and y ≈ 1500 (bottom UI, caption and the right-hand action rail).
-  The app scrolls its active verse to the upper third, which already
-  satisfies this.
-- **Motion**: the world moves right to left at three parallax speeds. Rain
-  beads hold, and runnels slide back and down. The hand sways under the
-  carriage with sub-pixel easing, about 0.6° at most and 0.4 Hz with a slow
-  0.07 Hz drift. No camera moves beyond that sway.
-- **Loop**: the Reel ends on 55:10's final word drying, then 2 s of rain.
-  The end card is the cover frame (below), not a separate slide.
 
 ## Deliverables
 
 | Asset | Spec |
 |---|---|
-| Reel, ×3 variants | 1080 × 1920, 30 fps, H.264 High, yuv420p, about 8 Mb/s, AAC 48 kHz stereo |
-| Cover still, ×3 | 1080 × 1920 JPEG, a frame during 55:5 (the light-break) |
-| Grid crop, ×3 | 1080 × 1350 (4:5) from the cover, phone centred |
-| Website hero | Al-Fatihah, Paper theme, reader capture in the phone frame |
-| Website themes, ×3 | 13 s Al-Fatihah loops, half resolution |
+| Intro Reel | 1080 × 1920, 60 fps, H.264, AAC 48 kHz, −16 LUFS, 29 s |
+| Mockups ×3 | 1080 × 1920, 60 fps, 69 s, one per theme |
+| Product page hero | Al-Fatihah, Paper, 1080 × 2400, 30 fps, about 1 MB |
+| Product page theme loops ×3 | Al-Fatihah opening, 540 × 1200, 13 s, about 150 KB |
+| Rain carriage plates ×3 | 9:16 stills with a green screen, for compositing |
 
 ## Producing the assets
 
-The pipeline is in `tools/key_art/`:
-
-1. **Capture the reader frame by frame.** `capture.mjs` drives the built web
-   reader in headless Chrome under a virtual clock (`vclock.js`). It takes
-   over `performance.now`, timers, `requestAnimationFrame`, Web Animations
-   and media playback, so every frame lands at exactly 1/30 s. The wash is
-   therefore the real engine's output with no dropped frames, regardless of
-   machine load. The capture logs every audio segment it played.
-2. **Rebuild the recitation.** `mix_audio.py` places the same EveryAyah
-   segments at the logged frame times and lays the synthesised rain and
-   carriage bed beneath them.
-3. **Render the scene.** `train_window.html` draws the window, rain, world,
-   phone and hand around each captured frame. A WebGL scene plus a 2D hand
-   layer, it is seeded and deterministic per variant. `render_scene.mjs`
-   steps it.
-4. **Encode.** ffmpeg muxes frames and audio; the encode settings are in
-   `render_scene.mjs`.
-
-The website clips use step 1 and step 4 only.
+All tooling, with commands, is in
+[tools/key_art/README.md](../tools/key_art/README.md): emulator takes
+slowed to 0.25×/0.5× (a capture-only speed patch), onset detection,
+conforming to 1× at 60 fps, and the edit in Revideo (MIT). Rendered
+videos are not committed except the product-page clips in `docs/`.

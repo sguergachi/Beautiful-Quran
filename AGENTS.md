@@ -388,7 +388,7 @@ this document combined: `ReaderComponents.kt` (~36k tokens),
 | `docs/CHESTERTON.md` | Worked examples for invariant #9 — guards that look wrong and aren't |
 | `docs/OUTPUT_LATENCY.md` | Route-based Bluetooth/output lag presets applied before the highlight clock |
 | `docs/DESIGN.md` | Any UI/visual change — the paper metaphor and its hard rules |
-| `docs/KEY_ART.md` | Marketing art and product-page videos — the *Rain carriage* Reels, their niche and rules, and the frame-exact capture pipeline in `tools/key_art/` |
+| `docs/KEY_ART.md` | Marketing art and product-page videos — niche and rules, the intro Reel shot list, and the Android capture → Revideo edit pipeline in `tools/key_art/` |
 | `docs/CONTEXTUAL_GUIDES.md` | Adding or changing feature education — live-target contract, wiring, and device verification |
 | `docs/PERFORMANCE.md` | Anything touching the reader, scrolling, or the highlight loop |
 | `docs/REPEAT_HIGHLIGHTING.md` | Repeat-aware timings and the orange second fade |
