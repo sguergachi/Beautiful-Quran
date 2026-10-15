@@ -1039,6 +1039,10 @@ class AppStore {
     player.clearError()
   }
 
+  async applyRepeat(mode: PlayerState['repeatMode'], range: PlayerState['repeatRange']) {
+    await player.applyRepeat(mode, range)
+  }
+
   setRepeat(mode: PlayerState['repeatMode'], range: PlayerState['repeatRange'] = null) {
     player.setRepeatMode(mode, range)
   }

@@ -123,6 +123,7 @@ export class PlayerController {
    * the second would clear isPlaying mid-join.
    */
   private pauseSuppressRemaining = 0
+  private repeatSelectionGeneration = 0
   /**
    * Developer preference for Gapless-5 joins (Settings). Effective use also
    * requires 1× speed — see [wantsGapless5Transport].
@@ -389,6 +390,13 @@ export class PlayerController {
         index, this.gapless5?.getPositionMs() ?? 0, this.gapless5?.getDurationMs() ?? 0,
       ),
       onFinishedAll: () => {
+        const range = this.state.repeatMode === 'range' ? this.state.repeatRange : null
+        const first = range ? this.playlist.findIndex(item => item.ayah === range.first) : -1
+        if (first >= 0 && this.gapless5) {
+          this.gapless5.goto(first, true)
+          this.syncGapless5Index(first, 0, this.gapless5.getDurationMs(), true)
+          return
+        }
         this.setBuffering(false)
         this.stopTick()
         this.patch({ isPlaying: false })
@@ -402,7 +410,7 @@ export class PlayerController {
   }
 
   /** Apply Gapless-5 auto-advance; wrap range-repeat when it walks past last. */
-  private syncGapless5Index(index: number, positionMs = 0, durationMs = 0) {
+  private syncGapless5Index(index: number, positionMs = 0, durationMs = 0, force = false) {
     if (!this.gapless5Enabled || index < 0 || index >= this.playlist.length) return
 
     let wrapped = false
@@ -422,7 +430,7 @@ export class PlayerController {
       }
     }
 
-    if (index === this.index && !wrapped) return
+    if (index === this.index && !wrapped && !force) return
     this.index = index
     const item = this.playlist[index]
     if (!item) return
@@ -1293,7 +1301,41 @@ export class PlayerController {
     void this.applyGapless5Transport()
   }
 
+  /** Apply a repeat-sheet choice, preserving a live utterance inside its range. */
+  async applyRepeat(mode: PlayerState['repeatMode'], range: PlayerState['repeatRange']) {
+    if (!this.content || !this.reciter) return
+    const total = this.content.surah.ayahCount
+    const bounds = mode === 'range' && range ? {
+      first: Math.max(1, Math.min(total, Math.trunc(range.first))),
+      last: Math.max(1, Math.min(total, Math.trunc(range.last))),
+    } : null
+    if (bounds) bounds.last = Math.max(bounds.first, bounds.last)
+    const current = this.state.nowPlaying?.surahId === this.surahId
+      ? this.state.nowPlaying.ayah : this.playlist[this.index]?.ayah ?? 1
+    const inside = bounds != null && this.state.isPlaying && current >= bounds.first && current <= bounds.last
+    const target = bounds && !inside ? bounds.first : current
+    const position = bounds && !inside ? 0 : this.state.positionMs
+    const autoplay = bounds != null || this.state.isPlaying
+    const requiredStart = mode === 'surah' ? 1 : bounds?.first
+    const full = requiredStart != null && !this.playlist.some(item => item.ayah === requiredStart)
+    this.setRepeatMode(mode === 'range' && !bounds ? 'off' : mode, bounds)
+    const generation = this.repeatSelectionGeneration
+    if (full) {
+      this.playlist = buildPlaylist(this.content, this.reciter, 1)
+      this.joins.clearStandby()
+    }
+    const index = this.playlist.findIndex(item => item.ayah === target)
+    if (index >= 0 && (full || bounds && !inside)) {
+      const pending = this.playIndex(index, autoplay, { fadeIn: false })
+      const token = this.playToken
+      await pending
+      if (generation !== this.repeatSelectionGeneration || token !== this.playToken) return
+      if (position > 0) this.seekMs(position)
+    }
+  }
+
   setRepeatMode(mode: PlayerState['repeatMode'], range: PlayerState['repeatRange'] = null) {
+    this.repeatSelectionGeneration++
     this.patch({ repeatMode: mode, repeatRange: range })
     this.active.loop = mode === 'ayah'
     this.gapless5?.applyRepeat(mode)

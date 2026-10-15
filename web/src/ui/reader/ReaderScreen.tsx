@@ -1,3 +1,5 @@
+import { RepeatSheet } from './RepeatSheet'
+import type { RepeatChoice } from './repeatPolicy'
 import { foldEnglish } from '../../domain/EnglishTypography'
 import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from 'react'
 import { AyahBlock } from '../../render/AyahBlock'
@@ -1203,6 +1205,7 @@ export function ReaderScreen({
   useEffect(() => {
     if (!readerOwnsKeyboard(isTop, state.rootViewer != null) || !content) return
     const onKeyDown = (event: KeyboardEvent) => {
+      if (document.querySelector('dialog[open]')) return
       if (event.defaultPrevented || event.altKey || event.ctrlKey || event.metaKey) return
       if (isKeyboardControl(event.target)) return
       if (ayahRailTipOpen || ayahRailTipRendered || bookmarkTipOpen || bookmarkTipRendered) return
@@ -1359,6 +1362,8 @@ export function ReaderScreen({
     bookmarkTipAyah > 0 &&
     Number.isFinite(bookmarkTipCenterY)
 
+  const [repeatOpen, setRepeatOpen] = useState(false)
+  const retainedRepeat = useRef<RepeatChoice | null>(null)
   const repeatMode = state.player.repeatMode
   const nowPlaying = state.player.nowPlaying
   // Cover keeps this same bar and opens the return pill and Close into it.
@@ -1908,16 +1913,16 @@ export function ReaderScreen({
             <div className="player-transport">
               <button
                 type="button"
-                className="ctrl"
+                className="ctrl repeat-control"
                 data-receded={receded && repeatMode === 'off'}
                 data-active={repeatMode !== 'off'}
                 aria-pressed={repeatMode !== 'off'}
-                aria-label={repeatMode === 'off' ? 'Repeat off' : `Repeat ${repeatMode}`}
-                onClick={() =>
-                  appStore.setRepeat(repeatMode === 'ayah' ? 'off' : 'ayah')
-                }
+                aria-label="Open repeat options"
+                aria-haspopup="dialog"
+                aria-expanded={repeatOpen}
+                onClick={() => setRepeatOpen(true)}
               >
-                {repeatMode === 'ayah' ? <IconRepeatOne /> : <IconRepeat />}
+                {repeatMode === 'ayah' || state.player.repeatRange?.first === state.player.repeatRange?.last && state.player.repeatRange != null ? <IconRepeatOne /> : <IconRepeat />}
               </button>
               <button
                 type="button"
@@ -2025,6 +2030,18 @@ export function ReaderScreen({
 
       {/* Ink bleed lives on this sheet — not a full-viewport layer over the deck. */}
       <RootViewer />
+      {repeatOpen && content ? <RepeatSheet
+        chapter={content.surah.nameTransliteration}
+        ayahCount={content.surah.ayahCount}
+        currentAyah={state.player.nowPlaying?.surahId === content.surah.id
+          ? Math.max(1, state.player.nowPlaying.ayah) : focusedAyah || state.openAyah || 1}
+        mode={repeatMode} range={state.player.repeatRange} retainedChoice={retainedRepeat.current}
+        onDismiss={() => setRepeatOpen(false)}
+        onApply={(mode, range, choice) => {
+          retainedRepeat.current = choice
+          setRepeatOpen(false)
+          void appStore.applyRepeat(mode, range)
+        }} /> : null}
     </div>
   )
 }

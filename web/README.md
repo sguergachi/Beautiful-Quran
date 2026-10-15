@@ -18,6 +18,17 @@ Repository **Settings → Pages → Build and deployment → Source** must be
 **GitHub Actions**. Selecting the legacy `master /docs` source deploys only the
 marketing files and overwrites `/app/` with a 404.
 
+## Repeat in the book
+
+The playback repeat button opens a paper modal sheet, matching Settings: a
+right-page sheet on desktop and a full sheet on phones. It offers Android’s
+Off, This ayah, Whole surah, A range of ayahs, and From this ayah modes.
+From this ayah counts the opening ayah in the requested number. Done applies
+the choice; Cancel or Escape discards edits and returns focus to the button.
+An active ayah inside a new range continues uninterrupted; a range selected
+while paused or outside its bounds starts at its first ayah. Whole-surah
+repeat includes the chapter’s beginning even when playback began later.
+
 ## Quick start
 
 ```bash

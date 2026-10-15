@@ -368,3 +368,72 @@ describe('gapless verse-clock publication', () => {
     vi.unstubAllGlobals()
   })
 })
+
+describe('repeat sheet playback application', () => {
+  afterEach(() => vi.unstubAllGlobals())
+  async function fixture(start: number, playing: boolean, ayah: number) {
+    vi.stubGlobal('Audio', FakeAudio)
+    vi.stubGlobal('navigator', {})
+    const { PlayerController } = await import('../player')
+    const p = new PlayerController(instantPrefetcher(), true, null, () => new FakeAudio().asAudio())
+    p.loadSurah(content, reciter, start, { quiet: true, warm: false })
+    const internal = p as unknown as {
+      state: import('../player').PlayerState
+      playlist: { ayah: number; url: string }[]
+      index: number
+      playIndex: ReturnType<typeof vi.fn>
+      gapless5Enabled: boolean
+      gapless5: { goto: ReturnType<typeof vi.fn>; getDurationMs: () => number }
+      createGapless5Backend(): { handlers: { onFinishedAll(): void } }
+    }
+    internal.state = { ...p.getState(), nowPlaying: { surahId: 1, reciterId: 1, ayah }, isPlaying: playing, positionMs: 432 }
+    internal.index = internal.playlist.findIndex(item => item.ayah === ayah)
+    internal.playIndex = vi.fn(async () => {})
+    return { p, internal }
+  }
+  it('keeps an in-range live utterance at its position', async () => {
+    const { p, internal } = await fixture(1, true, 2)
+    await p.applyRepeat('range', { first: 1, last: 3 })
+    expect(internal.playIndex).not.toHaveBeenCalled()
+    expect(p.getState()).toMatchObject({ positionMs: 432, repeatRange: { first: 1, last: 3 } })
+  })
+  it('does not reload a live range already present in a truncated playlist', async () => {
+    const { p, internal } = await fixture(2, true, 2)
+    await p.applyRepeat('range', { first: 2, last: 3 })
+    expect(internal.playIndex).not.toHaveBeenCalled()
+    expect(p.getState().positionMs).toBe(432)
+  })
+  it('abandons an old position restore after a newer repeat choice', async () => {
+    const { p, internal } = await fixture(3, false, 3)
+    let finish!: () => void
+    internal.playIndex = vi.fn(() => new Promise<void>(resolve => { finish = resolve }))
+    const seek = vi.spyOn(p, 'seekMs')
+    const pending = p.applyRepeat('surah', null)
+    await p.applyRepeat('off', null)
+    finish()
+    await pending
+    expect(seek).not.toHaveBeenCalled()
+    expect(p.getState().repeatMode).toBe('off')
+  })
+  it('rebuilds a truncated playlist for a whole-chapter loop', async () => {
+    const { p, internal } = await fixture(3, false, 3)
+    await p.applyRepeat('surah', null)
+    expect(internal.playlist.map(item => item.ayah)).toEqual([1, 2, 3])
+    expect(internal.playIndex).toHaveBeenCalledWith(2, false, { fadeIn: false })
+    expect(p.getState().repeatMode).toBe('surah')
+  })
+  it('starts from the range beginning when playback is outside it', async () => {
+    const { p, internal } = await fixture(1, true, 1)
+    await p.applyRepeat('range', { first: 2, last: 3 })
+    expect(internal.playIndex).toHaveBeenCalledWith(1, true, { fadeIn: false })
+  })
+  it('wraps a range ending at the final clip, including a single final ayah', async () => {
+    const { p, internal } = await fixture(1, true, 3)
+    internal.gapless5Enabled = true
+    internal.gapless5 = { goto: vi.fn(), getDurationMs: () => 4000 }
+    internal.state = { ...internal.state, repeatMode: 'range', repeatRange: { first: 3, last: 3 } }
+    internal.createGapless5Backend().handlers.onFinishedAll()
+    expect(internal.gapless5.goto).toHaveBeenCalledWith(2, true)
+    expect(p.getState()).toMatchObject({ nowPlaying: { ayah: 3 }, isPlaying: true, positionMs: 0 })
+  })
+})

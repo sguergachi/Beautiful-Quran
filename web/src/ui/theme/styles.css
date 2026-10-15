@@ -8373,3 +8373,51 @@ html[data-entrance-closing]
 .supplied-bracket {
   color: color-mix(in srgb, currentColor 40%, transparent);
 }
+
+/* Repeat is a loose sheet on the book, with the same placement as Settings. */
+.repeat-sheet {
+  position: fixed;
+  inset: 0;
+  width: auto;
+  height: auto;
+  max-width: none;
+  max-height: none;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: var(--paper);
+  color: var(--ink);
+  overflow: auto;
+}
+.repeat-sheet::backdrop { background: transparent; }
+.repeat-sheet-content { min-height: 100%; height: auto; padding: 28px; }
+.repeat-chapter { color: var(--ink-muted); margin: 0 0 1.75rem; }
+.repeat-bounds { display: flex; align-items: end; gap: 1rem; margin: 1.5rem 0; }
+.repeat-number { display: flex; flex-direction: column; gap: 0.75rem; }
+.repeat-number span, .repeat-from-here p { font-size: 0.9rem; color: var(--ink-muted); }
+.repeat-number input {
+  width: 6ch;
+  padding: 0.35rem 0;
+  font: inherit;
+  font-size: 1.75rem;
+  color: var(--ink);
+  background: transparent;
+  border: 0;
+  border-bottom: 1px solid currentColor;
+  border-radius: 0;
+}
+.repeat-from-here { margin: 1.5rem 0; }
+.repeat-done { display: block; margin: 2rem auto 1rem; font: inherit; font-size: 1.25rem; color: var(--ink); }
+.app-shell[data-spread='true'] .repeat-sheet {
+  --sheet-inset: calc(var(--u) * 0.382);
+  --sheet-off: calc(-100% - var(--page-y) - 2rem);
+  --sheet-skew: 1.3deg;
+  inset: calc(var(--page-y) + var(--sheet-inset)) calc(var(--page-outer) + var(--sheet-inset)) calc(var(--page-y) + var(--sheet-inset)) calc(50% + var(--u) * 0.618);
+  border-radius: 2px;
+  transform-origin: 50% 0;
+  animation: settings-sheet-in 640ms both;
+}
+@media (prefers-reduced-motion: reduce) { .repeat-sheet { animation: none !important; } }
+
+/* Repeat remains available while listening, including when repeat is off. */
+.player-bar .repeat-control[data-receded='true'] { opacity: 0.45; pointer-events: auto; }

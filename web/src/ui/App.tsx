@@ -154,7 +154,7 @@ export function App() {
   useEffect(() => {
     if (!entranceDone) return
     const onKey = (e: KeyboardEvent) => {
-      if (e.key !== 'Escape') return
+      if (e.key !== 'Escape' || e.defaultPrevented || document.querySelector('dialog[open]')) return
       appStore.goBack()
     }
     window.addEventListener('keydown', onKey)
