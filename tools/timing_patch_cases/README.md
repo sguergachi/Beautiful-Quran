@@ -96,7 +96,10 @@ a case under this directory.
 3. Drop a new `tools/timing_patch_cases/<id>.json`.
 4. Implement or adjust the systematic rule until `python3 tools/test_build_db.py`
    is green.
-5. Rebuild `data/quran.db` and bump `DB_FILE_NAME` only if content changes.
+5. Use the voice's delivery path: QF runtime fixes require an authenticated
+   source replay, acoustic verdicts and reviewed runtime publication. Rebuild
+   `data/quran.db` and bump its version/fingerprint only for changed independent
+   bundled timings. See [the maintainer workflow](../../docs/TIMINGS_LAB.md#getting-corrections-upstream).
 
 ## Run
 

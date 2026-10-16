@@ -2,7 +2,7 @@
   "id": "rewind-onset-hani-21-63",
   "label": "Hani 21:63 60 ms إِن stamped on the rewind to فَسۡـَٔلُوهُمۡ",
   "refs": [
-    "GitHub issue #781",
+    "GitHub issues #781 and #873 (repeat topology is already corrected)",
     "dual CTC",
     "waveform"
   ],

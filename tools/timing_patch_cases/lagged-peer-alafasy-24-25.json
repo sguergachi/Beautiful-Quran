@@ -2,7 +2,7 @@
   "id": "lagged-peer-alafasy-24-25",
   "label": "Alafasy 24:25 يَوۡمَئِذٖ is labelled twice because qdc lags, not re-said",
   "refs": [
-    "GitHub #856 (Timings Lab, Pixel 10, v0.10)",
+    "GitHub #856 and #873 (Timings Lab, Pixel 10, v0.10)",
     "raw qdc 1,1,2,5 (words 3-4 never labelled)",
     "timing_repairs Alafasy drop edit"
   ],

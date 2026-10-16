@@ -214,10 +214,20 @@ Free, no backend, no auth beyond the GitHub account:
    Agent checklist (mandatory): [AGENTS.md — Landing Timings Lab / GitHub
    timing patches](../AGENTS.md#landing-timings-lab--github-timing-patches).
 
-   Before classifying, **diff the Lab positions against raw qdc**
-   (`tools/.cache/qdc_<id>.json`) and against the row **after**
-   `clean_qdc_artifacts` and **after** `timing_repairs` — the shipped DB may
-   already be wrong because a `drop` repair flattened a real re-say (#570).
+   First compare every edit with the **currently delivered** row. Alafasy,
+   Husary Murattal, Abdul Basit Murattal, Minshawi Murattal, Sudais and Hani
+   use `/api/timings/<appReciterId>` and the device's runtime cache; their
+   timings are absent from `data/quran.db`. A Lab export may contain old local
+   corrections that the service already delivers, or less accurate boundaries
+   than a reviewed fix. Preserve existing correct repeats and investigate
+   disagreements before applying the payload.
+
+   Before classifying, **diff the Lab positions against the pinned source**
+   for that voice: authenticated snapshots for QF runtime delivery, or
+   `tools/.cache/qdc_<id>.json` for a legacy-source audit. Compare the rows
+   after `clean_qdc_artifacts`, typed corrections, generated repairs and
+   reviewed holds. A delivered row may already be wrong because a `drop`
+   repair flattened a real re-say (#570); a Lab edit may also predate a fix.
 
    | Class | Where to fix | Unit test |
    |---|---|---|
@@ -254,9 +264,24 @@ Free, no backend, no auth beyond the GitHub account:
    a multi-word re-recitation; peer same-word re-says are restored per position
    so unrelated repairs still apply. Boundary repairs replace only their listed,
    uniquely occurring positions.
-5. Run `python3 tools/test_build_db.py`, rebuild `quran.db`, bump
-   `DB_FILE_NAME`, and commit the systematic code, regression case, and DB.
-   Delete any local override JSON first.
+5. Run `python3 tools/test_build_db.py`, then use the correct delivery path:
+   - **QF runtime voices:** replay the pinned authenticated snapshots against
+     the private reviewed baseline, obtain the required per-row acoustic
+     verdicts, and publish reviewed runtime resources using
+     `tools/sync_qf_timings.py`. Follow [QF_TIMING_PARITY.md](QF_TIMING_PARITY.md).
+     Default `build_db.py` preserves bundled timings; rebuilding the APK or
+     release database cannot update these voices. Keep QF snapshots and
+     generated databases outside the checkout. Do not claim a fix is delivered
+     until the published runtime row has been checked.
+   - **Independent bundled voices:** rebuild `quran.db`; if its content
+     changes, bump `DB_FILE_NAME` and the database fingerprint, and commit the
+     systematic code, regression case, evidence and DB.
+   Delete any local override JSON before committing. Missing acoustic evidence
+   leaves a candidate pending; it does not justify weakening the delta gate.
+
+The five-verse [#873 review](quality-reviews/TIMING_PATCH_873_2026-10-16.md)
+records already-delivered corrections, unsupported edits and the remaining
+acoustic review requirements.
 
 The patch JSON shape (also the shape `tools/timing_overrides/*.json` accepts):
 

@@ -28,6 +28,15 @@ occurrence (0.83 / 0.75). In the new row that audio stays on word 1 (the
 repair runs يَوۡمَئِذٖ to 2020 ms), so a high word-1 probability there is
 expected, not evidence of a re-say.
 
+**Runtime observation, 2026-10-16:** the public Alafasy runtime resource already
+matches the 24:25 edit in #856/#873, including the retained word-6 repeat.
+The deployed normalizer fingerprint differs from this checkout, so the table
+above describes the reproducible local pipeline delta, not proof that the
+service still carries the old row. Reconcile publication provenance and the
+ledger during the next authenticated replay; do not reapply the Lab row or
+remove another occurrence. See the
+[#873 review](../../docs/quality-reviews/TIMING_PATCH_873_2026-10-16.md).
+
 ## Resolved: Sudais re-clock after #712 (quran-v64)
 
 c4e17836 (#712) taught `parse_alignment_payload` to read Sudais' quran-align
