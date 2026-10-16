@@ -878,6 +878,17 @@ fun englishTranslationHighlightSpans(
     return highlightAllOccurrences(snippet, needles)
 }
 
+/** Every ranked result has visible gold: precise terms, or the whole ayah-level context. */
+fun searchHitHighlightSpans(hit: WordSearchHit, query: String): List<AyahTextSpan> {
+    val spans = englishTranslationHighlightSpans(
+        hit.displayText, query, EnglishTypography.typesetName(hit.translation),
+        hit.matchLabel.orEmpty(), hit.matchTerms,
+    )
+    if (spans.any(AyahTextSpan::highlighted)) return spans
+    val context = spans.joinToString("") { it.text }.ifBlank { hit.matchReason }
+    return listOf(AyahTextSpan(context, highlighted = true))
+}
+
 /**
  * Trims [text] to roughly [wordsBefore]…[wordsAfter] words around the first
  * occurrence of [needle], adding an ellipsis when the ends were cut.
@@ -996,6 +1007,14 @@ private fun highlightNeedleSpecs(
     presentTokens(semanticLabel)
         .filterNot { it.lowercase() in highlightFillers }
         .forEach(::add)
+    if (needles.isEmpty() && !parsed.exactOnly && searchTextRelevance(haystack, parsed, false) > 0) {
+        // Reordered phrases rank as words; show those same words when no phrase is visible.
+        EnglishContractions.words(parsed.text)
+            .filter { it.length >= 2 && it.lowercase() !in highlightFillers }
+            .forEach { term ->
+                visibleTerm(term)?.let(::add) ?: add(term, wholeWord = false, wordPrefix = true)
+            }
+    }
     return needles.values.toList()
 }
 

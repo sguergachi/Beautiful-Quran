@@ -1245,6 +1245,16 @@ export function englishTranslationHighlightSpans(
   return highlightAllOccurrences(snippet, needles)
 }
 
+/** Every ranked result has visible gold: precise terms, or the whole ayah-level context. */
+export function searchHitHighlightSpans(hit: WordSearchHit, query: string): AyahTextSpan[] {
+  const spans = englishTranslationHighlightSpans(
+    hit.displayText ?? hit.ayahTranslation, query, hit.translation, hit.matchLabel ?? '', hit.matchTerms ?? [],
+  )
+  if (spans.some((span) => span.highlighted)) return spans
+  const context = spans.map((span) => span.text).join('')
+  return [{ text: context.trim() ? context : hit.matchReason || 'Text match', highlighted: true }]
+}
+
 /**
  * Trims [text] to roughly [wordsBefore]…[wordsAfter] words around the first
  * occurrence of [needle], adding an ellipsis when the ends were cut.
@@ -1371,6 +1381,15 @@ function highlightNeedleSpecs(
   presentTokens(semanticLabel)
     .filter((token) => !HIGHLIGHT_FILLERS.has(token.toLowerCase()))
     .forEach((term) => add(term))
+  if (!needles.size && !parsed.exactOnly && searchTextRelevance(haystack, parsed, false) > 0) {
+    // Reordered phrases rank as words; show those same words when no phrase is visible.
+    for (const term of contractionWords(parsed.text)
+      .filter((word) => word.length >= 2 && !HIGHLIGHT_FILLERS.has(word.toLowerCase()))) {
+      const visible = visibleTerm(term)
+      if (visible) add(visible)
+      else add(term, false, true)
+    }
+  }
   return [...needles.values()]
 }
 

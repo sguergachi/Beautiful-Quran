@@ -1608,9 +1608,11 @@ Search results keep relevance in the existing paper hierarchy. The quiet
 metadata line explains why each result appeared (`7:154 · Text match`,
 `9:26 · Related · tranquility`, or `2:83 · Concept · Kindness to Parents`),
 while the section line gives the relevant-ayah count. These never become
-badges, chips, cards, confidence meters, or second headings. Every visible word
-that genuinely earned a result may take the gold accent; connective or merely
-similar words remain ordinary ink. Literal word hits still open with the word
+badges, chips, cards, confidence meters, or second headings. Every result has
+gold emphasis: precise matching words take the accent, including reordered
+query terms. A semantic hit without a precise word colors its full excerpt as
+ayah-level context, keeping the reader target at its honest scope.
+Literal word hits still open with the word
 flash; ayah-level concept and quoted-phrase hits open the verse without
 inventing an Arabic word to highlight.
 **Android:** continue listening no longer takes a persistent top band in the

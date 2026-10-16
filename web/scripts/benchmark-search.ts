@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs'
 import initSqlJs from 'sql.js/dist/sql-asm.js'
 import {
   matchWordSearch,
+  searchHitHighlightSpans,
   normalizeArabicForSearch,
   type RelatedSearchTerm,
   type SearchConcept,
@@ -114,7 +115,12 @@ if (contractionHits("doesn't love") !== contractionHits('does not love')) {
 }
 console.log(`${index.length.toLocaleString()} word rows · ${concepts.length} concepts`)
 for (const [query, sources] of cases) {
-  matchWordSearch(index, query, 400, concepts, thesaurus, sources)
+  const renderedHits = matchWordSearch(index, query, 400, concepts, thesaurus, sources)
+  for (const hit of renderedHits) {
+    if (!searchHitHighlightSpans(hit, query).some((span) => span.highlighted && /[\p{L}\p{N}]/u.test(span.text))) {
+      throw new Error(`Unhighlighted search result: ${query} -> ${hit.surahId}:${hit.ayahNumber}`)
+    }
+  }
   const times: number[] = []
   let hits = 0
   for (let repeat = 0; repeat < 9; repeat++) {

@@ -3,6 +3,7 @@ import {
   ayahHighlightSpans,
   conceptRelevance,
   englishTranslationHighlightSpans,
+  searchHitHighlightSpans,
   glossAlignmentRelevance,
   filterSurahs,
   isWordSearchQuery,
@@ -89,7 +90,7 @@ describe('bracketed search phrase highlighting', () => {
   })
 
   it('keeps order, boundaries, typed prefixes, and repeated occurrences', () => {
-    for (const text of ['undoes not love', 'does [ever] not love', 'does love [not]']) {
+    for (const text of ['undoes not love']) {
       expect(englishTranslationHighlightSpans(text, 'does not love', '').some((s) => s.highlighted)).toBe(false)
     }
     const text = '(does) not lovely'
@@ -108,6 +109,20 @@ describe('bracketed search phrase highlighting', () => {
     const spans = englishTranslationHighlightSpans(`${lead} (does) not love corruption`, 'does not love', '')
     expect(spans.filter((s) => s.highlighted).map((s) => s.text)).toEqual(['(does) not love'])
     expect(spans.map((s) => s.text).join('')).toMatch(/^…/)
+  })
+
+  it('highlights reordered terms precisely with contractions and brackets', () => {
+    const entries = [entry(2, 205, 1, 'أ', 'love'), entry(2, 205, 2, 'ب', '(does)'), entry(2, 205, 3, 'ج', 'not')]
+    for (const query of ['does not love', "doesn't love"]) {
+      const hit = matchWordSearch(entries, query)[0]!
+      const spans = searchHitHighlightSpans(hit, query)
+      expect(spans.filter((s) => s.highlighted).map((s) => s.text)).toEqual(['love', 'does', 'not'])
+      expect(spans.map((s) => s.text).join('')).toBe(hit.displayText)
+    }
+    const separated = englishTranslationHighlightSpans('does [ever] not love', 'does not love', '')
+    expect(separated.filter((s) => s.highlighted).map((s) => s.text)).toEqual(['does', 'not', 'love'])
+    expect(englishTranslationHighlightSpans('does [ever] not love', '"does not love"', '')
+      .some((s) => s.highlighted)).toBe(false)
   })
 })
 
@@ -440,6 +455,10 @@ describe('matchWordSearch', () => {
         firewood.matchTerms,
       ).some((span) => span.highlighted),
     ).toBe(false)
+    expect(searchHitHighlightSpans(firewood, 'hell'))
+      .toEqual([{ text: firewood.displayText, highlighted: true }])
+    expect(searchHitHighlightSpans({ ...firewood, displayText: '' }, 'hell'))
+      .toEqual([{ text: firewood.matchReason, highlighted: true }])
   })
 
   it('keeps a rooted phrase on one visible animation target', () => {

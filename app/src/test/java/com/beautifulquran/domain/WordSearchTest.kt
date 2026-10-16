@@ -447,6 +447,14 @@ class WordSearchTest {
                 firewood.matchTerms,
             ).none(AyahTextSpan::highlighted),
         )
+        assertEquals(
+            listOf(AyahTextSpan(firewood.displayText, highlighted = true)),
+            searchHitHighlightSpans(firewood, "hell"),
+        )
+        assertEquals(
+            listOf(AyahTextSpan(firewood.matchReason, highlighted = true)),
+            searchHitHighlightSpans(firewood.copy(displayText = ""), "hell"),
+        )
     }
 
     @Test
@@ -632,7 +640,7 @@ class WordSearchTest {
 
     @Test
     fun `bracketed phrase matching keeps order boundaries and typed prefixes`() {
-        for (text in listOf("undoes not love", "does [ever] not love", "does love [not]")) {
+        for (text in listOf("undoes not love")) {
             assertTrue(englishTranslationHighlightSpans(text, "does not love", "").none { it.highlighted })
         }
         val text = "(does) not lovely"
@@ -648,6 +656,24 @@ class WordSearchTest {
             englishTranslationHighlightSpans(repeated, "does not love", "")
                 .filter { it.highlighted }.map { it.text },
         )
+    }
+
+    @Test
+    fun `reordered query terms have precise gold even with contractions and brackets`() {
+        val entries = listOf(
+            entry(2, 205, 1, "أ", "love"),
+            entry(2, 205, 2, "ب", "(does)"),
+            entry(2, 205, 3, "ج", "not"),
+        )
+        for (query in listOf("does not love", "doesn't love")) {
+            val hit = matchWordSearch(entries, query).single()
+            val spans = searchHitHighlightSpans(hit, query)
+            assertEquals(listOf("love", "does", "not"), spans.filter { it.highlighted }.map { it.text })
+            assertEquals(hit.displayText, spans.joinToString("") { it.text })
+        }
+        val separated = englishTranslationHighlightSpans("does [ever] not love", "does not love", "")
+        assertEquals(listOf("does", "not", "love"), separated.filter { it.highlighted }.map { it.text })
+        assertTrue(englishTranslationHighlightSpans("does [ever] not love", "\"does not love\"", "").none { it.highlighted })
     }
 
     @Test

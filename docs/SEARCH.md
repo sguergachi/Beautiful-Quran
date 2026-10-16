@@ -71,9 +71,11 @@ colors `(does) not love` or `does [not] love` as one phrase, preserving the disp
 text and the quiet bracket styling. Quoted phrases retain whole-word matching.
 Rooted multi-word glosses such as `The patient` remain one visible phrase and
 one animation target; their articles do not spill onto unrelated occurrences
-of `the`. Connective words remain ordinary ink. If the selected English source contains
-none of those, the result stays unaccented rather than promising a highlight
-the reader cannot locate. The gloss fallback coalesces adjacent copies of a
+of `the`. Reordered phrases highlight their matching query words individually.
+Every displayed result contains gold emphasis: when a semantic or root hit has
+no precise visible word, its complete excerpt is gold as ayah-level context.
+That does not invent a word target in the reader. An empty source excerpt uses
+the match explanation instead. The gloss fallback coalesces adjacent copies of a
 shared multi-word gloss, matching the reader's English prose instead of showing
 the source phrase once per Arabic word.
 
