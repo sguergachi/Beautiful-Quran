@@ -1615,9 +1615,9 @@ flash; ayah-level concept and quoted-phrase hits open the verse without
 inventing an Arabic word to highlight.
 **Android:** continue listening no longer takes a persistent top band in the
 scrolling chapter document: the reading place lives in its chapter row, marked
-by the place ribbon in situ. While that row is scrolled out of view a mint
-pill (`continueWash`, the #774 mint — bands keep the paper-faint `greenWash`,
-but a pill floating over the list must read apart from it) — the place ribbon, gold number, and a small-caps CONTINUE flag
+by the place ribbon in situ. While that row is scrolled out of view a quiet green
+pill (the same `greenWash` as the playback bar's return button) — the place
+ribbon, gold number, and a small-caps CONTINUE flag
 over the chapter row's bilingual identity, set in a rounded wash on the rows'
 own Arabic rail — floats at the bottom (above the gesture inset). It stands
 down entirely while the playback bar is up; the bar owns the bottom paper and
@@ -1627,7 +1627,7 @@ up to the row — resizing onto its exact bounds, squaring its corners, settling
 every inset, then fading to reveal the row — so the row owns the tap, and
 scrolling back down peels it off the top and settles it home again. Flights
 only ever arm off a fully-visible row and cancel the moment it leaves, so
-flings pass through untouched. Web uses the same mint pill in its top
+flings pass through untouched. Web keeps its mint pill in its top
 continue area: a 28 px radius, 16 px outer inset, 40 px green place cloth,
 gold chapter number, CONTINUE flag, and compact bilingual chapter and ayah.
 The shared ribbon is decorative inside one accessible resume button. Only one
