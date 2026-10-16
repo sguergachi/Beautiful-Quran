@@ -311,6 +311,7 @@ class ReaderViewModel(
     val player: PlayerController,
     private val annotations: AnnotationRepository,
     private val englishBookCache: EnglishBookCache,
+    private val bluetoothOutput: StateFlow<Boolean>,
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(ReaderUiState())
@@ -649,7 +650,11 @@ class ReaderViewModel(
             }
         }
         val leadMs = InkEngine.highlightLeadMs.toLong().coerceAtLeast(0L) +
-            ReciterSync.highlightAdvanceMs(reciterId)
+            ReciterSync.highlightAdvanceMs(
+                reciterId,
+                bluetoothOutput = bluetoothOutput.value,
+                playbackSpeed = player.state.value.speed,
+            )
         if (latencyMs != lastOutputLatencyMs || leadMs != lastHighlightLeadMs) {
             lastOutputLatencyMs = latencyMs
             lastHighlightLeadMs = leadMs

@@ -33,6 +33,7 @@ object AppViewModelFactory : ViewModelProvider.Factory {
                     app.player,
                     app.annotations,
                     app.englishBookCache,
+                    app.outputRoutes.isBluetooth,
                 ) as T
             modelClass.isAssignableFrom(SettingsViewModel::class.java) ->
                 SettingsViewModel(app.repository, app.settings, app.tarjiProfiles) as T

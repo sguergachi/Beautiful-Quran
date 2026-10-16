@@ -89,8 +89,21 @@ on word 2). Neither lag nor lead is baked into `HighlightEngine`.
 Al-Dosari, whose source-aligned wash was ear-verified that far behind the voice.
 It uses the same opening ramp as the Ink Lab lead, so short first words remain
 visible instead of being skipped. Timing rows, ayah handoff, basmalah wash, and
-every other reciter stay on their existing clocks. Android and web share the
-same policy.
+every other reciter stay on their existing clocks. Android and web share this
+Yasser calibration.
+
+On Android, Alafasy additionally receives a **200 ms wall-time word lead only
+on the player's actual Bluetooth output**, addressing the reported 100–200 ms
+late wash. Classic A2DP/SCO and LE headset/speaker/broadcast routes qualify;
+speaker, wired, USB and unknown routes do not, even with Bluetooth devices
+connected. The visual trim scales to media time at the playback speed and uses
+the same opening-silence ramp, preserving short first words. It does not add a
+second transport-latency subtraction or change the PCM/tarjīʿ clock, timing
+rows, basmalah or ayah handoff. A route-driven change in the resulting lead
+uses the existing highlight-clock reset, so returning to speaker does not hold
+the Bluetooth-advanced word as jitter. This Android route-specific calibration
+does not change the web clock. The 200 ms amount comes from the listener's
+report; physical headset alignment still needs an on-device check.
 
 ## PCM on the presentation clock
 
@@ -121,7 +134,8 @@ filter's phase compensation advances only its input, not the graph cursor.
 
 `playback/AudioOutputRoutes` (app-lifetime, from `QuranApp`) observes the
 service's AudioTrack through `AudioRouting.OnRoutingChangedListener` and
-publishes `routedDevice.id`. A connected but inactive headset does not change
+publishes `routedDevice.id` and its Bluetooth classification. Unknown, detached
+and newly attached unconfirmed outputs clear that classification. A connected but inactive headset does not change
 the route. Distinct devices are tracked even when they share a device type.
 An unknown route and the initial discovery do not restart playback.
 
