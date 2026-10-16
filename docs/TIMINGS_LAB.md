@@ -234,6 +234,7 @@ Free, no backend, no auth beyond the GitHub account:
    | Structural qdc noise (forward spikes, strays, split slivers, non-contiguous / gap phantoms) | `clean_qdc_artifacts` in `tools/build_db.py` | Add `tools/timing_patch_cases/<id>.json` — broken `input_*` + expected `expected_*` from the patch; run `python3 tools/test_build_db.py` |
    | Topology cannot distinguish a false loop from a genuine repeat | narrow typed operation under `tools/timing_corrections/` | `pipeline: timing_correction` case |
    | Audio proves a substantial first-pass label before a rewind is unspoken | exact-source `discard_unspoken_rewind_onset`; keep the cleaner's 200 ms floor | `audio-vetted-rewind-onset-alafasy-5-2`, stale-source guard tests |
+   | Maintainer confirms one held word was split into two substantial labels | exact-source `merge_verified_word_split` after repairs; retain global peer protection | `verified-word-split-alafasy-47-4`, repair-order and stale-source tests |
    | Drop repair that flattens a real span-repeat | `apply_timing_repairs` span-protect (and regenerate repairs) | `pipeline: erases_span_repeat` case in `timing_patch_cases/` |
    | Repair flattens a peer same-word re-say while fixing elsewhere | per-position `preserve_peer_repeats` | `pipeline: preserve_peer_repeats` case |
    | Restore invents a flush same-word pair (gap < 300 ms) | `collapse_invented_flush_repeats` in `apply_timing_repairs` | `pipeline: invented_flush_restore` case |
@@ -258,7 +259,9 @@ Free, no backend, no auth beyond the GitHub account:
    per-ayah median clock offset. Quran-align has weight 2 and the bundled row
    weight 1; ≤250 ms supports a boundary and >500 ms conflicts. Timestamps are
    never averaged, and one-pass evidence never judges repeat backtracks.
-4. Typed corrections run before generated structural evidence. Repairs are
+4. Ordinary typed corrections run before generated structural evidence.
+   Reviewed held-word merges run after repairs, so their exact source pair
+   includes the repaired boundaries and no unrelated boundary moves. Repairs are
    rebased onto the latest source row. Only changed
    topology and its immediate neighbours use the repair clock; equal spans
    retain current source timings. Span protection rejects repairs that flatten

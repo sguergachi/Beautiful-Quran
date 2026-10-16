@@ -15,9 +15,14 @@ transition ledger and every other corpus delta before this row can ship.
 The returning word-11 boundary at 24,070 ms also remains unvalidated: both
 models force it around 25,146–25,166 ms. No clock offset is inferred.
 
-Alafasy 47:4 remains unchanged: both models prefer one word 13, but the
-removed occurrence exceeds the confidence ceiling on XLSR. Keep that pair
-pending adjudication. Alafasy 24:25 and Hani 21:46/21:63 need no new edit.
+The maintainer subsequently auditioned Alafasy 47:4 and reported that word 13,
+مَنّا, must not highlight twice. An exact-source correction now merges it to
+16,565–19,000 ms after repairs, preserving every other segment. Both models
+prefer one word, but the removed occurrence still exceeds XLSR's confidence
+ceiling. `maintainer-word-split-class.json` retains that automatic hold and
+records the human report separately. Do not weaken the gate or claim the
+correction has been published: its source-profile promotion needs to reconcile
+that adjudication. Alafasy 24:25 and Hani 21:46/21:63 need no new edit.
 
 ## Lagged qdc peer pairs (#856)
 

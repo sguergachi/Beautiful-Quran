@@ -42,6 +42,7 @@ from build_db import (  # noqa: E402
     finalize_timing_rows,
     load_audio_durations,
     load_audio_onsets,
+    merge_verified_word_split,
     apply_audit_holds,
     append_new_reciter_timings,
     discard_false_same_position_lead,
@@ -247,6 +248,10 @@ def run_pipeline(case, segs):
         return offset_for_audio_onset(segs, onset)
     if pipeline == "timing_correction":
         position = case.get("correction_position")
+        if case.get("correction_op") == "merge_verified_word_split":
+            return merge_verified_word_split(
+                segs, case["source_pair"], bool(case.get("requires_audio_verdict"))
+            )
         if case.get("correction_op") == "discard_unspoken_rewind_onset":
             return discard_unspoken_rewind_onset(
                 segs, case["source_window"], bool(case.get("requires_audio_verdict"))

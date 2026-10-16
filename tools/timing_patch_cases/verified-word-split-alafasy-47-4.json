@@ -1,0 +1,12 @@
+{
+  "id": "verified-word-split-alafasy-47-4",
+  "label": "Alafasy 47:4 مَنّا is one held utterance, confirmed by the maintainer after audition",
+  "refs": ["GitHub #873", "maintainer feedback 2026-10-16", "tools/timing_verdicts/maintainer-word-split-class.json"],
+  "pipeline": "timing_correction",
+  "correction_op": "merge_verified_word_split",
+  "source_pair": [[13, 16565, 17820], [13, 17820, 19000]],
+  "requires_audio_verdict": true,
+  "notes": "Apply after structural repairs: one word 13 spans 16565–19000 ms. Keep every other start and end. The automatic confidence disagreement remains recorded; no agent ear verification is claimed.",
+  "input_segments": [[12, 14625, 16565], [13, 16565, 17820], [13, 17820, 19000], [14, 19000, 19650], [15, 19650, 21360]],
+  "expected_segments": [[12, 14625, 16565], [13, 16565, 19000], [14, 19000, 19650], [15, 19650, 21360]]
+}

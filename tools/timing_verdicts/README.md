@@ -57,8 +57,14 @@ which is the Pareto non-regression this document asks for.
 `unspoken-rewind-onset-class.json` binds the Alafasy 5:2 correction from #873
 to the currently delivered payload and the exact implemented candidate. Both
 models were run locally; their revision, audio hash, scores and removed-word
-confidence are recorded with the evidence. The existing 47:4 pair remains
-protected because its removal fails the confidence gate.
+confidence are recorded with the evidence.
+
+`maintainer-word-split-class.json` records the later human adjudication of
+47:4 as one held word and the exact merged candidate. Both model scores prefer
+that sequence, but XLSR's removed-occurrence confidence still fails the
+automatic gate. The entry stays `hold`; the maintainer's report is recorded
+separately and must not be presented as an automatic acceptance or an agent
+ear verdict. The ordinary peer guard remains active before the explicit merge.
 
 This candidate verdict does not replace the authenticated source-transition
 ledger. Before publication, replay the private authenticated snapshots, reconcile

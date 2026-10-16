@@ -10,6 +10,15 @@ compared.
 
 Supported operations:
 
+- `merge_verified_word_split`: join one reviewed contiguous same-word pair
+  into its complete span. The exact `sourcePair` and explicit audio verdict
+  are mandatory. Alafasy 47:4 (#873) was confirmed by the maintainer after
+  audition: مَنّا is held once. Its `phase: "after_repairs"` preserves the
+  existing repair's neighbouring boundaries and avoids changing global peer
+  protection. All other corrections default to `before_repairs`; unknown
+  phases fail closed. The human report and the remaining automatic confidence
+  disagreement are recorded separately, without claiming agent listening.
+
 - `discard_unspoken_rewind_onset`: discard one audio-proven unspoken label
   immediately before a rewind. The exact three-segment `sourceWindow` pins
   the preceding word, false label and returning word to the reviewed clock.

@@ -2110,6 +2110,22 @@ def discard_unspoken_rewind_onset(segs, source_window, requires_audio_verdict=Fa
     return out
 
 
+def merge_verified_word_split(segs, source_pair, requires_audio_verdict=False):
+    """Join one reviewed held word without merging other substantial peers."""
+    if not requires_audio_verdict:
+        raise ValueError("merge_verified_word_split requires an audio verdict")
+    if (len(source_pair) != 2 or source_pair[0][0] != source_pair[1][0]
+            or source_pair[0][2] != source_pair[1][1]):
+        raise ValueError("merge_verified_word_split needs a contiguous same-word source pair")
+    matches = [i for i in range(len(segs) - 1) if segs[i:i + 2] == source_pair]
+    if len(matches) != 1:
+        raise ValueError("merge_verified_word_split source pair changed or is ambiguous")
+    i = matches[0]
+    return [*[list(seg) for seg in segs[:i]],
+            [segs[i][0], segs[i][1], segs[i + 1][2]],
+            *[list(seg) for seg in segs[i + 2:]]]
+
+
 def restore_flattened_resay(
     segs,
     position,
@@ -2176,8 +2192,12 @@ def apply_timing_corrections(
     corrections_dir=CORRECTIONS_DIR,
     only_reciter_ids=None,
     source_profile="legacy",
+    phase="before_repairs",
 ):
     """Apply narrow typed verdicts that cannot be inferred from row topology."""
+    phases = {"before_repairs", "after_repairs"}
+    if phase not in phases:
+        raise ValueError(f"unknown timing correction phase {phase!r}")
     by_key = {
         (rid, sid, ay): json.loads(segs) if isinstance(segs, str) else segs
         for rid, sid, ay, segs in timing_rows
@@ -2191,6 +2211,11 @@ def apply_timing_corrections(
             print(f"  !! cannot parse correction {path.name}: {e}", file=sys.stderr)
             sys.exit(1)
         for edit in payload.get("edits") or []:
+            edit_phase = edit.get("phase", "before_repairs")
+            if edit_phase not in phases:
+                raise SystemExit(f"correction {path.name}: unknown phase {edit_phase!r}")
+            if edit_phase != phase:
+                continue
             key = (
                 int(edit["reciterId"]),
                 int(edit["surahId"]),
@@ -2232,6 +2257,10 @@ def apply_timing_corrections(
                     by_key[key] = discard_unspoken_rewind_onset(
                         by_key[key], edit["sourceWindow"], bool(edit.get("requiresAudioVerdict"))
                     )
+                elif op == "merge_verified_word_split":
+                    by_key[key] = merge_verified_word_split(
+                        by_key[key], edit["sourcePair"], bool(edit.get("requiresAudioVerdict"))
+                    )
                 else:
                     raise ValueError(f"unknown op {op!r}")
             except ValueError as e:
@@ -2241,7 +2270,7 @@ def apply_timing_corrections(
                 )
                 sys.exit(1)
             applied += 1
-    print(f"  typed corrections: {applied} verdict(s) across {len(files)} file(s)")
+    print(f"  typed corrections ({phase}): {applied} verdict(s) across {len(files)} file(s)")
     return [
         (rid, sid, ay, json.dumps(segs, separators=(",", ":")))
         for (rid, sid, ay), segs in sorted(by_key.items())
@@ -3617,6 +3646,12 @@ def main(argv=None):
                 print(f"[audit] {len(refitted)} displaced row(s) re-anchored on the voice")
                 for rid, sid, ay in refitted:
                     print(f"    re-anchored: reciter {rid} {sid}:{ay}")
+        if include_qdc_timings:
+            # Reviewed held-word merges run after peer protection, preserving
+            # repaired neighbour boundaries without weakening that protection.
+            timing_rows = apply_timing_corrections(
+                timing_rows, source_profile=source_profile, phase="after_repairs"
+            )
         print("[timing finalizer] completing coverage and enforcing file physics")
         timing_rows, audio_onsets = finalize_timing_rows(
             timing_rows,
