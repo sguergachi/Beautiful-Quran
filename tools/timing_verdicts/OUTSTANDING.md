@@ -5,8 +5,28 @@ verdict has reviewed them yet. The fail-closed delta gate withholds each of
 them; this file keeps that from being silent. Remove an entry when its rows ship
 with a verdict, are held with their model scores, or its cause is reverted.
 
-**Nothing is outstanding.** `python3 tools/build_db.py --refresh-qdc-timings`
-reproduces the shipped database (quran-v65) row for row.
+## Lagged qdc peer pairs (#856)
+
+`lagged_peer_positions` stops `preserve_peer_repeats` restoring a same-word
+pair the repair shows to be qdc labels running one word late before a skip.
+The bundled database is unchanged. A replay of public qdc plus
+`tools/timing_repairs/` changes four QF runtime rows, all from a fake pair
+to the repair's topology:
+
+| Row | Before | After |
+|---|---|---|
+| Alafasy 24:25 | `1,1,2,3,4,5,6,6…` | `1,2,3,4,5,6,6…` (matches the #856 Lab edit) |
+| Sudais 59:5 | `…5,6,6,7,8…` | `…5,6,7,8…` (real `10,11,10,11` kept) |
+| Abdul Basit 33:6 | `15,15,28,29` | complete 1–29 |
+| Abdul Basit 35:10 | `5,5,15,…` | complete 1–24 |
+
+They need dual-model verdicts from a `--qf-snapshots` build before
+`sync_qf_timings.py --publish`; until then the delta gate keeps the reviewed
+rows. Note for the reviewer: `qf-source-transition.json` held an earlier
+24:25 candidate because both models still heard word 1 in the removed
+occurrence (0.83 / 0.75). In the new row that audio stays on word 1 (the
+repair runs يَوۡمَئِذٖ to 2020 ms), so a high word-1 probability there is
+expected, not evidence of a re-say.
 
 ## Resolved: Sudais re-clock after #712 (quran-v64)
 

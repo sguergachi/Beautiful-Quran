@@ -305,6 +305,7 @@ close a `Timings patch — …` GitHub issue, **do this checklist in order**:
 | Word said twice, qdc hands the second utterance to the next word (next word starts a whole utterance early) | regenerate with `tools/find_flattened_resays.py` (dual-model repeat test → generated `restore_flattened_resay`) | `pipeline: "timing_correction"` case + `tools/test_find_flattened_resays.py` |
    | Repair flattens a multi-word re-say that cleaned qdc still has | `apply_timing_repairs` span-protect (`erases_span_repeat`) | `pipeline: "erases_span_repeat"` case |
 | Repair erases a peer same-word re-say while fixing elsewhere | per-position `preserve_peer_repeats` | `pipeline: "preserve_peer_repeats"` case |
+| "Re-say" is qdc labels running a word late before a skip (`1,1,2,5` for `1,2,3,4,5`); peer-protect restores it | `lagged_peer_positions` in `preserve_peer_repeats` | `lagged-peer-*` cases |
 | Same-position pair is really the previous word's held tail (qdc tiles gaplessly, so a madd gets the next word's index) | `false_same_position_leads` + `hand_lead_to_previous_word`, gated on quran-align's onset | `pipeline: "false_same_position_lead"` case |
 | Restore invents a flush same-word pair (gap < 300 ms) | `collapse_invented_flush_repeats` in `apply_timing_repairs` | `pipeline: "invented_flush_restore"` case |
 | qdc has 1..n+1 because QAC glued ما (وَمَالِيَ) | `fold_qdc_fused_ma` in `adjust_qdc_segments` | `pipeline: "adjust_qdc_segments"` case |
