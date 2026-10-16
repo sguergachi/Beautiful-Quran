@@ -12,7 +12,7 @@ Everything on screen is the **real Android app**, recorded on an emulator.
 | `android_take.py` | Drives the emulator by text/content-desc (theme, text size, speed, clean status bar) and records a take. |
 | `find_onset.py` | Finds where playback started in a take (the transport glyph flips ▶ → ⏸). |
 | `conform_take.py` | Speeds a slow take back to 1×, resamples to 60 fps, removes the lit speed label, and starts every clip 0.6 s before the recitation. |
-| `reel/` | The edit, in [Revideo](https://github.com/redotvideo/revideo) (MIT, headless Motion Canvas): `reel.tsx` (31.5 s intro) and `mockup.tsx` (full-length device mockup). |
+| `reel/` | The edit, in [Revideo](https://github.com/redotvideo/revideo) (MIT, headless Motion Canvas): `cut.tsx` (18.5 s final cut), `reel.tsx` (31.5 s), `mockup.tsx` (full-length device mockup). |
 | `composite_screen.py`, `composite_video.py` | Put a take onto a green-screen phone in a photo or stock clip (chroma alpha, edge unmixing, skin-aware despill, tracked corners). |
 
 ## Why slow takes

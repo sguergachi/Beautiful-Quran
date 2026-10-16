@@ -105,6 +105,25 @@ staged to answer the verses, never to illustrate them literally:
 
 The light-break is timed to land on 55:5 in every variant.
 
+## The Reel (final cut): 18.5 s
+
+Short attention spans: no intro, no title card. Frame 1 is the app, already
+moving, with the recitation already sounding. The goal is for viewers to
+think "I've never seen that — what app is that?". 1080 × 1920, 60 fps,
+full-resolution takes, voice unbroken (basmalah, 55:1–3).
+
+| Time | Shot | Text |
+|---|---|---|
+| 0.0 | Full-bleed app, Royal green: the chapter's ornament band, and beneath it the basmalah writing itself in white-gold; slow push | *Every word, written as it is recited.* (low, on a scrim) |
+| 6.0 (55:1) | Cut to the phone, Royal green | |
+| 8.3 | **Theme flip mid-word** to Paper: the page changes, the ink keeps writing | *Word by word, with meaning.* |
+| 10.6 (55:2) | Flip to Nightfall | |
+| 12.9 | The Mushaf page, Nightfall, gold banner and verse marks | *Or the whole page, as printed.* |
+| 15.4 | End card while 55:3 is recited: icon, *Beautiful Quran*, FREE · ANDROID & WEB, link in bio | |
+
+`reel/src/cut.tsx`. The longer 31.5 s edit (`reel.tsx`, opening on the
+chapter header) remains for slower placements.
+
 ## The intro Reel: "Every word, as it is recited"
 
 31.5 s, 1080 × 1920, 60 fps, recorded at full device resolution. The
@@ -168,7 +187,8 @@ frame. The palettes per variant:
 
 | Asset | Spec |
 |---|---|
-| Intro Reel | 1080 × 1920, 60 fps, H.264, AAC 48 kHz, −16 LUFS, 31.5 s |
+| Reel, final cut | 1080 × 1920, 60 fps, H.264, AAC 48 kHz, −16 LUFS, 18.5 s |
+| Long Reel | same, 31.5 s, opens on the chapter header |
 | Mockups ×3 | 1080 × 1920, 60 fps, 69 s, one per theme |
 | Product page hero | Al-Fatihah, Paper, 1080 × 2400, 30 fps, about 1 MB |
 | Product page theme loops ×3 | Al-Fatihah opening, 540 × 1200, 13 s, about 150 KB |
