@@ -105,6 +105,8 @@ const cases: [string, WordSearchSources][] = [
   ['hell', mushaf],
   ["doesn't love", mushaf],
   ['does not love', mushaf],
+  ["doesn't lov", mushaf],
+  ['does not lov', mushaf],
 ]
 
 const medians: number[] = []
@@ -112,6 +114,9 @@ const contractionHits = (query: string) => matchWordSearch(index, query, 400, co
   .map((hit) => `${hit.surahId}:${hit.ayahNumber}`).sort().join(',')
 if (contractionHits("doesn't love") !== contractionHits('does not love')) {
   throw new Error('Contracted and expanded search results differ')
+}
+if (contractionHits("doesn't lov") !== contractionHits('does not lov') || !contractionHits("doesn't lov")) {
+  throw new Error('Contracted and expanded final-prefix results differ or vanished')
 }
 console.log(`${index.length.toLocaleString()} word rows · ${concepts.length} concepts`)
 for (const [query, sources] of cases) {

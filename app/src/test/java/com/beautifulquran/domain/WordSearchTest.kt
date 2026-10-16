@@ -64,7 +64,7 @@ class WordSearchTest {
             entry(2, 205, 4, "د", "corruption"),
         )
         val sources = WordSearchSources(arabic = false, wordGloss = true, transliteration = false, verseTranslation = false)
-        for (query in listOf("does not love", "doesn't love", "DOESN’T LOVE")) {
+        for (query in listOf("does not love", "doesn't love", "DOESN’T LOVE", "doesn't l", "doesn't lo", "doesn't lov")) {
             val hit = matchWordSearch(entries, query, sources = sources).single()
             assertEquals(listOf(2, 3), hit.targetPositions)
             assertEquals("Text match", hit.matchReason)
@@ -77,6 +77,8 @@ class WordSearchTest {
         val contractedVerse = entries.map { it.copy(context = it.context.copy(ayahTranslation = "Allah doesn't love corruption")) }
         val hit = matchWordSearch(contractedVerse, "does not love", sources = sources.copy(wordGloss = false, verseTranslation = true)).single()
         assertEquals(listOf(2, 3), hit.targetPositions)
+        assertEquals(listOf(2, 3), matchWordSearch(contractedVerse, "does not lov",
+            sources = sources.copy(wordGloss = false, verseTranslation = true)).single().targetPositions)
     }
 
     @Test

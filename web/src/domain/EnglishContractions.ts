@@ -15,6 +15,7 @@ const special: Record<string, string> = {
   "'tis": 'it is', "'twas": 'it was', "'twere": 'it were',
 }
 interface Token { forms: string[]; start: number; end: number }
+interface Match { start: number; end: number; complete: boolean }
 
 function expand(word: string): string[][] {
   if (Object.hasOwn(special, word)) return special[word]!.split(' ').map((part) => [part])
@@ -40,7 +41,7 @@ function expand(word: string): string[][] {
 }
 
 function tokens(text: string): Token[] {
-  return [...foldEnglish(text).matchAll(/'?[\p{L}\p{N}]+(?:'[\p{L}\p{N}]+)*/gu)]
+  return [...foldEnglish(text).matchAll(/(?:'(?=tis\b|twas\b|twere\b))?[\p{L}\p{N}]+(?:'[\p{L}\p{N}]+)*/giu)]
     .flatMap((match) => expand(match[0].toLowerCase()).map((forms) => ({
       forms, start: match.index, end: match.index + match[0].length,
     })))
@@ -55,20 +56,38 @@ export const contractionForms = (text: string): string[][] => tokens(text).map((
 /** Cheap gate for search-only expansion; displayed translations stay unchanged. */
 export const mayExpandContractions = (text: string): boolean => /['’]|cannot/i.test(text)
 
-/** Contiguous equivalents mapped back onto the original glyphs and brackets. */
+/** Complete equivalents lead the user's unfinished final word, as in literal search. */
+export const contractionRelevance = (text: string, query: string): number =>
+  matches(text, query).reduce((score, match) => Math.max(score, match.complete ? 3_000 : 2_200), 0)
+
+/** Equivalent phrases and final-word prefixes retain the original glyphs and brackets. */
 export function contractionRanges(text: string, query: string): { start: number; end: number }[] {
+  return matches(text, query).filter((match, i, all) =>
+    all.findIndex((other) => other.start === match.start && other.end === match.end) === i)
+    .map(({ start, end }) => ({ start, end }))
+}
+
+function matches(text: string, query: string): Match[] {
   if (!mayExpandContractions(text) && !mayExpandContractions(query)) return []
   const needle = tokens(query)
   const haystack = tokens(text)
   if (!needle.length || needle.length > haystack.length) return []
-  const ranges: { start: number; end: number }[] = []
+  // An expanded suffix is complete: "doesn't" must never prefix "does nothing".
+  const last = needle.at(-1)!
+  const prefix = last.forms.length === 1 && last.forms[0] === foldEnglish(query).slice(last.start, last.end).toLowerCase()
+    ? last.forms[0]! : null
+  const ranges: Match[] = []
   for (let at = 0; at <= haystack.length - needle.length; at++) {
-    if (needle.some((token, i) => !token.forms.some((form) => haystack[at + i]!.forms.includes(form)))) continue
+    if (needle.some((token, i) => i < needle.length - 1 &&
+      !token.forms.some((form) => haystack[at + i]!.forms.includes(form)))) continue
+    const ending = haystack[at + needle.length - 1]!.forms
+    const complete = last.forms.some((form) => ending.includes(form))
+    if (!complete && (prefix === null || !ending.some((form) => form.startsWith(prefix)))) continue
     let start = haystack[at]!.start
     let end = haystack[at + needle.length - 1]!.end
     while (start > 0 && '(['.includes(text[start - 1]!)) start--
     while (end < text.length && ')]'.includes(text[end]!)) end++
-    if (!ranges.some((range) => range.start === start && range.end === end)) ranges.push({ start, end })
+    ranges.push({ start, end, complete })
   }
   return ranges
 }

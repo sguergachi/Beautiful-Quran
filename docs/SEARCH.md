@@ -16,6 +16,11 @@ signals rather than a general-purpose language model:
    `can't`/`cannot`, and `let's` share the same ranking and highlight rules.
    Ambiguous `'s` and `'d` on pronouns accept `is`/`has` and `had`/`would`;
    noun possessives such as `Allah's` are not auxiliary contractions.
+   Final-word prefixes work through these equivalents too: `doesn't lov`
+   finds and highlights `(does) not love`. Complete contractions keep their
+   expanded words whole, so `doesn't` never matches `does nothing`.
+   Surrounding single quotation marks do not become part of a contraction;
+   enclosing the user's query in double quotes still disables expansion.
 2. **Thesaurus vocabulary** — when fewer than three grounded results exist, a
    compact Open English WordNet graph supplements them with related words that
    actually occur in this Quran. Synonyms lead precise derivational, similar,

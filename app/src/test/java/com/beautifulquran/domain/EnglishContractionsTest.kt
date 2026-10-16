@@ -22,6 +22,11 @@ class EnglishContractionsTest {
                     assertEquals("$typed -> $text", source.replace("'", apostrophe),
                         spans.filter { it.highlighted }.joinToString("") { it.text })
                     assertEquals(text, spans.joinToString("") { it.text })
+                    val partial = "Before ${source.replace("'", apostrophe)} love after"
+                    assertEquals(2_200, searchTextRelevance(partial, parseSearchQuery("$typed lov"), false))
+                    assertEquals("${source.replace("'", apostrophe)} love",
+                        englishTranslationHighlightSpans(partial, "$typed lov", "")
+                            .filter { it.highlighted }.joinToString("") { it.text })
                 }
             }
         }
@@ -36,6 +41,36 @@ class EnglishContractionsTest {
         assertEquals(text, spans.joinToString("") { it.text })
         assertEquals("does", quickSearchFallbackTerm("doesn't"))
         assertEquals("will", quickSearchFallbackTerm("won't"))
+    }
+
+    @Test
+    fun `final prefixes work through expansions while complete negations stay complete`() {
+        for ((source, query) in listOf("(does) not love" to "doesn't", "doesn't love" to "does not")) {
+            for (prefix in listOf("l", "lo", "lov")) {
+                val typed = "$query $prefix"
+                assertEquals(2_200, searchTextRelevance(source, parseSearchQuery(typed), false))
+                assertEquals(source, englishTranslationHighlightSpans(source, typed, "")
+                    .filter { it.highlighted }.joinToString("") { it.text })
+                assertEquals(0, searchTextRelevance(source, parseSearchQuery("\"$typed\""), false))
+            }
+        }
+        for ((source, query) in listOf("does nothing" to "doesn't", "can nothing" to "can't",
+            "he island" to "he's", "would nothing have" to "wouldn't've")) {
+            assertEquals(0, searchTextRelevance(source, parseSearchQuery(query), false))
+        }
+    }
+
+    @Test
+    fun `surrounding quotation marks do not become contraction letters`() {
+        for ((source, query) in listOf("doesn't love" to "does not love", "he's merciful" to "he is merciful",
+            "'tis good" to "it is good")) {
+            for ((open, close) in listOf("'" to "'", "‘" to "’")) {
+                val text = "He said $open$source$close"
+                assertEquals(3_000, searchTextRelevance(text, parseSearchQuery(query), false))
+                assertEquals(source, englishTranslationHighlightSpans(text, query, "")
+                    .filter { it.highlighted }.joinToString("") { it.text })
+            }
+        }
     }
 
     @Test

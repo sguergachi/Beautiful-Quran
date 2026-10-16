@@ -1,5 +1,5 @@
 /** Quran-wide word search — mirrors Android `domain/WordSearch.kt`. */
-import { contractionForms, contractionRanges, contractionWords, mayExpandContractions } from './EnglishContractions'
+import { contractionForms, contractionRanges, contractionRelevance, contractionWords, mayExpandContractions } from './EnglishContractions'
 
 export const WORD_SEARCH_MAX_HITS = 400
 
@@ -166,7 +166,8 @@ function searchLowerTextRelevance(
     const canonicalNeedle = canonicalWords(needle).join(' ')
     return canonicalNeedle && containsBounded(phrase, canonicalNeedle) ? 3_000 : 0
   }
-  if (contractionRanges(target, needle).length) return 3_000
+  const contractionScore = contractionRelevance(target, needle)
+  if (contractionScore > 0) return contractionScore
   if (containsWordPrefix(target, needle)) return 2_200
   const singleWord = /^[\p{L}\p{N}]+$/u.test(needle) && !mayExpandContractions(needle)
   if (allowFuzzy && singleWord) {

@@ -85,7 +85,8 @@ internal fun searchLowerTextRelevance(
         val canonicalNeedle = canonicalWords(needle).joinToString(" ")
         return if (canonicalNeedle.isNotEmpty() && containsBounded(phrase, canonicalNeedle)) 3_000 else 0
     }
-    if (EnglishContractions.ranges(target, needle).isNotEmpty()) return 3_000
+    val contractionScore = EnglishContractions.relevance(target, needle)
+    if (contractionScore > 0) return contractionScore
     if (containsWordPrefix(target, needle)) return 2_200
     val singleWord = needle.all(Char::isLetterOrDigit) && !EnglishContractions.mayExpand(needle)
     if (allowFuzzy && singleWord) {

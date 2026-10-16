@@ -63,7 +63,7 @@ describe('bracketed search phrase highlighting', () => {
     const entries = [entry(2, 205, 1, 'أ', 'Allah'), entry(2, 205, 2, 'ب', '(does) not'),
       entry(2, 205, 3, 'ج', 'love'), entry(2, 205, 4, 'د', 'corruption')]
     const sources = { arabic: false, wordGloss: true, transliteration: false, verseTranslation: false }
-    for (const query of ['does not love', "doesn't love", 'DOESN’T LOVE']) {
+    for (const query of ['does not love', "doesn't love", 'DOESN’T LOVE', "doesn't l", "doesn't lo", "doesn't lov"]) {
       const hits = matchWordSearch(entries, query, 400, [], new Map(), sources)
       expect(hits).toHaveLength(1)
       expect(hits[0]!.targetPositions).toEqual([2, 3])
@@ -74,6 +74,8 @@ describe('bracketed search phrase highlighting', () => {
     expect(matchWordSearch(entries, "doesn't", 400, [], new Map(), sources)[0]!.targetPositions).toEqual([2])
     const contracted = entries.map((row) => ({ ...row, ayahTranslation: "Allah doesn't love corruption" }))
     expect(matchWordSearch(contracted, 'does not love', 400, [], new Map(),
+      { ...sources, wordGloss: false, verseTranslation: true })[0]!.targetPositions).toEqual([2, 3])
+    expect(matchWordSearch(contracted, 'does not lov', 400, [], new Map(),
       { ...sources, wordGloss: false, verseTranslation: true })[0]!.targetPositions).toEqual([2, 3])
   })
 

@@ -2,7 +2,10 @@ package com.beautifulquran.domain
 
 /** Search-only expansion with source ranges; displayed Quran translations are never rewritten. */
 internal object EnglishContractions {
-    private val wordPattern = Regex("'?[\\p{L}\\p{N}]+(?:'[\\p{L}\\p{N}]+)*")
+    private val wordPattern = Regex(
+        "(?:'(?=tis\\b|twas\\b|twere\\b))?[\\p{L}\\p{N}]+(?:'[\\p{L}\\p{N}]+)*",
+        RegexOption.IGNORE_CASE,
+    )
     private val hosts = setOf(
         "i", "you", "he", "she", "it", "we", "they", "that", "there", "here",
         "who", "what", "where", "when", "why", "how", "y'all",
@@ -19,6 +22,7 @@ internal object EnglishContractions {
         "'twas" to "it was", "'twere" to "it were",
     )
     private data class Token(val forms: List<String>, val range: IntRange)
+    private data class Match(val range: IntRange, val complete: Boolean)
 
     private fun expand(word: String): List<List<String>> {
         special[word]?.let { return it.split(' ').map(::listOf) }
@@ -57,21 +61,34 @@ internal object EnglishContractions {
     /** Alternative auxiliaries remain one word slot rather than requiring both meanings. */
     fun forms(text: String): List<List<String>> = tokens(text).map(Token::forms)
 
-    /** Contiguous equivalent phrases, mapped back onto the original glyphs and brackets. */
-    fun ranges(text: String, query: String): List<IntRange> {
+    /** Complete equivalents lead the user's unfinished final word, as in literal search. */
+    fun relevance(text: String, query: String): Int =
+        matches(text, query).maxOfOrNull { if (it.complete) 3_000 else 2_200 } ?: 0
+
+    /** Equivalent phrases and final-word prefixes retain the original glyphs and brackets. */
+    fun ranges(text: String, query: String): List<IntRange> = matches(text, query).map(Match::range).distinct()
+
+    private fun matches(text: String, query: String): List<Match> {
         if (!mayExpand(text) && !mayExpand(query)) return emptyList()
         val needle = tokens(query)
         val haystack = tokens(text)
         if (needle.isEmpty() || needle.size > haystack.size) return emptyList()
+        // An expanded suffix is complete: "doesn't" must never prefix "does nothing".
+        val prefix = needle.last().forms.singleOrNull()?.takeIf {
+            it == EnglishTypography.fold(query).substring(needle.last().range).lowercase()
+        }
         return (0..haystack.size - needle.size).mapNotNull { at ->
-            if (needle.indices.any { i -> needle[i].forms.none { it in haystack[at + i].forms } }) {
+            if ((0 until needle.lastIndex).any { i -> needle[i].forms.none { it in haystack[at + i].forms } }) {
                 return@mapNotNull null
             }
+            val ending = haystack[at + needle.lastIndex].forms
+            val complete = needle.last().forms.any { it in ending }
+            if (!complete && (prefix == null || ending.none { it.startsWith(prefix) })) return@mapNotNull null
             var start = haystack[at].range.first
             var end = haystack[at + needle.lastIndex].range.last + 1
             while (start > 0 && text[start - 1] in "([") start--
             while (end < text.length && text[end] in ")]") end++
-            start until end
+            Match(start until end, complete)
         }.distinct()
     }
 }
