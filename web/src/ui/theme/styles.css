@@ -2290,16 +2290,15 @@ button.ayah-mark {
   color: var(--repeat);
 }
 
-/* Search-hit orange is intentionally heavier than recitation's repeat wash.
-   The overlay is absolute, so neither bold English nor the tight glyph stroke
-   can reflow the verse; Arabic keeps its original shaped glyph underneath. */
+/* Search-hit orange uses a tight stroke for emphasis, retaining the base
+   font weight and advances so every overlay letter stays on its base glyph. */
 .search-hit-breath {
   -webkit-text-stroke: 0.025em var(--repeat);
   paint-order: stroke fill;
 }
 
-.word-repeat-overlay.search-hit-breath.word-gloss {
-  font-weight: 700;
+.word-gloss[data-search-hit='true'] ~ .word-repeat-overlay.search-hit-breath.word-gloss {
+  font-weight: 600;
 }
 
 /* White-gold first-gloss glint (Nightfall + Royal Green) — same geometry

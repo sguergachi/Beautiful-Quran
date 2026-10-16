@@ -115,8 +115,10 @@ verse geometry; Mushaf waits for the requested
 leaf to be visible and never depends on the unmounted scrolling list. The
 Mushaf gives every visible non-target ayah the same shaped paper cover during
 that interval; it does not dim Arabic by changing glyph opacity. The orange
-overlay uses bold English or a tight glyph-shaped ink spread, making the
-filled moment conspicuous without reflowing the verse or reshaping Arabic. If
+overlay uses a tight glyph-shaped ink spread, making the filled moment
+conspicuous without changing font weight or letter placement. Android gloss
+overlays paint the base text's existing layout, so centering, line breaks,
+and bidirectional phrases stay identical. If
 English prose coalesced a gloss shared by several Arabic words, its hidden slot
 redirects to the visible phrase; Arabic layouts still breathe over the exact matched
 Arabic word. Ayah-level phrase and concept hits are resolved back to the word
