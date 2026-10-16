@@ -66,6 +66,16 @@ automatic gate. The entry stays `hold`; the maintainer's report is recorded
 separately and must not be presented as an automatic acceptance or an agent
 ear verdict. The ordinary peer guard remains active before the explicit merge.
 
+The [later Pixel 10 review](../timing_evidence/device-lab-alafasy-5-2-boundaries.verdict.json)
+compares that report with the accepted local topology-only candidate. Both new inference runs
+lower the row's mean start residual, but the opening word is truncated and
+word 2's individual start residual worsens. The existing waveform veto holds
+the complete boundary proposal. Word 16 moves closer to the models while
+remaining 1,933 ms late; its exact onset needs separate review. The full Lab
+proposal is retained in a regression fixture, without changing production rows
+or weakening the gate. This is review evidence for an alternative candidate;
+it does not replace the active accepted topology-only verdict for the same row.
+
 This candidate verdict does not replace the authenticated source-transition
 ledger. Before publication, replay the private authenticated snapshots, reconcile
 every delta against the reviewed runtime baseline, and bind those actual output

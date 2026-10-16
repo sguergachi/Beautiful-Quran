@@ -15,6 +15,16 @@ transition ledger and every other corpus delta before this row can ship.
 The returning word-11 boundary at 24,070 ms also remains unvalidated: both
 models force it around 25,146–25,166 ms. No clock offset is inferred.
 
+The later Pixel 10 5:2 report also shortens word 1 to 2,609 ms, advances word 2
+to 3,072 ms, and moves the word-15/16 handoff to 33,660 ms. Fresh XLSR/MMS
+inference rejects the opening edit: forced word-1 ends are 3,281/3,241 ms and
+word 2's start error increases from 41 to 269 ms. Word 16 improves by 750 ms
+but remains 1,933 ms late on both models. Keep these boundaries held, preserve
+the existing topology-only fix, and review the exact word-16 onset separately.
+The held proposal and full regression are recorded in
+`../timing_evidence/device-lab-alafasy-5-2-boundaries.verdict.json`; no runtime
+publication is implied.
+
 The maintainer subsequently auditioned Alafasy 47:4 and reported that word 13,
 مَنّا, must not highlight twice. An exact-source correction now merges it to
 16,565–19,000 ms after repairs, preserving every other segment. Both models

@@ -232,6 +232,22 @@ class AuthenticatedTimingBuildTest(unittest.TestCase):
         with patch.object(build, "QF_VERDICTS_FILE", ledger), self.assertRaisesRegex(SystemExit, "waveform"):
             build.apply_authenticated_verdicts([(1, 1, 1, new)], {}, before)
 
+    def test_device_patch_mean_improvement_cannot_hide_opening_truncation(self):
+        tools = Path(__file__).parent
+        case = json.loads((tools / "timing_patch_cases" /
+                           "device-lab-alafasy-5-2-boundaries.json").read_text())
+        ledger = json.loads((tools / "timing_evidence" /
+                             "device-lab-alafasy-5-2-boundaries.verdict.json").read_text())
+        entry = ledger["verdicts"]["Alafasy_128kbps:5:2"]
+        self.assertTrue(all(model["candidateResidualMs"] < model["baselineResidualMs"]
+                            for model in entry["evidence"]["models"]))
+        problem = build.authenticated_evidence_problem({
+            "old": {"segments": case["expected_segments"]},
+            "new": {"segments": case["device_proposed_segments"]},
+            "kinds": ["timestamp"], "verdict": entry,
+        })
+        self.assertEqual(problem, "decoded waveform physics are missing or veto the candidate")
+
     def test_verdict_ledger_cannot_move_to_another_source_profile(self):
         old, new = [[1, 0, 1000]], [[1, 20, 1000]]
         before, after = self.database("before.db", old), self.database("after.db", new)
