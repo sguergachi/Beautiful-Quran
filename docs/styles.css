@@ -1007,23 +1007,73 @@ h3 {
 }
 
 .attribution-list {
-  grid-column: 4 / span 8;
+  grid-column: 4 / span 9;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 30px var(--grid-gap);
   font-size: var(--text-sm);
-  line-height: 1.5;
+  line-height: 1.45;
   color: var(--ink-faint);
 }
 
-.attribution-list strong {
+/* A colophon: each source's name in ink, its terms beneath in the faint
+ * hand, groups headed in the same tracked small caps as the kickers. */
+.credit-group h3 {
+  font-family: var(--body);
+  font-weight: 500;
+  font-size: calc(var(--text-xs) * 1.15);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  font-feature-settings: var(--ff-caps);
+  color: var(--gold-deep);
+  margin: 0 0 10px;
+}
+
+.credit-group dl {
+  margin: 0;
+}
+
+.credit-group dt {
   color: var(--ink-muted);
-  font-weight: 600;
+  font-weight: 500;
+  margin-top: 0.75em;
 }
 
-.attribution-list p {
-  margin-bottom: 0.7em;
+.credit-group dt:first-child {
+  margin-top: 0;
 }
 
-.attribution-list p:last-child {
-  margin-bottom: 0;
+.credit-group dd {
+  margin: 0.1em 0 0;
+  text-wrap: pretty;
+  hyphens: auto;
+  font-feature-settings: 'kern' 1, 'liga' 1, 'lnum' 1, 'ss09' 1;
+}
+
+.credit-group a {
+  color: inherit;
+  text-decoration-color: color-mix(in srgb, currentColor 40%, transparent);
+}
+
+.credit-group a:hover {
+  color: var(--green);
+}
+
+@media (max-width: 860px) {
+  .attribution h2,
+  .attribution-list {
+    grid-column: 1 / -1;
+  }
+
+  .attribution h2 {
+    margin-bottom: 18px;
+  }
+}
+
+@media (max-width: 560px) {
+  .attribution-list {
+    grid-template-columns: minmax(0, 1fr);
+  }
 }
 
 /* ── Footer ─────────────────────────────────────────────── */
