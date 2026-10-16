@@ -729,8 +729,8 @@ Below that size nothing changes. Rationale in
 2. **Reader** — header + ayahs + icon player bar; mushaf page breaks
    (whisper-gold hairline; folio script is a Customize setting — both, Arabic,
    or English — Android `PageBreak` parity) between ayahs that start a new Madinah page; once the
-   opening surah header scrolls off, a compact ornate title (Arabic + chapter ·
-   transliteration) reappears in the top bar; ayah selector rail
+   opening surah header scrolls off, its miniature chapter medallion above
+   Arabic + chapter · transliteration reappears in the top bar; ayah selector rail
    (hover-magnified dashes with gold focal tick under the cursor; spring
    expand from the minimized stack into the dial wheel — Android parity;
    centered on desktop, Android-
@@ -851,9 +851,9 @@ sans.
   (HTML5 + Web Audio hybrid). Developer mode can fall back to dual-`<audio>`
   standby (iOS single-element HTTPS path on that legacy engine).
 - ✅ Collapsed surah title in the reader top bar once the opening header
-  scrolls off (Android `OrnateSurahTitle` — since #783 a miniature chapter medallion over
-  Arabic + chapter · transliteration, arriving with scroll; web still uses the
-  earlier gilded flourishes and a threshold switch).
+  scrolls off (Android `OrnateSurahTitle` — the chapter's miniature medallion
+  over Arabic + chapter · transliteration). Web retains a threshold-triggered
+  fade; Android also ties its arrival lift/scale to the header's scroll progress.
 - ✅ Mushaf page breaks (Android `PageBreak` — gold hairline + Western /
   Arabic-Indic page numbers from `ayahs.page`).
 - ✅ Contextual feature guides (ayah-rail + saved-bookmark lessons; reader

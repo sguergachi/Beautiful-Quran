@@ -604,6 +604,17 @@ and runs karaoke ink.
 7. **Lazy orange/search overlays** — mounted only while repeating / flashing.
 8. **`content-visibility: auto`** on ayah blocks — paint skip for offscreen
    verses (measure target forced visible for focus).
+9. **Static chapter ornaments** — memoized header, footer and compact title
+   retain their generated geometry across word-boundary reader updates.
+10. **Chapter animation outside the keyed reader** — `ReaderChapterHost`
+    retains the transition across chapter remounts. Animation frames write DOM
+    styles; React handles the start and finish. New navigation, word sheets,
+    sheet/layout changes or resizing cancel the pending handoff. Reduced motion
+    advances directly. Verse transform/promotion exists only during the
+    ceremony, with no permanent idle `will-change` on every mounted verse.
+
+The [2026-10-16 web performance and Android UX review](quality-reviews/WEB_PERFORMANCE_PARITY_2026-10-16.md)
+records the reproduced defects, local render measurements and validation.
 
 ### Profiling checklist (Chrome)
 

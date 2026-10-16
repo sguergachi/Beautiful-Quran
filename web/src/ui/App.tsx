@@ -12,7 +12,7 @@ import {
 } from './paper/stack'
 import { HomeScreen } from './home/HomeScreen'
 import { BookmarksScreen } from './bookmarks/BookmarksScreen'
-import { ReaderScreen } from './reader/ReaderScreen'
+import { ReaderChapterHost } from './reader/ReaderChapterHost'
 import { SettingsScreen } from './settings/SettingsScreen'
 import { EntranceCover } from './entrance/EntranceCover'
 import { OrnamentsLab } from './lab/OrnamentsLab'
@@ -231,8 +231,8 @@ export function App() {
           {/* Chapter boundaries get fresh focus/rail geometry. Carrying the
               previous chapter's dial state into the first peel frame makes
               the rail visibly jump before the initial focus settles. */}
-          <ReaderScreen
-            key={state.content?.surah.id ?? 'empty-reader'}
+          <ReaderChapterHost
+            chapterId={state.content?.surah.id}
             stackLayer={pageLayers.reader}
             playbackPinned={playbackPinned && !spread}
           />

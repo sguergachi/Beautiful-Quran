@@ -349,6 +349,9 @@ class AppStore {
         ps.nowPlaying?.surahId,
         ps.nowPlaying?.ayah,
         ps.repeatMode,
+        ps.repeatRange?.first,
+        ps.repeatRange?.last,
+        ps.speed,
         ps.error ?? '',
         this.lastActiveKey,
       ].join('|')

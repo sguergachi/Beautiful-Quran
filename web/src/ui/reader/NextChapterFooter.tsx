@@ -7,7 +7,7 @@
  * without a pattern or type reconnect.
  */
 
-import { useMemo } from 'react'
+import { memo, useMemo } from 'react'
 import type { Surah } from '../../data/models'
 import { fieldWeaveBackground, GeneratedRosette, useFieldCellWidth } from '../theme/GeneratedOrnament'
 import { chapterOrnamentSeed, generateChapterOrnament } from '../theme/ornamentGenerator'
@@ -19,37 +19,19 @@ function chapterWeaveInk(themeMode: string): string {
     : 'rgba(232, 226, 213, 0.03)'
 }
 
-/** Material-ish ease for invitation collapse. */
-function easeMorph(t: number): number {
-  const x = Math.min(1, Math.max(0, t))
-  return x * x * (3 - 2 * x)
-}
-
 type Props = {
   surah: Surah
   themeMode: string
-  onOpen: () => void
+  onOpen: (chapterId: number) => void
   enabled?: boolean
-  /**
-   * 0 = full invitation chrome.
-   * 1 = pure chapter opening (identical to the surah header block).
-   */
-  headerMorph?: number
 }
 
-export function NextChapterFooter({
+export const NextChapterFooter = memo(function NextChapterFooter({
   surah,
   themeMode,
   onOpen,
   enabled = true,
-  headerMorph = 0,
 }: Props) {
-  const morph = easeMorph(headerMorph)
-  // Chrome fully gone by ~0.85 so the scroll phase is a pure header lift.
-  const invite = Math.max(0, 1 - morph / 0.85)
-  const rosetteScale = 40 / 52 + (1 - 40 / 52) * morph
-  const rosetteAlpha = 0.88 + 0.12 * morph
-
   const ornament = useMemo(
     () => generateChapterOrnament(chapterOrnamentSeed(surah.id, surah.ayahCount)),
     [surah.id, surah.ayahCount],
@@ -73,17 +55,16 @@ export function NextChapterFooter({
   return (
     <div
       className="next-chapter"
-      data-morphing={morph > 0.02 || undefined}
       style={
         {
-          ['--invite' as string]: String(invite),
-          ['--rosette-scale' as string]: String(rosetteScale),
-          ['--rosette-alpha' as string]: String(rosetteAlpha),
+          ['--invite' as string]: '1',
+          ['--rosette-scale' as string]: String(40 / 52),
+          ['--rosette-alpha' as string]: '0.88',
         } as import('react').CSSProperties
       }
     >
       {/* Invitation air + NEXT — collapses without touching the opening layout. */}
-      <div className="next-chapter-invite-top" aria-hidden={invite < 0.02}>
+      <div className="next-chapter-invite-top" aria-hidden={!enabled || undefined}>
         <span className="next-chapter-label">Next</span>
       </div>
 
@@ -115,12 +96,12 @@ export function NextChapterFooter({
         </p>
       </div>
 
-      <div className="next-chapter-invite-pill" aria-hidden={invite < 0.02}>
+      <div className="next-chapter-invite-pill" aria-hidden={!enabled || undefined}>
         <button
           type="button"
           className="next-chapter-pill"
-          onClick={onOpen}
-          disabled={!enabled || invite < 0.45}
+          onClick={() => onOpen(surah.id)}
+          disabled={!enabled}
           aria-label={`Open ${surah.nameTransliteration}`}
         >
           <span className="next-chapter-pill-label">Continue</span>
@@ -144,4 +125,4 @@ export function NextChapterFooter({
       </div>
     </div>
   )
-}
+})

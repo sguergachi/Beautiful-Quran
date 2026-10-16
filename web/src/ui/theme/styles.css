@@ -1389,6 +1389,7 @@ input[type='search']::-webkit-search-decoration {
 
 .ornate-surah-title {
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
   gap: 0;
@@ -1399,7 +1400,8 @@ input[type='search']::-webkit-search-decoration {
   display: flex;
   flex-direction: column;
   align-items: center;
-  padding: 0 0.65rem;
+  width: 100%;
+  padding: 0 0.2rem;
   min-width: 0;
 }
 
@@ -1430,10 +1432,12 @@ input[type='search']::-webkit-search-decoration {
   max-width: 100%;
 }
 
-.reader-top-flourish {
+.reader-top-medallion {
   flex-shrink: 0;
   display: block;
-  opacity: 0.92;
+  width: 18px;
+  height: 18px;
+  margin-bottom: 2px;
 }
 
 .reader-top .back {
@@ -1825,7 +1829,7 @@ input[type='search']::-webkit-search-decoration {
 /* After next-chapter header handoff: verses rest low and invisible, then
    fade + rise into place. --verse-reveal drives lift; --verse-fade is a
    smootherstep opacity (set in JS) so the ink wash-in reads clearly. */
-.reader-verse-rise {
+.scroll[data-chapter-advancing] .reader-verse-rise {
   transform: translate3d(0, calc((1 - var(--verse-reveal, 1)) * 2.5rem), 0);
   opacity: var(--verse-fade, 1);
   will-change: transform, opacity;
@@ -5708,15 +5712,6 @@ button.ayah-mark {
     font-size: 1.05rem;
   }
 
-  .ornate-surah-title-text {
-    padding: 0 0.4rem;
-  }
-
-  .reader-top-flourish {
-    width: 28px;
-    height: 10px;
-  }
-
   /* Keep inactive sheets fully off-screen on small phones so they don't
      peek under the active sheet during the slide. */
   .sheet[data-name='reader'][data-active='false']:not([data-depth='1']):not([data-depth='2']) {
@@ -7216,6 +7211,11 @@ html[data-entrance='true'] body {
   font-size: calc(0.56rem * var(--furn));
 }
 
+.app-shell[data-spread='true'] .reader-top-medallion {
+  width: calc(18px * var(--furn));
+  height: calc(18px * var(--furn));
+}
+
 .app-shell[data-spread='true'] .reader-search-input {
   font-size: calc(1rem * var(--furn));
 }
@@ -8389,7 +8389,6 @@ html[data-entrance-closing]
 /* Guidance and sharing are lines of ink on the existing page. */
 .sheet:focus, .ink-bleed:focus { outline: none; }
 @container (max-width: 370px) {
-  .reader-top-flourish { display: none; }
   .ornate-surah-title-text { padding-inline: 0.2rem; }
 }
 .reading-preview__translit { font-size: calc(0.72rem * var(--preview-scale, 1)); color: var(--ink-rung-secondary); }

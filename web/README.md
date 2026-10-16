@@ -57,6 +57,11 @@ when navigating through chapter controls or browser history.
 It also checks that a Repeat dialog above a word sheet stays usable when
 resizing from facing pages to a phone layout.
 
+`node scripts/check-reader-performance-browser.mjs` checks chapter handoff,
+interrupted navigation, reduced motion, idle animation layers, static ornament
+render isolation, and repeat-range control updates. Its render counters use
+the development React build; they are not device frame-rate measurements.
+
 Builds and tests are kept short: the type check is incremental (its cache is
 in `node_modules/.cache`) and runs beside the bundle (`scripts/parallel.mjs`);
 `sync-data` does nothing when the canonical files are unchanged; tests share

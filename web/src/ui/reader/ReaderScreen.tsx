@@ -1,7 +1,8 @@
+import type { ChapterTransition } from './ReaderChapterHost'
 import { RepeatSheet } from './RepeatSheet'
 import type { RepeatChoice } from './repeatPolicy'
 import { foldEnglish } from '../../domain/EnglishTypography'
-import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from 'react'
+import { memo, useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from 'react'
 import { AyahBlock } from '../../render/AyahBlock'
 import { BasmalahCalligraphy } from '../../render/BasmalahCalligraphy'
 import { getTuning, prefaceState } from './InkEngine'
@@ -102,7 +103,7 @@ function chapterWeaveInk(themeMode: string): string {
  * reader's own gold/emboss/ink custom properties rather than the entrance
  * cover's fixed leather gold, since this sits on the page background.
  */
-function SurahHeaderOrnament({
+const SurahHeaderOrnament = memo(function SurahHeaderOrnament({
   chapterNumber,
   ayahCount,
   themeMode,
@@ -137,17 +138,23 @@ function SurahHeaderOrnament({
       />
     </>
   )
-}
+})
 
 export function ReaderScreen({
   stackLayer,
   playbackPinned = false,
+  chapterTransition,
+  onAdvanceChapter,
 }: {
   stackLayer: StackLayer
   /** Phone scroll stack: draw the chapter bar above the sheets. */
   playbackPinned?: boolean
+  chapterTransition: ChapterTransition | null
+  onAdvanceChapter: (nextId: number, scroll: HTMLElement, pinTitle: boolean) => Promise<void>
 }) {
   const state = useAppState()
+  const [repeatOpen, setRepeatOpen] = useState(false)
+  const retainedRepeat = useRef<RepeatChoice | null>(null)
   const inkTuning = getTuning()
   const content = state.content
   const mushaf = state.settings.readingLayout === 'mushaf'
@@ -203,39 +210,9 @@ export function ReaderScreen({
   const [searchIndex, setSearchIndex] = useState(0)
   /** Android `showTopTitle` — header scrolled fully off the page. */
   const [showTopTitle, setShowTopTitle] = useState(false)
-  /**
-   * Previous chapter name held in the top bar during next-chapter advance so
-   * it can fade out instead of vanishing when content remounts.
-   */
-  const [pinnedTopNavTitle, setPinnedTopNavTitle] = useState<{
-    id: number
-    nameArabic: string
-    nameTransliteration: string
-  } | null>(null)
-  const [chapterAdvancing, setChapterAdvancing] = useState(false)
-  /** 0..1 invitation → header morph during continuous advance. */
-  const [headerMorph, setHeaderMorph] = useState(0)
-  /**
-   * 0 = verse body parked below the header after next-chapter handoff;
-   * 1 = settled. Rises as soon as the header lands (Android parity).
-   */
-  const [verseReveal, setVerseReveal] = useState(1)
+  const pinnedTopNavTitle = chapterTransition?.title ?? null
+  const chapterAdvancing = chapterTransition != null
   const followWasEnabled = useRef(true)
-  const chapterAdvancingRef = useRef(false)
-  const headerMorphRef = useRef(0)
-  const verseRevealRef = useRef(1)
-  /** True between next-chapter handoff and the delayed verse rise finishing. */
-  const verseRevealPendingRef = useRef(false)
-  /** Surah id the delayed rise belongs to (ignore if the reader navigated away). */
-  const verseRevealForSurahRef = useRef(0)
-  const nextSurahRef = useRef<{
-    id: number
-    nameArabic: string
-    nameTransliteration: string
-    nameTranslation: string
-    revelationPlace: string
-    ayahCount: number
-  } | null>(null)
   /** While a rail/search jump is in flight, pin focus UI to the commit target. */
   const pendingJumpAyah = useRef<number | null>(null)
   const [mountRequest, setMountRequest] = useState<{
@@ -388,192 +365,11 @@ export function ReaderScreen({
     if (id == null || id >= 114) return null
     return state.surahs.find((s) => s.id === id + 1) ?? null
   }, [content?.surah.id, state.surahs])
-  nextSurahRef.current = nextSurah
 
-  /**
-   * Continuous next-chapter advance (web: button tap only — no overscroll).
-   * Fly a cloned opening from the footer up to the header slot, then hand off.
-   */
-  const advanceToNextChapter = useCallback(async (nextId: number) => {
-    if (chapterAdvancingRef.current) return
-    const el = scrollRef.current
-    const next = nextSurahRef.current
-    const prevContent = content
-    if (!el || !next || next.id !== nextId) {
-      appStore.prepareSurah(nextId)
-      appStore.openSurah(nextId, 1)
-      return
-    }
-    // Pin the top-nav title (usually visible at chapter end) for a soft fade.
-    if (prevContent && showTopTitle) {
-      setPinnedTopNavTitle({
-        id: prevContent.surah.id,
-        nameArabic: prevContent.surah.nameArabic,
-        nameTransliteration: prevContent.surah.nameTransliteration,
-      })
-    }
-
-    chapterAdvancingRef.current = true
-    setChapterAdvancing(true)
-    appStore.setFollowEnabled(false)
-    appStore.prepareSurah(nextId)
-
-    const ease = (t: number) => {
-      const x = Math.min(1, Math.max(0, t))
-      return x * x * (3 - 2 * x)
-    }
-    const animate = (ms: number, onFrame: (e: number) => void) =>
-      new Promise<void>((resolve) => {
-        const t0 = performance.now()
-        const tick = (now: number) => {
-          const u = Math.min(1, (now - t0) / ms)
-          onFrame(ease(u))
-          if (u < 1) requestAnimationFrame(tick)
-          else resolve()
-        }
-        requestAnimationFrame(tick)
-      })
-
-    await new Promise<void>((r) => requestAnimationFrame(() => r()))
-    const opening =
-      (el.querySelector('.next-chapter-opening') as HTMLElement | null) ??
-      (el.querySelector('.next-chapter') as HTMLElement | null)
-    const scrollRect = el.getBoundingClientRect()
-    const openRect = opening?.getBoundingClientRect()
-    const startTop = openRect?.top ?? scrollRect.bottom - 200
-    const endTop = scrollRect.top + 8
-    const startLeft = openRect?.left ?? scrollRect.left
-    const width = openRect?.width ?? scrollRect.width
-
-    headerMorphRef.current = 0
-    setHeaderMorph(0)
-
-    // Flying clone of the opening slides continuously to the header slot.
-    let flyer: HTMLElement | null = null
-    if (opening) {
-      flyer = opening.cloneNode(true) as HTMLElement
-      flyer.classList.add('chapter-fly-header')
-      flyer.setAttribute('aria-hidden', 'true')
-      Object.assign(flyer.style, {
-        position: 'fixed',
-        top: `${startTop}px`,
-        left: `${startLeft}px`,
-        width: `${width}px`,
-        margin: '0',
-        zIndex: '40',
-        pointerEvents: 'none',
-        opacity: '1',
-        transform: 'translate3d(0,0,0)',
-        willChange: 'transform, opacity',
-        transition: 'none',
-      })
-      document.body.appendChild(flyer)
-      opening.style.transition = 'opacity 200ms ease'
-      opening.style.opacity = '0'
-    }
-
-    // Soft-fade invitation chrome (NEXT + pill).
-    const inviteBits = el.querySelectorAll(
-      '.next-chapter-invite-top, .next-chapter-invite-pill',
-    )
-    inviteBits.forEach((node) => {
-      const n = node as HTMLElement
-      n.style.transition = 'opacity 280ms ease'
-      n.style.opacity = '0'
-    })
-
-    const flyerTravel = startTop - endTop
-    // Scroll previous verses clear of the viewport (not just a soft nudge).
-    const listEndLift = Math.max(flyerTravel, window.innerHeight * 0.55, 320)
-
-    await animate(780, (e) => {
-      headerMorphRef.current = Math.min(1, e / 0.35)
-      setHeaderMorph(headerMorphRef.current)
-      if (flyer) {
-        flyer.style.transform = `translate3d(0, ${-flyerTravel * e}px, 0)`
-      }
-      // Front-load exit: previous page fully faded/scrolled by ~28% of the fly.
-      const exitT = Math.min(1, e / 0.28)
-      const exitE = 1 - (1 - exitT) * (1 - exitT)
-      el.style.willChange = 'transform, opacity'
-      el.style.transform = `translate3d(0, ${-listEndLift * exitE}px, 0)`
-      el.style.opacity = String(1 - exitE)
-    })
-
-    // Handoff under the flyer (covers the remount).
-    verseRevealPendingRef.current = true
-    verseRevealForSurahRef.current = nextId
-    verseRevealRef.current = 0
-    setVerseReveal(0)
-    appStore.openSurah(nextId, 1)
-    await new Promise<void>((r) => requestAnimationFrame(() => r()))
-    el.scrollTop = 0
-    el.style.transform = ''
-    el.style.opacity = ''
-    // Crossfade: flyer out, settled header in — nothing snaps off.
-    const realHeader = el.querySelector(
-      '.surah-header:not(.chapter-fly-header):not(.next-chapter-opening)',
-    ) as HTMLElement | null
-    if (realHeader) {
-      realHeader.style.opacity = '0'
-      realHeader.style.transition = 'opacity 320ms ease'
-    }
-    await new Promise<void>((r) => requestAnimationFrame(() => r()))
-    if (realHeader) realHeader.style.opacity = '1'
-    if (flyer) {
-      flyer.style.transition = 'opacity 320ms ease'
-      flyer.style.opacity = '0'
-    }
-    await new Promise<void>((r) => window.setTimeout(r, 320))
-    if (flyer?.parentNode) flyer.parentNode.removeChild(flyer)
-    if (realHeader) {
-      realHeader.style.transition = ''
-      realHeader.style.opacity = ''
-    }
-    // Clean residual inline styles on the (now unmounted) old footer if still present.
-    inviteBits.forEach((node) => {
-      const n = node as HTMLElement
-      n.style.transition = ''
-      n.style.opacity = ''
-    })
-    headerMorphRef.current = 0
-    setHeaderMorph(0)
-    chapterAdvancingRef.current = false
-    setChapterAdvancing(false)
-    // Top-nav pin has finished fading with data-advancing.
-    setPinnedTopNavTitle(null)
-
-    // Verses fade and rise in as soon as the header has landed.
-    if (
-      !verseRevealPendingRef.current ||
-      verseRevealForSurahRef.current !== nextId
-    ) {
-      return
-    }
-    await animate(640, (e) => {
-      verseRevealRef.current = e
-      setVerseReveal(e)
-    })
-    if (verseRevealForSurahRef.current !== nextId) return
-    verseRevealRef.current = 1
-    setVerseReveal(1)
-    verseRevealPendingRef.current = false
-  }, [content, showTopTitle])
-
-  // Clear morph when the chapter changes.
-  useEffect(() => {
-    headerMorphRef.current = 0
-    setHeaderMorph(0)
-    // Keep the delayed rise only for the surah the advance just handed off.
-    const keepParked =
-      verseRevealPendingRef.current &&
-      content?.surah.id === verseRevealForSurahRef.current
-    if (!keepParked) {
-      verseRevealPendingRef.current = false
-      verseRevealRef.current = 1
-      setVerseReveal(1)
-    }
-  }, [content?.surah.id])
+  const advanceToNextChapter = useCallback((nextId: number) => {
+    const scroll = scrollRef.current
+    if (scroll) void onAdvanceChapter(nextId, scroll, showTopTitle)
+  }, [onAdvanceChapter, showTopTitle])
 
   const activeQuery = activeSearchQuery(searchActive, searchQuery)
   // Keep the input snappy — match/highlight work trails by a frame or two.
@@ -686,9 +482,10 @@ export function ReaderScreen({
   // Continuous next-chapter advance owns scroll/transform — only pin focus.
   useEffect(() => {
     if (!content || !isTop || mushaf || initialFocusSettled) return
-    if (chapterAdvancingRef.current) {
+    if (chapterAdvancing) {
       setFocusedAyah(Math.max(1, state.openAyah || 1))
       setShowTopTitle(false)
+      setSettledOpenRevision(state.readerOpenRevision)
       return
     }
     const ayah = state.readingPlace?.surahId === content.surah.id
@@ -759,7 +556,6 @@ export function ReaderScreen({
       !initialFocusSettled ||
       !Number.isFinite(ayahRailTipCenterY) ||
       chapterAdvancing ||
-      verseReveal < 1 ||
       recitingActive
     ) {
       return
@@ -783,7 +579,6 @@ export function ReaderScreen({
     initialFocusSettled,
     ayahRailTipCenterY,
     chapterAdvancing,
-    verseReveal,
     recitingActive,
   ])
 
@@ -1311,18 +1106,6 @@ export function ReaderScreen({
     )
   }
 
-  // Rise is linear in --verse-reveal; fade uses a delayed smootherstep so
-  // ink washes in clearly as the verses settle (Android parity).
-  const verseFade = (() => {
-    const t = Math.min(1, Math.max(0, verseReveal))
-    const u = Math.min(1, Math.max(0, (t - 0.08) / 0.92))
-    return u * u * (3 - 2 * u)
-  })()
-  const verseRiseStyle = {
-    ['--verse-reveal' as string]: String(verseReveal),
-    ['--verse-fade' as string]: String(verseFade),
-  } as import('react').CSSProperties
-
   // Recess is one paper veil per inactive ayah (`.ayah-recess-veil` under
   // `.scroll[data-reciting]`) — not per-word opacity. Inactive ayahs keep
   // dimmed=false so memo(AyahBlock) skips them on play/pause. Karaoke ink
@@ -1365,8 +1148,6 @@ export function ReaderScreen({
     bookmarkTipAyah > 0 &&
     Number.isFinite(bookmarkTipCenterY)
 
-  const [repeatOpen, setRepeatOpen] = useState(false)
-  const retainedRepeat = useRef<RepeatChoice | null>(null)
   const repeatMode = state.player.repeatMode
   const nowPlaying = state.player.nowPlaying
   // Cover keeps this same bar and opens the return pill and Close into it.
@@ -1450,6 +1231,8 @@ export function ReaderScreen({
       }}
       style={
         {
+          ['--verse-reveal' as string]: chapterTransition?.toId === content.surah.id ? '0' : '1',
+          ['--verse-fade' as string]: chapterTransition?.toId === content.surah.id ? '0' : '1',
           ['--reader-paper' as string]: 'var(--paper)',
           ['--reader-ink' as string]: 'var(--ink)',
         } as import('react').CSSProperties
@@ -1486,6 +1269,7 @@ export function ReaderScreen({
             aria-hidden={!mushaf && !showTopTitle && !pinnedTopNavTitle}
           >
             <OrnateSurahTitle
+              ayahCount={pinnedTopNavTitle?.ayahCount ?? readerSurah!.ayahCount}
               chapterNumber={
                 pinnedTopNavTitle?.id ?? readerSurah!.id
               }
@@ -1652,7 +1436,6 @@ export function ReaderScreen({
                   data-ayah="0"
                   data-ayah-active={state.activeBasmalah || undefined}
                   style={{
-                    ...verseRiseStyle,
                     ['--font-scale' as string]: String(state.settings.fontScale),
                   }}
                 >
@@ -1708,7 +1491,6 @@ export function ReaderScreen({
                   <div
                     key={ayah.number}
                     className="reader-verse-rise"
-                    style={verseRiseStyle}
                   >
                     <AyahBlock
                       ayah={ayah}
@@ -1786,10 +1568,7 @@ export function ReaderScreen({
                   surah={nextSurah}
                   themeMode={state.settings.themeMode}
                   enabled={!chapterAdvancing}
-                  headerMorph={headerMorph}
-                  onOpen={() => {
-                    void advanceToNextChapter(nextSurah.id)
-                  }}
+                  onOpen={advanceToNextChapter}
                 />
               ) : null}
             </div>

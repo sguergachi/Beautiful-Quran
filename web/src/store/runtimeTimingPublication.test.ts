@@ -1,8 +1,10 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { PreparedTimings } from '../domain/HighlightEngine'
 import type { Segment } from '../data/models'
+import type { PlayerState } from '../playback/player'
 
 let publish!: (id: number | null) => void
+let publishPlayer!: (state: PlayerState) => void
 let app: typeof import('./appStore').appStore
 const corpora = new Map<string, Map<number, Segment[]>>()
 const revokeWords = vi.fn(async () => undefined)
@@ -44,7 +46,9 @@ beforeAll(async () => {
     timings: (id: number, surah: number) => corpora.get(`${id}:${surah}`) ?? new Map(),
   } }))
   vi.doMock('../playback/player', () => ({ player: {
-    getState: () => playback, subscribe: vi.fn(), pause: vi.fn(),
+    getState: () => playback,
+    subscribe: (listener: typeof publishPlayer) => { publishPlayer = listener },
+    pause: vi.fn(),
   } }))
   app = (await import('./appStore')).appStore
 })
@@ -80,6 +84,27 @@ beforeEach(() => {
 })
 
 describe('live timing publication', () => {
+  it('publishes edited repeat bounds and speed without publishing position ticks', () => {
+    const initial: PlayerState = {
+      ...playback, isPlaying: false, speed: 1, repeatMode: 'range',
+      repeatRange: { first: 1, last: 3 }, error: null,
+    }
+    publishPlayer(initial)
+    const emitted = vi.fn()
+    const unsubscribe = app.subscribe(emitted)
+    try {
+      publishPlayer({ ...initial, positionMs: 46 })
+      expect(emitted).not.toHaveBeenCalled()
+      publishPlayer({ ...initial, repeatRange: { first: 2, last: 2 } })
+      expect(emitted).toHaveBeenCalledTimes(1)
+      expect(app.getSnapshot().player.repeatRange).toEqual({ first: 2, last: 2 })
+      publishPlayer({ ...app.getSnapshot().player, repeatRange: { first: 2, last: 2 }, positionMs: 47 })
+      expect(emitted).toHaveBeenCalledTimes(1)
+      publishPlayer({ ...app.getSnapshot().player, speed: 1.25 })
+      expect(emitted).toHaveBeenCalledTimes(2)
+    } finally { unsubscribe() }
+  })
+
   it('replaces active prepared timings and basmalah without restarting chapter audio', () => {
     corpora.set('1:2', new Map([[1, repeat]]))
     publish(1)
