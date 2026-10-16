@@ -107,18 +107,20 @@ The light-break is timed to land on 55:5 in every variant.
 
 ## The intro Reel: "Every word, as it is recited"
 
-29 s, 1080 × 1920, 60 fps. The recitation (basmalah, 55:1–4) runs
-unbroken; every cut lands on a verse boundary, and the phone changes theme
-across cuts, because all takes share one timeline (see the tools README).
+31.5 s, 1080 × 1920, 60 fps, recorded at full device resolution. The
+recitation (basmalah, 55:1–4) runs unbroken; every cut lands on a verse
+boundary, because all takes share one timeline (see the tools README). It
+opens on the chapter header, the app's most ornate moment.
 
 | Time | Verse | Shot | Caption |
 |---|---|---|---|
-| 0.0–6.6 | basmalah | Full-bleed screen, Royal green, large text: the basmalah writes itself in white-gold; slow push-in pivoting on it | none |
-| 6.6 | 55:1 | Cut to the phone, Royal green, settling from 1.10× | *Every word, as it is recited.* |
-| 11.2 | 55:2 | Cut, Paper phone on paper | *Its meaning, word by word, beneath.* |
-| 15.9 | 55:3 | Cut, Nightfall phone on near-black | *Paper, nightfall, or royal green.* |
-| 21.4 | 55:4 | Cut, Royal green, slow push | *Free and open source.* |
-| 25.9–29 | tail | End card: icon, *Beautiful Quran*, ANDROID · WEB · LINK IN BIO | |
+| 0.0–3.0 | silence | Full-bleed chapter header, Royal green: tooled weave field, gold rosette, سورة الرحمن, slow push toward the rosette | none |
+| 3.0–9.0 | basmalah | The recitation begins; the app's own scroll carries the page to the basmalah, which writes itself in white-gold | none |
+| 9.0 | 55:1 | Cut to the phone, Royal green, settling from 1.10× | *Every word, as it is recited.* |
+| 13.6 | 55:2 | Paper phone on paper | *Its meaning, word by word.* |
+| 18.3 | 55:3 | Mushaf layout, Nightfall: the printed page with Ar-Rahman's gold banner | *Or the whole page, as printed.* |
+| 23.8 | 55:4 | Royal green, slow push | *Free and open source.* |
+| 28.3–31.5 | tail | End card: icon, *Beautiful Quran*, ANDROID · WEB · LINK IN BIO | |
 
 Captions are Cormorant Garamond italic (the product page's voice); the end
 card uses Junicode, the app's English face. Captions sit above the phone,
@@ -132,6 +134,10 @@ upper third, clear of the caption and action rail at the bottom.
 - No stylised or vector hands. A hand on screen must be photographic.
 - Smoothness is part of fidelity: wash footage is captured slowed and
   conformed (≥ 60 distinct frames per second of recitation), never upsampled.
+  Android's animation scales follow the capture speed, so scrolls, fades
+  and the glint's drying keep their real pace.
+- Show the app at its most beautiful: open on the chapter header, and
+  include the Mushaf page, not only the scroll reader.
 
 ## Device mockups
 
@@ -162,7 +168,7 @@ frame. The palettes per variant:
 
 | Asset | Spec |
 |---|---|
-| Intro Reel | 1080 × 1920, 60 fps, H.264, AAC 48 kHz, −16 LUFS, 29 s |
+| Intro Reel | 1080 × 1920, 60 fps, H.264, AAC 48 kHz, −16 LUFS, 31.5 s |
 | Mockups ×3 | 1080 × 1920, 60 fps, 69 s, one per theme |
 | Product page hero | Al-Fatihah, Paper, 1080 × 2400, 30 fps, about 1 MB |
 | Product page theme loops ×3 | Al-Fatihah opening, 540 × 1200, 13 s, about 150 KB |

@@ -12,7 +12,7 @@ Everything on screen is the **real Android app**, recorded on an emulator.
 | `android_take.py` | Drives the emulator by text/content-desc (theme, text size, speed, clean status bar) and records a take. |
 | `find_onset.py` | Finds where playback started in a take (the transport glyph flips ▶ → ⏸). |
 | `conform_take.py` | Speeds a slow take back to 1×, resamples to 60 fps, removes the lit speed label, and starts every clip 0.6 s before the recitation. |
-| `reel/` | The edit, in [Revideo](https://github.com/redotvideo/revideo) (MIT, headless Motion Canvas): `reel.tsx` (29 s intro) and `mockup.tsx` (full-length device mockup). |
+| `reel/` | The edit, in [Revideo](https://github.com/redotvideo/revideo) (MIT, headless Motion Canvas): `reel.tsx` (31.5 s intro) and `mockup.tsx` (full-length device mockup). |
 | `composite_screen.py`, `composite_video.py` | Put a take onto a green-screen phone in a photo or stock clip (chroma alpha, edge unmixing, skin-aware despill, tracked corners). |
 
 ## Why slow takes
@@ -20,7 +20,10 @@ Everything on screen is the **real Android app**, recorded on an emulator.
 The emulator can't render the reader at 60 fps, and the wash must never be
 steppy. The app's ink follows the audio clock, so a take recorded at 0.25×
 contains four times as many distinct wash frames per second of recitation.
-`conform_take.py` speeds it back up. The recitation is not taken from the
+`conform_take.py` speeds it back up. Set Android's animation scales to the
+inverse speed for the take (`android_take.py anim 4` at 0.25×): scrolls,
+fades and the glint's drying run on the animation clock, not the audio, and
+would otherwise come out 4× too fast. The recitation is not taken from the
 emulator: the edit lays in the same EveryAyah files the app played, back to
 back (Android plays them gapless), from the detected onset. Every conformed
 clip of one recitation shares a timeline, so the edit can cut between themes
@@ -36,17 +39,18 @@ git -C ~/.cache/bq-key-art/capture-build apply "$PWD/tools/key_art/capture-speed
 
 S=$(scripts/emu.sh lease "key art"); export ANDROID_SERIAL=$S
 scripts/emu.sh run --apk ~/.cache/bq-key-art/capture-build/app/build/outputs/apk/release/app-release.apk
-adb shell wm size 720x1600; adb shell wm density 280      # the phone in frame is ~690 px wide
+# full 1080x2400 when the host GPU is healthy (~60 fps at 1x); 720x1600 if the
+# emulator is slow: adb shell wm size 720x1600; adb shell wm density 280
 K=tools/key_art
 python3 $K/android_take.py prep
 python3 $K/android_take.py theme "Royal green"            # Paper | Nightfall | Royal green
 python3 $K/android_take.py speed 1;  python3 $K/android_take.py ref ~/.cache/bq-key-art/takes/royal-ref.png
-python3 $K/android_take.py speed 0.25
+python3 $K/android_take.py speed 0.25; python3 $K/android_take.py anim 4
 python3 $K/android_take.py record ~/.cache/bq-key-art/takes/royal.mp4 55 1 120
 python3 $K/android_take.py restore; scripts/emu.sh release "$S"
 ```
 
-A 0.25× take of 120 s holds 29 s of recitation (the intro); full-length
+A 0.25× take of 135 s holds 33 s of recitation (the intro); full-length
 mockups use 0.5× (`record … 142`, screenrecord's limit is 180 s).
 
 ## The edit
@@ -64,8 +68,13 @@ Notes:
 
 - Keep takes and frames in `~/.cache/bq-key-art`, never `/tmp`: here it is
   a shared 16 GB tmpfs.
-- Host load matters: another agent's Gradle build halved one take's frame
-  rate. 0.25× tolerates that; check cadence with
+- Host health matters. An NVIDIA kernel/userspace mismatch (fixed by a
+  reboot) held the emulator to about 25 fps; afterwards full resolution ran
+  at 60 fps and 0.25× takes captured 119 frames per second of recitation.
+  Another agent's Gradle build can halve a take's rate. Check cadence with
   `ffprobe -show_entries frame=pts_time`.
+- The chapter-header opener (`android_take.py header`) frames the chapter
+  top with one measured swipe (Scroll is continuous across chapters), rests,
+  then starts with the verse link so the basmalah plays first.
 - Product-page clips are conformed at 30 fps and encoded small (hero CRF 30,
   theme loops 540×1200 CRF 27).

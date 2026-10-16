@@ -20,8 +20,8 @@ for f in 001001 055001 055002 055003 055004 055005 055006 055007 055008 055009 0
 done
 cat_files() { local IFS='|'; echo "concat:$*"; }
 ffmpeg -v error -y -i "$(cat_files $A/001001.mp3 $A/055001.mp3 $A/055002.mp3 $A/055003.mp3 $A/055004.mp3)" \
-  -af "adelay=600|600,apad=whole_dur=29,afade=t=out:st=27.4:d=1.6,loudnorm=I=-16:TP=-1.5:LRA=11" \
-  -ar 48000 -ac 2 -t 29 public/audio/reel.wav
+  -af "adelay=3000|3000,apad=whole_dur=31.5,afade=t=out:st=29.9:d=1.6,loudnorm=I=-16:TP=-1.5:LRA=11" \
+  -ar 48000 -ac 2 -t 31.5 public/audio/reel.wav
 ffmpeg -v error -y -i "$(cat_files $A/001001.mp3 $A/0550{01..09}.mp3 $A/055010.mp3)" \
   -af "adelay=600|600,apad=whole_dur=68.9,afade=t=out:st=67.6:d=1.3,loudnorm=I=-16:TP=-1.5:LRA=11" \
   -ar 48000 -ac 2 -t 68.9 public/audio/mockup.wav

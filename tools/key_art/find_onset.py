@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """When did playback start in an Android take?
 
-    find_onset.py TAKE.mp4 REF.png [--after 1.0]
+    find_onset.py TAKE.mp4 REF.png [--after 1.0] [--at 0.5,0.9387]
 
 android_take.py starts the screen recording paused and then opens the verse
 with ?play=true. The transport's play glyph turns into pause when Media3
@@ -20,7 +20,9 @@ def main():
     after = float(sys.argv[sys.argv.index("--after") + 1]) if "--after" in sys.argv else 1.0
     r = np.asarray(Image.open(ref).convert("L"), np.float32)
     h, w = r.shape
-    cx, cy, half = w // 2, int(h * 0.9387), int(w * 0.05)
+    # play/pause centre as a fraction of the frame (Scroll default; Mushaf ~0.5,0.888)
+    fx, fy = (map(float, sys.argv[sys.argv.index("--at") + 1].split(",")) if "--at" in sys.argv else (0.5, 0.9387))
+    cx, cy, half = int(w * fx), int(h * fy), int(w * 0.05)
     box = (cx - half, cy - half, cx + half, cy + half)
     tpl = r[box[1]:box[3], box[0]:box[2]]
     vw, vh = map(int, subprocess.run(["ffprobe", "-v", "error", "-select_streams", "v:0", "-show_entries",
