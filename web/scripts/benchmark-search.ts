@@ -102,9 +102,16 @@ const cases: [string, WordSearchSources][] = [
   ['corrupy', scroll],
   ['"day of judgment"', scroll],
   ['hell', mushaf],
+  ["doesn't love", mushaf],
+  ['does not love', mushaf],
 ]
 
 const medians: number[] = []
+const contractionHits = (query: string) => matchWordSearch(index, query, 400, concepts, thesaurus, mushaf)
+  .map((hit) => `${hit.surahId}:${hit.ayahNumber}`).sort().join(',')
+if (contractionHits("doesn't love") !== contractionHits('does not love')) {
+  throw new Error('Contracted and expanded search results differ')
+}
 console.log(`${index.length.toLocaleString()} word rows · ${concepts.length} concepts`)
 for (const [query, sources] of cases) {
   matchWordSearch(index, query, 400, concepts, thesaurus, sources)

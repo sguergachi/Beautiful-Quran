@@ -1,4 +1,5 @@
 import { foldEnglish } from '../../domain/EnglishTypography'
+import { contractionRanges } from '../../domain/EnglishContractions'
 
 /** Timing for the reader's orange search-hit wash; mirrors Android. */
 export const SearchHitFlash = {
@@ -47,6 +48,11 @@ export function searchHitTextRanges(text: string, rawQuery?: string | null): Arr
     }
     if (!ranges.some(([a, b]) => a === start && b === end)) ranges.push([start, end])
     from = Math.max(end, match + 1)
+  }
+  if (!quoted) {
+    for (const { start, end } of contractionRanges(text, query)) {
+      if (!ranges.some(([a, b]) => a === start && b === end)) ranges.push([start, end])
+    }
   }
   return ranges
 }

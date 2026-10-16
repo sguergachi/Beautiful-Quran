@@ -9,6 +9,13 @@ signals rather than a general-purpose language model:
    searches its flowing English translation. Search results are never Arabic,
    and the other English source never contributes a hidden result. An exact field match leads an
    embedded phrase, reordered multi-word coverage, and a plain substring.
+   Unquoted English contractions also match their expansions in either direction:
+   `doesn't love` finds `does not love`, including `(does) not love`. Straight
+   and curly apostrophes are equivalent. Negative forms, pronoun auxiliaries,
+   combined forms such as `wouldn't've`, and irregular forms such as `won't`,
+   `can't`/`cannot`, and `let's` share the same ranking and highlight rules.
+   Ambiguous `'s` and `'d` on pronouns accept `is`/`has` and `had`/`would`;
+   noun possessives such as `Allah's` are not auxiliary contractions.
 2. **Thesaurus vocabulary** — when fewer than three grounded results exist, a
    compact Open English WordNet graph supplements them with related words that
    actually occur in this Quran. Synonyms lead precise derivational, similar,
@@ -138,6 +145,8 @@ receded across verse joins and repeat restarts on Android and web.
 A pair of straight or typographic double quotes around the complete query
 disables spelling, thesaurus expansion, roots, concepts, token reordering, and
 substring matching. Literal matching still observes the active reader sources.
+Contraction expansion is disabled too: `"doesn't"` stays literal, while
+unquoted `doesn't` also finds `does not`.
 It keeps only a literal whole word or contiguous phrase, ignoring case and
 punctuation boundaries:
 

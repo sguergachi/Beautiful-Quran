@@ -56,6 +56,30 @@ class WordSearchTest {
     }
 
     @Test
+    fun `contracted queries rank multi-word glosses and ground the same reader words`() {
+        val entries = listOf(
+            entry(2, 205, 1, "أ", "Allah"),
+            entry(2, 205, 2, "ب", "(does) not"),
+            entry(2, 205, 3, "ج", "love"),
+            entry(2, 205, 4, "د", "corruption"),
+        )
+        val sources = WordSearchSources(arabic = false, wordGloss = true, transliteration = false, verseTranslation = false)
+        for (query in listOf("does not love", "doesn't love", "DOESN’T LOVE")) {
+            val hit = matchWordSearch(entries, query, sources = sources).single()
+            assertEquals(listOf(2, 3), hit.targetPositions)
+            assertEquals("Text match", hit.matchReason)
+            assertEquals(listOf("(does) not love"),
+                englishTranslationHighlightSpans(hit.displayText, query, "")
+                    .filter { it.highlighted }.map { it.text })
+        }
+        assertEquals(listOf(2), matchWordSearch(entries, "doesn't", sources = sources).single().targetPositions)
+
+        val contractedVerse = entries.map { it.copy(context = it.context.copy(ayahTranslation = "Allah doesn't love corruption")) }
+        val hit = matchWordSearch(contractedVerse, "does not love", sources = sources.copy(wordGloss = false, verseTranslation = true)).single()
+        assertEquals(listOf(2, 3), hit.targetPositions)
+    }
+
+    @Test
     fun `english gloss matches are case-insensitive`() {
         val hits = matchWordSearch(index, "merciful")
         assertEquals(listOf(1 to 4, 55 to 1), hits.map { it.surahId to it.position })

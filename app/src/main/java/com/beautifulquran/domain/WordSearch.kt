@@ -93,7 +93,8 @@ fun isWordSearchQuery(query: String): Boolean {
 
 /** Candidate term for cold first results; phrases may consist entirely of short words. */
 internal fun quickSearchFallbackTerm(query: String): String? {
-    val words = query.split(Regex("[^\\p{L}\\p{N}]+"))
+    val words = (if (EnglishContractions.mayExpand(query)) EnglishContractions.words(query) else
+        query.split(Regex("[^\\p{L}\\p{N}]+")))
         .filter(String::isNotEmpty)
     return words.maxByOrNull(String::length)?.takeIf { words.size > 1 || it.length >= 4 }
 }
@@ -224,7 +225,7 @@ fun matchWordSearch(
                 if (sources.verseTranslation) {
                     searchTextRelevance(anchor.ayahTranslation, latin, allowFuzzy)
                 } else 0,
-                if (sources.wordGloss && parsed.text.any(Char::isWhitespace)) {
+                if (sources.wordGloss && (parsed.text.any(Char::isWhitespace) || EnglishContractions.mayExpand(parsed.text))) {
                     searchTextRelevance(sameAyahGlossLine(index, at), latin, allowFuzzy)
                 } else {
                     0
@@ -644,7 +645,8 @@ private fun visibleSearchTargetIndices(
     val needles = highlightNeedles(displayText, query, "", semanticLabel, semanticTerms)
     val terms = needles
         .flatMap { needle ->
-            listOf(needle) + Regex("[\\p{L}\\p{N}]+").findAll(needle).map { it.value }
+            listOf(needle) + Regex("[\\p{L}\\p{N}]+").findAll(needle).map { it.value } +
+                if (EnglishContractions.mayExpand(needle)) EnglishContractions.words(needle) else emptyList()
         }
         .filter { it.length >= 3 && it.lowercase() !in highlightFillers }
         .distinctBy(String::lowercase)
@@ -948,6 +950,9 @@ private fun highlightNeedleSpecs(
     }
     val parsed = parseSearchQuery(query)
     add(parsed.text, wholeWord = parsed.exactOnly, wordPrefix = !parsed.exactOnly)
+    if (!parsed.exactOnly) {
+        EnglishContractions.ranges(haystack, parsed.text).forEach { add(haystack.substring(it)) }
+    }
     val phraseWords = EnglishTypography.fold(parsed.text)
         .split(Regex("[\\s()\\[\\]]+")).filter(String::isNotEmpty)
     if (phraseWords.size > 1) {

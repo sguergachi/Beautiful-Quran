@@ -58,6 +58,24 @@ const index = [
 ]
 
 describe('bracketed search phrase highlighting', () => {
+  it('ranks contraction phrases across glosses and grounds the reader words in either direction', () => {
+    const entries = [entry(2, 205, 1, 'أ', 'Allah'), entry(2, 205, 2, 'ب', '(does) not'),
+      entry(2, 205, 3, 'ج', 'love'), entry(2, 205, 4, 'د', 'corruption')]
+    const sources = { arabic: false, wordGloss: true, transliteration: false, verseTranslation: false }
+    for (const query of ['does not love', "doesn't love", 'DOESN’T LOVE']) {
+      const hits = matchWordSearch(entries, query, 400, [], new Map(), sources)
+      expect(hits).toHaveLength(1)
+      expect(hits[0]!.targetPositions).toEqual([2, 3])
+      expect(hits[0]!.matchReason).toBe('Text match')
+      expect(englishTranslationHighlightSpans(hits[0]!.displayText!, query, '')
+        .filter((s) => s.highlighted).map((s) => s.text)).toEqual(['(does) not love'])
+    }
+    expect(matchWordSearch(entries, "doesn't", 400, [], new Map(), sources)[0]!.targetPositions).toEqual([2])
+    const contracted = entries.map((row) => ({ ...row, ayahTranslation: "Allah doesn't love corruption" }))
+    expect(matchWordSearch(contracted, 'does not love', 400, [], new Map(),
+      { ...sources, wordGloss: false, verseTranslation: true })[0]!.targetPositions).toEqual([2, 3])
+  })
+
   it.each([
     '(does) not love', '[does] not love', 'does [not] love', 'does not (love)',
     '(does not love)', '[does] (not) [love]', 'does  not\nlove',
