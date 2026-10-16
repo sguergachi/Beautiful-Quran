@@ -5,6 +5,20 @@ verdict has reviewed them yet. The fail-closed delta gate withholds each of
 them; this file keeps that from being silent. Remove an entry when its rows ship
 with a verdict, are held with their model scores, or its cause is reverted.
 
+## Audio-vetted rewind onset (#873)
+
+The typed Alafasy 5:2 correction removes only the unspoken word 15 at
+23,340–24,040 ms and folds that interval into word 14. Its local candidate
+verdict is bound to the delivered runtime row; it is not an authenticated
+snapshot publication. The private replay must reconcile the existing source
+transition ledger and every other corpus delta before this row can ship.
+The returning word-11 boundary at 24,070 ms also remains unvalidated: both
+models force it around 25,146–25,166 ms. No clock offset is inferred.
+
+Alafasy 47:4 remains unchanged: both models prefer one word 13, but the
+removed occurrence exceeds the confidence ceiling on XLSR. Keep that pair
+pending adjudication. Alafasy 24:25 and Hani 21:46/21:63 need no new edit.
+
 ## Lagged qdc peer pairs (#856)
 
 `lagged_peer_positions` stops `preserve_peer_repeats` restoring a same-word

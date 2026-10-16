@@ -10,6 +10,16 @@ compared.
 
 Supported operations:
 
+- `discard_unspoken_rewind_onset`: discard one audio-proven unspoken label
+  immediately before a rewind. The exact three-segment `sourceWindow` pins
+  the preceding word, false label and returning word to the reviewed clock.
+  The label must be a new high-water position, immediately after its previous
+  canonical word, and still occur later. Its interval returns to that previous
+  word; no other start or repeat changes. Source drift or a missing audio
+  verdict fails closed. Alafasy 5:2 (#873) is this shape: both models reject
+  the 700 ms word 15. The cleaner's 200 ms floor stays unchanged because a
+  substantial pre-rewind label can also be a genuinely spoken word.
+
 - `one_utterance`: collapse one verified `A,B,A,B` aligner loop to a single
   utterance while preserving the first `A` and final `B` boundaries.
 - `discard_false_same_position_lead`: remove one audio-proven false duplicate

@@ -76,6 +76,8 @@ a case under this directory.
 | `current_file_clock` | with `repair_file_clock` | rebase when both the source and repair already share the MP3 clock |
 | `expected_erases` | for `erases_span_repeat` | bool — must the guard refuse this repair? |
 | `correction_positions` | for `timing_correction` | positions named by the typed operation |
+| `source_window` | for `discard_unspoken_rewind_onset` | exact preceding/removed/returning segments; source drift fails closed |
+| `requires_audio_verdict` | for audio-backed typed corrections | must be true; shape alone never authorizes removal |
 | `audio_onset_ms` | for `leading_silence_offset` | measured first sustained voice onset |
 | `n_words` | for `complete_repeat_topology` | canonical word count; source must cover it completely |
 | `exact_file_clock` | no | false when word 2 proves the complete row predates voice |

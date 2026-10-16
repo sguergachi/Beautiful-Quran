@@ -1,0 +1,10 @@
+{
+  "id": "peer-alafasy-47-4-pending-audio",
+  "label": "Alafasy 47:4 retains the substantial word-13 pair pending adjudication",
+  "refs": ["GitHub #873"],
+  "pipeline": "preserve_peer_repeats",
+  "notes": "One-word transcripts score better, but XLSR gives the removed occurrence 0.666 confidence. The acoustic removal gate fails; do not weaken peer protection or claim this establishes a genuine repeat.",
+  "input_segments": [[12, 14625, 16565], [13, 16565, 17820], [13, 17820, 19000], [14, 19000, 19650]],
+  "repair_segments": [[12, 14625, 16565], [13, 16565, 19000], [14, 19000, 19650]],
+  "expected_segments": [[12, 14625, 16565], [13, 16565, 17820], [13, 17820, 19000], [14, 19000, 19650]]
+}

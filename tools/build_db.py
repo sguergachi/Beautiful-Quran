@@ -2083,6 +2083,33 @@ def discard_false_same_position_lead(segs, position, requires_audio_verdict=Fals
     ]
 
 
+def discard_unspoken_rewind_onset(segs, source_window, requires_audio_verdict=False):
+    """Remove an audio-proven false label before a rewind, on its exact clock.
+
+    Substantial pre-rewind labels may be spoken words. Only a reviewed source
+    window can authorize removal; ordinary cleaning keeps its short-word floor.
+    The previous word retains the interval and the later real occurrence stays.
+    """
+    if not requires_audio_verdict:
+        raise ValueError("discard_unspoken_rewind_onset requires an audio verdict")
+    if len(source_window) != 3:
+        raise ValueError("discard_unspoken_rewind_onset needs a three-segment source window")
+    matches = [i for i in range(1, len(segs) - 1) if segs[i - 1:i + 2] == source_window]
+    if len(matches) != 1:
+        raise ValueError("discard_unspoken_rewind_onset source window changed or is ambiguous")
+    i = matches[0]
+    position = segs[i][0]
+    if (position != segs[i - 1][0] + 1 or
+            position <= max(seg[0] for seg in segs[:i]) or
+            segs[i + 1][0] >= position or
+            not any(seg[0] == position for seg in segs[i + 2:])):
+        raise ValueError("discard_unspoken_rewind_onset needs a new word before a rewind, recited later")
+    out = [list(seg) for seg in segs]
+    out[i - 1][2] = max(out[i - 1][2], out[i][2])
+    del out[i]
+    return out
+
+
 def restore_flattened_resay(
     segs,
     position,
@@ -2200,6 +2227,10 @@ def apply_timing_corrections(
                         int(edit["nextOnsetMs"]),
                         edit["sourcePair"],
                         bool(edit.get("requiresAudioVerdict")),
+                    )
+                elif op == "discard_unspoken_rewind_onset":
+                    by_key[key] = discard_unspoken_rewind_onset(
+                        by_key[key], edit["sourceWindow"], bool(edit.get("requiresAudioVerdict"))
                     )
                 else:
                     raise ValueError(f"unknown op {op!r}")

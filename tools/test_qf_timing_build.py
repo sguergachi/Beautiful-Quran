@@ -218,6 +218,20 @@ class AuthenticatedTimingBuildTest(unittest.TestCase):
                 with self.assertRaises(SystemExit):
                     build.apply_authenticated_verdicts([(1, 1, 1, new)], {}, before)
 
+    def test_better_start_residuals_cannot_approve_a_truncated_repeat_tail(self):
+        old = [[8, 7710, 9340], [8, 9340, 11400], [9, 11400, 12340]]
+        new = [[8, 7710, 9326], [8, 9382, 9800], [9, 11435, 12340]]
+        before, after = self.database("before.db", old), self.database("after.db", new)
+        ledger = self.ledger(before, after, "accept")
+        payload = json.loads(ledger.read_text())
+        waveform = next(iter(payload["verdicts"].values()))["evidence"]["waveform"]
+        waveform["decodedDurationMs"] = 16000
+        waveform["voicedTailCutRisks"] = [{"position": 8, "candidateEndMs": 9800,
+                                          "forcedEndMs": 11157}]
+        ledger.write_text(json.dumps(payload))
+        with patch.object(build, "QF_VERDICTS_FILE", ledger), self.assertRaisesRegex(SystemExit, "waveform"):
+            build.apply_authenticated_verdicts([(1, 1, 1, new)], {}, before)
+
     def test_verdict_ledger_cannot_move_to_another_source_profile(self):
         old, new = [[1, 0, 1000]], [[1, 20, 1000]]
         before, after = self.database("before.db", old), self.database("after.db", new)

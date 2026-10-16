@@ -51,3 +51,17 @@ timestamp-only rows in the quran-v54 rebuild it was identical on both models
 for every single row. Boundary changes are judged instead on the mean absolute
 start residual between the stored boundary and the model's forced boundary,
 which is the Pareto non-regression this document asks for.
+
+## Reviewed runtime candidate, not a publication
+
+`unspoken-rewind-onset-class.json` binds the Alafasy 5:2 correction from #873
+to the currently delivered payload and the exact implemented candidate. Both
+models were run locally; their revision, audio hash, scores and removed-word
+confidence are recorded with the evidence. The existing 47:4 pair remains
+protected because its removal fails the confidence gate.
+
+This candidate verdict does not replace the authenticated source-transition
+ledger. Before publication, replay the private authenticated snapshots, reconcile
+every delta against the reviewed runtime baseline, and bind those actual output
+payloads to the source-profile ledger. A stale verdict must continue to stop
+publication. An APK rebuild cannot deliver this runtime correction.

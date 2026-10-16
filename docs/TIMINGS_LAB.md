@@ -233,6 +233,7 @@ Free, no backend, no auth beyond the GitHub account:
    |---|---|---|
    | Structural qdc noise (forward spikes, strays, split slivers, non-contiguous / gap phantoms) | `clean_qdc_artifacts` in `tools/build_db.py` | Add `tools/timing_patch_cases/<id>.json` — broken `input_*` + expected `expected_*` from the patch; run `python3 tools/test_build_db.py` |
    | Topology cannot distinguish a false loop from a genuine repeat | narrow typed operation under `tools/timing_corrections/` | `pipeline: timing_correction` case |
+   | Audio proves a substantial first-pass label before a rewind is unspoken | exact-source `discard_unspoken_rewind_onset`; keep the cleaner's 200 ms floor | `audio-vetted-rewind-onset-alafasy-5-2`, stale-source guard tests |
    | Drop repair that flattens a real span-repeat | `apply_timing_repairs` span-protect (and regenerate repairs) | `pipeline: erases_span_repeat` case in `timing_patch_cases/` |
    | Repair flattens a peer same-word re-say while fixing elsewhere | per-position `preserve_peer_repeats` | `pipeline: preserve_peer_repeats` case |
    | Restore invents a flush same-word pair (gap < 300 ms) | `collapse_invented_flush_repeats` in `apply_timing_repairs` | `pipeline: invented_flush_restore` case |
