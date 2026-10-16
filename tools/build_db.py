@@ -1017,6 +1017,59 @@ def hand_lead_to_previous_word(segs, leads):
     return out
 
 
+LAG_SKIP_COVER = 0.5   # pre-skip occurrence heard as the skipped words
+LAG_PEER_COVER = 1 / 3  # "re-say" heard as later words, not its own
+
+
+def _covered_by(seg, repaired, positions):
+    """Fraction of ``seg`` that ``repaired`` assigns to ``positions``."""
+    start, end = seg[1], seg[2]
+    covered = sum(
+        max(0, min(end, r[2]) - max(start, r[1]))
+        for r in repaired
+        if r[0] in positions
+    )
+    return covered / (end - start) if end > start else 0.0
+
+
+def lagged_peer_positions(current, repaired):
+    """Same-word pairs that are qdc labels running one word late, not re-says.
+
+    qdc tiles gaplessly, so when it loses a word its labels can lag: the
+    second half of word p is labelled p again, each following label sits on
+    the next word's audio, and the run then jumps over the words it lost
+    (Alafasy 24:25 reads 1,1,2,5 where the recitation is 1,2,3,4,5). A repair
+    that supplies the skipped words witnesses the lag twice over — the
+    occurrence just before the jump is mostly heard as the skipped words, and
+    the "re-say" is largely heard as later words rather than as p — so the
+    pair must not be restored as a peer repeat. A genuine re-say flattened by
+    a repair is heard as p itself, and a missing word with no jump (trailing,
+    or never labelled) leaves no lag to witness.
+    """
+    present = {seg[0] for seg in current}
+    supplied = {seg[0] for seg in repaired} - present
+    lagged = set()
+    for i in range(len(current) - 1):
+        p = current[i][0]
+        if current[i + 1][0] != p:
+            continue
+        k = i + 2
+        while k < len(current) and current[k][0] == current[k - 1][0] + 1:
+            k += 1
+        if k >= len(current) or current[k][0] <= current[k - 1][0] + 1:
+            continue
+        skipped = set(range(current[k - 1][0] + 1, current[k][0]))
+        if not skipped <= supplied:
+            continue
+        later = {pos for pos in supplied | present if pos > p}
+        if (
+            _covered_by(current[k - 1], repaired, skipped) >= LAG_SKIP_COVER
+            and _covered_by(current[i + 1], repaired, later) >= LAG_PEER_COVER
+        ):
+            lagged.add(p)
+    return lagged
+
+
 def preserve_peer_repeats(current, repaired, unwitnessed=()):
     """Keep substantial same-word re-says while applying unrelated repairs.
 
@@ -1025,8 +1078,11 @@ def preserve_peer_repeats(current, repaired, unwitnessed=()):
     occurrences, then restore only the unmatched peer utterances. Split
     fragments are deliberately excluded because the cleaner owns those, and so
     are ``unwitnessed`` positions — the pairs an independent aligner has
-    positively identified as false leads (see [false_same_position_leads]).
+    positively identified as false leads (see [false_same_position_leads]) —
+    and pairs the repair itself shows to be lagged qdc labels
+    (see [lagged_peer_positions]).
     """
+    unwitnessed = set(unwitnessed) | lagged_peer_positions(current, repaired)
     peer_positions = {
         current[i][0]
         for i in range(len(current) - 1)

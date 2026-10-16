@@ -1,0 +1,24 @@
+{
+  "id": "lagged-peer-alafasy-24-25",
+  "label": "Alafasy 24:25 يَوۡمَئِذٖ is labelled twice because qdc lags, not re-said",
+  "refs": [
+    "GitHub #856 (Timings Lab, Pixel 10, v0.10)",
+    "raw qdc 1,1,2,5 (words 3-4 never labelled)",
+    "timing_repairs Alafasy drop edit"
+  ],
+  "pipeline": "preserve_peer_repeats",
+  "notes": "Cleaned qdc on the repair clock. qdc lost words 3-4 and its labels lag: the second 1 is word 1's tail plus word 2, and its 2 (3205-5615) sits 84% on the repair's words 3-4. The CTC drop repair hears 1,2,3,4,5 once each. preserve_peer_repeats used to restore the qdc's second 1 as a peer re-say; the Lab edit removes exactly that occurrence and keeps the real word-6 re-say.",
+  "input_segments": [
+    [1, 0, 965], [1, 965, 3205], [2, 3205, 5615], [5, 5615, 6645],
+    [6, 6645, 10395], [6, 10395, 11865], [7, 11865, 13325],
+    [8, 13325, 14345], [9, 14345, 14745], [10, 14745, 15735],
+    [11, 15735, 18760]
+  ],
+  "repair_segments": [
+    [1, 0, 2020], [2, 2020, 3580], [3, 3580, 4540], [4, 4540, 5700],
+    [5, 5700, 6640], [6, 6640, 10480], [6, 10480, 12020],
+    [7, 12020, 13440], [8, 13440, 14400], [9, 14400, 14840],
+    [10, 14840, 15860], [11, 15860, 18791]
+  ],
+  "expected_positions": [1, 2, 3, 4, 5, 6, 6, 7, 8, 9, 10, 11]
+}
