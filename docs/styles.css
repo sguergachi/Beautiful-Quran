@@ -30,8 +30,20 @@
   --phone-rim: rgba(28, 27, 24, 0.08);
   --phone-shadow: 0 28px 60px -28px rgba(28, 27, 24, 0.28);
 
-  --body: 'EB Garamond', Georgia, 'Times New Roman', serif;
-  --display: 'Cormorant Garamond', Georgia, 'Times New Roman', serif;
+  /* Junicode, the app's English face (DESIGN.md "Type"); EB Garamond
+   * supplies glyphs it lacks. Sizes stay Garamond's: fonts.css sets
+   * Junicode at size-adjust 96.9 %. */
+  --body: 'Junicode', 'EB Garamond', Georgia, 'Times New Roman', serif;
+  --display: 'Junicode', 'EB Garamond', Georgia, 'Times New Roman', serif;
+  /* The reader's reviewed feature sets. font-feature-settings replaces
+   * rather than merges, so every rule that sets one names a whole set:
+   * ss09 is the flagged old-style 1 (the default reads as a small-cap I). */
+  --ff-prose: 'kern' 1, 'liga' 1, 'onum' 1, 'ss09' 1;
+  --ff-title: 'kern' 1, 'liga' 1, 'lnum' 1, 'ss09' 1, 'cv33' 3;
+  --ff-caps: 'kern' 1, 'c2sc' 1, 'onum' 1, 'ss09' 1;
+  --ff-figures: 'kern' 1, 'lnum' 1, 'tnum' 1, 'ss09' 1;
+  /* Titles are served one weight step lighter than asked. */
+  --title-weight: 520;
   --arabic: 'Hafs Uthmanic', 'Amiri', 'Scheherazade New', 'Times New Roman', serif;
 
   --text-xs: 0.78rem;
@@ -155,8 +167,7 @@ body {
   background: var(--paper);
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
-  font-variant-numeric: oldstyle-nums;
-  font-feature-settings: 'kern' 1, 'liga' 1, 'onum' 1;
+  font-feature-settings: var(--ff-prose);
 }
 
 a {
@@ -248,8 +259,8 @@ p {
   gap: 10px;
   font-family: var(--display);
   font-size: var(--text-body);
-  font-weight: 600;
-  letter-spacing: -0.01em;
+  font-weight: var(--title-weight);
+  font-feature-settings: var(--ff-title);
   color: var(--ink);
   text-decoration: none;
 }
@@ -306,9 +317,10 @@ p {
 }
 
 .eyebrow {
-  font-size: var(--text-xs);
+  font-size: calc(var(--text-xs) * 1.15);
   letter-spacing: 0.14em;
   text-transform: uppercase;
+  font-feature-settings: var(--ff-caps);
   color: var(--gold-deep);
   margin-bottom: 14px;
 }
@@ -325,9 +337,10 @@ p {
 .app-title {
   font-family: var(--display);
   font-size: var(--text-display);
-  font-weight: 600;
+  font-weight: var(--title-weight);
   line-height: 1.02;
-  letter-spacing: -0.025em;
+  letter-spacing: -0.012em;
+  font-feature-settings: var(--ff-title);
   color: var(--ink);
   margin-bottom: 18px;
   display: flex;
@@ -341,9 +354,10 @@ p {
 .alpha-tag {
   font-family: var(--body);
   font-weight: 500;
-  font-size: var(--text-xs);
+  font-size: calc(var(--text-xs) * 1.15);
   letter-spacing: 0.14em;
   text-transform: uppercase;
+  font-feature-settings: var(--ff-caps);
   color: var(--ink-faint);
   line-height: 1;
   white-space: nowrap;
@@ -541,9 +555,10 @@ p {
 /* ── Shared section chrome ──────────────────────────────── */
 
 .section-kicker {
-  font-size: var(--text-xs);
+  font-size: calc(var(--text-xs) * 1.15);
   letter-spacing: 0.14em;
   text-transform: uppercase;
+  font-feature-settings: var(--ff-caps);
   color: var(--gold-deep);
   margin-bottom: 10px;
 }
@@ -571,16 +586,19 @@ p {
 h2 {
   font-family: var(--display);
   font-size: var(--text-h2);
-  font-weight: 600;
+  font-weight: var(--title-weight);
   line-height: 1.15;
-  letter-spacing: -0.015em;
+  letter-spacing: -0.008em;
+  font-feature-settings: var(--ff-title);
+  text-wrap: balance;
   color: var(--ink);
 }
 
 h3 {
   font-family: var(--display);
   font-size: var(--text-h3);
-  font-weight: 600;
+  font-weight: var(--title-weight);
+  font-feature-settings: var(--ff-title);
   line-height: 1.25;
   color: var(--ink);
   margin-bottom: 6px;
@@ -717,7 +735,7 @@ h3 {
   color: var(--gold);
   margin-bottom: 10px;
   opacity: 0.9;
-  font-variant-numeric: lining-nums tabular-nums;
+  font-feature-settings: var(--ff-figures);
 }
 
 .feature-grid p {
@@ -1200,9 +1218,10 @@ body::before {
 .privacy h1 {
   font-family: var(--display);
   font-size: clamp(2rem, 4vw, 2.5rem);
-  font-weight: 600;
+  font-weight: var(--title-weight);
   line-height: 1.15;
-  letter-spacing: -0.02em;
+  letter-spacing: -0.01em;
+  font-feature-settings: var(--ff-title);
   margin-bottom: 0.2em;
 }
 
@@ -1232,6 +1251,128 @@ body::before {
 
 .privacy li {
   margin-bottom: 0.4em;
+}
+
+/* Legal prose is long-form reading: even rag, hyphenation, no widows. */
+.privacy p,
+.privacy li {
+  text-wrap: pretty;
+  hyphens: auto;
+  hanging-punctuation: first;
+}
+
+/* A book's table: hairlines above, under the heads and below; no grid, no
+ * fill. Heads in tracked small caps, cells hang from the top so a row reads
+ * across from its first line. */
+.privacy table {
+  --rule: color-mix(in srgb, var(--ink) 28%, transparent);
+  --rule-faint: color-mix(in srgb, var(--ink) 12%, transparent);
+  width: 100%;
+  border-collapse: collapse;
+  margin: 0.6em 0 1.8em;
+  font-size: 0.94em;
+  line-height: 1.45;
+  border-top: 1px solid var(--rule);
+  border-bottom: 1px solid var(--rule);
+}
+
+.privacy th {
+  text-align: left;
+  vertical-align: bottom;
+  font-weight: 500;
+  font-size: calc(var(--text-xs) * 1.15);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  font-feature-settings: var(--ff-caps);
+  color: var(--ink-muted);
+  padding: 0.95em 1.4em 0.55em 0;
+  border-bottom: 1px solid var(--rule);
+}
+
+.privacy td {
+  vertical-align: top;
+  padding: 0.85em 1.4em 0.9em 0;
+  text-wrap: pretty;
+  hyphens: auto;
+}
+
+.privacy th:last-child,
+.privacy td:last-child {
+  padding-right: 0;
+}
+
+.privacy tbody tr + tr td {
+  border-top: 1px solid var(--rule-faint);
+}
+
+.privacy td:first-child {
+  width: 29%;
+  font-weight: 500;
+  color: var(--ink);
+}
+
+.privacy td:nth-child(2) {
+  width: 25%;
+  color: var(--ink-muted);
+}
+
+/* On a phone three columns crush every cell to a word or two: each row
+ * becomes its own short entry, labelled in the same small caps. */
+@media (max-width: 640px) {
+  .privacy thead {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+  }
+
+  .privacy table,
+  .privacy tbody,
+  .privacy tr,
+  .privacy td {
+    display: block;
+    width: auto;
+  }
+
+  .privacy tr {
+    padding: 0.95em 0 1em;
+  }
+
+  .privacy tbody tr + tr {
+    border-top: 1px solid var(--rule-faint);
+  }
+
+  .privacy tbody tr + tr td {
+    border-top: 0;
+  }
+
+  .privacy td,
+  .privacy td:first-child,
+  .privacy td:nth-child(2) {
+    width: auto;
+    padding: 0;
+  }
+
+  .privacy td:first-child {
+    font-size: 1.04em;
+    margin-bottom: 0.35em;
+  }
+
+  .privacy td + td {
+    margin-top: 0.45em;
+  }
+
+  .privacy td[data-label]::before {
+    content: attr(data-label);
+    display: block;
+    font-size: calc(var(--text-xs) * 1.15);
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    font-feature-settings: var(--ff-caps);
+    color: var(--ink-faint);
+    margin-bottom: 0.15em;
+  }
 }
 
 .privacy code {
