@@ -57,6 +57,42 @@ const index = [
   entry(55, 1, 1, 'ٱلرَّحۡمَٰنُ', 'The Most Merciful', 'al-rahman'),
 ]
 
+describe('bracketed search phrase highlighting', () => {
+  it.each([
+    '(does) not love', '[does] not love', 'does [not] love', 'does not (love)',
+    '(does not love)', '[does] (not) [love]', 'does  not\nlove',
+  ])('preserves and highlights %s', (phrase) => {
+    for (const query of ['does not love', '"does not love"']) {
+      const text = `And Allah ${phrase} corruption.`
+      const spans = englishTranslationHighlightSpans(text, query, '')
+      expect(spans.filter((s) => s.highlighted).map((s) => s.text).join('')).toBe(phrase)
+      expect(spans.map((s) => s.text).join('')).toBe(text)
+    }
+  })
+
+  it('keeps order, boundaries, typed prefixes, and repeated occurrences', () => {
+    for (const text of ['undoes not love', 'does [ever] not love', 'does love [not]']) {
+      expect(englishTranslationHighlightSpans(text, 'does not love', '').some((s) => s.highlighted)).toBe(false)
+    }
+    const text = '(does) not lovely'
+    expect(englishTranslationHighlightSpans(text, 'does not love', '')
+      .filter((s) => s.highlighted).map((s) => s.text)).toEqual([text])
+    expect(englishTranslationHighlightSpans(text, '"does not love"', '')
+      .some((s) => s.highlighted)).toBe(false)
+    const repeated = '(does) not love and does [not] love and does not love'
+    expect(englishTranslationHighlightSpans(repeated, 'does not love', '')
+      .filter((s) => s.highlighted).map((s) => s.text))
+      .toEqual(['(does) not love', 'does [not] love', 'does not love'])
+  })
+
+  it('anchors a long snippet at the bracketed phrase', () => {
+    const lead = Array.from({ length: 40 }, (_, i) => `w${i + 1}`).join(' ')
+    const spans = englishTranslationHighlightSpans(`${lead} (does) not love corruption`, 'does not love', '')
+    expect(spans.filter((s) => s.highlighted).map((s) => s.text)).toEqual(['(does) not love'])
+    expect(spans.map((s) => s.text).join('')).toMatch(/^…/)
+  })
+})
+
 describe('normalizeArabicForSearch', () => {
   it('strips tashkeel and unifies alef', () => {
     expect(normalizeArabicForSearch('ٱلرَّحۡمَٰنِ')).toBe('الرحمن')

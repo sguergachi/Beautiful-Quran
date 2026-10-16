@@ -59,6 +59,9 @@ and concept terms require whole-word or inflection matches: `fire` never colors
 or targets the substring in `firewood`. Only the user's typed text retains
 word-edge prefix matching, and a prefix colors the complete visible word.
 Overlapping terms resolve to the longest precise phrase.
+Typed phrases also highlight across parentheses and square brackets: `does not love`
+colors `(does) not love` or `does [not] love` as one phrase, preserving the displayed
+text and the quiet bracket styling. Quoted phrases retain whole-word matching.
 Rooted multi-word glosses such as `The patient` remain one visible phrase and
 one animation target; their articles do not spill onto unrelated occurrences
 of `the`. Connective words remain ordinary ink. If the selected English source contains

@@ -1312,6 +1312,17 @@ function highlightNeedleSpecs(
   }
   const parsed = parseSearchQuery(query)
   add(parsed.text, parsed.exactOnly, !parsed.exactOnly)
+  const phraseWords = foldEnglish(parsed.text).split(/[\s()[\]]+/).filter(Boolean)
+  if (phraseWords.length > 1) {
+    // Keep the source spelling and offsets; brackets do not interrupt a typed phrase.
+    const phrase = phraseWords.map((word) => word.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'))
+      .join('[\\s()\\[\\]]+')
+    const ending = parsed.exactOnly ? '(?![\\p{L}\\p{N}])' : '[\\p{L}\\p{N}]*'
+    const pattern = new RegExp(`(?<![\\p{L}\\p{N}])[\\[(]*${phrase}${ending}[)\\]]*`, 'giu')
+    for (const match of foldEnglish(haystack).matchAll(pattern)) {
+      add(haystack.slice(match.index, match.index + match[0].length))
+    }
+  }
   const arabicQuery = Boolean(normalizeArabicForSearch(query))
   const visibleTerm = (term: string): string | null => {
     if (firstOccurrence(haystack, term, true) >= 0) return term

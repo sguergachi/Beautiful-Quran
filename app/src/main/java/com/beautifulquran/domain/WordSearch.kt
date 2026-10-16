@@ -948,6 +948,16 @@ private fun highlightNeedleSpecs(
     }
     val parsed = parseSearchQuery(query)
     add(parsed.text, wholeWord = parsed.exactOnly, wordPrefix = !parsed.exactOnly)
+    val phraseWords = EnglishTypography.fold(parsed.text)
+        .split(Regex("[\\s()\\[\\]]+")).filter(String::isNotEmpty)
+    if (phraseWords.size > 1) {
+        // Keep the source spelling and offsets; brackets do not interrupt a typed phrase.
+        val phrase = phraseWords.joinToString("[\\s()\\[\\]]+", transform = Regex::escape)
+        val ending = if (parsed.exactOnly) "(?![\\p{L}\\p{N}])" else "[\\p{L}\\p{N}]*"
+        Regex("(?<![\\p{L}\\p{N}])[\\[(]*$phrase$ending[)\\]]*", RegexOption.IGNORE_CASE)
+            .findAll(EnglishTypography.fold(haystack))
+            .forEach { add(haystack.substring(it.range), wholeWord = true) }
+    }
     val arabicQuery = normalizeArabicForSearch(query).isNotEmpty()
     fun visibleTerm(term: String): String? {
         if (firstOccurrence(haystack, term, wholeWord = true) >= 0) return term

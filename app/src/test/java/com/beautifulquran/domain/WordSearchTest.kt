@@ -592,6 +592,49 @@ class WordSearchTest {
     }
 
     @Test
+    fun `typed phrases highlight through brackets without changing the text`() {
+        for (phrase in listOf(
+            "(does) not love", "[does] not love", "does [not] love", "does not (love)",
+            "(does not love)", "[does] (not) [love]", "does  not\nlove",
+        )) {
+            for (query in listOf("does not love", "\"does not love\"")) {
+                val text = "And Allah $phrase corruption."
+                val spans = englishTranslationHighlightSpans(text, query, "")
+                assertEquals(phrase, spans.filter { it.highlighted }.joinToString("") { it.text })
+                assertEquals(text, spans.joinToString("") { it.text })
+            }
+        }
+    }
+
+    @Test
+    fun `bracketed phrase matching keeps order boundaries and typed prefixes`() {
+        for (text in listOf("undoes not love", "does [ever] not love", "does love [not]")) {
+            assertTrue(englishTranslationHighlightSpans(text, "does not love", "").none { it.highlighted })
+        }
+        val text = "(does) not lovely"
+        assertEquals(
+            listOf(text),
+            englishTranslationHighlightSpans(text, "does not love", "")
+                .filter { it.highlighted }.map { it.text },
+        )
+        assertTrue(englishTranslationHighlightSpans(text, "\"does not love\"", "").none { it.highlighted })
+        val repeated = "(does) not love and does [not] love and does not love"
+        assertEquals(
+            listOf("(does) not love", "does [not] love", "does not love"),
+            englishTranslationHighlightSpans(repeated, "does not love", "")
+                .filter { it.highlighted }.map { it.text },
+        )
+    }
+
+    @Test
+    fun `bracketed phrase anchors a long search snippet`() {
+        val lead = (1..40).joinToString(" ") { "w$it" }
+        val spans = englishTranslationHighlightSpans("$lead (does) not love corruption", "does not love", "")
+        assertEquals(listOf("(does) not love"), spans.filter { it.highlighted }.map { it.text })
+        assertTrue(spans.joinToString("") { it.text }.startsWith("…"))
+    }
+
+    @Test
     fun `english translation highlight falls back to gloss token`() {
         val ayah = "And He is the Oft-Returning, the Merciful."
         val spans = englishTranslationHighlightSpans(
