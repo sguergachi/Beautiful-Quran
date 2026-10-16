@@ -218,6 +218,36 @@ class AuthenticatedTimingBuildTest(unittest.TestCase):
                 with self.assertRaises(SystemExit):
                     build.apply_authenticated_verdicts([(1, 1, 1, new)], {}, before)
 
+    def test_better_start_residuals_cannot_approve_a_truncated_repeat_tail(self):
+        old = [[8, 7710, 9340], [8, 9340, 11400], [9, 11400, 12340]]
+        new = [[8, 7710, 9326], [8, 9382, 9800], [9, 11435, 12340]]
+        before, after = self.database("before.db", old), self.database("after.db", new)
+        ledger = self.ledger(before, after, "accept")
+        payload = json.loads(ledger.read_text())
+        waveform = next(iter(payload["verdicts"].values()))["evidence"]["waveform"]
+        waveform["decodedDurationMs"] = 16000
+        waveform["voicedTailCutRisks"] = [{"position": 8, "candidateEndMs": 9800,
+                                          "forcedEndMs": 11157}]
+        ledger.write_text(json.dumps(payload))
+        with patch.object(build, "QF_VERDICTS_FILE", ledger), self.assertRaisesRegex(SystemExit, "waveform"):
+            build.apply_authenticated_verdicts([(1, 1, 1, new)], {}, before)
+
+    def test_device_patch_mean_improvement_cannot_hide_opening_truncation(self):
+        tools = Path(__file__).parent
+        case = json.loads((tools / "timing_patch_cases" /
+                           "device-lab-alafasy-5-2-boundaries.json").read_text())
+        ledger = json.loads((tools / "timing_evidence" /
+                             "device-lab-alafasy-5-2-boundaries.verdict.json").read_text())
+        entry = ledger["verdicts"]["Alafasy_128kbps:5:2"]
+        self.assertTrue(all(model["candidateResidualMs"] < model["baselineResidualMs"]
+                            for model in entry["evidence"]["models"]))
+        problem = build.authenticated_evidence_problem({
+            "old": {"segments": case["expected_segments"]},
+            "new": {"segments": case["device_proposed_segments"]},
+            "kinds": ["timestamp"], "verdict": entry,
+        })
+        self.assertEqual(problem, "decoded waveform physics are missing or veto the candidate")
+
     def test_verdict_ledger_cannot_move_to_another_source_profile(self):
         old, new = [[1, 0, 1000]], [[1, 20, 1000]]
         before, after = self.database("before.db", old), self.database("after.db", new)

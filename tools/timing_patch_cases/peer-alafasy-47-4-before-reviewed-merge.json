@@ -1,0 +1,10 @@
+{
+  "id": "peer-alafasy-47-4-before-reviewed-merge",
+  "label": "Alafasy 47:4 peer protection remains conservative before the reviewed merge",
+  "refs": ["GitHub #873"],
+  "pipeline": "preserve_peer_repeats",
+  "notes": "XLSR gives the removed occurrence 0.666 confidence, so automatic peer protection must still retain it. The maintainer subsequently confirmed one held utterance; its exact-source typed merge runs after repairs. Do not weaken the global protection for genuine repeats.",
+  "input_segments": [[12, 14625, 16565], [13, 16565, 17820], [13, 17820, 19000], [14, 19000, 19650]],
+  "repair_segments": [[12, 14625, 16565], [13, 16565, 19000], [14, 19000, 19650]],
+  "expected_segments": [[12, 14625, 16565], [13, 16565, 17820], [13, 17820, 19000], [14, 19000, 19650]]
+}

@@ -1,0 +1,68 @@
+{
+  "schemaVersion": 1,
+  "baseline": {
+    "commit": "afe0766b",
+    "runtimeRevision": "5413f8f82f0c674892b0213b5f7fb90249df38418515af65b75c933190c7739b"
+  },
+  "publication": "not published; human-adjudicated correction requires source-profile reconciliation without weakening the automatic gate",
+  "verdicts": {
+    "Alafasy_128kbps:47:4": {
+      "verdict": "hold",
+      "reason": "Maintainer reports one held utterance after audition. The explicit merge is implemented, but the unchanged automatic gate rejects XLSR removed-occurrence confidence above 0.5; source-profile promotion remains pending.",
+      "kinds": [
+        "topology"
+      ],
+      "baselinePayloadHash": "10a0edf29f62bf794df231ae403c202e3b6952d05abb7e3f50523161d3374383",
+      "candidatePayloadHash": "c83de733aedd1df5c5f6fcd88d9376106e2f78ac32dd2b1169b60b206cedae6a",
+      "maintainerReview": {
+        "decision": "merge_verified_word_split",
+        "date": "2026-10-16",
+        "source": "Direct maintainer feedback after Alafasy 47:4 EveryAyah audition at 14.625–21.625 s",
+        "statement": "this is repeated twice it shouldnt play twice",
+        "identifiedWord": {
+          "position": 13,
+          "arabic": "مَنّا"
+        },
+        "scope": "One word-13 span at 16565–19000 ms; preserve the recording and every other segment.",
+        "agentManualListening": false
+      },
+      "evidence": {
+        "kind": "dual_model_topology",
+        "artifact": "tools/timing_evidence/issue-873-verified-word-split.jsonl",
+        "summary": "Both cached acoustic models ran on the actual merged candidate. Scores favor one word 13, but XLSR removed-occurrence confidence still fails the existing automatic gate. The human report is recorded separately and is not represented as an automatic acceptance or agent listening.",
+        "audioSha256": "0de869da3a7549dc7f7f922dce388fdae424c457ab3409f2a03f7b815c0de7e3",
+        "waveformVeto": false,
+        "waveform": {
+          "method": "ffmpeg_pcm_visual_inspection_and_dual_ctc_newly_shortened_end_check",
+          "decodedDurationMs": 49821,
+          "durationToleranceMs": 50,
+          "boundsWithinTolerance": true,
+          "voicedEndToleranceMs": 250,
+          "voicedTailCutRisks": [],
+          "scope": "The merged occurrence retains the complete 16565–19000 ms interval; all other segments are identical."
+        },
+        "models": [
+          {
+            "name": "arabic-xlsr-ctc",
+            "model": "jonatasgrosman/wav2vec2-large-xlsr-53-arabic",
+            "modelRevision": "af46c2d8531b8dcbb5e23b952f739b372c2e5d2d",
+            "metric": "viterbiLogProbabilityPerFrame",
+            "baselineScore": -0.5776125988328313,
+            "candidateScore": -0.5712818559393825,
+            "removedOccurrenceMaxLabelProbability": 0.6661030619870871
+          },
+          {
+            "name": "mms-uroman-ctc",
+            "model": "MahmoudAshraf/mms-300m-1130-forced-aligner",
+            "modelRevision": "49402e9577b1158620820667c218cd494cc44486",
+            "metric": "viterbiLogProbabilityPerFrame",
+            "baselineScore": -0.05688831988108685,
+            "candidateScore": -0.05163476170306225,
+            "removedOccurrenceMaxLabelProbability": 0.32120648224372417
+          }
+        ]
+      },
+      "automaticGateProblem": "a removed occurrence is heard or lacks baseline confidence on either model"
+    }
+  }
+}

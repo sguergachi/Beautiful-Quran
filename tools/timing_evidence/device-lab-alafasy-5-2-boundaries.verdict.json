@@ -1,0 +1,129 @@
+{
+  "schemaVersion": 1,
+  "baseline": {
+    "commit": "fad14fc62aab5f2169c9ef70a1c001c704755505",
+    "runtimeRevision": "5413f8f82f0c674892b0213b5f7fb90249df38418515af65b75c933190c7739b",
+    "scope": "Previously reviewed local topology-only candidate; not the published runtime row."
+  },
+  "publication": "not published; alternative-candidate review evidence, not an active release verdict or authenticated source-profile approval",
+  "verdicts": {
+    "Alafasy_128kbps:5:2": {
+      "verdict": "hold",
+      "reason": "The full device patch truncates the opening word and worsens the word-2 start. Word 16 moves closer to both forced starts but remains 1933 ms late; exact boundary review is still needed. Keep the independently accepted phantom-removal candidate unchanged.",
+      "kinds": [
+        "timestamp"
+      ],
+      "baselinePayloadHash": "e2df61535b7cd3753c4bfa456842bb09acab6eaf5133d19e4c6eefbd51f17530",
+      "candidatePayloadHash": "b9416ba1b41d1a47bf53a2dece1ff0fffe75cda09b9a6ef5f11e7af7b5717fb2",
+      "evidence": {
+        "kind": "dual_model_boundary",
+        "artifact": "tools/timing_evidence/device-lab-alafasy-5-2-boundaries.jsonl",
+        "summary": "Both cached models completed actual inference on the exact 62-segment device proposal. The same occurrence sequence yields identical transcript scores; boundary review uses start residuals. Aggregate improvement hides a local opening regression, and waveform/model-tail evidence vetoes the full patch. No agent listening claimed.",
+        "audioSha256": "332ae686820ed1d633bb8378d2af7f4338a18de601ff80b6b0c622e377bc84b5",
+        "waveformVeto": true,
+        "waveform": {
+          "method": "ffmpeg_pcm_waveform_and_forced_end_inspection",
+          "decodedDurationMs": 82599,
+          "durationToleranceMs": 50,
+          "boundsWithinTolerance": true,
+          "voicedEndToleranceMs": 250,
+          "voicedTailCutRisks": [
+            {
+              "model": "arabic-xlsr-ctc",
+              "position": 1,
+              "occurrence": 1,
+              "candidateEndMs": 2609,
+              "forcedEndMs": 3281,
+              "tailShortfallMs": 672
+            },
+            {
+              "model": "arabic-xlsr-ctc",
+              "position": 14,
+              "occurrence": 18,
+              "candidateEndMs": 23340,
+              "forcedEndMs": 24326,
+              "tailShortfallMs": 986
+            },
+            {
+              "model": "mms-uroman-ctc",
+              "position": 1,
+              "occurrence": 1,
+              "candidateEndMs": 2609,
+              "forcedEndMs": 3241,
+              "tailShortfallMs": 632
+            },
+            {
+              "model": "mms-uroman-ctc",
+              "position": 14,
+              "occurrence": 18,
+              "candidateEndMs": 23340,
+              "forcedEndMs": 24326,
+              "tailShortfallMs": 986
+            }
+          ],
+          "rms2609To3072Dbfs": -23.425739288330078,
+          "rms23340To24040Dbfs": -23.97017478942871
+        },
+        "models": [
+          {
+            "name": "arabic-xlsr-ctc",
+            "model": "jonatasgrosman/wav2vec2-large-xlsr-53-arabic",
+            "modelRevision": "af46c2d8531b8dcbb5e23b952f739b372c2e5d2d",
+            "metric": "meanAbsStartResidualMs",
+            "baselineScore": -191.46774193548387,
+            "candidateScore": -183.0483870967742,
+            "baselineResidualMs": 191.46774193548387,
+            "candidateResidualMs": 183.0483870967742,
+            "baselineViterbiLogProbabilityPerFrame": -0.42973367917852384,
+            "candidateViterbiLogProbabilityPerFrame": -0.42973367917852384
+          },
+          {
+            "name": "mms-uroman-ctc",
+            "model": "MahmoudAshraf/mms-300m-1130-forced-aligner",
+            "modelRevision": "49402e9577b1158620820667c218cd494cc44486",
+            "metric": "meanAbsStartResidualMs",
+            "baselineScore": -184.56451612903226,
+            "candidateScore": -176.1451612903226,
+            "baselineResidualMs": 184.56451612903226,
+            "candidateResidualMs": 176.1451612903226,
+            "baselineViterbiLogProbabilityPerFrame": -0.041962601192120516,
+            "candidateViterbiLogProbabilityPerFrame": -0.041962601192120516
+          }
+        ]
+      },
+      "boundaryReview": {
+        "opening": {
+          "decision": "retain",
+          "word1ProposedEndMs": 2609,
+          "word1ForcedEndsMs": [
+            3281,
+            3241
+          ],
+          "word2ProposedStartMs": 3072,
+          "word2ForcedStartsMs": [
+            3341,
+            3341
+          ]
+        },
+        "rewind": {
+          "decision": "retain accepted topology fix",
+          "acceptedPrecedingEndMs": 24040,
+          "devicePrecedingEndMs": 23340,
+          "returningWord11StartMs": 24070,
+          "remainingWord11BoundaryConcern": "Both models place the returning onset at 25146–25166 ms; no guessed offset."
+        },
+        "word16": {
+          "decision": "uncertain",
+          "currentStartMs": 34410,
+          "proposedStartMs": 33660,
+          "forcedStartsMs": [
+            31727,
+            31727
+          ],
+          "reason": "Partial start-residual improvement is not confirmation of the exact onset."
+        }
+      },
+      "agentManualListening": false
+    }
+  }
+}
