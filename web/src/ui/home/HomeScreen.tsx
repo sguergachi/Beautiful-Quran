@@ -25,9 +25,8 @@ import {
 import { QuranRepository } from '../../data/repository'
 import { VerseBookmarkRibbon } from '../../render/VerseBookmarkRibbon'
 import {
-  englishTranslationHighlightSpans,
+  searchHitHighlightSpans,
   filterSurahs,
-  parseSearchQuery,
   sectionWordSearchHits,
   shouldRunWordSearch,
   spellingCorrection,
@@ -599,7 +598,6 @@ function WordSearchSection({
   onPrepareHit: (hit: WordSearchHit) => void
   onOpenHit: (hit: WordSearchHit) => void
 }) {
-  const displayQuery = parseSearchQuery(query).text
   return (
     <section className="word-search-section">
       <header className="word-search-surah-header">
@@ -613,13 +611,7 @@ function WordSearchSection({
       </header>
       <ul className="word-search-hits">
         {section.hits.map((hit) => {
-          const spans = englishTranslationHighlightSpans(
-            hit.displayText ?? hit.ayahTranslation,
-            displayQuery,
-            hit.translation,
-            hit.matchLabel ?? '',
-            hit.matchTerms ?? [],
-          )
+          const spans = searchHitHighlightSpans(hit, query)
           return <li key={`${hit.ayahNumber}-${hit.position}`}>
             <button
               type="button"
@@ -637,7 +629,7 @@ function WordSearchSection({
                 {spans.map((span, i) =>
                   span.highlighted ? (
                     <mark key={i} className="word-search-mark">
-                      {span.text}
+                      {suppliedWords(span.text, `s${i}`)}
                     </mark>
                   ) : (
                     <span key={i}>{suppliedWords(span.text, `s${i}`)}</span>

@@ -3,6 +3,7 @@ import {
   ayahHighlightSpans,
   conceptRelevance,
   englishTranslationHighlightSpans,
+  searchHitHighlightSpans,
   glossAlignmentRelevance,
   filterSurahs,
   isWordSearchQuery,
@@ -56,6 +57,76 @@ const index = [
   entry(2, 163, 2, 'ٱلرَّحۡمَٰنُ', 'the Most Gracious', 'al-rahmanu'),
   entry(55, 1, 1, 'ٱلرَّحۡمَٰنُ', 'The Most Merciful', 'al-rahman'),
 ]
+
+describe('bracketed search phrase highlighting', () => {
+  it('ranks contraction phrases across glosses and grounds the reader words in either direction', () => {
+    const entries = [entry(2, 205, 1, 'أ', 'Allah'), entry(2, 205, 2, 'ب', '(does) not'),
+      entry(2, 205, 3, 'ج', 'love'), entry(2, 205, 4, 'د', 'corruption')]
+    const sources = { arabic: false, wordGloss: true, transliteration: false, verseTranslation: false }
+    for (const query of ['does not love', "doesn't love", 'DOESN’T LOVE', "doesn't l", "doesn't lo", "doesn't lov"]) {
+      const hits = matchWordSearch(entries, query, 400, [], new Map(), sources)
+      expect(hits).toHaveLength(1)
+      expect(hits[0]!.targetPositions).toEqual([2, 3])
+      expect(hits[0]!.matchReason).toBe('Text match')
+      expect(englishTranslationHighlightSpans(hits[0]!.displayText!, query, '')
+        .filter((s) => s.highlighted).map((s) => s.text)).toEqual(['(does) not love'])
+    }
+    expect(matchWordSearch(entries, "doesn't", 400, [], new Map(), sources)[0]!.targetPositions).toEqual([2])
+    const contracted = entries.map((row) => ({ ...row, ayahTranslation: "Allah doesn't love corruption" }))
+    expect(matchWordSearch(contracted, 'does not love', 400, [], new Map(),
+      { ...sources, wordGloss: false, verseTranslation: true })[0]!.targetPositions).toEqual([2, 3])
+    expect(matchWordSearch(contracted, 'does not lov', 400, [], new Map(),
+      { ...sources, wordGloss: false, verseTranslation: true })[0]!.targetPositions).toEqual([2, 3])
+  })
+
+  it.each([
+    '(does) not love', '[does] not love', 'does [not] love', 'does not (love)',
+    '(does not love)', '[does] (not) [love]', 'does  not\nlove',
+  ])('preserves and highlights %s', (phrase) => {
+    for (const query of ['does not love', '"does not love"']) {
+      const text = `And Allah ${phrase} corruption.`
+      const spans = englishTranslationHighlightSpans(text, query, '')
+      expect(spans.filter((s) => s.highlighted).map((s) => s.text).join('')).toBe(phrase)
+      expect(spans.map((s) => s.text).join('')).toBe(text)
+    }
+  })
+
+  it('keeps order, boundaries, typed prefixes, and repeated occurrences', () => {
+    for (const text of ['undoes not love']) {
+      expect(englishTranslationHighlightSpans(text, 'does not love', '').some((s) => s.highlighted)).toBe(false)
+    }
+    const text = '(does) not lovely'
+    expect(englishTranslationHighlightSpans(text, 'does not love', '')
+      .filter((s) => s.highlighted).map((s) => s.text)).toEqual([text])
+    expect(englishTranslationHighlightSpans(text, '"does not love"', '')
+      .some((s) => s.highlighted)).toBe(false)
+    const repeated = '(does) not love and does [not] love and does not love'
+    expect(englishTranslationHighlightSpans(repeated, 'does not love', '')
+      .filter((s) => s.highlighted).map((s) => s.text))
+      .toEqual(['(does) not love', 'does [not] love', 'does not love'])
+  })
+
+  it('anchors a long snippet at the bracketed phrase', () => {
+    const lead = Array.from({ length: 40 }, (_, i) => `w${i + 1}`).join(' ')
+    const spans = englishTranslationHighlightSpans(`${lead} (does) not love corruption`, 'does not love', '')
+    expect(spans.filter((s) => s.highlighted).map((s) => s.text)).toEqual(['(does) not love'])
+    expect(spans.map((s) => s.text).join('')).toMatch(/^…/)
+  })
+
+  it('highlights reordered terms precisely with contractions and brackets', () => {
+    const entries = [entry(2, 205, 1, 'أ', 'love'), entry(2, 205, 2, 'ب', '(does)'), entry(2, 205, 3, 'ج', 'not')]
+    for (const query of ['does not love', "doesn't love"]) {
+      const hit = matchWordSearch(entries, query)[0]!
+      const spans = searchHitHighlightSpans(hit, query)
+      expect(spans.filter((s) => s.highlighted).map((s) => s.text)).toEqual(['love', 'does', 'not'])
+      expect(spans.map((s) => s.text).join('')).toBe(hit.displayText)
+    }
+    const separated = englishTranslationHighlightSpans('does [ever] not love', 'does not love', '')
+    expect(separated.filter((s) => s.highlighted).map((s) => s.text)).toEqual(['does', 'not', 'love'])
+    expect(englishTranslationHighlightSpans('does [ever] not love', '"does not love"', '')
+      .some((s) => s.highlighted)).toBe(false)
+  })
+})
 
 describe('normalizeArabicForSearch', () => {
   it('strips tashkeel and unifies alef', () => {
@@ -386,6 +457,10 @@ describe('matchWordSearch', () => {
         firewood.matchTerms,
       ).some((span) => span.highlighted),
     ).toBe(false)
+    expect(searchHitHighlightSpans(firewood, 'hell'))
+      .toEqual([{ text: firewood.displayText, highlighted: true }])
+    expect(searchHitHighlightSpans({ ...firewood, displayText: '' }, 'hell'))
+      .toEqual([{ text: firewood.matchReason, highlighted: true }])
   })
 
   it('keeps a rooted phrase on one visible animation target', () => {

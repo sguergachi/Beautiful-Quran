@@ -100,10 +100,8 @@ import com.beautifulquran.data.model.Surah
 import com.beautifulquran.data.model.SurahWordSearchSection
 import com.beautifulquran.data.model.WordSearchHit
 import com.beautifulquran.data.AyahSelectorSide
-import com.beautifulquran.domain.EnglishTypography
 import com.beautifulquran.domain.WORD_SEARCH_PREVIEW_LIMIT
-import com.beautifulquran.domain.englishTranslationHighlightSpans
-import com.beautifulquran.domain.parseSearchQuery
+import com.beautifulquran.domain.searchHitHighlightSpans
 import com.beautifulquran.domain.spellingCorrection
 import com.beautifulquran.ui.reader.VerseBookmarkRibbon
 import com.beautifulquran.ui.reader.CAPS_TRACKING
@@ -1366,24 +1364,18 @@ private fun WordSearchHitRow(
     val accents = LocalQuranAccents.current
     val highlightColor = accents.gold
     val translationInk = QuranTheme.ink.strong
-    val displayQuery = remember(query) { parseSearchQuery(query).text }
     val translation = remember(
         hit.displayText,
         hit.translation,
         hit.matchTerms,
         hit.matchLabel,
-        displayQuery,
+        hit.matchReason,
+        query,
         highlightColor,
         translationInk,
     ) {
         buildAnnotatedString {
-            for (span in englishTranslationHighlightSpans(
-                ayahTranslation = hit.displayText,
-                query = displayQuery,
-                wordGloss = EnglishTypography.typesetName(hit.translation),
-                semanticLabel = hit.matchLabel.orEmpty(),
-                semanticTerms = hit.matchTerms,
-            )) {
+            for (span in searchHitHighlightSpans(hit, query)) {
                 if (span.highlighted) {
                     withStyle(
                         SpanStyle(

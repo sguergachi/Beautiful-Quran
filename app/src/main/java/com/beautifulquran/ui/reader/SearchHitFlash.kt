@@ -1,6 +1,8 @@
 package com.beautifulquran.ui.reader
 
 import com.beautifulquran.domain.EnglishTypography
+import com.beautifulquran.domain.EnglishContractions
+import com.beautifulquran.domain.parseSearchQuery
 import androidx.compose.animation.core.CubicBezierEasing
 
 /**
@@ -81,6 +83,9 @@ object SearchHitFlash {
                 add(start until end)
                 from = end.coerceAtLeast(match + 1)
             }
-        }.distinct()
+        }.plus(
+            if (parseSearchQuery(rawQuery.orEmpty()).exactOnly) emptyList() else
+                EnglishContractions.ranges(typeset, query),
+        ).distinct()
     }
 }

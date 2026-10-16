@@ -56,6 +56,32 @@ class WordSearchTest {
     }
 
     @Test
+    fun `contracted queries rank multi-word glosses and ground the same reader words`() {
+        val entries = listOf(
+            entry(2, 205, 1, "أ", "Allah"),
+            entry(2, 205, 2, "ب", "(does) not"),
+            entry(2, 205, 3, "ج", "love"),
+            entry(2, 205, 4, "د", "corruption"),
+        )
+        val sources = WordSearchSources(arabic = false, wordGloss = true, transliteration = false, verseTranslation = false)
+        for (query in listOf("does not love", "doesn't love", "DOESN’T LOVE", "doesn't l", "doesn't lo", "doesn't lov")) {
+            val hit = matchWordSearch(entries, query, sources = sources).single()
+            assertEquals(listOf(2, 3), hit.targetPositions)
+            assertEquals("Text match", hit.matchReason)
+            assertEquals(listOf("(does) not love"),
+                englishTranslationHighlightSpans(hit.displayText, query, "")
+                    .filter { it.highlighted }.map { it.text })
+        }
+        assertEquals(listOf(2), matchWordSearch(entries, "doesn't", sources = sources).single().targetPositions)
+
+        val contractedVerse = entries.map { it.copy(context = it.context.copy(ayahTranslation = "Allah doesn't love corruption")) }
+        val hit = matchWordSearch(contractedVerse, "does not love", sources = sources.copy(wordGloss = false, verseTranslation = true)).single()
+        assertEquals(listOf(2, 3), hit.targetPositions)
+        assertEquals(listOf(2, 3), matchWordSearch(contractedVerse, "does not lov",
+            sources = sources.copy(wordGloss = false, verseTranslation = true)).single().targetPositions)
+    }
+
+    @Test
     fun `english gloss matches are case-insensitive`() {
         val hits = matchWordSearch(index, "merciful")
         assertEquals(listOf(1 to 4, 55 to 1), hits.map { it.surahId to it.position })
@@ -423,6 +449,14 @@ class WordSearchTest {
                 firewood.matchTerms,
             ).none(AyahTextSpan::highlighted),
         )
+        assertEquals(
+            listOf(AyahTextSpan(firewood.displayText, highlighted = true)),
+            searchHitHighlightSpans(firewood, "hell"),
+        )
+        assertEquals(
+            listOf(AyahTextSpan(firewood.matchReason, highlighted = true)),
+            searchHitHighlightSpans(firewood.copy(displayText = ""), "hell"),
+        )
     }
 
     @Test
@@ -589,6 +623,67 @@ class WordSearchTest {
             spans.filter { it.highlighted }.map { it.text },
         )
         assertEquals(ayah, spans.joinToString("") { it.text })
+    }
+
+    @Test
+    fun `typed phrases highlight through brackets without changing the text`() {
+        for (phrase in listOf(
+            "(does) not love", "[does] not love", "does [not] love", "does not (love)",
+            "(does not love)", "[does] (not) [love]", "does  not\nlove",
+        )) {
+            for (query in listOf("does not love", "\"does not love\"")) {
+                val text = "And Allah $phrase corruption."
+                val spans = englishTranslationHighlightSpans(text, query, "")
+                assertEquals(phrase, spans.filter { it.highlighted }.joinToString("") { it.text })
+                assertEquals(text, spans.joinToString("") { it.text })
+            }
+        }
+    }
+
+    @Test
+    fun `bracketed phrase matching keeps order boundaries and typed prefixes`() {
+        for (text in listOf("undoes not love")) {
+            assertTrue(englishTranslationHighlightSpans(text, "does not love", "").none { it.highlighted })
+        }
+        val text = "(does) not lovely"
+        assertEquals(
+            listOf(text),
+            englishTranslationHighlightSpans(text, "does not love", "")
+                .filter { it.highlighted }.map { it.text },
+        )
+        assertTrue(englishTranslationHighlightSpans(text, "\"does not love\"", "").none { it.highlighted })
+        val repeated = "(does) not love and does [not] love and does not love"
+        assertEquals(
+            listOf("(does) not love", "does [not] love", "does not love"),
+            englishTranslationHighlightSpans(repeated, "does not love", "")
+                .filter { it.highlighted }.map { it.text },
+        )
+    }
+
+    @Test
+    fun `reordered query terms have precise gold even with contractions and brackets`() {
+        val entries = listOf(
+            entry(2, 205, 1, "أ", "love"),
+            entry(2, 205, 2, "ب", "(does)"),
+            entry(2, 205, 3, "ج", "not"),
+        )
+        for (query in listOf("does not love", "doesn't love")) {
+            val hit = matchWordSearch(entries, query).single()
+            val spans = searchHitHighlightSpans(hit, query)
+            assertEquals(listOf("love", "does", "not"), spans.filter { it.highlighted }.map { it.text })
+            assertEquals(hit.displayText, spans.joinToString("") { it.text })
+        }
+        val separated = englishTranslationHighlightSpans("does [ever] not love", "does not love", "")
+        assertEquals(listOf("does", "not", "love"), separated.filter { it.highlighted }.map { it.text })
+        assertTrue(englishTranslationHighlightSpans("does [ever] not love", "\"does not love\"", "").none { it.highlighted })
+    }
+
+    @Test
+    fun `bracketed phrase anchors a long search snippet`() {
+        val lead = (1..40).joinToString(" ") { "w$it" }
+        val spans = englishTranslationHighlightSpans("$lead (does) not love corruption", "does not love", "")
+        assertEquals(listOf("(does) not love"), spans.filter { it.highlighted }.map { it.text })
+        assertTrue(spans.joinToString("") { it.text }.startsWith("…"))
     }
 
     @Test

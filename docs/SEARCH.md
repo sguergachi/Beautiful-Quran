@@ -9,6 +9,18 @@ signals rather than a general-purpose language model:
    searches its flowing English translation. Search results are never Arabic,
    and the other English source never contributes a hidden result. An exact field match leads an
    embedded phrase, reordered multi-word coverage, and a plain substring.
+   Unquoted English contractions also match their expansions in either direction:
+   `doesn't love` finds `does not love`, including `(does) not love`. Straight
+   and curly apostrophes are equivalent. Negative forms, pronoun auxiliaries,
+   combined forms such as `wouldn't've`, and irregular forms such as `won't`,
+   `can't`/`cannot`, and `let's` share the same ranking and highlight rules.
+   Ambiguous `'s` and `'d` on pronouns accept `is`/`has` and `had`/`would`;
+   noun possessives such as `Allah's` are not auxiliary contractions.
+   Final-word prefixes work through these equivalents too: `doesn't lov`
+   finds and highlights `(does) not love`. Complete contractions keep their
+   expanded words whole, so `doesn't` never matches `does nothing`.
+   Surrounding single quotation marks do not become part of a contraction;
+   enclosing the user's query in double quotes still disables expansion.
 2. **Thesaurus vocabulary** — when fewer than three grounded results exist, a
    compact Open English WordNet graph supplements them with related words that
    actually occur in this Quran. Synonyms lead precise derivational, similar,
@@ -59,11 +71,16 @@ and concept terms require whole-word or inflection matches: `fire` never colors
 or targets the substring in `firewood`. Only the user's typed text retains
 word-edge prefix matching, and a prefix colors the complete visible word.
 Overlapping terms resolve to the longest precise phrase.
+Typed phrases also highlight across parentheses and square brackets: `does not love`
+colors `(does) not love` or `does [not] love` as one phrase, preserving the displayed
+text and the quiet bracket styling. Quoted phrases retain whole-word matching.
 Rooted multi-word glosses such as `The patient` remain one visible phrase and
 one animation target; their articles do not spill onto unrelated occurrences
-of `the`. Connective words remain ordinary ink. If the selected English source contains
-none of those, the result stays unaccented rather than promising a highlight
-the reader cannot locate. The gloss fallback coalesces adjacent copies of a
+of `the`. Reordered phrases highlight their matching query words individually.
+Every displayed result contains gold emphasis: when a semantic or root hit has
+no precise visible word, its complete excerpt is gold as ayah-level context.
+That does not invent a word target in the reader. An empty source excerpt uses
+the match explanation instead. The gloss fallback coalesces adjacent copies of a
 shared multi-word gloss, matching the reader's English prose instead of showing
 the source phrase once per Arabic word.
 
@@ -112,8 +129,10 @@ verse geometry; Mushaf waits for the requested
 leaf to be visible and never depends on the unmounted scrolling list. The
 Mushaf gives every visible non-target ayah the same shaped paper cover during
 that interval; it does not dim Arabic by changing glyph opacity. The orange
-overlay uses bold English or a tight glyph-shaped ink spread, making the
-filled moment conspicuous without reflowing the verse or reshaping Arabic. If
+overlay uses a tight glyph-shaped ink spread, making the filled moment
+conspicuous without changing font weight or letter placement. Android gloss
+overlays paint the base text's existing layout, so centering, line breaks,
+and bidirectional phrases stay identical. If
 English prose coalesced a gloss shared by several Arabic words, its hidden slot
 redirects to the visible phrase; Arabic layouts still breathe over the exact matched
 Arabic word. Ayah-level phrase and concept hits are resolved back to the word
@@ -133,6 +152,8 @@ receded across verse joins and repeat restarts on Android and web.
 A pair of straight or typographic double quotes around the complete query
 disables spelling, thesaurus expansion, roots, concepts, token reordering, and
 substring matching. Literal matching still observes the active reader sources.
+Contraction expansion is disabled too: `"doesn't"` stays literal, while
+unquoted `doesn't` also finds `does not`.
 It keeps only a literal whole word or contiguous phrase, ignoring case and
 punctuation boundaries:
 

@@ -110,6 +110,7 @@ import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.text.PlatformTextStyle
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.drawText
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.LineHeightStyle
@@ -1820,6 +1821,7 @@ private fun WordUnit(
         )
         if (showGloss) {
             Box {
+                var glossLayout by remember { mutableStateOf<TextLayoutResult?>(null) }
                 Text(
                     text = word.translation,
                     fontSize = typeScale(12.sp) * fontScale,
@@ -1835,19 +1837,22 @@ private fun WordUnit(
                         motion.secondaryAlpha() *
                             if (recessedForSearch) searchBackgroundAlpha() else 1f
                     },
+                    onTextLayout = { glossLayout = it },
                 )
                 if (searchHitWash != null) {
-                    Text(
-                        text = word.translation,
-                        fontSize = typeScale(12.sp) * fontScale,
-                        lineHeight = 15.sp * fontScale,
-                        fontWeight = FontWeight.Bold,
-                        color = repeatInk.copy(alpha = InkEngine.tuning.repeatInkAlpha),
-                        textAlign = TextAlign.Center,
-                        modifier = Modifier
-                            .matchParentSize()
-                            .searchHitInkLayer(searchHitWash),
-                    )
+                    // Paint the same shaped layout; a bold Text twin moves its letters.
+                    Canvas(Modifier.matchParentSize().searchHitInkLayer(searchHitWash)) {
+                        glossLayout?.let { layout ->
+                            drawText(
+                                textLayoutResult = layout,
+                                color = repeatInk.copy(alpha = InkEngine.tuning.repeatInkAlpha),
+                                shadow = Shadow(
+                                    color = repeatInk.copy(alpha = SearchHitFlash.EMPHASIS_GLOW_ALPHA),
+                                    blurRadius = SearchHitFlash.EMPHASIS_GLOW_RADIUS.dp.toPx(),
+                                ),
+                            )
+                        }
+                    }
                 }
             }
         }
