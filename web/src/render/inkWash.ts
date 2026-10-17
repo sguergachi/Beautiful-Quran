@@ -250,39 +250,6 @@ export function runLetterWash(
   )
 }
 
-/** @deprecated Use [runPaperCoverWash] — kept so older call sites type-check. */
-export function runPaperCoverPeel(
-  cover: HTMLElement,
-  rtl: boolean,
-  durationMs: number,
-  ease: { x1: number; y1: number; x2: number; y2: number } | CubicBezierEase,
-  onTick?: WashTick,
-  onDone?: () => void,
-): () => void {
-  return runPaperCoverWash(
-    cover,
-    rtl,
-    durationMs,
-    ease,
-    getTuning().upcomingAlpha,
-    onTick,
-    onDone,
-  )
-}
-
-/** @deprecated Use [runLetterWash] for directional English ink. */
-export function runOpacityReveal(
-  el: HTMLElement,
-  fromAlpha: number,
-  _toAlpha: number,
-  durationMs: number,
-  ease: { x1: number; y1: number; x2: number; y2: number } | CubicBezierEase,
-  onTick?: WashTick,
-  onDone?: () => void,
-): () => void {
-  return runLetterWash(el, false, durationMs, ease, fromAlpha, onTick, onDone)
-}
-
 /**
  * Theme half of the fresh-ink glint gate (the word half is
  * `InkEngine.glinting`): the white-gold first-gloss sheen is a Nightfall and

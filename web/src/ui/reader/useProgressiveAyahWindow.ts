@@ -33,14 +33,6 @@ export function slidingAyahMountRange(
   return { lo, hi, complete: lo === 1 && hi === ayahCount }
 }
 
-/** @deprecated alias — same sliding window as open / jump. */
-export function initialAyahMountRange(
-  ayahCount: number,
-  anchorAyah: number,
-): AyahMountRange {
-  return slidingAyahMountRange(ayahCount, anchorAyah)
-}
-
 /**
  * Materialize a requested ayah before the focus controller measures it.
  * Already-visible targets keep the current window. Far targets get a fresh
@@ -76,15 +68,6 @@ export function expandWindowToward(
   const complete = lo === 1 && hi === ayahCount
   if (lo === current.lo && hi === current.hi) return current
   return { lo, hi, complete }
-}
-
-/** @deprecated use expandWindowToward — shrink-on-scroll was the blank-view bug. */
-export function slideWindowToward(
-  current: AyahMountRange,
-  ayahCount: number,
-  centerAyah: number,
-): AyahMountRange {
-  return expandWindowToward(current, ayahCount, centerAyah)
 }
 
 /**

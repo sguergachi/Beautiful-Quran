@@ -396,6 +396,9 @@ finish concurrently, and a seek's already-spoken chain is complete immediately.
 This matches Android's newer audio-bound repeat policy rather than the older
 position-queued orange wash. JVM-generated numeric fixtures and the optional
 `web/scripts/check-ink-browser.mjs` check cover the port.
+`WordMotionProvider` supplies the shared wash registry directly; the obsolete
+repeat queue and its unused context were removed in the
+[legacy/test audit](quality-reviews/LEGACY_TEST_AUDIT_2026-10-17.md).
 
 ## 9. UI surface (paper metaphor)
 

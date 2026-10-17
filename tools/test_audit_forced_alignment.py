@@ -8,6 +8,9 @@ virtualenv.  They do not load an acoustic model or touch quran.db.
 import math
 import sqlite3
 import json
+import tempfile
+from contextlib import redirect_stdout
+from io import StringIO
 from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
@@ -25,6 +28,7 @@ from audit_forced_alignment import (
     normalize_for_model,
     occurrence_frame_evidence,
     target_labels,
+    main as audit_main,
 )
 
 
@@ -179,6 +183,52 @@ def test_hypotheses_share_inference_but_keep_distinct_ctc_paths():
     db.close()
 
 
+def test_resume_preserves_selected_errors_without_retrying_recorded_rows():
+    def row(ayah, error=False):
+        return {
+            "schema": 1,
+            "kind": "ctc_fixed_sequence_audio_audit_error" if error else "ctc_fixed_sequence_audio_audit",
+            "reciterId": 1, "surahId": 1, "ayah": ayah,
+            **({"error": "FileNotFoundError: missing audio"} if error else {"reviewCount": 0}),
+        }
+
+    cases = [
+        ("all-success", [row(1), row(2)], [], 0, 0, 0),
+        ("recorded-error", [row(1, True), row(2)], [], 1, 0, 1),
+        ("mixed-new-success", [row(1, True)], [], 1, 1, 1),
+        ("unselected-error", [row(1), row(2, True)], ["--surah", "1", "--ayah", "1"], 0, 0, 0),
+        ("unselected-error-new-success", [row(2, True)], ["--surah", "1", "--ayah", "1"], 0, 1, 0),
+        ("error-outside-shard", [row(1, True), row(2)], ["--shard", "2/2"], 0, 0, 0),
+    ]
+    for name, reports, selection, expected_code, expected_new, expected_recorded_errors in cases:
+        with tempfile.TemporaryDirectory(prefix=f"forced-audit-{name}-") as temporary:
+            root = Path(temporary)
+            database, report = root / "timings.db", root / "audit.jsonl"
+            with sqlite3.connect(database) as db:
+                db.executescript("""
+                    CREATE TABLE reciters(id, slug, has_timings);
+                    CREATE TABLE timings(reciter_id, surah_id, ayah_number);
+                    INSERT INTO reciters VALUES(1, 'fixture', 1);
+                    INSERT INTO timings VALUES(1, 1, 1), (1, 1, 2);
+                """)
+            original = "".join(json.dumps(item) + "\n" for item in reports)
+            report.write_text(original)
+            output = StringIO()
+            with patch("audit_forced_alignment.load_model", return_value=(None, None, None)) as load, \
+                 patch("audit_forced_alignment.force_one", side_effect=lambda **kwargs: row(kwargs["ayah"])) as force, \
+                 redirect_stdout(output):
+                code = audit_main([
+                    "--db", str(database), "--reciter-id", "1", "--output", str(report), "--resume",
+                    *selection,
+                ])
+            assert code == expected_code, (name, output.getvalue())
+            assert force.call_count == expected_new, name
+            assert load.call_count == bool(expected_new), name
+            assert f"recorded_errors={expected_recorded_errors}" in output.getvalue(), name
+            assert report.read_text().startswith(original), name
+            assert len(report.read_text().splitlines()) == len(reports) + expected_new, name
+
+
 def main():
     test_normalization()
     test_target_keeps_repeated_occurrences()
@@ -190,6 +240,7 @@ def main():
     test_occurrence_evidence_does_not_merge_repeated_words()
     test_ffmpeg_decoder_uses_complete_float_pcm()
     test_hypotheses_share_inference_but_keep_distinct_ctc_paths()
+    test_resume_preserves_selected_errors_without_retrying_recorded_rows()
     print("all forced-alignment audit tests pass")
 
 

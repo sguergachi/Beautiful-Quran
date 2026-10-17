@@ -13,7 +13,7 @@ import { formatAyahNumberMark } from '../util/digits'
 import { WordUnit } from './WordUnit'
 import { HafsWord } from './HafsWord'
 import { VerseBookmarkRibbon } from './VerseBookmarkRibbon'
-import { RepeatWashGateProvider } from './RepeatWashContext'
+import { WordMotionProvider } from './WordMotionContext'
 import { runSearchHitWash } from './inkWash'
 import { SearchHitFlash, searchHitTextRanges } from '../ui/reader/SearchHitFlash'
 
@@ -196,7 +196,7 @@ function AyahBlockInner({
   const markWithLastWord = !arabicOnly && !englishOnly && words.length > 0
 
   return (
-    <RepeatWashGateProvider>
+    <WordMotionProvider>
     <article
       ref={ayahRef}
       className="ayah-block"
@@ -350,7 +350,7 @@ function AyahBlockInner({
         </p>
       ) : null}
     </article>
-    </RepeatWashGateProvider>
+    </WordMotionProvider>
   )
 }
 

@@ -29,7 +29,8 @@ For parallel machines/workers, split the deterministic selected-row order:
     ... --all-reciters --shard 1/8 --output /home/sammy/qasr/audits/1-of-8.jsonl
 
 The output is intentionally JSONL: interrupted work is preserved and
-``--resume`` skips every ayah already represented in the file.
+``--resume`` skips every ayah already represented in the file. Recorded errors
+in the selected rows still make a resumed run fail, even when no work remains.
 """
 
 from __future__ import annotations
@@ -603,21 +604,25 @@ def selected_rows(
     ).fetchall()
 
 
-def completed_keys(path: Path) -> set[tuple[int, int, int]]:
-    """Read completed success/error rows so an interrupted audit can continue."""
+def completed_report_keys(path: Path) -> tuple[set[tuple[int, int, int]], set[tuple[int, int, int]]]:
+    """Read represented and failed row keys without discarding recorded gaps."""
     if not path.exists():
-        return set()
+        return set(), set()
     keys: set[tuple[int, int, int]] = set()
+    errors: set[tuple[int, int, int]] = set()
     with path.open(encoding="utf-8") as report:
         for number, line in enumerate(report, start=1):
             if not line.strip():
                 continue
             try:
                 row = json.loads(line)
-                keys.add((int(row["reciterId"]), int(row["surahId"]), int(row["ayah"])))
+                key = (int(row["reciterId"]), int(row["surahId"]), int(row["ayah"]))
+                keys.add(key)
+                if row.get("kind") == "ctc_fixed_sequence_audio_audit_error":
+                    errors.add(key)
             except (KeyError, TypeError, ValueError, json.JSONDecodeError) as error:
                 raise ValueError(f"invalid existing report line {number} in {path}") from error
-    return keys
+    return keys, errors
 
 
 def argument_parser() -> argparse.ArgumentParser:
@@ -673,11 +678,13 @@ def main(argv: Sequence[str] | None = None) -> int:
         if args.shard:
             part, total = args.shard
             rows = [row for index, row in enumerate(rows) if index % total == part]
-        done = completed_keys(args.output) if args.resume else set()
+        done, recorded_errors = completed_report_keys(args.output) if args.resume else (set(), set())
+        selected_keys = {(row[0], row[2], row[3]) for row in rows}
+        recorded_error_count = len(recorded_errors & selected_keys)
         rows = [row for row in rows if (row[0], row[2], row[3]) not in done]
         if not rows:
-            print("no rows left to audit", flush=True)
-            return 0
+            print(f"no rows left to audit; recorded_errors={recorded_error_count}", flush=True)
+            return 1 if recorded_error_count else 0
         processor, model, device = load_model(args.model, args.device)
         romanizer = None
         if args.romanize:
@@ -725,10 +732,11 @@ def main(argv: Sequence[str] | None = None) -> int:
                 report.flush()
                 print(f"[{index}/{len(rows)}] {message}", flush=True)
         print(
-            f"complete: rows={len(rows)} successful={success} review_words={review_words} errors={errors}",
+            f"complete: rows={len(rows)} successful={success} review_words={review_words} "
+            f"errors={errors} recorded_errors={recorded_error_count}",
             flush=True,
         )
-        return 1 if errors else 0
+        return 1 if errors or recorded_error_count else 0
     finally:
         db.close()
 

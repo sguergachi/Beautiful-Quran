@@ -87,10 +87,6 @@ def _load(path):
     return json.loads(Path(path).read_text(encoding="utf-8"))
 
 
-def _key(k):
-    return tuple(int(x) for x in k)
-
-
 def settled_keys():
     """Rows another verdict already owns; a generated edit must not compete."""
     owned = set()
