@@ -421,6 +421,8 @@ paper with its folio and no Scroll rail, gloss or size scaling. Preview paper
 and theme samples have no gold control outlines. **Reading help** is its own
 Settings page with gesture instructions, keyboard shortcuts and the hints toggle. Back and
 Escape return from either sub-page to Settings before peeling the sheet away.
+Back and Escape from Settings itself return to the sheet it was opened from
+(Chapters or the reader), never one layer down.
 
 **Tablet and desktop book spread.** At `(min-width: 720px) and (min-height: 600px)`
 (`ui/paper/bookSpread.ts`) the default stack is laid open as a book instead of a
