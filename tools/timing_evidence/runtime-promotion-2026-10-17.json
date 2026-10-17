@@ -1,0 +1,171 @@
+{
+  "schemaVersion": 1,
+  "sourceProfile": "authenticated",
+  "promotedExactMergeKeys": [
+    "Abdul_Basit_Murattal_64kbps:2:34",
+    "Abdul_Basit_Murattal_64kbps:2:146",
+    "Abdul_Basit_Murattal_64kbps:2:188",
+    "Abdul_Basit_Murattal_64kbps:2:206",
+    "Abdul_Basit_Murattal_64kbps:3:14",
+    "Abdul_Basit_Murattal_64kbps:3:127",
+    "Abdul_Basit_Murattal_64kbps:4:128",
+    "Abdul_Basit_Murattal_64kbps:4:135",
+    "Abdul_Basit_Murattal_64kbps:4:141",
+    "Abdul_Basit_Murattal_64kbps:5:11",
+    "Abdul_Basit_Murattal_64kbps:5:33",
+    "Abdul_Basit_Murattal_64kbps:5:42",
+    "Abdul_Basit_Murattal_64kbps:5:44",
+    "Abdul_Basit_Murattal_64kbps:5:48",
+    "Abdul_Basit_Murattal_64kbps:5:82",
+    "Abdul_Basit_Murattal_64kbps:5:89",
+    "Abdul_Basit_Murattal_64kbps:6:130",
+    "Abdul_Basit_Murattal_64kbps:6:145",
+    "Abdul_Basit_Murattal_64kbps:8:34",
+    "Abdul_Basit_Murattal_64kbps:9:8",
+    "Abdul_Basit_Murattal_64kbps:9:13",
+    "Abdul_Basit_Murattal_64kbps:9:108",
+    "Abdul_Basit_Murattal_64kbps:9:114",
+    "Abdul_Basit_Murattal_64kbps:9:120",
+    "Abdul_Basit_Murattal_64kbps:9:123",
+    "Abdul_Basit_Murattal_64kbps:10:3",
+    "Abdul_Basit_Murattal_64kbps:10:34",
+    "Abdul_Basit_Murattal_64kbps:10:49",
+    "Abdul_Basit_Murattal_64kbps:11:78",
+    "Abdul_Basit_Murattal_64kbps:12:41",
+    "Abdul_Basit_Murattal_64kbps:16:14",
+    "Abdul_Basit_Murattal_64kbps:18:19",
+    "Abdul_Basit_Murattal_64kbps:18:70",
+    "Abdul_Basit_Murattal_64kbps:18:74",
+    "Abdul_Basit_Murattal_64kbps:27:59",
+    "Abdul_Basit_Murattal_64kbps:28:76",
+    "Abdul_Basit_Murattal_64kbps:29:39",
+    "Abdul_Basit_Murattal_64kbps:42:53",
+    "Abdul_Basit_Murattal_64kbps:48:16",
+    "Abdul_Basit_Murattal_64kbps:49:9",
+    "Abdul_Basit_Murattal_64kbps:58:11",
+    "Abdul_Basit_Murattal_64kbps:61:13",
+    "Abdul_Basit_Murattal_64kbps:71:7",
+    "Abdurrahmaan_As-Sudais_192kbps:2:6",
+    "Abdurrahmaan_As-Sudais_192kbps:5:103",
+    "Alafasy_128kbps:5:57",
+    "Alafasy_128kbps:9:69",
+    "Alafasy_128kbps:11:87",
+    "Alafasy_128kbps:12:46",
+    "Alafasy_128kbps:15:16",
+    "Alafasy_128kbps:27:68",
+    "Alafasy_128kbps:28:63",
+    "Alafasy_128kbps:42:13",
+    "Alafasy_128kbps:51:14",
+    "Alafasy_128kbps:61:14",
+    "Alafasy_128kbps:71:16",
+    "Alafasy_128kbps:77:15",
+    "Hani_Rifai_192kbps:29:21",
+    "Husary_64kbps:2:236",
+    "Husary_64kbps:6:90",
+    "Husary_64kbps:27:59",
+    "Husary_64kbps:28:27",
+    "Husary_64kbps:28:33",
+    "Husary_64kbps:28:83",
+    "Husary_64kbps:33:5",
+    "Husary_64kbps:42:42",
+    "Minshawy_Murattal_128kbps:5:38"
+  ],
+  "retiredStaleMergeInputs": [
+    {
+      "key": [
+        1,
+        3,
+        86
+      ],
+      "inputSegmentsSha256": "d0d312b511bcf1adc746fbf60deeef10bdab2d34bd368c20866bb531385cc603",
+      "decision": "retain_baseline",
+      "reason": "authenticated pipeline input differs from the acoustically reviewed legacy pair"
+    },
+    {
+      "key": [
+        1,
+        7,
+        113
+      ],
+      "inputSegmentsSha256": "90539c5c65312c36d50b03dad9e863f70aea2ffefed1309d84c0cc3937f9d1de",
+      "decision": "retain_baseline",
+      "reason": "authenticated pipeline input differs from the acoustically reviewed legacy pair"
+    },
+    {
+      "key": [
+        1,
+        11,
+        58
+      ],
+      "inputSegmentsSha256": "f2bfd48d83be5021a466bf0bdb175922df64f1335d44fa6e1b4b8ebcbfb5f29b",
+      "decision": "retain_baseline",
+      "reason": "authenticated pipeline input differs from the acoustically reviewed legacy pair"
+    }
+  ],
+  "heldUnreviewedKeys": [
+    "Abdul_Basit_Murattal_64kbps:33:6",
+    "Abdul_Basit_Murattal_64kbps:35:10",
+    "Abdurrahmaan_As-Sudais_192kbps:59:5",
+    "Alafasy_128kbps:47:4"
+  ],
+  "diagnosticDeltaRows": 924,
+  "restoredAuditHolds": 94,
+  "issueInventory": {
+    "count": 60,
+    "query": "gh issue list --state all --limit 1000 --json number,title,state,body",
+    "complete": true,
+    "sourceArtifact": "tools/timing_evidence/word-split-issue-inventory.json",
+    "notes": "All 60 current issues reviewed; the existing inventory includes 31 patches because one issue contains multiple edits."
+  },
+  "inverseOneUtteranceAudit": {
+    "predicate": "Every op == one_utterance in all tools/timing_corrections/*.json at de44c6eb; no reciter/hold exclusions",
+    "count": 3,
+    "decisions": [
+      {
+        "key": [
+          1,
+          2,
+          229
+        ],
+        "decision": "retain",
+        "reason": "legacy ear-reviewed #594 correction, retired on exact authenticated input; runtime full row stays at v65 by existing acoustic hold"
+      },
+      {
+        "key": [
+          1,
+          2,
+          235
+        ],
+        "decision": "retain",
+        "reason": "legacy ear-reviewed #598 correction, retired on exact authenticated input; runtime full row stays at v65 by existing acoustic hold"
+      },
+      {
+        "key": [
+          1,
+          6,
+          145
+        ],
+        "decision": "repair",
+        "reason": "only active authenticated one_utterance; both models prefer the real repeat, while the raw intervening label is unspoken"
+      }
+    ]
+  },
+  "broaderPreRewindClass": {
+    "candidateCount": 4337,
+    "compatibleTypedShapeCount": 4313,
+    "acousticCoverage": "partial: 5:2 and 6:145 only; unscored candidates unchanged",
+    "disposition": "pending; do not generalize same-word merge results to this class",
+    "inventory": "tools/timing_evidence/rewind-onset-inventory.pending.json"
+  },
+  "promotedRewindKeys": [
+    "Alafasy_128kbps:5:2",
+    "Alafasy_128kbps:6:145"
+  ],
+  "ledgerSummary": {
+    "accepted_timestamp": 508,
+    "held_topology": 156,
+    "held_timestamp": 158,
+    "accepted_topology": 101,
+    "held_added": 1
+  }
+}
