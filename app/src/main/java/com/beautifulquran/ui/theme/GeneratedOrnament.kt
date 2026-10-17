@@ -1,28 +1,38 @@
 package com.beautifulquran.ui.theme
 
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.State
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.draw.drawWithCache
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.ClipOp
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.PathMeasure
+import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.clipPath
+import androidx.compose.ui.graphics.drawscope.rotate
 import androidx.compose.ui.graphics.drawscope.translate
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.layer.GraphicsLayer
 import androidx.compose.ui.graphics.layer.drawLayer
 import androidx.compose.ui.graphics.rememberGraphicsLayer
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.beautifulquran.ui.entrance.CoverFrameGeometry
@@ -32,6 +42,7 @@ import com.beautifulquran.ui.theme.ornament.fittedFieldCellWidth
 import com.beautifulquran.ui.theme.ornament.RosetteSpec
 import com.beautifulquran.ui.theme.ornament.StrokeWeight
 import kotlin.math.PI
+import kotlin.math.atan2
 import kotlin.math.ceil
 import kotlin.math.cos
 import kotlin.math.hypot
@@ -51,7 +62,9 @@ import kotlin.math.sqrt
  *
  * All geometry is cached per size (drawWithCache); build and sheen values
  * are read only inside the draw phase, so the ceremony animates without
- * recomposing anything.
+ * recomposing anything. The ceremony's complete figures go through
+ * [TooledGold]: relief and leaf recorded once, the sheen moving one rotated
+ * gradient per step instead of re-inking every stroke.
  */
 
 /** A generated stroke ready to draw: full path, its measure for partial
@@ -172,6 +185,115 @@ private fun DrawScope.drawDots(
     }
 }
 
+/** Build state of figures tooled complete from the first frame — the frame,
+ *  band and seals: never inking in, so the record happens at once. */
+private val CompleteBuild: State<Float> = object : State<Float> {
+    override val value: Float get() = 1f
+}
+
+/** Where [goldBrush]'s axis (start (0,h·t) → end (w,h·(1−t))) stands at
+ *  sheen [t], for this size: the light's tilt as a rotation, in degrees. */
+private fun DrawScope.sheenRotation(t: Float): Float =
+    atan2(size.height * (1f - 2f * t), size.width) * (180f / PI.toFloat())
+
+/**
+ * The ceremony's gilded figures, made cheap to move. A sheen step used to
+ * re-ink every stroke of every figure — three passes over the band's
+ * thousands of points, hundreds of draw commands per figure, on every frame
+ * the light moves (measured on the emulator: every closed-cover frame
+ * stalled ~85ms issuing them). Now the figure records twice the first frame
+ * it is complete — the emboss relief, and the leaf's strokes as an opaque
+ * mask — and every step after that replays two layers and one gradient rect
+ * blended into the mask (SrcIn, inside an offscreen layer so the blend sees
+ * only the mask, not the relief beneath).
+ *
+ * The gold ramp keeps [goldBrush]'s axis: horizontal through the centre,
+ * spanning the width — what [goldBrush] reads at rest — and the sheen turns
+ * the whole ramp about the figure's centre ([sheenRotation]). The same
+ * light, moved for a handful of commands instead of hundreds. The ramp
+ * keeps its resting span, so at the extremes of the tilt the leaf reads a
+ * shade flatter than the rebuilt gradient did.
+ *
+ * [build] gates the record until the figure is fully inked; until then
+ * [inkIn] draws the growing figure as before. Figures complete from the
+ * first frame pass no [inkIn].
+ */
+@Composable
+internal fun TooledGold(
+    modifier: Modifier,
+    brightGold: Color,
+    deepGold: Color,
+    sheen: State<Float>,
+    record: DrawScope.(relief: GraphicsLayer, leaf: GraphicsLayer) -> Unit,
+    inkIn: (DrawScope.(gold: Brush, progress: Float) -> Unit)? = null,
+    build: State<Float> = CompleteBuild,
+) {
+    GildingDemand(sheen)
+    val relief = rememberGraphicsLayer()
+    val leaf = rememberGraphicsLayer()
+    Box(
+        modifier
+            .gildingLayer()
+            // Offscreen so the whole tooled figure renders once into a
+            // persistent layer and every later composite is a texture blit:
+            // replaying the box's display list re-executes the recorded
+            // relief and leaf layers — the band's thousands of points —
+            // on the render thread, on every frame the surface is damaged.
+            .graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen },
+    ) {
+        // Replays the relief once [record] fills it; empty — so nothing —
+        // before that, and its own draw never runs again afterwards: the
+        // layer is live, its content composites as recorded.
+        Spacer(Modifier.matchParentSize().drawWithCache {
+            onDrawBehind { drawLayer(relief) }
+        })
+        Spacer(
+            Modifier.matchParentSize()
+                .graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }
+                .drawWithCache {
+                    // The ramp is fixed (axis horizontal through the centre,
+                    // spanning the width — goldBrush at rest), built once per
+                    // size; only its rotation moves.
+                    val ramp = Brush.linearGradient(
+                        colors = listOf(deepGold, brightGold, deepGold),
+                        start = Offset(0f, size.height / 2f),
+                        end = Offset(size.width, size.height / 2f),
+                    )
+                    // A square on the diagonal, centred here, still covers
+                    // the bounds at any tilt; beyond the ramp's span the
+                    // gradient clamps to deep gold.
+                    val side = hypot(size.width, size.height) + 2f
+                    val center = Offset(size.width / 2f, size.height / 2f)
+                    val rect = Offset(center.x - side / 2f, center.y - side / 2f)
+                    var recorded = false
+                    onDrawBehind {
+                        val progress = build.value
+                        if (progress < 1f && inkIn != null) {
+                            inkIn(
+                                goldBrush(brightGold, deepGold, sheen.value.coerceIn(0f, 1f)),
+                                progress,
+                            )
+                        } else {
+                            if (!recorded) {
+                                record(relief, leaf)
+                                recorded = true
+                            }
+                            drawLayer(leaf)
+                            rotate(sheenRotation(sheen.value.coerceIn(0f, 1f)), pivot = center) {
+                                drawRect(
+                                    ramp,
+                                    topLeft = rect,
+                                    size = Size(side, side),
+                                    blendMode = BlendMode.SrcIn,
+                                )
+                            }
+                        }
+                    }
+                },
+        )
+    }
+}
+
 /**
  * The generated medallion — this launch's own star composition at the
  * ceremonial centre of the cover. [build] 0..1 inks it in stroke by stroke;
@@ -189,31 +311,32 @@ fun GeneratedMedallion(
     build: State<Float>,
     modifier: Modifier = Modifier,
 ) {
-    GildingDemand(sheen)
-    Spacer(
-        modifier
-            .size(size)
-            .gildingLayer()
-            .drawWithCache {
-                val d = min(this.size.width, this.size.height)
-                val paths = RosettePaths(
-                    spec,
-                    d,
-                    ruleWidth = (d * 0.011f).coerceAtLeast(1f),
-                    hairWidth = (d * 0.005f).coerceAtLeast(1f),
-                )
-                onDrawBehind {
-                    val gold = goldBrush(brightGold, deepGold, sheen.value.coerceIn(0f, 1f))
-                    drawRosette(
-                        paths,
-                        Offset(this.size.width / 2f, this.size.height / 2f),
-                        gold,
-                        embossDark,
-                        embossLight,
-                        build.value,
-                    )
-                }
-            },
+    // The medallion inks in stroke by stroke, so its geometry is needed both
+    // by the growing draw and by the once-only record; a fixed dp size, it
+    // is built here in composition.
+    val d = with(LocalDensity.current) { size.toPx() }
+    val paths = remember(spec, d) {
+        RosettePaths(
+            spec,
+            d,
+            ruleWidth = (d * 0.011f).coerceAtLeast(1f),
+            hairWidth = (d * 0.005f).coerceAtLeast(1f),
+        )
+    }
+    val center = Offset(d / 2f, d / 2f)
+    TooledGold(
+        modifier = modifier.size(size),
+        brightGold = brightGold,
+        deepGold = deepGold,
+        sheen = sheen,
+        build = build,
+        inkIn = { gold, progress ->
+            drawRosette(paths, center, gold, embossDark, embossLight, progress)
+        },
+        record = { relief, leaf ->
+            relief.record { drawRosetteRelief(paths, center, embossDark, embossLight, emboss = 0.8f) }
+            leaf.record { drawRosetteGold(paths, center, SolidColor(Color.White)) }
+        },
     )
 }
 
@@ -433,40 +556,42 @@ fun GeneratedCornerSeals(
     sheen: State<Float>,
     modifier: Modifier = Modifier,
 ) {
-    GildingDemand(sheen)
-    Spacer(
-        modifier
-            .fillMaxSize()
-            .gildingLayer()
-            .drawWithCache {
-                val d = sealBoxPx(geometry, spec)
-                val paths = RosettePaths(
-                    spec,
-                    d,
-                    ruleWidth = 1.dp.toPx(),
-                    hairWidth = 1.dp.toPx(),
-                )
-                // Each corner rides its own arc: displays may report four
-                // different radii, and a seal seated for the wrong one
-                // leaves the band.
-                val oc = geometry.outerCorners
-                val tl = sealCenterPx(geometry, screenRadius(geometry, oc.topLeft))
-                val tr = sealCenterPx(geometry, screenRadius(geometry, oc.topRight))
-                val bl = sealCenterPx(geometry, screenRadius(geometry, oc.bottomLeft))
-                val br = sealCenterPx(geometry, screenRadius(geometry, oc.bottomRight))
-                val corners = listOf(
-                    Offset(tl, tl),
-                    Offset(size.width - tr, tr),
-                    Offset(bl, size.height - bl),
-                    Offset(size.width - br, size.height - br),
-                )
-                onDrawBehind {
-                    val gold = goldBrush(brightGold, deepGold, sheen.value.coerceIn(0f, 1f))
-                    for (corner in corners) {
-                        drawRosette(paths, corner, gold, embossDark, embossLight, 1f)
-                    }
+    TooledGold(
+        modifier = modifier.fillMaxSize(),
+        brightGold = brightGold,
+        deepGold = deepGold,
+        sheen = sheen,
+        record = { relief, leaf ->
+            val d = sealBoxPx(geometry, spec)
+            val paths = RosettePaths(
+                spec,
+                d,
+                ruleWidth = 1.dp.toPx(),
+                hairWidth = 1.dp.toPx(),
+            )
+            // Each corner rides its own arc: displays may report four
+            // different radii, and a seal seated for the wrong one
+            // leaves the band.
+            val oc = geometry.outerCorners
+            val tl = sealCenterPx(geometry, screenRadius(geometry, oc.topLeft))
+            val tr = sealCenterPx(geometry, screenRadius(geometry, oc.topRight))
+            val bl = sealCenterPx(geometry, screenRadius(geometry, oc.bottomLeft))
+            val br = sealCenterPx(geometry, screenRadius(geometry, oc.bottomRight))
+            val corners = listOf(
+                Offset(tl, tl),
+                Offset(size.width - tr, tr),
+                Offset(bl, size.height - bl),
+                Offset(size.width - br, size.height - br),
+            )
+            relief.record {
+                for (corner in corners) {
+                    drawRosetteRelief(paths, corner, embossDark, embossLight, emboss = 0.8f)
                 }
-            },
+            }
+            leaf.record {
+                for (corner in corners) drawRosetteGold(paths, corner, SolidColor(Color.White))
+            }
+        },
     )
 }
 
@@ -492,106 +617,112 @@ fun GeneratedBorderBand(
     sheen: State<Float>,
     modifier: Modifier = Modifier,
 ) {
-    GildingDemand(sheen)
-    Spacer(
-        modifier
-            .fillMaxSize()
-            .gildingLayer()
-            .drawWithCache {
-                val bandH = ((geometry.innerInsetPx - geometry.outerInsetPx) * 0.72f)
-                    .coerceIn(10.dp.toPx(), 20.dp.toPx())
-                val c = bandCenter(geometry)
-                val w = size.width
-                val h = size.height
-                // Each run starts at one corner seal and ends at the next,
-                // carrying the pattern round the corner arc into the seal.
-                // The band is clipped by each seal's ring (no arrowhead
-                // tapering to a point short of it), so the channel runs
-                // under the star and reads as one piece with it. Whole
-                // periods fit between the two rings, the period stretching a
-                // little, so every run meets its seals at the same phase.
-                val ringR = geometry.starRadiusPx * SEAL_RING_FRACTION
-                val half = bandH / 2f
-                val bandStart = sqrt(max(ringR * ringR - half * half, 0f))
-                val periodPx = (spec.period * bandH).toFloat()
-                val maxStep = 2.5.dp.toPx()
-                val oc = geometry.outerCorners
-                val rTl = screenRadius(geometry, oc.topLeft)
-                val rTr = screenRadius(geometry, oc.topRight)
-                val rBl = screenRadius(geometry, oc.bottomLeft)
-                val rBr = screenRadius(geometry, oc.bottomRight)
-                // Same seats as [GeneratedCornerSeals].
-                val sealRings = Path().apply {
-                    val tl = sealCenterPx(geometry, rTl)
-                    val tr = sealCenterPx(geometry, rTr)
-                    val bl = sealCenterPx(geometry, rBl)
-                    val br = sealCenterPx(geometry, rBr)
-                    for (centre in listOf(
-                        Offset(tl, tl),
-                        Offset(w - tr, tr),
-                        Offset(bl, h - bl),
-                        Offset(w - br, h - br),
-                    )) addOval(Rect(centre, ringR))
-                }
+    TooledGold(
+        modifier = modifier.fillMaxSize(),
+        brightGold = brightGold,
+        deepGold = deepGold,
+        sheen = sheen,
+        record = { relief, leaf ->
+            val bandH = ((geometry.innerInsetPx - geometry.outerInsetPx) * 0.72f)
+                .coerceIn(10.dp.toPx(), 20.dp.toPx())
+            val c = bandCenter(geometry)
+            val w = size.width
+            val h = size.height
+            // Each run starts at one corner seal and ends at the next,
+            // carrying the pattern round the corner arc into the seal.
+            // The band is clipped by each seal's ring (no arrowhead
+            // tapering to a point short of it), so the channel runs
+            // under the star and reads as one piece with it. Whole
+            // periods fit between the two rings, the period stretching a
+            // little, so every run meets its seals at the same phase.
+            val ringR = geometry.starRadiusPx * SEAL_RING_FRACTION
+            val half = bandH / 2f
+            val bandStart = sqrt(max(ringR * ringR - half * half, 0f))
+            val periodPx = (spec.period * bandH).toFloat()
+            val maxStep = 2.5.dp.toPx()
+            val oc = geometry.outerCorners
+            val rTl = screenRadius(geometry, oc.topLeft)
+            val rTr = screenRadius(geometry, oc.topRight)
+            val rBl = screenRadius(geometry, oc.bottomLeft)
+            val rBr = screenRadius(geometry, oc.bottomRight)
+            // Same seats as [GeneratedCornerSeals].
+            val sealRings = Path().apply {
+                val tl = sealCenterPx(geometry, rTl)
+                val tr = sealCenterPx(geometry, rTr)
+                val bl = sealCenterPx(geometry, rBl)
+                val br = sealCenterPx(geometry, rBr)
+                for (centre in listOf(
+                    Offset(tl, tl),
+                    Offset(w - tr, tr),
+                    Offset(bl, h - bl),
+                    Offset(w - br, h - br),
+                )) addOval(Rect(centre, ringR))
+            }
 
-                // A run in the canonical top-edge frame → screen, per side;
-                // inward stays inward on every side so the pattern faces in.
-                class Side(val run: BandRun, val toScreen: (Offset) -> Offset)
-                val sides = listOf(
-                    Side(BandRun(w, c, rTl, rTr)) { Offset(it.x, it.y) },
-                    Side(BandRun(w, c, rBl, rBr)) { Offset(it.x, h - it.y) },
-                    Side(BandRun(h, c, rTl, rBl)) { Offset(it.y, it.x) },
-                    Side(BandRun(h, c, rTr, rBr)) { Offset(w - it.y, it.x) },
-                )
+            // A run in the canonical top-edge frame → screen, per side;
+            // inward stays inward on every side so the pattern faces in.
+            class Side(val run: BandRun, val toScreen: (Offset) -> Offset)
+            val sides = listOf(
+                Side(BandRun(w, c, rTl, rTr)) { Offset(it.x, it.y) },
+                Side(BandRun(w, c, rBl, rBr)) { Offset(it.x, h - it.y) },
+                Side(BandRun(h, c, rTl, rBl)) { Offset(it.y, it.x) },
+                Side(BandRun(h, c, rTr, rBr)) { Offset(w - it.y, it.x) },
+            )
 
-                // Pattern strokes stay hairline; rails and channel mouths
-                // carry rule weight so the band reads as a tooled channel.
-                val hairBand = Path()
-                val ruleBand = Path()
-                val dotCenters = ArrayList<Pair<Offset, Float>>()
-                for (side in sides) {
-                    val run = side.run
-                    val span = run.length - 2f * bandStart
-                    if (span < periodPx / 2f) continue
-                    val tiles = max(1, (span / periodPx).roundToInt())
-                    val stretch = (span / tiles) / spec.period.toFloat()
-                    for (k in 0 until tiles) {
-                        val u0 = bandStart + k * (span / tiles)
-                        for (s in spec.strokes) {
-                            val path = if (s.weight == StrokeWeight.Rule) ruleBand else hairBand
-                            val pts = s.points.map {
-                                Offset(u0 + (it.x * stretch).toFloat(), ((it.y.toFloat() - 0.5f) * bandH))
-                            }
-                            run.trace(path, pts, s.closed, side.toScreen, maxStep)
+            // Pattern strokes stay hairline; rails and channel mouths
+            // carry rule weight so the band reads as a tooled channel.
+            val hairBand = Path()
+            val ruleBand = Path()
+            val dotCenters = ArrayList<Pair<Offset, Float>>()
+            for (side in sides) {
+                val run = side.run
+                val span = run.length - 2f * bandStart
+                if (span < periodPx / 2f) continue
+                val tiles = max(1, (span / periodPx).roundToInt())
+                val stretch = (span / tiles) / spec.period.toFloat()
+                for (k in 0 until tiles) {
+                    val u0 = bandStart + k * (span / tiles)
+                    for (s in spec.strokes) {
+                        val path = if (s.weight == StrokeWeight.Rule) ruleBand else hairBand
+                        val pts = s.points.map {
+                            Offset(u0 + (it.x * stretch).toFloat(), ((it.y.toFloat() - 0.5f) * bandH))
                         }
-                        for (d in spec.dots) {
-                            dotCenters.add(
-                                side.toScreen(
-                                    run.point(
-                                        u0 + (d.x * stretch).toFloat(),
-                                        (d.y.toFloat() - 0.5f) * bandH,
-                                    ),
-                                ) to (d.radius * bandH).toFloat(),
-                            )
-                        }
+                        run.trace(path, pts, s.closed, side.toScreen, maxStep)
+                    }
+                    for (d in spec.dots) {
+                        dotCenters.add(
+                            side.toScreen(
+                                run.point(
+                                    u0 + (d.x * stretch).toFloat(),
+                                    (d.y.toFloat() - 0.5f) * bandH,
+                                ),
+                            ) to (d.radius * bandH).toFloat(),
+                        )
                     }
                 }
-                // 0.8dp keeps the rumi leaves' outline and vein open at band size.
-                val hairStroke = Stroke(width = 0.8.dp.toPx(), cap = StrokeCap.Round, join = StrokeJoin.Round)
-                val ruleStroke = Stroke(width = 1.5.dp.toPx(), cap = StrokeCap.Round, join = StrokeJoin.Round)
+            }
+            // 0.8dp keeps the rumi leaves' outline and vein open at band size.
+            val hairStroke = Stroke(width = 0.8.dp.toPx(), cap = StrokeCap.Round, join = StrokeJoin.Round)
+            val ruleStroke = Stroke(width = 1.5.dp.toPx(), cap = StrokeCap.Round, join = StrokeJoin.Round)
+            val bands = listOf(hairBand to hairStroke, ruleBand to ruleStroke)
 
-                onDrawBehind {
-                    val gold = goldBrush(brightGold, deepGold, sheen.value.coerceIn(0f, 1f))
-                    clipPath(sealRings, ClipOp.Difference) {
-                        for ((band, stroke) in listOf(hairBand to hairStroke, ruleBand to ruleStroke)) {
-                            translate(0.6f, 0.6f) { drawPath(band, embossDark, style = stroke, alpha = 0.7f) }
-                            translate(-0.6f, -0.6f) { drawPath(band, embossLight, style = stroke, alpha = 0.7f) }
-                            drawPath(band, gold, style = stroke)
-                        }
-                        for ((center, r) in dotCenters) drawCircle(gold, radius = r, center = center)
+            relief.record {
+                clipPath(sealRings, ClipOp.Difference) {
+                    for ((band, stroke) in bands) {
+                        translate(0.6f, 0.6f) { drawPath(band, embossDark, style = stroke, alpha = 0.7f) }
+                        translate(-0.6f, -0.6f) { drawPath(band, embossLight, style = stroke, alpha = 0.7f) }
                     }
                 }
-            },
+            }
+            leaf.record {
+                clipPath(sealRings, ClipOp.Difference) {
+                    for ((band, stroke) in bands) {
+                        drawPath(band, Color.White, style = stroke)
+                    }
+                    for ((center, r) in dotCenters) drawCircle(Color.White, radius = r, center = center)
+                }
+            }
+        },
     )
 }
 
