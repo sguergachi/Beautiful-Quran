@@ -1,0 +1,31 @@
+---
+description: Mandatory systematic investigation for every Beautiful-Quran timing patch
+alwaysApply: true
+---
+
+# Every timing patch
+
+This is a standing user requirement for all future timing patches, including
+small boundary edits. Follow the complete
+[AGENTS.md checklist](../../AGENTS.md#landing-timings-lab--github-timing-patches)
+and [Timings Lab workflow](../../docs/TIMINGS_LAB.md) without another reminder.
+
+1. Compare the patch with currently delivered rows. Trace disagreements through
+   source, cleaner, corrections, repairs, finalization and reviewed holds.
+2. Audit each defect class across the complete applicable corpus and reciters,
+   including owned/held rows and analogous open/closed issues. Preserve genuine
+   repeats and use correct rows as negative controls.
+3. Run actual dual-model acoustic inference for ambiguous topology. Use sequence
+   scores for topology and start residuals plus waveform tails for boundaries.
+   Follow the existing gates; never infer Bluetooth offsets or claim listening
+   that did not occur.
+4. Fix the class with a reusable, calibrated detector and regression cases.
+   Exact-verse fixtures or source-guarded entries alone do not prove a class fix.
+   Keep any necessary human exception explicit and uncertain rows at baseline.
+5. Record predicates, source revisions, counts, every candidate disposition,
+   evidence paths, errors and uncertainty in the repair report or PR. Label
+   unfinished class audits as partial and track them in
+   [OUTSTANDING.md](../../tools/timing_verdicts/OUTSTANDING.md).
+
+Keep full QF timing packs and alignment JSONL private. Acoustic acceptance and
+an APK build do not replace authenticated-source review or runtime publication.

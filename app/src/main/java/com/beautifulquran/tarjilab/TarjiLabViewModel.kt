@@ -42,6 +42,8 @@ class TarjiLabViewModel(
     private val settingsRepo: SettingsRepository,
     private val player: PlayerController,
     private val profiles: ReciterTarjiProfiles? = null,
+    /** For the verse's audio: the Recording method judges drama against the whole verse. */
+    private val appContext: android.content.Context? = null,
 ) : ViewModel() {
 
     data class TarjiLabUiState(
@@ -380,7 +382,12 @@ class TarjiLabViewModel(
         val firstHopMediaMs = capture?.hopContentMs?.firstOrNull()
             ?.let { ve.mediaMsOfContent(it.toDouble()) } ?: Double.NaN
         restorePlayer()
-        if (error != null || capture == null || !firstHopMediaMs.isFinite()) {
+        val outOfAudio = error == "Audio stopped before the word's end."
+        // A capture that hit the internal hop cap, or whose audio ended a
+        // little early, still carries usable PCM. Keep it rather than failing.
+        val usable = capture != null && capture.hopCount > 0 && firstHopMediaMs.isFinite() &&
+            (error == null || outOfAudio)
+        if (!usable) {
             _ui.value = st.copy(
                 capturing = false,
                 captureProgress = 0f,
@@ -464,8 +471,19 @@ class TarjiLabViewModel(
             while (true) {
                 val st = _ui.value
                 val capture = st.capture ?: return@launch
+                // The capture is part of a verse; the reader judges drama
+                // against all of it, so the lab must too or the two disagree.
+                val reference = if (st.mode == TarjiDetectorMode.Recording && st.reciter != null && appContext != null) {
+                    runCatching {
+                        com.beautifulquran.ui.reader.TarjiVersePulse.recordingReference(
+                            appContext, st.reciter, st.surahId, st.ayah, st.knobs,
+                        )
+                    }.getOrElse { if (it is kotlinx.coroutines.CancellationException) throw it else null }
+                } else {
+                    null
+                }
                 val trace = withContext(Dispatchers.Default) {
-                    analyzeTarjiCapture(capture, st.knobs, st.mode, st.reciter?.id ?: 0) {
+                    analyzeTarjiCapture(capture, st.knobs, st.mode, st.reciter?.id ?: 0, reference) {
                         coroutineContext.ensureActive()
                         true
                     }

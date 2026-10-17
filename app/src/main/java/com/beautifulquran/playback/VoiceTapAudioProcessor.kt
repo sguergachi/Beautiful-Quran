@@ -64,12 +64,16 @@ class VoiceTapAudioProcessor : BaseAudioProcessor() {
     override fun onConfigure(
         inputAudioFormat: AudioProcessor.AudioFormat,
     ): AudioProcessor.AudioFormat {
-        if (inputAudioFormat.encoding != C.ENCODING_PCM_16BIT) {
-            // Anything else: sit out (audio flows past) rather than fail the
-            // sink's processor chain.
-            return AudioProcessor.AudioFormat.NOT_SET
+        // Only signed/unsigned integer and float PCM can be read by the tap;
+        // pass it through untouched in all cases so audio is never altered.
+        // The capture conversion below normalises the received samples to the
+        // PCM16 shape VoiceEnergy already understands.
+        return when (inputAudioFormat.encoding) {
+            C.ENCODING_PCM_8BIT, C.ENCODING_PCM_16BIT,
+            C.ENCODING_PCM_24BIT, C.ENCODING_PCM_32BIT,
+            C.ENCODING_PCM_FLOAT -> inputAudioFormat
+            else -> AudioProcessor.AudioFormat.NOT_SET
         }
-        return inputAudioFormat
     }
 
     override fun queueInput(inputBuffer: ByteBuffer) {
@@ -81,14 +85,60 @@ class VoiceTapAudioProcessor : BaseAudioProcessor() {
             if (voice != null) {
                 val bufferUs = sink?.getAudioTrackBufferSizeUs() ?: 0L
                 if (bufferUs > 0L) voice.sinkLatencyMs = bufferUs / 1000
-                voice.onPcm16(
-                    inputBuffer.asReadOnlyBuffer(),
-                    f.channelCount,
-                    f.sampleRate,
-                )
+                feedVoiceEnergy(voice, inputBuffer.asReadOnlyBuffer(), f)
             }
         }
         replaceOutputBuffer(remaining).put(inputBuffer).flip()
+    }
+
+    /** Mirror the sink's PCM into [voice], normalising any supported PCM
+     * encoding to the PCM16 shape the detector expects. Only the first channel
+     * is used, matching VoiceEnergy's existing (left-channel) behaviour. */
+    private fun feedVoiceEnergy(
+        voice: VoiceEnergy,
+        buffer: ByteBuffer,
+        format: AudioProcessor.AudioFormat,
+    ) {
+        val ch = format.channelCount.coerceAtLeast(1)
+        val sr = format.sampleRate
+        if (sr <= 0) return
+        val bytesPerFrame = maxOf(1, format.bytesPerFrame)
+        val frames = buffer.remaining() / bytesPerFrame
+        if (frames <= 0) return
+        val little = buffer.duplicate().order(java.nio.ByteOrder.LITTLE_ENDIAN)
+        when (format.encoding) {
+            C.ENCODING_PCM_16BIT -> voice.onPcm16(little, ch, sr)
+            else -> {
+                val out = java.nio.ByteBuffer.allocate(frames * 2)
+                    .order(java.nio.ByteOrder.LITTLE_ENDIAN)
+                for (i in 0 until frames) {
+                    val base = i * bytesPerFrame
+                    val sample = when (format.encoding) {
+                        C.ENCODING_PCM_8BIT -> {
+                            (little.get(base).toInt() and 0xFF) - 128
+                        }
+                        C.ENCODING_PCM_24BIT -> {
+                            val b0 = little.get(base).toInt() and 0xFF
+                            val b1 = little.get(base + 1).toInt() and 0xFF
+                            val b2 = little.get(base + 2).toInt()
+                            val raw = (b2 shl 16) or (b1 shl 8) or b0
+                            val signed = if (raw and 0x800000 != 0) raw or 0xFF000000.toInt() else raw
+                            (signed.toDouble() / 8388608.0 * 32767.0).toInt()
+                        }
+                        C.ENCODING_PCM_32BIT -> {
+                            little.getInt(base) shr 16
+                        }
+                        C.ENCODING_PCM_FLOAT -> {
+                            (little.getFloat(base) * 32767f).toInt()
+                        }
+                        else -> 0
+                    }.coerceIn(-32768, 32767).toShort()
+                    out.putShort(sample)
+                }
+                out.flip()
+                voice.onPcm16(out, 1, sr)
+            }
+        }
     }
 
     override fun onFlush(streamMetadata: AudioProcessor.StreamMetadata) {

@@ -2,14 +2,17 @@ package com.beautifulquran.ui.home
 
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.EnterTransition
+import androidx.compose.animation.core.CubicBezierEasing
+import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.animate
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.background
-import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.waitForUpOrCancellation
@@ -28,13 +31,17 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.layout.navigationBars
+import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.absoluteOffset
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Tune
 import androidx.compose.material3.Icon
@@ -44,6 +51,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
@@ -57,6 +65,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.boundsInRoot
@@ -66,7 +75,9 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
@@ -75,8 +86,11 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.util.lerp
+import kotlinx.coroutines.delay
 import kotlin.math.roundToInt
 import kotlinx.coroutines.flow.drop
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -87,24 +101,47 @@ import com.beautifulquran.data.model.SurahWordSearchSection
 import com.beautifulquran.data.model.WordSearchHit
 import com.beautifulquran.data.AyahSelectorSide
 import com.beautifulquran.domain.WORD_SEARCH_PREVIEW_LIMIT
-import com.beautifulquran.domain.englishTranslationHighlightSpans
-import com.beautifulquran.domain.parseSearchQuery
+import com.beautifulquran.domain.searchHitHighlightSpans
 import com.beautifulquran.domain.spellingCorrection
 import com.beautifulquran.ui.reader.VerseBookmarkRibbon
+import com.beautifulquran.ui.reader.CAPS_TRACKING
 import com.beautifulquran.ui.reader.remainingUnfurlSignal
+import com.beautifulquran.ui.theme.quietSuppliedBrackets
 import com.beautifulquran.ui.theme.ArabicTitleStyle
+import com.beautifulquran.ui.theme.FloatingPaperControl
+import com.beautifulquran.ui.theme.FloatingPaperEnter
 import com.beautifulquran.ui.theme.LocalQuranAccents
+import com.beautifulquran.ui.theme.typeScale
 import com.beautifulquran.ui.theme.PaperSearchField
-import com.beautifulquran.ui.theme.paperBottomFeather
 import com.beautifulquran.ui.theme.quietClickable
 import com.beautifulquran.ui.theme.verticalFadingEdges
 import com.beautifulquran.ui.theme.QuranTheme
 
-/** The search field leads the scrolling document beneath the fixed masthead. */
+/** The chapter list's first content item — focusing search returns here. */
 private const val SEARCH_ITEM_INDEX = 0
 
-/** How far (px) the list must move past the lifted search before a scroll counts as "dismiss". */
+/** How far (px) the list must move before a scroll counts as "dismiss". */
 internal const val DISMISS_SCROLL_THRESHOLD_PX = 24
+
+/** The pill's flight up to its row: far enough to travel that it earns a
+ * drawer-scale duration; the strong ease-in-out keeps both ends graceful. */
+internal const val ContinueDockMs = 500
+
+/** The return flight settles at the same graceful pace. */
+internal const val ContinueUndockMs = 500
+
+/**
+ * Strong ease-in-out for on-screen movement: the flight leaves and lands
+ * gently instead of snapping at either end.
+ */
+internal val ContinueFlightEase = CubicBezierEasing(0.77f, 0f, 0.175f, 1f)
+
+/** Grace so fast scrolls never flap the pill: the row must sit fully in
+ * view a beat before the dock flight runs. */
+internal const val ContinueDockDwellMs = 500L
+
+/** Raw flight progress where the docked pill starts fading into its row. */
+internal const val ContinueDockFadeFrom = 0.5f
 
 private val HomeRibbonLane = 28.dp
 private val HomeRibbonWidth = 13.dp
@@ -123,7 +160,6 @@ private val TopBoundRibbonHeight = 96.dp
 private val SearchBottomBreath = 10.dp
 private val SearchBottomFeather = 24.dp
 
-@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun HomeScreen(
     viewModel: HomeViewModel,
@@ -157,9 +193,8 @@ fun HomeScreen(
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val focusManager = LocalFocusManager.current
     val floatingPlayback = uiState.floatingPlayback
-    // Bottom dissolve only — the search bar owns the top of this list, so a
-    // top fade would sit on the field. ContentPadding matches the bottom
-    // fade so the last ink sits clear of it at rest.
+    // ContentPadding matches each fade so the first and last ink sit clear of
+    // them at rest; rows only dissolve once they scroll into one.
     val listFadeBottom = 48.dp
     // Measured height of the floating transport; falls back to the clearance
     // estimate until the first layout pass. Used as bottomInset so the soft
@@ -170,6 +205,7 @@ fun HomeScreen(
     // field, floating over the surah list.
     var searchFocused by remember { mutableStateOf(false) }
     var boxTop by remember { mutableFloatStateOf(0f) }
+    var boxLeft by remember { mutableFloatStateOf(0f) }
     var boxHeight by remember { mutableFloatStateOf(0f) }
     var searchBottom by remember { mutableFloatStateOf(0f) }
     var searchBounds by remember { mutableStateOf<Rect?>(null) }
@@ -208,12 +244,176 @@ fun HomeScreen(
     // the paper: holding the inset through the slide reads as a second
     // bar sliding behind the first.)
     val pinnedSession = playbackPinned && !searchActive && floatingPlayback != null
+    // The transport owns the bottom paper while it is up: the pill stands
+    // down entirely instead of stacking above it.
+    val transportOnScreen = !playbackPinned && showFloatingPlayback
+    // The reading place lives in its chapter row. While that row is
+    // scrolled out of view the pill floats at the bottom; once the row
+    // itself is visible the pill docks away so the row owns the tap.
+    val continueSurahId = uiState.continueTarget?.surah?.id
+    // Dock only once the row is fully in view — flying to a sliver reads
+    // as a miss. The row then owns the tap; the pill lands on its bounds.
+    val continueRowVisible by remember(continueSurahId, searching) {
+        derivedStateOf {
+            if (continueSurahId == null || searching) {
+                false
+            } else {
+                val info = listState.layoutInfo
+                info.visibleItemsInfo.firstOrNull { it.key == "surah-$continueSurahId" }?.let { item ->
+                    item.offset >= info.viewportStartOffset &&
+                        item.offset + item.size <= info.viewportEndOffset
+                } == true
+            }
+        }
+    }
+    val showContinuePill = shouldShowContinuePill(
+        continuePresent = uiState.continueTarget != null,
+        searchActive = searchActive,
+        coverVisible = coverSheetVisible,
+        continueRowVisible = continueRowVisible,
+        transportVisible = transportOnScreen,
+    )
+    var continuePillHeight by remember { mutableStateOf(0.dp) }
+    // Window bounds of the resting pill and its chapter row, for the dock
+    // flight. The seat freezes while the pill is up: exit frames must not
+    // shift the launch point. The row rect tracks live so the ghost homes
+    // onto the row even while the list is still moving under it.
+    var pillSeatRect by remember { mutableStateOf<Rect?>(null) }
+    var continueRowRect by remember { mutableStateOf<Rect?>(null) }
+    var pillWasShown by remember { mutableStateOf(false) }
+    var dockStart by remember { mutableStateOf<Rect?>(null) }
+    var docking by remember { mutableStateOf(false) }
+    var dockProgress by remember { mutableFloatStateOf(0f) }
+    var undockStart by remember { mutableStateOf<Rect?>(null) }
+    var undocking by remember { mutableStateOf(false) }
+    var undockProgress by remember { mutableFloatStateOf(0f) }
+    var rowWasVisible by remember { mutableStateOf(false) }
+    var dockReady by remember { mutableStateOf(false) }
+    var undockArrived by remember { mutableStateOf(false) }
+    /** True once a dock flight has landed and the row owns the place. */
+    var docked by remember { mutableStateOf(false) }
+    // The transport owns the bottom paper while it is up: stand the pill
+    // down and forget its flight history so nothing launches from a stale
+    // seat or lands on the transport's paper.
+    if (transportOnScreen) {
+        pillWasShown = false
+        rowWasVisible = false
+        docked = false
+        docking = false
+        dockStart = null
+        undocking = false
+        undockStart = null
+    }
+    // The pill holds its seat through the dwell so the flight launches
+    // from the visible pill instead of chasing a half-second-old fade —
+    // and keeps its list clearance, so arrival never shifts rows under
+    // the waiting row and flaps the visibility guard.
+    val dwellHolding = continueRowVisible && pillWasShown && !searchActive && coverSheetVisible
+    // Dock flights run once the row has sat fully in view through the
+    // dwell: fly the pill to the row — morphing onto its exact bounds —
+    // instead of fading it away. Fast scrolls never arm the flight.
+    if (showContinuePill) pillWasShown = true
+    if (continueRowVisible && pillWasShown && !docking && !undocking && dockReady) {
+        val start = pillSeatRect
+        val end = if (!searching && coverSheetVisible) continueRowRect else null
+        if (start != null && end != null) {
+            dockStart = start
+            docking = true
+            pillWasShown = false
+        }
+    }
+    if (continueRowVisible) rowWasVisible = true
+    // The row left through the top while it owned the place: peel a copy
+    // off the row and fly it back down to the pill's seat. A bottom exit
+    // just lets the pill slide up on its own enter.
+    val continueIndex = continueLazyIndex(
+        uiState.surahs.map { it.id },
+        continueSurahId,
+        searching,
+    )
+    if (!continueRowVisible && rowWasVisible && !docking && !undocking) {
+        val seat = pillSeatRect
+        val start = continueRowRect
+        if (seat != null && start != null && !searchActive && coverSheetVisible &&
+            continueIndex >= 0 && listState.firstVisibleItemIndex >= continueIndex &&
+            docked
+        ) {
+            undockStart = start
+            undocking = true
+        } else {
+            // No landing owns the row, a bottom exit, or nowhere to fly
+            // from: the pill returns on its plain enter, flightless.
+            docked = false
+        }
+        rowWasVisible = false
+    }
+    LaunchedEffect(continueRowVisible, pillWasShown, searchActive, coverSheetVisible) {
+        // showContinuePill is already false once the row is visible, so the
+        // dwell watches pillWasShown (the pill was up when the row arrived).
+        if (continueRowVisible && pillWasShown && !searchActive && coverSheetVisible) {
+            delay(ContinueDockDwellMs)
+            dockReady = true
+        } else {
+            dockReady = false
+        }
+    }
+    LaunchedEffect(docking) {
+        if (docking) {
+            dockProgress = 0f
+            animate(
+                initialValue = 0f,
+                targetValue = 1f,
+                animationSpec = tween(ContinueDockMs, easing = LinearEasing),
+            ) { value, _ -> dockProgress = value }
+            docked = true
+            docking = false
+            dockStart = null
+        }
+    }
+    LaunchedEffect(undocking) {
+        if (undocking) {
+            undockProgress = 0f
+            animate(
+                initialValue = 0f,
+                targetValue = 1f,
+                animationSpec = tween(ContinueUndockMs, easing = LinearEasing),
+            ) { value, _ -> undockProgress = value }
+            docked = false
+            undocking = false
+            undockStart = null
+            undockArrived = true
+        }
+    }
+    // The row came back, or search/cover took the sheet: abandon any
+    // flight and let the floats' own enters bring them back.
+    LaunchedEffect(continueRowVisible, searchActive, coverSheetVisible) {
+        if (!continueRowVisible || searchActive || !coverSheetVisible) {
+            docking = false
+            dockStart = null
+        }
+        if (continueRowVisible || searchActive || !coverSheetVisible) {
+            undocking = false
+            undockStart = null
+        }
+        if (searchActive || !coverSheetVisible) {
+            pillWasShown = false
+            rowWasVisible = false
+            docked = false
+        }
+    }
+    // The undocked pill lands exactly on its seat: skip its enter so the
+    // handoff from the ghost is seamless. Any later hide re-arms it.
+    LaunchedEffect(showContinuePill) {
+        if (!showContinuePill) undockArrived = false
+    }
     val listBottomInsetTarget = homeListBottomInset(
         pinnedSession = pinnedSession,
         pinnedHeight = if (pinnedSession) pinnedPlaybackHeight() else 0.dp,
         floatingVisible = showFloatingPlayback,
         floatingHeight = floatingPlaybackHeight,
         navigationBottom = navigationBottom,
+        continueVisible = showContinuePill || dwellHolding,
+        continueHeight = continuePillHeight,
     )
     // One motion, not two: the sweep and the inset share duration and
     // easing, so bar, fade band, and rows travel down together. Staging
@@ -286,10 +486,10 @@ fun HomeScreen(
         }
     }
 
-    // Lift the focused search to the top of its scrolling document, then
-    // dismiss the keyboard on a deliberate scroll. Results stay: searchActive
-    // covers a query without focus, so the field keeps its sticky seat while
-    // the keyboard and dials go away. Back still dismisses without scrolling.
+    // Lift the results to the top on focus, then dismiss the keyboard
+    // on a deliberate scroll. Results stay: searchActive covers a query
+    // without focus, so the field keeps its fixed seat while the keyboard
+    // and dials go away. Back still dismisses without scrolling.
     LaunchedEffect(searchFocused) {
         if (!searchFocused) return@LaunchedEffect
         listState.animateScrollToItem(SEARCH_ITEM_INDEX)
@@ -346,6 +546,7 @@ fun HomeScreen(
                 }
                 .onGloballyPositioned {
                     boxTop = it.boundsInWindow().top
+                    boxLeft = it.boundsInWindow().left
                     boxHeight = it.size.height.toFloat()
                 },
         ) {
@@ -356,14 +557,46 @@ fun HomeScreen(
                     .widthIn(max = 640.dp)
                     .fillMaxWidth(),
             ) {
+                // Single fixed top bar: masthead + search + feather never
+                // scroll, so the field can never be caught half-cut mid-list.
                 // Focused search claims the top of the sheet: the masthead
                 // recedes so the field sits higher above the keyboard.
-                AnimatedVisibility(
-                    visible = !searchFocused,
-                    enter = fadeIn(tween(180)) + expandVertically(tween(220)),
-                    exit = fadeOut(tween(140)) + shrinkVertically(tween(200)),
+                val paper = MaterialTheme.colorScheme.background
+                Column(
+                    Modifier
+                        .fillMaxWidth()
+                        .background(paper),
                 ) {
-                    HomeHeader(onOpenSettings = onOpenSettings)
+                    AnimatedVisibility(
+                        visible = !searchFocused,
+                        enter = fadeIn(tween(180)) + expandVertically(tween(220)),
+                        exit = fadeOut(tween(140)) + shrinkVertically(tween(200)),
+                    ) {
+                        HomeHeader(onOpenSettings = onOpenSettings)
+                    }
+                    // Small top breath when the masthead is gone so the
+                    // field is not hard against the status-bar padding.
+                    if (searchFocused) {
+                        Spacer(Modifier.height(8.dp))
+                    }
+                    PaperSearchField(
+                        value = uiState.query,
+                        onValueChange = viewModel::onQueryChange,
+                        placeholder = "Search concept, “exact phrase”, or 2:255",
+                        contentDescription = "Search",
+                        onFocusChanged = { focused ->
+                            searchFocused = focused
+                            if (focused) viewModel.onSearchFocused()
+                        },
+                        modifier = Modifier
+                            .padding(start = HomeStartInset, end = HomeEndInset)
+                            .fillMaxWidth()
+                            .onGloballyPositioned {
+                                searchBottom = it.boundsInWindow().bottom
+                                searchBounds = it.boundsInRoot()
+                            },
+                    )
+                    Spacer(Modifier.height(SearchBottomBreath))
                 }
                 LazyColumn(
                     state = listState,
@@ -372,159 +605,129 @@ fun HomeScreen(
                     .fillMaxWidth()
                     .verticalFadingEdges(
                         color = MaterialTheme.colorScheme.background,
-                        top = 0.dp,
+                        // The feather under the search field. It is the list's
+                        // own top edge, not a strip above the list: a strip
+                        // has nothing passing under it, so once the field
+                        // left the list (#853) it faded paper into paper and
+                        // the rows met the bar on a hard line.
+                        top = SearchBottomFeather,
                         bottom = listFadeBottom,
                         // Opaque band over the float's footprint so the soft
                         // edge dissolves just above the player, not through it.
                         bottomInset = listBottomInset,
                     ),
                     contentPadding = PaddingValues(
+                        top = SearchBottomFeather,
                         bottom = listBottomPadding,
                     ),
                 ) {
-                    stickyHeader(key = "search") {
-                        val paper = MaterialTheme.colorScheme.background
-                        Column(Modifier.fillMaxWidth()) {
-                            Column(
-                                Modifier
-                                    .fillMaxWidth()
-                                    .background(paper),
-                            ) {
-                                // Small top breath when the masthead is gone so the
-                                // field is not hard against the status-bar padding.
-                                if (searchFocused) {
-                                    Spacer(Modifier.height(8.dp))
+                    // The reading place no longer gets a persistent top band:
+                    // its chapter row carries the place ribbon in situ, and
+                    // the floating pill below stands in only while that row
+                    // is scrolled out of view.
+                    if (showSurahMatches) {
+                        item(key = "surahs-label") {
+                            SearchSectionLabel(text = "Surahs")
+                        }
+                    }
+                    items(uiState.surahs, key = { "surah-${it.id}" }) { surah ->
+                        SurahRow(
+                            surah = surah,
+                            currentAyah = uiState.continueTarget
+                                ?.takeIf { it.surah.id == surah.id }
+                                ?.ayah,
+                            placeUnfurlSignal = placeRibbonUnfurlEpoch,
+                            onPlaceUnfurlConsumed = { consumed ->
+                                placeRibbonUnfurlEpoch = remainingUnfurlSignal(
+                                    current = placeRibbonUnfurlEpoch,
+                                    consumed = consumed,
+                                )
+                            },
+                            onClick = {
+                                focusManager.clearFocus()
+                                onOpenSurah(
+                                    surah.id,
+                                    uiState.ayahTarget ?: uiState.continueTarget
+                                        ?.takeIf { it.surah.id == surah.id }
+                                        ?.ayah,
+                                    null,
+                                    null,
+                                )
+                            },
+                            modifier = if (!searching && continueSurahId == surah.id) {
+                                Modifier.onGloballyPositioned {
+                                    continueRowRect = it.boundsInWindow()
                                 }
-                                PaperSearchField(
-                                    value = uiState.query,
-                                    onValueChange = viewModel::onQueryChange,
-                                    placeholder = "Search concept, “exact phrase”, or 2:255",
-                                    contentDescription = "Search",
-                                    onFocusChanged = { focused ->
-                                        searchFocused = focused
-                                        if (focused) viewModel.onSearchFocused()
+                            } else {
+                                Modifier
+                            },
+                        )
+                    }
+
+                    if (showWordSections) {
+                        item(key = "word-results") {
+                            Column(Modifier.fillMaxWidth()) {
+                                if (correctedQuery != null) {
+                                    SearchCorrectionLabel(correctedQuery)
+                                }
+                                SearchSectionLabel(
+                                    text = if (uiState.wordSearchLoading && uiState.wordSections.isEmpty()) {
+                                        "Searching ayahs…"
+                                    } else {
+                                        val count = uiState.wordSections.sumOf { it.totalCount }
+                                        "In the Quran · $count relevant ${if (count == 1) "ayah" else "ayahs"}" +
+                                            if (uiState.wordSearchLoading) " · refining…" else ""
                                     },
-                                    modifier = Modifier
-                                        .padding(start = HomeStartInset, end = HomeEndInset)
-                                        .fillMaxWidth()
-                                        .onGloballyPositioned {
-                                            searchBottom = it.boundsInWindow().bottom
-                                            searchBounds = it.boundsInRoot()
-                                        },
+                                    topPadding = if (correctedQuery == null) 8.dp else 2.dp,
                                 )
-                                Spacer(Modifier.height(SearchBottomBreath))
-                            }
-                            Spacer(
-                                Modifier
-                                    .fillMaxWidth()
-                                    .height(SearchBottomFeather)
-                                    .paperBottomFeather(paper),
-                            )
-                        }
-                    }
-            item(key = "chapter-page") {
-                Box(Modifier.fillMaxWidth()) {
-                    Column(Modifier.fillMaxWidth()) {
-                        if (!searching) {
-                            uiState.continueTarget?.let { target ->
-                                ContinueRow(
-                                    target = target,
-                                    onClick = { onOpenSurah(target.surah.id, target.ayah, null, null) },
-                                )
-                            }
-                        }
-                        Spacer(Modifier.height(16.dp))
-
-                        if (showSurahMatches) SearchSectionLabel(text = "Surahs")
-                        uiState.surahs.forEach { surah ->
-                            SurahRow(
-                                surah = surah,
-                                currentAyah = uiState.continueTarget
-                                    ?.takeIf { it.surah.id == surah.id }
-                                    ?.ayah,
-                                placeUnfurlSignal = placeRibbonUnfurlEpoch,
-                                onPlaceUnfurlConsumed = { consumed ->
-                                    placeRibbonUnfurlEpoch = remainingUnfurlSignal(
-                                        current = placeRibbonUnfurlEpoch,
-                                        consumed = consumed,
-                                    )
-                                },
-                                onClick = {
-                                    focusManager.clearFocus()
-                                    onOpenSurah(
-                                        surah.id,
-                                        uiState.ayahTarget ?: uiState.continueTarget
-                                            ?.takeIf { it.surah.id == surah.id }
-                                            ?.ayah,
-                                        null,
-                                        null,
-                                    )
-                                },
-                            )
-                        }
-
-                        if (showWordSections) {
-                            if (correctedQuery != null) {
-                                SearchCorrectionLabel(correctedQuery)
-                            }
-                            SearchSectionLabel(
-                                text = if (uiState.wordSearchLoading && uiState.wordSections.isEmpty()) {
-                                    "Searching ayahs…"
-                                } else {
-                                    val count = uiState.wordSections.sumOf { it.totalCount }
-                                    "In the Quran · $count relevant ${if (count == 1) "ayah" else "ayahs"}" +
-                                        if (uiState.wordSearchLoading) " · refining…" else ""
-                                },
-                                topPadding = if (correctedQuery == null) 8.dp else 2.dp,
-                            )
-                            uiState.wordSections.forEach { section ->
-                                WordSearchSurahHeader(section = section)
-                                section.hits.forEach { hit ->
-                                    WordSearchHitRow(
-                                        hit = hit,
-                                        query = uiState.query,
-                                        onClick = {
-                                            focusManager.clearFocus()
-                                            onOpenSearchHit(hit, uiState.query)
-                                        },
-                                    )
-                                }
-                                if (section.hiddenCount > 0) {
-                                    WordSearchExpandRow(
-                                        section = section,
-                                        onClick = { viewModel.toggleWordSearchSection(section.surahId) },
-                                    )
-                                } else if (
-                                    section.expanded &&
-                                    section.totalCount > WORD_SEARCH_PREVIEW_LIMIT
-                                ) {
-                                    WordSearchCollapseRow(
-                                        onClick = { viewModel.toggleWordSearchSection(section.surahId) },
-                                    )
+                                uiState.wordSections.forEach { section ->
+                                    WordSearchSurahHeader(section = section)
+                                    section.hits.forEach { hit ->
+                                        WordSearchHitRow(
+                                            hit = hit,
+                                            query = uiState.query,
+                                            onClick = {
+                                                focusManager.clearFocus()
+                                                onOpenSearchHit(hit, uiState.query)
+                                            },
+                                        )
+                                    }
+                                    if (section.hiddenCount > 0) {
+                                        WordSearchExpandRow(
+                                            section = section,
+                                            onClick = { viewModel.toggleWordSearchSection(section.surahId) },
+                                        )
+                                    } else if (
+                                        section.expanded &&
+                                        section.totalCount > WORD_SEARCH_PREVIEW_LIMIT
+                                    ) {
+                                        WordSearchCollapseRow(
+                                            onClick = { viewModel.toggleWordSearchSection(section.surahId) },
+                                        )
+                                    }
                                 }
                             }
                         }
-
-                        if (showEmpty) {
-                            Text(
-                                text = "No relevant ayahs found",
-                                style = MaterialTheme.typography.bodyLarge,
-                                color = QuranTheme.ink.quiet,
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(
-                                        start = HomeStartInset,
-                                        end = HomeEndInset,
-                                        top = 24.dp,
-                                        bottom = 24.dp,
-                                    ),
-                            )
-                        }
                     }
 
+                    if (showEmpty) {
+                        item(key = "empty") {
+                        Text(
+                            text = "No relevant ayahs found",
+                            style = MaterialTheme.typography.bodyLarge,
+                            color = QuranTheme.ink.quiet,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(
+                                    start = HomeStartInset,
+                                    end = HomeEndInset,
+                                    top = 24.dp,
+                                    bottom = 24.dp,
+                                ),
+                        )
+                        }
+                    }
                 }
-            }
-            }
             }
 
             // The ribbon is the bookmarks entry; search owns the sheet while
@@ -560,41 +763,137 @@ fun HomeScreen(
                     .onGloballyPositioned { searchPaneBounds = it.boundsInRoot() },
             )
 
-            // While the reader sheet is open the chapter bar is pinned above
-            // the stack and carries this pill itself. This copy is only for
-            // a session whose reader sheet is not mounted.
-            if (!playbackPinned) FloatingPlaybackControl(
-                visible = showFloatingPlayback,
-                state = uiState.playerState,
-                chapterLabel = floatingPlayback?.surah?.nameTransliteration.orEmpty(),
-                ayahLabel = floatingPlayback?.let { "${it.surah.id}:${it.ayah}" }.orEmpty(),
-                reciterName = uiState.reciterName,
-                onOpenNowPlaying = {
-                    val target = floatingPlayback ?: return@FloatingPlaybackControl
-                    focusManager.clearFocus()
-                    onOpenSurah(target.surah.id, target.ayah, null, null)
-                },
-                onReciterClick = onOpenSettings,
-                onDismissError = viewModel::clearPlaybackError,
-                onPlayPause = viewModel::togglePlayPause,
-                onFastBackward = viewModel::fastBackward,
-                onFastForward = viewModel::fastForward,
-                onRepeatClick = viewModel::cycleRepeatMode,
-                onSpeed = viewModel::cycleSpeed,
-                onClose = viewModel::dismissFloatingPlayback,
-                inkLabAvailable = host?.inkLabAvailable == true,
-                inkLabOpen = host?.inkLabOpen == true,
-                onInkLabClick = { host?.let { it.inkLabOpen = !it.inkLabOpen } },
+            // Bottom stack: the pill stands down entirely while the
+            // transport is up (no stacking). While the reader sheet is open
+            // the chapter bar is pinned above the stack and carries the
+            // transport itself; the continue pill is cover-gated, so it is
+            // already gone there and needs no pinned copy.
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
                     .widthIn(max = 640.dp)
-                    .fillMaxWidth()
-                    .onGloballyPositioned { coords ->
-                        floatingPlaybackHeight = with(density) {
-                            coords.size.height.toDp()
+                    .fillMaxWidth(),
+            ) {
+                uiState.continueTarget?.let { target ->
+                    FloatingPaperControl(
+                        visible = (showContinuePill || dwellHolding) && !docking && !undocking,
+                        enter = if (undockArrived) EnterTransition.None else FloatingPaperEnter,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            // The pill only ever shows while the transport is
+                            // off, so it always carries its own gesture pad.
+                            .navigationBarsPadding()
+                            .onGloballyPositioned { coords ->
+                                continuePillHeight = with(density) {
+                                    coords.size.height.toDp()
+                                }
+                            },
+                    ) {
+                        // Seat on the ink, not the host: the AnimatedVisibility
+                        // wrapper carries the bottom clearance and nav pad,
+                        // which would launch every flight tall and drift it.
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .onGloballyPositioned { coords ->
+                                    if (showContinuePill || dwellHolding) {
+                                        pillSeatRect = coords.boundsInWindow()
+                                    }
+                                },
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            ContinuePill(
+                                target = target,
+                                onClick = {
+                                    focusManager.clearFocus()
+                                    onOpenSurah(target.surah.id, target.ayah, null, null)
+                                },
+                            )
                         }
+                    }
+                }
+                if (!playbackPinned) FloatingPlaybackControl(
+                    visible = showFloatingPlayback,
+                    state = uiState.playerState,
+                    chapterLabel = floatingPlayback?.surah?.nameTransliteration.orEmpty(),
+                    ayahLabel = floatingPlayback?.let { "${it.surah.id}:${it.ayah}" }.orEmpty(),
+                    reciterName = uiState.reciterName,
+                    onOpenNowPlaying = {
+                        val target = floatingPlayback ?: return@FloatingPlaybackControl
+                        focusManager.clearFocus()
+                        onOpenSurah(target.surah.id, target.ayah, null, null)
                     },
-            )
+                    onReciterClick = onOpenSettings,
+                    onDismissError = viewModel::clearPlaybackError,
+                    onPlayPause = viewModel::togglePlayPause,
+                    onFastBackward = viewModel::fastBackward,
+                    onFastForward = viewModel::fastForward,
+                    onRepeatClick = viewModel::cycleRepeatMode,
+                    onSpeed = viewModel::cycleSpeed,
+                    onClose = viewModel::dismissFloatingPlayback,
+                    inkLabAvailable = host?.inkLabAvailable == true,
+                    inkLabOpen = host?.inkLabOpen == true,
+                    onInkLabClick = { host?.let { it.inkLabOpen = !it.inkLabOpen } },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .onGloballyPositioned { coords ->
+                            floatingPlaybackHeight = with(density) {
+                                coords.size.height.toDp()
+                            }
+                        },
+                )
+            }
+            // Dock flights: a live copy of the pill travels between its
+            // resting seat and the chapter row — resizing, squaring its
+            // corners, settling every inset onto the row, then fading to
+            // reveal it (or landing back on its seat, seamless, on the way
+            // out). Sizing runs on layout because only a full morph lands
+            // exactly; the tree is tiny and the flight is half a second.
+            // The landing end tracks live bounds so flights still connect
+            // while the list moves. Undock reverses the morph instead of
+            // fading.
+            if (docking || undocking) {
+                val start = if (docking) dockStart else undockStart
+                val end = if (docking) continueRowRect else pillSeatRect
+                val target = uiState.continueTarget
+                val raw = if (docking) dockProgress else undockProgress
+                if (start != null && end != null && target != null &&
+                    start.width > 0f && start.height > 0f
+                ) {
+                    val flight = ContinueFlightEase.transform(raw.coerceIn(0f, 1f))
+                    val settled = if (docking) flight else 1f - flight
+                    // The Box origin is already the content origin: the
+                    // onGloballyPositioned feeding boxLeft/boxTop sits after
+                    // the Scaffold padding in the chain, so no padding math
+                    // belongs here (subtracting it lands every flight high).
+                    val left = lerp(start.left, end.left, flight) - boxLeft
+                    val top = lerp(start.top, end.top, flight) - boxTop
+                    val width = with(density) { lerp(start.width, end.width, flight).toDp() }
+                    val height = with(density) { lerp(start.height, end.height, flight).toDp() }
+                    Box(
+                        modifier = Modifier
+                            .absoluteOffset { IntOffset(left.roundToInt(), top.roundToInt()) }
+                            .width(width)
+                            .height(height)
+                            .graphicsLayer {
+                                shape = RoundedCornerShape(continueDockRadius(settled))
+                                clip = true
+                                alpha = if (docking) continueDockAlpha(raw) else 1f
+                            }
+                            .clearAndSetSemantics {},
+                    ) {
+                        ContinuePill(
+                            target = target,
+                            onClick = {
+                                focusManager.clearFocus()
+                                onOpenSurah(target.surah.id, target.ayah, null, null)
+                            },
+                            docked = settled,
+                        )
+                    }
+                }
+            }
         }
     }
 }
@@ -618,7 +917,7 @@ private fun HomeHeader(
                 Text(
                     text = "Beautiful Quran",
                     style = MaterialTheme.typography.headlineMedium.copy(
-                        fontSize = 34.sp,
+                        fontSize = typeScale(34.sp),
                         lineHeight = 40.sp,
                     ),
                     color = MaterialTheme.colorScheme.onBackground,
@@ -683,39 +982,186 @@ private fun HomeBookmarkOverlay(
     }
 }
 
+/** The pill's wash: a calm fixed radius the ribbon's straight-cut ends sit inside. */
+internal val ContinuePillRadius: Dp = 28.dp
+internal val ContinuePillShape = RoundedCornerShape(ContinuePillRadius)
+
+/** Resting pill geometry. */
+internal val ContinuePillMargin: Dp = 16.dp
+internal val ContinuePillStartInset: Dp = 8.dp
+internal val ContinuePillEndInset: Dp = 16.dp
+internal val ContinuePillVertical: Dp = 12.dp
+internal val ContinuePillRibbonHeight: Dp = 40.dp
+internal val ContinuePillArabicSize: TextUnit = 20.sp
+
+/** The chapter row geometry the flight lands on. */
+internal val ContinueRowVertical: Dp = 15.dp
+internal val ContinueRowRibbonHeight: Dp = 44.dp
+internal val ContinueRowEndInset: Dp = HomeEndInset + HomeArabicOpticalInset
+
+/** Wash-to-row corner collapse over the dock flight (pill radius → rectangle). */
+internal fun continueDockRadius(flight: Float): Dp =
+    ContinuePillRadius * (1f - flight.coerceIn(0f, 1f))
+
+/** The docked pill holds opaque through the flight, then fades into its row. */
+internal fun continueDockAlpha(progress: Float): Float =
+    1f - ((progress - ContinueDockFadeFrom) / (1f - ContinueDockFadeFrom)).coerceIn(0f, 1f)
+
+/** Outer margin melts so the wash lands full-bleed on the row's width. */
+internal fun continueDockMargin(docked: Float): Dp =
+    ContinuePillMargin * (1f - docked.coerceIn(0f, 1f))
+
+/** Ribbon lane slides to the row's lane so the cloths coincide on landing. */
+internal fun continueDockStartInset(docked: Float): Dp =
+    ContinuePillStartInset * (1f - docked.coerceIn(0f, 1f))
+
+/** Trailing inset glides out so the Arabic lands on the row's Arabic rail. */
+internal fun continueDockEndInset(docked: Float): Dp =
+    ContinuePillEndInset + (ContinueRowEndInset - ContinuePillEndInset) * docked.coerceIn(0f, 1f)
+
+/** The CONTINUE flag dissolves across the flight; the row has none. */
+internal fun continueDockCapsAlpha(docked: Float): Float = 1f - docked.coerceIn(0f, 1f)
+
+/**
+ * Lazy-column index of the reading-place row: the surahs lead the list in
+ * order (no section label outside search, no spacer above them). Negative when the row
+ * is not on the sheet — searching, or no reading place at all.
+ */
+internal fun continueLazyIndex(
+    surahIds: List<Int>,
+    continueId: Int?,
+    searching: Boolean,
+): Int {
+    if (searching || continueId == null) return -1
+    val position = surahIds.indexOf(continueId)
+    return if (position < 0) -1 else position
+}
+
+/**
+ * The reading place floats only while its chapter row is scrolled out of
+ * view. Search owns the sheet while active, and the pill is cover-gated
+ * like the transport, so it never stacks on the pinned chapter session.
+ */
+internal fun shouldShowContinuePill(
+    continuePresent: Boolean,
+    searchActive: Boolean = false,
+    coverVisible: Boolean = true,
+    continueRowVisible: Boolean = false,
+    /** The transport owns the bottom paper while it is up: no stacking. */
+    transportVisible: Boolean = false,
+): Boolean = continuePresent && !searchActive && coverVisible && !continueRowVisible && !transportVisible
+
+/**
+ * Pill-shaped stand-in for the chapter row: the green place ribbon and a
+ * small-caps CONTINUE flag over the same bilingual identity
+ * (transliterated name, ayah place, Arabic name) on the same quiet green wash
+ * as [ReturnToAyahPill], floating over the paper until its row scrolls into
+ * view and the pill docks away. No card, elevation, or border — the wash
+ * is the container. The ribbon is the shared
+ * [VerseBookmarkRibbon] place cloth, not a bespoke mark. Ribbon, gold
+ * number, and bilingual name keep the chapter row's order; Arabic ends
+ * where chapter Arabic ends.
+ */
 @Composable
-private fun ContinueRow(target: ContinueTarget, onClick: () -> Unit) {
+private fun ContinuePill(
+    target: ContinueTarget,
+    onClick: () -> Unit,
+    /** Dock flight progress: 0 resting, 1 settled exactly onto the chapter row. */
+    docked: Float = 0f,
+) {
     val colors = MaterialTheme.colorScheme
+    val settled = docked.coerceIn(0f, 1f)
+    val vertical = ContinuePillVertical + (ContinueRowVertical - ContinuePillVertical) * settled
+    val shape = RoundedCornerShape(continueDockRadius(settled))
     Row(
         verticalAlignment = Alignment.CenterVertically,
         modifier = Modifier
-            .fillMaxWidth()
-            .background(QuranTheme.accents.greenWash)
+            .padding(horizontal = continueDockMargin(settled))
+            .background(QuranTheme.accents.greenWash, shape)
+            // Clip the cloth to the wash so the ribbon's straight-cut ends
+            // can never poke past the curve.
+            .clip(shape)
             .quietClickable(onClick = onClick)
-            .padding(vertical = 18.dp),
+            .padding(
+                start = continueDockStartInset(settled),
+                end = continueDockEndInset(settled),
+                top = vertical,
+                bottom = vertical,
+            )
+            .semantics {
+                contentDescription =
+                    "Continue listening: ${target.surah.nameTransliteration}, ayah ${target.ayah}"
+                role = Role.Button
+            },
     ) {
-        Spacer(Modifier.width(HomeStartInset + HomeNumberColumn))
+        VerseBookmarkRibbon(
+            bookmarked = false,
+            placeMarked = true,
+            side = AyahSelectorSide.LEFT,
+            chromeAlpha = { 1f },
+            interactive = false,
+            onToggle = { false },
+            bookmarkTipVisible = false,
+            edgeInset = HomeRibbonGutter,
+            ribbonWidth = HomeRibbonWidth,
+            topInset = 0.dp,
+            bottomGap = 0.dp,
+            modifier = Modifier
+                .width(HomeRibbonLane)
+                .height(
+                    ContinuePillRibbonHeight +
+                        (ContinueRowRibbonHeight - ContinuePillRibbonHeight) * settled,
+                ),
+        )
+        // Row order, compacted: ribbon, gold number, then the name —
+        // the pill keeps the chapter row's structure, not its rails.
+        Box(Modifier.width(HomeNumberColumn)) {
+            Text(
+                text = target.surah.id.toString(),
+                style = MaterialTheme.typography.labelMedium,
+                color = LocalQuranAccents.current.goldInk,
+                maxLines = 1,
+            )
+        }
         Spacer(Modifier.width(HomeColumnGap))
         Column(Modifier.weight(1f)) {
             Text(
-                text = "Continue listening",
-                style = MaterialTheme.typography.labelMedium,
-                color = QuranTheme.accents.greenQuiet,
+                text = "CONTINUE",
+                style = MaterialTheme.typography.labelSmall.copy(letterSpacing = CAPS_TRACKING),
+                fontSize = 10.sp,
+                color = QuranTheme.accents.greenQuiet.copy(alpha = continueDockCapsAlpha(settled)),
+                maxLines = 1,
             )
             Spacer(Modifier.height(2.dp))
-            Text(
-                text = "${target.surah.nameTransliteration} · Ayah ${target.ayah}",
-                style = MaterialTheme.typography.titleMedium,
-                color = colors.onSurface,
-            )
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    text = target.surah.nameTransliteration,
+                    style = MaterialTheme.typography.titleMedium,
+                    color = colors.primary,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f, fill = false),
+                )
+                Text(
+                    text = " · Ayah ${target.ayah}",
+                    style = MaterialTheme.typography.titleMedium,
+                    color = QuranTheme.accents.greenInk,
+                    maxLines = 1,
+                )
+            }
         }
-        Spacer(Modifier.width(16.dp))
+        Spacer(Modifier.width(12.dp))
+        // At rest 16 margin + 16 inset = 32, the rows' Arabic rail (28 + 4
+        // optical); docked the wash is full-bleed with the rail's own 32.
         Text(
             text = target.surah.nameArabic,
             style = ArabicTitleStyle,
-            fontSize = 24.sp,
-            color = colors.primary,
-            modifier = Modifier.padding(end = HomeEndInset + HomeArabicOpticalInset),
+            fontSize = (
+                ContinuePillArabicSize.value +
+                    (ArabicTitleStyle.fontSize.value - ContinuePillArabicSize.value) * settled
+                ).sp,
+            color = QuranTheme.accents.greenInk,
+            maxLines = 1,
         )
     }
 }
@@ -727,17 +1173,18 @@ private fun SurahRow(
     placeUnfurlSignal: Int,
     onPlaceUnfurlConsumed: (Int) -> Unit,
     onClick: () -> Unit,
+    modifier: Modifier = Modifier,
 ) {
     val accents = LocalQuranAccents.current
     Row(
         verticalAlignment = Alignment.CenterVertically,
-        modifier = Modifier
+        modifier = modifier
             .fillMaxWidth()
             .quietClickable(onClick = onClick)
             .padding(
                 end = HomeEndInset,
-                top = 15.dp,
-                bottom = 15.dp,
+                top = ContinueRowVertical,
+                bottom = ContinueRowVertical,
             ),
     ) {
         if (currentAyah != null) {
@@ -757,7 +1204,7 @@ private fun SurahRow(
                 bottomGap = 0.dp,
                 modifier = Modifier
                     .width(HomeRibbonLane)
-                    .height(44.dp)
+                    .height(ContinueRowRibbonHeight)
                     .semantics {
                         contentDescription = "Current place, ayah $currentAyah"
                     },
@@ -776,7 +1223,9 @@ private fun SurahRow(
         Column(Modifier.weight(1f)) {
             Text(
                 text = surah.nameTransliteration,
-                style = MaterialTheme.typography.titleMedium.copy(fontSize = 17.sp),
+                style = MaterialTheme.typography.titleMedium.copy(
+                    fontSize = typeScale(17.sp),
+                ),
                 color = MaterialTheme.colorScheme.onBackground,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
@@ -805,7 +1254,7 @@ internal fun shouldUnfurlReadingPlaceRibbon(
     currentPlacePresent: Boolean,
 ): Boolean = pendingReturn && chapterRibbonReady && currentPlacePresent
 
-/** A deliberate list scroll past the lifted search dismisses the keyboard. */
+/** A deliberate list scroll under the fixed search dismisses the keyboard. */
 internal fun shouldDismissSearchOnScroll(
     isScrolling: Boolean,
     firstVisibleItemIndex: Int,
@@ -883,7 +1332,9 @@ private fun WordSearchSurahHeader(section: SurahWordSearchSection) {
     ) {
         Text(
             text = section.surahNameTransliteration,
-            style = MaterialTheme.typography.titleMedium.copy(fontSize = 16.sp),
+            style = MaterialTheme.typography.titleMedium.copy(
+                fontSize = typeScale(16.sp),
+            ),
             color = MaterialTheme.colorScheme.onBackground,
             modifier = Modifier.weight(1f),
             maxLines = 1,
@@ -912,23 +1363,19 @@ private fun WordSearchHitRow(
 ) {
     val accents = LocalQuranAccents.current
     val highlightColor = accents.gold
-    val displayQuery = remember(query) { parseSearchQuery(query).text }
+    val translationInk = QuranTheme.ink.strong
     val translation = remember(
         hit.displayText,
         hit.translation,
         hit.matchTerms,
         hit.matchLabel,
-        displayQuery,
+        hit.matchReason,
+        query,
         highlightColor,
+        translationInk,
     ) {
         buildAnnotatedString {
-            for (span in englishTranslationHighlightSpans(
-                ayahTranslation = hit.displayText,
-                query = displayQuery,
-                wordGloss = hit.translation,
-                semanticLabel = hit.matchLabel.orEmpty(),
-                semanticTerms = hit.matchTerms,
-            )) {
+            for (span in searchHitHighlightSpans(hit, query)) {
                 if (span.highlighted) {
                     withStyle(
                         SpanStyle(
@@ -942,6 +1389,7 @@ private fun WordSearchHitRow(
                     append(span.text)
                 }
             }
+            quietSuppliedBrackets(toAnnotatedString().text, 0, translationInk)
         }
     }
     Column(

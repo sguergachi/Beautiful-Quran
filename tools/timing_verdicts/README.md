@@ -51,3 +51,39 @@ timestamp-only rows in the quran-v54 rebuild it was identical on both models
 for every single row. Boundary changes are judged instead on the mean absolute
 start residual between the stored boundary and the model's forced boundary,
 which is the Pareto non-regression this document asks for.
+
+## Reviewed runtime candidate, not a publication
+
+`unspoken-rewind-onset-class.json` binds the Alafasy 5:2 correction from #873
+to the currently delivered payload and the exact implemented candidate. Both
+models were run locally; their revision, audio hash, scores and removed-word
+confidence are recorded with the evidence.
+
+`maintainer-word-split-class.json` records the later human adjudication of
+47:4 as one held word and the exact merged candidate. The subsequent
+[complete corpus review](../../docs/quality-reviews/TIMING_WORD_SPLIT_CORPUS_2026-10-17.md)
+adds raw retained-frame evidence: XLSR's confident source label is explained
+by speech retained on identical frames. It now passes the bounded same-word
+exception while MMS passes the ordinary low-confidence gate. The exact
+runtime candidate is `accept`; authenticated-source promotion remains pending.
+The maintainer's report remains separate from model evidence and is not an
+agent ear verdict. The ordinary peer guard remains active before generated
+merges. The other 70 accepted runtime candidates are recorded in
+`../timing_evidence/word-split-corpus-candidates.verdict.json`, separately from
+the authenticated source ledger and earlier active database verdicts.
+
+The [later Pixel 10 review](../timing_evidence/device-lab-alafasy-5-2-boundaries.verdict.json)
+compares that report with the accepted local topology-only candidate. Both new inference runs
+lower the row's mean start residual, but the opening word is truncated and
+word 2's individual start residual worsens. The existing waveform veto holds
+the complete boundary proposal. Word 16 moves closer to the models while
+remaining 1,933 ms late; its exact onset needs separate review. The full Lab
+proposal is retained in a regression fixture, without changing production rows
+or weakening the gate. This is review evidence for an alternative candidate;
+it does not replace the active accepted topology-only verdict for the same row.
+
+This candidate verdict does not replace the authenticated source-transition
+ledger. Before publication, replay the private authenticated snapshots, reconcile
+every delta against the reviewed runtime baseline, and bind those actual output
+payloads to the source-profile ledger. A stale verdict must continue to stop
+publication. An APK rebuild cannot deliver this runtime correction.

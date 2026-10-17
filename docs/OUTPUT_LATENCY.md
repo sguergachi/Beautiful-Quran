@@ -92,6 +92,13 @@ visible instead of being skipped. Timing rows, ayah handoff, basmalah wash, and
 every other reciter stay on their existing clocks. Android and web share the
 same policy.
 
+Alafasy has no automatic Bluetooth-specific advance. The earlier 200 ms trim
+was based on a listener's report without isolating the output clock from the
+word timestamps, and was removed during timing report #873's review. Compare
+Alafasy and another reciter on speaker and Bluetooth before adding a measured
+correction. A route-specific error belongs to the output clock; a source-timing
+error requires recording-specific evidence, independent of the audio route.
+
 ## PCM on the presentation clock
 
 `VoiceTapAudioProcessor` wraps the sink to retain the first input buffer's

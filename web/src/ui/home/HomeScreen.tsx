@@ -1,3 +1,4 @@
+import { suppliedWords } from '../../render/suppliedWords'
 import {
   useEffect,
   useMemo,
@@ -24,9 +25,8 @@ import {
 import { QuranRepository } from '../../data/repository'
 import { VerseBookmarkRibbon } from '../../render/VerseBookmarkRibbon'
 import {
-  englishTranslationHighlightSpans,
+  searchHitHighlightSpans,
   filterSurahs,
-  parseSearchQuery,
   sectionWordSearchHits,
   shouldRunWordSearch,
   spellingCorrection,
@@ -180,6 +180,12 @@ export function HomeScreen({
       ? state.surahs.find((s) => s.id === state.settings.lastSurah)
       : null
 
+  const readingSurah = !searching
+    ? state.surahs.find((surah) => surah.id === state.settings.lastReadSurah)
+    : null
+  // One Android-style place marker: last heard, or reading before any listening.
+  const resumeSurah = continueSurah ?? readingSurah
+  const resumeAyah = continueSurah ? state.settings.lastAyah : state.settings.lastReadAyah
   const depth = Math.max(0, stackLayer - COVER_LAYER)
   const isTop = stackLayer === COVER_LAYER
 
@@ -379,13 +385,14 @@ export function HomeScreen({
                 </div>
               </div>
 
-            {continueSurah ? (
+            {resumeSurah ? (
               <ContinueRow
-                surahId={continueSurah.id}
-                ayah={state.settings.lastAyah || 1}
-                transliteration={continueSurah.nameTransliteration}
-                arabic={continueSurah.nameArabic}
-                onPrepare={() => prepareChapter(continueSurah.id)}
+                label={continueSurah ? 'Continue listening' : 'Continue reading'}
+                surahId={resumeSurah.id}
+                ayah={resumeAyah}
+                transliteration={resumeSurah.nameTransliteration}
+                arabic={resumeSurah.nameArabic}
+                onPrepare={() => prepareChapter(resumeSurah.id)}
               />
             ) : null}
 
@@ -591,7 +598,6 @@ function WordSearchSection({
   onPrepareHit: (hit: WordSearchHit) => void
   onOpenHit: (hit: WordSearchHit) => void
 }) {
-  const displayQuery = parseSearchQuery(query).text
   return (
     <section className="word-search-section">
       <header className="word-search-surah-header">
@@ -605,13 +611,7 @@ function WordSearchSection({
       </header>
       <ul className="word-search-hits">
         {section.hits.map((hit) => {
-          const spans = englishTranslationHighlightSpans(
-            hit.displayText ?? hit.ayahTranslation,
-            displayQuery,
-            hit.translation,
-            hit.matchLabel ?? '',
-            hit.matchTerms ?? [],
-          )
+          const spans = searchHitHighlightSpans(hit, query)
           return <li key={`${hit.ayahNumber}-${hit.position}`}>
             <button
               type="button"
@@ -629,10 +629,10 @@ function WordSearchSection({
                 {spans.map((span, i) =>
                   span.highlighted ? (
                     <mark key={i} className="word-search-mark">
-                      {span.text}
+                      {suppliedWords(span.text, `s${i}`)}
                     </mark>
                   ) : (
-                    <span key={i}>{span.text}</span>
+                    <span key={i}>{suppliedWords(span.text, `s${i}`)}</span>
                   ),
                 )}
               </span>

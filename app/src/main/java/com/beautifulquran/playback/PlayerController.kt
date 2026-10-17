@@ -1,5 +1,6 @@
 package com.beautifulquran.playback
 
+import com.beautifulquran.domain.BASMALAH_PLAYLIST_AYAH
 import android.content.ComponentName
 import android.content.Context
 import android.util.Log
@@ -144,6 +145,10 @@ class PlayerController(private val context: Context) {
     val positionMs: Long
         get() = controller?.currentPosition ?: 0L
 
+    /** The loaded chapter restart: its basmalah clip when present, otherwise ayah 1. */
+    val chapterOpeningAyah: Int
+        get() = if (basmalahLeadIn) BASMALAH_PLAYLIST_AYAH else 1
+
     /**
      * Listening skips silence the word timings already mark. The timings lab
      * turns this off so a scrub can sit inside a gap.
@@ -241,6 +246,7 @@ class PlayerController(private val context: Context) {
             val keepInk = reason == Player.DISCONTINUITY_REASON_SEEK &&
                 silenceInk.claims(newPosition.positionMs, itemChanged)
             _state.value = _state.value.copy(
+                nowPlaying = newPosition.mediaItem?.mediaId?.let(::parseMediaId),
                 positionEvents = _state.value.positionEvents.afterDiscontinuity(
                     reason = reason,
                     itemChanged = itemChanged,

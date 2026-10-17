@@ -18,6 +18,22 @@ Repository **Settings → Pages → Build and deployment → Source** must be
 **GitHub Actions**. Selecting the legacy `master /docs` source deploys only the
 marketing files and overwrites `/app/` with a 404.
 
+## Repeat in the book
+
+The playback repeat button opens a paper modal sheet, matching Settings: a
+left-page sheet on desktop and a full sheet on phones. It offers Android’s
+Off, This ayah, Whole surah, A range of ayahs, and From this ayah modes.
+From this ayah counts the opening ayah in the requested number. Done applies
+the choice; Cancel or Escape discards edits and returns focus to the button.
+An active ayah inside a new range continues uninterrupted; a range selected
+while paused or outside its bounds starts at its first ayah. Whole-surah
+repeat includes the chapter’s beginning even when playback began later.
+
+In facing Mushaf mode, Chapters faces a gilded resume page with the chapter's
+Arabic and English names, kept ayah, and return link. Returning resumes the mounted reader at its previous
+folio. Settings, repeat, and word details always overlay the left page;
+Settings keeps the spread it opened over and returns to it when dismissed.
+
 ## Quick start
 
 ```bash
@@ -29,6 +45,28 @@ npm run typecheck    # tsc alone
 npm run build    # static site → dist/
 npm run build:pages  # → ../_site/app (CI does this on master)
 ```
+
+With Playwright installed, `node scripts/check-book-browser.mjs` checks the
+return page, overlay placement, keyboard ownership, and Settings navigation
+against a running dev server. It uses canonical English verses on synthetic
+folios and does not need the live printed-page service.
+
+`node scripts/check-ui-navigation-browser.mjs` checks live System theme changes,
+word-sheet focus across Settings and screen resizing, and overlay dismissal
+when navigating through chapter controls or browser history.
+It also checks that a Repeat dialog above a word sheet stays usable when
+resizing from facing pages to a phone layout.
+
+`BROWSER=firefox node scripts/check-mushaf-browser.mjs` checks Arabic opening
+and full leaves, responsive margins, and opening/interrupted page turns.
+Set `BROWSER=chromium` for the same check in Chromium, `BROWSER_EXECUTABLE`
+for an installed test browser, and `RECORD_VIDEO=1` to save a recording.
+It uses bundled Arabic text and a tab-local four-page placement fixture.
+
+`node scripts/check-reader-performance-browser.mjs` checks chapter handoff,
+interrupted navigation, reduced motion, idle animation layers, static ornament
+render isolation, and repeat-range control updates. Its render counters use
+the development React build; they are not device frame-rate measurements.
 
 Builds and tests are kept short: the type check is incremental (its cache is
 in `node_modules/.cache`) and runs beside the bundle (`scripts/parallel.mjs`);
@@ -57,7 +95,30 @@ src/ui/         paper stack plus Android-mirrored reader/focus/Ink/Fade policy
 src/store/      hand-rolled app store (boundary-only React updates)
 ```
 
-Engines are DOM-free and unit-tested against the Android JVM suites. See
+The ink stack includes Android's gate/cruise/hold tajweed curves (madd,
+ghunnah, waqf and wasl carry-in), ordered English residuals and audio-bound
+orange repeat washes. Tarjīʿ analyzes decoded 8 kHz PCM in a worker: two-sided
+AM/FM cycles, event ownership, per-reciter drama admission and the Hani capture
+profile. Glyph light and the three-radius halo use Android's light-smoothing
+and gamma math. Missing analysis keeps still ink; it never invents a pulse.
+Analysis prepares the current and next clip without delaying playback and
+retains at most twelve feature tracks. Letter widths use Android's uniform
+v1 approximation; exact shaped-letter measurement remains future work.
+
+Pure engines are tested with Android JVM numeric fixtures. An optional native
+browser regression check covers viewport occupancy, pause/seek/residual ink,
+concurrent repeats, audio decoding/worker analysis and a two-clip handoff:
+
+```bash
+# With the dev server running and Playwright available to Node:
+node scripts/check-ink-browser.mjs
+# PLAYWRIGHT_MODULE can point to an installed Playwright index.mjs;
+# CHROMIUM_EXECUTABLE can select a system Chromium.
+```
+
+The browser check uses controlled local audio, so separately audition real
+reciters when network access is available. No client credentials are needed.
+ See
 [`docs/WEB.md`](../docs/WEB.md) for the full plan and quality bar.
 
 ## Notes
@@ -92,12 +153,15 @@ Engines are DOM-free and unit-tested against the Android JVM suites. See
   hard abut — no crossfade). Word highlight still uses the same per-ayah
   `positionMs` clock. Developer mode can disable it to A/B the legacy
   dual-`<audio>` transport.
-- Repeat-aware timings are build-generated from the canonical database and
-  cached after the selected reciter's first chapter open.
+- Six QF voices fetch complete reviewed timing views from authenticated Content
+  Sync through the Worker, then retain them atomically in IndexedDB. They refresh
+  after six days and remain available through provider outages. The other seven
+  voices keep their packaged lazy timing corpora.
 - The QF word/QCF cache bootstraps once, refreshes from its saved checkpoint
   after six days, and withholds those fields after seven days until it can sync.
 - Click a word to play from there; right-click / long-press opens the Root Word Viewer.
-- Themes: Paper / Nightfall / Royal green (Settings).
+- Themes: Paper / Nightfall / Royal green (Settings). System follows live OS
+  appearance changes, including the browser's theme color.
 - Form controls use [Base UI](https://base-ui.com) primitives (`Select`,
   `Switch`, `Slider`, `Input`) styled to the paper kit in `ui/kit/`.
 - Escape returns through Settings → Reader → Chapters.

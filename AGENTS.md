@@ -95,6 +95,33 @@ web/                    Browser port (Vite + React): Focus / Highlight / Ink + p
 .github/workflows/web.yml     CI: Vitest + web build; deploys a Pages artifact on master
 ```
 
+## Quran.ai MCP — reliable Quran reference
+
+Use [quran.ai MCP](https://mcp.quran.ai) as a reliable canonical reference for
+Quran text, translations, Arabic morphology and tafsir when investigating
+meanings, roots or English highlighting. Its public endpoint uses Streamable
+HTTP; follow the [official usage guide](https://github.com/quran/mcp.quran.ai/blob/master/skills/quran.ai-MCP-usage/SKILL.md).
+
+1. Call `fetch_grounding_rules` first and follow its attribution and
+   faithfulness rules. Pass its nonce only where the live tool schema accepts it.
+2. Retrieve the actual passage with `fetch_quran` and `fetch_translation`.
+   Discover editions through `list_editions`; ground interpretations in
+   `fetch_tafsir`, selecting a suitable edition before fetching it.
+3. Use `fetch_word_morphology` for lexical evidence. Prefer the Arabic word
+   within its verse; verify positions against the app's actual Arabic words,
+   since MCP/QAC segmentation can differ from the reader's word slots.
+4. Verify every returned verse key, follow pagination, and retain edition and
+   citation URLs with the evidence. Use unique JSON-RPC IDs for concurrent
+   requests; reject missing or mismatched responses.
+5. Turn reviewed ownership decisions into exact-owner and continuous-prefix
+   regressions. Distinguish fetched evidence from model adjudication: quran.ai
+   shares Quran.com/Quran Foundation upstream data with this app, so agreement
+   alone cannot certify 99.99% accuracy or replace independent coverage.
+
+Keep this an agent-side reference. If unavailable, report that and do not claim
+memory-based content was MCP-verified. See [docs/ENGLISH_ALIGNMENT_COVERAGE.md](docs/ENGLISH_ALIGNMENT_COVERAGE.md)
+for the existing review and its limits.
+
 ## Build, test, run
 
 Requires **JDK 21**. No Android device/emulator is needed for tests.
@@ -103,6 +130,7 @@ Requires **JDK 21**. No Android device/emulator is needed for tests.
 ./gradlew testDebugUnitTest     # unit tests — run these before committing
 ./gradlew assembleDebug         # debug APK
 ./gradlew assembleRelease       # what CI ships (R8-minified; falls back to debug keystore)
+scripts/publish_apk.sh --release                  # build, then put the APK at this worktree's known path
 scripts/send_apk_to_phone.sh --label "the work"   # name it, share it, delete the last one
 python3 tools/test_build_db.py  # timing pipeline regressions (~1s, no Gradle)
 ```
@@ -127,6 +155,13 @@ python3 tools/test_build_db.py  # timing pipeline regressions (~1s, no Gradle)
   `python3 tools/build_dictionary_db.py` (caches ~485 MB kaikki Arabic JSONL
   under `tools/.cache/`, emits a ~1 MB QAC-lemma subset). Bump
   `DictionaryDatabase.DB_FILE_NAME` when its content changes.
+- The English face, Junicode, is committed as one subset cut for both apps
+  (`app/src/main/res/font/junicode_*.ttf`, `web/public/fonts/junicode_*.woff2`).
+  Rebuild only to change the cut: `python3 tools/build_junicode_fonts.py
+  <Junicode 2.226 release>/VAR` (reproducible), then update
+  `JUNICODE_ROMAN_SHA` / `JUNICODE_ITALIC_SHA` in `ui/theme/Type.kt` —
+  `JunicodeTypeTest` fails until you do, and they key the English book cache.
+  No font is downloaded at build time. See `docs/DESIGN.md` "Type".
 - `data/search_concepts.json` is committed and read directly (not extracted or
   cached under a versioned filename). Rebuild it only with
   `python3 tools/build_search_concepts.py`; the script verifies its pinned QSAC
@@ -205,9 +240,13 @@ python3 tools/test_build_db.py  # timing pipeline regressions (~1s, no Gradle)
    `QuranDatabase`), no navigation library (the three sheets are a hand-rolled
    paper stack in `MainActivity`). Do not introduce a framework to solve a
    problem the existing hand-rolled piece already solves.
-6. **Offline-first, no backend.** No accounts, no analytics, no API keys. Only
-   recitation audio touches the network at runtime (listening uses a 1 GB LRU
-   in cacheDir; explicit downloads are kept in filesDir).
+6. **Offline-first, no accounts or analytics.** Clients contain no API keys.
+   Authenticated QF word/QCF content and six reviewed timing resources use the
+   narrow Worker and separate device caches; normalization stays in the Python
+   pipeline. QF credentials remain server-side. Timing copies stay available
+   through provider outages, with withdrawal/revocation purging the appropriate
+   content. Recitation audio uses a 1 GB listening LRU in cacheDir; explicit
+   downloads are kept in filesDir. See `docs/QF_CONTENT_SYNC.md`.
 7. **Ink / karaoke fidelity is non-negotiable (Android + web).** The signature
    product moment is the soft directional ink wash: each word reveals with a
    **visible faded leading edge** (smootherstep `letterFadeIn` /
@@ -224,6 +263,13 @@ python3 tools/test_build_db.py  # timing pipeline regressions (~1s, no Gradle)
    the **class** in `clean_qdc_artifacts`, use a narrow typed operation only
    when topology is irreducibly ambiguous, and lock it with
    `tools/timing_patch_cases/*.json` + `python3 tools/test_build_db.py`.
+   Every new patch also requires a corpus-wide search for the same cause,
+   including other reciters and genuine-repeat counterexamples. Record the
+   search predicate, source revisions, coverage counts, every candidate's
+   disposition and unresolved evidence. Exact-verse fixtures or source-guarded
+   typed entries alone are not a systematic fix. Generated entries must come
+   from a reusable, calibrated detector applied to the complete candidate set;
+   a necessary human exception stays explicitly exceptional.
    Override JSON is local reproduction scratch only and must not be committed.
    Canonical anti-pattern: the first #570 attempt (one-off override); the
    correct fix is #571 (gap phantoms + span-protect).
@@ -237,7 +283,27 @@ python3 tools/test_build_db.py  # timing pipeline regressions (~1s, no Gradle)
    is a good outcome; quietly relaxing it is not. Worked example — a check that
    looks wrong and isn't: [docs/CHESTERTON.md](docs/CHESTERTON.md).
 
+10. **Never skip highlighting words.** This is a core product rule for Arabic
+    and English, on Android and web. The forward wash must remain continuous:
+    never highlight a later word while leaving an intervening word unhighlighted.
+    When spoken Arabic maps to a later English word because of sentence order,
+    advance the wash through that meaning and every English word before it.
+    Prioritize the meaning being heard; preserve the soft leading edge required
+    by invariant #7. Glimmer, repeat tint, seeks, and page transitions must never
+    create gaps in the underlying wash. Any highlighting change must preserve
+    this rule and test reordered phrases and interrupted playback.
+
 ## Landing Timings Lab / GitHub timing patches
+
+**Standing user requirement for every future timing patch, regardless of size
+or source.** Follow the complete workflow without needing another reminder.
+Audit each distinct defect class in a patch separately. Completing one class
+does not complete another, and fixing the reported ayah does not complete the
+corpus audit. State incomplete coverage as partial, keep unresolved rows at
+baseline, and record remaining work in `tools/timing_verdicts/OUTSTANDING.md`.
+Every repair report or PR must identify the coverage, candidate dispositions,
+genuine-repeat controls, evidence locations and remaining uncertainty before
+production publication.
 
 When the user asks to "fix the timing issue", "apply the timings patch", or
 close a `Timings patch — …` GitHub issue, **do this checklist in order**:
@@ -256,6 +322,7 @@ close a `Timings patch — …` GitHub issue, **do this checklist in order**:
 | Word said twice, qdc hands the second utterance to the next word (next word starts a whole utterance early) | regenerate with `tools/find_flattened_resays.py` (dual-model repeat test → generated `restore_flattened_resay`) | `pipeline: "timing_correction"` case + `tools/test_find_flattened_resays.py` |
    | Repair flattens a multi-word re-say that cleaned qdc still has | `apply_timing_repairs` span-protect (`erases_span_repeat`) | `pipeline: "erases_span_repeat"` case |
 | Repair erases a peer same-word re-say while fixing elsewhere | per-position `preserve_peer_repeats` | `pipeline: "preserve_peer_repeats"` case |
+| "Re-say" is qdc labels running a word late before a skip (`1,1,2,5` for `1,2,3,4,5`); peer-protect restores it | `lagged_peer_positions` in `preserve_peer_repeats` | `lagged-peer-*` cases |
 | Same-position pair is really the previous word's held tail (qdc tiles gaplessly, so a madd gets the next word's index) | `false_same_position_leads` + `hand_lead_to_previous_word`, gated on quran-align's onset | `pipeline: "false_same_position_lead"` case |
 | Restore invents a flush same-word pair (gap < 300 ms) | `collapse_invented_flush_repeats` in `apply_timing_repairs` | `pipeline: "invented_flush_restore"` case |
 | qdc has 1..n+1 because QAC glued ما (وَمَالِيَ) | `fold_qdc_fused_ma` in `adjust_qdc_segments` | `pipeline: "adjust_qdc_segments"` case |
@@ -263,6 +330,15 @@ close a `Timings patch — …` GitHub issue, **do this checklist in order**:
 | Single boundary steal, no structural signal | weighted source-conflict validation + surgical `kind: "boundary"` repair | `pipeline: "boundary_repair"` case |
 | Whole ayah starts early because its MP3 has encoded silence | regenerate the reciter with `tools/detect_audio_onsets.py` | `pipeline: "leading_silence_offset"` case |
 | Missing positions, unsafe clock, or marks outside the MP3 | fix the source/class; `finalize_timing_rows` completes, falls back, or withholds | completion/physics checks in `tools/test_build_db.py` |
+3b. **Search the entire delivered corpus for the same cause**, including all
+   applicable reciters and analogous open/closed timing issues. Follow the
+   source → cleaner → correction → repair → reviewed-hold trace for matches.
+   Use real repeats and already-correct rows as negative controls. Run both
+   acoustic models for ambiguous topology candidates; compare start residuals
+   and waveform tails for boundaries. Report incomplete coverage and errors,
+   never silently exclude rows already owned by another correction or hold.
+   Keep a reproducible inventory and evidence for accepted, retained and
+   uncertain cases. Do this for every patch, even when its own fix is narrow.
 4. **Implement the class fix** + add the patch case (input = broken shape,
    expected = Lab/ear topology). Run `python3 tools/test_build_db.py`.
 4b. **Evidence**: a changed row ships only with a dual-model verdict in
@@ -339,6 +415,7 @@ this document combined: `ReaderComponents.kt` (~36k tokens),
 | `docs/CHESTERTON.md` | Worked examples for invariant #9 — guards that look wrong and aren't |
 | `docs/OUTPUT_LATENCY.md` | Route-based Bluetooth/output lag presets applied before the highlight clock |
 | `docs/DESIGN.md` | Any UI/visual change — the paper metaphor and its hard rules |
+| `docs/KEY_ART.md` | Marketing art and product-page videos — niche and rules, the intro Reel shot list, and the Android capture → Revideo edit pipeline in `tools/key_art/` |
 | `docs/CONTEXTUAL_GUIDES.md` | Adding or changing feature education — live-target contract, wiring, and device verification |
 | `docs/PERFORMANCE.md` | Anything touching the reader, scrolling, or the highlight loop |
 | `docs/REPEAT_HIGHLIGHTING.md` | Repeat-aware timings and the orange second fade |
@@ -360,19 +437,32 @@ this document combined: `ReaderComponents.kt` (~36k tokens),
 - Finish every requested code change by committing and pushing it. Continue an
   open PR on its actual head branch; if that PR has merged, follow the fresh-PR
   rule below instead.
+- **Where the built APK lives.** Each worktree (= each T3 Code thread) has one
+  known APK location: `~/.t3/artifacts/Beautiful-Quran/apks/<worktree-dir>/`
+  holding `release.apk` / `debug.apk` plus a `.info` file (`sha`, `branch`,
+  `dirty`, `built_at`, `bytes`). `scripts/publish_apk.sh [--release]` builds
+  and writes it; `scripts/publish_apk.sh --release --print` prints the path
+  (exit 1 if none). Any APK you build for this thread goes there — don't leave
+  it only in `app/build/outputs` or a `/tmp` name. `send_apk_to_phone.sh`
+  always goes through it, and the **Send APK** action in T3 Code runs
+  `send_apk_to_phone.sh --release --zip --published --wait`, which shares
+  the APK there when it matches HEAD on a clean tree, and rebuilds it first
+  otherwise.
 - Send a clearly named APK to the Pixel 10 after every completed code change,
-  and **delete the previous one once the new one has gone**. Use
-  `scripts/send_apk_to_phone.sh --label "<the work>"` (add `--release` for a
-  release build): it stages the build under a name made from the work and the
+  and **delete local staged copies once the phone confirms receipt**. Always
+  delegate this to the cheap `apk-sender` subagent (haiku) following
+  `docs/APK_DELIVERY.md` — do not run the send inline in the main session.
+  It stages the build under a name made from the work and the
   commit, verifies the copy, shares it, and then removes every older staged
-  APK. Three rules are baked into it and hold whether or not you use it:
+  build. Three rules are baked into it and hold whether or not you use it:
   - Never send a generic `app-debug.apk` / `app-release.apk`. A phone full of
     identically-named builds is a phone you cannot test from, and KDE Connect
     drops a repeat of the same filename to its notification rate limit — so a
     generic name is a send that silently does not arrive.
-  - Delete the older builds after the new one is away. They are a quarter of a
-    gigabyte each; left to pile up they filled `/tmp`, which truncated a copy
-    mid-send and shipped a broken APK to the phone. Scope any hand-rolled
+  - Delete the older builds after the new one is away, and delete the new
+    one's local copy too once the phone confirms receipt. They are a quarter
+    of a gigabyte each; left to pile up they filled `/tmp`, which truncated a
+    copy mid-send and shipped a broken APK to the phone. Scope any hand-rolled
     cleanup to files you staged yourself — never a bare `/tmp/*.apk`.
   - Verify the transfer completed rather than trusting the sender's exit code,
     and do not connect to port 1739 to "check" — that steals the payload from

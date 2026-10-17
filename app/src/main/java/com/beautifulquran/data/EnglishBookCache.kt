@@ -195,23 +195,50 @@ class EnglishBookCache internal constructor(private val dir: File) {
          * 22: the head gutter is one line of prose rather than one Arabic
          * unit, so the well is taller and the hand solved from it a hair
          * bigger. The leaf holds a little more.
+         *
+         * 24: the rag (`EnglishRag`) breaks the lines, hyphenating at the
+         * book's kept cuts. Lines end somewhere new and a paragraph can set a
+         * line shorter, so leaves cut anew.
+         *
+         * 25: words stay whole. The rag chooses only word-space breaks;
+         * pagination uses their equivalent greedy minimum line count.
+         * 26: tighter prose letter spacing, with the same book hand.
+         * 27: the basmalah's size is fitted to the column by subpixel advances;
+         * its measured one-line slot follows that size.
+         * 28: Timeless leaf leading 1.46 em; typeset punctuation and
+         * restored closing quotes change the verses' text.
+         * 29: lining figures in the book face (old-style is opt-in).
+         * 30: the leaf is Timeless at its own tuning (weight 365, tracking -0.0125 em),
+         * leading 1.62, capacity 1130: a larger hand and a different line count.
+         * 31: the typeface profiles key their own books (bookCacheSuffix).
+         * 32: Timeless removed; Junicode is the book face. Its suffix now
+         * carries the font files' hashes and every constant that moves a line.
+         * 33: the basmalah is set on the page pitch with quarter-pitch air.
+         * 34: the leaf is justified (EnglishJustify), and the ruler counts the
+         * justified setting's lines, which hold more than ragged ones.
+         * 35: the ruler searches past an overflowing prefix when later words
+         * can close a line in the justified setting.
+         * 36: combine the justified book with 33's basmalah slot; the old 35
+         * book was measured with the previous fixed-air opening.
          */
-        const val FORMAT = 23
+        const val FORMAT = 36
         const val MAX_LEAVES = 10_000
         const val MAX_RUNS = 20_000
     }
 }
 
-/** Adds the exact prose to the pagination identity without putting QF text in a file name. */
+/** Hashes the complete layout and prose identity into a bounded cache filename. */
 internal fun englishBookContentKey(base: String, verses: Map<Long, String>): String {
     val digest = MessageDigest.getInstance("SHA-256")
+    digest.update(base.toByteArray(StandardCharsets.UTF_8))
+    digest.update(0)
     verses.toSortedMap().forEach { (key, text) ->
         digest.update(key.toString().toByteArray(StandardCharsets.UTF_8))
         digest.update(0)
         digest.update(text.toByteArray(StandardCharsets.UTF_8))
         digest.update(0)
     }
-    return "$base-${digest.digest().joinToString("") { byte ->
+    return digest.digest().joinToString("") { byte ->
         byte.toUByte().toString(16).padStart(2, '0')
-    }}"
+    }
 }

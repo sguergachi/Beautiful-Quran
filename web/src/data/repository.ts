@@ -1,6 +1,8 @@
+import { quoteContinuesInto, typesetEnglish, typesetEnglishName } from '../domain/EnglishTypography'
 import { openDatabase, queryAll, queryOne, type LoadProgress } from './database'
 import { pickLemmaGloss, type GlossVote } from './lemmaGloss'
 import { runtimeMushafCache } from './runtimeMushaf'
+import { QF_TIMING_RECITERS, runtimeTimingsCache } from './runtimeTimings'
 import type {
   Ayah,
   Reciter,
@@ -40,6 +42,12 @@ const timingsCache = new Map<string, Map<number, Segment[]>>()
 type TimingCorpus = Record<string, Record<string, number[][]>>
 const timingCorpora = new Map<number, TimingCorpus>()
 const timingCorpusLoads = new Map<number, Promise<void>>()
+runtimeTimingsCache.subscribe((reciterId) => {
+  for (const key of timingsCache.keys()) {
+    if (reciterId == null ? QF_TIMING_RECITERS[Number(key.split(':')[0])]
+      : key.startsWith(`${reciterId}:`)) timingsCache.delete(key)
+  }
+})
 
 export async function ensureReady(
   onProgress?: (p: LoadProgress) => void,
@@ -55,7 +63,7 @@ export function surahs(): Surah[] {
     (r) => ({
       id: Number(r.id),
       nameArabic: String(r.name_arabic),
-      nameTransliteration: String(r.name_transliteration),
+      nameTransliteration: typesetEnglishName(String(r.name_transliteration)),
       nameTranslation: String(r.name_translation),
       revelationPlace: String(r.revelation_place),
       ayahCount: Number(r.ayah_count),
@@ -100,7 +108,7 @@ export function surahContent(surahId: number): SurahContent {
       list.push({
         position,
         arabic: String(r.arabic),
-        translation: runtime?.translation_en ?? '',
+        translation: typesetEnglishName(runtime?.translation_en ?? ''),
         transliteration: runtime?.transliteration ?? '',
       })
       wordsByAyah.set(ayah, list)
@@ -123,6 +131,10 @@ export function surahContent(surahId: number): SurahContent {
       }
     },
   )
+  // Typeset for display; a quotation that runs on into the next verse stays open.
+  ayahs.forEach((ayah, i) => {
+    ayah.translation = typesetEnglish(ayah.translation, quoteContinuesInto(ayahs[i + 1]?.translation))
+  })
 
   const content = { surah, ayahs }
   surahContentCache.set(surahId, content)
@@ -179,6 +191,7 @@ function mapSegments(rows: number[][]): Segment[] {
 
 /** Fetch one reciter's corpus only when the reader needs highlighting. */
 export function ensureTimings(reciterId: number): Promise<void> {
+  if (QF_TIMING_RECITERS[reciterId]) return runtimeTimingsCache.ensure(reciterId)
   if (timingCorpora.has(reciterId)) return Promise.resolve()
   const pending = timingCorpusLoads.get(reciterId)
   if (pending) return pending
@@ -211,7 +224,10 @@ export function timings(reciterId: number, surahId: number): Map<number, Segment
   if (cached) return cached
 
   const map = new Map<number, Segment[]>()
-  const rows = timingCorpora.get(reciterId)?.[String(surahId)] ?? {}
+  const rows = QF_TIMING_RECITERS[reciterId]
+    ? Object.fromEntries((runtimeTimingsCache.resource(reciterId)?.rows ?? [])
+      .filter((row) => row[0] === surahId).map((row) => [row[1], row[2]]))
+    : timingCorpora.get(reciterId)?.[String(surahId)] ?? {}
   for (const [ayah, segments] of Object.entries(rows)) {
     map.set(Number(ayah), mapSegments(segments))
   }
@@ -268,10 +284,10 @@ export function rootSummary(root: string): RootSummary | null {
       ayahNumber: Number(r.ayah_number),
       position: Number(r.position),
       arabic: String(r.arabic),
-      translation: runtimeMushafCache?.word(
+      translation: typesetEnglishName(runtimeMushafCache?.word(
         Number(r.surah_id), Number(r.ayah_number), Number(r.position),
-      )?.translation_en ?? String(r.translation_en),
-      surahNameTransliteration: String(r.name_transliteration),
+      )?.translation_en ?? String(r.translation_en)),
+      surahNameTransliteration: typesetEnglishName(String(r.name_transliteration)),
     }),
   )
 
@@ -338,7 +354,8 @@ function buildWordSearchIndex(): WordSearchIndexEntry[] {
     (r) => {
       ayahMeta.set(`${Number(r.surah_id)}:${Number(r.ayah_number)}`, {
         text: String(r.text_uthmani),
-        translation: String(r.translation_en),
+        // Shown alone in a result, so an open quotation is closed.
+        translation: typesetEnglish(String(r.translation_en)),
       })
       return null
     },

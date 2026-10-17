@@ -1,0 +1,55 @@
+{
+  "schemaVersion": 1,
+  "baseline": {
+    "commit": "b2812e8e8186725840674f6659d28850375e9ed8",
+    "runtimeRevision": "5413f8f82f0c674892b0213b5f7fb90249df38418515af65b75c933190c7739b"
+  },
+  "publication": "not published; authenticated snapshot replay and source-profile verdict reconciliation are still required",
+  "verdicts": {
+    "Alafasy_128kbps:5:2": {
+      "verdict": "accept",
+      "kinds": [
+        "topology"
+      ],
+      "baselinePayloadHash": "03c309505bb4d31d935500fef840f1e4657c2bf8ede4c67219fb4807098172d3",
+      "candidatePayloadHash": "e2df61535b7cd3753c4bfa456842bb09acab6eaf5133d19e4c6eefbd51f17530",
+      "evidence": {
+        "kind": "dual_model_topology",
+        "artifact": "tools/timing_evidence/issue-873-rewind-onset.jsonl",
+        "summary": "Both cached models ran on the exact implemented candidate: remove only the first word 15 and extend word 14 to 24040 ms. The later word 15 and all genuine rewinds remain. Both gains exceed 0.001/frame and removed-occurrence confidence is below 0.5. FFmpeg PCM inspected; no manual listening. This local runtime candidate does not replace an authenticated source-profile verdict or publish a resource.",
+        "audioSha256": "332ae686820ed1d633bb8378d2af7f4338a18de601ff80b6b0c622e377bc84b5",
+        "waveformVeto": false,
+        "waveform": {
+          "method": "ffmpeg_pcm_visual_inspection_and_dual_ctc_newly_shortened_end_check",
+          "decodedDurationMs": 82599,
+          "durationToleranceMs": 50,
+          "boundsWithinTolerance": true,
+          "voicedEndToleranceMs": 250,
+          "voicedTailCutRisks": [],
+          "scope": "No retained end is shortened; the removed low-confidence label is reassigned to the preceding word.",
+          "remainingConcern": "Word 14 forced end is 24326 ms; its stored end improves from 23340 to 24040 ms. The returning word 11 still starts at 24070 versus forced 25146\u201325166 ms. This existing boundary disagreement is not approved by the topology verdict."
+        },
+        "models": [
+          {
+            "name": "arabic-xlsr-ctc",
+            "model": "jonatasgrosman/wav2vec2-large-xlsr-53-arabic",
+            "modelRevision": "af46c2d8531b8dcbb5e23b952f739b372c2e5d2d",
+            "metric": "viterbiLogProbabilityPerFrame",
+            "baselineScore": -0.4384910489260414,
+            "candidateScore": -0.42973367917852384,
+            "removedOccurrenceMaxLabelProbability": 0.002716338140392812
+          },
+          {
+            "name": "mms-uroman-ctc",
+            "model": "MahmoudAshraf/mms-300m-1130-forced-aligner",
+            "modelRevision": "49402e9577b1158620820667c218cd494cc44486",
+            "metric": "viterbiLogProbabilityPerFrame",
+            "baselineScore": -0.04701941710287562,
+            "candidateScore": -0.041962601192120516,
+            "removedOccurrenceMaxLabelProbability": 0.015451408701968225
+          }
+        ]
+      }
+    }
+  }
+}

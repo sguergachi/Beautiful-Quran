@@ -42,6 +42,11 @@ private fun canonicalWords(text: String): List<String> = text
     .split(searchSeparator)
     .filter(String::isNotEmpty)
 
+private fun canonicalWordForms(text: String): List<List<String>> =
+    if (EnglishContractions.mayExpand(text)) EnglishContractions.forms(text).flatMap { forms ->
+        if (forms.size > 1) listOf(forms) else canonicalWords(forms.single()).map(::listOf)
+    } else canonicalWords(text).map(::listOf)
+
 private fun stem(word: String): String = when {
     word.length > 6 && word.endsWith("ness") -> word.dropLast(4)
     word.length > 5 && word.endsWith("ies") -> word.dropLast(3) + "y"
@@ -58,8 +63,9 @@ fun searchTextRelevance(
     query: ParsedSearchQuery,
     allowFuzzy: Boolean = true,
 ): Int = searchLowerTextRelevance(
-    text.lowercase(),
-    query.text.lowercase(),
+    // Display text is typeset (curled quotes, en dashes); match it as typed.
+    EnglishTypography.fold(text).lowercase(),
+    EnglishTypography.fold(query.text).lowercase(),
     query.exactOnly,
     allowFuzzy,
 )
@@ -79,19 +85,21 @@ internal fun searchLowerTextRelevance(
         val canonicalNeedle = canonicalWords(needle).joinToString(" ")
         return if (canonicalNeedle.isNotEmpty() && containsBounded(phrase, canonicalNeedle)) 3_000 else 0
     }
+    val contractionScore = EnglishContractions.relevance(target, needle)
+    if (contractionScore > 0) return contractionScore
     if (containsWordPrefix(target, needle)) return 2_200
-    val singleWord = needle.all(Char::isLetterOrDigit)
+    val singleWord = needle.all(Char::isLetterOrDigit) && !EnglishContractions.mayExpand(needle)
     if (allowFuzzy && singleWord) {
         return if (fuzzyWordContains(target, needle)) 1_600 else 0
     }
     if (singleWord && needle !in queryFillers) return 0
 
-    val queryWords = canonicalWords(needle)
-    val content = queryWords.filterNot(queryFillers::contains).ifEmpty { queryWords }
+    val queryWords = canonicalWordForms(needle)
+    val content = queryWords.filterNot { forms -> forms.all(queryFillers::contains) }.ifEmpty { queryWords }
     if (content.size > 1 || content.size < queryWords.size) {
-        val words = canonicalWords(target)
+        val words = canonicalWordForms(target).flatten()
         val stems = words.mapTo(HashSet(words.size), ::stem)
-        if (content.all { stem(it) in stems }) return 2_600
+        if (content.all { forms -> forms.any { stem(it) in stems } }) return 2_600
     }
     return 0
 }

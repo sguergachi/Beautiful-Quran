@@ -41,9 +41,9 @@ import kotlin.math.roundToInt
  * rather than doing without it: each Arabic word carries its own gloss, and
  * `EnglishWordAlignment` aligns that gloss stream to the translation, so the
  * wash crosses the English the reciter is actually saying — say ٱلْكِتَٰبُ and
- * "the Book" inks. 84 % of Arabic words land on a lexical anchor; the rest are
- * spread between their neighbours, which is the plain proportion the leaf used
- * before and is what an unalignable verse still gets. The recess and the
+ * "the Book" inks. A reordered meaning takes every intervening English word
+ * into one continuous forward wash. Unmatched text is spread between its neighbours, which
+ * is the plain proportion an unalignable verse still gets. The recess and the
  * retained ink are the Arabic leaf's. See `ui/reader/MushafEnglishSheet.kt`.
  */
 
@@ -82,10 +82,9 @@ data class EnglishLeafVerse(
      * were taken off on the way. Null where the caller has no source, and the
      * ink falls back to plain proportion.
      *
-     * The alignment names offsets in *this* string, and [text] is not it: the
-     * hyphenation vetoes thread invisible word joiners through it, whitespace
-     * is closed up, and the asides may be gone. Scaling a share of the source
-     * onto [text] let the difference pile up along the sentence — on Al-Mulk's
+     * The alignment names offsets in *this* string, and [text] is not it:
+     * whitespace is closed up, and the asides may be gone. Scaling a share of
+     * the source onto [text] let the difference pile up along the sentence — on Al-Mulk's
      * second verse "created" inked as `creat` and "death" as `ed death`, and on
      * a long verse the band ran a word or two behind the voice. Letters are the
      * one thing all three leave alone, so offsets are carried across by
@@ -162,6 +161,19 @@ data class EnglishLeafVerse(
         if (!lettersMap || text.isEmpty()) return fragmentProgress(verseProgress)
         val offset = (verseProgress.coerceIn(0f, 1f) * verseLength).roundToInt()
         return (textOffsetOf(offset).toFloat() / text.length).coerceIn(0f, 1f)
+    }
+
+    /** Animated ink travels between letter anchors; owned ranges still use [fragmentInkProgress]. */
+    fun fragmentWashProgress(verseProgress: Float): Float {
+        if (!lettersMap || text.isEmpty()) return fragmentProgress(verseProgress)
+        val offset = verseProgress.coerceIn(0f, 1f) * verseLength
+        val next = countAtOrBelow(sourceLetterEnds, offset.toInt())
+        val start = sourceLetterEnds.getOrNull(next - 1) ?: textFrom
+        val end = sourceLetterEnds.getOrNull(next) ?: to
+        val fromText = textLetterEnds.getOrNull(next - 1) ?: 0
+        val toText = textLetterEnds.getOrNull(next) ?: text.length
+        val progress = if (end > start) ((offset - start) / (end - start)).coerceIn(0f, 1f) else 1f
+        return ((fromText + (toText - fromText) * progress) / text.length).coerceIn(0f, 1f)
     }
 
     /**
@@ -412,10 +424,7 @@ fun englishLeaf(
  * sentence in the middle for them.
  */
 private fun englishVerseProse(text: String): String {
-    // The vetoed cuts: bad hyphen breaks joined before the breaker sees the
-    // text. The ruler composes through this same function, so the pagination
-    // measures exactly what the leaf draws.
-    return EnglishHyphenation.setProse(text.replace(WHITESPACE_RUN, " ").trim())
+    return text.replace(WHITESPACE_RUN, " ").trim()
 }
 
 private val WHITESPACE_RUN = Regex("\\s+")

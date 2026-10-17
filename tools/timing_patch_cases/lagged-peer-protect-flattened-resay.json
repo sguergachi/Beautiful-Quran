@@ -1,0 +1,16 @@
+{
+  "id": "lagged-peer-protect-flattened-resay",
+  "label": "a genuine re-say next to a qdc-skipped word stays a peer repeat",
+  "refs": [
+    "GitHub #856 (negative control for lagged_peer_positions)"
+  ],
+  "pipeline": "preserve_peer_repeats",
+  "notes": "Same shape as Alafasy 24:25 (1,1,2 then a jump over word 3), but the repair hears the second 1 as word 1 itself: it flattened a real re-say while supplying word 3. No lag is witnessed, so the peer occurrence is restored.",
+  "input_segments": [
+    [1, 0, 800], [1, 800, 1600], [2, 1600, 3200], [4, 3200, 4000]
+  ],
+  "repair_segments": [
+    [1, 0, 1600], [2, 1600, 2400], [3, 2400, 3200], [4, 3200, 4000]
+  ],
+  "expected_positions": [1, 1, 2, 3, 4]
+}

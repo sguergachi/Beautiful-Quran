@@ -32,6 +32,17 @@ export const MUSHAF_INK_IDLE: MushafInk = {
   speed: 1,
 }
 
+export interface MushafReadHistory { ayah: number | null; activation: number; read: boolean }
+
+/** A new seek/repeat must hear its own word before a null word can mean a tail. */
+export function mushafReadHistory(
+  previous: MushafReadHistory, ayah: number | null, activation: number, hasWord: boolean,
+): MushafReadHistory {
+  const read = hasWord || (previous.ayah === ayah && previous.activation === activation && previous.read)
+  return previous.ayah === ayah && previous.activation === activation && previous.read === read
+    ? previous : { ayah, activation, read }
+}
+
 const PLAIN: InkWord = { state: InkState.Plain, repeat: false }
 const UPCOMING: InkWord = { state: InkState.Upcoming, repeat: false }
 /** A word in hand on a page that is only a picture: inked, with no wash. */

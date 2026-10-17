@@ -1,0 +1,20 @@
+{
+  "id": "audio-vetted-rewind-onset-alafasy-5-2",
+  "label": "Alafasy 5:2 unspoken word 15 before the real 11–14 rewind",
+  "refs": ["GitHub #873", "tools/timing_verdicts/unspoken-rewind-onset-class.json"],
+  "pipeline": "timing_correction",
+  "correction_op": "discard_unspoken_rewind_onset",
+  "source_window": [[14, 21530, 23340], [15, 23340, 24040], [11, 24070, 25430]],
+  "requires_audio_verdict": true,
+  "notes": "Both acoustic models reject the first word 15. Fold its interval into word 14; preserve the rewind and the later real word 15. The 24,070 ms rewind boundary is unchanged and remains a separate concern. No manual listening is claimed.",
+  "input_segments": [
+    [13, 21170, 21530], [14, 21530, 23340], [15, 23340, 24040],
+    [11, 24070, 25430], [12, 25430, 26380], [13, 26380, 26740],
+    [14, 26740, 29540], [15, 29540, 34410]
+  ],
+  "expected_segments": [
+    [13, 21170, 21530], [14, 21530, 24040],
+    [11, 24070, 25430], [12, 25430, 26380], [13, 26380, 26740],
+    [14, 26740, 29540], [15, 29540, 34410]
+  ]
+}

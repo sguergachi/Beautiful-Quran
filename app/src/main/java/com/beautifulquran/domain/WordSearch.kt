@@ -93,7 +93,8 @@ fun isWordSearchQuery(query: String): Boolean {
 
 /** Candidate term for cold first results; phrases may consist entirely of short words. */
 internal fun quickSearchFallbackTerm(query: String): String? {
-    val words = query.split(Regex("[^\\p{L}\\p{N}]+"))
+    val words = (if (EnglishContractions.mayExpand(query)) EnglishContractions.words(query) else
+        query.split(Regex("[^\\p{L}\\p{N}]+")))
         .filter(String::isNotEmpty)
     return words.maxByOrNull(String::length)?.takeIf { words.size > 1 || it.length >= 4 }
 }
@@ -224,7 +225,7 @@ fun matchWordSearch(
                 if (sources.verseTranslation) {
                     searchTextRelevance(anchor.ayahTranslation, latin, allowFuzzy)
                 } else 0,
-                if (sources.wordGloss && parsed.text.any(Char::isWhitespace)) {
+                if (sources.wordGloss && (parsed.text.any(Char::isWhitespace) || EnglishContractions.mayExpand(parsed.text))) {
                     searchTextRelevance(sameAyahGlossLine(index, at), latin, allowFuzzy)
                 } else {
                     0
@@ -238,7 +239,7 @@ fun matchWordSearch(
                     fuzzyWordMatch(normalizeArabicForSearch(anchor.ayahText), arabic)
                 } else {
                     (if (sources.verseTranslation) {
-                        fuzzyWordMatch(anchor.ayahTranslation.lowercase(), latin.text)
+                        fuzzyWordMatch(EnglishTypography.fold(anchor.ayahTranslation).lowercase(), latin.text)
                     } else null) ?: (if (sources.wordGloss) {
                         fuzzyWordMatch(sameAyahGlossLine(index, at).lowercase(), latin.text)
                     } else null) ?: if (sources.transliteration) {
@@ -644,7 +645,8 @@ private fun visibleSearchTargetIndices(
     val needles = highlightNeedles(displayText, query, "", semanticLabel, semanticTerms)
     val terms = needles
         .flatMap { needle ->
-            listOf(needle) + Regex("[\\p{L}\\p{N}]+").findAll(needle).map { it.value }
+            listOf(needle) + Regex("[\\p{L}\\p{N}]+").findAll(needle).map { it.value } +
+                if (EnglishContractions.mayExpand(needle)) EnglishContractions.words(needle) else emptyList()
         }
         .filter { it.length >= 3 && it.lowercase() !in highlightFillers }
         .distinctBy(String::lowercase)
@@ -876,6 +878,17 @@ fun englishTranslationHighlightSpans(
     return highlightAllOccurrences(snippet, needles)
 }
 
+/** Every ranked result has visible gold: precise terms, or the whole ayah-level context. */
+fun searchHitHighlightSpans(hit: WordSearchHit, query: String): List<AyahTextSpan> {
+    val spans = englishTranslationHighlightSpans(
+        hit.displayText, query, EnglishTypography.typesetName(hit.translation),
+        hit.matchLabel.orEmpty(), hit.matchTerms,
+    )
+    if (spans.any(AyahTextSpan::highlighted)) return spans
+    val context = spans.joinToString("") { it.text }.ifBlank { hit.matchReason }
+    return listOf(AyahTextSpan(context, highlighted = true))
+}
+
 /**
  * Trims [text] to roughly [wordsBefore]…[wordsAfter] words around the first
  * occurrence of [needle], adding an ellipsis when the ends were cut.
@@ -948,6 +961,19 @@ private fun highlightNeedleSpecs(
     }
     val parsed = parseSearchQuery(query)
     add(parsed.text, wholeWord = parsed.exactOnly, wordPrefix = !parsed.exactOnly)
+    if (!parsed.exactOnly) {
+        EnglishContractions.ranges(haystack, parsed.text).forEach { add(haystack.substring(it)) }
+    }
+    val phraseWords = EnglishTypography.fold(parsed.text)
+        .split(Regex("[\\s()\\[\\]]+")).filter(String::isNotEmpty)
+    if (phraseWords.size > 1) {
+        // Keep the source spelling and offsets; brackets do not interrupt a typed phrase.
+        val phrase = phraseWords.joinToString("[\\s()\\[\\]]+", transform = Regex::escape)
+        val ending = if (parsed.exactOnly) "(?![\\p{L}\\p{N}])" else "[\\p{L}\\p{N}]*"
+        Regex("(?<![\\p{L}\\p{N}])[\\[(]*$phrase$ending[)\\]]*", RegexOption.IGNORE_CASE)
+            .findAll(EnglishTypography.fold(haystack))
+            .forEach { add(haystack.substring(it.range), wholeWord = true) }
+    }
     val arabicQuery = normalizeArabicForSearch(query).isNotEmpty()
     fun visibleTerm(term: String): String? {
         if (firstOccurrence(haystack, term, wholeWord = true) >= 0) return term
@@ -981,16 +1007,27 @@ private fun highlightNeedleSpecs(
     presentTokens(semanticLabel)
         .filterNot { it.lowercase() in highlightFillers }
         .forEach(::add)
+    if (needles.isEmpty() && !parsed.exactOnly && searchTextRelevance(haystack, parsed, false) > 0) {
+        // Reordered phrases rank as words; show those same words when no phrase is visible.
+        EnglishContractions.words(parsed.text)
+            .filter { it.length >= 2 && it.lowercase() !in highlightFillers }
+            .forEach { term ->
+                visibleTerm(term)?.let(::add) ?: add(term, wholeWord = false, wordPrefix = true)
+            }
+    }
     return needles.values.toList()
 }
 
 private fun firstOccurrence(
-    text: String,
-    term: String,
+    typeset: String,
+    rawTerm: String,
     wholeWord: Boolean,
     wordPrefix: Boolean = false,
     startIndex: Int = 0,
 ): Int {
+    // Folded character for character: an index here is an index in [typeset].
+    val text = EnglishTypography.fold(typeset)
+    val term = EnglishTypography.fold(rawTerm)
     var at = text.indexOf(term, startIndex, ignoreCase = true)
     while (at >= 0) {
         val end = at + term.length

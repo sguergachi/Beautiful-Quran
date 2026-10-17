@@ -1,6 +1,15 @@
 /** Quran-wide word search — mirrors Android `domain/WordSearch.kt`. */
+import { contractionForms, contractionRanges, contractionRelevance, contractionWords, mayExpandContractions } from './EnglishContractions'
 
 export const WORD_SEARCH_MAX_HITS = 400
+
+/** `typesetEnglish` (EnglishTypography) undone character for character, for matching typed queries. */
+export function foldEnglish(text: string): string {
+  return /[“”‘’–]/u.test(text)
+    ? text.replace(/[“”]/gu, '"').replace(/[‘’]/gu, "'").replace(/–/gu, '-')
+    : text
+}
+
 export const WORD_SEARCH_MIN_QUERY_LENGTH = 2
 export const WORD_SEARCH_PREVIEW_LIMIT = 3
 
@@ -116,6 +125,10 @@ const QUERY_FILLERS = new Set([
 const canonicalWords = (text: string): string[] =>
   text.toLowerCase().split(SEARCH_SEPARATOR).filter(Boolean)
 
+const canonicalWordForms = (text: string): string[][] => mayExpandContractions(text)
+  ? contractionForms(text).flatMap((forms) => forms.length > 1 ? [forms] : canonicalWords(forms[0]!).map((word) => [word]))
+  : canonicalWords(text).map((word) => [word])
+
 const stem = (word: string): string => {
   if (word.length > 6 && word.endsWith('ness')) return word.slice(0, -4)
   if (word.length > 5 && word.endsWith('ies')) return `${word.slice(0, -3)}y`
@@ -129,9 +142,10 @@ export function searchTextRelevance(
   query: ParsedSearchQuery,
   allowFuzzy = true,
 ): number {
+  // Display text is typeset (curled quotes, en dashes); match it as typed.
   return searchLowerTextRelevance(
-    text.toLowerCase(),
-    query.text.toLowerCase(),
+    foldEnglish(text).toLowerCase(),
+    foldEnglish(query.text).toLowerCase(),
     query.exactOnly,
     allowFuzzy,
   )
@@ -152,19 +166,21 @@ function searchLowerTextRelevance(
     const canonicalNeedle = canonicalWords(needle).join(' ')
     return canonicalNeedle && containsBounded(phrase, canonicalNeedle) ? 3_000 : 0
   }
+  const contractionScore = contractionRelevance(target, needle)
+  if (contractionScore > 0) return contractionScore
   if (containsWordPrefix(target, needle)) return 2_200
-  const singleWord = /^[\p{L}\p{N}]+$/u.test(needle)
+  const singleWord = /^[\p{L}\p{N}]+$/u.test(needle) && !mayExpandContractions(needle)
   if (allowFuzzy && singleWord) {
     return fuzzyWordContains(target, needle) ? 1_600 : 0
   }
   if (singleWord && !QUERY_FILLERS.has(needle)) return 0
 
-  const queryWords = canonicalWords(needle)
-  const meaningful = queryWords.filter((word) => !QUERY_FILLERS.has(word))
+  const queryWords = canonicalWordForms(needle)
+  const meaningful = queryWords.filter((forms) => !forms.every((word) => QUERY_FILLERS.has(word)))
   const content = meaningful.length > 0 ? meaningful : queryWords
   if (content.length > 1 || content.length < queryWords.length) {
-    const stems = new Set(canonicalWords(target).map(stem))
-    if (content.every((word) => stems.has(stem(word)))) return 2_600
+    const stems = new Set(canonicalWordForms(target).flat().map(stem))
+    if (content.every((forms) => forms.some((word) => stems.has(stem(word))))) return 2_600
   }
   return 0
 }
@@ -496,7 +512,7 @@ function scanAyahText(state: RankingState, allowFuzzy: boolean): void {
       end++
     }
     let glossScore = 0
-    if (state.sources.wordGloss && /\s/u.test(state.parsed.text)) {
+    if (state.sources.wordGloss && (/\s/u.test(state.parsed.text) || mayExpandContractions(state.parsed.text))) {
       glossScore = searchTextRelevance(sameAyahGlossLine(state.index, at), state.latin, allowFuzzy)
     }
     const transliterationScore = state.sources.transliteration && /\s/u.test(state.parsed.text)
@@ -912,7 +928,8 @@ function visibleSearchTargetIndices(
   const needles = highlightNeedles(displayText, query, '', semanticLabel, semanticTerms)
   const terms = [...new Set(
     needles
-      .flatMap((needle) => [needle, ...(needle.match(/[\p{L}\p{N}]+/gu) ?? [])])
+      .flatMap((needle) => [needle, ...(needle.match(/[\p{L}\p{N}]+/gu) ?? []),
+        ...(mayExpandContractions(needle) ? contractionWords(needle) : [])])
       .filter((term) => term.length >= 3 && !HIGHLIGHT_FILLERS.has(term.toLowerCase()))
       .map((term) => term.toLowerCase()),
   )]
@@ -1229,6 +1246,16 @@ export function englishTranslationHighlightSpans(
   return highlightAllOccurrences(snippet, needles)
 }
 
+/** Every ranked result has visible gold: precise terms, or the whole ayah-level context. */
+export function searchHitHighlightSpans(hit: WordSearchHit, query: string): AyahTextSpan[] {
+  const spans = englishTranslationHighlightSpans(
+    hit.displayText ?? hit.ayahTranslation, query, hit.translation, hit.matchLabel ?? '', hit.matchTerms ?? [],
+  )
+  if (spans.some((span) => span.highlighted)) return spans
+  const context = spans.map((span) => span.text).join('')
+  return [{ text: context.trim() ? context : hit.matchReason || 'Text match', highlighted: true }]
+}
+
 /**
  * Trims [text] to roughly [wordsBefore]…[wordsAfter] words around the first
  * occurrence of [needle], adding an ellipsis when the ends were cut.
@@ -1303,6 +1330,20 @@ function highlightNeedleSpecs(
   }
   const parsed = parseSearchQuery(query)
   add(parsed.text, parsed.exactOnly, !parsed.exactOnly)
+  if (!parsed.exactOnly) {
+    for (const match of contractionRanges(haystack, parsed.text)) add(haystack.slice(match.start, match.end))
+  }
+  const phraseWords = foldEnglish(parsed.text).split(/[\s()[\]]+/).filter(Boolean)
+  if (phraseWords.length > 1) {
+    // Keep the source spelling and offsets; brackets do not interrupt a typed phrase.
+    const phrase = phraseWords.map((word) => word.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'))
+      .join('[\\s()\\[\\]]+')
+    const ending = parsed.exactOnly ? '(?![\\p{L}\\p{N}])' : '[\\p{L}\\p{N}]*'
+    const pattern = new RegExp(`(?<![\\p{L}\\p{N}])[\\[(]*${phrase}${ending}[)\\]]*`, 'giu')
+    for (const match of foldEnglish(haystack).matchAll(pattern)) {
+      add(haystack.slice(match.index, match.index + match[0].length))
+    }
+  }
   const arabicQuery = Boolean(normalizeArabicForSearch(query))
   const visibleTerm = (term: string): string | null => {
     if (firstOccurrence(haystack, term, true) >= 0) return term
@@ -1341,6 +1382,15 @@ function highlightNeedleSpecs(
   presentTokens(semanticLabel)
     .filter((token) => !HIGHLIGHT_FILLERS.has(token.toLowerCase()))
     .forEach((term) => add(term))
+  if (!needles.size && !parsed.exactOnly && searchTextRelevance(haystack, parsed, false) > 0) {
+    // Reordered phrases rank as words; show those same words when no phrase is visible.
+    for (const term of contractionWords(parsed.text)
+      .filter((word) => word.length >= 2 && !HIGHLIGHT_FILLERS.has(word.toLowerCase()))) {
+      const visible = visibleTerm(term)
+      if (visible) add(visible)
+      else add(term, false, true)
+    }
+  }
   return [...needles.values()]
 }
 
@@ -1351,8 +1401,9 @@ function firstOccurrence(
   wordPrefix = false,
   startAt = 0,
 ): number {
-  const lowerText = text.toLowerCase()
-  const lowerTerm = term.toLowerCase()
+  // Folded character for character: an index here is an index in `text`.
+  const lowerText = foldEnglish(text).toLowerCase()
+  const lowerTerm = foldEnglish(term).toLowerCase()
   let at = lowerText.indexOf(lowerTerm, startAt)
   while (at >= 0) {
     const end = at + term.length

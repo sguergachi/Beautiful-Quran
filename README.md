@@ -11,7 +11,7 @@ illuminates in time with the audio, with its English meaning beneath it.
 - 🔁 Repeat one ayah, the whole surah, or any ayah range you choose
 - 🔍 Search the English translation and word glosses within a surah
 - 🌙 Warm paper light theme and near-black charcoal dark theme
-- 📴 All Quran text and repeat-aware timings work offline
+- 📴 Quran text works offline; authenticated repeat timings remain available offline after their first download
 - 🚫 No ads, no accounts, no analytics
 
 ## Install on your phone
@@ -113,13 +113,14 @@ verifies that it is signed with the upload certificate expected by Google Play.
 In a linked Git worktree it also checks the primary checkout for
 `release.keystore`; set `RELEASE_KEYSTORE_FILE` to use a key stored elsewhere.
 
-`tools/build_db.py` downloads Quran text, morphology, open quran-align timings,
-and QDC repeat topology, then normalizes and validates the result offline. The
-committed asset contains no QF word gloss, transliteration, QCF, or page-layout
-values. Android and web fetch those fields from the authenticated Quran
-Foundation Content API into a separate seven-day device cache.
-Repeat-aware timings are bundled in `quran.db`, work fully offline, and change
-only through a reviewed app release. CI (GitHub Actions) runs unit tests on
+`tools/build_db.py` prepares Quran text, morphology, and independent timing
+corpora for the committed asset. Six repeat-aware voices use authenticated
+Quran Foundation Content Sync through the app's Worker; the canonical Python
+pipeline normalizes their audio clock and gates every change with acoustic
+evidence before a runtime timing view is published. Neither those timing rows
+nor QF word gloss, transliteration, QCF, or page-layout values are bundled.
+Timings are cached atomically and remain usable offline after the first download,
+including during provider outages. CI (GitHub Actions) runs unit tests on
 every push; on `master`
 it also assembles the release APK and publishes it to the rolling latest release.
 
@@ -223,6 +224,10 @@ If host Vulkan is broken on your machine, you can still fall back with
 | Root / lemma / morphology | [Quranic Arabic Corpus](http://corpus.quran.com) v0.4 | free with attribution + link |
 | Word timing clock/fallback | [cpfair/quran-align](https://github.com/cpfair/quran-align) | CC-BY 4.0 |
 | Yasser Al-Dosari word timings | [Qur'anic Universal Audio](https://github.com/Wider-Community/quranic-universal-audio) | CC-BY 4.0 |
-| Bundled repeat topology | [quran.com](https://quran.com) legacy `qdc` audio API, normalized offline | written QF permission requested before release |
+| Repeat topology (runtime cache only) | Quran Foundation authenticated Content Sync, normalized and acoustically reviewed | governed by QF Developer Terms |
 | Recitation audio | [everyayah.com](https://everyayah.com) | free; rights remain with reciters |
 | Arabic typeface | KFGQPC HAFS Uthmanic Script, King Fahd Complex | redistribution permission/official license confirmation pending |
+
+The [authenticated timing transition](docs/QF_TIMING_PARITY.md) records the
+source comparison and full canonical regression review. See
+[QF_CONTENT_SYNC.md](docs/QF_CONTENT_SYNC.md) for cache and maintenance details.

@@ -5,8 +5,86 @@ verdict has reviewed them yet. The fail-closed delta gate withholds each of
 them; this file keeps that from being silent. Remove an entry when its rows ship
 with a verdict, are held with their model scores, or its cause is reverted.
 
-**Nothing is outstanding.** `python3 tools/build_db.py --refresh-qdc-timings`
-reproduces the shipped database (quran-v65) row for row.
+## Audio-vetted rewind onset (#873)
+
+The typed Alafasy 5:2 correction removes only the unspoken word 15 at
+23,340–24,040 ms and folds that interval into word 14. Its local candidate
+verdict is bound to the delivered runtime row; it is not an authenticated
+snapshot publication. The private replay must reconcile the existing source
+transition ledger and every other corpus delta before this row can ship.
+The returning word-11 boundary at 24,070 ms also remains unvalidated: both
+models force it around 25,146–25,166 ms. No clock offset is inferred.
+
+The later Pixel 10 5:2 report also shortens word 1 to 2,609 ms, advances word 2
+to 3,072 ms, and moves the word-15/16 handoff to 33,660 ms. Fresh XLSR/MMS
+inference rejects the opening edit: forced word-1 ends are 3,281/3,241 ms and
+word 2's start error increases from 41 to 269 ms. Word 16 improves by 750 ms
+but remains 1,933 ms late on both models. Keep these boundaries held, preserve
+the existing topology-only fix, and review the exact word-16 onset separately.
+The held proposal and full regression are recorded in
+`../timing_evidence/device-lab-alafasy-5-2-boundaries.verdict.json`; no runtime
+publication is implied.
+
+The maintainer subsequently auditioned Alafasy 47:4 and reported that word 13,
+مَنّا, must not highlight twice. An exact-source correction now merges it to
+16,565–19,000 ms after repairs, preserving every other segment. Both models
+prefer one word. The subsequent corpus audit now proves retained acoustic
+ownership for XLSR's confident source label; the bounded same-word gate accepts
+the exact candidate. `maintainer-word-split-class.json` records that evidence
+and keeps the human report separate. Authenticated-source promotion and runtime
+publication are still pending. Alafasy 24:25 and Hani 21:46/21:63 need no edit.
+
+## Generated held-word merges: 71 runtime candidates
+
+The [complete same-word audit](../../docs/quality-reviews/TIMING_WORD_SPLIT_CORPUS_2026-10-17.md)
+ran actual XLSR/MMS inference for all 1,021 adjacent equal-position pairs in
+81,059 delivered rows. It generates 71 accepted merges across the six reviewed
+QF voices, including 47:4 and the duplicate component of closed #565 (5:57).
+Every generated operation reproduces its complete audited output after the
+finalizer. The 784 retained and 166 uncertain cases remain unchanged.
+
+`../timing_evidence/word-split-corpus-candidates.verdict.json` binds the actual
+runtime baseline/candidate hashes, audio and both model proofs. These candidate
+verdicts do not replace `qf-source-transition.json`. The private authenticated
+source replay must reconcile all 71 rows and every other delta before runtime
+publication. No bundled database asset changed.
+
+The separate high-water-before-rewind inventory has 4,337 candidates, 4,313
+compatible with the typed pre-rewind operation. Its acoustic coverage is
+explicitly incomplete. The 5:2 exception does not authorize class-wide drops;
+the same-word detector must not be presented as fixing that distinct class.
+
+## Lagged qdc peer pairs (#856)
+
+`lagged_peer_positions` stops `preserve_peer_repeats` restoring a same-word
+pair the repair shows to be qdc labels running one word late before a skip.
+The bundled database is unchanged. A replay of public qdc plus
+`tools/timing_repairs/` changes four QF runtime rows, all from a fake pair
+to the repair's topology:
+
+| Row | Before | After |
+|---|---|---|
+| Alafasy 24:25 | `1,1,2,3,4,5,6,6…` | `1,2,3,4,5,6,6…` (matches the #856 Lab edit) |
+| Sudais 59:5 | `…5,6,6,7,8…` | `…5,6,7,8…` (real `10,11,10,11` kept) |
+| Abdul Basit 33:6 | `15,15,28,29` | complete 1–29 |
+| Abdul Basit 35:10 | `5,5,15,…` | complete 1–24 |
+
+They need dual-model verdicts from a `--qf-snapshots` build before
+`sync_qf_timings.py --publish`; until then the delta gate keeps the reviewed
+rows. Note for the reviewer: `qf-source-transition.json` held an earlier
+24:25 candidate because both models still heard word 1 in the removed
+occurrence (0.83 / 0.75). In the new row that audio stays on word 1 (the
+repair runs يَوۡمَئِذٖ to 2020 ms), so a high word-1 probability there is
+expected, not evidence of a re-say.
+
+**Runtime observation, 2026-10-16:** the public Alafasy runtime resource already
+matches the 24:25 edit in #856/#873, including the retained word-6 repeat.
+The deployed normalizer fingerprint differs from this checkout, so the table
+above describes the reproducible local pipeline delta, not proof that the
+service still carries the old row. Reconcile publication provenance and the
+ledger during the next authenticated replay; do not reapply the Lab row or
+remove another occurrence. See the
+[#873 review](../../docs/quality-reviews/TIMING_PATCH_873_2026-10-16.md).
 
 ## Resolved: Sudais re-clock after #712 (quran-v64)
 

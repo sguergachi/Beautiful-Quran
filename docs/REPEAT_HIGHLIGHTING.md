@@ -10,19 +10,23 @@ data comes from, and the traps we hit making it ship.
 
 ## Current state
 
-As of `quran-v57.db`, Android and web both read the same verified repeat-aware
-rows from the bundled database. There is no runtime timing API, cache, backend,
-or on-device audio analysis. The offline build pipeline combines QDC repeat
-topology with quran-align's everyayah audio clock, applies every correction and
-physical gate, and ships changes only through a reviewed app release.
+As of `quran-v66.db`, the six QF voices obtain reviewed repeat-aware timings
+from authenticated Content Sync through the app's Worker. The canonical Python
+pipeline combines those ordered occurrences with the EveryAyah clock, existing
+corrections/repairs, onset evidence, and physical gates. Every changed canonical
+row is acoustically reviewed against the private v65 baseline; rejected or
+ambiguous rows retain that reviewed baseline. Clients perform no timing repair.
 
-The database deliberately excludes QF word gloss, transliteration, QCF, and
-page-layout fields; authenticated Content Sync keeps those in the separate
-seven-day runtime cache.
-Bundling the QDC-derived topology requires written QF permission before release.
-The code architecture and that permission question are separate.
+The complete-reciter copies are committed atomically to Android SQLite or web
+IndexedDB and revalidated after six days. They remain readable through provider
+outages; explicit withdrawal/access rejection purges the appropriate content.
+A first online download is required. Release assets exclude all 37,411 QF timing
+rows; 43,648 independent timing rows remain unchanged. The pure highlight and
+ink engines still consume the same segment representation and repeat policy.
+See [QF_TIMING_PARITY.md](QF_TIMING_PARITY.md) for the transition evidence and
+[QF_CONTENT_SYNC.md](QF_CONTENT_SYNC.md) for backend maintenance.
 
-The current timing table has:
+The historical v57 timing table had:
 
 | Fact | Value |
 |---|---|

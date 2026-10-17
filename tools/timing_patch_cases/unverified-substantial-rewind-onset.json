@@ -1,0 +1,9 @@
+{
+  "id": "unverified-substantial-rewind-onset",
+  "label": "A substantial label before a rewind needs an audio verdict",
+  "refs": ["GitHub #873"],
+  "pipeline": "clean_qdc_artifacts",
+  "notes": "The 700 ms shape alone cannot identify an unspoken word. Keep the existing short-word floor and require the separate exact-source typed correction.",
+  "input_segments": [[13, 21170, 21530], [14, 21530, 23340], [15, 23340, 24040], [11, 24070, 25430], [12, 25430, 26380], [13, 26380, 26740], [14, 26740, 29540], [15, 29540, 34410]],
+  "expected_positions": [13, 14, 15, 11, 12, 13, 14, 15]
+}

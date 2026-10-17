@@ -13,6 +13,7 @@ import { dictionaryEntry, type DictionaryEntry } from '../data/dictionary'
 import { lexiconEntry, type LexiconEntry } from '../data/lexicon'
 import { QuranRepository } from '../data/repository'
 import { runtimeMushafCache } from '../data/runtimeMushaf'
+import { QF_TIMING_RECITERS, runtimeTimingsCache } from '../data/runtimeTimings'
 import {
   loadBookmarks,
   loadSettings,
@@ -48,10 +49,9 @@ import {
   COVER_LAYER,
   READER_LAYER,
   SETTINGS_LAYER,
-  backDestination,
   hasReaderOpen,
-  nextSettingsReturn,
   settingsLayerFor,
+  underlyingLayer,
   sheetAtLayer,
   type StackLayer,
 } from '../ui/paper/stack'
@@ -123,12 +123,8 @@ export interface AppState {
   loadProgress: number | null
   /** Paper-stack position: -1 Bookmarks · 0 Chapters · 1 Reader · 2 Settings. */
   stackLayer: StackLayer
-  /**
-   * Where Settings was opened from — Back returns there instead of peeling
-   * one layer, so Chapters → Settings → Back lands on Chapters, not the
-   * reader. Null outside Settings.
-   */
-  settingsReturn: StackLayer | null
+  /** Paper beneath Settings; closing the sheet returns here. */
+  settingsOrigin: StackLayer
   /** Derived top sheet name (for labels / legacy checks). */
   sheet: Sheet
   surahs: Surah[]
@@ -138,6 +134,8 @@ export interface AppState {
   content: SurahContent | null
   player: PlayerState
   activeWord: ActiveWord | null
+  /** Playback generation, available even before the first word of a restart. */
+  inkActivation: number
   activeAyah: number | null
   activeBasmalah: boolean
   hasTimings: boolean
@@ -246,7 +244,7 @@ class AppStore {
     loadLabel: 'Opening the book…',
     loadProgress: null,
     stackLayer: COVER_LAYER,
-    settingsReturn: null,
+    settingsOrigin: COVER_LAYER,
     sheet: 'home',
     surahs: [],
     reciters: [],
@@ -255,6 +253,7 @@ class AppStore {
     content: null,
     player: player.getState(),
     activeWord: null,
+    inkActivation: 0,
     activeAyah: null,
     activeBasmalah: false,
     hasTimings: false,
@@ -272,12 +271,34 @@ class AppStore {
   }
 
   constructor() {
+    runtimeTimingsCache.subscribe((reciterId) => {
+      if (reciterId == null) void runtimeMushafCache.revoke().catch(() => undefined)
+      const currentReciter = this.state.reciters.find((reciter) => reciter.id === this.state.settings.reciterId)
+        ?? this.state.reciters[0]
+      if (!currentReciter || !QF_TIMING_RECITERS[currentReciter.id] ||
+          (reciterId != null && reciterId !== currentReciter.id)) return
+      ++this.timingLoadToken
+      this.stopWordAudition(true)
+      this.prepared.clear()
+      this.forcedHighlight = null
+      this.lastActiveKey = ''
+      const content = this.state.content
+      this.timingSegments = content
+        ? withBasmalahLeadIn(QuranRepository.timings(currentReciter.id, content.surah.id),
+          currentReciter.id, content.surah.id)
+        : new Map()
+      this.recomputeActive(this.state.player)
+      this.set({ hasTimings: currentReciter.hasTimings && this.timingSegments.size > 0 })
+    })
     runtimeMushafCache?.subscribe(() => {
       QuranRepository.invalidateRuntimeMushafViews()
       const current = this.state.content
       if (current) this.set({ content: QuranRepository.surahContent(current.surah.id) })
     })
     runtimeMushafCache?.subscribeDiagnostics(() => {
+      if (runtimeMushafCache.status().lastError === 'revoked') {
+        void runtimeTimingsCache.revoke().catch(() => undefined)
+      }
       if (this.state.ready) return
       const status = runtimeMushafCache.status()
       if (status.phase === 'refreshing') {
@@ -299,6 +320,7 @@ class AppStore {
     })
     window.addEventListener('online', () => {
       void runtimeMushafCache?.refreshIfNeeded()
+      void runtimeTimingsCache.refreshLoaded()
     })
     player.subscribe((ps) => {
       const prev = this.state.player
@@ -327,6 +349,9 @@ class AppStore {
         ps.nowPlaying?.surahId,
         ps.nowPlaying?.ayah,
         ps.repeatMode,
+        ps.repeatRange?.first,
+        ps.repeatRange?.last,
+        ps.speed,
         ps.error ?? '',
         this.lastActiveKey,
       ].join('|')
@@ -371,28 +396,36 @@ class AppStore {
   }
 
   /** Animate / snap the paper stack to a layer. */
-  setStackLayer(layer: number) {
+  setStackLayer(layer: number, settingsOrigin?: StackLayer) {
     const max = settingsLayerFor(this.hasReader())
     const min = this.state.bookmarks.length > 0 ? BOOKMARKS_LAYER : COVER_LAYER
     const stackLayer = Math.max(min, Math.min(max, Math.round(layer))) as StackLayer
     const sheet = deriveSheet(stackLayer, this.hasReader())
-    const from = this.state.stackLayer
-    // Remember where Settings was opened from; forget it on the way out.
-    const settingsReturn = nextSettingsReturn(from, stackLayer, this.hasReader(), this.state.settingsReturn)
+    // Popping Settings reveals its original paper, including an open word sheet.
+    if (this.state.sheet !== 'settings' && (sheet === 'home' || sheet === 'bookmarks')) {
+      this.closeRootViewer(false)
+    }
     const leave = onLeaveReaderSheet(this.state.gathering && leavesReader(
       bookSpreadEnabled(window.matchMedia(BOOK_SPREAD_QUERY).matches, this.state.settings.pagePresentation),
       this.state.stackLayer, stackLayer, this.hasReader(),
+      this.state.settings.readingLayout === 'mushaf',
     ))
     this.set({
       stackLayer,
-      settingsReturn,
       sheet,
+      ...(sheet === 'settings' && this.state.sheet !== 'settings'
+        ? { settingsOrigin: settingsOrigin ?? this.state.stackLayer } : {}),
       ...(leave.type === 'exit' ? { gathering: false, gatherSelection: [], shareError: null } : {}),
     })
   }
 
   /** Peel one sheet back (Settings → Reader → Chapters). */
   goBack() {
+    // Settings lies above any word sheet already on the opening page.
+    if (this.state.sheet === 'settings') {
+      this.setStackLayer(underlyingLayer(this.state.stackLayer, this.hasReader(), this.state.settingsOrigin))
+      return
+    }
     // Match Android: only consume back while the bleed is open (not mid-exit).
     if (this.state.rootViewer && !this.state.rootViewerClosing) {
       this.closeRootViewer()
@@ -400,11 +433,16 @@ class AppStore {
     }
     if (this.state.gathering && readerVisible(
       bookSpreadEnabled(window.matchMedia(BOOK_SPREAD_QUERY).matches, this.state.settings.pagePresentation), this.state.stackLayer, this.hasReader(),
+      this.state.settings.readingLayout === 'mushaf',
     )) {
       this.exitGather()
       return
     }
-    this.setStackLayer(backDestination(this.state.stackLayer, this.hasReader(), this.state.settingsReturn))
+    if (this.state.stackLayer === BOOKMARKS_LAYER) {
+      this.setStackLayer(COVER_LAYER)
+    } else {
+      this.setStackLayer(this.state.stackLayer - 1)
+    }
   }
 
   /** Jump to a specific sheet by clicking its peek. */
@@ -592,8 +630,9 @@ class AppStore {
     if (layoutChanged && this.state.content && this.state.readingPlace) {
       const { surahId, ayah } = this.state.readingPlace
       const layer = this.state.stackLayer
+      const origin = this.state.settingsOrigin
       this.openReading(surahId, ayah)
-      this.setStackLayer(layer)
+      this.setStackLayer(layer, origin)
     }
   }
 
@@ -1021,6 +1060,10 @@ class AppStore {
     player.clearError()
   }
 
+  async applyRepeat(mode: PlayerState['repeatMode'], range: PlayerState['repeatRange']) {
+    await player.applyRepeat(mode, range)
+  }
+
   setRepeat(mode: PlayerState['repeatMode'], range: PlayerState['repeatRange'] = null) {
     player.setRepeatMode(mode, range)
   }
@@ -1352,6 +1395,9 @@ class AppStore {
       this.inkActivation++
     }
     this.lastInkClockMs = highlightPositionMs
+    if (this.state.inkActivation !== this.inkActivation) {
+      this.state = { ...this.state, inkActivation: this.inkActivation }
+    }
     const next = readerHighlightState(
       {
         ayah: np.ayah,

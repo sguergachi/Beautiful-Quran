@@ -1,3 +1,5 @@
+import { suppliedWords } from './suppliedWords'
+import { foldEnglish } from '../domain/EnglishTypography'
 import { memo, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import type { ActiveWord, Ayah, Word } from '../data/models'
 import type { ReadingMode, VerseNumberScript } from '../data/settings'
@@ -132,18 +134,18 @@ function AyahBlockInner({
   const [hovered, setHovered] = useState(false)
   const query = searchQuery?.toLowerCase() ?? null
   const translationHit =
-    query != null && ayah.translation.toLowerCase().includes(query)
+    query != null && foldEnglish(ayah.translation).toLowerCase().includes(query)
   const hits = (translation: string) =>
-    query != null && translation.toLowerCase().includes(query)
+    query != null && foldEnglish(translation).toLowerCase().includes(query)
   const translationRef = useRef<HTMLParagraphElement>(null)
   const translationContent = useMemo<ReactNode>(() => {
-    if (flashWordPosition !== 0) return ayah.translation
+    if (flashWordPosition !== 0) return suppliedWords(ayah.translation)
     const ranges = searchHitTextRanges(ayah.translation, searchFlashText)
-    if (!ranges.length) return ayah.translation
+    if (!ranges.length) return suppliedWords(ayah.translation)
     const parts: ReactNode[] = []
     let cursor = 0
     for (const [start, end] of ranges) {
-      if (start > cursor) parts.push(ayah.translation.slice(cursor, start))
+      if (start > cursor) parts.push(...suppliedWords(ayah.translation.slice(cursor, start), `p${cursor}`))
       const match = ayah.translation.slice(start, end)
       parts.push(
         <span className="translation-search-term" key={`${start}-${end}`}>
@@ -155,7 +157,7 @@ function AyahBlockInner({
       )
       cursor = end
     }
-    if (cursor < ayah.translation.length) parts.push(ayah.translation.slice(cursor))
+    if (cursor < ayah.translation.length) parts.push(...suppliedWords(ayah.translation.slice(cursor), `p${cursor}`))
     return parts
   }, [ayah.translation, flashWordPosition, searchFlashText])
 
@@ -255,6 +257,9 @@ function AyahBlockInner({
                 word={w}
                 ink={ink}
                 sweepMs={isActive ? activeSweepMs : null}
+                  motion={{ key: `${ayah.surahId}:${ayah.number}:${w.position}`, timing: isActive ? activeWord : null,
+                    isAyahFinal: index === words.length - 1, previousArabic: words[index - 1]?.arabic,
+                    nextArabic: words[index + 1]?.arabic }}
                 activation={isActive ? (activeWord?.activation ?? 0) : 0}
                 searchFlash={searchFocusActive && searchTargets.has(w.position)}
                 searchRecessed={searchTargetAyah && !searchTargets.has(w.position)}
@@ -295,6 +300,9 @@ function AyahBlockInner({
                   englishText={englishOnly ? englishWords[index] : undefined}
                   ink={ink}
                   sweepMs={isActive ? activeSweepMs : null}
+                  motion={{ key: `${ayah.surahId}:${ayah.number}:${w.position}`, timing: isActive ? activeWord : null,
+                    isAyahFinal: index === words.length - 1, previousArabic: words[index - 1]?.arabic,
+                    nextArabic: words[index + 1]?.arabic }}
                   activation={isActive ? (activeWord?.activation ?? 0) : 0}
                   showGloss={!englishOnly && showWordGloss}
                   showTransliteration={showTransliteration}

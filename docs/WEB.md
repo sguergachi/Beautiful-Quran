@@ -16,8 +16,11 @@ viewer, and a PWA shell. Production build is published to GitHub Pages at
 `web/README.md` for run instructions. The sections
 below remain the design record and quality bar.
 
-The current data layer mirrors Android: reviewed repeat-aware timings come from
-the shared database and are exported per reciter for lazy web loading, while
+The current data layer mirrors Android: the seven independent voices use
+packaged lazy timing corpora; six QF voices load complete reviewed timing views
+from the authenticated Worker into separate IndexedDB resources. Timing copies
+refresh after six days and survive provider outages, with explicit withdrawal
+and shared QF revocation purging their prepared reader state. Separately,
 authenticated Quran Foundation word/QCF fields live in a separate IndexedDB
 cache with six-day revalidation, a seven-day hard freshness limit, and
 automatic retry when the browser comes back online.
@@ -174,10 +177,9 @@ playback does not resume the chapter-opening clip left by `openSurah` /
 updates when a verse is actually recited — not on open, scroll, or rail jump.
 
 **Continue reading** keeps a separate `lastReadSurah` / `lastReadAyah` at the
-settled scroll verse or Mushaf leaf. It never seeks audio. Chapters shows a
-single Continue row on the listening place (Android parity); the reading
-place still drives resume, verse links, and the toolbar readout below.
-A Mushaf turn reports
+settled scroll verse or Mushaf leaf. It never seeks audio. Chapters shows one
+green-ribbon continue pill: the last-heard place, matching Android, with the
+reading place as its fallback before any listening. A Mushaf turn reports
 its settled verse to the toolbar and in-chapter search; the loaded listening
 chapter stays identified on the transport when it differs from the paper.
 An explicitly opened verse is kept when it is on either facing leaf, so a link
@@ -232,8 +234,10 @@ Renderers consume these; they do not re-derive curves.
   This keeps the main-thread sql.js work from freezing the cover or paper
   peel. Timings remain lazy and hydrate after the reader's first frame.
 - **Do not** add data-repair logic in the web app (Android invariant #2).
-- The generated timing corpora contain the exact reviewed repeat-aware rows
-  Android uses. They are static first-party assets, not a timing API.
+- Generated timing corpora include only the seven independent voices. IDs
+  `1,2,3,4,5,7` use the reviewed runtime timing endpoint and are forbidden in
+  the Pages artifact. Source normalization and acoustic review stay in Python;
+  web validates identity, canonical coverage, chronology, and the exact digest.
 
 ### 6.2 Audio
 
@@ -372,19 +376,26 @@ bounds and never reaches the lines above and below.
 Repeat orange wash: second overlay on the same wash curve; dissolve when
 the repeat chain releases (`InkEngine` + `REPEAT_HIGHLIGHTING.md`).
 
-Fresh-ink glint (Nightfall + Royal Green): a third overlay twin in white gold
-(`--glint`, defined on `[data-theme='dark']` and `[data-theme='royal_green']`)
-that washes in alongside a genuinely new word's first-pass ink — same duration,
-easing, and directional mask — then dissolves to plain recited ink over
-`glintFadeMs` (1 s) once the voice moves on. Gate: `InkEngine.glinting` (word
-half) × `glintEnabled()` in `render/inkWash.ts` (theme half). Repeat events
-always retrigger the glimmer, including when the word starts already revealed;
-an ordinary backward-seek re-entry does not. A transparent duplicate glyph
-supplies the tight two-radius `text-shadow` halo while the crisp overlay keeps
-the directional mask. The halo has no background, box shadow, or filter, and
-overflow remains visible so its edge cannot expose the word box. Same policy
-and color as Android (`QuranAccents.glintInk`); see [GLIMMER.md](GLIMMER.md) for
-the complete layer and visual-verification contract.
+Fresh-ink glint (Nightfall + Royal Green) follows the word's wash and dries
+over `glintFadeMs` after handoff. Arabic tints its single authoritative glyph;
+English uses a masked tint twin. An outline-only halo has Android's tight
+bloom, 5 px halo and warm 22.5 px veil. Acoustic tarjīʿ comes from worker-side
+8 kHz PCM analysis: AM/FM cycle admission, held-note lifecycle, recording
+noise calibration, per-reciter drama and one-event/one-word ownership. The
+pulse is measured from PCM at hop centres, while gain and event identity use
+hop ends. Light uses the 139 ms smoothing filter with speed-aware phase
+compensation, linear-light tint and gamma-correct glow alpha. Pausing dries
+wet ink without spending the word's event gate; unavailable analysis leaves
+still ink. There is no free-running sine fallback.
+
+`useWordWash` and `useRepeatWash` share the lifecycle between Hafs and word
+blocks. The former retains a short residual only into Recited, carries a wasl
+prefix into the next activation, and waits for English predecessors. Repeat
+orange follows each live word's measured dwell and paced feather; residuals
+finish concurrently, and a seek's already-spoken chain is complete immediately.
+This matches Android's newer audio-bound repeat policy rather than the older
+position-queued orange wash. JVM-generated numeric fixtures and the optional
+`web/scripts/check-ink-browser.mjs` check cover the port.
 
 ## 9. UI surface (paper metaphor)
 
@@ -420,7 +431,8 @@ centred phone column, including iPads in portrait and landscape. Customize →
 tablet text more room while retaining the default facing book. The preference
 also drives entrance, root-viewer and gather visibility policies. In the facing
 book, Chapters lies on the verso with Bookmarks laid over it; the recto carries
-the title page, then the Reader, with Settings laid over it in every layout. `App` sets `data-spread` on the shell and hands
+the title page, then the Reader; Settings overlays the left page in every layout.
+`App` sets `data-spread` on the shell and hands
 each page the layer it should believe it is on (`spreadLayers`), so the reader
 stays live — focus follow, keys, rail — while Chapters is also on top; the
 store's real stack layer is untouched. `BookSpread` draws the boards, page
@@ -432,8 +444,14 @@ real layer and covers the verso only at layer 0 (`data-leaves`). Covered
 verso content is inert and hidden from assistive technology; the recto comes
 first in DOM and Tab order. `sheetFocus.ts` makes all fully covered or parked
 sheets inert, hands focus to arriving paper, and restores its previous control
-on return. The word viewer focuses its own paper, makes the leaf beneath it
-inert, and restores the word on close; its facing origin page stays usable.
+on return. It also owns the desktop word sheet's covered pages and portal
+slot, so opening and closing Settings cannot re-enable controls beneath the
+word sheet. The word viewer manages its inline siblings on phones and keeps
+the first focus origin across Strict Mode's effect replay. On close it waits
+until the page is uncovered before restoring focus; navigation to another
+chapter instead focuses the arriving page.
+Native Repeat dialogs stay above the word sheet across screen resizing;
+closing Repeat restores the word sheet if its old trigger is now covered.
 Exposed facing pages remain usable. Only the reading verse's word,
 bookmark and verse number enter Scroll's Tab order; Mushaf has one word cursor
 per leaf. Focused words use left/right to move in their reading direction,
@@ -456,7 +474,8 @@ The spread is one grid: a single module `--u` in `styles.css`
 (`--page-w` = φ⁶u, `--page-h`), the margins and the gutter's shade
 (`--gutter-shade`). It drives the book, the cover board and every sheet; a
 Mushaf leaf is absolutely placed on `--margin-inner/head/fore/foot`. Head and
-foot are floored at `--chrome-h` / `--transport-h`; inner and fore are not.
+foot are floored at `--chrome-h` / `--transport-h` (both ride `--furn`, so the
+margins hold scaled furniture on a desk-sized page); inner and fore are not.
 The scrolling reader's column is the same block (`--reader-max`, and the
 sheet's `padding-right` of fore − inner). The block's two piles: `App` sets `--book-right` (a registered `<number>`,
 eased over 900 ms) from `bookRightShare`, the share of the 302 leaves on the
@@ -496,7 +515,7 @@ lines in a layout effect in `MushafLeaf`. The cap is the
 `mushafGlyphWiden` setting.
 Mushaf lines justify by even word spaces: words and verse marks are
 separate flex items of the line (`space-between`) inside `.mushaf-block`, so
-head, lines and folio share one measure. The minimum gap is Hafs's own word
+head and lines share one measure. The minimum gap is Hafs's own word
 space (`MUSHAF_MIN_GAP`, 0.22 em) and loose lines widen toward 0.3 em. The
 block's width is `mushafMeasure`: the widest line set at minimum spaces with
 its letters condensed by up to `MUSHAF_MAX_CONDENSE` (4%), written inline by
@@ -505,9 +524,20 @@ loosen every other line; now it is set slightly narrow instead. `mushafLeafFit` 
 shrinks the type when the widest line overruns the page; widths are read at
 the applied scale and divided back (toggling the scale to measure made the
 measurement oscillate). Rationale in `docs/DESIGN.md`.
-The leaf's folio follows the Customize page-number script (both figures
-share one centred line with a diamond between), opening leaves 1–2 centre
-their few lines in the well, and facing leaves mirror their running heads.
+The leaf's folio stands in the running head — Western figure at the left,
+the chapter centred, Arabic-Indic at the right (one script puts its figure
+at the left and the chapter at the right), Android `MushafRunningHead`
+parity, the same order on both facing leaves. Opening leaves 1–2 centre
+their few lines in the well.
+The spread's furniture scale keeps the same `u / 27.5px` ratio and 0.85
+floor, expressed as `tan(atan2(u, 27.5px))` for browsers without typed CSS
+division. `--u` is registered as a length so Firefox resolves its viewport
+expression before evaluating the ratio. An invalid scale otherwise makes
+the head/foot margins and controls invalid, collapses the opening rows, and
+gives the turning leaf the same broken geometry. The optional
+`web/scripts/check-mushaf-browser.mjs` regression runs in Firefox or Chromium
+with a tab-local printed-page map, checking opening/full leaves, tablet
+resizing, forward/back turns, chapter opening, and interrupted turns.
 Page turns: `MushafReader` keeps the place the book last settled on,
 prepares both destination leaves at the reader’s measure, then portals a
 two-faced leaf (`TurningLeaf`) into `BookSpread`'s turn slot (`.mushaf-flip`,
@@ -587,15 +617,22 @@ lies (its scrolled list, pinned search bar, rounded field, prompt, icons).
 The sheet itself is hidden while a leaf is in the air (`data-air` on the
 shell, set by `BookSpread` from `useBookAir`), so it is never seen under a
 pile that has not landed. Nothing turns under a sheet laid over the leaves
-(Settings, the word viewer). Before a chapter is chosen `BookSpread` shows
-`MushafStartLeaf`, page 1, opposite Chapters; a word on it opens its
-chapter there.
+(Settings, the word viewer). While Chapters or Bookmarks shows, `BookSpread`
+covers the right page with a quiet resume page: a gilded medallion, Arabic
+chapter title, English name, saved ayah and return link. The mounted Mushaf
+reader keeps its place and is inert and hidden
+under this page. Before any chapter has been read, the book's title page
+invites a chapter choice. A saved reading place can reopen its chapter after reload.
 
 **Settings is a loose sheet on the spread** (styles.css,
 `settings-sheet-in` / `-out`): the same `.sheet` element, laid over the
-right-hand page a grid step inside it, coming down from above the window
+left-hand page a grid step inside it, coming down from above the window
 like the word viewer's sheet. `data-laid` marks that it has been on the
-page, so it is only drawn back off a page it was laid on.
+page, so it is only drawn back off a page it was laid on. `settingsOrigin`
+keeps the paper beneath it: Chapters, Bookmarks, or the reader. `underlyingLayer`
+preserves that spread while Settings is open, including when changing reading
+layout. Back and Escape return to that paper. Covered sheets leave the focus
+tree, and repeat uses the same left-page placement.
 
 It replaced eighteen flat strips of DOM hinged in CSS 3D (each a composited
 layer holding a slice of the page): on an RTX 3080 that ran 12–26 frames in
@@ -621,9 +658,8 @@ the mouse (`.entrance-glint`): a difference layer then a dodge layer, tuned
 so the leather is returned unchanged and only gold flares. They need
 `.entrance-front` to be an isolated group.
 Root viewer on the spread: right-clicking a word lays the viewer as a loose
-sheet on the page facing that word (`facingPage`; the leaf passes its side
-through `onHoldWord` into `RootViewerState.origin`), so the word stays in
-sight. `RootViewer` portals into `BookSpread`'s `.book-loose` slot and the
+sheet on the left page, whether the word came from the right or left leaf.
+`RootViewer` portals into `BookSpread`'s `.book-loose` slot and the
 sheet slides down from above the window (`root-sheet-in` / `root-sheet-out`):
 leading edge lifted, a slight skew, a small overrun and settle. No shadow.
 Phones keep the ink bleed inside the reader sheet.
@@ -684,9 +720,17 @@ Below that size nothing changes. Rationale in
    builds its slim in-memory index on demand (never during chapter browsing),
    and scans cooperatively with cancellation so typing stays responsive.
    Its fixed masthead, 30 px gilded Settings rosette, rounded search field,
-   full-width continue wash, and compact 28 / 26 / 4 px chapter grid mirror
+   Android-style continue pill, and compact 28 / 26 / 4 px chapter grid mirror
    the Android Home sheet while the whole composition remains centred at a
    640 px maximum measure.
+   The top continue area uses Android's resting pill geometry: 28 px corners,
+   16 px outer insets, a passive green place ribbon, gold chapter number,
+   small CONTINUE flag, and bilingual chapter identity with the saved ayah.
+   Its dedicated `--continue-wash` follows Android PR #871: Paper `#B8EDDB`,
+   Nightfall `#134738`, Royal Green `#1F5141`.
+   The single pill is one accessible button; long chapter names ellipsize while
+   the ayah stays visible. Reading and listening retain separate saved places,
+   with the last-heard place taking priority in the pill.
    Developer settings expose the same two persisted bookmark treatments as
    Android—a 96 px top-bound ribbon and the *Saved passages* line—while both
    open the same left-hand Bookmarks sheet. The inline line follows the
@@ -696,8 +740,8 @@ Below that size nothing changes. Rationale in
 2. **Reader** — header + ayahs + icon player bar; mushaf page breaks
    (whisper-gold hairline; folio script is a Customize setting — both, Arabic,
    or English — Android `PageBreak` parity) between ayahs that start a new Madinah page; once the
-   opening surah header scrolls off, a compact ornate title (Arabic + chapter ·
-   transliteration) reappears in the top bar; ayah selector rail
+   opening surah header scrolls off, its miniature chapter medallion above
+   Arabic + chapter · transliteration reappears in the top bar; ayah selector rail
    (hover-magnified dashes with gold focal tick under the cursor; spring
    expand from the minimized stack into the dial wheel — Android parity;
    centered on desktop, Android-
@@ -818,9 +862,9 @@ sans.
   (HTML5 + Web Audio hybrid). Developer mode can fall back to dual-`<audio>`
   standby (iOS single-element HTTPS path on that legacy engine).
 - ✅ Collapsed surah title in the reader top bar once the opening header
-  scrolls off (Android `OrnateSurahTitle` — since #783 a miniature chapter medallion over
-  Arabic + chapter · transliteration, arriving with scroll; web still uses the
-  earlier gilded flourishes and a threshold switch).
+  scrolls off (Android `OrnateSurahTitle` — the chapter's miniature medallion
+  over Arabic + chapter · transliteration). Web retains a threshold-triggered
+  fade; Android also ties its arrival lift/scale to the header's scroll progress.
 - ✅ Mushaf page breaks (Android `PageBreak` — gold hairline + Western /
   Arabic-Indic page numbers from `ayahs.page`).
 - ✅ Contextual feature guides (ayah-rail + saved-bookmark lessons; reader

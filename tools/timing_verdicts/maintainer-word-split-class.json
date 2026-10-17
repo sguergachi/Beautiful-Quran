@@ -1,0 +1,418 @@
+{
+  "schemaVersion": 1,
+  "baseline": {
+    "commit": "c48145c9",
+    "runtimeRevision": "5413f8f82f0c674892b0213b5f7fb90249df38418515af65b75c933190c7739b"
+  },
+  "publication": "Acoustically accepted by the corpus detector; authenticated-source reconciliation and runtime publication remain pending.",
+  "verdicts": {
+    "Alafasy_128kbps:47:4": {
+      "verdict": "accept",
+      "kinds": [
+        "topology"
+      ],
+      "baselinePayloadHash": "10a0edf29f62bf794df231ae403c202e3b6952d05abb7e3f50523161d3374383",
+      "candidatePayloadHash": "c83de733aedd1df5c5f6fcd88d9376106e2f78ac32dd2b1169b60b206cedae6a",
+      "reason": "dual-model sequence preference and retained acoustic ownership",
+      "evidence": {
+        "kind": "dual_model_topology",
+        "audioSha256": "0de869da3a7549dc7f7f922dce388fdae424c457ab3409f2a03f7b815c0de7e3",
+        "artifact": "tools/timing_evidence/word-split-corpus-review.json",
+        "summary": "Both sequences were forced against identical neural emissions per model; the full merged span and every other timing boundary are retained.",
+        "waveformVeto": false,
+        "waveform": {
+          "method": "ffmpeg_decoded_bounds_and_exact_union_of_unchanged_spans",
+          "decodedDurationMs": 49821,
+          "durationToleranceMs": 50,
+          "boundsWithinTolerance": true,
+          "voicedEndToleranceMs": 250,
+          "voicedTailCutRisks": [],
+          "scope": "An exact flush merge removes no audio interval and shortens no segment end."
+        },
+        "models": [
+          {
+            "name": "arabic-xlsr-ctc",
+            "model": "jonatasgrosman/wav2vec2-large-xlsr-53-arabic",
+            "modelRevision": "af46c2d8531b8dcbb5e23b952f739b372c2e5d2d",
+            "metric": "viterbiLogProbabilityPerFrame",
+            "baselineScore": -0.577638483621988,
+            "candidateScore": -0.5713078878012048,
+            "removedOccurrenceMaxLabelProbability": 0.6661027841037139,
+            "sameWordSplit": {
+              "baselineWords": [
+                {
+                  "occurrence": 13,
+                  "position": 13,
+                  "arabic": "مَنَّۢا",
+                  "normalized": "منا",
+                  "storedStartMs": 16565,
+                  "storedEndMs": 17820,
+                  "forcedStartMs": 16067,
+                  "forcedEndMs": 16267,
+                  "startResidualMs": -498,
+                  "endResidualMs": -1553,
+                  "startWithinTolerance": false,
+                  "endWithinTolerance": false,
+                  "firstFrame": 803,
+                  "lastFrameExclusive": 813,
+                  "meanLabelProbability": 0.5936585916206241,
+                  "minLabelProbability": 0.042168181389570236,
+                  "labelFrames": [
+                    [
+                      803,
+                      37,
+                      0.9946698546409607
+                    ],
+                    [
+                      804,
+                      37,
+                      0.9984966516494751
+                    ],
+                    [
+                      811,
+                      38,
+                      0.042168181389570236
+                    ],
+                    [
+                      812,
+                      12,
+                      0.33929967880249023
+                    ]
+                  ],
+                  "status": "review"
+                },
+                {
+                  "occurrence": 14,
+                  "position": 13,
+                  "arabic": "مَنَّۢا",
+                  "normalized": "منا",
+                  "storedStartMs": 17820,
+                  "storedEndMs": 19000,
+                  "forcedStartMs": 16527,
+                  "forcedEndMs": 17768,
+                  "startResidualMs": -1293,
+                  "endResidualMs": -1232,
+                  "startWithinTolerance": false,
+                  "endWithinTolerance": false,
+                  "firstFrame": 826,
+                  "lastFrameExclusive": 888,
+                  "meanLabelProbability": 0.6661027841037139,
+                  "minLabelProbability": 0.0003552950220182538,
+                  "labelFrames": [
+                    [
+                      826,
+                      37,
+                      0.9998728036880493
+                    ],
+                    [
+                      881,
+                      38,
+                      0.9980802536010742
+                    ],
+                    [
+                      887,
+                      12,
+                      0.0003552950220182538
+                    ]
+                  ],
+                  "status": "review"
+                }
+              ],
+              "candidateWords": [
+                {
+                  "occurrence": 12,
+                  "position": 12,
+                  "arabic": "فَإِمَّا",
+                  "normalized": "فاما",
+                  "storedStartMs": 14625,
+                  "storedEndMs": 16565,
+                  "forcedStartMs": 14586,
+                  "forcedEndMs": 16247,
+                  "startResidualMs": -39,
+                  "endResidualMs": -318,
+                  "startWithinTolerance": true,
+                  "endWithinTolerance": false,
+                  "firstFrame": 729,
+                  "lastFrameExclusive": 812,
+                  "meanLabelProbability": 0.6726978455697008,
+                  "minLabelProbability": 2.7625051188806538e-06,
+                  "labelFrames": [
+                    [
+                      729,
+                      33,
+                      0.9999133348464966
+                    ],
+                    [
+                      730,
+                      33,
+                      0.5006099343299866
+                    ],
+                    [
+                      740,
+                      12,
+                      2.7625051188806538e-06
+                    ],
+                    [
+                      803,
+                      37,
+                      0.9946698546409607
+                    ],
+                    [
+                      804,
+                      37,
+                      0.9984966516494751
+                    ],
+                    [
+                      811,
+                      12,
+                      0.542494535446167
+                    ]
+                  ],
+                  "status": "aligned"
+                },
+                {
+                  "occurrence": 13,
+                  "position": 13,
+                  "arabic": "مَنَّۢا",
+                  "normalized": "منا",
+                  "storedStartMs": 16565,
+                  "storedEndMs": 19000,
+                  "forcedStartMs": 16527,
+                  "forcedEndMs": 17768,
+                  "startResidualMs": -38,
+                  "endResidualMs": -1232,
+                  "startWithinTolerance": true,
+                  "endWithinTolerance": false,
+                  "firstFrame": 826,
+                  "lastFrameExclusive": 888,
+                  "meanLabelProbability": 0.6661027841037139,
+                  "minLabelProbability": 0.0003552950220182538,
+                  "labelFrames": [
+                    [
+                      826,
+                      37,
+                      0.9998728036880493
+                    ],
+                    [
+                      881,
+                      38,
+                      0.9980802536010742
+                    ],
+                    [
+                      887,
+                      12,
+                      0.0003552950220182538
+                    ]
+                  ],
+                  "status": "aligned"
+                },
+                {
+                  "occurrence": 14,
+                  "position": 14,
+                  "arabic": "بَعۡدُ",
+                  "normalized": "بعد",
+                  "storedStartMs": 19000,
+                  "storedEndMs": 19650,
+                  "forcedStartMs": 19028,
+                  "forcedEndMs": 19448,
+                  "startResidualMs": 28,
+                  "endResidualMs": -202,
+                  "startWithinTolerance": true,
+                  "endWithinTolerance": true,
+                  "firstFrame": 951,
+                  "lastFrameExclusive": 972,
+                  "meanLabelProbability": 0.9994261413812637,
+                  "minLabelProbability": 0.9977553486824036,
+                  "labelFrames": [
+                    [
+                      951,
+                      13,
+                      0.9999933242797852
+                    ],
+                    [
+                      961,
+                      30,
+                      0.9999909400939941
+                    ],
+                    [
+                      970,
+                      20,
+                      0.9977553486824036
+                    ],
+                    [
+                      971,
+                      20,
+                      0.9999649524688721
+                    ]
+                  ],
+                  "status": "aligned"
+                }
+              ],
+              "unexplainedFrames": [
+                [
+                  811,
+                  38,
+                  0.042168181389570236
+                ],
+                [
+                  812,
+                  12,
+                  0.33929967880249023
+                ]
+              ],
+              "unexplainedMaxLabelProbability": 0.33929967880249023
+            },
+            "retainedWord": {
+              "occurrence": 13,
+              "position": 13,
+              "arabic": "مَنَّۢا",
+              "normalized": "منا",
+              "storedStartMs": 16565,
+              "storedEndMs": 19000,
+              "forcedStartMs": 16527,
+              "forcedEndMs": 17768,
+              "startResidualMs": -38,
+              "endResidualMs": -1232,
+              "startWithinTolerance": true,
+              "endWithinTolerance": false,
+              "firstFrame": 826,
+              "lastFrameExclusive": 888,
+              "meanLabelProbability": 0.6661027841037139,
+              "minLabelProbability": 0.0003552950220182538,
+              "status": "aligned"
+            },
+            "baselineOccurrences": [
+              {
+                "occurrence": 13,
+                "position": 13,
+                "arabic": "مَنَّۢا",
+                "normalized": "منا",
+                "storedStartMs": 16565,
+                "storedEndMs": 17820,
+                "forcedStartMs": 16067,
+                "forcedEndMs": 16267,
+                "startResidualMs": -498,
+                "endResidualMs": -1553,
+                "startWithinTolerance": false,
+                "endWithinTolerance": false,
+                "firstFrame": 803,
+                "lastFrameExclusive": 813,
+                "meanLabelProbability": 0.5936585916206241,
+                "minLabelProbability": 0.042168181389570236,
+                "status": "review"
+              },
+              {
+                "occurrence": 14,
+                "position": 13,
+                "arabic": "مَنَّۢا",
+                "normalized": "منا",
+                "storedStartMs": 17820,
+                "storedEndMs": 19000,
+                "forcedStartMs": 16527,
+                "forcedEndMs": 17768,
+                "startResidualMs": -1293,
+                "endResidualMs": -1232,
+                "startWithinTolerance": false,
+                "endWithinTolerance": false,
+                "firstFrame": 826,
+                "lastFrameExclusive": 888,
+                "meanLabelProbability": 0.6661027841037139,
+                "minLabelProbability": 0.0003552950220182538,
+                "status": "review"
+              }
+            ],
+            "ownershipSummary": {
+              "unexplainedFrameCount": 2,
+              "unexplainedMaxLabelProbability": 0.33929967880249023
+            }
+          },
+          {
+            "name": "mms-uroman-ctc",
+            "model": "MahmoudAshraf/mms-300m-1130-forced-aligner",
+            "modelRevision": "49402e9577b1158620820667c218cd494cc44486",
+            "metric": "viterbiLogProbabilityPerFrame",
+            "baselineScore": -0.056953515968169555,
+            "candidateScore": -0.051699142762456074,
+            "removedOccurrenceMaxLabelProbability": 0.32147226470988244,
+            "retainedWord": {
+              "occurrence": 13,
+              "position": 13,
+              "arabic": "مَنَّۢا",
+              "normalized": "mna",
+              "storedStartMs": 16565,
+              "storedEndMs": 19000,
+              "forcedStartMs": 16527,
+              "forcedEndMs": 17748,
+              "startResidualMs": -38,
+              "endResidualMs": -1252,
+              "startWithinTolerance": true,
+              "endWithinTolerance": false,
+              "firstFrame": 826,
+              "lastFrameExclusive": 887,
+              "meanLabelProbability": 0.6457894630730152,
+              "minLabelProbability": 0.11379249393939972,
+              "status": "aligned"
+            },
+            "baselineOccurrences": [
+              {
+                "occurrence": 13,
+                "position": 13,
+                "arabic": "مَنَّۢا",
+                "normalized": "mna",
+                "storedStartMs": 16565,
+                "storedEndMs": 17820,
+                "forcedStartMs": 16527,
+                "forcedEndMs": 16787,
+                "startResidualMs": -38,
+                "endResidualMs": -1033,
+                "startWithinTolerance": true,
+                "endWithinTolerance": false,
+                "firstFrame": 826,
+                "lastFrameExclusive": 839,
+                "meanLabelProbability": 0.5852547887673912,
+                "minLabelProbability": 0.0007402907940559089,
+                "status": "aligned"
+              },
+              {
+                "occurrence": 14,
+                "position": 13,
+                "arabic": "مَنَّۢا",
+                "normalized": "mna",
+                "storedStartMs": 17820,
+                "storedEndMs": 19000,
+                "forcedStartMs": 17127,
+                "forcedEndMs": 17748,
+                "startResidualMs": -693,
+                "endResidualMs": -1252,
+                "startWithinTolerance": false,
+                "endWithinTolerance": false,
+                "firstFrame": 856,
+                "lastFrameExclusive": 887,
+                "meanLabelProbability": 0.32147226470988244,
+                "minLabelProbability": 0.0002571117365732789,
+                "status": "review"
+              }
+            ],
+            "ownershipSummary": {
+              "unexplainedFrameCount": 3,
+              "unexplainedMaxLabelProbability": 0.8503671884536743
+            }
+          }
+        ]
+      },
+      "maintainerReview": {
+        "decision": "merge_verified_word_split",
+        "date": "2026-10-16",
+        "source": "Direct maintainer feedback after Alafasy 47:4 EveryAyah audition at 14.625–21.625 s",
+        "statement": "this is repeated twice it shouldnt play twice",
+        "identifiedWord": {
+          "position": 13,
+          "arabic": "مَنّا"
+        },
+        "scope": "One word-13 span at 16565–19000 ms; preserve the recording and every other segment.",
+        "agentManualListening": false
+      },
+      "previousAutomaticHold": "The ordinal confidence-only review was held. The corpus audit now proves retained acoustic ownership on XLSR; MMS passes the ordinary low-confidence gate."
+    }
+  }
+}

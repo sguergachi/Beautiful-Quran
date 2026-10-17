@@ -1,11 +1,9 @@
 /**
  * The ornament-generating machine — web port.
  *
- * A seeded, pure generator of Islamic geometric compositions built from the
- * two classical construction methods: {n/k} star polygons (gcd(n, k) > 1
- * yields the interlaced polygons — the khatam is exactly {8/2}) and
- * Hankin's "polygons in contact" method (rays from tile-edge midpoints at a
- * contact angle θ), plus the five frieze grammars of tooled binding borders.
+ * A seeded, pure generator of Islamic geometric compositions: {n/k} star
+ * polygons (gcd(n, k) > 1 yields the interlaced polygons — the khatam is
+ * exactly {8/2}) and the illuminator's rumi scroll for the border.
  *
  * This file mirrors, line for line, the Android original at
  * `app/src/main/java/com/beautifulquran/ui/theme/ornament/OrnamentGenerator.kt`;
@@ -419,142 +417,63 @@ function generateSeal(rng: Mulberry32, fold: number): RosetteSpec {
 }
 
 /**
- * The border band — one of five frieze grammars found on tooled mushaf
- * bindings: a zigzag lattice with pearls in its diamonds, an interlaced
- * two-strand cable with pearl eyes (guilloche), a Hankin star-and-cross
- * strip, a nested lozenge chain, or a khatam chain — small eight-fold
- * stars linked by diamonds. Historical bindings run exactly these between
- * their gilt fillets ("bordered by geometric braiding"). Every recipe is
- * bounded by rule-weight edge rails so the band reads as one tooled
- * channel; renderers taper the channel's mouth onto the corner seals'
- * petal tips.
+ * The border band: a rumi scroll, the running gold border of Ottoman and
+ * Mamluk illuminated Qur'ans. One vine waves along the band's centre; under
+ * every crest a split palmette (rumi) springs into the hollow and ends in a
+ * beak curling back over its own body, vein down its middle, glide-mirrored
+ * under each trough, with a pearl between each crest and its rail. The
+ * seed only nudges proportions, and the draws match the five-grammar picker
+ * this replaced, so the field grown after it is unchanged for every seed.
+ * Mirrors Android's generateBorder line for line.
  */
 function generateBorder(rng: Mulberry32): BorderSpec {
+  const draws = BORDER_LEGACY_DRAWS[rng.int(BORDER_LEGACY_DRAWS.length)]!
+  const v = Array.from({ length: draws }, () => rng.next())
+  const period = 2.2 + 0.4 * v[0]!
+  const leafWidth = 0.24 + 0.04 * v[1]!
+
   const strokes: OrnamentStroke[] = []
   const dots: OrnamentDot[] = []
-  let period: number
-  const recipe = rng.int(5)
-  if (recipe === 0) {
-    // Zigzag lattice — two zigzags half a period out of phase make an
-    // X-crossing diamond trellis; a pearl rests in each diamond.
-    period = rng.range(1.2, 1.7)
-    const zig = (a: number, b: number): OrnamentStroke => ({
-      points: [
-        { x: 0, y: a },
-        { x: period / 2, y: b },
-        { x: period, y: a },
-      ],
-      closed: false,
-      weight: 'hairline',
-      birth: 0,
-      span: 1,
-    })
-    strokes.push(zig(0.86, 0.14))
-    strokes.push(zig(0.14, 0.86))
-    const pearl = rng.range(0.05, 0.075)
-    dots.push({ x: period / 4, y: 0.5, radius: pearl, birth: 0 })
-    dots.push({ x: (3 * period) / 4, y: 0.5, radius: pearl, birth: 0 })
-  } else if (recipe === 1) {
-    // Cable: two phase-opposed strands, a pearl in each eye.
-    period = rng.range(1.8, 2.6)
-    const amp = rng.range(0.26, 0.34)
-    const samples = 24
-    const strand = (sign: number): OrnamentStroke => {
-      const points: OrnamentPoint[] = []
-      for (let i = 0; i <= samples; i++) {
-        const x = (i * period) / samples
-        points.push({ x, y: 0.5 + sign * amp * Math.cos((TAU * x) / period) })
-      }
-      return { points, closed: false, weight: 'hairline', birth: 0, span: 1 }
-    }
-    strokes.push(strand(1))
-    strokes.push(strand(-1))
-    const eye = rng.range(0.06, 0.09)
-    dots.push({ x: 0, y: 0.5, radius: eye, birth: 0 })
-    dots.push({ x: period / 2, y: 0.5, radius: eye, birth: 0 })
-  } else if (recipe === 2) {
-    // Star-and-cross strip: Hankin's method on a row of squares.
-    period = 1
-    const deg = rng.chance(0.5) ? rng.range(28, 42) : rng.range(50, 68)
-    strokes.push(
-      ...hankinStrokes(
-        [
-          { x: 0, y: 0 },
-          { x: 1, y: 0 },
-          { x: 1, y: 1 },
-          { x: 0, y: 1 },
-        ],
-        (deg * Math.PI) / 180,
-      ),
-    )
-  } else if (recipe === 3) {
-    // Nested lozenge chain — a diamond in a diamond, tip-to-tip, a pearl
-    // at each heart.
-    period = rng.range(1.7, 2.3)
-    const diamond = (halfW: number, halfH: number): OrnamentStroke => ({
-      points: [
-        { x: period / 2 - halfW, y: 0.5 },
-        { x: period / 2, y: 0.5 - halfH },
-        { x: period / 2 + halfW, y: 0.5 },
-        { x: period / 2, y: 0.5 + halfH },
-      ],
-      closed: true,
-      weight: 'hairline',
-      birth: 0,
-      span: 1,
-    })
-    strokes.push(diamond(period / 2, 0.38))
-    strokes.push(diamond(period / 4, 0.19))
-    dots.push({ x: period / 2, y: 0.5, radius: rng.range(0.05, 0.08), birth: 0 })
-  } else {
-    // Khatam chain — small eight-fold stars (two overlapped squares)
-    // linked by diamonds at the period boundaries.
-    period = rng.range(1.35, 1.75)
-    const r = rng.range(0.26, 0.31)
-    const a = r * 0.7071
-    strokes.push({
-      points: [
-        { x: period / 2 - a, y: 0.5 - a },
-        { x: period / 2 + a, y: 0.5 - a },
-        { x: period / 2 + a, y: 0.5 + a },
-        { x: period / 2 - a, y: 0.5 + a },
-      ],
-      closed: true,
-      weight: 'hairline',
-      birth: 0,
-      span: 1,
-    })
-    strokes.push({
-      points: [
-        { x: period / 2 - r, y: 0.5 },
-        { x: period / 2, y: 0.5 - r },
-        { x: period / 2 + r, y: 0.5 },
-        { x: period / 2, y: 0.5 + r },
-      ],
-      closed: true,
-      weight: 'hairline',
-      birth: 0,
-      span: 1,
-    })
-    // Link diamond straddling the period boundary; when tiled, the half
-    // past x = 0 is completed by the neighbouring tile.
-    const cw = rng.range(0.1, 0.14)
-    strokes.push({
-      points: [
-        { x: -cw, y: 0.5 },
-        { x: 0, y: 0.5 - cw * 0.85 },
-        { x: cw, y: 0.5 },
-        { x: 0, y: 0.5 + cw * 0.85 },
-      ],
-      closed: true,
-      weight: 'hairline',
-      birth: 0,
-      span: 1,
-    })
-    dots.push({ x: period / 2, y: 0.5, radius: 0.05, birth: 0 })
+  const hair = (points: OrnamentPoint[], closed: boolean): OrnamentStroke => ({
+    points,
+    closed,
+    weight: 'hairline',
+    birth: 0,
+    span: 1,
+  })
+
+  // The vine crosses the centre at each period boundary, so every run
+  // enters its corner seals at mid-band.
+  const stemY = (x: number) => 0.5 - RUMI_AMP * Math.sin((TAU * x) / period)
+  const stem: OrnamentPoint[] = []
+  for (let i = 0; i <= RUMI_STEM_SAMPLES; i++) {
+    const x = (period * i) / RUMI_STEM_SAMPLES
+    stem.push({ x, y: stemY(x) })
   }
-  // Rule-weight edge rails bound every recipe into one tooled channel;
-  // renderers taper the channel's mouth onto the corner seals' petal tips.
+  strokes.push(hair(stem, false))
+
+  const crest = period / 4
+  const baseX = crest + 0.14 * period
+  const base = { x: baseX, y: stemY(baseX) }
+  const tip = { x: crest - 0.12 * period, y: 0.66 }
+  const spine = rumiSpine(
+    base,
+    { x: base.x - 0.01 * period, y: base.y + 0.42 },
+    { x: tip.x + 0.12 * period, y: tip.y + 0.2 },
+    tip,
+  )
+  const outline = rumiOutline(spine, leafWidth)
+  const vein = spine.slice(3, Math.round(spine.length * 0.55))
+  const pearl = { x: crest, y: 0.14 }
+  for (const glide of [false, true]) {
+    const map = (p: OrnamentPoint): OrnamentPoint =>
+      glide ? { x: p.x + period / 2, y: 1 - p.y } : p
+    strokes.push(hair(outline.map(map), true))
+    strokes.push(hair(vein.map(map), false))
+    const d = map(pearl)
+    dots.push({ x: d.x, y: d.y, radius: 0.055, birth: 0 })
+  }
+  // Rule-weight edge rails bound the scroll into one tooled channel.
   for (const y of [0, 1]) {
     strokes.push({
       points: [
@@ -570,106 +489,65 @@ function generateBorder(rng: Mulberry32): BorderSpec {
   return { period, strokes, dots }
 }
 
-// ── Hankin fields ────────────────────────────────────────────────────────
+/** Draws each of the replaced border grammars took after its pick, in pick order. */
+const BORDER_LEGACY_DRAWS = [2, 3, 2, 2, 3]
 
-interface Ray {
-  ox: number
-  oy: number
-  dx: number
-  dy: number
+/** The vine's swing either side of the band's centre, in band heights. */
+const RUMI_AMP = 0.2
+
+const RUMI_STEM_SAMPLES = 32
+
+/** The rumi's spine: a cubic to `tip`, then the beak hooking back over the body. */
+function rumiSpine(
+  p0: OrnamentPoint,
+  c1: OrnamentPoint,
+  c2: OrnamentPoint,
+  tip: OrnamentPoint,
+): OrnamentPoint[] {
+  const n = 24
+  const pts: OrnamentPoint[] = []
+  for (let i = 0; i <= n; i++) pts.push(bezier(p0, c1, c2, tip, i / n))
+  const prev = pts[n - 1]!
+  const len = Math.hypot(tip.x - prev.x, tip.y - prev.y)
+  const tx = (tip.x - prev.x) / len
+  const ty = (tip.y - prev.y) / len
+  const r = 0.07
+  const cx = tip.x - ty * r
+  const cy = tip.y + tx * r
+  const a0 = Math.atan2(tip.y - cy, tip.x - cx)
+  const m = 12
+  for (let i = 1; i <= m; i++) {
+    const f = i / m
+    const a = a0 + 0.55 * TAU * f
+    const rr = r * (1 - 0.35 * f)
+    pts.push({ x: cx + rr * Math.cos(a), y: cy + rr * Math.sin(a) })
+  }
+  return pts
 }
 
-/**
- * Hankin's method on one convex polygon: two rays leave each edge midpoint
- * at ±θ, aimed inward; each ray is kept up to its nearest crossing with
- * another ray. Shared edge midpoints make the pattern continuous across
- * the whole tiling.
- */
-function hankinStrokes(vertices: OrnamentPoint[], theta: number): OrnamentStroke[] {
-  const n = vertices.length
-  let cx = 0
-  let cy = 0
-  for (const v of vertices) {
-    cx += v.x
-    cy += v.y
+/** Closed leaf outline round `spine`: stalk, swell at a third, taper to the beak. */
+function rumiOutline(spine: OrnamentPoint[], width: number): OrnamentPoint[] {
+  const n = spine.length - 1
+  const left: OrnamentPoint[] = []
+  const right: OrnamentPoint[] = []
+  const peak = 0.3
+  for (let i = 0; i <= n; i++) {
+    const t = i / n
+    const p = spine[i]!
+    const q = spine[Math.min(n, i + 1)]!
+    const r = spine[Math.max(0, i - 1)]!
+    const len = Math.hypot(q.x - r.x, q.y - r.y)
+    const tx = (q.x - r.x) / len
+    const ty = (q.y - r.y) / len
+    const swell =
+      t < peak
+        ? 0.3 + 0.7 * Math.sin(((t / peak) * Math.PI) / 2)
+        : Math.pow(Math.max(Math.cos((((t - peak) / (1 - peak)) * Math.PI) / 2), 0), 1.2)
+    const half = (width * swell) / 2
+    left.push({ x: p.x - ty * half, y: p.y + tx * half })
+    right.push({ x: p.x + ty * half, y: p.y - tx * half })
   }
-  cx /= n
-  cy /= n
-
-  const rays: Ray[] = []
-  for (let i = 0; i < n; i++) {
-    const a = vertices[i]!
-    const b = vertices[(i + 1) % n]!
-    const mx = (a.x + b.x) / 2
-    const my = (a.y + b.y) / 2
-    let dx = b.x - a.x
-    let dy = b.y - a.y
-    const len = Math.sqrt(dx * dx + dy * dy)
-    dx /= len
-    dy /= len
-    const c = Math.cos(theta)
-    const s = Math.sin(theta)
-    // rot(d, +θ) and rot(−d, −θ), mirrored if facing away from the centroid.
-    let ax = dx * c - dy * s
-    let ay = dx * s + dy * c
-    let bx = -dx * c - dy * s
-    let by = dx * s - dy * c
-    if ((ax + bx) * (cx - mx) + (ay + by) * (cy - my) < 0) {
-      ax = dx * c + dy * s
-      ay = -dx * s + dy * c
-      bx = -dx * c + dy * s
-      by = -dx * s - dy * c
-    }
-    rays.push({ ox: mx, oy: my, dx: ax, dy: ay })
-    rays.push({ ox: mx, oy: my, dx: bx, dy: by })
-  }
-
-  const strokes: OrnamentStroke[] = []
-  for (const r of rays) {
-    let bestT = Number.MAX_VALUE
-    for (const o of rays) {
-      if (o === r) continue
-      const denom = r.dx * o.dy - r.dy * o.dx
-      if (Math.abs(denom) < 1e-9) continue
-      const qpx = o.ox - r.ox
-      const qpy = o.oy - r.oy
-      const t = (qpx * o.dy - qpy * o.dx) / denom
-      const s = (qpx * r.dy - qpy * r.dx) / denom
-      if (t > 1e-6 && s > 1e-6 && t < bestT) {
-        const px = r.ox + t * r.dx
-        const py = r.oy + t * r.dy
-        if (pointInConvex(vertices, px, py)) bestT = t
-      }
-    }
-    if (bestT === Number.MAX_VALUE) continue
-    strokes.push({
-      points: [
-        { x: r.ox, y: r.oy },
-        { x: r.ox + bestT * r.dx, y: r.oy + bestT * r.dy },
-      ],
-      closed: false,
-      weight: 'hairline',
-      birth: 0,
-      span: 1,
-    })
-  }
-  return strokes
-}
-
-/** Inside test tolerant of boundary points (midpoints sit on edges). */
-function pointInConvex(vertices: OrnamentPoint[], px: number, py: number): boolean {
-  const n = vertices.length
-  let sign = 0
-  for (let i = 0; i < n; i++) {
-    const a = vertices[i]!
-    const b = vertices[(i + 1) % n]!
-    const cross = (b.x - a.x) * (py - a.y) - (b.y - a.y) * (px - a.x)
-    if (Math.abs(cross) < 1e-9) continue
-    const s = cross > 0 ? 1 : -1
-    if (sign === 0) sign = s
-    else if (s !== sign) return false
-  }
-  return true
+  return [...left, ...right.slice(0, n).reverse()]
 }
 
 // ── Geometric fields with filigree ──────────────────────────────────────────────

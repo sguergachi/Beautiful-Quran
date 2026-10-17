@@ -1,3 +1,6 @@
+import { foldEnglish } from '../../domain/EnglishTypography'
+import { contractionRanges } from '../../domain/EnglishContractions'
+
 /** Timing for the reader's orange search-hit wash; mirrors Android. */
 export const SearchHitFlash = {
   START_DELAY_MS: 140,
@@ -29,8 +32,9 @@ export function searchHitTextRanges(text: string, rawQuery?: string | null): Arr
   const query = quoted ? trimmed.slice(1, -1).trim() : trimmed
   if (!query) return []
   const ranges: Array<[number, number]> = []
-  const lowerText = text.toLowerCase()
-  const lowerQuery = query.toLowerCase()
+  // Folded character for character, so these ranges mark the typeset text.
+  const lowerText = foldEnglish(text).toLowerCase()
+  const lowerQuery = foldEnglish(query).toLowerCase()
   const expandWord = /^[\p{L}\p{N}]+$/u.test(query)
   let from = 0
   while (from < text.length) {
@@ -44,6 +48,11 @@ export function searchHitTextRanges(text: string, rawQuery?: string | null): Arr
     }
     if (!ranges.some(([a, b]) => a === start && b === end)) ranges.push([start, end])
     from = Math.max(end, match + 1)
+  }
+  if (!quoted) {
+    for (const { start, end } of contractionRanges(text, query)) {
+      if (!ranges.some(([a, b]) => a === start && b === end)) ranges.push([start, end])
+    }
   }
   return ranges
 }

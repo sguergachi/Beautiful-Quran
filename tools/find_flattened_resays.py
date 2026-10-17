@@ -38,7 +38,7 @@ Steps 2 and 3 need the qasr venv (torch, uroman) and the cached EveryAyah MP3s:
     ~/qasr/venv/bin/python tools/find_flattened_resays.py score \\
         /tmp/resay-candidates.json --out /tmp/resay-scores.jsonl --resume
     python3 tools/find_flattened_resays.py write /tmp/resay-scores.jsonl
-    python3 tools/build_db.py --refresh-qdc-timings
+    python3 tools/build_db.py --refresh-qdc-timings --output /tmp/legacy-candidate.db
     git show "$(git merge-base HEAD origin/master)":data/quran.db > /tmp/base.db
     python3 tools/find_flattened_resays.py verdicts /tmp/resay-scores.jsonl \\
         --baseline-db /tmp/base.db
@@ -116,12 +116,14 @@ def pipeline_rows():
     captured = {}
     apply_corrections = build_db.apply_timing_corrections
     apply_repairs = build_db.apply_timing_repairs
+    output = build_db.OUT
 
     def corrections(rows, *args, **kwargs):
-        captured["rows"] = {
-            (rid, sid, ay): json.loads(segs) if isinstance(segs, str) else segs
-            for rid, sid, ay, segs in rows
-        }
+        if kwargs.get("phase", "before_repairs") == "before_repairs":
+            captured["rows"] = {
+                (rid, sid, ay): json.loads(segs) if isinstance(segs, str) else segs
+                for rid, sid, ay, segs in rows
+            }
         # Judge every row as if nothing had been generated yet, so a rerun
         # re-derives the same entries instead of seeing its own output.
         return apply_corrections(rows, *args, corrections_dir=hand_only, **kwargs)
@@ -144,17 +146,22 @@ def pipeline_rows():
         build_db.apply_timing_repairs = repairs
         build_db.OUT = Path(tmp) / "quran.db"
         argv = sys.argv
-        sys.argv = ["build_db.py", "--refresh-qdc-timings"]
+        sys.argv = ["build_db.py", "--refresh-qdc-timings", "--output", str(build_db.OUT)]
         try:
             build_db.main()
+            with sqlite3.connect(build_db.OUT) as db:
+                shipped = {
+                    (rid, sid, ay): json.loads(segs)
+                    for rid, sid, ay, segs in db.execute(
+                        "SELECT reciter_id,surah_id,ayah_number,segments FROM timings"
+                    )
+                }
+            db.close()
         finally:
             sys.argv = argv
-        shipped = {
-            (rid, sid, ay): json.loads(segs)
-            for rid, sid, ay, segs in sqlite3.connect(build_db.OUT).execute(
-                "SELECT reciter_id,surah_id,ayah_number,segments FROM timings"
-            )
-        }
+            build_db.apply_timing_corrections = apply_corrections
+            build_db.apply_timing_repairs = apply_repairs
+            build_db.OUT = output
     return captured["rows"], captured["references"], shipped
 
 

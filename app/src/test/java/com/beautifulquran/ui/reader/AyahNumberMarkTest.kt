@@ -4,7 +4,8 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
-import com.beautifulquran.ui.theme.TranslationFontFamily
+import com.beautifulquran.ui.theme.QuranTypeProfile
+import com.beautifulquran.ui.theme.quranTypePalette
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -102,16 +103,35 @@ class AyahNumberMarkTest {
     }
 
     @Test
-    fun `English mark gives Western digits an explicit Garamond span`() {
-        val mark = buildAnnotatedString {
-            appendAyahNumberMark(12, useArabicIndicDigits = false, style = SpanStyle())
-        }
+    fun `a shared line selects the touched verse instead of the earlier wrapped rectangle`() {
+        assertEquals(1, inlineRangeIndexAt(32, listOf(0..19, 21..47), 48) { 0 })
+        assertEquals(0, inlineRangeIndexAt(12, listOf(0..19, 21..47), 48) { 1 })
+    }
 
-        assertEquals(
-            listOf(4 to 5, 6 to 7),
-            mark.spanStyles
-                .filter { it.item.fontFamily == TranslationFontFamily }
-                .map { it.start to it.end },
-        )
+    @Test
+    fun `inline whitespace keeps the geometric hit slop fallback`() {
+        assertEquals(0, inlineRangeIndexAt(20, listOf(0..19, 21..47), 48) { 0 })
+        assertEquals(-1, inlineRangeIndexAt(20, listOf(0..19, 21..47), 48) { -1 })
+    }
+
+    @Test
+    fun `a shared line's final caret belongs to its final verse`() {
+        assertEquals(1, inlineRangeIndexAt(48, listOf(0..19, 21..47), 48) { 0 })
+    }
+
+    @Test
+    fun `English mark gives Western digits the selected book face`() {
+        for (profile in QuranTypeProfile.entries) {
+            val family = quranTypePalette(profile).serif
+            val mark = buildAnnotatedString {
+                appendAyahNumberMark(
+                    12, useArabicIndicDigits = false, style = SpanStyle(), bookFontFamily = family,
+                )
+            }
+            assertEquals(
+                listOf(4 to 5, 6 to 7),
+                mark.spanStyles.filter { it.item.fontFamily == family }.map { it.start to it.end },
+            )
+        }
     }
 }

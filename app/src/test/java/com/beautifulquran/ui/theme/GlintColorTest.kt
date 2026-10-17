@@ -229,4 +229,24 @@ class GlintColorTest {
         assertEquals(0.88f, InkEngine.glintRestAlpha(0.88f, 2f), 0f)
         assertEquals(0.44f, InkEngine.glintRestAlpha(0.88f, 0.5f), 0f)
     }
+
+    @Test
+    fun `the glow ends within its reach of the word and never on an edge`() {
+        // A 60 x 40 mask lit everywhere; the word's ink is the middle 20 x 10.
+        val w = 60; val h = 40
+        val mask = ByteArray(w * h) { 200.toByte() }
+        confineAlphaMask(mask, w, w, h, left = 20, top = 15, right = 39, bottom = 24, reach = 8f)
+        fun at(x: Int, y: Int) = mask[y * w + x].toInt() and 0xFF
+        // On the word: untouched.
+        assertEquals(200, at(30, 20))
+        // Past the reach, above, below and beside it: no light at all.
+        assertEquals(0, at(30, 5))
+        assertEquals(0, at(30, 34))
+        assertEquals(0, at(5, 20))
+        assertEquals(0, at(55, 20))
+        // Between: falling off step by step, no jump bigger than a smoothstep's.
+        val run = (39..48).map { at(it, 20) }
+        assertTrue(run.zipWithNext().all { (a, b) -> b <= a })
+        assertTrue(run.zipWithNext().all { (a, b) -> a - b <= 40 })
+    }
 }

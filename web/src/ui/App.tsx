@@ -7,11 +7,12 @@ import {
   SETTINGS_LAYER,
   hasReaderOpen,
   showPinnedChapterBar,
+  underlyingLayer,
   type StackLayer,
 } from './paper/stack'
 import { HomeScreen } from './home/HomeScreen'
 import { BookmarksScreen } from './bookmarks/BookmarksScreen'
-import { ReaderScreen } from './reader/ReaderScreen'
+import { ReaderChapterHost } from './reader/ReaderChapterHost'
 import { SettingsScreen } from './settings/SettingsScreen'
 import { EntranceCover } from './entrance/EntranceCover'
 import { OrnamentsLab } from './lab/OrnamentsLab'
@@ -68,12 +69,15 @@ export function App() {
       loadLabel: s.loadLabel,
       loadProgress: s.loadProgress,
       stackLayer: s.stackLayer,
+      settingsOrigin: s.settingsOrigin,
       sheet: s.sheet,
       content: s.content,
+      surahs: s.surahs,
       readerOpenRevision: s.readerOpenRevision,
       readingPlace: s.readingPlace,
       bookmarks: s.bookmarks,
       settings: s.settings,
+      wordSheetOpen: s.rootViewer != null,
     }),
     shallowEqual,
   )
@@ -113,32 +117,44 @@ export function App() {
   // Facing leaves: Mushaf layout in a spread, once a chapter is open.
   const leaves =
     spread && state.content != null && state.settings.readingLayout === 'mushaf'
-  const pageLayers = spreadLayers(spread, stack, state.content != null, leaves)
-  useSheetFocus(state.ready && entranceDone && !isLab, spread, leaves, stack, hasReader, state.readerOpenRevision)
+  const underlay = underlyingLayer(stack, hasReader, state.settingsOrigin)
+  const pageLayers = spreadLayers(spread, stack, state.content != null, leaves, underlay)
+  const returnPlace = state.readingPlace ?? (state.content
+    ? { surahId: state.content.surah.id, ayah: 1 }
+    : { surahId: state.settings.lastReadSurah, ayah: state.settings.lastReadAyah })
+  const returnChapter = state.surahs.find(surah => surah.id === returnPlace.surahId)
+  useSheetFocus(state.ready && entranceDone && !isLab, spread, leaves, stack, hasReader, state.readerOpenRevision, state.wordSheetOpen)
 
   useEffect(() => {
     void appStore.init()
   }, [])
 
   useEffect(() => {
-    const resolved = resolveTheme(state.settings.themeMode)
-    if (resolved === 'light') document.documentElement.removeAttribute('data-theme')
-    else document.documentElement.setAttribute('data-theme', resolved)
-    if (state.settings.colorSystem === 'legacy') {
-      document.documentElement.dataset.colors = 'legacy'
-    } else {
-      delete document.documentElement.dataset.colors
-    }
+    const apply = () => {
+      const resolved = resolveTheme(state.settings.themeMode)
+      if (resolved === 'light') document.documentElement.removeAttribute('data-theme')
+      else document.documentElement.setAttribute('data-theme', resolved)
+      if (state.settings.colorSystem === 'legacy') {
+        document.documentElement.dataset.colors = 'legacy'
+      } else {
+        delete document.documentElement.dataset.colors
+      }
 
-    // Cover owns theme-color while the leather is up.
-    if (!entranceDone) return
-    const meta = document.querySelector('meta[name="theme-color"]')
-    if (meta) {
-      meta.setAttribute(
-        'content',
-        resolved === 'light' ? '#FAF3E8' : resolved === 'royal_green' ? '#062C24' : state.settings.colorSystem === 'legacy' ? '#0A0B0C' : '#0C0B09',
-      )
+      // Cover owns theme-color while the leather is up.
+      if (!entranceDone) return
+      const meta = document.querySelector('meta[name="theme-color"]')
+      if (meta) {
+        meta.setAttribute(
+          'content',
+          resolved === 'light' ? '#FAF3E8' : resolved === 'royal_green' ? '#062C24' : state.settings.colorSystem === 'legacy' ? '#0A0B0C' : '#0C0B09',
+        )
+      }
     }
+    apply()
+    if (state.settings.themeMode !== 'system') return
+    const preference = window.matchMedia('(prefers-color-scheme: dark)')
+    preference.addEventListener('change', apply)
+    return () => preference.removeEventListener('change', apply)
   }, [state.settings.themeMode, state.settings.colorSystem, entranceDone])
 
   useEffect(() => {
@@ -154,7 +170,7 @@ export function App() {
   useEffect(() => {
     if (!entranceDone) return
     const onKey = (e: KeyboardEvent) => {
-      if (e.key !== 'Escape') return
+      if (e.key !== 'Escape' || e.defaultPrevented || document.querySelector('dialog[open]')) return
       appStore.goBack()
     }
     window.addEventListener('keydown', onKey)
@@ -199,6 +215,7 @@ export function App() {
     <div
       className="app-shell"
       data-stack={stack}
+      data-underlay={underlay}
       data-has-reader={hasReader}
       data-spread={spread ? 'true' : undefined}
       data-playback-pinned={playbackPinned && !spread ? 'true' : undefined}
@@ -214,22 +231,34 @@ export function App() {
           {/* Chapter boundaries get fresh focus/rail geometry. Carrying the
               previous chapter's dial state into the first peel frame makes
               the rail visibly jump before the initial focus settles. */}
-          <ReaderScreen
-            key={state.content?.surah.id ?? 'empty-reader'}
+          <ReaderChapterHost
+            chapterId={state.content?.surah.id}
             stackLayer={pageLayers.reader}
             playbackPinned={playbackPinned && !spread}
           />
           {spread ? (
             <BookSpread
               titlePage={state.content == null}
-              versoCovered={!leaves || stack !== READER_LAYER}
+              versoCovered={!leaves || stack !== READER_LAYER || state.wordSheetOpen}
               mushaf={state.settings.readingLayout === 'mushaf'}
               leaves={leaves}
               stack={stack}
               chapterPage={state.content?.ayahs[0]?.page ?? null}
+              chaptersPage={state.settings.readingLayout === 'mushaf' && underlay <= COVER_LAYER}
+              returnPageInert={!entranceDone || stack > COVER_LAYER}
+              returnPlace={returnChapter ? {
+                chapter: returnChapter.nameTransliteration,
+                arabic: returnChapter.nameArabic,
+                ayah: returnPlace.ayah,
+                ayahCount: returnChapter.ayahCount,
+                onReturn: () => {
+                  if (state.content) appStore.revealLayer(READER_LAYER)
+                  else appStore.openReading(returnPlace.surahId, returnPlace.ayah)
+                },
+              } : null}
             />
           ) : null}
-          <BookmarksScreen stackLayer={stack} />
+          <BookmarksScreen stackLayer={spread ? underlay : stack} />
           <HomeScreen
             stackLayer={pageLayers.home}
             playbackPinned={playbackPinned && !spread}

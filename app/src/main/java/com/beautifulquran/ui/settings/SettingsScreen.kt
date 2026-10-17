@@ -70,15 +70,19 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.beautifulquran.BuildConfig
 import com.beautifulquran.QuranApp
 import com.beautifulquran.R
+import com.beautifulquran.data.BookTypeface
+import com.beautifulquran.data.ScrollArabicFace
 import com.beautifulquran.data.BrushCircleStyle
 import com.beautifulquran.data.MushafBannerStyle
 import com.beautifulquran.data.RuntimeCachePhase
 import com.beautifulquran.data.RuntimeMushafCache
+import com.beautifulquran.data.RuntimeTimingCache
 import com.beautifulquran.data.Settings
 import com.beautifulquran.data.ThemeMode
 import com.beautifulquran.playback.RecitationCache
 import com.beautifulquran.playback.RecitationUsage
 import com.beautifulquran.playback.formatUsage
+import com.beautifulquran.ui.theme.forCaps
 import com.beautifulquran.ui.theme.AlphaTag
 import com.beautifulquran.ui.theme.BrushCheckParams
 import com.beautifulquran.ui.theme.BrushCircleParams
@@ -99,6 +103,7 @@ import com.beautifulquran.ui.theme.quietClickable
 import com.beautifulquran.ui.theme.shippedCheckParams
 import com.beautifulquran.ui.theme.themePreviewColors
 import com.beautifulquran.ui.theme.verticalFadingEdges
+import com.beautifulquran.ui.theme.typeScale
 import kotlin.math.roundToInt
 import com.beautifulquran.ui.theme.QuranTheme
 
@@ -372,6 +377,28 @@ private fun DeveloperSection(
     Caption("Tools for testing work in progress.")
 
     Spacer(Modifier.height(20.dp))
+    SectionLabel("English type")
+    BookTypeface.entries.forEach { face ->
+        SelectRow(
+            label = face.label,
+            selected = settings.bookTypeface == face,
+            onClick = { viewModel.settings.update { it.copy(bookTypeface = face) } },
+        )
+    }
+    Caption("Readers get Junicode, set to Garamond's size, measure and colour. The earlier EB Garamond stays for comparison.")
+
+    Spacer(Modifier.height(20.dp))
+    SectionLabel("Scroll Arabic")
+    ScrollArabicFace.entries.forEach { face ->
+        SelectRow(
+            label = face.label,
+            selected = settings.scrollArabicFace == face,
+            onClick = { viewModel.settings.update { it.copy(scrollArabicFace = face) } },
+        )
+    }
+    Caption("Readers get Hafs. The others are set to Hafs's letter height; verse marks stay in Hafs, and Mushaf leaves keep their own faces.")
+
+    Spacer(Modifier.height(20.dp))
     SectionLabel("Chapter banner")
     MushafBannerStyle.entries.forEach { style ->
         SelectRow(
@@ -384,7 +411,7 @@ private fun DeveloperSection(
 
     Spacer(Modifier.height(20.dp))
     val app = context.applicationContext as QuranApp
-    MushafRuntimeCacheStatus(app.runtimeMushaf)
+    MushafRuntimeCacheStatus(app.runtimeMushaf, app.runtimeTimings)
 
     Spacer(Modifier.height(20.dp))
     ToggleRow(
@@ -1095,7 +1122,7 @@ internal fun TextSizeControl(scale: Float, onScale: (Float) -> Unit) {
     Row(verticalAlignment = Alignment.CenterVertically) {
         Text(
             text = "A",
-            fontSize = 15.sp,
+            fontSize = typeScale(15.sp),
             fontFamily = MaterialTheme.typography.bodyLarge.fontFamily,
             color = glyphInk,
             modifier = Modifier
@@ -1130,7 +1157,7 @@ internal fun TextSizeControl(scale: Float, onScale: (Float) -> Unit) {
         }
         Text(
             text = "A",
-            fontSize = 26.sp,
+            fontSize = typeScale(26.sp),
             fontFamily = MaterialTheme.typography.bodyLarge.fontFamily,
             color = glyphInk,
             modifier = Modifier
@@ -1168,7 +1195,7 @@ internal val ThemeMode.label: String
 // ── Quiet typographic helpers ──────────────────────────────────────────────
 
 @Composable
-private fun MushafRuntimeCacheStatus(cache: RuntimeMushafCache?) {
+private fun MushafRuntimeCacheStatus(cache: RuntimeMushafCache?, timings: RuntimeTimingCache) {
     Text(
         text = "Quran Foundation word & QCF cache",
         style = MaterialTheme.typography.bodyLarge,
@@ -1179,6 +1206,7 @@ private fun MushafRuntimeCacheStatus(cache: RuntimeMushafCache?) {
         return
     }
     val diagnostics by cache.diagnostics.collectAsStateWithLifecycle()
+    val timingStatus by timings.status.collectAsStateWithLifecycle()
     var now by remember { mutableLongStateOf(System.currentTimeMillis()) }
     LaunchedEffect(Unit) {
         while (true) {
@@ -1204,11 +1232,13 @@ private fun MushafRuntimeCacheStatus(cache: RuntimeMushafCache?) {
         Caption("Updated ${cacheAge(it, now)} · seven-day limit ${cacheCountdown(status.expiresAtMs, now)}")
     }
     status.lastError?.let { Caption("Last error · $it") }
+    Caption("Recitation timings · ${timingStatus.settledReciters} of ${timingStatus.totalReciters} providers checked")
+    timingStatus.lastError?.let { Caption("Timing refresh · $it") }
     Text(
         text = if (status.phase == RuntimeCachePhase.REFRESHING) {
             "Updating Quran cache…"
         } else {
-            "Force seven-day cache update"
+            "Force Quran cache update"
         },
         style = MaterialTheme.typography.bodyLarge,
         modifier = Modifier
@@ -1216,7 +1246,10 @@ private fun MushafRuntimeCacheStatus(cache: RuntimeMushafCache?) {
             .quietClickable(
                 enabled = status.phase != RuntimeCachePhase.REFRESHING,
                 role = Role.Button,
-                onClick = cache::refresh,
+                onClick = {
+                    cache.refresh()
+                    timings.refresh()
+                },
             )
             .padding(vertical = 6.dp),
         color = MaterialTheme.colorScheme.primary.copy(
@@ -1224,8 +1257,7 @@ private fun MushafRuntimeCacheStatus(cache: RuntimeMushafCache?) {
         ),
     )
     Caption(
-        "Forces the authenticated Content Sync used when the cache is due. " +
-            "Only QF changes are applied from the saved checkpoint.",
+        "Refreshes authenticated Content Sync and reviewed recitation timings.",
     )
 }
 
@@ -1267,7 +1299,7 @@ internal fun Section(text: String) {
 internal fun SectionLabel(text: String) {
     Text(
         text = text.uppercase(),
-        style = MaterialTheme.typography.labelSmall,
+        style = MaterialTheme.typography.labelSmall.forCaps(),
         letterSpacing = 2.sp,
         color = QuranTheme.ink.muted,
     )

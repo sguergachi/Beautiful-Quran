@@ -17,11 +17,21 @@ import {
   paperCoverMaskImage,
   washMaskImage,
 } from '../ui/theme/Fade'
-import { getTuning, glintResonance } from '../ui/reader/InkEngine'
+import { getTuning } from '../ui/reader/InkEngine'
+import { tarjiSignal } from '../playback/tarjiSignal'
+import { TarjiWordGate } from '../playback/tarji'
+import {
+  glintGlowAlpha,
+  glintLetterLight,
+  glintLightLagMs,
+  glintLightLevel,
+  glintResonance,
+} from './glintLight'
 import { cubicBezierTuple, type CubicBezierEase } from '../ui/motion/easing'
 
-/** Quantize wash progress to ~48 steps — visually identical, far fewer strings. */
-const WASH_STEPS = 48
+/** Subpixel steps even on long words; keep the cache bounded across tuning changes. */
+const WASH_STEPS = 256
+const MASK_CACHE_LIMIT = 2048
 
 const washMaskCache = new Map<string, string>()
 const paperMaskCache = new Map<string, string>()
@@ -29,7 +39,7 @@ const paperMaskCache = new Map<string, string>()
 function quantizeProgress(p: number): number {
   if (p >= 1) return 1
   if (p <= 0) return 0
-  return Math.round(p * WASH_STEPS) / WASH_STEPS
+  return Math.min(WASH_STEPS - 1, Math.round(p * WASH_STEPS)) / WASH_STEPS
 }
 
 function sweepEase() {
@@ -54,6 +64,7 @@ export function cachedWashMask(
   let mask = washMaskCache.get(key)
   if (mask == null) {
     mask = washMaskImage(q, restingAlpha, rtl, feather)
+    if (washMaskCache.size >= MASK_CACHE_LIMIT) washMaskCache.clear()
     washMaskCache.set(key, mask)
   }
   return mask
@@ -71,6 +82,7 @@ export function cachedPaperCoverMask(
   let mask = paperMaskCache.get(key)
   if (mask == null) {
     mask = paperCoverMaskImage(q, restingAlpha, rtl, feather)
+    if (paperMaskCache.size >= MASK_CACHE_LIMIT) paperMaskCache.clear()
     paperMaskCache.set(key, mask)
   }
   return mask
@@ -127,32 +139,23 @@ export function runWash(
   onDone?: () => void,
 ): () => void {
   const curve: CubicBezierEase =
-    'x1' in ease
-      ? cubicBezierTuple(ease.x1, ease.y1, ease.x2, ease.y2)
-      : ease
+    'x1' in ease ? cubicBezierTuple(ease.x1, ease.y1, ease.x2, ease.y2) : ease
 
   let controls: AnimationPlaybackControls | null = null
   let cancelled = false
-  let lastQuantized = -1
 
-  // Motion applies the cubic-bezier to the animated value, so the onUpdate
-  // value *is* the eased progress. Pass the same number for both args so
-  // existing callers that paint from `eased` keep working.
-  // Skip ticks whose quantized progress matches the previous frame so mask
-  // rebuilds / style writes stay off the critical path.
+  // Keep the animation clock continuous. Only mask strings are quantized;
+  // secondary ink and glint opacity must retain display-refresh precision.
   controls = animate(0, 1, {
     duration: Math.max(0.001, durationMs / 1000),
     ease: [...curve] as [number, number, number, number],
     onUpdate: (eased) => {
       if (cancelled) return
-      const q = quantizeProgress(eased)
-      if (q === lastQuantized) return
-      lastQuantized = q
-      onTick(q, q)
+      onTick(eased, eased)
     },
     onComplete: () => {
       if (cancelled) return
-      if (lastQuantized !== 1) onTick(1, 1)
+      onTick(1, 1)
       onDone?.()
     },
   })
@@ -471,27 +474,114 @@ export function runGlintWashIn(
   halo: HTMLElement,
   rtl: boolean,
   durationMs: number,
+  motion?: {
+    eligible: boolean
+    wordStartMs: number
+    washProgress?: () => number
+    repeat?: boolean
+  },
 ): () => void {
   halo.style.opacity = '0'
-  const cancelInk = ink ? runRepeatWashIn(ink, rtl, durationMs) : null
-  // Web has no full TajweedPacing / Visualizer yet: approximate long-waqf
-  // resonance as a stronger free-running shimmer over the middle of long
-  // Active sweeps (verse closers). Android gates on Curve.inWaqfHold + voice.
-  const longHold = durationMs >= 1_800
-  const cancelHalo = runWash(
+  if (motion?.repeat) {
+    halo.style.setProperty('--glint', 'var(--repeat)')
+    ink?.style.setProperty('--glint', 'var(--repeat)')
+  } else {
+    halo.style.removeProperty('--glint')
+    ink?.style.removeProperty('--glint')
+  }
+  const glyph = !ink
+    ? halo.parentElement?.querySelector<HTMLElement>(
+        ':scope > .hafs-glyph, :scope > .word-arabic',
+      )
+    : null
+  if (glyph) {
+    // Tint the authoritative filled glyph, never a second Hafs rasterization.
+    glyph.style.color =
+      'color-mix(in srgb, var(--ink), var(--glint-lit, var(--ink)) var(--glint-tint, 0%))'
+    glyph.style.setProperty('--glint-tint', '0%')
+  }
+  const cancelInk =
+    ink && !motion?.washProgress ? runRepeatWashIn(ink, rtl, durationMs) : null
+  const gate = new TarjiWordGate(tarjiSignal.eventLedger)
+  let formation = 0,
+    glow = 0,
+    wet = 1,
+    frame = 0,
+    last = performance.now()
+  const source = tarjiSignal.sourceKey
+  const cancelFormation = runWash(
     durationMs,
     sweepEase(),
     cubicBezierEase,
-    (p, eased) => {
-      const holding = longHold && p >= 0.4 && p <= 0.95
-      const phaseSec = (p * durationMs) / 1000
-      // No AnalyserNode wire yet — sine floor only (depth 0 keeps identity).
-      const r = glintResonance(holding, phaseSec, 0, 0, 0)
-      halo.style.opacity = String(Math.min(1, Math.max(0, eased * r)))
+    (_p, eased) => {
+      formation = eased
     },
-    () => { halo.style.opacity = '1' },
   )
-  return () => { cancelInk?.(); cancelHalo() }
+  const tick = (now: number) => {
+    const delta = Math.max(0, now - last)
+    last = now
+    if (motion?.washProgress) {
+      formation = motion.washProgress()
+      if (ink) {
+        ink.style.opacity = String(wet)
+        applyMask(
+          ink,
+          cachedWashMask(formation, 0, rtl, getTuning().washFeather),
+        )
+      }
+    }
+    const live = tarjiSignal.sample()
+    const paused = source !== '' && !tarjiSignal.isPlaying
+    wet += (1 - Math.exp(-delta / 250)) * ((paused ? 0 : 1) - wet)
+    const allowed =
+      !paused &&
+      motion?.eligible &&
+      source === tarjiSignal.sourceKey &&
+      gate.allows(
+        live.gain,
+        live.eventMs >= 0,
+        live.eventMs,
+        motion.wordStartMs,
+      )
+    // Read ahead by the light filter's phase lag, on the same source clock.
+    const ahead = allowed
+      ? tarjiSignal.sample(glintLightLagMs(139, live.rate, tarjiSignal.speed))
+      : live
+    const target = allowed ? glintResonance(ahead.pulse, ahead.gain) : 0
+    glow += (1 - Math.exp(-delta / 139)) * (target - glow)
+    const level = glintLightLevel(glow, tarjiSignal.lightBrightness)
+    const letters = glintLetterLight(level)
+    halo.style.opacity = String(formation * wet)
+    halo.style.setProperty(
+      '--glint-halo-alpha',
+      `${glintGlowAlpha(0.4514, level) * 100}%`,
+    )
+    halo.style.setProperty(
+      '--glint-bloom-alpha',
+      `${glintGlowAlpha(0.75, level) * 100}%`,
+    )
+    halo.style.setProperty(
+      '--glint-veil-alpha',
+      `${glintGlowAlpha(0.6, level) * 100}%`,
+    )
+    halo.style.setProperty('--glint-light', String(Math.pow(letters, 1 / 2.2)))
+    if (glyph) {
+      glyph.style.setProperty('--glint-tint', `${88 * formation * wet}%`)
+      glyph.style.setProperty(
+        '--glint-lit',
+        `color-mix(in srgb-linear, ${motion?.repeat ? 'var(--repeat)' : 'var(--glint, var(--ink))'} ${letters * 100}%, black)`,
+      )
+    }
+    if (ink)
+      ink.style.setProperty('--glint-light', String(Math.pow(letters, 1 / 2.2)))
+    frame = requestAnimationFrame(tick)
+  }
+  frame = requestAnimationFrame(tick)
+  return () => {
+    cancelInk?.()
+    cancelFormation()
+    cancelAnimationFrame(frame)
+  }
 }
 
 /** Glimmer dry-down: glyph sheen and its halo recede together. */
@@ -502,21 +592,42 @@ export function runGlintFadeOut(
   durationMs = getTuning().glintFadeMs,
 ): () => void {
   if (ink) applyMask(ink, 'none')
-  const fade = (el: HTMLElement, done?: () => void) => runWash(
-    durationMs,
-    sweepEase(),
-    cubicBezierEase,
-    (_p, eased) => {
-      el.style.opacity = String(1 - eased)
-    },
-    () => {
-      el.style.opacity = '0'
-      done?.()
-    },
-  )
+  const glyph = !ink
+    ? halo.parentElement?.querySelector<HTMLElement>(
+        ':scope > .hafs-glyph, :scope > .word-arabic',
+      )
+    : null
+  const fromTint = glyph
+    ? parseFloat(glyph.style.getPropertyValue('--glint-tint')) || 0
+    : 0
+  const fade = (el: HTMLElement, done?: () => void) => {
+    const from = Number(el.style.opacity || 0)
+    return runWash(
+      durationMs,
+      sweepEase(),
+      cubicBezierEase,
+      (_p, eased) => {
+        el.style.opacity = String(from * (1 - eased))
+        if (glyph && el === halo)
+          glyph.style.setProperty('--glint-tint', `${fromTint * (1 - eased)}%`)
+      },
+      () => {
+        el.style.opacity = '0'
+        if (glyph && el === halo) {
+          glyph.style.removeProperty('color')
+          glyph.style.removeProperty('--glint-tint')
+          glyph.style.removeProperty('--glint-lit')
+        }
+        done?.()
+      },
+    )
+  }
   const cancelInk = ink ? fade(ink, onDone) : null
   const cancelHalo = fade(halo, ink ? undefined : onDone)
-  return () => { cancelInk?.(); cancelHalo() }
+  return () => {
+    cancelInk?.()
+    cancelHalo()
+  }
 }
 
 /**
@@ -557,13 +668,20 @@ export function runSearchHitWash(
       if (!cancelled) next()
     }, durationMs)
   }
-  const fade = (from: number, to: number, durationMs: number, next: () => void) => {
+  const fade = (
+    from: number,
+    to: number,
+    durationMs: number,
+    next: () => void,
+  ) => {
     el.style.opacity = String(from)
     cancelCurrent = runWash(
       durationMs,
       timing.EASING,
       cubicBezierEase,
-      (_p, eased) => { el.style.opacity = String(from + (to - from) * eased) },
+      (_p, eased) => {
+        el.style.opacity = String(from + (to - from) * eased)
+      },
       () => {
         el.style.opacity = String(to)
         if (!cancelled) next()

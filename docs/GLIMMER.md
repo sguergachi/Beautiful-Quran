@@ -394,6 +394,12 @@ already-laid-out paragraph to that range, extracts its glyph alpha into a
 small cached mask, and blurs that mask. The crisp tint still uses the existing
 directional color-reveal mask.
 
+The shaped tint and all three glow layers dry as one offscreen layer, with
+`InkMotion.glintLayerAlpha` applied once when that layer is composited. Applying
+the fade to the glow paint and again to the tint's `SrcIn` source faded the
+halo inside the selection twice while its outer fringe faded once. The shared
+layer alpha keeps the light's shape intact as it recedes to zero.
+
 The cache is local to the laid-out line and keeps only the most recent masks,
 so a draw frame only recolours one small bitmap while the glimmer animates.
 The extracted mask includes the blur's own expansion, preventing the halo from

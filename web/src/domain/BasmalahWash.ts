@@ -1,3 +1,4 @@
+import { tajweedCurve, type Hold } from './tajweedPacing'
 import type { Segment } from '../data/models'
 import { BASMALAH_UTHMANI } from './Basmalah'
 
@@ -12,11 +13,8 @@ import { BASMALAH_UTHMANI } from './Basmalah'
  * ٱلرَّحِيمِ holds most of the clip in the last quarter — so each word owns the
  * band of artwork its glyphs actually cover ([WORD_END_PROGRESS]).
  *
- * Android additionally paces the wash *inside* each band by tajweed (the madd
- * of ٱلرَّحۡمَٰنِ, the madd ʿāriḍ of the closer). That needs `TajweedPacing`,
- * which is not ported to the web yet (docs/TAJWEED_PACING.md), so here each
- * band is crossed at a constant rate — the same as Android with Ink Lab's
- * pacing toggle off. Progress stays monotone in `positionMs` either way.
+ * Each band is paced with the same tajweed curve as Android, including
+ * madd ʿāriḍ on the closer. Null hold options preserve the plain-band mode.
  */
 
 /** The four timed words of the basmalah, right to left (Al-Fatihah 1:1). */
@@ -63,6 +61,7 @@ export function basmalahWashProgress(
   positionMs: number,
   segments: Segment[] | null | undefined,
   clipDurationMs = 0,
+  hold: Partial<Hold> | null = { maddAaridWaqf: true },
 ): number | null {
   if (!segments || !timesTheWholeBasmalah(segments)) return null
   const rowMs = onRowClock(positionMs, segments, clipDurationMs)
@@ -87,7 +86,12 @@ export function basmalahWashProgress(
   const holdMs = Math.max(0, holdEndMs - segment.startMs)
   const phase =
     holdMs <= 0 ? 1 : Math.min(1, Math.max(0, (rowMs - segment.startMs) / holdMs))
-  return bandStart + (bandEnd - bandStart) * phase
+  const isCloser = index === segments.length - 1
+  const spokenEnd = isCloser ? holdEndMs : segment.endMs
+  const curve = hold ? tajweedCurve(BASMALAH_WASH_WORDS[index],
+    holdMs <= 0 ? 1 : Math.min(1, Math.max(0, (spokenEnd - segment.startMs) / holdMs)),
+    { ...hold, isAyahFinal: isCloser }, BASMALAH_WASH_WORDS[index - 1]) : null
+  return bandStart + (bandEnd - bandStart) * (curve?.at(phase) ?? phase)
 }
 
 /**

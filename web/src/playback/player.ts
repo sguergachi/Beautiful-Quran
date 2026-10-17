@@ -1,3 +1,4 @@
+import { tarjiSignal } from './tarjiSignal'
 /**
  * Audio playback controller — HTMLAudioElement + Media Session.
  *
@@ -122,6 +123,7 @@ export class PlayerController {
    * the second would clear isPlaying mid-join.
    */
   private pauseSuppressRemaining = 0
+  private repeatSelectionGeneration = 0
   /**
    * Developer preference for Gapless-5 joins (Settings). Effective use also
    * requires 1× speed — see [wantsGapless5Transport].
@@ -369,9 +371,10 @@ export class PlayerController {
     return new Gapless5Backend({
       onTime: (positionMs, durationMs, index) => {
         if (index >= 0 && index !== this.index) {
-          this.syncGapless5Index(index, positionMs)
+          this.syncGapless5Index(index, positionMs, durationMs)
+        } else if (index === this.index) {
+          this.patch({ positionMs, durationMs })
         }
-        this.patch({ positionMs, durationMs })
       },
       onPlay: () => {
         this.patch({ isPlaying: true, error: null })
@@ -383,8 +386,17 @@ export class PlayerController {
         this.stopTick()
         this.patch({ isPlaying: false })
       },
-      onIndex: (index) => this.syncGapless5Index(index),
+      onIndex: (index) => this.syncGapless5Index(
+        index, this.gapless5?.getPositionMs() ?? 0, this.gapless5?.getDurationMs() ?? 0,
+      ),
       onFinishedAll: () => {
+        const range = this.state.repeatMode === 'range' ? this.state.repeatRange : null
+        const first = range ? this.playlist.findIndex(item => item.ayah === range.first) : -1
+        if (first >= 0 && this.gapless5) {
+          this.gapless5.goto(first, true)
+          this.syncGapless5Index(first, 0, this.gapless5.getDurationMs(), true)
+          return
+        }
         this.setBuffering(false)
         this.stopTick()
         this.patch({ isPlaying: false })
@@ -398,9 +410,10 @@ export class PlayerController {
   }
 
   /** Apply Gapless-5 auto-advance; wrap range-repeat when it walks past last. */
-  private syncGapless5Index(index: number, positionMs = 0) {
+  private syncGapless5Index(index: number, positionMs = 0, durationMs = 0, force = false) {
     if (!this.gapless5Enabled || index < 0 || index >= this.playlist.length) return
 
+    let wrapped = false
     if (this.state.repeatMode === 'range' && this.state.repeatRange) {
       const item = this.playlist[index]
       if (item && item.ayah > this.state.repeatRange.last) {
@@ -410,11 +423,14 @@ export class PlayerController {
         if (first >= 0) {
           this.gapless5?.goto(first, true)
           index = first
+          wrapped = true
+          positionMs = this.gapless5?.getPositionMs() ?? 0
+          durationMs = this.gapless5?.getDurationMs() ?? 0
         }
       }
     }
 
-    if (index === this.index) return
+    if (index === this.index && !wrapped && !force) return
     this.index = index
     const item = this.playlist[index]
     if (!item) return
@@ -429,6 +445,7 @@ export class PlayerController {
       // time update: the ink took whichever word of the new verse that time
       // fell in, and the highlight clock then held it there while it settled.
       positionMs,
+      durationMs,
       error: null,
     })
     this.updateMediaSession()
@@ -437,6 +454,7 @@ export class PlayerController {
 
   private patch(partial: Partial<PlayerState>) {
     this.state = { ...this.state, ...partial }
+    tarjiSignal.setClock(this.playlist[this.index]?.url ?? '', this.state.positionMs, this.state.isPlaying, this.reciter?.id ?? 0, this.state.speed)
     for (const fn of this.listeners) fn(this.state)
   }
 
@@ -466,7 +484,9 @@ export class PlayerController {
         }
         if (this.gapless5) {
           const idx = this.gapless5.getIndex()
-          if (idx >= 0 && idx !== this.index) this.syncGapless5Index(idx)
+          if (idx >= 0 && idx !== this.index) {
+            this.syncGapless5Index(idx, this.gapless5.getPositionMs(), this.gapless5.getDurationMs())
+          }
         }
         this.onTime()
         this.tickTimer = window.requestAnimationFrame(loop)
@@ -562,6 +582,12 @@ export class PlayerController {
   private schedulePrefetch() {
     const urls = this.playlistUrls()
     this.prefetcher.readAhead(urls, this.index)
+    const reciterId = this.reciter?.id ?? 0
+    const analysisUrls = urls.slice(this.index, this.index + 2)
+    tarjiSignal.retain(analysisUrls, reciterId)
+    for (const url of analysisUrls) {
+      void tarjiSignal.prepare(url, reciterId, this.prefetcher)
+    }
     if (this.gapless5Enabled) return
     void this.prepareAudioBounds(this.index)
     const next = this.peekNextIndex({ forStandby: true })
@@ -1275,7 +1301,41 @@ export class PlayerController {
     void this.applyGapless5Transport()
   }
 
+  /** Apply a repeat-sheet choice, preserving a live utterance inside its range. */
+  async applyRepeat(mode: PlayerState['repeatMode'], range: PlayerState['repeatRange']) {
+    if (!this.content || !this.reciter) return
+    const total = this.content.surah.ayahCount
+    const bounds = mode === 'range' && range ? {
+      first: Math.max(1, Math.min(total, Math.trunc(range.first))),
+      last: Math.max(1, Math.min(total, Math.trunc(range.last))),
+    } : null
+    if (bounds) bounds.last = Math.max(bounds.first, bounds.last)
+    const current = this.state.nowPlaying?.surahId === this.surahId
+      ? this.state.nowPlaying.ayah : this.playlist[this.index]?.ayah ?? 1
+    const inside = bounds != null && this.state.isPlaying && current >= bounds.first && current <= bounds.last
+    const target = bounds && !inside ? bounds.first : current
+    const position = bounds && !inside ? 0 : this.state.positionMs
+    const autoplay = bounds != null || this.state.isPlaying
+    const requiredStart = mode === 'surah' ? 1 : bounds?.first
+    const full = requiredStart != null && !this.playlist.some(item => item.ayah === requiredStart)
+    this.setRepeatMode(mode === 'range' && !bounds ? 'off' : mode, bounds)
+    const generation = this.repeatSelectionGeneration
+    if (full) {
+      this.playlist = buildPlaylist(this.content, this.reciter, 1)
+      this.joins.clearStandby()
+    }
+    const index = this.playlist.findIndex(item => item.ayah === target)
+    if (index >= 0 && (full || bounds && !inside)) {
+      const pending = this.playIndex(index, autoplay, { fadeIn: false })
+      const token = this.playToken
+      await pending
+      if (generation !== this.repeatSelectionGeneration || token !== this.playToken) return
+      if (position > 0) this.seekMs(position)
+    }
+  }
+
   setRepeatMode(mode: PlayerState['repeatMode'], range: PlayerState['repeatRange'] = null) {
+    this.repeatSelectionGeneration++
     this.patch({ repeatMode: mode, repeatRange: range })
     this.active.loop = mode === 'ayah'
     this.gapless5?.applyRepeat(mode)

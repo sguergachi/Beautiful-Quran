@@ -33,6 +33,13 @@ class SearchHitFlashTest {
     }
 
     @Test
+    fun `translator-only contractions locate expanded visible text but quotes stay literal`() {
+        assertEquals(listOf(0..14), SearchHitFlash.textRanges("(does) not love", "doesn't love"))
+        assertEquals(listOf(0..11), SearchHitFlash.textRanges("doesn't love", "does not love"))
+        assertTrue(SearchHitFlash.textRanges("does not love", "\"doesn't love\"").isEmpty())
+    }
+
+    @Test
     fun `ungrounded Mushaf translation locates the whole ayah without inventing a word`() {
         assertEquals(
             setOf(1, 2, 3),

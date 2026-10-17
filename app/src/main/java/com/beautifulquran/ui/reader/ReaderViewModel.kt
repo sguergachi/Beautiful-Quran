@@ -7,6 +7,10 @@ import com.beautifulquran.data.BookmarkRepository
 import com.beautifulquran.data.AnnotationRepository
 import com.beautifulquran.data.EducationMoment
 import com.beautifulquran.data.QuranRepository
+import com.beautifulquran.data.RuntimeTimingRead
+import com.beautifulquran.data.readStableTimingGeneration
+import com.beautifulquran.data.readStableTimingSelection
+import com.beautifulquran.data.observeTimingGeneration
 import com.beautifulquran.DevProfiling
 import com.beautifulquran.data.EnglishBookCache
 import com.beautifulquran.data.englishBookContentKey
@@ -51,9 +55,11 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.merge
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.currentCoroutineContext
@@ -95,6 +101,8 @@ data class ActiveWord(
      * before Media3 owns the leaf and disposes the wash Animatable.
      */
     val fromTap: Boolean = false,
+    /** Media3's generation, retained when a tap pins [activation] for the wash. */
+    val playbackActivation: Long = activation,
 )
 
 /**
@@ -206,6 +214,8 @@ data class MushafUi(
      * notices one moving.
      */
     val measured: Boolean = false,
+    /** The same immutable prose used to paginate this book, already held by the repository. */
+    val englishText: Map<Long, String> = emptyMap(),
 )
 
 /**
@@ -255,6 +265,8 @@ data class PreparedSurah(
      * install cannot cancel and override a newer [load].
      */
     val originGeneration: Long = 0L,
+    /** Accepted runtime timing generation, independently of navigation. */
+    val timingGeneration: Long = 0L,
 )
 
 /** Reading-session state temporarily displaced by an in-page surface such as
@@ -307,13 +319,6 @@ class ReaderViewModel(
     private val _mushaf = MutableStateFlow<MushafUi?>(null)
     val mushaf: StateFlow<MushafUi?> = _mushaf
 
-    /**
-     * The verses that begin on one mushaf leaf — what the English leaf is set
-     * from. A page at a time, and windowed in the repository.
-     */
-    suspend fun leafText(page: Int, text: EnglishLeafText): Map<Long, String> =
-        repository.mushafPageTranslations(page, text)
-
     /** Which English the book in [_mushaf] was paginated for. */
     private var mushafLeafText: EnglishLeafText? = null
 
@@ -336,6 +341,8 @@ class ReaderViewModel(
         rulerKey: Any? = null,
         /** Everything the leaves depend on — see [EnglishBookCache.key]. */
         cacheKey: String = "",
+        /** Keep the current leaf visible while the developer auditions its type. */
+        retainMeasuredBook: Boolean = false,
     ) {
         if (_mushaf.value != null && mushafLeafText == text && mushafRulerKey == rulerKey) return
         // Never fall back. A book already paginated by measuring a leaf is not
@@ -343,6 +350,7 @@ class ReaderViewModel(
         // mushaf after the app has loaded, and its own first call carries no
         // ruler.
         if (rulerFor == null && mushafRulerKey != null && mushafLeafText == text) return
+        val retain = retainMeasuredBook && _mushaf.value?.measured == true && mushafLeafText == text
         mushafLeafText = text
         mushafRulerKey = rulerKey
         // Retained so a runtime word/QCF refresh can repaginate the same book
@@ -359,8 +367,10 @@ class ReaderViewModel(
         mushafJob = viewModelScope.launch {
             val catalog = repository.mushafCatalog()
             val surahs = repository.surahs().associateBy { it.id }
+            val words: Map<Long, String>
             val book = if (rulerFor == null) {
                 val prose = repository.englishVerseProse(text)
+                words = repository.englishVerseText(text)
                 buildEnglishBook(catalog) { surahId, ayah ->
                     prose[quranWordKey(surahId, ayah, 1)] ?: 0
                 }
@@ -370,7 +380,10 @@ class ReaderViewModel(
                 // thousand-layout measure below must never hold them. The
                 // English leaf waits for measured=true before setting a word,
                 // and the gate holds English until the measured book lands.
-                if (generation == mushafGeneration) {
+                // A lab edit has a valid measured book to draw with the new
+                // face while it repaginates. Cold starts still publish the
+                // catalog immediately and hold English for a measured book.
+                if (generation == mushafGeneration && !retain) {
                     val prose = repository.englishVerseProse(text)
                     _mushaf.value = MushafUi(
                         catalog,
@@ -381,7 +394,7 @@ class ReaderViewModel(
                         measured = false,
                     )
                 }
-                val words = repository.englishVerseText(text)
+                words = repository.englishVerseText(text)
                 val contentCacheKey = englishBookContentKey(cacheKey, words)
                 val verse = { surahId: Int, ayah: Int ->
                     words[quranWordKey(surahId, ayah, 1)].orEmpty()
@@ -417,7 +430,7 @@ class ReaderViewModel(
                 }
             }
             if (generation != mushafGeneration) return@launch
-            _mushaf.value = MushafUi(catalog, surahs, book, measured = rulerFor != null)
+            _mushaf.value = MushafUi(catalog, surahs, book, measured = rulerFor != null, englishText = words)
         }
     }
 
@@ -479,9 +492,13 @@ class ReaderViewModel(
     /** Per-ayah repeat/high-water tables built once at load — hot-path lookups
      * allocate nothing (see [HighlightEngine.PreparedTimings]). */
     private var preparedTimings: Map<Int, HighlightEngine.PreparedTimings> = emptyMap()
+    private val transportCursor = ReaderTransportCursor()
     private var loadJob: Job? = null
+    private var installedTimingGeneration = 0L
 
     private fun installTimings(loaded: Map<Int, List<Segment>>) {
+        tapInk.value = null
+        tapSeed = null
         timings = loaded
         preparedTimings = loaded.mapValues { (_, segs) ->
             HighlightEngine.PreparedTimings.prepare(segs)
@@ -496,11 +513,29 @@ class ReaderViewModel(
     private suspend fun timingsWithBasmalahLeadIn(
         reciterId: Int,
         surahId: Int,
-    ): Map<Int, List<Segment>> {
+    ): RuntimeTimingRead = readStableTimingGeneration({ repository.runtimeTimingGeneration(reciterId) }) {
         val loaded = repository.timings(reciterId, surahId)
-        if (!surahOpensWithBasmalahPreface(surahId)) return loaded
-        val basmalah = repository.timings(reciterId, SURAH_FATIHA)[1] ?: return loaded
-        return loaded + (BASMALAH_PLAYLIST_AYAH to basmalah)
+        val basmalah = if (surahOpensWithBasmalahPreface(surahId)) {
+            repository.timings(reciterId, SURAH_FATIHA)[1]
+        } else null
+        if (basmalah == null) loaded else loaded + (BASMALAH_PLAYLIST_AYAH to basmalah)
+    }
+
+    private suspend fun reloadCurrentTimings() {
+        val gen = sessions.generation
+        val id = sessions.surahId.takeIf { it != 0 } ?: return
+        val reciter = _uiState.value.currentReciter ?: return
+        tapInk.value = null
+        tapSeed = null
+        if (!repository.timingProviderAvailable(reciter.id)) {
+            installTimings(emptyMap())
+            _uiState.value = _uiState.value.copy(hasTimings = false)
+        }
+        val refreshed = timingsWithBasmalahLeadIn(reciter.id, id)
+        if (!sessions.isCurrent(gen, id) || _uiState.value.currentReciter?.id != reciter.id) return
+        installTimings(refreshed.segments)
+        installedTimingGeneration = refreshed.generation
+        _uiState.value = _uiState.value.copy(hasTimings = refreshed.segments.isNotEmpty())
     }
 
     /**
@@ -548,6 +583,10 @@ class ReaderViewModel(
      * boundary — the source of the random full → faint → wash word flicker. */
     private val highlightClock = HighlightClock()
     private val activeWordPollCache = ActiveWordPollCache()
+
+    // Draw-only media samples: word snapshots still publish once per word.
+    private val _englishWashClock = MutableStateFlow<EnglishWashClock?>(null)
+    internal val englishWashClock: StateFlow<EnglishWashClock?> = _englishWashClock
 
     private var lastClockEventId = player.state.value.positionEvents.clockId
     /** Last applied lag/lead so a lab or route change can reset the clock. */
@@ -642,6 +681,14 @@ class ReaderViewModel(
             val voiceMs = firstWordVoiceMs(np.ayah, np.reciterId, segments)
             val rawMs = highlightPositionMs(voiceMs, np.reciterId)
             val clockMs = highlightClock.sample(np, rawMs)
+            _englishWashClock.value = EnglishWashClock(
+                np.surahId, np.ayah, events.inkId, clockMs, voiceMs, segments, sampledAtNanos = System.nanoTime(),
+                isPlaying = player.state.value.isPlaying && !player.state.value.isBuffering,
+                speed = player.state.value.speed,
+                clockId = events.clockId,
+                correctionMs = lastHighlightLeadMs - lastOutputLatencyMs,
+            )
+                .after(_englishWashClock.value)
             val info = prepared?.activeInfo(clockMs)
             val washStart = if (info == null) {
                 null
@@ -874,19 +921,16 @@ class ReaderViewModel(
                 .drop(1)
                 .collect { onReciterChanged() }
         }
-        // Timings Lab corrections land immediately: whenever the override
-        // store changes, re-pull this surah's fused timings so the highlight
-        // follows the edit the moment the Lab sheet is lowered.
+        // Lab edits and accepted runtime generations replace prepared timings together.
         viewModelScope.launch {
-            repository.timingOverridesChanged?.drop(1)?.collect {
-                val gen = sessions.generation
-                val id = sessions.surahId.takeIf { it != 0 } ?: return@collect
-                val reciter = _uiState.value.currentReciter ?: return@collect
-                val refreshed = timingsWithBasmalahLeadIn(reciter.id, id)
-                // Drop if navigation moved on while the DB re-read ran.
-                if (!sessions.isCurrent(gen, id)) return@collect
-                installTimings(refreshed)
-                _uiState.value = _uiState.value.copy(hasTimings = refreshed.isNotEmpty())
+            merge(*listOfNotNull(
+                repository.timingOverridesChanged?.drop(1)?.map { Unit },
+                repository.runtimeTimingsChanged
+                    ?.observeTimingGeneration(_uiState.map { it.currentReciter?.id })
+                    ?.filter { (_, generation) -> generation != installedTimingGeneration }
+                    ?.map { Unit },
+            ).toTypedArray()).collect {
+                reloadCurrentTimings()
             }
         }
         // Word glosses and QCF layout arrive as one atomic runtime snapshot.
@@ -992,14 +1036,28 @@ class ReaderViewModel(
         val surahs = repository.surahs()
         val nextSurah = surahs.firstOrNull { it.id == surahId + 1 }
         val previousSurah = surahs.firstOrNull { it.id == surahId - 1 }
-        return PreparedSurah(
+        return freshenPreparedTimings(PreparedSurah(
             content = content,
             nextSurah = nextSurah,
             previousSurah = previousSurah,
             reciters = reciters,
             reciter = reciter,
-            timings = loadedTimings,
+            timings = loadedTimings.segments,
             originGeneration = originGeneration,
+            timingGeneration = loadedTimings.generation,
+        ))
+    }
+
+    private suspend fun freshenPreparedTimings(prepared: PreparedSurah): PreparedSurah {
+        if (prepared.reciter.id == currentReciter(prepared.reciters).id &&
+            prepared.timingGeneration == repository.runtimeTimingGeneration(prepared.reciter.id)) return prepared
+        val (reciterId, current) = readStableTimingSelection({ currentReciter(prepared.reciters).id }) {
+            timingsWithBasmalahLeadIn(it, prepared.content.surah.id)
+        }
+        return prepared.copy(
+            reciter = prepared.reciters.first { it.id == reciterId },
+            timings = current.segments,
+            timingGeneration = current.generation,
         )
     }
 
@@ -1010,12 +1068,14 @@ class ReaderViewModel(
      * When still current, cancels any in-flight [load] for the same session
      * window and starts a new generation for the committed chapter.
      */
-    fun installPrepared(prepared: PreparedSurah) {
+    suspend fun installPrepared(prepared: PreparedSurah) {
+        if (!sessions.isCurrent(prepared.originGeneration)) return
+        val current = freshenPreparedTimings(prepared)
         if (!sessions.isCurrent(prepared.originGeneration)) return
         loadJob?.cancel()
         loadJob = null
         sessions.begin(prepared.content.surah.id, pendingPlayAyah = null)
-        commitPrepared(prepared)
+        commitPrepared(current)
     }
 
     /** Applies [prepared] to UI + timings. Caller must already own the live session. */
@@ -1023,7 +1083,9 @@ class ReaderViewModel(
         loadedSurah.value = prepared.content.surah.id
         focusedAyah = 1
         longAyahMidpointConsumed = 0
+        transportCursor.clear()
         installTimings(prepared.timings)
+        installedTimingGeneration = prepared.timingGeneration
         _uiState.value = ReaderUiState(
             content = prepared.content,
             nextSurah = prepared.nextSurah,
@@ -1051,10 +1113,13 @@ class ReaderViewModel(
         val id = sessions.surahId
         if (id == 0) return
         val reciters = _uiState.value.reciters.ifEmpty { repository.reciters() }
-        val reciter = currentReciter(reciters)
-        val refreshed = timingsWithBasmalahLeadIn(reciter.id, id)
+        val (reciterId, refreshed) = readStableTimingSelection({ currentReciter(reciters).id }) {
+            timingsWithBasmalahLeadIn(it, id)
+        }
+        val reciter = reciters.first { it.id == reciterId }
         if (!sessions.isCurrent(gen, id)) return
-        installTimings(refreshed)
+        installTimings(refreshed.segments)
+        installedTimingGeneration = refreshed.generation
         _uiState.value = _uiState.value.copy(
             currentReciter = reciter,
             hasTimings = timings.isNotEmpty(),
@@ -1124,51 +1189,67 @@ class ReaderViewModel(
      */
     private var longAyahMidpointConsumed: Int = 0
 
-    fun fastForward() {
-        val content = _uiState.value.content ?: return
-        val np = playerState.value.nowPlaying?.takeIf { it.surahId == surahId } ?: return
+    private fun transportPosition(): ReaderTransportCursor.Position? {
+        val np = (player.liveNowPlaying ?: playerState.value.nowPlaying)
+            ?.takeIf { it.surahId == surahId } ?: return null
+        return transportCursor.current(np.ayah, player.positionMs, playerState.value.positionEvents)
+    }
+
+    /** Returns the seek target so its leaf can start turning before the clock lands. */
+    fun fastForward(): ReaderInteraction.MushafPlayTarget? {
+        val content = _uiState.value.content ?: return null
+        val np = transportPosition() ?: return null
         // During the basmalah lead-in, skip ahead into ayah 1.
         if (np.ayah == BASMALAH_PLAYLIST_AYAH) {
             longAyahMidpointConsumed = 0
-            player.seekToAyah(1)
-            return
+            return transportTarget(1).also { player.seekToAyah(1) }
         }
         val action = FastForwardPolicy.action(
             ayah = np.ayah,
-            positionMs = player.positionMs,
+            positionMs = np.positionMs,
             ayahCount = content.surah.ayahCount,
             midpointMs = midpointForLongAyah(np.ayah),
             midpointConsumedForAyah = longAyahMidpointConsumed,
         )
         longAyahMidpointConsumed = FastForwardPolicy.nextConsumedAyah(action)
-        when (action) {
+        return when (action) {
             is FastForwardPolicy.Action.SeekToMidpoint -> {
-                player.seekToWord(action.ayah, action.positionMs)
+                transportTarget(action.ayah, action.positionMs).also {
+                    player.seekToWord(action.ayah, action.positionMs)
+                }
             }
             is FastForwardPolicy.Action.SeekToAyah -> {
-                player.seekToAyah(action.ayah)
+                transportTarget(action.ayah).also { player.seekToAyah(action.ayah) }
             }
-            FastForwardPolicy.Action.None -> Unit
+            FastForwardPolicy.Action.None -> null
         }
     }
 
-    fun fastBackward() {
-        val np = playerState.value.nowPlaying?.takeIf { it.surahId == surahId } ?: return
+    /** Returns the verse restart so its leaf can start turning before the clock lands. */
+    fun fastBackward(): ReaderInteraction.MushafPlayTarget? {
+        val np = transportPosition() ?: return null
         if (np.ayah == BASMALAH_PLAYLIST_AYAH) {
-            player.seekToBasmalah()
-            return
+            return transportTarget(BASMALAH_PLAYLIST_AYAH).also { player.seekToBasmalah() }
         }
-        if (player.positionMs > START_SEEK_GRACE_MS) {
-            player.seekToAyah(np.ayah)
-            return
+        if (np.positionMs > START_SEEK_GRACE_MS) {
+            return transportTarget(np.ayah).also { player.seekToAyah(np.ayah) }
         }
 
         if (np.ayah > 1) {
-            player.seekToAyah(np.ayah - 1)
+            return transportTarget(np.ayah - 1).also { player.seekToAyah(np.ayah - 1) }
         } else if (np.ayah == 1) {
             // Restart from the basmalah lead-in when present.
-            player.playLoadedFromAyah(1)
+            return transportTarget(player.chapterOpeningAyah).also { player.playLoadedFromAyah(1) }
         }
+        return null
+    }
+
+    private fun transportTarget(ayah: Int, positionMs: Long = 0L): ReaderInteraction.MushafPlayTarget {
+        transportCursor.seek(ayah, positionMs, playerState.value.positionEvents.clockId)
+        return ReaderInteraction.MushafPlayTarget(
+            surahId, ayah.coerceAtLeast(1),
+            if (positionMs == 0L) null else preparedTimings[ayah]?.activeInfo(positionMs)?.position,
+        )
     }
 
     private fun midpointForLongAyah(ayah: Int): Long? =
@@ -1187,6 +1268,7 @@ class ReaderViewModel(
     ): Boolean {
         val content = _uiState.value.content ?: return false
         val reciter = _uiState.value.currentReciter ?: return false
+        transportCursor.clear()
         player.playSurah(
             surahId = content.surah.id,
             ayahCount = content.surah.ayahCount,
@@ -1294,6 +1376,7 @@ class ReaderViewModel(
 
     fun playFromWord(ayah: Int, positionMs: Long) {
         val reciter = _uiState.value.currentReciter ?: return
+        transportCursor.clear()
         val np = playerState.value.nowPlaying
         // Keep the loop when the tapped verse is inside the active range;
         // only abandon it when the user jumps outside.
@@ -1313,6 +1396,7 @@ class ReaderViewModel(
 
     /** Resume a loaded playlist from [ayah] and mark it as listened. */
     fun playLoadedFromAyah(ayah: Int) {
+        transportCursor.clear()
         player.playLoadedFromAyah(ayah)
         rememberListened(ayah)
     }
