@@ -52,6 +52,8 @@ import {
   solveLine,
 } from './mushafFit'
 import { mushafLeafModel } from './mushafLeafModel'
+import { MushafChapterBand } from './MushafChapterBand'
+import { BASMALAH_UTHMANI } from '../../domain/Basmalah'
 import { pileTurnSchedule, playFlip, warmPageTurnSounds } from '../paper/pageTurnSounds'
 import { clearPagePictures, hasPagePicture, warmPageTurn } from '../paper/pageTurn'
 import { InkEngine, InkState, getTuning, type InkWord } from './InkEngine'
@@ -794,14 +796,15 @@ function MushafLeaf({
       // Rewriting the scale to measure at full size re-laid the block and
       // let the measurement chase its own result.
       const scale = Number(lines.style.getPropertyValue('--mushaf-fit')) || 1
-      const first = lines.firstElementChild
+      const textLines = Array.from(lines.querySelectorAll<HTMLElement>('.mushaf-line'))
+      const first = textLines[0]
       const gap = first ? parseFloat(getComputedStyle(first).columnGap) || 0 : 0
       // A line already set narrow or wide carries its scale into every
       // item's box; divide it back out. The widest line may be condensed,
       // so it is measured as it would be set at the limit.
       const widest = opening
         ? 0
-        : Math.max(0, ...Array.from(lines.children, (line) => {
+        : Math.max(0, ...textLines.map((line) => {
             const set = Number((line as HTMLElement).style.getPropertyValue('--line-widen')) || 1
             return naturalLineWidth(
               Array.from(line.children, (item) => item.getBoundingClientRect().width / set),
@@ -817,10 +820,14 @@ function MushafLeaf({
       const furniture = block
         ? Array.from(block.children).reduce((sum, child) => (child === lines ? sum : sum + child.clientHeight), 0)
         : 0
-      const pitch = block ? (block.clientHeight - furniture) / MUSHAF_LINES_PER_PAGE : 0
+      const slots = Number(lines.style.getPropertyValue('--mushaf-slots')) || MUSHAF_LINES_PER_PAGE
+      const pitch = block ? (block.clientHeight - furniture) / slots : 0
       const baseEm = parseFloat(getComputedStyle(lines).fontSize) / scale
       const maxGrow = pitch > 0 && baseEm > 0 ? pitch / (MUSHAF_MIN_LEADING * baseEm) : 1
-      onFit(page, mushafLeafFit(available, widest, maxGrow))
+      const fitted = mushafLeafFit(available, widest, maxGrow)
+      // Headings outside the source's fifteen slots must fit vertically too;
+      // the tighter leaf still chooses one shared hand for the spread.
+      onFit(page, slots > MUSHAF_LINES_PER_PAGE ? Math.min(fitted, maxGrow) : fitted)
     }
     measure()
     const observer = new ResizeObserver(measure)
@@ -846,7 +853,8 @@ function MushafLeaf({
       return
     }
     const em = parseFloat(getComputedStyle(lines).fontSize)
-    for (const line of Array.from(lines.children) as HTMLElement[]) {
+    const textLines = Array.from(lines.querySelectorAll<HTMLElement>('.mushaf-line'))
+    for (const line of textLines) {
       line.removeAttribute('data-widen')
       line.removeAttribute('data-short')
       line.style.removeProperty('--line-widen')
@@ -856,7 +864,7 @@ function MushafLeaf({
       return
     }
     // Read every line before writing any, so the page is laid out once.
-    const set = (Array.from(lines.children) as HTMLElement[]).map((line) => ({
+    const set = textLines.map((line) => ({
       ink: Array.from(line.children).reduce((sum, item) => sum + item.getBoundingClientRect().width, 0),
       gaps: line.children.length - 1,
     }))
@@ -870,7 +878,8 @@ function MushafLeaf({
     const measure = lines.clientWidth
     const settings = set.map(({ ink, gaps }) => solveLine(ink, gaps, measure, em, glyphWiden))
     settings.forEach((setting, index) => {
-      const line = lines.children[index] as HTMLElement
+      const line = textLines[index]
+      if (!line) return
       if (setting.short) line.setAttribute('data-short', '')
       else if (Math.abs(setting.widen - 1) > 0.001) {
         line.setAttribute('data-widen', '')
@@ -884,7 +893,7 @@ function MushafLeaf({
   const { leaf, headSurah, englishAyahs, lastPositions, verseWords } = mushafLeafModel(page, rows, QuranRepository.surahContent)
   // The two opening leaves carry a few short lines, set in the middle of the
   // well; every other leaf hangs its fifteen lines from the head.
-  const lines = opening ? leaf.lines.filter((line) => line.tokens.length > 0) : leaf.lines
+  const lines = opening ? leaf.lines.filter((line) => line.tokens.length > 0 || line.chapter || line.basmalah) : leaf.lines
   const firstToken = lines.find((line) => line.tokens.length > 0)?.tokens[0]
   const isLive = live && !english
   const tuning = getTuning()
@@ -914,20 +923,24 @@ function MushafLeaf({
         drag.current = null
       }}
     >
-      {/* One measure: head and text share the text block's width. */}
-      <div className="mushaf-block" ref={blockRef}>
       <MushafHead
         page={page}
         script={english ? 'english' : pageNumberScript}
         chapter={headSurah?.nameTransliteration ?? ''}
       />
+      <div className="mushaf-block" ref={blockRef}>
       {english ? (
         <div className="mushaf-english">
           {englishAyahs.map((item) => {
             const active = item.surahId === activeSurahId && item.ayah === activeAyah
             return (
+              <Fragment key={`${item.surahId}:${item.ayah}`}>
+              {item.ayah === 1 ? (
+                <div className="mushaf-english-chapter">
+                  <MushafChapterBand surah={QuranRepository.surahContent(item.surahId).surah} latin />
+                </div>
+              ) : null}
               <p
-                key={`${item.surahId}:${item.ayah}`}
                 className="mushaf-english-ayah"
                 data-active={active || undefined}
               >
@@ -961,6 +974,7 @@ function MushafLeaf({
                   {formatAyahNumberMark(item.ayah, false)}
                 </button>
               </p>
+              </Fragment>
             )
           })}
         </div>
@@ -972,12 +986,19 @@ function MushafLeaf({
           ref={linesRef}
           style={{
             ['--mushaf-fit' as string]: String(fit),
+            ['--mushaf-slots' as string]: String(Math.max(MUSHAF_LINES_PER_PAGE, leaf.lines.length)),
             ['--recess-ms' as string]: `${tuning.recessMs}ms`,
             ['--ayah-mark-fade-ms' as string]: `${tuning.ayahMarkFadeMs}ms`,
             ['--upcoming-alpha' as string]: String(tuning.upcomingAlpha),
           }}
         >
-          {lines.map((line) => (
+          {lines.map((line) => line.chapter ? (
+            <div className="mushaf-chapter-slot" key={line.number}>
+              <MushafChapterBand surah={QuranRepository.surahContent(line.chapter).surah} fit={fit} />
+            </div>
+          ) : line.basmalah ? (
+            <div className="mushaf-basmalah" key={line.number} lang="ar">{BASMALAH_UTHMANI}</div>
+          ) : (
             <p key={line.number} className="mushaf-line" lang="ar">
               {line.tokens.map((token) => {
                 const endsAyah = mushafTokenEndsAyah(

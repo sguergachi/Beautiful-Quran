@@ -514,8 +514,12 @@ own clear mark (`::-webkit-search-cancel-button`); the field draws one. The per-
 lines in a layout effect in `MushafLeaf`. The cap is the
 `mushafGlyphWiden` setting.
 Mushaf lines justify by even word spaces: words and verse marks are
-separate flex items of the line (`space-between`) inside `.mushaf-block`, so
-head and lines share one measure. The minimum gap is Hafs's own word
+separate flex items of the line (`space-between`) inside `.mushaf-block`.
+The running head is a sibling of that fitted block, anchored to the leaf's
+full text grid so its figures never drift with a shorter line measure.
+Its equal end columns align Western figures left and Arabic-Indic figures
+right; a single-script head keeps its figure left and chapter right.
+The minimum gap is Hafs's own word
 space (`MUSHAF_MIN_GAP`, 0.22 em) and loose lines widen toward 0.3 em. The
 block's width is `mushafMeasure`: the widest line set at minimum spaces with
 its letters condensed by up to `MUSHAF_MAX_CONDENSE` (4%), written inline by
@@ -529,6 +533,18 @@ the chapter centred, Arabic-Indic at the right (one script puts its figure
 at the left and the chapter at the right), Android `MushafRunningHead`
 parity, the same order on both facing leaves. Opening leaves 1–2 centre
 their few lines in the well.
+Chapter openings carry the Android cartouche's doubled wings, pointed paper
+window, chapter-specific weave and two shamsas (`MushafChapterBand`). The name
+hangs from a shared writing baseline, with long names fitted inside the open
+window. English leaves use the same band with a Latin name. Arabic places
+the band and preface in the source's spare slots; where a chapter heading is
+counted outside the source grid, it adds the missing furniture and fits both
+facing leaves to the taller slot count (up to seventeen), retaining every word
+on its page. Fatiha's basmalah remains its timed first verse; Tawbah has no
+preface. The entire opening group stays centred on leaves 1–2.
+The compact top-bar title stays on the page's physical centre line. Its caps
+line uses Android's 10 px label enlarged for Junicode small caps, and the Arabic
+name gives its descender slack to the caps line rather than leaving a gap.
 The spread's furniture scale keeps the same `u / 27.5px` ratio and 0.85
 floor, expressed as `tan(atan2(u, 27.5px))` for browsers without typed CSS
 division. `--u` is registered as a length so Firefox resolves its viewport
@@ -538,6 +554,7 @@ gives the turning leaf the same broken geometry. The optional
 `web/scripts/check-mushaf-browser.mjs` regression runs in Firefox or Chromium
 with a tab-local printed-page map, checking opening/full leaves, tablet
 resizing, forward/back turns, chapter opening, and interrupted turns.
+It also checks chapter bands, basmalah exceptions, and running-head alignment.
 Page turns: `MushafReader` keeps the place the book last settled on,
 prepares both destination leaves at the reader’s measure, then portals a
 two-faced leaf (`TurningLeaf`) into `BookSpread`'s turn slot (`.mushaf-flip`,

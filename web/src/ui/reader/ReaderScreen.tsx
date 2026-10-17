@@ -45,7 +45,6 @@ import { AyahRailTip } from './AyahRailTip'
 import { BookmarkTip } from './BookmarkTip'
 import {
   dismissEducation,
-  isEducationDismissed,
   shouldShowAyahRailTip,
   shouldShowBookmarkTip,
 } from '../../data/education'
@@ -179,12 +178,6 @@ export function ReaderScreen({
   const [focusedAyah, setFocusedAyah] = useState(initialAyah)
   const readingScrolled = useRef(false)
   useEffect(() => { readingScrolled.current = false }, [state.readerOpenRevision])
-  const [wordHintOpen, setWordHintOpen] = useState(() => !isEducationDismissed('word_hold'))
-  useEffect(() => {
-    if (!state.rootViewer && !state.gathering) return
-    dismissEducation('word_hold')
-    setWordHintOpen(false)
-  }, [state.rootViewer, state.gathering])
   /**
    * Continuous readout for the rail marker (Android `focusedPosition`).
    *
@@ -1588,12 +1581,6 @@ export function ReaderScreen({
             />
           ) : null}
 
-          {wordHintOpen && state.settings.educationGuidesEnabled && isTop && !recitingActive && !state.rootViewer && !state.gathering && !ayahRailTipVisible && !bookmarkTipVisible ? (
-            <div className="reader-word-hint">
-              <span>Hold a word for its root. Tap a verse number to share.</span>
-              <button type="button" onClick={() => { dismissEducation('word_hold'); setWordHintOpen(false) }}>Got it</button>
-            </div>
-          ) : null}
           {state.gathering ? (
             <div className="share-ribbon" role="group" aria-label={
               state.gatherSelection.length === 1
