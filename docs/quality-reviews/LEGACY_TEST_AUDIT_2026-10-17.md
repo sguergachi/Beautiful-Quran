@@ -8,6 +8,14 @@ every remaining symbol is reachable or every behavior is covered.
 
 ## Removal evidence
 
+- **Android cross-verse silence seeking:** `a1a7bc26` removed the production
+  imports/calls of `playbackSkipMs`, `isAfterLastWord` and `nextVerseAyah`,
+  replacing cross-verse seeks with play-through and `VerseSeamFade` to avoid
+  clicks. `nextVoicedMs` only served the abandoned helper. Whole-repository
+  search found no remaining production callers. Remove those four internal
+  functions and seven tests of the retired policy; keep the six live
+  `VerseOpeningTest` cases for hizb-only seeking, recitation style, first-word
+  voice, wash starts and silence parsing. Keep both seam-fade test classes.
 - **Web repeat queue/context:** `4c0ae91f` introduced serial orange washes;
   `103307d0` added its seek helper. `8f868a77` replaced both renderers with
   `useRepeatWash`: measured dwell and concurrent residuals. No live hook read
@@ -57,6 +65,10 @@ references alone do not prove obsolescence. Keep migration/serialization paths,
 legacy timing replay, the dynamic `tarjiWorker` entry point, and test helpers
 that verify production CSS. Other test-only policy helpers need stronger
 evidence before removal.
+In particular, Android download helpers `formatDownloadedBytes`,
+`cachedBytesForKey`, `chapterStateIsLive` and `chapterStateIsAction`, and web
+geometry/ink policy helpers, remain pending intent review. Sparse references
+alone did not justify deleting their behavioral contracts.
 
 The CTC core suite requires NumPy/PyTorch and remains a separately run local
 check; Build CI does not install those dependencies. Browser checks use local
@@ -69,6 +81,8 @@ performance and global semantic accuracy are outside this audit's evidence.
   47 Worker tests, all 13 `tools/test_*.py` scripts, and web production build.
 - Android tests were explicitly executed with
   `./gradlew :app:testDebugUnitTest --rerun`; zero skipped/failing tests.
+- Final Android: 166 suites / 1,515 tests after removing seven obsolete
+  silence-seeking tests. All six live opening-policy tests remain.
 - Final web: 92 files / 841 tests and typecheck/production build. Six removed
   tests exercised only the removed queue/helper and compatibility aliases.
 - Existing Chromium browser harness: five viewport sizes, base wash
