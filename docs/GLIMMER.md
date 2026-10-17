@@ -25,11 +25,20 @@ The gestures are an illustrative hand, not a validated calligrapher's
 recording, and must not be generalized by cutting other words into bands.
 
 Wet ink is optically fuller than dry ink and has restrained pigment pooling
-and a glyph-bound reflection. Hafs is a fixed-weight font: this is a small
+and a glyph-bound reflection of two broad window panes. The former faint
+diffuse-facing lobe left most wet ink almost the same brightness as dry ink
+on the phone. A stronger edge highlight alone looked like raised lettering.
+The revised surface is a thin, mostly flat film with shallow smooth pools;
+one reflected room is continuous across the verse and moves with tilt.
+Thinner film loses its reflection first during the shared dry-down envelope.
+Hafs is a fixed-weight font: this is a small
 stroke expansion, not a variable-font weight axis. Both thickness and gloss
 dry over the same `InkEngine.tuning.glintFadeMs` as glimmer. The existing
 tajweed curve supplies letter timing before wash-feather compensation.
 Pausing stops stroke travel and lets wet ink dry; Again starts a fresh pass.
+**Hold wet** pauses audio and holds the complete verse wet for tilt inspection;
+**Dry ink** shows the same verse matte and thinner. **Follow voice**, Play or
+Again returns to timed drawing. These modes keep the controls in fixed slots.
 
 The shader uses committed 4× contour/arrival maps, linearly filtered input
 buffers and smooth pixel coverage. Surface normals are low-pass filtered;
@@ -54,6 +63,24 @@ database. `PaperInkClockTest` covers ordered handoff, pause/resume dry-down,
 and backward-seek reset. Normal/half-speed playback can be compared in the
 sheet. A screen recording cannot exercise a physical phone's gyro; verify
 its tilt response separately on the phone.
+
+The material target is carbon calligraphy ink on smooth, sized paper,
+settling to a matte finish. It is an art-directed approximation compressed
+into the existing highlight duration, not a fluid simulation or a universal
+claim about ink: some formulations and papers retain gloss after drying.
+Research references and their roles:
+
+- [Calligraphy Qalam: tools and materials](https://www.calligraphyqalam.com/process/tools/):
+  soot/gum/water ink, controlled qalam loading and smooth, less absorbent ahar paper.
+- [Sumi wet/dry product photograph](https://store.shopping.yahoo.co.jp/bungle/1515902.html):
+  a dark stroke with localized liquid reflections, settling to matte without a large silhouette change.
+- [Togawa paper comparison](https://www.togawaseishi.com/SHOP/10003100.html):
+  both examples are dry; the retained shine differs with the paper.
+- [Iwai, Hamada and Sumi, 1966](https://doi.org/10.11413/nig1958.9.2):
+  printing-ink penetration increases surface micro-roughness and reduces gloss.
+  This supports the direction of the optical change, not a measured timing for qalam ink.
+- [PBRT: specular reflection](https://www.pbr-book.org/4ed/Reflection_Models/Specular_Reflection_and_Transmission):
+  the surface reflects the lit surroundings according to its normal and the viewing direction.
 
 ## When it appears
 

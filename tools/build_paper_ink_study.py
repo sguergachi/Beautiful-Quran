@@ -85,13 +85,16 @@ def build(text, strokes, position):
     edge = (alpha > 0) & (alpha < 1)
     distance[edge] = (alpha[edge] - .5) / SS
 
-    # Independent low-pass surface normals prevent pixel-scale specular sparkle.
-    gy, gx = np.gradient(gaussian_filter(distance, 2.5))
-    slope = .5 * np.exp(-np.maximum(0, distance) / 3)
-    nx, ny = -gx * SS * slope, -gy * SS * slope
+    # A thin, mostly flat liquid film with shallow pools, not a bevel around
+    # every glyph. Smooth surface variation stays well above pixel frequency.
+    yy, xx = np.mgrid[:H * SS, :W * SS] / SS
+    deposit = .7 + .16 * np.sin(xx * .055 + yy * .04) + .12 * np.sin(xx * .08 - yy * .025)
+    film = (1 - np.exp(-np.maximum(0, distance) / 1.7)) * deposit
+    gy, gx = np.gradient(gaussian_filter(film * .65, 2.5))
+    nx, ny = -gx * SS, -gy * SS
     length = np.sqrt(nx * nx + ny * ny + 1)
     normal = np.stack([128 + nx / length * 127, 128 + ny / length * 127, 128 + 1 / length * 127, np.full(alpha.shape, 255)], axis=-1).astype('uint8')
-    encoded = np.stack([np.round(arrival * 255), np.clip(128 + distance * 16, 0, 255), np.zeros(alpha.shape), np.full(alpha.shape, 255)], axis=-1).astype('uint8')
+    encoded = np.stack([np.round(arrival * 255), np.clip(128 + distance * 16, 0, 255), np.round(film * 255), np.full(alpha.shape, 255)], axis=-1).astype('uint8')
     normal = np.array(Image.fromarray(normal).resize((W, H), Image.Resampling.LANCZOS))
     Image.fromarray(encoded).save(ASSETS / f'word-{position}-field.png', optimize=True)
     Image.fromarray(normal).save(ASSETS / f'word-{position}-normal.png', optimize=True)

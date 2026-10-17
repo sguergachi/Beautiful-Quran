@@ -154,13 +154,19 @@ private suspend fun loadStudy(app: QuranApp): PaperInkStudy {
 }
 
 @RequiresApi(33)
+private enum class InkPreview(val label: String) {
+    Voice("Follow voice"), Wet("Hold wet"), Dry("Dry ink"),
+}
+
+@RequiresApi(33)
 @Composable
 private fun PaperInkStudyPage(app: QuranApp, study: PaperInkStudy) {
     val state by app.player.state.collectAsStateWithLifecycle()
     val speed = remember { mutableFloatStateOf(1f) }
     val tick = remember { mutableLongStateOf(SystemClock.uptimeMillis()) }
     val lightingActive = remember { mutableStateOf(false) }
-    val tilt = rememberPaperInkTilt(lightingActive.value)
+    val preview = remember { mutableStateOf(InkPreview.Voice) }
+    val tilt = rememberPaperInkTilt(lightingActive.value || preview.value == InkPreview.Wet)
     val paper = Color(0xFFFAF3E8)
     LaunchedEffect(study) {
         app.player.playSurah(1, 1, 1, study.reciter, "Al-Fatihah", preserveRepeatRange = false, autoplay = false)
@@ -199,13 +205,21 @@ private fun PaperInkStudyPage(app: QuranApp, study: PaperInkStudy) {
                 val baseline = size.height / 2 + (row - .5f) * 260f * scale
                 for (word in pair) {
                     word.motion.update(media, state.isPlaying && belongs, now)
-                    val progress = word.pacing?.at(word.motion.progress) ?: InkEngine.sweepEasing.transform(word.motion.progress)
+                    val progress = if (preview.value != InkPreview.Voice) 1f else
+                        word.pacing?.at(word.motion.progress) ?: InkEngine.sweepEasing.transform(word.motion.progress)
+                    val wet = when (preview.value) {
+                        InkPreview.Voice -> word.motion.wet
+                        InkPreview.Wet -> 1f
+                        InkPreview.Dry -> 0f
+                    }
                     word.shader.setFloatUniform("progress", progress)
-                    word.shader.setFloatUniform("wet", word.motion.wet)
+                    word.shader.setFloatUniform("wet", wet)
                     word.shader.setFloatUniform("weight", 1.3f)
                     word.shader.setFloatUniform("aa", .9f / scale)
                     word.shader.setFloatUniform("tilt", tilt.value.x, tilt.value.y)
                     x -= word.width * scale
+                    word.shader.setFloatUniform("origin", x / scale - 362.5f,
+                        baseline / scale - word.baseline - size.height / (2 * scale))
                     native.save()
                     native.translate(x, baseline - word.baseline * scale)
                     native.scale(scale, scale)
@@ -217,10 +231,24 @@ private fun PaperInkStudyPage(app: QuranApp, study: PaperInkStudy) {
         }
         Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
             Text("Paper ink", style = MaterialTheme.typography.titleMedium)
-            Text("Abu Bakr Al-Shatri · tilt gently while the ink is wet", style = MaterialTheme.typography.bodySmall)
+            Text("Abu Bakr Al-Shatri · hold wet to inspect the reflection", style = MaterialTheme.typography.bodySmall)
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                Text(if (state.isPlaying) "Pause" else "Play", Modifier.quietClickable { app.player.togglePlayPause() }.padding(vertical = 12.dp))
+                InkPreview.entries.forEach { mode ->
+                    Text(mode.label, Modifier.quietClickable {
+                        preview.value = mode
+                        if (mode != InkPreview.Voice) app.player.pause()
+                    }.padding(vertical = 8.dp), color = if (preview.value == mode)
+                        MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                        style = MaterialTheme.typography.bodySmall)
+                }
+            }
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                Text(if (state.isPlaying) "Pause" else "Play", Modifier.quietClickable {
+                    preview.value = InkPreview.Voice
+                    app.player.togglePlayPause()
+                }.padding(vertical = 12.dp))
                 Text("Again", Modifier.quietClickable {
+                    preview.value = InkPreview.Voice
                     app.player.seekToWordAndPlay(1, 0)
                 }.padding(vertical = 12.dp))
                 Text(if (speed.floatValue == 1f) "1×" else "½×", Modifier.quietClickable {

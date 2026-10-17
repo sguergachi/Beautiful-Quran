@@ -5,6 +5,7 @@ uniform float wet;
 uniform float weight;
 uniform float aa;
 uniform float2 tilt;
+uniform float2 origin;
 
 half4 main(float2 p) {
     float4 data = field.eval(p * 4.0);
@@ -14,12 +15,23 @@ half4 main(float2 p) {
     float expanded = smoothstep(-aa * 0.5, aa * 0.5, distance + weight * wet);
     float revealed = smoothstep(arrival, arrival + 0.014, progress);
     float coverage = mix(base * 0.2661, expanded, revealed);
+    float localWet = smoothstep(0.0, 0.55, wet - (1.0 - data.b) * 0.45);
     float3 normal = normalize((normals.eval(p).rgb * 255.0 - 128.0) / 127.0);
-    float3 light = normalize(float3(0.28 + tilt.x * 0.3, -0.3 + tilt.y * 0.3, 0.9));
-    float sheen = pow(max(0.0, dot(normal, light)), 24.0);
+    normal = normalize(float3(normal.xy * localWet, normal.z));
+    float3 view = normalize(float3(0.12 + tilt.x * 0.4, -0.16 + tilt.y * 0.4, 1.0));
+    float3 reflected = reflect(-view, normal);
+    float2 room = reflected.xy / max(0.2, reflected.z) + (p + origin) * 0.001;
+    // Two broad window panes reflected inside the liquid surface. Shared page
+    // coordinates keep the reflected room continuous across all four words.
+    float softness = mix(0.075, 0.15, 1.0 - localWet);
+    float pane = min(abs(room.x + 0.32), abs(room.x - 0.08));
+    float vertical = (room.y - 0.16) / 0.38;
+    float window = exp(-pane * pane / (softness * softness) -
+        vertical * vertical * vertical * vertical);
+    float sheen = window * localWet * localWet;
     float pooling = 1.0 - smoothstep(0.0, 5.0, max(0.0, distance));
-    float3 pigment = float3(17.0 - pooling * 13.0, 19.0 - pooling * 7.0, 20.0 - pooling * 5.0) / 255.0;
-    pigment += float3(0.24, 0.23, 0.21) * sheen;
+    float3 pigment = float3(12.0 - pooling * 8.0, 15.0 - pooling * 6.0, 17.0 - pooling * 5.0) / 255.0;
+    pigment += float3(0.38, 0.38, 0.36) * sheen;
     // Fine, stationary nib striations; never pixel noise or an outer halo.
     pigment += sin(dot(p, float2(0.19, -0.07))) * 0.004;
     float3 ink = mix(float3(28.0, 27.0, 24.0) / 255.0, pigment, wet * revealed);
