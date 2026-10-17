@@ -12,6 +12,28 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class EnglishWashClockTest {
+    @Test
+    fun `approved heads and ink anchors share the real repeat and carried wash policy`() {
+        val text = "Allah helped us."
+        val arabic = listOf("نَصَرَنَا", "ٱللَّهُ")
+        val record = com.beautifulquran.data.model.EnglishAlignmentRecord(
+            com.beautifulquran.domain.ReviewedEnglishAlignment.fingerprint(text, arabic),
+            listOf(1, 1, 2), listOf(2, 1, 1),
+        )
+        val alignment = com.beautifulquran.domain.ReviewedEnglishAlignment.alignment(text, arabic, record)!!
+        assertEquals(2, alignment.positionAt(0.1f))
+        val timings = listOf(Segment(1, 1000, 1800), Segment(1, 2000, 2300), Segment(2, 3000, 4000))
+        val windows = englishWashWindows(alignment.washSpans.map { it.position }, timings)
+        val endOfFirst = alignment.washSpans.first().to
+        assertEquals(endOfFirst, englishWashThrough(alignment, windows, 2000, 1000)!!, 0f)
+        val edges = (1000L..4000L step 17).map { englishWashThrough(alignment, windows, it, 1000)!! }
+        assertTrue(edges.zipWithNext().all { (a, b) -> b >= a })
+        val leaf = englishLeaf(1, listOf(EnglishVerseRun(1, 1, 6, text.length))) { _, _ -> text }.verses.single()
+        val span = EnglishInkSpan(0..5, 1, 0f, endOfFirst)
+        assertTrue(englishWashFragmentProgress(span, 0.9f, leaf::fragmentWashProgress) < 1f)
+        assertEquals(1f, englishWashFragmentProgress(span, 1f, leaf::fragmentWashProgress), 0f)
+    }
+
     private val tail = listOf(
         Segment(22, 25530, 26800), Segment(23, 26800, 28490),
         Segment(24, 28490, 32560), Segment(25, 32560, 32930), Segment(26, 32930, 36250),

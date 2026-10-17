@@ -43,7 +43,9 @@ jobs:
           python3 tools/test_qf_timing_assets.py
 
       - name: English semantic acceptance gate regressions
-        run: python3 tools/test_audit_english_alignment.py
+        run: |
+          python3 tools/test_audit_english_alignment.py
+          python3 tools/test_english_alignment_ledger.py
 
       - name: QF proxy regressions
         run: node --test worker/test/*.test.mjs
