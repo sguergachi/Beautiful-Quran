@@ -417,63 +417,200 @@ function generateSeal(rng: Mulberry32, fold: number): RosetteSpec {
 }
 
 /**
- * The border band: a rumi scroll, the running gold border of Ottoman and
- * Mamluk illuminated Qur'ans. One vine waves along the band's centre; under
- * every crest a split palmette (rumi) springs into the hollow and ends in a
- * beak curling back over its own body, vein down its middle, glide-mirrored
- * under each trough, with a pearl between each crest and its rail. The
- * seed only nudges proportions, and the draws match the five-grammar picker
- * this replaced, so the field grown after it is unchanged for every seed.
- * Mirrors Android's generateBorder line for line.
+ * The border band. One of six grammars is grown per launch: the five frieze
+ * grammars found on tooled mushaf bindings — interlocking scallops, an
+ * interlaced two-strand cable (guilloche), a Hankin star-and-cross strip, a
+ * nested lozenge chain, a khatam chain of linked eight-fold stars — plus the
+ * illuminator's rumi scroll. Mirrors Android's generateBorder line for line,
+ * including each grammar's RNG draw order.
  */
 function generateBorder(rng: Mulberry32): BorderSpec {
-  const draws = BORDER_LEGACY_DRAWS[rng.int(BORDER_LEGACY_DRAWS.length)]!
-  const v = Array.from({ length: draws }, () => rng.next())
-  const period = 2.2 + 0.4 * v[0]!
-  const leafWidth = 0.24 + 0.04 * v[1]!
-
   const strokes: OrnamentStroke[] = []
   const dots: OrnamentDot[] = []
-  const hair = (points: OrnamentPoint[], closed: boolean): OrnamentStroke => ({
-    points,
-    closed,
-    weight: 'hairline',
-    birth: 0,
-    span: 1,
-  })
+  let period: number
 
-  // The vine crosses the centre at each period boundary, so every run
-  // enters its corner seals at mid-band.
-  const stemY = (x: number) => 0.5 - RUMI_AMP * Math.sin((TAU * x) / period)
-  const stem: OrnamentPoint[] = []
-  for (let i = 0; i <= RUMI_STEM_SAMPLES; i++) {
-    const x = (period * i) / RUMI_STEM_SAMPLES
-    stem.push({ x, y: stemY(x) })
-  }
-  strokes.push(hair(stem, false))
+  const recipe = rng.int(6)
+  if (recipe === 0) {
+    // Interlocking scallops — a row of pointed scales hangs from the top
+    // rail while a second row, half a period out of phase, rises from the
+    // bottom rail; where they overlap they weave a fish-scale (imbricated)
+    // border, and a pearl rests in each scale's open heart.
+    period = rng.range(1, 1.4)
+    const h = 0.74
+    const samples = 16
+    const scale = (
+      apexX: number,
+      fromTop: boolean,
+      x0: number,
+      x1: number,
+    ): OrnamentPoint[] => {
+      const pts: OrnamentPoint[] = []
+      for (let i = 0; i <= samples; i++) {
+        const x = x0 + ((x1 - x0) * i) / samples
+        const u = (x - apexX) / (period / 2)
+        const depth = h * Math.pow(Math.max(0, 1 - u * u), 0.75)
+        pts.push({ x, y: fromTop ? depth : 1 - depth })
+      }
+      return pts
+    }
+    strokes.push({
+      points: scale(period / 2, true, 0, period),
+      closed: false,
+      weight: 'hairline',
+      birth: 0,
+      span: 1,
+    })
+    strokes.push({
+      points: [...scale(0, false, 0, period / 2), ...scale(period, false, period / 2, period)],
+      closed: false,
+      weight: 'hairline',
+      birth: 0,
+      span: 1,
+    })
+    const pearl = rng.range(0.05, 0.075)
+    dots.push({ x: period / 2, y: 0.3, radius: pearl, birth: 0 })
+    dots.push({ x: 0, y: 0.7, radius: pearl, birth: 0 })
+  } else if (recipe === 1) {
+    // Cable: two phase-opposed strands crossing twice per period, a pearl
+    // in each eye where the strands part.
+    period = rng.range(1.8, 2.6)
+    const amp = rng.range(0.26, 0.34)
+    const samples = 24
+    const strand = (sign: number): OrnamentStroke => {
+      const points: OrnamentPoint[] = []
+      for (let i = 0; i <= samples; i++) {
+        const x = (i * period) / samples
+        points.push({ x, y: 0.5 + sign * amp * Math.cos((TAU * x) / period) })
+      }
+      return { points, closed: false, weight: 'hairline', birth: 0, span: 1 }
+    }
+    strokes.push(strand(1))
+    strokes.push(strand(-1))
+    const eye = rng.range(0.06, 0.09)
+    dots.push({ x: 0, y: 0.5, radius: eye, birth: 0 })
+    dots.push({ x: period / 2, y: 0.5, radius: eye, birth: 0 })
+  } else if (recipe === 2) {
+    // Star-and-cross strip: Hankin's method on a row of squares.
+    period = 1
+    const deg = rng.chance(0.5) ? rng.range(28, 42) : rng.range(50, 68)
+    strokes.push(
+      ...hankinStrokes(
+        [
+          { x: 0, y: 0 },
+          { x: 1, y: 0 },
+          { x: 1, y: 1 },
+          { x: 0, y: 1 },
+        ],
+        (deg * Math.PI) / 180,
+      ),
+    )
+  } else if (recipe === 3) {
+    // Nested lozenge chain — a diamond in a diamond, tip-to-tip, a pearl
+    // at each heart.
+    period = rng.range(1.7, 2.3)
+    const diamond = (halfW: number, halfH: number): OrnamentStroke => ({
+      points: [
+        { x: period / 2 - halfW, y: 0.5 },
+        { x: period / 2, y: 0.5 - halfH },
+        { x: period / 2 + halfW, y: 0.5 },
+        { x: period / 2, y: 0.5 + halfH },
+      ],
+      closed: true,
+      weight: 'hairline',
+      birth: 0,
+      span: 1,
+    })
+    strokes.push(diamond(period / 2, 0.38))
+    strokes.push(diamond(period / 4, 0.19))
+    dots.push({ x: period / 2, y: 0.5, radius: rng.range(0.05, 0.08), birth: 0 })
+  } else if (recipe === 4) {
+    // Khatam chain — small eight-fold stars (two overlapped squares)
+    // linked by diamonds at the period boundaries.
+    period = rng.range(1.35, 1.75)
+    const r = rng.range(0.26, 0.31)
+    const a = r * 0.7071
+    strokes.push({
+      points: [
+        { x: period / 2 - a, y: 0.5 - a },
+        { x: period / 2 + a, y: 0.5 - a },
+        { x: period / 2 + a, y: 0.5 + a },
+        { x: period / 2 - a, y: 0.5 + a },
+      ],
+      closed: true,
+      weight: 'hairline',
+      birth: 0,
+      span: 1,
+    })
+    strokes.push({
+      points: [
+        { x: period / 2 - r, y: 0.5 },
+        { x: period / 2, y: 0.5 - r },
+        { x: period / 2 + r, y: 0.5 },
+        { x: period / 2, y: 0.5 + r },
+      ],
+      closed: true,
+      weight: 'hairline',
+      birth: 0,
+      span: 1,
+    })
+    // Link diamond straddling the period boundary; when tiled, the half
+    // past x = 0 is completed by the neighbouring tile.
+    const cw = rng.range(0.1, 0.14)
+    strokes.push({
+      points: [
+        { x: -cw, y: 0.5 },
+        { x: 0, y: 0.5 - cw * 0.85 },
+        { x: cw, y: 0.5 },
+        { x: 0, y: 0.5 + cw * 0.85 },
+      ],
+      closed: true,
+      weight: 'hairline',
+      birth: 0,
+      span: 1,
+    })
+    dots.push({ x: period / 2, y: 0.5, radius: 0.05, birth: 0 })
+  } else {
+    // The rumi scroll: a vine waves along the band's centre; under every
+    // crest a split palmette (rumi) springs into the hollow and ends in a
+    // beak curling back over its own body, vein down its middle,
+    // glide-mirrored under each trough, with a pearl between crest and rail.
+    const v = [rng.next(), rng.next()]
+    period = 2.2 + 0.4 * v[0]!
+    const leafWidth = 0.24 + 0.04 * v[1]!
 
-  const crest = period / 4
-  const baseX = crest + 0.14 * period
-  const base = { x: baseX, y: stemY(baseX) }
-  const tip = { x: crest - 0.12 * period, y: 0.66 }
-  const spine = rumiSpine(
-    base,
-    { x: base.x - 0.01 * period, y: base.y + 0.42 },
-    { x: tip.x + 0.12 * period, y: tip.y + 0.2 },
-    tip,
-  )
-  const outline = rumiOutline(spine, leafWidth)
-  const vein = spine.slice(3, Math.round(spine.length * 0.55))
-  const pearl = { x: crest, y: 0.14 }
-  for (const glide of [false, true]) {
-    const map = (p: OrnamentPoint): OrnamentPoint =>
-      glide ? { x: p.x + period / 2, y: 1 - p.y } : p
-    strokes.push(hair(outline.map(map), true))
-    strokes.push(hair(vein.map(map), false))
-    const d = map(pearl)
-    dots.push({ x: d.x, y: d.y, radius: 0.055, birth: 0 })
+    // The vine crosses the centre at each period boundary, so every run
+    // enters its corner seals at mid-band. Crest at a quarter period,
+    // trough at three quarters.
+    const stem: OrnamentPoint[] = []
+    for (let i = 0; i <= RUMI_STEM_SAMPLES; i++) {
+      const x = (period * i) / RUMI_STEM_SAMPLES
+      stem.push({ x, y: stemY(x, period) })
+    }
+    strokes.push(hair(stem, false))
+
+    const crest = period / 4
+    const baseX = crest + 0.14 * period
+    const base = { x: baseX, y: stemY(baseX, period) }
+    const tip = { x: crest - 0.12 * period, y: 0.66 }
+    const spine = rumiSpine(
+      base,
+      { x: base.x - 0.01 * period, y: base.y + 0.42 },
+      { x: tip.x + 0.12 * period, y: tip.y + 0.2 },
+      tip,
+    )
+    const outline = rumiOutline(spine, leafWidth)
+    const vein = spine.slice(3, Math.round(spine.length * 0.55))
+    const pearl = { x: crest, y: 0.14 }
+    for (const glide of [false, true]) {
+      const map = (p: OrnamentPoint): OrnamentPoint =>
+        glide ? { x: p.x + period / 2, y: 1 - p.y } : p
+      strokes.push(hair(outline.map(map), true))
+      strokes.push(hair(vein.map(map), false))
+      const d = map(pearl)
+      dots.push({ x: d.x, y: d.y, radius: 0.055, birth: 0 })
+    }
   }
-  // Rule-weight edge rails bound the scroll into one tooled channel.
+  // Rule-weight edge rails bound every recipe into one tooled channel.
   for (const y of [0, 1]) {
     strokes.push({
       points: [
@@ -489,13 +626,120 @@ function generateBorder(rng: Mulberry32): BorderSpec {
   return { period, strokes, dots }
 }
 
-/** Draws each of the replaced border grammars took after its pick, in pick order. */
-const BORDER_LEGACY_DRAWS = [2, 3, 2, 2, 3]
-
 /** The vine's swing either side of the band's centre, in band heights. */
 const RUMI_AMP = 0.2
 
 const RUMI_STEM_SAMPLES = 32
+
+const stemY = (x: number, period: number): number => 0.5 - RUMI_AMP * Math.sin((TAU * x) / period)
+
+const hair = (points: OrnamentPoint[], closed: boolean): OrnamentStroke => ({
+  points,
+  closed,
+  weight: 'hairline',
+  birth: 0,
+  span: 1,
+})
+
+interface Ray {
+  ox: number
+  oy: number
+  dx: number
+  dy: number
+}
+
+/**
+ * Hankin's method on one convex polygon: two rays leave each edge midpoint
+ * at ±θ, aimed inward; each ray is kept up to its nearest crossing with
+ * another ray. Shared edge midpoints make the pattern continuous across
+ * the whole tiling.
+ */
+function hankinStrokes(vertices: OrnamentPoint[], theta: number): OrnamentStroke[] {
+  const n = vertices.length
+  let cx = 0
+  let cy = 0
+  for (const v of vertices) {
+    cx += v.x
+    cy += v.y
+  }
+  cx /= n
+  cy /= n
+
+  const rays: Ray[] = []
+  for (let i = 0; i < n; i++) {
+    const a = vertices[i]!
+    const b = vertices[(i + 1) % n]!
+    const mx = (a.x + b.x) / 2
+    const my = (a.y + b.y) / 2
+    let dx = b.x - a.x
+    let dy = b.y - a.y
+    const len = Math.sqrt(dx * dx + dy * dy)
+    dx /= len
+    dy /= len
+    const c = Math.cos(theta)
+    const s = Math.sin(theta)
+    // rot(d, +θ) and rot(−d, −θ), mirrored if facing away from the centroid.
+    let ax = dx * c - dy * s
+    let ay = dx * s + dy * c
+    let bx = -dx * c - dy * s
+    let by = dx * s - dy * c
+    if ((ax + bx) * (cx - mx) + (ay + by) * (cy - my) < 0) {
+      ax = dx * c + dy * s
+      ay = -dx * s + dy * c
+      bx = -dx * c + dy * s
+      by = -dx * s - dy * c
+    }
+    rays.push({ ox: mx, oy: my, dx: ax, dy: ay })
+    rays.push({ ox: mx, oy: my, dx: bx, dy: by })
+  }
+
+  const strokes: OrnamentStroke[] = []
+  for (const r of rays) {
+    let bestT = Number.MAX_VALUE
+    for (const o of rays) {
+      if (o === r) continue
+      const denom = r.dx * o.dy - r.dy * o.dx
+      if (Math.abs(denom) < 1e-9) continue
+      const qpx = o.ox - r.ox
+      const qpy = o.oy - r.oy
+      const t = (qpx * o.dy - qpy * o.dx) / denom
+      const s = (qpx * r.dy - qpy * r.dx) / denom
+      if (t > 1e-6 && s > 1e-6 && t < bestT) {
+        const px = r.ox + t * r.dx
+        const py = r.oy + t * r.dy
+        if (pointInConvex(vertices, px, py)) bestT = t
+      }
+    }
+    if (bestT === Number.MAX_VALUE) continue
+    strokes.push({
+      points: [
+        { x: r.ox, y: r.oy },
+        { x: r.ox + bestT * r.dx, y: r.oy + bestT * r.dy },
+      ],
+      closed: false,
+      weight: 'hairline',
+      birth: 0,
+      span: 1,
+    })
+  }
+  return strokes
+}
+
+/** Inside test tolerant of boundary points (midpoints sit on edges). */
+function pointInConvex(vertices: OrnamentPoint[], px: number, py: number): boolean {
+  const n = vertices.length
+  let sign = 0
+  for (let i = 0; i < n; i++) {
+    const a = vertices[i]!
+    const b = vertices[(i + 1) % n]!
+    const cross = (b.x - a.x) * (py - a.y) - (b.y - a.y) * (px - a.x)
+    if (Math.abs(cross) < 1e-9) continue
+    const s = cross > 0 ? 1 : -1
+    if (sign === 0) sign = s
+    else if (s !== sign) return false
+  }
+  return true
+}
 
 /** The rumi's spine: a cubic to `tip`, then the beak hooking back over the body. */
 function rumiSpine(

@@ -1219,15 +1219,19 @@ image, so it is crisp at any density and nearly free to render.
   assigns a distinct frame/interior/corner recipe and a distinct medallion
   structure across all 114 chapters; verse count varies their safe
   proportions. The same chapter always regrows the same ornament. The cover's
-  border frieze is one grammar, a **rumi scroll** after the running gold
-  borders of Ottoman and Mamluk illuminated Qur'ans: a vine waves along the
-  band, a split palmette (rumi) springs under each crest and ends in a beak
-  curling back over its own body, vein down its middle, glide-mirrored
-  under each trough, with a pearl between crest and rail. The seed only
-  nudges its proportions. It replaced five geometric grammars (scallops,
-  cable, Hankin strip, lozenge and khatam chains) whose straight crossings
-  and diamonds read as typed ASCII (`x`, `<>`) at band size; keep border
-  line work curved. On the cover, the **medallion and field build
+  border frieze is one of **six grammars grown per launch**: the five
+  geometries of tooled mushaf bindings — interlocking scallops with a pearl
+  in each scale, a two-strand guilloche cable with pearl eyes, a Hankin
+  star-and-cross strip, a nested lozenge chain, a khatam chain of linked
+  eight-fold stars — and the **rumi scroll**, the running gold borders of
+  Ottoman and Mamluk illuminated Qur'ans: a vine waves along the band, a
+  split palmette (rumi) springs under each crest and ends in a beak curling
+  back over its own body, vein down its middle, glide-mirrored under each
+  trough, with a pearl between crest and rail. A single fixed scroll briefly
+  replaced the five pickers (#868), which took away the launch-to-launch
+  variety the pattern families exist for; the pickers are restored around
+  the scroll, which remains the one fully-fixed grammar (its seed only
+  nudges proportions). On the cover, the **medallion and field build
   in real time** — strokes ink themselves in along their length across
   ~3.4 s, field first, then medallion outside-in — so the illumination is
   drawn before the reader's eyes, not stamped; the **border and corner
