@@ -5,19 +5,12 @@ import android.graphics.BitmapShader
 import android.graphics.Paint
 import android.graphics.RuntimeShader
 import android.graphics.Shader
-import android.hardware.Sensor
-import android.hardware.SensorEvent
-import android.hardware.SensorEventListener
-import android.hardware.SensorManager
 import android.os.Build
 import android.os.Bundle
 import android.os.SystemClock
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.annotation.RequiresApi
-import androidx.compose.animation.core.Animatable
-import androidx.compose.animation.core.VectorConverter
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -30,7 +23,6 @@ import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
@@ -38,18 +30,12 @@ import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.nativeCanvas
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import androidx.lifecycle.compose.LocalLifecycleOwner
-import androidx.lifecycle.Lifecycle
-import androidx.lifecycle.LifecycleEventObserver
 import androidx.core.view.WindowCompat
 import com.beautifulquran.QuranApp
 import com.beautifulquran.R
@@ -60,13 +46,8 @@ import com.beautifulquran.domain.TajweedPacing
 import com.beautifulquran.ui.theme.BeautifulQuranTheme
 import com.beautifulquran.ui.theme.quietClickable
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.withContext
 import org.json.JSONArray
-import kotlin.math.asin
-import kotlin.math.atan2
-import kotlin.math.cos
-import kotlin.math.sin
 
 /** Native, one-verse Paper paint experiment; intentionally separate from the reader. */
 class PaperInkStudyActivity : ComponentActivity() {
@@ -165,21 +146,17 @@ private fun PaperInkStudyPage(app: QuranApp, study: PaperInkStudy) {
     val state by app.player.state.collectAsStateWithLifecycle()
     val speed = remember { mutableFloatStateOf(1f) }
     val tick = remember { mutableLongStateOf(SystemClock.uptimeMillis()) }
-    val lightingActive = remember { mutableStateOf(false) }
     val preview = remember { mutableStateOf(InkPreview.Voice) }
-    val tilt = rememberPaperInkTilt(lightingActive.value || preview.value == InkPreview.Wet)
     val paper = Color(0xFFFAF3E8)
     LaunchedEffect(study) {
         app.player.playSurah(1, 1, 1, study.reciter, "Al-Fatihah", preserveRepeatRange = false, autoplay = false)
         app.player.setSpeed(1f)
     }
     LaunchedEffect(state.isPlaying, state.positionEvents.clockId) {
-        lightingActive.value = true
         val until = SystemClock.uptimeMillis() + InkEngine.tuning.glintFadeMs
         do {
             withFrameNanos { tick.longValue = SystemClock.uptimeMillis() }
         } while (state.isPlaying || SystemClock.uptimeMillis() < until)
-        lightingActive.value = false
     }
     Column(
         Modifier.fillMaxSize().background(paper).safeDrawingPadding().padding(horizontal = 24.dp, vertical = 20.dp),
@@ -216,9 +193,8 @@ private fun PaperInkStudyPage(app: QuranApp, study: PaperInkStudy) {
                     word.shader.setFloatUniform("progress", progress)
                     word.shader.setFloatUniform("wet", wet)
                     word.shader.setFloatUniform("applying", if (preview.value == InkPreview.Voice && word.motion.applying) 1f else 0f)
-                    word.shader.setFloatUniform("weight", 1.3f)
+                    word.shader.setFloatUniform("weight", 2.6f)
                     word.shader.setFloatUniform("aa", .9f / scale)
-                    word.shader.setFloatUniform("tilt", tilt.value.x, tilt.value.y)
                     x -= word.width * scale
                     word.shader.setFloatUniform("origin", x / scale - 362.5f,
                         baseline / scale - word.baseline - size.height / (2 * scale))
@@ -233,7 +209,7 @@ private fun PaperInkStudyPage(app: QuranApp, study: PaperInkStudy) {
         }
         Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
             Text("Paper ink", style = MaterialTheme.typography.titleMedium)
-            Text("Abu Bakr Al-Shatri · hold wet to inspect the reflection", style = MaterialTheme.typography.bodySmall)
+            Text("Abu Bakr Al-Shatri · controlled wet reflection", style = MaterialTheme.typography.bodySmall)
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                 InkPreview.entries.forEach { mode ->
                     Text(mode.label, Modifier.quietClickable {
@@ -260,40 +236,4 @@ private fun PaperInkStudyPage(app: QuranApp, study: PaperInkStudy) {
             }
         }
     }
-}
-
-/** One lifecycle-bound fused gyro listener; only the small light vector animates. */
-@Composable
-private fun rememberPaperInkTilt(active: Boolean): androidx.compose.runtime.State<Offset> {
-    val manager = LocalContext.current.getSystemService(SensorManager::class.java)
-    val lifecycle = LocalLifecycleOwner.current.lifecycle
-    val aim = remember { mutableStateOf(Offset.Zero) }
-    val light = remember { Animatable(Offset.Zero, Offset.VectorConverter) }
-    LaunchedEffect(Unit) { snapshotFlow { aim.value }.collectLatest { light.animateTo(it, tween(140)) } }
-    DisposableEffect(active, lifecycle) {
-        val sensor = manager?.getDefaultSensor(Sensor.TYPE_GAME_ROTATION_VECTOR)
-        val matrix = FloatArray(9)
-        var origin: Offset? = null
-        val listener = object : SensorEventListener {
-            override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) = Unit
-            override fun onSensorChanged(event: SensorEvent) {
-                SensorManager.getRotationMatrixFromVector(matrix, event.values)
-                val angles = Offset(atan2(matrix[6], matrix[8]), asin((-matrix[7]).coerceIn(-1f, 1f)))
-                val zero = origin ?: angles.also { origin = it }
-                fun relative(value: Float) = (atan2(sin(value), cos(value)) / .45f).coerceIn(-1f, 1f)
-                aim.value = Offset(relative(angles.x - zero.x), relative(angles.y - zero.y))
-            }
-        }
-        fun followLifecycle() {
-            manager?.unregisterListener(listener)
-            if (active && sensor != null && lifecycle.currentState.isAtLeast(Lifecycle.State.STARTED)) {
-                manager.registerListener(listener, sensor, 100_000)
-            }
-        }
-        val observer = LifecycleEventObserver { _, _ -> followLifecycle() }
-        lifecycle.addObserver(observer)
-        followLifecycle()
-        onDispose { lifecycle.removeObserver(observer); manager?.unregisterListener(listener) }
-    }
-    return light.asState()
 }

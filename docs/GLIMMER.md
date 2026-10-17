@@ -34,19 +34,26 @@ advances along that edge, then relaxes into the laid film. The moving ridge
 stops on pause, leaving the wet ink to settle. Older laid areas settle before
 the current contact, while deeper deposits keep their reflection longer.
 
-Wet ink is optically fuller than dry ink and has restrained pigment pooling
+Wet ink is optically fuller than dry ink and has localized pigment pooling
 and a glyph-bound reflection of two broad window panes. The former faint
 diffuse-facing lobe left most wet ink almost the same brightness as dry ink
 on the phone. A stronger edge highlight alone looked like raised lettering.
 The revised surface is a thin, mostly flat film with shallow smooth pools;
-one reflected room is continuous across the verse and moves with tilt.
+the reflected window panes follow a controlled pass tied to drawing progress
+and the dry-down. No device movement or sensor is involved.
 Thinner film loses its reflection first during the shared dry-down envelope.
+The wet-phase contrast is deliberately pronounced for normal reading speed:
+the liquid lip catches light even with a still phone, window reflections are
+brighter, and wet expansion reaches 2.6 font pixels before settling. The
+fresh reflection remains inside the painted stroke, with no surrounding glow.
+The film stays glossy through deposition; its loss of gloss happens during
+the existing dry-down rather than fading most of the cue before handoff.
 Hafs is a fixed-weight font: this is a small
 stroke expansion, not a variable-font weight axis. Both thickness and gloss
 dry over the same `InkEngine.tuning.glintFadeMs` as glimmer. The existing
 tajweed curve supplies letter timing before wash-feather compensation.
 Pausing stops stroke travel and lets wet ink dry; Again starts a fresh pass.
-**Hold wet** pauses audio and holds the complete verse wet for tilt inspection;
+**Hold wet** pauses audio and holds the complete verse wet for inspection;
 **Dry ink** shows the same verse matte and thinner. **Follow voice**, Play or
 Again returns to timed drawing. These modes keep the controls in fixed slots.
 
@@ -57,10 +64,10 @@ shaders draw the verse; no shaping, stroke rasterization or bitmap upload
 runs per frame. Opaque field maps carry two arrival bytes in RG and signed
 contour distance in B; surface maps carry normal XY and film depth. The
 shader reconstructs normal Z and samples the arrival gradient locally.
-A lifecycle-bound game rotation vector sensor supplies
-relative tilt at 10 Hz, smoothly interpolated, only during playback/dry-down.
-Devices without that sensor retain the resting reflection. Real phone
-performance and the fidelity of the authored hand still need evaluation.
+The light pass is driven entirely by the existing drawing progress and wet
+envelope, so its visibility does not depend on phone angle. There are no
+sensor listeners. Real phone performance and the fidelity of the authored
+hand still need evaluation.
 
 `tools/paper_ink_study/strokes.json` contains the gestures. Rebuild the
 committed `app/src/main/assets/paper-ink-study/` maps with:
@@ -74,8 +81,8 @@ adb shell am start -n com.beautifulquran/.ui.reader.PaperInkStudyActivity
 The generator reads the existing canonical verse without changing any
 database. `PaperInkClockTest` covers ordered handoff, pause/resume dry-down,
 contact gating and backward-seek reset. Normal/half-speed playback can be compared in the
-sheet. A screen recording cannot exercise a physical phone's gyro; verify
-its tilt response separately on the phone.
+sheet. The controlled reflection is identical in recordings and on a still
+phone; physical-device performance still needs evaluation.
 
 The material target is carbon calligraphy ink on smooth, sized paper,
 settling to a matte finish. It is an art-directed approximation compressed
