@@ -180,7 +180,7 @@ updates when a verse is actually recited — not on open, scroll, or rail jump.
 settled scroll verse or Mushaf leaf. It never seeks audio. Chapters shows one
 green-ribbon continue pill: the last-heard place, matching Android, with the
 reading place as its fallback before any listening. A Mushaf turn reports
-its settled verse to the toolbar and in-chapter search; the loaded listening
+its settled verse to in-chapter search; the loaded listening
 chapter stays identified on the transport when it differs from the paper.
 An explicitly opened verse is kept when it is on either facing leaf, so a link
 to 2:255 remains 2:255 rather than becoming the first verse on that printed page.
@@ -542,7 +542,9 @@ counted outside the source grid, it adds the missing furniture and fits both
 facing leaves to the taller slot count (up to seventeen), retaining every word
 on its page. Fatiha's basmalah remains its timed first verse; Tawbah has no
 preface. The entire opening group stays centred on leaves 1–2.
-The compact top-bar title stays on the page's physical centre line. Its caps
+The Mushaf toolbar has no chapter medallion or title: its chapter names live
+in the running heads and opening cartouches. Only the scrolling reader carries
+the compact top-bar title, on the page's physical centre line. Its caps
 line uses Android's 10 px label enlarged for Junicode small caps, and the Arabic
 name gives its descender slack to the caps line rather than leaving a gap.
 The spread's furniture scale keeps the same `u / 27.5px` ratio and 0.85

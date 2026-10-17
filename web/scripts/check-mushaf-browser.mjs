@@ -130,16 +130,7 @@ try {
       if (leaf.opening) assert(Math.abs(leaf.center - leaf.wellCenter) < 2, JSON.stringify(leaf))
     }
     assert(Math.abs(geometry[0].top - geometry[1].top) < 1, JSON.stringify(geometry))
-    const medallion = await page.locator('.reader-top-medallion').boundingBox()
-    assert(medallion.width >= 15 && medallion.width < 40, JSON.stringify(medallion))
-    const bar = await page.locator('.reader-top').boundingBox()
-    const title = await page.locator('.reader-top-title').boundingBox()
-    const actions = await page.locator('.reader-actions').boundingBox()
-    assert(Math.abs(title.x + title.width / 2 - bar.x - bar.width / 2) < 1, JSON.stringify({ bar, title }))
-    assert(title.y >= bar.y - 1 && title.y + title.height <= bar.y + bar.height + 1, JSON.stringify({ bar, title }))
-    assert(title.x + title.width < actions.x, JSON.stringify({ title, actions }))
-    const caps = await page.locator('.ornate-en').evaluate(el => parseFloat(getComputedStyle(el).fontSize))
-    assert(caps >= 10 * 1.15 * 0.85, String(caps))
+    assert.equal(await page.locator('.reader-top-title, .reader-top-medallion').count(), 0, 'Mushaf must not carry the scroll reader toolbar title')
     return geometry
   }
   await page.evaluate(() => window.mushafApp.openReading(1, 1))
@@ -206,6 +197,9 @@ try {
   const english = page.locator('.mushaf[data-side="verso"] .mushaf-chapter-name')
   assert.equal(await english.count(), 3)
   assert.equal(await english.first().getAttribute('lang'), 'en')
+  await page.evaluate(() => window.mushafApp.updateSettings({ readingLayout: 'scroll' }))
+  await page.locator('.reader-top-title .reader-top-medallion').waitFor({ state: 'attached' })
+  assert.equal(await page.locator('.reader-top-title').count(), 1, 'Scrolling reader keeps its chapter title')
   assert.deepEqual(errors, [])
   console.log(`${engine}: opening, full leaves, forward/back and chapter opening passed`)
 } finally {

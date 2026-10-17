@@ -1254,12 +1254,12 @@ export function ReaderScreen({
           {searchActive ? <IconClose /> : <span aria-hidden="true">←</span>}
         </button>
 
-        {!searchActive && (pinnedTopNavTitle || content) ? (
+        {!mushaf && !searchActive && (pinnedTopNavTitle || content) ? (
           <div
             className="reader-top-title"
-            data-visible={(mushaf || showTopTitle) && !chapterAdvancing}
+            data-visible={showTopTitle && !chapterAdvancing}
             data-advancing={chapterAdvancing && pinnedTopNavTitle != null ? true : undefined}
-            aria-hidden={!mushaf && !showTopTitle && !pinnedTopNavTitle}
+            aria-hidden={!showTopTitle && !pinnedTopNavTitle}
           >
             <OrnateSurahTitle
               ayahCount={pinnedTopNavTitle?.ayahCount ?? readerSurah!.ayahCount}
