@@ -413,12 +413,17 @@ fun EntranceCover(
         ) {
             // Record the field once; its wash changes only layer alpha, so it
             // never re-records the leather, title, or border around it.
+            // Offscreen, not ModulateAlpha: the weave's four giant paths are
+            // past the atlas-path cache's size, so a plain node re-tessellates
+            // them on the render thread every frame the surface is damaged —
+            // the whole ceremony, since the sheen damages it every frame. An
+            // offscreen layer renders them once and composites the texture.
             Spacer(
                 Modifier
                     .matchParentSize()
                     .graphicsLayer {
                         alpha = (build.value / 0.55f).coerceIn(0f, 1f)
-                        compositingStrategy = CompositingStrategy.ModulateAlpha
+                        compositingStrategy = CompositingStrategy.Offscreen
                     }
                     .generatedFieldWeave(
                         field = ornament.field,
