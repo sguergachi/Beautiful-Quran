@@ -1629,7 +1629,13 @@ up to the row — resizing onto its exact bounds, squaring its corners, settling
 every inset, then fading to reveal the row — so the row owns the tap, and
 scrolling back down peels it off the top and settles it home again. Flights
 only ever arm off a fully-visible row and cancel the moment it leaves, so
-flings pass through untouched. Web keeps its mint pill in its top
+flings pass through untouched. The pill also never rises until the chapter
+list has measured its first pass: on the list's first composition the
+row-visibility rule cannot see the row yet, and a launch whose reading row
+is already in view must behave as if the pill had always been docked away —
+no pop, dwell, or late flight. On departure the resting pill does not fade:
+it is replaced in place by the flight's own copy, so the departure is only
+ever one motion. Web keeps its mint pill in its top
 continue area: a 28 px radius, 16 px outer inset, 40 px green place cloth,
 gold chapter number, CONTINUE flag, and compact bilingual chapter and ayah.
 The shared ribbon is decorative inside one accessible resume button. Only one

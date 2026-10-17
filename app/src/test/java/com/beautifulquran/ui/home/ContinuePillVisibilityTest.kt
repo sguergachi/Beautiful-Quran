@@ -21,6 +21,31 @@ class ContinuePillVisibilityTest {
     }
 
     @Test
+    fun heldBackUntilTheListHasLaidOut() {
+        // First composition: no measured rows yet, so the rule cannot tell
+        // that the reading-place row is already in view. Hold the pill.
+        assertFalse(
+            shouldShowContinuePill(
+                continuePresent = true,
+                searchActive = false,
+                coverVisible = true,
+                continueRowVisible = false,
+                listLaidOut = false,
+            ),
+        )
+        // Once the list has measured, geometry decides as usual.
+        assertTrue(
+            shouldShowContinuePill(
+                continuePresent = true,
+                searchActive = false,
+                coverVisible = true,
+                continueRowVisible = false,
+                listLaidOut = true,
+            ),
+        )
+    }
+
+    @Test
     fun hiddenWhenChapterRowInView() {
         assertFalse(
             shouldShowContinuePill(
