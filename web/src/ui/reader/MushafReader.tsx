@@ -61,7 +61,6 @@ import type { AyahRef } from '../../share/gather'
 import { HafsWord } from '../../render/HafsWord'
 import { BASMALAH_PLAYLIST_AYAH } from '../../domain/Basmalah'
 import { createWheelTurn, isSidewaysWheel } from './wheelTurn'
-import { RepeatWashGateProvider } from '../../render/RepeatWashContext'
 
 /** The share of the block between two pages: the pile a turn between them carries. */
 function pileBetween(from: number, to: number): number {
@@ -965,7 +964,7 @@ function MushafLeaf({
           })}
         </div>
       ) : (
-        <RepeatWashGateProvider>
+        <WordMotionProvider>
         <div
           className="mushaf-lines"
           data-opening={opening || undefined}
@@ -1043,7 +1042,7 @@ function MushafLeaf({
             </p>
           ))}
         </div>
-        </RepeatWashGateProvider>
+        </WordMotionProvider>
       )}
       </div>
     </div>

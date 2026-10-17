@@ -69,11 +69,6 @@ export const SHIPPED_CHECK_PARAMS: BrushCheckParams = {
   alpha: 0.75,
 }
 
-/** @deprecated use SHIPPED_CHECK_PARAMS — kept for older imports. */
-export const BRUSH_CHECK_PARAMS = SHIPPED_CHECK_PARAMS
-/** @deprecated use SHIPPED_CHECK_PARAMS.paintMs */
-export const BRUSH_CHECK_PAINT_MS = SHIPPED_CHECK_PARAMS.paintMs
-
 export const BRUSH_CHECK_KNOB_SLIDERS: {
   key: BrushCheckKnobKey
   label: string

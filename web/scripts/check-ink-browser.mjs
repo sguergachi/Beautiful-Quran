@@ -101,8 +101,8 @@ async function main() {
       const { flushSync } = dom
       const { HafsWord } = await import('/src/render/HafsWord.tsx')
       const { WordUnit } = await import('/src/render/WordUnit.tsx')
-      const { RepeatWashGateProvider } = await import(
-        '/src/render/RepeatWashContext.tsx'
+      const { WordMotionProvider } = await import(
+        '/src/render/WordMotionContext.tsx'
       )
       const hookCode = await (await fetch('/src/render/useWordWash.ts')).text()
       const signalPath = hookCode.match(
@@ -132,7 +132,7 @@ async function main() {
         flushSync(() =>
           root.render(
             React.createElement(
-              RepeatWashGateProvider,
+              WordMotionProvider,
               null,
               React.createElement(english ? WordUnit : HafsWord, {
                 word: {
@@ -163,7 +163,7 @@ async function main() {
         flushSync(() =>
           root.render(
             React.createElement(
-              RepeatWashGateProvider,
+              WordMotionProvider,
               null,
               ...[first, second].map((state, i) =>
                 React.createElement(HafsWord, {
