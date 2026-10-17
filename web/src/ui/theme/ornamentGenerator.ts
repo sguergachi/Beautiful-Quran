@@ -417,19 +417,20 @@ function generateSeal(rng: Mulberry32, fold: number): RosetteSpec {
 }
 
 /**
- * The border band. One of six grammars is grown per launch: the five frieze
- * grammars found on tooled mushaf bindings — interlocking scallops, an
- * interlaced two-strand cable (guilloche), a Hankin star-and-cross strip, a
- * nested lozenge chain, a khatam chain of linked eight-fold stars — plus the
- * illuminator's rumi scroll. Mirrors Android's generateBorder line for line,
- * including each grammar's RNG draw order.
+ * The border band. One of five grammars is grown per launch: four frieze
+ * grammars of tooled mushaf bindings — interlocking scallops, an
+ * interlaced two-strand cable (guilloche), a nested lozenge chain, a
+ * khatam chain of linked eight-fold stars — plus the illuminator's rumi
+ * scroll. The Hankin star-and-cross strip is culled for good (rows of
+ * typed `x` at band size). Mirrors Android's generateBorder line for
+ * line, including each grammar's RNG draw order.
  */
 function generateBorder(rng: Mulberry32): BorderSpec {
   const strokes: OrnamentStroke[] = []
   const dots: OrnamentDot[] = []
   let period: number
 
-  const recipe = rng.int(6)
+  const recipe = rng.int(5)
   if (recipe === 0) {
     // Interlocking scallops — a row of pointed scales hangs from the top
     // rail while a second row, half a period out of phase, rises from the
@@ -490,21 +491,6 @@ function generateBorder(rng: Mulberry32): BorderSpec {
     dots.push({ x: 0, y: 0.5, radius: eye, birth: 0 })
     dots.push({ x: period / 2, y: 0.5, radius: eye, birth: 0 })
   } else if (recipe === 2) {
-    // Star-and-cross strip: Hankin's method on a row of squares.
-    period = 1
-    const deg = rng.chance(0.5) ? rng.range(28, 42) : rng.range(50, 68)
-    strokes.push(
-      ...hankinStrokes(
-        [
-          { x: 0, y: 0 },
-          { x: 1, y: 0 },
-          { x: 1, y: 1 },
-          { x: 0, y: 1 },
-        ],
-        (deg * Math.PI) / 180,
-      ),
-    )
-  } else if (recipe === 3) {
     // Nested lozenge chain — a diamond in a diamond, tip-to-tip, a pearl
     // at each heart.
     period = rng.range(1.7, 2.3)
@@ -523,7 +509,7 @@ function generateBorder(rng: Mulberry32): BorderSpec {
     strokes.push(diamond(period / 2, 0.38))
     strokes.push(diamond(period / 4, 0.19))
     dots.push({ x: period / 2, y: 0.5, radius: rng.range(0.05, 0.08), birth: 0 })
-  } else if (recipe === 4) {
+  } else if (recipe === 3) {
     // Khatam chain — small eight-fold stars (two overlapped squares)
     // linked by diamonds at the period boundaries.
     period = rng.range(1.35, 1.75)
@@ -640,106 +626,6 @@ const hair = (points: OrnamentPoint[], closed: boolean): OrnamentStroke => ({
   birth: 0,
   span: 1,
 })
-
-interface Ray {
-  ox: number
-  oy: number
-  dx: number
-  dy: number
-}
-
-/**
- * Hankin's method on one convex polygon: two rays leave each edge midpoint
- * at ±θ, aimed inward; each ray is kept up to its nearest crossing with
- * another ray. Shared edge midpoints make the pattern continuous across
- * the whole tiling.
- */
-function hankinStrokes(vertices: OrnamentPoint[], theta: number): OrnamentStroke[] {
-  const n = vertices.length
-  let cx = 0
-  let cy = 0
-  for (const v of vertices) {
-    cx += v.x
-    cy += v.y
-  }
-  cx /= n
-  cy /= n
-
-  const rays: Ray[] = []
-  for (let i = 0; i < n; i++) {
-    const a = vertices[i]!
-    const b = vertices[(i + 1) % n]!
-    const mx = (a.x + b.x) / 2
-    const my = (a.y + b.y) / 2
-    let dx = b.x - a.x
-    let dy = b.y - a.y
-    const len = Math.sqrt(dx * dx + dy * dy)
-    dx /= len
-    dy /= len
-    const c = Math.cos(theta)
-    const s = Math.sin(theta)
-    // rot(d, +θ) and rot(−d, −θ), mirrored if facing away from the centroid.
-    let ax = dx * c - dy * s
-    let ay = dx * s + dy * c
-    let bx = -dx * c - dy * s
-    let by = dx * s - dy * c
-    if ((ax + bx) * (cx - mx) + (ay + by) * (cy - my) < 0) {
-      ax = dx * c + dy * s
-      ay = -dx * s + dy * c
-      bx = -dx * c + dy * s
-      by = -dx * s - dy * c
-    }
-    rays.push({ ox: mx, oy: my, dx: ax, dy: ay })
-    rays.push({ ox: mx, oy: my, dx: bx, dy: by })
-  }
-
-  const strokes: OrnamentStroke[] = []
-  for (const r of rays) {
-    let bestT = Number.MAX_VALUE
-    for (const o of rays) {
-      if (o === r) continue
-      const denom = r.dx * o.dy - r.dy * o.dx
-      if (Math.abs(denom) < 1e-9) continue
-      const qpx = o.ox - r.ox
-      const qpy = o.oy - r.oy
-      const t = (qpx * o.dy - qpy * o.dx) / denom
-      const s = (qpx * r.dy - qpy * r.dx) / denom
-      if (t > 1e-6 && s > 1e-6 && t < bestT) {
-        const px = r.ox + t * r.dx
-        const py = r.oy + t * r.dy
-        if (pointInConvex(vertices, px, py)) bestT = t
-      }
-    }
-    if (bestT === Number.MAX_VALUE) continue
-    strokes.push({
-      points: [
-        { x: r.ox, y: r.oy },
-        { x: r.ox + bestT * r.dx, y: r.oy + bestT * r.dy },
-      ],
-      closed: false,
-      weight: 'hairline',
-      birth: 0,
-      span: 1,
-    })
-  }
-  return strokes
-}
-
-/** Inside test tolerant of boundary points (midpoints sit on edges). */
-function pointInConvex(vertices: OrnamentPoint[], px: number, py: number): boolean {
-  const n = vertices.length
-  let sign = 0
-  for (let i = 0; i < n; i++) {
-    const a = vertices[i]!
-    const b = vertices[(i + 1) % n]!
-    const cross = (b.x - a.x) * (py - a.y) - (b.y - a.y) * (px - a.x)
-    if (Math.abs(cross) < 1e-9) continue
-    const s = cross > 0 ? 1 : -1
-    if (sign === 0) sign = s
-    else if (s !== sign) return false
-  }
-  return true
-}
 
 /** The rumi's spine: a cubic to `tip`, then the beak hooking back over the body. */
 function rumiSpine(

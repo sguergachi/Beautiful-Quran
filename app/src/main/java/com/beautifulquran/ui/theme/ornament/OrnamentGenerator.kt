@@ -22,10 +22,9 @@ fun fittedFieldCellWidth(width: Double, preferred: Double): Double =
  *  - {n/k} STAR POLYGONS: n points on a circle joined every k-th vertex.
  *    gcd(n, k) > 1 splits the star into interlaced polygons (the khatam is
  *    exactly {8/2} — two squares), which is where the woven look comes from.
- *  - BORDER FRIEZE: one of six launch-grown grammars — the five closed
- *    friezes of tooled mushaf bindings (scallops, guilloche cable, Hankin
- *    star-and-cross, lozenge chain, khatam chain) and the illuminator's
- *    RUMI SCROLL (see generateBorder).
+ *  - BORDER FRIEZE: one of five launch-grown grammars — the closed friezes
+ *    of tooled mushaf bindings (scallops, guilloche cable, lozenge chain,
+ *    khatam chain) and the illuminator's RUMI SCROLL (see generateBorder).
  *
  * Every run samples fold counts, star indices, ring radii, proportions,
  * and motif recipes from a deterministic PRNG, so each launch of the app
@@ -472,27 +471,26 @@ private fun generateSeal(rng: Mulberry32, fold: Int): RosetteSpec {
 }
 
 /**
- * The border band. One of six grammars is grown per launch: the five
- * frieze grammars found on tooled mushaf bindings — interlocking scallops
+ * The border band. One of five grammars is grown per launch: four are the
+ * closed frieze grammars of tooled mushaf bindings — interlocking scallops
  * with a pearl in each scale, an interlaced two-strand cable with pearl
- * eyes (guilloche), a Hankin star-and-cross strip, a nested lozenge chain,
- * and a khatam chain of small eight-fold stars linked by diamonds — plus
- * the illuminator's rumi scroll, the running gold border of Ottoman and
- * Mamluk illuminated Qur'ans. Historical bindings run these geometric
- * braids between their gilt fillets ("bordered by geometric braiding"),
- * and the cover's ornament families exist to differ launch to launch, so
- * the single-grammar pass (#868) is undone by restoring the pickers
- * beside the scroll it had kept alone. Each branch draws the same count
- * of RNG values its geometry needs, in the same order both platforms
- * mirror; every recipe is bounded by rule-weight edge rails so the band
- * reads as one tooled channel, whose mouth the renderers taper onto the
- * corner seals' petal tips.
+ * eyes (guilloche), a nested lozenge chain, and a khatam chain of small
+ * eight-fold stars linked by diamonds — plus the illuminator's rumi scroll,
+ * the running gold border of Ottoman and Mamluk illuminated Qur'ans. The
+ * Hankin star-and-cross strip that once completed the five was culled for
+ * good: its open rays read as rows of typed `x` at band size (#868, and the
+ * user's own verdict on the restored build). Historical bindings run these
+ * curved and braided grammars between their gilt fillets ("bordered by
+ * geometric braiding"), and the cover's ornament families exist to differ
+ * launch to launch. Every recipe is bounded by rule-weight edge rails so
+ * the band reads as one tooled channel, whose mouth the renderers taper
+ * onto the corner seals' petal tips.
  */
 private fun generateBorder(rng: Mulberry32): BorderSpec {
     val strokes = ArrayList<OrnamentStroke>()
     val dots = ArrayList<OrnamentDot>()
     val period: Double
-    when (rng.int(6)) {
+    when (rng.int(5)) {
         0 -> {
             // Interlocking scallops — a row of pointed scales hangs from the
             // top rail while a second row, half a period out of phase, rises
@@ -549,22 +547,6 @@ private fun generateBorder(rng: Mulberry32): BorderSpec {
             dots.add(OrnamentDot(period / 2.0, 0.5, eye, 0.0))
         }
         2 -> {
-            // Star-and-cross strip: Hankin's method on a row of squares.
-            period = 1.0
-            val deg = if (rng.chance(0.5)) rng.range(28.0, 42.0) else rng.range(50.0, 68.0)
-            strokes.addAll(
-                hankinStrokes(
-                    listOf(
-                        OrnamentPoint(0.0, 0.0),
-                        OrnamentPoint(1.0, 0.0),
-                        OrnamentPoint(1.0, 1.0),
-                        OrnamentPoint(0.0, 1.0),
-                    ),
-                    deg * PI / 180.0,
-                ),
-            )
-        }
-        3 -> {
             // Nested lozenge chain — a diamond in a diamond, tip-to-tip,
             // a pearl at each heart.
             period = rng.range(1.7, 2.3)
@@ -584,7 +566,7 @@ private fun generateBorder(rng: Mulberry32): BorderSpec {
             strokes.add(diamond(period / 4.0, 0.19))
             dots.add(OrnamentDot(period / 2.0, 0.5, rng.range(0.05, 0.08), 0.0))
         }
-        4 -> {
+        3 -> {
             // Khatam chain — small eight-fold stars (two overlapped
             // squares) linked by diamonds at the period boundaries.
             period = rng.range(1.35, 1.75)
@@ -706,107 +688,6 @@ private fun stemY(x: Double, period: Double): Double =
 
 private fun hair(points: List<OrnamentPoint>, closed: Boolean) =
     OrnamentStroke(points, closed, StrokeWeight.Hairline, birth = 0.0, span = 1.0)
-
-// ── Hankin fields ────────────────────────────────────────────────────────
-
-private class Ray(val ox: Double, val oy: Double, val dx: Double, val dy: Double)
-
-/**
- * Hankin's method on one convex polygon: two rays leave each edge midpoint
- * at ±θ to the edge, aimed inward; each ray is kept up to its nearest
- * crossing with another ray. Because both polygons sharing an edge launch
- * from the same midpoint at the same angle, the pattern is continuous
- * across the whole tiling.
- */
-private fun hankinStrokes(vertices: List<OrnamentPoint>, theta: Double): List<OrnamentStroke> {
-    val n = vertices.size
-    var cx = 0.0
-    var cy = 0.0
-    for (v in vertices) {
-        cx += v.x
-        cy += v.y
-    }
-    cx /= n
-    cy /= n
-
-    val rays = ArrayList<Ray>(n * 2)
-    for (i in 0 until n) {
-        val a = vertices[i]
-        val b = vertices[(i + 1) % n]
-        val mx = (a.x + b.x) / 2.0
-        val my = (a.y + b.y) / 2.0
-        var dx = b.x - a.x
-        var dy = b.y - a.y
-        val len = kotlin.math.sqrt(dx * dx + dy * dy)
-        dx /= len
-        dy /= len
-        val c = cos(theta)
-        val s = sin(theta)
-        // rot(d, +θ) and rot(−d, −θ) — the symmetric pair about the edge
-        // normal. Mirrored to the other side if it faces away from the
-        // centroid, so tiling code can list vertices in either winding.
-        var ax = dx * c - dy * s
-        var ay = dx * s + dy * c
-        var bx = -dx * c - dy * s
-        var by = dx * s - dy * c
-        if ((ax + bx) * (cx - mx) + (ay + by) * (cy - my) < 0) {
-            ax = dx * c + dy * s
-            ay = -dx * s + dy * c
-            bx = -dx * c + dy * s
-            by = -dx * s - dy * c
-        }
-        rays.add(Ray(mx, my, ax, ay))
-        rays.add(Ray(mx, my, bx, by))
-    }
-
-    val strokes = ArrayList<OrnamentStroke>(rays.size)
-    for (r in rays) {
-        var bestT = Double.MAX_VALUE
-        for (o in rays) {
-            if (o === r) continue
-            val denom = r.dx * o.dy - r.dy * o.dx
-            if (abs(denom) < 1e-9) continue
-            val qpx = o.ox - r.ox
-            val qpy = o.oy - r.oy
-            val t = (qpx * o.dy - qpy * o.dx) / denom
-            val s = (qpx * r.dy - qpy * r.dx) / denom
-            if (t > 1e-6 && s > 1e-6 && t < bestT) {
-                val px = r.ox + t * r.dx
-                val py = r.oy + t * r.dy
-                if (pointInConvex(vertices, px, py)) bestT = t
-            }
-        }
-        if (bestT == Double.MAX_VALUE) continue
-        strokes.add(
-            OrnamentStroke(
-                listOf(
-                    OrnamentPoint(r.ox, r.oy),
-                    OrnamentPoint(r.ox + bestT * r.dx, r.oy + bestT * r.dy),
-                ),
-                closed = false,
-                weight = StrokeWeight.Hairline,
-                birth = 0.0,
-                span = 1.0,
-            ),
-        )
-    }
-    return strokes
-}
-
-/** Inside test tolerant of boundary points (midpoints sit on edges). */
-private fun pointInConvex(vertices: List<OrnamentPoint>, px: Double, py: Double): Boolean {
-    val n = vertices.size
-    var sign = 0
-    for (i in 0 until n) {
-        val a = vertices[i]
-        val b = vertices[(i + 1) % n]
-        val cross = (b.x - a.x) * (py - a.y) - (b.y - a.y) * (px - a.x)
-        if (abs(cross) < 1e-9) continue
-        val s = if (cross > 0) 1 else -1
-        if (sign == 0) sign = s else if (s != sign) return false
-    }
-    return true
-}
 
 /**
  * The rumi's spine: a cubic from its stalk on the vine to [tip], then the
