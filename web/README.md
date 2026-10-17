@@ -57,6 +57,12 @@ when navigating through chapter controls or browser history.
 It also checks that a Repeat dialog above a word sheet stays usable when
 resizing from facing pages to a phone layout.
 
+`BROWSER=firefox node scripts/check-mushaf-browser.mjs` checks Arabic opening
+and full leaves, responsive margins, and opening/interrupted page turns.
+Set `BROWSER=chromium` for the same check in Chromium, `BROWSER_EXECUTABLE`
+for an installed test browser, and `RECORD_VIDEO=1` to save a recording.
+It uses bundled Arabic text and a tab-local four-page placement fixture.
+
 `node scripts/check-reader-performance-browser.mjs` checks chapter handoff,
 interrupted navigation, reduced motion, idle animation layers, static ornament
 render isolation, and repeat-range control updates. Its render counters use
