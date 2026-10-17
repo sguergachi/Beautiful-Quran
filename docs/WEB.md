@@ -527,6 +527,15 @@ the chapter centred, Arabic-Indic at the right (one script puts its figure
 at the left and the chapter at the right), Android `MushafRunningHead`
 parity, the same order on both facing leaves. Opening leaves 1–2 centre
 their few lines in the well.
+The spread's furniture scale keeps the same `u / 27.5px` ratio and 0.85
+floor, expressed as `tan(atan2(u, 27.5px))` for browsers without typed CSS
+division. `--u` is registered as a length so Firefox resolves its viewport
+expression before evaluating the ratio. An invalid scale otherwise makes
+the head/foot margins and controls invalid, collapses the opening rows, and
+gives the turning leaf the same broken geometry. The optional
+`web/scripts/check-mushaf-browser.mjs` regression runs in Firefox or Chromium
+with a tab-local printed-page map, checking opening/full leaves, tablet
+resizing, forward/back turns, chapter opening, and interrupted turns.
 Page turns: `MushafReader` keeps the place the book last settled on,
 prepares both destination leaves at the reader’s measure, then portals a
 two-faced leaf (`TurningLeaf`) into `BookSpread`'s turn slot (`.mushaf-flip`,

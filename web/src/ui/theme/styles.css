@@ -6823,6 +6823,14 @@ html[data-entrance='true'] body {
   initial-value: 1;
 }
 
+/* Resolve the viewport expression to a length before atan2 reads it.
+   Firefox cannot reduce mixed viewport/px expressions inside that ratio. */
+@property --u {
+  syntax: '<length>';
+  inherits: true;
+  initial-value: 0px;
+}
+
 /* —— Desktop book spread ——
  * Wide windows lay the paper stack open as a book on a desk: Chapters (and
  * the sheets that cover it — Bookmarks, Settings) on the verso, the Reader
@@ -6925,7 +6933,10 @@ html[data-entrance='true'] body {
    * of staying small on a desk-sized page. Never below 0.85 — on a small
    * window the head and foot deepen to hold phone-sized furniture, as above.
    */
-  --furn: max(0.85, calc(var(--u) / 27.5px));
+  /* tan(atan2) gives the same unitless ratio in Firefox and older Safari,
+   * where calc(length / length) invalidates the head/foot margins and
+   * collapses the Mushaf grid (and its page-turn pictures). */
+  --furn: max(0.85, tan(atan2(var(--u), 27.5px)));
   --chrome-h: calc(3.6rem * var(--furn));
   --transport-h: calc(5.6rem * var(--furn));
   --margin-inner: var(--u);
