@@ -46,6 +46,8 @@ The wet-phase contrast is deliberately pronounced for normal reading speed:
 the liquid lip catches light even with a still phone, window reflections are
 brighter, and wet expansion reaches 2.6 font pixels before settling. The
 fresh reflection remains inside the painted stroke, with no surrounding glow.
+The pooled window reflection runs at 70% strength to keep the body dark;
+the advancing liquid lip retains its stronger highlight.
 The film stays glossy through deposition; its loss of gloss happens during
 the existing dry-down rather than fading most of the cue before handoff.
 Hafs is a fixed-weight font: this is a small
