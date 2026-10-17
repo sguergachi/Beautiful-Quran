@@ -1,0 +1,62 @@
+{
+  "id": "verified-word-split-3-2-34-9",
+  "label": "Corpus detector 3:2:34:9: one held word, all surrounding boundaries retained",
+  "pipeline": "timing_correction",
+  "correction_op": "merge_verified_word_split",
+  "source_pair": [
+    [
+      10,
+      14312,
+      14962
+    ],
+    [
+      10,
+      14962,
+      15642
+    ]
+  ],
+  "requires_audio_verdict": true,
+  "input_segments": [
+    [
+      9,
+      13732,
+      14312
+    ],
+    [
+      10,
+      14312,
+      14962
+    ],
+    [
+      10,
+      14962,
+      15642
+    ],
+    [
+      11,
+      15642,
+      16392
+    ]
+  ],
+  "expected_segments": [
+    [
+      9,
+      13732,
+      14312
+    ],
+    [
+      10,
+      14312,
+      15642
+    ],
+    [
+      11,
+      15642,
+      16392
+    ]
+  ],
+  "refs": [
+    "tools/timing_evidence/word-split-corpus-review.json"
+  ],
+  "notes": "Generated from the complete two-model candidate cohort; no manual listening claimed."
+}

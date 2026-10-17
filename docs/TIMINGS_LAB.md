@@ -222,6 +222,18 @@ Free, no backend, no auth beyond the GitHub account:
    than a reviewed fix. Preserve existing correct repeats and investigate
    disagreements before applying the payload.
 
+   **Every patch requires a broader check.** Search the complete delivered
+   corpus for the same structural/acoustic cause across reciters, and review
+   analogous timing issues, existing corrections, repairs and holds. Record
+   the predicate, source revisions, row/candidate counts, accepted/retained/
+   uncertain decisions, errors and genuine-repeat controls. A regression for
+   only the reported verse does not establish a class fix. Use a reusable
+   detector to generate source-guarded repairs consistently; label any human
+   exception explicitly. Missing models or sources leave the audit incomplete,
+   not implicitly passed. Keep that limitation visible before publication.
+   For held words versus same-word repeats, use the complete, resumable
+   [acoustic ownership audit](WORD_SPLIT_AUDIT.md).
+
    Before classifying, **diff the Lab positions against the pinned source**
    for that voice: authenticated snapshots for QF runtime delivery, or
    `tools/.cache/qdc_<id>.json` for a legacy-source audit. Compare the rows

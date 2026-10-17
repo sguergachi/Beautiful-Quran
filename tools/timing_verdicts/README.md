@@ -60,11 +60,17 @@ models were run locally; their revision, audio hash, scores and removed-word
 confidence are recorded with the evidence.
 
 `maintainer-word-split-class.json` records the later human adjudication of
-47:4 as one held word and the exact merged candidate. Both model scores prefer
-that sequence, but XLSR's removed-occurrence confidence still fails the
-automatic gate. The entry stays `hold`; the maintainer's report is recorded
-separately and must not be presented as an automatic acceptance or an agent
-ear verdict. The ordinary peer guard remains active before the explicit merge.
+47:4 as one held word and the exact merged candidate. The subsequent
+[complete corpus review](../../docs/quality-reviews/TIMING_WORD_SPLIT_CORPUS_2026-10-17.md)
+adds raw retained-frame evidence: XLSR's confident source label is explained
+by speech retained on identical frames. It now passes the bounded same-word
+exception while MMS passes the ordinary low-confidence gate. The exact
+runtime candidate is `accept`; authenticated-source promotion remains pending.
+The maintainer's report remains separate from model evidence and is not an
+agent ear verdict. The ordinary peer guard remains active before generated
+merges. The other 70 accepted runtime candidates are recorded in
+`../timing_evidence/word-split-corpus-candidates.verdict.json`, separately from
+the authenticated source ledger and earlier active database verdicts.
 
 The [later Pixel 10 review](../timing_evidence/device-lab-alafasy-5-2-boundaries.verdict.json)
 compares that report with the accepted local topology-only candidate. Both new inference runs

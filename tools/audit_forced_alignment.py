@@ -314,10 +314,12 @@ def occurrence_frame_evidence(
     labels: Sequence[int],
     label_occurrences: Sequence[int | None],
     occurrence_count: int,
+    include_alignment: bool = False,
 ) -> list[dict[str, float | int | None]]:
     """Collect emitting-frame ranges and CTC probabilities for each occurrence."""
     frames: list[list[int]] = [[] for _ in range(occurrence_count)]
     probabilities: list[list[float]] = [[] for _ in range(occurrence_count)]
+    emitting = [[] for _ in range(occurrence_count)]
     # A scalar ``.cpu()`` in this loop synchronizes CUDA once for every emitted
     # character frame.  Moving the small [frames, vocabulary] probability
     # matrix once per ayah keeps a full-corpus audit practical on GPU.
@@ -332,6 +334,8 @@ def occurrence_frame_evidence(
         label = labels[label_index]
         frames[occurrence_index].append(frame)
         probabilities[occurrence_index].append(float(cpu_probabilities[frame, label]))
+        if include_alignment:
+            emitting[occurrence_index].append([frame, label, float(cpu_probabilities[frame, label])])
 
     evidence: list[dict[str, float | int | None]] = []
     for occurrence_frames, occurrence_probabilities in zip(frames, probabilities):
@@ -351,6 +355,7 @@ def occurrence_frame_evidence(
             "lastFrameExclusive": occurrence_frames[-1] + 1,
             "meanLabelProbability": sum(occurrence_probabilities) / len(occurrence_probabilities),
             "minLabelProbability": min(occurrence_probabilities),
+            **({"labelFrames": emitting[len(evidence)]} if include_alignment else {}),
         })
     return evidence
 
@@ -450,6 +455,8 @@ def force_one(
     romanize: bool = False,
     model_name: str = MODEL_NAME,
     romanizer=None,
+    emission_cache: dict | None = None,
+    include_alignment: bool = False,
 ) -> dict:
     """Generate one self-contained audio-evidence report object."""
     if romanize:
@@ -478,16 +485,27 @@ def force_one(
     labels, label_occurrences, transcript = target_labels(occurrences, vocabulary, delimiter)
 
     sample_rate = processor.feature_extractor.sampling_rate
-    waveform = decode_waveform(path, sample_rate)
-    inputs = processor(waveform, sampling_rate=sample_rate, return_tensors="pt")
-    with torch.inference_mode():
-        logits = model(inputs.input_values.to(device)).logits[0]
-        log_probabilities = logits.log_softmax(dim=-1)
+    audio_hash = sha256(path)
+    cache_key = (audio_hash, id(model))
+    cached = emission_cache.get(cache_key) if emission_cache is not None else None
+    if cached is None:
+        waveform = decode_waveform(path, sample_rate)
+        inputs = processor(waveform, sampling_rate=sample_rate, return_tensors="pt")
+        with torch.inference_mode():
+            logits = model(inputs.input_values.to(device)).logits[0]
+            log_probabilities = logits.log_softmax(dim=-1).detach().cpu()
+        cached = (log_probabilities, len(waveform), str(device))
+        if emission_cache is not None:
+            # Compare every hypothesis with identical neural emissions, while
+            # retaining only one recording's tensor during a corpus audit.
+            emission_cache.clear()
+            emission_cache[cache_key] = cached
+    log_probabilities, sample_count, inference_device = cached
     state_path, viterbi_score = forced_ctc_viterbi(log_probabilities, labels, int(blank_id))
     evidence = occurrence_frame_evidence(
-        log_probabilities, state_path, labels, label_occurrences, len(occurrences)
+        log_probabilities, state_path, labels, label_occurrences, len(occurrences), include_alignment
     )
-    frame_ms = len(waveform) * 1000.0 / sample_rate / len(state_path)
+    frame_ms = sample_count * 1000.0 / sample_rate / len(state_path)
 
     words: list[dict] = []
     review_count = 0
@@ -542,15 +560,15 @@ def force_one(
         "schema": 1,
         "kind": "ctc_fixed_sequence_audio_audit",
         "model": model_name,
-        "ctcDevice": str(device),
+        "ctcDevice": inference_device,
         "reciterId": reciter_id,
         "reciterSlug": slug,
         "surahId": surah,
         "ayah": ayah,
         "audioPath": str(path),
-        "audioSha256": sha256(path),
+        "audioSha256": audio_hash,
         "audioDecoder": "ffmpeg",
-        "audioDurationMs": round(len(waveform) * 1000.0 / sample_rate),
+        "audioDurationMs": round(sample_count * 1000.0 / sample_rate),
         "ctcFrames": len(state_path),
         "ctcFrameMs": frame_ms,
         "fixedTranscript": transcript,

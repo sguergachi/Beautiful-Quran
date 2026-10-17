@@ -28,11 +28,31 @@ publication is implied.
 The maintainer subsequently auditioned Alafasy 47:4 and reported that word 13,
 مَنّا, must not highlight twice. An exact-source correction now merges it to
 16,565–19,000 ms after repairs, preserving every other segment. Both models
-prefer one word, but the removed occurrence still exceeds XLSR's confidence
-ceiling. `maintainer-word-split-class.json` retains that automatic hold and
-records the human report separately. Do not weaken the gate or claim the
-correction has been published: its source-profile promotion needs to reconcile
-that adjudication. Alafasy 24:25 and Hani 21:46/21:63 need no new edit.
+prefer one word. The subsequent corpus audit now proves retained acoustic
+ownership for XLSR's confident source label; the bounded same-word gate accepts
+the exact candidate. `maintainer-word-split-class.json` records that evidence
+and keeps the human report separate. Authenticated-source promotion and runtime
+publication are still pending. Alafasy 24:25 and Hani 21:46/21:63 need no edit.
+
+## Generated held-word merges: 71 runtime candidates
+
+The [complete same-word audit](../../docs/quality-reviews/TIMING_WORD_SPLIT_CORPUS_2026-10-17.md)
+ran actual XLSR/MMS inference for all 1,021 adjacent equal-position pairs in
+81,059 delivered rows. It generates 71 accepted merges across the six reviewed
+QF voices, including 47:4 and the duplicate component of closed #565 (5:57).
+Every generated operation reproduces its complete audited output after the
+finalizer. The 784 retained and 166 uncertain cases remain unchanged.
+
+`../timing_evidence/word-split-corpus-candidates.verdict.json` binds the actual
+runtime baseline/candidate hashes, audio and both model proofs. These candidate
+verdicts do not replace `qf-source-transition.json`. The private authenticated
+source replay must reconcile all 71 rows and every other delta before runtime
+publication. No bundled database asset changed.
+
+The separate high-water-before-rewind inventory has 4,337 candidates, 4,313
+compatible with the typed pre-rewind operation. Its acoustic coverage is
+explicitly incomplete. The 5:2 exception does not authorize class-wide drops;
+the same-word detector must not be presented as fixing that distinct class.
 
 ## Lagged qdc peer pairs (#856)
 
