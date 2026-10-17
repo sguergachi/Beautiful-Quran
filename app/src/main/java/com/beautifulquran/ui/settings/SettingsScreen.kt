@@ -376,6 +376,19 @@ private fun DeveloperSection(
     Spacer(Modifier.height(2.dp))
     Caption("Tools for testing work in progress.")
 
+    if (Build.VERSION.SDK_INT >= 33) {
+        Spacer(Modifier.height(20.dp))
+        Text(
+            "Paper ink study",
+            Modifier.fillMaxWidth().quietClickable {
+                context.startActivity(android.content.Intent(context, com.beautifulquran.ui.reader.PaperInkStudyActivity::class.java))
+            }.padding(vertical = 6.dp),
+            style = MaterialTheme.typography.bodyLarge,
+            color = MaterialTheme.colorScheme.primary,
+        )
+        Caption("Al-Fatihah 1:1, traced by an invisible pen with wet ink that dries as the voice moves on.")
+    }
+
     Spacer(Modifier.height(20.dp))
     SectionLabel("English type")
     BookTypeface.entries.forEach { face ->

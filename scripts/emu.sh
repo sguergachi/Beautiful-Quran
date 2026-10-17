@@ -3,6 +3,7 @@
 #
 #   serial=$(scripts/emu.sh lease "my-task")   # claim (and boot) a free emulator
 #   ANDROID_SERIAL=$serial scripts/emu.sh run  # build, install, launch
+#   EMU_COLD_BOOT=1 scripts/emu.sh lease      # skip a broken snapshot restore
 #   ANDROID_SERIAL=$serial scripts/emu.sh shot /tmp/a.png
 #   scripts/emu.sh release "$serial"           # give it back; it stays booted for the next agent
 #
@@ -144,8 +145,13 @@ boot_slot() {
     fail "only $(mem_avail_mb)MB RAM available, need ~${need}MB per emulator. Release an idle one, or EMU_FORCE=1"
   fi
   build_gold
-  log "Booting $serial from snapshot"
-  launch "$serial" -read-only -snapshot "$SNAPSHOT" -no-snapshot-save
+  if [[ "${EMU_COLD_BOOT:-0}" == 1 ]]; then
+    log "Cold-booting $serial (snapshot restore disabled)"
+    launch "$serial" -read-only -no-snapshot-load -no-snapshot-save
+  else
+    log "Booting $serial from snapshot"
+    launch "$serial" -read-only -snapshot "$SNAPSHOT" -no-snapshot-save
+  fi
   wait_boot "$serial"
   exec 7>&-
 }

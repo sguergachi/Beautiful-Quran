@@ -11,6 +11,103 @@ glimmer on Android and web. Repeat-chain timing and orange ink are documented
 in [REPEAT_HIGHLIGHTING.md](REPEAT_HIGHLIGHTING.md); the shared word-state and
 motion policy lives in [INK_ENGINE.md](INK_ENGINE.md).
 
+## Paper ink experiment — Al-Fatihah 1:1
+
+Settings → Developer → **Paper ink study** opens a native Android 13+ test
+sheet for the complete four-word verse, using Al-Shatri's bundled timings
+and the existing playback service. It is an experiment for this verse; the
+Paper reader's normal wash is unchanged.
+
+The pen is **invisible**. Authored broad-nib gestures form an arrival map
+along each stroke, including pen lifts and marks, rather than slicing a
+letter with a moving vertical edge. Font contours remain authoritative.
+The gestures are an illustrative hand, not a validated calligrapher's
+recording, and must not be generalized by cutting other words into bands.
+Within each letter, the pen eases through bends. Deposited film follows nib
+width, slower turns, and the contact/lift ends of each gesture; shallow
+parallel tracks follow the nib across the path. These cues replace a
+page-space decorative wave, while the four word spans remain unchanged.
+
+The contact edge uses a 16-bit arrival field and its local spatial gradient
+to keep its antialiasing about one output pixel wide. A small liquid ridge
+advances along that edge, then relaxes into the laid film. The moving ridge
+stops on pause, leaving the wet ink to settle. Older laid areas settle before
+the current contact, while deeper deposits keep their reflection longer.
+
+Wet ink is optically fuller than dry ink and has localized pigment pooling
+and a glyph-bound reflection of two broad window panes. The former faint
+diffuse-facing lobe left most wet ink almost the same brightness as dry ink
+on the phone. A stronger edge highlight alone looked like raised lettering.
+The revised surface is a thin, mostly flat film with shallow smooth pools;
+the reflected window panes follow a controlled pass tied to drawing progress
+and the dry-down. No device movement or sensor is involved.
+Thinner film loses its reflection first during the shared dry-down envelope.
+The wet-phase contrast is deliberately pronounced for normal reading speed:
+the liquid lip catches light even with a still phone, window reflections are
+brighter, and wet expansion reaches 2.6 font pixels before settling. The
+fresh reflection remains inside the painted stroke, with no surrounding glow.
+The pooled window reflection runs at 70% strength to keep the body dark;
+the advancing liquid lip retains its stronger highlight.
+The film stays glossy through deposition; its loss of gloss happens during
+the existing dry-down rather than fading most of the cue before handoff.
+Hafs is a fixed-weight font: this is a small
+stroke expansion, not a variable-font weight axis. Both thickness and gloss
+dry over the same `InkEngine.tuning.glintFadeMs` as glimmer. The existing
+tajweed curve supplies letter timing before wash-feather compensation.
+Pausing stops stroke travel and lets wet ink dry; Again starts a fresh pass.
+**Hold wet** pauses audio and holds the complete verse wet for inspection;
+**Dry ink** shows the same verse matte and thinner. **Follow voice**, Play or
+Again returns to timed drawing. These modes keep the controls in fixed slots.
+
+The shader uses committed 4× contour/16-bit arrival maps, linearly filtered input
+buffers and smooth pixel coverage. Surface normals are low-pass filtered;
+there is no per-pixel noise, halo, or visible pen. Four cached native AGSL
+shaders draw the verse; no shaping, stroke rasterization or bitmap upload
+runs per frame. Opaque field maps carry two arrival bytes in RG and signed
+contour distance in B; surface maps carry normal XY and film depth. The
+shader reconstructs normal Z and samples the arrival gradient locally.
+The light pass is driven entirely by the existing drawing progress and wet
+envelope, so its visibility does not depend on phone angle. There are no
+sensor listeners. Real phone performance and the fidelity of the authored
+hand still need evaluation.
+
+`tools/paper_ink_study/strokes.json` contains the gestures. Rebuild the
+committed `app/src/main/assets/paper-ink-study/` maps with:
+
+```bash
+# Python environment: numpy, scipy, Pillow with RAQM
+python3 tools/build_paper_ink_study.py
+adb shell am start -n com.beautifulquran/.ui.reader.PaperInkStudyActivity
+```
+
+The generator reads the existing canonical verse without changing any
+database. `PaperInkClockTest` covers ordered handoff, pause/resume dry-down,
+contact gating and backward-seek reset. Normal/half-speed playback can be compared in the
+sheet. The controlled reflection is identical in recordings and on a still
+phone; physical-device performance still needs evaluation.
+
+The material target is carbon calligraphy ink on smooth, sized paper,
+settling to a matte finish. It is an art-directed approximation compressed
+into the existing highlight duration, not a fluid simulation or a universal
+claim about ink: some formulations and papers retain gloss after drying.
+Research references and their roles:
+
+- [Calligraphy Qalam: tools and materials](https://www.calligraphyqalam.com/process/tools/):
+  soot/gum/water ink, controlled qalam loading and smooth, less absorbent ahar paper.
+- [Sumi wet/dry product photograph](https://store.shopping.yahoo.co.jp/bungle/1515902.html):
+  a dark stroke with localized liquid reflections, settling to matte without a large silhouette change.
+- [Togawa paper comparison](https://www.togawaseishi.com/SHOP/10003100.html):
+  both examples are dry; the retained shine differs with the paper.
+- [Iwai, Hamada and Sumi, 1966](https://doi.org/10.11413/nig1958.9.2):
+  printing-ink penetration increases surface micro-roughness and reduces gloss.
+  This supports the direction of the optical change, not a measured timing for qalam ink.
+- [PBRT: specular reflection](https://www.pbr-book.org/4ed/Reflection_Models/Specular_Reflection_and_Transmission):
+  the surface reflects the lit surroundings according to its normal and the viewing direction.
+- [Kim et al., Hydrodynamics of Writing with Ink, 2011](https://doi.org/10.1103/PhysRevLett.107.264501):
+  moving ink supply, speed and substrate properties govern the trail and its
+  advancing front. The study uses a model capillary pen and micropillar paper;
+  it motivates these deposition cues without calibrating this qalam rendering.
+
 ## When it appears
 
 The word half of the gate is:
