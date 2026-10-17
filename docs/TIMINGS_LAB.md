@@ -213,6 +213,10 @@ Free, no backend, no auth beyond the GitHub account:
    Do **not** paste every Lab issue straight into `tools/timing_overrides/`.
    Agent checklist (mandatory): [AGENTS.md — Landing Timings Lab / GitHub
    timing patches](../AGENTS.md#landing-timings-lab--github-timing-patches).
+   This is a standing user requirement for every future patch. Audit every
+   distinct defect class separately, report incomplete coverage as partial,
+   and keep unresolved work visible in
+   [OUTSTANDING.md](../tools/timing_verdicts/OUTSTANDING.md).
 
    First compare every edit with the **currently delivered** row. Alafasy,
    Husary Murattal, Abdul Basit Murattal, Minshawi Murattal, Sudais and Hani

@@ -295,6 +295,16 @@ python3 tools/test_build_db.py  # timing pipeline regressions (~1s, no Gradle)
 
 ## Landing Timings Lab / GitHub timing patches
 
+**Standing user requirement for every future timing patch, regardless of size
+or source.** Follow the complete workflow without needing another reminder.
+Audit each distinct defect class in a patch separately. Completing one class
+does not complete another, and fixing the reported ayah does not complete the
+corpus audit. State incomplete coverage as partial, keep unresolved rows at
+baseline, and record remaining work in `tools/timing_verdicts/OUTSTANDING.md`.
+Every repair report or PR must identify the coverage, candidate dispositions,
+genuine-repeat controls, evidence locations and remaining uncertainty before
+production publication.
+
 When the user asks to "fix the timing issue", "apply the timings patch", or
 close a `Timings patch — …` GitHub issue, **do this checklist in order**:
 
