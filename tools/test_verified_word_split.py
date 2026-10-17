@@ -46,8 +46,8 @@ class VerifiedWordSplitTest(unittest.TestCase):
 
     def test_merge_runs_after_peer_protection_without_moving_neighbours(self):
         edits = json.loads((Path(__file__).parent /
-                            "timing_corrections/Alafasy_128kbps.json").read_text())["edits"]
-        correction = next(e for e in edits if e["op"] == "merge_verified_word_split")
+                            "timing_corrections/generated-word-splits.json").read_text())["edits"]
+        correction = next(e for e in edits if e["reciterId"] == 1 and e["surahId"] == 47 and e["ayah"] == 4)
         source = [[12, 14510, 16460], [13, 16460, 17820], [13, 17820, 19000],
                   [14, 19000, 19650], [15, 19650, 21360]]
         repair = {"reciterId": 1, "surahId": 47, "ayah": 4, "kind": "drop",

@@ -6,9 +6,11 @@ virtualenv.  They do not load an acoustic model or touch quran.db.
 """
 
 import math
+import sqlite3
+import json
 from pathlib import Path
 from types import SimpleNamespace
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 import numpy as np
 import torch
@@ -18,6 +20,7 @@ from audit_forced_alignment import (
     blank_id_for,
     decode_waveform,
     forced_ctc_viterbi,
+    force_one,
     normalize_for_mms,
     normalize_for_model,
     occurrence_frame_evidence,
@@ -136,6 +139,46 @@ def test_ffmpeg_decoder_uses_complete_float_pcm():
     assert run.call_args.args[0][-1] == "pipe:1"
 
 
+def test_hypotheses_share_inference_but_keep_distinct_ctc_paths():
+    class Processor:
+        feature_extractor = SimpleNamespace(sampling_rate=16_000)
+        tokenizer = SimpleNamespace(pad_token_id=0, word_delimiter_token="|",
+                                    get_vocab=lambda: {"<pad>": 0, "ا": 1, "|": 2})
+
+        def __call__(self, waveform, **kwargs):
+            return SimpleNamespace(input_values=torch.zeros((1, len(waveform))))
+
+    logits = torch.stack([log_row(.05, .9, .05), log_row(.9, .05, .05),
+                          log_row(.05, .05, .9), log_row(.9, .05, .05),
+                          log_row(.05, .9, .05), log_row(.9, .05, .05)])
+    model = MagicMock(return_value=SimpleNamespace(logits=logits.unsqueeze(0)))
+    db = sqlite3.connect(":memory:")
+    db.executescript("""
+        CREATE TABLE words(surah_id, ayah_number, position, arabic);
+        CREATE TABLE timings(reciter_id, surah_id, ayah_number, segments);
+        INSERT INTO words VALUES(1,1,1,'ا');
+        INSERT INTO timings VALUES(1,1,1,'[[1,0,30],[1,30,60]]');
+    """)
+    cache = {}
+    kwargs = dict(db=db, processor=Processor(), model=model, device=torch.device("cpu"),
+                  qasr_root=Path("unused"), reciter_id=1, slug="fixture", surah=1, ayah=1,
+                  min_label_probability=.15, max_residual_ms=250, include_alignment=True)
+    with patch("audit_forced_alignment.audio_path", return_value=Path("fixture.mp3")), \
+         patch("audit_forced_alignment.sha256", return_value="a" * 64), \
+         patch("audit_forced_alignment.decode_waveform", return_value=np.zeros(960)) as decode:
+        repeated = force_one(**kwargs, emission_cache=cache)
+        db.execute("UPDATE timings SET segments='[[1,0,60]]'")
+        single = force_one(**kwargs, emission_cache=cache)
+        assert model.call_count == decode.call_count == 1
+        assert repeated["occurrenceCount"] == 2 and single["occurrenceCount"] == 1
+        assert repeated["viterbiLogProbabilityPerFrame"] != single["viterbiLogProbabilityPerFrame"]
+        assert single["words"][0]["labelFrames"]
+        uncached = force_one(**kwargs)
+        assert uncached == single
+        assert model.call_count == 2
+    db.close()
+
+
 def main():
     test_normalization()
     test_target_keeps_repeated_occurrences()
@@ -146,6 +189,7 @@ def main():
     test_viterbi_requires_blank_between_duplicate_labels()
     test_occurrence_evidence_does_not_merge_repeated_words()
     test_ffmpeg_decoder_uses_complete_float_pcm()
+    test_hypotheses_share_inference_but_keep_distinct_ctc_paths()
     print("all forced-alignment audit tests pass")
 
 

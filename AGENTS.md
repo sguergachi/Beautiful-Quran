@@ -263,6 +263,13 @@ python3 tools/test_build_db.py  # timing pipeline regressions (~1s, no Gradle)
    the **class** in `clean_qdc_artifacts`, use a narrow typed operation only
    when topology is irreducibly ambiguous, and lock it with
    `tools/timing_patch_cases/*.json` + `python3 tools/test_build_db.py`.
+   Every new patch also requires a corpus-wide search for the same cause,
+   including other reciters and genuine-repeat counterexamples. Record the
+   search predicate, source revisions, coverage counts, every candidate's
+   disposition and unresolved evidence. Exact-verse fixtures or source-guarded
+   typed entries alone are not a systematic fix. Generated entries must come
+   from a reusable, calibrated detector applied to the complete candidate set;
+   a necessary human exception stays explicitly exceptional.
    Override JSON is local reproduction scratch only and must not be committed.
    Canonical anti-pattern: the first #570 attempt (one-off override); the
    correct fix is #571 (gap phantoms + span-protect).
@@ -287,6 +294,16 @@ python3 tools/test_build_db.py  # timing pipeline regressions (~1s, no Gradle)
     this rule and test reordered phrases and interrupted playback.
 
 ## Landing Timings Lab / GitHub timing patches
+
+**Standing user requirement for every future timing patch, regardless of size
+or source.** Follow the complete workflow without needing another reminder.
+Audit each distinct defect class in a patch separately. Completing one class
+does not complete another, and fixing the reported ayah does not complete the
+corpus audit. State incomplete coverage as partial, keep unresolved rows at
+baseline, and record remaining work in `tools/timing_verdicts/OUTSTANDING.md`.
+Every repair report or PR must identify the coverage, candidate dispositions,
+genuine-repeat controls, evidence locations and remaining uncertainty before
+production publication.
 
 When the user asks to "fix the timing issue", "apply the timings patch", or
 close a `Timings patch — …` GitHub issue, **do this checklist in order**:
@@ -313,6 +330,15 @@ close a `Timings patch — …` GitHub issue, **do this checklist in order**:
 | Single boundary steal, no structural signal | weighted source-conflict validation + surgical `kind: "boundary"` repair | `pipeline: "boundary_repair"` case |
 | Whole ayah starts early because its MP3 has encoded silence | regenerate the reciter with `tools/detect_audio_onsets.py` | `pipeline: "leading_silence_offset"` case |
 | Missing positions, unsafe clock, or marks outside the MP3 | fix the source/class; `finalize_timing_rows` completes, falls back, or withholds | completion/physics checks in `tools/test_build_db.py` |
+3b. **Search the entire delivered corpus for the same cause**, including all
+   applicable reciters and analogous open/closed timing issues. Follow the
+   source → cleaner → correction → repair → reviewed-hold trace for matches.
+   Use real repeats and already-correct rows as negative controls. Run both
+   acoustic models for ambiguous topology candidates; compare start residuals
+   and waveform tails for boundaries. Report incomplete coverage and errors,
+   never silently exclude rows already owned by another correction or hold.
+   Keep a reproducible inventory and evidence for accepted, retained and
+   uncertain cases. Do this for every patch, even when its own fix is narrow.
 4. **Implement the class fix** + add the patch case (input = broken shape,
    expected = Lab/ear topology). Run `python3 tools/test_build_db.py`.
 4b. **Evidence**: a changed row ships only with a dual-model verdict in

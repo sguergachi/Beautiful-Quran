@@ -1,0 +1,1194 @@
+{
+  "issueCount": 60,
+  "issues": [
+    {
+      "issue": 873,
+      "title": "Timings patch — 5 ayahs",
+      "state": "CLOSED",
+      "url": "https://github.com/sguergachi/Beautiful-Quran/issues/873",
+      "timingEdits": [
+        {
+          "key": [
+            1,
+            5,
+            2
+          ],
+          "candidateIds": [],
+          "liveEqualsPatch": false,
+          "occurrenceCounts": []
+        },
+        {
+          "key": [
+            1,
+            24,
+            25
+          ],
+          "candidateIds": [
+            "1:24:25:5"
+          ],
+          "liveEqualsPatch": true,
+          "occurrenceCounts": [
+            {
+              "id": "1:24:25:5",
+              "position": 6,
+              "live": 2,
+              "patch": 2
+            }
+          ]
+        },
+        {
+          "key": [
+            1,
+            47,
+            4
+          ],
+          "candidateIds": [
+            "1:47:4:12"
+          ],
+          "liveEqualsPatch": false,
+          "occurrenceCounts": [
+            {
+              "id": "1:47:4:12",
+              "position": 13,
+              "live": 2,
+              "patch": 1
+            }
+          ]
+        },
+        {
+          "key": [
+            7,
+            21,
+            46
+          ],
+          "candidateIds": [
+            "7:21:46:7"
+          ],
+          "liveEqualsPatch": false,
+          "occurrenceCounts": [
+            {
+              "id": "7:21:46:7",
+              "position": 8,
+              "live": 2,
+              "patch": 2
+            }
+          ]
+        },
+        {
+          "key": [
+            7,
+            21,
+            63
+          ],
+          "candidateIds": [
+            "7:21:63:5"
+          ],
+          "liveEqualsPatch": false,
+          "occurrenceCounts": [
+            {
+              "id": "7:21:63:5",
+              "position": 6,
+              "live": 2,
+              "patch": 2
+            }
+          ]
+        }
+      ],
+      "parseErrors": [],
+      "classification": "timing patch"
+    },
+    {
+      "issue": 856,
+      "title": "Timings patch — Alafasy_128kbps 24:25",
+      "state": "OPEN",
+      "url": "https://github.com/sguergachi/Beautiful-Quran/issues/856",
+      "timingEdits": [
+        {
+          "key": [
+            1,
+            24,
+            25
+          ],
+          "candidateIds": [
+            "1:24:25:5"
+          ],
+          "liveEqualsPatch": true,
+          "occurrenceCounts": [
+            {
+              "id": "1:24:25:5",
+              "position": 6,
+              "live": 2,
+              "patch": 2
+            }
+          ]
+        }
+      ],
+      "parseErrors": [],
+      "classification": "timing patch"
+    },
+    {
+      "issue": 783,
+      "title": "Update design of nav bar chapter title when scroll down past header title section",
+      "state": "CLOSED",
+      "url": "https://github.com/sguergachi/Beautiful-Quran/issues/783",
+      "timingEdits": [],
+      "parseErrors": [],
+      "classification": "other report; no timing edit"
+    },
+    {
+      "issue": 782,
+      "title": "Skip or cut off the silence gap between hizb stop points",
+      "state": "CLOSED",
+      "url": "https://github.com/sguergachi/Beautiful-Quran/issues/782",
+      "timingEdits": [],
+      "parseErrors": [],
+      "classification": "other report; no timing edit"
+    },
+    {
+      "issue": 781,
+      "title": "Timings patch — Hani_Rifai_192kbps 21:63",
+      "state": "CLOSED",
+      "url": "https://github.com/sguergachi/Beautiful-Quran/issues/781",
+      "timingEdits": [
+        {
+          "key": [
+            7,
+            21,
+            63
+          ],
+          "candidateIds": [
+            "7:21:63:5"
+          ],
+          "liveEqualsPatch": false,
+          "occurrenceCounts": [
+            {
+              "id": "7:21:63:5",
+              "position": 6,
+              "live": 2,
+              "patch": 2
+            }
+          ]
+        }
+      ],
+      "parseErrors": [],
+      "classification": "timing patch"
+    },
+    {
+      "issue": 780,
+      "title": "Peaks showing prior to ink wash on overhang Arabic text areas",
+      "state": "CLOSED",
+      "url": "https://github.com/sguergachi/Beautiful-Quran/issues/780",
+      "timingEdits": [],
+      "parseErrors": [],
+      "classification": "other report; no timing edit"
+    },
+    {
+      "issue": 779,
+      "title": "Timings patch — Hani_Rifai_192kbps 21:46",
+      "state": "CLOSED",
+      "url": "https://github.com/sguergachi/Beautiful-Quran/issues/779",
+      "timingEdits": [
+        {
+          "key": [
+            7,
+            21,
+            46
+          ],
+          "candidateIds": [
+            "7:21:46:7"
+          ],
+          "liveEqualsPatch": false,
+          "occurrenceCounts": [
+            {
+              "id": "7:21:46:7",
+              "position": 8,
+              "live": 2,
+              "patch": 2
+            }
+          ]
+        }
+      ],
+      "parseErrors": [],
+      "classification": "timing patch"
+    },
+    {
+      "issue": 748,
+      "title": "Timings patch — Alafasy_128kbps 19:48",
+      "state": "CLOSED",
+      "url": "https://github.com/sguergachi/Beautiful-Quran/issues/748",
+      "timingEdits": [
+        {
+          "key": [
+            1,
+            19,
+            48
+          ],
+          "candidateIds": [],
+          "liveEqualsPatch": false,
+          "occurrenceCounts": []
+        }
+      ],
+      "parseErrors": [],
+      "classification": "timing patch"
+    },
+    {
+      "issue": 733,
+      "title": "fix bismilah in mushaf doesn't play or selectable ",
+      "state": "CLOSED",
+      "url": "https://github.com/sguergachi/Beautiful-Quran/issues/733",
+      "timingEdits": [],
+      "parseErrors": [],
+      "classification": "other report; no timing edit"
+    },
+    {
+      "issue": 732,
+      "title": "add bookmark action in mushaf view",
+      "state": "OPEN",
+      "url": "https://github.com/sguergachi/Beautiful-Quran/issues/732",
+      "timingEdits": [],
+      "parseErrors": [],
+      "classification": "other report; no timing edit"
+    },
+    {
+      "issue": 731,
+      "title": "Add return to previous verse toast",
+      "state": "OPEN",
+      "url": "https://github.com/sguergachi/Beautiful-Quran/issues/731",
+      "timingEdits": [],
+      "parseErrors": [],
+      "classification": "other report; no timing edit"
+    },
+    {
+      "issue": 729,
+      "title": "Improve corner seal placement ",
+      "state": "OPEN",
+      "url": "https://github.com/sguergachi/Beautiful-Quran/issues/729",
+      "timingEdits": [],
+      "parseErrors": [],
+      "classification": "other report; no timing edit"
+    },
+    {
+      "issue": 724,
+      "title": "why are we 700 MB",
+      "state": "CLOSED",
+      "url": "https://github.com/sguergachi/Beautiful-Quran/issues/724",
+      "timingEdits": [],
+      "parseErrors": [],
+      "classification": "other report; no timing edit"
+    },
+    {
+      "issue": 723,
+      "title": "Timings patch — Hani_Rifai_192kbps 66:7",
+      "state": "CLOSED",
+      "url": "https://github.com/sguergachi/Beautiful-Quran/issues/723",
+      "timingEdits": [
+        {
+          "key": [
+            7,
+            66,
+            7
+          ],
+          "candidateIds": [],
+          "liveEqualsPatch": false,
+          "occurrenceCounts": []
+        }
+      ],
+      "parseErrors": [],
+      "classification": "timing patch"
+    },
+    {
+      "issue": 722,
+      "title": "Timings patch — Hani_Rifai_192kbps 66:7",
+      "state": "CLOSED",
+      "url": "https://github.com/sguergachi/Beautiful-Quran/issues/722",
+      "timingEdits": [
+        {
+          "key": [
+            7,
+            66,
+            7
+          ],
+          "candidateIds": [],
+          "liveEqualsPatch": false,
+          "occurrenceCounts": []
+        }
+      ],
+      "parseErrors": [],
+      "classification": "timing patch"
+    },
+    {
+      "issue": 721,
+      "title": "Timings patch — Hani_Rifai_192kbps 66:6",
+      "state": "CLOSED",
+      "url": "https://github.com/sguergachi/Beautiful-Quran/issues/721",
+      "timingEdits": [
+        {
+          "key": [
+            7,
+            66,
+            6
+          ],
+          "candidateIds": [
+            "7:66:6:6"
+          ],
+          "liveEqualsPatch": false,
+          "occurrenceCounts": [
+            {
+              "id": "7:66:6:6",
+              "position": 7,
+              "live": 2,
+              "patch": 2
+            }
+          ]
+        }
+      ],
+      "parseErrors": [],
+      "classification": "timing patch"
+    },
+    {
+      "issue": 634,
+      "title": "Fix repetition bug ",
+      "state": "CLOSED",
+      "url": "https://github.com/sguergachi/Beautiful-Quran/issues/634",
+      "timingEdits": [
+        {
+          "key": [
+            1,
+            4,
+            171
+          ],
+          "candidateIds": [],
+          "liveEqualsPatch": false,
+          "occurrenceCounts": []
+        }
+      ],
+      "parseErrors": [],
+      "classification": "timing patch"
+    },
+    {
+      "issue": 598,
+      "title": "Timings patch — Alafasy_128kbps 2:235",
+      "state": "CLOSED",
+      "url": "https://github.com/sguergachi/Beautiful-Quran/issues/598",
+      "timingEdits": [
+        {
+          "key": [
+            1,
+            2,
+            235
+          ],
+          "candidateIds": [],
+          "liveEqualsPatch": false,
+          "occurrenceCounts": []
+        }
+      ],
+      "parseErrors": [],
+      "classification": "timing patch"
+    },
+    {
+      "issue": 594,
+      "title": "Timings patch — Alafasy_128kbps 2:229",
+      "state": "CLOSED",
+      "url": "https://github.com/sguergachi/Beautiful-Quran/issues/594",
+      "timingEdits": [
+        {
+          "key": [
+            1,
+            2,
+            229
+          ],
+          "candidateIds": [],
+          "liveEqualsPatch": false,
+          "occurrenceCounts": []
+        }
+      ],
+      "parseErrors": [],
+      "classification": "timing patch"
+    },
+    {
+      "issue": 589,
+      "title": "Timings patch — Alafasy_128kbps 2:214",
+      "state": "CLOSED",
+      "url": "https://github.com/sguergachi/Beautiful-Quran/issues/589",
+      "timingEdits": [
+        {
+          "key": [
+            1,
+            2,
+            214
+          ],
+          "candidateIds": [],
+          "liveEqualsPatch": false,
+          "occurrenceCounts": []
+        }
+      ],
+      "parseErrors": [],
+      "classification": "timing patch"
+    },
+    {
+      "issue": 572,
+      "title": "Timings patch — Alafasy_128kbps 5:66",
+      "state": "CLOSED",
+      "url": "https://github.com/sguergachi/Beautiful-Quran/issues/572",
+      "timingEdits": [
+        {
+          "key": [
+            1,
+            5,
+            66
+          ],
+          "candidateIds": [],
+          "liveEqualsPatch": false,
+          "occurrenceCounts": []
+        }
+      ],
+      "parseErrors": [],
+      "classification": "timing patch"
+    },
+    {
+      "issue": 570,
+      "title": "Timings patch — Alafasy_128kbps 5:59",
+      "state": "CLOSED",
+      "url": "https://github.com/sguergachi/Beautiful-Quran/issues/570",
+      "timingEdits": [
+        {
+          "key": [
+            1,
+            5,
+            59
+          ],
+          "candidateIds": [],
+          "liveEqualsPatch": false,
+          "occurrenceCounts": []
+        }
+      ],
+      "parseErrors": [],
+      "classification": "timing patch"
+    },
+    {
+      "issue": 565,
+      "title": "Timings patch — Alafasy_128kbps 5:57",
+      "state": "CLOSED",
+      "url": "https://github.com/sguergachi/Beautiful-Quran/issues/565",
+      "timingEdits": [
+        {
+          "key": [
+            1,
+            5,
+            57
+          ],
+          "candidateIds": [
+            "1:5:57:8"
+          ],
+          "liveEqualsPatch": false,
+          "occurrenceCounts": [
+            {
+              "id": "1:5:57:8",
+              "position": 9,
+              "live": 2,
+              "patch": 1
+            }
+          ]
+        }
+      ],
+      "parseErrors": [],
+      "classification": "timing patch"
+    },
+    {
+      "issue": 564,
+      "title": "Timings patch — Alafasy_128kbps 5:52",
+      "state": "CLOSED",
+      "url": "https://github.com/sguergachi/Beautiful-Quran/issues/564",
+      "timingEdits": [
+        {
+          "key": [
+            1,
+            5,
+            52
+          ],
+          "candidateIds": [
+            "1:5:52:23"
+          ],
+          "liveEqualsPatch": false,
+          "occurrenceCounts": [
+            {
+              "id": "1:5:52:23",
+              "position": 22,
+              "live": 2,
+              "patch": 2
+            }
+          ]
+        }
+      ],
+      "parseErrors": [],
+      "classification": "timing patch"
+    },
+    {
+      "issue": 560,
+      "title": "fast forward on long verse past halfway doesn't go to next verse. ",
+      "state": "CLOSED",
+      "url": "https://github.com/sguergachi/Beautiful-Quran/issues/560",
+      "timingEdits": [],
+      "parseErrors": [],
+      "classification": "other report; no timing edit"
+    },
+    {
+      "issue": 559,
+      "title": "Timings patch — Alafasy_128kbps 5:46",
+      "state": "CLOSED",
+      "url": "https://github.com/sguergachi/Beautiful-Quran/issues/559",
+      "timingEdits": [
+        {
+          "key": [
+            1,
+            5,
+            46
+          ],
+          "candidateIds": [
+            "1:5:46:17"
+          ],
+          "liveEqualsPatch": false,
+          "occurrenceCounts": [
+            {
+              "id": "1:5:46:17",
+              "position": 18,
+              "live": 2,
+              "patch": 2
+            }
+          ]
+        }
+      ],
+      "parseErrors": [],
+      "classification": "timing patch"
+    },
+    {
+      "issue": 558,
+      "title": "Timings patch — Alafasy_128kbps 5:44",
+      "state": "CLOSED",
+      "url": "https://github.com/sguergachi/Beautiful-Quran/issues/558",
+      "timingEdits": [
+        {
+          "key": [
+            1,
+            5,
+            44
+          ],
+          "candidateIds": [],
+          "liveEqualsPatch": false,
+          "occurrenceCounts": []
+        }
+      ],
+      "parseErrors": [],
+      "classification": "timing patch"
+    },
+    {
+      "issue": 551,
+      "title": "Timings patch — 3 ayahs",
+      "state": "CLOSED",
+      "url": "https://github.com/sguergachi/Beautiful-Quran/issues/551",
+      "timingEdits": [
+        {
+          "key": [
+            7,
+            4,
+            157
+          ],
+          "candidateIds": [],
+          "liveEqualsPatch": false,
+          "occurrenceCounts": []
+        },
+        {
+          "key": [
+            7,
+            4,
+            169
+          ],
+          "candidateIds": [],
+          "liveEqualsPatch": false,
+          "occurrenceCounts": []
+        },
+        {
+          "key": [
+            7,
+            4,
+            171
+          ],
+          "candidateIds": [
+            "7:4:171:38"
+          ],
+          "liveEqualsPatch": false,
+          "occurrenceCounts": [
+            {
+              "id": "7:4:171:38",
+              "position": 39,
+              "live": 2,
+              "patch": 1
+            }
+          ]
+        }
+      ],
+      "parseErrors": [],
+      "classification": "timing patch"
+    },
+    {
+      "issue": 533,
+      "title": "Timings patch — 2 ayahs",
+      "state": "CLOSED",
+      "url": "https://github.com/sguergachi/Beautiful-Quran/issues/533",
+      "timingEdits": [
+        {
+          "key": [
+            7,
+            4,
+            157
+          ],
+          "candidateIds": [],
+          "liveEqualsPatch": false,
+          "occurrenceCounts": []
+        },
+        {
+          "key": [
+            7,
+            4,
+            169
+          ],
+          "candidateIds": [],
+          "liveEqualsPatch": false,
+          "occurrenceCounts": []
+        }
+      ],
+      "parseErrors": [],
+      "classification": "timing patch"
+    },
+    {
+      "issue": 531,
+      "title": "Timings patch — Hani_Rifai_192kbps 4:157",
+      "state": "CLOSED",
+      "url": "https://github.com/sguergachi/Beautiful-Quran/issues/531",
+      "timingEdits": [
+        {
+          "key": [
+            7,
+            4,
+            157
+          ],
+          "candidateIds": [],
+          "liveEqualsPatch": false,
+          "occurrenceCounts": []
+        }
+      ],
+      "parseErrors": [],
+      "classification": "timing patch"
+    },
+    {
+      "issue": 530,
+      "title": "Timings patch — Hani_Rifai_192kbps 4:157",
+      "state": "CLOSED",
+      "url": "https://github.com/sguergachi/Beautiful-Quran/issues/530",
+      "timingEdits": [
+        {
+          "key": [
+            7,
+            4,
+            157
+          ],
+          "candidateIds": [],
+          "liveEqualsPatch": false,
+          "occurrenceCounts": []
+        }
+      ],
+      "parseErrors": [],
+      "classification": "timing patch"
+    },
+    {
+      "issue": 466,
+      "title": "Timings patch — 2 ayahs",
+      "state": "CLOSED",
+      "url": "https://github.com/sguergachi/Beautiful-Quran/issues/466",
+      "timingEdits": [
+        {
+          "key": [
+            1,
+            2,
+            153
+          ],
+          "candidateIds": [],
+          "liveEqualsPatch": false,
+          "occurrenceCounts": []
+        },
+        {
+          "key": [
+            7,
+            16,
+            15
+          ],
+          "candidateIds": [],
+          "liveEqualsPatch": false,
+          "occurrenceCounts": []
+        }
+      ],
+      "parseErrors": [],
+      "classification": "timing patch"
+    },
+    {
+      "issue": 461,
+      "title": "when a repeat starts don't reset from the beginning of the first verse in the range if we are currently playing and withing range ",
+      "state": "CLOSED",
+      "url": "https://github.com/sguergachi/Beautiful-Quran/issues/461",
+      "timingEdits": [],
+      "parseErrors": [],
+      "classification": "other report; no timing edit"
+    },
+    {
+      "issue": 459,
+      "title": "Timings patch — Alafasy_128kbps 2:153",
+      "state": "CLOSED",
+      "url": "https://github.com/sguergachi/Beautiful-Quran/issues/459",
+      "timingEdits": [
+        {
+          "key": [
+            1,
+            2,
+            153
+          ],
+          "candidateIds": [],
+          "liveEqualsPatch": false,
+          "occurrenceCounts": []
+        }
+      ],
+      "parseErrors": [],
+      "classification": "timing patch"
+    },
+    {
+      "issue": 417,
+      "title": "Timings patch — 5 ayahs",
+      "state": "CLOSED",
+      "url": "https://github.com/sguergachi/Beautiful-Quran/issues/417",
+      "timingEdits": [
+        {
+          "key": [
+            1,
+            67,
+            22
+          ],
+          "candidateIds": [],
+          "liveEqualsPatch": false,
+          "occurrenceCounts": []
+        },
+        {
+          "key": [
+            7,
+            2,
+            14
+          ],
+          "candidateIds": [],
+          "liveEqualsPatch": false,
+          "occurrenceCounts": []
+        },
+        {
+          "key": [
+            7,
+            2,
+            33
+          ],
+          "candidateIds": [],
+          "liveEqualsPatch": false,
+          "occurrenceCounts": []
+        },
+        {
+          "key": [
+            7,
+            2,
+            38
+          ],
+          "candidateIds": [],
+          "liveEqualsPatch": false,
+          "occurrenceCounts": []
+        },
+        {
+          "key": [
+            7,
+            4,
+            143
+          ],
+          "candidateIds": [],
+          "liveEqualsPatch": false,
+          "occurrenceCounts": []
+        }
+      ],
+      "parseErrors": [],
+      "classification": "timing patch"
+    },
+    {
+      "issue": 350,
+      "title": "the continue listening should update after we play a verse ",
+      "state": "CLOSED",
+      "url": "https://github.com/sguergachi/Beautiful-Quran/issues/350",
+      "timingEdits": [],
+      "parseErrors": [],
+      "classification": "other report; no timing edit"
+    },
+    {
+      "issue": 336,
+      "title": "make the ribbon when it's not active empty like an outline so no red fill, just an outline of the ribbon shape",
+      "state": "CLOSED",
+      "url": "https://github.com/sguergachi/Beautiful-Quran/issues/336",
+      "timingEdits": [],
+      "parseErrors": [],
+      "classification": "other report; no timing edit"
+    },
+    {
+      "issue": 330,
+      "title": "don't allow swiping page when root word view is open or any notification ink reveal mode ",
+      "state": "CLOSED",
+      "url": "https://github.com/sguergachi/Beautiful-Quran/issues/330",
+      "timingEdits": [],
+      "parseErrors": [],
+      "classification": "other report; no timing edit"
+    },
+    {
+      "issue": 329,
+      "title": "Timings patch — 4 ayahs",
+      "state": "CLOSED",
+      "url": "https://github.com/sguergachi/Beautiful-Quran/issues/329",
+      "timingEdits": [
+        {
+          "key": [
+            7,
+            2,
+            14
+          ],
+          "candidateIds": [],
+          "liveEqualsPatch": false,
+          "occurrenceCounts": []
+        },
+        {
+          "key": [
+            7,
+            2,
+            33
+          ],
+          "candidateIds": [],
+          "liveEqualsPatch": false,
+          "occurrenceCounts": []
+        },
+        {
+          "key": [
+            7,
+            2,
+            38
+          ],
+          "candidateIds": [],
+          "liveEqualsPatch": false,
+          "occurrenceCounts": []
+        },
+        {
+          "key": [
+            7,
+            4,
+            143
+          ],
+          "candidateIds": [],
+          "liveEqualsPatch": false,
+          "occurrenceCounts": []
+        }
+      ],
+      "parseErrors": [],
+      "classification": "timing patch"
+    },
+    {
+      "issue": 328,
+      "title": "sometimes if I move slight scroll not locked onto verse I don't see the return to verse button ",
+      "state": "CLOSED",
+      "url": "https://github.com/sguergachi/Beautiful-Quran/issues/328",
+      "timingEdits": [],
+      "parseErrors": [],
+      "classification": "other report; no timing edit"
+    },
+    {
+      "issue": 327,
+      "title": "Timings patch — 3 ayahs",
+      "state": "CLOSED",
+      "url": "https://github.com/sguergachi/Beautiful-Quran/issues/327",
+      "timingEdits": [
+        {
+          "key": [
+            7,
+            2,
+            14
+          ],
+          "candidateIds": [],
+          "liveEqualsPatch": false,
+          "occurrenceCounts": []
+        },
+        {
+          "key": [
+            7,
+            2,
+            33
+          ],
+          "candidateIds": [],
+          "liveEqualsPatch": false,
+          "occurrenceCounts": []
+        },
+        {
+          "key": [
+            7,
+            4,
+            143
+          ],
+          "candidateIds": [],
+          "liveEqualsPatch": false,
+          "occurrenceCounts": []
+        }
+      ],
+      "parseErrors": [],
+      "classification": "timing patch"
+    },
+    {
+      "issue": 326,
+      "title": "if I open root word viewer pause audio. resume when I exit out. ",
+      "state": "CLOSED",
+      "url": "https://github.com/sguergachi/Beautiful-Quran/issues/326",
+      "timingEdits": [],
+      "parseErrors": [],
+      "classification": "other report; no timing edit"
+    },
+    {
+      "issue": 325,
+      "title": "English text rendering of decenders cutoff",
+      "state": "CLOSED",
+      "url": "https://github.com/sguergachi/Beautiful-Quran/issues/325",
+      "timingEdits": [],
+      "parseErrors": [],
+      "classification": "other report; no timing edit"
+    },
+    {
+      "issue": 324,
+      "title": "should not be period here. Fix period insertion detection for English ",
+      "state": "CLOSED",
+      "url": "https://github.com/sguergachi/Beautiful-Quran/issues/324",
+      "timingEdits": [],
+      "parseErrors": [],
+      "classification": "other report; no timing edit"
+    },
+    {
+      "issue": 191,
+      "title": "Timings patch — 2 ayahs",
+      "state": "CLOSED",
+      "url": "https://github.com/sguergachi/Beautiful-Quran/issues/191",
+      "timingEdits": [
+        {
+          "key": [
+            7,
+            2,
+            14
+          ],
+          "candidateIds": [],
+          "liveEqualsPatch": false,
+          "occurrenceCounts": []
+        },
+        {
+          "key": [
+            7,
+            4,
+            143
+          ],
+          "candidateIds": [],
+          "liveEqualsPatch": false,
+          "occurrenceCounts": []
+        }
+      ],
+      "parseErrors": [],
+      "classification": "timing patch"
+    },
+    {
+      "issue": 190,
+      "title": "Timings patch — 2 ayahs",
+      "state": "CLOSED",
+      "url": "https://github.com/sguergachi/Beautiful-Quran/issues/190",
+      "timingEdits": [
+        {
+          "key": [
+            7,
+            2,
+            14
+          ],
+          "candidateIds": [],
+          "liveEqualsPatch": false,
+          "occurrenceCounts": []
+        },
+        {
+          "key": [
+            7,
+            4,
+            143
+          ],
+          "candidateIds": [],
+          "liveEqualsPatch": false,
+          "occurrenceCounts": []
+        }
+      ],
+      "parseErrors": [],
+      "classification": "timing patch"
+    },
+    {
+      "issue": 123,
+      "title": "Timings patch — Hani_Rifai_192kbps 4:143",
+      "state": "CLOSED",
+      "url": "https://github.com/sguergachi/Beautiful-Quran/issues/123",
+      "timingEdits": [
+        {
+          "key": [
+            7,
+            4,
+            143
+          ],
+          "candidateIds": [],
+          "liveEqualsPatch": false,
+          "occurrenceCounts": []
+        }
+      ],
+      "parseErrors": [],
+      "classification": "timing patch"
+    },
+    {
+      "issue": 119,
+      "title": "Aya selector broken",
+      "state": "CLOSED",
+      "url": "https://github.com/sguergachi/Beautiful-Quran/issues/119",
+      "timingEdits": [],
+      "parseErrors": [],
+      "classification": "other report; no timing edit"
+    },
+    {
+      "issue": 118,
+      "title": "Aya number size too big for Arabic only",
+      "state": "CLOSED",
+      "url": "https://github.com/sguergachi/Beautiful-Quran/issues/118",
+      "timingEdits": [],
+      "parseErrors": [],
+      "classification": "other report; no timing edit"
+    },
+    {
+      "issue": 117,
+      "title": "Flicker in highlight ",
+      "state": "CLOSED",
+      "url": "https://github.com/sguergachi/Beautiful-Quran/issues/117",
+      "timingEdits": [],
+      "parseErrors": [],
+      "classification": "other report; no timing edit"
+    },
+    {
+      "issue": 114,
+      "title": "Timings patch — Hani_Rifai_192kbps 4:163",
+      "state": "CLOSED",
+      "url": "https://github.com/sguergachi/Beautiful-Quran/issues/114",
+      "timingEdits": [
+        {
+          "key": [
+            7,
+            4,
+            163
+          ],
+          "candidateIds": [
+            "7:4:163:19"
+          ],
+          "liveEqualsPatch": false,
+          "occurrenceCounts": [
+            {
+              "id": "7:4:163:19",
+              "position": 20,
+              "live": 2,
+              "patch": 2
+            }
+          ]
+        }
+      ],
+      "parseErrors": [],
+      "classification": "timing patch"
+    },
+    {
+      "issue": 46,
+      "title": "when I tap on Aya for Arabic only it doesn't play from the word closest to where I tapped. it jumps to the last Aya in the Surah. this is only in Arabic only mode",
+      "state": "CLOSED",
+      "url": "https://github.com/sguergachi/Beautiful-Quran/issues/46",
+      "timingEdits": [],
+      "parseErrors": [],
+      "classification": "other report; no timing edit"
+    },
+    {
+      "issue": 44,
+      "title": "The Arabic only view when I start playing by selecting using the Aya selector and then I play for a bit and then I pause and then hit play again. it goes back to the aya that was selected with the AyaS selector",
+      "state": "CLOSED",
+      "url": "https://github.com/sguergachi/Beautiful-Quran/issues/44",
+      "timingEdits": [],
+      "parseErrors": [],
+      "classification": "other report; no timing edit"
+    },
+    {
+      "issue": 32,
+      "title": "I want to be able to swipe right from the reader view to see the settings screen. right now it doesn't do the paper swipe that we have from the home screen to the reader page",
+      "state": "CLOSED",
+      "url": "https://github.com/sguergachi/Beautiful-Quran/issues/32",
+      "timingEdits": [],
+      "parseErrors": [],
+      "classification": "other report; no timing edit"
+    },
+    {
+      "issue": 31,
+      "title": "if I change reciters, don't reset the looping range of ayah. don't ever reset it",
+      "state": "CLOSED",
+      "url": "https://github.com/sguergachi/Beautiful-Quran/issues/31",
+      "timingEdits": [],
+      "parseErrors": [],
+      "classification": "other report; no timing edit"
+    },
+    {
+      "issue": 30,
+      "title": "In the playing state have a opaque blank bar where the status bar would be. I don't want AS showing near and beneath the camera/ notch",
+      "state": "CLOSED",
+      "url": "https://github.com/sguergachi/Beautiful-Quran/issues/30",
+      "timingEdits": [],
+      "parseErrors": [],
+      "classification": "other report; no timing edit"
+    },
+    {
+      "issue": 29,
+      "title": "if we're repeating as and we reach the end, don't\n don't go into the pause state. maintain the playing state when we repeat and start from the beginning again because it causes a momentary flash of controls fading in",
+      "state": "CLOSED",
+      "url": "https://github.com/sguergachi/Beautiful-Quran/issues/29",
+      "timingEdits": [],
+      "parseErrors": [],
+      "classification": "other report; no timing edit"
+    },
+    {
+      "issue": 28,
+      "title": "When I set a range to range of ayah and it's playing already reset the play to the starting position after I hit done",
+      "state": "CLOSED",
+      "url": "https://github.com/sguergachi/Beautiful-Quran/issues/28",
+      "timingEdits": [],
+      "parseErrors": [],
+      "classification": "other report; no timing edit"
+    },
+    {
+      "issue": 27,
+      "title": "When English word for word is disabled on the Arabic view, show the Arabic texts connected",
+      "state": "CLOSED",
+      "url": "https://github.com/sguergachi/Beautiful-Quran/issues/27",
+      "timingEdits": [],
+      "parseErrors": [],
+      "classification": "other report; no timing edit"
+    },
+    {
+      "issue": 26,
+      "title": "pausing and playing causes jumping back to previous ayah",
+      "state": "CLOSED",
+      "url": "https://github.com/sguergachi/Beautiful-Quran/issues/26",
+      "timingEdits": [],
+      "parseErrors": [],
+      "classification": "other report; no timing edit"
+    }
+  ],
+  "inputSha256": "b07f6bbf9e1a67f37d47b2a5485013a4d3e214f7792f8333a5014d31838983cf"
+}

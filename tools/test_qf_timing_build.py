@@ -248,6 +248,35 @@ class AuthenticatedTimingBuildTest(unittest.TestCase):
         })
         self.assertEqual(problem, "decoded waveform physics are missing or veto the candidate")
 
+    def test_exact_held_word_merge_requires_both_acoustic_witnesses(self):
+        calibration = json.loads((Path(__file__).parent / "timing_evidence" /
+                                  "word-split-calibration.json").read_text())
+        change = {"old": {"segments": calibration["beforeSegments"]},
+                  "new": {"segments": calibration["afterSegments"]}, "kinds": ["topology"],
+                  "verdict": {"evidence": {"models": calibration["models"], "waveform": {
+                      "decodedDurationMs": 49821, "durationToleranceMs": 50,
+                      "boundsWithinTolerance": True, "voicedEndToleranceMs": 250,
+                      "voicedTailCutRisks": []}}}}
+        self.assertIsNone(build.authenticated_evidence_problem(change))
+        witness = change["verdict"]["evidence"]["models"][0]
+        proof = witness.pop("sameWordSplit")
+        self.assertIn("removed occurrence", build.authenticated_evidence_problem(change))
+        witness["sameWordSplit"] = proof
+        for confidence in [None, float("nan"), -.1, 1.1]:
+            witness["removedOccurrenceMaxLabelProbability"] = confidence
+            with self.subTest(confidence=confidence):
+                self.assertIn("removed occurrence", build.authenticated_evidence_problem(change))
+
+    def test_actual_genuine_repeat_is_not_merged_by_ownership_matching(self):
+        control = json.loads((Path(__file__).parent / "timing_evidence" /
+                              "word-split-genuine-repeat-control.json").read_text())
+        self.assertTrue(all(m["candidateScore"] < m["baselineScore"] for m in control["models"]))
+        change = {"old": {"segments": control["beforeSegments"]},
+                  "new": {"segments": control["afterSegments"]}, "kinds": ["topology"],
+                  "verdict": {"evidence": {"models": control["models"]}}}
+        self.assertEqual(build.authenticated_evidence_problem(change),
+                         "independent model witnesses regress or use the wrong metric")
+
     def test_verdict_ledger_cannot_move_to_another_source_profile(self):
         old, new = [[1, 0, 1000]], [[1, 20, 1000]]
         before, after = self.database("before.db", old), self.database("after.db", new)
