@@ -162,10 +162,17 @@
     "Alafasy_128kbps:6:145"
   ],
   "ledgerSummary": {
-    "accepted_timestamp": 508,
-    "held_topology": 156,
-    "held_timestamp": 158,
-    "accepted_topology": 101,
+    "accepted_topology": 69,
+    "held_timestamp": 159,
+    "held_topology": 155,
     "held_added": 1
+  },
+  "baselineDbSha256": "1d4fc496babe533ad28f5a8f46fd328e0b24588f25d85427949d18ddd530f673",
+  "previousBaselineDbSha256": "3489bd89a91177d2701a2bbc3e8e414d957e308a539c6ec71122a568015f7c8d",
+  "authenticatedDeltaRows": 384,
+  "alreadyDeliveredControl": {
+    "key": "Alafasy_128kbps:24:25",
+    "decision": "retain exact October 12 payload including the real word-6 repeat",
+    "reason": "An older v65 baseline would resurrect the removed word-1 label."
   }
 }
