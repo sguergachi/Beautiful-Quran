@@ -1,0 +1,27 @@
+uniform shader field;
+uniform shader normals;
+uniform float progress;
+uniform float wet;
+uniform float weight;
+uniform float aa;
+uniform float2 tilt;
+
+half4 main(float2 p) {
+    float4 data = field.eval(p * 4.0);
+    float arrival = data.r;
+    float distance = (data.g * 255.0 - 128.0) / 16.0;
+    float base = smoothstep(-aa * 0.5, aa * 0.5, distance);
+    float expanded = smoothstep(-aa * 0.5, aa * 0.5, distance + weight * wet);
+    float revealed = smoothstep(arrival, arrival + 0.014, progress);
+    float coverage = mix(base * 0.2661, expanded, revealed);
+    float3 normal = normalize((normals.eval(p).rgb * 255.0 - 128.0) / 127.0);
+    float3 light = normalize(float3(0.28 + tilt.x * 0.3, -0.3 + tilt.y * 0.3, 0.9));
+    float sheen = pow(max(0.0, dot(normal, light)), 24.0);
+    float pooling = 1.0 - smoothstep(0.0, 5.0, max(0.0, distance));
+    float3 pigment = float3(17.0 - pooling * 13.0, 19.0 - pooling * 7.0, 20.0 - pooling * 5.0) / 255.0;
+    pigment += float3(0.24, 0.23, 0.21) * sheen;
+    // Fine, stationary nib striations; never pixel noise or an outer halo.
+    pigment += sin(dot(p, float2(0.19, -0.07))) * 0.004;
+    float3 ink = mix(float3(28.0, 27.0, 24.0) / 255.0, pigment, wet * revealed);
+    return half4(mix(float3(250.0, 243.0, 232.0) / 255.0, ink, coverage), 1.0);
+}

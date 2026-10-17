@@ -11,6 +11,50 @@ glimmer on Android and web. Repeat-chain timing and orange ink are documented
 in [REPEAT_HIGHLIGHTING.md](REPEAT_HIGHLIGHTING.md); the shared word-state and
 motion policy lives in [INK_ENGINE.md](INK_ENGINE.md).
 
+## Paper ink experiment — Al-Fatihah 1:1
+
+Settings → Developer → **Paper ink study** opens a native Android 13+ test
+sheet for the complete four-word verse, using Al-Shatri's bundled timings
+and the existing playback service. It is an experiment for this verse; the
+Paper reader's normal wash is unchanged.
+
+The pen is **invisible**. Authored broad-nib gestures form an arrival map
+along each stroke, including pen lifts and marks, rather than slicing a
+letter with a moving vertical edge. Font contours remain authoritative.
+The gestures are an illustrative hand, not a validated calligrapher's
+recording, and must not be generalized by cutting other words into bands.
+
+Wet ink is optically fuller than dry ink and has restrained pigment pooling
+and a glyph-bound reflection. Hafs is a fixed-weight font: this is a small
+stroke expansion, not a variable-font weight axis. Both thickness and gloss
+dry over the same `InkEngine.tuning.glintFadeMs` as glimmer. The existing
+tajweed curve supplies letter timing before wash-feather compensation.
+Pausing stops stroke travel and lets wet ink dry; Again starts a fresh pass.
+
+The shader uses committed 4× contour/arrival maps, linearly filtered input
+buffers and smooth pixel coverage. Surface normals are low-pass filtered;
+there is no per-pixel noise, halo, or visible pen. Four cached native AGSL
+shaders draw the verse; no shaping, stroke rasterization or bitmap upload
+runs per frame. A lifecycle-bound game rotation vector sensor supplies
+relative tilt at 10 Hz, smoothly interpolated, only during playback/dry-down.
+Devices without that sensor retain the resting reflection. Real phone
+performance and the fidelity of the authored hand still need evaluation.
+
+`tools/paper_ink_study/strokes.json` contains the gestures. Rebuild the
+committed `app/src/main/assets/paper-ink-study/` maps with:
+
+```bash
+# Python environment: numpy, scipy, Pillow with RAQM
+python3 tools/build_paper_ink_study.py
+adb shell am start -n com.beautifulquran/.ui.reader.PaperInkStudyActivity
+```
+
+The generator reads the existing canonical verse without changing any
+database. `PaperInkClockTest` covers ordered handoff, pause/resume dry-down,
+and backward-seek reset. Normal/half-speed playback can be compared in the
+sheet. A screen recording cannot exercise a physical phone's gyro; verify
+its tilt response separately on the phone.
+
 ## When it appears
 
 The word half of the gate is:
