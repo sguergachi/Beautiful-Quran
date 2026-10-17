@@ -59,6 +59,8 @@ class QuranApp : Application() {
         private set
     lateinit var bookmarks: BookmarkRepository
         private set
+    lateinit var qfAccount: com.beautifulquran.data.account.QfAccount
+        private set
     lateinit var annotations: AnnotationRepository
         private set
     lateinit var player: PlayerController
@@ -123,6 +125,7 @@ class QuranApp : Application() {
                             runtimeMushaf?.refreshIfNeeded()
                             runtimeTimings.refreshIfNeeded()
                         }
+                        if (::qfAccount.isInitialized) qfAccount.retry()
                     }
                 },
             )
@@ -132,6 +135,8 @@ class QuranApp : Application() {
         settings = DevProfiling.trace("settingsInit") { SettingsRepository(this) }
         englishBookCache = EnglishBookCache(this)
         bookmarks = DevProfiling.trace("bookmarksInit") { BookmarkRepository(this) }
+        qfAccount = com.beautifulquran.data.account.QfAccount(this, bookmarks, repository, appScope)
+        qfAccount.retry()
         annotations = AnnotationRepository(this)
         player = PlayerController(this)
         outputRoutes = AudioOutputRoutes()

@@ -21,10 +21,11 @@ data class Bookmark(
  * [SettingsRepository] and unlike everything in `quran.db` — they live in their
  * own SharedPreferences store and never touch the read-only bundled database.
  *
- * The store mirrors [SettingsRepository]'s shape: a single [StateFlow] the UI
+ * Guest storage mirrors [SettingsRepository]'s shape: a single [StateFlow] the UI
  * observes, mutated only through [toggle]. Each bookmark serializes to a
  * `"surah:ayah:createdAt"` triple; the whole set persists under one key, so no
- * JSON/serialization dependency is pulled in (invariant #5, minimal deps).
+ * JSON/serialization dependency is pulled in for guest use. Optional QF account
+ * changes delegate to its separate, atomic journal; the guest store is kept.
  */
 class BookmarkRepository(context: Context) {
 
@@ -32,6 +33,8 @@ class BookmarkRepository(context: Context) {
         context.getSharedPreferences("bookmarks", Context.MODE_PRIVATE)
 
     private val _bookmarks = MutableStateFlow(read())
+    @Volatile
+    private var accountEdit: ((Bookmark, Boolean) -> Boolean)? = null
 
     /** All bookmarks, ordered by surah then ayah so the reader ribbons and any
      * index render in reading order. */
@@ -56,6 +59,10 @@ class BookmarkRepository(context: Context) {
     fun toggle(surahId: Int, ayah: Int): Boolean {
         val current = _bookmarks.value
         val already = current.any { it.surahId == surahId && it.ayah == ayah }
+        accountEdit?.let { edit ->
+            return if (edit(Bookmark(surahId, ayah, System.currentTimeMillis()), !already)) !already
+            else already
+        }
         val next = if (already) {
             current.filterNot { it.surahId == surahId && it.ayah == ayah }
         } else {
@@ -74,6 +81,7 @@ class BookmarkRepository(context: Context) {
     fun ensure(surahId: Int, ayah: Int): Boolean {
         if (surahId < 1 || ayah < 1) return false
         if (isBookmarked(surahId, ayah)) return false
+        accountEdit?.let { return it(Bookmark(surahId, ayah, System.currentTimeMillis()), true) }
         val next = (_bookmarks.value + Bookmark(surahId, ayah, System.currentTimeMillis()))
             .sortedWith(byPosition)
         _bookmarks.value = next
@@ -83,11 +91,30 @@ class BookmarkRepository(context: Context) {
 
     /** Removes one bookmark if present. Returns whether anything changed. */
     fun remove(surahId: Int, ayah: Int): Boolean {
+        accountEdit?.let {
+            return isBookmarked(surahId, ayah) && it(Bookmark(surahId, ayah), false)
+        }
         val next = _bookmarks.value.filterNot { it.surahId == surahId && it.ayah == ayah }
         if (next.size == _bookmarks.value.size) return false
         _bookmarks.value = next
         prefs.edit { putStringSet(KEY, next.map(::encode).toSet()) }
         return true
+    }
+
+    /** Guest bookmarks never become account bookmarks merely because the reader signed in. */
+    fun deviceBookmarks(): List<Bookmark> = read()
+
+    internal fun showAccountBookmarks(
+        saved: List<Bookmark>,
+        edit: (Bookmark, Boolean) -> Boolean,
+    ) {
+        accountEdit = edit
+        _bookmarks.value = saved.sortedWith(byPosition)
+    }
+
+    internal fun showDeviceBookmarks() {
+        accountEdit = null
+        _bookmarks.value = read()
     }
 
     companion object {

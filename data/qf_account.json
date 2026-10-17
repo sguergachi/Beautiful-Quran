@@ -1,0 +1,9 @@
+{
+  "enabled": false,
+  "environment": "prelive",
+  "androidClientId": "",
+  "webClientId": "",
+  "webOrigins": [],
+  "scopes": [],
+  "consentVersion": "2026-10-11"
+}

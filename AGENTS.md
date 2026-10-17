@@ -240,7 +240,13 @@ python3 tools/test_build_db.py  # timing pipeline regressions (~1s, no Gradle)
    `QuranDatabase`), no navigation library (the three sheets are a hand-rolled
    paper stack in `MainActivity`). Do not introduce a framework to solve a
    problem the existing hand-rolled piece already solves.
-6. **Offline-first, no accounts or analytics.** Clients contain no API keys.
+6. **Offline-first, optional QF bookmarks.** Guest reading needs no account.
+   No analytics, client secrets or developer-operated account backend. Approved
+   public PKCE login may sync one QF bookmark collection only after explicit
+   adult/religious-data consent; guest saves require a separate import action.
+   Notes, settings and playback remain local. Account data never goes through
+   the Content Worker. See `docs/QF_ACCOUNT_SYNC.md`; its live configuration
+   remains disabled until Console approvals and two-client tests pass.
    Authenticated QF word/QCF content and six reviewed timing resources use the
    narrow Worker and separate device caches; normalization stays in the Python
    pipeline. QF credentials remain server-side. Timing copies stay available
@@ -429,6 +435,7 @@ this document combined: `ReaderComponents.kt` (~36k tokens),
 | `tools/timing_patch_cases/README.md` | **Required** unit tests when landing a Lab/GitHub timing patch systematically |
 | `tools/timing_overrides/README.md` | Local patch reproduction; committed JSON is rejected |
 | `docs/WEB.md` | Web port plan — Focus / Highlight / Ink engines + paper reader in the browser |
+| `docs/QF_ACCOUNT_SYNC.md` | Optional public OAuth, bookmark outbox, consent/deletion and live approval gates |
 
 ## Working style
 

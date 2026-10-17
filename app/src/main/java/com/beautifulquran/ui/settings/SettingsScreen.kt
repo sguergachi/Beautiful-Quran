@@ -114,7 +114,7 @@ private const val FONT_SCALE_STOPS = 8 // intervals; nine tappable stops
 private val FONT_SCALE_STEP = (FONT_SCALE_MAX - FONT_SCALE_MIN) / FONT_SCALE_STOPS
 private val PINCH_SCALE_THRESHOLD = FONT_SCALE_STEP * 0.6f
 
-internal enum class SettingsDetail { RECITERS, CUSTOMIZE, DOWNLOADS, COMPONENT_KIT, ACKNOWLEDGEMENTS }
+internal enum class SettingsDetail { RECITERS, CUSTOMIZE, DOWNLOADS, ACCOUNT, COMPONENT_KIT, ACKNOWLEDGEMENTS }
 
 /** Session-only brush lab state shared by Settings and its Customize leaf. */
 internal class SettingsInkPreviewState(initialStyle: BrushCircleStyle) {
@@ -161,6 +161,7 @@ internal fun SettingsScreen(
     onOpenReciters: () -> Unit = {},
     onOpenCustomize: () -> Unit = {},
     onOpenDownloads: () -> Unit = {},
+    onOpenAccount: () -> Unit = {},
     onOpenAcknowledgements: () -> Unit = {},
     onOpenComponentKit: () -> Unit = {},
     onOpenTimingsLab: () -> Unit = {},
@@ -310,6 +311,13 @@ internal fun SettingsScreen(
                 }
                 DisclosureChevron(expanded = false)
             }
+
+            Spacer(Modifier.height(20.dp))
+            NavigateRow(
+                label = "Quran Foundation",
+                note = "Optional bookmark sync",
+                onClick = onOpenAccount,
+            )
 
             Spacer(Modifier.height(20.dp))
             NavigateRow(

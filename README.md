@@ -12,7 +12,8 @@ illuminates in time with the audio, with its English meaning beneath it.
 - 🔍 Search the English translation and word glosses within a surah
 - 🌙 Warm paper light theme and near-black charcoal dark theme
 - 📴 Quran text works offline; authenticated repeat timings remain available offline after their first download
-- 🚫 No ads, no accounts, no analytics
+- 🚫 No ads or analytics; guest reading needs no account
+- 🔖 Optional QF bookmark sync on Android and web, awaiting approved public OAuth configuration — [setup and scope](docs/QF_ACCOUNT_SYNC.md)
 
 ## Install on your phone
 

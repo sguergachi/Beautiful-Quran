@@ -121,6 +121,7 @@ import com.beautifulquran.ui.settings.RecitersPage
 import com.beautifulquran.ui.settings.SettingsDetail
 import com.beautifulquran.ui.settings.SettingsInkPreviewState
 import com.beautifulquran.ui.settings.SettingsScreen
+import com.beautifulquran.ui.settings.QfAccountPage
 import com.beautifulquran.ui.settings.SettingsViewModel
 import com.beautifulquran.ui.share.ShareHost
 import com.beautifulquran.ui.share.ShareViewModel
@@ -167,6 +168,7 @@ class MainActivity : ComponentActivity() {
 
     override fun onStart() {
         super.onStart()
+        (application as QuranApp).qfAccount.retry()
         if (android.os.Build.VERSION.SDK_INT >= 37) {
             foregroundAppFunctions = ForegroundAppFunctions(this).also { it.register() }
         }
@@ -1123,6 +1125,10 @@ private fun PaperStackApp(
                         settingsDetail = SettingsDetail.DOWNLOADS
                         animateTo(settingsLayer + 1)
                     },
+                    onOpenAccount = {
+                        settingsDetail = SettingsDetail.ACCOUNT
+                        animateTo(settingsLayer + 1)
+                    },
                     onOpenAcknowledgements = {
                         settingsDetail = SettingsDetail.ACKNOWLEDGEMENTS
                         animateTo(settingsLayer + 1)
@@ -1167,6 +1173,10 @@ private fun PaperStackApp(
                             onBack = { animateTo(settingsLayer) },
                         )
                         SettingsDetail.ACKNOWLEDGEMENTS -> AcknowledgementsSheet(
+                            onBack = { animateTo(settingsLayer) },
+                        )
+                        SettingsDetail.ACCOUNT -> QfAccountPage(
+                            account = app.qfAccount,
                             onBack = { animateTo(settingsLayer) },
                         )
                         SettingsDetail.COMPONENT_KIT -> ComponentKitScreen(
