@@ -120,6 +120,17 @@ separate, static recording whose wash changes only layer alpha with
 large tiled path or re-recording the board. The medallion retains its
 stroke-by-stroke build and the titles retain their soft letter washes.
 
+The swing itself stays a pure layer transform by freezing the light: a sheen
+step re-records the gold pass of every gilded figure at draw time, so while
+the idle sweep or a hand's tilt kept moving during the hinge open, the band,
+seals and medallion re-recorded on every frame under a full-screen
+perspective transform and the swing dropped frames. `beginOpening` snaps the
+sheen into a frozen `State` first; from Opening until the ceremony leaves,
+the renderers read a constant and the hinge turns only RenderNode
+properties. Edge-on the moving light is invisible anyway. The tilt sensor's
+demand is kept alive by an explicit `GildingDemand(liveSheen)` in the
+ceremony, since the renderers' own demands see the frozen wrapper.
+
 The QF SQLite cache opens and migrates lazily on the first background read.
 The application launches its checkpoint/refresh decision on `Dispatchers.IO`,
 so these disk operations do not delay the first cover composition. The bundled
