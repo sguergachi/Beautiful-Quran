@@ -111,6 +111,7 @@ private class PaperInkWord(
 private class PaperInkStudy(val reciter: Reciter, val words: List<PaperInkWord>) {
     val clock = HighlightClock()
     val lines = words.chunked(2)
+    var lastMediaMs = 0L
 }
 
 @RequiresApi(33)
@@ -163,6 +164,7 @@ private fun PaperInkStudyPage(app: QuranApp, study: PaperInkStudy) {
     val paper = Color(0xFFFAF3E8)
     LaunchedEffect(study) {
         app.player.playSurah(1, 1, 1, study.reciter, "Al-Fatihah", preserveRepeatRange = false, autoplay = false)
+        app.player.setSpeed(1f)
     }
     LaunchedEffect(state.isPlaying, state.positionEvents.clockId) {
         lightingActive.value = true
@@ -183,7 +185,12 @@ private fun PaperInkStudyPage(app: QuranApp, study: PaperInkStudy) {
         Canvas(Modifier.fillMaxWidth().weight(1f)) {
             val now = tick.longValue
             val belongs = state.nowPlaying?.let { it.surahId == 1 && it.ayah == 1 && it.reciterId == 14 } == true
-            val media = if (belongs) study.clock.sample(state.positionEvents.clockId, app.player.positionMs) else 0L
+            // The service clears nowPlaying at EOF; keep the completed ink for dry-down.
+            val media = if (belongs) {
+                study.clock.sample(state.positionEvents.clockId, app.player.positionMs).also { study.lastMediaMs = it }
+            } else if (state.nowPlaying == null && study.lastMediaMs > 0) {
+                maxOf(study.lastMediaMs, app.player.positionMs)
+            } else 0L
             val scale = size.width / 725f
             val native = drawContext.canvas.nativeCanvas
             for ((row, pair) in study.lines.withIndex()) {
