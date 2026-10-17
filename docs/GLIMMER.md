@@ -23,6 +23,16 @@ along each stroke, including pen lifts and marks, rather than slicing a
 letter with a moving vertical edge. Font contours remain authoritative.
 The gestures are an illustrative hand, not a validated calligrapher's
 recording, and must not be generalized by cutting other words into bands.
+Within each letter, the pen eases through bends. Deposited film follows nib
+width, slower turns, and the contact/lift ends of each gesture; shallow
+parallel tracks follow the nib across the path. These cues replace a
+page-space decorative wave, while the four word spans remain unchanged.
+
+The contact edge uses a 16-bit arrival field and its local spatial gradient
+to keep its antialiasing about one output pixel wide. A small liquid ridge
+advances along that edge, then relaxes into the laid film. The moving ridge
+stops on pause, leaving the wet ink to settle. Older laid areas settle before
+the current contact, while deeper deposits keep their reflection longer.
 
 Wet ink is optically fuller than dry ink and has restrained pigment pooling
 and a glyph-bound reflection of two broad window panes. The former faint
@@ -40,11 +50,14 @@ Pausing stops stroke travel and lets wet ink dry; Again starts a fresh pass.
 **Dry ink** shows the same verse matte and thinner. **Follow voice**, Play or
 Again returns to timed drawing. These modes keep the controls in fixed slots.
 
-The shader uses committed 4× contour/arrival maps, linearly filtered input
+The shader uses committed 4× contour/16-bit arrival maps, linearly filtered input
 buffers and smooth pixel coverage. Surface normals are low-pass filtered;
 there is no per-pixel noise, halo, or visible pen. Four cached native AGSL
 shaders draw the verse; no shaping, stroke rasterization or bitmap upload
-runs per frame. A lifecycle-bound game rotation vector sensor supplies
+runs per frame. Opaque field maps carry two arrival bytes in RG and signed
+contour distance in B; surface maps carry normal XY and film depth. The
+shader reconstructs normal Z and samples the arrival gradient locally.
+A lifecycle-bound game rotation vector sensor supplies
 relative tilt at 10 Hz, smoothly interpolated, only during playback/dry-down.
 Devices without that sensor retain the resting reflection. Real phone
 performance and the fidelity of the authored hand still need evaluation.
@@ -60,7 +73,7 @@ adb shell am start -n com.beautifulquran/.ui.reader.PaperInkStudyActivity
 
 The generator reads the existing canonical verse without changing any
 database. `PaperInkClockTest` covers ordered handoff, pause/resume dry-down,
-and backward-seek reset. Normal/half-speed playback can be compared in the
+contact gating and backward-seek reset. Normal/half-speed playback can be compared in the
 sheet. A screen recording cannot exercise a physical phone's gyro; verify
 its tilt response separately on the phone.
 
@@ -81,6 +94,10 @@ Research references and their roles:
   This supports the direction of the optical change, not a measured timing for qalam ink.
 - [PBRT: specular reflection](https://www.pbr-book.org/4ed/Reflection_Models/Specular_Reflection_and_Transmission):
   the surface reflects the lit surroundings according to its normal and the viewing direction.
+- [Kim et al., Hydrodynamics of Writing with Ink, 2011](https://doi.org/10.1103/PhysRevLett.107.264501):
+  moving ink supply, speed and substrate properties govern the trail and its
+  advancing front. The study uses a model capillary pen and micropillar paper;
+  it motivates these deposition cues without calibrating this qalam rendering.
 
 ## When it appears
 

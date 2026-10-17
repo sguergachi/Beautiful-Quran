@@ -39,25 +39,33 @@ def build(text, strokes, position):
             distances = np.r_[0, np.cumsum(np.hypot(*np.diff(pts[:, :2], axis=0).T))]
             steps = np.linspace(0, distances[-1], max(3, int(distances[-1] * 3)))
             samples = PchipInterpolator(distances, pts, axis=0)(steps)
-            gestures.append((samples, distances[-1]))
-        total = sum(length + 7 for samples, length in gestures)
+            tangent = np.gradient(samples[:, :2], axis=0)
+            heading = np.unwrap(np.arctan2(tangent[:, 1], tangent[:, 0]))
+            bend = np.clip(np.abs(np.gradient(heading, steps)) * 8, 0, 1)
+            effort = np.r_[0, np.cumsum(np.diff(steps) * (1 + .8 * (bend[1:] + bend[:-1]) / 2))]
+            load = (.6 + .22 * bend + .08 * samples[:, 2] / 24 +
+                    .12 * np.exp(-steps / 6) + .10 * np.exp(-(steps[-1] - steps) / 4))
+            gestures.append((samples, effort, load))
+        total = sum(effort[-1] + 7 for samples, effort, load in gestures)
         cursor = 0
-        for samples, length in gestures:
+        for samples, effort, load in gestures:
             # Lift travel is represented in the route, but it deposits no paint.
             if route:
-                route.append([(letter + cursor / total) / letter_count, *samples[0], 0])
+                route.append([(letter + cursor / total) / letter_count, *samples[0], 0, 0])
             cursor += 7
             for i, (x, y, width) in enumerate(samples):
-                t = (letter + (cursor + i / max(1, len(samples) - 1) * length) / total) / letter_count
-                route.append([t, x, y, width, 1])
-            cursor += length
+                t = (letter + (cursor + effort[i]) / total) / letter_count
+                route.append([t, x, y, width, 1, load[i]])
+            cursor += effort[-1]
 
     arrival = np.full(alpha.shape, np.inf)
     nearest = np.full(alpha.shape, np.inf)
     closest_time = np.zeros(alpha.shape)
+    closest_load = np.full(alpha.shape, .6)
+    nib_track = np.zeros(alpha.shape)
     angle = np.deg2rad(70)
     cos, sin = np.cos(angle), np.sin(angle)
-    for t, x, y, width, down in route:
+    for t, x, y, width, down, load in route:
         if not down:
             continue
         radius = 25
@@ -72,6 +80,8 @@ def build(text, strokes, position):
         arrival[region] = np.where(score <= 0, np.minimum(arrival[region], t), arrival[region])
         better = score < nearest[region]
         closest_time[region] = np.where(better, t, closest_time[region])
+        closest_load[region] = np.where(better, load, closest_load[region])
+        nib_track[region] = np.where(better, u, nib_track[region])
         nearest[region] = np.minimum(nearest[region], score)
 
     # The hand is illustrative, while the font remains authoritative. A contour
@@ -85,20 +95,22 @@ def build(text, strokes, position):
     edge = (alpha > 0) & (alpha < 1)
     distance[edge] = (alpha[edge] - .5) / SS
 
-    # A thin, mostly flat liquid film with shallow pools, not a bevel around
-    # every glyph. Smooth surface variation stays well above pixel frequency.
-    yy, xx = np.mgrid[:H * SS, :W * SS] / SS
-    deposit = .7 + .16 * np.sin(xx * .055 + yy * .04) + .12 * np.sin(xx * .08 - yy * .025)
-    film = (1 - np.exp(-np.maximum(0, distance) / 1.7)) * deposit
-    gy, gx = np.gradient(gaussian_filter(film * .65, 2.5))
+    # Slower turns and contact/lift deposits leave deeper pools. Fine tracks
+    # follow the nib across the authored path, while filtered normals stay smooth.
+    deposit = np.clip(closest_load, .35, .98) * (.98 + .02 * np.cos(nib_track * 1.3))
+    film = (1 - np.exp(-np.maximum(0, distance) / 1.5)) * deposit
+    gy, gx = np.gradient(gaussian_filter(film * .3, 4))
     nx, ny = -gx * SS, -gy * SS
     length = np.sqrt(nx * nx + ny * ny + 1)
-    normal = np.stack([128 + nx / length * 127, 128 + ny / length * 127, 128 + 1 / length * 127, np.full(alpha.shape, 255)], axis=-1).astype('uint8')
-    encoded = np.stack([np.round(arrival * 255), np.clip(128 + distance * 16, 0, 255), np.round(film * 255), np.full(alpha.shape, 255)], axis=-1).astype('uint8')
+    # Opaque maps avoid Android premultiplying data channels. Two arrival bytes
+    # preserve the small contact edge without the old 8-bit temporal terraces.
+    times = np.round(arrival * 65535).astype('uint16')
+    normal = np.stack([128 + nx / length * 127, 128 + ny / length * 127, film * 255, np.full(alpha.shape, 255)], axis=-1).astype('uint8')
+    encoded = np.stack([times >> 8, times & 255, np.clip(128 + distance * 16, 0, 255), np.full(alpha.shape, 255)], axis=-1).astype('uint8')
     normal = np.array(Image.fromarray(normal).resize((W, H), Image.Resampling.LANCZOS))
     Image.fromarray(encoded).save(ASSETS / f'word-{position}-field.png', optimize=True)
     Image.fromarray(normal).save(ASSETS / f'word-{position}-normal.png', optimize=True)
-    return {'position': position, 'arabic': text, 'width': W, 'height': H,
+    return {'position': position, 'arabic': text, 'width': W, 'height': H, 'arrivalBits': 16,
             'baseline': reference.getmetrics()[0] + 8 - box[1],
             'nibCoverage': round(float((ink & ~miss).sum() / ink.sum()), 4)}
 

@@ -125,6 +125,7 @@ private suspend fun loadStudy(app: QuranApp): PaperInkStudy {
     val t = InkEngine.tuning
     return PaperInkStudy(reciter, words.mapIndexed { i, word ->
         val spec = manifest.getJSONObject(i)
+        check(spec.getInt("arrivalBits") == 16)
         check(spec.getString("arabic") == word.arabic && spec.getInt("position") == word.position)
         val span = segments[i]
         val end = segments.getOrNull(i + 1)?.startMs ?: span.endMs
@@ -214,6 +215,7 @@ private fun PaperInkStudyPage(app: QuranApp, study: PaperInkStudy) {
                     }
                     word.shader.setFloatUniform("progress", progress)
                     word.shader.setFloatUniform("wet", wet)
+                    word.shader.setFloatUniform("applying", if (preview.value == InkPreview.Voice && word.motion.applying) 1f else 0f)
                     word.shader.setFloatUniform("weight", 1.3f)
                     word.shader.setFloatUniform("aa", .9f / scale)
                     word.shader.setFloatUniform("tilt", tilt.value.x, tilt.value.y)

@@ -2,22 +2,40 @@ uniform shader field;
 uniform shader normals;
 uniform float progress;
 uniform float wet;
+uniform float applying;
 uniform float weight;
 uniform float aa;
 uniform float2 tilt;
 uniform float2 origin;
 
+float arrivalAt(float2 p) {
+    return dot(field.eval(p * 4.0).rg, float2(65280.0, 255.0)) / 65535.0;
+}
+
 half4 main(float2 p) {
     float4 data = field.eval(p * 4.0);
-    float arrival = data.r;
-    float distance = (data.g * 255.0 - 128.0) / 16.0;
+    float arrival = dot(data.rg, float2(65280.0, 255.0)) / 65535.0;
+    float distance = (data.b * 255.0 - 128.0) / 16.0;
+    float2 gradient = float2(arrivalAt(p + float2(1.0, 0.0)),
+        arrivalAt(p + float2(0.0, 1.0))) - arrival;
+    float rate = clamp(length(gradient), 0.0003, 0.014 / max(aa, 0.01));
+    float travel = (progress - arrival) / rate;
+    float revealed = smoothstep(0.0, aa, travel);
+    float contact = applying * wet * revealed * exp(-max(0.0, travel) / 2.5);
+    float settled = 1.0 - exp(-max(0.0, progress - arrival) * 5.0);
+    float3 surface = normals.eval(p).rgb;
+    float localWet = smoothstep(0.0, 0.7,
+        wet * (1.0 - settled * 0.32) - (1.0 - surface.b) * 0.45);
     float base = smoothstep(-aa * 0.5, aa * 0.5, distance);
-    float expanded = smoothstep(-aa * 0.5, aa * 0.5, distance + weight * wet);
-    float revealed = smoothstep(arrival, arrival + 0.014, progress);
+    float spread = weight * localWet * (0.55 + contact * 0.45);
+    float expanded = smoothstep(-aa * 0.5, aa * 0.5, distance + spread);
     float coverage = mix(base * 0.2661, expanded, revealed);
-    float localWet = smoothstep(0.0, 0.55, wet - (1.0 - data.b) * 0.45);
-    float3 normal = normalize((normals.eval(p).rgb * 255.0 - 128.0) / 127.0);
-    normal = normalize(float3(normal.xy * localWet, normal.z));
+    float2 slope = (surface.rg * 255.0 - 128.0) / 127.0;
+    // A small moving meniscus faces the direction of travel. The laid film
+    // relaxes behind it, retaining the deeper pools until the final dry-down.
+    float2 flow = gradient / max(length(gradient), 0.0005);
+    float3 normal = normalize(float3(slope * localWet + flow * contact * 0.06,
+        sqrt(max(0.01, 1.0 - dot(slope, slope)))));
     float3 view = normalize(float3(0.12 + tilt.x * 0.4, -0.16 + tilt.y * 0.4, 1.0));
     float3 reflected = reflect(-view, normal);
     float2 room = reflected.xy / max(0.2, reflected.z) + (p + origin) * 0.001;
@@ -29,11 +47,10 @@ half4 main(float2 p) {
     float window = exp(-pane * pane / (softness * softness) -
         vertical * vertical * vertical * vertical);
     float sheen = window * localWet * localWet;
-    float pooling = 1.0 - smoothstep(0.0, 5.0, max(0.0, distance));
-    float3 pigment = float3(12.0 - pooling * 8.0, 15.0 - pooling * 6.0, 17.0 - pooling * 5.0) / 255.0;
+    float pooling = smoothstep(0.65, 0.95, surface.b) + contact * 0.2;
+    float3 pigment = (float3(13.0, 14.0, 15.0) - pooling * float3(7.0, 6.0, 5.0)) / 255.0;
     pigment += float3(0.38, 0.38, 0.36) * sheen;
-    // Fine, stationary nib striations; never pixel noise or an outer halo.
-    pigment += sin(dot(p, float2(0.19, -0.07))) * 0.004;
-    float3 ink = mix(float3(28.0, 27.0, 24.0) / 255.0, pigment, wet * revealed);
+    float3 dry = float3(28.0, 27.0, 24.0) / 255.0 + (1.0 - surface.b) * 0.009;
+    float3 ink = mix(dry, pigment, localWet * revealed);
     return half4(mix(float3(250.0, 243.0, 232.0) / 255.0, ink, coverage), 1.0);
 }

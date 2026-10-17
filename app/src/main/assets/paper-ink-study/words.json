@@ -4,6 +4,7 @@
     "arabic": "بِسۡمِ",
     "width": 184,
     "height": 171,
+    "arrivalBits": 16,
     "baseline": 90,
     "nibCoverage": 0.8046
   },
@@ -12,6 +13,7 @@
     "arabic": "ٱللَّهِ",
     "width": 191,
     "height": 186,
+    "arrivalBits": 16,
     "baseline": 146,
     "nibCoverage": 0.7342
   },
@@ -20,6 +22,7 @@
     "arabic": "ٱلرَّحۡمَٰنِ",
     "width": 336,
     "height": 225,
+    "arrivalBits": 16,
     "baseline": 146,
     "nibCoverage": 0.7951
   },
@@ -28,6 +31,7 @@
     "arabic": "ٱلرَّحِيمِ",
     "width": 339,
     "height": 227,
+    "arrivalBits": 16,
     "baseline": 146,
     "nibCoverage": 0.8113
   }

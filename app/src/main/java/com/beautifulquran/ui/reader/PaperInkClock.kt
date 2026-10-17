@@ -10,7 +10,9 @@ internal class PaperInkClock(
         private set
     var wet = 0f
         private set
-    private var laying = false
+    /** Whether the current word may animate its advancing liquid contact. */
+    var applying = false
+        private set
     private var dryingAt = 0L
     private var dryingFrom = 0f
 
@@ -24,13 +26,13 @@ internal class PaperInkClock(
         } else if (active) {
             wet = 1f
         } else {
-            if (laying) {
+            if (applying) {
                 dryingAt = nowMs
                 dryingFrom = wet
             }
             val phase = ((nowMs - dryingAt).toFloat() / fadeMs.coerceAtLeast(1)).coerceIn(0f, 1f)
             wet = dryingFrom * (1f - InkEngine.sweepEasing.transform(phase))
         }
-        laying = active
+        applying = active
     }
 }
