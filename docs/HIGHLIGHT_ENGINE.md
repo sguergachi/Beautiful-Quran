@@ -18,6 +18,10 @@ consumes it. For the *visual* side of repeats (the orange second fade) and
 where repeat-aware timing data comes from, see
 [REPEAT_HIGHLIGHTING.md](REPEAT_HIGHLIGHTING.md).
 
+The proposed [HighlightEngine V2 plan](HIGHLIGHT_ENGINE_V2.md) expands the pure
+engine's ownership of runtime synchronization. It records goals, work packages,
+acceptance criteria, and testing gates; implementation has not started.
+
 ## The input: a list of `Segment`s
 
 One ayah's timing for one reciter is a list of `Segment`
