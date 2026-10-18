@@ -47,6 +47,7 @@ import androidx.compose.ui.semantics.ProgressBarRangeInfo
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.progressBarRangeInfo
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.setProgress
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -58,6 +59,7 @@ import com.beautifulquran.data.ThemeMode
 import com.beautifulquran.data.model.Reciter
 import com.beautifulquran.domain.TajweedPacing
 import com.beautifulquran.domain.HighlightClock
+import com.beautifulquran.domain.EnglishWordAlignment
 import com.beautifulquran.ui.theme.BeautifulQuranTheme
 import com.beautifulquran.ui.theme.LocalQuranAccents
 import com.beautifulquran.ui.theme.quietClickable
@@ -109,11 +111,34 @@ private class PaperInkWord(
 }
 
 @RequiresApi(33)
-private class PaperInkStudy(val reciter: Reciter, val words: List<PaperInkWord>) {
+private class PaperInkLine(val words: List<PaperInkWord>, gap: Float) {
+    val width = words.sumOf { it.width.toDouble() }.toFloat() + (words.size - 1) * gap
+}
+
+@RequiresApi(33)
+private class PaperInkStudy(val reciter: Reciter, val words: List<PaperInkWord>, val englishWords: List<PaperInkWord>) {
     val clock = HighlightClock()
-    val lines = words.groupBy { it.ayah }.values.toList()
-    val lineWidths = lines.map { line -> line.sumOf { it.width.toDouble() }.toFloat() + (line.size - 1) * 24f }
-    val maxWidth = lineWidths.max()
+    val allWords = words + englishWords
+    val maxWidth = words.groupBy { it.ayah }.values.maxOf { line ->
+        line.sumOf { it.width.toDouble() }.toFloat() + (line.size - 1) * 24f
+    }
+    val arabicLines = words.groupBy { it.ayah }.values.map { listOf(PaperInkLine(it, 24f)) }
+    val englishLines = englishWords.groupBy { it.ayah }.values.map { verse ->
+        val lines = mutableListOf<List<PaperInkWord>>()
+        var line = mutableListOf<PaperInkWord>()
+        var width = 0f
+        for (word in verse) {
+            if (line.isNotEmpty() && width + word.width > maxWidth) {
+                lines.add(line)
+                line = mutableListOf()
+                width = 0f
+            }
+            line.add(word)
+            width += word.width + 8f
+        }
+        lines.add(line)
+        lines.map { PaperInkLine(it, 8f) }
+    }
     val sequence = PaperInkSequence()
     var lastMediaMs = 0L
 }
@@ -121,13 +146,26 @@ private class PaperInkStudy(val reciter: Reciter, val words: List<PaperInkWord>)
 @RequiresApi(33)
 private suspend fun loadStudy(app: QuranApp): PaperInkStudy {
     val reciter = app.repository.reciters().first { it.id == 14 }
-    val words = app.repository.surahContent(1).ayahs.take(3).flatMap { ayah -> ayah.words.map { ayah.number to it } }
+    val verses = app.repository.surahContent(1).ayahs.take(3)
+    val words = verses.flatMap { ayah -> ayah.words.map { ayah.number to it } }
     val timings = app.repository.defaultTimings(14, 1)
     val manifest = JSONArray(app.assets.open("paper-ink-study/words.json").bufferedReader().use { it.readText() })
     check(manifest.length() == words.size)
     val source = app.assets.open("paper-ink-study/ink.agsl").bufferedReader().use { it.readText() }
     val t = InkEngine.tuning
-    return PaperInkStudy(reciter, words.mapIndexed { i, (ayah, word) ->
+    fun shader(key: String): RuntimeShader {
+        val shader = RuntimeShader(source)
+        for ((name, file) in listOf("field" to "field", "normals" to "normal")) {
+            val bitmap = app.assets.open("paper-ink-study/word-$key-$file.png").use {
+                requireNotNull(BitmapFactory.decodeStream(it, null, BitmapFactory.Options().apply { inScaled = false }))
+            }
+            val input = BitmapShader(bitmap, Shader.TileMode.CLAMP, Shader.TileMode.CLAMP)
+            input.setFilterMode(BitmapShader.FILTER_MODE_LINEAR)
+            shader.setInputBuffer(name, input)
+        }
+        return shader
+    }
+    val arabicWords = words.mapIndexed { i, (ayah, word) ->
         val spec = manifest.getJSONObject(i)
         check(spec.getInt("ayah") == ayah && spec.getString("arabic") == word.arabic &&
             spec.getInt("position") == word.position)
@@ -143,21 +181,29 @@ private suspend fun loadStudy(app: QuranApp): PaperInkStudy {
                 waqfLengthScale = t.waqfLengthScale, creep = t.holdCreep,
             ), words.getOrNull(i - 1)?.takeIf { it.first == ayah }?.second?.arabic,
         ) else null
-        val shader = RuntimeShader(source)
-        for ((name, file) in listOf("field" to "field", "normals" to "normal")) {
-            val bitmap = app.assets.open("paper-ink-study/word-$ayah-${word.position}-$file.png").use {
-                requireNotNull(BitmapFactory.decodeStream(it, null, BitmapFactory.Options().apply { inScaled = false }))
-            }
-            val input = BitmapShader(bitmap, Shader.TileMode.CLAMP, Shader.TileMode.CLAMP)
-            input.setFilterMode(BitmapShader.FILTER_MODE_LINEAR)
-            shader.setInputBuffer(name, input)
-        }
         PaperInkWord(
             spec.getDouble("width").toFloat(), spec.getDouble("height").toFloat(),
             spec.getDouble("baseline").toFloat(), PaperInkClock(span.startMs, end, t.glintFadeMs), ayah,
-            curve, shader,
+            curve, shader("$ayah-${word.position}"),
         )
-    })
+    }
+    val english = JSONArray(app.assets.open("paper-ink-study/english.json").bufferedReader().use { it.readText() })
+    val englishWords = verses.flatMap { verse ->
+        val specs = (0 until english.length()).map { english.getJSONObject(it) }
+            .filter { it.getInt("ayah") == verse.number }
+        check(specs.joinToString(" ") { it.getString("text") } == verse.translation)
+        val alignment = EnglishWordAlignment.align(verse.translation, verse.words.map { it.translation },
+            verse.words.map { it.lemma }, verse.words.map { it.arabic })
+        val windows = paperInkEnglishWindows(specs.map { it.getInt("start") until it.getInt("end") },
+            verse.translation.length, alignment, timings.getValue(verse.number))
+        specs.mapIndexed { index, spec ->
+            val span = windows[index]
+            PaperInkWord(spec.getDouble("width").toFloat(), spec.getDouble("height").toFloat(),
+                spec.getDouble("baseline").toFloat(), PaperInkClock(span.startMs, span.endMs, t.glintFadeMs),
+                verse.number, null, shader("en-${verse.number}-${spec.getInt("position")}"))
+        }
+    }
+    return PaperInkStudy(reciter, arabicWords, englishWords)
 }
 
 @RequiresApi(33)
@@ -172,11 +218,12 @@ private fun PaperInkStudyPage(app: QuranApp, study: PaperInkStudy) {
     val speed = remember { mutableFloatStateOf(1f) }
     val tick = remember { mutableLongStateOf(SystemClock.uptimeMillis()) }
     val preview = remember { mutableStateOf(InkPreview.Voice) }
+    val english = remember { mutableStateOf(false) }
     val thickness = remember { mutableFloatStateOf(.25f) }
-    val fontScale = remember { mutableFloatStateOf(1f) }
-    val fillAmount = remember { mutableFloatStateOf(.5f) }
-    val reflection = remember { mutableFloatStateOf(.45f) }
-    val softness = remember { mutableFloatStateOf(.25f) }
+    val fontScale = remember { mutableFloatStateOf(.91f) }
+    val fillAmount = remember { mutableFloatStateOf(1f) }
+    val reflection = remember { mutableFloatStateOf(.5f) }
+    val softness = remember { mutableFloatStateOf(0f) }
     val paper = Color(0xFFFAF3E8)
     val repeatColor = LocalQuranAccents.current.repeatInk
     LaunchedEffect(study) {
@@ -217,52 +264,70 @@ private fun PaperInkStudyPage(app: QuranApp, study: PaperInkStudy) {
             val currentAyah = if (belongs) state.nowPlaying!!.ayah else study.sequence.ayah
             val scale = min(size.width / (study.maxWidth + 16f), size.height / 1080f) * fontScale.floatValue
             val native = drawContext.canvas.nativeCanvas
-            for ((row, line) in study.lines.withIndex()) {
-                val lineWidth = study.lineWidths[row]
-                var x = (size.width + lineWidth * scale) / 2
-                val baseline = size.height / 2 + (row - 1f) * 360f * scale
-                for (word in line) {
-                    val position = when {
-                        word.ayah < currentAyah -> word.motion.endMs
-                        word.ayah == currentAyah -> media
-                        else -> 0L
+            for (word in study.allWords) {
+                val position = when {
+                    word.ayah < currentAyah -> word.motion.endMs
+                    word.ayah == currentAyah -> media
+                    else -> 0L
+                }
+                word.motion.update(position, state.isPlaying && belongs && word.ayah == currentAyah, now)
+            }
+            val verses = if (english.value) study.englishLines else study.arabicLines
+            val gap = if (english.value) 8f else 24f
+            for ((row, lines) in verses.withIndex()) {
+                for ((lineIndex, line) in lines.withIndex()) {
+                    var x = (size.width + line.width * scale * if (english.value) -1 else 1) / 2
+                    val baseline = size.height / 2 + ((row - 1f) * 360f +
+                        (lineIndex - (lines.size - 1f) / 2) * 140f) * scale
+                    for (word in line.words) {
+                        val progress = when (preview.value) {
+                            InkPreview.Wet -> fillAmount.floatValue
+                            InkPreview.Dry -> 1f
+                            InkPreview.Voice -> if (english.value) word.motion.progress else
+                                word.pacing?.at(word.motion.progress) ?: InkEngine.sweepEasing.transform(word.motion.progress)
+                        }
+                        val repeat = word.ayah == 2 && study.sequence.repeatedMiddle
+                        val wet = when (preview.value) {
+                            InkPreview.Voice -> word.motion.wet
+                            InkPreview.Wet -> 1f
+                            InkPreview.Dry -> 0f
+                        }
+                        word.shader.setFloatUniform("progress", progress)
+                        word.shader.setFloatUniform("wet", wet)
+                        word.shader.setFloatUniform("reflectionStrength", reflection.floatValue)
+                        word.shader.setFloatUniform("lightSoftness", softness.floatValue)
+                        word.shader.setFloatUniform("retained", if (repeat) 1f else 0f)
+                        word.shader.setFloatUniform("repeatPass", if (repeat) 1f else 0f)
+                        word.shader.setFloatUniform("repeatColor", repeatColor.red, repeatColor.green, repeatColor.blue)
+                        word.shader.setFloatUniform("weight", thickness.floatValue * 3.5f)
+                        word.shader.setFloatUniform("aa", .9f / scale)
+                        if (!english.value) x -= word.width * scale
+                        word.shader.setFloatUniform("origin", x / scale - 362.5f,
+                            baseline / scale - word.baseline - size.height / (2 * scale))
+                        native.save()
+                        native.translate(x, baseline - word.baseline * scale)
+                        native.scale(scale, scale)
+                        native.drawRect(0f, 0f, word.width, word.height, word.paint)
+                        native.restore()
+                        x += if (english.value) (word.width + gap) * scale else -gap * scale
                     }
-                    word.motion.update(position, state.isPlaying && belongs && word.ayah == currentAyah, now)
-                    val progress = when (preview.value) {
-                        InkPreview.Wet -> fillAmount.floatValue
-                        InkPreview.Dry -> 1f
-                        InkPreview.Voice -> word.pacing?.at(word.motion.progress) ?:
-                            InkEngine.sweepEasing.transform(word.motion.progress)
-                    }
-                    val repeat = word.ayah == 2 && study.sequence.repeatedMiddle
-                    val wet = when (preview.value) {
-                        InkPreview.Voice -> word.motion.wet
-                        InkPreview.Wet -> 1f
-                        InkPreview.Dry -> 0f
-                    }
-                    word.shader.setFloatUniform("progress", progress)
-                    word.shader.setFloatUniform("wet", wet)
-                    word.shader.setFloatUniform("reflectionStrength", reflection.floatValue)
-                    word.shader.setFloatUniform("lightSoftness", softness.floatValue)
-                    word.shader.setFloatUniform("retained", if (repeat) 1f else 0f)
-                    word.shader.setFloatUniform("repeatPass", if (repeat) 1f else 0f)
-                    word.shader.setFloatUniform("repeatColor", repeatColor.red, repeatColor.green, repeatColor.blue)
-                    word.shader.setFloatUniform("weight", thickness.floatValue * 3.5f)
-                    word.shader.setFloatUniform("aa", .9f / scale)
-                    x -= word.width * scale
-                    word.shader.setFloatUniform("origin", x / scale - 362.5f,
-                        baseline / scale - word.baseline - size.height / (2 * scale))
-                    native.save()
-                    native.translate(x, baseline - word.baseline * scale)
-                    native.scale(scale, scale)
-                    native.drawRect(0f, 0f, word.width, word.height, word.paint)
-                    native.restore()
-                    x -= 24f * scale
                 }
             }
         }
         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text("Paper ink", style = MaterialTheme.typography.titleMedium)
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically) {
+                Text("Paper ink", style = MaterialTheme.typography.titleMedium)
+                Row(horizontalArrangement = Arrangement.spacedBy(20.dp)) {
+                    listOf("Arabic", "English").forEachIndexed { index, label ->
+                        val active = english.value == (index == 1)
+                        Text(label, Modifier.semantics { selected = active }.quietClickable {
+                            english.value = index == 1
+                        }.padding(vertical = 8.dp), color = if (active) MaterialTheme.colorScheme.primary
+                            else MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
+                    }
+                }
+            }
             Text("Inside out · liquid ink · verse 2 repeats", style = MaterialTheme.typography.bodySmall)
             InkStudyDial("Ink pooling", thickness)
             InkStudyDial("Font size", fontScale, .5f..1f)

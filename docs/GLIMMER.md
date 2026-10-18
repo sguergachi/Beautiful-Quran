@@ -18,18 +18,27 @@ sheet for three verses. The existing Al-Shatri audio queue plays **1 → 2 →
 2 → 3**: Media3 repeats the middle item once, then resumes the queue. The
 normal reader wash is unchanged; this is an isolated visual experiment.
 
-The existing tajweed pacing supplies a right-to-left reading sequence through
+**Arabic / English** switches the three verses without restarting audio or
+changing the dials. Arabic uses Hafs; English uses the bundled Junicode face
+and the canonical Saheeh International verse translation, wrapped into centred
+lines. Text stays in its normal reading order. The material fills **from the
+right within each word in both scripts**, as requested for this experiment.
+Arabic words advance right-to-left; English words advance in English reading
+order so the continuous wash never skips an earlier word.
+
+The existing tajweed pacing supplies Arabic's reading sequence through
 the font's shaped letter clusters. Ink develops through each cluster's shape
 rather than behind a moving vertical mask. HarfBuzz glyph advances schedule
 the clusters; glyph bounds associate the printed ink and marks with them.
-Ligatures stay together and the original printed contour stays authoritative.
+Ligatures keep their printed shape and the original contour stays authoritative.
 There is no pen, authored stroke route, or whole-word opacity fade.
 
-**Inside out** is the study's single fill. Ink gathers in each connected
-piece's deeper interior, then spreads toward the contour and along its
-branches. A baked travel field follows the connected ink, favouring wider
-passages; it is blended with local contour depth to retain the inside-out
-bloom. Neighbouring clusters overlap with a broad feathered front. Small
+**Inside out** is the study's single fill. Ink gathers in a deep pool towards
+the right of each connected piece, then spreads toward the contour and along
+its branches. A spatial right-to-left phase also runs through wide ligatures, preventing a large
+connected cluster from filling backwards or starting as a whole-word blob.
+A baked travel field follows the connected ink, favouring wider passages;
+it is blended with local contour depth to retain the inside-out bloom. Neighbouring clusters overlap with a broad feathered front. Small
 marks use their own geometry. This is a geometry-guided approximation, not a
 fluid solver or inferred pen route; there is no animated random noise.
 
@@ -47,8 +56,8 @@ Both gloss and the optical expansion settle over the existing
 pixel noise, or surrounding shadow is added.
 
 **Reflection** adjusts the window reflection's strength from 0–100%, default
-45%. **Softness** changes its spread from a focused, antialiased reflection
-to a broad soft light, default 25%. Both work during timed playback and Hold
+50%. **Softness** changes its spread from a focused, antialiased reflection
+to a broad soft light, default 0%. Both work during timed playback and Hold
 fill without changing the fill amount, pooling, or clock. Surface normals
 are smoothed independently of the printed contour; even the focused light
 retains a soft edge to avoid pixel-scale sparkle. A rounded moving
@@ -64,8 +73,8 @@ expansion; the default is 25% (0.875 pixels), down from the previous fixed
 returns to the original font contour, at every dial setting. The dial does
 not change timing or restart playback.
 The **Font size** dial scales the fitted sample from 50% to 100%, centred on
-the same three rows. It changes only drawing scale, keeping playback and
-the pooling setting intact. All dials reset when the study is reopened.
+the same three verse groups, default 91%. It changes only drawing scale,
+keeping playback and the pooling setting intact. All dials reset when the study is reopened.
 
 When verse 2 repeats, its entire previously read black base stays visible.
 The wash brings in the existing Paper orange repeat accent together
@@ -80,14 +89,22 @@ back to black.
 The repeat mode is cleared when the study stops.
 
 **Inspect fill** scrubs a paused, fully wet material preview from 0–100%.
-It starts at 50%, where the front and its wet reflection can be inspected;
-100% shows the completed wet material. Touching it pauses audio, and
+It starts at 100%, showing the completed wet material; lower values expose
+the organic front and its wet reflection. Touching it pauses audio, and
 **Hold fill** restores that inspected phase. **Dry ink** shows complete dry
 text. **Follow voice**, Play or Again returns to timed filling. Controls
 keep their fixed slots. Normal and half-speed playback are available.
 
-Ten cached native AGSL shaders draw the ten word instances. Committed 4×
-contour maps preserve the font; smooth surface maps supply normal XY and film
+English uses the reader's existing continuous semantic wash bands when
+word glosses are available. Each band is divided into adjacent printed-word
+clocks; English follows linear media time without Arabic tajweed pacing.
+Without cached word glosses, the sample uses continuous proportional verse
+time, an approximation rather than claimed word-level translation timing.
+Both languages' clocks stay warm across a toggle, including pause/dry-down
+and the one orange middle repeat.
+
+Cached native AGSL shaders draw ten Arabic and 27 English word instances.
+Committed 4× contour maps preserve the font; smooth surface maps supply normal XY and film
 depth. There is no per-frame shaping, rasterization, or bitmap upload. The
 material maps are generated from the font outlines, without stroke inference.
 Field G carries the inside-out arrival phase, B contour distance, and R is
@@ -105,6 +122,8 @@ The generator verifies the app's canonical words when loading the study;
 it changes no database. `PaperInkClockTest` covers application, handoff, pause/resume, dry-down and
 backward reset.
 `PaperInkSequenceTest` covers the one middle repeat and restarting the study.
+`PaperInkEnglishWindowsTest` checks reordered meaning, continuous word clocks,
+proportional fallback and finishing before a repeat.
 The controlled reflection is identical in recordings and on a still phone;
 physical-device performance and reading comfort still need evaluation.
 

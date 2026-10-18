@@ -4,6 +4,7 @@ Requires numpy, scipy, uharfbuzz and Pillow with RAQM. Assets are committed;
 nothing is shaped or rasterized per frame. No pen routes are inferred.
 """
 import json
+import re
 import sqlite3
 from pathlib import Path
 
@@ -17,7 +18,8 @@ from scipy.sparse.csgraph import dijkstra
 ROOT = Path(__file__).resolve().parents[1]
 SS = 4
 ASSETS = ROOT / 'app/src/main/assets/paper-ink-study'
-FONT = ROOT / 'app/src/main/res/font/uthmanic_hafs_v22.ttf'
+ARABIC_FONT = ROOT / 'app/src/main/res/font/uthmanic_hafs_v22.ttf'
+ENGLISH_FONT = ROOT / 'app/src/main/res/font/junicode_variable.ttf'
 
 
 def wicking_time(ink, depth):
@@ -38,15 +40,18 @@ def wicking_time(ink, depth):
         targets.extend(b[valid])
         costs.extend(np.hypot(dx, dy) * 2 / (speed[a[valid]] + speed[b[valid]]))
     graph = coo_matrix((costs, (sources, targets)), shape=(count, count)).tocsr()
-    travel = dijkstra(graph, directed=False, indices=int(np.argmax(depth[ink])))
+    # Load a deep pool towards the right, rather than whichever side happens to be thickest.
+    x = np.nonzero(ink)[1]
+    source = depth[ink] * (.35 + .65 * (x - x.min()) / max(1, np.ptp(x)))
+    travel = dijkstra(graph, directed=False, indices=int(np.argmax(source)))
     assert np.isfinite(travel).all()
     return travel / max(1, travel.max())
 
 
-def filling_field(text, ink, distance, box, ascent):
+def filling_field(text, ink, distance, box, ascent, font_path, font_size):
     """Schedule shaped letter clusters, then wick from their interiors to the contour."""
-    font = hb.Font(hb.Face(FONT.read_bytes()))
-    font.scale = (160 * SS * 64, 160 * SS * 64)
+    font = hb.Font(hb.Face(font_path.read_bytes()))
+    font.scale = (font_size * SS * 64, font_size * SS * 64)
     buf = hb.Buffer()
     buf.add_str(text)
     buf.guess_segment_properties()
@@ -75,7 +80,14 @@ def filling_field(text, ink, distance, box, ascent):
         cursor = end
     inside_out = np.zeros(ink.shape)
     for cluster, (first, last) in advances.items():
-        phase = 1 - (first + last) / (2 * cursor)
+        cluster_ink = ink & (owner == cluster)
+        if not cluster_ink.any():
+            continue
+        left, right = np.nonzero(cluster_ink)[1].min(), np.nonzero(cluster_ink)[1].max()
+        # A long ligature must still progress from the right. Retain interior
+        # growth at each location instead of revealing the ligature all at once.
+        across = np.clip((right - xx) / max(1, right - left), 0, 1)
+        phase = 1 - last / cursor + across * (last - first) / cursor
         pieces, _ = label(ink & (owner == cluster), np.ones((3, 3)))
         for i, region in enumerate(find_objects(pieces), 1):
             if region is None:
@@ -84,20 +96,21 @@ def filling_field(text, ink, distance, box, ascent):
             depth = np.clip(distance[region] / max(.25, distance[region][pixels].max()), 0, 1)
             travel = wicking_time(pixels, distance[region])
             growth = .6 * (1 - depth[pixels] ** .65) + .4 * travel ** .55
-            inside_out[region][pixels] = .62 * phase + .38 * growth
+            inside_out[region][pixels] = .7 * phase[region][pixels] + .3 * growth
     nearest = tuple(distance_transform_edt(~ink, return_distances=False, return_indices=True))
     # Extrapolate into wet spread and soften joins without blurring the printed contour.
     return gaussian_filter(inside_out[nearest], SS * .65)
 
 
-def build(ayah, position, text):
-    reference = ImageFont.truetype(str(FONT), 160)
-    box = reference.getbbox(text, direction='rtl')
+def build(ayah, position, text, english=False):
+    font_path, font_size, direction = (ENGLISH_FONT, 80, 'ltr') if english else (ARABIC_FONT, 160, 'rtl')
+    reference = ImageFont.truetype(str(font_path), font_size)
+    box = reference.getbbox(text, direction=direction)
     w, h = box[2] - box[0] + 16, box[3] - box[1] + 16
     image = Image.new('L', (w * SS, h * SS))
-    font = ImageFont.truetype(str(FONT), 160 * SS)
+    font = ImageFont.truetype(str(font_path), font_size * SS)
     ImageDraw.Draw(image).text(((8 - box[0]) * SS, (8 - box[1]) * SS), text,
-                              font=font, fill=255, direction='rtl')
+                              font=font, fill=255, direction=direction)
     alpha = np.array(image) / 255
     ink = alpha > .5
     distance = (distance_transform_edt(ink) - distance_transform_edt(~ink)) / SS
@@ -114,15 +127,15 @@ def build(ayah, position, text):
                               film * 255, np.full(alpha.shape, 255)], axis=-1)).astype('uint8')
     # Opaque data avoids premultiplication. B carries signed contour distance.
     field = np.zeros((*alpha.shape, 4), dtype='uint8')
-    bloom = filling_field(text, ink, distance, box, reference.getmetrics()[0])
+    bloom = filling_field(text, ink, distance, box, reference.getmetrics()[0], font_path, font_size)
     field[:, :, 1] = np.round(bloom * 255)
     field[:, :, 2] = np.clip(128 + distance * 16, 0, 255)
     field[:, :, 3] = 255
-    key = f'{ayah}-{position}'
+    key = f'{"en-" if english else ""}{ayah}-{position}'
     Image.fromarray(field).save(ASSETS / f'word-{key}-field.png', optimize=True)
     Image.fromarray(normal).resize((w, h), Image.Resampling.LANCZOS).save(
         ASSETS / f'word-{key}-normal.png', optimize=True)
-    return dict(ayah=ayah, position=position, arabic=text, width=w, height=h,
+    return dict(ayah=ayah, position=position, **({'text': text} if english else {'arabic': text}), width=w, height=h,
                 baseline=reference.getmetrics()[0] + 8 - box[1], maxDepth=float(distance.max()))
 
 
@@ -135,6 +148,14 @@ if __name__ == '__main__':
         words = db.execute('select ayah_number,position,arabic from words '
                            'where surah_id=1 and ayah_number<=3 '
                            'order by ayah_number,position').fetchall()
+        verses = db.execute('select ayah_number,translation_en from ayahs '
+                            'where surah_id=1 and ayah_number<=3 order by ayah_number').fetchall()
     manifest = [build(*word) for word in words]
     (ASSETS / 'words.json').write_text(json.dumps(manifest, ensure_ascii=False, indent=2) + '\n')
-    print(json.dumps(manifest, ensure_ascii=False))
+    english = []
+    for ayah, text in verses:
+        for position, match in enumerate(re.finditer(r'\S+', text), 1):
+            english.append(dict(build(ayah, position, match[0], english=True),
+                                start=match.start(), end=match.end()))
+    (ASSETS / 'english.json').write_text(json.dumps(english, ensure_ascii=False, indent=2) + '\n')
+    print(f'Built {len(manifest)} Arabic and {len(english)} English word maps.')
