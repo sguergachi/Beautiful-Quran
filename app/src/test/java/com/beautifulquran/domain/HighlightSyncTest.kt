@@ -119,6 +119,23 @@ class HighlightSyncTest {
     }
 
     @Test
+    fun `frozen paused or buffering samples cannot certify a post resume overshoot`() {
+        for (buffering in listOf(false, true)) {
+            var state = HighlightSync.sample(null,
+                sample(0, 0, playing = buffering, buffering = buffering), timing)
+            repeat(20) {
+                state = HighlightSync.sample(state,
+                    sample(0, (it + 1) * 250L, playing = buffering, buffering = buffering), timing)
+            }
+            state = HighlightSync.sample(state, sample(800, 5033), timing)
+            assertEquals(0L, state.acceptedMediaMs)
+            assertEquals(0L, frame(state, 5033).inkMs)
+            assertEquals(33L, frame(state, 5066).inkMs)
+            assertEquals(0L, state.sample.inkGeneration)
+        }
+    }
+
+    @Test
     fun `a confirmed seek can move backward but a subsequent adjustment preserves laid ink`() {
         val initial = HighlightSync.sample(null, sample(1500, 0), timing)
         val seek = HighlightSync.sample(initial, sample(100, 33, clock = 1, ink = 1), timing)

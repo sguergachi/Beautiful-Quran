@@ -126,14 +126,16 @@ object HighlightSync {
         val elapsedNs = next.sampledAtNanos - old.sampledAtNanos
         // The preceding sample owns speed/transport for this elapsed interval.
         val expectedMs = if (old.advances) elapsedNs / 1_000_000.0 * old.speed else 0.0
-        val settleNs = next.sampledAtNanos - previous.settleStartNanos
+        val resuming = !old.advances && next.advances
+        val settleStart = if (resuming) next.sampledAtNanos else previous.settleStartNanos
+        val settleNs = next.sampledAtNanos - settleStart
         val settling = settleNs < SETTLE_CAP_NS &&
-            (settleNs < MIN_SETTLE_NS || previous.stableSamples < STABLE_SAMPLES)
+            (settleNs < MIN_SETTLE_NS || previous.stableSamples < STABLE_SAMPLES || resuming)
         val maxStepMs = maxOf(100.0, expectedMs * 3.0)
         val believableMs = maxOf(66.0, expectedMs * 2.0)
         val rawAdvance = next.positionMs - old.positionMs
         val gap = next.positionMs - previous.acceptedMediaMs
-        val stable = if (rawAdvance >= 0 && rawAdvance <= believableMs && gap >= 0) {
+        val stable = if (old.advances && rawAdvance >= 0 && rawAdvance <= believableMs && gap >= 0) {
             (previous.stableSamples + 1).coerceAtMost(STABLE_SAMPLES)
         } else 0
         val accepted = when {
@@ -147,7 +149,7 @@ object HighlightSync {
             // After a backward correction, project the actual raw series until
             // it catches retained ink; projecting the held ceiling adds debt.
             minOf(accepted, next.positionMs), retained,
-            previous.settleStartNanos, stable,
+            settleStart, stable,
         )
     }
 

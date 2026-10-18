@@ -43,6 +43,7 @@ geometry have not moved into this core.
 | Empty timing publication | Expose missing timings, never the preceding occurrence |
 | Ordinary backward position correction | Hold laid ink; project the corrected raw series until it catches up |
 | Pause or buffering | Freeze projection from that sample |
+| Resume after pause or buffering | Restart the trust-settle window without restarting ink; frozen samples do not prove realtime convergence |
 | Speed change | Previous speed owns the preceding interval; new speed owns subsequent frames |
 | Calibration change | Recompute after media projection; retain ink within the same performance |
 
