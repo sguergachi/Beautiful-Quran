@@ -60,7 +60,9 @@ without a playback window retain their animation clock.
 | Provisional tap | Hold its wash at zero until a matching word with a current player generation acknowledges it |
 | Consecutive same-word re-say | Distinct orange occurrence; ordinary base ink is not restarted |
 
-Revisions are cumulative within a player/controller lifetime. A new controller
+Revisions are cumulative within a player/controller lifetime, including across
+playback dismissal and queue clearing. The next play increments them to rearm
+ink even when it restarts the same verse. A new controller
 requires a new sync session. Negative monotonic timestamp origins are valid.
 Timing publication, provider generation, reader navigation, clock revision,
 performance generation, and occurrence identity remain distinct.

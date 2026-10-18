@@ -7,7 +7,7 @@ independent acoustic review or a zero-regression guarantee.
 | Gate | Result |
 |---|---|
 | Android JVM | 1,574 passed; one optional external-corpus test skipped in the ordinary suite |
-| Web | 866 tests / 93 files passed; production build passed |
+| Web | 868 tests / 93 files passed; production build passed |
 | Offline timing pipeline | 116 cases passed |
 | V2 delivered-corpus lookup | 81,059 rows, 13 reciters, 12,378,291 boundary/reverse/scrambled queries, 17,748 repeat occurrences passed |
 | Arabic/English prefix oracle | 12,384,384 queries passed for each of published prose and word-card text |
@@ -21,6 +21,12 @@ Android adds seeded transport sequences, draw-timeline tests at 60/90/120 Hz,
 provisional tap and reciter isolation, repeat/residual policy, and observer
 suspension/reopen. Existing English ownership, reordered-prefix, carried-page,
 glimmer, silence, and transport suites remain gates.
+
+Review follow-up: dismissing web playback reset controller revisions while V2
+retained its suspended session, causing fresh playback to be rejected as stale.
+The controller now keeps revisions cumulative across queue clearing. Two tests
+connect the real player controller to V2 through stop/restart, covering both the
+same verse and a different verse; both failed before the fix and pass after it.
 
 The external corpus test was also exercised explicitly. The nine unavailable
 rows remain separately listed, rather than counted as successes. All six

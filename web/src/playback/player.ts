@@ -1388,7 +1388,14 @@ export class PlayerController {
     this.playlist = []
     this.index = 0
     this.stopTick()
-    this.patch({ ...initial, speed: this.state.speed })
+    // Sync survives a dismissed session and rejects lower revisions as stale.
+    // Keep counters cumulative for this controller; the next play rearms ink.
+    this.patch({
+      ...initial,
+      speed: this.state.speed,
+      clockRevision: this.state.clockRevision,
+      inkGeneration: this.state.inkGeneration,
+    })
   }
 
   private async onEnded() {

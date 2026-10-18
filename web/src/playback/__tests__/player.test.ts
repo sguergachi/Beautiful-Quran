@@ -13,6 +13,8 @@ import type { AudioPrefetcher } from '../audioPrefetch'
 import { wantsGapless5Transport } from '../gaplessPolicy'
 import { FakeAudio } from './fakeAudio'
 import { PLAYBACK_MESSAGES } from '../playbackErrors'
+import { PreparedTimings } from '../../domain/HighlightEngine'
+import { highlightFrame, sampleHighlight, suspendHighlight, type HighlightSyncState } from '../../domain/HighlightSync'
 
 let PlayerController: typeof import('../player').PlayerController
 
@@ -100,6 +102,53 @@ describe('PlayerController event sequences', () => {
     player.seekMs(3000)
     expect(player.getState().inkGeneration).toBe(initial + 2)
     player.pause()
+  })
+
+  it.each([1, 2])('restarts V2 highlighting on ayah %i after playback is dismissed', async (ayah) => {
+    const audio = new FakeAudio()
+    const player = new PlayerController(instantPrefetcher(), true, null, () => audio.asAudio())
+    const timing = { revision: 1, voiceStartMs: 0, timings: PreparedTimings.prepare([
+      { position: 1, startMs: 0, endMs: 1000 },
+      { position: 2, startMs: 1000, endMs: 2000 },
+    ]) }
+    let sync: HighlightSyncState | null = null
+    let atNanos = 0
+    // Keep V2 alive across the same null-source interval as AppStore.
+    const unsubscribe = player.subscribe(state => {
+      atNanos += 1e6
+      const item = state.nowPlaying
+      if (!item) {
+        if (sync) sync = suspendHighlight(sync, atNanos)
+        return
+      }
+      sync = sampleHighlight(sync, {
+        item: { surah: item.surahId, ayah: item.ayah, reciter: item.reciterId },
+        positionMs: state.positionMs, sampledAtNanos: atNanos,
+        isPlaying: state.isPlaying, isBuffering: state.isBuffering || state.isPlaying && state.advances === false,
+        speed: state.speed, clockRevision: state.clockRevision!, inkGeneration: state.inkGeneration!,
+      }, timing)
+    })
+    try {
+      player.loadSurah(content, reciter, 1, { quiet: true, warm: false })
+      await player.play()
+      player.seekMs(1200)
+      player.seekMs(1500)
+      const prior = player.getState()
+      expect(highlightFrame(sync!, atNanos).active?.position).toBe(2)
+
+      player.stop()
+      player.loadSurah(content, reciter, ayah, { quiet: true, warm: false })
+      await player.play()
+      const frame = highlightFrame(sync!, atNanos)
+      expect(frame.item.ayah).toBe(ayah)
+      expect(frame.inkGeneration).toBeGreaterThan(prior.inkGeneration!)
+      expect(frame.active?.position).toBe(1)
+      expect(sync!.suspended).not.toBe(true)
+      expect(highlightFrame(sync!, atNanos + 100e6).inkMs).toBeGreaterThan(frame.inkMs)
+    } finally {
+      unsubscribe()
+      player.stop()
+    }
   })
 
   it('keeps play intent separate from actual advancement until the audio element starts', async () => {
