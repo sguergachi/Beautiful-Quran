@@ -45,8 +45,10 @@ import { finishPageTurn, requestPageTurn, type PageTurnQueue } from './pageTurnQ
 import {
   MUSHAF_MAX_CONDENSE,
   MUSHAF_MIN_LEADING,
+  MUSHAF_MIN_GAP,
   mushafFit,
   mushafLeafFit,
+  mushafLineGaps,
   mushafMeasure,
   naturalLineWidth,
   solveLine,
@@ -353,7 +355,7 @@ export function MushafReader({
     return pageHoldsVoice(pair.right, activeSurahId, voice) ||
       pageHoldsVoice(pair.left, activeSurahId, voice)
   }
-  const leafProps = { fitRevision, activeSurahId, activeAyah, english, pageNumberScript, glyphWiden, ink, onPlayWord, onHoldWord, onTurn: turn, onFit: reportFit }
+  const leafProps = { fitRevision, facing, activeSurahId, activeAyah, english, pageNumberScript, glyphWiden, ink, onPlayWord, onHoldWord, onTurn: turn, onFit: reportFit }
   // Nothing turns under a sheet laid over the leaves (Settings, the word
   // viewer): a leaf in the air would cross it. Under Chapters the leaves do
   // turn, since that is how the book gets there. A phone has one sheet, and
@@ -719,6 +721,7 @@ function MushafHead({
 function MushafLeaf({
   page,
   fitRevision,
+  facing,
   side,
   style,
   leafRef,
@@ -738,6 +741,8 @@ function MushafLeaf({
 }: {
   page: number
   fitRevision: number
+  /** Extra chapter furniture sets the same row pitch on both leaves. */
+  facing: boolean
   /** The hand both facing leaves are set in: the tighter page's fit. */
   fit: number
   onFit: (page: number, fit: number) => void
@@ -796,8 +801,7 @@ function MushafLeaf({
       // let the measurement chase its own result.
       const scale = Number(lines.style.getPropertyValue('--mushaf-fit')) || 1
       const textLines = Array.from(lines.querySelectorAll<HTMLElement>('.mushaf-line'))
-      const first = textLines[0]
-      const gap = first ? parseFloat(getComputedStyle(first).columnGap) || 0 : 0
+      const gap = parseFloat(getComputedStyle(lines).fontSize) * MUSHAF_MIN_GAP
       // A line already set narrow or wide carries its scale into every
       // item's box; divide it back out. The widest line may be condensed,
       // so it is measured as it would be set at the limit.
@@ -813,20 +817,14 @@ function MushafLeaf({
           })) / scale
       const box = getComputedStyle(leaf)
       const available = leaf.clientWidth - parseFloat(box.paddingLeft) - parseFloat(box.paddingRight)
-      // Room to grow is bounded by the line pitch the page can give: the
-      // block's height, less its running head and folio, over fifteen lines.
+      // The grid has already reserved the running head and real controls.
+      // This well belongs entirely to the printed slots, including banners.
       const block = lines.parentElement
-      const furniture = block
-        ? Array.from(block.children).reduce((sum, child) => (child === lines ? sum : sum + child.clientHeight), 0)
-        : 0
       const slots = Number(lines.style.getPropertyValue('--mushaf-slots')) || MUSHAF_LINES_PER_PAGE
-      const pitch = block ? (block.clientHeight - furniture) / slots : 0
+      const pitch = block ? block.clientHeight / slots : 0
       const baseEm = parseFloat(getComputedStyle(lines).fontSize) / scale
-      const maxGrow = pitch > 0 && baseEm > 0 ? pitch / (MUSHAF_MIN_LEADING * baseEm) : 1
-      const fitted = mushafLeafFit(available, widest, maxGrow)
-      // Headings outside the source's fifteen slots must fit vertically too;
-      // the tighter leaf still chooses one shared hand for the spread.
-      onFit(page, slots > MUSHAF_LINES_PER_PAGE ? Math.min(fitted, maxGrow) : fitted)
+      const heightFit = pitch > 0 && baseEm > 0 ? pitch / (MUSHAF_MIN_LEADING * baseEm) : 1
+      onFit(page, mushafLeafFit(available, widest, heightFit))
     }
     measure()
     const observer = new ResizeObserver(measure)
@@ -838,7 +836,7 @@ function MushafLeaf({
     void document.fonts?.ready.then(measure)
     return () => { disposed = true; observer.disconnect() }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [page, english, side, fitRevision, onFit === noFit])
+  }, [page, english, side, facing, fitRevision, onFit === noFit])
 
   // Once the hand and the measure are settled, set each line: widen the
   // letters of a loose line toward the target word space, and centre a line
@@ -858,27 +856,34 @@ function MushafLeaf({
       line.removeAttribute('data-short')
       line.style.removeProperty('--line-widen')
     }
-    if (opening) {
-      block?.style.removeProperty('width')
-      return
-    }
+    if (opening) block?.style.removeProperty('width')
     // Read every line before writing any, so the page is laid out once.
     const set = textLines.map((line) => ({
       ink: Array.from(line.children).reduce((sum, item) => sum + item.getBoundingClientRect().width, 0),
       gaps: line.children.length - 1,
+      markJoins: Array.from(line.children).slice(1).map((item, index) =>
+        item.matches('.mushaf-mark') || line.children[index]!.matches('.mushaf-mark')),
     }))
     const leaf = lines.closest('.mushaf')
-    if (block && leaf instanceof HTMLElement) {
+    if (!opening && block && leaf instanceof HTMLElement) {
       const box = getComputedStyle(leaf)
       const available = leaf.clientWidth - parseFloat(box.paddingLeft) - parseFloat(box.paddingRight)
       block.style.width = `${mushafMeasure(set, em, available)}px`
     }
     // The block's floor (min-width) may hold it wider than asked.
     const measure = lines.clientWidth
-    const settings = set.map(({ ink, gaps }) => solveLine(ink, gaps, measure, em, glyphWiden))
+    const settings = set.map(({ ink, gaps }) => opening
+      ? { widen: 1, short: true } : solveLine(ink, gaps, measure, em, glyphWiden))
     settings.forEach((setting, index) => {
       const line = textLines[index]
       if (!line) return
+      const { wordGap, markGap } = mushafLineGaps(
+        set[index]!.markJoins, em,
+        setting.short ? undefined : measure / setting.widen - set[index]!.ink,
+        opening ? MUSHAF_MIN_GAP : undefined,
+      )
+      line.style.setProperty('--word-gap', `${wordGap.toFixed(4)}px`)
+      line.style.setProperty('--mark-gap', `${markGap.toFixed(4)}px`)
       if (setting.short) line.setAttribute('data-short', '')
       else if (Math.abs(setting.widen - 1) > 0.001) {
         line.setAttribute('data-widen', '')
@@ -890,6 +895,9 @@ function MushafLeaf({
   if (!runtimeMushafCache) return null
   const rows = runtimeMushafCache.pageWords(page) ?? []
   const { leaf, headSurah, englishAyahs, lastPositions, verseWords } = mushafLeafModel(page, rows, QuranRepository.surahContent)
+  const peerPage = page % 2 === 1 ? page + 1 : page - 1
+  const peerRows = facing ? runtimeMushafCache.pageWords(peerPage) : null
+  const peerSlots = peerRows ? mushafLeafModel(peerPage, peerRows, QuranRepository.surahContent).leaf.lines.length : 0
   // The two opening leaves carry a few short lines, set in the middle of the
   // well; every other leaf hangs its fifteen lines from the head.
   const lines = opening ? leaf.lines.filter((line) => line.tokens.length > 0 || line.chapter || line.basmalah) : leaf.lines
@@ -985,7 +993,7 @@ function MushafLeaf({
           ref={linesRef}
           style={{
             ['--mushaf-fit' as string]: String(fit),
-            ['--mushaf-slots' as string]: String(Math.max(MUSHAF_LINES_PER_PAGE, leaf.lines.length)),
+            ['--mushaf-slots' as string]: String(Math.max(MUSHAF_LINES_PER_PAGE, leaf.lines.length, peerSlots)),
             ['--recess-ms' as string]: `${tuning.recessMs}ms`,
             ['--ayah-mark-fade-ms' as string]: `${tuning.ayahMarkFadeMs}ms`,
             ['--upcoming-alpha' as string]: String(tuning.upcomingAlpha),
@@ -1012,7 +1020,7 @@ function MushafLeaf({
                 const owner = wordInk.state === InkState.Active
                 const { surahId, ayah, position } = token
                 // Word and mark are separate items of the line, so the
-                // justified space falls evenly on both sides of a mark.
+                // mark-specific spacing can fall on both sides of a mark.
                 return (
                   <Fragment key={`${surahId}:${ayah}:${position}`}>
                     {still ? (

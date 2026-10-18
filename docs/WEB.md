@@ -516,8 +516,9 @@ own clear mark (`::-webkit-search-cancel-button`); the field draws one. The per-
 `MUSHAF_TARGET_GAP`, or centring below `MUSHAF_SHORT_FILL`), applied to the
 lines in a layout effect in `MushafLeaf`. The cap is the
 `mushafGlyphWiden` setting.
-Mushaf lines justify by even word spaces: words and verse marks are
-separate flex items of the line (`space-between`) inside `.mushaf-block`.
+Mushaf words and verse marks are separate flex items inside `.mushaf-block`.
+The line solver assigns each join a margin, giving marks a smaller share of
+white while preserving the full measure.
 The running head is a sibling of that fitted block, anchored to the leaf's
 full text grid so its figures never drift with a shorter line measure.
 Its equal end columns align Western figures left and Arabic-Indic figures
@@ -527,10 +528,23 @@ space (`MUSHAF_MIN_GAP`, 0.22 em) and loose lines widen toward 0.3 em. The
 block's width is `mushafMeasure`: the widest line set at minimum spaces with
 its letters condensed by up to `MUSHAF_MAX_CONDENSE` (4%), written inline by
 `MushafLeaf`. One outlier line used to set the measure for the whole page and
-loosen every other line; now it is set slightly narrow instead. `mushafLeafFit` only
-shrinks the type when the widest line overruns the page; widths are read at
-the applied scale and divided back (toggling the scale to measure made the
-measurement oscillate). Rationale in `docs/DESIGN.md`.
+loosen every other line; now it is set slightly narrow instead. `mushafLeafFit`
+fits the hand against both width and height, including short landscape windows
+and opening leaves. Widths are read at the applied scale and divided back
+(toggling the scale to measure made the measurement oscillate).
+`useMushafGrid` observes the actual toolbar and transport through callback refs,
+including the phone transport's portal and the gathering ribbon. Both facing
+leaves reserve those measured heights plus one rhythm step (8–16 px), keeping
+hit-target floors, notices and safe-area padding out of the text. A two-row
+leaf grid gives the running head its own track and the scripture the remaining
+well, with one constrained column so short lines cannot enlarge an implicit
+grid track. Facing leaves share the larger slot count when either chapter
+opening needs extra furniture rows, keeping their row pitch aligned. Heads
+use a quieter 10–13 px rung derived from the book's base hand.
+A height-bound Arabic text block may draw narrower than the opening's 72%
+width floor, so fitting type vertically does not loosen its word spaces.
+The phone reserves its footer once; the toolbar already owns the top safe area.
+Rationale in `docs/DESIGN.md`.
 The leaf's folio stands in the running head — Western figure at the left,
 the chapter centred, Arabic-Indic at the right (one script puts its figure
 at the left and the chapter at the right), Android `MushafRunningHead`
@@ -544,7 +558,12 @@ the band and preface in the source's spare slots; where a chapter heading is
 counted outside the source grid, it adds the missing furniture and fits both
 facing leaves to the taller slot count (up to seventeen), retaining every word
 on its page. Fatiha's basmalah remains its timed first verse; Tawbah has no
-preface. The entire opening group stays centred on leaves 1–2.
+preface. The entire opening group stays centred on leaves 1–2. Opening word
+spaces are 0.22 em, with tighter space beside verse marks. Full lines budget
+the remaining white across word joins and mark joins separately: a mark receives 0.85 of the
+word gap, softening above 0.42 em to 0.45 of further growth (typography §8).
+The two kinds of join still spend the full line width; marks remain separate
+cells and both full-line margins stay flush.
 The Mushaf toolbar has no chapter medallion or title: its chapter names live
 in the running heads and opening cartouches. Only the scrolling reader carries
 the compact top-bar title, on the page's physical centre line. Its caps

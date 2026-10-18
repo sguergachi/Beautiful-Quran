@@ -114,7 +114,7 @@ shrinks until the leaf's widest line, at minimum word spaces, fills the
 block — never so far that fifteen lines would stand closer than 1.75 times
 the type. Each loose line then has its *letters* widened a few percent
 (6 by default; Settings → Developer offers 0, 4, 6, 8) toward a word space of
-0.42 em before any space is added between words: the stand-in for the print's
+0.3 em before any space is added between words: the stand-in for the print's
 elongated letters, and it adds nothing to the text. A line that fills less
 than 62% of the measure is centred at an ordinary word space instead of being
 justified, as the print centres a chapter's last line. On a phone, leading
@@ -125,12 +125,21 @@ leaf in Hafs, not in the page's own face, and Hafs sets narrower than the
 print — the print fills its line by elongating letters, which the app must
 not imitate by adding characters to the revelation. Justifying such lines
 out to the full page opened rivers three word-spaces wide. So the text block
-is drawn in to its widest line set with minimum word spaces (0.3 em), and
-every other line justifies to that; the type only ever shrinks, when a line
-would overrun the page. A verse mark is an item of the line like a word, so
-the space falls evenly on both its sides. Facing leaves keep one type size
-but each its own block width: two blocks of one width matter less than a
-sparse page not being all gaps. Running head and folio hang on the block.
+is drawn in to its widest line set with minimum word spaces (0.22 em), and
+every other line justifies to that. Type fits both the width and the height
+of the reading well, shrinking when either dimension would overflow. A verse
+mark remains a separate item of the line,
+with a smaller share of white on both sides: 0.85 of a word join, softening
+above 0.42 em. Opening leaves use a 0.22 em word space. Facing leaves keep
+one type size but each its own block width: two blocks of one width matter
+less than a sparse page not being all gaps. Running heads and folios follow
+the full leaf grid. The head and scripture occupy separate grid rows, with
+one rhythm step between them. Both leaves reserve the measured toolbar and
+transport heights plus a step of air; control hit-target floors and safe-area
+padding cannot intrude into the scripture. A short, wide window may draw its
+measured text block below the opening medallion’s 72% width floor, so height
+fitting does not reopen word-space rivers.
+
 What remains uneven is line against line — a line the print stretched with
 long letters still sets looser than a full one — and only the page faces
 would close that.

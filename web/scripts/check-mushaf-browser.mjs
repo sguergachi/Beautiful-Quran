@@ -95,9 +95,9 @@ try {
     })
     observer.observe(document.body, { childList: true, subtree: true })
   }, interrupt)
-  const checkLeaf = async () => {
+  const checkLeaf = async (expectedLeaves = 2) => {
     const geometry = await page.evaluate(() => {
-      const leaves = [...document.querySelectorAll('.mushaf[data-side]')]
+      const leaves = [...document.querySelectorAll('.mushaf')]
         .filter(el => !el.closest('.mushaf-flip, .mushaf-fit-probes'))
       return leaves.map(leaf => {
         const rows = [...leaf.querySelectorAll('.mushaf-line')]
@@ -107,6 +107,20 @@ try {
         const leafStyle = getComputedStyle(leaf)
         const font = parseFloat(getComputedStyle(lines).fontSize)
         return {
+          spacing: rows.filter(row => row.children.length > 1).map(row => ({
+            text: row.textContent,
+            width: row.getBoundingClientRect().width,
+            setting: row.getAttribute('style'),
+            word: parseFloat(row.style.getPropertyValue('--word-gap')),
+            mark: parseFloat(row.style.getPropertyValue('--mark-gap')),
+            centered: row.hasAttribute('data-short') || lines.dataset.opening === 'true',
+            fillError: row.getBoundingClientRect().width -
+              (row.firstElementChild.getBoundingClientRect().right - row.lastElementChild.getBoundingClientRect().left),
+          })),
+          topClearance: head.getBoundingClientRect().top - document.querySelector('.reader-top').getBoundingClientRect().bottom,
+          footClearance: document.querySelector('.player-bar').getBoundingClientRect().top - leaf.querySelector('.mushaf-block').getBoundingClientRect().bottom,
+          headGap: lines.getBoundingClientRect().top - head.getBoundingClientRect().bottom,
+          headSize: parseFloat(getComputedStyle(head).fontSize),
           side: leaf.dataset.side,
           top: leaf.getBoundingClientRect().top,
           height: leaf.clientHeight,
@@ -122,14 +136,26 @@ try {
         }
       })
     })
-    assert.equal(geometry.length, 2, JSON.stringify(geometry))
+    assert.equal(geometry.length, expectedLeaves, JSON.stringify(geometry))
     for (const leaf of geometry) {
+      for (const spacing of leaf.spacing) {
+        assert(spacing.mark >= 0 && spacing.mark < spacing.word, JSON.stringify(spacing))
+        if (leaf.opening) assert(spacing.word / leaf.font <= 0.221, JSON.stringify(spacing))
+        if (!spacing.centered) assert(Math.abs(spacing.fillError) < 1, JSON.stringify(spacing))
+      }
+      assert(leaf.topClearance >= 7 && leaf.footClearance >= 7, JSON.stringify(leaf))
+      assert(leaf.headGap >= 7, JSON.stringify(leaf))
+      assert(leaf.headSize >= 10 && leaf.headSize <= 13, JSON.stringify(leaf))
       assert(leaf.height > leaf.font * 15 * 1.7, JSON.stringify(leaf))
       assert(leaf.pitch >= leaf.font * 1.7, JSON.stringify(leaf))
       assert(Math.abs(leaf.headStart) < 1 && Math.abs(leaf.headEnd) < 1, JSON.stringify(leaf))
       if (leaf.opening) assert(Math.abs(leaf.center - leaf.wellCenter) < 2, JSON.stringify(leaf))
     }
-    assert(Math.abs(geometry[0].top - geometry[1].top) < 1, JSON.stringify(geometry))
+    if (expectedLeaves === 2) {
+      assert(Math.abs(geometry[0].top - geometry[1].top) < 1, JSON.stringify(geometry))
+      assert(Math.abs(geometry[0].pitch - geometry[1].pitch) < 1, JSON.stringify(geometry))
+      assert(Math.abs(geometry[0].font - geometry[1].font) < 0.1, JSON.stringify(geometry))
+    }
     assert.equal(await page.locator('.reader-top-title, .reader-top-medallion').count(), 0, 'Mushaf must not carry the scroll reader toolbar title')
     return geometry
   }
@@ -164,13 +190,27 @@ try {
   await checkLeaf()
   // Resize the same mounted book: the golden grid and the 0.85 furniture
   // floor must both remain usable, including a narrow tablet spread.
-  for (const viewport of [{ width: 1280, height: 800 }, { width: 744, height: 1133 }]) {
+  for (const viewport of [{ width: 1280, height: 800 }, { width: 744, height: 1133 }, { width: 1440, height: 600 }, { width: 1024, height: 600 }]) {
     await page.setViewportSize(viewport)
     await page.waitForTimeout(400)
     await checkLeaf()
   }
+  for (const viewport of [{ width: 390, height: 844 }, { width: 320, height: 568 }]) {
+    await page.setViewportSize(viewport)
+    await page.waitForTimeout(400)
+    await checkLeaf(1)
+    await page.screenshot({ path: `${out}/${engine}-phone-${viewport.width}.png` })
+  }
   await page.setViewportSize({ width: 1920, height: 1296 })
   await page.waitForTimeout(400)
+  // A larger footer (for example safe-area or notice padding) must reserve
+  // its real height on both leaves without changing their shared hand.
+  await page.locator('.player-bar').evaluate(el => { el.style.paddingBottom = '40px' })
+  await page.waitForTimeout(400)
+  await checkLeaf()
+  await page.locator('.player-bar').evaluate(el => el.style.removeProperty('padding-bottom'))
+  await page.waitForTimeout(400)
+  await checkLeaf()
   assert.equal(await page.locator('.mushaf-flip-canvas').count(), 0)
   assert.equal(await page.locator('.sheet[data-name="home"]').evaluate(el => el.inert), true)
   // Reverse a chapter-opening turn while its pile is still airborne.
