@@ -107,6 +107,13 @@ try {
         const leafStyle = getComputedStyle(leaf)
         const font = parseFloat(getComputedStyle(lines).fontSize)
         return {
+          spacing: rows.filter(row => row.children.length > 1).map(row => ({
+            word: parseFloat(row.style.getPropertyValue('--word-gap')),
+            mark: parseFloat(row.style.getPropertyValue('--mark-gap')),
+            centered: row.hasAttribute('data-short') || lines.dataset.opening === 'true',
+            fillError: row.getBoundingClientRect().width -
+              (row.firstElementChild.getBoundingClientRect().right - row.lastElementChild.getBoundingClientRect().left),
+          })),
           side: leaf.dataset.side,
           top: leaf.getBoundingClientRect().top,
           height: leaf.clientHeight,
@@ -124,6 +131,11 @@ try {
     })
     assert.equal(geometry.length, 2, JSON.stringify(geometry))
     for (const leaf of geometry) {
+      for (const spacing of leaf.spacing) {
+        assert(spacing.mark >= 0 && spacing.mark < spacing.word, JSON.stringify(spacing))
+        if (leaf.opening) assert(spacing.word / leaf.font <= 0.221, JSON.stringify(spacing))
+        if (!spacing.centered) assert(Math.abs(spacing.fillError) < 1, JSON.stringify(spacing))
+      }
       assert(leaf.height > leaf.font * 15 * 1.7, JSON.stringify(leaf))
       assert(leaf.pitch >= leaf.font * 1.7, JSON.stringify(leaf))
       assert(Math.abs(leaf.headStart) < 1 && Math.abs(leaf.headEnd) < 1, JSON.stringify(leaf))

@@ -127,10 +127,12 @@ not imitate by adding characters to the revelation. Justifying such lines
 out to the full page opened rivers three word-spaces wide. So the text block
 is drawn in to its widest line set with minimum word spaces (0.3 em), and
 every other line justifies to that; the type only ever shrinks, when a line
-would overrun the page. A verse mark is an item of the line like a word, so
-the space falls evenly on both its sides. Facing leaves keep one type size
-but each its own block width: two blocks of one width matter less than a
-sparse page not being all gaps. Running head and folio hang on the block.
+would overrun the page. A verse mark remains a separate item of the line,
+with a smaller share of white on both sides: 0.85 of a word join, softening
+above 0.42 em. Opening leaves use a 0.22 em word space. Facing leaves keep
+one type size but each its own block width: two blocks of one width matter
+less than a sparse page not being all gaps. Running heads and folios follow
+the full leaf grid.
 What remains uneven is line against line — a line the print stretched with
 long letters still sets looser than a full one — and only the page faces
 would close that.

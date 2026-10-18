@@ -516,8 +516,9 @@ own clear mark (`::-webkit-search-cancel-button`); the field draws one. The per-
 `MUSHAF_TARGET_GAP`, or centring below `MUSHAF_SHORT_FILL`), applied to the
 lines in a layout effect in `MushafLeaf`. The cap is the
 `mushafGlyphWiden` setting.
-Mushaf lines justify by even word spaces: words and verse marks are
-separate flex items of the line (`space-between`) inside `.mushaf-block`.
+Mushaf words and verse marks are separate flex items inside `.mushaf-block`.
+The line solver assigns each join a margin, giving marks a smaller share of
+white while preserving the full measure.
 The running head is a sibling of that fitted block, anchored to the leaf's
 full text grid so its figures never drift with a shorter line measure.
 Its equal end columns align Western figures left and Arabic-Indic figures
@@ -544,7 +545,12 @@ the band and preface in the source's spare slots; where a chapter heading is
 counted outside the source grid, it adds the missing furniture and fits both
 facing leaves to the taller slot count (up to seventeen), retaining every word
 on its page. Fatiha's basmalah remains its timed first verse; Tawbah has no
-preface. The entire opening group stays centred on leaves 1–2.
+preface. The entire opening group stays centred on leaves 1–2. Opening word
+spaces are 0.22 em, with tighter space beside verse marks. Full lines budget
+the remaining white across word joins and mark joins separately: a mark receives 0.85 of the
+word gap, softening above 0.42 em to 0.45 of further growth (typography §8).
+The two kinds of join still spend the full line width; marks remain separate
+cells and both full-line margins stay flush.
 The Mushaf toolbar has no chapter medallion or title: its chapter names live
 in the running heads and opening cartouches. Only the scrolling reader carries
 the compact top-bar title, on the page's physical centre line. Its caps

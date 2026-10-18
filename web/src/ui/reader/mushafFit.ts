@@ -8,7 +8,7 @@ export function mushafFit(page: number, facing: boolean, fits: Readonly<Record<n
 /**
  * The least a word space may be, in em: Hafs's own space. The print sets
  * its words this close; anything wider reads as a gap between words rather
- * than a space. Keep in step with `.mushaf-line` gap in styles.css.
+ * than a space. Keep in step with the `.mushaf-line` word-join fallback in styles.css.
  */
 export const MUSHAF_MIN_GAP = 0.22
 
@@ -99,4 +99,33 @@ export function mushafMeasure(
   const widest = Math.max(0, ...lines.map(({ ink, gaps }) =>
     ink * (1 - MUSHAF_MAX_CONDENSE) + Math.max(0, gaps) * MUSHAF_MIN_GAP * em))
   return widest > 0 ? Math.min(available, widest) : available
+}
+
+/** Verse marks share less white than words; sparse lines soften above 0.42 em,
+ * matching the mark-spacing curve in QURAN_TYPOGRAPHY §8. The returned gaps
+ * spend the offered white exactly, so full lines keep both margins flush.
+ * Without an offer, use ordinary centred-line spacing.
+ */
+export function mushafLineGaps(
+  markJoins: readonly boolean[],
+  em: number,
+  availableSpace?: number,
+  preferredGap = MUSHAF_TARGET_GAP,
+): { wordGap: number; markGap: number } {
+  const marks = markJoins.filter(Boolean).length
+  const words = markJoins.length - marks
+  const share = 0.85
+  const knee = 0.42 * em
+  const slope = 0.45
+  let wordGap = preferredGap * em
+  if (availableSpace != null && markJoins.length > 0) {
+    const white = Math.max(0, availableSpace)
+    const kneeSpace = words * knee / share + marks * knee
+    wordGap = white <= kneeSpace
+      ? white / (words + marks * share)
+      : (white - marks * knee * (1 - slope)) / (words + marks * share * slope)
+  }
+  const markShare = wordGap * share
+  const markGap = Math.min(markShare, knee) + Math.max(0, markShare - knee) * slope
+  return { wordGap, markGap }
 }

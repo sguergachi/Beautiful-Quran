@@ -2733,7 +2733,6 @@ button.ayah-mark {
    word space, as the print centres a chapter's last line. */
 .mushaf-line[data-short] {
   justify-content: center;
-  gap: 0.3em;
 }
 
 /* Folio figures in-head, one direction on both leaves: Western at the left,
@@ -2805,14 +2804,23 @@ button.ayah-mark {
   min-height: 0;
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  /* The least a word space may be: Hafs's own space (MUSHAF_MIN_GAP).
-     Justification only ever adds to it. */
-  gap: 0.22em;
+  justify-content: flex-start;
+  gap: 0;
   font-family: var(--font-arabic);
   line-height: 1;
   overflow: hidden;
   white-space: nowrap;
+}
+
+/* Each join has its own white: a verse number is not a full word.
+   Margins participate in flex layout and survive the turning-page picture. */
+.mushaf-line > * + * {
+  margin-inline-start: var(--word-gap, 0.22em);
+}
+
+.mushaf-line > * + .mushaf-mark,
+.mushaf-line > .mushaf-mark + * {
+  margin-inline-start: var(--mark-gap, 0.187em);
 }
 
 .mushaf-mark,
@@ -2943,7 +2951,6 @@ button.ayah-mark {
 
 .mushaf-lines[data-opening='true'] .mushaf-line {
   justify-content: center;
-  gap: 0.7em;
 }
 
 .mushaf-wait {

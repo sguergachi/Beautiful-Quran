@@ -45,8 +45,10 @@ import { finishPageTurn, requestPageTurn, type PageTurnQueue } from './pageTurnQ
 import {
   MUSHAF_MAX_CONDENSE,
   MUSHAF_MIN_LEADING,
+  MUSHAF_MIN_GAP,
   mushafFit,
   mushafLeafFit,
+  mushafLineGaps,
   mushafMeasure,
   naturalLineWidth,
   solveLine,
@@ -796,8 +798,7 @@ function MushafLeaf({
       // let the measurement chase its own result.
       const scale = Number(lines.style.getPropertyValue('--mushaf-fit')) || 1
       const textLines = Array.from(lines.querySelectorAll<HTMLElement>('.mushaf-line'))
-      const first = textLines[0]
-      const gap = first ? parseFloat(getComputedStyle(first).columnGap) || 0 : 0
+      const gap = parseFloat(getComputedStyle(lines).fontSize) * MUSHAF_MIN_GAP
       // A line already set narrow or wide carries its scale into every
       // item's box; divide it back out. The widest line may be condensed,
       // so it is measured as it would be set at the limit.
@@ -858,27 +859,34 @@ function MushafLeaf({
       line.removeAttribute('data-short')
       line.style.removeProperty('--line-widen')
     }
-    if (opening) {
-      block?.style.removeProperty('width')
-      return
-    }
+    if (opening) block?.style.removeProperty('width')
     // Read every line before writing any, so the page is laid out once.
     const set = textLines.map((line) => ({
       ink: Array.from(line.children).reduce((sum, item) => sum + item.getBoundingClientRect().width, 0),
       gaps: line.children.length - 1,
+      markJoins: Array.from(line.children).slice(1).map((item, index) =>
+        item.matches('.mushaf-mark') || line.children[index]!.matches('.mushaf-mark')),
     }))
     const leaf = lines.closest('.mushaf')
-    if (block && leaf instanceof HTMLElement) {
+    if (!opening && block && leaf instanceof HTMLElement) {
       const box = getComputedStyle(leaf)
       const available = leaf.clientWidth - parseFloat(box.paddingLeft) - parseFloat(box.paddingRight)
       block.style.width = `${mushafMeasure(set, em, available)}px`
     }
     // The block's floor (min-width) may hold it wider than asked.
     const measure = lines.clientWidth
-    const settings = set.map(({ ink, gaps }) => solveLine(ink, gaps, measure, em, glyphWiden))
+    const settings = set.map(({ ink, gaps }) => opening
+      ? { widen: 1, short: true } : solveLine(ink, gaps, measure, em, glyphWiden))
     settings.forEach((setting, index) => {
       const line = textLines[index]
       if (!line) return
+      const { wordGap, markGap } = mushafLineGaps(
+        set[index]!.markJoins, em,
+        setting.short ? undefined : measure / setting.widen - set[index]!.ink,
+        opening ? MUSHAF_MIN_GAP : undefined,
+      )
+      line.style.setProperty('--word-gap', `${wordGap.toFixed(4)}px`)
+      line.style.setProperty('--mark-gap', `${markGap.toFixed(4)}px`)
       if (setting.short) line.setAttribute('data-short', '')
       else if (Math.abs(setting.widen - 1) > 0.001) {
         line.setAttribute('data-widen', '')
@@ -1012,7 +1020,7 @@ function MushafLeaf({
                 const owner = wordInk.state === InkState.Active
                 const { surahId, ayah, position } = token
                 // Word and mark are separate items of the line, so the
-                // justified space falls evenly on both sides of a mark.
+                // mark-specific spacing can fall on both sides of a mark.
                 return (
                   <Fragment key={`${surahId}:${ayah}:${position}`}>
                     {still ? (
