@@ -54,8 +54,14 @@ describe('measure', () => {
     expect(500 * fit).toBeLessThanOrEqual(600)
     // The line pitch only allows 5% more: stop there, block drawn in instead.
     expect(mushafLeafFit(600, 500, 1.05)).toBe(1.05)
-    // A pitch too tight for even the base size never shrinks a line that fits.
-    expect(mushafLeafFit(600, 500, 0.8)).toBe(1)
+    // The type must fit the reserved well even when width alone permits it.
+    expect(mushafLeafFit(600, 500, 0.8)).toBe(0.8)
+  })
+
+  it('fits both dimensions in a short window, including the opening leaves', () => {
+    expect(mushafLeafFit(400, 500, 0.6)).toBe(0.6)
+    expect(mushafLeafFit(500, 0, 0.6)).toBe(0.6)
+    expect(mushafLeafFit(400, 500, 1.2)).toBeCloseTo(0.792)
   })
 
   it('is neutral with nothing to measure', () => {

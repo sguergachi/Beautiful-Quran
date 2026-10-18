@@ -58,6 +58,7 @@
    * (--u) and keeps --sheet-pad as it was.
    */
   --grid: 4px;
+  --mushaf-step: calc(2 * var(--grid));
   --viewport-h: 100vh;
   --sheet-margin: 28px;
   --reference-margin: 24px;
@@ -2690,12 +2691,16 @@ button.ayah-mark {
 }
 
 .mushaf {
+  --mushaf-type: clamp(1.05rem, 4.2vw, 1.55rem);
   flex: 1;
   min-height: 0;
-  display: flex;
-  flex-direction: column;
-  /* Foot clears the transport's dissolve, so the folio is never under it. */
-  padding: max(0.4rem, env(safe-area-inset-top, 0px)) var(--leaf-margin) 6.5rem;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  row-gap: var(--mushaf-step);
+  /* The toolbar already owns the top safe area. The measured transport
+     includes the bottom safe area; reserve it once, plus one grid step. */
+  padding: var(--mushaf-step) var(--leaf-margin)
+    calc(var(--mushaf-transport-h, 6.5rem) + var(--mushaf-step));
   touch-action: pan-y;
 }
 
@@ -2715,6 +2720,13 @@ button.ayah-mark {
   max-width: 100%;
   margin-inline: auto;
   justify-content: center;
+}
+
+/* A height-bound hand can need less than 72% of a very wide page. Keep
+   its measured width instead of reopening the word spaces to that floor.
+   Opening medallions and the English column retain their own proportions. */
+.mushaf-block:has(.mushaf-lines:not([data-opening='true'])) {
+  min-width: 0;
 }
 
 /* Letter widening, the stand-in for the print's elongated letters: a loose
@@ -2744,7 +2756,7 @@ button.ayah-mark {
   grid-template-columns: 1fr 3fr 1fr;
   align-items: baseline;
   direction: ltr;
-  font-size: 0.75rem;
+  font-size: clamp(10px, calc(var(--mushaf-type) * 0.45), 13px);
   line-height: 1.4;
   color: color-mix(in srgb, var(--ink) 44%, transparent);
 }
@@ -2785,11 +2797,12 @@ button.ayah-mark {
 .mushaf-lines {
   flex: 1;
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   grid-template-rows: repeat(var(--mushaf-slots, 15), minmax(0, 1fr));
   min-height: 0;
-  margin-top: 0.6em;
+  margin-top: 0;
   /* The page's hand. --mushaf-fit is solved per leaf (MushafReader). */
-  font-size: calc(clamp(1.05rem, 4.2vw, 1.55rem) * var(--mushaf-fit, 1));
+  font-size: calc(var(--mushaf-type) * var(--mushaf-fit, 1));
   /* Leading follows the type: fifteen lines never spread further apart
      than this, however tall the sheet. The block then sits centred. */
   max-height: calc(var(--mushaf-slots, 15) * 2.15em);
@@ -6999,6 +7012,11 @@ html[data-entrance='true'] body {
   --margin-fore: calc(var(--u) * var(--phi));
   --margin-head: max(calc(var(--u) * var(--phi)), var(--chrome-h));
   --margin-foot: max(calc(var(--u) * var(--phi) * var(--phi)), var(--transport-h));
+  /* Mushaf furniture keeps its real hit-target and safe-area size. Both
+     leaves share these edges and the rhythm between head and scripture. */
+  --mushaf-step: clamp(8px, calc(var(--u) * 0.5), 16px);
+  --mushaf-head-edge: max(var(--margin-head), calc(var(--mushaf-toolbar-h, var(--chrome-h)) + var(--mushaf-step)));
+  --mushaf-foot-edge: max(var(--margin-foot), calc(var(--mushaf-transport-h, var(--transport-h)) + var(--mushaf-step)));
   /* The shade of the paper turning down into the spine. */
   --gutter-shade: calc(var(--u) * 4.236);
   --book-width: calc(2 * (var(--page-w) + var(--book-rim) + var(--book-fore-edge)));
@@ -7863,8 +7881,11 @@ html[data-entrance-closing]
 
 /* On the spread the hand starts from the page, not the window's width;
    the fit then grows or shrinks it until the widest line fills the block. */
+.app-shell[data-spread='true'] .mushaf {
+  --mushaf-type: calc(var(--page-w) / 24);
+}
+
 .app-shell[data-spread='true'] .mushaf-lines {
-  font-size: calc(var(--page-w) / 24 * var(--mushaf-fit, 1));
   max-height: none;
 }
 
@@ -7874,8 +7895,8 @@ html[data-entrance-closing]
 .app-shell[data-spread='true'] .mushaf[data-side],
 .app-shell[data-spread='true'] .mushaf-fit-probes > .mushaf {
   position: absolute !important;
-  top: var(--margin-head) !important;
-  bottom: var(--margin-foot) !important;
+  top: var(--mushaf-head-edge) !important;
+  bottom: var(--mushaf-foot-edge) !important;
   left: var(--margin-inner) !important;
   right: var(--margin-fore) !important;
   width: auto !important;

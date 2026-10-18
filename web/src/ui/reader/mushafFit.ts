@@ -36,15 +36,15 @@ export const MUSHAF_MIN_LEADING = 1.75
 /**
  * The scale at which a page's widest line, set with minimum word spaces,
  * exactly fills the width it is given. It shrinks the type when the line
- * overruns, and grows it when there is room — but never past [maxGrow], the
+ * overruns, and grows it when there is room — but never past [heightFit], the
  * point where the lines would crowd each other vertically.
  */
-export function mushafLeafFit(available: number, widest: number, maxGrow = 1): number {
-  if (available <= 0 || widest <= 0) return 1
+export function mushafLeafFit(available: number, widest: number, heightFit = 1): number {
+  if (available <= 0 || widest <= 0) return Math.min(1, heightFit)
   const ratio = available / widest
   // A hair under, so rounding never leaves the last word a pixel over.
-  if (ratio < 1) return ratio * 0.99
-  return Math.max(1, Math.min(ratio * 0.99, maxGrow))
+  const widthFit = ratio < 1 ? ratio * 0.99 : Math.max(1, ratio * 0.99)
+  return Math.min(widthFit, heightFit)
 }
 
 /** How one line is set once the page's hand and measure are known. */

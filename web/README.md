@@ -61,7 +61,10 @@ resizing from facing pages to a phone layout.
 and full leaves, responsive margins, and opening/interrupted page turns.
 Set `BROWSER=chromium` for the same check in Chromium, `BROWSER_EXECUTABLE`
 for an installed test browser, and `RECORD_VIDEO=1` to save a recording.
-It also checks chapter cartouches, preface exceptions, and page-grid alignment.
+It also checks chapter cartouches, preface exceptions, grid alignment and
+clearance around the measured controls. Sizes include short desktop windows,
+portrait tablets and 320/390 px phones, with a resized transport after switching
+between phone and spread layouts.
 It uses bundled text and a tab-local placement fixture, including the last leaf.
 
 `node scripts/check-reader-performance-browser.mjs` checks chapter handoff,

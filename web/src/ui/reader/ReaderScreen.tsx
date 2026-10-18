@@ -49,6 +49,7 @@ import {
   shouldShowBookmarkTip,
 } from '../../data/education'
 import { OrnateSurahTitle } from './OrnateSurahTitle'
+import { useMushafGrid } from './useMushafGrid'
 import { NextChapterFooter } from './NextChapterFooter'
 import { PageBreak } from './PageBreak'
 import { QuranRepository } from '../../data/repository'
@@ -240,6 +241,7 @@ export function ReaderScreen({
     void appStore.playFromWord(ayah, pos)
   }, [])
   const sheetRef = useRef<HTMLDivElement>(null)
+  const mushafGrid = useMushafGrid(sheetRef, mushaf)
   const inkReadRef = useRef<MushafReadHistory>({ ayah: null, activation: 0, read: false })
   const spread = useBookSpread(state.settings.pagePresentation)
   // Facing leaves with Chapters lying over the left one: touching the page
@@ -1240,7 +1242,7 @@ export function ReaderScreen({
         />
       ) : null}
 
-      <div className="reader-top" data-receded={receded} data-search={searchActive}>
+      <div ref={mushafGrid.topRef} className="reader-top" data-receded={receded} data-search={searchActive}>
         <button
           type="button"
           className="back"
@@ -1582,7 +1584,7 @@ export function ReaderScreen({
           ) : null}
 
           {state.gathering ? (
-            <div className="share-ribbon" role="group" aria-label={
+            <div ref={mushafGrid.footRef} className="share-ribbon" role="group" aria-label={
               state.gatherSelection.length === 1
                 ? '1 verse selected'
                 : `${state.gatherSelection.length} verses selected`
@@ -1617,7 +1619,7 @@ export function ReaderScreen({
             </div>
           ) : (
           <PlaybackPin active={playbackPinned}>
-          <div className={`player-bar${coverChrome ? ' cover-chrome' : ''}`} inert={ayahRailTipOpen || ayahRailTipRendered || bookmarkTipOpen || bookmarkTipRendered}>
+          <div ref={mushafGrid.footRef} className={`player-bar${coverChrome ? ' cover-chrome' : ''}`} inert={ayahRailTipOpen || ayahRailTipRendered || bookmarkTipOpen || bookmarkTipRendered}>
             <div className="player-reciter-row">
               {playerNotice ? (
                 <div className="player-error">
