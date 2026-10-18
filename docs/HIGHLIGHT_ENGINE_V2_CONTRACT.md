@@ -143,6 +143,22 @@ Sample-clock replay does **not** capture the V1 Compose animation/effect
 lifecycle, rendered glyph edges, page carry, or physical speaker/Bluetooth
 latency. It must not be reported as evidence for those gates.
 
+### Initial release-capture evidence
+
+An Android 15 emulator run of release commit `98bb2766` captured **284 samples**
+across Alafasy's basmalah lead-in and 24:1, with two timing tables and no dropped
+samples. JVM replay reproduced the recorded clock, occurrence, phase, and
+progress outputs. There were 22 sample-clock differences; the candidate's
+largest lead over V1 was 143 ms. The opening sequence included legitimate
+73/88/114 ms elapsed polls that V1 clamped or rejected during settle. A
+sanitized version of that delay pattern is pinned in the shared trace fixture.
+
+The capture ran with profiling enabled; it does not establish normal-device
+poll frequency or physical sound-to-ink error. Full local timing evidence is
+kept outside the repository under this thread's timing-audit artifacts. This
+first capture also exposed omitted default header fields; the production
+encoder now writes schema, scope, and engine versions explicitly.
+
 ## Remaining migration work
 
 The reader's word, follow, and basmalah polls now use coherent packets, but

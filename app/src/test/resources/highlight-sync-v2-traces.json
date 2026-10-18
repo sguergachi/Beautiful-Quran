@@ -47,6 +47,19 @@
       ]
     },
     {
+      "name": "irregular elapsed polls from release capture preserve real progress",
+      "difference": "elapsed-aware-settle",
+      "speed": 1.0,
+      "samples": [
+        {"atMs": 0, "rawMs": 0, "v1Ms": 0, "v2Ms": 0},
+        {"atMs": 73, "rawMs": 73, "v1Ms": 66, "v2Ms": 73},
+        {"atMs": 161, "rawMs": 161, "v1Ms": 132, "v2Ms": 161},
+        {"atMs": 275, "rawMs": 275, "v1Ms": 132, "v2Ms": 275},
+        {"atMs": 330, "rawMs": 330, "v1Ms": 198, "v2Ms": 330},
+        {"atMs": 376, "rawMs": 376, "v1Ms": 264, "v2Ms": 376}
+      ]
+    },
+    {
       "name": "settle still rejects an implausible post seek spike",
       "difference": "frame-retention",
       "speed": 1.0,

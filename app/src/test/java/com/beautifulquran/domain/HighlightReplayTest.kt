@@ -91,6 +91,16 @@ class HighlightReplayTest {
     }
 
     @Test
+    fun `production capture explicitly serializes schema scope and active engine versions`() {
+        val trace = HighlightTraceRecorder(header).snapshot()
+        val json = Json.parseToJsonElement(trace.encodeForReplay()).jsonObject.getValue("header").jsonObject
+        assertEquals(1, json.getValue("schemaVersion").jsonPrimitive.int)
+        assertEquals(1, json.getValue("visibleEngineVersion").jsonPrimitive.int)
+        assertEquals(2, json.getValue("candidateEngineVersion").jsonPrimitive.int)
+        assertEquals("sample-clock", json.getValue("scope").jsonPrimitive.content)
+    }
+
+    @Test
     fun `shadow capture and its restart do not change visible V1 results`() {
         val visible = HighlightSession()
         val shadow = HighlightSession()

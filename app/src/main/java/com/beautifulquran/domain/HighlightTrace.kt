@@ -2,6 +2,10 @@ package com.beautifulquran.domain
 
 import java.security.MessageDigest
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.encodeToString
+import kotlinx.serialization.json.Json
+
+private val highlightTraceJson = Json { encodeDefaults = true }
 
 /** Local developer capture provenance. Sample-clock traces do not certify rendered motion. */
 @Serializable
@@ -58,6 +62,9 @@ data class HighlightTrace(
     val samples: List<HighlightTraceSample>,
     val droppedSamples: Int,
 )
+
+/** Persist schema and actual engine versions explicitly, even when they equal codec defaults. */
+fun HighlightTrace.encodeForReplay(): String = highlightTraceJson.encodeToString(this)
 
 /**
  * Records only when explicitly called by the developer capture adapter.

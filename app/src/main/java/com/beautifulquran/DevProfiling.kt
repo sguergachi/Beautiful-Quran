@@ -28,8 +28,7 @@ import com.beautifulquran.domain.HighlightPlaybackSample
 import com.beautifulquran.domain.HighlightTimingContext
 import com.beautifulquran.domain.HighlightTraceHeader
 import com.beautifulquran.domain.HighlightTraceRecorder
-import kotlinx.serialization.encodeToString
-import kotlinx.serialization.json.Json
+import com.beautifulquran.domain.encodeForReplay
 import java.io.File
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.Executor
@@ -135,7 +134,7 @@ object DevProfiling {
             val trace = highlightTrace?.snapshot()
             highlightTrace = null
             markLines.toList() + if (trace == null) emptyList() else listOf(
-                "highlight-sync-trace-begin", Json.encodeToString(trace), "highlight-sync-trace-end",
+                "highlight-sync-trace-begin", trace.encodeForReplay(), "highlight-sync-trace-end",
             )
         }
     }
