@@ -87,10 +87,6 @@ def _load(path):
     return json.loads(Path(path).read_text(encoding="utf-8"))
 
 
-def _key(k):
-    return tuple(int(x) for x in k)
-
-
 def settled_keys():
     """Rows another verdict already owns; a generated edit must not compete."""
     owned = set()
@@ -116,12 +112,14 @@ def pipeline_rows():
     captured = {}
     apply_corrections = build_db.apply_timing_corrections
     apply_repairs = build_db.apply_timing_repairs
+    output = build_db.OUT
 
     def corrections(rows, *args, **kwargs):
-        captured["rows"] = {
-            (rid, sid, ay): json.loads(segs) if isinstance(segs, str) else segs
-            for rid, sid, ay, segs in rows
-        }
+        if kwargs.get("phase", "before_repairs") == "before_repairs":
+            captured["rows"] = {
+                (rid, sid, ay): json.loads(segs) if isinstance(segs, str) else segs
+                for rid, sid, ay, segs in rows
+            }
         # Judge every row as if nothing had been generated yet, so a rerun
         # re-derives the same entries instead of seeing its own output.
         return apply_corrections(rows, *args, corrections_dir=hand_only, **kwargs)
@@ -147,14 +145,19 @@ def pipeline_rows():
         sys.argv = ["build_db.py", "--refresh-qdc-timings", "--output", str(build_db.OUT)]
         try:
             build_db.main()
+            with sqlite3.connect(build_db.OUT) as db:
+                shipped = {
+                    (rid, sid, ay): json.loads(segs)
+                    for rid, sid, ay, segs in db.execute(
+                        "SELECT reciter_id,surah_id,ayah_number,segments FROM timings"
+                    )
+                }
+            db.close()
         finally:
             sys.argv = argv
-        shipped = {
-            (rid, sid, ay): json.loads(segs)
-            for rid, sid, ay, segs in sqlite3.connect(build_db.OUT).execute(
-                "SELECT reciter_id,surah_id,ayah_number,segments FROM timings"
-            )
-        }
+            build_db.apply_timing_corrections = apply_corrections
+            build_db.apply_timing_repairs = apply_repairs
+            build_db.OUT = output
     return captured["rows"], captured["references"], shipped
 
 

@@ -2,7 +2,11 @@
 """Offline tests for tools/find_flattened_resays.py (no models, no audio)."""
 
 import sys
+import json
+import sqlite3
+import tempfile
 from pathlib import Path
+from unittest.mock import patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
@@ -56,6 +60,40 @@ def test_hand_written_corrections_survive_a_rewrite():
     for path in sorted(f.CORRECTIONS_DIR.glob("*.json")):
         text = path.read_text(encoding="utf-8")
         assert f._dump_corrections(__import__("json").loads(text)) == text, path.name
+
+
+def test_pipeline_capture_keeps_pre_repair_input_and_restores_hooks():
+    import build_db
+    output = build_db.OUT
+    raw = [(7,21,46,json.dumps(ROW))]
+    final = [(7,21,46,json.dumps([[8,7710,9800],[8,9800,11400],[9,11400,12340]]))]
+
+    def main():
+        build_db.apply_timing_corrections(raw)
+        build_db.apply_timing_repairs(raw, references={KEY:REFERENCE})
+        build_db.apply_timing_corrections(final, phase="after_repairs")
+        with sqlite3.connect(build_db.OUT) as db:
+            db.execute('CREATE TABLE timings(reciter_id,surah_id,ayah_number,segments)')
+            db.executemany('INSERT INTO timings VALUES(?,?,?,?)',final)
+        db.close()
+
+    def corrections(rows, *args, **kwargs):
+        return rows
+
+    def repairs(rows, *args, **kwargs):
+        return rows
+
+    with tempfile.TemporaryDirectory() as tmp, patch.object(f,"CORRECTIONS_DIR",Path(tmp)), \
+            patch.object(build_db,"main",main), \
+            patch.object(build_db,"apply_timing_corrections",corrections), \
+            patch.object(build_db,"apply_timing_repairs",repairs):
+        rows,references,shipped=f.pipeline_rows()
+        assert rows[KEY] == ROW
+        assert references[KEY] == REFERENCE
+        assert shipped[KEY] != ROW
+        assert build_db.apply_timing_corrections is corrections
+        assert build_db.apply_timing_repairs is repairs
+        assert build_db.OUT == output
 
 
 def test_hypothesis_only_adds_the_repeated_occurrence():

@@ -80,6 +80,12 @@ both runs completed without errors. Changed topologies require improvement on
 both models and sufficient confidence for inserted/relabelled occurrences.
 Every removed occurrence must also have baseline label probability below 0.5
 on both models; a confident baseline occurrence on either model retains the row.
+An exact contiguous same-word merge can instead supply a reproducible
+emitting-frame ownership proof: any confident removed label must consist of
+speech the candidate still retains, with no confident unexplained frame.
+This exception changes no other boundary or occurrence and keeps dual-model
+sequence, onset and waveform gates. Existing holds without that new proof
+remain held. See [the corpus audit](WORD_SPLIT_AUDIT.md).
 Boundary changes use mean absolute start residual on both models. End-only
 changes are held because start residuals cannot justify them. Duration and
 model-voiced/PCM checks veto premature cutoffs.

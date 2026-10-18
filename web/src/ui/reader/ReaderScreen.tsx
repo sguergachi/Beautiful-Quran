@@ -45,11 +45,11 @@ import { AyahRailTip } from './AyahRailTip'
 import { BookmarkTip } from './BookmarkTip'
 import {
   dismissEducation,
-  isEducationDismissed,
   shouldShowAyahRailTip,
   shouldShowBookmarkTip,
 } from '../../data/education'
 import { OrnateSurahTitle } from './OrnateSurahTitle'
+import { useMushafGrid } from './useMushafGrid'
 import { NextChapterFooter } from './NextChapterFooter'
 import { PageBreak } from './PageBreak'
 import { QuranRepository } from '../../data/repository'
@@ -179,12 +179,6 @@ export function ReaderScreen({
   const [focusedAyah, setFocusedAyah] = useState(initialAyah)
   const readingScrolled = useRef(false)
   useEffect(() => { readingScrolled.current = false }, [state.readerOpenRevision])
-  const [wordHintOpen, setWordHintOpen] = useState(() => !isEducationDismissed('word_hold'))
-  useEffect(() => {
-    if (!state.rootViewer && !state.gathering) return
-    dismissEducation('word_hold')
-    setWordHintOpen(false)
-  }, [state.rootViewer, state.gathering])
   /**
    * Continuous readout for the rail marker (Android `focusedPosition`).
    *
@@ -247,6 +241,7 @@ export function ReaderScreen({
     void appStore.playFromWord(ayah, pos)
   }, [])
   const sheetRef = useRef<HTMLDivElement>(null)
+  const mushafGrid = useMushafGrid(sheetRef, mushaf)
   const inkReadRef = useRef<MushafReadHistory>({ ayah: null, activation: 0, read: false })
   const spread = useBookSpread(state.settings.pagePresentation)
   // Facing leaves with Chapters lying over the left one: touching the page
@@ -1247,7 +1242,7 @@ export function ReaderScreen({
         />
       ) : null}
 
-      <div className="reader-top" data-receded={receded} data-search={searchActive}>
+      <div ref={mushafGrid.topRef} className="reader-top" data-receded={receded} data-search={searchActive}>
         <button
           type="button"
           className="back"
@@ -1261,12 +1256,12 @@ export function ReaderScreen({
           {searchActive ? <IconClose /> : <span aria-hidden="true">←</span>}
         </button>
 
-        {!searchActive && (pinnedTopNavTitle || content) ? (
+        {!mushaf && !searchActive && (pinnedTopNavTitle || content) ? (
           <div
             className="reader-top-title"
-            data-visible={(mushaf || showTopTitle) && !chapterAdvancing}
+            data-visible={showTopTitle && !chapterAdvancing}
             data-advancing={chapterAdvancing && pinnedTopNavTitle != null ? true : undefined}
-            aria-hidden={!mushaf && !showTopTitle && !pinnedTopNavTitle}
+            aria-hidden={!showTopTitle && !pinnedTopNavTitle}
           >
             <OrnateSurahTitle
               ayahCount={pinnedTopNavTitle?.ayahCount ?? readerSurah!.ayahCount}
@@ -1588,14 +1583,8 @@ export function ReaderScreen({
             />
           ) : null}
 
-          {wordHintOpen && state.settings.educationGuidesEnabled && isTop && !recitingActive && !state.rootViewer && !state.gathering && !ayahRailTipVisible && !bookmarkTipVisible ? (
-            <div className="reader-word-hint">
-              <span>Hold a word for its root. Tap a verse number to share.</span>
-              <button type="button" onClick={() => { dismissEducation('word_hold'); setWordHintOpen(false) }}>Got it</button>
-            </div>
-          ) : null}
           {state.gathering ? (
-            <div className="share-ribbon" role="group" aria-label={
+            <div ref={mushafGrid.footRef} className="share-ribbon" role="group" aria-label={
               state.gatherSelection.length === 1
                 ? '1 verse selected'
                 : `${state.gatherSelection.length} verses selected`
@@ -1630,7 +1619,7 @@ export function ReaderScreen({
             </div>
           ) : (
           <PlaybackPin active={playbackPinned}>
-          <div className={`player-bar${coverChrome ? ' cover-chrome' : ''}`} inert={ayahRailTipOpen || ayahRailTipRendered || bookmarkTipOpen || bookmarkTipRendered}>
+          <div ref={mushafGrid.footRef} className={`player-bar${coverChrome ? ' cover-chrome' : ''}`} inert={ayahRailTipOpen || ayahRailTipRendered || bookmarkTipOpen || bookmarkTipRendered}>
             <div className="player-reciter-row">
               {playerNotice ? (
                 <div className="player-error">

@@ -8,6 +8,7 @@ import {
 import type { Word } from '../data/models'
 import type { WordMotion } from './useWordWash'
 import { tarjiSignal } from '../playback/tarjiSignal'
+import { highlightTimeline, mediaWashProgress } from '../playback/highlightTimeline'
 import { cubicBezierEase } from '../ui/theme/Fade'
 import { applyMask, cachedWashMask, runRepeatFadeOut } from './inkWash'
 
@@ -24,7 +25,7 @@ export function useRepeatWash(
   overlay: RefObject<HTMLSpanElement | null>,
   unmount: () => void,
 ) {
-  const previous = useRef({ repeat: false, activation: 0 })
+  const previous = useRef({ repeat: false, activation: 0, occurrence: -1 })
   const live = useRef(ink)
   live.current = ink
   const stop = useRef<(() => void) | null>(null)
@@ -46,9 +47,10 @@ export function useRepeatWash(
       prev = previous.current
     const reveal =
       ink.repeat &&
-      (!prev.repeat || (activation !== 0 && activation !== prev.activation))
+      (!prev.repeat || (activation !== 0 && activation !== prev.activation) ||
+        ink.state === InkState.Active && motion?.timing?.startMs !== prev.occurrence)
     const release = !ink.repeat && prev.repeat
-    previous.current = { repeat: ink.repeat, activation }
+    previous.current = { repeat: ink.repeat, activation, occurrence: motion?.timing?.startMs ?? -1 }
     if (release) {
       if (!running.current) dry()
       return
@@ -83,6 +85,7 @@ export function useRepeatWash(
           )
         : null
     const feather = curve ? t.pacedFeather : t.washFeather
+    const mediaWindow = motion?.timing?.startMs != null ? highlightTimeline.window(motion.timing.startMs, duration) : null
     const source = tarjiSignal.sourceKey
     let elapsed = 0,
       last = performance.now(),
@@ -106,7 +109,7 @@ export function useRepeatWash(
             : delta
       }
       lastMedia = media
-      const clock = Math.min(1, elapsed / duration)
+      const clock = mediaWindow ? mediaWashProgress(mediaWindow, highlightTimeline.frame(now)) : Math.min(1, elapsed / duration)
       const p = curve
         ? curve.at(clock)
         : cubicBezierEase(
@@ -132,12 +135,12 @@ export function useRepeatWash(
     }
     // Capture tuning/duration at Reveal only; Active→Recited keeps this clock.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [ink.repeat, ink.state, activation, mounted, english])
+  }, [ink.repeat, ink.state, activation, motion?.timing?.startMs, mounted, english])
   useLayoutEffect(
     () => () => {
       stop.current?.()
       fading.current?.()
-      previous.current = { repeat: false, activation: 0 }
+      previous.current = { repeat: false, activation: 0, occurrence: -1 }
     },
     [],
   )

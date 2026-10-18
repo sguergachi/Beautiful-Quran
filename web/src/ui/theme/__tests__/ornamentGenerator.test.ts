@@ -106,12 +106,15 @@ describe('ornamentGenerator', () => {
           )
         }
       }
-      // The rumi scroll lies inside one period (its tiles butt without
-      // overlap), and always inside the band.
+      // Every grammar lies inside its period except the khatam chain's
+      // link diamond, which straddles the period boundary by design (its
+      // far half is completed by the neighbouring tile when the band
+      // repeats), so the x margin allows for it; y always stays inside
+      // the band.
       for (const s of o.border.strokes) {
         for (const p of s.points) {
           check(
-            p.x >= -0.001 && p.x <= o.border.period + 0.001 && p.y >= -0.001 && p.y <= 1.001,
+            p.x >= -0.2 && p.x <= o.border.period + 0.2 && p.y >= -0.001 && p.y <= 1.001,
             `${at}: border point outside band (${p.x}, ${p.y})`,
           )
         }
@@ -263,7 +266,7 @@ describe('ornamentGenerator', () => {
       ...Array.from({ length: 4 }, () => [5, 21]).flat()]
     for (const [seed, pattern, signature, width] of [
       [1, 'lozenge rosettes', lozenge, 47.73055739685947],
-      [8, 'star-and-cross', star, 51.29965216862327],
+      [20, 'star-and-cross', star, 47.97857713206948],
       [21, 'octagonal garden', garden, 50.4501521020009],
       [132614421, 'lozenge rosettes', lozenge, 50.61806257444628],
     ] as const) {

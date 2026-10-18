@@ -8,9 +8,9 @@ let publishPlayer!: (state: PlayerState) => void
 let app: typeof import('./appStore').appStore
 const corpora = new Map<string, Map<number, Segment[]>>()
 const revokeWords = vi.fn(async () => undefined)
-const playback = {
+const playback: PlayerState = {
   nowPlaying: { surahId: 2, ayah: 1, reciterId: 1 },
-  isPlaying: true, isBuffering: false, positionMs: 45, durationMs: 100, repeatRange: null,
+  isPlaying: true, isBuffering: false, positionMs: 45, durationMs: 100, repeatRange: null, speed: 1, repeatMode: 'off', error: null,
 }
 const firstPass: Segment[] = [
   { position: 1, startMs: 10, endMs: 20 },

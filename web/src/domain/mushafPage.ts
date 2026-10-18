@@ -1,3 +1,5 @@
+import { surahOpensWithBasmalahPreface } from './Basmalah'
+
 /** One Hafs word placed on a printed Madinah line. */
 export interface MushafToken {
   surahId: number
@@ -8,8 +10,12 @@ export interface MushafToken {
 }
 
 export interface MushafLine {
+  /** Printed line; negative for furniture absent from the source's slots. */
   number: number
   tokens: MushafToken[]
+  /** Chapter furniture occupies the print's empty slots, never a text row. */
+  chapter?: number
+  basmalah?: number
 }
 
 export interface MushafPage {
@@ -61,6 +67,26 @@ export function buildMushafPage(page: number, words: readonly MushafWordPlacemen
   const lines: MushafLine[] = []
   for (let number = 1; number <= MUSHAF_LINES_PER_PAGE; number++) {
     lines.push({ number, tokens: byLine.get(number) ?? [] })
+  }
+  let extra = -1
+  for (const word of sorted) {
+    if (word.ayah !== 1 || word.position !== 1) continue
+    const preface = surahOpensWithBasmalahPreface(word.surahId)
+    const count = preface ? 2 : 1
+    const first = lines.findIndex(line => line.number === word.line)
+    if (first < 0) continue
+    let available = 0
+    while (available < count) {
+      const prior = lines[first - available - 1]
+      if (!prior || prior.tokens.length || prior.chapter || prior.basmalah) break
+      available++
+    }
+    const at = first - available
+    // Some chapter-top sources count the heading outside their fifteen
+    // lines. Add the missing furniture instead of dropping a printed word.
+    lines.splice(at, 0, ...Array.from({ length: count - available }, () => ({ number: extra--, tokens: [] })))
+    lines[at]!.chapter = word.surahId
+    if (preface) lines[at + 1]!.basmalah = word.surahId
   }
   return { page, lines }
 }

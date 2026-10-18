@@ -18,6 +18,14 @@ consumes it. For the *visual* side of repeats (the orange second fade) and
 where repeat-aware timing data comes from, see
 [REPEAT_HIGHLIGHTING.md](REPEAT_HIGHLIGHTING.md).
 
+The runtime now uses **HighlightEngine V2**: `HighlightSync` reconciles coherent
+playback samples and projects frames; `HighlightWash` owns captured occurrence
+windows. The prepared lookup described below remains pure and unchanged.
+Android and web draw from one media timeline, including pause/buffering, speed,
+corrections, repeats, and wasl. See the [implemented contract](HIGHLIGHT_ENGINE_V2_CONTRACT.md)
+and [goals and acceptance plan](HIGHLIGHT_ENGINE_V2.md). `HighlightClock` remains
+only the V1 diagnostic comparator.
+
 ## The input: a list of `Segment`s
 
 One ayah's timing for one reciter is a list of `Segment`
@@ -147,61 +155,48 @@ flagged.
 
 Repeat / high-water tables are built once via
 `HighlightEngine.PreparedTimings.prepare(segments)` when a surah's timings
-load. The 33 ms poll then does a binary search + O(1) array lookup and
-allocates nothing until a word boundary emits a new `ActiveWord`. The
+load. Lookup uses binary search + O(1) array access. V2 creates immutable sync
+snapshots per sample/frame; the cached `ActiveWord` changes only at boundaries. The
 convenience `activeInfo(segments, positionMs)` still rebuilds those tables
 per call (fine for tests and one-shots).
 
 ## How the app consumes it
 
-The engine is a pure function; the *cadence* of calling it lives in
-`ReaderViewModel` (and, for the in-app editor, `TimingsLabViewModel`):
+The pure lookup is called by `HighlightSync`; time acquisition and scheduling
+stay in the platform adapter and reader:
 
 ```
-ExoPlayer.currentPosition ──(polled every 33 ms while playing)──►
-OutputLatency.heardMs (extra manual lag only; automatic lag 0) ──►
-HighlightClock.sample ──►
-PreparedTimings.activeInfo(positionMs) ──►
-StateFlow<ActiveWord?>  (distinctUntilChanged: emits once per word boundary) ──►
-per-item derivedStateOf in the reader list ──► exactly one AyahBlock recomposes
+Media3/browser coherent playback sample + explicit revisions
+    → HighlightSync.sample → accepted media anchor
+    → HighlightSync.frame(frame timestamp) → calibrated word/occurrence/progress
+          ├── boundary-only ActiveWord → ink state / follow
+          └── shared draw timeline → captured media wash windows → soft masks
 ```
 
-Key points, detailed in [PERFORMANCE.md](PERFORMANCE.md) and
-[ARCHITECTURE.md](ARCHITECTURE.md#the-sync-engine):
+Android has one 33 ms schedule while advancing and a gentle 250 ms schedule
+while paused/buffering. Transport, speed, revisions, and timing publication wake
+it immediately. Incoherent item reads are skipped. One session advances sync
+before word, English, voice, and capture consumers read the result.
 
-- The 33 ms poll runs only while this surah is audible and drops to a gentle
-  250 ms while paused. A play/pause transition restarts that poll immediately,
-  so a paused word tap publishes its forced ink restart on the resume callback
-  instead of waiting up to 250 ms; the flow publishes only *word boundaries*
-  (`distinctUntilChanged`), so downstream recomposition happens ~2–3×/sec, not
-  30×.
-- Source-data word accuracy is ±73 ms on average — inside the ~150 ms window
-  that reads as "in sync" to a human — which is why a 33 ms boundary poll is
-  plenty and frame-accurate syncing would be wasted work.
-- **Output latency is applied on the clock, not in this engine.** Media3
-  already corrects its position for audio presentation. The reader uses that
-  clock directly; only an explicit Ink Lab lag is subtracted (wall ms × speed)
-  before `HighlightClock`. PCM route presets must not be subtracted again. See
-  [OUTPUT_LATENCY.md](OUTPUT_LATENCY.md). Shipped word selection has no visual
-  lead; an explicit Ink Lab lead is gated until the first segment starts, so it
-  cannot cross encoded opening silence.
-  Do not bake device lag into segments or into `HighlightEngine`.
-- The lit word's `startMs`/`endMs` drive the letter-by-letter fade in the UI,
-  which interpolates at the display's full refresh rate independently of the
-  poll.
-- The poll never feeds the engine a *backward* step it didn't mean. Three
-  guards protect it: `HighlightClock` holds every backward position-estimate
-  correction regardless of distance; `PlayerController.positionEvents`
-  identifies authoritative Media3 clock discontinuities separately from the
-  seek/repeat/playlist events allowed to restart ink; and
-  `pollingWhileLoaded` skips ticks where the
-  controller has already moved to the next ayah's item but the flow's key
-  hasn't caught up (the same bounce at ayah handoff).
-- Media3 is the sole owner of `ActiveWord.activation`: a seek, repeat, or
-  playlist replacement advances it once, while later inexact-seek adjustments
-  only rebase the clock. This prevents a stale, smoothly extrapolated
-  MediaController clock followed by a late correction from blooming the same
-  word twice.
+`HighlightSync` retains backward corrections without inferring seeks from their
+size. Authoritative Media3/browser revisions distinguish clock corrections from
+new ink performances. Frame projection uses media time before manual output
+lag, word-only lead, opening ramp, and clamping. Media3 already corrects its
+position for presentation, so no Bluetooth preset is subtracted again.
+See [OUTPUT_LATENCY.md](OUTPUT_LATENCY.md).
+
+Arabic, repeat, and wasl motion capture media windows instead of starting
+wall-time speech tweens. English uses the same corrected frame clock and its
+existing continuous meaning bands. Pacing, feather, the minimum sweep floor,
+residuals, and underlying prefix coverage remain intact. A tap can pin the UI
+activation while its authoritative playback generation advances; the window
+tracks that actual generation and reciter separately.
+
+Frame values are read in drawing/derived state; the reader root observes only
+word/occurrence boundaries. Source timing and physical output accuracy remain
+separate from this deterministic runtime contract. See
+[HIGHLIGHT_ENGINE_V2_CONTRACT.md](HIGHLIGHT_ENGINE_V2_CONTRACT.md) for recovery
+limits, fixtures, corpus evidence, and local replay.
 
 ## Testing
 

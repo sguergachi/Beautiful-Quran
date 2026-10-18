@@ -3,6 +3,7 @@ package com.beautifulquran.ui.home
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.EnterTransition
+import androidx.compose.animation.ExitTransition
 import androidx.compose.animation.core.CubicBezierEasing
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.animateDpAsState
@@ -110,6 +111,7 @@ import com.beautifulquran.ui.theme.quietSuppliedBrackets
 import com.beautifulquran.ui.theme.ArabicTitleStyle
 import com.beautifulquran.ui.theme.FloatingPaperControl
 import com.beautifulquran.ui.theme.FloatingPaperEnter
+import com.beautifulquran.ui.theme.FloatingPaperExit
 import com.beautifulquran.ui.theme.LocalQuranAccents
 import com.beautifulquran.ui.theme.typeScale
 import com.beautifulquran.ui.theme.PaperSearchField
@@ -251,6 +253,13 @@ fun HomeScreen(
     // scrolled out of view the pill floats at the bottom; once the row
     // itself is visible the pill docks away so the row owns the tap.
     val continueSurahId = uiState.continueTarget?.surah?.id
+    // The list must have measured before the pill may rise: on the sheet's
+    // first composition the row-visibility rule cannot see any row yet, and
+    // a pill that shows before then pops, dwells, and flies to a row that
+    // was in view all along — instead of never appearing.
+    val continueListLaidOut by remember(listState) {
+        derivedStateOf { listState.layoutInfo.visibleItemsInfo.isNotEmpty() }
+    }
     // Dock only once the row is fully in view — flying to a sliver reads
     // as a miss. The row then owns the tap; the pill lands on its bounds.
     val continueRowVisible by remember(continueSurahId, searching) {
@@ -272,6 +281,7 @@ fun HomeScreen(
         coverVisible = coverSheetVisible,
         continueRowVisible = continueRowVisible,
         transportVisible = transportOnScreen,
+        listLaidOut = continueListLaidOut,
     )
     var continuePillHeight by remember { mutableStateOf(0.dp) }
     // Window bounds of the resting pill and its chapter row, for the dock
@@ -779,6 +789,10 @@ fun HomeScreen(
                     FloatingPaperControl(
                         visible = (showContinuePill || dwellHolding) && !docking && !undocking,
                         enter = if (undockArrived) EnterTransition.None else FloatingPaperEnter,
+                        // The dock ghost replaces the resting pill at its exact
+                        // seat on the same frame docking starts; a retirement
+                        // fade would read as a second animation under it.
+                        exit = if (docking) ExitTransition.None else FloatingPaperExit,
                         modifier = Modifier
                             .fillMaxWidth()
                             // The pill only ever shows while the transport is
@@ -1041,6 +1055,9 @@ internal fun continueLazyIndex(
  * The reading place floats only while its chapter row is scrolled out of
  * view. Search owns the sheet while active, and the pill is cover-gated
  * like the transport, so it never stacks on the pinned chapter session.
+ * [listLaidOut] holds the pill back until the chapter list has measured:
+ * on the first composition the row-visibility rule sees no rows, and a
+ * pill that showed would dwell and fly to a row that was already in view.
  */
 internal fun shouldShowContinuePill(
     continuePresent: Boolean,
@@ -1049,7 +1066,13 @@ internal fun shouldShowContinuePill(
     continueRowVisible: Boolean = false,
     /** The transport owns the bottom paper while it is up: no stacking. */
     transportVisible: Boolean = false,
-): Boolean = continuePresent && !searchActive && coverVisible && !continueRowVisible && !transportVisible
+    listLaidOut: Boolean = true,
+): Boolean = listLaidOut &&
+    continuePresent &&
+    !searchActive &&
+    coverVisible &&
+    !continueRowVisible &&
+    !transportVisible
 
 /**
  * Pill-shaped stand-in for the chapter row: the green place ribbon and a

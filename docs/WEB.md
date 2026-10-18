@@ -34,6 +34,12 @@ chords.
 
 ---
 
+Runtime synchronization uses **HighlightEngine V2**, with the same sanitized
+sample/transport fixtures as Android. The browser adapter distinguishes play
+intent from actual advancement and supplies explicit seek/loop revisions.
+`highlightTimeline` feeds DOM mask callbacks without React frame state. See
+[the runtime contract and validation limits](HIGHLIGHT_ENGINE_V2_CONTRACT.md).
+
 ## 1. One-sentence goal
 
 Ship a browser app that feels like the Android reader: one sheet of paper,
@@ -65,7 +71,7 @@ the marketing compromise as the highlight.
 tools/build_db.py  ──►  quran.db  (canonical Android asset)
                               │ web/scripts/sync-data.mjs
 web/                          ▼ core DB + per-reciter timing JSON
-  domain/          HighlightEngine / HighlightClock + domain policy
+  domain/          HighlightEngine / HighlightSync + domain policy
   data/            WASM SQLite + typed queries + separate IndexedDB word/QCF cache
   playback/        Gapless-5 (default) / dual-`<audio>` fallback + Media Session + Cache API LRU
   ui/reader/       InkEngine + focus engine/controller + reader state policy
@@ -180,7 +186,7 @@ updates when a verse is actually recited — not on open, scroll, or rail jump.
 settled scroll verse or Mushaf leaf. It never seeks audio. Chapters shows one
 green-ribbon continue pill: the last-heard place, matching Android, with the
 reading place as its fallback before any listening. A Mushaf turn reports
-its settled verse to the toolbar and in-chapter search; the loaded listening
+its settled verse to in-chapter search; the loaded listening
 chapter stays identified on the transport when it differs from the paper.
 An explicitly opened verse is kept when it is on either facing leaf, so a link
 to 2:255 remains 2:255 rather than becoming the first verse on that printed page.
@@ -396,6 +402,9 @@ finish concurrently, and a seek's already-spoken chain is complete immediately.
 This matches Android's newer audio-bound repeat policy rather than the older
 position-queued orange wash. JVM-generated numeric fixtures and the optional
 `web/scripts/check-ink-browser.mjs` check cover the port.
+`WordMotionProvider` supplies the shared wash registry directly; the obsolete
+repeat queue and its unused context were removed in the
+[legacy/test audit](quality-reviews/LEGACY_TEST_AUDIT_2026-10-17.md).
 
 ## 9. UI surface (paper metaphor)
 
@@ -421,6 +430,8 @@ paper with its folio and no Scroll rail, gloss or size scaling. Preview paper
 and theme samples have no gold control outlines. **Reading help** is its own
 Settings page with gesture instructions, keyboard shortcuts and the hints toggle. Back and
 Escape return from either sub-page to Settings before peeling the sheet away.
+Back and Escape from Settings itself return to the sheet it was opened from
+(Chapters or the reader), never one layer down.
 
 **Tablet and desktop book spread.** At `(min-width: 720px) and (min-height: 600px)`
 (`ui/paper/bookSpread.ts`) the default stack is laid open as a book instead of a
@@ -511,22 +522,69 @@ own clear mark (`::-webkit-search-cancel-button`); the field draws one. The per-
 `MUSHAF_TARGET_GAP`, or centring below `MUSHAF_SHORT_FILL`), applied to the
 lines in a layout effect in `MushafLeaf`. The cap is the
 `mushafGlyphWiden` setting.
-Mushaf lines justify by even word spaces: words and verse marks are
-separate flex items of the line (`space-between`) inside `.mushaf-block`, so
-head and lines share one measure. The minimum gap is Hafs's own word
+Mushaf words and verse marks are separate flex items inside `.mushaf-block`.
+The line solver assigns each join a margin, giving marks a smaller share of
+white while preserving the full measure.
+The running head is a sibling of that fitted block, anchored to the leaf's
+full text grid so its figures never drift with a shorter line measure.
+Its equal end columns align Western figures left and Arabic-Indic figures
+right; a single-script head keeps its figure left and chapter right.
+The minimum gap is Hafs's own word
 space (`MUSHAF_MIN_GAP`, 0.22 em) and loose lines widen toward 0.3 em. The
 block's width is `mushafMeasure`: the widest line set at minimum spaces with
 its letters condensed by up to `MUSHAF_MAX_CONDENSE` (4%), written inline by
 `MushafLeaf`. One outlier line used to set the measure for the whole page and
-loosen every other line; now it is set slightly narrow instead. `mushafLeafFit` only
-shrinks the type when the widest line overruns the page; widths are read at
-the applied scale and divided back (toggling the scale to measure made the
-measurement oscillate). Rationale in `docs/DESIGN.md`.
+loosen every other line; now it is set slightly narrow instead. `mushafLeafFit`
+fits the hand against both width and height, including short landscape windows
+and opening leaves. Widths are read at the applied scale and divided back
+(toggling the scale to measure made the measurement oscillate).
+`useMushafGrid` observes the actual toolbar and transport through callback refs,
+including the phone transport's portal and the gathering ribbon. Both facing
+leaves reserve those measured heights plus one rhythm step (8–16 px), keeping
+hit-target floors, notices and safe-area padding out of the text. A two-row
+leaf grid gives the running head its own track and the scripture the remaining
+well, with one constrained column so short lines cannot enlarge an implicit
+grid track. Facing leaves share the larger slot count when either chapter
+opening needs extra furniture rows, keeping their row pitch aligned. Heads
+use a quieter 10–13 px rung derived from the book's base hand.
+A height-bound Arabic text block may draw narrower than the opening's 72%
+width floor, so fitting type vertically does not loosen its word spaces.
+The phone reserves its footer once; the toolbar already owns the top safe area.
+Rationale in `docs/DESIGN.md`.
 The leaf's folio stands in the running head — Western figure at the left,
 the chapter centred, Arabic-Indic at the right (one script puts its figure
 at the left and the chapter at the right), Android `MushafRunningHead`
 parity, the same order on both facing leaves. Opening leaves 1–2 centre
 their few lines in the well.
+Chapter openings carry the Android cartouche's doubled wings, pointed paper
+window, chapter-specific weave and two shamsas (`MushafChapterBand`). The name
+hangs from a shared writing baseline, with long names fitted inside the open
+window. English leaves use the same band with a Latin name. Arabic places
+the band and preface in the source's spare slots; where a chapter heading is
+counted outside the source grid, it adds the missing furniture and fits both
+facing leaves to the taller slot count (up to seventeen), retaining every word
+on its page. Fatiha's basmalah remains its timed first verse; Tawbah has no
+preface. The entire opening group stays centred on leaves 1–2. Opening word
+spaces are 0.22 em, with tighter space beside verse marks. Full lines budget
+the remaining white across word joins and mark joins separately: a mark receives 0.85 of the
+word gap, softening above 0.42 em to 0.45 of further growth (typography §8).
+The two kinds of join still spend the full line width; marks remain separate
+cells and both full-line margins stay flush.
+The Mushaf toolbar has no chapter medallion or title: its chapter names live
+in the running heads and opening cartouches. Only the scrolling reader carries
+the compact top-bar title, on the page's physical centre line. Its caps
+line uses Android's 10 px label enlarged for Junicode small caps, and the Arabic
+name gives its descender slack to the caps line rather than leaving a gap.
+The spread's furniture scale keeps the same `u / 27.5px` ratio and 0.85
+floor, expressed as `tan(atan2(u, 27.5px))` for browsers without typed CSS
+division. `--u` is registered as a length so Firefox resolves its viewport
+expression before evaluating the ratio. An invalid scale otherwise makes
+the head/foot margins and controls invalid, collapses the opening rows, and
+gives the turning leaf the same broken geometry. The optional
+`web/scripts/check-mushaf-browser.mjs` regression runs in Firefox or Chromium
+with a tab-local printed-page map, checking opening/full leaves, tablet
+resizing, forward/back turns, chapter opening, and interrupted turns.
+It also checks chapter bands, basmalah exceptions, and running-head alignment.
 Page turns: `MushafReader` keeps the place the book last settled on,
 prepares both destination leaves at the reader’s measure, then portals a
 two-faced leaf (`TurningLeaf`) into `BookSpread`'s turn slot (`.mushaf-flip`,
@@ -882,7 +940,8 @@ web/
   src/
     domain/
       HighlightEngine.ts
-      HighlightClock.ts
+      HighlightSync.ts
+      HighlightClock.ts  # V1 comparison fixtures only
       Basmalah.ts
       WordSearch.ts
     data/

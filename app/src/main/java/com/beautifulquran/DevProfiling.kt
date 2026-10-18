@@ -22,6 +22,14 @@ import androidx.core.os.BufferFillPolicy
 import androidx.core.os.SystemTraceRequestBuilder
 import androidx.core.content.FileProvider
 import androidx.core.os.requestProfiling
+import com.beautifulquran.domain.HighlightCalibration
+import com.beautifulquran.domain.HighlightEngineVersion
+import com.beautifulquran.domain.HighlightObservation
+import com.beautifulquran.domain.HighlightPlaybackSample
+import com.beautifulquran.domain.HighlightTimingContext
+import com.beautifulquran.domain.HighlightTraceHeader
+import com.beautifulquran.domain.HighlightTraceRecorder
+import com.beautifulquran.domain.encodeForReplay
 import java.io.File
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.Executor
@@ -96,6 +104,7 @@ object DevProfiling {
      */
     private val markLock = Any()
     private val markLines = ArrayList<String>(256)
+    private var highlightTrace: HighlightTraceRecorder? = null
     @PublishedApi
     internal val captureStart = AtomicReference<Long?>(null)
 
@@ -113,13 +122,41 @@ object DevProfiling {
     private fun startMarkCapture() {
         synchronized(markLock) {
             markLines.clear()
+            highlightTrace = HighlightTraceRecorder(HighlightTraceHeader(
+                BuildConfig.CAPTURE_SOURCE_REVISION, BuildConfig.CAPTURE_SOURCE_DIRTY, BuildConfig.VERSION_NAME,
+                visibleEngineVersion = HighlightEngineVersion.VISIBLE,
+                schemaVersion = 2, scope = "sample-and-frame-clock",
+            ))
             captureStart.set(System.currentTimeMillis())
         }
     }
 
     private fun stopMarkCapture(): List<String> {
         captureStart.set(null)
-        return synchronized(markLock) { markLines.toList() }
+        return synchronized(markLock) {
+            val trace = highlightTrace?.snapshot()
+            highlightTrace = null
+            markLines.toList() + if (trace == null) emptyList() else listOf(
+                "highlight-sync-trace-begin", trace.encodeForReplay(), "highlight-sync-trace-end",
+            )
+        }
+    }
+
+    /** Local, bounded sample-clock replay data attached only to an explicit performance capture. */
+    internal fun recordHighlight(
+        sample: HighlightPlaybackSample,
+        timing: HighlightTimingContext,
+        calibration: HighlightCalibration,
+        observation: HighlightObservation,
+    ) {
+        if (captureStart.get() == null) return
+        synchronized(markLock) { highlightTrace?.record(sample, timing, calibration, observation) }
+    }
+
+    /** Frame evidence stays local and exists only during an explicit developer capture. */
+    internal fun recordHighlightFrame(state: com.beautifulquran.domain.HighlightSyncState, atNanos: Long) {
+        if (captureStart.get() == null) return
+        synchronized(markLock) { highlightTrace?.recordFrame(state, atNanos) }
     }
 
     /**

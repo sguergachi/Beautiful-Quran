@@ -15,6 +15,7 @@ import {
   type InkWord,
 } from '../ui/reader/InkEngine'
 import { tarjiSignal } from '../playback/tarjiSignal'
+import { highlightTimeline, mediaWashProgress } from '../playback/highlightTimeline'
 import {
   applyMask,
   cachedPaperCoverMask,
@@ -203,6 +204,7 @@ export function useWordWash({
           Math.min(connected.prefixFraction + 0.25, 0.55)) /
         (1 + tuning.washFeather)
       : 0
+    const mediaWindow = motion?.timing?.startMs != null ? highlightTimeline.window(motion.timing.startMs, duration) : null
     let elapsed = 0,
       last = performance.now(),
       frame = 0,
@@ -248,7 +250,10 @@ export function useWordWash({
         } else elapsed += delta
       }
       lastMedia = currentMedia
-      const clock = Math.min(1, elapsed / duration)
+      const priorIncomplete = english && prior != null && prior < 1
+      const clock = priorIncomplete ? 0 : mediaWindow
+        ? mediaWashProgress(mediaWindow, highlightTimeline.frame(now))
+        : Math.min(1, elapsed / duration)
       const shaped = curve
         ? curve.at(clock)
         : cubicBezierEase(

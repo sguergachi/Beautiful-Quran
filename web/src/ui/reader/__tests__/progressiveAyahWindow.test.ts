@@ -1,9 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   expandWindowToward,
-  initialAyahMountRange,
   mountRangeForAyah,
-  slideWindowToward,
   slidingAyahMountRange,
   WINDOW_AFTER,
   WINDOW_BEFORE,
@@ -39,12 +37,6 @@ describe('slidingAyahMountRange', () => {
     const mid = slidingAyahMountRange(286, 150)
     expect(mid.complete).toBe(false)
     expect(mid.hi - mid.lo).toBeLessThan(286)
-  })
-})
-
-describe('initialAyahMountRange', () => {
-  it('aliases the sliding window', () => {
-    expect(initialAyahMountRange(286, 1)).toEqual(slidingAyahMountRange(286, 1))
   })
 })
 
@@ -89,14 +81,5 @@ describe('expandWindowToward', () => {
     // Window already wide enough that wantLo/wantHi sit inside lo/hi.
     const current = { lo: 50, hi: 150, complete: false as const }
     expect(expandWindowToward(current, 286, 100)).toBe(current)
-  })
-})
-
-describe('slideWindowToward', () => {
-  it('aliases expand-only behaviour', () => {
-    const current = slidingAyahMountRange(286, 1)
-    expect(slideWindowToward(current, 286, 40)).toEqual(
-      expandWindowToward(current, 286, 40),
-    )
   })
 })

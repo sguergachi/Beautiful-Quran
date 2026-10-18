@@ -24,7 +24,7 @@ describe('cached leaf model', () => {
     const calls = lookup.mock.calls.length
     for (let copy = 0; copy < 18; copy++) expect(mushafLeafModel(1, rows, lookup)).toBe(model)
     expect(lookup).toHaveBeenCalledTimes(calls)
-    expect(model.leaf.lines[0]?.tokens.map((token) => token.arabic)).toEqual(['أ', 'ب'])
+    expect(model.leaf.lines.find(line => line.number === 1)?.tokens.map((token) => token.arabic)).toEqual(['أ', 'ب'])
     // A verse can continue on the next leaf: its mark stays with its real last word.
     expect(model.lastPositions.get('1:1')).toBe(3)
     expect(model.englishAyahs[0]?.translation).toBe('Meaning')
@@ -34,6 +34,6 @@ describe('cached leaf model', () => {
     const before = mushafLeafModel(1, [row(1)], () => content)
     const after = mushafLeafModel(1, [row(1), row(2)], () => content)
     expect(after).not.toBe(before)
-    expect(after.leaf.lines[0]?.tokens).toHaveLength(2)
+    expect(after.leaf.lines.find(line => line.number === 1)?.tokens).toHaveLength(2)
   })
 })

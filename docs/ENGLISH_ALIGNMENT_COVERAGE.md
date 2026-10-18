@@ -155,6 +155,8 @@ requiring a threshold. The frozen published corpus has 158,066 words; at most
 158 may be wrong **or unreviewed** to meet 99.9%, or 15 to meet 99.99%.
 An audit without these options retains the old content-only diagnostic; its
 report explicitly identifies that scope. Literal agreement is never the gate.
+When no literal gloss matches exist, the diagnostic reports unavailable;
+reviewed semantic owners still determine acceptance or rejection.
 
 `--semantic-reference reviewed.tsv` accepts one independently reviewed row per
 token: verse key, character start, exclusive end, exact printed token, and

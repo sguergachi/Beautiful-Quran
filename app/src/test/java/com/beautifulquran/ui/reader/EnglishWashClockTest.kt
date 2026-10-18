@@ -1,6 +1,12 @@
 package com.beautifulquran.ui.reader
 
 import com.beautifulquran.data.model.Segment
+import com.beautifulquran.domain.HighlightCalibration
+import com.beautifulquran.domain.HighlightEngine
+import com.beautifulquran.domain.HighlightItem
+import com.beautifulquran.domain.HighlightPlaybackSample
+import com.beautifulquran.domain.HighlightSync
+import com.beautifulquran.domain.HighlightTimingContext
 import com.beautifulquran.domain.EnglishWordAlignment
 import com.beautifulquran.domain.EnglishAlignment
 import com.beautifulquran.domain.EnglishWordSpan
@@ -16,6 +22,39 @@ class EnglishWashClockTest {
         Segment(22, 25530, 26800), Segment(23, 26800, 28490),
         Segment(24, 28490, 32560), Segment(25, 32560, 32930), Segment(26, 32930, 36250),
     )
+
+    @Test
+    fun `English receives every shared frame and ordinary correction without a second anchor`() {
+        val segments = listOf(Segment(1, 0, 13000))
+        val context = HighlightTimingContext(1, HighlightEngine.PreparedTimings.prepare(segments), 0)
+        val input = HighlightPlaybackSample(HighlightItem(24, 1, 1), 1000, 1_000_000_000, true, inkGeneration = 8)
+        val state = HighlightSync.sample(null, input, context)
+        val metadata = EnglishWashClock(24, 1, 8, 1000, 0, segments)
+        for (at in listOf(1041L, 1049L, 1057L, 1065L, 1145L)) {
+            assertEquals(at, metadata.onFrame(HighlightSync.frame(state, at * 1_000_000)).positionMs)
+        }
+        val corrected = HighlightSync.sample(state, input.copy(positionMs = 1050, sampledAtNanos = 1_150_000_000), context)
+        assertEquals(1150L, metadata.onFrame(HighlightSync.frame(corrected, 1_150_000_000)).positionMs)
+        assertEquals(1000L, metadata.onFrame(HighlightSync.frame(corrected, 1_150_000_000).copy(inkGeneration = 9)).positionMs)
+        val paused = HighlightSync.sample(corrected, input.copy(positionMs = 1150,
+            sampledAtNanos = 1_250_000_000, isPlaying = false), context)
+        val frame = HighlightSync.frame(paused, 99_000_000_000)
+        assertEquals(1150L, metadata.onFrame(frame).positionMs)
+    }
+
+    @Test
+    fun `calibration and explicit seek share Arabic retention semantics`() {
+        val segments = listOf(Segment(1, 0, 13000))
+        val context = HighlightTimingContext(1, HighlightEngine.PreparedTimings.prepare(segments), 0)
+        val input = HighlightPlaybackSample(HighlightItem(24, 1, 1), 4000, 0, false, inkGeneration = 8)
+        val state = HighlightSync.sample(null, input, context)
+        val metadata = EnglishWashClock(24, 1, 8, 4000, 0, segments)
+        val retuned = HighlightSync.sample(state, input.copy(sampledAtNanos = 100), context, HighlightCalibration(200))
+        assertEquals(4000L, metadata.onFrame(HighlightSync.frame(retuned, 100)).positionMs)
+        val sought = HighlightSync.sample(retuned, input.copy(positionMs = 2000, sampledAtNanos = 200,
+            inkGeneration = 9, clockRevision = 1), context)
+        assertEquals(2000L, metadata.copy(activation = 9).onFrame(HighlightSync.frame(sought, 200)).positionMs)
+    }
 
     @Test
     fun `ever after completes with each reciters actual abadan timing`() {
@@ -110,76 +149,7 @@ class EnglishWashClockTest {
         assertTrue(!sample.copy(activation = 9).samePerformanceAs(sample))
         assertTrue(!sample.copy(ayah = 2).samePerformanceAs(sample))
         assertTrue(!sample.copy(surahId = 25).samePerformanceAs(sample))
-        assertTrue(!sample.runsWith(sample.copy(activation = 9)))
-        assertTrue(!sample.runsWith(sample.copy(ayah = 2)))
-        assertTrue(!sample.runsWith(sample.copy(surahId = 25)))
     }
-
-    @Test
-    fun `every frame moves continuously across irregular playback polls`() {
-        val anchor = runningClock()
-        val frames = listOf(1041L, 1049L, 1057L, 1065L, 1145L).map { anchor.frameAt(it * 1_000_000).positionMs }
-        assertEquals(listOf(1041L, 1049L, 1057L, 1065L, 1145L), frames)
-        listOf(1033L, 1097L, 1200L).forEach {
-            assertTrue("poll must not cancel the running sweep", anchor.runsWith(
-                anchor.copy(positionMs = it, sampledAtNanos = it * 1_000_000),
-            ))
-        }
-    }
-
-    @Test
-    fun `a late playback poll must not stop a spoken wash`() {
-        val sample = runningClock().copy(positionMs = 1033, sampledAtNanos = 1_033_000_000L)
-        assertEquals(1081L, sample.frameAt(1_081_000_000L).positionMs)
-        assertEquals(1250L, sample.frameAt(1_250_000_000L).positionMs)
-    }
-
-    @Test
-    fun `pause and speed reanchors retain the last drawn frame but seeks reset it`() {
-        val running = runningClock()
-        val drawn = running.frameAt(1_150_000_000L)
-        val poll = running.copy(positionMs = 1100, sampledAtNanos = 1_150_000_000L)
-        val paused = poll.copy(isPlaying = false).after(drawn)
-        assertEquals(1150L, paused.frameAt(99_000_000_000L).positionMs)
-        val faster = poll.copy(speed = 1.25f).after(drawn)
-        assertEquals(1275L, faster.frameAt(1_250_000_000L).positionMs)
-        assertEquals(1100L, poll.copy(activation = 9).after(drawn).positionMs)
-    }
-
-    @Test
-    fun `paused samples freeze and changing speed changes the frame slope`() {
-        val playing = runningClock()
-        val paused = playing.copy(isPlaying = false, positionMs = 4000)
-        assertEquals(4000L, paused.frameAt(99_000_000_000L).positionMs)
-        assertTrue(!paused.runsWith(playing))
-        val resumed = paused.copy(isPlaying = true, speed = 1.25f, sampledAtNanos = 99_000_000_000L)
-        assertEquals(5250L, resumed.frameAt(100_000_000_000L).positionMs)
-        assertTrue(!resumed.runsWith(playing))
-    }
-
-    @Test
-    fun `continuous motion ends with the reciter without a visual duration cap`() {
-        val anchor = runningClock()
-        assertEquals(12999L, anchor.frameAt(12_999_000_000L).positionMs)
-        assertEquals(13000L, anchor.frameAt(13_000_000_000L).positionMs)
-        assertEquals(13000L, anchor.frameAt(99_000_000_000L).positionMs)
-        assertEquals(1000L, anchor.frameAt(0L).positionMs)
-    }
-
-    @Test
-    fun `buffering source discontinuities and output corrections interrupt the clock`() {
-        val anchor = runningClock()
-        assertTrue(!anchor.runsWith(anchor.copy(isPlaying = false)))
-        assertTrue(!anchor.runsWith(anchor.copy(clockId = 1)))
-        assertTrue(!anchor.runsWith(anchor.copy(correctionMs = 200)))
-        assertTrue(!anchor.runsWith(anchor.copy(segments = listOf(Segment(1, 0, 14000)))))
-        assertTrue(!anchor.runsWith(null))
-    }
-
-    private fun runningClock() = EnglishWashClock(
-        24, 1, 8, 1000, 0, listOf(Segment(1, 0, 13000)),
-        sampledAtNanos = 1_000_000_000L, isPlaying = true,
-    )
 
     @Test
     fun `a repeat completes prior ink even while the frame animation trails its poll`() {
@@ -253,16 +223,6 @@ class EnglishWashClockTest {
         assertEquals(1f, englishWashFragmentProgress(span, 0.5f, firstLeaf), 0.00001f)
         assertEquals(0f, englishWashFragmentProgress(span, 0.5f, secondLeaf), 0.00001f)
         assertEquals(0.5f, englishWashFragmentProgress(span, 0.75f, secondLeaf), 0.00001f)
-    }
-
-    @Test
-    fun `calibration cannot rewind laid ink but a seek can`() {
-        val previous = EnglishWashClock(24, 2, 8, 32000, 360, tail)
-        val retuned = previous.copy(positionMs = 31000).after(previous)
-        assertEquals(32000L, retuned.positionMs)
-        assertEquals(27000L, previous.copy(activation = 9, positionMs = 27000).after(previous).positionMs)
-        assertEquals(0L, previous.copy(ayah = 3, positionMs = 0).after(previous).positionMs)
-        assertEquals(0L, previous.copy(surahId = 25, positionMs = 0).after(previous).positionMs)
     }
 
     @Test

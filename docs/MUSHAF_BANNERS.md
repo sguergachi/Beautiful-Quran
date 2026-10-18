@@ -22,6 +22,12 @@ geometry are shared. The setting persists and applies to Arabic and English.
 Canvas paths are cached by size and title width; the implementation reuses
 the existing weave and rosette without additional fonts, images or layers.
 
+The web leaf uses the Cartouche panel in `MushafChapterBand.tsx`, with the same
+chapter seed, pointed window, baseline and tail allowance. Its ground and
+rules are ordinary SVG paths, so page-turn captures keep the illumination.
+English chapter openings share the panel. Cloud collar remains an Android
+developer option.
+
 The research consulted heading and illumination records including
 [Walters manuscript W.555](https://art.thewalters.org/files/pdf/W555.pdf),
 [the Met's Mamluk folio](https://www.metmuseum.org/art/collection/search/452704),

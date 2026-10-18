@@ -53,4 +53,12 @@ class ActiveWordResolveTest {
         val next = word(position = 6, activation = 7)
         assertSame(next, resolveActiveWord(next, tap = null, seed = seed))
     }
+    @Test
+    fun `old poll for the same word cannot acknowledge a new tap`() {
+        val seed = word(activation = 8, fromTap = true)
+        val stale = word(activation = 7)
+        assertSame(seed, resolveActiveWord(stale, seed, seed))
+        assertFalse(resolveActiveWord(word(activation = 8), seed, seed)!!.fromTap)
+    }
+
 }

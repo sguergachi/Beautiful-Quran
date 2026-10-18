@@ -114,7 +114,7 @@ shrinks until the leaf's widest line, at minimum word spaces, fills the
 block — never so far that fifteen lines would stand closer than 1.75 times
 the type. Each loose line then has its *letters* widened a few percent
 (6 by default; Settings → Developer offers 0, 4, 6, 8) toward a word space of
-0.42 em before any space is added between words: the stand-in for the print's
+0.3 em before any space is added between words: the stand-in for the print's
 elongated letters, and it adds nothing to the text. A line that fills less
 than 62% of the measure is centred at an ordinary word space instead of being
 justified, as the print centres a chapter's last line. On a phone, leading
@@ -125,12 +125,21 @@ leaf in Hafs, not in the page's own face, and Hafs sets narrower than the
 print — the print fills its line by elongating letters, which the app must
 not imitate by adding characters to the revelation. Justifying such lines
 out to the full page opened rivers three word-spaces wide. So the text block
-is drawn in to its widest line set with minimum word spaces (0.3 em), and
-every other line justifies to that; the type only ever shrinks, when a line
-would overrun the page. A verse mark is an item of the line like a word, so
-the space falls evenly on both its sides. Facing leaves keep one type size
-but each its own block width: two blocks of one width matter less than a
-sparse page not being all gaps. Running head and folio hang on the block.
+is drawn in to its widest line set with minimum word spaces (0.22 em), and
+every other line justifies to that. Type fits both the width and the height
+of the reading well, shrinking when either dimension would overflow. A verse
+mark remains a separate item of the line,
+with a smaller share of white on both sides: 0.85 of a word join, softening
+above 0.42 em. Opening leaves use a 0.22 em word space. Facing leaves keep
+one type size but each its own block width: two blocks of one width matter
+less than a sparse page not being all gaps. Running heads and folios follow
+the full leaf grid. The head and scripture occupy separate grid rows, with
+one rhythm step between them. Both leaves reserve the measured toolbar and
+transport heights plus a step of air; control hit-target floors and safe-area
+padding cannot intrude into the scripture. A short, wide window may draw its
+measured text block below the opening medallion’s 72% width floor, so height
+fitting does not reopen word-space rivers.
+
 What remains uneven is line against line — a line the print stretched with
 long letters still sets looser than a full one — and only the page faces
 would close that.
@@ -1219,15 +1228,21 @@ image, so it is crisp at any density and nearly free to render.
   assigns a distinct frame/interior/corner recipe and a distinct medallion
   structure across all 114 chapters; verse count varies their safe
   proportions. The same chapter always regrows the same ornament. The cover's
-  border frieze is one grammar, a **rumi scroll** after the running gold
-  borders of Ottoman and Mamluk illuminated Qur'ans: a vine waves along the
-  band, a split palmette (rumi) springs under each crest and ends in a beak
-  curling back over its own body, vein down its middle, glide-mirrored
-  under each trough, with a pearl between crest and rail. The seed only
-  nudges its proportions. It replaced five geometric grammars (scallops,
-  cable, Hankin strip, lozenge and khatam chains) whose straight crossings
-  and diamonds read as typed ASCII (`x`, `<>`) at band size; keep border
-  line work curved. On the cover, the **medallion and field build
+  border frieze is one of **five grammars grown per launch**: four geometries
+  of tooled mushaf bindings — interlocking scallops with a pearl in each
+  scale, a two-strand guilloche cable with pearl eyes, a nested lozenge
+  chain, a khatam chain of linked eight-fold stars — and the **rumi scroll**,
+  the running gold borders of Ottoman and Mamluk illuminated Qur'ans: a vine
+  waves along the band, a split palmette (rumi) springs under each crest and
+  ends in a beak curling back over its own body, vein down its middle,
+  glide-mirrored under each trough, with a pearl between crest and rail.
+  A single fixed scroll briefly replaced the five pickers (#868), which took
+  away the launch-to-launch variety the pattern families exist for; the
+  pickers came back around the scroll, and the Hankin star-and-cross strip
+  that once completed the set was culled for good on the user's verdict —
+  its open rays read as rows of typed `x` at band size. Keep border line
+  work curved. The scroll remains the one fully-fixed grammar (its seed
+  only nudges proportions). On the cover, the **medallion and field build
   in real time** — strokes ink themselves in along their length across
   ~3.4 s, field first, then medallion outside-in — so the illumination is
   drawn before the reader's eyes, not stamped; the **border and corner
@@ -1629,7 +1644,13 @@ up to the row — resizing onto its exact bounds, squaring its corners, settling
 every inset, then fading to reveal the row — so the row owns the tap, and
 scrolling back down peels it off the top and settles it home again. Flights
 only ever arm off a fully-visible row and cancel the moment it leaves, so
-flings pass through untouched. Web keeps its mint pill in its top
+flings pass through untouched. The pill also never rises until the chapter
+list has measured its first pass: on the list's first composition the
+row-visibility rule cannot see the row yet, and a launch whose reading row
+is already in view must behave as if the pill had always been docked away —
+no pop, dwell, or late flight. On departure the resting pill does not fade:
+it is replaced in place by the flight's own copy, so the departure is only
+ever one motion. Web keeps its mint pill in its top
 continue area: a 28 px radius, 16 px outer inset, 40 px green place cloth,
 gold chapter number, CONTINUE flag, and compact bilingual chapter and ayah.
 The shared ribbon is decorative inside one accessible resume button. Only one

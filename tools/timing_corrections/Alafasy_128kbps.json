@@ -4,17 +4,6 @@
   "edits": [
     {
       "reciterId": 1,
-      "surahId": 47,
-      "ayah": 4,
-      "op": "merge_verified_word_split",
-      "phase": "after_repairs",
-      "sourcePair": [[13, 16565, 17820], [13, 17820, 19000]],
-      "requiresAudioVerdict": true,
-      "evidence": ["maintainer feedback after the exact EveryAyah audition, 2026-10-16", "both CTC models prefer one word; automatic removal-confidence gate still fails", "waveform inspection"],
-      "refs": ["GitHub issue #873", "tools/timing_verdicts/maintainer-word-split-class.json"]
-    },
-    {
-      "reciterId": 1,
       "surahId": 5,
       "ayah": 2,
       "op": "discard_unspoken_rewind_onset",
@@ -53,10 +42,11 @@
       "reciterId": 1,
       "surahId": 6,
       "ayah": 145,
-      "op": "one_utterance",
-      "positions": [12, 13],
-      "evidence": ["CTC", "quran-align"],
-      "refs": ["full-corpus acoustic audit"]
+      "op": "discard_unspoken_rewind_onset",
+      "sourceWindow": [[12, 13770, 14650], [13, 14650, 15390], [12, 15390, 17590]],
+      "requiresAudioVerdict": true,
+      "evidence": ["ear", "Arabic XLSR", "MMS/uroman", "quran-align", "waveform"],
+      "refs": ["device timing lab 2026-10-17", "tools/timing_verdicts/qf-source-transition.json", "docs/quality-reviews/TIMING_RUNTIME_PROMOTION_2026-10-17.md"]
     },
     {
       "reciterId": 1,

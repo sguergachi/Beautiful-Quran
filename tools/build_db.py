@@ -227,7 +227,8 @@ QF_SOURCE_SHA256 = {
     7: "ee3d429dbdd9ab80e2310e9bf770cf7b7f4cbdc6cfe2a90257ef6072fa4010c0",
     9: "a145f59301feca42b727d43456368e1c7f2f87465325dd4104c863060c7eaeb2",
 }
-QF_TIMING_BASELINE_SHA256 = "3489bd89a91177d2701a2bbc3e8e414d957e308a539c6ec71122a568015f7c8d"
+# Pin the latest accepted private generation so refreshes retain earlier runtime repairs.
+QF_TIMING_BASELINE_SHA256 = "1d4fc496babe533ad28f5a8f46fd328e0b24588f25d85427949d18ddd530f673"
 QF_VERDICTS_FILE = ROOT / "tools/timing_verdicts/qf-source-transition.json"
 QF_RUNTIME_DELIVERY = "authenticated Content Sync runtime cache; no bundled QF timings"
 
@@ -3233,10 +3234,21 @@ def authenticated_evidence_problem(change):
                 (not finite(model.get("newOccurrenceMinLabelProbability")) or
                  not 0.5 <= model["newOccurrenceMinLabelProbability"] <= 1)) for model in models):
             return "topology preference or new-occurrence confidence is insufficient"
-        if has_removed_occurrence and any(
-                not finite(model.get("removedOccurrenceMaxLabelProbability")) or
-                not 0 <= model["removedOccurrenceMaxLabelProbability"] < 0.5 for model in models):
-            return "a removed occurrence is heard or lacks baseline confidence on either model"
+        if has_removed_occurrence:
+            from word_split_evidence import ownership_problem
+
+            for model in models:
+                confidence = model.get("removedOccurrenceMaxLabelProbability")
+                if not finite(confidence) or not 0 <= confidence <= 1:
+                    return "a removed occurrence is heard or lacks baseline confidence on either model"
+                if confidence < 0.5:
+                    continue
+                # A label ordinal can disappear while its confident phonetic
+                # frames remain in the candidate's held word/adjacent speech.
+                # The proof permits only an exact flush same-word merge; all
+                # other removals keep the original symmetric confidence gate.
+                if ownership_problem(before["segments"], after["segments"], model) is not None:
+                    return "a removed occurrence is heard or lacks baseline confidence on either model"
     elif (all(old[1] == new[1] for old, new in zip(before["segments"], after["segments"])) or
           any(not finite(model.get(field)) or model[field] < 0
               for model in models for field in ("baselineResidualMs", "candidateResidualMs")) or
