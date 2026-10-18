@@ -18,10 +18,13 @@ half4 main(float2 p) {
     // The familiar reading-order wash drives filling inside the letterforms.
     // Its wide soft edge replaces the authored pen path and whole-word fade.
     float wash = clamp((progress * (extent.x + 60.0) - (extent.x - p.x)) / 60.0, 0.0, 1.0);
+    wash = smoothstep(0.0, 1.0, wash);
     float coordinate = mix(shape.g, shape.r, fillMode);
-    float softness = mix(aa / maxDepth, aa / extent.y, fillMode);
-    float loaded = wash * smoothstep(coordinate - softness, coordinate + softness,
+    float softness = max(mix(aa / maxDepth, aa / extent.y, fillMode), mix(0.25, 0.12, fillMode));
+    float filling = smoothstep(coordinate - softness, coordinate + softness,
         mix(-softness, 1.0 + softness, wash));
+    // A light ink stain precedes the fuller fill, keeping the moving front soft.
+    float loaded = wash * mix(wash, filling, 0.65);
     float3 surface = normals.eval(p).rgb;
     float localWet = smoothstep(0.0, 0.7, wet - (1.0 - surface.b) * 0.2) * loaded;
     float base = smoothstep(-aa * 0.5, aa * 0.5, distance);
@@ -41,9 +44,11 @@ half4 main(float2 p) {
         vertical * vertical * vertical * vertical);
     float pooling = smoothstep(0.65, 0.95, surface.b);
     float3 pigment = mix(float3(13.0, 14.0, 15.0) / 255.0, repeatColor, repeatPass);
-    pigment *= 1.0 - pooling * 0.3;
+    pigment *= 1.0 - pooling * 0.3 * (1.0 - repeatPass);
     pigment += float3(0.76, 0.76, 0.72) * window * 0.7 * localWet;
     float3 dry = float3(28.0, 27.0, 24.0) / 255.0;
-    float3 ink = mix(dry, pigment, localWet);
+    // Let the clean orange establish early; the liquid film may still be filling.
+    float repeatDensity = wet * smoothstep(0.0, 0.35, loaded);
+    float3 ink = mix(dry, pigment, mix(localWet, repeatDensity, repeatPass));
     return half4(mix(float3(250.0, 243.0, 232.0) / 255.0, ink, coverage), 1.0);
 }

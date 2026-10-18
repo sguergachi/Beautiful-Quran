@@ -26,6 +26,9 @@ its contour) or **Bottom up** (a rising fill inside the font outline). A
 fixed toggle compares both during playback without moving the text or
 restarting audio. These are continuous fields inside the shaped word, not
 isolated character outlines: Arabic ligatures and their marks stay intact.
+Both fill modes have a broad, gradual pigment transition at the moving front,
+beyond pixel antialiasing. A faint ink stain leads into the fuller fill so the
+interior growth or rising level fades in. The printed contour stays sharp.
 
 The wash is based on media time, so pausing freezes filling and changing
 playback speed scales it with the recitation. Before its turn, a word remains
@@ -43,6 +46,10 @@ The wash brings in the existing Paper orange repeat accent together
 with the fuller wet shape and reflection, then dries back to black. Later
 words stay black until their turn. This gives the return both color and
 shape without erasing the passage or replaying the letter-drawing pattern.
+The repeat accent does not inherit carbon pooling's darkening. Its color
+establishes early within the feathered fill, while thickness and reflection
+continue to build with the liquid film; the shared wet envelope dries it
+back to black.
 **Again** restarts the three-verse demonstration and rearms its one repeat.
 The repeat mode is cleared when the study stops.
 
