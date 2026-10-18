@@ -46,6 +46,49 @@ describe('mushaf page', () => {
       { surahId: 1, ayah: 2 },
     ])
   })
+
+  it('reserves the printed title and preface slots without moving any words', () => {
+    const page = buildMushafPage(2, [
+      { surahId: 2, ayah: 1, position: 1, line: 3, arabic: 'الم' },
+      { surahId: 2, ayah: 2, position: 1, line: 3, arabic: 'ذَٰلِكَ' },
+    ])
+    expect(page.lines[0]).toMatchObject({ chapter: 2, tokens: [] })
+    expect(page.lines[1]).toMatchObject({ basmalah: 2, tokens: [] })
+    expect(page.lines[2]?.tokens.map(token => token.ayah)).toEqual([1, 2])
+    expect(page.lines).toHaveLength(15)
+  })
+
+  it('does not add a second basmalah to Fatiha or one to Tawbah', () => {
+    for (const surahId of [1, 9]) {
+      const page = buildMushafPage(1, [{ surahId, ayah: 1, position: 1, line: 2, arabic: 'أ' }])
+      expect(page.lines[0]?.chapter).toBe(surahId)
+      expect(page.lines.some(line => line.basmalah != null)).toBe(false)
+    }
+  })
+
+  it('keeps every chapter band on a shared leaf and never replaces a word row', () => {
+    const page = buildMushafPage(604, [112, 113, 114].map((surahId, index) => ({
+      surahId, ayah: 1, position: 1, line: 3 + index * 5, arabic: 'أ',
+    })))
+    expect(page.lines.filter(line => line.chapter).map(line => [line.number, line.chapter])).toEqual([[1, 112], [6, 113], [11, 114]])
+    const crowded = buildMushafPage(1, [
+      { surahId: 1, ayah: 7, position: 1, line: 1, arabic: 'أ' },
+      { surahId: 2, ayah: 1, position: 1, line: 3, arabic: 'ب' },
+    ])
+    expect(crowded.lines[0]?.chapter).toBeUndefined()
+    expect(crowded.lines[0]?.tokens).toHaveLength(1)
+    expect(crowded.lines.some(line => line.chapter === 2)).toBe(true)
+  })
+
+  it('includes headings counted outside the source grid, even with no spare leading slots', () => {
+    for (const line of [1, 2]) {
+      const page = buildMushafPage(586, [{ surahId: 81, ayah: 1, position: 1, line, arabic: 'إِذَا' }])
+      expect(page.lines[0]?.chapter).toBe(81)
+      expect(page.lines[1]?.basmalah).toBe(81)
+      expect(page.lines[2]?.tokens[0]?.arabic).toBe('إِذَا')
+      expect(page.lines).toHaveLength(18 - line)
+    }
+  })
 })
 
 describe('mushafFacingPages', () => {

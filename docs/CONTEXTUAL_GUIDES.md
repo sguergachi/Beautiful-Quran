@@ -4,6 +4,10 @@ Contextual guides teach a feature by letting the reader use that feature in
 place. They are a temporary change in the ink on the current paper, not a new
 sheet, dialog, card, tooltip, or modal layer.
 
+The web reader has no persistent word-hold/share hint strip or “Got it” line
+under its top bar. Word and verse actions stay discoverable through Reading
+help in Settings; do not add that tooltip back over the scripture.
+
 ## The contract
 
 The spotlighted feature is real and interactive. A guide that says “Tap, or

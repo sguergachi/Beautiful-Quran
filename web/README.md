@@ -61,7 +61,8 @@ resizing from facing pages to a phone layout.
 and full leaves, responsive margins, and opening/interrupted page turns.
 Set `BROWSER=chromium` for the same check in Chromium, `BROWSER_EXECUTABLE`
 for an installed test browser, and `RECORD_VIDEO=1` to save a recording.
-It uses bundled Arabic text and a tab-local four-page placement fixture.
+It also checks chapter cartouches, preface exceptions, and page-grid alignment.
+It uses bundled text and a tab-local placement fixture, including the last leaf.
 
 `node scripts/check-reader-performance-browser.mjs` checks chapter handoff,
 interrupted navigation, reduced motion, idle animation layers, static ornament

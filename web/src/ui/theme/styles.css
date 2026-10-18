@@ -1336,6 +1336,7 @@ input[type='search']::-webkit-search-decoration {
 
 /* —— Reader —— */
 .reader-top {
+  --title-clearance: calc(var(--top-bar-pad) + 104px);
   container-type: inline-size;
   display: flex;
   align-items: center;
@@ -1363,10 +1364,10 @@ input[type='search']::-webkit-search-decoration {
 /* Collapsed surah title — centred like Android CenterAlignedTopAppBar. */
 .reader-top-title {
   position: absolute;
-  left: calc(50% - 1.375rem);
+  left: 50%;
   top: 50%;
   transform: translate(-50%, -50%);
-  width: min(18rem, calc(100% - 13.5rem));
+  width: min(18rem, calc(100% - 2 * var(--title-clearance)));
   opacity: 0;
   pointer-events: none;
   transition: opacity 350ms ease;
@@ -1406,7 +1407,7 @@ input[type='search']::-webkit-search-decoration {
 }
 
 .ornate-surah-title .ornate-ar {
-  margin: 0;
+  margin: 0 0 -5px;
   font-family: var(--font-arabic);
   font-size: 1.15rem;
   line-height: 1.35;
@@ -1420,8 +1421,10 @@ input[type='search']::-webkit-search-decoration {
 
 .ornate-surah-title .ornate-en {
   margin: 0;
+  padding-bottom: 5px;
   font-family: var(--font-body);
-  font-size: calc(0.56rem * 1.15);
+  font-size: calc(10px * 1.15);
+  line-height: 1.2;
   letter-spacing: 0.14em;
   text-transform: uppercase;
   font-feature-settings: 'kern' 1, 'c2sc' 1, 'onum' 1, 'ss09' 1;
@@ -2701,7 +2704,7 @@ button.ayah-mark {
    words. The text block is instead as wide as its widest line set with
    minimum word spaces and slightly condensed letters (mushafMeasure, written
    inline once the lines are measured), and every other line justifies to
-   that. The running head hangs on the same block; the folio stands in it. */
+   that. The running head keeps the leaf's full grid above this block. */
 .mushaf-block {
   flex: 1;
   min-height: 0;
@@ -2738,7 +2741,8 @@ button.ayah-mark {
    figure at the left and the chapter at the right. Ink, not gold, at the
    finding-aid rung. Android `MushafRunningHead`. */
 .mushaf-head {
-  display: flex;
+  display: grid;
+  grid-template-columns: 1fr 3fr 1fr;
   align-items: baseline;
   direction: ltr;
   font-size: 0.75rem;
@@ -2747,11 +2751,18 @@ button.ayah-mark {
 }
 
 .mushaf-head-figure {
-  flex: 1;
   text-align: left;
   letter-spacing: 0.02em;
   font-variant-numeric: lining-nums;
   white-space: nowrap;
+}
+
+.mushaf-head[data-both] .mushaf-head-figure:last-child {
+  text-align: right;
+}
+
+.mushaf-head:not([data-both]) {
+  grid-template-columns: auto 1fr;
 }
 
 .mushaf-head-figure[lang='ar'] {
@@ -2760,7 +2771,6 @@ button.ayah-mark {
 }
 
 .mushaf-head-chapter {
-  flex: 3;
   min-width: 0;
   text-align: center;
   letter-spacing: 0.02em;
@@ -2770,21 +2780,20 @@ button.ayah-mark {
 }
 
 .mushaf-head:not([data-both]) .mushaf-head-chapter {
-  flex: 1;
   text-align: right;
 }
 
 .mushaf-lines {
   flex: 1;
   display: grid;
-  grid-template-rows: repeat(15, minmax(0, 1fr));
+  grid-template-rows: repeat(var(--mushaf-slots, 15), minmax(0, 1fr));
   min-height: 0;
   margin-top: 0.6em;
   /* The page's hand. --mushaf-fit is solved per leaf (MushafReader). */
   font-size: calc(clamp(1.05rem, 4.2vw, 1.55rem) * var(--mushaf-fit, 1));
   /* Leading follows the type: fifteen lines never spread further apart
      than this, however tall the sheet. The block then sits centred. */
-  max-height: calc(15 * 2.15em);
+  max-height: calc(var(--mushaf-slots, 15) * 2.15em);
 }
 
 .mushaf-head {
@@ -2837,11 +2846,51 @@ button.ayah-mark {
   transition-duration: var(--recess-ms, 400ms);
 }
 
-.mushaf-chapter {
-  display: block;
-  text-align: center;
-  font-size: 0.85em;
-  margin-bottom: 0.2em;
+.mushaf-chapter-slot {
+  min-height: 0;
+  display: flex;
+  align-items: center;
+}
+
+.mushaf-chapter-band {
+  position: relative;
+  width: 100%;
+  height: 72%;
+  color: var(--gold);
+}
+
+.mushaf-chapter-band > svg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.mushaf-chapter-ground { opacity: 0.2; }
+[data-theme='dark'] .mushaf-chapter-ground,
+[data-theme='royal_green'] .mushaf-chapter-ground { opacity: 0.07; }
+
+.mushaf-chapter-name {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  font-family: var(--font-arabic);
+  line-height: 1.6;
+  white-space: nowrap;
+}
+
+.mushaf-chapter-name[lang='en'] { font-family: var(--font-body); }
+.mushaf-chapter-baseline { display: inline-block; width: 0; height: 0; }
+.mushaf-english-chapter { height: 3em; margin-block: 0.6em; display: flex; align-items: center; }
+
+.mushaf-basmalah {
+  min-height: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-arabic);
+  line-height: 1;
+  white-space: nowrap;
 }
 
 .mushaf-english {
@@ -7174,9 +7223,10 @@ html[data-entrance='true'] body {
 
 /* Book furniture stands on the grid: glyphs, labels and gaps scale with
    --furn (the book's own module over the phone-sized chrome), while hit
-   targets keep their 44–48px floors. The title's centring fudge and width
-   reservation scale with the buttons they compensate for. */
+   targets keep their 44–48px floors. The title stays on the page's centre
+   line; its width reservation scales with the buttons beside it. */
 .app-shell[data-spread='true'] .reader-top {
+  --title-clearance: calc(max(var(--top-bar-pad), var(--margin-fore)) + 104px * var(--furn));
   min-height: calc(2.85rem * var(--furn));
   gap: calc(0.75rem * var(--furn));
   padding-top: max(calc(0.65rem * var(--furn)), env(safe-area-inset-top));
@@ -7209,16 +7259,17 @@ html[data-entrance='true'] body {
 }
 
 .app-shell[data-spread='true'] .reader-top-title {
-  left: calc(50% - calc(1.375rem * var(--furn)));
-  width: min(calc(18rem * var(--furn)), calc(100% - calc(13.5rem * var(--furn))));
+  width: min(calc(18rem * var(--furn)), calc(100% - 2 * var(--title-clearance)));
 }
 
 .app-shell[data-spread='true'] .ornate-surah-title .ornate-ar {
   font-size: calc(1.15rem * var(--furn));
+  margin-bottom: calc(-5px * var(--furn));
 }
 
 .app-shell[data-spread='true'] .ornate-surah-title .ornate-en {
-  font-size: calc(0.56rem * var(--furn));
+  font-size: calc(10px * 1.15 * var(--furn));
+  padding-bottom: calc(5px * var(--furn));
 }
 
 .app-shell[data-spread='true'] .reader-top-medallion {
@@ -8406,17 +8457,6 @@ html[data-entrance-closing]
 .reading-preview[data-layout='mushaf'] { padding-inline: 0.9rem; }
 .reading-preview[data-layout='mushaf'] .reading-preview__arabic { font-size: 1.5rem; text-align: justify; }
 .reading-preview[data-layout='mushaf'] .reading-preview__english { font-size: 1.125rem; }
-.reader-word-hint {
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-  max-width: var(--reader-max);
-  margin-inline: auto;
-  padding-inline: var(--top-bar-pad);
-  font-size: 0.8rem;
-  color: var(--ink-rung-muted);
-}
-.reader-word-hint button { min-height: 44px; flex-shrink: 0; color: var(--accent); }
 .reading-help dt { margin-top: 1.2rem; font-weight: 600; }
 .reading-help dd { margin: 0.4rem 0 0; color: var(--ink-rung-muted); line-height: 1.6; }
 .reading-shortcuts { display: grid; grid-template-columns: max-content 1fr; column-gap: 1rem; }
