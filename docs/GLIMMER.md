@@ -34,12 +34,24 @@ The wash is based on media time, so pausing freezes filling and changing
 playback speed scales it with the recitation. Before its turn, a word remains
 visible beneath the paper.
 
-Wet ink is optically fuller than dry ink, with a smooth liquid film and
-localized window reflections at 70% strength. A controlled light pass follows
+Wet ink is optically fuller than dry ink, with a rounded liquid film across
+the stroke interior and localized window reflections at 45% strength. The
+surface keeps curving through broad strokes rather than flattening behind a
+thick outline. A controlled light pass follows
 the word's media progress and dry-down; it needs no phone movement or sensor.
-Both gloss and the 2.6 font-pixel optical expansion settle over the existing
+Both gloss and the optical expansion settle over the existing
 `InkEngine.tuning.glintFadeMs`. Hafs has no variable weight axis. No glow,
 pixel noise, or surrounding shadow is added.
+
+The **Ink pooling** dial changes wet spread and liquid depth live, including
+in Hold wet. Its 0–100% range corresponds to 0–3.5 font pixels of optical
+expansion; the default is 25% (0.875 pixels), down from the previous fixed
+2.6 pixels. Zero keeps a thin wet film with no expansion. Dry ink always
+returns to the original font contour, at every dial setting. The dial does
+not change timing or restart playback.
+The **Font size** dial scales the fitted sample from 50% to 100%, centred on
+the same three rows. It changes only drawing scale, keeping playback and
+the pooling setting intact. Both dials reset when the study is reopened.
 
 When verse 2 repeats, its entire previously read black base stays visible.
 The wash brings in the existing Paper orange repeat accent together

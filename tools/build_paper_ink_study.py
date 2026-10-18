@@ -31,12 +31,14 @@ def build(ayah, position, text):
     distance -= np.sign(distance) / (2 * SS)
     edge = (alpha > 0) & (alpha < 1)
     distance[edge] = (alpha[edge] - .5) / SS
-    film = (1 - np.exp(-np.maximum(0, distance) / 1.5)) * .75
-    gy, gx = np.gradient(gaussian_filter(film * .3, 4))
+    # A rounded meniscus continues across broad strokes instead of flattening at the edge.
+    interior = np.maximum(0, distance)
+    film = interior / (interior + 3)
+    gy, gx = np.gradient(gaussian_filter(film * 3, SS))
     nx, ny = -gx * SS, -gy * SS
     length = np.sqrt(nx * nx + ny * ny + 1)
-    normal = np.stack([128 + nx / length * 127, 128 + ny / length * 127,
-                       film * 255, np.full(alpha.shape, 255)], axis=-1).astype('uint8')
+    normal = np.rint(np.stack([128 + nx / length * 127, 128 + ny / length * 127,
+                              film * 255, np.full(alpha.shape, 255)], axis=-1)).astype('uint8')
     # Opaque data avoids premultiplication. B carries signed contour distance.
     field = np.zeros((*alpha.shape, 4), dtype='uint8')
     yy = np.arange(h * SS)[:, None]
