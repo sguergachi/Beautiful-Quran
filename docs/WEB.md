@@ -34,6 +34,12 @@ chords.
 
 ---
 
+Runtime synchronization uses **HighlightEngine V2**, with the same sanitized
+sample/transport fixtures as Android. The browser adapter distinguishes play
+intent from actual advancement and supplies explicit seek/loop revisions.
+`highlightTimeline` feeds DOM mask callbacks without React frame state. See
+[the runtime contract and validation limits](HIGHLIGHT_ENGINE_V2_CONTRACT.md).
+
 ## 1. One-sentence goal
 
 Ship a browser app that feels like the Android reader: one sheet of paper,
@@ -65,7 +71,7 @@ the marketing compromise as the highlight.
 tools/build_db.py  ──►  quran.db  (canonical Android asset)
                               │ web/scripts/sync-data.mjs
 web/                          ▼ core DB + per-reciter timing JSON
-  domain/          HighlightEngine / HighlightClock + domain policy
+  domain/          HighlightEngine / HighlightSync + domain policy
   data/            WASM SQLite + typed queries + separate IndexedDB word/QCF cache
   playback/        Gapless-5 (default) / dual-`<audio>` fallback + Media Session + Cache API LRU
   ui/reader/       InkEngine + focus engine/controller + reader state policy
@@ -934,7 +940,8 @@ web/
   src/
     domain/
       HighlightEngine.ts
-      HighlightClock.ts
+      HighlightSync.ts
+      HighlightClock.ts  # V1 comparison fixtures only
       Basmalah.ts
       WordSearch.ts
     data/

@@ -37,10 +37,19 @@ class ReaderPollingTest {
         assertEquals(
             pollingIdentity(playing, loadedSurahId = 2) { it },
             pollingIdentity(
-                playing.copy(isBuffering = true, speed = 1.5f, error = "ignored"),
+                playing.copy(error = "ignored"),
                 loadedSurahId = 2,
             ) { it },
         )
+    }
+
+    @Test
+    fun `buffering speed and ink generation changes sample immediately`() {
+        val state = PlayerUiState(isPlaying = true, nowPlaying = NowPlaying(2, 5, 7))
+        for (next in listOf(state.copy(isBuffering = true), state.copy(speed = 1.5f),
+            state.copy(positionEvents = PlaybackPositionEvents(inkId = 1)))) {
+            assertNotEquals(pollingIdentity(state, 2) { it }, pollingIdentity(next, 2) { it })
+        }
     }
 
     @Test

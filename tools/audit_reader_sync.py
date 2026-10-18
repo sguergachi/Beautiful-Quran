@@ -19,6 +19,7 @@ parser.add_argument("corpus", type=Path)
 parser.add_argument("ownership", type=Path)
 parser.add_argument("--output", type=Path, required=True)
 parser.add_argument("--runtime-pack", type=Path, action="append", default=[], help="Reviewed canonical QF timing pack, kept outside Git; repeat for all six resources")
+parser.add_argument("--v2-output", type=Path, help="Export an external TSV for HighlightCorpusTest; no restricted content is committed")
 args = parser.parse_args()
 repo = Path(__file__).resolve().parents[1]
 source = repo / "app/src/main/java/com/beautifulquran"
@@ -117,6 +118,12 @@ for path in args.runtime_pack:
         assert segments and segments[0][1]>=onset>=0,(key,'runtime onset')
         occupied.add(key)
         rows.append((*key,json.dumps(segments)))
+if args.v2_output:
+    args.v2_output.parent.mkdir(parents=True, exist_ok=True)
+    with args.v2_output.open('w') as output:
+        for reciter, surah, ayah, encoded in sorted(rows):
+            output.write(f'{reciter}\t{surah}\t{ayah}\t' +
+                         ';'.join(','.join(map(str, segment)) for segment in json.loads(encoded)) + '\n')
 reciters = sorted({row[0] for row in rows})
 assert len(reciters) == 13
 present = {row[:3] for row in rows}

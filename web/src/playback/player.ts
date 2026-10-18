@@ -49,6 +49,11 @@ export interface NowPlaying {
 }
 
 export interface PlayerState {
+  /** Authoritative seeks and performance restarts; never inferred by the highlight core. */
+  /** Actual transport advancement, separate from optimistic play intent. */
+  advances?: boolean
+  clockRevision?: number
+  inkGeneration?: number
   nowPlaying: NowPlaying | null
   isPlaying: boolean
   /** True while fetching / waiting for enough audio to play (Android parity). */
@@ -65,6 +70,8 @@ type Listener = (state: PlayerState) => void
 
 const initial: PlayerState = {
   nowPlaying: null,
+  clockRevision: 0,
+  inkGeneration: 0,
   isPlaying: false,
   isBuffering: false,
   positionMs: 0,
@@ -102,6 +109,7 @@ export class PlayerController {
   private readonly joins: JoinCoordinator
   /** Bumps on every playIndex entry so a superseded load aborts after awaits. */
   private playToken = 0
+  private programmedSeek: { targetMs: number; atMs: number } | null = null
   private readonly stallWatchdog = new PlaybackStallWatchdog()
   private readonly mediaSession: MediaSessionBridge
   /** True while performing the pause/play cycle that revives frozen Safari audio. */
@@ -150,6 +158,20 @@ export class PlayerController {
           this.maybePrepJoin()
         },
         ended: () => void this.onEnded(),
+        seeking: () => {
+          const pending = this.programmedSeek
+          if (pending && performance.now() - pending.atMs < 1000 &&
+              Math.abs(pending.targetMs - this.positionMs) < 100) {
+            this.programmedSeek = null
+            return
+          }
+          // Native loop seeking is authoritative even if background throttling
+          // missed the end of the clip. An arbitrary position poll cannot do this.
+          if (this.active.loop && !this.awaitingClip) {
+            this.notePerformance()
+            this.onTime()
+          }
+        },
         play: () => {
           this.pauseSuppressRemaining = 0
           this.patch({ isPlaying: true, error: null })
@@ -387,7 +409,7 @@ export class PlayerController {
         this.patch({ isPlaying: false })
       },
       onIndex: (index) => this.syncGapless5Index(
-        index, this.gapless5?.getPositionMs() ?? 0, this.gapless5?.getDurationMs() ?? 0,
+        index, this.gapless5?.getPositionMs() ?? 0, this.gapless5?.getDurationMs() ?? 0, true,
       ),
       onFinishedAll: () => {
         const range = this.state.repeatMode === 'range' ? this.state.repeatRange : null
@@ -431,6 +453,7 @@ export class PlayerController {
     }
 
     if (index === this.index && !wrapped && !force) return
+    this.notePerformance()
     this.index = index
     const item = this.playlist[index]
     if (!item) return
@@ -454,6 +477,9 @@ export class PlayerController {
 
   private patch(partial: Partial<PlayerState>) {
     this.state = { ...this.state, ...partial }
+    this.state = { ...this.state, advances: this.state.isPlaying && !this.state.isBuffering &&
+      (this.gapless5Enabled ? this.gapless5?.isPlaying() === true :
+        !this.awaitingClip && !this.active.paused && !this.active.seeking && this.active.readyState >= HAVE_FUTURE_DATA) }
     tarjiSignal.setClock(this.playlist[this.index]?.url ?? '', this.state.positionMs, this.state.isPlaying, this.reciter?.id ?? 0, this.state.speed)
     for (const fn of this.listeners) fn(this.state)
   }
@@ -821,6 +847,7 @@ export class PlayerController {
       this.patch({ isPlaying: false })
       return
     }
+    this.notePerformance()
     if (this.gapless5Enabled) {
       await this.playIndexGapless5(i, autoplay, opts)
       return
@@ -1281,12 +1308,19 @@ export class PlayerController {
     await this.seekToAyah(ayah, positionMs)
   }
 
+  private notePerformance() {
+    this.state = { ...this.state, clockRevision: (this.state.clockRevision ?? 0) + 1,
+      inkGeneration: (this.state.inkGeneration ?? 0) + 1 }
+  }
+
   seekMs(ms: number) {
+    this.notePerformance()
     if (this.gapless5Enabled) {
       this.gapless5?.seekMs(ms)
       this.onTime()
       return
     }
+    this.programmedSeek = { targetMs: Math.max(0, ms), atMs: performance.now() }
     this.active.currentTime = Math.max(0, ms / 1000)
     this.onTime()
     this.scheduleGaplessBoundary()
@@ -1354,7 +1388,14 @@ export class PlayerController {
     this.playlist = []
     this.index = 0
     this.stopTick()
-    this.patch({ ...initial, speed: this.state.speed })
+    // Sync survives a dismissed session and rejects lower revisions as stale.
+    // Keep counters cumulative for this controller; the next play rearms ink.
+    this.patch({
+      ...initial,
+      speed: this.state.speed,
+      clockRevision: this.state.clockRevision,
+      inkGeneration: this.state.inkGeneration,
+    })
   }
 
   private async onEnded() {

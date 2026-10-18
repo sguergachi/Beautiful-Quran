@@ -35,6 +35,18 @@ val releaseKeystore = findReleaseKeystore()
 val qfContentBaseUrl = providers.gradleProperty("qfContentBaseUrl")
     .getOrElse("https://beautiful-quran.sguergachi.workers.dev")
 
+// Local timing captures must identify the actual source, including uncommitted work.
+val captureSourceRevision = providers.exec {
+    workingDir(rootProject.projectDir)
+    commandLine("git", "rev-parse", "HEAD")
+    isIgnoreExitValue = true
+}.standardOutput.asText.map { it.trim().takeIf { sha -> sha.matches(Regex("[0-9a-f]{40}")) } ?: "unknown" }
+val captureSourceDirty = providers.exec {
+    workingDir(rootProject.projectDir)
+    commandLine("git", "status", "--porcelain", "--untracked-files=normal")
+    isIgnoreExitValue = true
+}.standardOutput.asText.map { it.isNotBlank() }
+
 // The mushaf is the QCF V2 page faces or it is nothing: a build that ships
 // without all 604 renders every leaf in the fallback Hafs face, which is the
 // "misaligned mushaf" failure this pipeline once produced silently. So the
@@ -61,9 +73,11 @@ android {
         applicationId = "com.beautifulquran"
         minSdk = 30
         targetSdk = 37
-        versionCode = 12
-        versionName = "0.11"
+        versionCode = 13
+        versionName = "0.12"
         buildConfigField("String", "QF_CONTENT_BASE_URL", "\"$qfContentBaseUrl\"")
+        buildConfigField("String", "CAPTURE_SOURCE_REVISION", "\"${captureSourceRevision.get()}\"")
+        buildConfigField("boolean", "CAPTURE_SOURCE_DIRTY", captureSourceDirty.get().toString())
     }
 
     signingConfigs {
@@ -281,6 +295,17 @@ tasks.named("preBuild") {
 // precisely the case it exists to catch.
 tasks.withType<Test>().configureEach {
     maxParallelForks = Runtime.getRuntime().availableProcessors().coerceAtMost(4)
+    // Opt-in local profile replay, never required by an offline CI checkout.
+    providers.gradleProperty("highlightTrace").orNull?.let { trace ->
+        val traceFile = rootProject.file(trace)
+        inputs.file(traceFile).withPropertyName("highlightReplayTrace")
+        systemProperty("bq.highlightTrace", traceFile.absolutePath)
+    }
+    providers.gradleProperty("highlightCorpus").orNull?.let { corpus ->
+        val corpusFile = rootProject.file(corpus)
+        inputs.file(corpusFile).withPropertyName("highlightCorpus")
+        systemProperty("bq.highlightCorpus", corpusFile.absolutePath)
+    }
     listOf(
         "quran.db", "quran.db.sha256",
         "lexicon.db", "lexicon.db.sha256",

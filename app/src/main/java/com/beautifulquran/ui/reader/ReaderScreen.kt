@@ -1696,6 +1696,7 @@ fun ReaderScreen(
             }
         }
     }
+    ProvideHighlightTimeline(viewModel.highlightSyncState) {
     Box(Modifier.fillMaxSize()) {
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
@@ -3703,6 +3704,7 @@ fun ReaderScreen(
             }
         }
     }
+}
 }
 
 /**
