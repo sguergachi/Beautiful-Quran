@@ -23,6 +23,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawingPadding
+import androidx.compose.foundation.layout.width
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -34,8 +35,10 @@ import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.nativeCanvas
@@ -45,6 +48,7 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.progressBarRangeInfo
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.setProgress
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.core.view.WindowCompat
@@ -98,7 +102,6 @@ private class PaperInkWord(
     val baseline: Float,
     val motion: PaperInkClock,
     val ayah: Int,
-    val maxDepth: Float,
     val pacing: TajweedPacing.Curve?,
     val shader: RuntimeShader,
 ) {
@@ -152,14 +155,14 @@ private suspend fun loadStudy(app: QuranApp): PaperInkStudy {
         PaperInkWord(
             spec.getDouble("width").toFloat(), spec.getDouble("height").toFloat(),
             spec.getDouble("baseline").toFloat(), PaperInkClock(span.startMs, end, t.glintFadeMs), ayah,
-            spec.getDouble("maxDepth").toFloat(), curve, shader,
+            curve, shader,
         )
     })
 }
 
 @RequiresApi(33)
 private enum class InkPreview(val label: String) {
-    Voice("Follow voice"), Wet("Hold wet"), Dry("Dry ink"),
+    Voice("Follow voice"), Wet("Hold fill"), Dry("Dry ink"),
 }
 
 private enum class InkFill(val label: String) {
@@ -176,6 +179,7 @@ private fun PaperInkStudyPage(app: QuranApp, study: PaperInkStudy) {
     val preview = remember { mutableStateOf(InkPreview.Voice) }
     val thickness = remember { mutableFloatStateOf(.25f) }
     val fontScale = remember { mutableFloatStateOf(1f) }
+    val fillAmount = remember { mutableFloatStateOf(.5f) }
     val paper = Color(0xFFFAF3E8)
     val repeatColor = LocalQuranAccents.current.repeatInk
     LaunchedEffect(study) {
@@ -227,8 +231,12 @@ private fun PaperInkStudyPage(app: QuranApp, study: PaperInkStudy) {
                         else -> 0L
                     }
                     word.motion.update(position, state.isPlaying && belongs && word.ayah == currentAyah, now)
-                    val progress = if (preview.value != InkPreview.Voice) 1f else
-                        word.pacing?.at(word.motion.progress) ?: InkEngine.sweepEasing.transform(word.motion.progress)
+                    val progress = when (preview.value) {
+                        InkPreview.Wet -> fillAmount.floatValue
+                        InkPreview.Dry -> 1f
+                        InkPreview.Voice -> word.pacing?.at(word.motion.progress) ?:
+                            InkEngine.sweepEasing.transform(word.motion.progress)
+                    }
                     val repeat = word.ayah == 2 && study.sequence.repeatedMiddle
                     val wet = when (preview.value) {
                         InkPreview.Voice -> word.motion.wet
@@ -238,8 +246,6 @@ private fun PaperInkStudyPage(app: QuranApp, study: PaperInkStudy) {
                     word.shader.setFloatUniform("progress", progress)
                     word.shader.setFloatUniform("wet", wet)
                     word.shader.setFloatUniform("fillMode", fillMode.value.ordinal.toFloat())
-                    word.shader.setFloatUniform("extent", word.width, word.height)
-                    word.shader.setFloatUniform("maxDepth", word.maxDepth)
                     word.shader.setFloatUniform("retained", if (repeat) 1f else 0f)
                     word.shader.setFloatUniform("repeatPass", if (repeat) 1f else 0f)
                     word.shader.setFloatUniform("repeatColor", repeatColor.red, repeatColor.green, repeatColor.blue)
@@ -259,9 +265,14 @@ private fun PaperInkStudyPage(app: QuranApp, study: PaperInkStudy) {
         }
         Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
             Text("Paper ink", style = MaterialTheme.typography.titleMedium)
-            Text("Letter ink wash · verse 2 repeats once", style = MaterialTheme.typography.bodySmall)
+            Text(if (fillMode.value == InkFill.InsideOut) "Stroke centres → edges · verse 2 repeats" else
+                "Letter bottoms → tops · verse 2 repeats", style = MaterialTheme.typography.bodySmall)
             InkStudyDial("Ink pooling", thickness)
             InkStudyDial("Font size", fontScale, .5f..1f)
+            InkStudyDial("Inspect fill", fillAmount, onChange = {
+                if (preview.value != InkPreview.Wet) app.player.pause()
+                preview.value = InkPreview.Wet
+            })
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                 InkFill.entries.forEach { mode ->
                     Text(mode.label, Modifier.quietClickable { fillMode.value = mode }.padding(vertical = 8.dp),
@@ -302,40 +313,48 @@ private fun PaperInkStudyPage(app: QuranApp, study: PaperInkStudy) {
 }
 
 @Composable
-private fun InkStudyDial(label: String, value: MutableFloatState, range: ClosedFloatingPointRange<Float> = 0f..1f) {
+private fun InkStudyDial(
+    label: String,
+    value: MutableFloatState,
+    range: ClosedFloatingPointRange<Float> = 0f..1f,
+    onChange: () -> Unit = {},
+) {
+    val changed by rememberUpdatedState(onChange)
     val ink = MaterialTheme.colorScheme.primary
     val span = range.endInclusive - range.start
-    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-        Text(label, style = MaterialTheme.typography.bodySmall)
-        Text("${(value.floatValue * 100).roundToInt()}%", style = MaterialTheme.typography.bodySmall)
-    }
-    Canvas(Modifier.fillMaxWidth().height(48.dp).semantics {
-        contentDescription = label
-        progressBarRangeInfo = ProgressBarRangeInfo(value.floatValue, range)
-        setProgress { value.floatValue = it.coerceIn(range); true }
-    }.pointerInput(value, range) {
-        awaitEachGesture {
-            val down = awaitFirstDown()
-            fun adjust(x: Float) {
-                val fraction = ((x - 8.dp.toPx()) / (size.width - 16.dp.toPx())).coerceIn(0f, 1f)
-                value.floatValue = range.start + fraction * span
+    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+        Text(label, Modifier.width(88.dp), style = MaterialTheme.typography.bodySmall)
+        Canvas(Modifier.weight(1f).height(48.dp).semantics {
+            contentDescription = label
+            progressBarRangeInfo = ProgressBarRangeInfo(value.floatValue, range)
+            setProgress { value.floatValue = it.coerceIn(range); changed(); true }
+        }.pointerInput(value, range) {
+            awaitEachGesture {
+                val down = awaitFirstDown()
+                fun adjust(x: Float) {
+                    val fraction = ((x - 8.dp.toPx()) / (size.width - 16.dp.toPx())).coerceIn(0f, 1f)
+                    value.floatValue = range.start + fraction * span
+                    changed()
+                }
+                adjust(down.position.x)
+                down.consume()
+                do {
+                    val change = awaitPointerEvent().changes.first { it.id == down.id }
+                    adjust(change.position.x)
+                    change.consume()
+                } while (change.pressed)
             }
-            adjust(down.position.x)
-            down.consume()
-            do {
-                val change = awaitPointerEvent().changes.first { it.id == down.id }
-                adjust(change.position.x)
-                change.consume()
-            } while (change.pressed)
+        }) {
+            val left = 8.dp.toPx()
+            val width = size.width - left * 2
+            for (i in 0..20) {
+                val x = left + width * i / 20
+                val half = if (i % 5 == 0) 6.dp.toPx() else 3.dp.toPx()
+                drawLine(ink.copy(alpha = .3f), Offset(x, center.y - half), Offset(x, center.y + half), 1.dp.toPx())
+            }
+            drawCircle(ink, 4.dp.toPx(), Offset(left + width * (value.floatValue - range.start) / span, center.y))
         }
-    }) {
-        val left = 8.dp.toPx()
-        val width = size.width - left * 2
-        for (i in 0..20) {
-            val x = left + width * i / 20
-            val half = if (i % 5 == 0) 6.dp.toPx() else 3.dp.toPx()
-            drawLine(ink.copy(alpha = .3f), Offset(x, center.y - half), Offset(x, center.y + half), 1.dp.toPx())
-        }
-        drawCircle(ink, 4.dp.toPx(), Offset(left + width * (value.floatValue - range.start) / span, center.y))
+        Text("${(value.floatValue * 100).roundToInt()}%", Modifier.width(44.dp), textAlign = TextAlign.End,
+            style = MaterialTheme.typography.bodySmall)
     }
 }

@@ -18,17 +18,20 @@ sheet for three verses. The existing Al-Shatri audio queue plays **1 → 2 →
 2 → 3**: Media3 repeats the middle item once, then resumes the queue. The
 normal reader wash is unchanged; this is an isolated visual experiment.
 
-The familiar right-to-left wash moves through each word, with a soft leading
-edge driven by the existing tajweed pacing. There is no pen or authored
-stroke route, and no whole-word fade. As the wash reaches the letterforms,
-their ink fills using either **Inside out** (from the stroke interior toward
-its contour) or **Bottom up** (a rising fill inside the font outline). A
-fixed toggle compares both during playback without moving the text or
-restarting audio. These are continuous fields inside the shaped word, not
-isolated character outlines: Arabic ligatures and their marks stay intact.
-Both fill modes have a broad, gradual pigment transition at the moving front,
-beyond pixel antialiasing. A faint ink stain leads into the fuller fill so the
-interior growth or rising level fades in. The printed contour stays sharp.
+The existing tajweed pacing supplies a right-to-left reading sequence through
+the font's shaped letter clusters. Ink develops through each cluster's shape
+rather than behind a moving vertical mask. HarfBuzz glyph advances schedule
+the clusters; glyph bounds associate the printed ink and marks with them.
+Ligatures stay together and the original printed contour stays authoritative.
+There is no pen, authored stroke route, or whole-word opacity fade.
+
+**Inside out** blooms from each stroke's thick interior toward its contour.
+**Bottom up** raises ink from the bottom to the top of each connected ink
+piece, including marks, within that cluster's turn. Filling overlaps between
+neighbouring clusters, with a broad feathered pigment front. Each piece uses
+its own depth or height, so small marks participate rather than waiting for a
+word-wide height/depth threshold. The fixed toggle changes mode without
+moving text or restarting audio; the caption explains the selected mode.
 
 The wash is based on media time, so pausing freezes filling and changing
 playback speed scales it with the recitation. Before its turn, a word remains
@@ -65,19 +68,22 @@ back to black.
 **Again** restarts the three-verse demonstration and rearms its one repeat.
 The repeat mode is cleared when the study stops.
 
-**Hold wet** and **Dry ink** pause the audio for a material comparison;
-**Follow voice**, Play or Again returns to timed filling. Controls keep their
-fixed slots. Normal and half-speed playback are available.
+**Inspect fill** scrubs a paused, fully wet material preview from 0–100%.
+It starts at 50%, where switching modes visibly compares their growth;
+100% shows the completed wet material. Touching it pauses audio, and
+**Hold fill** restores that inspected phase. **Dry ink** shows complete dry
+text. **Follow voice**, Play or Again returns to timed filling. Controls
+keep their fixed slots. Normal and half-speed playback are available.
 
 Ten cached native AGSL shaders draw the ten word instances. Committed 4×
 contour maps preserve the font; smooth surface maps supply normal XY and film
-depth. There is no per-frame shaping, rasterization, bitmap upload, or
-arrival-map lookup. The material maps are generated from the font outlines,
-without stroke inference. Field R carries height, G interior-to-contour fill,
-and B contour distance; the surface map carries normal XY and film depth:
+depth. There is no per-frame shaping, rasterization, or bitmap upload. The
+material maps are generated from the font outlines, without stroke inference.
+Field R/G carry bottom-up/inside-out arrival phases, sampled together with
+B contour distance; the surface map carries normal XY and film depth:
 
 ```bash
-# Python environment: numpy, scipy, Pillow with RAQM
+# Python environment: numpy, scipy, uharfbuzz, Pillow with RAQM
 python3 tools/build_paper_ink_study.py
 adb shell am start -n com.beautifulquran/.ui.reader.PaperInkStudyActivity
 ```

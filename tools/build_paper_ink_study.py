@@ -1,20 +1,69 @@
 """Build contour and smooth liquid-film maps for the three-verse ink-wash study.
 
-Requires numpy, scipy and Pillow with RAQM. Assets are committed; nothing is
-rasterized per frame. The field carries inside-out and bottom-up filling coordinates, with no stroke routes.
+Requires numpy, scipy, uharfbuzz and Pillow with RAQM. Assets are committed;
+nothing is shaped or rasterized per frame. No pen routes are inferred.
 """
 import json
 import sqlite3
 from pathlib import Path
 
 import numpy as np
+import uharfbuzz as hb
 from PIL import Image, ImageDraw, ImageFont
-from scipy.ndimage import distance_transform_edt, gaussian_filter
+from scipy.ndimage import distance_transform_edt, find_objects, gaussian_filter, label
 
 ROOT = Path(__file__).resolve().parents[1]
 SS = 4
 ASSETS = ROOT / 'app/src/main/assets/paper-ink-study'
 FONT = ROOT / 'app/src/main/res/font/uthmanic_hafs_v22.ttf'
+
+
+def filling_fields(text, ink, distance, box, ascent):
+    """Schedule shaped letter clusters, then fill each stroke's own contour/height."""
+    font = hb.Font(hb.Face(FONT.read_bytes()))
+    font.scale = (160 * SS * 64, 160 * SS * 64)
+    buf = hb.Buffer()
+    buf.add_str(text)
+    buf.guess_segment_properties()
+    hb.shape(font, buf)
+    yy, xx = np.indices(ink.shape)
+    owner = np.zeros(ink.shape, dtype=int)
+    closest = np.full(ink.shape, np.inf)
+    advances = {}
+    cursor = 0
+    for info, pos in zip(buf.glyph_infos, buf.glyph_positions):
+        end = cursor + pos.x_advance / 64
+        first, last = advances.get(info.cluster, (cursor, end))
+        advances[info.cluster] = min(first, cursor), max(last, end)
+        ext = font.get_glyph_extents(info.codepoint)
+        if ext is not None and ext.width and ext.height:
+            x = (8 - box[0]) * SS + cursor + (pos.x_offset + ext.x_bearing) / 64
+            y = (8 - box[1] + ascent) * SS - (pos.y_offset + ext.y_bearing) / 64
+            right, bottom = x + ext.width / 64, y - ext.height / 64
+            # The printed font remains authoritative; boxes only associate ink with its cluster.
+            dx = np.maximum(0, np.maximum(x - xx, xx - right))
+            dy = np.maximum(0, np.maximum(y - yy, yy - bottom))
+            score = dx * dx + dy * dy + .02 * ((xx - (x + right) / 2) ** 2 + (yy - (y + bottom) / 2) ** 2)
+            nearer = score < closest
+            owner[nearer] = info.cluster
+            closest[nearer] = score[nearer]
+        cursor = end
+    inside_out = np.zeros(ink.shape)
+    bottom_up = np.zeros(ink.shape)
+    for cluster, (first, last) in advances.items():
+        phase = 1 - (first + last) / (2 * cursor)
+        pieces, _ = label(ink & (owner == cluster), np.ones((3, 3)))
+        for i, region in enumerate(find_objects(pieces), 1):
+            if region is None:
+                continue
+            pixels = pieces[region] == i
+            depth = np.clip(distance[region] / max(.25, distance[region][pixels].max()), 0, 1)
+            rise = (region[0].stop - 1 - yy[region]) / max(1, region[0].stop - 1 - region[0].start)
+            inside_out[region][pixels] = .62 * phase + .38 * (1 - depth[pixels])
+            bottom_up[region][pixels] = .62 * phase + .38 * rise[pixels]
+    nearest = tuple(distance_transform_edt(~ink, return_distances=False, return_indices=True))
+    # Extrapolate into wet spread and soften joins without blurring the printed contour.
+    return [gaussian_filter(f[nearest], SS * .65) for f in (bottom_up, inside_out)]
 
 
 def build(ayah, position, text):
@@ -41,12 +90,9 @@ def build(ayah, position, text):
                               film * 255, np.full(alpha.shape, 255)], axis=-1)).astype('uint8')
     # Opaque data avoids premultiplication. B carries signed contour distance.
     field = np.zeros((*alpha.shape, 4), dtype='uint8')
-    yy = np.arange(h * SS)[:, None]
-    rows = np.where(ink.any(axis=1))[0]
-    rise = np.clip((rows[-1] - yy) / max(1, rows[-1] - rows[0]), 0, 1)
-    depth = np.clip(distance / max(1, distance.max()), 0, 1)
+    rise, bloom = filling_fields(text, ink, distance, box, reference.getmetrics()[0])
     field[:, :, 0] = np.round(rise * 255)
-    field[:, :, 1] = np.round((1 - depth) * 255)
+    field[:, :, 1] = np.round(bloom * 255)
     field[:, :, 2] = np.clip(128 + distance * 16, 0, 255)
     field[:, :, 3] = 255
     key = f'{ayah}-{position}'

@@ -2,8 +2,6 @@ uniform shader field;
 uniform shader normals;
 uniform float progress;
 uniform float fillMode;
-uniform float2 extent;
-uniform float maxDepth;
 uniform float retained;
 uniform float wet;
 uniform float weight;
@@ -15,16 +13,9 @@ uniform float2 origin;
 half4 main(float2 p) {
     float4 shape = field.eval(p * 4.0);
     float distance = (shape.b * 255.0 - 128.0) / 16.0;
-    // The familiar reading-order wash drives filling inside the letterforms.
-    // Its wide soft edge replaces the authored pen path and whole-word fade.
-    float wash = clamp((progress * (extent.x + 60.0) - (extent.x - p.x)) / 60.0, 0.0, 1.0);
-    wash = smoothstep(0.0, 1.0, wash);
-    float coordinate = mix(shape.g, shape.r, fillMode);
-    float softness = max(mix(aa / maxDepth, aa / extent.y, fillMode), mix(0.25, 0.12, fillMode));
-    float filling = smoothstep(coordinate - softness, coordinate + softness,
-        mix(-softness, 1.0 + softness, wash));
-    // A light ink stain precedes the fuller fill, keeping the moving front soft.
-    float loaded = wash * mix(wash, filling, 0.65);
+    // Letter clusters arrive in reading order; each fills through its own shape.
+    float arrival = mix(shape.g, shape.r, fillMode);
+    float loaded = smoothstep(arrival - 0.065, arrival + 0.065, mix(-0.065, 1.065, progress));
     float3 surface = normals.eval(p).rgb;
     float localWet = smoothstep(0.0, 0.7, wet - (1.0 - surface.b) * 0.2) * loaded;
     float base = smoothstep(-aa * 0.5, aa * 0.5, distance);
