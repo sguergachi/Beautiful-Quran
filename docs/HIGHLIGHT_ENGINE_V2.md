@@ -1,8 +1,13 @@
 # HighlightEngine V2: synchronization overhaul plan
 
-Status: **planned; implementation has not started**. Reviewed on 2026-10-18
+Status: **implementation in progress; V1 remains the visible engine**. Reviewed on 2026-10-18
 against baseline commit `b94f4c88`. This document records the proposed scope,
 work packages, acceptance criteria, and validation gates.
+
+The first slice provides a candidate pure core, coherent sample packets, and
+bounded local sample-clock capture/replay. See the
+[executable contract and remaining gates](HIGHLIGHT_ENGINE_V2_CONTRACT.md).
+This does not complete the motion migration or authorize default cutover.
 
 ## Goals and expected outcomes
 
@@ -386,7 +391,8 @@ Track engine generation independently from application, trace, and data versions
   not require a DB bump; any later data change follows the separate fingerprint
   and versioning rules.
 
-All WP0–WP8 are pending. Start implementation with WP0/WP1, then WP2, WP3, WP4,
+WP0–WP3 have initial implementation; their full acceptance gates remain open.
+WP4–WP8 are pending. Continue with WP0/WP1, then WP2, WP3, WP4,
 the Arabic/English migrations, web parity, and final cutover. Do not combine
 the entire migration into a single rewrite.
 

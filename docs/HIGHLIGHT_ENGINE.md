@@ -20,7 +20,9 @@ where repeat-aware timing data comes from, see
 
 The proposed [HighlightEngine V2 plan](HIGHLIGHT_ENGINE_V2.md) expands the pure
 engine's ownership of runtime synchronization. It records goals, work packages,
-acceptance criteria, and testing gates; implementation has not started.
+acceptance criteria, and testing gates. The
+[initial V2 contract](HIGHLIGHT_ENGINE_V2_CONTRACT.md) describes the candidate
+core and local replay tooling. V1 remains responsible for visible highlighting.
 
 ## The input: a list of `Segment`s
 

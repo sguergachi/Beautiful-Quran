@@ -204,6 +204,15 @@ class PlayerController(private val context: Context) {
     val liveNowPlaying: NowPlaying?
         get() = controller?.currentMediaItem?.mediaId?.let(::parseMediaId)
 
+    /** One main-thread position read with matching item, transport, speed, and event revisions. */
+    internal fun highlightSample(expected: NowPlaying): com.beautifulquran.domain.HighlightPlaybackSample? {
+        val before = state.value
+        val liveBefore = liveNowPlaying
+        val position = positionMs
+        val sampledAt = System.nanoTime()
+        return coherentHighlightSample(expected, before, state.value, liveBefore, liveNowPlaying, position, sampledAt)
+    }
+
     /** Duration of the ayah currently loaded, or 0 while it is still unknown
      * (buffering / not prepared). Media3 reports an unset duration as a large
      * sentinel, so anything non-positive is treated as "not yet known". */

@@ -1,0 +1,61 @@
+{
+  "schemaVersion": 1,
+  "scope": "sample-clock",
+  "cases": [
+    {
+      "name": "nominal polls preserve V1 selection clock",
+      "difference": "none",
+      "speed": 1.0,
+      "samples": [
+        {"atMs": 0, "rawMs": 0, "v1Ms": 0, "v2Ms": 0},
+        {"atMs": 33, "rawMs": 33, "v1Ms": 33, "v2Ms": 33},
+        {"atMs": 66, "rawMs": 66, "v1Ms": 66, "v2Ms": 66},
+        {"atMs": 99, "rawMs": 99, "v1Ms": 99, "v2Ms": 99}
+      ]
+    },
+    {
+      "name": "delayed first poll does not become highlight debt",
+      "difference": "elapsed-aware-settle",
+      "speed": 1.0,
+      "samples": [
+        {"atMs": 0, "rawMs": 0, "v1Ms": 0, "v2Ms": 0},
+        {"atMs": 250, "rawMs": 250, "v1Ms": 0, "v2Ms": 250},
+        {"atMs": 283, "rawMs": 283, "v1Ms": 66, "v2Ms": 283},
+        {"atMs": 316, "rawMs": 316, "v1Ms": 132, "v2Ms": 316}
+      ]
+    },
+    {
+      "name": "repeated slow polls advance from their actual elapsed time",
+      "difference": "elapsed-aware-settle",
+      "speed": 1.0,
+      "samples": [
+        {"atMs": 0, "rawMs": 0, "v1Ms": 0, "v2Ms": 0},
+        {"atMs": 110, "rawMs": 110, "v1Ms": 0, "v2Ms": 110},
+        {"atMs": 220, "rawMs": 220, "v1Ms": 0, "v2Ms": 220},
+        {"atMs": 330, "rawMs": 330, "v1Ms": 0, "v2Ms": 330}
+      ]
+    },
+    {
+      "name": "fast playback is not mistaken for a creeping estimate",
+      "difference": "elapsed-aware-settle",
+      "speed": 1.5,
+      "samples": [
+        {"atMs": 0, "rawMs": 0, "v1Ms": 0, "v2Ms": 0},
+        {"atMs": 50, "rawMs": 75, "v1Ms": 66, "v2Ms": 75},
+        {"atMs": 100, "rawMs": 150, "v1Ms": 132, "v2Ms": 150},
+        {"atMs": 150, "rawMs": 225, "v1Ms": 198, "v2Ms": 225}
+      ]
+    },
+    {
+      "name": "settle still rejects an implausible post seek spike",
+      "difference": "frame-retention",
+      "speed": 1.0,
+      "samples": [
+        {"atMs": 0, "rawMs": 0, "v1Ms": 0, "v2Ms": 0},
+        {"atMs": 33, "rawMs": 800, "v1Ms": 0, "v2Ms": 33},
+        {"atMs": 66, "rawMs": 100, "v1Ms": 66, "v2Ms": 66},
+        {"atMs": 99, "rawMs": 40, "v1Ms": 66, "v2Ms": 99}
+      ]
+    }
+  ]
+}

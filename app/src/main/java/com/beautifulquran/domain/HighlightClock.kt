@@ -1,5 +1,7 @@
 package com.beautifulquran.domain
 
+import kotlinx.serialization.Serializable
+
 /**
  * Smooths the player's raw position samples into the clock the word
  * highlight reads.
@@ -43,6 +45,31 @@ class HighlightClock(
     private val maxSettleStepMs: Long = MAX_SETTLE_STEP_MS,
     private val believableStepMs: Long = BELIEVABLE_STEP_MS,
 ) {
+
+    /** Exact filter state at capture start; the adapter records the associated item separately. */
+    @Serializable
+    data class Checkpoint(
+        val clockMs: Long,
+        val lastRawMs: Long,
+        val acceptNext: Boolean,
+        val settlePolls: Int,
+        val stablePolls: Int,
+        val converged: Boolean,
+    )
+
+    internal fun checkpoint(): Checkpoint =
+        Checkpoint(clockMs, lastRawMs, acceptNext, settlePolls, stablePolls, converged)
+
+    /** Replay only: restore the same filter without restarting its settle window. */
+    internal fun restore(item: Any?, checkpoint: Checkpoint) {
+        key = item
+        clockMs = checkpoint.clockMs
+        lastRawMs = checkpoint.lastRawMs
+        acceptNext = checkpoint.acceptNext
+        settlePolls = checkpoint.settlePolls
+        stablePolls = checkpoint.stablePolls
+        converged = checkpoint.converged
+    }
 
     private var key: Any? = null
     private var clockMs = 0L

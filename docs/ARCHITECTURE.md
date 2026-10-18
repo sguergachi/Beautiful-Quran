@@ -34,6 +34,12 @@ app (runtime)                                           ▼
 
 ## Principles
 
+The [HighlightEngine V2 migration](HIGHLIGHT_ENGINE_V2.md) has an initial pure
+candidate core and coherent playback-sample adapter. V1 still draws; V2 runs
+only during an explicit developer performance capture. Those local reports
+include bounded, self-contained sample-clock replay data. See the
+[implemented boundary and remaining gates](HIGHLIGHT_ENGINE_V2_CONTRACT.md).
+
 1. **Offline-first reader.** The released reader still has no accounts,
    analytics, or client API keys and works in airplane mode using the verified
    bundled text, downloaded timing copies, and cached audio. A first download
