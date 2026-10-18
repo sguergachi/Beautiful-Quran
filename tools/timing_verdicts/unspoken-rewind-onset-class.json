@@ -4,7 +4,7 @@
     "commit": "b2812e8e8186725840674f6659d28850375e9ed8",
     "runtimeRevision": "5413f8f82f0c674892b0213b5f7fb90249df38418515af65b75c933190c7739b"
   },
-  "publication": "not published; authenticated snapshot replay and source-profile verdict reconciliation are still required",
+  "publication": "Authenticated source promotion is recorded in qf-source-transition.json; current production status is recorded in docs/quality-reviews/TIMING_RUNTIME_PROMOTION_2026-10-17.md. This file preserves the original delivered-row proposal.",
   "verdicts": {
     "Alafasy_128kbps:5:2": {
       "verdict": "accept",

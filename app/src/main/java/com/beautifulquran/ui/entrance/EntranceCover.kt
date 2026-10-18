@@ -32,6 +32,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
@@ -70,6 +71,7 @@ import com.beautifulquran.ui.theme.CoverAccents
 import com.beautifulquran.ui.theme.CoverLeatherCenter
 import com.beautifulquran.ui.theme.CoverLeatherEdge
 import com.beautifulquran.ui.theme.CoverParchment
+import com.beautifulquran.ui.theme.GildingDemand
 import com.beautifulquran.ui.theme.GildingTilt
 import com.beautifulquran.ui.theme.LocalGildingTilt
 import com.beautifulquran.ui.theme.GeneratedBorderBand
@@ -261,11 +263,45 @@ fun EntranceCover(
         }
     }
 
+    val accents = CoverAccents
+    // The gilding catches light as the phone is tilted. Without an
+    // accelerometer to tilt it, the cover keeps its slow idle sweep; the
+    // indeterminate load bar rides the same one.
+    val loadSweep = rememberInfiniteTransition(label = "coverSweep").animateFloat(
+        initialValue = 0.18f,
+        targetValue = 0.82f,
+        animationSpec = infiniteRepeatable(tween(6_500), RepeatMode.Reverse),
+        label = "coverSweepPosition",
+    )
+    val tilt = LocalGildingTilt.current
+    val liveSheen: State<Float> = if ((tilt as? GildingTilt)?.hasSensor == false) loadSweep else tilt
+    // The light stops while the board swings. A sheen step re-records the
+    // gold pass of every gilded figure (frame, band, seals, medallion) at
+    // draw time; mid-swing that lands on every frame beneath a full-screen
+    // perspective transform and the hinge stutters. From Opening on, the
+    // renderers read one frozen value, so the swing is a pure layer
+    // transform — edge-on, a moving light is invisible anyway.
+    val frozenSheen = remember { mutableFloatStateOf(0f) }
+    val sheen: State<Float> = remember {
+        derivedStateOf {
+            if (phase == EntrancePhase.Opening) frozenSheen.floatValue
+            else liveSheen.value.coerceIn(0f, 1f)
+        }
+    }
+    // The renderers' own demands see this frozen wrapper (not GildingTilt),
+    // so the tilt sensor is kept alive here for the closed ceremony.
+    GildingDemand(liveSheen)
+
+    fun beginOpening() {
+        frozenSheen.floatValue = liveSheen.value.coerceIn(0f, 1f)
+        phase = EntrancePhase.Opening
+    }
+
     fun skipToOpening() {
         if (phase != EntrancePhase.Opening) {
             skipRequested = true
             captionVisible = true
-            if (contentReady) phase = EntrancePhase.Opening
+            if (currentContentReady) beginOpening()
         }
     }
 
@@ -308,24 +344,12 @@ fun EntranceCover(
         captionVisible = true
         warmStackOnce()
         snapshotFlow { currentContentReady }.first { it }
-        phase = EntrancePhase.Opening
+        beginOpening()
         onOpenBegan()
         turn.animateTo(1f, tween(OPEN_MS, easing = CoverOpenEasing))
         onFinished()
     }
 
-    val accents = CoverAccents
-    // The gilding catches light as the phone is tilted. Without an
-    // accelerometer to tilt it, the cover keeps its slow idle sweep; the
-    // indeterminate load bar rides the same one.
-    val loadSweep = rememberInfiniteTransition(label = "coverSweep").animateFloat(
-        initialValue = 0.18f,
-        targetValue = 0.82f,
-        animationSpec = infiniteRepeatable(tween(6_500), RepeatMode.Reverse),
-        label = "coverSweepPosition",
-    )
-    val tilt = LocalGildingTilt.current
-    val sheen: State<Float> = if ((tilt as? GildingTilt)?.hasSensor == false) loadSweep else tilt
     // State view of the build so renderers re-draw (never recompose) as it runs.
     val buildState = remember { derivedStateOf { build.value } }
     val captionAlpha = animateFloatAsState(
@@ -389,12 +413,17 @@ fun EntranceCover(
         ) {
             // Record the field once; its wash changes only layer alpha, so it
             // never re-records the leather, title, or border around it.
+            // Offscreen, not ModulateAlpha: the weave's four giant paths are
+            // past the atlas-path cache's size, so a plain node re-tessellates
+            // them on the render thread every frame the surface is damaged —
+            // the whole ceremony, since the sheen damages it every frame. An
+            // offscreen layer renders them once and composites the texture.
             Spacer(
                 Modifier
                     .matchParentSize()
                     .graphicsLayer {
                         alpha = (build.value / 0.55f).coerceIn(0f, 1f)
-                        compositingStrategy = CompositingStrategy.ModulateAlpha
+                        compositingStrategy = CompositingStrategy.Offscreen
                     }
                     .generatedFieldWeave(
                         field = ornament.field,

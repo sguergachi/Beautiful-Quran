@@ -227,7 +227,8 @@ QF_SOURCE_SHA256 = {
     7: "ee3d429dbdd9ab80e2310e9bf770cf7b7f4cbdc6cfe2a90257ef6072fa4010c0",
     9: "a145f59301feca42b727d43456368e1c7f2f87465325dd4104c863060c7eaeb2",
 }
-QF_TIMING_BASELINE_SHA256 = "3489bd89a91177d2701a2bbc3e8e414d957e308a539c6ec71122a568015f7c8d"
+# Pin the latest accepted private generation so refreshes retain earlier runtime repairs.
+QF_TIMING_BASELINE_SHA256 = "1d4fc496babe533ad28f5a8f46fd328e0b24588f25d85427949d18ddd530f673"
 QF_VERDICTS_FILE = ROOT / "tools/timing_verdicts/qf-source-transition.json"
 QF_RUNTIME_DELIVERY = "authenticated Content Sync runtime cache; no bundled QF timings"
 

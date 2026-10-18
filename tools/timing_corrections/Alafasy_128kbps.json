@@ -42,10 +42,11 @@
       "reciterId": 1,
       "surahId": 6,
       "ayah": 145,
-      "op": "one_utterance",
-      "positions": [12, 13],
-      "evidence": ["CTC", "quran-align"],
-      "refs": ["full-corpus acoustic audit"]
+      "op": "discard_unspoken_rewind_onset",
+      "sourceWindow": [[12, 13770, 14650], [13, 14650, 15390], [12, 15390, 17590]],
+      "requiresAudioVerdict": true,
+      "evidence": ["ear", "Arabic XLSR", "MMS/uroman", "quran-align", "waveform"],
+      "refs": ["device timing lab 2026-10-17", "tools/timing_verdicts/qf-source-transition.json", "docs/quality-reviews/TIMING_RUNTIME_PROMOTION_2026-10-17.md"]
     },
     {
       "reciterId": 1,

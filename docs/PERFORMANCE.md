@@ -114,11 +114,40 @@ spill past the sheet's edge).
 
 The entrance cover follows that rule too. Caption alpha stays a `State` until
 its layer reads it, and the loading rule reads its sweep only in its Canvas;
-neither animation recomposes the cover. The leather's geometric field is a
-separate, static recording whose wash changes only layer alpha with
-`ModulateAlpha`, preserving each stroke's translucency without rebuilding the
-large tiled path or re-recording the board. The medallion retains its
+neither animation recomposes the cover. The medallion retains its
 stroke-by-stroke build and the titles retain their soft letter washes.
+
+The gilded figures are recorded once and re-lit, never redrawn. Each figure
+(`TooledGold`) records its embossed relief and its opaque gold leaf into
+remembered layers at first size; a sheen step re-records only the gold pass —
+three cheap ops: replay the leaf layer, rotate, and a gradient rect
+`BlendMode.SrcIn` into an offscreen spacer. The ramp's axis is frozen
+horizontal through the figure's centre (identical to the brush at rest) and the
+sheen rotates it, mirroring the web port's glint, so no per-step re-recording
+of the band's or seals' thousands of points ever happens again.
+
+That is half the law. The other half is where the render thread spends its
+frames: a node with no persistent buffer has its display list re-executed on
+the RT for every frame in which the surface is damaged — recording once saves
+the UI thread, not the RT, and the RT re-rasterises the giant paths each time.
+Measured on the emulator, the settled cover ran at ~20 fps with the RT pinned
+near a full core while the UI thread was idle; its real per-frame work was a
+few ms of stencil-covered giant paths. Everything static and heavy therefore
+lives in a `CompositingStrategy.Offscreen` layer, which renders its content
+once and composites the result as a texture: the leather's field weave (its
+four full-screen giant paths) and each gilded figure's box. After that flip the
+same emulator measures the settled sweep at 0/56 janky frames (p50 17 ms), the
+medallion build at 1.95% (p99 57 ms), and the swing at 2.2% (p95 32 ms), with
+zero slow-UI frames in the sweep. The reader's chapter backdrops and surah
+band keep their own weave layers on the same rule.
+
+The swing itself stays a pure layer transform by freezing the light on top of
+that: `beginOpening` snaps the sheen into a frozen `State` first, so from
+Opening until the ceremony leaves, the gold nodes do not re-record at all and
+the hinge turns only RenderNode properties. Edge-on the moving light is
+invisible anyway. The tilt sensor's demand is kept alive by an explicit
+`GildingDemand(liveSheen)` in the ceremony, since the renderers' own demands
+see the frozen wrapper.
 
 The QF SQLite cache opens and migrates lazily on the first background read.
 The application launches its checkpoint/refresh decision on `Dispatchers.IO`,

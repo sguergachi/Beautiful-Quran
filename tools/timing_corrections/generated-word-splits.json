@@ -12,7 +12,11 @@
       "requiresAudioVerdict": true,
       "generator": "tools/audit_word_splits.py",
       "evidence": ["Arabic XLSR", "MMS/uroman", "acoustic frame ownership"],
-      "refs": ["tools/timing_evidence/word-split-corpus-review.json"]
+      "refs": ["tools/timing_evidence/word-split-corpus-review.json"],
+      "authenticatedRetirement": {
+        "inputSegmentsSha256": "d0d312b511bcf1adc746fbf60deeef10bdab2d34bd368c20866bb531385cc603",
+        "evidence": "tools/timing_verdicts/qf-source-transition.json; docs/quality-reviews/TIMING_RUNTIME_PROMOTION_2026-10-17.md (retain exact baseline; merge proof is for another input)"
+      }
     },
     {
       "reciterId": 1,
@@ -36,7 +40,11 @@
       "requiresAudioVerdict": true,
       "generator": "tools/audit_word_splits.py",
       "evidence": ["Arabic XLSR", "MMS/uroman", "acoustic frame ownership"],
-      "refs": ["tools/timing_evidence/word-split-corpus-review.json"]
+      "refs": ["tools/timing_evidence/word-split-corpus-review.json"],
+      "authenticatedRetirement": {
+        "inputSegmentsSha256": "90539c5c65312c36d50b03dad9e863f70aea2ffefed1309d84c0cc3937f9d1de",
+        "evidence": "tools/timing_verdicts/qf-source-transition.json; docs/quality-reviews/TIMING_RUNTIME_PROMOTION_2026-10-17.md (retain exact baseline; merge proof is for another input)"
+      }
     },
     {
       "reciterId": 1,
@@ -60,7 +68,11 @@
       "requiresAudioVerdict": true,
       "generator": "tools/audit_word_splits.py",
       "evidence": ["Arabic XLSR", "MMS/uroman", "acoustic frame ownership"],
-      "refs": ["tools/timing_evidence/word-split-corpus-review.json"]
+      "refs": ["tools/timing_evidence/word-split-corpus-review.json"],
+      "authenticatedRetirement": {
+        "inputSegmentsSha256": "f2bfd48d83be5021a466bf0bdb175922df64f1335d44fa6e1b4b8ebcbfb5f29b",
+        "evidence": "tools/timing_verdicts/qf-source-transition.json; docs/quality-reviews/TIMING_RUNTIME_PROMOTION_2026-10-17.md (retain exact baseline; merge proof is for another input)"
+      }
     },
     {
       "reciterId": 1,

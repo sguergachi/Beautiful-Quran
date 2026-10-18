@@ -8,10 +8,10 @@ with a verdict, are held with their model scores, or its cause is reverted.
 ## Audio-vetted rewind onset (#873)
 
 The typed Alafasy 5:2 correction removes only the unspoken word 15 at
-23,340–24,040 ms and folds that interval into word 14. Its local candidate
-verdict is bound to the delivered runtime row; it is not an authenticated
-snapshot publication. The private replay must reconcile the existing source
-transition ledger and every other corpus delta before this row can ship.
+23,340–24,040 ms and folds that interval into word 14. Its candidate
+now has an exact authenticated replay and refreshed dual-model evidence in
+`qf-source-transition.json`; see the
+[October 17 promotion report](../../docs/quality-reviews/TIMING_RUNTIME_PROMOTION_2026-10-17.md).
 The returning word-11 boundary at 24,070 ms also remains unvalidated: both
 models force it around 25,146–25,166 ms. No clock offset is inferred.
 
@@ -31,10 +31,11 @@ The maintainer subsequently auditioned Alafasy 47:4 and reported that word 13,
 prefer one word. The subsequent corpus audit now proves retained acoustic
 ownership for XLSR's confident source label; the bounded same-word gate accepts
 the exact candidate. `maintainer-word-split-class.json` records that evidence
-and keeps the human report separate. Authenticated-source promotion and runtime
-publication are still pending. Alafasy 24:25 and Hani 21:46/21:63 need no edit.
+and keeps the human report separate. The authenticated replay also moves
+words 7–9, whose previous boundary review regresses. The combined candidate remains held; the merge proof cannot
+approve those other boundary edits. Alafasy 24:25 and Hani 21:46/21:63 need no edit.
 
-## Generated held-word merges: 71 runtime candidates
+## Generated held-word merges: four authenticated candidates remain held
 
 The [complete same-word audit](../../docs/quality-reviews/TIMING_WORD_SPLIT_CORPUS_2026-10-17.md)
 ran actual XLSR/MMS inference for all 1,021 adjacent equal-position pairs in
@@ -44,14 +45,20 @@ Every generated operation reproduces its complete audited output after the
 finalizer. The 784 retained and 166 uncertain cases remain unchanged.
 
 `../timing_evidence/word-split-corpus-candidates.verdict.json` binds the actual
-runtime baseline/candidate hashes, audio and both model proofs. These candidate
-verdicts do not replace `qf-source-transition.json`. The private authenticated
-source replay must reconcile all 71 rows and every other delta before runtime
-publication. No bundled database asset changed.
+runtime baseline/candidate hashes, audio and both model proofs. The October 17
+authenticated replay promotes 67 exact candidates into
+`qf-source-transition.json`. Four remain at baseline: Alafasy 3:86 has a
+different tail cutoff, 7:113 and 11:58 no longer contain the reviewed pairs,
+and 47:4 also moves previously rejected boundaries. The three stale merge
+operations retire only on their exact authenticated input hashes; their
+existing whole-row holds remain. No bundled database asset changed.
 
 The separate high-water-before-rewind inventory has 4,337 candidates, 4,313
 compatible with the typed pre-rewind operation. Its acoustic coverage is
-explicitly incomplete. The 5:2 exception does not authorize class-wide drops;
+explicitly incomplete: 5:2 and the new 6:145 report have exact dual-model
+verdicts. The inverse `one_utterance` audit covers all three existing operations
+(repair 6:145, retain the legacy 2:229/2:235 controls and authenticated holds).
+Those two reviewed rewind examples do not authorize class-wide drops;
 the same-word detector must not be presented as fixing that distinct class.
 
 ## Lagged qdc peer pairs (#856)

@@ -182,53 +182,58 @@ fun MushafCoverFrame(
     geometry: com.beautifulquran.ui.entrance.CoverFrameGeometry,
     modifier: Modifier = Modifier,
 ) {
-    GildingDemand(sheen)
-    Canvas(modifier.gildingLayer()) {
-        val outerInset = geometry.outerInsetPx
-        val innerInset = geometry.innerInsetPx
-        val rule = Stroke(width = 2.dp.toPx())
-        val hairline = Stroke(width = 1.dp.toPx())
+    TooledGold(
+        modifier = modifier,
+        brightGold = brightGold,
+        deepGold = deepGold,
+        sheen = sheen,
+        record = { relief, leaf ->
+            val outerInset = geometry.outerInsetPx
+            val innerInset = geometry.innerInsetPx
+            val rule = Stroke(width = 2.dp.toPx())
+            val hairline = Stroke(width = 1.dp.toPx())
 
-        val oc = geometry.outerCorners
-        val ic = geometry.innerCorners
-        val outer = Path().apply {
-            addRoundRect(
-                RoundRect(
-                    rect = Rect(
-                        left = outerInset,
-                        top = outerInset,
-                        right = size.width - outerInset,
-                        bottom = size.height - outerInset,
+            val oc = geometry.outerCorners
+            val ic = geometry.innerCorners
+            val outer = Path().apply {
+                addRoundRect(
+                    RoundRect(
+                        rect = Rect(
+                            left = outerInset,
+                            top = outerInset,
+                            right = size.width - outerInset,
+                            bottom = size.height - outerInset,
+                        ),
+                        topLeft = CornerRadius(oc.topLeft, oc.topLeft),
+                        topRight = CornerRadius(oc.topRight, oc.topRight),
+                        bottomRight = CornerRadius(oc.bottomRight, oc.bottomRight),
+                        bottomLeft = CornerRadius(oc.bottomLeft, oc.bottomLeft),
                     ),
-                    topLeft = CornerRadius(oc.topLeft, oc.topLeft),
-                    topRight = CornerRadius(oc.topRight, oc.topRight),
-                    bottomRight = CornerRadius(oc.bottomRight, oc.bottomRight),
-                    bottomLeft = CornerRadius(oc.bottomLeft, oc.bottomLeft),
-                ),
-            )
-        }
-        val inner = Path().apply {
-            addRoundRect(
-                RoundRect(
-                    rect = Rect(
-                        left = innerInset,
-                        top = innerInset,
-                        right = size.width - innerInset,
-                        bottom = size.height - innerInset,
+                )
+            }
+            val inner = Path().apply {
+                addRoundRect(
+                    RoundRect(
+                        rect = Rect(
+                            left = innerInset,
+                            top = innerInset,
+                            right = size.width - innerInset,
+                            bottom = size.height - innerInset,
+                        ),
+                        topLeft = CornerRadius(ic.topLeft, ic.topLeft),
+                        topRight = CornerRadius(ic.topRight, ic.topRight),
+                        bottomRight = CornerRadius(ic.bottomRight, ic.bottomRight),
+                        bottomLeft = CornerRadius(ic.bottomLeft, ic.bottomLeft),
                     ),
-                    topLeft = CornerRadius(ic.topLeft, ic.topLeft),
-                    topRight = CornerRadius(ic.topRight, ic.topRight),
-                    bottomRight = CornerRadius(ic.bottomRight, ic.bottomRight),
-                    bottomLeft = CornerRadius(ic.bottomLeft, ic.bottomLeft),
-                ),
-            )
-        }
-        embossed(outer, rule, embossDark, embossLight)
-
-        val gold = goldBrush(brightGold, deepGold, sheen.value.coerceIn(0f, 1f))
-        drawPath(outer, gold, style = rule)
-        drawPath(inner, gold, style = hairline)
-    }
+                )
+            }
+            relief.record { embossed(outer, rule, embossDark, embossLight) }
+            leaf.record {
+                drawPath(outer, Color.White, style = rule)
+                drawPath(inner, Color.White, style = hairline)
+            }
+        },
+    )
 }
 
 /**
