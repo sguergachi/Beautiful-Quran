@@ -481,6 +481,7 @@ class PlayerController(private val context: Context) {
         playIfOutOfRange: Boolean = play,
         keepInk: Boolean = false,
     ) = withController(holdSilenceSkip = true) { c ->
+        if (!keepInk) silenceInk.clear()
         val index = playlistIndex(ayah)
         val inRange = index in 0 until c.mediaItemCount
         if (inRange) {

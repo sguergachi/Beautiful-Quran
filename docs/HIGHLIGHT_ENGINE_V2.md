@@ -1,13 +1,9 @@
 # HighlightEngine V2: synchronization overhaul plan
 
-Status: **implementation in progress; V1 remains the visible engine**. Reviewed on 2026-10-18
-against baseline commit `b94f4c88`. This document records the proposed scope,
-work packages, acceptance criteria, and validation gates.
-
-The first slice provides a candidate pure core, coherent sample packets, and
-bounded local sample-clock capture/replay. See the
-[executable contract and remaining gates](HIGHLIGHT_ENGINE_V2_CONTRACT.md).
-This does not complete the motion migration or authorize default cutover.
+Status: **runtime implementation complete on Android and web; physical-output acceptance pending**.
+The design was reviewed on 2026-10-18 against baseline `b94f4c88`.
+See the [implemented contract and evidence](HIGHLIGHT_ENGINE_V2_CONTRACT.md).
+Physical speaker/Bluetooth acceptance remains distinct from code completion.
 
 ## Goals and expected outcomes
 
@@ -385,16 +381,18 @@ Track engine generation independently from application, trace, and data versions
   the new implementation as **2**. Report whichever is actually active; a build
   containing V2 in shadow mode is still drawing with engine 1.
 - Version trace schemas separately so old recordings remain interpretable.
-- Proposed release labels are Android **0.12 / versionCode 13** and web **0.12.0**
-  when their respective work ships. Confirm against then-current release history.
-- This plan changes no version fields or packaged data. Runtime-only work does
-  not require a DB bump; any later data change follows the separate fingerprint
+- The runtime update uses Android **0.12 / versionCode 13** and web **0.12.0**.
+  Engine generation is **2**; new native trace schema is **2**, independently.
+- Packaged timing data remains unchanged at v67. Runtime-only work does not
+  require a DB bump; any later data change follows the separate fingerprint
   and versioning rules.
 
-WP0–WP3 have initial implementation; their full acceptance gates remain open.
-WP4–WP8 are pending. Continue with WP0/WP1, then WP2, WP3, WP4,
-the Arabic/English migrations, web parity, and final cutover. Do not combine
-the entire migration into a single rewrite.
+WP0–WP7 are implemented: coherent shared sampling, pure sync and motion windows,
+transport/lifecycle integration, Arabic/repeat/wasl and English migration,
+Android/web fixtures, local sample/frame replay, and read-only corpus audit.
+WP8 includes release rendering/performance checks and removal of replaced
+speech animation owners. Physical Pixel speaker/Bluetooth acceptance remains
+unmeasured; APK delivery is paused at the user's request until engine work is complete.
 
 V2 is complete when the relevant surfaces use the pure synchronization core,
 every removed guard has replacement coverage, all differences are explained,

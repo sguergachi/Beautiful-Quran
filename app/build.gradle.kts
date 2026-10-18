@@ -73,8 +73,8 @@ android {
         applicationId = "com.beautifulquran"
         minSdk = 30
         targetSdk = 37
-        versionCode = 12
-        versionName = "0.11"
+        versionCode = 13
+        versionName = "0.12"
         buildConfigField("String", "QF_CONTENT_BASE_URL", "\"$qfContentBaseUrl\"")
         buildConfigField("String", "CAPTURE_SOURCE_REVISION", "\"${captureSourceRevision.get()}\"")
         buildConfigField("boolean", "CAPTURE_SOURCE_DIRTY", captureSourceDirty.get().toString())
@@ -300,6 +300,11 @@ tasks.withType<Test>().configureEach {
         val traceFile = rootProject.file(trace)
         inputs.file(traceFile).withPropertyName("highlightReplayTrace")
         systemProperty("bq.highlightTrace", traceFile.absolutePath)
+    }
+    providers.gradleProperty("highlightCorpus").orNull?.let { corpus ->
+        val corpusFile = rootProject.file(corpus)
+        inputs.file(corpusFile).withPropertyName("highlightCorpus")
+        systemProperty("bq.highlightCorpus", corpusFile.absolutePath)
     }
     listOf(
         "quran.db", "quran.db.sha256",

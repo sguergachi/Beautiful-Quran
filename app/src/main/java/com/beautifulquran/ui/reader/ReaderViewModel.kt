@@ -23,6 +23,9 @@ import com.beautifulquran.data.model.SurahContent
 import com.beautifulquran.domain.BASMALAH_PLAYLIST_AYAH
 import com.beautifulquran.domain.HighlightCalibration
 import com.beautifulquran.domain.HighlightPlaybackSample
+import com.beautifulquran.domain.HighlightEngineVersion
+import com.beautifulquran.domain.HighlightSyncState
+import com.beautifulquran.domain.HighlightObservation
 import com.beautifulquran.domain.HighlightSession
 import com.beautifulquran.domain.HighlightTimingContext
 import com.beautifulquran.domain.AudibleSilence
@@ -48,7 +51,6 @@ import com.beautifulquran.playback.PlayerController
 import com.beautifulquran.playback.PlayerUiState
 import kotlin.math.abs
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -57,10 +59,9 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.drop
-import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.flow
-import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.onCompletion
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.merge
 import kotlinx.coroutines.flow.stateIn
@@ -101,17 +102,18 @@ data class ActiveWord(
     /**
      * True while this is the optimistic word-tap seed, not the 33 ms poll.
      * Releasing a mushaf tap-hold on this value drops the waiting cover
-     * before Media3 owns the leaf and disposes the wash Animatable.
+     * before Media3 owns the leaf and disposes the captured wash.
      */
     val fromTap: Boolean = false,
     /** Media3's generation, retained when a tap pins [activation] for the wash. */
     val playbackActivation: Long = activation,
+    val reciterId: Int? = null,
 )
 
 /**
  * Word the reader sees after a tap. The seed lights the wash this frame;
  * the 33 ms poll replaces it. That poll often carries a new [ActiveWord.activation]
- * (seek inkId), and [rememberLetterSweep] rearms on a generation change —
+ * (seek inkId), and media motion rearms on a generation change —
  * keep the seed's activation while that word is still the one being said.
  */
 internal fun resolveActiveWord(
@@ -123,7 +125,8 @@ internal fun resolveActiveWord(
         tap != null &&
         (polled == null ||
             polled.ayah != tap.ayah ||
-            polled.wordPosition != tap.wordPosition)
+            polled.wordPosition != tap.wordPosition ||
+            polled.playbackActivation < tap.playbackActivation)
     ) {
         tap
     } else {
@@ -163,6 +166,7 @@ internal class ActiveWordPollCache {
         activation: Long,
         /** Voice time for this word's wash. [Long.MIN_VALUE] keeps [info]'s start. */
         washStartMs: Long = Long.MIN_VALUE,
+        reciterId: Int? = null,
     ): ActiveWord? {
         if (info == null) {
             this.info = null
@@ -175,7 +179,7 @@ internal class ActiveWordPollCache {
             ayah == this.ayah &&
             activation == this.activation &&
             startMs == this.washStartMs &&
-            cached != null
+            cached != null && cached.reciterId == reciterId
         ) {
             return cached
         }
@@ -191,6 +195,7 @@ internal class ActiveWordPollCache {
             highWater = info.highWater,
             repeatStart = info.repeatStart,
             activation = activation,
+            reciterId = reciterId,
         ).also {
             this.info = info
             this.ayah = ayah
@@ -290,6 +295,9 @@ internal data class PollingIdentity<K : Any>(
     val isPlaying: Boolean,
     /** Restarts immediately when Media3 reports any authoritative clock jump. */
     val discontinuityId: Long,
+    val isBuffering: Boolean,
+    val speed: Float,
+    val inkGeneration: Long,
 )
 
 /** Result of a ribbon tap; animation and contextual education have separate owners. */
@@ -305,7 +313,8 @@ internal fun <K : Any> pollingIdentity(
 ): PollingIdentity<K>? = state.nowPlaying
     ?.takeIf { it.surahId == loadedSurahId }
     ?.let(key)
-    ?.let { PollingIdentity(it, state.isPlaying, state.positionEvents.clockId) }
+    ?.let { PollingIdentity(it, state.isPlaying, state.positionEvents.clockId,
+        state.isBuffering, state.speed, state.positionEvents.inkId) }
 
 class ReaderViewModel(
     private val repository: QuranRepository,
@@ -498,16 +507,17 @@ class ReaderViewModel(
     private val transportCursor = ReaderTransportCursor()
     private var loadJob: Job? = null
     private var installedTimingGeneration = 0L
-    private var timingPublicationRevision = 0L
+    private val timingPublication = MutableStateFlow(0L)
+    private val timingPublicationRevision: Long get() = timingPublication.value
 
     private fun installTimings(loaded: Map<Int, List<Segment>>) {
-        timingPublicationRevision++
         tapInk.value = null
         tapSeed = null
         timings = loaded
         preparedTimings = loaded.mapValues { (_, segs) ->
             HighlightEngine.PreparedTimings.prepare(segs)
         }
+        timingPublication.value++
     }
 
     /**
@@ -543,56 +553,26 @@ class ReaderViewModel(
         _uiState.value = _uiState.value.copy(hasTimings = refreshed.segments.isNotEmpty())
     }
 
-    /**
-     * The polling backbone of the sync engine: while this surah is the loaded
-     * one, samples [sample] every [TICK_MS] (gently while paused, since the
-     * position is frozen) and publishes only *changes*, so downstream
-     * recomposition happens per word/ayah boundary — not per tick.
-     */
-    @OptIn(ExperimentalCoroutinesApi::class)
+    /** One schedule supplies every highlight/follow consumer with the same clock read. */
+    private val playbackPolls = readerPlaybackPolls(player.state, loadedSurah, player::highlightSample,
+        TICK_MS, PAUSED_TICK_MS, timingPublication)
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(1_000), null)
+
+    /** Publish only consumer boundaries; draw clocks can observe each shared sample separately. */
     private fun <K : Any, T> pollingWhileLoaded(
         key: (NowPlaying) -> K?,
         sample: (K, HighlightPlaybackSample) -> T?,
-    ): StateFlow<T?> = player.state
-        .map { pollingIdentity(it, surahId, key) }
-        .distinctUntilChanged()
-        .flatMapLatest { identity ->
-            if (identity == null) {
-                flowOf<T?>(null)
-            } else {
-                val k = identity.sampleKey
-                flow<T?> {
-                    while (true) {
-                        // At an ayah handoff the controller's item (and its
-                        // position, already near zero) advances a beat before
-                        // [player.state] — and therefore this flow's key —
-                        // catches up. Sampling the stale key against the new
-                        // item's position bounces the value backward for one
-                        // tick, which the renderer amplifies into the word
-                        // flicker. Skip incoherent ticks; the key switches
-                        // within milliseconds and samples fresh.
-                        val expected = player.state.value.nowPlaying
-                            ?.takeIf { it.surahId == surahId && key(it) == k }
-                        val playback = expected?.let(player::highlightSample)
-                        if (playback != null) emit(sample(k, playback))
-                        // Position is frozen while paused; poll gently.
-                        delay(if (player.state.value.isPlaying) TICK_MS else PAUSED_TICK_MS)
-                    }
-                }
-            }
-        }
+    ): StateFlow<T?> = playbackPolls.map { poll ->
+        poll?.let { key(it.nowPlaying)?.let { key -> sample(key, poll.playback) } }
+    }
         .distinctUntilChanged()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(1_000), null)
 
     /** Never lets sampling jitter bounce the highlight backward across a word
      * boundary — the source of the random full → faint → wash word flicker. */
-    private val highlightSession = HighlightSession()
+    private val highlightSession = HighlightSession(HighlightEngineVersion.VISIBLE)
     private val emptyPreparedTimings = HighlightEngine.PreparedTimings.prepare(emptyList())
     private val activeWordPollCache = ActiveWordPollCache()
-
-    // Draw-only media samples: word snapshots still publish once per word.
-    private val _englishWashClock = MutableStateFlow<EnglishWashClock?>(null)
-    internal val englishWashClock: StateFlow<EnglishWashClock?> = _englishWashClock
 
     private var shimmerWasOn = false
     private var lastTarjiReport = 0L
@@ -648,37 +628,58 @@ class ReaderViewModel(
         }
     }
 
-    /** Emits the active word ~30x/sec while this surah is playing, but only
-     * publishes on change, so the UI recomposes once per word. The highlight
-     * holds while paused (like a lyrics player); it only clears when this
-     * surah stops being the loaded one. */
-    private val polledActiveWord: StateFlow<ActiveWord?> =
-        pollingWhileLoaded(key = { it }) { np, playback ->
-            val prepared = preparedTimings[np.ayah]
-            val segments = prepared?.segments.orEmpty()
-            // Opening quiet is skipped to the voice. The wash starts there too,
-            // so a click stored as word 1 does not light early or run long.
-            val voiceMs = firstWordVoiceMs(np.ayah, np.reciterId, segments)
+    private data class HighlightPoll(
+        val playback: HighlightPlaybackSample,
+        val timing: HighlightTimingContext,
+        val observation: HighlightObservation,
+    )
+
+    /** One owner advances sync, voice analysis, and capture before any renderer reads it. */
+    private val highlightPolls = playbackPolls.map { poll ->
+        if (poll == null) highlightSession.suspendObservation(System.nanoTime())
+        poll?.let {
+            val np = it.nowPlaying
+            val playback = it.playback
+            val prepared = preparedTimings[np.ayah] ?: emptyPreparedTimings
+            val voiceMs = firstWordVoiceMs(np.ayah, np.reciterId, prepared.segments)
             updateVoicePosition(playback)
             val calibration = HighlightCalibration(
                 outputLagWallMs = InkEngine.outputLatencyOverrideMs?.toLong()?.coerceAtLeast(0L) ?: 0L,
                 wordLeadMs = InkEngine.highlightLeadMs.toLong().coerceAtLeast(0L) +
                     ReciterSync.highlightAdvanceMs(np.reciterId),
             )
-            val timing = HighlightTimingContext(timingPublicationRevision, prepared ?: emptyPreparedTimings, voiceMs)
+            val timing = HighlightTimingContext(timingPublicationRevision, prepared, voiceMs)
             val observation = highlightSession.observe(playback, timing, calibration, DevProfiling.captureStart.get())
-            val clockMs = observation.baselinePositionMs
             DevProfiling.recordHighlight(playback, timing, calibration, observation)
-            _englishWashClock.value = EnglishWashClock(
-                np.surahId, np.ayah, playback.inkGeneration, clockMs, voiceMs, segments,
-                sampledAtNanos = playback.sampledAtNanos,
-                isPlaying = playback.advances,
-                speed = playback.speed,
-                clockId = playback.clockRevision,
-                correctionMs = calibration.wordLeadMs - outputLatencyMs(playback),
+            HighlightPoll(playback, timing, observation)
+        }
+    }.onCompletion { highlightSession.suspendObservation(System.nanoTime()) }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(1_000, replayExpirationMillis = 0), null)
+
+    /** Draw-only snapshots: consumers select word boundaries independently of frame updates. */
+    internal val highlightSyncState: StateFlow<HighlightSyncState?> = highlightPolls
+        .map { it?.observation?.syncState }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(0, replayExpirationMillis = 0), null)
+
+    internal val englishWashClock: StateFlow<EnglishWashClock?> = highlightPolls.map { poll ->
+        poll?.let {
+            val playback = it.playback
+            EnglishWashClock(
+                playback.item.surah, playback.item.ayah, playback.inkGeneration,
+                it.observation.visiblePositionMs, it.timing.voiceStartMs, it.timing.timings.segments,
+                reciterId = playback.item.reciter,
             )
-                .after(_englishWashClock.value)
-            val info = observation.baselineActive
+        }
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(0, replayExpirationMillis = 0), null)
+
+    /** Only a word/occurrence boundary publishes to composition. */
+    private val polledActiveWord: StateFlow<ActiveWord?> = highlightPolls.map { poll ->
+        poll?.let {
+            val playback = it.playback
+            val segments = it.timing.timings.segments
+            val voiceMs = it.timing.voiceStartMs
+            val clockMs = it.observation.visiblePositionMs
+            val info = it.observation.visibleActive
             val washStart = if (info == null) {
                 null
             } else {
@@ -691,12 +692,15 @@ class ReaderViewModel(
                 )
             }
             activeWordPollCache.activeWord(
-                ayah = np.ayah,
+                ayah = playback.item.ayah,
                 info = if (washStart == null) null else info,
                 activation = playback.inkGeneration,
                 washStartMs = washStart ?: Long.MIN_VALUE,
+                reciterId = playback.item.reciter,
             )
         }
+    }.distinctUntilChanged()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(1_000), null)
 
     /** Word-tap ink, held until the 33 ms poll names the same word. */
     private val tapInk = MutableStateFlow<ActiveWord?>(null)
@@ -885,7 +889,8 @@ class ReaderViewModel(
                 if (tap != null &&
                     polled != null &&
                     polled.ayah == tap.ayah &&
-                    polled.wordPosition == tap.wordPosition
+                    polled.wordPosition == tap.wordPosition &&
+                    polled.playbackActivation >= tap.playbackActivation
                 ) {
                     tapInk.value = null
                 }
@@ -1337,6 +1342,7 @@ class ReaderViewModel(
             nextWordPosition = next,
             activation = player.state.value.positionEvents.inkId + 1L,
             fromTap = true,
+            reciterId = reciterId,
         )
         tapSeed = seed
         tapInk.value = seed

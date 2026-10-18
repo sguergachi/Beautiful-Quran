@@ -52,6 +52,18 @@ data class HighlightTraceSample(
     val candidateWord: Int?,
     val candidatePhase: String?,
     val candidateProgress: Float?,
+    val syncCheckpoint: HighlightSync.Checkpoint? = null,
+)
+
+/** A frame references the exact accepted sample used by the renderer's shared timeline. */
+@Serializable
+data class HighlightTraceFrame(
+    val sampleIndex: Int,
+    val atNanos: Long,
+    val mediaMs: Long,
+    val inkMs: Long,
+    val occurrence: Int?,
+    val progress: Float,
 )
 
 /** Bounded captures keep their complete prefix and explicitly report dropped samples. */
@@ -61,6 +73,8 @@ data class HighlightTrace(
     val timings: List<HighlightTraceTiming>,
     val samples: List<HighlightTraceSample>,
     val droppedSamples: Int,
+    val frames: List<HighlightTraceFrame> = emptyList(),
+    val droppedFrames: Int = 0,
 )
 
 /** Persist schema and actual engine versions explicitly, even when they equal codec defaults. */
@@ -78,6 +92,8 @@ class HighlightTraceRecorder(private val header: HighlightTraceHeader, private v
     private var previousTiming: HighlightTimingContext? = null
     private var timingDigest = ""
     private var dropped = 0
+    private val frames = ArrayList<HighlightTraceFrame>()
+    private var droppedFrames = 0
 
     fun record(
         sample: HighlightPlaybackSample,
@@ -104,8 +120,22 @@ class HighlightTraceRecorder(private val header: HighlightTraceHeader, private v
             observation.baselineActive?.position, observation.baselineActive?.startMs,
             observation.candidate?.occurrence, observation.candidate?.active?.position,
             observation.candidate?.phase?.name, observation.candidate?.linearProgress,
+            observation.syncCheckpoint,
         )
     }
 
-    fun snapshot(): HighlightTrace = HighlightTrace(header, tables.values.toList(), samples.toList(), dropped)
+    /** Skip a frame whose sample is outside this capture; never attach it to a newer poll. */
+    fun recordFrame(state: HighlightSyncState, atNanos: Long) {
+        val index = samples.indexOfLast { it.atNanos == state.sample.sampledAtNanos &&
+            it.clockRevision == state.sample.clockRevision && it.inkGeneration == state.sample.inkGeneration &&
+            it.surah == state.sample.item.surah && it.ayah == state.sample.item.ayah &&
+            it.reciter == state.sample.item.reciter && it.timingRevision == state.timing.revision }
+        if (index < 0) return
+        if (frames.size >= 2048) { droppedFrames++; return }
+        val frame = HighlightSync.frame(state, atNanos)
+        frames += HighlightTraceFrame(index, atNanos, frame.mediaMs, frame.inkMs, frame.occurrence, frame.linearProgress)
+    }
+
+    fun snapshot(): HighlightTrace = HighlightTrace(header, tables.values.toList(), samples.toList(), dropped,
+        frames.toList(), droppedFrames)
 }

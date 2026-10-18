@@ -96,6 +96,9 @@ internal fun rememberAyahInkPack(
         sweepMs = sweepMs,
         identity = activeWord?.wordPosition,
         activation = activation,
+        activeWord = activeWord,
+        playbackSpeed = playbackSpeed,
+        verse = ayah,
     )
     val previousActive = remember { ActiveWordEntry(activeIndex, activation) }
     val carriedIncoming = remember(activeIndex, activation) {
@@ -155,6 +158,8 @@ internal fun rememberAyahInkPack(
         waslPrefixes = waslPrefixes,
         activation = activation,
         activeWordStartMs = activeWordStartMs,
+        activeWord = activeWord,
+        playbackSpeed = playbackSpeed,
         verse = ayah,
         sequentialSweeps = false,
         animateLyricInk = false,

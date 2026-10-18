@@ -83,15 +83,15 @@ data class HighlightSyncState internal constructor(
     internal val retainedInkMs: Long,
     internal val settleStartNanos: Long,
     internal val stableSamples: Int,
+    internal val suspended: Boolean = false,
 )
 
 /**
- * Candidate HighlightEngine V2 time authority. No time is acquired here.
+ * HighlightEngine V2 time authority. No time is acquired here.
  *
  * The settle guard uses elapsed wall time and playback speed rather than a
  * presumed 33 ms poll. Backward corrections never start a new performance.
  * Continuous frame projection is deliberately not capped at the next poll.
- * This core runs in shadow until the migration and device gates are complete.
  */
 object HighlightSync {
     const val ENGINE_VERSION = 2
@@ -99,6 +99,31 @@ object HighlightSync {
     private const val MIN_SETTLE_NS = 400_000_000L
     private const val SETTLE_CAP_NS = 1_500_000_000L
     private const val STABLE_SAMPLES = 4
+
+    /** A local checkpoint after the first captured sample makes mid-performance replay exact. */
+    @Serializable
+    data class Checkpoint(
+        val acceptedMediaMs: Long,
+        val projectionBaseMs: Long,
+        val retainedInkMs: Long,
+        val settleStartNanos: Long,
+        val stableSamples: Int,
+    )
+
+    fun checkpoint(state: HighlightSyncState): Checkpoint = Checkpoint(state.acceptedMediaMs,
+        state.projectionBaseMs, state.retainedInkMs, state.settleStartNanos, state.stableSamples)
+
+    /** Restore uses the exact sample, timing table, and calibration recorded alongside the checkpoint. */
+    fun restore(sample: HighlightPlaybackSample, timing: HighlightTimingContext, calibration: HighlightCalibration,
+        checkpoint: Checkpoint): HighlightSyncState = HighlightSyncState(sample, timing, calibration,
+        checkpoint.acceptedMediaMs, checkpoint.projectionBaseMs, checkpoint.retainedInkMs,
+        checkpoint.settleStartNanos, checkpoint.stableSamples)
+
+    /** Stop extrapolation across an unobserved background interval; the next sample rebases it. */
+    fun suspendObservation(state: HighlightSyncState, atNanos: Long): HighlightSyncState {
+        val stopped = frame(state, atNanos)
+        return state.copy(projectionBaseMs = stopped.mediaMs, retainedInkMs = stopped.inkMs, suspended = true)
+    }
 
     /** Reconcile a sample; reject stale callbacks even when they carry an old seek. */
     fun sample(
@@ -114,8 +139,10 @@ object HighlightSync {
         ) return previous
 
         val samePerformance = old != null && old.item == next.item && old.inkGeneration == next.inkGeneration
-        val rearm = !samePerformance || old.clockRevision != next.clockRevision
-        val retained = if (samePerformance) frame(previous, next.sampledAtNanos).inkMs else 0L
+        val rearm = !samePerformance || old.clockRevision != next.clockRevision || previous.suspended
+        val retained = if (samePerformance) {
+            if (previous.suspended) previous.retainedInkMs else frame(previous, next.sampledAtNanos).inkMs
+        } else 0L
         if (rearm) {
             return HighlightSyncState(
                 next, timing, calibration, next.positionMs, next.positionMs,
@@ -156,7 +183,7 @@ object HighlightSync {
     /** Project first, then calibrate. Reordering these operations changes the opening ramp. */
     fun frame(state: HighlightSyncState, frameNanos: Long): HighlightFrame {
         val sample = state.sample
-        val elapsedMs = if (sample.advances) {
+        val elapsedMs = if (sample.advances && !state.suspended) {
             (frameNanos - sample.sampledAtNanos).coerceAtLeast(0L) / 1_000_000.0 * sample.speed
         } else 0.0
         val mediaMs = (state.projectionBaseMs + elapsedMs).toLong()

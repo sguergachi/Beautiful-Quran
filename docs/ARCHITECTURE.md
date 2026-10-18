@@ -34,11 +34,14 @@ app (runtime)                                           ▼
 
 ## Principles
 
-The [HighlightEngine V2 migration](HIGHLIGHT_ENGINE_V2.md) has an initial pure
-candidate core and coherent playback-sample adapter. V1 still draws; V2 runs
-only during an explicit developer performance capture. Those local reports
-include bounded, self-contained sample-clock replay data. See the
-[implemented boundary and remaining gates](HIGHLIGHT_ENGINE_V2_CONTRACT.md).
+[HighlightEngine V2](HIGHLIGHT_ENGINE_V2_CONTRACT.md) owns runtime sync on
+Android and web. One coherent playback stream feeds pure `HighlightSync`,
+which projects a display-frame clock. Arabic, English, repeat, and wasl washes
+use captured media windows; follow/voice retain their distinct heard-clock
+policies. Normal use records nothing. Explicit developer profiles can include
+bounded local sample/frame replay with exact timing fingerprints. V1 remains
+a diagnostic comparator. Physical speaker/Bluetooth accuracy is a separate
+release acceptance check.
 
 1. **Offline-first reader.** The released reader still has no accounts,
    analytics, or client API keys and works in airplane mode using the verified

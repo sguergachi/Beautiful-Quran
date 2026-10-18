@@ -78,4 +78,15 @@ class DiscontinuityPolicyTest {
 
         assertEquals(1_951L, landed.positionMs)
     }
+    @Test
+    fun `manual seek clears a silence mark even at the same landing`() {
+        val ink = SilenceInk()
+        ink.arm(4283)
+        ink.clear()
+        assertFalse(ink.claims(4283, itemChanged = false))
+        val event = PlaybackPositionEvents().afterDiscontinuity(
+            Player.DISCONTINUITY_REASON_SEEK, positionMs = 4283, keepInk = false)
+        assertEquals(1L, event.inkId)
+    }
+
 }

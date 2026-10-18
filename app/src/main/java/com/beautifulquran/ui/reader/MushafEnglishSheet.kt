@@ -604,20 +604,12 @@ internal fun englishInkLayerAllowed(state: InkEngine.State): Boolean = state != 
 /** Run continuously like scroll ink; only transport changes interrupt the spoken clock. */
 @Composable
 private fun rememberAnimatedEnglishWashClock(clock: State<EnglishWashClock?>): State<EnglishWashClock?> {
-    val sample = remember { mutableStateOf<EnglishWashClock?>(null) }
-    LaunchedEffect(clock) {
-        snapshotFlow { clock.value }
-            .distinctUntilChanged { prior, next -> next?.runsWith(prior) == true || next == prior }
-            .collectLatest { next ->
-                val anchor = next?.after(sample.value)
-                sample.value = anchor
-                if (anchor?.isPlaying != true || anchor.sampledAtNanos == 0L) return@collectLatest
-                do {
-                    sample.value = withFrameNanos { anchor.frameAt(it) }
-                } while (sample.value!!.positionMs < (anchor.segments.lastOrNull()?.endMs ?: anchor.positionMs))
-            }
+    val timeline = LocalHighlightTimeline.current
+    return remember(clock, timeline) {
+        derivedStateOf {
+            clock.value?.onFrame(timeline.frame())
+        }
     }
-    return sample
 }
 
 /** Cache windows on source changes; frame ticks invalidate drawing and leaf thresholds only. */

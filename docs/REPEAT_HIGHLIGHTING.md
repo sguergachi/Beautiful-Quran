@@ -10,6 +10,13 @@ data comes from, and the traps we hit making it ship.
 
 ## Current state
 
+HighlightEngine V2 derives orange progress from each occurrence's captured
+media window. Pauses/buffering freeze active and residual ink; speed changes
+continue from the same edge. Consecutive re-says of one word have separate
+windows, with no queue or accumulating animation delay. The underlying base
+wash remains continuous and completes before its repeat overlay. See
+[the V2 contract](HIGHLIGHT_ENGINE_V2_CONTRACT.md).
+
 As of `quran-v66.db`, the six QF voices obtain reviewed repeat-aware timings
 from authenticated Content Sync through the app's Worker. The canonical Python
 pipeline combines those ordered occurrences with the EveryAyah clock, existing

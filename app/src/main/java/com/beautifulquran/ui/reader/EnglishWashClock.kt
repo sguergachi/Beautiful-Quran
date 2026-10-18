@@ -2,6 +2,7 @@ package com.beautifulquran.ui.reader
 
 import com.beautifulquran.data.model.Segment
 import com.beautifulquran.domain.EnglishAlignment
+import com.beautifulquran.domain.HighlightFrame
 
 /** The same calibrated, seek-aware media sample that selects the Arabic word. */
 internal data class EnglishWashClock(
@@ -11,41 +12,21 @@ internal data class EnglishWashClock(
     val positionMs: Long,
     val voiceStartMs: Long,
     val segments: List<Segment> = emptyList(),
-    val sampledAtNanos: Long = 0L,
-    val isPlaying: Boolean = false,
-    val speed: Float = 1f,
-    val clockId: Long = 0L,
-    val correctionMs: Long = 0L,
+    val reciterId: Int? = null,
 ) {
-    /** Position samples may interpolate only within one audible performance. */
+    /** Project only this performance; all time policy lives in HighlightSync. */
+    fun onFrame(frame: HighlightFrame?): EnglishWashClock =
+        if (frame != null && frame.item.surah == surahId && frame.item.ayah == ayah &&
+            frame.inkGeneration == activation && (reciterId == null || frame.item.reciter == reciterId)) copy(positionMs = frame.inkMs) else this
+
     fun samePerformanceAs(other: EnglishWashClock?): Boolean =
         other != null && surahId == other.surahId && ayah == other.ayah && activation == other.activation
-
-    /** Ordinary position polls do not interrupt a spoken-duration animation. */
-    fun runsWith(other: EnglishWashClock?): Boolean = other != null && samePerformanceAs(other) &&
-        isPlaying == other.isPlaying && speed == other.speed && clockId == other.clockId &&
-        correctionMs == other.correctionMs && segments === other.segments
-
-    /** The scroll reader's continuous linear clock, bounded by the known spoken end. */
-    fun frameAt(frameNanos: Long): EnglishWashClock {
-        if (!isPlaying || sampledAtNanos == 0L) return this
-        val elapsedMs = (frameNanos - sampledAtNanos).coerceAtLeast(0L) / 1_000_000.0
-        val end = segments.lastOrNull()?.endMs ?: positionMs
-        return copy(positionMs = (positionMs + elapsedMs * speed).toLong()
-            .coerceIn(positionMs, maxOf(positionMs, end)))
-    }
 
     fun matches(word: ActiveWord, surahId: Int): Boolean =
         this.surahId == surahId && ayah == word.ayah && activation == word.playbackActivation
 
     /** Re-says locate their semantic word, rather than the retained forward prefix. */
     fun followsFirstWash(word: ActiveWord, surahId: Int): Boolean = matches(word, surahId) && !word.isRepeat
-
-    /** A calibration change cannot lift laid ink; a new seek generation can. */
-    fun after(previous: EnglishWashClock?): EnglishWashClock =
-        if (previous != null && samePerformanceAs(previous) && previous.segments === segments) {
-            copy(positionMs = maxOf(previous.positionMs, positionMs))
-        } else this
 }
 
 /** A first wash ends before a repeat, the next band, or the recitation's end. */

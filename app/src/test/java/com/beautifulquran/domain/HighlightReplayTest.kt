@@ -61,6 +61,39 @@ class HighlightReplayTest {
     }
 
     @Test
+    fun `shared Android web transport events have identical visible frames`() {
+        val root = Json.parseToJsonElement(javaClass.getResource("/highlight-sync-v2-events.json")!!.readText()).jsonObject
+        for (case in root.getValue("cases").jsonArray.map { it.jsonObject }) {
+            val prepared = HighlightEngine.PreparedTimings.prepare(case.getValue("segments").jsonArray.map { row ->
+                val values = row.jsonArray.map { it.jsonPrimitive.long }
+                Segment(values[0].toInt(), values[1], values[2])
+            })
+            val knobs = HighlightCalibration(case["lag"]?.jsonPrimitive?.long ?: 0, case["lead"]?.jsonPrimitive?.long ?: 0)
+            var state: HighlightSyncState? = null
+            for (e in case.getValue("events").jsonArray.map { it.jsonObject }) {
+                fun long(key: String, default: Long = 0) = e[key]?.jsonPrimitive?.long ?: default
+                val at = long("at")
+                val input = sample(long("raw"), at).copy(
+                    isPlaying = e["playing"]?.jsonPrimitive?.boolean ?: true,
+                    isBuffering = e["buffering"]?.jsonPrimitive?.boolean ?: false,
+                    speed = e["speed"]?.jsonPrimitive?.float ?: 1f,
+                    clockRevision = long("clock"), inkGeneration = long("generation"),
+                )
+                val context = HighlightTimingContext(long("revision", 1),
+                    if (e["empty"]?.jsonPrimitive?.boolean == true) HighlightEngine.PreparedTimings.prepare(emptyList()) else prepared,
+                    case["voice"]?.jsonPrimitive?.long ?: 0)
+                state = HighlightSync.sample(state, input, context, knobs)
+                val frame = HighlightSync.frame(state, long("frameAt", at) * 1_000_000)
+                val label = "${case["name"]}/$at"
+                assertEquals(label, long("ink"), frame.inkMs)
+                assertEquals(label, e["word"]?.jsonPrimitive?.intOrNull, frame.active?.position)
+                assertEquals(label, e["occurrence"]?.jsonPrimitive?.intOrNull, frame.occurrence)
+                assertEquals(label, e.getValue("phase").jsonPrimitive.content, frame.phase.name)
+            }
+        }
+    }
+
+    @Test
     fun `timing replacement withdrawal and calibration changes replay without provider access`() {
         val session = HighlightSession()
         val recorder = HighlightTraceRecorder(header)
@@ -151,6 +184,49 @@ class HighlightReplayTest {
     }
 
     @Test
+    fun `visible V2 keeps its live state when recording starts mid performance`() {
+        val session = HighlightSession(visibleEngineVersion = 2)
+        session.observe(sample(1000, 0), timing, calibration)
+        session.observe(sample(900, 100), timing, calibration)
+        val before = session.observe(sample(933, 133), timing, calibration)
+        val recorder = HighlightTraceRecorder(header.copy(visibleEngineVersion = 2))
+        for (i in 1..4) {
+            val input = sample(933 + i * 33L, 133 + i * 33L)
+            val result = session.observe(input, timing, calibration, 1)
+            assertTrue(result.visiblePositionMs >= before.visiblePositionMs)
+            recorder.record(input, timing, calibration, result)
+        }
+        replay(Json.decodeFromString(recorder.snapshot().encodeForReplay()))
+    }
+
+    @Test
+    fun `frame capture references its actual sample and replays beyond the next poll`() {
+        val session = HighlightSession(2)
+        val recorder = HighlightTraceRecorder(header.copy(visibleEngineVersion = 2,
+            schemaVersion = 2, scope = "sample-and-frame-clock"))
+        val input = sample(0, 0)
+        val observation = session.observe(input, timing, calibration, 1)
+        recorder.record(input, timing, calibration, observation)
+        for (hz in listOf(60, 90, 120)) repeat(hz) {
+            recorder.recordFrame(observation.syncState!!, it * 1_000_000_000L / hz)
+        }
+        val trace = recorder.snapshot()
+        assertEquals(270, trace.frames.size)
+        assertTrue(trace.frames.any { it.inkMs > 500 })
+        replay(Json.decodeFromString(trace.encodeForReplay()))
+    }
+
+    @Test
+    fun `live session rebases after its loaded chapter stops being observed`() {
+        val session = HighlightSession(2)
+        session.observe(sample(500, 500), timing, calibration)
+        session.suspendObservation(600_000_000)
+        val resumed = session.observe(sample(900, 20000).copy(isPlaying = false), timing, calibration)
+        assertEquals(900L, resumed.visiblePositionMs)
+        assertEquals(0L, resumed.syncState!!.sample.inkGeneration)
+    }
+
+    @Test
     fun `explicit local developer capture replays through production filters`() {
         val path = System.getProperty("bq.highlightTrace") ?: return
         val text = File(path).readText()
@@ -161,9 +237,9 @@ class HighlightReplayTest {
     }
 
     private fun replay(trace: HighlightTrace) {
-        assertEquals(1, trace.header.schemaVersion)
-        assertEquals("sample-clock", trace.header.scope)
-        assertEquals(1, trace.header.visibleEngineVersion)
+        assertTrue(trace.header.schemaVersion in 1..2)
+        assertTrue(trace.header.scope in setOf("sample-clock", "sample-and-frame-clock"))
+        assertTrue(trace.header.visibleEngineVersion in 1..2)
         assertEquals(2, trace.header.candidateEngineVersion)
         val tables = trace.timings.associate { table ->
             val bytes = ("${table.voiceStartMs}:" + table.triples.joinToString(",")).toByteArray(Charsets.UTF_8)
@@ -179,7 +255,7 @@ class HighlightReplayTest {
             baseline.restore(first.baselineCheckpointItem, requireNotNull(first.baselineCheckpoint))
         }
         var candidate: HighlightSyncState? = null
-        for (event in trace.samples) {
+        for ((sampleIndex, event) in trace.samples.withIndex()) {
             val input = HighlightPlaybackSample(
                 HighlightItem(event.surah, event.ayah, event.reciter), event.rawMs, event.atNanos,
                 event.playing, event.buffering, event.speed, event.clockRevision, event.inkGeneration,
@@ -192,13 +268,22 @@ class HighlightReplayTest {
             assertEquals(event.baselineMs, v1)
             assertEquals(event.baselineWord, context.timings.activeInfo(v1)?.position)
             assertEquals(event.baselineOccurrenceStartMs, context.timings.activeInfo(v1)?.startMs)
-            candidate = HighlightSync.sample(candidate, input, context, knobs)
+            candidate = if (candidate == null && event.syncCheckpoint != null) {
+                HighlightSync.restore(input, context, knobs, event.syncCheckpoint)
+            } else HighlightSync.sample(candidate, input, context, knobs)
             val frame = HighlightSync.frame(candidate, event.atNanos)
             assertEquals(event.candidateMs, frame.inkMs)
             assertEquals(event.candidateOccurrence, frame.occurrence)
             assertEquals(event.candidateWord, frame.active?.position)
             assertEquals(event.candidatePhase, frame.phase.name)
             assertEquals(event.candidateProgress!!, frame.linearProgress, 0.000001f)
+            for (recorded in trace.frames.filter { it.sampleIndex == sampleIndex }) {
+                val rendered = HighlightSync.frame(candidate, recorded.atNanos)
+                assertEquals(recorded.mediaMs, rendered.mediaMs)
+                assertEquals(recorded.inkMs, rendered.inkMs)
+                assertEquals(recorded.occurrence, rendered.occurrence)
+                assertEquals(recorded.progress, rendered.linearProgress, 0.000001f)
+            }
         }
     }
 }

@@ -1,173 +1,163 @@
-# HighlightEngine V2: initial executable contract
+# HighlightEngine V2 runtime contract
 
-Status: **candidate core and sample-clock replay implemented; V1 still draws**.
-This is the first implementation slice of [the V2 plan](HIGHLIGHT_ENGINE_V2.md).
-It is not completion of the rendering migration or permission to cut over.
+V2 supplies visible synchronization on Android and web. It reconciles playback
+facts and projects one media clock; the existing lookup, English ownership,
+tajweed curves, soft masks, typography, and acoustic glimmer remain separate
+policies. See the [goals and work packages](HIGHLIGHT_ENGINE_V2.md).
 
-## Implemented boundary
+## Ownership
 
-`HighlightPlaybackSample` carries one item, raw file position, monotonic sample
-timestamp, speed, playing/buffering flags, and cumulative clock/ink revisions.
-`PlayerController.highlightSample` checks the published and live item before
-and after the read. An incoherent read is skipped without publishing a null
-word. Domain timestamps may have a negative origin; only their ordering and
-elapsed intervals matter.
+Android's `PlayerController.highlightSample` checks the published and live item
+before and after one position read. `readerPlaybackPolls` supplies that coherent
+packet to word, voice, basmalah, and follow consumers. Transport, speed, ink/clock
+revision, and timing publication changes interrupt the paused polling sleep.
+Incoherent reads are skipped without publishing an empty word.
 
-`HighlightTimingContext` identifies an immutable prepared timing publication
-and its first-voice gate. The reader increments its local publication revision
-on each install, including withdrawal. It remains distinct from provider
-generation and navigation generation.
+`HighlightSession(HighlightEngineVersion.VISIBLE)` advances the live pure
+`HighlightSync` state once per packet. `HighlightTimeline` projects that state
+on display frames. The reader root never reads frame progress. Word snapshots
+publish only on occurrence/metadata changes; completed residuals release their
+frame subscription at the next word boundary. Only repeat completion's Boolean
+is observed in composition, with structural equality.
 
-`HighlightSession` owns the production V1 filter and optionally evaluates V2
-against those exact inputs. The normal path uses V1's existing calibration,
-tap latch, discontinuity rearm, and prepared lookup. It does no V2 projection
-or trace hashing when a developer capture is not active. Word snapshots still
-publish only on change through the existing cache/flow.
+`HighlightMediaMotions` captures a `HighlightWashWindow`, pacing, feather, and
+wasl carry at entry. Progress is a function of calibrated media time rather
+than elapsed animation time. The existing minimum sweep floor is retained:
+its wall duration is converted to media duration once at entry speed. A later
+speed change changes the shared clock slope. Repeat occurrences use measured
+dwell, have independent windows, and cannot wait behind a repeat queue.
+Prose can gate on its predecessor without shifting its own window into the
+future. Cosmetic recess/glimmer/tint dissolution still use their existing fades.
 
-`HighlightSync.sample(previous, sample, timing, calibration)` and
-`HighlightSync.frame(state, frameNanos)` are the candidate pure core. Neither
-acquires time, reads Android state, starts playback, or schedules a coroutine.
-Frames expose heard and ink positions, occurrence identity, linear progress,
-and an explicit phase. Letter pacing, English ownership, masks, and page
-geometry have not moved into this core.
+`EnglishWashClock` is metadata projected through that same frame. It owns no
+second interpolation anchor and cannot ignore ordinary clock corrections.
+English band windows, meaning owners, continuous prefixes, carried fragments,
+repeat location, and follow lead retain their existing policies.
 
-## Identity and transition rules
+Web uses the equivalent `HighlightSync.ts`, the shared replay fixtures, and a
+single `highlightTimeline` read by DOM mask callbacks. React receives boundary
+updates. Browser play intent is distinct from actual transport advancement:
+waiting for a source, buffering, a paused/seeking element, or an unstarted
+Gapless-5 backend cannot advance V2. Explicit seek, playlist, native-loop seeking,
+and backend index events supply revisions. Existing preview/cosmetic washes
+without a playback window retain their animation clock.
 
-| Input change | Candidate behavior |
+## Identities and transitions
+
+| Input | Behavior |
 |---|---|
-| Different surah, ayah, or reciter | Start a new item; do not inherit its predecessor's ink |
-| Increased ink generation | Start a new performance, allowing a backward reset |
-| Increased clock revision with the same ink generation | Accept the authoritative media landing, retain laid ink |
-| Lower clock/ink revision, lower timing publication, or older timestamp | Reject the stale input, including callbacks naming a different item |
-| New timing publication | Replace occurrence lookup atomically on the next coherent sample |
-| Empty timing publication | Expose missing timings, never the preceding occurrence |
-| Ordinary backward position correction | Hold laid ink; project the corrected raw series until it catches up |
-| Pause or buffering | Freeze projection from that sample |
-| Resume after pause or buffering | Restart the trust-settle window without restarting ink; frozen samples do not prove realtime convergence |
-| Speed change | Previous speed owns the preceding interval; new speed owns subsequent frames |
-| Calibration change | Recompute after media projection; retain ink within the same performance |
+| New item or reciter | New performance; no inherited predecessor ink |
+| Increased ink generation | Explicit restart/seek/loop may reset ink backward |
+| Increased clock revision, same ink generation | Accept landing and retain laid ink, including silence skips |
+| Older timestamp or lower clock/ink/timing revision | Reject stale callback, including another item |
+| Timing publication / withdrawal | Atomically replace lookup / expose missing timings on a coherent sample, including while paused |
+| Ordinary backward correction | Hold laid ink and project the corrected raw series until it catches up |
+| Pause / buffering | Freeze media projection; existing surface recess/reading policy remains in charge of presentation |
+| Resume | Rearm trust settling without resetting ink; frozen samples cannot prove convergence |
+| Speed change | Prior speed owns the preceding interval, new speed owns subsequent frames |
+| Calibration change | Project media first, then recalibrate; retain laid ink in the same performance |
+| Observer suspension | Stop extrapolation; first fresh sample rebases after the unobserved interval |
+| Provisional tap | Hold its wash at zero until a matching word with a current player generation acknowledges it |
+| Consecutive same-word re-say | Distinct orange occurrence; ordinary base ink is not restarted |
 
-Clock/ink revisions are cumulative within a `PlayerController` lifetime. A new
-controller/session must start a new `HighlightSession`; resetting counters on
-an existing candidate state would be rejected as stale.
+Revisions are cumulative within a player/controller lifetime. A new controller
+requires a new sync session. Negative monotonic timestamp origins are valid.
+Timing publication, provider generation, reader navigation, clock revision,
+performance generation, and occurrence identity remain distinct.
 
-The provisional V1 word-tap latch remains an explicit input to the baseline
-driver. V2 does not treat that provisional tap as an acknowledgment: its
-transport/seed integration remains a WP4 gate. This is recorded in traces so
-it cannot disappear into an unexplained comparison mismatch.
+## Numerical policy
 
-## Initial numerical contract
+- Integer sample/frame clocks compare exactly; fractional frame conversion
+  permits 1 ms rounding and progress tolerance is `0.000001`.
+- Projection is continuous at 60/90/120 Hz and has no next-poll deadline.
+- Legitimate first polls delayed 250 ms, repeated 110 ms polls, and 1.5×
+  playback sampled every 50 ms add zero sample-clock debt.
+- Within a performance, corrections create zero backward ink steps and zero
+  new ink generations. Projection starts from the corrected raw series rather
+  than adding elapsed time to the retained ceiling.
+- Settling lasts at least 400 ms and at most 1,500 ms. Four believable samples
+  permit convergence after the minimum. Maximum raw step is
+  `max(100 ms, 3 × elapsed media time)`; accepted catch-up is
+  `max(66 ms, 2 × elapsed media time)`, using prior transport/speed.
+- Manual output lag is wall time, speed-scaled once. Word lead is media time.
+  The existing net clamp and voice-opening ramp follow media projection.
+  Media3's presentation clock receives no guessed Bluetooth preset.
 
-These values are pinned before renderer cutover and tested in
-`HighlightSyncTest` and `HighlightReplayTest`:
+A smoothly advancing but wrong player estimate cannot be detected from
+position alone. Retained ink cannot undo a future word already revealed.
+These are deterministic recovery rules, not a physical latency guarantee.
 
-- Sample-clock comparisons use exact integer milliseconds. A frame schedule's
-  fractional conversion permits at most 1 ms rounding; progress comparisons
-  use an absolute tolerance of `0.000001`.
-- Ideal 60/90/120 Hz schedules must advance every frame during an active,
-  unclamped one-second span. Projection has no next-poll deadline.
-- A legitimate delayed first poll at 250 ms, repeated 110 ms polls, and 1.5×
-  playback sampled every 50 ms incur **zero additional sample-clock debt**.
-- Within a performance, a correction causes **zero backward ink steps** and
-  **zero new ink generations**. Projection after a correction starts from the
-  raw series rather than adding elapsed time to its retained ceiling.
-- The candidate settle minimum is 400 ms and its maximum is 1,500 ms. Four
-  consecutive believable samples permit convergence after the minimum.
-  During settle, the maximum raw step is `max(100 ms, 3 × elapsed media time)`;
-  accepted catch-up is `max(66 ms, 2 × elapsed media time)`. Elapsed media time
-  uses the preceding sample's transport and speed. These preserve the original
-  guard's nominal thresholds while accommodating legitimate delayed polls.
-- Output lag is wall time, speed-scaled once. Word lead is media time. Project
-  media first, then use the existing net clamp and opening-ramp transform.
+## Preserved fences and intentional changes
 
-This guard cannot identify a smoothly advancing but incorrect player estimate
-without additional evidence. Retaining ink prevents replay after a correction;
-it cannot undo future ink already revealed. Physical-output error budgets,
-stale-source trust policy, short-word residual completion, and release
-performance budgets remain unresolved cutover requirements. The initial
-thresholds are candidate behavior, not device-validated latency guarantees.
+| Historical policy | Replacement / evidence |
+|---|---|
+| #527 / `271f0846` post-seek overshoot | Elapsed-aware guard, exact spike/correction fixtures |
+| #673 / `02a60404` creeping estimates | Minimum/convergence/cap guard; frozen/resume regressions |
+| Large correction is not a seek | Only authoritative revisions reset a performance |
+| #859 / `bfa0e76b` continuous English motion | One uncapped frame clock; shared transport/frame fixtures; ordinary samples now feed corrections |
+| #569 / `8eb5d108` short-word floor | Captured media window retains floor, feather, pacing, and independent residual |
+| #631 / `a800db9e` one motion owner | `rememberInkMotions` remains shared by scroll/mushaf; replaced wall-time speech owners removed |
+| Shuraym 7:146 short repeat chain | Independent occurrence windows; no queued debt; existing repeat fixtures retained |
+| Tap seed and page carry | Existing protocol retained; stale same-word polls cannot acknowledge a newer tap; manual seeks clear pending silence marks |
 
-## Guard history retained
+V1 `HighlightClock` remains a diagnostic/replay comparator. It does not select
+visible words. Reverting the migration requires reverting the renderer and
+adapter changes together; changing a version label is not a rollback switch.
 
-| Guard / policy | Introducing evidence | Replacement coverage / current disposition |
-|---|---|---|
-| Post-seek overshoot rejection | `271f0846` / #527: estimate crosses word 2/3 then snaps back | V1 unchanged; V2 spike/correction and pinned trace tests |
-| Convergence-aware settle | `02a60404` / #673: creeping estimates outlive a fixed settle window | V1 unchanged; V2 elapsed-time settle and long correction tests |
-| No inferred seek from large correction | Existing `HighlightClockTest` late-snap-back cases, including 1:7 | V1 unchanged; V2 stale/correction tests; only revisions authorize resets |
-| Continuous English media anchor | `bfa0e76b` / #859: poll-bounded interpolation visibly stalls | English renderer unchanged; candidate 60/90/120 Hz projection tests |
-| Captured tajweed pacing | `271f0846`: retuning mid-word replays the edge | Renderer unchanged; existing wash-reset tests remain authoritative |
-| Repeat residuals without a queue | Historical Shuraym 7:146 regression in the V2 plan | Renderer unchanged; migration still requires actual motion tests |
-| Provisional tap and carried-page gates | Existing tap/seek and reader transport suites | Preserved; candidate integration deferred to WP4 |
+## Local capture and replay
 
-No guard is retired by this slice. Complete the remaining guard inventory and
-motion-policy budgets before calling WP0 done.
+Developer → **Record performance profile** explicitly records a bounded local
+report. Sharing remains an explicit user action. Normal use records no trace,
+uploads no samples, and introduces no analytics.
 
-## Capture and replay
-
-Use Developer → **Record performance profile** while reproducing a timing
-issue. Its local report includes JSON between `highlight-sync-trace-begin`
-and `highlight-sync-trace-end`. Sharing remains the existing explicit action;
-there is no upload or analytics path.
-
-Trace schema 1 records:
-
-- Source SHA and dirty flag, application version, visible engine **1**, candidate
-  engine **2**, and scope **`sample-clock`**.
-- Exact timing triples, first-voice gates, and SHA-256 fingerprints, including
-  replacements and withdrawal. These are local developer evidence, not bundled
-  fixtures for restricted provider content.
-- Ordered samples, transport/speed/calibration, clock/ink/timing revisions,
-  explicit baseline rearm, and the V1 checkpoint at capture start. A capture
-  started mid-verse therefore preserves the original settle state.
-- V1/V2 clock and occurrence results. Candidate phase and linear progress are
-  retained alongside them.
-
-The recorder retains at most 1,024 samples, preserving the complete prefix.
-`droppedSamples` reports truncation; a truncated run does not cover its tail.
-Sampling and serialization run only during an explicit capture.
-
-Replay an extracted JSON file or the whole report with JDK 21:
+Trace schema 2 (`sample-and-frame-clock`) records source SHA/dirty flag, app
+version, actual visible engine, exact timing triples/voice gates and SHA-256,
+ordered playback/calibration/revision samples, V1 checkpoint, live V2 checkpoint,
+and display frames referring to their actual accepted sample. A mid-verse
+capture preserves live V2 rather than resetting it. Storage keeps a prefix of
+1,024 samples and 2,048 frames, with separate dropped counters. Schema 1 sample
+captures remain replayable.
 
 ```sh
-./gradlew testDebugUnitTest \
-  --tests com.beautifulquran.domain.HighlightReplayTest \
+./gradlew testDebugUnitTest --tests '*HighlightReplayTest' \
   -PhighlightTrace=/absolute/path/to/profile.txt
+./gradlew testDebugUnitTest --tests '*HighlightCorpusTest' \
+  -PhighlightCorpus=/absolute/path/to/runtime-timings.tsv
 ```
 
-The optional file is declared as a Gradle test input. Replay verifies the
-fingerprints and reruns the production V1 filter and candidate core without a
-player, network, or provider cache. Pinned regression traces and seeded
-transport sequences run in ordinary CI without an external report.
+Both external files are declared Gradle inputs. Export the second using
+`audit_reader_sync.py --v2-output`, supplying the frozen English corpus,
+ownership TSV, and all six reviewed `--runtime-pack` inputs. Packs and complete
+local traces stay outside Git. Ordinary CI uses sanitized shared fixtures and
+seeded sequences, requiring neither network nor provider content.
 
-Sample-clock replay does **not** capture the V1 Compose animation/effect
-lifecycle, rendered glyph edges, page carry, or physical speaker/Bluetooth
-latency. It must not be reported as evidence for those gates.
+## Validation and limits
 
-### Initial release-capture evidence
+The read-only delivered-corpus run covered **81,059 rows / 13 reciters**, with
+**12,378,291 V2 boundary/reverse/scrambled queries** and **17,748 repeat
+occurrences**. The existing Arabic/English continuous-prefix oracle passed
+**12,384,384 queries per English view** over the same snapshot (published prose
+and word-card text). Nine unavailable rows remain
+explicitly unavailable. No database or timing payload changed.
 
-An Android 15 emulator run of release commit `98bb2766` captured **284 samples**
-across Alafasy's basmalah lead-in and 24:1, with two timing tables and no dropped
-samples. JVM replay reproduced the recorded clock, occurrence, phase, and
-progress outputs. There were 22 sample-clock differences; the candidate's
-largest lead over V1 was 143 ms. The opening sequence included legitimate
-73/88/114 ms elapsed polls that V1 clamped or rejected during settle. A
-sanitized version of that delay pattern is pinned in the shared trace fixture.
+A release emulator capture of the integrated engine replayed **158 samples and
+390 display frames**, with zero dropped records. Its header identifies engine
+2, schema 2, and dirty source honestly. Local evidence lives under
+`~/.t3/artifacts/Beautiful-Quran/timing-audit/t3-112e60be/v2/`.
 
-The capture ran with profiling enabled; it does not establish normal-device
-poll frequency or physical sound-to-ink error. Full local timing evidence is
-kept outside the repository under this thread's timing-audit artifacts. This
-first capture also exposed omitted default header fields; the production
-encoder now writes schema, scope, and engine versions explicitly.
+The earlier baseline capture (`98bb2766`) reproduced all 284 samples; its largest
+V1 clock debt was 143 ms under profiling. Sanitized irregular delays are pinned
+as intentional elapsed-aware differences. The integrated capture also covers
+actual display-clock projection, but does not certify glyph pixels, acoustic
+boundaries, or sound arrival at a headset.
 
-## Remaining migration work
+Matched 15-second Android release playback runs on the same emulator, Alafasy
+24:2, Arabic scroll, tracing and recording disabled, had zero reported janky
+frames and p95 8 ms for both V1 and V2 (p99 19 vs 18 ms). This migration
+measurement is local host evidence; it is not a physical-device frame guarantee.
 
-The reader's word, follow, and basmalah polls now use coherent packets, but
-they remain separately scheduled consumers. Consolidating their scheduling,
-ensuring transport events cannot be lost in conflation, and completing the
-actual-motion replay harness remain WP1/WP2 work.
+Physical Pixel speaker/Bluetooth listening and measured output error remain
+release acceptance work. Emulator traces and internal recording cannot replace
+that evidence. No zero-regression or semantic-accuracy guarantee is claimed.
 
-WP4–WP8 remain pending: candidate transport/seed integration, Arabic normal/
-repeat/wasl migration, English correction feedback, browser parity, pinned
-13-reciter coverage, rendered release checks, physical output measurement,
-and retirement of replaced paths. V2 remains shadow-only until those gates
-are satisfied. The application and database versions are unchanged.
+Full local gate totals and methods are recorded in the [validation report](quality-reviews/HIGHLIGHT_ENGINE_V2_2026-10-18.md).

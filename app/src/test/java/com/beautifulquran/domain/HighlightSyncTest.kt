@@ -239,6 +239,25 @@ class HighlightSyncTest {
     }
 
     @Test
+    fun `background observation gap cannot invent ink through an unobserved pause`() {
+        val running = HighlightSync.sample(null, sample(500, 500), timing)
+        val hidden = HighlightSync.suspendObservation(running, 600_000_000)
+        assertEquals(600L, frame(hidden, 20_000).inkMs)
+        val reopened = HighlightSync.sample(hidden, sample(900, 20_000, playing = false), timing)
+        assertEquals(900L, frame(reopened, 20_000).inkMs)
+        assertEquals(900L, frame(reopened, 25_000).inkMs)
+    }
+
+    @Test
+    fun `background listening can rebase a distant position without a new ink performance`() {
+        val hidden = HighlightSync.suspendObservation(
+            HighlightSync.sample(null, sample(500, 500), timing), 600_000_000)
+        val reopened = HighlightSync.sample(hidden, sample(15_000, 20_000), timing)
+        assertEquals(15_000L, reopened.acceptedMediaMs)
+        assertEquals(0L, reopened.sample.inkGeneration)
+    }
+
+    @Test
     fun `seeded transport sequences preserve identity and monotonic ink within a performance`() {
         for (seed in 0..19) {
             val random = Random(seed)

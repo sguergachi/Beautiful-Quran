@@ -27,8 +27,13 @@ export class PreparedTimings {
   ) {}
 
   activeInfo(positionMs: number): ActiveInfo | null {
-    const idx = activeIndex(this.segments, positionMs)
-    if (idx == null) return null
+    const idx = this.activeOccurrence(positionMs)
+    return idx == null ? null : this.infoAtOccurrence(idx)
+  }
+
+  activeOccurrence(positionMs: number): number | null { return activeIndex(this.segments, positionMs) }
+
+  infoAtOccurrence(idx: number): ActiveInfo {
     const seg = this.segments[idx]!
     const maxBefore = this.maxBeforeByIndex[idx]!
     const next = this.segments[idx + 1]

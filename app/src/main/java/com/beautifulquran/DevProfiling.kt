@@ -23,6 +23,7 @@ import androidx.core.os.SystemTraceRequestBuilder
 import androidx.core.content.FileProvider
 import androidx.core.os.requestProfiling
 import com.beautifulquran.domain.HighlightCalibration
+import com.beautifulquran.domain.HighlightEngineVersion
 import com.beautifulquran.domain.HighlightObservation
 import com.beautifulquran.domain.HighlightPlaybackSample
 import com.beautifulquran.domain.HighlightTimingContext
@@ -123,6 +124,8 @@ object DevProfiling {
             markLines.clear()
             highlightTrace = HighlightTraceRecorder(HighlightTraceHeader(
                 BuildConfig.CAPTURE_SOURCE_REVISION, BuildConfig.CAPTURE_SOURCE_DIRTY, BuildConfig.VERSION_NAME,
+                visibleEngineVersion = HighlightEngineVersion.VISIBLE,
+                schemaVersion = 2, scope = "sample-and-frame-clock",
             ))
             captureStart.set(System.currentTimeMillis())
         }
@@ -148,6 +151,12 @@ object DevProfiling {
     ) {
         if (captureStart.get() == null) return
         synchronized(markLock) { highlightTrace?.record(sample, timing, calibration, observation) }
+    }
+
+    /** Frame evidence stays local and exists only during an explicit developer capture. */
+    internal fun recordHighlightFrame(state: com.beautifulquran.domain.HighlightSyncState, atNanos: Long) {
+        if (captureStart.get() == null) return
+        synchronized(markLock) { highlightTrace?.recordFrame(state, atNanos) }
     }
 
     /**
