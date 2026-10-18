@@ -386,7 +386,7 @@ private fun DeveloperSection(
             style = MaterialTheme.typography.bodyLarge,
             color = MaterialTheme.colorScheme.primary,
         )
-        Caption("Al-Fatihah 1:1, traced by an invisible pen with wet ink that dries as the voice moves on.")
+        Caption("Al-Fatihah 1:1–3 with a repeat. Compare inside-out and bottom-up ink filling.")
     }
 
     Spacer(Modifier.height(20.dp))

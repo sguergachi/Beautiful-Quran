@@ -41,15 +41,18 @@ import com.beautifulquran.QuranApp
 import com.beautifulquran.R
 import com.beautifulquran.data.ThemeMode
 import com.beautifulquran.data.model.Reciter
-import com.beautifulquran.domain.HighlightClock
 import com.beautifulquran.domain.TajweedPacing
+import com.beautifulquran.domain.HighlightClock
 import com.beautifulquran.ui.theme.BeautifulQuranTheme
+import com.beautifulquran.ui.theme.LocalQuranAccents
 import com.beautifulquran.ui.theme.quietClickable
+import androidx.media3.common.Player
+import kotlin.math.min
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.json.JSONArray
 
-/** Native, one-verse Paper paint experiment; intentionally separate from the reader. */
+/** Native, three-verse Paper ink-fill experiment; intentionally separate from the reader. */
 class PaperInkStudyActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         setTheme(R.style.Theme_BeautifulQuran)
@@ -71,7 +74,7 @@ class PaperInkStudyActivity : ComponentActivity() {
     }
 
     override fun onStop() {
-        (application as QuranApp).player.pause()
+        (application as QuranApp).player.apply { pause(); setRepeatMode(Player.REPEAT_MODE_OFF) }
         super.onStop()
     }
 }
@@ -82,6 +85,8 @@ private class PaperInkWord(
     val height: Float,
     val baseline: Float,
     val motion: PaperInkClock,
+    val ayah: Int,
+    val maxDepth: Float,
     val pacing: TajweedPacing.Curve?,
     val shader: RuntimeShader,
 ) {
@@ -91,37 +96,41 @@ private class PaperInkWord(
 @RequiresApi(33)
 private class PaperInkStudy(val reciter: Reciter, val words: List<PaperInkWord>) {
     val clock = HighlightClock()
-    val lines = words.chunked(2)
+    val lines = words.groupBy { it.ayah }.values.toList()
+    val lineWidths = lines.map { line -> line.sumOf { it.width.toDouble() }.toFloat() + (line.size - 1) * 24f }
+    val maxWidth = lineWidths.max()
+    val sequence = PaperInkSequence()
     var lastMediaMs = 0L
 }
 
 @RequiresApi(33)
 private suspend fun loadStudy(app: QuranApp): PaperInkStudy {
     val reciter = app.repository.reciters().first { it.id == 14 }
-    val words = app.repository.surahContent(1).ayahs.first().words
-    val segments = app.repository.defaultTimings(14, 1).getValue(1)
+    val words = app.repository.surahContent(1).ayahs.take(3).flatMap { ayah -> ayah.words.map { ayah.number to it } }
+    val timings = app.repository.defaultTimings(14, 1)
     val manifest = JSONArray(app.assets.open("paper-ink-study/words.json").bufferedReader().use { it.readText() })
-    check(manifest.length() == words.size && segments.map { it.position } == words.map { it.position })
+    check(manifest.length() == words.size)
     val source = app.assets.open("paper-ink-study/ink.agsl").bufferedReader().use { it.readText() }
     val t = InkEngine.tuning
-    return PaperInkStudy(reciter, words.mapIndexed { i, word ->
+    return PaperInkStudy(reciter, words.mapIndexed { i, (ayah, word) ->
         val spec = manifest.getJSONObject(i)
-        check(spec.getInt("arrivalBits") == 16)
-        check(spec.getString("arabic") == word.arabic && spec.getInt("position") == word.position)
-        val span = segments[i]
-        val end = segments.getOrNull(i + 1)?.startMs ?: span.endMs
+        check(spec.getInt("ayah") == ayah && spec.getString("arabic") == word.arabic &&
+            spec.getInt("position") == word.position)
+        val segments = timings.getValue(ayah)
+        val span = segments.first { it.position == word.position }
+        val end = segments.firstOrNull { it.position == word.position + 1 }?.startMs ?: span.endMs
         val curve = if (t.tajweedPacing) TajweedPacing.curve(
             word.arabic, (span.endMs - span.startMs).toFloat() / (end - span.startMs),
             TajweedPacing.Hold(
                 madd = t.holdMadd, ghunnah = t.holdGhunnah, waqf = t.holdWaqf,
-                connect = t.holdConnect, isAyahFinal = i == words.lastIndex,
+                connect = t.holdConnect, isAyahFinal = words.getOrNull(i + 1)?.first != ayah,
                 cruiseCap = t.cruiseCap, waqfShare = t.waqfShare,
                 waqfLengthScale = t.waqfLengthScale, creep = t.holdCreep,
-            ), words.getOrNull(i - 1)?.arabic,
+            ), words.getOrNull(i - 1)?.takeIf { it.first == ayah }?.second?.arabic,
         ) else null
         val shader = RuntimeShader(source)
         for ((name, file) in listOf("field" to "field", "normals" to "normal")) {
-            val bitmap = app.assets.open("paper-ink-study/word-${word.position}-$file.png").use {
+            val bitmap = app.assets.open("paper-ink-study/word-$ayah-${word.position}-$file.png").use {
                 requireNotNull(BitmapFactory.decodeStream(it, null, BitmapFactory.Options().apply { inScaled = false }))
             }
             val input = BitmapShader(bitmap, Shader.TileMode.CLAMP, Shader.TileMode.CLAMP)
@@ -130,7 +139,8 @@ private suspend fun loadStudy(app: QuranApp): PaperInkStudy {
         }
         PaperInkWord(
             spec.getDouble("width").toFloat(), spec.getDouble("height").toFloat(),
-            spec.getDouble("baseline").toFloat(), PaperInkClock(span.startMs, end, t.glintFadeMs), curve, shader,
+            spec.getDouble("baseline").toFloat(), PaperInkClock(span.startMs, end, t.glintFadeMs), ayah,
+            spec.getDouble("maxDepth").toFloat(), curve, shader,
         )
     })
 }
@@ -140,17 +150,31 @@ private enum class InkPreview(val label: String) {
     Voice("Follow voice"), Wet("Hold wet"), Dry("Dry ink"),
 }
 
+private enum class InkFill(val label: String) {
+    InsideOut("Inside out"), BottomUp("Bottom up"),
+}
+
 @RequiresApi(33)
 @Composable
 private fun PaperInkStudyPage(app: QuranApp, study: PaperInkStudy) {
     val state by app.player.state.collectAsStateWithLifecycle()
     val speed = remember { mutableFloatStateOf(1f) }
     val tick = remember { mutableLongStateOf(SystemClock.uptimeMillis()) }
+    val fillMode = remember { mutableStateOf(InkFill.InsideOut) }
     val preview = remember { mutableStateOf(InkPreview.Voice) }
     val paper = Color(0xFFFAF3E8)
+    val repeatColor = LocalQuranAccents.current.repeatInk
     LaunchedEffect(study) {
-        app.player.playSurah(1, 1, 1, study.reciter, "Al-Fatihah", preserveRepeatRange = false, autoplay = false)
+        app.player.playSurah(1, 3, 1, study.reciter, "Al-Fatihah", preserveRepeatRange = false, autoplay = false)
         app.player.setSpeed(1f)
+        app.player.setRepeatMode(Player.REPEAT_MODE_OFF)
+    }
+    LaunchedEffect(state.nowPlaying?.ayah, state.positionEvents.inkId) {
+        val item = state.nowPlaying
+        if (item?.surahId == 1 && item.reciterId == 14 && item.ayah in 1..3) {
+            val armed = study.sequence.observe(item.ayah, state.positionEvents.inkId)
+            app.player.setRepeatMode(if (armed) Player.REPEAT_MODE_ONE else Player.REPEAT_MODE_OFF)
+        }
     }
     LaunchedEffect(state.isPlaying, state.positionEvents.clockId) {
         val until = SystemClock.uptimeMillis() + InkEngine.tuning.glintFadeMs
@@ -164,27 +188,34 @@ private fun PaperInkStudyPage(app: QuranApp, study: PaperInkStudy) {
     ) {
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
             Text("Al-Fatihah", style = MaterialTheme.typography.titleMedium)
-            Text("1:1", style = MaterialTheme.typography.titleMedium)
+            Text("1:1–3", style = MaterialTheme.typography.titleMedium)
         }
         Canvas(Modifier.fillMaxWidth().weight(1f)) {
             val now = tick.longValue
-            val belongs = state.nowPlaying?.let { it.surahId == 1 && it.ayah == 1 && it.reciterId == 14 } == true
+            val belongs = state.nowPlaying?.let { it.surahId == 1 && it.ayah in 1..3 && it.reciterId == 14 } == true
             // The service clears nowPlaying at EOF; keep the completed ink for dry-down.
             val media = if (belongs) {
                 study.clock.sample(state.positionEvents.clockId, app.player.positionMs).also { study.lastMediaMs = it }
             } else if (state.nowPlaying == null && study.lastMediaMs > 0) {
                 maxOf(study.lastMediaMs, app.player.positionMs)
             } else 0L
-            val scale = size.width / 725f
+            val currentAyah = if (belongs) state.nowPlaying!!.ayah else study.sequence.ayah
+            val scale = min(size.width / (study.maxWidth + 16f), size.height / 1080f)
             val native = drawContext.canvas.nativeCanvas
-            for ((row, pair) in study.lines.withIndex()) {
-                val lineWidth = pair.sumOf { it.width.toDouble() }.toFloat() + 24f
+            for ((row, line) in study.lines.withIndex()) {
+                val lineWidth = study.lineWidths[row]
                 var x = (size.width + lineWidth * scale) / 2
-                val baseline = size.height / 2 + (row - .5f) * 260f * scale
-                for (word in pair) {
-                    word.motion.update(media, state.isPlaying && belongs, now)
+                val baseline = size.height / 2 + (row - 1f) * 360f * scale
+                for (word in line) {
+                    val position = when {
+                        word.ayah < currentAyah -> word.motion.endMs
+                        word.ayah == currentAyah -> media
+                        else -> 0L
+                    }
+                    word.motion.update(position, state.isPlaying && belongs && word.ayah == currentAyah, now)
                     val progress = if (preview.value != InkPreview.Voice) 1f else
                         word.pacing?.at(word.motion.progress) ?: InkEngine.sweepEasing.transform(word.motion.progress)
+                    val repeat = word.ayah == 2 && study.sequence.repeatedMiddle
                     val wet = when (preview.value) {
                         InkPreview.Voice -> word.motion.wet
                         InkPreview.Wet -> 1f
@@ -192,7 +223,12 @@ private fun PaperInkStudyPage(app: QuranApp, study: PaperInkStudy) {
                     }
                     word.shader.setFloatUniform("progress", progress)
                     word.shader.setFloatUniform("wet", wet)
-                    word.shader.setFloatUniform("applying", if (preview.value == InkPreview.Voice && word.motion.applying) 1f else 0f)
+                    word.shader.setFloatUniform("fillMode", fillMode.value.ordinal.toFloat())
+                    word.shader.setFloatUniform("extent", word.width, word.height)
+                    word.shader.setFloatUniform("maxDepth", word.maxDepth)
+                    word.shader.setFloatUniform("retained", if (repeat) 1f else 0f)
+                    word.shader.setFloatUniform("repeatPass", if (repeat) 1f else 0f)
+                    word.shader.setFloatUniform("repeatColor", repeatColor.red, repeatColor.green, repeatColor.blue)
                     word.shader.setFloatUniform("weight", 2.6f)
                     word.shader.setFloatUniform("aa", .9f / scale)
                     x -= word.width * scale
@@ -209,7 +245,15 @@ private fun PaperInkStudyPage(app: QuranApp, study: PaperInkStudy) {
         }
         Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
             Text("Paper ink", style = MaterialTheme.typography.titleMedium)
-            Text("Abu Bakr Al-Shatri · controlled wet reflection", style = MaterialTheme.typography.bodySmall)
+            Text("Letter ink wash · verse 2 repeats once", style = MaterialTheme.typography.bodySmall)
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                InkFill.entries.forEach { mode ->
+                    Text(mode.label, Modifier.quietClickable { fillMode.value = mode }.padding(vertical = 8.dp),
+                        color = if (fillMode.value == mode) MaterialTheme.colorScheme.primary else
+                            MaterialTheme.colorScheme.onSurfaceVariant,
+                        style = MaterialTheme.typography.bodySmall)
+                }
+            }
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                 InkPreview.entries.forEach { mode ->
                     Text(mode.label, Modifier.quietClickable {
@@ -227,6 +271,9 @@ private fun PaperInkStudyPage(app: QuranApp, study: PaperInkStudy) {
                 }.padding(vertical = 12.dp))
                 Text("Again", Modifier.quietClickable {
                     preview.value = InkPreview.Voice
+                    study.sequence.reset()
+                    study.lastMediaMs = 0
+                    app.player.setRepeatMode(Player.REPEAT_MODE_OFF)
                     app.player.seekToWordAndPlay(1, 0)
                 }.padding(vertical = 12.dp))
                 Text(if (speed.floatValue == 1f) "1×" else "½×", Modifier.quietClickable {

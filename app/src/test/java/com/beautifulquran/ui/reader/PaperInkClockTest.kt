@@ -5,7 +5,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class PaperInkClockTest {
-    @Test fun contactAnimationStopsOnPauseAndAtWordHandoff() {
+    @Test fun inkApplicationStopsOnPauseAndAtWordHandoff() {
         val clock = PaperInkClock(100, 1100, 1000)
         clock.update(0, true, 0)
         assertTrue(!clock.applying)
@@ -20,7 +20,7 @@ class PaperInkClockTest {
         assertTrue(!clock.applying)
     }
 
-    @Test fun pauseFreezesStrokeAndDriesInk() {
+    @Test fun pauseFreezesFillAndDriesInk() {
         val clock = PaperInkClock(100, 1100, 1000)
         clock.update(600, true, 0)
         assertEquals(.5f, clock.progress)

@@ -11,68 +11,51 @@ glimmer on Android and web. Repeat-chain timing and orange ink are documented
 in [REPEAT_HIGHLIGHTING.md](REPEAT_HIGHLIGHTING.md); the shared word-state and
 motion policy lives in [INK_ENGINE.md](INK_ENGINE.md).
 
-## Paper ink experiment — Al-Fatihah 1:1
+## Paper ink experiment — Al-Fatihah 1:1–3
 
 Settings → Developer → **Paper ink study** opens a native Android 13+ test
-sheet for the complete four-word verse, using Al-Shatri's bundled timings
-and the existing playback service. It is an experiment for this verse; the
-Paper reader's normal wash is unchanged.
+sheet for three verses. The existing Al-Shatri audio queue plays **1 → 2 →
+2 → 3**: Media3 repeats the middle item once, then resumes the queue. The
+normal reader wash is unchanged; this is an isolated visual experiment.
 
-The pen is **invisible**. Authored broad-nib gestures form an arrival map
-along each stroke, including pen lifts and marks, rather than slicing a
-letter with a moving vertical edge. Font contours remain authoritative.
-The gestures are an illustrative hand, not a validated calligrapher's
-recording, and must not be generalized by cutting other words into bands.
-Within each letter, the pen eases through bends. Deposited film follows nib
-width, slower turns, and the contact/lift ends of each gesture; shallow
-parallel tracks follow the nib across the path. These cues replace a
-page-space decorative wave, while the four word spans remain unchanged.
+The familiar right-to-left wash moves through each word, with a soft leading
+edge driven by the existing tajweed pacing. There is no pen or authored
+stroke route, and no whole-word fade. As the wash reaches the letterforms,
+their ink fills using either **Inside out** (from the stroke interior toward
+its contour) or **Bottom up** (a rising fill inside the font outline). A
+fixed toggle compares both during playback without moving the text or
+restarting audio. These are continuous fields inside the shaped word, not
+isolated character outlines: Arabic ligatures and their marks stay intact.
 
-The contact edge uses a 16-bit arrival field and its local spatial gradient
-to keep its antialiasing about one output pixel wide. A small liquid ridge
-advances along that edge, then relaxes into the laid film. The moving ridge
-stops on pause, leaving the wet ink to settle. Older laid areas settle before
-the current contact, while deeper deposits keep their reflection longer.
+The wash is based on media time, so pausing freezes filling and changing
+playback speed scales it with the recitation. Before its turn, a word remains
+visible beneath the paper.
 
-Wet ink is optically fuller than dry ink and has localized pigment pooling
-and a glyph-bound reflection of two broad window panes. The former faint
-diffuse-facing lobe left most wet ink almost the same brightness as dry ink
-on the phone. A stronger edge highlight alone looked like raised lettering.
-The revised surface is a thin, mostly flat film with shallow smooth pools;
-the reflected window panes follow a controlled pass tied to drawing progress
-and the dry-down. No device movement or sensor is involved.
-Thinner film loses its reflection first during the shared dry-down envelope.
-The wet-phase contrast is deliberately pronounced for normal reading speed:
-the liquid lip catches light even with a still phone, window reflections are
-brighter, and wet expansion reaches 2.6 font pixels before settling. The
-fresh reflection remains inside the painted stroke, with no surrounding glow.
-The pooled window reflection runs at 70% strength to keep the body dark;
-the advancing liquid lip retains its stronger highlight.
-The film stays glossy through deposition; its loss of gloss happens during
-the existing dry-down rather than fading most of the cue before handoff.
-Hafs is a fixed-weight font: this is a small
-stroke expansion, not a variable-font weight axis. Both thickness and gloss
-dry over the same `InkEngine.tuning.glintFadeMs` as glimmer. The existing
-tajweed curve supplies letter timing before wash-feather compensation.
-Pausing stops stroke travel and lets wet ink dry; Again starts a fresh pass.
-**Hold wet** pauses audio and holds the complete verse wet for inspection;
-**Dry ink** shows the same verse matte and thinner. **Follow voice**, Play or
-Again returns to timed drawing. These modes keep the controls in fixed slots.
+Wet ink is optically fuller than dry ink, with a smooth liquid film and
+localized window reflections at 70% strength. A controlled light pass follows
+the word's media progress and dry-down; it needs no phone movement or sensor.
+Both gloss and the 2.6 font-pixel optical expansion settle over the existing
+`InkEngine.tuning.glintFadeMs`. Hafs has no variable weight axis. No glow,
+pixel noise, or surrounding shadow is added.
 
-The shader uses committed 4× contour/16-bit arrival maps, linearly filtered input
-buffers and smooth pixel coverage. Surface normals are low-pass filtered;
-there is no per-pixel noise, halo, or visible pen. Four cached native AGSL
-shaders draw the verse; no shaping, stroke rasterization or bitmap upload
-runs per frame. Opaque field maps carry two arrival bytes in RG and signed
-contour distance in B; surface maps carry normal XY and film depth. The
-shader reconstructs normal Z and samples the arrival gradient locally.
-The light pass is driven entirely by the existing drawing progress and wet
-envelope, so its visibility does not depend on phone angle. There are no
-sensor listeners. Real phone performance and the fidelity of the authored
-hand still need evaluation.
+When verse 2 repeats, its entire previously read black base stays visible.
+The wash brings in the existing Paper orange repeat accent together
+with the fuller wet shape and reflection, then dries back to black. Later
+words stay black until their turn. This gives the return both color and
+shape without erasing the passage or replaying the letter-drawing pattern.
+**Again** restarts the three-verse demonstration and rearms its one repeat.
+The repeat mode is cleared when the study stops.
 
-`tools/paper_ink_study/strokes.json` contains the gestures. Rebuild the
-committed `app/src/main/assets/paper-ink-study/` maps with:
+**Hold wet** and **Dry ink** pause the audio for a material comparison;
+**Follow voice**, Play or Again returns to timed filling. Controls keep their
+fixed slots. Normal and half-speed playback are available.
+
+Ten cached native AGSL shaders draw the ten word instances. Committed 4×
+contour maps preserve the font; smooth surface maps supply normal XY and film
+depth. There is no per-frame shaping, rasterization, bitmap upload, or
+arrival-map lookup. The material maps are generated from the font outlines,
+without stroke inference. Field R carries height, G interior-to-contour fill,
+and B contour distance; the surface map carries normal XY and film depth:
 
 ```bash
 # Python environment: numpy, scipy, Pillow with RAQM
@@ -80,11 +63,12 @@ python3 tools/build_paper_ink_study.py
 adb shell am start -n com.beautifulquran/.ui.reader.PaperInkStudyActivity
 ```
 
-The generator reads the existing canonical verse without changing any
-database. `PaperInkClockTest` covers ordered handoff, pause/resume dry-down,
-contact gating and backward-seek reset. Normal/half-speed playback can be compared in the
-sheet. The controlled reflection is identical in recordings and on a still
-phone; physical-device performance still needs evaluation.
+The generator verifies the app's canonical words when loading the study;
+it changes no database. `PaperInkClockTest` covers application, handoff, pause/resume, dry-down and
+backward reset.
+`PaperInkSequenceTest` covers the one middle repeat and restarting the study.
+The controlled reflection is identical in recordings and on a still phone;
+physical-device performance and reading comfort still need evaluation.
 
 The material target is carbon calligraphy ink on smooth, sized paper,
 settling to a matte finish. It is an art-directed approximation compressed

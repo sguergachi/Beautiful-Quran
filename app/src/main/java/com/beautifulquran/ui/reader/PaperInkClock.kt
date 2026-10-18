@@ -1,6 +1,6 @@
 package com.beautifulquran.ui.reader
 
-/** The study's existing media-clock reveal and wall-clock glimmer dry-down. */
+/** Reading-order wash on the media clock, followed by the shared glimmer dry-down. */
 internal class PaperInkClock(
     val startMs: Long,
     val endMs: Long,
@@ -10,13 +10,13 @@ internal class PaperInkClock(
         private set
     var wet = 0f
         private set
-    /** Whether the current word may animate its advancing liquid contact. */
+    /** Whether the reciter is currently applying fresh ink to this word. */
     var applying = false
         private set
     private var dryingAt = 0L
     private var dryingFrom = 0f
 
-    /** Pausing freezes the pen but lets its ink dry; a seek clears future ink. */
+    /** Pausing freezes filling but lets ink dry; a seek clears future ink. */
     fun update(positionMs: Long, playing: Boolean, nowMs: Long) {
         progress = ((positionMs - startMs).toFloat() / (endMs - startMs).coerceAtLeast(1)).coerceIn(0f, 1f)
         val active = playing && positionMs >= startMs && positionMs < endMs
