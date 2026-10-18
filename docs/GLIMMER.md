@@ -25,20 +25,20 @@ the clusters; glyph bounds associate the printed ink and marks with them.
 Ligatures stay together and the original printed contour stays authoritative.
 There is no pen, authored stroke route, or whole-word opacity fade.
 
-**Inside out** blooms from each stroke's thick interior toward its contour.
-**Bottom up** raises ink from the bottom to the top of each connected ink
-piece, including marks, within that cluster's turn. Filling overlaps between
-neighbouring clusters, with a broad feathered pigment front. Each piece uses
-its own depth or height, so small marks participate rather than waiting for a
-word-wide height/depth threshold. The fixed toggle changes mode without
-moving text or restarting audio; the caption explains the selected mode.
+**Inside out** is the study's single fill. Ink gathers in each connected
+piece's deeper interior, then spreads toward the contour and along its
+branches. A baked travel field follows the connected ink, favouring wider
+passages; it is blended with local contour depth to retain the inside-out
+bloom. Neighbouring clusters overlap with a broad feathered front. Small
+marks use their own geometry. This is a geometry-guided approximation, not a
+fluid solver or inferred pen route; there is no animated random noise.
 
 The wash is based on media time, so pausing freezes filling and changing
 playback speed scales it with the recitation. Before its turn, a word remains
 visible beneath the paper.
 
 Wet ink is optically fuller than dry ink, with a rounded liquid film across
-the stroke interior and localized window reflections at 45% strength. The
+the stroke interior and localized window reflections. The
 surface keeps curving through broad strokes rather than flattening behind a
 thick outline. A controlled light pass follows
 the word's media progress and dry-down; it needs no phone movement or sensor.
@@ -46,15 +46,26 @@ Both gloss and the optical expansion settle over the existing
 `InkEngine.tuning.glintFadeMs`. Hafs has no variable weight axis. No glow,
 pixel noise, or surrounding shadow is added.
 
+**Reflection** adjusts the window reflection's strength from 0–100%, default
+45%. **Softness** changes its spread from a focused, antialiased reflection
+to a broad soft light, default 25%. Both work during timed playback and Hold
+fill without changing the fill amount, pooling, or clock. Surface normals
+are smoothed independently of the printed contour; even the focused light
+retains a soft edge to avoid pixel-scale sparkle. A rounded moving
+meniscus follows the advancing ink front; its normal comes from smooth
+arrival-field gradients sampled at a scale-aware radius. The light blends
+with the pigment rather than adding unbounded brightness, preserving the
+orange repeat at high settings. Fully dry text is unaffected by either dial.
+
 The **Ink pooling** dial changes wet spread and liquid depth live, including
-in Hold wet. Its 0–100% range corresponds to 0–3.5 font pixels of optical
+in Hold fill. Its 0–100% range corresponds to 0–3.5 font pixels of optical
 expansion; the default is 25% (0.875 pixels), down from the previous fixed
 2.6 pixels. Zero keeps a thin wet film with no expansion. Dry ink always
 returns to the original font contour, at every dial setting. The dial does
 not change timing or restart playback.
 The **Font size** dial scales the fitted sample from 50% to 100%, centred on
 the same three rows. It changes only drawing scale, keeping playback and
-the pooling setting intact. Both dials reset when the study is reopened.
+the pooling setting intact. All dials reset when the study is reopened.
 
 When verse 2 repeats, its entire previously read black base stays visible.
 The wash brings in the existing Paper orange repeat accent together
@@ -69,7 +80,7 @@ back to black.
 The repeat mode is cleared when the study stops.
 
 **Inspect fill** scrubs a paused, fully wet material preview from 0–100%.
-It starts at 50%, where switching modes visibly compares their growth;
+It starts at 50%, where the front and its wet reflection can be inspected;
 100% shows the completed wet material. Touching it pauses audio, and
 **Hold fill** restores that inspected phase. **Dry ink** shows complete dry
 text. **Follow voice**, Play or Again returns to timed filling. Controls
@@ -79,8 +90,10 @@ Ten cached native AGSL shaders draw the ten word instances. Committed 4×
 contour maps preserve the font; smooth surface maps supply normal XY and film
 depth. There is no per-frame shaping, rasterization, or bitmap upload. The
 material maps are generated from the font outlines, without stroke inference.
-Field R/G carry bottom-up/inside-out arrival phases, sampled together with
-B contour distance; the surface map carries normal XY and film depth:
+Field G carries the inside-out arrival phase, B contour distance, and R is
+reserved at zero; the surface map carries normal XY and film depth. Wicking
+is solved only in the generator. The shader uses the same cached textures,
+with two additional field samples for the moving meniscus:
 
 ```bash
 # Python environment: numpy, scipy, uharfbuzz, Pillow with RAQM

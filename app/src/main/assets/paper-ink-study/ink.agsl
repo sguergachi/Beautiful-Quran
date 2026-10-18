@@ -1,7 +1,8 @@
 uniform shader field;
 uniform shader normals;
 uniform float progress;
-uniform float fillMode;
+uniform float reflectionStrength;
+uniform float lightSoftness;
 uniform float retained;
 uniform float wet;
 uniform float weight;
@@ -14,7 +15,7 @@ half4 main(float2 p) {
     float4 shape = field.eval(p * 4.0);
     float distance = (shape.b * 255.0 - 128.0) / 16.0;
     // Letter clusters arrive in reading order; each fills through its own shape.
-    float arrival = mix(shape.g, shape.r, fillMode);
+    float arrival = shape.g;
     float loaded = smoothstep(arrival - 0.065, arrival + 0.065, mix(-0.065, 1.065, progress));
     float3 surface = normals.eval(p).rgb;
     float localWet = smoothstep(0.0, 0.7, wet - (1.0 - surface.b) * 0.2) * loaded;
@@ -23,12 +24,20 @@ half4 main(float2 p) {
     float coverage = mix(base * 0.2661, expanded, max(loaded, retained));
     float2 slope = (surface.rg * 255.0 - 128.0) / 127.0;
     float volume = 0.6 + weight / 6.5;
-    float3 normal = normalize(float3(slope * localWet * volume,
+    // A rounded advancing meniscus follows the same smooth arrival field as the ink.
+    float rim = 4.0 * loaded * (1.0 - loaded) * wet;
+    float2 frontSlope = float2(0.0);
+    if (rim > 0.0) {
+        float radius = max(1.5, aa * 1.5);
+        frontSlope = (float2(field.eval((p + float2(radius, 0.0)) * 4.0).g,
+            field.eval((p + float2(0.0, radius)) * 4.0).g) - arrival) / radius;
+    }
+    float3 normal = normalize(float3(slope * localWet * volume + frontSlope * rim * 6.0,
         sqrt(max(0.01, 1.0 - dot(slope, slope)))));
     float3 view = normalize(float3(0.12, -0.16, 1.0));
     float3 reflected = reflect(-view, normal);
     float2 room = reflected.xy / max(0.2, reflected.z) + (p + origin) * 0.001;
-    float reflectionSoftness = mix(0.055, 0.14, 1.0 - localWet);
+    float reflectionSoftness = mix(mix(0.1, 0.22, lightSoftness), 0.24, 1.0 - localWet);
     float lightPass = mix(-0.12, 0.12, progress * 0.8 + (1.0 - wet) * 0.2);
     float pane = min(abs(room.x + 0.32 - lightPass), abs(room.x - 0.08 - lightPass));
     float vertical = (room.y - 0.16) / 0.38;
@@ -37,7 +46,7 @@ half4 main(float2 p) {
     float pooling = smoothstep(0.25, 0.8, surface.b);
     float3 pigment = mix(float3(13.0, 14.0, 15.0) / 255.0, repeatColor, repeatPass);
     pigment *= 1.0 - pooling * 0.2 * volume * (1.0 - repeatPass);
-    pigment += float3(0.76, 0.76, 0.72) * window * 0.45 * localWet;
+    pigment = mix(pigment, float3(0.86, 0.86, 0.82), window * reflectionStrength * localWet);
     float3 dry = float3(28.0, 27.0, 24.0) / 255.0;
     // Let the clean orange establish early; the liquid film may still be filling.
     float repeatDensity = wet * smoothstep(0.0, 0.35, loaded);

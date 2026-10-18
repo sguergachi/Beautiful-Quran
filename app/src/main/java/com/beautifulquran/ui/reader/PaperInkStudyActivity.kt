@@ -165,21 +165,18 @@ private enum class InkPreview(val label: String) {
     Voice("Follow voice"), Wet("Hold fill"), Dry("Dry ink"),
 }
 
-private enum class InkFill(val label: String) {
-    InsideOut("Inside out"), BottomUp("Bottom up"),
-}
-
 @RequiresApi(33)
 @Composable
 private fun PaperInkStudyPage(app: QuranApp, study: PaperInkStudy) {
     val state by app.player.state.collectAsStateWithLifecycle()
     val speed = remember { mutableFloatStateOf(1f) }
     val tick = remember { mutableLongStateOf(SystemClock.uptimeMillis()) }
-    val fillMode = remember { mutableStateOf(InkFill.InsideOut) }
     val preview = remember { mutableStateOf(InkPreview.Voice) }
     val thickness = remember { mutableFloatStateOf(.25f) }
     val fontScale = remember { mutableFloatStateOf(1f) }
     val fillAmount = remember { mutableFloatStateOf(.5f) }
+    val reflection = remember { mutableFloatStateOf(.45f) }
+    val softness = remember { mutableFloatStateOf(.25f) }
     val paper = Color(0xFFFAF3E8)
     val repeatColor = LocalQuranAccents.current.repeatInk
     LaunchedEffect(study) {
@@ -245,7 +242,8 @@ private fun PaperInkStudyPage(app: QuranApp, study: PaperInkStudy) {
                     }
                     word.shader.setFloatUniform("progress", progress)
                     word.shader.setFloatUniform("wet", wet)
-                    word.shader.setFloatUniform("fillMode", fillMode.value.ordinal.toFloat())
+                    word.shader.setFloatUniform("reflectionStrength", reflection.floatValue)
+                    word.shader.setFloatUniform("lightSoftness", softness.floatValue)
                     word.shader.setFloatUniform("retained", if (repeat) 1f else 0f)
                     word.shader.setFloatUniform("repeatPass", if (repeat) 1f else 0f)
                     word.shader.setFloatUniform("repeatColor", repeatColor.red, repeatColor.green, repeatColor.blue)
@@ -263,24 +261,17 @@ private fun PaperInkStudyPage(app: QuranApp, study: PaperInkStudy) {
                 }
             }
         }
-        Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Text("Paper ink", style = MaterialTheme.typography.titleMedium)
-            Text(if (fillMode.value == InkFill.InsideOut) "Stroke centres → edges · verse 2 repeats" else
-                "Letter bottoms → tops · verse 2 repeats", style = MaterialTheme.typography.bodySmall)
+            Text("Inside out · liquid ink · verse 2 repeats", style = MaterialTheme.typography.bodySmall)
             InkStudyDial("Ink pooling", thickness)
             InkStudyDial("Font size", fontScale, .5f..1f)
+            InkStudyDial("Reflection", reflection)
+            InkStudyDial("Softness", softness)
             InkStudyDial("Inspect fill", fillAmount, onChange = {
                 if (preview.value != InkPreview.Wet) app.player.pause()
                 preview.value = InkPreview.Wet
             })
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                InkFill.entries.forEach { mode ->
-                    Text(mode.label, Modifier.quietClickable { fillMode.value = mode }.padding(vertical = 8.dp),
-                        color = if (fillMode.value == mode) MaterialTheme.colorScheme.primary else
-                            MaterialTheme.colorScheme.onSurfaceVariant,
-                        style = MaterialTheme.typography.bodySmall)
-                }
-            }
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                 InkPreview.entries.forEach { mode ->
                     Text(mode.label, Modifier.quietClickable {

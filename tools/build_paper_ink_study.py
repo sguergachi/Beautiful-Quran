@@ -11,6 +11,8 @@ import numpy as np
 import uharfbuzz as hb
 from PIL import Image, ImageDraw, ImageFont
 from scipy.ndimage import distance_transform_edt, find_objects, gaussian_filter, label
+from scipy.sparse import coo_matrix
+from scipy.sparse.csgraph import dijkstra
 
 ROOT = Path(__file__).resolve().parents[1]
 SS = 4
@@ -18,8 +20,31 @@ ASSETS = ROOT / 'app/src/main/assets/paper-ink-study'
 FONT = ROOT / 'app/src/main/res/font/uthmanic_hafs_v22.ttf'
 
 
-def filling_fields(text, ink, distance, box, ascent):
-    """Schedule shaped letter clusters, then fill each stroke's own contour/height."""
+def wicking_time(ink, depth):
+    """Bake travel from a deep ink pool along the connected stroke, favouring wider passages."""
+    count = int(ink.sum())
+    if count == 1:
+        return np.zeros(1)
+    ids = np.full(ink.shape, -1)
+    ids[ink] = np.arange(count)
+    speed = np.sqrt(np.maximum(0, depth[ink]) + .25)
+    sources, targets, costs = [], [], []
+    h, w = ink.shape
+    for dy, dx in ((0, 1), (1, 0), (1, 1), (1, -1)):
+        a = ids[:h - dy, max(0, -dx):w - max(0, dx)]
+        b = ids[dy:, max(0, dx):w - max(0, -dx)]
+        valid = (a >= 0) & (b >= 0)
+        sources.extend(a[valid])
+        targets.extend(b[valid])
+        costs.extend(np.hypot(dx, dy) * 2 / (speed[a[valid]] + speed[b[valid]]))
+    graph = coo_matrix((costs, (sources, targets)), shape=(count, count)).tocsr()
+    travel = dijkstra(graph, directed=False, indices=int(np.argmax(depth[ink])))
+    assert np.isfinite(travel).all()
+    return travel / max(1, travel.max())
+
+
+def filling_field(text, ink, distance, box, ascent):
+    """Schedule shaped letter clusters, then wick from their interiors to the contour."""
     font = hb.Font(hb.Face(FONT.read_bytes()))
     font.scale = (160 * SS * 64, 160 * SS * 64)
     buf = hb.Buffer()
@@ -49,7 +74,6 @@ def filling_fields(text, ink, distance, box, ascent):
             closest[nearer] = score[nearer]
         cursor = end
     inside_out = np.zeros(ink.shape)
-    bottom_up = np.zeros(ink.shape)
     for cluster, (first, last) in advances.items():
         phase = 1 - (first + last) / (2 * cursor)
         pieces, _ = label(ink & (owner == cluster), np.ones((3, 3)))
@@ -58,12 +82,12 @@ def filling_fields(text, ink, distance, box, ascent):
                 continue
             pixels = pieces[region] == i
             depth = np.clip(distance[region] / max(.25, distance[region][pixels].max()), 0, 1)
-            rise = (region[0].stop - 1 - yy[region]) / max(1, region[0].stop - 1 - region[0].start)
-            inside_out[region][pixels] = .62 * phase + .38 * (1 - depth[pixels])
-            bottom_up[region][pixels] = .62 * phase + .38 * rise[pixels]
+            travel = wicking_time(pixels, distance[region])
+            growth = .6 * (1 - depth[pixels] ** .65) + .4 * travel ** .55
+            inside_out[region][pixels] = .62 * phase + .38 * growth
     nearest = tuple(distance_transform_edt(~ink, return_distances=False, return_indices=True))
     # Extrapolate into wet spread and soften joins without blurring the printed contour.
-    return [gaussian_filter(f[nearest], SS * .65) for f in (bottom_up, inside_out)]
+    return gaussian_filter(inside_out[nearest], SS * .65)
 
 
 def build(ayah, position, text):
@@ -83,15 +107,14 @@ def build(ayah, position, text):
     # A rounded meniscus continues across broad strokes instead of flattening at the edge.
     interior = np.maximum(0, distance)
     film = interior / (interior + 3)
-    gy, gx = np.gradient(gaussian_filter(film * 3, SS))
+    gy, gx = np.gradient(gaussian_filter(film * 3, SS * 2))
     nx, ny = -gx * SS, -gy * SS
     length = np.sqrt(nx * nx + ny * ny + 1)
     normal = np.rint(np.stack([128 + nx / length * 127, 128 + ny / length * 127,
                               film * 255, np.full(alpha.shape, 255)], axis=-1)).astype('uint8')
     # Opaque data avoids premultiplication. B carries signed contour distance.
     field = np.zeros((*alpha.shape, 4), dtype='uint8')
-    rise, bloom = filling_fields(text, ink, distance, box, reference.getmetrics()[0])
-    field[:, :, 0] = np.round(rise * 255)
+    bloom = filling_field(text, ink, distance, box, reference.getmetrics()[0])
     field[:, :, 1] = np.round(bloom * 255)
     field[:, :, 2] = np.clip(128 + distance * 16, 0, 255)
     field[:, :, 3] = 255
