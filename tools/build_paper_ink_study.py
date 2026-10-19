@@ -22,11 +22,9 @@ ARABIC_FONT = ROOT / 'app/src/main/res/font/uthmanic_hafs_v22.ttf'
 ENGLISH_FONT = ROOT / 'app/src/main/res/font/junicode_variable.ttf'
 
 
-def wicking_time(ink, depth):
-    """Bake travel from a deep ink pool along the connected stroke, favouring wider passages."""
+def ink_graph(ink, depth):
+    """Connected stroke paths favour wide passages; paper is never a shortcut."""
     count = int(ink.sum())
-    if count == 1:
-        return np.zeros(1)
     ids = np.full(ink.shape, -1)
     ids[ink] = np.arange(count)
     speed = np.sqrt(np.maximum(0, depth[ink]) + .25)
@@ -39,13 +37,54 @@ def wicking_time(ink, depth):
         sources.extend(a[valid])
         targets.extend(b[valid])
         costs.extend(np.hypot(dx, dy) * 2 / (speed[a[valid]] + speed[b[valid]]))
-    graph = coo_matrix((costs, (sources, targets)), shape=(count, count)).tocsr()
-    # Load a deep pool towards the right, rather than whichever side happens to be thickest.
+    return coo_matrix((costs, (sources, targets)), shape=(count, count)).tocsr()
+
+
+def wicking_basins(ink, depth, anchors):
+    """Grow letter interiors along ink paths from separate deep pools, without an x sweep."""
     x = np.nonzero(ink)[1]
-    source = depth[ink] * (.35 + .65 * (x - x.min()) / max(1, np.ptp(x)))
-    travel = dijkstra(graph, directed=False, indices=int(np.argmax(source)))
+    nearest = np.argmin(np.abs(x[:, None] - np.array([a[1] for a in anchors])), axis=1)
+    seeds, letters = [], []
+    for index in np.unique(nearest):
+        candidates = np.flatnonzero(nearest == index)
+        seed = candidates[np.argmax(depth[ink][candidates])]
+        seeds.append(seed)
+        letters.append(anchors[index][0])
+    travel, _, sources = dijkstra(ink_graph(ink, depth), directed=False, indices=seeds,
+                                  min_only=True, return_predecessors=True)
     assert np.isfinite(travel).all()
-    return travel / max(1, travel.max())
+    lookup = np.full(int(ink.sum()), -1)
+    lookup[seeds] = letters
+    owners = lookup[sources]
+    assert (owners >= 0).all()
+    for letter in letters:
+        pixels = owners == letter
+        travel[pixels] /= max(1, travel[pixels].max())
+    return owners, travel
+
+
+def letter_anchors(advances, plain_advances, owner, ink, rtl):
+    """Split font ligatures into approximate letter basins; keep their printed outline intact."""
+    anchors = {}
+    clusters = sorted(advances)
+    for index, cluster in enumerate(clusters):
+        pixels = ink & (owner == cluster)
+        if not pixels.any():
+            continue
+        next_cluster = clusters[index + 1] if index + 1 < len(clusters) else float('inf')
+        letters = sorted((k for k, width in plain_advances.items()
+                          if cluster <= k < next_cluster and width > 0), reverse=rtl)
+        assert letters, cluster
+        x = np.nonzero(pixels)[1]
+        left, width = x.min(), max(1, np.ptp(x))
+        total = sum(plain_advances[k] for k in letters)
+        cursor = 0
+        anchors[cluster] = []
+        for letter in letters:
+            span = plain_advances[letter] / total
+            anchors[cluster].append((letter, left + width * (cursor + span / 2)))
+            cursor += span
+    return anchors
 
 
 def filling_field(text, ink, distance, box, ascent, font_path, font_size):
@@ -78,28 +117,51 @@ def filling_field(text, ink, distance, box, ascent, font_path, font_size):
             owner[nearer] = info.cluster
             closest[nearer] = score[nearer]
         cursor = end
+    # Font substitutions can merge an entire word (including basm and lillah).
+    # Shape a second measurement run to recover letter advance shares only;
+    # it never supplies the contour or the displayed glyphs.
+    plain = hb.Buffer()
+    plain.add_str(text)
+    plain.guess_segment_properties()
+    hb.shape(font, plain, {"calt": False, "liga": False, "rlig": False, "clig": False})
+    plain_advances = {}
+    for info, pos in zip(plain.glyph_infos, plain.glyph_positions):
+        plain_advances[info.cluster] = plain_advances.get(info.cluster, 0) + pos.x_advance
+    anchors = letter_anchors(advances, plain_advances, owner, ink, buf.direction == 'rtl')
+    ordered = sorted((a for group in anchors.values() for a in group),
+                     key=lambda a: -a[1] if buf.direction == 'rtl' else a[1])
+    # Stagger letters, overlapping roughly three blooms. Direction belongs to
+    # these starts, never to pixels within a letter.
+    duration = 2.8 / (len(ordered) + 1.8)
+    onsets = {letter: i / (len(ordered) + 1.8) for i, (letter, _) in enumerate(ordered)}
     inside_out = np.zeros(ink.shape)
-    for cluster, (first, last) in advances.items():
-        cluster_ink = ink & (owner == cluster)
-        if not cluster_ink.any():
-            continue
-        left, right = np.nonzero(cluster_ink)[1].min(), np.nonzero(cluster_ink)[1].max()
-        # A long ligature must still progress from the right. Retain interior
-        # growth at each location instead of revealing the ligature all at once.
-        across = np.clip((right - xx) / max(1, right - left), 0, 1)
-        phase = 1 - last / cursor + across * (last - first) / cursor
+    filled_letters = set()
+    for cluster, pools in anchors.items():
         pieces, _ = label(ink & (owner == cluster), np.ones((3, 3)))
         for i, region in enumerate(find_objects(pieces), 1):
             if region is None:
                 continue
             pixels = pieces[region] == i
-            depth = np.clip(distance[region] / max(.25, distance[region][pixels].max()), 0, 1)
-            travel = wicking_time(pixels, distance[region])
-            growth = .6 * (1 - depth[pixels] ** .65) + .4 * travel ** .55
-            inside_out[region][pixels] = .7 * phase[region][pixels] + .3 * growth
+            x = np.nonzero(pixels)[1] + region[1].start
+            local = [(letter, center - region[1].start) for letter, center in pools
+                     if x.min() <= center <= x.max()]
+            if not local:
+                letter, center = min(pools, key=lambda a: abs(a[1] - x.mean()))
+                local = [(letter, center - region[1].start)]
+            owners, travel = wicking_basins(pixels, distance[region], local)
+            filled_letters.update(owners)
+            growth = np.empty(int(pixels.sum()))
+            for letter in np.unique(owners):
+                basin = owners == letter
+                depth = np.clip(distance[region][pixels][basin] /
+                                max(.25, distance[region][pixels][basin].max()), 0, 1)
+                growth[basin] = .7 * (1 - depth ** .65) + .3 * travel[basin] ** .55
+            starts = np.array([onsets[letter] for letter in owners])
+            inside_out[region][pixels] = starts + duration * (.12 + .76 * growth)
+    assert filled_letters == onsets.keys(), (text, filled_letters, onsets.keys())
     nearest = tuple(distance_transform_edt(~ink, return_distances=False, return_indices=True))
     # Extrapolate into wet spread and soften joins without blurring the printed contour.
-    return gaussian_filter(inside_out[nearest], SS * .65)
+    return gaussian_filter(inside_out[nearest], SS * .65), duration
 
 
 def build(ayah, position, text, english=False):
@@ -127,7 +189,8 @@ def build(ayah, position, text, english=False):
                               film * 255, np.full(alpha.shape, 255)], axis=-1)).astype('uint8')
     # Opaque data avoids premultiplication. B carries signed contour distance.
     field = np.zeros((*alpha.shape, 4), dtype='uint8')
-    bloom = filling_field(text, ink, distance, box, reference.getmetrics()[0], font_path, font_size)
+    bloom, duration = filling_field(text, ink, distance, box, reference.getmetrics()[0], font_path, font_size)
+    field[:, :, 0] = round(duration * 255)
     field[:, :, 1] = np.round(bloom * 255)
     field[:, :, 2] = np.clip(128 + distance * 16, 0, 255)
     field[:, :, 3] = 255

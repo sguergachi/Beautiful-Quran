@@ -21,26 +21,31 @@ normal reader wash is unchanged; this is an isolated visual experiment.
 **Arabic / English** switches the three verses without restarting audio or
 changing the dials. Arabic uses Hafs; English uses the bundled Junicode face
 and the canonical Saheeh International verse translation, wrapped into centred
-lines. Text stays in its normal reading order. The material fills **from the
-right within each word in both scripts**, as requested for this experiment.
-Arabic words advance right-to-left; English words advance in English reading
-order so the continuous wash never skips an earlier word.
+lines. Text stays in its normal reading order. **Letter starts and words** progress
+right-to-left in Arabic and left-to-right in English, matching each script's
+reading order. The continuous wash never skips an earlier word.
 
-The existing tajweed pacing supplies Arabic's reading sequence through
-the font's shaped letter clusters. Ink develops through each cluster's shape
-rather than behind a moving vertical mask. HarfBuzz glyph advances schedule
-the clusters; glyph bounds associate the printed ink and marks with them.
-Ligatures keep their printed shape and the original contour stays authoritative.
-There is no pen, authored stroke route, or whole-word opacity fade.
+**Inside out** is the study's single fill. Each letter develops from its
+own deep interior pools toward its contour and through its branches.
+Direction comes from overlapping letter start times: roughly three letter
+blooms share the active part of the word. There is no pixel-position sweep
+inside a letter. The existing Arabic tajweed pacing orchestrates the starts
+on the word's media clock; English uses its linear clock.
 
-**Inside out** is the study's single fill. Ink gathers in a deep pool towards
-the right of each connected piece, then spreads toward the contour and along
-its branches. A spatial right-to-left phase also runs through wide ligatures, preventing a large
-connected cluster from filling backwards or starting as a whole-word blob.
-A baked travel field follows the connected ink, favouring wider passages;
-it is blended with local contour depth to retain the inside-out bloom. Neighbouring clusters overlap with a broad feathered front. Small
-marks use their own geometry. This is a geometry-guided approximation, not a
-fluid solver or inferred pen route; there is no animated random noise.
+HarfBuzz associates the original printed ink and marks with shaped clusters.
+Some Hafs substitutions merge several letters or a whole word into one glyph.
+A second measurement run without contextual/ligature substitutions recovers
+individual letter advance shares within those clusters. It supplies pool
+anchors only; the original shaped font always supplies the printed contour.
+A baked nearest-pool travel field partitions connected ink into letter basins
+along the strokes, favouring wider passages and never crossing paper gaps.
+Each basin blends local depth with travel from its pool, with a soft temporal
+front scaled to its letter duration. Marks follow their associated letter.
+Joins are smoothed without changing the glyph outline.
+
+This is a geometry-guided approximation of letter ownership and liquid spread,
+not anatomical letter outlines recovered from a ligature, a fluid solver or
+an inferred pen route. There is no pen or animated random noise.
 
 The wash is based on media time, so pausing freezes filling and changing
 playback speed scales it with the recitation. Before its turn, a word remains
@@ -107,23 +112,27 @@ Cached native AGSL shaders draw ten Arabic and 27 English word instances.
 Committed 4× contour maps preserve the font; smooth surface maps supply normal XY and film
 depth. There is no per-frame shaping, rasterization, or bitmap upload. The
 material maps are generated from the font outlines, without stroke inference.
-Field G carries the inside-out arrival phase, B contour distance, and R is
-reserved at zero; the surface map carries normal XY and film depth. Wicking
+Field G carries the staggered local arrival phase, R the letter duration
+that scales temporal feathering, and B the unchanged contour distance; the surface map carries normal XY and film depth. Wicking
 is solved only in the generator. The shader uses the same cached textures,
 with two additional field samples for the moving meniscus:
 
 ```bash
 # Python environment: numpy, scipy, uharfbuzz, Pillow with RAQM
 python3 tools/build_paper_ink_study.py
+python3 tools/test_paper_ink_study.py
 adb shell am start -n com.beautifulquran/.ui.reader.PaperInkStudyActivity
 ```
 
-The generator verifies the app's canonical words when loading the study;
+The study verifies the generated maps against the app's canonical text when loading;
 it changes no database. `PaperInkClockTest` covers application, handoff, pause/resume, dry-down and
 backward reset.
 `PaperInkSequenceTest` covers the one middle repeat and restarting the study.
 `PaperInkEnglishWindowsTest` checks reordered meaning, continuous word clocks,
 proportional fallback and finishing before a repeat.
+The generator's geometry regressions check interior-before-edge filling on
+both sides of a letter, left-to-right English and right-to-left Arabic overlapping blooms, multi-letter Hafs
+ligatures, single-pixel marks and capillary paths around a paper gap.
 The controlled reflection is identical in recordings and on a still phone;
 physical-device performance and reading comfort still need evaluation.
 

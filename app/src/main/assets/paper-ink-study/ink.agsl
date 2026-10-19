@@ -16,7 +16,8 @@ half4 main(float2 p) {
     float distance = (shape.b * 255.0 - 128.0) / 16.0;
     // Letter clusters arrive in reading order; each fills through its own shape.
     float arrival = shape.g;
-    float loaded = smoothstep(arrival - 0.065, arrival + 0.065, mix(-0.065, 1.065, progress));
+    float feather = max(0.006, shape.r * 0.1);
+    float loaded = smoothstep(arrival - feather, arrival + feather, progress);
     float3 surface = normals.eval(p).rgb;
     float localWet = smoothstep(0.0, 0.7, wet - (1.0 - surface.b) * 0.2) * loaded;
     float base = smoothstep(-aa * 0.5, aa * 0.5, distance);
