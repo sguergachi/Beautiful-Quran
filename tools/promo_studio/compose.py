@@ -209,7 +209,6 @@ class Renderer:
     def _overlays(self):
         s, W, H = self.s, self.W, self.H
         out = []
-        k = self.H / 1080 if s["aspect"] != "16:9" else 1.0
         for c in s["captions"]:
             pos = c.get("pos", "top")
             sz = int(c.get("size", 46) * min(W, H) / 1080)
@@ -223,7 +222,6 @@ class Renderer:
         e = s.get("end_card")
         if e:
             out.append({"t0": float(e["t"]), "t1": 1e9, "fade": float(e.get("fade", 0.8)), "layer": self._end_card(e)})
-        _ = k
         return out
 
     def _end_card(self, e):
@@ -256,7 +254,7 @@ class Renderer:
         P[self.scr] += screen * self.A[self.scr]
         return P
 
-    def _warp_phone(self, P, M, acc_rgb, acc_a):
+    def _warp_phone(self, P, M):
         """Area-downscale P (and its alpha) to the target scale, then place it."""
         sc = math.hypot(M[0, 0], M[1, 0])
         Hc, Wc = P.shape[:2]
@@ -289,7 +287,7 @@ class Renderer:
         plate = plate_u8.astype(np.float32) / 255
         P = self._phone_layers(screen)
         dt = 1.0 / self.fps
-        shutter = float(s.get("motion_blur", 1.0)) * 0.5 * dt * 2     # 1.0 = a 360-degree shutter
+        shutter = float(s.get("motion_blur", 1.0)) * dt               # 1.0 = open for the whole frame
         cams = [camera_at(s["camera"], t)]
         if shutter > 0:
             a = self.screen_corners(camera_at(s["camera"], t - shutter / 2))
@@ -313,7 +311,7 @@ class Renderer:
                 shd = cv2.warpAffine(self.shadow, Ms, (self.W, self.H), flags=cv2.INTER_LINEAR,
                                      borderMode=cv2.BORDER_CONSTANT)
                 bg *= (1 - sh_strength * shd)[..., None]
-            rgb, al = self._warp_phone(P, M, None, None)
+            rgb, al = self._warp_phone(P, M)
             acc += rgb + bg * (1 - al)[..., None]
         out = acc / len(cams)
         for o in self.overlays:

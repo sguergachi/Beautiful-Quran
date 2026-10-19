@@ -1,0 +1,87 @@
+{
+  "title": "At-Tin · Hani · Nightfall · Mushaf",
+  "aspect": "9:16",
+  "duration": 40.15,
+  "app": {
+    "surah": 95,
+    "ayah": 1,
+    "reciter": "hani",
+    "theme": "Nightfall",
+    "layout": "Mushaf",
+    "seconds": 43,
+    "start": 1.35
+  },
+  "background": {
+    "id": "moon-path",
+    "brightness": 0.05
+  },
+  "audio": {
+    "fade_out": 2.0,
+    "fade_in": 0.3
+  },
+  "camera": [
+    {
+      "t": 0,
+      "zoom": 1.4,
+      "x": 0.5,
+      "y": 0.25
+    },
+    {
+      "t": 3.45,
+      "zoom": 1.0,
+      "x": 0.5,
+      "y": 0.5,
+      "ease": "inOutSine"
+    },
+    {
+      "t": 30.15,
+      "zoom": 1.0,
+      "x": 0.5,
+      "y": 0.5
+    },
+    {
+      "t": 31.65,
+      "zoom": 1.3,
+      "x": 0.5,
+      "y": 0.4,
+      "ease": "inOutCubic"
+    },
+    {
+      "t": 36.25,
+      "zoom": 1.3,
+      "x": 0.5,
+      "y": 0.4
+    },
+    {
+      "t": 37.65,
+      "zoom": 1.0,
+      "x": 0.5,
+      "y": 0.5,
+      "ease": "inOutCubic"
+    }
+  ],
+  "captions": [
+    {
+      "t0": 1.0,
+      "t1": 6.0,
+      "text": "Or the whole page, as printed.",
+      "pos": "top",
+      "y": 0.058
+    },
+    {
+      "t0": 32.05,
+      "t1": 35.85,
+      "text": "When the reciter repeats, the ink remembers.",
+      "pos": "bottom",
+      "y": 0.945
+    }
+  ],
+  "end_card": {
+    "t": 37.95,
+    "title": "Beautiful Quran",
+    "subtitle": "Free · Android & Web"
+  },
+  "phone": {
+    "height": 0.78
+  }
+}

@@ -68,12 +68,20 @@ def main():
             print(capture.serial(), "up" if capture.is_up() else "down")
     elif a.cmd in ("capture", "make"):
         import capture
+        failed = []
         for n in names(a.specs):
             s = S.load(n)
-            capture.record(s, force=a.force)
+            try:
+                capture.record(s, force=a.force)
+            except (SystemExit, Exception) as e:
+                print(f"{n}: FAILED: {e}", flush=True)
+                failed.append(n)
+                continue
             if a.cmd == "make":
                 import compose
                 compose.export(s)
+        if failed:
+            raise SystemExit("failed: " + " ".join(failed))
     elif a.cmd == "render":
         import compose
         for n in names(a.specs):

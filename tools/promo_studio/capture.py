@@ -262,8 +262,10 @@ def cadence(path, t0=0.0, t1=1e9):
 
 
 def playing():
+    """Playing, or buffering towards it (Hani's 192 kbps files take a moment):
+    a second tap while buffering would pause it again."""
     out = adb("shell", "dumpsys", "media_session", check=False)
-    return "state=PlaybackState {state=PLAYING" in out
+    return any(f"state=PlaybackState {{state={k}" in out for k in ("PLAYING", "BUFFERING", "CONNECTING"))
 
 
 ARABIC_DIGITS = str.maketrans("0123456789", "٠١٢٣٤٥٦٧٨٩")
@@ -286,20 +288,26 @@ def first_word_xy(ayah):
     return None
 
 
-def start_playback(ayah=1, layout="Scroll"):
+def start_playback(surah, ayah=1, layout="Scroll"):
     """Start the opened verse without the reload a `?play=true` deep link
     causes (it crossfades and re-scrolls the page as the recitation begins).
 
-    Ayah 1 (and the Mushaf): the bar's Play, which plays the verse being
-    read, with the basmalah lead-in at a chapter's start. Other verses on
-    the scroll: tap the verse's first word (ReaderViewModel.playFromAyahWord),
-    since after a deep link the bar's Play still points at ayah 1.
+    Scroll, ayah 1: the bar's Play, which plays the chapter from the top with
+    the basmalah lead-in. Scroll, other verses: tap the verse's first word
+    (ReaderViewModel.playFromAyahWord), since after a deep link the bar's
+    Play still points at ayah 1. Mushaf: the leaf's Play would start the
+    first chapter the leaf carries (95:1's leaf opens with the end of 94),
+    and its words are not separate nodes, so it uses the deep link; the
+    page is the same before and after its reload.
     """
     for _ in range(3):
-        xy = first_word_xy(ayah) if (ayah > 1 and layout == "Scroll") else at.find("Play")
-        if xy:
-            at.tap(xy)
-        for _ in range(10):
+        if layout == "Mushaf":
+            at.open_reader(surah, ayah, play=True)
+        else:
+            xy = first_word_xy(ayah) if ayah > 1 else at.find("Play")
+            if xy:
+                at.tap(xy)
+        for _ in range(24):
             time.sleep(0.25)
             if playing():
                 return
@@ -340,7 +348,12 @@ def record(s, log=print, force=False):
                          env=env, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
     time.sleep(2.0)
     log(f"recording {limit}s: {a['reciter']} {a['surah']}:{a['ayah']} {a['theme']} {a['layout']} {a['view']}")
-    start_playback(int(a["ayah"]), a["layout"])
+    try:
+        start_playback(int(a["surah"]), int(a["ayah"]), a["layout"])
+    except BaseException:
+        p.terminate(); p.wait()
+        adb("shell", "input", "keyevent", "KEYCODE_MEDIA_PAUSE", check=False)
+        raise
     out, _ = p.communicate(timeout=limit + 60)
     adb("shell", "input", "keyevent", "KEYCODE_MEDIA_PAUSE", check=False)
     if not os.path.exists(raw) or os.path.getsize(raw) < 10000:

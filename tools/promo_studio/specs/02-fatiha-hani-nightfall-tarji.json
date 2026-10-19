@@ -1,0 +1,89 @@
+{
+  "title": "Al-Fatihah 5–7 · Hani · Nightfall · tarji",
+  "aspect": "1:1",
+  "duration": 26.0,
+  "app": {
+    "surah": 1,
+    "ayah": 5,
+    "reciter": "hani",
+    "theme": "Nightfall",
+    "seconds": 28
+  },
+  "background": {
+    "id": "moon-sea",
+    "brightness": 0.04
+  },
+  "phone": {
+    "height": 0.8,
+    "y": 0.035
+  },
+  "audio": {
+    "fade_out": 2.0
+  },
+  "camera": [
+    {
+      "t": 0,
+      "zoom": 1.0,
+      "x": 0.5,
+      "y": 0.5
+    },
+    {
+      "t": 10.0,
+      "zoom": 1.0,
+      "x": 0.5,
+      "y": 0.5
+    },
+    {
+      "t": 11.6,
+      "zoom": 1.6,
+      "x": 0.5,
+      "y": 0.34,
+      "ease": "inOutCubic"
+    },
+    {
+      "t": 16.0,
+      "zoom": 1.6,
+      "x": 0.5,
+      "y": 0.34
+    },
+    {
+      "t": 17.4,
+      "zoom": 2.4,
+      "x": 0.5,
+      "y": 0.45,
+      "ease": "inOutCubic"
+    },
+    {
+      "t": 21.2,
+      "zoom": 2.4,
+      "x": 0.5,
+      "y": 0.45
+    },
+    {
+      "t": 22.6,
+      "zoom": 1.0,
+      "x": 0.5,
+      "y": 0.5,
+      "ease": "inOutCubic"
+    }
+  ],
+  "captions": [
+    {
+      "t0": 1.0,
+      "t1": 6.0,
+      "text": "Every word, written as it is recited.",
+      "pos": "top"
+    },
+    {
+      "t0": 17.2,
+      "t1": 21.6,
+      "text": "Held notes shimmer with the voice.",
+      "pos": "top"
+    }
+  ],
+  "end_card": {
+    "t": 23.3,
+    "title": "Beautiful Quran",
+    "subtitle": "Free · Android & Web"
+  }
+}

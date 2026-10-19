@@ -1,0 +1,76 @@
+{
+  "title": "Al-Baqarah 14 · Alafasy · Royal green · repeat",
+  "aspect": "1:1",
+  "duration": 22.5,
+  "app": {
+    "surah": 2,
+    "ayah": 14,
+    "reciter": "alafasy",
+    "theme": "Royal green",
+    "seconds": 24
+  },
+  "background": {
+    "id": "valley"
+  },
+  "phone": {
+    "height": 0.8,
+    "y": 0.035
+  },
+  "audio": {
+    "fade_out": 2.0
+  },
+  "camera": [
+    {
+      "t": 0,
+      "zoom": 2.5,
+      "x": 0.5,
+      "y": 0.22
+    },
+    {
+      "t": 2.6,
+      "zoom": 1.0,
+      "x": 0.5,
+      "y": 0.5,
+      "ease": "inOutCubic"
+    },
+    {
+      "t": 10.4,
+      "zoom": 1.0,
+      "x": 0.5,
+      "y": 0.5
+    },
+    {
+      "t": 11.9,
+      "zoom": 2.2,
+      "x": 0.5,
+      "y": 0.3,
+      "ease": "inOutCubic"
+    },
+    {
+      "t": 17.8,
+      "zoom": 2.2,
+      "x": 0.5,
+      "y": 0.3
+    },
+    {
+      "t": 19.2,
+      "zoom": 1.0,
+      "x": 0.5,
+      "y": 0.5,
+      "ease": "inOutCubic"
+    }
+  ],
+  "captions": [
+    {
+      "t0": 11.6,
+      "t1": 17.6,
+      "text": "When the reciter repeats, the ink remembers.",
+      "pos": "top"
+    }
+  ],
+  "end_card": {
+    "t": 19.8,
+    "title": "Beautiful Quran",
+    "subtitle": "Free · Android & Web"
+  }
+}
