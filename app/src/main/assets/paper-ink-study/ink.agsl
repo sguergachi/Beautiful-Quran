@@ -22,7 +22,8 @@ half4 main(float2 p) {
     float feather = max(0.006, letterDuration * mix(0.1, 0.12, spreadMethod));
     float loaded = smoothstep(arrival - feather, arrival + feather, progress);
     float3 surface = normals.eval(p).rgb;
-    float localWet = smoothstep(0.0, 0.7, wet - (1.0 - surface.b) * 0.2) * loaded;
+    float moisture = smoothstep(0.0, 0.7, wet - (1.0 - surface.b) * 0.2);
+    float localWet = moisture * loaded;
     // Newly joined pools are fuller; their film levels behind the soaking front.
     // Pigment stays very dark until the existing word-level dry-down begins.
     float depositAge = max(0.0, progress - arrival) / max(0.01, letterDuration);
@@ -30,7 +31,6 @@ half4 main(float2 p) {
     float filmWet = localWet * mix(0.82, 1.0, fresh);
     float base = smoothstep(-aa * 0.5, aa * 0.5, distance);
     float expanded = smoothstep(-aa * 0.5, aa * 0.5, distance + weight * filmWet);
-    float coverage = mix(base * 0.2661, expanded, max(loaded, retained));
     float2 slope = (surface.rg * 255.0 - 128.0) / 127.0;
     float volume = 0.6 + weight / 6.5;
     // A rounded advancing meniscus follows the same smooth arrival field as the ink.
@@ -59,9 +59,12 @@ half4 main(float2 p) {
     pigment *= 1.0 - pooling * 0.2 * volume * (1.0 - repeatPass);
     pigment = mix(pigment, float3(0.86, 0.86, 0.82), window * reflectionStrength * filmWet);
     float3 dry = float3(52.0, 50.0, 46.0) / 255.0;
-    // Let the clean orange establish early; the liquid film may still be filling.
-    // Color belongs to the phrase chain; sheen and optical weight dry per word.
-    float repeatDensity = repeatTint * smoothstep(0.0, 0.35, loaded);
-    float3 ink = mix(dry, pigment, mix(localWet, repeatDensity, repeatPass));
-    return half4(mix(float3(250.0, 243.0, 232.0) / 255.0, ink, coverage), 1.0);
+    // Both passes deposit the same liquid layer through the same soft front.
+    // The repeat retains its dry underprint and holds orange after the film dries.
+    float3 ink = mix(dry, pigment, mix(moisture, repeatTint, repeatPass));
+    float3 paper = float3(250.0, 243.0, 232.0) / 255.0;
+    float dryCoverage = base * mix(0.2661, 1.0, retained) * (1.0 - loaded);
+    float liquidCoverage = expanded * loaded;
+    return half4(paper * (1.0 - dryCoverage - liquidCoverage) +
+        dry * dryCoverage + ink * liquidCoverage, 1.0);
 }

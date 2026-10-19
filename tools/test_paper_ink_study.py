@@ -8,7 +8,7 @@ from PIL import Image, ImageDraw, ImageFont
 from scipy.ndimage import distance_transform_edt, label
 
 from build_paper_ink_study import (
-    ARABIC_FONT, ENGLISH_FONT, ROOT, SS, filling_field, reservoir_growth, wicking_basins,
+    ARABIC_FONT, ENGLISH_FONT, ROOT, SS, filling_field, liquid_surface, reservoir_growth, wicking_basins,
 )
 
 
@@ -26,6 +26,18 @@ def material(text, arabic=False, merging=True):
 
 
 class PaperInkStudyTest(unittest.TestCase):
+    def test_liquid_surface_does_not_flatten_when_the_font_raster_is_half_size(self):
+        fields = []
+        for size in (160, 80):
+            unit = size / 160
+            yy, xx = np.indices((int(160 * unit), int(160 * unit)))
+            distance = (50 * unit - np.hypot(xx - 80 * unit, yy - 80 * unit)) / SS
+            surface = liquid_surface(distance, size)
+            fields.append(surface[::2, ::2] if size == 160 else surface)
+        # Compare the film's RGB data at the same physical points. The
+        # one-level allowance is for finite differences and quantization.
+        self.assertLessEqual(np.max(np.abs(fields[0].astype(int) - fields[1].astype(int))), 1)
+
     def test_uniform_stroke_receives_separate_pools_before_they_join(self):
         ink = np.zeros((60, 420), dtype=bool)
         ink[10:50, 10:410] = True

@@ -74,6 +74,15 @@ Both gloss and the optical expansion settle over the existing
 `InkEngine.tuning.glintFadeMs`. Hafs has no variable weight axis. No glow,
 pixel noise, or surrounding shadow is added.
 
+First and repeat passes deposit the same liquid layer through the same
+arrival field and soft front, including expansion, the rounded meniscus and
+reflection. The repeat's stronger retained dry underprint preserves legibility;
+it does not replace the liquid fill with an early-saturating color reveal.
+English surface depth, height and smoothing are scaled to its 80 px font
+raster, matching Arabic's 160 px material units. This keeps the smaller
+Junicode strokes from receiving a shallow, over-smoothed film. Printed contours,
+letter timing, dial values and the orange pigment are unchanged.
+
 **Reflection** adjusts the window reflection's strength from 0–100%, default
 50%. **Softness** changes its spread from a focused, antialiased reflection
 to a broad soft light, default 0%. Both work during timed playback and Hold
@@ -104,7 +113,7 @@ the sheen settles. Only when playback leaves verse 2 does the complete chain
 dissolve together to charcoal over `InkEngine.tuning.repeatFadeOutMs` (900 ms).
 The tint envelope is independent of wetness, so earlier words do not become
 brown or black while later words repeat. Carbon pooling does not darken orange;
-its color establishes early within the feathered fill.
+its pigment travels through the same feathered liquid fill as the first pass.
 **Again** restarts the three-verse demonstration and rearms its one repeat.
 The repeat mode is cleared when the study stops.
 
@@ -152,7 +161,8 @@ The generator's geometry regressions check interior-before-edge filling on
 both sides of a letter, left-to-right English and right-to-left Arabic overlapping blooms, multi-letter Hafs
 ligatures, single-pixel marks, separate deposits merging inside one letter,
 capillary paths around a paper gap, and distinct growth on identical outlines
-and schedules when switching spread methods.
+and schedules when switching spread methods. A surface-scale regression checks
+equivalent film depth and curvature at half-size font rasterization.
 The controlled reflection is identical in recordings and on a still phone;
 physical-device performance and reading comfort still need evaluation.
 

@@ -202,6 +202,18 @@ def filling_field(text, ink, distance, box, ascent, font_path, font_size, mergin
     return gaussian_filter(inside_out[nearest], SS * .65), duration
 
 
+def liquid_surface(distance, font_size):
+    """Keep film depth and curvature equivalent across the two font raster sizes."""
+    unit = font_size / 160
+    interior = np.maximum(0, distance)
+    film = interior / (interior + 3 * unit)
+    gy, gx = np.gradient(gaussian_filter(film * 3 * unit, SS * 2 * unit))
+    nx, ny = -gx * SS, -gy * SS
+    length = np.sqrt(nx * nx + ny * ny + 1)
+    return np.rint(np.stack([128 + nx / length * 127, 128 + ny / length * 127,
+                            film * 255, np.full(distance.shape, 255)], axis=-1)).astype('uint8')
+
+
 def build(ayah, position, text, english=False):
     font_path, font_size, direction = (ENGLISH_FONT, 80, 'ltr') if english else (ARABIC_FONT, 160, 'rtl')
     reference = ImageFont.truetype(str(font_path), font_size)
@@ -218,13 +230,7 @@ def build(ayah, position, text, english=False):
     edge = (alpha > 0) & (alpha < 1)
     distance[edge] = (alpha[edge] - .5) / SS
     # A rounded meniscus continues across broad strokes instead of flattening at the edge.
-    interior = np.maximum(0, distance)
-    film = interior / (interior + 3)
-    gy, gx = np.gradient(gaussian_filter(film * 3, SS * 2))
-    nx, ny = -gx * SS, -gy * SS
-    length = np.sqrt(nx * nx + ny * ny + 1)
-    normal = np.rint(np.stack([128 + nx / length * 127, 128 + ny / length * 127,
-                              film * 255, np.full(alpha.shape, 255)], axis=-1)).astype('uint8')
+    normal = liquid_surface(distance, font_size)
     # Opaque data avoids premultiplication. B carries signed contour distance.
     field = np.zeros((*alpha.shape, 4), dtype='uint8')
     bloom, duration = filling_field(text, ink, distance, box, reference.getmetrics()[0], font_path, font_size)
