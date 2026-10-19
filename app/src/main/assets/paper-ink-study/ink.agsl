@@ -45,10 +45,10 @@ half4 main(float2 p) {
     float window = exp(-pane * pane / (reflectionSoftness * reflectionSoftness) -
         vertical * vertical * vertical * vertical);
     float pooling = smoothstep(0.25, 0.8, surface.b);
-    float3 pigment = mix(float3(13.0, 14.0, 15.0) / 255.0, repeatColor, repeatPass);
+    float3 pigment = mix(float3(6.0, 7.0, 8.0) / 255.0, repeatColor, repeatPass);
     pigment *= 1.0 - pooling * 0.2 * volume * (1.0 - repeatPass);
     pigment = mix(pigment, float3(0.86, 0.86, 0.82), window * reflectionStrength * localWet);
-    float3 dry = float3(28.0, 27.0, 24.0) / 255.0;
+    float3 dry = float3(52.0, 50.0, 46.0) / 255.0;
     // Let the clean orange establish early; the liquid film may still be filling.
     float repeatDensity = wet * smoothstep(0.0, 0.35, loaded);
     float3 ink = mix(dry, pigment, mix(localWet, repeatDensity, repeatPass));

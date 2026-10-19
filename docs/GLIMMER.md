@@ -52,7 +52,11 @@ playback speed scales it with the recitation. Before its turn, a word remains
 visible beneath the paper.
 
 Wet ink is optically fuller than dry ink, with a rounded liquid film across
-the stroke interior and localized window reflections. The
+the stroke interior and localized window reflections. Fresh carbon pigment
+is a near-black `#060708`; it settles to the slightly lighter warm charcoal
+`#34322E` as it dries. Pooling can deepen the wet pigment further, while the
+localized reflection still catches light. The orange repeat accent keeps its
+own pigment and settles to the same dry charcoal. The
 surface keeps curving through broad strokes rather than flattening behind a
 thick outline. A controlled light pass follows
 the word's media progress and dry-down; it needs no phone movement or sensor.
