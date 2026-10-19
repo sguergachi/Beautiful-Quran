@@ -140,6 +140,7 @@ private class PaperInkStudy(val reciter: Reciter, val words: List<PaperInkWord>,
         lines.map { PaperInkLine(it, 8f) }
     }
     val sequence = PaperInkSequence()
+    val repeatChain = PaperInkRepeatChain(InkEngine.tuning.repeatFadeOutMs)
     var lastMediaMs = 0L
 }
 
@@ -153,8 +154,9 @@ private suspend fun loadStudy(app: QuranApp): PaperInkStudy {
     check(manifest.length() == words.size)
     val source = app.assets.open("paper-ink-study/ink.agsl").bufferedReader().use { it.readText() }
     val t = InkEngine.tuning
-    fun shader(key: String): RuntimeShader {
+    fun shader(key: String, letterDuration: Float): RuntimeShader {
         val shader = RuntimeShader(source)
+        shader.setFloatUniform("letterDuration", letterDuration)
         for ((name, file) in listOf("field" to "field", "normals" to "normal")) {
             val bitmap = app.assets.open("paper-ink-study/word-$key-$file.png").use {
                 requireNotNull(BitmapFactory.decodeStream(it, null, BitmapFactory.Options().apply { inScaled = false }))
@@ -184,7 +186,7 @@ private suspend fun loadStudy(app: QuranApp): PaperInkStudy {
         PaperInkWord(
             spec.getDouble("width").toFloat(), spec.getDouble("height").toFloat(),
             spec.getDouble("baseline").toFloat(), PaperInkClock(span.startMs, end, t.glintFadeMs), ayah,
-            curve, shader("$ayah-${word.position}"),
+            curve, shader("$ayah-${word.position}", spec.getDouble("letterDuration").toFloat()),
         )
     }
     val english = JSONArray(app.assets.open("paper-ink-study/english.json").bufferedReader().use { it.readText() })
@@ -200,7 +202,8 @@ private suspend fun loadStudy(app: QuranApp): PaperInkStudy {
             val span = windows[index]
             PaperInkWord(spec.getDouble("width").toFloat(), spec.getDouble("height").toFloat(),
                 spec.getDouble("baseline").toFloat(), PaperInkClock(span.startMs, span.endMs, t.glintFadeMs),
-                verse.number, null, shader("en-${verse.number}-${spec.getInt("position")}"))
+                verse.number, null, shader("en-${verse.number}-${spec.getInt("position")}",
+                    spec.getDouble("letterDuration").toFloat()))
         }
     }
     return PaperInkStudy(reciter, arabicWords, englishWords)
@@ -219,6 +222,7 @@ private fun PaperInkStudyPage(app: QuranApp, study: PaperInkStudy) {
     val tick = remember { mutableLongStateOf(SystemClock.uptimeMillis()) }
     val preview = remember { mutableStateOf(InkPreview.Voice) }
     val english = remember { mutableStateOf(false) }
+    val mergingPools = remember { mutableStateOf(false) }
     val thickness = remember { mutableFloatStateOf(.25f) }
     val fontScale = remember { mutableFloatStateOf(.91f) }
     val fillAmount = remember { mutableFloatStateOf(1f) }
@@ -239,7 +243,7 @@ private fun PaperInkStudyPage(app: QuranApp, study: PaperInkStudy) {
         }
     }
     LaunchedEffect(state.isPlaying, state.positionEvents.clockId) {
-        val until = SystemClock.uptimeMillis() + InkEngine.tuning.glintFadeMs
+        val until = SystemClock.uptimeMillis() + maxOf(InkEngine.tuning.glintFadeMs, InkEngine.tuning.repeatFadeOutMs)
         do {
             withFrameNanos { tick.longValue = SystemClock.uptimeMillis() }
         } while (state.isPlaying || SystemClock.uptimeMillis() < until)
@@ -262,6 +266,7 @@ private fun PaperInkStudyPage(app: QuranApp, study: PaperInkStudy) {
                 maxOf(study.lastMediaMs, app.player.positionMs)
             } else 0L
             val currentAyah = if (belongs) state.nowPlaying!!.ayah else study.sequence.ayah
+            study.repeatChain.update(study.sequence.repeatedMiddle && currentAyah == 2, now)
             val scale = min(size.width / (study.maxWidth + 16f), size.height / 1080f) * fontScale.floatValue
             val native = drawContext.canvas.nativeCanvas
             for (word in study.allWords) {
@@ -294,6 +299,9 @@ private fun PaperInkStudyPage(app: QuranApp, study: PaperInkStudy) {
                         }
                         word.shader.setFloatUniform("progress", progress)
                         word.shader.setFloatUniform("wet", wet)
+                        word.shader.setFloatUniform("spreadMethod", if (mergingPools.value) 1f else 0f)
+                        word.shader.setFloatUniform("repeatTint", if (repeat && preview.value != InkPreview.Dry)
+                            study.repeatChain.alpha else 0f)
                         word.shader.setFloatUniform("reflectionStrength", reflection.floatValue)
                         word.shader.setFloatUniform("lightSoftness", softness.floatValue)
                         word.shader.setFloatUniform("retained", if (repeat) 1f else 0f)
@@ -328,7 +336,15 @@ private fun PaperInkStudyPage(app: QuranApp, study: PaperInkStudy) {
                     }
                 }
             }
-            Text("Inside out · liquid ink · verse 2 repeats", style = MaterialTheme.typography.bodySmall)
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                listOf("Inside out", "Merging pools").forEachIndexed { index, label ->
+                    val active = mergingPools.value == (index == 1)
+                    Text(label, Modifier.semantics { selected = active }.quietClickable {
+                        mergingPools.value = index == 1
+                    }.padding(vertical = 8.dp), color = if (active) MaterialTheme.colorScheme.primary
+                        else MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
+                }
+            }
             InkStudyDial("Ink pooling", thickness)
             InkStudyDial("Font size", fontScale, .5f..1f)
             InkStudyDial("Reflection", reflection)
@@ -355,6 +371,7 @@ private fun PaperInkStudyPage(app: QuranApp, study: PaperInkStudy) {
                 Text("Again", Modifier.quietClickable {
                     preview.value = InkPreview.Voice
                     study.sequence.reset()
+                    study.repeatChain.reset()
                     study.lastMediaMs = 0
                     app.player.setRepeatMode(Player.REPEAT_MODE_OFF)
                     app.player.seekToWordAndPlay(1, 0)

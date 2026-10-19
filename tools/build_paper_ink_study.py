@@ -120,7 +120,7 @@ def letter_anchors(advances, plain_advances, owner, ink, rtl):
     return anchors
 
 
-def filling_field(text, ink, distance, box, ascent, font_path, font_size):
+def filling_field(text, ink, distance, box, ascent, font_path, font_size, merging=True):
     """Schedule shaped letter clusters, then wick from their interiors to the contour."""
     font = hb.Font(hb.Face(font_path.read_bytes()))
     font.scale = (font_size * SS * 64, font_size * SS * 64)
@@ -181,14 +181,19 @@ def filling_field(text, ink, distance, box, ascent, font_path, font_size):
             if not local:
                 letter, center = min(pools, key=lambda a: abs(a[1] - x.mean()))
                 local = [(letter, center - region[1].start)]
-            owners, _ = wicking_basins(pixels, distance[region], local)
+            owners, travel = wicking_basins(pixels, distance[region], local)
             filled_letters.update(owners)
             growth = np.empty(int(pixels.sum()))
             for letter in np.unique(owners):
                 basin = owners == letter
-                letter_ink = np.zeros(pixels.shape, dtype=bool)
-                letter_ink[pixels] = basin
-                growth[basin] = reservoir_growth(letter_ink, distance[region])
+                if merging:
+                    letter_ink = np.zeros(pixels.shape, dtype=bool)
+                    letter_ink[pixels] = basin
+                    growth[basin] = reservoir_growth(letter_ink, distance[region])
+                else:
+                    depth = np.clip(distance[region][pixels][basin] /
+                                    max(.25, distance[region][pixels][basin].max()), 0, 1)
+                    growth[basin] = .7 * (1 - depth ** .65) + .3 * travel[basin] ** .55
             starts = np.array([onsets[letter] for letter in owners])
             inside_out[region][pixels] = starts + duration * (.12 + .76 * growth)
     assert filled_letters == onsets.keys(), (text, filled_letters, onsets.keys())
@@ -223,7 +228,9 @@ def build(ayah, position, text, english=False):
     # Opaque data avoids premultiplication. B carries signed contour distance.
     field = np.zeros((*alpha.shape, 4), dtype='uint8')
     bloom, duration = filling_field(text, ink, distance, box, reference.getmetrics()[0], font_path, font_size)
-    field[:, :, 0] = round(duration * 255)
+    interior, _ = filling_field(text, ink, distance, box, reference.getmetrics()[0], font_path, font_size,
+                               merging=False)
+    field[:, :, 0] = np.round(interior * 255)
     field[:, :, 1] = np.round(bloom * 255)
     field[:, :, 2] = np.clip(128 + distance * 16, 0, 255)
     field[:, :, 3] = 255
@@ -232,7 +239,7 @@ def build(ayah, position, text, english=False):
     Image.fromarray(normal).resize((w, h), Image.Resampling.LANCZOS).save(
         ASSETS / f'word-{key}-normal.png', optimize=True)
     return dict(ayah=ayah, position=position, **({'text': text} if english else {'arabic': text}), width=w, height=h,
-                baseline=reference.getmetrics()[0] + 8 - box[1], maxDepth=float(distance.max()))
+                baseline=reference.getmetrics()[0] + 8 - box[1], maxDepth=float(distance.max()), letterDuration=duration)
 
 
 if __name__ == '__main__':

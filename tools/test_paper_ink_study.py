@@ -12,7 +12,7 @@ from build_paper_ink_study import (
 )
 
 
-def material(text, arabic=False):
+def material(text, arabic=False, merging=True):
     path, size, direction = (ARABIC_FONT, 160, 'rtl') if arabic else (ENGLISH_FONT, 80, 'ltr')
     font = ImageFont.truetype(str(path), size)
     box = font.getbbox(text, direction=direction)
@@ -21,7 +21,7 @@ def material(text, arabic=False):
                               font=ImageFont.truetype(str(path), size * SS), fill=255, direction=direction)
     ink = np.array(image) > 127
     depth = (distance_transform_edt(ink) - distance_transform_edt(~ink)) / SS
-    arrival, duration = filling_field(text, ink, depth, box, font.getmetrics()[0], path, size)
+    arrival, duration = filling_field(text, ink, depth, box, font.getmetrics()[0], path, size, merging=merging)
     return ink, depth, arrival, duration
 
 
@@ -38,6 +38,16 @@ class PaperInkStudyTest(unittest.TestCase):
         self.assertTrue((np.bincount(pieces.ravel())[1:] > 100).all())
         _, count = label(ink & (growth < .6))
         self.assertEqual(1, count)
+
+    def test_spread_modes_share_the_outline_and_letter_schedule_but_change_growth(self):
+        for text, arabic in [('OO', False), ('بِسۡمِ', True)]:
+            with self.subTest(text=text):
+                ink, depth, old, old_duration = material(text, arabic, merging=False)
+                new_ink, new_depth, new, new_duration = material(text, arabic)
+                np.testing.assert_array_equal(ink, new_ink)
+                np.testing.assert_array_equal(depth, new_depth)
+                self.assertEqual(old_duration, new_duration)
+                self.assertGreater(np.mean(np.abs(old[ink] - new[ink])), .02)
 
     def test_separate_deposits_merge_within_one_letter(self):
         ink, _, arrival, _ = material('O')

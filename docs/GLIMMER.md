@@ -25,8 +25,11 @@ lines. Text stays in its normal reading order. **Letter starts and words** progr
 right-to-left in Arabic and left-to-right in English, matching each script's
 reading order. The continuous wash never skips an earlier word.
 
-**Inside out** is the study's single fill. Each letter develops from its
-own deep interior pools toward its contour and through its branches.
+**Inside out / Merging pools** switches the ink spread without restarting
+playback or changing the other controls. **Inside out** is the default,
+restoring the earlier depth-led interior spread. **Merging pools** is the
+Pentiment-inspired comparison, with separated deposits joining within each
+letter. Both develop from deep interiors toward the contour and branches.
 Direction comes from overlapping letter start times: roughly three letter
 blooms share the active part of the word. There is no pixel-position sweep
 inside a letter. The existing Arabic tajweed pacing orchestrates the starts
@@ -39,7 +42,8 @@ individual letter advance shares within those clusters. It supplies pool
 anchors only; the original shaped font always supplies the printed contour.
 A baked nearest-pool travel field partitions connected ink into letter basins
 along the strokes, favouring wider passages and never crossing paper gaps.
-Within each basin, one to three broad reservoirs supply ink with small local
+Inside out blends local stroke depth with travel from its deep pool, keeping
+the original spread. In Merging pools, one to three reservoirs supply ink with small local
 delays. The reservoir fronts spread along connected strokes, join, and soak
 out to the contour. Deep passages carry ink faster; distant parts no longer
 appear together merely because they have the same stroke thickness. Small
@@ -92,14 +96,15 @@ the same three verse groups, default 91%. It changes only drawing scale,
 keeping playback and the pooling setting intact. All dials reset when the study is reopened.
 
 When verse 2 repeats, its entire previously read black base stays visible.
-The wash brings in the existing Paper orange repeat accent together
-with the fuller wet shape and reflection, then dries back to black. Later
-words stay black until their turn. This gives the return both color and
-shape without erasing the passage or replaying the letter-drawing pattern.
-The repeat accent does not inherit carbon pooling's darkening. Its color
-establishes early within the feathered fill, while thickness and reflection
-continue to build with the liquid film; the shared wet envelope dries it
-back to black.
+The wash brings in the existing Paper orange repeat accent (`#B4551E`)
+together with the fuller wet shape and reflection. Every reached word holds
+orange with the chain, even after its individual wet film dries. Later words
+stay black until their turn. Pausing retains the reached orange prefix while
+the sheen settles. Only when playback leaves verse 2 does the complete chain
+dissolve together to charcoal over `InkEngine.tuning.repeatFadeOutMs` (900 ms).
+The tint envelope is independent of wetness, so earlier words do not become
+brown or black while later words repeat. Carbon pooling does not darken orange;
+its color establishes early within the feathered fill.
 **Again** restarts the three-verse demonstration and rearms its one repeat.
 The repeat mode is cleared when the study stops.
 
@@ -122,8 +127,9 @@ Cached native AGSL shaders draw ten Arabic and 27 English word instances.
 Committed 4× contour maps preserve the font; smooth surface maps supply normal XY and film
 depth. There is no per-frame shaping, rasterization, or bitmap upload. The
 material maps are generated from the font outlines, without stroke inference.
-Field G carries the staggered local arrival phase, R the letter duration
-that scales temporal feathering, and B the unchanged contour distance; the surface map carries normal XY and film depth. Wicking
+Field R carries the earlier Inside out arrival phase, G the Merging pools
+phase, and B the unchanged contour distance. The manifest supplies letter
+duration once at shader creation. The surface map carries normal XY and film depth. Wicking
 is solved only in the generator. The shader uses the same cached textures,
 with two additional field samples for the moving meniscus:
 
@@ -138,12 +144,15 @@ The study verifies the generated maps against the app's canonical text when load
 it changes no database. `PaperInkClockTest` covers application, handoff, pause/resume, dry-down and
 backward reset.
 `PaperInkSequenceTest` covers the one middle repeat and restarting the study.
+`PaperInkRepeatChainTest` checks holding orange across word handoffs and pause,
+releasing only after the repeated verse, and clearing the chain on Again.
 `PaperInkEnglishWindowsTest` checks reordered meaning, continuous word clocks,
 proportional fallback and finishing before a repeat.
 The generator's geometry regressions check interior-before-edge filling on
 both sides of a letter, left-to-right English and right-to-left Arabic overlapping blooms, multi-letter Hafs
 ligatures, single-pixel marks, separate deposits merging inside one letter,
-and capillary paths around a paper gap.
+capillary paths around a paper gap, and distinct growth on identical outlines
+and schedules when switching spread methods.
 The controlled reflection is identical in recordings and on a still phone;
 physical-device performance and reading comfort still need evaluation.
 

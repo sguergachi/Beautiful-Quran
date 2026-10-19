@@ -9,20 +9,23 @@ uniform float weight;
 uniform float aa;
 uniform float3 repeatColor;
 uniform float repeatPass;
+uniform float repeatTint;
+uniform float spreadMethod;
+uniform float letterDuration;
 uniform float2 origin;
 
 half4 main(float2 p) {
     float4 shape = field.eval(p * 4.0);
     float distance = (shape.b * 255.0 - 128.0) / 16.0;
     // Letter clusters arrive in reading order; each fills through its own shape.
-    float arrival = shape.g;
-    float feather = max(0.006, shape.r * 0.12);
+    float arrival = mix(shape.r, shape.g, spreadMethod);
+    float feather = max(0.006, letterDuration * mix(0.1, 0.12, spreadMethod));
     float loaded = smoothstep(arrival - feather, arrival + feather, progress);
     float3 surface = normals.eval(p).rgb;
     float localWet = smoothstep(0.0, 0.7, wet - (1.0 - surface.b) * 0.2) * loaded;
     // Newly joined pools are fuller; their film levels behind the soaking front.
     // Pigment stays very dark until the existing word-level dry-down begins.
-    float depositAge = max(0.0, progress - arrival) / max(0.01, shape.r);
+    float depositAge = max(0.0, progress - arrival) / max(0.01, letterDuration);
     float fresh = 1.0 - smoothstep(0.08, 0.65, depositAge);
     float filmWet = localWet * mix(0.82, 1.0, fresh);
     float base = smoothstep(-aa * 0.5, aa * 0.5, distance);
@@ -35,8 +38,10 @@ half4 main(float2 p) {
     float2 frontSlope = float2(0.0);
     if (rim > 0.0) {
         float radius = max(1.5, aa * 1.5);
-        frontSlope = (float2(field.eval((p + float2(radius, 0.0)) * 4.0).g,
-            field.eval((p + float2(0.0, radius)) * 4.0).g) - arrival) / radius;
+        float2 sampleX = field.eval((p + float2(radius, 0.0)) * 4.0).rg;
+        float2 sampleY = field.eval((p + float2(0.0, radius)) * 4.0).rg;
+        frontSlope = (float2(mix(sampleX.r, sampleX.g, spreadMethod),
+            mix(sampleY.r, sampleY.g, spreadMethod)) - arrival) / radius;
     }
     float3 normal = normalize(float3(slope * filmWet * volume + frontSlope * rim * 6.0,
         sqrt(max(0.01, 1.0 - dot(slope, slope)))));
@@ -55,7 +60,8 @@ half4 main(float2 p) {
     pigment = mix(pigment, float3(0.86, 0.86, 0.82), window * reflectionStrength * filmWet);
     float3 dry = float3(52.0, 50.0, 46.0) / 255.0;
     // Let the clean orange establish early; the liquid film may still be filling.
-    float repeatDensity = wet * smoothstep(0.0, 0.35, loaded);
+    // Color belongs to the phrase chain; sheen and optical weight dry per word.
+    float repeatDensity = repeatTint * smoothstep(0.0, 0.35, loaded);
     float3 ink = mix(dry, pigment, mix(localWet, repeatDensity, repeatPass));
     return half4(mix(float3(250.0, 243.0, 232.0) / 255.0, ink, coverage), 1.0);
 }
