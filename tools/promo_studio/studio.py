@@ -7,6 +7,7 @@
     studio.py capture SPEC... [--force]    # record the app (picture + sound)
     studio.py render SPEC... [-o OUT]      # export mp4 (needs the take)
     studio.py make SPEC...                 # capture if needed, then render
+    studio.py remux SPEC...                # re-lay the sound only (after audio changes)
     studio.py still SPEC T OUT.png         # one exact frame
     studio.py new NAME [--from SPEC]       # start a spec
 
@@ -42,6 +43,7 @@ def main():
     p = sub.add_parser("render"); p.add_argument("specs", nargs="+"); p.add_argument("-o", "--out")
     p.add_argument("--scale", type=float, default=1.0); p.add_argument("--workers", type=int)
     p = sub.add_parser("make"); p.add_argument("specs", nargs="+"); p.add_argument("--force", action="store_true")
+    p = sub.add_parser("remux"); p.add_argument("specs", nargs="+")
     p = sub.add_parser("still"); p.add_argument("spec"); p.add_argument("t", type=float); p.add_argument("out")
     p.add_argument("--scale", type=float, default=1.0)
     p = sub.add_parser("new"); p.add_argument("name"); p.add_argument("--from", dest="src")
@@ -86,6 +88,13 @@ def main():
         import compose
         for n in names(a.specs):
             compose.export(S.load(n), out=a.out if len(a.specs) == 1 else None, scale=a.scale, workers=a.workers)
+    elif a.cmd == "remux":
+        import compose
+        for n in names(a.specs):
+            out = os.path.join(S.OUT, n + ".mp4")
+            if os.path.exists(out):
+                compose.mux(S.load(n), ["-i", out], out)     # writes beside, then replaces
+                print("remuxed", out)
     elif a.cmd == "still":
         import compose
         from PIL import Image

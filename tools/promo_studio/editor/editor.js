@@ -186,6 +186,12 @@ function draw() {
     const lines = wrap(ctx, c.text || "", W * 0.86), lh = size * 1.18;
     const y0 = y - (lh * lines.length) / 2;
     ctx.globalAlpha = k;
+    const scrim = +(c.scrim ?? 0.32);
+    if (scrim > 0) {   // soft dark scrim, as compose.text_layer draws it
+      const wmax = Math.max(...lines.map((ln) => ctx.measureText(ln).width)), pad = size * 0.7;
+      ctx.save(); ctx.filter = `blur(${size * 0.45 * (els.stage.width / W)}px)`; ctx.fillStyle = `rgba(0,0,0,${scrim})`;
+      roundRect(ctx, (W - wmax) / 2 - pad, y0 - pad * 0.55, wmax + 2 * pad, lh * lines.length + pad * 0.9, pad); ctx.fill(); ctx.restore();
+    }
     lines.forEach((ln, i) => {
       ctx.fillStyle = "rgba(0,0,0,0.35)"; ctx.fillText(ln, W / 2, y0 + i * lh + size * 0.04);
       ctx.fillStyle = c.color || "#F6F0E4"; ctx.fillText(ln, W / 2, y0 + i * lh);

@@ -85,8 +85,9 @@ def font_path(name):
     return os.path.join(fonts, name)
 
 
-def text_layer(W, H, text, font, size_px, y, color, shadow=0.35, max_w=0.86):
-    """RGBA float32 (premultiplied) layer holding one centred caption."""
+def text_layer(W, H, text, font, size_px, y, color, shadow=0.35, max_w=0.86, scrim=0.32):
+    """RGBA float32 (premultiplied) layer holding one centred caption, on a
+    soft dark scrim so it reads over a bright page as well as the blur."""
     img = Image.new("RGBA", (W, H), (0, 0, 0, 0))
     f = ImageFont.truetype(font_path(font), size_px)
     d = ImageDraw.Draw(img)
@@ -104,12 +105,17 @@ def text_layer(W, H, text, font, size_px, y, color, shadow=0.35, max_w=0.86):
     rgb = tuple(int(color.lstrip("#")[i:i + 2], 16) for i in (0, 2, 4))
     sh = Image.new("RGBA", (W, H), (0, 0, 0, 0))
     ds = ImageDraw.Draw(sh)
+    if scrim > 0:
+        wmax = max(d.textlength(line, font=f) for line in lines)
+        pad = size_px * 0.7
+        ds.rounded_rectangle([(W - wmax) / 2 - pad, top - pad * 0.55, (W + wmax) / 2 + pad,
+                              top + lh * len(lines) + pad * 0.35], radius=pad, fill=(0, 0, 0, int(255 * scrim)))
     for i, line in enumerate(lines):
         x = (W - d.textlength(line, font=f)) / 2
         ds.text((x, top + i * lh + size_px * 0.04), line, font=f, fill=(0, 0, 0, int(255 * shadow)))
         d.text((x, top + i * lh), line, font=f, fill=rgb + (255,))
     s = np.asarray(sh, np.float32) / 255
-    s = cv2.GaussianBlur(s, (0, 0), size_px * 0.18)
+    s = cv2.GaussianBlur(s, (0, 0), size_px * (0.45 if scrim > 0 else 0.18))
     t_ = np.asarray(img, np.float32) / 255
     a = t_[..., 3:4] + s[..., 3:4] * (1 - t_[..., 3:4])
     rgb_p = t_[..., :3] * t_[..., 3:4]
@@ -217,7 +223,7 @@ class Renderer:
             else:
                 y = H * float(c.get("y", 0.94 if s["aspect"] == "1:1" else 0.91))
             lay = text_layer(W, H, c["text"], c.get("font", "cormorant_garamond_italic.ttf"), sz, y,
-                             c.get("color", "#F6F0E4"))
+                             c.get("color", "#F6F0E4"), scrim=float(c.get("scrim", 0.32)))
             out.append({"t0": float(c["t0"]), "t1": float(c["t1"]), "fade": float(c.get("fade", 0.45)), "layer": lay})
         e = s.get("end_card")
         if e:
@@ -398,6 +404,43 @@ def _render_chunk(args):
     return path
 
 
+def audio_filter(s):
+    """The take's own sound for this video: trimmed, loudness-normalised
+    (two-pass EBU R128, docs/KEY_ART.md: -16 LUFS, peaks under -1.5 dBTP),
+    then the spec's gain and fades."""
+    a, dur = s["audio"], float(s["duration"])
+    wav = os.path.join(take_dir(s), "audio.wav")
+    trim = f"atrim=start={float(s['app']['start']):.4f}:duration={dur:.4f},asetpts=PTS-STARTPTS"
+    af = [trim]
+    target = a.get("loudness", -16.0)
+    if target is not None:
+        probe = subprocess.run(["ffmpeg", "-hide_banner", "-i", wav, "-af",
+                                f"{trim},loudnorm=I={target}:TP=-1.5:LRA=11:print_format=json", "-f", "null", "-"],
+                               capture_output=True, text=True).stderr
+        m = json.loads(probe[probe.rindex("{"):probe.rindex("}") + 1])
+        af.append(f"loudnorm=I={target}:TP=-1.5:LRA=11:measured_I={m['input_i']}:measured_TP={m['input_tp']}:"
+                  f"measured_LRA={m['input_lra']}:measured_thresh={m['input_thresh']}:offset={m['target_offset']}:"
+                  "linear=true")
+    af.append(f"volume={a['gain_db']}dB")
+    if float(a["fade_in"]) > 0:
+        af.append(f"afade=t=in:st=0:d={a['fade_in']}")
+    if float(a["fade_out"]) > 0:
+        af.append(f"afade=t=out:st={max(0.0, dur - float(a['fade_out'])):.3f}:d={a['fade_out']}")
+    af.append(f"aresample=48000,apad=whole_dur={dur:.4f}")
+    return wav, ",".join(af)
+
+
+def mux(s, video_input, out):
+    """Lay the take's sound under a rendered picture (video stream copied)."""
+    wav, af = audio_filter(s)
+    tmp = out + ".mux.mp4"
+    subprocess.run(["ffmpeg", "-v", "error", "-y", *video_input, "-i", wav, "-map", "0:v", "-map", "1:a",
+                    "-c:v", "copy", "-af", af, "-c:a", "aac", "-b:a", "256k", "-ar", "48000",
+                    "-t", f"{float(s['duration']):.4f}", "-movflags", "+faststart", tmp], check=True)
+    os.replace(tmp, out)
+    return out
+
+
 def export(s, out=None, workers=None, scale=1.0, log=print, progress=None):
     """Render the whole spec to an H.264/AAC mp4. Returns the output path."""
     r = Renderer(s, scale)          # validates the take and builds the plate once, up front
@@ -421,18 +464,6 @@ def export(s, out=None, workers=None, scale=1.0, log=print, progress=None):
     with open(lst, "w") as f:
         for c in chunks:
             f.write(f"file '{c[3]}'\n")
-    a = s["audio"]
-    start = float(s["app"]["start"])
-    wav = os.path.join(r.td, "audio.wav")
-    fo = float(a["fade_out"])
-    af = [f"atrim=start={start:.4f}:duration={dur:.4f}", "asetpts=PTS-STARTPTS", f"volume={a['gain_db']}dB"]
-    if float(a["fade_in"]) > 0:
-        af.append(f"afade=t=in:st=0:d={a['fade_in']}")
-    if fo > 0:
-        af.append(f"afade=t=out:st={max(0.0, dur - fo):.3f}:d={fo}")
-    af.append(f"apad=whole_dur={dur:.4f}")
-    subprocess.run(["ffmpeg", "-v", "error", "-y", "-f", "concat", "-safe", "0", "-i", lst, "-i", wav,
-                    "-map", "0:v", "-map", "1:a", "-c:v", "copy", "-af", ",".join(af), "-c:a", "aac",
-                    "-b:a", "256k", "-ar", "48000", "-t", f"{dur:.4f}", "-movflags", "+faststart", out], check=True)
+    mux(s, ["-f", "concat", "-safe", "0", "-i", lst], out)
     log(f"wrote {out} in {time.time() - t0:.0f}s")
     return out

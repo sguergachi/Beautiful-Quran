@@ -70,7 +70,7 @@ DEFAULTS = {
     "motion_blur": 1.0,          # shutter as a share of the frame interval (0 = off)
     "captions": [],              # {t0, t1, text, pos: top|bottom, size}
     "end_card": None,            # {t, title, subtitle}
-    "audio": {"gain_db": 0.0, "fade_in": 0.0, "fade_out": 1.2},
+    "audio": {"gain_db": 0.0, "fade_in": 0.0, "fade_out": 1.2, "loudness": -16.0},  # LUFS; null = as recorded
 }
 
 
