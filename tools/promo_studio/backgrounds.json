@@ -1,0 +1,15 @@
+{
+  "_about": "Background footage. Pexels licence: free to use, no attribution required (credits kept anyway). Files are downloaded on first use into the cache; nothing here is committed but the ids.",
+  "valley":      {"pexels": 16599117, "title": "Aerial view of green mountains", "suits": ["Royal green"], "start": 1.0},
+  "alpine":      {"pexels": 27604137, "title": "A mountain range with trees and clouds", "suits": ["Royal green", "Nightfall"], "start": 0.0},
+  "cloud-sea":   {"pexels": 14862547, "title": "Drone view over a cloudy mountain valley", "suits": ["Nightfall", "Royal green"], "start": 6.0},
+  "mist":        {"pexels": 4288051,  "title": "Low lying clouds covering a mountain valley", "suits": ["Royal green", "Paper"], "start": 0.0},
+  "dunes":       {"pexels": 12902302, "title": "Sand ripples in a desert landscape", "suits": ["Paper"], "start": 0.0},
+  "dunes-pale":  {"pexels": 15159393, "title": "A desert with brown sand", "suits": ["Paper"], "start": 0.0},
+  "moon-sea":    {"pexels": 6924608,  "title": "Moon over the sea", "suits": ["Nightfall"], "start": 0.0},
+  "moon-path":   {"pexels": 5419486,  "title": "Full moon reflection over sea", "suits": ["Nightfall"], "start": 0.0},
+  "golden-leaf": {"pexels": 6922876,  "title": "Swaying leaf during golden hour", "suits": ["Paper", "Royal green"], "start": 0.0},
+  "canopy":      {"pexels": 2909911,  "title": "Sunlight passing through the leaves of the tree", "suits": ["Paper", "Royal green"], "start": 0.0},
+  "rain-train":  {"pexels": 13255056, "title": "Rain on a train window", "suits": ["Royal green", "Paper"], "start": 0.0},
+  "rain-glass":  {"pexels": 30133842, "title": "Raindrops on a window, blue hour", "suits": ["Nightfall"], "start": 0.0}
+}
