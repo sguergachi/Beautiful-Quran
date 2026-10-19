@@ -63,6 +63,39 @@ def wicking_basins(ink, depth, anchors):
     return owners, travel
 
 
+def reservoir_growth(ink, depth):
+    """Merge a few broad deposits along connected ink, then soak out to its edge.
+
+    This is a baked capillary cue, not stroke order or a fluid simulation.
+    Wide interiors carry ink faster; a distant reservoir can start before
+    the first reaches it, without revealing the whole medial axis at once.
+    """
+    graph = ink_graph(ink, depth)
+    interior = np.maximum(.01, depth[ink])
+    core = interior >= interior.max() * .55
+    yy, xx = np.nonzero(ink)
+    # A fixed, broad loading variation breaks ties on equally deep stems.
+    loading = 1 + .12 * np.sin(xx / (SS * 7) + yy / (SS * 11))
+    first = int(np.argmax(interior * loading))
+    paths = [dijkstra(graph, directed=False, indices=first)]
+    assert np.isfinite(paths[0]).all()
+    radius = max(1, interior.max() * SS)
+    # Small dots stay a single deposit; long/broad letters get up to three.
+    extent = paths[0][core].max()
+    count = 1 + int(extent > radius * 4) + int(extent > radius * 10)
+    for _ in range(1, count):
+        nearest = np.min(paths, axis=0)
+        seed = int(np.argmax(np.where(core, nearest * loading, -1)))
+        paths.append(dijkstra(graph, directed=False, indices=seed))
+    scale = max(1, paths[0].max())
+    # All pools are supplied early, with small delays within the letter's
+    # own bloom. Taking the minimum joins fronts without a boundary seam.
+    travel = np.min([path / scale + i * .075 for i, path in enumerate(paths)], axis=0)
+    travel /= max(.001, travel.max())
+    edge = 1 - (interior / interior.max()) ** .65
+    return .72 * travel ** .72 + .28 * edge
+
+
 def letter_anchors(advances, plain_advances, owner, ink, rtl):
     """Split font ligatures into approximate letter basins; keep their printed outline intact."""
     anchors = {}
@@ -148,14 +181,14 @@ def filling_field(text, ink, distance, box, ascent, font_path, font_size):
             if not local:
                 letter, center = min(pools, key=lambda a: abs(a[1] - x.mean()))
                 local = [(letter, center - region[1].start)]
-            owners, travel = wicking_basins(pixels, distance[region], local)
+            owners, _ = wicking_basins(pixels, distance[region], local)
             filled_letters.update(owners)
             growth = np.empty(int(pixels.sum()))
             for letter in np.unique(owners):
                 basin = owners == letter
-                depth = np.clip(distance[region][pixels][basin] /
-                                max(.25, distance[region][pixels][basin].max()), 0, 1)
-                growth[basin] = .7 * (1 - depth ** .65) + .3 * travel[basin] ** .55
+                letter_ink = np.zeros(pixels.shape, dtype=bool)
+                letter_ink[pixels] = basin
+                growth[basin] = reservoir_growth(letter_ink, distance[region])
             starts = np.array([onsets[letter] for letter in owners])
             inside_out[region][pixels] = starts + duration * (.12 + .76 * growth)
     assert filled_letters == onsets.keys(), (text, filled_letters, onsets.keys())

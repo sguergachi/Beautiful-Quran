@@ -39,9 +39,13 @@ individual letter advance shares within those clusters. It supplies pool
 anchors only; the original shaped font always supplies the printed contour.
 A baked nearest-pool travel field partitions connected ink into letter basins
 along the strokes, favouring wider passages and never crossing paper gaps.
-Each basin blends local depth with travel from its pool, with a soft temporal
-front scaled to its letter duration. Marks follow their associated letter.
-Joins are smoothed without changing the glyph outline.
+Within each basin, one to three broad reservoirs supply ink with small local
+delays. The reservoir fronts spread along connected strokes, join, and soak
+out to the contour. Deep passages carry ink faster; distant parts no longer
+appear together merely because they have the same stroke thickness. Small
+marks keep a single deposit and follow their associated letter. A soft temporal
+front scales to the letter duration; joins are smoothed without changing the
+glyph outline.
 
 This is a geometry-guided approximation of letter ownership and liquid spread,
 not anatomical letter outlines recovered from a ligature, a fluid solver or
@@ -58,7 +62,9 @@ is a near-black `#060708`; it settles to the slightly lighter warm charcoal
 localized reflection still catches light. The orange repeat accent keeps its
 own pigment and settles to the same dry charcoal. The
 surface keeps curving through broad strokes rather than flattening behind a
-thick outline. A controlled light pass follows
+thick outline. The just-deposited film is a little fuller and more reflective;
+it levels behind the advancing front while retaining its dark pigment. The
+existing word-level dry-down then settles it to charcoal. A controlled light pass follows
 the word's media progress and dry-down; it needs no phone movement or sensor.
 Both gloss and the optical expansion settle over the existing
 `InkEngine.tuning.glintFadeMs`. Hafs has no variable weight axis. No glow,
@@ -136,9 +142,16 @@ backward reset.
 proportional fallback and finishing before a repeat.
 The generator's geometry regressions check interior-before-edge filling on
 both sides of a letter, left-to-right English and right-to-left Arabic overlapping blooms, multi-letter Hafs
-ligatures, single-pixel marks and capillary paths around a paper gap.
+ligatures, single-pixel marks, separate deposits merging inside one letter,
+and capillary paths around a paper gap.
 The controlled reflection is identical in recordings and on a still phone;
 physical-device performance and reading comfort still need evaluation.
+
+[Pentiment's font designers](https://lettermatic.com/custom/pentiment) are a
+material reference for ink bleed and small stroke overlaps. Their animation
+uses authored stroke-order diagrams and individually cut strokes. This study
+borrows deposition and settling cues while retaining voice-paced interior
+filling; it does not reconstruct their pen animation.
 
 The material target is carbon calligraphy ink on smooth, sized paper,
 settling to a matte finish. It is an art-directed approximation compressed

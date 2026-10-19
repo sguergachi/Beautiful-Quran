@@ -8,7 +8,7 @@ from PIL import Image, ImageDraw, ImageFont
 from scipy.ndimage import distance_transform_edt, label
 
 from build_paper_ink_study import (
-    ARABIC_FONT, ENGLISH_FONT, ROOT, SS, filling_field, wicking_basins,
+    ARABIC_FONT, ENGLISH_FONT, ROOT, SS, filling_field, reservoir_growth, wicking_basins,
 )
 
 
@@ -26,6 +26,30 @@ def material(text, arabic=False):
 
 
 class PaperInkStudyTest(unittest.TestCase):
+    def test_uniform_stroke_receives_separate_pools_before_they_join(self):
+        ink = np.zeros((60, 420), dtype=bool)
+        ink[10:50, 10:410] = True
+        growth = np.ones(ink.shape)
+        growth[ink] = reservoir_growth(ink, distance_transform_edt(ink) / SS)
+        # Constant stroke thickness rules out contour erosion as the cause
+        # of two islands. Both are supplied before the connecting middle.
+        pieces, count = label(ink & (growth < .3))
+        self.assertEqual(2, count)
+        self.assertTrue((np.bincount(pieces.ravel())[1:] > 100).all())
+        _, count = label(ink & (growth < .6))
+        self.assertEqual(1, count)
+
+    def test_separate_deposits_merge_within_one_letter(self):
+        ink, _, arrival, _ = material('O')
+        # Two supplied regions grow independently, then meet around the ring.
+        # This should remain visible after smoothing the actual font field.
+        for phase in (.35, .5):
+            pieces, count = label(ink & (arrival < phase))
+            self.assertEqual(2, count)
+            self.assertTrue((np.bincount(pieces.ravel())[1:] > 100).all())
+        _, count = label(ink & (arrival < .75))
+        self.assertEqual(1, count)
+
     def test_single_letter_fills_its_interior_before_both_sides_of_its_contour(self):
         ink, depth, arrival, _ = material('O')
         x = np.indices(ink.shape)[1]
@@ -71,8 +95,8 @@ class PaperInkStudyTest(unittest.TestCase):
         for text, is_arabic in [(v, True) for v in arabic] + [(v, False) for v in english]:
             with self.subTest(text=text):
                 ink, _, arrival, duration = material(text, is_arabic)
-                self.assertGreaterEqual(arrival[ink].min() - duration * .1, -1 / 255)
-                self.assertLessEqual(arrival[ink].max() + duration * .1, 1 + 1 / 255)
+                self.assertGreaterEqual(arrival[ink].min() - duration * .12, -1 / 255)
+                self.assertLessEqual(arrival[ink].max() + duration * .12, 1 + 1 / 255)
 
     def test_single_pixel_mark_has_finite_ink_and_its_letter_owner(self):
         owners, travel = wicking_basins(np.ones((1, 1), dtype=bool), np.ones((1, 1)), [(7, 0)])
