@@ -27,6 +27,7 @@ def ayah_count(surah):
         cols = [r[1] for r in db.execute("pragma table_info(surahs)")]
         col = "ayah_count" if "ayah_count" in cols else next(c for c in cols if "ayah" in c and "count" in c)
         AYAH_COUNTS = dict(db.execute(f"select id, {col} from surahs"))
+        db.close()
     return AYAH_COUNTS[surah]
 
 
@@ -56,18 +57,29 @@ def duration(path):
                                 capture_output=True, text=True, check=True).stdout.strip())
 
 
-def playlist(reciter, surah, ayah, seconds):
-    """[(label, wav, start_s)] covering at least `seconds` of recitation."""
+def playlist(reciter, surah, ayah, seconds, repeat="off", repeat_to=None, end_at=None):
+    """[(label, wav, start_s)] covering at least `seconds` of recitation.
+    With the app's verse repeat the ayah (or ayah..repeat_to) loops."""
     slug = RECITERS[reciter]["slug"]
     items, t = [], 0.0
-    if ayah == 1 and surah not in (1, 9):
+    if ayah == 1 and surah not in (1, 9) and repeat == "off":
         w = fetch(slug, 1, 1)
         items.append(("basmalah", w, t)); t += duration(w)
-    a = ayah
     n = ayah_count(surah)
-    while t < seconds and a <= n:
+    if not 1 <= ayah <= n or repeat not in ("off", "ayah", "range"): raise ValueError("invalid playlist range")
+    if repeat == "range" and (repeat_to is None or not ayah <= int(repeat_to) <= n): raise ValueError("invalid repeat endpoint")
+    last = ayah if repeat == "ayah" else min(n, int(repeat_to)) if repeat == "range" else n
+    a = ayah
+    while t < seconds:
+        if a > last:
+            if repeat == "off":
+                break
+            a = ayah
         w = fetch(slug, surah, a)
-        items.append((f"{surah}:{a}", w, t)); t += duration(w)
+        span = duration(w)
+        if a == last and repeat != "off" and end_at is not None:
+            span = min(span, max(0.001, end_at))
+        items.append((f"{surah}:{a}", w, t)); t += span
         a += 1
     return items, t
 

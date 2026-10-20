@@ -11,6 +11,7 @@ import {
   useStore, wholeTake, type Tab,
 } from "../state/store.ts";
 import { Button, Dot, Empty, Field, Icon, Progress, Section, Segmented, Select, Slider, TextInput } from "./ui.tsx";
+import { Opening } from "./Opening.tsx";
 import { VerseRangeEditor } from "./VerseEditor.tsx";
 
 const EASES: [Ease, string][] = [["inOutCubic", "Ease in & out"], ["inOutSine", "Gentle in & out"], ["outCubic", "Ease out"], ["inCubic", "Ease in"], ["outExpo", "Fast out, long settle"], ["linear", "Linear"], ["hold", "Hold (cut)"]];
@@ -132,9 +133,12 @@ function Recording() {
     <>
       <Section title="What the app plays">
         <Field label="Reciter"><Select value={a.reciter} options={Object.entries(meta.reciters)} onChange={(v) => set("app.reciter", v)} /></Field>
-        <Field label="Chapter"><Select value={a.surah} options={meta.surahs.map((s) => [s.id, `${s.id}. ${s.name} (${s.ayahs})`])} onChange={(v) => set("app.surah", +v)} /></Field>
+        <Field label="Chapter"><Select value={a.surah} options={meta.surahs.map((s) => [s.id, `${s.id}. ${s.name} (${s.ayahs})`])} onChange={(v) => mutate((r) => {
+          const count = meta.surahs.find((s) => s.id === +v)!.ayahs, ayah = Math.min(a.ayah, count);
+          r.app = { ...r.app, surah: +v, ayah, ...(a.repeat === "range" ? { repeat_to: Math.max(ayah, Math.min(a.repeat_to ?? ayah, count)) } : {}) };
+        })} /></Field>
         <Field label="Take starts" hint="The recording opens here. Choose the video's start and stop verses under Edit. Verse 1 includes the chapter opening.">
-          <TextInput type="number" min={1} value={a.ayah} onCommit={(v) => { const n = parseInt(v); if (n >= 1) set("app.ayah", n); }} />
+          <TextInput type="number" min={1} max={meta.surahs.find((s) => s.id === a.surah)?.ayahs} value={a.ayah} onCommit={(v) => { const n = Number(v), count = meta.surahs.find((s) => s.id === a.surah)!.ayahs; if (Number.isInteger(n) && n >= 1 && n <= count) mutate((r) => { r.app = { ...r.app, ayah: n, ...(a.repeat === "range" ? { repeat_to: Math.max(n, a.repeat_to ?? n) } : {}) }; }); }} />
         </Field>
         <Field label="Theme" hint={a.theme === "Paper" ? "Tarjīʿ glimmer only shows on Nightfall and Royal green." : undefined}>
           <Segmented size="sm" value={a.theme} options={Object.keys(meta.themes).map((t) => [t, t.replace("Royal green", "Royal")])} onChange={(v) => set("app.theme", v)} />
@@ -142,24 +146,28 @@ function Recording() {
         <Field label="Layout"><Segmented size="sm" value={a.layout} options={meta.layouts.map((l) => [l, l])} onChange={(v) => set("app.layout", v)} /></Field>
         <Field label="View"><Segmented size="sm" value={a.view} options={meta.views.map((v) => [v, v])} onChange={(v) => set("app.view", v)} /></Field>
         <Field label="Text size"><Segmented size="sm" value={a.text_size} options={[["default", "Default"], ["max", "Largest"]]} onChange={(v) => set("app.text_size", v)} /></Field>
-        <Field label="Record (s)" hint="Seconds of recitation to record, at 1×, with the emulator's own sound.">
+        <Field label={a.intro.play ? "Recitation (s)" : "Minimum take (s)"} hint={a.intro.play ? "Seconds of recitation after the opening, at 1×, with the emulator's own sound." : "Minimum total duration. Every sequence step and its final hold are always included."}>
           <TextInput type="number" min={5} step={1} value={a.seconds} onCommit={(v) => { const n = parseInt(v); if (n >= 5) set("app.seconds", n); }} />
         </Field>
       </Section>
+
+      <Opening />
 
       <Section title="Take">
         {live ? <CaptureCard job={live} /> : (
           <div className="mb-3 rounded-lg border border-line bg-panel2 p-3">
             {take ? (
-              <p className="mb-2.5 text-mute"><Dot tone={activeFps != null && activeFps < 50 ? "gold" : "green"} /> <span className="ml-1 text-ink">{take.length.toFixed(1)} s</span> recorded {take.recorded}{activeFps != null ? ` · ${activeFps} fps active` : ` · ${take.capture_fps} fps average (includes still pauses)`}</p>
+              <p className="mb-2.5 text-mute"><Dot tone={a.intro.play && activeFps != null && activeFps < 50 ? "gold" : "green"} /> <span className="ml-1 text-ink">{take.length.toFixed(1)} s</span> recorded {take.recorded}{activeFps != null ? ` · ${activeFps} fps active` : ` · ${take.capture_fps} fps average (includes still pauses)`}</p>
             ) : <p className="mb-2.5 text-mute"><Dot tone="faint" /> <span className="ml-1">No take for these settings yet.</span></p>}
-            {activeFps != null && activeFps < 50 && (
+            {a.intro.play && activeFps != null && activeFps < 50 && (
               <p className="mb-2.5 text-[12px] text-gold">The active frames are slow. Use 6 cores and record one take at a time for smoother ink.</p>
             )}
             {take?.frame_p90_ms != null && <p className="mb-2.5 text-[11.5px] text-faint">90% of active frame intervals are within {take.frame_p90_ms} ms. Still holds are excluded.</p>}
             {takeShort && (
               <p className="mb-2.5 text-[12px] text-orange">This edit needs a longer take. The recording length is set to include it; record the full range to preview and export the added verses.</p>
             )}
+            {take && a.intro.play && Math.max(...spec.edit.map((p) => p.out)) <= take.lead && <p className="mb-2.5 text-[12px] text-gold">This edit ends during the opening. Use the whole take to include playback.</p>}
+            {take && <Button size="sm" className="mb-2.5" onClick={wholeTake}>Use whole take · {take.length.toFixed(1)} s</Button>}
             {job?.state === "error" && <p className="mb-2.5 rounded border border-danger/40 bg-danger/10 p-2 text-[12px] text-danger">Last attempt failed: {job.error}</p>}
             <div className="flex flex-wrap items-center gap-2">
               <Button variant={take ? "default" : "primary"} disabled={!usable.length} onClick={() => record(serial === "auto" ? null : serial, !!take)}>
@@ -193,7 +201,7 @@ function Recording() {
           <Button size="sm" onClick={() => split()}>{Icon.scissors} Split at playhead</Button>
           <Button size="sm" variant="ghost" onClick={wholeTake} title="One piece: the whole take">Whole take</Button>
         </div>
-        <p className="mt-2 text-[11.5px] leading-relaxed text-faint">The take opens 1 s before the recitation. Pieces play back to back and the sound is cut with the picture; keys stay where they are in video time.{tl?.take != null && ` The take is ${tl.take.toFixed(1)} s long.`}</p>
+        <p className="mt-2 text-[11.5px] leading-relaxed text-faint">{take ? (a.intro.play ? `The recitation starts ${take.lead.toFixed(1)} s into the take.` : "This take records the screen sequence without recitation.") : "The take opens on its opening, then the recitation."} Pieces play back to back and the sound is cut with the picture; keys stay where they are in video time.{tl?.take != null && ` The take is ${tl.take.toFixed(1)} s long.`}</p>
       </Section>
       {name && <p className="break-words text-[11px] text-faint">Spec: specs/{name}.json</p>}
     </>
@@ -202,7 +210,7 @@ function Recording() {
 
 // Live progress of a capture: the steps so far, the bar, and the emulator's screen.
 export function CaptureCard({ job, compact }: { job: Job; compact?: boolean }) {
-  const steps = [["check", "Check emulator"], ["prepare", "Prepare device"], ["reciter", "Reciter"], ["customize", "Theme & layout"], ["open", "Open the verse"], ["record", "Record"], ["conform", "Sync & conform"]];
+  const steps = [["check", "Check emulator"], ["prepare", "Prepare device"], ["reciter", "Reciter"], ["customize", "Theme & layout"], ["open", "Open the verse"], ["opening", "Recording sequence"], ["record", "Record"], ["conform", "Sync & conform"]];
   const seen = new Set(job.stages.map((s) => s.key)), current = job.stage?.key;
   return (
     <div className="mb-3 rounded-lg border border-orange/40 bg-orange/[0.06] p-3">

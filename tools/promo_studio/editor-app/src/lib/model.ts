@@ -99,6 +99,7 @@ export function videoTimes(s: Spec, a0: number, a1: number): [number, number][] 
 // The take opens on `lead` silent seconds, so the fade in starts with the
 // first sound, not the video (compose.audio_filter / anim.sound_onset).
 export function soundOnset(s: Spec, lead: number): number {
+  if (s.app?.intro?.play === false) return 0;
   let acc = 0;
   for (const p of s.edit) {
     if (p.out > lead) return acc + Math.max(0, lead - p.in);
@@ -119,7 +120,8 @@ export function fadeAt(s: Spec, t: number, onset: number): number {
 // Linear gain the preview applies: the spec's gain and its fades.
 export const soundGain = (s: Spec, t: number, onset: number) => 10 ** ((s.audio.gain_db || 0) / 20) * fadeAt(s, t, onset);
 
-export const takeKey = (s: Spec) => [s.app.reciter, s.app.surah, s.app.ayah, s.app.theme, s.app.layout, s.app.view, s.app.text_size].join("|");
+export const takeKey = (s: Spec) => [s.app.reciter, s.app.surah, s.app.ayah, s.app.theme, s.app.layout, s.app.view, s.app.text_size,
+  s.app.repeat, s.app.repeat === "range" ? s.app.repeat_to : null, JSON.stringify(s.app.intro)].join("|");
 
 // Everything baked into the background plate: a change means a new plate.
 export function plateLook(s: Spec): string {

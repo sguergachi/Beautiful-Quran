@@ -30,6 +30,8 @@ def plan_range(s, start, end, lead=1.0):
     timeline edge actions can preserve the cuts between its ends.
     """
     a = s["app"]
+    if a.get("repeat", "off") != "off" or not a.get("intro", {}).get("play", True):
+        raise ValueError("Choose the repeat range under Recording sequence; trim this take in seconds.")
     count = audio.ayah_count(int(a["surah"]))
     if any(isinstance(v, bool) or not isinstance(v, int) for v in (start, end)) or not 1 <= start <= end <= count:
         raise ValueError(f"choose verses within 1..{count}, with start before stop")
@@ -82,12 +84,18 @@ def repeats_in(segs):
 def build(s, lead=1.0):
     """Verse and repeat spans for a spec, in take seconds."""
     a = s["app"]
-    horizon = max(float(p["out"]) for p in s["edit"]) + 2
-    items, _ = audio.playlist(a["reciter"], int(a["surah"]), int(a["ayah"]), max(horizon, float(a["seconds"])))
+    if not a.get("intro", {}).get("play", True): return {"verses": [], "repeats": [], "words": []}
+    horizon = max(0, max(float(p["out"]) for p in s["edit"]) - lead) + 2
     rs = rows(a["reciter"])
+    last = a["ayah"] if a.get("repeat") == "ayah" else a.get("repeat_to")
+    tail = rs.get((a["surah"], last), [])
+    end_at = tail[-1][2] / 1000 if tail else None
+    items, _ = audio.playlist(a["reciter"], int(a["surah"]), int(a["ayah"]), max(horizon, float(a["seconds"])),
+                              a.get("repeat", "off"), a.get("repeat_to"), end_at)
     verses, reps, words = [], [], []
     for label, wav, r0 in items:
         dur = audio.duration(wav)
+        if a.get("repeat", "off") != "off" and label == f"{a['surah']}:{last}" and end_at is not None: dur = min(dur, end_at)
         t0 = r0 + lead
         verses.append({"label": label, "t0": round(t0, 3), "t1": round(t0 + dur, 3)})
         if label == "basmalah":

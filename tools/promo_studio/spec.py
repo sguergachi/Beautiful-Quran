@@ -57,6 +57,45 @@ PROPS = {
     "bg_brightness": {"group": "Background", "label": "Brightness", "min": -0.6, "max": 0.4, "step": 0.005, "default": 0.0},
 }
 
+# What a take shows before the recitation, in this order (capture.intro).
+INTRO = {
+    "steps": None,      # ordered steps; None reads the older checklist below
+    "play": True,       # false finishes on the last screen without recitation
+    "cover": 0.0,       # s on the app's cover ("touch to open"); 0 = none
+    "home": 0.0,        # s on the chapter list; 0 = none
+    "open_by": "tap",   # from the list: "tap" the chapter or "search" for S:A
+    "header": False,    # Scroll: arrive at the chapter's top, then scroll down to the verse
+    "settings": 0.0,    # s showing Settings, then back
+    "roots": 0.0,       # s showing the root viewer for the verse's first word
+    "repeat": False,    # choose app.repeat on camera (otherwise it is set before recording)
+    "dwell": 1.0,       # s of still page before the recitation, at least
+}
+OPEN_BY = ("tap", "search")
+REPEATS = ("off", "ayah", "range")   # the app's verse repeat: this ayah, or ayah..repeat_to
+STEP_KINDS = ("cover", "home", "open", "header", "settings", "roots", "repeat", "wait")
+
+
+def opening_steps(s):
+    """Canonical ordered opening; retain existing checklist drafts on load."""
+    it = s["app"]["intro"]
+    if it.get("steps") is not None:
+        return copy.deepcopy(it["steps"])
+    steps = []
+    for kind in ("cover", "home"):
+        if it[kind]: steps.append({"kind": kind, "seconds": it[kind]})
+    if steps or it["header"]:
+        steps.append({"kind": "open", "seconds": 0.5, "via": it["open_by"] if it["home"] else "direct"})
+    if it["header"]: steps.append({"kind": "header", "seconds": 1.0})
+    for kind in ("settings", "roots"):
+        if it[kind]: steps.append({"kind": kind, "seconds": it[kind]})
+    if it["repeat"]: steps.append({"kind": "repeat", "seconds": 2.0})
+    return steps
+
+
+def opening_estimate(s):
+    """Planning estimate only. Actual playback offset is measured in the take."""
+    return s["app"]["intro"]["dwell"] + sum(float(x["seconds"]) + (0 if x["kind"] == "wait" else 2.5) for x in opening_steps(s))
+
 DEFAULTS = {
     "title": "",
     "aspect": "1:1",
@@ -70,6 +109,9 @@ DEFAULTS = {
         "view": "Both",
         "text_size": "default",  # default | max
         "seconds": 30,           # seconds of recitation to record
+        "repeat": "off",         # REPEATS
+        "repeat_to": None,       # last ayah of a repeated range
+        "intro": INTRO,
     },
     "edit": [{"in": 0.0, "out": 20.0}],
     "background": {
@@ -197,6 +239,33 @@ def validate(s):
     number(a["ayah"], "app.ayah", 1, 286)
     if int(a["surah"]) != a["surah"] or int(a["ayah"]) != a["ayah"]: errs.append("chapter and ayah must be integers")
     number(a["seconds"], "app.seconds", 1)
+    it = a["intro"]
+    if not isinstance(it, dict): raise ValueError("app.intro must be an object")
+    for name in ("cover", "home", "settings", "roots", "dwell"):
+        number(it[name], f"app.intro.{name}", 0, 30)
+    if it["open_by"] not in OPEN_BY: errs.append(f"app.intro.open_by must be one of {OPEN_BY}")
+    for name in ("header", "repeat", "play"):
+        if not isinstance(it[name], bool): errs.append(f"app.intro.{name} must be true or false")
+    if set(it) - set(INTRO): errs.append(f"unknown app.intro fields: {sorted(set(it) - set(INTRO))}")
+    steps = it.get("steps")
+    if steps is not None:
+        if not isinstance(steps, list) or len(steps) > 24: raise ValueError("opening needs at most 24 steps")
+        for step in steps:
+            if not isinstance(step, dict) or step.get("kind") not in STEP_KINDS: raise ValueError("unknown recording step")
+            if set(step) - {"kind", "seconds", "via", "word"}: raise ValueError("unknown recording step fields")
+            number(step.get("seconds"), "step.seconds", 0, 30)
+            if step.get("via", "direct") not in (*OPEN_BY, "direct"): raise ValueError("unknown chapter opening route")
+            number(step.get("word", 1), "step.word", 1, 100)
+            if int(step.get("word", 1)) != step.get("word", 1): raise ValueError("word position must be an integer")
+    if any(step["kind"] == "roots" for step in opening_steps(s)):
+        if a["layout"] != "Scroll": raise ValueError("word-root recording needs Scroll layout")
+        if a["view"] == "English": raise ValueError("word-root recording needs Arabic or Both view")
+    if a["repeat"] not in REPEATS: errs.append(f"app.repeat must be one of {REPEATS}")
+    if a["repeat"] == "range":
+        number(a["repeat_to"], "app.repeat_to", a["ayah"], 286)
+        if int(a["repeat_to"]) != a["repeat_to"]: errs.append("app.repeat_to must be an integer")
+        import audio
+        if a["repeat_to"] > audio.ayah_count(int(a["surah"])): errs.append("repeat range ends past this chapter")
     for name, p in PROPS.items():
         number(s["props"][name], f"props.{name}")
         if p.get("log") and s["props"][name] <= 0: errs.append(f"{name} must be positive")
@@ -239,10 +308,26 @@ def size(s):
     return ASPECTS[s["aspect"]]
 
 
+def take_script(s):
+    """What a take does beyond opening and playing the verse: None for the
+    plain take, so takes recorded before intros keep their keys."""
+    a = s["app"]
+    steps = opening_steps(s)
+    canonical = [{"kind": x["kind"], "seconds": round(float(x["seconds"]), 3),
+                  **({"via": x.get("via", "direct")} if x["kind"] == "open" else {}),
+                  **({"word": x.get("word", 1)} if x["kind"] == "roots" else {})} for x in steps]
+    intro = {"steps": canonical, "dwell": round(float(a["intro"]["dwell"]), 3), "play": a["intro"]["play"]}
+    script = {"intro": intro, "repeat": a["repeat"], "repeat_to": int(a["repeat_to"]) if a["repeat"] == "range" else None}
+    return None if not steps and intro["dwell"] == 1 and intro["play"] and a["repeat"] == "off" else script
+
+
 def take_key(s):
     """Takes are shared by every spec that records the same thing."""
     a = s["app"]
     k = f"{a['reciter']}-{int(a['surah']):03d}-{int(a['ayah']):03d}-{a['theme']}-{a['layout']}-{a['view']}-{a['text_size']}"
+    script = take_script(s)
+    if script:
+        k += "-" + digest(script)[:8]
     return k.replace(" ", "_").lower()
 
 

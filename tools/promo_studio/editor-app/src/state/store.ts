@@ -358,7 +358,7 @@ export function split(t = clock.t) {
   else set({ sel: { type: "piece", i: at } });
 }
 export function wholeTake() {
-  const len = get().tl?.take ?? Math.max(...get().spec!.edit.map((p) => p.out));
+  const len = get().geo?.take?.length ?? get().tl?.take ?? Math.max(...get().spec!.edit.map((p) => p.out));
   mutate((raw) => { raw.edit = [{ in: 0, out: +len.toFixed(3) }]; });
   set({ sel: null });
 }

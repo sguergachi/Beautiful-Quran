@@ -39,6 +39,7 @@ python3 timeline.py SPEC                   # when each verse and repeat happens 
 | File | Role |
 |---|---|
 | `capture.py` | Drives the app on the emulator (reciter, theme, layout, view, text size) and records picture **and** sound with scrcpy. |
+| `recording.py` | Runs the ordered screen sequence, chapter routes and repeat picker on camera. |
 | `compose.py` | The compositor: each frame is a pure function of (spec, t). Used by export, stills and the editor's exact frame. |
 | `anim.py` | Keyframe evaluation and the edit's time mapping (the editor mirrors it). |
 | `phone.py` | Draws the Pixel 10 front (aluminium rim, glass, punch-hole, keys) at the take's resolution. |
@@ -106,15 +107,32 @@ the host's speakers.
 
 How a take starts matters:
 
-- The verse is opened first with the deep link (no `play`), the page
-  settles, the recording starts, and only then does playback begin. The
-  video keeps 1 s of the still page before the first sound (`lead`).
+- **Recording → Recording sequence** lets you add, remove and reorder up to
+  24 steps: opening ceremony, Home/chapter list, open chapter, chapter header,
+  Settings, root word viewer, repeat settings, or a wait on the current screen.
+  Each step has a 0–30 s hold after arrival. Navigation is part of the take.
+  The ceremony launches the app on camera and plays in full, then holds Home.
+  Open chapter can tap the chapter list, search by name, or open the verse
+  directly. Root steps choose a word position and need Scroll + Arabic/Both.
+- Set **Wait before play** for the final still pause (default 1 s), or switch
+  off **Play recitation after the sequence** to finish on the last screen.
+  Screen-only recordings have no verse markers and do not require an audio
+  onset to conform. **Record (s)** is recitation duration when playing, or
+  minimum total sequence duration when recording screens only.
+- Choose repeat Off, This verse, or a range ending at **Repeat through**.
+  The picker can be shown as a step, or configured before capture. Repeated
+  verse markers wrap at the selected endpoint, using the app's reviewed tail.
+  Trim repeated and screen-only takes in seconds; whole-verse range actions
+  apply to ordinary forward playback.
 - Playback starts from the app's own controls, not `?play=true`: that deep
   link reloads the reader, which crossfades and re-scrolls the page right as
-  the recitation starts. Ayah 1 (and the Mushaf) use the bar's Play, which
-  plays the basmalah first; other verses tap the verse's first word, because
-  after a deep link the bar's Play still points at ayah 1.
-- The recitation's start is found in the recording's own audio.
+  the recitation starts. Other verses tap their first word; if it cannot be
+  identified, an exact deep link is the fallback. A configured repeat resumes
+  its cued queue so playing verse 1 cannot clear its bounds.
+- The recitation's start is measured in the recording's own audio after the
+  playback request. `meta.lead` locates it on the take clock, including every
+  opening step; verse markers and fades use this offset. **Use whole take**
+  includes the full sequence when an existing short edit ends during it.
 - The status-bar clock is hidden (the emulator draws it in a broken face).
 
 Smoothness comes from the emulator. The **Emulators** panel lists running
@@ -140,8 +158,9 @@ recorder closes with SIGTERM so SDL finalizes the file even when the studio
 was launched in the background with SIGINT ignored.
 
 Takes are keyed by what they record (reciter, chapter, ayah, theme, layout,
-view, text size), so specs that differ only in camera, background or text
-share one take.
+view, text size, ordered steps/holds, final wait and repeat choice). The
+default empty sequence keeps existing take keys. Camera/background edits and
+recording duration share the same take; changing the sequence needs a new one.
 
 ## What the app shows off
 
@@ -162,7 +181,8 @@ share one take.
   piece, dragging a piece's edges trims it. The sound is cut with the
   picture (8 ms fades at each cut, so no clicks). In the spec:
   `"edit": [{"in": 0.0, "out": 12.4}, {"in": 15.0, "out": 21.0}]`, in take
-  seconds; the take opens 1 s before the recitation.
+  seconds; by default the take opens 1 s before recitation, or with the chosen
+  screen sequence and final wait.
 - **Sound**: the take's waveform through your cuts, shaped by the fades.
   Drag a fade's gold handle to set its length (it rounds to 0.05 s; hold
   Alt for no rounding); double-click a handle to remove the fade. The fade

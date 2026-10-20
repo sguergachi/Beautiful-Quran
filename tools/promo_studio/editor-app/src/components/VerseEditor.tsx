@@ -12,7 +12,8 @@ function useVerseEdit() {
   const spec = useStore((s) => s.spec), tl = useStore((s) => s.tl), meta = useStore((s) => s.meta);
   const busy = useStore((s) => s.verseBusy), error = useStore((s) => s.verseError);
   const count = meta?.surahs.find((s) => s.id === spec?.app.surah)?.ayahs ?? 0;
-  const range = spec && tl ? verseRange(spec, tl.verses) : null;
+  const linear = spec?.app.repeat === "off" && spec.app.intro.play;
+  const range = spec && tl && linear ? verseRange(spec, tl.verses) : null;
   const can = (action: VerseAction) => !busy && !!nextVerseRange(range, action, count);
   return { spec, tl, count, range, busy, error, can };
 }
@@ -36,6 +37,8 @@ export function TimelineVerseControls() {
 export function VerseRangeEditor() {
   const { spec, tl, count, range, busy, error, can } = useVerseEdit();
   if (!spec) return null;
+  if (!spec.app.intro.play) return <p className="mb-3 text-[12px] text-mute">Screen-only take. Trim the recorded sequence below.</p>;
+  if (spec.app.repeat !== "off") return <p className="mb-3 text-[12px] text-mute">Choose the verses to loop under Recording sequence. Trim repeated playback below.</p>;
   const current = range ?? { start: spec.app.ayah, end: spec.app.ayah };
   const options: [number, string][] = Array.from({ length: count }, (_, i) => [i + 1, `${spec.app.surah}:${i + 1}`]);
   return <div className="mb-4" aria-busy={busy}>

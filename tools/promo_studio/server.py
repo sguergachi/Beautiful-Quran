@@ -76,7 +76,7 @@ def editor_timeline(s):
     """Timeline for a saved spec or a live editor draft, on its take clock."""
     meta = take_meta(s)
     if meta:
-        s["app"]["seconds"] = max(s["app"]["seconds"], meta["length"])
+        s["app"]["seconds"] = max(s["app"]["seconds"], max(0, meta["length"] - meta["lead"]))
     tl = timeline.build(s, meta["lead"] if meta else S.LEAD)
     return {"verses": tl["verses"], "repeats": tl["repeats"], "take": meta["length"] if meta else None}
 

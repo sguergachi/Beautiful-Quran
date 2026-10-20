@@ -120,15 +120,15 @@ def scroll_to(label, max_swipes=6):
     return at.find(label)
 
 
-def scroll_top(anchor, max_swipes=6):
+def scroll_top(anchor, max_swipes=6, exact=True):
     """Screens keep their scroll position between visits: swipe back up to `anchor`."""
     w, h = map(int, re.findall(r"(\d+)x(\d+)", adb("shell", "wm", "size"))[-1])
     for _ in range(max_swipes):
-        if at.find(anchor):
+        if at.find(anchor, exact):
             return True
         adb("shell", "input", "swipe", str(w // 2), str(int(h * 0.45)), str(w // 2), str(int(h * 0.95)), "300")
         time.sleep(0.7)
-    return bool(at.find(anchor))
+    return bool(at.find(anchor, exact))
 
 
 def set_reciter(key, log=print):
@@ -256,14 +256,26 @@ def _is_arabic_word(t):
 def first_word_xy(ayah):
     """Centre of the opened verse's first word: the first Arabic word after
     the previous verse's end marker (﴿N﴾, Arabic-Indic digits)."""
+    return word_xy(ayah, 1)
+
+
+def word_xy(ayah, position=1):
+    """A visible Arabic word slot in the opened Scroll verse."""
     for attempt in range(3):
         ns = at.nodes()
         want = "﴿" + str(ayah - 1).translate(ARABIC_DIGITS) + "﴾"
         idx = next((i for i, (t, d, b) in enumerate(ns) if t.replace("\u2060", "") == want), None)
-        cands = ns[idx + 1:] if idx is not None else ns
+        # Do not silently select another verse when the requested marker is
+        # outside the viewport. Playback can fall back to the exact deep link.
+        cands = ns[idx + 1:] if idx is not None else ns if ayah == 1 else []
+        seen = 0
         for t, d, b in cands:
-            if _is_arabic_word(t):
-                return ((b[0] + b[2]) // 2, (b[1] + b[3]) // 2)
+            if "﴿" in t:
+                break
+            if _is_arabic_word(t) and not t.startswith("سُورَةُ"):
+                seen += 1
+                if seen == position:
+                    return ((b[0] + b[2]) // 2, (b[1] + b[3]) // 2)
         # verse marker not on screen: scroll down and retry
         if attempt < 2:
             adb("shell", "input", "swipe", "540", "1800", "540", "600", "400", check=False)
@@ -337,6 +349,8 @@ def record(s, log=print, force=False):
     overall progress, which the editor shows as the capture runs.
     """
     from report import Report
+    from recording import Sequence
+    from spec import opening_steps, opening_estimate
     rep = log if isinstance(log, Report) else None
     stage = (lambda k, m, p: rep.stage(k, m, p)) if rep else (lambda k, m, p: log(m))
     _env()
@@ -367,21 +381,38 @@ def record(s, log=print, force=False):
     adb("shell", "input", "keyevent", "KEYCODE_MEDIA_PAUSE", check=False)
     at.open_reader(int(a["surah"]), int(a["ayah"]))
     time.sleep(3.0)
+    sequence = Sequence(s, log=log)
+    sequence.prepare()
     raw = os.path.join(d, "raw.mkv")
     if os.path.exists(raw):
         os.remove(raw)
     # scrcpy gets a generous limit; the take is ended a fixed time after the
     # recitation actually starts (Hani's first file can buffer for seconds)
-    limit = int(math.ceil(secs + LEAD + 40))
+    limit = int(math.ceil(secs + opening_estimate(s) + 300))
     env = dict(os.environ, ADB=shutil.which("adb"))
     p = subprocess.Popen([scrcpy(), "--no-window", "--no-playback", f"--record={raw}",
                           "--audio-source=playback", "--audio-codec=flac", "--video-codec=h264",
                           "--video-bit-rate=40M", "--max-fps=60", f"--time-limit={limit}"],
                          env=env, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
+    recording_start = time.monotonic()
     time.sleep(2.0)
-    stage("record", f"Starting playback ({secs} s to record)", 0.25)
+    marks = {"dwell": a["intro"]["dwell"], "scene_only": not a["intro"]["play"]}
+    def mark(key):
+        marks[key] = time.monotonic() - recording_start
     try:
-        start_playback(int(a["surah"]), int(a["ayah"]), a["layout"], log=log)
+        if opening_steps(s): mark("intro")
+        sequence.run(mark, stage)
+        stage("record", f"{'Starting playback' if a['intro']['play'] else 'Holding the last screen'} ({secs} s to record)", 0.25)
+        if a["intro"]["play"]:
+            mark("play")
+            if a["repeat"] != "off":
+                # The repeat picker has already cued the requested range.
+                # Tapping verse 1 would re-add the chapter's basmalah preface
+                # and clear that range, so resume its paused queue instead.
+                adb("shell", "input", "keyevent", "KEYCODE_MEDIA_PLAY")
+                if not playing(): raise RuntimeError("Repeated playback did not start")
+            else:
+                start_playback(int(a["surah"]), int(a["ayah"]), a["layout"], log=log)
     except BaseException as e:
         try:
             adb("shell", "screencap", "-p", "/sdcard/fail.png", check=False)
@@ -392,7 +423,8 @@ def record(s, log=print, force=False):
         adb("shell", "input", "keyevent", "KEYCODE_MEDIA_PAUSE", check=False)
         log(f"capture failed: {e}")
         raise
-    t0, want = time.monotonic(), secs + 1.5
+    t0 = time.monotonic()
+    want = secs + 1.5 if a['intro']['play'] else max(0, secs - (t0 - recording_start - marks.get('intro', 0)))
     try:
         while p.poll() is None:
             el = time.monotonic() - t0
@@ -419,19 +451,33 @@ def record(s, log=print, force=False):
     if p.returncode != 0 or not os.path.exists(raw) or os.path.getsize(raw) < 10000:
         raise SystemExit("scrcpy recording failed:\n" + out[-2000:])
     stage("conform", "Finding the recitation's start and conforming to 60 fps", 0.88)
-    conform(d, log)
+    conform(d, log, marks)
     if rep:
         rep.progress(1.0, "take ready")
     return d
 
 
-def conform(d, log=print):
-    """raw.mkv -> clip.mp4 (60 fps CFR) + audio.wav, both starting LEAD s before the recitation."""
+def conform(d, log=print, marks=None):
+    """raw.mkv -> clip.mp4 (60 fps CFR) + audio.wav on one timeline.
+
+    `marks` (recording seconds): "play", when playback was asked for (the
+    recitation is searched for after it); "intro", when the opening began;
+    "dwell", the still seconds to keep before the recitation. With an intro
+    the take starts with it, otherwise `dwell` s before the recitation.
+    `lead` in meta.json is where the recitation starts on the take's clock.
+    """
+    marks = marks or {}
     raw = os.path.join(d, "raw.mkv")
-    onset = audio_onset(raw, after=1.0)
+    scene_only = marks.get("scene_only", False)
+    onset = None if scene_only else audio_onset(raw, after=max(0.5, marks["play"] - 1.0) if marks.get("play") is not None else 1.0)
     v0 = first_video_pts(raw)
-    start = max(0.0, onset - LEAD)
-    rates = cadence(raw, onset, onset + 20)
+    if scene_only:
+        start = max(0.0, marks.get("intro", 1.0) - 0.15)
+    elif marks.get("intro") is not None:
+        start = max(0.0, min(onset - 0.5, marks["intro"] - 0.15))
+    else:
+        start = max(0.0, onset - float(marks.get("dwell", LEAD)))
+    rates = cadence(raw, onset or start, (onset or start) + 20)
     clip, wav = os.path.join(d, "clip.mp4"), os.path.join(d, "audio.wav")
     # scrcpy writes frames only when the screen changes: fps=60 repeats the
     # last one, it never invents in-between frames
@@ -445,7 +491,7 @@ def conform(d, log=print):
     w, h = map(int, subprocess.run(["ffprobe", "-v", "error", "-select_streams", "v:0", "-show_entries",
                                     "stream=width,height", "-of", "csv=p=0", clip],
                                    capture_output=True, text=True, check=True).stdout.strip().split(","))
-    meta = {"onset_raw": onset, "video_first_pts": v0, "lead": LEAD, "length": length, **{k: round(v, 1) for k, v in rates.items()},
+    meta = {"onset_raw": onset, "video_first_pts": v0, "lead": round(onset - start, 3) if onset is not None else length, "length": length, "marks": marks, **{k: round(v, 1) for k, v in rates.items()},
             "width": w, "height": h, "recorded": time.strftime("%Y-%m-%d %H:%M")}
     json.dump(meta, open(os.path.join(d, "meta.json"), "w"), indent=1)
     log(f"take ready: {d} ({length:.1f}s, active cadence {rates['active_fps']:.1f} fps, p90 frame interval {rates['frame_p90_ms']:.0f} ms)")

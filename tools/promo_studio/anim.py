@@ -74,6 +74,7 @@ def video_times(s, take_t0, take_t1):
 def sound_onset(s, lead):
     """Video time of the first sound. A take opens on `lead` silent seconds
     before the recitation, so the fade in starts where the sound does."""
+    if not s.get("app", {}).get("intro", {}).get("play", True): return 0.0
     acc = 0.0
     for p in s["edit"]:
         i, o = float(p["in"]), float(p["out"])

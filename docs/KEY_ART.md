@@ -194,6 +194,11 @@ the recording and keyframes the camera, the phone and the background; there
 is no text. The React/Tailwind editor has resizable panes, undo/redo,
 multi-key editing and a draggable playhead. Recording and export jobs show
 live stages and progress, survive a server restart, and can be cancelled.
+Recording sequences can order the opening ceremony, Home, chapter-list or
+search entry, chapter header, Settings, root viewer and repeat picker, with
+per-screen holds and a final wait before playback. They can also finish on a
+screen without recitation. The measured audio start keeps verse markers and
+fades aligned after long introductions; Use whole take includes the full flow.
 The emulator panel starts and prepares additional instances of the shared
 golden AVD; use one six-core capture at a time for the smoothest ink.
 Ten starter specs cover Alafasy and Hani across the three

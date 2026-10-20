@@ -9,12 +9,27 @@ export interface PropDef { group: string; label: string; min: number; max: numbe
 // the server validates; the editor edits a draft and sends it back.
 export type RawSpec = Record<string, any>;
 
+/** What a take shows before the recitation, in this order (spec.INTRO). */
+export interface Intro {
+  steps: RecordingStep[] | null;
+  play: boolean;
+  cover: number; home: number; open_by: "tap" | "search"; header: boolean;
+  settings: number; roots: number; repeat: boolean; dwell: number;
+}
+export interface RecordingStep {
+  kind: "cover" | "home" | "open" | "header" | "settings" | "roots" | "repeat" | "wait";
+  seconds: number; via?: "tap" | "search" | "direct"; word?: number;
+}
+
 export interface Spec {
   name?: string;
   title: string;
   aspect: string;
   fps: number;
-  app: { surah: number; ayah: number; reciter: string; theme: string; layout: string; view: string; text_size: string; seconds: number };
+  app: {
+    surah: number; ayah: number; reciter: string; theme: string; layout: string; view: string; text_size: string; seconds: number;
+    repeat: "off" | "ayah" | "range"; repeat_to: number | null; intro: Intro;
+  };
   edit: Piece[];
   background: { id: string; saturation: number; speed: number; parallax: number; vignette: number; offset?: number };
   phone: { color: string; height: number; shadow: number };
