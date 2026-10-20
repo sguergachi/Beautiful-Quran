@@ -1,11 +1,12 @@
 // The timeline: the recording's pieces, where verses and repeats fall, and a
 // keyframe lane per property. Every drag is captured on the scroll box (it
 // survives re-renders) and is one undo step.
-import { memo, useEffect, useRef, useState } from "react";
+import { memo, useEffect, useLayoutEffect, useRef, useState } from "react";
 import * as E from "../lib/edit.ts";
 import { track } from "../lib/drag.ts";
 import { clamp, pieceStart, r3, sourceTime, valueAt, videoTimes } from "../lib/model.ts";
 import type { Ease, Key, PropDef, Spec } from "../lib/types.ts";
+import { fitTimelineScale } from "../lib/timeline.ts";
 import { clock, useTime } from "../state/clock.ts";
 import {
   copy, deleteSelection, endGesture, mutate, paste, select, selectAll, selectKeys, selKeys, setEase, setUI, split,
@@ -29,7 +30,22 @@ export function Timeline() {
   const playhead = useRef<HTMLDivElement>(null), head = useRef<HTMLDivElement>(null);
   const hover = useRef<HTMLDivElement>(null), hoverT = useRef<HTMLDivElement>(null);
   const [marquee, setMarquee] = useState<{ x: number; y: number; w: number; h: number } | null>(null);
-  const { pps, labelW } = ui;
+  const [width, setWidth] = useState(0);
+  const { labelW } = ui;
+  const pps = ui.fit && width ? fitTimelineScale(width, labelW, spec?.duration ?? 0) : ui.pps;
+
+  useLayoutEffect(() => {
+    const b = box.current;
+    if (!b) return;
+    const measure = () => setWidth(b.clientWidth);
+    const observer = new ResizeObserver(measure);
+    observer.observe(b); measure();
+    return () => observer.disconnect();
+  }, [!!spec]);
+
+  useLayoutEffect(() => {
+    if (ui.fit && box.current) box.current.scrollLeft = 0;
+  }, [ui.fit, width, labelW, spec?.duration]);
 
   const timeAt = (clientX: number) => (clientX - inner.current!.getBoundingClientRect().left - labelW) / pps;
   const edgeOpt = () => ({ box: box.current!, left: labelW });
@@ -42,7 +58,7 @@ export function Timeline() {
       if (playhead.current) { playhead.current.style.transform = `translateX(${labelW + x}px)`; playhead.current.style.visibility = x < box.current!.scrollLeft - 1 ? "hidden" : "visible"; }
       if (head.current) head.current.style.transform = `translateX(${x}px)`;
       const b = box.current;
-      if (b && clock.playing) {
+      if (b && clock.playing && !ui.fit) {
         const px = labelW + x;
         if (px > b.scrollLeft + b.clientWidth - 40 || px < b.scrollLeft + labelW) b.scrollLeft = Math.max(0, px - labelW - 40);
       }
@@ -52,7 +68,7 @@ export function Timeline() {
     const b = box.current, onScroll = () => place(clock.t);
     b?.addEventListener("scroll", onScroll);
     return () => { off(); b?.removeEventListener("scroll", onScroll); };
-  }, [pps, labelW, spec?.duration]);
+  }, [pps, labelW, spec?.duration, ui.fit]);
 
   // ctrl / pinch wheel zooms around the pointer
   useEffect(() => {
@@ -62,7 +78,8 @@ export function Timeline() {
       if (!e.ctrlKey) return;
       e.preventDefault();
       const t = timeAt(e.clientX), rect = b.getBoundingClientRect();
-      const next = clamp(useStore.getState().ui.pps * Math.exp(-e.deltaY * 0.002), 8, 500);
+      const current = useStore.getState().ui;
+      const next = clamp((current.fit ? pps : current.pps) * Math.exp(-e.deltaY * 0.002), 8, 500);
       setUI({ pps: next });
       requestAnimationFrame(() => { b.scrollLeft = Math.max(0, t * next - (e.clientX - rect.left - labelW)); });
     };
@@ -71,7 +88,7 @@ export function Timeline() {
   });
 
   if (!spec || !meta) return <div className="flex-1 bg-panel" />;
-  const dur = spec.duration, laneW = Math.max(240, dur * pps + 48);
+  const dur = spec.duration, laneW = ui.fit && width ? Math.max(1, width - labelW) : Math.max(240, dur * pps + 48);
 
   const snapT = (t: number, exclude: E.KeyRef[] = [], noPlayhead = false, playhead = clock.t) => {
     const c = [0, dur];
@@ -231,7 +248,7 @@ export function Timeline() {
         <div className="flex items-center gap-1.5">
           <span className="text-[11px] text-faint">Zoom</span>
           <input type="range" min={8} max={500} step={1} value={pps} className="w-24 min-w-0" onChange={(e) => setUI({ pps: +e.target.value })} title="Timeline zoom (Ctrl-scroll)" />
-          <Button size="sm" variant="ghost" onClick={() => setUI({ pps: clamp((box.current!.clientWidth - labelW - 60) / Math.max(1, dur), 8, 500) })}>Fit</Button>
+          <Button size="sm" variant="ghost" active={ui.fit} aria-pressed={ui.fit} title="Keep the whole edit visible as it changes; manual zoom turns Fit off" onClick={() => setUI({ fit: !ui.fit })}>Fit</Button>
         </div>
       </div>
       <div ref={box} className="relative min-h-0 flex-1 overflow-auto select-none" onPointerMove={onHover}

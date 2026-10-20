@@ -86,6 +86,9 @@ controls. Narrow inspector fields stack their labels above the controls.
 The ruler scrubs
 with pointer capture and scrolls at its edges. Shift-drag selects several
 keys, which can move, copy, paste or delete together. **?** lists shortcuts.
+**Fit** stays active while extending or shortening an edit and while resizing
+panes or timeline labels. Its highlighted button keeps the whole edit visible;
+click it again, move the zoom slider or Ctrl-scroll to return to manual zoom.
 
 [Studio UI review](../../docs/PROMO_STUDIO_UI_REVIEW.md) records the clipping
 fixes and the desktop, narrow-window and zoom-equivalent review matrix.

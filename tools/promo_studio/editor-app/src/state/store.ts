@@ -11,13 +11,13 @@ import { clock, media } from "./clock.ts";
 export type Tab = "animate" | "recording" | "look";
 export interface UI {
   leftW: number; rightW: number; tlH: number; labelW: number; hideL: boolean; hideR: boolean;
-  tab: Tab; pps: number; collapsed: Record<string, boolean>;
+  tab: Tab; pps: number; fit: boolean; collapsed: Record<string, boolean>;
 }
 export type Panel = null | "emulators" | "jobs" | "help";
 export interface Toast { id: number; msg: string; kind: "info" | "error" | "ok" }
 type SaveState = "saved" | "dirty" | "saving" | "error";
 
-const UI_DEFAULTS: UI = { leftW: 248, rightW: 340, tlH: 260, labelW: 136, hideL: false, hideR: false, tab: "animate", pps: 60, collapsed: {} };
+const UI_DEFAULTS: UI = { leftW: 248, rightW: 340, tlH: 260, labelW: 136, hideL: false, hideR: false, tab: "animate", pps: 60, fit: false, collapsed: {} };
 function loadUI(): UI {
   try { return { ...UI_DEFAULTS, ...JSON.parse(localStorage.getItem("promo.ui") || "{}"), tab: "animate" }; } catch { return UI_DEFAULTS; }
 }
@@ -59,6 +59,7 @@ export function toast(msg: string, kind: Toast["kind"] = "info", ms = 3200) {
 }
 export function setUI(patch: Partial<UI>) {
   const ui = { ...get().ui, ...patch };
+  if (patch.pps != null && patch.fit == null) ui.fit = false;
   if (innerWidth <= 1000) {
     if (patch.hideL === false) ui.hideR = true;
     else if (patch.hideR === false) ui.hideL = true;
