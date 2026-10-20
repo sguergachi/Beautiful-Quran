@@ -32,6 +32,22 @@ function seekMedia(m: HTMLMediaElement, t: number) {
   want.delete(m);
   m.currentTime = t;
 }
+
+// A small clock difference is normal between native video and the timeline.
+// Seeking it away replays/skips scroll frames inside an otherwise smooth phone
+// move. Converge quietly on muted video; cuts, scrubs and large stalls still
+// seek exactly. The take's audio keeps its original speed and pitch.
+function followRecording(t: number, exact: boolean) {
+  const v = media.screen, error = t - v.currentTime;
+  if (!exact && v.seeking) return;
+  let rate = 1;
+  if (exact || Math.abs(error) > 0.3) {
+    if (Math.abs(error) > 0.001) seekMedia(v, t);
+  } else if (Math.abs(error) > 0.015) {
+    rate = clamp(1 + error * 0.5, 0.96, 1.04);
+  }
+  if (Math.abs(v.playbackRate - rate) > 0.001) v.playbackRate = rate;
+}
 for (const m of [media.screen, media.plate, media.audio]) {
   m.addEventListener("loadeddata", () => {
     clock.sync(true);
@@ -106,7 +122,7 @@ export const clock = {
     force = force || piece !== this._piece;
     this._piece = piece;
     if (hasClip) {
-      if (Math.abs(media.screen.currentTime - src) > (force ? 0.001 : 0.07)) seekMedia(media.screen, src);
+      followRecording(src, force || !this.playing);
       if (Math.abs(media.audio.currentTime - src) > (force ? 0.001 : 0.09)) seekMedia(media.audio, src);
     }
     if (hasPlate) {
@@ -140,6 +156,7 @@ export const clock = {
     this.playing = false;
     cancelAnimationFrame(this._raf);
     media.screen.pause(); media.audio.pause(); media.plate.pause();
+    media.screen.playbackRate = 1;
     this.emitState(); this.emit();
   },
   toggle() { this.playing ? this.pause() : this.play(); },

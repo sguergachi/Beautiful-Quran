@@ -40,6 +40,12 @@ to concurrent applications and emulator work.
   1080×2400 recording into Canvas on every tick. The background canvas is
   opaque and desynchronized; reflected padding covers only the visible crop
   and blur kernel. A cached phone-space shadow follows the camera transform.
+- During playback, small recording/timeline clock differences converge with
+  a muted-video rate adjustment bounded to 0.96–1.04, with a 15 ms deadband.
+  Repeated hard seeks at 70 ms of drift could replay or skip scrolling frames
+  inside the moving phone. Scrubs, edit cuts and delays over 300 ms still
+  seek exactly; pending seeks keep the latest explicit target. Pause restores
+  normal speed. Recitation audio and the export renderer are unchanged.
 - Each export defaults to at most four workers. Decoder/filter/encoder pools
   are bounded, OpenCV uses one thread per worker, and workers run at niceness
   5 or lower priority. The alpha cache is small; float buffers are reused and
@@ -78,3 +84,11 @@ print("Elapsed seconds:", time.perf_counter() - start)
 For comparable measurements, use the same spec snapshot, take, cached plate
 and machine load. The default queue keeps exports sequential. Performance
 work must preserve the recorded wash and the original frame quality.
+
+The preview drift regression uses the cached Al-Baqarah take during the
+camera move at 18–24 s. In headless Chromium with SwiftShader, introducing
+120 ms of relative clock drift made the old screen seek backward by 117 ms.
+The corrected preview had no screen seeks or backward presented frames;
+its error converged to 26 ms after five seconds. Both traces delivered
+about 60 animation ticks/s (p95 17.3/17.4 ms). This controlled check covers
+the timing-correction mechanism, rather than certifying every client GPU.
