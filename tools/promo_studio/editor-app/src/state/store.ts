@@ -59,6 +59,10 @@ export function toast(msg: string, kind: Toast["kind"] = "info", ms = 3200) {
 }
 export function setUI(patch: Partial<UI>) {
   const ui = { ...get().ui, ...patch };
+  if (innerWidth <= 1000) {
+    if (patch.hideL === false) ui.hideR = true;
+    else if (patch.hideR === false) ui.hideL = true;
+  }
   set({ ui });
   localStorage.setItem("promo.ui", JSON.stringify(ui));
 }

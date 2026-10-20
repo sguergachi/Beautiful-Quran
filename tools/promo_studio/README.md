@@ -78,9 +78,17 @@ queue and reattaches running jobs after a restart; a failed job leaves the
 editor available. Cancelling a waiting job leaves a running take alone.
 
 Drag the separators to resize the video list, preview/timeline and inspector;
-double-click to reset. Pane sizes persist across visits. The ruler scrubs
+double-click to reset. Preferred pane sizes persist across visits and fit the
+available window. At 1,000 CSS pixels wide or less, the video list and inspector
+open one at a time over the canvas; their top-bar buttons or the backdrop close
+them. Toolbars wrap, and a tall timeline leaves room for the preview and playback
+controls. Narrow inspector fields stack their labels above the controls.
+The ruler scrubs
 with pointer capture and scrolls at its edges. Shift-drag selects several
 keys, which can move, copy, paste or delete together. **?** lists shortcuts.
+
+[Studio UI review](../../docs/PROMO_STUDIO_UI_REVIEW.md) records the clipping
+fixes and the desktop, narrow-window and zoom-equivalent review matrix.
 
 ## Takes: the real app, its real sound
 

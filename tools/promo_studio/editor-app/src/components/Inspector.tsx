@@ -23,7 +23,7 @@ export function Inspector() {
   const tab = useStore((s) => s.ui.tab), spec = useStore((s) => s.spec);
   const capture = useStore((s) => s.jobs.find((j) => j.kind === "capture" && j.name === s.name && (j.state === "running" || j.state === "queued")));
   return (
-    <div className="flex h-full min-h-0 flex-col bg-panel">
+    <div className="inspector flex h-full min-h-0 min-w-0 flex-col bg-panel">
       <div className="flex shrink-0 gap-1 border-b border-line p-2">
         {(["animate", "recording", "look"] as Tab[]).map((t) => (
           <button key={t} onClick={() => setUI({ tab: t })}
@@ -55,11 +55,11 @@ function Animate() {
           {names.map((n) => {
             const d = meta.props[n], keys = spec.tracks[n] || [], here = keys.some((k) => Math.abs(k.t - t) < 0.5 / (spec.fps || 60) + 1e-6);
             return (
-              <div key={n} className="mb-1.5 grid grid-cols-[24px_86px_1fr] items-center gap-1.5">
+              <div key={n} className="mb-1.5 grid grid-cols-[24px_86px_minmax(0,1fr)] items-center gap-1.5">
                 <button onClick={() => toggleKey(n)} title={here ? "Remove the key at the playhead" : "Add a key at the playhead"}
                   className={`grid size-6 place-items-center rounded border text-[11px] ${here ? "border-gold/60 text-gold" : keys.length ? "border-line text-green" : "border-line text-faint hover:text-mute"}`}>◆</button>
-                <span className="truncate text-mute" title={keys.length ? `${keys.length} key${keys.length > 1 ? "s" : ""}` : "one value for the whole video"}>{d.label}</span>
-                <Slider value={valueAt(spec, meta.props, n, t)} min={d.min} max={d.max} step={d.step} digits={d.step < 0.01 ? 3 : 2}
+                <span className="truncate text-mute" title={`${d.label} · ${keys.length ? `${keys.length} key${keys.length > 1 ? "s" : ""}` : "one value for the whole video"}`}>{d.label}</span>
+                <Slider label={d.label} value={valueAt(spec, meta.props, n, t)} min={d.min} max={d.max} step={d.step} digits={d.step < 0.01 ? 3 : 2}
                   onChange={(v) => setProp(n, v)} onDone={endGesture} />
               </div>
             );
@@ -159,11 +159,11 @@ function Recording() {
               <p className="mb-2.5 text-[12px] text-orange">The edit runs past the end of the take; its last frame will hold. Raise Record (s) and record again.</p>
             )}
             {job?.state === "error" && <p className="mb-2.5 rounded border border-danger/40 bg-danger/10 p-2 text-[12px] text-danger">Last attempt failed: {job.error}</p>}
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2">
               <Button variant={take ? "default" : "primary"} disabled={!usable.length} onClick={() => record(serial === "auto" ? null : serial, !!take)}>
                 {Icon.rec} {take ? "Record again" : "Record take"}
               </Button>
-              <div className="min-w-0 flex-1">
+              <div className="min-w-[130px] flex-1">
                 <Select value={serial} onChange={setSerial}
                   options={[["auto", usable.length ? "Any free emulator" : "No emulator ready"], ...usable.map((e): [string, string] => [e.serial, `${e.serial}${e.job ? " (busy)" : ""}`])]} />
               </div>
@@ -176,9 +176,9 @@ function Recording() {
       </Section>
 
       <Section title="Edit" right={<span className="num text-[11.5px] text-faint">{spec.duration.toFixed(2)} s</span>}>
-        <div className="mb-1 grid grid-cols-[22px_1fr_1fr_26px] gap-1.5 text-[11px] text-faint"><span>#</span><span>In (take s)</span><span>Out (take s)</span><span /></div>
+        <div className="mb-1 grid grid-cols-[22px_minmax(0,1fr)_minmax(0,1fr)_26px] gap-1.5 text-[11px] text-faint"><span>#</span><span>In (take s)</span><span>Out (take s)</span><span /></div>
         {raw.edit.map((p: { in: number; out: number }, i: number) => (
-          <div key={i} className={`mb-1.5 grid grid-cols-[22px_1fr_1fr_26px] items-center gap-1.5 ${sel?.type === "piece" && sel.i === i ? "text-blue" : ""}`}>
+          <div key={i} className={`mb-1.5 grid grid-cols-[22px_minmax(0,1fr)_minmax(0,1fr)_26px] items-center gap-1.5 ${sel?.type === "piece" && sel.i === i ? "text-blue" : ""}`}>
             <button className="text-left" onClick={() => select({ type: "piece", i })}>{i + 1}</button>
             <TextInput type="number" step={0.01} value={p.in} onCommit={(v) => mutate((r) => E.trimPiece(r, i, "in", parseFloat(v), tl?.take))} />
             <TextInput type="number" step={0.01} value={p.out} onCommit={(v) => mutate((r) => E.trimPiece(r, i, "out", parseFloat(v), tl?.take))} />
@@ -186,13 +186,13 @@ function Recording() {
               onClick={() => mutate((r) => { E.deletePiece(r, i); })} title="Delete this piece">{Icon.x}</button>
           </div>
         ))}
-        <div className="mt-2 flex gap-2">
+        <div className="mt-2 flex flex-wrap gap-2">
           <Button size="sm" onClick={() => split()}>{Icon.scissors} Split at playhead</Button>
           <Button size="sm" variant="ghost" onClick={wholeTake} title="One piece: the whole take">Whole take</Button>
         </div>
         <p className="mt-2 text-[11.5px] leading-relaxed text-faint">The take opens 1 s before the recitation. Pieces play back to back and the sound is cut with the picture; keys stay where they are in video time.{tl?.take != null && ` The take is ${tl.take.toFixed(1)} s long.`}</p>
       </Section>
-      {name && <p className="text-[11px] text-faint">Spec: specs/{name}.json</p>}
+      {name && <p className="break-words text-[11px] text-faint">Spec: specs/{name}.json</p>}
     </>
   );
 }
@@ -203,7 +203,7 @@ export function CaptureCard({ job, compact }: { job: Job; compact?: boolean }) {
   const seen = new Set(job.stages.map((s) => s.key)), current = job.stage?.key;
   return (
     <div className="mb-3 rounded-lg border border-orange/40 bg-orange/[0.06] p-3">
-      <div className="mb-2 flex items-center gap-2">
+      <div className="mb-2 flex flex-wrap items-center gap-2">
         <span className="size-2 rounded-full bg-orange animate-pulse-soft" />
         <span className="font-semibold">{job.state === "queued" ? "Waiting for the emulator" : "Recording a take"}</span>
         <span className="text-faint">on {job.serial}</span>
@@ -211,7 +211,7 @@ export function CaptureCard({ job, compact }: { job: Job; compact?: boolean }) {
         <Button size="sm" variant="ghost" onClick={() => cancelJob(job.id)}>Cancel</Button>
       </div>
       <Progress value={job.progress} tone="gold" indeterminate={job.state === "queued"} />
-      <p className="num mt-1.5 truncate text-[12px] text-mute">{job.msg}</p>
+      <p className="num mt-1.5 break-words text-[12px] text-mute">{job.msg}</p>
       {!compact && (
         <div className="mt-3 flex gap-3">
           <ol className="flex-1 space-y-1 text-[12px]">
@@ -231,7 +231,7 @@ export function CaptureCard({ job, compact }: { job: Job; compact?: boolean }) {
 export function LiveScreen({ serial, width = 92, every = 1000 }: { serial: string; width?: number; every?: number }) {
   const [src, setSrc] = useState(api.screenUrl(serial));
   useEffect(() => { const id = setInterval(() => setSrc(api.screenUrl(serial)), every); return () => clearInterval(id); }, [serial, every]);
-  return <img src={src} alt={`${serial} screen`} style={{ width }} className="rounded-md border border-line bg-black" onError={(e) => { (e.target as HTMLImageElement).style.opacity = "0.2"; }} />;
+  return <img src={src} alt={`${serial} screen`} style={{ width }} className="h-fit max-w-full shrink-0 rounded-md border border-line bg-black" onError={(e) => { (e.target as HTMLImageElement).style.opacity = "0.2"; }} />;
 }
 
 export const emulatorTone = (e: Emulator): "green" | "gold" | "orange" | "faint" | "danger" =>
@@ -242,7 +242,7 @@ export const emulatorTone = (e: Emulator): "green" | "gold" | "orange" | "faint"
 function Look() {
   const meta = useStore((s) => s.meta)!, spec = useStore((s) => s.spec)!, raw = useStore((s) => s.raw)!;
   const slider = (label: string, path: string, value: number, min: number, max: number, step: number, hint?: string) => (
-    <Field label={label} hint={hint}><Slider value={value} min={min} max={max} step={step} onChange={(v) => set(path, v, "f:" + path)} onDone={endGesture} /></Field>
+    <Field label={label} hint={hint}><Slider label={label} value={value} min={min} max={max} step={step} onChange={(v) => set(path, v, "f:" + path)} onDone={endGesture} /></Field>
   );
   return (
     <>

@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { Toasts, TopBar, VideoList } from "./components/Chrome.tsx";
 import { Inspector } from "./components/Inspector.tsx";
 import { MenuHost } from "./components/Menu.tsx";
@@ -94,8 +94,28 @@ function useShortcuts() {
 
 export function App() {
   const ui = useStore((s) => s.ui), panel = useStore((s) => s.panel), fatal = useStore((s) => s.fatal);
+  const workspace = useRef<HTMLDivElement>(null);
+  const [size, setSize] = useState({ w: innerWidth, h: innerHeight - 48 });
+  const [transportH, setTransportH] = useState(44);
   useShortcuts();
   useEffect(() => { init(); }, []);
+  useLayoutEffect(() => {
+    if (!workspace.current) return;
+    const observer = new ResizeObserver((entries) => {
+      for (const entry of entries) {
+        if (entry.target === workspace.current) setSize({ w: entry.contentRect.width, h: entry.contentRect.height });
+        else setTransportH(entry.borderBoxSize[0]?.blockSize ?? entry.target.getBoundingClientRect().height);
+      }
+    });
+    observer.observe(workspace.current);
+    const transport = workspace.current.querySelector(".transport");
+    if (transport) observer.observe(transport);
+    return () => observer.disconnect();
+  }, []);
+  const overlay = size.w <= 1000;
+  useEffect(() => {
+    if (overlay && !ui.hideL && !ui.hideR) setUI({ hideL: true });
+  }, [overlay, ui.hideL, ui.hideR]);
   if (fatal) {
     return (
       <div className="grid h-full place-items-center p-8 text-center">
@@ -103,29 +123,35 @@ export function App() {
       </div>
     );
   }
-  const w0 = { left: ui.leftW, right: ui.rightW, tl: ui.tlH };
+  // Keep a useful canvas when stored pane sizes meet a smaller window. The
+  // preferred widths survive; narrow windows open one pane over the canvas.
+  const rightW = Math.min(ui.rightW, overlay ? size.w - 24 : Math.max(280, size.w - 382 - (ui.hideL ? 0 : 190)));
+  const leftW = Math.min(ui.leftW, overlay ? size.w - 24 : Math.max(190, size.w - 382 - (ui.hideR ? 0 : rightW)));
+  const tlH = Math.min(ui.tlH, size.h * 0.72, Math.max(80, size.h - transportH - 97));
+  const w0 = { left: leftW, right: rightW, tl: tlH };
   return (
     <div className="flex h-full flex-col">
       <TopBar />
-      <div className="flex min-h-0 flex-1">
+      <div ref={workspace} className="relative flex min-h-0 min-w-0 flex-1">
+        {overlay && (!ui.hideL || !ui.hideR) && <button aria-label="Close side pane" className="absolute inset-0 z-30 bg-black/40" onClick={() => setUI({ hideL: true, hideR: true })} />}
         {!ui.hideL && (
           <>
-            <div style={{ width: ui.leftW }} className="min-h-0 shrink-0"><VideoList /></div>
-            <Divider axis="x" onReset={() => setUI({ leftW: 248 })}
-              onDrag={(d) => { const w = w0.left + d; if (w < 140) setUI({ hideL: true, leftW: 248 }); else setUI({ leftW: Math.round(clamp(w, 190, 460)) }); }} />
+            <aside aria-label="Videos" style={{ width: leftW }} className={`min-h-0 min-w-0 shrink-0 ${overlay ? "absolute inset-y-0 left-0 z-30 border-r border-line shadow-xl" : ""}`}><VideoList /></aside>
+            {!overlay && <Divider axis="x" onReset={() => setUI({ leftW: 248 })}
+              onDrag={(d) => { const w = w0.left + d; if (w < 140) setUI({ hideL: true, leftW: 248 }); else setUI({ leftW: Math.round(clamp(w, 190, 460)) }); }} />}
           </>
         )}
-        <main className="flex min-w-0 flex-1 flex-col">
+        <main className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
           <Stage />
           <Transport />
           <Divider axis="y" onReset={() => setUI({ tlH: 260 })} onDrag={(d) => setUI({ tlH: Math.round(clamp(w0.tl - d, 120, innerHeight * 0.72)) })} />
-          <div style={{ height: ui.tlH }} className="min-h-0 shrink-0"><Timeline /></div>
+          <div style={{ height: tlH }} className="min-h-0 shrink-0"><Timeline /></div>
         </main>
         {!ui.hideR && (
           <>
-            <Divider axis="x" onReset={() => setUI({ rightW: 340 })}
-              onDrag={(d) => { const w = w0.right - d; if (w < 200) setUI({ hideR: true, rightW: 340 }); else setUI({ rightW: Math.round(clamp(w, 280, 560)) }); }} />
-            <div style={{ width: ui.rightW }} className="min-h-0 shrink-0"><Inspector /></div>
+            {!overlay && <Divider axis="x" onReset={() => setUI({ rightW: 340 })}
+              onDrag={(d) => { const w = w0.right - d; if (w < 200) setUI({ hideR: true, rightW: 340 }); else setUI({ rightW: Math.round(clamp(w, 280, 560)) }); }} />}
+            <aside aria-label="Inspector" style={{ width: rightW }} className={`min-h-0 min-w-0 shrink-0 ${overlay ? "absolute inset-y-0 right-0 z-30 border-l border-line shadow-xl" : ""}`}><Inspector /></aside>
           </>
         )}
       </div>

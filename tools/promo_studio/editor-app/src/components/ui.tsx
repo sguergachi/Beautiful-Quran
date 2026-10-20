@@ -15,14 +15,14 @@ export function Button({ variant = "default", size = "md", className = "", activ
   return (
     <button
       {...rest}
-      className={`inline-flex items-center gap-1.5 whitespace-nowrap rounded-md border transition-colors disabled:pointer-events-none disabled:opacity-40 ${sz} ${VARIANT[variant]} ${active ? "!border-gold/60 !text-gold" : ""} ${className}`}
+      className={`inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-md border transition-colors disabled:pointer-events-none disabled:opacity-40 ${sz} ${VARIANT[variant]} ${active ? "!border-gold/60 !text-gold" : ""} ${className}`}
     />
   );
 }
 
 export function Segmented<T extends string>({ value, options, onChange, size = "md" }: { value: T; options: [T, ReactNode][]; onChange: (v: T) => void; size?: "sm" | "md" }) {
   return (
-    <div className="inline-flex rounded-md border border-line bg-panel p-0.5">
+    <div className="inline-flex max-w-full flex-wrap rounded-md border border-line bg-panel p-0.5">
       {options.map(([v, label]) => (
         <button key={v} onClick={() => onChange(v)}
           className={`${size === "sm" ? "h-6 px-2 text-xs" : "h-7 px-2.5"} rounded-[5px] transition-colors ${v === value ? "bg-raised text-ink shadow-sm" : "text-mute hover:text-ink"}`}>
@@ -35,15 +35,15 @@ export function Segmented<T extends string>({ value, options, onChange, size = "
 
 export function Field({ label, hint, children }: { label: ReactNode; hint?: ReactNode; children: ReactNode }) {
   return (
-    <label className="mb-2.5 grid grid-cols-[104px_1fr] items-center gap-2">
+    <label className="inspector-field mb-2.5 grid grid-cols-[104px_minmax(0,1fr)] items-center gap-2">
       <span className="text-mute">{label}</span>
       <div className="min-w-0">{children}</div>
-      {hint && <p className="col-span-2 -mt-1 text-[11.5px] leading-snug text-faint">{hint}</p>}
+      {hint && <p className="col-span-full -mt-1 text-[11.5px] leading-snug text-faint">{hint}</p>}
     </label>
   );
 }
 
-const inputCls = "h-8 w-full rounded-md border border-line bg-panel2 px-2 outline-none focus:border-gold/70";
+const inputCls = "h-8 min-w-0 max-w-full w-full rounded-md border border-line bg-panel2 px-2 outline-none focus:border-gold/70";
 export function Select({ value, options, onChange }: { value: string | number; options: [string | number, string][]; onChange: (v: string) => void }) {
   return (
     <select className={inputCls} value={String(value)} onChange={(e) => onChange(e.target.value)}>
@@ -73,12 +73,12 @@ export function TextInput({ value, onCommit, className = "", ...rest }: { value:
 
 // A slider with a typed value beside it. onChange fires while dragging
 // (the store folds a drag into one undo step); onDone ends the gesture.
-export function Slider({ value, min, max, step, onChange, onDone, digits = 2 }: { value: number; min: number; max: number; step: number; onChange: (v: number) => void; onDone?: () => void; digits?: number }) {
+export function Slider({ label, value, min, max, step, onChange, onDone, digits = 2 }: { label: string; value: number; min: number; max: number; step: number; onChange: (v: number) => void; onDone?: () => void; digits?: number }) {
   return (
-    <div className="flex items-center gap-2">
-      <input type="range" className="h-4 min-w-0 flex-1" min={min} max={max} step={step} value={value}
+    <div className="flex min-w-0 items-center gap-2">
+      <input type="range" aria-label={label} className="h-4 w-0 min-w-0 flex-1" min={min} max={max} step={step} value={value}
         onChange={(e) => onChange(+e.target.value)} onPointerUp={onDone} onKeyUp={onDone} />
-      <TextInput type="number" className="num !h-7 !w-[68px] !px-1.5 text-right" step={step} min={min} max={max}
+      <TextInput type="number" aria-label={`${label} value`} className="num !h-7 !w-[68px] shrink-0 !px-1.5 text-right" step={step} min={min} max={max}
         value={+value.toFixed(digits)} onCommit={(v) => { const n = parseFloat(v); if (Number.isFinite(n)) { onChange(n); onDone?.(); } }} />
     </div>
   );

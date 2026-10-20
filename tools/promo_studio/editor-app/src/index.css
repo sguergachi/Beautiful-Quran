@@ -36,6 +36,8 @@
 }
 
 @layer components {
+  .inspector { container: inspector / inline-size; }
+  .drawer { container: drawer / inline-size; }
   .num { font-variant-numeric: tabular-nums; }
   .key-diamond { width: 11px; height: 11px; margin: -5.5px 0 0 -5.5px; transform: rotate(45deg); border-radius: 2px; }
   .ph-head { clip-path: polygon(0 0, 100% 0, 100% 55%, 50% 100%, 0 55%); }
@@ -45,6 +47,23 @@
   .cur-row, .cur-row * { cursor: row-resize !important; }
   .cur-grab, .cur-grab * { cursor: grabbing !important; }
   .stripes { background: repeating-linear-gradient(45deg, #4a2e2e, #4a2e2e 6px, #3a2626 6px, #3a2626 12px); }
+}
+
+@container inspector (max-width: 310px) {
+  .inspector-field { grid-template-columns: minmax(0, 1fr); gap: 4px; }
+}
+@container drawer (max-width: 380px) {
+  .shortcuts { grid-template-columns: minmax(0, 1fr); row-gap: 4px; }
+  .shortcuts dd { margin-bottom: 8px; }
+}
+@media (max-width: 1200px) {
+  .studio-brand span, .studio-header-divider, .emulator-summary, .job-progress { display: none; }
+  .studio-title { max-width: 180px; }
+}
+@media (max-width: 600px) {
+  .studio-title { order: 1; flex-basis: 100%; max-width: none; margin-left: 0; }
+  .studio-aspects { display: none; } /* Also available under Look → Frame. */
+  .studio-header { gap: 6px; padding-inline: 8px; }
 }
 
 @keyframes pulse-soft { 50% { opacity: 0.45; } }

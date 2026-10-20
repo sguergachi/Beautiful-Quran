@@ -120,12 +120,12 @@ export function Stage() {
           className="absolute cursor-pointer rounded-sm outline outline-2 outline-gold" title="The exporter's own frame (with motion blur) · click to hide" />
       )}
       {spec && geo && !geo.clip && (
-        <div className="absolute bottom-6 left-1/2 flex -translate-x-1/2 items-center gap-3 rounded-lg border border-line bg-panel/95 px-4 py-2.5 shadow-xl">
+        <div className="absolute bottom-3 left-1/2 flex w-max max-w-[calc(100%-24px)] -translate-x-1/2 flex-wrap items-center justify-center gap-3 rounded-lg border border-line bg-panel/95 px-4 py-2.5 text-center shadow-xl">
           <span className="text-mute">This video has no take yet.</span>
           <Button variant="primary" size="sm" onClick={() => setUI({ tab: "recording", hideR: false })}>{Icon.rec} Record a take</Button>
         </div>
       )}
-      {!spec && <p className="text-faint">Pick a video on the left, or make a new one.</p>}
+      {!spec && <p className="px-3 text-center text-faint">Pick a video on the left, or make a new one.</p>}
     </div>
   );
 }

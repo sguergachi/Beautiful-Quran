@@ -35,18 +35,20 @@ export function Transport() {
   const { playing, loop } = usePlaying();
   const hasClip = useStore((s) => !!s.geo?.clip), hasSpec = useStore((s) => !!s.spec);
   return (
-    <div className="flex h-11 shrink-0 items-center gap-1.5 border-t border-line bg-panel px-3">
+    <div className="transport flex shrink-0 flex-wrap items-center gap-1.5 border-t border-line bg-panel px-3 py-1.5">
+      <div className="flex items-center gap-1.5">
       <Button size="icon" variant="primary" disabled={!hasSpec} onClick={() => clock.toggle()} title="Play / pause (Space)">{playing ? Icon.pause : Icon.play}</Button>
       <Button size="icon" variant="ghost" active={loop} onClick={() => clock.setLoop(!loop)} title="Loop (L)">{Icon.loop}</Button>
       <Timecode />
-      <div className="flex-1" />
-      <span className="mr-1 hidden text-[11px] uppercase tracking-wider text-faint xl:inline">Camera</span>
+      </div>
+      <div className="flex min-w-0 flex-1 flex-wrap items-center justify-end gap-1.5">
       <Button size="sm" disabled={!hasSpec} onClick={keyCamera} title="Key zoom and pan at the playhead (K)">{Icon.key} Key</Button>
       <Button size="sm" disabled={!hasSpec} onClick={() => preset("push")} title="Ease in on the active verse over 0.9 s">Push in</Button>
       <Button size="sm" disabled={!hasSpec} onClick={() => preset("pull")} title="Ease back to the whole phone over 0.9 s">Pull back</Button>
       <Button size="sm" disabled={!hasSpec} onClick={() => preset("punch")} title="Cut straight to a close-up">Punch in</Button>
       <div className="mx-1 h-5 w-px bg-line" />
       <Button size="sm" variant="ghost" disabled={!hasClip} onClick={showExact} title="Show the exporter's own frame, with motion blur">Exact frame</Button>
+      </div>
     </div>
   );
 }
