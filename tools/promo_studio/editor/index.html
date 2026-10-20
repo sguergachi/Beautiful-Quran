@@ -15,10 +15,24 @@
     <button id="redo" title="Redo (Ctrl+Shift+Z)" disabled>↷ Redo</button>
   </div>
   <div class="spacer"></div>
+  <button id="helpBtn" class="ghost" aria-expanded="false" aria-controls="shortcutHelp" title="Shortcuts (?)">? Shortcuts</button>
   <div id="emu" class="pill" title="Capture emulator">emulator …</div>
   <button id="emuBoot" class="ghost hidden">Boot emulator</button>
 </header>
 
+<section id="shortcutHelp" class="hidden" aria-label="Keyboard shortcuts">
+  <div class="row"><strong>Shortcuts</strong><div class="spacer"></div><button id="closeHelp" class="ghost">Close · Esc</button></div>
+  <dl>
+    <dt>Space</dt><dd>Play / pause</dd><dt>← / → · Shift</dt><dd>One frame · one second</dd>
+    <dt>Home / End</dt><dd>Start / end</dd><dt>S · Delete</dt><dd>Split · delete selection (undoable)</dd>
+    <dt>K · [ / ]</dt><dd>Key camera · previous / next key</dd><dt>Ctrl/⌘ C · V</dt><dd>Copy selected key · paste at playhead</dd>
+    <dt>Ctrl/⌘ Z · Shift Z</dt><dd>Undo · redo</dd><dt>Ctrl/⌘ S</dt><dd>Save now</dd>
+    <dt>Drag · scroll</dt><dd>Pan camera · zoom</dd><dt>Alt-drag · Alt-scroll</dt><dd>Move phone · scale phone</dd>
+    <dt>Shift-scroll</dt><dd>Rotate camera</dd><dt>Alt while dragging a key</dt><dd>Disable snapping</dd>
+    <dt>Double-click a lane</dt><dd>Add key</dd><dt>Ctrl-scroll timeline</dt><dd>Zoom around cursor</dd>
+  </dl>
+  <p class="note">Keys stay in video time when you cut the recording. Easing controls the move into a key. The live preview omits motion blur; Exact frame includes it. Sound gain, fades and normalisation are applied on export.</p>
+</section>
 <main>
   <aside id="left">
     <div class="side-head">
@@ -39,6 +53,7 @@
     <div id="stageWrap">
       <canvas id="stage" title="Drag: pan · scroll: zoom · shift-scroll: rotate · alt-drag / alt-scroll: move / scale the phone"></canvas>
       <img id="exact" class="hidden" alt="exact frame">
+      <div id="stageHint">Drag to pan · scroll to zoom · Alt moves the phone · ? for shortcuts</div>
       <div id="stageNote" class="hidden"></div>
     </div>
     <div id="transport">
@@ -52,9 +67,11 @@
       <button id="exactBtn" class="ghost" title="Show the compositor's exact frame (with motion blur)">Exact frame</button>
     </div>
     <div id="timeline">
+      <div id="tlResize" title="Drag to resize the timeline · double-click to reset"></div>
       <div id="tlbar">
         <button id="split" title="Split the recording at the playhead (S)">✂ Split</button>
         <button id="delSel" class="danger" title="Delete the selected key or piece (Del)">Delete</button>
+        <span id="selection" aria-live="polite">No selection</span>
         <span class="sep"></span>
         <button id="prevKey" title="Previous key ([)">◂◆</button>
         <button id="nextKey" title="Next key (])">◆▸</button>
@@ -65,7 +82,7 @@
       <div id="tlscroll"><div id="tlinner"></div></div>
     </div>
     <div id="actions">
-      <span id="saveState">—</span>
+      <button id="saveState" class="ghost" title="Save now / retry (Ctrl+S)" aria-live="polite">—</button>
       <div class="spacer"></div>
       <button id="recordBtn" title="Record this take on the emulator (picture + the emulator's own audio)">Record take</button>
       <button id="rerecordBtn" class="ghost" title="Record again even if a take exists">Re-record</button>

@@ -11,6 +11,8 @@ video) or `color:#RRGGBB`.
 """
 import json
 import os
+import re
+import threading
 import subprocess
 import urllib.request
 
@@ -63,13 +65,26 @@ def plate_geometry(bg, out_w, out_h):
     return pw, ph, k
 
 
+_PLATE_LOCK = threading.Lock()
+
+
 def plate(bg, out_w, out_h, fps=30):
+    """Build a plate once; HTTP preview requests may arrive concurrently."""
+    with _PLATE_LOCK:
+        return _plate(bg, out_w, out_h, fps)
+
+
+def _plate(bg, out_w, out_h, fps=30):
     """Path to a seamless, blurred, graded plate for this background look."""
     pw, ph, k = plate_geometry(bg, out_w, out_h)
+    identity = None
+    if bg["id"].startswith("file:"):
+        stat = os.stat(bg["id"][5:])
+        identity = [stat.st_mtime_ns, stat.st_size]
     key = digest({"id": bg["id"], "blur": bg["blur"], "brightness": bg["brightness"],
-                  "saturation": bg["saturation"], "speed": bg["speed"], "w": pw, "h": ph, "fps": fps, "v": 2})
+                  "saturation": bg["saturation"], "speed": bg["speed"], "w": pw, "h": ph, "fps": fps, "v": 2, **({"file": identity} if identity else {})})
     os.makedirs(PLATES, exist_ok=True)
-    out = os.path.join(PLATES, f"{bg['id'].replace('/', '_').replace(':', '_')}-{key}.mp4")
+    out = os.path.join(PLATES, f"{re.sub(r'[^A-Za-z0-9._-]', '_', bg['id'])[:80]}-{key}.mp4")
     if os.path.exists(out):
         return out
     sigma = bg["blur"] * k
@@ -81,13 +96,13 @@ def plate(bg, out_w, out_h, fps=30):
     if bg["id"].startswith("color:"):
         color = bg["id"][6:]
         cmd = ["ffmpeg", "-v", "error", "-y", "-f", "lavfi", "-i", f"color=c={color}:s={pw}x{ph}:r={fps}:d=1",
-               "-c:v", "libx264", "-crf", "12", "-pix_fmt", "yuv420p", out]
+               "-c:v", "libx264", "-crf", "12", "-pix_fmt", "yuv420p", out + ".part.mp4"]
     else:
         src = source(bg["id"])
         if src.lower().endswith(IMAGE_EXT):
             cmd = ["ffmpeg", "-v", "error", "-y", "-loop", "1", "-i", src, "-t", "1", "-r", str(fps),
                    "-vf", f"{cover},{blur},crop={pw}:{ph}:{pad}:{pad},{grade},format=yuv420p",
-                   "-c:v", "libx264", "-crf", "12", out]
+                   "-c:v", "libx264", "-crf", "12", out + ".part.mp4"]
         else:
             start = float(catalog().get(bg["id"], {}).get("start", 0))
             _, _, dur = probe(src)
@@ -102,4 +117,5 @@ def plate(bg, out_w, out_h, fps=30):
             os.replace(out + ".part.mp4", out)
             return out
     subprocess.run(cmd, check=True)
+    os.replace(out + ".part.mp4", out)
     return out

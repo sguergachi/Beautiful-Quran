@@ -11,6 +11,7 @@ const api = async (path, opts = {}) => {
   if (!r.ok || j.error) throw new Error(j.error || r.statusText);
   return j;
 };
+const escapeHTML = (v) => String(v).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
 const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
 const clone = (o) => JSON.parse(JSON.stringify(o));
 const r3 = (v) => Math.round(v * 1000) / 1000;
@@ -19,6 +20,7 @@ const el = (tag, cls, html) => { const e = document.createElement(tag); if (cls)
 const st = {
   meta: null, specs: [], name: null, raw: null, spec: null, geo: null, plate: null, tl: null,
   t: 0, playing: false, sel: null, pps: 60, collapsed: {}, undo: [], redo: [], coalesce: null,
+  session: 0, saved: null, saveChain: Promise.resolve(), openSeq: 0, geoSeq: 0, plateSeq: 0, clipboard: null,
   saveTimer: null, plateTimer: null, lastTakeKey: "", lastLook: "", wall0: 0, t0: 0,
 };
 const els = {
@@ -45,7 +47,7 @@ function resolve(raw) {
   const tr = {};
   for (const [k, v] of Object.entries(s.tracks || {})) if (v && v.length) tr[k] = [...v].sort((a, b) => a.t - b.t);
   s.tracks = tr;
-  s.duration = s.edit.reduce((a, p) => a + (p.out - p.in), 0);
+  s.duration = Math.round(s.edit.reduce((a, p) => a + (p.out - p.in), 0) * 1e6) / 1e6;
   return s;
 }
 const takeKey = (s) => [s.app.reciter, s.app.surah, s.app.ayah, s.app.theme, s.app.layout, s.app.view, s.app.text_size].join("|");
@@ -90,6 +92,7 @@ function valueAt(name, t, s = st.spec) {
 }
 function stateAt(t) { const o = {}; for (const k in st.meta.props) o[k] = valueAt(k, t); return o; }
 function sourceTime(t, s = st.spec) {
+  t = Math.max(0, t);
   let acc = 0;
   for (let i = 0; i < s.edit.length; i++) {
     const p = s.edit[i], n = p.out - p.in;
@@ -109,6 +112,7 @@ function videoTimes(a0, a1, s = st.spec) {
   }
   return out;
 }
+const MIN_PIECE = 0.05;
 const frameT = () => 1 / (st.spec.fps || 60);
 
 // ------------------------------------------------------------------ geometry (mirrors compose.Renderer)
@@ -156,6 +160,25 @@ function roundRect(ctx, x, y, w, h, r) {
   ctx.beginPath(); ctx.moveTo(x + r, y); ctx.arcTo(x + w, y, x + w, y + h, r); ctx.arcTo(x + w, y + h, x, y + h, r);
   ctx.arcTo(x, y + h, x, y, r); ctx.arcTo(x, y, x + w, y, r); ctx.closePath();
 }
+const bgCanvas = document.createElement("canvas");
+const bgCtx = bgCanvas.getContext("2d");
+const tileCanvas = document.createElement("canvas"), tileCtx = tileCanvas.getContext("2d");
+let bgCacheKey = "";
+const vigCanvas = document.createElement("canvas");
+let vigKey = "";
+function vignette(W, H, strength) {
+  const key = [W, H, strength].join("|");
+  if (key !== vigKey) {
+    vigKey = key; vigCanvas.width = W; vigCanvas.height = H;
+    const ctx = vigCanvas.getContext("2d"), img = ctx.createImageData(W, H);
+    for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+      const r2 = Math.min(1, ((2 * x / W - 1) ** 2 + (2 * y / H - 1) ** 2) / 2);
+      img.data[(y * W + x) * 4 + 3] = Math.round(255 * strength * r2);
+    }
+    ctx.putImageData(img, 0, 0);
+  }
+  return vigCanvas;
+}
 function draw() {
   const ctx = els.ctx;
   if (!st.geo || !st.spec) return;
@@ -167,22 +190,38 @@ function draw() {
   ctx.fillStyle = st.meta.themes[s.app.theme].bg; ctx.fillRect(0, 0, els.stage.width, els.stage.height);
   // background: the plate holds the least blur; the rest is added here, as the exporter does
   if (st.plate && els.plate.readyState >= 2) {
-    ctx.save();
-    const extra = Math.sqrt(Math.max(0, S.bg_blur ** 2 - st.plate.blur ** 2));
-    if (extra > 0.3) ctx.filter = `blur(${extra * ps}px)`;
-    ctx.setTransform(ps, 0, 0, ps, 0, 0); ctx.transform(...bgMatrix(S));
-    ctx.drawImage(els.plate, -st.plate.w * 0.08, -st.plate.h * 0.08, st.plate.w * 1.16, st.plate.h * 1.16);
-    ctx.restore();
+    const { w, h, k } = st.plate;
+    const extra = Math.sqrt(Math.max(0, S.bg_blur ** 2 - st.plate.blur ** 2)) * k;
+    // Filter in plate space before applying the camera transform. Reflected
+    // tiles provide the same edge extension as BORDER_REFLECT in compose.py.
+    const matrix = bgMatrix(S), [a, b, c, d, e, f] = matrix, det = a * d - b * c;
+    const points = [[0, 0], [W, 0], [0, H], [W, H]].map(([x, y]) => [(d * (x - e) - c * (y - f)) / det, (-b * (x - e) + a * (y - f)) / det]);
+    const edge = Math.max(0, ...points.flatMap(([x, y]) => [-x, x - w, -y, y - h]));
+    const pad = Math.ceil(Math.max(w, h, edge + extra * 4) / 64) * 64;
+    const bw = w + 2 * pad, bh = h + 2 * pad;
+    if (bgCanvas.width !== bw || bgCanvas.height !== bh) { bgCanvas.width = bw; bgCanvas.height = bh; }
+    const cacheKey = [els.plate.src, els.plate.currentTime, extra.toFixed(3), bw, bh].join("|");
+    if (cacheKey !== bgCacheKey) {
+      bgCacheKey = cacheKey;
+      if (tileCanvas.width !== bw || tileCanvas.height !== bh) { tileCanvas.width = bw; tileCanvas.height = bh; }
+      for (let iy = -Math.ceil(pad / h); iy <= Math.ceil(pad / h); iy++) {
+        for (let ix = -Math.ceil(pad / w); ix <= Math.ceil(pad / w); ix++) {
+          tileCtx.save(); tileCtx.translate(pad + ix * w + (Math.abs(ix % 2) ? w : 0), pad + iy * h + (Math.abs(iy % 2) ? h : 0));
+          tileCtx.scale(Math.abs(ix % 2) ? -1 : 1, Math.abs(iy % 2) ? -1 : 1); tileCtx.drawImage(els.plate, 0, 0, w, h); tileCtx.restore();
+        }
+      }
+      bgCtx.clearRect(0, 0, bw, bh);
+      bgCtx.filter = extra > 0.3 ? `blur(${extra}px)` : "none";
+      bgCtx.drawImage(tileCanvas, 0, 0);
+    }
+    ctx.save(); ctx.setTransform(ps, 0, 0, ps, 0, 0); ctx.transform(...matrix);
+    ctx.drawImage(bgCanvas, -pad, -pad); ctx.restore();
   }
   ctx.setTransform(ps, 0, 0, ps, 0, 0);
   const b = S.bg_brightness;
   if (b) { ctx.globalAlpha = Math.min(1, Math.abs(b)); ctx.fillStyle = b > 0 ? "#fff" : "#000"; ctx.fillRect(0, 0, W, H); ctx.globalAlpha = 1; }
   const vg = +s.background.vignette;
-  if (vg > 0) {
-    const grad = ctx.createRadialGradient(W / 2, H / 2, 0, W / 2, H / 2, Math.hypot(W, H) / 2);
-    grad.addColorStop(0, "rgba(0,0,0,0)"); grad.addColorStop(1, `rgba(0,0,0,${vg})`);
-    ctx.fillStyle = grad; ctx.fillRect(0, 0, W, H);
-  }
+  if (vg > 0) ctx.drawImage(vignette(els.stage.width, els.stage.height, vg), 0, 0, W, H);
   const m = phoneMatrix(S);
   const shd = +s.phone.shadow;
   if (shd > 0) {
@@ -210,7 +249,7 @@ function draw() {
 function sizeStage() {
   if (!st.geo) return;
   const wrapEl = $("#stageWrap"), { W, H } = st.geo;
-  const k = Math.max(0.05, Math.min((wrapEl.clientWidth - 20) / W, (wrapEl.clientHeight - 26) / H));
+  const k = Math.max(0.05, Math.min((wrapEl.clientWidth - 20) / W, (wrapEl.clientHeight - 50) / H));
   const dpr = window.devicePixelRatio || 1;
   els.stage.style.width = W * k + "px"; els.stage.style.height = H * k + "px";
   els.stage.width = Math.round(W * k * dpr); els.stage.height = Math.round(H * k * dpr);
@@ -222,14 +261,17 @@ function sizeStage() {
 
 function plateTime(t) { const d = els.plate.duration || 1; return ((+(st.spec.background.offset || 0) + t) % d + d) % d; }
 function syncMedia(force) {
-  const [src] = sourceTime(st.t);
+  if (!st.spec) return;
+  const [src, piece] = sourceTime(Math.min(st.t, Math.max(0, st.spec.duration - frameT())));
+  force = force || syncMedia.piece !== piece; syncMedia.piece = piece;
   const tol = force ? 0.001 : 0.07;
   if (st.geo && st.geo.clip && Math.abs(els.screen.currentTime - src) > tol) els.screen.currentTime = src;
   if (st.geo && st.geo.audio && Math.abs(els.audio.currentTime - src) > (force ? 0.001 : 0.09)) els.audio.currentTime = src;
-  if (st.plate && force) els.plate.currentTime = plateTime(st.t);
+  if (st.plate && (force || Math.abs(els.plate.currentTime - plateTime(st.t)) > 0.09)) els.plate.currentTime = plateTime(st.t);
 }
-function seek(t) { st.t = clamp(t, 0, st.spec.duration); hideExact(); syncMedia(true); draw(); }
+function seek(t) { if (!st.spec) return; st.t = clamp(t, 0, st.spec.duration); st.wall0 = performance.now(); st.t0 = st.t; st.coalesce = null; hideExact(); syncMedia(true); draw(); }
 function play() {
+  if (!st.spec || !st.geo) return;
   if (st.playing) return pause();
   if (st.t >= st.spec.duration - 0.05) st.t = 0;
   st.playing = true; $("#play").textContent = "❚❚"; hideExact();
@@ -254,11 +296,14 @@ function tick() {
 
 function hideExact() { els.exact.classList.add("hidden"); }
 async function showExact() {
-  if (!st.geo.clip) return note("record a take first");
-  pause(); $("#exactBtn").disabled = true;
+  if (!st.geo?.clip) return note("record a take first");
+  pause();
+  if (!await save()) return;
+  const session = st.session, at = st.t, body = snapshot();
+  $("#exactBtn").disabled = true;
   try {
     await new Promise((res, rej) => { els.exact.onload = res; els.exact.onerror = rej; els.exact.src = `/api/still/${st.name}?t=${st.t.toFixed(3)}&scale=0.5&_=${Date.now()}`; });
-    els.exact.classList.remove("hidden");
+    if (session === st.session && at === st.t && body === snapshot()) els.exact.classList.remove("hidden");
   } catch { note("exact frame failed (see the terminal)"); }
   $("#exactBtn").disabled = false;
 }
@@ -273,20 +318,25 @@ function snapshot() { return JSON.stringify(st.raw); }
 // Run a change as one undo step. Changes with the same `coalesce` key in quick
 // succession (a slider drag, a scroll-zoom) fold into a single step.
 function mutate(fn, coalesce = null) {
-  const now = performance.now();
-  const join = coalesce && st.coalesce && st.coalesce.key === coalesce && now - st.coalesce.at < 900;
-  if (!join) { st.undo.push(snapshot()); if (st.undo.length > 200) st.undo.shift(); st.redo = []; }
-  st.coalesce = coalesce ? { key: coalesce, at: now } : null;
+  if (!st.raw) return;
+  if (st.playing) pause(); hideExact();
+  const before = snapshot(), now = performance.now();
   fn();
+  if (snapshot() === before) return;
+  const join = coalesce && st.coalesce && st.coalesce.key === coalesce && (coalesce.startsWith("drag-") || now - st.coalesce.at < 900);
+  if (!join) { st.undo.push(before); if (st.undo.length > 200) st.undo.shift(); st.redo = []; }
+  st.coalesce = coalesce ? { key: coalesce, at: now } : null;
   changed();
 }
 function undo() {
   if (!st.undo.length) return;
+  pause();
   st.redo.push(snapshot()); st.raw = JSON.parse(st.undo.pop()); st.coalesce = null; st.sel = null;
   changed(); buildPanes();
 }
 function redo() {
   if (!st.redo.length) return;
+  pause();
   st.undo.push(snapshot()); st.raw = JSON.parse(st.redo.pop()); st.coalesce = null; st.sel = null;
   changed(); buildPanes();
 }
@@ -303,6 +353,7 @@ const animated = (name) => !!((st.raw.tracks || {})[name] || []).length;
 // Set a property at the playhead: a key there when it is animated, else its static value.
 function setProp(name, v, coalesce) {
   const p = st.meta.props[name];
+  if (!Number.isFinite(+v)) return;
   v = r3(clamp(+v, p.min, p.max));
   mutate(() => {
     if (animated(name)) {
@@ -346,22 +397,24 @@ function selKey() {
   return i >= 0 ? { keys, i, k: keys[i] } : null;
 }
 function preset(kind) {
+  if (!st.spec) return;
   const t = st.t, d = 0.9, cam = ["zoom", "pan_x", "pan_y"];
   mutate(() => {
     keyAll(cam, t);
     if (kind === "push" || kind === "punch") {
       const z = fitZoom(t), [px, py] = screenPointWorld(0.5, 0.32, t);
-      const at = kind === "push" ? t + d : t + frameT();
+      const at = Math.min(st.spec.duration, kind === "push" ? t + d : t + frameT());
       keyAll(cam, at, { zoom: z, pan_x: px, pan_y: py }, kind === "push" ? "inOutCubic" : "hold");
     } else {
       const [px, py] = screenPointWorld(0.5, 0.5, t);
-      keyAll(cam, t + d, { zoom: 1, pan_x: px, pan_y: py }, "inOutCubic");
+      keyAll(cam, Math.min(st.spec.duration, t + d), { zoom: 1, pan_x: px, pan_y: py }, "inOutCubic");
     }
   });
   buildPanes();
 }
 function deleteSelection() {
   if (!st.sel) return;
+  pause();
   if (st.sel.type === "key") {
     const sk = selKey(); if (!sk) return;
     mutate(() => {
@@ -370,12 +423,13 @@ function deleteSelection() {
       st.sel = null;
     });
   } else if (st.sel.type === "piece") {
-    if (st.raw.edit.length <= 1) return note("the video needs at least one piece");
+    if (st.spec.edit.length <= 1) return note("the video needs at least one piece");
     mutate(() => { st.raw.edit.splice(st.sel.i, 1); st.sel = null; });
   }
   buildPanes();
 }
 function jumpKey(dir) {
+  if (!st.spec) return;
   const names = st.sel && st.sel.type === "key" ? [st.sel.prop] : Object.keys(st.meta.props);
   const ts = [...new Set(names.flatMap((n) => (st.spec.tracks[n] || []).map((k) => k.t)))].sort((a, b) => a - b);
   const next = dir > 0 ? ts.find((x) => x > st.t + 1e-3) : [...ts].reverse().find((x) => x < st.t - 1e-3);
@@ -385,14 +439,17 @@ function jumpKey(dir) {
 // ------------------------------------------------------------------ edit (the recording)
 
 function splitAt(t = st.t) {
+  if (!st.spec) return;
   const [src, i] = sourceTime(t);
   const p = st.raw.edit[i];
-  if (!p || src - p.in < 0.05 || p.out - src < 0.05) return note("move the playhead inside a piece to split it");
+  if (!p || src - p.in < MIN_PIECE || p.out - src < MIN_PIECE) return note("move the playhead inside a piece to split it");
   mutate(() => { st.raw.edit.splice(i, 1, { in: p.in, out: r3(src) }, { in: r3(src), out: p.out }); st.sel = { type: "piece", i: i + 1 }; });
   buildPanes();
 }
 function resetEdit() {
-  const len = st.tl && st.tl.take ? st.tl.take : st.spec.duration;
+  if (!st.spec) return;
+  if (st.spec.edit.length > 1 && !confirm("Replace all cuts with the whole take? You can undo this.")) return;
+  const len = st.tl && st.tl.take ? st.tl.take : Math.max(...st.spec.edit.map((p) => p.out));
   mutate(() => { st.raw.edit = [{ in: 0, out: r3(len) }]; st.sel = null; });
   buildPanes();
 }
@@ -409,16 +466,23 @@ function row(cls, labelHTML) {
   return { r, lab, lane };
 }
 function snapT(t, exclude) {
-  const cands = [st.t, 0, st.spec.duration];
-  for (const n in st.spec.tracks) for (const k of st.spec.tracks[n]) if (k !== exclude) cands.push(k.t);
+  const cands = [0, st.spec.duration];
+  if (!exclude) cands.push(st.t);
+  for (const n in st.spec.tracks) for (const k of st.spec.tracks[n]) if (!exclude || n !== exclude.prop || Math.abs(k.t - exclude.t) > 1e-6) cands.push(k.t);
   for (let i = 1; i < st.spec.edit.length; i++) cands.push(pieceStart(i));
   if (st.tl) for (const v of st.tl.verses) for (const [a] of videoTimes(v.t0, v.t1)) cands.push(a);
   let best = t, bd = 6 / st.pps;
   for (const c of cands) if (Math.abs(c - t) < bd) { bd = Math.abs(c - t); best = c; }
   return best;
 }
+let timelineFrame = null;
+function scheduleTimeline() {
+  if (timelineFrame == null) timelineFrame = requestAnimationFrame(() => { timelineFrame = null; buildTimeline(); });
+}
 function buildTimeline() {
   if (!st.spec) return;
+  $("#delSel").disabled = !st.sel;
+  $("#selection").textContent = st.sel?.type === "key" ? `${st.meta.props[st.sel.prop].label} · ${st.sel.t.toFixed(2)}s` : st.sel?.type === "piece" ? `Piece ${st.sel.i + 1}` : "No selection";
   const sl = els.scroll.scrollLeft, stp = els.scroll.scrollTop;
   els.inner.innerHTML = "";
   els.inner.style.width = LABEL_W + laneWidth() + "px";
@@ -486,7 +550,8 @@ function buildTimeline() {
       for (const k of keys) addDiamond(lr.lane, n, k);
       lr.lane.addEventListener("mousedown", (e) => { if (e.target === lr.lane || e.target.closest(".curve")) scrubFrom(e); });
       lr.lane.addEventListener("dblclick", (e) => {
-        const t = snapT((e.clientX - lr.lane.getBoundingClientRect().left) / st.pps);
+        if (e.target.closest(".key")) return;
+        const t = clamp(e.altKey ? (e.clientX - lr.lane.getBoundingClientRect().left) / st.pps : snapT((e.clientX - lr.lane.getBoundingClientRect().left) / st.pps), 0, dur);
         mutate(() => { keyAll([n], t); st.sel = { type: "key", prop: n, t: r3(t) }; }); seek(t); buildPanes();
       });
     }
@@ -501,7 +566,7 @@ function drawCurve(lane, n) {
   const vs = keys.map((k) => +k.v), lo = Math.min(...vs), hi = Math.max(...vs);
   if (hi - lo < 1e-9) return;
   let d = "";
-  for (let x = 0; x <= w; x += 3) {
+  for (let x = 0; x <= w; x += Math.max(3, w / 1500)) {
     const v = valueAt(n, x / st.pps), y = h - 4 - ((v - lo) / (hi - lo)) * (h - 8);
     d += (x ? "L" : "M") + x.toFixed(1) + " " + y.toFixed(1);
   }
@@ -522,6 +587,7 @@ function addDiamond(lane, n, k) {
 function placePlayhead() {
   const ph = $("#playhead"); if (!ph || !st.spec) return;
   ph.style.left = LABEL_W + tx(st.t) + "px";
+  ph.style.visibility = tx(st.t) < els.scroll.scrollLeft ? "hidden" : "visible";
 }
 function followPlayhead(center) {
   const x = LABEL_W + tx(st.t), sc = els.scroll, vis = sc.clientWidth;
@@ -545,7 +611,7 @@ function refreshValues() {
 function fmt(n, v) { return Math.abs(v) >= 10 ? v.toFixed(1) : v.toFixed(2); }
 function scrubFrom(ev) {
   if (ev.button !== 0) return;
-  ev.preventDefault();
+  ev.preventDefault(); pause(); st.sel = null; scheduleTimeline(); buildPanes();
   const lane = $(".tl-lane", els.inner);
   const at = (e) => seek((e.clientX - lane.getBoundingClientRect().left) / st.pps);
   at(ev);
@@ -553,7 +619,8 @@ function scrubFrom(ev) {
   addEventListener("mousemove", at); addEventListener("mouseup", up);
 }
 function dragKey(ev, n, k) {
-  ev.preventDefault(); ev.stopPropagation();
+  if (ev.button !== 0) return;
+  ev.preventDefault(); ev.stopPropagation(); pause(); hideExact(); st.coalesce = null;
   st.sel = { type: "key", prop: n, t: k.t };
   const keys = trackOf(n), i0 = keys.findIndex((x) => Math.abs(x.t - k.t) < 1e-6);
   if (i0 < 0) return;
@@ -564,37 +631,41 @@ function dragKey(ev, n, k) {
     if (!moved && Math.abs(e.clientX - x0) < 3) return;
     if (!moved) { st.undo.push(snapshot()); st.redo = []; moved = true; }
     let t = clamp(t0 + dt, 0, st.spec.duration);
-    if (!e.altKey) t = snapT(t, key);
-    key.t = r3(t); st.sel.t = key.t;
+    if (!e.altKey) t = snapT(t, { prop: n, t: key.t });
+    t = r3(clamp(t, 0, st.spec.duration));
+    if (keys.some((x) => x !== key && Math.abs(x.t - t) < frameT() / 2)) return;
+    key.t = t; st.sel.t = key.t;
     keys.sort((a, b) => a.t - b.t);
-    st.spec = resolve(st.raw); st.t = key.t; syncMedia(true); buildTimeline(); draw();
+    st.spec = resolve(st.raw); st.t = key.t; syncMedia(true); scheduleTimeline(); draw();
   };
   const up = () => {
     removeEventListener("mousemove", move); removeEventListener("mouseup", up);
-    if (moved) { st.coalesce = null; changed(); } else { seek(key.t); buildTimeline(); }
-    buildPanes();
+    if (moved) { st.coalesce = null; changed(); } else { seek(key.t); buildTimeline(); save(); }
+    buildPanes(); showTab("animate");
   };
   addEventListener("mousemove", move); addEventListener("mouseup", up);
 }
 function dragPiece(ev, i) {
-  ev.preventDefault(); ev.stopPropagation();
+  if (ev.button !== 0) return;
+  ev.preventDefault(); ev.stopPropagation(); pause(); hideExact(); st.coalesce = null;
   st.sel = { type: "piece", i };
   const p = st.raw.edit[i], mode = ev.target.classList.contains("l") ? "l" : ev.target.classList.contains("r") ? "r" : null;
-  if (!mode) { buildTimeline(); buildPanes(); showTab("recording"); return; }
+  if (!mode) { const lane = ev.currentTarget.parentElement; seek(clamp((ev.clientX - lane.getBoundingClientRect().left) / st.pps, pieceStart(i), pieceStart(i) + p.out - p.in)); buildTimeline(); buildPanes(); showTab("recording"); save(); return; }
+  const minLength = Math.min(MIN_PIECE, p.out - p.in);
   const x0 = ev.clientX, in0 = p.in, out0 = p.out, max = st.tl && st.tl.take ? st.tl.take : 1e9;
   let moved = false;
   const move = (e) => {
     const dt = (e.clientX - x0) / st.pps;
     if (!moved && Math.abs(e.clientX - x0) < 2) return;
     if (!moved) { st.undo.push(snapshot()); st.redo = []; moved = true; }
-    if (mode === "l") p.in = r3(clamp(in0 + dt, 0, p.out - 0.1));
-    else p.out = r3(clamp(out0 + dt, p.in + 0.1, max));
+    if (mode === "l") p.in = clamp(r3(in0 + dt), 0, p.out - minLength);
+    else p.out = clamp(r3(out0 + dt), p.in + minLength, Math.max(p.in + minLength, max));
     st.spec = resolve(st.raw);
     // show the frame at the edge being trimmed
     st.t = clamp(pieceStart(i) + (mode === "l" ? 0 : p.out - p.in - 1e-3), 0, st.spec.duration);
-    syncMedia(true); buildTimeline(); draw();
+    syncMedia(true); scheduleTimeline(); draw();
   };
-  const up = () => { removeEventListener("mousemove", move); removeEventListener("mouseup", up); if (moved) changed(); buildPanes(); };
+  const up = () => { removeEventListener("mousemove", move); removeEventListener("mouseup", up); if (moved) changed(); else save(); buildPanes(); };
   addEventListener("mousemove", move); addEventListener("mouseup", up);
 }
 
@@ -602,13 +673,15 @@ function dragPiece(ev, i) {
 
 function stageDrag(ev) {
   if (ev.button !== 0) return;
-  ev.preventDefault(); hideExact();
+  if (!st.geo || !st.spec) return;
+  ev.preventDefault(); pause(); hideExact(); st.coalesce = null;
   els.stage.classList.add("drag");
   const rect = els.stage.getBoundingClientRect(), outPerPx = st.geo.W / rect.width;
   const S0 = stateAt(st.t), x0 = ev.clientX, y0 = ev.clientY, phone = ev.altKey;
   const tag = (phone ? "drag-phone:" : "drag-cam:") + performance.now();
   const move = (e) => {
-    const dx = (e.clientX - x0) * outPerPx, dy = (e.clientY - y0) * outPerPx;
+    const sx = (e.clientX - x0) * outPerPx, sy = (e.clientY - y0) * outPerPx;
+    const [c, r] = rot(-S0.rotate), dx = c * sx - r * sy, dy = r * sx + c * sy;
     if (phone) {
       setProp("phone_x", S0.phone_x + dx / (S0.zoom * st.geo.W), tag);
       setProp("phone_y", S0.phone_y + dy / (S0.zoom * st.geo.H), tag);
@@ -618,11 +691,12 @@ function stageDrag(ev) {
       setProp("pan_y", S0.pan_y - dy / (S0.zoom * st.geo.H), tag);
     }
   };
-  const up = () => { els.stage.classList.remove("drag"); removeEventListener("mousemove", move); removeEventListener("mouseup", up); buildTimeline(); };
+  const up = () => { st.coalesce = null; els.stage.classList.remove("drag"); removeEventListener("mousemove", move); removeEventListener("mouseup", up); buildTimeline(); };
   addEventListener("mousemove", move); addEventListener("mouseup", up);
 }
 function stageWheel(ev) {
-  ev.preventDefault(); hideExact();
+  if (!st.geo || !st.spec) return;
+  ev.preventDefault(); pause(); hideExact();
   const S = stateAt(st.t), f = Math.exp(-ev.deltaY * 0.0015);
   if (ev.altKey) setProp("phone_scale", S.phone_scale * f, "wheel-phone");
   else if (ev.shiftKey) setProp("rotate", S.rotate + (ev.deltaY > 0 ? 0.5 : -0.5), "wheel-rot");
@@ -635,7 +709,7 @@ function stageWheel(ev) {
 function field(label, path, type, opts = {}) {
   const w = el("label", "field"); w.append(el("span", null, label));
   const cur = opts.get ? opts.get() : (getPath(st.raw, path) ?? getPath(st.spec, path));
-  const set = (v) => mutate(() => { if (opts.set) opts.set(v); else setPath(st.raw, path, v); }, opts.coalesce ? "f:" + path : null);
+  const set = (v) => { if (typeof v === "number" && !Number.isFinite(v)) return; mutate(() => { if (opts.set) opts.set(v); else setPath(st.raw, path, v); }, opts.coalesce ? "f:" + path : null); };
   let input;
   if (type === "select") {
     input = el("select");
@@ -673,7 +747,7 @@ function buildPanes() {
     const num = el("input"); Object.assign(num, { type: "number", min: d.min, max: d.max, step: d.step });
     rng.oninput = () => { num.value = rng.value; setProp(n, rng.value); };
     num.onchange = () => setProp(n, num.value, "num:" + n + performance.now());
-    rng.onchange = () => buildTimeline();
+    rng.onchange = () => { st.coalesce = null; buildTimeline(); };
     box.append(rng, num); r.append(kb, el("span", null, d.label), box); p.append(r);
   }
   p.append(noteEl("◆ adds or removes a key at the playhead. Once a property has a key, changing it (here or on the picture) keys it at the playhead; with none, it is one value for the whole video."));
@@ -682,7 +756,7 @@ function buildPanes() {
     const card = el("div", "card");
     const d = m.props[st.sel.prop];
     card.append(el("h3", null, `Key · ${d.label}`),
-      field("Time (s)", "", "number", { step: 0.01, get: () => sk.k.t, set: (v) => { sk.k.t = r3(clamp(v, 0, st.spec.duration)); st.sel.t = sk.k.t; sk.keys.sort((a, b) => a.t - b.t); }, after: () => seek(sk.k.t) }),
+      field("Time (s)", "", "number", { step: 0.01, get: () => sk.k.t, set: (v) => { const t = r3(clamp(v, 0, st.spec.duration)); if (sk.keys.some((k) => k !== sk.k && Math.abs(k.t - t) < frameT() / 2)) return note("there is already a key here"); sk.k.t = t; st.sel.t = sk.k.t; sk.keys.sort((a, b) => a.t - b.t); }, after: () => { seek(sk.k.t); buildPanes(); } }),
       field("Value", "", "number", { step: d.step, get: () => sk.k.v, set: (v) => { sk.k.v = r3(clamp(v, d.min, d.max)); } }),
       field("Ease into it", "", "select", { options: m.eases.map((e) => [e, e === "hold" ? "hold (cut)" : e]), get: () => sk.k.ease || "inOutCubic", set: (v) => { if (v === "inOutCubic") delete sk.k.ease; else sk.k.ease = v; } }));
     const row_ = el("div", "row");
@@ -713,8 +787,8 @@ function buildPanes() {
     const r = el("div", "pc" + (st.sel && st.sel.type === "piece" && st.sel.i === i ? " on" : ""));
     const a = el("input"); a.type = "number"; a.step = 0.01; a.value = pc.in;
     const b = el("input"); b.type = "number"; b.step = 0.01; b.value = pc.out;
-    a.onchange = () => mutate(() => { pc.in = r3(clamp(+a.value, 0, pc.out - 0.05)); });
-    b.onchange = () => mutate(() => { pc.out = r3(Math.max(pc.in + 0.05, +b.value)); });
+    a.onchange = () => { mutate(() => { pc.in = clamp(r3(+a.value), 0, pc.out - Math.min(MIN_PIECE, pc.out - pc.in)); }); buildPanes(); }
+    b.onchange = () => { mutate(() => { pc.out = Math.max(pc.in + Math.min(MIN_PIECE, pc.out - pc.in), r3(+b.value)); }); buildPanes(); }
     const x = el("button", "x danger", "✕"); x.title = "Delete this piece";
     x.onclick = () => { st.sel = { type: "piece", i }; deleteSelection(); };
     r.append(el("span", null, String(i + 1)), a, b, x); list.append(r);
@@ -766,51 +840,81 @@ function showTab(name) {
 function changed() {
   st.spec = resolve(st.raw);
   st.t = clamp(st.t, 0, st.spec.duration);
-  buildTimeline(); draw(); histButtons();
+  hideExact(); scheduleTimeline(); draw(); histButtons();
   $("#saveState").textContent = "editing…";
   clearTimeout(st.saveTimer); st.saveTimer = setTimeout(save, 450);
   if (plateLook(st.spec) !== st.lastLook) { clearTimeout(st.plateTimer); st.plateTimer = setTimeout(loadPlate, 400); }
 }
 async function save() {
-  try {
-    const r = await api(`/api/spec/${st.name}`, { method: "PUT", body: JSON.stringify(st.raw) });
-    $("#saveState").textContent = "saved";
-    const i = st.specs.findIndex((x) => x.name === st.name);
-    if (i >= 0) { st.specs[i] = r.status; renderList(); }
-    if (takeKey(st.spec) !== st.lastTakeKey || st.geo.frame.indexOf(st.spec.phone.color) < 0 || `${st.geo.W}x${st.geo.H}` !== st.meta.aspects[st.spec.aspect].join("x")) await loadGeometry();
-  } catch (e) { $("#saveState").textContent = "not saved: " + e.message; }
+  clearTimeout(st.saveTimer);
+  if (!st.raw) return true;
+  const name = st.name, body = snapshot(), session = st.session;
+  const task = st.saveChain.catch(() => {}).then(async () => {
+    if (session === st.session && st.saved === body) {   // e.g. undone back to what is on disk
+      if (body === snapshot()) $("#saveState").textContent = "saved";
+      return;
+    }
+    const r = await api(`/api/spec/${name}`, { method: "PUT", body });
+    const i = st.specs.findIndex((x) => x.name === name);
+    if (i >= 0) st.specs[i] = r.status;
+    if (session !== st.session) return;
+    st.saved = body;
+    $("#saveState").textContent = body === snapshot() ? "saved" : "editing…";
+    renderList(); updateActions();
+    if (body === snapshot() && (!st.geo || takeKey(st.spec) !== st.lastTakeKey || !st.geo.frame.includes(st.spec.phone.color) || `${st.geo.W}x${st.geo.H}` !== st.meta.aspects[st.spec.aspect].join("x"))) await loadGeometry();
+  });
+  st.saveChain = task;
+  try { await task; return true; }
+  catch (e) { if (session === st.session) $("#saveState").textContent = "not saved: " + e.message; return false; }
 }
 async function loadGeometry() {
-  st.geo = await api(`/api/geometry/${st.name}`);
-  st.lastTakeKey = takeKey(st.spec);
-  els.frame.src = st.geo.frame;
-  if (st.geo.clip) { if (!els.screen.src.endsWith(st.geo.clip)) { els.screen.src = st.geo.clip; els.audio.src = st.geo.audio; } }
-  else { els.screen.removeAttribute("src"); els.audio.removeAttribute("src"); els.screen.load(); }
-  st.tl = await api(`/api/timeline/${st.name}`).catch(() => null);
+  const name = st.name, session = st.session, seq = ++st.geoSeq, spec = st.spec;
+  const [geo, tl] = await Promise.all([api(`/api/geometry/${name}`), api(`/api/timeline/${name}`).catch(() => null)]);
+  if (session !== st.session || seq !== st.geoSeq || takeKey(spec) !== takeKey(st.spec) || spec.aspect !== st.spec.aspect || spec.phone.color !== st.spec.phone.color) return;
+  st.geo = geo; st.tl = tl; st.lastTakeKey = takeKey(spec);
+  els.frame.src = geo.frame;
+  if (geo.clip) { if (!els.screen.src.endsWith(geo.clip)) { els.screen.src = geo.clip; els.audio.src = geo.audio; } }
+  else { els.screen.removeAttribute("src"); els.audio.removeAttribute("src"); els.screen.load(); els.audio.load(); }
+  syncMedia.piece = null;
   sizeStage(); buildTimeline(); buildPanes(); updateActions(); seek(st.t);
 }
 async function loadPlate() {
-  st.lastLook = plateLook(st.spec);
+  if (!st.raw) return;
+  const look = plateLook(st.spec), session = st.session, seq = ++st.plateSeq;
   note("preparing background…", 1500);
   try {
-    st.plate = await api(`/api/plate/${st.name}`, { method: "POST", body: JSON.stringify(st.raw) });
-    els.plate.src = st.plate.url;
-    els.plate.onloadeddata = () => { els.plate.currentTime = plateTime(st.t); draw(); };
-  } catch (e) { note("background: " + e.message); }
+    const plate = await api(`/api/plate/${st.name}`, { method: "POST", body: snapshot() });
+    if (session !== st.session || seq !== st.plateSeq || look !== plateLook(st.spec)) return;
+    st.plate = plate; st.lastLook = look;
+    els.plate.onloadeddata = () => { if (session === st.session) { els.plate.currentTime = plateTime(st.t); draw(); } };
+    els.plate.src = plate.url;
+  } catch (e) { if (session === st.session) note("background: " + e.message); }
 }
 async function open(name) {
+  const seq = ++st.openSeq;
   pause();
-  st.name = name; st.sel = null; st.t = 0; st.undo = []; st.redo = []; st.coalesce = null;
-  const r = await api(`/api/spec/${name}`);
-  st.raw = r.raw; st.spec = resolve(st.raw);
-  localStorage.setItem("promo.last", name);
-  renderList(); histButtons();
-  await loadGeometry();
-  fitTimeline();
-  await loadPlate();
-  $("#saveState").textContent = "saved";
+  if (!await save()) return note("Save failed; staying on this video. Click the save status to retry.", 5000);
+  try {
+    const r = await api(`/api/spec/${name}`);
+    if (seq !== st.openSeq) return;
+    clearTimeout(st.saveTimer); clearTimeout(st.plateTimer);
+    st.session++; st.geoSeq++; st.plateSeq++;
+    $("#panes").inert = true;
+    st.name = name; st.sel = null; st.t = 0; st.undo = []; st.redo = []; st.coalesce = null;
+    st.raw = r.raw; st.spec = resolve(st.raw); st.raw.edit = clone(st.spec.edit);
+    st.saved = snapshot(); st.geo = null; st.plate = null; st.tl = null; st.lastLook = "";
+    localStorage.setItem("promo.last", name);
+    renderList(); histButtons();
+    await loadGeometry();
+    $("#panes").inert = false;
+    if (seq !== st.openSeq) return;
+    fitTimeline();
+    await loadPlate();
+    if (seq === st.openSeq) $("#saveState").textContent = st.saved === snapshot() ? "saved" : "editing…";
+  } catch (e) { $("#panes").inert = false; note("Could not open video: " + e.message, 5000); }
 }
 function fitTimeline() {
+  if (!st.spec) return;
   const w = els.scroll.clientWidth - LABEL_W - 50;
   st.pps = clamp(w / Math.max(1, st.spec.duration), 10, 400); $("#pps").value = st.pps; buildTimeline();
 }
@@ -818,19 +922,23 @@ function renderList() {
   const ul = $("#specList"); ul.innerHTML = "";
   for (const s of st.specs) {
     const li = el("li", s.name === st.name ? "on" : "");
-    if (s.error) li.innerHTML = `<div class="t">${s.name}</div><div class="s">⚠ ${s.error}</div>`;
+    if (s.error) li.innerHTML = `<div class="t">${escapeHTML(s.name)}</div><div class="s">⚠ ${escapeHTML(s.error)}</div>`;
     else {
       const rec = st.meta.reciters[s.app.reciter].split(" ").pop();
-      li.innerHTML = `<div class="t">${s.title || s.name}</div><div class="s"><span>${rec}</span><span>${s.app.surah}:${s.app.ayah}</span><span>${s.app.theme}</span><span>${s.aspect}</span><span>${(s.duration || 0).toFixed(1)}s</span></div>
+      li.innerHTML = `<div class="t">${escapeHTML(s.title || s.name)}</div><div class="s"><span>${rec}</span><span>${s.app.surah}:${s.app.ayah}</span><span>${s.app.theme}</span><span>${s.aspect}</span><span>${(s.duration || 0).toFixed(1)}s</span></div>
         <div class="s"><span><i class="dot ${s.take ? (s.take_short ? "short" : "ok") : ""}"></i>${s.take_short ? "take too short" : "take"}</span><span><i class="dot ${s.video ? "vid" : ""}"></i>video</span></div>`;
     }
     li.onclick = () => open(s.name);
+    li.tabIndex = 0; li.setAttribute("aria-current", String(s.name === st.name));
+    li.onkeydown = (e) => { if (e.key === "Enter") { e.preventDefault(); open(s.name); } };
     ul.appendChild(li);
   }
 }
 async function refreshList() { st.specs = await api("/api/specs"); renderList(); }
 function updateActions() {
   const have = !!(st.geo && st.geo.clip);
+  for (const id of ["play", "split", "keyCam", "presetPush", "presetPull", "presetPunch", "recordBtn", "rerecordBtn", "dupSpec", "delSpec"]) $("#" + id).disabled = !st.raw;
+  $("#exactBtn").disabled = !have;
   $("#recordBtn").classList.toggle("hidden", have);
   $("#rerecordBtn").classList.toggle("hidden", !have);
   $("#exportBtn").disabled = !have;
@@ -841,7 +949,7 @@ function updateActions() {
 // ------------------------------------------------------------------ jobs & emulator
 
 async function startJob(path, body = {}) {
-  try { await api(path, { method: "POST", body: JSON.stringify(body) }); pollJobs(); } catch (e) { note(e.message, 4000); }
+  try { if (!await save()) throw new Error("Save failed; job not started"); await api(path, { method: "POST", body: JSON.stringify(body) }); pollJobs(); } catch (e) { note(e.message, 4000); }
 }
 let jobsTimer = null;
 async function pollJobs() {
@@ -873,6 +981,27 @@ async function pollEmu() {
   setTimeout(pollEmu, 8000);
 }
 
+function copyKey() {
+  const sk = selKey();
+  if (!sk) return note("Select a key to copy");
+  st.clipboard = { prop: st.sel.prop, key: clone(sk.k) };
+  note(`Copied ${st.meta.props[st.sel.prop].label} key`);
+}
+function pasteKey() {
+  if (!st.clipboard || !st.raw) return;
+  const { prop, key } = st.clipboard, at = r3(st.t);
+  mutate(() => {
+    const keys = trackOf(prop), i = keyIndexAt(prop, at), k = { ...key, t: at };
+    if (i >= 0) keys[i] = k; else keys.push(k);
+    keys.sort((a, b) => a.t - b.t); st.sel = { type: "key", prop, t: at };
+  });
+  buildPanes(); showTab("animate");
+}
+function toggleHelp() {
+  const help = $("#shortcutHelp"); help.classList.toggle("hidden");
+  $("#helpBtn").setAttribute("aria-expanded", String(!help.classList.contains("hidden")));
+}
+
 // ------------------------------------------------------------------ wiring
 
 async function init() {
@@ -886,7 +1015,7 @@ async function init() {
 $("#play").onclick = play;
 $("#undo").onclick = undo;
 $("#redo").onclick = redo;
-$("#keyCam").onclick = () => { mutate(() => keyAll(["zoom", "pan_x", "pan_y"])); buildPanes(); };
+$("#keyCam").onclick = () => { if (!st.spec) return; mutate(() => keyAll(["zoom", "pan_x", "pan_y"])); buildPanes(); };
 $("#presetPush").onclick = () => preset("push");
 $("#presetPull").onclick = () => preset("pull");
 $("#presetPunch").onclick = () => preset("punch");
@@ -905,6 +1034,7 @@ els.scroll.addEventListener("wheel", (e) => {
   st.pps = clamp(st.pps * Math.exp(-e.deltaY * 0.002), 10, 400); $("#pps").value = st.pps;
   buildTimeline(); els.scroll.scrollLeft = Math.max(0, t * st.pps - (e.clientX - rect.left - LABEL_W));
 }, { passive: false });
+els.scroll.addEventListener("scroll", placePlayhead);
 els.stage.addEventListener("mousedown", stageDrag);
 els.stage.addEventListener("wheel", stageWheel, { passive: false });
 $$("#tabs button").forEach((b) => (b.onclick = () => showTab(b.dataset.tab)));
@@ -919,30 +1049,77 @@ $("#newSpec").onclick = async () => {
 };
 $("#dupSpec").onclick = async () => {
   if (!st.name) return; const n = prompt("Name for the copy:", st.name + "-2"); if (!n) return;
-  try { await api(`/api/copy/${st.name}/${n}`, { method: "POST" }); await refreshList(); await open(n); } catch (e) { note(e.message); }
+  try { if (!await save()) return; await api(`/api/copy/${st.name}/${n}`, { method: "POST" }); await refreshList(); await open(n); } catch (e) { note(e.message); }
 };
 $("#delSpec").onclick = async () => {
   if (!st.name || !confirm(`Delete the spec "${st.name}"? (Takes and exported videos stay on disk.)`)) return;
-  await api(`/api/spec/${st.name}`, { method: "DELETE" }); await refreshList(); if (st.specs[0]) open(st.specs[0].name);
+  pause();
+  if (!await save()) return;
+  try {
+    await api(`/api/spec/${st.name}`, { method: "DELETE" });
+    clearTimeout(st.saveTimer); clearTimeout(st.plateTimer); st.session++; st.openSeq++; st.geoSeq++; st.plateSeq++;
+    st.raw = st.spec = st.geo = st.plate = st.tl = st.sel = null; st.name = null; st.undo = []; st.redo = [];
+    await refreshList(); histButtons(); updateActions();
+    els.inner.innerHTML = ""; $$(".pane").forEach((p) => p.innerHTML = "");
+    els.ctx.clearRect(0, 0, els.stage.width, els.stage.height); $("#saveState").textContent = "—"; $("#time").textContent = "0.00 / 0.00";
+    if (st.specs[0]) await open(st.specs[0].name);
+  } catch (e) { note(e.message); }
 };
 addEventListener("resize", sizeStage);
+// The divider above the timeline trades picture for lanes; the height is remembered.
+function setTimelineHeight(h) {
+  if (h == null) { els.scroll.style.height = ""; localStorage.removeItem("promo.tlh"); }
+  else { h = clamp(h, 110, innerHeight * 0.7); els.scroll.style.height = h + "px"; localStorage.setItem("promo.tlh", h); }
+  sizeStage();
+}
+if (localStorage.getItem("promo.tlh")) els.scroll.style.height = localStorage.getItem("promo.tlh") + "px";
+$("#tlResize").addEventListener("mousedown", (ev) => {
+  if (ev.button !== 0) return;
+  ev.preventDefault();
+  const y0 = ev.clientY, h0 = els.scroll.getBoundingClientRect().height, bar = $("#tlResize");
+  bar.classList.add("on");
+  const move = (e) => setTimelineHeight(h0 + (y0 - e.clientY));
+  const up = () => { bar.classList.remove("on"); removeEventListener("mousemove", move); removeEventListener("mouseup", up); };
+  addEventListener("mousemove", move); addEventListener("mouseup", up);
+});
+$("#tlResize").addEventListener("dblclick", () => setTimelineHeight(null));
+$("#helpBtn").onclick = toggleHelp;
+$("#closeHelp").onclick = toggleHelp;
+$("#saveState").onclick = save;
+addEventListener("beforeunload", (e) => {
+  if (st.raw && snapshot() !== st.saved) { e.preventDefault(); e.returnValue = ""; }
+});
 addEventListener("keydown", (e) => {
-  const mod = e.ctrlKey || e.metaKey;
-  if (mod && (e.key === "z" || e.key === "Z")) { e.preventDefault(); return e.shiftKey ? redo() : undo(); }
-  if (mod && (e.key === "y" || e.key === "Y")) { e.preventDefault(); return redo(); }
-  if (e.target.closest("input, textarea, select")) return;
-  if (e.code === "Space") { e.preventDefault(); play(); }
-  else if (e.key === "k" || e.key === "K") { mutate(() => keyAll(["zoom", "pan_x", "pan_y"])); buildPanes(); }
-  else if (e.key === "s" || e.key === "S") splitAt();
-  else if (e.key === "Delete" || e.key === "Backspace") deleteSelection();
+  if (e.key === "Escape") {
+    $("#shortcutHelp").classList.add("hidden"); $("#helpBtn").setAttribute("aria-expanded", "false");
+    st.sel = null; buildTimeline(); buildPanes(); return;
+  }
+  // Text fields keep their own keys (typing, caret undo); sliders, dropdowns
+  // and checkboxes don't, so app shortcuts like Ctrl+Z still work after a drag.
+  const typing = e.target.closest("textarea, [contenteditable=true], input:not([type=range]):not([type=checkbox]):not([type=radio]):not([type=button])");
+  const mod = e.ctrlKey || e.metaKey, key = e.key.toLowerCase();
+  if (typing || (e.target.closest("select, input") && !mod)) return;
+  if (mod && key === "s") { e.preventDefault(); save(); return; }
+  if (!st.spec) return;
+  if (mod && key === "z") { e.preventDefault(); return e.shiftKey ? redo() : undo(); }
+  if (mod && key === "y") { e.preventDefault(); return redo(); }
+  if (mod && key === "c") { if (selKey()) { e.preventDefault(); copyKey(); } return; }
+  if (mod && key === "v") { if (st.clipboard) { e.preventDefault(); pasteKey(); } return; }
+  if (mod || e.altKey) return;
+  if (e.code === "Space") { e.preventDefault(); if (!e.repeat) play(); }
+  else if (key === "k") { mutate(() => keyAll(["zoom", "pan_x", "pan_y"])); buildPanes(); }
+  else if (key === "s") { e.preventDefault(); if (!e.repeat) splitAt(); }
+  else if (e.key === "Delete" || e.key === "Backspace") { e.preventDefault(); if (!e.repeat) deleteSelection(); }
   else if (e.key === "[") jumpKey(-1);
   else if (e.key === "]") jumpKey(1);
-  else if (e.key === "Home") seek(0);
-  else if (e.key === "End") seek(st.spec.duration);
-  else if (e.key === "ArrowLeft") { seek(st.t - (e.shiftKey ? 1 : frameT())); followPlayhead(); }
-  else if (e.key === "ArrowRight") { seek(st.t + (e.shiftKey ? 1 : frameT())); followPlayhead(); }
+  else if (e.key === "Home") { e.preventDefault(); seek(0); followPlayhead(true); }
+  else if (e.key === "End") { e.preventDefault(); seek(st.spec.duration); followPlayhead(true); }
+  else if (e.key === "ArrowLeft" || e.key === "ArrowRight") {
+    e.preventDefault(); pause(); seek(st.t + (e.key === "ArrowLeft" ? -1 : 1) * (e.shiftKey ? 1 : frameT())); followPlayhead();
+  }
+  else if (e.key === "?") { e.preventDefault(); toggleHelp(); }
 });
 els.screen.addEventListener("seeked", draw);
-els.plate.addEventListener("seeked", draw);
+els.plate.addEventListener("seeked", () => { bgCacheKey = ""; draw(); });
 els.frame.addEventListener("load", draw);
-init();
+init().catch((e) => note("Could not load the studio: " + e.message, 10000));

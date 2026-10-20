@@ -43,6 +43,7 @@ python3 timeline.py SPEC                   # when each verse and repeat happens 
 | `timeline.py` | Verse and repeat times in video seconds, from the app's own timing data. |
 | `server.py`, `editor/` | The editor. |
 | `spec.py` | Spec defaults and validation. |
+| `test_studio.py`, `test_editor.cjs` | Offline regressions (no emulator): `python3 -m unittest discover -s tools/promo_studio -p 'test_*.py'` and `node tools/promo_studio/test_editor.cjs`. They check spec migration, the editor/compositor math parity, cuts across parallel export chunks, audio edge cases, atomic saves and media ranges. |
 
 ## Takes: the real app, its real sound
 
@@ -124,7 +125,12 @@ On the picture: drag to pan, scroll to zoom, Shift-scroll to rotate, Alt-drag
 and Alt-scroll to move and scale the phone. **Key camera** (K) keys zoom and
 pan at the playhead; **Push in** / **Pull back** / **Punch in** key a move
 to the active verse (zoomed so the screen spans the frame's width) and back.
-Ctrl-scroll zooms the timeline; **Fit** shows the whole video.
+Ctrl-scroll zooms the timeline; **Fit** shows the whole video; drag the
+divider above the timeline to trade picture for lanes. Ctrl+C / Ctrl+V copy
+the selected key and paste it at the playhead. **? Shortcuts** (or `?`) lists
+every key. Edits save as you go (Ctrl+S saves now); exports, stills and
+switching videos save first, and a failed save is shown and retried from the
+save status.
 
 Zoom and phone scale ease in log space, so a 1 → 4 zoom feels even. Fast
 moves get real motion blur (`motion_blur`: the shutter as a share of the

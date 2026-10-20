@@ -6,12 +6,15 @@ place is what exports; `/api/still` returns the compositor's own frame
 when you want to be sure.
 """
 import io
+from contextlib import nullcontext
 import json
 import mimetypes
 import os
 import re
 import shutil
 import threading
+import tempfile
+import math
 import time
 import traceback
 import urllib.parse
@@ -25,6 +28,8 @@ import timeline
 EDITOR = os.path.join(S.HERE, "editor")
 JOBS = {}
 JOB_LOCK = threading.Lock()
+SPEC_LOCK = threading.Lock()
+RENDER_LOCK = threading.Lock()       # export-all queues, rather than multiplying worker pools
 CAPTURE_LOCK = threading.Lock()      # one emulator: one take at a time
 
 
@@ -32,6 +37,28 @@ def spec_path(name):
     if not re.fullmatch(r"[A-Za-z0-9._-]+", name):
         raise ValueError("bad spec name")
     return os.path.join(S.SPECS, name + ".json")
+
+
+def write_spec(name, raw):
+    """Readers see either complete revision, never a half-written JSON file."""
+    path = spec_path(name)
+    with SPEC_LOCK:
+        tmp = None
+        try:
+            with tempfile.NamedTemporaryFile(mode="w", dir=S.SPECS, suffix=".json.part", delete=False) as f:
+                tmp = f.name
+                json.dump(raw, f, indent=2, ensure_ascii=False, allow_nan=False)
+                f.write("\n")
+            os.replace(tmp, path)
+        finally:
+            if tmp and os.path.exists(tmp): os.remove(tmp)
+
+
+def render_scale(value):
+    scale = float(value)
+    if not math.isfinite(scale) or not 0.05 <= scale <= 2:
+        raise ValueError("scale must be 0.05..2")
+    return scale
 
 
 def spec_status(name):
@@ -65,11 +92,13 @@ def geometry(s):
             "plate": {"w": pw, "h": ph, "k": pk}}
 
 
-def new_job(kind, name, fn):
+def new_job(kind, name, fn, lock=None):
     jid = f"{kind}-{name}-{int(time.time() * 1000)}"
     job = {"id": jid, "kind": kind, "name": name, "state": "queued", "log": [], "progress": 0.0,
            "started": time.time(), "result": None}
     with JOB_LOCK:
+        if any(j["kind"] == kind and j["name"] == name and j["state"] in ("queued", "running") for j in JOBS.values()):
+            raise ValueError(f"{kind} for {name} is already running")
         JOBS[jid] = job
 
     def log(msg):
@@ -77,15 +106,16 @@ def new_job(kind, name, fn):
         job["log"] = job["log"][-200:]
 
     def run():
-        job["state"] = "running"
-        try:
-            job["result"] = fn(log, lambda p: job.__setitem__("progress", p))
-            job["state"] = "done"
-            job["progress"] = 1.0
-        except BaseException as e:            # SystemExit carries our user-facing errors
-            job["state"] = "error"
-            log(str(e) or e.__class__.__name__)
-            log(traceback.format_exc(limit=3))
+        with lock or nullcontext():
+            job["state"] = "running"
+            try:
+                job["result"] = fn(log, lambda p: job.__setitem__("progress", p))
+                job["state"] = "done"
+                job["progress"] = 1.0
+            except BaseException as e:            # SystemExit carries our user-facing errors
+                job["state"] = "error"
+                log(str(e) or e.__class__.__name__)
+                log(traceback.format_exc(limit=3))
     threading.Thread(target=run, daemon=True).start()
     return job
 
@@ -115,14 +145,21 @@ class Handler(BaseHTTPRequestHandler):
         rng = self.headers.get("Range")
         start, end = 0, size - 1
         if rng:
-            m = re.match(r"bytes=(\d*)-(\d*)", rng)
-            if m:
-                if m.group(1):
-                    start = int(m.group(1))
-                    end = int(m.group(2)) if m.group(2) else size - 1
-                else:
-                    start = size - int(m.group(2))
+            m = re.fullmatch(r"bytes=(\d*)-(\d*)", rng)
+            if not m or not any(m.groups()):
+                return self.send_error(416)
+            if m.group(1):
+                start = int(m.group(1))
+                end = int(m.group(2)) if m.group(2) else size - 1
+            else:
+                start = max(0, size - int(m.group(2)))
             end = min(end, size - 1)
+            if start > end or start >= size:
+                self.send_response(416)
+                self.send_header("Content-Range", f"bytes */{size}")
+                self.send_header("Content-Length", "0")
+                self.end_headers()
+                return
             self.send_response(206)
             self.send_header("Content-Range", f"bytes {start}-{end}/{size}")
         else:
@@ -145,6 +182,13 @@ class Handler(BaseHTTPRequestHandler):
             except (BrokenPipeError, ConnectionResetError):
                 pass
 
+    def local_request(self):
+        origin = self.headers.get("Origin")
+        if origin and origin != f"http://{self.headers.get('Host')}":
+            self.send_json({"error": "cross-origin changes are not allowed"}, 403)
+            return False
+        return True
+
     def body(self):
         n = int(self.headers.get("Content-Length") or 0)
         return json.loads(self.rfile.read(n) or b"{}") if n else {}
@@ -158,28 +202,32 @@ class Handler(BaseHTTPRequestHandler):
             self.send_json({"error": str(e)}, 500)
 
     def do_PUT(self):
+        if not self.local_request(): return
         try:
             m = re.fullmatch(r"/api/spec/([\w.-]+)", self.path)
             if not m:
                 return self.send_error(404)
             raw = S.migrate(self.body())                     # an old editor tab may still send v1
             S.resolve(raw)                                   # validate before saving
-            with open(spec_path(m.group(1)), "w") as f:
-                json.dump(raw, f, indent=2, ensure_ascii=False)
+            write_spec(m.group(1), raw)
             self.send_json({"ok": True, "status": spec_status(m.group(1))})
         except Exception as e:
             self.send_json({"error": str(e)}, 400)
 
     def do_DELETE(self):
-        m = re.fullmatch(r"/api/spec/([\w.-]+)", self.path)
-        if not m:
-            return self.send_error(404)
-        p = spec_path(m.group(1))
-        if os.path.exists(p):
-            os.remove(p)
-        self.send_json({"ok": True})
+        if not self.local_request(): return
+        try:
+            m = re.fullmatch(r"/api/spec/([\w.-]+)", self.path)
+            if not m: return self.send_error(404)
+            p = spec_path(m.group(1))
+            with SPEC_LOCK:
+                if os.path.exists(p): os.remove(p)
+            self.send_json({"ok": True})
+        except Exception as e:
+            self.send_json({"error": str(e)}, 400)
 
     def do_POST(self):
+        if not self.local_request(): return
         try:
             self.route_post()
         except Exception as e:
@@ -193,7 +241,7 @@ class Handler(BaseHTTPRequestHandler):
             return self.send_file(os.path.join(EDITOR, "index.html"), "text/html; charset=utf-8")
         if p.startswith("/editor/"):
             f = os.path.normpath(os.path.join(EDITOR, p[len("/editor/"):]))
-            if not f.startswith(EDITOR):
+            if os.path.commonpath([f, EDITOR]) != EDITOR:
                 return self.send_error(403)
             return self.send_file(f)
         if p.startswith("/fonts/"):
@@ -224,6 +272,7 @@ class Handler(BaseHTTPRequestHandler):
             s = S.load(m.group(1))
             meta_p = os.path.join(S.take_dir(s), "meta.json")
             lead = json.load(open(meta_p))["lead"] if os.path.exists(meta_p) else 1.0
+            if os.path.exists(meta_p): s["app"]["seconds"] = max(s["app"]["seconds"], json.load(open(meta_p))["length"])
             tl = timeline.build(s, lead)
             return self.send_json({"verses": tl["verses"], "repeats": tl["repeats"],
                                    "take": json.load(open(meta_p))["length"] if os.path.exists(meta_p) else None})
@@ -233,7 +282,9 @@ class Handler(BaseHTTPRequestHandler):
             from PIL import Image
             s = S.load(m.group(1))
             t = float(q.get("t", ["0"])[0])
-            scale = float(q.get("scale", ["0.5"])[0])
+            if not math.isfinite(t): raise ValueError("time must be finite")
+            t = min(max(0, t), max(0, s["duration"] - 1 / s["fps"]))
+            scale = render_scale(q.get("scale", ["0.5"])[0])
             img = Image.fromarray(compose.still(s, t, scale))
             buf = io.BytesIO()
             img.save(buf, "JPEG", quality=90)
@@ -285,36 +336,39 @@ class Handler(BaseHTTPRequestHandler):
         m = re.fullmatch(r"/api/copy/([\w.-]+)/([\w.-]+)", p)
         if m:
             src, dst = spec_path(m.group(1)), spec_path(m.group(2))
-            if os.path.exists(dst):
-                return self.send_json({"error": "exists"}, 409)
-            shutil.copy(src, dst)
+            with SPEC_LOCK:
+                if os.path.exists(dst): return self.send_json({"error": "exists"}, 409)
+                with open(src, "rb") as source, open(dst, "xb") as dest: shutil.copyfileobj(source, dest)
             return self.send_json({"ok": True})
         m = re.fullmatch(r"/api/new/([\w.-]+)", p)
         if m:
             dst = spec_path(m.group(1))
-            if os.path.exists(dst):
-                return self.send_json({"error": "exists"}, 409)
-            json.dump({"title": m.group(1)}, open(dst, "w"), indent=2)
+            with SPEC_LOCK:
+                if os.path.exists(dst): return self.send_json({"error": "exists"}, 409)
+                with open(dst, "x") as f: json.dump({"title": m.group(1)}, f, indent=2)
             return self.send_json({"ok": True})
         m = re.fullmatch(r"/api/capture/([\w.-]+)", p)
         if m:
             name = m.group(1)
             force = bool(self.body().get("force"))
+            spec = S.load(name)
 
             def run(log, progress):
                 import capture
                 with CAPTURE_LOCK:
-                    return capture.record(S.load(name), log=log, force=force)
+                    return capture.record(spec, log=log, force=force)
             return self.send_json(new_job("capture", name, run))
         m = re.fullmatch(r"/api/render/([\w.-]+)", p)
         if m:
             name = m.group(1)
             opts = self.body()
+            spec = S.load(name)
+            scale = render_scale(opts.get("scale", 1.0))
 
             def run(log, progress):
                 import compose
-                return compose.export(S.load(name), scale=float(opts.get("scale", 1.0)), log=log, progress=progress)
-            return self.send_json(new_job("render", name, run))
+                return compose.export(spec, scale=scale, log=log, progress=progress)
+            return self.send_json(new_job("render", name, run, RENDER_LOCK))
         if p == "/api/emu/boot":
             def run(log, progress):
                 import capture

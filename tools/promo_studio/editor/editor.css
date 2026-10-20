@@ -60,7 +60,9 @@ aside { background: var(--panel); display: flex; flex-direction: column; min-hei
 .zoomer input { width: 140px; accent-color: var(--gold); }
 
 /* timeline */
-#timeline { background: var(--panel); border-top: 1px solid var(--line); display: flex; flex-direction: column; }
+#timeline { background: var(--panel); border-top: 1px solid var(--line); display: flex; flex-direction: column; position: relative; }
+#tlResize { position: absolute; top: -4px; left: 0; right: 0; height: 8px; cursor: ns-resize; z-index: 6; }
+#tlResize:hover, #tlResize.on { background: linear-gradient(transparent 3px, var(--gold) 3px, var(--gold) 5px, transparent 5px); }
 #tlscroll { overflow: auto; height: 300px; position: relative; border-top: 1px solid var(--line); user-select: none; }
 #tlinner { position: relative; min-width: 100%; }
 .tl-row { display: flex; height: 24px; border-bottom: 1px solid #2a2822; }
@@ -134,3 +136,24 @@ aside { background: var(--panel); display: flex; flex-direction: column; min-hei
 .job.error .k { color: var(--danger); } .job.done .k { color: var(--green); }
 .job pre { white-space: pre-wrap; color: var(--faint); margin: 4px 0 0; font-size: 11px; max-height: 90px; overflow: auto; }
 a { color: var(--gold); }
+
+button:focus-visible, input:focus-visible, select:focus-visible, #specList li:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
+#shortcutHelp { position: absolute; z-index: 20; top: 54px; right: 20px; width: min(540px, calc(100vw - 40px)); padding: 16px; background: var(--panel2); border: 1px solid var(--line); border-radius: var(--r); box-shadow: 0 12px 40px #0008; }
+#shortcutHelp dl { display: grid; grid-template-columns: 190px 1fr; gap: 6px 12px; }
+#shortcutHelp dt { color: var(--gold); } #shortcutHelp dd { margin: 0; color: var(--mute); }
+#shortcutHelp .note { margin-bottom: 0; }
+#selection { color: var(--mute); font-size: 11px; max-width: 140px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+#saveState { max-width: 55%; overflow: hidden; text-overflow: ellipsis; color: var(--mute); font-size: 11px; }
+.key:hover { box-shadow: 0 0 0 4px #88c0ac44; }
+.key.hold.on { border-color: var(--gold); box-shadow: 0 0 0 3px #caa54788; }
+.piece:hover { border-color: var(--blue); } .piece .h:hover { background: #ffffff40; }
+.tl-prop .tl-lane { cursor: crosshair; }
+@media (max-width: 1400px) {
+  main { grid-template-columns: 210px minmax(0, 1fr) 310px; }
+  #transport, #actions, #tlbar { padding: 6px 8px; gap: 5px; }
+  .side-head .row button { padding-inline: 7px; }
+  #transport button { padding: 4px 6px; font-size: 12px; }
+  #time { min-width: 92px; font-size: 12px; }
+  .zoomer input { width: 90px; }
+}
+@media (max-height: 850px) { #tlscroll { height: 250px; } }

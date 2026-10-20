@@ -17,6 +17,7 @@ below, so a spec only says what makes it different.
 import copy
 import hashlib
 import json
+import math
 import os
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -119,7 +120,9 @@ def migrate(raw):
     s0 = height * H / g["bh"]
     P0 = (W / 2 + px * W, H / 2 + py * H)
     tracks = raw.setdefault("tracks", {})
-    for k in sorted(raw.pop("camera", []), key=lambda k: k["t"]):
+    camera = sorted(raw.pop("camera", []), key=lambda k: k["t"])
+    has_rotation = any(k.get("rot") for k in camera)
+    for k in camera:
         z = float(k.get("zoom", 1.0))
         F = (P0[0] + s0 * (g["sx0"] + k.get("x", 0.5) * g["sw"] - g["W"] / 2),
              P0[1] + s0 * (g["sy0"] + k.get("y", 0.5) * g["sh"] - g["H"] / 2))
@@ -128,8 +131,8 @@ def migrate(raw):
         tracks.setdefault("zoom", []).append({"t": k["t"], "v": round(z, 4), **e})
         tracks.setdefault("pan_x", []).append({"t": k["t"], "v": round(C[0] / W, 4), **e})
         tracks.setdefault("pan_y", []).append({"t": k["t"], "v": round(C[1] / H, 4), **e})
-        if k.get("rot"):
-            tracks.setdefault("rotate", []).append({"t": k["t"], "v": k["rot"], **e})
+        if has_rotation:
+            tracks.setdefault("rotate", []).append({"t": k["t"], "v": k.get("rot", 0), **e})
     props = raw.setdefault("props", {})
     bg = raw.setdefault("background", {})
     if "blur" in bg: props["bg_blur"] = bg.pop("blur")
@@ -138,7 +141,8 @@ def migrate(raw):
     if py: props["phone_y"] = py
     start = float(raw.get("app", {}).pop("start", 0.0))
     if "duration" in raw:
-        raw["edit"] = [{"in": round(start, 3), "out": round(start + float(raw.pop("duration")), 3)}]
+        dur = float(raw.pop("duration"))
+        raw.setdefault("edit", [{"in": round(start, 3), "out": round(start + dur, 3)}])
     raw.pop("captions", None)
     raw.pop("end_card", None)
     return raw
@@ -178,6 +182,35 @@ def take_needed(s):
 def validate(s):
     a = s["app"]
     errs = []
+
+    def number(v, label, minimum=None, maximum=None):
+        if isinstance(v, bool) or not isinstance(v, (int, float)) or not math.isfinite(v):
+            raise ValueError(f"{label} must be a finite number")
+        if minimum is not None and v < minimum or maximum is not None and v > maximum:
+            raise ValueError(f"{label} outside {minimum}..{maximum}")
+        return v
+
+    number(s["fps"], "fps", 1, 120)
+    if int(s["fps"]) != s["fps"]: errs.append("fps must be an integer")
+    number(s["motion_blur"], "motion_blur", 0, 2)
+    number(a["surah"], "app.surah", 1, 114)
+    number(a["ayah"], "app.ayah", 1, 286)
+    if int(a["surah"]) != a["surah"] or int(a["ayah"]) != a["ayah"]: errs.append("chapter and ayah must be integers")
+    number(a["seconds"], "app.seconds", 1)
+    for name, p in PROPS.items():
+        number(s["props"][name], f"props.{name}")
+        if p.get("log") and s["props"][name] <= 0: errs.append(f"{name} must be positive")
+    for name in ("height", "shadow"):
+        number(s["phone"][name], f"phone.{name}", 0 if name == "shadow" else 0.01, 1 if name == "shadow" else 3)
+    from phone import COLORS
+    if s["phone"]["color"] not in (*COLORS, "auto"): errs.append("unknown phone colour")
+    for name in ("saturation", "speed", "parallax", "vignette"):
+        number(s["background"][name], f"background.{name}", 0, 3 if name in ("saturation", "speed") else 1)
+    number(s["background"].get("offset", 0), "background.offset")
+    for name in ("gain_db", "fade_in", "fade_out"):
+        number(s["audio"][name], f"audio.{name}", -60 if name == "gain_db" else 0, 60)
+    if s["audio"].get("loudness") is not None: number(s["audio"]["loudness"], "audio.loudness", -70, -5)
+    if not s["edit"]: errs.append("the video needs at least one edit piece")
     if a["reciter"] not in RECITERS: errs.append(f"app.reciter must be one of {sorted(RECITERS)}")
     if a["theme"] not in THEMES: errs.append(f"app.theme must be one of {sorted(THEMES)}")
     if a["layout"] not in LAYOUTS: errs.append(f"app.layout must be one of {LAYOUTS}")
@@ -185,10 +218,18 @@ def validate(s):
     if not (1 <= int(a["surah"]) <= 114): errs.append("app.surah must be 1..114")
     if s["aspect"] not in ASPECTS: errs.append(f"aspect must be one of {sorted(ASPECTS)}")
     for p in s["edit"]:
-        if float(p["in"]) < 0 or float(p["out"]) < float(p["in"]): errs.append(f"bad edit piece {p}")
+        number(p["in"], "edit.in", 0)
+        number(p["out"], "edit.out", 0)
+        if p["out"] - p["in"] <= 1e-3: errs.append(f"empty or reversed edit piece {p}")
     for name, keys in s["tracks"].items():
         if name not in PROPS: errs.append(f"unknown track {name}")
+        times = set()
         for k in keys:
+            number(k["t"], f"{name}.t", 0)
+            number(k["v"], f"{name}.v")
+            if k["t"] in times: errs.append(f"{name}: duplicate key time {k['t']}")
+            times.add(k["t"])
+            if PROPS.get(name, {}).get("log") and k["v"] <= 0: errs.append(f"{name} must be positive")
             if k.get("ease", "inOutCubic") not in EASES: errs.append(f"{name}: ease {k.get('ease')} not in {EASES}")
     if errs:
         raise ValueError("; ".join(errs))

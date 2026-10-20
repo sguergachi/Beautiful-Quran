@@ -46,8 +46,10 @@ def plate_settings(s):
 class Renderer:
     def __init__(self, s, scale=1.0):
         self.s = s
+        if not math.isfinite(scale) or not 0.05 <= scale <= 2: raise ValueError("scale must be 0.05..2")
         W, H = size(s)
         self.W, self.H = int(round(W * scale / 2) * 2), int(round(H * scale / 2) * 2)
+        self.output_scale = self.W / W
         self.fps = int(s["fps"])
         self.td = take_dir(s)
         meta_p = os.path.join(self.td, "meta.json")
@@ -78,6 +80,7 @@ class Renderer:
         self.O = np.array([self.W / 2, self.H / 2])
         # background plate
         self.bg = plate_settings(s)
+        self.bg["blur"] *= self.output_scale
         self.plate = library.plate(self.bg, self.W, self.H)
         self.pw, self.ph, self.pk = library.plate_geometry(self.bg, self.W, self.H)
         self.plate_len = library.probe(self.plate)[2]
@@ -153,7 +156,7 @@ class Renderer:
         return rgb, al
 
     def _background(self, plate, st):
-        extra = math.sqrt(max(0.0, st["bg_blur"] ** 2 - self.bg["blur"] ** 2)) * self.pk
+        extra = math.sqrt(max(0.0, (st["bg_blur"] * self.output_scale) ** 2 - self.bg["blur"] ** 2)) * self.pk
         if extra > 0.3:
             plate = cv2.GaussianBlur(plate, (0, 0), extra, borderType=cv2.BORDER_REFLECT)
         bg = cv2.warpAffine(plate, self.bg_matrix(st), (self.W, self.H), flags=cv2.INTER_LINEAR,
@@ -205,7 +208,8 @@ class Frames:
     """Sequential rgb24 frames from a video via ffmpeg, starting at `start` s."""
 
     def __init__(self, path, w, h, fps, start=0.0, loop=False, loop_len=None):
-        self.w, self.h = w, h
+        self.path, self.w, self.h = path, w, h
+        self.has_frame = False
         if loop and loop_len:
             start = start % loop_len
         cmd = ["ffmpeg", "-v", "error"]
@@ -220,6 +224,10 @@ class Frames:
         buf = self.p.stdout.read(self.w * self.h * 3)
         if len(buf) == self.w * self.h * 3:
             self.last = np.frombuffer(buf, np.uint8).reshape(self.h, self.w, 3)
+            self.has_frame = True
+        elif not self.has_frame:
+            self.last = last_frame(self.path, self.w, self.h)
+            self.has_frame = True
         return self.last        # past the end: hold the last frame
 
     def close(self):
@@ -254,12 +262,31 @@ def grab(path, w, h, t):
                           "-vf", f"scale={w}:{h}", "-f", "rawvideo", "-pix_fmt", "rgb24", "-"],
                          capture_output=True, check=True).stdout
     if len(raw) < w * h * 3:
-        return np.zeros((h, w, 3), np.uint8)
+        return last_frame(path, w, h)
     return np.frombuffer(raw[:w * h * 3], np.uint8).reshape(h, w, 3)
+
+
+def last_frame(path, w, h):
+    """Hold the actual final frame even when a cut starts beyond EOF."""
+    p = subprocess.Popen(["ffmpeg", "-v", "error", "-sseof", "-1", "-i", path,
+                          "-vf", f"scale={w}:{h}", "-fps_mode", "passthrough", "-f", "rawvideo", "-pix_fmt", "rgb24", "-"],
+                         stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
+    last = None
+    try:
+        while True:
+            buf = p.stdout.read(w * h * 3)
+            if len(buf) != w * h * 3: break
+            last = buf
+        if p.wait() or last is None: raise RuntimeError(f"could not decode video: {path}")
+        return np.frombuffer(last, np.uint8).reshape(h, w, 3)
+    finally:
+        p.stdout.close()
+        if p.poll() is None: p.kill(); p.wait()
 
 
 def still(s, t, scale=1.0):
     """One exact output frame (RGB uint8) at video time t."""
+    t = min(max(0.0, t), max(0.0, s["duration"] - 1 / s["fps"]))
     r = Renderer(s, scale)
     scr = grab(r.clip, r.sw, r.sh, source_time(s, t)[0])
     pl = grab(r.plate, r.pw, r.ph, (t + float(s["background"].get("offset", 0))) % max(0.01, r.plate_len))
@@ -278,11 +305,15 @@ def _render_chunk(args):
     enc = subprocess.Popen(["ffmpeg", "-v", "error", "-y", "-f", "rawvideo", "-pix_fmt", "rgb24", "-s",
                             f"{r.W}x{r.H}", "-r", str(fps), "-i", "-", "-c:v", "libx264", "-preset", "medium",
                             "-crf", "14", "-pix_fmt", "yuv420p", "-g", str(fps), path], stdin=subprocess.PIPE)
-    for f in range(f0, f1):
-        t = f / fps
-        enc.stdin.write(r.frame(t, scr.read(t), pl.read()).tobytes())
-    enc.stdin.close(); enc.wait()
-    scr.close(); pl.close()
+    try:
+        for f in range(f0, f1):
+            t = f / fps
+            enc.stdin.write(r.frame(t, scr.read(t), pl.read()).tobytes())
+        enc.stdin.close()
+        if enc.wait(): raise RuntimeError(f"video encoder failed for {path}")
+    finally:
+        if enc.poll() is None: enc.kill(); enc.wait()
+        scr.close(); pl.close()
     return path
 
 
@@ -294,7 +325,7 @@ def audio_graph(s):
     parts, n = [], len(s["edit"])
     for i, p in enumerate(s["edit"]):
         a, b = float(p["in"]), float(p["out"])
-        f = f"[0:a]atrim=start={a:.4f}:end={b:.4f},asetpts=PTS-STARTPTS"
+        f = f"[0:a]apad,atrim=start={a:.6f}:end={b:.6f},asetpts=PTS-STARTPTS"
         if i > 0:
             f += f",afade=t=in:st=0:d={CUT_FADE}"
         if i < n - 1:
@@ -317,15 +348,18 @@ def audio_filter(s):
         probe = subprocess.run(["ffmpeg", "-hide_banner", "-i", wav, "-filter_complex",
                                 f"{graph};[cut]loudnorm=I={target}:TP=-1.5:LRA=11:print_format=json",
                                 "-f", "null", "-"], capture_output=True, text=True).stderr
+        if "{" not in probe: raise RuntimeError("audio loudness analysis failed: " + probe[-1000:])
         m = json.loads(probe[probe.rindex("{"):probe.rindex("}") + 1])
-        chain.append(f"loudnorm=I={target}:TP=-1.5:LRA=11:measured_I={m['input_i']}:measured_TP={m['input_tp']}:"
+        # Silence has -inf LUFS; feeding that back to loudnorm is invalid.
+        if all(math.isfinite(float(m[k])) for k in ("input_i", "input_tp", "input_lra", "input_thresh", "target_offset")):
+            chain.append(f"loudnorm=I={target}:TP=-1.5:LRA=11:measured_I={m['input_i']}:measured_TP={m['input_tp']}:"
                      f"measured_LRA={m['input_lra']}:measured_thresh={m['input_thresh']}:"
                      f"offset={m['target_offset']}:linear=true")
     chain.append(f"volume={a['gain_db']}dB")
     if float(a["fade_in"]) > 0:
-        chain.append(f"afade=t=in:st=0:d={a['fade_in']}")
+        chain.append(f"afade=t=in:st=0:d={min(dur, float(a['fade_in']))}")
     if float(a["fade_out"]) > 0:
-        chain.append(f"afade=t=out:st={max(0.0, dur - float(a['fade_out'])):.3f}:d={a['fade_out']}")
+        chain.append(f"afade=t=out:st={max(0.0, dur - float(a['fade_out'])):.6f}:d={min(dur, float(a['fade_out']))}")
     chain.append(f"aresample=48000,apad=whole_dur={dur:.4f}")
     return wav, f"{graph};[cut]{','.join(chain)}[aout]"
 
@@ -349,10 +383,10 @@ def export(s, out=None, workers=None, scale=1.0, log=print, progress=None):
     if s["duration"] > 0 and max(float(p["out"]) for p in s["edit"]) > r.meta["length"] + 0.05:
         log(f"warning: the edit reads past the take's end ({r.meta['length']:.1f}s): the last frame holds")
     fps, dur = r.fps, float(s["duration"])
-    n = int(round(dur * fps))
+    n = max(1, int(math.ceil(dur * fps - 1e-9)))
     workers = workers or max(1, min(8, (os.cpu_count() or 4) - 2))
-    os.makedirs(OUT, exist_ok=True)
     out = out or os.path.join(OUT, f"{s['name']}.mp4")
+    os.makedirs(os.path.dirname(os.path.abspath(out)), exist_ok=True)
     work = os.path.join(CACHE, "render", s["name"])
     os.makedirs(work, exist_ok=True)
     bounds = [round(n * i / workers) for i in range(workers + 1)]

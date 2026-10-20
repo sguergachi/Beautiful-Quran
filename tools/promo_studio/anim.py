@@ -48,6 +48,7 @@ def state_at(s, t):
 
 def source_time(s, t):
     """Video time -> take time, through the edit."""
+    t = max(0.0, t)
     acc = 0.0
     for p in s["edit"]:
         n = float(p["out"]) - float(p["in"])
