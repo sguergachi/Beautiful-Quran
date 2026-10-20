@@ -41,9 +41,38 @@ python3 timeline.py SPEC                   # when each verse and repeat happens 
 | `phone.py` | Draws the Pixel 10 front (aluminium rim, glass, punch-hole, keys) at the take's resolution. |
 | `library.py`, `backgrounds.json` | Background footage (Pexels) and the blurred, seamless plates made from it. |
 | `timeline.py` | Verse and repeat times in video seconds, from the app's own timing data. |
-| `server.py`, `editor/` | The editor. |
+| `server.py`, `editor-app/` | Local Python API and the React + TypeScript + Tailwind editor. |
+| `emus.py`, `report.py` | Shared emulator launcher and structured job progress. |
 | `spec.py` | Spec defaults and validation. |
-| `test_studio.py`, `test_editor.cjs` | Offline regressions (no emulator): `python3 -m unittest discover -s tools/promo_studio -p 'test_*.py'` and `node tools/promo_studio/test_editor.cjs`. They check spec migration, the editor/compositor math parity, cuts across parallel export chunks, audio edge cases, atomic saves and media ranges. |
+| `test_studio.py`, `editor-app/tests/` | Offline regressions: spec migration, Python/TypeScript geometry parity, edit operations, playback lifecycle, cuts, audio, persistence, job scheduling and cancellation. |
+
+## Running and checking the editor
+
+`studio.py serve` installs frontend dependencies if needed, builds changed
+sources, and serves everything on localhost. Node 22.18+ is needed for the
+TypeScript tests. During frontend development, run the Python server and
+`npm --prefix editor-app run dev` (Vite proxies API/media requests to it).
+`serve --no-build` serves the last production build.
+
+From the repository root:
+
+```bash
+python3 -m unittest discover -s tools/promo_studio -p 'test_*.py'
+npm --prefix tools/promo_studio/editor-app test
+npm --prefix tools/promo_studio/editor-app run build
+```
+
+Long work runs in separate processes. **Jobs** shows stages, live progress,
+logs, cancellation and completed video links. Captures count recorded
+seconds; exports count rendered frames. Jobs use a snapshot of the edit you
+submitted, so later changes apply to the next job. The server persists its
+queue and reattaches running jobs after a restart; a failed job leaves the
+editor available. Cancelling a waiting job leaves a running take alone.
+
+Drag the separators to resize the video list, preview/timeline and inspector;
+double-click to reset. Pane sizes persist across visits. The ruler scrubs
+with pointer capture and scrolls at its edges. Shift-drag selects several
+keys, which can move, copy, paste or delete together. **?** lists shortcuts.
 
 ## Takes: the real app, its real sound
 
@@ -69,13 +98,26 @@ How a take starts matters:
 - The recitation's start is found in the recording's own audio.
 - The status-bar clock is hidden (the emulator draws it in a broken face).
 
-Smoothness comes from the emulator. The pool's 3-core slots render the
-reader at about 44 fps; the capture emulator (`studio.py emu boot`: the
-pool's golden snapshot, read-only, `-cores 6`, port 5650) records at
-55–58 fps at 1080×2400. scrcpy writes a frame only when the screen changes;
-the take is resampled to 60 fps by repeating frames, never by inventing them.
-On this host only one emulator can run at a time (a second one segfaults on
-boot), so `scripts/emu.sh down` first if a pool slot is up.
+Smoothness comes from the emulator. The **Emulators** panel lists running
+instances with their core count, app state, current job and a live screen.
+Start another, prepare its app, then choose it in **Recording** (or leave
+**Any free emulator** selected). Captures queue per emulator and shared take;
+exports run one at a time and wait for a capture of their take to finish.
+Use six cores and record one take at a time for the smoothest animation.
+Parallel takes work, but compete for the host's CPU and GPU.
+
+Capture instances reuse the pool's golden AVD and snapshot, through
+`scripts/emu.sh capture PORT` with `EMU_CORES=6`. The existing boot lock,
+GPU setup and RAM guard apply; no extra AVD is created. Each read-only boot
+needs **Prepare app** once. Stop spare instances in the panel when done.
+
+scrcpy writes a frame only when the screen changes. Take metadata separates
+average capture rate (including still holds), median active cadence, and
+the 90th-percentile active frame interval; gaps of 200 ms or more are still
+holds. These describe recorded cadence, not a promise of 60 unique frames
+per second. The output is conformed to 60 fps by repeating frames. The
+recorder closes with SIGTERM so SDL finalizes the file even when the studio
+was launched in the background with SIGINT ignored.
 
 Takes are keyed by what they record (reciter, chapter, ayah, theme, layout,
 view, text size), so specs that differ only in camera, background or text

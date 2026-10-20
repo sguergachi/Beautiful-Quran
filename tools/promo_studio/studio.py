@@ -1,9 +1,12 @@
 #!/usr/bin/env python3
 """Beautiful Quran promo studio: app recordings in a Pixel frame, ready to post.
 
-    studio.py serve [--port 8765]          # the editor: preview, zooms, export
+    studio.py serve [--port 8765]          # the editor (builds editor-app/ when its sources changed)
     studio.py list                         # specs and whether their takes exist
-    studio.py emu boot | install [APK]     # the capture emulator (6 cores)
+    studio.py emu list                     # emulators, booted / app installed
+    studio.py emu boot [--cores 6] [--port P]   # start another capture emulator
+    studio.py emu prepare [SERIAL] [--apk APK]  # install + first launch (timings)
+    studio.py emu stop SERIAL
     studio.py capture SPEC... [--force]    # record the app (picture + sound)
     studio.py render SPEC... [-o OUT]      # export mp4 (needs the take)
     studio.py make SPEC...                 # capture if needed, then render
@@ -35,10 +38,17 @@ def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     sub = ap.add_subparsers(dest="cmd", required=True)
     p = sub.add_parser("serve"); p.add_argument("--port", type=int, default=8765)
+    p.add_argument("--no-build", action="store_true", help="serve the last build of the editor as is")
     sub.add_parser("list")
-    p = sub.add_parser("emu"); p.add_argument("what", choices=["boot", "install", "status"])
-    p.add_argument("apk", nargs="?", default=os.path.join(S.REPO, "app/build/outputs/apk/release/app-release.apk"))
-    p.add_argument("--cores", type=int, default=6)
+    p = sub.add_parser("emu"); p.add_argument("what", choices=["list", "boot", "prepare", "install", "stop", "status"])
+    p.add_argument("serial", nargs="?")
+    p.add_argument("--apk", default=os.path.join(S.REPO, "app/build/outputs/apk/release/app-release.apk"))
+    p.add_argument("--cores", type=int, default=6); p.add_argument("--port", type=int)
+    # the editor runs long work as `studio.py job ...`: JSON progress lines on stdout
+    p = sub.add_parser("job"); p.add_argument("kind", choices=["capture", "render", "emu-boot", "emu-prepare"])
+    p.add_argument("target", nargs="?"); p.add_argument("--force", action="store_true")
+    p.add_argument("--scale", type=float, default=1.0); p.add_argument("--cores", type=int, default=6)
+    p.add_argument("--port", type=int); p.add_argument("--apk")
     p = sub.add_parser("capture"); p.add_argument("specs", nargs="+"); p.add_argument("--force", action="store_true")
     p = sub.add_parser("render"); p.add_argument("specs", nargs="+"); p.add_argument("-o", "--out")
     p.add_argument("--scale", type=float, default=1.0); p.add_argument("--workers", type=int)
@@ -51,7 +61,7 @@ def main():
 
     if a.cmd == "serve":
         import server
-        server.serve(a.port)
+        server.serve(a.port, build=not a.no_build)
     elif a.cmd == "list":
         for n in names(["all"]):
             s = S.load(n)
@@ -61,13 +71,21 @@ def main():
             print(f"{n:34} {ap_['reciter']:8} {ap_['surah']:>3}:{ap_['ayah']:<3} {ap_['theme']:11} "
                   f"{s['aspect']:5} take:{'yes' if have else 'no ':3} video:{'yes' if out else 'no'}")
     elif a.cmd == "emu":
-        import capture
-        if a.what == "boot":
-            capture.boot(a.cores)
-        elif a.what == "install":
-            capture.install(a.apk)
-        else:
-            print(capture.serial(), "up" if capture.is_up() else "down")
+        import emus
+        from report import Report
+        rep = Report()
+        if a.what in ("list", "status"):
+            for d in emus.list_all():
+                print(f"{d['serial']:16} {d['kind']:8} {'booted' if d['booted'] else 'booting':8} "
+                      f"app:{'yes' if d['app'] else 'no ':3} cores:{d['cores'] or '?'} {d['size'] or ''}")
+        elif a.what == "boot":
+            print(emus.boot(a.port, a.cores, rep))
+        elif a.what in ("prepare", "install"):
+            emus.prepare(a.serial or os.environ.get("ANDROID_SERIAL") or "emulator-5650", a.apk, rep)
+        elif a.what == "stop":
+            emus.stop(a.serial)
+    elif a.cmd == "job":
+        run_job(a)
     elif a.cmd in ("capture", "make"):
         import capture
         failed = []
@@ -107,6 +125,31 @@ def main():
             raise SystemExit(f"{path} exists")
         json.dump(base, open(path, "w"), indent=2, ensure_ascii=False)
         print(path)
+
+
+def run_job(a):
+    """One unit of editor work, reporting JSON lines (report.Report) for server.Jobs."""
+    from report import Report
+    rep = Report(json_mode=True)
+    try:
+        if a.kind == "capture":
+            import capture
+            rep.result(capture.record(S.load(a.target), log=rep, force=a.force))
+        elif a.kind == "render":
+            import compose
+            rep.result(compose.export(S.load(a.target), scale=a.scale, log=rep))
+        elif a.kind == "emu-boot":
+            import emus
+            rep.result(emus.boot(a.port, a.cores, rep))
+        elif a.kind == "emu-prepare":
+            import emus
+            rep.result(emus.prepare(a.target, a.apk or emus.DEFAULT_APK, rep))
+    except BaseException as e:                 # SystemExit carries the user-facing errors
+        rep.error(str(e) or e.__class__.__name__)
+        if not isinstance(e, SystemExit):
+            import traceback
+            rep.log(traceback.format_exc(limit=4))
+        sys.exit(1)
 
 
 if __name__ == "__main__":

@@ -1,0 +1,53 @@
+@import "tailwindcss";
+
+@font-face { font-family: "Junicode"; src: url(/media/fonts/junicode_variable.woff2); font-display: swap; }
+
+@theme {
+  --color-bg: #121110;
+  --color-panel: #191815;
+  --color-panel2: #211f1b;
+  --color-raised: #2a2823;
+  --color-line: #33302a;
+  --color-line2: #45413a;
+  --color-ink: #efe8da;
+  --color-mute: #a49c8c;
+  --color-faint: #6f695d;
+  --color-gold: #caa547;
+  --color-gold-ink: #1c1b18;
+  --color-green: #88c0ac;
+  --color-orange: #ff8948;
+  --color-danger: #e07a68;
+  --color-blue: #8fb3e8;
+  --font-display: "Junicode", Georgia, serif;
+  --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+
+@layer base {
+  html, body, #root { height: 100%; }
+  body { margin: 0; font: 13px/1.4 var(--font-sans); -webkit-font-smoothing: antialiased; overflow: hidden; }
+  button, input, select { font: inherit; color: inherit; }
+  :focus-visible { outline: 2px solid var(--color-gold); outline-offset: 1px; }
+  ::-webkit-scrollbar { width: 10px; height: 10px; }
+  ::-webkit-scrollbar-thumb { background: var(--color-line2); border-radius: 8px; border: 2px solid transparent; background-clip: padding-box; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  input[type="range"] { accent-color: var(--color-gold); }
+  input[type="number"]::-webkit-inner-spin-button, input[type="number"]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+  input[type="number"] { -moz-appearance: textfield; }
+}
+
+@layer components {
+  .num { font-variant-numeric: tabular-nums; }
+  .key-diamond { width: 11px; height: 11px; margin: -5.5px 0 0 -5.5px; transform: rotate(45deg); border-radius: 2px; }
+  .ph-head { clip-path: polygon(0 0, 100% 0, 100% 55%, 50% 100%, 0 55%); }
+  .dragging, .dragging * { user-select: none !important; }
+  .cur-ew, .cur-ew * { cursor: ew-resize !important; }
+  .cur-col, .cur-col * { cursor: col-resize !important; }
+  .cur-row, .cur-row * { cursor: row-resize !important; }
+  .cur-grab, .cur-grab * { cursor: grabbing !important; }
+  .stripes { background: repeating-linear-gradient(45deg, #4a2e2e, #4a2e2e 6px, #3a2626 6px, #3a2626 12px); }
+}
+
+@keyframes pulse-soft { 50% { opacity: 0.45; } }
+.animate-pulse-soft { animation: pulse-soft 1.6s ease-in-out infinite; }
+@keyframes toast-in { from { transform: translateY(8px); opacity: 0; } }
+.animate-toast { animation: toast-in 160ms ease-out; }

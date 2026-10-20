@@ -309,6 +309,9 @@ def _render_chunk(args):
         for f in range(f0, f1):
             t = f / fps
             enc.stdin.write(r.frame(t, scr.read(t), pl.read()).tobytes())
+            if (f - f0) % 15 == 14:          # frames done, for export()'s progress
+                with open(path + ".progress", "w") as pf:
+                    pf.write(str(f - f0 + 1))
         enc.stdin.close()
         if enc.wait(): raise RuntimeError(f"video encoder failed for {path}")
     finally:
@@ -378,7 +381,16 @@ def mux(s, video_input, out):
 
 
 def export(s, out=None, workers=None, scale=1.0, log=print, progress=None):
-    """Render the whole spec to an H.264/AAC mp4. Returns the output path."""
+    """Render the whole spec to an H.264/AAC mp4. Returns the output path.
+
+    `log` may be a report.Report (named stages, frame-accurate progress);
+    `progress` is an optional plain 0..1 callback."""
+    from report import Report
+    rep = log if isinstance(log, Report) else None
+    def tell(value, msg=None):
+        if rep: rep.progress(value, msg)
+        if progress: progress(value)
+    rep and rep.stage("prepare", "Preparing the background and the phone", 0.01)
     r = Renderer(s, scale)          # validates the take and builds the plate once, up front
     if s["duration"] > 0 and max(float(p["out"]) for p in s["edit"]) > r.meta["length"] + 0.05:
         log(f"warning: the edit reads past the take's end ({r.meta['length']:.1f}s): the last frame holds")
@@ -392,16 +404,36 @@ def export(s, out=None, workers=None, scale=1.0, log=print, progress=None):
     bounds = [round(n * i / workers) for i in range(workers + 1)]
     chunks = [(s, bounds[i], bounds[i + 1], os.path.join(work, f"part{i:02d}.mp4"), scale)
               for i in range(workers) if bounds[i + 1] > bounds[i]]
+    for c in chunks:
+        if os.path.exists(c[3] + ".progress"):
+            os.remove(c[3] + ".progress")
     t0 = time.time()
+    rep and rep.stage("render", f"Rendering {n} frames at {r.W}×{r.H}, {fps} fps", 0.03)
     log(f"rendering {s['name']}: {n} frames {r.W}x{r.H}@{fps} in {len(chunks)} parts")
     with ProcessPoolExecutor(len(chunks)) as ex:
-        for i, _ in enumerate(ex.map(_render_chunk, chunks)):
-            if progress:
-                progress((i + 1) / len(chunks))
+        futures = [ex.submit(_render_chunk, c) for c in chunks]
+        while not all(f.done() for f in futures):
+            done = 0
+            for c, f in zip(chunks, futures):
+                if f.done():
+                    done += c[2] - c[1]
+                else:
+                    try:
+                        done += int(open(c[3] + ".progress").read() or 0)
+                    except (OSError, ValueError):
+                        pass
+            el = time.time() - t0
+            eta = el / done * (n - done) if done else None
+            tell(0.03 + 0.9 * done / n, f"{done} / {n} frames" + (f" · {eta:.0f} s left" if eta else ""))
+            time.sleep(0.5)
+        for f in futures:
+            f.result()                      # surface a worker's error
     lst = os.path.join(work, "parts.txt")
     with open(lst, "w") as f:
         for c in chunks:
             f.write(f"file '{c[3]}'\n")
+    rep and rep.stage("mux", "Laying in the sound (−16 LUFS) and writing the MP4", 0.94)
     mux(s, ["-f", "concat", "-safe", "0", "-i", lst], out)
+    tell(1.0, f"wrote {os.path.basename(out)} in {time.time() - t0:.0f} s")
     log(f"wrote {out} in {time.time() - t0:.0f}s")
     return out

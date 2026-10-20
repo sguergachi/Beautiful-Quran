@@ -21,6 +21,7 @@ import library
 import phone
 import server
 import spec
+import capture
 
 SCRATCH = Path(spec.CACHE) / "test"
 SCRATCH.mkdir(parents=True, exist_ok=True)
@@ -54,8 +55,9 @@ class ModelTests(unittest.TestCase):
             W, H = spec.size(s)
             pw, ph, pk = library.plate_geometry(compose.plate_settings(s), W, H)
             cases.append(dict(spec=s, t=t, W=W, H=H, plate=dict(w=pw, h=ph, k=pk), a=.4, b=1.7))
-        proc = subprocess.run(["node", str(Path(__file__).with_name("test_editor.cjs")), "--parity"],
-                              input=json.dumps(cases), capture_output=True, text=True, check=True)
+        payload = {"props": spec.PROPS, "g": phone.geometry(1080, 2400), "cases": cases}
+        proc = subprocess.run(["node", str(Path(__file__).with_name("editor-app") / "tests" / "parity.ts")],
+                              input=json.dumps(payload), capture_output=True, text=True, check=True)
         for c, js in zip(cases, json.loads(proc.stdout), strict=True):
             s, t = c["spec"], c["t"]
             st = anim.state_at(s, t)
@@ -78,6 +80,15 @@ class MediaTests(unittest.TestCase):
         self.d = Path(self.tmp.name)
 
     def tearDown(self): self.tmp.cleanup()
+
+    def test_capture_cadence_excludes_still_holds_without_hiding_uneven_frames(self):
+        # Smooth active frames, a still hold, then some missed frames.
+        pts = [i / 60 for i in range(61)] + [2 + i / 30 for i in range(16)]
+        with patch.object(capture.subprocess, "run", return_value=type("Probe", (), {"stdout": "\n".join(map(str, pts))})()):
+            rates = capture.cadence("take.mkv")
+        self.assertLess(rates["capture_fps"], 35)
+        self.assertAlmostEqual(rates["active_fps"], 60)
+        self.assertAlmostEqual(rates["frame_p90_ms"], 1000 / 30)
 
     def test_cuts_are_independent_of_parallel_chunk_boundaries(self):
         path = str(self.d / "counter.mp4")
@@ -170,13 +181,81 @@ class ServerTests(unittest.TestCase):
                     self.assertEqual(status, code); self.assertEqual(data, expected)
             finally: srv.shutdown(); srv.server_close(); thread.join()
 
-    def test_duplicate_jobs_are_rejected(self):
-        release = threading.Event()
-        with patch.dict(server.JOBS, {}, clear=True):
-            job = server.new_job("test", "fixture", lambda *_: release.wait(2))
-            try:
-                with self.assertRaises(ValueError): server.new_job("test", "fixture", lambda *_: None)
-            finally: release.set()
+    def test_job_rules(self):
+        """Duplicates are refused, renders run one at a time, captures one per emulator."""
+        with tempfile.TemporaryDirectory(dir=SCRATCH) as d, patch.object(server, "JOB_DIR", d), \
+                patch.object(server.Jobs, "_loop", lambda self: None), \
+                patch.object(server.Jobs, "_start", lambda self, j: j.update(state="running", pid=None, _proc=None)):
+            jobs = server.Jobs()
+            jobs.submit("render", "a", ["render", "a"])
+            with self.assertRaises(ValueError): jobs.submit("render", "a", ["render", "a"])
+            self.assertEqual(jobs.submit("render", "b", ["render", "b"])["state"], "queued")
+            c1 = jobs.submit("capture", "x", ["capture", "x"], serial="emulator-5650")
+            c2 = jobs.submit("capture", "y", ["capture", "y"], serial="emulator-5652")
+            c3 = jobs.submit("capture", "z", ["capture", "z"], serial="emulator-5650")
+            self.assertEqual([c1["state"], c2["state"], c3["state"]], ["running", "running", "queued"])
+            jobs.cancel(c3["id"])
+            self.assertEqual(jobs.get(c3["id"])["state"], "cancelled")
+            self.assertEqual(set(jobs.busy_serials()), {"emulator-5650", "emulator-5652"})
+
+    def test_job_progress_file(self):
+        """A job's JSON lines become its stage, progress, result and final state."""
+        with tempfile.TemporaryDirectory(dir=SCRATCH) as d, patch.object(server, "JOB_DIR", d), \
+                patch.object(server.Jobs, "_loop", lambda self: None):
+            jobs = server.Jobs()
+            f = Path(d, "j.jsonl")
+            lines = [{"type": "stage", "key": "record", "msg": "Recording"}, {"type": "progress", "value": 0.5, "msg": "half"},
+                     {"type": "log", "msg": "detail"}, {"type": "result", "value": "/take"}]
+            f.write_text("\n".join(json.dumps(x) for x in lines) + "\nnot json\n{\"type\": \"prog")    # a partial last line waits
+            class Done:
+                def poll(self): return 0
+            j = {"id": "j", "kind": "capture", "name": "n", "state": "running", "stage": None, "stages": [], "progress": 0,
+                 "msg": "", "log": [], "error": None, "file": str(f), "_offset": 0, "_proc": Done(), "pid": None}
+            self.assertTrue(jobs._follow(j))
+            self.assertEqual((j["state"], j["stage"]["key"], j["result"]), ("done", "record", "/take"))
+            self.assertIn("not json", j["log"])
+            self.assertLess(j["_offset"], f.stat().st_size, "the partial line is read next time")
+
+    def test_shared_take_jobs_and_cancelled_queue_leave_the_running_capture_alone(self):
+        with tempfile.TemporaryDirectory(dir=SCRATCH) as d, patch.object(server, "JOB_DIR", d), \
+                patch.object(server.Jobs, "_loop", lambda self: None), \
+                patch.object(server.Jobs, "_start", lambda self, j: j.update(state="running")), \
+                patch.object(server.emus, "adb") as adb:
+            jobs = server.Jobs()
+            s = spec.resolve({"title": "submitted"})
+            a = jobs.submit("capture", "a", ["capture", "a"], serial="emulator-5650", snapshot=s)
+            b = jobs.submit("capture", "b", ["capture", "b"], serial="emulator-5652", snapshot=s)
+            r = jobs.submit("render", "r", ["render", "r"], snapshot=s)
+            self.assertEqual([a["state"], b["state"], r["state"]], ["running", "queued", "queued"])
+            s["title"] = "changed after submission"
+            self.assertEqual(spec.load(a["args"][1])["title"], "submitted")
+            jobs.cancel(b["id"])
+            adb.assert_not_called()
+            self.assertEqual(jobs.get(a["id"])["state"], "running")
+
+    def test_restart_replays_a_success_and_preserves_waiting_work(self):
+        with tempfile.TemporaryDirectory(dir=SCRATCH) as d, patch.object(server, "JOB_DIR", d), \
+                patch.object(server.Jobs, "_loop", lambda self: None), \
+                patch.object(server.Jobs, "_start", lambda self, j: j.update(state="running", pid=999999999)):
+            jobs = server.Jobs()
+            a = jobs.submit("render", "a", ["render", "a"])
+            b = jobs.submit("render", "b", ["render", "b"])
+            Path(a["file"]).write_text(json.dumps({"type": "result", "value": "/export.mp4"}) + "\n")
+            recovered = server.Jobs()
+            recovered._follow(recovered.get(a["id"]))
+            self.assertEqual(recovered.get(a["id"])["state"], "done")
+            self.assertEqual(recovered.get(b["id"])["state"], "queued")
+            recovered._pump()
+            self.assertEqual(recovered.get(b["id"])["state"], "running")
+
+    def test_concurrent_job_saves_always_leave_valid_persistence(self):
+        from concurrent.futures import ThreadPoolExecutor
+        with tempfile.TemporaryDirectory(dir=SCRATCH) as d, patch.object(server, "JOB_DIR", d), \
+                patch.object(server.Jobs, "_loop", lambda self: None):
+            jobs = server.Jobs()
+            with ThreadPoolExecutor(8) as pool:
+                list(pool.map(lambda _: jobs._save(), range(80)))
+            self.assertEqual(json.loads(Path(d, "jobs.json").read_text()), [])
 
 
 if __name__ == "__main__": unittest.main()

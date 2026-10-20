@@ -191,7 +191,12 @@ soft-focus landscape, the camera easing in and out) are made with
 that record the Android app **with its own sound** on an emulator, frame it
 in a Pixel 10 over blurred Pexels footage, and export MP4s. A timeline cuts
 the recording and keyframes the camera, the phone and the background; there
-is no text. Ten starter specs cover Alafasy and Hani across the three
+is no text. The React/Tailwind editor has resizable panes, undo/redo,
+multi-key editing and a draggable playhead. Recording and export jobs show
+live stages and progress, survive a server restart, and can be cancelled.
+The emulator panel starts and prepares additional instances of the shared
+golden AVD; use one six-core capture at a time for the smoothest ink.
+Ten starter specs cover Alafasy and Hani across the three
 themes, including reciter repeats and tarjīʿ.
 
 ## Deliverables

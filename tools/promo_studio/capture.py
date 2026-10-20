@@ -51,48 +51,16 @@ def is_up():
         return False
 
 
-def boot(cores=6, log=print):
-    """Boot the capture emulator: the pool's golden snapshot, read-only, more cores.
-
-    The pool (scripts/emu.sh) runs 3-core slots, fine for tests but ~44 fps
-    for takes. This instance shares the golden AVD (-read-only) on its own
-    port. Audio stays -no-audio: playback capture taps the guest mixer, so
-    nothing ever plays through the host speakers.
-    """
-    if is_up():
-        log(f"{serial()} already up")
-        return
-    env = os.path.join(REPO, "scripts", "android_env.sh")
-    script = f"""
-set -euo pipefail
-source "{env}"
-for x in "/run/user/$(id -u)"/xauth_* "$HOME/.Xauthority"; do [[ -r "$x" ]] && {{ export XAUTHORITY="$x"; break; }}; done
-export DISPLAY="${{DISPLAY:-:0}}"
-setsid -f "$ANDROID_HOME/emulator/emulator" -avd "${{EMU_GOLD:-BeautifulQuran_gold_35}}" -port {CAPTURE_PORT} \\
-  -no-window -no-audio -no-boot-anim -no-metrics -gpu host -accel on -feature -Vulkan \\
-  -netdelay none -netspeed full -read-only -snapshot pool_ready -no-snapshot-save -cores {cores} \\
-  > "{CACHE}/capture-emu.log" 2>&1 < /dev/null 7>&- 8>&-
-"""
-    os.makedirs(CACHE, exist_ok=True)
-    subprocess.run(["bash", "-c", script], check=True,
-                   env={"HOME": os.environ["HOME"], "PATH": "/usr/bin:/bin"})
-    for _ in range(120):
-        if is_up():
-            log(f"{serial()} booted")
-            adb("shell", "svc", "power", "stayon", "true", check=False)
-            return
-        time.sleep(2)
-    raise SystemExit(f"capture emulator did not boot; see {CACHE}/capture-emu.log "
-                     "(only one emulator may run at a time on this host: `scripts/emu.sh down` first)")
+def boot(cores=6, log=print, port=None):
+    """Boot a capture emulator (see emus.boot); returns its serial."""
+    import emus
+    return emus.boot(port or CAPTURE_PORT, cores, log if hasattr(log, "stage") else None)
 
 
 def install(apk, log=print):
-    log(adb("install", "-r", apk, timeout=600).strip().splitlines()[-1])
-    # interpreted code janks; AOT-compile like emu.sh run does
-    adb("shell", "cmd", "package", "compile", "-m", "speed", "-f", "com.beautifulquran", timeout=600)
-    adb("shell", "am", "start", "-n", "com.beautifulquran/.MainActivity", check=False)
-    log("warming up (recitation timings download on first launch)")
-    time.sleep(30)
+    """Install, compile and first-launch the app (see emus.prepare)."""
+    import emus
+    return emus.prepare(serial(), apk, log if hasattr(log, "stage") else None)
 
 
 def scrcpy():
@@ -258,7 +226,12 @@ def cadence(path, t0=0.0, t1=1e9):
                           "-of", "csv=p=0", path], capture_output=True, text=True, check=True).stdout.split()
     ts = [float(x.strip(",")) for x in out if x.strip(",")]
     ts = [t for t in ts if t0 <= t <= t1]
-    return (len(ts) - 1) / (ts[-1] - ts[0]) if len(ts) > 2 else 0.0
+    intervals = [b - a for a, b in zip(ts, ts[1:]) if 0 < b - a < 0.2]
+    import numpy as np
+    import statistics
+    return {"capture_fps": (len(ts) - 1) / (ts[-1] - ts[0]) if len(ts) > 2 else 0.0,
+            "active_fps": 1 / statistics.median(intervals) if intervals else 0.0,
+            "frame_p90_ms": float(np.percentile(intervals, 90) * 1000) if intervals else 0.0}
 
 
 def playing():
@@ -358,7 +331,14 @@ def _tap_play_bar():
 
 
 def record(s, log=print, force=False):
-    """Record (or reuse) the take a spec needs. Returns the take directory."""
+    """Record (or reuse) the take a spec needs. Returns the take directory.
+
+    `log` may be a report.Report: then each step is a named stage with
+    overall progress, which the editor shows as the capture runs.
+    """
+    from report import Report
+    rep = log if isinstance(log, Report) else None
+    stage = (lambda k, m, p: rep.stage(k, m, p)) if rep else (lambda k, m, p: log(m))
     _env()
     a = s["app"]
     d = take_dir(s)
@@ -369,31 +349,37 @@ def record(s, log=print, force=False):
         if meta["length"] >= need:
             log(f"take exists: {d}")
             return d
+    stage("check", f"Checking {serial()}", 0.0)
     if not is_up():
-        raise SystemExit(f"no emulator at {serial()}: run `studio.py emu boot` (and `emu install`)")
+        raise SystemExit(f"no emulator at {serial()}: boot one from the Emulators panel (or `studio.py emu boot`)")
+    if "package:" not in adb("shell", "pm", "path", "com.beautifulquran", check=False):
+        raise SystemExit(f"the app is not installed on {serial()}: prepare it from the Emulators panel")
     os.makedirs(d, exist_ok=True)
     secs = max(int(a["seconds"]), int(need - LEAD + 1))
-    log("preparing device (demo mode, volume)")
+    stage("prepare", "Preparing the device (status bar, volume)", 0.03)
     prep()
-    log(f"setting reciter: {a['reciter']}")
+    stage("reciter", f"Choosing the reciter: {RECITERS[a['reciter']]['name']}", 0.08)
     set_reciter(a["reciter"], log)
-    log(f"customizing: {a['theme']} / {a['layout']} / {a['view']} / {a['text_size']}")
+    stage("customize", f"Setting {a['theme']} · {a['layout']} · {a['view']}", 0.14)
     customize(a["theme"], a["layout"], a["view"], a["text_size"], log)
     # open the verse still, let it settle, then roll and start the recitation
+    stage("open", f"Opening {a['surah']}:{a['ayah']}", 0.22)
     adb("shell", "input", "keyevent", "KEYCODE_MEDIA_PAUSE", check=False)
     at.open_reader(int(a["surah"]), int(a["ayah"]))
     time.sleep(3.0)
     raw = os.path.join(d, "raw.mkv")
     if os.path.exists(raw):
         os.remove(raw)
-    limit = int(math.ceil(secs + LEAD + 3))
+    # scrcpy gets a generous limit; the take is ended a fixed time after the
+    # recitation actually starts (Hani's first file can buffer for seconds)
+    limit = int(math.ceil(secs + LEAD + 40))
     env = dict(os.environ, ADB=shutil.which("adb"))
     p = subprocess.Popen([scrcpy(), "--no-window", "--no-playback", f"--record={raw}",
                           "--audio-source=playback", "--audio-codec=flac", "--video-codec=h264",
                           "--video-bit-rate=40M", "--max-fps=60", f"--time-limit={limit}"],
                          env=env, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
     time.sleep(2.0)
-    log(f"recording {limit}s: {a['reciter']} {a['surah']}:{a['ayah']} {a['theme']} {a['layout']} {a['view']}")
+    stage("record", f"Starting playback ({secs} s to record)", 0.25)
     try:
         start_playback(int(a["surah"]), int(a["ayah"]), a["layout"], log=log)
     except BaseException as e:
@@ -406,11 +392,36 @@ def record(s, log=print, force=False):
         adb("shell", "input", "keyevent", "KEYCODE_MEDIA_PAUSE", check=False)
         log(f"capture failed: {e}")
         raise
-    out, _ = p.communicate(timeout=limit + 60)
+    t0, want = time.monotonic(), secs + 1.5
+    try:
+        while p.poll() is None:
+            el = time.monotonic() - t0
+            if el >= want:
+                # A background-launched studio may inherit SIGINT ignored.
+                # SDL preserves that disposition; TERM still closes the recorder.
+                p.terminate()
+                try:
+                    p.wait(timeout=20)
+                except subprocess.TimeoutExpired:
+                    p.kill()
+                    p.wait()
+                    raise RuntimeError("scrcpy did not close the recording within 20 seconds")
+                break
+            if rep:
+                rep.progress(0.25 + 0.6 * min(1.0, el / want), f"recording {el:.0f} / {want:.0f} s")
+            time.sleep(0.5)
+    finally:
+        if p.poll() is None:
+            p.kill()
+            p.wait()
+    out = p.stdout.read() if p.stdout else ""
     adb("shell", "input", "keyevent", "KEYCODE_MEDIA_PAUSE", check=False)
-    if not os.path.exists(raw) or os.path.getsize(raw) < 10000:
+    if p.returncode != 0 or not os.path.exists(raw) or os.path.getsize(raw) < 10000:
         raise SystemExit("scrcpy recording failed:\n" + out[-2000:])
+    stage("conform", "Finding the recitation's start and conforming to 60 fps", 0.88)
     conform(d, log)
+    if rep:
+        rep.progress(1.0, "take ready")
     return d
 
 
@@ -420,7 +431,7 @@ def conform(d, log=print):
     onset = audio_onset(raw, after=1.0)
     v0 = first_video_pts(raw)
     start = max(0.0, onset - LEAD)
-    fps = cadence(raw, onset, onset + 20)
+    rates = cadence(raw, onset, onset + 20)
     clip, wav = os.path.join(d, "clip.mp4"), os.path.join(d, "audio.wav")
     # scrcpy writes frames only when the screen changes: fps=60 repeats the
     # last one, it never invents in-between frames
@@ -434,8 +445,8 @@ def conform(d, log=print):
     w, h = map(int, subprocess.run(["ffprobe", "-v", "error", "-select_streams", "v:0", "-show_entries",
                                     "stream=width,height", "-of", "csv=p=0", clip],
                                    capture_output=True, text=True, check=True).stdout.strip().split(","))
-    meta = {"onset_raw": onset, "video_first_pts": v0, "lead": LEAD, "length": length, "capture_fps": round(fps, 1),
+    meta = {"onset_raw": onset, "video_first_pts": v0, "lead": LEAD, "length": length, **{k: round(v, 1) for k, v in rates.items()},
             "width": w, "height": h, "recorded": time.strftime("%Y-%m-%d %H:%M")}
     json.dump(meta, open(os.path.join(d, "meta.json"), "w"), indent=1)
-    log(f"take ready: {d} ({length:.1f}s, captured at {fps:.1f} fps)")
+    log(f"take ready: {d} ({length:.1f}s, active cadence {rates['active_fps']:.1f} fps, p90 frame interval {rates['frame_p90_ms']:.0f} ms)")
     return meta
