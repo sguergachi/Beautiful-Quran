@@ -49,6 +49,43 @@
   .stripes { background: repeating-linear-gradient(45deg, #4a2e2e, #4a2e2e 6px, #3a2626 6px, #3a2626 12px); }
 }
 
+.editor-toolbar { container: toolbar / inline-size; flex-shrink: 0; border-bottom: 1px solid var(--color-line); }
+.toolbar-row { display: flex; height: 44px; align-items: center; gap: 8px; padding: 6px 12px; }
+.toolbar-group { display: flex; flex-shrink: 0; align-items: center; gap: 4px; }
+.toolbar-separated { border-left: 1px solid var(--color-line); padding-left: 8px; }
+.toolbar-row button, .toolbar-timecode { height: 32px; }
+.toolbar-row button { justify-content: center; }
+.toolbar-timecode { width: 154px; flex-shrink: 0; overflow: hidden; white-space: nowrap; }
+.toolbar-row svg { flex-shrink: 0; }
+.toolbar-row [aria-label="Delete selection"] { color: var(--color-mute); }
+.toolbar-row [aria-label="Delete selection"]:hover { color: var(--color-danger); }
+.toolbar-selection { min-width: 0; max-width: 140px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.toolbar-spacer { min-width: 0; flex: 1; }
+.toolbar-zoom-slider { display: flex; align-items: center; gap: 8px; }
+.toolbar-zoom-slider input { width: 96px; height: 32px; min-width: 0; }
+.toolbar-camera-menu, .toolbar-tools { display: none; }
+
+@container toolbar (max-width: 1139px) {
+  .toolbar-camera-full, .toolbar-wide-label, .toolbar-selection { display: none; }
+  .toolbar-camera-menu { display: inline-flex; }
+}
+@container toolbar (max-width: 899px) {
+  .toolbar-label { display: none; }
+}
+@container toolbar (max-width: 859px) {
+  .toolbar-direct-key, .toolbar-zoom-label { display: none; }
+  .toolbar-zoom-slider input { width: 80px; }
+}
+@container toolbar (max-width: 679px) {
+  .toolbar-edit, .toolbar-camera { display: none; }
+  .toolbar-tools { display: inline-flex; }
+}
+@container toolbar (max-width: 499px) {
+  .toolbar-row { gap: 6px; padding-inline: 8px; }
+  .toolbar-timecode { width: 116px; }
+  .toolbar-zoom-slider, .toolbar-duration { display: none; }
+}
+
 @container inspector (max-width: 310px) {
   .inspector-field { grid-template-columns: minmax(0, 1fr); gap: 4px; }
 }

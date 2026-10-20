@@ -6,23 +6,29 @@ export type MenuItem =
   | { label: string; run: () => void; danger?: boolean; checked?: boolean; disabled?: boolean; hint?: string }
   | { head: string }
   | "-";
-const useMenu = create<{ at: [number, number] | null; items: MenuItem[] }>(() => ({ at: null, items: [] }));
+const useMenu = create<{ at: [number, number] | null; items: MenuItem[]; trigger: HTMLElement | null }>(() => ({ at: null, items: [], trigger: null }));
 
-export function openMenu(e: { clientX: number; clientY: number; preventDefault: () => void; stopPropagation: () => void }, items: MenuItem[]) {
+export function openMenu(e: { clientX: number; clientY: number; preventDefault: () => void; stopPropagation: () => void }, items: MenuItem[], trigger: HTMLElement | null = null) {
   e.preventDefault(); e.stopPropagation();
-  useMenu.setState({ at: [e.clientX, e.clientY], items });
+  useMenu.setState({ at: [e.clientX, e.clientY], items, trigger });
 }
-export const closeMenu = () => useMenu.setState({ at: null });
+export const closeMenu = () => {
+  const trigger = useMenu.getState().trigger;
+  useMenu.setState({ at: null, trigger: null });
+  if (trigger?.isConnected) trigger.focus({ preventScroll: true });
+};
 
 export function MenuHost() {
-  const { at, items } = useMenu();
+  const { at, items, trigger } = useMenu();
   const ref = useRef<HTMLDivElement>(null);
   const [pos, setPos] = useState<[number, number]>([0, 0]);
   useLayoutEffect(() => {
     if (!at || !ref.current) return;
     const r = ref.current.getBoundingClientRect();
     setPos([Math.max(6, Math.min(at[0], innerWidth - r.width - 6)), Math.max(6, Math.min(at[1], innerHeight - r.height - 6))]);
-  }, [at, items]);
+    // Button menus take keyboard focus only after their items have mounted.
+    if (trigger) ref.current.querySelector<HTMLButtonElement>('button:not(:disabled)')?.focus({ preventScroll: true });
+  }, [at, items, trigger]);
   useEffect(() => {
     if (!at) return;
     const off = (e: Event) => { if (!ref.current?.contains(e.target as Node)) closeMenu(); };
@@ -34,6 +40,7 @@ export function MenuHost() {
   if (!at) return null;
   return (
     <div ref={ref} role="menu" style={{ left: pos[0], top: pos[1] }}
+      onKeyDown={(e) => { if (e.key === " " || e.key === "Enter") e.stopPropagation(); }}
       className="fixed z-50 flex min-w-[190px] max-w-[calc(100vw-12px)] max-h-[calc(100dvh-12px)] flex-col overflow-y-auto overscroll-contain rounded-lg border border-line bg-panel2 p-1 shadow-2xl shadow-black/60 [&>*]:shrink-0">
       {items.map((it, i) =>
         it === "-" ? <div key={i} className="mx-1 my-1 h-px bg-line" /> :

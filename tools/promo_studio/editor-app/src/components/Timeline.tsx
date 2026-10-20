@@ -13,8 +13,8 @@ import {
   toggleKey, useStore,
 } from "../state/store.ts";
 import { openMenu, type MenuItem } from "./Menu.tsx";
-import { Button, Icon } from "./ui.tsx";
 import { SoundLane } from "./SoundLane.tsx";
+import { EditorToolbar } from "./Transport.tsx";
 import { TimelineVerseControls } from "./VerseEditor.tsx";
 
 let lastFadePress = { side: "", at: 0 };
@@ -260,20 +260,7 @@ export function Timeline() {
 
   return (
     <div className="flex h-full min-h-0 flex-col bg-panel">
-      <div className="timeline-toolbar flex shrink-0 flex-wrap items-center gap-1.5 border-b border-line px-3 py-1.5">
-        <Button size="sm" onClick={() => split()} title="Split the recording at the playhead (S)">{Icon.scissors} Split</Button>
-        <Button size="sm" variant="danger" disabled={!sel} onClick={deleteSelection} title="Delete the selection (Del)">{Icon.trash} Delete</Button>
-        <div className="mx-1 h-5 w-px bg-line" />
-        <Button size="sm" variant="ghost" onClick={() => jumpKey(spec, -1)} title="Previous key ([)">◂ ◆</Button>
-        <Button size="sm" variant="ghost" onClick={() => jumpKey(spec, 1)} title="Next key (])">◆ ▸</Button>
-        <span className="ml-2 truncate text-[11.5px] text-mute">{selText}</span>
-        <div className="flex-1" />
-        <div className="flex items-center gap-1.5">
-          <span className="text-[11px] text-faint">Zoom</span>
-          <input type="range" min={8} max={500} step={1} value={pps} className="w-24 min-w-0" onChange={(e) => setUI({ pps: +e.target.value })} title="Timeline zoom (Ctrl-scroll)" />
-          <Button size="sm" variant="ghost" active={ui.fit} aria-pressed={ui.fit} title="Keep the whole edit visible as it changes; manual zoom turns Fit off" onClick={() => setUI({ fit: !ui.fit })}>Fit</Button>
-        </div>
-      </div>
+      <EditorToolbar pps={pps} selection={selText} onJumpKey={(direction) => jumpKey(spec, direction)} />
       <div ref={box} className="relative min-h-0 flex-1 overflow-auto select-none" onPointerMove={onHover}
         onPointerLeave={() => { if (hover.current) hover.current.style.display = "none"; if (hoverT.current) hoverT.current.style.display = "none"; }}>
         <div ref={inner} className="relative" style={{ width: labelW + laneW, minWidth: "100%" }}>

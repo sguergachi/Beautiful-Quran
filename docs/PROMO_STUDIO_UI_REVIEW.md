@@ -12,9 +12,9 @@ context menus.
 | Animate | The slider's intrinsic width expanded the grid's `1fr` track beyond the inspector. `overflow-x-hidden` concealed the numeric field. | The track uses `minmax(0,1fr)`; the range shrinks while the numeric field keeps its width. |
 | Inspector fields | Fixed label columns and segmented choices competed for narrow space. Edit inputs also imposed intrinsic widths. | Inputs shrink within their tracks; choices wrap; labels stack in inspectors no wider than 310 px. |
 | Recording | Record/select and split/whole-take rows could overflow; long spec paths did not wrap. | Actions wrap and paths remain readable. |
-| Window layout | Stored wide panes could consume the preview, and a tall timeline could hide playback controls after resizing. | Pane widths fit the current window without replacing preferred widths. Timeline height reserves preview and measured playback-toolbar space. |
+| Window layout | Stored wide panes could consume the preview, and a tall timeline could hide playback controls after resizing. | Pane widths fit the current window without replacing preferred widths. Timeline height reserves at least 96 px for the preview; its toolbar is included in the timeline's height. |
 | Compact windows | Both side panes could crowd out the central editor. | At widths of 1,000 CSS px or less, one pane opens over the editor with a dismissible backdrop. |
-| Toolbars | Header, playback and timeline controls extended outside narrow panes. | Controls wrap; the timeline zoom group stays together. Compact headers keep aspect selection in Look → Frame. |
+| Toolbars | Playback and editing occupied separate rows, with different button heights and uneven icon alignment. | One toolbar joins playback/timecode, edit/key navigation, camera actions and timeline zoom. Controls share a 32 px height, 4 px within-group gaps and centered SVG icons. Camera actions collapse into a menu below 1,140 px of toolbar width; below 680 px, Tools also contains editing commands. The row stays single-line. Compact headers keep aspect selection in Look → Frame. |
 | Video list | Footer text overflowed at minimum width; titles lacked a full-text tooltip; actions required hover. | The batch action has the shared export icon and wrapping text; titles have tooltips and actions remain visible. |
 | Drawers | Fixed drawer widths, shortcut columns and long progress messages could exceed the window. | Drawers fit the viewport, shortcut columns stack, and job/status text wraps. |
 | Context menus | Large menus could start above the window; scrolling dismissed them. | Menus stay inside the viewport, scroll vertically, and close on window resize. |
@@ -61,3 +61,11 @@ resizing, typed timecodes, undo, blank videos, duplicate freshness and numeric
 input cancellation. Offline gates are the 16 Python regressions, 10 Node tests,
 strict TypeScript/production build and Android JVM suite. See the studio README
 for the build/test commands.
+
+The unified toolbar was checked at 19 viewport widths from 320 to 1,920 px,
+with side panes open and closed (38 combinations). Checks require one row,
+equal button heights, aligned control centres and no horizontal clipping.
+Interaction checks cover split/undo, previous/next key, loop, camera/Tools
+menus, keyboard activation, Fit, typed timecodes and a short viewport. Below
+500 px the slider is folded away while Fit and every editing command remain
+reachable; the timecode keeps its current time, with total duration in its tooltip.

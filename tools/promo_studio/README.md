@@ -249,6 +249,9 @@ On the picture: drag to pan, scroll to zoom, Shift-scroll to rotate, Alt-drag
 and Alt-scroll to move and scale the phone. **Key camera** (K) keys zoom and
 pan at the playhead; **Push in** / **Pull back** / **Punch in** key a move
 to the active verse (zoomed so the screen spans the frame's width) and back.
+Playback, editing, camera actions and timeline zoom share one aligned toolbar.
+Narrow panes collect camera actions under **Camera**, then editing actions
+under **Tools**; the toolbar keeps one row as panes are resized.
 Ctrl-scroll zooms the timeline; **Fit** shows the whole video; drag the
 divider above the timeline to trade picture for lanes. Ctrl+C / Ctrl+V copy
 the selected key and paste it at the playhead. **? Shortcuts** (or `?`) lists

@@ -6,7 +6,6 @@ import { ExportPanel } from "./components/ExportPanel.tsx";
 import { EmulatorsPanel, HelpPanel, JobsPanel } from "./components/Panels.tsx";
 import { Stage } from "./components/Stage.tsx";
 import { Timeline } from "./components/Timeline.tsx";
-import { Transport } from "./components/Transport.tsx";
 import { track } from "./lib/drag.ts";
 import { clamp, videoTimes } from "./lib/model.ts";
 import { landmarks } from "./lib/edit.ts";
@@ -98,7 +97,6 @@ export function App() {
   const ui = useStore((s) => s.ui), panel = useStore((s) => s.panel), fatal = useStore((s) => s.fatal);
   const workspace = useRef<HTMLDivElement>(null);
   const [size, setSize] = useState({ w: innerWidth, h: innerHeight - 48 });
-  const [transportH, setTransportH] = useState(44);
   useShortcuts();
   useEffect(() => { init(); }, []);
   useLayoutEffect(() => {
@@ -106,12 +104,9 @@ export function App() {
     const observer = new ResizeObserver((entries) => {
       for (const entry of entries) {
         if (entry.target === workspace.current) setSize({ w: entry.contentRect.width, h: entry.contentRect.height });
-        else setTransportH(entry.borderBoxSize[0]?.blockSize ?? entry.target.getBoundingClientRect().height);
       }
     });
     observer.observe(workspace.current);
-    const transport = workspace.current.querySelector(".transport");
-    if (transport) observer.observe(transport);
     return () => observer.disconnect();
   }, []);
   const overlay = size.w <= 1000;
@@ -129,7 +124,7 @@ export function App() {
   // preferred widths survive; narrow windows open one pane over the canvas.
   const rightW = Math.min(ui.rightW, overlay ? size.w - 24 : Math.max(280, size.w - 382 - (ui.hideL ? 0 : 190)));
   const leftW = Math.min(ui.leftW, overlay ? size.w - 24 : Math.max(190, size.w - 382 - (ui.hideR ? 0 : rightW)));
-  const tlH = Math.min(ui.tlH, size.h * 0.72, Math.max(80, size.h - transportH - 97));
+  const tlH = Math.min(ui.tlH, size.h * 0.72, Math.max(80, size.h - 97));
   const w0 = { left: leftW, right: rightW, tl: tlH };
   return (
     <div className="flex h-full flex-col">
@@ -145,7 +140,6 @@ export function App() {
         )}
         <main className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
           <Stage />
-          <Transport />
           <Divider axis="y" onReset={() => setUI({ tlH: 260 })} onDrag={(d) => setUI({ tlH: Math.round(clamp(w0.tl - d, 120, innerHeight * 0.72)) })} />
           <div style={{ height: tlH }} className="min-h-0 shrink-0"><Timeline /></div>
         </main>
