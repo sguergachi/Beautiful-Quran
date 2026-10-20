@@ -46,14 +46,20 @@ export interface PhoneGeometry { W: number; H: number; bw: number; bh: number; b
 export interface Geo {
   W: number; H: number; fps: number; g: PhoneGeometry;
   take: { length: number; lead: number; capture_fps: number; active_fps?: number; frame_p90_ms?: number; width: number; height: number; recorded: string } | null;
-  frame: string; clip: string | null; audio: string | null;
+  frame: string; clip: string | null; audio: string | null; peaks: string | null;
   plate: { w: number; h: number; k: number };
 }
+/** The take's waveform: one 0..255 column (square-root scale) per 1/rate s. */
+export interface Wave { rate: number; peaks: Uint8Array }
 export interface Plate { url: string; w: number; h: number; k: number; blur: number }
 export interface Timeline {
   verses: { label: string; t0: number; t1: number }[];
   repeats: { verse: string; pos: number; t0: number; t1: number }[];
   take: number | null;
+}
+export interface VersePlan {
+  start: number; end: number; anchor: number; shift: number; in: number; out: number; seconds: number;
+  verses: Timeline["verses"];
 }
 
 export interface SpecStatus {

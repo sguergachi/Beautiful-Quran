@@ -3,7 +3,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
 import * as E from "../src/lib/edit.ts";
-import { parseTime, resolve, valueAt, videoTimes } from "../src/lib/model.ts";
+import { fadeAt, parseTime, resolve, soundGain, soundOnset, valueAt, videoTimes } from "../src/lib/model.ts";
 
 const meta = JSON.parse(execFileSync("python3", ["-c", "import json,spec,phone; print(json.dumps(dict(defaults=spec.DEFAULTS, props=spec.PROPS, themes=spec.THEMES, g=phone.geometry(1080,2400))))"], { cwd: new URL("../..", import.meta.url).pathname }).toString());
 const ctx = (raw: any): E.Ctx => ({ spec: resolve(raw, meta), props: meta.props, fps: 60 });
@@ -76,7 +76,7 @@ test("split, trim and delete pieces of the recording", () => {
 });
 
 test("presets key a push to the active verse and back", () => {
-  const geo = { W: 1080, H: 1080, g: meta.g, fps: 60, take: null, frame: "", clip: null, audio: null, plate: { w: 1, h: 1, k: 1 } };
+  const geo = { W: 1080, H: 1080, g: meta.g, fps: 60, take: null, frame: "", clip: null, audio: null, peaks: null, plate: { w: 1, h: 1, k: 1 } };
   const { raw } = run({ edit: [{ in: 0, out: 10 }] }, (r, c) => E.preset(r, c, geo, "push", 2));
   assert.deepEqual(raw.tracks.zoom.map((k: any) => k.t), [2, 2.9]);
   assert.ok(raw.tracks.zoom[1].v > 1.5);
@@ -91,4 +91,19 @@ test("landmarks and time parsing", () => {
   assert.equal(parseTime("0:12.5"), 12.5);
   assert.equal(parseTime("3"), 3);
   assert.ok(Number.isNaN(parseTime("abc")));
+});
+
+test("the fade in starts with the first sound, after the take's silent lead", () => {
+  const onset = (edit: { in: number; out: number }[]) => soundOnset(resolve({ edit }, meta), 1);
+  assert.equal(onset([{ in: 0, out: 10 }]), 1);
+  assert.equal(onset([{ in: 1.5, out: 10 }]), 0, "a cut into the recitation fades from the start");
+  assert.ok(Math.abs(onset([{ in: 0.2, out: 0.8 }, { in: 0.5, out: 5 }]) - 1.1) < 1e-9, "silent pieces count");
+  const s = resolve({ edit: [{ in: 0, out: 10 }], audio: { fade_in: 0.5, fade_out: 2, gain_db: 6 } }, meta);
+  assert.equal(fadeAt(s, 0.5, 1), 0);
+  assert.equal(fadeAt(s, 1.25, 1), 0.5);
+  assert.equal(fadeAt(s, 5, 1), 1);
+  assert.equal(fadeAt(s, 9, 1), 0.5);
+  assert.ok(Math.abs(soundGain(s, 5, 1) - 10 ** (6 / 20)) < 1e-9);
+  const short = resolve({ edit: [{ in: 0, out: 0.5 }], audio: { fade_in: 0, fade_out: 4 } }, meta);
+  assert.equal(fadeAt(short, 0, 1), 1, "a fade longer than the video spans it, like ffmpeg's");
 });

@@ -69,3 +69,15 @@ def video_times(s, take_t0, take_t1):
             out.append((acc + a - i, acc + b - i))
         acc += o - i
     return out
+
+
+def sound_onset(s, lead):
+    """Video time of the first sound. A take opens on `lead` silent seconds
+    before the recitation, so the fade in starts where the sound does."""
+    acc = 0.0
+    for p in s["edit"]:
+        i, o = float(p["in"]), float(p["out"])
+        if o > lead:
+            return acc + max(0.0, lead - i)
+        acc += o - i
+    return 0.0

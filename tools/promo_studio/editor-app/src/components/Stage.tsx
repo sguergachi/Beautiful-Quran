@@ -111,7 +111,7 @@ export function Stage() {
       <div ref={scene} className="relative shrink-0 overflow-hidden rounded-sm shadow-[0_0_0_1px_var(--color-line)]">
         <canvas ref={canvas} onPointerDown={onPointerDown} className="block cursor-grab"
           title="Drag: pan · Scroll: zoom · Shift-scroll: rotate · Alt-drag / Alt-scroll: move / scale the phone" />
-        <div ref={phone} className="pointer-events-none absolute left-0 top-0 origin-top-left" style={{ width: geo?.g.W, height: geo?.g.H }}>
+        <div ref={phone} className="pointer-events-none absolute left-0 top-0 origin-top-left" style={{ width: geo?.g.W, height: geo?.g.H, visibility: geo ? "visible" : "hidden" }}>
           <div ref={screen} className="absolute overflow-hidden" style={{ left: geo?.g.sx0, top: geo?.g.sy0, width: geo?.g.sw, height: geo?.g.sh, borderRadius: geo?.g.screen_r }} />
         </div>
       </div>
@@ -125,6 +125,7 @@ export function Stage() {
           <Button variant="primary" size="sm" onClick={() => setUI({ tab: "recording", hideR: false })}>{Icon.rec} Record a take</Button>
         </div>
       )}
+      {spec && !geo && <p role="status" className="absolute rounded bg-panel/95 px-3 py-2 text-mute">Loading take…</p>}
       {!spec && <p className="px-3 text-center text-faint">Pick a video on the left, or make a new one.</p>}
     </div>
   );

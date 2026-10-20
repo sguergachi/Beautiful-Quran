@@ -4,8 +4,9 @@
 import { create } from "zustand";
 import { api } from "../lib/api.ts";
 import * as E from "../lib/edit.ts";
-import { clamp, plateLook, resolve, takeKey } from "../lib/model.ts";
-import type { Ease, Emulator, Geo, Job, Meta, Plate, RawSpec, Selection, Spec, SpecStatus, Timeline } from "../lib/types.ts";
+import { applyVersePlan, nextVerseRange, verseRange, type VerseAction } from "../lib/verses.ts";
+import { clamp, plateLook, resolve, soundOnset, takeKey } from "../lib/model.ts";
+import type { Ease, Emulator, Geo, Job, Meta, Plate, RawSpec, Selection, Spec, SpecStatus, Timeline, Wave } from "../lib/types.ts";
 import { clock, media } from "./clock.ts";
 
 export type Tab = "animate" | "recording" | "look";
@@ -24,16 +25,18 @@ function loadUI(): UI {
 
 interface St {
   meta: Meta | null; specs: SpecStatus[]; name: string | null; raw: RawSpec | null; spec: Spec | null;
-  geo: Geo | null; plate: Plate | null; tl: Timeline | null; sel: Selection; clipboard: E.Clip[] | null;
+  geo: Geo | null; plate: Plate | null; tl: Timeline | null; wave: Wave | null; sel: Selection; clipboard: E.Clip[] | null;
   undo: string[]; redo: string[]; saveState: SaveState; saveError: string | null;
   jobs: Job[]; emus: Emulator[]; booting: Job[]; emusLoaded: boolean;
   exact: string | null; ui: UI; panel: Panel; toasts: Toast[]; fatal: string | null;
+  verseBusy: boolean; verseError: string | null;
 }
 
 export const useStore = create<St>(() => ({
-  meta: null, specs: [], name: null, raw: null, spec: null, geo: null, plate: null, tl: null, sel: null, clipboard: null,
+  meta: null, specs: [], name: null, raw: null, spec: null, geo: null, plate: null, tl: null, wave: null, sel: null, clipboard: null,
   undo: [], redo: [], saveState: "saved", saveError: null, jobs: [], emus: [], booting: [], emusLoaded: false,
   exact: null, ui: loadUI(), panel: null, toasts: [], fatal: null,
+  verseBusy: false, verseError: null,
 }));
 const get = useStore.getState, set = useStore.setState;
 
@@ -43,10 +46,14 @@ let saveChain: Promise<unknown> = Promise.resolve();
 let saveTimer: number | undefined, plateTimer: number | undefined;
 let coalesce: { key: string; at: number } | null = null;
 let lastLook = "", lastGeoKey = "";
+let lastTimelineKey = "", verseRequest = 0;
 
 clock.bind(() => {
   const s = get();
-  return { spec: s.spec, hasClip: !!s.geo?.clip, hasPlate: !!s.plate, offset: +(s.spec?.background.offset || 0) };
+  return {
+    spec: s.spec, hasClip: !!s.geo?.clip, hasPlate: !!s.plate, offset: +(s.spec?.background.offset || 0),
+    onset: s.spec ? soundOnset(s.spec, s.geo?.take?.lead ?? 1) : 0,
+  };
 });
 
 // -------------------------------------------------------------- feedback
@@ -140,6 +147,7 @@ export function save(): Promise<boolean> {
     set({ saveState: body === snapshot() ? "saved" : "dirty", saveError: null, specs: get().specs.map((x) => (x.name === name ? r.status : x)) });
     const s = get().spec!;
     if (geoKey(s) !== lastGeoKey) await loadGeometry();
+    else if (timelineKey(s) !== lastTimelineKey) void loadTimeline();
   });
   saveChain = task;
   return task.then(() => true, (e: Error) => {
@@ -148,6 +156,7 @@ export function save(): Promise<boolean> {
   });
 }
 const geoKey = (s: Spec) => [takeKey(s), s.aspect, s.phone.color].join("|");
+const timelineKey = (s: Spec) => JSON.stringify([takeKey(s), s.app.seconds, Math.max(...s.edit.map((p) => p.out))]);
 
 // -------------------------------------------------------------- loading
 
@@ -178,12 +187,12 @@ export async function open(name: string) {
     const r = await api.spec(name);
     if (mine !== session) return;
     clearTimeout(saveTimer); clearTimeout(plateTimer);
-    coalesce = null; lastLook = ""; lastGeoKey = "";
+    coalesce = null; lastLook = ""; lastGeoKey = ""; lastTimelineKey = ""; verseRequest++;
     const spec = resolve(r.raw, get().meta!);
     // New specs may contain just a title; editing always needs real pieces.
     r.raw.edit = spec.edit.map((p) => ({ ...p }));
     saved = JSON.stringify(r.raw);
-    set({ name, raw: r.raw, spec, geo: null, plate: null, tl: null, sel: null, undo: [], redo: [], exact: null, saveState: "saved", saveError: null });
+    set({ name, raw: r.raw, spec, geo: null, plate: null, tl: null, wave: null, sel: null, undo: [], redo: [], exact: null, saveState: "saved", saveError: null, verseBusy: false, verseError: null });
     localStorage.setItem("promo.last", name);
     clock.t = 0;
     await Promise.all([loadGeometry(), loadPlate()]);
@@ -197,7 +206,7 @@ export async function loadGeometry() {
   const { name, spec } = get();
   if (!name || !spec) return;
   const mine = session, key = geoKey(spec);
-  const timeline = api.timeline(name).catch(() => null);
+  void loadTimeline();
   const geo = await api.geometry(name);
   if (mine !== session || geoKey(get().spec!) !== key) return;
   lastGeoKey = key;
@@ -209,7 +218,63 @@ export async function loadGeometry() {
   }
   set({ geo });
   clock.seek(clock.t);
-  timeline.then((tl) => { if (mine === session && geoKey(get().spec!) === key) set({ tl }); });
+  void loadWave(geo.peaks);
+}
+
+let waveUrl: string | null = null;
+async function loadWave(url: string | null) {
+  if (url === waveUrl && get().wave) return;
+  waveUrl = url;
+  if (!url) return set({ wave: null });
+  try {
+    const r = await fetch(url);
+    if (!r.ok) throw new Error(String(r.status));
+    const w = await r.json() as { rate: number; peaks: number[] };
+    if (waveUrl === url) set({ wave: { rate: w.rate, peaks: Uint8Array.from(w.peaks) } });
+  } catch { if (waveUrl === url) set({ wave: null }); }   // the lane draws its fades without a waveform
+}
+
+export async function loadTimeline() {
+  const { name, spec, raw } = get();
+  if (!name || !spec || !raw) return;
+  const mine = session, key = timelineKey(spec);
+  try {
+    const tl = await api.timeline(name, raw);
+    if (mine === session && get().spec && timelineKey(get().spec!) === key) { lastTimelineKey = key; set({ tl }); }
+  } catch { /* Range controls provide a retry when the timeline is unavailable. */ }
+}
+
+/** Choose a continuous range, or add/remove a complete verse at an edit edge. */
+export async function editVerses(start: number, end: number, action?: VerseAction) {
+  const s = get();
+  if (!s.spec || !s.raw || !s.name || s.verseBusy) return;
+  const mine = session, request = ++verseRequest;
+  const identity = JSON.stringify([takeKey(s.spec), s.spec.edit]);
+  set({ verseBusy: true, verseError: null });
+  try {
+    const plan = await api.verseRange(s.name, s.raw, start, end);
+    if (mine !== session || request !== verseRequest) return;
+    const current = get();
+    if (!current.spec || JSON.stringify([takeKey(current.spec), current.spec.edit]) !== identity) throw new Error("The edit changed while loading verses. Try the verse action again.");
+    const changedTake = plan.anchor !== current.spec.app.ayah;
+    mutate((raw) => applyVersePlan(raw, current.spec!, plan, action));
+    set({ sel: null, tl: { verses: plan.verses, repeats: changedTake ? [] : (current.tl?.repeats ?? []), take: changedTake ? null : (current.tl?.take ?? null) }, ...(changedTake ? { geo: null } : {}) });
+    // Save/load the new recording origin immediately; existing footage stays
+    // available for extensions on the same take and is marked short in the UI.
+    await save();
+  } catch (e) {
+    if (mine === session && request === verseRequest) set({ verseError: (e as Error).message });
+  } finally {
+    if (mine === session && request === verseRequest) set({ verseBusy: false });
+  }
+}
+
+export function changeVerse(action: VerseAction) {
+  const { spec, tl, meta } = get();
+  if (!spec || !tl || !meta) return;
+  const count = meta.surahs.find((s) => s.id === spec.app.surah)?.ayahs ?? 0;
+  const next = nextVerseRange(verseRange(spec, tl.verses), action, count);
+  if (next) void editVerses(next.start, next.end, action);
 }
 
 export async function loadPlate() {

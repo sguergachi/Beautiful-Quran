@@ -11,6 +11,7 @@ import {
   useStore, wholeTake, type Tab,
 } from "../state/store.ts";
 import { Button, Dot, Empty, Field, Icon, Progress, Section, Segmented, Select, Slider, TextInput } from "./ui.tsx";
+import { VerseRangeEditor } from "./VerseEditor.tsx";
 
 const EASES: [Ease, string][] = [["inOutCubic", "Ease in & out"], ["inOutSine", "Gentle in & out"], ["outCubic", "Ease out"], ["inCubic", "Ease in"], ["outExpo", "Fast out, long settle"], ["linear", "Linear"], ["hold", "Hold (cut)"]];
 const set = (path: string, v: unknown, key: string | null = null) => mutate((raw) => {
@@ -125,13 +126,14 @@ function Recording() {
   const [serial, setSerial] = useState<string>("auto");
   const a = spec.app, take = geo?.take;
   const activeFps = take?.active_fps;
+  const takeShort = take && Math.max(...spec.edit.map((p) => p.out)) > take.length + 0.05;
   const usable = emus.filter((e) => e.kind === "capture" && e.booted && e.app);
   return (
     <>
       <Section title="What the app plays">
         <Field label="Reciter"><Select value={a.reciter} options={Object.entries(meta.reciters)} onChange={(v) => set("app.reciter", v)} /></Field>
         <Field label="Chapter"><Select value={a.surah} options={meta.surahs.map((s) => [s.id, `${s.id}. ${s.name} (${s.ayahs})`])} onChange={(v) => set("app.surah", +v)} /></Field>
-        <Field label="From ayah" hint="Ayah 1 opens on the chapter header and plays the basmalah first.">
+        <Field label="Take starts" hint="The recording opens here. Choose the video's start and stop verses under Edit. Verse 1 includes the chapter opening.">
           <TextInput type="number" min={1} value={a.ayah} onCommit={(v) => { const n = parseInt(v); if (n >= 1) set("app.ayah", n); }} />
         </Field>
         <Field label="Theme" hint={a.theme === "Paper" ? "Tarjīʿ glimmer only shows on Nightfall and Royal green." : undefined}>
@@ -155,13 +157,13 @@ function Recording() {
               <p className="mb-2.5 text-[12px] text-gold">The active frames are slow. Use 6 cores and record one take at a time for smoother ink.</p>
             )}
             {take?.frame_p90_ms != null && <p className="mb-2.5 text-[11.5px] text-faint">90% of active frame intervals are within {take.frame_p90_ms} ms. Still holds are excluded.</p>}
-            {take && tl?.take != null && Math.max(...spec.edit.map((p) => p.out)) > tl.take + 0.05 && (
-              <p className="mb-2.5 text-[12px] text-orange">The edit runs past the end of the take; its last frame will hold. Raise Record (s) and record again.</p>
+            {takeShort && (
+              <p className="mb-2.5 text-[12px] text-orange">This edit needs a longer take. The recording length is set to include it; record the full range to preview and export the added verses.</p>
             )}
             {job?.state === "error" && <p className="mb-2.5 rounded border border-danger/40 bg-danger/10 p-2 text-[12px] text-danger">Last attempt failed: {job.error}</p>}
             <div className="flex flex-wrap items-center gap-2">
               <Button variant={take ? "default" : "primary"} disabled={!usable.length} onClick={() => record(serial === "auto" ? null : serial, !!take)}>
-                {Icon.rec} {take ? "Record again" : "Record take"}
+                {Icon.rec} {takeShort ? "Record full range" : take ? "Record again" : "Record take"}
               </Button>
               <div className="min-w-[130px] flex-1">
                 <Select value={serial} onChange={setSerial}
@@ -176,6 +178,7 @@ function Recording() {
       </Section>
 
       <Section title="Edit" right={<span className="num text-[11.5px] text-faint">{spec.duration.toFixed(2)} s</span>}>
+        <VerseRangeEditor />
         <div className="mb-1 grid grid-cols-[22px_minmax(0,1fr)_minmax(0,1fr)_26px] gap-1.5 text-[11px] text-faint"><span>#</span><span>In (take s)</span><span>Out (take s)</span><span /></div>
         {raw.edit.map((p: { in: number; out: number }, i: number) => (
           <div key={i} className={`mb-1.5 grid grid-cols-[22px_minmax(0,1fr)_minmax(0,1fr)_26px] items-center gap-1.5 ${sel?.type === "piece" && sel.i === i ? "text-blue" : ""}`}>
@@ -274,9 +277,9 @@ function Look() {
       </Section>
       <Section title="Sound">
         {slider("Gain (dB)", "audio.gain_db", spec.audio.gain_db, -12, 12, 0.5)}
-        {slider("Fade in (s)", "audio.fade_in", spec.audio.fade_in, 0, 3, 0.1)}
-        {slider("Fade out (s)", "audio.fade_out", spec.audio.fade_out, 0, 4, 0.1)}
-        <p className="text-[11.5px] text-faint">The emulator's own recording, normalised to −16 LUFS on export.</p>
+        {slider("Fade in (s)", "audio.fade_in", spec.audio.fade_in, 0, 3, 0.1, "Starts with the first sound: takes open on a silent second.")}
+        {slider("Fade out (s)", "audio.fade_out", spec.audio.fade_out, 0, 4, 0.1, "Ends with the video.")}
+        <p className="text-[11.5px] text-faint">The emulator's own recording, normalised to −16 LUFS on export. The preview plays the gain and fades; drag the handles on the timeline's Sound lane to set the fades there.</p>
       </Section>
       <Section title="Title">
         <TextInput value={spec.title} placeholder="What this video is" onCommit={(v) => set("title", v)} />

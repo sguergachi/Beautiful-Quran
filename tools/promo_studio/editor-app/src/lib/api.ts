@@ -1,5 +1,5 @@
 // The studio server's API (server.py). Errors carry the server's message.
-import type { Emulator, Geo, Job, Meta, Plate, RawSpec, SpecStatus, Timeline } from "./types.ts";
+import type { Emulator, Geo, Job, Meta, Plate, RawSpec, SpecStatus, Timeline, VersePlan } from "./types.ts";
 
 async function call<T>(path: string, opts: RequestInit = {}): Promise<T> {
   let r: Response;
@@ -24,7 +24,8 @@ export const api = {
   copy: (from: string, to: string) => post<{ ok: true }>(`/api/copy/${from}/${to}`),
   rename: (from: string, to: string) => post<{ ok: true }>(`/api/rename/${from}/${to}`),
   geometry: (name: string) => call<Geo>(`/api/geometry/${name}`),
-  timeline: (name: string) => call<Timeline>(`/api/timeline/${name}`),
+  timeline: (name: string, raw: RawSpec) => post<Timeline>(`/api/timeline/${name}`, raw),
+  verseRange: (name: string, raw: RawSpec, start: number, end: number) => post<VersePlan>(`/api/verse-range/${name}`, { raw, start, end }),
   plate: (name: string, raw: string) => call<Plate>(`/api/plate/${name}`, { method: "POST", body: raw }),
   stillUrl: (name: string, t: number) => `/api/still/${name}?t=${t.toFixed(3)}&scale=0.5&_=${Date.now()}`,
   jobs: () => call<Job[]>("/api/jobs"),

@@ -11,6 +11,7 @@ second the take keeps before the recitation starts); the edit maps them to
 video time (anim.video_times), live in the editor.
 """
 import json
+import math
 import os
 import urllib.request
 
@@ -19,6 +20,37 @@ from spec import CACHE, RECITERS
 
 BASE = os.environ.get("BQ_TIMINGS_BASE", "https://beautiful-quran.sguergachi.workers.dev")
 _ROWS = {}
+
+
+def plan_range(s, start, end, lead=1.0):
+    """Whole-verse edit bounds on the take clock, including basmalah/lead.
+
+    Keep the existing recording origin when possible. An earlier start needs
+    a new take; shift identifies the old origin on that new take's clock so
+    timeline edge actions can preserve the cuts between its ends.
+    """
+    a = s["app"]
+    count = audio.ayah_count(int(a["surah"]))
+    if any(isinstance(v, bool) or not isinstance(v, int) for v in (start, end)) or not 1 <= start <= end <= count:
+        raise ValueError(f"choose verses within 1..{count}, with start before stop")
+    old_anchor = int(a["ayah"])
+    anchor = min(start, old_anchor)
+    slug = RECITERS[a["reciter"]]["slug"]
+    t, verses = float(lead), []
+    if anchor == 1 and a["surah"] not in (1, 9):
+        t += audio.duration(audio.fetch(slug, 1, 1))
+        verses.append({"label": "basmalah", "t0": round(lead, 3), "t1": round(t, 3)})
+    for ayah in range(anchor, end + 1):
+        t0 = t
+        t += audio.duration(audio.fetch(slug, int(a["surah"]), ayah))
+        verses.append({"label": f"{a['surah']}:{ayah}", "t0": round(t0, 3), "t1": round(t, 3)})
+    by_label = {v["label"]: v for v in verses}
+    old = by_label.get(f"{a['surah']}:{old_anchor}")
+    # A replace-range ending before the old origin needs no retained pieces.
+    shift = round(old["t0"] - lead, 3) if anchor < old_anchor and old else 0
+    return {"start": start, "end": end, "anchor": anchor, "shift": shift,
+            "in": 0.0 if start == anchor else by_label[f"{a['surah']}:{start}"]["t0"],
+            "out": round(t, 3), "seconds": max(5, math.ceil(t - lead + 0.5)), "verses": verses}
 
 
 def rows(reciter):

@@ -30,8 +30,8 @@ from PIL import Image
 
 import library
 import phone as phone_mod
-from anim import source_time, state_at
-from spec import CACHE, OUT, size, take_dir
+from anim import sound_onset, source_time, state_at
+from spec import CACHE, LEAD, OUT, size, take_dir
 
 cv2.setNumThreads(1)
 
@@ -365,6 +365,12 @@ def audio_graph(s):
     return ";".join(parts)
 
 
+def take_lead(s):
+    """Seconds of silent page the take keeps before the recitation."""
+    p = os.path.join(take_dir(s), "meta.json")
+    return float(json.load(open(p)).get("lead", LEAD)) if os.path.exists(p) else LEAD
+
+
 def audio_filter(s):
     """The take's own sound for this video: cut by the edit, loudness-
     normalised (two-pass EBU R128, docs/KEY_ART.md: -16 LUFS, peaks under
@@ -387,7 +393,9 @@ def audio_filter(s):
                      f"offset={m['target_offset']}:linear=true")
     chain.append(f"volume={a['gain_db']}dB")
     if float(a["fade_in"]) > 0:
-        chain.append(f"afade=t=in:st=0:d={min(dur, float(a['fade_in']))}")
+        # from the first sound, not over the take's silent lead (editor: soundGain)
+        on = min(sound_onset(s, take_lead(s)), dur)
+        chain.append(f"afade=t=in:st={on:.6f}:d={max(1e-3, min(dur - on, float(a['fade_in']))):.6f}")
     if float(a["fade_out"]) > 0:
         chain.append(f"afade=t=out:st={max(0.0, dur - float(a['fade_out'])):.6f}:d={min(dur, float(a['fade_out']))}")
     chain.append(f"aresample=48000,apad=whole_dur={dur:.4f}")

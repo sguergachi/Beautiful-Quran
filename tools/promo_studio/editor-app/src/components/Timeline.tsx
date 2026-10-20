@@ -4,7 +4,7 @@
 import { memo, useEffect, useLayoutEffect, useRef, useState } from "react";
 import * as E from "../lib/edit.ts";
 import { track } from "../lib/drag.ts";
-import { clamp, pieceStart, r3, sourceTime, valueAt, videoTimes } from "../lib/model.ts";
+import { clamp, pieceStart, r3, soundOnset, sourceTime, valueAt, videoTimes } from "../lib/model.ts";
 import type { Ease, Key, PropDef, Spec } from "../lib/types.ts";
 import { fitTimelineScale } from "../lib/timeline.ts";
 import { clock, useTime } from "../state/clock.ts";
@@ -14,6 +14,10 @@ import {
 } from "../state/store.ts";
 import { openMenu, type MenuItem } from "./Menu.tsx";
 import { Button, Icon } from "./ui.tsx";
+import { SoundLane } from "./SoundLane.tsx";
+import { TimelineVerseControls } from "./VerseEditor.tsx";
+
+let lastFadePress = { side: "", at: 0 };
 
 const EASE_LABEL: Record<Ease, string> = {
   inOutCubic: "Ease in & out", inOutSine: "Gentle in & out", outCubic: "Ease out", inCubic: "Ease in",
@@ -26,6 +30,7 @@ const EASE_COLOR: Record<Ease, string> = {
 export function Timeline() {
   const spec = useStore((s) => s.spec), meta = useStore((s) => s.meta), tl = useStore((s) => s.tl);
   const sel = useStore((s) => s.sel), ui = useStore((s) => s.ui), clipboard = useStore((s) => s.clipboard);
+  const wave = useStore((s) => s.wave), lead = useStore((s) => s.geo?.take?.lead ?? 1);
   const box = useRef<HTMLDivElement>(null), inner = useRef<HTMLDivElement>(null);
   const playhead = useRef<HTMLDivElement>(null), head = useRef<HTMLDivElement>(null);
   const hover = useRef<HTMLDivElement>(null), hoverT = useRef<HTMLDivElement>(null);
@@ -88,7 +93,7 @@ export function Timeline() {
   });
 
   if (!spec || !meta) return <div className="flex-1 bg-panel" />;
-  const dur = spec.duration, laneW = ui.fit && width ? Math.max(1, width - labelW) : Math.max(240, dur * pps + 48);
+  const dur = spec.duration, onset = soundOnset(spec, lead), laneW = ui.fit && width ? Math.max(1, width - labelW) : Math.max(240, dur * pps + 48);
 
   const snapT = (t: number, exclude: E.KeyRef[] = [], noPlayhead = false, playhead = clock.t) => {
     const c = [0, dur];
@@ -174,6 +179,24 @@ export function Timeline() {
       if (q) clock.seek(pieceStart(s, i) + (side === "in" ? 0 : q.out - q.in - 1e-3));
     }, () => endGesture(), { cursor: "ew" });
   };
+  // a fade handle sits at the inner end of its fade; the fade in counts from the first sound
+  const fadeDown = (e: React.PointerEvent, side: "in" | "out") => {
+    if (e.button !== 0) return;
+    e.preventDefault(); e.stopPropagation(); clock.pause(); endGesture();
+    // pointer capture sends dblclick to the scroll box, so a second press removes the fade
+    const now = performance.now(), again = lastFadePress.side === side && now - lastFadePress.at < 400;
+    lastFadePress = again ? { side: "", at: 0 } : { side, at: now };
+    if (again) return fadeReset(side);
+    const tag = `drag:fade:${performance.now()}`;
+    track(e, box.current!, (m) => {
+      const t = clamp(timeAt(m.clientX), 0, dur);
+      let v = side === "in" ? t - onset : dur - t;
+      if (!m.altKey) v = Math.round(v * 20) / 20;
+      v = r3(clamp(v, 0, side === "in" ? Math.max(0, dur - onset) : dur));
+      mutate((raw) => { raw.audio = { ...raw.audio, [side === "in" ? "fade_in" : "fade_out"]: v }; }, tag);
+    }, () => endGesture(), { cursor: "ew", edge: edgeOpt() });
+  };
+  const fadeReset = (side: "in" | "out") => mutate((raw) => { raw.audio = { ...raw.audio, [side === "in" ? "fade_in" : "fade_out"]: 0 }; });
   const resizeLabels = (e: React.PointerEvent) => {
     e.preventDefault(); e.stopPropagation();
     const x0 = e.clientX, w0 = labelW;
@@ -287,8 +310,15 @@ export function Timeline() {
             })}
             {spec.edit.slice(1).map((_, i) => <div key={"c" + i} className="pointer-events-none absolute inset-y-0 border-l border-dashed border-[#6a8ab0]" style={{ left: pieceStart(spec, i + 1) * pps }} />)}
           </LaneRow>
+          <LaneRow labelW={labelW} laneW={laneW} scrub={scrub} tall label={
+            <button className="flex w-full min-w-0 items-center gap-1.5 text-left" onClick={() => setUI({ tab: "look", hideR: false })} title="Sound settings (gain, fades) on the Look tab">
+              <span>Sound</span>
+              <span className="num ml-auto truncate text-[10.5px] text-faint">{spec.audio.fade_in > 0 || spec.audio.fade_out > 0 ? `fades ${+spec.audio.fade_in.toFixed(2)} / ${+spec.audio.fade_out.toFixed(2)} s` : "no fades"}</span>
+            </button>}>
+            <SoundLane spec={spec} wave={wave} pps={pps} onset={onset} onFadeDown={fadeDown} />
+          </LaneRow>
           {/* references */}
-          <LaneRow labelW={labelW} laneW={laneW} scrub={scrub} label="Verses">
+          <LaneRow labelW={labelW} laneW={laneW} scrub={scrub} label={<TimelineVerseControls />}>
             {(tl?.verses || []).flatMap((v, vi) => videoTimes(spec, v.t0, v.t1).map(([a, b], j) => (
               <div key={`${vi}-${j}`} onPointerDown={(e) => scrub(e, a)} title={`${v.label} · click to jump · drag to scrub`}
                 className={`absolute top-1 bottom-1 cursor-pointer overflow-hidden whitespace-nowrap rounded border px-1.5 text-[10.5px] ${v.label === "basmalah" ? "border-[#5a4c2c] bg-[#3a3324] text-[#e9d9ae]" : "border-[#3f5a50] bg-[#26332e] text-[#cfe5dc]"}`}

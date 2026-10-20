@@ -14,7 +14,8 @@ Object.assign(globalThis, {
   cancelAnimationFrame: (id: number) => frames.delete(id),
 });
 const { clock, media } = await import('../src/state/clock.ts');
-clock.bind(() => ({ spec: { duration: 10, fps: 60, edit: [{ in: 0, out: 10 }] } as any, hasClip: true, hasPlate: true, offset: 0 }));
+const audio = { gain_db: 0, fade_in: 1, fade_out: 2, loudness: -16 };
+clock.bind(() => ({ spec: { duration: 10, fps: 60, edit: [{ in: 0, out: 10 }], audio } as any, hasClip: true, hasPlate: true, offset: 0, onset: 1 }));
 
 test('rapid play/pause/play leaves one animation loop', () => {
   clock.play(); clock.pause(); clock.play();
@@ -34,4 +35,13 @@ test('replacement media resumes only while the timeline is playing', () => {
   clock.pause();
   media.plate.dispatchEvent(new Event('loadeddata'));
   assert.equal(media.plate.paused, true);
+});
+
+test('without Web Audio the preview still hears the fades', () => {
+  clock.seek(1.5); clock.play();
+  assert.equal(media.audio.volume, 0.5);
+  clock.pause();
+  clock.seek(9); clock.play();
+  assert.equal(media.audio.volume, 0.5);
+  clock.pause();
 });

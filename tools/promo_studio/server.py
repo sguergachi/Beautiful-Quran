@@ -72,6 +72,15 @@ def take_meta(s):
     return json.load(open(p)) if os.path.exists(p) else None
 
 
+def editor_timeline(s):
+    """Timeline for a saved spec or a live editor draft, on its take clock."""
+    meta = take_meta(s)
+    if meta:
+        s["app"]["seconds"] = max(s["app"]["seconds"], meta["length"])
+    tl = timeline.build(s, meta["lead"] if meta else S.LEAD)
+    return {"verses": tl["verses"], "repeats": tl["repeats"], "take": meta["length"] if meta else None}
+
+
 def spec_status(name):
     try:
         s = S.load(name)
@@ -84,6 +93,36 @@ def spec_status(name):
             "duration": s["duration"], "take": bool(meta), "take_length": length or None,
             "take_short": bool(length) and S.take_needed(s) > length + 0.05, "video": os.path.exists(out),
             "video_mtime": os.path.getmtime(out) if os.path.exists(out) else None}
+
+
+PEAK_RATE = 100     # waveform columns per take second
+
+
+def take_peaks(key):
+    """The take's waveform for the timeline's Sound lane, as JSON: the
+    loudest sample of each 10 ms, 0..255 on a square-root scale so quiet
+    recitation still shows. Cached beside audio.wav."""
+    d = os.path.join(S.CACHE, "takes", key)
+    wav, out = os.path.join(d, "audio.wav"), os.path.join(d, "peaks.json")
+    if not os.path.isfile(wav):
+        return None
+    if os.path.exists(out) and os.path.getmtime(out) >= os.path.getmtime(wav):
+        return open(out, "rb").read()
+    import wave
+    import numpy as np
+    with wave.open(wav) as w:
+        if w.getsampwidth() != 2:
+            raise ValueError("audio.wav is not 16-bit PCM")
+        ch, step = w.getnchannels(), max(1, w.getframerate() // PEAK_RATE)
+        x = np.abs(np.frombuffer(w.readframes(w.getnframes()), np.int16).astype(np.int32)).reshape(-1, ch).max(axis=1)
+    n = -(-len(x) // step)
+    x = np.pad(x, (0, n * step - len(x))).reshape(n, step).max(axis=1)
+    body = json.dumps({"rate": PEAK_RATE, "peaks": np.round(np.sqrt(x / 32768.0) * 255).astype(int).tolist()},
+                      separators=(",", ":")).encode()
+    tmp = f"{out}.{os.getpid()}.{threading.get_ident()}.tmp"
+    open(tmp, "wb").write(body)
+    os.replace(tmp, out)
+    return body
 
 
 def geometry(s):
@@ -100,6 +139,7 @@ def geometry(s):
             "frame": "/media/phone/" + os.path.basename(fp),
             "clip": f"/media/take/{key}/clip.mp4?v={revision}" if meta else None,
             "audio": f"/media/take/{key}/audio.wav?v={revision}" if meta else None,
+            "peaks": f"/media/take/{key}/peaks.json?v={revision}" if meta else None,
             "plate": {"w": pw, "h": ph, "k": pk}}
 
 
@@ -547,12 +587,7 @@ class Handler(BaseHTTPRequestHandler):
             return self.send_json(geometry(S.load(m.group(1))))
         m = re.fullmatch(r"/api/timeline/([\w.-]+)", p)
         if m:
-            s = S.load(m.group(1))
-            meta = take_meta(s)
-            if meta:
-                s["app"]["seconds"] = max(s["app"]["seconds"], meta["length"])
-            tl = timeline.build(s, meta["lead"] if meta else 1.0)
-            return self.send_json({"verses": tl["verses"], "repeats": tl["repeats"], "take": meta["length"] if meta else None})
+            return self.send_json(editor_timeline(S.load(m.group(1))))
         m = re.fullmatch(r"/api/still/([\w.-]+)", p)
         if m:
             import compose
@@ -577,6 +612,10 @@ class Handler(BaseHTTPRequestHandler):
         m = re.fullmatch(r"/api/emus/(emulator-\d+)/screen\.jpg", p)
         if m:
             return self.send_bytes(emus.screenshot(m.group(1)), "image/jpeg")
+        m = re.fullmatch(r"/media/take/([\w.-]+)/peaks\.json", p)
+        if m:
+            body = take_peaks(m.group(1))
+            return self.send_bytes(body, "application/json", cache="no-cache") if body else self.send_json({"error": "no take"}, 404)
         m = re.fullmatch(r"/media/take/([\w.-]+)/(clip\.mp4|audio\.wav)", p)
         if m:
             return self.send_file(os.path.join(S.CACHE, "takes", m.group(1), m.group(2)))
@@ -615,6 +654,13 @@ class Handler(BaseHTTPRequestHandler):
 
     def route_post(self):
         p = urllib.parse.urlparse(self.path).path
+        if re.fullmatch(r"/api/timeline/[\w.-]+", p):
+            return self.send_json(editor_timeline(S.resolve(self.body())))
+        if re.fullmatch(r"/api/verse-range/[\w.-]+", p):
+            body = self.body()
+            s = S.resolve(body.get("raw", {}))
+            meta = take_meta(s)
+            return self.send_json(timeline.plan_range(s, body.get("start"), body.get("end"), meta["lead"] if meta else S.LEAD))
         m = re.fullmatch(r"/api/plate/([\w.-]+)", p)
         if m:
             # plate for the (possibly unsaved) background settings in the body

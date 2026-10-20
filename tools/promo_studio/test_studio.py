@@ -137,6 +137,19 @@ class MediaTests(unittest.TestCase):
         self.assertIn("afade=t=out:st=0.000000:d=0.5", fc)
         subprocess.run(["ffmpeg", "-v", "error", "-i", wav, "-filter_complex", fc, "-map", "[aout]", "-f", "null", "-"], check=True)
 
+    def test_fade_in_starts_with_the_first_sound(self):
+        from anim import sound_onset
+        on = lambda edit: sound_onset(spec.resolve({"edit": edit}), 1.0)
+        self.assertEqual(on([{"in": 0, "out": 10}]), 1.0)
+        self.assertEqual(on([{"in": 1.5, "out": 10}]), 0.0)
+        self.assertAlmostEqual(on([{"in": .2, "out": .8}, {"in": .5, "out": 5}]), 1.1)
+        wav = str(self.d / "audio.wav")
+        subprocess.run(["ffmpeg", "-v", "error", "-y", "-f", "lavfi", "-i", "sine=f=440:r=48000", "-t", "4", wav], check=True)
+        s = spec.resolve({"edit": [{"in": .4, "out": 4}], "audio": {"fade_in": .5, "fade_out": 0, "loudness": None}})
+        with patch.object(compose, "take_dir", return_value=str(self.d)):
+            _, fc = compose.audio_filter(s)
+        self.assertIn("afade=t=in:st=0.600000:d=0.500000", fc)
+
     def test_motion_blur_does_not_accumulate_background_grading(self):
         s = spec.resolve({"phone": {"shadow": 0}, "props": {"bg_brightness": -.4},
                           "tracks": {"zoom": [{"t": 0, "v": 1}, {"t": 1, "v": 6}]}})

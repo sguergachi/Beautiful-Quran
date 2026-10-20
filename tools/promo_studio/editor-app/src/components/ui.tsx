@@ -44,9 +44,9 @@ export function Field({ label, hint, children }: { label: ReactNode; hint?: Reac
 }
 
 const inputCls = "h-8 min-w-0 max-w-full w-full rounded-md border border-line bg-panel2 px-2 outline-none focus:border-gold/70";
-export function Select({ value, options, onChange }: { value: string | number; options: [string | number, string][]; onChange: (v: string) => void }) {
+export function Select({ value, options, onChange, disabled }: { value: string | number; options: [string | number, string][]; onChange: (v: string) => void; disabled?: boolean }) {
   return (
-    <select className={inputCls} value={String(value)} onChange={(e) => onChange(e.target.value)}>
+    <select className={`${inputCls} disabled:opacity-40`} disabled={disabled} value={String(value)} onChange={(e) => onChange(e.target.value)}>
       {options.map(([v, l]) => <option key={String(v)} value={String(v)}>{l}</option>)}
     </select>
   );

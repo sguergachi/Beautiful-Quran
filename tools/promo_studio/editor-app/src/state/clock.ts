@@ -3,7 +3,7 @@
 // without re-rendering the app; React reads it through useTime() at a
 // gentler rate.
 import { useEffect, useState } from "react";
-import { clamp, sourceTime } from "../lib/model.ts";
+import { clamp, soundGain, sourceTime } from "../lib/model.ts";
 import type { Spec } from "../lib/types.ts";
 
 type Listener = (t: number) => void;
@@ -45,7 +45,33 @@ for (const m of [media.screen, media.plate, media.audio]) {
   });
 }
 
-let ctx: () => { spec: Spec | null; hasClip: boolean; hasPlate: boolean; offset: number } = () => ({ spec: null, hasClip: false, hasPlate: false, offset: 0 });
+let ctx: () => { spec: Spec | null; hasClip: boolean; hasPlate: boolean; offset: number; onset: number } =
+  () => ({ spec: null, hasClip: false, hasPlate: false, offset: 0, onset: 0 });
+
+// The take's sound runs through a gain node so the preview hears the spec's
+// gain and fades as the export will (a media element's volume stops at 1).
+// The graph starts on the first play, inside the user's gesture.
+let audioCtx: AudioContext | null = null, gainNode: GainNode | null = null;
+function startSound() {
+  if (!audioCtx) {
+    try {
+      audioCtx = new AudioContext();
+      gainNode = audioCtx.createGain();
+      audioCtx.createMediaElementSource(media.audio).connect(gainNode).connect(audioCtx.destination);
+    } catch { audioCtx = gainNode = null; }
+  }
+  if (audioCtx?.state === "suspended") audioCtx.resume().catch(() => {});
+}
+function setGain(t: number, jump: boolean) {
+  const { spec, onset } = ctx();
+  if (!spec) return;
+  const g = soundGain(spec, t, onset);
+  if (!audioCtx || !gainNode) { media.audio.volume = clamp(g, 0, 1); return; }
+  const at = audioCtx.currentTime, p = gainNode.gain;
+  p.cancelScheduledValues(at);
+  if (jump) p.setValueAtTime(g, at);
+  else p.setTargetAtTime(g, at, 0.012);   // per-frame steps without zipper noise
+}
 
 export const clock = {
   t: 0,
@@ -92,6 +118,7 @@ export const clock = {
     this.t = clamp(t, 0, this.duration());
     this._wall0 = performance.now(); this._t0 = this.t;
     this.sync(true);
+    if (this.playing) setGain(this.t, true);
     this.emit();
   },
   play() {
@@ -99,6 +126,8 @@ export const clock = {
     if (!spec || this.playing) return;
     if (this.t >= spec.duration - 0.05) this.t = 0;
     this.playing = true;
+    startSound();
+    setGain(this.t, true);
     this.sync(true);
     this._wall0 = performance.now(); this._t0 = this.t;
     if (hasClip) { media.screen.play().catch(() => {}); media.audio.play().catch(() => {}); }
@@ -114,6 +143,8 @@ export const clock = {
     this.emitState(); this.emit();
   },
   toggle() { this.playing ? this.pause() : this.play(); },
+  /** The preview's sound level now: the gain node's, or the element volume without Web Audio. */
+  gain() { return gainNode ? gainNode.gain.value : media.audio.volume; },
   setLoop(on: boolean) { this.loop = on; this.emitState(); },
   _tick() {
     if (!this.playing) return;
@@ -122,9 +153,10 @@ export const clock = {
     const d = this.duration();
     if (this.t >= d) {
       if (!this.loop) { this.t = d; this.pause(); return; }
-      this.t = 0; this._t0 = 0; this._wall0 = performance.now(); this.sync(true);
+      this.t = 0; this._t0 = 0; this._wall0 = performance.now(); this.sync(true); setGain(0, true);
     }
     this.sync(false);
+    setGain(this.t, false);
     this.emit();
     this._raf = requestAnimationFrame(() => this._tick());
   },

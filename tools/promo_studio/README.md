@@ -163,8 +163,20 @@ share one take.
   picture (8 ms fades at each cut, so no clicks). In the spec:
   `"edit": [{"in": 0.0, "out": 12.4}, {"in": 15.0, "out": 21.0}]`, in take
   seconds; the take opens 1 s before the recitation.
+- **Sound**: the take's waveform through your cuts, shaped by the fades.
+  Drag a fade's gold handle to set its length (it rounds to 0.05 s; hold
+  Alt for no rounding); double-click a handle to remove the fade. The fade
+  in starts with the first sound, not over the take's silent lead second,
+  and the fade out ends with the video. The preview plays the gain and the
+  fades as the export does (the export also normalises to −16 LUFS).
 - **Verses** and **Repeats**: where each verse and each repeated word falls,
-  mapped through your cuts. Click one to jump there.
+  mapped through your cuts. Click one to jump there. The **−** / **+** on
+  the Verses label remove or add a whole verse at the end; the Recording
+  tab's Edit section also picks Start and Stop verses (one continuous
+  range) and adds or removes a verse at either end (keeping the cuts in
+  between). A verse before the take's first one needs a new take, and a
+  verse past the take's end raises Record (s); the take card then asks
+  for the full range.
 - **Property lanes**, one per property, in three groups (click a group to
   fold it; folded, its keys share one lane):
 
