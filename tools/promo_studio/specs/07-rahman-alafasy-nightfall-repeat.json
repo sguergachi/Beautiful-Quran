@@ -1,7 +1,6 @@
 {
   "title": "Ar-Rahman 46–48 · Alafasy · Nightfall · repeat",
   "aspect": "1:1",
-  "duration": 26.5,
   "app": {
     "surah": 55,
     "ayah": 46,
@@ -9,74 +8,111 @@
     "theme": "Nightfall",
     "seconds": 28
   },
+  "edit": [
+    {
+      "in": 0.0,
+      "out": 26.5
+    }
+  ],
   "background": {
     "id": "cloud-sea"
   },
   "phone": {
-    "height": 0.8,
-    "y": 0.035
+    "height": 0.8
+  },
+  "props": {
+    "phone_y": 0.035
+  },
+  "tracks": {
+    "zoom": [
+      {
+        "t": 0,
+        "v": 2.0
+      },
+      {
+        "t": 3.0,
+        "v": 1.0,
+        "ease": "inOutCubic"
+      },
+      {
+        "t": 17.6,
+        "v": 1.0
+      },
+      {
+        "t": 19.0,
+        "v": 2.3,
+        "ease": "inOutCubic"
+      },
+      {
+        "t": 24.0,
+        "v": 2.3
+      },
+      {
+        "t": 25.2,
+        "v": 1.0,
+        "ease": "inOutCubic"
+      }
+    ],
+    "pan_x": [
+      {
+        "t": 0,
+        "v": 0.5
+      },
+      {
+        "t": 3.0,
+        "v": 0.5,
+        "ease": "inOutCubic"
+      },
+      {
+        "t": 17.6,
+        "v": 0.5
+      },
+      {
+        "t": 19.0,
+        "v": 0.5,
+        "ease": "inOutCubic"
+      },
+      {
+        "t": 24.0,
+        "v": 0.5
+      },
+      {
+        "t": 25.2,
+        "v": 0.5,
+        "ease": "inOutCubic"
+      }
+    ],
+    "pan_y": [
+      {
+        "t": 0,
+        "v": 0.3264
+      },
+      {
+        "t": 3.0,
+        "v": 0.5,
+        "ease": "inOutCubic"
+      },
+      {
+        "t": 17.6,
+        "v": 0.5
+      },
+      {
+        "t": 19.0,
+        "v": 0.3937,
+        "ease": "inOutCubic"
+      },
+      {
+        "t": 24.0,
+        "v": 0.3937
+      },
+      {
+        "t": 25.2,
+        "v": 0.5,
+        "ease": "inOutCubic"
+      }
+    ]
   },
   "audio": {
     "fade_out": 2.0
-  },
-  "camera": [
-    {
-      "t": 0,
-      "zoom": 2.0,
-      "x": 0.5,
-      "y": 0.25
-    },
-    {
-      "t": 3.0,
-      "zoom": 1.0,
-      "x": 0.5,
-      "y": 0.5,
-      "ease": "inOutCubic"
-    },
-    {
-      "t": 17.6,
-      "zoom": 1.0,
-      "x": 0.5,
-      "y": 0.5
-    },
-    {
-      "t": 19.0,
-      "zoom": 2.3,
-      "x": 0.5,
-      "y": 0.335,
-      "ease": "inOutCubic"
-    },
-    {
-      "t": 24.0,
-      "zoom": 2.3,
-      "x": 0.5,
-      "y": 0.335
-    },
-    {
-      "t": 25.2,
-      "zoom": 1.0,
-      "x": 0.5,
-      "y": 0.5,
-      "ease": "inOutCubic"
-    }
-  ],
-  "captions": [
-    {
-      "t0": 1.2,
-      "t1": 6.4,
-      "text": "Every word, written as it is recited.",
-      "pos": "top"
-    },
-    {
-      "t0": 20.6,
-      "t1": 24.2,
-      "text": "Every repetition, marked.",
-      "pos": "top"
-    }
-  ],
-  "end_card": {
-    "t": 24.4,
-    "title": "Beautiful Quran",
-    "subtitle": "Free · Android & Web"
   }
 }

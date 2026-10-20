@@ -1,7 +1,6 @@
 {
   "title": "Al-Baqarah 16 · Hani · Nightfall · repeat + tarji",
   "aspect": "9:16",
-  "duration": 23.0,
   "app": {
     "surah": 2,
     "ayah": 16,
@@ -9,83 +8,111 @@
     "theme": "Nightfall",
     "seconds": 25
   },
+  "edit": [
+    {
+      "in": 0.0,
+      "out": 23.0
+    }
+  ],
   "background": {
-    "id": "rain-glass",
-    "brightness": 0.03
-  },
-  "audio": {
-    "fade_out": 2.0
-  },
-  "camera": [
-    {
-      "t": 0,
-      "zoom": 1.3,
-      "x": 0.5,
-      "y": 0.3
-    },
-    {
-      "t": 3.5,
-      "zoom": 1.0,
-      "x": 0.5,
-      "y": 0.5,
-      "ease": "inOutSine"
-    },
-    {
-      "t": 10.8,
-      "zoom": 1.0,
-      "x": 0.5,
-      "y": 0.5
-    },
-    {
-      "t": 12.0,
-      "zoom": 1.3,
-      "x": 0.5,
-      "y": 0.32,
-      "ease": "inOutCubic"
-    },
-    {
-      "t": 19.4,
-      "zoom": 1.3,
-      "x": 0.5,
-      "y": 0.32
-    },
-    {
-      "t": 20.4,
-      "zoom": 1.0,
-      "x": 0.5,
-      "y": 0.5,
-      "ease": "inOutCubic"
-    }
-  ],
-  "captions": [
-    {
-      "t0": 1.0,
-      "t1": 6.5,
-      "text": "Every word, as it is recited.",
-      "pos": "top",
-      "y": 0.058
-    },
-    {
-      "t0": 12.0,
-      "t1": 16.0,
-      "text": "When the reciter repeats, the ink remembers.",
-      "pos": "bottom",
-      "y": 0.945
-    },
-    {
-      "t0": 16.6,
-      "t1": 19.8,
-      "text": "Held notes shimmer with the voice.",
-      "pos": "bottom",
-      "y": 0.945
-    }
-  ],
-  "end_card": {
-    "t": 20.4,
-    "title": "Beautiful Quran",
-    "subtitle": "Free · Android & Web"
+    "id": "rain-glass"
   },
   "phone": {
     "height": 0.78
+  },
+  "props": {
+    "bg_brightness": 0.03
+  },
+  "tracks": {
+    "zoom": [
+      {
+        "t": 0,
+        "v": 1.3
+      },
+      {
+        "t": 3.5,
+        "v": 1.0,
+        "ease": "inOutSine"
+      },
+      {
+        "t": 10.8,
+        "v": 1.0
+      },
+      {
+        "t": 12.0,
+        "v": 1.3,
+        "ease": "inOutCubic"
+      },
+      {
+        "t": 19.4,
+        "v": 1.3
+      },
+      {
+        "t": 20.4,
+        "v": 1.0,
+        "ease": "inOutCubic"
+      }
+    ],
+    "pan_x": [
+      {
+        "t": 0,
+        "v": 0.5
+      },
+      {
+        "t": 3.5,
+        "v": 0.5,
+        "ease": "inOutSine"
+      },
+      {
+        "t": 10.8,
+        "v": 0.5
+      },
+      {
+        "t": 12.0,
+        "v": 0.5,
+        "ease": "inOutCubic"
+      },
+      {
+        "t": 19.4,
+        "v": 0.5
+      },
+      {
+        "t": 20.4,
+        "v": 0.5,
+        "ease": "inOutCubic"
+      }
+    ],
+    "pan_y": [
+      {
+        "t": 0,
+        "v": 0.3509
+      },
+      {
+        "t": 3.5,
+        "v": 0.5,
+        "ease": "inOutSine"
+      },
+      {
+        "t": 10.8,
+        "v": 0.5
+      },
+      {
+        "t": 12.0,
+        "v": 0.3658,
+        "ease": "inOutCubic"
+      },
+      {
+        "t": 19.4,
+        "v": 0.3658
+      },
+      {
+        "t": 20.4,
+        "v": 0.5,
+        "ease": "inOutCubic"
+      }
+    ]
+  },
+  "audio": {
+    "fade_out": 2.0
   }
 }

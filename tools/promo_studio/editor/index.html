@@ -10,6 +10,10 @@
 <body>
 <header>
   <div class="brand"><img src="/icon.png" alt=""><span>Promo Studio</span></div>
+  <div class="row hist">
+    <button id="undo" title="Undo (Ctrl+Z)" disabled>↶ Undo</button>
+    <button id="redo" title="Redo (Ctrl+Shift+Z)" disabled>↷ Redo</button>
+  </div>
   <div class="spacer"></div>
   <div id="emu" class="pill" title="Capture emulator">emulator …</div>
   <button id="emuBoot" class="ghost hidden">Boot emulator</button>
@@ -33,29 +37,32 @@
 
   <section id="center">
     <div id="stageWrap">
-      <canvas id="stage"></canvas>
+      <canvas id="stage" title="Drag: pan · scroll: zoom · shift-scroll: rotate · alt-drag / alt-scroll: move / scale the phone"></canvas>
       <img id="exact" class="hidden" alt="exact frame">
       <div id="stageNote" class="hidden"></div>
-      <div id="stageHint">Select a camera key, then drag the picture to pan · scroll to zoom · shift-scroll to rotate</div>
     </div>
     <div id="transport">
       <button id="play" class="icon" title="Play / pause (space)">▶</button>
       <span id="time">0.00 / 0.00</span>
       <div class="spacer"></div>
-      <button id="addKey" title="Add a camera key at the playhead (K)">+ Camera key</button>
+      <button id="keyCam" title="Key the camera (zoom, pan) at the playhead (K)">◆ Key camera</button>
       <button id="presetPush" title="Ease in to the active verse over 0.9 s">Push in</button>
       <button id="presetPull" title="Ease back out to the whole phone over 0.9 s">Pull back</button>
       <button id="presetPunch" title="Cut straight to a close-up">Punch in</button>
-      <button id="delKey" class="danger" title="Delete the selected camera key (Del)">Delete key</button>
       <button id="exactBtn" class="ghost" title="Show the compositor's exact frame (with motion blur)">Exact frame</button>
     </div>
     <div id="timeline">
-      <div id="ruler"></div>
-      <div class="track" data-track="verses"><label>Verses</label><div class="lane"></div></div>
-      <div class="track" data-track="repeats"><label>Repeats</label><div class="lane"></div></div>
-      <div class="track" data-track="camera"><label>Camera</label><div class="lane"></div></div>
-      <div class="track" data-track="captions"><label>Text</label><div class="lane"></div></div>
-      <div id="playhead"></div>
+      <div id="tlbar">
+        <button id="split" title="Split the recording at the playhead (S)">✂ Split</button>
+        <button id="delSel" class="danger" title="Delete the selected key or piece (Del)">Delete</button>
+        <span class="sep"></span>
+        <button id="prevKey" title="Previous key ([)">◂◆</button>
+        <button id="nextKey" title="Next key (])">◆▸</button>
+        <div class="spacer"></div>
+        <label class="zoomer" title="Timeline zoom">⇔ <input id="pps" type="range" min="10" max="400" step="1" value="60"></label>
+        <button id="fit" class="ghost" title="Fit the whole video">Fit</button>
+      </div>
+      <div id="tlscroll"><div id="tlinner"></div></div>
     </div>
     <div id="actions">
       <span id="saveState">—</span>
@@ -69,18 +76,14 @@
 
   <aside id="right">
     <nav id="tabs">
-      <button data-tab="video" class="on">Video</button>
-      <button data-tab="app">App</button>
+      <button data-tab="animate" class="on">Animate</button>
+      <button data-tab="recording">Recording</button>
       <button data-tab="look">Look</button>
-      <button data-tab="text">Text</button>
-      <button data-tab="key">Key</button>
     </nav>
     <div id="panes">
-      <div class="pane on" data-pane="video"></div>
-      <div class="pane" data-pane="app"></div>
+      <div class="pane on" data-pane="animate"></div>
+      <div class="pane" data-pane="recording"></div>
       <div class="pane" data-pane="look"></div>
-      <div class="pane" data-pane="text"></div>
-      <div class="pane" data-pane="key"></div>
     </div>
     <div id="jobs"></div>
   </aside>
@@ -90,7 +93,6 @@
 <video id="plateVid" muted playsinline loop preload="auto" class="media"></video>
 <audio id="audio" preload="auto"></audio>
 <img id="frameImg" class="media" alt="">
-<img id="iconImg" class="media" src="/icon.png" alt="">
 <script src="/editor/editor.js"></script>
 </body>
 </html>

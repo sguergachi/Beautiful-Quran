@@ -41,8 +41,10 @@ def spec_status(name):
         return {"name": name, "error": str(e)}
     take = os.path.join(S.take_dir(s), "meta.json")
     out = os.path.join(S.OUT, name + ".mp4")
+    length = json.load(open(take))["length"] if os.path.exists(take) else 0
     return {"name": name, "title": s.get("title", ""), "aspect": s["aspect"], "app": s["app"],
-            "take": os.path.exists(take), "video": os.path.exists(out),
+            "duration": s["duration"], "take": os.path.exists(take),
+            "take_short": bool(length) and S.take_needed(s) > length + 0.05, "video": os.path.exists(out),
             "video_mtime": os.path.getmtime(out) if os.path.exists(out) else None}
 
 
@@ -53,7 +55,8 @@ def geometry(s):
     meta = json.load(open(meta_p)) if os.path.exists(meta_p) else None
     sw, sh = (meta["width"], meta["height"]) if meta else (1080, 2400)
     fp, mp, g = phone_mod.ensure(os.path.join(S.CACHE, "phone"), sw, sh, s["phone"]["color"])
-    pw, ph, pk = library.plate_geometry(s["background"], W, H)
+    from compose import plate_settings
+    pw, ph, pk = library.plate_geometry(plate_settings(s), W, H)
     key = S.take_key(s)
     return {"W": W, "H": H, "fps": s["fps"], "g": g, "take": meta,
             "frame": "/media/phone/" + os.path.basename(fp),
@@ -159,7 +162,7 @@ class Handler(BaseHTTPRequestHandler):
             m = re.fullmatch(r"/api/spec/([\w.-]+)", self.path)
             if not m:
                 return self.send_error(404)
-            raw = self.body()
+            raw = S.migrate(self.body())                     # an old editor tab may still send v1
             S.resolve(raw)                                   # validate before saving
             with open(spec_path(m.group(1)), "w") as f:
                 json.dump(raw, f, indent=2, ensure_ascii=False)
@@ -202,7 +205,7 @@ class Handler(BaseHTTPRequestHandler):
                 "reciters": {k: v["name"] for k, v in S.RECITERS.items()},
                 "themes": S.THEMES, "layouts": S.LAYOUTS, "views": S.VIEWS,
                 "aspects": {k: list(v) for k, v in S.ASPECTS.items()}, "eases": S.EASES,
-                "phones": sorted(phone.COLORS), "defaults": S.DEFAULTS,
+                "phones": sorted(phone.COLORS), "defaults": S.DEFAULTS, "props": S.PROPS,
                 "backgrounds": {k: {"title": v["title"], "suits": v["suits"], "thumb": f"/media/thumb/{k}.jpg"}
                                 for k, v in bgs.items()},
                 "surahs": surahs(), "out_dir": S.OUT})
@@ -211,7 +214,7 @@ class Handler(BaseHTTPRequestHandler):
             return self.send_json([spec_status(n) for n in names])
         m = re.fullmatch(r"/api/spec/([\w.-]+)", p)
         if m:
-            raw = json.load(open(spec_path(m.group(1))))
+            raw = S.migrate(json.load(open(spec_path(m.group(1)))))
             return self.send_json({"raw": raw, "resolved": S.load(m.group(1))})
         m = re.fullmatch(r"/api/geometry/([\w.-]+)", p)
         if m:
@@ -221,7 +224,9 @@ class Handler(BaseHTTPRequestHandler):
             s = S.load(m.group(1))
             meta_p = os.path.join(S.take_dir(s), "meta.json")
             lead = json.load(open(meta_p))["lead"] if os.path.exists(meta_p) else 1.0
-            return self.send_json(timeline.build(s, lead))
+            tl = timeline.build(s, lead)
+            return self.send_json({"verses": tl["verses"], "repeats": tl["repeats"],
+                                   "take": json.load(open(meta_p))["length"] if os.path.exists(meta_p) else None})
         m = re.fullmatch(r"/api/still/([\w.-]+)", p)
         if m:
             import compose
@@ -269,12 +274,14 @@ class Handler(BaseHTTPRequestHandler):
         m = re.fullmatch(r"/api/plate/([\w.-]+)", p)
         if m:
             # plate for the (possibly unsaved) background settings in the body
-            raw = self.body()
-            s = S.resolve(raw)
+            from compose import plate_settings
+            s = S.resolve(self.body())
             W, H = S.size(s)
-            path = library.plate(s["background"], W, H)
-            pw, ph, pk = library.plate_geometry(s["background"], W, H)
-            return self.send_json({"url": "/media/plate/" + os.path.basename(path), "w": pw, "h": ph, "k": pk})
+            bg = plate_settings(s)
+            path = library.plate(bg, W, H)
+            pw, ph, pk = library.plate_geometry(bg, W, H)
+            return self.send_json({"url": "/media/plate/" + os.path.basename(path), "w": pw, "h": ph, "k": pk,
+                                   "blur": bg["blur"]})
         m = re.fullmatch(r"/api/copy/([\w.-]+)/([\w.-]+)", p)
         if m:
             src, dst = spec_path(m.group(1)), spec_path(m.group(2))

@@ -1,7 +1,6 @@
 {
   "title": "Al-Fatihah 5–7 · Hani · Nightfall · tarji",
   "aspect": "1:1",
-  "duration": 26.0,
   "app": {
     "surah": 1,
     "ayah": 5,
@@ -9,81 +8,124 @@
     "theme": "Nightfall",
     "seconds": 28
   },
+  "edit": [
+    {
+      "in": 0.0,
+      "out": 24.95
+    }
+  ],
   "background": {
-    "id": "moon-sea",
-    "brightness": 0.04
+    "id": "moon-sea"
   },
   "phone": {
-    "height": 0.8,
-    "y": 0.035
+    "height": 0.8
+  },
+  "props": {
+    "bg_brightness": 0.04,
+    "phone_y": 0.035
+  },
+  "tracks": {
+    "zoom": [
+      {
+        "t": 0,
+        "v": 1.0
+      },
+      {
+        "t": 10.0,
+        "v": 1.0
+      },
+      {
+        "t": 11.6,
+        "v": 1.6,
+        "ease": "inOutCubic"
+      },
+      {
+        "t": 16.0,
+        "v": 1.6
+      },
+      {
+        "t": 17.4,
+        "v": 2.4,
+        "ease": "inOutCubic"
+      },
+      {
+        "t": 21.2,
+        "v": 2.4
+      },
+      {
+        "t": 22.6,
+        "v": 1.0,
+        "ease": "inOutCubic"
+      }
+    ],
+    "pan_x": [
+      {
+        "t": 0,
+        "v": 0.5
+      },
+      {
+        "t": 10.0,
+        "v": 0.5
+      },
+      {
+        "t": 11.6,
+        "v": 0.5,
+        "ease": "inOutCubic"
+      },
+      {
+        "t": 16.0,
+        "v": 0.5
+      },
+      {
+        "t": 17.4,
+        "v": 0.5,
+        "ease": "inOutCubic"
+      },
+      {
+        "t": 21.2,
+        "v": 0.5
+      },
+      {
+        "t": 22.6,
+        "v": 0.5,
+        "ease": "inOutCubic"
+      }
+    ],
+    "pan_y": [
+      {
+        "t": 0,
+        "v": 0.5
+      },
+      {
+        "t": 10.0,
+        "v": 0.5
+      },
+      {
+        "t": 11.6,
+        "v": 0.3908,
+        "ease": "inOutCubic"
+      },
+      {
+        "t": 16.0,
+        "v": 0.3908
+      },
+      {
+        "t": 17.4,
+        "v": 0.4822,
+        "ease": "inOutCubic"
+      },
+      {
+        "t": 21.2,
+        "v": 0.4822
+      },
+      {
+        "t": 22.6,
+        "v": 0.5,
+        "ease": "inOutCubic"
+      }
+    ]
   },
   "audio": {
     "fade_out": 2.0
-  },
-  "camera": [
-    {
-      "t": 0,
-      "zoom": 1.0,
-      "x": 0.5,
-      "y": 0.5
-    },
-    {
-      "t": 10.0,
-      "zoom": 1.0,
-      "x": 0.5,
-      "y": 0.5
-    },
-    {
-      "t": 11.6,
-      "zoom": 1.6,
-      "x": 0.5,
-      "y": 0.34,
-      "ease": "inOutCubic"
-    },
-    {
-      "t": 16.0,
-      "zoom": 1.6,
-      "x": 0.5,
-      "y": 0.34
-    },
-    {
-      "t": 17.4,
-      "zoom": 2.4,
-      "x": 0.5,
-      "y": 0.45,
-      "ease": "inOutCubic"
-    },
-    {
-      "t": 21.2,
-      "zoom": 2.4,
-      "x": 0.5,
-      "y": 0.45
-    },
-    {
-      "t": 22.6,
-      "zoom": 1.0,
-      "x": 0.5,
-      "y": 0.5,
-      "ease": "inOutCubic"
-    }
-  ],
-  "captions": [
-    {
-      "t0": 1.0,
-      "t1": 6.0,
-      "text": "Every word, written as it is recited.",
-      "pos": "top"
-    },
-    {
-      "t0": 17.2,
-      "t1": 21.6,
-      "text": "Held notes shimmer with the voice.",
-      "pos": "top"
-    }
-  ],
-  "end_card": {
-    "t": 23.3,
-    "title": "Beautiful Quran",
-    "subtitle": "Free · Android & Web"
   }
 }

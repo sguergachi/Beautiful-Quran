@@ -1,9 +1,10 @@
 # Promo studio
 
-Short intro videos of the app: a real recording of the Android app, sound
-included, inside a Pixel 10 frame, over a slow blurred landscape, with eased
-camera moves (push-ins, pull-backs, punch-ins) and a few words of text. Make
-as many as you like; each video is one JSON spec in `specs/`.
+Short intro videos of the app, made of three things: a real recording of
+the Android app (sound included), a Pixel 10 model, and a slow blurred
+background. A timeline cuts the recording and keyframes the camera, the
+phone and the background. Make as many as you like; each video is one JSON
+spec in `specs/`.
 
 ```bash
 cd tools/promo_studio
@@ -13,8 +14,9 @@ python3 studio.py serve               # editor at http://127.0.0.1:8765/
 ```
 
 In the editor: pick or create a video on the left, set what the app plays
-(App tab) and the look (Look tab), press **Record take**, then add camera
-keys on the timeline and **Export MP4**. Exports land in
+(Recording tab) and the look (Look tab), press **Record take**, then edit on
+the timeline and **Export MP4**. Every change is undoable (Ctrl+Z /
+Ctrl+Shift+Z) and saved as you go. Exports land in
 `~/Videos/beautiful-quran-promo/` (`BQ_PROMO_OUT`); takes, plates and
 downloads are cached in `~/.cache/bq-promo/` (`BQ_PROMO_CACHE`), never `/tmp`.
 
@@ -35,6 +37,7 @@ python3 timeline.py SPEC                   # when each verse and repeat happens 
 |---|---|
 | `capture.py` | Drives the app on the emulator (reciter, theme, layout, view, text size) and records picture **and** sound with scrcpy. |
 | `compose.py` | The compositor: each frame is a pure function of (spec, t). Used by export, stills and the editor's exact frame. |
+| `anim.py` | Keyframe evaluation and the edit's time mapping (the editor mirrors it). |
 | `phone.py` | Draws the Pixel 10 front (aluminium rim, glass, punch-hole, keys) at the take's resolution. |
 | `library.py`, `backgrounds.json` | Background footage (Pexels) and the blurred, seamless plates made from it. |
 | `timeline.py` | Verse and repeat times in video seconds, from the app's own timing data. |
@@ -89,19 +92,50 @@ share one take.
 - Good repeat verses, from the live data: Alafasy 2:14, 55:48, 80:37, 79:26,
   83:17; Hani 2:16, 55:26 (the whole verse twice), 55:27, 95:6, 67:22.
 
-## Camera and look
+## The timeline
 
-Camera keys: `t` (video seconds), `zoom` (1 = the whole phone), `x`, `y` (the
-point on the phone screen the camera centres on, 0–1), `rot` (degrees) and
-`ease` (how the move into this key is paced; `hold` is a cut). The active
-verse sits around `y` 0.28–0.34 on the scroll. Fast moves get real motion
-blur (`motion_blur`: shutter as a share of the frame interval).
+- **Recording** track: the take, cut into pieces that play back to back.
+  **S** (or ✂ Split) splits at the playhead, **Delete** removes the selected
+  piece, dragging a piece's edges trims it. The sound is cut with the
+  picture (8 ms fades at each cut, so no clicks). In the spec:
+  `"edit": [{"in": 0.0, "out": 12.4}, {"in": 15.0, "out": 21.0}]`, in take
+  seconds; the take opens 1 s before the recitation.
+- **Verses** and **Repeats**: where each verse and each repeated word falls,
+  mapped through your cuts. Click one to jump there.
+- **Property lanes**, one per property, in three groups (click a group to
+  fold it; folded, its keys share one lane):
 
-The background follows the camera by `parallax`, so a push-in deepens the
-blur behind the phone. Footage is from Pexels (free licence); a spec can use
-any image or video as `file:/abs/path`, or a flat `color:#RRGGBB`.
+  | Group | Properties |
+  |---|---|
+  | Camera | Zoom (1 = whole frame), Pan X / Pan Y (the point of the frame the camera centres on, 0–1), Rotate |
+  | Phone | Phone X / Phone Y (offset, shares of the frame), Phone scale, Phone tilt |
+  | Background | Blur (output pixels), Brightness (− towards black, + towards white) |
 
-Captions use Cormorant Garamond italic (the product page's voice), the end
-card the app icon and Junicode. The brief in [docs/KEY_ART.md](../../docs/KEY_ART.md)
-applies: the phone screen is the only paper, no music under the recitation,
-never a hexagram, text light.
+  A property with no keys is one value for the whole video. ◆ adds or
+  removes a key at the playhead; once a property has a key, changing it (in
+  the Animate tab or on the picture) keys it at the playhead. Drag keys to
+  retime them (they snap to the playhead, other keys, cuts and verse starts;
+  hold Alt not to snap); double-click a lane to add a key there. A selected
+  key has a time, a value and an ease (`hold` is a cut); [ and ] jump
+  between keys. In the spec: `"tracks": {"zoom": [{"t": 0, "v": 2.2},
+  {"t": 2.5, "v": 1, "ease": "inOutCubic"}]}` and static values in `props`.
+
+On the picture: drag to pan, scroll to zoom, Shift-scroll to rotate, Alt-drag
+and Alt-scroll to move and scale the phone. **Key camera** (K) keys zoom and
+pan at the playhead; **Push in** / **Pull back** / **Punch in** key a move
+to the active verse (zoomed so the screen spans the frame's width) and back.
+Ctrl-scroll zooms the timeline; **Fit** shows the whole video.
+
+Zoom and phone scale ease in log space, so a 1 → 4 zoom feels even. Fast
+moves get real motion blur (`motion_blur`: the shutter as a share of the
+frame interval). The background follows the camera by `parallax`. Its blur
+is baked into a small plate at the least blur the video uses; more is added
+per frame, so blur can be keyed.
+
+Footage is from Pexels (free licence); a spec can use any image or video as
+`file:/abs/path`, or a flat `color:#RRGGBB`. The brief in
+[docs/KEY_ART.md](../../docs/KEY_ART.md) applies: the phone screen is the only
+paper, no music under the recitation, never a hexagram.
+
+Specs written before the timeline (with `camera`, `captions`, `end_card`,
+`duration`) are migrated when loaded: the framing is kept, the text is dropped.

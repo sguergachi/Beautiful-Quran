@@ -1,13 +1,13 @@
 {
   "title": "Al-Fatihah · Alafasy · Paper",
   "aspect": "1:1",
-  "duration": 31.5,
+  "duration": 40.7,
   "app": {
     "surah": 1,
     "ayah": 1,
     "reciter": "alafasy",
     "theme": "Paper",
-    "seconds": 33
+    "seconds": 95
   },
   "background": {
     "id": "dunes",
@@ -18,7 +18,7 @@
     "y": 0.035
   },
   "audio": {
-    "fade_out": 2.0
+    "fade_out": 2
   },
   "camera": [
     {
@@ -29,14 +29,14 @@
     },
     {
       "t": 3.2,
-      "zoom": 1.0,
+      "zoom": 1,
       "x": 0.5,
       "y": 0.5,
       "ease": "inOutCubic"
     },
     {
-      "t": 12.0,
-      "zoom": 1.0,
+      "t": 12,
+      "zoom": 1,
       "x": 0.5,
       "y": 0.5
     },
@@ -46,19 +46,6 @@
       "x": 0.5,
       "y": 0.32,
       "ease": "inOutSine"
-    },
-    {
-      "t": 24.5,
-      "zoom": 1.35,
-      "x": 0.5,
-      "y": 0.32
-    },
-    {
-      "t": 27.0,
-      "zoom": 1.0,
-      "x": 0.5,
-      "y": 0.5,
-      "ease": "inOutCubic"
     }
   ],
   "captions": [
@@ -69,15 +56,12 @@
       "pos": "top"
     },
     {
-      "t0": 13.0,
-      "t1": 20.0,
+      "t0": 13,
+      "t1": 20,
       "text": "Word by word, with its meaning.",
       "pos": "top"
     }
   ],
-  "end_card": {
-    "t": 28.4,
-    "title": "Beautiful Quran",
-    "subtitle": "Free · Android & Web"
-  }
+  "end_card": null,
+  "motion_blur": 2
 }

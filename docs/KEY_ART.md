@@ -189,9 +189,10 @@ Short intro videos in the Handheld-feature style (a phone floating over a
 soft-focus landscape, the camera easing in and out) are made with
 [tools/promo_studio](../tools/promo_studio/README.md): an editor and CLI
 that record the Android app **with its own sound** on an emulator, frame it
-in a Pixel 10 over blurred Pexels footage, and export MP4s with eased zooms,
-captions and an end card. Ten starter specs cover Alafasy and Hani across
-the three themes, including reciter repeats and tarjīʿ.
+in a Pixel 10 over blurred Pexels footage, and export MP4s. A timeline cuts
+the recording and keyframes the camera, the phone and the background; there
+is no text. Ten starter specs cover Alafasy and Hani across the three
+themes, including reciter repeats and tarjīʿ.
 
 ## Deliverables
 

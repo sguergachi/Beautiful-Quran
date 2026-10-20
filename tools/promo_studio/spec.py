@@ -1,10 +1,18 @@
 """Promo video specs: one JSON file per video (see specs/ and README.md).
 
-A spec names what to record from the app (`app`), the world around the
-phone (`background`, `phone`), how the camera moves (`camera`), any words
-on screen (`captions`, `end_card`) and the export (`aspect`, `fps`,
-`duration`). Missing keys take the defaults below, so a spec only says what
-makes it different.
+A video is three things: the emulator recording (`app`, cut by `edit`), the
+phone model (`phone`) and a background (`background`). Everything that moves
+is a property (`PROPS`): it has a static value in `props`, and once it has
+keyframes in `tracks` those drive it instead. Missing keys take the defaults
+below, so a spec only says what makes it different.
+
+    "edit":   [{"in": 0.0, "out": 12.4}, {"in": 15.0, "out": 21.0}]
+              pieces of the take, played back to back (take seconds; the
+              take opens 1 s before the recitation). The video's length is
+              their sum.
+    "tracks": {"zoom": [{"t": 0, "v": 2.2}, {"t": 2.5, "v": 1, "ease": "inOutCubic"}]}
+              t: video seconds; v: value; ease: how the move INTO this key
+              is paced ("hold" = cut).
 """
 import copy
 import hashlib
@@ -31,12 +39,27 @@ LAYOUTS = ("Scroll", "Mushaf")
 VIEWS = ("Arabic", "English", "Both")
 ASPECTS = {"1:1": (1080, 1080), "9:16": (1080, 1920), "4:5": (1080, 1350), "16:9": (1920, 1080)}
 EASES = ("inOutCubic", "inOutSine", "outCubic", "inCubic", "outExpo", "linear", "hold")
+LEAD = 1.0                 # seconds of still page a take keeps before the recitation
+
+# Animatable properties. `log`: interpolate in log space (scales), so a
+# 1 -> 4 zoom feels even rather than rushing at the start.
+PROPS = {
+    "zoom":          {"group": "Camera", "label": "Zoom", "min": 0.4, "max": 6, "step": 0.01, "default": 1.0, "log": True},
+    "pan_x":         {"group": "Camera", "label": "Pan X", "min": -0.5, "max": 1.5, "step": 0.001, "default": 0.5},
+    "pan_y":         {"group": "Camera", "label": "Pan Y", "min": -0.5, "max": 1.5, "step": 0.001, "default": 0.5},
+    "rotate":        {"group": "Camera", "label": "Rotate °", "min": -30, "max": 30, "step": 0.1, "default": 0.0},
+    "phone_x":       {"group": "Phone", "label": "Phone X", "min": -0.8, "max": 0.8, "step": 0.001, "default": 0.0},
+    "phone_y":       {"group": "Phone", "label": "Phone Y", "min": -0.8, "max": 0.8, "step": 0.001, "default": 0.0},
+    "phone_scale":   {"group": "Phone", "label": "Phone scale", "min": 0.2, "max": 3, "step": 0.01, "default": 1.0, "log": True},
+    "phone_tilt":    {"group": "Phone", "label": "Phone tilt °", "min": -45, "max": 45, "step": 0.1, "default": 0.0},
+    "bg_blur":       {"group": "Background", "label": "Blur", "min": 4, "max": 90, "step": 0.5, "default": 36.0},
+    "bg_brightness": {"group": "Background", "label": "Brightness", "min": -0.6, "max": 0.4, "step": 0.005, "default": 0.0},
+}
 
 DEFAULTS = {
     "title": "",
     "aspect": "1:1",
     "fps": 60,
-    "duration": 20.0,          # seconds of finished video
     "app": {
         "surah": 1,
         "ayah": 1,
@@ -46,12 +69,10 @@ DEFAULTS = {
         "view": "Both",
         "text_size": "default",  # default | max
         "seconds": 30,           # seconds of recitation to record
-        "start": 0.0,            # where the finished video starts in the take (s after the clip's t=0)
     },
+    "edit": [{"in": 0.0, "out": 20.0}],
     "background": {
         "id": "dunes",
-        "blur": 36,              # gaussian sigma in output pixels
-        "brightness": 0.0,       # -1..1 added in linear-ish space
         "saturation": 1.0,
         "speed": 0.5,            # background playback speed (it loops back and forth)
         "parallax": 0.18,        # share of the camera's zoom/pan the background follows
@@ -59,17 +80,12 @@ DEFAULTS = {
     },
     "phone": {
         "color": "auto",         # auto follows the theme; see phone.COLORS
-        "height": 0.84,          # body height as a share of the frame height at zoom 1
-        "x": 0.0, "y": 0.0,      # offset from the centre, shares of the frame
+        "height": 0.84,          # body height as a share of the frame height (phone_scale 1, zoom 1)
         "shadow": 0.45,
     },
-    # Camera keyframes. t: video seconds; zoom: 1 = whole phone; x, y: the
-    # point on the phone screen (0..1) the camera centres on; rot: degrees;
-    # ease: how the move INTO this keyframe is paced.
-    "camera": [{"t": 0, "zoom": 1.0, "x": 0.5, "y": 0.5}],
+    "props": {k: p["default"] for k, p in PROPS.items()},
+    "tracks": {},
     "motion_blur": 1.0,          # shutter as a share of the frame interval (0 = off)
-    "captions": [],              # {t0, t1, text, pos: top|bottom, size}
-    "end_card": None,            # {t, title, subtitle}
     "audio": {"gain_db": 0.0, "fade_in": 0.0, "fade_out": 1.2, "loudness": -16.0},  # LUFS; null = as recorded
 }
 
@@ -84,6 +100,50 @@ def merge(base, over):
     return out
 
 
+LEGACY = ("camera", "captions", "end_card", "duration")
+
+
+def migrate(raw):
+    """Specs from before the timeline: camera keys (focus as a point on the
+    phone screen) become zoom/pan tracks with the same framing, app.start +
+    duration become one edit piece, background blur/brightness and phone
+    offsets become properties. Captions and end cards are dropped."""
+    if not any(k in raw for k in LEGACY) and "start" not in raw.get("app", {}):
+        return raw
+    from phone import geometry
+    raw = copy.deepcopy(raw)
+    W, H = ASPECTS[raw.get("aspect", "1:1")]
+    g = geometry(1080, 2400)
+    ph = raw.get("phone", {})
+    height, px, py = ph.get("height", 0.84), ph.pop("x", 0.0), ph.pop("y", 0.0)
+    s0 = height * H / g["bh"]
+    P0 = (W / 2 + px * W, H / 2 + py * H)
+    tracks = raw.setdefault("tracks", {})
+    for k in sorted(raw.pop("camera", []), key=lambda k: k["t"]):
+        z = float(k.get("zoom", 1.0))
+        F = (P0[0] + s0 * (g["sx0"] + k.get("x", 0.5) * g["sw"] - g["W"] / 2),
+             P0[1] + s0 * (g["sy0"] + k.get("y", 0.5) * g["sh"] - g["H"] / 2))
+        C = (F[0] - (P0[0] - W / 2) / z, F[1] - (P0[1] - H / 2) / z)
+        e = {"ease": k["ease"]} if k.get("ease") else {}
+        tracks.setdefault("zoom", []).append({"t": k["t"], "v": round(z, 4), **e})
+        tracks.setdefault("pan_x", []).append({"t": k["t"], "v": round(C[0] / W, 4), **e})
+        tracks.setdefault("pan_y", []).append({"t": k["t"], "v": round(C[1] / H, 4), **e})
+        if k.get("rot"):
+            tracks.setdefault("rotate", []).append({"t": k["t"], "v": k["rot"], **e})
+    props = raw.setdefault("props", {})
+    bg = raw.setdefault("background", {})
+    if "blur" in bg: props["bg_blur"] = bg.pop("blur")
+    if "brightness" in bg: props["bg_brightness"] = bg.pop("brightness")
+    if px: props["phone_x"] = px
+    if py: props["phone_y"] = py
+    start = float(raw.get("app", {}).pop("start", 0.0))
+    if "duration" in raw:
+        raw["edit"] = [{"in": round(start, 3), "out": round(start + float(raw.pop("duration")), 3)}]
+    raw.pop("captions", None)
+    raw.pop("end_card", None)
+    return raw
+
+
 def load(path_or_name):
     path = path_or_name
     if not os.path.exists(path):
@@ -96,12 +156,23 @@ def load(path_or_name):
 
 
 def resolve(raw):
-    s = merge(DEFAULTS, raw)
+    s = merge(DEFAULTS, migrate(raw))
     validate(s)
     if s["phone"]["color"] == "auto":
         s["phone"]["color"] = THEMES[s["app"]["theme"]]["phone"]
-    s["camera"] = sorted(s["camera"], key=lambda k: k["t"]) or [{"t": 0, "zoom": 1, "x": 0.5, "y": 0.5}]
+    s["edit"] = [p for p in s["edit"] if float(p["out"]) - float(p["in"]) > 1e-3] or [{"in": 0.0, "out": 1.0}]
+    s["tracks"] = {k: sorted(v, key=lambda k_: k_["t"]) for k, v in s["tracks"].items() if v}
+    s["duration"] = duration(s)
     return s
+
+
+def duration(s):
+    return round(sum(float(p["out"]) - float(p["in"]) for p in s["edit"]), 6)
+
+
+def take_needed(s):
+    """Take seconds a spec reads (its furthest edit point)."""
+    return max(float(p["out"]) for p in s["edit"])
 
 
 def validate(s):
@@ -113,8 +184,12 @@ def validate(s):
     if a["view"] not in VIEWS: errs.append(f"app.view must be one of {VIEWS}")
     if not (1 <= int(a["surah"]) <= 114): errs.append("app.surah must be 1..114")
     if s["aspect"] not in ASPECTS: errs.append(f"aspect must be one of {sorted(ASPECTS)}")
-    for k in s["camera"]:
-        if k.get("ease", "inOutCubic") not in EASES: errs.append(f"camera ease {k.get('ease')} not in {EASES}")
+    for p in s["edit"]:
+        if float(p["in"]) < 0 or float(p["out"]) < float(p["in"]): errs.append(f"bad edit piece {p}")
+    for name, keys in s["tracks"].items():
+        if name not in PROPS: errs.append(f"unknown track {name}")
+        for k in keys:
+            if k.get("ease", "inOutCubic") not in EASES: errs.append(f"{name}: ease {k.get('ease')} not in {EASES}")
     if errs:
         raise ValueError("; ".join(errs))
 

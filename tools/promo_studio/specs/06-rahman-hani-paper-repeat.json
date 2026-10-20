@@ -1,7 +1,6 @@
 {
   "title": "Ar-Rahman 26–27 · Hani · Paper · repeat",
   "aspect": "1:1",
-  "duration": 18.0,
   "app": {
     "surah": 55,
     "ayah": 26,
@@ -9,64 +8,97 @@
     "theme": "Paper",
     "seconds": 20
   },
+  "edit": [
+    {
+      "in": 0.0,
+      "out": 18.0
+    }
+  ],
   "background": {
-    "id": "mist",
-    "brightness": 0.03
+    "id": "mist"
   },
   "phone": {
-    "height": 0.8,
-    "y": 0.035
+    "height": 0.8
+  },
+  "props": {
+    "bg_brightness": 0.03,
+    "phone_y": 0.035
+  },
+  "tracks": {
+    "zoom": [
+      {
+        "t": 0,
+        "v": 1.0
+      },
+      {
+        "t": 3.8,
+        "v": 1.0
+      },
+      {
+        "t": 4.9,
+        "v": 2.2,
+        "ease": "inOutCubic"
+      },
+      {
+        "t": 12.0,
+        "v": 2.2
+      },
+      {
+        "t": 13.4,
+        "v": 1.0,
+        "ease": "inOutCubic"
+      }
+    ],
+    "pan_x": [
+      {
+        "t": 0,
+        "v": 0.5
+      },
+      {
+        "t": 3.8,
+        "v": 0.5
+      },
+      {
+        "t": 4.9,
+        "v": 0.5,
+        "ease": "inOutCubic"
+      },
+      {
+        "t": 12.0,
+        "v": 0.5
+      },
+      {
+        "t": 13.4,
+        "v": 0.5,
+        "ease": "inOutCubic"
+      }
+    ],
+    "pan_y": [
+      {
+        "t": 0,
+        "v": 0.5
+      },
+      {
+        "t": 3.8,
+        "v": 0.5
+      },
+      {
+        "t": 4.9,
+        "v": 0.4121,
+        "ease": "inOutCubic"
+      },
+      {
+        "t": 12.0,
+        "v": 0.4121
+      },
+      {
+        "t": 13.4,
+        "v": 0.5,
+        "ease": "inOutCubic"
+      }
+    ]
   },
   "audio": {
     "fade_out": 1.8
-  },
-  "camera": [
-    {
-      "t": 0,
-      "zoom": 1.0,
-      "x": 0.5,
-      "y": 0.5
-    },
-    {
-      "t": 3.8,
-      "zoom": 1.0,
-      "x": 0.5,
-      "y": 0.5
-    },
-    {
-      "t": 4.9,
-      "zoom": 2.2,
-      "x": 0.5,
-      "y": 0.36,
-      "ease": "inOutCubic"
-    },
-    {
-      "t": 12.0,
-      "zoom": 2.2,
-      "x": 0.5,
-      "y": 0.36
-    },
-    {
-      "t": 13.4,
-      "zoom": 1.0,
-      "x": 0.5,
-      "y": 0.5,
-      "ease": "inOutCubic"
-    }
-  ],
-  "captions": [
-    {
-      "t0": 5.0,
-      "t1": 11.6,
-      "text": "A verse said twice, inked twice.",
-      "pos": "top",
-      "color": "#2A2622",
-      "scrim": 0
-    }
-  ],
-  "end_card": {
-    "t": 16.2,
-    "title": "Beautiful Quran",
-    "subtitle": "Free · Android & Web"
   }
 }

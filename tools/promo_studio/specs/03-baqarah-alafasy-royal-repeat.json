@@ -1,7 +1,6 @@
 {
   "title": "Al-Baqarah 14 · Alafasy · Royal green · repeat",
   "aspect": "1:1",
-  "duration": 22.5,
   "app": {
     "surah": 2,
     "ayah": 14,
@@ -9,68 +8,111 @@
     "theme": "Royal green",
     "seconds": 24
   },
+  "edit": [
+    {
+      "in": 0.0,
+      "out": 22.5
+    }
+  ],
   "background": {
     "id": "valley"
   },
   "phone": {
-    "height": 0.8,
-    "y": 0.035
+    "height": 0.8
+  },
+  "props": {
+    "phone_y": 0.035
+  },
+  "tracks": {
+    "zoom": [
+      {
+        "t": 0,
+        "v": 2.5
+      },
+      {
+        "t": 2.6,
+        "v": 1.0,
+        "ease": "inOutCubic"
+      },
+      {
+        "t": 10.4,
+        "v": 1.0
+      },
+      {
+        "t": 11.9,
+        "v": 2.2,
+        "ease": "inOutCubic"
+      },
+      {
+        "t": 17.8,
+        "v": 2.2
+      },
+      {
+        "t": 19.2,
+        "v": 1.0,
+        "ease": "inOutCubic"
+      }
+    ],
+    "pan_x": [
+      {
+        "t": 0,
+        "v": 0.5
+      },
+      {
+        "t": 2.6,
+        "v": 0.5,
+        "ease": "inOutCubic"
+      },
+      {
+        "t": 10.4,
+        "v": 0.5
+      },
+      {
+        "t": 11.9,
+        "v": 0.5,
+        "ease": "inOutCubic"
+      },
+      {
+        "t": 17.8,
+        "v": 0.5
+      },
+      {
+        "t": 19.2,
+        "v": 0.5,
+        "ease": "inOutCubic"
+      }
+    ],
+    "pan_y": [
+      {
+        "t": 0,
+        "v": 0.307
+      },
+      {
+        "t": 2.6,
+        "v": 0.5,
+        "ease": "inOutCubic"
+      },
+      {
+        "t": 10.4,
+        "v": 0.5
+      },
+      {
+        "t": 11.9,
+        "v": 0.393,
+        "ease": "inOutCubic"
+      },
+      {
+        "t": 17.8,
+        "v": 0.393
+      },
+      {
+        "t": 19.2,
+        "v": 0.5,
+        "ease": "inOutCubic"
+      }
+    ]
   },
   "audio": {
     "fade_out": 2.0
-  },
-  "camera": [
-    {
-      "t": 0,
-      "zoom": 2.5,
-      "x": 0.5,
-      "y": 0.22
-    },
-    {
-      "t": 2.6,
-      "zoom": 1.0,
-      "x": 0.5,
-      "y": 0.5,
-      "ease": "inOutCubic"
-    },
-    {
-      "t": 10.4,
-      "zoom": 1.0,
-      "x": 0.5,
-      "y": 0.5
-    },
-    {
-      "t": 11.9,
-      "zoom": 2.2,
-      "x": 0.5,
-      "y": 0.335,
-      "ease": "inOutCubic"
-    },
-    {
-      "t": 17.8,
-      "zoom": 2.2,
-      "x": 0.5,
-      "y": 0.335
-    },
-    {
-      "t": 19.2,
-      "zoom": 1.0,
-      "x": 0.5,
-      "y": 0.5,
-      "ease": "inOutCubic"
-    }
-  ],
-  "captions": [
-    {
-      "t0": 11.6,
-      "t1": 17.6,
-      "text": "When the reciter repeats, the ink remembers.",
-      "pos": "top"
-    }
-  ],
-  "end_card": {
-    "t": 19.8,
-    "title": "Beautiful Quran",
-    "subtitle": "Free · Android & Web"
   }
 }

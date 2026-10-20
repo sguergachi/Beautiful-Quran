@@ -22,7 +22,7 @@ import subprocess
 import sys
 import time
 
-from spec import CACHE, HERE, RECITERS, REPO, take_dir
+from spec import CACHE, RECITERS, REPO, take_dir, take_needed
 
 sys.path.insert(0, os.path.join(REPO, "tools", "key_art"))
 import android_take as at  # noqa: E402  (adb helpers: nodes/find/tap/demo/open_reader)
@@ -320,7 +320,7 @@ def record(s, log=print, force=False):
     a = s["app"]
     d = take_dir(s)
     meta_p = os.path.join(d, "meta.json")
-    need = float(a["start"]) + float(s["duration"]) + 0.5
+    need = take_needed(s) + 0.5            # the furthest point the edit reads
     if not force and os.path.exists(meta_p):
         meta = json.load(open(meta_p))
         if meta["length"] >= need:
