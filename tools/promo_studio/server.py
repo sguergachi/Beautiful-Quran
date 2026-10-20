@@ -1,7 +1,7 @@
 """The editor's backend: specs, media, exact stills, emulators and jobs.
 
-Local only (binds 127.0.0.1). The browser preview draws the same scene the
-compositor renders, from the same geometry (`/api/geometry`), so what you
+Local by default; --host selects a LAN bind address. The browser preview draws
+the same scene the compositor renders, from its geometry (`/api/geometry`), so what you
 place is what exports; `/api/still` returns the compositor's own frame
 when you want to be sure.
 
@@ -746,15 +746,15 @@ def ensure_built(force=False):
     subprocess.run(["npm", "run", "build"], cwd=APP_DIR, check=True)
 
 
-def serve(port=8765, build=True):
+def serve(port=8765, build=True, host="127.0.0.1"):
     global JOBS
     os.makedirs(S.SPECS, exist_ok=True)
     if build:
         ensure_built()
     JOBS = Jobs()
-    httpd = ThreadingHTTPServer(("127.0.0.1", port), Handler)
+    httpd = ThreadingHTTPServer((host, port), Handler)
     httpd.daemon_threads = True
-    print(f"promo studio: http://127.0.0.1:{port}/  (specs in {S.SPECS}, videos to {S.OUT})", flush=True)
+    print(f"promo studio: http://{host}:{port}/  (specs in {S.SPECS}, videos to {S.OUT})", flush=True)
     try:
         httpd.serve_forever()
     except KeyboardInterrupt:

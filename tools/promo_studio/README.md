@@ -13,6 +13,9 @@ python3 studio.py emu install         # app-release.apk; first launch downloads 
 python3 studio.py serve               # editor at http://127.0.0.1:8765/
 ```
 
+For another device on the same LAN, run `python3 studio.py serve --host 0.0.0.0`
+and open `http://<this computer's LAN IP>:8765/`. The default bind remains localhost.
+
 In the editor: pick or create a video on the left, set what the app plays
 (Recording tab) and the look (Look tab), press **Record take**, then edit on
 the timeline and **Export MP4**. Every change is undoable (Ctrl+Z /

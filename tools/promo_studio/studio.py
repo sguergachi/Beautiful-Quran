@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Beautiful Quran promo studio: app recordings in a Pixel frame, ready to post.
 
-    studio.py serve [--port 8765]          # the editor (builds editor-app/ when its sources changed)
+    studio.py serve [--host 0.0.0.0] [--port 8765]  # editor; --host enables LAN access
     studio.py list                         # specs and whether their takes exist
     studio.py emu list                     # emulators, booted / app installed
     studio.py emu boot [--cores 6] [--port P]   # start another capture emulator
@@ -38,6 +38,7 @@ def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     sub = ap.add_subparsers(dest="cmd", required=True)
     p = sub.add_parser("serve"); p.add_argument("--port", type=int, default=8765)
+    p.add_argument("--host", default="127.0.0.1", help="bind address; 0.0.0.0 enables LAN access")
     p.add_argument("--no-build", action="store_true", help="serve the last build of the editor as is")
     sub.add_parser("list")
     p = sub.add_parser("emu"); p.add_argument("what", choices=["list", "boot", "prepare", "install", "stop", "status"])
@@ -61,7 +62,7 @@ def main():
 
     if a.cmd == "serve":
         import server
-        server.serve(a.port, build=not a.no_build)
+        server.serve(a.port, build=not a.no_build, host=a.host)
     elif a.cmd == "list":
         for n in names(["all"]):
             s = S.load(n)
