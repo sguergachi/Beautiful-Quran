@@ -20,14 +20,14 @@ const el = (tag, cls, html) => { const e = document.createElement(tag); if (cls)
 const st = {
   meta: null, specs: [], name: null, raw: null, spec: null, geo: null, plate: null, tl: null,
   t: 0, playing: false, sel: null, pps: 60, collapsed: {}, undo: [], redo: [], coalesce: null,
-  session: 0, saved: null, saveChain: Promise.resolve(), openSeq: 0, geoSeq: 0, plateSeq: 0, clipboard: null,
+  session: 0, saved: null, saveChain: Promise.resolve(), openSeq: 0, geoSeq: 0, plateSeq: 0, clipboard: null, loop: false,
   saveTimer: null, plateTimer: null, lastTakeKey: "", lastLook: "", wall0: 0, t0: 0,
 };
 const els = {
   stage: $("#stage"), ctx: $("#stage").getContext("2d"), screen: $("#screenVid"), plate: $("#plateVid"),
   audio: $("#audio"), frame: $("#frameImg"), exact: $("#exact"), inner: $("#tlinner"), scroll: $("#tlscroll"),
 };
-const LABEL_W = 132;
+let LABEL_W = +(localStorage.getItem("promo.labelw") || 132);   // timeline label column, resizable
 
 // ------------------------------------------------------------------ spec model (mirrors spec.py)
 
@@ -260,14 +260,24 @@ function sizeStage() {
 // ------------------------------------------------------------------ playback
 
 function plateTime(t) { const d = els.plate.duration || 1; return ((+(st.spec.background.offset || 0) + t) % d + d) % d; }
+// A media element seeks asynchronously, and asking again before it lands
+// restarts the decode: a fast scrub would show nothing until it stopped.
+// Keep only the latest target and apply it when the current seek lands.
+function seekMedia(m, t) {
+  if (m.seeking) { m._want = t; return; }
+  m._want = null;
+  m.currentTime = t;
+}
+function seekLanded(m) { if (m._want != null) { const t = m._want; m._want = null; m.currentTime = t; } }
 function syncMedia(force) {
   if (!st.spec) return;
   const [src, piece] = sourceTime(Math.min(st.t, Math.max(0, st.spec.duration - frameT())));
   force = force || syncMedia.piece !== piece; syncMedia.piece = piece;
   const tol = force ? 0.001 : 0.07;
-  if (st.geo && st.geo.clip && Math.abs(els.screen.currentTime - src) > tol) els.screen.currentTime = src;
-  if (st.geo && st.geo.audio && Math.abs(els.audio.currentTime - src) > (force ? 0.001 : 0.09)) els.audio.currentTime = src;
-  if (st.plate && (force || Math.abs(els.plate.currentTime - plateTime(st.t)) > 0.09)) els.plate.currentTime = plateTime(st.t);
+  if (st.geo && st.geo.clip && Math.abs(els.screen.currentTime - src) > tol) seekMedia(els.screen, src);
+  if (st.geo && st.geo.audio && Math.abs(els.audio.currentTime - src) > (force ? 0.001 : 0.09)) seekMedia(els.audio, src);
+  const pt = plateTime(st.t);
+  if (st.plate && (force || Math.abs(els.plate.currentTime - pt) > 0.09)) seekMedia(els.plate, pt);
 }
 function seek(t) { if (!st.spec) return; st.t = clamp(t, 0, st.spec.duration); st.wall0 = performance.now(); st.t0 = st.t; st.coalesce = null; hideExact(); syncMedia(true); draw(); }
 function play() {
@@ -287,9 +297,42 @@ function tick() {
   if (!st.playing) return;
   // wall clock leads; the take's picture and sound follow it through the cuts
   st.t = st.t0 + (performance.now() - st.wall0) / 1000;
-  if (st.t >= st.spec.duration) { st.t = st.spec.duration; pause(); return; }
+  if (st.t >= st.spec.duration) {
+    if (!st.loop) { st.t = st.spec.duration; pause(); return; }
+    st.t = 0; st.t0 = 0; st.wall0 = performance.now(); syncMedia(true);
+  }
   syncMedia(false);
   draw(); followPlayhead(); requestAnimationFrame(tick);
+}
+function toggleLoop() { st.loop = !st.loop; $("#loopBtn").classList.toggle("on", st.loop); }
+// Verse starts and cuts, in video time: what ↑ / ↓ step between.
+function landmarks() {
+  const out = [0, st.spec.duration];
+  if (st.tl) for (const v of st.tl.verses) for (const [a] of videoTimes(v.t0, v.t1)) out.push(a);
+  for (let i = 1; i < st.spec.edit.length; i++) out.push(pieceStart(i));
+  return [...new Set(out.map(r3))].sort((a, b) => a - b);
+}
+function jumpLandmark(dir) {
+  const ts = landmarks();
+  const next = dir > 0 ? ts.find((x) => x > st.t + 1e-3) : [...ts].reverse().find((x) => x < st.t - 1e-3);
+  if (next != null) { pause(); seek(next); followPlayhead(true); }
+}
+function parseTime(text) {
+  const m = String(text).trim().match(/^(?:(\d+):)?(\d+(?:\.\d*)?)$/);
+  return m ? (+(m[1] || 0)) * 60 + +m[2] : NaN;
+}
+function editTime() {
+  if (!st.spec || $("#timeInput")) return;
+  const span = $("#time"), input = el("input"); input.id = "timeInput"; input.value = st.t.toFixed(2);
+  span.replaceWith(input); input.focus(); input.select();
+  let done = false;
+  const finish = (apply) => {
+    if (done) return; done = true;
+    if (apply) { const t = parseTime(input.value); if (Number.isFinite(t)) { pause(); seek(t); followPlayhead(true); } else note("type seconds (12.5) or minutes:seconds (0:12.5)"); }
+    input.replaceWith(span); draw();
+  };
+  input.onkeydown = (e) => { if (e.key === "Enter") finish(true); else if (e.key === "Escape") { e.stopPropagation(); finish(false); } };
+  input.onblur = () => finish(true);
 }
 
 // ------------------------------------------------------------------ exact frame
@@ -350,6 +393,7 @@ function keyIndexAt(name, t) {
   return keys.findIndex((k) => Math.abs(k.t - t) < frameT() / 2 + 1e-6);
 }
 const animated = (name) => !!((st.raw.tracks || {})[name] || []).length;
+function findKey(prop, t) { return ((st.raw.tracks || {})[prop] || []).find((k) => Math.abs(k.t - t) < 1e-6); }
 // Set a property at the playhead: a key there when it is animated, else its static value.
 function setProp(name, v, coalesce) {
   const p = st.meta.props[name];
@@ -370,11 +414,11 @@ function toggleKey(name) {
       const v = trackOf(name)[i].v;
       trackOf(name).splice(i, 1);
       if (!trackOf(name).length) { delete st.raw.tracks[name]; (st.raw.props = st.raw.props || {})[name] = v; }
-      if (st.sel && st.sel.type === "key" && st.sel.prop === name) st.sel = null;
+      st.sel = null;
     } else {
       const v = r3(valueAt(name, st.t));
       trackOf(name).push({ t: r3(st.t), v }); trackOf(name).sort((a, b) => a.t - b.t);
-      st.sel = { type: "key", prop: name, t: r3(st.t) };
+      selectKeys([{ prop: name, t: r3(st.t) }]);
     }
   });
   buildPanes();
@@ -390,11 +434,48 @@ function keyAll(names, at = st.t, vals = {}, easeName) {
     keys.sort((a, b) => a.t - b.t);
   }
 }
+// The selection is one recording piece, or keys: a primary key (the one the
+// inspector edits) plus any more picked with Shift/Ctrl-click or a marquee.
+function selItems() { return st.sel && st.sel.type === "key" ? [{ prop: st.sel.prop, t: st.sel.t }, ...(st.sel.more || [])] : []; }
+function isSel(prop, t) { return selItems().some((x) => x.prop === prop && Math.abs(x.t - t) < 1e-6); }
+function selectKeys(items) { st.sel = items.length ? { type: "key", prop: items[0].prop, t: items[0].t, more: items.slice(1) } : null; }
+function toggleInSel(prop, t) {
+  const items = selItems(), i = items.findIndex((x) => x.prop === prop && Math.abs(x.t - t) < 1e-6);
+  if (i >= 0) items.splice(i, 1); else items.unshift({ prop, t });
+  selectKeys(items);
+}
+function selectAllKeys() {
+  const items = [];
+  for (const [prop, keys] of Object.entries(st.spec.tracks)) for (const k of keys) items.push({ prop, t: k.t });
+  selectKeys(items); buildTimeline(); buildPanes();
+  if (items.length) note(`${items.length} key${items.length > 1 ? "s" : ""} selected`);
+}
 function selKey() {
   if (!st.sel || st.sel.type !== "key") return null;
   const keys = (st.raw.tracks || {})[st.sel.prop] || [];
   const i = keys.findIndex((k) => Math.abs(k.t - st.sel.t) < 1e-6);
   return i >= 0 ? { keys, i, k: keys[i] } : null;
+}
+function setEase(easeName) {
+  const items = selItems(); if (!items.length) return;
+  mutate(() => { for (const { prop, t } of items) { const k = findKey(prop, t); if (!k) continue; if (easeName === "inOutCubic") delete k.ease; else k.ease = easeName; } });
+  buildPanes();
+}
+// Move every selected key by dt seconds, unless one would land on another key of its track.
+function moveSelected(dt) {
+  const moving = selItems().map(({ prop, t }) => ({ prop, key: findKey(prop, t) })).filter((m) => m.key);
+  if (!moving.length) return;
+  const lo = -Math.min(...moving.map((m) => m.key.t)), hi = st.spec.duration - Math.max(...moving.map((m) => m.key.t));
+  dt = clamp(dt, lo, hi);
+  if (Math.abs(dt) < 1e-6) return;
+  const clash = moving.some((m) => trackOf(m.prop).some((x) => !moving.some((o) => o.key === x) && Math.abs(x.t - (m.key.t + dt)) < frameT() / 2));
+  if (clash) return note("a key is in the way");
+  mutate(() => {
+    for (const m of moving) m.key.t = r3(m.key.t + dt);
+    for (const m of moving) trackOf(m.prop).sort((a, b) => a.t - b.t);
+    selectKeys(moving.map((m) => ({ prop: m.prop, t: m.key.t })));
+  }, "nudge");
+  seek(st.sel.t); buildPanes();
 }
 function preset(kind) {
   if (!st.spec) return;
@@ -416,10 +497,15 @@ function deleteSelection() {
   if (!st.sel) return;
   pause();
   if (st.sel.type === "key") {
-    const sk = selKey(); if (!sk) return;
+    const items = selItems();
     mutate(() => {
-      sk.keys.splice(sk.i, 1);
-      if (!sk.keys.length) { delete st.raw.tracks[st.sel.prop]; (st.raw.props = st.raw.props || {})[st.sel.prop] = sk.k.v; }
+      for (const { prop, t } of items) {
+        const keys = (st.raw.tracks || {})[prop]; if (!keys) continue;
+        const i = keys.findIndex((k) => Math.abs(k.t - t) < 1e-6); if (i < 0) continue;
+        const [k] = keys.splice(i, 1);
+        // the last key gone: the property keeps that value for the whole video
+        if (!keys.length) { delete st.raw.tracks[prop]; (st.raw.props = st.raw.props || {})[prop] = k.v; }
+      }
       st.sel = null;
     });
   } else if (st.sel.type === "piece") {
@@ -430,7 +516,7 @@ function deleteSelection() {
 }
 function jumpKey(dir) {
   if (!st.spec) return;
-  const names = st.sel && st.sel.type === "key" ? [st.sel.prop] : Object.keys(st.meta.props);
+  const names = st.sel && st.sel.type === "key" ? [...new Set(selItems().map((x) => x.prop))] : Object.keys(st.meta.props);
   const ts = [...new Set(names.flatMap((n) => (st.spec.tracks[n] || []).map((k) => k.t)))].sort((a, b) => a - b);
   const next = dir > 0 ? ts.find((x) => x > st.t + 1e-3) : [...ts].reverse().find((x) => x < st.t - 1e-3);
   if (next != null) { seek(next); followPlayhead(true); }
@@ -458,6 +544,9 @@ function resetEdit() {
 
 const tx = (t) => t * st.pps;
 function laneWidth() { return Math.max(200, tx(st.spec.duration) + 40); }
+// Video time under a pointer. Measured against the timeline's inner box,
+// which is never rebuilt, so it stays right while rows are redrawn mid-drag.
+function timeAt(clientX) { return (clientX - els.inner.getBoundingClientRect().left - LABEL_W) / st.pps; }
 function row(cls, labelHTML) {
   const r = el("div", "tl-row " + (cls || ""));
   const lab = el("div", "tl-label", labelHTML);
@@ -465,13 +554,15 @@ function row(cls, labelHTML) {
   r.append(lab, lane); els.inner.appendChild(r);
   return { r, lab, lane };
 }
-function snapT(t, exclude) {
+function groupProps(g) { return Object.keys(st.meta.props).filter((n) => st.meta.props[n].group === g); }
+// exclude: keys being dragged ([{prop, t}]); noPlayhead: when the playhead itself moves
+function snapT(t, exclude = [], noPlayhead = false) {
   const cands = [0, st.spec.duration];
-  if (!exclude) cands.push(st.t);
-  for (const n in st.spec.tracks) for (const k of st.spec.tracks[n]) if (!exclude || n !== exclude.prop || Math.abs(k.t - exclude.t) > 1e-6) cands.push(k.t);
+  if (!noPlayhead) cands.push(st.t);
+  for (const n in st.spec.tracks) for (const k of st.spec.tracks[n]) if (!exclude.some((x) => x.prop === n && Math.abs(x.t - k.t) < 1e-6)) cands.push(k.t);
   for (let i = 1; i < st.spec.edit.length; i++) cands.push(pieceStart(i));
   if (st.tl) for (const v of st.tl.verses) for (const [a] of videoTimes(v.t0, v.t1)) cands.push(a);
-  let best = t, bd = 6 / st.pps;
+  let best = t, bd = 7 / st.pps;
   for (const c of cands) if (Math.abs(c - t) < bd) { bd = Math.abs(c - t); best = c; }
   return best;
 }
@@ -479,23 +570,62 @@ let timelineFrame = null;
 function scheduleTimeline() {
   if (timelineFrame == null) timelineFrame = requestAnimationFrame(() => { timelineFrame = null; buildTimeline(); });
 }
+// Follow one pointer until release, captured on an element that survives
+// redraws (the timeline's scroll box, a divider, the stage): releasing
+// outside the window still ends the drag. edge: scroll the timeline when the
+// pointer nears its sides, and keep scrolling while it stays there.
+function track(ev, host, move, up, { edge = false, cursor = "" } = {}) {
+  host.setPointerCapture(ev.pointerId);
+  document.body.classList.add("dragging"); if (cursor) document.body.classList.add(cursor);
+  let last = ev, timer = null;
+  const nudge = () => {
+    const r = els.scroll.getBoundingClientRect(), left = r.left + LABEL_W + 30, right = r.right - 30;
+    const d = last.clientX < left ? last.clientX - left : last.clientX > right ? last.clientX - right : 0;
+    if (!d) return false;
+    els.scroll.scrollLeft += d * 0.5; move(last); return true;
+  };
+  const mv = (e) => {
+    if (e.pointerId !== ev.pointerId) return;
+    last = e; move(e);
+    if (edge && !timer && nudge()) timer = setInterval(() => { if (!nudge()) { clearInterval(timer); timer = null; } }, 30);
+  };
+  const end = (e) => {
+    if (e.pointerId !== ev.pointerId) return;
+    clearInterval(timer);
+    host.removeEventListener("pointermove", mv); host.removeEventListener("pointerup", end); host.removeEventListener("pointercancel", end);
+    if (host.hasPointerCapture(ev.pointerId)) host.releasePointerCapture(ev.pointerId);
+    document.body.classList.remove("dragging"); if (cursor) document.body.classList.remove(cursor);
+    if (up) up(e);
+  };
+  host.addEventListener("pointermove", mv); host.addEventListener("pointerup", end); host.addEventListener("pointercancel", end);
+}
+function selectionText() {
+  const n = selItems().length;
+  if (n > 1) return `${n} keys`;
+  if (n === 1) return `${st.meta.props[st.sel.prop].label} · ${st.sel.t.toFixed(2)}s`;
+  return st.sel?.type === "piece" ? `Piece ${st.sel.i + 1}` : "No selection";
+}
 function buildTimeline() {
   if (!st.spec) return;
+  closeCtx();
   $("#delSel").disabled = !st.sel;
-  $("#selection").textContent = st.sel?.type === "key" ? `${st.meta.props[st.sel.prop].label} · ${st.sel.t.toFixed(2)}s` : st.sel?.type === "piece" ? `Piece ${st.sel.i + 1}` : "No selection";
+  $("#selection").textContent = selectionText();
   const sl = els.scroll.scrollLeft, stp = els.scroll.scrollTop;
   els.inner.innerHTML = "";
   els.inner.style.width = LABEL_W + laneWidth() + "px";
   const dur = st.spec.duration;
-  // ruler
-  const ru = row("tl-ruler", '<span class="nm">time</span>');
+  // ruler (sticks to the top while the lanes scroll)
+  const ru = row("tl-ruler", '<span class="nm">time</span><i class="lw" title="Drag to resize the labels"></i>');
   const step = st.pps >= 120 ? 0.5 : st.pps >= 50 ? 1 : st.pps >= 20 ? 2 : 5;
   for (let t = 0; t <= dur + 1e-6; t += step) {
     const major = Math.abs(t / (step * 2) - Math.round(t / (step * 2))) < 1e-6 || step >= 2;
     const d = el("div", "tick" + (major ? "" : " minor"), major ? (Number.isInteger(t) ? t : t.toFixed(1)) + "s" : "");
     d.style.left = tx(t) + "px"; ru.lane.appendChild(d);
   }
-  ru.lane.onmousedown = scrubFrom;
+  const head = el("div"); head.id = "phHead"; head.title = "Drag to scrub"; ru.lane.appendChild(head);
+  const ht = el("div"); ht.id = "hoverTime"; ru.lane.appendChild(ht);
+  ru.lane.addEventListener("pointerdown", scrubFrom);
+  $(".lw", ru.lab).addEventListener("pointerdown", resizeLabels);
   // recording pieces
   const rec = row("tall", '<span class="nm">Recording</span>');
   const takeLen = st.tl && st.tl.take;
@@ -504,37 +634,40 @@ function buildTimeline() {
     const d = el("div", "piece" + (st.sel && st.sel.type === "piece" && st.sel.i === i ? " on" : "") + (takeLen && p.out > takeLen + 0.05 ? " over" : ""),
       `${p.in.toFixed(2)}–${p.out.toFixed(2)}s<i class="h l"></i><i class="h r"></i>`);
     d.style.left = tx(a) + "px"; d.style.width = Math.max(4, tx(b - a)) + "px";
-    d.title = `take ${p.in.toFixed(2)}–${p.out.toFixed(2)}s · drag the edges to trim · S splits at the playhead` + (takeLen && p.out > takeLen ? " · past the end of the take: re-record longer" : "");
-    d.onmousedown = (ev) => dragPiece(ev, i);
+    d.title = `take ${p.in.toFixed(2)}–${p.out.toFixed(2)}s · drag the edges to trim · S splits at the playhead · right-click for more` + (takeLen && p.out > takeLen ? " · past the end of the take: re-record longer" : "");
+    d.addEventListener("pointerdown", (ev) => dragPiece(ev, i));
+    d.addEventListener("contextmenu", (ev) => pieceMenu(ev, i));
     rec.lane.appendChild(d);
     if (i > 0) { const c = el("div", "cut"); c.style.left = tx(a) + "px"; rec.lane.appendChild(c); }
   });
-  rec.lane.addEventListener("mousedown", (e) => { if (e.target === rec.lane) scrubFrom(e); });
+  rec.lane.addEventListener("pointerdown", (e) => { if (e.target === rec.lane) scrubFrom(e); });
   // reference tracks
   const vr = row("", '<span class="nm">Verses</span>');
   const rp = row("", '<span class="nm">Repeats</span>');
   if (st.tl) {
     for (const v of st.tl.verses) for (const [a, b] of videoTimes(v.t0, v.t1)) {
       const d = el("div", "seg verse" + (v.label === "basmalah" ? " basm" : ""), v.label);
-      d.style.left = tx(a) + "px"; d.style.width = Math.max(2, tx(b - a)) + "px"; d.title = `${v.label} · click to jump`;
-      d.onmousedown = (e) => { e.stopPropagation(); seek(a); }; vr.lane.appendChild(d);
+      d.style.left = tx(a) + "px"; d.style.width = Math.max(2, tx(b - a)) + "px"; d.title = `${v.label} · click to jump · drag to scrub`;
+      d.addEventListener("pointerdown", (e) => { e.stopPropagation(); scrubFrom(e, a); }); vr.lane.appendChild(d);
     }
     const spans = [];
     for (const r of st.tl.repeats) { const l = spans[spans.length - 1]; if (l && l.verse === r.verse && r.t0 - l.t1 < 0.15) l.t1 = r.t1; else spans.push({ ...r }); }
     for (const r of spans) for (const [a, b] of videoTimes(r.t0, r.t1)) {
       const d = el("div", "seg rep", "repeat"); d.style.left = tx(a) + "px"; d.style.width = Math.max(2, tx(b - a)) + "px";
-      d.title = `${r.verse} repeat · click to jump`; d.onmousedown = (e) => { e.stopPropagation(); seek(Math.max(0, a - 0.5)); }; rp.lane.appendChild(d);
+      d.title = `${r.verse} repeat · click to jump (0.5 s before)`; d.addEventListener("pointerdown", (e) => { e.stopPropagation(); scrubFrom(e, Math.max(0, a - 0.5)); }); rp.lane.appendChild(d);
     }
   }
-  for (const r of [vr, rp]) r.lane.addEventListener("mousedown", (e) => { if (e.target === r.lane) scrubFrom(e); });
+  for (const r of [vr, rp]) r.lane.addEventListener("pointerdown", (e) => { if (e.target === r.lane) scrubFrom(e); });
   // property lanes, by group
   const groups = {};
   for (const [n, p] of Object.entries(st.meta.props)) (groups[p.group] = groups[p.group] || []).push(n);
   for (const [gname, names] of Object.entries(groups)) {
     const nAnim = names.filter(animated).length;
     const gr = row("group", `<span class="nm">${st.collapsed[gname] ? "▸" : "▾"} ${gname}</span><span class="vv">${nAnim ? nAnim + " animated" : ""}</span>`);
+    gr.r.dataset.group = gname;
     gr.lab.onclick = () => { st.collapsed[gname] = !st.collapsed[gname]; buildTimeline(); };
-    gr.lane.addEventListener("mousedown", scrubFrom);
+    gr.lane.addEventListener("pointerdown", (e) => { if (e.target === gr.lane) laneDown(e); });
+    gr.lane.addEventListener("contextmenu", (e) => { if (e.target === gr.lane) laneMenu(e, null); });
     if (st.collapsed[gname]) {   // collapsed: every key of the group on one lane
       for (const n of names) for (const k of st.spec.tracks[n] || []) addDiamond(gr.lane, n, k);
       continue;
@@ -548,20 +681,23 @@ function buildTimeline() {
       const keys = st.spec.tracks[n] || [];
       if (keys.length) drawCurve(lr.lane, n);
       for (const k of keys) addDiamond(lr.lane, n, k);
-      lr.lane.addEventListener("mousedown", (e) => { if (e.target === lr.lane || e.target.closest(".curve")) scrubFrom(e); });
+      lr.lane.addEventListener("pointerdown", (e) => { if (e.target === lr.lane || e.target.closest(".curve")) laneDown(e); });
+      lr.lane.addEventListener("contextmenu", (e) => { if (!e.target.closest(".key")) laneMenu(e, n); });
       lr.lane.addEventListener("dblclick", (e) => {
         if (e.target.closest(".key")) return;
-        const t = clamp(e.altKey ? (e.clientX - lr.lane.getBoundingClientRect().left) / st.pps : snapT((e.clientX - lr.lane.getBoundingClientRect().left) / st.pps), 0, dur);
-        mutate(() => { keyAll([n], t); st.sel = { type: "key", prop: n, t: r3(t) }; }); seek(t); buildPanes();
+        const raw = timeAt(e.clientX), t = clamp(e.altKey ? raw : snapT(raw), 0, dur);
+        mutate(() => { keyAll([n], t); selectKeys([{ prop: n, t: r3(t) }]); }); seek(t); buildPanes();
       });
     }
   }
-  const ph = el("div"); ph.id = "playhead"; els.inner.appendChild(ph);
+  const ph = el("div"); ph.id = "playhead"; ph.title = "Drag to scrub"; ph.addEventListener("pointerdown", scrubFrom);
+  const hl = el("div"); hl.id = "hoverLine";
+  els.inner.append(ph, hl);
   els.scroll.scrollLeft = sl; els.scroll.scrollTop = stp;
   placePlayhead(); refreshValues();
 }
 function drawCurve(lane, n) {
-  const p = st.meta.props[n], w = tx(st.spec.duration), h = 24;
+  const w = tx(st.spec.duration), h = 24;
   const keys = st.spec.tracks[n];
   const vs = keys.map((k) => +k.v), lo = Math.min(...vs), hi = Math.max(...vs);
   if (hi - lo < 1e-9) return;
@@ -574,20 +710,21 @@ function drawCurve(lane, n) {
   svg.setAttribute("class", "curve"); svg.setAttribute("width", w); svg.setAttribute("height", h);
   const path = document.createElementNS("http://www.w3.org/2000/svg", "path"); path.setAttribute("d", d);
   svg.appendChild(path); lane.appendChild(svg);
-  void p;
 }
 function addDiamond(lane, n, k) {
-  const on = st.sel && st.sel.type === "key" && st.sel.prop === n && Math.abs(st.sel.t - k.t) < 1e-6;
-  const d = el("div", "key" + (on ? " on" : "") + (k.ease === "hold" ? " hold" : ""));
+  const ease = k.ease || "inOutCubic";
+  const d = el("div", "key e-" + ease + (isSel(n, k.t) ? " on" : "") + (ease === "hold" ? " hold" : ""));
   d.style.left = tx(k.t) + "px";
-  d.title = `${st.meta.props[n].label} = ${(+k.v).toFixed(3)} at ${(+k.t).toFixed(2)}s · ${k.ease || "inOutCubic"}`;
-  d.onmousedown = (ev) => dragKey(ev, n, k);
+  d.title = `${st.meta.props[n].label} = ${(+k.v).toFixed(3)} at ${(+k.t).toFixed(2)}s · ease ${ease}\nDrag to move · Shift/Ctrl-click to add to the selection · right-click for ease`;
+  d.addEventListener("pointerdown", (ev) => dragKey(ev, n, k));
+  d.addEventListener("contextmenu", (ev) => keyMenu(ev, n, k));
   lane.appendChild(d);
 }
 function placePlayhead() {
-  const ph = $("#playhead"); if (!ph || !st.spec) return;
+  const ph = $("#playhead"), head = $("#phHead"); if (!ph || !st.spec) return;
   ph.style.left = LABEL_W + tx(st.t) + "px";
-  ph.style.visibility = tx(st.t) < els.scroll.scrollLeft ? "hidden" : "visible";
+  if (head) head.style.left = tx(st.t) + "px";
+  ph.style.visibility = tx(st.t) < els.scroll.scrollLeft - 1 ? "hidden" : "visible";
 }
 function followPlayhead(center) {
   const x = LABEL_W + tx(st.t), sc = els.scroll, vis = sc.clientWidth;
@@ -609,64 +746,167 @@ function refreshValues() {
   }
 }
 function fmt(n, v) { return Math.abs(v) >= 10 ? v.toFixed(1) : v.toFixed(2); }
-function scrubFrom(ev) {
+// Drag the playhead (from the ruler, the playhead line, a verse or an empty
+// lane). `at`: start there instead of under the pointer (a verse's start).
+// Playback pauses while scrubbing and resumes on release.
+function scrubFrom(ev, at = null) {
   if (ev.button !== 0) return;
-  ev.preventDefault(); pause(); st.sel = null; scheduleTimeline(); buildPanes();
-  const lane = $(".tl-lane", els.inner);
-  const at = (e) => seek((e.clientX - lane.getBoundingClientRect().left) / st.pps);
-  at(ev);
-  const up = () => { removeEventListener("mousemove", at); removeEventListener("mouseup", up); };
-  addEventListener("mousemove", at); addEventListener("mouseup", up);
+  ev.preventDefault(); ev.stopPropagation(); closeCtx();
+  const was = st.playing; pause();
+  if (st.sel) { st.sel = null; buildTimeline(); buildPanes(); }
+  els.scroll.classList.add("scrubbing");
+  const go = (e, t) => { if (e.shiftKey) t = snapT(t, [], true); seek(t); };
+  go(ev, at ?? timeAt(ev.clientX));
+  track(ev, els.scroll, (e) => go(e, timeAt(e.clientX)), () => { els.scroll.classList.remove("scrubbing"); if (was) play(); }, { edge: true, cursor: "ew" });
 }
+// An empty lane: Shift-drag draws a selection box (Shift+Ctrl adds to the
+// selection); a plain drag scrubs.
+function laneDown(ev) {
+  if (ev.button !== 0) return;
+  if (!ev.shiftKey) return scrubFrom(ev);
+  ev.preventDefault(); closeCtx();
+  const base = ev.ctrlKey || ev.metaKey ? selItems() : [];
+  const r0 = els.inner.getBoundingClientRect(), x0 = ev.clientX - r0.left, y0 = ev.clientY - r0.top;
+  const box = el("div", "marquee"); els.inner.appendChild(box);
+  const draw_ = (e) => {
+    const r = els.inner.getBoundingClientRect(), x1 = e.clientX - r.left, y1 = e.clientY - r.top;
+    Object.assign(box.style, { left: Math.min(x0, x1) + "px", top: Math.min(y0, y1) + "px", width: Math.abs(x1 - x0) + "px", height: Math.abs(y1 - y0) + "px" });
+  };
+  draw_(ev);
+  track(ev, els.scroll, draw_, () => {
+    const b = box.getBoundingClientRect(); box.remove();
+    const ta = timeAt(b.left), tb = timeAt(b.right), items = [...base];
+    for (const r of $$(".tl-row.tl-prop, .tl-row.group", els.inner)) {
+      const rr = r.getBoundingClientRect();
+      if (rr.bottom < b.top || rr.top > b.bottom) continue;
+      const props = r.dataset.prop ? [r.dataset.prop] : st.collapsed[r.dataset.group] ? groupProps(r.dataset.group) : [];
+      for (const p of props) for (const k of st.spec.tracks[p] || []) if (k.t >= ta - 1e-6 && k.t <= tb + 1e-6 && !items.some((x) => x.prop === p && Math.abs(x.t - k.t) < 1e-6)) items.push({ prop: p, t: k.t });
+    }
+    selectKeys(items); buildTimeline(); buildPanes();
+    if (items.length) showTab("animate");
+  }, { edge: true });
+}
+// Drag keys: the grabbed one plus the rest of the selection, keeping their
+// spacing. Shift/Ctrl-click toggles a key in the selection instead.
 function dragKey(ev, n, k) {
   if (ev.button !== 0) return;
-  ev.preventDefault(); ev.stopPropagation(); pause(); hideExact(); st.coalesce = null;
-  st.sel = { type: "key", prop: n, t: k.t };
-  const keys = trackOf(n), i0 = keys.findIndex((x) => Math.abs(x.t - k.t) < 1e-6);
-  if (i0 < 0) return;
-  const key = keys[i0], t0 = key.t, x0 = ev.clientX;
+  ev.preventDefault(); ev.stopPropagation(); closeCtx(); pause(); hideExact(); st.coalesce = null;
+  if (ev.shiftKey || ev.ctrlKey || ev.metaKey) { toggleInSel(n, k.t); buildTimeline(); buildPanes(); return; }
+  if (!isSel(n, k.t)) selectKeys([{ prop: n, t: k.t }]);
+  else selectKeys([{ prop: n, t: k.t }, ...selItems().filter((x) => !(x.prop === n && Math.abs(x.t - k.t) < 1e-6))]);
+  const moving = selItems().map(({ prop, t }) => ({ prop, key: findKey(prop, t), t0: t })).filter((m) => m.key);
+  if (!moving.length) return;
+  const lead = moving[0], x0 = ev.clientX, start = timeAt(ev.clientX);
+  const lo = -Math.min(...moving.map((m) => m.t0)), hi = st.spec.duration - Math.max(...moving.map((m) => m.t0));
   let moved = false;
-  const move = (e) => {
-    const dt = (e.clientX - x0) / st.pps;
+  track(ev, els.scroll, (e) => {
     if (!moved && Math.abs(e.clientX - x0) < 3) return;
-    if (!moved) { st.undo.push(snapshot()); st.redo = []; moved = true; }
-    let t = clamp(t0 + dt, 0, st.spec.duration);
-    if (!e.altKey) t = snapT(t, { prop: n, t: key.t });
-    t = r3(clamp(t, 0, st.spec.duration));
-    if (keys.some((x) => x !== key && Math.abs(x.t - t) < frameT() / 2)) return;
-    key.t = t; st.sel.t = key.t;
-    keys.sort((a, b) => a.t - b.t);
-    st.spec = resolve(st.raw); st.t = key.t; syncMedia(true); scheduleTimeline(); draw();
-  };
-  const up = () => {
-    removeEventListener("mousemove", move); removeEventListener("mouseup", up);
-    if (moved) { st.coalesce = null; changed(); } else { seek(key.t); buildTimeline(); save(); }
+    if (!moved) { st.undo.push(snapshot()); if (st.undo.length > 200) st.undo.shift(); st.redo = []; moved = true; }
+    let t = lead.t0 + timeAt(e.clientX) - start;
+    if (!e.altKey) t = snapT(t, moving.map((m) => ({ prop: m.prop, t: m.key.t })));
+    const d = clamp(t - lead.t0, lo, hi);
+    // refuse a step that would land a key on another key of its track
+    if (moving.some((m) => trackOf(m.prop).some((x) => !moving.some((o) => o.key === x) && Math.abs(x.t - (m.t0 + d)) < frameT() / 2))) return;
+    for (const m of moving) m.key.t = r3(m.t0 + d);
+    for (const p of new Set(moving.map((m) => m.prop))) trackOf(p).sort((a, b) => a.t - b.t);
+    selectKeys(moving.map((m) => ({ prop: m.prop, t: m.key.t })));
+    st.spec = resolve(st.raw); st.t = lead.key.t; syncMedia(true); scheduleTimeline(); draw();
+  }, () => {
+    if (moved) { st.coalesce = null; changed(); } else { seek(lead.key.t); buildTimeline(); }
     buildPanes(); showTab("animate");
-  };
-  addEventListener("mousemove", move); addEventListener("mouseup", up);
+  }, { edge: true, cursor: "ew" });
 }
 function dragPiece(ev, i) {
   if (ev.button !== 0) return;
-  ev.preventDefault(); ev.stopPropagation(); pause(); hideExact(); st.coalesce = null;
+  ev.preventDefault(); ev.stopPropagation(); closeCtx(); pause(); hideExact(); st.coalesce = null;
   st.sel = { type: "piece", i };
   const p = st.raw.edit[i], mode = ev.target.classList.contains("l") ? "l" : ev.target.classList.contains("r") ? "r" : null;
-  if (!mode) { const lane = ev.currentTarget.parentElement; seek(clamp((ev.clientX - lane.getBoundingClientRect().left) / st.pps, pieceStart(i), pieceStart(i) + p.out - p.in)); buildTimeline(); buildPanes(); showTab("recording"); save(); return; }
+  if (!mode) { seek(clamp(timeAt(ev.clientX), pieceStart(i), pieceStart(i) + p.out - p.in)); buildTimeline(); buildPanes(); showTab("recording"); return; }
   const minLength = Math.min(MIN_PIECE, p.out - p.in);
-  const x0 = ev.clientX, in0 = p.in, out0 = p.out, max = st.tl && st.tl.take ? st.tl.take : 1e9;
+  const in0 = p.in, out0 = p.out, start = timeAt(ev.clientX), max = st.tl && st.tl.take ? st.tl.take : 1e9;
   let moved = false;
-  const move = (e) => {
-    const dt = (e.clientX - x0) / st.pps;
-    if (!moved && Math.abs(e.clientX - x0) < 2) return;
-    if (!moved) { st.undo.push(snapshot()); st.redo = []; moved = true; }
+  track(ev, els.scroll, (e) => {
+    const dt = timeAt(e.clientX) - start;
+    if (!moved && Math.abs(dt * st.pps) < 2) return;
+    if (!moved) { st.undo.push(snapshot()); if (st.undo.length > 200) st.undo.shift(); st.redo = []; moved = true; }
     if (mode === "l") p.in = clamp(r3(in0 + dt), 0, p.out - minLength);
     else p.out = clamp(r3(out0 + dt), p.in + minLength, Math.max(p.in + minLength, max));
     st.spec = resolve(st.raw);
     // show the frame at the edge being trimmed
     st.t = clamp(pieceStart(i) + (mode === "l" ? 0 : p.out - p.in - 1e-3), 0, st.spec.duration);
     syncMedia(true); scheduleTimeline(); draw();
-  };
-  const up = () => { removeEventListener("mousemove", move); removeEventListener("mouseup", up); if (moved) changed(); else save(); buildPanes(); };
-  addEventListener("mousemove", move); addEventListener("mouseup", up);
+  }, () => { if (moved) changed(); buildPanes(); }, { cursor: "ew" });
+}
+function resizeLabels(ev) {
+  if (ev.button !== 0) return;
+  ev.preventDefault(); ev.stopPropagation();
+  const x0 = ev.clientX, w0 = LABEL_W, host = els.scroll;
+  track(ev, host, (e) => {
+    LABEL_W = Math.round(clamp(w0 + e.clientX - x0, 90, 260));
+    document.documentElement.style.setProperty("--label", LABEL_W + "px");
+    scheduleTimeline();
+  }, () => localStorage.setItem("promo.labelw", LABEL_W), { cursor: "col-resize" });
+}
+// Where the pointer is on the timeline, and its time, while nothing is held.
+function hoverGuide(e) {
+  const hl = $("#hoverLine"), ht = $("#hoverTime");
+  if (!hl || !ht || !st.spec) return;
+  const t = timeAt(e.clientX), show = !e.buttons && t >= 0 && t <= st.spec.duration && !e.target.closest(".tl-label");
+  hl.style.display = ht.style.display = show ? "block" : "none";
+  if (!show) return;
+  hl.style.left = LABEL_W + tx(t) + "px"; ht.style.left = tx(t) + "px"; ht.textContent = t.toFixed(2) + "s";
+}
+
+// ------------------------------------------------------------------ menus
+
+function closeCtx() { const m = $("#ctx"); if (m) m.remove(); }
+function ctxMenu(ev, items) {
+  ev.preventDefault(); ev.stopPropagation(); closeCtx();
+  const m = el("div"); m.id = "ctx";
+  for (const it of items) {
+    if (it === "-") { m.append(el("div", "sep")); continue; }
+    if (it.head) { m.append(el("div", "hd", it.head)); continue; }
+    const b = el("button", (it.danger ? "danger" : "") + (it.on ? " on" : ""), it.label);
+    if (it.disabled) b.disabled = true;
+    b.onclick = () => { closeCtx(); it.run(); };
+    m.append(b);
+  }
+  document.body.append(m);
+  const r = m.getBoundingClientRect();
+  m.style.left = Math.min(ev.clientX, innerWidth - r.width - 6) + "px";
+  m.style.top = Math.min(ev.clientY, innerHeight - r.height - 6) + "px";
+}
+const EASE_LABEL = { inOutCubic: "Ease in & out", inOutSine: "Gentle in & out", outCubic: "Ease out", inCubic: "Ease in", outExpo: "Fast out, long settle", linear: "Linear", hold: "Hold (cut)" };
+function keyMenu(ev, n, k) {
+  if (!isSel(n, k.t)) selectKeys([{ prop: n, t: k.t }]);
+  buildTimeline(); buildPanes();
+  const cur = k.ease || "inOutCubic", count = selItems().length;
+  ctxMenu(ev, [
+    { head: count > 1 ? `${count} keys · ease into them` : "Ease into this key" },
+    ...st.meta.eases.map((e) => ({ label: EASE_LABEL[e] || e, on: e === cur, run: () => setEase(e) })),
+    "-",
+    { label: "Go to key", run: () => { seek(k.t); followPlayhead(true); } },
+    { label: count > 1 ? `Copy ${count} keys` : "Copy", run: copyKey },
+    { label: count > 1 ? `Delete ${count} keys` : "Delete", danger: true, run: deleteSelection },
+  ]);
+}
+function pieceMenu(ev, i) {
+  st.sel = { type: "piece", i }; buildTimeline(); buildPanes();
+  const t = timeAt(ev.clientX);
+  ctxMenu(ev, [
+    { label: "Split here", run: () => splitAt(t) },
+    { label: "Split at the playhead", run: () => splitAt() },
+    "-",
+    { label: "Delete piece", danger: true, disabled: st.spec.edit.length <= 1, run: deleteSelection },
+  ]);
+}
+function laneMenu(ev, n) {
+  const t = clamp(timeAt(ev.clientX), 0, st.spec.duration);
+  ctxMenu(ev, [
+    ...(n ? [{ label: `Add a ${st.meta.props[n].label} key here`, run: () => { mutate(() => { keyAll([n], t); selectKeys([{ prop: n, t: r3(t) }]); }); seek(t); buildPanes(); } }] : []),
+    { label: "Paste here", disabled: !st.clipboard, run: () => pasteKey(t) },
+    { label: "Select all keys", run: selectAllKeys },
+  ]);
 }
 
 // ------------------------------------------------------------------ stage gestures (auto-key)
@@ -674,12 +914,12 @@ function dragPiece(ev, i) {
 function stageDrag(ev) {
   if (ev.button !== 0) return;
   if (!st.geo || !st.spec) return;
-  ev.preventDefault(); pause(); hideExact(); st.coalesce = null;
+  ev.preventDefault(); pause(); hideExact(); closeCtx(); st.coalesce = null;
   els.stage.classList.add("drag");
   const rect = els.stage.getBoundingClientRect(), outPerPx = st.geo.W / rect.width;
   const S0 = stateAt(st.t), x0 = ev.clientX, y0 = ev.clientY, phone = ev.altKey;
   const tag = (phone ? "drag-phone:" : "drag-cam:") + performance.now();
-  const move = (e) => {
+  track(ev, els.stage, (e) => {
     const sx = (e.clientX - x0) * outPerPx, sy = (e.clientY - y0) * outPerPx;
     const [c, r] = rot(-S0.rotate), dx = c * sx - r * sy, dy = r * sx + c * sy;
     if (phone) {
@@ -690,9 +930,7 @@ function stageDrag(ev) {
       setProp("pan_x", S0.pan_x - dx / (S0.zoom * st.geo.W), tag);
       setProp("pan_y", S0.pan_y - dy / (S0.zoom * st.geo.H), tag);
     }
-  };
-  const up = () => { st.coalesce = null; els.stage.classList.remove("drag"); removeEventListener("mousemove", move); removeEventListener("mouseup", up); buildTimeline(); };
-  addEventListener("mousemove", move); addEventListener("mouseup", up);
+  }, () => { st.coalesce = null; els.stage.classList.remove("drag"); buildTimeline(); });
 }
 function stageWheel(ev) {
   if (!st.geo || !st.spec) return;
@@ -751,14 +989,25 @@ function buildPanes() {
     box.append(rng, num); r.append(kb, el("span", null, d.label), box); p.append(r);
   }
   p.append(noteEl("◆ adds or removes a key at the playhead. Once a property has a key, changing it (here or on the picture) keys it at the playhead; with none, it is one value for the whole video."));
-  const sk = selKey();
-  if (sk) {
+  const sk = selKey(), count = selItems().length;
+  if (count > 1) {
+    const card = el("div", "card");
+    const eases = new Set(selItems().map(({ prop, t }) => (findKey(prop, t) || {}).ease || "inOutCubic"));
+    card.append(el("h3", null, `${count} keys selected`),
+      field("Ease into them", "", "select", { options: [...(eases.size > 1 ? [["", "(mixed)"]] : []), ...m.eases.map((e) => [e, EASE_LABEL[e] || e])], get: () => (eases.size > 1 ? "" : [...eases][0]), set: () => {}, after: () => {} }));
+    $("select", card).onchange = (e) => { if (e.target.value) setEase(e.target.value); };
+    const row_ = el("div", "row");
+    const del = el("button", "danger", `Delete ${count} keys`); del.onclick = deleteSelection;
+    const cp = el("button", "ghost", "Copy"); cp.onclick = copyKey;
+    row_.append(del, cp); card.append(row_, noteEl("Drag any of them on the timeline to move them together; , and . nudge them a frame."));
+    p.append(card);
+  } else if (sk) {
     const card = el("div", "card");
     const d = m.props[st.sel.prop];
     card.append(el("h3", null, `Key · ${d.label}`),
       field("Time (s)", "", "number", { step: 0.01, get: () => sk.k.t, set: (v) => { const t = r3(clamp(v, 0, st.spec.duration)); if (sk.keys.some((k) => k !== sk.k && Math.abs(k.t - t) < frameT() / 2)) return note("there is already a key here"); sk.k.t = t; st.sel.t = sk.k.t; sk.keys.sort((a, b) => a.t - b.t); }, after: () => { seek(sk.k.t); buildPanes(); } }),
       field("Value", "", "number", { step: d.step, get: () => sk.k.v, set: (v) => { sk.k.v = r3(clamp(v, d.min, d.max)); } }),
-      field("Ease into it", "", "select", { options: m.eases.map((e) => [e, e === "hold" ? "hold (cut)" : e]), get: () => sk.k.ease || "inOutCubic", set: (v) => { if (v === "inOutCubic") delete sk.k.ease; else sk.k.ease = v; } }));
+      field("Ease into it", "", "select", { options: m.eases.map((e) => [e, EASE_LABEL[e] || e]), get: () => sk.k.ease || "inOutCubic", set: (v) => { if (v === "inOutCubic") delete sk.k.ease; else sk.k.ease = v; } }));
     const row_ = el("div", "row");
     const del = el("button", "danger", "Delete key"); del.onclick = deleteSelection;
     const clr = el("button", "ghost", "Clear track"); clr.title = "Remove every key of this property; it keeps the value at the playhead";
@@ -982,24 +1231,67 @@ async function pollEmu() {
 }
 
 function copyKey() {
-  const sk = selKey();
-  if (!sk) return note("Select a key to copy");
-  st.clipboard = { prop: st.sel.prop, key: clone(sk.k) };
-  note(`Copied ${st.meta.props[st.sel.prop].label} key`);
+  const items = selItems().map(({ prop, t }) => ({ prop, key: findKey(prop, t) })).filter((x) => x.key);
+  if (!items.length) return note("Select keys to copy");
+  const t0 = Math.min(...items.map((x) => x.key.t));
+  st.clipboard = items.map((x) => ({ prop: x.prop, key: clone(x.key), dt: x.key.t - t0 }));
+  note(`Copied ${items.length} key${items.length > 1 ? "s" : ""}`);
 }
-function pasteKey() {
+// Paste at the playhead (or `at`), keeping the copied keys' spacing.
+function pasteKey(at = st.t) {
   if (!st.clipboard || !st.raw) return;
-  const { prop, key } = st.clipboard, at = r3(st.t);
+  const placed = [];
   mutate(() => {
-    const keys = trackOf(prop), i = keyIndexAt(prop, at), k = { ...key, t: at };
-    if (i >= 0) keys[i] = k; else keys.push(k);
-    keys.sort((a, b) => a.t - b.t); st.sel = { type: "key", prop, t: at };
+    for (const c of st.clipboard) {
+      const t = r3(clamp(at + c.dt, 0, st.spec.duration)), keys = trackOf(c.prop), i = keyIndexAt(c.prop, t), k = { ...c.key, t };
+      if (i >= 0) keys[i] = k; else keys.push(k);
+      keys.sort((a, b) => a.t - b.t); placed.push({ prop: c.prop, t });
+    }
+    selectKeys(placed);
   });
   buildPanes(); showTab("animate");
 }
 function toggleHelp() {
   const help = $("#shortcutHelp"); help.classList.toggle("hidden");
   $("#helpBtn").setAttribute("aria-expanded", String(!help.classList.contains("hidden")));
+}
+
+// ------------------------------------------------------------------ panes
+
+// Side panes resize from their dividers and fold away (Ctrl+B / Ctrl+.);
+// the timeline resizes from the divider above it. All of it is remembered.
+const PANE_DEFAULTS = { left: 240, right: 330 };
+const panes = {
+  left: +(localStorage.getItem("promo.leftw") || PANE_DEFAULTS.left), right: +(localStorage.getItem("promo.rightw") || PANE_DEFAULTS.right),
+  hideL: localStorage.getItem("promo.hideL") === "1", hideR: localStorage.getItem("promo.hideR") === "1",
+};
+function applyPanes() {
+  const root = document.documentElement.style;
+  root.setProperty("--left-w", (panes.hideL ? 0 : panes.left) + "px");
+  root.setProperty("--right-w", (panes.hideR ? 0 : panes.right) + "px");
+  $("#left").classList.toggle("gone", panes.hideL); $("#right").classList.toggle("gone", panes.hideR);
+  $("#toggleLeft").classList.toggle("on", !panes.hideL); $("#toggleRight").classList.toggle("on", !panes.hideR);
+  localStorage.setItem("promo.leftw", panes.left); localStorage.setItem("promo.rightw", panes.right);
+  localStorage.setItem("promo.hideL", panes.hideL ? "1" : "0"); localStorage.setItem("promo.hideR", panes.hideR ? "1" : "0");
+  sizeStage();
+}
+function dragPane(ev, side) {
+  if (ev.button !== 0) return;
+  ev.preventDefault();
+  const bar = ev.currentTarget, x0 = ev.clientX, w0 = side === "left" ? (panes.hideL ? 0 : panes.left) : (panes.hideR ? 0 : panes.right);
+  bar.classList.add("on");
+  track(ev, bar, (e) => {
+    const w = side === "left" ? w0 + e.clientX - x0 : w0 - (e.clientX - x0);
+    const hide = w < 120;                       // drag it nearly shut to fold it away
+    if (side === "left") { panes.hideL = hide; if (!hide) panes.left = Math.round(clamp(w, 170, 460)); }
+    else { panes.hideR = hide; if (!hide) panes.right = Math.round(clamp(w, 260, 560)); }
+    applyPanes();
+  }, () => bar.classList.remove("on"), { cursor: "col-resize" });
+}
+function setTimelineHeight(h) {
+  if (h == null) { els.scroll.style.height = ""; localStorage.removeItem("promo.tlh"); }
+  else { h = clamp(h, 110, innerHeight * 0.7); els.scroll.style.height = h + "px"; localStorage.setItem("promo.tlh", h); }
+  sizeStage();
 }
 
 // ------------------------------------------------------------------ wiring
@@ -1012,7 +1304,12 @@ async function init() {
   if (first) await open(first.name);
   pollJobs(); pollEmu();
 }
+document.documentElement.style.setProperty("--label", LABEL_W + "px");
+if (localStorage.getItem("promo.tlh")) els.scroll.style.height = localStorage.getItem("promo.tlh") + "px";
+applyPanes();
 $("#play").onclick = play;
+$("#loopBtn").onclick = toggleLoop;
+$("#time").onclick = editTime;
 $("#undo").onclick = undo;
 $("#redo").onclick = redo;
 $("#keyCam").onclick = () => { if (!st.spec) return; mutate(() => keyAll(["zoom", "pan_x", "pan_y"])); buildPanes(); };
@@ -1026,16 +1323,31 @@ $("#prevKey").onclick = () => jumpKey(-1);
 $("#nextKey").onclick = () => jumpKey(1);
 $("#fit").onclick = fitTimeline;
 $("#pps").oninput = (e) => { st.pps = +e.target.value; buildTimeline(); followPlayhead(true); };
+$("#toggleLeft").onclick = () => { panes.hideL = !panes.hideL; applyPanes(); };
+$("#toggleRight").onclick = () => { panes.hideR = !panes.hideR; applyPanes(); };
+$("#splitL").addEventListener("pointerdown", (e) => dragPane(e, "left"));
+$("#splitR").addEventListener("pointerdown", (e) => dragPane(e, "right"));
+$("#splitL").addEventListener("dblclick", () => { panes.left = PANE_DEFAULTS.left; panes.hideL = false; applyPanes(); });
+$("#splitR").addEventListener("dblclick", () => { panes.right = PANE_DEFAULTS.right; panes.hideR = false; applyPanes(); });
+$("#tlResize").addEventListener("pointerdown", (ev) => {
+  if (ev.button !== 0) return;
+  ev.preventDefault();
+  const bar = ev.currentTarget, y0 = ev.clientY, h0 = els.scroll.getBoundingClientRect().height;
+  bar.classList.add("on");
+  track(ev, bar, (e) => setTimelineHeight(h0 + (y0 - e.clientY)), () => bar.classList.remove("on"), { cursor: "row-resize" });
+});
+$("#tlResize").addEventListener("dblclick", () => setTimelineHeight(null));
 els.scroll.addEventListener("wheel", (e) => {
   if (!e.ctrlKey) return;               // ctrl/pinch-wheel zooms the timeline around the cursor
   e.preventDefault();
-  const rect = els.scroll.getBoundingClientRect(), x = e.clientX - rect.left - LABEL_W + els.scroll.scrollLeft;
-  const t = x / st.pps;
+  const t = timeAt(e.clientX), rect = els.scroll.getBoundingClientRect();
   st.pps = clamp(st.pps * Math.exp(-e.deltaY * 0.002), 10, 400); $("#pps").value = st.pps;
   buildTimeline(); els.scroll.scrollLeft = Math.max(0, t * st.pps - (e.clientX - rect.left - LABEL_W));
 }, { passive: false });
-els.scroll.addEventListener("scroll", placePlayhead);
-els.stage.addEventListener("mousedown", stageDrag);
+els.scroll.addEventListener("scroll", () => { placePlayhead(); closeCtx(); });
+els.scroll.addEventListener("pointermove", hoverGuide);
+els.scroll.addEventListener("pointerleave", () => { for (const id of ["hoverLine", "hoverTime"]) { const x = document.getElementById(id); if (x) x.style.display = "none"; } });
+els.stage.addEventListener("pointerdown", stageDrag);
 els.stage.addEventListener("wheel", stageWheel, { passive: false });
 $$("#tabs button").forEach((b) => (b.onclick = () => showTab(b.dataset.tab)));
 $("#recordBtn").onclick = () => startJob(`/api/capture/${st.name}`);
@@ -1066,31 +1378,17 @@ $("#delSpec").onclick = async () => {
   } catch (e) { note(e.message); }
 };
 addEventListener("resize", sizeStage);
-// The divider above the timeline trades picture for lanes; the height is remembered.
-function setTimelineHeight(h) {
-  if (h == null) { els.scroll.style.height = ""; localStorage.removeItem("promo.tlh"); }
-  else { h = clamp(h, 110, innerHeight * 0.7); els.scroll.style.height = h + "px"; localStorage.setItem("promo.tlh", h); }
-  sizeStage();
-}
-if (localStorage.getItem("promo.tlh")) els.scroll.style.height = localStorage.getItem("promo.tlh") + "px";
-$("#tlResize").addEventListener("mousedown", (ev) => {
-  if (ev.button !== 0) return;
-  ev.preventDefault();
-  const y0 = ev.clientY, h0 = els.scroll.getBoundingClientRect().height, bar = $("#tlResize");
-  bar.classList.add("on");
-  const move = (e) => setTimelineHeight(h0 + (y0 - e.clientY));
-  const up = () => { bar.classList.remove("on"); removeEventListener("mousemove", move); removeEventListener("mouseup", up); };
-  addEventListener("mousemove", move); addEventListener("mouseup", up);
-});
-$("#tlResize").addEventListener("dblclick", () => setTimelineHeight(null));
 $("#helpBtn").onclick = toggleHelp;
 $("#closeHelp").onclick = toggleHelp;
 $("#saveState").onclick = save;
+addEventListener("pointerdown", (e) => { if (!e.target.closest("#ctx")) closeCtx(); }, true);
+addEventListener("blur", closeCtx);
 addEventListener("beforeunload", (e) => {
   if (st.raw && snapshot() !== st.saved) { e.preventDefault(); e.returnValue = ""; }
 });
 addEventListener("keydown", (e) => {
   if (e.key === "Escape") {
+    if ($("#ctx")) return closeCtx();
     $("#shortcutHelp").classList.add("hidden"); $("#helpBtn").setAttribute("aria-expanded", "false");
     st.sel = null; buildTimeline(); buildPanes(); return;
   }
@@ -1100,18 +1398,26 @@ addEventListener("keydown", (e) => {
   const mod = e.ctrlKey || e.metaKey, key = e.key.toLowerCase();
   if (typing || (e.target.closest("select, input") && !mod)) return;
   if (mod && key === "s") { e.preventDefault(); save(); return; }
+  if (mod && key === "b") { e.preventDefault(); panes.hideL = !panes.hideL; applyPanes(); return; }
+  if (mod && key === ".") { e.preventDefault(); panes.hideR = !panes.hideR; applyPanes(); return; }
   if (!st.spec) return;
   if (mod && key === "z") { e.preventDefault(); return e.shiftKey ? redo() : undo(); }
   if (mod && key === "y") { e.preventDefault(); return redo(); }
-  if (mod && key === "c") { if (selKey()) { e.preventDefault(); copyKey(); } return; }
+  if (mod && key === "a") { e.preventDefault(); return selectAllKeys(); }
+  if (mod && key === "c") { if (selItems().length) { e.preventDefault(); copyKey(); } return; }
   if (mod && key === "v") { if (st.clipboard) { e.preventDefault(); pasteKey(); } return; }
   if (mod || e.altKey) return;
   if (e.code === "Space") { e.preventDefault(); if (!e.repeat) play(); }
+  else if (key === "l") toggleLoop();
   else if (key === "k") { mutate(() => keyAll(["zoom", "pan_x", "pan_y"])); buildPanes(); }
   else if (key === "s") { e.preventDefault(); if (!e.repeat) splitAt(); }
   else if (e.key === "Delete" || e.key === "Backspace") { e.preventDefault(); if (!e.repeat) deleteSelection(); }
   else if (e.key === "[") jumpKey(-1);
   else if (e.key === "]") jumpKey(1);
+  else if (e.key === "," || e.key === "<") moveSelected(-(e.shiftKey ? 10 : 1) * frameT());
+  else if (e.key === "." || e.key === ">") moveSelected((e.shiftKey ? 10 : 1) * frameT());
+  else if (e.key === "ArrowUp") { e.preventDefault(); jumpLandmark(-1); }
+  else if (e.key === "ArrowDown") { e.preventDefault(); jumpLandmark(1); }
   else if (e.key === "Home") { e.preventDefault(); seek(0); followPlayhead(true); }
   else if (e.key === "End") { e.preventDefault(); seek(st.spec.duration); followPlayhead(true); }
   else if (e.key === "ArrowLeft" || e.key === "ArrowRight") {
@@ -1119,7 +1425,8 @@ addEventListener("keydown", (e) => {
   }
   else if (e.key === "?") { e.preventDefault(); toggleHelp(); }
 });
-els.screen.addEventListener("seeked", draw);
-els.plate.addEventListener("seeked", () => { bgCacheKey = ""; draw(); });
+els.screen.addEventListener("seeked", () => { seekLanded(els.screen); draw(); });
+els.audio.addEventListener("seeked", () => seekLanded(els.audio));
+els.plate.addEventListener("seeked", () => { seekLanded(els.plate); bgCacheKey = ""; draw(); });
 els.frame.addEventListener("load", draw);
 init().catch((e) => note("Could not load the studio: " + e.message, 10000));

@@ -9,6 +9,7 @@
 </head>
 <body>
 <header>
+  <button id="toggleLeft" class="ghost icon" title="Show / hide the video list (Ctrl+B)">☰</button>
   <div class="brand"><img src="/icon.png" alt=""><span>Promo Studio</span></div>
   <div class="row hist">
     <button id="undo" title="Undo (Ctrl+Z)" disabled>↶ Undo</button>
@@ -18,22 +19,29 @@
   <button id="helpBtn" class="ghost" aria-expanded="false" aria-controls="shortcutHelp" title="Shortcuts (?)">? Shortcuts</button>
   <div id="emu" class="pill" title="Capture emulator">emulator …</div>
   <button id="emuBoot" class="ghost hidden">Boot emulator</button>
+  <button id="toggleRight" class="ghost icon" title="Show / hide the inspector (Ctrl+.)">⚙</button>
 </header>
 
 <section id="shortcutHelp" class="hidden" aria-label="Keyboard shortcuts">
   <div class="row"><strong>Shortcuts</strong><div class="spacer"></div><button id="closeHelp" class="ghost">Close · Esc</button></div>
   <dl>
-    <dt>Space</dt><dd>Play / pause</dd><dt>← / → · Shift</dt><dd>One frame · one second</dd>
-    <dt>Home / End</dt><dd>Start / end</dd><dt>S · Delete</dt><dd>Split · delete selection (undoable)</dd>
-    <dt>K · [ / ]</dt><dd>Key camera · previous / next key</dd><dt>Ctrl/⌘ C · V</dt><dd>Copy selected key · paste at playhead</dd>
-    <dt>Ctrl/⌘ Z · Shift Z</dt><dd>Undo · redo</dd><dt>Ctrl/⌘ S</dt><dd>Save now</dd>
-    <dt>Drag · scroll</dt><dd>Pan camera · zoom</dd><dt>Alt-drag · Alt-scroll</dt><dd>Move phone · scale phone</dd>
-    <dt>Shift-scroll</dt><dd>Rotate camera</dd><dt>Alt while dragging a key</dt><dd>Disable snapping</dd>
+    <dt>Space · L</dt><dd>Play / pause · loop</dd><dt>← / → · Shift</dt><dd>One frame · one second</dd>
+    <dt>↑ / ↓</dt><dd>Previous / next verse or cut</dd><dt>Home / End</dt><dd>Start / end</dd>
+    <dt>Click the time</dt><dd>Type a time (12.5 or 0:12.5)</dd><dt>Drag the ruler or playhead</dt><dd>Scrub (Shift snaps to keys, cuts, verses)</dd>
+    <dt>S · Delete</dt><dd>Split · delete selection (undoable)</dd><dt>K · [ / ]</dt><dd>Key camera · previous / next key</dd>
+    <dt>Shift / Ctrl-click a key</dt><dd>Add to / remove from the selection</dd><dt>Shift-drag a lane</dt><dd>Select keys in a box (Ctrl too: add)</dd>
+    <dt>Ctrl/⌘ A · C · V</dt><dd>Select all keys · copy · paste at playhead</dd><dt>, / . · Shift</dt><dd>Nudge selected keys a frame · ten frames</dd>
+    <dt>Right-click</dt><dd>Ease, copy, delete; split pieces</dd><dt>Ctrl/⌘ Z · Shift Z</dt><dd>Undo · redo</dd>
+    <dt>Drag · scroll the picture</dt><dd>Pan camera · zoom</dd><dt>Alt-drag · Alt-scroll</dt><dd>Move phone · scale phone</dd>
+    <dt>Shift-scroll the picture</dt><dd>Rotate camera</dd><dt>Alt while dragging a key</dt><dd>Disable snapping</dd>
     <dt>Double-click a lane</dt><dd>Add key</dd><dt>Ctrl-scroll timeline</dt><dd>Zoom around cursor</dd>
+    <dt>Ctrl/⌘ B · Ctrl/⌘ .</dt><dd>Hide / show videos · inspector</dd><dt>Drag any divider</dt><dd>Resize panes (double-click resets)</dd>
   </dl>
   <p class="note">Keys stay in video time when you cut the recording. Easing controls the move into a key. The live preview omits motion blur; Exact frame includes it. Sound gain, fades and normalisation are applied on export.</p>
 </section>
 <main>
+  <div class="split" id="splitL" title="Drag to resize · double-click to reset"></div>
+  <div class="split" id="splitR" title="Drag to resize · double-click to reset"></div>
   <aside id="left">
     <div class="side-head">
       <h2>Videos</h2>
@@ -58,7 +66,8 @@
     </div>
     <div id="transport">
       <button id="play" class="icon" title="Play / pause (space)">▶</button>
-      <span id="time">0.00 / 0.00</span>
+      <button id="loopBtn" class="icon ghost" title="Loop playback (L)">↻</button>
+      <span id="time" title="Click to type a time">0.00 / 0.00</span>
       <div class="spacer"></div>
       <button id="keyCam" title="Key the camera (zoom, pan) at the playhead (K)">◆ Key camera</button>
       <button id="presetPush" title="Ease in to the active verse over 0.9 s">Push in</button>

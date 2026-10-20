@@ -28,7 +28,14 @@ header { display: flex; align-items: center; gap: 12px; padding: 8px 14px; borde
 .pill { font-size: 12px; color: var(--mute); border: 1px solid var(--line); border-radius: 99px; padding: 3px 10px; }
 .pill.up { color: var(--green); border-color: #3f5a50; }
 
-main { flex: 1; display: grid; grid-template-columns: 240px 1fr 330px; min-height: 0; }
+main { flex: 1; display: grid; grid-template-columns: var(--left-w, 240px) minmax(0, 1fr) var(--right-w, 330px); min-height: 0; position: relative; }
+aside.gone > * { display: none !important; }
+.split { position: absolute; top: 0; bottom: 0; width: 8px; z-index: 15; cursor: col-resize; }
+#splitL { left: calc(var(--left-w, 240px) - 4px); } #splitR { right: calc(var(--right-w, 330px) - 4px); }
+.split:hover, .split.on { background: linear-gradient(90deg, transparent 3px, var(--gold) 3px, var(--gold) 5px, transparent 5px); }
+header .icon { width: 32px; padding: 4px 0; font-size: 15px; }
+body.dragging, body.dragging * { cursor: inherit; user-select: none !important; }
+body.col-resize { cursor: col-resize; } body.row-resize { cursor: ns-resize; } body.ew { cursor: ew-resize; }
 aside { background: var(--panel); display: flex; flex-direction: column; min-height: 0; }
 #left { border-right: 1px solid var(--line); }
 #right { border-left: 1px solid var(--line); }
@@ -54,7 +61,10 @@ aside { background: var(--panel); display: flex; flex-direction: column; min-hei
 
 #transport, #actions, #tlbar { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; padding: 7px 12px; border-top: 1px solid var(--line); background: var(--panel); }
 #transport .icon { width: 36px; font-size: 14px; }
-#time { font-variant-numeric: tabular-nums; color: var(--mute); min-width: 110px; }
+#time { font-variant-numeric: tabular-nums; color: var(--mute); min-width: 110px; cursor: text; border-radius: 4px; padding: 2px 4px; }
+#time:hover { background: var(--panel2); color: var(--ink); }
+#timeInput { width: 110px; background: var(--panel2); border: 1px solid var(--gold); border-radius: 4px; padding: 2px 4px; font-variant-numeric: tabular-nums; }
+#loopBtn.on { color: var(--gold); border-color: #5a4c2c; }
 .sep { width: 1px; height: 20px; background: var(--line); margin: 0 4px; }
 .zoomer { color: var(--mute); display: flex; align-items: center; gap: 6px; }
 .zoomer input { width: 140px; accent-color: var(--gold); }
@@ -77,7 +87,16 @@ aside { background: var(--panel); display: flex; flex-direction: column; min-hei
 .tl-label .nm { flex: 1; overflow: hidden; text-overflow: ellipsis; }
 .tl-label .vv { color: var(--faint); font-variant-numeric: tabular-nums; font-size: 10.5px; }
 .tl-lane { position: relative; flex: none; height: 100%; }
-.tl-ruler .tl-lane { cursor: pointer; }
+.tl-row.tl-ruler { position: sticky; top: 0; z-index: 6; background: var(--panel); }
+.tl-ruler .tl-lane { cursor: ew-resize; background: var(--panel); }
+.tl-ruler .tl-label { z-index: 7; }
+.tl-label .lw { position: absolute; right: -3px; top: 0; bottom: 0; width: 6px; cursor: col-resize; z-index: 8; }
+.tl-label .lw:hover { background: var(--gold); }
+#phHead { position: absolute; top: 0; width: 13px; height: 13px; margin-left: -6px; background: var(--gold); clip-path: polygon(0 0, 100% 0, 100% 55%, 50% 100%, 0 55%); cursor: ew-resize; z-index: 3; }
+#hoverLine { position: absolute; top: 0; bottom: 0; width: 1px; background: #ffffff30; pointer-events: none; z-index: 3; display: none; }
+#hoverTime { position: absolute; top: 1px; padding: 0 4px; border-radius: 3px; background: #000c; color: var(--ink); font-size: 10px; pointer-events: none; z-index: 4; display: none; transform: translateX(6px); }
+.marquee { position: absolute; border: 1px solid var(--blue); background: #8fb3e822; pointer-events: none; z-index: 5; }
+#tlscroll.scrubbing { cursor: ew-resize; }
 .tick { position: absolute; top: 0; height: 100%; border-left: 1px solid var(--line); padding-left: 3px; color: var(--faint); font-size: 10.5px; }
 .tick.minor { height: 30%; top: 70%; padding: 0; }
 .seg { position: absolute; top: 4px; bottom: 4px; border-radius: 4px; font-size: 10.5px; padding: 1px 5px; overflow: hidden; white-space: nowrap; }
@@ -95,7 +114,14 @@ aside { background: var(--panel); display: flex; flex-direction: column; min-hei
 .key { position: absolute; top: 50%; width: 11px; height: 11px; margin: -5.5px 0 0 -5.5px; transform: rotate(45deg); background: var(--green); border: 1px solid #d8f2e7; cursor: ew-resize; border-radius: 2px; z-index: 2; }
 .key.on { background: var(--gold); border-color: #fff3cc; box-shadow: 0 0 0 3px #caa54744; }
 .key.hold { background: var(--danger); }
-#playhead { position: absolute; top: 0; bottom: 0; width: 2px; background: var(--gold); pointer-events: none; z-index: 4; }
+#playhead { position: absolute; top: 0; bottom: 0; width: 2px; margin-left: -1px; background: var(--gold); z-index: 4; cursor: ew-resize; }
+#playhead::before { content: ""; position: absolute; top: 0; bottom: 0; left: -4px; right: -4px; }   /* a wider grab area */
+.key.e-linear { background: var(--blue); border-color: #dbe8fb; }
+.key.e-outCubic, .key.e-outExpo { background: #b9d38a; } .key.e-inCubic { background: #79a7a0; } .key.e-inOutSine { background: #9fd6c2; }
+#ctx { position: fixed; z-index: 50; min-width: 170px; padding: 4px; background: var(--panel2); border: 1px solid var(--line); border-radius: 8px; box-shadow: 0 10px 30px #0009; display: flex; flex-direction: column; }
+#ctx button { text-align: left; border: 0; background: transparent; padding: 5px 10px; border-radius: 5px; }
+#ctx button:hover { background: #ffffff12; } #ctx button.on::after { content: "  ✓"; color: var(--gold); }
+#ctx .sep { height: 1px; background: var(--line); margin: 4px 2px; } #ctx .hd { color: var(--faint); font-size: 11px; padding: 4px 10px 2px; }
 
 /* inspector */
 #tabs { display: flex; border-bottom: 1px solid var(--line); }
@@ -149,7 +175,6 @@ button:focus-visible, input:focus-visible, select:focus-visible, #specList li:fo
 .piece:hover { border-color: var(--blue); } .piece .h:hover { background: #ffffff40; }
 .tl-prop .tl-lane { cursor: crosshair; }
 @media (max-width: 1400px) {
-  main { grid-template-columns: 210px minmax(0, 1fr) 310px; }
   #transport, #actions, #tlbar { padding: 6px 8px; gap: 5px; }
   .side-head .row button { padding-inline: 7px; }
   #transport button { padding: 4px 6px; font-size: 12px; }

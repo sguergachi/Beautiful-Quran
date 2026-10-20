@@ -6,12 +6,12 @@
     "ayah": 14,
     "reciter": "alafasy",
     "theme": "Royal green",
-    "seconds": 24
+    "seconds": 69
   },
   "edit": [
     {
-      "in": 0.0,
-      "out": 22.5
+      "in": 0,
+      "out": 24.867
     }
   ],
   "background": {
@@ -31,12 +31,12 @@
       },
       {
         "t": 2.6,
-        "v": 1.0,
+        "v": 1,
         "ease": "inOutCubic"
       },
       {
         "t": 10.4,
-        "v": 1.0
+        "v": 1
       },
       {
         "t": 11.9,
@@ -44,12 +44,12 @@
         "ease": "inOutCubic"
       },
       {
-        "t": 17.8,
+        "t": 19.237,
         "v": 2.2
       },
       {
-        "t": 19.2,
-        "v": 1.0,
+        "t": 20.463,
+        "v": 1,
         "ease": "inOutCubic"
       }
     ],
@@ -73,11 +73,11 @@
         "ease": "inOutCubic"
       },
       {
-        "t": 17.8,
+        "t": 19.237,
         "v": 0.5
       },
       {
-        "t": 19.2,
+        "t": 20.463,
         "v": 0.5,
         "ease": "inOutCubic"
       }
@@ -102,17 +102,17 @@
         "ease": "inOutCubic"
       },
       {
-        "t": 17.8,
+        "t": 19.237,
         "v": 0.393
       },
       {
-        "t": 19.2,
+        "t": 20.463,
         "v": 0.5,
         "ease": "inOutCubic"
       }
     ]
   },
   "audio": {
-    "fade_out": 2.0
+    "fade_out": 2
   }
 }

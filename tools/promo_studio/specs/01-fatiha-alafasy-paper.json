@@ -1,7 +1,6 @@
 {
   "title": "Al-Fatihah · Alafasy · Paper",
   "aspect": "1:1",
-  "duration": 40.7,
   "app": {
     "surah": 1,
     "ayah": 1,
@@ -10,58 +9,87 @@
     "seconds": 95
   },
   "background": {
-    "id": "dunes",
-    "brightness": 0.02
+    "id": "valley"
   },
   "phone": {
     "height": 0.8,
-    "y": 0.035
+    "color": "auto"
   },
   "audio": {
-    "fade_out": 2
+    "fade_out": 2,
+    "fade_in": 0
   },
-  "camera": [
+  "motion_blur": 1.1,
+  "tracks": {
+    "zoom": [
+      {
+        "t": 4.143,
+        "v": 2.3
+      },
+      {
+        "t": 8.546,
+        "v": 1,
+        "ease": "inOutCubic"
+      },
+      {
+        "t": 16.265,
+        "v": 1
+      },
+      {
+        "t": 19.702,
+        "v": 1.35,
+        "ease": "inOutSine"
+      }
+    ],
+    "pan_x": [
+      {
+        "t": 4.433,
+        "v": 0.5
+      },
+      {
+        "t": 8.264,
+        "v": 0.5,
+        "ease": "inOutCubic"
+      },
+      {
+        "t": 16.265,
+        "v": 0.5
+      },
+      {
+        "t": 19.702,
+        "v": 0.5,
+        "ease": "inOutSine"
+      }
+    ],
+    "pan_y": [
+      {
+        "t": 3.838,
+        "v": 0.3058
+      },
+      {
+        "t": 8.546,
+        "v": 0.5,
+        "ease": "inOutCubic"
+      },
+      {
+        "t": 16.265,
+        "v": 0.5
+      },
+      {
+        "t": 19.997,
+        "v": 0.3715,
+        "ease": "inOutSine"
+      }
+    ]
+  },
+  "props": {
+    "bg_brightness": 0.02,
+    "phone_y": 0.035
+  },
+  "edit": [
     {
-      "t": 0,
-      "zoom": 2.3,
-      "x": 0.5,
-      "y": 0.22
-    },
-    {
-      "t": 3.2,
-      "zoom": 1,
-      "x": 0.5,
-      "y": 0.5,
-      "ease": "inOutCubic"
-    },
-    {
-      "t": 12,
-      "zoom": 1,
-      "x": 0.5,
-      "y": 0.5
-    },
-    {
-      "t": 14.5,
-      "zoom": 1.35,
-      "x": 0.5,
-      "y": 0.32,
-      "ease": "inOutSine"
+      "in": 0,
+      "out": 47.922
     }
-  ],
-  "captions": [
-    {
-      "t0": 1.2,
-      "t1": 6.6,
-      "text": "Every word, written as it is recited.",
-      "pos": "top"
-    },
-    {
-      "t0": 13,
-      "t1": 20,
-      "text": "Word by word, with its meaning.",
-      "pos": "top"
-    }
-  ],
-  "end_card": null,
-  "motion_blur": 2
+  ]
 }
