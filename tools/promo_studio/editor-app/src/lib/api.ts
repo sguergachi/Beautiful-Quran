@@ -1,5 +1,5 @@
 // The studio server's API (server.py). Errors carry the server's message.
-import type { Emulator, Geo, Job, Meta, Plate, RawSpec, SpecStatus, Timeline, VersePlan } from "./types.ts";
+import type { Emulator, ExportOptions, Geo, Job, Meta, Plate, RawSpec, SpecStatus, Timeline, VersePlan } from "./types.ts";
 
 async function call<T>(path: string, opts: RequestInit = {}): Promise<T> {
   let r: Response;
@@ -33,7 +33,7 @@ export const api = {
   cancel: (id: string) => post<Job>(`/api/jobs/${id}/cancel`),
   clearJobs: () => post<{ ok: true }>("/api/jobs/clear"),
   capture: (name: string, opts: { force?: boolean; serial?: string | null }) => post<Job>(`/api/capture/${name}`, opts),
-  render: (name: string, scale = 1) => post<Job>(`/api/render/${name}`, { scale }),
+  render: (name: string, opts: ExportOptions) => post<Job>(`/api/render/${name}`, opts),
   emus: (fresh = false) => call<{ emulators: Emulator[]; booting: Job[] }>(`/api/emus${fresh ? "?fresh=1" : ""}`),
   bootEmu: (cores: number) => post<Job>("/api/emus/boot", { cores }),
   prepareEmu: (serial: string) => post<Job>(`/api/emus/${serial}/prepare`),

@@ -1,14 +1,15 @@
 // The app's frame: top bar, the video list, toasts.
 import { useState } from "react";
+import { exportLabel } from "../lib/exporting.ts";
 import type { SpecStatus } from "../lib/types.ts";
 import {
-  createVideo, deleteVideo, exportVideo, mutate, open, openPanel, redo, renameVideo, save, setUI, undo, useStore,
+  createVideo, deleteVideo, exportOptions, exportVideo, mutate, open, openPanel, redo, renameVideo, save, setUI, undo, useStore,
 } from "../state/store.ts";
 import { openMenu } from "./Menu.tsx";
 import { Button, Dot, Icon, Segmented } from "./ui.tsx";
 
 export function TopBar() {
-  const { spec, meta, undo: u, redo: r, saveState, saveError, jobs, emus, ui, name } = useStore();
+  const { spec, meta, undo: u, redo: r, saveState, saveError, jobs, emus, ui, name, panel } = useStore();
   const live = jobs.filter((j) => j.state === "running" || j.state === "queued");
   const ready = emus.filter((e) => e.ready).length, busy = emus.filter((e) => e.job).length;
   const progress = live.length ? live.reduce((a, j) => a + j.progress, 0) / live.length : 0;
@@ -55,8 +56,8 @@ export function TopBar() {
         )}
       </Button>
       <Button variant="ghost" size="icon" onClick={() => openPanel("help")} title="Shortcuts (?)">?</Button>
-      <Button variant="primary" disabled={!spec || !useStore.getState().geo?.clip || !!renderJob} onClick={() => exportVideo()} title="Render the MP4">
-        {Icon.exportIcon}{renderJob ? `Exporting ${Math.round(renderJob.progress * 100)}%` : "Export"}
+      <Button variant="primary" disabled={!spec} active={panel === "export"} onClick={() => openPanel("export")} title="Format, size and quality, then export (Ctrl E)">
+        {Icon.exportIcon}{renderJob ? `Exporting ${Math.round(renderJob.progress * 100)}%` : "Export…"}
       </Button>
       <Button size="icon" variant="ghost" active={!ui.hideR} onClick={() => setUI({ hideR: !ui.hideR })} title="Inspector (Ctrl .)">{Icon.sideR}</Button>
     </header>
@@ -69,8 +70,9 @@ function VideoItem({ s, active }: { s: SpecStatus; active: boolean }) {
     { label: "Open", run: () => open(s.name) },
     { label: "Duplicate", run: () => { const t = prompt("Name for the copy:", `${s.name}-2`); if (t) createVideo(t, s.name); } },
     { label: "Rename", run: () => { const t = prompt("New name:", s.name); if (t) renameVideo(s.name, t); } },
-    ...(s.video ? [{ label: "Open the exported video ↗", run: () => window.open(`/media/out/${s.name}.mp4?${s.video_mtime}`, "_blank") }] : []),
-    { label: "Export", run: () => exportVideo(s.name) },
+    ...(s.exports?.length ? [{ label: "Open the latest export ↗", run: () => window.open(`/media/out/${s.exports![0].file}?${s.exports![0].mtime}`, "_blank") }] : []),
+    { label: `Export · ${exportLabel({ aspect: s.aspect ?? "1:1", fps: s.fps ?? 60 }, exportOptions(), useStore.getState().meta!.aspects)}`, disabled: !s.take || s.take_short, run: () => exportVideo(s.name) },
+    { label: "Export settings…", run: () => { if (s.name !== useStore.getState().name) open(s.name); openPanel("export"); } },
     "-",
     { label: "Delete…", danger: true, run: () => { if (confirm(`Delete "${s.name}"? Its take and exported video stay on disk.`)) deleteVideo(s.name); } },
   ]);
@@ -113,9 +115,9 @@ export function VideoList() {
         {!shown.length && <li className="p-3 text-faint">{specs.length ? "No match." : "No videos yet."}</li>}
       </ul>
       <div className="shrink-0 border-t border-line p-2.5">
-        <Button size="sm" variant="ghost" className="!h-auto min-h-7 w-full justify-center !whitespace-normal text-center" onClick={() => { for (const s of specs) if (s.take && !s.take_short) exportVideo(s.name); }}>
+        <Button size="sm" variant="ghost" className="!h-auto min-h-7 w-full justify-center !whitespace-normal text-center" onClick={() => openPanel("export")} title="Choose the format, then export every video with a take">
           <span className="shrink-0">{Icon.exportIcon}</span>
-          <span>Export every video with a take</span>
+          <span>Export videos…</span>
         </Button>
       </div>
     </div>

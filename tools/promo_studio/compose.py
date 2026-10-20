@@ -28,6 +28,7 @@ import cv2
 import numpy as np
 from PIL import Image
 
+import formats
 import library
 import phone as phone_mod
 from anim import sound_onset, source_time, state_at
@@ -322,16 +323,37 @@ def _render_priority():
         os.nice(max(0, 5 - os.nice(0)))
 
 
+def video_args(o, fps):
+    """Encoder arguments for one chunk of a format (formats.FORMATS).
+    Chunks are Matroska and are joined without re-encoding, except a GIF:
+    its chunks are near-lossless H.264, quantised once at the end."""
+    f = o["format"]
+    q = formats.FORMATS[f]["q"][o["quality"]]
+    if f in ("h264", "gif"):
+        return ["-c:v", "libx264", "-preset", "medium", "-crf", str(q if f == "h264" else 10), "-threads", "1",
+                "-pix_fmt", "yuv420p", "-g", str(fps)]
+    if f == "hevc":
+        return ["-c:v", "libx265", "-preset", "medium", "-crf", str(q), "-pix_fmt", "yuv420p",
+                "-x265-params", f"log-level=error:pools=1:frame-threads=1:keyint={fps}"]
+    if f == "av1":
+        return ["-c:v", "libsvtav1", "-preset", "8", "-crf", str(q), "-pix_fmt", "yuv420p10le", "-g", str(fps * 2),
+                "-svtav1-params", "lp=1"]
+    if f == "vp9":
+        return ["-c:v", "libvpx-vp9", "-b:v", "0", "-crf", str(q), "-deadline", "good", "-cpu-used", "2",
+                "-row-mt", "1", "-threads", "2", "-pix_fmt", "yuv420p", "-g", str(fps * 2)]
+    return ["-c:v", "prores_ks", "-profile:v", str(q), "-vendor", "apl0", "-pix_fmt", "yuv422p10le", "-threads", "2"]
+
+
 def _render_chunk(args):
-    s, f0, f1, path, scale = args
+    s, f0, f1, path, scale, o = args
     r = Renderer(s, scale)
     fps = r.fps
     off = float(s["background"].get("offset", 0))
     scr = EditFrames(s, r.clip, r.sw, r.sh, fps)
     pl = Frames(r.plate, r.pw, r.ph, fps, off + f0 / fps, loop=True, loop_len=r.plate_len)
     enc = subprocess.Popen([*FFMPEG, "-y", "-f", "rawvideo", "-pix_fmt", "rgb24", "-s",
-                            f"{r.W}x{r.H}", "-r", str(fps), "-i", "-", "-c:v", "libx264", "-preset", "medium",
-                            "-crf", "14", "-threads", "1", "-pix_fmt", "yuv420p", "-g", str(fps), path], stdin=subprocess.PIPE)
+                            f"{r.W}x{r.H}", "-r", str(fps), "-i", "-", *video_args(o, fps), path],
+                           stdin=subprocess.PIPE, env=dict(os.environ, SVT_LOG="1"))
     try:
         for f in range(f0, f1):
             t = f / fps
@@ -402,21 +424,54 @@ def audio_filter(s):
     return wav, f"{graph};[cut]{','.join(chain)}[aout]"
 
 
-def mux(s, video_input, out):
-    """Lay the take's sound under a rendered picture (video stream copied)."""
-    wav, fc = audio_filter(s)
-    tmp = out + ".mux.mp4"
+def audio_args(o):
+    f, k = formats.FORMATS[o["format"]]["audio"], o["audio_kbps"]
+    if f == "pcm":
+        return ["-c:a", "pcm_s16le", "-ar", "48000"]
+    if f == "opus":
+        return ["-c:a", "libopus", "-b:a", f"{min(k, 256)}k", "-ar", "48000"]
+    return ["-c:a", "aac", "-b:a", f"{k}k", "-ar", "48000"]
+
+
+def mux(s, video_input, out, o=None):
+    """Lay the take's sound under a rendered picture (video stream copied),
+    or write the picture alone when the export has no sound."""
+    o = formats.options(o)
+    ext = formats.FORMATS[o["format"]]["ext"]
+    tmp = f"{out}.mux.{ext}"
     n_in = video_input.count("-i")
-    fc = fc.replace("[0:a]", f"[{n_in}:a]")
-    subprocess.run(["ffmpeg", "-v", "error", "-y", *video_input, "-i", wav, "-filter_complex", fc,
-                    "-map", "0:v", "-map", "[aout]", "-c:v", "copy", "-c:a", "aac", "-b:a", "256k", "-ar", "48000",
-                    "-t", f"{float(s['duration']):.4f}", "-movflags", "+faststart", tmp], check=True)
+    tail = ["-c:v", "copy", "-t", f"{float(s['duration']):.4f}"]
+    if o["format"] == "hevc":
+        tail += ["-tag:v", "hvc1"]               # QuickTime / iOS want hvc1
+    if ext in ("mp4", "mov"):
+        tail += ["-movflags", "+faststart"]
+    if o["audio_kbps"]:                         # 0 = no sound (ProRes takes any other value as PCM)
+        wav, fc = audio_filter(s)
+        fc = fc.replace("[0:a]", f"[{n_in}:a]")
+        cmd = [*video_input, "-i", wav, "-filter_complex", fc, "-map", "0:v", "-map", "[aout]", *audio_args(o)]
+    else:
+        cmd = [*video_input, "-map", "0:v"]
+    subprocess.run(["ffmpeg", "-v", "error", "-y", *cmd, *tail, tmp], check=True)
     os.replace(tmp, out)
     return out
 
 
-def export(s, out=None, workers=None, scale=1.0, log=print, progress=None):
-    """Render the whole spec to an H.264/AAC mp4. Returns the output path.
+def gif(video_input, out, o):
+    """Quantise the rendered chunks to one GIF with a palette made for it."""
+    fmt = formats.FORMATS["gif"]
+    colours, dither = fmt["q"][o["quality"]], fmt["dither"][o["quality"]]
+    tmp = out + ".tmp.gif"
+    subprocess.run(["ffmpeg", "-v", "error", "-y", *video_input, "-filter_complex",
+                    f"split[a][b];[a]palettegen=max_colors={colours}:stats_mode=diff[p];"
+                    f"[b][p]paletteuse=dither={dither}:diff_mode=rectangle", "-loop", "0", tmp], check=True)
+    os.replace(tmp, out)
+    return out
+
+
+def export(s, out=None, workers=None, scale=None, log=print, progress=None, options=None):
+    """Render the whole spec in an export format (formats.options: format,
+    quality, scale, fps, audio_kbps; H.264 MP4 at full size by default).
+    Returns the output path, OUT/formats.filename unless `out` is given.
 
     `log` may be a report.Report (named stages, frame-accurate progress);
     `progress` is an optional plain 0..1 callback."""
@@ -425,6 +480,11 @@ def export(s, out=None, workers=None, scale=1.0, log=print, progress=None):
     def tell(value, msg=None):
         if rep: rep.progress(value, msg)
         if progress: progress(value)
+    o = formats.options({**(options or {}), **({"scale": scale} if scale is not None else {})})
+    filename, label = formats.filename(s, o), formats.describe(s, o)    # named against the video's own fps
+    if o["fps"] and o["fps"] != s["fps"]:
+        s = {**s, "fps": o["fps"]}
+    scale = o["scale"]
     rep and rep.stage("prepare", "Preparing the background and the phone", 0.01)
     r = Renderer(s, scale)          # validates the take and builds the plate once, up front
     if s["duration"] > 0 and max(float(p["out"]) for p in s["edit"]) > r.meta["length"] + 0.05:
@@ -432,18 +492,18 @@ def export(s, out=None, workers=None, scale=1.0, log=print, progress=None):
     fps, dur = r.fps, float(s["duration"])
     n = max(1, int(math.ceil(dur * fps - 1e-9)))
     workers = workers or max(1, min(4, (os.cpu_count() or 4) // 2))
-    out = out or os.path.join(OUT, f"{s['name']}.mp4")
+    out = out or os.path.join(OUT, filename)
     os.makedirs(os.path.dirname(os.path.abspath(out)), exist_ok=True)
     work = os.path.join(CACHE, "render", s["name"])
     os.makedirs(work, exist_ok=True)
     bounds = [round(n * i / workers) for i in range(workers + 1)]
-    chunks = [(s, bounds[i], bounds[i + 1], os.path.join(work, f"part{i:02d}.mp4"), scale)
+    chunks = [(s, bounds[i], bounds[i + 1], os.path.join(work, f"part{i:02d}.mkv"), scale, o)
               for i in range(workers) if bounds[i + 1] > bounds[i]]
     for c in chunks:
         if os.path.exists(c[3] + ".progress"):
             os.remove(c[3] + ".progress")
     t0 = time.time()
-    rep and rep.stage("render", f"Rendering {n} frames at {r.W}×{r.H}, {fps} fps", 0.03)
+    rep and rep.stage("render", f"Rendering {n} frames at {r.W}×{r.H}, {fps} fps ({label})", 0.03)
     log(f"rendering {s['name']}: {n} frames {r.W}x{r.H}@{fps} in {len(chunks)} parts")
     with ProcessPoolExecutor(len(chunks), initializer=_render_priority) as ex:
         futures = [ex.submit(_render_chunk, c) for c in chunks]
@@ -467,8 +527,15 @@ def export(s, out=None, workers=None, scale=1.0, log=print, progress=None):
     with open(lst, "w") as f:
         for c in chunks:
             f.write(f"file '{c[3]}'\n")
-    rep and rep.stage("mux", "Laying in the sound (−16 LUFS) and writing the MP4", 0.94)
-    mux(s, ["-f", "concat", "-safe", "0", "-i", lst], out)
-    tell(1.0, f"wrote {os.path.basename(out)} in {time.time() - t0:.0f} s")
-    log(f"wrote {out} in {time.time() - t0:.0f}s")
+    joined = ["-f", "concat", "-safe", "0", "-i", lst]
+    ext = formats.FORMATS[o["format"]]["ext"].upper()
+    if o["format"] == "gif":
+        rep and rep.stage("mux", "Making the GIF's palette and writing it", 0.94)
+        gif(joined, out, o)
+    else:
+        rep and rep.stage("mux", f"Laying in the sound (−16 LUFS) and writing the {ext}" if o["audio_kbps"] else f"Writing the {ext} (no sound)", 0.94)
+        mux(s, joined, out, o)
+    mb = os.path.getsize(out) / 1e6
+    tell(1.0, f"wrote {os.path.basename(out)} ({mb:.1f} MB) in {time.time() - t0:.0f} s")
+    log(f"wrote {out} ({mb:.1f} MB) in {time.time() - t0:.0f}s")
     return out

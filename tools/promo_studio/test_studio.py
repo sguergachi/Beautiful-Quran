@@ -18,6 +18,7 @@ import numpy as np
 import anim
 import audio
 import compose
+import formats
 import library
 import phone
 import server
@@ -173,6 +174,43 @@ class MediaTests(unittest.TestCase):
             self.assertNotIn("#", os.path.basename(out))
             self.assertEqual(library.probe(out)[:2], library.plate_geometry(bg, 64, 64)[:2])
             self.assertFalse(list(self.d.glob("*.part.mp4")))
+
+
+class FormatTests(unittest.TestCase):
+    def test_options_validate_and_name_one_file_per_kind(self):
+        s = spec.resolve({"aspect": "9:16"}); s["name"] = "v"
+        o = formats.options(None)
+        self.assertEqual(formats.filename(s, o), "v.mp4")
+        o = formats.options({"format": "hevc", "scale": 2 / 3, "fps": 30})
+        self.assertEqual(formats.filename(s, o), "v-720p-30fps.mp4")
+        self.assertEqual(formats.describe(s, o), "HEVC · 720p · 30 fps")
+        g = formats.options({"format": "gif", "fps": 60, "audio_kbps": 256})
+        self.assertEqual((g["fps"], g["audio_kbps"]), (25, 0), "GIFs play at whole-centisecond rates, silently")
+        self.assertEqual(formats.filename(s, formats.options({"format": "prores"})), "v.mov")
+        for bad in ({"format": "avi"}, {"quality": "max"}, {"scale": 3}, {"fps": 48}, {"audio_kbps": 100}, {"scale": True}):
+            with self.assertRaises(ValueError, msg=str(bad)):
+                formats.options(bad)
+
+    def test_encoders_and_sound_per_format(self):
+        o = lambda f, **k: formats.options({"format": f, **k})
+        self.assertIn("libx265", compose.video_args(o("hevc"), 60))
+        self.assertIn("yuv420p10le", compose.video_args(o("av1"), 60))
+        self.assertIn("prores_ks", compose.video_args(o("prores", quality="best"), 60))
+        self.assertEqual(compose.video_args(o("h264", quality="small"), 60)[5], "23")
+        self.assertIn("libopus", compose.audio_args(o("vp9", audio_kbps=320)))
+        self.assertIn("256k", compose.audio_args(o("vp9", audio_kbps=320)), "Opus tops out at 256 kbps here")
+        self.assertIn("pcm_s16le", compose.audio_args(o("prores")))
+
+    def test_exports_list_every_kind_and_follow_a_rename(self):
+        d = SCRATCH / "out"
+        d.mkdir(exist_ok=True)
+        for f in d.iterdir():
+            f.unlink()
+        for f in ("a.mp4", "a-720p.webm", "a-720p-30fps.gif", "a-b.mp4", "a.txt", "ab.mp4"):
+            (d / f).write_bytes(b"x")
+        with patch.object(spec, "OUT", str(d)):
+            self.assertEqual(sorted(e["file"] for e in server.exports("a")), ["a-720p-30fps.gif", "a-720p.webm", "a.mp4"])
+            self.assertEqual([e["file"] for e in server.exports("a-b")], ["a-b.mp4"])
 
 
 class ServerTests(unittest.TestCase):

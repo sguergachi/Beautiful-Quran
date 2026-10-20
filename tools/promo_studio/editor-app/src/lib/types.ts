@@ -53,6 +53,7 @@ export interface Meta {
   backgrounds: Record<string, { title: string; suits: string[]; thumb: string }>;
   surahs: { id: number; name: string; ayahs: number }[];
   out_dir: string;
+  export: ExportMeta;
   apk: string;
   apk_exists: boolean;
 }
@@ -78,9 +79,24 @@ export interface VersePlan {
 }
 
 export interface SpecStatus {
-  name: string; title?: string; aspect?: string; error?: string;
+  name: string; title?: string; aspect?: string; fps?: number; error?: string;
   app?: Spec["app"]; duration?: number; take?: boolean; take_length?: number | null; take_short?: boolean;
-  video?: boolean; video_mtime?: number | null;
+  video?: boolean; video_mtime?: number | null; exports?: ExportFile[];
+}
+export interface ExportFile { file: string; bytes: number; mtime: number }
+
+// Export settings (formats.py): what the editor offers and what it sends.
+export type ExportFormat = "h264" | "hevc" | "av1" | "vp9" | "prores" | "gif";
+export type ExportQuality = "best" | "high" | "balanced" | "small";
+export interface ExportOptions { format: ExportFormat; quality: ExportQuality; scale: number; fps: number | null; audio_kbps: number }
+export interface ExportFormatInfo {
+  label: string; ext: string; audio: "aac" | "opus" | "pcm" | null; hint: string;
+  q: Record<ExportQuality, number>; q_label: string; q_names?: Record<ExportQuality, string>;
+  rate?: Record<ExportQuality, number>; mbps?: Record<ExportQuality, number>; kbs?: number;
+}
+export interface ExportMeta {
+  formats: Record<ExportFormat, ExportFormatInfo>; qualities: ExportQuality[]; fps: number[]; gif_fps: number[];
+  audio_kbps: number[]; scales: number[]; defaults: ExportOptions; h264_high_kbps: number;
 }
 
 export type JobState = "queued" | "running" | "done" | "error" | "cancelled";

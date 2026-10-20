@@ -1,4 +1,4 @@
-// Slide-over panels: Emulators, Jobs, Shortcuts.
+// Slide-over panels: Emulators, Jobs, Shortcuts (Export is in ExportPanel.tsx).
 import { useState, type ReactNode } from "react";
 import type { Emulator, Job } from "../lib/types.ts";
 import {
@@ -8,7 +8,7 @@ import { api } from "../lib/api.ts";
 import { CaptureCard, LiveScreen, emulatorTone } from "./Inspector.tsx";
 import { Button, Dot, Icon, Kbd, Progress, Select } from "./ui.tsx";
 
-function Drawer({ title, children, onClose, width = 420, right }: { title: string; children: ReactNode; onClose: () => void; width?: number; right?: ReactNode }) {
+export function Drawer({ title, children, onClose, width = 420, right }: { title: string; children: ReactNode; onClose: () => void; width?: number; right?: ReactNode }) {
   return (
     <div className="fixed inset-0 z-40 flex justify-end bg-black/30" onPointerDown={(e) => { if (e.target === e.currentTarget) onClose(); }}>
       <aside aria-label={title} style={{ width }} className="drawer flex h-full max-w-full min-w-0 flex-col border-l border-line bg-panel shadow-2xl shadow-black/60">
@@ -108,7 +108,10 @@ function JobRow({ job }: { job: Job }) {
       {live && <div className="mt-2"><Progress value={job.progress} indeterminate={job.state === "queued"} /></div>}
       <p className={`num mt-1.5 break-words text-[12px] ${job.state === "error" ? "text-danger" : "text-mute"}`}>{job.state === "error" ? job.error : job.msg}</p>
       <div className="mt-1.5 flex gap-3 text-[11.5px]">
-        {job.kind === "render" && job.state === "done" && <a className="text-gold hover:underline" target="_blank" href={`/media/out/${job.name}.mp4?${job.ended}`}>Open the video ↗</a>}
+        {job.kind === "render" && job.state === "done" && typeof job.result === "string" && <>
+          <a className="text-gold hover:underline" target="_blank" href={`/media/out/${job.result.split("/").pop()}?${job.ended}`}>Open the video ↗</a>
+          <a className="text-mute hover:text-ink" href={`/media/out/${job.result.split("/").pop()}?download=1&${job.ended}`}>Download</a>
+        </>}
         <button className="text-faint hover:text-ink" onClick={async () => { if (!open) setFull((await api.job(job.id)).log); setOpen(!open); }}>{open ? "Hide log" : "Log"}</button>
       </div>
       {open && <pre className="mt-2 max-h-56 overflow-auto whitespace-pre-wrap rounded bg-black/40 p-2 text-[11px] text-faint">{(full || job.log).join("\n") || "(empty)"}</pre>}
@@ -137,7 +140,7 @@ const SHORTCUTS: [string, string][] = [
   ["S", "Split the recording at the playhead"], ["Delete", "Delete the selection"], ["K", "Key the camera"], ["[ / ]", "Previous / next key"],
   ["Shift / Ctrl-click a key", "Add to / remove from the selection"], ["Shift-drag a lane", "Select keys in a box (with Ctrl: add)"],
   [", / .", "Nudge selected keys a frame (Shift: ten)"], ["Ctrl A · C · V", "Select all keys · copy · paste at the playhead"],
-  ["Ctrl Z · Ctrl Shift Z", "Undo · redo"], ["Ctrl S", "Save now"], ["Ctrl B · Ctrl .", "Hide / show the videos · the inspector"],
+  ["Ctrl Z · Ctrl Shift Z", "Undo · redo"], ["Ctrl S", "Save now"], ["Ctrl E", "Export"], ["Ctrl B · Ctrl .", "Hide / show the videos · the inspector"],
   ["Drag · scroll the picture", "Pan · zoom the camera"], ["Shift-scroll the picture", "Rotate"], ["Alt-drag · Alt-scroll", "Move · scale the phone"],
   ["Alt while dragging a key", "No snapping"], ["Double-click a lane", "Add a key there"], ["Right-click", "Ease, copy, split, delete"],
   ["Ctrl-scroll the timeline", "Zoom around the pointer"], ["Drag a divider", "Resize panes (double-click: reset)"],

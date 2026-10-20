@@ -8,7 +8,9 @@
     studio.py emu prepare [SERIAL] [--apk APK]  # install + first launch (timings)
     studio.py emu stop SERIAL
     studio.py capture SPEC... [--force]    # record the app (picture + sound)
-    studio.py render SPEC... [-o OUT]      # export mp4 (needs the take)
+    studio.py render SPEC... [-o OUT] [--format h264|hevc|av1|vp9|prores|gif]
+                  [--quality best|high|balanced|small] [--scale 0.667] [--fps 30] [--audio 192|0]
+                                           # export (needs the take); formats.py
     studio.py make SPEC...                 # capture if needed, then render
     studio.py remux SPEC...                # re-lay the sound only (after audio changes)
     studio.py still SPEC T OUT.png         # one exact frame
@@ -49,10 +51,12 @@ def main():
     p = sub.add_parser("job"); p.add_argument("kind", choices=["capture", "render", "emu-boot", "emu-prepare"])
     p.add_argument("target", nargs="?"); p.add_argument("--force", action="store_true")
     p.add_argument("--scale", type=float, default=1.0); p.add_argument("--cores", type=int, default=6)
-    p.add_argument("--port", type=int); p.add_argument("--apk")
+    p.add_argument("--port", type=int); p.add_argument("--apk"); p.add_argument("--options", help="export settings, JSON")
     p = sub.add_parser("capture"); p.add_argument("specs", nargs="+"); p.add_argument("--force", action="store_true")
     p = sub.add_parser("render"); p.add_argument("specs", nargs="+"); p.add_argument("-o", "--out")
     p.add_argument("--scale", type=float, default=1.0); p.add_argument("--workers", type=int)
+    p.add_argument("--format", default="h264"); p.add_argument("--quality", default="high")
+    p.add_argument("--fps", type=int); p.add_argument("--audio", type=int, default=256, help="AAC kbps; 0 = no sound")
     p = sub.add_parser("make"); p.add_argument("specs", nargs="+"); p.add_argument("--force", action="store_true")
     p = sub.add_parser("remux"); p.add_argument("specs", nargs="+")
     p = sub.add_parser("still"); p.add_argument("spec"); p.add_argument("t", type=float); p.add_argument("out")
@@ -106,7 +110,8 @@ def main():
     elif a.cmd == "render":
         import compose
         for n in names(a.specs):
-            compose.export(S.load(n), out=a.out if len(a.specs) == 1 else None, scale=a.scale, workers=a.workers)
+            o = {"format": a.format, "quality": a.quality, "scale": a.scale, "fps": a.fps, "audio_kbps": a.audio}
+            compose.export(S.load(n), out=a.out if len(a.specs) == 1 else None, workers=a.workers, options=o)
     elif a.cmd == "remux":
         import compose
         for n in names(a.specs):
@@ -138,7 +143,8 @@ def run_job(a):
             rep.result(capture.record(S.load(a.target), log=rep, force=a.force))
         elif a.kind == "render":
             import compose
-            rep.result(compose.export(S.load(a.target), scale=a.scale, log=rep))
+            o = json.loads(a.options) if a.options else {"scale": a.scale}    # older queued jobs pass --scale
+            rep.result(compose.export(S.load(a.target), log=rep, options=o))
         elif a.kind == "emu-boot":
             import emus
             rep.result(emus.boot(a.port, a.cores, rep))

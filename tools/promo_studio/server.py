@@ -27,6 +27,7 @@ import urllib.parse
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 import emus
+import formats
 import library
 import phone as phone_mod
 import spec as S
@@ -81,18 +82,38 @@ def editor_timeline(s):
     return {"verses": tl["verses"], "repeats": tl["repeats"], "take": meta["length"] if meta else None}
 
 
+EXPORT_EXT = "|".join(sorted({f["ext"] for f in formats.FORMATS.values()}))
+
+
+def exports(name):
+    """A video's exported files (formats.filename), newest first."""
+    pat = re.compile(rf"{re.escape(name)}(-\d+p)?(-\d+fps)?\.({EXPORT_EXT})")
+    try:
+        files = [f for f in os.listdir(S.OUT) if pat.fullmatch(f)]
+    except FileNotFoundError:
+        return []
+    out = []
+    for f in files:
+        try:
+            st = os.stat(os.path.join(S.OUT, f))
+        except FileNotFoundError:
+            continue
+        out.append({"file": f, "bytes": st.st_size, "mtime": st.st_mtime})
+    return sorted(out, key=lambda e: -e["mtime"])
+
+
 def spec_status(name):
     try:
         s = S.load(name)
     except Exception as e:                       # a broken spec still lists
         return {"name": name, "error": str(e)}
     meta = take_meta(s)
-    out = os.path.join(S.OUT, name + ".mp4")
+    files = exports(name)
     length = meta["length"] if meta else 0
-    return {"name": name, "title": s.get("title", ""), "aspect": s["aspect"], "app": s["app"],
+    return {"name": name, "title": s.get("title", ""), "aspect": s["aspect"], "fps": s["fps"], "app": s["app"],
             "duration": s["duration"], "take": bool(meta), "take_length": length or None,
-            "take_short": bool(length) and S.take_needed(s) > length + 0.05, "video": os.path.exists(out),
-            "video_mtime": os.path.getmtime(out) if os.path.exists(out) else None}
+            "take_short": bool(length) and S.take_needed(s) > length + 0.05, "video": bool(files),
+            "video_mtime": files[0]["mtime"] if files else None, "exports": files}
 
 
 PEAK_RATE = 100     # waveform columns per take second
@@ -448,7 +469,7 @@ class Handler(BaseHTTPRequestHandler):
         except (BrokenPipeError, ConnectionResetError):
             pass
 
-    def send_file(self, path, ctype=None, cache="no-cache"):
+    def send_file(self, path, ctype=None, cache="no-cache", download=False):
         if not os.path.isfile(path):
             return self.send_json({"error": "not found"}, 404)
         size = os.path.getsize(path)
@@ -480,6 +501,8 @@ class Handler(BaseHTTPRequestHandler):
             self.send_header("Accept-Ranges", "bytes")
             self.send_header("Content-Length", str(end - start + 1))
             self.send_header("Cache-Control", cache)
+            if download:
+                self.send_header("Content-Disposition", f'attachment; filename="{os.path.basename(path)}"')
             self.end_headers()
             with open(path, "rb") as f:
                 f.seek(start)
@@ -571,7 +594,7 @@ class Handler(BaseHTTPRequestHandler):
                 "phones": sorted(phone_mod.COLORS), "defaults": S.DEFAULTS, "props": S.PROPS,
                 "backgrounds": {k: {"title": v["title"], "suits": v["suits"], "thumb": f"/media/thumb/{k}.jpg"}
                                 for k, v in bgs.items()},
-                "surahs": surahs(), "out_dir": S.OUT, "apk": emus.DEFAULT_APK,
+                "surahs": surahs(), "out_dir": S.OUT, "export": formats.meta(), "apk": emus.DEFAULT_APK,
                 "apk_exists": os.path.exists(emus.DEFAULT_APK)})
         if p == "/api/health":
             return self.send_json({"ok": True, "jobs": len(JOBS.jobs)})
@@ -625,9 +648,9 @@ class Handler(BaseHTTPRequestHandler):
         m = re.fullmatch(r"/media/plate/([\w.-]+\.mp4)", p)
         if m:
             return self.send_file(os.path.join(library.PLATES, m.group(1)), cache="max-age=86400")
-        m = re.fullmatch(r"/media/out/([\w.-]+\.mp4)", p)
+        m = re.fullmatch(rf"/media/out/([\w.-]+\.(?:{EXPORT_EXT}))", p)
         if m:
-            return self.send_file(os.path.join(S.OUT, m.group(1)))
+            return self.send_file(os.path.join(S.OUT, m.group(1)), download="download" in q)
         m = re.fullmatch(r"/media/thumb/([\w.-]+)\.jpg", p)
         if m:
             return self.send_file(thumb(m.group(1)), "image/jpeg", cache="max-age=86400")
@@ -688,9 +711,10 @@ class Handler(BaseHTTPRequestHandler):
                 if os.path.exists(dst):
                     return self.send_json({"error": f"{m.group(2)} already exists"}, 409)
                 os.rename(src, dst)
-            out = os.path.join(S.OUT, m.group(1) + ".mp4")
-            if os.path.exists(out) and not os.path.exists(os.path.join(S.OUT, m.group(2) + ".mp4")):
-                os.rename(out, os.path.join(S.OUT, m.group(2) + ".mp4"))
+            for e in exports(m.group(1)):                # every export follows its video
+                renamed = m.group(2) + e["file"][len(m.group(1)):]
+                if not os.path.exists(os.path.join(S.OUT, renamed)):
+                    os.rename(os.path.join(S.OUT, e["file"]), os.path.join(S.OUT, renamed))
             return self.send_json({"ok": True})
         m = re.fullmatch(r"/api/new/([\w.-]+)", p)
         if m:
@@ -714,8 +738,9 @@ class Handler(BaseHTTPRequestHandler):
         if m:
             name, opts = m.group(1), self.body()
             snapshot = S.load(name)
-            scale = render_scale(opts.get("scale", 1.0))
-            return self.send_json(JOBS.submit("render", name, ["render", name, "--scale", str(scale)], title="Export", snapshot=snapshot))
+            o = formats.options(opts)
+            return self.send_json(JOBS.submit("render", name, ["render", name, "--options", json.dumps(o)],
+                                              title=f"Export · {formats.describe(snapshot, o)}", snapshot=snapshot))
         m = re.fullmatch(r"/api/jobs/([\w.-]+)/cancel", p)
         if m:
             return self.send_json(JOBS.cancel(m.group(1)))

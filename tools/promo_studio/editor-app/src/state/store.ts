@@ -6,7 +6,7 @@ import { api } from "../lib/api.ts";
 import * as E from "../lib/edit.ts";
 import { applyVersePlan, nextVerseRange, verseRange, type VerseAction } from "../lib/verses.ts";
 import { clamp, plateLook, resolve, soundOnset, takeKey } from "../lib/model.ts";
-import type { Ease, Emulator, Geo, Job, Meta, Plate, RawSpec, Selection, Spec, SpecStatus, Timeline, Wave } from "../lib/types.ts";
+import type { Ease, Emulator, ExportOptions, Geo, Job, Meta, Plate, RawSpec, Selection, Spec, SpecStatus, Timeline, Wave } from "../lib/types.ts";
 import { clock, media } from "./clock.ts";
 
 export type Tab = "animate" | "recording" | "look";
@@ -14,13 +14,17 @@ export interface UI {
   leftW: number; rightW: number; tlH: number; labelW: number; hideL: boolean; hideR: boolean;
   tab: Tab; pps: number; fit: boolean; collapsed: Record<string, boolean>;
 }
-export type Panel = null | "emulators" | "jobs" | "help";
+export type Panel = null | "emulators" | "jobs" | "help" | "export";
 export interface Toast { id: number; msg: string; kind: "info" | "error" | "ok" }
 type SaveState = "saved" | "dirty" | "saving" | "error";
 
 const UI_DEFAULTS: UI = { leftW: 248, rightW: 340, tlH: 260, labelW: 136, hideL: false, hideR: false, tab: "animate", pps: 60, fit: false, collapsed: {} };
 function loadUI(): UI {
   try { return { ...UI_DEFAULTS, ...JSON.parse(localStorage.getItem("promo.ui") || "{}"), tab: "animate" }; } catch { return UI_DEFAULTS; }
+}
+
+function loadExport(): ExportOptions | null {
+  try { return JSON.parse(localStorage.getItem("promo.export") || "null"); } catch { return null; }
 }
 
 interface St {
@@ -30,6 +34,7 @@ interface St {
   jobs: Job[]; emus: Emulator[]; booting: Job[]; emusLoaded: boolean;
   exact: string | null; ui: UI; panel: Panel; toasts: Toast[]; fatal: string | null;
   verseBusy: boolean; verseError: string | null;
+  exportOpts: ExportOptions | null;     // the editor's export settings (localStorage), defaults from meta
 }
 
 export const useStore = create<St>(() => ({
@@ -37,6 +42,7 @@ export const useStore = create<St>(() => ({
   undo: [], redo: [], saveState: "saved", saveError: null, jobs: [], emus: [], booting: [], emusLoaded: false,
   exact: null, ui: loadUI(), panel: null, toasts: [], fatal: null,
   verseBusy: false, verseError: null,
+  exportOpts: loadExport(),
 }));
 const get = useStore.getState, set = useStore.setState;
 
@@ -403,10 +409,19 @@ export async function record(serial: string | null, force: boolean) {
   if (!name || !(await save())) return;
   return job(api.capture(name, { force, serial }), "Recording");
 }
-export async function exportVideo(name = get().name, scale = 1) {
+/** The export settings in force: the saved choice over the server's defaults. */
+export function exportOptions(): ExportOptions {
+  return { ...get().meta!.export.defaults, ...(get().exportOpts ?? {}) };
+}
+export function setExport(patch: Partial<ExportOptions>) {
+  const next = { ...exportOptions(), ...patch };
+  set({ exportOpts: next });
+  localStorage.setItem("promo.export", JSON.stringify(next));
+}
+export async function exportVideo(name = get().name, opts = exportOptions()) {
   if (!name) return;
   if (name === get().name && !(await save())) return;
-  return job(api.render(name, scale), `Export ${name}`);
+  return job(api.render(name, opts), `Export ${name}`);
 }
 export const cancelJob = (id: string) => api.cancel(id).then(pollJobs, (e) => toast(e.message, "error"));
 export const bootEmulator = (cores: number) => job(api.bootEmu(cores), "Starting an emulator").then(() => pollEmus(true));

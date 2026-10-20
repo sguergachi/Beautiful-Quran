@@ -18,7 +18,7 @@ and open `http://<this computer's LAN IP>:8765/`. The default bind remains local
 
 In the editor: pick or create a video on the left, set what the app plays
 (Recording tab) and the look (Look tab), press **Record take**, then edit on
-the timeline and **Export MP4**. Every change is undoable (Ctrl+Z /
+the timeline and **Export…** (Ctrl+E). Every change is undoable (Ctrl+Z /
 Ctrl+Shift+Z) and saved as you go. Exports land in
 `~/Videos/beautiful-quran-promo/` (`BQ_PROMO_OUT`); takes, plates and
 downloads are cached in `~/.cache/bq-promo/` (`BQ_PROMO_CACHE`), never `/tmp`.
@@ -30,6 +30,7 @@ python3 studio.py list                     # every spec, and whether it has a ta
 python3 studio.py make 03-baqarah-alafasy-royal-repeat   # record if needed, then export
 python3 studio.py capture all --force      # re-record every take
 python3 studio.py render all               # export every video
+python3 studio.py render SPEC --format hevc --quality balanced --scale 0.667 --fps 30 --audio 128
 python3 studio.py still SPEC 12.5 f.png    # one exact frame
 python3 timeline.py SPEC                   # when each verse and repeat happens in the video
 ```
@@ -41,6 +42,7 @@ python3 timeline.py SPEC                   # when each verse and repeat happens 
 | `capture.py` | Drives the app on the emulator (reciter, theme, layout, view, text size) and records picture **and** sound with scrcpy. |
 | `recording.py` | Runs the ordered screen sequence, chapter routes and repeat picker on camera. |
 | `compose.py` | The compositor: each frame is a pure function of (spec, t). Used by export, stills and the editor's exact frame. |
+| `formats.py` | Export formats, qualities, sizes, frame rates and sound; the file each export writes. |
 | `anim.py` | Keyframe evaluation and the edit's time mapping (the editor mirrors it). |
 | `phone.py` | Draws the Pixel 10 front (aluminium rim, glass, punch-hole, keys) at the take's resolution. |
 | `library.py`, `backgrounds.json` | Background footage (Pexels) and the blurred, seamless plates made from it. |
@@ -70,6 +72,34 @@ npm --prefix tools/promo_studio/editor-app run build
 cover preview cadence, API latency and export throughput. Exports default to
 four background workers with bounded FFmpeg pools, preserving full output
 resolution and motion blur. The CLI's `--workers` can override that budget.
+
+## Export
+
+**Export…** opens the export settings. They are the editor's own,
+remembered between sessions, and every export uses them (including
+**Export all with a take**):
+
+| Format | For | Quality maps to |
+|---|---|---|
+| MP4 · H.264 | Everywhere: social, messaging, slides (default) | CRF 11 / 14 / 18 / 23 |
+| MP4 · HEVC (H.265) | About half H.264's size; tagged `hvc1` for Apple | CRF 15 / 18 / 22 / 27 |
+| MP4 · AV1 | The smallest files, 10-bit (no banding in the blur) | SVT-AV1 CRF 20 / 26 / 32 / 38 |
+| WebM · VP9 + Opus | Web pages, every browser | CRF 18 / 24 / 31 / 37 |
+| MOV · ProRes 422 + PCM | An editing master (Final Cut, Premiere, Resolve) | HQ / 422 / LT / Proxy |
+| GIF | A silent loop; 10, 20 or 25 fps (whole 1/100 s delays) | 256 / 256 / 192 / 128 colours |
+
+Quality is Best / High / Balanced / Small, in that order. **Resolution** is
+2×, 1⅓×, 1×, ⅔, ½ or ⅓ of the aspect's 1080 base. **Frame rate** is the
+video's own or 60/50/30/25/24 fps. **Sound** is AAC 128 to 320 kbps, Opus
+(WebM, up to 256), PCM (ProRes) or none. The panel estimates the file size
+(roughly; busy motion makes bigger files), shows the file it will write and
+lists this video's earlier exports to open or download (handy from another
+device on the LAN).
+
+Each kind of export gets its own file, `<name>[-720p][-30fps].<ext>`, so a
+small copy never replaces the full-size master; exporting the same kind
+again replaces it. Presets: Social (H.264 1×), Small (720p 30 fps), Web
+(AV1), Edit master (ProRes HQ), GIF (540p 25 fps).
 
 Long work runs in separate processes. **Jobs** shows stages, live progress,
 logs, cancellation and completed video links. Captures count recorded

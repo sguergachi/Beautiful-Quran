@@ -2,6 +2,7 @@ import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { Toasts, TopBar, VideoList } from "./components/Chrome.tsx";
 import { Inspector } from "./components/Inspector.tsx";
 import { MenuHost } from "./components/Menu.tsx";
+import { ExportPanel } from "./components/ExportPanel.tsx";
 import { EmulatorsPanel, HelpPanel, JobsPanel } from "./components/Panels.tsx";
 import { Stage } from "./components/Stage.tsx";
 import { Timeline } from "./components/Timeline.tsx";
@@ -45,6 +46,7 @@ function useShortcuts() {
       const mod = e.ctrlKey || e.metaKey, key = e.key.toLowerCase();
       if (typing || (t.closest("select, input") && !mod)) return;
       if (mod && key === "s") { e.preventDefault(); save(); return; }
+      if (mod && key === "e") { e.preventDefault(); openPanel("export"); return; }
       if (mod && key === "b") { e.preventDefault(); setUI({ hideL: !s.ui.hideL }); return; }
       if (mod && key === ".") { e.preventDefault(); setUI({ hideR: !s.ui.hideR }); return; }
       if (!s.spec) return;
@@ -158,6 +160,7 @@ export function App() {
       {panel === "emulators" && <EmulatorsPanel />}
       {panel === "jobs" && <JobsPanel />}
       {panel === "help" && <HelpPanel />}
+      {panel === "export" && <ExportPanel />}
       <MenuHost />
       <Toasts />
     </div>
