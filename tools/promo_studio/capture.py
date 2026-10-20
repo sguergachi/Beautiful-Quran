@@ -264,8 +264,13 @@ def cadence(path, t0=0.0, t1=1e9):
 def playing():
     """Playing, or buffering towards it (Hani's 192 kbps files take a moment):
     a second tap while buffering would pause it again."""
-    out = adb("shell", "dumpsys", "media_session", check=False)
-    return any(f"state=PlaybackState {{state={k}" in out for k in ("PLAYING", "BUFFERING", "CONNECTING"))
+    for _ in range(3):
+        try:
+            out = adb("shell", "dumpsys", "media_session", check=False, timeout=10)
+            return any(f"state=PlaybackState {{state={k}" in out for k in ("PLAYING", "BUFFERING", "CONNECTING"))
+        except Exception:
+            time.sleep(0.5)
+    return False
 
 
 ARABIC_DIGITS = str.maketrans("0123456789", "٠١٢٣٤٥٦٧٨٩")
@@ -278,17 +283,22 @@ def _is_arabic_word(t):
 def first_word_xy(ayah):
     """Centre of the opened verse's first word: the first Arabic word after
     the previous verse's end marker (﴿N﴾, Arabic-Indic digits)."""
-    ns = at.nodes()
-    want = "﴿" + str(ayah - 1).translate(ARABIC_DIGITS) + "﴾"
-    idx = next((i for i, (t, d, b) in enumerate(ns) if t.replace("\u2060", "") == want), None)
-    cands = ns[idx + 1:] if idx is not None else ns
-    for t, d, b in cands:
-        if _is_arabic_word(t):
-            return ((b[0] + b[2]) // 2, (b[1] + b[3]) // 2)
+    for attempt in range(3):
+        ns = at.nodes()
+        want = "﴿" + str(ayah - 1).translate(ARABIC_DIGITS) + "﴾"
+        idx = next((i for i, (t, d, b) in enumerate(ns) if t.replace("\u2060", "") == want), None)
+        cands = ns[idx + 1:] if idx is not None else ns
+        for t, d, b in cands:
+            if _is_arabic_word(t):
+                return ((b[0] + b[2]) // 2, (b[1] + b[3]) // 2)
+        # verse marker not on screen: scroll down and retry
+        if attempt < 2:
+            adb("shell", "input", "swipe", "540", "1800", "540", "600", "400", check=False)
+            time.sleep(0.8)
     return None
 
 
-def start_playback(surah, ayah=1, layout="Scroll"):
+def start_playback(surah, ayah=1, layout="Scroll", log=print):
     """Start the opened verse without the reload a `?play=true` deep link
     causes (it crossfades and re-scrolls the page as the recitation begins).
 
@@ -299,19 +309,52 @@ def start_playback(surah, ayah=1, layout="Scroll"):
     first chapter the leaf carries (95:1's leaf opens with the end of 94),
     and its words are not separate nodes, so it uses the deep link; the
     page is the same before and after its reload.
+
+    Several strategies are tried in order; each is given time to register
+    (Hani's 192 kbps files buffer before PLAYING reports). A deep-link
+    fallback reloads the verse with play=true if tapping never registers.
     """
-    for _ in range(3):
-        if layout == "Mushaf":
-            at.open_reader(surah, ayah, play=True)
-        else:
-            xy = first_word_xy(ayah) if ayah > 1 else at.find("Play")
-            if xy:
-                at.tap(xy)
-        for _ in range(24):
-            time.sleep(0.25)
-            if playing():
-                return
+    attempts = [
+        ("tap-first-word", lambda: _tap_play(surah, ayah, layout)),
+        ("deep-link", lambda: at.open_reader(surah, ayah, play=True)),
+        ("tap-play-bar", lambda: _tap_play_bar()),
+    ]
+    for name, action in attempts:
+        for try_no in range(2):
+            try:
+                action()
+            except Exception as e:
+                log(f"start_playback: {name} attempt {try_no + 1} raised {e}")
+            for _ in range(24):
+                time.sleep(0.25)
+                if playing():
+                    log(f"playback started via {name}")
+                    return
+            log(f"start_playback: {name} attempt {try_no + 1} did not register")
     raise SystemExit("playback did not start")
+
+
+def _tap_play(surah, ayah, layout):
+    if layout == "Mushaf":
+        at.open_reader(surah, ayah, play=True)
+        return
+    if ayah > 1:
+        xy = first_word_xy(ayah)
+        if xy is None:
+            # first_word_xy already retries with scrolling internally
+            xy = first_word_xy(ayah)
+        if xy:
+            at.tap(xy)
+            return
+    b = at.find("Play")
+    if b:
+        at.tap(b)
+
+
+def _tap_play_bar():
+    b = at.find("Play")
+    if b:
+        at.tap(b)
 
 
 def record(s, log=print, force=False):
@@ -330,8 +373,11 @@ def record(s, log=print, force=False):
         raise SystemExit(f"no emulator at {serial()}: run `studio.py emu boot` (and `emu install`)")
     os.makedirs(d, exist_ok=True)
     secs = max(int(a["seconds"]), int(need - LEAD + 1))
+    log("preparing device (demo mode, volume)")
     prep()
+    log(f"setting reciter: {a['reciter']}")
     set_reciter(a["reciter"], log)
+    log(f"customizing: {a['theme']} / {a['layout']} / {a['view']} / {a['text_size']}")
     customize(a["theme"], a["layout"], a["view"], a["text_size"], log)
     # open the verse still, let it settle, then roll and start the recitation
     adb("shell", "input", "keyevent", "KEYCODE_MEDIA_PAUSE", check=False)
@@ -349,10 +395,16 @@ def record(s, log=print, force=False):
     time.sleep(2.0)
     log(f"recording {limit}s: {a['reciter']} {a['surah']}:{a['ayah']} {a['theme']} {a['layout']} {a['view']}")
     try:
-        start_playback(int(a["surah"]), int(a["ayah"]), a["layout"])
-    except BaseException:
+        start_playback(int(a["surah"]), int(a["ayah"]), a["layout"], log=log)
+    except BaseException as e:
+        try:
+            adb("shell", "screencap", "-p", "/sdcard/fail.png", check=False)
+            adb("pull", "/sdcard/fail.png", os.path.join(d, "fail.png"), check=False)
+        except Exception:
+            pass
         p.terminate(); p.wait()
         adb("shell", "input", "keyevent", "KEYCODE_MEDIA_PAUSE", check=False)
+        log(f"capture failed: {e}")
         raise
     out, _ = p.communicate(timeout=limit + 60)
     adb("shell", "input", "keyevent", "KEYCODE_MEDIA_PAUSE", check=False)

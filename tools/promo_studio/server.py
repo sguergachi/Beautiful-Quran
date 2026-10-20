@@ -126,6 +126,14 @@ class Handler(BaseHTTPRequestHandler):
     def log_message(self, fmt, *args):
         pass
 
+    def handle_error(self, request, client_address):
+        # Never let a single bad connection kill the server thread.
+        try:
+            import traceback
+            traceback.print_exc()
+        except Exception:
+            pass
+
     # -- helpers -----------------------------------------------------------
 
     def send_json(self, obj, code=200):
@@ -190,8 +198,19 @@ class Handler(BaseHTTPRequestHandler):
         return True
 
     def body(self):
-        n = int(self.headers.get("Content-Length") or 0)
-        return json.loads(self.rfile.read(n) or b"{}") if n else {}
+        try:
+            n = int(self.headers.get("Content-Length") or 0)
+        except (TypeError, ValueError):
+            n = 0
+        if n <= 0:
+            return {}
+        raw = self.rfile.read(n)
+        if not raw:
+            return {}
+        try:
+            return json.loads(raw)
+        except json.JSONDecodeError:
+            return {}
 
     # -- routes ------------------------------------------------------------
 
@@ -301,6 +320,8 @@ class Handler(BaseHTTPRequestHandler):
         if p == "/api/emu":
             import capture
             return self.send_json({"serial": capture.serial(), "up": capture.is_up()})
+        if p == "/api/health":
+            return self.send_json({"ok": True, "jobs": len(JOBS), "specs": len(os.listdir(S.SPECS)) if os.path.isdir(S.SPECS) else 0})
         m = re.fullmatch(r"/media/take/([\w.-]+)/(clip\.mp4|audio\.wav)", p)
         if m:
             return self.send_file(os.path.join(S.CACHE, "takes", m.group(1), m.group(2)))
@@ -394,8 +415,11 @@ def surahs():
     if _SURAHS is None:
         import sqlite3
         db = sqlite3.connect(os.path.join(S.REPO, "data", "quran.db"))
-        _SURAHS = [{"id": i, "name": n, "ayahs": c}
-                   for i, n, c in db.execute("select id, name_transliteration, ayah_count from surahs order by id")]
+        try:
+            _SURAHS = [{"id": i, "name": n, "ayahs": c}
+                       for i, n, c in db.execute("select id, name_transliteration, ayah_count from surahs order by id")]
+        finally:
+            db.close()
     return _SURAHS
 
 
@@ -415,8 +439,11 @@ def thumb(bg_id):
 def serve(port=8765):
     os.makedirs(S.SPECS, exist_ok=True)
     httpd = ThreadingHTTPServer(("127.0.0.1", port), Handler)
+    httpd.daemon_threads = True
     print(f"promo studio: http://127.0.0.1:{port}/  (specs in {S.SPECS}, videos to {S.OUT})")
     try:
         httpd.serve_forever()
     except KeyboardInterrupt:
         pass
+    finally:
+        httpd.server_close()
