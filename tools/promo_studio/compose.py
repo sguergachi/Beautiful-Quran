@@ -33,7 +33,11 @@ import phone as phone_mod
 from anim import source_time, state_at
 from spec import CACHE, OUT, size, take_dir
 
-cv2.setNumThreads(2)
+cv2.setNumThreads(1)
+
+# Each render worker already runs in parallel. FFmpeg's automatic decoder,
+# filter and encoder pools multiplied into >1,300 threads on a 12-thread host.
+FFMPEG = ["ffmpeg", "-v", "error", "-threads", "1", "-filter_threads", "1", "-filter_complex_threads", "1"]
 
 
 def plate_settings(s):
@@ -68,6 +72,9 @@ class Renderer:
         self.Pa = (self.A + fa)[..., 0]                             # phone alpha
         y0, x0 = int(round(g["sy0"])), int(round(g["sx0"]))
         self.scr = (slice(y0, y0 + self.sh), slice(x0, x0 + self.sw))
+        # Interleaved channels let OpenCV use SIMD instead of NumPy's slow
+        # per-pixel broadcast across three colour channels on every frame.
+        self._screen_alpha = np.repeat(self.A[self.scr], 3, axis=2)
         # soft shadow from the body silhouette, kept at 1/4 resolution
         q = 4
         pad = int(g["H"] * 0.12)
@@ -128,7 +135,8 @@ class Renderer:
     def _phone_layers(self, screen):
         """Premultiplied phone RGB at canvas resolution for this screen frame."""
         P = self.Fp.copy()
-        P[self.scr] += screen * self.A[self.scr]
+        cv2.multiply(screen, self._screen_alpha, dst=screen)
+        cv2.add(P[self.scr], screen, dst=P[self.scr])
         return P
 
     def _warp_phone(self, P, M):
@@ -141,7 +149,9 @@ class Renderer:
             a = self._alpha_cache.get((tw, th))
             if a is None:
                 a = cv2.resize(self.Pa, (tw, th), interpolation=cv2.INTER_AREA)
-                if len(self._alpha_cache) > 64:
+                # Animated zooms rarely reuse a size; 64 large alpha planes
+                # per worker consumed gigabytes without improving throughput.
+                if len(self._alpha_cache) > 4:
                     self._alpha_cache.clear()
                 self._alpha_cache[(tw, th)] = a
             S = np.array([[Wc / tw, 0, 0], [0, Hc / th, 0], [0, 0, 1]])
@@ -166,13 +176,16 @@ class Renderer:
             bg = bg + min(1.0, b) * (1 - bg)
         elif b < 0:
             bg = bg * (1 + max(-1.0, b))
-        return bg * self.vig
+        bg *= self.vig
+        return bg
 
     def frame(self, t, screen_u8, plate_u8):
         """Compose the output frame at video time t (uint8 RGB)."""
         s = self.s
-        screen = screen_u8.astype(np.float32) / 255
-        plate = plate_u8.astype(np.float32) / 255
+        screen = screen_u8.astype(np.float32)
+        screen /= 255
+        plate = plate_u8.astype(np.float32)
+        plate /= 255
         P = self._phone_layers(screen)
         shutter = float(s.get("motion_blur", 1.0)) / self.fps       # 1.0 = open for the whole frame
         states = [state_at(s, t)]
@@ -195,11 +208,19 @@ class Renderer:
                                      borderMode=cv2.BORDER_CONSTANT)
                 bg *= (1 - sh_strength * shd)[..., None]
             rgb, al = self._warp_phone(P, M)
-            acc += rgb + bg * (1 - al)[..., None]
-        out = acc / len(states)
+            bg *= (1 - al)[..., None]
+            bg += rgb
+            acc += bg
+        acc /= len(states)
         # half-LSB dither: the blurred gradients would band in 8 bit
-        noise = (np.random.default_rng(int(t * 1000)).random((self.H, self.W, 1), np.float32) - 0.5) / 255
-        return np.clip((out + noise) * 255 + 0.5, 0, 255).astype(np.uint8)
+        noise = np.random.default_rng(int(t * 1000)).random((self.H, self.W, 1), np.float32)
+        noise -= 0.5
+        noise /= 255
+        acc += noise
+        acc *= 255
+        acc += 0.5
+        np.clip(acc, 0, 255, out=acc)
+        return acc.astype(np.uint8)
 
 
 # ---------------------------------------------------------------- decoding
@@ -212,11 +233,11 @@ class Frames:
         self.has_frame = False
         if loop and loop_len:
             start = start % loop_len
-        cmd = ["ffmpeg", "-v", "error"]
+        cmd = FFMPEG.copy()
         if loop:
             cmd += ["-stream_loop", "-1"]
         cmd += ["-ss", f"{start:.4f}", "-i", path, "-vf", f"fps={fps},scale={w}:{h}", "-f", "rawvideo",
-                "-pix_fmt", "rgb24", "-"]
+                "-pix_fmt", "rgb24", "-threads", "1", "-"]
         self.p = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, bufsize=w * h * 3 * 4)
         self.last = np.zeros((h, w, 3), np.uint8)
 
@@ -258,8 +279,8 @@ class EditFrames:
 
 
 def grab(path, w, h, t):
-    raw = subprocess.run(["ffmpeg", "-v", "error", "-ss", f"{max(0.0, t):.4f}", "-i", path, "-frames:v", "1",
-                          "-vf", f"scale={w}:{h}", "-f", "rawvideo", "-pix_fmt", "rgb24", "-"],
+    raw = subprocess.run([*FFMPEG, "-ss", f"{max(0.0, t):.4f}", "-i", path, "-frames:v", "1",
+                          "-vf", f"scale={w}:{h}", "-f", "rawvideo", "-pix_fmt", "rgb24", "-threads", "1", "-"],
                          capture_output=True, check=True).stdout
     if len(raw) < w * h * 3:
         return last_frame(path, w, h)
@@ -268,8 +289,8 @@ def grab(path, w, h, t):
 
 def last_frame(path, w, h):
     """Hold the actual final frame even when a cut starts beyond EOF."""
-    p = subprocess.Popen(["ffmpeg", "-v", "error", "-sseof", "-1", "-i", path,
-                          "-vf", f"scale={w}:{h}", "-fps_mode", "passthrough", "-f", "rawvideo", "-pix_fmt", "rgb24", "-"],
+    p = subprocess.Popen([*FFMPEG, "-sseof", "-1", "-i", path,
+                          "-vf", f"scale={w}:{h}", "-fps_mode", "passthrough", "-f", "rawvideo", "-pix_fmt", "rgb24", "-threads", "1", "-"],
                          stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
     last = None
     try:
@@ -295,6 +316,12 @@ def still(s, t, scale=1.0):
 
 # ---------------------------------------------------------------- export
 
+def _render_priority():
+    """Background export workers yield CPU to editing and emulator capture."""
+    if hasattr(os, "nice"):
+        os.nice(max(0, 5 - os.nice(0)))
+
+
 def _render_chunk(args):
     s, f0, f1, path, scale = args
     r = Renderer(s, scale)
@@ -302,9 +329,9 @@ def _render_chunk(args):
     off = float(s["background"].get("offset", 0))
     scr = EditFrames(s, r.clip, r.sw, r.sh, fps)
     pl = Frames(r.plate, r.pw, r.ph, fps, off + f0 / fps, loop=True, loop_len=r.plate_len)
-    enc = subprocess.Popen(["ffmpeg", "-v", "error", "-y", "-f", "rawvideo", "-pix_fmt", "rgb24", "-s",
+    enc = subprocess.Popen([*FFMPEG, "-y", "-f", "rawvideo", "-pix_fmt", "rgb24", "-s",
                             f"{r.W}x{r.H}", "-r", str(fps), "-i", "-", "-c:v", "libx264", "-preset", "medium",
-                            "-crf", "14", "-pix_fmt", "yuv420p", "-g", str(fps), path], stdin=subprocess.PIPE)
+                            "-crf", "14", "-threads", "1", "-pix_fmt", "yuv420p", "-g", str(fps), path], stdin=subprocess.PIPE)
     try:
         for f in range(f0, f1):
             t = f / fps
@@ -396,7 +423,7 @@ def export(s, out=None, workers=None, scale=1.0, log=print, progress=None):
         log(f"warning: the edit reads past the take's end ({r.meta['length']:.1f}s): the last frame holds")
     fps, dur = r.fps, float(s["duration"])
     n = max(1, int(math.ceil(dur * fps - 1e-9)))
-    workers = workers or max(1, min(8, (os.cpu_count() or 4) - 2))
+    workers = workers or max(1, min(4, (os.cpu_count() or 4) // 2))
     out = out or os.path.join(OUT, f"{s['name']}.mp4")
     os.makedirs(os.path.dirname(os.path.abspath(out)), exist_ok=True)
     work = os.path.join(CACHE, "render", s["name"])
@@ -410,7 +437,7 @@ def export(s, out=None, workers=None, scale=1.0, log=print, progress=None):
     t0 = time.time()
     rep and rep.stage("render", f"Rendering {n} frames at {r.W}×{r.H}, {fps} fps", 0.03)
     log(f"rendering {s['name']}: {n} frames {r.W}x{r.H}@{fps} in {len(chunks)} parts")
-    with ProcessPoolExecutor(len(chunks)) as ex:
+    with ProcessPoolExecutor(len(chunks), initializer=_render_priority) as ex:
         futures = [ex.submit(_render_chunk, c) for c in chunks]
         while not all(f.done() for f in futures):
             done = 0

@@ -181,8 +181,7 @@ export async function open(name: string) {
     set({ name, raw: r.raw, spec, geo: null, plate: null, tl: null, sel: null, undo: [], redo: [], exact: null, saveState: "saved", saveError: null });
     localStorage.setItem("promo.last", name);
     clock.t = 0;
-    await loadGeometry();
-    await loadPlate();
+    await Promise.all([loadGeometry(), loadPlate()]);
     clock.seek(0);
   } catch (e) {
     toast("Could not open " + name + ": " + (e as Error).message, "error");
@@ -193,7 +192,8 @@ export async function loadGeometry() {
   const { name, spec } = get();
   if (!name || !spec) return;
   const mine = session, key = geoKey(spec);
-  const [geo, tl] = await Promise.all([api.geometry(name), api.timeline(name).catch(() => null)]);
+  const timeline = api.timeline(name).catch(() => null);
+  const geo = await api.geometry(name);
   if (mine !== session || geoKey(get().spec!) !== key) return;
   lastGeoKey = key;
   media.frame.src = geo.frame;
@@ -202,8 +202,9 @@ export async function loadGeometry() {
   } else {
     media.screen.removeAttribute("src"); media.audio.removeAttribute("src"); media.screen.load(); media.audio.load();
   }
-  set({ geo, tl });
+  set({ geo });
   clock.seek(clock.t);
+  timeline.then((tl) => { if (mine === session && geoKey(get().spec!) === key) set({ tl }); });
 }
 
 export async function loadPlate() {

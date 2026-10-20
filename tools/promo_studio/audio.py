@@ -11,6 +11,7 @@ import json
 import os
 import subprocess
 import urllib.request
+import wave
 
 from spec import CACHE, RECITERS
 
@@ -46,6 +47,11 @@ def fetch(slug, surah, ayah):
 
 
 def duration(path):
+    # Cached playlist audio is PCM WAV: its header already has the exact
+    # sample count. Spawning ffprobe per ayah stalled every timeline load.
+    if str(path).lower().endswith(".wav"):
+        with wave.open(str(path), "rb") as wav:
+            return wav.getnframes() / wav.getframerate()
     return float(subprocess.run(["ffprobe", "-v", "error", "-show_entries", "format=duration", "-of", "csv=p=0", path],
                                 capture_output=True, text=True, check=True).stdout.strip())
 

@@ -1,9 +1,10 @@
 // The preview: the exported scene, live. Drag to pan, scroll to zoom,
 // Shift-scroll to rotate, Alt to move / scale the phone. Changes key the
 // property at the playhead once it is animated (store.setProp).
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { track } from "../lib/drag.ts";
 import { stateAt } from "../lib/model.ts";
+import { phoneMatrix } from "../lib/geometry.ts";
 import { Preview } from "../lib/render.ts";
 import { clock, media } from "../state/clock.ts";
 import { endGesture, hideExact, setProp, setUI, useStore } from "../state/store.ts";
@@ -11,10 +12,21 @@ import { Button, Icon } from "./ui.tsx";
 
 export function Stage() {
   const wrap = useRef<HTMLDivElement>(null), canvas = useRef<HTMLCanvasElement>(null);
-  const preview = useRef(new Preview());
+  const scene = useRef<HTMLDivElement>(null), phone = useRef<HTMLDivElement>(null), screen = useRef<HTMLDivElement>(null);
+  const [preview] = useState(() => new Preview());
   const spec = useStore((s) => s.spec), geo = useStore((s) => s.geo), plate = useStore((s) => s.plate);
   const meta = useStore((s) => s.meta), exact = useStore((s) => s.exact);
   const box = useRef({ w: 0, h: 0 });
+
+  // Keep the video in the browser's video compositor. Copying a full 1080 ×
+  // 2400 video through Canvas every tick dominated preview time on CPU decode.
+  useEffect(() => {
+    screen.current!.append(media.screen);
+    phone.current!.append(media.frame);
+    Object.assign(media.screen.style, { width: "100%", height: "100%", display: "block" });
+    Object.assign(media.frame.style, { position: "absolute", inset: "0", width: "100%", height: "100%" });
+    return () => { media.screen.remove(); media.frame.remove(); };
+  }, []);
 
   // size the canvas to fit its pane at the output's aspect
   useEffect(() => {
@@ -27,6 +39,7 @@ export function Stage() {
       if (w === box.current.w && h === box.current.h) return;
       box.current = { w, h };
       c.style.width = w + "px"; c.style.height = h + "px";
+      scene.current!.style.width = w + "px"; scene.current!.style.height = h + "px";
       c.width = Math.round(w * dpr); c.height = Math.round(h * dpr);
       paint();
     };
@@ -44,8 +57,11 @@ export function Stage() {
       raf.current = 0;
       const s = useStore.getState(), c = canvas.current;
       if (!c || !s.spec || !s.geo || !s.meta) return;
-      preview.current.draw(c.getContext("2d")!, {
-        spec: s.spec, geo: s.geo, plate: s.plate, S: stateAt(s.spec, s.meta.props, clock.t),
+      const S = stateAt(s.spec, s.meta.props, clock.t), scale = box.current.w / s.geo.W;
+      phone.current!.style.transform = `matrix(${phoneMatrix(s.spec, s.geo, S).map((v) => v * scale).join(",")})`;
+      screen.current!.style.background = s.meta.themes[s.spec.app.theme]?.bg ?? "#111";
+      preview.draw(c.getContext("2d", { alpha: false, desynchronized: true })!, {
+        spec: s.spec, geo: s.geo, plate: s.plate, S, nativePhone: true,
         themeBg: s.meta.themes[s.spec.app.theme]?.bg ?? "#111", screen: media.screen, plateVideo: media.plate, frame: media.frame,
       });
     });
@@ -92,8 +108,13 @@ export function Stage() {
 
   return (
     <div ref={wrap} className="relative flex min-h-0 flex-1 items-center justify-center overflow-hidden bg-[#0c0b0a]">
-      <canvas ref={canvas} onPointerDown={onPointerDown} className="cursor-grab rounded-sm shadow-[0_0_0_1px_var(--color-line)]"
-        title="Drag: pan · Scroll: zoom · Shift-scroll: rotate · Alt-drag / Alt-scroll: move / scale the phone" />
+      <div ref={scene} className="relative shrink-0 overflow-hidden rounded-sm shadow-[0_0_0_1px_var(--color-line)]">
+        <canvas ref={canvas} onPointerDown={onPointerDown} className="block cursor-grab"
+          title="Drag: pan · Scroll: zoom · Shift-scroll: rotate · Alt-drag / Alt-scroll: move / scale the phone" />
+        <div ref={phone} className="pointer-events-none absolute left-0 top-0 origin-top-left" style={{ width: geo?.g.W, height: geo?.g.H }}>
+          <div ref={screen} className="absolute overflow-hidden" style={{ left: geo?.g.sx0, top: geo?.g.sy0, width: geo?.g.sw, height: geo?.g.sh, borderRadius: geo?.g.screen_r }} />
+        </div>
+      </div>
       {exact && (
         <img src={exact} alt="exact frame" onClick={hideExact} style={{ width: box.current.w, height: box.current.h }}
           className="absolute cursor-pointer rounded-sm outline outline-2 outline-gold" title="The exporter's own frame (with motion blur) · click to hide" />

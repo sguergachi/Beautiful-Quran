@@ -65,6 +65,11 @@ npm --prefix tools/promo_studio/editor-app test
 npm --prefix tools/promo_studio/editor-app run build
 ```
 
+[Performance measurements and implementation notes](../../docs/PROMO_STUDIO_PERFORMANCE.md)
+cover preview cadence, API latency and export throughput. Exports default to
+four background workers with bounded FFmpeg pools, preserving full output
+resolution and motion blur. The CLI's `--workers` can override that budget.
+
 Long work runs in separate processes. **Jobs** shows stages, live progress,
 logs, cancellation and completed video links. Captures count recorded
 seconds; exports count rendered frames. Jobs use a snapshot of the edit you
@@ -105,7 +110,8 @@ Smoothness comes from the emulator. The **Emulators** panel lists running
 instances with their core count, app state, current job and a live screen.
 Start another, prepare its app, then choose it in **Recording** (or leave
 **Any free emulator** selected). Captures queue per emulator and shared take;
-exports run one at a time and wait for a capture of their take to finish.
+exports run one at a time. Recording and export do not overlap on the host,
+so exports cannot steal frame time from a take.
 Use six cores and record one take at a time for the smoothest animation.
 Parallel takes work, but compete for the host's CPU and GPU.
 

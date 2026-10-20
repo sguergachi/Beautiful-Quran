@@ -1,7 +1,7 @@
 // The live preview: the same scene compose.Renderer exports, drawn on a
 // canvas. Motion blur is left to the exporter ("Exact frame" shows it).
 import { bgMatrix, invert, phoneMatrix } from "./geometry.ts";
-import type { Geo, Plate, Spec, State } from "./types.ts";
+import type { Geo, PhoneGeometry, Plate, Spec, State } from "./types.ts";
 
 function roundRect(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, r: number) {
   ctx.beginPath();
@@ -14,14 +14,32 @@ function roundRect(ctx: CanvasRenderingContext2D, x: number, y: number, w: numbe
 export interface Scene {
   spec: Spec; geo: Geo; plate: Plate | null; S: State; themeBg: string;
   screen: HTMLVideoElement; plateVideo: HTMLVideoElement; frame: HTMLImageElement;
+  nativePhone?: boolean;
 }
 
 export class Preview {
   private bg = document.createElement("canvas");
   private tiles = document.createElement("canvas");
   private vig = document.createElement("canvas");
+  private shadow = document.createElement("canvas");
+  private shadowKey = "";
   private bgKey = "";
   private vigKey = "";
+
+  private phoneShadow(g: PhoneGeometry) {
+    const q = 4, blur = g.H * 0.035 / q, pad = Math.ceil(blur * 4);
+    const key = [g.W, g.H, g.bw, g.bh, g.body_r].join("|");
+    if (key !== this.shadowKey) {
+      this.shadowKey = key;
+      this.shadow.width = Math.ceil(g.W / q + 2 * pad);
+      this.shadow.height = Math.ceil(g.H / q + 2 * pad);
+      const c = this.shadow.getContext("2d")!;
+      c.filter = `blur(${blur}px)`; c.fillStyle = "#000";
+      roundRect(c, pad + (g.W - g.bw) / (2 * q), pad + (g.H - g.bh) / (2 * q), g.bw / q, g.bh / q, g.body_r / q);
+      c.fill();
+    }
+    return { canvas: this.shadow, q, pad };
+  }
 
   // Vignette as the exporter multiplies it: (1 − v·r²), r = distance from the
   // centre normalised to the corner.
@@ -54,7 +72,9 @@ export class Preview {
       const m = bgMatrix(spec, geo, plate, S), inv = invert(m);
       const corners = [[0, 0], [W, 0], [0, H], [W, H]].map(([x, y]) => [inv[0] * x + inv[2] * y + inv[4], inv[1] * x + inv[3] * y + inv[5]]);
       const edge = Math.max(0, ...corners.flatMap(([x, y]) => [-x, x - w, -y, y - h]));
-      const pad = Math.ceil(Math.max(w, h, edge + extra * 4) / 64) * 64;
+      // Extend only as far as the visible crop and blur kernel reach.
+      // Padding by a full plate on every side rebuilt nine times the pixels.
+      const pad = Math.ceil((edge + extra * 4 + 2) / 64) * 64;
       const bw = w + 2 * pad, bh = h + 2 * pad;
       const key = [sc.plateVideo.src, sc.plateVideo.currentTime.toFixed(3), extra.toFixed(2), bw, bh].join("|");
       if (key !== this.bgKey) {
@@ -90,14 +110,17 @@ export class Preview {
     const m = phoneMatrix(spec, geo, S);
     const shd = +spec.phone.shadow;
     if (shd > 0) {
+      const shadow = this.phoneShadow(g);
       ctx.save();
       ctx.setTransform(ps, 0, 0, ps, 0, 0);
       ctx.translate(0, H * 0.022 * S.zoom * S.phone_scale); ctx.transform(...m);
-      ctx.filter = `blur(${g.H * 0.035 * Math.hypot(m[0], m[1]) * ps}px)`;
-      ctx.globalAlpha = shd; ctx.fillStyle = "#000";
-      roundRect(ctx, g.W / 2 - g.bw / 2, g.H / 2 - g.bh / 2, g.bw, g.bh, g.body_r); ctx.fill();
+      // Blur once in phone space, then transform it with the phone. The
+      // compositor uses the same quarter-size shadow; screen ink stays native.
+      ctx.globalAlpha = shd;
+      ctx.drawImage(shadow.canvas, -shadow.pad * shadow.q, -shadow.pad * shadow.q, shadow.canvas.width * shadow.q, shadow.canvas.height * shadow.q);
       ctx.restore();
     }
+    if (sc.nativePhone) return;
     ctx.save();
     ctx.setTransform(ps, 0, 0, ps, 0, 0); ctx.transform(...m);
     ctx.save();

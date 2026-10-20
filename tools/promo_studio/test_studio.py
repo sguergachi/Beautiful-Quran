@@ -16,6 +16,7 @@ from http.server import ThreadingHTTPServer
 import numpy as np
 
 import anim
+import audio
 import compose
 import library
 import phone
@@ -80,6 +81,15 @@ class MediaTests(unittest.TestCase):
         self.d = Path(self.tmp.name)
 
     def tearDown(self): self.tmp.cleanup()
+
+    def test_pcm_duration_uses_exact_samples_without_a_subprocess(self):
+        import wave
+        path = self.d / "fractional.wav"
+        with wave.open(str(path), "wb") as wav:
+            wav.setnchannels(2); wav.setsampwidth(2); wav.setframerate(48000)
+            wav.writeframes(bytes(481 * 4))
+        with patch.object(audio.subprocess, "run", side_effect=AssertionError("no ffprobe needed")):
+            self.assertEqual(audio.duration(path), 481 / 48000)
 
     def test_capture_cadence_excludes_still_holds_without_hiding_uneven_frames(self):
         # Smooth active frames, a still hold, then some missed frames.
@@ -187,13 +197,21 @@ class ServerTests(unittest.TestCase):
                 patch.object(server.Jobs, "_loop", lambda self: None), \
                 patch.object(server.Jobs, "_start", lambda self, j: j.update(state="running", pid=None, _proc=None)):
             jobs = server.Jobs()
-            jobs.submit("render", "a", ["render", "a"])
+            first = jobs.submit("render", "a", ["render", "a"])
             with self.assertRaises(ValueError): jobs.submit("render", "a", ["render", "a"])
-            self.assertEqual(jobs.submit("render", "b", ["render", "b"])["state"], "queued")
+            second = jobs.submit("render", "b", ["render", "b"])
+            self.assertEqual(second["state"], "queued")
+            jobs.cancel(second["id"])
             c1 = jobs.submit("capture", "x", ["capture", "x"], serial="emulator-5650")
             c2 = jobs.submit("capture", "y", ["capture", "y"], serial="emulator-5652")
             c3 = jobs.submit("capture", "z", ["capture", "z"], serial="emulator-5650")
-            self.assertEqual([c1["state"], c2["state"], c3["state"]], ["running", "running", "queued"])
+            self.assertEqual([c1["state"], c2["state"], c3["state"]], ["queued", "queued", "queued"])
+            jobs.get(first["id"])["state"] = "done"
+            jobs._pump()
+            self.assertEqual([jobs.get(j["id"])["state"] for j in (c1, c2, c3)], ["running", "running", "queued"])
+            render = jobs.submit("render", "c", ["render", "c"])
+            self.assertEqual(render["state"], "queued", "export yields the host while emulators record")
+            self.assertIn("recording", render["msg"])
             jobs.cancel(c3["id"])
             self.assertEqual(jobs.get(c3["id"])["state"], "cancelled")
             self.assertEqual(set(jobs.busy_serials()), {"emulator-5650", "emulator-5652"})

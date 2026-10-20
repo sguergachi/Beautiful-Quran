@@ -108,9 +108,9 @@ def geometry(s):
 class Jobs:
     """Subprocess jobs with stages, progress, logs and cancellation.
 
-    Rules: one capture per emulator, one render at a time (each render
-    already uses every core), emulator jobs on their own. Queued jobs start
-    as soon as their rule allows.
+    Rules: one capture per emulator/shared take, one render at a time.
+    Recording and export share the host budget and do not overlap. Queued
+    jobs start as soon as their resource is free.
     """
 
     def __init__(self):
@@ -216,6 +216,10 @@ class Jobs:
     # -- scheduling -------------------------------------------------------
 
     def _can_start(self, j, running):
+        # Recording must keep the emulator's cadence. Exporting on the same
+        # host saturated CPU/memory and dropped capture/preview frames.
+        if j["kind"] in ("capture", "render") and any({r["kind"], j["kind"]} == {"capture", "render"} for r in running):
+            return False
         if j.get("take_key") and any(r.get("take_key") == j["take_key"] and "capture" in (j["kind"], r["kind"]) for r in running):
             return False
         if j["kind"] == "render":
@@ -233,6 +237,9 @@ class Jobs:
                     self._start(j)
                     running.append(j)
                     started = True
+                elif j["kind"] in ("capture", "render"):
+                    kinds = {r["kind"] for r in running}
+                    j["msg"] = "Waiting for recording to finish" if "capture" in kinds else "Waiting for export to finish" if "render" in kinds else "Waiting for emulator to be ready"
             if started:
                 self._save()
 
