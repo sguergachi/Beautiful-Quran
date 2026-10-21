@@ -30,7 +30,10 @@ half4 main(float2 p) {
     float fresh = 1.0 - smoothstep(0.08, 0.65, depositAge);
     float filmWet = localWet * mix(0.82, 1.0, fresh);
     float base = smoothstep(-aa * 0.5, aa * 0.5, distance);
-    float expanded = smoothstep(-aa * 0.5, aa * 0.5, distance + weight * filmWet);
+    // The repeated phrase holds its deposited width together with its orange.
+    // Reflections still follow per-word wetness, rather than staying glossy.
+    float repeatBody = repeatPass * repeatTint * loaded * mix(0.82, 1.0, fresh);
+    float expanded = smoothstep(-aa * 0.5, aa * 0.5, distance + weight * max(filmWet, repeatBody));
     float2 slope = (surface.rg * 255.0 - 128.0) / 127.0;
     float volume = 0.6 + weight / 6.5;
     // A rounded advancing meniscus follows the same smooth arrival field as the ink.

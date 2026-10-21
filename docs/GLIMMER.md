@@ -107,10 +107,13 @@ keeping playback and the pooling setting intact. All dials reset when the study 
 When verse 2 repeats, its entire previously read black base stays visible.
 The wash brings in the existing Paper orange repeat accent (`#B4551E`)
 together with the fuller wet shape and reflection. Every reached word holds
-orange with the chain, even after its individual wet film dries. Later words
+orange and the thicker deposited shape with the chain, even after its individual
+wet film dries. The pooling dial sets that held width as well as the fresh
+wet expansion. Reflections continue drying per word. Later words
 stay black until their turn. Pausing retains the reached orange prefix while
 the sheen settles. Only when playback leaves verse 2 does the complete chain
-dissolve together to charcoal over `InkEngine.tuning.repeatFadeOutMs` (900 ms).
+dissolve together to charcoal and the original font weight over
+`InkEngine.tuning.repeatFadeOutMs` (900 ms).
 The tint envelope is independent of wetness, so earlier words do not become
 brown or black while later words repeat. Carbon pooling does not darken orange;
 its pigment travels through the same feathered liquid fill as the first pass.
