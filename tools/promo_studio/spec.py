@@ -53,7 +53,7 @@ PROPS = {
     "phone_y":       {"group": "Phone", "label": "Phone Y", "min": -0.8, "max": 0.8, "step": 0.001, "default": 0.0},
     "phone_scale":   {"group": "Phone", "label": "Phone scale", "min": 0.2, "max": 3, "step": 0.01, "default": 1.0, "log": True},
     "phone_tilt":    {"group": "Phone", "label": "Phone tilt °", "min": -45, "max": 45, "step": 0.1, "default": 0.0},
-    "bg_blur":       {"group": "Background", "label": "Blur", "min": 4, "max": 90, "step": 0.5, "default": 36.0},
+    "bg_blur":       {"group": "Background", "label": "Blur", "min": 0, "max": 90, "step": 0.5, "default": 36.0},
     "bg_brightness": {"group": "Background", "label": "Brightness", "min": -0.6, "max": 0.4, "step": 0.005, "default": 0.0},
 }
 

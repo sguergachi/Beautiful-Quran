@@ -157,7 +157,7 @@ function Recording() {
         {live ? <CaptureCard job={live} /> : (
           <div className="mb-3 rounded-lg border border-line bg-panel2 p-3">
             {take ? (
-              <p className="mb-2.5 text-mute"><Dot tone={a.intro.play && activeFps != null && activeFps < 50 ? "gold" : "green"} /> <span className="ml-1 text-ink">{take.length.toFixed(1)} s</span> recorded {take.recorded}{activeFps != null ? ` · ${activeFps} fps active` : ` · ${take.capture_fps} fps average (includes still pauses)`}</p>
+              <p className="mb-2.5 text-mute"><Dot tone={a.intro.play && activeFps != null && activeFps < 50 ? "gold" : "green"} /> <span className="ml-1 text-ink">{take.length.toFixed(1)} s</span> · {take.width} × {take.height} · recorded {take.recorded}{activeFps != null ? ` · ${activeFps} fps active` : ` · ${take.capture_fps} fps average (includes still pauses)`}</p>
             ) : <p className="mb-2.5 text-mute"><Dot tone="faint" /> <span className="ml-1">No take for these settings yet.</span></p>}
             {a.intro.play && activeFps != null && activeFps < 50 && (
               <p className="mb-2.5 text-[12px] text-gold">The active frames are slow. Use 6 cores and record one take at a time for smoother ink.</p>
@@ -252,45 +252,54 @@ export const emulatorTone = (e: Emulator): "green" | "gold" | "orange" | "faint"
 
 function Look() {
   const meta = useStore((s) => s.meta)!, spec = useStore((s) => s.spec)!, raw = useStore((s) => s.raw)!;
+  const t = useTime();
   const slider = (label: string, path: string, value: number, min: number, max: number, step: number, hint?: string) => (
     <Field label={label} hint={hint}><Slider label={label} value={value} min={min} max={max} step={step} onChange={(v) => set(path, v, "f:" + path)} onDone={endGesture} /></Field>
   );
+  const property = (name: string, hint?: string) => {
+    const d = meta.props[name], animated = !!spec.tracks[name]?.length;
+    return <Field label={d.label} hint={animated ? `${hint ?? ""} Animated · changes apply at the playhead.`.trim() : hint}>
+      <Slider label={d.label} value={valueAt(spec, meta.props, name, t)} min={d.min} max={d.max} step={d.step}
+        onChange={(v) => setProp(name, v, "look:" + name)} onDone={endGesture} />
+    </Field>;
+  };
   return (
     <>
-      <Section title="Frame">
-        <Field label="Aspect"><Segmented size="sm" value={spec.aspect} options={Object.keys(meta.aspects).map((a) => [a, a])} onChange={(v) => set("aspect", v)} /></Field>
-        <Field label="Frame rate"><Segmented size="sm" value={String(spec.fps)} options={[["60", "60 fps"], ["30", "30 fps"]]} onChange={(v) => set("fps", +v)} /></Field>
-        {slider("Motion blur", "motion_blur", spec.motion_blur, 0, 2, 0.05, "Blur on fast camera moves (shutter, as a share of a frame). The preview omits it; Exact frame shows it.")}
-      </Section>
       <Section title="Background">
         <div className="mb-3 grid grid-cols-3 gap-1.5">
           {Object.entries(meta.backgrounds).map(([id, b]) => (
-            <button key={id} onClick={() => set("background.id", id)} title={`${b.title} · suits ${b.suits.join(", ")}`}
+            <button key={id} onClick={() => set("background.id", id)} title={`${b.title} · suits ${b.suits.join(", ")}`} aria-label={b.label ?? b.title} aria-pressed={id === spec.background.id}
               className={`relative aspect-square overflow-hidden rounded-md border-2 ${id === spec.background.id ? "border-gold" : "border-transparent hover:border-line2"}`}>
               <img src={b.thumb} alt="" loading="lazy" className="size-full object-cover blur-[1.5px]" />
-              <span className="absolute inset-x-0 bottom-0 truncate bg-black/65 px-1 py-0.5 text-left text-[10px]">{id}</span>
+              <span className="absolute inset-x-0 bottom-0 line-clamp-2 bg-black/65 px-1.5 py-1 text-left text-[10px] leading-tight">{b.label ?? b.title}</span>
             </button>
           ))}
         </div>
+        <h4 className="mb-2 text-[10px] font-semibold uppercase tracking-wider text-faint">Image</h4>
+        {property("bg_blur", "0 keeps the background sharp. More blur keeps attention on the phone.")}
+        {property("bg_brightness")}
         {slider("Saturation", "background.saturation", spec.background.saturation, 0, 1.6, 0.05)}
+        {slider("Vignette", "background.vignette", spec.background.vignette, 0, 0.8, 0.01)}
+        <h4 className="mb-2 mt-4 text-[10px] font-semibold uppercase tracking-wider text-faint">Movement</h4>
         {slider("Motion speed", "background.speed", spec.background.speed, 0.1, 1.5, 0.05)}
         {slider("Parallax", "background.parallax", spec.background.parallax, 0, 1, 0.01, "How much of the camera's moves the background follows.")}
-        {slider("Vignette", "background.vignette", spec.background.vignette, 0, 0.8, 0.01)}
-        <p className="text-[11.5px] text-faint">Blur and brightness are on the Animate tab, so they can be keyed.</p>
       </Section>
       <Section title="Phone">
         <Field label="Colour"><Select value={raw.phone?.color ?? "auto"} options={[["auto", "Match the theme"], ...meta.phones.map((c): [string, string] => [c, c[0].toUpperCase() + c.slice(1)])]} onChange={(v) => set("phone.color", v)} /></Field>
         {slider("Base size", "phone.height", spec.phone.height, 0.4, 1.2, 0.01, "The phone's height as a share of the frame, before zoom.")}
         {slider("Shadow", "phone.shadow", spec.phone.shadow, 0, 1, 0.01)}
       </Section>
+      <Section title="Canvas">
+        <Field label="Video name"><TextInput value={spec.title} placeholder="What this video is" onCommit={(v) => set("title", v)} /></Field>
+        <Field label="Aspect"><Segmented size="sm" value={spec.aspect} options={Object.keys(meta.aspects).map((a) => [a, a])} onChange={(v) => set("aspect", v)} /></Field>
+        <Field label="Frame rate"><Segmented size="sm" value={String(spec.fps)} options={[["60", "60 fps"], ["30", "30 fps"]]} onChange={(v) => set("fps", +v)} /></Field>
+        {slider("Motion blur", "motion_blur", spec.motion_blur, 0, 2, 0.05, "Softens fast camera moves in exports. Use Exact frame to preview it.")}
+      </Section>
       <Section title="Sound">
         {slider("Gain (dB)", "audio.gain_db", spec.audio.gain_db, -12, 12, 0.5)}
         {slider("Fade in (s)", "audio.fade_in", spec.audio.fade_in, 0, 3, 0.1, "Starts with the first sound: takes open on a silent second.")}
         {slider("Fade out (s)", "audio.fade_out", spec.audio.fade_out, 0, 4, 0.1, "Ends with the video.")}
         <p className="text-[11.5px] text-faint">The emulator's own recording, normalised to −16 LUFS on export. The preview plays the gain and fades; drag the handles on the timeline's Sound lane to set the fades there.</p>
-      </Section>
-      <Section title="Title">
-        <TextInput value={spec.title} placeholder="What this video is" onCommit={(v) => set("title", v)} />
       </Section>
     </>
   );

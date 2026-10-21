@@ -14,7 +14,8 @@ context menus.
 | Recording | Record/select and split/whole-take rows could overflow; long spec paths did not wrap. | Actions wrap and paths remain readable. |
 | Window layout | Stored wide panes could consume the preview, and a tall timeline could hide playback controls after resizing. | Pane widths fit the current window without replacing preferred widths. Timeline height reserves at least 96 px for the preview; its toolbar is included in the timeline's height. |
 | Compact windows | Both side panes could crowd out the central editor. | At widths of 1,000 CSS px or less, one pane opens over the editor with a dismissible backdrop. |
-| Toolbars | Playback and editing occupied separate rows, with different button heights and uneven icon alignment. | One toolbar joins playback/timecode, edit/key navigation, camera actions and timeline zoom. Controls share a 32 px height, 4 px within-group gaps and centered SVG icons. Camera actions collapse into a menu below 1,140 px of toolbar width; below 680 px, Tools also contains editing commands. The row stays single-line. Compact headers keep aspect selection in Look → Frame. |
+| Toolbars | Playback and editing occupied separate rows, with different button heights and uneven icon alignment. | One toolbar joins playback/timecode, edit/key navigation, camera actions and timeline zoom. Controls share a 32 px height, 4 px within-group gaps and centered SVG icons. Camera actions collapse into a menu below 1,140 px of toolbar width; below 680 px, Tools also contains editing commands. The row stays single-line. Compact headers keep aspect selection in Look → Canvas. |
+| Look | Background controls were split between tabs; blur could not reach sharp, and thumbnail labels were internal IDs. | Background, Phone, Canvas and Sound form the main groups. Background separates Image adjustments from Movement; Blur and Brightness share Animate's playhead-aware properties. Blur reaches zero through the renderer. Short background names and selected-state semantics make the picker readable. |
 | Video list | Footer text overflowed at minimum width; titles lacked a full-text tooltip; actions required hover. | The batch action has the shared export icon and wrapping text; titles have tooltips and actions remain visible. |
 | Drawers | Fixed drawer widths, shortcut columns and long progress messages could exceed the window. | Drawers fit the viewport, shortcut columns stack, and job/status text wraps. |
 | Context menus | Large menus could start above the window; scrolling dismissed them. | Menus stay inside the viewport, scroll vertically, and close on window resize. |
@@ -58,7 +59,7 @@ certification.
 The existing 25 real-input browser checks cover ruler/playhead dragging, edge
 scrolling, key movement and selection, easing, split/trim/delete, pane and label
 resizing, typed timecodes, undo, blank videos, duplicate freshness and numeric
-input cancellation. Offline gates are the 16 Python regressions, 10 Node tests,
+input cancellation. Offline gates are the 31 Python regressions, 26 Node tests,
 strict TypeScript/production build and Android JVM suite. See the studio README
 for the build/test commands.
 
@@ -69,3 +70,9 @@ Interaction checks cover split/undo, previous/next key, loop, camera/Tools
 menus, keyboard activation, Fit, typed timecodes and a short viewport. Below
 500 px the slider is folded away while Fit and every editing command remain
 reachable; the timecode keeps its current time, with total duration in its tooltip.
+
+Look controls were checked at 1440, 1100, 800, 600, 390 and 320 px, including
+stacked field labels and all numeric inputs. Real keyboard checks cover zero
+blur, a sharp source plate, single-step undo/redo, brightness, animated blur at
+the playhead, neighboring-key preservation, and matching values in Animate.
+A rendered striped-image regression confirms zero blur retains detail.

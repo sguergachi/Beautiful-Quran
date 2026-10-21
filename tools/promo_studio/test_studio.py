@@ -175,6 +175,26 @@ class MediaTests(unittest.TestCase):
             self.assertEqual(library.probe(out)[:2], library.plate_geometry(bg, 64, 64)[:2])
             self.assertFalse(list(self.d.glob("*.part.mp4")))
 
+    def test_zero_blur_keeps_image_detail_and_is_not_baked_into_animated_looks(self):
+        from PIL import Image
+        source = self.d / 'stripes.png'
+        pattern = np.tile(((np.arange(128) // 4) % 2 * 255).astype(np.uint8), (128, 1))
+        Image.fromarray(np.repeat(pattern[..., None], 3, axis=2)).save(source)
+        s = spec.resolve({'background': {'id': 'file:' + str(source)}, 'props': {'bg_blur': 0}})
+        sharp = compose.plate_settings(s)
+        self.assertEqual(sharp['blur'], 0)
+        self.assertEqual(spec.PROPS['bg_blur']['min'], 0)
+        s['props']['bg_blur'] = 36
+        s['tracks']['bg_blur'] = [{'t': 0, 'v': 36}, {'t': 1, 'v': 0}]
+        self.assertEqual(compose.plate_settings(s)['blur'], 0)
+        with patch.object(library, 'PLATES', str(self.d)):
+            clear = library.plate(sharp, 128, 128)
+            soft = library.plate(dict(sharp, blur=8), 128, 128)
+            w, h, _ = library.plate_geometry(sharp, 128, 128)
+            clear_pixels = compose.grab(clear, w, h, 0)[16:-16, 16:-16].astype(float)
+            soft_pixels = compose.grab(soft, w, h, 0)[16:-16, 16:-16].astype(float)
+            self.assertGreater(clear_pixels.std(), soft_pixels.std() * 4)
+
 
 class FormatTests(unittest.TestCase):
     def test_options_validate_and_name_one_file_per_kind(self):

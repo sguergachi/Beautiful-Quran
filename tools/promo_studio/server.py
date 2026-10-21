@@ -592,7 +592,7 @@ class Handler(BaseHTTPRequestHandler):
                 "themes": S.THEMES, "layouts": S.LAYOUTS, "views": S.VIEWS,
                 "aspects": {k: list(v) for k, v in S.ASPECTS.items()}, "eases": S.EASES,
                 "phones": sorted(phone_mod.COLORS), "defaults": S.DEFAULTS, "props": S.PROPS,
-                "backgrounds": {k: {"title": v["title"], "suits": v["suits"], "thumb": f"/media/thumb/{k}.jpg"}
+                "backgrounds": {k: {"title": v["title"], "label": v.get("label", v["title"]), "suits": v["suits"], "thumb": f"/media/thumb/{k}.jpg"}
                                 for k, v in bgs.items()},
                 "surahs": surahs(), "out_dir": S.OUT, "export": formats.meta(), "apk": emus.DEFAULT_APK,
                 "apk_exists": os.path.exists(emus.DEFAULT_APK)})

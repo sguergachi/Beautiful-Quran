@@ -45,7 +45,7 @@ def plate_settings(s):
     """The background look baked into the plate: the least blur the video
     ever uses (more is added per frame), no brightness (added per frame)."""
     blurs = [float(s["props"]["bg_blur"])] + [float(k["v"]) for k in s["tracks"].get("bg_blur", [])]
-    return dict(s["background"], blur=max(2.0, min(blurs)), brightness=0.0)
+    return dict(s["background"], blur=max(0.0, min(blurs)), brightness=0.0)
 
 
 class Renderer:

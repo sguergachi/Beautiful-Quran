@@ -126,7 +126,7 @@ export const takeKey = (s: Spec) => [s.app.reciter, s.app.surah, s.app.ayah, s.a
 // Everything baked into the background plate: a change means a new plate.
 export function plateLook(s: Spec): string {
   const blurs = [+s.props.bg_blur, ...(s.tracks.bg_blur || []).map((k) => +k.v)];
-  return JSON.stringify([s.background, s.aspect, Math.max(2, Math.min(...blurs))]);
+  return JSON.stringify([s.background, s.aspect, Math.max(0, Math.min(...blurs))]);
 }
 
 export function fmtTime(t: number): string {

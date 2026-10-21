@@ -124,6 +124,21 @@ click it again, move the zoom slider or Ctrl-scroll to return to manual zoom.
 [Studio UI review](../../docs/PROMO_STUDIO_UI_REVIEW.md) records the clipping
 fixes and the desktop, narrow-window and zoom-equivalent review matrix.
 
+## Look
+
+The Look tab groups **Background**, **Phone**, **Canvas**, and **Sound**.
+Background choices use their names and show which one is selected. Under
+**Image**, Blur, Brightness, Saturation, and Vignette shape the background;
+**Movement** holds Motion speed and Parallax. Blur reaches **0** for a sharp
+background. This is separate from Canvas's Motion blur, which softens camera
+movement in exports.
+
+Blur and Brightness share their properties with Animate. Without keys they
+set the whole video; with keys they show the value at the playhead and edits
+add or update that key. The hints identify animated values. Phone groups its
+colour, size, and shadow; Canvas holds the video name, aspect, frame rate, and
+camera motion blur. Sound keeps gain and both fades together.
+
 ## Takes: the real app, its real sound
 
 A take is the Android app playing, recorded at 1× by

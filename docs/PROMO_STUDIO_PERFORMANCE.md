@@ -92,3 +92,23 @@ The corrected preview had no screen seeks or backward presented frames;
 its error converged to 26 ms after five seconds. Both traces delivered
 about 60 animation ticks/s (p95 17.3/17.4 ms). This controlled check covers
 the timing-correction mechanism, rather than certifying every client GPU.
+
+## Capture resolution limit
+
+The current Android 15 capture emulator records at 1080×2400. A native
+1440×3200 experiment with proportionally scaled density (560 instead of
+420) kept the logical layout, but scrcpy's `c2.android.avc.encoder` rejected
+the height. The [AOSP AVC encoder](https://android.googlesource.com/platform/frameworks/av/+/refs/heads/android15-release/media/codec2/components/avc/C2SoftAvcEnc.cpp)
+limits both dimensions to 2560 pixels. No smaller fallback was accepted in
+the experiment. Host-side emulator recording also retains a native
+1080×2400 framebuffer; asking it for a 1440×3200 file only upscales those
+pixels. Native 2K takes need a different capture backend and framebuffer
+configuration. Increasing export resolution alone does not add source detail.
+
+## Background detail
+
+Background blur now permits zero in both preview and export. The source
+plate uses the least blur needed by any key, including zero, so a sharp key
+does not inherit baked blur. Zero skips the Gaussian filter, and low-blur
+plates retain full spatial resolution rather than the small strongly blurred
+cache. Strongly blurred looks keep their existing cache size and performance.

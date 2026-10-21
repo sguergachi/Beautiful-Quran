@@ -50,7 +50,7 @@ export interface Meta {
   phones: string[];
   defaults: RawSpec;
   props: Record<string, PropDef>;
-  backgrounds: Record<string, { title: string; suits: string[]; thumb: string }>;
+  backgrounds: Record<string, { title: string; label?: string; suits: string[]; thumb: string }>;
   surahs: { id: number; name: string; ayahs: number }[];
   out_dir: string;
   export: ExportMeta;
