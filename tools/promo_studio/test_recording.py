@@ -64,6 +64,30 @@ class SequenceTests(unittest.TestCase):
             self.assertEqual(capture.word_xy(1), (40, 100))
             self.assertIsNone(capture.word_xy(14))
 
+    def test_take_contents_moves_origin_and_keeps_the_opening(self):
+        s = spec.resolve({'app': {'surah': 2, 'ayah': 14, 'seconds': 120}})
+        with patch.object(audio, 'fetch', side_effect=lambda slug, sur, ay: f'{sur}:{ay}'), patch.object(audio, 'duration', return_value=5), patch.object(audio, 'ayah_count', return_value=286):
+            edit = timeline.plan_range(s, 16, 17, lead=12)
+            self.assertEqual((edit['anchor'], edit['in'], edit['out']), (14, 22, 32))
+            take = timeline.plan_range(s, 16, 17, lead=12, take=True)
+            self.assertEqual((take['anchor'], take['in'], take['out']), (16, 0, 22))
+            self.assertEqual(take['seconds'], 11)
+            self.assertEqual([v['label'] for v in take['verses']], ['2:16', '2:17'])
+            opening = timeline.plan_range(s, 1, 2, lead=12, take=True)
+            self.assertEqual((opening['anchor'], opening['in'], opening['out']), (1, 0, 27))
+            self.assertEqual(opening['verses'][0]['label'], 'basmalah')
+
+    def test_contents_request_uses_the_selected_takes_measured_lead(self):
+        h = Mock(path='/api/verse-range/test')
+        h.body.return_value = {'raw': {'app': {'surah': 2, 'ayah': 14}}, 'start': 16, 'end': 17, 'take': True}
+        with patch.object(server, 'take_meta', return_value={'lead': 12}) as meta, patch.object(audio, 'fetch', return_value='wav'), patch.object(audio, 'duration', return_value=5), patch.object(audio, 'ayah_count', return_value=286):
+            server.Handler.route_post(h)
+            self.assertEqual(meta.call_args.args[0]['app']['ayah'], 16)
+            result = h.send_json.call_args.args[0]
+            self.assertEqual((result['in'], result['out']), (0, 22))
+        h.body.return_value['take'] = 'yes'
+        with self.assertRaises(ValueError): server.Handler.route_post(h)
+
     def test_ceremony_launches_on_camera_and_opens_automatically(self):
         driver = Mock()
         driver.wait_for.return_value = True

@@ -251,19 +251,19 @@ export async function loadTimeline() {
 }
 
 /** Choose a continuous range, or add/remove a complete verse at an edit edge. */
-export async function editVerses(start: number, end: number, action?: VerseAction) {
+export async function editVerses(start: number, end: number, action?: VerseAction, take = false) {
   const s = get();
   if (!s.spec || !s.raw || !s.name || s.verseBusy) return;
   const mine = session, request = ++verseRequest;
   const identity = JSON.stringify([takeKey(s.spec), s.spec.edit]);
   set({ verseBusy: true, verseError: null });
   try {
-    const plan = await api.verseRange(s.name, s.raw, start, end);
+    const plan = await api.verseRange(s.name, s.raw, start, end, take);
     if (mine !== session || request !== verseRequest) return;
     const current = get();
     if (!current.spec || JSON.stringify([takeKey(current.spec), current.spec.edit]) !== identity) throw new Error("The edit changed while loading verses. Try the verse action again.");
     const changedTake = plan.anchor !== current.spec.app.ayah;
-    mutate((raw) => applyVersePlan(raw, current.spec!, plan, action));
+    mutate((raw) => applyVersePlan(raw, current.spec!, plan, action, take));
     set({ sel: null, tl: { verses: plan.verses, repeats: changedTake ? [] : (current.tl?.repeats ?? []), take: changedTake ? null : (current.tl?.take ?? null) }, ...(changedTake ? { geo: null } : {}) });
     // Save/load the new recording origin immediately; existing footage stays
     // available for extensions on the same take and is marked short in the UI.

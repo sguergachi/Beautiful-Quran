@@ -25,7 +25,7 @@ export const api = {
   rename: (from: string, to: string) => post<{ ok: true }>(`/api/rename/${from}/${to}`),
   geometry: (name: string) => call<Geo>(`/api/geometry/${name}`),
   timeline: (name: string, raw: RawSpec) => post<Timeline>(`/api/timeline/${name}`, raw),
-  verseRange: (name: string, raw: RawSpec, start: number, end: number) => post<VersePlan>(`/api/verse-range/${name}`, { raw, start, end }),
+  verseRange: (name: string, raw: RawSpec, start: number, end: number, take = false) => post<VersePlan>(`/api/verse-range/${name}`, { raw, start, end, take }),
   plate: (name: string, raw: string) => call<Plate>(`/api/plate/${name}`, { method: "POST", body: raw }),
   stillUrl: (name: string, t: number) => `/api/still/${name}?t=${t.toFixed(3)}&scale=0.5&_=${Date.now()}`,
   jobs: () => call<Job[]>("/api/jobs"),

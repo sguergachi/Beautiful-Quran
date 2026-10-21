@@ -40,3 +40,13 @@ test("adding and removing at the edges keeps the cuts in between", () => {
   applyVersePlan(raw, s, plan({ start: 17, end: 18, in: 11 }));
   assert.deepEqual(raw.edit, [{ in: 11, out: 26 }], "choosing start/stop makes one continuous range");
 });
+
+test("take contents replaces old cuts and recording duration, keeping the full opening", () => {
+  const s = spec([{ in: 2, out: 5 }, { in: 8, out: 20 }], 14);
+  s.app.seconds = 120;
+  const raw: any = { edit: s.edit, app: s.app };
+  applyVersePlan(raw, s, { start: 16, end: 17, anchor: 16, shift: 0, in: 0, out: 22, seconds: 11, verses }, undefined, true);
+  assert.deepEqual(raw.edit, [{ in: 0, out: 22 }]);
+  assert.equal(raw.app.ayah, 16);
+  assert.equal(raw.app.seconds, 11);
+});

@@ -152,7 +152,7 @@ is laid in from EveryAyah afterwards. The emulator still runs `-no-audio`,
 so nothing plays through the host's speakers. Preparation verifies full media
 volume; the old shell volume command silently left it at one-third volume.
 
-**Recording → Take → Resolution** chooses **1080p** (1080×2400) or **2K**
+**Recording → Record take → Resolution** chooses **1080p** (1080×2400) or **2K**
 (1440×3200). New 2K takes use native framebuffer pixels; the recorder rejects
 a smaller framebuffer. Resolution is part of the take identity, so switching
 to 2K preserves old 1080p takes. Old recordings need recording again to replace
@@ -170,25 +170,34 @@ path centred for the wider framebuffer. The frame uses measured display
 corners and retains the actual camera cutout once. The full status-bar layer,
 including the clock, Wi-Fi and battery, is captured rather than reconstructed.
 
-How a take starts matters:
+**Recording → Take contents** defines the whole recording in one flow. Pick a
+chapter and reciter, add screens in order, then configure its final Recitation
+or Hold final screen step. App appearance is a collapsed group; **Fine trim &
+cuts** keeps source-second trims and splits available below the record button.
+There is no separate Take starts control or Edit verse range.
 
-- **Recording → Recording sequence** lets you add, remove and reorder up to
+- **Add screen** lets you add, remove and reorder up to
   24 steps: opening ceremony, Home/chapter list, open chapter, chapter header,
   Settings, root word viewer, repeat settings, or a wait on the current screen.
   Each step has a 0–30 s hold after arrival. Navigation is part of the take.
   The ceremony launches the app on camera and plays in full, then holds Home.
   Open chapter can tap the chapter list, search by name, or open the verse
   directly. Root steps choose a word position and need Scroll + Arabic/Both.
-- Set **Wait before play** for the final still pause (default 1 s), or switch
-  off **Play recitation after the sequence** to finish on the last screen.
-  Screen-only recordings have no verse markers and do not require an audio
-  onset to conform. **Record (s)** is recitation duration when playing, or
-  minimum total sequence duration when recording screens only.
-- Choose repeat Off, This verse, or a range ending at **Repeat through**.
-  The picker can be shown as a step, or configured before capture. Repeated
-  verse markers wrap at the selected endpoint, using the app's reviewed tail.
-  Trim repeated and screen-only takes in seconds; whole-verse range actions
-  apply to ordinary forward playback.
+- In the final **Recitation** step, choose **Start verse**, **Stop verse** and
+  **Pause before (s)** (default 1 s). Choosing a range includes whole verses,
+  makes its start verse the recording origin, and retains the opening screens.
+  It replaces precise cuts with one continuous piece. The timeline's verse
+  +/− actions still preserve interior cuts and reuse existing footage when
+  possible. A matching recording is needed if the start verse changes.
+- **Repeat** offers Off, One verse or Range. Range uses the same Start/Stop
+  fields; **Play for (s)** controls repeated playback duration. The picker
+  can be shown as a screen step or configured before capture. Repeated verse
+  markers wrap at the endpoint using the app's reviewed tail.
+- Choose **Screens only** to finish on the final screen. Start verse then
+  selects the page for reader/root/repeat steps; Final hold and Minimum (s)
+  control the ending. These recordings have no verse markers and do not need
+  an audio onset to conform. Repeated and screen-only takes can be trimmed
+  precisely under Fine trim & cuts.
 - Playback starts from the app's own controls, not `?play=true`: that deep
   link reloads the reader, which crossfades and re-scrolls the page right as
   the recitation starts. Other verses tap their first word; if it cannot be
@@ -198,7 +207,7 @@ How a take starts matters:
   playback request. `meta.lead` locates it on the take clock, including every
   opening step; verse markers and fades use this offset. **Use whole take**
   includes the full sequence when an existing short edit ends during it.
-- The status-bar clock is hidden (the emulator draws it in a broken face).
+- The real status bar shows a fixed 9:41 clock, Wi-Fi and full battery.
 
 Smoothness comes from the emulator. The **Emulators** panel lists running
 instances with their core count, app state, current job and a live screen.

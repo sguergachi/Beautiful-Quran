@@ -24,7 +24,7 @@ export function Segmented<T extends string>({ value, options, onChange, size = "
   return (
     <div className="inline-flex max-w-full flex-wrap rounded-md border border-line bg-panel p-0.5">
       {options.map(([v, label]) => (
-        <button key={v} onClick={() => onChange(v)}
+        <button key={v} aria-pressed={v === value} onClick={() => onChange(v)}
           className={`${size === "sm" ? "h-6 px-2 text-xs" : "h-7 px-2.5"} rounded-[5px] transition-colors ${v === value ? "bg-raised text-ink shadow-sm" : "text-mute hover:text-ink"}`}>
           {label}
         </button>

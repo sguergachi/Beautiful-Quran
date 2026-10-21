@@ -682,8 +682,12 @@ class Handler(BaseHTTPRequestHandler):
         if re.fullmatch(r"/api/verse-range/[\w.-]+", p):
             body = self.body()
             s = S.resolve(body.get("raw", {}))
-            meta = take_meta(s)
-            return self.send_json(timeline.plan_range(s, body.get("start"), body.get("end"), meta["lead"] if meta else S.LEAD))
+            contents = body.get("take", False)
+            if not isinstance(contents, bool): raise ValueError("take must be a boolean")
+            target = S.resolve({**s, "app": {**s["app"], "ayah": body.get("start")}}) if contents else s
+            meta = take_meta(target)
+            lead = meta["lead"] if meta else S.opening_estimate(s)
+            return self.send_json(timeline.plan_range(s, body.get("start"), body.get("end"), lead, take=contents))
         m = re.fullmatch(r"/api/plate/([\w.-]+)", p)
         if m:
             # plate for the (possibly unsaved) background settings in the body
