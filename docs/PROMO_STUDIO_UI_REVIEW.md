@@ -15,7 +15,7 @@ context menus.
 | Window layout | Stored wide panes could consume the preview, and a tall timeline could hide playback controls after resizing. | Pane widths fit the current window without replacing preferred widths. Timeline height reserves at least 96 px for the preview; its toolbar is included in the timeline's height. |
 | Compact windows | Both side panes could crowd out the central editor. | At widths of 1,000 CSS px or less, one pane opens over the editor with a dismissible backdrop. |
 | Toolbars | Playback and editing occupied separate rows, with different button heights and uneven icon alignment. | One toolbar joins playback/timecode, edit/key navigation, camera actions and timeline zoom. Controls share a 32 px height, 4 px within-group gaps and centered SVG icons. Camera actions collapse into a menu below 1,140 px of toolbar width; below 680 px, Tools also contains editing commands. The row stays single-line. Compact headers keep aspect selection in Look → Canvas. |
-| Look | Background controls were split between tabs; blur could not reach sharp, and thumbnail labels were internal IDs. | Background, Phone, Canvas and Sound form the main groups. Background separates Image adjustments from Movement; Blur and Brightness share Animate's playhead-aware properties. Blur reaches zero through the renderer. Short background names and selected-state semantics make the picker readable. |
+| Look | Background controls were split between tabs; blur could not reach sharp, thumbnail labels were internal IDs, and phone choices had no nearby preview. | Background, Phone, Canvas and Sound form the main groups. Background separates Image adjustments from Movement; Blur and Brightness share Animate's playhead-aware properties. Blur reaches zero through the renderer. Short background names and selected-state semantics make the picker readable. A whole-phone preview above Colour, Base size and Shadow shows appearance before camera crops, following the existing take or showing the theme when no take exists. |
 | Video list | Footer text overflowed at minimum width; titles lacked a full-text tooltip; actions required hover. | The batch action has the shared export icon and wrapping text; titles have tooltips and actions remain visible. |
 | Drawers | Fixed drawer widths, shortcut columns and long progress messages could exceed the window. | Drawers fit the viewport, shortcut columns stack, and job/status text wraps. |
 | Context menus | Large menus could start above the window; scrolling dismissed them. | Menus stay inside the viewport, scroll vertically, and close on window resize. |
@@ -76,3 +76,11 @@ stacked field labels and all numeric inputs. Real keyboard checks cover zero
 blur, a sharp source plate, single-step undo/redo, brightness, animated blur at
 the playhead, neighboring-key preservation, and matching values in Animate.
 A rendered striped-image regression confirms zero blur retains detail.
+
+The inline phone preview was checked for colour changes, keyboard size/shadow
+edits, paused seeks, playback, tab remounts and the no-take state. Six widths
+from 320 to 1440 px at 2× device scale keep it contained; its raster stays
+bounded at 1.5×. Instrumentation confirmed only the original two video elements
+(screen and background plate), 35 thumbnail samples over five seconds of
+playback, and no redraws when scrolled entirely out of view. In that local
+SwiftShader run the main clock's median interval was 16.1 ms, p95 21.4 ms.

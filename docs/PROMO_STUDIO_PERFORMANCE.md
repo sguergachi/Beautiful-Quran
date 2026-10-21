@@ -46,6 +46,10 @@ to concurrent applications and emulator work.
   inside the moving phone. Scrubs, edit cuts and delays over 300 ms still
   seek exactly; pending seeks keep the latest explicit target. Pause restores
   normal speed. Recitation audio and the export renderer are unchanged.
+- The Look tab's phone thumbnail draws from the existing decoded recording
+  directly into its small canvas, capped at 1.5 device pixels per CSS pixel.
+  Visible playback refreshes at most eight times per second; scrolling it out
+  of view stops redraws. It adds no video decoder or full-size scratch image.
 - Each export defaults to at most four workers. Decoder/filter/encoder pools
   are bounded, OpenCV uses one thread per worker, and workers run at niceness
   5 or lower priority. The alpha cache is small; float buffers are reused and

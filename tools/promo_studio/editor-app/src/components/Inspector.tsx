@@ -12,6 +12,7 @@ import {
 } from "../state/store.ts";
 import { Button, Dot, Empty, Field, Icon, Progress, Section, Segmented, Select, Slider, TextInput } from "./ui.tsx";
 import { Opening } from "./Opening.tsx";
+import { PhoneLookPreview } from "./PhoneLookPreview.tsx";
 import { VerseRangeEditor } from "./VerseEditor.tsx";
 
 const EASES: [Ease, string][] = [["inOutCubic", "Ease in & out"], ["inOutSine", "Gentle in & out"], ["outCubic", "Ease out"], ["inCubic", "Ease in"], ["outExpo", "Fast out, long settle"], ["linear", "Linear"], ["hold", "Hold (cut)"]];
@@ -285,6 +286,7 @@ function Look() {
         {slider("Parallax", "background.parallax", spec.background.parallax, 0, 1, 0.01, "How much of the camera's moves the background follows.")}
       </Section>
       <Section title="Phone">
+        <PhoneLookPreview />
         <Field label="Colour"><Select value={raw.phone?.color ?? "auto"} options={[["auto", "Match the theme"], ...meta.phones.map((c): [string, string] => [c, c[0].toUpperCase() + c.slice(1)])]} onChange={(v) => set("phone.color", v)} /></Field>
         {slider("Base size", "phone.height", spec.phone.height, 0.4, 1.2, 0.01, "The phone's height as a share of the frame, before zoom.")}
         {slider("Shadow", "phone.shadow", spec.phone.shadow, 0, 1, 0.01)}

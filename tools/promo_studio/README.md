@@ -136,7 +136,9 @@ movement in exports.
 Blur and Brightness share their properties with Animate. Without keys they
 set the whole video; with keys they show the value at the playhead and edits
 add or update that key. The hints identify animated values. Phone groups its
-colour, size, and shadow; Canvas holds the video name, aspect, frame rate, and
+colour, size, and shadow beneath a whole-phone appearance preview. It follows
+the take at the playhead, without camera crops, and shows the selected bezel
+even before a take exists. Canvas holds the video name, aspect, frame rate, and
 camera motion blur. Sound keeps gain and both fades together.
 
 ## Takes: the real app, its real sound
