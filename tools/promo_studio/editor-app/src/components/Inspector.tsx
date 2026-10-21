@@ -155,6 +155,9 @@ function Recording() {
       <Opening />
 
       <Section title="Take">
+        <Field label="Resolution" hint="2K records native 1440 × 3200 detail. Existing 1080p takes stay available.">
+          <Segmented size="sm" value={a.capture} options={[["1080p", "1080p"], ["2k", "2K"]]} onChange={(v) => set("app.capture", v)} />
+        </Field>
         {live ? <CaptureCard job={live} /> : (
           <div className="mb-3 rounded-lg border border-line bg-panel2 p-3">
             {take ? (

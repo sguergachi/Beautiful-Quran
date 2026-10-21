@@ -144,14 +144,30 @@ camera motion blur. Sound keeps gain and both fades together.
 
 ## Takes: the real app, its real sound
 
-A take is the Android app playing, recorded at 1× by
-[scrcpy](https://github.com/Genymobile/scrcpy) with
-`--audio-source=playback` (Android's AudioPlaybackCapture). Picture and
-sound share the device clock in one file, so the ink and the voice can't
-drift; nothing is laid in from EveryAyah afterwards. (`--audio-source=output`
-records about 37 dB too quiet on the emulator.) The emulator still runs
-`-no-audio`: playback capture taps the guest mixer, so nothing plays through
-the host's speakers.
+A take is the Android app playing, recorded at 1× through the SDK's
+authenticated, loopback-only EmulatorController frame and PCM streams.
+Picture and sound retain their emulator host timestamps in one file; nothing
+is laid in from EveryAyah afterwards. The emulator still runs `-no-audio`,
+so nothing plays through the host's speakers. Preparation verifies full media
+volume; the old shell volume command silently left it at one-third volume.
+
+**Recording → Take → Resolution** chooses **1080p** (1080×2400) or **2K**
+(1440×3200). New 2K takes use native framebuffer pixels; the recorder rejects
+a smaller framebuffer. Resolution is part of the take identity, so switching
+to 2K preserves old 1080p takes. Old recordings need recording again to replace
+clipped status icons; changing a mockup cannot recover missing source pixels.
+
+The host currently needs an NVIDIA GPU with working **H.264 NVENC**. Its
+encoder is checked before on-camera navigation. The first recording installs
+the pinned `requirements-capture.txt` dependencies into
+`~/.cache/bq-promo/capture-venv`; it does not change system Python packages.
+RGBA frames go straight to the hardware encoder, and PCM is stored as FLAC.
+The 60 fps editing copy is hardware encoded too, avoiding a long CPU conform.
+
+Capture preparation uses the Android Pixel display profile, with its camera
+path centred for the wider framebuffer. The frame uses measured display
+corners and retains the actual camera cutout once. The full status-bar layer,
+including the clock, Wi-Fi and battery, is captured rather than reconstructed.
 
 How a take starts matters:
 
@@ -192,21 +208,24 @@ so exports cannot steal frame time from a take.
 Use six cores and record one take at a time for the smoothest animation.
 Parallel takes work, but compete for the host's CPU and GPU.
 
-Capture instances reuse the pool's golden AVD and snapshot, through
+Capture instances reuse the pool's golden AVD, through
 `scripts/emu.sh capture PORT` with `EMU_CORES=6`. The existing boot lock,
-GPU setup and RAM guard apply; no extra AVD is created. Each read-only boot
+GPU setup and RAM guard apply; no extra AVD is created. A native 1440×3200
+framebuffer cold-boots with density 560: loading the old snapshot would restore
+its 1080p framebuffer. The test pool keeps its existing snapshot behavior.
+The capture endpoint requires the SDK's local token. Each read-only boot
 needs **Prepare app** once. Stop spare instances in the panel when done.
 
-scrcpy writes a frame only when the screen changes. Take metadata separates
+The emulator emits a frame when the screen changes. Take metadata separates
 average capture rate (including still holds), median active cadence, and
 the 90th-percentile active frame interval; gaps of 200 ms or more are still
 holds. These describe recorded cadence, not a promise of 60 unique frames
 per second. The output is conformed to 60 fps by repeating frames. The
-recorder closes with SIGTERM so SDL finalizes the file even when the studio
+recorder closes with SIGTERM and flushes both streams even when the studio
 was launched in the background with SIGINT ignored.
 
 Takes are keyed by what they record (reciter, chapter, ayah, theme, layout,
-view, text size, ordered steps/holds, final wait and repeat choice). The
+view, text size, resolution, ordered steps/holds, final wait and repeat choice). The
 default empty sequence keeps existing take keys. Camera/background edits and
 recording duration share the same take; changing the sequence needs a new one.
 

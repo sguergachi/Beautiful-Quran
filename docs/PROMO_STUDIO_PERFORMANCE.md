@@ -97,17 +97,37 @@ its error converged to 26 ms after five seconds. Both traces delivered
 about 60 animation ticks/s (p95 17.3/17.4 ms). This controlled check covers
 the timing-correction mechanism, rather than certifying every client GPU.
 
-## Capture resolution limit
+## Native 2K capture
 
-The current Android 15 capture emulator records at 1080×2400. A native
-1440×3200 experiment with proportionally scaled density (560 instead of
-420) kept the logical layout, but scrcpy's `c2.android.avc.encoder` rejected
-the height. The [AOSP AVC encoder](https://android.googlesource.com/platform/frameworks/av/+/refs/heads/android15-release/media/codec2/components/avc/C2SoftAvcEnc.cpp)
-limits both dimensions to 2560 pixels. No smaller fallback was accepted in
-the experiment. Host-side emulator recording also retains a native
-1080×2400 framebuffer; asking it for a 1440×3200 file only upscales those
-pixels. Native 2K takes need a different capture backend and framebuffer
-configuration. Increasing export resolution alone does not add source detail.
+Android's [software AVC encoder](https://android.googlesource.com/platform/frameworks/av/+/refs/heads/android15-release/media/codec2/components/avc/C2SoftAvcEnc.cpp)
+limits each dimension to 2560, so capture now bypasses it. The shared emulator
+launcher cold-boots capture instances at a native 1440×3200 framebuffer;
+merely changing the requested recording size or Android's logical size would
+not provide those pixels. Density 560 keeps the same logical reader layout.
+
+The authenticated [EmulatorController API](https://android.googlesource.com/platform/prebuilts/android-emulator/+/master/linux-x86_64/lib/emulator_controller.proto)
+supplies RGBA frames and PCM with emulator host timestamps. Pinned PyAV/gRPC
+dependencies live in a cached venv. NVENC accepts RGBA directly: CPU RGB→YUV
+conversion in the first prototype reduced output to about 26 frames/s, while
+direct input reached about 50. The reader takes recorded 52–53 fps after audio onset,
+58.8 fps median active cadence, p90 active interval 33 ms and zero recorder
+queue drops on the RTX 3080 host. These describe source cadence; the editing
+copy repeats frames to 60 fps. PCM peaked at −5.3 dB after verifying the guest
+volume, instead of about −39 dB with the old ineffective shell volume command.
+
+The bounded frame queue holds at most three images. Sound has a separate
+queue and keeps continuous samples through delivery jitter; genuine gaps
+over 30 ms retain their time. Both streams flush on stop. The actual camera
+cutout stays in the captured image; the mockup does not add a second camera.
+Display corners come from physical display information, rather than the
+activity's transient fullscreen insets. 1080p and 2K take keys stay separate.
+
+Verification: 35 Python and 27 Node tests, strict TypeScript/Vite build and the
+Android JVM suite. Real browser quality switches loaded separate takes at
+1440, 800, 390 and 320 px. The native 2K preview with a visible phone thumbnail
+kept a median 16.6 ms animation interval, p95 23.1 ms in local SwiftShader.
+In a captured header all 2,358 bright right-side status pixels survived the
+mockup mask; the actual camera centroid was x=719.6 on the 1,440-pixel screen.
 
 ## Background detail
 

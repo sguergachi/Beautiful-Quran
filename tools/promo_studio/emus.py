@@ -1,14 +1,14 @@
 """Emulators for takes: find them, start more, get the app onto them.
 
 Capture emulators are read-only instances of the pool's golden AVD
-(scripts/emu.sh), booted from its `pool_ready` snapshot with more cores, on
+(scripts/emu.sh), cold-booted with a native 1440×3200 framebuffer and six cores, on
 ports from 5650 up (the pool uses 5600-5606). Several can run at once, so
 several takes can record in parallel; each needs the app installed and its
 recitation timings downloaded once ("prepare"), because a read-only instance
-starts from the snapshot every boot.
+starts from the golden data every boot.
 
-Audio stays -no-audio: capture taps the guest mixer (AudioPlaybackCapture),
-so nothing plays through the host speakers.
+Audio stays -no-audio: capture taps the emulator's PCM stream, so nothing
+plays through the host speakers. The ordinary test pool keeps its warm snapshot.
 """
 import io
 import os
@@ -98,7 +98,7 @@ def boot(port=None, cores=6, rep=None):
     # The shared launcher owns GPU setup, the boot lock and the RAM guard.
     with open(log, "w") as out:
         proc = subprocess.Popen(["bash", os.path.join(REPO, "scripts", "emu.sh"), "capture", str(port)],
-                                env=dict(os.environ, EMU_CORES=str(cores)), stdout=out, stderr=subprocess.STDOUT)
+                                env=dict(os.environ, EMU_CORES=str(cores), EMU_CAPTURE_SIZE="1440x3200"), stdout=out, stderr=subprocess.STDOUT)
     t0 = time.monotonic()
     try:
         while proc.poll() is None:

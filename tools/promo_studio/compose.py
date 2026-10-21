@@ -63,7 +63,7 @@ class Renderer:
         self.meta = json.load(open(meta_p))
         self.clip = os.path.join(self.td, "clip.mp4")
         self.sw, self.sh = self.meta["width"], self.meta["height"]
-        fp, mp, g = phone_mod.ensure(os.path.join(CACHE, "phone"), self.sw, self.sh, s["phone"]["color"])
+        fp, mp, g = phone_mod.ensure(os.path.join(CACHE, "phone"), self.sw, self.sh, s["phone"]["color"], self.meta.get('display'))
         self.g = g
         fr = np.asarray(Image.open(fp), np.float32) / 255
         m = np.asarray(Image.open(mp), np.float32) / 255

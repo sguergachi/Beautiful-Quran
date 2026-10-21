@@ -109,6 +109,7 @@ DEFAULTS = {
         "view": "Both",
         "text_size": "default",  # default | max
         "seconds": 30,           # seconds of recitation to record
+        "capture": "1080p",     # 1080p | 2k; identity includes non-default resolution
         "repeat": "off",         # REPEATS
         "repeat_to": None,       # last ayah of a repeated range
         "intro": INTRO,
@@ -239,6 +240,7 @@ def validate(s):
     number(a["ayah"], "app.ayah", 1, 286)
     if int(a["surah"]) != a["surah"] or int(a["ayah"]) != a["ayah"]: errs.append("chapter and ayah must be integers")
     number(a["seconds"], "app.seconds", 1)
+    if a["capture"] not in ("1080p", "2k"): errs.append("app.capture must be 1080p or 2k")
     it = a["intro"]
     if not isinstance(it, dict): raise ValueError("app.intro must be an object")
     for name in ("cover", "home", "settings", "roots", "dwell"):
@@ -328,6 +330,8 @@ def take_key(s):
     script = take_script(s)
     if script:
         k += "-" + digest(script)[:8]
+    if a.get("capture", "1080p") == "2k":
+        k += "-2k"
     return k.replace(" ", "_").lower()
 
 

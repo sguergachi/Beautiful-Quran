@@ -151,7 +151,7 @@ def geometry(s):
     W, H = S.size(s)
     meta = take_meta(s)
     sw, sh = (meta["width"], meta["height"]) if meta else (1080, 2400)
-    fp, mp, g = phone_mod.ensure(os.path.join(S.CACHE, "phone"), sw, sh, s["phone"]["color"])
+    fp, mp, g = phone_mod.ensure(os.path.join(S.CACHE, "phone"), sw, sh, s["phone"]["color"], (meta or {}).get('display'))
     from compose import plate_settings
     pw, ph, pk = library.plate_geometry(plate_settings(s), W, H)
     key = S.take_key(s)

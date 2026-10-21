@@ -28,6 +28,7 @@ export interface Spec {
   fps: number;
   app: {
     surah: number; ayah: number; reciter: string; theme: string; layout: string; view: string; text_size: string; seconds: number;
+    capture: "1080p" | "2k";
     repeat: "off" | "ayah" | "range"; repeat_to: number | null; intro: Intro;
   };
   edit: Piece[];

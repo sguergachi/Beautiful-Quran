@@ -121,7 +121,7 @@ export function fadeAt(s: Spec, t: number, onset: number): number {
 export const soundGain = (s: Spec, t: number, onset: number) => 10 ** ((s.audio.gain_db || 0) / 20) * fadeAt(s, t, onset);
 
 export const takeKey = (s: Spec) => [s.app.reciter, s.app.surah, s.app.ayah, s.app.theme, s.app.layout, s.app.view, s.app.text_size,
-  s.app.repeat, s.app.repeat === "range" ? s.app.repeat_to : null, JSON.stringify(s.app.intro)].join("|");
+  s.app.repeat, s.app.repeat === "range" ? s.app.repeat_to : null, JSON.stringify(s.app.intro), s.app.capture ?? "1080p"].join("|");
 
 // Everything baked into the background plate: a change means a new plate.
 export function plateLook(s: Spec): string {
