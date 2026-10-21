@@ -156,11 +156,29 @@ private val HomeColumnGap = 4.dp
 private val HomeArabicOpticalInset = 4.dp
 private val TopBoundRibbonHeight = 96.dp
 /**
- * With the feather below it, this sets the field as far above the Continue
- * band (34 dp) as the masthead title's baseline sits above the field.
+ * Paper margin between the field and where scrolled ink dies: the feather
+ * finishes dissolving a row here, so fading rows never brush the bar. While
+ * the field is focused the same margin sits under the receded masthead, so
+ * both states put the bar in the same spot over the first ink.
  */
 private val SearchBottomBreath = 10.dp
-private val SearchBottomFeather = 24.dp
+/**
+ * The scroll feather. It must end where the list's first ink starts at
+ * rest, so at-rest ink renders at full alpha and scrolling ink dissolves
+ * exactly from there (see the content padding beside the list).
+ */
+private val SearchBottomFeather = 22.dp
+/**
+ * How far the first chapter row's ink rides below its own box top, measured
+ * on paper: the 15 dp band under the row's edge plus the cap slack inside
+ * titleMedium's line box. Re-measure if the row's title style changes.
+ */
+private val HomeRowInkLeading = 5.dp
+/**
+ * Top breath of a section label that is the list's first ink while
+ * searching; it owns the same air as the first chapter row.
+ */
+private val SearchFirstLabelTop = 16.dp
 
 @Composable
 fun HomeScreen(
@@ -584,10 +602,10 @@ fun HomeScreen(
                     ) {
                         HomeHeader(onOpenSettings = onOpenSettings)
                     }
-                    // Small top breath when the masthead is gone so the
-                    // field is not hard against the status-bar padding.
+                    // The same breath stands in for the receded masthead so
+                    // the bar keeps its spot over the list's first ink.
                     if (searchFocused) {
-                        Spacer(Modifier.height(8.dp))
+                        Spacer(Modifier.height(SearchBottomBreath))
                     }
                     PaperSearchField(
                         value = uiState.query,
@@ -627,7 +645,13 @@ fun HomeScreen(
                         bottomInset = listBottomInset,
                     ),
                     contentPadding = PaddingValues(
-                        top = SearchBottomFeather,
+                        // The feather's physics: first ink starts at rest
+                        // exactly at the fade's end (full alpha), by giving
+                        // the list exactly SearchBottomFeather of air above
+                        // that ink. The ink rides the row's own band plus
+                        // its line-box cap slack (~20 dp measured), so the
+                        // list padding is the feather minus that.
+                        top = SearchBottomFeather - ContinueRowVertical - HomeRowInkLeading,
                         bottom = listBottomPadding,
                     ),
                 ) {
@@ -637,7 +661,7 @@ fun HomeScreen(
                     // is scrolled out of view.
                     if (showSurahMatches) {
                         item(key = "surahs-label") {
-                            SearchSectionLabel(text = "Surahs")
+                            SearchSectionLabel(text = "Surahs", topPadding = SearchFirstLabelTop)
                         }
                     }
                     items(uiState.surahs, key = { "surah-${it.id}" }) { surah ->
@@ -678,7 +702,13 @@ fun HomeScreen(
                         item(key = "word-results") {
                             Column(Modifier.fillMaxWidth()) {
                                 if (correctedQuery != null) {
-                                    SearchCorrectionLabel(correctedQuery)
+                                    SearchCorrectionLabel(
+                                        correctedQuery,
+                                        // When no surah matches ride in front of
+                                        // it, its ink opens the list and owns
+                                        // the field's air.
+                                        first = !showSurahMatches,
+                                    )
                                 }
                                 SearchSectionLabel(
                                     text = if (uiState.wordSearchLoading && uiState.wordSections.isEmpty()) {
@@ -688,7 +718,13 @@ fun HomeScreen(
                                         "In the Quran · $count relevant ${if (count == 1) "ayah" else "ayahs"}" +
                                             if (uiState.wordSearchLoading) " · refining…" else ""
                                     },
-                                    topPadding = if (correctedQuery == null) 8.dp else 2.dp,
+                                    // First ink when the surah section is
+                                    // absent and no correction rides above.
+                                    topPadding = if (!showSurahMatches && correctedQuery == null) {
+                                        SearchFirstLabelTop
+                                    } else {
+                                        8.dp
+                                    },
                                 )
                                 uiState.wordSections.forEach { section ->
                                     WordSearchSurahHeader(section = section)
@@ -1305,8 +1341,9 @@ private fun SearchSectionLabel(text: String, topPadding: Dp = 8.dp) {
     )
 }
 
+/** The correction line; when it opens the search list it owns the same air. */
 @Composable
-private fun SearchCorrectionLabel(correctedQuery: String) {
+private fun SearchCorrectionLabel(correctedQuery: String, first: Boolean = false) {
     val accents = LocalQuranAccents.current
     Text(
         text = buildAnnotatedString {
@@ -1323,7 +1360,7 @@ private fun SearchCorrectionLabel(correctedQuery: String) {
             .padding(
                 start = HomeStartInset,
                 end = HomeEndInset,
-                top = 8.dp,
+                top = if (first) SearchFirstLabelTop else 8.dp,
             ),
     )
 }
