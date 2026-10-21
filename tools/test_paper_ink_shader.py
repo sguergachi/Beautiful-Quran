@@ -13,6 +13,7 @@ import skia
 
 ASSETS = Path(__file__).resolve().parents[1] / 'app/src/main/assets/paper-ink-study'
 DRY_REPEAT = np.array([180, 85, 30]) * .82 + np.array([.8, .74, .65]) * 255 * .18
+WET_REPEAT = np.array([180, 85, 30]) * np.array([.95, .88, .7])
 
 
 class PaperInkShaderTest(unittest.TestCase):
@@ -56,7 +57,7 @@ class PaperInkShaderTest(unittest.TestCase):
                 for weight in (.875, 3.5):
                     with self.subTest(word=word[0], method=method, weight=weight):
                         first = self.coverage(self.render(word, 0, 1, weight, method), 8) > .5
-                        repeat = self.coverage(self.render(word, 1, 1, weight, method), 30) > .5
+                        repeat = self.coverage(self.render(word, 1, 1, weight, method), WET_REPEAT[2]) > .5
                         dry = self.coverage(self.render(word, 1, 0, weight, method), DRY_REPEAT[2]) > .5
                         self.assertGreater((first & repeat).sum() / (first | repeat).sum(), .99)
                         self.assertGreater(repeat.sum(), dry.sum() * 1.05)
@@ -65,7 +66,7 @@ class PaperInkShaderTest(unittest.TestCase):
         for word in self.words:
             for method in (0, 1):
                 with self.subTest(word=word[0], method=method):
-                    areas = [self.coverage(self.render(word, 1, wet, .875, method), 30).sum()
+                    areas = [self.coverage(self.render(word, 1, wet, .875, method), WET_REPEAT[2]).sum()
                              for wet in (1, .5, .25, 0)]
                     self.assertTrue(all(a > b for a, b in zip(areas, areas[1:])), areas)
                     dry_orange = self.coverage(self.render(word, 1, 0, .875, method), DRY_REPEAT[2])
@@ -80,9 +81,12 @@ class PaperInkShaderTest(unittest.TestCase):
             core = self.coverage(regular, 46) > .999
             wet = np.median(self.render(word, 1, 1, .875, 0)[core, :3], axis=0)
             dry = np.median(self.render(word, 1, 0, .875, 0)[core, :3], axis=0)
-            np.testing.assert_allclose(wet, [180, 85, 30], atol=1)
+            np.testing.assert_allclose(wet, WET_REPEAT, atol=1)
             np.testing.assert_allclose(dry, DRY_REPEAT, atol=1)
             wet_hue, wet_light, wet_sat = colorsys.rgb_to_hls(*(wet / 255))
+            _, original_light, original_sat = colorsys.rgb_to_hls(180/255, 85/255, 30/255)
+            self.assertLess(wet_light, original_light)
+            self.assertGreater(wet_sat, original_sat)
             dry_hue, dry_light, dry_sat = colorsys.rgb_to_hls(*(dry / 255))
             self.assertGreater(dry_light, wet_light)
             self.assertLess(dry_sat, wet_sat)
@@ -98,7 +102,7 @@ class PaperInkShaderTest(unittest.TestCase):
                 for progress in (.25, .5, .75):
                     with self.subTest(word=word[0], method=method, progress=progress):
                         first = self.coverage(self.render(word, 0, 1, .875, method, progress=progress), 8)
-                        repeat = self.coverage(self.render(word, 1, 1, .875, method, progress=progress), 30)
+                        repeat = self.coverage(self.render(word, 1, 1, .875, method, progress=progress), WET_REPEAT[2])
                         # Outside the regular contour, the retained repeat base
                         # contributes nothing: this is the added wet weight.
                         np.testing.assert_allclose(first[outside], repeat[outside], atol=.012)

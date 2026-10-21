@@ -64,7 +64,8 @@ the stroke interior and localized window reflections. Fresh carbon pigment
 is a near-black `#060708`; it settles to the slightly lighter warm charcoal
 `#34322E` as it dries. Pooling can deepen the wet pigment further, while the
 localized reflection still catches light. The wet orange repeat accent
-(`#B4551E`) dries to a slightly paler, less saturated orange (about `#B86836`)
+(about `#AB4B15`, a slightly darker, more saturated version of the Paper accent)
+dries to a slightly paler, less saturated orange (about `#B86836`)
 while its chain is held, then releases to dry charcoal with the chain. The
 surface keeps curving through broad strokes rather than flattening behind a
 thick outline. The just-deposited film is a little fuller and more reflective;
@@ -106,7 +107,7 @@ the same three verse groups, default 91%. It changes only drawing scale,
 keeping playback and the pooling setting intact. All dials reset when the study is reopened.
 
 When verse 2 repeats, its entire previously read black base stays visible.
-The wash brings in the existing Paper orange repeat accent (`#B4551E`)
+The wash brings in a deeper wet Paper orange (about `#AB4B15`)
 together with the fuller wet shape and reflection. Every reached word holds
 orange with the chain, softening to the paler dry orange as its individual
 wet film dries. Both passes
