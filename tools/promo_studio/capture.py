@@ -373,7 +373,7 @@ def record(s, log=print, force=False):
     overall progress, which the editor shows as the capture runs.
     """
     from report import Report
-    from recording import Sequence
+    from recording import Sequence, remaining_recording_seconds
     from spec import opening_steps, opening_estimate
     rep = log if isinstance(log, Report) else None
     stage = (lambda k, m, p: rep.stage(k, m, p)) if rep else (lambda k, m, p: log(m))
@@ -441,7 +441,7 @@ def record(s, log=print, force=False):
     try:
         if opening_steps(s): mark("intro")
         sequence.run(mark, stage)
-        stage("record", f"{'Starting playback' if a['intro']['play'] else 'Holding the last screen'} ({secs} s to record)", 0.25)
+        stage("record", "Starting playback" if a['intro']['play'] else "Holding the last screen", 0.25)
         if a["intro"]["play"]:
             mark("play")
             if a["repeat"] != "off":
@@ -463,7 +463,8 @@ def record(s, log=print, force=False):
         log(f"capture failed: {e}")
         raise
     t0 = time.monotonic()
-    want = secs + 1.5 if a['intro']['play'] else max(0, secs - (t0 - recording_start - marks.get('intro', 0)))
+    want = remaining_recording_seconds(s, t0 - recording_start, marks)
+    stage("record", f"Recording {want:.1f} s remaining", 0.25)
     try:
         while p.poll() is None:
             el = time.monotonic() - t0
@@ -526,10 +527,12 @@ def conform(d, log=print, marks=None, capture_info=None):
     # The emulator emits frames when the screen changes: fps=60 repeats the
     # last one, it never invents in-between frames
     codec = ["-c:v", "h264_nvenc", "-preset", "p4", "-rc", "constqp", "-qp", "12"] if capture_info else ["-c:v", "libx264", "-preset", "slow", "-crf", "12"]
-    subprocess.run(["ffmpeg", "-v", "error", "-y", "-threads", "2", "-filter_threads", "1", "-ss", f"{start:.3f}", "-i", raw, "-map", "0:v",
+    # A VFR still may have no image at the seek point. Input seeking drops
+    # that held image and shortens the clip; trim after decoding and fps fill.
+    subprocess.run(["ffmpeg", "-v", "error", "-y", "-threads", "2", "-filter_threads", "1", "-i", raw, "-ss", f"{start:.3f}", "-map", "0:v",
                     "-vf", "fps=60,format=yuv420p", *codec,
                     "-g", "30", "-an", clip], check=True)
-    subprocess.run(["ffmpeg", "-v", "error", "-y", "-ss", f"{start:.3f}", "-i", raw, "-map", "0:a",
+    subprocess.run(["ffmpeg", "-v", "error", "-y", "-i", raw, "-ss", f"{start:.3f}", "-map", "0:a",
                     "-ar", "48000", "-ac", "2", wav], check=True)
     length = float(subprocess.run(["ffprobe", "-v", "error", "-show_entries", "format=duration", "-of", "csv=p=0",
                                    clip], capture_output=True, text=True, check=True).stdout.strip())
@@ -539,6 +542,7 @@ def conform(d, log=print, marks=None, capture_info=None):
     meta = {"onset_raw": onset, "video_first_pts": v0, "lead": round(onset - start, 3) if onset is not None else length, "length": length, "marks": marks, **{k: round(v, 1) for k, v in rates.items()},
             "width": w, "height": h, "recorded": time.strftime("%Y-%m-%d %H:%M")}
     if capture_info: meta.update(capture=capture_info, display=capture_info['display'])
-    json.dump(meta, open(os.path.join(d, "meta.json"), "w"), indent=1)
+    with open(os.path.join(d, "meta.json"), "w") as f:
+        json.dump(meta, f, indent=1)
     log(f"take ready: {d} ({length:.1f}s, active cadence {rates['active_fps']:.1f} fps, p90 frame interval {rates['frame_p90_ms']:.0f} ms)")
     return meta

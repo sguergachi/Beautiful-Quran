@@ -203,6 +203,9 @@ There is no separate Take starts control or Edit verse range.
   the recitation starts. Other verses tap their first word; if it cannot be
   identified, an exact deep link is the fallback. A configured repeat resumes
   its cued queue so playing verse 1 cannot clear its bounds.
+- Recording time counts the screens already filmed; it does not add the
+  opening a second time as recitation. The requested recitation duration and
+  the edit's final out point are both covered.
 - The recitation's start is measured in the recording's own audio after the
   playback request. `meta.lead` locates it on the take clock, including every
   opening step; verse markers and fades use this offset. **Use whole take**

@@ -157,7 +157,10 @@ class MediaTests(unittest.TestCase):
         r = compose.Renderer.__new__(compose.Renderer)
         r.s, r.W, r.H, r.fps, r.pk, r.output_scale = s, 4, 4, 60, 1, 1
         r.bg, r.vig = compose.plate_settings(s), np.ones((4, 4, 1), np.float32)
-        r._phone_layers = lambda _: None
+        r._vig_rgb = np.repeat(r.vig, 3, axis=2)
+        r._blend = np.empty((4, 4, 3), np.float32)
+        r._acc = np.empty((4, 4, 3), np.float32)
+        r._phone_layers = lambda _: np.zeros((4, 4, 3), np.float32)
         r._warp_phone = lambda *_: (np.zeros((4, 4, 3), np.float32), np.zeros((4, 4), np.float32))
         r.phone_matrix = r.bg_matrix = lambda _: np.array([[1., 0, 0], [0, 1., 0]])
         r.screen_corners = lambda st: np.array([[st["zoom"] * 1000]])
@@ -166,6 +169,42 @@ class MediaTests(unittest.TestCase):
         s["motion_blur"] = 0
         np.testing.assert_array_equal(blurred, r.frame(.5, plate, plate))
         self.assertTrue(np.all(plate == 200))
+
+    def test_conform_retains_a_still_that_straddles_the_opening_cut(self):
+        raw = str(self.d / 'raw.mkv')
+        subprocess.run(['ffmpeg', '-v', 'error', '-y', '-f', 'lavfi', '-i', 'color=blue:s=32x32:r=10:d=5',
+                        '-f', 'lavfi', '-i', 'sine=frequency=440:sample_rate=48000:duration=5',
+                        '-filter_complex', "[0:v]drawbox=color=red:t=fill:enable='gte(t,3)',select='eq(n,0)+gte(t,3)'[v];[1:a]volume=0:enable='lt(t,3)'[a]",
+                        '-map', '[v]', '-map', '[a]', '-fps_mode', 'vfr', '-c:v', 'libx264', '-g', '1', '-bf', '0', '-c:a', 'flac', raw], check=True)
+        meta = capture.conform(str(self.d), log=lambda _: None, marks={'intro': .5, 'play': 2.9, 'dwell': 1})
+        self.assertAlmostEqual(meta['length'], 4.65, delta=.04)
+        self.assertLess(meta['lead'], meta['length'])
+        first = compose.grab(str(self.d / 'clip.mp4'), 32, 32, 0)[16, 16]
+        self.assertGreater(int(first[2]), int(first[0]) + 100, 'the held blue frame precedes the later red image')
+        self.assertAlmostEqual(audio.duration(str(self.d / 'audio.wav')), meta['length'], delta=.04)
+
+    def test_renderer_reuse_keeps_cuts_and_new_geometry_independent(self):
+        meta = {'width': 96, 'height': 212, 'length': 8, 'lead': 1}
+        (self.d / 'meta.json').write_text(json.dumps(meta))
+        s = spec.resolve({'motion_blur': 2, 'tracks': {
+            'pan_x': [{'t': 0, 'v': .2}, {'t': 1, 'v': .8}],
+            'zoom': [{'t': 1, 'v': 1}, {'t': 2, 'v': 1.5}],
+        }})
+        def renderer():
+            with patch.object(compose, 'take_dir', return_value=str(self.d)), patch.object(compose, 'CACHE', str(self.d)), patch.object(library, 'plate', return_value='unused'), patch.object(library, 'probe', return_value=(64, 64, 1)):
+                return compose.Renderer(s, .06)
+        r = renderer()
+        dark = np.zeros((212, 96, 3), np.uint8)
+        light = np.full_like(dark, 255)
+        plate = np.full((r.ph, r.pw, 3), 120, np.uint8)
+        first = r.frame(.5, dark, plate)
+        saved = first.copy()
+        # Repeated geometry across a cut must use the new screen. A changed
+        # zoom and a later return must also match independent renders.
+        for t, pixels in [(.5, light), (1.5, light), (.5, dark)]:
+            np.testing.assert_array_equal(r.frame(t, pixels, plate), renderer().frame(t, pixels, plate))
+        np.testing.assert_array_equal(first, saved)
+        self.assertFalse(np.array_equal(saved, r.frame(.5, light, plate)))
 
     def test_color_plate_is_atomic_and_media_safe(self):
         bg = dict(spec.DEFAULTS["background"], id="color:#192837", blur=8, brightness=0)

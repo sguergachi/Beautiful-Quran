@@ -8,10 +8,30 @@ import capture
 import spec
 import timeline
 import server
-from recording import Sequence
+from recording import Sequence, remaining_recording_seconds
 
 
 class SequenceTests(unittest.TestCase):
+    def test_long_opening_is_not_recorded_again_as_recitation(self):
+        s = spec.resolve({'app': {'seconds': 10}, 'edit': [{'in': 0, 'out': 70}]})
+        # 60 seconds of opening is already on camera; retain the ten-second
+        # recitation minimum and both existing safety tails.
+        marks = {'intro': 2.15, 'play': 62}
+        self.assertEqual(remaining_recording_seconds(s, 62, marks), 12)
+        s['edit'][0]['out'] = 100
+        self.assertEqual(remaining_recording_seconds(s, 62, marks), 42)
+        s['app']['seconds'] = 60
+        self.assertEqual(remaining_recording_seconds(s, 62, marks), 61.5)
+
+    def test_plain_and_screen_only_takes_retain_their_needed_end(self):
+        s = spec.resolve({'app': {'seconds': 5, 'intro': {'dwell': 2}}, 'edit': [{'in': 10, 'out': 20}]})
+        self.assertEqual(remaining_recording_seconds(s, 4, {}), 20)
+        s['app']['intro']['play'] = False
+        self.assertEqual(remaining_recording_seconds(s, 12, {'intro': 2.15}), 10.5)
+        self.assertEqual(remaining_recording_seconds(s, 100, {'intro': 2.15}), 0)
+        s['app']['seconds'] = 30
+        self.assertEqual(remaining_recording_seconds(s, 12, {}), 18.85)
+
     def test_plain_take_identity_and_legacy_migration(self):
         plain = spec.resolve({})
         self.assertEqual(spec.take_key(plain), 'alafasy-001-001-paper-scroll-both-default')
