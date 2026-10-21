@@ -63,8 +63,9 @@ Wet ink is optically fuller than dry ink, with a rounded liquid film across
 the stroke interior and localized window reflections. Fresh carbon pigment
 is a near-black `#060708`; it settles to the slightly lighter warm charcoal
 `#34322E` as it dries. Pooling can deepen the wet pigment further, while the
-localized reflection still catches light. The orange repeat accent keeps its
-own pigment and settles to the same dry charcoal. The
+localized reflection still catches light. The wet orange repeat accent
+(`#B4551E`) dries to a slightly paler, less saturated orange (about `#B86836`)
+while its chain is held, then releases to dry charcoal with the chain. The
 surface keeps curving through broad strokes rather than flattening behind a
 thick outline. The just-deposited film is a little fuller and more reflective;
 it levels behind the advancing front while retaining its dark pigment. The
@@ -81,7 +82,7 @@ it does not replace the liquid fill with an early-saturating color reveal.
 English surface depth, height and smoothing are scaled to its 80 px font
 raster, matching Arabic's 160 px material units. This keeps the smaller
 Junicode strokes from receiving a shallow, over-smoothed film. Printed contours,
-letter timing, dial values and the orange pigment are unchanged.
+letter timing and dial values are unchanged.
 
 **Reflection** adjusts the window reflection's strength from 0–100%, default
 50%. **Softness** changes its spread from a focused, antialiased reflection
@@ -107,7 +108,8 @@ keeping playback and the pooling setting intact. All dials reset when the study 
 When verse 2 repeats, its entire previously read black base stays visible.
 The wash brings in the existing Paper orange repeat accent (`#B4551E`)
 together with the fuller wet shape and reflection. Every reached word holds
-orange with the chain, even after its individual wet film dries. Both passes
+orange with the chain, softening to the paler dry orange as its individual
+wet film dries. Both passes
 gain the same stroke weight while wet and return to the regular weight during
 the same per-word dry-down. The pooling dial sets the amount on both passes.
 Only the color is held by the chain; weight and reflection follow wetness. Later words

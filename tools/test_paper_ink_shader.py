@@ -3,6 +3,7 @@
 Optional offline render gate: requires skia-python and numpy. No Android or
 production dependency. Run with `python3 tools/test_paper_ink_shader.py`.
 """
+import colorsys
 import json
 from pathlib import Path
 import unittest
@@ -11,6 +12,7 @@ import numpy as np
 import skia
 
 ASSETS = Path(__file__).resolve().parents[1] / 'app/src/main/assets/paper-ink-study'
+DRY_REPEAT = np.array([180, 85, 30]) * .82 + np.array([.8, .74, .65]) * 255 * .18
 
 
 class PaperInkShaderTest(unittest.TestCase):
@@ -55,7 +57,7 @@ class PaperInkShaderTest(unittest.TestCase):
                     with self.subTest(word=word[0], method=method, weight=weight):
                         first = self.coverage(self.render(word, 0, 1, weight, method), 8) > .5
                         repeat = self.coverage(self.render(word, 1, 1, weight, method), 30) > .5
-                        dry = self.coverage(self.render(word, 1, 0, weight, method), 30) > .5
+                        dry = self.coverage(self.render(word, 1, 0, weight, method), DRY_REPEAT[2]) > .5
                         self.assertGreater((first & repeat).sum() / (first | repeat).sum(), .99)
                         self.assertGreater(repeat.sum(), dry.sum() * 1.05)
 
@@ -66,11 +68,26 @@ class PaperInkShaderTest(unittest.TestCase):
                     areas = [self.coverage(self.render(word, 1, wet, .875, method), 30).sum()
                              for wet in (1, .5, .25, 0)]
                     self.assertTrue(all(a > b for a, b in zip(areas, areas[1:])), areas)
-                    dry_orange = self.coverage(self.render(word, 1, 0, .875, method), 30)
+                    dry_orange = self.coverage(self.render(word, 1, 0, .875, method), DRY_REPEAT[2])
                     dry_black = self.coverage(self.render(word, 0, 0, .875, method), 46)
                     np.testing.assert_allclose(dry_orange, dry_black, atol=.006)
                     np.testing.assert_array_equal(self.render(word, 1, 0, .875, method),
                                                   self.render(word, 1, 0, 0, method))
+
+    def test_repeat_dries_paler_and_less_saturated_before_releasing_to_charcoal(self):
+        for word in self.words:
+            regular = self.render(word, 0, 0, 0, 0)
+            core = self.coverage(regular, 46) > .999
+            wet = np.median(self.render(word, 1, 1, .875, 0)[core, :3], axis=0)
+            dry = np.median(self.render(word, 1, 0, .875, 0)[core, :3], axis=0)
+            np.testing.assert_allclose(wet, [180, 85, 30], atol=1)
+            np.testing.assert_allclose(dry, DRY_REPEAT, atol=1)
+            wet_hue, wet_light, wet_sat = colorsys.rgb_to_hls(*(wet / 255))
+            dry_hue, dry_light, dry_sat = colorsys.rgb_to_hls(*(dry / 255))
+            self.assertGreater(dry_light, wet_light)
+            self.assertLess(dry_sat, wet_sat)
+            self.assertLess(abs(dry_hue - wet_hue), .02)
+            np.testing.assert_array_equal(self.render(word, 1, 0, .875, 0, tint=0), regular)
 
     def test_repeat_gains_weight_during_letter_filling_before_the_word_finishes(self):
         for word in self.words:
