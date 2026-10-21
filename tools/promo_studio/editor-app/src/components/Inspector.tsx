@@ -4,15 +4,17 @@ import { useEffect, useState } from "react";
 import { api } from "../lib/api.ts";
 import * as E from "../lib/edit.ts";
 import { clamp, r3, valueAt } from "../lib/model.ts";
+import { activeContext, INSPECTOR, type InspectorContext } from "../lib/inspector.ts";
 import type { Ease, Emulator, Job } from "../lib/types.ts";
 import { clock, useTime } from "../state/clock.ts";
 import {
-  cancelJob, deleteSelection, endGesture, mutate, openPanel, record, select, setEase, setProp, setUI, split, toggleKey,
+  cancelJob, deleteSelection, endGesture, inspectSelection, mutate, openPanel, record, select, setEase, setProp, setUI, split, toggleKey,
   useStore, wholeTake, type Tab,
 } from "../state/store.ts";
 import { Button, Dot, Empty, Field, Icon, Progress, Section, Segmented, Select, Slider, TextInput } from "./ui.tsx";
 import { Opening } from "./Opening.tsx";
 import { PhoneLookPreview } from "./PhoneLookPreview.tsx";
+import { ClipEditor } from "./ClipEditor.tsx";
 
 const EASES: [Ease, string][] = [["inOutCubic", "Ease in & out"], ["inOutSine", "Gentle in & out"], ["outCubic", "Ease out"], ["inCubic", "Ease in"], ["outExpo", "Fast out, long settle"], ["linear", "Linear"], ["hold", "Hold (cut)"]];
 const set = (path: string, v: unknown, key: string | null = null) => mutate((raw) => {
@@ -23,19 +25,24 @@ const set = (path: string, v: unknown, key: string | null = null) => mutate((raw
 
 export function Inspector() {
   const tab = useStore((s) => s.ui.tab), spec = useStore((s) => s.spec);
+  const context = useStore((s) => activeContext(s.inspector, s.sel));
   const capture = useStore((s) => s.jobs.find((j) => j.kind === "capture" && j.name === s.name && (j.state === "running" || j.state === "queued")));
   return (
     <div className="inspector flex h-full min-h-0 min-w-0 flex-col bg-panel">
       <div className="flex shrink-0 gap-1 border-b border-line p-2">
         {(["animate", "recording", "look"] as Tab[]).map((t) => (
-          <button key={t} onClick={() => setUI({ tab: t })}
+          <button key={t} aria-pressed={tab === t} onClick={() => setUI({ tab: t })}
             className={`relative flex-1 rounded-md py-1.5 capitalize transition-colors ${tab === t ? "bg-raised text-ink" : "text-mute hover:text-ink"}`}>
             {t}{t === "recording" && capture && <span className="absolute right-2 top-2 size-1.5 rounded-full bg-orange animate-pulse-soft" />}
           </button>
         ))}
       </div>
-      <div className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden px-4 py-4">
-        {!spec ? <Empty>No video open.</Empty> : tab === "animate" ? <Animate /> : tab === "recording" ? <Recording /> : <Look />}
+      {context && <div className="flex shrink-0 items-center justify-between gap-2 border-b border-line px-4 py-2">
+        <span role="status" className="text-[12px] text-gold">{INSPECTOR[context].title}</span>
+        <button className="shrink-0 text-[11px] text-mute hover:text-ink" onClick={() => setUI({ tab })}>All {tab === "look" ? "Look" : tab === "animate" ? "Animate" : "Recording"}</button>
+      </div>}
+      <div key={`${tab}:${context ?? "all"}`} data-inspector-context={context ?? "all"} className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden px-4 py-4">
+        {!spec ? <Empty>No video open.</Empty> : context === "clip" ? <ClipEditor /> : tab === "animate" ? <Animate context={context} /> : tab === "recording" ? <Recording contentsOnly={context === "contents"} /> : <Look context={context} />}
       </div>
     </div>
   );
@@ -43,16 +50,18 @@ export function Inspector() {
 
 // ------------------------------------------------------------ animate
 
-function Animate() {
+function Animate({ context }: { context: InspectorContext | null }) {
   const meta = useStore((s) => s.meta)!, spec = useStore((s) => s.spec)!, sel = useStore((s) => s.sel), raw = useStore((s) => s.raw)!;
   const t = useTime(60);
   const groups: Record<string, string[]> = {};
   for (const [n, p] of Object.entries(meta.props)) (groups[p.group] = groups[p.group] || []).push(n);
   const items = sel?.type === "keys" ? sel.items : [];
+  const group = context === "camera" ? "Camera" : context === "phone-motion" ? "Phone" : context === "background-motion" ? "Background" : null;
+  if (context === "keys") return <KeyCard items={items} />;
   return (
     <>
       {items.length > 0 && <KeyCard items={items} />}
-      {Object.entries(groups).map(([g, names]) => (
+      {Object.entries(groups).filter(([g]) => !group || group === g).map(([g, names]) => (
         <Section key={g} title={g}>
           {names.map((n) => {
             const d = meta.props[n], keys = spec.tracks[n] || [], here = keys.some((k) => Math.abs(k.t - t) < 0.5 / (spec.fps || 60) + 1e-6);
@@ -118,7 +127,7 @@ function KeyCard({ items }: { items: E.KeyRef[] }) {
 
 // ------------------------------------------------------------ recording
 
-function Recording() {
+function Recording({ contentsOnly = false }: { contentsOnly?: boolean }) {
   const meta = useStore((s) => s.meta)!, spec = useStore((s) => s.spec)!, raw = useStore((s) => s.raw)!;
   const geo = useStore((s) => s.geo), tl = useStore((s) => s.tl), sel = useStore((s) => s.sel), name = useStore((s) => s.name);
   const emus = useStore((s) => s.emus);
@@ -140,6 +149,7 @@ function Recording() {
         <Opening />
       </Section>
 
+      {!contentsOnly && <>
       <details className="mb-5 rounded-md border border-line p-2.5">
         <summary className="cursor-pointer text-mute">App appearance <span className="text-[11px] text-faint">· {a.theme} · {a.layout} · {a.view}</span></summary>
         <div className="mt-3">
@@ -194,7 +204,7 @@ function Recording() {
           <div className="mb-1 grid grid-cols-[22px_minmax(0,1fr)_minmax(0,1fr)_26px] gap-1.5 text-[11px] text-faint"><span>#</span><span>In (take s)</span><span>Out (take s)</span><span /></div>
           {raw.edit.map((p: { in: number; out: number }, i: number) => (
             <div key={i} className={`mb-1.5 grid grid-cols-[22px_minmax(0,1fr)_minmax(0,1fr)_26px] items-center gap-1.5 ${sel?.type === "piece" && sel.i === i ? "text-blue" : ""}`}>
-              <button className="text-left" onClick={() => select({ type: "piece", i })}>{i + 1}</button>
+              <button className="text-left" onClick={() => { select({ type: "piece", i }); inspectSelection(true); }}>{i + 1}</button>
               <TextInput type="number" step={0.01} value={p.in} onCommit={(v) => mutate((r) => E.trimPiece(r, i, "in", parseFloat(v), tl?.take))} />
               <TextInput type="number" step={0.01} value={p.out} onCommit={(v) => mutate((r) => E.trimPiece(r, i, "out", parseFloat(v), tl?.take))} />
               <button className="grid h-7 place-items-center text-faint hover:text-danger disabled:opacity-30" disabled={raw.edit.length <= 1}
@@ -209,6 +219,7 @@ function Recording() {
         </div>
       </details>
       {name && <p className="break-words text-[11px] text-faint">Spec: specs/{name}.json</p>}
+      </>}
     </>
   );
 }
@@ -255,7 +266,7 @@ export const emulatorTone = (e: Emulator): "green" | "gold" | "orange" | "faint"
 
 // ------------------------------------------------------------ look
 
-function Look() {
+function Look({ context }: { context: InspectorContext | null }) {
   const meta = useStore((s) => s.meta)!, spec = useStore((s) => s.spec)!, raw = useStore((s) => s.raw)!;
   const t = useTime();
   const slider = (label: string, path: string, value: number, min: number, max: number, step: number, hint?: string) => (
@@ -270,13 +281,13 @@ function Look() {
   };
   return (
     <>
-      <Section title="Canvas">
+      {(!context || context === "canvas") && <Section title="Canvas">
         <Field label="Video name"><TextInput value={spec.title} placeholder="What this video is" onCommit={(v) => set("title", v)} /></Field>
         <Field label="Aspect"><Segmented size="sm" value={spec.aspect} options={Object.keys(meta.aspects).map((a) => [a, a])} onChange={(v) => set("aspect", v)} /></Field>
         <Field label="Frame rate"><Segmented size="sm" value={String(spec.fps)} options={[["60", "60 fps"], ["30", "30 fps"]]} onChange={(v) => set("fps", +v)} /></Field>
         {slider("Motion blur", "motion_blur", spec.motion_blur, 0, 2, 0.05, "Softens fast camera moves in exports. Use Exact frame to preview it.")}
-      </Section>
-      <Section title="Background">
+      </Section>}
+      {(!context || context === "background-look") && <Section title="Background">
         <div className="mb-3 grid grid-cols-3 gap-1.5">
           {Object.entries(meta.backgrounds).map(([id, b]) => (
             <button key={id} onClick={() => set("background.id", id)} title={`${b.title} · suits ${b.suits.join(", ")}`} aria-label={b.label ?? b.title} aria-pressed={id === spec.background.id}
@@ -294,19 +305,19 @@ function Look() {
         <h4 className="mb-2 mt-4 text-[10px] font-semibold uppercase tracking-wider text-faint">Movement</h4>
         {slider("Motion speed", "background.speed", spec.background.speed, 0.1, 1.5, 0.05)}
         {slider("Parallax", "background.parallax", spec.background.parallax, 0, 1, 0.01, "How much of the camera's moves the background follows.")}
-      </Section>
-      <Section title="Phone">
+      </Section>}
+      {(!context || context === "phone-look") && <Section title="Phone">
         <PhoneLookPreview />
         <Field label="Colour"><Select value={raw.phone?.color ?? "auto"} options={[["auto", "Match the theme"], ...meta.phones.map((c): [string, string] => [c, c[0].toUpperCase() + c.slice(1)])]} onChange={(v) => set("phone.color", v)} /></Field>
         {slider("Base size", "phone.height", spec.phone.height, 0.4, 1.2, 0.01, "The phone's height as a share of the frame, before zoom.")}
         {slider("Shadow", "phone.shadow", spec.phone.shadow, 0, 1, 0.01)}
-      </Section>
-      <Section title="Sound">
+      </Section>}
+      {(!context || context === "sound") && <Section title="Sound">
         {slider("Gain (dB)", "audio.gain_db", spec.audio.gain_db, -12, 12, 0.5)}
         {slider("Fade in (s)", "audio.fade_in", spec.audio.fade_in, 0, 3, 0.1, "Starts with the first sound: takes open on a silent second.")}
         {slider("Fade out (s)", "audio.fade_out", spec.audio.fade_out, 0, 4, 0.1, "Ends with the video.")}
         <p className="text-[11.5px] text-faint">The emulator's own recording, normalised to −16 LUFS on export. The preview plays the gain and fades; drag the handles on the timeline's Sound lane to set the fades there.</p>
-      </Section>
+      </Section>}
     </>
   );
 }

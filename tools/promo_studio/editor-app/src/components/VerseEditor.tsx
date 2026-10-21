@@ -1,5 +1,5 @@
 import { nextVerseRange, verseRange, type VerseAction } from "../lib/verses.ts";
-import { changeVerse, editVerses, loadTimeline, useStore } from "../state/store.ts";
+import { changeVerse, editVerses, inspect, loadTimeline, useStore } from "../state/store.ts";
 import { openMenu } from "./Menu.tsx";
 import { Field, Select } from "./ui.tsx";
 
@@ -23,6 +23,7 @@ export function TimelineVerseControls() {
   const { can, busy, error } = useVerseEdit();
   return <div className="flex w-full items-center gap-1">
     <button className="min-w-0 flex-1 text-left" title={error || (busy ? "Finding verse boundaries…" : "Verse actions: add or remove at either end")} onClick={(e) => openMenu(e, [
+      { label: "Take contents…", run: () => inspect("contents", true) }, "-",
       { head: "Whole verses" },
       ...ACTIONS.map(([action, sign, label]) => ({ label: `${sign} ${label}`, disabled: !can(action), run: () => changeVerse(action) })),
     ])}>{busy ? "Verses…" : "Verses"}</button>

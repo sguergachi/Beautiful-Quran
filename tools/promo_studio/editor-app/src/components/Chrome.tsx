@@ -4,7 +4,7 @@ import { exportLabel } from "../lib/exporting.ts";
 import { copyTitle, searchText, videoSlug } from "../lib/videos.ts";
 import type { SpecStatus } from "../lib/types.ts";
 import {
-  createVideo, deleteVideo, exportOptions, exportVideo, mutate, open, openPanel, redo, renameVideo, save, setUI, undo, useStore,
+  createVideo, deleteVideo, exportOptions, exportVideo, mutate, open, openPanel, redo, renameVideo, revealInspector, save, setUI, undo, useStore,
 } from "../state/store.ts";
 import { openMenu } from "./Menu.tsx";
 import { Button, Dot, Icon, Segmented } from "./ui.tsx";
@@ -60,7 +60,7 @@ export function TopBar() {
       <Button variant="primary" disabled={!spec} active={panel === "export"} onClick={() => openPanel("export")} title="Format, size and quality, then export (Ctrl E)">
         {Icon.exportIcon}{renderJob ? `Exporting ${Math.round(renderJob.progress * 100)}%` : "Export…"}
       </Button>
-      <Button size="icon" variant="ghost" active={!ui.hideR} onClick={() => setUI({ hideR: !ui.hideR })} title="Inspector (Ctrl .)">{Icon.sideR}</Button>
+      <Button size="icon" variant="ghost" active={!ui.hideR} onClick={() => ui.hideR ? revealInspector() : setUI({ hideR: true })} title="Inspector · inspect the current selection (Ctrl .)">{Icon.sideR}</Button>
     </header>
   );
 }

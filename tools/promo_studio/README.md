@@ -153,6 +153,34 @@ The editor behind it is inactive. Menus support the arrow keys, Home and End.
 Space activates a focused button, and editing shortcuts do not alter the
 timeline while a drawer, menu or video form is in use.
 
+## Contextual inspector
+
+The inspector follows deliberate editing actions:
+
+| Action | Focused controls |
+|---|---|
+| Select or trim a recording clip; split at the playhead | That clip's source in/out, duration, navigation, split and delete |
+| Select one or several animation keys | Exact key time/value and easing, or shared easing for a selection |
+| Click a property lane label or scrub its lane | The matching Camera, Phone or Background animation group |
+| Click Sound, scrub its lane or drag a fade | Gain and fades |
+| Click the phone or background in the preview | Its appearance controls |
+| Drag/zoom the preview; Alt-drag/Alt-scroll the phone | Camera or phone motion |
+| Click outside the preview frame | Canvas |
+| Click the Recording lane label, or choose Take contents from the verse menu | The recording's chapter, reciter and screen sequence |
+
+The context label above the controls explains what is being edited. **All
+Animate / Recording / Look** restores that tab's complete controls; the tabs
+remain available for manual navigation. Playback, normal ruler scrubbing,
+autosaving and field edits do not retarget the inspector. Context is temporary
+and does not become part of the video spec.
+
+Desktop panes reveal after a drag ends; wheel gestures wait for a short idle
+pause, and a newer manual choice takes precedence. At 1,000 px or narrower,
+timeline gestures prepare the relevant controls while keeping the timeline
+exposed. Open them with **Inspector**, **Ctrl .**, the selection readout, or
+Tools → Inspect selection. Explicit lane-label and preview-object clicks open
+their controls directly.
+
 ## Look
 
 The Look tab starts with **Canvas**, then **Background**, **Phone**, and **Sound**.
@@ -224,8 +252,8 @@ There is no separate Take starts control or Edit verse range.
 - Choose **Screens only** to finish on the final screen. Start verse then
   selects the page for reader/root/repeat steps; Final hold and Minimum (s)
   control the ending. These recordings have no verse markers and do not need
-  an audio onset to conform. Repeated and screen-only takes can be trimmed
-  precisely under Fine trim & cuts.
+  an audio onset to conform. Select a timeline clip for precise source trims;
+  Fine trim & cuts also lists every piece together.
 - Playback starts from the app's own controls, not `?play=true`: that deep
   link reloads the reader, which crossfades and re-scrolls the page right as
   the recitation starts. Other verses tap their first word; if it cannot be
@@ -299,12 +327,10 @@ recording duration share the same take; changing the sequence needs a new one.
   fades as the export does (the export also normalises to −16 LUFS).
 - **Verses** and **Repeats**: where each verse and each repeated word falls,
   mapped through your cuts. Click one to jump there. The **−** / **+** on
-  the Verses label remove or add a whole verse at the end; the Recording
-  tab's Edit section also picks Start and Stop verses (one continuous
-  range) and adds or removes a verse at either end (keeping the cuts in
-  between). A verse before the take's first one needs a new take, and a
-  verse past the take's end raises Record (s); the take card then asks
-  for the full range.
+  the Verses label remove or add a whole verse at the end, keeping interior
+  cuts. Its menu opens Take contents, where the Recitation step sets a
+  continuous Start/Stop range. A changed start verse needs a matching take;
+  extending past the take's end asks for Record full range.
 - **Property lanes**, one per property, in three groups (click a group to
   fold it; folded, its keys share one lane):
 

@@ -11,7 +11,7 @@ import { clamp, videoTimes } from "./lib/model.ts";
 import { landmarks } from "./lib/edit.ts";
 import { clock } from "./state/clock.ts";
 import {
-  copy, deleteSelection, init, keyCamera, nudge, openPanel, paste, redo, save, select, selectAll, selKeys, setUI, split,
+  copy, deleteSelection, init, keyCamera, nudge, openPanel, paste, redo, revealInspector, save, select, selectAll, selKeys, setUI, split,
   undo, useStore,
 } from "./state/store.ts";
 
@@ -49,7 +49,7 @@ function useShortcuts() {
       if (mod && key === "s") { e.preventDefault(); save(); return; }
       if (mod && key === "e") { e.preventDefault(); openPanel("export"); return; }
       if (mod && key === "b") { e.preventDefault(); setUI({ hideL: !s.ui.hideL }); return; }
-      if (mod && key === ".") { e.preventDefault(); setUI({ hideR: !s.ui.hideR }); return; }
+      if (mod && key === ".") { e.preventDefault(); s.ui.hideR ? revealInspector() : setUI({ hideR: true }); return; }
       if (!s.spec) return;
       if (mod && key === "z") { e.preventDefault(); e.shiftKey ? redo() : undo(); return; }
       if (mod && key === "y") { e.preventDefault(); redo(); return; }

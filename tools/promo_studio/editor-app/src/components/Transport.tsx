@@ -2,7 +2,7 @@
 import { useEffect, useRef, useState, type MouseEvent } from "react";
 import { fmtTime, parseTime } from "../lib/model.ts";
 import { clock, usePlaying } from "../state/clock.ts";
-import { deleteSelection, keyCamera, preset, setUI, showExact, split, toast, useStore } from "../state/store.ts";
+import { deleteSelection, keyCamera, preset, revealInspector, setUI, showExact, split, toast, useStore } from "../state/store.ts";
 import { openMenu, type MenuItem } from "./Menu.tsx";
 import { Button, Icon } from "./ui.tsx";
 
@@ -51,6 +51,7 @@ export function EditorToolbar({ pps, selection, onJumpKey }: { pps: number; sele
     "-", { label: "Exact frame", run: showExact, disabled: !hasClip },
   ];
   const tools: MenuItem[] = [
+    { label: selected ? "Inspect selection" : "Inspector", run: revealInspector }, "-",
     { head: "Edit" }, { label: "Split at playhead", hint: "S", run: () => split(), disabled: !hasSpec },
     { label: "Delete selection", hint: "Del", run: deleteSelection, disabled: !selected, danger: true },
     { label: "Previous key", hint: "[", run: () => onJumpKey(-1) },
@@ -84,7 +85,7 @@ export function EditorToolbar({ pps, selection, onJumpKey }: { pps: number; sele
         </div>
       </div>
       <Button size="sm" className="toolbar-tools" aria-haspopup="menu" onClick={(e) => menu(e, tools)}>Tools <span aria-hidden="true">▾</span></Button>
-      <span className="toolbar-selection text-[11.5px] text-mute" title={selection}>{selection}</span>
+      {selection && <button className="toolbar-selection text-[11.5px] text-mute hover:text-ink" onClick={revealInspector} title={`Inspect ${selection}`} aria-label="Inspect selection">{selection}</button>}
       <div className="toolbar-spacer" />
       <div className="toolbar-group toolbar-zoom toolbar-separated" role="group" aria-label="Timeline zoom">
         <label className="toolbar-zoom-slider"><span className="toolbar-zoom-label text-[11px] text-faint">Zoom</span><input type="range" min={8} max={500} step={1} value={pps} aria-label="Timeline zoom" onChange={(e) => setUI({ pps: +e.target.value })} title="Timeline zoom (Ctrl-scroll)" /></label>

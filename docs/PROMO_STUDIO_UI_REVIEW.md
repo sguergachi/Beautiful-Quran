@@ -13,6 +13,7 @@ context menus.
 | Inspector fields | Fixed label columns and segmented choices competed for narrow space. Edit inputs also imposed intrinsic widths. | Inputs shrink within their tracks; choices wrap; labels stack in inspectors no wider than 310 px. |
 | Recording | Record/select and split/whole-take rows could overflow; long spec paths did not wrap. | Actions wrap and paths remain readable. |
 | Take contents | Starting verse, recording sequence, playback duration and Edit verse range described one recording in separate places. | One Take contents flow joins chapter/reciter, ordered screens and a final Recitation or Hold step. Start/Stop verses, repeat and playback pause live in that final step. App appearance and Fine trim & cuts are collapsed secondary groups. Choosing a range sets the recording origin and includes the opening; timeline edge actions preserve their existing cut behavior. |
+| Contextual editing | Clip selection opened take setup; keys and audio actions could leave unrelated tabs visible, and sound controls were far below Canvas. | Explicit actions focus the relevant clip, keys, motion group, sound or appearance section. Selected clips have precise source trims, navigation, split and delete. Manual tabs and All restore the full inspector; ordinary playback, field edits and scrubbing do not retarget it. Desktop reveal waits for gesture completion; compact timeline gestures retain the timeline until Inspector is requested. |
 | Window layout | Stored wide panes could consume the preview, and a tall timeline could hide playback controls after resizing. | Pane widths fit the current window without replacing preferred widths. Timeline height reserves at least 96 px for the preview; its toolbar is included in the timeline's height. |
 | Compact windows | Both side panes could crowd out the central editor. | At widths of 1,000 CSS px or less, one pane opens over the editor with a dismissible backdrop. Resizing retains the pane being edited, and the timeline has its own stacking context so its ruler cannot paint over a side pane. |
 | Toolbars | Playback and editing occupied separate rows, with different button heights and uneven icon alignment. | One toolbar joins playback/timecode, edit/key navigation, camera actions and timeline zoom. Controls share a 32 px height, 4 px within-group gaps and centered SVG icons. Camera actions collapse into a menu below 1,140 px of toolbar width; below 680 px, Tools also contains editing commands. The row stays single-line. Compact headers keep aspect selection in Look → Canvas. |
@@ -118,3 +119,17 @@ inside the pane. Hit testing verifies the timeline cannot cover the compact
 video pane. Native 2K preview still advances, with no browser exceptions.
 Regression gates: 43 Python, 30 Node, strict TypeScript/production build and
 Android JVM tests. Export deletion browser checks also pass after these changes.
+
+Contextual editing verification covers selected-clip source trims, navigation,
+split/delete and undo, single/mixed key selection, manual-tab retention during
+playback, sound gain/fade targeting and stale-selection clearing. Preview clicks
+identify phone/background through their transforms without changing the edit;
+camera and Alt-phone drags reveal their matching motion group. Clip-edge and
+key drags retain their coordinate space until release, with Fit still active.
+Wheel reveal waits for idle and yields to a newer manual tab or active drag.
+Compact gestures keep the timeline visible until Inspector or Ctrl . is used.
+Fifty context/viewport combinations from 1440 to 320 px keep controls contained;
+context never enters the raw spec or saved UI, and no browser exceptions occur.
+The mapping/geometry regressions join 32 Node tests; the 43 Python tests,
+TypeScript/production build and Android JVM suite also pass. Only owned QA
+specs were edited and removed.

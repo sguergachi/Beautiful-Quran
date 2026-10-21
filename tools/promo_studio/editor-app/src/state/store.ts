@@ -9,6 +9,7 @@ import { clamp, plateLook, resolve, soundOnset, takeKey } from "../lib/model.ts"
 import type { Ease, Emulator, ExportFile, ExportOptions, Geo, Job, Meta, Plate, RawSpec, Selection, Spec, SpecStatus, Timeline, Wave } from "../lib/types.ts";
 import { clock, media } from "./clock.ts";
 import { videoSlug } from "../lib/videos.ts";
+import { activeContext, INSPECTOR, selectionContext, type InspectorContext } from "../lib/inspector.ts";
 
 export type Tab = "animate" | "recording" | "look";
 export interface UI {
@@ -36,6 +37,7 @@ interface St {
   exact: string | null; ui: UI; panel: Panel; toasts: Toast[]; fatal: string | null;
   verseBusy: boolean; verseError: string | null;
   exportOpts: ExportOptions | null;     // the editor's export settings (localStorage), defaults from meta
+  inspector: InspectorContext | null;
 }
 
 export const useStore = create<St>(() => ({
@@ -44,6 +46,7 @@ export const useStore = create<St>(() => ({
   exact: null, ui: loadUI(), panel: null, toasts: [], fatal: null,
   verseBusy: false, verseError: null,
   exportOpts: loadExport(),
+  inspector: null,
 }));
 const get = useStore.getState, set = useStore.setState;
 
@@ -78,10 +81,25 @@ export function setUI(patch: Partial<UI>) {
     if (patch.hideL === false) ui.hideR = true;
     else if (patch.hideR === false) ui.hideL = true;
   }
-  set({ ui });
+  set({ ui, ...(patch.tab ? { inspector: null } : {}) });
   localStorage.setItem("promo.ui", JSON.stringify(ui));
 }
 export const openPanel = (panel: Panel) => set({ panel: get().panel === panel ? null : panel });
+
+/** Open a focused inspector after an action. Compact gestures keep the timeline exposed. */
+export function inspect(context: InspectorContext, reveal = innerWidth > 1000) {
+  const tab = INSPECTOR[context].tab;
+  if (get().ui.tab !== tab || (reveal && get().ui.hideR)) setUI({ tab, ...(reveal ? { hideR: false } : {}) });
+  set({ inspector: context, ...(context === "keys" || context === "clip" ? {} : { sel: null }) });
+}
+export function inspectSelection(reveal = innerWidth > 1000) {
+  const context = selectionContext(get().sel);
+  if (context) inspect(context, reveal);
+}
+export function revealInspector() {
+  const s = get(), context = selectionContext(s.sel) ?? activeContext(s.inspector, s.sel);
+  if (context) inspect(context, true); else setUI({ hideR: false });
+}
 
 // -------------------------------------------------------------- context
 
@@ -199,7 +217,7 @@ export async function open(name: string) {
     // New specs may contain just a title; editing always needs real pieces.
     r.raw.edit = spec.edit.map((p) => ({ ...p }));
     saved = JSON.stringify(r.raw);
-    set({ name, raw: r.raw, spec, geo: null, plate: null, tl: null, wave: null, sel: null, undo: [], redo: [], exact: null, saveState: "saved", saveError: null, verseBusy: false, verseError: null });
+    set({ name, raw: r.raw, spec, geo: null, plate: null, tl: null, wave: null, sel: null, inspector: null, undo: [], redo: [], exact: null, saveState: "saved", saveError: null, verseBusy: false, verseError: null });
     localStorage.setItem("promo.last", name);
     clock.t = 0;
     await Promise.all([loadGeometry(), loadPlate()]);
@@ -303,7 +321,7 @@ export async function loadPlate() {
 
 export const selKeys = (): E.KeyRef[] => { const s = get().sel; return s?.type === "keys" ? s.items : []; };
 export const selectKeys = (items: E.KeyRef[]) => set({ sel: items.length ? { type: "keys", items } : null });
-export const select = (sel: Selection) => set({ sel });
+export const select = (sel: Selection) => set({ sel, ...(!sel ? { inspector: null } : {}) });
 
 export function setProp(name: string, v: number, key?: string) {
   if (!Number.isFinite(v)) return;
@@ -313,19 +331,21 @@ export function toggleKey(name: string) {
   let added: E.KeyRef | null = null;
   mutate((raw, c) => { added = E.toggleKey(raw, c, name, clock.t); });
   selectKeys(added ? [added] : []);
+  inspectSelection();
 }
-export function keyCamera() { mutate((raw, c) => E.keyAll(raw, c, ["zoom", "pan_x", "pan_y"], clock.t)); }
+export function keyCamera() { mutate((raw, c) => E.keyAll(raw, c, ["zoom", "pan_x", "pan_y"], clock.t)); inspect("camera"); }
 export function preset(kind: "push" | "pull" | "punch") {
   const geo = get().geo;
   if (!geo) return;
   mutate((raw, c) => E.preset(raw, c, geo, kind, clock.t));
+  inspect("camera");
 }
 export function nudge(frames: number) {
   const items = selKeys();
   if (!items.length) return;
   let moved: E.KeyRef[] | null = null;
   mutate((raw, c) => { moved = E.moveKeys(raw, c, items, frames / (c.fps || 60)); }, "nudge");
-  if (moved) { selectKeys(moved); clock.seek((moved as E.KeyRef[])[0].t); } else toast("A key is in the way");
+  if (moved) { selectKeys(moved); clock.seek((moved as E.KeyRef[])[0].t); inspectSelection(); } else toast("A key is in the way");
 }
 export function deleteSelection() {
   const s = get().sel;
@@ -351,18 +371,20 @@ export function paste(at = clock.t) {
   let placed: E.KeyRef[] = [];
   mutate((raw, c) => { placed = E.pasteKeys(raw, c, clip, at); });
   selectKeys(placed);
+  inspectSelection();
 }
 export function selectAll() {
   const items: E.KeyRef[] = [];
   for (const [prop, keys] of Object.entries(get().spec?.tracks || {})) for (const k of keys) items.push({ prop, t: k.t });
   selectKeys(items);
+  inspectSelection();
   if (items.length) toast(`${items.length} key${items.length > 1 ? "s" : ""} selected`);
 }
 export function split(t = clock.t) {
   let at: number | null = null;
   mutate((raw, c) => { at = E.splitAt(raw, c, t); });
   if (at == null) toast("Put the playhead inside a piece to split it");
-  else set({ sel: { type: "piece", i: at } });
+  else { set({ sel: { type: "piece", i: at } }); inspectSelection(); }
 }
 export function wholeTake() {
   const len = get().geo?.take?.length ?? get().tl?.take ?? Math.max(...get().spec!.edit.map((p) => p.out));
