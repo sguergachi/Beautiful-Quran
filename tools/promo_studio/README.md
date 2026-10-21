@@ -126,7 +126,8 @@ fixes and the desktop, narrow-window and zoom-equivalent review matrix.
 
 ## Look
 
-The Look tab groups **Background**, **Phone**, **Canvas**, and **Sound**.
+The Look tab starts with **Canvas**, then **Background**, **Phone**, and **Sound**.
+Canvas comes first because its aspect and frame rate define the whole video.
 Background choices use their names and show which one is selected. Under
 **Image**, Blur, Brightness, Saturation, and Vignette shape the background;
 **Movement** holds Motion speed and Parallax. Blur reaches **0** for a sharp

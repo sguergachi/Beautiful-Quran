@@ -266,6 +266,12 @@ function Look() {
   };
   return (
     <>
+      <Section title="Canvas">
+        <Field label="Video name"><TextInput value={spec.title} placeholder="What this video is" onCommit={(v) => set("title", v)} /></Field>
+        <Field label="Aspect"><Segmented size="sm" value={spec.aspect} options={Object.keys(meta.aspects).map((a) => [a, a])} onChange={(v) => set("aspect", v)} /></Field>
+        <Field label="Frame rate"><Segmented size="sm" value={String(spec.fps)} options={[["60", "60 fps"], ["30", "30 fps"]]} onChange={(v) => set("fps", +v)} /></Field>
+        {slider("Motion blur", "motion_blur", spec.motion_blur, 0, 2, 0.05, "Softens fast camera moves in exports. Use Exact frame to preview it.")}
+      </Section>
       <Section title="Background">
         <div className="mb-3 grid grid-cols-3 gap-1.5">
           {Object.entries(meta.backgrounds).map(([id, b]) => (
@@ -290,12 +296,6 @@ function Look() {
         <Field label="Colour"><Select value={raw.phone?.color ?? "auto"} options={[["auto", "Match the theme"], ...meta.phones.map((c): [string, string] => [c, c[0].toUpperCase() + c.slice(1)])]} onChange={(v) => set("phone.color", v)} /></Field>
         {slider("Base size", "phone.height", spec.phone.height, 0.4, 1.2, 0.01, "The phone's height as a share of the frame, before zoom.")}
         {slider("Shadow", "phone.shadow", spec.phone.shadow, 0, 1, 0.01)}
-      </Section>
-      <Section title="Canvas">
-        <Field label="Video name"><TextInput value={spec.title} placeholder="What this video is" onCommit={(v) => set("title", v)} /></Field>
-        <Field label="Aspect"><Segmented size="sm" value={spec.aspect} options={Object.keys(meta.aspects).map((a) => [a, a])} onChange={(v) => set("aspect", v)} /></Field>
-        <Field label="Frame rate"><Segmented size="sm" value={String(spec.fps)} options={[["60", "60 fps"], ["30", "30 fps"]]} onChange={(v) => set("fps", +v)} /></Field>
-        {slider("Motion blur", "motion_blur", spec.motion_blur, 0, 2, 0.05, "Softens fast camera moves in exports. Use Exact frame to preview it.")}
       </Section>
       <Section title="Sound">
         {slider("Gain (dB)", "audio.gain_db", spec.audio.gain_db, -12, 12, 0.5)}
