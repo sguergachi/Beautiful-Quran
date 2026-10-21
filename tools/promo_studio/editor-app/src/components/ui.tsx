@@ -67,7 +67,7 @@ export function TextInput({ value, onCommit, className = "", ...rest }: { value:
         if (cancelled.current || (rest.type === "number" && (!draft.trim() || !Number.isFinite(Number(draft))))) setDraft(String(value));
         else if (draft !== String(value)) onCommit(draft);
       }}
-      onKeyDown={(e) => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); if (e.key === "Escape") { cancelled.current = true; (e.target as HTMLInputElement).blur(); } }} />
+      onKeyDown={(e) => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); if (e.key === "Escape") { e.stopPropagation(); cancelled.current = true; (e.target as HTMLInputElement).blur(); } }} />
   );
 }
 

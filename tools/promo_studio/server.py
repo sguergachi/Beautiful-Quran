@@ -762,11 +762,17 @@ class Handler(BaseHTTPRequestHandler):
         m = re.fullmatch(r"/api/new/([\w.-]+)", p)
         if m:
             dst = spec_path(m.group(1))
-            base = self.body().get("from")
+            body = self.body()
+            base, title = body.get("from"), body.get("title")
+            if title is not None and (not isinstance(title, str) or not title.strip()):
+                raise ValueError("Give the video a title")
             with SPEC_LOCK:
                 if os.path.exists(dst):
                     return self.send_json({"error": f"{m.group(1)} already exists"}, 409)
-                raw = json.load(open(spec_path(base))) if base else {"title": m.group(1).replace("-", " ")}
+                raw = {"title": m.group(1).replace("-", " ")}
+                if base:
+                    with open(spec_path(base)) as source: raw = json.load(source)
+                if title is not None: raw["title"] = title.strip()
                 with open(dst, "x") as f:
                     json.dump(raw, f, indent=2, ensure_ascii=False)
             return self.send_json({"ok": True})

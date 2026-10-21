@@ -8,6 +8,7 @@ import { applyVersePlan, nextVerseRange, verseRange, type VerseAction } from "..
 import { clamp, plateLook, resolve, soundOnset, takeKey } from "../lib/model.ts";
 import type { Ease, Emulator, ExportFile, ExportOptions, Geo, Job, Meta, Plate, RawSpec, Selection, Spec, SpecStatus, Timeline, Wave } from "../lib/types.ts";
 import { clock, media } from "./clock.ts";
+import { videoSlug } from "../lib/videos.ts";
 
 export type Tab = "animate" | "recording" | "look";
 export interface UI {
@@ -440,36 +441,30 @@ export const stopEmulator = (serial: string) => api.stopEmu(serial).then(() => {
 
 // -------------------------------------------------------------- videos
 
-const slug = (s: string) => s.trim().toLowerCase().replace(/[^a-z0-9._-]+/g, "-").replace(/^-+|-+$/g, "");
 export async function createVideo(title: string, from?: string) {
-  const name = slug(title);
-  if (!name) return;
-  try {
-    if (from === get().name && !(await save())) return;
-    await (from ? api.copy(from, name) : api.create(name));
-    await refreshSpecs();
-    await open(name);
-    if (!from) mutate((raw) => { raw.title = title; });
-  } catch (e) { toast((e as Error).message, "error"); }
+  const name = videoSlug(title);
+  if (!name) throw new Error("Include a letter or number in the title.");
+  if (from === get().name && !(await save())) throw new Error("Save the current edit before making a copy.");
+  await api.create(name, from, title);
+  await refreshSpecs();
+  await open(name);
 }
 export async function renameVideo(from: string, title: string) {
-  const to = slug(title);
-  if (!to || to === from) return;
-  try {
-    if (from === get().name && !(await save())) return;
-    await api.rename(from, to);
-    await refreshSpecs();
-    if (from === get().name) { session++; set({ name: null }); await open(to); }
-  } catch (e) { toast((e as Error).message, "error"); }
+  if (from === get().name) {
+    mutate((raw) => { raw.title = title.trim(); });
+    if (!(await save())) throw new Error("The title could not be saved. Try again.");
+  } else {
+    const { raw } = await api.spec(from);
+    await api.save(from, JSON.stringify({ ...raw, title: title.trim() }));
+  }
+  await refreshSpecs();
 }
 export async function deleteVideo(name: string) {
-  try {
-    if (name === get().name) { clearTimeout(saveTimer); session++; set({ name: null, raw: null, spec: null, geo: null, plate: null, tl: null }); }
-    await api.remove(name);
-    await refreshSpecs();
-    if (!get().name && get().specs[0]) await open(get().specs[0].name);
-    toast(`Deleted ${name} (its take and video stay on disk)`);
-  } catch (e) { toast((e as Error).message, "error"); }
+  if (name === get().name && !(await save())) throw new Error("The edit could not be saved. Try again before deleting it.");
+  await api.remove(name);
+  if (name === get().name) { clearTimeout(saveTimer); clock.pause(); session++; set({ name: null, raw: null, spec: null, geo: null, plate: null, tl: null, wave: null, sel: null, undo: [], redo: [], exact: null }); }
+  await refreshSpecs();
+  if (!get().name && get().specs[0]) await open(get().specs[0].name);
 }
 
 export async function showExact() {

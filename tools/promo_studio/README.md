@@ -132,6 +132,27 @@ click it again, move the zoom slider or Ctrl-scroll to return to manual zoom.
 [Studio UI review](../../docs/PROMO_STUDIO_UI_REVIEW.md) records the clipping
 fixes and the desktop, narrow-window and zoom-equivalent review matrix.
 
+## Videos
+
+Use **+** to create a video, or the actions beside a video to duplicate,
+rename or delete it. These actions open an inline form in the video list;
+Enter submits and Escape cancels. Errors stay beside the form. A duplicate
+gets its own title and copies the latest saved edit. Rename changes the
+visible title with undo support for the open video; its file name stays stable
+so exports and queued jobs retain their identity. Delete asks for confirmation
+and keeps the current edit visible if the request fails. Takes and exported
+files remain on disk; remove an exported file from Export separately.
+
+Search matches titles, chapter names, reciter names and themes, including
+unaccented transliteration such as `rahman`. Clear search restores the list.
+The footer shows the number of matching videos.
+
+Export, Jobs, Emulators and Shortcuts keep keyboard focus inside their drawer;
+Tab and Shift-Tab cycle through its controls, and Escape returns to the opener.
+The editor behind it is inactive. Menus support the arrow keys, Home and End.
+Space activates a focused button, and editing shortcuts do not alter the
+timeline while a drawer, menu or video form is in use.
+
 ## Look
 
 The Look tab starts with **Canvas**, then **Background**, **Phone**, and **Sound**.

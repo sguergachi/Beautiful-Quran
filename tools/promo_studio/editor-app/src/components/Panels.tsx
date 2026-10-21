@@ -1,5 +1,6 @@
 // Slide-over panels: Emulators, Jobs, Shortcuts (Export is in ExportPanel.tsx).
-import { useState, type ReactNode } from "react";
+import { useLayoutEffect, useRef, useState, type ReactNode } from "react";
+import { closeMenu } from "./Menu.tsx";
 import type { Emulator, Job } from "../lib/types.ts";
 import {
   bootEmulator, cancelJob, openPanel, pollJobs, prepareEmulator, stopEmulator, useStore,
@@ -9,14 +10,28 @@ import { CaptureCard, LiveScreen, emulatorTone } from "./Inspector.tsx";
 import { Button, Dot, Icon, Kbd, Progress, Select } from "./ui.tsx";
 
 export function Drawer({ title, children, onClose, width = 420, right }: { title: string; children: ReactNode; onClose: () => void; width?: number; right?: ReactNode }) {
+  const ref = useRef<HTMLElement>(null), previous = useRef(document.activeElement as HTMLElement | null);
+  useLayoutEffect(() => {
+    closeMenu();
+    ref.current?.querySelector<HTMLButtonElement>("[data-drawer-close]")?.focus();
+    return () => { requestAnimationFrame(() => { if (document.activeElement === document.body && previous.current?.isConnected) previous.current.focus({ preventScroll: true }); }); };
+  }, []);
   return (
     <div className="fixed inset-0 z-40 flex justify-end bg-black/30" onPointerDown={(e) => { if (e.target === e.currentTarget) onClose(); }}>
-      <aside aria-label={title} style={{ width }} className="drawer flex h-full max-w-full min-w-0 flex-col border-l border-line bg-panel shadow-2xl shadow-black/60">
+      <aside ref={ref} role="dialog" aria-modal="true" aria-label={title} style={{ width }}
+        onKeyDown={(e) => {
+          if (e.key !== "Tab") return;
+          const items = [...ref.current!.querySelectorAll<HTMLElement>('button:not(:disabled), a[href], input:not(:disabled), select:not(:disabled), textarea:not(:disabled), [tabindex="0"]')].filter((el) => el.getClientRects().length);
+          const first = items[0], last = items.at(-1);
+          if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last?.focus(); }
+          else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first?.focus(); }
+        }}
+        className="drawer flex h-full max-w-full min-w-0 flex-col border-l border-line bg-panel shadow-2xl shadow-black/60">
         <div className="flex h-12 shrink-0 items-center gap-2 border-b border-line px-4">
           <h2 className="text-[15px] font-semibold">{title}</h2>
           <div className="flex-1" />
           {right}
-          <Button size="icon" variant="ghost" onClick={onClose} title="Close (Esc)">{Icon.x}</Button>
+          <Button data-drawer-close size="icon" variant="ghost" onClick={onClose} title="Close (Esc)">{Icon.x}</Button>
         </div>
         <div className="min-h-0 min-w-0 flex-1 overflow-y-auto break-words p-4">{children}</div>
       </aside>

@@ -273,6 +273,29 @@ class FormatTests(unittest.TestCase):
 
 
 class ServerTests(unittest.TestCase):
+    def test_named_new_video_and_copy_preserve_source_and_reject_collisions(self):
+        with tempfile.TemporaryDirectory(dir=SCRATCH) as d, patch.object(spec, 'SPECS', d):
+            source = {'title': 'Original', 'props': {'zoom': 2.5}, 'edit': [{'in': 3, 'out': 9}]}
+            Path(d, 'original.json').write_text(json.dumps(source))
+            srv = ThreadingHTTPServer(('127.0.0.1', 0), server.Handler)
+            thread = threading.Thread(target=srv.serve_forever, daemon=True); thread.start()
+            def create(name, body):
+                c = http.client.HTTPConnection(*srv.server_address)
+                c.request('POST', f'/api/new/{name}', json.dumps(body), {'Content-Type': 'application/json'})
+                r = c.getresponse(); status = r.status; r.read(); c.close(); return status
+            try:
+                self.assertEqual(create('named', {'title': '  Ar-Raḥmān  '}), 200)
+                self.assertEqual(json.loads(Path(d, 'named.json').read_text()), {'title': 'Ar-Raḥmān'})
+                self.assertEqual(create('copy', {'from': 'original', 'title': 'My copy'}), 200)
+                self.assertEqual(json.loads(Path(d, 'copy.json').read_text()), {**source, 'title': 'My copy'})
+                self.assertEqual(json.loads(Path(d, 'original.json').read_text()), source)
+                self.assertEqual(create('copy', {'title': 'Overwrite'}), 409)
+                self.assertEqual(json.loads(Path(d, 'copy.json').read_text())['title'], 'My copy')
+                for title in (' ', [], 1):
+                    self.assertEqual(create('invalid', {'title': title}), 400)
+                    self.assertFalse(Path(d, 'invalid.json').exists())
+            finally: srv.shutdown(); srv.server_close(); thread.join()
+
     def test_export_deletion_is_scoped_versioned_and_excludes_active_renders(self):
         with tempfile.TemporaryDirectory(dir=SCRATCH) as d, patch.object(spec, 'OUT', d), patch.object(spec, 'SPECS', d), patch.object(server, 'JOB_DIR', d), patch.object(server.Jobs, '_loop', lambda _: None), patch.object(server.Jobs, '_start', lambda _, j: j.update(state='running')):
             jobs = server.Jobs()

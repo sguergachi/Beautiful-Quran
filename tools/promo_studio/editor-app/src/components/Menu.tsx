@@ -10,7 +10,8 @@ const useMenu = create<{ at: [number, number] | null; items: MenuItem[]; trigger
 
 export function openMenu(e: { clientX: number; clientY: number; preventDefault: () => void; stopPropagation: () => void }, items: MenuItem[], trigger: HTMLElement | null = null) {
   e.preventDefault(); e.stopPropagation();
-  useMenu.setState({ at: [e.clientX, e.clientY], items, trigger });
+  const rect = trigger?.getBoundingClientRect();
+  useMenu.setState({ at: rect && !e.clientX && !e.clientY ? [rect.left, rect.bottom] : [e.clientX, e.clientY], items, trigger });
 }
 export const closeMenu = () => {
   const trigger = useMenu.getState().trigger;
@@ -40,12 +41,19 @@ export function MenuHost() {
   if (!at) return null;
   return (
     <div ref={ref} role="menu" style={{ left: pos[0], top: pos[1] }}
-      onKeyDown={(e) => { if (e.key === " " || e.key === "Enter") e.stopPropagation(); }}
+      onKeyDown={(e) => {
+        e.stopPropagation();
+        if (!["ArrowUp", "ArrowDown", "Home", "End"].includes(e.key)) return;
+        e.preventDefault();
+        const buttons = [...ref.current!.querySelectorAll<HTMLButtonElement>("button:not(:disabled)")], i = buttons.indexOf(document.activeElement as HTMLButtonElement);
+        const next = e.key === "Home" ? 0 : e.key === "End" ? buttons.length - 1 : (i + (e.key === "ArrowDown" ? 1 : -1) + buttons.length) % buttons.length;
+        buttons[next]?.focus();
+      }}
       className="fixed z-50 flex min-w-[190px] max-w-[calc(100vw-12px)] max-h-[calc(100dvh-12px)] flex-col overflow-y-auto overscroll-contain rounded-lg border border-line bg-panel2 p-1 shadow-2xl shadow-black/60 [&>*]:shrink-0">
       {items.map((it, i) =>
         it === "-" ? <div key={i} className="mx-1 my-1 h-px bg-line" /> :
         "head" in it ? <div key={i} className="px-2.5 pb-0.5 pt-1.5 text-[11px] text-faint">{it.head}</div> :
-        <button key={i} disabled={it.disabled} onClick={() => { closeMenu(); it.run(); }}
+        <button key={i} role="menuitem" disabled={it.disabled} onClick={() => { closeMenu(); it.run(); }}
           className={`flex items-center gap-2 rounded px-2.5 py-1.5 text-left hover:bg-white/5 disabled:opacity-40 ${it.danger ? "text-danger" : ""}`}>
           <span className="w-3.5 text-gold">{it.checked ? "✓" : ""}</span>
           <span className="flex-1">{it.label}</span>
