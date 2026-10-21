@@ -156,8 +156,8 @@ private val HomeColumnGap = 4.dp
 private val HomeArabicOpticalInset = 4.dp
 private val TopBoundRibbonHeight = 96.dp
 /**
- * With the feather below it, this sets the field as far above the Continue
- * band (34 dp) as the masthead title's baseline sits above the field.
+ * Paper margin between the field and where scrolled ink dies: the feather
+ * finishes dissolving a row here, so fading rows never brush the bar.
  */
 private val SearchBottomBreath = 10.dp
 private val SearchBottomFeather = 24.dp
@@ -627,7 +627,12 @@ fun HomeScreen(
                         bottomInset = listBottomInset,
                     ),
                     contentPadding = PaddingValues(
-                        top = SearchBottomFeather,
+                        // The rows carry 15 dp of their own padding above the
+                        // ink, higher than the feather itself; trimming that
+                        // double count from the list padding keeps the first
+                        // chapter row's ink as far below the field (34 dp) as
+                        // the masthead title's baseline sits above it (#812).
+                        top = SearchBottomFeather - ContinueRowVertical,
                         bottom = listBottomPadding,
                     ),
                 ) {
