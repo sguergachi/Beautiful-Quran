@@ -24,7 +24,7 @@ APP = "com.beautifulquran"
 CAPTURE_BASE = 5650
 POOL_PORTS = range(5600, 5608, 2)
 DEFAULT_APK = os.path.join(REPO, "app", "build", "outputs", "apk", "release", "app-release.apk")
-BOOT_SECONDS = 25            # a snapshot boot, for the progress estimate
+BOOT_SECONDS = 25            # native capture cold boot, for the progress estimate
 
 
 def adb(serial, *a, timeout=15, check=False):

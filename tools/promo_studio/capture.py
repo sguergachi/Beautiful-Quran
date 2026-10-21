@@ -411,7 +411,7 @@ def record(s, log=print, force=False):
     raw = os.path.join(d, "raw.mkv")
     if os.path.exists(raw):
         os.remove(raw)
-    # scrcpy gets a generous limit; the take is ended a fixed time after the
+    # The recorder gets a generous limit; the take ends a fixed time after the
     # recitation actually starts (Hani's first file can buffer for seconds)
     limit = int(math.ceil(secs + opening_estimate(s) + 300))
     import capture_host

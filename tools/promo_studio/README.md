@@ -39,7 +39,8 @@ python3 timeline.py SPEC                   # when each verse and repeat happens 
 
 | File | Role |
 |---|---|
-| `capture.py` | Drives the app on the emulator (reciter, theme, layout, view, text size) and records picture **and** sound with scrcpy. |
+| `capture.py` | Drives the real app and recording sequence, prepares display/status/audio settings, and conforms each take. |
+| `capture_host.py` | Captures authenticated emulator frames and PCM with shared timestamps; hardware-encodes native 2K picture and stores FLAC sound. |
 | `recording.py` | Runs the ordered screen sequence, chapter routes and repeat picker on camera. |
 | `compose.py` | The compositor: each frame is a pure function of (spec, t). Used by export, stills and the editor's exact frame. |
 | `formats.py` | Export formats, qualities, sizes, frame rates and sound; the file each export writes. |
