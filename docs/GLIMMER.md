@@ -107,13 +107,13 @@ keeping playback and the pooling setting intact. All dials reset when the study 
 When verse 2 repeats, its entire previously read black base stays visible.
 The wash brings in the existing Paper orange repeat accent (`#B4551E`)
 together with the fuller wet shape and reflection. Every reached word holds
-orange and the thicker deposited shape with the chain, even after its individual
-wet film dries. The pooling dial sets that held width as well as the fresh
-wet expansion. Reflections continue drying per word. Later words
+orange with the chain, even after its individual wet film dries. Both passes
+gain the same stroke weight while wet and return to the regular weight during
+the same per-word dry-down. The pooling dial sets the amount on both passes.
+Only the color is held by the chain; weight and reflection follow wetness. Later words
 stay black until their turn. Pausing retains the reached orange prefix while
 the sheen settles. Only when playback leaves verse 2 does the complete chain
-dissolve together to charcoal and the original font weight over
-`InkEngine.tuning.repeatFadeOutMs` (900 ms).
+dissolve together to charcoal over `InkEngine.tuning.repeatFadeOutMs` (900 ms).
 The tint envelope is independent of wetness, so earlier words do not become
 brown or black while later words repeat. Carbon pooling does not darken orange;
 its pigment travels through the same feathered liquid fill as the first pass.
@@ -155,6 +155,11 @@ adb shell am start -n com.beautifulquran/.ui.reader.PaperInkStudyActivity
 The study verifies the generated maps against the app's canonical text when loading;
 it changes no database. `PaperInkClockTest` covers application, handoff, pause/resume, dry-down and
 backward reset.
+It also checks that a completed, dried word receives the identical wet/dry
+cycle when repeated. `tools/test_paper_ink_shader.py` is an optional direct
+Skia render gate (requires `skia-python` and `numpy`): it checks equal wet
+stroke weight on both passes in both scripts and spread modes, plus narrowing
+back to the regular contour while the repeat remains fully orange.
 `PaperInkSequenceTest` covers the one middle repeat and restarting the study.
 `PaperInkRepeatChainTest` checks holding orange across word handoffs and pause,
 releasing only after the repeated verse, and clearing the chain on Again.

@@ -5,6 +5,22 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class PaperInkClockTest {
+    @Test fun aRepeatedWordReceivesTheSameWetAndDryCycleAsItsFirstPass() {
+        val first = PaperInkClock(100, 1100, 1000)
+        val repeated = PaperInkClock(100, 1100, 1000)
+        // Complete and dry the previous occurrence before rewinding for repeat.
+        repeated.update(600, true, 0)
+        repeated.update(1100, true, 500)
+        repeated.update(1100, true, 1500)
+        assertEquals(0f, repeated.wet)
+        for (time in 0L..2200L step 20) {
+            first.update(time, true, time)
+            repeated.update(time, true, 2000 + time)
+            assertEquals(first.progress, repeated.progress)
+            assertEquals(first.wet, repeated.wet)
+        }
+    }
+
     @Test fun inkApplicationStopsOnPauseAndAtWordHandoff() {
         val clock = PaperInkClock(100, 1100, 1000)
         clock.update(0, true, 0)
