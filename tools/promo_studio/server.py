@@ -85,9 +85,21 @@ def editor_timeline(s):
 EXPORT_EXT = "|".join(sorted({f["ext"] for f in formats.FORMATS.values()}))
 
 
+def export_pattern(name):
+    return re.compile(rf"{re.escape(name)}(-\d+p)?(-\d+fps)?\.({EXPORT_EXT})")
+
+
+def export_revision(st):
+    return f"{st.st_ino}:{st.st_mtime_ns}:{st.st_size}"
+
+
+class ExportConflict(ValueError):
+    """A displayed export changed, or an active render still owns its path."""
+
+
 def exports(name):
     """A video's exported files (formats.filename), newest first."""
-    pat = re.compile(rf"{re.escape(name)}(-\d+p)?(-\d+fps)?\.({EXPORT_EXT})")
+    pat = export_pattern(name)
     try:
         files = [f for f in os.listdir(S.OUT) if pat.fullmatch(f)]
     except FileNotFoundError:
@@ -98,7 +110,8 @@ def exports(name):
             st = os.stat(os.path.join(S.OUT, f))
         except FileNotFoundError:
             continue
-        out.append({"file": f, "bytes": st.st_size, "mtime": st.st_mtime})
+        if not os.path.isfile(os.path.join(S.OUT, f)): continue
+        out.append({"file": f, "bytes": st.st_size, "mtime": st.st_mtime, "revision": export_revision(st)})
     return sorted(out, key=lambda e: -e["mtime"])
 
 
@@ -212,6 +225,8 @@ class Jobs:
 
     def public(self, j, full=False):
         d = {k: v for k, v in j.items() if not k.startswith("_")}
+        if j["kind"] == "render" and j["state"] == "done" and isinstance(j.get("result"), str):
+            d["export_exists"] = os.path.isfile(j["result"])
         if not full:
             d["log"] = d["log"][-6:]
         return d
@@ -224,7 +239,7 @@ class Jobs:
         with self.lock:
             return {j["serial"]: j for j in self.jobs.values() if j.get("serial") and j["state"] in ("queued", "running")}
 
-    def submit(self, kind, name, args, serial=None, title=None, snapshot=None):
+    def submit(self, kind, name, args, serial=None, title=None, snapshot=None, export_file=None):
         with self.lock:
             for j in self.jobs.values():
                 if j["kind"] == kind and j["name"] == name and j["state"] in ("queued", "running"):
@@ -234,6 +249,7 @@ class Jobs:
                  "state": "queued", "stage": None, "stages": [], "progress": 0.0, "msg": "Waiting",
                  "log": [], "created": time.time(), "started": None, "ended": None, "result": None,
                  "error": None, "pid": None, "file": os.path.join(JOB_DIR, jid + ".jsonl")}
+            if export_file is not None: j["export_file"] = export_file
             if snapshot is not None:
                 folder = os.path.join(JOB_DIR, jid)
                 os.makedirs(folder, exist_ok=True)
@@ -246,6 +262,21 @@ class Jobs:
         self._save()
         self._pump()
         return self.public(j)
+
+    def delete_export(self, name, filename, revision):
+        """Delete one listed file, excluding active or replaced versions."""
+        if not export_pattern(name).fullmatch(filename):
+            raise ValueError("This file is not an export of this video")
+        with self.lock:    # a render cannot start between this check and unlink
+            if any(j['kind'] == 'render' and j['state'] in ('queued', 'running') and
+                   (j.get('export_file') == filename if j.get('export_file') else j['name'] == name)
+                   for j in self.jobs.values()):
+                raise ExportConflict("This file is queued or rendering. Wait for the export to finish.")
+            path = os.path.join(S.OUT, filename)
+            st = os.stat(path)
+            if not isinstance(revision, str) or revision != export_revision(st):
+                raise ExportConflict("This export was replaced. Refresh the list before deleting it.")
+            os.unlink(path)
 
     def cancel(self, jid):
         with self.lock:
@@ -540,6 +571,8 @@ class Handler(BaseHTTPRequestHandler):
             fn()
         except FileNotFoundError as e:
             self.send_json({"error": str(e)}, 404)
+        except ExportConflict as e:
+            self.send_json({"error": str(e)}, 409)
         except Exception as e:
             self.send_json({"error": str(e) or e.__class__.__name__}, 400 if isinstance(e, ValueError) else 500)
 
@@ -570,6 +603,12 @@ class Handler(BaseHTTPRequestHandler):
         self.send_json({"ok": True, "status": spec_status(m.group(1))})
 
     def route_delete(self):
+        m = re.fullmatch(r"/api/exports/([\w.-]+)/([\w.-]+)", urllib.parse.unquote(self.path))
+        if m:
+            name, filename = m.groups()
+            spec_path(name)    # apply the same video-name constraints as saving
+            JOBS.delete_export(name, filename, self.body().get('revision'))
+            return self.send_json({"ok": True, "exports": exports(name)})
         m = re.fullmatch(r"/api/spec/([\w.-]+)", self.path)
         if not m:
             return self.send_json({"error": "not found"}, 404)
@@ -744,7 +783,8 @@ class Handler(BaseHTTPRequestHandler):
             snapshot = S.load(name)
             o = formats.options(opts)
             return self.send_json(JOBS.submit("render", name, ["render", name, "--options", json.dumps(o)],
-                                              title=f"Export · {formats.describe(snapshot, o)}", snapshot=snapshot))
+                                              title=f"Export · {formats.describe(snapshot, o)}", snapshot=snapshot,
+                                              export_file=formats.filename(snapshot, o)))
         m = re.fullmatch(r"/api/jobs/([\w.-]+)/cancel", p)
         if m:
             return self.send_json(JOBS.cancel(m.group(1)))

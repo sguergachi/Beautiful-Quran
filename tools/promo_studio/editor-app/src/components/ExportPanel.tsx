@@ -1,9 +1,10 @@
 // Export: the file to write (format, size, frame rate, quality, sound), a
 // size estimate, and this video's earlier exports. The settings are the
 // editor's, remembered between sessions, and apply to every export.
-import type { ExportFormat, ExportOptions, ExportQuality } from "../lib/types.ts";
+import { useRef, useState } from "react";
+import type { ExportFile, ExportFormat, ExportOptions, ExportQuality } from "../lib/types.ts";
 import { estimateBytes, exportFilename, exportFps, fmtBytes, frameSize, scaleLabel } from "../lib/exporting.ts";
-import { cancelJob, exportOptions, exportVideo, openPanel, setExport, useStore } from "../state/store.ts";
+import { cancelJob, deleteExport, exportOptions, exportVideo, openPanel, refreshSpecs, setExport, toast, useStore } from "../state/store.ts";
 import { Drawer } from "./Panels.tsx";
 import { Button, Field, Icon, Progress, Segmented, Select } from "./ui.tsx";
 
@@ -107,21 +108,49 @@ export function ExportPanel() {
         {live.length > (mine ? 1 : 0) && <p className="mt-2 text-[11.5px] text-faint">{live.length - (mine ? 1 : 0)} other export{live.length - (mine ? 1 : 0) > 1 ? "s" : ""} in the queue; one runs at a time.</p>}
       </div>
 
-      {!!status?.exports?.length && (
-        <>
-          <h3 className="mb-2 mt-5 text-[11px] font-semibold uppercase tracking-wider text-mute">Exports of this video</h3>
-          <ul className="space-y-1.5">
-            {status.exports.map((e) => (
-              <li key={e.file} className={`flex flex-wrap items-center gap-x-3 gap-y-0.5 rounded-md border px-2.5 py-1.5 text-[12px] ${e.file === file ? "border-gold/40" : "border-line"}`}>
-                <span className="min-w-0 flex-1 break-all text-ink">{e.file}</span>
-                <span className="num text-faint">{fmtBytes(e.bytes)} · {ago(e.mtime)}</span>
-                <a className="text-gold hover:underline" target="_blank" href={`/media/out/${e.file}?${e.mtime}`}>Open ↗</a>
-                <a className="text-mute hover:text-ink" href={`/media/out/${e.file}?download=1&${e.mtime}`}>Download</a>
-              </li>
-            ))}
-          </ul>
-        </>
-      )}
+      <div className="mb-1 mt-5 flex items-center justify-between gap-2">
+        <h3 className="text-[11px] font-semibold uppercase tracking-wider text-mute">Exports of this video</h3>
+        <Button size="sm" variant="ghost" onClick={() => void refreshSpecs().catch((e: Error) => toast(e.message, "error"))}>Refresh</Button>
+      </div>
+      <p role="status" className="num mb-2 text-[11px] text-faint">{status?.exports?.length
+        ? `${status.exports.length} file${status.exports.length === 1 ? "" : "s"} · ${fmtBytes(status.exports.reduce((n, e) => n + e.bytes, 0))}`
+        : "No exports saved for this video."}</p>
+      <ul className="space-y-1.5">
+        {status?.exports?.map((e) => <ExportRow key={`${name}:${e.file}:${e.revision}`} name={name} entry={e} current={e.file === file}
+          rendering={live.some((j) => j.export_file ? j.export_file === e.file : j.name === name)} />)}
+      </ul>
     </Drawer>
   );
+}
+
+function ExportRow({ name, entry: e, current, rendering }: { name: string; entry: ExportFile; current: boolean; rendering: boolean }) {
+  const [confirming, setConfirming] = useState(false), [deleting, setDeleting] = useState(false), [error, setError] = useState("");
+  const button = useRef<HTMLButtonElement>(null);
+  const cancel = () => { setConfirming(false); setError(""); requestAnimationFrame(() => button.current?.focus()); };
+  return <li className={`min-w-0 rounded-md border px-2.5 py-2 text-[12px] ${current ? "border-gold/40" : "border-line"}`}>
+    <p className="mb-1 break-all text-ink">{e.file}</p>
+    <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+      <span className="num flex-1 text-[11px] text-faint">{fmtBytes(e.bytes)} · {ago(e.mtime)}</span>
+      <div className="flex flex-wrap items-center gap-2">
+        <a className="inline-flex h-7 items-center text-gold hover:underline" target="_blank" href={`/media/out/${e.file}?${e.mtime}`}>Open ↗</a>
+        <a className="inline-flex h-7 items-center text-mute hover:text-ink" href={`/media/out/${e.file}?download=1&${e.mtime}`}>Download</a>
+        {!confirming && <span title={rendering ? "This file is queued or rendering" : "Delete this exported file"}>
+          <button ref={button} className="inline-flex h-7 items-center gap-1 text-mute hover:text-danger disabled:opacity-40" aria-label={`Delete ${e.file}`} disabled={rendering} onClick={() => setConfirming(true)}>{Icon.trash} Delete</button>
+        </span>}
+      </div>
+    </div>
+    {confirming && <div className="mt-2 border-t border-line pt-2">
+      <p className="mb-2 text-mute">Permanently delete this {fmtBytes(e.bytes)} file?</p>
+      {rendering && <p className="mb-2 text-gold">Wait for the queued export to finish.</p>}
+      <div className="flex flex-wrap gap-2">
+        <Button size="sm" autoFocus disabled={deleting} onClick={cancel}>Cancel</Button>
+        <Button size="sm" variant="danger" aria-label={`Confirm delete ${e.file}`} disabled={deleting || rendering} onClick={async () => {
+          setDeleting(true); setError("");
+          try { await deleteExport(name, e); }
+          catch (err) { setError((err as Error).message); setDeleting(false); }
+        }}>{Icon.trash}{deleting ? "Deleting…" : "Delete file"}</Button>
+      </div>
+      {error && <p role="alert" className="mt-2 break-words text-danger">{error}</p>}
+    </div>}
+  </li>;
 }

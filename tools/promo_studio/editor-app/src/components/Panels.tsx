@@ -108,7 +108,8 @@ function JobRow({ job }: { job: Job }) {
       {live && <div className="mt-2"><Progress value={job.progress} indeterminate={job.state === "queued"} /></div>}
       <p className={`num mt-1.5 break-words text-[12px] ${job.state === "error" ? "text-danger" : "text-mute"}`}>{job.state === "error" ? job.error : job.msg}</p>
       <div className="mt-1.5 flex gap-3 text-[11.5px]">
-        {job.kind === "render" && job.state === "done" && typeof job.result === "string" && <>
+        {job.kind === "render" && job.state === "done" && job.export_exists === false && <span className="text-faint">Export deleted or moved</span>}
+        {job.kind === "render" && job.state === "done" && job.export_exists !== false && typeof job.result === "string" && <>
           <a className="text-gold hover:underline" target="_blank" href={`/media/out/${job.result.split("/").pop()}?${job.ended}`}>Open the video ↗</a>
           <a className="text-mute hover:text-ink" href={`/media/out/${job.result.split("/").pop()}?download=1&${job.ended}`}>Download</a>
         </>}

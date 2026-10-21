@@ -18,6 +18,7 @@ context menus.
 | Toolbars | Playback and editing occupied separate rows, with different button heights and uneven icon alignment. | One toolbar joins playback/timecode, edit/key navigation, camera actions and timeline zoom. Controls share a 32 px height, 4 px within-group gaps and centered SVG icons. Camera actions collapse into a menu below 1,140 px of toolbar width; below 680 px, Tools also contains editing commands. The row stays single-line. Compact headers keep aspect selection in Look → Canvas. |
 | Look | Canvas settings were buried below appearance controls; background controls were split between tabs, blur could not reach sharp, thumbnail labels were internal IDs, and phone choices had no nearby preview. | Canvas comes first because it defines the video, followed by Background, Phone and Sound. Background separates Image adjustments from Movement; Blur and Brightness share Animate's playhead-aware properties. Blur reaches zero through the renderer. Short background names and selected-state semantics make the picker readable. A whole-phone preview above Colour, Base size and Shadow shows appearance before camera crops, following the existing take or showing the theme when no take exists. |
 | Take quality and phone fit | Android's encoder could not record native 2K; the old take already contained clipped status icons, and the drawn camera/corners differed from the emulator. | Recording → Record take exposes 1080p / 2K, with separate take identities. Host capture retains the whole status bar and real cutout, centred for the native framebuffer. The mockup uses physical display corners and omits its synthetic camera for these takes. Existing recordings need recording again to replace missing source pixels. |
+| Export management | Older export files had no delete control and finished jobs could keep broken download links. | Each export has a visible Delete action with inline confirmation, Cancel focus return and error feedback. A live file count and total size update without an overlaid success message, with an empty state after the last file. The server checks file ownership, its exact revision and active render destinations before unlinking. Job links reflect whether the output still exists. |
 | Video list | Footer text overflowed at minimum width; titles lacked a full-text tooltip; actions required hover. | The batch action has the shared export icon and wrapping text; titles have tooltips and actions remain visible. |
 | Drawers | Fixed drawer widths, shortcut columns and long progress messages could exceed the window. | Drawers fit the viewport, shortcut columns stack, and job/status text wraps. |
 | Context menus | Large menus could start above the window; scrolling dismissed them. | Menus stay inside the viewport, scroll vertically, and close on window resize. |
@@ -94,3 +95,11 @@ from 320 to 1440 px, both collapsed and expanded secondary groups keep all
 controls inside the inspector. Regression gates include ordinary edit-edge
 origin reuse, full-opening retention for take range selection, basmalah,
 repeated/screen-only range rejection, strict TypeScript/build and the JVM suite.
+
+Export deletion checks cover confirmation/Cancel and focus return, replaced-file
+conflicts, refresh, individual deletion, the last-file empty state, live-render
+disabling, and preservation of the edit/take. At 1440, 800, 390 and 320 px,
+long filenames and confirmation controls stay inside the drawer. HTTP
+regressions verify ownership/path and origin rejection, queued/running output
+protection, same-size/same-time replacement detection, another format remaining
+removable, and finished job links after deletion. QA deletes only owned fixtures.

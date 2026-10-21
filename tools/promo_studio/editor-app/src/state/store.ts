@@ -6,7 +6,7 @@ import { api } from "../lib/api.ts";
 import * as E from "../lib/edit.ts";
 import { applyVersePlan, nextVerseRange, verseRange, type VerseAction } from "../lib/verses.ts";
 import { clamp, plateLook, resolve, soundOnset, takeKey } from "../lib/model.ts";
-import type { Ease, Emulator, ExportOptions, Geo, Job, Meta, Plate, RawSpec, Selection, Spec, SpecStatus, Timeline, Wave } from "../lib/types.ts";
+import type { Ease, Emulator, ExportFile, ExportOptions, Geo, Job, Meta, Plate, RawSpec, Selection, Spec, SpecStatus, Timeline, Wave } from "../lib/types.ts";
 import { clock, media } from "./clock.ts";
 
 export type Tab = "animate" | "recording" | "look";
@@ -422,6 +422,16 @@ export async function exportVideo(name = get().name, opts = exportOptions()) {
   if (!name) return;
   if (name === get().name && !(await save())) return;
   return job(api.render(name, opts), `Export ${name}`);
+}
+export async function deleteExport(name: string, file: ExportFile) {
+  const result = await api.removeExport(name, file);
+  set((s) => ({
+    specs: s.specs.map((v) => {
+      const exports = v.name === name ? result.exports : v.exports?.filter((e) => e.file !== file.file);
+      return { ...v, exports, video: !!exports?.length, video_mtime: exports?.[0]?.mtime ?? null };
+    }),
+    jobs: s.jobs.map((j) => j.kind === "render" && j.state === "done" && typeof j.result === "string" && j.result.split("/").pop() === file.file ? { ...j, export_exists: false } : j),
+  }));
 }
 export const cancelJob = (id: string) => api.cancel(id).then(pollJobs, (e) => toast(e.message, "error"));
 export const bootEmulator = (cores: number) => job(api.bootEmu(cores), "Starting an emulator").then(() => pollEmus(true));

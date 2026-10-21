@@ -97,6 +97,13 @@ video's own or 60/50/30/25/24 fps. **Sound** is AAC 128 to 320 kbps, Opus
 lists this video's earlier exports to open or download (handy from another
 device on the LAN).
 
+Under **Exports of this video**, each file has Open, Download and **Delete**.
+Delete asks for confirmation in its row, then permanently removes only that
+export. The file count and total size update immediately; the take and edit
+stay available. A queued/running export owns its destination until it finishes.
+If a file has been replaced since the list loaded, Refresh loads the new
+version before it can be deleted. Finished jobs stop linking to deleted files.
+
 Each kind of export gets its own file, `<name>[-720p][-30fps].<ext>`, so a
 small copy never replaces the full-size master; exporting the same kind
 again replaces it. Presets: Social (H.264 1×), Small (720p 30 fps), Web

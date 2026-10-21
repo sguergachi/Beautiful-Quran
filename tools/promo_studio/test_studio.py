@@ -273,6 +273,54 @@ class FormatTests(unittest.TestCase):
 
 
 class ServerTests(unittest.TestCase):
+    def test_export_deletion_is_scoped_versioned_and_excludes_active_renders(self):
+        with tempfile.TemporaryDirectory(dir=SCRATCH) as d, patch.object(spec, 'OUT', d), patch.object(spec, 'SPECS', d), patch.object(server, 'JOB_DIR', d), patch.object(server.Jobs, '_loop', lambda _: None), patch.object(server.Jobs, '_start', lambda _, j: j.update(state='running')):
+            jobs = server.Jobs()
+            paths = {f: Path(d, f) for f in ('video.mp4', 'video-720p-30fps.webm', 'other.mp4', 'video.json', 'take.mkv')}
+            for path in paths.values(): path.write_bytes(b'keep')
+            srv = ThreadingHTTPServer(('127.0.0.1', 0), server.Handler)
+            with patch.object(server, 'JOBS', jobs):
+                thread = threading.Thread(target=srv.serve_forever, daemon=True); thread.start()
+                def delete(name, file, revision, origin=None):
+                    c = http.client.HTTPConnection(*srv.server_address)
+                    headers = {'Content-Type': 'application/json', **({'Origin': origin} if origin else {})}
+                    c.request('DELETE', f'/api/exports/{name}/{file}', json.dumps({'revision': revision}), headers)
+                    r = c.getresponse(); status, body = r.status, json.loads(r.read()); c.close()
+                    return status, body
+                def revision(file): return next(e['revision'] for e in server.exports('video') if e['file'] == file)
+                try:
+                    old = revision('video.mp4')
+                    self.assertEqual(delete('video', 'video.mp4', old, 'https://example.org')[0], 403)
+                    self.assertEqual(delete('video', 'other.mp4', old)[0], 400)
+                    self.assertEqual(delete('video', '%2e%2e%2fother.mp4', old)[0], 404)
+                    self.assertEqual(delete('video', 'video.json', old)[0], 400)
+                    # Replacement preserves size and mtime; its inode still
+                    # distinguishes the new export from the displayed one.
+                    st = paths['video.mp4'].stat()
+                    replacement = Path(d, 'replacement')
+                    replacement.write_bytes(b'next')
+                    os.utime(replacement, ns=(st.st_atime_ns, st.st_mtime_ns))
+                    os.replace(replacement, paths['video.mp4'])
+                    self.assertEqual(delete('video', 'video.mp4', old)[0], 409)
+                    current = revision('video.mp4')
+                    job = jobs.submit('render', 'other-video', ['render', 'other-video'], export_file='video.mp4')
+                    self.assertEqual(delete('video', 'video.mp4', current)[0], 409)
+                    jobs.jobs[job['id']]['state'] = 'queued'
+                    self.assertEqual(delete('video', 'video.mp4', current)[0], 409)
+                    # Another format stays removable while that path is owned.
+                    status, body = delete('video', 'video-720p-30fps.webm', revision('video-720p-30fps.webm'))
+                    self.assertEqual(status, 200)
+                    self.assertEqual([e['file'] for e in body['exports']], ['video.mp4'])
+                    jobs.jobs[job['id']].update(state='done', result=str(paths['video.mp4']))
+                    self.assertTrue(jobs.public(jobs.jobs[job['id']])['export_exists'])
+                    self.assertEqual(delete('video', 'video.mp4', current)[0], 200)
+                    self.assertFalse(jobs.public(jobs.jobs[job['id']])['export_exists'])
+                    self.assertEqual(delete('video', 'video.mp4', current)[0], 404)
+                    self.assertFalse(paths['video.mp4'].exists())
+                    for file in ('other.mp4', 'video.json', 'take.mkv'):
+                        self.assertEqual(paths[file].read_bytes(), b'keep')
+                finally: srv.shutdown(); srv.server_close(); thread.join()
+
     def test_atomic_put_and_media_ranges(self):
         with tempfile.TemporaryDirectory(dir=SCRATCH) as d, patch.object(spec, "SPECS", d), patch.object(spec, "CACHE", d):
             srv = ThreadingHTTPServer(("127.0.0.1", 0), server.Handler)

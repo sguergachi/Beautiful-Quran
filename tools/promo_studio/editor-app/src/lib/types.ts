@@ -84,7 +84,7 @@ export interface SpecStatus {
   app?: Spec["app"]; duration?: number; take?: boolean; take_length?: number | null; take_short?: boolean;
   video?: boolean; video_mtime?: number | null; exports?: ExportFile[];
 }
-export interface ExportFile { file: string; bytes: number; mtime: number }
+export interface ExportFile { file: string; bytes: number; mtime: number; revision: string }
 
 // Export settings (formats.py): what the editor offers and what it sends.
 export type ExportFormat = "h264" | "hevc" | "av1" | "vp9" | "prores" | "gif";
@@ -106,6 +106,7 @@ export interface Job {
   serial: string | null; state: JobState; stage: { key: string; msg: string } | null;
   stages: { key: string; msg: string; at: number }[]; progress: number; msg: string; log: string[];
   created: number; started: number | null; ended: number | null; result: unknown; error: string | null;
+  export_file?: string; export_exists?: boolean;
 }
 export interface Emulator {
   serial: string; port: number; kind: "capture" | "pool"; booted: boolean; app: boolean;
