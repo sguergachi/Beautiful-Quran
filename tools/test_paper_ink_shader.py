@@ -32,12 +32,12 @@ class PaperInkShaderTest(unittest.TestCase):
                         samplingOptions=skia.SamplingOptions(skia.FilterMode.kLinear))
                 cls.words.append((spec, children))
 
-    def render(self, word, repeat, wet, weight, method, tint=1, progress=1):
+    def render(self, word, repeat, wet, weight, method, tint=1, progress=1, retained=1):
         spec, children = word
         builder = skia.RuntimeShaderBuilder(self.effect)
         for name, child in children.items():
             builder.setChild(name, child)
-        uniforms = dict(progress=float(progress), reflectionStrength=0., lightSoftness=0., retained=1.,
+        uniforms = dict(progress=float(progress), reflectionStrength=0., lightSoftness=0., retained=float(retained),
                         wet=float(wet), weight=float(weight), aa=.9, repeatColor=[180/255, 85/255, 30/255],
                         repeatPass=float(repeat), repeatTint=float(tint), spreadMethod=float(method),
                         letterDuration=spec['letterDuration'], origin=[0., 0.])

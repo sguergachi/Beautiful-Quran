@@ -8,7 +8,8 @@ from PIL import Image, ImageDraw, ImageFont
 from scipy.ndimage import distance_transform_edt, label
 
 from build_paper_ink_study import (
-    ARABIC_FONT, ENGLISH_FONT, ROOT, SS, filling_field, liquid_surface, reservoir_growth, wicking_basins,
+    ARABIC_FONT, ENGLISH_FONT, ROOT, SS, connected_letter_flow, filling_field, liquid_surface,
+    reservoir_growth, wicking_basins,
 )
 
 
@@ -26,6 +27,28 @@ def material(text, arabic=False, merging=True):
 
 
 class PaperInkStudyTest(unittest.TestCase):
+    def test_joined_letters_exchange_ink_smoothly_without_retiming_their_interiors(self):
+        ink = np.zeros((80, 320), dtype=bool)
+        ink[28:52, 20:300] = True
+        owners = np.broadcast_to((np.arange(320) >= 160).astype(int), ink.shape)
+        arrival = np.where(owners == 0, .2, .8)
+        flowing = connected_letter_flow(arrival, ink, owners, 160)
+        # The old ownership cut jumped 60% of the word in one raster pixel.
+        self.assertLess(np.max(np.abs(np.diff(flowing[40, 100:220]))), .04)
+        self.assertTrue(np.all(np.diff(flowing[40, 20:300]) >= -1e-12))
+        np.testing.assert_array_equal(flowing[:, :100], arrival[:, :100])
+        np.testing.assert_array_equal(flowing[:, 220:], arrival[:, 220:])
+        self.assertGreaterEqual(flowing[ink].min(), .2 - 1e-12)
+        self.assertLessEqual(flowing[ink].max(), .8 + 1e-12)
+
+    def test_close_but_disconnected_letters_keep_their_own_ink(self):
+        ink = np.zeros((80, 320), dtype=bool)
+        ink[28:52, 20:159] = True
+        ink[28:52, 161:300] = True
+        owners = np.broadcast_to((np.arange(320) >= 160).astype(int), ink.shape)
+        arrival = np.where(owners == 0, .2, .8)
+        np.testing.assert_array_equal(connected_letter_flow(arrival, ink, owners, 160), arrival)
+
     def test_liquid_surface_does_not_flatten_when_the_font_raster_is_half_size(self):
         fields = []
         for size in (160, 80):

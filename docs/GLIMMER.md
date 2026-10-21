@@ -27,7 +27,7 @@ reading order. The continuous wash never skips an earlier word.
 
 **Inside out / Merging pools** switches the ink spread without restarting
 playback or changing the other controls. **Inside out** is the default,
-restoring the earlier depth-led interior spread. **Merging pools** is the
+using the earlier depth-led interior spread. **Merging pools** is the
 Pentiment-inspired comparison, with separated deposits joining within each
 letter. Both develop from deep interiors toward the contour and branches.
 Direction comes from overlapping letter start times: roughly three letter
@@ -48,8 +48,12 @@ delays. The reservoir fronts spread along connected strokes, join, and soak
 out to the contour. Deep passages carry ink faster; distant parts no longer
 appear together merely because they have the same stroke thickness. Small
 marks keep a single deposit and follow their associated letter. A soft temporal
-front scales to the letter duration; joins are smoothed without changing the
-glyph outline.
+front scales to the letter duration. Where letter basins touch, a tapered
+diffusion band blends their arrival times along the connected ink. It follows
+stroke paths through the join, keeping distant letter interiors and their
+reading-order starts intact. Paper gaps do not conduct that blend. Both spread
+methods use it; the printed contour stays unchanged. The solve is baked into
+the maps and adds no shader work or runtime sampling.
 
 This is a geometry-guided approximation of letter ownership and liquid spread,
 not anatomical letter outlines recovered from a ligature, a fluid solver or
@@ -174,6 +178,8 @@ ligatures, single-pixel marks, separate deposits merging inside one letter,
 capillary paths around a paper gap, and distinct growth on identical outlines
 and schedules when switching spread methods. A surface-scale regression checks
 equivalent film depth and curvature at half-size font rasterization.
+Connected-flow regressions check a smooth, bounded transition through a shared
+stroke with fixed interiors, and exact independence across a narrow paper gap.
 The controlled reflection is identical in recordings and on a still phone;
 physical-device performance and reading comfort still need evaluation.
 

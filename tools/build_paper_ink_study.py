@@ -12,8 +12,9 @@ import numpy as np
 import uharfbuzz as hb
 from PIL import Image, ImageDraw, ImageFont
 from scipy.ndimage import distance_transform_edt, find_objects, gaussian_filter, label
-from scipy.sparse import coo_matrix
-from scipy.sparse.csgraph import dijkstra
+from scipy.sparse import coo_matrix, diags, eye
+from scipy.sparse.csgraph import dijkstra, laplacian
+from scipy.sparse.linalg import spsolve
 
 ROOT = Path(__file__).resolve().parents[1]
 SS = 4
@@ -120,6 +121,40 @@ def letter_anchors(advances, plain_advances, owner, ink, rtl):
     return anchors
 
 
+def connected_letter_flow(arrival, ink, owners, font_size):
+    """Blend letter timing across actual ink joins, keeping distant interiors fixed.
+
+    A screened graph diffusion removes ownership cuts along connected strokes.
+    Its tapered band follows ink paths: nearby letters separated by paper never
+    exchange ink, and the original per-letter pools remain outside that band.
+    This is baked into the arrival map, with no added runtime sampling.
+    """
+    graph = ink_graph(ink, np.full(ink.shape, .75))
+    edges = graph.tocoo()
+    letters = owners[ink]
+    joins = letters[edges.row] != letters[edges.col]
+    if not joins.any():
+        return arrival
+    seeds = np.unique(np.concatenate((edges.row[joins], edges.col[joins])))
+    radius = font_size * .08 * SS
+    travel = dijkstra(graph, directed=False, indices=seeds, min_only=True, limit=radius)
+    selected = np.flatnonzero(travel < radius)
+    strength = (radius / 2) ** 2 * (1 - (travel[selected] / radius) ** 2) ** 2
+    conductance = graph + graph.T
+    conductance.data = 1 / conductance.data ** 2
+    diffusion = laplacian(conductance).tocsr()
+    local = diffusion[selected][:, selected]
+    values = arrival[ink]
+    # The unselected nodes are fixed boundary conditions from the original fill.
+    rhs = values[selected] - strength * ((diffusion @ values)[selected] - local @ values[selected])
+    solved = spsolve(eye(len(selected), format='csr') + diags(strength) @ local, rhs)
+    result = arrival.copy()
+    blended = values.copy()
+    blended[selected] = solved
+    result[ink] = blended
+    return result
+
+
 def filling_field(text, ink, distance, box, ascent, font_path, font_size, merging=True):
     """Schedule shaped letter clusters, then wick from their interiors to the contour."""
     font = hb.Font(hb.Face(font_path.read_bytes()))
@@ -168,6 +203,7 @@ def filling_field(text, ink, distance, box, ascent, font_path, font_size, mergin
     duration = 2.8 / (len(ordered) + 1.8)
     onsets = {letter: i / (len(ordered) + 1.8) for i, (letter, _) in enumerate(ordered)}
     inside_out = np.zeros(ink.shape)
+    letter_owner = np.full(ink.shape, -1)
     filled_letters = set()
     for cluster, pools in anchors.items():
         pieces, _ = label(ink & (owner == cluster), np.ones((3, 3)))
@@ -183,6 +219,7 @@ def filling_field(text, ink, distance, box, ascent, font_path, font_size, mergin
                 local = [(letter, center - region[1].start)]
             owners, travel = wicking_basins(pixels, distance[region], local)
             filled_letters.update(owners)
+            letter_owner[region][pixels] = owners
             growth = np.empty(int(pixels.sum()))
             for letter in np.unique(owners):
                 basin = owners == letter
@@ -197,6 +234,7 @@ def filling_field(text, ink, distance, box, ascent, font_path, font_size, mergin
             starts = np.array([onsets[letter] for letter in owners])
             inside_out[region][pixels] = starts + duration * (.12 + .76 * growth)
     assert filled_letters == onsets.keys(), (text, filled_letters, onsets.keys())
+    inside_out = connected_letter_flow(inside_out, ink, letter_owner, font_size)
     nearest = tuple(distance_transform_edt(~ink, return_distances=False, return_indices=True))
     # Extrapolate into wet spread and soften joins without blurring the printed contour.
     return gaussian_filter(inside_out[nearest], SS * .65), duration
