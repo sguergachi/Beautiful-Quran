@@ -1,0 +1,104 @@
+{
+  "title": "Abasa 36–37 · Alafasy · Royal green · repeat",
+  "aspect": "1:1",
+  "app": {
+    "surah": 80,
+    "ayah": 33,
+    "reciter": "alafasy",
+    "theme": "Royal green",
+    "seconds": 38
+  },
+  "edit": [
+    {
+      "in": 18.6,
+      "out": 36.6
+    }
+  ],
+  "background": {
+    "id": "rain-train"
+  },
+  "phone": {
+    "height": 0.8
+  },
+  "props": {
+    "phone_y": 0.035
+  },
+  "tracks": {
+    "zoom": [
+      {
+        "t": 0,
+        "v": 1
+      },
+      {
+        "t": 6.4,
+        "v": 1
+      },
+      {
+        "t": 7.9,
+        "v": 2.2,
+        "ease": "inOutCubic"
+      },
+      {
+        "t": 13.2,
+        "v": 2.2
+      },
+      {
+        "t": 14.4,
+        "v": 1,
+        "ease": "inOutCubic"
+      }
+    ],
+    "pan_x": [
+      {
+        "t": 0,
+        "v": 0.5
+      },
+      {
+        "t": 6.4,
+        "v": 0.5
+      },
+      {
+        "t": 7.9,
+        "v": 0.5,
+        "ease": "inOutCubic"
+      },
+      {
+        "t": 13.2,
+        "v": 0.5
+      },
+      {
+        "t": 14.4,
+        "v": 0.5,
+        "ease": "inOutCubic"
+      }
+    ],
+    "pan_y": [
+      {
+        "t": 0,
+        "v": 0.5
+      },
+      {
+        "t": 6.4,
+        "v": 0.5
+      },
+      {
+        "t": 7.9,
+        "v": 0.393,
+        "ease": "inOutCubic"
+      },
+      {
+        "t": 13.2,
+        "v": 0.393
+      },
+      {
+        "t": 14.4,
+        "v": 0.5,
+        "ease": "inOutCubic"
+      }
+    ]
+  },
+  "audio": {
+    "fade_in": 0.4,
+    "fade_out": 1.8
+  }
+}

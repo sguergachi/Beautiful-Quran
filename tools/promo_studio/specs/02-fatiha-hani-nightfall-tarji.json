@@ -1,0 +1,131 @@
+{
+  "title": "Al-Fatihah 5–7 · Hani · Nightfall · tarji",
+  "aspect": "1:1",
+  "app": {
+    "surah": 1,
+    "ayah": 5,
+    "reciter": "hani",
+    "theme": "Nightfall",
+    "seconds": 28
+  },
+  "edit": [
+    {
+      "in": 0.0,
+      "out": 24.95
+    }
+  ],
+  "background": {
+    "id": "moon-sea"
+  },
+  "phone": {
+    "height": 0.8
+  },
+  "props": {
+    "bg_brightness": 0.04,
+    "phone_y": 0.035
+  },
+  "tracks": {
+    "zoom": [
+      {
+        "t": 0,
+        "v": 1.0
+      },
+      {
+        "t": 10.0,
+        "v": 1.0
+      },
+      {
+        "t": 11.6,
+        "v": 1.6,
+        "ease": "inOutCubic"
+      },
+      {
+        "t": 16.0,
+        "v": 1.6
+      },
+      {
+        "t": 17.4,
+        "v": 2.4,
+        "ease": "inOutCubic"
+      },
+      {
+        "t": 21.2,
+        "v": 2.4
+      },
+      {
+        "t": 22.6,
+        "v": 1.0,
+        "ease": "inOutCubic"
+      }
+    ],
+    "pan_x": [
+      {
+        "t": 0,
+        "v": 0.5
+      },
+      {
+        "t": 10.0,
+        "v": 0.5
+      },
+      {
+        "t": 11.6,
+        "v": 0.5,
+        "ease": "inOutCubic"
+      },
+      {
+        "t": 16.0,
+        "v": 0.5
+      },
+      {
+        "t": 17.4,
+        "v": 0.5,
+        "ease": "inOutCubic"
+      },
+      {
+        "t": 21.2,
+        "v": 0.5
+      },
+      {
+        "t": 22.6,
+        "v": 0.5,
+        "ease": "inOutCubic"
+      }
+    ],
+    "pan_y": [
+      {
+        "t": 0,
+        "v": 0.5
+      },
+      {
+        "t": 10.0,
+        "v": 0.5
+      },
+      {
+        "t": 11.6,
+        "v": 0.3908,
+        "ease": "inOutCubic"
+      },
+      {
+        "t": 16.0,
+        "v": 0.3908
+      },
+      {
+        "t": 17.4,
+        "v": 0.4822,
+        "ease": "inOutCubic"
+      },
+      {
+        "t": 21.2,
+        "v": 0.4822
+      },
+      {
+        "t": 22.6,
+        "v": 0.5,
+        "ease": "inOutCubic"
+      }
+    ]
+  },
+  "audio": {
+    "fade_out": 2.0
+  }
+}
