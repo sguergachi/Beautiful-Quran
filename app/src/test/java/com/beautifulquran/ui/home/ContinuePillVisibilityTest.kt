@@ -195,16 +195,6 @@ class ContinuePillVisibilityTest {
     }
 
     @Test
-    fun pinnedWashesJoinIntoOneRoundedBlock() {
-        // A lone pin is a whole pill.
-        assertEquals(true to true, pinnedWashCorners(0, 1))
-        // Three pins: rounded top, square middle, rounded bottom.
-        assertEquals(true to false, pinnedWashCorners(0, 3))
-        assertEquals(false to false, pinnedWashCorners(1, 3))
-        assertEquals(false to true, pinnedWashCorners(2, 3))
-    }
-
-    @Test
     fun continueRowOffSheetWhileSearching() {
         val ids = (1..114).toList()
         assertEquals(-1, continueLazyIndex(ids, 18, true))

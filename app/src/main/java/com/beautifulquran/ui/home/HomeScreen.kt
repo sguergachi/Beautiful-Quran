@@ -41,7 +41,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -65,12 +64,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.composed
 import androidx.compose.ui.geometry.Size
-import androidx.compose.ui.graphics.Outline
-import androidx.compose.ui.graphics.Path
-import androidx.compose.ui.graphics.addOutline
-import androidx.compose.ui.graphics.Shape
-import androidx.compose.ui.unit.Density
-import androidx.compose.ui.unit.LayoutDirection
+import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
@@ -166,13 +160,15 @@ private val HomeArabicOpticalInset = 4.dp
 private val TopBoundRibbonHeight = 96.dp
 /** The pinned wash's inset from the sheet edge: the Continue pill's own. */
 private val PinnedWashMargin = 16.dp
-/** Paper above the pinned block: the search feather's depth, so the wash
- * starts at full strength instead of dissolving under the field. */
+/** Paper above the pinned stack: the search feather's depth, so the flag
+ * and first capsule sit clear of the field's fade. */
 private val PinnedBlockTop = 20.dp
-/** Paper between the pinned block and the full list below it. */
+/** Paper between the pinned stack and the full list below it. */
 private val PinnedGroupGap = 20.dp
-/** Pinned rows are set compact, as the Continue pill sets its row. */
-private val PinnedRowVertical = 10.dp
+/** Pinned rows are set compact, as the Continue pill sets its row; the
+ * extra half-gap either side is the paper between capsules. */
+private val PinnedCapsuleGap = 6.dp
+private val PinnedRowVertical = 10.dp + PinnedCapsuleGap / 2
 /**
  * Paper margin between the field and where scrolled ink dies: the feather
  * finishes dissolving a row here, so fading rows never brush the bar. While
@@ -744,11 +740,10 @@ fun HomeScreen(
                         }
                     }
                     if (showPinned) {
-                        val blockSize = uiState.pinned.size + 1
                         item(key = "pinned-air") {
                             Spacer(Modifier.height(PinnedBlockTop).animateItem())
                         }
-                        // The block's head: a small-caps flag on the names'
+                        // The stack's head: a small-caps flag on the names'
                         // rail, the Continue pill's CONTINUE flag in kind.
                         item(key = "pinned-flag") {
                             Text(
@@ -760,20 +755,19 @@ fun HomeScreen(
                                 modifier = Modifier
                                     .animateItem()
                                     .fillMaxWidth()
-                                    .pinnedWash(pinnedWashShape(0, blockSize))
                                     .padding(
                                         start = HomeStartInset + HomeNumberColumn + HomeColumnGap,
                                         top = 14.dp,
                                     ),
                             )
                         }
-                        itemsIndexed(uiState.pinned, key = { _, it -> "pinned-${it.id}" }) { index, surah ->
+                        items(uiState.pinned, key = { "pinned-${it.id}" }) { surah ->
                             chapterRow(
                                 surah,
                                 "pinned-${surah.id}",
                                 Modifier
                                     .animateItem()
-                                    .pinnedWash(pinnedWashShape(index + 1, blockSize)),
+                                    .pinnedCapsule(),
                                 PinnedRowVertical,
                             )
                         }
@@ -1180,34 +1174,24 @@ internal fun continueLazyIndex(
 }
 
 /**
- * Which corners of a pinned row's wash round: the first row's top, the last
- * row's bottom. Adjacent rows' square edges meet, so the group reads as one
- * rounded block — a lone pin is a whole pill.
+ * A pinned chapter's capsule: the Continue pill's green wash, margin and
+ * fully round ends, one per row with a hairline of paper between, so the
+ * pinned chapters read as a stack of pills rather than a card. It does not
+ * clip: the place ribbon hangs in the sheet-edge lane and lies whole over
+ * the capsule's end.
  */
-internal fun pinnedWashCorners(index: Int, count: Int): Pair<Boolean, Boolean> =
-    (index == 0) to (index == count - 1)
-
-private fun pinnedWashShape(index: Int, count: Int): Shape {
-    val (top, bottom) = pinnedWashCorners(index, count)
-    val topRadius = if (top) ContinuePillRadius else 0.dp
-    val bottomRadius = if (bottom) ContinuePillRadius else 0.dp
-    return RoundedCornerShape(topRadius, topRadius, bottomRadius, bottomRadius)
-}
-
-/** The Continue pill's green wash behind a pinned row. The row's content
- * keeps the list's rails; the wash is inset from the sheet edge. It does not
- * clip: the place ribbon hangs in the sheet-edge lane, so the curve would
- * slice the cloth — it lies whole over the wash's edge instead. */
-private fun Modifier.pinnedWash(shape: Shape): Modifier = composed {
-    background(QuranTheme.accents.greenWash, remember(shape) { HorizontalInsetShape(shape, PinnedWashMargin) })
-}
-
-/** [shape] drawn [inset] in from both side edges of the element. */
-private class HorizontalInsetShape(private val shape: Shape, private val inset: Dp) : Shape {
-    override fun createOutline(size: Size, layoutDirection: LayoutDirection, density: Density): Outline {
-        val px = with(density) { inset.toPx() }
-        val inner = shape.createOutline(Size(size.width - 2 * px, size.height), layoutDirection, density)
-        return Outline.Generic(Path().apply { addOutline(inner); translate(Offset(px, 0f)) })
+private fun Modifier.pinnedCapsule(): Modifier = composed {
+    val wash = QuranTheme.accents.greenWash
+    drawBehind {
+        val margin = PinnedWashMargin.toPx()
+        val gap = PinnedCapsuleGap.toPx() / 2f
+        val height = size.height - 2 * gap
+        drawRoundRect(
+            color = wash,
+            topLeft = Offset(margin, gap),
+            size = Size(size.width - 2 * margin, height),
+            cornerRadius = CornerRadius(height / 2f),
+        )
     }
 }
 
