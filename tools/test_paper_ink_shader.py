@@ -119,14 +119,24 @@ class PaperInkShaderTest(unittest.TestCase):
             prefix = 'word-en' if 'text' in spec else 'word'
             full_field = np.asarray(Image.open(ASSETS / f'{prefix}-2-{spec["position"]}-field.png')).astype(float)
             field = full_field[2::4, 2::4][:spec['height'], :spec['width']]
-            # A pixel is untouched only when all four subpixel taps lie beyond
-            # the lead. Each linearly sampled tap averages four 4x field texels;
+            # A pixel is untouched only when all eight subpixel taps lie beyond
+            # the lead. Sample the same continuous 4x field as the shader;
             # using just the centre misclassifies pixels on steep arrival edges.
-            taps = np.array([
-                sum(full_field[y + dy::4, x + dx::4][:spec['height'], :spec['width']]
-                    for dy in (0, 1) for dx in (0, 1)) * .25
-                for y in (0, 2) for x in (0, 2)
-            ])
+            taps = []
+            for dx, dy in [(-7, -1), (-5, 5), (-3, -7), (-1, 3),
+                           (1, -3), (3, 7), (5, -5), (7, 1)]:
+                x = np.arange(spec['width']) * 4 + 1.5 + dx / 4
+                y = np.arange(spec['height']) * 4 + 1.5 + dy / 4
+                ix, iy = np.floor(x).astype(int), np.floor(y).astype(int)
+                fx, fy = (x - ix)[None, :, None], (y - iy)[:, None, None]
+                sample = 0
+                for oy in (0, 1):
+                    for ox in (0, 1):
+                        sample = sample + full_field[np.clip(iy + oy, 0, full_field.shape[0] - 1)[:, None],
+                            np.clip(ix + ox, 0, full_field.shape[1] - 1)[None, :]] * \
+                            (fx if ox else 1 - fx) * (fy if oy else 1 - fy)
+                taps.append(sample)
+            taps = np.array(taps)
             d = spec['letterDuration']
             slot = (1 - .24 * d) / max(1, 2.8 / d - 1.8)
             for method in (0, 1):

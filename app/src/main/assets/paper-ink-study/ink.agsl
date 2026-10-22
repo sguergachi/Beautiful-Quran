@@ -96,9 +96,15 @@ half4 main(float2 p) {
     float base = smoothstep(-aa * 0.5, aa * 0.5, distance);
     if (base == 0.0 && distance < -weight - max(aa, 1.0)) return half4(250.0 / 255.0, 243.0 / 255.0, 232.0 / 255.0, 1.0);
     if (wet <= 0.0) return inkAt(p, base, aa);
-    float pixelOffset = aa * (0.25 / 0.9);
-    return (inkAt(p + float2(-pixelOffset, -pixelOffset), base, aa * 0.5) +
-            inkAt(p + float2( pixelOffset, -pixelOffset), base, aa * 0.5) +
-            inkAt(p + float2(-pixelOffset,  pixelOffset), base, aa * 0.5) +
-            inkAt(p + float2( pixelOffset,  pixelOffset), base, aa * 0.5)) * 0.25;
+    // Stratify across both axes so a thin alif reflection has eight samples.
+    float step = aa / (0.9 * 16.0);
+    float tapAA = aa * 0.35355339;
+    return (inkAt(p + float2(-7.0, -1.0) * step, base, tapAA) +
+            inkAt(p + float2(-5.0,  5.0) * step, base, tapAA) +
+            inkAt(p + float2(-3.0, -7.0) * step, base, tapAA) +
+            inkAt(p + float2(-1.0,  3.0) * step, base, tapAA) +
+            inkAt(p + float2( 1.0, -3.0) * step, base, tapAA) +
+            inkAt(p + float2( 3.0,  7.0) * step, base, tapAA) +
+            inkAt(p + float2( 5.0, -5.0) * step, base, tapAA) +
+            inkAt(p + float2( 7.0,  1.0) * step, base, tapAA)) * 0.125;
 }

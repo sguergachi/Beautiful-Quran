@@ -114,9 +114,16 @@ half4 main(float2 p) {
     float base = normals.eval(p).b;
     if (base == 0.0 && distance < -weight - max(aa, 1.0)) return half4(0.0);
     if (wet <= 0.0) return evaporated(inkAt(p, base, aa), base);
-    float pixelOffset = aa * (0.25 / 0.9);
-    return evaporated((inkAt(p + float2(-pixelOffset, -pixelOffset), base, aa * 0.5) +
-            inkAt(p + float2( pixelOffset, -pixelOffset), base, aa * 0.5) +
-            inkAt(p + float2(-pixelOffset,  pixelOffset), base, aa * 0.5) +
-            inkAt(p + float2( pixelOffset,  pixelOffset), base, aa * 0.5)) * 0.25, base);
+    // Eight distinct positions along both axes resolve thin reflected lines
+    // on nearly vertical alifs; a 2x2 grid has only two horizontal samples.
+    float step = aa / (0.9 * 16.0);
+    float tapAA = aa * 0.35355339;
+    return evaporated((inkAt(p + float2(-7.0, -1.0) * step, base, tapAA) +
+            inkAt(p + float2(-5.0,  5.0) * step, base, tapAA) +
+            inkAt(p + float2(-3.0, -7.0) * step, base, tapAA) +
+            inkAt(p + float2(-1.0,  3.0) * step, base, tapAA) +
+            inkAt(p + float2( 1.0, -3.0) * step, base, tapAA) +
+            inkAt(p + float2( 3.0,  7.0) * step, base, tapAA) +
+            inkAt(p + float2( 5.0, -5.0) * step, base, tapAA) +
+            inkAt(p + float2( 7.0,  1.0) * step, base, tapAA)) * 0.125, base);
 }

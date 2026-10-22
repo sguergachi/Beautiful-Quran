@@ -17,12 +17,25 @@ from paper_ink_outline import outline_distance
 ROOT = Path(__file__).resolve().parents[1]
 SOURCE = (ROOT / 'app/src/main/assets/paper-ink/ink.agsl').read_text()
 # Same material, sampled directly. At high resolution, this integrates the
-# pixel area independently of the production four-tap approximation.
+# pixel area independently of the production eight-tap approximation.
 POINT_SOURCE = SOURCE[:SOURCE.index('// Integrate the wet material')] + '''
+uniform float2 samplePhase;
 half4 main(float2 p) {
-    float base = normals.eval(floor(p) + 0.5).b;
+    float base = normals.eval(floor(p + samplePhase) + 0.5 - samplePhase).b;
     float unread = base * unreadAlpha;
     return mix(inkAt(p, base, aa), half4(dryInk * unread, unread), evaporation);
+}
+'''
+QUAD_SOURCE = SOURCE[:SOURCE.index('// Integrate the wet material')] + '''
+half4 main(float2 p) {
+    float base = normals.eval(p).b;
+    float o = aa * (0.25 / 0.9);
+    half4 ink = (inkAt(p + float2(-o, -o), base, aa * 0.5) +
+        inkAt(p + float2(o, -o), base, aa * 0.5) +
+        inkAt(p + float2(-o, o), base, aa * 0.5) +
+        inkAt(p + float2(o, o), base, aa * 0.5)) * 0.25;
+    float unread = base * unreadAlpha;
+    return mix(ink, half4(dryInk * unread, unread), evaporation);
 }
 '''
 
@@ -69,12 +82,13 @@ class PaperInkAntialiasingTest(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         cls.effects = {'aa': skia.RuntimeEffect.MakeForShader(SOURCE),
-                       'point': skia.RuntimeEffect.MakeForShader(POINT_SOURCE)}
+                       'point': skia.RuntimeEffect.MakeForShader(POINT_SOURCE),
+                       'quad': skia.RuntimeEffect.MakeForShader(QUAD_SOURCE)}
         cls.words = [word('ٱللَّهِ', geometry.ARABIC_FONT, 40, True, 4),
                      word('ٱلرَّحۡمَٰنِ', geometry.ARABIC_FONT, 40, True, 6),
                      word('Merciful', geometry.ENGLISH_FONT, 24, False, 8)]
 
-    def render(self, word, effect='aa', resolution=1, **values):
+    def render(self, word, effect='aa', resolution=1, pixel_phase=(0., 0.), **values):
         builder = skia.RuntimeShaderBuilder(self.effects[effect])
         for name, child in word['children'].items():
             builder.setChild(name, child)
@@ -86,8 +100,11 @@ class PaperInkAntialiasingTest(unittest.TestCase):
         uniforms.update(values)
         for name, value in uniforms.items():
             builder.setUniform(name, value)
+        if effect == 'point':
+            builder.setUniform('samplePhase', list(pixel_phase))
         surface = skia.Surface(word['width'] * resolution, word['height'] * resolution)
         surface.getCanvas().scale(resolution, resolution)
+        surface.getCanvas().translate(*pixel_phase)
         surface.getCanvas().drawPaint(skia.Paint(Shader=builder.makeShader()))
         return surface.makeImageSnapshot().toarray(colorType=skia.ColorType.kRGBA_8888_ColorType,
             alphaType=skia.AlphaType.kPremul_AlphaType)
@@ -120,6 +137,28 @@ class PaperInkAntialiasingTest(unittest.TestCase):
         point_error, filtered_error = np.mean(errors, axis=0)
         print(f'Wet pixel-area MSE: point={point_error:.4f}, antialiased={filtered_error:.4f}')
         self.assertLess(filtered_error, point_error * .85)
+
+    def test_alif_reflection_uses_the_pixel_area_at_fractional_reader_positions(self):
+        from scipy.ndimage import label, find_objects
+        errors = []
+        for size in (48, 80, 112):
+            pictured = word('أُمِرُوٓاْ', geometry.ARABIC_FONT, size, True, 5)
+            components = find_objects(label(pictured['coverage'] > 127)[0])
+            stem = max((s for s in components if s[0].stop - s[0].start > pictured['height'] * .25),
+                       key=lambda s: s[1].stop)
+            region = tuple(slice(max(0, s.start - 2), s.stop + 2) for s in stem)
+            for phase in ((0., 0.), (.3, .4), (.65, .2)):
+                for progress in (.25, .6, 1.):
+                    options = dict(pixel_phase=phase, progress=progress, retained=0.)
+                    reference = self.render(pictured, 'point', 8, **options).astype(float)
+                    reference = reference.reshape(pictured['height'], 8, pictured['width'], 8, 4).mean((1, 3))
+                    quad = self.render(pictured, 'quad', **options).astype(float)
+                    actual = self.render(pictured, **options).astype(float)
+                    errors.append([np.mean((pixels[region] - reference[region]) ** 2)
+                                   for pixels in (quad, actual)])
+        quad_error, filtered_error = np.mean(errors, axis=0)
+        print(f'Alif reflection MSE: four-tap={quad_error:.4f}, stratified={filtered_error:.4f}')
+        self.assertLess(filtered_error, quad_error * .7)
 
     def test_evaporation_dissolves_the_existing_deposit_to_exact_unread_ink(self):
         for word in self.words:

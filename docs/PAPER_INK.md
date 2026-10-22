@@ -99,10 +99,13 @@ the background generator, with the same textures and cache limit. Arrival
 fields keep their existing depth solver, so letter timing and spread stay
 unchanged. The study's baked 4× maps are unchanged.
 
-Wet ink uses four subpixel samples in a 2×2 grid, each with a half-pixel
-coverage filter. This antialiases the expanded outline, swelling front and
-focused reflection together. Each sample keeps the original glyph coverage
-at the pixel centre, so the printed base stays crisp. Fully dry words use
+Wet ink uses eight stratified subpixel samples, with a distinct position along
+both axes in each sample and a coverage filter scaled to the sample area.
+The earlier 2×2 grid had only two horizontal positions and missed narrow
+reflections on nearly vertical alifs. The distributed pattern antialiases the
+expanded outline, swelling front and focused reflection together. Each sample
+keeps the original glyph coverage at the pixel centre, so the printed base
+stays crisp. Fully dry words use
 the original single-sample path, preserving exact glyph coverage and the
 handoff to static text. Empty paper beyond the wet spread is skipped. The
 study uses the same sampling scheme; no additional textures or mask generation
@@ -133,7 +136,9 @@ dries it toward warm paper.
 - `tools/test_paper_ink_antialiasing.py` — direct Skia renders of the production
   shader on Arabic and English at reading sizes. Compares wet coverage against
   an 8× pixel-area reference in both modes and passes, at default/full pooling;
-  checks exact dry, held-repeat and unread glyph coverage.
+  checks exact dry, held-repeat and unread glyph coverage. The pictured alif
+  in أُمِرُوٓاْ is also checked at three sizes, fractional screen positions and
+  three fill phases against the previous four-tap pattern and an 8× reference.
 - `PaperInkEvaporationTest` — unread entry, settled and partial/repeat
   departures, interrupted fades, re-entry and retained reciter repeats. The
   Skia gate also checks that evaporating first/repeat ink reaches the exact
