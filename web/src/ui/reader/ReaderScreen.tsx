@@ -350,18 +350,36 @@ export function ReaderScreen({
   // speaks (same rule as Android). Debounced against Media3's brief
   // per-item buffering dips, released the moment a word is spoken.
   const [streamWait, setStreamWait] = useState(false)
-  const spokenWord = state.activeWord != null
+  // Each reciting session starts mute: the parked word of the performance
+  // before the pause is stale the moment play is pressed again. Only a word
+  // heard inside the open session un-waits the page. Marked on word change
+  // rather than presence so a session reset cannot re-mark the stale word.
+  const [sessionSpoken, setSessionSpoken] = useState(false)
+  const recitingRef = useRef(false)
   useEffect(() => {
-    if (spokenWord || !state.player.isBuffering) {
+    if (!recitingActive) {
+      recitingRef.current = false
+      return
+    }
+    if (!recitingRef.current) {
+      recitingRef.current = true
+      setSessionSpoken(false)
+    }
+  }, [recitingActive])
+  useEffect(() => {
+    if (state.activeWord != null) setSessionSpoken(true)
+  }, [state.activeWord])
+  useEffect(() => {
+    if (sessionSpoken || !state.player.isBuffering) {
       setStreamWait(false)
       return
     }
     const settle = window.setTimeout(
-      () => setStreamWait(readerWaitsOnStream(state.player.isBuffering, state.activeWord)),
+      () => setStreamWait(readerWaitsOnStream(state.player.isBuffering, sessionSpoken)),
       STREAM_WAIT_SETTLE_MS,
     )
     return () => window.clearTimeout(settle)
-  }, [state.player.isBuffering, spokenWord, state.activeWord])
+  }, [state.player.isBuffering, sessionSpoken])
   // This sheet is keyed by chapter, so the ref starts false at every opening.
   const recitedSinceOpen = useRef(false)
 

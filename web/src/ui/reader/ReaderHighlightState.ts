@@ -63,17 +63,18 @@ export function readerAyahInkPolicyActive(
 export const STREAM_WAIT_SETTLE_MS = 500
 
 /**
- * Waiting on the stream download: the spinner is up and nothing is spoken
- * yet, so the whole page — the due verse and the opening basmalah included
- * — waits under Upcoming paper, not the reciter's verse alone. A recited
- * word anchor (mid-chapter rebuffer, ink frozen on the last word) un-waits
- * the page, exactly as Android's [readerWaitingOnStream] gate does.
+ * Waiting on the stream download: the spinner is up and this reciting
+ * performance has not spoken yet, so the whole page — the due verse and the
+ * opening basmalah included — waits under Upcoming paper, not the reciter's
+ * verse alone. The spoken mark is performance-scoped (the session effect in
+ * the screen): the word parked by the performance before the pause is stale
+ * the moment play is pressed again, so a fresh wait starts mute.
  */
 export function readerWaitsOnStream(
   isBuffering: boolean,
-  activeWord: ActiveWord | null | undefined,
+  spokenInPerformance: boolean,
 ): boolean {
-  return isBuffering && activeWord == null
+  return isBuffering && !spokenInPerformance
 }
 
 /**

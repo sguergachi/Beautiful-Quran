@@ -1,6 +1,5 @@
 import { describe, expect, it } from 'vitest'
 import type { Segment } from '../../../data/models'
-import type { ActiveWord } from '../../../data/models'
 import { PreparedTimings } from '../../../domain/HighlightEngine'
 import {
   readerAyahInkPolicyActive,
@@ -75,18 +74,16 @@ describe('ReaderHighlightState', () => {
     expect(readerInkAyah(null, null)).toBeNull()
   })
 
-  it('waits on the stream only while buffering holds and nothing is spoken', () => {
-    // Hits play on an uncached item: spinner up, no word yet — the whole page
-    // waits under Upcoming paper.
-    expect(readerWaitsOnStream(true, null)).toBe(true)
-    // Mid-chapter rebuffer: the last spoken word still owns the ink, so the
-    // page keeps the wash as it froze.
-    expect(
-      readerWaitsOnStream(true, { ayah: 9, wordPosition: 3 } as ActiveWord),
-    ).toBe(false)
+  it('waits on the stream only while buffering holds and the performance is mute', () => {
+    // Hits play on an uncached item: spinner up, nothing spoken this session
+    // — the whole page waits under Upcoming paper.
+    expect(readerWaitsOnStream(true, false)).toBe(true)
+    // Mid-chapter rebuffer: the wash froze on the last heard word; the page
+    // keeps what the ink left.
+    expect(readerWaitsOnStream(true, true)).toBe(false)
     // No buffering — playing, paused, or idle.
-    expect(readerWaitsOnStream(false, null)).toBe(false)
-    expect(readerWaitsOnStream(false, { ayah: 9, wordPosition: 3 } as ActiveWord)).toBe(false)
+    expect(readerWaitsOnStream(false, false)).toBe(false)
+    expect(readerWaitsOnStream(false, true)).toBe(false)
   })
 
   it('prepares the fade-lead verse for Upcoming ink without stealing word ownership', () => {

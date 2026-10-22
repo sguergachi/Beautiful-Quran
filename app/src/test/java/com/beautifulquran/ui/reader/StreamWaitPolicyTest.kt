@@ -5,35 +5,26 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
- * Waiting on the stream download: the whole page waits under Upcoming paper,
- * the reciter's due verse included — but only while nothing has been spoken.
+ * Waiting on the stream download: the whole page waits under Upcoming paper —
+ * but only while this reciting performance has spoken nothing.
  */
 class StreamWaitPolicyTest {
 
-    private fun seed(ayah: Int = 9) = ActiveWord(
-        ayah = ayah,
-        wordPosition = 3,
-        durationMs = 600,
-        fromTap = true,
-    )
-
-    private fun spoken(ayah: Int = 9) = seed(ayah).copy(fromTap = false)
-
     @Test
-    fun `the spinner wait holds the page while the voice has not spoken`() {
-        assertTrue(readerWaitingOnStream(isBuffering = true, activeWord = null))
-        assertTrue(readerWaitingOnStream(isBuffering = true, activeWord = seed()))
+    fun `the spinner wait holds the page while the performance is mute`() {
+        assertTrue(readerWaitingOnStream(isBuffering = true, spokenInPerformance = false))
     }
 
     @Test
-    fun `a recited word anchor un-waits the page`() {
-        assertFalse(readerWaitingOnStream(isBuffering = true, activeWord = spoken()))
+    fun `a word spoken inside the performance un-waits the page`() {
+        // Mid-chapter rebuffer: the wash froze on the last heard word; the
+        // page keeps what the ink left, no dim.
+        assertFalse(readerWaitingOnStream(isBuffering = true, spokenInPerformance = true))
     }
 
     @Test
     fun `no buffering means no wait`() {
-        assertFalse(readerWaitingOnStream(isBuffering = false, activeWord = null))
-        assertFalse(readerWaitingOnStream(isBuffering = false, activeWord = spoken()))
-        assertFalse(readerWaitingOnStream(isBuffering = false, activeWord = seed()))
+        assertFalse(readerWaitingOnStream(isBuffering = false, spokenInPerformance = true))
+        assertFalse(readerWaitingOnStream(isBuffering = false, spokenInPerformance = false))
     }
 }

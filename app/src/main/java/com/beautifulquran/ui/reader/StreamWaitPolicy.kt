@@ -1,19 +1,19 @@
 package com.beautifulquran.ui.reader
 
 /**
- * Waiting on the stream download: the spinner is up and the reciter has not
- * spoken for this performance, so the whole page — the due verse and the
+ * Waiting on the stream download: the spinner is up and this reciting
+ * performance has not spoken yet, so the whole page — the due verse and the
  * opening basmalah included — waits under Upcoming paper. Not just the
  * verse the voice is coming to.
  *
- * The wait is gated on the absence of a recited word anchor ([ActiveWord]
- * from the 33 ms poll): a mid-chapter rebuffer keeps the last spoken word
- * lit and the ink frozen, and must not dim the page the wash left behind.
- * A provisionally-lit tap word ([ActiveWord.fromTap]) does not count as
- * spoken — until audio talks, the voice owns nothing but the wait.
+ * The spoken mark is performance-scoped ([ReaderScreen] keeps it): the word
+ * parked by the performance before the pause is stale the moment play is
+ * pressed again, so only a word heard inside the open session may hold the
+ * page awake — that is what keeps a mid-chapter rebuffer frozen on the wash
+ * instead of dimming it.
  */
-internal fun readerWaitingOnStream(isBuffering: Boolean, activeWord: ActiveWord?): Boolean =
-    isBuffering && activeWord?.takeIf { !it.fromTap } == null
+internal fun readerWaitingOnStream(isBuffering: Boolean, spokenInPerformance: Boolean): Boolean =
+    isBuffering && !spokenInPerformance
 
 /**
  * How long [Player.STATE_BUFFERING] must hold before the page settles into
