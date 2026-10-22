@@ -462,7 +462,9 @@ this document combined: `ReaderComponents.kt` (~36k tokens),
   `kdeconnect-cli` sends, never delegate the send to a subagent. If it
   exits non-zero, report that plainly; the staged copy is kept for a
   re-send, and port 1739 is never probed to "check". Cleanup is scoped to
-  the staging dir — never a bare `/tmp/*.apk`.
+  the staging dir — never a bare `/tmp/*.apk`. The project's T3 scripts
+  carry the same script as a manual **Send APK** the user can trigger
+  (`--release --published --wait`).
 - Update the relevant doc in `docs/` when you change behavior it describes —
   the docs are load-bearing and kept accurate.
 
