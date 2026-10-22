@@ -403,15 +403,16 @@ tween-vs-snap rules, sweep entry and residual rules, repeat wash timing, the
   tuning, and visual-verification specification.
 - **Stream wait**: while the spinner is up, the whole page — the recited tail,
   the due verse and the opening basmalah included — waits under Upcoming paper
-  (`StreamWaitPolicy.kt` holds the debounce constant). The *wait is the
+  (`StreamWaitPolicy.kt` holds the release-hold constant). The *wait is the
   buffering itself*, not a question of whether anything has been spoken
   (user rule): the recited tail from before a pause or an earlier seek stays
   lit only while playback goes on — the moment the download holds the voice,
-  it goes under the paper like the rest, and the page wakes when the buffer
-  carries the voice again. Mid-recitation stalls and item-boundary joins dim
-  the lit words exactly as a fresh play does. The wait settles after
-  `STREAM_WAIT_DEBOUNCE_MS` so Media3's brief per-item dips, and the
-  Ready↔Buffering alternation of a stuttering clip, cannot flash the page.
+  it goes under the paper like the rest. Mid-recitation stalls and
+  item-boundary joins dim the lit words exactly as a fresh play does. The
+  fade is one synchronized action the moment buffering begins (no engage
+  delay), and releases only after `STREAM_WAIT_RELEASE_HOLD_MS` of a carried
+  voice, so a starving stream's brief ready windows cannot strobe the page
+  between download bursts.
   Web parity: `data-stream-wait` CSS covers in `styles.css`.
 - **Basmalah preface**: `prefaceState(isActive, dimmed)` /
   `prefaceWashProgress(positionMs, durationMs, segments)` for the surah-header

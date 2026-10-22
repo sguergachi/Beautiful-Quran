@@ -756,19 +756,19 @@ fun ReaderScreen(
     // Waiting on the stream download: while the spinner holds, the whole
     // page — the recited tail and the opening basmalah included — waits
     // under Upcoming paper (user rule). The wait is the buffering itself:
-    // a mid-recitation stall or an item-boundary join dims the lit words
-    // exactly as a fresh play does; the page wakes when the buffer carries
-    // the voice again. Debounced so Media3's brief per-item dips, and
-    // the Ready↔Buffering alternation of a stuttering clip, cannot flash
-    // the page.
+    // the moment it begins the page fades as one synchronized action; a
+    // mid-recitation stall or an item-boundary join dims the lit words
+    // exactly as a fresh play does. Released only after the buffer has
+    // carried the voice for a moment, so a starving stream's brief ready
+    // windows cannot strobe the page between download bursts.
     var streamWait by remember { mutableStateOf(false) }
     LaunchedEffect(playerState.isBuffering) {
-        if (!playerState.isBuffering) {
-            streamWait = false
+        if (playerState.isBuffering) {
+            streamWait = true
         } else {
-            delay(STREAM_WAIT_DEBOUNCE_MS)
-            if (playerState.isBuffering) {
-                streamWait = true
+            delay(STREAM_WAIT_RELEASE_HOLD_MS)
+            if (!playerState.isBuffering) {
+                streamWait = false
             }
         }
     }

@@ -62,7 +62,7 @@ import { ReaderFocusController } from './focus/ReaderFocusController'
 import { selectedPlaybackAyah } from './selectedPlaybackAyah'
 import { shouldPauseFollowOnDrag } from './followGesture'
 import { isRecitingSession } from './recitingActive'
-import { STREAM_WAIT_SETTLE_MS, readerAyahInkPolicyActive, readerInkAyah } from './ReaderHighlightState'
+import { STREAM_WAIT_RELEASE_HOLD_MS, readerAyahInkPolicyActive, readerInkAyah } from './ReaderHighlightState'
 import {
   AYAH_SPACER_EST_PX,
   useProgressiveAyahWindow,
@@ -343,16 +343,19 @@ export function ReaderScreen({
   // Waiting on the stream download: while the spinner holds, the whole page
   // — the recited tail and the opening basmalah included — waits under
   // Upcoming paper (same rule as Android). The wait is the buffering itself:
-  // a mid-recitation stall or an item-boundary join dims the lit words
-  // exactly as a fresh play does. Debounced against brief per-item dips and
-  // the Ready↔Buffering alternation of a stuttering clip.
+  // the moment it begins the page fades as one synchronized action.
+  // Released only after the buffer has carried the voice for a moment, so
+  // a starving stream's brief ready windows cannot strobe the page.
   const [streamWait, setStreamWait] = useState(false)
   useEffect(() => {
-    if (!state.player.isBuffering) {
-      setStreamWait(false)
+    if (state.player.isBuffering) {
+      setStreamWait(true)
       return
     }
-    const settle = window.setTimeout(() => setStreamWait(true), STREAM_WAIT_SETTLE_MS)
+    const settle = window.setTimeout(
+      () => setStreamWait(false),
+      STREAM_WAIT_RELEASE_HOLD_MS,
+    )
     return () => window.clearTimeout(settle)
   }, [state.player.isBuffering])
   // This sheet is keyed by chapter, so the ref starts false at every opening.

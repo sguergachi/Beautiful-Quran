@@ -5,11 +5,14 @@ package com.beautifulquran.ui.reader
  * the recited tail and the opening basmalah included — waits under Upcoming
  * paper (user rule). The wait is the buffering itself, not a question of
  * whether anything has been spoken: a mid-recitation stall or an
- * item-boundary join dims the lit words exactly as a fresh play does, and
- * the page wakes when the buffer carries the voice again.
+ * item-boundary join dims the lit words exactly as a fresh play does. The
+ * page fades as one synchronized action — no engage delay — and wakes when
+ * the buffer has carried the voice for [STREAM_WAIT_RELEASE_HOLD_MS].
  */
 
-/** How long [Player.STATE_BUFFERING] must hold before the page settles into
- * the wait. Media3 pulses buffering briefly between playlist items while
- * prefetch stitches; those dips must not flash the whole page dim. */
-internal const val STREAM_WAIT_DEBOUNCE_MS = 500L
+/** How long the buffer must carry the voice before the page wakes from the
+ * stream wait. A starving stream alternates brief ready windows with
+ * buffering; waking on the first would strobe the page bright between
+ * download bursts instead of holding the one simultaneous fade. */
+internal const val STREAM_WAIT_RELEASE_HOLD_MS = 700L
+
