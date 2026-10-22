@@ -8,7 +8,7 @@ from PIL import Image, ImageDraw, ImageFont
 from scipy.ndimage import distance_transform_edt, label
 
 from build_paper_ink_study import (
-    ARABIC_FONT, BASELINE_CORE_LEAD, ENGLISH_FONT, ROOT, SS, baseline_wave, filling_field, liquid_surface,
+    ARABIC_FONT, ENGLISH_FONT, ROOT, SS, baseline_wave, filling_field, liquid_surface,
 )
 
 
@@ -26,6 +26,17 @@ def material(text, arabic=False, flowing=True):
 
 
 class PaperInkStudyTest(unittest.TestCase):
+    @staticmethod
+    def vertical_travel(ink, arrival):
+        """Largest gap between a column's upper and lower ink halves."""
+        worst = 0
+        for x in range(ink.shape[1]):
+            rows = np.flatnonzero(ink[:, x])
+            if rows.size >= 8:
+                half = rows.size // 2
+                worst = max(worst, abs(arrival[rows[:half], x].mean() - arrival[rows[half:], x].mean()))
+        return worst
+
     def test_front_sweeps_along_the_baseline_not_up_a_stroke(self):
         # A tall upright stroke beside a low horizontal one: the column, not the
         # path along the ink, sets arrival.
@@ -34,21 +45,42 @@ class PaperInkStudyTest(unittest.TestCase):
         ink[160:190, 20:220] = True
         depth = distance_transform_edt(ink) / SS
         for flowing in (False, True):
-            field = baseline_wave(ink, depth, True, flowing)
-            upright = field[30:170, 230]
-            self.assertLessEqual(np.ptp(upright), 1e-9, flowing)
+            field = baseline_wave(ink, depth, [230, 120], True, flowing)
+            upright = field[30:170, 226:235]
+            # Only Inside out's static fibre varies along the stroke; it has no direction.
+            self.assertLess(abs(upright[:70].mean() - upright[70:].mean()), .03 if not flowing else 1e-3)
             self.assertLess(field[175, 230], field[175, 100])
             self.assertLess(field[175, 100], field[175, 30])
+
+    def test_each_letter_gets_an_equal_time_slot(self):
+        # Two narrow letters then one wide flourish, right to left: the narrow
+        # pair takes well over its small share of width (smoothing softens the
+        # exact two thirds so the speed never jumps).
+        ink = np.zeros((40, 420), dtype=bool)
+        ink[10:30, 10:410] = True
+        depth = distance_transform_edt(ink) / SS
+        field = baseline_wave(ink, depth, [390, 350, 170], True, True)
+        row = field[20]
+        self.assertGreater(row[340], 1.5 * (409 - 340) / 399)
+        # Monotone away from the end caps, where the meniscus rims lag the core.
+        self.assertTrue(np.all(np.diff(row[30:390]) <= 1e-9))
+
+    def test_meniscus_lets_the_stroke_core_lead_its_rims(self):
+        ink = np.zeros((60, 400), dtype=bool)
+        ink[10:50, 10:390] = True
+        depth = distance_transform_edt(ink) / SS
+        for flowing in (False, True):
+            field = baseline_wave(ink, depth, [200], False, flowing)
+            self.assertLess(field[30, 100:300].mean(), field[11, 100:300].mean(), flowing)
 
     def test_detached_mark_arrives_with_the_body_beneath_it(self):
         ink = np.zeros((80, 320), dtype=bool)
         ink[40:65, 10:300] = True
         ink[10:20, 250:260] = True
         for flowing in (False, True):
-            field = baseline_wave(ink, distance_transform_edt(ink) / SS, False, flowing)
-            beneath = field[40:65, 250:260]
-            self.assertLessEqual(np.abs(field[10:20, 250:260].mean() - beneath.mean()),
-                                 BASELINE_CORE_LEAD, flowing)
+            field = baseline_wave(ink, distance_transform_edt(ink) / SS, [155], False, flowing)
+            self.assertLess(abs(field[10:20, 250:260].mean() - field[40:65, 250:260].mean()), .03, flowing)
+
     def test_liquid_surface_does_not_flatten_when_the_font_raster_is_half_size(self):
         fields = []
         for size in (160, 80):
@@ -65,23 +97,25 @@ class PaperInkStudyTest(unittest.TestCase):
         for text in ('ٱللَّهِ', 'ٱلرَّحِيمِ', 'ٱلۡحَمۡدُ'):
             for flowing in (False, True):
                 with self.subTest(text=text, flowing=flowing):
-                    ink, _, arrival, duration = material(text, True, flowing=flowing)
-                    span = 1 - .24 * duration
-                    columns = [arrival[:, x][ink[:, x]] for x in range(ink.shape[1]) if ink[:, x].any()]
-                    # Every column fills together (Inside out only lets the core lead its rims).
-                    self.assertLessEqual(max(np.ptp(c) for c in columns),
-                                         span * BASELINE_CORE_LEAD / (1 + BASELINE_CORE_LEAD) + 1e-9)
-                    means = [c.mean() for c in columns]
-                    self.assertTrue(all(np.diff(means) < 1e-9 + span * BASELINE_CORE_LEAD))
+                    ink, _, arrival, _ = material(text, True, flowing=flowing)
+                    # Upper and lower halves of every column fill together.
+                    self.assertLess(self.vertical_travel(ink, arrival), .03)
+                    means = [arrival[:, x][ink[:, x]].mean() for x in range(ink.shape[1]) if ink[:, x].any()]
+                    self.assertTrue(all(np.diff(means) < .03))
                     self.assertGreater(means[0], means[-1])
 
-    def test_modes_keep_the_same_contour_and_window_with_different_flow_rates(self):
+    def test_study_builds_are_reproducible(self):
+        first = material('ٱلرَّحۡمَٰنِ', True, flowing=False)[2]
+        np.testing.assert_array_equal(first, material('ٱلرَّحۡمَٰنِ', True, flowing=False)[2])
+
+    def test_modes_keep_the_same_contour_and_window_with_different_fronts(self):
         ink, depth, first, duration = material('ٱلۡحَمۡدُ', True, flowing=False)
         other, other_depth, second, second_duration = material('ٱلۡحَمۡدُ', True, flowing=True)
         np.testing.assert_array_equal(ink, other)
         np.testing.assert_array_equal(depth, other_depth)
         self.assertEqual(duration, second_duration)
-        self.assertGreater(np.mean(np.abs(first[ink] - second[ink])), .005)
+        # Same letter pacing; only the front's meniscus and fibre differ.
+        self.assertGreater(np.mean(np.abs(first[ink] - second[ink])), .002)
 
     def test_english_detached_letters_continue_left_to_right(self):
         ink, _, arrival, _ = material('OO')

@@ -11,13 +11,16 @@ from pathlib import Path
 import numpy as np
 import uharfbuzz as hb
 from PIL import Image, ImageDraw, ImageFont
-from scipy.ndimage import distance_transform_edt, gaussian_filter
+from scipy.ndimage import distance_transform_edt, gaussian_filter, gaussian_filter1d
 
 ROOT = Path(__file__).resolve().parents[1]
 SS = 4
 ASSETS = ROOT / 'app/src/main/assets/paper-ink-study'
-# Inside out rims trail the stroke core by this share of the word sweep.
-BASELINE_CORE_LEAD = .035
+# Slot-map smoothing, in mean letter widths.
+LETTER_SMOOTHING = .45
+# Front shape in display pixels at the Arabic size: (meniscus lead, fibre amplitude).
+INSIDE_OUT_FRONT = (6, 1)
+FLOWING_FRONT = (3, 0)
 ARABIC_FONT = ROOT / 'app/src/main/res/font/uthmanic_hafs_v22.ttf'
 ENGLISH_FONT = ROOT / 'app/src/main/res/font/junicode_variable.ttf'
 
@@ -46,24 +49,47 @@ def letter_anchors(advances, plain_advances, owner, ink, rtl):
     return anchors
 
 
-def baseline_wave(ink, depth, rtl, flowing=False, unit=1.):
-    """Sweep one front along the baseline in reading order.
+def baseline_wave(ink, depth, centers, rtl, flowing=False, unit=1.):
+    """Sweep one liquid front along the baseline in reading order.
 
-    Arrival depends on horizontal position only, so tall letters, loops and
-    marks fill as the front passes beneath them rather than rising up a stroke
-    or travelling diagonally. Inside out lets the stroke core lead its rims by
-    a small fraction of the sweep; the lead saturates a few pixels in, so a
-    tapering tip does not climb. Flowing ink is a pure horizontal front.
+    Arrival depends on horizontal position, so tall letters, loops and marks
+    fill as the front passes beneath them; it never rises up a stroke or runs
+    diagonally. Three refinements make the front read as ink, not a wipe:
+
+    * Letter pacing: each letter (centers, in reading order) gets an equal
+      time slot, the slots TajweedPacing already assumes. Long flourishes are
+      crossed briskly and dense clusters slowly; a Gaussian over the slot map
+      keeps speed changes smooth and monotone.
+    * Meniscus: a stroke's core leads its rims by a fixed few pixels, so the
+      front is a rounded tongue down each stroke rather than a ruler edge.
+    * Paper fibre (Inside out only): static, horizontally stretched fibre
+      noise breaks the leading edge up by a pixel or two, like wicking.
+    Pixel offsets are converted to phase through the local sweep speed, so the
+    front's shape is the same on wide and narrow letters.
     """
     x = np.nonzero(ink)[1]
     left, right = x.min(), x.max()
-    columns = np.indices(ink.shape)[1]
-    along = (right - columns if rtl else columns - left) / max(1, right - left)
-    if flowing:
-        return np.clip(along, 0, 1)
+    start, end = (right, left) if rtl else (left, right)
+    columns = np.arange(ink.shape[1], dtype=float)
+    count = len(centers)
+    knots = np.array([start, *centers, end], dtype=float)
+    slots = np.array([0, *((np.arange(count) + .5) / count), 1])
+    order = np.argsort(knots, kind='stable')
+    sweep = gaussian_filter1d(np.interp(columns, knots[order], slots[order]),
+                              LETTER_SMOOTHING * (right - left) / count, mode='nearest')
+    sweep = (sweep - sweep[start]) / (sweep[end] - sweep[start])
+    speed = np.abs(np.gradient(sweep))
+    arrival = np.broadcast_to(sweep, ink.shape).copy()
     interior = np.maximum(0, depth)
     core = interior / (interior + unit)
-    return np.clip((along + BASELINE_CORE_LEAD * (1 - core)) / (1 + BASELINE_CORE_LEAD), 0, 1)
+    meniscus, fibre = FLOWING_FRONT if flowing else INSIDE_OUT_FRONT
+    arrival += meniscus * SS * unit * (1 - core) * speed
+    if fibre:
+        noise = gaussian_filter(np.random.default_rng(0).standard_normal(ink.shape),
+                                (.6 * SS * unit, 5 * SS * unit))
+        arrival += fibre * SS * unit * noise / noise.std() * speed
+    low, high = arrival[ink].min(), arrival[ink].max()
+    return np.clip((arrival - low) / (high - low), 0, 1)
 
 
 def filling_field(text, ink, distance, box, ascent, font_path, font_size, flowing=True):
@@ -109,7 +135,9 @@ def filling_field(text, ink, distance, box, ascent, font_path, font_size, flowin
     anchors = letter_anchors(advances, plain_advances, owner, ink, buf.direction == 'rtl')
     # Letter count keeps the existing feather duration and full word window.
     duration = 2.8 / (sum(map(len, anchors.values())) + 1.8)
-    wave = baseline_wave(ink, distance, buf.direction == 'rtl', flowing, font_size / 160)
+    rtl = buf.direction == 'rtl'
+    centers = sorted((x for group in anchors.values() for _, x in group), reverse=rtl)
+    wave = baseline_wave(ink, distance, centers, rtl, flowing, font_size / 160)
     # Defined on paper too, so wet spread beyond the contour shares its column's arrival.
     return .12 * duration + (1 - .24 * duration) * wave, duration
 

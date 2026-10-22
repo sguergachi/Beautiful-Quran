@@ -26,15 +26,29 @@ right-to-left in Arabic and left-to-right in English, matching each script's
 reading order. The continuous wash never skips an earlier word.
 
 **Inside out / Flowing ink** switches the ink spread without restarting
-playback or changing the other controls. Both sweep one soft front along the
+playback or changing the other controls. Both sweep one liquid front along the
 baseline, right to left in Arabic and left to right in English. Arrival
-depends on horizontal position only: tall letters, loops, dots and marks fill
-as the front passes beneath them, never rising up a stroke or travelling
-diagonally. Inside out lets each stroke's core lead its rims by 3.5% of the
-sweep (saturating a few pixels in, so tapering tips do not climb); Flowing ink
-is a pure vertical front. This replaces the geodesic wave, which filled
-upright lam and alif strokes from the bottom up. The existing Arabic tajweed
-pacing maps the front to the word's media clock; English uses its linear clock.
+depends on horizontal position: tall letters, loops, dots and marks fill as
+the front passes beneath them, never rising up a stroke or travelling
+diagonally (the geodesic wave that filled upright lam and alif strokes from
+the bottom up was rejected). Three refinements keep it from reading as a wipe:
+
+- **Letter pacing.** Each letter gets an equal time slot, the slots
+  `TajweedPacing` already assumes, so holds land on the letter being voiced.
+  Long flourishes are crossed briskly and dense clusters slowly; a Gaussian
+  over the slot map (0.45 letter widths) keeps speed changes smooth.
+- **Meniscus.** A stroke's core leads its rims by a few pixels, so the front
+  is a rounded tongue down each stroke rather than a ruler edge.
+- **Paper fibre** (Inside out only). Static, horizontally stretched fibre
+  noise breaks the leading edge by about a pixel, like wicking.
+
+Inside out (default) uses a 6 px meniscus with fibre; Flowing ink is the
+cleaner 3 px meniscus without fibre. Pixel offsets convert to phase through the
+local sweep speed, so the front keeps its shape on wide and narrow letters.
+Per column, upper and lower halves fill within 0.03 phase of each other
+(about 0.2 for the rejected geodesic wave; under the shader feather). The
+existing Arabic tajweed pacing maps the front to the word's media clock;
+English uses its linear clock.
 
 HarfBuzz shaping, with a second measurement run without contextual/ligature
 substitutions, still counts the letters in each word to keep the existing
@@ -161,8 +175,9 @@ releasing only after the repeated verse, and clearing the chain on Again.
 proportional fallback and finishing before a repeat.
 The generator's geometry regressions check that an upright stroke fills
 together rather than rising, that the pictured Arabic forms (Allah, al-rahim,
-al-hamd) fill column by column right to left, that detached marks arrive with
-the body beneath them and that detached letters continue in reading order.
+al-hamd) fill column by column right to left, equal letter time slots, the
+meniscus core lead, reproducible builds, that detached marks arrive with the
+body beneath them and that detached letters continue in reading order.
 They also cover unchanged contours across modes, full-word completion,
 ligature letter counts and equivalent film depth and curvature at half-size
 font rasterization.
