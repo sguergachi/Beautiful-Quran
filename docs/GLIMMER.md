@@ -26,29 +26,32 @@ right-to-left in Arabic and left-to-right in English, matching each script's
 reading order. The continuous wash never skips an earlier word.
 
 **Inside out / Flowing ink** switches the ink spread without restarting
-playback or changing the other controls. Both sweep one liquid front along the
-baseline, right to left in Arabic and left to right in English. Arrival
-depends on horizontal position: tall letters, loops, dots and marks fill as
-the front passes beneath them, never rising up a stroke or travelling
-diagonally (the geodesic wave that filled upright lam and alif strokes from
-the bottom up was rejected). Three refinements keep it from reading as a wipe:
+playback or changing the other controls. Both use the swelling-channel spread.
+A front moves along the baseline in reading order (right to left in Arabic,
+left to right in English) and lays a fine wet line down the core of every
+stroke it passes. Each stroke then swells from that line out to both edges,
+like ink pooling into a channel, with a crisp liquid boundary rather than a
+fading wipe edge. Swell depth is normalized by the local stroke half-width,
+so bowls and hairlines fill out in the same time.
 
+- **No climbing.** The front feeds whole stroke heights at once, so upright
+  alif and lam strokes never fill bottom-up. Leaning stems are fed from the
+  baseline foot they stand on (a vertical-preferring ink path), so a slant
+  does not fill diagonally either. Shallow strokes keep their own position.
+- **One continuing flow.** A detached letter begins only once the previous
+  one is mostly inked; only its finest hairlines may still be swelling.
 - **Letter pacing.** Each letter gets an equal time slot, the slots
-  `TajweedPacing` already assumes, so holds land on the letter being voiced.
-  Long flourishes are crossed briskly and dense clusters slowly; a Gaussian
-  over the slot map (0.45 letter widths) keeps speed changes smooth.
-- **Meniscus.** A stroke's core leads its rims by a few pixels, so the front
-  is a rounded tongue down each stroke rather than a ruler edge.
-- **Paper fibre** (Inside out only). Static, horizontally stretched fibre
-  noise breaks the leading edge by about a pixel, like wicking.
+  `TajweedPacing` already assumes, so holds land on the letter being voiced;
+  a Gaussian over the slot map (0.45 letter widths) keeps speed smooth.
 
-Inside out (default) uses a 6 px meniscus with fibre; Flowing ink is the
-cleaner 3 px meniscus without fibre. Pixel offsets convert to phase through the
-local sweep speed, so the front keeps its shape on wide and narrow letters.
-Per column, upper and lower halves fill within 0.03 phase of each other
-(about 0.2 for the rejected geodesic wave; under the shader feather). The
-existing Arabic tajweed pacing maps the front to the word's media clock;
-English uses its linear clock.
+Inside out (default) swells over 1.6 letter slots with a fuller profile;
+Flowing ink is the cleaner, quicker swell (1 slot). This keeps the earlier
+merging-pools look, where ink appears inside a letter and grows outward,
+without the rejected versions' faults: separate starts in one stroke, the
+geodesic wave's bottom-up lam, and the straight baseline wipe. The moving
+meniscus highlight is tempered on steep fronts so a swelling channel keeps
+a gentle bulge instead of ridged stripes. The existing Arabic tajweed pacing
+maps the front to the word's media clock; English uses its linear clock.
 
 HarfBuzz shaping, with a second measurement run without contextual/ligature
 substitutions, still counts the letters in each word to keep the existing
@@ -174,10 +177,11 @@ releasing only after the repeated verse, and clearing the chain on Again.
 `PaperInkEnglishWindowsTest` checks reordered meaning, continuous word clocks,
 proportional fallback and finishing before a repeat.
 The generator's geometry regressions check that an upright stroke fills
-together rather than rising, that the pictured Arabic forms (Allah, al-rahim,
-al-hamd) fill column by column right to left, equal letter time slots, the
-meniscus core lead, reproducible builds, that detached marks arrive with the
-body beneath them and that detached letters continue in reading order.
+together rather than rising, that a leaning stem is fed from its foot, that
+strokes swell symmetrically from the core (more in Inside out), equal letter
+time slots, that the pictured Arabic forms' core lines arrive in reading
+order, reproducible builds, that detached marks arrive with the body beneath
+them and that detached letters continue in reading order.
 They also cover unchanged contours across modes, full-word completion,
 ligature letter counts and equivalent film depth and curvature at half-size
 font rasterization.

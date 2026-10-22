@@ -45,6 +45,9 @@ half4 main(float2 p) {
         float2 sampleY = field.eval((p + float2(0.0, radius)) * 4.0).rg;
         frontSlope = (float2(mix(sampleX.r, sampleX.g, spreadMethod),
             mix(sampleY.r, sampleY.g, spreadMethod)) - arrival) / radius;
+        // Steep fronts (an ink channel swelling across its width) keep a
+        // gentle bulge instead of a ridged highlight.
+        frontSlope /= max(1.0, length(frontSlope) * letterDuration * 40.0);
     }
     float3 normal = normalize(float3(slope * filmWet * volume + frontSlope * rim * 6.0,
         sqrt(max(0.01, 1.0 - dot(slope, slope)))));

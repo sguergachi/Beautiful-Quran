@@ -11,16 +11,22 @@ from pathlib import Path
 import numpy as np
 import uharfbuzz as hb
 from PIL import Image, ImageDraw, ImageFont
-from scipy.ndimage import distance_transform_edt, gaussian_filter, gaussian_filter1d
+from scipy.ndimage import distance_transform_edt, gaussian_filter, gaussian_filter1d, maximum_filter
+from scipy.sparse import coo_matrix
+from scipy.sparse.csgraph import dijkstra
 
 ROOT = Path(__file__).resolve().parents[1]
 SS = 4
 ASSETS = ROOT / 'app/src/main/assets/paper-ink-study'
 # Slot-map smoothing, in mean letter widths.
 LETTER_SMOOTHING = .45
-# Front shape in display pixels at the Arabic size: (meniscus lead, fibre amplitude).
-INSIDE_OUT_FRONT = (6, 1)
-FLOWING_FRONT = (3, 0)
+# Swell from stroke core to edge: (lag in letter slots, profile exponent).
+INSIDE_OUT_SWELL = (1.6, .7)
+FLOWING_SWELL = (1., 1.)
+# Neighbourhood, in display pixels at the Arabic size, for local stroke half-width.
+STROKE_RADIUS = 6
+# Cost of one pixel of horizontal drift when finding a stroke's baseline foot.
+FOOTING_DRIFT_COST = 6
 ARABIC_FONT = ROOT / 'app/src/main/res/font/uthmanic_hafs_v22.ttf'
 ENGLISH_FONT = ROOT / 'app/src/main/res/font/junicode_variable.ttf'
 
@@ -49,51 +55,89 @@ def letter_anchors(advances, plain_advances, owner, ink, rtl):
     return anchors
 
 
-def baseline_wave(ink, depth, centers, rtl, flowing=False, unit=1.):
-    """Sweep one liquid front along the baseline in reading order.
+def baseline_footing(ink, baseline, stem, band):
+    """x of the baseline where each pixel's own stroke stands.
 
-    Arrival depends on horizontal position, so tall letters, loops and marks
-    fill as the front passes beneath them; it never rises up a stroke or runs
-    diagonally. Three refinements make the front read as ink, not a wipe:
+    Ink paths strongly prefer vertical steps, so a leaning alif or lam maps
+    its whole height to the foot it stands on. The projection fades out as the
+    path's drift per rise grows past a stem's lean, so horizontal strokes keep
+    their own x. Detached marks keep their own x as well.
+    """
+    count = int(ink.sum())
+    ids = np.full(ink.shape, -1)
+    ids[ink] = np.arange(count)
+    yy, xx = np.nonzero(ink)
+    h, w = ink.shape
+    sources, targets, costs = [], [], []
+    for dy, dx in ((0, 1), (1, 0), (1, 1), (1, -1)):
+        a = ids[:h - dy, max(0, -dx):w - max(0, dx)]
+        b = ids[dy:, max(0, dx):w - max(0, -dx)]
+        valid = (a >= 0) & (b >= 0)
+        sources.append(a[valid])
+        targets.append(b[valid])
+        costs.append(np.full(valid.sum(), dy + FOOTING_DRIFT_COST * abs(dx), dtype=float))
+    graph = coo_matrix((np.concatenate(costs), (np.concatenate(sources), np.concatenate(targets))),
+                       shape=(count, count)).tocsr()
+    feet = np.flatnonzero(np.abs(yy - baseline) <= band)
+    footing = xx.astype(float)
+    if feet.size:
+        _, _, nearest = dijkstra(graph, directed=False, indices=feet, min_only=True, return_predecessors=True)
+        reached = nearest >= 0
+        drift = xx[nearest[reached]] - xx[reached]
+        rise = np.abs(yy[nearest[reached]] - yy[reached])
+        # Steep strokes stand on their foot; shallow ones keep their own x.
+        lean = np.clip((np.abs(drift) / (rise + stem) - .25) / .35, 0, 1)
+        footing[reached] += drift * (1 - lean * lean * (3 - 2 * lean))
+    field = np.zeros(ink.shape)
+    field[ink] = footing
+    return field
 
-    * Letter pacing: each letter (centers, in reading order) gets an equal
-      time slot, the slots TajweedPacing already assumes. Long flourishes are
-      crossed briskly and dense clusters slowly; a Gaussian over the slot map
-      keeps speed changes smooth and monotone.
-    * Meniscus: a stroke's core leads its rims by a fixed few pixels, so the
-      front is a rounded tongue down each stroke rather than a ruler edge.
-    * Paper fibre (Inside out only): static, horizontally stretched fibre
-      noise breaks the leading edge up by a pixel or two, like wicking.
-    Pixel offsets are converted to phase through the local sweep speed, so the
-    front's shape is the same on wide and narrow letters.
+
+def swelling_channels(ink, depth, centers, rtl, flowing=False, unit=1., baseline=None):
+    """Feed ink down the centre of each stroke in reading order, then let it swell.
+
+    A front moves along the baseline (right to left in Arabic, left to right
+    in English) and lays a thin wet line down the core of every stroke it
+    passes; each stroke then swells from that line out to its edges, like ink
+    pooling into a channel. The front feeds whole columns, so upright strokes
+    never fill bottom-up, and the swell is symmetric across the stroke rather
+    than a travelling edge. Swell depth is normalized by the local stroke
+    half-width, so bowls and hairlines fill out in the same time.
+
+    Leaning stems are fed from the foot they stand on (baseline_footing), so
+    a slanted alif or lam does not fill diagonally either.
+
+    Each letter (centers, in reading order) gets an equal time slot, the slots
+    TajweedPacing assumes; a Gaussian over the slot map keeps speed smooth.
+    Inside out swells over more of a slot than the cleaner Flowing ink.
     """
     x = np.nonzero(ink)[1]
     left, right = x.min(), x.max()
     start, end = (right, left) if rtl else (left, right)
-    columns = np.arange(ink.shape[1], dtype=float)
     count = len(centers)
     knots = np.array([start, *centers, end], dtype=float)
     slots = np.array([0, *((np.arange(count) + .5) / count), 1])
     order = np.argsort(knots, kind='stable')
-    sweep = gaussian_filter1d(np.interp(columns, knots[order], slots[order]),
+    sweep = gaussian_filter1d(np.interp(np.arange(ink.shape[1], dtype=float), knots[order], slots[order]),
                               LETTER_SMOOTHING * (right - left) / count, mode='nearest')
     sweep = (sweep - sweep[start]) / (sweep[end] - sweep[start])
-    speed = np.abs(np.gradient(sweep))
-    arrival = np.broadcast_to(sweep, ink.shape).copy()
     interior = np.maximum(0, depth)
-    core = interior / (interior + unit)
-    meniscus, fibre = FLOWING_FRONT if flowing else INSIDE_OUT_FRONT
-    arrival += meniscus * SS * unit * (1 - core) * speed
-    if fibre:
-        noise = gaussian_filter(np.random.default_rng(0).standard_normal(ink.shape),
-                                (.6 * SS * unit, 5 * SS * unit))
-        arrival += fibre * SS * unit * noise / noise.std() * speed
+    half_width = maximum_filter(interior, size=int(2 * STROKE_RADIUS * SS * unit) + 1)
+    core = np.clip(interior / np.maximum(half_width, 1e-6), 0, 1)
+    lag, shape = FLOWING_SWELL if flowing else INSIDE_OUT_SWELL
+    columns = np.indices(ink.shape)[1].astype(float)
+    if baseline is not None:
+        columns[ink] = baseline_footing(ink, baseline, STROKE_RADIUS * SS * unit * 2, 1.5 * SS * unit)[ink]
+    fed = np.interp(columns, np.arange(ink.shape[1]), sweep)
+    arrival = fed + lag / count * (1 - core) ** shape
+    # Paper takes its nearest ink's arrival, so wet spread past the contour agrees.
+    arrival = arrival[tuple(distance_transform_edt(~ink, return_distances=False, return_indices=True))]
     low, high = arrival[ink].min(), arrival[ink].max()
     return np.clip((arrival - low) / (high - low), 0, 1)
 
 
 def filling_field(text, ink, distance, box, ascent, font_path, font_size, flowing=True):
-    """Shape letter clusters for pacing, then sweep the ink along the baseline."""
+    """Shape letter clusters for pacing, then feed and swell ink through the strokes."""
     font = hb.Font(hb.Face(font_path.read_bytes()))
     font.scale = (font_size * SS * 64, font_size * SS * 64)
     buf = hb.Buffer()
@@ -137,8 +181,8 @@ def filling_field(text, ink, distance, box, ascent, font_path, font_size, flowin
     duration = 2.8 / (sum(map(len, anchors.values())) + 1.8)
     rtl = buf.direction == 'rtl'
     centers = sorted((x for group in anchors.values() for _, x in group), reverse=rtl)
-    wave = baseline_wave(ink, distance, centers, rtl, flowing, font_size / 160)
-    # Defined on paper too, so wet spread beyond the contour shares its column's arrival.
+    wave = swelling_channels(ink, distance, centers, rtl, flowing, font_size / 160,
+                             (8 - box[1] + ascent) * SS)
     return .12 * duration + (1 - .24 * duration) * wave, duration
 
 
