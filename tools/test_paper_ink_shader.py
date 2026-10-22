@@ -10,10 +10,16 @@ import unittest
 
 import numpy as np
 import skia
+from PIL import Image
 
 ASSETS = Path(__file__).resolve().parents[1] / 'app/src/main/assets/paper-ink-study'
 DRY_REPEAT = np.array([194, 95, 59]) * .7 + np.array([.86, .82, .77]) * 255 * .3
 WET_REPEAT = np.array([194, 95, 59])
+
+
+def mix_feather(method):
+    """The shader's feather share of letterDuration for each spread method."""
+    return .1 + .02 * method
 
 
 class PaperInkShaderTest(unittest.TestCase):
@@ -32,7 +38,7 @@ class PaperInkShaderTest(unittest.TestCase):
                         samplingOptions=skia.SamplingOptions(skia.FilterMode.kLinear))
                 cls.words.append((spec, children))
 
-    def render(self, word, repeat, wet, weight, method, tint=1, progress=1, retained=1):
+    def render(self, word, repeat, wet, weight, method, tint=1, progress=1, retained=1, lead=0):
         spec, children = word
         builder = skia.RuntimeShaderBuilder(self.effect)
         for name, child in children.items():
@@ -40,7 +46,7 @@ class PaperInkShaderTest(unittest.TestCase):
         uniforms = dict(progress=float(progress), reflectionStrength=0., lightSoftness=0., retained=float(retained),
                         wet=float(wet), weight=float(weight), aa=.9, repeatColor=[194/255, 95/255, 59/255],
                         repeatPass=float(repeat), repeatTint=float(tint), spreadMethod=float(method),
-                        letterDuration=spec['letterDuration'], origin=[0., 0.])
+                        letterDuration=spec['letterDuration'], origin=[0., 0.], lead=float(lead))
         for name, value in uniforms.items():
             builder.setUniform(name, value)
         surface = skia.Surface(spec['width'], spec['height'])
@@ -106,6 +112,31 @@ class PaperInkShaderTest(unittest.TestCase):
                         growth.append(repeat[outside].sum())
                 # Interior pools need not reach the outline at the first sample.
                 self.assertGreater(max(growth), 1)
+
+    def test_lead_fade_feathers_about_one_letter_ahead_of_the_wet_edge(self):
+        for word in self.words:
+            spec = word[0]
+            prefix = 'word-en' if 'text' in spec else 'word'
+            # The shader samples the 4x field at pixel centres.
+            field = np.asarray(Image.open(ASSETS / f'{prefix}-2-{spec["position"]}-field.png'))[2::4, 2::4]
+            field = field[:spec['height'], :spec['width']].astype(float)
+            d = spec['letterDuration']
+            slot = (1 - .24 * d) / max(1, 2.8 / d - 1.8)
+            for method in (0, 1):
+                arrival = field[:, :, method] / 255
+                feather = max(.006, d * mix_feather(method))
+                with self.subTest(word=spec, method=method):
+                    plain, led = (self.render(word, 0, 1, .875, method, progress=.4, retained=0, lead=lead)
+                                  [:, :, 2].astype(int) for lead in (0, 1))
+                    ink = field[:, :, 2] > 140
+                    near = ink & (arrival > .4 + feather + .01) & (arrival < .4 + slot * .6)
+                    far = ink & (arrival > .4 + slot + feather + .02)
+                    if near.any():
+                        self.assertLess(led[near].mean(), plain[near].mean() - 10)
+                    np.testing.assert_array_equal(led[far], plain[far])
+                    # The repeat keeps its clean dry charcoal until the orange arrives.
+                    np.testing.assert_array_equal(self.render(word, 1, 1, .875, method, progress=.4, lead=1),
+                                                  self.render(word, 1, 1, .875, method, progress=.4))
 
 
 if __name__ == '__main__':

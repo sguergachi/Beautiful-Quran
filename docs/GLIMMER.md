@@ -53,6 +53,13 @@ meniscus highlight is tempered on steep fronts so a swelling channel keeps
 a gentle bulge instead of ridged stripes. The existing Arabic tajweed pacing
 maps the front to the word's media clock; English uses its linear clock.
 
+**Lead fade** feathers the edge: the letter ahead of the wet ink fades in
+from the faint unread tone toward fresh black (60%) before the liquid
+arrives. The default 50% is one letter slot; 100% is two, 0 disables it. An
+upcoming word's first letter starts fading in while the previous word's last
+letter is voiced (`PaperInkClock.ahead`). The orange repeat skips the fade:
+its text is already dry charcoal, and tinting that toward orange turns muddy.
+
 HarfBuzz shaping, with a second measurement run without contextual/ligature
 substitutions, still counts the letters in each word to keep the existing
 feather duration and word window. The original shaped font always supplies
@@ -170,7 +177,8 @@ It also checks that a completed, dried word receives the identical wet/dry
 cycle when repeated. `tools/test_paper_ink_shader.py` is an optional direct
 Skia render gate (requires `skia-python` and `numpy`): it checks equal wet
 stroke weight on both passes in both scripts and spread modes, plus narrowing
-back to the regular contour while the repeat remains fully orange.
+back to the regular contour while the repeat remains fully orange, and that
+the lead fade darkens only about a letter ahead and leaves the repeat clean.
 `PaperInkSequenceTest` covers the one middle repeat and restarting the study.
 `PaperInkRepeatChainTest` checks holding orange across word handoffs and pause,
 releasing only after the repeated verse, and clearing the chain on Again.

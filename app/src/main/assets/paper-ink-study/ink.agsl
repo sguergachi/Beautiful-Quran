@@ -12,6 +12,8 @@ uniform float repeatPass;
 uniform float repeatTint;
 uniform float spreadMethod;
 uniform float letterDuration;
+// Letters of fade-in ahead of the wet edge (0 disables it).
+uniform float lead;
 uniform float2 origin;
 
 half4 main(float2 p) {
@@ -73,8 +75,16 @@ half4 main(float2 p) {
     // The repeat retains its dry underprint and holds orange after the film dries.
     float3 ink = mix(dry, pigment, mix(moisture, repeatTint, repeatPass));
     float3 paper = float3(250.0, 243.0, 232.0) / 255.0;
-    float dryCoverage = base * mix(0.2661, 1.0, retained) * (1.0 - loaded);
+    // The letter ahead of the wet edge fades in toward fresh ink, so the edge
+    // is feathered over about a letter before the liquid arrives. The repeat's
+    // text is already dry charcoal; tinting it toward orange there turns muddy.
+    // letterDuration = 2.8 / (letters + 1.8); arrival spans 1 - 0.24 * letterDuration.
+    float slot = (1.0 - 0.24 * letterDuration) / max(1.0, 2.8 / letterDuration - 1.8);
+    float approach = lead > 0.0 ? smoothstep(arrival - feather - lead * slot,
+        arrival + feather, progress) * 0.6 * (1.0 - repeatPass) : 0.0;
+    float3 waiting = mix(dry, float3(6.0, 7.0, 8.0) / 255.0, approach);
+    float dryCoverage = base * mix(mix(0.2661, 1.0, retained), 1.0, approach) * (1.0 - loaded);
     float liquidCoverage = expanded * loaded;
     return half4(paper * (1.0 - dryCoverage - liquidCoverage) +
-        dry * dryCoverage + ink * liquidCoverage, 1.0);
+        waiting * dryCoverage + ink * liquidCoverage, 1.0);
 }

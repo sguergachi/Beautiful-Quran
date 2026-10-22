@@ -21,6 +21,20 @@ class PaperInkClockTest {
         }
     }
 
+    @Test fun anUpcomingWordReportsHowFarAheadItIsWithoutApplyingInk() {
+        val clock = PaperInkClock(1000, 2000, 1000)
+        clock.update(0, true, 0)
+        assertEquals(-1f, clock.ahead)
+        clock.update(850, true, 850)
+        assertEquals(-.15f, clock.ahead, 1e-6f)
+        assertEquals(0f, clock.progress)
+        assertEquals(0f, clock.wet)
+        assertTrue(!clock.applying)
+        clock.update(1500, true, 1500)
+        assertEquals(0f, clock.ahead)
+        assertEquals(.5f, clock.progress)
+    }
+
     @Test fun inkApplicationStopsOnPauseAndAtWordHandoff() {
         val clock = PaperInkClock(100, 1100, 1000)
         clock.update(0, true, 0)

@@ -10,6 +10,9 @@ internal class PaperInkClock(
         private set
     var wet = 0f
         private set
+    /** Before the word starts: how far ahead it is, in its own durations (-1..0). */
+    var ahead = -1f
+        private set
     /** Whether the reciter is currently applying fresh ink to this word. */
     var applying = false
         private set
@@ -18,7 +21,9 @@ internal class PaperInkClock(
 
     /** Pausing freezes filling but lets ink dry; a seek clears future ink. */
     fun update(positionMs: Long, playing: Boolean, nowMs: Long) {
-        progress = ((positionMs - startMs).toFloat() / (endMs - startMs).coerceAtLeast(1)).coerceIn(0f, 1f)
+        val phase = (positionMs - startMs).toFloat() / (endMs - startMs).coerceAtLeast(1)
+        progress = phase.coerceIn(0f, 1f)
+        ahead = phase.coerceIn(-1f, 0f)
         val active = playing && positionMs >= startMs && positionMs < endMs
         if (positionMs < startMs) {
             wet = 0f

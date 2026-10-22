@@ -227,6 +227,8 @@ private fun PaperInkStudyPage(app: QuranApp, study: PaperInkStudy) {
     val fillAmount = remember { mutableFloatStateOf(1f) }
     val reflection = remember { mutableFloatStateOf(.5f) }
     val softness = remember { mutableFloatStateOf(0f) }
+    // Half the dial is one letter of fade-in ahead of the wet edge.
+    val leadFade = remember { mutableFloatStateOf(.5f) }
     val paper = Color(0xFFFAF3E8)
     val repeatColor = Color(0xFFC25F3B)
     LaunchedEffect(study) {
@@ -287,8 +289,10 @@ private fun PaperInkStudyPage(app: QuranApp, study: PaperInkStudy) {
                         val progress = when (preview.value) {
                             InkPreview.Wet -> fillAmount.floatValue
                             InkPreview.Dry -> 1f
-                            InkPreview.Voice -> if (english.value) word.motion.progress else
-                                word.pacing?.at(word.motion.progress) ?: InkEngine.sweepEasing.transform(word.motion.progress)
+                            // An upcoming word's first letter fades in while the previous one is voiced.
+                            InkPreview.Voice -> if (word.motion.ahead < 0f) word.motion.ahead
+                                else if (english.value) word.motion.progress
+                                else word.pacing?.at(word.motion.progress) ?: InkEngine.sweepEasing.transform(word.motion.progress)
                         }
                         val repeat = word.ayah == 2 && study.sequence.repeatedMiddle
                         val wet = when (preview.value) {
@@ -303,6 +307,7 @@ private fun PaperInkStudyPage(app: QuranApp, study: PaperInkStudy) {
                             study.repeatChain.alpha else 0f)
                         word.shader.setFloatUniform("reflectionStrength", reflection.floatValue)
                         word.shader.setFloatUniform("lightSoftness", softness.floatValue)
+                        word.shader.setFloatUniform("lead", leadFade.floatValue * 2f)
                         word.shader.setFloatUniform("retained", if (repeat) 1f else 0f)
                         word.shader.setFloatUniform("repeatPass", if (repeat) 1f else 0f)
                         word.shader.setFloatUniform("repeatColor", repeatColor.red, repeatColor.green, repeatColor.blue)
@@ -348,6 +353,7 @@ private fun PaperInkStudyPage(app: QuranApp, study: PaperInkStudy) {
             InkStudyDial("Font size", fontScale, .5f..1f)
             InkStudyDial("Reflection", reflection)
             InkStudyDial("Softness", softness)
+            InkStudyDial("Lead fade", leadFade)
             InkStudyDial("Inspect fill", fillAmount, onChange = {
                 if (preview.value != InkPreview.Wet) app.player.pause()
                 preview.value = InkPreview.Wet
