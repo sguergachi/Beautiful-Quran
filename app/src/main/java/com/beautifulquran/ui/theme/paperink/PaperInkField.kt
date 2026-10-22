@@ -11,7 +11,8 @@ import kotlin.math.sqrt
  * The paper ink's swelling-channel fields for one word, worked out from the
  * word's own rasterized glyphs. Pure Kotlin: no Android types, so the geometry
  * is unit tested on the JVM. `tools/build_paper_ink_study.py` is the reference
- * implementation; keep the two in step (see docs/PAPER_INK.md).
+ * implementation for arrival; `tools/paper_ink_outline.py` is the wet contour
+ * reference. Keep the implementations in step (see docs/PAPER_INK.md).
  *
  * Coordinates are mask pixels at [scale] samples per device pixel. Distances
  * and the stroke radii are in device pixels, as the shader measures them.
@@ -88,8 +89,11 @@ internal object PaperInkField {
         val nearestInk = outside.index!!
         val waves = swellingBoth(ink, distance, width, height, scale, centers, rtl, unit, baseline, nearestInk)
             .map { wave -> FloatArray(n) { 0.12f * duration + (1f - 0.24f * duration) * wave[it] } }
-        val (normalX, normalY) = liquidSurface(distance, width, height, scale, unit)
-        return Result(width, height, waves[0], waves[1], distance, normalX, normalY, duration)
+        // Preserve the established depth/arrival map; only the liquid outline
+        // and its reflection need the font's fractional edge locations.
+        val outline = PaperInkOutline.distance(alpha, width, height, scale, distance)
+        val (normalX, normalY) = liquidSurface(outline, width, height, scale, unit)
+        return Result(width, height, waves[0], waves[1], outline, normalX, normalY, duration)
     }
 
     /** [count] letter centres spaced evenly across the ink, in reading order. */

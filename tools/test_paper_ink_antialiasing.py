@@ -12,6 +12,7 @@ import skia
 from scipy.ndimage import distance_transform_edt
 
 import build_paper_ink_study as geometry
+from paper_ink_outline import outline_distance
 
 ROOT = Path(__file__).resolve().parents[1]
 SOURCE = (ROOT / 'app/src/main/assets/paper-ink/ink.agsl').read_text()
@@ -47,6 +48,7 @@ def word(text, font, size, rtl, letters):
     duration = 2.8 / (letters + 1.8)
     arrivals = [geometry.swelling_channels(ink, distance, centers, rtl, flowing, size / 160, baseline)
                 for flowing in (False, True)]
+    distance = outline_distance(alpha, scale, distance)
     field = np.full((*alpha.shape, 4), 255, dtype='uint8')
     for i, arrival in enumerate(arrivals):
         field[:, :, i] = np.rint((.12 * duration + (1 - .24 * duration) * arrival) * 255)

@@ -15,6 +15,7 @@ from PIL import Image, ImageDraw, ImageFont
 from scipy.ndimage import distance_transform_edt
 
 import build_paper_ink_study as B
+from paper_ink_outline import outline_distance
 
 OUT = B.ROOT / 'app/src/test/resources/paper-ink'
 SS = 2
@@ -44,6 +45,7 @@ def export(name, text):
     duration = 2.8 / (letters + 1.8)
     waves = [B.swelling_channels(ink, distance, centers, True, flowing, unit, baseline) for flowing in (False, True)]
     fields = [.12 * duration + (1 - .24 * duration) * wave for wave in waves]
+    distance = outline_distance(alpha, SS, distance)
     interior = np.maximum(0, distance)
     film = interior / (interior + 3 * unit) * 3 * unit
     gy, gx = np.gradient(B.gaussian_filter(film, SS * 2 * unit))

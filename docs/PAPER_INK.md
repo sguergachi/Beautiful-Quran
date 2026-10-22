@@ -90,6 +90,15 @@ Textures: `field` at 2× (R Inside out, G Flowing, B distance as 128 + 16 px),
 `normals` at 1× (R/G film normal, B exact glyph coverage). Shader constants
 were tuned at a 160 px font; `unit = fontPx / 160` scales them.
 
+The reader's wet outline keeps the source font's fractional edge coverage.
+`PaperInkOutline` reconstructs contour segments between neighbouring coverage
+samples, then measures distance to those segments around the nearest boundary
+cell. This avoids the small bumps made by expanding a thresholded bitmap.
+The film normals use the reconstructed outline too. This work happens once on
+the background generator, with the same textures and cache limit. Arrival
+fields keep their existing depth solver, so letter timing and spread stay
+unchanged. The study's baked 4× maps are unchanged.
+
 Wet ink uses four subpixel samples in a 2×2 grid, each with a half-pixel
 coverage filter. This antialiases the expanded outline, swelling front and
 focused reflection together. Each sample keeps the original glyph coverage
@@ -112,6 +121,13 @@ dries it toward warm paper.
 - `PaperInkFieldTest` — the Kotlin generator against the Python reference on
   real Hafs words (`tools/export_paper_ink_fixture.py`), plus upright stems,
   leaning stems, symmetric swell and letter slots.
+- `PaperInkOutlineTest` — fractional circles and angled strokes against
+  independent analytic shapes, plus saddle corners and uniform masks.
+- `tools/test_paper_ink_outline.py` — the pictured 6:150 word 16 against a
+  freshly rasterized 16× font outline at four reading sizes and both pooling
+  settings. This tests geometry independently of the low-resolution field.
+  `tools/paper_ink_outline.py` is the contour reference used by the Kotlin
+  parity fixtures and production-shader tests.
 - `tools/test_paper_ink_study.py`, `tools/test_paper_ink_shader.py` — the
   reference geometry and the study shader.
 - `tools/test_paper_ink_antialiasing.py` — direct Skia renders of the production
