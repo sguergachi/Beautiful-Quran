@@ -342,10 +342,9 @@ export function ReaderScreen({
   const receded = recitingActive
   // Waiting on the stream download: while the spinner holds, the whole page
   // — the recited tail and the opening basmalah included — waits under
-  // Upcoming paper (same rule as Android). The wait is the buffering itself:
-  // the moment it begins the page fades as one synchronized action.
-  // Released only after the buffer has carried the voice for a moment, so
-  // a starving stream's brief ready windows cannot strobe the page.
+  // Upcoming paper (same rule as Android). The wait is the buffering itself,
+  // with no spoken-word gate: the moment it begins the page fades as one
+  // synchronized action; see STREAM_WAIT_RELEASE_HOLD_MS for the wake hold.
   const [streamWait, setStreamWait] = useState(false)
   useEffect(() => {
     if (state.player.isBuffering) {

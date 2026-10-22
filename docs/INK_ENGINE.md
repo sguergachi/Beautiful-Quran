@@ -403,7 +403,7 @@ tween-vs-snap rules, sweep entry and residual rules, repeat wash timing, the
   tuning, and visual-verification specification.
 - **Stream wait**: while the spinner is up, the whole page — the recited tail,
   the due verse and the opening basmalah included — waits under Upcoming paper
-  (`StreamWaitPolicy.kt` holds the release-hold constant). The *wait is the
+  (`ReaderScreen.kt` holds `STREAM_WAIT_RELEASE_HOLD_MS`). The *wait is the
   buffering itself*, not a question of whether anything has been spoken
   (user rule): the recited tail from before a pause or an earlier seek stays
   lit only while playback goes on — the moment the download holds the voice,
