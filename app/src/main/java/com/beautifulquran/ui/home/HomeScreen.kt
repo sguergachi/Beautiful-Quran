@@ -67,6 +67,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
@@ -112,6 +113,7 @@ import com.beautifulquran.ui.reader.remainingUnfurlSignal
 import com.beautifulquran.ui.theme.quietSuppliedBrackets
 import com.beautifulquran.ui.theme.ArabicTitleStyle
 import com.beautifulquran.ui.theme.FloatingPaperControl
+import com.beautifulquran.ui.theme.InkNuqta
 import com.beautifulquran.ui.theme.FloatingPaperEnter
 import com.beautifulquran.ui.theme.FloatingPaperExit
 import com.beautifulquran.ui.theme.LocalQuranAccents
@@ -157,9 +159,12 @@ private val HomeRowRibbonGutter = (HomeNumberColumn - HomeRibbonWidth) / 2f
 private val HomeColumnGap = 4.dp
 private val HomeArabicOpticalInset = 4.dp
 private val TopBoundRibbonHeight = 96.dp
-/** Air closing the Revising group before the full list: the Bookmarks index's
- * gap before a later chapter group. */
-private val RevisingGroupGap = 32.dp
+/** Air either side of the hairline closing the Pinned group: the rows' own
+ * 15 dp bands carry the rest, so ink-to-rule reads even both ways. */
+private val PinnedRuleAir = 8.dp
+/** The pin: the ink nuqta, cut down to sit beside an Arabic chapter name
+ * (the Reciters leaf's full-size dot would outweigh the name). */
+private const val PinNuqtaScale = 0.55f
 /**
  * Paper margin between the field and where scrolled ink dies: the feather
  * finishes dissolving a row here, so fading rows never brush the bar. While
@@ -276,11 +281,11 @@ fun HomeScreen(
     // scrolled out of view the pill floats at the bottom; once the row
     // itself is visible the pill docks away so the row owns the tap.
     val continueSurahId = uiState.continueTarget?.surah?.id
-    // Chapters being revised lead the list (search owns the sheet while
-    // active); a revised chapter's corded copy up there owns the place.
-    val showRevising = !searching && uiState.revising.isNotEmpty()
-    val revisingIds = if (showRevising) uiState.revising.map { it.id } else emptyList()
-    val placeKey = placeRowKey(continueSurahId, revisingIds)
+    // Pinned chapters lead the list (search owns the sheet while active);
+    // a pinned chapter's copy up there owns the place.
+    val showPinned = !searching && uiState.pinned.isNotEmpty()
+    val pinnedOrder = if (showPinned) uiState.pinned.map { it.id } else emptyList()
+    val placeKey = placeRowKey(continueSurahId, pinnedOrder)
     // The list must have measured before the pill may rise: on the sheet's
     // first composition the row-visibility rule cannot see any row yet, and
     // a pill that shows before then pops, dwells, and flies to a row that
@@ -368,7 +373,7 @@ fun HomeScreen(
         uiState.surahs.map { it.id },
         continueSurahId,
         searching,
-        revisingIds,
+        pinnedOrder,
     )
     if (!continueRowVisible && rowWasVisible && !docking && !undocking) {
         val seat = pillSeatRect
@@ -637,17 +642,17 @@ fun HomeScreen(
                     )
                     Spacer(Modifier.height(SearchBottomBreath))
                 }
-                // Every chapter row, in order or corded atop the list, is the
+                // Every chapter row, in order or pinned atop the list, is the
                 // same row; only the place ribbon follows [placeKey].
-                val revisingCords = uiState.revising.mapTo(HashSet()) { it.id }
-                // Cording a chapter from the top of the sheet would grow the
+                val pinnedIds = uiState.pinned.mapTo(HashSet()) { it.id }
+                // Pinning a chapter from the top of the sheet would grow the
                 // group above the viewport, out of sight (the list holds its
                 // place by key). Bring the group down into view instead; a
                 // reader deep in the list keeps their place.
-                var revealRevising by remember { mutableStateOf(false) }
-                LaunchedEffect(uiState.revising.size) {
-                    if (revealRevising) {
-                        revealRevising = false
+                var revealPinned by remember { mutableStateOf(false) }
+                LaunchedEffect(uiState.pinned.size) {
+                    if (revealPinned) {
+                        revealPinned = false
                         listState.animateScrollToItem(0)
                     }
                 }
@@ -655,12 +660,12 @@ fun HomeScreen(
                     SurahRow(
                         surah = surah,
                         // One place marker: only the row owning the place
-                        // carries the green cloth (the corded copy, when revised).
+                        // carries the green cloth (the pinned copy, when pinned).
                         currentAyah = uiState.continueTarget?.ayah?.takeIf { key == placeKey },
-                        revising = surah.id in revisingCords,
-                        onToggleRevising = {
-                            revealRevising = surah.id !in revisingCords && !listState.canScrollBackward
-                            viewModel.toggleRevising(surah.id)
+                        pinned = surah.id in pinnedIds,
+                        onTogglePinned = {
+                            revealPinned = surah.id !in pinnedIds && !listState.canScrollBackward
+                            viewModel.togglePinned(surah.id)
                         },
                         placeUnfurlSignal = placeRibbonUnfurlEpoch,
                         onPlaceUnfurlConsumed = { consumed ->
@@ -727,19 +732,31 @@ fun HomeScreen(
                             SearchSectionLabel(text = "Surahs", topPadding = SearchFirstLabelTop)
                         }
                     }
-                    if (showRevising) {
-                        item(key = "revising-label") {
+                    if (showPinned) {
+                        item(key = "pinned-label") {
                             SearchSectionLabel(
-                                text = "Revising",
+                                text = "Pinned",
                                 topPadding = SearchFirstLabelTop,
                                 modifier = Modifier.animateItem(),
                             )
                         }
-                        items(uiState.revising, key = { "revising-${it.id}" }) { surah ->
-                            chapterRow(surah, "revising-${surah.id}", Modifier.animateItem())
+                        items(uiState.pinned, key = { "pinned-${it.id}" }) { surah ->
+                            chapterRow(surah, "pinned-${surah.id}", Modifier.animateItem())
                         }
-                        item(key = "revising-gap") {
-                            Spacer(Modifier.height(RevisingGroupGap).animateItem())
+                        item(key = "pinned-rule") {
+                            Box(
+                                Modifier
+                                    .animateItem()
+                                    .fillMaxWidth()
+                                    .padding(
+                                        start = HomeStartInset,
+                                        end = HomeEndInset,
+                                        top = PinnedRuleAir,
+                                        bottom = PinnedRuleAir,
+                                    )
+                                    .height(1.dp)
+                                    .background(QuranTheme.ink.hairline),
+                            )
                         }
                     }
                     items(uiState.surahs, key = { "surah-${it.id}" }) { surah ->
@@ -1129,15 +1146,23 @@ internal fun continueLazyIndex(
     surahIds: List<Int>,
     continueId: Int?,
     searching: Boolean,
-    /** The Revising group leads the list: its label, its rows, its air. */
-    revisingIds: List<Int> = emptyList(),
+    /** The Pinned group leads the list: its label, its rows, its hairline. */
+    pinnedOrder: List<Int> = emptyList(),
 ): Int {
     if (searching || continueId == null) return -1
-    val revised = revisingIds.indexOf(continueId)
-    if (revised >= 0) return 1 + revised
+    val pinned = pinnedOrder.indexOf(continueId)
+    if (pinned >= 0) return 1 + pinned
     val position = surahIds.indexOf(continueId)
-    val lead = if (revisingIds.isEmpty()) 0 else revisingIds.size + 2
+    val lead = if (pinnedOrder.isEmpty()) 0 else pinnedOrder.size + 2
     return if (position < 0) -1 else lead + position
+}
+
+/** Key of the chapter row that owns the reading place: the pinned copy atop
+ * the list when the chapter is pinned, its in-order row otherwise. */
+internal fun placeRowKey(continueId: Int?, pinnedOrder: List<Int>): String? = when (continueId) {
+    null -> null
+    in pinnedOrder -> "pinned-$continueId"
+    else -> "surah-$continueId"
 }
 
 /**
@@ -1284,8 +1309,8 @@ private fun SurahRow(
     currentAyah: Int?,
     placeUnfurlSignal: Int,
     onPlaceUnfurlConsumed: (Int) -> Unit,
-    revising: Boolean,
-    onToggleRevising: () -> Unit,
+    pinned: Boolean,
+    onTogglePinned: () -> Unit,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -1295,8 +1320,7 @@ private fun SurahRow(
         verticalAlignment = Alignment.CenterVertically,
         modifier = modifier
             .fillMaxWidth()
-            .revisingCord(revising, QuranTheme.ink.secondary, HomeEndInset)
-            .quietClickable(onLongClick = onToggleRevising, onClick = onClick)
+            .quietClickable(onLongClick = onTogglePinned, onClick = onClick)
             .padding(
                 top = ContinueRowVertical,
                 bottom = ContinueRowVertical,
@@ -1361,19 +1385,32 @@ private fun SurahRow(
             modifier = Modifier.padding(end = HomeArabicOpticalInset),
         )
         // The trailing gutter mirrors the ribbon lane: marking is where you
-        // tap, as on a verse's ribbon margin. The cord hangs here.
+        // tap, as on a verse's ribbon margin. A pinned chapter carries the
+        // app's one choice mark, the ink nuqta: one drop soaks in on pin and
+        // lifts on unpin. Unpinned rows show bare paper, not 114 outlines.
         Box(
-            Modifier
+            contentAlignment = Alignment.Center,
+            modifier = Modifier
                 .width(HomeEndInset)
                 .height(ContinueRowRibbonHeight)
                 .quietClickable(role = Role.Button) {
                     view.performHapticFeedback(HapticFeedbackConstants.CONTEXT_CLICK)
-                    onToggleRevising()
+                    onTogglePinned()
                 }
                 .semantics {
-                    contentDescription = revisingCordLabel(revising, surah.nameTransliteration)
+                    contentDescription =
+                        if (pinned) "Unpin ${surah.nameTransliteration}" else "Pin ${surah.nameTransliteration}"
                 },
-        )
+        ) {
+            InkNuqta(
+                selected = pinned,
+                restingInk = Color.Transparent,
+                modifier = Modifier.graphicsLayer {
+                    scaleX = PinNuqtaScale
+                    scaleY = PinNuqtaScale
+                },
+            )
+        }
     }
 }
 

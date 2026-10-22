@@ -179,16 +179,16 @@ class ContinuePillVisibilityTest {
     }
 
     @Test
-    fun revisedChapterOwnsThePlaceAtopTheList() {
+    fun pinnedChapterOwnsThePlaceAtopTheList() {
         val ids = (1..114).toList()
-        val revising = listOf(18, 67)
-        // Label, then the corded rows: 67's copy is the third item.
-        assertEquals(2, continueLazyIndex(ids, 67, false, revising))
-        assertEquals("revising-67", placeRowKey(67, revising))
-        // Unrevised chapters sit below the label, both rows and the air.
-        assertEquals(4, continueLazyIndex(ids, 1, false, revising))
-        assertEquals("surah-1", placeRowKey(1, revising))
-        assertEquals(null, placeRowKey(null, revising))
+        val pinned = listOf(18, 67)
+        // Label, then the pinned rows: 67's copy is the third item.
+        assertEquals(2, continueLazyIndex(ids, 67, false, pinned))
+        assertEquals("pinned-67", placeRowKey(67, pinned))
+        // Unpinned chapters sit below the label, both rows and the hairline.
+        assertEquals(4, continueLazyIndex(ids, 1, false, pinned))
+        assertEquals("surah-1", placeRowKey(1, pinned))
+        assertEquals(null, placeRowKey(null, pinned))
     }
 
     @Test

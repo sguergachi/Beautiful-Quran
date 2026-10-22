@@ -1670,32 +1670,31 @@ animation from being borrowed as navigation feedback, and leaves the shared
 component authoritative for its own visual language. Do not create another
 bookmark icon, a second ribbon shape, or a bespoke animated substitute.
 
-### Revising cord (Android prototype)
+### Pinned chapters (Android)
 
-A chapter being revised or memorised carries a **study cord**: a twisted
-silk thread, like the sewn-in marker of a bound mushaf, hanging in the row's
-**trailing** 28 dp gutter. The leading lane belongs to the green place
-ribbon, so the cord takes the mirrored gutter and the two never share or
-shift a lane. Marking is where you tap: a tap on that gutter cords or uncords
-the chapter (a long-press anywhere on the row does the same). The cord drops
-with the bookmark ribbon's gravity spill and gathers back under the page on
-removal. It emerges from under the paper at the row's top edge, bellies
-slightly toward the text, and ends in a knot and a frayed tassel. The belly,
-twist and tassel are what keep it from reading as a scrollbar. It is plain
-ink, not a fourth hue: green is interaction, gold is ornament, ruby is a
-saved verse.
+A chapter can be **pinned** to the top of Chapters. Its mark is the app's one
+choice mark, the [ink nuqta](../app/src/main/java/com/beautifulquran/ui/theme/InkNuqta.kt)
+already used for the chosen reciter, cut to 55% so it sits beside the Arabic
+chapter name in the row's **trailing** 28 dp gutter. The leading lane belongs
+to the green place ribbon, so the pin takes the mirrored gutter and the two
+never share or shift a lane. Marking is where you tap: a tap on that gutter
+pins or unpins the chapter (a long-press anywhere on the row does the same).
+Pinning soaks one drop of ink in; unpinning lifts it. Unpinned rows show bare
+paper rather than an outline on all 114 rows. A twisted-cord mark was tried
+first and rejected as ugly.
 
-Corded chapters gather above the full list under a quiet **Revising** label,
-in Quranic order, followed by 32 dp of air. The full list still carries
-them in their places, also corded, so the book's order never has holes.
-The current-place ribbon (and the Continue pill's docking target) belongs to
-one row only: the corded copy when the chapter is being revised, its
+Pinned chapters gather above the full list under a quiet **Pinned** label, in
+Quranic order, closed by a hairline (`ink.hairline`, on the text block's
+edges, 8 dp of air either side beyond the rows' own bands). The full list
+still carries them in their places, also marked, so the book's order never
+has holes. The current-place ribbon (and the Continue pill's docking target)
+belongs to one row only: the pinned copy when the chapter is pinned, its
 in-order row otherwise. Search owns the sheet while active, so the group
-stands down. Cording from the top of the sheet scrolls the new group into
+stands down. Pinning from the top of the sheet scrolls the new group into
 view; a reader deep in the list keeps their place. Stored as
-`Settings.revisingSurahIds`; web parity is pending.
+`Settings.pinnedSurahIds`; web parity is pending.
 
-Implementation: `ui/home/RevisingCord.kt`, `SurahRow` in `HomeScreen.kt`.
+Implementation: `SurahRow` and the list in `ui/home/HomeScreen.kt`.
 
 ### Chapters bookmark treatment
 
