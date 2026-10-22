@@ -234,7 +234,8 @@ state == Active
 
 The theme half requires the white-gold glimmer accent (`#F8E9BE`) provided by
 Nightfall and Royal Green. Paper does not define that accent, so it does not
-glimmer.
+glimmer; on Paper the same wet/dry clock drives the paper ink instead
+([PAPER_INK.md](PAPER_INK.md)).
 
 This produces three deliberate cases:
 

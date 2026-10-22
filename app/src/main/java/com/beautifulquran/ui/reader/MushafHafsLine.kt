@@ -910,6 +910,9 @@ private fun MushafQcfWord(
     // Single-element and fixed for this node: only the motion changes per frame.
     val wordAsList = remember(token.word) { listOf(token.word) }
     var layoutResult by remember { mutableStateOf<TextLayoutResult?>(null) }
+    // Paper: the shared ink pipeline draws this word while it is live, in place
+    // of the whole wash chain below (docs/PAPER_INK.md).
+    val paperNode = rememberPaperInkNode()
     val packKey = remember(token.surahId, token.ayah) { token.surahId to token.ayah }
     val packState = remember(packs, packKey) { derivedStateOf { packs[packKey] } }
     val pack = packState.value
@@ -996,6 +999,8 @@ private fun MushafQcfWord(
                     searchFocusPositions = pack.searchFocusPositions,
                     searchBackgroundAlpha = { pack.searchBackgroundAlpha.value },
                     waslInk = palette.fullInkColor,
+                    // This node draws its own paper ink (paperInkBase, above).
+                    paperInk = null,
                     // The reveal is washed onto this word's own layer below,
                     // where it follows the letterform. Paper laid over the line
                     // box cannot: it left tails, high marks and the circled
@@ -1016,6 +1021,22 @@ private fun MushafQcfWord(
         // which is exactly what the line end showed.
         overflow = TextOverflow.Visible,
         modifier = Modifier
+            .then(
+                if (hasMotionInk && palette.paperInk != null) {
+                    with(paperNode) {
+                        Modifier.paperInkBase(
+                            motion = { packState.value?.motions?.getOrNull(token.word.position - 1) },
+                            style = palette.paperInk,
+                            rtl = true,
+                            letterCount = remember(token.word.arabic) {
+                                com.beautifulquran.domain.TajweedPacing.letterOffsets(token.word.arabic).size
+                            },
+                        )
+                    }
+                } else {
+                    Modifier
+                },
+            )
             // Only while there is ink to animate — the verse under the voice.
             // A graphicsLayer marks its node transformed, and Compose then
             // keeps that node's rect index up to date by walking its whole
@@ -1067,7 +1088,10 @@ private fun MushafQcfWord(
                     )
                 },
             ),
-        onTextLayout = { layoutResult = it },
+        onTextLayout = {
+            layoutResult = it
+            paperNode.layout = it
+        },
     )
 }
 

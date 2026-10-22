@@ -227,6 +227,20 @@ object InkEngine {
         val tarjiReleaseMs: Float = com.beautifulquran.playback.Tarji.RELEASE_MS,
         /** Additional wall-time trim on the pulse and its graph (ms); shipped 0. */
         val tarjiEarDelayMs: Float = 0f,
+        /**
+         * Paper ink (docs/PAPER_INK.md): on Paper, Android 13+, every reader
+         * surface draws words through the swelling-channel ink shader. Off
+         * keeps the paper-cover wash. The dials are the study's tuned defaults.
+         */
+        val paperInk: Boolean = true,
+        /** Wet stroke-weight gain (study "Ink pooling"). */
+        val paperInkPooling: Float = 0.25f,
+        val paperInkReflection: Float = 0.5f,
+        val paperInkSoftness: Float = 0f,
+        /** Fade-in ahead of the wet edge: 0.5 is one letter, 1 is two. */
+        val paperInkLeadFade: Float = 0.5f,
+        /** Flowing ink (quicker, cleaner swell) instead of Inside out. */
+        val paperInkFlowing: Boolean = false,
     )
 
     /**

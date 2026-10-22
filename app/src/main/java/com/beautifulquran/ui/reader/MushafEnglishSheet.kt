@@ -1,5 +1,6 @@
 package com.beautifulquran.ui.reader
 
+import com.beautifulquran.ui.theme.paperink.PaperInk
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.snap
@@ -1666,11 +1667,76 @@ private fun englishVerseBlooms(
     if (markCover > 0f && !verse.markRange.isEmpty()) {
         blooms += cover(verse.markRange, paper, markCover)
     }
+    if (motions.isNotEmpty() && palette.paperInk != null) {
+        blooms.addEnglishPaperInk(verse, washSpans, motions, palette.paperInk, text, washEdge)
+    }
     if (motions.isNotEmpty()) {
         blooms.addEnglishInkLayerBlooms(washSpans, motions, palette, glintInk, repeatLayers = false, washEdge)
         blooms.addEnglishInkLayerBlooms(spans, motions, palette, glintInk, repeatLayers = true, washEdge)
     }
     return blooms
+}
+
+/**
+ * Paper ink on the English leaf (docs/PAPER_INK.md). The leaf's first-pass
+ * wash is one continuous prefix with its edge at [washEdge] (a character
+ * position), so each English word's progress is its own distance from that
+ * edge: words behind it are laid, the word it is crossing is mid-ink, and the
+ * next word's negative progress lets its first letter fade in ahead. A word
+ * stays with the paper ink while its owner's ink is still wet.
+ *
+ * Drawn over the leaf's covers — the paper ink erases what they left of the
+ * word — and under its orange repeat tint. With no fallback of its own: a
+ * word whose field is not ready simply keeps the leaf's wash.
+ */
+private fun MutableList<ShapedWordBloom>.addEnglishPaperInk(
+    verse: EnglishProseVerse,
+    washSpans: List<EnglishInkSpan>,
+    motions: List<InkMotion>,
+    style: PaperInkStyle,
+    text: CharSequence,
+    washEdge: Float,
+) {
+    val end = (verse.range.last + 1).coerceAtMost(text.length)
+    var i = verse.range.first.coerceAtLeast(0)
+    while (i < end) {
+        if (text[i].isWhitespace()) {
+            i++
+            continue
+        }
+        var j = i
+        while (j < end && !text[j].isWhitespace()) j++
+        val owner = washSpans.firstOrNull { i in it.range }?.let { motions.getOrNull(it.position - 1) }
+        val raw = ((washEdge - i) / (j - i).coerceAtLeast(1)).coerceIn(-1f, 1f)
+        val wet = owner?.paperWetness ?: 0f
+        if ((raw > -1f && raw < 1f && owner != null) || wet > 0f) {
+            val frame = (owner ?: motions.first()).paperInkFrame(style)
+            add(
+                ShapedWordBloom.PaperInk(
+                    range = i until j,
+                    frame = PaperInk.Frame(
+                        progress = raw,
+                        wet = wet,
+                        // The leaf keeps its own orange layer for repeats.
+                        repeatPass = 0f,
+                        repeatTint = 0f,
+                        retained = 0f,
+                        dryInk = frame.dryInk,
+                        wetInk = frame.wetInk,
+                        repeatColor = frame.repeatColor,
+                        unreadAlpha = frame.unreadAlpha,
+                        pooling = frame.pooling,
+                        reflection = frame.reflection,
+                        softness = frame.softness,
+                        leadFade = frame.leadFade,
+                        flowing = frame.flowing,
+                    ),
+                    fallback = emptyList(),
+                ),
+            )
+        }
+        i = j
+    }
 }
 
 /**

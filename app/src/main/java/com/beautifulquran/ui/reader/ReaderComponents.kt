@@ -833,8 +833,28 @@ internal class InkMotion(
      * its recorded pulse, and the green to draw it in. */
     val tarjiTrace: InkEngine.TarjiTrace? = null,
     val tarjiTraceColor: Color = Color.Unspecified,
+    /** Paper's wet ink: 1 while the voice lays this word, drying over
+     * [InkEngine.Tuning.glintFadeMs] — the glimmer's clock, on Paper. */
+    private val paperWet: State<Float>? = null,
+    /** The word before this one in reading order, for the paper ink's lead fade. */
+    private val previous: InkMotion? = null,
 ) {
     val isActive: Boolean get() = ink.state == InkEngine.State.Active
+
+    /** Paper ink wetness this frame (0 dry). */
+    val paperWetness: Float get() = paperWet?.value ?: 0f
+
+    /**
+     * How far this word is from starting, in word durations (−1..0), while the
+     * word before it is being recited: the paper ink fades its first letter in
+     * as the previous word finishes. −1 when nothing is approaching.
+     */
+    val paperAhead: Float
+        get() {
+            val before = previous ?: return -1f
+            if (isActive || ink.state != InkEngine.State.Upcoming || !before.isActive) return -1f
+            return (before.plainSweepProgress - 1f).coerceIn(-1f, 0f)
+        }
     val repeat: Boolean get() = ink.repeat
 
     /** Already continued through wasl revealStart inside [rememberLetterSweep]. */
@@ -1203,6 +1223,8 @@ internal fun rememberInkMotions(
             ),
             tarjiTrace = tarjiTrace,
             tarjiTraceColor = traceInk,
+            paperWet = rememberGlintAlpha(glintInk == null && InkEngine.glinting(ink.state, wetInk)),
+            previous = motions.lastOrNull(),
         )
         predecessor = sweep.progress
     }
@@ -1301,6 +1323,9 @@ private fun HighlightLayeredText(
     val searchHitActive = !motion.showRepeatLayer && searchHitWash != null
     val orangeWash = motion.repeatWash.takeIf { motion.showRepeatLayer }
     val trace = motion.tarjiTrace
+    // Paper: the shared ink pipeline draws this word while it is live.
+    val paperInk = rememberPaperInkStyle(color)
+    val paperNode = rememberPaperInkNode()
     Box(if (trace != null) modifier.tarjiPulseTrace(trace, rtl, motion.tarjiTraceColor) else modifier) {
         // The glow is a light's falloff, glyph-shaped at every width — no
         // radial field: a wide faint veil, the halo, and a tight bloom.
@@ -1348,7 +1373,9 @@ private fun HighlightLayeredText(
             maxLines = 1,
             softWrap = false,
             overflow = TextOverflow.Visible,
-            modifier = Modifier.layeredBaseInk(motion, rtl),
+            onTextLayout = { paperNode.layout = it },
+            modifier = with(paperNode) { Modifier.paperInkBase(motion, paperInk, rtl) }
+                .layeredBaseInk(motion, rtl),
         )
         motion.waslPrefix?.let { prefix ->
             InkOverlayText(
@@ -1397,7 +1424,7 @@ private fun HighlightLayeredText(
                 text = text,
                 style = style,
                 color = repeatInk.copy(alpha = InkEngine.tuning.repeatInkAlpha),
-                modifier = Modifier.repeatInkLayer(orangeWash, rtl),
+                modifier = with(paperNode) { Modifier.hiddenWhilePaperInk() }.repeatInkLayer(orangeWash, rtl),
             )
         }
         // Base hue stays latched; accepted crests lift either hue toward white.
@@ -1527,6 +1554,8 @@ internal class WordInkPalette(
     private val fullInk: Color,
     private val paper: Color,
     private val repeatInk: Color,
+    /** Paper theme's shared ink pipeline; null keeps the paper-cover wash. */
+    val paperInk: PaperInkStyle? = null,
 ) {
     val fullInkColor: Color get() = fullInk
     val paperColor: Color get() = paper
@@ -1538,8 +1567,9 @@ internal fun rememberWordInkPalette(): WordInkPalette {
     val fullInk = MaterialTheme.colorScheme.onBackground
     val paper = MaterialTheme.colorScheme.background
     val repeatInk = LocalQuranAccents.current.repeatInk
-    return remember(fullInk, paper, repeatInk) {
-        WordInkPalette(fullInk = fullInk, paper = paper, repeatInk = repeatInk)
+    val paperInk = rememberPaperInkStyle(fullInk)
+    return remember(fullInk, paper, repeatInk, paperInk) {
+        WordInkPalette(fullInk = fullInk, paper = paper, repeatInk = repeatInk, paperInk = paperInk)
     }
 }
 
@@ -1569,20 +1599,63 @@ private fun MutableList<ShapedWordBloom>.addShapedInkMotionBlooms(
      * coverage and cannot cut across a letterform.
      */
     baseReveal: Boolean = true,
+    /** Paper ink: live words are drawn by the shared pipeline ([ShapedWordBloom.PaperInk]). */
+    paperInk: PaperInkStyle? = null,
+    /** Per word, the dim cover it would have had; moved into its paper ink bloom. */
+    paperCovers: Array<ShapedWordBloom.UpcomingDim?> = emptyArray(),
 ) {
+    // Warm the words just ahead of the voice; a long verse's whole field set
+    // would not fit the cache (about 1 MB a word at 2x).
+    val firstLive = if (paperInk == null) -1 else motions.indexOfFirst { it.paperInkLive }
     motions.forEachIndexed { index, motion ->
         val range = ranges.getOrNull(index) ?: return@forEachIndexed
-        if (baseReveal && !motion.repeat && motion.sweepProgress < 1f) {
-            add(
-                ShapedWordBloom.InkReveal(
+        val reveal = if (baseReveal && !motion.repeat && motion.sweepProgress < 1f) {
+            ShapedWordBloom.InkReveal(
+                range = range,
+                progress = motion.sweepProgress,
+                paper = palette.paperColor,
+                restingAlpha = InkEngine.State.Upcoming.inkAlpha(),
+                feather = motion.sweepFeather,
+            )
+        } else {
+            null
+        }
+        if (paperInk != null && motion.paperInkLive) {
+            val repeatTint = if (motion.repeatAlpha > 0f) {
+                ShapedWordBloom.ColorReveal(
                     range = range,
-                    progress = motion.sweepProgress,
-                    paper = palette.paperColor,
-                    restingAlpha = InkEngine.State.Upcoming.inkAlpha(),
-                    feather = motion.sweepFeather,
+                    progress = motion.repeatProgress,
+                    color = palette.repeatInkColor,
+                    restingAlpha = 0f,
+                    layerAlpha = motion.repeatAlpha,
+                    feather = motion.repeatFeather,
+                    colorAlpha = InkEngine.tuning.repeatInkAlpha,
+                )
+            } else {
+                null
+            }
+            val cover = paperCovers.getOrNull(index)
+            add(
+                ShapedWordBloom.PaperInk(
+                    range = range,
+                    frame = motion.paperInkFrame(paperInk),
+                    fallback = listOfNotNull(cover, reveal, repeatTint),
+                    // Unread ink is the shader's own; a verse recess still dims recited ink.
+                    after = listOfNotNull(cover.takeIf { motion.ink.state != InkEngine.State.Upcoming }),
                 ),
             )
+        } else if (firstLive >= 0 && index > firstLive && index <= firstLive + PAPER_INK_WARM_AHEAD) {
+            add(ShapedWordBloom.PaperInkWarm(range))
         }
+        if (paperInk != null && motion.paperInkLive) {
+            val wasl = motion.waslPrefix
+            val waslProgress = wasl?.displayProgress() ?: 0f
+            if (waslInk != null && wasl != null && waslProgress > 0f) {
+                add(ShapedWordBloom.ColorReveal(range = range, progress = waslProgress, color = waslInk, feather = wasl.feather))
+            }
+            return@forEachIndexed
+        }
+        if (reveal != null) add(reveal)
         val wasl = motion.waslPrefix
         val waslProgress = wasl?.displayProgress() ?: 0f
         if (waslInk != null && wasl != null && waslProgress > 0f) {
@@ -1644,6 +1717,9 @@ private fun MutableList<ShapedWordBloom>.addShapedInkMotionBlooms(
     }
 }
 
+/** Words ahead of the voice whose paper ink fields are generated in advance. */
+private const val PAPER_INK_WARM_AHEAD = 10
+
 /**
  * The whole bloom list for one shaped frame, shared by the English paragraph
  * and the Hafs ayah: dim covers, the ﴿N﴾ mark cover, per-word ink motion,
@@ -1670,7 +1746,10 @@ internal fun buildShapedBlooms(
     waslInk: Color? = null,
     /** See [addShapedInkMotionBlooms]. */
     baseReveal: Boolean = true,
+    /** Paper theme's shared ink pipeline; null keeps the paper-cover wash. */
+    paperInk: PaperInkStyle? = palette.paperInk,
 ): List<ShapedWordBloom> {
+    val paperCovers = arrayOfNulls<ShapedWordBloom.UpcomingDim>(motions.size)
     val recess = recessCover()
     val upcomingCover = 1f - InkEngine.State.Upcoming.inkAlpha()
     val blooms = ArrayList<ShapedWordBloom>(motions.size * 4 + 2)
@@ -1693,11 +1772,12 @@ internal fun buildShapedBlooms(
         )
         if (coverAlpha <= 0f) return@forEachIndexed
         val range = rendered.wordRanges.getOrNull(index) ?: return@forEachIndexed
-        blooms += ShapedWordBloom.UpcomingDim(
+        val cover = ShapedWordBloom.UpcomingDim(
             range = range,
             paper = palette.paperColor,
             coverAlpha = coverAlpha,
         )
+        if (paperInk != null && motion.paperInkLive) paperCovers[index] = cover else blooms += cover
     }
     // ﴿N﴾ mark: paper cover of (1 − markAlpha) so it fades up to full gold
     // with the shared ayah-mark animation.
@@ -1726,6 +1806,8 @@ internal fun buildShapedBlooms(
         glintInk = glintInk,
         waslInk = waslInk,
         baseReveal = baseReveal,
+        paperInk = paperInk,
+        paperCovers = paperCovers,
     )
     // Home search-hit flash: the complete glyph-shaped orange word breathes
     // through opacity without reshaping or moving the base text.

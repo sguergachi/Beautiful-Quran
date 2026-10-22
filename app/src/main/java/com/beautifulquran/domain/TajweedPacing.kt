@@ -469,6 +469,20 @@ object TajweedPacing {
         val haraka: Boolean get() = fatha || damma || kasra
     }
 
+    /**
+     * Character offsets of the letters [curve] paces across, in text order:
+     * one per event of the tokenizer, so a renderer can put each letter's slot
+     * where the font drew it (the paper ink's letter-paced fields).
+     */
+    fun letterOffsets(arabic: String): IntArray {
+        val offsets = ArrayList<Int>(arabic.length)
+        for (i in arabic.indices) {
+            val ch = arabic[i]
+            if (ch == ALEF_MADDA || isBaseLetter(ch)) offsets += i
+        }
+        return offsets.toIntArray()
+    }
+
     private fun tokenize(arabic: String): List<Event> {
         val events = ArrayList<Event>(arabic.length)
         for (ch in arabic) {

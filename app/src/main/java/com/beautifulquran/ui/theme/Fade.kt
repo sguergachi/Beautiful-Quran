@@ -220,6 +220,24 @@ sealed class ShapedWordBloom {
         val feather: Float? = null,
     ) : ShapedWordBloom()
 
+    /**
+     * Paper ink (docs/PAPER_INK.md): this word is drawn by the shared paper
+     * ink pipeline — its printed glyphs erased from the layer, then the ink
+     * shader. Until the word's field is generated it draws [fallback], the
+     * blooms it would otherwise have had, and a word that started its wash in
+     * the fallback finishes it there rather than switching mid-letter.
+     * [after] is drawn over the ink (a verse recess dimming a drying word).
+     */
+    class PaperInk(
+        override val range: IntRange,
+        val frame: com.beautifulquran.ui.theme.paperink.PaperInk.Frame,
+        val fallback: List<ShapedWordBloom>,
+        val after: List<ShapedWordBloom> = emptyList(),
+    ) : ShapedWordBloom()
+
+    /** Paper ink: generate this word's field ahead of its turn. Draws nothing. */
+    class PaperInkWarm(override val range: IntRange) : ShapedWordBloom()
+
     /** The Ink Lab's mark under a tarjīʿ candidate: a sparkline of the pulse
      * the word will be given ([drawPulseTrace]). Never drawn outside the lab. */
     class PulseTrace(
@@ -435,19 +453,23 @@ fun Modifier.shapedWordBloom(
     val wordInkCache = WordInkCache()
     val raisedMarkTrace = RaisedMarkTraceCache()
     val washBrushCache = WashBrushCache(rtl, stops)
+    val paperInk = PaperInkBlooms(rtl, lineBoundsCache, wordInkCache)
     return drawWithContent {
         // The one place a frame is consumed, and so the one place the
         // covers-before-ink order can be guaranteed. Enforcing it in the
         // builders instead left it to be re-broken by every caller that
         // concatenates their output — which is how a cover kept landing on a
         // lit word's halo after the builders had been fixed. See [coversFirst].
-        val bloomList = blooms().coversFirst()
+        val bloomList = paperInk.resolve(blooms().coversFirst(), layout(), clipTintToRange)
         val punchLayer = bloomList.any { bloom ->
             when (bloom) {
                 is ShapedWordBloom.UpcomingDim -> bloom.coverAlpha > 0f
                 is ShapedWordBloom.InkReveal -> bloom.progress < 1f
                 is ShapedWordBloom.ColorReveal -> false
                 is ShapedWordBloom.PulseTrace -> false
+                // Erasing the printed glyphs needs this word's own layer.
+                is ShapedWordBloom.PaperInk -> true
+                is ShapedWordBloom.PaperInkWarm -> false
             }
         }
         val coverBlend = paperCoverBlendMode(punchLayer)
@@ -479,6 +501,8 @@ fun Modifier.shapedWordBloom(
             // the shaped glyph path. Deriving both for every bloom meant a long
             // ayah rebuilt ~2 paths per word on every animation frame.
             when (bloom) {
+                is ShapedWordBloom.PaperInk -> paperInk.draw(this, bloom)
+                is ShapedWordBloom.PaperInkWarm -> Unit
                 is ShapedWordBloom.PulseTrace -> {
                     lineBoundsCache.boundsFor(textLayout, start, endExclusive).forEach { bounds ->
                         drawPulseTrace(
@@ -856,6 +880,106 @@ fun Modifier.shapedWordBloom(
         }
     }
 }
+
+/**
+ * The paper ink's adapter for shaped text: maps a word's range to a
+ * [com.beautifulquran.ui.theme.paperink.PaperInk.Source] — the word laid out
+ * alone ([WordInkCache]) where words share a line, the node's own layout where
+ * each word is its own node — and swaps in a word's fallback blooms until its
+ * field is ready.
+ */
+private class PaperInkBlooms(
+    private val rtl: Boolean,
+    private val lineBounds: LineBoundsCache,
+    private val wordInk: WordInkCache,
+) {
+    private val latched = HashSet<Long>()
+    private val seen = HashSet<Long>()
+    private val sources = HashMap<Long, com.beautifulquran.ui.theme.paperink.PaperInk.Source>()
+    private val words = HashMap<Long, com.beautifulquran.ui.theme.paperink.PaperInk.Word>()
+
+    fun resolve(
+        blooms: List<ShapedWordBloom>,
+        layout: TextLayoutResult?,
+        sharedLine: Boolean,
+    ): List<ShapedWordBloom> {
+        if (blooms.none { it is ShapedWordBloom.PaperInk || it is ShapedWordBloom.PaperInkWarm }) {
+            latched.clear()
+            return blooms
+        }
+        sources.clear()
+        words.clear()
+        seen.clear()
+        val out = ArrayList<ShapedWordBloom>(blooms.size + 4)
+        for (bloom in blooms) {
+            when (bloom) {
+                is ShapedWordBloom.PaperInkWarm -> {
+                    source(bloom.range, layout, sharedLine)?.let {
+                        com.beautifulquran.ui.theme.paperink.PaperInk.word(it)
+                    }
+                }
+                is ShapedWordBloom.PaperInk -> {
+                    val key = rangeKey(bloom.range)
+                    seen += key
+                    val source = source(bloom.range, layout, sharedLine)
+                    val word = if (key in latched || source == null) {
+                        null
+                    } else {
+                        com.beautifulquran.ui.theme.paperink.PaperInk.word(source)
+                    }
+                    if (word != null && source != null) {
+                        sources[key] = source
+                        words[key] = word
+                        out += bloom
+                        out += bloom.after
+                    } else {
+                        // A word already visibly washing in the fallback stays
+                        // there, rather than changing hands mid-letter.
+                        if (bloom.frame.progress > PAPER_INK_LATCH_PROGRESS || bloom.frame.wet > 0f) {
+                            latched += key
+                        }
+                        out += bloom.fallback
+                    }
+                }
+                else -> out += bloom
+            }
+        }
+        latched.retainAll(seen)
+        return out
+    }
+
+    fun draw(scope: DrawScope, bloom: ShapedWordBloom.PaperInk) {
+        val key = rangeKey(bloom.range)
+        val word = words[key] ?: return
+        val source = sources[key] ?: return
+        with(com.beautifulquran.ui.theme.paperink.PaperInk) {
+            scope.drawWord(word, source, bloom.frame, erase = true)
+        }
+    }
+
+    private fun source(
+        range: IntRange,
+        layout: TextLayoutResult?,
+        sharedLine: Boolean,
+    ): com.beautifulquran.ui.theme.paperink.PaperInk.Source? {
+        layout ?: return null
+        val length = layout.layoutInput.text.length
+        val start = range.first.coerceIn(0, length)
+        val endExclusive = (range.last + 1).coerceIn(start, length)
+        if (endExclusive <= start) return null
+        if (!sharedLine) {
+            return com.beautifulquran.ui.theme.paperink.PaperInk.Source(layout, 0f, 0f, rtl)
+        }
+        val ink = wordInk.inkFor(layout, start, endExclusive, lineBounds.boundsFor(layout, start, endExclusive))
+            ?: return null
+        return com.beautifulquran.ui.theme.paperink.PaperInk.Source(ink.layout, ink.offset.x, ink.offset.y, rtl)
+    }
+
+    private fun rangeKey(range: IntRange): Long = (range.first.toLong() shl 32) or (range.last.toLong() and 0xFFFFFFFFL)
+}
+
+/** Past this much of its wash, a word that began in the fallback finishes there. */
+private const val PAPER_INK_LATCH_PROGRESS = 0.12f
 
 /**
  * Per-word line boxes for one [TextLayoutResult], memoised across draw frames.
