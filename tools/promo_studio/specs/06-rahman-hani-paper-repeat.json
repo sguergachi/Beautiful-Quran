@@ -1,0 +1,104 @@
+{
+  "title": "Ar-Rahman 26–27 · Hani · Paper · repeat",
+  "aspect": "1:1",
+  "app": {
+    "surah": 55,
+    "ayah": 26,
+    "reciter": "hani",
+    "theme": "Paper",
+    "seconds": 20
+  },
+  "edit": [
+    {
+      "in": 0.0,
+      "out": 18.0
+    }
+  ],
+  "background": {
+    "id": "mist"
+  },
+  "phone": {
+    "height": 0.8
+  },
+  "props": {
+    "bg_brightness": 0.03,
+    "phone_y": 0.035
+  },
+  "tracks": {
+    "zoom": [
+      {
+        "t": 0,
+        "v": 1.0
+      },
+      {
+        "t": 3.8,
+        "v": 1.0
+      },
+      {
+        "t": 4.9,
+        "v": 2.2,
+        "ease": "inOutCubic"
+      },
+      {
+        "t": 12.0,
+        "v": 2.2
+      },
+      {
+        "t": 13.4,
+        "v": 1.0,
+        "ease": "inOutCubic"
+      }
+    ],
+    "pan_x": [
+      {
+        "t": 0,
+        "v": 0.5
+      },
+      {
+        "t": 3.8,
+        "v": 0.5
+      },
+      {
+        "t": 4.9,
+        "v": 0.5,
+        "ease": "inOutCubic"
+      },
+      {
+        "t": 12.0,
+        "v": 0.5
+      },
+      {
+        "t": 13.4,
+        "v": 0.5,
+        "ease": "inOutCubic"
+      }
+    ],
+    "pan_y": [
+      {
+        "t": 0,
+        "v": 0.5
+      },
+      {
+        "t": 3.8,
+        "v": 0.5
+      },
+      {
+        "t": 4.9,
+        "v": 0.4121,
+        "ease": "inOutCubic"
+      },
+      {
+        "t": 12.0,
+        "v": 0.4121
+      },
+      {
+        "t": 13.4,
+        "v": 0.5,
+        "ease": "inOutCubic"
+      }
+    ]
+  },
+  "audio": {
+    "fade_out": 1.8
+  }
+}

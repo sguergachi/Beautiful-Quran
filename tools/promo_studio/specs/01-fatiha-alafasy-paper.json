@@ -1,0 +1,95 @@
+{
+  "title": "Al-Fatihah · Alafasy · Paper",
+  "aspect": "1:1",
+  "app": {
+    "surah": 1,
+    "ayah": 1,
+    "reciter": "alafasy",
+    "theme": "Paper",
+    "seconds": 95
+  },
+  "background": {
+    "id": "valley"
+  },
+  "phone": {
+    "height": 0.8,
+    "color": "auto"
+  },
+  "audio": {
+    "fade_out": 2,
+    "fade_in": 0
+  },
+  "motion_blur": 1.1,
+  "tracks": {
+    "zoom": [
+      {
+        "t": 4.143,
+        "v": 2.3
+      },
+      {
+        "t": 8.546,
+        "v": 1,
+        "ease": "inOutCubic"
+      },
+      {
+        "t": 16.265,
+        "v": 1
+      },
+      {
+        "t": 19.702,
+        "v": 1.35,
+        "ease": "inOutSine"
+      }
+    ],
+    "pan_x": [
+      {
+        "t": 4.433,
+        "v": 0.5
+      },
+      {
+        "t": 8.264,
+        "v": 0.5,
+        "ease": "inOutCubic"
+      },
+      {
+        "t": 16.265,
+        "v": 0.5
+      },
+      {
+        "t": 19.702,
+        "v": 0.5,
+        "ease": "inOutSine"
+      }
+    ],
+    "pan_y": [
+      {
+        "t": 3.838,
+        "v": 0.3058
+      },
+      {
+        "t": 8.546,
+        "v": 0.5,
+        "ease": "inOutCubic"
+      },
+      {
+        "t": 16.265,
+        "v": 0.5
+      },
+      {
+        "t": 19.997,
+        "v": 0.3715,
+        "ease": "inOutSine"
+      }
+    ]
+  },
+  "props": {
+    "bg_brightness": 0.02,
+    "phone_y": 0.035
+  },
+  "edit": [
+    {
+      "in": 0,
+      "out": 47.922
+    }
+  ]
+}

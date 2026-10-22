@@ -8,6 +8,7 @@
 #   scripts/emu.sh release "$serial"           # give it back; it stays booted for the next agent
 #
 # Other commands: status, perf [reset], doctor, down (stops free slots to free RAM).
+# Promo studio: EMU_CORES=6 scripts/emu.sh capture 5650 (shared golden AVD).
 #
 # Design (why it is fast and safe to share):
 #   * One golden AVD holds a booted snapshot. Every pool slot is a -read-only
@@ -147,10 +148,10 @@ boot_slot() {
   build_gold
   if [[ "${EMU_COLD_BOOT:-0}" == 1 ]]; then
     log "Cold-booting $serial (snapshot restore disabled)"
-    launch "$serial" -read-only -no-snapshot-load -no-snapshot-save
+    launch "$serial" -read-only -no-snapshot-load -no-snapshot-save -cores "$CORES"
   else
     log "Booting $serial from snapshot"
-    launch "$serial" -read-only -snapshot "$SNAPSHOT" -no-snapshot-save
+    launch "$serial" -read-only -snapshot "$SNAPSHOT" -no-snapshot-save -cores "$CORES"
   fi
   wait_boot "$serial"
   exec 7>&-
@@ -271,8 +272,17 @@ cmd_down() {  # stops free slots only; a leased one has a tenant
   done
 }
 
+cmd_capture() {
+  local port="${1:-5650}"
+  [[ "$port" =~ ^[0-9]{4,5}$ ]] && (( port >= 5650 && port <= 5688 && port % 2 == 0 )) || fail "capture port must be even, 5650-5688"
+  [[ "$CORES" =~ ^[1-8]$ ]] || fail "capture cores must be 1-8"
+  boot_slot "emulator-$port"
+  echo "emulator-$port"
+}
+
 case "${1:-}" in
   lease) shift; lease "$@" ;;
+  capture) shift; cmd_capture "$@" ;;
   release) shift; cmd_release "$@" ;;
   status) status ;;
   run) shift; cmd_run "$@" ;;

@@ -183,6 +183,27 @@ frame. The palettes per variant:
 | The view | Misted coast; the sea opens under the break | Wet countryside, distant town lights, the moon | Deep green mountain valley; sun shafts on the valley floor |
 | Sleeve | Oat knit | Charcoal knit | Moss knit |
 
+## Promo videos (the studio)
+
+Short intro videos in the Handheld-feature style (a phone floating over a
+soft-focus landscape, the camera easing in and out) are made with
+[tools/promo_studio](../tools/promo_studio/README.md): an editor and CLI
+that record the Android app **with its own sound** on an emulator, frame it
+in a Pixel 10 over blurred Pexels footage, and export MP4s. A timeline cuts
+the recording and keyframes the camera, the phone and the background; there
+is no text. The React/Tailwind editor has resizable panes, undo/redo,
+multi-key editing and a draggable playhead. Recording and export jobs show
+live stages and progress, survive a server restart, and can be cancelled.
+Recording sequences can order the opening ceremony, Home, chapter-list or
+search entry, chapter header, Settings, root viewer and repeat picker, with
+per-screen holds and a final wait before playback. They can also finish on a
+screen without recitation. The measured audio start keeps verse markers and
+fades aligned after long introductions; Use whole take includes the full flow.
+The emulator panel starts and prepares additional instances of the shared
+golden AVD; use one six-core capture at a time for the smoothest ink.
+Ten starter specs cover Alafasy and Hani across the three
+themes, including reciter repeats and tarjīʿ.
+
 ## Deliverables
 
 | Asset | Spec |

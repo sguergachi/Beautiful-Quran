@@ -1,0 +1,116 @@
+{
+  "title": "Ar-Rahman 1–4 · Hani · Royal green",
+  "aspect": "9:16",
+  "app": {
+    "surah": 55,
+    "ayah": 1,
+    "reciter": "hani",
+    "theme": "Royal green",
+    "seconds": 23
+  },
+  "edit": [
+    {
+      "in": 0.0,
+      "out": 21.0
+    }
+  ],
+  "background": {
+    "id": "alpine"
+  },
+  "phone": {
+    "height": 0.78
+  },
+  "props": {},
+  "tracks": {
+    "zoom": [
+      {
+        "t": 0,
+        "v": 1.7
+      },
+      {
+        "t": 4.2,
+        "v": 1.0,
+        "ease": "inOutSine"
+      },
+      {
+        "t": 8.0,
+        "v": 1.0
+      },
+      {
+        "t": 10.5,
+        "v": 1.3,
+        "ease": "inOutSine"
+      },
+      {
+        "t": 16.0,
+        "v": 1.3
+      },
+      {
+        "t": 17.8,
+        "v": 1.0,
+        "ease": "inOutCubic"
+      }
+    ],
+    "pan_x": [
+      {
+        "t": 0,
+        "v": 0.5
+      },
+      {
+        "t": 4.2,
+        "v": 0.5,
+        "ease": "inOutSine"
+      },
+      {
+        "t": 8.0,
+        "v": 0.5
+      },
+      {
+        "t": 10.5,
+        "v": 0.5,
+        "ease": "inOutSine"
+      },
+      {
+        "t": 16.0,
+        "v": 0.5
+      },
+      {
+        "t": 17.8,
+        "v": 0.5,
+        "ease": "inOutCubic"
+      }
+    ],
+    "pan_y": [
+      {
+        "t": 0,
+        "v": 0.2168
+      },
+      {
+        "t": 4.2,
+        "v": 0.5,
+        "ease": "inOutSine"
+      },
+      {
+        "t": 8.0,
+        "v": 0.5
+      },
+      {
+        "t": 10.5,
+        "v": 0.3808,
+        "ease": "inOutSine"
+      },
+      {
+        "t": 16.0,
+        "v": 0.3808
+      },
+      {
+        "t": 17.8,
+        "v": 0.5,
+        "ease": "inOutCubic"
+      }
+    ]
+  },
+  "audio": {
+    "fade_out": 2.0
+  }
+}

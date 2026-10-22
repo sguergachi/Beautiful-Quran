@@ -1616,7 +1616,10 @@ ends; icon and text spacing is independent of the chapter-number grid.
 The pill is the fixed head of the chapter document: chapters and results move
 beneath it while it remains available at the top of the scrollport. Scrolling
 does not dismiss its focus. Its opaque paper head keeps 12 dp/px of breathing
-room below the pill so moving results never crowd its edge. Android Back, or
+room below the pill so moving results never crowd its edge. The air around the
+pill reads even on Android: the first chapter row's ink sits as far below it
+(34 dp) as the masthead title's ink sits above it, so the list padding trims
+the row's own 15 dp band above its ink. Android Back, or
 Escape on web, first dismisses the keyboard/focus while preserving the query
 and its results; only a later Back action may leave the sheet.
 Search results keep relevance in the existing paper hierarchy. The quiet

@@ -1,0 +1,120 @@
+{
+  "title": "Ya-Sin 1–3 · Alafasy · Paper · Arabic",
+  "aspect": "4:5",
+  "app": {
+    "surah": 36,
+    "ayah": 1,
+    "reciter": "alafasy",
+    "theme": "Paper",
+    "view": "Arabic",
+    "seconds": 26
+  },
+  "edit": [
+    {
+      "in": 0.0,
+      "out": 24.5
+    }
+  ],
+  "background": {
+    "id": "golden-leaf"
+  },
+  "phone": {
+    "height": 0.82
+  },
+  "props": {
+    "bg_brightness": -0.02,
+    "phone_y": 0.02
+  },
+  "tracks": {
+    "zoom": [
+      {
+        "t": 0,
+        "v": 2.1
+      },
+      {
+        "t": 4.5,
+        "v": 1.0,
+        "ease": "inOutSine"
+      },
+      {
+        "t": 7.6,
+        "v": 1.0
+      },
+      {
+        "t": 9.6,
+        "v": 1.45,
+        "ease": "inOutSine"
+      },
+      {
+        "t": 18.5,
+        "v": 1.45
+      },
+      {
+        "t": 20.6,
+        "v": 1.0,
+        "ease": "inOutCubic"
+      }
+    ],
+    "pan_x": [
+      {
+        "t": 0,
+        "v": 0.5
+      },
+      {
+        "t": 4.5,
+        "v": 0.5,
+        "ease": "inOutSine"
+      },
+      {
+        "t": 7.6,
+        "v": 0.5
+      },
+      {
+        "t": 9.6,
+        "v": 0.5,
+        "ease": "inOutSine"
+      },
+      {
+        "t": 18.5,
+        "v": 0.5
+      },
+      {
+        "t": 20.6,
+        "v": 0.5,
+        "ease": "inOutCubic"
+      }
+    ],
+    "pan_y": [
+      {
+        "t": 0,
+        "v": 0.2206
+      },
+      {
+        "t": 4.5,
+        "v": 0.5,
+        "ease": "inOutSine"
+      },
+      {
+        "t": 7.6,
+        "v": 0.5
+      },
+      {
+        "t": 9.6,
+        "v": 0.3652,
+        "ease": "inOutSine"
+      },
+      {
+        "t": 18.5,
+        "v": 0.3652
+      },
+      {
+        "t": 20.6,
+        "v": 0.5,
+        "ease": "inOutCubic"
+      }
+    ]
+  },
+  "audio": {
+    "fade_out": 2.0
+  }
+}
