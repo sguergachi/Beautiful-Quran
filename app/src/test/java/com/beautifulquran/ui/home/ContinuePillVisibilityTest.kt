@@ -185,10 +185,20 @@ class ContinuePillVisibilityTest {
         // Label, then the pinned rows: 67's copy is the third item.
         assertEquals(2, continueLazyIndex(ids, 67, false, pinned))
         assertEquals("pinned-67", placeRowKey(67, pinned))
-        // Unpinned chapters sit below the label, both rows and the hairline.
+        // Unpinned chapters sit below the label, both rows and the gap.
         assertEquals(4, continueLazyIndex(ids, 1, false, pinned))
         assertEquals("surah-1", placeRowKey(1, pinned))
         assertEquals(null, placeRowKey(null, pinned))
+    }
+
+    @Test
+    fun pinnedWashesJoinIntoOneRoundedBlock() {
+        // A lone pin is a whole pill.
+        assertEquals(true to true, pinnedWashCorners(0, 1))
+        // Three pins: rounded top, square middle, rounded bottom.
+        assertEquals(true to false, pinnedWashCorners(0, 3))
+        assertEquals(false to false, pinnedWashCorners(1, 3))
+        assertEquals(false to true, pinnedWashCorners(2, 3))
     }
 
     @Test

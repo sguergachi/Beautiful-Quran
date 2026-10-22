@@ -48,8 +48,6 @@ import kotlin.math.sin
 fun InkNuqta(
     selected: Boolean,
     modifier: Modifier = Modifier,
-    /** The unchosen outline; [Color.Transparent] for a mark that is only ever ink. */
-    restingInk: Color = MaterialTheme.colorScheme.outline,
     params: NuqtaParams = LocalNuqtaParams.current,
 ) {
     val spread = remember { Animatable(if (selected) 1f else 0f) }
@@ -68,6 +66,7 @@ fun InkNuqta(
         }
     }
     val ink = MaterialTheme.colorScheme.primary
+    val restingInk = MaterialTheme.colorScheme.outline
 
     Canvas(modifier.size(params.sizeDp.dp)) {
         drawInkNuqta(spread.value, presence.value, params, fingers, ink, restingInk)

@@ -1,6 +1,5 @@
 package com.beautifulquran.ui.home
 
-import android.view.HapticFeedbackConstants
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.EnterTransition
@@ -42,6 +41,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -63,11 +63,18 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.composed
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Outline
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.addOutline
+import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.unit.Density
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
@@ -77,7 +84,6 @@ import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalLayoutDirection
-import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
@@ -113,7 +119,6 @@ import com.beautifulquran.ui.reader.remainingUnfurlSignal
 import com.beautifulquran.ui.theme.quietSuppliedBrackets
 import com.beautifulquran.ui.theme.ArabicTitleStyle
 import com.beautifulquran.ui.theme.FloatingPaperControl
-import com.beautifulquran.ui.theme.InkNuqta
 import com.beautifulquran.ui.theme.FloatingPaperEnter
 import com.beautifulquran.ui.theme.FloatingPaperExit
 import com.beautifulquran.ui.theme.LocalQuranAccents
@@ -159,12 +164,11 @@ private val HomeRowRibbonGutter = (HomeNumberColumn - HomeRibbonWidth) / 2f
 private val HomeColumnGap = 4.dp
 private val HomeArabicOpticalInset = 4.dp
 private val TopBoundRibbonHeight = 96.dp
-/** Air either side of the hairline closing the Pinned group: the rows' own
- * 15 dp bands carry the rest, so ink-to-rule reads even both ways. */
-private val PinnedRuleAir = 8.dp
-/** The pin: the ink nuqta, cut down to sit beside an Arabic chapter name
- * (the Reciters leaf's full-size dot would outweigh the name). */
-private const val PinNuqtaScale = 0.55f
+/** The pinned wash's inset from the sheet edge: the Continue pill's wash,
+ * set wider so it keeps the chapter rows' own rails inside it. */
+private val PinnedWashMargin = 8.dp
+/** Paper between the pinned block and the full list below it. */
+private val PinnedGroupGap = 12.dp
 /**
  * Paper margin between the field and where scrolled ink dies: the feather
  * finishes dissolving a row here, so fading rows never brush the bar. While
@@ -662,7 +666,6 @@ fun HomeScreen(
                         // One place marker: only the row owning the place
                         // carries the green cloth (the pinned copy, when pinned).
                         currentAyah = uiState.continueTarget?.ayah?.takeIf { key == placeKey },
-                        pinned = surah.id in pinnedIds,
                         onTogglePinned = {
                             revealPinned = surah.id !in pinnedIds && !listState.canScrollBackward
                             viewModel.togglePinned(surah.id)
@@ -740,23 +743,17 @@ fun HomeScreen(
                                 modifier = Modifier.animateItem(),
                             )
                         }
-                        items(uiState.pinned, key = { "pinned-${it.id}" }) { surah ->
-                            chapterRow(surah, "pinned-${surah.id}", Modifier.animateItem())
-                        }
-                        item(key = "pinned-rule") {
-                            Box(
+                        itemsIndexed(uiState.pinned, key = { _, it -> "pinned-${it.id}" }) { index, surah ->
+                            chapterRow(
+                                surah,
+                                "pinned-${surah.id}",
                                 Modifier
                                     .animateItem()
-                                    .fillMaxWidth()
-                                    .padding(
-                                        start = HomeStartInset,
-                                        end = HomeEndInset,
-                                        top = PinnedRuleAir,
-                                        bottom = PinnedRuleAir,
-                                    )
-                                    .height(1.dp)
-                                    .background(QuranTheme.ink.hairline),
+                                    .pinnedWash(pinnedWashShape(index, uiState.pinned.size)),
                             )
+                        }
+                        item(key = "pinned-gap") {
+                            Spacer(Modifier.height(PinnedGroupGap).animateItem())
                         }
                     }
                     items(uiState.surahs, key = { "surah-${it.id}" }) { surah ->
@@ -1157,6 +1154,38 @@ internal fun continueLazyIndex(
     return if (position < 0) -1 else lead + position
 }
 
+/**
+ * Which corners of a pinned row's wash round: the first row's top, the last
+ * row's bottom. Adjacent rows' square edges meet, so the group reads as one
+ * rounded block — a lone pin is a whole pill.
+ */
+internal fun pinnedWashCorners(index: Int, count: Int): Pair<Boolean, Boolean> =
+    (index == 0) to (index == count - 1)
+
+private fun pinnedWashShape(index: Int, count: Int): Shape {
+    val (top, bottom) = pinnedWashCorners(index, count)
+    val topRadius = if (top) ContinuePillRadius else 0.dp
+    val bottomRadius = if (bottom) ContinuePillRadius else 0.dp
+    return RoundedCornerShape(topRadius, topRadius, bottomRadius, bottomRadius)
+}
+
+/** The Continue pill's green wash behind a pinned row. The row's content
+ * keeps the list's rails; the wash is inset from the sheet edge. It does not
+ * clip: the place ribbon hangs in the sheet-edge lane, so the curve would
+ * slice the cloth — it lies whole over the wash's edge instead. */
+private fun Modifier.pinnedWash(shape: Shape): Modifier = composed {
+    background(QuranTheme.accents.greenWash, remember(shape) { HorizontalInsetShape(shape, PinnedWashMargin) })
+}
+
+/** [shape] drawn [inset] in from both side edges of the element. */
+private class HorizontalInsetShape(private val shape: Shape, private val inset: Dp) : Shape {
+    override fun createOutline(size: Size, layoutDirection: LayoutDirection, density: Density): Outline {
+        val px = with(density) { inset.toPx() }
+        val inner = shape.createOutline(Size(size.width - 2 * px, size.height), layoutDirection, density)
+        return Outline.Generic(Path().apply { addOutline(inner); translate(Offset(px, 0f)) })
+    }
+}
+
 /** Key of the chapter row that owns the reading place: the pinned copy atop
  * the list when the chapter is pinned, its in-order row otherwise. */
 internal fun placeRowKey(continueId: Int?, pinnedOrder: List<Int>): String? = when (continueId) {
@@ -1309,19 +1338,18 @@ private fun SurahRow(
     currentAyah: Int?,
     placeUnfurlSignal: Int,
     onPlaceUnfurlConsumed: (Int) -> Unit,
-    pinned: Boolean,
     onTogglePinned: () -> Unit,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val accents = LocalQuranAccents.current
-    val view = LocalView.current
     Row(
         verticalAlignment = Alignment.CenterVertically,
         modifier = modifier
             .fillMaxWidth()
             .quietClickable(onLongClick = onTogglePinned, onClick = onClick)
             .padding(
+                end = HomeEndInset,
                 top = ContinueRowVertical,
                 bottom = ContinueRowVertical,
             ),
@@ -1384,33 +1412,6 @@ private fun SurahRow(
             color = QuranTheme.accents.greenInk,
             modifier = Modifier.padding(end = HomeArabicOpticalInset),
         )
-        // The trailing gutter mirrors the ribbon lane: marking is where you
-        // tap, as on a verse's ribbon margin. A pinned chapter carries the
-        // app's one choice mark, the ink nuqta: one drop soaks in on pin and
-        // lifts on unpin. Unpinned rows show bare paper, not 114 outlines.
-        Box(
-            contentAlignment = Alignment.Center,
-            modifier = Modifier
-                .width(HomeEndInset)
-                .height(ContinueRowRibbonHeight)
-                .quietClickable(role = Role.Button) {
-                    view.performHapticFeedback(HapticFeedbackConstants.CONTEXT_CLICK)
-                    onTogglePinned()
-                }
-                .semantics {
-                    contentDescription =
-                        if (pinned) "Unpin ${surah.nameTransliteration}" else "Pin ${surah.nameTransliteration}"
-                },
-        ) {
-            InkNuqta(
-                selected = pinned,
-                restingInk = Color.Transparent,
-                modifier = Modifier.graphicsLayer {
-                    scaleX = PinNuqtaScale
-                    scaleY = PinNuqtaScale
-                },
-            )
-        }
     }
 }
 
