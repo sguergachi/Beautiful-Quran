@@ -1673,28 +1673,34 @@ bookmark icon, a second ribbon shape, or a bespoke animated substitute.
 ### Pinned chapters (Android)
 
 A long-press on a chapter row pins it to the top of Chapters; a long-press
-on a pinned row unpins it. Pinned chapters gather under a quiet **Pinned**
-label, in Quranic order, each row set on the Continue pill's green wash
-(`greenWash`, 28 dp radius, 8 dp in from the sheet edges). Only the first
-row rounds its top corners and only the last its bottom, so adjacent washes
-meet on square edges and the group reads as **one rounded block**; a lone pin
-is a whole pill. The rows keep the list's own rails inside the wash, and
-12 dp of paper separates the block from the full list. The full list still
-carries pinned chapters in their places, unmarked, so the book's order never
-has holes.
+on a pinned row unpins it. Pinned chapters form one block that is the
+Continue pill's sibling: the same green wash (`greenWash`), the same 16 dp
+margin from the sheet edges, the same 28 dp radius, and the same small-caps
+flag, **PINNED**, on the names' rail at its head where the pill says
+CONTINUE. The flag and every row each carry a slice of the wash; only the
+flag rounds its top corners and only the last row its bottom, so the slices
+meet on square edges and read as **one rounded pill**, however many chapters
+are pinned. Rows inside are set compact (10 dp bands, as the pill sets its
+row) on the list's own rails, so numbers and names stay aligned with the
+chapters below. 20 dp of paper sits above the block (the search feather's
+depth, so the wash never dissolves under the field) and below it.
 
-Tried and rejected: a twisted cord in the trailing gutter (ugly), then an ink
-nuqta beside the Arabic name under a closing hairline. The wash is the whole
-mark: no rule, no dot, no hidden gutter target.
+A pinned chapter **moves** into the block: it is left out of the list below,
+so no chapter shows twice on one sheet, and unpinning returns it to its
+place.
 
-The current-place ribbon (and the Continue pill's docking target) belongs to
-one row only: the pinned copy when the chapter is pinned, its in-order row
-otherwise. The wash does not clip: the ribbon hangs in the sheet-edge lane,
-so the pill's curve would slice the cloth, and it lies whole over the wash's
-edge instead. Search owns the sheet while active, so the group stands down.
-Pinning from the top of the sheet scrolls the new group into view; a reader
-deep in the list keeps their place. Stored as `Settings.pinnedSurahIds`; web
-parity is pending.
+Tried and rejected: a twisted cord in the trailing gutter (ugly); an ink
+nuqta under a closing hairline; full-height rows on a near full-bleed wash
+under a separate sans "Pinned" label, which read as a card and showed every
+pinned chapter twice.
+
+The current-place ribbon (and the Continue pill's docking target) is on the
+pinned row when the chapter is pinned. The wash does not clip: the ribbon
+hangs in the sheet-edge lane, so the curve would slice the cloth, and it
+lies whole over the wash's edge instead. Search owns the sheet while
+active, so the block stands down. Pinning from the top of the sheet scrolls
+the block into view; a reader deep in the list keeps their place. Stored as
+`Settings.pinnedSurahIds`; web parity is pending.
 
 Implementation: `pinnedWash` / `pinnedWashCorners` and the list in
 `ui/home/HomeScreen.kt`.

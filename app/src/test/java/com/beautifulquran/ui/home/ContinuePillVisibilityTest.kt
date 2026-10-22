@@ -182,11 +182,14 @@ class ContinuePillVisibilityTest {
     fun pinnedChapterOwnsThePlaceAtopTheList() {
         val ids = (1..114).toList()
         val pinned = listOf(18, 67)
-        // Label, then the pinned rows: 67's copy is the third item.
-        assertEquals(2, continueLazyIndex(ids, 67, false, pinned))
+        // Air, flag, then the pinned rows: 67's copy is the fourth item.
+        assertEquals(3, continueLazyIndex(ids, 67, false, pinned))
         assertEquals("pinned-67", placeRowKey(67, pinned))
-        // Unpinned chapters sit below the label, both rows and the gap.
-        assertEquals(4, continueLazyIndex(ids, 1, false, pinned))
+        // Pinned chapters leave the list below, so unpinned ones sit after
+        // air, flag, both rows and the gap, at their place among the rest.
+        val listed = ids - pinned.toSet()
+        assertEquals(5, continueLazyIndex(listed, 1, false, pinned))
+        assertEquals(5 + 18, continueLazyIndex(listed, 20, false, pinned))
         assertEquals("surah-1", placeRowKey(1, pinned))
         assertEquals(null, placeRowKey(null, pinned))
     }

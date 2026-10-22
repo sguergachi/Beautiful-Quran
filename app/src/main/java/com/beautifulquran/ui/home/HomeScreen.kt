@@ -164,11 +164,15 @@ private val HomeRowRibbonGutter = (HomeNumberColumn - HomeRibbonWidth) / 2f
 private val HomeColumnGap = 4.dp
 private val HomeArabicOpticalInset = 4.dp
 private val TopBoundRibbonHeight = 96.dp
-/** The pinned wash's inset from the sheet edge: the Continue pill's wash,
- * set wider so it keeps the chapter rows' own rails inside it. */
-private val PinnedWashMargin = 8.dp
+/** The pinned wash's inset from the sheet edge: the Continue pill's own. */
+private val PinnedWashMargin = 16.dp
+/** Paper above the pinned block: the search feather's depth, so the wash
+ * starts at full strength instead of dissolving under the field. */
+private val PinnedBlockTop = 20.dp
 /** Paper between the pinned block and the full list below it. */
-private val PinnedGroupGap = 12.dp
+private val PinnedGroupGap = 20.dp
+/** Pinned rows are set compact, as the Continue pill sets its row. */
+private val PinnedRowVertical = 10.dp
 /**
  * Paper margin between the field and where scrolled ink dies: the feather
  * finishes dissolving a row here, so fading rows never brush the bar. While
@@ -374,7 +378,7 @@ fun HomeScreen(
     // off the row and fly it back down to the pill's seat. A bottom exit
     // just lets the pill slide up on its own enter.
     val continueIndex = continueLazyIndex(
-        uiState.surahs.map { it.id },
+        uiState.surahs.map { it.id }.filterNot { it in pinnedOrder },
         continueSurahId,
         searching,
         pinnedOrder,
@@ -660,8 +664,12 @@ fun HomeScreen(
                         listState.animateScrollToItem(0)
                     }
                 }
-                val chapterRow: @Composable (Surah, String, Modifier) -> Unit = { surah, key, modifier ->
+                // A pinned chapter moves up into the block rather than showing
+                // twice on one sheet; unpinning returns it to its place.
+                val listedSurahs = if (showPinned) uiState.surahs.filterNot { it.id in pinnedIds } else uiState.surahs
+                val chapterRow: @Composable (Surah, String, Modifier, Dp) -> Unit = { surah, key, modifier, vertical ->
                     SurahRow(
+                        vertical = vertical,
                         surah = surah,
                         // One place marker: only the row owning the place
                         // carries the green cloth (the pinned copy, when pinned).
@@ -736,11 +744,27 @@ fun HomeScreen(
                         }
                     }
                     if (showPinned) {
-                        item(key = "pinned-label") {
-                            SearchSectionLabel(
-                                text = "Pinned",
-                                topPadding = SearchFirstLabelTop,
-                                modifier = Modifier.animateItem(),
+                        val blockSize = uiState.pinned.size + 1
+                        item(key = "pinned-air") {
+                            Spacer(Modifier.height(PinnedBlockTop).animateItem())
+                        }
+                        // The block's head: a small-caps flag on the names'
+                        // rail, the Continue pill's CONTINUE flag in kind.
+                        item(key = "pinned-flag") {
+                            Text(
+                                text = "PINNED",
+                                style = MaterialTheme.typography.labelSmall.copy(letterSpacing = CAPS_TRACKING),
+                                fontSize = 10.sp,
+                                color = QuranTheme.accents.greenQuiet,
+                                maxLines = 1,
+                                modifier = Modifier
+                                    .animateItem()
+                                    .fillMaxWidth()
+                                    .pinnedWash(pinnedWashShape(0, blockSize))
+                                    .padding(
+                                        start = HomeStartInset + HomeNumberColumn + HomeColumnGap,
+                                        top = 14.dp,
+                                    ),
                             )
                         }
                         itemsIndexed(uiState.pinned, key = { _, it -> "pinned-${it.id}" }) { index, surah ->
@@ -749,15 +773,16 @@ fun HomeScreen(
                                 "pinned-${surah.id}",
                                 Modifier
                                     .animateItem()
-                                    .pinnedWash(pinnedWashShape(index, uiState.pinned.size)),
+                                    .pinnedWash(pinnedWashShape(index + 1, blockSize)),
+                                PinnedRowVertical,
                             )
                         }
                         item(key = "pinned-gap") {
                             Spacer(Modifier.height(PinnedGroupGap).animateItem())
                         }
                     }
-                    items(uiState.surahs, key = { "surah-${it.id}" }) { surah ->
-                        chapterRow(surah, "surah-${surah.id}", Modifier)
+                    items(listedSurahs, key = { "surah-${it.id}" }) { surah ->
+                        chapterRow(surah, "surah-${surah.id}", Modifier, ContinueRowVertical)
                     }
 
                     if (showWordSections) {
@@ -1143,14 +1168,14 @@ internal fun continueLazyIndex(
     surahIds: List<Int>,
     continueId: Int?,
     searching: Boolean,
-    /** The Pinned group leads the list: its label, its rows, its hairline. */
+    /** The pinned block leads the list: air, its flag, its rows, its gap. */
     pinnedOrder: List<Int> = emptyList(),
 ): Int {
     if (searching || continueId == null) return -1
     val pinned = pinnedOrder.indexOf(continueId)
-    if (pinned >= 0) return 1 + pinned
+    if (pinned >= 0) return 2 + pinned
     val position = surahIds.indexOf(continueId)
-    val lead = if (pinnedOrder.isEmpty()) 0 else pinnedOrder.size + 2
+    val lead = if (pinnedOrder.isEmpty()) 0 else pinnedOrder.size + 3
     return if (position < 0) -1 else lead + position
 }
 
@@ -1341,6 +1366,7 @@ private fun SurahRow(
     onTogglePinned: () -> Unit,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
+    vertical: Dp = ContinueRowVertical,
 ) {
     val accents = LocalQuranAccents.current
     Row(
@@ -1350,8 +1376,8 @@ private fun SurahRow(
             .quietClickable(onLongClick = onTogglePinned, onClick = onClick)
             .padding(
                 end = HomeEndInset,
-                top = ContinueRowVertical,
-                bottom = ContinueRowVertical,
+                top = vertical,
+                bottom = vertical,
             ),
     ) {
         if (currentAyah != null) {
