@@ -26,31 +26,25 @@ right-to-left in Arabic and left-to-right in English, matching each script's
 reading order. The continuous wash never skips an earlier word.
 
 **Inside out / Flowing ink** switches the ink spread without restarting
-playback or changing the other controls. Both now carry one advancing wave
-from the leading side of the word, right to left in Arabic and left to right
-in English. Inside out favours deep passages more strongly; Flowing ink has
-more even travel through narrow strokes. The former Merging pools comparison
-has been replaced: neither mode starts separate reservoirs ahead of the wave.
-The existing Arabic tajweed pacing maps the wave to the word's media clock;
-English uses its linear clock.
+playback or changing the other controls. Both sweep one soft front along the
+baseline, right to left in Arabic and left to right in English. Arrival
+depends on horizontal position only: tall letters, loops, dots and marks fill
+as the front passes beneath them, never rising up a stroke or travelling
+diagonally. Inside out lets each stroke's core lead its rims by 3.5% of the
+sweep (saturating a few pixels in, so tapering tips do not climb); Flowing ink
+is a pure vertical front. This replaces the geodesic wave, which filled
+upright lam and alif strokes from the bottom up. The existing Arabic tajweed
+pacing maps the front to the word's media clock; English uses its linear clock.
 
-HarfBuzz associates the original printed ink and marks with shaped clusters.
-Some Hafs substitutions merge several letters or a whole word into one glyph.
-A second measurement run without contextual/ligature substitutions recovers
-individual letter advance shares within those clusters. It supplies ownership
-only; the original shaped font always supplies the printed contour.
-One root supplies geodesic travel through each connected body, so every newly
-filled region connects back to the advancing front. A detached letter body
-continues after the previous body's wave reaches its end. Detached dots and
-marks inherit the arrival at the nearest point on their own letter's body,
-plus the crossing time; they have no independently scheduled start. Virtual
-gap travel deposits no ink on paper. No ownership seam or secondary origin is
-introduced inside a connected stroke. All travel is baked into the maps,
-adding no shader work or runtime sampling.
+HarfBuzz shaping, with a second measurement run without contextual/ligature
+substitutions, still counts the letters in each word to keep the existing
+feather duration and word window. The original shaped font always supplies
+the printed contour. The arrival field is defined on paper too, so wet spread
+beyond the contour shares its column's arrival. All travel is baked into the
+maps, adding no shader work or runtime sampling.
 
-This is a geometry-guided approximation of letter ownership and liquid spread,
-not anatomical letter outlines recovered from a ligature, a fluid solver or
-an inferred pen route. There is no pen or animated random noise.
+This is a geometry-guided approximation of liquid spread, not a fluid solver
+or an inferred pen route. There is no pen or animated random noise.
 
 The wash is based on media time, so pausing freezes filling and changing
 playback speed scales it with the recitation. Before its turn, a word remains
@@ -141,8 +135,8 @@ depth. There is no per-frame shaping, rasterization, or bitmap upload. The
 material maps are generated from the font outlines, without stroke inference.
 Field R carries the Inside out arrival phase, G the Flowing ink
 phase, and B the unchanged contour distance. The manifest supplies letter
-duration once at shader creation. The surface map carries normal XY and film depth. Wicking
-is solved only in the generator. The shader uses the same cached textures,
+duration once at shader creation. The surface map carries normal XY and film depth. The
+sweep is solved only in the generator. The shader uses the same cached textures,
 with two additional field samples for the moving meniscus:
 
 ```bash
@@ -165,12 +159,13 @@ back to the regular contour while the repeat remains fully orange.
 releasing only after the repeated verse, and clearing the chain on Again.
 `PaperInkEnglishWindowsTest` checks reordered meaning, continuous word clocks,
 proportional fallback and finishing before a repeat.
-The generator's geometry regressions check a single advancing front on a
-uniform stroke, a loop and the pictured Arabic forms; detached letter bodies
-continue in reading order, and detached marks inherit the body's wave.
+The generator's geometry regressions check that an upright stroke fills
+together rather than rising, that the pictured Arabic forms (Allah, al-rahim,
+al-hamd) fill column by column right to left, that detached marks arrive with
+the body beneath them and that detached letters continue in reading order.
 They also cover unchanged contours across modes, full-word completion,
-ligature letter counts, single-pixel marks, capillary travel around paper gaps
-and equivalent film depth and curvature at half-size font rasterization.
+ligature letter counts and equivalent film depth and curvature at half-size
+font rasterization.
 The controlled reflection is identical in recordings and on a still phone;
 physical-device performance and reading comfort still need evaluation.
 

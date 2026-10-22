@@ -17,7 +17,7 @@ uniform float2 origin;
 half4 main(float2 p) {
     float4 shape = field.eval(p * 4.0);
     float distance = (shape.b * 255.0 - 128.0) / 16.0;
-    // Letter clusters arrive in reading order; each fills through its own shape.
+    // One front sweeps along the baseline in reading order, never up a stroke.
     float arrival = mix(shape.r, shape.g, spreadMethod);
     float feather = max(0.006, letterDuration * mix(0.1, 0.12, spreadMethod));
     float loaded = smoothstep(arrival - feather, arrival + feather, progress);

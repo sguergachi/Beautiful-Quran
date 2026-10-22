@@ -11,56 +11,15 @@ from pathlib import Path
 import numpy as np
 import uharfbuzz as hb
 from PIL import Image, ImageDraw, ImageFont
-from scipy.ndimage import distance_transform_edt, find_objects, gaussian_filter, label
-from scipy.sparse import coo_matrix
-from scipy.sparse.csgraph import dijkstra
+from scipy.ndimage import distance_transform_edt, gaussian_filter
 
 ROOT = Path(__file__).resolve().parents[1]
 SS = 4
 ASSETS = ROOT / 'app/src/main/assets/paper-ink-study'
+# Inside out rims trail the stroke core by this share of the word sweep.
+BASELINE_CORE_LEAD = .035
 ARABIC_FONT = ROOT / 'app/src/main/res/font/uthmanic_hafs_v22.ttf'
 ENGLISH_FONT = ROOT / 'app/src/main/res/font/junicode_variable.ttf'
-
-
-def ink_graph(ink, depth):
-    """Connected stroke paths favour wide passages; paper is never a shortcut."""
-    count = int(ink.sum())
-    ids = np.full(ink.shape, -1)
-    ids[ink] = np.arange(count)
-    speed = np.sqrt(np.maximum(0, depth[ink]) + .25)
-    sources, targets, costs = [], [], []
-    h, w = ink.shape
-    for dy, dx in ((0, 1), (1, 0), (1, 1), (1, -1)):
-        a = ids[:h - dy, max(0, -dx):w - max(0, dx)]
-        b = ids[dy:, max(0, dx):w - max(0, -dx)]
-        valid = (a >= 0) & (b >= 0)
-        sources.extend(a[valid])
-        targets.extend(b[valid])
-        costs.extend(np.hypot(dx, dy) * 2 / (speed[a[valid]] + speed[b[valid]]))
-    return coo_matrix((costs, (sources, targets)), shape=(count, count)).tocsr()
-
-
-def wicking_basins(ink, depth, anchors):
-    """Grow letter interiors along ink paths from separate deep pools, without an x sweep."""
-    x = np.nonzero(ink)[1]
-    nearest = np.argmin(np.abs(x[:, None] - np.array([a[1] for a in anchors])), axis=1)
-    seeds, letters = [], []
-    for index in np.unique(nearest):
-        candidates = np.flatnonzero(nearest == index)
-        seed = candidates[np.argmax(depth[ink][candidates])]
-        seeds.append(seed)
-        letters.append(anchors[index][0])
-    travel, _, sources = dijkstra(ink_graph(ink, depth), directed=False, indices=seeds,
-                                  min_only=True, return_predecessors=True)
-    assert np.isfinite(travel).all()
-    lookup = np.full(int(ink.sum()), -1)
-    lookup[seeds] = letters
-    owners = lookup[sources]
-    assert (owners >= 0).all()
-    for letter in letters:
-        pixels = owners == letter
-        travel[pixels] /= max(1, travel[pixels].max())
-    return owners, travel
 
 
 def letter_anchors(advances, plain_advances, owner, ink, rtl):
@@ -87,75 +46,28 @@ def letter_anchors(advances, plain_advances, owner, ink, rtl):
     return anchors
 
 
-def single_origin_wave(ink, depth, owners, order, rtl, flowing=False):
-    """Carry one wave through connected strokes and onward across reading-order gaps.
+def baseline_wave(ink, depth, rtl, flowing=False, unit=1.):
+    """Sweep one front along the baseline in reading order.
 
-    Main letter bodies receive ink in sequence. Detached marks inherit the
-    arrival of their nearest point on their own letter's body, plus travel
-    across the gap; they have no independently scheduled start. Inside out
-    favours deep passages more strongly than Flowing ink. Both have one root.
+    Arrival depends on horizontal position only, so tall letters, loops and
+    marks fill as the front passes beneath them rather than rising up a stroke
+    or travelling diagonally. Inside out lets the stroke core lead its rims by
+    a small fraction of the sweep; the lead saturates a few pixels in, so a
+    tapering tip does not climb. Flowing ink is a pure horizontal front.
     """
-    pieces, count = label(ink, np.ones((3, 3)))
-    ids = np.full(ink.shape, -1)
-    ids[ink] = np.arange(int(ink.sum()))
-    yy, xx = np.nonzero(ink)
-    component = pieces[ink]
-    letters = owners[ink]
-    # Geodesic travel stays on the font outline; virtual gap travel deposits
-    # no ink on paper. Using the same graph preserves every connected neck.
-    material_depth = np.sqrt(np.maximum(0, depth)) if flowing else depth
-    graph = ink_graph(ink, material_depth)
-    bodies = {}
-    for letter in order:
-        candidates = component[letters == letter]
-        assert candidates.size, letter
-        bodies[letter] = int(np.bincount(candidates).argmax())
-    main = list(dict.fromkeys(bodies[letter] for letter in order))
-    travel = np.full(len(component), np.inf)
-    offset = 0.
-    previous = None
-    for part in main:
-        letter = next(letter for letter in order if bodies[letter] == part)
-        candidates = np.flatnonzero((component == part) & (letters == letter))
-        leading = xx[candidates].max() if rtl else xx[candidates].min()
-        margin = max(SS, np.ptp(xx[candidates]) * .2)
-        candidates = candidates[np.abs(xx[candidates] - leading) <= margin]
-        seed = int(candidates[np.argmax(depth[ink][candidates])])
-        if previous is not None:
-            gap = np.hypot(xx[seed] - xx[previous], yy[seed] - yy[previous])
-            offset = travel[previous] + max(SS, gap)
-        local = dijkstra(graph, directed=False, indices=seed)
-        active = component == part
-        assert np.isfinite(local[active]).all()
-        travel[active] = offset + local[active]
-        # A disconnected body continues after the previous body's wave,
-        # rather than blooming from a second source while it is still filling.
-        previous = int(np.flatnonzero(active)[np.argmax(travel[active])])
-    nearest_bodies = {}
-    for part in range(1, count + 1):
-        if part in main:
-            continue
-        active = component == part
-        letter = int(np.bincount(letters[active]).argmax())
-        parent = bodies[letter]
-        if parent not in nearest_bodies:
-            nearest_bodies[parent] = distance_transform_edt(pieces != parent,
-                return_distances=True, return_indices=True)
-        distances, nearest = nearest_bodies[parent]
-        candidates = np.flatnonzero(active)
-        seed = int(candidates[np.argmin(distances[ink][active])])
-        source = ids[nearest[0, yy[seed], xx[seed]], nearest[1, yy[seed], xx[seed]]]
-        assert source >= 0 and np.isfinite(travel[source])
-        local = dijkstra(graph, directed=False, indices=seed)
-        travel[active] = travel[source] + max(SS, distances[yy[seed], xx[seed]]) + local[active]
-    assert np.isfinite(travel).all()
-    field = np.zeros(ink.shape)
-    field[ink] = travel / max(1, travel.max())
-    return field
+    x = np.nonzero(ink)[1]
+    left, right = x.min(), x.max()
+    columns = np.indices(ink.shape)[1]
+    along = (right - columns if rtl else columns - left) / max(1, right - left)
+    if flowing:
+        return np.clip(along, 0, 1)
+    interior = np.maximum(0, depth)
+    core = interior / (interior + unit)
+    return np.clip((along + BASELINE_CORE_LEAD * (1 - core)) / (1 + BASELINE_CORE_LEAD), 0, 1)
 
 
 def filling_field(text, ink, distance, box, ascent, font_path, font_size, flowing=True):
-    """Shape letter ownership, then carry a single reading-order ink wave."""
+    """Shape letter clusters for pacing, then sweep the ink along the baseline."""
     font = hb.Font(hb.Face(font_path.read_bytes()))
     font.scale = (font_size * SS * 64, font_size * SS * 64)
     buf = hb.Buffer()
@@ -195,34 +107,11 @@ def filling_field(text, ink, distance, box, ascent, font_path, font_size, flowin
     for info, pos in zip(plain.glyph_infos, plain.glyph_positions):
         plain_advances[info.cluster] = plain_advances.get(info.cluster, 0) + pos.x_advance
     anchors = letter_anchors(advances, plain_advances, owner, ink, buf.direction == 'rtl')
-    ordered = sorted((a for group in anchors.values() for a in group),
-                     key=lambda a: -a[1] if buf.direction == 'rtl' else a[1])
-    # Retain the existing feather duration and full word window.
-    duration = 2.8 / (len(ordered) + 1.8)
-    letter_order = [letter for letter, _ in ordered]
-    letter_owner = np.full(ink.shape, -1)
-    filled_letters = set()
-    for cluster, pools in anchors.items():
-        pieces, _ = label(ink & (owner == cluster), np.ones((3, 3)))
-        for i, region in enumerate(find_objects(pieces), 1):
-            if region is None:
-                continue
-            pixels = pieces[region] == i
-            x = np.nonzero(pixels)[1] + region[1].start
-            local = [(letter, center - region[1].start) for letter, center in pools
-                     if x.min() <= center <= x.max()]
-            if not local:
-                letter, center = min(pools, key=lambda a: abs(a[1] - x.mean()))
-                local = [(letter, center - region[1].start)]
-            owners, _ = wicking_basins(pixels, distance[region], local)
-            filled_letters.update(owners)
-            letter_owner[region][pixels] = owners
-    assert filled_letters == set(letter_order), (text, filled_letters, letter_order)
-    wave = single_origin_wave(ink, distance, letter_owner, letter_order, buf.direction == 'rtl', flowing)
-    inside_out = .12 * duration + (1 - .24 * duration) * wave
-    nearest = tuple(distance_transform_edt(~ink, return_distances=False, return_indices=True))
-    # Extrapolate into wet spread and soften joins without blurring the printed contour.
-    return inside_out[nearest], duration
+    # Letter count keeps the existing feather duration and full word window.
+    duration = 2.8 / (sum(map(len, anchors.values())) + 1.8)
+    wave = baseline_wave(ink, distance, buf.direction == 'rtl', flowing, font_size / 160)
+    # Defined on paper too, so wet spread beyond the contour shares its column's arrival.
+    return .12 * duration + (1 - .24 * duration) * wave, duration
 
 
 def liquid_surface(distance, font_size):

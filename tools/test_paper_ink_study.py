@@ -8,7 +8,7 @@ from PIL import Image, ImageDraw, ImageFont
 from scipy.ndimage import distance_transform_edt, label
 
 from build_paper_ink_study import (
-    ARABIC_FONT, ENGLISH_FONT, ROOT, SS, filling_field, liquid_surface, single_origin_wave, wicking_basins,
+    ARABIC_FONT, BASELINE_CORE_LEAD, ENGLISH_FONT, ROOT, SS, baseline_wave, filling_field, liquid_surface,
 )
 
 
@@ -26,28 +26,29 @@ def material(text, arabic=False, flowing=True):
 
 
 class PaperInkStudyTest(unittest.TestCase):
-    def test_one_origin_advances_through_a_connected_stroke_without_new_islands(self):
-        ink = np.zeros((60, 420), dtype=bool)
-        ink[10:50, 10:410] = True
+    def test_front_sweeps_along_the_baseline_not_up_a_stroke(self):
+        # A tall upright stroke beside a low horizontal one: the column, not the
+        # path along the ink, sets arrival.
+        ink = np.zeros((200, 300), dtype=bool)
+        ink[10:190, 220:240] = True
+        ink[160:190, 20:220] = True
         depth = distance_transform_edt(ink) / SS
         for flowing in (False, True):
-            field = single_origin_wave(ink, depth, np.zeros(ink.shape, dtype=int), [0], False, flowing)
-            self.assertEqual(1, np.count_nonzero(ink & (field == 0)))
-            for phase in np.linspace(.01, .99, 99):
-                _, count = label(ink & (field <= phase), np.ones((3, 3)))
-                self.assertEqual(1, count)
-            self.assertLess(np.median(field[ink & (np.indices(ink.shape)[1] < 100)]),
-                            np.median(field[ink & (np.indices(ink.shape)[1] > 300)]))
+            field = baseline_wave(ink, depth, True, flowing)
+            upright = field[30:170, 230]
+            self.assertLessEqual(np.ptp(upright), 1e-9, flowing)
+            self.assertLess(field[175, 230], field[175, 100])
+            self.assertLess(field[175, 100], field[175, 30])
 
-    def test_detached_mark_inherits_wave_arrival_instead_of_starting_ahead(self):
+    def test_detached_mark_arrives_with_the_body_beneath_it(self):
         ink = np.zeros((80, 320), dtype=bool)
         ink[40:65, 10:300] = True
         ink[10:20, 250:260] = True
-        field = single_origin_wave(ink, distance_transform_edt(ink) / SS,
-                                   np.zeros(ink.shape, dtype=int), [0], False)
-        self.assertGreater(field[10:20, 250:260].min(), field[40:65, 245:265].min())
-        self.assertEqual(1, np.count_nonzero(ink & (field == 0)))
-
+        for flowing in (False, True):
+            field = baseline_wave(ink, distance_transform_edt(ink) / SS, False, flowing)
+            beneath = field[40:65, 250:260]
+            self.assertLessEqual(np.abs(field[10:20, 250:260].mean() - beneath.mean()),
+                                 BASELINE_CORE_LEAD, flowing)
     def test_liquid_surface_does_not_flatten_when_the_font_raster_is_half_size(self):
         fields = []
         for size in (160, 80):
@@ -60,15 +61,19 @@ class PaperInkStudyTest(unittest.TestCase):
         # one-level allowance is for finite differences and quantization.
         self.assertLessEqual(np.max(np.abs(fields[0].astype(int) - fields[1].astype(int))), 1)
 
-    def test_both_modes_have_one_advancing_front_on_the_pictured_arabic_and_a_loop(self):
-        for text, arabic in [('O', False), ('ٱلرَّحِيمِ', True), ('ٱلۡحَمۡدُ', True)]:
+    def test_pictured_arabic_fills_right_to_left_without_vertical_travel(self):
+        for text in ('ٱللَّهِ', 'ٱلرَّحِيمِ', 'ٱلۡحَمۡدُ'):
             for flowing in (False, True):
-                ink, _, arrival, _ = material(text, arabic, flowing=flowing)
-                components, _ = label(ink, np.ones((3, 3)))
-                for phase in np.linspace(.02, .98, 49):
-                    for part in np.unique(components[ink]):
-                        _, count = label((components == part) & (arrival < phase), np.ones((3, 3)))
-                        self.assertLessEqual(count, 1, (text, flowing, phase, part))
+                with self.subTest(text=text, flowing=flowing):
+                    ink, _, arrival, duration = material(text, True, flowing=flowing)
+                    span = 1 - .24 * duration
+                    columns = [arrival[:, x][ink[:, x]] for x in range(ink.shape[1]) if ink[:, x].any()]
+                    # Every column fills together (Inside out only lets the core lead its rims).
+                    self.assertLessEqual(max(np.ptp(c) for c in columns),
+                                         span * BASELINE_CORE_LEAD / (1 + BASELINE_CORE_LEAD) + 1e-9)
+                    means = [c.mean() for c in columns]
+                    self.assertTrue(all(np.diff(means) < 1e-9 + span * BASELINE_CORE_LEAD))
+                    self.assertGreater(means[0], means[-1])
 
     def test_modes_keep_the_same_contour_and_window_with_different_flow_rates(self):
         ink, depth, first, duration = material('ٱلۡحَمۡدُ', True, flowing=False)
@@ -112,21 +117,6 @@ class PaperInkStudyTest(unittest.TestCase):
                 ink, _, arrival, duration = material(text, is_arabic)
                 self.assertGreaterEqual(arrival[ink].min() - duration * .12, -1 / 255)
                 self.assertLessEqual(arrival[ink].max() + duration * .12, 1 + 1 / 255)
-
-    def test_single_pixel_mark_has_finite_ink_and_its_letter_owner(self):
-        owners, travel = wicking_basins(np.ones((1, 1), dtype=bool), np.ones((1, 1)), [(7, 0)])
-        np.testing.assert_array_equal(owners, [7])
-        np.testing.assert_array_equal(travel, [0])
-
-    def test_capillary_paths_cannot_cross_a_gap_in_the_paper(self):
-        ink = np.ones((15, 15), dtype=bool)
-        ink[:12, 6:9] = False
-        depth = distance_transform_edt(ink)
-        _, travel = wicking_basins(ink, depth, [(1, 1)])
-        field = np.zeros(ink.shape)
-        field[ink] = travel
-        self.assertGreater(field[1, 10], field[12, 10])
-
 
 if __name__ == '__main__':
     unittest.main()
