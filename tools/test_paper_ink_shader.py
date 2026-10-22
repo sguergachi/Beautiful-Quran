@@ -117,9 +117,16 @@ class PaperInkShaderTest(unittest.TestCase):
         for word in self.words:
             spec = word[0]
             prefix = 'word-en' if 'text' in spec else 'word'
-            # The shader samples the 4x field at pixel centres.
-            field = np.asarray(Image.open(ASSETS / f'{prefix}-2-{spec["position"]}-field.png'))[2::4, 2::4]
-            field = field[:spec['height'], :spec['width']].astype(float)
+            full_field = np.asarray(Image.open(ASSETS / f'{prefix}-2-{spec["position"]}-field.png')).astype(float)
+            field = full_field[2::4, 2::4][:spec['height'], :spec['width']]
+            # A pixel is untouched only when all four subpixel taps lie beyond
+            # the lead. Each linearly sampled tap averages four 4x field texels;
+            # using just the centre misclassifies pixels on steep arrival edges.
+            taps = np.array([
+                sum(full_field[y + dy::4, x + dx::4][:spec['height'], :spec['width']]
+                    for dy in (0, 1) for dx in (0, 1)) * .25
+                for y in (0, 2) for x in (0, 2)
+            ])
             d = spec['letterDuration']
             slot = (1 - .24 * d) / max(1, 2.8 / d - 1.8)
             for method in (0, 1):
@@ -130,7 +137,7 @@ class PaperInkShaderTest(unittest.TestCase):
                                   [:, :, 2].astype(int) for lead in (0, 1))
                     ink = field[:, :, 2] > 140
                     near = ink & (arrival > .4 + feather + .01) & (arrival < .4 + slot * .6)
-                    far = ink & (arrival > .4 + slot + feather + .02)
+                    far = ink & (taps[:, :, :, method].min(axis=0) / 255 > .4 + slot + feather + .02)
                     if near.any():
                         self.assertLess(led[near].mean(), plain[near].mean() - 10)
                     np.testing.assert_array_equal(led[far], plain[far])

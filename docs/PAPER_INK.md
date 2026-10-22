@@ -80,6 +80,15 @@ Textures: `field` at 2× (R Inside out, G Flowing, B distance as 128 + 16 px),
 `normals` at 1× (R/G film normal, B exact glyph coverage). Shader constants
 were tuned at a 160 px font; `unit = fontPx / 160` scales them.
 
+Wet ink uses four subpixel samples in a 2×2 grid, each with a half-pixel
+coverage filter. This antialiases the expanded outline, swelling front and
+focused reflection together. Each sample keeps the original glyph coverage
+at the pixel centre, so the printed base stays crisp. Fully dry words use
+the original single-sample path, preserving exact glyph coverage and the
+handoff to static text. Empty paper beyond the wet spread is skipped. The
+study uses the same sampling scheme; no additional textures or mask generation
+are needed.
+
 ## Tuning
 
 Ink Lab → Sweep: **Paper ink** (on), **Flowing ink** (off = Inside out),
@@ -95,6 +104,10 @@ dries it toward warm paper.
   leaning stems, symmetric swell and letter slots.
 - `tools/test_paper_ink_study.py`, `tools/test_paper_ink_shader.py` — the
   reference geometry and the study shader.
+- `tools/test_paper_ink_antialiasing.py` — direct Skia renders of the production
+  shader on Arabic and English at reading sizes. Compares wet coverage against
+  an 8× pixel-area reference in both modes and passes, at default/full pooling;
+  checks exact dry, held-repeat and unread glyph coverage.
 
 ## Not yet
 

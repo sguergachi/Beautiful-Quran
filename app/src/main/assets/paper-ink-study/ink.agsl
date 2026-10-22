@@ -16,7 +16,7 @@ uniform float letterDuration;
 uniform float lead;
 uniform float2 origin;
 
-half4 main(float2 p) {
+half4 inkAt(float2 p, float base, float coverageAA) {
     float4 shape = field.eval(p * 4.0);
     float distance = (shape.b * 255.0 - 128.0) / 16.0;
     // One front sweeps along the baseline in reading order, never up a stroke.
@@ -31,11 +31,10 @@ half4 main(float2 p) {
     float depositAge = max(0.0, progress - arrival) / max(0.01, letterDuration);
     float fresh = 1.0 - smoothstep(0.08, 0.65, depositAge);
     float filmWet = localWet * mix(0.82, 1.0, fresh);
-    float base = smoothstep(-aa * 0.5, aa * 0.5, distance);
     // Both passes gain weight while wet and return to the regular stroke as
     // they dry. The orange chain holds color only; it cannot hold font weight.
     float wetStrokeWeight = weight * filmWet;
-    float expanded = smoothstep(-aa * 0.5, aa * 0.5, distance + wetStrokeWeight);
+    float expanded = smoothstep(-coverageAA * 0.5, coverageAA * 0.5, distance + wetStrokeWeight);
     float2 slope = (surface.rg * 255.0 - 128.0) / 127.0;
     float volume = 0.6 + weight / 6.5;
     // A rounded advancing meniscus follows the same smooth arrival field as the ink.
@@ -87,4 +86,19 @@ half4 main(float2 p) {
     float liquidCoverage = expanded * loaded;
     return half4(paper * (1.0 - dryCoverage - liquidCoverage) +
         waiting * dryCoverage + ink * liquidCoverage, 1.0);
+}
+
+// Integrate the wet material over the pixel rather than taking one point.
+// The resting glyph coverage stays at the pixel centre in every tap: filtering
+// that captured coverage again would blur the printed letters and their handoff.
+half4 main(float2 p) {
+    float distance = (field.eval(p * 4.0).b * 255.0 - 128.0) / 16.0;
+    float base = smoothstep(-aa * 0.5, aa * 0.5, distance);
+    if (base == 0.0 && distance < -weight - max(aa, 1.0)) return half4(250.0 / 255.0, 243.0 / 255.0, 232.0 / 255.0, 1.0);
+    if (wet <= 0.0) return inkAt(p, base, aa);
+    float pixelOffset = aa * (0.25 / 0.9);
+    return (inkAt(p + float2(-pixelOffset, -pixelOffset), base, aa * 0.5) +
+            inkAt(p + float2( pixelOffset, -pixelOffset), base, aa * 0.5) +
+            inkAt(p + float2(-pixelOffset,  pixelOffset), base, aa * 0.5) +
+            inkAt(p + float2( pixelOffset,  pixelOffset), base, aa * 0.5)) * 0.25;
 }
