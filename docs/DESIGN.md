@@ -1673,34 +1673,35 @@ bookmark icon, a second ribbon shape, or a bespoke animated substitute.
 ### Pinned chapters (Android)
 
 A long-press on a chapter row pins it to the top of Chapters; a long-press
-on a pinned row unpins it. Pinned chapters stand as a **stack of pills**,
-each the Continue pill's sibling: the same green wash (`greenWash`), the same
-16 dp margin from the sheet edges, and fully round ends, one capsule per
-chapter with 6 dp of paper between them. A small-caps **PINNED** flag on the
-names' rail heads the stack, on the paper, as CONTINUE heads its pill. Rows
-inside are set compact (the pill's 10 dp bands) on the list's own rails, so
-numbers and names stay aligned with the chapters below. 20 dp of paper sits
-above the stack (the search feather's depth) and below it.
+on a pinned row unpins it. Pinned chapters sit on a **band**: the Continue
+pill's green wash (`greenWash`) laid edge to edge across the sheet,
+square-cut like a strip of tinted paper, behind a small-caps **PINNED** flag
+on the names' rail (as CONTINUE heads its pill) and every pinned row. Each
+row carries its own slice of the wash; the slices meet, so it reads as one
+band however many chapters are pinned. Rows are set compact (the pill's
+10 dp bands) on the list's own rails, so numbers and names stay aligned with
+the chapters below. 20 dp of paper sits above the band (the search
+feather's depth, so the wash never dissolves under the field) and below it.
 
-A pinned chapter **moves** into the stack: it is left out of the list below,
+A pinned chapter **moves** into the band: it is left out of the list below,
 so no chapter shows twice on one sheet, and unpinning returns it to its
 place.
 
 Tried and rejected, in order: a twisted cord in the trailing gutter (ugly);
-an ink nuqta under a closing hairline; one rounded rectangle joining every
-pinned row (read as a card, even when compact and flagged); a flat
-edge-to-edge band (calm but heavy, like a selected region); a feathered ink
-wash (its soft edge reads as a shadow).
+an ink nuqta under a closing hairline; one inset rounded rectangle joining
+every pinned row (read as a card); a stack of separate Continue-style
+capsules; a feathered ink wash (its soft edge reads as a shadow). The owner
+chose the band from an on-device comparison of rectangle, capsules, band and
+wash.
 
 The current-place ribbon (and the Continue pill's docking target) is on the
-pinned capsule when the chapter is pinned. The capsule does not clip: the
-ribbon hangs in the sheet-edge lane and lies whole over the capsule's end.
-Search owns the sheet while active, so the stack stands down. Pinning from
-the top of the sheet scrolls the stack into view; a reader deep in the list
-keeps their place. Stored as `Settings.pinnedSurahIds`; web parity is
-pending.
+pinned row when the chapter is pinned; it hangs in the sheet-edge lane on
+the band. Search owns the sheet while active, so the band stands down.
+Pinning from the top of the sheet scrolls the band into view; a reader deep
+in the list keeps their place. Stored as `Settings.pinnedSurahIds`; web
+parity is pending.
 
-Implementation: `pinnedCapsule` and the list in `ui/home/HomeScreen.kt`.
+Implementation: `pinnedBand` and the list in `ui/home/HomeScreen.kt`.
 
 ### Chapters bookmark treatment
 

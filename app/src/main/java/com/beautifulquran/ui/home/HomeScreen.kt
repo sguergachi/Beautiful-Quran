@@ -63,8 +63,6 @@ import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.composed
-import androidx.compose.ui.geometry.Size
-import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
@@ -158,17 +156,13 @@ private val HomeRowRibbonGutter = (HomeNumberColumn - HomeRibbonWidth) / 2f
 private val HomeColumnGap = 4.dp
 private val HomeArabicOpticalInset = 4.dp
 private val TopBoundRibbonHeight = 96.dp
-/** The pinned wash's inset from the sheet edge: the Continue pill's own. */
-private val PinnedWashMargin = 16.dp
-/** Paper above the pinned stack: the search feather's depth, so the flag
- * and first capsule sit clear of the field's fade. */
+/** Paper above the pinned band: the search feather's depth, so the wash
+ * starts at full strength instead of dissolving under the field. */
 private val PinnedBlockTop = 20.dp
-/** Paper between the pinned stack and the full list below it. */
+/** Paper between the pinned band and the full list below it. */
 private val PinnedGroupGap = 20.dp
-/** Pinned rows are set compact, as the Continue pill sets its row; the
- * extra half-gap either side is the paper between capsules. */
-private val PinnedCapsuleGap = 6.dp
-private val PinnedRowVertical = 10.dp + PinnedCapsuleGap / 2
+/** Pinned rows are set compact, as the Continue pill sets its row. */
+private val PinnedRowVertical = 10.dp
 /**
  * Paper margin between the field and where scrolled ink dies: the feather
  * finishes dissolving a row here, so fading rows never brush the bar. While
@@ -743,7 +737,7 @@ fun HomeScreen(
                         item(key = "pinned-air") {
                             Spacer(Modifier.height(PinnedBlockTop).animateItem())
                         }
-                        // The stack's head: a small-caps flag on the names'
+                        // The band's head: a small-caps flag on the names'
                         // rail, the Continue pill's CONTINUE flag in kind.
                         item(key = "pinned-flag") {
                             Text(
@@ -755,6 +749,7 @@ fun HomeScreen(
                                 modifier = Modifier
                                     .animateItem()
                                     .fillMaxWidth()
+                                    .pinnedBand()
                                     .padding(
                                         start = HomeStartInset + HomeNumberColumn + HomeColumnGap,
                                         top = 14.dp,
@@ -767,7 +762,7 @@ fun HomeScreen(
                                 "pinned-${surah.id}",
                                 Modifier
                                     .animateItem()
-                                    .pinnedCapsule(),
+                                    .pinnedBand(),
                                 PinnedRowVertical,
                             )
                         }
@@ -1174,25 +1169,14 @@ internal fun continueLazyIndex(
 }
 
 /**
- * A pinned chapter's capsule: the Continue pill's green wash, margin and
- * fully round ends, one per row with a hairline of paper between, so the
- * pinned chapters read as a stack of pills rather than a card. It does not
- * clip: the place ribbon hangs in the sheet-edge lane and lies whole over
- * the capsule's end.
+ * The pinned band: the Continue pill's green wash laid edge to edge across
+ * the sheet behind the flag and every pinned row, square-cut like a strip of
+ * tinted paper. Adjacent rows' washes meet, so the stack reads as one band
+ * however many chapters are pinned. The place ribbon hangs in the sheet-edge
+ * lane on top of it.
  */
-private fun Modifier.pinnedCapsule(): Modifier = composed {
-    val wash = QuranTheme.accents.greenWash
-    drawBehind {
-        val margin = PinnedWashMargin.toPx()
-        val gap = PinnedCapsuleGap.toPx() / 2f
-        val height = size.height - 2 * gap
-        drawRoundRect(
-            color = wash,
-            topLeft = Offset(margin, gap),
-            size = Size(size.width - 2 * margin, height),
-            cornerRadius = CornerRadius(height / 2f),
-        )
-    }
+private fun Modifier.pinnedBand(): Modifier = composed {
+    background(QuranTheme.accents.greenWash)
 }
 
 /** Key of the chapter row that owns the reading place: the pinned copy atop
