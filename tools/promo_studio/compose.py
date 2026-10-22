@@ -197,11 +197,13 @@ class Renderer:
     def frame(self, t, screen_u8, plate_u8):
         """Compose the output frame at video time t (uint8 RGB)."""
         s = self.s
-        screen = screen_u8.astype(np.float32)
-        screen /= 255
+        screen = None
+        if screen_u8 is not None:
+            screen = screen_u8.astype(np.float32)
+            screen /= 255
         plate = plate_u8.astype(np.float32)
         plate /= 255
-        P = self._phone_layers(screen)
+        P = self._phone_layers(screen) if screen is not None else None
         self._resized_phone = None   # a new recording frame invalidates RGB
         shutter = float(s.get("motion_blur", 1.0)) / self.fps       # 1.0 = open for the whole frame
         states = [state_at(s, t)]
@@ -216,6 +218,9 @@ class Renderer:
         sh_strength = float(s["phone"]["shadow"])
         for st in states:
             bg = self._background(plate, st)
+            if P is None:
+                acc += bg
+                continue
             M = self.phone_matrix(st)
             if sh_strength > 0:
                 q, pad = self.shadow_q, self.shadow_pad
@@ -299,6 +304,11 @@ class EditFrames:
 
     def read(self, t):
         src, piece = source_time(self.s, t)
+        if piece is None:
+            if self.cur:
+                self.cur.close()
+            self.cur, self.piece = None, None
+            return None
         if piece is not self.piece:
             if self.cur:
                 self.cur.close()
@@ -341,7 +351,8 @@ def still(s, t, scale=1.0):
     """One exact output frame (RGB uint8) at video time t."""
     t = min(max(0.0, t), max(0.0, s["duration"] - 1 / s["fps"]))
     r = Renderer(s, scale)
-    scr = grab(r.clip, r.sw, r.sh, source_time(s, t)[0])
+    src, piece = source_time(s, t)
+    scr = grab(r.clip, r.sw, r.sh, src) if piece is not None else None
     pl = grab(r.plate, r.pw, r.ph, (t + float(s["background"].get("offset", 0))) % max(0.01, r.plate_len))
     return r.frame(t, scr, pl)
 
@@ -405,16 +416,21 @@ CUT_FADE = 0.008     # seconds faded at each side of a cut: no click, no audible
 
 def audio_graph(s):
     """filter_complex cutting the take's sound like the picture -> [cut]."""
-    parts, n = [], len(s["edit"])
+    parts, labels, n = [], [], len(s["edit"])
     for i, p in enumerate(s["edit"]):
+        gap = float(p.get("gap", 0))
+        if gap > 0:
+            parts.append(f"anullsrc=r=48000:cl=stereo,atrim=duration={gap:.6f},asetpts=PTS-STARTPTS[g{i}]")
+            labels.append(f"[g{i}]")
         a, b = float(p["in"]), float(p["out"])
         f = f"[0:a]apad,atrim=start={a:.6f}:end={b:.6f},asetpts=PTS-STARTPTS"
-        if i > 0:
+        if i > 0 or gap > 0:
             f += f",afade=t=in:st=0:d={CUT_FADE}"
         if i < n - 1:
             f += f",afade=t=out:st={max(0.0, b - a - CUT_FADE):.4f}:d={CUT_FADE}"
         parts.append(f + f"[p{i}]")
-    parts.append("".join(f"[p{i}]" for i in range(n)) + f"concat=n={n}:v=0:a=1[cut]")
+        labels.append(f"[p{i}]")
+    parts.append("".join(labels) + f"concat=n={len(labels)}:v=0:a=1[cut]")
     return ";".join(parts)
 
 

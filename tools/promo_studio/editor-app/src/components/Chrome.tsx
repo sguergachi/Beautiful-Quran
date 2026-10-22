@@ -51,7 +51,7 @@ export function TopBar() {
         <span>Jobs</span>
         {live.length > 0 && (
           <span className="flex items-center gap-1.5 text-[11.5px] text-orange">
-            <span className="job-progress h-1.5 w-10 overflow-hidden rounded-full bg-line"><span className="block h-full bg-orange transition-[width]" style={{ width: `${progress * 100}%` }} /></span>
+            <span className="job-progress h-1.5 w-10 overflow-hidden rounded-full bg-line"><span className="block h-full w-full origin-left bg-orange transition-transform duration-500 ease-linear" style={{ transform: `scaleX(${Math.max(0, Math.min(1, progress))})` }} /></span>
             {live.length}
           </span>
         )}

@@ -23,10 +23,14 @@ export function MenuHost() {
   const { at, items, trigger } = useMenu();
   const ref = useRef<HTMLDivElement>(null);
   const [pos, setPos] = useState<[number, number]>([0, 0]);
+  const [origin, setOrigin] = useState("top left");
   useLayoutEffect(() => {
     if (!at || !ref.current) return;
     const r = ref.current.getBoundingClientRect();
-    setPos([Math.max(6, Math.min(at[0], innerWidth - r.width - 6)), Math.max(6, Math.min(at[1], innerHeight - r.height - 6))]);
+    const x = Math.max(6, Math.min(at[0], innerWidth - r.width - 6)), y = Math.max(6, Math.min(at[1], innerHeight - r.height - 6));
+    setPos([x, y]);
+    // pushed back from an edge: grow from the corner nearest the pointer
+    setOrigin(`${y < at[1] - 1 ? "bottom" : "top"} ${x < at[0] - 1 ? "right" : "left"}`);
     // Button menus take keyboard focus only after their items have mounted.
     if (trigger) ref.current.querySelector<HTMLButtonElement>('button:not(:disabled)')?.focus({ preventScroll: true });
   }, [at, items, trigger]);
@@ -40,7 +44,7 @@ export function MenuHost() {
   }, [at]);
   if (!at) return null;
   return (
-    <div ref={ref} role="menu" style={{ left: pos[0], top: pos[1] }}
+    <div ref={ref} role="menu" style={{ left: pos[0], top: pos[1], "--origin": origin } as React.CSSProperties}
       onKeyDown={(e) => {
         e.stopPropagation();
         if (!["ArrowUp", "ArrowDown", "Home", "End"].includes(e.key)) return;
@@ -49,7 +53,7 @@ export function MenuHost() {
         const next = e.key === "Home" ? 0 : e.key === "End" ? buttons.length - 1 : (i + (e.key === "ArrowDown" ? 1 : -1) + buttons.length) % buttons.length;
         buttons[next]?.focus();
       }}
-      className="fixed z-50 flex min-w-[190px] max-w-[calc(100vw-12px)] max-h-[calc(100dvh-12px)] flex-col overflow-y-auto overscroll-contain rounded-lg border border-line bg-panel2 p-1 shadow-2xl shadow-black/60 [&>*]:shrink-0">
+      className="menu fixed z-50 flex min-w-[190px] max-w-[calc(100vw-12px)] max-h-[calc(100dvh-12px)] flex-col overflow-y-auto overscroll-contain rounded-lg border border-line bg-panel2 p-1 shadow-2xl shadow-black/60 [&>*]:shrink-0">
       {items.map((it, i) =>
         it === "-" ? <div key={i} className="mx-1 my-1 h-px bg-line" /> :
         "head" in it ? <div key={i} className="px-2.5 pb-0.5 pt-1.5 text-[11px] text-faint">{it.head}</div> :

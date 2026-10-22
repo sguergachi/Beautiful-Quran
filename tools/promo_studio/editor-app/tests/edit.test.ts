@@ -3,7 +3,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
 import * as E from "../src/lib/edit.ts";
-import { fadeAt, parseTime, resolve, soundGain, soundOnset, valueAt, videoTimes } from "../src/lib/model.ts";
+import { fadeAt, parseTime, pieceStart, resolve, soundGain, soundOnset, sourceTime, valueAt, videoTimes } from "../src/lib/model.ts";
 
 const meta = JSON.parse(execFileSync("python3", ["-c", "import json,spec,phone; print(json.dumps(dict(defaults=spec.DEFAULTS, props=spec.PROPS, themes=spec.THEMES, g=phone.geometry(1080,2400))))"], { cwd: new URL("../..", import.meta.url).pathname }).toString());
 const ctx = (raw: any): E.Ctx => ({ spec: resolve(raw, meta), props: meta.props, fps: 60 });
@@ -65,7 +65,7 @@ test("split, trim and delete pieces of the recording", () => {
   ({ out } = run(raw, (r, c) => E.splitAt(r, c, 4.01)));
   assert.equal(out, null, "a split right beside a cut is refused");
   ({ raw } = run(raw, (r) => E.trimPiece(r, 1, "in", 5)));
-  assert.deepEqual(raw.edit[1], { in: 5, out: 10 });
+  assert.deepEqual(raw.edit[1], { in: 5, out: 10, gap: 1 });
   ({ raw } = run(raw, (r) => E.trimPiece(r, 1, "out", 99, 12)));
   assert.equal(raw.edit[1].out, 12, "capped at the take's length");
   ({ raw } = run(raw, (r) => E.trimPiece(r, 0, "out", -3)));
@@ -73,6 +73,51 @@ test("split, trim and delete pieces of the recording", () => {
   ({ raw } = run(raw, (r) => E.deletePiece(r, 1)));
   assert.equal(raw.edit.length, 1);
   assert.equal(E.deletePiece(raw, 0), false, "the last piece stays");
+});
+
+test("left trims preserve duration, later clips, keys, and source alignment", () => {
+  const raw = { edit: [{ in: 2, out: 12 }, { in: 20, out: 25 }], tracks: { zoom: [{ t: 7, v: 2 }] } };
+  const before = ctx(raw).spec, keys = JSON.stringify(raw.tracks);
+  for (const value of [3, 5, 6]) E.trimPiece(raw, 0, "in", value);
+  const after = ctx(raw).spec;
+  assert.equal(after.duration, before.duration);
+  assert.equal(pieceStart(after, 0), 4);
+  assert.equal(pieceStart(after, 1), pieceStart(before, 1));
+  assert.deepEqual(sourceTime(after, 3.99), [0, -1]);
+  assert.deepEqual(sourceTime(after, 4), [6, 0]);
+  assert.deepEqual(sourceTime(after, 7), sourceTime(before, 7));
+  assert.deepEqual(videoTimes(after, 2, 12), [[4, 10]]);
+  assert.equal(JSON.stringify(raw.tracks), keys);
+  E.trimPiece(raw, 0, "in", 0); // restore only as far as the video start
+  assert.deepEqual(raw.edit[0], { in: 2, out: 12 });
+  E.trimPiece(raw, 1, "in", 22);
+  assert.equal(ctx(raw).spec.duration, 15);
+  assert.equal(pieceStart(ctx(raw).spec, 1), 12);
+  E.trimPiece(raw, 1, "in", 0); // never overlaps the preceding clip
+  assert.deepEqual(raw.edit[1], { in: 20, out: 25 });
+});
+
+test("splits keep the gap before the first half and never split empty time", () => {
+  const base = { edit: [{ in: 4, out: 10, gap: 3 }] };
+  let { raw, out } = run(base, (r, c) => E.splitAt(r, c, 2));
+  assert.equal(out, null);
+  assert.deepEqual(raw, base);
+  ({ raw, out } = run(base, (r, c) => E.splitAt(r, c, 5)));
+  assert.equal(out, 1);
+  assert.deepEqual(raw.edit, [{ in: 4, out: 6, gap: 3 }, { in: 6, out: 10 }]);
+  assert.equal(ctx(raw).spec.duration, 9);
+  assert.deepEqual(sourceTime(ctx(raw).spec, 5), [6, 1]);
+});
+
+test("gaps are silent and shift the fade onset without moving later source spans", () => {
+  const s = ctx({ edit: [{ in: 0, out: 2, gap: 3 }, { in: 4, out: 8, gap: 2 }], audio: { fade_in: 1, fade_out: 0 } }).spec;
+  assert.equal(s.duration, 11);
+  assert.equal(soundOnset(s, 1), 4);
+  assert.equal(soundGain(s, 2, 4), 0);
+  assert.equal(soundGain(s, 6, 4), 0);
+  assert.equal(soundGain(s, 4.5, 4), .5);
+  assert.equal(soundGain(s, 7, 4), 1);
+  assert.deepEqual(videoTimes(s, 0, 8), [[3, 5], [7, 11]]);
 });
 
 test("presets key a push to the active verse and back", () => {

@@ -109,7 +109,9 @@ function KeyCard({ items }: { items: E.KeyRef[] }) {
             }} />
           </Field>
           <Field label="Value">
-            <TextInput type="number" step={d.step} value={k.v} onCommit={(v) => { const n = parseFloat(v); if (Number.isFinite(n)) mutate((r) => { const key = E.findKey(r, items[0]); if (key) key.v = r3(clamp(n, d.min, d.max)); }); }} />
+            <TextInput type="number" step={d.step} min={d.min} max={d.max} value={k.v}
+              onScrub={(n) => mutate((r) => { const key = E.findKey(r, items[0]); if (key) key.v = r3(clamp(n, d.min, d.max)); }, "drag:key-value")} onScrubEnd={endGesture}
+              onCommit={(v) => { const n = parseFloat(v); if (Number.isFinite(n)) mutate((r) => { const key = E.findKey(r, items[0]); if (key) key.v = r3(clamp(n, d.min, d.max)); }); }} />
           </Field>
         </>
       )}
@@ -205,8 +207,10 @@ function Recording({ contentsOnly = false }: { contentsOnly?: boolean }) {
           {raw.edit.map((p: { in: number; out: number }, i: number) => (
             <div key={i} className={`mb-1.5 grid grid-cols-[22px_minmax(0,1fr)_minmax(0,1fr)_26px] items-center gap-1.5 ${sel?.type === "piece" && sel.i === i ? "text-blue" : ""}`}>
               <button className="text-left" onClick={() => { select({ type: "piece", i }); inspectSelection(true); }}>{i + 1}</button>
-              <TextInput type="number" step={0.01} value={p.in} onCommit={(v) => mutate((r) => E.trimPiece(r, i, "in", parseFloat(v), tl?.take))} />
-              <TextInput type="number" step={0.01} value={p.out} onCommit={(v) => mutate((r) => E.trimPiece(r, i, "out", parseFloat(v), tl?.take))} />
+              <TextInput type="number" step={0.01} min={0} value={p.in} onScrub={(v) => mutate((r) => E.trimPiece(r, i, "in", v, tl?.take), `drag:trim-field:${i}`)} onScrubEnd={endGesture}
+                onCommit={(v) => mutate((r) => E.trimPiece(r, i, "in", parseFloat(v), tl?.take))} />
+              <TextInput type="number" step={0.01} min={0} value={p.out} onScrub={(v) => mutate((r) => E.trimPiece(r, i, "out", v, tl?.take), `drag:trim-field:${i}`)} onScrubEnd={endGesture}
+                onCommit={(v) => mutate((r) => E.trimPiece(r, i, "out", parseFloat(v), tl?.take))} />
               <button className="grid h-7 place-items-center text-faint hover:text-danger disabled:opacity-30" disabled={raw.edit.length <= 1}
                 onClick={() => mutate((r) => { E.deletePiece(r, i); })} title="Delete this piece">{Icon.x}</button>
             </div>
@@ -215,7 +219,7 @@ function Recording({ contentsOnly = false }: { contentsOnly?: boolean }) {
             <Button size="sm" onClick={() => split()}>{Icon.scissors} Split at playhead</Button>
             <Button size="sm" variant="ghost" onClick={wholeTake} title="One piece: the whole take">Whole take</Button>
           </div>
-          <p className="mt-2 text-[11.5px] leading-relaxed text-faint">{take ? (a.intro.play ? `The recitation starts ${take.lead.toFixed(1)} s into the take.` : "This take records the screen sequence without recitation.") : "The screens above are recorded before recitation starts."} Pieces play back to back and the sound is cut with the picture; keys stay where they are in video time.{tl?.take != null && ` The take is ${tl.take.toFixed(1)} s long.`}</p>
+          <p className="mt-2 text-[11.5px] leading-relaxed text-faint">{take ? (a.intro.play ? `The recitation starts ${take.lead.toFixed(1)} s into the take.` : "This take records the screen sequence without recitation.") : "The screens above are recorded before recitation starts."} Trimming a clip's start leaves a silent gap; picture and sound trim together, and keys stay in video time.{tl?.take != null && ` The take is ${tl.take.toFixed(1)} s long.`}</p>
         </div>
       </details>
       {name && <p className="break-words text-[11px] text-faint">Spec: specs/{name}.json</p>}

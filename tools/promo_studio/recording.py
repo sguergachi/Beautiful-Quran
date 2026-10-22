@@ -51,12 +51,14 @@ class Sequence:
 
     def home(self):
         for _ in range(5):
-            if self.find('Open settings'):
-                clear = self.find('Clear search')
+            ns = self.c.at.nodes()                     # one look per attempt: each dump costs a second on camera
+            if any(d == 'Open settings' for t, d, b in ns):
+                clear = next((b for t, d, b in ns if d == 'Clear search'), None)
                 if clear:
-                    self.c.at.tap(clear)
+                    self.c.at.tap(((clear[0] + clear[2]) // 2, (clear[1] + clear[3]) // 2))
                     self.c.back()   # dismiss the keyboard opened by Clear
-                self.screen = 'home'
+                    ns = None
+                self.screen, self.home_nodes = 'home', ns
                 return
             self.c.back()
         raise RuntimeError('Could not reach the chapter list')
@@ -69,6 +71,8 @@ class Sequence:
             self.c.back(); self.screen = 'reader'
             if self.ayah == ayah:
                 return
+        if self.screen == 'reader' and self.goto(ayah):
+            return
         if self.screen == 'reader':
             # Leave the current reader before replacing its deep-link target;
             # this also releases that sheet's pinned transport callbacks.
@@ -76,6 +80,41 @@ class Sequence:
         self.c.at.open_reader(self.a['surah'], ayah)
         time.sleep(2.5)
         self.screen, self.ayah = 'reader', ayah
+
+    def goto(self, ayah):
+        """Travel inside the open Scroll reader to `ayah` on camera: swipe to
+        it, or scrub the ayah rail. Only an explicit Jump or Mushaf uses
+        Home + link; a failed smooth route must not silently change the shot."""
+        how = self.a['intro'].get('goto', 'scroll')
+        if how == 'jump' or self.a['layout'] != 'Scroll':
+            return False
+        current = self.ayah
+        if current is None and how == 'rail':
+            current = self.c.reading_ayah()
+        ok = how == 'rail' and current is not None and self.c.rail_to_verse(ayah, current, self.log)
+        ok = ok or self.c.scroll_to_verse(ayah, self.log)
+        if not ok:
+            raise RuntimeError(f'Could not reach verse {ayah} inside the chapter; recording stopped to avoid an unexpected Home transition')
+        self.ayah = ayah
+        return True
+
+    def header(self):
+        """Reveal the current chapter's heading without replacing its reader.
+
+        A header is a place within the same page, including after a repeated
+        header step or a sheet over the reader. Keep the known verse until
+        the heading is actually reached, then travel from verse 1 next time.
+        """
+        if self.a['layout'] != 'Scroll':
+            self.reader(1)
+            return
+        if self.screen in ('settings', 'roots', 'repeat'):
+            self.c.back(); self.screen = 'reader'
+        if self.screen != 'reader':
+            self.reader(1)
+        if not self.c.scroll_top(f"Chapter {self.a['surah']} ·", max_swipes=12, exact=False):
+            raise RuntimeError('Chapter heading was not found')
+        self.ayah = 1
 
     def chapter(self, via):
         if via == 'direct':
@@ -91,13 +130,21 @@ class Sequence:
             self.c.adb('shell', 'input', 'text', shlex.quote(name.replace(' ', '%s')))
             time.sleep(1)
             self.c.adb('shell', 'input', 'keyevent', 'KEYCODE_BACK')
+            xy = None
         else:
-            self.c.scroll_top('Al-Fatihah', max_swipes=20)
-        xy = self.c.scroll_to(name, max_swipes=30)
+            # Tap the row straight away when the list already shows it.
+            row = next((b for t, d, b in (getattr(self, 'home_nodes', None) or []) if t == name), None)
+            xy = row and row[3] < self.c.screen_px()[1] * 0.9 and ((row[0] + row[2]) // 2, (row[1] + row[3]) // 2)
+            if not xy:
+                self.c.scroll_top('Al-Fatihah', max_swipes=20)
+        xy = xy or self.c.scroll_to(name, max_swipes=30)
         if not xy:
             raise RuntimeError(f'Chapter {name} was not found in the list')
         self.c.at.tap(xy); time.sleep(2)
-        self.screen, self.ayah = 'reader', 1
+        # The chapter opens at its top, or at the saved place when it was the
+        # last one read: look rather than assume, so travel starts from there.
+        self.screen = 'reader'
+        self.ayah = (self.a['layout'] == 'Scroll' and self.c.reading_ayah()) or 1
 
     def cover(self):
         self.c.adb('shell', 'am', 'force-stop', 'com.beautifulquran')
@@ -161,14 +208,38 @@ class Sequence:
             self.repeat()
         elif not self.c.wait_for('Settings', tries=15):
             raise RuntimeError('The verse did not become ready')
+        if any(x['kind'] == 'open' and x.get('via', 'direct') != 'direct' for x in steps):
+            # A chapter tapped open lands on the place playback last paused in
+            # it (every take plays its verse). Pause briefly in another chapter
+            # so the tapped one opens at its heading and the travel is filmed.
+            self.c.at.open_reader(2 if self.a['surah'] == 1 else 1, 1, play=True)
+            for _ in range(30):
+                if self.c.playing(): break
+                time.sleep(0.5)
+            time.sleep(1.0)
+            self.c.adb('shell', 'input', 'keyevent', 'KEYCODE_MEDIA_PAUSE', check=False)
+            time.sleep(1.0)
+            self.screen, self.ayah = 'reader', None
+            # Start the take on the chapter list, without that playback's pill.
+            self.home()
+            close = self.find('Close playback')
+            if close:
+                self.c.at.tap(close); time.sleep(0.8)
+                self.home_nodes = None
+            if self.a['repeat'] != 'off':
+                self.repeat_reset = True     # that playlist replaced the verse's: set repeat again before playing
         if steps and steps[0]['kind'] == 'cover':
             self.c.adb('shell', 'am', 'force-stop', 'com.beautifulquran')
             self.screen = 'stopped'
         elif steps and steps[0]['kind'] == 'home':
             self.home()
+        elif steps and steps[0]['kind'] == 'header':
+            # Start on the requested opening screen, not on the verse that
+            # was cued for playback during off-camera preparation.
+            self.header()
         # A cover restart clears session repeat. Reapply it immediately before
         # playback if the sequence has not shown the picker itself.
-        self.repeat_applied = bool(not steps or steps[0]['kind'] != 'cover')
+        self.repeat_applied = bool(not steps or steps[0]['kind'] != 'cover') and not getattr(self, 'repeat_reset', False)
 
     def run(self, mark, stage):
         steps = spec.opening_steps(self.s)
@@ -187,10 +258,7 @@ class Sequence:
             elif kind == 'home': self.home(); time.sleep(seconds)
             elif kind == 'open': self.chapter(step.get('via', 'direct')); time.sleep(seconds)
             elif kind == 'header':
-                self.ayah = None
-                self.reader(1)
-                if self.a['layout'] == 'Scroll' and not self.c.scroll_top(f"Chapter {self.a['surah']} ·", max_swipes=12, exact=False):
-                    raise RuntimeError('Chapter heading was not found')
+                self.header()
                 time.sleep(seconds)
             elif kind == 'settings':
                 self.reader(); self.tap('Settings'); self.screen = 'settings'; time.sleep(seconds)

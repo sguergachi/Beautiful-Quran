@@ -307,6 +307,129 @@ def word_xy(ayah, position=1):
     return None
 
 
+# ---------------------------------------------------------------- going to a verse on camera
+
+def screen_px():
+    return tuple(map(int, re.findall(r"(\d+)x(\d+)", adb("shell", "wm", "size"))[-1]))
+
+
+def px_per_dp():
+    found = re.findall(r"density: (\d+)", adb("shell", "wm", "density"))
+    return int(found[-1]) / 160 if found else 2.625      # the override, when set, is listed last
+
+
+def verse_markers():
+    """Verse-end markers on screen: [(ayah, centre y)] (﴿N﴾ ends ayah N)."""
+    out = []
+    for t, d, b in at.nodes():
+        m = re.search(r"﴿([٠-٩]+)﴾", t.replace("\u2060", ""))   # word joiners sit between the digits
+        if m:
+            out.append((int(m.group(1).translate(str.maketrans("٠١٢٣٤٥٦٧٨٩", "0123456789"))), (b[1] + b[3]) // 2))
+    return out
+
+
+def _swipe_by(dy, speed):
+    """Scroll the page by dy px (positive = forward) with one drag at `speed` px/ms."""
+    w, h = screen_px()
+    y0 = int(h * 0.8) if dy > 0 else int(h * 0.2)
+    adb("shell", "input", "swipe", str(w // 2), str(y0), str(w // 2), str(y0 - dy), str(max(250, int(abs(dy) / speed))))
+
+
+SCROLL_GLIDE = 1.4          # px/ms: an unhurried reader's swipe; the list coasts ~7% beyond it
+SCROLL_SETTLE = 0.6         # px/ms: the final placement drags without coasting
+
+
+def scroll_to_verse(ayah, log=print):
+    """Scroll the Scroll reader to `ayah` the way a reader would.
+
+    From the verse ends in view it estimates the way to go, glides most of it
+    in back-to-back swipes (no pauses to look), then places the verse with
+    slow drags: the previous verse's end marker settles in the upper quarter."""
+    w, h = screen_px()
+    goal, reach = int(h * 0.24), int(h * 0.6)
+    if ayah == 1:
+        # The heading also exists in English view and in At-Tawbah, which
+        # has no basmalah. The reader's accessibility label is stable.
+        return scroll_top("Chapter ", max_swipes=12, exact=False)
+    blind = 0
+    for _ in range(16):
+        marks = sorted(verse_markers())
+        prev = next((y for n, y in marks if n == ayah - 1), None)
+        if prev is not None:
+            dy = prev - goal
+            if abs(dy) < h * 0.05:
+                return True
+            _swipe_by(max(-reach, min(reach, dy)), SCROLL_SETTLE)
+            time.sleep(0.5)
+            continue
+        if not marks:
+            blind += 1
+            if blind > 3:                             # no verse ends in sight: not a Scroll reader
+                break
+            _swipe_by(reach // 2, SCROLL_GLIDE); time.sleep(0.4)
+            continue
+        blind = 0
+        (n0, y0), (n1, y1) = marks[0], marks[-1]
+        per = (y1 - y0) / (n1 - n0) if n1 > n0 else h * 0.3     # px a verse takes on this page
+        if n1 < ayah - 1:
+            way = (ayah - 1 - n1) * per + (y1 - goal)
+        else:                                          # already past it: back up
+            way = -((n0 - (ayah - 1)) * per + (goal - y0))
+        way *= 0.85 / 1.07                             # stop short of it; the coast covers some
+        while abs(way) > h * 0.1:
+            step = max(-reach, min(reach, way))
+            _swipe_by(int(step), SCROLL_GLIDE)
+            way -= step
+            time.sleep(0.12)
+        time.sleep(0.5)
+    log(f"scroll_to_verse: {ayah} not reached")
+    return False
+
+
+RAIL_TICK_DP = 14            # AyahSelectorRail: one ayah per 14 dp of drag
+RAIL_DECAY = 1.85 * 4.2      # exponentialDecay(frictionMultiplier = 1.85): coasts velocity / 7.77 ayahs
+
+
+def reading_ayah():
+    """The verse at the page's reading line (a fifth of the way down): the one
+    after the last verse end above that line, else the first verse whose end
+    is in view (a chapter's heading pushes verse 1's end below the line)."""
+    w, h = screen_px()
+    marks = sorted(verse_markers(), key=lambda m: m[1])
+    above = [n for n, y in marks if y < h * 0.2]
+    return above[-1] + 1 if above else (marks[0][0] if marks else None)
+
+
+def rail_to_verse(ayah, current, log=print):
+    """Scrub the reader's ayah rail (left edge, Scroll layout) to `ayah`.
+
+    A vertical drag on the collapsed dashes opens the wheel and scrubs it;
+    dragging up moves forward. On release the wheel coasts (compensated
+    here), settles, and commits after its 1.5 s grace. Each pass is one drag
+    from the middle of the edge; a long way, or an off-by-one, takes
+    another pass from where the page landed."""
+    w, h = screen_px()
+    tick = RAIL_TICK_DP * px_per_dp()
+    x, y = int(22 * px_per_dp()), h // 2              # inside the 44 dp strip, clear of the Back edge
+    most = int(h * 0.4 / tick)                        # ayahs one drag can cover
+    for _ in range(8):
+        delta = ayah - current
+        if delta == 0:
+            return True
+        n = min(abs(delta), most)
+        secs = min(4.0, max(0.9, n / 6))              # about six ayahs a second, at most
+        travel = (n - (n / secs) / RAIL_DECAY) * tick  # the release coast covers the rest
+        sign = 1 if delta > 0 else -1                  # forward: finger moves up
+        adb("shell", "input", "swipe", str(x), str(y), str(x), str(int(y - sign * travel)), str(int(secs * 1000)))
+        time.sleep(1.5 + 1.1)                          # settle, grace, then the page jumps
+        landed = reading_ayah()
+        log(f"ayah rail: aimed {current + sign * n}, page opens at {landed}")
+        if landed is None:
+            return False
+        current = landed
+    return current == ayah
+
+
 def start_playback(surah, ayah=1, layout="Scroll", log=print):
     """Start the opened verse without the reload a `?play=true` deep link
     causes (it crossfades and re-scrolls the page as the recitation begins).

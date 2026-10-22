@@ -130,8 +130,9 @@ export function endGesture() { coalesce = null; }
 
 function commit(draft: RawSpec, undo: string[], redo: string[]) {
   const spec = resolve(draft, get().meta!);
+  const editChanged = JSON.stringify(get().spec?.edit) !== JSON.stringify(spec.edit);
   set({ raw: draft, spec, undo, redo, exact: null, saveState: "dirty" });
-  if (clock.t > spec.duration) clock.seek(spec.duration); else clock.emit();
+  if (editChanged || clock.t > spec.duration) clock.seek(Math.min(clock.t, spec.duration)); else clock.emit();
   clearTimeout(saveTimer);
   saveTimer = window.setTimeout(save, 450);
   if (plateLook(spec) !== lastLook) { clearTimeout(plateTimer); plateTimer = window.setTimeout(loadPlate, 350); }

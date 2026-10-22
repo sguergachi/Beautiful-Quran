@@ -2,7 +2,7 @@
 
 export type Ease = "inOutCubic" | "inOutSine" | "outCubic" | "inCubic" | "outExpo" | "linear" | "hold";
 export interface Key { t: number; v: number; ease?: Ease }
-export interface Piece { in: number; out: number }
+export interface Piece { in: number; out: number; gap?: number }
 export interface PropDef { group: string; label: string; min: number; max: number; step: number; default: number; log?: boolean }
 
 // A spec as stored (only what differs from the defaults). Loose on purpose:
@@ -15,6 +15,7 @@ export interface Intro {
   play: boolean;
   cover: number; home: number; open_by: "tap" | "search"; header: boolean;
   settings: number; roots: number; repeat: boolean; dwell: number;
+  goto: "scroll" | "rail" | "jump";
 }
 export interface RecordingStep {
   kind: "cover" | "home" | "open" | "header" | "settings" | "roots" | "repeat" | "wait";

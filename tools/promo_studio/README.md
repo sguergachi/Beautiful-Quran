@@ -245,6 +245,18 @@ There is no separate Take starts control or Edit verse range.
   It replaces precise cuts with one continuous piece. The timeline's verse
   +/− actions still preserve interior cuts and reuse existing footage when
   possible. A matching recording is needed if the start verse changes.
+- **Go to the verse** (shown when a chapter is opened from the list or its
+  header is shown, so the reader starts at the top) chooses how the take
+  travels to the start verse: **Scroll** swipes down the page as a reader
+  would (planned glides, then a slow placement), **Ayah rail** scrubs the
+  rail at the page's edge so the page jumps there, **Jump** cuts via Home
+  and a direct link. Before recording, playback is parked in another
+  chapter so a tapped chapter opens at its heading rather than its saved
+  place. Chapter header steps scroll within the open reader and retain that
+  position for the next step, including repeated headers. When the header is
+  the first step, it is ready before capture begins. Scroll and Ayah
+  rail stop with an error if the verse cannot be reached, rather than silently
+  taking a detour through Home. Scroll layout only; Mushaf always jumps.
 - **Repeat** offers Off, One verse or Range. Range uses the same Start/Stop
   fields; **Play for (s)** controls repeated playback duration. The picker
   can be shown as a screen step or configured before capture. Repeated verse
@@ -312,12 +324,24 @@ recording duration share the same take; changing the sequence needs a new one.
 
 ## The timeline
 
-- **Recording** track: the take, cut into pieces that play back to back.
+Lanes keep a 24 px empty gutter before 0 s, so keys and clip edges dragged to
+the start stay clear of the labels. Every number field scrubs: drag across
+it to change the value (Shift ×10, Alt ×0.1; one undo step per drag), click
+to type.
+
+- **Recording** track: the take, cut into pieces with optional gaps.
   **S** (or ✂ Split) splits at the playhead, **Delete** removes the selected
-  piece, dragging a piece's edges trims it. The sound is cut with the
+  piece, dragging a piece's edges trims it. Trimming the left edge leaves a
+  gap before the clip: its end, later clips, animation keys, total duration,
+  and Fit scale stay in place. Pull left into that gap to restore footage;
+  the edge stops at the preceding clip (or video start). Gaps show only the
+  background and play no recording audio in both preview and export. Source
+  in fields use the same trim behavior. Splitting retains an existing gap
+  before the first half. The sound is cut with the
   picture (8 ms fades at each cut, so no clicks). In the spec:
   `"edit": [{"in": 0.0, "out": 12.4}, {"in": 15.0, "out": 21.0}]`, in take
-  seconds; by default the take opens 1 s before recitation, or with the chosen
+  seconds, with optional `"gap": 2.0` on a piece for two video seconds before
+  it; by default the take opens 1 s before recitation, or with the chosen
   screen sequence and final wait.
 - **Sound**: the take's waveform through your cuts, shaped by the fades.
   Drag a fade's gold handle to set its length (it rounds to 0.05 s; hold

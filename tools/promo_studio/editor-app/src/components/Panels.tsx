@@ -17,7 +17,7 @@ export function Drawer({ title, children, onClose, width = 420, right }: { title
     return () => { requestAnimationFrame(() => { if (document.activeElement === document.body && previous.current?.isConnected) previous.current.focus({ preventScroll: true }); }); };
   }, []);
   return (
-    <div className="fixed inset-0 z-40 flex justify-end bg-black/30" onPointerDown={(e) => { if (e.target === e.currentTarget) onClose(); }}>
+    <div className="drawer-scrim fixed inset-0 z-40 flex justify-end bg-black/30" onPointerDown={(e) => { if (e.target === e.currentTarget) onClose(); }}>
       <aside ref={ref} role="dialog" aria-modal="true" aria-label={title} style={{ width }}
         onKeyDown={(e) => {
           if (e.key !== "Tab") return;
