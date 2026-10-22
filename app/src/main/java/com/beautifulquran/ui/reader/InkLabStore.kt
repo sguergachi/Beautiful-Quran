@@ -201,8 +201,9 @@ data class InkLabSnapshot(
          * 2: the glow's numbers changed meaning — blur in dp in every reading
          * mode, swings in linear light. A save from before is dropped back to
          * shipped for those fields ([decode]); the rest of it is kept.
+         * 3: adopt zero scroll lead in existing saves; later auditions persist.
          */
-        const val SCHEMA = 2
+        const val SCHEMA = 3
 
         private val json = Json {
             ignoreUnknownKeys = true
@@ -293,10 +294,8 @@ data class InkLabSnapshot(
 
         fun decode(raw: String): InkLabSnapshot? =
             runCatching { json.decodeFromString(serializer(), raw) }.getOrNull()?.let { saved ->
-                if (saved.schema >= 2) return@let saved
                 val shipped = InkLabSnapshot()
-                saved.copy(
-                    schema = SCHEMA,
+                val glow = if (saved.schema >= 2) saved else saved.copy(
                     glintGlowAlpha = shipped.glintGlowAlpha,
                     glintGlowRadius = shipped.glintGlowRadius,
                     glintBloomAlpha = shipped.glintBloomAlpha,
@@ -304,6 +303,10 @@ data class InkLabSnapshot(
                     tarjiLightRise = shipped.tarjiLightRise,
                     tarjiLightFall = shipped.tarjiLightFall,
                     tarjiGlowGain = shipped.tarjiGlowGain,
+                )
+                if (saved.schema >= SCHEMA) glow else glow.copy(
+                    schema = SCHEMA,
+                    scrollLeadMs = shipped.scrollLeadMs,
                 )
             }
     }

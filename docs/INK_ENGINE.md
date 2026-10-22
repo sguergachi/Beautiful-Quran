@@ -453,12 +453,14 @@ tween-vs-snap rules, sweep entry and residual rules, repeat wash timing, the
   snapshot-backed (`mutableStateOf`), so release builds read constants while
   the Ink Lab can retune a live session.
 - **Sync knobs, deliberately outside `Tuning`**: `highlightLeadMs` (default 0),
-  `fadeLeadMs` (default 500), `scrollLeadMs` (default 500 — the camera's own
+  `fadeLeadMs` (default 500), `scrollLeadMs` (default 0 — the camera's own
   lead, deliberately separate from the ink's; see `FocusEngine.playbackFocusTarget`)
   and `outputLatencyOverrideMs` (null = use Media3’s presentation clock;
   a manual value adds wall-time delay, scaled to media time by playback speed). These move *when* things fire rather than how the ink feels, so they
   stay out of the data class that **Copy values** transcribes — but they persist
-  with it via `InkLabStore`. `fadeLeadMs` is how far the ayah focus/recess target
+  with it via `InkLabStore`. Schema 3 brings saved scroll leads to 0 once,
+  preserving the other knobs; later scroll-lead auditions persist normally.
+  `fadeLeadMs` is how far the ayah focus/recess target
   runs ahead of the audio; a nonzero Ink Lab `highlightLeadMs` advances word ink
   only. Both start
   from the same latency-corrected heard position, a contract enforced in

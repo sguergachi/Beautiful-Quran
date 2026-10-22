@@ -37,8 +37,19 @@ class InkLabStoreTest {
         assertEquals(0, InkEngine.DEFAULT_HIGHLIGHT_LEAD_MS)
         assertEquals(500, InkEngine.DEFAULT_FADE_LEAD_MS)
         // The camera's lead is its own number, not a copy of the ink's.
-        assertEquals(500, InkEngine.DEFAULT_SCROLL_LEAD_MS)
+        assertEquals(0, InkEngine.DEFAULT_SCROLL_LEAD_MS)
         assertNull(InkLabSnapshot().outputLatencyOverrideMs)
+    }
+
+    @Test
+    fun oldSaves_adoptZeroScrollLeadWithoutResettingOtherTuning() {
+        val saved = InkLabSnapshot(schema = 2, scrollLeadMs = 500,
+            glintGlowRadius = 8f, paperInkPooling = .4f, fadeLeadMs = 650)
+        val migrated = InkLabSnapshot.decode(InkLabSnapshot.encode(saved))!!
+        assertEquals(saved.copy(schema = InkLabSnapshot.SCHEMA, scrollLeadMs = 0), migrated)
+        // The migration runs once; subsequent scroll-lead auditions still persist.
+        val retuned = migrated.copy(scrollLeadMs = 444)
+        assertEquals(retuned, InkLabSnapshot.decode(InkLabSnapshot.encode(retuned)))
     }
 
     @Test

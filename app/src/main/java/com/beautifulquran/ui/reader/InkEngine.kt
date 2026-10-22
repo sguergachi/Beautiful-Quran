@@ -371,7 +371,7 @@ object InkEngine {
     /** Shipped defaults for highlight sync (lab knobs start here). */
     const val DEFAULT_HIGHLIGHT_LEAD_MS = 0
     const val DEFAULT_FADE_LEAD_MS = 500
-    const val DEFAULT_SCROLL_LEAD_MS = 500
+    const val DEFAULT_SCROLL_LEAD_MS = 0
 
     /**
      * Attach [store] and restore any saved lab numbers. Call once from
