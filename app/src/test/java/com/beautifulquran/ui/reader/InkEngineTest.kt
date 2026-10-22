@@ -335,7 +335,9 @@ class InkEngineTest {
     fun `basmalah preface ink follows active and recess`() {
         assertEquals(State.Plain, InkEngine.prefaceState(isActive = false, dimmed = false))
         assertEquals(State.Active, InkEngine.prefaceState(isActive = true, dimmed = false))
-        assertEquals(State.Active, InkEngine.prefaceState(isActive = true, dimmed = true))
+        // The stream wait lets the preface waive its license to full ink: the
+        // whole page — calligraphy included — waits under Upcoming paper.
+        assertEquals(State.Upcoming, InkEngine.prefaceState(isActive = true, dimmed = true))
         assertEquals(State.Upcoming, InkEngine.prefaceState(isActive = false, dimmed = true))
     }
 

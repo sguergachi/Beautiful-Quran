@@ -15,7 +15,7 @@ export function Button({ variant = "default", size = "md", className = "", activ
   return (
     <button
       {...rest}
-      className={`inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-md border transition-colors disabled:pointer-events-none disabled:opacity-40 ${sz} ${VARIANT[variant]} ${active ? "!border-gold/60 !text-gold" : ""} ${className}`}
+      className={`press inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-md border disabled:pointer-events-none disabled:opacity-40 ${sz} ${VARIANT[variant]} ${active ? "!border-gold/60 !text-gold" : ""} ${className}`}
     />
   );
 }
@@ -24,8 +24,8 @@ export function Segmented<T extends string>({ value, options, onChange, size = "
   return (
     <div className="inline-flex max-w-full flex-wrap rounded-md border border-line bg-panel p-0.5">
       {options.map(([v, label]) => (
-        <button key={v} onClick={() => onChange(v)}
-          className={`${size === "sm" ? "h-6 px-2 text-xs" : "h-7 px-2.5"} rounded-[5px] transition-colors ${v === value ? "bg-raised text-ink shadow-sm" : "text-mute hover:text-ink"}`}>
+        <button key={v} aria-pressed={v === value} onClick={() => onChange(v)}
+          className={`press ${size === "sm" ? "h-6 px-2 text-xs" : "h-7 px-2.5"} rounded-[5px] ${v === value ? "bg-raised text-ink shadow-sm" : "text-mute hover:text-ink"}`}>
           {label}
         </button>
       ))}
@@ -53,13 +53,57 @@ export function Select({ value, options, onChange, disabled }: { value: string |
 }
 
 // Commits on Enter / blur, so typing "1.5" does not save "1." on the way.
-export function TextInput({ value, onCommit, className = "", ...rest }: { value: string | number; onCommit: (v: string) => void; className?: string; placeholder?: string; type?: string; step?: number; min?: number; max?: number }) {
+// Number fields scrub: drag sideways to change the value (Shift ×10,
+// Alt ×0.1), a plain click types. A full range takes about 400 px; a step
+// never takes less than 2 px. `onScrub` follows the drag live (one undo step
+// is the caller's business, closed by `onScrubEnd`); without it the value
+// commits on release.
+function scrubber(input: HTMLInputElement, e: React.PointerEvent, start: number, o: { step?: number; min?: number; max?: number },
+  show: (v: number) => void, done: (v: number | null) => void) {
+  const step = o.step || 1, range = Number.isFinite(o.min) && Number.isFinite(o.max) ? o.max! - o.min! : 0;
+  const unit = Math.max(step, range / 400) / 2, decimals = (String(step).split(".")[1] || "").length;
+  const x0 = e.clientX;
+  let moved = false, v = start;
+  input.setPointerCapture(e.pointerId);
+  const move = (m: PointerEvent) => {
+    const dx = m.clientX - x0;
+    if (!moved && Math.abs(dx) < 3) return;
+    if (!moved) { moved = true; document.body.classList.add("cur-ew"); }
+    const k = m.shiftKey ? 10 : m.altKey ? 0.1 : 1;
+    let next = start + Math.round((dx * unit * k) / step) * step;
+    if (Number.isFinite(o.min)) next = Math.max(o.min!, next);
+    if (Number.isFinite(o.max)) next = Math.min(o.max!, next);
+    next = +next.toFixed(Math.min(6, decimals + (m.altKey ? 1 : 0)));
+    if (next !== v) { v = next; show(v); }
+  };
+  const up = () => {
+    input.removeEventListener("pointermove", move); input.removeEventListener("pointerup", up); input.removeEventListener("pointercancel", up);
+    document.body.classList.remove("cur-ew");
+    done(moved ? v : null);
+  };
+  input.addEventListener("pointermove", move); input.addEventListener("pointerup", up); input.addEventListener("pointercancel", up);
+}
+
+export function TextInput({ value, onCommit, onScrub, onScrubEnd, className = "", ...rest }: {
+  value: string | number; onCommit: (v: string) => void; onScrub?: (v: number) => void; onScrubEnd?: () => void;
+  className?: string; placeholder?: string; type?: string; step?: number; min?: number; max?: number;
+}) {
   const [draft, setDraft] = useState(String(value));
   const focused = useRef(false);
   const cancelled = useRef(false);
   useEffect(() => { if (!focused.current) setDraft(String(value)); }, [value]);
+  const numeric = rest.type === "number";
   return (
-    <input {...rest} className={`${inputCls} ${className}`} value={draft}
+    <input {...rest} className={`${inputCls} ${numeric ? "cursor-ew-resize focus:cursor-text" : ""} ${className}`} value={draft}
+      onPointerDown={numeric ? (e) => {
+        const input = e.currentTarget, start = Number(draft);
+        if (focused.current || e.button !== 0 || !Number.isFinite(start)) return;
+        e.preventDefault();                       // no focus or selection while it may become a drag
+        scrubber(input, e, start, rest, (v) => { setDraft(String(v)); onScrub?.(v); }, (v) => {
+          if (v == null) { input.focus(); input.select(); return; }
+          if (onScrub) onScrubEnd?.(); else onCommit(String(v));
+        });
+      } : undefined}
       onFocus={() => { focused.current = true; cancelled.current = false; }}
       onChange={(e) => setDraft(e.target.value)}
       onBlur={() => {
@@ -67,7 +111,7 @@ export function TextInput({ value, onCommit, className = "", ...rest }: { value:
         if (cancelled.current || (rest.type === "number" && (!draft.trim() || !Number.isFinite(Number(draft))))) setDraft(String(value));
         else if (draft !== String(value)) onCommit(draft);
       }}
-      onKeyDown={(e) => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); if (e.key === "Escape") { cancelled.current = true; (e.target as HTMLInputElement).blur(); } }} />
+      onKeyDown={(e) => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); if (e.key === "Escape") { e.stopPropagation(); cancelled.current = true; (e.target as HTMLInputElement).blur(); } }} />
   );
 }
 
@@ -79,7 +123,7 @@ export function Slider({ label, value, min, max, step, onChange, onDone, digits 
       <input type="range" aria-label={label} className="h-4 w-0 min-w-0 flex-1" min={min} max={max} step={step} value={value}
         onChange={(e) => onChange(+e.target.value)} onPointerUp={onDone} onKeyUp={onDone} />
       <TextInput type="number" aria-label={`${label} value`} className="num !h-7 !w-[68px] shrink-0 !px-1.5 text-right" step={step} min={min} max={max}
-        value={+value.toFixed(digits)} onCommit={(v) => { const n = parseFloat(v); if (Number.isFinite(n)) { onChange(n); onDone?.(); } }} />
+        value={+value.toFixed(digits)} onScrub={onChange} onScrubEnd={onDone} onCommit={(v) => { const n = parseFloat(v); if (Number.isFinite(n)) { onChange(n); onDone?.(); } }} />
     </div>
   );
 }
@@ -88,7 +132,7 @@ export function Progress({ value, tone = "gold", indeterminate }: { value: numbe
   const color = { gold: "bg-gold", green: "bg-green", danger: "bg-danger", blue: "bg-blue" }[tone];
   return (
     <div className="h-1.5 overflow-hidden rounded-full bg-line">
-      <div className={`h-full rounded-full ${color} ${indeterminate ? "animate-pulse-soft w-full" : "transition-[width] duration-300"}`} style={indeterminate ? undefined : { width: `${Math.round(value * 100)}%` }} />
+      <div className={`h-full w-full origin-left rounded-full ${color} ${indeterminate ? "animate-pulse-soft" : "transition-transform duration-500 ease-linear"}`} style={indeterminate ? undefined : { transform: `scaleX(${Math.max(0, Math.min(1, value))})` }} />
     </div>
   );
 }

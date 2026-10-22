@@ -62,7 +62,7 @@ import { ReaderFocusController } from './focus/ReaderFocusController'
 import { selectedPlaybackAyah } from './selectedPlaybackAyah'
 import { shouldPauseFollowOnDrag } from './followGesture'
 import { isRecitingSession } from './recitingActive'
-import { readerAyahInkPolicyActive, readerInkAyah } from './ReaderHighlightState'
+import { STREAM_WAIT_RELEASE_HOLD_MS, readerAyahInkPolicyActive, readerInkAyah } from './ReaderHighlightState'
 import {
   AYAH_SPACER_EST_PX,
   useProgressiveAyahWindow,
@@ -340,6 +340,23 @@ export function ReaderScreen({
     isBuffering: state.player.isBuffering,
   })
   const receded = recitingActive
+  // Waiting on the stream download: while the spinner holds, the whole page
+  // — the recited tail and the opening basmalah included — waits under
+  // Upcoming paper (same rule as Android). The wait is the buffering itself,
+  // with no spoken-word gate: the moment it begins the page fades as one
+  // synchronized action; see STREAM_WAIT_RELEASE_HOLD_MS for the wake hold.
+  const [streamWait, setStreamWait] = useState(false)
+  useEffect(() => {
+    if (state.player.isBuffering) {
+      setStreamWait(true)
+      return
+    }
+    const settle = window.setTimeout(
+      () => setStreamWait(false),
+      STREAM_WAIT_RELEASE_HOLD_MS,
+    )
+    return () => window.clearTimeout(settle)
+  }, [state.player.isBuffering])
   // This sheet is keyed by chapter, so the ref starts false at every opening.
   const recitedSinceOpen = useRef(false)
 
@@ -1392,6 +1409,7 @@ export function ReaderScreen({
               className="scroll"
               ref={scrollRef}
               data-reciting={recitingActive || undefined}
+              data-stream-wait={streamWait || undefined}
               data-search-flash={flashTarget != null || undefined}
               data-search-focus-active={flashTarget?.focusActive || undefined}
               data-chapter-advancing={chapterAdvancing || undefined}

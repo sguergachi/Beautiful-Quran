@@ -15,6 +15,7 @@ export interface Scene {
   spec: Spec; geo: Geo; plate: Plate | null; S: State; themeBg: string;
   screen: HTMLVideoElement; plateVideo: HTMLVideoElement; frame: HTMLImageElement;
   nativePhone?: boolean;
+  recording?: boolean;
 }
 
 export class Preview {
@@ -107,6 +108,7 @@ export class Preview {
     if (b) { ctx.globalAlpha = Math.min(1, Math.abs(b)); ctx.fillStyle = b > 0 ? "#fff" : "#000"; ctx.fillRect(0, 0, W, H); ctx.globalAlpha = 1; }
     const vg = +spec.background.vignette;
     if (vg > 0) ctx.drawImage(this.vignette(Math.max(1, Math.round(cw / 2)), Math.max(1, Math.round(ch / 2)), vg), 0, 0, W, H);
+    if (sc.recording === false) return;
     const m = phoneMatrix(spec, geo, S);
     const shd = +spec.phone.shadow;
     if (shd > 0) {

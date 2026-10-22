@@ -32,8 +32,8 @@ export function nextVerseRange(range: VerseRange | null, action: VerseAction, co
  * explicitly choosing start/stop makes one continuous range. Keys keep their
  * video-time positions, matching the editor's existing trim contract.
  */
-export function applyVersePlan(raw: RawSpec, spec: Spec, plan: VersePlan, action?: VerseAction): void {
-  let pieces: Piece[] = spec.edit.map((p) => ({ in: r3(p.in + plan.shift), out: r3(p.out + plan.shift) }));
+export function applyVersePlan(raw: RawSpec, spec: Spec, plan: VersePlan, action?: VerseAction, take = false): void {
+  let pieces: Piece[] = spec.edit.map((p) => ({ ...p, in: r3(p.in + plan.shift), out: r3(p.out + plan.shift) }));
   if (!action) pieces = [{ in: plan.in, out: plan.out }];
   else if (action === "add-start") pieces[0].in = plan.in;
   else if (action === "add-end") pieces.at(-1)!.out = plan.out;
@@ -46,5 +46,5 @@ export function applyVersePlan(raw: RawSpec, spec: Spec, plan: VersePlan, action
   }
   if (!pieces.length || pieces.some((p) => p.out - p.in <= 0.001)) throw new Error("Keep at least one verse in the edit.");
   raw.edit = pieces;
-  raw.app = { ...spec.app, ...raw.app, ayah: plan.anchor, seconds: Math.max(spec.app.seconds, plan.seconds) };
+  raw.app = { ...spec.app, ...raw.app, ayah: plan.anchor, seconds: take ? plan.seconds : Math.max(spec.app.seconds, plan.seconds) };
 }

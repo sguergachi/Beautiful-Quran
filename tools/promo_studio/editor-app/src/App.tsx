@@ -11,7 +11,7 @@ import { clamp, videoTimes } from "./lib/model.ts";
 import { landmarks } from "./lib/edit.ts";
 import { clock } from "./state/clock.ts";
 import {
-  copy, deleteSelection, init, keyCamera, nudge, openPanel, paste, redo, save, select, selectAll, selKeys, setUI, split,
+  copy, deleteSelection, init, keyCamera, nudge, openPanel, paste, redo, revealInspector, save, select, selectAll, selKeys, setUI, split,
   undo, useStore,
 } from "./state/store.ts";
 
@@ -37,17 +37,19 @@ function Divider({ axis, onDrag, onReset, className = "" }: { axis: "x" | "y"; o
 function useShortcuts() {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
+      if (e.defaultPrevented) return;
       const s = useStore.getState();
-      if (e.key === "Escape") { if (s.panel) return openPanel(null); select(null); return; }
+      if (e.key === "Escape") { if (s.panel) { e.preventDefault(); return openPanel(null); } select(null); return; }
       // text fields keep their keys; sliders and dropdowns don't, so Ctrl+Z still undoes after a drag
       const t = e.target as HTMLElement;
+      if (s.panel || t.closest('[data-project-form], [role="menu"]')) return;
       const typing = t.closest("textarea, [contenteditable=true], input:not([type=range]):not([type=checkbox]):not([type=radio])");
       const mod = e.ctrlKey || e.metaKey, key = e.key.toLowerCase();
       if (typing || (t.closest("select, input") && !mod)) return;
       if (mod && key === "s") { e.preventDefault(); save(); return; }
       if (mod && key === "e") { e.preventDefault(); openPanel("export"); return; }
       if (mod && key === "b") { e.preventDefault(); setUI({ hideL: !s.ui.hideL }); return; }
-      if (mod && key === ".") { e.preventDefault(); setUI({ hideR: !s.ui.hideR }); return; }
+      if (mod && key === ".") { e.preventDefault(); s.ui.hideR ? revealInspector() : setUI({ hideR: true }); return; }
       if (!s.spec) return;
       if (mod && key === "z") { e.preventDefault(); e.shiftKey ? redo() : undo(); return; }
       if (mod && key === "y") { e.preventDefault(); redo(); return; }
@@ -55,6 +57,7 @@ function useShortcuts() {
       if (mod && key === "c") { if (selKeys().length) { e.preventDefault(); copy(); } return; }
       if (mod && key === "v") { if (s.clipboard) { e.preventDefault(); paste(); } return; }
       if (mod || e.altKey) return;
+      if (e.key === " " && t.closest("button, a, summary")) return;
       const step = (sec: number) => { e.preventDefault(); clock.pause(); clock.seek(clock.t + sec); };
       const fps = s.spec.fps || 60;
       switch (e.key) {
@@ -111,7 +114,7 @@ export function App() {
   }, []);
   const overlay = size.w <= 1000;
   useEffect(() => {
-    if (overlay && !ui.hideL && !ui.hideR) setUI({ hideL: true });
+    if (overlay && !ui.hideL && !ui.hideR) setUI(document.activeElement?.closest('aside[aria-label="Videos"]') ? { hideR: true } : { hideL: true });
   }, [overlay, ui.hideL, ui.hideR]);
   if (fatal) {
     return (
@@ -128,28 +131,30 @@ export function App() {
   const w0 = { left: leftW, right: rightW, tl: tlH };
   return (
     <div className="flex h-full flex-col">
-      <TopBar />
-      <div ref={workspace} className="relative flex min-h-0 min-w-0 flex-1">
-        {overlay && (!ui.hideL || !ui.hideR) && <button aria-label="Close side pane" className="absolute inset-0 z-30 bg-black/40" onClick={() => setUI({ hideL: true, hideR: true })} />}
-        {!ui.hideL && (
-          <>
-            <aside aria-label="Videos" style={{ width: leftW }} className={`min-h-0 min-w-0 shrink-0 ${overlay ? "absolute inset-y-0 left-0 z-30 border-r border-line shadow-xl" : ""}`}><VideoList /></aside>
-            {!overlay && <Divider axis="x" onReset={() => setUI({ leftW: 248 })}
-              onDrag={(d) => { const w = w0.left + d; if (w < 140) setUI({ hideL: true, leftW: 248 }); else setUI({ leftW: Math.round(clamp(w, 190, 460)) }); }} />}
-          </>
-        )}
-        <main className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
-          <Stage />
-          <Divider axis="y" onReset={() => setUI({ tlH: 260 })} onDrag={(d) => setUI({ tlH: Math.round(clamp(w0.tl - d, 120, innerHeight * 0.72)) })} />
-          <div style={{ height: tlH }} className="min-h-0 shrink-0"><Timeline /></div>
-        </main>
-        {!ui.hideR && (
-          <>
-            {!overlay && <Divider axis="x" onReset={() => setUI({ rightW: 340 })}
-              onDrag={(d) => { const w = w0.right - d; if (w < 200) setUI({ hideR: true, rightW: 340 }); else setUI({ rightW: Math.round(clamp(w, 280, 560)) }); }} />}
-            <aside aria-label="Inspector" style={{ width: rightW }} className={`min-h-0 min-w-0 shrink-0 ${overlay ? "absolute inset-y-0 right-0 z-30 border-l border-line shadow-xl" : ""}`}><Inspector /></aside>
-          </>
-        )}
+      <div id="editor-workspace" inert={!!panel} className="flex min-h-0 flex-1 flex-col">
+        <TopBar />
+        <div ref={workspace} className="relative flex min-h-0 min-w-0 flex-1">
+          {overlay && (!ui.hideL || !ui.hideR) && <button aria-label="Close side pane" className="absolute inset-0 z-30 bg-black/40" onClick={() => setUI({ hideL: true, hideR: true })} />}
+          {!ui.hideL && (
+            <>
+              <aside aria-label="Videos" style={{ width: leftW }} className={`min-h-0 min-w-0 shrink-0 ${overlay ? "absolute inset-y-0 left-0 z-30 border-r border-line shadow-xl" : ""}`}><VideoList /></aside>
+              {!overlay && <Divider axis="x" onReset={() => setUI({ leftW: 248 })}
+                onDrag={(d) => { const w = w0.left + d; if (w < 140) setUI({ hideL: true, leftW: 248 }); else setUI({ leftW: Math.round(clamp(w, 190, 460)) }); }} />}
+            </>
+          )}
+          <main className="isolate flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
+            <Stage />
+            <Divider axis="y" onReset={() => setUI({ tlH: 260 })} onDrag={(d) => setUI({ tlH: Math.round(clamp(w0.tl - d, 120, innerHeight * 0.72)) })} />
+            <div style={{ height: tlH }} className="min-h-0 shrink-0"><Timeline /></div>
+          </main>
+          {!ui.hideR && (
+            <>
+              {!overlay && <Divider axis="x" onReset={() => setUI({ rightW: 340 })}
+                onDrag={(d) => { const w = w0.right - d; if (w < 200) setUI({ hideR: true, rightW: 340 }); else setUI({ rightW: Math.round(clamp(w, 280, 560)) }); }} />}
+              <aside aria-label="Inspector" style={{ width: rightW }} className={`min-h-0 min-w-0 shrink-0 ${overlay ? "absolute inset-y-0 right-0 z-30 border-l border-line shadow-xl" : ""}`}><Inspector /></aside>
+            </>
+          )}
+        </div>
       </div>
       {panel === "emulators" && <EmulatorsPanel />}
       {panel === "jobs" && <JobsPanel />}

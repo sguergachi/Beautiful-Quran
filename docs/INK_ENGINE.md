@@ -401,10 +401,24 @@ tween-vs-snap rules, sweep entry and residual rules, repeat wash timing, the
   The base/repeat wash position is never part of this modulation.
   [GLIMMER.md](GLIMMER.md) is the canonical cross-platform rendering,
   tuning, and visual-verification specification.
+- **Stream wait**: while the spinner is up, the whole page — the recited tail,
+  the due verse and the opening basmalah included — waits under Upcoming paper
+  (`ReaderScreen.kt` holds `STREAM_WAIT_RELEASE_HOLD_MS`). The *wait is the
+  buffering itself*, not a question of whether anything has been spoken
+  (user rule): the recited tail from before a pause or an earlier seek stays
+  lit only while playback goes on — the moment the download holds the voice,
+  it goes under the paper like the rest. Mid-recitation stalls and
+  item-boundary joins dim the lit words exactly as a fresh play does. The
+  fade is one synchronized action the moment buffering begins (no engage
+  delay), and releases only after `STREAM_WAIT_RELEASE_HOLD_MS` of a carried
+  voice, so a starving stream's brief ready windows cannot strobe the page
+  between download bursts.
+  Web parity: `data-stream-wait` CSS covers in `styles.css`.
 - **Basmalah preface**: `prefaceState(isActive, dimmed)` /
   `prefaceWashProgress(positionMs, durationMs, segments)` for the surah-header
   basmalah VectorDrawable (Active during the Al-Fatihah 1:1 lead-in clip, with
-  an RTL `letterFadeIn` wash; Upcoming while recessed; Plain at rest). With the
+  an RTL `letterFadeIn` wash; Upcoming while recessed; Plain at rest; `dimmed`
+  beats `isActive` so the stream wait covers the preface too). With the
   clip's word `segments` the wash is locked to the voice by
   [`BasmalahWash`](../app/src/main/java/com/beautifulquran/domain/BasmalahWash.kt):
   each of the four words owns the **band of artwork its glyphs cover** (the
@@ -439,7 +453,7 @@ tween-vs-snap rules, sweep entry and residual rules, repeat wash timing, the
   snapshot-backed (`mutableStateOf`), so release builds read constants while
   the Ink Lab can retune a live session.
 - **Sync knobs, deliberately outside `Tuning`**: `highlightLeadMs` (default 0),
-  `fadeLeadMs` (default 500), `scrollLeadMs` (default 400 — the camera's own
+  `fadeLeadMs` (default 500), `scrollLeadMs` (default 500 — the camera's own
   lead, deliberately separate from the ink's; see `FocusEngine.playbackFocusTarget`)
   and `outputLatencyOverrideMs` (null = use Media3’s presentation clock;
   a manual value adds wall-time delay, scaled to media time by playback speed). These move *when* things fire rather than how the ink feels, so they

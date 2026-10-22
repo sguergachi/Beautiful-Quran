@@ -24,7 +24,7 @@ export function resolve(raw: RawSpec, meta: Pick<Meta, "defaults" | "themes">): 
   const tracks: Record<string, Key[]> = {};
   for (const [k, v] of Object.entries(s.tracks || {})) if (v && v.length) tracks[k] = [...v].sort((a, b) => a.t - b.t);
   s.tracks = tracks;
-  s.duration = Math.round(s.edit.reduce((a, p) => a + (p.out - p.in), 0) * 1e6) / 1e6;
+  s.duration = Math.round(s.edit.reduce((a, p) => a + (p.gap || 0) + (p.out - p.in), 0) * 1e6) / 1e6;
   return s;
 }
 
@@ -65,12 +65,14 @@ export function stateAt(s: Spec, props: Record<string, PropDef>, t: number): Sta
   return o;
 }
 
-// Video time -> [take time, piece index], through the edit.
+// Video time -> [take time, piece index]; index -1 is a silent picture gap.
 export function sourceTime(s: Spec, t: number): [number, number] {
   t = Math.max(0, t);
   let acc = 0;
   for (let i = 0; i < s.edit.length; i++) {
     const p = s.edit[i], n = p.out - p.in;
+    acc += p.gap || 0;
+    if (t < acc) return [0, -1];
     if (t < acc + n) return [p.in + (t - acc), i];
     acc += n;
   }
@@ -80,8 +82,8 @@ export function sourceTime(s: Spec, t: number): [number, number] {
 
 export function pieceStart(s: Spec, i: number): number {
   let acc = 0;
-  for (let j = 0; j < i; j++) acc += s.edit[j].out - s.edit[j].in;
-  return acc;
+  for (let j = 0; j < i; j++) acc += (s.edit[j].gap || 0) + s.edit[j].out - s.edit[j].in;
+  return acc + (s.edit[i]?.gap || 0);
 }
 
 // A take span -> the video spans it appears in (a span can be cut or repeated).
@@ -89,6 +91,7 @@ export function videoTimes(s: Spec, a0: number, a1: number): [number, number][] 
   const out: [number, number][] = [];
   let acc = 0;
   for (const p of s.edit) {
+    acc += p.gap || 0;
     const a = Math.max(p.in, a0), b = Math.min(p.out, a1);
     if (b > a) out.push([acc + a - p.in, acc + b - p.in]);
     acc += p.out - p.in;
@@ -102,6 +105,7 @@ export function soundOnset(s: Spec, lead: number): number {
   if (s.app?.intro?.play === false) return 0;
   let acc = 0;
   for (const p of s.edit) {
+    acc += p.gap || 0;
     if (p.out > lead) return acc + Math.max(0, lead - p.in);
     acc += p.out - p.in;
   }
@@ -118,15 +122,15 @@ export function fadeAt(s: Spec, t: number, onset: number): number {
 }
 
 // Linear gain the preview applies: the spec's gain and its fades.
-export const soundGain = (s: Spec, t: number, onset: number) => 10 ** ((s.audio.gain_db || 0) / 20) * fadeAt(s, t, onset);
+export const soundGain = (s: Spec, t: number, onset: number) => sourceTime(s, t)[1] < 0 ? 0 : 10 ** ((s.audio.gain_db || 0) / 20) * fadeAt(s, t, onset);
 
 export const takeKey = (s: Spec) => [s.app.reciter, s.app.surah, s.app.ayah, s.app.theme, s.app.layout, s.app.view, s.app.text_size,
-  s.app.repeat, s.app.repeat === "range" ? s.app.repeat_to : null, JSON.stringify(s.app.intro)].join("|");
+  s.app.repeat, s.app.repeat === "range" ? s.app.repeat_to : null, JSON.stringify(s.app.intro), s.app.capture ?? "1080p"].join("|");
 
 // Everything baked into the background plate: a change means a new plate.
 export function plateLook(s: Spec): string {
   const blurs = [+s.props.bg_blur, ...(s.tracks.bg_blur || []).map((k) => +k.v)];
-  return JSON.stringify([s.background, s.aspect, Math.max(2, Math.min(...blurs))]);
+  return JSON.stringify([s.background, s.aspect, Math.max(0, Math.min(...blurs))]);
 }
 
 export function fmtTime(t: number): string {

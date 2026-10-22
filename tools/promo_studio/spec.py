@@ -7,9 +7,10 @@ keyframes in `tracks` those drive it instead. Missing keys take the defaults
 below, so a spec only says what makes it different.
 
     "edit":   [{"in": 0.0, "out": 12.4}, {"in": 15.0, "out": 21.0}]
-              pieces of the take, played back to back (take seconds; the
+              pieces of the take, with optional silent `gap` seconds before
+              each piece (take seconds; the
               take opens 1 s before the recitation). The video's length is
-              their sum.
+              their sum, including gaps.
     "tracks": {"zoom": [{"t": 0, "v": 2.2}, {"t": 2.5, "v": 1, "ease": "inOutCubic"}]}
               t: video seconds; v: value; ease: how the move INTO this key
               is paced ("hold" = cut).
@@ -53,7 +54,7 @@ PROPS = {
     "phone_y":       {"group": "Phone", "label": "Phone Y", "min": -0.8, "max": 0.8, "step": 0.001, "default": 0.0},
     "phone_scale":   {"group": "Phone", "label": "Phone scale", "min": 0.2, "max": 3, "step": 0.01, "default": 1.0, "log": True},
     "phone_tilt":    {"group": "Phone", "label": "Phone tilt °", "min": -45, "max": 45, "step": 0.1, "default": 0.0},
-    "bg_blur":       {"group": "Background", "label": "Blur", "min": 4, "max": 90, "step": 0.5, "default": 36.0},
+    "bg_blur":       {"group": "Background", "label": "Blur", "min": 0, "max": 90, "step": 0.5, "default": 36.0},
     "bg_brightness": {"group": "Background", "label": "Brightness", "min": -0.6, "max": 0.4, "step": 0.005, "default": 0.0},
 }
 
@@ -69,7 +70,9 @@ INTRO = {
     "roots": 0.0,       # s showing the root viewer for the verse's first word
     "repeat": False,    # choose app.repeat on camera (otherwise it is set before recording)
     "dwell": 1.0,       # s of still page before the recitation, at least
+    "goto": "scroll",   # reaching the verse inside the reader: scroll to it, the ayah rail, or a jump (Home + link)
 }
+GOTO = ("scroll", "rail", "jump")
 OPEN_BY = ("tap", "search")
 REPEATS = ("off", "ayah", "range")   # the app's verse repeat: this ayah, or ayah..repeat_to
 STEP_KINDS = ("cover", "home", "open", "header", "settings", "roots", "repeat", "wait")
@@ -109,6 +112,7 @@ DEFAULTS = {
         "view": "Both",
         "text_size": "default",  # default | max
         "seconds": 30,           # seconds of recitation to record
+        "capture": "1080p",     # 1080p | 2k; identity includes non-default resolution
         "repeat": "off",         # REPEATS
         "repeat_to": None,       # last ayah of a repeated range
         "intro": INTRO,
@@ -213,7 +217,7 @@ def resolve(raw):
 
 
 def duration(s):
-    return round(sum(float(p["out"]) - float(p["in"]) for p in s["edit"]), 6)
+    return round(sum(float(p.get("gap", 0)) + float(p["out"]) - float(p["in"]) for p in s["edit"]), 6)
 
 
 def take_needed(s):
@@ -239,11 +243,13 @@ def validate(s):
     number(a["ayah"], "app.ayah", 1, 286)
     if int(a["surah"]) != a["surah"] or int(a["ayah"]) != a["ayah"]: errs.append("chapter and ayah must be integers")
     number(a["seconds"], "app.seconds", 1)
+    if a["capture"] not in ("1080p", "2k"): errs.append("app.capture must be 1080p or 2k")
     it = a["intro"]
     if not isinstance(it, dict): raise ValueError("app.intro must be an object")
     for name in ("cover", "home", "settings", "roots", "dwell"):
         number(it[name], f"app.intro.{name}", 0, 30)
     if it["open_by"] not in OPEN_BY: errs.append(f"app.intro.open_by must be one of {OPEN_BY}")
+    if it["goto"] not in GOTO: errs.append(f"app.intro.goto must be one of {GOTO}")
     for name in ("header", "repeat", "play"):
         if not isinstance(it[name], bool): errs.append(f"app.intro.{name} must be true or false")
     if set(it) - set(INTRO): errs.append(f"unknown app.intro fields: {sorted(set(it) - set(INTRO))}")
@@ -287,6 +293,7 @@ def validate(s):
     if not (1 <= int(a["surah"]) <= 114): errs.append("app.surah must be 1..114")
     if s["aspect"] not in ASPECTS: errs.append(f"aspect must be one of {sorted(ASPECTS)}")
     for p in s["edit"]:
+        number(p.get("gap", 0), "edit.gap", 0)
         number(p["in"], "edit.in", 0)
         number(p["out"], "edit.out", 0)
         if p["out"] - p["in"] <= 1e-3: errs.append(f"empty or reversed edit piece {p}")
@@ -316,7 +323,8 @@ def take_script(s):
     canonical = [{"kind": x["kind"], "seconds": round(float(x["seconds"]), 3),
                   **({"via": x.get("via", "direct")} if x["kind"] == "open" else {}),
                   **({"word": x.get("word", 1)} if x["kind"] == "roots" else {})} for x in steps]
-    intro = {"steps": canonical, "dwell": round(float(a["intro"]["dwell"]), 3), "play": a["intro"]["play"]}
+    intro = {"steps": canonical, "dwell": round(float(a["intro"]["dwell"]), 3), "play": a["intro"]["play"],
+             **({"goto": a["intro"]["goto"]} if a["intro"]["goto"] != "scroll" else {})}
     script = {"intro": intro, "repeat": a["repeat"], "repeat_to": int(a["repeat_to"]) if a["repeat"] == "range" else None}
     return None if not steps and intro["dwell"] == 1 and intro["play"] and a["repeat"] == "off" else script
 
@@ -328,6 +336,8 @@ def take_key(s):
     script = take_script(s)
     if script:
         k += "-" + digest(script)[:8]
+    if a.get("capture", "1080p") == "2k":
+        k += "-2k"
     return k.replace(" ", "_").lower()
 
 

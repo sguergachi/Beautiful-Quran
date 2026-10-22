@@ -85,9 +85,21 @@ def editor_timeline(s):
 EXPORT_EXT = "|".join(sorted({f["ext"] for f in formats.FORMATS.values()}))
 
 
+def export_pattern(name):
+    return re.compile(rf"{re.escape(name)}(-\d+p)?(-\d+fps)?\.({EXPORT_EXT})")
+
+
+def export_revision(st):
+    return f"{st.st_ino}:{st.st_mtime_ns}:{st.st_size}"
+
+
+class ExportConflict(ValueError):
+    """A displayed export changed, or an active render still owns its path."""
+
+
 def exports(name):
     """A video's exported files (formats.filename), newest first."""
-    pat = re.compile(rf"{re.escape(name)}(-\d+p)?(-\d+fps)?\.({EXPORT_EXT})")
+    pat = export_pattern(name)
     try:
         files = [f for f in os.listdir(S.OUT) if pat.fullmatch(f)]
     except FileNotFoundError:
@@ -98,7 +110,8 @@ def exports(name):
             st = os.stat(os.path.join(S.OUT, f))
         except FileNotFoundError:
             continue
-        out.append({"file": f, "bytes": st.st_size, "mtime": st.st_mtime})
+        if not os.path.isfile(os.path.join(S.OUT, f)): continue
+        out.append({"file": f, "bytes": st.st_size, "mtime": st.st_mtime, "revision": export_revision(st)})
     return sorted(out, key=lambda e: -e["mtime"])
 
 
@@ -151,7 +164,7 @@ def geometry(s):
     W, H = S.size(s)
     meta = take_meta(s)
     sw, sh = (meta["width"], meta["height"]) if meta else (1080, 2400)
-    fp, mp, g = phone_mod.ensure(os.path.join(S.CACHE, "phone"), sw, sh, s["phone"]["color"])
+    fp, mp, g = phone_mod.ensure(os.path.join(S.CACHE, "phone"), sw, sh, s["phone"]["color"], (meta or {}).get('display'))
     from compose import plate_settings
     pw, ph, pk = library.plate_geometry(plate_settings(s), W, H)
     key = S.take_key(s)
@@ -212,6 +225,8 @@ class Jobs:
 
     def public(self, j, full=False):
         d = {k: v for k, v in j.items() if not k.startswith("_")}
+        if j["kind"] == "render" and j["state"] == "done" and isinstance(j.get("result"), str):
+            d["export_exists"] = os.path.isfile(j["result"])
         if not full:
             d["log"] = d["log"][-6:]
         return d
@@ -224,7 +239,7 @@ class Jobs:
         with self.lock:
             return {j["serial"]: j for j in self.jobs.values() if j.get("serial") and j["state"] in ("queued", "running")}
 
-    def submit(self, kind, name, args, serial=None, title=None, snapshot=None):
+    def submit(self, kind, name, args, serial=None, title=None, snapshot=None, export_file=None):
         with self.lock:
             for j in self.jobs.values():
                 if j["kind"] == kind and j["name"] == name and j["state"] in ("queued", "running"):
@@ -234,6 +249,7 @@ class Jobs:
                  "state": "queued", "stage": None, "stages": [], "progress": 0.0, "msg": "Waiting",
                  "log": [], "created": time.time(), "started": None, "ended": None, "result": None,
                  "error": None, "pid": None, "file": os.path.join(JOB_DIR, jid + ".jsonl")}
+            if export_file is not None: j["export_file"] = export_file
             if snapshot is not None:
                 folder = os.path.join(JOB_DIR, jid)
                 os.makedirs(folder, exist_ok=True)
@@ -246,6 +262,21 @@ class Jobs:
         self._save()
         self._pump()
         return self.public(j)
+
+    def delete_export(self, name, filename, revision):
+        """Delete one listed file, excluding active or replaced versions."""
+        if not export_pattern(name).fullmatch(filename):
+            raise ValueError("This file is not an export of this video")
+        with self.lock:    # a render cannot start between this check and unlink
+            if any(j['kind'] == 'render' and j['state'] in ('queued', 'running') and
+                   (j.get('export_file') == filename if j.get('export_file') else j['name'] == name)
+                   for j in self.jobs.values()):
+                raise ExportConflict("This file is queued or rendering. Wait for the export to finish.")
+            path = os.path.join(S.OUT, filename)
+            st = os.stat(path)
+            if not isinstance(revision, str) or revision != export_revision(st):
+                raise ExportConflict("This export was replaced. Refresh the list before deleting it.")
+            os.unlink(path)
 
     def cancel(self, jid):
         with self.lock:
@@ -540,6 +571,8 @@ class Handler(BaseHTTPRequestHandler):
             fn()
         except FileNotFoundError as e:
             self.send_json({"error": str(e)}, 404)
+        except ExportConflict as e:
+            self.send_json({"error": str(e)}, 409)
         except Exception as e:
             self.send_json({"error": str(e) or e.__class__.__name__}, 400 if isinstance(e, ValueError) else 500)
 
@@ -570,6 +603,12 @@ class Handler(BaseHTTPRequestHandler):
         self.send_json({"ok": True, "status": spec_status(m.group(1))})
 
     def route_delete(self):
+        m = re.fullmatch(r"/api/exports/([\w.-]+)/([\w.-]+)", urllib.parse.unquote(self.path))
+        if m:
+            name, filename = m.groups()
+            spec_path(name)    # apply the same video-name constraints as saving
+            JOBS.delete_export(name, filename, self.body().get('revision'))
+            return self.send_json({"ok": True, "exports": exports(name)})
         m = re.fullmatch(r"/api/spec/([\w.-]+)", self.path)
         if not m:
             return self.send_json({"error": "not found"}, 404)
@@ -592,7 +631,7 @@ class Handler(BaseHTTPRequestHandler):
                 "themes": S.THEMES, "layouts": S.LAYOUTS, "views": S.VIEWS,
                 "aspects": {k: list(v) for k, v in S.ASPECTS.items()}, "eases": S.EASES,
                 "phones": sorted(phone_mod.COLORS), "defaults": S.DEFAULTS, "props": S.PROPS,
-                "backgrounds": {k: {"title": v["title"], "suits": v["suits"], "thumb": f"/media/thumb/{k}.jpg"}
+                "backgrounds": {k: {"title": v["title"], "label": v.get("label", v["title"]), "suits": v["suits"], "thumb": f"/media/thumb/{k}.jpg"}
                                 for k, v in bgs.items()},
                 "surahs": surahs(), "out_dir": S.OUT, "export": formats.meta(), "apk": emus.DEFAULT_APK,
                 "apk_exists": os.path.exists(emus.DEFAULT_APK)})
@@ -682,8 +721,12 @@ class Handler(BaseHTTPRequestHandler):
         if re.fullmatch(r"/api/verse-range/[\w.-]+", p):
             body = self.body()
             s = S.resolve(body.get("raw", {}))
-            meta = take_meta(s)
-            return self.send_json(timeline.plan_range(s, body.get("start"), body.get("end"), meta["lead"] if meta else S.LEAD))
+            contents = body.get("take", False)
+            if not isinstance(contents, bool): raise ValueError("take must be a boolean")
+            target = S.resolve({**s, "app": {**s["app"], "ayah": body.get("start")}}) if contents else s
+            meta = take_meta(target)
+            lead = meta["lead"] if meta else S.opening_estimate(s)
+            return self.send_json(timeline.plan_range(s, body.get("start"), body.get("end"), lead, take=contents))
         m = re.fullmatch(r"/api/plate/([\w.-]+)", p)
         if m:
             # plate for the (possibly unsaved) background settings in the body
@@ -719,11 +762,17 @@ class Handler(BaseHTTPRequestHandler):
         m = re.fullmatch(r"/api/new/([\w.-]+)", p)
         if m:
             dst = spec_path(m.group(1))
-            base = self.body().get("from")
+            body = self.body()
+            base, title = body.get("from"), body.get("title")
+            if title is not None and (not isinstance(title, str) or not title.strip()):
+                raise ValueError("Give the video a title")
             with SPEC_LOCK:
                 if os.path.exists(dst):
                     return self.send_json({"error": f"{m.group(1)} already exists"}, 409)
-                raw = json.load(open(spec_path(base))) if base else {"title": m.group(1).replace("-", " ")}
+                raw = {"title": m.group(1).replace("-", " ")}
+                if base:
+                    with open(spec_path(base)) as source: raw = json.load(source)
+                if title is not None: raw["title"] = title.strip()
                 with open(dst, "x") as f:
                     json.dump(raw, f, indent=2, ensure_ascii=False)
             return self.send_json({"ok": True})
@@ -740,7 +789,8 @@ class Handler(BaseHTTPRequestHandler):
             snapshot = S.load(name)
             o = formats.options(opts)
             return self.send_json(JOBS.submit("render", name, ["render", name, "--options", json.dumps(o)],
-                                              title=f"Export · {formats.describe(snapshot, o)}", snapshot=snapshot))
+                                              title=f"Export · {formats.describe(snapshot, o)}", snapshot=snapshot,
+                                              export_file=formats.filename(snapshot, o)))
         m = re.fullmatch(r"/api/jobs/([\w.-]+)/cancel", p)
         if m:
             return self.send_json(JOBS.cancel(m.group(1)))

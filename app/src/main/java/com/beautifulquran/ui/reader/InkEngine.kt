@@ -371,7 +371,7 @@ object InkEngine {
     /** Shipped defaults for highlight sync (lab knobs start here). */
     const val DEFAULT_HIGHLIGHT_LEAD_MS = 0
     const val DEFAULT_FADE_LEAD_MS = 500
-    const val DEFAULT_SCROLL_LEAD_MS = 400
+    const val DEFAULT_SCROLL_LEAD_MS = 500
 
     /**
      * Attach [store] and restore any saved lab numbers. Call once from
@@ -803,10 +803,14 @@ object InkEngine {
      * Ink for the surah-header basmalah calligraphy (a VectorDrawable, not
      * shaped text): Active while the lead-in clip plays, Upcoming while
      * another ayah is recited (same recess as verse words), Plain at rest.
+     *
+     * [dimmed] wins over [isActive]: while the page waits on the stream
+     * download, the preface waives its license to full ink and waits under
+     * Upcoming paper with everything else — the voice has not spoken yet.
      */
     fun prefaceState(isActive: Boolean, dimmed: Boolean): State = when {
-        isActive -> State.Active
         dimmed -> State.Upcoming
+        isActive -> State.Active
         else -> State.Plain
     }
 

@@ -19,6 +19,8 @@
   --color-danger: #e07a68;
   --color-blue: #8fb3e8;
   --font-display: "Junicode", Georgia, serif;
+  --ease-out-ui: cubic-bezier(0.23, 1, 0.32, 1);     /* entering, pressing: instant response, soft landing */
+  --ease-drawer: cubic-bezier(0.32, 0.72, 0, 1);    /* side sheets */
   --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
 }
 
@@ -105,5 +107,33 @@
 
 @keyframes pulse-soft { 50% { opacity: 0.45; } }
 .animate-pulse-soft { animation: pulse-soft 1.6s ease-in-out infinite; }
-@keyframes toast-in { from { transform: translateY(8px); opacity: 0; } }
-.animate-toast { animation: toast-in 160ms ease-out; }
+
+/* Motion. A crisp tool used all day: surfaces opened with the pointer arrive
+   quickly from where they came from; opened from the keyboard they simply
+   appear (html[data-input=key], set in main.tsx). Exits are instant.
+   Only transform and opacity move. */
+.press { transition: color 150ms ease, background-color 150ms ease, border-color 150ms ease, filter 150ms ease, transform 150ms var(--ease-out-ui); }
+.press:active:not(:disabled) { transform: scale(0.97); }
+.animate-toast {
+  transition: transform 220ms var(--ease-out-ui), opacity 220ms var(--ease-out-ui);
+  @starting-style { transform: translateY(8px); opacity: 0; }
+}
+.drawer-scrim {
+  transition: background-color 200ms ease;
+  @starting-style { background-color: transparent; }
+}
+.drawer-scrim > .drawer {
+  transition: transform 260ms var(--ease-drawer);
+  @starting-style { transform: translateX(100%); }
+}
+.menu {
+  transform-origin: var(--origin, top left);           /* grows from the pointer or the button it came from */
+  transition: opacity 140ms var(--ease-out-ui), transform 140ms var(--ease-out-ui);
+  @starting-style { opacity: 0; transform: scale(0.96); }
+}
+html[data-input="key"] :is(.drawer-scrim, .drawer-scrim > .drawer, .menu) { transition: none; }
+@media (prefers-reduced-motion: reduce) {
+  .press:active:not(:disabled) { transform: none; }
+  .drawer-scrim > .drawer { transition: none; }
+  .menu, .animate-toast { transition: opacity 140ms ease; @starting-style { opacity: 0; transform: none; } }
+}

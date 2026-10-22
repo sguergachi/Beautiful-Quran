@@ -1,18 +1,20 @@
-// The right-hand inspector: Animate (properties and keys), Recording (what
-// the app plays, the take and the edit), Look (frame, background, phone, sound).
+// The right-hand inspector: Animate (properties and keys), Recording (take
+// contents and capture), Look (frame, background, phone, sound).
 import { useEffect, useState } from "react";
 import { api } from "../lib/api.ts";
 import * as E from "../lib/edit.ts";
 import { clamp, r3, valueAt } from "../lib/model.ts";
+import { activeContext, INSPECTOR, type InspectorContext } from "../lib/inspector.ts";
 import type { Ease, Emulator, Job } from "../lib/types.ts";
 import { clock, useTime } from "../state/clock.ts";
 import {
-  cancelJob, deleteSelection, endGesture, mutate, openPanel, record, select, setEase, setProp, setUI, split, toggleKey,
+  cancelJob, deleteSelection, endGesture, inspectSelection, mutate, openPanel, record, select, setEase, setProp, setUI, split, toggleKey,
   useStore, wholeTake, type Tab,
 } from "../state/store.ts";
 import { Button, Dot, Empty, Field, Icon, Progress, Section, Segmented, Select, Slider, TextInput } from "./ui.tsx";
 import { Opening } from "./Opening.tsx";
-import { VerseRangeEditor } from "./VerseEditor.tsx";
+import { PhoneLookPreview } from "./PhoneLookPreview.tsx";
+import { ClipEditor } from "./ClipEditor.tsx";
 
 const EASES: [Ease, string][] = [["inOutCubic", "Ease in & out"], ["inOutSine", "Gentle in & out"], ["outCubic", "Ease out"], ["inCubic", "Ease in"], ["outExpo", "Fast out, long settle"], ["linear", "Linear"], ["hold", "Hold (cut)"]];
 const set = (path: string, v: unknown, key: string | null = null) => mutate((raw) => {
@@ -23,19 +25,24 @@ const set = (path: string, v: unknown, key: string | null = null) => mutate((raw
 
 export function Inspector() {
   const tab = useStore((s) => s.ui.tab), spec = useStore((s) => s.spec);
+  const context = useStore((s) => activeContext(s.inspector, s.sel));
   const capture = useStore((s) => s.jobs.find((j) => j.kind === "capture" && j.name === s.name && (j.state === "running" || j.state === "queued")));
   return (
     <div className="inspector flex h-full min-h-0 min-w-0 flex-col bg-panel">
       <div className="flex shrink-0 gap-1 border-b border-line p-2">
         {(["animate", "recording", "look"] as Tab[]).map((t) => (
-          <button key={t} onClick={() => setUI({ tab: t })}
+          <button key={t} aria-pressed={tab === t} onClick={() => setUI({ tab: t })}
             className={`relative flex-1 rounded-md py-1.5 capitalize transition-colors ${tab === t ? "bg-raised text-ink" : "text-mute hover:text-ink"}`}>
             {t}{t === "recording" && capture && <span className="absolute right-2 top-2 size-1.5 rounded-full bg-orange animate-pulse-soft" />}
           </button>
         ))}
       </div>
-      <div className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden px-4 py-4">
-        {!spec ? <Empty>No video open.</Empty> : tab === "animate" ? <Animate /> : tab === "recording" ? <Recording /> : <Look />}
+      {context && <div className="flex shrink-0 items-center justify-between gap-2 border-b border-line px-4 py-2">
+        <span role="status" className="text-[12px] text-gold">{INSPECTOR[context].title}</span>
+        <button className="shrink-0 text-[11px] text-mute hover:text-ink" onClick={() => setUI({ tab })}>All {tab === "look" ? "Look" : tab === "animate" ? "Animate" : "Recording"}</button>
+      </div>}
+      <div key={`${tab}:${context ?? "all"}`} data-inspector-context={context ?? "all"} className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden px-4 py-4">
+        {!spec ? <Empty>No video open.</Empty> : context === "clip" ? <ClipEditor /> : tab === "animate" ? <Animate context={context} /> : tab === "recording" ? <Recording contentsOnly={context === "contents"} /> : <Look context={context} />}
       </div>
     </div>
   );
@@ -43,16 +50,18 @@ export function Inspector() {
 
 // ------------------------------------------------------------ animate
 
-function Animate() {
+function Animate({ context }: { context: InspectorContext | null }) {
   const meta = useStore((s) => s.meta)!, spec = useStore((s) => s.spec)!, sel = useStore((s) => s.sel), raw = useStore((s) => s.raw)!;
   const t = useTime(60);
   const groups: Record<string, string[]> = {};
   for (const [n, p] of Object.entries(meta.props)) (groups[p.group] = groups[p.group] || []).push(n);
   const items = sel?.type === "keys" ? sel.items : [];
+  const group = context === "camera" ? "Camera" : context === "phone-motion" ? "Phone" : context === "background-motion" ? "Background" : null;
+  if (context === "keys") return <KeyCard items={items} />;
   return (
     <>
       {items.length > 0 && <KeyCard items={items} />}
-      {Object.entries(groups).map(([g, names]) => (
+      {Object.entries(groups).filter(([g]) => !group || group === g).map(([g, names]) => (
         <Section key={g} title={g}>
           {names.map((n) => {
             const d = meta.props[n], keys = spec.tracks[n] || [], here = keys.some((k) => Math.abs(k.t - t) < 0.5 / (spec.fps || 60) + 1e-6);
@@ -100,7 +109,9 @@ function KeyCard({ items }: { items: E.KeyRef[] }) {
             }} />
           </Field>
           <Field label="Value">
-            <TextInput type="number" step={d.step} value={k.v} onCommit={(v) => { const n = parseFloat(v); if (Number.isFinite(n)) mutate((r) => { const key = E.findKey(r, items[0]); if (key) key.v = r3(clamp(n, d.min, d.max)); }); }} />
+            <TextInput type="number" step={d.step} min={d.min} max={d.max} value={k.v}
+              onScrub={(n) => mutate((r) => { const key = E.findKey(r, items[0]); if (key) key.v = r3(clamp(n, d.min, d.max)); }, "drag:key-value")} onScrubEnd={endGesture}
+              onCommit={(v) => { const n = parseFloat(v); if (Number.isFinite(n)) mutate((r) => { const key = E.findKey(r, items[0]); if (key) key.v = r3(clamp(n, d.min, d.max)); }); }} />
           </Field>
         </>
       )}
@@ -118,7 +129,7 @@ function KeyCard({ items }: { items: E.KeyRef[] }) {
 
 // ------------------------------------------------------------ recording
 
-function Recording() {
+function Recording({ contentsOnly = false }: { contentsOnly?: boolean }) {
   const meta = useStore((s) => s.meta)!, spec = useStore((s) => s.spec)!, raw = useStore((s) => s.raw)!;
   const geo = useStore((s) => s.geo), tl = useStore((s) => s.tl), sel = useStore((s) => s.sel), name = useStore((s) => s.name);
   const emus = useStore((s) => s.emus);
@@ -131,33 +142,36 @@ function Recording() {
   const usable = emus.filter((e) => e.kind === "capture" && e.booted && e.app);
   return (
     <>
-      <Section title="What the app plays">
+      <Section title="Take contents">
         <Field label="Reciter"><Select value={a.reciter} options={Object.entries(meta.reciters)} onChange={(v) => set("app.reciter", v)} /></Field>
         <Field label="Chapter"><Select value={a.surah} options={meta.surahs.map((s) => [s.id, `${s.id}. ${s.name} (${s.ayahs})`])} onChange={(v) => mutate((r) => {
           const count = meta.surahs.find((s) => s.id === +v)!.ayahs, ayah = Math.min(a.ayah, count);
           r.app = { ...r.app, surah: +v, ayah, ...(a.repeat === "range" ? { repeat_to: Math.max(ayah, Math.min(a.repeat_to ?? ayah, count)) } : {}) };
         })} /></Field>
-        <Field label="Take starts" hint="The recording opens here. Choose the video's start and stop verses under Edit. Verse 1 includes the chapter opening.">
-          <TextInput type="number" min={1} max={meta.surahs.find((s) => s.id === a.surah)?.ayahs} value={a.ayah} onCommit={(v) => { const n = Number(v), count = meta.surahs.find((s) => s.id === a.surah)!.ayahs; if (Number.isInteger(n) && n >= 1 && n <= count) mutate((r) => { r.app = { ...r.app, ayah: n, ...(a.repeat === "range" ? { repeat_to: Math.max(n, a.repeat_to ?? n) } : {}) }; }); }} />
-        </Field>
-        <Field label="Theme" hint={a.theme === "Paper" ? "Tarjīʿ glimmer only shows on Nightfall and Royal green." : undefined}>
-          <Segmented size="sm" value={a.theme} options={Object.keys(meta.themes).map((t) => [t, t.replace("Royal green", "Royal")])} onChange={(v) => set("app.theme", v)} />
-        </Field>
-        <Field label="Layout"><Segmented size="sm" value={a.layout} options={meta.layouts.map((l) => [l, l])} onChange={(v) => set("app.layout", v)} /></Field>
-        <Field label="View"><Segmented size="sm" value={a.view} options={meta.views.map((v) => [v, v])} onChange={(v) => set("app.view", v)} /></Field>
-        <Field label="Text size"><Segmented size="sm" value={a.text_size} options={[["default", "Default"], ["max", "Largest"]]} onChange={(v) => set("app.text_size", v)} /></Field>
-        <Field label={a.intro.play ? "Recitation (s)" : "Minimum take (s)"} hint={a.intro.play ? "Seconds of recitation after the opening, at 1×, with the emulator's own sound." : "Minimum total duration. Every sequence step and its final hold are always included."}>
-          <TextInput type="number" min={5} step={1} value={a.seconds} onCommit={(v) => { const n = parseInt(v); if (n >= 5) set("app.seconds", n); }} />
-        </Field>
+        <Opening />
       </Section>
 
-      <Opening />
+      {!contentsOnly && <>
+      <details className="mb-5 rounded-md border border-line p-2.5">
+        <summary className="cursor-pointer text-mute">App appearance <span className="text-[11px] text-faint">· {a.theme} · {a.layout} · {a.view}</span></summary>
+        <div className="mt-3">
+          <Field label="Theme" hint={a.theme === "Paper" ? "Tarjīʿ glimmer only shows on Nightfall and Royal green." : undefined}>
+            <Segmented size="sm" value={a.theme} options={Object.keys(meta.themes).map((t) => [t, t.replace("Royal green", "Royal")])} onChange={(v) => set("app.theme", v)} />
+          </Field>
+          <Field label="Layout"><Segmented size="sm" value={a.layout} options={meta.layouts.map((l) => [l, l])} onChange={(v) => set("app.layout", v)} /></Field>
+          <Field label="View"><Segmented size="sm" value={a.view} options={meta.views.map((v) => [v, v])} onChange={(v) => set("app.view", v)} /></Field>
+          <Field label="Text size"><Segmented size="sm" value={a.text_size} options={[["default", "Default"], ["max", "Largest"]]} onChange={(v) => set("app.text_size", v)} /></Field>
+        </div>
+      </details>
 
-      <Section title="Take">
+      <Section title="Record take">
+        <Field label="Resolution" hint="2K records native 1440 × 3200 detail. Existing 1080p takes stay available.">
+          <Segmented size="sm" value={a.capture} options={[["1080p", "1080p"], ["2k", "2K"]]} onChange={(v) => set("app.capture", v)} />
+        </Field>
         {live ? <CaptureCard job={live} /> : (
           <div className="mb-3 rounded-lg border border-line bg-panel2 p-3">
             {take ? (
-              <p className="mb-2.5 text-mute"><Dot tone={a.intro.play && activeFps != null && activeFps < 50 ? "gold" : "green"} /> <span className="ml-1 text-ink">{take.length.toFixed(1)} s</span> recorded {take.recorded}{activeFps != null ? ` · ${activeFps} fps active` : ` · ${take.capture_fps} fps average (includes still pauses)`}</p>
+              <p className="mb-2.5 text-mute"><Dot tone={a.intro.play && activeFps != null && activeFps < 50 ? "gold" : "green"} /> <span className="ml-1 text-ink">{take.length.toFixed(1)} s</span> · {take.width} × {take.height} · recorded {take.recorded}{activeFps != null ? ` · ${activeFps} fps active` : ` · ${take.capture_fps} fps average (includes still pauses)`}</p>
             ) : <p className="mb-2.5 text-mute"><Dot tone="faint" /> <span className="ml-1">No take for these settings yet.</span></p>}
             {a.intro.play && activeFps != null && activeFps < 50 && (
               <p className="mb-2.5 text-[12px] text-gold">The active frames are slow. Use 6 cores and record one take at a time for smoother ink.</p>
@@ -185,25 +199,31 @@ function Recording() {
         )}
       </Section>
 
-      <Section title="Edit" right={<span className="num text-[11.5px] text-faint">{spec.duration.toFixed(2)} s</span>}>
-        <VerseRangeEditor />
-        <div className="mb-1 grid grid-cols-[22px_minmax(0,1fr)_minmax(0,1fr)_26px] gap-1.5 text-[11px] text-faint"><span>#</span><span>In (take s)</span><span>Out (take s)</span><span /></div>
-        {raw.edit.map((p: { in: number; out: number }, i: number) => (
-          <div key={i} className={`mb-1.5 grid grid-cols-[22px_minmax(0,1fr)_minmax(0,1fr)_26px] items-center gap-1.5 ${sel?.type === "piece" && sel.i === i ? "text-blue" : ""}`}>
-            <button className="text-left" onClick={() => select({ type: "piece", i })}>{i + 1}</button>
-            <TextInput type="number" step={0.01} value={p.in} onCommit={(v) => mutate((r) => E.trimPiece(r, i, "in", parseFloat(v), tl?.take))} />
-            <TextInput type="number" step={0.01} value={p.out} onCommit={(v) => mutate((r) => E.trimPiece(r, i, "out", parseFloat(v), tl?.take))} />
-            <button className="grid h-7 place-items-center text-faint hover:text-danger disabled:opacity-30" disabled={raw.edit.length <= 1}
-              onClick={() => mutate((r) => { E.deletePiece(r, i); })} title="Delete this piece">{Icon.x}</button>
+      <details className="mb-5 rounded-md border border-line p-2.5">
+        <summary className="cursor-pointer text-mute">Fine trim &amp; cuts <span className="num text-[11px] text-faint">· {spec.duration.toFixed(2)} s</span></summary>
+        <div className="mt-3">
+          <p className="mb-3 text-[11.5px] leading-relaxed text-faint">Trim the recorded take in seconds, or split it into pieces. Choose whole verses in Take contents above.</p>
+          <div className="mb-1 grid grid-cols-[22px_minmax(0,1fr)_minmax(0,1fr)_26px] gap-1.5 text-[11px] text-faint"><span>#</span><span>In (take s)</span><span>Out (take s)</span><span /></div>
+          {raw.edit.map((p: { in: number; out: number }, i: number) => (
+            <div key={i} className={`mb-1.5 grid grid-cols-[22px_minmax(0,1fr)_minmax(0,1fr)_26px] items-center gap-1.5 ${sel?.type === "piece" && sel.i === i ? "text-blue" : ""}`}>
+              <button className="text-left" onClick={() => { select({ type: "piece", i }); inspectSelection(true); }}>{i + 1}</button>
+              <TextInput type="number" step={0.01} min={0} value={p.in} onScrub={(v) => mutate((r) => E.trimPiece(r, i, "in", v, tl?.take), `drag:trim-field:${i}`)} onScrubEnd={endGesture}
+                onCommit={(v) => mutate((r) => E.trimPiece(r, i, "in", parseFloat(v), tl?.take))} />
+              <TextInput type="number" step={0.01} min={0} value={p.out} onScrub={(v) => mutate((r) => E.trimPiece(r, i, "out", v, tl?.take), `drag:trim-field:${i}`)} onScrubEnd={endGesture}
+                onCommit={(v) => mutate((r) => E.trimPiece(r, i, "out", parseFloat(v), tl?.take))} />
+              <button className="grid h-7 place-items-center text-faint hover:text-danger disabled:opacity-30" disabled={raw.edit.length <= 1}
+                onClick={() => mutate((r) => { E.deletePiece(r, i); })} title="Delete this piece">{Icon.x}</button>
+            </div>
+          ))}
+          <div className="mt-2 flex flex-wrap gap-2">
+            <Button size="sm" onClick={() => split()}>{Icon.scissors} Split at playhead</Button>
+            <Button size="sm" variant="ghost" onClick={wholeTake} title="One piece: the whole take">Whole take</Button>
           </div>
-        ))}
-        <div className="mt-2 flex flex-wrap gap-2">
-          <Button size="sm" onClick={() => split()}>{Icon.scissors} Split at playhead</Button>
-          <Button size="sm" variant="ghost" onClick={wholeTake} title="One piece: the whole take">Whole take</Button>
+          <p className="mt-2 text-[11.5px] leading-relaxed text-faint">{take ? (a.intro.play ? `The recitation starts ${take.lead.toFixed(1)} s into the take.` : "This take records the screen sequence without recitation.") : "The screens above are recorded before recitation starts."} Trimming a clip's start leaves a silent gap; picture and sound trim together, and keys stay in video time.{tl?.take != null && ` The take is ${tl.take.toFixed(1)} s long.`}</p>
         </div>
-        <p className="mt-2 text-[11.5px] leading-relaxed text-faint">{take ? (a.intro.play ? `The recitation starts ${take.lead.toFixed(1)} s into the take.` : "This take records the screen sequence without recitation.") : "The take opens on its opening, then the recitation."} Pieces play back to back and the sound is cut with the picture; keys stay where they are in video time.{tl?.take != null && ` The take is ${tl.take.toFixed(1)} s long.`}</p>
-      </Section>
+      </details>
       {name && <p className="break-words text-[11px] text-faint">Spec: specs/{name}.json</p>}
+      </>}
     </>
   );
 }
@@ -250,48 +270,58 @@ export const emulatorTone = (e: Emulator): "green" | "gold" | "orange" | "faint"
 
 // ------------------------------------------------------------ look
 
-function Look() {
+function Look({ context }: { context: InspectorContext | null }) {
   const meta = useStore((s) => s.meta)!, spec = useStore((s) => s.spec)!, raw = useStore((s) => s.raw)!;
+  const t = useTime();
   const slider = (label: string, path: string, value: number, min: number, max: number, step: number, hint?: string) => (
     <Field label={label} hint={hint}><Slider label={label} value={value} min={min} max={max} step={step} onChange={(v) => set(path, v, "f:" + path)} onDone={endGesture} /></Field>
   );
+  const property = (name: string, hint?: string) => {
+    const d = meta.props[name], animated = !!spec.tracks[name]?.length;
+    return <Field label={d.label} hint={animated ? `${hint ?? ""} Animated · changes apply at the playhead.`.trim() : hint}>
+      <Slider label={d.label} value={valueAt(spec, meta.props, name, t)} min={d.min} max={d.max} step={d.step}
+        onChange={(v) => setProp(name, v, "look:" + name)} onDone={endGesture} />
+    </Field>;
+  };
   return (
     <>
-      <Section title="Frame">
+      {(!context || context === "canvas") && <Section title="Canvas">
+        <Field label="Video name"><TextInput value={spec.title} placeholder="What this video is" onCommit={(v) => set("title", v)} /></Field>
         <Field label="Aspect"><Segmented size="sm" value={spec.aspect} options={Object.keys(meta.aspects).map((a) => [a, a])} onChange={(v) => set("aspect", v)} /></Field>
         <Field label="Frame rate"><Segmented size="sm" value={String(spec.fps)} options={[["60", "60 fps"], ["30", "30 fps"]]} onChange={(v) => set("fps", +v)} /></Field>
-        {slider("Motion blur", "motion_blur", spec.motion_blur, 0, 2, 0.05, "Blur on fast camera moves (shutter, as a share of a frame). The preview omits it; Exact frame shows it.")}
-      </Section>
-      <Section title="Background">
+        {slider("Motion blur", "motion_blur", spec.motion_blur, 0, 2, 0.05, "Softens fast camera moves in exports. Use Exact frame to preview it.")}
+      </Section>}
+      {(!context || context === "background-look") && <Section title="Background">
         <div className="mb-3 grid grid-cols-3 gap-1.5">
           {Object.entries(meta.backgrounds).map(([id, b]) => (
-            <button key={id} onClick={() => set("background.id", id)} title={`${b.title} · suits ${b.suits.join(", ")}`}
+            <button key={id} onClick={() => set("background.id", id)} title={`${b.title} · suits ${b.suits.join(", ")}`} aria-label={b.label ?? b.title} aria-pressed={id === spec.background.id}
               className={`relative aspect-square overflow-hidden rounded-md border-2 ${id === spec.background.id ? "border-gold" : "border-transparent hover:border-line2"}`}>
               <img src={b.thumb} alt="" loading="lazy" className="size-full object-cover blur-[1.5px]" />
-              <span className="absolute inset-x-0 bottom-0 truncate bg-black/65 px-1 py-0.5 text-left text-[10px]">{id}</span>
+              <span className="absolute inset-x-0 bottom-0 line-clamp-2 bg-black/65 px-1.5 py-1 text-left text-[10px] leading-tight">{b.label ?? b.title}</span>
             </button>
           ))}
         </div>
+        <h4 className="mb-2 text-[10px] font-semibold uppercase tracking-wider text-faint">Image</h4>
+        {property("bg_blur", "0 keeps the background sharp. More blur keeps attention on the phone.")}
+        {property("bg_brightness")}
         {slider("Saturation", "background.saturation", spec.background.saturation, 0, 1.6, 0.05)}
+        {slider("Vignette", "background.vignette", spec.background.vignette, 0, 0.8, 0.01)}
+        <h4 className="mb-2 mt-4 text-[10px] font-semibold uppercase tracking-wider text-faint">Movement</h4>
         {slider("Motion speed", "background.speed", spec.background.speed, 0.1, 1.5, 0.05)}
         {slider("Parallax", "background.parallax", spec.background.parallax, 0, 1, 0.01, "How much of the camera's moves the background follows.")}
-        {slider("Vignette", "background.vignette", spec.background.vignette, 0, 0.8, 0.01)}
-        <p className="text-[11.5px] text-faint">Blur and brightness are on the Animate tab, so they can be keyed.</p>
-      </Section>
-      <Section title="Phone">
+      </Section>}
+      {(!context || context === "phone-look") && <Section title="Phone">
+        <PhoneLookPreview />
         <Field label="Colour"><Select value={raw.phone?.color ?? "auto"} options={[["auto", "Match the theme"], ...meta.phones.map((c): [string, string] => [c, c[0].toUpperCase() + c.slice(1)])]} onChange={(v) => set("phone.color", v)} /></Field>
         {slider("Base size", "phone.height", spec.phone.height, 0.4, 1.2, 0.01, "The phone's height as a share of the frame, before zoom.")}
         {slider("Shadow", "phone.shadow", spec.phone.shadow, 0, 1, 0.01)}
-      </Section>
-      <Section title="Sound">
+      </Section>}
+      {(!context || context === "sound") && <Section title="Sound">
         {slider("Gain (dB)", "audio.gain_db", spec.audio.gain_db, -12, 12, 0.5)}
         {slider("Fade in (s)", "audio.fade_in", spec.audio.fade_in, 0, 3, 0.1, "Starts with the first sound: takes open on a silent second.")}
         {slider("Fade out (s)", "audio.fade_out", spec.audio.fade_out, 0, 4, 0.1, "Ends with the video.")}
         <p className="text-[11.5px] text-faint">The emulator's own recording, normalised to −16 LUFS on export. The preview plays the gain and fades; drag the handles on the timeline's Sound lane to set the fades there.</p>
-      </Section>
-      <Section title="Title">
-        <TextInput value={spec.title} placeholder="What this video is" onCommit={(v) => set("title", v)} />
-      </Section>
+      </Section>}
     </>
   );
 }

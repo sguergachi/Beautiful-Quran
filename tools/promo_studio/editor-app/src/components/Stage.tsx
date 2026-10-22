@@ -3,11 +3,12 @@
 // property at the playhead once it is animated (store.setProp).
 import { useEffect, useRef, useState } from "react";
 import { track } from "../lib/drag.ts";
-import { stateAt } from "../lib/model.ts";
+import { sourceTime, stateAt } from "../lib/model.ts";
 import { phoneMatrix } from "../lib/geometry.ts";
+import { previewContext } from "../lib/inspector.ts";
 import { Preview } from "../lib/render.ts";
 import { clock, media } from "../state/clock.ts";
-import { endGesture, hideExact, setProp, setUI, useStore } from "../state/store.ts";
+import { endGesture, hideExact, inspect, select, setProp, setUI, useStore } from "../state/store.ts";
 import { Button, Icon } from "./ui.tsx";
 
 export function Stage() {
@@ -58,10 +59,12 @@ export function Stage() {
       const s = useStore.getState(), c = canvas.current;
       if (!c || !s.spec || !s.geo || !s.meta) return;
       const S = stateAt(s.spec, s.meta.props, clock.t), scale = box.current.w / s.geo.W;
+      const recording = sourceTime(s.spec, clock.t)[1] >= 0;
+      phone.current!.style.visibility = recording ? "visible" : "hidden";
       phone.current!.style.transform = `matrix(${phoneMatrix(s.spec, s.geo, S).map((v) => v * scale).join(",")})`;
       screen.current!.style.background = s.meta.themes[s.spec.app.theme]?.bg ?? "#111";
       preview.draw(c.getContext("2d", { alpha: false, desynchronized: true })!, {
-        spec: s.spec, geo: s.geo, plate: s.plate, S, nativePhone: true,
+        spec: s.spec, geo: s.geo, plate: s.plate, S, nativePhone: true, recording,
         themeBg: s.meta.themes[s.spec.app.theme]?.bg ?? "#111", screen: media.screen, plateVideo: media.plate, frame: media.frame,
       });
     });
@@ -78,21 +81,28 @@ export function Stage() {
   const onPointerDown = (e: React.PointerEvent) => {
     const s = useStore.getState();
     if (e.button !== 0 || !s.spec || !s.geo || !s.meta) return;
-    e.preventDefault(); clock.pause(); hideExact();
+    e.preventDefault(); clock.pause(); hideExact(); select(null);
     const rect = canvas.current!.getBoundingClientRect(), outPerPx = s.geo.W / rect.width;
     const S0 = stateAt(s.spec, s.meta.props, clock.t), x0 = e.clientX, y0 = e.clientY, phone = e.altKey;
     const tag = `drag:${phone ? "phone" : "cam"}:${performance.now()}`;
+    let moved = false;
     const r = (S0.rotate * Math.PI) / 180, c = Math.cos(-r), sn = Math.sin(-r);
     track(e, canvas.current!, (m) => {
+      if (!moved && Math.hypot(m.clientX - x0, m.clientY - y0) < 3) return;
+      moved = true;
       const sx = (m.clientX - x0) * outPerPx, sy = (m.clientY - y0) * outPerPx;
       const dx = c * sx - sn * sy, dy = sn * sx + c * sy, W = s.geo!.W, H = s.geo!.H;
       if (phone) { setProp("phone_x", S0.phone_x + dx / (S0.zoom * W), tag); setProp("phone_y", S0.phone_y + dy / (S0.zoom * H), tag); }
       else { setProp("pan_x", S0.pan_x - dx / (S0.zoom * W), tag); setProp("pan_y", S0.pan_y - dy / (S0.zoom * H), tag); }
-    }, () => endGesture(), { cursor: "grab" });
+    }, (up) => {
+      endGesture(); if (up.type === "pointercancel") return;
+      inspect(moved ? (phone ? "phone-motion" : "camera") : sourceTime(s.spec!, clock.t)[1] < 0 ? "background-look" : previewContext(s.spec!, s.geo!, S0, (x0 - rect.left) * outPerPx, (y0 - rect.top) * outPerPx), !moved || innerWidth > 1000);
+    }, { cursor: "grab" });
   };
   // a non-passive wheel listener: the page must not scroll under the preview
   useEffect(() => {
     const c = canvas.current!;
+    let timer: number | undefined;
     const onWheel = (e: WheelEvent) => {
       const s = useStore.getState();
       if (!s.spec || !s.meta) return;
@@ -101,16 +111,22 @@ export function Stage() {
       if (e.altKey) setProp("phone_scale", S.phone_scale * f, "wheel-phone");
       else if (e.shiftKey) setProp("rotate", S.rotate + (e.deltaY > 0 ? 0.5 : -0.5), "wheel-rot");
       else setProp("zoom", S.zoom * f, "wheel-zoom");
+      const target = e.altKey ? "phone-motion" : "camera";
+      if (s.inspector !== target) inspect(target, false);
+      clearTimeout(timer);
+      timer = window.setTimeout(() => {
+        if (useStore.getState().inspector === target && !document.body.classList.contains("dragging")) inspect(target);
+      }, 220);
     };
     c.addEventListener("wheel", onWheel, { passive: false });
-    return () => c.removeEventListener("wheel", onWheel);
+    return () => { clearTimeout(timer); c.removeEventListener("wheel", onWheel); };
   }, []);
 
   return (
-    <div ref={wrap} className="relative flex min-h-0 flex-1 items-center justify-center overflow-hidden bg-[#0c0b0a]">
+    <div ref={wrap} onPointerDown={(e) => { if (e.button === 0 && e.target === e.currentTarget && spec) inspect("canvas", true); }} className="relative flex min-h-0 flex-1 items-center justify-center overflow-hidden bg-[#0c0b0a]">
       <div ref={scene} className="relative shrink-0 overflow-hidden rounded-sm shadow-[0_0_0_1px_var(--color-line)]">
         <canvas ref={canvas} onPointerDown={onPointerDown} className="block cursor-grab"
-          title="Drag: pan · Scroll: zoom · Shift-scroll: rotate · Alt-drag / Alt-scroll: move / scale the phone" />
+          title="Click phone / background: appearance · Drag: pan · Scroll: zoom · Shift-scroll: rotate · Alt-drag / Alt-scroll: move / scale the phone" />
         <div ref={phone} className="pointer-events-none absolute left-0 top-0 origin-top-left" style={{ width: geo?.g.W, height: geo?.g.H, visibility: geo ? "visible" : "hidden" }}>
           <div ref={screen} className="absolute overflow-hidden" style={{ left: geo?.g.sx0, top: geo?.g.sy0, width: geo?.g.sw, height: geo?.g.sh, borderRadius: geo?.g.screen_r }} />
         </div>

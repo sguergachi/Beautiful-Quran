@@ -22,21 +22,23 @@ BASE = os.environ.get("BQ_TIMINGS_BASE", "https://beautiful-quran.sguergachi.wor
 _ROWS = {}
 
 
-def plan_range(s, start, end, lead=1.0):
+def plan_range(s, start, end, lead=1.0, *, take=False):
     """Whole-verse edit bounds on the take clock, including basmalah/lead.
 
     Keep the existing recording origin when possible. An earlier start needs
     a new take; shift identifies the old origin on that new take's clock so
-    timeline edge actions can preserve the cuts between its ends.
+    timeline edge actions can preserve the cuts between its ends. Defining
+    take contents instead makes start the recording origin, retaining the
+    complete opening even when the selected verse moves forwards.
     """
     a = s["app"]
     if a.get("repeat", "off") != "off" or not a.get("intro", {}).get("play", True):
-        raise ValueError("Choose the repeat range under Recording sequence; trim this take in seconds.")
+        raise ValueError("Choose repeated verses in Take contents; use Fine trim & cuts for seconds.")
     count = audio.ayah_count(int(a["surah"]))
     if any(isinstance(v, bool) or not isinstance(v, int) for v in (start, end)) or not 1 <= start <= end <= count:
         raise ValueError(f"choose verses within 1..{count}, with start before stop")
     old_anchor = int(a["ayah"])
-    anchor = min(start, old_anchor)
+    anchor = start if take else min(start, old_anchor)
     slug = RECITERS[a["reciter"]]["slug"]
     t, verses = float(lead), []
     if anchor == 1 and a["surah"] not in (1, 9):

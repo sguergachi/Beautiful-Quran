@@ -47,10 +47,25 @@ class ModelTests(unittest.TestCase):
                     {"tracks": {"zoom": [{"t": 1, "v": 1}, {"t": 1, "v": 2}]}}, {"phone": {"height": -1}}):
             with self.subTest(raw=raw), self.assertRaises(ValueError): spec.resolve(raw)
 
+    def test_gaps_are_finite_nonnegative_and_preserve_source_clock(self):
+        for gap in (-1, float('nan'), float('inf'), True, '2'):
+            with self.subTest(gap=gap), self.assertRaises(ValueError):
+                spec.resolve({'edit': [{'in': 4, 'out': 8, 'gap': gap}]})
+        s = spec.resolve({'edit': [{'in': 4, 'out': 8, 'gap': 3}, {'in': 10, 'out': 12, 'gap': 2}]})
+        self.assertEqual(s['duration'], 11)
+        self.assertEqual(spec.take_needed(s), 12)
+        self.assertEqual(spec.resolve(s)['edit'], s['edit'])
+        self.assertEqual(anim.source_time(s, 0), (0, None))
+        self.assertEqual(anim.source_time(s, 3)[0], 4)
+        self.assertEqual(anim.source_time(s, 7), (0, None))
+        self.assertEqual(anim.source_time(s, 9)[0], 10)
+        self.assertEqual(anim.video_times(s, 4, 12), [(3, 7), (9, 11)])
+        self.assertEqual(anim.sound_onset(s, 5), 4)
+
     def test_editor_math_parity(self):
         rng, cases = random.Random(886), []
         for i in range(32):
-            s = spec.resolve({"aspect": list(spec.ASPECTS)[i % 4], "edit": [{"in": .5, "out": 2}, {"in": .2, "out": 1}],
+            s = spec.resolve({"aspect": list(spec.ASPECTS)[i % 4], "edit": [{"in": .5, "out": 2, "gap": .3 if i % 2 else 0}, {"in": .2, "out": 1, "gap": .6 if i % 3 else 0}],
                               "tracks": {"zoom": [{"t": 0, "v": .7}, {"t": 2, "v": 4, "ease": spec.EASES[i % len(spec.EASES)]}]}})
             for name, p in spec.PROPS.items(): s["props"][name] = rng.uniform(p["min"], p["max"])
             t = [-.5, 0, .4, 1.5, 2, 2.3, 3][i % 7]
@@ -128,6 +143,35 @@ class MediaTests(unittest.TestCase):
         self.assertLess(float(np.max(np.abs(samples[10000:33000]))), 1e-6)
         self.assertGreater(float(np.max(np.abs(samples[35000:]))), .05)
 
+    def test_audio_gaps_have_exact_duration_and_silence_between_clips(self):
+        wav = str(self.d / 'tone.wav')
+        subprocess.run(['ffmpeg', '-v', 'error', '-y', '-f', 'lavfi', '-i', 'sine=frequency=440:sample_rate=48000:duration=1', wav], check=True)
+        s = spec.resolve({'edit': [{'in': 0, 'out': .25, 'gap': .25}, {'in': .5, 'out': .75, 'gap': .5}]})
+        raw = subprocess.run(['ffmpeg', '-v', 'error', '-i', wav, '-filter_complex', compose.audio_graph(s),
+                              '-map', '[cut]', '-ac', '1', '-f', 'f32le', '-'], capture_output=True, check=True).stdout
+        samples = np.frombuffer(raw, np.float32)
+        self.assertEqual(len(samples), round(s['duration'] * 48000))
+        for a, b in ((0, .25), (.5, 1)):
+            self.assertLess(float(np.max(np.abs(samples[round(a * 48000):round(b * 48000)]))), 1e-6)
+        for a, b in ((.28, .48), (1.03, 1.23)):
+            self.assertGreater(float(np.max(np.abs(samples[round(a * 48000):round(b * 48000)]))), .05)
+
+    def test_gap_frames_do_not_decode_or_reuse_recording_pixels(self):
+        s = spec.resolve({'edit': [{'in': 4, 'out': 5, 'gap': 1}, {'in': 8, 'out': 9, 'gap': 2}]})
+        with patch.object(compose, 'Frames') as frames:
+            frames.return_value.read.return_value = 'recording pixels'
+            decoder = compose.EditFrames(s, 'unused', 16, 16, 60)
+            self.assertIsNone(decoder.read(.5))
+            frames.assert_not_called()
+            self.assertEqual(decoder.read(1), 'recording pixels')
+            self.assertEqual(frames.call_args.args[-1], 4)
+            self.assertIsNone(decoder.read(2))
+            frames.return_value.close.assert_called_once()
+            self.assertIsNone(decoder.read(3))
+            self.assertEqual(decoder.read(4), 'recording pixels')
+            self.assertEqual(frames.call_args.args[-1], 8)
+            decoder.close()
+
     def test_silent_loudness_and_long_fades(self):
         wav = str(self.d / "audio.wav")
         subprocess.run(["ffmpeg", "-v", "error", "-y", "-f", "lavfi", "-i", "anullsrc=r=48000:cl=stereo", "-t", "1", wav], check=True)
@@ -157,7 +201,10 @@ class MediaTests(unittest.TestCase):
         r = compose.Renderer.__new__(compose.Renderer)
         r.s, r.W, r.H, r.fps, r.pk, r.output_scale = s, 4, 4, 60, 1, 1
         r.bg, r.vig = compose.plate_settings(s), np.ones((4, 4, 1), np.float32)
-        r._phone_layers = lambda _: None
+        r._vig_rgb = np.repeat(r.vig, 3, axis=2)
+        r._blend = np.empty((4, 4, 3), np.float32)
+        r._acc = np.empty((4, 4, 3), np.float32)
+        r._phone_layers = lambda _: np.zeros((4, 4, 3), np.float32)
         r._warp_phone = lambda *_: (np.zeros((4, 4, 3), np.float32), np.zeros((4, 4), np.float32))
         r.phone_matrix = r.bg_matrix = lambda _: np.array([[1., 0, 0], [0, 1., 0]])
         r.screen_corners = lambda st: np.array([[st["zoom"] * 1000]])
@@ -167,6 +214,45 @@ class MediaTests(unittest.TestCase):
         np.testing.assert_array_equal(blurred, r.frame(.5, plate, plate))
         self.assertTrue(np.all(plate == 200))
 
+    def test_conform_retains_a_still_that_straddles_the_opening_cut(self):
+        raw = str(self.d / 'raw.mkv')
+        subprocess.run(['ffmpeg', '-v', 'error', '-y', '-f', 'lavfi', '-i', 'color=blue:s=32x32:r=10:d=5',
+                        '-f', 'lavfi', '-i', 'sine=frequency=440:sample_rate=48000:duration=5',
+                        '-filter_complex', "[0:v]drawbox=color=red:t=fill:enable='gte(t,3)',select='eq(n,0)+gte(t,3)'[v];[1:a]volume=0:enable='lt(t,3)'[a]",
+                        '-map', '[v]', '-map', '[a]', '-fps_mode', 'vfr', '-c:v', 'libx264', '-g', '1', '-bf', '0', '-c:a', 'flac', raw], check=True)
+        meta = capture.conform(str(self.d), log=lambda _: None, marks={'intro': .5, 'play': 2.9, 'dwell': 1})
+        self.assertAlmostEqual(meta['length'], 4.65, delta=.04)
+        self.assertLess(meta['lead'], meta['length'])
+        first = compose.grab(str(self.d / 'clip.mp4'), 32, 32, 0)[16, 16]
+        self.assertGreater(int(first[2]), int(first[0]) + 100, 'the held blue frame precedes the later red image')
+        self.assertAlmostEqual(audio.duration(str(self.d / 'audio.wav')), meta['length'], delta=.04)
+
+    def test_renderer_reuse_keeps_cuts_and_new_geometry_independent(self):
+        meta = {'width': 96, 'height': 212, 'length': 8, 'lead': 1}
+        (self.d / 'meta.json').write_text(json.dumps(meta))
+        s = spec.resolve({'motion_blur': 2, 'tracks': {
+            'pan_x': [{'t': 0, 'v': .2}, {'t': 1, 'v': .8}],
+            'zoom': [{'t': 1, 'v': 1}, {'t': 2, 'v': 1.5}],
+        }})
+        def renderer():
+            with patch.object(compose, 'take_dir', return_value=str(self.d)), patch.object(compose, 'CACHE', str(self.d)), patch.object(library, 'plate', return_value='unused'), patch.object(library, 'probe', return_value=(64, 64, 1)):
+                return compose.Renderer(s, .06)
+        r = renderer()
+        dark = np.zeros((212, 96, 3), np.uint8)
+        light = np.full_like(dark, 255)
+        plate = np.full((r.ph, r.pw, 3), 120, np.uint8)
+        first = r.frame(.5, dark, plate)
+        saved = first.copy()
+        # Repeated geometry across a cut must use the new screen. A changed
+        # zoom and a later return must also match independent renders.
+        for t, pixels in [(.5, light), (1.5, light), (.5, None), (.5, dark)]:
+            np.testing.assert_array_equal(r.frame(t, pixels, plate), renderer().frame(t, pixels, plate))
+        gap = r.frame(.5, None, plate)
+        s['phone']['shadow'] = 0
+        np.testing.assert_array_equal(gap, r.frame(.5, None, plate), 'a gap must not retain the phone shadow')
+        np.testing.assert_array_equal(first, saved)
+        self.assertFalse(np.array_equal(saved, r.frame(.5, light, plate)))
+
     def test_color_plate_is_atomic_and_media_safe(self):
         bg = dict(spec.DEFAULTS["background"], id="color:#192837", blur=8, brightness=0)
         with patch.object(library, "PLATES", str(self.d)):
@@ -174,6 +260,26 @@ class MediaTests(unittest.TestCase):
             self.assertNotIn("#", os.path.basename(out))
             self.assertEqual(library.probe(out)[:2], library.plate_geometry(bg, 64, 64)[:2])
             self.assertFalse(list(self.d.glob("*.part.mp4")))
+
+    def test_zero_blur_keeps_image_detail_and_is_not_baked_into_animated_looks(self):
+        from PIL import Image
+        source = self.d / 'stripes.png'
+        pattern = np.tile(((np.arange(128) // 4) % 2 * 255).astype(np.uint8), (128, 1))
+        Image.fromarray(np.repeat(pattern[..., None], 3, axis=2)).save(source)
+        s = spec.resolve({'background': {'id': 'file:' + str(source)}, 'props': {'bg_blur': 0}})
+        sharp = compose.plate_settings(s)
+        self.assertEqual(sharp['blur'], 0)
+        self.assertEqual(spec.PROPS['bg_blur']['min'], 0)
+        s['props']['bg_blur'] = 36
+        s['tracks']['bg_blur'] = [{'t': 0, 'v': 36}, {'t': 1, 'v': 0}]
+        self.assertEqual(compose.plate_settings(s)['blur'], 0)
+        with patch.object(library, 'PLATES', str(self.d)):
+            clear = library.plate(sharp, 128, 128)
+            soft = library.plate(dict(sharp, blur=8), 128, 128)
+            w, h, _ = library.plate_geometry(sharp, 128, 128)
+            clear_pixels = compose.grab(clear, w, h, 0)[16:-16, 16:-16].astype(float)
+            soft_pixels = compose.grab(soft, w, h, 0)[16:-16, 16:-16].astype(float)
+            self.assertGreater(clear_pixels.std(), soft_pixels.std() * 4)
 
 
 class FormatTests(unittest.TestCase):
@@ -214,6 +320,77 @@ class FormatTests(unittest.TestCase):
 
 
 class ServerTests(unittest.TestCase):
+    def test_named_new_video_and_copy_preserve_source_and_reject_collisions(self):
+        with tempfile.TemporaryDirectory(dir=SCRATCH) as d, patch.object(spec, 'SPECS', d):
+            source = {'title': 'Original', 'props': {'zoom': 2.5}, 'edit': [{'in': 3, 'out': 9}]}
+            Path(d, 'original.json').write_text(json.dumps(source))
+            srv = ThreadingHTTPServer(('127.0.0.1', 0), server.Handler)
+            thread = threading.Thread(target=srv.serve_forever, daemon=True); thread.start()
+            def create(name, body):
+                c = http.client.HTTPConnection(*srv.server_address)
+                c.request('POST', f'/api/new/{name}', json.dumps(body), {'Content-Type': 'application/json'})
+                r = c.getresponse(); status = r.status; r.read(); c.close(); return status
+            try:
+                self.assertEqual(create('named', {'title': '  Ar-Raḥmān  '}), 200)
+                self.assertEqual(json.loads(Path(d, 'named.json').read_text()), {'title': 'Ar-Raḥmān'})
+                self.assertEqual(create('copy', {'from': 'original', 'title': 'My copy'}), 200)
+                self.assertEqual(json.loads(Path(d, 'copy.json').read_text()), {**source, 'title': 'My copy'})
+                self.assertEqual(json.loads(Path(d, 'original.json').read_text()), source)
+                self.assertEqual(create('copy', {'title': 'Overwrite'}), 409)
+                self.assertEqual(json.loads(Path(d, 'copy.json').read_text())['title'], 'My copy')
+                for title in (' ', [], 1):
+                    self.assertEqual(create('invalid', {'title': title}), 400)
+                    self.assertFalse(Path(d, 'invalid.json').exists())
+            finally: srv.shutdown(); srv.server_close(); thread.join()
+
+    def test_export_deletion_is_scoped_versioned_and_excludes_active_renders(self):
+        with tempfile.TemporaryDirectory(dir=SCRATCH) as d, patch.object(spec, 'OUT', d), patch.object(spec, 'SPECS', d), patch.object(server, 'JOB_DIR', d), patch.object(server.Jobs, '_loop', lambda _: None), patch.object(server.Jobs, '_start', lambda _, j: j.update(state='running')):
+            jobs = server.Jobs()
+            paths = {f: Path(d, f) for f in ('video.mp4', 'video-720p-30fps.webm', 'other.mp4', 'video.json', 'take.mkv')}
+            for path in paths.values(): path.write_bytes(b'keep')
+            srv = ThreadingHTTPServer(('127.0.0.1', 0), server.Handler)
+            with patch.object(server, 'JOBS', jobs):
+                thread = threading.Thread(target=srv.serve_forever, daemon=True); thread.start()
+                def delete(name, file, revision, origin=None):
+                    c = http.client.HTTPConnection(*srv.server_address)
+                    headers = {'Content-Type': 'application/json', **({'Origin': origin} if origin else {})}
+                    c.request('DELETE', f'/api/exports/{name}/{file}', json.dumps({'revision': revision}), headers)
+                    r = c.getresponse(); status, body = r.status, json.loads(r.read()); c.close()
+                    return status, body
+                def revision(file): return next(e['revision'] for e in server.exports('video') if e['file'] == file)
+                try:
+                    old = revision('video.mp4')
+                    self.assertEqual(delete('video', 'video.mp4', old, 'https://example.org')[0], 403)
+                    self.assertEqual(delete('video', 'other.mp4', old)[0], 400)
+                    self.assertEqual(delete('video', '%2e%2e%2fother.mp4', old)[0], 404)
+                    self.assertEqual(delete('video', 'video.json', old)[0], 400)
+                    # Replacement preserves size and mtime; its inode still
+                    # distinguishes the new export from the displayed one.
+                    st = paths['video.mp4'].stat()
+                    replacement = Path(d, 'replacement')
+                    replacement.write_bytes(b'next')
+                    os.utime(replacement, ns=(st.st_atime_ns, st.st_mtime_ns))
+                    os.replace(replacement, paths['video.mp4'])
+                    self.assertEqual(delete('video', 'video.mp4', old)[0], 409)
+                    current = revision('video.mp4')
+                    job = jobs.submit('render', 'other-video', ['render', 'other-video'], export_file='video.mp4')
+                    self.assertEqual(delete('video', 'video.mp4', current)[0], 409)
+                    jobs.jobs[job['id']]['state'] = 'queued'
+                    self.assertEqual(delete('video', 'video.mp4', current)[0], 409)
+                    # Another format stays removable while that path is owned.
+                    status, body = delete('video', 'video-720p-30fps.webm', revision('video-720p-30fps.webm'))
+                    self.assertEqual(status, 200)
+                    self.assertEqual([e['file'] for e in body['exports']], ['video.mp4'])
+                    jobs.jobs[job['id']].update(state='done', result=str(paths['video.mp4']))
+                    self.assertTrue(jobs.public(jobs.jobs[job['id']])['export_exists'])
+                    self.assertEqual(delete('video', 'video.mp4', current)[0], 200)
+                    self.assertFalse(jobs.public(jobs.jobs[job['id']])['export_exists'])
+                    self.assertEqual(delete('video', 'video.mp4', current)[0], 404)
+                    self.assertFalse(paths['video.mp4'].exists())
+                    for file in ('other.mp4', 'video.json', 'take.mkv'):
+                        self.assertEqual(paths[file].read_bytes(), b'keep')
+                finally: srv.shutdown(); srv.server_close(); thread.join()
+
     def test_atomic_put_and_media_ranges(self):
         with tempfile.TemporaryDirectory(dir=SCRATCH) as d, patch.object(spec, "SPECS", d), patch.object(spec, "CACHE", d):
             srv = ThreadingHTTPServer(("127.0.0.1", 0), server.Handler)

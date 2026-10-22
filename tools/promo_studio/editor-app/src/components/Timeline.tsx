@@ -7,9 +7,10 @@ import { track } from "../lib/drag.ts";
 import { clamp, pieceStart, r3, soundOnset, sourceTime, valueAt, videoTimes } from "../lib/model.ts";
 import type { Ease, Key, PropDef, Spec } from "../lib/types.ts";
 import { fitTimelineScale } from "../lib/timeline.ts";
+import { motionContext, type InspectorContext } from "../lib/inspector.ts";
 import { clock, useTime } from "../state/clock.ts";
 import {
-  copy, deleteSelection, endGesture, mutate, paste, select, selectAll, selectKeys, selKeys, setEase, setUI, split,
+  copy, deleteSelection, endGesture, inspect, inspectSelection, mutate, paste, select, selectAll, selectKeys, selKeys, setEase, setUI, split,
   toggleKey, useStore,
 } from "../state/store.ts";
 import { openMenu, type MenuItem } from "./Menu.tsx";
@@ -18,6 +19,10 @@ import { EditorToolbar } from "./Transport.tsx";
 import { TimelineVerseControls } from "./VerseEditor.tsx";
 
 let lastFadePress = { side: "", at: 0 };
+
+// Empty lane before 0 s: things dragged to the start, and the first clip's
+// trim handle, keep room instead of sitting against the labels.
+const GUTTER = 24;
 
 const EASE_LABEL: Record<Ease, string> = {
   inOutCubic: "Ease in & out", inOutSine: "Gentle in & out", outCubic: "Ease out", inCubic: "Ease in",
@@ -37,7 +42,7 @@ export function Timeline() {
   const [marquee, setMarquee] = useState<{ x: number; y: number; w: number; h: number } | null>(null);
   const [width, setWidth] = useState(0);
   const { labelW } = ui;
-  const pps = ui.fit && width ? fitTimelineScale(width, labelW, spec?.duration ?? 0) : ui.pps;
+  const pps = ui.fit && width ? fitTimelineScale(width, labelW + GUTTER, spec?.duration ?? 0) : ui.pps;
 
   useLayoutEffect(() => {
     const b = box.current;
@@ -52,7 +57,7 @@ export function Timeline() {
     if (ui.fit && box.current) box.current.scrollLeft = 0;
   }, [ui.fit, width, labelW, spec?.duration]);
 
-  const timeAt = (clientX: number) => (clientX - inner.current!.getBoundingClientRect().left - labelW) / pps;
+  const timeAt = (clientX: number) => (clientX - inner.current!.getBoundingClientRect().left - labelW - GUTTER) / pps;
   const edgeOpt = () => ({ box: box.current!, left: labelW });
 
   // playhead and auto-follow, outside React renders
@@ -60,11 +65,11 @@ export function Timeline() {
     const place = (t: number) => {
       if (!box.current) return;
       const x = t * pps;
-      if (playhead.current) { playhead.current.style.transform = `translateX(${labelW + x}px)`; playhead.current.style.visibility = x < box.current!.scrollLeft - 1 ? "hidden" : "visible"; }
+      if (playhead.current) { playhead.current.style.transform = `translateX(${labelW + GUTTER + x}px)`; playhead.current.style.visibility = GUTTER + x < box.current!.scrollLeft - 1 ? "hidden" : "visible"; }
       if (head.current) head.current.style.transform = `translateX(${x}px)`;
       const b = box.current;
       if (b && clock.playing && !ui.fit) {
-        const px = labelW + x;
+        const px = labelW + GUTTER + x;
         if (px > b.scrollLeft + b.clientWidth - 40 || px < b.scrollLeft + labelW) b.scrollLeft = Math.max(0, px - labelW - 40);
       }
     };
@@ -86,20 +91,20 @@ export function Timeline() {
       const current = useStore.getState().ui;
       const next = clamp((current.fit ? pps : current.pps) * Math.exp(-e.deltaY * 0.002), 8, 500);
       setUI({ pps: next });
-      requestAnimationFrame(() => { b.scrollLeft = Math.max(0, t * next - (e.clientX - rect.left - labelW)); });
+      requestAnimationFrame(() => { b.scrollLeft = Math.max(0, GUTTER + t * next - (e.clientX - rect.left - labelW)); });
     };
     b.addEventListener("wheel", onWheel, { passive: false });
     return () => b.removeEventListener("wheel", onWheel);
   });
 
   if (!spec || !meta) return <div className="flex-1 bg-panel" />;
-  const dur = spec.duration, onset = soundOnset(spec, lead), laneW = ui.fit && width ? Math.max(1, width - labelW) : Math.max(240, dur * pps + 48);
+  const dur = spec.duration, onset = soundOnset(spec, lead), laneW = ui.fit && width ? Math.max(1, width - labelW) : Math.max(240, GUTTER + dur * pps + 48);
 
   const snapT = (t: number, exclude: E.KeyRef[] = [], noPlayhead = false, playhead = clock.t) => {
     const c = [0, dur];
     if (!noPlayhead) c.push(playhead);
     for (const [n, keys] of Object.entries(spec.tracks)) for (const k of keys) if (!exclude.some((x) => x.prop === n && Math.abs(x.t - k.t) < 1e-6)) c.push(k.t);
-    for (let i = 1; i < spec.edit.length; i++) c.push(pieceStart(spec, i));
+    for (let i = 0; i < spec.edit.length; i++) c.push(pieceStart(spec, i), pieceStart(spec, i) + spec.edit[i].out - spec.edit[i].in);
     for (const v of tl?.verses || []) for (const [a] of videoTimes(spec, v.t0, v.t1)) c.push(a);
     let best = t, bd = 7 / pps;
     for (const x of c) if (Math.abs(x - t) < bd) { bd = Math.abs(x - t); best = x; }
@@ -107,7 +112,7 @@ export function Timeline() {
   };
 
   // ---- gestures
-  const scrub = (e: React.PointerEvent, at?: number) => {
+  const scrub = (e: React.PointerEvent, at?: number, context?: InspectorContext) => {
     if (e.button !== 0) return;
     e.preventDefault(); e.stopPropagation();
     const was = clock.playing;
@@ -115,11 +120,11 @@ export function Timeline() {
     if (useStore.getState().sel) select(null);
     const go = (ev: { clientX: number; shiftKey: boolean }, t?: number) => clock.seek(ev.shiftKey ? snapT(t ?? timeAt(ev.clientX), [], true) : t ?? timeAt(ev.clientX));
     go(e, at);
-    track(e, box.current!, (m) => go(m), () => { if (was) clock.play(); }, { cursor: "ew", edge: edgeOpt() });
+    track(e, box.current!, (m) => go(m), () => { if (was) clock.play(); if (context) inspect(context); }, { cursor: "ew", edge: edgeOpt() });
   };
-  const laneDown = (e: React.PointerEvent) => {
+  const laneDown = (e: React.PointerEvent, group?: string) => {
     if (e.button !== 0) return;
-    if (!e.shiftKey) return scrub(e);
+    if (!e.shiftKey) return scrub(e, undefined, group ? motionContext(group) : undefined);
     e.preventDefault();
     const base = e.ctrlKey || e.metaKey ? selKeys() : [];
     const r0 = inner.current!.getBoundingClientRect(), x0 = e.clientX - r0.left, y0 = e.clientY - r0.top;
@@ -130,7 +135,7 @@ export function Timeline() {
       setMarquee(last);
     }, () => {
       setMarquee(null);
-      const ta = (last.x - labelW) / pps, tb = (last.x + last.w - labelW) / pps, items = [...base];
+      const ta = (last.x - labelW - GUTTER) / pps, tb = (last.x + last.w - labelW - GUTTER) / pps, items = [...base];
       for (const row of inner.current!.querySelectorAll<HTMLElement>("[data-lane]")) {
         const top = row.offsetTop, bottom = top + row.offsetHeight;
         if (bottom < last.y || top > last.y + last.h) continue;
@@ -138,6 +143,7 @@ export function Timeline() {
           if (k.t >= ta - 1e-6 && k.t <= tb + 1e-6 && !items.some((x) => x.prop === p && Math.abs(x.t - k.t) < 1e-6)) items.push({ prop: p, t: k.t });
       }
       selectKeys(items);
+      inspectSelection();
     }, { edge: edgeOpt() });
   };
   const keyDown = (e: React.PointerEvent, prop: string, k: Key) => {
@@ -147,6 +153,7 @@ export function Timeline() {
     if (e.shiftKey || e.ctrlKey || e.metaKey) {
       const i = current.findIndex((x) => E.sameKey(x, ref));
       selectKeys(i >= 0 ? current.filter((_, j) => j !== i) : [ref, ...current]);
+      track(e, box.current!, () => {}, (up) => { if (up.type !== "pointercancel") inspectSelection(); });
       return;
     }
     let items = current.some((x) => E.sameKey(x, ref)) ? [ref, ...current.filter((x) => !E.sameKey(x, ref))] : [ref];
@@ -162,14 +169,18 @@ export function Timeline() {
       let next: E.KeyRef[] | null = null;
       mutate((raw, c) => { next = E.moveKeys(raw, c, items, t - origin[0].t, origin); }, tag);
       if (next) { items = next; selectKeys(next); clock.seek((next as E.KeyRef[])[0].t); }
-    }, () => { endGesture(); if (!moved) clock.seek(k.t); }, { cursor: "ew", edge: edgeOpt() });
+    }, () => { endGesture(); if (!moved) clock.seek(k.t); inspectSelection(); }, { cursor: "ew", edge: edgeOpt() });
   };
   const pieceDown = (e: React.PointerEvent, i: number, side: "in" | "out" | null) => {
     if (e.button !== 0) return;
     e.preventDefault(); e.stopPropagation(); clock.pause(); endGesture();
     select({ type: "piece", i });
     const p = spec.edit[i];
-    if (!side) { clock.seek(clamp(timeAt(e.clientX), pieceStart(spec, i), pieceStart(spec, i) + p.out - p.in)); setUI({ tab: "recording", hideR: false }); return; }
+    if (!side) {
+      clock.seek(clamp(timeAt(e.clientX), pieceStart(spec, i), pieceStart(spec, i) + p.out - p.in));
+      track(e, box.current!, () => {}, () => inspectSelection());
+      return;
+    }
     const v0 = side === "in" ? p.in : p.out, start = timeAt(e.clientX), tag = `drag:trim:${performance.now()}`;
     track(e, box.current!, (m) => {
       const v = v0 + timeAt(m.clientX) - start;
@@ -177,7 +188,7 @@ export function Timeline() {
       const s = useStore.getState().spec!, q = s.edit[i];
       // show the frame at the edge being trimmed
       if (q) clock.seek(pieceStart(s, i) + (side === "in" ? 0 : q.out - q.in - 1e-3));
-    }, () => endGesture(), { cursor: "ew" });
+    }, () => { endGesture(); inspectSelection(); }, { cursor: "ew" });
   };
   // a fade handle sits at the inner end of its fade; the fade in counts from the first sound
   const fadeDown = (e: React.PointerEvent, side: "in" | "out") => {
@@ -186,7 +197,7 @@ export function Timeline() {
     // pointer capture sends dblclick to the scroll box, so a second press removes the fade
     const now = performance.now(), again = lastFadePress.side === side && now - lastFadePress.at < 400;
     lastFadePress = again ? { side: "", at: 0 } : { side, at: now };
-    if (again) return fadeReset(side);
+    if (again) { fadeReset(side); inspect("sound"); return; }
     const tag = `drag:fade:${performance.now()}`;
     track(e, box.current!, (m) => {
       const t = clamp(timeAt(m.clientX), 0, dur);
@@ -194,7 +205,7 @@ export function Timeline() {
       if (!m.altKey) v = Math.round(v * 20) / 20;
       v = r3(clamp(v, 0, side === "in" ? Math.max(0, dur - onset) : dur));
       mutate((raw) => { raw.audio = { ...raw.audio, [side === "in" ? "fade_in" : "fade_out"]: v }; }, tag);
-    }, () => endGesture(), { cursor: "ew", edge: edgeOpt() });
+    }, () => { endGesture(); inspect("sound"); }, { cursor: "ew", edge: edgeOpt() });
   };
   const fadeReset = (side: "in" | "out") => mutate((raw) => { raw.audio = { ...raw.audio, [side === "in" ? "fade_in" : "fade_out"]: 0 }; });
   const resizeLabels = (e: React.PointerEvent) => {
@@ -207,7 +218,7 @@ export function Timeline() {
     const t = timeAt(e.clientX), show = !e.buttons && t >= 0 && t <= dur && !(e.target as HTMLElement).closest("[data-label]");
     hover.current.style.display = hoverT.current.style.display = show ? "block" : "none";
     if (!show) return;
-    hover.current.style.transform = `translateX(${labelW + t * pps}px)`;
+    hover.current.style.transform = `translateX(${labelW + GUTTER + t * pps}px)`;
     hoverT.current.style.transform = `translateX(${t * pps + 6}px)`;
     hoverT.current.textContent = t.toFixed(2) + "s";
   };
@@ -216,6 +227,7 @@ export function Timeline() {
   const keyMenu = (e: React.MouseEvent, prop: string, k: Key) => {
     const ref = { prop, t: k.t }, cur = selKeys();
     if (!cur.some((x) => E.sameKey(x, ref))) selectKeys([ref]);
+    inspectSelection();
     const n = Math.max(1, selKeys().length), ease = k.ease || "inOutCubic";
     openMenu(e, [
       { head: n > 1 ? `${n} keys · ease into them` : "Ease into this key" },
@@ -228,6 +240,7 @@ export function Timeline() {
   };
   const pieceMenu = (e: React.MouseEvent, i: number) => {
     select({ type: "piece", i });
+    inspectSelection();
     const t = timeAt(e.clientX);
     openMenu(e, [
       { label: "Split here", run: () => split(t) },
@@ -271,34 +284,40 @@ export function Timeline() {
               <div onPointerDown={resizeLabels} className="absolute -right-1 top-0 bottom-0 z-50 w-2 cursor-col-resize hover:bg-gold/60" title="Drag to resize the labels" />
             </div>
             <div className="relative shrink-0 cursor-ew-resize" style={{ width: laneW }} onPointerDown={(e) => scrub(e)}>
+              <div className="absolute inset-y-0 right-0" style={{ left: GUTTER }}>
               {ticks.map((t, i) => {
                 const major = step >= 2 || i % 2 === 0;
                 return <div key={t} className={`absolute border-l border-line pl-1 text-[10.5px] text-faint ${major ? "top-0 h-full" : "top-[70%] h-[30%]"}`} style={{ left: t * pps }}>{major ? `${Number.isInteger(t) ? t : t.toFixed(1)}s` : ""}</div>;
               })}
               <div ref={head} onPointerDown={(e) => scrub(e)} className="ph-head absolute top-0 -ml-[6px] h-[13px] w-[13px] bg-gold" style={{ left: 0 }} title="Drag to scrub" />
               <div ref={hoverT} className="pointer-events-none absolute top-[3px] hidden rounded bg-black/80 px-1 text-[10px] text-ink" />
+              </div>
             </div>
           </div>
           {/* recording */}
-          <LaneRow labelW={labelW} laneW={laneW} scrub={scrub} tall label={<span>Recording</span>} lane="">
+          <LaneRow labelW={labelW} laneW={laneW} scrub={scrub} tall label={<button onClick={() => inspect("contents", true)} title="Define the take's contents">Recording</button>} lane="">
+            {spec.edit.map((p, i) => p.gap ? <div key={`gap-${i}`} data-gap data-lanebg
+              title={`${p.gap.toFixed(2)} s gap · background only, no recording sound · pull the clip's left edge back to restore footage`}
+              className="absolute inset-y-[3px] cursor-ew-resize overflow-hidden whitespace-nowrap rounded border border-dashed border-line px-2 py-0.5 text-[10.5px] text-faint"
+              style={{ left: (pieceStart(spec, i) - p.gap) * pps, width: p.gap * pps }}>Gap · {p.gap.toFixed(2)} s</div> : null)}
             {spec.edit.map((p, i) => {
               const a = pieceStart(spec, i), w = Math.max(4, (p.out - p.in) * pps), over = takeLen != null && p.out > takeLen + 0.05;
               const on = sel?.type === "piece" && sel.i === i;
               return (
-                <div key={i} onPointerDown={(e) => pieceDown(e, i, null)} onContextMenu={(e) => pieceMenu(e, i)}
+                <div key={i} data-piece={i} onPointerDown={(e) => pieceDown(e, i, null)} onContextMenu={(e) => pieceMenu(e, i)}
                   title={`take ${p.in.toFixed(2)}–${p.out.toFixed(2)} s · drag an edge to trim · right-click to split or delete${over ? " · past the end of the take: record a longer take" : ""}`}
                   className={`absolute top-[3px] bottom-[3px] cursor-pointer overflow-hidden whitespace-nowrap rounded-[5px] border px-2 py-0.5 text-[10.5px] ${over ? "stripes border-danger" : "border-[#4b6280] bg-[#2b3747] text-[#dce8f8] hover:border-blue"} ${on ? "outline outline-2 outline-blue" : ""}`}
                   style={{ left: a * pps, width: w }}>
                   {p.in.toFixed(2)}–{p.out.toFixed(2)}s
-                  <div onPointerDown={(e) => pieceDown(e, i, "in")} className="absolute inset-y-0 left-0 w-2 cursor-ew-resize bg-white/10 hover:bg-white/30" />
-                  <div onPointerDown={(e) => pieceDown(e, i, "out")} className="absolute inset-y-0 right-0 w-2 cursor-ew-resize bg-white/10 hover:bg-white/30" />
+                  <div data-trim="in" onPointerDown={(e) => pieceDown(e, i, "in")} className="absolute inset-y-0 left-0 w-2 cursor-ew-resize bg-white/10 hover:bg-white/30" />
+                  <div data-trim="out" onPointerDown={(e) => pieceDown(e, i, "out")} className="absolute inset-y-0 right-0 w-2 cursor-ew-resize bg-white/10 hover:bg-white/30" />
                 </div>
               );
             })}
             {spec.edit.slice(1).map((_, i) => <div key={"c" + i} className="pointer-events-none absolute inset-y-0 border-l border-dashed border-[#6a8ab0]" style={{ left: pieceStart(spec, i + 1) * pps }} />)}
           </LaneRow>
-          <LaneRow labelW={labelW} laneW={laneW} scrub={scrub} tall label={
-            <button className="flex w-full min-w-0 items-center gap-1.5 text-left" onClick={() => setUI({ tab: "look", hideR: false })} title="Sound settings (gain, fades) on the Look tab">
+          <LaneRow labelW={labelW} laneW={laneW} scrub={scrub} onDown={(e) => scrub(e, undefined, "sound")} tall label={
+            <button className="flex w-full min-w-0 items-center gap-1.5 text-left" onClick={() => inspect("sound", true)} title="Edit sound gain and fades">
               <span>Sound</span>
               <span className="num ml-auto truncate text-[10.5px] text-faint">{spec.audio.fade_in > 0 || spec.audio.fade_out > 0 ? `fades ${+spec.audio.fade_in.toFixed(2)} / ${+spec.audio.fade_out.toFixed(2)} s` : "no fades"}</span>
             </button>}>
@@ -324,14 +343,14 @@ export function Timeline() {
             const collapsed = !!ui.collapsed[group], nAnim = names.filter((n) => spec.tracks[n]?.length).length;
             return (
               <div key={group}>
-                <LaneRow labelW={labelW} laneW={laneW} scrub={scrub} className="bg-[#1d1c18]" lane={collapsed ? names.join(",") : ""} onDown={laneDown} onMenu={(e) => laneMenu(e, null)}
+                <LaneRow labelW={labelW} laneW={laneW} scrub={scrub} className="bg-[#1d1c18]" lane={collapsed ? names.join(",") : ""} onDown={(e) => laneDown(e, group)} onMenu={(e) => laneMenu(e, null)}
                   label={<button className="flex w-full items-center gap-1.5 text-left font-semibold text-ink" onClick={() => setUI({ collapsed: { ...ui.collapsed, [group]: !collapsed } })}>
                     <span className="text-faint">{collapsed ? "▸" : "▾"}</span>{group}<span className="ml-auto font-normal text-faint">{nAnim ? `${nAnim} animated` : ""}</span></button>}>
                   {collapsed && names.flatMap((n) => (spec.tracks[n] || []).map((k) => <Diamond key={n + k.t} k={k} on={isSel(n, k.t)} pps={pps} label={meta.props[n].label} onDown={(e) => keyDown(e, n, k)} onMenu={(e) => keyMenu(e, n, k)} />))}
                 </LaneRow>
                 {!collapsed && names.map((n) => (
-                  <LaneRow labelW={labelW} laneW={laneW} scrub={scrub} key={n} lane={n} onDown={laneDown} onMenu={(e) => laneMenu(e, n)}
-                    laneProps={{ onDoubleClick: (e) => { if ((e.target as HTMLElement).closest("[data-key]")) return; const raw = timeAt(e.clientX), t = clamp(e.altKey ? raw : snapT(raw), 0, dur); mutate((d, c) => E.keyAll(d, c, [n], t)); selectKeys([{ prop: n, t: r3(t) }]); clock.seek(t); } }}
+                  <LaneRow labelW={labelW} laneW={laneW} scrub={scrub} key={n} lane={n} onDown={(e) => laneDown(e, group)} onMenu={(e) => laneMenu(e, n)}
+                    laneProps={{ onDoubleClick: (e) => { if ((e.target as HTMLElement).closest("[data-key]")) return; const raw = timeAt(e.clientX), t = clamp(e.altKey ? raw : snapT(raw), 0, dur); mutate((d, c) => E.keyAll(d, c, [n], t)); selectKeys([{ prop: n, t: r3(t) }]); clock.seek(t); inspectSelection(); } }}
                     label={<LaneLabel name={n} def={meta.props[n]} spec={spec} />}>
                     {spec.tracks[n]?.length ? <Curve spec={spec} name={n} props={meta.props} pps={pps} /> : null}
                     {(spec.tracks[n] || []).map((k) => <Diamond key={k.t} k={k} on={isSel(n, k.t)} pps={pps} label={meta.props[n].label} onDown={(e) => keyDown(e, n, k)} onMenu={(e) => keyMenu(e, n, k)} />)}
@@ -365,7 +384,7 @@ function LaneRow({ labelW, laneW, scrub, label, children, lane, tall, className 
       <div className="relative shrink-0" style={{ width: laneW }}
         onPointerDown={(e) => { if (bare(e)) (onDown ?? scrub)(e); }}
         onContextMenu={(e) => { if (onMenu && bare(e)) onMenu(e); }} {...laneProps}>
-        {children}
+        <div data-lanebg className="absolute inset-y-0 right-0" style={{ left: GUTTER }}>{children}</div>
       </div>
     </div>
   );
@@ -414,7 +433,7 @@ function LaneLabel({ name, def, spec }: { name: string; def: PropDef; spec: Spec
     <>
       <button onClick={(e) => { e.stopPropagation(); toggleKey(name); }} title="Add / remove a key at the playhead"
         className={`grid size-5 place-items-center rounded border text-[11px] ${here ? "border-gold/50 text-gold" : keys.length ? "border-transparent text-green" : "border-transparent text-faint hover:text-mute"}`}>◆</button>
-      <span className="flex-1 truncate">{def.label}</span>
+      <button className="min-w-0 flex-1 truncate text-left hover:text-ink" title={`Edit ${def.group.toLowerCase()} animation`} onClick={() => inspect(motionContext(def.group), true)}>{def.label}</button>
       <span className="num text-[10.5px] text-faint">{Math.abs(v) >= 10 ? v.toFixed(1) : v.toFixed(2)}</span>
     </>
   );

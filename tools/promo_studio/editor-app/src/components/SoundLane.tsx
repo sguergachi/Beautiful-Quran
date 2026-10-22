@@ -68,7 +68,7 @@ export function SoundLane({ spec, wave, pps, onset, onFadeDown }: Props) {
         <div key={side} data-key onPointerDown={(e) => onFadeDown(e, side)}
           title={`${label} · drag to change (Alt: no rounding) · double-click to remove`}
           className="fade-handle group absolute top-0 z-10 -ml-[6px] flex h-full w-3 cursor-ew-resize justify-center" style={{ left: t * pps }} data-side={side}>
-          <div className="mt-px size-[9px] rotate-45 rounded-[1px] border border-[#fff3cc] bg-gold shadow-[0_0_0_2px_#0006] group-hover:scale-125" />
+          <div className="mt-px size-[9px] rotate-45 rounded-[1px] border border-[#fff3cc] bg-gold shadow-[0_0_0_2px_#0006] transition-transform duration-150 ease-out group-hover:scale-125" />
         </div>
       ))}
     </>
