@@ -149,8 +149,11 @@ through it. Verse advances and tall-verse line follow both use continuous
 verse and the next line glide smoothly. Word-band math lives in pure
 `wordBandDeltaPx`. Non-active ayahs recess only while a reciting session is
 live (`isPlaying || isBuffering` on this surah) via `.scroll[data-reciting]`
-and one paper veil per inactive ayah — at rest every ayah is Plain. Play/pause
-must not React-reconcile the whole surah.
+and one paper veil per inactive ayah — at rest every ayah is Plain. While the
+stream download holds the voice and nothing is spoken, `data-stream-wait`
+(`ReaderHighlightState.readerWaitsOnStream`) covers the *whole* page under the
+same paper, due verse and basmalah included, so it matches Android's
+`StreamWaitPolicy`. Play/pause must not React-reconcile the whole surah.
 JS-driven washes / ribbons / entrance use the `motion` package
 (`web/src/ui/motion/easing.ts` for shared Android curves). Active ink is the
 smootherstep directional mask wash (soft faded edge — product fidelity).

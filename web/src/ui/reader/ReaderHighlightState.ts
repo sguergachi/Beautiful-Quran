@@ -59,6 +59,23 @@ export function readerAyahInkPolicyActive(
   return inkAyah === ayah || leadAyah === ayah
 }
 
+/** How long buffering must hold before the page settles into the wait. */
+export const STREAM_WAIT_SETTLE_MS = 500
+
+/**
+ * Waiting on the stream download: the spinner is up and nothing is spoken
+ * yet, so the whole page — the due verse and the opening basmalah included
+ * — waits under Upcoming paper, not the reciter's verse alone. A recited
+ * word anchor (mid-chapter rebuffer, ink frozen on the last word) un-waits
+ * the page, exactly as Android's [readerWaitingOnStream] gate does.
+ */
+export function readerWaitsOnStream(
+  isBuffering: boolean,
+  activeWord: ActiveWord | null | undefined,
+): boolean {
+  return isBuffering && activeWord == null
+}
+
 /**
  * Pure playback-to-reader projection shared by every store tick. Keeping this
  * out of AppStore makes fade-lead and full ActiveWord identity unit-testable.

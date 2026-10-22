@@ -62,7 +62,12 @@ import { ReaderFocusController } from './focus/ReaderFocusController'
 import { selectedPlaybackAyah } from './selectedPlaybackAyah'
 import { shouldPauseFollowOnDrag } from './followGesture'
 import { isRecitingSession } from './recitingActive'
-import { readerAyahInkPolicyActive, readerInkAyah } from './ReaderHighlightState'
+import {
+  STREAM_WAIT_SETTLE_MS,
+  readerAyahInkPolicyActive,
+  readerInkAyah,
+  readerWaitsOnStream,
+} from './ReaderHighlightState'
 import {
   AYAH_SPACER_EST_PX,
   useProgressiveAyahWindow,
@@ -340,6 +345,23 @@ export function ReaderScreen({
     isBuffering: state.player.isBuffering,
   })
   const receded = recitingActive
+  // Waiting on the stream download: the whole page — the due verse and the
+  // opening basmalah included — settles under Upcoming paper until the voice
+  // speaks (same rule as Android). Debounced against Media3's brief
+  // per-item buffering dips, released the moment a word is spoken.
+  const [streamWait, setStreamWait] = useState(false)
+  const spokenWord = state.activeWord != null
+  useEffect(() => {
+    if (spokenWord || !state.player.isBuffering) {
+      setStreamWait(false)
+      return
+    }
+    const settle = window.setTimeout(
+      () => setStreamWait(readerWaitsOnStream(state.player.isBuffering, state.activeWord)),
+      STREAM_WAIT_SETTLE_MS,
+    )
+    return () => window.clearTimeout(settle)
+  }, [state.player.isBuffering, spokenWord, state.activeWord])
   // This sheet is keyed by chapter, so the ref starts false at every opening.
   const recitedSinceOpen = useRef(false)
 
@@ -1392,6 +1414,7 @@ export function ReaderScreen({
               className="scroll"
               ref={scrollRef}
               data-reciting={recitingActive || undefined}
+              data-stream-wait={streamWait || undefined}
               data-search-flash={flashTarget != null || undefined}
               data-search-focus-active={flashTarget?.focusActive || undefined}
               data-chapter-advancing={chapterAdvancing || undefined}

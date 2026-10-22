@@ -401,10 +401,21 @@ tween-vs-snap rules, sweep entry and residual rules, repeat wash timing, the
   The base/repeat wash position is never part of this modulation.
   [GLIMMER.md](GLIMMER.md) is the canonical cross-platform rendering,
   tuning, and visual-verification specification.
+- **Stream wait**: `readerWaitingOnStream(isBuffering, activeWord)`
+  (`StreamWaitPolicy.kt`, JVM-tested): while the spinner is up and nothing is
+  spoken for this performance, the whole page — the due verse and the opening
+  basmalah included — waits under Upcoming paper, not the reciter's verse
+  alone. A recited word anchor (mid-chapter rebuffer, ink frozen on the last
+  word) un-waits the page; a provisionally-lit tap word does not count as
+  spoken. The wait settles after `STREAM_WAIT_DEBOUNCE_MS` so Media3's brief
+  per-item buffering dips cannot flash the page, and releases the moment a
+  word is spoken. Web parity: `readerWaitsOnStream` +
+  `data-stream-wait` CSS covers in `styles.css`.
 - **Basmalah preface**: `prefaceState(isActive, dimmed)` /
   `prefaceWashProgress(positionMs, durationMs, segments)` for the surah-header
   basmalah VectorDrawable (Active during the Al-Fatihah 1:1 lead-in clip, with
-  an RTL `letterFadeIn` wash; Upcoming while recessed; Plain at rest). With the
+  an RTL `letterFadeIn` wash; Upcoming while recessed; Plain at rest; `dimmed`
+  beats `isActive` so the stream wait covers the preface too). With the
   clip's word `segments` the wash is locked to the voice by
   [`BasmalahWash`](../app/src/main/java/com/beautifulquran/domain/BasmalahWash.kt):
   each of the four words owns the **band of artwork its glyphs cover** (the

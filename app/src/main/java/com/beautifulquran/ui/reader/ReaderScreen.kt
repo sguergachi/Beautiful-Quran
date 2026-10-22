@@ -753,6 +753,24 @@ fun ReaderScreen(
             recitingActive = false
         }
     }
+    // Waiting on the stream download: the reciter's due verse waits under
+    // Upcoming paper with everything else (user rule — not the current verse
+    // alone). Released the moment a word is spoken or buffering ends, and
+    // debounced so Media3's brief per-item dips cannot flash the page.
+    var streamWait by remember { mutableStateOf(false) }
+    LaunchedEffect(playerState.isBuffering) {
+        val spoken = activeWordState.value?.let { !it.fromTap } ?: false
+        when {
+            spoken -> streamWait = false
+            playerState.isBuffering -> {
+                delay(STREAM_WAIT_DEBOUNCE_MS)
+                if (readerWaitingOnStream(playerState.isBuffering, activeWordState.value)) {
+                    streamWait = true
+                }
+            }
+            else -> streamWait = false
+        }
+    }
     val view = LocalView.current
     DisposableEffect(view, recitingActive, keepStatusBarVisible) {
         val window = view.context.findActivity()?.window
@@ -3118,7 +3136,14 @@ fun ReaderScreen(
                             ) {
                                 BasmalahBlock(
                                     active = isThisSurahPlaying && activeBasmalah == true,
-                                    dimmed = recitingActive && activeBasmalah != true,
+                                    // The stream wait covers the opening
+                                    // clip too: until the audio speaks, the
+                                    // basmalah waits under Upcoming paper.
+                                    dimmed = if (streamWait) {
+                                        true
+                                    } else {
+                                        recitingActive && activeBasmalah != true
+                                    },
                                     fontScale = settings.fontScale,
                                     washProgress = viewModel.basmalahWashProgress,
                                     onClick = {
@@ -3135,7 +3160,11 @@ fun ReaderScreen(
                             // never every visible AyahBlock (docs/PERFORMANCE.md).
                             val activeWord by remember(ayah.number) {
                                 derivedStateOf {
-                                    activeWordState.value?.takeIf { it.ayah == ayah.number }
+                                    // The stream wait sees no recited word —
+                                    // even a tap seed's provisional wash gives
+                                    // way to the Upcoming cover.
+                                    activeWordState.value
+                                        ?.takeIf { it.ayah == ayah.number && !streamWait }
                                 }
                             }
                             // Ink policy matches web readerAyahInkPolicyActive: the
@@ -3185,7 +3214,11 @@ fun ReaderScreen(
                                 activeWord = activeWord,
                                 playbackSpeed = playerState.speed,
                                 isActiveAyah = policyActive,
-                                dimmed = recitingActive && !policyActive,
+                                dimmed = if (streamWait) {
+                                    true
+                                } else {
+                                    recitingActive && !policyActive
+                                },
                                 // Keep the page readable the moment a jump
                                 // commits — the decelerating scroll is the cue,
                                 // and a 7 % fade would hide it.
