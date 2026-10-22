@@ -61,7 +61,6 @@ import com.beautifulquran.domain.TajweedPacing
 import com.beautifulquran.domain.HighlightClock
 import com.beautifulquran.domain.EnglishWordAlignment
 import com.beautifulquran.ui.theme.BeautifulQuranTheme
-import com.beautifulquran.ui.theme.LocalQuranAccents
 import com.beautifulquran.ui.theme.quietClickable
 import androidx.media3.common.Player
 import kotlin.math.min
@@ -222,14 +221,14 @@ private fun PaperInkStudyPage(app: QuranApp, study: PaperInkStudy) {
     val tick = remember { mutableLongStateOf(SystemClock.uptimeMillis()) }
     val preview = remember { mutableStateOf(InkPreview.Voice) }
     val english = remember { mutableStateOf(false) }
-    val mergingPools = remember { mutableStateOf(false) }
+    val flowingInk = remember { mutableStateOf(false) }
     val thickness = remember { mutableFloatStateOf(.25f) }
     val fontScale = remember { mutableFloatStateOf(.91f) }
     val fillAmount = remember { mutableFloatStateOf(1f) }
     val reflection = remember { mutableFloatStateOf(.5f) }
     val softness = remember { mutableFloatStateOf(0f) }
     val paper = Color(0xFFFAF3E8)
-    val repeatColor = LocalQuranAccents.current.repeatInk
+    val repeatColor = Color(0xFFC25F3B)
     LaunchedEffect(study) {
         app.player.playSurah(1, 3, 1, study.reciter, "Al-Fatihah", preserveRepeatRange = false, autoplay = false)
         app.player.setSpeed(1f)
@@ -299,7 +298,7 @@ private fun PaperInkStudyPage(app: QuranApp, study: PaperInkStudy) {
                         }
                         word.shader.setFloatUniform("progress", progress)
                         word.shader.setFloatUniform("wet", wet)
-                        word.shader.setFloatUniform("spreadMethod", if (mergingPools.value) 1f else 0f)
+                        word.shader.setFloatUniform("spreadMethod", if (flowingInk.value) 1f else 0f)
                         word.shader.setFloatUniform("repeatTint", if (repeat && preview.value != InkPreview.Dry)
                             study.repeatChain.alpha else 0f)
                         word.shader.setFloatUniform("reflectionStrength", reflection.floatValue)
@@ -337,10 +336,10 @@ private fun PaperInkStudyPage(app: QuranApp, study: PaperInkStudy) {
                 }
             }
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                listOf("Inside out", "Merging pools").forEachIndexed { index, label ->
-                    val active = mergingPools.value == (index == 1)
+                listOf("Inside out", "Flowing ink").forEachIndexed { index, label ->
+                    val active = flowingInk.value == (index == 1)
                     Text(label, Modifier.semantics { selected = active }.quietClickable {
-                        mergingPools.value = index == 1
+                        flowingInk.value = index == 1
                     }.padding(vertical = 8.dp), color = if (active) MaterialTheme.colorScheme.primary
                         else MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
                 }

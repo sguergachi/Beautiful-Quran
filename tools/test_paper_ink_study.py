@@ -8,12 +8,11 @@ from PIL import Image, ImageDraw, ImageFont
 from scipy.ndimage import distance_transform_edt, label
 
 from build_paper_ink_study import (
-    ARABIC_FONT, ENGLISH_FONT, ROOT, SS, connected_letter_flow, filling_field, liquid_surface,
-    reservoir_growth, wicking_basins,
+    ARABIC_FONT, ENGLISH_FONT, ROOT, SS, filling_field, liquid_surface, single_origin_wave, wicking_basins,
 )
 
 
-def material(text, arabic=False, merging=True):
+def material(text, arabic=False, flowing=True):
     path, size, direction = (ARABIC_FONT, 160, 'rtl') if arabic else (ENGLISH_FONT, 80, 'ltr')
     font = ImageFont.truetype(str(path), size)
     box = font.getbbox(text, direction=direction)
@@ -22,32 +21,32 @@ def material(text, arabic=False, merging=True):
                               font=ImageFont.truetype(str(path), size * SS), fill=255, direction=direction)
     ink = np.array(image) > 127
     depth = (distance_transform_edt(ink) - distance_transform_edt(~ink)) / SS
-    arrival, duration = filling_field(text, ink, depth, box, font.getmetrics()[0], path, size, merging=merging)
+    arrival, duration = filling_field(text, ink, depth, box, font.getmetrics()[0], path, size, flowing=flowing)
     return ink, depth, arrival, duration
 
 
 class PaperInkStudyTest(unittest.TestCase):
-    def test_joined_letters_exchange_ink_smoothly_without_retiming_their_interiors(self):
-        ink = np.zeros((80, 320), dtype=bool)
-        ink[28:52, 20:300] = True
-        owners = np.broadcast_to((np.arange(320) >= 160).astype(int), ink.shape)
-        arrival = np.where(owners == 0, .2, .8)
-        flowing = connected_letter_flow(arrival, ink, owners, 160)
-        # The old ownership cut jumped 60% of the word in one raster pixel.
-        self.assertLess(np.max(np.abs(np.diff(flowing[40, 100:220]))), .04)
-        self.assertTrue(np.all(np.diff(flowing[40, 20:300]) >= -1e-12))
-        np.testing.assert_array_equal(flowing[:, :100], arrival[:, :100])
-        np.testing.assert_array_equal(flowing[:, 220:], arrival[:, 220:])
-        self.assertGreaterEqual(flowing[ink].min(), .2 - 1e-12)
-        self.assertLessEqual(flowing[ink].max(), .8 + 1e-12)
+    def test_one_origin_advances_through_a_connected_stroke_without_new_islands(self):
+        ink = np.zeros((60, 420), dtype=bool)
+        ink[10:50, 10:410] = True
+        depth = distance_transform_edt(ink) / SS
+        for flowing in (False, True):
+            field = single_origin_wave(ink, depth, np.zeros(ink.shape, dtype=int), [0], False, flowing)
+            self.assertEqual(1, np.count_nonzero(ink & (field == 0)))
+            for phase in np.linspace(.01, .99, 99):
+                _, count = label(ink & (field <= phase), np.ones((3, 3)))
+                self.assertEqual(1, count)
+            self.assertLess(np.median(field[ink & (np.indices(ink.shape)[1] < 100)]),
+                            np.median(field[ink & (np.indices(ink.shape)[1] > 300)]))
 
-    def test_close_but_disconnected_letters_keep_their_own_ink(self):
+    def test_detached_mark_inherits_wave_arrival_instead_of_starting_ahead(self):
         ink = np.zeros((80, 320), dtype=bool)
-        ink[28:52, 20:159] = True
-        ink[28:52, 161:300] = True
-        owners = np.broadcast_to((np.arange(320) >= 160).astype(int), ink.shape)
-        arrival = np.where(owners == 0, .2, .8)
-        np.testing.assert_array_equal(connected_letter_flow(arrival, ink, owners, 160), arrival)
+        ink[40:65, 10:300] = True
+        ink[10:20, 250:260] = True
+        field = single_origin_wave(ink, distance_transform_edt(ink) / SS,
+                                   np.zeros(ink.shape, dtype=int), [0], False)
+        self.assertGreater(field[10:20, 250:260].min(), field[40:65, 245:265].min())
+        self.assertEqual(1, np.count_nonzero(ink & (field == 0)))
 
     def test_liquid_surface_does_not_flatten_when_the_font_raster_is_half_size(self):
         fields = []
@@ -61,72 +60,43 @@ class PaperInkStudyTest(unittest.TestCase):
         # one-level allowance is for finite differences and quantization.
         self.assertLessEqual(np.max(np.abs(fields[0].astype(int) - fields[1].astype(int))), 1)
 
-    def test_uniform_stroke_receives_separate_pools_before_they_join(self):
-        ink = np.zeros((60, 420), dtype=bool)
-        ink[10:50, 10:410] = True
-        growth = np.ones(ink.shape)
-        growth[ink] = reservoir_growth(ink, distance_transform_edt(ink) / SS)
-        # Constant stroke thickness rules out contour erosion as the cause
-        # of two islands. Both are supplied before the connecting middle.
-        pieces, count = label(ink & (growth < .3))
-        self.assertEqual(2, count)
-        self.assertTrue((np.bincount(pieces.ravel())[1:] > 100).all())
-        _, count = label(ink & (growth < .6))
-        self.assertEqual(1, count)
+    def test_both_modes_have_one_advancing_front_on_the_pictured_arabic_and_a_loop(self):
+        for text, arabic in [('O', False), ('ٱلرَّحِيمِ', True), ('ٱلۡحَمۡدُ', True)]:
+            for flowing in (False, True):
+                ink, _, arrival, _ = material(text, arabic, flowing=flowing)
+                components, _ = label(ink, np.ones((3, 3)))
+                for phase in np.linspace(.02, .98, 49):
+                    for part in np.unique(components[ink]):
+                        _, count = label((components == part) & (arrival < phase), np.ones((3, 3)))
+                        self.assertLessEqual(count, 1, (text, flowing, phase, part))
 
-    def test_spread_modes_share_the_outline_and_letter_schedule_but_change_growth(self):
-        for text, arabic in [('OO', False), ('بِسۡمِ', True)]:
-            with self.subTest(text=text):
-                ink, depth, old, old_duration = material(text, arabic, merging=False)
-                new_ink, new_depth, new, new_duration = material(text, arabic)
-                np.testing.assert_array_equal(ink, new_ink)
-                np.testing.assert_array_equal(depth, new_depth)
-                self.assertEqual(old_duration, new_duration)
-                self.assertGreater(np.mean(np.abs(old[ink] - new[ink])), .02)
+    def test_modes_keep_the_same_contour_and_window_with_different_flow_rates(self):
+        ink, depth, first, duration = material('ٱلۡحَمۡدُ', True, flowing=False)
+        other, other_depth, second, second_duration = material('ٱلۡحَمۡدُ', True, flowing=True)
+        np.testing.assert_array_equal(ink, other)
+        np.testing.assert_array_equal(depth, other_depth)
+        self.assertEqual(duration, second_duration)
+        self.assertGreater(np.mean(np.abs(first[ink] - second[ink])), .005)
 
-    def test_separate_deposits_merge_within_one_letter(self):
-        ink, _, arrival, _ = material('O')
-        # Two supplied regions grow independently, then meet around the ring.
-        # This should remain visible after smoothing the actual font field.
-        for phase in (.35, .5):
-            pieces, count = label(ink & (arrival < phase))
-            self.assertEqual(2, count)
-            self.assertTrue((np.bincount(pieces.ravel())[1:] > 100).all())
-        _, count = label(ink & (arrival < .75))
-        self.assertEqual(1, count)
-
-    def test_single_letter_fills_its_interior_before_both_sides_of_its_contour(self):
-        ink, depth, arrival, _ = material('O')
-        x = np.indices(ink.shape)[1]
-        for half in (x < ink.shape[1] / 2, x >= ink.shape[1] / 2):
-            core = ink & half & (depth > depth.max() * .7)
-            edge = ink & half & (depth < .5)
-            self.assertLess(np.median(arrival[core]), np.median(arrival[edge]) - .12)
-        # The left contour can remain empty after the right interior fills:
-        # this cannot be produced by a directional cut through the letter.
-        left_edge = ink & (x < ink.shape[1] / 2) & (depth < .5)
-        right_core = ink & (x >= ink.shape[1] / 2) & (depth > depth.max() * .7)
-        self.assertLess(np.median(arrival[right_core]), np.median(arrival[left_edge]) - .12)
-
-    def test_english_letters_start_left_to_right_with_overlapping_blooms(self):
+    def test_english_detached_letters_continue_left_to_right(self):
         ink, _, arrival, _ = material('OO')
         pieces, count = label(ink)
         self.assertEqual(2, count)
         ordered = sorted(range(1, count + 1), key=lambda p: np.nonzero(pieces == p)[1].mean())
         left, right = (arrival[pieces == p] for p in ordered)
         self.assertLess(np.median(left), np.median(right))
-        self.assertLess(right.min(), left.max())
+        self.assertGreater(right.min(), left.max())
 
-    def test_arabic_letters_start_right_to_left_with_overlapping_blooms(self):
+    def test_arabic_detached_letters_continue_right_to_left(self):
         ink, _, arrival, _ = material('اا', arabic=True)
         pieces, count = label(ink)
         self.assertEqual(2, count)
         ordered = sorted(range(1, count + 1), key=lambda p: -np.nonzero(pieces == p)[1].mean())
         right, left = (arrival[pieces == p] for p in ordered)
         self.assertLess(np.median(right), np.median(left))
-        self.assertLess(left.min(), right.max())
+        self.assertGreater(left.min(), right.max())
 
-    def test_whole_word_ligatures_keep_separate_letter_blooms(self):
+    def test_whole_word_ligatures_keep_their_letter_pacing_window(self):
         for text in ('بِسۡمِ', 'لِلَّهِ'):
             with self.subTest(text=text):
                 _, _, _, duration = material(text, arabic=True)

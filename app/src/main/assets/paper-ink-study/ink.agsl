@@ -59,8 +59,8 @@ half4 main(float2 p) {
         vertical * vertical * vertical * vertical);
     float pooling = smoothstep(0.25, 0.8, surface.b);
     // Dry repeat pigment softens toward warm paper; fresh orange stays rich.
-    float3 dryRepeat = mix(repeatColor, float3(0.8, 0.74, 0.65), 0.18);
-    float3 wetRepeat = repeatColor * float3(0.95, 0.88, 0.7);
+    float3 dryRepeat = mix(repeatColor, float3(0.86, 0.82, 0.77), 0.3);
+    float3 wetRepeat = repeatColor;
     float3 pigment = mix(float3(6.0, 7.0, 8.0) / 255.0,
         mix(dryRepeat, wetRepeat, moisture), repeatPass);
     pigment *= 1.0 - pooling * 0.2 * volume * (1.0 - repeatPass);

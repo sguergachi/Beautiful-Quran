@@ -12,8 +12,8 @@ import numpy as np
 import skia
 
 ASSETS = Path(__file__).resolve().parents[1] / 'app/src/main/assets/paper-ink-study'
-DRY_REPEAT = np.array([180, 85, 30]) * .82 + np.array([.8, .74, .65]) * 255 * .18
-WET_REPEAT = np.array([180, 85, 30]) * np.array([.95, .88, .7])
+DRY_REPEAT = np.array([194, 95, 59]) * .7 + np.array([.86, .82, .77]) * 255 * .3
+WET_REPEAT = np.array([194, 95, 59])
 
 
 class PaperInkShaderTest(unittest.TestCase):
@@ -38,7 +38,7 @@ class PaperInkShaderTest(unittest.TestCase):
         for name, child in children.items():
             builder.setChild(name, child)
         uniforms = dict(progress=float(progress), reflectionStrength=0., lightSoftness=0., retained=float(retained),
-                        wet=float(wet), weight=float(weight), aa=.9, repeatColor=[180/255, 85/255, 30/255],
+                        wet=float(wet), weight=float(weight), aa=.9, repeatColor=[194/255, 95/255, 59/255],
                         repeatPass=float(repeat), repeatTint=float(tint), spreadMethod=float(method),
                         letterDuration=spec['letterDuration'], origin=[0., 0.])
         for name, value in uniforms.items():
@@ -84,9 +84,6 @@ class PaperInkShaderTest(unittest.TestCase):
             np.testing.assert_allclose(wet, WET_REPEAT, atol=1)
             np.testing.assert_allclose(dry, DRY_REPEAT, atol=1)
             wet_hue, wet_light, wet_sat = colorsys.rgb_to_hls(*(wet / 255))
-            _, original_light, original_sat = colorsys.rgb_to_hls(180/255, 85/255, 30/255)
-            self.assertLess(wet_light, original_light)
-            self.assertGreater(wet_sat, original_sat)
             dry_hue, dry_light, dry_sat = colorsys.rgb_to_hls(*(dry / 255))
             self.assertGreater(dry_light, wet_light)
             self.assertLess(dry_sat, wet_sat)

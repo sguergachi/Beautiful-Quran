@@ -25,35 +25,28 @@ lines. Text stays in its normal reading order. **Letter starts and words** progr
 right-to-left in Arabic and left-to-right in English, matching each script's
 reading order. The continuous wash never skips an earlier word.
 
-**Inside out / Merging pools** switches the ink spread without restarting
-playback or changing the other controls. **Inside out** is the default,
-using the earlier depth-led interior spread. **Merging pools** is the
-Pentiment-inspired comparison, with separated deposits joining within each
-letter. Both develop from deep interiors toward the contour and branches.
-Direction comes from overlapping letter start times: roughly three letter
-blooms share the active part of the word. There is no pixel-position sweep
-inside a letter. The existing Arabic tajweed pacing orchestrates the starts
-on the word's media clock; English uses its linear clock.
+**Inside out / Flowing ink** switches the ink spread without restarting
+playback or changing the other controls. Both now carry one advancing wave
+from the leading side of the word, right to left in Arabic and left to right
+in English. Inside out favours deep passages more strongly; Flowing ink has
+more even travel through narrow strokes. The former Merging pools comparison
+has been replaced: neither mode starts separate reservoirs ahead of the wave.
+The existing Arabic tajweed pacing maps the wave to the word's media clock;
+English uses its linear clock.
 
 HarfBuzz associates the original printed ink and marks with shaped clusters.
 Some Hafs substitutions merge several letters or a whole word into one glyph.
 A second measurement run without contextual/ligature substitutions recovers
-individual letter advance shares within those clusters. It supplies pool
-anchors only; the original shaped font always supplies the printed contour.
-A baked nearest-pool travel field partitions connected ink into letter basins
-along the strokes, favouring wider passages and never crossing paper gaps.
-Inside out blends local stroke depth with travel from its deep pool, keeping
-the original spread. In Merging pools, one to three reservoirs supply ink with small local
-delays. The reservoir fronts spread along connected strokes, join, and soak
-out to the contour. Deep passages carry ink faster; distant parts no longer
-appear together merely because they have the same stroke thickness. Small
-marks keep a single deposit and follow their associated letter. A soft temporal
-front scales to the letter duration. Where letter basins touch, a tapered
-diffusion band blends their arrival times along the connected ink. It follows
-stroke paths through the join, keeping distant letter interiors and their
-reading-order starts intact. Paper gaps do not conduct that blend. Both spread
-methods use it; the printed contour stays unchanged. The solve is baked into
-the maps and adds no shader work or runtime sampling.
+individual letter advance shares within those clusters. It supplies ownership
+only; the original shaped font always supplies the printed contour.
+One root supplies geodesic travel through each connected body, so every newly
+filled region connects back to the advancing front. A detached letter body
+continues after the previous body's wave reaches its end. Detached dots and
+marks inherit the arrival at the nearest point on their own letter's body,
+plus the crossing time; they have no independently scheduled start. Virtual
+gap travel deposits no ink on paper. No ownership seam or secondary origin is
+introduced inside a connected stroke. All travel is baked into the maps,
+adding no shader work or runtime sampling.
 
 This is a geometry-guided approximation of letter ownership and liquid spread,
 not anatomical letter outlines recovered from a ligature, a fluid solver or
@@ -68,8 +61,8 @@ the stroke interior and localized window reflections. Fresh carbon pigment
 is a near-black `#060708`; it settles to the slightly lighter warm charcoal
 `#34322E` as it dries. Pooling can deepen the wet pigment further, while the
 localized reflection still catches light. The wet orange repeat accent
-(about `#AB4B15`, a slightly darker, more saturated version of the Paper accent)
-dries to a slightly paler, less saturated orange (about `#B86836`)
+(`#C25F3B`, a warm orange terracotta)
+dries to a slightly paler, less saturated terracotta (about `#CA8164`)
 while its chain is held, then releases to dry charcoal with the chain. The
 surface keeps curving through broad strokes rather than flattening behind a
 thick outline. The just-deposited film is a little fuller and more reflective;
@@ -111,7 +104,7 @@ the same three verse groups, default 91%. It changes only drawing scale,
 keeping playback and the pooling setting intact. All dials reset when the study is reopened.
 
 When verse 2 repeats, its entire previously read black base stays visible.
-The wash brings in a deeper wet Paper orange (about `#AB4B15`)
+The wash brings in the wet terracotta orange (`#C25F3B`)
 together with the fuller wet shape and reflection. Every reached word holds
 orange with the chain, softening to the paler dry orange as its individual
 wet film dries. Both passes
@@ -146,7 +139,7 @@ Cached native AGSL shaders draw ten Arabic and 27 English word instances.
 Committed 4× contour maps preserve the font; smooth surface maps supply normal XY and film
 depth. There is no per-frame shaping, rasterization, or bitmap upload. The
 material maps are generated from the font outlines, without stroke inference.
-Field R carries the earlier Inside out arrival phase, G the Merging pools
+Field R carries the Inside out arrival phase, G the Flowing ink
 phase, and B the unchanged contour distance. The manifest supplies letter
 duration once at shader creation. The surface map carries normal XY and film depth. Wicking
 is solved only in the generator. The shader uses the same cached textures,
@@ -172,14 +165,12 @@ back to the regular contour while the repeat remains fully orange.
 releasing only after the repeated verse, and clearing the chain on Again.
 `PaperInkEnglishWindowsTest` checks reordered meaning, continuous word clocks,
 proportional fallback and finishing before a repeat.
-The generator's geometry regressions check interior-before-edge filling on
-both sides of a letter, left-to-right English and right-to-left Arabic overlapping blooms, multi-letter Hafs
-ligatures, single-pixel marks, separate deposits merging inside one letter,
-capillary paths around a paper gap, and distinct growth on identical outlines
-and schedules when switching spread methods. A surface-scale regression checks
-equivalent film depth and curvature at half-size font rasterization.
-Connected-flow regressions check a smooth, bounded transition through a shared
-stroke with fixed interiors, and exact independence across a narrow paper gap.
+The generator's geometry regressions check a single advancing front on a
+uniform stroke, a loop and the pictured Arabic forms; detached letter bodies
+continue in reading order, and detached marks inherit the body's wave.
+They also cover unchanged contours across modes, full-word completion,
+ligature letter counts, single-pixel marks, capillary travel around paper gaps
+and equivalent film depth and curvature at half-size font rasterization.
 The controlled reflection is identical in recordings and on a still phone;
 physical-device performance and reading comfort still need evaluation.
 
