@@ -45,7 +45,7 @@ def plate_settings(s):
     """The background look baked into the plate: the least blur the video
     ever uses (more is added per frame), no brightness (added per frame)."""
     blurs = [float(s["props"]["bg_blur"])] + [float(k["v"]) for k in s["tracks"].get("bg_blur", [])]
-    return dict(s["background"], blur=max(2.0, min(blurs)), brightness=0.0)
+    return dict(s["background"], blur=max(0.0, min(blurs)), brightness=0.0)
 
 
 class Renderer:
@@ -60,10 +60,11 @@ class Renderer:
         meta_p = os.path.join(self.td, "meta.json")
         if not os.path.exists(meta_p):
             raise FileNotFoundError(f"no take for this spec yet ({self.td}); run: studio.py capture {s['name']}")
-        self.meta = json.load(open(meta_p))
+        with open(meta_p) as f:
+            self.meta = json.load(f)
         self.clip = os.path.join(self.td, "clip.mp4")
         self.sw, self.sh = self.meta["width"], self.meta["height"]
-        fp, mp, g = phone_mod.ensure(os.path.join(CACHE, "phone"), self.sw, self.sh, s["phone"]["color"])
+        fp, mp, g = phone_mod.ensure(os.path.join(CACHE, "phone"), self.sw, self.sh, s["phone"]["color"], self.meta.get('display'))
         self.g = g
         fr = np.asarray(Image.open(fp), np.float32) / 255
         m = np.asarray(Image.open(mp), np.float32) / 255
@@ -96,6 +97,11 @@ class Renderer:
         r = np.hypot((xx - self.W / 2) / (self.W / 2), (yy - self.H / 2) / (self.H / 2)) / math.sqrt(2)
         self.vig = (1 - s["background"]["vignette"] * np.clip(r, 0, 1) ** 2)[..., None].astype(np.float32)
         self._alpha_cache = {}
+        self._phone_rgb = self.Fp.copy()
+        self._blend = np.empty((self.H, self.W, 3), np.float32)
+        self._vig_rgb = np.repeat(self.vig, 3, axis=2)
+        self._acc = np.empty((self.H, self.W, 3), np.float32)
+        self._resized_phone = None
 
     # -- geometry (editor.js phoneMatrix / bgMatrix mirror these) ---------
 
@@ -135,9 +141,10 @@ class Renderer:
 
     def _phone_layers(self, screen):
         """Premultiplied phone RGB at canvas resolution for this screen frame."""
-        P = self.Fp.copy()
+        # Only the screen rectangle changes; the bezel outside it is static.
+        P = self._phone_rgb
         cv2.multiply(screen, self._screen_alpha, dst=screen)
-        cv2.add(P[self.scr], screen, dst=P[self.scr])
+        cv2.add(self.Fp[self.scr], screen, dst=P[self.scr])
         return P
 
     def _warp_phone(self, P, M):
@@ -146,7 +153,14 @@ class Renderer:
         Hc, Wc = P.shape[:2]
         if sc < 0.98:
             tw, th = max(8, int(round(Wc * sc))), max(8, int(round(Hc * sc)))
-            Ps = cv2.resize(P, (tw, th), interpolation=cv2.INTER_AREA)
+            # Pan/rotation blur can place the same resized image many times.
+            # Keep one size for this frame, independent of the alpha cache.
+            cached = self._resized_phone
+            if cached is not None and cached[0] == (tw, th):
+                Ps = cached[1]
+            else:
+                Ps = cv2.resize(P, (tw, th), interpolation=cv2.INTER_AREA)
+                self._resized_phone = ((tw, th), Ps)
             a = self._alpha_cache.get((tw, th))
             if a is None:
                 a = cv2.resize(self.Pa, (tw, th), interpolation=cv2.INTER_AREA)
@@ -177,7 +191,7 @@ class Renderer:
             bg = bg + min(1.0, b) * (1 - bg)
         elif b < 0:
             bg = bg * (1 + max(-1.0, b))
-        bg *= self.vig
+        cv2.multiply(bg, self._vig_rgb, dst=bg)
         return bg
 
     def frame(self, t, screen_u8, plate_u8):
@@ -188,6 +202,7 @@ class Renderer:
         plate = plate_u8.astype(np.float32)
         plate /= 255
         P = self._phone_layers(screen)
+        self._resized_phone = None   # a new recording frame invalidates RGB
         shutter = float(s.get("motion_blur", 1.0)) / self.fps       # 1.0 = open for the whole frame
         states = [state_at(s, t)]
         if shutter > 0:
@@ -196,7 +211,8 @@ class Renderer:
             n = int(min(24, max(1, math.ceil(float(np.abs(a - b).max()) / 1.5))))
             if n > 1:
                 states = [state_at(s, t + shutter * (i / (n - 1) - 0.5)) for i in range(n)]
-        acc = np.zeros((self.H, self.W, 3), np.float32)
+        acc = self._acc
+        acc.fill(0)
         sh_strength = float(s["phone"]["shadow"])
         for st in states:
             bg = self._background(plate, st)
@@ -207,17 +223,32 @@ class Renderer:
                 Ms[1, 2] += self.H * 0.022 * st["zoom"] * st["phone_scale"]   # light from above
                 shd = cv2.warpAffine(self.shadow, Ms, (self.W, self.H), flags=cv2.INTER_LINEAR,
                                      borderMode=cv2.BORDER_CONSTANT)
-                bg *= (1 - sh_strength * shd)[..., None]
+                cv2.cvtColor(1 - sh_strength * shd, cv2.COLOR_GRAY2RGB, dst=self._blend)
+                cv2.multiply(bg, self._blend, dst=bg)
             rgb, al = self._warp_phone(P, M)
-            bg *= (1 - al)[..., None]
-            bg += rgb
+            # Outside the transformed phone canvas, RGB/alpha are exactly
+            # zero. Blend only its footprint; retain the full warp grid so
+            # interpolation and pixel-centre rounding remain identical.
+            h, w = P.shape[:2]
+            corners = np.array([[0, 0, 1], [w, 0, 1], [0, h, 1], [w, h, 1]]) @ M.T
+            pad = math.ceil(np.abs(M[:, :2]).sum(axis=1).max()) + 2
+            x0 = max(0, int(math.floor(corners[:, 0].min())) - pad)
+            x1 = min(self.W, int(math.ceil(corners[:, 0].max())) + pad)
+            y0 = max(0, int(math.floor(corners[:, 1].min())) - pad)
+            y1 = min(self.H, int(math.ceil(corners[:, 1].max())) + pad)
+            if x1 > x0 and y1 > y0:
+                roi = np.s_[y0:y1, x0:x1]
+                cv2.cvtColor(1 - al[roi], cv2.COLOR_GRAY2RGB, dst=self._blend[roi])
+                cv2.multiply(bg[roi], self._blend[roi], dst=bg[roi])
+                bg[roi] += rgb[roi]
             acc += bg
         acc /= len(states)
         # half-LSB dither: the blurred gradients would band in 8 bit
         noise = np.random.default_rng(int(t * 1000)).random((self.H, self.W, 1), np.float32)
         noise -= 0.5
         noise /= 255
-        acc += noise
+        cv2.cvtColor(noise, cv2.COLOR_GRAY2RGB, dst=self._blend)
+        cv2.add(acc, self._blend, dst=acc)
         acc *= 255
         acc += 0.5
         np.clip(acc, 0, 255, out=acc)
@@ -505,6 +536,7 @@ def export(s, out=None, workers=None, scale=None, log=print, progress=None, opti
     t0 = time.time()
     rep and rep.stage("render", f"Rendering {n} frames at {r.W}×{r.H}, {fps} fps ({label})", 0.03)
     log(f"rendering {s['name']}: {n} frames {r.W}x{r.H}@{fps} in {len(chunks)} parts")
+    del r     # workers own their render buffers; the parent only prepares assets
     with ProcessPoolExecutor(len(chunks), initializer=_render_priority) as ex:
         futures = [ex.submit(_render_chunk, c) for c in chunks]
         while not all(f.done() for f in futures):

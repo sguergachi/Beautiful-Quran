@@ -39,7 +39,8 @@ python3 timeline.py SPEC                   # when each verse and repeat happens 
 
 | File | Role |
 |---|---|
-| `capture.py` | Drives the app on the emulator (reciter, theme, layout, view, text size) and records picture **and** sound with scrcpy. |
+| `capture.py` | Drives the real app and recording sequence, prepares display/status/audio settings, and conforms each take. |
+| `capture_host.py` | Captures authenticated emulator frames and PCM with shared timestamps; hardware-encodes native 2K picture and stores FLAC sound. |
 | `recording.py` | Runs the ordered screen sequence, chapter routes and repeat picker on camera. |
 | `compose.py` | The compositor: each frame is a pure function of (spec, t). Used by export, stills and the editor's exact frame. |
 | `formats.py` | Export formats, qualities, sizes, frame rates and sound; the file each export writes. |
@@ -96,6 +97,13 @@ video's own or 60/50/30/25/24 fps. **Sound** is AAC 128 to 320 kbps, Opus
 lists this video's earlier exports to open or download (handy from another
 device on the LAN).
 
+Under **Exports of this video**, each file has Open, Download and **Delete**.
+Delete asks for confirmation in its row, then permanently removes only that
+export. The file count and total size update immediately; the take and edit
+stay available. A queued/running export owns its destination until it finishes.
+If a file has been replaced since the list loaded, Refresh loads the new
+version before it can be deleted. Finished jobs stop linking to deleted files.
+
 Each kind of export gets its own file, `<name>[-720p][-30fps].<ext>`, so a
 small copy never replaces the full-size master; exporting the same kind
 again replaces it. Presets: Social (H.264 1×), Small (720p 30 fps), Web
@@ -124,46 +132,141 @@ click it again, move the zoom slider or Ctrl-scroll to return to manual zoom.
 [Studio UI review](../../docs/PROMO_STUDIO_UI_REVIEW.md) records the clipping
 fixes and the desktop, narrow-window and zoom-equivalent review matrix.
 
+## Videos
+
+Use **+** to create a video, or the actions beside a video to duplicate,
+rename or delete it. These actions open an inline form in the video list;
+Enter submits and Escape cancels. Errors stay beside the form. A duplicate
+gets its own title and copies the latest saved edit. Rename changes the
+visible title with undo support for the open video; its file name stays stable
+so exports and queued jobs retain their identity. Delete asks for confirmation
+and keeps the current edit visible if the request fails. Takes and exported
+files remain on disk; remove an exported file from Export separately.
+
+Search matches titles, chapter names, reciter names and themes, including
+unaccented transliteration such as `rahman`. Clear search restores the list.
+The footer shows the number of matching videos.
+
+Export, Jobs, Emulators and Shortcuts keep keyboard focus inside their drawer;
+Tab and Shift-Tab cycle through its controls, and Escape returns to the opener.
+The editor behind it is inactive. Menus support the arrow keys, Home and End.
+Space activates a focused button, and editing shortcuts do not alter the
+timeline while a drawer, menu or video form is in use.
+
+## Contextual inspector
+
+The inspector follows deliberate editing actions:
+
+| Action | Focused controls |
+|---|---|
+| Select or trim a recording clip; split at the playhead | That clip's source in/out, duration, navigation, split and delete |
+| Select one or several animation keys | Exact key time/value and easing, or shared easing for a selection |
+| Click a property lane label or scrub its lane | The matching Camera, Phone or Background animation group |
+| Click Sound, scrub its lane or drag a fade | Gain and fades |
+| Click the phone or background in the preview | Its appearance controls |
+| Drag/zoom the preview; Alt-drag/Alt-scroll the phone | Camera or phone motion |
+| Click outside the preview frame | Canvas |
+| Click the Recording lane label, or choose Take contents from the verse menu | The recording's chapter, reciter and screen sequence |
+
+The context label above the controls explains what is being edited. **All
+Animate / Recording / Look** restores that tab's complete controls; the tabs
+remain available for manual navigation. Playback, normal ruler scrubbing,
+autosaving and field edits do not retarget the inspector. Context is temporary
+and does not become part of the video spec.
+
+Desktop panes reveal after a drag ends; wheel gestures wait for a short idle
+pause, and a newer manual choice takes precedence. At 1,000 px or narrower,
+timeline gestures prepare the relevant controls while keeping the timeline
+exposed. Open them with **Inspector**, **Ctrl .**, the selection readout, or
+Tools → Inspect selection. Explicit lane-label and preview-object clicks open
+their controls directly.
+
+## Look
+
+The Look tab starts with **Canvas**, then **Background**, **Phone**, and **Sound**.
+Canvas comes first because its aspect and frame rate define the whole video.
+Background choices use their names and show which one is selected. Under
+**Image**, Blur, Brightness, Saturation, and Vignette shape the background;
+**Movement** holds Motion speed and Parallax. Blur reaches **0** for a sharp
+background. This is separate from Canvas's Motion blur, which softens camera
+movement in exports.
+
+Blur and Brightness share their properties with Animate. Without keys they
+set the whole video; with keys they show the value at the playhead and edits
+add or update that key. The hints identify animated values. Phone groups its
+colour, size, and shadow beneath a whole-phone appearance preview. It follows
+the take at the playhead, without camera crops, and shows the selected bezel
+even before a take exists. Canvas holds the video name, aspect, frame rate, and
+camera motion blur. Sound keeps gain and both fades together.
+
 ## Takes: the real app, its real sound
 
-A take is the Android app playing, recorded at 1× by
-[scrcpy](https://github.com/Genymobile/scrcpy) with
-`--audio-source=playback` (Android's AudioPlaybackCapture). Picture and
-sound share the device clock in one file, so the ink and the voice can't
-drift; nothing is laid in from EveryAyah afterwards. (`--audio-source=output`
-records about 37 dB too quiet on the emulator.) The emulator still runs
-`-no-audio`: playback capture taps the guest mixer, so nothing plays through
-the host's speakers.
+A take is the Android app playing, recorded at 1× through the SDK's
+authenticated, loopback-only EmulatorController frame and PCM streams.
+Picture and sound retain their emulator host timestamps in one file; nothing
+is laid in from EveryAyah afterwards. The emulator still runs `-no-audio`,
+so nothing plays through the host's speakers. Preparation verifies full media
+volume; the old shell volume command silently left it at one-third volume.
 
-How a take starts matters:
+**Recording → Record take → Resolution** chooses **1080p** (1080×2400) or **2K**
+(1440×3200). New 2K takes use native framebuffer pixels; the recorder rejects
+a smaller framebuffer. Resolution is part of the take identity, so switching
+to 2K preserves old 1080p takes. Old recordings need recording again to replace
+clipped status icons; changing a mockup cannot recover missing source pixels.
 
-- **Recording → Recording sequence** lets you add, remove and reorder up to
+The host currently needs an NVIDIA GPU with working **H.264 NVENC**. Its
+encoder is checked before on-camera navigation. The first recording installs
+the pinned `requirements-capture.txt` dependencies into
+`~/.cache/bq-promo/capture-venv`; it does not change system Python packages.
+RGBA frames go straight to the hardware encoder, and PCM is stored as FLAC.
+The 60 fps editing copy is hardware encoded too, avoiding a long CPU conform.
+
+Capture preparation uses the Android Pixel display profile, with its camera
+path centred for the wider framebuffer. The frame uses measured display
+corners and retains the actual camera cutout once. The full status-bar layer,
+including the clock, Wi-Fi and battery, is captured rather than reconstructed.
+
+**Recording → Take contents** defines the whole recording in one flow. Pick a
+chapter and reciter, add screens in order, then configure its final Recitation
+or Hold final screen step. App appearance is a collapsed group; **Fine trim &
+cuts** keeps source-second trims and splits available below the record button.
+There is no separate Take starts control or Edit verse range.
+
+- **Add screen** lets you add, remove and reorder up to
   24 steps: opening ceremony, Home/chapter list, open chapter, chapter header,
   Settings, root word viewer, repeat settings, or a wait on the current screen.
   Each step has a 0–30 s hold after arrival. Navigation is part of the take.
   The ceremony launches the app on camera and plays in full, then holds Home.
   Open chapter can tap the chapter list, search by name, or open the verse
   directly. Root steps choose a word position and need Scroll + Arabic/Both.
-- Set **Wait before play** for the final still pause (default 1 s), or switch
-  off **Play recitation after the sequence** to finish on the last screen.
-  Screen-only recordings have no verse markers and do not require an audio
-  onset to conform. **Record (s)** is recitation duration when playing, or
-  minimum total sequence duration when recording screens only.
-- Choose repeat Off, This verse, or a range ending at **Repeat through**.
-  The picker can be shown as a step, or configured before capture. Repeated
-  verse markers wrap at the selected endpoint, using the app's reviewed tail.
-  Trim repeated and screen-only takes in seconds; whole-verse range actions
-  apply to ordinary forward playback.
+- In the final **Recitation** step, choose **Start verse**, **Stop verse** and
+  **Pause before (s)** (default 1 s). Choosing a range includes whole verses,
+  makes its start verse the recording origin, and retains the opening screens.
+  It replaces precise cuts with one continuous piece. The timeline's verse
+  +/− actions still preserve interior cuts and reuse existing footage when
+  possible. A matching recording is needed if the start verse changes.
+- **Repeat** offers Off, One verse or Range. Range uses the same Start/Stop
+  fields; **Play for (s)** controls repeated playback duration. The picker
+  can be shown as a screen step or configured before capture. Repeated verse
+  markers wrap at the endpoint using the app's reviewed tail.
+- Choose **Screens only** to finish on the final screen. Start verse then
+  selects the page for reader/root/repeat steps; Final hold and Minimum (s)
+  control the ending. These recordings have no verse markers and do not need
+  an audio onset to conform. Select a timeline clip for precise source trims;
+  Fine trim & cuts also lists every piece together.
 - Playback starts from the app's own controls, not `?play=true`: that deep
   link reloads the reader, which crossfades and re-scrolls the page right as
   the recitation starts. Other verses tap their first word; if it cannot be
   identified, an exact deep link is the fallback. A configured repeat resumes
   its cued queue so playing verse 1 cannot clear its bounds.
+- Recording time counts the screens already filmed; it does not add the
+  opening a second time as recitation. The requested recitation duration and
+  the edit's final out point are both covered.
 - The recitation's start is measured in the recording's own audio after the
   playback request. `meta.lead` locates it on the take clock, including every
   opening step; verse markers and fades use this offset. **Use whole take**
   includes the full sequence when an existing short edit ends during it.
-- The status-bar clock is hidden (the emulator draws it in a broken face).
+- The real status bar shows a fixed 9:41 clock, Wi-Fi and full battery.
 
 Smoothness comes from the emulator. The **Emulators** panel lists running
 instances with their core count, app state, current job and a live screen.
@@ -174,21 +277,24 @@ so exports cannot steal frame time from a take.
 Use six cores and record one take at a time for the smoothest animation.
 Parallel takes work, but compete for the host's CPU and GPU.
 
-Capture instances reuse the pool's golden AVD and snapshot, through
+Capture instances reuse the pool's golden AVD, through
 `scripts/emu.sh capture PORT` with `EMU_CORES=6`. The existing boot lock,
-GPU setup and RAM guard apply; no extra AVD is created. Each read-only boot
+GPU setup and RAM guard apply; no extra AVD is created. A native 1440×3200
+framebuffer cold-boots with density 560: loading the old snapshot would restore
+its 1080p framebuffer. The test pool keeps its existing snapshot behavior.
+The capture endpoint requires the SDK's local token. Each read-only boot
 needs **Prepare app** once. Stop spare instances in the panel when done.
 
-scrcpy writes a frame only when the screen changes. Take metadata separates
+The emulator emits a frame when the screen changes. Take metadata separates
 average capture rate (including still holds), median active cadence, and
 the 90th-percentile active frame interval; gaps of 200 ms or more are still
 holds. These describe recorded cadence, not a promise of 60 unique frames
 per second. The output is conformed to 60 fps by repeating frames. The
-recorder closes with SIGTERM so SDL finalizes the file even when the studio
+recorder closes with SIGTERM and flushes both streams even when the studio
 was launched in the background with SIGINT ignored.
 
 Takes are keyed by what they record (reciter, chapter, ayah, theme, layout,
-view, text size, ordered steps/holds, final wait and repeat choice). The
+view, text size, resolution, ordered steps/holds, final wait and repeat choice). The
 default empty sequence keeps existing take keys. Camera/background edits and
 recording duration share the same take; changing the sequence needs a new one.
 
@@ -221,12 +327,10 @@ recording duration share the same take; changing the sequence needs a new one.
   fades as the export does (the export also normalises to −16 LUFS).
 - **Verses** and **Repeats**: where each verse and each repeated word falls,
   mapped through your cuts. Click one to jump there. The **−** / **+** on
-  the Verses label remove or add a whole verse at the end; the Recording
-  tab's Edit section also picks Start and Stop verses (one continuous
-  range) and adds or removes a verse at either end (keeping the cuts in
-  between). A verse before the take's first one needs a new take, and a
-  verse past the take's end raises Record (s); the take card then asks
-  for the full range.
+  the Verses label remove or add a whole verse at the end, keeping interior
+  cuts. Its menu opens Take contents, where the Recitation step sets a
+  continuous Start/Stop range. A changed start verse needs a matching take;
+  extending past the take's end asks for Record full range.
 - **Property lanes**, one per property, in three groups (click a group to
   fold it; folded, its keys share one lane):
 

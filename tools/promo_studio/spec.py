@@ -53,7 +53,7 @@ PROPS = {
     "phone_y":       {"group": "Phone", "label": "Phone Y", "min": -0.8, "max": 0.8, "step": 0.001, "default": 0.0},
     "phone_scale":   {"group": "Phone", "label": "Phone scale", "min": 0.2, "max": 3, "step": 0.01, "default": 1.0, "log": True},
     "phone_tilt":    {"group": "Phone", "label": "Phone tilt °", "min": -45, "max": 45, "step": 0.1, "default": 0.0},
-    "bg_blur":       {"group": "Background", "label": "Blur", "min": 4, "max": 90, "step": 0.5, "default": 36.0},
+    "bg_blur":       {"group": "Background", "label": "Blur", "min": 0, "max": 90, "step": 0.5, "default": 36.0},
     "bg_brightness": {"group": "Background", "label": "Brightness", "min": -0.6, "max": 0.4, "step": 0.005, "default": 0.0},
 }
 
@@ -109,6 +109,7 @@ DEFAULTS = {
         "view": "Both",
         "text_size": "default",  # default | max
         "seconds": 30,           # seconds of recitation to record
+        "capture": "1080p",     # 1080p | 2k; identity includes non-default resolution
         "repeat": "off",         # REPEATS
         "repeat_to": None,       # last ayah of a repeated range
         "intro": INTRO,
@@ -239,6 +240,7 @@ def validate(s):
     number(a["ayah"], "app.ayah", 1, 286)
     if int(a["surah"]) != a["surah"] or int(a["ayah"]) != a["ayah"]: errs.append("chapter and ayah must be integers")
     number(a["seconds"], "app.seconds", 1)
+    if a["capture"] not in ("1080p", "2k"): errs.append("app.capture must be 1080p or 2k")
     it = a["intro"]
     if not isinstance(it, dict): raise ValueError("app.intro must be an object")
     for name in ("cover", "home", "settings", "roots", "dwell"):
@@ -328,6 +330,8 @@ def take_key(s):
     script = take_script(s)
     if script:
         k += "-" + digest(script)[:8]
+    if a.get("capture", "1080p") == "2k":
+        k += "-2k"
     return k.replace(" ", "_").lower()
 
 

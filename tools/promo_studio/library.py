@@ -90,7 +90,7 @@ def _plate(bg, out_w, out_h, fps=30):
     sigma = bg["blur"] * k
     pad = int(sigma * 3) + 2                    # blur past the edges, then crop them off
     grade = f"eq=brightness={bg['brightness']:.3f}:saturation={bg['saturation']:.3f}"
-    blur = f"gblur=sigma={sigma:.2f}:steps=3"
+    blur = f"gblur=sigma={sigma:.2f}:steps=3" if sigma > 0 else "null"
     cover = (f"scale={pw + 2 * pad}:{ph + 2 * pad}:force_original_aspect_ratio=increase:flags=area,"
              f"crop={pw + 2 * pad}:{ph + 2 * pad}")
     if bg["id"].startswith("color:"):

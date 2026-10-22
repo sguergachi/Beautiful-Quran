@@ -8,6 +8,23 @@ from pathlib import Path
 import spec
 
 
+def remaining_recording_seconds(s, elapsed, marks):
+    """Time still needed after navigation, retaining the edit and sound tail.
+
+    Edit bounds use the take clock, so its opening has already been filmed.
+    The requested recitation duration remains a minimum even if navigation or
+    playback preparation takes longer than estimated.
+    """
+    a = s['app']
+    need = spec.take_needed(s) + .5
+    if not a['intro']['play']:
+        start = max(0, marks.get('intro', 1) - .15)
+        return max(0, max(a['seconds'], need) - max(0, elapsed - start))
+    lead = (marks.get('play', elapsed) - max(0, marks['intro'] - .15)
+            if 'intro' in marks else a['intro']['dwell'])
+    return max(a['seconds'], need - lead) + 1.5
+
+
 class Sequence:
     """Each step leaves its screen open; the following step chooses the route."""
     def __init__(self, s, driver=None, log=print):

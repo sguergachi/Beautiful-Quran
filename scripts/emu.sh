@@ -7,7 +7,7 @@
 #   scripts/emu.sh release "$serial"           # give it back; it stays booted for the next agent
 #
 # Other commands: status, perf [reset], doctor, down (stops free slots to free RAM).
-# Promo studio: EMU_CORES=6 scripts/emu.sh capture 5650 (shared golden AVD).
+# Promo studio: EMU_CORES=6 scripts/emu.sh capture 5650 (same AVD, native QHD).
 #
 # Design (why it is fast and safe to share):
 #   * One golden AVD holds a booted snapshot. Every pool slot is a -read-only
@@ -145,9 +145,20 @@ boot_slot() {
     fail "only $(mem_avail_mb)MB RAM available, need ~${need}MB per emulator. Release an idle one, or EMU_FORCE=1"
   fi
   build_gold
-  log "Booting $serial from snapshot"
-  launch "$serial" -read-only -snapshot "$SNAPSHOT" -no-snapshot-save -cores "$CORES"
+  if [[ "${EMU_CAPTURE_SIZE:-}" == "1440x3200" ]] && (( $(port_of "$serial") >= 5650 )); then
+    # A snapshot restores its original framebuffer, even with a different
+    # skin. Native QHD capture must cold boot; the shared test pool stays warm.
+    log "Booting $serial with a native 1440x3200 framebuffer"
+    launch "$serial" -read-only -no-snapshot-load -no-snapshot-save -cores "$CORES" \
+      -skin 1440x3200 -grpc "$(( $(port_of "$serial") + 3000 ))" -grpc-use-token
+  else
+    log "Booting $serial from snapshot"
+    launch "$serial" -read-only -snapshot "$SNAPSHOT" -no-snapshot-save -cores "$CORES"
+  fi
   wait_boot "$serial"
+  if [[ "${EMU_CAPTURE_SIZE:-}" == "1440x3200" ]] && (( $(port_of "$serial") >= 5650 )); then
+    adb_s "$serial" shell wm density 560 >/dev/null
+  fi
   exec 7>&-
 }
 
@@ -268,6 +279,7 @@ cmd_down() {  # stops free slots only; a leased one has a tenant
 
 cmd_capture() {
   local port="${1:-5650}"
+  EMU_CAPTURE_SIZE="${EMU_CAPTURE_SIZE:-1440x3200}"
   [[ "$port" =~ ^[0-9]{4,5}$ ]] && (( port >= 5650 && port <= 5688 && port % 2 == 0 )) || fail "capture port must be even, 5650-5688"
   [[ "$CORES" =~ ^[1-8]$ ]] || fail "capture cores must be 1-8"
   boot_slot "emulator-$port"

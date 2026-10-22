@@ -6,8 +6,10 @@ import { api } from "../lib/api.ts";
 import * as E from "../lib/edit.ts";
 import { applyVersePlan, nextVerseRange, verseRange, type VerseAction } from "../lib/verses.ts";
 import { clamp, plateLook, resolve, soundOnset, takeKey } from "../lib/model.ts";
-import type { Ease, Emulator, ExportOptions, Geo, Job, Meta, Plate, RawSpec, Selection, Spec, SpecStatus, Timeline, Wave } from "../lib/types.ts";
+import type { Ease, Emulator, ExportFile, ExportOptions, Geo, Job, Meta, Plate, RawSpec, Selection, Spec, SpecStatus, Timeline, Wave } from "../lib/types.ts";
 import { clock, media } from "./clock.ts";
+import { videoSlug } from "../lib/videos.ts";
+import { activeContext, INSPECTOR, selectionContext, type InspectorContext } from "../lib/inspector.ts";
 
 export type Tab = "animate" | "recording" | "look";
 export interface UI {
@@ -35,6 +37,7 @@ interface St {
   exact: string | null; ui: UI; panel: Panel; toasts: Toast[]; fatal: string | null;
   verseBusy: boolean; verseError: string | null;
   exportOpts: ExportOptions | null;     // the editor's export settings (localStorage), defaults from meta
+  inspector: InspectorContext | null;
 }
 
 export const useStore = create<St>(() => ({
@@ -43,6 +46,7 @@ export const useStore = create<St>(() => ({
   exact: null, ui: loadUI(), panel: null, toasts: [], fatal: null,
   verseBusy: false, verseError: null,
   exportOpts: loadExport(),
+  inspector: null,
 }));
 const get = useStore.getState, set = useStore.setState;
 
@@ -77,10 +81,25 @@ export function setUI(patch: Partial<UI>) {
     if (patch.hideL === false) ui.hideR = true;
     else if (patch.hideR === false) ui.hideL = true;
   }
-  set({ ui });
+  set({ ui, ...(patch.tab ? { inspector: null } : {}) });
   localStorage.setItem("promo.ui", JSON.stringify(ui));
 }
 export const openPanel = (panel: Panel) => set({ panel: get().panel === panel ? null : panel });
+
+/** Open a focused inspector after an action. Compact gestures keep the timeline exposed. */
+export function inspect(context: InspectorContext, reveal = innerWidth > 1000) {
+  const tab = INSPECTOR[context].tab;
+  if (get().ui.tab !== tab || (reveal && get().ui.hideR)) setUI({ tab, ...(reveal ? { hideR: false } : {}) });
+  set({ inspector: context, ...(context === "keys" || context === "clip" ? {} : { sel: null }) });
+}
+export function inspectSelection(reveal = innerWidth > 1000) {
+  const context = selectionContext(get().sel);
+  if (context) inspect(context, reveal);
+}
+export function revealInspector() {
+  const s = get(), context = selectionContext(s.sel) ?? activeContext(s.inspector, s.sel);
+  if (context) inspect(context, true); else setUI({ hideR: false });
+}
 
 // -------------------------------------------------------------- context
 
@@ -198,7 +217,7 @@ export async function open(name: string) {
     // New specs may contain just a title; editing always needs real pieces.
     r.raw.edit = spec.edit.map((p) => ({ ...p }));
     saved = JSON.stringify(r.raw);
-    set({ name, raw: r.raw, spec, geo: null, plate: null, tl: null, wave: null, sel: null, undo: [], redo: [], exact: null, saveState: "saved", saveError: null, verseBusy: false, verseError: null });
+    set({ name, raw: r.raw, spec, geo: null, plate: null, tl: null, wave: null, sel: null, inspector: null, undo: [], redo: [], exact: null, saveState: "saved", saveError: null, verseBusy: false, verseError: null });
     localStorage.setItem("promo.last", name);
     clock.t = 0;
     await Promise.all([loadGeometry(), loadPlate()]);
@@ -251,19 +270,19 @@ export async function loadTimeline() {
 }
 
 /** Choose a continuous range, or add/remove a complete verse at an edit edge. */
-export async function editVerses(start: number, end: number, action?: VerseAction) {
+export async function editVerses(start: number, end: number, action?: VerseAction, take = false) {
   const s = get();
   if (!s.spec || !s.raw || !s.name || s.verseBusy) return;
   const mine = session, request = ++verseRequest;
   const identity = JSON.stringify([takeKey(s.spec), s.spec.edit]);
   set({ verseBusy: true, verseError: null });
   try {
-    const plan = await api.verseRange(s.name, s.raw, start, end);
+    const plan = await api.verseRange(s.name, s.raw, start, end, take);
     if (mine !== session || request !== verseRequest) return;
     const current = get();
     if (!current.spec || JSON.stringify([takeKey(current.spec), current.spec.edit]) !== identity) throw new Error("The edit changed while loading verses. Try the verse action again.");
     const changedTake = plan.anchor !== current.spec.app.ayah;
-    mutate((raw) => applyVersePlan(raw, current.spec!, plan, action));
+    mutate((raw) => applyVersePlan(raw, current.spec!, plan, action, take));
     set({ sel: null, tl: { verses: plan.verses, repeats: changedTake ? [] : (current.tl?.repeats ?? []), take: changedTake ? null : (current.tl?.take ?? null) }, ...(changedTake ? { geo: null } : {}) });
     // Save/load the new recording origin immediately; existing footage stays
     // available for extensions on the same take and is marked short in the UI.
@@ -302,7 +321,7 @@ export async function loadPlate() {
 
 export const selKeys = (): E.KeyRef[] => { const s = get().sel; return s?.type === "keys" ? s.items : []; };
 export const selectKeys = (items: E.KeyRef[]) => set({ sel: items.length ? { type: "keys", items } : null });
-export const select = (sel: Selection) => set({ sel });
+export const select = (sel: Selection) => set({ sel, ...(!sel ? { inspector: null } : {}) });
 
 export function setProp(name: string, v: number, key?: string) {
   if (!Number.isFinite(v)) return;
@@ -312,19 +331,21 @@ export function toggleKey(name: string) {
   let added: E.KeyRef | null = null;
   mutate((raw, c) => { added = E.toggleKey(raw, c, name, clock.t); });
   selectKeys(added ? [added] : []);
+  inspectSelection();
 }
-export function keyCamera() { mutate((raw, c) => E.keyAll(raw, c, ["zoom", "pan_x", "pan_y"], clock.t)); }
+export function keyCamera() { mutate((raw, c) => E.keyAll(raw, c, ["zoom", "pan_x", "pan_y"], clock.t)); inspect("camera"); }
 export function preset(kind: "push" | "pull" | "punch") {
   const geo = get().geo;
   if (!geo) return;
   mutate((raw, c) => E.preset(raw, c, geo, kind, clock.t));
+  inspect("camera");
 }
 export function nudge(frames: number) {
   const items = selKeys();
   if (!items.length) return;
   let moved: E.KeyRef[] | null = null;
   mutate((raw, c) => { moved = E.moveKeys(raw, c, items, frames / (c.fps || 60)); }, "nudge");
-  if (moved) { selectKeys(moved); clock.seek((moved as E.KeyRef[])[0].t); } else toast("A key is in the way");
+  if (moved) { selectKeys(moved); clock.seek((moved as E.KeyRef[])[0].t); inspectSelection(); } else toast("A key is in the way");
 }
 export function deleteSelection() {
   const s = get().sel;
@@ -350,18 +371,20 @@ export function paste(at = clock.t) {
   let placed: E.KeyRef[] = [];
   mutate((raw, c) => { placed = E.pasteKeys(raw, c, clip, at); });
   selectKeys(placed);
+  inspectSelection();
 }
 export function selectAll() {
   const items: E.KeyRef[] = [];
   for (const [prop, keys] of Object.entries(get().spec?.tracks || {})) for (const k of keys) items.push({ prop, t: k.t });
   selectKeys(items);
+  inspectSelection();
   if (items.length) toast(`${items.length} key${items.length > 1 ? "s" : ""} selected`);
 }
 export function split(t = clock.t) {
   let at: number | null = null;
   mutate((raw, c) => { at = E.splitAt(raw, c, t); });
   if (at == null) toast("Put the playhead inside a piece to split it");
-  else set({ sel: { type: "piece", i: at } });
+  else { set({ sel: { type: "piece", i: at } }); inspectSelection(); }
 }
 export function wholeTake() {
   const len = get().geo?.take?.length ?? get().tl?.take ?? Math.max(...get().spec!.edit.map((p) => p.out));
@@ -423,6 +446,16 @@ export async function exportVideo(name = get().name, opts = exportOptions()) {
   if (name === get().name && !(await save())) return;
   return job(api.render(name, opts), `Export ${name}`);
 }
+export async function deleteExport(name: string, file: ExportFile) {
+  const result = await api.removeExport(name, file);
+  set((s) => ({
+    specs: s.specs.map((v) => {
+      const exports = v.name === name ? result.exports : v.exports?.filter((e) => e.file !== file.file);
+      return { ...v, exports, video: !!exports?.length, video_mtime: exports?.[0]?.mtime ?? null };
+    }),
+    jobs: s.jobs.map((j) => j.kind === "render" && j.state === "done" && typeof j.result === "string" && j.result.split("/").pop() === file.file ? { ...j, export_exists: false } : j),
+  }));
+}
 export const cancelJob = (id: string) => api.cancel(id).then(pollJobs, (e) => toast(e.message, "error"));
 export const bootEmulator = (cores: number) => job(api.bootEmu(cores), "Starting an emulator").then(() => pollEmus(true));
 export const prepareEmulator = (serial: string) => job(api.prepareEmu(serial), `Preparing ${serial}`);
@@ -430,36 +463,30 @@ export const stopEmulator = (serial: string) => api.stopEmu(serial).then(() => {
 
 // -------------------------------------------------------------- videos
 
-const slug = (s: string) => s.trim().toLowerCase().replace(/[^a-z0-9._-]+/g, "-").replace(/^-+|-+$/g, "");
 export async function createVideo(title: string, from?: string) {
-  const name = slug(title);
-  if (!name) return;
-  try {
-    if (from === get().name && !(await save())) return;
-    await (from ? api.copy(from, name) : api.create(name));
-    await refreshSpecs();
-    await open(name);
-    if (!from) mutate((raw) => { raw.title = title; });
-  } catch (e) { toast((e as Error).message, "error"); }
+  const name = videoSlug(title);
+  if (!name) throw new Error("Include a letter or number in the title.");
+  if (from === get().name && !(await save())) throw new Error("Save the current edit before making a copy.");
+  await api.create(name, from, title);
+  await refreshSpecs();
+  await open(name);
 }
 export async function renameVideo(from: string, title: string) {
-  const to = slug(title);
-  if (!to || to === from) return;
-  try {
-    if (from === get().name && !(await save())) return;
-    await api.rename(from, to);
-    await refreshSpecs();
-    if (from === get().name) { session++; set({ name: null }); await open(to); }
-  } catch (e) { toast((e as Error).message, "error"); }
+  if (from === get().name) {
+    mutate((raw) => { raw.title = title.trim(); });
+    if (!(await save())) throw new Error("The title could not be saved. Try again.");
+  } else {
+    const { raw } = await api.spec(from);
+    await api.save(from, JSON.stringify({ ...raw, title: title.trim() }));
+  }
+  await refreshSpecs();
 }
 export async function deleteVideo(name: string) {
-  try {
-    if (name === get().name) { clearTimeout(saveTimer); session++; set({ name: null, raw: null, spec: null, geo: null, plate: null, tl: null }); }
-    await api.remove(name);
-    await refreshSpecs();
-    if (!get().name && get().specs[0]) await open(get().specs[0].name);
-    toast(`Deleted ${name} (its take and video stay on disk)`);
-  } catch (e) { toast((e as Error).message, "error"); }
+  if (name === get().name && !(await save())) throw new Error("The edit could not be saved. Try again before deleting it.");
+  await api.remove(name);
+  if (name === get().name) { clearTimeout(saveTimer); clock.pause(); session++; set({ name: null, raw: null, spec: null, geo: null, plate: null, tl: null, wave: null, sel: null, undo: [], redo: [], exact: null }); }
+  await refreshSpecs();
+  if (!get().name && get().specs[0]) await open(get().specs[0].name);
 }
 
 export async function showExact() {

@@ -14,6 +14,8 @@ The frame is drawn rather than taken from device art so it has no licence
 strings attached and so every colour shares one lighting model.
 """
 import argparse
+import hashlib
+import json
 import os
 
 import numpy as np
@@ -47,23 +49,28 @@ def rounded_box_sdf(xx, yy, cx, cy, hw, hh, r):
     return outside + inside - r
 
 
-def geometry(sw, sh):
+def geometry(sw, sh, display=None):
     k = sw / SCREEN_W_MM                      # px per mm
     bw, bh = BODY_MM[0] * k, BODY_MM[1] * k
     # the body must hold the screen; tall takes (e.g. 1080x2424) stretch it
     bh = max(bh, sh + 2 * (bw - sw) / 2 * 1.05)
     margin = int(np.ceil(KEY_OUT_MM * k + 4))
     W, H = int(np.ceil(bw)) + 2 * margin, int(np.ceil(bh)) + 2 * margin
+    W += W % 2; H += H % 2  # integer screen origin at both capture resolutions
     cx, cy = W / 2, H / 2
     body_r = BODY_R_MM * k
     sx0, sy0 = cx - sw / 2, cy - sh / 2
     screen_r = max(8.0, body_r - (bw - sw) / 2)
+    native_radius = (display or {}).get('corner_radius')
+    if native_radius is not None and 0 < native_radius < min(sw, sh) / 2:
+        screen_r = float(native_radius)
+        body_r = screen_r + (bw - sw) / 2
     return dict(k=k, W=W, H=H, cx=cx, cy=cy, bw=bw, bh=bh, body_r=body_r, sx0=sx0, sy0=sy0,
                 sw=sw, sh=sh, screen_r=screen_r, margin=margin)
 
 
-def render(sw, sh, color):
-    g = geometry(sw, sh)
+def render(sw, sh, color, display=None):
+    g = geometry(sw, sh, display)
     k, W, H, cx, cy = g["k"], g["W"], g["H"], g["cx"], g["cy"]
     yy, xx = np.mgrid[0:H, 0:W].astype(np.float32) + 0.5
     d_body = rounded_box_sdf(xx, yy, cx, cy, g["bw"] / 2, g["bh"] / 2, g["body_r"])
@@ -116,17 +123,19 @@ def render(sw, sh, color):
     hole = np.clip(0.5 - d_scr, 0, 1)
     alpha = alpha * (1 - hole)
 
-    # Punch-hole camera, drawn over the screen.
-    hx, hy = cx, g["sy0"] + HOLE_TOP_MM * k
-    r_hole = HOLE_MM * k / 2
-    d_cam = np.hypot(xx - hx, yy - hy) - r_hole
-    a_cam = np.clip(0.5 - d_cam, 0, 1)
-    lens = np.exp(-((np.hypot(xx - hx + r_hole * 0.25, yy - hy + r_hole * 0.25)) / (r_hole * 0.35)) ** 2)
-    cam_rgb = np.full((H, W, 3), 0.012, np.float32) + lens[..., None] * np.array([0.05, 0.06, 0.10], np.float32)
-    ring = np.exp(-((d_cam + 1.0) / 0.9) ** 2)[..., None] * 0.07
-    cam_rgb = cam_rgb + ring
-    rgb = rgb * (1 - a_cam[..., None]) + cam_rgb * a_cam[..., None]
-    alpha = np.maximum(alpha, a_cam)
+    # Host frames contain the real camera cutout. Draw one only for legacy
+    # Android-mirror takes, which omitted the hardware decoration layer.
+    if not (display or {}).get('camera_baked'):
+        hx, hy = cx, g["sy0"] + HOLE_TOP_MM * k
+        r_hole = HOLE_MM * k / 2
+        d_cam = np.hypot(xx - hx, yy - hy) - r_hole
+        a_cam = np.clip(0.5 - d_cam, 0, 1)
+        lens = np.exp(-((np.hypot(xx - hx + r_hole * 0.25, yy - hy + r_hole * 0.25)) / (r_hole * 0.35)) ** 2)
+        cam_rgb = np.full((H, W, 3), 0.012, np.float32) + lens[..., None] * np.array([0.05, 0.06, 0.10], np.float32)
+        ring = np.exp(-((d_cam + 1.0) / 0.9) ** 2)[..., None] * 0.07
+        cam_rgb = cam_rgb + ring
+        rgb = rgb * (1 - a_cam[..., None]) + cam_rgb * a_cam[..., None]
+        alpha = np.maximum(alpha, a_cam)
 
     # premultiplied -> straight alpha
     safe = np.maximum(alpha, 1e-6)[..., None]
@@ -136,14 +145,15 @@ def render(sw, sh, color):
     return g, (frame * 255 + 0.5).astype(np.uint8), (mask * 255 + 0.5).astype(np.uint8)
 
 
-def ensure(out_dir, sw, sh, color):
+def ensure(out_dir, sw, sh, color, display=None):
     """Cached frame + mask for this screen size and colour; returns paths and geometry."""
     os.makedirs(out_dir, exist_ok=True)
-    fp = os.path.join(out_dir, f"frame-{color}-{sw}x{sh}.png")
-    mp = os.path.join(out_dir, f"screen-mask-{sw}x{sh}.png")
-    g = geometry(sw, sh)
+    revision = 'v2-' + hashlib.sha256(json.dumps(display or {}, sort_keys=True).encode()).hexdigest()[:10]
+    fp = os.path.join(out_dir, f"frame-{color}-{sw}x{sh}-{revision}.png")
+    mp = os.path.join(out_dir, f"screen-mask-{sw}x{sh}-{revision}.png")
+    g = geometry(sw, sh, display)
     if not (os.path.exists(fp) and os.path.exists(mp)):
-        g, frame, mask = render(sw, sh, color)
+        g, frame, mask = render(sw, sh, color, display)
         Image.fromarray(frame, "RGBA").save(fp)
         Image.fromarray(mask, "L").save(mp)
     return fp, mp, g

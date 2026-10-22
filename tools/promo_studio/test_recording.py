@@ -8,10 +8,30 @@ import capture
 import spec
 import timeline
 import server
-from recording import Sequence
+from recording import Sequence, remaining_recording_seconds
 
 
 class SequenceTests(unittest.TestCase):
+    def test_long_opening_is_not_recorded_again_as_recitation(self):
+        s = spec.resolve({'app': {'seconds': 10}, 'edit': [{'in': 0, 'out': 70}]})
+        # 60 seconds of opening is already on camera; retain the ten-second
+        # recitation minimum and both existing safety tails.
+        marks = {'intro': 2.15, 'play': 62}
+        self.assertEqual(remaining_recording_seconds(s, 62, marks), 12)
+        s['edit'][0]['out'] = 100
+        self.assertEqual(remaining_recording_seconds(s, 62, marks), 42)
+        s['app']['seconds'] = 60
+        self.assertEqual(remaining_recording_seconds(s, 62, marks), 61.5)
+
+    def test_plain_and_screen_only_takes_retain_their_needed_end(self):
+        s = spec.resolve({'app': {'seconds': 5, 'intro': {'dwell': 2}}, 'edit': [{'in': 10, 'out': 20}]})
+        self.assertEqual(remaining_recording_seconds(s, 4, {}), 20)
+        s['app']['intro']['play'] = False
+        self.assertEqual(remaining_recording_seconds(s, 12, {'intro': 2.15}), 10.5)
+        self.assertEqual(remaining_recording_seconds(s, 100, {'intro': 2.15}), 0)
+        s['app']['seconds'] = 30
+        self.assertEqual(remaining_recording_seconds(s, 12, {}), 18.85)
+
     def test_plain_take_identity_and_legacy_migration(self):
         plain = spec.resolve({})
         self.assertEqual(spec.take_key(plain), 'alafasy-001-001-paper-scroll-both-default')
@@ -63,6 +83,30 @@ class SequenceTests(unittest.TestCase):
         with patch.object(capture.at, 'nodes', return_value=nodes), patch.object(capture, 'adb'), patch.object(capture.time, 'sleep'):
             self.assertEqual(capture.word_xy(1), (40, 100))
             self.assertIsNone(capture.word_xy(14))
+
+    def test_take_contents_moves_origin_and_keeps_the_opening(self):
+        s = spec.resolve({'app': {'surah': 2, 'ayah': 14, 'seconds': 120}})
+        with patch.object(audio, 'fetch', side_effect=lambda slug, sur, ay: f'{sur}:{ay}'), patch.object(audio, 'duration', return_value=5), patch.object(audio, 'ayah_count', return_value=286):
+            edit = timeline.plan_range(s, 16, 17, lead=12)
+            self.assertEqual((edit['anchor'], edit['in'], edit['out']), (14, 22, 32))
+            take = timeline.plan_range(s, 16, 17, lead=12, take=True)
+            self.assertEqual((take['anchor'], take['in'], take['out']), (16, 0, 22))
+            self.assertEqual(take['seconds'], 11)
+            self.assertEqual([v['label'] for v in take['verses']], ['2:16', '2:17'])
+            opening = timeline.plan_range(s, 1, 2, lead=12, take=True)
+            self.assertEqual((opening['anchor'], opening['in'], opening['out']), (1, 0, 27))
+            self.assertEqual(opening['verses'][0]['label'], 'basmalah')
+
+    def test_contents_request_uses_the_selected_takes_measured_lead(self):
+        h = Mock(path='/api/verse-range/test')
+        h.body.return_value = {'raw': {'app': {'surah': 2, 'ayah': 14}}, 'start': 16, 'end': 17, 'take': True}
+        with patch.object(server, 'take_meta', return_value={'lead': 12}) as meta, patch.object(audio, 'fetch', return_value='wav'), patch.object(audio, 'duration', return_value=5), patch.object(audio, 'ayah_count', return_value=286):
+            server.Handler.route_post(h)
+            self.assertEqual(meta.call_args.args[0]['app']['ayah'], 16)
+            result = h.send_json.call_args.args[0]
+            self.assertEqual((result['in'], result['out']), (0, 22))
+        h.body.return_value['take'] = 'yes'
+        with self.assertRaises(ValueError): server.Handler.route_post(h)
 
     def test_ceremony_launches_on_camera_and_opens_automatically(self):
         driver = Mock()

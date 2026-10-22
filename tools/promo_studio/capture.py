@@ -1,13 +1,11 @@
 """Record a take of the real Android app, picture AND sound, on an emulator.
 
-The sound is the emulator's own playback, captured by scrcpy through
-Android's AudioPlaybackCapture (`--audio-source=playback`) in the same file
-as the screen, so the ink and the voice share one device clock. Nothing is
-re-laid from EveryAyah afterwards.
+The picture and PCM sound come from the emulator's authenticated host API.
+Frames and samples keep the same emulator host clock, and NVIDIA hardware
+encodes the full native framebuffer. Nothing is re-laid from EveryAyah.
 
-A take is recorded at 1x. Smoothness therefore depends on the emulator:
-give it cores (see `boot()`): 6 cores render the reader at 55-57 fps at
-1080x2400 on this host, 3 cores (the pool default) only ~44.
+A take is recorded at 1x, at 1080×2400 or native 1440×3200. Smoothness still
+depends on the emulator; give it six cores and record one take at a time.
 
 Takes live in CACHE/takes/<key>/ (spec.take_key): raw.mkv as recorded,
 clip.mp4 (60 fps CFR, starts `lead` s before the recitation), audio.wav
@@ -17,7 +15,7 @@ import json
 import math
 import os
 import re
-import shutil
+import shlex
 import subprocess
 import sys
 import time
@@ -28,8 +26,6 @@ sys.path.insert(0, os.path.join(REPO, "tools", "key_art"))
 import android_take as at  # noqa: E402  (adb helpers: nodes/find/tap/demo/open_reader)
 
 CAPTURE_PORT = 5650
-SCRCPY_VERSION = "v5.0.1"
-SCRCPY_DIR = os.path.join(CACHE, "scrcpy")
 LEAD = 1.0          # seconds of the opened, still page before the recitation starts
 
 
@@ -61,18 +57,6 @@ def install(apk, log=print):
     """Install, compile and first-launch the app (see emus.prepare)."""
     import emus
     return emus.prepare(serial(), apk, log if hasattr(log, "stage") else None)
-
-
-def scrcpy():
-    exe = os.path.join(SCRCPY_DIR, f"scrcpy-linux-x86_64-{SCRCPY_VERSION}", "scrcpy")
-    if not os.path.exists(exe):
-        os.makedirs(SCRCPY_DIR, exist_ok=True)
-        tgz = os.path.join(SCRCPY_DIR, "scrcpy.tgz")
-        url = (f"https://github.com/Genymobile/scrcpy/releases/download/{SCRCPY_VERSION}/"
-               f"scrcpy-linux-x86_64-{SCRCPY_VERSION}.tar.gz")
-        subprocess.run(["curl", "-sfL", "-o", tgz, url], check=True)
-        subprocess.run(["tar", "xzf", tgz, "-C", SCRCPY_DIR], check=True)
-    return exe
 
 
 # ---------------------------------------------------------------- app driving
@@ -174,19 +158,59 @@ def customize(theme, layout, view, text_size, log=print):
     log(f"customize: {theme} / {layout} / {view} / text {text_size}")
 
 
+def centered_cutout(path, bounds=False):
+    """Keep the SDK Pixel profile's shape, centering its absolute 1080p path.
+
+    Pixel 9's resource is anchored at x=540 with @left. On a native QHD
+    framebuffer that places the camera off-center; Android also accepts a
+    center-relative path, preserving the profile's radius and status insets.
+    """
+    if '@left' not in path: return path
+    radius = re.search(r'\ba\s+([\d.]+),', path)
+    width = re.search(r'\bh\s+([\d.]+)', path)
+    if bounds and width:
+        x = -float(width[1]) / 2
+    elif not bounds and radius:
+        x = float(radius[1])
+    else:
+        raise ValueError('Unrecognized Pixel display cutout path')
+    return re.sub(r'^(\s*m\s+)[-\d.]+', lambda m: m[1] + f'{x:g}', path).replace('@left', '').strip()
+
+
 def prep():
-    """Gesture nav, a clean demo status bar (9:00, full battery), media volume up."""
+    """Match the Pixel display shape; clean 9:41 status bar and full media volume."""
     _env()
+    overlays = adb("shell", "cmd", "overlay", "list")
+    if 'com.android.internal.emulation.pixel_9' in overlays:
+        for prefix in ('com.android.internal', 'com.android.systemui'):
+            for model in re.findall(r'\[x\] (' + re.escape(prefix) + r'\.emulation\.pixel_[\w]+)', overlays):
+                adb('shell', 'cmd', 'overlay', 'disable', model)
+            adb('shell', 'cmd', 'overlay', 'enable', prefix + '.emulation.pixel_9')
+        for resource, bounds in (('config_mainBuiltInDisplayCutout', False), ('config_mainBuiltInDisplayCutoutRectApproximation', True)):
+            path = adb('shell', 'cmd', 'overlay', 'lookup', 'android', 'android:string/' + resource).strip()
+            name = 'bq_capture_' + ('bounds' if bounds else 'cutout')
+            adb('shell', 'su', '0', 'cmd', 'overlay', 'fabricate', '--target', 'android', '--name', name,
+                'android:string/' + resource, '0x03', shlex.quote(centered_cutout(path, bounds)))
+            adb('shell', 'cmd', 'overlay', 'enable', 'com.android.shell:' + name)
     adb("shell", "cmd", "overlay", "enable", "com.android.internal.systemui.navbar.gestural", check=False)
     adb("shell", "settings", "put", "global", "sysui_demo_allowed", "1")
-    at.demo("enter"); at.demo("clock", "-e", "hhmm", "0900")
+    # API 35 no longer enables demo mode from the `enter` broadcast alone.
+    # An asynchronous `exit` broadcast can also undo a following enable.
+    adb('shell', 'settings', 'put', 'global', 'sysui_tuner_demo_on', '1')
+    time.sleep(.5)
+    at.demo('clock', '-e', 'hhmm', '0941')
     at.demo("battery", "-e", "level", "100", "-e", "plugged", "false")
-    at.demo("network", "-e", "mobile", "hide")
-    at.demo("network", "-e", "wifi", "show", "-e", "level", "4", "-e", "fully", "true")
+    at.demo("network", "-e", "sims", "0", "-e", "nosim", "hide", "-e", "mobile", "hide",
+            "-e", "wifi", "show", "-e", "level", "4", "-e", "fully", "true")
     at.demo("notifications", "-e", "visible", "false")
-    # the emulator's status-bar clock renders in a broken face ("9·ՈՈ"): hide it
-    adb("shell", "settings", "put", "secure", "icon_blacklist", "clock")
-    adb("shell", "cmd", "media_session", "volume", "--stream", "3", "--set", "15", check=False)
+    # Host capture retains the full status-bar layer, including the clock.
+    adb("shell", "settings", "delete", "secure", "icon_blacklist")
+    # `cmd media_session volume --set` reports success but does nothing on this
+    # image. Hardware key events change the real mixer; verify before recording.
+    adb('shell', 'input', 'keyevent', *(['KEYCODE_VOLUME_UP'] * 15))
+    volume = adb('shell', 'cmd', 'media_session', 'volume', '--stream', '3', '--get')
+    if 'volume is 15 in range' not in volume:
+        raise RuntimeError('Could not set the capture emulator media volume to 15: ' + volume.strip())
     for k in ("animator_duration_scale", "transition_animation_scale", "window_animation_scale"):
         adb("shell", "settings", "put", "global", k, "1")
 
@@ -349,7 +373,7 @@ def record(s, log=print, force=False):
     overall progress, which the editor shows as the capture runs.
     """
     from report import Report
-    from recording import Sequence
+    from recording import Sequence, remaining_recording_seconds
     from spec import opening_steps, opening_estimate
     rep = log if isinstance(log, Report) else None
     stage = (lambda k, m, p: rep.stage(k, m, p)) if rep else (lambda k, m, p: log(m))
@@ -383,18 +407,33 @@ def record(s, log=print, force=False):
     time.sleep(3.0)
     sequence = Sequence(s, log=log)
     sequence.prepare()
+    at.demo('clock', '-e', 'hhmm', '0941')
     raw = os.path.join(d, "raw.mkv")
     if os.path.exists(raw):
         os.remove(raw)
-    # scrcpy gets a generous limit; the take is ended a fixed time after the
+    # The recorder gets a generous limit; the take ends a fixed time after the
     # recitation actually starts (Hani's first file can buffer for seconds)
     limit = int(math.ceil(secs + opening_estimate(s) + 300))
-    env = dict(os.environ, ADB=shutil.which("adb"))
-    p = subprocess.Popen([scrcpy(), "--no-window", "--no-playback", f"--record={raw}",
-                          "--audio-source=playback", "--audio-codec=flac", "--video-codec=h264",
-                          "--video-bit-rate=40M", "--max-fps=60", f"--time-limit={limit}"],
-                         env=env, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
-    recording_start = time.monotonic()
+    import capture_host
+    runtime = capture_host.python(CACHE, log)
+    width, height = (1440, 3200) if a['capture'] == '2k' else (1080, 2400)
+    ready, capture_meta = os.path.join(d, 'capture-ready.json'), os.path.join(d, 'capture.json')
+    for path in (ready, capture_meta):
+        if os.path.exists(path): os.remove(path)
+    p = subprocess.Popen([runtime, os.path.join(os.path.dirname(__file__), 'capture_host.py'),
+                          '--serial', serial(), '--cache', CACHE, '--output', raw, '--ready', ready,
+                          '--metadata', capture_meta, '--width', str(width), '--height', str(height), '--limit', str(limit)],
+                         stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
+    deadline = time.monotonic() + 45
+    while not os.path.exists(ready):
+        if p.poll() is not None:
+            raise RuntimeError('Host recording failed: ' + p.stdout.read()[-2000:])
+        if time.monotonic() > deadline:
+            p.terminate(); p.wait(timeout=20)
+            raise RuntimeError('Host recording did not become ready within 45 seconds')
+        time.sleep(.05)
+    info = json.load(open(ready))
+    recording_start = time.monotonic() - (time.time_ns() // 1000 - info['started_wall_us']) / 1_000_000
     time.sleep(2.0)
     marks = {"dwell": a["intro"]["dwell"], "scene_only": not a["intro"]["play"]}
     def mark(key):
@@ -402,7 +441,7 @@ def record(s, log=print, force=False):
     try:
         if opening_steps(s): mark("intro")
         sequence.run(mark, stage)
-        stage("record", f"{'Starting playback' if a['intro']['play'] else 'Holding the last screen'} ({secs} s to record)", 0.25)
+        stage("record", "Starting playback" if a['intro']['play'] else "Holding the last screen", 0.25)
         if a["intro"]["play"]:
             mark("play")
             if a["repeat"] != "off":
@@ -424,7 +463,8 @@ def record(s, log=print, force=False):
         log(f"capture failed: {e}")
         raise
     t0 = time.monotonic()
-    want = secs + 1.5 if a['intro']['play'] else max(0, secs - (t0 - recording_start - marks.get('intro', 0)))
+    want = remaining_recording_seconds(s, t0 - recording_start, marks)
+    stage("record", f"Recording {want:.1f} s remaining", 0.25)
     try:
         while p.poll() is None:
             el = time.monotonic() - t0
@@ -437,7 +477,7 @@ def record(s, log=print, force=False):
                 except subprocess.TimeoutExpired:
                     p.kill()
                     p.wait()
-                    raise RuntimeError("scrcpy did not close the recording within 20 seconds")
+                    raise RuntimeError("host recorder did not close within 20 seconds")
                 break
             if rep:
                 rep.progress(0.25 + 0.6 * min(1.0, el / want), f"recording {el:.0f} / {want:.0f} s")
@@ -449,15 +489,20 @@ def record(s, log=print, force=False):
     out = p.stdout.read() if p.stdout else ""
     adb("shell", "input", "keyevent", "KEYCODE_MEDIA_PAUSE", check=False)
     if p.returncode != 0 or not os.path.exists(raw) or os.path.getsize(raw) < 10000:
-        raise SystemExit("scrcpy recording failed:\n" + out[-2000:])
+        raise SystemExit("host recording failed:\n" + out[-2000:])
     stage("conform", "Finding the recitation's start and conforming to 60 fps", 0.88)
-    conform(d, log, marks)
+    info = json.load(open(capture_meta))
+    window = adb('shell', 'dumpsys', 'display')
+    radius = re.search(r'RoundedCorner\{position=TopLeft, radius=(\d+)', window)
+    scale = width / info['native_width']
+    info['display'] = {'camera_baked': True, 'corner_radius': round(int(radius[1]) * scale, 3) if radius else None}
+    conform(d, log, marks, info)
     if rep:
         rep.progress(1.0, "take ready")
     return d
 
 
-def conform(d, log=print, marks=None):
+def conform(d, log=print, marks=None, capture_info=None):
     """raw.mkv -> clip.mp4 (60 fps CFR) + audio.wav on one timeline.
 
     `marks` (recording seconds): "play", when playback was asked for (the
@@ -479,12 +524,15 @@ def conform(d, log=print, marks=None):
         start = max(0.0, onset - float(marks.get("dwell", LEAD)))
     rates = cadence(raw, onset or start, (onset or start) + 20)
     clip, wav = os.path.join(d, "clip.mp4"), os.path.join(d, "audio.wav")
-    # scrcpy writes frames only when the screen changes: fps=60 repeats the
+    # The emulator emits frames when the screen changes: fps=60 repeats the
     # last one, it never invents in-between frames
-    subprocess.run(["ffmpeg", "-v", "error", "-y", "-ss", f"{start:.3f}", "-i", raw, "-map", "0:v",
-                    "-vf", "fps=60,format=yuv420p", "-c:v", "libx264", "-preset", "slow", "-crf", "12",
+    codec = ["-c:v", "h264_nvenc", "-preset", "p4", "-rc", "constqp", "-qp", "12"] if capture_info else ["-c:v", "libx264", "-preset", "slow", "-crf", "12"]
+    # A VFR still may have no image at the seek point. Input seeking drops
+    # that held image and shortens the clip; trim after decoding and fps fill.
+    subprocess.run(["ffmpeg", "-v", "error", "-y", "-threads", "2", "-filter_threads", "1", "-i", raw, "-ss", f"{start:.3f}", "-map", "0:v",
+                    "-vf", "fps=60,format=yuv420p", *codec,
                     "-g", "30", "-an", clip], check=True)
-    subprocess.run(["ffmpeg", "-v", "error", "-y", "-ss", f"{start:.3f}", "-i", raw, "-map", "0:a",
+    subprocess.run(["ffmpeg", "-v", "error", "-y", "-i", raw, "-ss", f"{start:.3f}", "-map", "0:a",
                     "-ar", "48000", "-ac", "2", wav], check=True)
     length = float(subprocess.run(["ffprobe", "-v", "error", "-show_entries", "format=duration", "-of", "csv=p=0",
                                    clip], capture_output=True, text=True, check=True).stdout.strip())
@@ -493,6 +541,8 @@ def conform(d, log=print, marks=None):
                                    capture_output=True, text=True, check=True).stdout.strip().split(","))
     meta = {"onset_raw": onset, "video_first_pts": v0, "lead": round(onset - start, 3) if onset is not None else length, "length": length, "marks": marks, **{k: round(v, 1) for k, v in rates.items()},
             "width": w, "height": h, "recorded": time.strftime("%Y-%m-%d %H:%M")}
-    json.dump(meta, open(os.path.join(d, "meta.json"), "w"), indent=1)
+    if capture_info: meta.update(capture=capture_info, display=capture_info['display'])
+    with open(os.path.join(d, "meta.json"), "w") as f:
+        json.dump(meta, f, indent=1)
     log(f"take ready: {d} ({length:.1f}s, active cadence {rates['active_fps']:.1f} fps, p90 frame interval {rates['frame_p90_ms']:.0f} ms)")
     return meta
