@@ -445,28 +445,24 @@ this document combined: `ReaderComponents.kt` (~36k tokens),
   (exit 1 if none). Any APK you build for this thread goes there — don't leave
   it only in `app/build/outputs` or a `/tmp` name. `send_apk_to_phone.sh`
   always goes through it, and the **Send APK** action in T3 Code runs
-  `send_apk_to_phone.sh --release --zip --published --wait`, which shares
-  the APK there when it matches HEAD on a clean tree, and rebuilds it first
-  otherwise.
-- Send a clearly named APK to the Pixel 10 after every completed code change,
-  and **delete local staged copies once the phone confirms receipt**. Always
-  delegate this to the cheap `apk-sender` subagent (haiku) following
-  `docs/APK_DELIVERY.md` — do not run the send inline in the main session.
-  It stages the build under a name made from the work and the
-  commit, verifies the copy, shares it, and then removes every older staged
-  build. Three rules are baked into it and hold whether or not you use it:
-  - Never send a generic `app-debug.apk` / `app-release.apk`. A phone full of
-    identically-named builds is a phone you cannot test from, and KDE Connect
-    drops a repeat of the same filename to its notification rate limit — so a
-    generic name is a send that silently does not arrive.
-  - Delete the older builds after the new one is away, and delete the new
-    one's local copy too once the phone confirms receipt. They are a quarter
-    of a gigabyte each; left to pile up they filled `/tmp`, which truncated a
-    copy mid-send and shipped a broken APK to the phone. Scope any hand-rolled
-    cleanup to files you staged yourself — never a bare `/tmp/*.apk`.
-  - Verify the transfer completed rather than trusting the sender's exit code,
-    and do not connect to port 1739 to "check" — that steals the payload from
-    the phone. If it is unreachable, report that plainly.
+  `send_apk_to_phone.sh --release --zip --published --wait` (the script
+  ignores `--zip`: sends are plain APK now).
+- **APK delivery is one script, not an agent.** When the requested work is
+  complete, check the T3 queue (`t3_queue_list`): send only when it is
+  **empty** — queued work owns this build, and sends when it finishes.
+  Then trigger the script and you are done:
+
+  ```bash
+  scripts/send_apk_to_phone.sh --release --label "the work"
+  ```
+
+  It builds, stages a copy named after the work + commit, verifies the
+  whole copy, shares it, detects failed sends and retries them itself
+  (10s/30s/60s), and deletes older staged builds. Never hand-roll
+  `kdeconnect-cli` sends, never delegate the send to a subagent. If it
+  exits non-zero, report that plainly; the staged copy is kept for a
+  re-send, and port 1739 is never probed to "check". Cleanup is scoped to
+  the staging dir — never a bare `/tmp/*.apk`.
 - Update the relevant doc in `docs/` when you change behavior it describes —
   the docs are load-bearing and kept accurate.
 

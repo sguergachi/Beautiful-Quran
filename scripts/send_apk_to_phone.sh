@@ -1,18 +1,25 @@
 #!/usr/bin/env bash
-# Build an APK, name it after the work, and share it to a paired KDE Connect
-# phone — then throw the previous one away.
+# The whole APK delivery in one script: build, name it after the work, share
+# it to a paired KDE Connect phone, retry a failed send, and throw the older
+# builds away. Call it and read the exit status — no hand-rolled steps.
 #
-# Two rules live in here rather than in anyone's head:
+# Three rules live in here rather than in anyone's head:
 #
 #   * The phone never receives a generic app-debug.apk / app-release.apk. It
 #     receives a file named after the work and the commit, because a phone full
 #     of identically-named builds is a phone you cannot test from. (KDE Connect
 #     also drops repeat sends of the same filename to its notification rate
 #     limit, so a generic name is a send that silently does not arrive.)
+#   * A send that fails is detected and retried here (10s, 30s, 60s); when
+#     every attempt fails the exit status says so and the staged copy is kept
+#     for a re-send — nothing is quietly dropped.
 #   * Once a new build has gone, the ones before it are deleted. They are
 #     throwaway artifacts of a quarter of a gigabyte each, and left to pile up
 #     they filled /tmp — which truncated a copy mid-send and shipped a broken
 #     APK to the phone.
+#
+# Only plain APKs are sent; the zip detour is retired. (--zip is still
+# accepted and ignored, because the T3 Code "Send APK" action passes it.)
 #
 # Staged builds live in their own directory so that cleanup can only ever
 # remove files this script created.
@@ -28,7 +35,6 @@ SKIP_BUILD=0
 PUBLISHED=0
 WAIT=0
 RELEASE=0
-ZIP=0
 LABEL=""
 KEEP_OLD=0
 WAIT_SECONDS="${KDECONNECT_WAIT_SECONDS:-300}"
@@ -38,11 +44,10 @@ STAGE_DIR="${BQ_APK_STAGE:-${TMPDIR:-/tmp}/beautiful-quran-apks}"
 
 usage() {
   cat <<'EOF'
-Usage: scripts/send_apk_to_phone.sh [--release] [--zip] [--label TEXT] [--skip-build]
+Usage: scripts/send_apk_to_phone.sh [--release] [--label TEXT] [--skip-build]
                                     [--published] [--wait] [--name NAME] [--keep-old]
 
   --release      Build/send the release APK (default: debug)
-  --zip          Zip the staged build (store only) and share the ZIP instead
   --label TEXT   What this build is, for the filename (default: the branch)
   --skip-build   Use the APK already in app/build/outputs
   --published    Send the APK at this worktree's known location
@@ -51,6 +56,8 @@ Usage: scripts/send_apk_to_phone.sh [--release] [--zip] [--label TEXT] [--skip-b
   --wait         Poll until a paired phone is reachable (default 300s)
   --name NAME    KDE Connect device name (default: first available)
   --keep-old     Do not delete previously staged builds after a successful send
+  --zip          Accepted and ignored: zip sends are retired; the plain APK
+                 is sent (kept only so the T3 Code action's flags still parse)
 
 Env: KDECONNECT_DEVICE_ID, KDECONNECT_DEVICE_NAME, KDECONNECT_WAIT_SECONDS,
      BQ_APK_STAGE (where named builds are staged; default $TMPDIR/beautiful-quran-apks)
@@ -62,7 +69,7 @@ while [[ $# -gt 0 ]]; do
     --skip-build) SKIP_BUILD=1 ;;
     --published) PUBLISHED=1 ;;
     --release) RELEASE=1 ;;
-    --zip) ZIP=1 ;;
+    --zip) printf 'note: zip sends are retired; sending the plain APK\n' ;;
     --keep-old) KEEP_OLD=1 ;;
     --label)
       shift
@@ -157,27 +164,6 @@ cmp -s -- "$APK" "$STAGED" || {
 }
 APK="$STAGED"
 
-# Zip for the slow link: APKs are already compressed, so store without
-# recompressing. The phone verifies with `unzip -l`.
-if [[ "$ZIP" -eq 1 ]]; then
-  ZIPPED="${STAGED%.apk}.zip"
-  [[ ! -e "$ZIPPED" ]] || ZIPPED="${ZIPPED%.zip}-$(date +%H%M).zip"
-  rm -f -- "$ZIPPED"
-  if command -v zip >/dev/null 2>&1; then
-    (cd -- "$STAGE_DIR" && zip -j -0 -q "$ZIPPED" "$(basename -- "$STAGED")")
-  else
-    # No `zip` binary (e.g. minimal containers): stdlib fallback, still stored.
-    python3 - "$STAGED" "$ZIPPED" <<'EOF'
-import sys, zipfile, os
-src, dst = sys.argv[1], sys.argv[2]
-with zipfile.ZipFile(dst, "w", zipfile.ZIP_STORED) as z:
-    z.write(src, os.path.basename(src))
-EOF
-  fi
-  printf 'Zipped %s (%s bytes)\n' "$(basename -- "$ZIPPED")" "$(stat -c%s -- "$ZIPPED")"
-  APK="$ZIPPED"
-fi
-
 pick_device() {
   local available id name
   available="$(kdeconnect-cli -a --id-name-only 2>/dev/null || true)"
@@ -238,7 +224,7 @@ while true; do
   fi
   attempt=$((attempt + 1))
   if (( attempt > 3 )); then
-    printf 'error: share failed after 4 attempts; keeping %s\n' "$APK" >&2
+    printf 'error: send failed after 4 attempts; kept %s for a re-send\n' "$APK" >&2
     exit 1
   fi
   delay="${SHARE_DELAYS[$((attempt - 1))]:-60}"
