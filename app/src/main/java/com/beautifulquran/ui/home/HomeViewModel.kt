@@ -49,6 +49,9 @@ data class HomeUiState(
     /** Reading place parked on the previous visit, kept visible as the green
      * marker even while the chapter list is filtered. */
     val continueTarget: ContinueTarget? = null,
+    /** Chapters the reader is revising, in Quranic order — corded and
+     * gathered above the full list, which still carries them in place. */
+    val revising: List<Surah> = emptyList(),
     /** When the query is a `surah:ayah` reference, the ayah to open the matched surah at. */
     val ayahTarget: Int? = null,
     /** Verse currently loaded in the player — drives the floating transport. */
@@ -174,6 +177,7 @@ class HomeViewModel(
                     surahs = surahs,
                     lastSurah = prefs.lastSurah,
                     lastAyah = prefs.lastAyah,
+                    revisingIds = prefs.revisingSurahIds,
                     reciterId = prefs.reciterId,
                     playerState = playerState,
                     names = names,
@@ -200,6 +204,7 @@ class HomeViewModel(
                 surahs = filtered,
                 allSurahs = base.surahs,
                 continueTarget = continueTarget,
+                revising = base.surahs.filter { it.id in base.revisingIds },
                 ayahTarget = ayahTarget,
                 floatingPlayback = floating,
                 playerState = base.playerState,
@@ -273,6 +278,12 @@ class HomeViewModel(
         }
     }
 
+    /** Cords or uncords a chapter as one the reader is revising. */
+    fun toggleRevising(surahId: Int) = settings.update {
+        val ids = it.revisingSurahIds
+        it.copy(revisingSurahIds = if (surahId in ids) ids - surahId else ids + surahId)
+    }
+
     fun togglePlayPause() = player.togglePlayPause()
 
     fun clearPlaybackError() = player.clearError()
@@ -311,6 +322,7 @@ private data class HomeCombineBase(
     val surahs: List<Surah>,
     val lastSurah: Int,
     val lastAyah: Int,
+    val revisingIds: Set<Int>,
     val reciterId: Int,
     val playerState: PlayerUiState,
     val names: Map<Int, String>,

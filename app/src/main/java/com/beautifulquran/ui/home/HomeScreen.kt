@@ -1,5 +1,6 @@
 package com.beautifulquran.ui.home
 
+import android.view.HapticFeedbackConstants
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.EnterTransition
@@ -75,6 +76,7 @@ import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
@@ -155,6 +157,9 @@ private val HomeRowRibbonGutter = (HomeNumberColumn - HomeRibbonWidth) / 2f
 private val HomeColumnGap = 4.dp
 private val HomeArabicOpticalInset = 4.dp
 private val TopBoundRibbonHeight = 96.dp
+/** Air closing the Revising group before the full list: the Bookmarks index's
+ * gap before a later chapter group. */
+private val RevisingGroupGap = 32.dp
 /**
  * Paper margin between the field and where scrolled ink dies: the feather
  * finishes dissolving a row here, so fading rows never brush the bar. While
@@ -271,6 +276,11 @@ fun HomeScreen(
     // scrolled out of view the pill floats at the bottom; once the row
     // itself is visible the pill docks away so the row owns the tap.
     val continueSurahId = uiState.continueTarget?.surah?.id
+    // Chapters being revised lead the list (search owns the sheet while
+    // active); a revised chapter's corded copy up there owns the place.
+    val showRevising = !searching && uiState.revising.isNotEmpty()
+    val revisingIds = if (showRevising) uiState.revising.map { it.id } else emptyList()
+    val placeKey = placeRowKey(continueSurahId, revisingIds)
     // The list must have measured before the pill may rise: on the sheet's
     // first composition the row-visibility rule cannot see any row yet, and
     // a pill that shows before then pops, dwells, and flies to a row that
@@ -280,13 +290,13 @@ fun HomeScreen(
     }
     // Dock only once the row is fully in view — flying to a sliver reads
     // as a miss. The row then owns the tap; the pill lands on its bounds.
-    val continueRowVisible by remember(continueSurahId, searching) {
+    val continueRowVisible by remember(placeKey, searching) {
         derivedStateOf {
             if (continueSurahId == null || searching) {
                 false
             } else {
                 val info = listState.layoutInfo
-                info.visibleItemsInfo.firstOrNull { it.key == "surah-$continueSurahId" }?.let { item ->
+                info.visibleItemsInfo.firstOrNull { it.key == placeKey }?.let { item ->
                     item.offset >= info.viewportStartOffset &&
                         item.offset + item.size <= info.viewportEndOffset
                 } == true
@@ -358,6 +368,7 @@ fun HomeScreen(
         uiState.surahs.map { it.id },
         continueSurahId,
         searching,
+        revisingIds,
     )
     if (!continueRowVisible && rowWasVisible && !docking && !undocking) {
         val seat = pillSeatRect
@@ -626,6 +637,58 @@ fun HomeScreen(
                     )
                     Spacer(Modifier.height(SearchBottomBreath))
                 }
+                // Every chapter row, in order or corded atop the list, is the
+                // same row; only the place ribbon follows [placeKey].
+                val revisingCords = uiState.revising.mapTo(HashSet()) { it.id }
+                // Cording a chapter from the top of the sheet would grow the
+                // group above the viewport, out of sight (the list holds its
+                // place by key). Bring the group down into view instead; a
+                // reader deep in the list keeps their place.
+                var revealRevising by remember { mutableStateOf(false) }
+                LaunchedEffect(uiState.revising.size) {
+                    if (revealRevising) {
+                        revealRevising = false
+                        listState.animateScrollToItem(0)
+                    }
+                }
+                val chapterRow: @Composable (Surah, String, Modifier) -> Unit = { surah, key, modifier ->
+                    SurahRow(
+                        surah = surah,
+                        // One place marker: only the row owning the place
+                        // carries the green cloth (the corded copy, when revised).
+                        currentAyah = uiState.continueTarget?.ayah?.takeIf { key == placeKey },
+                        revising = surah.id in revisingCords,
+                        onToggleRevising = {
+                            revealRevising = surah.id !in revisingCords && !listState.canScrollBackward
+                            viewModel.toggleRevising(surah.id)
+                        },
+                        placeUnfurlSignal = placeRibbonUnfurlEpoch,
+                        onPlaceUnfurlConsumed = { consumed ->
+                            placeRibbonUnfurlEpoch = remainingUnfurlSignal(
+                                current = placeRibbonUnfurlEpoch,
+                                consumed = consumed,
+                            )
+                        },
+                        onClick = {
+                            focusManager.clearFocus()
+                            onOpenSurah(
+                                surah.id,
+                                uiState.ayahTarget ?: uiState.continueTarget
+                                    ?.takeIf { it.surah.id == surah.id }
+                                    ?.ayah,
+                                null,
+                                null,
+                            )
+                        },
+                        modifier = if (!searching && key == placeKey) {
+                            modifier.onGloballyPositioned {
+                                continueRowRect = it.boundsInWindow()
+                            }
+                        } else {
+                            modifier
+                        },
+                    )
+                }
                 LazyColumn(
                     state = listState,
                     modifier = Modifier
@@ -664,38 +727,23 @@ fun HomeScreen(
                             SearchSectionLabel(text = "Surahs", topPadding = SearchFirstLabelTop)
                         }
                     }
+                    if (showRevising) {
+                        item(key = "revising-label") {
+                            SearchSectionLabel(
+                                text = "Revising",
+                                topPadding = SearchFirstLabelTop,
+                                modifier = Modifier.animateItem(),
+                            )
+                        }
+                        items(uiState.revising, key = { "revising-${it.id}" }) { surah ->
+                            chapterRow(surah, "revising-${surah.id}", Modifier.animateItem())
+                        }
+                        item(key = "revising-gap") {
+                            Spacer(Modifier.height(RevisingGroupGap).animateItem())
+                        }
+                    }
                     items(uiState.surahs, key = { "surah-${it.id}" }) { surah ->
-                        SurahRow(
-                            surah = surah,
-                            currentAyah = uiState.continueTarget
-                                ?.takeIf { it.surah.id == surah.id }
-                                ?.ayah,
-                            placeUnfurlSignal = placeRibbonUnfurlEpoch,
-                            onPlaceUnfurlConsumed = { consumed ->
-                                placeRibbonUnfurlEpoch = remainingUnfurlSignal(
-                                    current = placeRibbonUnfurlEpoch,
-                                    consumed = consumed,
-                                )
-                            },
-                            onClick = {
-                                focusManager.clearFocus()
-                                onOpenSurah(
-                                    surah.id,
-                                    uiState.ayahTarget ?: uiState.continueTarget
-                                        ?.takeIf { it.surah.id == surah.id }
-                                        ?.ayah,
-                                    null,
-                                    null,
-                                )
-                            },
-                            modifier = if (!searching && continueSurahId == surah.id) {
-                                Modifier.onGloballyPositioned {
-                                    continueRowRect = it.boundsInWindow()
-                                }
-                            } else {
-                                Modifier
-                            },
-                        )
+                        chapterRow(surah, "surah-${surah.id}", Modifier)
                     }
 
                     if (showWordSections) {
@@ -1081,10 +1129,15 @@ internal fun continueLazyIndex(
     surahIds: List<Int>,
     continueId: Int?,
     searching: Boolean,
+    /** The Revising group leads the list: its label, its rows, its air. */
+    revisingIds: List<Int> = emptyList(),
 ): Int {
     if (searching || continueId == null) return -1
+    val revised = revisingIds.indexOf(continueId)
+    if (revised >= 0) return 1 + revised
     val position = surahIds.indexOf(continueId)
-    return if (position < 0) -1 else position
+    val lead = if (revisingIds.isEmpty()) 0 else revisingIds.size + 2
+    return if (position < 0) -1 else lead + position
 }
 
 /**
@@ -1231,17 +1284,20 @@ private fun SurahRow(
     currentAyah: Int?,
     placeUnfurlSignal: Int,
     onPlaceUnfurlConsumed: (Int) -> Unit,
+    revising: Boolean,
+    onToggleRevising: () -> Unit,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val accents = LocalQuranAccents.current
+    val view = LocalView.current
     Row(
         verticalAlignment = Alignment.CenterVertically,
         modifier = modifier
             .fillMaxWidth()
-            .quietClickable(onClick = onClick)
+            .revisingCord(revising, QuranTheme.ink.secondary, HomeEndInset)
+            .quietClickable(onLongClick = onToggleRevising, onClick = onClick)
             .padding(
-                end = HomeEndInset,
                 top = ContinueRowVertical,
                 bottom = ContinueRowVertical,
             ),
@@ -1304,6 +1360,20 @@ private fun SurahRow(
             color = QuranTheme.accents.greenInk,
             modifier = Modifier.padding(end = HomeArabicOpticalInset),
         )
+        // The trailing gutter mirrors the ribbon lane: marking is where you
+        // tap, as on a verse's ribbon margin. The cord hangs here.
+        Box(
+            Modifier
+                .width(HomeEndInset)
+                .height(ContinueRowRibbonHeight)
+                .quietClickable(role = Role.Button) {
+                    view.performHapticFeedback(HapticFeedbackConstants.CONTEXT_CLICK)
+                    onToggleRevising()
+                }
+                .semantics {
+                    contentDescription = revisingCordLabel(revising, surah.nameTransliteration)
+                },
+        )
     }
 }
 
@@ -1325,12 +1395,12 @@ internal fun shouldDismissSearchOnScroll(
         )
 
 @Composable
-private fun SearchSectionLabel(text: String, topPadding: Dp = 8.dp) {
+private fun SearchSectionLabel(text: String, topPadding: Dp = 8.dp, modifier: Modifier = Modifier) {
     Text(
         text = text,
         style = MaterialTheme.typography.labelLarge,
         color = QuranTheme.ink.quiet,
-        modifier = Modifier
+        modifier = modifier
             .fillMaxWidth()
             .padding(
                 start = HomeStartInset,

@@ -1670,6 +1670,33 @@ animation from being borrowed as navigation feedback, and leaves the shared
 component authoritative for its own visual language. Do not create another
 bookmark icon, a second ribbon shape, or a bespoke animated substitute.
 
+### Revising cord (Android prototype)
+
+A chapter being revised or memorised carries a **study cord**: a twisted
+silk thread, like the sewn-in marker of a bound mushaf, hanging in the row's
+**trailing** 28 dp gutter. The leading lane belongs to the green place
+ribbon, so the cord takes the mirrored gutter and the two never share or
+shift a lane. Marking is where you tap: a tap on that gutter cords or uncords
+the chapter (a long-press anywhere on the row does the same). The cord drops
+with the bookmark ribbon's gravity spill and gathers back under the page on
+removal. It emerges from under the paper at the row's top edge, bellies
+slightly toward the text, and ends in a knot and a frayed tassel. The belly,
+twist and tassel are what keep it from reading as a scrollbar. It is plain
+ink, not a fourth hue: green is interaction, gold is ornament, ruby is a
+saved verse.
+
+Corded chapters gather above the full list under a quiet **Revising** label,
+in Quranic order, followed by 32 dp of air. The full list still carries
+them in their places, also corded, so the book's order never has holes.
+The current-place ribbon (and the Continue pill's docking target) belongs to
+one row only: the corded copy when the chapter is being revised, its
+in-order row otherwise. Search owns the sheet while active, so the group
+stands down. Cording from the top of the sheet scrolls the new group into
+view; a reader deep in the list keeps their place. Stored as
+`Settings.revisingSurahIds`; web parity is pending.
+
+Implementation: `ui/home/RevisingCord.kt`, `SurahRow` in `HomeScreen.kt`.
+
 ### Chapters bookmark treatment
 
 Android uses the top-bound ruby ribbon to open Bookmarks. It starts at the
