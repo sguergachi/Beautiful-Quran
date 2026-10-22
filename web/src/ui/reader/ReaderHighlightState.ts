@@ -60,6 +60,15 @@ export function readerAyahInkPolicyActive(
 }
 
 /**
+ * How long the buffer must carry the voice before the page wakes from the
+ * stream wait (the `data-stream-wait` cover in the screen). A starving
+ * stream alternates brief ready windows with buffering; waking on the first
+ * would strobe the page bright between download bursts instead of holding
+ * the one simultaneous fade.
+ */
+export const STREAM_WAIT_RELEASE_HOLD_MS = 700
+
+/**
  * Pure playback-to-reader projection shared by every store tick. Keeping this
  * out of AppStore makes fade-lead and full ActiveWord identity unit-testable.
  */

@@ -179,6 +179,14 @@ private const val HELD_WORD_REFRESH_MS = 300L
  */
 private const val ReaderEntranceFadeMs = 450
 
+/**
+ * How long the stream buffer must carry the voice before the page wakes
+ * from the stream wait. A starving stream alternates brief ready windows
+ * with buffering; waking on the first would brighten the page between
+ * download bursts instead of holding the one synchronized fade.
+ */
+private const val STREAM_WAIT_RELEASE_HOLD_MS = 700L
+
 /** One-shot request to reveal a held word after opening or foreground resume. */
 private data class WordFocusRequest(
     val generation: Int,
@@ -751,6 +759,24 @@ fun ReaderScreen(
         } else {
             delay(350)
             recitingActive = false
+        }
+    }
+    // Waiting on the stream download: while the spinner holds, the whole
+    // page — the recited tail and the opening basmalah included — waits
+    // under Upcoming paper. The wait is the buffering itself, not a question
+    // of whether anything has been spoken: the moment it begins the page
+    // fades as one synchronized action (no spoken-word gate — the recited
+    // tail is exactly the lit region the wait must cover), and it releases
+    // only after the buffer has carried the voice for a moment, so a
+    // starving stream's brief ready windows cannot strobe the page between
+    // download bursts.
+    var streamWait by remember { mutableStateOf(false) }
+    LaunchedEffect(playerState.isBuffering) {
+        if (playerState.isBuffering) {
+            streamWait = true
+        } else {
+            delay(STREAM_WAIT_RELEASE_HOLD_MS)
+            streamWait = false
         }
     }
     val view = LocalView.current
@@ -3118,7 +3144,14 @@ fun ReaderScreen(
                             ) {
                                 BasmalahBlock(
                                     active = isThisSurahPlaying && activeBasmalah == true,
-                                    dimmed = recitingActive && activeBasmalah != true,
+                                    // The stream wait covers the opening
+                                    // clip too: until the audio speaks, the
+                                    // basmalah waits under Upcoming paper.
+                                    dimmed = if (streamWait) {
+                                        true
+                                    } else {
+                                        recitingActive && activeBasmalah != true
+                                    },
                                     fontScale = settings.fontScale,
                                     washProgress = viewModel.basmalahWashProgress,
                                     onClick = {
@@ -3135,7 +3168,11 @@ fun ReaderScreen(
                             // never every visible AyahBlock (docs/PERFORMANCE.md).
                             val activeWord by remember(ayah.number) {
                                 derivedStateOf {
-                                    activeWordState.value?.takeIf { it.ayah == ayah.number }
+                                    // The stream wait sees no recited word —
+                                    // even a tap seed's provisional wash gives
+                                    // way to the Upcoming cover.
+                                    activeWordState.value
+                                        ?.takeIf { it.ayah == ayah.number && !streamWait }
                                 }
                             }
                             // Ink policy matches web readerAyahInkPolicyActive: the
@@ -3185,7 +3222,11 @@ fun ReaderScreen(
                                 activeWord = activeWord,
                                 playbackSpeed = playerState.speed,
                                 isActiveAyah = policyActive,
-                                dimmed = recitingActive && !policyActive,
+                                dimmed = if (streamWait) {
+                                    true
+                                } else {
+                                    recitingActive && !policyActive
+                                },
                                 // Keep the page readable the moment a jump
                                 // commits — the decelerating scroll is the cue,
                                 // and a 7 % fade would hide it.

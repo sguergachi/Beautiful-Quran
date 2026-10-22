@@ -2520,6 +2520,14 @@ button.ayah-mark {
   opacity: var(--upcoming-cover, 0.7339);
 }
 
+/* Waiting on the stream download: nothing is spoken yet, so the whole page —
+   the due verse and the basmalah included — waits under the same paper, not
+   the reciter's verse alone. Released (same transitions) once audio talks. */
+.scroll[data-stream-wait='true'] .ayah-recess-veil,
+.scroll[data-stream-wait='true'] .basmalah-block::after {
+  opacity: var(--upcoming-cover, 0.7339);
+}
+
 /* Search-result focus: keep every orange target at full strength while the
    rest of the chapter recedes behind 60% paper. Arabic is covered rather than
    alpha-dimmed so Quran glyphs and overlapping marks remain opaque. */
