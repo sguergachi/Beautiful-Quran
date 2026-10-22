@@ -2,7 +2,7 @@
 
 export type Ease = "inOutCubic" | "inOutSine" | "outCubic" | "inCubic" | "outExpo" | "linear" | "hold";
 export interface Key { t: number; v: number; ease?: Ease }
-export interface Piece { in: number; out: number }
+export interface Piece { in: number; out: number; gap?: number }
 export interface PropDef { group: string; label: string; min: number; max: number; step: number; default: number; log?: boolean }
 
 // A spec as stored (only what differs from the defaults). Loose on purpose:

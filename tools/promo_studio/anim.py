@@ -47,10 +47,13 @@ def state_at(s, t):
 
 
 def source_time(s, t):
-    """Video time -> take time, through the edit."""
+    """Video time -> (take time, piece); (0, None) in a silent picture gap."""
     t = max(0.0, t)
     acc = 0.0
     for p in s["edit"]:
+        acc += float(p.get("gap", 0))
+        if t < acc:
+            return 0.0, None
         n = float(p["out"]) - float(p["in"])
         if t < acc + n:
             return float(p["in"]) + (t - acc), p
@@ -63,6 +66,7 @@ def video_times(s, take_t0, take_t1):
     """Take span -> the video spans it appears in (a span can be cut or repeated)."""
     out, acc = [], 0.0
     for p in s["edit"]:
+        acc += float(p.get("gap", 0))
         i, o = float(p["in"]), float(p["out"])
         a, b = max(i, take_t0), min(o, take_t1)
         if b > a:
@@ -77,6 +81,7 @@ def sound_onset(s, lead):
     if not s.get("app", {}).get("intro", {}).get("play", True): return 0.0
     acc = 0.0
     for p in s["edit"]:
+        acc += float(p.get("gap", 0))
         i, o = float(p["in"]), float(p["out"])
         if o > lead:
             return acc + max(0.0, lead - i)

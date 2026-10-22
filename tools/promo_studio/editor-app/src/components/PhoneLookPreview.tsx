@@ -1,4 +1,5 @@
 import { useEffect, useRef } from "react";
+import { sourceTime } from "../lib/model.ts";
 import { clock, media } from "../state/clock.ts";
 import { useStore } from "../state/store.ts";
 
@@ -43,11 +44,12 @@ export function PhoneLookPreview() {
       ctx.fillStyle = meta?.themes[spec.app.theme]?.bg ?? "#111";
       ctx.fillRect(x + g.sx0 * k, y + g.sy0 * k, g.sw * k, g.sh * k);
       const matches = (src: string, path: string) => src === new URL(path, location.href).href;
-      if (geo.clip && matches(media.screen.currentSrc, geo.clip) && media.screen.readyState >= 2) {
+      const gap = sourceTime(spec, clock.t)[1] < 0;
+      if (!gap && geo.clip && matches(media.screen.currentSrc, geo.clip) && media.screen.readyState >= 2) {
         ctx.drawImage(media.screen, x + g.sx0 * k, y + g.sy0 * k, g.sw * k, g.sh * k);
       } else {
         ctx.fillStyle = "#a49c8c"; ctx.font = "10px system-ui"; ctx.textAlign = "center";
-        ctx.fillText(geo.clip ? "Loading…" : "No take yet", w / 2, h / 2);
+        ctx.fillText(gap ? "Gap in recording" : geo.clip ? "Loading…" : "No take yet", w / 2, h / 2);
       }
       ctx.restore();
       if (media.frame.complete && media.frame.naturalWidth && matches(media.frame.src, geo.frame)) {

@@ -104,7 +104,7 @@ export function Timeline() {
     const c = [0, dur];
     if (!noPlayhead) c.push(playhead);
     for (const [n, keys] of Object.entries(spec.tracks)) for (const k of keys) if (!exclude.some((x) => x.prop === n && Math.abs(x.t - k.t) < 1e-6)) c.push(k.t);
-    for (let i = 1; i < spec.edit.length; i++) c.push(pieceStart(spec, i));
+    for (let i = 0; i < spec.edit.length; i++) c.push(pieceStart(spec, i), pieceStart(spec, i) + spec.edit[i].out - spec.edit[i].in);
     for (const v of tl?.verses || []) for (const [a] of videoTimes(spec, v.t0, v.t1)) c.push(a);
     let best = t, bd = 7 / pps;
     for (const x of c) if (Math.abs(x - t) < bd) { bd = Math.abs(x - t); best = x; }
@@ -296,17 +296,21 @@ export function Timeline() {
           </div>
           {/* recording */}
           <LaneRow labelW={labelW} laneW={laneW} scrub={scrub} tall label={<button onClick={() => inspect("contents", true)} title="Define the take's contents">Recording</button>} lane="">
+            {spec.edit.map((p, i) => p.gap ? <div key={`gap-${i}`} data-gap data-lanebg
+              title={`${p.gap.toFixed(2)} s gap · background only, no recording sound · pull the clip's left edge back to restore footage`}
+              className="absolute inset-y-[3px] cursor-ew-resize overflow-hidden whitespace-nowrap rounded border border-dashed border-line px-2 py-0.5 text-[10.5px] text-faint"
+              style={{ left: (pieceStart(spec, i) - p.gap) * pps, width: p.gap * pps }}>Gap · {p.gap.toFixed(2)} s</div> : null)}
             {spec.edit.map((p, i) => {
               const a = pieceStart(spec, i), w = Math.max(4, (p.out - p.in) * pps), over = takeLen != null && p.out > takeLen + 0.05;
               const on = sel?.type === "piece" && sel.i === i;
               return (
-                <div key={i} onPointerDown={(e) => pieceDown(e, i, null)} onContextMenu={(e) => pieceMenu(e, i)}
+                <div key={i} data-piece={i} onPointerDown={(e) => pieceDown(e, i, null)} onContextMenu={(e) => pieceMenu(e, i)}
                   title={`take ${p.in.toFixed(2)}–${p.out.toFixed(2)} s · drag an edge to trim · right-click to split or delete${over ? " · past the end of the take: record a longer take" : ""}`}
                   className={`absolute top-[3px] bottom-[3px] cursor-pointer overflow-hidden whitespace-nowrap rounded-[5px] border px-2 py-0.5 text-[10.5px] ${over ? "stripes border-danger" : "border-[#4b6280] bg-[#2b3747] text-[#dce8f8] hover:border-blue"} ${on ? "outline outline-2 outline-blue" : ""}`}
                   style={{ left: a * pps, width: w }}>
                   {p.in.toFixed(2)}–{p.out.toFixed(2)}s
-                  <div onPointerDown={(e) => pieceDown(e, i, "in")} className="absolute inset-y-0 left-0 w-2 cursor-ew-resize bg-white/10 hover:bg-white/30" />
-                  <div onPointerDown={(e) => pieceDown(e, i, "out")} className="absolute inset-y-0 right-0 w-2 cursor-ew-resize bg-white/10 hover:bg-white/30" />
+                  <div data-trim="in" onPointerDown={(e) => pieceDown(e, i, "in")} className="absolute inset-y-0 left-0 w-2 cursor-ew-resize bg-white/10 hover:bg-white/30" />
+                  <div data-trim="out" onPointerDown={(e) => pieceDown(e, i, "out")} className="absolute inset-y-0 right-0 w-2 cursor-ew-resize bg-white/10 hover:bg-white/30" />
                 </div>
               );
             })}

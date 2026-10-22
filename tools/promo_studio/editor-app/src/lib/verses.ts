@@ -33,7 +33,7 @@ export function nextVerseRange(range: VerseRange | null, action: VerseAction, co
  * video-time positions, matching the editor's existing trim contract.
  */
 export function applyVersePlan(raw: RawSpec, spec: Spec, plan: VersePlan, action?: VerseAction, take = false): void {
-  let pieces: Piece[] = spec.edit.map((p) => ({ in: r3(p.in + plan.shift), out: r3(p.out + plan.shift) }));
+  let pieces: Piece[] = spec.edit.map((p) => ({ ...p, in: r3(p.in + plan.shift), out: r3(p.out + plan.shift) }));
   if (!action) pieces = [{ in: plan.in, out: plan.out }];
   else if (action === "add-start") pieces[0].in = plan.in;
   else if (action === "add-end") pieces.at(-1)!.out = plan.out;

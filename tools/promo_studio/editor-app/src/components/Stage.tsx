@@ -3,7 +3,7 @@
 // property at the playhead once it is animated (store.setProp).
 import { useEffect, useRef, useState } from "react";
 import { track } from "../lib/drag.ts";
-import { stateAt } from "../lib/model.ts";
+import { sourceTime, stateAt } from "../lib/model.ts";
 import { phoneMatrix } from "../lib/geometry.ts";
 import { previewContext } from "../lib/inspector.ts";
 import { Preview } from "../lib/render.ts";
@@ -59,10 +59,12 @@ export function Stage() {
       const s = useStore.getState(), c = canvas.current;
       if (!c || !s.spec || !s.geo || !s.meta) return;
       const S = stateAt(s.spec, s.meta.props, clock.t), scale = box.current.w / s.geo.W;
+      const recording = sourceTime(s.spec, clock.t)[1] >= 0;
+      phone.current!.style.visibility = recording ? "visible" : "hidden";
       phone.current!.style.transform = `matrix(${phoneMatrix(s.spec, s.geo, S).map((v) => v * scale).join(",")})`;
       screen.current!.style.background = s.meta.themes[s.spec.app.theme]?.bg ?? "#111";
       preview.draw(c.getContext("2d", { alpha: false, desynchronized: true })!, {
-        spec: s.spec, geo: s.geo, plate: s.plate, S, nativePhone: true,
+        spec: s.spec, geo: s.geo, plate: s.plate, S, nativePhone: true, recording,
         themeBg: s.meta.themes[s.spec.app.theme]?.bg ?? "#111", screen: media.screen, plateVideo: media.plate, frame: media.frame,
       });
     });
@@ -94,7 +96,7 @@ export function Stage() {
       else { setProp("pan_x", S0.pan_x - dx / (S0.zoom * W), tag); setProp("pan_y", S0.pan_y - dy / (S0.zoom * H), tag); }
     }, (up) => {
       endGesture(); if (up.type === "pointercancel") return;
-      inspect(moved ? (phone ? "phone-motion" : "camera") : previewContext(s.spec!, s.geo!, S0, (x0 - rect.left) * outPerPx, (y0 - rect.top) * outPerPx), !moved || innerWidth > 1000);
+      inspect(moved ? (phone ? "phone-motion" : "camera") : sourceTime(s.spec!, clock.t)[1] < 0 ? "background-look" : previewContext(s.spec!, s.geo!, S0, (x0 - rect.left) * outPerPx, (y0 - rect.top) * outPerPx), !moved || innerWidth > 1000);
     }, { cursor: "grab" });
   };
   // a non-passive wheel listener: the page must not scroll under the preview

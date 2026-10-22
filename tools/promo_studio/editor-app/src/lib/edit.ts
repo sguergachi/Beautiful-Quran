@@ -150,7 +150,7 @@ export function splitAt(raw: RawSpec, c: Ctx, t: number): number | null {
   const [src, i] = sourceTime(c.spec, t);
   const p = raw.edit[i];
   if (!p || src - p.in < MIN_PIECE || p.out - src < MIN_PIECE) return null;
-  raw.edit.splice(i, 1, { in: p.in, out: r3(src) }, { in: r3(src), out: p.out });
+  raw.edit.splice(i, 1, { ...p, out: r3(src) }, { in: r3(src), out: p.out });
   return i + 1;
 }
 
@@ -160,16 +160,26 @@ export function deletePiece(raw: RawSpec, i: number): boolean {
   return true;
 }
 
-// Move a piece's edge (take seconds); `take` caps the out point when known.
+// A left trim leaves a gap, preserving the clip's end and everything after
+// it. Extending left fills that gap, stopping before the preceding clip.
 export function trimPiece(raw: RawSpec, i: number, side: "in" | "out", value: number, take?: number | null) {
+  if (!Number.isFinite(value)) return;
   const p = raw.edit[i], minLength = Math.min(MIN_PIECE, p.out - p.in);
-  if (side === "in") p.in = clamp(r3(value), 0, p.out - minLength);
+  if (side === "in") {
+    const gap = p.gap || 0, next = clamp(r3(value), Math.max(0, p.in - gap), p.out - minLength);
+    p.gap = r3(gap + next - p.in);
+    p.in = next;
+    if (!p.gap) delete p.gap;
+  }
   else p.out = clamp(r3(value), p.in + minLength, Math.max(p.in + minLength, take ?? 1e9));
 }
 
 export function landmarks(spec: Spec, verses: { t0: number; t1: number }[] | undefined, videoTimes: (a: number, b: number) => [number, number][]): number[] {
   const out = [0, spec.duration];
   for (const v of verses || []) for (const [a] of videoTimes(v.t0, v.t1)) out.push(a);
-  for (let i = 1; i < spec.edit.length; i++) out.push(pieceStart(spec, i));
+  for (let i = 0; i < spec.edit.length; i++) {
+    const start = pieceStart(spec, i);
+    out.push(start, start + spec.edit[i].out - spec.edit[i].in);
+  }
   return [...new Set(out.map(r3))].sort((a, b) => a - b);
 }

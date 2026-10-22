@@ -51,7 +51,7 @@ function followRecording(t: number, exact: boolean) {
 for (const m of [media.screen, media.plate, media.audio]) {
   m.addEventListener("loadeddata", () => {
     clock.sync(true);
-    if (clock.playing) m.play().catch(() => {});
+    if (clock.playing && (m === media.plate || clock._piece >= 0)) m.play().catch(() => {});
     clock.emitMedia();
   });
   m.addEventListener("seeked", () => {
@@ -85,7 +85,7 @@ function setGain(t: number, jump: boolean) {
   if (!audioCtx || !gainNode) { media.audio.volume = clamp(g, 0, 1); return; }
   const at = audioCtx.currentTime, p = gainNode.gain;
   p.cancelScheduledValues(at);
-  if (jump) p.setValueAtTime(g, at);
+  if (jump || g === 0) p.setValueAtTime(g, at);
   else p.setTargetAtTime(g, at, 0.012);   // per-frame steps without zipper noise
 }
 
@@ -121,9 +121,16 @@ export const clock = {
     const [src, piece] = sourceTime(spec, Math.min(this.t, Math.max(0, spec.duration - 1 / fps)));
     force = force || piece !== this._piece;
     this._piece = piece;
-    if (hasClip) {
+    if (hasClip && piece >= 0) {
       followRecording(src, force || !this.playing);
       if (Math.abs(media.audio.currentTime - src) > (force ? 0.001 : 0.09)) seekMedia(media.audio, src);
+      if (this.playing && force) {
+        if (media.screen.paused) media.screen.play().catch(() => {});
+        if (media.audio.paused) media.audio.play().catch(() => {});
+      }
+    } else if (piece < 0) {
+      media.screen.pause(); media.audio.pause();
+      media.screen.playbackRate = 1;
     }
     if (hasPlate) {
       const pt = this.plateTime(this.t);
@@ -146,7 +153,7 @@ export const clock = {
     setGain(this.t, true);
     this.sync(true);
     this._wall0 = performance.now(); this._t0 = this.t;
-    if (hasClip) { media.screen.play().catch(() => {}); media.audio.play().catch(() => {}); }
+    if (hasClip && this._piece >= 0) { media.screen.play().catch(() => {}); media.audio.play().catch(() => {}); }
     if (hasPlate) media.plate.play().catch(() => {});
     this.emitState();
     this._raf = requestAnimationFrame(() => this._tick());

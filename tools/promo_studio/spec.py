@@ -7,9 +7,10 @@ keyframes in `tracks` those drive it instead. Missing keys take the defaults
 below, so a spec only says what makes it different.
 
     "edit":   [{"in": 0.0, "out": 12.4}, {"in": 15.0, "out": 21.0}]
-              pieces of the take, played back to back (take seconds; the
+              pieces of the take, with optional silent `gap` seconds before
+              each piece (take seconds; the
               take opens 1 s before the recitation). The video's length is
-              their sum.
+              their sum, including gaps.
     "tracks": {"zoom": [{"t": 0, "v": 2.2}, {"t": 2.5, "v": 1, "ease": "inOutCubic"}]}
               t: video seconds; v: value; ease: how the move INTO this key
               is paced ("hold" = cut).
@@ -216,7 +217,7 @@ def resolve(raw):
 
 
 def duration(s):
-    return round(sum(float(p["out"]) - float(p["in"]) for p in s["edit"]), 6)
+    return round(sum(float(p.get("gap", 0)) + float(p["out"]) - float(p["in"]) for p in s["edit"]), 6)
 
 
 def take_needed(s):
@@ -292,6 +293,7 @@ def validate(s):
     if not (1 <= int(a["surah"]) <= 114): errs.append("app.surah must be 1..114")
     if s["aspect"] not in ASPECTS: errs.append(f"aspect must be one of {sorted(ASPECTS)}")
     for p in s["edit"]:
+        number(p.get("gap", 0), "edit.gap", 0)
         number(p["in"], "edit.in", 0)
         number(p["out"], "edit.out", 0)
         if p["out"] - p["in"] <= 1e-3: errs.append(f"empty or reversed edit piece {p}")

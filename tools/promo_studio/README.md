@@ -329,12 +329,19 @@ the start stay clear of the labels. Every number field scrubs: drag across
 it to change the value (Shift ×10, Alt ×0.1; one undo step per drag), click
 to type.
 
-- **Recording** track: the take, cut into pieces that play back to back.
+- **Recording** track: the take, cut into pieces with optional gaps.
   **S** (or ✂ Split) splits at the playhead, **Delete** removes the selected
-  piece, dragging a piece's edges trims it. The sound is cut with the
+  piece, dragging a piece's edges trims it. Trimming the left edge leaves a
+  gap before the clip: its end, later clips, animation keys, total duration,
+  and Fit scale stay in place. Pull left into that gap to restore footage;
+  the edge stops at the preceding clip (or video start). Gaps show only the
+  background and play no recording audio in both preview and export. Source
+  in fields use the same trim behavior. Splitting retains an existing gap
+  before the first half. The sound is cut with the
   picture (8 ms fades at each cut, so no clicks). In the spec:
   `"edit": [{"in": 0.0, "out": 12.4}, {"in": 15.0, "out": 21.0}]`, in take
-  seconds; by default the take opens 1 s before recitation, or with the chosen
+  seconds, with optional `"gap": 2.0` on a piece for two video seconds before
+  it; by default the take opens 1 s before recitation, or with the chosen
   screen sequence and final wait.
 - **Sound**: the take's waveform through your cuts, shaped by the fades.
   Drag a fade's gold handle to set its length (it rounds to 0.05 s; hold

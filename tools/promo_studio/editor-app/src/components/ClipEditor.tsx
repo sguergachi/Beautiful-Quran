@@ -27,6 +27,6 @@ export function ClipEditor() {
       <Button size="sm" disabled={t <= start + .05 || t >= end - .05} onClick={() => split()}>{Icon.scissors} Split here</Button>
       <Button size="sm" variant="danger" disabled={spec.edit.length <= 1} onClick={deleteSelection}>{Icon.trash} Delete clip</Button>
     </div>
-    <p className="mt-4 text-[11.5px] leading-relaxed text-faint">Source times refer to the recorded take. Picture and sound trim together; animation keys stay in video time.</p>
+    <p className="mt-4 text-[11.5px] leading-relaxed text-faint">Trimming the start leaves a silent gap and keeps later clips in place. Pull the edge left to restore footage. Picture and sound trim together; animation keys stay in video time.</p>
   </div>;
 }

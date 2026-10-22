@@ -47,10 +47,25 @@ class ModelTests(unittest.TestCase):
                     {"tracks": {"zoom": [{"t": 1, "v": 1}, {"t": 1, "v": 2}]}}, {"phone": {"height": -1}}):
             with self.subTest(raw=raw), self.assertRaises(ValueError): spec.resolve(raw)
 
+    def test_gaps_are_finite_nonnegative_and_preserve_source_clock(self):
+        for gap in (-1, float('nan'), float('inf'), True, '2'):
+            with self.subTest(gap=gap), self.assertRaises(ValueError):
+                spec.resolve({'edit': [{'in': 4, 'out': 8, 'gap': gap}]})
+        s = spec.resolve({'edit': [{'in': 4, 'out': 8, 'gap': 3}, {'in': 10, 'out': 12, 'gap': 2}]})
+        self.assertEqual(s['duration'], 11)
+        self.assertEqual(spec.take_needed(s), 12)
+        self.assertEqual(spec.resolve(s)['edit'], s['edit'])
+        self.assertEqual(anim.source_time(s, 0), (0, None))
+        self.assertEqual(anim.source_time(s, 3)[0], 4)
+        self.assertEqual(anim.source_time(s, 7), (0, None))
+        self.assertEqual(anim.source_time(s, 9)[0], 10)
+        self.assertEqual(anim.video_times(s, 4, 12), [(3, 7), (9, 11)])
+        self.assertEqual(anim.sound_onset(s, 5), 4)
+
     def test_editor_math_parity(self):
         rng, cases = random.Random(886), []
         for i in range(32):
-            s = spec.resolve({"aspect": list(spec.ASPECTS)[i % 4], "edit": [{"in": .5, "out": 2}, {"in": .2, "out": 1}],
+            s = spec.resolve({"aspect": list(spec.ASPECTS)[i % 4], "edit": [{"in": .5, "out": 2, "gap": .3 if i % 2 else 0}, {"in": .2, "out": 1, "gap": .6 if i % 3 else 0}],
                               "tracks": {"zoom": [{"t": 0, "v": .7}, {"t": 2, "v": 4, "ease": spec.EASES[i % len(spec.EASES)]}]}})
             for name, p in spec.PROPS.items(): s["props"][name] = rng.uniform(p["min"], p["max"])
             t = [-.5, 0, .4, 1.5, 2, 2.3, 3][i % 7]
@@ -128,6 +143,35 @@ class MediaTests(unittest.TestCase):
         self.assertLess(float(np.max(np.abs(samples[10000:33000]))), 1e-6)
         self.assertGreater(float(np.max(np.abs(samples[35000:]))), .05)
 
+    def test_audio_gaps_have_exact_duration_and_silence_between_clips(self):
+        wav = str(self.d / 'tone.wav')
+        subprocess.run(['ffmpeg', '-v', 'error', '-y', '-f', 'lavfi', '-i', 'sine=frequency=440:sample_rate=48000:duration=1', wav], check=True)
+        s = spec.resolve({'edit': [{'in': 0, 'out': .25, 'gap': .25}, {'in': .5, 'out': .75, 'gap': .5}]})
+        raw = subprocess.run(['ffmpeg', '-v', 'error', '-i', wav, '-filter_complex', compose.audio_graph(s),
+                              '-map', '[cut]', '-ac', '1', '-f', 'f32le', '-'], capture_output=True, check=True).stdout
+        samples = np.frombuffer(raw, np.float32)
+        self.assertEqual(len(samples), round(s['duration'] * 48000))
+        for a, b in ((0, .25), (.5, 1)):
+            self.assertLess(float(np.max(np.abs(samples[round(a * 48000):round(b * 48000)]))), 1e-6)
+        for a, b in ((.28, .48), (1.03, 1.23)):
+            self.assertGreater(float(np.max(np.abs(samples[round(a * 48000):round(b * 48000)]))), .05)
+
+    def test_gap_frames_do_not_decode_or_reuse_recording_pixels(self):
+        s = spec.resolve({'edit': [{'in': 4, 'out': 5, 'gap': 1}, {'in': 8, 'out': 9, 'gap': 2}]})
+        with patch.object(compose, 'Frames') as frames:
+            frames.return_value.read.return_value = 'recording pixels'
+            decoder = compose.EditFrames(s, 'unused', 16, 16, 60)
+            self.assertIsNone(decoder.read(.5))
+            frames.assert_not_called()
+            self.assertEqual(decoder.read(1), 'recording pixels')
+            self.assertEqual(frames.call_args.args[-1], 4)
+            self.assertIsNone(decoder.read(2))
+            frames.return_value.close.assert_called_once()
+            self.assertIsNone(decoder.read(3))
+            self.assertEqual(decoder.read(4), 'recording pixels')
+            self.assertEqual(frames.call_args.args[-1], 8)
+            decoder.close()
+
     def test_silent_loudness_and_long_fades(self):
         wav = str(self.d / "audio.wav")
         subprocess.run(["ffmpeg", "-v", "error", "-y", "-f", "lavfi", "-i", "anullsrc=r=48000:cl=stereo", "-t", "1", wav], check=True)
@@ -201,8 +245,11 @@ class MediaTests(unittest.TestCase):
         saved = first.copy()
         # Repeated geometry across a cut must use the new screen. A changed
         # zoom and a later return must also match independent renders.
-        for t, pixels in [(.5, light), (1.5, light), (.5, dark)]:
+        for t, pixels in [(.5, light), (1.5, light), (.5, None), (.5, dark)]:
             np.testing.assert_array_equal(r.frame(t, pixels, plate), renderer().frame(t, pixels, plate))
+        gap = r.frame(.5, None, plate)
+        s['phone']['shadow'] = 0
+        np.testing.assert_array_equal(gap, r.frame(.5, None, plate), 'a gap must not retain the phone shadow')
         np.testing.assert_array_equal(first, saved)
         self.assertFalse(np.array_equal(saved, r.frame(.5, light, plate)))
 

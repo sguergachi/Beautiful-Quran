@@ -15,7 +15,7 @@ Object.assign(globalThis, {
 });
 const { clock, media } = await import('../src/state/clock.ts');
 const audio = { gain_db: 0, fade_in: 1, fade_out: 2, loudness: -16 };
-const spec = { duration: 10, fps: 60, edit: [{ in: 0, out: 10 }], audio };
+const spec = { duration: 10, fps: 60, edit: [{ in: 0, out: 10 }] as { in: number; out: number; gap?: number }[], audio };
 clock.bind(() => ({ spec: spec as any, hasClip: true, hasPlate: true, offset: 0, onset: 1 }));
 
 test('rapid play/pause/play leaves one animation loop', () => {
@@ -107,4 +107,39 @@ test('playback does not replace the latest explicit scrub while a seek is pendin
     assert.ok(media.screen.playbackRate > 1);
   } finally { screen.seeking = false; clock.pause(); }
   assert.equal(media.screen.playbackRate, 1);
+});
+
+test('play, media loads, cuts, seeks, and loops keep gaps silent and resume at the right source', () => {
+  const original = spec.edit;
+  spec.edit = [{ in: 3, out: 6, gap: 2 }, { in: 8, out: 10, gap: 3 }];
+  try {
+    clock.seek(0); clock.play();
+    assert.equal(media.audio.paused, true);
+    assert.equal(media.screen.paused, true);
+    assert.equal(media.plate.paused, false);
+    assert.equal(media.audio.volume, 0);
+    for (const m of [media.audio, media.screen]) {
+      m.dispatchEvent(new Event('loadeddata'));
+      assert.equal(m.paused, true, 'late loads must not leak audio or picture into a gap');
+    }
+    clock.t = 2; clock.sync(false);
+    assert.equal(media.audio.currentTime, 3);
+    assert.equal(media.screen.currentTime, 3);
+    assert.equal(media.audio.paused, false);
+    clock.t = 5; clock.sync(false);
+    assert.equal(media.audio.paused, true);
+    assert.equal(media.screen.paused, true);
+    clock.seek(8);
+    assert.equal(media.audio.currentTime, 8);
+    assert.equal(media.audio.paused, false);
+    clock.seek(1);
+    assert.equal(media.audio.paused, true);
+    assert.equal(media.audio.volume, 0);
+    clock.seek(9.99); clock.setLoop(true);
+    clock._wall0 = performance.now() - 20;
+    frames.clear(); // the scheduled frame is now being dispatched
+    clock._tick();
+    assert.equal(clock.t, 0);
+    assert.equal(media.audio.paused, true);
+  } finally { clock.pause(); clock.setLoop(false); spec.edit = original; }
 });

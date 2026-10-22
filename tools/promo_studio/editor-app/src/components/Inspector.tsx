@@ -219,7 +219,7 @@ function Recording({ contentsOnly = false }: { contentsOnly?: boolean }) {
             <Button size="sm" onClick={() => split()}>{Icon.scissors} Split at playhead</Button>
             <Button size="sm" variant="ghost" onClick={wholeTake} title="One piece: the whole take">Whole take</Button>
           </div>
-          <p className="mt-2 text-[11.5px] leading-relaxed text-faint">{take ? (a.intro.play ? `The recitation starts ${take.lead.toFixed(1)} s into the take.` : "This take records the screen sequence without recitation.") : "The screens above are recorded before recitation starts."} Pieces play back to back and the sound is cut with the picture; keys stay where they are in video time.{tl?.take != null && ` The take is ${tl.take.toFixed(1)} s long.`}</p>
+          <p className="mt-2 text-[11.5px] leading-relaxed text-faint">{take ? (a.intro.play ? `The recitation starts ${take.lead.toFixed(1)} s into the take.` : "This take records the screen sequence without recitation.") : "The screens above are recorded before recitation starts."} Trimming a clip's start leaves a silent gap; picture and sound trim together, and keys stay in video time.{tl?.take != null && ` The take is ${tl.take.toFixed(1)} s long.`}</p>
         </div>
       </details>
       {name && <p className="break-words text-[11px] text-faint">Spec: specs/{name}.json</p>}
