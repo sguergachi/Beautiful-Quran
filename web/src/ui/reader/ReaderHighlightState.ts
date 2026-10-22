@@ -59,23 +59,13 @@ export function readerAyahInkPolicyActive(
   return inkAyah === ayah || leadAyah === ayah
 }
 
-/** How long buffering must hold before the page settles into the wait. */
-export const STREAM_WAIT_SETTLE_MS = 500
-
 /**
- * Waiting on the stream download: the spinner is up and this reciting
- * performance has not spoken yet, so the whole page — the due verse and the
- * opening basmalah included — waits under Upcoming paper, not the reciter's
- * verse alone. The spoken mark is performance-scoped (the session effect in
- * the screen): the word parked by the performance before the pause is stale
- * the moment play is pressed again, so a fresh wait starts mute.
+ * How long buffering must hold before the page settles into the stream wait
+ * (the `data-stream-wait` cover in the screen). Media3 pulses buffering
+ * briefly between playlist items while prefetch stitches; those dips must
+ * not flash the whole page dim.
  */
-export function readerWaitsOnStream(
-  isBuffering: boolean,
-  spokenInPerformance: boolean,
-): boolean {
-  return isBuffering && !spokenInPerformance
-}
+export const STREAM_WAIT_SETTLE_MS = 500
 
 /**
  * Pure playback-to-reader projection shared by every store tick. Keeping this

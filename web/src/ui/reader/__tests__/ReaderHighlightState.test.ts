@@ -6,7 +6,6 @@ import {
   readerHighlightKey,
   readerHighlightState,
   readerInkAyah,
-  readerWaitsOnStream,
 } from '../ReaderHighlightState'
 
 function prepared(segments: Segment[]) {
@@ -72,18 +71,6 @@ describe('ReaderHighlightState', () => {
   it('keeps ink on the media verse when no word owns the trailing silence', () => {
     expect(readerInkAyah(null, 4)).toBe(4)
     expect(readerInkAyah(null, null)).toBeNull()
-  })
-
-  it('waits on the stream only while buffering holds and the performance is mute', () => {
-    // Hits play on an uncached item: spinner up, nothing spoken this session
-    // — the whole page waits under Upcoming paper.
-    expect(readerWaitsOnStream(true, false)).toBe(true)
-    // Mid-chapter rebuffer: the wash froze on the last heard word; the page
-    // keeps what the ink left.
-    expect(readerWaitsOnStream(true, true)).toBe(false)
-    // No buffering — playing, paused, or idle.
-    expect(readerWaitsOnStream(false, false)).toBe(false)
-    expect(readerWaitsOnStream(false, true)).toBe(false)
   })
 
   it('prepares the fade-lead verse for Upcoming ink without stealing word ownership', () => {

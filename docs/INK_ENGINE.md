@@ -401,16 +401,18 @@ tween-vs-snap rules, sweep entry and residual rules, repeat wash timing, the
   The base/repeat wash position is never part of this modulation.
   [GLIMMER.md](GLIMMER.md) is the canonical cross-platform rendering,
   tuning, and visual-verification specification.
-- **Stream wait**: `readerWaitingOnStream(isBuffering, activeWord)`
-  (`StreamWaitPolicy.kt`, JVM-tested): while the spinner is up and nothing is
-  spoken for this performance, the whole page — the due verse and the opening
-  basmalah included — waits under Upcoming paper, not the reciter's verse
-  alone. A recited word anchor (mid-chapter rebuffer, ink frozen on the last
-  word) un-waits the page; a provisionally-lit tap word does not count as
-  spoken. The wait settles after `STREAM_WAIT_DEBOUNCE_MS` so Media3's brief
-  per-item buffering dips cannot flash the page, and releases the moment a
-  word is spoken. Web parity: `readerWaitsOnStream` +
-  `data-stream-wait` CSS covers in `styles.css`.
+- **Stream wait**: while the spinner is up, the whole page — the recited tail,
+  the due verse and the opening basmalah included — waits under Upcoming paper
+  (`StreamWaitPolicy.kt` holds the debounce constant). The *wait is the
+  buffering itself*, not a question of whether anything has been spoken
+  (user rule): the recited tail from before a pause or an earlier seek stays
+  lit only while playback goes on — the moment the download holds the voice,
+  it goes under the paper like the rest, and the page wakes when the buffer
+  carries the voice again. Mid-recitation stalls and item-boundary joins dim
+  the lit words exactly as a fresh play does. The wait settles after
+  `STREAM_WAIT_DEBOUNCE_MS` so Media3's brief per-item dips, and the
+  Ready↔Buffering alternation of a stuttering clip, cannot flash the page.
+  Web parity: `data-stream-wait` CSS covers in `styles.css`.
 - **Basmalah preface**: `prefaceState(isActive, dimmed)` /
   `prefaceWashProgress(positionMs, durationMs, segments)` for the surah-header
   basmalah VectorDrawable (Active during the Al-Fatihah 1:1 lead-in clip, with

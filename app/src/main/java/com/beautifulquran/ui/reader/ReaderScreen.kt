@@ -738,10 +738,6 @@ fun ReaderScreen(
     // audio ends, so the block fade to the next ayah starts a touch early.
     val activeAyahState = viewModel.activeAyah.collectAsStateWithLifecycle()
     val activeBasmalah by viewModel.activeBasmalah.collectAsStateWithLifecycle()
-    // The lead-in clip's ear clock: > 0 only once the clip actually speaks,
-    // so it anchors the stream-wait release for the preface, which publishes
-    // no ActiveWord of its own. (Freshly armed it is 0f — buffering holds.)
-    val basmalahWash by viewModel.basmalahWashProgress.collectAsStateWithLifecycle()
     val activeAyah = if (isThisSurahPlaying) activeAyahState.value else null
 
     // When a repeat range loops back, the player dips out of "playing" for a
@@ -757,49 +753,23 @@ fun ReaderScreen(
             recitingActive = false
         }
     }
-    // Waiting on the stream download: the reciter's due verse waits under
-    // Upcoming paper with everything else (user rule — not the current verse
-    // alone). Released the moment a word is spoken or buffering ends, and
-    // debounced so Media3's brief per-item dips cannot flash the page.
+    // Waiting on the stream download: while the spinner holds, the whole
+    // page — the recited tail and the opening basmalah included — waits
+    // under Upcoming paper (user rule). The wait is the buffering itself:
+    // a mid-recitation stall or an item-boundary join dims the lit words
+    // exactly as a fresh play does; the page wakes when the buffer carries
+    // the voice again. Debounced so Media3's brief per-item dips, and
+    // the Ready↔Buffering alternation of a stuttering clip, cannot flash
+    // the page.
     var streamWait by remember { mutableStateOf(false) }
-    // Each reciting session starts mute: the parked word of the performance
-    // before the pause is stale the moment play is pressed again, and must
-    // not hold the page awake through its spinner. A session opens on every
-    // play (false→true) — a fresh press or a resume alike — and only a word
-    // heard inside the open session un-waits the page.
-    var sessionLive by remember { mutableStateOf(false) }
-    var spokeInSession by remember { mutableStateOf(false) }
-    LaunchedEffect(playingNow) {
-        if (playingNow && !sessionLive) {
-            sessionLive = true
-            spokeInSession = false
-        } else if (!playingNow) {
-            sessionLive = false
-        }
-    }
-    // Not keyed on [sessionLive]: replaying the still-published stale word
-    // here would mark the fresh session spoken before its first real word.
-    LaunchedEffect(activeWordState.value) {
-        if (activeWordState.value?.fromTap == false) {
-            spokeInSession = true
-        }
-    }
     LaunchedEffect(playerState.isBuffering) {
-        // Read at execution time: the preface's ear clock anchors its part of
-        // the release — the clip speaks but publishes no ActiveWord.
-        fun spokenInPerformance(): Boolean =
-            spokeInSession || (basmalahWash ?: 0f) > 0f
-        when {
-            spokenInPerformance() -> streamWait = false
-            playerState.isBuffering -> {
-                delay(STREAM_WAIT_DEBOUNCE_MS)
-                // Re-read at the deadline: a word arriving mid-debounce
-                // keeps the page as the ink left it.
-                if (readerWaitingOnStream(playerState.isBuffering, spokenInPerformance())) {
-                    streamWait = true
-                }
+        if (!playerState.isBuffering) {
+            streamWait = false
+        } else {
+            delay(STREAM_WAIT_DEBOUNCE_MS)
+            if (playerState.isBuffering) {
+                streamWait = true
             }
-            else -> streamWait = false
         }
     }
     val view = LocalView.current

@@ -62,12 +62,7 @@ import { ReaderFocusController } from './focus/ReaderFocusController'
 import { selectedPlaybackAyah } from './selectedPlaybackAyah'
 import { shouldPauseFollowOnDrag } from './followGesture'
 import { isRecitingSession } from './recitingActive'
-import {
-  STREAM_WAIT_SETTLE_MS,
-  readerAyahInkPolicyActive,
-  readerInkAyah,
-  readerWaitsOnStream,
-} from './ReaderHighlightState'
+import { STREAM_WAIT_SETTLE_MS, readerAyahInkPolicyActive, readerInkAyah } from './ReaderHighlightState'
 import {
   AYAH_SPACER_EST_PX,
   useProgressiveAyahWindow,
@@ -345,41 +340,21 @@ export function ReaderScreen({
     isBuffering: state.player.isBuffering,
   })
   const receded = recitingActive
-  // Waiting on the stream download: the whole page — the due verse and the
-  // opening basmalah included — settles under Upcoming paper until the voice
-  // speaks (same rule as Android). Debounced against Media3's brief
-  // per-item buffering dips, released the moment a word is spoken.
+  // Waiting on the stream download: while the spinner holds, the whole page
+  // — the recited tail and the opening basmalah included — waits under
+  // Upcoming paper (same rule as Android). The wait is the buffering itself:
+  // a mid-recitation stall or an item-boundary join dims the lit words
+  // exactly as a fresh play does. Debounced against brief per-item dips and
+  // the Ready↔Buffering alternation of a stuttering clip.
   const [streamWait, setStreamWait] = useState(false)
-  // Each reciting session starts mute: the parked word of the performance
-  // before the pause is stale the moment play is pressed again. Only a word
-  // heard inside the open session un-waits the page. Marked on word change
-  // rather than presence so a session reset cannot re-mark the stale word.
-  const [sessionSpoken, setSessionSpoken] = useState(false)
-  const recitingRef = useRef(false)
   useEffect(() => {
-    if (!recitingActive) {
-      recitingRef.current = false
-      return
-    }
-    if (!recitingRef.current) {
-      recitingRef.current = true
-      setSessionSpoken(false)
-    }
-  }, [recitingActive])
-  useEffect(() => {
-    if (state.activeWord != null) setSessionSpoken(true)
-  }, [state.activeWord])
-  useEffect(() => {
-    if (sessionSpoken || !state.player.isBuffering) {
+    if (!state.player.isBuffering) {
       setStreamWait(false)
       return
     }
-    const settle = window.setTimeout(
-      () => setStreamWait(readerWaitsOnStream(state.player.isBuffering, sessionSpoken)),
-      STREAM_WAIT_SETTLE_MS,
-    )
+    const settle = window.setTimeout(() => setStreamWait(true), STREAM_WAIT_SETTLE_MS)
     return () => window.clearTimeout(settle)
-  }, [state.player.isBuffering, sessionSpoken])
+  }, [state.player.isBuffering])
   // This sheet is keyed by chapter, so the ref starts false at every opening.
   const recitedSinceOpen = useRef(false)
 
