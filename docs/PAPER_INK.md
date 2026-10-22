@@ -58,6 +58,12 @@ The basmalah sites (drawable and QCF glyph) keep their wash for now.
   Everything else is the surface's ordinary static ink.
 - **Soft leading edge (AGENTS.md #7).** The front keeps a feathered edge and
   the lead fade; there is no whole-word pop.
+- **Letter pacing uses letter positions.** The ink field supplies its own
+  feather, so first and repeat passes use the tajweed curve before
+  `Curve.forWash` extends travel for the paper-cover mask. Feeding that
+  extended travel into the ink leaves a verse-closing letter behind during
+  its hold. Both positions follow the same captured media window, including
+  pauses, residuals, and wasl carry-in.
 - **No climbing.** The swell is fed column by column along the baseline;
   leaning stems are fed from their baseline foot.
 - **Rewind evaporates the forward ink.** When a rewind or earlier-word tap
@@ -143,6 +149,9 @@ dries it toward warm paper.
   departures, interrupted fades, re-entry and retained reciter repeats. The
   Skia gate also checks that evaporating first/repeat ink reaches the exact
   unread colour and coverage without moving its captured fill.
+- `PaperInkMotionTest`, `TajweedPacingTest` — the closing nūn of 7:31 receives
+  its letter position during the final hold on first and repeat passes. The
+  Skia gate checks complete, continuous coverage without retained ink.
 
 ## Not yet
 

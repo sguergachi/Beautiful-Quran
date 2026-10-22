@@ -402,6 +402,7 @@ internal data class RepeatWash(
     val progress: State<Float>,
     val alpha: State<Float>,
     val feather: State<Float?>,
+    val letterProgress: State<Float> = progress,
 )
 
 internal enum class RepeatWashAction { Hold, Reveal, Release }
@@ -555,6 +556,8 @@ internal class LetterSweep(
     /** Defaults to [progress]: with no pacing curve and no wasl prefix, the
      * two are the same number. */
     val plainProgress: State<Float> = progress,
+    /** Letter position for liquid ink, whose own field supplies its feather. */
+    val letterProgress: State<Float> = progress,
 )
 
 internal enum class SweepEntryAction { Arm, Keep, Clear }
@@ -862,6 +865,10 @@ internal class InkMotion(
 
     /** Already continued through wasl revealStart inside [rememberLetterSweep]. */
     val sweepProgress: Float get() = sweep.progress.value
+
+    /** Liquid ink supplies its own feather and reads the unextended letter positions. */
+    val paperSweepProgress: Float get() = sweep.letterProgress.value
+    val paperRepeatProgress: Float get() = repeatWash.letterProgress.value
 
     /**
      * The same wash clock, linear across the word's karaoke hold: no tajweed

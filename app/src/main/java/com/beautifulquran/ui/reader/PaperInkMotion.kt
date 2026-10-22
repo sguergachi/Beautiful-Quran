@@ -82,9 +82,9 @@ private fun InkMotion.paperInkDeposit(): PaperInkDeposit {
     val repeating = !upcoming && (repeat || repeatAlpha > 0f)
     val current = PaperInkDeposit(
         progress = when {
-            repeating -> repeatProgress
+            repeating -> paperRepeatProgress
             upcoming -> paperAhead
-            else -> sweepProgress
+            else -> paperSweepProgress
         },
         wet = if (upcoming) 0f else paperWetness,
         repeatPass = if (repeating) 1f else 0f,

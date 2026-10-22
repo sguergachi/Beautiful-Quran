@@ -186,6 +186,7 @@ object TajweedPacing {
          * sustains the *previous* word's nūn, so the listener hears no hold
          * on this word. Gates the tarjīʿ shimmer's eligibility. */
         val hasStrongHold: Boolean = false,
+        private val letterCurve: Curve? = null,
     ) {
         /** Centre the wash's soft edge on each letter hold. The renderer travels
          * across the word plus its feather; endpoints still start unread and
@@ -200,8 +201,12 @@ object TajweedPacing {
                 },
                 letterCount,
                 hasStrongHold,
+                letterCurve ?: this,
             )
         }
+
+        /** Letter position before the paper-cover feather extends the wash's travel. */
+        fun atLetters(t: Float): Float = (letterCurve ?: this).at(t)
 
         fun at(t: Float): Float {
             if (t >= 1f) return 1f

@@ -138,6 +138,17 @@ class PaperInkAntialiasingTest(unittest.TestCase):
         print(f'Wet pixel-area MSE: point={point_error:.4f}, antialiased={filtered_error:.4f}')
         self.assertLess(filtered_error, point_error * .85)
 
+    def test_final_word_fills_every_letter_without_a_retained_base(self):
+        closing = word('ٱلۡمُسۡرِفِينَ', geometry.ARABIC_FONT, 80, True, 8)
+        for method in (0., 1.):
+            previous = np.zeros_like(closing['coverage'], dtype=int)
+            for progress in (0., .25, .5, .75, 1.):
+                actual = self.render(closing, wet=0., retained=0., progress=progress,
+                                     spreadMethod=method)[:, :, 3].astype(int)
+                self.assertTrue((actual >= previous).all())
+                previous = actual
+            np.testing.assert_array_equal(previous, closing['coverage'])
+
     def test_alif_reflection_uses_the_pixel_area_at_fractional_reader_positions(self):
         from scipy.ndimage import label, find_objects
         errors = []

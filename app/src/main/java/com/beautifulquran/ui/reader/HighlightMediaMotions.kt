@@ -85,7 +85,13 @@ internal fun rememberMediaLetterSweep(
     }
     val feather = remember { derivedStateOf { entry.value.feather } }
     val curve = remember { derivedStateOf { entry.value.pacing } }
-    return remember { LetterSweep(progress, feather, curve, raw) }
+    val letters = remember {
+        derivedStateOf {
+            val e = entry.value
+            continuedSweepProgress(e.pacing?.atLetters(raw.value) ?: raw.value, e.revealStart)
+        }
+    }
+    return remember { LetterSweep(progress, feather, curve, raw, letters) }
 }
 
 /** Re-says have independent occurrence windows; only the cosmetic tint dissolve uses wall time. */
@@ -103,16 +109,18 @@ internal fun rememberMediaRepeatWash(
     val entry = rememberMediaEntry(repeat && active, true, activation, window, provisional, pacing,
         repeatOccurrence = true)
     val baseState = rememberUpdatedState(base)
-    val progress = remember {
+    val raw = remember {
         derivedStateOf {
             if (!canStartSequentialSweep(baseState.value.value)) 0f else {
                 val e = entry.value
                 val linear = if (e.wash.window == null) { if (e.wash.active) 0f else 1f }
                     else HighlightWash.progress(e.wash, timeline.frame())
-                e.pacing?.at(linear) ?: InkEngine.sweepEasing.transform(linear)
+                if (e.pacing != null) linear else InkEngine.sweepEasing.transform(linear)
             }
         }
     }
+    val progress = remember { derivedStateOf { entry.value.pacing?.at(raw.value) ?: raw.value } }
+    val letters = remember { derivedStateOf { entry.value.pacing?.atLetters(raw.value) ?: raw.value } }
     val complete = remember { derivedStateOf(structuralEqualityPolicy()) { progress.value >= 1f } }
     val alpha = remember { Animatable(if (repeat) 1f else 0f) }
     LaunchedEffect(repeat, complete.value) {
@@ -120,5 +128,5 @@ internal fun rememberMediaRepeatWash(
         else if (complete.value) alpha.animateTo(0f, tween(InkEngine.tuning.repeatFadeOutMs))
     }
     val feather = remember { derivedStateOf { entry.value.feather } }
-    return remember { RepeatWash(progress, alpha.asState(), feather) }
+    return remember { RepeatWash(progress, alpha.asState(), feather, letters) }
 }
