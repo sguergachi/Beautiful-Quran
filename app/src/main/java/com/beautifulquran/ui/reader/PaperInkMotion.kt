@@ -2,6 +2,12 @@ package com.beautifulquran.ui.reader
 
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.SideEffect
+import androidx.compose.runtime.State
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.snap
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.graphics.Color
@@ -24,6 +30,29 @@ internal class PaperInkStyle(
     val wetInk: Color = Color(0xFF060708)
 }
 
+/** A cosmetic departure clock; it never delays or changes the audio wash. */
+internal class PaperInkDeparture(
+    val history: PaperInkEvaporation,
+    val remaining: State<Float>,
+) {
+    val active: Boolean get() = history.isEvaporating(remaining.value)
+}
+
+@Composable
+internal fun rememberPaperInkDeparture(enabled: Boolean, state: InkEngine.State): PaperInkDeparture? {
+    if (!enabled) return null
+    val upcoming = state == InkEngine.State.Upcoming
+    val read = state == InkEngine.State.Active || state == InkEngine.State.Recited
+    val history = remember { PaperInkEvaporation(upcoming, read) }
+    SideEffect { history.transition(upcoming, read) }
+    val remaining = animateFloatAsState(
+        targetValue = if (upcoming) 0f else 1f,
+        animationSpec = if (upcoming) tween(850, easing = FastOutSlowInEasing) else snap(),
+        label = "paperInkEvaporation",
+    )
+    return remember(history, remaining) { PaperInkDeparture(history, remaining) }
+}
+
 /** Paper is the theme with no glimmer accent (see docs/GLIMMER.md "When it appears"). */
 @Composable
 internal fun rememberPaperInkStyle(dryInk: Color): PaperInkStyle? {
@@ -40,27 +69,50 @@ internal fun rememberPaperInkStyle(dryInk: Color): PaperInkStyle? {
  * in. Everything else is static ink the surface already draws.
  */
 internal val InkMotion.paperInkLive: Boolean
-    get() = isActive ||
-        (!repeat && sweepProgress > 0f && sweepProgress < 1f) ||
-        paperWetness > 0f ||
-        repeatAlpha > 0f ||
-        paperAhead > -1f
+    get() {
+        val deposit = paperInkDeposit()
+        return paperDeparture?.active == true || isActive ||
+            (!repeat && deposit.progress > 0f && deposit.progress < 1f) ||
+            deposit.wet > 0f || deposit.repeatTint > 0f || paperAhead > -1f
+    }
+
+/** Upcoming words cannot retain an old wet or repeat clock after a seek. */
+private fun InkMotion.paperInkDeposit(): PaperInkDeposit {
+    val upcoming = ink.state == InkEngine.State.Upcoming
+    val repeating = !upcoming && (repeat || repeatAlpha > 0f)
+    val current = PaperInkDeposit(
+        progress = when {
+            repeating -> repeatProgress
+            upcoming -> paperAhead
+            else -> sweepProgress
+        },
+        wet = if (upcoming) 0f else paperWetness,
+        repeatPass = if (repeating) 1f else 0f,
+        repeatTint = if (repeating) repeatAlpha else 0f,
+        retained = if (repeating) 1f else 0f,
+    )
+    return paperDeparture?.let { it.history.sample(current, it.remaining.value) } ?: current
+}
+
+/** Cover-wash fallback for a departing word whose liquid field is unavailable. */
+internal val InkMotion.paperDepartureProgress: Float
+    get() = paperInkDeposit().let { if (it.retained > 0f) 1f else it.progress }
+
+internal val InkMotion.paperDepartureAlpha: Float
+    get() = InkEngine.State.Upcoming.inkAlpha().let { floor ->
+        floor + (1f - floor) * (paperDeparture?.remaining?.value ?: 1f)
+    }
 
 /** This frame of the word for [PaperInk.drawWord]. */
 internal fun InkMotion.paperInkFrame(style: PaperInkStyle): PaperInk.Frame {
     val t = InkEngine.tuning
-    val repeating = repeat || repeatAlpha > 0f
-    val progress = when {
-        repeating -> repeatProgress
-        paperAhead > -1f -> paperAhead
-        else -> sweepProgress
-    }
+    val deposit = paperInkDeposit()
     return PaperInk.Frame(
-        progress = progress,
-        wet = paperWetness,
-        repeatPass = if (repeating) 1f else 0f,
-        repeatTint = if (repeating) repeatAlpha else 0f,
-        retained = if (repeating) 1f else 0f,
+        progress = deposit.progress,
+        wet = deposit.wet,
+        repeatPass = deposit.repeatPass,
+        repeatTint = deposit.repeatTint,
+        retained = deposit.retained,
         dryInk = style.dryInk,
         wetInk = style.wetInk,
         repeatColor = style.repeatInk,
@@ -70,6 +122,7 @@ internal fun InkMotion.paperInkFrame(style: PaperInkStyle): PaperInk.Frame {
         softness = t.paperInkSoftness,
         leadFade = t.paperInkLeadFade,
         flowing = t.paperInkFlowing,
+        evaporation = paperDeparture?.takeIf { it.active }?.let { 1f - it.remaining.value } ?: 0f,
     )
 }
 

@@ -60,6 +60,16 @@ The basmalah sites (drawable and QCF glyph) keep their wash for now.
   the lead fade; there is no whole-word pop.
 - **No climbing.** The swell is fed column by column along the baseline;
   leaning stems are fed from their baseline foot.
+- **Rewind evaporates the forward ink.** When a rewind or earlier-word tap
+  makes a visible word unread, its last deposit dissolves in place over 850 ms
+  toward the ordinary faded ink. A partially filled word keeps its exact fill
+  during that dissolve; the mask does not wipe backward. The selected word
+  immediately follows its new media window. Re-entering a dissolving word
+  cancels the departure, and initially unread words never flash full ink.
+  Reciter repeats retain their high-water prefix and keep the orange chain.
+  The clock is read only while drawing. English leaf words retain their own
+  positions within the Arabic timing band, and a missing liquid field keeps a
+  fading paper-cover fallback.
 
 ## Geometry
 
@@ -108,6 +118,10 @@ dries it toward warm paper.
   shader on Arabic and English at reading sizes. Compares wet coverage against
   an 8× pixel-area reference in both modes and passes, at default/full pooling;
   checks exact dry, held-repeat and unread glyph coverage.
+- `PaperInkEvaporationTest` — unread entry, settled and partial/repeat
+  departures, interrupted fades, re-entry and retained reciter repeats. The
+  Skia gate also checks that evaporating first/repeat ink reaches the exact
+  unread colour and coverage without moving its captured fill.
 
 ## Not yet
 

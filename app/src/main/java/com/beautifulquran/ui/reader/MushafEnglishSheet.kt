@@ -1481,6 +1481,9 @@ private fun EnglishProseBlock(
     val set = remember(block.text, style, measurePx, density, justifyLast) {
         englishSetProse(block.text, style, measurePx, density, measurer, justifyLast)
     }
+    // English words have their own positions within an Arabic owner's band.
+    // Capture those positions rather than replaying the Arabic letter mask.
+    val paperDeposits = remember(block) { HashMap<Int, PaperInkDeposit>() }
     Text(
         text = set,
         style = style,
@@ -1512,6 +1515,7 @@ private fun EnglishProseBlock(
                                 },
                                 clock = clock.value,
                                 windows = washWindows[verse.surahId to verse.ayah].orEmpty(),
+                                paperDeposits = paperDeposits,
                             )
                         }
                     }
@@ -1597,6 +1601,7 @@ private fun englishVerseBlooms(
     word: ActiveWord?,
     clock: EnglishWashClock?,
     windows: Map<Int, EnglishWashWindow>,
+    paperDeposits: MutableMap<Int, PaperInkDeposit>,
 ): List<ShapedWordBloom> {
     if (pack == null) return emptyList()
     val paper = palette.paperColor
@@ -1640,6 +1645,25 @@ private fun englishVerseBlooms(
             val motion = motions.getOrNull(span.position - 1) ?: continue
             val progress = progress(span, motion)
             if (progress > 0f) washEdge = span.range.first + (span.range.last + 1 - span.range.first) * progress
+            if (palette.paperInk != null && motion.paperDeparture?.active == true) {
+                // The missing-field fallback releases each word's old mask,
+                // just as the liquid renderer does, without moving the edge.
+                var i = span.range.first
+                while (i <= span.range.last) {
+                    if (text[i].isWhitespace()) { i++; continue }
+                    var j = i + 1
+                    while (j <= span.range.last && !text[j].isWhitespace()) j++
+                    blooms += ShapedWordBloom.InkReveal(
+                        range = i until j,
+                        progress = paperDeposits[i]?.progress ?: 0f,
+                        paper = paper,
+                        restingAlpha = resting,
+                        revealedAlpha = motion.paperDepartureAlpha,
+                    )
+                    i = j
+                }
+                continue
+            }
             if (progress > 0f && progress < 1f) {
                 blooms += ShapedWordBloom.InkReveal(
                     range = span.range,
@@ -1668,11 +1692,12 @@ private fun englishVerseBlooms(
         blooms += cover(verse.markRange, paper, markCover)
     }
     if (motions.isNotEmpty() && palette.paperInk != null) {
-        blooms.addEnglishPaperInk(verse, washSpans, motions, palette.paperInk, text, washEdge)
+        blooms.addEnglishPaperInk(verse, washSpans, motions, palette.paperInk, text, washEdge, paperDeposits)
     }
     if (motions.isNotEmpty()) {
         blooms.addEnglishInkLayerBlooms(washSpans, motions, palette, glintInk, repeatLayers = false, washEdge)
-        blooms.addEnglishInkLayerBlooms(spans, motions, palette, glintInk, repeatLayers = true, washEdge)
+        blooms.addEnglishInkLayerBlooms(spans, motions, palette, glintInk, repeatLayers = true, washEdge,
+            departures = paperDeposits.takeIf { palette.paperInk != null })
     }
     return blooms
 }
@@ -1696,7 +1721,10 @@ private fun MutableList<ShapedWordBloom>.addEnglishPaperInk(
     style: PaperInkStyle,
     text: CharSequence,
     washEdge: Float,
+    deposits: MutableMap<Int, PaperInkDeposit>,
 ) {
+    // Observe settled owners too, so a rewind has a dry deposit to release.
+    motions.forEach { it.paperInkLive }
     val end = (verse.range.last + 1).coerceAtMost(text.length)
     var i = verse.range.first.coerceAtLeast(0)
     while (i < end) {
@@ -1708,14 +1736,17 @@ private fun MutableList<ShapedWordBloom>.addEnglishPaperInk(
         while (j < end && !text[j].isWhitespace()) j++
         val owner = washSpans.firstOrNull { i in it.range }?.let { motions.getOrNull(it.position - 1) }
         val raw = ((washEdge - i) / (j - i).coerceAtLeast(1)).coerceIn(-1f, 1f)
-        val wet = owner?.paperWetness ?: 0f
-        if ((raw > -1f && raw < 1f && owner != null) || wet > 0f) {
+        val evaporating = owner?.paperDeparture?.active == true
+        val current = PaperInkDeposit(raw, owner?.paperWetness ?: 0f, 0f, 0f, 0f)
+        val deposit = if (evaporating) deposits[i] ?: current else current.also { deposits[i] = it }
+        val wet = deposit.wet
+        if ((raw > -1f && raw < 1f && owner != null) || wet > 0f || evaporating) {
             val frame = (owner ?: motions.first()).paperInkFrame(style)
             add(
                 ShapedWordBloom.PaperInk(
                     range = i until j,
                     frame = PaperInk.Frame(
-                        progress = raw,
+                        progress = deposit.progress,
                         wet = wet,
                         // The leaf keeps its own orange layer for repeats.
                         repeatPass = 0f,
@@ -1730,6 +1761,7 @@ private fun MutableList<ShapedWordBloom>.addEnglishPaperInk(
                         softness = frame.softness,
                         leadFade = frame.leadFade,
                         flowing = frame.flowing,
+                        evaporation = frame.evaporation,
                     ),
                     fallback = emptyList(),
                 ),
@@ -1781,18 +1813,29 @@ private fun MutableList<ShapedWordBloom>.addEnglishInkLayerBlooms(
     glintInk: Color?,
     repeatLayers: Boolean,
     washEdge: Float,
+    departures: MutableMap<Int, PaperInkDeposit>? = null,
 ) {
     spans.forEach { owned ->
         val motion = motions.getOrNull(owned.position - 1) ?: return@forEach
-        if (!englishInkLayerAllowed(motion.ink.state)) return@forEach
-        val repeating = repeatLayers && motion.repeatAlpha > 0f
+        val departing = repeatLayers && motion.paperDeparture?.active == true
+        // Negative keys hold semantic tint spans; nonnegative keys hold the
+        // first-pass English words. Both maps belong to this paragraph only.
+        val key = -owned.range.first - 1
+        val old = departures?.get(key).takeIf { departing }
+        val laid = if (old != null) 1f else englishInkLayerProgress(owned.range, washEdge)
+        if (repeatLayers && !departing && departures != null) {
+            departures[key] = PaperInkDeposit(minOf(motion.repeatProgress, laid), 0f, 1f, motion.repeatAlpha, 0f)
+        }
+        if (!englishInkLayerAllowed(motion.ink.state) && old == null) return@forEach
+        val repeatAlpha = if (old != null) old.repeatTint * (motion.paperDeparture?.remaining?.value ?: 0f)
+            else motion.repeatAlpha
+        val repeating = repeatLayers && repeatAlpha > 0f
         val glinting = glintInk != null && motion.showGlintLayer &&
             motion.glintLayerAlpha > 0f && motion.glintIsRepeat == repeatLayers
         if (!repeating && !glinting) return@forEach
         val span = owned.range
-        val laid = englishInkLayerProgress(span, washEdge)
         if (laid <= 0f) return@forEach
-        val repeatProgress = motion.repeatProgress
+        val repeatProgress = old?.progress ?: motion.repeatProgress
         if (repeating) {
             add(
                 ShapedWordBloom.ColorReveal(
@@ -1800,7 +1843,7 @@ private fun MutableList<ShapedWordBloom>.addEnglishInkLayerBlooms(
                     progress = minOf(repeatProgress, laid),
                     color = palette.repeatInkColor,
                     restingAlpha = 0f,
-                    layerAlpha = motion.repeatAlpha,
+                    layerAlpha = repeatAlpha,
                     feather = motion.repeatFeather,
                     colorAlpha = InkEngine.tuning.repeatInkAlpha,
                 ),

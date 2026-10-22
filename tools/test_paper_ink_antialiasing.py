@@ -19,7 +19,9 @@ SOURCE = (ROOT / 'app/src/main/assets/paper-ink/ink.agsl').read_text()
 # pixel area independently of the production four-tap approximation.
 POINT_SOURCE = SOURCE[:SOURCE.index('// Integrate the wet material')] + '''
 half4 main(float2 p) {
-    return inkAt(p, normals.eval(floor(p) + 0.5).b, aa);
+    float base = normals.eval(floor(p) + 0.5).b;
+    float unread = base * unreadAlpha;
+    return mix(inkAt(p, base, aa), half4(dryInk * unread, unread), evaporation);
 }
 '''
 
@@ -78,7 +80,7 @@ class PaperInkAntialiasingTest(unittest.TestCase):
             lightSoftness=0., retained=1., wet=1., weight=.875 * word['unit'], aa=.9 / resolution,
             dryInk=[52/255, 50/255, 46/255], wetInk=[6/255, 7/255, 8/255], unreadAlpha=.2661,
             repeatColor=[194/255, 95/255, 59/255], repeatPass=0., repeatTint=0., spreadMethod=0.,
-            letterDuration=word['duration'], lead=1., origin=[0., 0.])
+            letterDuration=word['duration'], lead=1., origin=[0., 0.], evaporation=0.)
         uniforms.update(values)
         for name, value in uniforms.items():
             builder.setUniform(name, value)
@@ -116,6 +118,20 @@ class PaperInkAntialiasingTest(unittest.TestCase):
         point_error, filtered_error = np.mean(errors, axis=0)
         print(f'Wet pixel-area MSE: point={point_error:.4f}, antialiased={filtered_error:.4f}')
         self.assertLess(filtered_error, point_error * .85)
+
+    def test_evaporation_dissolves_the_existing_deposit_to_exact_unread_ink(self):
+        for word in self.words:
+            unread = self.render(word, wet=0., progress=-1., retained=0.)
+            for repeat in (0., 1.):
+                for progress in (.35, 1.):
+                    options = dict(progress=progress, repeatPass=repeat, repeatTint=repeat, retained=repeat)
+                    deposited = self.render(word, **options).astype(float)
+                    for evaporation in (.25, .5, .75, 1.):
+                        actual = self.render(word, **options, evaporation=evaporation).astype(float)
+                        expected = deposited * (1 - evaporation) + unread * evaporation
+                        np.testing.assert_allclose(actual, expected, atol=1.)
+                        self.assertTrue((actual[:, :, :3] <= actual[:, :, 3:4]).all())
+                    np.testing.assert_array_equal(actual, unread)
 
 
 if __name__ == '__main__':

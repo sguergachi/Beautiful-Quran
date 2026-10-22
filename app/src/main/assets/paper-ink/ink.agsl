@@ -28,6 +28,7 @@ uniform float letterDuration;
 // Letters of fade-in ahead of the wet edge (0 disables it).
 uniform float lead;
 uniform float2 origin;
+uniform float evaporation;
 
 half4 inkAt(float2 p, float base, float coverageAA) {
     float4 shape = field.eval(p * fieldScale);
@@ -103,14 +104,19 @@ half4 inkAt(float2 p, float base, float coverageAA) {
 // Integrate the wet material over the pixel rather than taking one point.
 // The resting glyph coverage stays at the pixel centre in every tap: filtering
 // that captured coverage again would blur the printed letters and their handoff.
+half4 evaporated(half4 ink, float base) {
+    float unread = base * unreadAlpha;
+    return mix(ink, half4(dryInk * unread, unread), evaporation);
+}
+
 half4 main(float2 p) {
     float distance = (field.eval(p * fieldScale).b * 255.0 - 128.0) / 16.0;
     float base = normals.eval(p).b;
     if (base == 0.0 && distance < -weight - max(aa, 1.0)) return half4(0.0);
-    if (wet <= 0.0) return inkAt(p, base, aa);
+    if (wet <= 0.0) return evaporated(inkAt(p, base, aa), base);
     float pixelOffset = aa * (0.25 / 0.9);
-    return (inkAt(p + float2(-pixelOffset, -pixelOffset), base, aa * 0.5) +
+    return evaporated((inkAt(p + float2(-pixelOffset, -pixelOffset), base, aa * 0.5) +
             inkAt(p + float2( pixelOffset, -pixelOffset), base, aa * 0.5) +
             inkAt(p + float2(-pixelOffset,  pixelOffset), base, aa * 0.5) +
-            inkAt(p + float2( pixelOffset,  pixelOffset), base, aa * 0.5)) * 0.25;
+            inkAt(p + float2( pixelOffset,  pixelOffset), base, aa * 0.5)) * 0.25, base);
 }

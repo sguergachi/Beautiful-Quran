@@ -135,6 +135,7 @@ import com.beautifulquran.data.model.Word
 import com.beautifulquran.domain.EnglishTypography
 import com.beautifulquran.domain.TajweedPacing
 import com.beautifulquran.ui.reader.focus.FocusEngine
+import com.beautifulquran.ui.theme.paperink.PaperInk
 import com.beautifulquran.ui.theme.quietSuppliedBrackets
 import com.beautifulquran.ui.theme.forCaps
 import com.beautifulquran.ui.theme.liningFigures
@@ -838,6 +839,8 @@ internal class InkMotion(
     private val paperWet: State<Float>? = null,
     /** The word before this one in reading order, for the paper ink's lead fade. */
     private val previous: InkMotion? = null,
+    /** Last visible deposit dissolving after this word becomes unread again. */
+    val paperDeparture: PaperInkDeparture? = null,
 ) {
     val isActive: Boolean get() = ink.state == InkEngine.State.Active
 
@@ -882,7 +885,8 @@ internal class InkMotion(
     val washFeather: Float
         get() = sweepFeather ?: InkEngine.tuning.washFeather
     val repeatProgress: Float get() = repeatWash.progress.value
-    val repeatAlpha: Float get() = repeatWash.alpha.value
+    val repeatAlpha: Float
+        get() = if (paperDeparture != null && ink.state == InkEngine.State.Upcoming) 0f else repeatWash.alpha.value
     val repeatFeather: Float? get() = repeatWash.feather.value
     val glintProgress: Float
         get() = if (glintIsRepeat) repeatProgress else sweepProgress
@@ -950,12 +954,13 @@ private fun Modifier.layeredBaseInk(motion: InkMotion, rtl: Boolean): Modifier =
     else -> glyphLayerAlpha {
         // Wash owns ink strength mid-reveal; lyric alpha applies only once
         // settled (upcoming dim, plain, recited).
-        if (motion.isActive || motion.sweepProgress < 1f) 1f else motion.lyricAlpha
+        if (motion.paperDeparture?.active == true || motion.isActive || motion.sweepProgress < 1f) 1f else motion.lyricAlpha
     }.letterFadeIn(
-        progress = { motion.sweepProgress },
+        progress = { if (motion.paperDeparture?.active == true) motion.paperDepartureProgress else motion.sweepProgress },
         rtl = rtl,
         restingAlpha = InkEngine.State.Upcoming.inkAlpha(),
         feather = motion.washFeather,
+        revealedAlpha = { if (motion.paperDeparture?.active == true) motion.paperDepartureAlpha else 1f },
     )
 }
 
@@ -1225,6 +1230,10 @@ internal fun rememberInkMotions(
             tarjiTraceColor = traceInk,
             paperWet = rememberGlintAlpha(glintInk == null && InkEngine.glinting(ink.state, wetInk)),
             previous = motions.lastOrNull(),
+            paperDeparture = rememberPaperInkDeparture(
+                enabled = glintInk == null && InkEngine.tuning.paperInk && PaperInk.supported,
+                state = ink.state,
+            ),
         )
         predecessor = sweep.progress
     }
@@ -1609,25 +1618,28 @@ private fun MutableList<ShapedWordBloom>.addShapedInkMotionBlooms(
     val firstLive = if (paperInk == null) -1 else motions.indexOfFirst { it.paperInkLive }
     motions.forEachIndexed { index, motion ->
         val range = ranges.getOrNull(index) ?: return@forEachIndexed
-        val reveal = if (baseReveal && !motion.repeat && motion.sweepProgress < 1f) {
+        val evaporating = paperInk != null && motion.paperDeparture?.active == true
+        val reveal = if (baseReveal && (evaporating || !motion.repeat && motion.sweepProgress < 1f)) {
             ShapedWordBloom.InkReveal(
                 range = range,
-                progress = motion.sweepProgress,
+                progress = if (evaporating) motion.paperDepartureProgress else motion.sweepProgress,
                 paper = palette.paperColor,
                 restingAlpha = InkEngine.State.Upcoming.inkAlpha(),
                 feather = motion.sweepFeather,
+                revealedAlpha = if (evaporating) motion.paperDepartureAlpha else 1f,
             )
         } else {
             null
         }
         if (paperInk != null && motion.paperInkLive) {
-            val repeatTint = if (motion.repeatAlpha > 0f) {
+            val frame = motion.paperInkFrame(paperInk)
+            val repeatTint = if (frame.repeatTint > 0f) {
                 ShapedWordBloom.ColorReveal(
                     range = range,
-                    progress = motion.repeatProgress,
+                    progress = frame.progress,
                     color = palette.repeatInkColor,
                     restingAlpha = 0f,
-                    layerAlpha = motion.repeatAlpha,
+                    layerAlpha = frame.repeatTint * (1f - frame.evaporation),
                     feather = motion.repeatFeather,
                     colorAlpha = InkEngine.tuning.repeatInkAlpha,
                 )
@@ -1638,7 +1650,7 @@ private fun MutableList<ShapedWordBloom>.addShapedInkMotionBlooms(
             add(
                 ShapedWordBloom.PaperInk(
                     range = range,
-                    frame = motion.paperInkFrame(paperInk),
+                    frame = frame,
                     fallback = listOfNotNull(cover, reveal, repeatTint),
                     // Unread ink is the shader's own; a verse recess still dims recited ink.
                     after = listOfNotNull(cover.takeIf { motion.ink.state != InkEngine.State.Upcoming }),
@@ -1759,7 +1771,7 @@ internal fun buildShapedBlooms(
     motions.forEachIndexed { index, motion ->
         val coverAlpha = maxOf(
             shapedWordCoverAlpha(
-                state = motion.ink.state,
+                state = if (motion.paperDeparture?.active == true) InkEngine.State.Plain else motion.ink.state,
                 recess = recess,
                 upcomingCover = upcomingCover,
                 softHandoff = softHandoff,

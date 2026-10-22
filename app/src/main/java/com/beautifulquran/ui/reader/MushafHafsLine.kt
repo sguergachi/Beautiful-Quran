@@ -946,7 +946,8 @@ private fun MushafQcfWord(
             // is what dims the words still ahead of the voice inside the verse
             // being recited, and what keeps a waiting word off the layered
             // wash path entirely (see wordSweep).
-            motion.isActive || (motion.sweepProgress > 0f && motion.sweepProgress < 1f) -> 1f
+            motion.paperDeparture?.active == true || motion.isActive ||
+                (motion.sweepProgress > 0f && motion.sweepProgress < 1f) -> 1f
             else -> motion.lyricAlpha
         }
         mushafLayerTransitionAlpha(
@@ -965,6 +966,7 @@ private fun MushafQcfWord(
         val motion = packState.value?.motions?.getOrNull(token.word.position - 1)
         when {
             motion == null || motion.repeat -> 1f
+            motion.paperDeparture?.active == true -> motion.paperDepartureProgress
             motion.isActive || motion.sweepProgress > 0f -> motion.sweepProgress
             else -> 1f
         }
@@ -1058,6 +1060,11 @@ private fun MushafQcfWord(
                                 rtl = true,
                                 restingAlpha = InkEngine.State.Upcoming.inkAlpha(),
                                 feather = wordFeather(),
+                                revealedAlpha = {
+                                    packState.value?.motions?.getOrNull(token.word.position - 1)?.let {
+                                        if (it.paperDeparture?.active == true) it.paperDepartureAlpha else 1f
+                                    } ?: 1f
+                                },
                                 // The glimmer's halo is drawn inside this layer.
                                 bleed = glowLayerBleed(
                                     if (glintInk != null) InkEngine.tuning.glintGlowRadius else 0f,

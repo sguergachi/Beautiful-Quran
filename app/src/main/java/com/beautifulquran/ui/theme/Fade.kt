@@ -69,6 +69,8 @@ fun Modifier.letterFadeIn(
     revealFraction: Float = 1f,
     /** Room the offscreen wash layer keeps past the word; see [glowLayerBleed]. */
     bleed: Dp = FadeLayerBleed,
+    /** Draw-phase strength of deposited ink; unread ink keeps [restingAlpha]. */
+    revealedAlpha: () -> Float = { 1f },
 ): Modifier {
     // Alpha profile across the feathered edge, sampled into gradient stops.
     // The seam-free smootherstep shape lives in [inkSmootherstep].
@@ -82,9 +84,11 @@ fun Modifier.letterFadeIn(
     // See [WashBrushCache] for why a fresh Brush each frame is expensive.
     var cachedBrush: Brush? = null
     var cachedEdge = Float.NaN
+    var cachedReveal = 1f
     return drawWithContent {
         val p = progress().coerceIn(0f, 1f)
-        if (p >= 1f && revealFraction >= 1f) {
+        val revealed = revealedAlpha().coerceIn(restingAlpha, 1f)
+        if (p >= 1f && revealFraction >= 1f && revealed >= 1f) {
             drawContent()
             return@drawWithContent
         }
@@ -109,14 +113,19 @@ fun Modifier.letterFadeIn(
             // finishes exactly at p = 1.
             val edge = (w * feather).coerceAtLeast(1f)
             val head = p * (w * revealFraction.coerceIn(0f, 1f) + edge)
-            val brush = cachedBrush?.takeIf { cachedEdge == edge }
+            val brush = cachedBrush?.takeIf { cachedEdge == edge && cachedReveal == revealed }
                 ?: Brush.horizontalGradient(
-                    colors = washColors,
+                    colors = if (revealed == 1f) washColors else stops.map { t ->
+                        val a = restingAlpha + (revealed - restingAlpha) *
+                            (if (rtl) inkSmootherstep(t) else 1f - inkSmootherstep(t))
+                        Color.White.copy(alpha = a)
+                    },
                     startX = 0f,
                     endX = edge,
                 ).also {
                     cachedBrush = it
                     cachedEdge = edge
+                    cachedReveal = revealed
                 }
             // Built at the origin, so the canvas moves under it rather than the
             // gradient moving across the canvas. TileMode.Clamp extends the end
@@ -218,6 +227,8 @@ sealed class ShapedWordBloom {
         val paper: Color,
         val restingAlpha: Float,
         val feather: Float? = null,
+        /** Deposited ink can dissolve in place while its old edge stays fixed. */
+        val revealedAlpha: Float = 1f,
     ) : ShapedWordBloom()
 
     /**
@@ -464,7 +475,7 @@ fun Modifier.shapedWordBloom(
         val punchLayer = bloomList.any { bloom ->
             when (bloom) {
                 is ShapedWordBloom.UpcomingDim -> bloom.coverAlpha > 0f
-                is ShapedWordBloom.InkReveal -> bloom.progress < 1f
+                is ShapedWordBloom.InkReveal -> bloom.progress < 1f || bloom.revealedAlpha < 1f
                 is ShapedWordBloom.ColorReveal -> false
                 is ShapedWordBloom.PulseTrace -> false
                 // Erasing the printed glyphs needs this word's own layer.
@@ -561,7 +572,7 @@ fun Modifier.shapedWordBloom(
                     // wash so glyphs breathe in. Padded clip covers mark/AA
                     // overhangs (same as UpcomingDim).
                     val p = bloom.progress.coerceIn(0f, 1f)
-                    if (p >= 1f) return@forEach
+                    if (p >= 1f && bloom.revealedAlpha >= 1f) return@forEach
                     val lineBounds = lineBoundsCache.boundsFor(textLayout, start, endExclusive)
                     val pad = coverPad.toPx()
                     // One wash across the whole range, however many lines it
@@ -584,7 +595,7 @@ fun Modifier.shapedWordBloom(
                     }
                     total = total.coerceAtLeast(1f)
                     val edge = (total * (bloom.feather ?: feather)).coerceAtLeast(1f)
-                    val brush = washBrushCache.brushFor(bloom.paper, bloom.restingAlpha, edge)
+                    val brush = washBrushCache.brushFor(bloom.paper, bloom.restingAlpha, edge, bloom.revealedAlpha)
                     val head = p * (total + edge)
                     var travelled = 0f
                     for (i in lineBounds.indices) {
@@ -1428,19 +1439,19 @@ private fun DrawScope.coverRaisedMarks(
  * null asks for the white `DstIn` mask ([ShapedWordBloom.ColorReveal]).
  */
 private class WashBrushCache(private val rtl: Boolean, private val stops: FloatArray) {
-    private data class Key(val paper: Color?, val restingAlphaBits: Int, val edgeBits: Int)
+    private data class Key(val paper: Color?, val restingAlphaBits: Int, val edgeBits: Int, val revealedAlphaBits: Int)
 
     private val byKey = object : LinkedHashMap<Key, Brush>(8, 0.75f, true) {
         override fun removeEldestEntry(eldest: MutableMap.MutableEntry<Key, Brush>?): Boolean =
             size > 8
     }
 
-    fun brushFor(paper: Color?, restingAlpha: Float, edge: Float): Brush {
-        val key = Key(paper, restingAlpha.toBits(), edge.toBits())
+    fun brushFor(paper: Color?, restingAlpha: Float, edge: Float, revealedAlpha: Float = 1f): Brush {
+        val key = Key(paper, restingAlpha.toBits(), edge.toBits(), revealedAlpha.toBits())
         byKey[key]?.let { return it }
         val colors = stops.map { t ->
             val s = inkSmootherstep(t)
-            val glyphAlpha = restingAlpha + (1f - restingAlpha) * (if (rtl) s else 1f - s)
+            val glyphAlpha = restingAlpha + (revealedAlpha - restingAlpha) * (if (rtl) s else 1f - s)
             if (paper == null) {
                 Color.White.copy(alpha = glyphAlpha)
             } else {

@@ -83,6 +83,8 @@ object PaperInk {
         val softness: Float,
         val leadFade: Float,
         val flowing: Boolean,
+        /** 0 keeps the deposit; 1 has evaporated back to unread glyph coverage. */
+        val evaporation: Float = 0f,
     )
 
     /** A generated word, ready to draw. */
@@ -308,6 +310,7 @@ object PaperInk {
             shader.setFloatUniform("repeatPass", frame.repeatPass)
             shader.setFloatUniform("repeatTint", frame.repeatTint)
             shader.setFloatUniform("retained", frame.retained)
+            shader.setFloatUniform("evaporation", frame.evaporation)
             shader.setFloatUniform("dryInk", frame.dryInk.red, frame.dryInk.green, frame.dryInk.blue)
             shader.setFloatUniform("wetInk", frame.wetInk.red, frame.wetInk.green, frame.wetInk.blue)
             shader.setFloatUniform("repeatColor", frame.repeatColor.red, frame.repeatColor.green, frame.repeatColor.blue)
