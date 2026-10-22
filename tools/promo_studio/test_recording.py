@@ -89,6 +89,90 @@ class SequenceTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             spec.resolve({'app': {'surah': 1, 'repeat': 'range', 'repeat_to': 8}})
 
+    def test_header_then_recitation_stays_in_the_same_reader(self):
+        for how in ('scroll', 'rail'):
+            for screen in ('reader', 'settings', 'roots', 'repeat'):
+                with self.subTest(how=how, screen=screen):
+                    s = spec.resolve({'app': {'surah': 2, 'ayah': 14, 'intro': {
+                        'goto': how, 'steps': [{'kind': 'header', 'seconds': 1}, {'kind': 'header', 'seconds': 2}]}}})
+                    d = Mock()
+                    d.scroll_top.return_value = True
+                    d.scroll_to_verse.return_value = True
+                    d.rail_to_verse.return_value = True
+                    seq = Sequence(s, driver=d)
+                    seq.screen, seq.repeat_applied = screen, True
+                    with patch('recording.time.sleep'):
+                        seq.run(lambda *args: None, lambda *args: None)
+                    d.at.open_reader.assert_not_called()
+                    d.at.nodes.assert_not_called()       # never visits Home
+                    self.assertEqual(d.back.call_count, int(screen != 'reader'))
+                    self.assertEqual(d.scroll_top.call_count, 2)
+                    if how == 'rail':
+                        d.rail_to_verse.assert_called_once_with(14, 1, seq.log)
+                        d.scroll_to_verse.assert_not_called()
+                    else:
+                        d.scroll_to_verse.assert_called_once_with(14, seq.log)
+                    self.assertEqual((seq.screen, seq.ayah), ('reader', 14))
+
+    def test_header_from_home_opens_only_once_and_failed_heading_does_not_claim_verse_one(self):
+        d = Mock()
+        s = spec.resolve({'app': {'surah': 2, 'ayah': 14}})
+        seq = Sequence(s, driver=d)
+        seq.screen = 'home'
+        with patch('recording.time.sleep'):
+            seq.header()
+            seq.header()
+        d.at.open_reader.assert_called_once_with(2, 1)
+        self.assertEqual(seq.ayah, 1)
+        seq.ayah = 14
+        d.scroll_top.return_value = False
+        with self.assertRaisesRegex(RuntimeError, 'heading'):
+            seq.header()
+        self.assertEqual(seq.ayah, 14)
+
+    def test_failed_smooth_navigation_never_substitutes_a_home_cut(self):
+        for how, current in (('scroll', 1), ('scroll', None), ('rail', None)):
+            with self.subTest(how=how, current=current):
+                d = Mock()
+                d.scroll_to_verse.return_value = False
+                d.reading_ayah.return_value = None
+                seq = Sequence(spec.resolve({'app': {'ayah': 4, 'intro': {'goto': how}}}), driver=d)
+                seq.ayah = current
+                with self.assertRaisesRegex(RuntimeError, 'unexpected Home transition'):
+                    seq.reader()
+                d.at.open_reader.assert_not_called()
+                d.back.assert_not_called()
+                d.rail_to_verse.assert_not_called()
+                self.assertEqual(seq.ayah, current)
+
+    def test_unknown_position_can_scroll_without_reopening_the_chapter(self):
+        d = Mock()
+        d.scroll_to_verse.return_value = True
+        seq = Sequence(spec.resolve({'app': {'ayah': 4}}), driver=d)
+        seq.ayah = None
+        seq.reader()
+        d.scroll_to_verse.assert_called_once_with(4, seq.log)
+        d.at.open_reader.assert_not_called()
+        self.assertEqual(seq.ayah, 4)
+
+    def test_first_header_is_ready_before_capture_starts(self):
+        d = Mock()
+        d.wait_for.return_value = True
+        d.scroll_top.return_value = True
+        seq = Sequence(spec.resolve({'app': {'surah': 2, 'ayah': 14, 'intro': {
+            'steps': [{'kind': 'header', 'seconds': 2}]}}}), driver=d)
+        with patch('recording.time.sleep'):
+            seq.prepare()
+        d.at.open_reader.assert_called_once_with(2, 14, play=False)
+        d.scroll_top.assert_called_once_with('Chapter 2 ·', max_swipes=12, exact=False)
+        d.start_playback.assert_not_called()
+        self.assertEqual((seq.screen, seq.ayah), ('reader', 1))
+
+    def test_verse_one_scroll_uses_heading_including_without_a_basmalah(self):
+        with patch.object(capture, 'screen_px', return_value=(1440, 3200)), patch.object(capture, 'scroll_top', return_value=True) as top:
+            self.assertTrue(capture.scroll_to_verse(1))
+        top.assert_called_once_with('Chapter ', max_swipes=12, exact=False)
+
     def test_step_order_holds_and_scene_only_finish(self):
         s = spec.resolve({'app': {'intro': {'steps': [{'kind': 'home', 'seconds': 2}, {'kind': 'open', 'via': 'search', 'seconds': 3}, {'kind': 'wait', 'seconds': 4}], 'dwell': 5, 'play': False}}})
         q = Sequence(s, driver=object())

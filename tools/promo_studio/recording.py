@@ -71,7 +71,7 @@ class Sequence:
             self.c.back(); self.screen = 'reader'
             if self.ayah == ayah:
                 return
-        if self.screen == 'reader' and self.ayah is not None and self.goto(ayah):
+        if self.screen == 'reader' and self.goto(ayah):
             return
         if self.screen == 'reader':
             # Leave the current reader before replacing its deep-link target;
@@ -83,15 +83,38 @@ class Sequence:
 
     def goto(self, ayah):
         """Travel inside the open Scroll reader to `ayah` on camera: swipe to
-        it, or scrub the ayah rail. False leaves the jump (Home + link)."""
+        it, or scrub the ayah rail. Only an explicit Jump or Mushaf uses
+        Home + link; a failed smooth route must not silently change the shot."""
         how = self.a['intro'].get('goto', 'scroll')
         if how == 'jump' or self.a['layout'] != 'Scroll':
             return False
-        ok = how == 'rail' and self.c.rail_to_verse(ayah, self.ayah, self.log)
+        current = self.ayah
+        if current is None and how == 'rail':
+            current = self.c.reading_ayah()
+        ok = how == 'rail' and current is not None and self.c.rail_to_verse(ayah, current, self.log)
         ok = ok or self.c.scroll_to_verse(ayah, self.log)
-        if ok:
-            self.ayah = ayah
-        return ok
+        if not ok:
+            raise RuntimeError(f'Could not reach verse {ayah} inside the chapter; recording stopped to avoid an unexpected Home transition')
+        self.ayah = ayah
+        return True
+
+    def header(self):
+        """Reveal the current chapter's heading without replacing its reader.
+
+        A header is a place within the same page, including after a repeated
+        header step or a sheet over the reader. Keep the known verse until
+        the heading is actually reached, then travel from verse 1 next time.
+        """
+        if self.a['layout'] != 'Scroll':
+            self.reader(1)
+            return
+        if self.screen in ('settings', 'roots', 'repeat'):
+            self.c.back(); self.screen = 'reader'
+        if self.screen != 'reader':
+            self.reader(1)
+        if not self.c.scroll_top(f"Chapter {self.a['surah']} ·", max_swipes=12, exact=False):
+            raise RuntimeError('Chapter heading was not found')
+        self.ayah = 1
 
     def chapter(self, via):
         if via == 'direct':
@@ -210,6 +233,10 @@ class Sequence:
             self.screen = 'stopped'
         elif steps and steps[0]['kind'] == 'home':
             self.home()
+        elif steps and steps[0]['kind'] == 'header':
+            # Start on the requested opening screen, not on the verse that
+            # was cued for playback during off-camera preparation.
+            self.header()
         # A cover restart clears session repeat. Reapply it immediately before
         # playback if the sequence has not shown the picker itself.
         self.repeat_applied = bool(not steps or steps[0]['kind'] != 'cover') and not getattr(self, 'repeat_reset', False)
@@ -231,10 +258,7 @@ class Sequence:
             elif kind == 'home': self.home(); time.sleep(seconds)
             elif kind == 'open': self.chapter(step.get('via', 'direct')); time.sleep(seconds)
             elif kind == 'header':
-                self.ayah = None
-                self.reader(1)
-                if self.a['layout'] == 'Scroll' and not self.c.scroll_top(f"Chapter {self.a['surah']} ·", max_swipes=12, exact=False):
-                    raise RuntimeError('Chapter heading was not found')
+                self.header()
                 time.sleep(seconds)
             elif kind == 'settings':
                 self.reader(); self.tap('Settings'); self.screen = 'settings'; time.sleep(seconds)

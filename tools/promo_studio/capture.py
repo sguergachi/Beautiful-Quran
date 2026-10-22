@@ -348,7 +348,9 @@ def scroll_to_verse(ayah, log=print):
     w, h = screen_px()
     goal, reach = int(h * 0.24), int(h * 0.6)
     if ayah == 1:
-        return scroll_top("بِسۡمِ ٱللَّهِ ٱلرَّحۡمَٰنِ ٱلرَّحِيمِ", max_swipes=12, exact=False)
+        # The heading also exists in English view and in At-Tawbah, which
+        # has no basmalah. The reader's accessibility label is stable.
+        return scroll_top("Chapter ", max_swipes=12, exact=False)
     blind = 0
     for _ in range(16):
         marks = sorted(verse_markers())

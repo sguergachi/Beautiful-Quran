@@ -252,7 +252,11 @@ There is no separate Take starts control or Edit verse range.
   rail at the page's edge so the page jumps there, **Jump** cuts via Home
   and a direct link. Before recording, playback is parked in another
   chapter so a tapped chapter opens at its heading rather than its saved
-  place. Scroll layout only; Mushaf always jumps.
+  place. Chapter header steps scroll within the open reader and retain that
+  position for the next step, including repeated headers. When the header is
+  the first step, it is ready before capture begins. Scroll and Ayah
+  rail stop with an error if the verse cannot be reached, rather than silently
+  taking a detour through Home. Scroll layout only; Mushaf always jumps.
 - **Repeat** offers Off, One verse or Range. Range uses the same Start/Stop
   fields; **Play for (s)** controls repeated playback duration. The picker
   can be shown as a screen step or configured before capture. Repeated verse
