@@ -245,6 +245,14 @@ There is no separate Take starts control or Edit verse range.
   It replaces precise cuts with one continuous piece. The timeline's verse
   +/− actions still preserve interior cuts and reuse existing footage when
   possible. A matching recording is needed if the start verse changes.
+- **Go to the verse** (shown when a chapter is opened from the list or its
+  header is shown, so the reader starts at the top) chooses how the take
+  travels to the start verse: **Scroll** swipes down the page as a reader
+  would (planned glides, then a slow placement), **Ayah rail** scrubs the
+  rail at the page's edge so the page jumps there, **Jump** cuts via Home
+  and a direct link. Before recording, playback is parked in another
+  chapter so a tapped chapter opens at its heading rather than its saved
+  place. Scroll layout only; Mushaf always jumps.
 - **Repeat** offers Off, One verse or Range. Range uses the same Start/Stop
   fields; **Play for (s)** controls repeated playback duration. The picker
   can be shown as a screen step or configured before capture. Repeated verse
@@ -311,6 +319,11 @@ recording duration share the same take; changing the sequence needs a new one.
   83:17; Hani 2:16, 55:26 (the whole verse twice), 55:27, 95:6, 67:22.
 
 ## The timeline
+
+Lanes keep a 24 px empty gutter before 0 s, so keys and clip edges dragged to
+the start stay clear of the labels. Every number field scrubs: drag across
+it to change the value (Shift ×10, Alt ×0.1; one undo step per drag), click
+to type.
 
 - **Recording** track: the take, cut into pieces that play back to back.
   **S** (or ✂ Split) splits at the playhead, **Delete** removes the selected

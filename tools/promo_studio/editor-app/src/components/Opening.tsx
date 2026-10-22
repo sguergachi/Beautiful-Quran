@@ -7,6 +7,12 @@ import { mutate, useStore } from "../state/store.ts";
 import { VerseRangeEditor } from "./VerseEditor.tsx";
 import { Button, Field, Icon, Segmented, Select, TextInput } from "./ui.tsx";
 
+const GOTO_HINT: Record<"scroll" | "rail" | "jump", string> = {
+  scroll: "Swipe down the page to the start verse, as a reader would.",
+  rail: "Scrub the ayah rail at the page's edge to the start verse; the page jumps there.",
+  jump: "Cut to the verse (back to Home, then open it directly).",
+};
+
 const STEPS: [RecordingStep["kind"], string][] = [["cover", "Opening ceremony"], ["home", "Chapter list / Home"], ["open", "Open chapter"], ["header", "Chapter header"], ["settings", "Settings"], ["roots", "Root word viewer"], ["repeat", "Repeat settings"], ["wait", "Wait on current screen"]];
 const HINT: Record<RecordingStep["kind"], string> = {
   cover: "Launch the app, show the full opening ceremony, then hold on Home.", home: "Show Home with the chapter list.",
@@ -24,6 +30,8 @@ export function Opening() {
   const startVerse = <Field label="Start verse"><TextInput aria-label="Start verse" type="number" min={1} max={count} value={a.ayah} onCommit={(v) => {
     const n = +v; if (Number.isInteger(n) && n >= 1 && n <= count) mutate((r) => { r.app = { ...r.app, ayah: n, ...(a.repeat === "range" ? { repeat_to: Math.max(n, a.repeat_to ?? n) } : {}) }; });
   }} /></Field>;
+  // A chapter opened from the list, or its header, leaves the reader at the top: the take travels to the verse.
+  const travels = a.layout === "Scroll" && a.ayah > 1 && steps.some((s) => s.kind === "header" || (s.kind === "open" && (s.via ?? "direct") !== "direct"));
   const addStep = <Select value={add} options={[["", "+ Add screen"], ...STEPS.filter(([k]) => k !== "roots" || a.layout === "Scroll" && a.view !== "English")]} disabled={steps.length >= 24} onChange={(v) => {
     setAdd(""); if (v) update([...steps, { kind: v as RecordingStep["kind"], seconds: v === "roots" ? 3 : 2, ...(v === "open" ? { via: "tap" as const } : {}), ...(v === "roots" ? { word: 1 } : {}) }]);
   }} />;
@@ -58,6 +66,12 @@ export function Opening() {
           <p className="mb-3 text-[11px] leading-snug text-faint">Chapter and verse choose the page shown during reader, root viewer and repeat steps. The take finishes on the last screen above.</p>
           <Field label="Minimum (s)" hint="The full sequence is always included. Add time here to keep its final screen longer."><TextInput aria-label="Minimum take duration seconds" type="number" min={5} step={1} value={a.seconds} onCommit={(v) => { const n = +v; if (Number.isFinite(n) && n >= 5) mutate((r) => { r.app = { ...r.app, seconds: n }; }); }} /></Field>
         </>}
+        {travels && <div className="mb-3" role="group" aria-label="Go to the verse">
+          <span className="mb-1.5 block text-mute">Go to the verse</span>
+          <Segmented size="sm" value={a.intro.goto ?? "scroll"} onChange={(goto) => mutate((r) => { r.app = { ...r.app, intro: { ...r.app?.intro, goto } }; })}
+            options={[["scroll", "Scroll"], ["rail", "Ayah rail"], ["jump", "Jump"]]} />
+          <p className="mt-1 text-[11px] leading-snug text-faint">{GOTO_HINT[a.intro.goto ?? "scroll"]}</p>
+        </div>}
         <Field label={a.intro.play ? "Pause before (s)" : "Final hold (s)"} hint={a.intro.play ? "Settle on the start verse before playing." : "Hold the final screen without starting recitation."}>
           <TextInput aria-label="Wait before playback seconds" type="number" min={0} max={30} step={0.5} value={a.intro.dwell} onCommit={(v) => { const n = +v; if (n >= 0 && n <= 30) mutate((r) => { r.app = { ...r.app, intro: { ...r.app?.intro, dwell: n } }; }); }} />
         </Field>

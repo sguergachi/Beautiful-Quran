@@ -48,6 +48,33 @@ class SequenceTests(unittest.TestCase):
         self.assertNotEqual(spec.take_key(explicit), spec.take_key(legacy))
         self.assertEqual(spec.opening_steps(legacy)[0]['seconds'], 2)
 
+    def test_reaching_the_verse_inside_the_reader_follows_goto(self):
+        def run(goto, rail_ok=True):
+            s = spec.resolve({'app': {'surah': 2, 'ayah': 14, 'intro': {'goto': goto}}})
+            d = Mock()
+            d.rail_to_verse.return_value = rail_ok
+            d.scroll_to_verse.return_value = True
+            d.at.nodes.return_value = [('', 'Open settings', [0, 0, 1, 1])]
+            seq = Sequence(s, driver=d)
+            seq.screen, seq.ayah = 'reader', 1          # e.g. a chapter tapped open at its top
+            seq.reader()
+            return d, seq
+        d, seq = run('scroll')
+        d.scroll_to_verse.assert_called_once_with(14, seq.log); d.at.open_reader.assert_not_called()
+        self.assertEqual(seq.ayah, 14)
+        d, _ = run('rail')
+        d.rail_to_verse.assert_called_once(); d.scroll_to_verse.assert_not_called()
+        d, _ = run('rail', rail_ok=False)
+        d.scroll_to_verse.assert_called_once()           # a missed rail falls back to scrolling
+        d, _ = run('jump')
+        d.scroll_to_verse.assert_not_called(); d.at.open_reader.assert_called_once_with(2, 14)
+        plain = spec.resolve({})
+        self.assertEqual(spec.take_key(spec.resolve({'app': {'intro': {'goto': 'scroll'}}})), spec.take_key(plain))
+        self.assertNotEqual(spec.take_key(spec.resolve({'app': {'intro': {'goto': 'rail', 'steps': [{'kind': 'header', 'seconds': 1}]}}})),
+                            spec.take_key(spec.resolve({'app': {'intro': {'steps': [{'kind': 'header', 'seconds': 1}]}}})))
+        with self.assertRaises(ValueError):
+            spec.resolve({'app': {'intro': {'goto': 'teleport'}}})
+
     def test_invalid_sequences_fail_before_capture(self):
         for intro in [None, {'steps': [{}]}, {'steps': [{'kind': 'home', 'seconds': -1}]},
                       {'steps': [{'kind': 'home', 'seconds': float('nan')}]},
@@ -122,9 +149,10 @@ class SequenceTests(unittest.TestCase):
 
     def test_home_recognizes_a_nonempty_search_then_clears_it(self):
         driver = Mock()
-        driver.at.find.side_effect = lambda label, exact: (10, 20) if label in ('Open settings', 'Clear search') else None
+        driver.at.nodes.return_value = [('', 'Open settings', [0, 0, 20, 40]), ('', 'Clear search', [0, 0, 20, 40])]
         q = Sequence(spec.resolve({}), driver=driver)
         q.home()
+        driver.at.nodes.assert_called_once()           # one look, not one per label
         driver.at.tap.assert_called_once_with((10, 20))
         driver.back.assert_called_once()
         self.assertEqual(q.screen, 'home')

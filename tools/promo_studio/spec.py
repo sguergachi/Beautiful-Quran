@@ -69,7 +69,9 @@ INTRO = {
     "roots": 0.0,       # s showing the root viewer for the verse's first word
     "repeat": False,    # choose app.repeat on camera (otherwise it is set before recording)
     "dwell": 1.0,       # s of still page before the recitation, at least
+    "goto": "scroll",   # reaching the verse inside the reader: scroll to it, the ayah rail, or a jump (Home + link)
 }
+GOTO = ("scroll", "rail", "jump")
 OPEN_BY = ("tap", "search")
 REPEATS = ("off", "ayah", "range")   # the app's verse repeat: this ayah, or ayah..repeat_to
 STEP_KINDS = ("cover", "home", "open", "header", "settings", "roots", "repeat", "wait")
@@ -246,6 +248,7 @@ def validate(s):
     for name in ("cover", "home", "settings", "roots", "dwell"):
         number(it[name], f"app.intro.{name}", 0, 30)
     if it["open_by"] not in OPEN_BY: errs.append(f"app.intro.open_by must be one of {OPEN_BY}")
+    if it["goto"] not in GOTO: errs.append(f"app.intro.goto must be one of {GOTO}")
     for name in ("header", "repeat", "play"):
         if not isinstance(it[name], bool): errs.append(f"app.intro.{name} must be true or false")
     if set(it) - set(INTRO): errs.append(f"unknown app.intro fields: {sorted(set(it) - set(INTRO))}")
@@ -318,7 +321,8 @@ def take_script(s):
     canonical = [{"kind": x["kind"], "seconds": round(float(x["seconds"]), 3),
                   **({"via": x.get("via", "direct")} if x["kind"] == "open" else {}),
                   **({"word": x.get("word", 1)} if x["kind"] == "roots" else {})} for x in steps]
-    intro = {"steps": canonical, "dwell": round(float(a["intro"]["dwell"]), 3), "play": a["intro"]["play"]}
+    intro = {"steps": canonical, "dwell": round(float(a["intro"]["dwell"]), 3), "play": a["intro"]["play"],
+             **({"goto": a["intro"]["goto"]} if a["intro"]["goto"] != "scroll" else {})}
     script = {"intro": intro, "repeat": a["repeat"], "repeat_to": int(a["repeat_to"]) if a["repeat"] == "range" else None}
     return None if not steps and intro["dwell"] == 1 and intro["play"] and a["repeat"] == "off" else script
 

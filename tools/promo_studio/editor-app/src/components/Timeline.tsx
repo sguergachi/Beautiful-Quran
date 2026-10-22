@@ -20,6 +20,10 @@ import { TimelineVerseControls } from "./VerseEditor.tsx";
 
 let lastFadePress = { side: "", at: 0 };
 
+// Empty lane before 0 s: things dragged to the start, and the first clip's
+// trim handle, keep room instead of sitting against the labels.
+const GUTTER = 24;
+
 const EASE_LABEL: Record<Ease, string> = {
   inOutCubic: "Ease in & out", inOutSine: "Gentle in & out", outCubic: "Ease out", inCubic: "Ease in",
   outExpo: "Fast out, long settle", linear: "Linear", hold: "Hold (cut)",
@@ -38,7 +42,7 @@ export function Timeline() {
   const [marquee, setMarquee] = useState<{ x: number; y: number; w: number; h: number } | null>(null);
   const [width, setWidth] = useState(0);
   const { labelW } = ui;
-  const pps = ui.fit && width ? fitTimelineScale(width, labelW, spec?.duration ?? 0) : ui.pps;
+  const pps = ui.fit && width ? fitTimelineScale(width, labelW + GUTTER, spec?.duration ?? 0) : ui.pps;
 
   useLayoutEffect(() => {
     const b = box.current;
@@ -53,7 +57,7 @@ export function Timeline() {
     if (ui.fit && box.current) box.current.scrollLeft = 0;
   }, [ui.fit, width, labelW, spec?.duration]);
 
-  const timeAt = (clientX: number) => (clientX - inner.current!.getBoundingClientRect().left - labelW) / pps;
+  const timeAt = (clientX: number) => (clientX - inner.current!.getBoundingClientRect().left - labelW - GUTTER) / pps;
   const edgeOpt = () => ({ box: box.current!, left: labelW });
 
   // playhead and auto-follow, outside React renders
@@ -61,11 +65,11 @@ export function Timeline() {
     const place = (t: number) => {
       if (!box.current) return;
       const x = t * pps;
-      if (playhead.current) { playhead.current.style.transform = `translateX(${labelW + x}px)`; playhead.current.style.visibility = x < box.current!.scrollLeft - 1 ? "hidden" : "visible"; }
+      if (playhead.current) { playhead.current.style.transform = `translateX(${labelW + GUTTER + x}px)`; playhead.current.style.visibility = GUTTER + x < box.current!.scrollLeft - 1 ? "hidden" : "visible"; }
       if (head.current) head.current.style.transform = `translateX(${x}px)`;
       const b = box.current;
       if (b && clock.playing && !ui.fit) {
-        const px = labelW + x;
+        const px = labelW + GUTTER + x;
         if (px > b.scrollLeft + b.clientWidth - 40 || px < b.scrollLeft + labelW) b.scrollLeft = Math.max(0, px - labelW - 40);
       }
     };
@@ -87,14 +91,14 @@ export function Timeline() {
       const current = useStore.getState().ui;
       const next = clamp((current.fit ? pps : current.pps) * Math.exp(-e.deltaY * 0.002), 8, 500);
       setUI({ pps: next });
-      requestAnimationFrame(() => { b.scrollLeft = Math.max(0, t * next - (e.clientX - rect.left - labelW)); });
+      requestAnimationFrame(() => { b.scrollLeft = Math.max(0, GUTTER + t * next - (e.clientX - rect.left - labelW)); });
     };
     b.addEventListener("wheel", onWheel, { passive: false });
     return () => b.removeEventListener("wheel", onWheel);
   });
 
   if (!spec || !meta) return <div className="flex-1 bg-panel" />;
-  const dur = spec.duration, onset = soundOnset(spec, lead), laneW = ui.fit && width ? Math.max(1, width - labelW) : Math.max(240, dur * pps + 48);
+  const dur = spec.duration, onset = soundOnset(spec, lead), laneW = ui.fit && width ? Math.max(1, width - labelW) : Math.max(240, GUTTER + dur * pps + 48);
 
   const snapT = (t: number, exclude: E.KeyRef[] = [], noPlayhead = false, playhead = clock.t) => {
     const c = [0, dur];
@@ -131,7 +135,7 @@ export function Timeline() {
       setMarquee(last);
     }, () => {
       setMarquee(null);
-      const ta = (last.x - labelW) / pps, tb = (last.x + last.w - labelW) / pps, items = [...base];
+      const ta = (last.x - labelW - GUTTER) / pps, tb = (last.x + last.w - labelW - GUTTER) / pps, items = [...base];
       for (const row of inner.current!.querySelectorAll<HTMLElement>("[data-lane]")) {
         const top = row.offsetTop, bottom = top + row.offsetHeight;
         if (bottom < last.y || top > last.y + last.h) continue;
@@ -214,7 +218,7 @@ export function Timeline() {
     const t = timeAt(e.clientX), show = !e.buttons && t >= 0 && t <= dur && !(e.target as HTMLElement).closest("[data-label]");
     hover.current.style.display = hoverT.current.style.display = show ? "block" : "none";
     if (!show) return;
-    hover.current.style.transform = `translateX(${labelW + t * pps}px)`;
+    hover.current.style.transform = `translateX(${labelW + GUTTER + t * pps}px)`;
     hoverT.current.style.transform = `translateX(${t * pps + 6}px)`;
     hoverT.current.textContent = t.toFixed(2) + "s";
   };
@@ -280,12 +284,14 @@ export function Timeline() {
               <div onPointerDown={resizeLabels} className="absolute -right-1 top-0 bottom-0 z-50 w-2 cursor-col-resize hover:bg-gold/60" title="Drag to resize the labels" />
             </div>
             <div className="relative shrink-0 cursor-ew-resize" style={{ width: laneW }} onPointerDown={(e) => scrub(e)}>
+              <div className="absolute inset-y-0 right-0" style={{ left: GUTTER }}>
               {ticks.map((t, i) => {
                 const major = step >= 2 || i % 2 === 0;
                 return <div key={t} className={`absolute border-l border-line pl-1 text-[10.5px] text-faint ${major ? "top-0 h-full" : "top-[70%] h-[30%]"}`} style={{ left: t * pps }}>{major ? `${Number.isInteger(t) ? t : t.toFixed(1)}s` : ""}</div>;
               })}
               <div ref={head} onPointerDown={(e) => scrub(e)} className="ph-head absolute top-0 -ml-[6px] h-[13px] w-[13px] bg-gold" style={{ left: 0 }} title="Drag to scrub" />
               <div ref={hoverT} className="pointer-events-none absolute top-[3px] hidden rounded bg-black/80 px-1 text-[10px] text-ink" />
+              </div>
             </div>
           </div>
           {/* recording */}
@@ -374,7 +380,7 @@ function LaneRow({ labelW, laneW, scrub, label, children, lane, tall, className 
       <div className="relative shrink-0" style={{ width: laneW }}
         onPointerDown={(e) => { if (bare(e)) (onDown ?? scrub)(e); }}
         onContextMenu={(e) => { if (onMenu && bare(e)) onMenu(e); }} {...laneProps}>
-        {children}
+        <div data-lanebg className="absolute inset-y-0 right-0" style={{ left: GUTTER }}>{children}</div>
       </div>
     </div>
   );

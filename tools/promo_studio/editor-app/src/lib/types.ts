@@ -15,6 +15,7 @@ export interface Intro {
   play: boolean;
   cover: number; home: number; open_by: "tap" | "search"; header: boolean;
   settings: number; roots: number; repeat: boolean; dwell: number;
+  goto: "scroll" | "rail" | "jump";
 }
 export interface RecordingStep {
   kind: "cover" | "home" | "open" | "header" | "settings" | "roots" | "repeat" | "wait";
