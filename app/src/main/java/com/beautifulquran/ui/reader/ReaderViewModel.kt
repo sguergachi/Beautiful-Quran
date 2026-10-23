@@ -86,7 +86,8 @@ data class ActiveWord(
     val durationMs: Long,
     /** Voiced span of the word (segment end − start), without the karaoke
      * hold across the gap to the next word. Tajweed pacing distributes the
-     * letters over this share of [durationMs] and rests for the remainder. */
+     * letters over this share of [durationMs] and rests for the remainder.
+     * English Scroll uses this span directly for its linear fill. */
     val spokenMs: Long = durationMs,
     /** Next timing owner, including a repeat backtrack; null at ayah end. */
     val nextWordPosition: Int? = null,

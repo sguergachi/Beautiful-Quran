@@ -22,9 +22,12 @@ is observed in composition, with structural equality.
 
 `HighlightMediaMotions` captures a `HighlightWashWindow`, pacing, feather, and
 wasl carry at entry. Progress is a function of calibrated media time rather
-than elapsed animation time. The existing minimum sweep floor is retained:
-its wall duration is converted to media duration once at entry speed. A later
-speed change changes the shared clock slope. Repeat occurrences use measured
+than elapsed animation time. Arabic retains the minimum sweep floor, converted
+to media duration once at entry speed. English Scroll uses the voiced span
+(`spokenMs`) without a floor or cap and reads it linearly, finishing before
+the reciter's intervening pause. Both first and repeat fills hold at their
+spoken end while the karaoke owner remains selected. A later speed change
+changes the shared clock slope. Repeat occurrences use measured
 dwell, have independent windows, and cannot wait behind a repeat queue.
 Prose can gate on its predecessor without shifting its own window into the
 future. Cosmetic recess/glimmer/tint dissolution still use their existing fades.

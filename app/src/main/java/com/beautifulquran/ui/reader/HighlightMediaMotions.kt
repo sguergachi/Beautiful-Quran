@@ -16,6 +16,7 @@ private data class MediaEntry(
     val feather: Float? = null,
     val revealStart: Float = 0f,
     val letterRevealStart: Float = 0f,
+    val linearTime: Boolean = false,
 )
 private class MediaHistory(var entry: MediaEntry = MediaEntry())
 
@@ -31,6 +32,7 @@ private fun rememberMediaEntry(
     revealStart: Float = 0f,
     repeatOccurrence: Boolean = false,
     letterRevealStart: Float = 0f,
+    linearTime: Boolean = false,
 ): State<MediaEntry> {
     val timeline = LocalHighlightTimeline.current
     val history = remember { MediaHistory() }
@@ -43,17 +45,31 @@ private fun rememberMediaEntry(
     }
     val entry = if (next.window != prior.wash.window || next.provisional != prior.wash.provisional) {
         MediaEntry(next, pacing, pacing?.let { InkEngine.pacedFeather() },
-            revealStart.coerceIn(0f, 1f), letterRevealStart.coerceIn(0f, 1f))
+            revealStart.coerceIn(0f, 1f), letterRevealStart.coerceIn(0f, 1f), linearTime)
     } else prior.copy(wash = next)
     SideEffect { history.entry = entry }
     return rememberUpdatedState(entry)
 }
 
-internal fun mediaWashWindow(verse: Ayah?, word: ActiveWord?, wallDurationMs: Int?, speed: Float): HighlightWashWindow? =
-    if (verse == null || word == null || wallDurationMs == null) null else HighlightWashWindow(
-        verse.surahId, verse.number, word.playbackActivation, word.startMs,
-        (wallDurationMs.toDouble() * speed).toLong().coerceAtLeast(1L), word.reciterId,
+/** English Scroll finishes at the spoken end; other surfaces keep their visual hold window. */
+internal fun mediaWashWindow(
+    verse: Ayah?, word: ActiveWord?, wallDurationMs: Int?, speed: Float,
+    spokenOnly: Boolean = false,
+): HighlightWashWindow? {
+    if (verse == null || word == null) return null
+    val duration = if (spokenOnly) {
+        word.spokenMs.coerceIn(1L, word.durationMs.coerceAtLeast(1L))
+    } else {
+        wallDurationMs?.let { (it.toDouble() * speed).toLong().coerceAtLeast(1L) } ?: return null
+    }
+    return HighlightWashWindow(
+        verse.surahId, verse.number, word.playbackActivation, word.startMs, duration, word.reciterId,
     )
+}
+
+/** A prose speech clock stays linear; Arabic retains its existing paced or eased wash. */
+internal fun mediaSweepProgress(linear: Float, paced: Boolean, linearTime: Boolean): Float =
+    if (paced || linearTime) linear else InkEngine.sweepEasing.transform(linear)
 
 /** Serial prose gates on the preceding edge, without queuing or restarting a media window. */
 @Composable
@@ -67,10 +83,11 @@ internal fun rememberMediaLetterSweep(
     revealStart: Float,
     predecessor: State<Float>?,
     letterRevealStart: Float = 0f,
+    linearTime: Boolean = false,
 ): LetterSweep {
     val timeline = LocalHighlightTimeline.current
     val entry = rememberMediaEntry(active, retain, activation, window, provisional, pacing, revealStart,
-        letterRevealStart = letterRevealStart)
+        letterRevealStart = letterRevealStart, linearTime = linearTime)
     val prior = rememberUpdatedState(predecessor)
     val raw = remember {
         derivedStateOf {
@@ -78,7 +95,7 @@ internal fun rememberMediaLetterSweep(
                 val e = entry.value
                 val linear = if (e.wash.window == null) { if (e.wash.active) 0f else 1f }
                     else HighlightWash.progress(e.wash, timeline.frame())
-                if (e.pacing != null) linear else InkEngine.sweepEasing.transform(linear)
+                mediaSweepProgress(linear, e.pacing != null, e.linearTime)
             }
         }
     }
@@ -109,10 +126,11 @@ internal fun rememberMediaRepeatWash(
     provisional: Boolean,
     pacing: TajweedPacing.Curve?,
     base: State<Float>,
+    linearTime: Boolean = false,
 ): RepeatWash {
     val timeline = LocalHighlightTimeline.current
     val entry = rememberMediaEntry(repeat && active, true, activation, window, provisional, pacing,
-        repeatOccurrence = true)
+        repeatOccurrence = true, linearTime = linearTime)
     val baseState = rememberUpdatedState(base)
     val raw = remember {
         derivedStateOf {
@@ -120,7 +138,7 @@ internal fun rememberMediaRepeatWash(
                 val e = entry.value
                 val linear = if (e.wash.window == null) { if (e.wash.active) 0f else 1f }
                     else HighlightWash.progress(e.wash, timeline.frame())
-                if (e.pacing != null) linear else InkEngine.sweepEasing.transform(linear)
+                mediaSweepProgress(linear, e.pacing != null, e.linearTime)
             }
         }
     }

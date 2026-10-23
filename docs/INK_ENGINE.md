@@ -643,8 +643,16 @@ shared `HighlightTimeline` through that window. The replaced speech-time
 `Animatable` owners (`rememberLetterSweep` and `rememberRepeatWash`) are gone.
 
 - Active entry captures duration, tajweed curve, feather, and wasl carry once.
-  Mid-word tuning cannot replay the wash. The minimum visual floor remains,
-  converted from wall milliseconds to media duration at entry speed.
+  Mid-word tuning cannot replay the wash. Arabic keeps its minimum visual
+  floor, converted from wall milliseconds to media duration at entry speed.
+  English Scroll uses the measured spoken span directly, without a visual
+  minimum or maximum, and follows its linear media progress on both first
+  and repeat passes. The fill finishes at the spoken end and stays complete
+  during the karaoke gap before the next word. The owner remains selected
+  through that gap; neither easing nor the pause can stretch the fill.
+  This uses the supplied segment end, not inferred silence: if a timing row
+  extends a word to the next onset, the renderer cannot recover an unmarked
+  pause inside it. Alafasy 64:8 currently has such adjoining timing spans.
 - Active→Recited retains that word's independent residual window; Upcoming or
   Plain abandons it. Pauses and buffering freeze residuals as well as active ink.
   Speed changes alter the shared media clock instead of restarting animation.
@@ -655,8 +663,10 @@ shared `HighlightTimeline` through that window. The replaced speech-time
   as a spoken residual.
 - A consecutive same-word repeat starts another orange occurrence. Base ink
   remains laid; orange waits for the base edge. Repeats never form a queue.
-- English predecessor gating preserves a continuous prefix while each window
-  stays anchored to speech, so short words cannot accumulate queued delay.
+- English predecessor gating preserves a continuous prefix while each spoken
+  window stays anchored to speech, so short words cannot accumulate queued
+  delay. The one-letter soft preview stays inside its printed word and shares
+  that same clock; it introduces no separate animation duration.
 - Completed residuals stop observing frame updates at the next word boundary.
   Repeat completion is observed as a structurally compared Boolean; frame
   progress itself is read in drawing, avoiding frame-driven composition.
