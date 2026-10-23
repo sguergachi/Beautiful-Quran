@@ -318,8 +318,8 @@ Renderers consume these; they do not re-derive curves.
   focuses Keep, and reserves ruby for the existing ribbon component.
 - **Pinned chapters** mirror Android (`docs/DESIGN.md`, "Pinned chapters"):
   `pinnedSurahIds` in settings; a PINNED flag over a square-cut band in
-  `--green-wash` (Android's Continue green, not the web pill's mint
-  `--continue-wash`); pinned chapters move out of the list.
+  `--green-wash`, the Continue pill's green; pinned chapters move out of
+  the list.
   Press-and-hold (500 ms, cancelled by 10 px of travel), a long-press or
   right-click (`contextmenu`), the Context Menu key, Shift+F10 or Shift+Enter
   asks in place: a crisp fill from the pointer (the middle for keyboard),
@@ -791,8 +791,9 @@ Below that size nothing changes. Rationale in
    The top continue area uses Android's resting pill geometry: 28 px corners,
    16 px outer insets, a passive green place ribbon, gold chapter number,
    small CONTINUE flag, and bilingual chapter identity with the saved ayah.
-   Its dedicated `--continue-wash` follows Android PR #871: Paper `#B8EDDB`,
-   Nightfall `#134738`, Royal Green `#1F5141`.
+   It is washed in `--green-wash`, Android's `greenWash`. A dedicated mint
+   `--continue-wash` (from Android PR #871, since reverted there) was removed:
+   the owner rejects mint anywhere in the app.
    The single pill is one accessible button; long chapter names ellipsize while
    the ayah stays visible. Reading and listening retain separate saved places,
    with the last-heard place taking priority in the pill.

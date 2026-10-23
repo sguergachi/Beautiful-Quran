@@ -1653,7 +1653,7 @@ row-visibility rule cannot see the row yet, and a launch whose reading row
 is already in view must behave as if the pill had always been docked away —
 no pop, dwell, or late flight. On departure the resting pill does not fade:
 it is replaced in place by the flight's own copy, so the departure is only
-ever one motion. Web keeps its mint pill in its top
+ever one motion. Web keeps its pill, in the same green wash, in its top
 continue area: a 28 px radius, 16 px outer inset, 40 px green place cloth,
 gold chapter number, CONTINUE flag, and compact bilingual chapter and ayah.
 The shared ribbon is decorative inside one accessible resume button. Only one
@@ -1713,8 +1713,7 @@ pinned row when the chapter is pinned; it hangs in the sheet-edge lane on
 the band. Search owns the sheet while active, so the band stands down.
 Pinning from the top of the sheet scrolls the band into view; a reader deep
 in the list keeps their place. Stored as `Settings.pinnedSurahIds`. The web
-mirrors it (`docs/WEB.md` §6.3) in the same Continue green, `--green-wash`;
-the owner rejected the web pill's mint `--continue-wash` for the band.
+mirrors it (`docs/WEB.md` §6.3) in the same Continue green, `--green-wash`.
 
 Press-and-hold is taught by a contextual guide (`PinChapterTip`, behind the
 developer guide gate like every lesson); see
