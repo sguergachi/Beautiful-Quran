@@ -127,7 +127,9 @@ together with the fuller wet shape and reflection. Every reached word holds
 orange with the chain, softening to the paler dry orange as its individual
 wet film dries. Both passes
 gain the same stroke weight while wet and return to the regular weight during
-the same per-word dry-down. The pooling dial sets the amount on both passes.
+the same per-word dry-down. The pooling dial sets the amount on both passes,
+scaled to the actual font size with gentle relief for smaller type. The study
+uses the same rule as the reader, including its smaller English face.
 Only the color is held by the chain; weight and reflection follow wetness. Later words
 stay black until their turn. Pausing retains the reached orange prefix while
 the sheen settles. Only when playback leaves verse 2 does the complete chain

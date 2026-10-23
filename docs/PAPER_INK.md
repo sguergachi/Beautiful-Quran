@@ -100,6 +100,13 @@ Textures: `field` at 2× (R Inside out, G Flowing, B distance as 128 + 16 px),
 `normals` at 1× (R/G film normal, B exact glyph coverage). Shader constants
 were tuned at a 160 px font; `unit = fontPx / 160` scales them.
 
+Pooling also takes a gentle optical correction below a 48 dp font:
+`min(fontDp / 48, 1)^0.25`. At 24 dp this removes about 16% of the added wet
+weight, and at 12 dp about 29%, while larger type keeps its existing relative
+weight. The calculation uses dp so density alone cannot change the effect.
+The reader and study use the same rule, including the study's smaller English
+face. Only the added wet spread changes; dry glyphs and letter timing do not.
+
 The reader's wet outline keeps the source font's fractional edge coverage.
 `PaperInkOutline` reconstructs contour segments between neighbouring coverage
 samples, then measures distance to those segments around the nearest boundary
@@ -136,6 +143,8 @@ dries it toward warm paper.
   leaning stems, symmetric swell and letter slots.
 - `PaperInkOutlineTest` — fractional circles and angled strokes against
   independent analytic shapes, plus saddle corners and uniform masks.
+- `PaperInkPoolingTest` — gentle relief at smaller sizes, density-independent
+  physical weight, and a proportional pooling dial.
 - `tools/test_paper_ink_outline.py` — the pictured 6:150 word 16 against a
   freshly rasterized 16× font outline at four reading sizes and both pooling
   settings. This tests geometry independently of the low-resolution field.

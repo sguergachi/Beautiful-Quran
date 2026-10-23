@@ -61,6 +61,7 @@ import com.beautifulquran.domain.TajweedPacing
 import com.beautifulquran.domain.HighlightClock
 import com.beautifulquran.domain.EnglishWordAlignment
 import com.beautifulquran.ui.theme.BeautifulQuranTheme
+import com.beautifulquran.ui.theme.paperink.paperInkPoolingWeight
 import com.beautifulquran.ui.theme.quietClickable
 import androidx.media3.common.Player
 import kotlin.math.min
@@ -269,6 +270,8 @@ private fun PaperInkStudyPage(app: QuranApp, study: PaperInkStudy) {
             val currentAyah = if (belongs) state.nowPlaying!!.ayah else study.sequence.ayah
             study.repeatChain.update(study.sequence.repeatedMiddle && currentAyah == 2, now)
             val scale = min(size.width / (study.maxWidth + 16f), size.height / 1080f) * fontScale.floatValue
+            val fontPx = (if (english.value) 80f else 160f) * scale
+            val poolingWeight = paperInkPoolingWeight(thickness.floatValue, fontPx, density) / scale
             val native = drawContext.canvas.nativeCanvas
             for (word in study.allWords) {
                 val position = when {
@@ -311,7 +314,7 @@ private fun PaperInkStudyPage(app: QuranApp, study: PaperInkStudy) {
                         word.shader.setFloatUniform("retained", if (repeat) 1f else 0f)
                         word.shader.setFloatUniform("repeatPass", if (repeat) 1f else 0f)
                         word.shader.setFloatUniform("repeatColor", repeatColor.red, repeatColor.green, repeatColor.blue)
-                        word.shader.setFloatUniform("weight", thickness.floatValue * 3.5f)
+                        word.shader.setFloatUniform("weight", poolingWeight)
                         word.shader.setFloatUniform("aa", .9f / scale)
                         if (!english.value) x -= word.width * scale
                         word.shader.setFloatUniform("origin", x / scale - 362.5f,

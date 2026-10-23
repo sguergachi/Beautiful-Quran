@@ -315,7 +315,7 @@ object PaperInk {
             shader.setFloatUniform("wetInk", frame.wetInk.red, frame.wetInk.green, frame.wetInk.blue)
             shader.setFloatUniform("repeatColor", frame.repeatColor.red, frame.repeatColor.green, frame.repeatColor.blue)
             shader.setFloatUniform("unreadAlpha", frame.unreadAlpha)
-            shader.setFloatUniform("weight", frame.pooling * 3.5f * word.unit)
+            shader.setFloatUniform("weight", paperInkPoolingWeight(frame.pooling, word.unit * 160f, density))
             shader.setFloatUniform("reflectionStrength", frame.reflection)
             shader.setFloatUniform("lightSoftness", frame.softness)
             shader.setFloatUniform("lead", frame.leadFade * 2f)
