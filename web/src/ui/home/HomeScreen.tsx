@@ -16,6 +16,8 @@ import {
 } from '../icons/PlaybackIcons'
 import { PaperInput } from '../kit/PaperInput'
 import { ContinueRow } from './ContinueRow'
+import { ChapterRow } from './ChapterRow'
+import { chapterRowKey, pinnedChapterLists } from './pinnedChapters'
 import {
   appStore,
   useAppSelector,
@@ -94,6 +96,12 @@ export function HomeScreen({
   const [expandedSurahIds, setExpandedSurahIds] = useState<Set<number>>(
     () => new Set(),
   )
+  // One row asks to pin or unpin at a time. Kept after it backs out, so the
+  // fill draws back to where it grew from.
+  const [pinAsk, setPinAsk] = useState<{ key: string; origin: number; open: boolean } | null>(null)
+  const pinAsking = pinAsk?.open === true
+  const revealPinned = useRef(false)
+  const focusAfterPin = useRef<string | null>(null)
   const previousBookmarkCount = useRef(state.bookmarks.length)
   const pendingRibbonUnfurl = useRef(false)
   const [ribbonUnfurlSignal, setRibbonUnfurlSignal] = useState(0)
@@ -123,6 +131,40 @@ export function HomeScreen({
       delete shell.dataset.coverSearch
     }
   }, [searchFocused, searching])
+
+  // Starting a search backs out of a pin question.
+  useEffect(() => {
+    setPinAsk((ask) => (ask?.open ? { ...ask, open: false } : ask))
+  }, [search])
+
+  useEffect(() => {
+    if (!pinAsking) return
+    const backOut = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape') return
+      event.preventDefault()
+      event.stopImmediatePropagation()
+      setPinAsk((ask) => (ask ? { ...ask, open: false } : ask))
+    }
+    window.addEventListener('keydown', backOut, true)
+    return () => window.removeEventListener('keydown', backOut, true)
+  }, [pinAsking])
+
+  // Pinning from the very top of the sheet brings the band into view (as
+  // Android scrolls to the first item); a reader deep in the list keeps
+  // their place. A row confirmed from the keyboard keeps focus where it went.
+  const pinnedSurahIds = state.settings.pinnedSurahIds
+  useEffect(() => {
+    const scroller = sheetRef.current?.querySelector('.scroll')
+    if (revealPinned.current) scroller?.scrollTo({ top: 0, behavior: 'smooth' })
+    revealPinned.current = false
+    const key = focusAfterPin.current
+    focusAfterPin.current = null
+    if (key) {
+      sheetRef.current
+        ?.querySelector<HTMLElement>(`[data-row-key="${key}"]`)
+        ?.focus({ preventScroll: true })
+    }
+  }, [pinnedSurahIds])
 
   useEffect(() => {
     setExpandedSurahIds(new Set())
@@ -252,6 +294,44 @@ export function HomeScreen({
     !wordLoading
   const prepareChapter = (surahId: number) => {
     appStore.prepareSurah(surahId)
+  }
+
+  // Pinned chapters lead the list on the band and leave the list below.
+  const chapterLists = pinnedChapterLists(filtered, pinnedSurahIds, searching)
+  const bandIds = new Set(chapterLists.pinned.map((s) => s.id))
+  const togglePinned = (surahId: number) => {
+    const pinned = pinnedSurahIds.includes(surahId)
+    const scroller = sheetRef.current?.querySelector('.scroll')
+    revealPinned.current = !pinned && !searching && (scroller?.scrollTop ?? 0) <= 0
+    if (document.activeElement?.closest('.surah-item')) {
+      focusAfterPin.current = chapterRowKey(surahId, !pinned && !searching)
+    }
+    setPinAsk(null)
+    appStore.togglePinnedSurah(surahId)
+  }
+  const chapterRow = (s: (typeof filtered)[number]) => {
+    const onBand = bandIds.has(s.id)
+    const key = chapterRowKey(s.id, onBand)
+    return (
+      <ChapterRow
+        key={key}
+        surah={s}
+        rowKey={key}
+        pinned={pinnedSurahIds.includes(s.id)}
+        onBand={onBand}
+        asking={pinAsking && pinAsk?.key === key}
+        fillOrigin={pinAsk?.key === key ? pinAsk.origin : undefined}
+        onPrepare={() => prepareChapter(s.id)}
+        onOpen={() => {
+          setPinAsk(null)
+          if (searching) appStore.openReading(s.id, ayahTarget ?? 1)
+          else appStore.openSurah(s.id)
+        }}
+        onAsk={(origin) => setPinAsk({ key, origin, open: true })}
+        onCancel={() => setPinAsk((ask) => (ask ? { ...ask, open: false } : ask))}
+        onConfirm={() => togglePinned(s.id)}
+      />
+    )
   }
 
   return (
@@ -433,30 +513,17 @@ export function HomeScreen({
               <p className="search-section-label">Surahs</p>
             ) : null}
 
+            {chapterLists.pinned.length > 0 ? (
+              <>
+                <p className="pinned-flag">Pinned</p>
+                <ul className="surah-list surah-list-pinned">
+                  {chapterLists.pinned.map(chapterRow)}
+                </ul>
+              </>
+            ) : null}
+
             <ul className="surah-list">
-              {filtered.map((s) => (
-                <li key={s.id}>
-                  <button
-                    type="button"
-                    className="surah-row"
-                    onPointerEnter={() => prepareChapter(s.id)}
-                    onPointerDown={() => prepareChapter(s.id)}
-                    onFocus={() => prepareChapter(s.id)}
-                    onClick={() =>
-                      searching ? appStore.openReading(s.id, ayahTarget ?? 1) : appStore.openSurah(s.id)
-                    }
-                  >
-                    <span className="surah-num">{s.id}</span>
-                    <span className="surah-names">
-                      <span className="en">{s.nameTransliteration}</span>
-                      <span className="meta">
-                        {s.nameTranslation} · {s.ayahCount} ayahs
-                      </span>
-                    </span>
-                    <span className="surah-ar">{s.nameArabic}</span>
-                  </button>
-                </li>
-              ))}
+              {chapterLists.listed.map(chapterRow)}
             </ul>
 
             {showWordSections ? (

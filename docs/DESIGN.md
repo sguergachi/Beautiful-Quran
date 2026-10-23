@@ -1712,8 +1712,10 @@ The current-place ribbon (and the Continue pill's docking target) is on the
 pinned row when the chapter is pinned; it hangs in the sheet-edge lane on
 the band. Search owns the sheet while active, so the band stands down.
 Pinning from the top of the sheet scrolls the band into view; a reader deep
-in the list keeps their place. Stored as `Settings.pinnedSurahIds`; web
-parity is pending.
+in the list keeps their place. Stored as `Settings.pinnedSurahIds`. The web
+mirrors it (`docs/WEB.md` §6.3), its band in the web Continue pill's mint
+`--continue-wash`, so on each platform the band matches that platform's
+Continue pill.
 
 Press-and-hold is taught by a contextual guide (`PinChapterTip`, behind the
 developer guide gate like every lesson); see

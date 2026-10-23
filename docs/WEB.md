@@ -316,6 +316,18 @@ Renderers consume these; they do not re-derive curves.
   collapses the rest; search bypasses the preview and displays every match.
   Unmarking swaps the fixed-height reference line for an inline confirmation,
   focuses Keep, and reserves ruby for the existing ribbon component.
+- **Pinned chapters** mirror Android (`docs/DESIGN.md`, "Pinned chapters"):
+  `pinnedSurahIds` in settings; a PINNED flag over a square-cut band in the
+  web Continue pill's `--continue-wash`; pinned chapters move out of the list.
+  Press-and-hold (500 ms, cancelled by 10 px of travel), a long-press or
+  right-click (`contextmenu`), the Context Menu key, Shift+F10 or Shift+Enter
+  asks in place: a crisp fill from the pointer (the middle for keyboard),
+  then **Pin** / **Unpin** and Cancel, with focus on Cancel. Cancel, a click
+  elsewhere on the row, Escape or typing in search backs out. Pure decisions
+  live in `ui/home/pinnedChapters.ts`; the row is `ui/home/ChapterRow.tsx`.
+  Web rows carry no place ribbon and the Continue pill never docks, so the
+  place-row rule has nothing to move here. The pinning lesson is Android-only
+  for now.
 
 ## 7. Performance bar (non-negotiable)
 
