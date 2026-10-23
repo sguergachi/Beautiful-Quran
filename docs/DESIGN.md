@@ -1679,10 +1679,19 @@ band to unpin, as an even tint: no shape spreads across a strip this thin
 (a deliberate form has no room to develop in it). The tint waits 150 ms
 under an unhurried finger, then deepens over the next 550 ms in step with
 the hold; holding it full is the act, marked by the long-press haptic tick,
-and the pin toggles. Lifting early drains the tint away and changes
-nothing: a release within 300 ms was the tap that opens the chapter, a
-longer one was a hold let go before it filled. A drag belongs to the list.
-Readers who cannot hold get Pin / Unpin as accessibility actions. Tried
+and the pin toggles. Lifting early drains the tint (180 ms) and pins
+nothing: a release within 300 ms is the ordinary tap that opens the
+chapter; a longer one does nothing. A drag belongs to the list, and a
+cancelled or consumed release (a system back swipe begun on a row, the
+search dials' dismissing tap) is not a tap. The hold is timed on the frame
+clock, not by an animation, so the system's animator scale (animations off,
+or slowed) changes neither what a tap does nor how long a hold takes; a
+longer system touch & hold delay stretches all three timings in proportion
+(`holdPace`), so a slow tapper's tap still opens. Readers who cannot hold get Pin / Unpin as a TalkBack
+action, and a keyboard or D-pad opens with Enter and pins with Shift+Enter;
+the row is one merged, focusable control. While searching, results list
+pinned chapters in place, off the band, where a hold could show nothing of
+what it would do, so there the row is only a tap. Tried
 and rejected, in order: a written subtitle question answered by a verb and
 Cancel; the share selection's feathered ink soak (a smudged inset patch on
 a row this thin); a straight square wipe from the finger (no ink in it);
@@ -1695,9 +1704,9 @@ Pinned chapters sit on a **band**: the Continue pill's green wash
 tinted paper, behind every pinned row. A small-caps **PINNED** flag on the
 names' rail (as CONTINUE heads its pill) stands on the paper just above the
 band, 8 dp clear of it. Each row carries its own slice of the wash; the
-slices meet, so it reads as one band however many chapters are pinned. Rows are set compact (the pill's
-10 dp bands) on the list's own rails, so numbers and names stay aligned with
-the chapters below. The flag takes the search list's first-label air
+slices meet, so it reads as one band however many chapters are pinned.
+Rows are set compact (10 dp bands against the list's 15 dp) on the list's
+own rails, so numbers and names stay aligned with the chapters below. The flag takes the search list's first-label air
 (16 dp) above it, and 20 dp of paper separates the band from the list.
 
 A pinned chapter **moves** into the band: it is left out of the list below,
@@ -1719,10 +1728,13 @@ in the list keeps their place. Stored as `Settings.pinnedSurahIds`. The web
 mirrors it (`docs/WEB.md` §6.3) in the same Continue green, `--green-wash`.
 
 Press-and-hold is taught by a contextual guide (`PinChapterTip`, behind the
-developer guide gate like every lesson); see
+developer guide gate like every lesson). It never opens during a scroll,
+and leaving Chapters by any route while it is up puts it away, so it can
+never hold the stack or Back from behind the reader. See
 [CONTEXTUAL_GUIDES.md](CONTEXTUAL_GUIDES.md).
 
-Implementation: `pinnedBand`, `holdToPin` / `holdOutcome` and the list in
+Implementation: `pinnedBand`, `holdToPin` / `holdOutcome` / `holdFillProgress` /
+`holdPace` and the list in
 `ui/home/HomeScreen.kt`.
 
 ### Chapters bookmark treatment

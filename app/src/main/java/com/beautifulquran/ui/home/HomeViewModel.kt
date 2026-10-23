@@ -50,8 +50,8 @@ data class HomeUiState(
     /** Reading place parked on the previous visit, kept visible as the green
      * marker even while the chapter list is filtered. */
     val continueTarget: ContinueTarget? = null,
-    /** Pinned chapters, in Quranic order — gathered above the full list,
-     * which still carries them in place. */
+    /** Pinned chapters, in Quranic order — gathered on the band above the
+     * full list, which leaves them out (they move, never show twice). */
     val pinned: List<Surah> = emptyList(),
     /** When the query is a `surah:ayah` reference, the ayah to open the matched surah at. */
     val ayahTarget: Int? = null,

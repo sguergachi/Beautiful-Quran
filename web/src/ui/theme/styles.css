@@ -1330,14 +1330,14 @@ input[type='search']::-webkit-search-decoration {
   /* Android HomeScreen: the Arabic name is the row's one green. */
   color: var(--green-ink);
   direction: rtl;
-  transition: opacity 160ms ease 110ms;
 }
 
 /* Pinned chapters (Android HomeScreen `pinnedBand`): a small-caps flag on
    the names' rail, as CONTINUE heads its pill, 8px above a band of the
-   Continue pill's wash laid edge to edge and square-cut behind every pinned
-   row. Each row carries its own slice; the slices meet, so it reads as one
-   band. Rows are set compact on the list's own rails; 20px of paper below. */
+   Continue pill's wash, square-cut behind every pinned row and painted out
+   to the sheet's edges. Each row carries its own slice; the slices meet, so
+   it reads as one band. Rows are set compact on the list's own rails; 20px
+   of paper below. */
 .pinned-flag {
   max-width: var(--home-max);
   margin: 16px auto 8px;
@@ -1360,9 +1360,15 @@ input[type='search']::-webkit-search-decoration {
   position: relative;
 }
 
-/* The band is the Continue pill's green wash. */
+/* The band is the Continue pill's green wash, laid edge to edge across the
+   sheet: painted out past the list's measure without moving its rails, and
+   clipped by the sheet itself. */
 .surah-item[data-band] {
-  background: var(--green-wash);
+  border-image: conic-gradient(var(--green-wash) 0 0) fill 0 / 0 / 0 100vw;
+}
+
+.sheet[data-name='home'] .scroll {
+  overflow-x: hidden;
 }
 
 .surah-item[data-band] .surah-row {
@@ -1397,9 +1403,16 @@ input[type='search']::-webkit-search-decoration {
   transition: opacity 550ms linear 150ms;
 }
 
+/* The row's own hover/pressed ink would sit over the fill and grey it. */
+.surah-item[data-holding] .surah-row {
+  background: transparent;
+}
+
+/* Reduced motion: no deepening, but the tint still answers the hold, at
+   once when the tap's window has passed; full is still the pin. */
 @media (prefers-reduced-motion: reduce) {
   .surah-item[data-holding] .pin-fill {
-    transition: opacity 0s linear 700ms;
+    transition: opacity 0s linear 150ms;
   }
 }
 

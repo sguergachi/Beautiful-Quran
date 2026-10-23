@@ -209,6 +209,29 @@ class ContinuePillVisibilityTest {
     }
 
     @Test
+    fun theHoldFillsOnTheClockNotTheAnimatorScale() {
+        // A tap's worth shows nothing; then the row deepens evenly to full.
+        assertEquals(0f, holdFillProgress(0L), 0f)
+        assertEquals(0f, holdFillProgress(150L), 0f)
+        assertEquals(0.5f, holdFillProgress(425L), 0.001f)
+        assertEquals(1f, holdFillProgress(700L), 0f)
+        assertEquals(1f, holdFillProgress(5_000L), 0f)
+    }
+
+    @Test
+    fun aLongerSystemTouchAndHoldDelayStretchesTheHold() {
+        // The default delay and quicker keep the designed timings.
+        assertEquals(1f, holdPace(400L), 0f)
+        assertEquals(1f, holdPace(300L), 0f)
+        // "Long" (1500 ms) stretches everything alike: a slow tap still opens.
+        val pace = holdPace(1500L)
+        assertEquals(3.75f, pace, 0.001f)
+        assertEquals(HoldOutcome.Tap, holdOutcome(900L, pace))
+        assertEquals(0f, holdFillProgress(500L, pace), 0f)
+        assertEquals(1f, holdFillProgress(2_625L, pace), 0f)
+    }
+
+    @Test
     fun continueRowOffSheetWhileSearching() {
         val ids = (1..114).toList()
         assertEquals(-1, continueLazyIndex(ids, 18, true))

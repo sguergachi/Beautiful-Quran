@@ -18,7 +18,7 @@ import com.beautifulquran.ui.theme.royalGreenOverlayInk
 /**
  * The pinning lesson, written around the live row of the chapter being read:
  * the one a reader is most likely to want kept at the top. The row stays the
- * real target — its hold fills it and offers Pin — and the lesson's body
+ * real target — holding it until it is full pins it — and the lesson's body
  * takes the paper above or below it, whichever half of the sheet is open
  * ([bodyBelow], from [pinTipBodyBelow]). [target] is the row's centre in this
  * sheet's own space.

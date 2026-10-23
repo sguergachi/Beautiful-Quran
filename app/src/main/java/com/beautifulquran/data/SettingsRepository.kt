@@ -110,7 +110,7 @@ enum class BrushCircleStyle {
 data class Settings(
     val reciterId: Int = 1,
     val favoriteReciterIds: Set<Int> = DEFAULT_FAVORITE_RECITER_IDS,
-    /** Chapters pinned atop Chapters, marked with an ink nuqta. */
+    /** Chapters pinned atop Chapters, on the green band. */
     val pinnedSurahIds: Set<Int> = emptySet(),
     val fontScale: Float = 1f,
     val readingMode: ReadingMode = ReadingMode.ARABIC_ENGLISH,

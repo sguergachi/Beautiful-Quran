@@ -324,9 +324,19 @@ Renderers consume these; they do not re-derive curves.
   deepens into its answer as an even `opacity` fill (550 ms linear after
   150 ms of settle), and full toggles the pin; lifting early drains it
   (180 ms). A release within 300 ms is the tap that opens; movement over
-  the slop cancels. A keyboard cannot hold, so the context-menu event
-  (right click, Context Menu key, Shift+F10) and Shift+Enter toggle the
-  pin outright, and the row announces `Hold, or Shift+Enter, to pin`.
+  the slop (10 px) or leaving the row cancels, and a cancelled hold never
+  becomes a click. Only the primary pointer holds. A keyboard cannot hold,
+  so the context-menu event (right click, Mac Ctrl+click, Context Menu key,
+  Shift+F10) and Shift+Enter toggle the pin outright, and the row announces
+  `Hold, or Shift+Enter, to pin`; a touch or pen long-press's own
+  `contextmenu` is ignored (the hold owns it, and it can arrive after the
+  row has moved). Under reduced motion the tint steps on at 150 ms instead
+  of deepening; the pin still lands at 700 ms. While searching, results
+  list pinned chapters in place, so rows are only a click. The band is
+  painted out to the sheet's edges past the list's measure (`border-image`
+  outset; the Chapters scroller hides horizontal overflow). After a pin from
+  deep in the list, keyboard focus stays in view on the row that took the
+  moved one's place.
   Pure decisions live in `ui/home/pinnedChapters.ts`; the row is
   `ui/home/ChapterRow.tsx`.
   Web rows carry no place ribbon and the Continue pill never docks, so the

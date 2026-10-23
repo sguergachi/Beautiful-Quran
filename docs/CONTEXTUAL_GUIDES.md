@@ -152,10 +152,13 @@ For the existing lessons, the acceptance actions are:
   guide withdraws as the real scrub wheel blooms.
 - Pin a chapter (Chapters sheet): with nothing pinned, the lesson opens around
   the fully visible row of the chapter being read. Press and hold that row
-  while the guide is up; the row fills and offers **Pin**. Tapping **Pin**
-  pins it and completes the lesson; the hold alone, Cancel, **Got it**, Back,
-  or scrolling the list only dismiss. Paper-stack swipes stay blocked while
-  the guide is visible or closing (`onInkOverlayVisibilityChange`).
+  while the guide is up; the row fills evenly, and holding it full pins it
+  (haptic tick) and completes the lesson (pinning any row does). Releasing
+  early drains the fill and leaves the guide up. **Got it**, Back, scrolling
+  the list, or leaving Chapters by any route only dismiss; it never opens
+  mid-scroll. Paper-stack swipes stay
+  blocked while the guide is visible or closing
+  (`onInkOverlayVisibilityChange`).
 
 ## Common failures
 

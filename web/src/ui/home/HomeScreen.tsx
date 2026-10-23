@@ -283,9 +283,21 @@ export function HomeScreen({
     const scroller = sheetRef.current?.querySelector('.scroll')
     revealPinned.current = !pinned && !searching && (scroller?.scrollTop ?? 0) <= 0
     if (document.activeElement?.closest('.surah-item')) {
-      focusAfterPin.current = chapterRowKey(surahId, !pinned && !searching)
+      // Focus follows the row only when the reader will see where it went;
+      // otherwise it stays in place, on the row that takes the moved one's.
+      focusAfterPin.current = revealPinned.current
+        ? chapterRowKey(surahId, true)
+        : neighbourRowKey(surahId, pinned)
     }
     appStore.togglePinnedSurah(surahId)
+  }
+  /** The row beside [surahId] in the list it is leaving: the next, else the
+   * previous. Focus lands there when the moved row goes out of view. */
+  const neighbourRowKey = (surahId: number, fromBand: boolean): string | null => {
+    const rows = fromBand ? chapterLists.pinned : chapterLists.listed
+    const at = rows.findIndex((s) => s.id === surahId)
+    const neighbour = rows[at + 1] ?? rows[at - 1]
+    return neighbour ? chapterRowKey(neighbour.id, fromBand) : null
   }
   const chapterRow = (s: (typeof filtered)[number]) => {
     const onBand = bandIds.has(s.id)
@@ -297,6 +309,7 @@ export function HomeScreen({
         rowKey={key}
         pinned={pinnedSurahIds.includes(s.id)}
         onBand={onBand}
+        holdable={!searching}
         onPrepare={() => prepareChapter(s.id)}
         onOpen={() => {
           if (searching) appStore.openReading(s.id, ayahTarget ?? 1)

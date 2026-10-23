@@ -96,6 +96,16 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.util.lerp
 import kotlinx.coroutines.delay
 import kotlin.math.roundToInt
+import androidx.compose.ui.semantics.stateDescription
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.ui.input.key.type
+import androidx.compose.ui.input.key.onKeyEvent
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.isShiftPressed
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.Key
+import androidx.compose.runtime.withFrameMillis
+import androidx.compose.foundation.focusable
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.coroutineScope
 import android.view.HapticFeedbackConstants
@@ -175,7 +185,7 @@ private val PinnedBlockTop = 16.dp
 private val PinnedFlagGap = 8.dp
 /** Paper between the pinned band and the full list below it. */
 private val PinnedGroupGap = 20.dp
-/** Pinned rows are set compact, as the Continue pill sets its row. */
+/** Pinned rows are set compact: 10 dp bands against the list's 15 dp. */
 private val PinnedRowVertical = 10.dp
 /**
  * Paper margin between the field and where scrolled ink dies: the feather
@@ -577,9 +587,15 @@ fun HomeScreen(
         viewModel.dismissPinTip()
         pinTipOpen = false
     }
+    // Layout facts read through derivedStateOf: the place row's bounds move
+    // on every scroll frame and must not recompose the sheet (PERFORMANCE.md).
+    val placeRowMeasured by remember { derivedStateOf { continueRowRect != null } }
+    val listScrolling by remember { derivedStateOf { listState.isScrollInProgress } }
+    // Never during a scroll: it would open and be put away by that same
+    // scroll, spent without being seen.
     val pinTipEligible = coverSheetVisible && chapterRibbonReady && !searchActive &&
         uiState.pinned.isEmpty() && continueRowVisible && !docking && !undocking &&
-        !transportOnScreen && continueRowRect != null
+        !transportOnScreen && placeRowMeasured && !listScrolling
     LaunchedEffect(pinTipEligible) {
         if (!pinTipEligible) return@LaunchedEffect
         delay(600)
@@ -591,11 +607,16 @@ fun HomeScreen(
         snapshotFlow { listState.isScrollInProgress }.first { it }
         closePinTip()
     }
+    // Leaving Chapters by any route (a row, the rosette, the ribbon, a swipe)
+    // puts the lesson away, so it never holds the stack or Back from behind
+    // the reader.
+    LaunchedEffect(coverSheetVisible) {
+        if (!coverSheetVisible && pinTipOpen) closePinTip()
+    }
     LaunchedEffect(pinTipOpen, pinTipRendered) {
         onInkOverlayVisibilityChange(pinTipOpen || pinTipRendered)
     }
-    // Composed before the row's own confirmation Back, which therefore
-    // backs out of a held row first.
+    DisposableEffect(Unit) { onDispose { onInkOverlayVisibilityChange(false) } }
     BackHandler(enabled = pinTipOpen) { closePinTip() }
 
     val layoutDirection = LocalLayoutDirection.current
@@ -688,7 +709,7 @@ fun HomeScreen(
                 }
                 // Every chapter row, in order or pinned atop the list, is the
                 // same row; only the place ribbon follows [placeKey].
-                val pinnedIds = uiState.pinned.mapTo(HashSet()) { it.id }
+                val pinnedIds = remember(uiState.pinned) { uiState.pinned.mapTo(HashSet()) { it.id } }
                 // Pinning a chapter from the top of the sheet would grow the
                 // group above the viewport, out of sight (the list holds its
                 // place by key). Bring the group down into view instead; a
@@ -700,13 +721,14 @@ fun HomeScreen(
                         listState.animateScrollToItem(0)
                     }
                 }
-                // A pinned chapter moves up into the block rather than showing
+                // A pinned chapter moves up into the band rather than showing
                 // twice on one sheet; unpinning returns it to its place.
                 val listedSurahs = if (showPinned) uiState.surahs.filterNot { it.id in pinnedIds } else uiState.surahs
                 val chapterRow: @Composable (Surah, String, Modifier, Dp) -> Unit = { surah, key, modifier, vertical ->
                     SurahRow(
                         vertical = vertical,
                         pinned = surah.id in pinnedIds,
+                        holdable = !searching,
                         surah = surah,
                         // One place marker: only the row owning the place
                         // carries the green cloth (the pinned copy, when pinned).
@@ -726,6 +748,8 @@ fun HomeScreen(
                         },
                         onClick = {
                             focusManager.clearFocus()
+                            // Leaving for the reader puts the lesson away with it.
+                            if (pinTipOpen) closePinTip()
                             onOpenSurah(
                                 surah.id,
                                 uiState.ayahTarget ?: uiState.continueTarget
@@ -1018,16 +1042,9 @@ fun HomeScreen(
                         },
                 )
             }
-            // Dock flights: a live copy of the pill travels between its
-            // resting seat and the chapter row — resizing, squaring its
-            // corners, settling every inset onto the row, then fading to
-            // reveal it (or landing back on its seat, seamless, on the way
-            // out). Sizing runs on layout because only a full morph lands
-            // exactly; the tree is tiny and the flight is half a second.
-            // The landing end tracks live bounds so flights still connect
-            // while the list moves. Undock reverses the morph instead of
-            // fading.
-            continueRowRect?.let { row ->
+            // The pinning lesson, composed only while it shows: the place row's
+            // bounds change every scroll frame and are read here only then.
+            if (pinTipOpen || pinTipRendered) continueRowRect?.let { row ->
                 PinChapterTip(
                     visible = pinTipOpen,
                     target = with(density) {
@@ -1039,6 +1056,15 @@ fun HomeScreen(
                     modifier = Modifier.zIndex(3f),
                 )
             }
+            // Dock flights: a live copy of the pill travels between its
+            // resting seat and the chapter row — resizing, squaring its
+            // corners, settling every inset onto the row, then fading to
+            // reveal it (or landing back on its seat, seamless, on the way
+            // out). Sizing runs on layout because only a full morph lands
+            // exactly; the tree is tiny and the flight is half a second.
+            // The landing end tracks live bounds so flights still connect
+            // while the list moves. Undock reverses the morph instead of
+            // fading.
             if (docking || undocking) {
                 val start = if (docking) dockStart else undockStart
                 val end = if (docking) continueRowRect else pillSeatRect
@@ -1230,7 +1256,8 @@ internal fun continueLazyIndex(
 
 /**
  * The pinned band: the Continue pill's green wash laid edge to edge across
- * the sheet behind the flag and every pinned row, square-cut like a strip of
+ * the sheet behind every pinned row (the flag stands on the paper above),
+ * square-cut like a strip of
  * tinted paper. Adjacent rows' washes meet, so the stack reads as one band
  * however many chapters are pinned. The place ribbon hangs in the sheet-edge
  * lane on top of it.
@@ -1392,6 +1419,8 @@ private fun SurahRow(
     placeUnfurlSignal: Int,
     onPlaceUnfurlConsumed: (Int) -> Unit,
     pinned: Boolean,
+    /** Off while searching; see [holdToPin]. */
+    holdable: Boolean,
     onTogglePinned: () -> Unit,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
@@ -1407,6 +1436,7 @@ private fun SurahRow(
             // and holding it full is the confirmation.
             .holdToPin(
                 pinned = pinned,
+                holdable = holdable,
                 label = surah.nameTransliteration,
                 color = if (pinned) MaterialTheme.colorScheme.background else QuranTheme.accents.greenWash,
                 onTap = onClick,
@@ -1484,12 +1514,19 @@ private fun SurahRow(
  * Held, the row takes [color] evenly — no shape spreading across a strip
  * this thin — deepening in step with the finger until it is the full band
  * slice; a haptic tick and [onHeld] land at full. Lifting early, or the list
- * taking the drag, drains it and changes nothing. Readers who cannot hold
- * get Pin / Unpin as an accessibility action instead.
+ * taking the drag, drains it and changes nothing.
+ *
+ * The hold is timed on the frame clock, not by an animation: the system's
+ * animator scale must neither make every tap a pin (animations off) nor
+ * stretch a hold to seconds. Keyboards and D-pads open with Enter and pin
+ * with Shift+Enter; TalkBack gets Pin / Unpin as an action. With [holdable]
+ * off (search lists pinned chapters in place, off the band, where a hold
+ * could show nothing of what it would do) the row is only a tap.
  */
 @Composable
 private fun Modifier.holdToPin(
     pinned: Boolean,
+    holdable: Boolean,
     label: String,
     color: androidx.compose.ui.graphics.Color,
     onTap: () -> Unit,
@@ -1499,14 +1536,22 @@ private fun Modifier.holdToPin(
     val view = LocalView.current
     val tap by rememberUpdatedState(onTap)
     val held by rememberUpdatedState(onHeld)
+    val canHold by rememberUpdatedState(holdable)
     return pointerInput(Unit) {
         coroutineScope {
             awaitEachGesture {
                 val down = awaitFirstDown()
+                // Readers who set a longer system touch & hold delay get a
+                // proportionally slower hold, and a longer tap.
+                val pace = holdPace(viewConfiguration.longPressTimeoutMillis)
                 var full = false
-                val filling = launch {
-                    fill.animateTo(1f, tween(HoldFillMs, delayMillis = HoldStartMs, easing = LinearEasing))
-                    full = true
+                val filling = if (!canHold) null else launch {
+                    val start = withFrameMillis { it }
+                    while (!full) {
+                        val elapsed = withFrameMillis { it } - start
+                        fill.snapTo(holdFillProgress(elapsed, pace))
+                        full = elapsed >= (HoldStartMs + HoldFillMs) * pace
+                    }
                     view.performHapticFeedback(HapticFeedbackConstants.LONG_PRESS)
                     held()
                 }
@@ -1519,7 +1564,9 @@ private fun Modifier.holdToPin(
                         if (!change.pressed) break else continue
                     }
                     if (!change.pressed) {
-                        up = change
+                        // A cancelled or consumed release (a system back swipe, the
+                        // search dials' dismissing tap) is not a tap.
+                        if (!change.isConsumed) up = change
                         break
                     }
                     // A drag belongs to the list: let it scroll, drain the fill.
@@ -1530,34 +1577,56 @@ private fun Modifier.holdToPin(
                     }
                 }
                 if (!full) {
-                    filling.cancel()
-                    if (up != null && holdOutcome(up.uptimeMillis - down.uptimeMillis) == HoldOutcome.Tap) {
-                        up.consume()
+                    filling?.cancel()
+                    val opens = up != null &&
+                        (!canHold || holdOutcome(up.uptimeMillis - down.uptimeMillis, pace) == HoldOutcome.Tap)
+                    if (opens) {
+                        up!!.consume()
                         tap()
                     }
                 }
                 launch { fill.animateTo(0f, tween(if (full) 0 else HoldDrainMs)) }
             }
         }
-    }.semantics {
+    }.onKeyEvent { event ->
+        val enter = event.key == Key.Enter || event.key == Key.NumPadEnter || event.key == Key.DirectionCenter
+        if (!enter || event.type != KeyEventType.KeyUp) return@onKeyEvent enter
+        if (event.isShiftPressed) { if (canHold) held() } else tap()
+        true
+    }.focusable().semantics(mergeDescendants = true) {
         role = Role.Button
+        if (pinned) stateDescription = "Pinned"
         onClick(label = "Open $label") { tap(); true }
-        customActions = listOf(
-            CustomAccessibilityAction(if (pinned) "Unpin $label" else "Pin $label") { held(); true },
-        )
+        if (holdable) {
+            customActions = listOf(
+                CustomAccessibilityAction(if (pinned) "Unpin $label" else "Pin $label") { held(); true },
+            )
+        }
     }.drawBehind {
         val alpha = fill.value
         if (alpha > 0f) drawRect(color.copy(alpha = color.alpha * alpha))
     }
 }
 
+/** How full the row is [elapsedMs] into a hold: nothing for an ordinary
+ * tap's worth, then deepening evenly to full. [pace] stretches it. */
+internal fun holdFillProgress(elapsedMs: Long, pace: Float = 1f): Float =
+    ((elapsedMs - HoldStartMs * pace) / (HoldFillMs * pace)).coerceIn(0f, 1f)
+
+/** The hold's timings stretched to the system touch & hold delay; the
+ * default (400 ms) and anything quicker keep them as designed. */
+internal fun holdPace(longPressTimeoutMs: Long): Float =
+    (longPressTimeoutMs / DefaultLongPressMs.toFloat()).coerceAtLeast(1f)
+
+private const val DefaultLongPressMs = 400L
+
 internal enum class HoldOutcome { Tap, Cancel }
 
 /** What lifting the finger [heldMs] into a hold means, before the fill is
  * full: a quick release is the ordinary tap that opens the chapter; a
  * longer one was a hold let go early, and changes nothing. */
-internal fun holdOutcome(heldMs: Long): HoldOutcome =
-    if (heldMs < HoldTapMaxMs) HoldOutcome.Tap else HoldOutcome.Cancel
+internal fun holdOutcome(heldMs: Long, pace: Float = 1f): HoldOutcome =
+    if (heldMs < HoldTapMaxMs * pace) HoldOutcome.Tap else HoldOutcome.Cancel
 
 /** No tint for an ordinary tap: the fill waits this long to begin. */
 private const val HoldStartMs = 150
@@ -1584,12 +1653,12 @@ internal fun shouldDismissSearchOnScroll(
         )
 
 @Composable
-private fun SearchSectionLabel(text: String, topPadding: Dp = 8.dp, modifier: Modifier = Modifier) {
+private fun SearchSectionLabel(text: String, topPadding: Dp = 8.dp) {
     Text(
         text = text,
         style = MaterialTheme.typography.labelLarge,
         color = QuranTheme.ink.quiet,
-        modifier = modifier
+        modifier = Modifier
             .fillMaxWidth()
             .padding(
                 start = HomeStartInset,
