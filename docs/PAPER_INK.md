@@ -11,6 +11,11 @@ stopping at the current word boundary. Scroll splits multi-word glosses into
 printed-word fields on the same timing owner's clock, including repeats and
 rewind evaporation; the next word receives no anticipatory fade. These word
 bounds are cached with the paragraph. Arabic retains the Ink Lab lead dial.
+An English word's lead starts at the unread strength and grows on that word's
+own clock over its first letter slot. Enabling the full preview at progress
+zero would flash part of its first letter as each word or gloss owner begins.
+This entry ramp affects only the preview: the wet fill, timing windows,
+continuous prefix, repeats and evaporation keep their existing clocks.
 A repeat is laid in terracotta, held through its chain, and released to
 charcoal by evaporation: thin edges clear first and thicker stroke interiors
 linger, with a soft front over a 1,800 ms release. The dry black
@@ -199,6 +204,10 @@ dries it toward warm paper.
   Repeat-release checks cover thin edges clearing before thicker interiors,
   a monotone fade, complete underprint, and exact dry ink even when the
   departing film is still wet. The study shader has the same endpoint gate.
+  English entry checks compare the first active frame to the unread word,
+  then require a continuous soft fill in both spread methods, including
+  partial undercoats and interrupted evaporation. Disabling the entry ramp
+  reproduces the leading-letter flash in the same production shader.
 - `PaperInkEvaporationTest` — unread entry, settled and partial/repeat
   departures, interrupted fades, re-entry and retained reciter repeats. The
   Skia gate also checks that evaporating first/repeat ink reaches the exact

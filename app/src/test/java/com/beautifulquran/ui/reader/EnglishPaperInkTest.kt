@@ -36,6 +36,7 @@ class EnglishPaperInkTest {
         assertEquals(listOf(1f, 0f, 0f), words.map { it.frame.wet })
         words.forEach { word ->
             assertEquals(1f, word.frame.leadFade * 2f, 0f)
+            assertTrue(word.frame.fadeLeadOnEntry)
             assertTrue(word.fallback.all { it.range == word.range })
             assertTrue(word.after.all { it.range == word.range })
         }
@@ -66,6 +67,7 @@ class EnglishPaperInkTest {
             assertEquals(1f, word.frame.retained, 0f)
             assertEquals(.6f, word.frame.repeatTint, 0f)
             assertEquals(.3f, word.frame.underWet, 0f)
+            assertTrue(word.frame.fadeLeadOnEntry)
             assertEquals(frame.pooling, word.frame.pooling, 0f)
         }
         assertEquals(words.map { it.frame }, split(repeat).map { it.frame })
@@ -76,5 +78,6 @@ class EnglishPaperInkTest {
         assertEquals(listOf(0..1, 3..4, 6..9), warm.map { it.range })
         val arabic = ShapedWordBloom.PaperInk(20..24, frame, emptyList())
         assertTrue(englishPaperInkBlooms(listOf(arabic), bounds).single() === arabic)
+        assertTrue(!arabic.frame.fadeLeadOnEntry)
     }
 }

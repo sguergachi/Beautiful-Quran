@@ -56,6 +56,7 @@ internal fun englishPaperInkBlooms(
                         underProgress = under,
                         underWet = if (under < 0f) 0f else bloom.frame.underWet,
                         leadFade = ENGLISH_PAPER_INK_LEAD_FADE,
+                        fadeLeadOnEntry = true,
                     ),
                     fallback = bloom.fallback.map(::bounded),
                     after = bloom.after.map(::bounded),

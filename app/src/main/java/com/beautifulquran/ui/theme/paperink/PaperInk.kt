@@ -88,6 +88,8 @@ object PaperInk {
         /** First-pass deposit beneath a new repeat, still on its original dry-down. */
         val underProgress: Float = 1f,
         val underWet: Float = 0f,
+        /** English words start unread; their lead fades in on their own clock. */
+        val fadeLeadOnEntry: Boolean = false,
     )
 
     /** A generated word, ready to draw. */
@@ -324,6 +326,7 @@ object PaperInk {
             shader.setFloatUniform("reflectionStrength", frame.reflection)
             shader.setFloatUniform("lightSoftness", frame.softness)
             shader.setFloatUniform("lead", frame.leadFade * 2f)
+            shader.setFloatUniform("leadEntry", if (frame.fadeLeadOnEntry) 1f else 0f)
             shader.setFloatUniform("spreadMethod", if (frame.flowing) 1f else 0f)
             shader.setFloatUniform("origin", left / word.unit, top / word.unit)
             inkPaint.shader = shader

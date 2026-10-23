@@ -29,6 +29,9 @@ uniform float spreadMethod;
 uniform float letterDuration;
 // Letters of fade-in ahead of the wet edge (0 disables it).
 uniform float lead;
+// English forbids anticipation across word boundaries, so its preview enters
+// from unread on the current word's clock instead of appearing at phase zero.
+uniform float leadEntry;
 uniform float2 origin;
 uniform float evaporation;
 
@@ -95,6 +98,7 @@ half4 materialAt(float2 p, float base, float coverageAA, float phase, float wetn
     float slot = (1.0 - 0.24 * letterDuration) / max(1.0, 2.8 / letterDuration - 1.8);
     float approach = lead > 0.0 ? smoothstep(arrival - feather - lead * slot,
         arrival + feather, phase) * 0.6 * (1.0 - orange) : 0.0;
+    approach *= mix(1.0, smoothstep(0.0, max(feather, lead * slot), phase), leadEntry);
     float3 waiting = mix(dryInk, wetInk, approach);
     float dryCoverage = base * mix(mix(unreadAlpha, 1.0, keep), 1.0, approach) * (1.0 - loaded);
     float liquidCoverage = expanded * loaded;

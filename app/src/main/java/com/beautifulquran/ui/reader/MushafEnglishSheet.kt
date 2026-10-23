@@ -1760,6 +1760,7 @@ private fun MutableList<ShapedWordBloom>.addEnglishPaperInk(
                         reflection = frame.reflection,
                         softness = frame.softness,
                         leadFade = ENGLISH_PAPER_INK_LEAD_FADE,
+                        fadeLeadOnEntry = true,
                         flowing = frame.flowing,
                         evaporation = frame.evaporation,
                     ),

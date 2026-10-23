@@ -97,7 +97,7 @@ class PaperInkAntialiasingTest(unittest.TestCase):
             weight=.875 * word['unit'], aa=.9 / resolution,
             dryInk=[52/255, 50/255, 46/255], wetInk=[6/255, 7/255, 8/255], unreadAlpha=.2661,
             repeatColor=[194/255, 95/255, 59/255], repeatPass=0., repeatTint=0., spreadMethod=0.,
-            letterDuration=word['duration'], lead=1., origin=[0., 0.], evaporation=0.)
+            letterDuration=word['duration'], lead=1., leadEntry=0., origin=[0., 0.], evaporation=0.)
         uniforms.update(values)
         for name, value in uniforms.items():
             builder.setUniform(name, value)
@@ -147,6 +147,48 @@ class PaperInkAntialiasingTest(unittest.TestCase):
                     np.testing.assert_array_equal(compose(True), replacement)
                     if progress < 0:
                         self.assertGreater(np.abs(compose(False).astype(int) - replacement.astype(int)).max(), 5)
+
+    def test_english_word_entry_does_not_pop_its_leading_letter(self):
+        # The one-letter lead may not anticipate the next printed English word.
+        # Its first active frame must therefore still equal that unread word.
+        for text in ('in', 'Allah', 'and', 'His', 'Messenger'):
+            specimen = word(text, geometry.ENGLISH_FONT, 48, False, len(text))
+            unread = self.render(specimen, progress=-1., wet=0., retained=0.)
+            entering = self.render(specimen, progress=0., wet=1., retained=0., leadEntry=1.)
+            np.testing.assert_array_equal(entering, unread, err_msg=text)
+
+            # Disabling the English entry rule reproduces the reported flash.
+            old_entry = self.render(specimen, progress=0., wet=1., retained=0.)
+            self.assertGreater(np.abs(old_entry.astype(int) - unread.astype(int)).max(), 10)
+            next_frame = self.render(specimen, progress=.0001, wet=1., retained=0., leadEntry=1.)
+            np.testing.assert_allclose(next_frame, unread, atol=1., err_msg=text)
+
+    def test_english_entry_keeps_a_soft_continuous_fill_through_both_spread_methods(self):
+        for text in ('in', 'Allah', 'Messenger'):
+            specimen = word(text, geometry.ENGLISH_FONT, 48, False, len(text))
+            for method in (0., 1.):
+                options = dict(wet=0., retained=0., leadEntry=1., spreadMethod=method)
+                previous = self.render(specimen, progress=-1., **options)[:, :, 3].astype(int)
+                partial = False
+                for progress in np.linspace(0., 1., 101):
+                    actual = self.render(specimen, progress=float(progress), **options)[:, :, 3].astype(int)
+                    self.assertTrue((actual >= previous).all())
+                    partial |= bool(((actual > specimen['coverage'] * .27) &
+                                     (actual < specimen['coverage'] * .95)).any())
+                    previous = actual
+                self.assertTrue(partial)
+                np.testing.assert_array_equal(previous, specimen['coverage'])
+                for phase in (.03, .5):
+                    first = self.render(specimen, progress=phase, wet=.6, retained=0.,
+                        leadEntry=1., spreadMethod=method)
+                    repeated = self.render(specimen, progress=0., wet=1., retained=1.,
+                        repeatPass=1., repeatTint=1., underProgress=phase, underWet=.6,
+                        leadEntry=1., spreadMethod=method)
+                    np.testing.assert_allclose(repeated, first, atol=1.)
+                    evaporated = self.render(specimen, progress=phase, wet=.6, retained=0.,
+                        leadEntry=1., spreadMethod=method, evaporation=1.)
+                    unread = self.render(specimen, progress=-1., wet=0., retained=0., leadEntry=1.)
+                    np.testing.assert_array_equal(evaporated, unread)
 
     def test_wet_sampling_tracks_pixel_area_more_closely_than_one_point(self):
         errors = []
