@@ -1290,13 +1290,14 @@ class ReaderViewModel(
         )
         tapInk.value = WordTapInk(seed)
         viewModelScope.launch {
-            delay(2_000)
-            // Slow downloads have not rejected the seek. Keep its prefix;
-            // retain the timeout once transport is no longer waiting.
-            while (tapInk.value.pending && tapInk.value.seed === seed && player.state.value.isBuffering) {
-                delay(250)
+            val timeout = WordTapConfirmationTimeout(2_000)
+            while (tapInk.value.pending && tapInk.value.seed === seed) {
+                if (timeout.expired(player.state.value.isBuffering, android.os.SystemClock.uptimeMillis())) {
+                    tapInk.update { if (it.pending && it.seed === seed) WordTapInk() else it }
+                    break
+                }
+                delay(100)
             }
-            tapInk.update { if (it.pending && it.seed === seed) WordTapInk() else it }
         }
     }
 

@@ -421,6 +421,10 @@ tween-vs-snap rules, sweep entry and residual rules, repeat wash timing, the
   acknowledged verse, reciter and playback generation. A later play or seek
   cannot inherit it. The tapped word still waits for its own media clock;
   words after it retain the ordinary Upcoming treatment.
+  Confirmation gets two uninterrupted seconds after buffering clears; a
+  download or another buffer burst cannot consume that grace and erase the
+  prefix just as the voice arrives. An unconfirmed seek still expires after
+  that ready period.
 - **Basmalah preface**: `prefaceState(isActive, dimmed)` /
   `prefaceWashProgress(positionMs, durationMs, segments)` for the surah-header
   basmalah VectorDrawable (Active during the Al-Fatihah 1:1 lead-in clip, with

@@ -4,9 +4,31 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertSame
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class ActiveWordResolveTest {
+
+    @Test
+    fun `slow buffering leaves a full confirmation grace after the stream becomes ready`() {
+        val timeout = WordTapConfirmationTimeout(2_000)
+        assertFalse(timeout.expired(buffering = false, nowMs = 0))
+        assertFalse(timeout.expired(buffering = true, nowMs = 1_000))
+        assertFalse(timeout.expired(buffering = true, nowMs = 10_000))
+        assertFalse(timeout.expired(buffering = false, nowMs = 10_100))
+        assertFalse(timeout.expired(buffering = false, nowMs = 12_099))
+        assertTrue(timeout.expired(buffering = false, nowMs = 12_100))
+    }
+
+    @Test
+    fun `a new buffering burst restarts the confirmation grace`() {
+        val timeout = WordTapConfirmationTimeout(2_000)
+        assertFalse(timeout.expired(buffering = false, nowMs = 100))
+        assertFalse(timeout.expired(buffering = true, nowMs = 2_000))
+        assertFalse(timeout.expired(buffering = false, nowMs = 3_000))
+        assertFalse(timeout.expired(buffering = false, nowMs = 4_999))
+        assertTrue(timeout.expired(buffering = false, nowMs = 5_000))
+    }
 
     private fun word(
         ayah: Int = 2,

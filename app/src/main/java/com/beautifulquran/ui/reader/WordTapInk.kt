@@ -38,3 +38,17 @@ internal data class WordTapInk(
 /** A deliberate word start keeps its continuous prefix while the stream waits. */
 internal fun streamWaitActiveWord(word: ActiveWord?, streamWait: Boolean): ActiveWord? =
     word?.takeIf { !streamWait || it.tapStartPosition != null }
+
+/** A download cannot spend the grace period reserved for confirming a word seek. */
+internal class WordTapConfirmationTimeout(private val readyMs: Long) {
+    private var readyAt: Long? = null
+
+    fun expired(buffering: Boolean, nowMs: Long): Boolean {
+        if (buffering) {
+            readyAt = null
+            return false
+        }
+        val start = readyAt ?: nowMs.also { readyAt = it }
+        return nowMs - start >= readyMs
+    }
+}
