@@ -1655,7 +1655,14 @@ private fun MutableList<ShapedWordBloom>.addShapedInkMotionBlooms(
     motions.forEachIndexed { index, motion ->
         val range = ranges.getOrNull(index) ?: return@forEachIndexed
         val evaporating = paperInk != null && motion.paperDeparture?.active == true
-        val reveal = if (baseReveal && (evaporating || !motion.repeat && motion.sweepProgress < 1f)) {
+        // Untouched words already have their UpcomingDim cover. A zero reveal
+        // on top squares the faint alpha, then flashes brighter as the word
+        // switches to its own reveal or shader. Residuals and evaporation still
+        // need their partial edge, and Active at zero needs its initial cover.
+        val untouched = motion.ink.state == InkEngine.State.Upcoming && motion.sweepProgress <= 0f
+        val reveal = if (baseReveal &&
+            (evaporating || !motion.repeat && !untouched && motion.sweepProgress < 1f)
+        ) {
             ShapedWordBloom.InkReveal(
                 range = range,
                 progress = if (evaporating) motion.paperDepartureProgress else motion.sweepProgress,
@@ -1808,6 +1815,10 @@ internal fun buildShapedBlooms(
     // cover strength — ayah handoff does not change unread ink; only the
     // active word starts its bloom.
     motions.forEachIndexed { index, motion ->
+        // Outgoing verses may soften already-laid ink, but a word that never
+        // started must retain its unread floor throughout that handoff too.
+        val untouched = motion.ink.state == InkEngine.State.Upcoming &&
+            motion.sweepProgress <= 0f && motion.paperDeparture?.active != true
         val coverAlpha = maxOf(
             shapedWordCoverAlpha(
                 state = if (motion.paperDeparture?.active == true) InkEngine.State.Plain else motion.ink.state,
@@ -1815,6 +1826,7 @@ internal fun buildShapedBlooms(
                 upcomingCover = upcomingCover,
                 softHandoff = softHandoff,
             ),
+            if (untouched) upcomingCover else 0f,
             if (searchFocusPositions != null && words[index].position !in searchFocusPositions) {
                 1f - searchBackgroundAlpha()
             } else {

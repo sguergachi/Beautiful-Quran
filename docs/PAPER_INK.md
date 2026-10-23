@@ -73,6 +73,16 @@ The basmalah sites (drawable and QCF glyph) keep their wash for now.
   a dried word equals the printed glyph, and an unread word equals the
   reader's upcoming ink (`InkEngine.State.Upcoming.inkAlpha()`), to within
   8-bit rounding. A word therefore leaves the pipeline the frame it is static.
+  Untouched shaped words use a single dim cover: adding a zero-progress reveal
+  would square that faint alpha, then brighten still-unread English words when
+  their shared timing owner enters the shader. The ordinary wash, liquid field,
+  and missing-field fallback keep the same unread strength. Partial residuals
+  and rewind evaporation retain their own soft reveals. Outgoing verse handoff
+  can soften laid ink; untouched words keep their faint floor throughout it.
+  Replacing printed ink clears its captured pixel support completely before
+  drawing the shader. A fractional erase mask would leave old antialiased ink
+  beneath the new glyph and darken its edges. The visible glyph keeps its
+  original fractional coverage, so clearing the old paint does not harden it.
 - **A word is live** while it is active, still washing, wet, holding or
   releasing orange, or is the next word fading in (`InkMotion.paperInkLive`).
   Everything else is the surface's ordinary static ink.

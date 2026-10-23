@@ -286,7 +286,7 @@ object PaperInk {
         }
         val normals = Bitmap.createBitmap(normalPixels, w, h, Bitmap.Config.ARGB_8888)
         val erase = Bitmap.createBitmap(w, h, Bitmap.Config.ALPHA_8)
-        erase.copyPixelsFromBuffer(ByteBuffer.wrap(c.coverage))
+        erase.copyPixelsFromBuffer(ByteBuffer.wrap(paperInkEraseMask(c.coverage)))
         return Word(field, normals, erase, c.padX, c.padY, result.letterDuration, c.fontPx / 160f)
     }
 

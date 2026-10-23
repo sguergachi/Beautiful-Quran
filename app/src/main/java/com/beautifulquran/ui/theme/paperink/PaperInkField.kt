@@ -8,6 +8,15 @@ import kotlin.math.pow
 import kotlin.math.sqrt
 
 /**
+ * Remove the old paint at every captured glyph pixel before replacing it.
+ * Reusing fractional glyph coverage for DST_OUT leaves some of the old edge
+ * underneath the new one and darkens it. Visible antialiasing stays in the
+ * shader's original fractional coverage; this mask only clears its support.
+ */
+internal fun paperInkEraseMask(coverage: ByteArray): ByteArray =
+    ByteArray(coverage.size) { if (coverage[it] == 0.toByte()) 0 else 0xFF.toByte() }
+
+/**
  * The paper ink's swelling-channel fields for one word, worked out from the
  * word's own rasterized glyphs. Pure Kotlin: no Android types, so the geometry
  * is unit tested on the JVM. `tools/build_paper_ink_study.py` is the reference

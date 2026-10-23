@@ -120,6 +120,34 @@ class PaperInkAntialiasingTest(unittest.TestCase):
                 if retained:
                     np.testing.assert_array_equal(actual[:, :, 3], word['coverage'])
 
+    def test_replacing_printed_ink_does_not_stack_fractional_glyph_edges(self):
+        for word in self.words:
+            printed = self.render(word, progress=-1., wet=0., retained=0.)
+            for progress in (-1., .3, 1.):
+                replacement = self.render(word, progress=progress, wet=1., retained=0.)
+
+                def compose(binary):
+                    mask = np.zeros_like(printed)
+                    mask[:, :, 3] = np.where(word['coverage'] > 0, 255, 0) if binary else word['coverage']
+                    surface = skia.Surface(word['width'], word['height'])
+                    canvas = surface.getCanvas()
+
+                    def image(pixels):
+                        return skia.Image.fromarray(pixels, colorType=skia.ColorType.kRGBA_8888_ColorType,
+                            alphaType=skia.AlphaType.kPremul_AlphaType)
+
+                    canvas.drawImage(image(printed), 0, 0)
+                    canvas.drawImage(image(mask), 0, 0, skia.SamplingOptions(),
+                        skia.Paint(BlendMode=skia.BlendMode.kDstOut))
+                    canvas.drawImage(image(replacement), 0, 0)
+                    return surface.makeImageSnapshot().toarray(colorType=skia.ColorType.kRGBA_8888_ColorType,
+                        alphaType=skia.AlphaType.kPremul_AlphaType)
+
+                with self.subTest(word=word['width'], progress=progress):
+                    np.testing.assert_array_equal(compose(True), replacement)
+                    if progress < 0:
+                        self.assertGreater(np.abs(compose(False).astype(int) - replacement.astype(int)).max(), 5)
+
     def test_wet_sampling_tracks_pixel_area_more_closely_than_one_point(self):
         errors = []
         for word in self.words:
