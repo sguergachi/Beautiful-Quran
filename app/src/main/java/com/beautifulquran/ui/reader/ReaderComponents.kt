@@ -374,7 +374,7 @@ private fun Rect.expandToInclude(other: Rect): Rect =
  * Upcoming does not flash full ink.
  */
 @Composable
-private fun animatedInkAlpha(state: InkEngine.State): State<Float> =
+private fun animatedInkAlpha(state: InkEngine.State, tappedPrefix: Boolean = false): State<Float> =
     animateFloatAsState(
         targetValue = state.inkAlpha(),
         // The active word's base ink is carried by the letter sweep, not this
@@ -382,7 +382,7 @@ private fun animatedInkAlpha(state: InkEngine.State): State<Float> =
         // than the tween (short words at speed) is already at full ink the
         // instant it flips to Recited, instead of dipping to a stale mid-fade
         // value and animating back up (a visible flicker on hand-off).
-        animationSpec = if (state == InkEngine.State.Active) {
+        animationSpec = if (state == InkEngine.State.Active || tappedPrefix) {
             snap<Float>()
         } else {
             tween(InkEngine.tuning.inkFadeMs, easing = FastOutSlowInEasing)
@@ -1178,6 +1178,7 @@ internal fun rememberInkMotions(
     var predecessor: State<Float>? = null
     inks.forEachIndexed { index, ink ->
         val isActive = ink.state == InkEngine.State.Active
+        val tappedPrefix = InkEngine.inTappedPrefix(words[index].position, activeWord)
         val wordActivation = if (isActive) activation else 0L
         // Freeze tajweed for this activation so an Ink Lab toggle mid-word
         // cannot remap the wash (or swap feather) and look like a reset.
@@ -1199,7 +1200,7 @@ internal fun rememberInkMotions(
         ) verse?.let { InkEngine.tarjiTrace(it.surahId, it.number, words[index].position) } else null
         val sweep = rememberMediaLetterSweep(
             active = isActive && activeWord?.isRepeat != true,
-            retain = ink.state == InkEngine.State.Recited || isActive && activeWord?.isRepeat == true,
+            retain = InkEngine.retainWordSweep(words[index].position, ink.state, activeWord),
             activation = wordActivation,
             window = mediaWashWindow(verse, activeWord, activeSweepMs, playbackSpeed),
             provisional = activeWord?.fromTap == true,
@@ -1210,7 +1211,7 @@ internal fun rememberInkMotions(
         motions += InkMotion(
             ink = ink,
             lyricInk = if (animateLyricInk) {
-                animatedInkAlpha(ink.state)
+                animatedInkAlpha(ink.state, tappedPrefix)
             } else {
                 rememberUpdatedState(ink.state.inkAlpha())
             },

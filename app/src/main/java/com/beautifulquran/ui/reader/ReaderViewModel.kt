@@ -67,7 +67,6 @@ import kotlinx.coroutines.flow.onCompletion
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.merge
 import kotlinx.coroutines.flow.stateIn
-import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
@@ -482,7 +481,7 @@ class ReaderViewModel(
     private val timingPublicationRevision: Long get() = timingPublication.value
 
     private fun installTimings(loaded: Map<Int, List<Segment>>) {
-        tapInk.value = WordTapInk()
+        wordInk.clear()
         endWordTapWait()
         timings = loaded
         preparedTimings = loaded.mapValues { (_, segs) ->
@@ -511,7 +510,7 @@ class ReaderViewModel(
         val gen = sessions.generation
         val id = sessions.surahId.takeIf { it != 0 } ?: return
         val reciter = _uiState.value.currentReciter ?: return
-        tapInk.value = WordTapInk()
+        wordInk.clear()
         if (!repository.timingProviderAvailable(reciter.id)) {
             installTimings(emptyMap())
             _uiState.value = _uiState.value.copy(hasTimings = false)
@@ -672,7 +671,7 @@ class ReaderViewModel(
     }.distinctUntilChanged()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(1_000), null)
 
-    private val tapInk = MutableStateFlow(WordTapInk())
+    private val wordInk = WordInkPublication()
 
     /** True from a word tap until its sought word is heard ([WordTapVoiceWait]). */
     private val tapAwaitingVoice = MutableStateFlow(false)
@@ -685,9 +684,7 @@ class ReaderViewModel(
         tapAwaitingVoice.value = false
     }
 
-    val activeWord: StateFlow<ActiveWord?> = combine(polledActiveWord, tapInk) { polled, tap ->
-        tap.resolve(polled)
-    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(1_000), null)
+    val activeWord: StateFlow<ActiveWord?> = wordInk.activeWord
 
     /** The ayah focus/prepare target on the sheet. Normally the playing ayah,
      * but advances to the next ayah [InkEngine.fadeLeadMs] before the current
@@ -860,8 +857,13 @@ class ReaderViewModel(
             }
         }
         viewModelScope.launch {
+            player.state.map { it.positionIntentId }.distinctUntilChanged().collect {
+                wordInk.onPositionIntent(it)
+            }
+        }
+        viewModelScope.launch {
             polledActiveWord.collect { polled ->
-                tapInk.update { it.onPoll(polled) }
+                wordInk.onPoll(polled)
             }
         }
         // React when the reciter is changed on the settings sheet: reload the
@@ -1304,7 +1306,7 @@ class ReaderViewModel(
             tapStartPosition = word,
             reciterId = reciterId,
         )
-        tapInk.value = WordTapInk(seed)
+        wordInk.seed(seed, positionIntentId = player.state.value.positionIntentId + 1L)
         tapVoiceJob?.cancel()
         tapAwaitingVoice.value = true
         tapVoiceJob = viewModelScope.launch {
@@ -1317,9 +1319,9 @@ class ReaderViewModel(
         }
         viewModelScope.launch {
             val timeout = WordTapConfirmationTimeout(2_000)
-            while (tapInk.value.pending && tapInk.value.seed === seed) {
+            while (wordInk.awaiting(seed)) {
                 if (timeout.expired(player.state.value.isBuffering, android.os.SystemClock.uptimeMillis())) {
-                    tapInk.update { if (it.pending && it.seed === seed) WordTapInk() else it }
+                    wordInk.expire(seed)
                     break
                 }
                 delay(100)

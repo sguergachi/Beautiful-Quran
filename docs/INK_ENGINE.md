@@ -417,10 +417,21 @@ tween-vs-snap rules, sweep entry and residual rules, repeat wash timing, the
   Android word-play is an explicit exception: the tapped verse keeps its
   continuous recited prefix, including during the buffer and release hold.
   `WordTapInk` publishes the same immediate target for word tiles and book
-  pages, waits for a matching poll, then retains that origin only within the
-  acknowledged verse, reciter and playback generation. A later play or seek
-  cannot inherit it. The tapped word still waits for its own media clock;
+  pages, waits for a matching poll, then retains that origin within the
+  acknowledged verse, reciter and requested place (`positionIntentId`). A
+  later play, seek or automatic verse repeat cannot inherit it. MediaController
+  can report the immediate seek and its session acknowledgement as separate
+  ink generations; the same landing within the same request rebases the
+  prefix onto the new generation. A different landing still releases it.
+  The tapped word still waits for its own media clock;
   words after it retain the ordinary Upcoming treatment.
+  `WordInkPublication` writes that target synchronously before issuing the
+  player command; it does not wait for a `combine` collector while playback
+  can already recess the page. `InkEngine` treats the saved tap position as
+  a minimum completed prefix even if the acknowledged display clock is
+  temporarily earlier. Those words complete any old residual wash and lift
+  their lyric alpha immediately. Natural handoffs still finish their own
+  soft residuals, and genuine repeats can lay orange over that full base.
   Confirmation gets two uninterrupted seconds after buffering clears; a
   download or another buffer burst cannot consume that grace and erase the
   prefix just as the voice arrives. An unconfirmed seek still expires after

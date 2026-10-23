@@ -1,11 +1,16 @@
 package com.beautifulquran.ui.reader
 
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+
 /** A word-play intent, provisional until its own playback generation acknowledges it. */
 internal data class WordTapInk(
     val seed: ActiveWord? = null,
     val pending: Boolean = seed != null,
+    val positionIntentId: Long? = null,
 ) {
-    /** Stale polls cannot release a tap; later words retain its prefix within this performance. */
+    /** Stale polls cannot release a tap; later words retain its prefix within this request. */
     fun onPoll(polled: ActiveWord?): WordTapInk {
         val target = seed ?: return this
         if (polled == null) return this
@@ -17,7 +22,15 @@ internal data class WordTapInk(
                 copy(seed = target.copy(playbackActivation = polled.playbackActivation), pending = false)
             } else this
         }
-        return if (sameVerse && polled.playbackActivation == target.playbackActivation) this
+        if (!sameVerse) return WordTapInk()
+        if (polled.playbackActivation == target.playbackActivation) return this
+        // MediaController can report both its immediate seek and the session's
+        // acknowledgement. They share one requested place, but each advances
+        // the media generation. Only the same landing may rebase this origin.
+        return if (positionIntentId != null &&
+            polled.playbackActivation > target.playbackActivation &&
+            polled.wordPosition == target.wordPosition && polled.startMs == target.startMs
+        ) copy(seed = target.copy(playbackActivation = polled.playbackActivation))
             else WordTapInk()
     }
 
@@ -32,6 +45,51 @@ internal data class WordTapInk(
             activation = if (polled.wordPosition == target.wordPosition) target.activation else polled.activation,
             tapStartPosition = target.wordPosition,
         )
+    }
+}
+
+/**
+ * Publishes a word tap synchronously, before its player command can enable page dimming.
+ * Polls and taps share this publication so an asynchronous combine cannot expose a stale
+ * word between the user's intent and the seek. Calls belong to the ViewModel's main thread.
+ */
+internal class WordInkPublication {
+    private var tap = WordTapInk()
+    private var polled: ActiveWord? = null
+    private val shown = MutableStateFlow<ActiveWord?>(null)
+    val activeWord: StateFlow<ActiveWord?> = shown.asStateFlow()
+
+    fun seed(word: ActiveWord, positionIntentId: Long? = null) {
+        tap = WordTapInk(word, positionIntentId = positionIntentId)
+        shown.value = tap.resolve(polled)
+    }
+
+    fun onPoll(word: ActiveWord?) {
+        polled = word
+        tap = tap.onPoll(word)
+        shown.value = tap.resolve(word)
+    }
+
+    /** A new command cancels the exception; repeated callbacks from its own seek do not. */
+    fun onPositionIntent(id: Long) {
+        val origin = tap.positionIntentId ?: return
+        if (id <= origin) return
+        tap = WordTapInk()
+        shown.value = polled
+    }
+
+    fun clear() {
+        tap = WordTapInk()
+        polled = null
+        shown.value = null
+    }
+
+    fun awaiting(word: ActiveWord): Boolean = tap.pending && tap.seed === word
+
+    fun expire(word: ActiveWord) {
+        if (!awaiting(word)) return
+        tap = WordTapInk()
+        shown.value = polled
     }
 }
 

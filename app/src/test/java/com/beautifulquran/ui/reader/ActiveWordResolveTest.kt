@@ -1,5 +1,8 @@
 package com.beautifulquran.ui.reader
 
+import com.beautifulquran.domain.HighlightWash
+import com.beautifulquran.domain.HighlightWashState
+import com.beautifulquran.domain.HighlightWashWindow
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertSame
@@ -113,6 +116,127 @@ class ActiveWordResolveTest {
         val tap = WordTapInk(seed).onPoll(heard)
         assertEquals(5, streamWaitActiveWord(tap.resolve(heard), true)?.tapStartPosition)
         assertEquals(5, streamWaitActiveWord(tap.onPoll(null).resolve(heard), true)?.tapStartPosition)
+    }
+
+    @Test
+    fun `an acknowledged seek cannot fade its prefix when the display clock is earlier`() {
+        val seed = word(position = 8, fromTap = true)
+        val heard = word(position = 8, activation = 7)
+        val tap = WordTapInk(seed).onPoll(heard)
+        for (cursor in listOf(1, 4, 7, 8, 9)) {
+            val shown = tap.resolve(word(position = cursor, activation = 7))!!
+            for (position in 1..7) {
+                assertEquals("cursor=$cursor prefix=$position", InkEngine.State.Recited,
+                    InkEngine.wordState(position, shown, isActiveAyah = true, dimmed = false))
+            }
+            assertEquals(InkEngine.State.Upcoming,
+                InkEngine.wordState(10, shown, isActiveAyah = true, dimmed = false))
+        }
+    }
+
+    @Test
+    fun `a tap publishes its full prefix before any player or coroutine update`() {
+        val publication = WordInkPublication()
+        publication.onPoll(word(position = 1, activation = 5))
+        val seed = word(position = 8, fromTap = true)
+        publication.seed(seed)
+        // No collector or dispatcher turn is needed before playback can start.
+        assertSame(seed, publication.activeWord.value)
+        for (position in 1..7) {
+            assertEquals(InkEngine.State.Recited,
+                InkEngine.wordState(position, publication.activeWord.value, true, false))
+        }
+        publication.onPoll(null)
+        assertSame(seed, publication.activeWord.value)
+        publication.onPoll(word(position = 8, activation = 7))
+        publication.onPoll(word(position = 1, activation = 7))
+        assertEquals(8, publication.activeWord.value?.tapStartPosition)
+    }
+
+    @Test
+    fun `an old confirmation timer cannot clear a newer tap publication`() {
+        val publication = WordInkPublication()
+        val first = word(position = 3, fromTap = true)
+        val second = word(position = 8, activation = 7, fromTap = true)
+        publication.seed(first)
+        publication.seed(second)
+        publication.expire(first)
+        assertSame(second, publication.activeWord.value)
+        assertFalse(publication.awaiting(first))
+        assertTrue(publication.awaiting(second))
+        publication.clear()
+        assertNull(publication.activeWord.value)
+    }
+
+    @Test
+    fun `session acknowledgement of the same word seek cannot hand its prefix to stream wait`() {
+        val publication = WordInkPublication()
+        val seed = word(position = 11, activation = 4, fromTap = true).copy(startMs = 11_900)
+        publication.seed(seed, positionIntentId = 4)
+        publication.onPositionIntent(4)
+        publication.onPoll(seed.copy(fromTap = false, tapStartPosition = null))
+        // Recorded 2:63: an immediate controller seek, a buffering callback,
+        // then the session reports the same landing with another ink generation.
+        publication.onPoll(seed.copy(activation = 5, playbackActivation = 5,
+            fromTap = false, tapStartPosition = null))
+        val shown = streamWaitActiveWord(publication.activeWord.value, streamWait = true)!!
+        assertEquals(5L, shown.playbackActivation)
+        assertEquals(11, shown.tapStartPosition)
+        for (position in 1..10) {
+            assertEquals(InkEngine.State.Recited, InkEngine.wordState(position, shown, true, false))
+        }
+        publication.onPoll(word(position = 12, activation = 5))
+        assertEquals(11, publication.activeWord.value?.tapStartPosition)
+    }
+
+    @Test
+    fun `a new position intent clears the exception even when it seeks to the same word`() {
+        val publication = WordInkPublication()
+        val seed = word(fromTap = true)
+        publication.seed(seed, positionIntentId = 4)
+        publication.onPoll(word())
+        publication.onPositionIntent(5)
+        assertNull(publication.activeWord.value?.tapStartPosition)
+        publication.onPoll(word(activation = 7))
+        assertNull(streamWaitActiveWord(publication.activeWord.value, streamWait = true))
+    }
+
+    @Test
+    fun `an unrelated seek cannot reuse a word taps intent merely by staying in the same verse`() {
+        val publication = WordInkPublication()
+        publication.seed(word(fromTap = true), positionIntentId = 4)
+        publication.onPoll(word())
+        publication.onPoll(word(position = 2, activation = 7))
+        assertNull(publication.activeWord.value?.tapStartPosition)
+    }
+
+    @Test
+    fun `a tapped prefix completes old residuals while natural handoffs keep their soft edge`() {
+        val window = HighlightWashWindow(2, 2, 7, 1_000, 2_000)
+        val old = HighlightWash.transition(HighlightWashState(), true, false, 7, window)
+        val tapped = word(position = 8, activation = 7).copy(tapStartPosition = 8)
+        val state = InkEngine.wordState(4, tapped, true, false)
+        val skipped = HighlightWash.transition(old, false,
+            InkEngine.retainWordSweep(4, state, tapped), 0, null)
+        assertNull(skipped.window)
+        assertEquals(1f, HighlightWash.progress(skipped, null), 0f)
+
+        val natural = tapped.copy(tapStartPosition = null)
+        val residual = HighlightWash.transition(old, false,
+            InkEngine.retainWordSweep(4, state, natural), 0, null)
+        assertEquals(window, residual.window)
+        assertFalse(InkEngine.inTappedPrefix(8, tapped))
+    }
+
+    @Test
+    fun `a genuine repeat before the tap keeps its orange occurrence over full base ink`() {
+        val repeating = word(position = 2, activation = 7).copy(
+            tapStartPosition = 8, isRepeat = true, highWater = 9, repeatStart = 2)
+        assertEquals(InkEngine.State.Active, InkEngine.wordState(2, repeating, true, false))
+        assertTrue(InkEngine.inRepeatChain(2, repeating))
+        assertFalse(InkEngine.retainWordSweep(2, InkEngine.State.Active, repeating))
+        assertEquals(InkEngine.State.Recited, InkEngine.wordState(7, repeating, true, false))
+        assertEquals(InkEngine.State.Upcoming, InkEngine.wordState(10, repeating, true, false))
     }
 
     @Test

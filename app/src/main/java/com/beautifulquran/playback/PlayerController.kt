@@ -57,6 +57,8 @@ data class PlayerUiState(
     val speed: Float = 1f,
     val error: String? = null,
     val positionEvents: PlaybackPositionEvents = PlaybackPositionEvents(),
+    /** Requested place, independent of MediaController's duplicate seek callbacks. */
+    val positionIntentId: Long = 0L,
 )
 
 /** Only a deliberate seek, automatic repeat, or playlist replacement starts
@@ -232,6 +234,7 @@ class PlayerController(private val context: Context) {
                     voiceEnergy.release()
                     _state.value = PlayerUiState(
                         positionEvents = _state.value.positionEvents,
+                        positionIntentId = _state.value.positionIntentId,
                     )
                 }
             })
@@ -255,6 +258,8 @@ class PlayerController(private val context: Context) {
             val keepInk = reason == Player.DISCONTINUITY_REASON_SEEK &&
                 silenceInk.claims(newPosition.positionMs, itemChanged)
             _state.value = _state.value.copy(
+                positionIntentId = _state.value.positionIntentId +
+                    if (reason == Player.DISCONTINUITY_REASON_AUTO_TRANSITION) 1L else 0L,
                 nowPlaying = newPosition.mediaItem?.mediaId?.let(::parseMediaId),
                 positionEvents = _state.value.positionEvents.afterDiscontinuity(
                     reason = reason,
@@ -325,6 +330,7 @@ class PlayerController(private val context: Context) {
         val idx = player.currentMediaItemIndex.coerceIn(0, player.mediaItemCount - 1)
         if (endedLoopHandledIndex == idx) return false
         endedLoopHandledIndex = idx
+        beginPositionIntent()
         player.seekTo(idx, 0L)
         player.play()
         return true
@@ -347,6 +353,7 @@ class PlayerController(private val context: Context) {
                 if (endedLoopHandledIndex == idx) return false
                 endedLoopHandledIndex = idx
             }
+            beginPositionIntent()
             player.seekTo(firstIdx, 0L)
             player.play()
             return true
@@ -365,6 +372,7 @@ class PlayerController(private val context: Context) {
             val firstIdx = playlistIndex(startAyah)
             val lastIdx = playlistIndex(endAyah)
             if (c.mediaItemCount > 0 && (idx < firstIdx || idx > lastIdx)) {
+                beginPositionIntent()
                 c.seekTo(firstIdx.coerceIn(0, c.mediaItemCount - 1), 0L)
             }
             if (c.isPlaying) startRepeatBoundaryMonitor()
@@ -441,12 +449,16 @@ class PlayerController(private val context: Context) {
      * Runs [block] on the main scope with a connected controller, serialised
      * with every other command. [epoch] is the gate snapshot at issue time —
      * if [PlayerCommandGate.invalidate] ran since then, the body is skipped.
+     * [positionIntent] names the requested place before callbacks arrive;
+     * silence skips opt out because they continue the current performance.
      */
     private fun withController(
         epoch: Long = commands.epoch,
         holdSilenceSkip: Boolean = false,
+        positionIntent: Boolean = holdSilenceSkip,
         block: suspend (MediaController) -> Unit,
     ) {
+        if (positionIntent) beginPositionIntent()
         if (holdSilenceSkip) holdSilenceSkip()
         scope.launch {
             commands.runIfCurrent(epoch) {
@@ -457,6 +469,10 @@ class PlayerController(private val context: Context) {
                 block(c)
             }
         }
+    }
+
+    private fun beginPositionIntent() {
+        _state.value = _state.value.copy(positionIntentId = _state.value.positionIntentId + 1L)
     }
 
     fun togglePlayPause() = withController { c ->
@@ -480,7 +496,7 @@ class PlayerController(private val context: Context) {
         play: Boolean,
         playIfOutOfRange: Boolean = play,
         keepInk: Boolean = false,
-    ) = withController(holdSilenceSkip = true) { c ->
+    ) = withController(holdSilenceSkip = true, positionIntent = !keepInk) { c ->
         if (!keepInk) silenceInk.clear()
         val index = playlistIndex(ayah)
         val inRange = index in 0 until c.mediaItemCount
@@ -538,6 +554,7 @@ class PlayerController(private val context: Context) {
      * start audio after this returns.
      */
     fun stop() {
+        beginPositionIntent()
         resetRepeatState()
         silenceInk.clear()
         basmalahLeadIn = false
@@ -577,6 +594,7 @@ class PlayerController(private val context: Context) {
                 }
 
                 if (idx > lastIdx) {
+                    beginPositionIntent()
                     c.seekTo(firstIdx, 0L)
                     c.play()
                     syncFromController(c, forcePlaying = true)
@@ -586,6 +604,7 @@ class PlayerController(private val context: Context) {
 
                 if (idx == lastIdx && c.currentPosition >= repeatBoundary(c)) {
                     endedLoopHandledIndex = idx
+                    beginPositionIntent()
                     c.seekTo(firstIdx, 0L)
                     c.play()
                     syncFromController(c, forcePlaying = true)

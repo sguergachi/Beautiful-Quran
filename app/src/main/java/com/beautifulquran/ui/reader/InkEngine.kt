@@ -457,11 +457,22 @@ object InkEngine {
         dimmed: Boolean,
     ): State = when {
         activeWord == null -> if (isActiveAyah || dimmed) State.Upcoming else State.Plain
+        inTappedPrefix(position, activeWord) &&
+            !(activeWord.isRepeat && position == activeWord.wordPosition) -> State.Recited
         position == activeWord.wordPosition -> State.Active
         position < activeWord.wordPosition -> State.Recited
         position <= activeWord.highWater -> State.Recited
         else -> State.Upcoming
     }
+
+    /** A word-play intent establishes full base ink even while its media cursor settles earlier. */
+    fun inTappedPrefix(position: Int, activeWord: ActiveWord?): Boolean =
+        activeWord?.tapStartPosition?.let { position < it } == true
+
+    /** Natural handoffs finish their residual; a deliberately skipped prefix is already complete. */
+    fun retainWordSweep(position: Int, state: State, activeWord: ActiveWord?): Boolean =
+        !inTappedPrefix(position, activeWord) &&
+            (state == State.Recited || state == State.Active && activeWord?.isRepeat == true)
 
     /**
      * Whether the word at [position] belongs to the active repeat chain: from

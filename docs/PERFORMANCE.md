@@ -263,6 +263,15 @@ changes. The steady 30 Hz word poll therefore allocates no per-word objects;
 both allocation and downstream emission happen only at real ink boundaries
 (~2–3×/second).
 
+`WordInkPublication` applies an explicit word tap synchronously before its
+player command, then consumes those boundary polls. Keeping tap intent and
+the displayed word in one publication avoids an asynchronous `combine`
+turn where playback has begun recessing the page but the tap prefix is
+still missing. Frame clocks and per-ayah derived subscriptions are unchanged.
+The word-play exception follows the player's position intent, so a second
+MediaController acknowledgement of the same seek does not discard its
+prefix. Actual media generations still own the captured wash windows.
+
 ### 3b. Playlist preload + cache warm
 
 ExoPlayer's `PreloadConfiguration` buffers ~5 s of the *next* ayah in the
