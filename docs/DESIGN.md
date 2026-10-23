@@ -1673,17 +1673,19 @@ bookmark icon, a second ribbon shape, or a bespoke animated substitute.
 ### Pinned chapters (Android)
 
 Press and hold a chapter row to pin it to the top of Chapters, or a pinned
-row to unpin it. The hold **asks first**, in place. Ink soaks the row from
-the finger: the same `inkSpotHighlight` verse soak as choosing a verse to
-share (250 ms, linear, fibre-edged, rim-inset), in the band's green
-(`primary` at 0.26) rather than share's gold. The soaked row is the
-question, so no question is written: the subtitle stays the chapter's own
-line, and the Arabic name gives way to two answers in book type, the verb
-(**Pin** or **Unpin**) in green and a quiet Cancel, inside the row's own
-height so nothing jumps. A tap elsewhere on the row, Back, or starting a
-search backs out and the ink draws back to the finger; one row asks at a
-time. (A written subtitle question, *Pin to the top?*, was tried and
-rejected.)
+row to unpin it. The hold **asks first**, in place, by filling the row with
+its answer: a solid, square-cut slice of the band's green grows out from the
+finger to both edges (250 ms, the share soak's time) and holds, so the row
+already looks like the band slice it will become. Holding a pinned row fills
+paper back over its slice of the band the same way. No question is written:
+the subtitle stays the chapter's own line, and the Arabic name hands over
+(it lifts off before they ink in, never overlapping) to two answers in book
+type, the verb (**Pin** or **Unpin**) in green and a quiet Cancel, inside the
+row's own height so nothing jumps. A tap elsewhere on the row, Back, or
+starting a search backs out and the fill draws back to the finger; one row
+asks at a time. Tried and rejected: a written subtitle question (*Pin to the
+top?*), and the share selection's feathered ink soak (a smudged inset patch
+on a row this thin).
 
 Pinned chapters sit on a **band**: the Continue pill's green wash
 (`greenWash`) laid edge to edge across the sheet, square-cut like a strip of
@@ -1713,7 +1715,7 @@ Pinning from the top of the sheet scrolls the band into view; a reader deep
 in the list keeps their place. Stored as `Settings.pinnedSurahIds`; web
 parity is pending.
 
-Implementation: `pinnedBand`, `pinAction` and the list in
+Implementation: `pinnedBand`, `pinFill` / `pinFillSpan`, `pinAction` and the list in
 `ui/home/HomeScreen.kt`.
 
 ### Chapters bookmark treatment

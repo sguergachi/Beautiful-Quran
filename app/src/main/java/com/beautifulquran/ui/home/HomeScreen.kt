@@ -3,8 +3,6 @@ package com.beautifulquran.ui.home
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.AnimatedContent
-import androidx.compose.animation.slideInHorizontally
-import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.togetherWith
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.liveRegion
@@ -15,6 +13,8 @@ import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animate
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -73,6 +73,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
@@ -122,7 +123,6 @@ import com.beautifulquran.ui.theme.FloatingPaperExit
 import com.beautifulquran.ui.theme.LocalQuranAccents
 import com.beautifulquran.ui.theme.typeScale
 import com.beautifulquran.ui.theme.PaperSearchField
-import com.beautifulquran.ui.theme.inkSpotHighlight
 import com.beautifulquran.ui.theme.quietClickable
 import com.beautifulquran.ui.theme.verticalFadingEdges
 import com.beautifulquran.ui.theme.QuranTheme
@@ -1363,15 +1363,11 @@ private fun SurahRow(
         verticalAlignment = Alignment.CenterVertically,
         modifier = modifier
             .fillMaxWidth()
-            // Holding soaks the row from the finger, the same spread as
-            // choosing a verse to share, in the band's green.
-            .inkSpotHighlight(
-                selected = confirmingPin,
-                seed = surah.id,
-                color = MaterialTheme.colorScheme.primary.copy(alpha = 0.26f),
-                fillBox = true,
-                durationMillis = 250,
-                easing = LinearEasing,
+            // Holding fills the row with the answer: the band's green to pin,
+            // paper back over the band to unpin.
+            .pinFill(
+                filling = confirmingPin,
+                color = if (pinned) MaterialTheme.colorScheme.background else QuranTheme.accents.greenWash,
             )
             // While asking, a tap anywhere else on the row backs out.
             .quietClickable(
@@ -1438,9 +1434,10 @@ private fun SurahRow(
         Spacer(Modifier.width(12.dp))
         AnimatedContent(
             targetState = confirmingPin,
+            // Hand over, never overlap: the name lifts off before the
+            // answers ink in, so the two never print on top of each other.
             transitionSpec = {
-                (fadeIn() + slideInHorizontally { it / 8 }) togetherWith
-                    (fadeOut() + slideOutHorizontally { -it / 8 })
+                fadeIn(tween(160, delayMillis = 110)) togetherWith fadeOut(tween(110))
             },
             contentAlignment = Alignment.CenterEnd,
             label = "pin answers",
@@ -1466,6 +1463,47 @@ private fun SurahRow(
         }
     }
 }
+
+/**
+ * The band filling in: a solid, square-cut slice of [color] that grows from
+ * the finger out to both edges of the row and holds there, so the row
+ * becomes exactly the band slice it will be once pinned. No feathered front.
+ * Letting go draws it back to where the finger was.
+ */
+@Composable
+private fun Modifier.pinFill(filling: Boolean, color: androidx.compose.ui.graphics.Color): Modifier {
+    val progress by animateFloatAsState(
+        targetValue = if (filling) 1f else 0f,
+        animationSpec = tween(PinFillMs, easing = FastOutSlowInEasing),
+        label = "pinFill",
+    )
+    // Read only in the draw phase, so the finger never recomposes the row.
+    val fingerX = remember { mutableFloatStateOf(Float.NaN) }
+    return pointerInput(Unit) {
+        awaitPointerEventScope {
+            while (true) {
+                val down = awaitPointerEvent(PointerEventPass.Initial).changes
+                    .firstOrNull { it.pressed && !it.previousPressed }
+                if (down != null) fingerX.floatValue = down.position.x
+            }
+        }
+    }.drawBehind {
+        if (progress <= 0f) return@drawBehind
+        val (left, right) = pinFillSpan(fingerX.floatValue, size.width, progress)
+        drawRect(color, topLeft = Offset(left, 0f), size = Size(right - left, size.height))
+    }
+}
+
+/** The filled span at [progress]: out from [fingerX] (the middle when no
+ * finger is known) to reach both edges together. */
+internal fun pinFillSpan(fingerX: Float, width: Float, progress: Float): Pair<Float, Float> {
+    val origin = if (fingerX.isNaN()) width / 2f else fingerX.coerceIn(0f, width)
+    val p = progress.coerceIn(0f, 1f)
+    return origin * (1f - p) to origin + (width - origin) * p
+}
+
+/** The share selection's soak time: the band fills as quickly. */
+private const val PinFillMs = 250
 
 /** The verb press-and-hold offers beside Cancel. */
 internal fun pinAction(pinned: Boolean): String = if (pinned) "Unpin" else "Pin"

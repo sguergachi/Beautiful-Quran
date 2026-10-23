@@ -201,6 +201,15 @@ class ContinuePillVisibilityTest {
     }
 
     @Test
+    fun pinFillGrowsFromTheFingerToBothEdgesTogether() {
+        assertEquals(300f to 300f, pinFillSpan(300f, 1000f, 0f))
+        assertEquals(150f to 650f, pinFillSpan(300f, 1000f, 0.5f))
+        assertEquals(0f to 1000f, pinFillSpan(300f, 1000f, 1f))
+        // No finger known: out from the middle.
+        assertEquals(500f to 500f, pinFillSpan(Float.NaN, 1000f, 0f))
+    }
+
+    @Test
     fun continueRowOffSheetWhileSearching() {
         val ids = (1..114).toList()
         assertEquals(-1, continueLazyIndex(ids, 18, true))
