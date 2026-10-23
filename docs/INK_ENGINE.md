@@ -425,6 +425,15 @@ tween-vs-snap rules, sweep entry and residual rules, repeat wash timing, the
   prefix onto the new generation. A different landing still releases it.
   The tapped word still waits for its own media clock;
   words after it retain the ordinary Upcoming treatment.
+  That exception covers only words within the selected verse. Other verses
+  above and below fade from the start request, including during a word tap's
+  own loading. Scroll ignores a stale fade-led focus during that wait. Arabic
+  and English book leaves recess earlier verses as well as later ones while
+  carrying recitation; the current verse retains its ink through its closing
+  hold and silent tail. Outgoing wet ink keeps its drying clocks as it fades,
+  and manually browsed leaves keep their ordinary resting ink.
+  Web uses the same surrounding-verse policy in `mushafInk` and starts Scroll's
+  `data-reciting` recess with the word request, before audio becomes ready.
   `WordInkPublication` writes that target synchronously before issuing the
   player command; it does not wait for a `combine` collector while playback
   can already recess the page. `InkEngine` treats the saved tap position as

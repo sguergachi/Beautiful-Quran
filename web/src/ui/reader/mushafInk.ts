@@ -50,10 +50,9 @@ export const MUSHAF_STILL_INK: InkWord = { state: InkState.Recited, repeat: fals
 
 /**
  * One word's ink on a leaf that carries the voice. Port of Android
- * `mushafInkPackKind`: the voiced verse runs the karaoke wash, every verse
- * still to come waits under Upcoming paper, and what has been read keeps
- * full ink. A leaf the reader has browsed to, away from the voice, is
- * [live] = false and stays plain.
+ * `mushafInkPackKind`: the voiced verse runs the karaoke wash, and every
+ * surrounding verse waits under Upcoming paper. A leaf the reader has browsed
+ * to, away from the voice, is [live] = false and stays plain.
  *
  * The clip of a verse runs on a little after its last word. The voice has
  * no word then, exactly as before the first one, but the verse is read:
@@ -67,21 +66,20 @@ export function mushafTokenInk(
   live: boolean,
 ): InkWord {
   if (!live || !ink.reciting) return PLAIN
-  if (token.surahId !== surahId) return token.surahId > surahId ? UPCOMING : PLAIN
+  if (token.surahId !== surahId) return UPCOMING
   if (token.ayah === ink.inkAyah || token.ayah === ink.leadAyah) {
     const word = token.ayah === ink.inkAyah && ink.activeWord?.ayah === token.ayah ? ink.activeWord : null
     if (!word && token.ayah === ink.inkAyah && ink.inkAyahRead) return MUSHAF_STILL_INK
     return InkEngine.word(token.position, word, true, false)
   }
-  const frontier = Math.max(ink.inkAyah ?? 0, ink.leadAyah ?? 0)
-  return token.ayah > frontier ? UPCOMING : PLAIN
+  return UPCOMING
 }
 
 /**
  * Whether a verse's number still waits under paper on a leaf that carries
  * the voice. Android `rememberAyahMarkAlpha`: the mark belongs to the verse,
  * not to its last word, so it lights as the voice takes the verse up (and
- * with the lead, a moment before the hand-off) and stays lit after. Taking
+ * with the lead, a moment before the hand-off). Other verses fade. Taking
  * its ink from the verse's last word held it dim until that word was
  * reached, with the rest of the verse already being read.
  */
@@ -92,6 +90,6 @@ export function mushafMarkWaits(
   live: boolean,
 ): boolean {
   if (!live || !ink.reciting) return false
-  if (token.surahId !== surahId) return token.surahId > surahId
-  return token.ayah > Math.max(ink.inkAyah ?? 0, ink.leadAyah ?? 0)
+  if (token.surahId !== surahId) return true
+  return token.ayah !== ink.inkAyah && token.ayah !== ink.leadAyah
 }

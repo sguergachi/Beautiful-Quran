@@ -5,6 +5,31 @@ import org.junit.Test
 
 class MushafInkFrontierTest {
     @Test
+    fun `a first word or verse start fades earlier and later verses during recitation`() {
+        for (target in 2..12) for (word in listOf(null, target)) {
+            val states = (1..13).map { ayah ->
+                mushafInkPackKind(true, ayah, word, target, false, false,
+                    frontierWaitingForFirstWord = word == null, recessSurrounding = true)
+            }
+            assertEquals(List(13) { index ->
+                if (word != null && index + 1 == target) MushafInkPackKind.ACTIVE_WORD
+                else MushafInkPackKind.UPCOMING
+            }, states)
+        }
+    }
+
+    @Test
+    fun `outgoing ink keeps its drying clocks while the current verse keeps its tail`() {
+        assertEquals(MushafInkPackKind.ACTIVE_WORD,
+            mushafInkPackKind(true, 6, 7, 7, false, false,
+                drying = true, recessSurrounding = true))
+        assertEquals(MushafInkPackKind.STATIC,
+            mushafInkPackKind(true, 7, null, 7, false, false, recessSurrounding = true))
+        assertEquals(MushafInkPackKind.UPCOMING,
+            mushafInkPackKind(true, 6, null, 7, false, false, recessSurrounding = true))
+    }
+
+    @Test
     fun `restarting a heard verse waits for its new generation before revealing ink`() {
         for (target in 2..12) for (focus in listOf(null, target - 1, target, target + 1)) {
             val frontier = mushafInkFrontier(null, focus, target)
@@ -34,7 +59,7 @@ class MushafInkFrontierTest {
     }
 
     @Test
-    fun `completed verses never recess during the 24 29 to 30 handoff`() {
+    fun `resting pages retain completed verses through frontier updates`() {
         // Media3, the word poll and the fade-led focus publish independently.
         val moments = listOf(
             Moment(29, 30, 29, true),

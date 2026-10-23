@@ -29,7 +29,7 @@ const state = (token: ReturnType<typeof at>, ink: MushafInk, live = true) =>
   mushafTokenInk(token, 2, ink, live).state
 
 describe('mushaf leaf ink', () => {
-  it('retains earlier verses but covers a restarted verse before its new first word', () => {
+  it('covers surrounding verses and a restarted verse before its new first word', () => {
     for (let target = 2; target <= 12; target++) {
       let history = mushafReadHistory({ ayah: null, activation: 0, read: false }, target, 7, true)
       history = mushafReadHistory(history, target, 7, false)
@@ -38,7 +38,7 @@ describe('mushaf leaf ink', () => {
       history = mushafReadHistory(history, target, 8, false)
       const restarted = voice({ inkAyah: target, leadAyah: target, activeWord: null, inkAyahRead: history.read })
       for (let ayah = 1; ayah <= 13; ayah++) {
-        expect(state(at(ayah, 1), restarted)).toBe(ayah < target ? InkState.Plain : InkState.Upcoming)
+        expect(state(at(ayah, 1), restarted)).toBe(InkState.Upcoming)
       }
       history = mushafReadHistory(history, target, 8, true)
       history = mushafReadHistory(history, target, 8, false)
@@ -54,12 +54,12 @@ describe('mushaf leaf ink', () => {
     expect(state(at(5, 4), ink)).toBe(InkState.Upcoming)
   })
 
-  it('keeps what has been read in full ink and holds what is to come under paper', () => {
+  it('fades verses and chapters on both sides of the voiced verse', () => {
     const ink = voice({})
-    expect(state(at(4, 9), ink)).toBe(InkState.Plain)
+    expect(state(at(4, 9), ink)).toBe(InkState.Upcoming)
     expect(state(at(6, 1), ink)).toBe(InkState.Upcoming)
     // A chapter sharing the leaf stands before or after the whole of this one.
-    expect(state(at(200, 1, 1), ink)).toBe(InkState.Plain)
+    expect(state(at(200, 1, 1), ink)).toBe(InkState.Upcoming)
     expect(state(at(1, 1, 3), ink)).toBe(InkState.Upcoming)
   })
 
@@ -121,12 +121,12 @@ describe('mushaf verse numbers', () => {
     expect(waits(5, voice({ activeWord: null, inkAyahRead: false }))).toBe(false)
   })
 
-  it('keeps the numbers of verses still to come under paper, and those read lit', () => {
+  it('fades the numbers of surrounding verses', () => {
     const ink = voice({})
     expect(waits(6, ink)).toBe(true)
-    expect(waits(4, ink)).toBe(false)
+    expect(waits(4, ink)).toBe(true)
     expect(waits(1, ink, true, 3)).toBe(true)
-    expect(waits(200, ink, true, 1)).toBe(false)
+    expect(waits(200, ink, true, 1)).toBe(true)
   })
 
   it('lights the next verse\'s number with the lead, ahead of the hand-off', () => {

@@ -55,8 +55,9 @@ export function readerAyahInkPolicyActive(
   ayah: number,
   inkAyah: number | null | undefined,
   leadAyah: number | null | undefined,
+  awaitingWordStart = false,
 ): boolean {
-  return inkAyah === ayah || leadAyah === ayah
+  return inkAyah === ayah || (!awaitingWordStart && leadAyah === ayah)
 }
 
 /**

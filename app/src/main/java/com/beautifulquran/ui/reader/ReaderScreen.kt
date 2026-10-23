@@ -774,6 +774,7 @@ fun ReaderScreen(
     // A word tap is not that wait: until its sought word is heard the page
     // keeps the ordinary recitation look (WordTapVoiceWait).
     val wordTapAwaitingVoice by viewModel.wordTapAwaitingVoice.collectAsStateWithLifecycle()
+    val recessingAyahs = recitingActive || wordTapAwaitingVoice
     var streamWait by remember { mutableStateOf(false) }
     LaunchedEffect(playerState.isBuffering, wordTapAwaitingVoice) {
         if (streamWaitEngages(playerState.isBuffering, wordTapAwaitingVoice)) {
@@ -2795,7 +2796,7 @@ fun ReaderScreen(
                     SideEffect {
                         mushafPlayback.value = MushafPlayback(
                             activeAyah = activeAyah,
-                            reciting = recitingActive,
+                            reciting = recessingAyahs,
                             playingHere = isThisSurahPlaying,
                             basmalahActive = isThisSurahPlaying && activeBasmalah == true,
                             isPlaying = isThisSurahPlaying && playerState.isPlaying,
@@ -3156,7 +3157,7 @@ fun ReaderScreen(
                                     dimmed = if (streamWait) {
                                         true
                                     } else {
-                                        recitingActive && activeBasmalah != true
+                                        recessingAyahs && (wordTapAwaitingVoice || activeBasmalah != true)
                                     },
                                     fontScale = settings.fontScale,
                                     washProgress = viewModel.basmalahWashProgress,
@@ -3184,10 +3185,10 @@ fun ReaderScreen(
                             // next verse can lift its recess before handoff.
                             val policyActive by remember(ayah.number, isThisSurahPlaying) {
                                 derivedStateOf {
-                                    if (!isThisSurahPlaying) return@derivedStateOf false
                                     val inkAyah = activeWordState.value?.ayah
+                                    if (!isThisSurahPlaying && !wordTapAwaitingVoice) return@derivedStateOf false
                                     val leadAyah = activeAyahState.value
-                                    ayah.number == inkAyah || ayah.number == leadAyah
+                                    readerAyahInkPolicyActive(ayah.number, inkAyah, leadAyah, wordTapAwaitingVoice)
                                 }
                             }
                             val bookmarked = ayah.number in bookmarkedAyahs
@@ -3228,7 +3229,7 @@ fun ReaderScreen(
                                 dimmed = if (streamWait) {
                                     activeWord == null
                                 } else {
-                                    recitingActive && !policyActive
+                                    recessingAyahs && !policyActive
                                 },
                                 // Keep the page readable the moment a jump
                                 // commits — the decelerating scroll is the cue,
