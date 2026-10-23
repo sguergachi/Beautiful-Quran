@@ -6,8 +6,11 @@ reading order and lays a fine wet line down the core of every stroke it
 passes, each stroke swells out to its edges, the fresh ink stands slightly
 heavier and glossier, and then dries back to the page's ink over the glimmer's
 dry-down (`glintFadeMs`). The letter ahead fades in so the edge is feathered.
-English-only Scroll and the English leaf keep that soft edge within the current
-word; the next word receives no anticipatory fade before its own wash begins.
+English-only Scroll and the English leaf lead by exactly one printed letter,
+stopping at the current word boundary. Scroll splits multi-word glosses into
+printed-word fields on the same timing owner's clock, including repeats and
+rewind evaporation; the next word receives no anticipatory fade. These word
+bounds are cached with the paragraph. Arabic retains the Ink Lab lead dial.
 A repeat is laid in terracotta, held through its chain, and released to
 charcoal by evaporation: thin edges clear first and thicker stroke interiors
 linger, with a soft front over a 1,800 ms release. The dry black

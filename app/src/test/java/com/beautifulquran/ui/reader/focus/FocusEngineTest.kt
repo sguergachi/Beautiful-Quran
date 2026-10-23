@@ -12,6 +12,14 @@ class FocusEngineTest {
     private val guard = 0
 
     @Test
+    fun `word focus waits for the matching text layout during content hydration`() {
+        assertFalse(FocusEngine.matchesWordLayout(48..51, "it is said ".repeat(5), "short text"))
+        assertFalse(FocusEngine.matchesWordLayout(0..1, "it is said", "we are one"))
+        assertFalse(FocusEngine.matchesWordLayout(IntRange.EMPTY, "it is said", "it is said"))
+        assertTrue(FocusEngine.matchesWordLayout(3..4, "it is said", "it is said"))
+    }
+
+    @Test
     fun `clipped empty word bounds after a verse glide never scroll backward`() {
         // Rect.Zero minus the list's window top produced this false target.
         for ((top, bottom) in listOf(-173f to -173f, 0f to 0f, 2000f to 2000f)) {

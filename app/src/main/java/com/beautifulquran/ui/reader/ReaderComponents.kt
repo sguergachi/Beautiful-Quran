@@ -775,6 +775,7 @@ private typealias OnKeepAnnotationInView = suspend (
 private fun Modifier.shapedActiveWordInView(
     keepInView: Boolean,
     activeIndex: Int,
+    renderedText: AnnotatedString,
     wordRanges: List<IntRange>,
     layoutResult: TextLayoutResult?,
     listCoordinates: () -> LayoutCoordinates?,
@@ -784,6 +785,7 @@ private fun Modifier.shapedActiveWordInView(
     LaunchedEffect(
         keepInView,
         activeIndex,
+        renderedText,
         layoutResult,
         wordRanges,
         textCoordinates,
@@ -799,7 +801,10 @@ private fun Modifier.shapedActiveWordInView(
             val textCoords = textCoordinates?.takeIf { it.isAttached } ?: return@onKeepWordInView null
             val listCoords = listCoordinates()?.takeIf { it.isAttached } ?: return@onKeepWordInView null
             val range = wordRanges.getOrNull(index) ?: return@onKeepWordInView null
-            if (range.isEmpty()) return@onKeepWordInView null
+            if (!com.beautifulquran.ui.reader.focus.FocusEngine.matchesWordLayout(
+                    range, renderedText.text, textLayout.layoutInput.text.text,
+                )
+            ) return@onKeepWordInView null
             val first = textLayout.getBoundingBox(range.first)
             val last = textLayout.getBoundingBox(range.last)
             val top = minOf(first.top, last.top)
@@ -1792,6 +1797,8 @@ internal fun buildShapedBlooms(
     baseReveal: Boolean = true,
     /** Paper theme's shared ink pipeline; null keeps the paper-cover wash. */
     paperInk: PaperInkStyle? = palette.paperInk,
+    /** English gloss owners can contain several printed words, each with its own field. */
+    englishWordRanges: Map<IntRange, List<IntRange>>? = null,
 ): List<ShapedWordBloom> {
     val paperCovers = arrayOfNulls<ShapedWordBloom.UpcomingDim>(motions.size)
     val recess = recessCover()
@@ -1877,7 +1884,7 @@ internal fun buildShapedBlooms(
     // this invariant has already been broken twice. Ordering the frame here too
     // keeps it under test; the second pass is free, since [coversFirst] returns
     // an already-ordered list untouched.
-    return blooms.coversFirst()
+    return (englishWordRanges?.let { englishPaperInkBlooms(blooms, it) } ?: blooms).coversFirst()
 }
 
 /** Paper-cover strength for one shaped word during an ayah handoff. */
@@ -2015,6 +2022,10 @@ private fun ResponsiveEnglishAyah(
         RenderedLineText(text = text, wordRanges = ranges, markRange = markRange)
     }
 
+    val englishWordRanges = remember(rendered) {
+        englishPaperInkWordRanges(rendered.text, rendered.wordRanges)
+    }
+
     Text(
         text = rendered.text,
         style = style,
@@ -2024,6 +2035,7 @@ private fun ResponsiveEnglishAyah(
             .shapedActiveWordInView(
                 keepInView = keepActiveWordInView,
                 activeIndex = activeIndex,
+                renderedText = rendered.text,
                 wordRanges = rendered.wordRanges,
                 layoutResult = layoutResult,
                 listCoordinates = listCoordinates,
@@ -2046,6 +2058,7 @@ private fun ResponsiveEnglishAyah(
                         },
                         searchBackgroundAlpha = searchBackgroundAlpha,
                         softHandoff = softHandoff,
+                        englishWordRanges = englishWordRanges,
                     )
                 },
                 layout = { layoutResult },
@@ -2275,6 +2288,7 @@ private fun ResponsiveHafsAyah(
             .shapedActiveWordInView(
                 keepInView = keepActiveWordInView,
                 activeIndex = activeIndex,
+                renderedText = rendered.text,
                 wordRanges = rendered.wordRanges,
                 layoutResult = layoutResult,
                 listCoordinates = listCoordinates,

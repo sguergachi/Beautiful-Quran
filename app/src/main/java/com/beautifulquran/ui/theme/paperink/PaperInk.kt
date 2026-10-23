@@ -68,7 +68,7 @@ object PaperInk {
     )
 
     /** The live values one frame of a word needs, all from its InkMotion. */
-    class Frame(
+    data class Frame(
         val progress: Float,
         val wet: Float,
         val repeatPass: Float,

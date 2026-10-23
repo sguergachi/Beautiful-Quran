@@ -369,7 +369,10 @@ ReaderFocusController ── holds the LazyListState; the sole writer to it
   anchors are not fought. A correction suspends in its word's `LaunchedEffect`:
   advancing the word, disabling follow, or pausing cancels it even while it
   waits behind a verse glide. Old words cannot queue reverse corrections after
-  the next verse lands. Word tiles report their full, unclipped viewport bounds
+  the next verse lands. Shaped paragraphs wait for a layout of the same text
+  before measuring, so content arriving from the cache cannot apply its new
+  word offsets to an older paragraph. Word tiles report their full, unclipped
+  viewport bounds
   so a line below the fold clears it in one glide; empty or invalid bounds never
   drive scroll. Verse-level `anchorOffsetPx` also takes a bottom
   guard so a near-full-height verse is not parked with its last lines under
