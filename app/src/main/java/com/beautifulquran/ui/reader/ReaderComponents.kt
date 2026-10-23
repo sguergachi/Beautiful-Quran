@@ -2976,7 +2976,9 @@ fun AyahBlock(
         activeRevealStart = activeRevealStart.takeUnless {
             readingMode == ReadingMode.ENGLISH_ONLY
         } ?: 0f,
-        waslPrefixes = waslPrefixes,
+        waslPrefixes = if (readingMode == ReadingMode.ENGLISH_ONLY) {
+            List(ayah.words.size) { null }
+        } else waslPrefixes,
         activation = activation,
         activeWordStartMs = activeWordStartMs,
         verse = ayah,
