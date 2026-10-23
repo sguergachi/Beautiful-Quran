@@ -34,6 +34,9 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.layout.AlignmentLine
+import androidx.compose.ui.layout.FirstBaseline
+import androidx.compose.ui.layout.layout
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
@@ -41,6 +44,8 @@ import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.constrainHeight
+import androidx.compose.ui.unit.offset
 import androidx.compose.ui.unit.dp
 import androidx.media3.common.Player
 import com.beautifulquran.playback.PlayerUiState
@@ -272,8 +277,9 @@ internal fun ReturnToAyahPill(
     modifier: Modifier = Modifier,
 ) {
     val labelStyle = MaterialTheme.typography.titleMedium
-    // The arrow hangs on the capitals' midline, not the line box's centre:
-    // centred on the box its head dropped below the baseline.
+    // The capitals' midline, above the baseline. The wash centres on it and
+    // the arrow hangs on it: the line box carries the face's deep descender
+    // room, so centring the box rode the words high and hung the arrow low.
     val capMiddle = with(LocalDensity.current) { (labelStyle.fontSize * CAP_MIDDLE_EM).roundToPx() }
     Row(
         verticalAlignment = Alignment.CenterVertically,
@@ -287,7 +293,8 @@ internal fun ReturnToAyahPill(
                 RoundedCornerShape(50),
             )
             .quietClickable(onClick = onClick)
-            .padding(horizontal = 18.dp, vertical = 8.dp)
+            .padding(horizontal = 18.dp)
+            .centreCapsVertically(padding = 8.dp, capMiddle = capMiddle)
             .semantics {
                 contentDescription = "Return to $chapterLabel · $ayahLabel"
                 role = Role.Button
@@ -330,6 +337,25 @@ internal fun ReturnToAyahPill(
 
 /** Half the book face's cap height (Junicode 0.663 em, EB Garamond 0.650 em). */
 private const val CAP_MIDDLE_EM = 0.33f
+
+/**
+ * [padding] above and below, with the content nudged inside that height so the
+ * capitals' midline — [capMiddle] px above its first baseline — sits at the
+ * centre. Without a baseline it is plain vertical padding.
+ */
+private fun Modifier.centreCapsVertically(padding: Dp, capMiddle: Int): Modifier =
+    layout { measurable, constraints ->
+        val pad = padding.roundToPx()
+        val placeable = measurable.measure(constraints.offset(vertical = -2 * pad))
+        val height = constraints.constrainHeight(placeable.height + 2 * pad)
+        val baseline = placeable[FirstBaseline]
+        val y = if (baseline == AlignmentLine.Unspecified) {
+            pad
+        } else {
+            (height / 2 + capMiddle - baseline).coerceIn(0, (height - placeable.height).coerceAtLeast(0))
+        }
+        layout(placeable.width, height) { placeable.place(0, y) }
+    }
 
 internal fun shouldShowFloatingPlayback(
     nowPlayingPresent: Boolean,

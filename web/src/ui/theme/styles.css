@@ -3046,7 +3046,10 @@ button.ayah-mark {
   justify-content: center;
   max-width: calc(100% - 1rem);
   margin-block: 0.25rem;
-  padding: 0.45rem 1.125rem;
+  /* The capitals' midline centred, not the line box: Junicode's deep
+     descender room (0.86 / 0.41 em at line-height 1.35) rides the caps
+     0.1em high, so that much air moves from below to above. */
+  padding: calc(0.45rem + 0.1em) 1.125rem calc(0.45rem - 0.1em);
   border-radius: 999px;
   background: var(--green-wash);
   color: var(--accent);
@@ -7390,7 +7393,8 @@ html[data-entrance='true'] body {
 
 .app-shell[data-spread='true'] .player-return {
   font-size: calc(1rem * var(--furn));
-  padding: calc(0.45rem * var(--furn)) calc(1.125rem * var(--furn));
+  padding: calc(0.45rem * var(--furn) + 0.1em) calc(1.125rem * var(--furn))
+    calc(0.45rem * var(--furn) - 0.1em);
 }
 
 .app-shell[data-spread='true'] .player-return-chapter {
