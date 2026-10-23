@@ -317,8 +317,9 @@ Renderers consume these; they do not re-derive curves.
   Unmarking swaps the fixed-height reference line for an inline confirmation,
   focuses Keep, and reserves ruby for the existing ribbon component.
 - **Pinned chapters** mirror Android (`docs/DESIGN.md`, "Pinned chapters"):
-  `pinnedSurahIds` in settings; a PINNED flag over a square-cut band in the
-  web Continue pill's `--continue-wash`; pinned chapters move out of the list.
+  `pinnedSurahIds` in settings; a PINNED flag over a square-cut band in
+  `--green-wash` (Android's Continue green, not the web pill's mint
+  `--continue-wash`); pinned chapters move out of the list.
   Press-and-hold (500 ms, cancelled by 10 px of travel), a long-press or
   right-click (`contextmenu`), the Context Menu key, Shift+F10 or Shift+Enter
   asks in place: a crisp fill from the pointer (the middle for keyboard),

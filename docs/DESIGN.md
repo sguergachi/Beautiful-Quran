@@ -1713,9 +1713,8 @@ pinned row when the chapter is pinned; it hangs in the sheet-edge lane on
 the band. Search owns the sheet while active, so the band stands down.
 Pinning from the top of the sheet scrolls the band into view; a reader deep
 in the list keeps their place. Stored as `Settings.pinnedSurahIds`. The web
-mirrors it (`docs/WEB.md` §6.3), its band in the web Continue pill's mint
-`--continue-wash`, so on each platform the band matches that platform's
-Continue pill.
+mirrors it (`docs/WEB.md` §6.3) in the same Continue green, `--green-wash`;
+the owner rejected the web pill's mint `--continue-wash` for the band.
 
 Press-and-hold is taught by a contextual guide (`PinChapterTip`, behind the
 developer guide gate like every lesson); see
