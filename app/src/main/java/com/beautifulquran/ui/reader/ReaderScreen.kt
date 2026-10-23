@@ -911,23 +911,22 @@ fun ReaderScreen(
     }
     var listCoordinates by remember { mutableStateOf<LayoutCoordinates?>(null) }
     val scope = rememberCoroutineScope()
-    val onKeepWordInView: (() -> Pair<Float, Float>?) -> Unit = remember(
+    // Stay in the word modifier's LaunchedEffect: advancing the word, pausing,
+    // or hand scrolling must cancel its correction even while it waits for a
+    // verse glide's focus lock. A screen-scope launch outlives that word.
+    val onKeepWordInView: suspend (() -> Pair<Float, Float>?) -> Unit = remember(
         focusController,
         wordBandBottomMarginPx,
         wordFocusRequest,
     ) {
         val request = wordFocusRequest
         { measure ->
-            scope.launch {
-                val measured = focusController.keepWordInView(
-                    // Bottom-only: lift words clear of the play-bar fold; do not
-                    // pull short verses down from their reading-line anchor.
-                    bandTopMarginPx = 0f,
-                    bandBottomMarginPx = wordBandBottomMarginPx,
-                    measureInViewport = measure,
-                )
-                if (measured && wordFocusRequest == request) wordFocusRequest = null
-            }
+            val measured = focusController.keepWordInView(
+                bandTopMarginPx = 0f,
+                bandBottomMarginPx = wordBandBottomMarginPx,
+                measureInViewport = measure,
+            )
+            if (measured && wordFocusRequest == request) wordFocusRequest = null
         }
     }
     val onKeepAnnotationInView:

@@ -327,6 +327,11 @@ object FocusEngine {
         bandTopMarginPx: Float,
         bandBottomMarginPx: Float,
     ): Float {
+        // A clipped-away word can report an empty rectangle at the window
+        // origin. It is not a target above the page and must never pull it back.
+        if (!wordTopPx.isFinite() || !wordBottomPx.isFinite() || wordBottomPx <= wordTopPx) {
+            return 0f
+        }
         val bandTop = topGuardPx + bandTopMarginPx
         val bandBottom = viewportHeightPx - bandBottomMarginPx
         if (wordTopPx < bandTop) return wordTopPx - bandTop

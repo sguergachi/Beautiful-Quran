@@ -754,8 +754,8 @@ private val GlintLayerBleed = 40.dp
 /** Measures a target as (top, bottom) in LazyColumn viewport pixels. */
 private typealias ViewportBoundsMeasure = () -> Pair<Float, Float>?
 
-/** Hands live word bounds to the focus controller (may re-call). */
-private typealias OnKeepWordInView = (measure: ViewportBoundsMeasure) -> Unit
+/** Keeps the correction in the active word's effect so it cancels with it. */
+private typealias OnKeepWordInView = suspend (measure: ViewportBoundsMeasure) -> Unit
 
 /** Routes a live note-field measure through the serialized focus controller. */
 private typealias OnKeepAnnotationInView = suspend (
@@ -1284,9 +1284,13 @@ private fun Modifier.wordUnitBehavior(
         onKeepWordInView {
             val wordCoords = wordCoordinates?.takeIf { it.isAttached } ?: return@onKeepWordInView null
             val listCoords = listCoordinates()?.takeIf { it.isAttached } ?: return@onKeepWordInView null
-            val bounds = wordCoords.boundsInWindow()
-            val listTop = listCoords.boundsInWindow().top
-            (bounds.top - listTop) to (bounds.bottom - listTop)
+            // boundsInWindow clips to the list and becomes Rect.Zero for a
+            // fully hidden word. Focus needs its actual extent to clear the
+            // fold in one glide, including when restoring a held word.
+            val listTop = listCoords.localToWindow(Offset.Zero).y
+            val top = wordCoords.localToWindow(Offset.Zero).y - listTop
+            val bottom = wordCoords.localToWindow(Offset(0f, wordCoords.size.height.toFloat())).y - listTop
+            top to bottom
         }
     }
     return this

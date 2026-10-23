@@ -11,6 +11,27 @@ class FocusEngineTest {
     private val viewport = 2000
     private val guard = 0
 
+    @Test
+    fun `clipped empty word bounds after a verse glide never scroll backward`() {
+        // Rect.Zero minus the list's window top produced this false target.
+        for ((top, bottom) in listOf(-173f to -173f, 0f to 0f, 2000f to 2000f)) {
+            assertEquals(0f, FocusEngine.wordBandDeltaPx(top, bottom, 1880f, 0f, 0f, 346.5f))
+        }
+    }
+
+    @Test
+    fun `word follow rejects invalid bounds but restores real offscreen words`() {
+        for ((top, bottom) in listOf(330f to 0f, Float.NaN to 330f, 0f to Float.POSITIVE_INFINITY)) {
+            assertEquals(0f, FocusEngine.wordBandDeltaPx(top, bottom, 1880f, 0f, 0f, 346.5f))
+        }
+        // Unclipped bounds keep all 330px of a large tile below the fold.
+        val delta = FocusEngine.wordBandDeltaPx(1565f, 1895f, 1880f, 0f, 0f, 346.5f)
+        assertEquals(361.5f, delta)
+        assertEquals(0f, FocusEngine.wordBandDeltaPx(1565f - delta, 1895f - delta, 1880f, 0f, 0f, 346.5f))
+        // A real held word above the page still restores upward.
+        assertEquals(-400f, FocusEngine.wordBandDeltaPx(-400f, -70f, 1880f, 0f, 0f, 346.5f))
+    }
+
     // ---- chapter-top basmalah ----
 
     @Test

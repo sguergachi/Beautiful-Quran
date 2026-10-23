@@ -366,7 +366,12 @@ ReaderFocusController ── holds the LazyListState; the sole writer to it
   `ReaderFocusController.keepWordInView` applies a **bottom-only** reading-band
   correction (pure `wordBandDeltaPx`) so the active line lifts clear of the
   player-bar fold / edge fade. Top margin stays 0 so short-verse reading-line
-  anchors are not fought. Verse-level `anchorOffsetPx` also takes a bottom
+  anchors are not fought. A correction suspends in its word's `LaunchedEffect`:
+  advancing the word, disabling follow, or pausing cancels it even while it
+  waits behind a verse glide. Old words cannot queue reverse corrections after
+  the next verse lands. Word tiles report their full, unclipped viewport bounds
+  so a line below the fold clears it in one glide; empty or invalid bounds never
+  drive scroll. Verse-level `anchorOffsetPx` also takes a bottom
   guard so a near-full-height verse is not parked with its last lines under
   that chrome. A repeat-aware timing backtrack to word one is a fresh verse
   focus event even though its media item and ayah key did not change, restoring
