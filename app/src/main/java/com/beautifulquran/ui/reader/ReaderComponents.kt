@@ -847,6 +847,8 @@ internal class InkMotion(
     private val paperFirstWet: State<Float>? = null,
     /** The word before this one in reading order, for the paper ink's lead fade. */
     private val previous: InkMotion? = null,
+    /** English-only waits for its own word clock before depositing any ink. */
+    private val anticipateNextWord: Boolean = true,
     /** Last visible deposit dissolving after this word becomes unread again. */
     val paperDeparture: PaperInkDeparture? = null,
 ) {
@@ -869,6 +871,7 @@ internal class InkMotion(
      */
     val paperAhead: Float
         get() {
+            if (!anticipateNextWord) return -1f
             val before = previous ?: return -1f
             if (isActive || ink.state != InkEngine.State.Upcoming || !before.isActive) return -1f
             return (before.plainSweepProgress - 1f).coerceIn(-1f, 0f)
@@ -1253,6 +1256,7 @@ internal fun rememberInkMotions(
             paperFirstWet = rememberGlintAlpha(glintInk == null && !ink.repeat &&
                 InkEngine.glinting(ink.state, wetInk)),
             previous = motions.lastOrNull(),
+            anticipateNextWord = !sequentialSweeps,
             paperDeparture = rememberPaperInkDeparture(
                 enabled = glintInk == null && InkEngine.tuning.paperInk && PaperInk.supported,
                 state = ink.state,

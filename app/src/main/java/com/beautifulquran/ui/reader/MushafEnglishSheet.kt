@@ -1707,7 +1707,7 @@ private fun englishVerseBlooms(
  * wash is one continuous prefix with its edge at [washEdge] (a character
  * position), so each English word's progress is its own distance from that
  * edge: words behind it are laid, the word it is crossing is mid-ink, and the
- * next word's negative progress lets its first letter fade in ahead. A word
+ * next word stays unread until the edge reaches its start. A word
  * stays with the paper ink while its owner's ink is still wet.
  *
  * Drawn over the leaf's covers — the paper ink erases what they left of the
@@ -1735,7 +1735,7 @@ private fun MutableList<ShapedWordBloom>.addEnglishPaperInk(
         var j = i
         while (j < end && !text[j].isWhitespace()) j++
         val owner = washSpans.firstOrNull { i in it.range }?.let { motions.getOrNull(it.position - 1) }
-        val raw = ((washEdge - i) / (j - i).coerceAtLeast(1)).coerceIn(-1f, 1f)
+        val raw = englishPaperInkWordProgress(washEdge, i, j)
         val evaporating = owner?.paperDeparture?.active == true
         val current = PaperInkDeposit(raw, owner?.paperWetness ?: 0f, 0f, 0f, 0f)
         val deposit = if (evaporating) deposits[i] ?: current else current.also { deposits[i] = it }

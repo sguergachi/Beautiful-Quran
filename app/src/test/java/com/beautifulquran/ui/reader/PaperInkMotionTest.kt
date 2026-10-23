@@ -6,6 +6,7 @@ import androidx.compose.runtime.State
 import androidx.compose.ui.graphics.Color
 import com.beautifulquran.domain.TajweedPacing
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -16,6 +17,7 @@ class PaperInkMotionTest {
         prefix: WaslPrefix? = null,
         previous: InkMotion? = null,
         wet: Float = 1f,
+        anticipateNextWord: Boolean = true,
     ) = InkMotion(
         ink = InkEngine.Word(state, false), lyricInk = mutableStateOf(1f),
         sweep = LetterSweep(progress, mutableStateOf(null), mutableStateOf(null)),
@@ -24,7 +26,27 @@ class PaperInkMotionTest {
         glintReplacedByRepeat = false, waslPrefix = prefix,
         tarji = mutableStateOf(InkEngine.GlintResonance.Idle),
         paperWet = mutableStateOf(wet), previous = previous,
+        anticipateNextWord = anticipateNextWord,
     )
+
+    @Test fun englishUpcomingWordWaitsEvenAsItsPredecessorFinishes() {
+        val clock = mutableStateOf(0f)
+        val before = motion(InkEngine.State.Active, clock)
+        val next = motion(InkEngine.State.Upcoming, mutableStateOf(0f), previous = before,
+            anticipateNextWord = false)
+        val arabicNext = motion(InkEngine.State.Upcoming, mutableStateOf(0f), previous = before)
+        val style = PaperInkStyle(Color.Black, Color.Red)
+        for (progress in listOf(.5f, .9f, .99f, 1f)) {
+            clock.value = progress
+            assertEquals(-1f, next.paperInkFrame(style).progress, 0f)
+            assertFalse(next.paperInkLive)
+            assertEquals(progress - 1f, arabicNext.paperInkFrame(style).progress, 0f)
+        }
+        val active = motion(InkEngine.State.Active, clock, anticipateNextWord = false)
+        clock.value = .05f
+        assertEquals(.05f, active.paperInkFrame(style).progress, 0f)
+        assertEquals(InkEngine.tuning.paperInkLeadFade, active.paperInkFrame(style).leadFade, 0f)
+    }
 
     @Test fun connectedOpeningContinuesTheSameWetLetterEdgeAcrossHandoff() {
         val style = PaperInkStyle(Color.Black, Color.Red)

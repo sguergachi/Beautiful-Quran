@@ -6,6 +6,8 @@ reading order and lays a fine wet line down the core of every stroke it
 passes, each stroke swells out to its edges, the fresh ink stands slightly
 heavier and glossier, and then dries back to the page's ink over the glimmer's
 dry-down (`glintFadeMs`). The letter ahead fades in so the edge is feathered.
+English-only Scroll and the English leaf keep that soft edge within the current
+word; the next word receives no anticipatory fade before its own wash begins.
 A repeat is laid in terracotta, held through its chain, and released to
 charcoal by evaporation: thin edges clear first and thicker stroke interiors
 linger, with a soft front over a 1,800 ms release. The dry black

@@ -5,6 +5,10 @@ import com.beautifulquran.domain.EnglishAlignment
 import com.beautifulquran.domain.EnglishWordSpan
 import kotlin.math.roundToLong
 
+/** Keep a future English word fully unread until the continuous wash reaches it. */
+internal fun englishPaperInkWordProgress(washEdge: Float, start: Int, end: Int): Float =
+    if (washEdge < start) -1f else ((washEdge - start) / (end - start).coerceAtLeast(1)).coerceIn(0f, 1f)
+
 /** Split the reader's continuous English bands into word clocks for the material study. */
 internal fun paperInkEnglishWindows(
     ranges: List<IntRange>,
