@@ -79,6 +79,14 @@ The basmalah sites (drawable and QCF glyph) keep their wash for now.
   extended travel into the ink leaves a verse-closing letter behind during
   its hold. Both positions follow the same captured media window, including
   pauses, residuals, and wasl carry-in.
+- **Connected openings continue one deposit.** During a nūn/tanwīn donor's
+  tail, the next opening receives a gradually increasing fraction of its
+  first letter slot, with the donor's wetness. The active word captures that
+  same letter edge and continues it on the media clock. The wider cover-wash
+  handoff is kept separately; reusing it for liquid ink jumps the opening
+  forward. Cover-wash wasl overlays draw only in the fallback, so they cannot
+  darken a letter on top of the liquid front. Regression: Alafasy 64:12
+  `فَإِن → تَوَلَّيۡتُمۡ`, plus short and wrapped connections.
 - **No climbing.** The swell is fed column by column along the baseline;
   leaning stems are fed from their baseline foot.
 - **Rewind evaporates the forward ink.** When a rewind or earlier-word tap

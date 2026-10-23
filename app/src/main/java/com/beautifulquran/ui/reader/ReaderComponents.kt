@@ -674,8 +674,11 @@ internal data class WaslPrefix(
     val windowProgress: State<Float>,
     val endProgress: Float,
     val feather: Float,
+    /** Liquid ink has its own feather: carry only the opening letter's slot. */
+    val letterEndProgress: Float = 0f,
 ) {
     fun displayProgress(): Float = waslWashProgress(windowProgress.value, endProgress)
+    fun letterProgress(): Float = waslWashProgress(windowProgress.value, letterEndProgress)
 }
 
 internal class ActiveWordEntry(
@@ -852,6 +855,12 @@ internal class InkMotion(
     /** Paper ink wetness this frame (0 dry). */
     val paperWetness: Float get() = paperWet?.value ?: 0f
     val paperUnderWetness: Float get() = paperFirstWet?.value ?: 0f
+
+    /** A connected opening is already being deposited during its donor's tail. */
+    val paperPrefixWetness: Float
+        get() = if (waslPrefix?.letterProgress()?.let { it > 0f } == true) {
+            previous?.paperWetness ?: 0f
+        } else 0f
 
     /**
      * How far this word is from starting, in word durations (−1..0), while the
@@ -1206,6 +1215,7 @@ internal fun rememberInkMotions(
             provisional = activeWord?.fromTap == true,
             pacing = entryPacing,
             revealStart = activeRevealStart.takeIf { isActive } ?: 0f,
+            letterRevealStart = if (isActive) waslPrefixes[index]?.letterProgress() ?: 0f else 0f,
             predecessor = predecessor.takeIf { sequentialSweeps },
         )
         motions += InkMotion(
@@ -1404,7 +1414,7 @@ private fun HighlightLayeredText(
                 text = text,
                 style = style,
                 color = color,
-                modifier = Modifier.letterFadeIn(
+                modifier = with(paperNode) { Modifier.hiddenWhilePaperInk() }.letterFadeIn(
                     progress = { prefix.displayProgress() },
                     rtl = rtl,
                     restingAlpha = 0f,
@@ -1664,7 +1674,13 @@ private fun MutableList<ShapedWordBloom>.addShapedInkMotionBlooms(
                 ShapedWordBloom.PaperInk(
                     range = range,
                     frame = frame,
-                    fallback = listOfNotNull(cover, reveal, repeatTint),
+                    fallback = listOfNotNull(cover, reveal, repeatTint,
+                        motion.waslPrefix?.let { wasl ->
+                            waslInk?.let { ink -> ShapedWordBloom.ColorReveal(
+                                range = range, progress = wasl.displayProgress(),
+                                color = ink, feather = wasl.feather,
+                            ) }
+                        }),
                     // Unread ink is the shader's own; a verse recess still dims recited ink.
                     after = listOfNotNull(cover.takeIf { motion.ink.state != InkEngine.State.Upcoming }),
                 ),
@@ -1673,11 +1689,6 @@ private fun MutableList<ShapedWordBloom>.addShapedInkMotionBlooms(
             add(ShapedWordBloom.PaperInkWarm(range))
         }
         if (paperInk != null && motion.paperInkLive) {
-            val wasl = motion.waslPrefix
-            val waslProgress = wasl?.displayProgress() ?: 0f
-            if (waslInk != null && wasl != null && waslProgress > 0f) {
-                add(ShapedWordBloom.ColorReveal(range = range, progress = waslProgress, color = waslInk, feather = wasl.feather))
-            }
             return@forEachIndexed
         }
         if (reveal != null) add(reveal)
@@ -2936,6 +2947,7 @@ fun AyahBlock(
                     windowProgress = fullWaslWindow,
                     endProgress = activeRevealStart,
                     feather = waslMainFeather,
+                    letterEndProgress = waslWashProgress(incomingHandoff, incomingConnection.prefixFraction),
                 )
             index == activeIndex + 1 && outgoingConnection != null ->
                 WaslPrefix(
@@ -2945,6 +2957,7 @@ fun AyahBlock(
                         mainFeather = waslMainFeather,
                     ),
                     feather = waslMainFeather,
+                    letterEndProgress = outgoingConnection.prefixFraction,
                 )
             else -> null
         }

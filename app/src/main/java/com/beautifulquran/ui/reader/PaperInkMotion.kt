@@ -83,10 +83,10 @@ private fun InkMotion.paperInkDeposit(): PaperInkDeposit {
     val current = PaperInkDeposit(
         progress = when {
             repeating -> paperRepeatProgress
-            upcoming -> paperAhead
+            upcoming -> waslPrefix?.let { maxOf(paperAhead, it.letterProgress()) } ?: paperAhead
             else -> paperSweepProgress
         },
-        wet = if (upcoming) 0f else paperWetness,
+        wet = if (upcoming) paperPrefixWetness else paperWetness,
         repeatPass = if (repeating) 1f else 0f,
         repeatTint = if (repeating) repeatAlpha else 0f,
         retained = if (repeating) 1f else 0f,

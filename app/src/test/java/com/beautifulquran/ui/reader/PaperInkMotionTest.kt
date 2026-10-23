@@ -2,12 +2,75 @@ package com.beautifulquran.ui.reader
 
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.State
 import androidx.compose.ui.graphics.Color
+import com.beautifulquran.domain.TajweedPacing
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class PaperInkMotionTest {
+    private fun motion(
+        state: InkEngine.State,
+        progress: State<Float>,
+        prefix: WaslPrefix? = null,
+        previous: InkMotion? = null,
+        wet: Float = 1f,
+    ) = InkMotion(
+        ink = InkEngine.Word(state, false), lyricInk = mutableStateOf(1f),
+        sweep = LetterSweep(progress, mutableStateOf(null), mutableStateOf(null)),
+        repeatWash = RepeatWash(mutableStateOf(0f), mutableStateOf(0f), mutableStateOf(null)),
+        glintAlpha = mutableStateOf(0f), glintIsRepeat = false,
+        glintReplacedByRepeat = false, waslPrefix = prefix,
+        tarji = mutableStateOf(InkEngine.GlintResonance.Idle),
+        paperWet = mutableStateOf(wet), previous = previous,
+    )
+
+    @Test fun connectedOpeningContinuesTheSameWetLetterEdgeAcrossHandoff() {
+        val style = PaperInkStyle(Color.Black, Color.Red)
+        // The reported 64:12 pair, plus short and wrapped connected openings.
+        for ((donor, target) in listOf("فَإِن" to "تَوَلَّيۡتُمۡ", "مَن" to "يَشۡرِي",
+            "مِن" to "رَّبِّكُمۡ", "بِمَعۡرُوفٖ" to "وَلَا")) {
+            val connection = requireNotNull(TajweedPacing.connection(donor, target))
+            val handoff = connection.at(1f, .75f, .45f)
+            val clock = mutableStateOf(0f)
+            val before = motion(InkEngine.State.Active, mutableStateOf(1f))
+            val prefix = WaslPrefix(clock, waslContinuationStart(connection.prefixFraction, 1.6f),
+                1.6f, connection.prefixFraction)
+            val upcoming = motion(InkEngine.State.Upcoming, mutableStateOf(0f), prefix, before)
+            val samples = (0..12).map { step ->
+                clock.value = handoff * step / 12
+                upcoming.paperInkFrame(style).progress
+            }
+            assertEquals(0f, samples.first(), 0f)
+            assertTrue(samples.zipWithNext().all { (a, b) -> b > a })
+            assertTrue(samples.last() < connection.prefixFraction)
+            val arriving = upcoming.paperInkFrame(style)
+            val active = motion(InkEngine.State.Active, mutableStateOf(samples.last()))
+                .paperInkFrame(style)
+            assertEquals("$target must keep its deposit", active.progress, arriving.progress, 0f)
+            assertEquals("$target must not suddenly change pigment", active.wet, arriving.wet, 0f)
+            assertEquals(0f, arriving.retained, 0f)
+            // Pausing the donor freezes this same edge and dries both sides alike.
+            val pausedBefore = motion(InkEngine.State.Active, mutableStateOf(1f), wet = .4f)
+            assertEquals(.4f, motion(InkEngine.State.Upcoming, mutableStateOf(0f), prefix,
+                pausedBefore).paperInkFrame(style).wet, 0f)
+        }
+    }
+
+    @Test fun unconnectedOpeningBeginsUnreadAndFillsGraduallyOnItsOwnClock() {
+        val clock = mutableStateOf(0f)
+        val style = PaperInkStyle(Color.Black, Color.Red)
+        val opening = motion(InkEngine.State.Active, clock)
+        assertEquals(0f, opening.paperInkFrame(style).progress, 0f)
+        clock.value = .05f
+        assertEquals(.05f, opening.paperInkFrame(style).progress, 0f)
+        // A direct start has no predecessor's prefix to import.
+        val unread = motion(InkEngine.State.Upcoming, mutableStateOf(1f))
+        assertEquals(-1f, unread.paperInkFrame(style).progress, 0f)
+        assertEquals(0f, unread.paperInkFrame(style).wet, 0f)
+    }
+
     @Test fun repeatRetainsFirstCoatProgressAndItsIndependentDryingClock() {
         val first = mutableStateOf(.9f)
         val underWet = mutableStateOf(.65f)

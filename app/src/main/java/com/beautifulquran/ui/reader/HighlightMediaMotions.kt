@@ -15,6 +15,7 @@ private data class MediaEntry(
     val pacing: TajweedPacing.Curve? = null,
     val feather: Float? = null,
     val revealStart: Float = 0f,
+    val letterRevealStart: Float = 0f,
 )
 private class MediaHistory(var entry: MediaEntry = MediaEntry())
 
@@ -29,6 +30,7 @@ private fun rememberMediaEntry(
     pacing: TajweedPacing.Curve?,
     revealStart: Float = 0f,
     repeatOccurrence: Boolean = false,
+    letterRevealStart: Float = 0f,
 ): State<MediaEntry> {
     val timeline = LocalHighlightTimeline.current
     val history = remember { MediaHistory() }
@@ -40,7 +42,8 @@ private fun rememberMediaEntry(
         next = next.copy(window = null)
     }
     val entry = if (next.window != prior.wash.window || next.provisional != prior.wash.provisional) {
-        MediaEntry(next, pacing, pacing?.let { InkEngine.pacedFeather() }, revealStart.coerceIn(0f, 1f))
+        MediaEntry(next, pacing, pacing?.let { InkEngine.pacedFeather() },
+            revealStart.coerceIn(0f, 1f), letterRevealStart.coerceIn(0f, 1f))
     } else prior.copy(wash = next)
     SideEffect { history.entry = entry }
     return rememberUpdatedState(entry)
@@ -63,9 +66,11 @@ internal fun rememberMediaLetterSweep(
     pacing: TajweedPacing.Curve?,
     revealStart: Float,
     predecessor: State<Float>?,
+    letterRevealStart: Float = 0f,
 ): LetterSweep {
     val timeline = LocalHighlightTimeline.current
-    val entry = rememberMediaEntry(active, retain, activation, window, provisional, pacing, revealStart)
+    val entry = rememberMediaEntry(active, retain, activation, window, provisional, pacing, revealStart,
+        letterRevealStart = letterRevealStart)
     val prior = rememberUpdatedState(predecessor)
     val raw = remember {
         derivedStateOf {
@@ -88,7 +93,7 @@ internal fun rememberMediaLetterSweep(
     val letters = remember {
         derivedStateOf {
             val e = entry.value
-            continuedSweepProgress(e.pacing?.atLetters(raw.value) ?: raw.value, e.revealStart)
+            continuedSweepProgress(e.pacing?.atLetters(raw.value) ?: raw.value, e.letterRevealStart)
         }
     }
     return remember { LetterSweep(progress, feather, curve, raw, letters) }
