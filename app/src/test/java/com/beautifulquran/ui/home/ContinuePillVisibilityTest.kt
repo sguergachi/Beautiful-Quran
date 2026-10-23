@@ -201,12 +201,16 @@ class ContinuePillVisibilityTest {
     }
 
     @Test
-    fun pinFillGrowsFromTheFingerToBothEdgesTogether() {
-        assertEquals(300f to 300f, pinFillSpan(300f, 1000f, 0f))
-        assertEquals(150f to 650f, pinFillSpan(300f, 1000f, 0.5f))
-        assertEquals(0f to 1000f, pinFillSpan(300f, 1000f, 1f))
-        // No finger known: out from the middle.
-        assertEquals(500f to 500f, pinFillSpan(Float.NaN, 1000f, 0f))
+    fun inkBlotStartsAtTheFingerAndSettlesCoveringTheWholeRow() {
+        for (seed in listOf(1, 18, 114)) {
+            for (step in 0 until 360) {
+                val angle = step * kotlin.math.PI.toFloat() / 180f
+                assertEquals(0f, inkBlotRadius(angle, 0f, seed), 0f)
+                // In reach units the farthest corner is √2 away: at rest even
+                // the shallowest lobe is past it, so the row is filled square.
+                assertTrue(inkBlotRadius(angle, 1f, seed) > kotlin.math.sqrt(2f))
+            }
+        }
     }
 
     @Test

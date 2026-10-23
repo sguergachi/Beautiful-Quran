@@ -1673,19 +1673,22 @@ bookmark icon, a second ribbon shape, or a bespoke animated substitute.
 ### Pinned chapters (Android)
 
 Press and hold a chapter row to pin it to the top of Chapters, or a pinned
-row to unpin it. The hold **asks first**, in place, by filling the row with
-its answer: a solid, square-cut slice of the band's green grows out from the
-finger to both edges (250 ms, the share soak's time) and holds, so the row
-already looks like the band slice it will become. Holding a pinned row fills
-paper back over its slice of the band the same way. No question is written:
+row to unpin it. The hold **asks first**, in place, by blotting the row with
+its answer: ink touches down where the finger is and spreads as a lobed,
+seeded blot (quick, then creeping to a stop, 380 ms) until it fills the row
+square-cut, so the row already looks like the band slice it will become. The
+blot grows in the row's own proportions, fuller across than along, since a
+round blot would fill a thin row's height at once and leave two edges
+sweeping sideways like a wipe. A faint wet rim rides the edge and dries as it
+settles. Holding a pinned row blots paper back over its slice of the band. No question is written:
 the subtitle stays the chapter's own line, and the Arabic name hands over
 (it lifts off before they ink in, never overlapping) to two answers in book
 type, the verb (**Pin** or **Unpin**) in green and a quiet Cancel, inside the
 row's own height so nothing jumps. A tap elsewhere on the row, Back, or
 starting a search backs out and the fill draws back to the finger; one row
 asks at a time. Tried and rejected: a written subtitle question (*Pin to the
-top?*), and the share selection's feathered ink soak (a smudged inset patch
-on a row this thin).
+top?*); the share selection's feathered ink soak (a smudged inset patch on a
+row this thin); and a straight square wipe from the finger (no ink in it).
 
 Pinned chapters sit on a **band**: the Continue pill's green wash
 (`greenWash`) laid edge to edge across the sheet, square-cut like a strip of
@@ -1719,7 +1722,7 @@ Press-and-hold is taught by a contextual guide (`PinChapterTip`, behind the
 developer guide gate like every lesson); see
 [CONTEXTUAL_GUIDES.md](CONTEXTUAL_GUIDES.md).
 
-Implementation: `pinnedBand`, `pinFill` / `pinFillSpan`, `pinAction` and the list in
+Implementation: `pinnedBand`, `pinFill` / `inkBlotRadius`, `pinAction` and the list in
 `ui/home/HomeScreen.kt`.
 
 ### Chapters bookmark treatment

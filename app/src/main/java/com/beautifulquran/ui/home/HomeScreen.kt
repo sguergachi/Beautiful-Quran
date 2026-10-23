@@ -103,6 +103,13 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.util.lerp
 import kotlinx.coroutines.delay
 import kotlin.math.roundToInt
+import kotlin.math.sin
+import kotlin.math.cos
+import kotlin.math.PI
+import androidx.compose.ui.geometry.isSpecified
+import androidx.compose.ui.graphics.drawscope.clipRect
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.Path
 import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.flow.first
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -1412,11 +1419,12 @@ private fun SurahRow(
         verticalAlignment = Alignment.CenterVertically,
         modifier = modifier
             .fillMaxWidth()
-            // Holding fills the row with the answer: the band's green to pin,
+            // Holding blots the row with the answer: the band's green to pin,
             // paper back over the band to unpin.
             .pinFill(
                 filling = confirmingPin,
                 color = if (pinned) MaterialTheme.colorScheme.background else QuranTheme.accents.greenWash,
+                seed = surah.id,
             )
             // While asking, a tap anywhere else on the row backs out.
             .quietClickable(
@@ -1514,45 +1522,92 @@ private fun SurahRow(
 }
 
 /**
- * The band filling in: a solid, square-cut slice of [color] that grows from
- * the finger out to both edges of the row and holds there, so the row
- * becomes exactly the band slice it will be once pinned. No feathered front.
- * Letting go draws it back to where the finger was.
+ * The band arriving as an ink blot: ink touches down where the finger is and
+ * spreads with a lobed, seeded edge, quick at first and then creeping to a
+ * stop, until it fills the row square-cut — exactly the band slice it will
+ * be once pinned. A darker wet rim rides the edge and dries away as the blot
+ * settles. Letting go draws the ink back to the finger.
  */
 @Composable
-private fun Modifier.pinFill(filling: Boolean, color: androidx.compose.ui.graphics.Color): Modifier {
+private fun Modifier.pinFill(
+    filling: Boolean,
+    color: androidx.compose.ui.graphics.Color,
+    seed: Int,
+): Modifier {
     val progress by animateFloatAsState(
         targetValue = if (filling) 1f else 0f,
-        animationSpec = tween(PinFillMs, easing = FastOutSlowInEasing),
+        animationSpec = tween(PinFillMs, easing = InkBlotEasing),
         label = "pinFill",
     )
+    val rim = MaterialTheme.colorScheme.primary.copy(alpha = 0.10f)
     // Read only in the draw phase, so the finger never recomposes the row.
-    val fingerX = remember { mutableFloatStateOf(Float.NaN) }
+    val finger = remember { mutableStateOf(Offset.Unspecified) }
     return pointerInput(Unit) {
         awaitPointerEventScope {
             while (true) {
                 val down = awaitPointerEvent(PointerEventPass.Initial).changes
                     .firstOrNull { it.pressed && !it.previousPressed }
-                if (down != null) fingerX.floatValue = down.position.x
+                if (down != null) finger.value = down.position
             }
         }
     }.drawBehind {
         if (progress <= 0f) return@drawBehind
-        val (left, right) = pinFillSpan(fingerX.floatValue, size.width, progress)
-        drawRect(color, topLeft = Offset(left, 0f), size = Size(right - left, size.height))
+        val origin = if (finger.value.isSpecified) finger.value else center
+        // Spread in the row's own proportions: a row is far wider than it is
+        // tall, and a round blot would fill its height at once and leave only
+        // two edges sweeping sideways — a wipe. Scaled to the row, the blot's
+        // top and bottom stay curved while it runs along the strip.
+        val reachX = maxOf(origin.x, size.width - origin.x)
+        // Fuller across the strip than along it, so the top and bottom seal
+        // with the ends instead of leaving thin dry margins to creep shut.
+        val reachY = maxOf(origin.y, size.height - origin.y) * InkBlotFullness
+        val blot = Path().apply {
+            for (step in 0..InkBlotSteps) {
+                val angle = step * 2f * PI.toFloat() / InkBlotSteps
+                val r = inkBlotRadius(angle, progress, seed)
+                val point = Offset(origin.x + reachX * r * cos(angle), origin.y + reachY * r * sin(angle))
+                if (step == 0) moveTo(point.x, point.y) else lineTo(point.x, point.y)
+            }
+            close()
+        }
+        clipRect {
+            drawPath(blot, color)
+            // The wet rim: pigment piled at the running edge, drying as it stops.
+            val wet = 1f - progress
+            if (wet > 0.02f) {
+                drawPath(blot, rim.copy(alpha = rim.alpha * wet), style = Stroke(width = InkBlotRim.toPx() * wet))
+            }
+        }
     }
 }
 
-/** The filled span at [progress]: out from [fingerX] (the middle when no
- * finger is known) to reach both edges together. */
-internal fun pinFillSpan(fingerX: Float, width: Float, progress: Float): Pair<Float, Float> {
-    val origin = if (fingerX.isNaN()) width / 2f else fingerX.coerceIn(0f, width)
-    val p = progress.coerceIn(0f, 1f)
-    return origin * (1f - p) to origin + (width - origin) * p
+/**
+ * The blot's edge at [angle], in units of the row's reach from the finger
+ * along each axis: lobes of a few seeded frequencies on a front that runs to
+ * past √2, so at rest even its shallowest lobe has crossed the farthest
+ * corner and the row is filled square. The lobes creep a little as the ink
+ * spreads, so the edge is never a growing stamp.
+ */
+internal fun inkBlotRadius(angle: Float, progress: Float, seed: Int): Float {
+    var wobble = 0f
+    for ((k, frequency) in InkBlotLobes.withIndex()) {
+        val phase = seed * (1.7f + k * 0.9f) + progress * (0.5f + k * 0.3f)
+        wobble += InkBlotLobeDepth[k] * sin(frequency * angle + phase)
+    }
+    return progress.coerceIn(0f, 1f) * InkBlotOvershoot * (1f + wobble)
 }
 
-/** The share selection's soak time: the band fills as quickly. */
-private const val PinFillMs = 250
+private val InkBlotLobes = floatArrayOf(3f, 5f, 8f, 13f)
+private val InkBlotLobeDepth = floatArrayOf(0.09f, 0.05f, 0.03f, 0.015f)
+/** Past the farthest corner (√2 in reach units) by enough that the deepest
+ * dip (−18.5%) still covers it: 1.8 × 0.815 > √2. */
+private const val InkBlotOvershoot = 1.8f
+private const val InkBlotSteps = 120
+private const val InkBlotFullness = 1.6f
+private val InkBlotRim = 3.dp
+/** Ink lands fast and creeps to a stop. */
+private val InkBlotEasing = CubicBezierEasing(0.15f, 0.75f, 0.3f, 1f)
+private const val PinFillMs = 380
 
 /** The verb press-and-hold offers beside Cancel. */
 internal fun pinAction(pinned: Boolean): String = if (pinned) "Unpin" else "Pin"
