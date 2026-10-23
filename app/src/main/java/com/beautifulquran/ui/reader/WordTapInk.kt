@@ -52,3 +52,30 @@ internal class WordTapConfirmationTimeout(private val readyMs: Long) {
         return nowMs - start >= readyMs
     }
 }
+
+/**
+ * A word tap's own wait, from the tap until the sought word is heard.
+ *
+ * The stream-wait cover (the whole page under Upcoming paper while the
+ * download spins) is for a wait the reader did not choose: play pressed on an
+ * uncached item, or a stall mid-recitation. A tapped word is a place the
+ * reader asked for, so while its own seek is still loading the page keeps the
+ * ordinary recitation look — the tapped word lit, its prefix kept — rather
+ * than going dark. The wait ends the first time playback carries the voice
+ * after the seek has landed: [activation] reached, or a buffering spell seen
+ * (a cold chapter start lands without a seek). Stalls after that are ordinary
+ * stream waits again.
+ */
+internal class WordTapVoiceWait(private val activation: Long) {
+    private var landed = false
+
+    /** True once the tapped performance is audibly playing. */
+    fun heard(inkId: Long, isPlaying: Boolean, isBuffering: Boolean): Boolean {
+        if (inkId >= activation || isBuffering) landed = true
+        return landed && isPlaying && !isBuffering
+    }
+}
+
+/** Whether buffering puts the page under the stream-wait cover. */
+internal fun streamWaitEngages(isBuffering: Boolean, wordTapAwaitingVoice: Boolean): Boolean =
+    isBuffering && !wordTapAwaitingVoice

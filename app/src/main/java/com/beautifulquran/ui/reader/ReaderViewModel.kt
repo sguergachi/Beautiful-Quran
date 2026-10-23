@@ -52,6 +52,8 @@ import com.beautifulquran.playback.PlayerUiState
 import kotlin.math.abs
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.withTimeoutOrNull
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -481,6 +483,7 @@ class ReaderViewModel(
 
     private fun installTimings(loaded: Map<Int, List<Segment>>) {
         tapInk.value = WordTapInk()
+        endWordTapWait()
         timings = loaded
         preparedTimings = loaded.mapValues { (_, segs) ->
             HighlightEngine.PreparedTimings.prepare(segs)
@@ -670,6 +673,17 @@ class ReaderViewModel(
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(1_000), null)
 
     private val tapInk = MutableStateFlow(WordTapInk())
+
+    /** True from a word tap until its sought word is heard ([WordTapVoiceWait]). */
+    private val tapAwaitingVoice = MutableStateFlow(false)
+    val wordTapAwaitingVoice: StateFlow<Boolean> = tapAwaitingVoice
+    private var tapVoiceJob: Job? = null
+
+    private fun endWordTapWait() {
+        tapVoiceJob?.cancel()
+        tapVoiceJob = null
+        tapAwaitingVoice.value = false
+    }
 
     val activeWord: StateFlow<ActiveWord?> = combine(polledActiveWord, tapInk) { polled, tap ->
         tap.resolve(polled)
@@ -1222,6 +1236,8 @@ class ReaderViewModel(
     }
 
     fun playFromAyah(ayah: Int) {
+        // Not a word tap: an ordinary download wait covers the page again.
+        endWordTapWait()
         // Playing a specific ayah abandons any active repeat range.
         // Chapter openings (ayah 1) include the basmalah lead-in.
         if (startSurah(ayah, preserveRepeatRange = false, startWithBasmalah = ayah == 1)) {
@@ -1289,6 +1305,16 @@ class ReaderViewModel(
             reciterId = reciterId,
         )
         tapInk.value = WordTapInk(seed)
+        tapVoiceJob?.cancel()
+        tapAwaitingVoice.value = true
+        tapVoiceJob = viewModelScope.launch {
+            val wait = WordTapVoiceWait(seed.activation)
+            // Bounded: a seek that never plays cannot hold the cover off forever.
+            withTimeoutOrNull(WORD_TAP_VOICE_WAIT_MAX_MS) {
+                player.state.first { wait.heard(it.positionEvents.inkId, it.isPlaying, it.isBuffering) }
+            }
+            tapAwaitingVoice.value = false
+        }
         viewModelScope.launch {
             val timeout = WordTapConfirmationTimeout(2_000)
             while (tapInk.value.pending && tapInk.value.seed === seed) {
@@ -1482,6 +1508,8 @@ class ReaderViewModel(
     }
 
     companion object {
+        /** Longest a word tap may hold the stream-wait cover off. */
+        private const val WORD_TAP_VOICE_WAIT_MAX_MS = 30_000L
         private const val TICK_MS = 33L
         private const val PAUSED_TICK_MS = 250L
         private const val START_SEEK_GRACE_MS = 1_500L

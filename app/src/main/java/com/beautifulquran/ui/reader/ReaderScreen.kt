@@ -771,10 +771,15 @@ fun ReaderScreen(
     // starving stream's brief ready windows cannot strobe the page between
     // download bursts. Explicit word-play keeps its requested prefix through
     // this cover; WordTapInk scopes that exception to the sought performance.
+    // A word tap is not that wait: until its sought word is heard the page
+    // keeps the ordinary recitation look (WordTapVoiceWait).
+    val wordTapAwaitingVoice by viewModel.wordTapAwaitingVoice.collectAsStateWithLifecycle()
     var streamWait by remember { mutableStateOf(false) }
-    LaunchedEffect(playerState.isBuffering) {
-        if (playerState.isBuffering) {
+    LaunchedEffect(playerState.isBuffering, wordTapAwaitingVoice) {
+        if (streamWaitEngages(playerState.isBuffering, wordTapAwaitingVoice)) {
             streamWait = true
+        } else if (wordTapAwaitingVoice) {
+            streamWait = false
         } else {
             delay(STREAM_WAIT_RELEASE_HOLD_MS)
             streamWait = false

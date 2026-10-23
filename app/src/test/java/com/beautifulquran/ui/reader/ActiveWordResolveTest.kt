@@ -146,4 +146,29 @@ class ActiveWordResolveTest {
                 InkEngine.wordState(position, shown, isActiveAyah = true, dimmed = false))
         }
     }
+
+    @Test fun aWordTapsOwnLoadingNeverPutsThePageUnderTheStreamWait() {
+        // Press play on an uncached item: the whole page waits under paper.
+        assertTrue(streamWaitEngages(isBuffering = true, wordTapAwaitingVoice = false))
+        // Tap a word whose audio is still downloading: the page keeps the
+        // ordinary recitation look instead.
+        assertFalse(streamWaitEngages(isBuffering = true, wordTapAwaitingVoice = true))
+        assertFalse(streamWaitEngages(isBuffering = false, wordTapAwaitingVoice = false))
+    }
+
+    @Test fun aTapsWaitEndsOnlyWhenItsOwnSeekIsHeard() {
+        val wait = WordTapVoiceWait(activation = 8)
+        // The old performance still playing at the moment of the tap is not it.
+        assertFalse(wait.heard(inkId = 7, isPlaying = true, isBuffering = false))
+        assertFalse(wait.heard(inkId = 8, isPlaying = false, isBuffering = true))
+        assertTrue(wait.heard(inkId = 8, isPlaying = true, isBuffering = false))
+    }
+
+    @Test fun aColdChapterStartLandsWhenItsDownloadHasBeenSeen() {
+        // A tap into a chapter that is not loaded yet starts a new item, with
+        // no seek generation to wait for: its buffering spell marks the landing.
+        val wait = WordTapVoiceWait(activation = 3)
+        assertFalse(wait.heard(inkId = 0, isPlaying = false, isBuffering = true))
+        assertTrue(wait.heard(inkId = 0, isPlaying = true, isBuffering = false))
+    }
 }

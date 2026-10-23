@@ -5,8 +5,7 @@ import {
   readerAyahInkPolicyActive,
   readerHighlightKey,
   readerHighlightState,
-  readerInkAyah,
-} from '../ReaderHighlightState'
+  readerInkAyah, streamWaitEngages } from '../ReaderHighlightState'
 
 function prepared(segments: Segment[]) {
   return PreparedTimings.prepare(segments)
@@ -114,5 +113,13 @@ describe('ReaderHighlightState', () => {
         activeWord: { ...base.activeWord, durationMs: 120, repeatStart: 1 },
       }),
     )
+  })
+})
+
+describe('stream wait and word taps', () => {
+  it("never puts the page under the stream wait for a word tap's own download", () => {
+    expect(streamWaitEngages(true, false)).toBe(true)
+    expect(streamWaitEngages(true, true)).toBe(false)
+    expect(streamWaitEngages(false, false)).toBe(false)
   })
 })

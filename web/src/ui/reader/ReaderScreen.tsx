@@ -62,7 +62,7 @@ import { ReaderFocusController } from './focus/ReaderFocusController'
 import { selectedPlaybackAyah } from './selectedPlaybackAyah'
 import { shouldPauseFollowOnDrag } from './followGesture'
 import { isRecitingSession } from './recitingActive'
-import { STREAM_WAIT_RELEASE_HOLD_MS, readerAyahInkPolicyActive, readerInkAyah } from './ReaderHighlightState'
+import { STREAM_WAIT_RELEASE_HOLD_MS, readerAyahInkPolicyActive, readerInkAyah, streamWaitEngages } from './ReaderHighlightState'
 import {
   AYAH_SPACER_EST_PX,
   useProgressiveAyahWindow,
@@ -345,10 +345,16 @@ export function ReaderScreen({
   // Upcoming paper (same rule as Android). The wait is the buffering itself,
   // with no spoken-word gate: the moment it begins the page fades as one
   // synchronized action; see STREAM_WAIT_RELEASE_HOLD_MS for the wake hold.
+  // A word tap is not that wait: until its sought word is heard the page
+  // keeps the ordinary recitation look.
   const [streamWait, setStreamWait] = useState(false)
   useEffect(() => {
-    if (state.player.isBuffering) {
+    if (streamWaitEngages(state.player.isBuffering, state.wordTapAwaitingVoice)) {
       setStreamWait(true)
+      return
+    }
+    if (state.wordTapAwaitingVoice) {
+      setStreamWait(false)
       return
     }
     const settle = window.setTimeout(
@@ -356,7 +362,7 @@ export function ReaderScreen({
       STREAM_WAIT_RELEASE_HOLD_MS,
     )
     return () => window.clearTimeout(settle)
-  }, [state.player.isBuffering])
+  }, [state.player.isBuffering, state.wordTapAwaitingVoice])
   // This sheet is keyed by chapter, so the ref starts false at every opening.
   const recitedSinceOpen = useRef(false)
 
