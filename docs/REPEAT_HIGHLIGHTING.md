@@ -576,8 +576,9 @@ HighlightEngine.PreparedTimings.activeInfo(positionMs)
   clock. Each word owns that captured animation, so an Active handoff cannot
   erase its pacing and a prior residual cannot delay the new word. On release,
   residual progress finishes independently, then alpha dissolves over
-  `Tuning.repeatFadeOutMs` (900 ms). Web keeps the constant 450 ms clock until
-  tajweed pacing is ported. A live chain member's displayed progress is pinned
+  `Tuning.repeatFadeOutMs` (1,800 ms on Android and web). Existing Ink Lab
+  profiles adopt this slower release once, retaining their camera and other
+  ink settings. A live chain member's displayed progress is pinned
   at 0 until its retained animation clock resets, preventing a one-frame full-
   orange/glimmer flash before the directional edge begins.
   On Nightfall, each newly active repeat word also

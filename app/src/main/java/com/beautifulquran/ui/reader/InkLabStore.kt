@@ -58,7 +58,7 @@ data class InkLabSnapshot(
     val minSweepMs: Int = 140,
     val maxSweepMs: Int = 8_000,
     val repeatSweepMs: Int = 450,
-    val repeatFadeOutMs: Int = 900,
+    val repeatFadeOutMs: Int = 1_800,
     val repeatInkAlpha: Float = 1f,
     val glintFadeMs: Int = 1_000,
     val glintTintAlpha: Float = 0.88f,
@@ -203,8 +203,9 @@ data class InkLabSnapshot(
          * shipped for those fields ([decode]); the rest of it is kept.
          * 3: adopt zero scroll lead in existing saves; later auditions persist.
          * 4: retune that scroll lead to 100 ms, preserving the other knobs.
+         * 5: give the repeat wash a slower 1.8 s release without resetting the camera.
          */
-        const val SCHEMA = 4
+        const val SCHEMA = 5
 
         private val json = Json {
             ignoreUnknownKeys = true
@@ -305,9 +306,12 @@ data class InkLabSnapshot(
                     tarjiLightFall = shipped.tarjiLightFall,
                     tarjiGlowGain = shipped.tarjiGlowGain,
                 )
-                if (saved.schema >= SCHEMA) glow else glow.copy(
-                    schema = SCHEMA,
+                val camera = if (saved.schema >= 4) glow else glow.copy(
                     scrollLeadMs = shipped.scrollLeadMs,
+                )
+                if (saved.schema >= SCHEMA) camera else camera.copy(
+                    schema = SCHEMA,
+                    repeatFadeOutMs = shipped.repeatFadeOutMs,
                 )
             }
     }

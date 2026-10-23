@@ -91,7 +91,7 @@ object InkEngine {
         /** Repeat sweep fallback when no live active-word timing exists. */
         val repeatSweepMs: Int = 450,
         /** Dissolve of the orange wash once the repeat chain releases. */
-        val repeatFadeOutMs: Int = 900,
+        val repeatFadeOutMs: Int = 1_800,
         /** Peak strength of the orange repeat overlay (and search-hit flash).
          *  Multiplies [com.beautifulquran.ui.theme.QuranAccents.repeatInk]
          *  so the hue stays theme-owned while visibility is live-tunable. */

@@ -74,6 +74,17 @@ class InkLabStoreTest {
     }
 
     @Test
+    fun oldSaves_adoptSlowerRepeatReleaseWithoutResettingTheCameraOrInk() {
+        val saved = InkLabSnapshot(schema = 4, repeatFadeOutMs = 900,
+            scrollLeadMs = 444, paperInkPooling = .4f, glintGlowRadius = 8f, fadeLeadMs = 650)
+        val migrated = InkLabSnapshot.decode(InkLabSnapshot.encode(saved))!!
+        assertEquals(saved.copy(schema = InkLabSnapshot.SCHEMA, repeatFadeOutMs = 1_800), migrated)
+        // Only old profiles migrate; later auditions still survive a restart.
+        val retuned = migrated.copy(repeatFadeOutMs = 2_400)
+        assertEquals(retuned, InkLabSnapshot.decode(InkLabSnapshot.encode(retuned)))
+    }
+
+    @Test
     fun decode_returnsNullForMalformedJson() {
         assertNull(InkLabSnapshot.decode(""))
         assertNull(InkLabSnapshot.decode("{"))

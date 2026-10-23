@@ -8,7 +8,7 @@ heavier and glossier, and then dries back to the page's ink over the glimmer's
 dry-down (`glintFadeMs`). The letter ahead fades in so the edge is feathered.
 A repeat is laid in terracotta, held through its chain, and released to
 charcoal by evaporation: thin edges clear first and thicker stroke interiors
-linger, with a soft front over the existing 900 ms release. The dry black
+linger, with a soft front over a 1,800 ms release. The dry black
 underprint stays complete throughout; the orange film and any remaining wet
 spread fade away together. If the first coat is still wet when the repeat
 starts, its width, dark pigment and reflection remain ahead of the orange
