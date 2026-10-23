@@ -85,6 +85,7 @@ internal val DEFAULT_FAVORITE_RECITER_IDS = (1..7).toSet()
 enum class EducationMoment(val preferenceKey: String) {
     BOOKMARK_NOTE("educationBookmarkNoteV1"),
     AYAH_RAIL("educationAyahRailV1"),
+    PIN_CHAPTER("educationPinChapterV1"),
 }
 
 /**

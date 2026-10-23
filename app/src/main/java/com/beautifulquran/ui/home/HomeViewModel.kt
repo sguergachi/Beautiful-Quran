@@ -3,6 +3,7 @@ package com.beautifulquran.ui.home
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.media3.common.Player
+import com.beautifulquran.data.EducationMoment
 import com.beautifulquran.data.QuranRepository
 import com.beautifulquran.data.ReadingLayout
 import com.beautifulquran.data.Settings
@@ -283,6 +284,16 @@ class HomeViewModel(
         val ids = it.pinnedSurahIds
         it.copy(pinnedSurahIds = if (surahId in ids) ids - surahId else ids + surahId)
     }
+
+    /** The pinning lesson runs behind the developer guide gate, once. */
+    fun shouldShowPinTip(): Boolean {
+        val current = settings.settings.value
+        return current.developerModeEnabled &&
+            current.educationGuidesEnabled &&
+            !settings.isEducationDismissed(EducationMoment.PIN_CHAPTER)
+    }
+
+    fun dismissPinTip() = settings.dismissEducation(EducationMoment.PIN_CHAPTER)
 
     fun togglePlayPause() = player.togglePlayPause()
 

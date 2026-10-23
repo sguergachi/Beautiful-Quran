@@ -606,6 +606,8 @@ private fun PaperStackApp(
     var ornamentsLabRendered by remember { mutableStateOf(false) }
     var tarjiLabRendered by remember { mutableStateOf(false) }
     var readerInkOverlayVisible by remember { mutableStateOf(false) }
+    /** Chapters' own ink surfaces (the pinning lesson), visible or closing. */
+    var homeInkOverlayVisible by remember { mutableStateOf(false) }
     /** Send page (share) rendered lifetime — ShareHost reports this. */
     var shareSendRendered by remember { mutableStateOf(false) }
     var rootPlaybackSnapshot by remember { mutableStateOf<ReaderPlaybackSnapshot?>(null) }
@@ -651,7 +653,7 @@ private fun PaperStackApp(
     val overlayBlocking = labVisible || rootVisible || chooserVisible || ornamentsLabVisible ||
         tarjiLabVisible ||
         labRendered || rootRendered || chooserRendered || ornamentsLabRendered || tarjiLabRendered ||
-        readerInkOverlayVisible || shareUi.sendOpen || shareSendRendered
+        readerInkOverlayVisible || homeInkOverlayVisible || shareUi.sendOpen || shareSendRendered
     val pinnedPlayback = remember { PinnedPlaybackHost() }
     SideEffect {
         val available = settings.developerModeEnabled
@@ -1364,6 +1366,7 @@ private fun PaperStackApp(
                 chapterRibbonReady = chapterRibbonReady,
                 bookmarkCount = bookmarkCount,
                 onOpenBookmarks = { animateTo(BOOKMARKS_LAYER) },
+                onInkOverlayVisibilityChange = { homeInkOverlayVisible = it },
                 playbackPinned = playbackPinned,
                 pinnedPlaybackHeight = { pinnedPlaybackHeight },
                 playbackHost = pinnedPlayback,

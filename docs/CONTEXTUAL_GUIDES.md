@@ -150,6 +150,12 @@ For the existing lessons, the acceptance actions are:
   inline note editor opens focused. A short tap does not unbookmark it.
 - Ayah rail: tap the spotlighted collapsed rail, or drag it vertically; the
   guide withdraws as the real scrub wheel blooms.
+- Pin a chapter (Chapters sheet): with nothing pinned, the lesson opens around
+  the fully visible row of the chapter being read. Press and hold that row
+  while the guide is up; the row fills and offers **Pin**. Tapping **Pin**
+  pins it and completes the lesson; the hold alone, Cancel, **Got it**, Back,
+  or scrolling the list only dismiss. Paper-stack swipes stay blocked while
+  the guide is visible or closing (`onInkOverlayVisibilityChange`).
 
 ## Common failures
 
@@ -174,6 +180,8 @@ For the existing lessons, the acceptance actions are:
   boundary, and dismiss action.
 - `ui/reader/BookmarkNoteTip.kt` — target-relative bookmark lesson.
 - `ui/reader/AyahRailTip.kt` — configurable left/right rail lesson.
+- `ui/home/PinChapterTip.kt` — Chapters pinning lesson; its trigger, success
+  and dismissals live in `ui/home/HomeScreen.kt`.
 - `ui/reader/ReaderScreen.kt` — trigger ownership, real target callbacks,
   completion persistence, Back/scroll dismissal, and overlay lifecycle.
 

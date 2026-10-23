@@ -68,6 +68,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.zIndex
 import androidx.compose.ui.composed
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
@@ -94,6 +95,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.DpOffset
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
@@ -102,6 +104,7 @@ import androidx.compose.ui.util.lerp
 import kotlinx.coroutines.delay
 import kotlin.math.roundToInt
 import kotlinx.coroutines.flow.drop
+import kotlinx.coroutines.flow.first
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.ui.res.stringResource
 import com.beautifulquran.R
@@ -216,6 +219,9 @@ fun HomeScreen(
     /** Number of saved verses; zero removes the Home-page ribbon entirely. */
     bookmarkCount: Int = 0,
     onOpenBookmarks: () -> Unit = {},
+    /** True while one of this sheet's ink surfaces (the pinning lesson) is
+     * up or still closing, so the paper stack holds still beneath it. */
+    onInkOverlayVisibilityChange: (Boolean) -> Unit = {},
     /**
      * The chapter bar is pinned above the paper stack, so this sheet does
      * not draw a second transport. [pinnedPlaybackHeight] is that bar's
@@ -560,6 +566,35 @@ fun HomeScreen(
 
     BackHandler(enabled = searchFocused) { focusManager.clearFocus() }
 
+    // The pinning lesson: offered once, on a settled sheet with nothing
+    // pinned yet, around the fully visible row of the chapter being read.
+    var pinTipOpen by remember { mutableStateOf(false) }
+    var pinTipRendered by remember { mutableStateOf(false) }
+    fun closePinTip() {
+        viewModel.dismissPinTip()
+        pinTipOpen = false
+    }
+    val pinTipEligible = coverSheetVisible && chapterRibbonReady && !searchActive &&
+        uiState.pinned.isEmpty() && continueRowVisible && !docking && !undocking &&
+        !transportOnScreen && continueRowRect != null
+    LaunchedEffect(pinTipEligible) {
+        if (!pinTipEligible) return@LaunchedEffect
+        delay(600)
+        if (viewModel.shouldShowPinTip()) pinTipOpen = true
+    }
+    // Ordinary page scrolling puts the lesson away, as in the reader.
+    LaunchedEffect(pinTipOpen) {
+        if (!pinTipOpen) return@LaunchedEffect
+        snapshotFlow { listState.isScrollInProgress }.first { it }
+        closePinTip()
+    }
+    LaunchedEffect(pinTipOpen, pinTipRendered) {
+        onInkOverlayVisibilityChange(pinTipOpen || pinTipRendered)
+    }
+    // Composed before the row's own confirmation Back, which therefore
+    // backs out of a held row first.
+    BackHandler(enabled = pinTipOpen) { closePinTip() }
+
     val layoutDirection = LocalLayoutDirection.current
     Scaffold(containerColor = MaterialTheme.colorScheme.background) { padding ->
         Box(
@@ -684,6 +719,8 @@ fun HomeScreen(
                         currentAyah = uiState.continueTarget?.ayah?.takeIf { key == placeKey },
                         onTogglePinned = {
                             confirmingPin = null
+                            // The lesson completes on a real pin, not on the hold.
+                            if (pinTipOpen && surah.id !in pinnedIds) closePinTip()
                             revealPinned = surah.id !in pinnedIds && !listState.canScrollBackward
                             viewModel.togglePinned(surah.id)
                         },
@@ -997,6 +1034,18 @@ fun HomeScreen(
             // The landing end tracks live bounds so flights still connect
             // while the list moves. Undock reverses the morph instead of
             // fading.
+            continueRowRect?.let { row ->
+                PinChapterTip(
+                    visible = pinTipOpen,
+                    target = with(density) {
+                        DpOffset((row.center.x - boxLeft).toDp(), (row.center.y - boxTop).toDp())
+                    },
+                    bodyBelow = pinTipBodyBelow(row.center.y - boxTop, boxHeight),
+                    onDismiss = ::closePinTip,
+                    onRenderedChange = { pinTipRendered = it },
+                    modifier = Modifier.zIndex(3f),
+                )
+            }
             if (docking || undocking) {
                 val start = if (docking) dockStart else undockStart
                 val end = if (docking) continueRowRect else pillSeatRect

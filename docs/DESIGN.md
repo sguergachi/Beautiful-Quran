@@ -1715,6 +1715,10 @@ Pinning from the top of the sheet scrolls the band into view; a reader deep
 in the list keeps their place. Stored as `Settings.pinnedSurahIds`; web
 parity is pending.
 
+Press-and-hold is taught by a contextual guide (`PinChapterTip`, behind the
+developer guide gate like every lesson); see
+[CONTEXTUAL_GUIDES.md](CONTEXTUAL_GUIDES.md).
+
 Implementation: `pinnedBand`, `pinFill` / `pinFillSpan`, `pinAction` and the list in
 `ui/home/HomeScreen.kt`.
 

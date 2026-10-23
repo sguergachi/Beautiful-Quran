@@ -210,6 +210,12 @@ class ContinuePillVisibilityTest {
     }
 
     @Test
+    fun pinLessonTakesTheOpenHalfOfTheSheet() {
+        assertEquals(true, pinTipBodyBelow(targetY = 300f, sheetHeight = 2000f))
+        assertEquals(false, pinTipBodyBelow(targetY = 1500f, sheetHeight = 2000f))
+    }
+
+    @Test
     fun continueRowOffSheetWhileSearching() {
         val ids = (1..114).toList()
         assertEquals(-1, continueLazyIndex(ids, 18, true))
