@@ -196,8 +196,8 @@ class ContinuePillVisibilityTest {
 
     @Test
     fun pressAndHoldAsksBeforePinningOrUnpinning() {
-        assertEquals(PinPrompt("Pin to the top?", green = "Pin", quiet = "Cancel"), pinPrompt(pinned = false))
-        assertEquals(PinPrompt("Unpin this chapter?", green = "Keep", quiet = "Unpin"), pinPrompt(pinned = true))
+        assertEquals("Pin", pinAction(pinned = false))
+        assertEquals("Unpin", pinAction(pinned = true))
     }
 
     @Test

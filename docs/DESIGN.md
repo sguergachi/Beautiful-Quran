@@ -1673,14 +1673,17 @@ bookmark icon, a second ribbon shape, or a bespoke animated substitute.
 ### Pinned chapters (Android)
 
 Press and hold a chapter row to pin it to the top of Chapters, or a pinned
-row to unpin it. The hold **asks first**, in place, as a bookmark's Keep /
-Remove does: the row's subtitle becomes the question and its Arabic name
-gives way to two answers in the bookmark sheet's book type, inside the row's
-own height so nothing jumps. Pinning asks *Pin to the top?* with **Pin**
-(green) and Cancel; unpinning asks *Unpin this chapter?* with **Keep**
-(green) and Unpin, so green is always the answer that leaves the sheet as
-the reader meant it. A tap elsewhere on the row, Back, or starting a search
-backs out; one row asks at a time.
+row to unpin it. The hold **asks first**, in place. Ink soaks the row from
+the finger: the same `inkSpotHighlight` verse soak as choosing a verse to
+share (250 ms, linear, fibre-edged, rim-inset), in the band's green
+(`primary` at 0.26) rather than share's gold. The soaked row is the
+question, so no question is written: the subtitle stays the chapter's own
+line, and the Arabic name gives way to two answers in book type, the verb
+(**Pin** or **Unpin**) in green and a quiet Cancel, inside the row's own
+height so nothing jumps. A tap elsewhere on the row, Back, or starting a
+search backs out and the ink draws back to the finger; one row asks at a
+time. (A written subtitle question, *Pin to the top?*, was tried and
+rejected.)
 
 Pinned chapters sit on a **band**: the Continue pill's green wash
 (`greenWash`) laid edge to edge across the sheet, square-cut like a strip of
@@ -1710,7 +1713,7 @@ Pinning from the top of the sheet scrolls the band into view; a reader deep
 in the list keeps their place. Stored as `Settings.pinnedSurahIds`; web
 parity is pending.
 
-Implementation: `pinnedBand`, `pinPrompt` and the list in
+Implementation: `pinnedBand`, `pinAction` and the list in
 `ui/home/HomeScreen.kt`.
 
 ### Chapters bookmark treatment

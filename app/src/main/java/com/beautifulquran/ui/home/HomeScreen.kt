@@ -3,7 +3,6 @@ package com.beautifulquran.ui.home
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.AnimatedContent
-import androidx.compose.animation.Crossfade
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.togetherWith
@@ -123,6 +122,7 @@ import com.beautifulquran.ui.theme.FloatingPaperExit
 import com.beautifulquran.ui.theme.LocalQuranAccents
 import com.beautifulquran.ui.theme.typeScale
 import com.beautifulquran.ui.theme.PaperSearchField
+import com.beautifulquran.ui.theme.inkSpotHighlight
 import com.beautifulquran.ui.theme.quietClickable
 import com.beautifulquran.ui.theme.verticalFadingEdges
 import com.beautifulquran.ui.theme.QuranTheme
@@ -1359,11 +1359,20 @@ private fun SurahRow(
     vertical: Dp = ContinueRowVertical,
 ) {
     val accents = LocalQuranAccents.current
-    val prompt = pinPrompt(pinned)
     Row(
         verticalAlignment = Alignment.CenterVertically,
         modifier = modifier
             .fillMaxWidth()
+            // Holding soaks the row from the finger, the same spread as
+            // choosing a verse to share, in the band's green.
+            .inkSpotHighlight(
+                selected = confirmingPin,
+                seed = surah.id,
+                color = MaterialTheme.colorScheme.primary.copy(alpha = 0.26f),
+                fillBox = true,
+                durationMillis = 250,
+                easing = LinearEasing,
+            )
             // While asking, a tap anywhere else on the row backs out.
             .quietClickable(
                 onLongClick = onAskPin,
@@ -1418,16 +1427,13 @@ private fun SurahRow(
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
-            Crossfade(confirmingPin, label = "pin question") { asking ->
-                Text(
-                    text = if (asking) prompt.question else "${surah.nameTranslation} · ${surah.ayahCount} ayahs",
-                    style = MaterialTheme.typography.labelMedium,
-                    color = if (asking) QuranTheme.ink.secondary else QuranTheme.ink.quiet,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = if (asking) Modifier.semantics { liveRegion = LiveRegionMode.Polite } else Modifier,
-                )
-            }
+            Text(
+                text = "${surah.nameTranslation} · ${surah.ayahCount} ayahs",
+                style = MaterialTheme.typography.labelMedium,
+                color = QuranTheme.ink.quiet,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
         }
         Spacer(Modifier.width(12.dp))
         AnimatedContent(
@@ -1440,15 +1446,14 @@ private fun SurahRow(
             label = "pin answers",
         ) { asking ->
             if (asking) {
-                // Green answers in the app's interaction ink; the other is
-                // quiet ink, as Keep / Remove are on a bookmark.
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    PinAnswer(prompt.green, MaterialTheme.colorScheme.primary) {
-                        if (pinned) onCancelPin() else onTogglePinned()
-                    }
-                    PinAnswer(prompt.quiet, QuranTheme.ink.body) {
-                        if (pinned) onTogglePinned() else onCancelPin()
-                    }
+                // The soaked row is the question; the answers are the verb
+                // in the app's interaction green and a quiet Cancel.
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite },
+                ) {
+                    PinAnswer(pinAction(pinned), MaterialTheme.colorScheme.primary, onTogglePinned)
+                    PinAnswer("Cancel", QuranTheme.ink.body, onCancelPin)
                 }
             } else {
                 Text(
@@ -1462,13 +1467,8 @@ private fun SurahRow(
     }
 }
 
-/** What press-and-hold asks: pinning offers Pin (green) or Cancel; unpinning
- * keeps the bookmark sheet's order, Keep (green) or Unpin. */
-internal data class PinPrompt(val question: String, val green: String, val quiet: String)
-
-internal fun pinPrompt(pinned: Boolean): PinPrompt =
-    if (pinned) PinPrompt("Unpin this chapter?", green = "Keep", quiet = "Unpin")
-    else PinPrompt("Pin to the top?", green = "Pin", quiet = "Cancel")
+/** The verb press-and-hold offers beside Cancel. */
+internal fun pinAction(pinned: Boolean): String = if (pinned) "Unpin" else "Pin"
 
 @Composable
 private fun PinAnswer(text: String, color: androidx.compose.ui.graphics.Color, onClick: () -> Unit) {
