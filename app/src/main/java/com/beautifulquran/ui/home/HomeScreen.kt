@@ -2,6 +2,13 @@ package com.beautifulquran.ui.home
 
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.Crossfade
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.togetherWith
+import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.animation.EnterTransition
 import androidx.compose.animation.ExitTransition
 import androidx.compose.animation.core.CubicBezierEasing
@@ -156,9 +163,10 @@ private val HomeRowRibbonGutter = (HomeNumberColumn - HomeRibbonWidth) / 2f
 private val HomeColumnGap = 4.dp
 private val HomeArabicOpticalInset = 4.dp
 private val TopBoundRibbonHeight = 96.dp
-/** Paper above the pinned band: the search feather's depth, so the wash
- * starts at full strength instead of dissolving under the field. */
-private val PinnedBlockTop = 20.dp
+/** Paper above the PINNED flag: the first-label air the search list uses. */
+private val PinnedBlockTop = 16.dp
+/** Paper between the flag and the band it heads. */
+private val PinnedFlagGap = 8.dp
 /** Paper between the pinned band and the full list below it. */
 private val PinnedGroupGap = 20.dp
 /** Pinned rows are set compact, as the Continue pill sets its row. */
@@ -657,14 +665,25 @@ fun HomeScreen(
                 // A pinned chapter moves up into the block rather than showing
                 // twice on one sheet; unpinning returns it to its place.
                 val listedSurahs = if (showPinned) uiState.surahs.filterNot { it.id in pinnedIds } else uiState.surahs
+                // Press-and-hold asks before it pins or unpins: the row's own
+                // lines turn into the question and its answers, in place, as
+                // a bookmark's Keep / Remove does. One row asks at a time.
+                var confirmingPin by remember { mutableStateOf<String?>(null) }
+                LaunchedEffect(searching) { confirmingPin = null }
+                BackHandler(enabled = confirmingPin != null) { confirmingPin = null }
                 val chapterRow: @Composable (Surah, String, Modifier, Dp) -> Unit = { surah, key, modifier, vertical ->
                     SurahRow(
                         vertical = vertical,
+                        pinned = surah.id in pinnedIds,
+                        confirmingPin = confirmingPin == key,
+                        onAskPin = { confirmingPin = key },
+                        onCancelPin = { confirmingPin = null },
                         surah = surah,
                         // One place marker: only the row owning the place
                         // carries the green cloth (the pinned copy, when pinned).
                         currentAyah = uiState.continueTarget?.ayah?.takeIf { key == placeKey },
                         onTogglePinned = {
+                            confirmingPin = null
                             revealPinned = surah.id !in pinnedIds && !listState.canScrollBackward
                             viewModel.togglePinned(surah.id)
                         },
@@ -737,8 +756,8 @@ fun HomeScreen(
                         item(key = "pinned-air") {
                             Spacer(Modifier.height(PinnedBlockTop).animateItem())
                         }
-                        // The band's head: a small-caps flag on the names'
-                        // rail, the Continue pill's CONTINUE flag in kind.
+                        // Over the band, on the paper: a small-caps flag on the
+                        // names' rail, the Continue pill's CONTINUE flag in kind.
                         item(key = "pinned-flag") {
                             Text(
                                 text = "PINNED",
@@ -749,10 +768,9 @@ fun HomeScreen(
                                 modifier = Modifier
                                     .animateItem()
                                     .fillMaxWidth()
-                                    .pinnedBand()
                                     .padding(
                                         start = HomeStartInset + HomeNumberColumn + HomeColumnGap,
-                                        top = 14.dp,
+                                        bottom = PinnedFlagGap,
                                     ),
                             )
                         }
@@ -1331,17 +1349,26 @@ private fun SurahRow(
     currentAyah: Int?,
     placeUnfurlSignal: Int,
     onPlaceUnfurlConsumed: (Int) -> Unit,
+    pinned: Boolean,
+    confirmingPin: Boolean,
+    onAskPin: () -> Unit,
+    onCancelPin: () -> Unit,
     onTogglePinned: () -> Unit,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
     vertical: Dp = ContinueRowVertical,
 ) {
     val accents = LocalQuranAccents.current
+    val prompt = pinPrompt(pinned)
     Row(
         verticalAlignment = Alignment.CenterVertically,
         modifier = modifier
             .fillMaxWidth()
-            .quietClickable(onLongClick = onTogglePinned, onClick = onClick)
+            // While asking, a tap anywhere else on the row backs out.
+            .quietClickable(
+                onLongClick = onAskPin,
+                onClick = if (confirmingPin) onCancelPin else onClick,
+            )
             .padding(
                 end = HomeEndInset,
                 top = vertical,
@@ -1391,22 +1418,72 @@ private fun SurahRow(
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
-            Text(
-                text = "${surah.nameTranslation} · ${surah.ayahCount} ayahs",
-                style = MaterialTheme.typography.labelMedium,
-                color = QuranTheme.ink.quiet,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
+            Crossfade(confirmingPin, label = "pin question") { asking ->
+                Text(
+                    text = if (asking) prompt.question else "${surah.nameTranslation} · ${surah.ayahCount} ayahs",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = if (asking) QuranTheme.ink.secondary else QuranTheme.ink.quiet,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = if (asking) Modifier.semantics { liveRegion = LiveRegionMode.Polite } else Modifier,
+                )
+            }
         }
         Spacer(Modifier.width(12.dp))
-        Text(
-            text = surah.nameArabic,
-            style = ArabicTitleStyle,
-            color = QuranTheme.accents.greenInk,
-            modifier = Modifier.padding(end = HomeArabicOpticalInset),
-        )
+        AnimatedContent(
+            targetState = confirmingPin,
+            transitionSpec = {
+                (fadeIn() + slideInHorizontally { it / 8 }) togetherWith
+                    (fadeOut() + slideOutHorizontally { -it / 8 })
+            },
+            contentAlignment = Alignment.CenterEnd,
+            label = "pin answers",
+        ) { asking ->
+            if (asking) {
+                // Green answers in the app's interaction ink; the other is
+                // quiet ink, as Keep / Remove are on a bookmark.
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    PinAnswer(prompt.green, MaterialTheme.colorScheme.primary) {
+                        if (pinned) onCancelPin() else onTogglePinned()
+                    }
+                    PinAnswer(prompt.quiet, QuranTheme.ink.body) {
+                        if (pinned) onTogglePinned() else onCancelPin()
+                    }
+                }
+            } else {
+                Text(
+                    text = surah.nameArabic,
+                    style = ArabicTitleStyle,
+                    color = QuranTheme.accents.greenInk,
+                    modifier = Modifier.padding(end = HomeArabicOpticalInset),
+                )
+            }
+        }
     }
+}
+
+/** What press-and-hold asks: pinning offers Pin (green) or Cancel; unpinning
+ * keeps the bookmark sheet's order, Keep (green) or Unpin. */
+internal data class PinPrompt(val question: String, val green: String, val quiet: String)
+
+internal fun pinPrompt(pinned: Boolean): PinPrompt =
+    if (pinned) PinPrompt("Unpin this chapter?", green = "Keep", quiet = "Unpin")
+    else PinPrompt("Pin to the top?", green = "Pin", quiet = "Cancel")
+
+@Composable
+private fun PinAnswer(text: String, color: androidx.compose.ui.graphics.Color, onClick: () -> Unit) {
+    Text(
+        text = text,
+        // The bookmark sheet's answer face: book type, not UI sans.
+        style = MaterialTheme.typography.bodyMedium.copy(
+            fontSize = typeScale(16.sp),
+            fontWeight = FontWeight.Medium,
+        ),
+        color = color,
+        modifier = Modifier
+            .quietClickable(role = Role.Button, onClick = onClick)
+            .padding(horizontal = 8.dp, vertical = 12.dp),
+    )
 }
 
 internal fun shouldUnfurlReadingPlaceRibbon(

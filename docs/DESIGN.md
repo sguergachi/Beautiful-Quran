@@ -1672,16 +1672,25 @@ bookmark icon, a second ribbon shape, or a bespoke animated substitute.
 
 ### Pinned chapters (Android)
 
-A long-press on a chapter row pins it to the top of Chapters; a long-press
-on a pinned row unpins it. Pinned chapters sit on a **band**: the Continue
-pill's green wash (`greenWash`) laid edge to edge across the sheet,
-square-cut like a strip of tinted paper, behind a small-caps **PINNED** flag
-on the names' rail (as CONTINUE heads its pill) and every pinned row. Each
-row carries its own slice of the wash; the slices meet, so it reads as one
-band however many chapters are pinned. Rows are set compact (the pill's
+Press and hold a chapter row to pin it to the top of Chapters, or a pinned
+row to unpin it. The hold **asks first**, in place, as a bookmark's Keep /
+Remove does: the row's subtitle becomes the question and its Arabic name
+gives way to two answers in the bookmark sheet's book type, inside the row's
+own height so nothing jumps. Pinning asks *Pin to the top?* with **Pin**
+(green) and Cancel; unpinning asks *Unpin this chapter?* with **Keep**
+(green) and Unpin, so green is always the answer that leaves the sheet as
+the reader meant it. A tap elsewhere on the row, Back, or starting a search
+backs out; one row asks at a time.
+
+Pinned chapters sit on a **band**: the Continue pill's green wash
+(`greenWash`) laid edge to edge across the sheet, square-cut like a strip of
+tinted paper, behind every pinned row. A small-caps **PINNED** flag on the
+names' rail (as CONTINUE heads its pill) stands on the paper just above the
+band, 8 dp clear of it. Each row carries its own slice of the wash; the
+slices meet, so it reads as one band however many chapters are pinned. Rows are set compact (the pill's
 10 dp bands) on the list's own rails, so numbers and names stay aligned with
-the chapters below. 20 dp of paper sits above the band (the search
-feather's depth, so the wash never dissolves under the field) and below it.
+the chapters below. The flag takes the search list's first-label air
+(16 dp) above it, and 20 dp of paper separates the band from the list.
 
 A pinned chapter **moves** into the band: it is left out of the list below,
 so no chapter shows twice on one sheet, and unpinning returns it to its
@@ -1701,7 +1710,8 @@ Pinning from the top of the sheet scrolls the band into view; a reader deep
 in the list keeps their place. Stored as `Settings.pinnedSurahIds`; web
 parity is pending.
 
-Implementation: `pinnedBand` and the list in `ui/home/HomeScreen.kt`.
+Implementation: `pinnedBand`, `pinPrompt` and the list in
+`ui/home/HomeScreen.kt`.
 
 ### Chapters bookmark treatment
 
