@@ -28,5 +28,6 @@
     }
   ],
   "lang": "en",
-  "dir": "auto"
+  "dir": "auto",
+  "orientation": "portrait"
 }
