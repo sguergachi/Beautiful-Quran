@@ -96,6 +96,10 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.util.lerp
 import kotlinx.coroutines.delay
 import kotlin.math.roundToInt
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.LinearOutSlowInEasing
+import android.os.Build
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.ui.input.key.type
@@ -310,7 +314,7 @@ fun HomeScreen(
     // a pinned chapter's copy up there owns the place.
     val showPinned = !searching && uiState.pinned.isNotEmpty()
     val pinnedOrder = if (showPinned) uiState.pinned.map { it.id } else emptyList()
-    val placeKey = placeRowKey(continueSurahId, pinnedOrder)
+    val placeKey = placeRowKey(continueSurahId)
     // The list must have measured before the pill may rise: on the sheet's
     // first composition the row-visibility rule cannot see any row yet, and
     // a pill that shows before then pops, dwells, and flies to a row that
@@ -724,7 +728,16 @@ fun HomeScreen(
                 // A pinned chapter moves up into the band rather than showing
                 // twice on one sheet; unpinning returns it to its place.
                 val listedSurahs = if (showPinned) uiState.surahs.filterNot { it.id in pinnedIds } else uiState.surahs
+                // The chapter just pinned or unpinned travels to its new seat
+                // above the others, still wet, and dries off over the glide.
+                // Held here, not in the row: the row restarts in its new seat.
+                val reflowScope = rememberCoroutineScope()
+                var movedChapter by remember { mutableStateOf<Int?>(null) }
+                val movedWet = remember { Animatable(0f) }
+                val wetInk = MaterialTheme.colorScheme.primary.copy(alpha = WetInkAlpha)
+                val sheetPaper = MaterialTheme.colorScheme.background
                 val chapterRow: @Composable (Surah, String, Modifier, Dp) -> Unit = { surah, key, modifier, vertical ->
+                    val moving = surah.id == movedChapter
                     SurahRow(
                         vertical = vertical,
                         pinned = surah.id in pinnedIds,
@@ -737,6 +750,12 @@ fun HomeScreen(
                             // The lesson completes on a real pin, not on the hold.
                             if (pinTipOpen && surah.id !in pinnedIds) closePinTip()
                             revealPinned = surah.id !in pinnedIds && !listState.canScrollBackward
+                            movedChapter = surah.id
+                            reflowScope.launch {
+                                movedWet.snapTo(1f)
+                                movedWet.animateTo(0f, tween(HoldDryMs, easing = LinearOutSlowInEasing))
+                                movedChapter = null
+                            }
                             viewModel.togglePinned(surah.id)
                         },
                         placeUnfurlSignal = placeRibbonUnfurlEpoch,
@@ -759,13 +778,30 @@ fun HomeScreen(
                                 null,
                             )
                         },
-                        modifier = if (!searching && key == placeKey) {
-                            modifier.onGloballyPositioned {
-                                continueRowRect = it.boundsInWindow()
+                        modifier = (
+                            if (!searching && key == placeKey) {
+                                modifier.onGloballyPositioned {
+                                    continueRowRect = it.boundsInWindow()
+                                }
+                            } else {
+                                modifier
                             }
-                        } else {
-                            modifier
-                        },
+                            ).then(
+                            if (moving) {
+                                Modifier
+                                    .zIndex(1f)
+                                    // Over the band, under the type: as the hold drew it.
+                                    // A row leaving the band has no band under it, so
+                                    // it carries its own paper and never shows the
+                                    // rows it passes through its type.
+                                    .drawBehind {
+                                        if (surah.id !in pinnedIds) drawRect(sheetPaper)
+                                        drawRect(wetInk.copy(alpha = wetInk.alpha * movedWet.value))
+                                    }
+                            } else {
+                                Modifier
+                            },
+                        ),
                     )
                 }
                 LazyColumn(
@@ -828,12 +864,15 @@ fun HomeScreen(
                                     ),
                             )
                         }
-                        items(uiState.pinned, key = { "pinned-${it.id}" }) { surah ->
+                        // One key per chapter wherever it sits: pinning moves the
+                        // very row up into the band (and unpinning back down),
+                        // and the list closes or opens its gap as it goes.
+                        items(uiState.pinned, key = { chapterKey(it.id) }) { surah ->
                             chapterRow(
                                 surah,
-                                "pinned-${surah.id}",
+                                chapterKey(surah.id),
                                 Modifier
-                                    .animateItem()
+                                    .animateItem(placementSpec = ChapterReflowSpec)
                                     .pinnedBand(),
                                 PinnedRowVertical,
                             )
@@ -842,8 +881,13 @@ fun HomeScreen(
                             Spacer(Modifier.height(PinnedGroupGap).animateItem())
                         }
                     }
-                    items(listedSurahs, key = { "surah-${it.id}" }) { surah ->
-                        chapterRow(surah, "surah-${surah.id}", Modifier, ContinueRowVertical)
+                    items(listedSurahs, key = { chapterKey(it.id) }) { surah ->
+                        chapterRow(
+                            surah,
+                            chapterKey(surah.id),
+                            Modifier.animateItem(placementSpec = ChapterReflowSpec),
+                            ContinueRowVertical,
+                        )
                     }
 
                     if (showWordSections) {
@@ -1266,13 +1310,16 @@ private fun Modifier.pinnedBand(): Modifier = composed {
     background(QuranTheme.accents.greenWash)
 }
 
-/** Key of the chapter row that owns the reading place: the pinned copy atop
- * the list when the chapter is pinned, its in-order row otherwise. */
-internal fun placeRowKey(continueId: Int?, pinnedOrder: List<Int>): String? = when (continueId) {
-    null -> null
-    in pinnedOrder -> "pinned-$continueId"
-    else -> "surah-$continueId"
-}
+/** A chapter row's one key, on the band or in the list: a pinned chapter
+ * moves rather than showing twice, so the row itself can travel. */
+internal fun chapterKey(surahId: Int): String = "chapter-$surahId"
+
+/** Key of the chapter row that owns the reading place. */
+internal fun placeRowKey(continueId: Int?): String? = continueId?.let(::chapterKey)
+
+/** The reflow when a chapter is pinned or unpinned: the row glides to its
+ * new seat and the list closes or opens around it. */
+private val ChapterReflowSpec = tween<IntOffset>(420, easing = FastOutSlowInEasing)
 
 /**
  * The reading place floats only while its chapter row is scrolled out of
@@ -1438,7 +1485,7 @@ private fun SurahRow(
                 pinned = pinned,
                 holdable = holdable,
                 label = surah.nameTransliteration,
-                color = if (pinned) MaterialTheme.colorScheme.background else QuranTheme.accents.greenWash,
+                wetInk = MaterialTheme.colorScheme.primary.copy(alpha = WetInkAlpha),
                 onTap = onClick,
                 onHeld = onTogglePinned,
             )
@@ -1511,10 +1558,12 @@ private fun SurahRow(
 
 /**
  * Hold-to-pin: the hold is the confirmation. A quick tap opens the chapter.
- * Held, the row takes [color] evenly — no shape spreading across a strip
- * this thin — deepening in step with the finger until it is the full band
- * slice; a haptic tick and [onHeld] land at full. Lifting early, or the list
- * taking the drag, drains it and changes nothing.
+ * Held, the row soaks evenly with [wetInk] — no shape spreading across a
+ * strip this thin — a soft tick as the hold takes, deepening in step with
+ * the finger; at full a firm tick and [onHeld]. The row then travels to its
+ * new seat (see ChapterReflowSpec) and the wet ink dries off it, down to the
+ * band's pale wash when pinned or to bare paper when unpinned. Lifting early,
+ * or the list taking the drag, drains it and changes nothing.
  *
  * The hold is timed on the frame clock, not by an animation: the system's
  * animator scale must neither make every tap a pin (animations off) nor
@@ -1528,7 +1577,7 @@ private fun Modifier.holdToPin(
     pinned: Boolean,
     holdable: Boolean,
     label: String,
-    color: androidx.compose.ui.graphics.Color,
+    wetInk: androidx.compose.ui.graphics.Color,
     onTap: () -> Unit,
     onHeld: () -> Unit,
 ): Modifier {
@@ -1547,12 +1596,26 @@ private fun Modifier.holdToPin(
                 var full = false
                 val filling = if (!canHold) null else launch {
                     val start = withFrameMillis { it }
+                    var engaged = false
                     while (!full) {
                         val elapsed = withFrameMillis { it } - start
-                        fill.snapTo(holdFillProgress(elapsed, pace))
+                        val progress = holdFillProgress(elapsed, pace)
+                        fill.snapTo(progress)
+                        // The hold has taken: a soft tick, so the finger knows
+                        // to stay before any ink is easy to see under it.
+                        if (!engaged && progress > 0f) {
+                            engaged = true
+                            view.performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK)
+                        }
                         full = elapsed >= (HoldStartMs + HoldFillMs) * pace
                     }
-                    view.performHapticFeedback(HapticFeedbackConstants.LONG_PRESS)
+                    view.performHapticFeedback(
+                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                            HapticFeedbackConstants.CONFIRM
+                        } else {
+                            HapticFeedbackConstants.LONG_PRESS
+                        },
+                    )
                     held()
                 }
                 var up: PointerInputChange? = null
@@ -1585,6 +1648,8 @@ private fun Modifier.holdToPin(
                         tap()
                     }
                 }
+                // Done, the sheet carries the wet ink with the moving row and
+                // dries it there; let go early, it drains back quickly.
                 launch { fill.animateTo(0f, tween(if (full) 0 else HoldDrainMs)) }
             }
         }
@@ -1604,7 +1669,7 @@ private fun Modifier.holdToPin(
         }
     }.drawBehind {
         val alpha = fill.value
-        if (alpha > 0f) drawRect(color.copy(alpha = color.alpha * alpha))
+        if (alpha > 0f) drawRect(wetInk.copy(alpha = wetInk.alpha * alpha))
     }
 }
 
@@ -1633,6 +1698,11 @@ private const val HoldStartMs = 150
 /** Then deepens to the full band slice over this, in step with the finger. */
 private const val HoldFillMs = 550
 private const val HoldDrainMs = 180
+/** The wet ink drying off a row that has moved, over its glide and past it. */
+private const val HoldDryMs = 650
+/** How dark the ink is at full: plainly wetter than the band's pale wash it
+ * dries down to, so the hold reads under a finger from its first frames. */
+private const val WetInkAlpha = 0.30f
 internal const val HoldTapMaxMs = 300L
 
 internal fun shouldUnfurlReadingPlaceRibbon(

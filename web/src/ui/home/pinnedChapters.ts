@@ -38,7 +38,22 @@ export function pinnedChapterLists<T extends { id: number }>(
   }
 }
 
-/** Key of a chapter row: its pinned copy on the band, or its in-order row. */
-export function chapterRowKey(surahId: number, pinned: boolean): string {
-  return pinned ? `pinned-${surahId}` : `surah-${surahId}`
+/** A chapter row's one key, on the band or in the list: a pinned chapter
+ * moves rather than showing twice, so the row itself can travel. */
+export function chapterRowKey(surahId: number): string {
+  return `chapter-${surahId}`
+}
+
+/** How far each row must be shifted back to where it stood before a reflow
+ * (old top − new top), for rows present both times that actually moved. */
+export function reflowDeltas(
+  before: ReadonlyMap<string, number>,
+  after: ReadonlyMap<string, number>,
+): Map<string, number> {
+  const deltas = new Map<string, number>()
+  for (const [key, top] of after) {
+    const old = before.get(key)
+    if (old != null && Math.abs(old - top) > 0.5) deltas.set(key, old - top)
+  }
+  return deltas
 }

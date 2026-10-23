@@ -321,8 +321,12 @@ Renderers consume these; they do not re-derive curves.
   `--green-wash`, the Continue pill's green; pinned chapters move out of
   the list.
   Hold-to-pin, as Android: a click opens the chapter; held, the row
-  deepens into its answer as an even `opacity` fill (550 ms linear after
-  150 ms of settle), and full toggles the pin; lifting early drains it
+  soaks with wet green ink (`--accent` at 30%) as an even `opacity` fill
+  (550 ms linear after 150 ms of settle), and full toggles the pin. Rows
+  keep one key per chapter (`chapter-N`), and a FLIP reflow
+  (`reflowDeltas`, 420 ms) slides every moved row from where it stood; the
+  moved row travels above the rest on its own paper while its wet ink
+  dries off (`data-drying`, 650 ms). Lifting early drains it
   (180 ms). A release within 300 ms is the tap that opens; movement over
   the slop (10 px) or leaving the row cancels, and a cancelled hold never
   becomes a click. Only the primary pointer holds. A keyboard cannot hold,

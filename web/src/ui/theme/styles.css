@@ -1382,25 +1382,42 @@ input[type='search']::-webkit-search-decoration {
   user-select: none;
 }
 
-/* Hold-to-pin: held, the row takes its answer evenly (no shape spreading
-   across a strip this thin), deepening until full, which pins. The band's
-   wash to pin, paper over the band to unpin. Lifting early drains it. */
+/* Hold-to-pin: held, the row soaks evenly with wet green ink (no shape
+   spreading across a strip this thin), deepening until full, which pins or
+   unpins. The row then travels to its new seat above the rest and the wet
+   ink dries off it, down to the band's wash or to bare paper. Lifting early
+   drains it. Plainly wetter than the band, so it reads under a finger. */
 .pin-fill {
   position: absolute;
   inset: 0;
-  background: var(--green-wash);
+  background: color-mix(in srgb, var(--accent) 30%, transparent);
   opacity: 0;
   transition: opacity 180ms ease;
   pointer-events: none;
 }
 
-.surah-item[data-pinned] .pin-fill {
-  background: var(--paper);
-}
-
 .surah-item[data-holding] .pin-fill {
   opacity: 1;
   transition: opacity 550ms linear 150ms;
+}
+
+.surah-item[data-drying] {
+  z-index: 1;
+}
+
+/* A row leaving the band has none under it: it carries its own paper, so it
+   never shows the rows it passes through its type. */
+.surah-item[data-drying]:not([data-band]) {
+  background: var(--paper);
+}
+
+.surah-item[data-drying] .pin-fill {
+  animation: pin-dry 650ms cubic-bezier(0, 0, 0.2, 1) forwards;
+}
+
+@keyframes pin-dry {
+  from { opacity: 1; }
+  to { opacity: 0; }
 }
 
 /* The row's own hover/pressed ink would sit over the fill and grey it. */
@@ -1413,6 +1430,10 @@ input[type='search']::-webkit-search-decoration {
 @media (prefers-reduced-motion: reduce) {
   .surah-item[data-holding] .pin-fill {
     transition: opacity 0s linear 150ms;
+  }
+
+  .surah-item[data-drying] .pin-fill {
+    animation: none;
   }
 }
 

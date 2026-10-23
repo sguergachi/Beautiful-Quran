@@ -1,6 +1,7 @@
 import { suppliedWords } from '../../render/suppliedWords'
 import {
   useEffect,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -17,7 +18,7 @@ import {
 import { PaperInput } from '../kit/PaperInput'
 import { ContinueRow } from './ContinueRow'
 import { ChapterRow } from './ChapterRow'
-import { chapterRowKey, pinnedChapterLists } from './pinnedChapters'
+import { chapterRowKey, pinnedChapterLists, reflowDeltas } from './pinnedChapters'
 import {
   appStore,
   useAppSelector,
@@ -98,6 +99,10 @@ export function HomeScreen({
   )
   const revealPinned = useRef(false)
   const focusAfterPin = useRef<string | null>(null)
+  // A pin or unpin moves the very row (Android ChapterReflowSpec): where every
+  // row stood just before, and which chapter is travelling, still wet.
+  const rowTopsBefore = useRef<Map<string, number> | null>(null)
+  const [dryingKey, setDryingKey] = useState<string | null>(null)
   const previousBookmarkCount = useRef(state.bookmarks.length)
   const pendingRibbonUnfurl = useRef(false)
   const [ribbonUnfurlSignal, setRibbonUnfurlSignal] = useState(0)
@@ -132,6 +137,26 @@ export function HomeScreen({
   // Android scrolls to the first item); a reader deep in the list keeps
   // their place. A row confirmed from the keyboard keeps focus where it went.
   const pinnedSurahIds = state.settings.pinnedSurahIds
+  // The reflow: each row slides from where it stood to its new seat, the
+  // moved one above the rest, so nothing jumps.
+  useLayoutEffect(() => {
+    const before = rowTopsBefore.current
+    rowTopsBefore.current = null
+    if (!before || window.matchMedia('(prefers-reduced-motion: reduce)').matches) return
+    const rows = rowElements(sheetRef.current)
+    const deltas = reflowDeltas(before, rowTops(rows))
+    for (const [key, delta] of deltas) {
+      rows.get(key)?.closest('li')?.animate(
+        [{ transform: `translateY(${delta}px)` }, { transform: 'none' }],
+        { duration: 420, easing: 'cubic-bezier(0.4, 0, 0.2, 1)' },
+      )
+    }
+  }, [pinnedSurahIds])
+  useEffect(() => {
+    if (!dryingKey) return
+    const done = window.setTimeout(() => setDryingKey(null), 650)
+    return () => window.clearTimeout(done)
+  }, [dryingKey])
   useEffect(() => {
     const scroller = sheetRef.current?.querySelector('.scroll')
     if (revealPinned.current) scroller?.scrollTo({ top: 0, behavior: 'smooth' })
@@ -286,9 +311,11 @@ export function HomeScreen({
       // Focus follows the row only when the reader will see where it went;
       // otherwise it stays in place, on the row that takes the moved one's.
       focusAfterPin.current = revealPinned.current
-        ? chapterRowKey(surahId, true)
+        ? chapterRowKey(surahId)
         : neighbourRowKey(surahId, pinned)
     }
+    rowTopsBefore.current = rowTops(rowElements(sheetRef.current))
+    setDryingKey(chapterRowKey(surahId))
     appStore.togglePinnedSurah(surahId)
   }
   /** The row beside [surahId] in the list it is leaving: the next, else the
@@ -297,11 +324,11 @@ export function HomeScreen({
     const rows = fromBand ? chapterLists.pinned : chapterLists.listed
     const at = rows.findIndex((s) => s.id === surahId)
     const neighbour = rows[at + 1] ?? rows[at - 1]
-    return neighbour ? chapterRowKey(neighbour.id, fromBand) : null
+    return neighbour ? chapterRowKey(neighbour.id) : null
   }
   const chapterRow = (s: (typeof filtered)[number]) => {
     const onBand = bandIds.has(s.id)
-    const key = chapterRowKey(s.id, onBand)
+    const key = chapterRowKey(s.id)
     return (
       <ChapterRow
         key={key}
@@ -309,6 +336,7 @@ export function HomeScreen({
         rowKey={key}
         pinned={pinnedSurahIds.includes(s.id)}
         onBand={onBand}
+        drying={dryingKey === key}
         holdable={!searching}
         onPrepare={() => prepareChapter(s.id)}
         onOpen={() => {
@@ -704,4 +732,20 @@ function WordSearchSection({
       ) : null}
     </section>
   )
+}
+
+/** Every chapter row on the sheet, by its key. */
+function rowElements(sheet: HTMLElement | null): Map<string, HTMLElement> {
+  const rows = new Map<string, HTMLElement>()
+  sheet?.querySelectorAll<HTMLElement>('[data-row-key]').forEach((row) => {
+    rows.set(row.dataset.rowKey!, row)
+  })
+  return rows
+}
+
+/** Where each row stands, in viewport px. */
+function rowTops(rows: Map<string, HTMLElement>): Map<string, number> {
+  const tops = new Map<string, number>()
+  for (const [key, row] of rows) tops.set(key, row.getBoundingClientRect().top)
+  return tops
 }

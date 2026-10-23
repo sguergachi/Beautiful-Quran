@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import {
   HOLD_TAP_MAX_MS,
   chapterRowKey,
+  reflowDeltas,
   holdOutcome,
   pinnedChapterLists,
 } from './pinnedChapters'
@@ -26,9 +27,14 @@ describe('pinned chapter lists', () => {
     expect(listed).toEqual(surahs)
   })
 
-  it('keys the pinned copy apart from the in-order row', () => {
-    expect(chapterRowKey(18, true)).toBe('pinned-18')
-    expect(chapterRowKey(18, false)).toBe('surah-18')
+  it('keys a chapter once, on the band or in the list, so a pin moves it', () => {
+    expect(chapterRowKey(18)).toBe('chapter-18')
+  })
+
+  it('shifts every row that moved back to where it stood', () => {
+    const before = new Map([['chapter-2', 100], ['chapter-4', 400], ['chapter-5', 460]])
+    const after = new Map([['chapter-2', 100], ['chapter-4', 160], ['chapter-5', 400], ['chapter-9', 900]])
+    expect([...reflowDeltas(before, after)]).toEqual([['chapter-4', 240], ['chapter-5', 60]])
   })
 })
 

@@ -1674,12 +1674,19 @@ bookmark icon, a second ribbon shape, or a bespoke animated substitute.
 
 Press and hold a chapter row to pin it to the top of Chapters, or a pinned
 row to unpin it. The hold is its own confirmation — nothing asks. The row
-fills with its answer, the band's green wash to pin and paper back over the
-band to unpin, as an even tint: no shape spreads across a strip this thin
-(a deliberate form has no room to develop in it). The tint waits 150 ms
-under an unhurried finger, then deepens over the next 550 ms in step with
-the hold; holding it full is the act, marked by the long-press haptic tick,
-and the pin toggles. Lifting early drains the tint (180 ms) and pins
+soaks evenly with **wet green ink** (`primary` at 0.30, plainly darker than
+the band's pale wash, so it reads under a finger): no shape spreads across a
+strip this thin (a deliberate form has no room to develop in it). The ink
+waits 150 ms under an unhurried finger — a soft haptic tick says the hold
+has taken — then deepens over the next 550 ms in step with the hold;
+holding it full is the act, marked by a firm confirm tick, and the pin
+toggles. The very row then **travels** to its new seat (one key per chapter,
+band or list; 420 ms, every row's placement animated, so the list closes or
+opens its gap around it), drawn above the rows it passes and carrying its
+own paper, and its wet ink **dries off** over 650 ms: down to the band's
+wash when pinned, to bare paper when unpinned. An even tint that only
+reached the band's own pale wash was too faint to feel, and a pinned row
+that vanished from the list and reappeared on the band read as a jump. Lifting early drains the tint (180 ms) and pins
 nothing: a release within 300 ms is the ordinary tap that opens the
 chapter; a longer one does nothing. A drag belongs to the list, and a
 cancelled or consumed release (a system back swipe begun on a row, the

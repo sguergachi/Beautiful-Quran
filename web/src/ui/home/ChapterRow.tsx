@@ -18,6 +18,7 @@ export function ChapterRow({
   rowKey,
   pinned,
   onBand,
+  drying,
   holdable,
   onPrepare,
   onOpen,
@@ -29,6 +30,8 @@ export function ChapterRow({
   pinned: boolean
   /** Set on the band atop the list (search lists a pinned chapter in place). */
   onBand: boolean
+  /** Just pinned or unpinned: travels above the rest, its wet ink drying. */
+  drying: boolean
   holdable: boolean
   onPrepare: () => void
   onOpen: () => void
@@ -120,6 +123,7 @@ export function ChapterRow({
       data-pinned={pinned || undefined}
       data-band={onBand || undefined}
       data-holding={holding || undefined}
+      data-drying={drying || undefined}
     >
       <span className="pin-fill" aria-hidden="true" />
       <button
