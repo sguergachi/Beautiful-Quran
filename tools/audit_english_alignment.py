@@ -73,7 +73,7 @@ with tempfile.TemporaryDirectory(prefix="english-alignment-audit-") as temporary
                                      for line in args.corpus.read_text().splitlines()) + '\n')
     (directory / "Probe.kt").write_text(probe)
     sources = [source / f for f in ("domain/EnglishWordAlignment.kt", "domain/EnglishTypography.kt",
-                                   "domain/ArabicNormalize.kt", "data/model/Models.kt")]
+                                   "domain/ArabicNormalize.kt", "domain/ReviewedEnglishAlignment.kt", "data/model/Models.kt")]
     subprocess.run(["kotlinc", *map(str, sources), str(directory / "Probe.kt"),
                     "-include-runtime", "-d", str(directory / "probe.jar")], check=True)
     result = subprocess.run(["java", "-jar", str(directory / "probe.jar"), str(input_corpus), *(["lyricize"] if args.word_by_word else [])],
@@ -262,8 +262,14 @@ target=args.require_semantic_accuracy
 if target is not None and not 0<target<=100: raise SystemExit('semantic accuracy must be a percent in (0,100]')
 denominator=len(population)
 lower=decimal.Decimal(100)*correct/denominator if denominator else decimal.Decimal(0)
-certificate={'corpus_sha256':hashlib.sha256(((root/'corpus.tsv') if args.word_by_word else args.corpus).read_bytes()).hexdigest(),
+corpus_hash=hashlib.sha256(((root/'corpus.tsv') if args.word_by_word else args.corpus).read_bytes()).hexdigest()
+if args.semantic_reference:
+    pinned=re.search(r'^# Frozen app corpus SHA256: ([0-9a-f]{64})$', args.semantic_reference.read_text(), re.M)
+    if pinned and pinned[1] != corpus_hash: raise SystemExit('Reviewed reference belongs to another frozen corpus')
+certificate={'corpus_sha256':corpus_hash,
              'mapper_sha256':hashlib.sha256((source/'domain/EnglishWordAlignment.kt').read_bytes()).hexdigest(),
+             'component_sha256':{str(p.relative_to(source)):hashlib.sha256(p.read_bytes()).hexdigest() for p in sources},
+             'database_sha256':hashlib.sha256((source.parents[5]/'data/quran.db').read_bytes()).hexdigest(),
              'reference_sha256':hashlib.sha256(args.semantic_reference.read_bytes()).hexdigest() if args.semantic_reference else None,
              'text_source':'word-cards' if args.word_by_word else 'published',
              ('population_printed_tokens' if args.all_printed_words else 'population_content_tokens'):denominator,
@@ -272,7 +278,9 @@ certificate={'corpus_sha256':hashlib.sha256(((root/'corpus.tsv') if args.word_by
              'disagreements':len(wrong),'unreviewed':denominator-reviewed,
              'verified_percent_of_full_population':str(lower),
              'required_percent':str(target) if target is not None else None,
-             'established':target is not None and bool(denominator) and lower>=target}
+             'reference_coverage_target_met':target is not None and bool(denominator) and lower>=target,
+             'reference_quality':'selected model adjudications; independent blind gold absent',
+             'established':False}
 (root/'semantic-certification.json').write_text(json.dumps(certificate,indent=2)+'\n')
 (root/'semantic-reference-template.tsv').write_text('\n'.join(template)+'\n')
 (root/'semantic-reference-disagreements.tsv').write_text('\n'.join('\t'.join(map(str,r)) for r in wrong)+'\n')
@@ -281,9 +289,9 @@ literal_agreement=(f"{counts['on_owner']/counts['literal_correspondences']:.3%}"
                    if counts['literal_correspondences'] else 'unavailable (no literal correspondences)')
 print(f"Literal agreement (diagnostic only): {literal_agreement}")
 print('SEMANTIC REFERENCE:', {k:v for k,v in certificate.items() if not k.endswith('_sha256')})
-if target is not None and not certificate['established']:
-    raise SystemExit(f'{target}% semantic accuracy not established: {reviewed}/{denominator} reviewed, {len(wrong)} disagreements')
 if counts['meaning_wash_delays']:
     raise SystemExit(f"{counts['meaning_wash_delays']} meanings highlighted late; see meaning-issues.tsv")
 if args.strict_meaning_owners and counts['meaning_owner_disagreement']:
     raise SystemExit(f"{counts['meaning_owner_disagreement']} meanings have approximate owners; see meaning-issues.tsv")
+if target is not None and not certificate['established']:
+    raise SystemExit(f'{target}% semantic accuracy not established: {reviewed}/{denominator} reviewed, {len(wrong)} disagreements')

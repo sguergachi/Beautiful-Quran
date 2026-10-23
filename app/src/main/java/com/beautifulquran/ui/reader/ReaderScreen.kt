@@ -2804,8 +2804,8 @@ fun ReaderScreen(
                     val mushafRootMoved = rememberUpdatedState(onRootReturnUserMoved)
                     val mushafOpenRoot = rememberUpdatedState(onOpenRootViewer)
                     val leafTextSource = settings.englishLeafText
-                    val seekAlignments = remember(content, leafTextSource) {
-                        EnglishVerseAlignments(content, leafTextSource == EnglishLeafText.GLOSS)
+                    val seekAlignments = remember(content, leafTextSource, settings.useAiEnglishAlignment) {
+                        EnglishVerseAlignments(content, leafTextSource == EnglishLeafText.GLOSS, settings.useAiEnglishAlignment)
                     }
                     // The leaf the reader tapped on. The active word carries no
                     // page of its own and the position poll can still be
@@ -2999,6 +2999,7 @@ fun ReaderScreen(
                         onBasmalahClick = onMushafBasmalahClick,
                         english = settings.readingMode == ReadingMode.ENGLISH_ONLY,
                         wordByWord = leafTextSource == EnglishLeafText.GLOSS,
+                        useAiReviewedAlignment = settings.useAiEnglishAlignment,
                         verseNumberScript = settings.verseNumberScript,
                         pageNumberScript = settings.pageNumberScript,
                         leafText = mushafReady.englishText,

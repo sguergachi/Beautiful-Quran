@@ -61,6 +61,22 @@ release acceptance check.
    no navigation library at all (the four sheets are a hand-rolled paper
    stack in `MainActivity`). Every dependency earns its place.
 
+Approved English prose mappings have a separate text-free asset and full
+edition manifest. The offline [alignment ledger](ENGLISH_ALIGNMENT_LEDGER.md)
+compiles fully reviewed verses. The reader validates each record against its
+exact typeset text and Arabic slots before caching it. The initial artifact
+is empty: every verse remains a mapper fallback and semantic accuracy is
+unestablished. Word-card English is a separate corpus.
+
+The separate AI-reviewed artifact is a developer experiment, off by default.
+Settings → Developer → AI-approved English mappings enables it only while
+developer mode is active. Valid human-reviewed records take precedence; absent
+or stale AI rows retain the mapper. Both English wash and tap/follow use the
+same selection. AI decisions never count as human review or blind gold.
+The AI corpus covers every An-Nur and Al-Furqan translation verse, plus three
+retained regression verses (144 verses / 4,571 printed tokens). Word-by-word mode keeps
+its existing mapping path.
+
 > **Quran Foundation Content API.** Android and web use authenticated
 > Production Content Sync through a narrow Cloudflare Worker. QF credentials
 > remain server-side; the clients retain only local content and an opaque

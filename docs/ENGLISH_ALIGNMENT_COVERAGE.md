@@ -11,6 +11,7 @@ the correct owner for repeat tint or a tap. These checks do not establish
 | Published English and actual lyricized word-card English | 6,236 verses and 77,429 Arabic steps each; ranges tile, boundaries do not split words, and every heard meaning advances a continuous prefix |
 | Timing rows, all 13 reciters | 81,059 rows from the public DB plus six hash-verified runtime packs; 1,023,989 segments, 17,748 repeat occurrences |
 | Boundary and seek queries, each English source | 12,384,384 checks in forward, backward and scrambled order; same clock gives the same word, high-water ink, repeat chain and handoff |
+| Production English wash functions, published mapper output | 4,128,128 monotone-edge queries in one forward pass; 227,910 completion checks for previously started bands at repeats. Compiles the real window/progress functions; excludes frame interpolation and page-cut rendering |
 | Independent root/lemma meaning cues | 1,403 correspondences: all exact owners, no delayed washes |
 | Annotated exact meaning fixtures | The existing 194 heads plus both words of 24:4 “ever after,” including grammar and sentence-tail completion |
 | Gloss-independent QAC candidates | 12,011 additional checks using vocalized lemmas and POS; all 13,413 combined correspondences pass with twelve reference guesses corrected by the reviewed labels |
@@ -165,7 +166,10 @@ changed text, invalid owners and duplicate labels, so repeating rows, timing
 queries, frames or reciters cannot increase semantic confidence. It records
 corpus and mapper hashes in `semantic-certification.json` and exports
 `semantic-reference-template.tsv` without predicted owners, ready for a
-bilingual review. Missing reference data makes the requested gate fail.
+bilingual review. It records the selected-reference coverage fraction, but
+`established` remains false: this file format carries no independent blind-gold
+provenance. `--require-semantic-accuracy` consequently fails even for a fully
+labelled subset. Meaning-delay and strict-owner checks still run first.
 
 Automated QAC candidates, literal agreement and passing regression fixtures
 are kept separate from this reference. They have uncovered real bugs, but
@@ -173,13 +177,16 @@ cannot validate the remaining unreviewed meanings. The finite gold-reference
 score also does not establish a statistical claim about unseen inputs. A
 95% one-sided bound of 99.9% would need at least 2,995 independent,
 representative zero-error observations; 99.99% needs 29,956. These selected
-checks and repeated frames are not that sample. A passing finite-reference
-accuracy gate does not itself establish the independence of that reference.
+checks and repeated frames are not that sample. A finite-reference coverage
+target does not establish the independence of that reference.
 
 `python3 tools/test_audit_english_alignment.py` exercises the production
 mapper and gate with hand-labelled synthetic input: an unreviewed grammar
 word, an unreviewed addition and a wrong owner each fail; a complete correct
-reference passes. CI runs these regressions alongside the JVM tests.
+reference meets its local coverage target. Neither a subset nor model labels
+can set semantic accuracy to established. CI runs these regressions and the
+offline ledger's binding/provenance gates alongside the JVM tests. The initial
+[ledger artifact](ENGLISH_ALIGNMENT_LEDGER.md) has no approved records.
 
 The nine unavailable timing rows are Alafasy 37:152; As-Sudais 2:198, 2:223,
 13:37, 73:4; and Ash-Shuraym 12:50, 12:75, 12:76, 91:15. The audit lists them

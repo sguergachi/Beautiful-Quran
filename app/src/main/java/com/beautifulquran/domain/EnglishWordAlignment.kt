@@ -8,26 +8,34 @@ import java.util.concurrent.ConcurrentHashMap
 data class EnglishWordSpan(val from: Float, val to: Float, val position: Int)
 
 /** Semantic owners for taps, and a continuous forward wash derived from those owners. */
-data class EnglishAlignment(val wordEnds: FloatArray, val spans: List<EnglishWordSpan>) {
-    /** A later spoken meaning brings every preceding English word into the same wash. */
-    val washSpans: List<EnglishWordSpan> = buildList {
-        var position = Int.MAX_VALUE
-        for (span in spans.asReversed()) {
-            position = minOf(position, span.position)
-            val previous = lastOrNull()
-            if (previous?.position == position) {
-                this[lastIndex] = previous.copy(from = span.from)
-            } else add(span.copy(position = position))
-        }
-        reverse()
-    }
-
+data class EnglishAlignment(
+    val wordEnds: FloatArray,
+    val spans: List<EnglishWordSpan>,
+    val washSpans: List<EnglishWordSpan> = continuousEnglishWash(spans),
+    /** Human review coverage, not semantic certification. AI review has its own flag. */
+    val usesApprovedRecord: Boolean = false,
+    /** The developer experiment; it never impersonates human approval. */
+    val usesAiReviewedRecord: Boolean = false,
+) {
     /** The Arabic owner of a point in the printed English, including reordered words. */
     fun positionAt(through: Float): Int =
         spans.firstOrNull { through.coerceIn(0f, 1f) < it.to }?.position ?: spans.lastOrNull()?.position ?: 1
 
     /** Where the forward wash begins; words already included never move it backwards. */
     fun through(position: Int): Float = washSpans.firstOrNull { it.position >= position }?.from ?: 1f
+}
+
+/** A later spoken meaning brings every preceding English word into the same wash. */
+internal fun continuousEnglishWash(spans: List<EnglishWordSpan>): List<EnglishWordSpan> = buildList {
+    var position = Int.MAX_VALUE
+    for (span in spans.asReversed()) {
+        position = minOf(position, span.position)
+        val previous = lastOrNull()
+        if (previous?.position == position) {
+            this[lastIndex] = previous.copy(from = span.from)
+        } else add(span.copy(position = position))
+    }
+    reverse()
 }
 
 /**
@@ -855,7 +863,11 @@ object EnglishWordAlignment {
  * [NONE] rather than not stored, so an unalignable verse is not re-solved on
  * every frame that asks.
  */
-class EnglishVerseAlignments(private val content: SurahContent, private val wordByWord: Boolean = false) {
+class EnglishVerseAlignments(
+    private val content: SurahContent,
+    private val wordByWord: Boolean = false,
+    private val useAiReviewed: Boolean = false,
+) {
 
     private val solved = ConcurrentHashMap<Int, EnglishAlignment>()
 
@@ -869,7 +881,15 @@ class EnglishVerseAlignments(private val content: SurahContent, private val word
             content.ayahs
                 .firstOrNull { it.number == number }
                 ?.let { verse ->
-                    EnglishWordAlignment.align(
+                    val approved = if (wordByWord) null else content.englishAlignmentRecords[number]?.let { record ->
+                        ReviewedEnglishAlignment.alignment(verse.translation, verse.words.map { it.arabic }, record)
+                    }
+                    val aiReviewed = if (wordByWord || !useAiReviewed || approved != null) null else
+                        content.aiEnglishAlignmentRecords[number]?.let { record ->
+                            ReviewedEnglishAlignment.alignment(verse.translation, verse.words.map { it.arabic }, record)
+                                ?.copy(usesApprovedRecord = false, usesAiReviewedRecord = true)
+                        }
+                    approved ?: aiReviewed ?: EnglishWordAlignment.align(
                         if (wordByWord) EnglishTypography.lyricize(
                             verse.words.map { it.translation }, verse.words.map { it.arabic },
                         ).filter { it.isNotBlank() }.joinToString(" ") else verse.translation,
