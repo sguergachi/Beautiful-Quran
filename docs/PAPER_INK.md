@@ -10,7 +10,11 @@ A repeat is laid in terracotta, held through its chain, and released to
 charcoal by evaporation: thin edges clear first and thicker stroke interiors
 linger, with a soft front over the existing 900 ms release. The dry black
 underprint stays complete throughout; the orange film and any remaining wet
-spread fade away together. A pause within the chain still holds its orange.
+spread fade away together. If the first coat is still wet when the repeat
+starts, its width, dark pigment and reflection remain ahead of the orange
+front. That coat continues its existing dry-down independently; the repeat
+replaces it as its own soft edge arrives. A pause within the chain still
+holds its orange.
 It is the Paper theme's counterpart of the Nightfall / Royal Green
 glimmer ([GLIMMER.md](GLIMMER.md)), designed and tuned in the Paper ink study
 (Settings → Developer → Paper ink study; GLIMMER.md "Paper ink experiment").
@@ -30,6 +34,13 @@ word's glyphs are.
 | Cache | `PaperInk.word` | Captures the mask on the UI thread (rationed to 3 words a frame), generates on one background thread, keeps ~32 MB of words keyed by layout and sub-pixel phase. |
 | Draw | `PaperInk.drawWord` + `assets/paper-ink/ink.agsl` | Erases the word's printed pixels from the surface's layer, then draws the ink. |
 | Clock | `InkMotion` | Letter progress (`paperSweepProgress`), wetness (`paperWetness`), repeat (`paperRepeatProgress` / `repeatAlpha`), and `paperAhead` for the lead fade. No clocks of its own. |
+
+The first coat has a separate wetness state (`paperUnderWetness`) on the same
+glimmer dry-down. Starting a repeat wets the new coat and leaves the original
+clock running. The study keeps the same separation with its first-pass clock.
+Both shaders reuse the existing material calculation for this underprint;
+there is no extra pooling weight when the two coats overlap. An already dry
+word keeps the ordinary charcoal underprint.
 
 Surface adapters:
 

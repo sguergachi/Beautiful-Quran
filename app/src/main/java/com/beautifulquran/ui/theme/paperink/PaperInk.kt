@@ -85,6 +85,9 @@ object PaperInk {
         val flowing: Boolean,
         /** 0 keeps the deposit; 1 has evaporated back to unread glyph coverage. */
         val evaporation: Float = 0f,
+        /** First-pass deposit beneath a new repeat, still on its original dry-down. */
+        val underProgress: Float = 1f,
+        val underWet: Float = 0f,
     )
 
     /** A generated word, ready to draw. */
@@ -307,6 +310,8 @@ object PaperInk {
             val shader = shaderFor(word)
             shader.setFloatUniform("progress", frame.progress)
             shader.setFloatUniform("wet", frame.wet)
+            shader.setFloatUniform("underProgress", frame.underProgress)
+            shader.setFloatUniform("underWet", frame.underWet)
             shader.setFloatUniform("repeatPass", frame.repeatPass)
             shader.setFloatUniform("repeatTint", frame.repeatTint)
             shader.setFloatUniform("retained", frame.retained)

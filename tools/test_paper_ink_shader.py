@@ -38,13 +38,14 @@ class PaperInkShaderTest(unittest.TestCase):
                         samplingOptions=skia.SamplingOptions(skia.FilterMode.kLinear))
                 cls.words.append((spec, children))
 
-    def render(self, word, repeat, wet, weight, method, tint=1, progress=1, retained=1, lead=0):
+    def render(self, word, repeat, wet, weight, method, tint=1, progress=1, retained=1, lead=0, under_wet=0):
         spec, children = word
         builder = skia.RuntimeShaderBuilder(self.effect)
         for name, child in children.items():
             builder.setChild(name, child)
         uniforms = dict(progress=float(progress), reflectionStrength=0., lightSoftness=0., retained=float(retained),
-                        wet=float(wet), weight=float(weight), aa=.9, repeatColor=[194/255, 95/255, 59/255],
+                        wet=float(wet), underProgress=1., underWet=float(under_wet),
+                        weight=float(weight), aa=.9, repeatColor=[194/255, 95/255, 59/255],
                         repeatPass=float(repeat), repeatTint=float(tint), spreadMethod=float(method),
                         letterDuration=spec['letterDuration'], origin=[0., 0.], lead=float(lead))
         for name, value in uniforms.items():
@@ -67,6 +68,16 @@ class PaperInkShaderTest(unittest.TestCase):
                         dry = self.coverage(self.render(word, 1, 0, weight, method), DRY_REPEAT[2]) > .5
                         self.assertGreater((first & repeat).sum() / (first | repeat).sum(), .99)
                         self.assertGreater(repeat.sum(), dry.sum() * 1.05)
+
+    def test_repeat_keeps_a_recent_first_coat_wet_until_the_orange_arrives(self):
+        for word in self.words:
+            for method in (0, 1):
+                for remaining in (1, .6, .2, 0):
+                    first = self.render(word, 0, remaining, .875, method)
+                    repeated = self.render(word, 1, 1, .875, method, progress=0, under_wet=remaining)
+                    np.testing.assert_allclose(repeated, first, atol=1)
+                np.testing.assert_allclose(self.render(word, 1, 1, .875, method, under_wet=1),
+                    self.render(word, 1, 1, .875, method), atol=1)
 
     def test_orange_held_at_full_strength_still_thins_as_the_wet_ink_dries(self):
         for word in self.words:

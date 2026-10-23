@@ -7,6 +7,8 @@ internal data class PaperInkDeposit(
     val repeatPass: Float,
     val repeatTint: Float,
     val retained: Float,
+    val underProgress: Float = 1f,
+    val underWet: Float = 0f,
 )
 
 /**

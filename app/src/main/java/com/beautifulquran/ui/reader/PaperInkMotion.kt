@@ -90,6 +90,8 @@ private fun InkMotion.paperInkDeposit(): PaperInkDeposit {
         repeatPass = if (repeating) 1f else 0f,
         repeatTint = if (repeating) repeatAlpha else 0f,
         retained = if (repeating) 1f else 0f,
+        underProgress = paperSweepProgress,
+        underWet = if (repeating) paperUnderWetness else 0f,
     )
     return paperDeparture?.let { it.history.sample(current, it.remaining.value) } ?: current
 }
@@ -113,6 +115,8 @@ internal fun InkMotion.paperInkFrame(style: PaperInkStyle): PaperInk.Frame {
         repeatPass = deposit.repeatPass,
         repeatTint = deposit.repeatTint,
         retained = deposit.retained,
+        underProgress = deposit.underProgress,
+        underWet = deposit.underWet,
         dryInk = style.dryInk,
         wetInk = style.wetInk,
         repeatColor = style.repeatInk,

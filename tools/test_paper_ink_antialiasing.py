@@ -93,7 +93,8 @@ class PaperInkAntialiasingTest(unittest.TestCase):
         for name, child in word['children'].items():
             builder.setChild(name, child)
         uniforms = dict(fieldScale=2., unit=word['unit'], progress=1., reflectionStrength=.5,
-            lightSoftness=0., retained=1., wet=1., weight=.875 * word['unit'], aa=.9 / resolution,
+            lightSoftness=0., retained=1., wet=1., underProgress=1., underWet=0.,
+            weight=.875 * word['unit'], aa=.9 / resolution,
             dryInk=[52/255, 50/255, 46/255], wetInk=[6/255, 7/255, 8/255], unreadAlpha=.2661,
             repeatColor=[194/255, 95/255, 59/255], repeatPass=0., repeatTint=0., spreadMethod=0.,
             letterDuration=word['duration'], lead=1., origin=[0., 0.], evaporation=0.)
@@ -181,6 +182,36 @@ class PaperInkAntialiasingTest(unittest.TestCase):
                             self.assertTrue((actual[:, :, 0].astype(int) <= previous[:, :, 0].astype(int)).all())
                         previous = actual
                     np.testing.assert_allclose(previous, dry, atol=1.)
+
+    def test_repeat_starts_on_the_existing_wet_coat_and_replaces_it_without_a_dry_flash(self):
+        for specimen in self.words:
+            for method in (0., 1.):
+                for remaining in (1., .6, .2, 0.):
+                    first = self.render(specimen, wet=remaining, spreadMethod=method)
+                    repeat = self.render(specimen, progress=0., wet=1., repeatPass=1., repeatTint=1.,
+                        underWet=remaining, spreadMethod=method)
+                    np.testing.assert_allclose(repeat, first, atol=1.)
+                orange = self.render(specimen, repeatPass=1., repeatTint=1., spreadMethod=method)
+                covered = self.render(specimen, repeatPass=1., repeatTint=1., underWet=1., spreadMethod=method)
+                np.testing.assert_allclose(covered, orange, atol=1.)
+                for progress in (.5, .9):
+                    first = self.render(specimen, progress=progress, wet=.6, retained=0., spreadMethod=method)
+                    repeated = self.render(specimen, progress=0., repeatPass=1., repeatTint=1.,
+                        underWet=.6, underProgress=progress, spreadMethod=method)
+                    np.testing.assert_allclose(repeated, first, atol=1.)
+
+    def test_wet_undercoat_remains_a_complete_premultiplied_layer_during_repeat_and_release(self):
+        for specimen in self.words:
+            for method in (0., 1.):
+                for progress in (0., .25, .5, .75, 1.):
+                    for tint in (1., .5, 0.):
+                        actual = self.render(specimen, repeatPass=1., repeatTint=tint,
+                            underWet=.6, progress=progress, spreadMethod=method)
+                        self.assertTrue((actual[:, :, 3].astype(int) >= specimen['coverage'].astype(int)).all())
+                        self.assertTrue((actual[:, :, :3] <= actual[:, :, 3:4]).all())
+                released = self.render(specimen, repeatPass=1., repeatTint=0., underWet=.6, spreadMethod=method)
+                first = self.render(specimen, wet=.6, spreadMethod=method)
+                np.testing.assert_allclose(released, first, atol=1.)
 
     def test_alif_reflection_uses_the_pixel_area_at_fractional_reader_positions(self):
         from scipy.ndimage import label, find_objects

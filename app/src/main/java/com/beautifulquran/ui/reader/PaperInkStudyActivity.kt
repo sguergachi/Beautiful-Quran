@@ -107,6 +107,7 @@ private class PaperInkWord(
     val pacing: TajweedPacing.Curve?,
     val shader: RuntimeShader,
 ) {
+    val firstMotion = PaperInkClock(motion.startMs, motion.endMs, InkEngine.tuning.glintFadeMs)
     val paint = Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG).apply { shader = this@PaperInkWord.shader }
 }
 
@@ -280,6 +281,9 @@ private fun PaperInkStudyPage(app: QuranApp, study: PaperInkStudy) {
                     else -> 0L
                 }
                 word.motion.update(position, state.isPlaying && belongs && word.ayah == currentAyah, now)
+                val repeat = word.ayah == 2 && study.sequence.repeatedMiddle
+                word.firstMotion.update(if (repeat) word.firstMotion.endMs else position,
+                    state.isPlaying && belongs && word.ayah == currentAyah && !repeat, now)
             }
             val verses = if (english.value) study.englishLines else study.arabicLines
             val gap = if (english.value) 8f else 24f
@@ -305,6 +309,11 @@ private fun PaperInkStudyPage(app: QuranApp, study: PaperInkStudy) {
                         }
                         word.shader.setFloatUniform("progress", progress)
                         word.shader.setFloatUniform("wet", wet)
+                        word.shader.setFloatUniform("underProgress", if (english.value) word.firstMotion.progress
+                            else word.pacing?.at(word.firstMotion.progress)
+                                ?: InkEngine.sweepEasing.transform(word.firstMotion.progress))
+                        word.shader.setFloatUniform("underWet", if (repeat && preview.value == InkPreview.Voice)
+                            word.firstMotion.wet else 0f)
                         word.shader.setFloatUniform("spreadMethod", if (flowingInk.value) 1f else 0f)
                         word.shader.setFloatUniform("repeatTint", if (repeat && preview.value != InkPreview.Dry)
                             study.repeatChain.alpha else 0f)

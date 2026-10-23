@@ -5,6 +5,27 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class PaperInkClockTest {
+    @Test fun repeatDoesNotRestartOrClearTheFirstCoatsDryingClock() {
+        val first = PaperInkClock(100, 1100, 1000)
+        val repeat = PaperInkClock(100, 1100, 1000)
+        first.update(600, true, 0)
+        first.update(1100, true, 500)
+        first.update(1100, true, 800)
+        val drying = first.wet
+        assertTrue(drying > 0f && drying < 1f)
+        // The media rewinds for the new coat; the old one keeps its handoff.
+        repeat.update(100, true, 800)
+        first.update(1100, false, 800)
+        assertEquals(drying, first.wet, 0f)
+        assertEquals(1f, repeat.wet, 0f)
+        first.update(1100, false, 1100)
+        repeat.update(600, true, 1100)
+        assertTrue(first.wet < drying)
+        assertEquals(1f, repeat.wet, 0f)
+        first.update(1100, false, 1500)
+        assertEquals(0f, first.wet, 0f)
+    }
+
     @Test fun aRepeatedWordReceivesTheSameWetAndDryCycleAsItsFirstPass() {
         val first = PaperInkClock(100, 1100, 1000)
         val repeated = PaperInkClock(100, 1100, 1000)

@@ -840,6 +840,8 @@ internal class InkMotion(
     /** Paper's wet ink: 1 while the voice lays this word, drying over
      * [InkEngine.Tuning.glintFadeMs] — the glimmer's clock, on Paper. */
     private val paperWet: State<Float>? = null,
+    /** The first coat keeps drying independently when a repeat wets the word again. */
+    private val paperFirstWet: State<Float>? = null,
     /** The word before this one in reading order, for the paper ink's lead fade. */
     private val previous: InkMotion? = null,
     /** Last visible deposit dissolving after this word becomes unread again. */
@@ -849,6 +851,7 @@ internal class InkMotion(
 
     /** Paper ink wetness this frame (0 dry). */
     val paperWetness: Float get() = paperWet?.value ?: 0f
+    val paperUnderWetness: Float get() = paperFirstWet?.value ?: 0f
 
     /**
      * How far this word is from starting, in word durations (−1..0), while the
@@ -1236,6 +1239,8 @@ internal fun rememberInkMotions(
             tarjiTrace = tarjiTrace,
             tarjiTraceColor = traceInk,
             paperWet = rememberGlintAlpha(glintInk == null && InkEngine.glinting(ink.state, wetInk)),
+            paperFirstWet = rememberGlintAlpha(glintInk == null && !ink.repeat &&
+                InkEngine.glinting(ink.state, wetInk)),
             previous = motions.lastOrNull(),
             paperDeparture = rememberPaperInkDeparture(
                 enabled = glintInk == null && InkEngine.tuning.paperInk && PaperInk.supported,

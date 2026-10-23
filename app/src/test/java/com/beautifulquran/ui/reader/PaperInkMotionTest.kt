@@ -8,6 +8,37 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class PaperInkMotionTest {
+    @Test fun repeatRetainsFirstCoatProgressAndItsIndependentDryingClock() {
+        val first = mutableStateOf(.9f)
+        val underWet = mutableStateOf(.65f)
+        val repeat = mutableStateOf(0f)
+        val freshWet = mutableStateOf(1f)
+        val motion = InkMotion(
+            ink = InkEngine.Word(InkEngine.State.Active, true),
+            lyricInk = mutableStateOf(1f),
+            sweep = LetterSweep(first, mutableStateOf(null), mutableStateOf(null)),
+            repeatWash = RepeatWash(repeat, mutableStateOf(1f), mutableStateOf(null)),
+            glintAlpha = mutableStateOf(0f), glintIsRepeat = true,
+            glintReplacedByRepeat = false, waslPrefix = null,
+            tarji = mutableStateOf(InkEngine.GlintResonance.Idle),
+            paperWet = freshWet, paperFirstWet = underWet,
+        )
+        val style = PaperInkStyle(Color.Black, Color.Red)
+        val initial = motion.paperInkFrame(style)
+        assertEquals(.9f, initial.underProgress, 0f)
+        assertEquals(.65f, initial.underWet, 0f)
+        assertEquals(0f, initial.progress, 0f)
+        assertEquals(1f, initial.wet, 0f)
+        underWet.value = .3f
+        first.value = 1f
+        repeat.value = .4f
+        val later = motion.paperInkFrame(style)
+        assertEquals(1f, later.underProgress, 0f)
+        assertEquals(.3f, later.underWet, 0f)
+        assertEquals(.4f, later.progress, 0f)
+        assertEquals(1f, later.wet, 0f)
+    }
+
     @Test fun closingLetterUsesItsPacedPositionOnFirstAndRepeatPasses() {
         val word = ActiveWord(31, 15, durationMs = 4000)
         val pacing = requireNotNull(InkEngine.pacing("ٱلۡمُسۡرِفِينَ", word, isAyahFinal = true))

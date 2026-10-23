@@ -122,6 +122,8 @@ the same three verse groups, default 91%. It changes only drawing scale,
 keeping playback and the pooling setting intact. All dials reset when the study is reopened.
 
 When verse 2 repeats, its entire previously read black base stays visible.
+Any first-pass wet ink keeps drying on its original clock beneath the new
+orange front, retaining its width and reflection until the front reaches it.
 The wash brings in the wet terracotta orange (`#C25F3B`)
 together with the fuller wet shape and reflection. Every reached word holds
 orange with the chain, softening to the paler dry orange as its individual
