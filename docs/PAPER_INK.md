@@ -7,7 +7,11 @@ passes, each stroke swells out to its edges, the fresh ink stands slightly
 heavier and glossier, and then dries back to the page's ink over the glimmer's
 dry-down (`glintFadeMs`). The letter ahead fades in so the edge is feathered.
 A repeat is laid in terracotta, held through its chain, and released to
-charcoal. It is the Paper theme's counterpart of the Nightfall / Royal Green
+charcoal by evaporation: thin edges clear first and thicker stroke interiors
+linger, with a soft front over the existing 900 ms release. The dry black
+underprint stays complete throughout; the orange film and any remaining wet
+spread fade away together. A pause within the chain still holds its orange.
+It is the Paper theme's counterpart of the Nightfall / Royal Green
 glimmer ([GLIMMER.md](GLIMMER.md)), designed and tuned in the Paper ink study
 (Settings → Developer → Paper ink study; GLIMMER.md "Paper ink experiment").
 
@@ -25,7 +29,7 @@ word's glyphs are.
 | Field generator | `PaperInkField` (pure Kotlin) | From the word's 2× glyph mask: signed outline distance, the swelling-channel arrival for both spread methods, the liquid film normal. Port of `tools/build_paper_ink_study.py`. |
 | Cache | `PaperInk.word` | Captures the mask on the UI thread (rationed to 3 words a frame), generates on one background thread, keeps ~32 MB of words keyed by layout and sub-pixel phase. |
 | Draw | `PaperInk.drawWord` + `assets/paper-ink/ink.agsl` | Erases the word's printed pixels from the surface's layer, then draws the ink. |
-| Clock | `InkMotion` | Progress (tajweed-paced), wetness (`paperWetness`), repeat (`repeatProgress` / `repeatAlpha`), and `paperAhead` for the lead fade. No clocks of its own. |
+| Clock | `InkMotion` | Letter progress (`paperSweepProgress`), wetness (`paperWetness`), repeat (`paperRepeatProgress` / `repeatAlpha`), and `paperAhead` for the lead fade. No clocks of its own. |
 
 Surface adapters:
 
@@ -145,6 +149,9 @@ dries it toward warm paper.
   checks exact dry, held-repeat and unread glyph coverage. The pictured alif
   in أُمِرُوٓاْ is also checked at three sizes, fractional screen positions and
   three fill phases against the previous four-tap pattern and an 8× reference.
+  Repeat-release checks cover thin edges clearing before thicker interiors,
+  a monotone fade, complete underprint, and exact dry ink even when the
+  departing film is still wet. The study shader has the same endpoint gate.
 - `PaperInkEvaporationTest` — unread entry, settled and partial/repeat
   departures, interrupted fades, re-entry and retained reciter repeats. The
   Skia gate also checks that evaporating first/repeat ink reaches the exact

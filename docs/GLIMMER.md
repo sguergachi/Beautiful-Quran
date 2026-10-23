@@ -132,6 +132,9 @@ Only the color is held by the chain; weight and reflection follow wetness. Later
 stay black until their turn. Pausing retains the reached orange prefix while
 the sheen settles. Only when playback leaves verse 2 does the complete chain
 dissolve together to charcoal over `InkEngine.tuning.repeatFadeOutMs` (900 ms).
+The repeat film evaporates softly from thin edges into the fuller stroke
+interiors, revealing the complete charcoal underprint. Any remaining wet
+spread and reflection recede with that film; there is no loss of recited ink.
 The tint envelope is independent of wetness, so earlier words do not become
 brown or black while later words repeat. Carbon pooling does not darken orange;
 its pigment travels through the same feathered liquid fill as the first pass.

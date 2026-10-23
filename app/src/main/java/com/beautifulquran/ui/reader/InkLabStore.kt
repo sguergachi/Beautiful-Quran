@@ -202,8 +202,9 @@ data class InkLabSnapshot(
          * mode, swings in linear light. A save from before is dropped back to
          * shipped for those fields ([decode]); the rest of it is kept.
          * 3: adopt zero scroll lead in existing saves; later auditions persist.
+         * 4: retune that scroll lead to 100 ms, preserving the other knobs.
          */
-        const val SCHEMA = 3
+        const val SCHEMA = 4
 
         private val json = Json {
             ignoreUnknownKeys = true

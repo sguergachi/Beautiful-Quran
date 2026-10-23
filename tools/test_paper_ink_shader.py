@@ -155,6 +155,28 @@ class PaperInkShaderTest(unittest.TestCase):
                     np.testing.assert_array_equal(self.render(word, 1, 1, .875, method, progress=.4, lead=1),
                                                   self.render(word, 1, 1, .875, method, progress=.4))
 
+    def test_repeat_release_finishes_on_exact_dry_underprint_even_while_wet(self):
+        for word in self.words:
+            for method in (0, 1):
+                dry = self.render(word, 0, 0, .875, method)
+                np.testing.assert_allclose(self.render(word, 1, 1, .875, method, tint=0), dry, atol=1)
+                previous = self.render(word, 1, 0, .875, method)
+                half = self.render(word, 1, 0, .875, method, tint=.5)
+                solid = self.coverage(dry, 46) > .98
+                core = solid.copy()
+                for axis in (0, 1):
+                    for shift in (-1, 1):
+                        core &= np.roll(solid, shift, axis=axis)
+                edges = solid & ~core
+                remaining = (half[:, :, 0].astype(float) - dry[:, :, 0]) / \
+                    np.maximum(1., previous[:, :, 0].astype(float) - dry[:, :, 0])
+                self.assertGreater(remaining[core].mean(), remaining[edges].mean() + .08)
+                for tint in np.linspace(.9, 0, 10):
+                    actual = self.render(word, 1, 0, .875, method, tint=tint)
+                    self.assertTrue((actual[:, :, 0].astype(int) <= previous[:, :, 0].astype(int)).all())
+                    previous = actual
+                np.testing.assert_array_equal(previous, dry)
+
 
 if __name__ == '__main__':
     unittest.main()

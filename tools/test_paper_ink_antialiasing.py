@@ -149,6 +149,39 @@ class PaperInkAntialiasingTest(unittest.TestCase):
                 previous = actual
             np.testing.assert_array_equal(previous, closing['coverage'])
 
+    def test_repeat_evaporates_from_thin_edges_into_thicker_strokes(self):
+        specimens = [word('ٱلرَّحۡمَٰنِ', geometry.ARABIC_FONT, 80, True, 6),
+                     word('Merciful', geometry.ENGLISH_FONT, 48, False, 8)]
+        for specimen in specimens:
+            inside = specimen['coverage'] > 240
+            depth = distance_transform_edt(specimen['coverage'] > 127)
+            edges = inside & (depth <= 1.)
+            cores = inside & (depth >= 2.)
+            self.assertTrue(edges.any() and cores.any())
+            for method in (0., 1.):
+                options = dict(wet=0., retained=1., repeatPass=1., spreadMethod=method)
+                dry = self.render(specimen, **options, repeatTint=0.).astype(float)
+                held = self.render(specimen, **options, repeatTint=1.).astype(float)
+                half = self.render(specimen, **options, repeatTint=.5).astype(float)
+                remaining = (half[:, :, 0] - dry[:, :, 0]) / np.maximum(1., held[:, :, 0] - dry[:, :, 0])
+                self.assertGreater(remaining[cores].mean(), remaining[edges].mean() + .15)
+
+    def test_repeat_release_retains_full_underprint_and_reaches_exact_dry_ink(self):
+        for specimen in self.words:
+            for method in (0., 1.):
+                dry = self.render(specimen, wet=0., repeatPass=0., retained=1., spreadMethod=method)
+                for wet in (0., 1.):
+                    options = dict(wet=wet, repeatPass=1., retained=1., spreadMethod=method)
+                    previous = self.render(specimen, **options, repeatTint=1.)
+                    for tint in np.linspace(.95, 0., 20):
+                        actual = self.render(specimen, **options, repeatTint=float(tint))
+                        self.assertTrue((actual[:, :, 3].astype(int) >= specimen['coverage'].astype(int)).all())
+                        self.assertTrue((actual[:, :, :3] <= actual[:, :, 3:4]).all())
+                        if wet == 0.:
+                            self.assertTrue((actual[:, :, 0].astype(int) <= previous[:, :, 0].astype(int)).all())
+                        previous = actual
+                    np.testing.assert_allclose(previous, dry, atol=1.)
+
     def test_alif_reflection_uses_the_pixel_area_at_fractional_reader_positions(self):
         from scipy.ndimage import label, find_objects
         errors = []

@@ -72,7 +72,7 @@ half4 inkAt(float2 p, float base, float coverageAA) {
     float3 dry = float3(52.0, 50.0, 46.0) / 255.0;
     // Both passes deposit the same liquid layer through the same soft front.
     // The repeat retains its dry underprint and holds orange after the film dries.
-    float3 ink = mix(dry, pigment, mix(moisture, repeatTint, repeatPass));
+    float3 ink = mix(dry, pigment, mix(moisture, 1.0, repeatPass));
     float3 paper = float3(250.0, 243.0, 232.0) / 255.0;
     // The letter ahead of the wet edge fades in toward fresh ink, so the edge
     // is feathered over about a letter before the liquid arrives. The repeat's
@@ -84,8 +84,15 @@ half4 inkAt(float2 p, float base, float coverageAA) {
     float3 waiting = mix(dry, float3(6.0, 7.0, 8.0) / 255.0, approach);
     float dryCoverage = base * mix(mix(0.2661, 1.0, retained), 1.0, approach) * (1.0 - loaded);
     float liquidCoverage = expanded * loaded;
-    return half4(paper * (1.0 - dryCoverage - liquidCoverage) +
+    half4 deposit = half4(paper * (1.0 - dryCoverage - liquidCoverage) +
         waiting * dryCoverage + ink * liquidCoverage, 1.0);
+    if (repeatPass <= 0.0) return deposit;
+    // Same edge-to-core evaporation as the reader, over its solid underprint.
+    float interior = max(0.0, distance);
+    float film = interior / (interior + 3.0);
+    float edgeDelay = 0.5 * (1.0 - smoothstep(0.0, 0.8, film));
+    float repeatFilm = smoothstep(edgeDelay, edgeDelay + 0.5, repeatTint);
+    return mix(half4(mix(paper, dry, base), 1.0), deposit, repeatFilm);
 }
 
 // Integrate the wet material over the pixel rather than taking one point.
