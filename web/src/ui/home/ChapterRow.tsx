@@ -1,145 +1,119 @@
-import {
-  useEffect,
-  useRef,
-  type KeyboardEvent,
-  type MouseEvent,
-  type PointerEvent,
-} from 'react'
+import { useEffect, useRef, useState, type KeyboardEvent, type MouseEvent, type PointerEvent } from 'react'
 import type { Surah } from '../../data/models'
 import { exceedsWordHoldSlop } from '../../render/useWordInteraction'
-import { PIN_HOLD_MS, pinAction, pinFillOrigin } from './pinnedChapters'
+import { HOLD_FILL_MS, HOLD_START_MS, holdOutcome } from './pinnedChapters'
 
 /**
  * One chapter row, in order or pinned on the band (Android `SurahRow`).
- * Press-and-hold asks before it pins or unpins, in place: the row fills with
- * its answer (the band's wash to pin, paper over the band to unpin) and the
- * Arabic name hands over to the verb and a quiet Cancel. The keyboard asks
- * with the context-menu key, Shift+F10 or Shift+Enter, as a word's hold does.
+ * A click opens it. Hold-to-pin: held, the row takes its answer evenly (the
+ * band's wash to pin, paper over the band to unpin), deepening until it is
+ * full, and full is the confirmation. Lifting early or moving drains it and
+ * changes nothing. Keyboard and right click cannot hold, so the context-menu
+ * key, Shift+F10, Shift+Enter or a right click toggle the pin outright.
  */
 export function ChapterRow({
   surah,
   rowKey,
   pinned,
   onBand,
-  asking,
-  fillOrigin,
   onPrepare,
   onOpen,
-  onAsk,
-  onCancel,
-  onConfirm,
+  onToggle,
 }: {
   surah: Surah
   rowKey: string
-  /** Pinned: the hold offers Unpin and fills with paper. */
+  /** Pinned: holding fills paper back over the band, and unpins. */
   pinned: boolean
   /** Set on the band atop the list (search lists a pinned chapter in place). */
   onBand: boolean
-  asking: boolean
-  /** Where this row's fill grows from, in px; set while it asks or draws back. */
-  fillOrigin?: number
   onPrepare: () => void
   onOpen: () => void
-  onAsk: (originX: number) => void
-  onCancel: () => void
-  onConfirm: () => void
+  onToggle: () => void
 }) {
-  const itemRef = useRef<HTMLLIElement>(null)
-  const cancelRef = useRef<HTMLButtonElement>(null)
-  const holdTimer = useRef<number | null>(null)
-  const start = useRef<{ x: number; y: number } | null>(null)
-  const held = useRef(false)
+  const [holding, setHolding] = useState(false)
+  const fullTimer = useRef<number | null>(null)
+  const start = useRef<{ x: number; y: number; at: number } | null>(null)
+  // A press that was a hold (full, or let go early) is not a click.
+  const swallowClick = useRef(false)
 
-  const clearHold = () => {
-    if (holdTimer.current == null) return
-    window.clearTimeout(holdTimer.current)
-    holdTimer.current = null
+  const endHold = () => {
+    if (fullTimer.current != null) window.clearTimeout(fullTimer.current)
+    fullTimer.current = null
+    start.current = null
+    setHolding(false)
   }
-  useEffect(() => clearHold, [])
-
-  // The safe answer takes focus, as a bookmark's Keep does.
-  useEffect(() => {
-    if (asking) cancelRef.current?.focus({ preventScroll: true })
-  }, [asking])
-
-  const ask = (clientX: number) => {
-    const rect = itemRef.current?.getBoundingClientRect()
-    if (!rect) return
-    onAsk(pinFillOrigin(clientX - rect.left, rect.width))
-  }
+  useEffect(() => () => {
+    if (fullTimer.current != null) window.clearTimeout(fullTimer.current)
+  }, [])
 
   const onPointerDown = (event: PointerEvent) => {
     onPrepare()
-    held.current = false
-    start.current = { x: event.clientX, y: event.clientY }
-    clearHold()
+    swallowClick.current = false
     if (event.pointerType === 'mouse' && event.button !== 0) return
-    const x = event.clientX
-    holdTimer.current = window.setTimeout(() => {
-      holdTimer.current = null
-      held.current = true
-      ask(x)
-    }, PIN_HOLD_MS)
+    start.current = { x: event.clientX, y: event.clientY, at: event.timeStamp }
+    setHolding(true)
+    fullTimer.current = window.setTimeout(() => {
+      fullTimer.current = null
+      swallowClick.current = true
+      start.current = null
+      setHolding(false)
+      onToggle()
+    }, HOLD_START_MS + HOLD_FILL_MS)
   }
 
   const onPointerMove = (event: PointerEvent) => {
-    if (start.current == null || holdTimer.current == null) return
-    if (exceedsWordHoldSlop(start.current, { x: event.clientX, y: event.clientY })) clearHold()
+    if (start.current == null) return
+    if (exceedsWordHoldSlop(start.current, { x: event.clientX, y: event.clientY })) endHold()
   }
 
-  const onPointerEnd = () => {
-    clearHold()
-    start.current = null
+  const onPointerUp = (event: PointerEvent) => {
+    if (start.current != null && holdOutcome(event.timeStamp - start.current.at) === 'cancel') {
+      swallowClick.current = true
+    }
+    endHold()
   }
 
-  // A touch hold or right click arrives here too; the keyboard's has no pointer.
   const onContextMenu = (event: MouseEvent) => {
     event.preventDefault()
-    clearHold()
-    const fromPointer = start.current != null || event.button === 2
-    held.current = start.current != null
-    if (!asking) ask(fromPointer ? event.clientX : Number.NaN)
+    // A touch hold raises this too; the hold timer owns that gesture.
+    if (start.current != null) return
+    onToggle()
   }
 
   const onKeyDown = (event: KeyboardEvent) => {
     if (event.key !== 'Enter' || !event.shiftKey || event.repeat) return
     event.preventDefault()
-    if (!asking) ask(Number.NaN)
+    onToggle()
   }
 
   const onClick = () => {
-    if (held.current) {
-      held.current = false
+    if (swallowClick.current) {
+      swallowClick.current = false
       return
     }
-    // While asking, a click anywhere else on the row backs out.
-    if (asking) onCancel()
-    else onOpen()
+    onOpen()
   }
 
   return (
     <li
-      ref={itemRef}
       className="surah-item"
       data-pinned={pinned || undefined}
       data-band={onBand || undefined}
-      data-asking={asking || undefined}
+      data-holding={holding || undefined}
     >
-      <span
-        className="pin-fill"
-        aria-hidden="true"
-        style={fillOrigin != null ? { transformOrigin: `${fillOrigin}px 50%` } : undefined}
-      />
+      <span className="pin-fill" aria-hidden="true" />
       <button
         type="button"
         className="surah-row"
         data-row-key={rowKey}
+        aria-keyshortcuts="Shift+Enter"
+        aria-description={pinned ? 'Hold, or Shift+Enter, to unpin' : 'Hold, or Shift+Enter, to pin'}
         onPointerEnter={onPrepare}
         onPointerDown={onPointerDown}
         onPointerMove={onPointerMove}
-        onPointerUp={onPointerEnd}
-        onPointerCancel={onPointerEnd}
-        onPointerLeave={onPointerEnd}
+        onPointerUp={onPointerUp}
+        onPointerCancel={endHold}
+        onPointerLeave={endHold}
         onFocus={onPrepare}
         onContextMenu={onContextMenu}
         onKeyDown={onKeyDown}
@@ -154,14 +128,6 @@ export function ChapterRow({
         </span>
         <span className="surah-ar">{surah.nameArabic}</span>
       </button>
-      <span className="pin-answers" aria-live="polite">
-        <button type="button" className="pin-answer" onClick={onConfirm}>
-          {pinAction(pinned)}
-        </button>
-        <button ref={cancelRef} type="button" className="pin-answer pin-cancel" onClick={onCancel}>
-          Cancel
-        </button>
-      </span>
     </li>
   )
 }

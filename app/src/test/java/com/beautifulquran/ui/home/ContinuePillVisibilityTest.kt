@@ -195,28 +195,17 @@ class ContinuePillVisibilityTest {
     }
 
     @Test
-    fun pressAndHoldAsksBeforePinningOrUnpinning() {
-        assertEquals("Pin", pinAction(pinned = false))
-        assertEquals("Unpin", pinAction(pinned = true))
-    }
-
-    @Test
-    fun inkBlotStartsAtTheFingerAndSettlesCoveringTheWholeRow() {
-        for (seed in listOf(1, 18, 114)) {
-            for (step in 0 until 360) {
-                val angle = step * kotlin.math.PI.toFloat() / 180f
-                assertEquals(0f, inkBlotRadius(angle, 0f, seed), 0f)
-                // In reach units the farthest corner is √2 away: at rest even
-                // the shallowest lobe is past it, so the row is filled square.
-                assertTrue(inkBlotRadius(angle, 1f, seed) > kotlin.math.sqrt(2f))
-            }
-        }
-    }
-
-    @Test
     fun pinLessonTakesTheOpenHalfOfTheSheet() {
         assertEquals(true, pinTipBodyBelow(targetY = 300f, sheetHeight = 2000f))
         assertEquals(false, pinTipBodyBelow(targetY = 1500f, sheetHeight = 2000f))
+    }
+
+    @Test
+    fun aQuickReleaseOpensTheChapterAndALongerOneChangesNothing() {
+        assertEquals(HoldOutcome.Tap, holdOutcome(80L))
+        assertEquals(HoldOutcome.Tap, holdOutcome(HoldTapMaxMs - 1))
+        assertEquals(HoldOutcome.Cancel, holdOutcome(HoldTapMaxMs))
+        assertEquals(HoldOutcome.Cancel, holdOutcome(650L))
     }
 
     @Test

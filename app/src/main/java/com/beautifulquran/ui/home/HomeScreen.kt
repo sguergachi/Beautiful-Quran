@@ -2,10 +2,6 @@ package com.beautifulquran.ui.home
 
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.AnimatedContent
-import androidx.compose.animation.togetherWith
-import androidx.compose.ui.semantics.LiveRegionMode
-import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.animation.EnterTransition
 import androidx.compose.animation.ExitTransition
 import androidx.compose.animation.core.CubicBezierEasing
@@ -13,8 +9,6 @@ import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animate
 import androidx.compose.animation.core.tween
-import androidx.compose.animation.core.FastOutSlowInEasing
-import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -74,7 +68,6 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
-import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
@@ -103,13 +96,16 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.util.lerp
 import kotlinx.coroutines.delay
 import kotlin.math.roundToInt
-import kotlin.math.sin
-import kotlin.math.cos
-import kotlin.math.PI
-import androidx.compose.ui.geometry.isSpecified
-import androidx.compose.ui.graphics.drawscope.clipRect
-import androidx.compose.ui.graphics.drawscope.Stroke
-import androidx.compose.ui.graphics.Path
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.coroutineScope
+import android.view.HapticFeedbackConstants
+import androidx.compose.ui.semantics.onClick
+import androidx.compose.ui.semantics.customActions
+import androidx.compose.ui.semantics.CustomAccessibilityAction
+import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.input.pointer.PointerInputChange
+import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.animation.core.Animatable
 import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.flow.first
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -707,25 +703,15 @@ fun HomeScreen(
                 // A pinned chapter moves up into the block rather than showing
                 // twice on one sheet; unpinning returns it to its place.
                 val listedSurahs = if (showPinned) uiState.surahs.filterNot { it.id in pinnedIds } else uiState.surahs
-                // Press-and-hold asks before it pins or unpins: the row's own
-                // lines turn into the question and its answers, in place, as
-                // a bookmark's Keep / Remove does. One row asks at a time.
-                var confirmingPin by remember { mutableStateOf<String?>(null) }
-                LaunchedEffect(searching) { confirmingPin = null }
-                BackHandler(enabled = confirmingPin != null) { confirmingPin = null }
                 val chapterRow: @Composable (Surah, String, Modifier, Dp) -> Unit = { surah, key, modifier, vertical ->
                     SurahRow(
                         vertical = vertical,
                         pinned = surah.id in pinnedIds,
-                        confirmingPin = confirmingPin == key,
-                        onAskPin = { confirmingPin = key },
-                        onCancelPin = { confirmingPin = null },
                         surah = surah,
                         // One place marker: only the row owning the place
                         // carries the green cloth (the pinned copy, when pinned).
                         currentAyah = uiState.continueTarget?.ayah?.takeIf { key == placeKey },
                         onTogglePinned = {
-                            confirmingPin = null
                             // The lesson completes on a real pin, not on the hold.
                             if (pinTipOpen && surah.id !in pinnedIds) closePinTip()
                             revealPinned = surah.id !in pinnedIds && !listState.canScrollBackward
@@ -1406,9 +1392,6 @@ private fun SurahRow(
     placeUnfurlSignal: Int,
     onPlaceUnfurlConsumed: (Int) -> Unit,
     pinned: Boolean,
-    confirmingPin: Boolean,
-    onAskPin: () -> Unit,
-    onCancelPin: () -> Unit,
     onTogglePinned: () -> Unit,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
@@ -1419,17 +1402,15 @@ private fun SurahRow(
         verticalAlignment = Alignment.CenterVertically,
         modifier = modifier
             .fillMaxWidth()
-            // Holding blots the row with the answer: the band's green to pin,
-            // paper back over the band to unpin.
-            .pinFill(
-                filling = confirmingPin,
+            // A tap opens the chapter; holding fills the row with its
+            // answer — the band's green to pin, paper over the band to unpin —
+            // and holding it full is the confirmation.
+            .holdToPin(
+                pinned = pinned,
+                label = surah.nameTransliteration,
                 color = if (pinned) MaterialTheme.colorScheme.background else QuranTheme.accents.greenWash,
-                seed = surah.id,
-            )
-            // While asking, a tap anywhere else on the row backs out.
-            .quietClickable(
-                onLongClick = onAskPin,
-                onClick = if (confirmingPin) onCancelPin else onClick,
+                onTap = onClick,
+                onHeld = onTogglePinned,
             )
             .padding(
                 end = HomeEndInset,
@@ -1489,144 +1470,101 @@ private fun SurahRow(
             )
         }
         Spacer(Modifier.width(12.dp))
-        AnimatedContent(
-            targetState = confirmingPin,
-            // Hand over, never overlap: the name lifts off before the
-            // answers ink in, so the two never print on top of each other.
-            transitionSpec = {
-                fadeIn(tween(160, delayMillis = 110)) togetherWith fadeOut(tween(110))
-            },
-            contentAlignment = Alignment.CenterEnd,
-            label = "pin answers",
-        ) { asking ->
-            if (asking) {
-                // The soaked row is the question; the answers are the verb
-                // in the app's interaction green and a quiet Cancel.
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite },
-                ) {
-                    PinAnswer(pinAction(pinned), MaterialTheme.colorScheme.primary, onTogglePinned)
-                    PinAnswer("Cancel", QuranTheme.ink.body, onCancelPin)
-                }
-            } else {
-                Text(
-                    text = surah.nameArabic,
-                    style = ArabicTitleStyle,
-                    color = QuranTheme.accents.greenInk,
-                    modifier = Modifier.padding(end = HomeArabicOpticalInset),
-                )
-            }
-        }
+        Text(
+            text = surah.nameArabic,
+            style = ArabicTitleStyle,
+            color = QuranTheme.accents.greenInk,
+            modifier = Modifier.padding(end = HomeArabicOpticalInset),
+        )
     }
 }
 
 /**
- * The band arriving as an ink blot: ink touches down where the finger is and
- * spreads with a lobed, seeded edge, quick at first and then creeping to a
- * stop, until it fills the row square-cut — exactly the band slice it will
- * be once pinned. A darker wet rim rides the edge and dries away as the blot
- * settles. Letting go draws the ink back to the finger.
+ * Hold-to-pin: the hold is the confirmation. A quick tap opens the chapter.
+ * Held, the row takes [color] evenly — no shape spreading across a strip
+ * this thin — deepening in step with the finger until it is the full band
+ * slice; a haptic tick and [onHeld] land at full. Lifting early, or the list
+ * taking the drag, drains it and changes nothing. Readers who cannot hold
+ * get Pin / Unpin as an accessibility action instead.
  */
 @Composable
-private fun Modifier.pinFill(
-    filling: Boolean,
+private fun Modifier.holdToPin(
+    pinned: Boolean,
+    label: String,
     color: androidx.compose.ui.graphics.Color,
-    seed: Int,
+    onTap: () -> Unit,
+    onHeld: () -> Unit,
 ): Modifier {
-    val progress by animateFloatAsState(
-        targetValue = if (filling) 1f else 0f,
-        animationSpec = tween(PinFillMs, easing = InkBlotEasing),
-        label = "pinFill",
-    )
-    val rim = MaterialTheme.colorScheme.primary.copy(alpha = 0.10f)
-    // Read only in the draw phase, so the finger never recomposes the row.
-    val finger = remember { mutableStateOf(Offset.Unspecified) }
+    val fill = remember { Animatable(0f) }
+    val view = LocalView.current
+    val tap by rememberUpdatedState(onTap)
+    val held by rememberUpdatedState(onHeld)
     return pointerInput(Unit) {
-        awaitPointerEventScope {
-            while (true) {
-                val down = awaitPointerEvent(PointerEventPass.Initial).changes
-                    .firstOrNull { it.pressed && !it.previousPressed }
-                if (down != null) finger.value = down.position
+        coroutineScope {
+            awaitEachGesture {
+                val down = awaitFirstDown()
+                var full = false
+                val filling = launch {
+                    fill.animateTo(1f, tween(HoldFillMs, delayMillis = HoldStartMs, easing = LinearEasing))
+                    full = true
+                    view.performHapticFeedback(HapticFeedbackConstants.LONG_PRESS)
+                    held()
+                }
+                var up: PointerInputChange? = null
+                while (true) {
+                    val change = awaitPointerEvent().changes.firstOrNull { it.id == down.id } ?: break
+                    if (full) {
+                        // Pinned: the rest of the gesture is spent, not a tap.
+                        change.consume()
+                        if (!change.pressed) break else continue
+                    }
+                    if (!change.pressed) {
+                        up = change
+                        break
+                    }
+                    // A drag belongs to the list: let it scroll, drain the fill.
+                    if (change.isConsumed ||
+                        (change.position - down.position).getDistance() > viewConfiguration.touchSlop
+                    ) {
+                        break
+                    }
+                }
+                if (!full) {
+                    filling.cancel()
+                    if (up != null && holdOutcome(up.uptimeMillis - down.uptimeMillis) == HoldOutcome.Tap) {
+                        up.consume()
+                        tap()
+                    }
+                }
+                launch { fill.animateTo(0f, tween(if (full) 0 else HoldDrainMs)) }
             }
         }
+    }.semantics {
+        role = Role.Button
+        onClick(label = "Open $label") { tap(); true }
+        customActions = listOf(
+            CustomAccessibilityAction(if (pinned) "Unpin $label" else "Pin $label") { held(); true },
+        )
     }.drawBehind {
-        if (progress <= 0f) return@drawBehind
-        val origin = if (finger.value.isSpecified) finger.value else center
-        // Spread in the row's own proportions: a row is far wider than it is
-        // tall, and a round blot would fill its height at once and leave only
-        // two edges sweeping sideways — a wipe. Scaled to the row, the blot's
-        // top and bottom stay curved while it runs along the strip.
-        val reachX = maxOf(origin.x, size.width - origin.x)
-        // Fuller across the strip than along it, so the top and bottom seal
-        // with the ends instead of leaving thin dry margins to creep shut.
-        val reachY = maxOf(origin.y, size.height - origin.y) * InkBlotFullness
-        val blot = Path().apply {
-            for (step in 0..InkBlotSteps) {
-                val angle = step * 2f * PI.toFloat() / InkBlotSteps
-                val r = inkBlotRadius(angle, progress, seed)
-                val point = Offset(origin.x + reachX * r * cos(angle), origin.y + reachY * r * sin(angle))
-                if (step == 0) moveTo(point.x, point.y) else lineTo(point.x, point.y)
-            }
-            close()
-        }
-        clipRect {
-            drawPath(blot, color)
-            // The wet rim: pigment piled at the running edge, drying as it stops.
-            val wet = 1f - progress
-            if (wet > 0.02f) {
-                drawPath(blot, rim.copy(alpha = rim.alpha * wet), style = Stroke(width = InkBlotRim.toPx() * wet))
-            }
-        }
+        val alpha = fill.value
+        if (alpha > 0f) drawRect(color.copy(alpha = color.alpha * alpha))
     }
 }
 
-/**
- * The blot's edge at [angle], in units of the row's reach from the finger
- * along each axis: lobes of a few seeded frequencies on a front that runs to
- * past √2, so at rest even its shallowest lobe has crossed the farthest
- * corner and the row is filled square. The lobes creep a little as the ink
- * spreads, so the edge is never a growing stamp.
- */
-internal fun inkBlotRadius(angle: Float, progress: Float, seed: Int): Float {
-    var wobble = 0f
-    for ((k, frequency) in InkBlotLobes.withIndex()) {
-        val phase = seed * (1.7f + k * 0.9f) + progress * (0.5f + k * 0.3f)
-        wobble += InkBlotLobeDepth[k] * sin(frequency * angle + phase)
-    }
-    return progress.coerceIn(0f, 1f) * InkBlotOvershoot * (1f + wobble)
-}
+internal enum class HoldOutcome { Tap, Cancel }
 
-private val InkBlotLobes = floatArrayOf(3f, 5f, 8f, 13f)
-private val InkBlotLobeDepth = floatArrayOf(0.09f, 0.05f, 0.03f, 0.015f)
-/** Past the farthest corner (√2 in reach units) by enough that the deepest
- * dip (−18.5%) still covers it: 1.8 × 0.815 > √2. */
-private const val InkBlotOvershoot = 1.8f
-private const val InkBlotSteps = 120
-private const val InkBlotFullness = 1.6f
-private val InkBlotRim = 3.dp
-/** Ink lands fast and creeps to a stop. */
-private val InkBlotEasing = CubicBezierEasing(0.15f, 0.75f, 0.3f, 1f)
-private const val PinFillMs = 380
+/** What lifting the finger [heldMs] into a hold means, before the fill is
+ * full: a quick release is the ordinary tap that opens the chapter; a
+ * longer one was a hold let go early, and changes nothing. */
+internal fun holdOutcome(heldMs: Long): HoldOutcome =
+    if (heldMs < HoldTapMaxMs) HoldOutcome.Tap else HoldOutcome.Cancel
 
-/** The verb press-and-hold offers beside Cancel. */
-internal fun pinAction(pinned: Boolean): String = if (pinned) "Unpin" else "Pin"
-
-@Composable
-private fun PinAnswer(text: String, color: androidx.compose.ui.graphics.Color, onClick: () -> Unit) {
-    Text(
-        text = text,
-        // The bookmark sheet's answer face: book type, not UI sans.
-        style = MaterialTheme.typography.bodyMedium.copy(
-            fontSize = typeScale(16.sp),
-            fontWeight = FontWeight.Medium,
-        ),
-        color = color,
-        modifier = Modifier
-            .quietClickable(role = Role.Button, onClick = onClick)
-            .padding(horizontal = 8.dp, vertical = 12.dp),
-    )
-}
+/** No tint for an ordinary tap: the fill waits this long to begin. */
+private const val HoldStartMs = 150
+/** Then deepens to the full band slice over this, in step with the finger. */
+private const val HoldFillMs = 550
+private const val HoldDrainMs = 180
+internal const val HoldTapMaxMs = 300L
 
 internal fun shouldUnfurlReadingPlaceRibbon(
     pendingReturn: Boolean,

@@ -1,9 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import {
+  HOLD_TAP_MAX_MS,
   chapterRowKey,
-  pinAction,
-  pinFillOrigin,
-  pinFillSpan,
+  holdOutcome,
   pinnedChapterLists,
 } from './pinnedChapters'
 
@@ -33,22 +32,11 @@ describe('pinned chapter lists', () => {
   })
 })
 
-describe('pin fill', () => {
-  it('grows out from the pointer and reaches both edges together', () => {
-    expect(pinFillSpan(100, 400, 0)).toEqual([100, 100])
-    expect(pinFillSpan(100, 400, 0.5)).toEqual([50, 250])
-    expect(pinFillSpan(100, 400, 1)).toEqual([0, 400])
-  })
-
-  it('starts in the middle without a pointer, and clamps one off the row', () => {
-    expect(pinFillOrigin(NaN, 400)).toBe(200)
-    expect(pinFillOrigin(-20, 400)).toBe(0)
-    expect(pinFillOrigin(480, 400)).toBe(400)
-    expect(pinFillSpan(480, 400, 2)).toEqual([0, 400])
-  })
-
-  it('offers the verb for the row it is on', () => {
-    expect(pinAction(false)).toBe('Pin')
-    expect(pinAction(true)).toBe('Unpin')
+describe('hold to pin', () => {
+  it('opens on a quick release and changes nothing on a longer one', () => {
+    expect(holdOutcome(80)).toBe('tap')
+    expect(holdOutcome(HOLD_TAP_MAX_MS - 1)).toBe('tap')
+    expect(holdOutcome(HOLD_TAP_MAX_MS)).toBe('cancel')
+    expect(holdOutcome(650)).toBe('cancel')
   })
 })

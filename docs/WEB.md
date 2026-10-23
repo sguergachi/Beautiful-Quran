@@ -320,12 +320,15 @@ Renderers consume these; they do not re-derive curves.
   `pinnedSurahIds` in settings; a PINNED flag over a square-cut band in
   `--green-wash`, the Continue pill's green; pinned chapters move out of
   the list.
-  Press-and-hold (500 ms, cancelled by 10 px of travel), a long-press or
-  right-click (`contextmenu`), the Context Menu key, Shift+F10 or Shift+Enter
-  asks in place: a crisp fill from the pointer (the middle for keyboard),
-  then **Pin** / **Unpin** and Cancel, with focus on Cancel. Cancel, a click
-  elsewhere on the row, Escape or typing in search backs out. Pure decisions
-  live in `ui/home/pinnedChapters.ts`; the row is `ui/home/ChapterRow.tsx`.
+  Hold-to-pin, as Android: a click opens the chapter; held, the row
+  deepens into its answer as an even `opacity` fill (550 ms linear after
+  150 ms of settle), and full toggles the pin; lifting early drains it
+  (180 ms). A release within 300 ms is the tap that opens; movement over
+  the slop cancels. A keyboard cannot hold, so the context-menu event
+  (right click, Context Menu key, Shift+F10) and Shift+Enter toggle the
+  pin outright, and the row announces `Hold, or Shift+Enter, to pin`.
+  Pure decisions live in `ui/home/pinnedChapters.ts`; the row is
+  `ui/home/ChapterRow.tsx`.
   Web rows carry no place ribbon and the Continue pill never docks, so the
   place-row rule has nothing to move here. The pinning lesson is Android-only
   for now.

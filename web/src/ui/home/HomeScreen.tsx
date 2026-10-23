@@ -96,10 +96,6 @@ export function HomeScreen({
   const [expandedSurahIds, setExpandedSurahIds] = useState<Set<number>>(
     () => new Set(),
   )
-  // One row asks to pin or unpin at a time. Kept after it backs out, so the
-  // fill draws back to where it grew from.
-  const [pinAsk, setPinAsk] = useState<{ key: string; origin: number; open: boolean } | null>(null)
-  const pinAsking = pinAsk?.open === true
   const revealPinned = useRef(false)
   const focusAfterPin = useRef<string | null>(null)
   const previousBookmarkCount = useRef(state.bookmarks.length)
@@ -131,23 +127,6 @@ export function HomeScreen({
       delete shell.dataset.coverSearch
     }
   }, [searchFocused, searching])
-
-  // Starting a search backs out of a pin question.
-  useEffect(() => {
-    setPinAsk((ask) => (ask?.open ? { ...ask, open: false } : ask))
-  }, [search])
-
-  useEffect(() => {
-    if (!pinAsking) return
-    const backOut = (event: KeyboardEvent) => {
-      if (event.key !== 'Escape') return
-      event.preventDefault()
-      event.stopImmediatePropagation()
-      setPinAsk((ask) => (ask ? { ...ask, open: false } : ask))
-    }
-    window.addEventListener('keydown', backOut, true)
-    return () => window.removeEventListener('keydown', backOut, true)
-  }, [pinAsking])
 
   // Pinning from the very top of the sheet brings the band into view (as
   // Android scrolls to the first item); a reader deep in the list keeps
@@ -306,7 +285,6 @@ export function HomeScreen({
     if (document.activeElement?.closest('.surah-item')) {
       focusAfterPin.current = chapterRowKey(surahId, !pinned && !searching)
     }
-    setPinAsk(null)
     appStore.togglePinnedSurah(surahId)
   }
   const chapterRow = (s: (typeof filtered)[number]) => {
@@ -319,17 +297,12 @@ export function HomeScreen({
         rowKey={key}
         pinned={pinnedSurahIds.includes(s.id)}
         onBand={onBand}
-        asking={pinAsking && pinAsk?.key === key}
-        fillOrigin={pinAsk?.key === key ? pinAsk.origin : undefined}
         onPrepare={() => prepareChapter(s.id)}
         onOpen={() => {
-          setPinAsk(null)
           if (searching) appStore.openReading(s.id, ayahTarget ?? 1)
           else appStore.openSurah(s.id)
         }}
-        onAsk={(origin) => setPinAsk({ key, origin, open: true })}
-        onCancel={() => setPinAsk((ask) => (ask ? { ...ask, open: false } : ask))}
-        onConfirm={() => togglePinned(s.id)}
+        onToggle={() => togglePinned(s.id)}
       />
     )
   }

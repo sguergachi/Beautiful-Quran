@@ -1358,7 +1358,6 @@ input[type='search']::-webkit-search-decoration {
 
 .surah-item {
   position: relative;
-  --pin-answers-width: 7rem;
 }
 
 /* The band is the Continue pill's green wash. */
@@ -1377,15 +1376,15 @@ input[type='search']::-webkit-search-decoration {
   user-select: none;
 }
 
-/* Holding asks first, by filling the row with its answer: a solid,
-   square-cut slice out from the pointer to both edges (pinFillSpan), the
-   band's wash to pin, paper back over the band to unpin. No feathered edge. */
+/* Hold-to-pin: held, the row takes its answer evenly (no shape spreading
+   across a strip this thin), deepening until full, which pins. The band's
+   wash to pin, paper over the band to unpin. Lifting early drains it. */
 .pin-fill {
   position: absolute;
   inset: 0;
   background: var(--green-wash);
-  transform: scaleX(0);
-  transition: transform 250ms cubic-bezier(0.4, 0, 0.2, 1);
+  opacity: 0;
+  transition: opacity 180ms ease;
   pointer-events: none;
 }
 
@@ -1393,59 +1392,14 @@ input[type='search']::-webkit-search-decoration {
   background: var(--paper);
 }
 
-.surah-item[data-asking] .pin-fill {
-  transform: scaleX(1);
-}
-
-.surah-item[data-asking] .surah-row {
-  background: transparent;
-}
-
-/* The Arabic name lifts off before the answers ink in; never both at once.
-   It keeps the answers' width, so the row's height never moves. */
-.surah-item[data-asking] .surah-ar {
-  min-width: var(--pin-answers-width);
-  opacity: 0;
-  transition: opacity 110ms ease;
-}
-
-.pin-answers {
-  position: absolute;
-  z-index: 2;
-  top: 0;
-  bottom: 0;
-  inset-inline-end: calc(var(--home-end-inset) - 4px);
-  display: flex;
-  align-items: center;
-  opacity: 0;
-  visibility: hidden;
-  transition: opacity 110ms ease, visibility 0s linear 110ms;
-}
-
-.surah-item[data-asking] .pin-answers {
+.surah-item[data-holding] .pin-fill {
   opacity: 1;
-  visibility: visible;
-  transition: opacity 160ms ease 110ms, visibility 0s;
-}
-
-/* The bookmark sheet's answer face: book type, not UI sans. */
-.pin-answer {
-  height: 100%;
-  padding: 0 8px;
-  color: var(--accent);
-  font: 500 16px/1.25 var(--font-body);
-  white-space: nowrap;
-}
-
-.pin-cancel {
-  color: var(--ink-rung-body);
+  transition: opacity 550ms linear 150ms;
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .pin-fill,
-  .surah-ar,
-  .pin-answers {
-    transition: none !important;
+  .surah-item[data-holding] .pin-fill {
+    transition: opacity 0s linear 700ms;
   }
 }
 
