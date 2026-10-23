@@ -414,6 +414,13 @@ tween-vs-snap rules, sweep entry and residual rules, repeat wash timing, the
   voice, so a starving stream's brief ready windows cannot strobe the page
   between download bursts.
   Web parity: `data-stream-wait` CSS covers in `styles.css`.
+  Android word-play is an explicit exception: the tapped verse keeps its
+  continuous recited prefix, including during the buffer and release hold.
+  `WordTapInk` publishes the same immediate target for word tiles and book
+  pages, waits for a matching poll, then retains that origin only within the
+  acknowledged verse, reciter and playback generation. A later play or seek
+  cannot inherit it. The tapped word still waits for its own media clock;
+  words after it retain the ordinary Upcoming treatment.
 - **Basmalah preface**: `prefaceState(isActive, dimmed)` /
   `prefaceWashProgress(positionMs, durationMs, segments)` for the surah-header
   basmalah VectorDrawable (Active during the Al-Fatihah 1:1 lead-in clip, with
@@ -617,6 +624,9 @@ shared `HighlightTimeline` through that window. The replaced speech-time
   Speed changes alter the shared media clock instead of restarting animation.
 - A tap is provisional until a matching player generation arrives. Its first
   draw is zero, without waiting for an effect to snap an idle animation down.
+  If another tap skips past an unconfirmed target, that target becomes fully
+  recited with the rest of the prefix; a provisional zero is never retained
+  as a spoken residual.
 - A consecutive same-word repeat starts another orange occurrence. Base ink
   remains laid; orange waits for the base edge. Repeats never form a queue.
 - English predecessor gating preserves a continuous prefix while each window

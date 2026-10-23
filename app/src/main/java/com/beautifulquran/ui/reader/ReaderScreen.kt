@@ -769,7 +769,8 @@ fun ReaderScreen(
     // tail is exactly the lit region the wait must cover), and it releases
     // only after the buffer has carried the voice for a moment, so a
     // starving stream's brief ready windows cannot strobe the page between
-    // download bursts.
+    // download bursts. Explicit word-play keeps its requested prefix through
+    // this cover; WordTapInk scopes that exception to the sought performance.
     var streamWait by remember { mutableStateOf(false) }
     LaunchedEffect(playerState.isBuffering) {
         if (playerState.isBuffering) {
@@ -3168,11 +3169,8 @@ fun ReaderScreen(
                             // never every visible AyahBlock (docs/PERFORMANCE.md).
                             val activeWord by remember(ayah.number) {
                                 derivedStateOf {
-                                    // The stream wait sees no recited word —
-                                    // even a tap seed's provisional wash gives
-                                    // way to the Upcoming cover.
-                                    activeWordState.value
-                                        ?.takeIf { it.ayah == ayah.number && !streamWait }
+                                    streamWaitActiveWord(activeWordState.value, streamWait)
+                                        ?.takeIf { it.ayah == ayah.number }
                                 }
                             }
                             // Ink policy matches web readerAyahInkPolicyActive: the
@@ -3223,7 +3221,7 @@ fun ReaderScreen(
                                 playbackSpeed = playerState.speed,
                                 isActiveAyah = policyActive,
                                 dimmed = if (streamWait) {
-                                    true
+                                    activeWord == null
                                 } else {
                                     recitingActive && !policyActive
                                 },
@@ -3353,15 +3351,7 @@ fun ReaderScreen(
                                         followWasEnabled = true
                                         pendingWordTapAyah = ayah.number
                                         dispatch(ReaderInteractionEvent.WordPlayRequested)
-                                        val start = viewModel.startMsForWord(
-                                            ayah.number,
-                                            word.position,
-                                        )
-                                        if (start != null) {
-                                            viewModel.playFromWord(ayah.number, start)
-                                        } else {
-                                            viewModel.playFromAyah(ayah.number)
-                                        }
+                                        viewModel.playFromAyahWord(ayah.number, word.position)
                                     }
                                 },
                                 onAyahClick = if (gathering) {

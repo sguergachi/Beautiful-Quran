@@ -65,6 +65,7 @@ import kotlinx.coroutines.flow.onCompletion
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.merge
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
@@ -105,44 +106,12 @@ data class ActiveWord(
      * before Media3 owns the leaf and disposes the captured wash.
      */
     val fromTap: Boolean = false,
+    /** Explicit word-play origin, retained through this playback generation's buffering. */
+    val tapStartPosition: Int? = null,
     /** Media3's generation, retained when a tap pins [activation] for the wash. */
     val playbackActivation: Long = activation,
     val reciterId: Int? = null,
 )
-
-/**
- * Word the reader sees after a tap. The seed lights the wash this frame;
- * the 33 ms poll replaces it. That poll often carries a new [ActiveWord.activation]
- * (seek inkId), and media motion rearms on a generation change —
- * keep the seed's activation while that word is still the one being said.
- */
-internal fun resolveActiveWord(
-    polled: ActiveWord?,
-    tap: ActiveWord?,
-    seed: ActiveWord?,
-): ActiveWord? {
-    val shown = if (
-        tap != null &&
-        (polled == null ||
-            polled.ayah != tap.ayah ||
-            polled.wordPosition != tap.wordPosition ||
-            polled.playbackActivation < tap.playbackActivation)
-    ) {
-        tap
-    } else {
-        polled
-    } ?: return null
-    return if (
-        seed != null &&
-        shown.ayah == seed.ayah &&
-        shown.wordPosition == seed.wordPosition &&
-        shown.activation != seed.activation
-    ) {
-        shown.copy(activation = seed.activation)
-    } else {
-        shown
-    }
-}
 
 /**
  * One tick of the basmalah lead-in's wash, read for both renderings of it: the
@@ -511,8 +480,7 @@ class ReaderViewModel(
     private val timingPublicationRevision: Long get() = timingPublication.value
 
     private fun installTimings(loaded: Map<Int, List<Segment>>) {
-        tapInk.value = null
-        tapSeed = null
+        tapInk.value = WordTapInk()
         timings = loaded
         preparedTimings = loaded.mapValues { (_, segs) ->
             HighlightEngine.PreparedTimings.prepare(segs)
@@ -540,8 +508,7 @@ class ReaderViewModel(
         val gen = sessions.generation
         val id = sessions.surahId.takeIf { it != 0 } ?: return
         val reciter = _uiState.value.currentReciter ?: return
-        tapInk.value = null
-        tapSeed = null
+        tapInk.value = WordTapInk()
         if (!repository.timingProviderAvailable(reciter.id)) {
             installTimings(emptyMap())
             _uiState.value = _uiState.value.copy(hasTimings = false)
@@ -702,15 +669,10 @@ class ReaderViewModel(
     }.distinctUntilChanged()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(1_000), null)
 
-    /** Word-tap ink, held until the 33 ms poll names the same word. */
-    private val tapInk = MutableStateFlow<ActiveWord?>(null)
-
-    /** The seed [tapInk] last published, kept after the poll takes over so
-     * [resolveActiveWord] can pin the wash generation for that word. */
-    private var tapSeed: ActiveWord? = null
+    private val tapInk = MutableStateFlow(WordTapInk())
 
     val activeWord: StateFlow<ActiveWord?> = combine(polledActiveWord, tapInk) { polled, tap ->
-        resolveActiveWord(polled, tap, tapSeed)
+        tap.resolve(polled)
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(1_000), null)
 
     /** The ayah focus/prepare target on the sheet. Normally the playing ayah,
@@ -885,26 +847,7 @@ class ReaderViewModel(
         }
         viewModelScope.launch {
             polledActiveWord.collect { polled ->
-                val tap = tapInk.value
-                if (tap != null &&
-                    polled != null &&
-                    polled.ayah == tap.ayah &&
-                    polled.wordPosition == tap.wordPosition &&
-                    polled.playbackActivation >= tap.playbackActivation
-                ) {
-                    tapInk.value = null
-                }
-                // Drop the pin once playback has left the tapped word. Not
-                // on the stale pre-seek poll: tap is still held then, and
-                // clearing here lets the matching poll re-arm the wash.
-                val seed = tapSeed
-                if (tapInk.value == null &&
-                    seed != null &&
-                    polled != null &&
-                    (polled.ayah != seed.ayah || polled.wordPosition != seed.wordPosition)
-                ) {
-                    tapSeed = null
-                }
+                tapInk.update { it.onPoll(polled) }
             }
         }
         // React when the reciter is changed on the settings sheet: reload the
@@ -1342,13 +1285,18 @@ class ReaderViewModel(
             nextWordPosition = next,
             activation = player.state.value.positionEvents.inkId + 1L,
             fromTap = true,
+            tapStartPosition = word,
             reciterId = reciterId,
         )
-        tapSeed = seed
-        tapInk.value = seed
+        tapInk.value = WordTapInk(seed)
         viewModelScope.launch {
             delay(2_000)
-            if (tapInk.value === seed) tapInk.value = null
+            // Slow downloads have not rejected the seek. Keep its prefix;
+            // retain the timeout once transport is no longer waiting.
+            while (tapInk.value.pending && tapInk.value.seed === seed && player.state.value.isBuffering) {
+                delay(250)
+            }
+            tapInk.update { if (it.pending && it.seed === seed) WordTapInk() else it }
         }
     }
 

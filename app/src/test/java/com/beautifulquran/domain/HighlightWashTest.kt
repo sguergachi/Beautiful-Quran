@@ -79,6 +79,16 @@ class HighlightWashTest {
     }
 
     @Test
+    fun `a later tap completes an abandoned provisional word in its recited prefix`() {
+        val provisional = HighlightWash.transition(HighlightWashState(), true, false, 1,
+            window.copy(inkGeneration = 1), provisional = true)
+        val recited = HighlightWash.transition(provisional, active = false, retain = true,
+            activation = 0, window = window.copy(inkGeneration = 2), provisional = true)
+        assertNull(recited.window)
+        assertEquals(1f, HighlightWash.progress(recited, frame(0)), 0f)
+    }
+
+    @Test
     fun `real pause speed and correction events drive the same motion lifecycle`() {
         val wash = HighlightWash.transition(HighlightWashState(), true, false, 0, window)
         var sync = HighlightSync.sample(null, sample(0, 0), timing)

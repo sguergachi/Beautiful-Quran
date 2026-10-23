@@ -76,6 +76,8 @@ The basmalah sites (drawable and QCF glyph) keep their wash for now.
   during that dissolve; the mask does not wipe backward. The selected word
   immediately follows its new media window. Re-entering a dissolving word
   cancels the departure, and initially unread words never flash full ink.
+  Word-play retains every word before the tap, including while its stream
+  buffers; only the words ahead of the new target become unread.
   Reciter repeats retain their high-water prefix and keep the orange chain.
   The clock is read only while drawing. English leaf words retain their own
   positions within the Arabic timing band, and a missing liquid field keeps a
