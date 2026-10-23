@@ -3077,14 +3077,20 @@ button.ayah-mark {
 .player-return-ayah {
   color: var(--green-ink);
   flex-shrink: 0;
+  /* A reference like 7:35 stands at cap height on the name's baseline;
+     old-style 3, 5 and 7 sank below it. */
+  font-variant-numeric: lining-nums;
 }
 
+/* Hung on the capitals' midline (half the face's ~0.66em cap height), not
+   the line box's centre, where its head dropped below the baseline. A
+   baseline-aligned box sits on its bottom margin edge. */
 .player-return-arrow {
   width: 18px;
   height: 18px;
   margin-inline-start: 0.5rem;
+  margin-block-end: calc(0.33em - 9px);
   flex-shrink: 0;
-  align-self: center;
 }
 
 @keyframes cover-close-in {
@@ -7394,6 +7400,7 @@ html[data-entrance='true'] body {
 .app-shell[data-spread='true'] .player-return-arrow {
   width: calc(18px * var(--furn));
   height: calc(18px * var(--furn));
+  margin-block-end: calc(0.33em - 9px * var(--furn));
 }
 
 /* A page laid onto either side settles in from its own fore-edge — nothing

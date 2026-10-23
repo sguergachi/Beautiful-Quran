@@ -34,6 +34,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.role
@@ -49,6 +50,7 @@ import com.beautifulquran.ui.reader.ReciterNameButton
 import com.beautifulquran.ui.theme.FloatingPaperEnter
 import com.beautifulquran.ui.theme.quietClickable
 import com.beautifulquran.ui.theme.QuranTheme
+import com.beautifulquran.ui.theme.lining
 
 /** Extra list padding so the last surah rows clear the floating transport. */
 val FloatingPlaybackListClearance: Dp = 96.dp
@@ -269,6 +271,10 @@ internal fun ReturnToAyahPill(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val labelStyle = MaterialTheme.typography.titleMedium
+    // The arrow hangs on the capitals' midline, not the line box's centre:
+    // centred on the box its head dropped below the baseline.
+    val capMiddle = with(LocalDensity.current) { (labelStyle.fontSize * CAP_MIDDLE_EM).roundToPx() }
     Row(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.Center,
@@ -289,33 +295,41 @@ internal fun ReturnToAyahPill(
     ) {
         Text(
             text = chapterLabel,
-            style = MaterialTheme.typography.titleMedium,
+            style = labelStyle,
             color = MaterialTheme.colorScheme.primary,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.widthIn(max = 200.dp),
+            modifier = Modifier.alignByBaseline().widthIn(max = 200.dp),
         )
         Text(
             text = "  ·  ",
-            style = MaterialTheme.typography.titleMedium,
+            style = labelStyle,
             color = QuranTheme.accents.greenQuiet,
+            modifier = Modifier.alignByBaseline(),
         )
+        // A reference like 7:35 stands on the name's baseline at cap height;
+        // the book's old-style 3, 5 and 7 sank below it.
         Text(
             text = ayahLabel,
-            style = MaterialTheme.typography.titleMedium,
+            style = labelStyle.lining(),
             color = QuranTheme.accents.greenInk,
             maxLines = 1,
+            modifier = Modifier.alignByBaseline(),
         )
         Icon(
             imageVector = Icons.AutoMirrored.Rounded.ArrowForward,
             contentDescription = null,
             tint = MaterialTheme.colorScheme.primary,
             modifier = Modifier
+                .alignBy { it.measuredHeight / 2 + capMiddle }
                 .padding(start = 8.dp)
                 .size(18.dp),
         )
     }
 }
+
+/** Half the book face's cap height (Junicode 0.663 em, EB Garamond 0.650 em). */
+private const val CAP_MIDDLE_EM = 0.33f
 
 internal fun shouldShowFloatingPlayback(
     nowPlayingPresent: Boolean,
