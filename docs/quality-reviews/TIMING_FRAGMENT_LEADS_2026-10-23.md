@@ -91,3 +91,19 @@ Other model residuals in 64:11 remain unchanged and are explicitly recorded in
 quran.ai share upstream limitations; this is not a semantic or corpus-wide
 accuracy certification. Publication and a fresh runtime read must be checked
 separately; an APK rebuild alone cannot deliver authenticated timing changes.
+
+## Publication check
+
+`sync_qf_timings.py --publish` successfully published all six reviewed views
+(37,411 rows). A fresh public capture was validated and compared across all
+81,059 combined rows: exactly the five accepted rows changed, with every other
+row retained. Alafasy's published payload revision is
+`fcde2f1af469ac0629014502963822a8f7275604a219cf7e6be61a416451fea1`.
+The Android debug app's existing timing cache was made due for revalidation;
+its ordinary refresh downloaded that exact revision and the 8,910 ms onset.
+No local timing override was injected into the app.
+
+Existing phones can obtain it immediately through Settings → Developer →
+**Force Quran cache update**, which calls the existing timing refresh along
+with Content Sync. The normal cache revalidation also obtains it when due.
+Replacing the APK alone does not force an already-fresh timing cache to refresh.
