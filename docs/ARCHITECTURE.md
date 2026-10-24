@@ -606,6 +606,10 @@ ViewModels get their dependencies from `QuranApp` (Application) through
 `AppViewModelFactory`. Settings changes propagate reactively: e.g.
 `ReaderViewModel` observes `reciterId` and reloads timings / restarts the
 current ayah in the new voice when it changes on the settings sheet.
+The shared reader poll checks that the installed timing publication belongs to
+the audio item's reciter before publishing word or follow state. Replacing the
+timings ahead of the asynchronous playlist switch therefore cannot expose the
+new table on the previous voice; superseded queued publications are rejected.
 
 ## Code conventions
 

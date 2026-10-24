@@ -477,17 +477,17 @@ class ReaderViewModel(
     private val transportCursor = ReaderTransportCursor()
     private var loadJob: Job? = null
     private var installedTimingGeneration = 0L
-    private val timingPublication = MutableStateFlow(0L)
-    private val timingPublicationRevision: Long get() = timingPublication.value
+    private val timingPublication = MutableStateFlow(ReaderTimingPublication())
+    private val timingPublicationRevision: Long get() = timingPublication.value.revision
 
-    private fun installTimings(loaded: Map<Int, List<Segment>>) {
+    private fun installTimings(loaded: Map<Int, List<Segment>>, reciterId: Int? = null) {
         wordInk.clear()
         endWordTapWait()
         timings = loaded
         preparedTimings = loaded.mapValues { (_, segs) ->
             HighlightEngine.PreparedTimings.prepare(segs)
         }
-        timingPublication.value++
+        timingPublication.value = ReaderTimingPublication(timingPublicationRevision + 1L, reciterId)
     }
 
     /**
@@ -512,12 +512,12 @@ class ReaderViewModel(
         val reciter = _uiState.value.currentReciter ?: return
         wordInk.clear()
         if (!repository.timingProviderAvailable(reciter.id)) {
-            installTimings(emptyMap())
+            installTimings(emptyMap(), reciter.id)
             _uiState.value = _uiState.value.copy(hasTimings = false)
         }
         val refreshed = timingsWithBasmalahLeadIn(reciter.id, id)
         if (!sessions.isCurrent(gen, id) || _uiState.value.currentReciter?.id != reciter.id) return
-        installTimings(refreshed.segments)
+        installTimings(refreshed.segments, reciter.id)
         installedTimingGeneration = refreshed.generation
         _uiState.value = _uiState.value.copy(hasTimings = refreshed.segments.isNotEmpty())
     }
@@ -532,7 +532,8 @@ class ReaderViewModel(
         key: (NowPlaying) -> K?,
         sample: (K, HighlightPlaybackSample) -> T?,
     ): StateFlow<T?> = playbackPolls.map { poll ->
-        poll?.let { key(it.nowPlaying)?.let { key -> sample(key, poll.playback) } }
+        poll?.takeIf { it.timingPublication == timingPublication.value }
+            ?.let { key(it.nowPlaying)?.let { key -> sample(key, poll.playback) } }
     }
         .distinctUntilChanged()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(1_000), null)
@@ -605,8 +606,10 @@ class ReaderViewModel(
 
     /** One owner advances sync, voice analysis, and capture before any renderer reads it. */
     private val highlightPolls = playbackPolls.map { poll ->
-        if (poll == null) highlightSession.suspendObservation(System.nanoTime())
-        poll?.let {
+        // A shared packet can be queued before a newer timing table is installed.
+        val current = poll?.takeIf { it.timingPublication == timingPublication.value }
+        if (current == null) highlightSession.suspendObservation(System.nanoTime())
+        current?.let {
             val np = it.nowPlaying
             val playback = it.playback
             val prepared = preparedTimings[np.ayah] ?: emptyPreparedTimings
@@ -1038,7 +1041,7 @@ class ReaderViewModel(
         focusedAyah = 1
         longAyahMidpointConsumed = 0
         transportCursor.clear()
-        installTimings(prepared.timings)
+        installTimings(prepared.timings, prepared.reciter.id)
         installedTimingGeneration = prepared.timingGeneration
         _uiState.value = ReaderUiState(
             content = prepared.content,
@@ -1072,7 +1075,7 @@ class ReaderViewModel(
         }
         val reciter = reciters.first { it.id == reciterId }
         if (!sessions.isCurrent(gen, id)) return
-        installTimings(refreshed.segments)
+        installTimings(refreshed.segments, reciter.id)
         installedTimingGeneration = refreshed.generation
         _uiState.value = _uiState.value.copy(
             currentReciter = reciter,

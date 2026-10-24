@@ -67,6 +67,14 @@ requires a new sync session. Negative monotonic timestamp origins are valid.
 Timing publication, provider generation, reader navigation, clock revision,
 performance generation, and occurrence identity remain distinct.
 
+Android's shared reader poll carries the installed timing revision and its
+reciter together. While a reciter change replaces the playlist, an old audio
+item cannot be sampled against the new voice's table. A mismatched handoff
+suspends observation until the matching item arrives; queued packets from a
+superseded timing publication are also discarded. A same-reciter refresh or
+withdrawal still wakes the paused poll immediately. This is an input ownership
+check around V2, not an extra timing offset.
+
 ## Numerical policy
 
 - Integer sample/frame clocks compare exactly; fractional frame conversion
