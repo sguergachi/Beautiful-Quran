@@ -4,6 +4,7 @@ import com.beautifulquran.domain.BASMALAH_PLAYLIST_AYAH
 import android.content.ComponentName
 import android.content.Context
 import android.util.Log
+import com.beautifulquran.DevProfiling
 import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
 import androidx.media3.session.MediaController
@@ -268,6 +269,11 @@ class PlayerController(private val context: Context) {
                     keepInk = keepInk,
                 ),
             )
+            DevProfiling.recordEvent(
+                "controller-discontinuity reason=$reason old=${oldPosition.mediaItem?.mediaId}@${oldPosition.positionMs} " +
+                    "new=${newPosition.mediaItem?.mediaId}@${newPosition.positionMs} keepInk=$keepInk " +
+                    "revisions=${_state.value.positionEvents}",
+            )
         }
 
         override fun onEvents(player: Player, events: Player.Events) {
@@ -276,12 +282,17 @@ class PlayerController(private val context: Context) {
             }
             val loopRestarted = loopSingleAyahIfNeeded(player) || loopRangeIfNeeded(player)
             syncFromController(player, forcePlaying = loopRestarted)
+            if (DevProfiling.captureStart.get() != null) DevProfiling.recordEvent(
+                "controller-state item=${player.currentMediaItem?.mediaId} playing=${player.isPlaying} " +
+                    "state=${player.playbackState} speed=${player.playbackParameters.speed} intent=${_state.value.positionIntentId}",
+            )
             if (repeatRange != null && (player.isPlaying || loopRestarted)) {
                 startRepeatBoundaryMonitor()
             }
         }
 
         override fun onPlayerError(error: PlaybackException) {
+            DevProfiling.recordEvent("player-error code=${error.errorCodeName}")
             Log.w(TAG, "Playback error ${error.errorCodeName}", error)
             _state.value = _state.value.copy(error = playbackErrorMessage(error.errorCode))
         }
@@ -411,6 +422,9 @@ class PlayerController(private val context: Context) {
         startWithBasmalah: Boolean = false,
         autoplay: Boolean = true,
     ) {
+        DevProfiling.recordEvent(
+            "playlist-request surah=$surahId ayah=$startAyah reciter=${reciter.id} positionMs=$startPositionMs autoplay=$autoplay",
+        )
         val boundedRange = repeatRange
             ?.takeIf { preserveRepeatRange }
             ?.let { range ->

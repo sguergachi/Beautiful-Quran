@@ -166,7 +166,8 @@ internal fun SettingsScreen(
     onOpenTimingsLab: () -> Unit = {},
     onOpenTarjiLab: () -> Unit = {},
     onOpenOrnamentsLab: () -> Unit = {},
-    onRecordSystemTrace: () -> Unit = {},
+    onLogExport: () -> Unit = {},
+    onShareLogExport: () -> Unit = {},
     downloadsRefreshKey: Int = 0,
 ) {
     val settings by viewModel.settings.settings.collectAsStateWithLifecycle()
@@ -329,7 +330,8 @@ internal fun SettingsScreen(
                     onOpenTimingsLab = onOpenTimingsLab,
                     onOpenTarjiLab = onOpenTarjiLab,
                     onOpenOrnamentsLab = onOpenOrnamentsLab,
-                    onRecordSystemTrace = onRecordSystemTrace,
+                    onLogExport = onLogExport,
+                    onShareLogExport = onShareLogExport,
                 )
             }
 
@@ -367,9 +369,11 @@ private fun DeveloperSection(
     onOpenTimingsLab: () -> Unit,
     onOpenTarjiLab: () -> Unit,
     onOpenOrnamentsLab: () -> Unit,
-    onRecordSystemTrace: () -> Unit,
+    onLogExport: () -> Unit,
+    onShareLogExport: () -> Unit,
 ) {
     val context = LocalContext.current
+    val logExport by com.beautifulquran.LogExport.state.collectAsStateWithLifecycle()
     var educationRearmed by remember { mutableStateOf(false) }
 
     SectionLabel("Developer")
@@ -468,19 +472,33 @@ private fun DeveloperSection(
 
     Spacer(Modifier.height(20.dp))
     Text(
-        text = "Record performance profile",
+        text = when {
+            logExport.recording -> "Stop and share log"
+            logExport.preparing -> "Preparing log…"
+            else -> "Log export"
+        },
         style = MaterialTheme.typography.bodyLarge,
         modifier = Modifier
             .fillMaxWidth()
-            .quietClickable(onClick = onRecordSystemTrace)
+            .quietClickable(enabled = !logExport.preparing, onClick = onLogExport)
             .padding(vertical = 6.dp),
         color = MaterialTheme.colorScheme.primary,
     )
     Caption(
-        "Records ten seconds — use the app while it runs — then opens the " +
-            "share sheet with a frame and stack log" +
-            if (Build.VERSION.SDK_INT >= 35) " and a system trace." else ".",
+        logExport.error ?: when {
+            logExport.recording -> "Recording. Return to the reader, reproduce the issue, then stop and share here."
+            logExport.preparing -> "Preparing your playback and highlighting log."
+            else -> "Record playback and highlighting, then share the log. Stops automatically after three minutes."
+        },
     )
+    if (logExport.hasLog && !logExport.recording && !logExport.preparing) {
+        Text(
+            text = "Share latest log",
+            style = MaterialTheme.typography.bodyLarge,
+            modifier = Modifier.fillMaxWidth().quietClickable(onClick = onShareLogExport).padding(vertical = 6.dp),
+            color = MaterialTheme.colorScheme.primary,
+        )
+    }
 
     Spacer(Modifier.height(20.dp))
     Text(

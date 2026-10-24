@@ -29,7 +29,7 @@ import com.beautifulquran.domain.HighlightPlaybackSample
 import com.beautifulquran.domain.HighlightTimingContext
 import com.beautifulquran.domain.HighlightTraceHeader
 import com.beautifulquran.domain.HighlightTraceRecorder
-import com.beautifulquran.domain.encodeForReplay
+import com.beautifulquran.domain.DiagnosticLog
 import java.io.File
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.Executor
@@ -40,15 +40,17 @@ import java.util.concurrent.atomic.AtomicReference
 import java.util.function.Consumer
 
 /**
- * Local performance capture.
+ * Local capture instrumentation shared by log export and performance tools.
  *
- * Two halves with different reach:
+ * Three uses with different reach:
  *
- * - **By hand, in every build.** Developer → "Record performance profile"
- *   ([recordSystemTrace]) watches ten seconds of use and hands the result to
+ * - **Log export, in every build.** [LogExport] owns the explicit start/stop
+ *   workflow and uses the bounded marks and highlight replay recorder here.
+ * - **Performance tools, in every build.** [recordSystemTrace] watches ten
+ *   seconds of use and hands the result to
  *   the share sheet: a text report (frame times, main-thread stack samples,
  *   named marks) and, where the platform will record one, a system trace.
- *   Nothing runs until that row is tapped and nothing leaves the phone unless
+ *   Nothing runs until requested and nothing leaves the phone unless
  *   the share sheet sends it.
  * - **On its own, debug builds only.** The cold-start ceremony trace and the
  *   Android 17 cold-start / fully-drawn triggers ([install]). A release build
@@ -104,6 +106,8 @@ object DevProfiling {
      */
     private val markLock = Any()
     private val markLines = ArrayList<String>(256)
+    private var maxMarks = 2000
+    private var droppedMarks = 0
     private var highlightTrace: HighlightTraceRecorder? = null
     @PublishedApi
     internal val captureStart = AtomicReference<Long?>(null)
@@ -113,33 +117,46 @@ object DevProfiling {
         synchronized(markLock) {
             val start = captureStart.get()
             if (start != null) {
-                markLines += String.format("%+.3fs  %s", (at - start) / 1000.0, label)
-                if (markLines.size > 2000) markLines.removeAt(0)
+                markLines += String.format("%+.3fs atNanos=%d  %s", (at - start) / 1000.0, System.nanoTime(), label)
+                if (markLines.size > maxMarks) {
+                    markLines.removeAt(0)
+                    droppedMarks++
+                }
             }
         }
     }
 
-    private fun startMarkCapture() {
+    private fun startMarkCapture(samples: Int = 1024, frames: Int = 2048, marks: Int = 2000): Boolean =
         synchronized(markLock) {
+            if (captureStart.get() != null) return@synchronized false
             markLines.clear()
+            maxMarks = marks
+            droppedMarks = 0
             highlightTrace = HighlightTraceRecorder(HighlightTraceHeader(
                 BuildConfig.CAPTURE_SOURCE_REVISION, BuildConfig.CAPTURE_SOURCE_DIRTY, BuildConfig.VERSION_NAME,
                 visibleEngineVersion = HighlightEngineVersion.VISIBLE,
                 schemaVersion = 2, scope = "sample-and-frame-clock",
-            ))
+            ), maxSamples = samples, maxFrames = frames)
             captureStart.set(System.currentTimeMillis())
+            true
         }
+
+    private fun stopMarkCapture(): DiagnosticLog = synchronized(markLock) {
+        captureStart.set(null)
+        val trace = highlightTrace?.snapshot()
+        highlightTrace = null
+        DiagnosticLog(markLines.toList(), trace, droppedMarks)
     }
 
-    private fun stopMarkCapture(): List<String> {
-        captureStart.set(null)
-        return synchronized(markLock) {
-            val trace = highlightTrace?.snapshot()
-            highlightTrace = null
-            markLines.toList() + if (trace == null) emptyList() else listOf(
-                "highlight-sync-trace-begin", trace.encodeForReplay(), "highlight-sync-trace-end",
-            )
-        }
+    /** Bounded three-minute log recording without method or system profiling overhead. */
+    internal fun startLogCapture(): Boolean = startMarkCapture(samples = 6000, frames = 24000, marks = 12000)
+
+    /** Snapshot under the recorder lock; callers encode and write it on a worker. */
+    internal fun stopLogCapture(): DiagnosticLog = stopMarkCapture()
+
+    /** Low-cost capture-only event; does not create a system-trace counter or logcat entry. */
+    internal fun recordEvent(label: String) {
+        if (captureStart.get() != null) recordMark(label)
     }
 
     /** Local, bounded sample-clock replay data attached only to an explicit performance capture. */
@@ -197,10 +214,13 @@ object DevProfiling {
             toast(context, "A performance profile is already recording")
             return
         }
-        // Ten seconds of recording with nothing on screen reads as a dead
-        // button, and the whole point is to use the app while it records.
+        if (!startMarkCapture()) {
+            capture.compareAndSet(window, null)
+            toast(context, "A log is already recording")
+            return
+        }
+        // The legacy performance capture remains available to development tools.
         toast(context, "Recording ${ManualTraceDurationMs / 1000}s — use the app now")
-        startMarkCapture()
         window.frames.start()
         Thread(window.stacks, "BQStackWatch").apply {
             isDaemon = true
@@ -218,7 +238,7 @@ object DevProfiling {
             window.stacks.stop()
             val marks = stopMarkCapture()
             // Off the main thread: it writes files and may wait on the trace.
-            Thread({ finishCapture(app, window, marks) }, "BQProfileShare").start()
+            Thread({ finishCapture(app, window, marks.encodedLines()) }, "BQProfileShare").start()
         }, ManualTraceDurationMs.toLong())
     }
 

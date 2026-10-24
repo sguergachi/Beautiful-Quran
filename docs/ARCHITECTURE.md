@@ -38,7 +38,7 @@ app (runtime)                                           ▼
 Android and web. One coherent playback stream feeds pure `HighlightSync`,
 which projects a display-frame clock. Arabic, English, repeat, and wasl washes
 use captured media windows; follow/voice retain their distinct heard-clock
-policies. Normal use records nothing. Explicit developer profiles can include
+policies. Normal use records nothing. Explicit developer log exports include
 bounded local sample/frame replay with exact timing fingerprints. V1 remains
 a diagnostic comparator. Physical speaker/Bluetooth accuracy is a separate
 release acceptance check.

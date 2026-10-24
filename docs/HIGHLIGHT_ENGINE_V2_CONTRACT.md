@@ -116,7 +116,7 @@ adapter changes together; changing a version label is not a rollback switch.
 
 ## Local capture and replay
 
-Developer → **Record performance profile** explicitly records a bounded local
+Developer → **Log export** explicitly records a bounded local
 report. Sharing remains an explicit user action. Normal use records no trace,
 uploads no samples, and introduces no analytics.
 
@@ -124,9 +124,11 @@ Trace schema 2 (`sample-and-frame-clock`) records source SHA/dirty flag, app
 version, actual visible engine, exact timing triples/voice gates and SHA-256,
 ordered playback/calibration/revision samples, V1 checkpoint, live V2 checkpoint,
 and display frames referring to their actual accepted sample. A mid-verse
-capture preserves live V2 rather than resetting it. Storage keeps a prefix of
-1,024 samples and 2,048 frames, with separate dropped counters. Schema 1 sample
-captures remain replayable.
+capture preserves live V2 rather than resetting it. A three-minute log keeps a
+prefix of 6,000 samples and 24,000 frames, with separate dropped counters.
+The legacy performance-capture API retains its smaller 1,024/2,048 budgets.
+Schema 1 sample captures remain replayable. See [log export](PROFILING.md#local-log-export)
+for service-player positions, action/renderer events and sharing instructions.
 
 ```sh
 ./gradlew testDebugUnitTest --tests '*HighlightReplayTest' \

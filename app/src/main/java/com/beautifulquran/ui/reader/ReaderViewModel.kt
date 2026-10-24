@@ -488,6 +488,7 @@ class ReaderViewModel(
             HighlightEngine.PreparedTimings.prepare(segs)
         }
         timingPublication.value = ReaderTimingPublication(timingPublicationRevision + 1L, reciterId)
+        DevProfiling.recordEvent("timing-publication reciter=$reciterId revision=$timingPublicationRevision ayahs=${loaded.size}")
     }
 
     /**
@@ -1066,6 +1067,7 @@ class ReaderViewModel(
     }
 
     private suspend fun onReciterChanged() {
+        DevProfiling.recordEvent("reciter-selection selected=${settings.settings.value.reciterId} playing=${player.state.value.nowPlaying}")
         val gen = sessions.generation
         val id = sessions.surahId
         if (id == 0) return
@@ -1258,6 +1260,7 @@ class ReaderViewModel(
      * the chapter has no timings at all.
      */
     fun playFromAyahWord(ayah: Int, word: Int?) {
+        DevProfiling.recordEvent("word-tap surah=$surahId ayah=$ayah word=$word reciter=${_uiState.value.currentReciter?.id}")
         // A chapter's opening — ayah 1 at its first word — starts with the
         // basmalah lead-in, exactly as play-from-ayah-1 does. The mushaf's
         // play target is a word, and the word path used to seek straight

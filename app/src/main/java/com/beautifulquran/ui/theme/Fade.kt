@@ -908,12 +908,21 @@ private class PaperInkBlooms(
     private val seen = HashSet<Long>()
     private val sources = HashMap<Long, com.beautifulquran.ui.theme.paperink.PaperInk.Source>()
     private val words = HashMap<Long, com.beautifulquran.ui.theme.paperink.PaperInk.Word>()
+    private var logCapture: Long? = null
+    private var logLayout: TextLayoutResult? = null
+    private val logChoices = HashMap<Long, Int>()
 
     fun resolve(
         blooms: List<ShapedWordBloom>,
         layout: TextLayoutResult?,
         sharedLine: Boolean,
     ): List<ShapedWordBloom> {
+        val capture = com.beautifulquran.DevProfiling.captureStart.get()
+        if (capture != logCapture || capture != null && layout !== logLayout) {
+            logChoices.clear()
+            logCapture = capture
+            logLayout = if (capture == null) null else layout
+        }
         if (blooms.none { it is ShapedWordBloom.PaperInk || it is ShapedWordBloom.PaperInkWarm }) {
             latched.clear()
             return blooms
@@ -938,6 +947,18 @@ private class PaperInkBlooms(
                     } else {
                         com.beautifulquran.ui.theme.paperink.PaperInk.word(source)
                     }
+                    if (capture != null) {
+                        val choice = if (word != null) 2 else if (key in latched) 1 else 0
+                        if (logChoices.put(key, choice) != choice) {
+                            val text = layout?.layoutInput?.text?.text.orEmpty()
+                            val start = bloom.range.first.coerceIn(0, text.length)
+                            val end = (bloom.range.last + 1).coerceIn(start, text.length)
+                            com.beautifulquran.DevProfiling.recordEvent(
+                                "paper-field rtl=$rtl word=${text.substring(start, end).take(80)} range=${bloom.range} " +
+                                    "progress=${bloom.frame.progress} shader=${word != null} latched=${key in latched}",
+                            )
+                        }
+                    }
                     if (word != null && source != null) {
                         sources[key] = source
                         words[key] = word
@@ -956,6 +977,7 @@ private class PaperInkBlooms(
             }
         }
         latched.retainAll(seen)
+        if (capture != null) logChoices.keys.retainAll(seen)
         return out
     }
 
