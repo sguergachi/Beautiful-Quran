@@ -77,7 +77,9 @@ export function useRepeatWash(
         ? motion.timing.durationMs / tarjiSignal.speed
         : t.repeatSweepMs,
     )
-    const duration = english ? englishRevealDurationMs(ordinaryDuration, minSweepFloorMs()) : ordinaryDuration
+    const duration = english
+      ? englishRevealDurationMs(ordinaryDuration, minSweepFloorMs(), motion?.timing?.spokenMs, tarjiSignal.speed)
+      : ordinaryDuration
     const curve =
       !english && motion?.timing
         ? pacing(

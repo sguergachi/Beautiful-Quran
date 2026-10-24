@@ -649,8 +649,9 @@ shared `HighlightTimeline` through that window. The replaced speech-time
 `Animatable` owners (`rememberLetterSweep` and `rememberRepeatWash`) are gone.
 
 - Active entry captures duration, tajweed curve, feather, and wasl carry once.
-  Mid-word tuning cannot replay the wash. The minimum visual floor remains,
-  converted from wall milliseconds to media duration at entry speed.
+  Mid-word tuning cannot replay the wash. The visual floor is converted from
+  wall milliseconds to media duration at entry speed; English Scroll also
+  bounds it by the voiced end below.
 - Active→Recited retains that word's independent residual window; Upcoming or
   Plain abandons it. Pauses and buffering freeze residuals as well as active ink.
   Speed changes alter the shared media clock instead of restarting animation.
@@ -665,10 +666,14 @@ shared `HighlightTimeline` through that window. The replaced speech-time
   stays anchored to speech, so short words cannot accumulate queued delay.
   English Scroll starts from the eased hold-duration window, including the
   first-pass minimum and maximum, then finishes its reveal up to **100 wall
-  milliseconds earlier**. The original onset stays fixed, leaving completed
-  ink still before the next timed word begins. The soft-edge minimum limits
-  the saving on short words. Repeats use the same reduction when affordable;
-  a repeat already shorter than that minimum keeps its measured dwell.
+  milliseconds earlier**. A positive occurrence-specific `spokenMs` then caps
+  that window at the actual voiced end. The karaoke hold includes silence up
+  to the next onset; subtracting 100 ms from that hold alone can still leave
+  the edge moving through most of a pause. The onset stays fixed and completed
+  ink holds through the remaining silence. The soft-edge minimum is retained
+  wherever it fits before the voiced end; it cannot extend into that silence.
+  Repeats use their own voiced span and are never stretched to meet the floor.
+  Missing or zero voiced metadata retains the earlier hold-based fallback.
   `EnglishRevealTiming` applies the policy before the shared window converts
   speed once. Android and web use the same policy. Paper ink consumes that
   progress; its one-letter lead stays inside each printed word. English leaf

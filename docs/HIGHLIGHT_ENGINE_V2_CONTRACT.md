@@ -22,18 +22,23 @@ is observed in composition, with structural equality.
 
 `HighlightMediaMotions` captures a `HighlightWashWindow`, pacing, feather, and
 wasl carry at entry. Progress is a function of calibrated media time rather
-than elapsed animation time. The existing minimum sweep floor is retained:
-its wall duration is converted to media duration once at entry speed. A later
+than elapsed animation time. The existing minimum sweep floor is retained
+where it fits the English voiced-end deadline below; its wall duration is
+converted to media duration once at entry speed. A later
 speed change changes the shared clock slope. Repeat occurrences use measured
 dwell, have independent windows, and cannot wait behind a repeat queue.
 Prose can gate on its predecessor without shifting its own window into the
 future. Cosmetic recess/glimmer/tint dissolution still use their existing fades.
 
 English Scroll shortens the eased visual reveal by up to 100 wall milliseconds,
-preserving the soft-edge floor and the next word's actual start. The completed
-edge holds for that extra interval; the audio/highlight clock is not advanced.
-Short repeat occurrences are never stretched to meet the floor. This policy
-is applied before the entry duration's single speed conversion.
+then caps it at the occurrence's positive `spokenMs`. The karaoke hold includes
+the silence before the next onset; the reveal must finish by the voiced end
+even when that silence is longer than 100 ms or the spoken span is shorter
+than the visual floor. Completed ink holds through the pause, with the next
+word's actual start unchanged. Short repeat occurrences use their own voiced
+span and are never stretched to meet the floor. Missing or zero voiced metadata
+keeps the earlier hold-based fallback. This policy is applied before the entry
+duration's single speed conversion; the audio/highlight clock is not advanced.
 
 `EnglishWashClock` is metadata projected through that same frame. It owns no
 second interpolation anchor and cannot ignore ordinary clock corrections.

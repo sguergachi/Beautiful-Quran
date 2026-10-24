@@ -159,7 +159,9 @@ export function useWordWash({
     registry.enter(activation)
     const tuning = { ...getTuning() }
     const ordinaryDuration = Math.max(1, durationMs ?? tuning.repeatSweepMs)
-    const duration = english ? englishRevealDurationMs(ordinaryDuration, minSweepFloorMs()) : ordinaryDuration
+    const duration = english
+      ? englishRevealDurationMs(ordinaryDuration, minSweepFloorMs(), motion?.timing?.spokenMs, tarjiSignal.speed)
+      : ordinaryDuration
     const from = !english ? (registry.prefixes.get(key) ?? 0) : 0
     const curve =
       !english && motion?.timing
