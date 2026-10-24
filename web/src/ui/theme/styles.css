@@ -98,9 +98,9 @@
   --translit-alpha: 0.55;
   /* Play-start recess — even ease-in-out, matched to Android. */
   --chrome-recede-ms: 520ms;
-  --ink-fade-ms: 400ms;
-  --ayah-mark-fade-ms: 400ms;
-  --recess-ms: 400ms;
+  --ink-fade-ms: var(--chrome-recede-ms);
+  --ayah-mark-fade-ms: var(--chrome-recede-ms);
+  --recess-ms: var(--chrome-recede-ms);
   --recede-ease: cubic-bezier(0.4, 0, 0.2, 1);
   color-scheme: light;
 }
@@ -2865,14 +2865,14 @@ button.ayah-mark {
   padding: 0;
   font-family: inherit;
   cursor: pointer;
-  transition: opacity var(--ayah-mark-fade-ms, 400ms) var(--recede-ease);
+  transition: opacity var(--ayah-mark-fade-ms, var(--chrome-recede-ms)) var(--recede-ease);
 }
 
 /* A verse still to come waits with its words; its mark lights as the voice
    takes the verse up (mushafMarkWaits). */
 .mushaf-mark[data-state='Upcoming'] {
   opacity: var(--upcoming-alpha, 0.2661);
-  transition-duration: var(--recess-ms, 400ms);
+  transition-duration: var(--recess-ms, var(--chrome-recede-ms));
 }
 
 .mushaf-chapter-slot {

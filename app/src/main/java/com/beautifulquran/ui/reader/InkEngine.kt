@@ -35,6 +35,9 @@ import com.beautifulquran.ui.theme.inkSmootherstep
  */
 object InkEngine {
 
+    /** Shared duration for playback chrome and the surrounding verse ink. */
+    const val CHROME_RECEDE_MS = 520
+
     /** The four ink states every reading mode shares. */
     enum class State {
         /** Idle page, no recitation touching this ayah: full ink. */
@@ -79,19 +82,19 @@ object InkEngine {
         val upcomingAlpha: Float = 0.2661f,
         /** State tween between resting inks (Active snaps — see
          *  ReaderComponents.animatedInkAlpha for why). */
-        val inkFadeMs: Int = 400,
+        val inkFadeMs: Int = CHROME_RECEDE_MS,
         /** Fade of the ﴿N﴾ ayah mark up to full when its verse gains focus. */
-        val ayahMarkFadeMs: Int = 400,
+        val ayahMarkFadeMs: Int = CHROME_RECEDE_MS,
         /** Softening when a verse recesses or returns (Arabic-only paper cover).
          *  Matched to [inkFadeMs] so every reading mode moves at the same pace. */
-        val recessMs: Int = 400,
+        val recessMs: Int = CHROME_RECEDE_MS,
         /** Letter-sweep duration clamps around the reciter's actual dwell. */
         val minSweepMs: Int = 140,
         val maxSweepMs: Int = 8_000,
         /** Repeat sweep fallback when no live active-word timing exists. */
         val repeatSweepMs: Int = 450,
         /** Dissolve of the orange wash once the repeat chain releases. */
-        val repeatFadeOutMs: Int = 900,
+        val repeatFadeOutMs: Int = 1_800,
         /** Peak strength of the orange repeat overlay (and search-hit flash).
          *  Multiplies [com.beautifulquran.ui.theme.QuranAccents.repeatInk]
          *  so the hue stays theme-owned while visibility is live-tunable. */
@@ -227,6 +230,20 @@ object InkEngine {
         val tarjiReleaseMs: Float = com.beautifulquran.playback.Tarji.RELEASE_MS,
         /** Additional wall-time trim on the pulse and its graph (ms); shipped 0. */
         val tarjiEarDelayMs: Float = 0f,
+        /**
+         * Paper ink (docs/PAPER_INK.md): on Paper, Android 13+, every reader
+         * surface draws words through the swelling-channel ink shader. Off
+         * keeps the paper-cover wash. The dials are the study's tuned defaults.
+         */
+        val paperInk: Boolean = true,
+        /** Wet stroke-weight gain (study "Ink pooling"). */
+        val paperInkPooling: Float = 0.25f,
+        val paperInkReflection: Float = 0.5f,
+        val paperInkSoftness: Float = 0f,
+        /** Fade-in ahead of the wet edge: 0.5 is one letter, 1 is two. */
+        val paperInkLeadFade: Float = 0.5f,
+        /** Flowing ink (quicker, cleaner swell) instead of Inside out. */
+        val paperInkFlowing: Boolean = false,
     )
 
     /**
@@ -357,7 +374,7 @@ object InkEngine {
     /** Shipped defaults for highlight sync (lab knobs start here). */
     const val DEFAULT_HIGHLIGHT_LEAD_MS = 0
     const val DEFAULT_FADE_LEAD_MS = 500
-    const val DEFAULT_SCROLL_LEAD_MS = 500
+    const val DEFAULT_SCROLL_LEAD_MS = 100
 
     /**
      * Attach [store] and restore any saved lab numbers. Call once from
@@ -443,11 +460,22 @@ object InkEngine {
         dimmed: Boolean,
     ): State = when {
         activeWord == null -> if (isActiveAyah || dimmed) State.Upcoming else State.Plain
+        inTappedPrefix(position, activeWord) &&
+            !(activeWord.isRepeat && position == activeWord.wordPosition) -> State.Recited
         position == activeWord.wordPosition -> State.Active
         position < activeWord.wordPosition -> State.Recited
         position <= activeWord.highWater -> State.Recited
         else -> State.Upcoming
     }
+
+    /** A word-play intent establishes full base ink even while its media cursor settles earlier. */
+    fun inTappedPrefix(position: Int, activeWord: ActiveWord?): Boolean =
+        activeWord?.tapStartPosition?.let { position < it } == true
+
+    /** Natural handoffs finish their residual; a deliberately skipped prefix is already complete. */
+    fun retainWordSweep(position: Int, state: State, activeWord: ActiveWord?): Boolean =
+        !inTappedPrefix(position, activeWord) &&
+            (state == State.Recited || state == State.Active && activeWord?.isRepeat == true)
 
     /**
      * Whether the word at [position] belongs to the active repeat chain: from

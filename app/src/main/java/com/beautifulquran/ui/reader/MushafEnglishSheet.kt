@@ -1,5 +1,6 @@
 package com.beautifulquran.ui.reader
 
+import com.beautifulquran.ui.theme.paperink.PaperInk
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.snap
@@ -86,7 +87,7 @@ import com.beautifulquran.domain.MushafToken
 import com.beautifulquran.domain.englishLeaf
 import com.beautifulquran.domain.englishLeafBreak
 import com.beautifulquran.domain.englishLeafFittedLeadingEm
-import com.beautifulquran.domain.englishLeafOverflowHandPx
+import com.beautifulquran.domain.englishLeafClosingLeadingEm
 import com.beautifulquran.domain.englishLeafHandPx
 import com.beautifulquran.domain.EnglishLeafFill
 import com.beautifulquran.domain.EnglishLeafRuler
@@ -769,18 +770,9 @@ private val EnglishLeafSettings = object : LinkedHashMap<EnglishLeafSettingKey, 
 }
 
 /**
- * Sets the leaf: the book's hand and the book's leading, then a measurement to
- * make sure the block really does fit the well.
- *
- * Neither number is this leaf's to choose. The hand is the book's, cut for the
- * heaviest leaf in it; the leading is the book's, one figure for all 604
- * leaves (`EnglishLeafFit.kt`). A page that respaced its lines to fill itself
- * would be a page a reader sees change as they turn onto it, which is a worse
- * fault than the white this leaves at the foot.
- *
- * So the only thing solved here is the guarantee: the leaf is measured as it
- * will be drawn, and the leading closes — on that leaf alone, and only far
- * enough — if the estimate the hand was cut from turns out to be wrong here.
+ * Keeps the book's type size and fits only the leading to the measured leaf.
+ * The ruler already paginates at this same hand, carrying long verses across
+ * leaves. A page must never change font size to absorb its amount of text.
  */
 private fun setEnglishLeaf(
     blocks: List<EnglishLeafBlockText>,
@@ -792,54 +784,33 @@ private fun setEnglishLeaf(
     justifyLast: Boolean,
 ): EnglishLeafSetting {
     val requestedLeading = typePalette.leafLeadingEm
-    var handPx = englishBookHandPx(wellPx, measurePx, density, measurer, typePalette)
-    // Three passes at most, and all but one leaf in the book settles on the
-    // first: the hand is the book's, the leading is the book's, and the leaf
-    // fits. The rest is the rescue — close the leading to its floor, and if the
-    // block still stands past the foot, give up a little of the hand. See
-    // englishLeafOverflowHandPx for why that order and not the other.
-    repeat(3) { pass ->
-        val basmalahPx = englishBasmalahPx(handPx, measurePx, density, measurer, typePalette)
-        val pitches = englishLeafPitches(blocks, handPx, measurePx, density, measurer, typePalette, justifyLast)
-        val stands = englishLeafHeightPx(
-            blocks,
-            handPx,
-            basmalahPx,
-            requestedLeading,
-            measurePx,
-            density,
-            measurer,
-            typePalette,
-            justifyLast,
+    val handPx = englishBookHandPx(wellPx, measurePx, density, measurer, typePalette)
+    val basmalahPx = englishBasmalahPx(handPx, measurePx, density, measurer, typePalette)
+    val pitches = englishLeafPitches(blocks, handPx, measurePx, density, measurer, typePalette, justifyLast)
+    val stands = englishLeafHeightPx(
+        blocks, handPx, basmalahPx, requestedLeading, measurePx, density,
+        measurer, typePalette, justifyLast,
+    )
+    val pitchesPx = (pitches * handPx).coerceAtLeast(1f)
+    var leadingEm = englishLeafFittedLeadingEm(requestedLeading, stands, wellPx, pitchesPx)
+    // Paragraph heights round to pixels while opening furniture keeps fractional
+    // pitches. Check the fitted result, correcting only leading if it overruns.
+    for (pass in 0 until 2) {
+        if (leadingEm == requestedLeading) break
+        val fittedHeight = englishLeafHeightPx(
+            blocks, handPx, basmalahPx, leadingEm, measurePx, density,
+            measurer, typePalette, justifyLast,
         )
-        val leadingEm = englishLeafFittedLeadingEm(
-            leadingEm = requestedLeading,
-            measuredHeightPx = stands,
-            wellHeightPx = wellPx,
-            pitchesPx = (pitches * handPx).coerceAtLeast(1f),
-        )
-        // What the block stands at the leading it will actually be drawn on.
-        // Only a *closed* leading counts here. Carding the leading out fills a
-        // short leaf to its foot, which raises the block to about the well's
-        // own height — and feeding that back into the overflow test reads a
-        // filled leaf as an overflowing one and gives up hand for it. The leaf
-        // then sets smaller type than the ruler paginated it for and comes out
-        // a line short, its last line half empty. The rescue is for leaves that
-        // run past the foot; a leaf carded to reach the foot has not.
-        val closed = stands -
-            (requestedLeading - minOf(leadingEm, requestedLeading)) *
-            pitches * handPx
-        val next = englishLeafOverflowHandPx(handPx, closed, wellPx)
-        if (next >= handPx || pass == 2) {
-            return EnglishLeafSetting(
-                handPx = handPx,
-                lineInkPx = englishLineInkPx(handPx, density, measurer, typePalette),
-                leadingEm = leadingEm,
-            )
-        }
-        handPx = next
+        if (fittedHeight <= wellPx) break
+        val next = englishLeafClosingLeadingEm(leadingEm, fittedHeight, wellPx, pitchesPx, handPx)
+        if (next >= leadingEm) break
+        leadingEm = next
     }
-    error("unreachable")
+    return EnglishLeafSetting(
+        handPx = handPx,
+        lineInkPx = englishLineInkPx(handPx, density, measurer, typePalette),
+        leadingEm = leadingEm,
+    )
 }
 
 /**
@@ -1480,6 +1451,13 @@ private fun EnglishProseBlock(
     val set = remember(block.text, style, measurePx, density, justifyLast) {
         englishSetProse(block.text, style, measurePx, density, measurer, justifyLast)
     }
+    // English words have their own positions within an Arabic owner's band.
+    // Capture those positions rather than replaying the Arabic letter mask.
+    val paperDeposits = remember(block) { HashMap<Int, PaperInkDeposit>() }
+    val printedWords = remember(block.text, block.verses) {
+        englishPaperInkWordRanges(block.text, block.verses.map { it.range })
+    }
+    val washEntries = remember(block) { HashMap<Pair<Int, Int>, EnglishWashEntry>() }
     Text(
         text = set,
         style = style,
@@ -1511,6 +1489,9 @@ private fun EnglishProseBlock(
                                 },
                                 clock = clock.value,
                                 windows = washWindows[verse.surahId to verse.ayah].orEmpty(),
+                                paperDeposits = paperDeposits,
+                                printedWords = printedWords[verse.range].orEmpty(),
+                                washEntry = washEntries.getOrPut(verse.surahId to verse.ayah) { EnglishWashEntry() },
                             )
                         }
                     }
@@ -1596,6 +1577,9 @@ private fun englishVerseBlooms(
     word: ActiveWord?,
     clock: EnglishWashClock?,
     windows: Map<Int, EnglishWashWindow>,
+    paperDeposits: MutableMap<Int, PaperInkDeposit>,
+    printedWords: List<IntRange>,
+    washEntry: EnglishWashEntry,
 ): List<ShapedWordBloom> {
     if (pack == null) return emptyList()
     val paper = palette.paperColor
@@ -1639,25 +1623,32 @@ private fun englishVerseBlooms(
             val motion = motions.getOrNull(span.position - 1) ?: continue
             val progress = progress(span, motion)
             if (progress > 0f) washEdge = span.range.first + (span.range.last + 1 - span.range.first) * progress
-            if (progress > 0f && progress < 1f) {
-                blooms += ShapedWordBloom.InkReveal(
-                    range = span.range,
-                    progress = progress,
+        }
+        performing?.let { washEntry.onFrame(it.playbackActivation, it.reciterId, washEdge) }
+        // The material uses character progress within printed words. A phrase-
+        // wide pixel mask is a different edge and can re-cover a completed word
+        // when its wet material stops drawing. Keep the fallback on the same edge.
+        for (range in printedWords) {
+            val motion = washSpans.firstOrNull { range.first in it.range }
+                ?.let { motions.getOrNull(it.position - 1) }
+            val bloom = if (palette.paperInk != null && motion?.paperDeparture?.active == true) {
+                ShapedWordBloom.InkReveal(
+                    range = range,
+                    progress = (paperDeposits[range.first]?.progress ?: 0f).coerceAtLeast(0f),
                     paper = paper,
                     restingAlpha = resting,
-                    feather = null,
+                    revealedAlpha = motion.paperDepartureAlpha,
                 )
-            } else {
-                // Arabic high-water state retains the continuous prefix
-                // already reached, including words advanced by reordering.
-                val alpha = if (progress == 0f) waiting else cover
-                if (alpha <= 0f) continue
-                val previous = blooms.lastOrNull() as? ShapedWordBloom.UpcomingDim
-                if (previous != null && previous.coverAlpha == alpha &&
-                    previous.range.last + 1 == span.range.first) {
-                    blooms[blooms.lastIndex] = cover(previous.range.first..span.range.last, paper, alpha)
-                } else blooms += cover(span.range, paper, alpha)
-            }
+            } else englishWordWashCover(
+                range, englishPaperInkWordProgress(washEdge, range.first, range.last + 1),
+                paper, resting, waiting,
+                if (performing != null) washEntry.recitedCover(range, cover) else cover,
+            )
+            val previous = blooms.lastOrNull() as? ShapedWordBloom.UpcomingDim
+            if (bloom is ShapedWordBloom.UpcomingDim && previous != null &&
+                previous.coverAlpha == bloom.coverAlpha && previous.range.last < range.first) {
+                blooms[blooms.lastIndex] = previous.copy(range = previous.range.first..range.last)
+            } else if (bloom != null) blooms += bloom
         }
     }
     // The mark's cover is paper, so it goes down before any ink — left after
@@ -1666,11 +1657,81 @@ private fun englishVerseBlooms(
     if (markCover > 0f && !verse.markRange.isEmpty()) {
         blooms += cover(verse.markRange, paper, markCover)
     }
+    if (motions.isNotEmpty() && palette.paperInk != null) {
+        blooms.addEnglishPaperInk(printedWords, washSpans, motions, palette.paperInk, washEdge, paperDeposits)
+    }
     if (motions.isNotEmpty()) {
         blooms.addEnglishInkLayerBlooms(washSpans, motions, palette, glintInk, repeatLayers = false, washEdge)
-        blooms.addEnglishInkLayerBlooms(spans, motions, palette, glintInk, repeatLayers = true, washEdge)
+        blooms.addEnglishInkLayerBlooms(spans, motions, palette, glintInk, repeatLayers = true, washEdge,
+            departures = paperDeposits.takeIf { palette.paperInk != null })
     }
     return blooms
+}
+
+/**
+ * Paper ink on the English leaf (docs/PAPER_INK.md). The leaf's first-pass
+ * wash is one continuous prefix with its edge at [washEdge] (a character
+ * position), so each English word's progress is its own distance from that
+ * edge: words behind it are laid, the word it is crossing is mid-ink, and the
+ * next word stays unread until the edge reaches its start. A word
+ * stays with the paper ink while its owner's ink is still wet.
+ *
+ * Drawn over the leaf's covers — the paper ink erases what they left of the
+ * word — and under its orange repeat tint. With no fallback of its own: a
+ * word whose field is not ready simply keeps the leaf's wash.
+ */
+private fun MutableList<ShapedWordBloom>.addEnglishPaperInk(
+    printedWords: List<IntRange>,
+    washSpans: List<EnglishInkSpan>,
+    motions: List<InkMotion>,
+    style: PaperInkStyle,
+    washEdge: Float,
+    deposits: MutableMap<Int, PaperInkDeposit>,
+) {
+    // Observe settled owners too, so a rewind has a dry deposit to release.
+    motions.forEach { it.paperInkLive }
+    var warmedNext = false
+    for (range in printedWords) {
+        val i = range.first
+        val j = range.last + 1
+        val owner = washSpans.firstOrNull { i in it.range }?.let { motions.getOrNull(it.position - 1) }
+        val raw = englishPaperInkWordProgress(washEdge, i, j)
+        val evaporating = owner?.paperDeparture?.active == true
+        val current = PaperInkDeposit(raw, owner?.paperWetness ?: 0f, 0f, 0f, 0f)
+        val deposit = if (evaporating) deposits[i] ?: current else current.also { deposits[i] = it }
+        val wet = deposit.wet
+        if (englishPaperInkWordVisible(deposit.progress, wet, evaporating) && owner != null) {
+            val frame = (owner ?: motions.first()).paperInkFrame(style)
+            add(
+                ShapedWordBloom.PaperInk(
+                    range = range,
+                    frame = PaperInk.Frame(
+                        progress = deposit.progress,
+                        wet = wet,
+                        // The leaf keeps its own orange layer for repeats.
+                        repeatPass = 0f,
+                        repeatTint = 0f,
+                        retained = 0f,
+                        dryInk = frame.dryInk,
+                        wetInk = frame.wetInk,
+                        repeatColor = frame.repeatColor,
+                        unreadAlpha = frame.unreadAlpha,
+                        pooling = frame.pooling,
+                        reflection = frame.reflection,
+                        softness = frame.softness,
+                        leadFade = ENGLISH_PAPER_INK_LEAD_FADE,
+                        fadeLeadOnEntry = true,
+                        flowing = frame.flowing,
+                        evaporation = frame.evaporation,
+                    ),
+                    fallback = emptyList(),
+                ),
+            )
+        } else if (raw < 0f && !warmedNext) {
+            add(ShapedWordBloom.PaperInkWarm(range))
+            warmedNext = true
+        }
+    }
 }
 
 /**
@@ -1715,18 +1776,29 @@ private fun MutableList<ShapedWordBloom>.addEnglishInkLayerBlooms(
     glintInk: Color?,
     repeatLayers: Boolean,
     washEdge: Float,
+    departures: MutableMap<Int, PaperInkDeposit>? = null,
 ) {
     spans.forEach { owned ->
         val motion = motions.getOrNull(owned.position - 1) ?: return@forEach
-        if (!englishInkLayerAllowed(motion.ink.state)) return@forEach
-        val repeating = repeatLayers && motion.repeatAlpha > 0f
+        val departing = repeatLayers && motion.paperDeparture?.active == true
+        // Negative keys hold semantic tint spans; nonnegative keys hold the
+        // first-pass English words. Both maps belong to this paragraph only.
+        val key = -owned.range.first - 1
+        val old = departures?.get(key).takeIf { departing }
+        val laid = if (old != null) 1f else englishInkLayerProgress(owned.range, washEdge)
+        if (repeatLayers && !departing && departures != null) {
+            departures[key] = PaperInkDeposit(minOf(motion.repeatProgress, laid), 0f, 1f, motion.repeatAlpha, 0f)
+        }
+        if (!englishInkLayerAllowed(motion.ink.state) && old == null) return@forEach
+        val repeatAlpha = if (old != null) old.repeatTint * (motion.paperDeparture?.remaining?.value ?: 0f)
+            else motion.repeatAlpha
+        val repeating = repeatLayers && repeatAlpha > 0f
         val glinting = glintInk != null && motion.showGlintLayer &&
             motion.glintLayerAlpha > 0f && motion.glintIsRepeat == repeatLayers
         if (!repeating && !glinting) return@forEach
         val span = owned.range
-        val laid = englishInkLayerProgress(span, washEdge)
         if (laid <= 0f) return@forEach
-        val repeatProgress = motion.repeatProgress
+        val repeatProgress = old?.progress ?: motion.repeatProgress
         if (repeating) {
             add(
                 ShapedWordBloom.ColorReveal(
@@ -1734,7 +1806,7 @@ private fun MutableList<ShapedWordBloom>.addEnglishInkLayerBlooms(
                     progress = minOf(repeatProgress, laid),
                     color = palette.repeatInkColor,
                     restingAlpha = 0f,
-                    layerAlpha = motion.repeatAlpha,
+                    layerAlpha = repeatAlpha,
                     feather = motion.repeatFeather,
                     colorAlpha = InkEngine.tuning.repeatInkAlpha,
                 ),
@@ -2403,12 +2475,28 @@ internal fun englishJustifyAudit(
     var unjustified = 0
     var ragged = 0
     var edgeMisses = 0
+    var minHandPx = handPx
+    var maxHandPx = handPx
+    val overflows = ArrayList<String>()
     synchronized(EnglishRagMemo) { EnglishRagMemo.clear() }
     book.leaves.forEachIndexed { index, bookLeaf ->
         val blocks = englishLeafBlockTexts(
             englishLeaf(bookLeaf.page, bookLeaf.runs, translation),
             emptyMap(), emptyMap(), Color.Black, Color.Black, verseNumberScript, typePalette,
         )
+        val justifyLast = (blocks.lastOrNull() as? EnglishLeafBlockText.Prose)?.proseRunsOn(surahsById) == true
+        val setting = setEnglishLeaf(blocks, wellPx, measurePx, density, measurer, typePalette, justifyLast)
+        minHandPx = minOf(minHandPx, setting.handPx)
+        maxHandPx = maxOf(maxHandPx, setting.handPx)
+        val heightPx = englishLeafHeightPx(
+            blocks, setting.handPx,
+            englishBasmalahPx(setting.handPx, measurePx, density, measurer, typePalette),
+            setting.leadingEm, measurePx, density, measurer, typePalette, justifyLast,
+        )
+        if (heightPx > wellPx + 1f) {
+            overflows += "leaf ${index + 1} ${bookLeaf.runs.first().key}: " +
+                "height=$heightPx well=$wellPx leading=${setting.leadingEm}"
+        }
         blocks.forEach { block ->
             if (block !is EnglishLeafBlockText.Prose) return@forEach
             val justifyLast = block === blocks.last() && block.proseRunsOn(surahsById)
@@ -2453,6 +2541,8 @@ internal fun englishJustifyAudit(
             "leaves=${book.leaves.size} lines=$lines justified=${seen.size} unjustified=$unjustified " +
                 "raggedParagraphs=$ragged edgeMisses=$edgeMisses",
         )
+        appendLine("book font px=$handPx leaf font min=$minHandPx max=$maxHandPx overflows=${overflows.size}")
+        overflows.forEach { appendLine("  overflow: $it") }
         appendLine(
             "word space em: p10=%.3f p50=%.3f p90=%.3f p99=%.3f max=%.3f; over 0.4em: %d, over 0.5em: %d".format(
                 spaces.q(0.10), spaces.q(0.50), spaces.q(0.90), spaces.q(0.99), spaces.maxOrNull() ?: 0f,

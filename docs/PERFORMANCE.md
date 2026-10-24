@@ -34,6 +34,10 @@ measure and carried-line setting remain in the keys.
 The ruler, height fitter and renderer use the same carried-line setting. A line
 without gaps keeps its natural width, so the model cannot count it as fitting
 by shrink alone. The hand still calibrates at natural spacing.
+Every leaf keeps that same book hand. Page fitting adjusts only leading and
+checks its drawn height; it never reruns the layout at a smaller font size. Oversized
+verses are carried by the measured pagination. The debug justification audit
+also reports leaf font-size extrema and vertical overflow.
 
 Pagination runs off the main thread and is written to `EnglishBookCache`.
 The cache key includes the justification tuning and algorithm version; a
@@ -52,6 +56,9 @@ English ownership is solved lazily per verse and cached for the selected text
 source. Semantic ranges and continuous forward wash bands are projected once
 when the paragraph is built. Frames read the existing Arabic motions; adjacent
 paper covers with equal alpha merge, and one band carries the active soft edge.
+Printed word ranges are cached with the paragraph. Both the base cover and
+paper material use the same per-word projection of that edge; only one next
+unread word per verse requests material prewarming.
 First-pass glimmer shares that band; repeats keep the semantic ranges. Geometry
 stays cached by layout and range, and only repeat/glint layers request shaped
 paths.
@@ -262,6 +269,15 @@ reuses the matching UI snapshot until the word, ayah, or genuine ink activation
 changes. The steady 30 Hz word poll therefore allocates no per-word objects;
 both allocation and downstream emission happen only at real ink boundaries
 (~2–3×/second).
+
+`WordInkPublication` applies an explicit word tap synchronously before its
+player command, then consumes those boundary polls. Keeping tap intent and
+the displayed word in one publication avoids an asynchronous `combine`
+turn where playback has begun recessing the page but the tap prefix is
+still missing. Frame clocks and per-ayah derived subscriptions are unchanged.
+The word-play exception follows the player's position intent, so a second
+MediaController acknowledgement of the same seek does not discard its
+prefix. Actual media generations still own the captured wash windows.
 
 ### 3b. Playlist preload + cache warm
 

@@ -55,7 +55,7 @@ class MushafTapHoldTest {
     @Test
     fun `finishing a carried verse and starting the next never follows its opening leaf`() {
         val seed = ActiveWord(ayah = 29, wordPosition = 5, durationMs = 500, activation = 8)
-        val last = resolveActiveWord(seed.copy(activation = 9, playbackActivation = 9), null, seed)!!
+        val last = WordTapInk(seed).resolve(seed.copy(activation = 9, playbackActivation = 9))!!
         fun leaf(word: ActiveWord?, ayah: Int, inkId: Long): Int {
             val location = mushafLocationWord(word, last, ayah, inkId)
             return mushafLeafNumber(

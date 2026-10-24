@@ -36,6 +36,10 @@ import kotlin.math.roundToInt
  * and lyric-follow behave identically for the basmalah.
  */
 object FocusEngine {
+    /** Word ranges belong to the new text only after its matching layout arrives. */
+    fun matchesWordLayout(range: IntRange, text: String, laidOutText: String): Boolean =
+        text == laidOutText && !range.isEmpty() && range.first >= 0 && range.last < laidOutText.length
+
     /**
      * The ayah-number key used to focus the chapter-opening basmalah.
      * Same sentinel as the playlist lead-in ([BASMALAH_PLAYLIST_AYAH]).
@@ -327,6 +331,11 @@ object FocusEngine {
         bandTopMarginPx: Float,
         bandBottomMarginPx: Float,
     ): Float {
+        // A clipped-away word can report an empty rectangle at the window
+        // origin. It is not a target above the page and must never pull it back.
+        if (!wordTopPx.isFinite() || !wordBottomPx.isFinite() || wordBottomPx <= wordTopPx) {
+            return 0f
+        }
         val bandTop = topGuardPx + bandTopMarginPx
         val bandBottom = viewportHeightPx - bandBottomMarginPx
         if (wordTopPx < bandTop) return wordTopPx - bandTop

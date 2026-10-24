@@ -49,6 +49,7 @@ from build_db import (  # noqa: E402
     discard_unspoken_rewind_onset,
     declared_reciter_rows,
     false_same_position_leads,
+    fragment_same_position_leads,
     hand_lead_to_previous_word,
     normalize_text,
     offset_for_audio_onset,
@@ -86,6 +87,7 @@ PIPELINES = frozenset(
         "complete_repeat_topology",
         "erases_span_repeat",
         "false_same_position_lead",
+        "fragment_same_position_lead",
         "invented_flush_restore",
         "leading_silence_offset",
         "preserve_peer_repeats",
@@ -203,6 +205,11 @@ def run_pipeline(case, segs):
         return adjust_qdc_segments(segs, n_words, stats, words=words)
     if pipeline == "boundary_repair":
         return apply_boundary_repair(segs, resolve_repair(case), case.get("occurrence"))
+    if pipeline == "fragment_same_position_lead":
+        from collections import defaultdict
+        cleaned = clean_qdc_artifacts(segs, defaultdict(int))
+        leads = fragment_same_position_leads(segs, cleaned, case.get("reference_segments"), 0)
+        return hand_lead_to_previous_word(cleaned, leads)
     if pipeline == "clock_shifted_repair":
         offset = case.get("clock_offset_ms")
         if offset is None:

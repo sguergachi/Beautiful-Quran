@@ -358,7 +358,7 @@ If the answer to any of these is no, reduce the scope.
 
 `ui/reader/InkEngine.kt` is a single object, per Option 2, with one amendment
 to the proposed shape: the review found that the four-state derivation is the
-easy part — the highlight's *feel* lives in the motion policy (400 ms
+easy part — the highlight's *feel* lives in the motion policy (520 ms
 tween-vs-snap rules, sweep entry and residual rules, repeat wash timing, the
 1.6× feather). `InkEngine` owns that policy as data, while one per-word
 `InkMotion` owns its Compose runtime:
@@ -414,6 +414,42 @@ tween-vs-snap rules, sweep entry and residual rules, repeat wash timing, the
   voice, so a starving stream's brief ready windows cannot strobe the page
   between download bursts.
   Web parity: `data-stream-wait` CSS covers in `styles.css`.
+  Android word-play is an explicit exception: the tapped verse keeps its
+  continuous recited prefix, including during the buffer and release hold.
+  `WordTapInk` publishes the same immediate target for word tiles and book
+  pages, waits for a matching poll, then retains that origin within the
+  acknowledged verse, reciter and requested place (`positionIntentId`). A
+  later play, seek or automatic verse repeat cannot inherit it. MediaController
+  can report the immediate seek and its session acknowledgement as separate
+  ink generations; the same landing within the same request rebases the
+  prefix onto the new generation. A different landing still releases it.
+  The tapped word still waits for its own media clock;
+  words after it retain the ordinary Upcoming treatment.
+  In Scroll, other verses above and below fade from the start request,
+  including during a word tap's own loading. Their ink, secondary text and
+  marks share the chrome's 520 ms Material ease-in-out fade on Android and
+  web. Existing default Ink Lab fades migrate to that duration; custom
+  auditions persist. Scroll ignores a stale fade-led
+  focus during that wait. Mushaf keeps earlier visible verses inked on the
+  current page, including preceding chapters sharing the leaf. Arabic and
+  English leaves cover later verses while the current verse carries the wash
+  and retains its ink through its closing hold and silent tail. Outgoing wet
+  ink keeps its drying clocks over the completed ink. A seek keeps earlier
+  verses inked, covers later ones, and waits for the selected verse's new
+  generation. Manually browsed leaves keep their ordinary resting ink.
+  Web uses the same cumulative page policy in `mushafInk` and starts Scroll's
+  `data-reciting` recess with the word request, before audio becomes ready.
+  `WordInkPublication` writes that target synchronously before issuing the
+  player command; it does not wait for a `combine` collector while playback
+  can already recess the page. `InkEngine` treats the saved tap position as
+  a minimum completed prefix even if the acknowledged display clock is
+  temporarily earlier. Those words complete any old residual wash and lift
+  their lyric alpha immediately. Natural handoffs still finish their own
+  soft residuals, and genuine repeats can lay orange over that full base.
+  Confirmation gets two uninterrupted seconds after buffering clears; a
+  download or another buffer burst cannot consume that grace and erase the
+  prefix just as the voice arrives. An unconfirmed seek still expires after
+  that ready period.
 - **Basmalah preface**: `prefaceState(isActive, dimmed)` /
   `prefaceWashProgress(positionMs, durationMs, segments)` for the surah-header
   basmalah VectorDrawable (Active during the Al-Fatihah 1:1 lead-in clip, with
@@ -453,12 +489,14 @@ tween-vs-snap rules, sweep entry and residual rules, repeat wash timing, the
   snapshot-backed (`mutableStateOf`), so release builds read constants while
   the Ink Lab can retune a live session.
 - **Sync knobs, deliberately outside `Tuning`**: `highlightLeadMs` (default 0),
-  `fadeLeadMs` (default 500), `scrollLeadMs` (default 500 — the camera's own
+  `fadeLeadMs` (default 500), `scrollLeadMs` (default 100 — the camera's own
   lead, deliberately separate from the ink's; see `FocusEngine.playbackFocusTarget`)
   and `outputLatencyOverrideMs` (null = use Media3’s presentation clock;
   a manual value adds wall-time delay, scaled to media time by playback speed). These move *when* things fire rather than how the ink feels, so they
   stay out of the data class that **Copy values** transcribes — but they persist
-  with it via `InkLabStore`. `fadeLeadMs` is how far the ayah focus/recess target
+  with it via `InkLabStore`. Schema 4 brings saved scroll leads to 100 ms once,
+  preserving the other knobs; later scroll-lead auditions persist normally.
+  `fadeLeadMs` is how far the ayah focus/recess target
   runs ahead of the audio; a nonzero Ink Lab `highlightLeadMs` advances word ink
   only. Both start
   from the same latency-corrected heard position, a contract enforced in
@@ -482,12 +520,15 @@ tween-vs-snap rules, sweep entry and residual rules, repeat wash timing, the
   creates an `Animatable`, `SideEffect`, ordered gate, or word-motion lifecycle.
   The two shaped modes still keep independent text construction because their
   typography differs; only their motion-to-bloom adapter is shared.
-- **Paper scroll handoff.** When playback advances, the shaped Arabic/English
-  verse that owned the lyric line eases its paper cover back over the dry ink
-  instead of snapping every word to Upcoming. Only that outgoing verse may use
-  the ramp; future verses retain the full Upcoming cover from their first frame,
-  preserving the no-full-ink-flash guard. Layered gloss already makes the same
-  handoff through its draw-phase word-alpha tween.
+- **Paper scroll handoff.** The shaped Arabic/English cover moves on one clock:
+  `recessMs` is `CHROME_RECEDE_MS`, so every verse leaving full ink — the page
+  at rest when play begins, and the verse giving up the lyric line as the wash
+  advances — eases its paper cover back over the dry ink with the chrome instead
+  of snapping every word to Upcoming. A verse that has only ever waited, or that
+  mounts during playback, keeps the Upcoming floor from its first frame
+  (no-full-ink-flash guard), and the outgoing verse keeps that floor under ink
+  it never read. Layered gloss already makes the same handoff through its
+  draw-phase word-alpha tween.
 - **Mushaf progression is page-local.** The leaf carrying the voice begins
   beneath the Upcoming paper cover; its active word uses the same motion pack
   as the scrolling reader, completed ayahs retain full ink, and later ayahs use
@@ -608,17 +649,35 @@ shared `HighlightTimeline` through that window. The replaced speech-time
 `Animatable` owners (`rememberLetterSweep` and `rememberRepeatWash`) are gone.
 
 - Active entry captures duration, tajweed curve, feather, and wasl carry once.
-  Mid-word tuning cannot replay the wash. The minimum visual floor remains,
-  converted from wall milliseconds to media duration at entry speed.
+  Mid-word tuning cannot replay the wash. The visual floor is converted from
+  wall milliseconds to media duration at entry speed; English Scroll also
+  bounds it by the voiced end below.
 - Active→Recited retains that word's independent residual window; Upcoming or
   Plain abandons it. Pauses and buffering freeze residuals as well as active ink.
   Speed changes alter the shared media clock instead of restarting animation.
 - A tap is provisional until a matching player generation arrives. Its first
   draw is zero, without waiting for an effect to snap an idle animation down.
+  If another tap skips past an unconfirmed target, that target becomes fully
+  recited with the rest of the prefix; a provisional zero is never retained
+  as a spoken residual.
 - A consecutive same-word repeat starts another orange occurrence. Base ink
   remains laid; orange waits for the base edge. Repeats never form a queue.
 - English predecessor gating preserves a continuous prefix while each window
   stays anchored to speech, so short words cannot accumulate queued delay.
+  English Scroll starts from the eased hold-duration window, including the
+  first-pass minimum and maximum, then finishes its reveal up to **100 wall
+  milliseconds earlier**. A positive occurrence-specific `spokenMs` then caps
+  that window at the actual voiced end. The karaoke hold includes silence up
+  to the next onset; subtracting 100 ms from that hold alone can still leave
+  the edge moving through most of a pause. The onset stays fixed and completed
+  ink holds through the remaining silence. The soft-edge minimum is retained
+  wherever it fits before the voiced end; it cannot extend into that silence.
+  Repeats use their own voiced span and are never stretched to meet the floor.
+  Missing or zero voiced metadata retains the earlier hold-based fallback.
+  `EnglishRevealTiming` applies the policy before the shared window converts
+  speed once. Android and web use the same policy. Paper ink consumes that
+  progress; its one-letter lead stays inside each printed word. English leaf
+  semantic windows and Arabic pacing retain their existing policies.
 - Completed residuals stop observing frame updates at the next word boundary.
   Repeat completion is observed as a structurally compared Boolean; frame
   progress itself is read in drawing, avoiding frame-driven composition.
@@ -644,6 +703,11 @@ The painted edge uses `EnglishLeafVerse.fragmentWashProgress`, interpolating
 between cached letter anchors. The exact integer mapping still places owned
 ranges and taps. Applying that integer mapping on each animation frame made
 the edge wait for a whole letter and then jump, despite a continuous clock.
+The base covers and paper material both project that edge into individual
+printed words. Completed words keep their ink when the material dries; a
+shared Arabic owner cannot wet English words still ahead of the edge. The
+prefix present when a playback generation enters still rises through seek
+recess. Words washed after entry remain laid even during that rise.
 The active word's onset closes preceding ink before its repeat tint begins. In 24:2, “their punishment” starts on word 23 but
 keeps washing through the reordered Arabic “a group of the believers,” words
 24–26. It finishes at 36.25 s rather than 28.49 s for Alafasy. Pauses freeze

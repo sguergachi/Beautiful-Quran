@@ -52,6 +52,8 @@ import com.beautifulquran.playback.PlayerUiState
 import kotlin.math.abs
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.withTimeoutOrNull
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -105,44 +107,12 @@ data class ActiveWord(
      * before Media3 owns the leaf and disposes the captured wash.
      */
     val fromTap: Boolean = false,
+    /** Explicit word-play origin, retained through this playback generation's buffering. */
+    val tapStartPosition: Int? = null,
     /** Media3's generation, retained when a tap pins [activation] for the wash. */
     val playbackActivation: Long = activation,
     val reciterId: Int? = null,
 )
-
-/**
- * Word the reader sees after a tap. The seed lights the wash this frame;
- * the 33 ms poll replaces it. That poll often carries a new [ActiveWord.activation]
- * (seek inkId), and media motion rearms on a generation change —
- * keep the seed's activation while that word is still the one being said.
- */
-internal fun resolveActiveWord(
-    polled: ActiveWord?,
-    tap: ActiveWord?,
-    seed: ActiveWord?,
-): ActiveWord? {
-    val shown = if (
-        tap != null &&
-        (polled == null ||
-            polled.ayah != tap.ayah ||
-            polled.wordPosition != tap.wordPosition ||
-            polled.playbackActivation < tap.playbackActivation)
-    ) {
-        tap
-    } else {
-        polled
-    } ?: return null
-    return if (
-        seed != null &&
-        shown.ayah == seed.ayah &&
-        shown.wordPosition == seed.wordPosition &&
-        shown.activation != seed.activation
-    ) {
-        shown.copy(activation = seed.activation)
-    } else {
-        shown
-    }
-}
 
 /**
  * One tick of the basmalah lead-in's wash, read for both renderings of it: the
@@ -507,17 +477,18 @@ class ReaderViewModel(
     private val transportCursor = ReaderTransportCursor()
     private var loadJob: Job? = null
     private var installedTimingGeneration = 0L
-    private val timingPublication = MutableStateFlow(0L)
-    private val timingPublicationRevision: Long get() = timingPublication.value
+    private val timingPublication = MutableStateFlow(ReaderTimingPublication())
+    private val timingPublicationRevision: Long get() = timingPublication.value.revision
 
-    private fun installTimings(loaded: Map<Int, List<Segment>>) {
-        tapInk.value = null
-        tapSeed = null
+    private fun installTimings(loaded: Map<Int, List<Segment>>, reciterId: Int? = null) {
+        wordInk.clear()
+        endWordTapWait()
         timings = loaded
         preparedTimings = loaded.mapValues { (_, segs) ->
             HighlightEngine.PreparedTimings.prepare(segs)
         }
-        timingPublication.value++
+        timingPublication.value = ReaderTimingPublication(timingPublicationRevision + 1L, reciterId)
+        DevProfiling.recordEvent("timing-publication reciter=$reciterId revision=$timingPublicationRevision ayahs=${loaded.size}")
     }
 
     /**
@@ -540,15 +511,14 @@ class ReaderViewModel(
         val gen = sessions.generation
         val id = sessions.surahId.takeIf { it != 0 } ?: return
         val reciter = _uiState.value.currentReciter ?: return
-        tapInk.value = null
-        tapSeed = null
+        wordInk.clear()
         if (!repository.timingProviderAvailable(reciter.id)) {
-            installTimings(emptyMap())
+            installTimings(emptyMap(), reciter.id)
             _uiState.value = _uiState.value.copy(hasTimings = false)
         }
         val refreshed = timingsWithBasmalahLeadIn(reciter.id, id)
         if (!sessions.isCurrent(gen, id) || _uiState.value.currentReciter?.id != reciter.id) return
-        installTimings(refreshed.segments)
+        installTimings(refreshed.segments, reciter.id)
         installedTimingGeneration = refreshed.generation
         _uiState.value = _uiState.value.copy(hasTimings = refreshed.segments.isNotEmpty())
     }
@@ -563,7 +533,8 @@ class ReaderViewModel(
         key: (NowPlaying) -> K?,
         sample: (K, HighlightPlaybackSample) -> T?,
     ): StateFlow<T?> = playbackPolls.map { poll ->
-        poll?.let { key(it.nowPlaying)?.let { key -> sample(key, poll.playback) } }
+        poll?.takeIf { it.timingPublication == timingPublication.value }
+            ?.let { key(it.nowPlaying)?.let { key -> sample(key, poll.playback) } }
     }
         .distinctUntilChanged()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(1_000), null)
@@ -636,8 +607,10 @@ class ReaderViewModel(
 
     /** One owner advances sync, voice analysis, and capture before any renderer reads it. */
     private val highlightPolls = playbackPolls.map { poll ->
-        if (poll == null) highlightSession.suspendObservation(System.nanoTime())
-        poll?.let {
+        // A shared packet can be queued before a newer timing table is installed.
+        val current = poll?.takeIf { it.timingPublication == timingPublication.value }
+        if (current == null) highlightSession.suspendObservation(System.nanoTime())
+        current?.let {
             val np = it.nowPlaying
             val playback = it.playback
             val prepared = preparedTimings[np.ayah] ?: emptyPreparedTimings
@@ -702,16 +675,20 @@ class ReaderViewModel(
     }.distinctUntilChanged()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(1_000), null)
 
-    /** Word-tap ink, held until the 33 ms poll names the same word. */
-    private val tapInk = MutableStateFlow<ActiveWord?>(null)
+    private val wordInk = WordInkPublication()
 
-    /** The seed [tapInk] last published, kept after the poll takes over so
-     * [resolveActiveWord] can pin the wash generation for that word. */
-    private var tapSeed: ActiveWord? = null
+    /** True from a word tap until its sought word is heard ([WordTapVoiceWait]). */
+    private val tapAwaitingVoice = MutableStateFlow(false)
+    val wordTapAwaitingVoice: StateFlow<Boolean> = tapAwaitingVoice
+    private var tapVoiceJob: Job? = null
 
-    val activeWord: StateFlow<ActiveWord?> = combine(polledActiveWord, tapInk) { polled, tap ->
-        resolveActiveWord(polled, tap, tapSeed)
-    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(1_000), null)
+    private fun endWordTapWait() {
+        tapVoiceJob?.cancel()
+        tapVoiceJob = null
+        tapAwaitingVoice.value = false
+    }
+
+    val activeWord: StateFlow<ActiveWord?> = wordInk.activeWord
 
     /** The ayah focus/prepare target on the sheet. Normally the playing ayah,
      * but advances to the next ayah [InkEngine.fadeLeadMs] before the current
@@ -884,27 +861,13 @@ class ReaderViewModel(
             }
         }
         viewModelScope.launch {
+            player.state.map { it.positionIntentId }.distinctUntilChanged().collect {
+                wordInk.onPositionIntent(it)
+            }
+        }
+        viewModelScope.launch {
             polledActiveWord.collect { polled ->
-                val tap = tapInk.value
-                if (tap != null &&
-                    polled != null &&
-                    polled.ayah == tap.ayah &&
-                    polled.wordPosition == tap.wordPosition &&
-                    polled.playbackActivation >= tap.playbackActivation
-                ) {
-                    tapInk.value = null
-                }
-                // Drop the pin once playback has left the tapped word. Not
-                // on the stale pre-seek poll: tap is still held then, and
-                // clearing here lets the matching poll re-arm the wash.
-                val seed = tapSeed
-                if (tapInk.value == null &&
-                    seed != null &&
-                    polled != null &&
-                    (polled.ayah != seed.ayah || polled.wordPosition != seed.wordPosition)
-                ) {
-                    tapSeed = null
-                }
+                wordInk.onPoll(polled)
             }
         }
         // React when the reciter is changed on the settings sheet: reload the
@@ -1079,7 +1042,7 @@ class ReaderViewModel(
         focusedAyah = 1
         longAyahMidpointConsumed = 0
         transportCursor.clear()
-        installTimings(prepared.timings)
+        installTimings(prepared.timings, prepared.reciter.id)
         installedTimingGeneration = prepared.timingGeneration
         _uiState.value = ReaderUiState(
             content = prepared.content,
@@ -1104,6 +1067,7 @@ class ReaderViewModel(
     }
 
     private suspend fun onReciterChanged() {
+        DevProfiling.recordEvent("reciter-selection selected=${settings.settings.value.reciterId} playing=${player.state.value.nowPlaying}")
         val gen = sessions.generation
         val id = sessions.surahId
         if (id == 0) return
@@ -1113,7 +1077,7 @@ class ReaderViewModel(
         }
         val reciter = reciters.first { it.id == reciterId }
         if (!sessions.isCurrent(gen, id)) return
-        installTimings(refreshed.segments)
+        installTimings(refreshed.segments, reciter.id)
         installedTimingGeneration = refreshed.generation
         _uiState.value = _uiState.value.copy(
             currentReciter = reciter,
@@ -1279,6 +1243,8 @@ class ReaderViewModel(
     }
 
     fun playFromAyah(ayah: Int) {
+        // Not a word tap: an ordinary download wait covers the page again.
+        endWordTapWait()
         // Playing a specific ayah abandons any active repeat range.
         // Chapter openings (ayah 1) include the basmalah lead-in.
         if (startSurah(ayah, preserveRepeatRange = false, startWithBasmalah = ayah == 1)) {
@@ -1294,6 +1260,7 @@ class ReaderViewModel(
      * the chapter has no timings at all.
      */
     fun playFromAyahWord(ayah: Int, word: Int?) {
+        DevProfiling.recordEvent("word-tap surah=$surahId ayah=$ayah word=$word reciter=${_uiState.value.currentReciter?.id}")
         // A chapter's opening — ayah 1 at its first word — starts with the
         // basmalah lead-in, exactly as play-from-ayah-1 does. The mushaf's
         // play target is a word, and the word path used to seek straight
@@ -1342,13 +1309,29 @@ class ReaderViewModel(
             nextWordPosition = next,
             activation = player.state.value.positionEvents.inkId + 1L,
             fromTap = true,
+            tapStartPosition = word,
             reciterId = reciterId,
         )
-        tapSeed = seed
-        tapInk.value = seed
+        wordInk.seed(seed, positionIntentId = player.state.value.positionIntentId + 1L)
+        tapVoiceJob?.cancel()
+        tapAwaitingVoice.value = true
+        tapVoiceJob = viewModelScope.launch {
+            val wait = WordTapVoiceWait(seed.activation)
+            // Bounded: a seek that never plays cannot hold the cover off forever.
+            withTimeoutOrNull(WORD_TAP_VOICE_WAIT_MAX_MS) {
+                player.state.first { wait.heard(it.positionEvents.inkId, it.isPlaying, it.isBuffering) }
+            }
+            tapAwaitingVoice.value = false
+        }
         viewModelScope.launch {
-            delay(2_000)
-            if (tapInk.value === seed) tapInk.value = null
+            val timeout = WordTapConfirmationTimeout(2_000)
+            while (wordInk.awaiting(seed)) {
+                if (timeout.expired(player.state.value.isBuffering, android.os.SystemClock.uptimeMillis())) {
+                    wordInk.expire(seed)
+                    break
+                }
+                delay(100)
+            }
         }
     }
 
@@ -1533,6 +1516,8 @@ class ReaderViewModel(
     }
 
     companion object {
+        /** Longest a word tap may hold the stream-wait cover off. */
+        private const val WORD_TAP_VOICE_WAIT_MAX_MS = 30_000L
         private const val TICK_MS = 33L
         private const val PAUSED_TICK_MS = 250L
         private const val START_SEEK_GRACE_MS = 1_500L

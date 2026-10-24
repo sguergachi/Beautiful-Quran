@@ -898,18 +898,26 @@ opening leaves of their own. Sad is the case to look at: it used to stop
 mid-verse at *"about My message. Rather,"* with two and a half lines of white
 under it, and now carries 38:1–8 whole and fills to the foot.
 
-**One leaf is over capacity and always will be.** 2:282 is a single sentence of
-1,333 characters, half as long again as a leaf holds.
+**One font size for the selected book face, on every leaf.** The measured ruler
+cuts the text at that size and carries oversized verses, including 2:282, across
+leaves. Page content never selects a smaller font size. The old overflow shrink
+was introduced when a sentence had to remain whole; carried verses removed
+that restriction, and the shrink fallback is now removed as well.
 
-**The rescue, in order.** The leaf is measured as it will be drawn, and if the
-block would run past the foot its leading closes — only on that leaf, only by
-the overflow. The leading stops at `ENGLISH_LEAF_MIN_LEADING_EM` = 1.15, because
-unbounded it will close as far as the arithmetic asks and a page whose ascenders
-touch the descenders above them is not a tight page but an unreadable one. What
-the floor cannot take, the hand does: `englishLeafOverflowHandPx` gives up a few
-percent of type on that leaf alone. That breaks §13.3 knowingly — on 2:282 the
-alternatives are overlapping lines or revelation clipped off the foot, and a page
-set a little small is the only one of the three a reader can still read.
+The leaf is measured as it will be drawn. Its leading can close for rounding
+or open within the existing carding range, with a floor of
+`ENGLISH_LEAF_MIN_LEADING_EM` = 1.15 so lines cannot overlap. Font size stays the
+book's size throughout. The debug justification audit reports the actual
+minimum and maximum leaf font sizes and every leaf overflowing its well.
+The fitted height is checked again: rounded paragraph heights and fractional
+chapter-opening furniture can leave a few pixels past the target. Any such
+overrun closes the leading by the measured amount, with at least one pixel of
+baseline-pitch change so rounded prose actually moves. Font size stays fixed.
+
+The 2026-10-24 native audit at a 1,006 px measure and 1,824 px well set all
+706 Junicode leaves at exactly 49.569916 px. All 15,933 lines stayed within
+their leaves, with zero vertical overflows and zero justified edge misses.
+The long 2:282 sentence continues across adjacent leaves at that same size.
 
 ### 13.5 Justified, with whole words
 
@@ -1444,7 +1452,10 @@ same reason: the shape was wrong, not the size.
 The base wash bands follow English order, driven by the calibrated media clock.
 Each band's owner is the earliest spoken meaning at or beyond its English
 range, so all text before the active edge is included. Adjacent bands with the
-same owner merge, leaving one active soft edge. First-pass glimmer uses those
+same owner merge, leaving one active soft edge. Timing remains band-based;
+base covers and paper material paint each printed word from the same character
+edge. This prevents completed words from fading again when their wet material
+retires. First-pass glimmer uses those
 same bands and cannot jump ahead of the wash. Repeat tint and repeat glimmer
 retain the semantic owners over the prefix already laid. Range projection is
 cached with the paragraph; frames only read clocks and build paint layers.
@@ -1460,8 +1471,8 @@ it. That is right where a bloom covers a word with whitespace either side, as
 in the scrolling reader: the reach lands on the space and nothing shows. These
 bands touch, so the reach put paper over the same strip of prose twice, and an
 8 dp notch of half-erased text travelled along with the voice — the shimmer at
-the wash's edge. The leaf passes `coverPad = 0`; the bands tile the sentence
-exactly, so they have nothing to close over. Their edges are also kept out of
+the wash's edge. The leaf passes `coverPad = 0`; adjacent unread word covers
+merge across their intervening spaces without overlapping. Band edges are also kept out of
 the middle of a word (`englishBandEdge`), because two abutting covers meeting
 inside a letter is a hard cut down it — the alignment's own boundaries are word
 ends already, but a carried verse or one with its asides hidden is a shorter

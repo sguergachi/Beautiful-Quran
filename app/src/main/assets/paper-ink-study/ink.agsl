@@ -1,0 +1,135 @@
+uniform shader field;
+uniform shader normals;
+uniform float progress;
+uniform float reflectionStrength;
+uniform float lightSoftness;
+uniform float retained;
+uniform float wet;
+uniform float underProgress;
+uniform float underWet;
+uniform float weight;
+uniform float aa;
+uniform float3 repeatColor;
+uniform float repeatPass;
+uniform float repeatTint;
+uniform float spreadMethod;
+uniform float letterDuration;
+// Letters of fade-in ahead of the wet edge (0 disables it).
+uniform float lead;
+uniform float2 origin;
+
+half4 materialAt(float2 p, float base, float coverageAA, float phase, float wetness, float orange, float keep) {
+    float4 shape = field.eval(p * 4.0);
+    float distance = (shape.b * 255.0 - 128.0) / 16.0;
+    // One front sweeps along the baseline in reading order, never up a stroke.
+    float arrival = mix(shape.r, shape.g, spreadMethod);
+    float feather = max(0.006, letterDuration * mix(0.1, 0.12, spreadMethod));
+    float loaded = smoothstep(arrival - feather, arrival + feather, phase);
+    float3 surface = normals.eval(p).rgb;
+    float moisture = smoothstep(0.0, 0.7, wetness - (1.0 - surface.b) * 0.2);
+    float localWet = moisture * loaded;
+    // Newly joined pools are fuller; their film levels behind the soaking front.
+    // Pigment stays very dark until the existing word-level dry-down begins.
+    float depositAge = max(0.0, phase - arrival) / max(0.01, letterDuration);
+    float fresh = 1.0 - smoothstep(0.08, 0.65, depositAge);
+    float filmWet = localWet * mix(0.82, 1.0, fresh);
+    // Both passes gain weight while wet and return to the regular stroke as
+    // they dry. The orange chain holds color only; it cannot hold font weight.
+    float wetStrokeWeight = weight * filmWet;
+    float expanded = smoothstep(-coverageAA * 0.5, coverageAA * 0.5, distance + wetStrokeWeight);
+    float2 slope = (surface.rg * 255.0 - 128.0) / 127.0;
+    float volume = 0.6 + weight / 6.5;
+    // A rounded advancing meniscus follows the same smooth arrival field as the ink.
+    float rim = 4.0 * loaded * (1.0 - loaded) * wetness;
+    float2 frontSlope = float2(0.0);
+    if (rim > 0.0) {
+        float radius = max(1.5, aa * 1.5);
+        float2 sampleX = field.eval((p + float2(radius, 0.0)) * 4.0).rg;
+        float2 sampleY = field.eval((p + float2(0.0, radius)) * 4.0).rg;
+        frontSlope = (float2(mix(sampleX.r, sampleX.g, spreadMethod),
+            mix(sampleY.r, sampleY.g, spreadMethod)) - arrival) / radius;
+        // Steep fronts (an ink channel swelling across its width) keep a
+        // gentle bulge instead of a ridged highlight.
+        frontSlope /= max(1.0, length(frontSlope) * letterDuration * 40.0);
+    }
+    float3 normal = normalize(float3(slope * filmWet * volume + frontSlope * rim * 6.0,
+        sqrt(max(0.01, 1.0 - dot(slope, slope)))));
+    float3 view = normalize(float3(0.12, -0.16, 1.0));
+    float3 reflected = reflect(-view, normal);
+    float2 room = reflected.xy / max(0.2, reflected.z) + (p + origin) * 0.001;
+    float reflectionSoftness = mix(mix(0.1, 0.22, lightSoftness), 0.24, 1.0 - localWet);
+    float lightPass = mix(-0.12, 0.12, phase * 0.8 + (1.0 - wetness) * 0.2);
+    float pane = min(abs(room.x + 0.32 - lightPass), abs(room.x - 0.08 - lightPass));
+    float vertical = (room.y - 0.16) / 0.38;
+    float window = exp(-pane * pane / (reflectionSoftness * reflectionSoftness) -
+        vertical * vertical * vertical * vertical);
+    float pooling = smoothstep(0.25, 0.8, surface.b);
+    // Dry repeat pigment softens toward warm paper; fresh orange stays rich.
+    float3 dryRepeat = mix(repeatColor, float3(0.86, 0.82, 0.77), 0.3);
+    float3 wetRepeat = repeatColor;
+    float3 pigment = mix(float3(6.0, 7.0, 8.0) / 255.0,
+        mix(dryRepeat, wetRepeat, moisture), orange);
+    pigment *= 1.0 - pooling * 0.2 * volume * (1.0 - orange);
+    pigment = mix(pigment, float3(0.86, 0.86, 0.82), window * reflectionStrength * filmWet);
+    float3 dry = float3(52.0, 50.0, 46.0) / 255.0;
+    // Both passes deposit the same liquid layer through the same soft front.
+    // The repeat retains its dry underprint and holds orange after the film dries.
+    float3 ink = mix(dry, pigment, mix(moisture, 1.0, orange));
+    float3 paper = float3(250.0, 243.0, 232.0) / 255.0;
+    // The letter ahead of the wet edge fades in toward fresh ink, so the edge
+    // is feathered over about a letter before the liquid arrives. The repeat's
+    // text is already dry charcoal; tinting it toward orange there turns muddy.
+    // letterDuration = 2.8 / (letters + 1.8); arrival spans 1 - 0.24 * letterDuration.
+    float slot = (1.0 - 0.24 * letterDuration) / max(1.0, 2.8 / letterDuration - 1.8);
+    float approach = lead > 0.0 ? smoothstep(arrival - feather - lead * slot,
+        arrival + feather, phase) * 0.6 * (1.0 - orange) : 0.0;
+    float3 waiting = mix(dry, float3(6.0, 7.0, 8.0) / 255.0, approach);
+    float dryCoverage = base * mix(mix(0.2661, 1.0, keep), 1.0, approach) * (1.0 - loaded);
+    float liquidCoverage = expanded * loaded;
+    half4 deposit = half4(paper * (1.0 - dryCoverage - liquidCoverage) +
+        waiting * dryCoverage + ink * liquidCoverage, 1.0);
+    return deposit;
+}
+
+half4 inkAt(float2 p, float base, float coverageAA) {
+    half4 deposit = materialAt(p, base, coverageAA, progress, wet, repeatPass, retained);
+    if (repeatPass <= 0.0) return deposit;
+    float4 shape = field.eval(p * 4.0);
+    float arrival = mix(shape.r, shape.g, spreadMethod);
+    float feather = max(0.006, letterDuration * mix(0.1, 0.12, spreadMethod));
+    float loaded = smoothstep(arrival - feather, arrival + feather, progress);
+    half4 dryUnderprint = half4(mix(float3(250.0, 243.0, 232.0) / 255.0, float3(52.0, 50.0, 46.0) / 255.0, base), 1.0);
+    half4 underprint = underWet > 0.0
+        ? materialAt(p, base, coverageAA, underProgress, underWet, 0.0, 0.0)
+        : dryUnderprint;
+    // Replace only the repeat's waiting underprint. The old coat keeps its
+    // wet width, pigment and reflection until the new soft front reaches it.
+    deposit += (underprint - dryUnderprint) * (1.0 - loaded);
+    float distance = (shape.b * 255.0 - 128.0) / 16.0;
+    float interior = max(0.0, distance);
+    float film = interior / (interior + 3.0);
+    float edgeDelay = 0.5 * (1.0 - smoothstep(0.0, 0.8, film));
+    float repeatFilm = smoothstep(edgeDelay, edgeDelay + 0.5, repeatTint);
+    return mix(underprint, deposit, repeatFilm);
+}
+
+// Integrate the wet material over the pixel rather than taking one point.
+// The resting glyph coverage stays at the pixel centre in every tap: filtering
+// that captured coverage again would blur the printed letters and their handoff.
+half4 main(float2 p) {
+    float distance = (field.eval(p * 4.0).b * 255.0 - 128.0) / 16.0;
+    float base = smoothstep(-aa * 0.5, aa * 0.5, distance);
+    if (base == 0.0 && distance < -weight - max(aa, 1.0)) return half4(250.0 / 255.0, 243.0 / 255.0, 232.0 / 255.0, 1.0);
+    if (max(wet, underWet * repeatPass) <= 0.0) return inkAt(p, base, aa);
+    // Stratify across both axes so a thin alif reflection has eight samples.
+    float step = aa / (0.9 * 16.0);
+    float tapAA = aa * 0.35355339;
+    return (inkAt(p + float2(-7.0, -1.0) * step, base, tapAA) +
+            inkAt(p + float2(-5.0,  5.0) * step, base, tapAA) +
+            inkAt(p + float2(-3.0, -7.0) * step, base, tapAA) +
+            inkAt(p + float2(-1.0,  3.0) * step, base, tapAA) +
+            inkAt(p + float2( 1.0, -3.0) * step, base, tapAA) +
+            inkAt(p + float2( 3.0,  7.0) * step, base, tapAA) +
+            inkAt(p + float2( 5.0, -5.0) * step, base, tapAA) +
+            inkAt(p + float2( 7.0,  1.0) * step, base, tapAA)) * 0.125;
+}

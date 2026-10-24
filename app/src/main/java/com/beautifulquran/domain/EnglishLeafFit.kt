@@ -3,61 +3,15 @@ package com.beautifulquran.domain
 import kotlin.math.sqrt
 
 /**
- * Setting the English leaf: what size the book is written in, and how the
- * page fills its well.
+ * The English book's type size and page leading.
  *
- * The Arabic leaf and this one solve the same problem in opposite orders,
- * because the two scripts justify by opposite means. Arabic fills a *line*
- * by the letterform and keeps one leading for the whole book
- * (`QURAN_TYPOGRAPHY.md` §§4, 9). Latin fills a line by the word space —
- * which the renderer already does — and fills the *page* by leading, which
- * is the compositor's classical lever and the one thing here that varies.
+ * One hand is calibrated from the reference specimen for the selected face,
+ * measure and well. A page's text never enters that choice. The measured
+ * ruler paginates at the same size and carries long verses across leaves.
  *
- * So the English leaf is set under three rules:
- *
- * 1. **One hand for the whole book.** The type size depends on the leaf's
- *    geometry and nothing else — never on how much this page happens to
- *    carry. A page whose type grew or shrank against its neighbour reads as
- *    a fault. Same law as §2.
- * 2. **The measure sets the type.** A book line holds about fifty
- *    characters; that is what makes it readable, and it is the Latin
- *    counterpart of the mushaf's fixed 16.4 em measure. The hand is solved
- *    from the well and the measure together so both come out right at once.
- * 3. **One leading for the whole book, and the foot falls where it falls.**
- *    A book is set on one leading. It does not respace its lines because a
- *    page happens to be full, and a reader turning pages sees a change in line
- *    spacing at once — far sooner than they notice a page that ends early.
- * 4. **The leaf is not the page.** A Madinah page takes as many leaves as its
- *    English needs at a legible size — two or three for nearly all of the 604,
- *    about 1,250 leaves in all. That is what stops the heaviest page in the
- *    book from setting the type for every other one. See `EnglishBook.kt`.
- *
- * Rule 3 is the third answer this setting has given to the same question, and
- * the question is unavoidable: the page boundary comes from the Arabic leaf, so
- * the mass of a page is fixed at somewhere between 1,055 and 1,997 characters
- * and *something* has to absorb a range of nearly two to one. It can be the
- * type, the leading, or the foot; it cannot be nothing.
- *
- * It was the type first — a few percent off the heaviest leaves. That is the
- * one thing rule 1 forbids and the first thing a reader notices, so it went.
- *
- * Then it was the leading, opening and closing between 1.20 and 2.00 em to
- * bring each block down to the foot. Every leaf filled, and the price was that
- * a page set at 2.00 em turned into one set at 1.20: the same book in two
- * different hands' worth of air, which reads as a fault however full the page.
- *
- * So it is the foot, and then rule 4 took most of the range away from it: a
- * page too heavy for one leaf is now two leaves rather than one crushed one.
- * What is left for the foot to absorb is the remainder — 81% of the well at the
- * median, 58% at the tenth percentile, all but full at the ninetieth. That is
- * what a printed parallel translation looks like on its English side, and it is the
- * only one of the three that a reader reads as meaning something: a page that
- * ends early ends something.
- *
- * The hand is therefore cut for a full leaf at that one leading
- * ([englishLeafReferenceBlock]), and `MushafEnglishSheet` still measures each
- * leaf as it will be drawn — but only as a guarantee against clipping, never as
- * the thing that sets the page.
+ * Within a page, leading may close to absorb rounding or open a little to
+ * card a nearly-full leaf to its foot. A chapter ending stays short. Neither
+ * adjustment changes font size, and the lower bound keeps lines apart.
  */
 
 /**
@@ -72,22 +26,13 @@ import kotlin.math.sqrt
 const val ENGLISH_LEAF_LEADING_EM = 1.40f
 
 /**
- * Smallest / largest hand, in px, so an odd viewport cannot produce nonsense.
- *
- * Wide, deliberately: these are device pixels, and every real leaf lands far
- * inside them — a phone comes out around 15 dp of type, a tablet around 23.
- * A clamp that bit would be silently setting the book to something other than
- * its measure. Same shape as `MUSHAF_MIN_FONT_PX` / `MUSHAF_MAX_FONT_PX`.
- */
-/**
  * How tight the book will ever be set.
  *
  * The fitted leading closes a leaf that would run past the foot, and left
- * unbounded it will close as far as the arithmetic asks — which on the leaf
- * that carries 2:282 is far enough that the lines run into one another. A page
+ * unbounded it will close as far as the arithmetic asks. A page
  * whose ascenders touch the descenders above them is not a tight page, it is an
- * unreadable one. So the leading stops here, and [englishLeafOverflowHandPx]
- * takes up whatever is left.
+ * unreadable one. So the leading stops here. Pagination carries long verses
+ * across leaves at the book's fixed type size instead of shrinking a page.
  */
 const val ENGLISH_LEAF_MIN_LEADING_EM = 1.15f
 
@@ -110,6 +55,14 @@ const val ENGLISH_LEAF_MIN_LEADING_EM = 1.15f
  */
 const val ENGLISH_LEAF_MAX_LEADING_EM = 1.50f
 
+/**
+ * Smallest / largest hand, in px, so an odd viewport cannot produce nonsense.
+ *
+ * Wide, deliberately: these are device pixels, and every real leaf lands far
+ * inside them — a phone comes out around 15 dp of type, a tablet around 23.
+ * A clamp that bit would be silently setting the book to something other than
+ * its measure. Same shape as `MUSHAF_MIN_FONT_PX` / `MUSHAF_MAX_FONT_PX`.
+ */
 const val ENGLISH_LEAF_MIN_FONT_PX = 18f
 const val ENGLISH_LEAF_MAX_FONT_PX = 140f
 
@@ -243,37 +196,16 @@ fun englishLeafHandPx(
 }
 
 /**
- * The leading a leaf is actually drawn on: the book's, unless that would put
- * the block past the foot of the well.
+ * The page's leading at the book's fixed font size.
  *
- * It should almost never have to. The hand is cut for a full leaf with five
- * percent to spare ([englishLeafReferenceBlock]) and `englishPageParts` fills
- * leaves rather than evening them, so it cannot hand out one over that
- * capacity: every leaf fits by construction — every leaf but one. 2:282 is a
- * single sentence of 1,333 characters, half as long again as a leaf holds, and
- * no rule splits a sentence; that leaf is set tight, and this is what sets it.
+ * The measured ruler carries oversized verses across leaves. This fit absorbs
+ * residual layout rounding, closing overflows down to the minimum leading or
+ * carding a nearly-full page out to its foot. A chapter ending that would need
+ * more than the maximum keeps its ordinary leading and ends short.
  *
- * It is also the guarantee behind the estimate. The hand is solved from
- * *characters*, not from a layout, and a character count can be wrong on some
- * page nobody looked at — being wrong there would mean revelation clipped off
- * the bottom of it. So the leaf is measured as it will be drawn, and if it
- * still stands past the foot the leading closes by exactly the overflow.
- *
- * **And it opens, for the same reason.** It used to only close, on the argument
- * that a page a hair tighter than its neighbours is a page nobody notices. True
- * — and the page a *line and a half short* of its foot is one every reader
- * notices, which is the one this book kept producing. The estimate cannot be
- * made exact: the margin has to cover the worst leaf or that leaf overflows, so
- * the typical leaf is short by the spread between worst and typical. The lever
- * that closes an over-full leaf is the same lever, and a compositor setting a
- * page short cards it out until the block sits flush.
- *
- * So the leading is solved to the well in both directions, between
- * [ENGLISH_LEAF_MIN_LEADING_EM] and [ENGLISH_LEAF_MAX_LEADING_EM] — and a leaf
- * that would need *more* than the maximum is not a nearly-full page wanting
- * carding, it is a chapter ending, which is supposed to stop short. Those keep
- * the book's own leading rather than being stretched halfway to the foot, which
- * would read as a mistake instead of as an ending.
+ * The renderer remeasures a fitted page to account for integer paragraph
+ * heights beside fractional chapter furniture, then uses this same correction
+ * for any remaining overrun. Font size never participates in that correction.
  */
 fun englishLeafFittedLeadingEm(
     leadingEm: Float,
@@ -294,25 +226,19 @@ fun englishLeafFittedLeadingEm(
 }
 
 /**
- * The hand a leaf falls back to when even [ENGLISH_LEAF_MIN_LEADING_EM] will
- * not bring it inside the well.
- *
- * One leaf in the Qur'an needs this and it will always be the same one: 2:282
- * is a single sentence of 1,333 characters, half as long again as a leaf holds,
- * and no pagination splits a sentence. Rule 1 says one hand for the whole book
- * and this breaks it — knowingly, because the alternatives on that one leaf are
- * lines that overlap or revelation clipped off the foot, and a page set a few
- * percent small is the only one of the three a reader can still read.
- *
- * [standsPx] is what the block measures at the floored leading; height goes as
- * the square of the hand, so one step lands it and the caller re-measures.
+ * Closes a measured overrun by at least one pixel of baseline pitch.
+ * Android rounds that pitch per line; a fractional correction can move only
+ * chapter furniture while leaving the prose height unchanged. Type size stays
+ * fixed and the minimum leading still prevents overlapping lines.
  */
-fun englishLeafOverflowHandPx(
-    handPx: Float,
-    standsPx: Float,
+fun englishLeafClosingLeadingEm(
+    leadingEm: Float,
+    measuredHeightPx: Float,
     wellHeightPx: Float,
+    pitchesPx: Float,
+    handPx: Float,
 ): Float {
-    if (standsPx <= wellHeightPx || standsPx <= 0f || wellHeightPx <= 0f) return handPx
-    return (handPx * sqrt(wellHeightPx / standsPx))
-        .coerceIn(ENGLISH_LEAF_MIN_FONT_PX, ENGLISH_LEAF_MAX_FONT_PX)
+    if (measuredHeightPx <= wellHeightPx || pitchesPx <= 0f || handPx <= 0f) return leadingEm
+    val fitted = englishLeafFittedLeadingEm(leadingEm, measuredHeightPx, wellHeightPx, pitchesPx)
+    return minOf(fitted, leadingEm - 1f / handPx).coerceAtLeast(ENGLISH_LEAF_MIN_LEADING_EM)
 }

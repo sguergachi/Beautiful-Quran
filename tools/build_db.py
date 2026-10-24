@@ -989,6 +989,48 @@ def false_same_position_leads(current, repaired, reference):
     return leads
 
 
+def fragment_same_position_leads(source, cleaned, reference, clock_offset):
+    """Find stolen tails hidden by the cleaner's necessary fragment merge.
+
+    A short real word can follow a long false label on the previous word's
+    held vowel. The fragment cleaner correctly removes the duplicate, but its
+    merged start still belongs to that previous word. On a witnessed file
+    clock, retain the second source onset only when quran-align corroborates
+    it and still assigns the lead to the preceding canonical word. Missing
+    evidence, pauses, real repeats and non-exact merges remain unchanged.
+    """
+    if clock_offset is None or not reference or not source:
+        return []
+    starts = {pos: start for pos, start, _ in reference}
+    ends = {pos: end for pos, _, end in reference}
+    leads = []
+    for i in range(1, len(source) - 1):
+        previous, lead, real = source[i - 1:i + 2]
+        position, start, end = lead
+        if (previous[0] != position - 1 or real[0] != position or
+                not 0 <= start - previous[2] <= QDC_SPLIT_MERGE_GAP_MS or
+                not 0 <= real[1] - end <= QDC_SPLIT_MERGE_GAP_MS or
+                not is_split_fragment(end - start, real[2] - real[1])):
+            continue
+        lead_start, real_start = start + clock_offset, real[1] + clock_offset
+        onset = starts.get(position)
+        if (onset is None or ends.get(position - 1, -1) < lead_start or
+                onset - lead_start < PEER_ONSET_CORROBORATION_MS or
+                abs(onset - real_start) > MAX_CLOCK_DISAGREEMENT_MS):
+            continue
+        matches = [index for index, seg in enumerate(cleaned) if seg[0] == position]
+        if len(matches) != 1:
+            continue
+        index = matches[0]
+        if (index == 0 or
+                cleaned[index] != [position, lead_start, real[2] + clock_offset] or
+                cleaned[index - 1][0] != position - 1 or
+                cleaned[index - 1][2] != lead_start):
+            continue
+        leads.append((position, lead_start, real_start))
+    return leads
+
+
 def hand_lead_to_previous_word(segs, leads):
     """Return the false lead's interval to the word still sounding through it.
 
@@ -3480,6 +3522,7 @@ def main(argv=None):
                     "rewind_onsets": 0, "clock_rebased": 0,
                     "clock_abstained": 0, "quran_align_fallback": 0,
                     "repeat_tail_clamped": 0,
+                    "fragment_leads": 0,
                 }
 
                 def adjust_qdc(key, n):
@@ -3508,7 +3551,11 @@ def main(argv=None):
                         if offset:
                             stats["clock_rebased"] += 1
                             timing_clock_offsets[row_key] = offset
-                        return rebased
+                        leads = fragment_same_position_leads(
+                            data.get(key), rebased, reference, offset,
+                        )
+                        stats["fragment_leads"] += len(leads)
+                        return hand_lead_to_previous_word(rebased, leads)
                     if cleaned and reference:
                         stats["clock_abstained"] += 1
                     if reference and not fits_audio(cleaned, duration):
@@ -3552,6 +3599,7 @@ def main(argv=None):
                     f"zero-len {stats['zero_len']}, missing {stats['missing']}, "
                     f"opening-shift {stats.get('opening_shift', 0)}, "
                     f"split-words merged {stats['merged_splits']}, "
+                    f"fragment leads returned {stats['fragment_leads']}, "
                     f"stray mislabels dropped {stats['dropped_strays']}, "
                     f"noncontiguous orphans {stats['noncontiguous_orphans']}, "
                     f"gap phantoms {stats.get('gap_phantoms', 0)}, "

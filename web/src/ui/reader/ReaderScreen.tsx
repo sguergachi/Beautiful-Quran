@@ -62,7 +62,7 @@ import { ReaderFocusController } from './focus/ReaderFocusController'
 import { selectedPlaybackAyah } from './selectedPlaybackAyah'
 import { shouldPauseFollowOnDrag } from './followGesture'
 import { isRecitingSession } from './recitingActive'
-import { STREAM_WAIT_RELEASE_HOLD_MS, readerAyahInkPolicyActive, readerInkAyah } from './ReaderHighlightState'
+import { STREAM_WAIT_RELEASE_HOLD_MS, readerAyahInkPolicyActive, readerInkAyah, streamWaitEngages } from './ReaderHighlightState'
 import {
   AYAH_SPACER_EST_PX,
   useProgressiveAyahWindow,
@@ -340,15 +340,22 @@ export function ReaderScreen({
     isBuffering: state.player.isBuffering,
   })
   const receded = recitingActive
+  const recessingAyahs = recitingActive || state.wordTapAwaitingVoice
   // Waiting on the stream download: while the spinner holds, the whole page
   // — the recited tail and the opening basmalah included — waits under
   // Upcoming paper (same rule as Android). The wait is the buffering itself,
   // with no spoken-word gate: the moment it begins the page fades as one
   // synchronized action; see STREAM_WAIT_RELEASE_HOLD_MS for the wake hold.
+  // A word tap is not that wait: until its sought word is heard the page
+  // keeps the ordinary recitation look.
   const [streamWait, setStreamWait] = useState(false)
   useEffect(() => {
-    if (state.player.isBuffering) {
+    if (streamWaitEngages(state.player.isBuffering, state.wordTapAwaitingVoice)) {
       setStreamWait(true)
+      return
+    }
+    if (state.wordTapAwaitingVoice) {
+      setStreamWait(false)
       return
     }
     const settle = window.setTimeout(
@@ -356,7 +363,7 @@ export function ReaderScreen({
       STREAM_WAIT_RELEASE_HOLD_MS,
     )
     return () => window.clearTimeout(settle)
-  }, [state.player.isBuffering])
+  }, [state.player.isBuffering, state.wordTapAwaitingVoice])
   // This sheet is keyed by chapter, so the ref starts false at every opening.
   const recitedSinceOpen = useRef(false)
 
@@ -1187,10 +1194,10 @@ export function ReaderScreen({
   // stays with the actual word/media owner until the audio item hands off.
   // Fade-lead still prepares the *next* verse (Upcoming + recess lift) so the
   // first word's wash is not buried under the veil at handoff.
-  const inkAyah = recitingActive
+  const inkAyah = recessingAyahs
     ? readerInkAyah(state.activeWord, state.player.nowPlaying?.ayah)
     : null
-  const leadAyah = recitingActive ? state.activeAyah : null
+  const leadAyah = recessingAyahs && !state.wordTapAwaitingVoice ? state.activeAyah : null
   const mushafInkActiveWord =
     inkAyah != null && state.activeWord?.ayah === inkAyah ? state.activeWord : null
   // Whether the voiced verse has had a word yet: after that, no active word
@@ -1198,7 +1205,7 @@ export function ReaderScreen({
   inkReadRef.current = mushafReadHistory(
     inkReadRef.current, inkAyah, state.inkActivation, mushafInkActiveWord != null,
   )
-  const mushafInk: MushafInk = recitingActive
+  const mushafInk: MushafInk = recessingAyahs
     ? {
         reciting: true,
         inkAyah,
@@ -1408,7 +1415,7 @@ export function ReaderScreen({
             <div
               className="scroll"
               ref={scrollRef}
-              data-reciting={recitingActive || undefined}
+              data-reciting={recessingAyahs || undefined}
               data-stream-wait={streamWait || undefined}
               data-search-flash={flashTarget != null || undefined}
               data-search-focus-active={flashTarget?.focusActive || undefined}
@@ -1495,6 +1502,7 @@ export function ReaderScreen({
                   ayah.number,
                   inkAyah,
                   leadAyah,
+                  state.wordTapAwaitingVoice,
                 )
                 const aw =
                   inkOwner && state.activeWord?.ayah === ayah.number

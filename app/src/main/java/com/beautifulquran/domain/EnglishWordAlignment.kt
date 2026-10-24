@@ -681,6 +681,7 @@ object EnglishWordAlignment {
         "slay" to "kill", "slays" to "kill", "slain" to "kill", "thankful" to "grateful",
         "flog" to "lash",
         "commerce" to "trade",
+        "glorify" to "exalt", "glorifi" to "exalt", "glorification" to "exalt",
         "bosom" to "chest",
         "tell" to "say", "apparent" to "appear",
         "poor" to "needy", "needy" to "needy",

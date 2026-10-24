@@ -420,6 +420,7 @@ this document combined: `ReaderComponents.kt` (~36k tokens),
 | `docs/PERFORMANCE.md` | Anything touching the reader, scrolling, or the highlight loop |
 | `docs/REPEAT_HIGHLIGHTING.md` | Repeat-aware timings and the orange second fade |
 | `docs/GLIMMER.md` | Nightfall glimmer lifecycle, repeat retriggering, halo rendering, tuning, and visual checks |
+| `docs/PAPER_INK.md` | Paper theme's wet-ink pipeline: one generator + shader every reader surface draws through, its fallbacks and tuning |
 | `docs/ANNOTATIONS.md` | Verse annotations (ḥawāshī) — reader's notes now, scholars' glosses later |
 | `docs/ROOT_VIEWER.md` | Hold-to-reveal root lexicon — concordance counts, ayah jumps, QAC data |
 | `docs/SEARCH.md` | Home search ranking, exact quotes, QAC roots, QSAC concepts, asset rebuild |
