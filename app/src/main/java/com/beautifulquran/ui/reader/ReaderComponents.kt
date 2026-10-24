@@ -3033,8 +3033,12 @@ fun AyahBlock(
     val motions = rememberInkMotions(
         words = ayah.words,
         inks = inks,
-        activeSweepMs = sweepMs,
-        activeRepeatDwellMs = repeatDwellMs,
+        activeSweepMs = if (readingMode == ReadingMode.ENGLISH_ONLY) {
+            englishRevealDurationMs(sweepMs, InkEngine.minSweepFloorMs())
+        } else sweepMs,
+        activeRepeatDwellMs = if (readingMode == ReadingMode.ENGLISH_ONLY) {
+            englishRevealDurationMs(repeatDwellMs, InkEngine.minSweepFloorMs())
+        } else repeatDwellMs,
         // English has no Arabic letter-pacing paint, but shares every other
         // lifecycle rule and the same low-level shaped bloom primitive.
         pacing = pacing.takeUnless { readingMode == ReadingMode.ENGLISH_ONLY },

@@ -663,12 +663,16 @@ shared `HighlightTimeline` through that window. The replaced speech-time
   remains laid; orange waits for the base edge. Repeats never form a queue.
 - English predecessor gating preserves a continuous prefix while each window
   stays anchored to speech, so short words cannot accumulate queued delay.
-  English Scroll retains the same eased hold-duration windows as `master`,
-  including the first-pass minimum and maximum sweep durations. Paper ink
-  consumes that existing progress; its one-letter lead stays inside each
-  printed word and adds no independent timing. Repeat windows retain their
-  measured dwell. No English-only linear or spoken-span timing override is
-  applied.
+  English Scroll starts from the eased hold-duration window, including the
+  first-pass minimum and maximum, then finishes its reveal up to **100 wall
+  milliseconds earlier**. The original onset stays fixed, leaving completed
+  ink still before the next timed word begins. The soft-edge minimum limits
+  the saving on short words. Repeats use the same reduction when affordable;
+  a repeat already shorter than that minimum keeps its measured dwell.
+  `EnglishRevealTiming` applies the policy before the shared window converts
+  speed once. Android and web use the same policy. Paper ink consumes that
+  progress; its one-letter lead stays inside each printed word. English leaf
+  semantic windows and Arabic pacing retain their existing policies.
 - Completed residuals stop observing frame updates at the next word boundary.
   Repeat completion is observed as a structurally compared Boolean; frame
   progress itself is read in drawing, avoiding frame-driven composition.

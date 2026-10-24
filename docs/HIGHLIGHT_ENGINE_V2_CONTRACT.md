@@ -29,6 +29,12 @@ dwell, have independent windows, and cannot wait behind a repeat queue.
 Prose can gate on its predecessor without shifting its own window into the
 future. Cosmetic recess/glimmer/tint dissolution still use their existing fades.
 
+English Scroll shortens the eased visual reveal by up to 100 wall milliseconds,
+preserving the soft-edge floor and the next word's actual start. The completed
+edge holds for that extra interval; the audio/highlight clock is not advanced.
+Short repeat occurrences are never stretched to meet the floor. This policy
+is applied before the entry duration's single speed conversion.
+
 `EnglishWashClock` is metadata projected through that same frame. It owns no
 second interpolation anchor and cannot ignore ordinary clock corrections.
 English band windows, meaning owners, continuous prefixes, carried fragments,
