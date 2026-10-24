@@ -1719,6 +1719,9 @@ own rails, so numbers and names stay aligned with the chapters below. The flag t
 A pinned chapter **moves** into the band: it is left out of the list below,
 so no chapter shows twice on one sheet, and unpinning returns it to its
 place.
+Both sections capture one `HomeUiState` value for each composition. The lazy
+content must not reread the live state while using a previously filtered
+list: a pin would then put the same chapter key in both sections and crash.
 
 Tried and rejected, in order: a twisted cord in the trailing gutter (ugly);
 an ink nuqta under a closing hairline; one inset rounded rectangle joining

@@ -249,7 +249,9 @@ fun HomeScreen(
     pinnedPlaybackHeight: () -> Dp = { 0.dp },
     playbackHost: com.beautifulquran.ui.reader.PinnedPlaybackHost? = null,
 ) {
-    val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    // Lazy content runs later: its pinned rows and the filtered list must
+    // capture the same state, or a pin can emit the same chapter key twice.
+    val uiState = viewModel.uiState.collectAsStateWithLifecycle().value
     val focusManager = LocalFocusManager.current
     val floatingPlayback = uiState.floatingPlayback
     // ContentPadding matches each fade so the first and last ink sit clear of
