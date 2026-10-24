@@ -832,8 +832,12 @@ and mushaf secondary controls to 5 %. Enabled repeat (one verse, chapter, or
 range) and speed other than 1× stay fully lit and tappable alongside
 play/pause and rewind/forward. Pause, and the chrome breathes back. Non-active
 Scroll verses, their secondary text and verse marks recess to upcoming ink
-over the same 520 ms and easing as the controls. Mushaf keeps earlier verses
-inked on the current page as the wash advances, in both Arabic and English.
+over the same 520 ms and easing as the controls: any verse showing full ink —
+the page at rest when play begins, or the verse giving up the lyric line —
+eases back under its paper cover on that clock, while a verse that has only ever
+waited, or mounts during playback, keeps the Upcoming floor from its first frame.
+Mushaf keeps earlier verses inked on the current page as the wash advances, in
+both Arabic and English.
 
 In Mushaf, the reciter name and its chevron share the secondary controls'
 fade to 5 % while playing and return on pause. The name cannot be tapped
