@@ -1,5 +1,6 @@
 package com.beautifulquran.ui.reader
 
+import androidx.compose.ui.graphics.Color
 import com.beautifulquran.ui.theme.ShapedWordBloom
 
 /** The shader doubles this dial value: English leads by exactly one letter slot. */
@@ -68,3 +69,40 @@ internal fun englishPaperInkBlooms(
 }
 
 private val ENGLISH_INK_WORD = Regex("\\S+")
+
+/** The fallback and liquid field share one printed word's progress, never a phrase-wide mask. */
+internal fun englishWordWashCover(
+    range: IntRange,
+    progress: Float,
+    paper: Color,
+    restingAlpha: Float,
+    waitingCover: Float,
+    recitedCover: Float,
+): ShapedWordBloom? = when {
+    progress <= 0f -> ShapedWordBloom.UpcomingDim(range, paper, waitingCover)
+    progress < 1f -> ShapedWordBloom.InkReveal(range, progress, paper, restingAlpha)
+    recitedCover > 0f -> ShapedWordBloom.UpcomingDim(range, paper, recitedCover)
+    else -> null
+}
+
+/** A shared Arabic owner's wetness cannot activate English words ahead of the wash. */
+internal fun englishPaperInkWordVisible(progress: Float, wet: Float, departing: Boolean): Boolean =
+    progress >= 0f && (progress < 1f || wet > 0f || departing)
+
+/** Only the prefix present on entry rises through seek recess; newly washed ink stays laid. */
+internal class EnglishWashEntry {
+    private var activation: Long? = null
+    private var reciterId: Int? = null
+    private var entryEdge = 0f
+
+    fun onFrame(activation: Long, reciterId: Int?, washEdge: Float) {
+        if (activation != this.activation || reciterId != this.reciterId) {
+            this.activation = activation
+            this.reciterId = reciterId
+            entryEdge = washEdge
+        }
+    }
+
+    fun recitedCover(range: IntRange, cover: Float): Float =
+        if (range.last + 1 <= entryEdge) cover else 0f
+}

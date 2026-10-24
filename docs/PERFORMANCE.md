@@ -56,6 +56,9 @@ English ownership is solved lazily per verse and cached for the selected text
 source. Semantic ranges and continuous forward wash bands are projected once
 when the paragraph is built. Frames read the existing Arabic motions; adjacent
 paper covers with equal alpha merge, and one band carries the active soft edge.
+Printed word ranges are cached with the paragraph. Both the base cover and
+paper material use the same per-word projection of that edge; only one next
+unread word per verse requests material prewarming.
 First-pass glimmer shares that band; repeats keep the semantic ranges. Geometry
 stays cached by layout and range, and only repeat/glint layers request shaped
 paths.

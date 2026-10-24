@@ -1454,6 +1454,10 @@ private fun EnglishProseBlock(
     // English words have their own positions within an Arabic owner's band.
     // Capture those positions rather than replaying the Arabic letter mask.
     val paperDeposits = remember(block) { HashMap<Int, PaperInkDeposit>() }
+    val printedWords = remember(block.text, block.verses) {
+        englishPaperInkWordRanges(block.text, block.verses.map { it.range })
+    }
+    val washEntries = remember(block) { HashMap<Pair<Int, Int>, EnglishWashEntry>() }
     Text(
         text = set,
         style = style,
@@ -1486,6 +1490,8 @@ private fun EnglishProseBlock(
                                 clock = clock.value,
                                 windows = washWindows[verse.surahId to verse.ayah].orEmpty(),
                                 paperDeposits = paperDeposits,
+                                printedWords = printedWords[verse.range].orEmpty(),
+                                washEntry = washEntries.getOrPut(verse.surahId to verse.ayah) { EnglishWashEntry() },
                             )
                         }
                     }
@@ -1572,6 +1578,8 @@ private fun englishVerseBlooms(
     clock: EnglishWashClock?,
     windows: Map<Int, EnglishWashWindow>,
     paperDeposits: MutableMap<Int, PaperInkDeposit>,
+    printedWords: List<IntRange>,
+    washEntry: EnglishWashEntry,
 ): List<ShapedWordBloom> {
     if (pack == null) return emptyList()
     val paper = palette.paperColor
@@ -1615,44 +1623,32 @@ private fun englishVerseBlooms(
             val motion = motions.getOrNull(span.position - 1) ?: continue
             val progress = progress(span, motion)
             if (progress > 0f) washEdge = span.range.first + (span.range.last + 1 - span.range.first) * progress
-            if (palette.paperInk != null && motion.paperDeparture?.active == true) {
-                // The missing-field fallback releases each word's old mask,
-                // just as the liquid renderer does, without moving the edge.
-                var i = span.range.first
-                while (i <= span.range.last) {
-                    if (text[i].isWhitespace()) { i++; continue }
-                    var j = i + 1
-                    while (j <= span.range.last && !text[j].isWhitespace()) j++
-                    blooms += ShapedWordBloom.InkReveal(
-                        range = i until j,
-                        progress = paperDeposits[i]?.progress ?: 0f,
-                        paper = paper,
-                        restingAlpha = resting,
-                        revealedAlpha = motion.paperDepartureAlpha,
-                    )
-                    i = j
-                }
-                continue
-            }
-            if (progress > 0f && progress < 1f) {
-                blooms += ShapedWordBloom.InkReveal(
-                    range = span.range,
-                    progress = progress,
+        }
+        performing?.let { washEntry.onFrame(it.playbackActivation, it.reciterId, washEdge) }
+        // The material uses character progress within printed words. A phrase-
+        // wide pixel mask is a different edge and can re-cover a completed word
+        // when its wet material stops drawing. Keep the fallback on the same edge.
+        for (range in printedWords) {
+            val motion = washSpans.firstOrNull { range.first in it.range }
+                ?.let { motions.getOrNull(it.position - 1) }
+            val bloom = if (palette.paperInk != null && motion?.paperDeparture?.active == true) {
+                ShapedWordBloom.InkReveal(
+                    range = range,
+                    progress = (paperDeposits[range.first]?.progress ?: 0f).coerceAtLeast(0f),
                     paper = paper,
                     restingAlpha = resting,
-                    feather = null,
+                    revealedAlpha = motion.paperDepartureAlpha,
                 )
-            } else {
-                // Arabic high-water state retains the continuous prefix
-                // already reached, including words advanced by reordering.
-                val alpha = if (progress == 0f) waiting else cover
-                if (alpha <= 0f) continue
-                val previous = blooms.lastOrNull() as? ShapedWordBloom.UpcomingDim
-                if (previous != null && previous.coverAlpha == alpha &&
-                    previous.range.last + 1 == span.range.first) {
-                    blooms[blooms.lastIndex] = cover(previous.range.first..span.range.last, paper, alpha)
-                } else blooms += cover(span.range, paper, alpha)
-            }
+            } else englishWordWashCover(
+                range, englishPaperInkWordProgress(washEdge, range.first, range.last + 1),
+                paper, resting, waiting,
+                if (performing != null) washEntry.recitedCover(range, cover) else cover,
+            )
+            val previous = blooms.lastOrNull() as? ShapedWordBloom.UpcomingDim
+            if (bloom is ShapedWordBloom.UpcomingDim && previous != null &&
+                previous.coverAlpha == bloom.coverAlpha && previous.range.last < range.first) {
+                blooms[blooms.lastIndex] = previous.copy(range = previous.range.first..range.last)
+            } else if (bloom != null) blooms += bloom
         }
     }
     // The mark's cover is paper, so it goes down before any ink — left after
@@ -1662,7 +1658,7 @@ private fun englishVerseBlooms(
         blooms += cover(verse.markRange, paper, markCover)
     }
     if (motions.isNotEmpty() && palette.paperInk != null) {
-        blooms.addEnglishPaperInk(verse, washSpans, motions, palette.paperInk, text, washEdge, paperDeposits)
+        blooms.addEnglishPaperInk(printedWords, washSpans, motions, palette.paperInk, washEdge, paperDeposits)
     }
     if (motions.isNotEmpty()) {
         blooms.addEnglishInkLayerBlooms(washSpans, motions, palette, glintInk, repeatLayers = false, washEdge)
@@ -1685,36 +1681,30 @@ private fun englishVerseBlooms(
  * word whose field is not ready simply keeps the leaf's wash.
  */
 private fun MutableList<ShapedWordBloom>.addEnglishPaperInk(
-    verse: EnglishProseVerse,
+    printedWords: List<IntRange>,
     washSpans: List<EnglishInkSpan>,
     motions: List<InkMotion>,
     style: PaperInkStyle,
-    text: CharSequence,
     washEdge: Float,
     deposits: MutableMap<Int, PaperInkDeposit>,
 ) {
     // Observe settled owners too, so a rewind has a dry deposit to release.
     motions.forEach { it.paperInkLive }
-    val end = (verse.range.last + 1).coerceAtMost(text.length)
-    var i = verse.range.first.coerceAtLeast(0)
-    while (i < end) {
-        if (text[i].isWhitespace()) {
-            i++
-            continue
-        }
-        var j = i
-        while (j < end && !text[j].isWhitespace()) j++
+    var warmedNext = false
+    for (range in printedWords) {
+        val i = range.first
+        val j = range.last + 1
         val owner = washSpans.firstOrNull { i in it.range }?.let { motions.getOrNull(it.position - 1) }
         val raw = englishPaperInkWordProgress(washEdge, i, j)
         val evaporating = owner?.paperDeparture?.active == true
         val current = PaperInkDeposit(raw, owner?.paperWetness ?: 0f, 0f, 0f, 0f)
         val deposit = if (evaporating) deposits[i] ?: current else current.also { deposits[i] = it }
         val wet = deposit.wet
-        if ((raw > -1f && raw < 1f && owner != null) || wet > 0f || evaporating) {
+        if (englishPaperInkWordVisible(deposit.progress, wet, evaporating) && owner != null) {
             val frame = (owner ?: motions.first()).paperInkFrame(style)
             add(
                 ShapedWordBloom.PaperInk(
-                    range = i until j,
+                    range = range,
                     frame = PaperInk.Frame(
                         progress = deposit.progress,
                         wet = wet,
@@ -1737,8 +1727,10 @@ private fun MutableList<ShapedWordBloom>.addEnglishPaperInk(
                     fallback = emptyList(),
                 ),
             )
+        } else if (raw < 0f && !warmedNext) {
+            add(ShapedWordBloom.PaperInkWarm(range))
+            warmedNext = true
         }
-        i = j
     }
 }
 

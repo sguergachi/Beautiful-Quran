@@ -1452,7 +1452,10 @@ same reason: the shape was wrong, not the size.
 The base wash bands follow English order, driven by the calibrated media clock.
 Each band's owner is the earliest spoken meaning at or beyond its English
 range, so all text before the active edge is included. Adjacent bands with the
-same owner merge, leaving one active soft edge. First-pass glimmer uses those
+same owner merge, leaving one active soft edge. Timing remains band-based;
+base covers and paper material paint each printed word from the same character
+edge. This prevents completed words from fading again when their wet material
+retires. First-pass glimmer uses those
 same bands and cannot jump ahead of the wash. Repeat tint and repeat glimmer
 retain the semantic owners over the prefix already laid. Range projection is
 cached with the paragraph; frames only read clocks and build paint layers.
@@ -1468,8 +1471,8 @@ it. That is right where a bloom covers a word with whitespace either side, as
 in the scrolling reader: the reach lands on the space and nothing shows. These
 bands touch, so the reach put paper over the same strip of prose twice, and an
 8 dp notch of half-erased text travelled along with the voice — the shimmer at
-the wash's edge. The leaf passes `coverPad = 0`; the bands tile the sentence
-exactly, so they have nothing to close over. Their edges are also kept out of
+the wash's edge. The leaf passes `coverPad = 0`; adjacent unread word covers
+merge across their intervening spaces without overlapping. Band edges are also kept out of
 the middle of a word (`englishBandEdge`), because two abutting covers meeting
 inside a letter is a hard cut down it — the alignment's own boundaries are word
 ends already, but a carried verse or one with its asides hidden is a shorter

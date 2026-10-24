@@ -1,5 +1,9 @@
 # English alignment and reader ink coverage
 
+The [October 24 English Mushaf follow-up](quality-reviews/ENGLISH_MUSHAF_SYNC_2026-10-24.md)
+records the glorify/exalt mapping correction, its 48-verse candidate inventory,
+and separate rendered-flash checks. It does not extend semantic certification.
+
 The October 12–13 audit separates exact meaning ownership, continuous ink, and
 rendered playback. Neither the requested 99.9% confidence nor the earlier
 99.99% semantic accuracy is established. A passing timing lookup or an early prefix does not prove

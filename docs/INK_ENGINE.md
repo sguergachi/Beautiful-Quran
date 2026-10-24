@@ -703,6 +703,11 @@ The painted edge uses `EnglishLeafVerse.fragmentWashProgress`, interpolating
 between cached letter anchors. The exact integer mapping still places owned
 ranges and taps. Applying that integer mapping on each animation frame made
 the edge wait for a whole letter and then jump, despite a continuous clock.
+The base covers and paper material both project that edge into individual
+printed words. Completed words keep their ink when the material dries; a
+shared Arabic owner cannot wet English words still ahead of the edge. The
+prefix present when a playback generation enters still rises through seek
+recess. Words washed after entry remain laid even during that rise.
 The active word's onset closes preceding ink before its repeat tint begins. In 24:2, “their punishment” starts on word 23 but
 keeps washing through the reordered Arabic “a group of the believers,” words
 24–26. It finishes at 36.25 s rather than 28.49 s for Alafasy. Pauses freeze

@@ -84,6 +84,12 @@ The basmalah sites (drawable and QCF glyph) keep their wash for now.
   and missing-field fallback keep the same unread strength. Partial residuals
   and rewind evaporation retain their own soft reveals. Outgoing verse handoff
   can soften laid ink; untouched words keep their faint floor throughout it.
+  On the English leaf, the base cover and liquid field share each printed
+  word's character progress. A phrase-wide pixel cover cannot replace that
+  word when its wet field retires. Shared-owner wetness never activates words
+  ahead of the edge; one next word is warmed without drawing it. Seek recess
+  applies to the prefix present on entry, so newly washed words do not flash
+  back under the verse cover while it is still lifting.
   Replacing printed ink clears its captured pixel support completely before
   drawing the shader. A fractional erase mask would leave old antialiased ink
   beneath the new glyph and darken its edges. The visible glyph keeps its

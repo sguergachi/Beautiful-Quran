@@ -18,6 +18,23 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class EnglishWashClockTest {
+    @Test
+    fun `Taghabun starts with Hani's first spoken word while semantic taps retain their owners`() {
+        val (_, text, glosses, _, lemmas) = javaClass.getResourceAsStream("/english-glorification-owners.tsv")!!
+            .bufferedReader().use { it.readLines().first { row -> row.startsWith("64:1\t") } }.split('\t')
+        val alignment = EnglishWordAlignment.align(text, glosses.split('|'), lemmas.split('|'))!!
+        val timings = listOf(Segment(1, 1020, 2140), Segment(2, 2140, 3150), Segment(3, 3150, 3450))
+        val window = englishWashWindows(alignment.washSpans.map { it.position }, timings).getValue(1)
+        assertEquals(EnglishWashWindow(1020, 2140), window)
+        assertEquals(0f, window.progress(1019, 1020), 0f)
+        assertEquals(.5f, window.progress(1580, 1020), 0f)
+        assertEquals(1f, window.progress(2140, 1020), 0f)
+        assertEquals(1, alignment.washSpans.first().position)
+        assertTrue(englishWashThrough(alignment, mapOf(1 to window), 1580, 1020)!! > 0f)
+        val heavens = (text.indexOf("heavens") + 3f) / text.length
+        assertEquals(5, alignment.positionAt(heavens))
+    }
+
     private val tail = listOf(
         Segment(22, 25530, 26800), Segment(23, 26800, 28490),
         Segment(24, 28490, 32560), Segment(25, 32560, 32930), Segment(26, 32930, 36250),
