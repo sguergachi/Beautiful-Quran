@@ -85,6 +85,25 @@ class InkLabStoreTest {
     }
 
     @Test
+    fun oldSaves_matchChromeFadesWithoutResettingCustomTuning() {
+        val saved = InkLabSnapshot(schema = 5, inkFadeMs = 400,
+            ayahMarkFadeMs = 400, recessMs = 400, repeatFadeOutMs = 2_400,
+            scrollLeadMs = 444, paperInkPooling = .4f)
+        val migrated = InkLabSnapshot.decode(InkLabSnapshot.encode(saved))!!
+        assertEquals(saved.copy(schema = InkLabSnapshot.SCHEMA,
+            inkFadeMs = InkEngine.CHROME_RECEDE_MS,
+            ayahMarkFadeMs = InkEngine.CHROME_RECEDE_MS,
+            recessMs = InkEngine.CHROME_RECEDE_MS), migrated)
+
+        val custom = saved.copy(inkFadeMs = 640, ayahMarkFadeMs = 700, recessMs = 800)
+        assertEquals(custom.copy(schema = InkLabSnapshot.SCHEMA),
+            InkLabSnapshot.decode(InkLabSnapshot.encode(custom)))
+        // A new audition at the old duration must still survive a restart.
+        val retuned = migrated.copy(inkFadeMs = 400, ayahMarkFadeMs = 400, recessMs = 400)
+        assertEquals(retuned, InkLabSnapshot.decode(InkLabSnapshot.encode(retuned)))
+    }
+
+    @Test
     fun decode_returnsNullForMalformedJson() {
         assertNull(InkLabSnapshot.decode(""))
         assertNull(InkLabSnapshot.decode("{"))

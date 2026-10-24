@@ -358,7 +358,7 @@ If the answer to any of these is no, reduce the scope.
 
 `ui/reader/InkEngine.kt` is a single object, per Option 2, with one amendment
 to the proposed shape: the review found that the four-state derivation is the
-easy part — the highlight's *feel* lives in the motion policy (400 ms
+easy part — the highlight's *feel* lives in the motion policy (520 ms
 tween-vs-snap rules, sweep entry and residual rules, repeat wash timing, the
 1.6× feather). `InkEngine` owns that policy as data, while one per-word
 `InkMotion` owns its Compose runtime:
@@ -426,7 +426,10 @@ tween-vs-snap rules, sweep entry and residual rules, repeat wash timing, the
   The tapped word still waits for its own media clock;
   words after it retain the ordinary Upcoming treatment.
   In Scroll, other verses above and below fade from the start request,
-  including during a word tap's own loading. Scroll ignores a stale fade-led
+  including during a word tap's own loading. Their ink, secondary text and
+  marks share the chrome's 520 ms Material ease-in-out fade on Android and
+  web. Existing default Ink Lab fades migrate to that duration; custom
+  auditions persist. Scroll ignores a stale fade-led
   focus during that wait. Mushaf keeps earlier visible verses inked on the
   current page, including preceding chapters sharing the leaf. Arabic and
   English leaves cover later verses while the current verse carries the wash

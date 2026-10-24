@@ -52,9 +52,9 @@ class InkLabStore(context: Context) {
 data class InkLabSnapshot(
     val schema: Int = SCHEMA,
     val upcomingAlpha: Float = 0.2661f,
-    val inkFadeMs: Int = 400,
-    val ayahMarkFadeMs: Int = 400,
-    val recessMs: Int = 400,
+    val inkFadeMs: Int = InkEngine.CHROME_RECEDE_MS,
+    val ayahMarkFadeMs: Int = InkEngine.CHROME_RECEDE_MS,
+    val recessMs: Int = InkEngine.CHROME_RECEDE_MS,
     val minSweepMs: Int = 140,
     val maxSweepMs: Int = 8_000,
     val repeatSweepMs: Int = 450,
@@ -204,8 +204,9 @@ data class InkLabSnapshot(
          * 3: adopt zero scroll lead in existing saves; later auditions persist.
          * 4: retune that scroll lead to 100 ms, preserving the other knobs.
          * 5: give the repeat wash a slower 1.8 s release without resetting the camera.
+         * 6: match old default verse fades to chrome; preserve custom fade auditions.
          */
-        const val SCHEMA = 5
+        const val SCHEMA = 6
 
         private val json = Json {
             ignoreUnknownKeys = true
@@ -309,9 +310,14 @@ data class InkLabSnapshot(
                 val camera = if (saved.schema >= 4) glow else glow.copy(
                     scrollLeadMs = shipped.scrollLeadMs,
                 )
-                if (saved.schema >= SCHEMA) camera else camera.copy(
-                    schema = SCHEMA,
+                val repeat = if (saved.schema >= 5) camera else camera.copy(
                     repeatFadeOutMs = shipped.repeatFadeOutMs,
+                )
+                if (saved.schema >= SCHEMA) repeat else repeat.copy(
+                    schema = SCHEMA,
+                    inkFadeMs = repeat.inkFadeMs.takeUnless { it == 400 } ?: shipped.inkFadeMs,
+                    ayahMarkFadeMs = repeat.ayahMarkFadeMs.takeUnless { it == 400 } ?: shipped.ayahMarkFadeMs,
+                    recessMs = repeat.recessMs.takeUnless { it == 400 } ?: shipped.recessMs,
                 )
             }
     }

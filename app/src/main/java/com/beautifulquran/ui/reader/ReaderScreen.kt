@@ -3758,7 +3758,7 @@ private tailrec fun Context.findActivity(): Activity? = when (this) {
 }
 
 /** Chrome / rail / bookmark fade while recitation starts or stops. */
-private const val ChromeRecedeMs = 520
+private const val ChromeRecedeMs = InkEngine.CHROME_RECEDE_MS
 
 /**
  * In-surah English search state: whether the top bar is in search mode, the

@@ -35,6 +35,9 @@ import com.beautifulquran.ui.theme.inkSmootherstep
  */
 object InkEngine {
 
+    /** Shared duration for playback chrome and the surrounding verse ink. */
+    const val CHROME_RECEDE_MS = 520
+
     /** The four ink states every reading mode shares. */
     enum class State {
         /** Idle page, no recitation touching this ayah: full ink. */
@@ -79,12 +82,12 @@ object InkEngine {
         val upcomingAlpha: Float = 0.2661f,
         /** State tween between resting inks (Active snaps — see
          *  ReaderComponents.animatedInkAlpha for why). */
-        val inkFadeMs: Int = 400,
+        val inkFadeMs: Int = CHROME_RECEDE_MS,
         /** Fade of the ﴿N﴾ ayah mark up to full when its verse gains focus. */
-        val ayahMarkFadeMs: Int = 400,
+        val ayahMarkFadeMs: Int = CHROME_RECEDE_MS,
         /** Softening when a verse recesses or returns (Arabic-only paper cover).
          *  Matched to [inkFadeMs] so every reading mode moves at the same pace. */
-        val recessMs: Int = 400,
+        val recessMs: Int = CHROME_RECEDE_MS,
         /** Letter-sweep duration clamps around the reciter's actual dwell. */
         val minSweepMs: Int = 140,
         val maxSweepMs: Int = 8_000,
