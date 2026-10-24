@@ -40,7 +40,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -62,6 +62,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.zIndex
+import androidx.compose.ui.composed
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
@@ -86,6 +88,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.DpOffset
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
@@ -93,7 +96,32 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.util.lerp
 import kotlinx.coroutines.delay
 import kotlin.math.roundToInt
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.LinearOutSlowInEasing
+import android.os.Build
+import androidx.compose.ui.semantics.stateDescription
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.ui.input.key.type
+import androidx.compose.ui.input.key.onKeyEvent
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.isShiftPressed
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.Key
+import androidx.compose.runtime.withFrameMillis
+import androidx.compose.foundation.focusable
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.coroutineScope
+import android.view.HapticFeedbackConstants
+import androidx.compose.ui.semantics.onClick
+import androidx.compose.ui.semantics.customActions
+import androidx.compose.ui.semantics.CustomAccessibilityAction
+import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.input.pointer.PointerInputChange
+import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.animation.core.Animatable
 import kotlinx.coroutines.flow.drop
+import kotlinx.coroutines.flow.first
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.ui.res.stringResource
 import com.beautifulquran.R
@@ -155,6 +183,14 @@ private val HomeRowRibbonGutter = (HomeNumberColumn - HomeRibbonWidth) / 2f
 private val HomeColumnGap = 4.dp
 private val HomeArabicOpticalInset = 4.dp
 private val TopBoundRibbonHeight = 96.dp
+/** Paper above the PINNED flag: the first-label air the search list uses. */
+private val PinnedBlockTop = 16.dp
+/** Paper between the flag and the band it heads. */
+private val PinnedFlagGap = 8.dp
+/** Paper between the pinned band and the full list below it. */
+private val PinnedGroupGap = 20.dp
+/** Pinned rows are set compact: 10 dp bands against the list's 15 dp. */
+private val PinnedRowVertical = 10.dp
 /**
  * Paper margin between the field and where scrolled ink dies: the feather
  * finishes dissolving a row here, so fading rows never brush the bar. While
@@ -200,6 +236,9 @@ fun HomeScreen(
     /** Number of saved verses; zero removes the Home-page ribbon entirely. */
     bookmarkCount: Int = 0,
     onOpenBookmarks: () -> Unit = {},
+    /** True while one of this sheet's ink surfaces (the pinning lesson) is
+     * up or still closing, so the paper stack holds still beneath it. */
+    onInkOverlayVisibilityChange: (Boolean) -> Unit = {},
     /**
      * The chapter bar is pinned above the paper stack, so this sheet does
      * not draw a second transport. [pinnedPlaybackHeight] is that bar's
@@ -210,7 +249,9 @@ fun HomeScreen(
     pinnedPlaybackHeight: () -> Dp = { 0.dp },
     playbackHost: com.beautifulquran.ui.reader.PinnedPlaybackHost? = null,
 ) {
-    val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    // Lazy content runs later: its pinned rows and the filtered list must
+    // capture the same state, or a pin can emit the same chapter key twice.
+    val uiState = viewModel.uiState.collectAsStateWithLifecycle().value
     val focusManager = LocalFocusManager.current
     val floatingPlayback = uiState.floatingPlayback
     // ContentPadding matches each fade so the first and last ink sit clear of
@@ -271,6 +312,11 @@ fun HomeScreen(
     // scrolled out of view the pill floats at the bottom; once the row
     // itself is visible the pill docks away so the row owns the tap.
     val continueSurahId = uiState.continueTarget?.surah?.id
+    // Pinned chapters lead the list (search owns the sheet while active);
+    // a pinned chapter's copy up there owns the place.
+    val showPinned = !searching && uiState.pinned.isNotEmpty()
+    val pinnedOrder = if (showPinned) uiState.pinned.map { it.id } else emptyList()
+    val placeKey = placeRowKey(continueSurahId)
     // The list must have measured before the pill may rise: on the sheet's
     // first composition the row-visibility rule cannot see any row yet, and
     // a pill that shows before then pops, dwells, and flies to a row that
@@ -280,13 +326,13 @@ fun HomeScreen(
     }
     // Dock only once the row is fully in view — flying to a sliver reads
     // as a miss. The row then owns the tap; the pill lands on its bounds.
-    val continueRowVisible by remember(continueSurahId, searching) {
+    val continueRowVisible by remember(placeKey, searching) {
         derivedStateOf {
             if (continueSurahId == null || searching) {
                 false
             } else {
                 val info = listState.layoutInfo
-                info.visibleItemsInfo.firstOrNull { it.key == "surah-$continueSurahId" }?.let { item ->
+                info.visibleItemsInfo.firstOrNull { it.key == placeKey }?.let { item ->
                     item.offset >= info.viewportStartOffset &&
                         item.offset + item.size <= info.viewportEndOffset
                 } == true
@@ -355,9 +401,10 @@ fun HomeScreen(
     // off the row and fly it back down to the pill's seat. A bottom exit
     // just lets the pill slide up on its own enter.
     val continueIndex = continueLazyIndex(
-        uiState.surahs.map { it.id },
+        uiState.surahs.map { it.id }.filterNot { it in pinnedOrder },
         continueSurahId,
         searching,
+        pinnedOrder,
     )
     if (!continueRowVisible && rowWasVisible && !docking && !undocking) {
         val seat = pillSeatRect
@@ -538,6 +585,46 @@ fun HomeScreen(
 
     BackHandler(enabled = searchFocused) { focusManager.clearFocus() }
 
+    // The pinning lesson: offered once, on a settled sheet with nothing
+    // pinned yet, around the fully visible row of the chapter being read.
+    var pinTipOpen by remember { mutableStateOf(false) }
+    var pinTipRendered by remember { mutableStateOf(false) }
+    fun closePinTip() {
+        viewModel.dismissPinTip()
+        pinTipOpen = false
+    }
+    // Layout facts read through derivedStateOf: the place row's bounds move
+    // on every scroll frame and must not recompose the sheet (PERFORMANCE.md).
+    val placeRowMeasured by remember { derivedStateOf { continueRowRect != null } }
+    val listScrolling by remember { derivedStateOf { listState.isScrollInProgress } }
+    // Never during a scroll: it would open and be put away by that same
+    // scroll, spent without being seen.
+    val pinTipEligible = coverSheetVisible && chapterRibbonReady && !searchActive &&
+        uiState.pinned.isEmpty() && continueRowVisible && !docking && !undocking &&
+        !transportOnScreen && placeRowMeasured && !listScrolling
+    LaunchedEffect(pinTipEligible) {
+        if (!pinTipEligible) return@LaunchedEffect
+        delay(600)
+        if (viewModel.shouldShowPinTip()) pinTipOpen = true
+    }
+    // Ordinary page scrolling puts the lesson away, as in the reader.
+    LaunchedEffect(pinTipOpen) {
+        if (!pinTipOpen) return@LaunchedEffect
+        snapshotFlow { listState.isScrollInProgress }.first { it }
+        closePinTip()
+    }
+    // Leaving Chapters by any route (a row, the rosette, the ribbon, a swipe)
+    // puts the lesson away, so it never holds the stack or Back from behind
+    // the reader.
+    LaunchedEffect(coverSheetVisible) {
+        if (!coverSheetVisible && pinTipOpen) closePinTip()
+    }
+    LaunchedEffect(pinTipOpen, pinTipRendered) {
+        onInkOverlayVisibilityChange(pinTipOpen || pinTipRendered)
+    }
+    DisposableEffect(Unit) { onDispose { onInkOverlayVisibilityChange(false) } }
+    BackHandler(enabled = pinTipOpen) { closePinTip() }
+
     val layoutDirection = LocalLayoutDirection.current
     Scaffold(containerColor = MaterialTheme.colorScheme.background) { padding ->
         Box(
@@ -626,6 +713,101 @@ fun HomeScreen(
                     )
                     Spacer(Modifier.height(SearchBottomBreath))
                 }
+                // Every chapter row, in order or pinned atop the list, is the
+                // same row; only the place ribbon follows [placeKey]. One set
+                // decides both the band and the list below it, so neither can
+                // keep a copy of the other's chapter.
+                val pinnedIds = uiState.pinned.mapTo(HashSet()) { it.id }
+                // Pinning a chapter from the top of the sheet would grow the
+                // group above the viewport, out of sight (the list holds its
+                // place by key). Bring the group down into view instead; a
+                // reader deep in the list keeps their place.
+                var revealPinned by remember { mutableStateOf(false) }
+                LaunchedEffect(uiState.pinned.size) {
+                    if (revealPinned) {
+                        revealPinned = false
+                        listState.animateScrollToItem(0)
+                    }
+                }
+                // The band is the head of the chapter list, not a second list;
+                // see [chapterRows].
+                val bandCount = if (showPinned) uiState.pinned.size else 0
+                // The chapter just pinned or unpinned travels to its new seat
+                // above the others, still wet, and dries off over the glide.
+                // Held here, not in the row: the row restarts in its new seat.
+                val reflowScope = rememberCoroutineScope()
+                var movedChapter by remember { mutableStateOf<Int?>(null) }
+                val movedWet = remember { Animatable(0f) }
+                val wetInk = MaterialTheme.colorScheme.primary.copy(alpha = WetInkAlpha)
+                val sheetPaper = MaterialTheme.colorScheme.background
+                val chapterRow: @Composable (Surah, String, Modifier, Dp) -> Unit = { surah, key, modifier, vertical ->
+                    val moving = surah.id == movedChapter
+                    SurahRow(
+                        vertical = vertical,
+                        pinned = surah.id in pinnedIds,
+                        holdable = !searching,
+                        surah = surah,
+                        // One place marker: only the row owning the place
+                        // carries the green cloth (the pinned copy, when pinned).
+                        currentAyah = uiState.continueTarget?.ayah?.takeIf { key == placeKey },
+                        onTogglePinned = {
+                            // The lesson completes on a real pin, not on the hold.
+                            if (pinTipOpen && surah.id !in pinnedIds) closePinTip()
+                            revealPinned = surah.id !in pinnedIds && !listState.canScrollBackward
+                            movedChapter = surah.id
+                            reflowScope.launch {
+                                movedWet.snapTo(1f)
+                                movedWet.animateTo(0f, tween(HoldDryMs, easing = LinearOutSlowInEasing))
+                                movedChapter = null
+                            }
+                            viewModel.togglePinned(surah.id)
+                        },
+                        placeUnfurlSignal = placeRibbonUnfurlEpoch,
+                        onPlaceUnfurlConsumed = { consumed ->
+                            placeRibbonUnfurlEpoch = remainingUnfurlSignal(
+                                current = placeRibbonUnfurlEpoch,
+                                consumed = consumed,
+                            )
+                        },
+                        onClick = {
+                            focusManager.clearFocus()
+                            // Leaving for the reader puts the lesson away with it.
+                            if (pinTipOpen) closePinTip()
+                            onOpenSurah(
+                                surah.id,
+                                uiState.ayahTarget ?: uiState.continueTarget
+                                    ?.takeIf { it.surah.id == surah.id }
+                                    ?.ayah,
+                                null,
+                                null,
+                            )
+                        },
+                        modifier = (
+                            if (!searching && key == placeKey) {
+                                modifier.onGloballyPositioned {
+                                    continueRowRect = it.boundsInWindow()
+                                }
+                            } else {
+                                modifier
+                            }
+                            ).then(
+                            if (moving) {
+                                Modifier
+                                    .zIndex(1f)
+                                    // Over the band, under the type: as the hold drew it.
+                                    // A row leaving the band has no band under it, so
+                                    // it carries its own paper and never shows the
+                                    // rows it passes through its type.
+                                    .drawBehind {
+                                        if (surah.id !in pinnedIds) drawRect(sheetPaper)
+                                        drawRect(wetInk.copy(alpha = wetInk.alpha * movedWet.value))
+                                    }
+                            } else {
+                                Modifier
+                            },
+                        ),
+                    )
+                }
                 LazyColumn(
                     state = listState,
                     modifier = Modifier
@@ -664,37 +846,54 @@ fun HomeScreen(
                             SearchSectionLabel(text = "Surahs", topPadding = SearchFirstLabelTop)
                         }
                     }
-                    items(uiState.surahs, key = { "surah-${it.id}" }) { surah ->
-                        SurahRow(
-                            surah = surah,
-                            currentAyah = uiState.continueTarget
-                                ?.takeIf { it.surah.id == surah.id }
-                                ?.ayah,
-                            placeUnfurlSignal = placeRibbonUnfurlEpoch,
-                            onPlaceUnfurlConsumed = { consumed ->
-                                placeRibbonUnfurlEpoch = remainingUnfurlSignal(
-                                    current = placeRibbonUnfurlEpoch,
-                                    consumed = consumed,
-                                )
-                            },
-                            onClick = {
-                                focusManager.clearFocus()
-                                onOpenSurah(
-                                    surah.id,
-                                    uiState.ayahTarget ?: uiState.continueTarget
-                                        ?.takeIf { it.surah.id == surah.id }
-                                        ?.ayah,
-                                    null,
-                                    null,
-                                )
-                            },
-                            modifier = if (!searching && continueSurahId == surah.id) {
-                                Modifier.onGloballyPositioned {
-                                    continueRowRect = it.boundsInWindow()
-                                }
-                            } else {
-                                Modifier
-                            },
+                    if (showPinned) {
+                        item(key = "pinned-air") {
+                            Spacer(Modifier.height(PinnedBlockTop).animateItem())
+                        }
+                        // Over the band, on the paper: a small-caps flag on the
+                        // names' rail, the Continue pill's CONTINUE flag in kind.
+                        item(key = "pinned-flag") {
+                            Text(
+                                text = "PINNED",
+                                style = MaterialTheme.typography.labelSmall.copy(letterSpacing = CAPS_TRACKING),
+                                fontSize = 10.sp,
+                                color = QuranTheme.accents.greenQuiet,
+                                maxLines = 1,
+                                modifier = Modifier
+                                    .animateItem()
+                                    .fillMaxWidth()
+                                    .padding(
+                                        start = HomeStartInset + HomeNumberColumn + HomeColumnGap,
+                                        bottom = PinnedFlagGap,
+                                    ),
+                            )
+                        }
+                    }
+                    // One key per chapter wherever it sits: the pinned head and
+                    // the list are the same interval, so pinning moves the very
+                    // row up into the band (and unpinning back down) and the
+                    // rows around it close or open.
+                    itemsIndexed(
+                        chapterRows(uiState.pinned, uiState.surahs, showPinned),
+                        key = { _, surah -> chapterKey(surah.id) },
+                    ) { index, surah ->
+                        val pinned = index < bandCount
+                        chapterRow(
+                            surah,
+                            chapterKey(surah.id),
+                            Modifier
+                                .animateItem(placementSpec = ChapterReflowSpec)
+                                .then(if (pinned) Modifier.pinnedBand() else Modifier)
+                                // The band closes with its own air before the
+                                // full list resumes.
+                                .then(
+                                    if (bandCount > 0 && index == bandCount) {
+                                        Modifier.padding(top = PinnedGroupGap)
+                                    } else {
+                                        Modifier
+                                    },
+                                ),
+                            if (pinned) PinnedRowVertical else ContinueRowVertical,
                         )
                     }
 
@@ -894,6 +1093,20 @@ fun HomeScreen(
                         },
                 )
             }
+            // The pinning lesson, composed only while it shows: the place row's
+            // bounds change every scroll frame and are read here only then.
+            if (pinTipOpen || pinTipRendered) continueRowRect?.let { row ->
+                PinChapterTip(
+                    visible = pinTipOpen,
+                    target = with(density) {
+                        DpOffset((row.center.x - boxLeft).toDp(), (row.center.y - boxTop).toDp())
+                    },
+                    bodyBelow = pinTipBodyBelow(row.center.y - boxTop, boxHeight),
+                    onDismiss = ::closePinTip,
+                    onRenderedChange = { pinTipRendered = it },
+                    modifier = Modifier.zIndex(3f),
+                )
+            }
             // Dock flights: a live copy of the pill travels between its
             // resting seat and the chapter row — resizing, squaring its
             // corners, settling every inset onto the row, then fading to
@@ -1081,11 +1294,58 @@ internal fun continueLazyIndex(
     surahIds: List<Int>,
     continueId: Int?,
     searching: Boolean,
+    /** The pinned block leads the list: air, then its flag, then its rows. */
+    pinnedOrder: List<Int> = emptyList(),
 ): Int {
     if (searching || continueId == null) return -1
+    val pinned = pinnedOrder.indexOf(continueId)
+    if (pinned >= 0) return 2 + pinned
     val position = surahIds.indexOf(continueId)
-    return if (position < 0) -1 else position
+    val lead = if (pinnedOrder.isEmpty()) 0 else pinnedOrder.size + 2
+    return if (position < 0) -1 else lead + position
 }
+
+/**
+ * The pinned band: the Continue pill's green wash laid edge to edge across
+ * the sheet behind every pinned row (the flag stands on the paper above),
+ * square-cut like a strip of
+ * tinted paper. Adjacent rows' washes meet, so the stack reads as one band
+ * however many chapters are pinned. The place ribbon hangs in the sheet-edge
+ * lane on top of it.
+ */
+private fun Modifier.pinnedBand(): Modifier = composed {
+    background(QuranTheme.accents.greenWash)
+}
+
+/** A chapter row's one key, on the band or in the list: a pinned chapter
+ * moves rather than showing twice, so the row itself can travel. */
+internal fun chapterKey(surahId: Int): String = "chapter-$surahId"
+
+/**
+ * The sheet's chapter rows: the pinned band leads, then every other chapter
+ * in order. One row per chapter, always.
+ *
+ * The band is the head of the list, not a list of its own. Pinning therefore
+ * *reorders* a chapter to the top instead of handing its key from one lazy
+ * interval to another — a hand-over that could emit the same key twice in a
+ * frame and crash the list as the filled row moved.
+ */
+internal fun chapterRows(
+    pinned: List<Surah>,
+    surahs: List<Surah>,
+    showPinned: Boolean,
+): List<Surah> {
+    if (!showPinned) return surahs
+    val pinnedIds = pinned.mapTo(HashSet()) { it.id }
+    return pinned + surahs.filterNot { it.id in pinnedIds }
+}
+
+/** Key of the chapter row that owns the reading place. */
+internal fun placeRowKey(continueId: Int?): String? = continueId?.let(::chapterKey)
+
+/** The reflow when a chapter is pinned or unpinned: the row glides to its
+ * new seat and the list closes or opens around it. */
+private val ChapterReflowSpec = tween<IntOffset>(420, easing = FastOutSlowInEasing)
 
 /**
  * The reading place floats only while its chapter row is scrolled out of
@@ -1231,19 +1491,34 @@ private fun SurahRow(
     currentAyah: Int?,
     placeUnfurlSignal: Int,
     onPlaceUnfurlConsumed: (Int) -> Unit,
+    pinned: Boolean,
+    /** Off while searching; see [holdToPin]. */
+    holdable: Boolean,
+    onTogglePinned: () -> Unit,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
+    vertical: Dp = ContinueRowVertical,
 ) {
     val accents = LocalQuranAccents.current
     Row(
         verticalAlignment = Alignment.CenterVertically,
         modifier = modifier
             .fillMaxWidth()
-            .quietClickable(onClick = onClick)
+            // A tap opens the chapter; holding fills the row with its
+            // answer — the band's green to pin, paper over the band to unpin —
+            // and holding it full is the confirmation.
+            .holdToPin(
+                pinned = pinned,
+                holdable = holdable,
+                label = surah.nameTransliteration,
+                wetInk = MaterialTheme.colorScheme.primary.copy(alpha = WetInkAlpha),
+                onTap = onClick,
+                onHeld = onTogglePinned,
+            )
             .padding(
                 end = HomeEndInset,
-                top = ContinueRowVertical,
-                bottom = ContinueRowVertical,
+                top = vertical,
+                bottom = vertical,
             ),
     ) {
         if (currentAyah != null) {
@@ -1306,6 +1581,155 @@ private fun SurahRow(
         )
     }
 }
+
+/**
+ * Hold-to-pin: the hold is the confirmation. A quick tap opens the chapter.
+ * Held, the row soaks evenly with [wetInk] — no shape spreading across a
+ * strip this thin — a soft tick as the hold takes, deepening in step with
+ * the finger; at full a firm tick and [onHeld]. The row then travels to its
+ * new seat (see ChapterReflowSpec) and the wet ink dries off it, down to the
+ * band's pale wash when pinned or to bare paper when unpinned. Lifting early,
+ * or the list taking the drag, drains it and changes nothing.
+ *
+ * The hold is timed on the frame clock, not by an animation: the system's
+ * animator scale must neither make every tap a pin (animations off) nor
+ * stretch a hold to seconds. Keyboards and D-pads open with Enter and pin
+ * with Shift+Enter; TalkBack gets Pin / Unpin as an action. With [holdable]
+ * off (search lists pinned chapters in place, off the band, where a hold
+ * could show nothing of what it would do) the row is only a tap.
+ */
+@Composable
+private fun Modifier.holdToPin(
+    pinned: Boolean,
+    holdable: Boolean,
+    label: String,
+    wetInk: androidx.compose.ui.graphics.Color,
+    onTap: () -> Unit,
+    onHeld: () -> Unit,
+): Modifier {
+    val fill = remember { Animatable(0f) }
+    val view = LocalView.current
+    val tap by rememberUpdatedState(onTap)
+    val held by rememberUpdatedState(onHeld)
+    val canHold by rememberUpdatedState(holdable)
+    return pointerInput(Unit) {
+        coroutineScope {
+            awaitEachGesture {
+                val down = awaitFirstDown()
+                // Readers who set a longer system touch & hold delay get a
+                // proportionally slower hold, and a longer tap.
+                val pace = holdPace(viewConfiguration.longPressTimeoutMillis)
+                var full = false
+                val filling = if (!canHold) null else launch {
+                    val start = withFrameMillis { it }
+                    var engaged = false
+                    while (!full) {
+                        val elapsed = withFrameMillis { it } - start
+                        val progress = holdFillProgress(elapsed, pace)
+                        fill.snapTo(progress)
+                        // The hold has taken: a soft tick, so the finger knows
+                        // to stay before any ink is easy to see under it.
+                        if (!engaged && progress > 0f) {
+                            engaged = true
+                            view.performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK)
+                        }
+                        full = elapsed >= (HoldStartMs + HoldFillMs) * pace
+                    }
+                    view.performHapticFeedback(
+                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                            HapticFeedbackConstants.CONFIRM
+                        } else {
+                            HapticFeedbackConstants.LONG_PRESS
+                        },
+                    )
+                    held()
+                }
+                var up: PointerInputChange? = null
+                while (true) {
+                    val change = awaitPointerEvent().changes.firstOrNull { it.id == down.id } ?: break
+                    if (full) {
+                        // Pinned: the rest of the gesture is spent, not a tap.
+                        change.consume()
+                        if (!change.pressed) break else continue
+                    }
+                    if (!change.pressed) {
+                        // A cancelled or consumed release (a system back swipe, the
+                        // search dials' dismissing tap) is not a tap.
+                        if (!change.isConsumed) up = change
+                        break
+                    }
+                    // A drag belongs to the list: let it scroll, drain the fill.
+                    if (change.isConsumed ||
+                        (change.position - down.position).getDistance() > viewConfiguration.touchSlop
+                    ) {
+                        break
+                    }
+                }
+                if (!full) {
+                    filling?.cancel()
+                    val opens = up != null &&
+                        (!canHold || holdOutcome(up.uptimeMillis - down.uptimeMillis, pace) == HoldOutcome.Tap)
+                    if (opens) {
+                        up!!.consume()
+                        tap()
+                    }
+                }
+                // Done, the sheet carries the wet ink with the moving row and
+                // dries it there; let go early, it drains back quickly.
+                launch { fill.animateTo(0f, tween(if (full) 0 else HoldDrainMs)) }
+            }
+        }
+    }.onKeyEvent { event ->
+        val enter = event.key == Key.Enter || event.key == Key.NumPadEnter || event.key == Key.DirectionCenter
+        if (!enter || event.type != KeyEventType.KeyUp) return@onKeyEvent enter
+        if (event.isShiftPressed) { if (canHold) held() } else tap()
+        true
+    }.focusable().semantics(mergeDescendants = true) {
+        role = Role.Button
+        if (pinned) stateDescription = "Pinned"
+        onClick(label = "Open $label") { tap(); true }
+        if (holdable) {
+            customActions = listOf(
+                CustomAccessibilityAction(if (pinned) "Unpin $label" else "Pin $label") { held(); true },
+            )
+        }
+    }.drawBehind {
+        val alpha = fill.value
+        if (alpha > 0f) drawRect(wetInk.copy(alpha = wetInk.alpha * alpha))
+    }
+}
+
+/** How full the row is [elapsedMs] into a hold: nothing for an ordinary
+ * tap's worth, then deepening evenly to full. [pace] stretches it. */
+internal fun holdFillProgress(elapsedMs: Long, pace: Float = 1f): Float =
+    ((elapsedMs - HoldStartMs * pace) / (HoldFillMs * pace)).coerceIn(0f, 1f)
+
+/** The hold's timings stretched to the system touch & hold delay; the
+ * default (400 ms) and anything quicker keep them as designed. */
+internal fun holdPace(longPressTimeoutMs: Long): Float =
+    (longPressTimeoutMs / DefaultLongPressMs.toFloat()).coerceAtLeast(1f)
+
+private const val DefaultLongPressMs = 400L
+
+internal enum class HoldOutcome { Tap, Cancel }
+
+/** What lifting the finger [heldMs] into a hold means, before the fill is
+ * full: a quick release is the ordinary tap that opens the chapter; a
+ * longer one was a hold let go early, and changes nothing. */
+internal fun holdOutcome(heldMs: Long, pace: Float = 1f): HoldOutcome =
+    if (heldMs < HoldTapMaxMs * pace) HoldOutcome.Tap else HoldOutcome.Cancel
+
+/** No tint for an ordinary tap: the fill waits this long to begin. */
+private const val HoldStartMs = 150
+/** Then deepens to the full band slice over this, in step with the finger. */
+private const val HoldFillMs = 550
+private const val HoldDrainMs = 180
+/** The wet ink drying off a row that has moved, over its glide and past it. */
+private const val HoldDryMs = 650
+/** How dark the ink is at full: plainly wetter than the band's pale wash it
+ * dries down to, so the hold reads under a finger from its first frames. */
+private const val WetInkAlpha = 0.30f
+internal const val HoldTapMaxMs = 300L
 
 internal fun shouldUnfurlReadingPlaceRibbon(
     pendingReturn: Boolean,

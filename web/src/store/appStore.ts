@@ -647,6 +647,16 @@ class AppStore {
     })
   }
 
+  /** Pin a chapter to the top of Chapters, or return it to its place. */
+  togglePinnedSurah(id: number) {
+    const pinned = this.state.settings.pinnedSurahIds
+    this.updateSettings({
+      pinnedSurahIds: pinned.includes(id)
+        ? pinned.filter((surahId) => surahId !== id)
+        : [...pinned, id],
+    })
+  }
+
   private async reloadTimingsAndReciter(reciter: Reciter) {
     const content = this.state.content
     if (!content) return

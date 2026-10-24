@@ -1,6 +1,7 @@
 import { suppliedWords } from '../../render/suppliedWords'
 import {
   useEffect,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -16,6 +17,8 @@ import {
 } from '../icons/PlaybackIcons'
 import { PaperInput } from '../kit/PaperInput'
 import { ContinueRow } from './ContinueRow'
+import { ChapterRow } from './ChapterRow'
+import { chapterRowKey, pinnedChapterLists, reflowDeltas } from './pinnedChapters'
 import {
   appStore,
   useAppSelector,
@@ -94,6 +97,12 @@ export function HomeScreen({
   const [expandedSurahIds, setExpandedSurahIds] = useState<Set<number>>(
     () => new Set(),
   )
+  const revealPinned = useRef(false)
+  const focusAfterPin = useRef<string | null>(null)
+  // A pin or unpin moves the very row (Android ChapterReflowSpec): where every
+  // row stood just before, and which chapter is travelling, still wet.
+  const rowTopsBefore = useRef<Map<string, number> | null>(null)
+  const [dryingKey, setDryingKey] = useState<string | null>(null)
   const previousBookmarkCount = useRef(state.bookmarks.length)
   const pendingRibbonUnfurl = useRef(false)
   const [ribbonUnfurlSignal, setRibbonUnfurlSignal] = useState(0)
@@ -123,6 +132,43 @@ export function HomeScreen({
       delete shell.dataset.coverSearch
     }
   }, [searchFocused, searching])
+
+  // Pinning from the very top of the sheet brings the band into view (as
+  // Android scrolls to the first item); a reader deep in the list keeps
+  // their place. A row confirmed from the keyboard keeps focus where it went.
+  const pinnedSurahIds = state.settings.pinnedSurahIds
+  // The reflow: each row slides from where it stood to its new seat, the
+  // moved one above the rest, so nothing jumps.
+  useLayoutEffect(() => {
+    const before = rowTopsBefore.current
+    rowTopsBefore.current = null
+    if (!before || window.matchMedia('(prefers-reduced-motion: reduce)').matches) return
+    const rows = rowElements(sheetRef.current)
+    const deltas = reflowDeltas(before, rowTops(rows))
+    for (const [key, delta] of deltas) {
+      rows.get(key)?.closest('li')?.animate(
+        [{ transform: `translateY(${delta}px)` }, { transform: 'none' }],
+        { duration: 420, easing: 'cubic-bezier(0.4, 0, 0.2, 1)' },
+      )
+    }
+  }, [pinnedSurahIds])
+  useEffect(() => {
+    if (!dryingKey) return
+    const done = window.setTimeout(() => setDryingKey(null), 650)
+    return () => window.clearTimeout(done)
+  }, [dryingKey])
+  useEffect(() => {
+    const scroller = sheetRef.current?.querySelector('.scroll')
+    if (revealPinned.current) scroller?.scrollTo({ top: 0, behavior: 'smooth' })
+    revealPinned.current = false
+    const key = focusAfterPin.current
+    focusAfterPin.current = null
+    if (key) {
+      sheetRef.current
+        ?.querySelector<HTMLElement>(`[data-row-key="${key}"]`)
+        ?.focus({ preventScroll: true })
+    }
+  }, [pinnedSurahIds])
 
   useEffect(() => {
     setExpandedSurahIds(new Set())
@@ -252,6 +298,54 @@ export function HomeScreen({
     !wordLoading
   const prepareChapter = (surahId: number) => {
     appStore.prepareSurah(surahId)
+  }
+
+  // Pinned chapters lead the list on the band and leave the list below.
+  const chapterLists = pinnedChapterLists(filtered, pinnedSurahIds, searching)
+  const bandIds = new Set(chapterLists.pinned.map((s) => s.id))
+  const togglePinned = (surahId: number) => {
+    const pinned = pinnedSurahIds.includes(surahId)
+    const scroller = sheetRef.current?.querySelector('.scroll')
+    revealPinned.current = !pinned && !searching && (scroller?.scrollTop ?? 0) <= 0
+    if (document.activeElement?.closest('.surah-item')) {
+      // Focus follows the row only when the reader will see where it went;
+      // otherwise it stays in place, on the row that takes the moved one's.
+      focusAfterPin.current = revealPinned.current
+        ? chapterRowKey(surahId)
+        : neighbourRowKey(surahId, pinned)
+    }
+    rowTopsBefore.current = rowTops(rowElements(sheetRef.current))
+    setDryingKey(chapterRowKey(surahId))
+    appStore.togglePinnedSurah(surahId)
+  }
+  /** The row beside [surahId] in the list it is leaving: the next, else the
+   * previous. Focus lands there when the moved row goes out of view. */
+  const neighbourRowKey = (surahId: number, fromBand: boolean): string | null => {
+    const rows = fromBand ? chapterLists.pinned : chapterLists.listed
+    const at = rows.findIndex((s) => s.id === surahId)
+    const neighbour = rows[at + 1] ?? rows[at - 1]
+    return neighbour ? chapterRowKey(neighbour.id) : null
+  }
+  const chapterRow = (s: (typeof filtered)[number]) => {
+    const onBand = bandIds.has(s.id)
+    const key = chapterRowKey(s.id)
+    return (
+      <ChapterRow
+        key={key}
+        surah={s}
+        rowKey={key}
+        pinned={pinnedSurahIds.includes(s.id)}
+        onBand={onBand}
+        drying={dryingKey === key}
+        holdable={!searching}
+        onPrepare={() => prepareChapter(s.id)}
+        onOpen={() => {
+          if (searching) appStore.openReading(s.id, ayahTarget ?? 1)
+          else appStore.openSurah(s.id)
+        }}
+        onToggle={() => togglePinned(s.id)}
+      />
+    )
   }
 
   return (
@@ -433,30 +527,17 @@ export function HomeScreen({
               <p className="search-section-label">Surahs</p>
             ) : null}
 
+            {chapterLists.pinned.length > 0 ? (
+              <>
+                <p className="pinned-flag">Pinned</p>
+                <ul className="surah-list surah-list-pinned">
+                  {chapterLists.pinned.map(chapterRow)}
+                </ul>
+              </>
+            ) : null}
+
             <ul className="surah-list">
-              {filtered.map((s) => (
-                <li key={s.id}>
-                  <button
-                    type="button"
-                    className="surah-row"
-                    onPointerEnter={() => prepareChapter(s.id)}
-                    onPointerDown={() => prepareChapter(s.id)}
-                    onFocus={() => prepareChapter(s.id)}
-                    onClick={() =>
-                      searching ? appStore.openReading(s.id, ayahTarget ?? 1) : appStore.openSurah(s.id)
-                    }
-                  >
-                    <span className="surah-num">{s.id}</span>
-                    <span className="surah-names">
-                      <span className="en">{s.nameTransliteration}</span>
-                      <span className="meta">
-                        {s.nameTranslation} · {s.ayahCount} ayahs
-                      </span>
-                    </span>
-                    <span className="surah-ar">{s.nameArabic}</span>
-                  </button>
-                </li>
-              ))}
+              {chapterLists.listed.map(chapterRow)}
             </ul>
 
             {showWordSections ? (
@@ -651,4 +732,20 @@ function WordSearchSection({
       ) : null}
     </section>
   )
+}
+
+/** Every chapter row on the sheet, by its key. */
+function rowElements(sheet: HTMLElement | null): Map<string, HTMLElement> {
+  const rows = new Map<string, HTMLElement>()
+  sheet?.querySelectorAll<HTMLElement>('[data-row-key]').forEach((row) => {
+    rows.set(row.dataset.rowKey!, row)
+  })
+  return rows
+}
+
+/** Where each row stands, in viewport px. */
+function rowTops(rows: Map<string, HTMLElement>): Map<string, number> {
+  const tops = new Map<string, number>()
+  for (const [key, row] of rows) tops.set(key, row.getBoundingClientRect().top)
+  return tops
 }
