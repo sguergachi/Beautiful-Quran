@@ -1795,9 +1795,12 @@ internal fun buildShapedBlooms(
     searchHitWash: RepeatWash,
     searchFocusPositions: Set<Int>? = null,
     searchBackgroundAlpha: () -> Float = { SearchHitFlash.BACKGROUND_ALPHA },
-    /** Let an outgoing verse's Upcoming words follow [recessCover] instead of
-     * snapping straight to the faint floor. Future verses keep the floor. */
+    /** Let a verse that was showing full ink follow [recessCover] back down
+     * instead of snapping straight to the faint floor. A verse that has only
+     * ever waited keeps the floor. */
     softHandoff: Boolean = false,
+    /** The verse is leaving the lyric line: keep the floor under unread ink. */
+    keepUnreadFloor: Boolean = false,
     /** Arabic-only wasl pre-ink; English has no connected-letter paint. */
     waslInk: Color? = null,
     /** See [addShapedInkMotionBlooms]. */
@@ -1815,8 +1818,6 @@ internal fun buildShapedBlooms(
     // cover strength — ayah handoff does not change unread ink; only the
     // active word starts its bloom.
     motions.forEachIndexed { index, motion ->
-        // Outgoing verses may soften already-laid ink, but a word that never
-        // started must retain its unread floor throughout that handoff too.
         val untouched = motion.ink.state == InkEngine.State.Upcoming &&
             motion.sweepProgress <= 0f && motion.paperDeparture?.active != true
         val coverAlpha = maxOf(
@@ -1825,8 +1826,9 @@ internal fun buildShapedBlooms(
                 recess = recess,
                 upcomingCover = upcomingCover,
                 softHandoff = softHandoff,
+                unread = untouched,
+                keepUnreadFloor = keepUnreadFloor,
             ),
-            if (untouched) upcomingCover else 0f,
             if (searchFocusPositions != null && words[index].position !in searchFocusPositions) {
                 1f - searchBackgroundAlpha()
             } else {
@@ -1899,21 +1901,40 @@ internal fun buildShapedBlooms(
     return (englishWordRanges?.let { englishPaperInkBlooms(blooms, it) } ?: blooms).coversFirst()
 }
 
-/** Paper-cover strength for one shaped word during an ayah handoff. */
+/**
+ * Paper-cover strength for one shaped word while its verse recedes.
+ *
+ * A verse that was showing full ink — the page at rest, or the verse leaving
+ * the voice — follows [recess] back down, so pressing play covers it on the
+ * same clock and easing as the chrome. A verse that has only ever waited at
+ * the Upcoming floor stays there from its first frame; it must never flash
+ * full ink. [keepUnreadFloor] protects ink the outgoing verse never read
+ * from *brightening* as its read ink fades.
+ */
 internal fun shapedWordCoverAlpha(
     state: InkEngine.State,
     recess: Float,
     upcomingCover: Float,
     softHandoff: Boolean,
-): Float = when {
-    // Active word is revealed by InkReveal, not recess.
-    state == InkEngine.State.Active -> 0f
-    // Only a verse that just owned the lyric line may fade down. A future
-    // verse must stay at the Upcoming floor from its first frame.
-    state == InkEngine.State.Upcoming && softHandoff -> recess
-    state == InkEngine.State.Upcoming -> maxOf(recess, upcomingCover)
-    recess > 0f -> recess
-    else -> 0f
+    /** This word has not begun its wash. */
+    unread: Boolean = true,
+    /** The verse is leaving the lyric line: keep the floor under unread ink. */
+    keepUnreadFloor: Boolean = false,
+): Float {
+    val fade = when {
+        // Active word is revealed by InkReveal, not recess.
+        state == InkEngine.State.Active -> 0f
+        state == InkEngine.State.Upcoming && softHandoff -> recess
+        state == InkEngine.State.Upcoming -> maxOf(recess, upcomingCover)
+        recess > 0f -> recess
+        else -> 0f
+    }
+    val floor = if (keepUnreadFloor && unread && state == InkEngine.State.Upcoming) {
+        upcomingCover
+    } else {
+        0f
+    }
+    return maxOf(fade, floor)
 }
 
 /**
@@ -1927,6 +1948,7 @@ private fun ResponsiveEnglishAyah(
     motions: List<InkMotion>,
     recessCover: () -> Float,
     softHandoff: Boolean,
+    keepUnreadFloor: Boolean,
     markAlpha: () -> Float,
     fontScale: Float,
     searchQuery: String?,
@@ -2070,6 +2092,7 @@ private fun ResponsiveEnglishAyah(
                         },
                         searchBackgroundAlpha = searchBackgroundAlpha,
                         softHandoff = softHandoff,
+                        keepUnreadFloor = keepUnreadFloor,
                         englishWordRanges = englishWordRanges,
                     )
                 },
@@ -2207,8 +2230,10 @@ private fun ResponsiveHafsAyah(
     motions: List<InkMotion>,
     /** Draw-phase ayah recess cover owned by [AyahBlock]. */
     recessCover: State<Float>,
-    /** True only while a Paper-theme lyric verse is fading into repose. */
+    /** True while a lyric verse that showed full ink is fading into repose. */
     softHandoff: Boolean,
+    /** The verse is leaving the lyric line: keep the floor under unread ink. */
+    keepUnreadFloor: Boolean,
     /** 0..1 opacity for the trailing ﴿N﴾ mark — fades to full when focused. */
     markAlpha: () -> Float,
     fontSize: TextUnit,
@@ -2321,6 +2346,7 @@ private fun ResponsiveHafsAyah(
                         searchFocusPositions = searchFocusPositions,
                         searchBackgroundAlpha = searchBackgroundAlpha,
                         softHandoff = softHandoff,
+                        keepUnreadFloor = keepUnreadFloor,
                         waslInk = palette.fullInkColor,
                     )
                 },
@@ -2870,10 +2896,15 @@ fun AyahBlock(
     var hasOwnedInk by remember(ayah.surahId, ayah.number) {
         mutableStateOf(isActiveAyah || activeWord != null)
     }
+    // A verse that has already shown full ink — the page at rest before play —
+    // fades back under Upcoming paper with the chrome. One that has only ever
+    // waited keeps that floor from its first frame.
+    var hasFullInk by remember(ayah.surahId, ayah.number) { mutableStateOf(!dimmed) }
     val paperTheme = LocalQuranAccents.current.glintInk == null
-    val softHandoff = paperTheme && dimmed && hasOwnedInk
+    val softHandoff = paperTheme && dimmed && (hasOwnedInk || hasFullInk)
     SideEffect {
         if (isActiveAyah || activeWord != null) hasOwnedInk = true
+        if (!dimmed) hasFullInk = true
     }
 
     // The letter fade paces itself to how long the reciter dwells on the
@@ -3120,6 +3151,7 @@ fun AyahBlock(
                     // use the same ayah cover that shaped Hafs uses.
                     recessCover = { if (paperTheme) recessCover.value else 0f },
                     softHandoff = softHandoff,
+                    keepUnreadFloor = hasOwnedInk,
                     markAlpha = { ayahMarkAlpha.value },
                     fontScale = fontScale,
                     searchQuery = searchQuery,
@@ -3200,6 +3232,7 @@ fun AyahBlock(
                         // landing on this verse does not change unread ink.
                         recessCover = recessCover,
                         softHandoff = softHandoff,
+                        keepUnreadFloor = hasOwnedInk,
                         markAlpha = { ayahMarkAlpha.value },
                         fontSize = ArabicWordStyle.fontSize * fontScale * ARABIC_ONLY_HAFS_FONT_MULTIPLIER,
                         flashWordPositions = searchTargets,

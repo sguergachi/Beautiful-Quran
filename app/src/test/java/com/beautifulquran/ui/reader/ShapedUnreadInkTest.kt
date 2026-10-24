@@ -21,6 +21,7 @@ class ShapedUnreadInkTest {
         departure: PaperInkDeparture? = null,
         recess: Float = 0f,
         softHandoff: Boolean = false,
+        keepUnreadFloor: Boolean = false,
     ): List<ShapedWordBloom> {
         val motion = InkMotion(
             ink = InkEngine.Word(state, false), lyricInk = mutableStateOf(1f),
@@ -43,6 +44,7 @@ class ShapedUnreadInkTest {
             searchHitWash = RepeatWash(mutableStateOf(0f), mutableStateOf(0f), mutableStateOf(null)),
             englishWordRanges = englishPaperInkWordRanges(text, listOf(owner)),
             softHandoff = softHandoff,
+            keepUnreadFloor = keepUnreadFloor,
         )
     }
 
@@ -81,10 +83,25 @@ class ShapedUnreadInkTest {
         for (paper in listOf(false, true)) {
             for (recess in listOf(0f, .2f, .5f, 1f - floor)) {
                 assertEquals(floor, untouchedAlpha(blooms(InkEngine.State.Upcoming, 0f,
-                    paper, recess = recess, softHandoff = true)), .000001f)
+                    paper, recess = recess, softHandoff = true,
+                    keepUnreadFloor = true)), .000001f)
             }
             assertEquals(.8f, untouchedAlpha(blooms(InkEngine.State.Upcoming, 1f,
-                paper, recess = .2f, softHandoff = true)), .000001f)
+                paper, recess = .2f, softHandoff = true,
+                keepUnreadFloor = true)), .000001f)
+        }
+    }
+
+    @Test fun `a verse at rest follows the recess instead of snapping to the floor`() {
+        // Pressing play recesses every verse that was showing full ink. Its
+        // cover must track the shared clock, so the ink fades with the chrome
+        // rather than dropping to the Upcoming floor on the first frame.
+        for (paper in listOf(false, true)) {
+            for (recess in listOf(0f, .2f, .5f, 1f - floor)) {
+                assertEquals(1f - recess, untouchedAlpha(blooms(InkEngine.State.Upcoming, 0f,
+                    paper, recess = recess, softHandoff = true,
+                    keepUnreadFloor = false)), .000001f)
+            }
         }
     }
 
