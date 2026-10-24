@@ -34,6 +34,10 @@ measure and carried-line setting remain in the keys.
 The ruler, height fitter and renderer use the same carried-line setting. A line
 without gaps keeps its natural width, so the model cannot count it as fitting
 by shrink alone. The hand still calibrates at natural spacing.
+Every leaf keeps that same book hand. Page fitting adjusts only leading and
+checks its drawn height; it never reruns the layout at a smaller font size. Oversized
+verses are carried by the measured pagination. The debug justification audit
+also reports leaf font-size extrema and vertical overflow.
 
 Pagination runs off the main thread and is written to `EnglishBookCache`.
 The cache key includes the justification tuning and algorithm version; a

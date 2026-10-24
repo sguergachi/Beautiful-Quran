@@ -68,6 +68,29 @@ class EnglishBookByLayoutTest {
     }
 
     @Test
+    fun `an oversized single sentence carries at fixed capacity with every character and voice position preserved`() {
+        val prose = mapOf(281 to "lead ".repeat(8).trim(), 282 to "word ".repeat(270).trim(), 283 to "tail")
+        val b = book(48 to listOf(2 to 281, 2 to 282, 2 to 283)) { _, ayah -> prose.getValue(ayah) }
+        val carried = b.leaves.withIndex().filter { (_, leaf) -> leaf.runs.any { it.ayah == 282 } }
+        assertTrue("the long sentence must use additional leaves", carried.size > 2)
+        prose.forEach { (ayah, text) ->
+            val runs = b.leaves.flatMap { it.runs }.filter { it.ayah == ayah }
+            assertEquals(0, runs.first().from)
+            assertEquals(text.length, runs.last().to)
+            runs.zipWithNext().forEach { (before, after) -> assertEquals(before.to, after.from) }
+            assertEquals(text, runs.joinToString("") { text.substring(it.from, it.to) })
+        }
+        b.leaves.forEach { leaf ->
+            assertTrue("a page must respect the fixed ruler capacity", leaf.runs.sumOf { it.to - it.from } <= 100)
+        }
+        carried.forEach { (index, leaf) ->
+            val run = leaf.runs.single { it.ayah == 282 }
+            val through = (run.from + run.to) / 2f / prose.getValue(282).length
+            assertEquals("the wash must follow the spoken fragment", index, b.leafOfVerse(2, 282, 48, through))
+        }
+    }
+
+    @Test
     fun `a leaf the offer could not fill is offered more`() {
         // The ruler answers null when the run it was handed all fitted, and the
         // pagination widens the offer rather than ending the leaf short. Sixty

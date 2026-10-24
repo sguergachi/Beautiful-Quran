@@ -961,7 +961,9 @@ not the app's.
 - **Developer comparison**: Settings → Developer can switch to the previous
   EB Garamond / Cormorant / system-sans profile and its original type sizes
   and leading. The English leaf measures and paginates against the selected
-  book face, using the current whole-word rag and full-column bismillah fit.
+    book face, using whole-word justification and full-column bismillah fit.
+  Each selected book face uses one font size across all English leaves;
+  long verses continue onto the next leaf instead of shrinking the type.
   Customize previews and share images follow the selected profile too.
   Arabic typefaces and sizing stay the same.
 - **The reader's hand**: Junicode's real *Italic* at Medium for verse notes,

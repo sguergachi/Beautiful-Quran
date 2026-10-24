@@ -87,7 +87,7 @@ import com.beautifulquran.domain.MushafToken
 import com.beautifulquran.domain.englishLeaf
 import com.beautifulquran.domain.englishLeafBreak
 import com.beautifulquran.domain.englishLeafFittedLeadingEm
-import com.beautifulquran.domain.englishLeafOverflowHandPx
+import com.beautifulquran.domain.englishLeafClosingLeadingEm
 import com.beautifulquran.domain.englishLeafHandPx
 import com.beautifulquran.domain.EnglishLeafFill
 import com.beautifulquran.domain.EnglishLeafRuler
@@ -770,18 +770,9 @@ private val EnglishLeafSettings = object : LinkedHashMap<EnglishLeafSettingKey, 
 }
 
 /**
- * Sets the leaf: the book's hand and the book's leading, then a measurement to
- * make sure the block really does fit the well.
- *
- * Neither number is this leaf's to choose. The hand is the book's, cut for the
- * heaviest leaf in it; the leading is the book's, one figure for all 604
- * leaves (`EnglishLeafFit.kt`). A page that respaced its lines to fill itself
- * would be a page a reader sees change as they turn onto it, which is a worse
- * fault than the white this leaves at the foot.
- *
- * So the only thing solved here is the guarantee: the leaf is measured as it
- * will be drawn, and the leading closes — on that leaf alone, and only far
- * enough — if the estimate the hand was cut from turns out to be wrong here.
+ * Keeps the book's type size and fits only the leading to the measured leaf.
+ * The ruler already paginates at this same hand, carrying long verses across
+ * leaves. A page must never change font size to absorb its amount of text.
  */
 private fun setEnglishLeaf(
     blocks: List<EnglishLeafBlockText>,
@@ -793,54 +784,33 @@ private fun setEnglishLeaf(
     justifyLast: Boolean,
 ): EnglishLeafSetting {
     val requestedLeading = typePalette.leafLeadingEm
-    var handPx = englishBookHandPx(wellPx, measurePx, density, measurer, typePalette)
-    // Three passes at most, and all but one leaf in the book settles on the
-    // first: the hand is the book's, the leading is the book's, and the leaf
-    // fits. The rest is the rescue — close the leading to its floor, and if the
-    // block still stands past the foot, give up a little of the hand. See
-    // englishLeafOverflowHandPx for why that order and not the other.
-    repeat(3) { pass ->
-        val basmalahPx = englishBasmalahPx(handPx, measurePx, density, measurer, typePalette)
-        val pitches = englishLeafPitches(blocks, handPx, measurePx, density, measurer, typePalette, justifyLast)
-        val stands = englishLeafHeightPx(
-            blocks,
-            handPx,
-            basmalahPx,
-            requestedLeading,
-            measurePx,
-            density,
-            measurer,
-            typePalette,
-            justifyLast,
+    val handPx = englishBookHandPx(wellPx, measurePx, density, measurer, typePalette)
+    val basmalahPx = englishBasmalahPx(handPx, measurePx, density, measurer, typePalette)
+    val pitches = englishLeafPitches(blocks, handPx, measurePx, density, measurer, typePalette, justifyLast)
+    val stands = englishLeafHeightPx(
+        blocks, handPx, basmalahPx, requestedLeading, measurePx, density,
+        measurer, typePalette, justifyLast,
+    )
+    val pitchesPx = (pitches * handPx).coerceAtLeast(1f)
+    var leadingEm = englishLeafFittedLeadingEm(requestedLeading, stands, wellPx, pitchesPx)
+    // Paragraph heights round to pixels while opening furniture keeps fractional
+    // pitches. Check the fitted result, correcting only leading if it overruns.
+    for (pass in 0 until 2) {
+        if (leadingEm == requestedLeading) break
+        val fittedHeight = englishLeafHeightPx(
+            blocks, handPx, basmalahPx, leadingEm, measurePx, density,
+            measurer, typePalette, justifyLast,
         )
-        val leadingEm = englishLeafFittedLeadingEm(
-            leadingEm = requestedLeading,
-            measuredHeightPx = stands,
-            wellHeightPx = wellPx,
-            pitchesPx = (pitches * handPx).coerceAtLeast(1f),
-        )
-        // What the block stands at the leading it will actually be drawn on.
-        // Only a *closed* leading counts here. Carding the leading out fills a
-        // short leaf to its foot, which raises the block to about the well's
-        // own height — and feeding that back into the overflow test reads a
-        // filled leaf as an overflowing one and gives up hand for it. The leaf
-        // then sets smaller type than the ruler paginated it for and comes out
-        // a line short, its last line half empty. The rescue is for leaves that
-        // run past the foot; a leaf carded to reach the foot has not.
-        val closed = stands -
-            (requestedLeading - minOf(leadingEm, requestedLeading)) *
-            pitches * handPx
-        val next = englishLeafOverflowHandPx(handPx, closed, wellPx)
-        if (next >= handPx || pass == 2) {
-            return EnglishLeafSetting(
-                handPx = handPx,
-                lineInkPx = englishLineInkPx(handPx, density, measurer, typePalette),
-                leadingEm = leadingEm,
-            )
-        }
-        handPx = next
+        if (fittedHeight <= wellPx) break
+        val next = englishLeafClosingLeadingEm(leadingEm, fittedHeight, wellPx, pitchesPx, handPx)
+        if (next >= leadingEm) break
+        leadingEm = next
     }
-    error("unreachable")
+    return EnglishLeafSetting(
+        handPx = handPx,
+        lineInkPx = englishLineInkPx(handPx, density, measurer, typePalette),
+        leadingEm = leadingEm,
+    )
 }
 
 /**
@@ -2513,12 +2483,28 @@ internal fun englishJustifyAudit(
     var unjustified = 0
     var ragged = 0
     var edgeMisses = 0
+    var minHandPx = handPx
+    var maxHandPx = handPx
+    val overflows = ArrayList<String>()
     synchronized(EnglishRagMemo) { EnglishRagMemo.clear() }
     book.leaves.forEachIndexed { index, bookLeaf ->
         val blocks = englishLeafBlockTexts(
             englishLeaf(bookLeaf.page, bookLeaf.runs, translation),
             emptyMap(), emptyMap(), Color.Black, Color.Black, verseNumberScript, typePalette,
         )
+        val justifyLast = (blocks.lastOrNull() as? EnglishLeafBlockText.Prose)?.proseRunsOn(surahsById) == true
+        val setting = setEnglishLeaf(blocks, wellPx, measurePx, density, measurer, typePalette, justifyLast)
+        minHandPx = minOf(minHandPx, setting.handPx)
+        maxHandPx = maxOf(maxHandPx, setting.handPx)
+        val heightPx = englishLeafHeightPx(
+            blocks, setting.handPx,
+            englishBasmalahPx(setting.handPx, measurePx, density, measurer, typePalette),
+            setting.leadingEm, measurePx, density, measurer, typePalette, justifyLast,
+        )
+        if (heightPx > wellPx + 1f) {
+            overflows += "leaf ${index + 1} ${bookLeaf.runs.first().key}: " +
+                "height=$heightPx well=$wellPx leading=${setting.leadingEm}"
+        }
         blocks.forEach { block ->
             if (block !is EnglishLeafBlockText.Prose) return@forEach
             val justifyLast = block === blocks.last() && block.proseRunsOn(surahsById)
@@ -2563,6 +2549,8 @@ internal fun englishJustifyAudit(
             "leaves=${book.leaves.size} lines=$lines justified=${seen.size} unjustified=$unjustified " +
                 "raggedParagraphs=$ragged edgeMisses=$edgeMisses",
         )
+        appendLine("book font px=$handPx leaf font min=$minHandPx max=$maxHandPx overflows=${overflows.size}")
+        overflows.forEach { appendLine("  overflow: $it") }
         appendLine(
             "word space em: p10=%.3f p50=%.3f p90=%.3f p99=%.3f max=%.3f; over 0.4em: %d, over 0.5em: %d".format(
                 spaces.q(0.10), spaces.q(0.50), spaces.q(0.90), spaces.q(0.99), spaces.maxOrNull() ?: 0f,
