@@ -40,7 +40,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -714,8 +714,10 @@ fun HomeScreen(
                     Spacer(Modifier.height(SearchBottomBreath))
                 }
                 // Every chapter row, in order or pinned atop the list, is the
-                // same row; only the place ribbon follows [placeKey].
-                val pinnedIds = remember(uiState.pinned) { uiState.pinned.mapTo(HashSet()) { it.id } }
+                // same row; only the place ribbon follows [placeKey]. One set
+                // decides both the band and the list below it, so neither can
+                // keep a copy of the other's chapter.
+                val pinnedIds = uiState.pinned.mapTo(HashSet()) { it.id }
                 // Pinning a chapter from the top of the sheet would grow the
                 // group above the viewport, out of sight (the list holds its
                 // place by key). Bring the group down into view instead; a
@@ -727,9 +729,9 @@ fun HomeScreen(
                         listState.animateScrollToItem(0)
                     }
                 }
-                // A pinned chapter moves up into the band rather than showing
-                // twice on one sheet; unpinning returns it to its place.
-                val listedSurahs = if (showPinned) uiState.surahs.filterNot { it.id in pinnedIds } else uiState.surahs
+                // The band is the head of the chapter list, not a second list;
+                // see [chapterRows].
+                val bandCount = if (showPinned) uiState.pinned.size else 0
                 // The chapter just pinned or unpinned travels to its new seat
                 // above the others, still wet, and dries off over the glide.
                 // Held here, not in the row: the row restarts in its new seat.
@@ -866,29 +868,32 @@ fun HomeScreen(
                                     ),
                             )
                         }
-                        // One key per chapter wherever it sits: pinning moves the
-                        // very row up into the band (and unpinning back down),
-                        // and the list closes or opens its gap as it goes.
-                        items(uiState.pinned, key = { chapterKey(it.id) }) { surah ->
-                            chapterRow(
-                                surah,
-                                chapterKey(surah.id),
-                                Modifier
-                                    .animateItem(placementSpec = ChapterReflowSpec)
-                                    .pinnedBand(),
-                                PinnedRowVertical,
-                            )
-                        }
-                        item(key = "pinned-gap") {
-                            Spacer(Modifier.height(PinnedGroupGap).animateItem())
-                        }
                     }
-                    items(listedSurahs, key = { chapterKey(it.id) }) { surah ->
+                    // One key per chapter wherever it sits: the pinned head and
+                    // the list are the same interval, so pinning moves the very
+                    // row up into the band (and unpinning back down) and the
+                    // rows around it close or open.
+                    itemsIndexed(
+                        chapterRows(uiState.pinned, uiState.surahs, showPinned),
+                        key = { _, surah -> chapterKey(surah.id) },
+                    ) { index, surah ->
+                        val pinned = index < bandCount
                         chapterRow(
                             surah,
                             chapterKey(surah.id),
-                            Modifier.animateItem(placementSpec = ChapterReflowSpec),
-                            ContinueRowVertical,
+                            Modifier
+                                .animateItem(placementSpec = ChapterReflowSpec)
+                                .then(if (pinned) Modifier.pinnedBand() else Modifier)
+                                // The band closes with its own air before the
+                                // full list resumes.
+                                .then(
+                                    if (bandCount > 0 && index == bandCount) {
+                                        Modifier.padding(top = PinnedGroupGap)
+                                    } else {
+                                        Modifier
+                                    },
+                                ),
+                            if (pinned) PinnedRowVertical else ContinueRowVertical,
                         )
                     }
 
@@ -1289,14 +1294,14 @@ internal fun continueLazyIndex(
     surahIds: List<Int>,
     continueId: Int?,
     searching: Boolean,
-    /** The pinned block leads the list: air, its flag, its rows, its gap. */
+    /** The pinned block leads the list: air, then its flag, then its rows. */
     pinnedOrder: List<Int> = emptyList(),
 ): Int {
     if (searching || continueId == null) return -1
     val pinned = pinnedOrder.indexOf(continueId)
     if (pinned >= 0) return 2 + pinned
     val position = surahIds.indexOf(continueId)
-    val lead = if (pinnedOrder.isEmpty()) 0 else pinnedOrder.size + 3
+    val lead = if (pinnedOrder.isEmpty()) 0 else pinnedOrder.size + 2
     return if (position < 0) -1 else lead + position
 }
 
@@ -1315,6 +1320,25 @@ private fun Modifier.pinnedBand(): Modifier = composed {
 /** A chapter row's one key, on the band or in the list: a pinned chapter
  * moves rather than showing twice, so the row itself can travel. */
 internal fun chapterKey(surahId: Int): String = "chapter-$surahId"
+
+/**
+ * The sheet's chapter rows: the pinned band leads, then every other chapter
+ * in order. One row per chapter, always.
+ *
+ * The band is the head of the list, not a list of its own. Pinning therefore
+ * *reorders* a chapter to the top instead of handing its key from one lazy
+ * interval to another — a hand-over that could emit the same key twice in a
+ * frame and crash the list as the filled row moved.
+ */
+internal fun chapterRows(
+    pinned: List<Surah>,
+    surahs: List<Surah>,
+    showPinned: Boolean,
+): List<Surah> {
+    if (!showPinned) return surahs
+    val pinnedIds = pinned.mapTo(HashSet()) { it.id }
+    return pinned + surahs.filterNot { it.id in pinnedIds }
+}
 
 /** Key of the chapter row that owns the reading place. */
 internal fun placeRowKey(continueId: Int?): String? = continueId?.let(::chapterKey)

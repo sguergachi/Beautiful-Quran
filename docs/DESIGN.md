@@ -1680,8 +1680,8 @@ strip this thin (a deliberate form has no room to develop in it). The ink
 waits 150 ms under an unhurried finger — a soft haptic tick says the hold
 has taken — then deepens over the next 550 ms in step with the hold;
 holding it full is the act, marked by a firm confirm tick, and the pin
-toggles. The very row then **travels** to its new seat (one key per chapter,
-band or list; 420 ms, every row's placement animated, so the list closes or
+toggles. The very row then **travels** to its new seat (one key per chapter
+inside one list; 420 ms, every row's placement animated, so the list closes or
 opens its gap around it), drawn above the rows it passes and carrying its
 own paper, and its wet ink **dries off** over 650 ms: down to the band's
 wash when pinned, to bare paper when unpinned. An even tint that only
@@ -1716,12 +1716,15 @@ Rows are set compact (10 dp bands against the list's 15 dp) on the list's
 own rails, so numbers and names stay aligned with the chapters below. The flag takes the search list's first-label air
 (16 dp) above it, and 20 dp of paper separates the band from the list.
 
-A pinned chapter **moves** into the band: it is left out of the list below,
-so no chapter shows twice on one sheet, and unpinning returns it to its
-place.
-Both sections capture one `HomeUiState` value for each composition. The lazy
-content must not reread the live state while using a previously filtered
-list: a pin would then put the same chapter key in both sections and crash.
+A pinned chapter **moves** into the band, and unpinning returns it to its
+place. The band is the head of the **one** chapter list, not a second list:
+pinning is a reorder to the top, so the row keeps its single key
+(`chapter-N`) inside a single lazy interval, which is both what lets it
+glide and what makes a second copy impossible. Never emit a chapter from a
+second `items(...)` interval: handing a row's key from one interval to
+another is what raised `Key "chapter-N" was already used` and killed the app
+as the filled row let go. `chapterRows` builds that one list; it drops any
+chapter the band already holds.
 
 Tried and rejected, in order: a twisted cord in the trailing gutter (ugly);
 an ink nuqta under a closing hairline; one inset rounded rectangle joining
@@ -1743,7 +1746,7 @@ and leaving Chapters by any route while it is up puts it away, so it can
 never hold the stack or Back from behind the reader. See
 [CONTEXTUAL_GUIDES.md](CONTEXTUAL_GUIDES.md).
 
-Implementation: `pinnedBand`, `holdToPin` / `holdOutcome` / `holdFillProgress` /
+Implementation: `pinnedBand`, `chapterRows`, `holdToPin` / `holdOutcome` / `holdFillProgress` /
 `holdPace` and the list in
 `ui/home/HomeScreen.kt`.
 

@@ -1,6 +1,7 @@
 package com.beautifulquran.ui.home
 
 import androidx.compose.ui.unit.dp
+import com.beautifulquran.data.model.Surah
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -187,12 +188,29 @@ class ContinuePillVisibilityTest {
         // One key per chapter, on the band or in the list, so a pin moves it.
         assertEquals("chapter-67", placeRowKey(67))
         // Pinned chapters leave the list below, so unpinned ones sit after
-        // air, flag, both rows and the gap, at their place among the rest.
+        // air, flag and both rows, at their place among the rest.
         val listed = ids - pinned.toSet()
-        assertEquals(5, continueLazyIndex(listed, 1, false, pinned))
-        assertEquals(5 + 18, continueLazyIndex(listed, 20, false, pinned))
+        assertEquals(4, continueLazyIndex(listed, 1, false, pinned))
+        assertEquals(4 + 18, continueLazyIndex(listed, 20, false, pinned))
         assertEquals("chapter-1", placeRowKey(1))
         assertEquals(null, placeRowKey(null))
+    }
+
+    @Test
+    fun chapterRowsNeverEmitAChapterTwice() {
+        fun surah(id: Int) = Surah(id, "arabic", "name$id", "meaning", "meccan", 7)
+        val ids = listOf(1, 2, 3)
+        val pinned = listOf(surah(2))
+        // The band leads the list and the list below loses the pinned chapter,
+        // so a pin is a reorder inside one interval: one row per chapter.
+        val rows = chapterRows(pinned, ids.map(::surah), showPinned = true)
+        assertEquals(listOf(2, 1, 3), rows.map { it.id })
+        // Even if the two sources disagreed, the band's copy wins and the
+        // duplicate is dropped rather than reaching the list as a second key.
+        val noisy = chapterRows(pinned, listOf(surah(2), surah(1)), showPinned = true)
+        assertEquals(listOf(2, 1), noisy.map { it.id })
+        // Search takes the band down and lists every chapter in its own order.
+        assertEquals(ids, chapterRows(pinned, ids.map(::surah), showPinned = false).map { it.id })
     }
 
     @Test
