@@ -5,6 +5,27 @@ verdict has reviewed them yet. The fail-closed delta gate withholds each of
 them; this file keeps that from being silent. Remove an entry when its rows ship
 with a verdict, are held with their model scores, or its cause is reverted.
 
+## Merged fragment leads (2026-10-23)
+
+The [complete delivered-source review](../../docs/quality-reviews/TIMING_FRAGMENT_LEADS_2026-10-23.md)
+inspected 193 eligible source fragment pairs across the six authenticated
+voices, within an 81,059-row delivered corpus. Eight qualify for the new
+stolen-tail detector; all eight and four genuine-repeat/older-lead controls
+have both acoustic witnesses. Five candidates pass; three remain at baseline:
+Abdul Basit 34:27, Sudais 4:104 and Sudais 21:28. Their source-derived starts
+improve both row means but remain 264–332 ms from an acoustic witness, beyond
+this review's 250 ms onset limit. Do not silently promote those partial
+boundary improvements. Their exact candidates and model metrics are held in
+`qf-source-transition.json` and `../timing_evidence/fragment-lead-review.json`.
+
+The legacy source scan found twelve qualifying rows. Four extra legacy
+examples (Alafasy 4:171, 5:5, 7:117, 33:51) are absent from the authenticated
+candidate cohort; that old-source replay is not a publication verdict.
+Other non-duplicate boundary residuals in Alafasy 64:11 (positions 4, 9, 10)
+are outside this detector and remain unchanged. Forced-label residuals alone
+do not establish an exact spoken onset; these require their own waveform and
+class review. No general timing-accuracy claim follows from this cohort.
+
 ## Audio-vetted rewind onset (#873)
 
 The typed Alafasy 5:2 correction removes only the unspoken word 15 at
