@@ -16,6 +16,7 @@ import tempfile
 PROBE = r'''
 import com.beautifulquran.domain.EnglishWordAlignment
 import com.beautifulquran.domain.EnglishAlignment
+import com.beautifulquran.domain.AudibleSilence
 import com.beautifulquran.data.model.Segment
 import com.beautifulquran.ui.reader.*
 import java.io.File
@@ -33,11 +34,11 @@ fun main(args: Array<String>) {
     File(args[2], "exposure.tsv").bufferedWriter().use { exposures ->
         File(args[2], "plans.tsv").bufferedWriter().use { plans ->
             exposures.appendLine("reciter\tverse\tword\ttext\tstart_ms\tend_ms\tsemantic_owner\tend_minus_owner_end_ms")
-            plans.appendLine("reciter\tverse\tblocks\treordered_blocks\trepeat_fallbacks\tearly_words\tlate_words\tsource_overlap_fallbacks\tcontained_cores\tcrossing_cores\tcore_collapses\tnew_collapses\tsource_order_skips\trepeat_collapses\tother_legacy_collapses\twhitespace_collapses")
+            plans.appendLine("reciter\tverse\tblocks\treordered_blocks\trepeat_fallbacks\tearly_words\tlate_words\tsource_overlap_fallbacks\tcontained_cores\tcrossing_cores\tcore_collapses\tnew_collapses\tsource_order_skips\trepeat_collapses\tother_legacy_collapses\twhitespace_collapses\treading_flow\treading_fallback\trate_checks\tpause_checks")
             cores.appendLine("reciter\tverse\ttext\tfrom\tto\tband_owner\tstart_ms\tend_ms\tlegacy_start_ms\tlegacy_end_ms\treason")
             crossings.appendLine("reciter\tverse\ttext\tfrom\tto\tplan_contained\tlegacy_contained")
             File(args[1]).forEachLine { line ->
-                val (reciter, key, encoded, voiceStart) = line.split('\t')
+                val (reciter, key, encoded, voiceStart, quiet) = line.split('\t')
                 val row = corpus[key] ?: error("Missing verse $key")
                 val text = row[1]
                 val alignment = cache.getOrPut(key) {
@@ -46,7 +47,10 @@ fun main(args: Array<String>) {
                 val segments = encoded.split(';').map {
                     val (p, s, e) = it.split(',').map(String::toLong); Segment(p.toInt(), s, e)
                 }
-                val plan = englishPresentationPlan(alignment, segments, voiceStart.toLong())
+                val silence = if (quiet.isEmpty()) emptyList() else quiet.split(';').map {
+                    val (s, e) = it.split(',').map(String::toLong); AudibleSilence(s, e)
+                }
+                val plan = englishPresentationPlan(alignment, segments, voiceStart.toLong(), silence)
                 check(plan.spans.first().from == 0f && plan.spans.last().to == 1f) { "$reciter $key ends" }
                 plan.spans.zipWithNext().forEach { (a, b) -> check(a.to == b.from) { "$key hole" } }
                 val windows = plan.spans.map { plan.windows.getValue(it.position) }
@@ -58,6 +62,27 @@ fun main(args: Array<String>) {
                     val at = segments.last().endMs * step / 100
                     val edge = englishWashThrough(plan, at)!!
                     check(edge >= last) { "$reciter $key retreat" }; last = edge
+                }
+                var rateChecks = 0; var pauseChecks = 0
+                plan.readingFlow?.clock?.let { clock ->
+                    val audible = clock.spoken.orEmpty()
+                    val duration = audible.sumOf { it.last - it.first }
+                    val boundaries = (segments.map { it.startMs } + plan.windows.values.map { it.endMs }).distinct()
+                    for (at in boundaries) {
+                        if (audible.none { at - 1 >= it.first && at + 1 <= it.last }) continue
+                        val delta = englishWashThrough(plan, at + 1)!! - englishWashThrough(plan, at - 1)!!
+                        check(kotlin.math.abs(delta - 2f / duration) < .00001f) { "$reciter $key rate reset at $at: $delta" }
+                        rateChecks++
+                    }
+                    audible.zipWithNext().forEach { (a, b) ->
+                        val held = englishWashThrough(plan, a.last)!!
+                        for (at in listOf(a.last, (a.last + b.first) / 2, b.first)) {
+                            check(kotlin.math.abs(englishWashThrough(plan, at)!! - held) < .000001f) { "$reciter $key quiet moves" }
+                        }
+                        check(kotlin.math.abs(clock.mediaAt(held) - a.last) <= 1) { "$reciter $key earliest pause finish" }
+                        check(kotlin.math.abs(clock.mediaAt(held, afterGap = true) - b.first) <= 1) { "$reciter $key latest pause start ${clock.mediaAt(held, afterGap = true)} vs ${b.first}" }
+                        pauseChecks++
+                    }
                 }
                 val legacy = EnglishWashPlan(alignment.washSpans,
                     englishWashWindows(alignment.washSpans.map { it.position }, segments).mapValues { (owner, window) ->
@@ -113,7 +138,7 @@ fun main(args: Array<String>) {
                     exposures.appendLine("$reciter\t$key\t${index + 1}\t${word.value}\t${window.startMs}\t${window.endMs}\t$owner\t${delta ?: ""}")
                 }
                 val reordered = alignment.presentationSpans.count { it.lastPosition > it.position }
-                plans.appendLine("$reciter\t$key\t${plan.spans.size}\t$reordered\t${plan.repeatFallbacks}\t$early\t$late\t${plan.sourceOverlapFallbacks}\t$coreCount\t$crossingCount\t$collapsed\t$introduced\t$skips\t$repeats\t$others\t$whitespaceCollapses")
+                plans.appendLine("$reciter\t$key\t${plan.spans.size}\t$reordered\t${plan.repeatFallbacks}\t$early\t$late\t${plan.sourceOverlapFallbacks}\t$coreCount\t$crossingCount\t$collapsed\t$introduced\t$skips\t$repeats\t$others\t$whitespaceCollapses\t${if (plan.readingFlow != null) 1 else 0}\t${plan.readingFlowFallback ?: ""}\t$rateChecks\t$pauseChecks")
             }
         }
     }
@@ -134,10 +159,23 @@ def main():
     source = Path(__file__).resolve().parents[1] / "app/src/main/java/com/beautifulquran"
     names = ["domain/EnglishWordAlignment.kt", "domain/EnglishPhrase.kt", "domain/EnglishTypography.kt",
              "domain/ArabicNormalize.kt", "data/model/Models.kt", "ui/reader/EnglishWashPlan.kt",
-             "ui/reader/EnglishWashWindow.kt"]
+             "ui/reader/EnglishWashWindow.kt", "ui/reader/EnglishReadingFlow.kt", "domain/VerseOpening.kt"]
     sources = [source / name for name in names]
     with sqlite3.connect(f"file:{args.timings_cache.resolve()}?mode=ro", uri=True) as database:
         revisions = dict(database.execute("SELECT reciter_id, revision FROM timing_state"))
+        silence_by_key = {}
+        silence_sources = {}
+        for reciter in revisions:
+            asset = source.parents[2] / "assets/silence" / f"{reciter}.txt"
+            if not asset.exists():
+                silence_sources[reciter] = None
+                continue
+            silence_sources[reciter] = hashlib.sha256(asset.read_bytes()).hexdigest()
+            for line in asset.read_text().splitlines():
+                if not line or line.startswith("#"):
+                    continue
+                surah, ayah, start, end = map(int, line.split())
+                silence_by_key.setdefault((reciter, surah, ayah), []).append((start, end))
         with tempfile.TemporaryDirectory(prefix="bq-phrase-audit-") as directory:
             directory = Path(directory)
             timings = directory / "timings.tsv"
@@ -149,7 +187,8 @@ def main():
                     if not segments:
                         raise ValueError(f"Empty timing row: {reciter} {surah}:{ayah}")
                     stream.write(f"{reciter}\t{surah}:{ayah}\t" + ";".join(",".join(map(str, row)) for row in segments)
-                                 + f"\t{max(onset, segments[0][1])}\n")
+                                 + f"\t{max(onset, segments[0][1])}\t"
+                                 + ";".join(f"{start},{end}" for start, end in silence_by_key.get((reciter, surah, ayah), [])) + "\n")
             # Compile the actual legacy function, not a second implementation
             # of its repeat/next-owner fences. Its surrounding file needs UI types.
             clock = source / "ui/reader/EnglishWashClock.kt"
@@ -180,6 +219,12 @@ def main():
         "collapsed_whitespace_tokens": sum(int(row[15]) for row in rows),
         "words_over_100ms_before_semantic_owner_end": sum(int(row[5]) for row in rows),
         "words_over_100ms_after_semantic_owner_end": sum(int(row[6]) for row in rows),
+        "steady_reading_rows": sum(int(row[16]) for row in rows),
+        "reading_flow_fallback_rows": {reason: sum(row[17] == reason for row in rows)
+                                       for reason in sorted({row[17] for row in rows if row[17]})},
+        "constant_rate_checks": sum(int(row[18]) for row in rows),
+        "pause_plateau_checks": sum(int(row[19]) for row in rows),
+        "measured_silence_sources": silence_sources,
         "semantic_accuracy_established": False,
         "readability_certified": False,
         "legacy_window_source_sha256": hashlib.sha256(clock.read_bytes()).hexdigest(),

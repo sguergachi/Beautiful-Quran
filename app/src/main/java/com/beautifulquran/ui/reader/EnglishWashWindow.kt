@@ -1,10 +1,13 @@
 package com.beautifulquran.ui.reader
 
+import kotlin.math.roundToLong
+
 /** A first wash ends before a repeat, the next band, or the recitation's end. */
 internal data class EnglishWashWindow(
     val startMs: Long,
     val endMs: Long,
     val spoken: List<LongRange>? = null,
+    val reading: EnglishReadingWindow? = null,
 ) {
     private val intervals = spoken.orEmpty()
     private val accumulated = LongArray(intervals.size + 1).also { sums ->
@@ -25,6 +28,17 @@ internal data class EnglishWashWindow(
 
     fun progress(positionMs: Long, voiceStartMs: Long = startMs): Float {
         val start = maxOf(startMs, voiceStartMs).coerceAtMost(endMs)
+        if (reading != null) {
+            // Inverse endpoints are rounded diagnostics. Only an additional
+            // explicit voice gate may clip the shared continuous projection.
+            if (voiceStartMs <= startMs) return reading.progress(positionMs)
+            if (positionMs < start) return 0f
+            if (start >= endMs) return 1f
+            // Rounded inverse endpoints are metadata, not a new phase origin.
+            val from = if (voiceStartMs > startMs) reading.progress(start) else 0f
+            if (from >= 1f) return 1f
+            return ((reading.progress(positionMs) - from) / (1f - from)).coerceIn(0f, 1f)
+        }
         if (positionMs < start) return 0f
         if (positionMs >= endMs) return 1f
         if (spoken == null) return (positionMs - start).toFloat() / (endMs - start)
@@ -37,10 +51,17 @@ internal data class EnglishWashWindow(
     fun mediaAt(progress: Float, afterGap: Boolean = false, voiceStartMs: Long = startMs): Long {
         val fraction = progress.coerceIn(0f, 1f)
         val start = maxOf(startMs, voiceStartMs).coerceAtMost(endMs)
+        if (reading != null) {
+            val from = if (voiceStartMs > startMs) reading.progress(start) else 0f
+            return reading.mediaAt(from + (1f - from) * fraction, afterGap).coerceIn(start, endMs)
+        }
         if (spoken == null) return start + ((endMs - start) * fraction).toLong()
         if (intervals.isEmpty()) return if (fraction == 0f) start else endMs
         val consumed = spokenUntil(start)
-        val target = consumed + (accumulated.last() - consumed) * fraction
+        val rawTarget = consumed + (accumulated.last() - consumed) * fraction.toDouble()
+        // The media clock is integer milliseconds. Quantize before choosing a
+        // pause's side: Float round trips must not select across a long silence.
+        val target = rawTarget.roundToLong().toDouble()
         val index = intervals.indices.firstOrNull {
             if (afterGap) target < accumulated[it + 1] else target <= accumulated[it + 1]
         } ?: intervals.lastIndex

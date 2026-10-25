@@ -57,9 +57,11 @@ source. Semantic ranges and continuous forward wash bands are projected once
 when the paragraph is built. Frames read the existing Arabic motions; adjacent
 paper covers with equal alpha merge, and one band carries the active soft edge.
 The pure whole-verse phrase plan is cached against the immutable alignment,
-text source and actual timing snapshot; a provider timing replacement rebuilds
-it. Drawing and page follow read the same plan. Voiced progress uses a binary
-search over cached interval sums. Printed word ranges are cached with the paragraph. Both the base cover and
+text source, reciter, actual timing snapshot, first-voice gate and measured
+quiet; a provider timing replacement rebuilds it. Drawing and page follow read
+the same plan. Connected translation speech uses one cumulative audible-time
+clock, projected into cached geometry partitions. Its normalized speech union
+and quiet subtraction are built once; frames binary-search cached interval sums. Printed word ranges are cached with the paragraph. Both the base cover and
 paper material use the same per-word projection of that edge; only one next
 unread word per verse requests material prewarming.
 First-pass glimmer shares that band; repeats keep the semantic ranges. Geometry

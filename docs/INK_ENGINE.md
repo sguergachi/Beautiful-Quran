@@ -693,32 +693,39 @@ media frame as Arabic. There is no second audio anchor. Pause and buffering
 freeze it; speed, seeks, reciter ownership and timing replacement retain the
 shared frame contract.
 
-Published translation uses a pure `EnglishWashPlan`. Verified content anchors
-retain their provenance from `align()`. Adjacent source intervals close their
-inversions into the smallest reordered phrases, including shared-owner ties.
-Weak grammar joins within that closed interval without setting its extent;
-normal sequences keep their word boundaries. This readable presentation can
-reach an English meaning later than its Arabic owner, as the user requested
-on October 24. Semantic taps, holds and repeat labels remain in the alignment.
-Word-card English retains its existing forward ranges and linear occurrence
-windows, including silence up to the next owner/repeat fence. Its null phrase
-plan selects that legacy clock explicitly; it does not acquire the published
-translation's voiced-end caps or voiced-time union.
+Published translation uses one steady reading clock through each safe forward
+verse. `EnglishPhrase` still closes reliable content anchors into reordered
+ranges, while semantic taps, holds and repeat labels stay in the alignment.
+These ranges partition geometry; they no longer give every word a separate
+velocity or stop at an Arabic owner's end. The user clarified on October 25
+that connected speech should carry constant paced movement.
 
-After phrase construction, adjacent source intervals must be disjoint. If weak
-next-clause text still shares a closed phrase's source tail, the partition is
-ambiguous (2:175). That whole verse explicitly retains legacy next-owner/repeat
-fences and all voiced speech before each fence. `sourceOverlapFallbacks` counts
-this separately from internal-repeat fallbacks. Grammar is not merged across
-the clause, and later text is not clamped to an exhausted source interval.
+`EnglishReadingFlow` sums the union of **all** source segments in the run,
+including owners swallowed by the English order, then subtracts the normalized,
+clipped measured quiet once. The printed prefix is linear in cumulative audible
+time. Source gaps and measured silence hold the exact fractional edge reached
+at their start, including inside an inversion; neither punctuation nor a word
+boundary snaps that edge. Resuming continues at the same rate. The existing
+first-voice gate and terminal fence bound the run. No live integrator or extra
+calibration is involved.
 
-Each window sums the union of actual voiced intervals, so known gaps hold the
-edge and overlaps count once. Normal bands end with their represented speech,
-without stretching across swallowed Arabic owners. Terminal residuals preserve
-the established verse-tail completion rule. A proposed phrase containing an
-internal backward repeat falls back to its legacy ranges and occurrence fences;
-it never borrows the later occurrence to lengthen the first pass. The 24:1
-repeat and 24:2 terminal-tail/carried-cut controls remain explicit tests.
+`EnglishReadingWindow` projects this same clock into each geometry span.
+Printed finish times, material cooling and follow invert the shared mapping.
+Inverse targets are quantized to integer media milliseconds before choosing a
+pause's earliest finish or latest start. Rounded endpoints are diagnostics and
+must never re-anchor or clip the default runtime projection.
+
+Word-card English (`phrases == null`) retains its actual linear legacy windows,
+including the pause before the next owner. Ambiguous source partitions retain
+the complete legacy occurrence bands (`sourceOverlapFallbacks`); verses with
+backward/same-word source repeats keep their reviewed occurrence policy too.
+Zero audible time or unusable source windows have explicit reading-flow fallback
+reasons. The 24:1 repeat and 24:2 terminal-tail/carried-cut guards remain.
+
+Measured quiet currently comes from the existing Hani asset, attached by actual
+audio ayah and reciter to `EnglishWashClock`; other voices use known timing gaps.
+This is limited pause evidence, not a claim that timing segments detect every
+acoustic stop. See the [steady-reading report](quality-reviews/ENGLISH_READING_FLOW_2026-10-25.md).
 
 The renderer and carried-leaf follow consume the same cached whole-verse plan.
 `EnglishLeafVerse.fragmentWashProgress` projects its edge through exact letter

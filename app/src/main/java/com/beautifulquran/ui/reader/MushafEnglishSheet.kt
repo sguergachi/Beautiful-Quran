@@ -625,11 +625,13 @@ internal fun rememberEnglishWashWindows(
     val segments by remember { derivedStateOf(structuralEqualityPolicy()) { clock.value?.segments.orEmpty() } }
     val verse by remember { derivedStateOf(structuralEqualityPolicy()) { clock.value?.let { it.surahId to it.ayah } } }
     val voiceStart by remember { derivedStateOf { clock.value?.voiceStartMs ?: 0L } }
-    return remember(alignments, segments, verse, content, voiceStart) {
+    val silence by remember { derivedStateOf { clock.value?.silence.orEmpty() } }
+    val reciter by remember { derivedStateOf { clock.value?.reciterId } }
+    return remember(alignments, segments, verse, content, voiceStart, silence, reciter) {
         verse?.takeIf { it.first == content.surah.id }?.let { key ->
             val alignment = alignments.alignment(key.second)
             val positions = content.ayahs.firstOrNull { it.number == key.second }?.words?.map { it.position }.orEmpty()
-            mapOf(key to (alignment?.let { englishPresentationPlan(it, segments, voiceStart) }
+            mapOf(key to (alignment?.let { englishPresentationPlan(it, segments, voiceStart, silence) }
                 ?: EnglishWashPlan(emptyList(), englishWashWindows(positions, segments))))
         }.orEmpty()
     }

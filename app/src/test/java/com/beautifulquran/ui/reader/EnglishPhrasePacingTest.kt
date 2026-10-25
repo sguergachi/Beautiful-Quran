@@ -33,7 +33,7 @@ class EnglishPhrasePacingTest {
 
     @Test
     fun `Hani opening stays on its reordered phrase until earth has been spoken`() {
-        val plan = englishPresentationPlan(alignment, hani)
+        val plan = englishPhrasePlan(alignment, hani)
         assertEquals(0, plan.sourceOverlapFallbacks)
         assertEquals(6770L, plan.windows.getValue(1).endMs)
         assertEquals(73, (plan.spans.first().to * text.length).toInt())
@@ -44,7 +44,7 @@ class EnglishPhrasePacingTest {
 
     @Test
     fun `every opening word has an exposure window and semantic owners stay unchanged`() {
-        val plan = englishPresentationPlan(alignment, hani)
+        val plan = englishPhrasePlan(alignment, hani)
         val words = Regex("\\S+").findAll(text.substring(0, 73)).toList()
         assertEquals(14, words.size)
         val exposure = words.map { word ->
@@ -100,7 +100,7 @@ class EnglishPhrasePacingTest {
         assertEquals(7f / 8, phrase.to, 0f)
         assertEquals(10, phrase.position)
         assertEquals(12, phrase.lastPosition)
-        val plan = englishPresentationPlan(aligned, (1..13).map { Segment(it, it * 1000L, (it + 1) * 1000L) })
+        val plan = englishPhrasePlan(aligned, (1..13).map { Segment(it, it * 1000L, (it + 1) * 1000L) })
         plan.spans.map { plan.windows.getValue(it.position) }.zipWithNext().forEach { (a, b) ->
             assertTrue(a.endMs <= b.startMs)
         }
@@ -124,7 +124,7 @@ class EnglishPhrasePacingTest {
     @Test
     fun `Al Baqarah 123 trimmed inversion gap attaches to the preceding closed phrase`() {
         val (text, aligned) = fixture("2:123")
-        val plan = englishPresentationPlan(aligned, fixtureTimings("2:123"))
+        val plan = englishPhrasePlan(aligned, fixtureTimings("2:123"))
         val phrase = aligned.presentationSpans.single { it.position == 10 }
         assertEquals(12, phrase.lastPosition)
         assertEquals(text.indexOf(" no compensation").toFloat(), phrase.from * text.length, .0001f)
@@ -147,7 +147,7 @@ class EnglishPhrasePacingTest {
         val semantic = aligned.spans.toList()
         val timings = fixtureTimings("2:175")
         assertTrue(aligned.presentationSpans.zipWithNext().any { (a, b) -> a.lastPosition >= b.position })
-        val plan = englishPresentationPlan(aligned, timings)
+        val plan = englishPhrasePlan(aligned, timings)
         assertEquals(1, plan.sourceOverlapFallbacks)
         assertEquals(0, plan.repeatFallbacks)
         assertEquals(aligned.washSpans, plan.spans)
@@ -166,7 +166,7 @@ class EnglishPhrasePacingTest {
     @Test
     fun `source overlap fallback keeps voiced gaps voice gate and occurrence fence`() {
         val aligned = synthetic(listOf(2, 1, 2, 4), setOf(0, 1, 3), listOf(0, 0, 1, 1))
-        val plan = englishPresentationPlan(aligned, listOf(Segment(1, 0, 400), Segment(2, 500, 700),
+        val plan = englishPhrasePlan(aligned, listOf(Segment(1, 0, 400), Segment(2, 500, 700),
             Segment(3, 1000, 1200), Segment(2, 1500, 1700), Segment(4, 2000, 2500)), 200)
         assertEquals(1, plan.sourceOverlapFallbacks)
         assertEquals(200L, plan.windows.getValue(1).startMs)
@@ -180,17 +180,17 @@ class EnglishPhrasePacingTest {
 
     @Test
     fun `ordinary order retains word windows and isolated semantic gaps hold ink`() {
-        val monotone = englishPresentationPlan(synthetic(listOf(1, 2, 3)),
+        val monotone = englishPhrasePlan(synthetic(listOf(1, 2, 3)),
             listOf(Segment(1, 0, 400), Segment(2, 1000, 1400), Segment(3, 2000, 2400)))
         assertEquals(listOf(1, 2, 3), monotone.spans.map { it.position })
         assertEquals(400L, monotone.windows.getValue(1).endMs)
         assertEquals(1000L, monotone.windows.getValue(2).startMs)
         assertEquals(1f / 3, englishWashThrough(monotone, 700)!!, 0f)
-        val skipped = englishPresentationPlan(synthetic(listOf(3, 1, 2, 9)), hani)
+        val skipped = englishPhrasePlan(synthetic(listOf(3, 1, 2, 9)), hani)
         assertEquals(3450L, skipped.windows.getValue(1).endMs)
         assertEquals(.75f, englishWashThrough(skipped, 5000)!!, 0f)
         // A normal band owning only Allah ends with Allah, not owner9.
-        val isolated = englishPresentationPlan(synthetic(listOf(2, 9)), hani)
+        val isolated = englishPhrasePlan(synthetic(listOf(2, 9)), hani)
         assertEquals(3150L, isolated.windows.getValue(2).endMs)
         assertEquals(.5f, englishWashThrough(isolated, 6000)!!, 0f)
     }
@@ -219,7 +219,7 @@ class EnglishPhrasePacingTest {
     @Test
     fun `phrase clock holds in silence and unions overlapping source intervals`() {
         val aligned = synthetic(listOf(2, 1, 3))
-        val plan = englishPresentationPlan(aligned,
+        val plan = englishPhrasePlan(aligned,
             listOf(Segment(1, 0, 400), Segment(2, 1000, 1400), Segment(3, 2000, 2400)))
         val clock = plan.windows.getValue(1)
         assertEquals(.5f, clock.progress(400), 0f)
@@ -227,7 +227,7 @@ class EnglishPhrasePacingTest {
         assertEquals(.75f, clock.progress(1200), 0f)
         assertEquals(400L, clock.mediaAt(.5f))
         assertEquals(1000L, clock.mediaAt(.5f, afterGap = true))
-        val overlap = englishPresentationPlan(aligned,
+        val overlap = englishPhrasePlan(aligned,
             listOf(Segment(1, 0, 700), Segment(2, 500, 1000), Segment(3, 1500, 2000)))
         assertEquals(listOf(0L..1000L), overlap.windows.getValue(1).spoken)
         assertEquals(.5f, overlap.windows.getValue(1).progress(500), 0f)
@@ -235,13 +235,13 @@ class EnglishPhrasePacingTest {
 
     @Test
     fun `repeat inside a merged block conservatively retains occurrence fences`() {
-        val plan = englishPresentationPlan(synthetic(listOf(3, 1, 2, 4)),
+        val plan = englishPhrasePlan(synthetic(listOf(3, 1, 2, 4)),
             listOf(1, 2, 1, 2, 3, 4).mapIndexed { i, owner -> Segment(owner, i * 1000L, (i + 1) * 1000L) })
         assertEquals(1, plan.repeatFallbacks)
         assertEquals(2000L, plan.windows.getValue(2).endMs)
         assertEquals(.75f, englishWashThrough(plan, 2000)!!, 0f)
         assertEquals(.75f, englishWashThrough(plan, 3500)!!, 0f)
-        val sameWord = englishPresentationPlan(synthetic(listOf(1, 2)),
+        val sameWord = englishPhrasePlan(synthetic(listOf(1, 2)),
             listOf(Segment(1, 0, 600), Segment(1, 1000, 1600), Segment(2, 2000, 2600)))
         assertEquals(600L, sameWord.windows.getValue(1).endMs)
         assertEquals(.5f, englishWashThrough(sameWord, 1600)!!, 0f)
@@ -255,7 +255,7 @@ class EnglishPhrasePacingTest {
         val aligned = EnglishWordAlignment.align(text, row[2].split('|'), row[4].split('|'), row[5].split('|'))!!
         val tail = listOf(Segment(22, 25530, 26800), Segment(23, 26800, 28490),
             Segment(24, 28490, 32560), Segment(25, 32560, 32930), Segment(26, 32930, 36250))
-        val plan = englishPresentationPlan(aligned, tail)
+        val plan = englishPhrasePlan(aligned, tail)
         assertEquals(36250L, plan.windows.getValue(22).endMs)
         val cut = text.indexOf("punishment")
         val book = englishBookOf(listOf(listOf(EnglishVerseRun(24, 2, 0, cut)),
@@ -279,7 +279,7 @@ class EnglishPhrasePacingTest {
         val row = javaClass.getResourceAsStream("/english-quran-ai-opening-owners.tsv")!!.bufferedReader()
             .use { it.readLines().first { row -> row.startsWith("24:1\t") } }.split('\t')
         val aligned = EnglishWordAlignment.align(row[1], row[2].split('|'), row[4].split('|'), row[5].split('|'))!!
-        val plan = englishPresentationPlan(aligned, listOf(1, 2, 3, 4, 5, 6, 7, 4, 5, 6, 7, 8, 9)
+        val plan = englishPhrasePlan(aligned, listOf(1, 2, 3, 4, 5, 6, 7, 4, 5, 6, 7, 8, 9)
             .mapIndexed { i, owner -> Segment(owner, i * 1000L, (i + 1) * 1000L) })
         val before = englishWashThrough(plan, 7000)!!
         assertEquals(before, englishWashThrough(plan, 9000)!!, 0f)
@@ -327,7 +327,7 @@ class EnglishPhrasePacingTest {
         val window = EnglishWashWindow(0, 1000, listOf(0L..1000L))
         assertEquals(.5f, window.progress(750, 500), 0f)
         assertEquals(750L, window.mediaAt(.5f, voiceStartMs = 500))
-        val plan = englishPresentationPlan(synthetic(listOf(2, 1, 3)),
+        val plan = englishPhrasePlan(synthetic(listOf(2, 1, 3)),
             listOf(Segment(1, 0, 400), Segment(2, 500, 1000), Segment(3, 1200, 1500)), 500)
         assertEquals(500L, plan.windows.getValue(1).startMs)
         assertEquals(.5f, plan.windows.getValue(1).progress(750), 0f)

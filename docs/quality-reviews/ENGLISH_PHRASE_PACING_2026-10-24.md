@@ -1,5 +1,9 @@
 # Readable English phrase pacing — 2026-10-24
 
+The user rejected this build’s remaining stop/go pace on October 25. The
+[steady reading follow-up](ENGLISH_READING_FLOW_2026-10-25.md) retains the semantic
+anchors and fallback guards while replacing independent band velocities.
+
 Status: accepted by the redirected alignment thread's final focused review.
 The final 1,698-test Android gate, debug build and R8 release build pass. No
 behavioral edits followed acceptance; the limitations below remain explicit.

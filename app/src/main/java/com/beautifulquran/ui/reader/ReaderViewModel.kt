@@ -641,6 +641,7 @@ class ReaderViewModel(
                 playback.item.surah, playback.item.ayah, playback.inkGeneration,
                 it.observation.visiblePositionMs, it.timing.voiceStartMs, it.timing.timings.segments,
                 reciterId = playback.item.reciter,
+                silence = audibleSilenceFor(playback.item.reciter, playback.item.surah, playback.item.ayah),
             )
         }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(0, replayExpirationMillis = 0), null)

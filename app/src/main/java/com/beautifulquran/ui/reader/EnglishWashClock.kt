@@ -3,6 +3,7 @@ package com.beautifulquran.ui.reader
 import com.beautifulquran.data.model.Segment
 import com.beautifulquran.domain.EnglishAlignment
 import com.beautifulquran.domain.HighlightFrame
+import com.beautifulquran.domain.AudibleSilence
 
 /** The same calibrated, seek-aware media sample that selects the Arabic word. */
 internal data class EnglishWashClock(
@@ -13,6 +14,7 @@ internal data class EnglishWashClock(
     val voiceStartMs: Long,
     val segments: List<Segment> = emptyList(),
     val reciterId: Int? = null,
+    val silence: List<AudibleSilence> = emptyList(),
 ) {
     /** Project only this performance; all time policy lives in HighlightSync. */
     fun onFrame(frame: HighlightFrame?): EnglishWashClock =

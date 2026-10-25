@@ -291,7 +291,9 @@ python3 tools/test_build_db.py  # timing pipeline regressions (~1s, no Gradle)
     Prioritize the meaning being heard; preserve the soft leading edge required
     by invariant #7. For published English translation Mushaf, the user clarified
     on 2026-10-24 that reordered phrases use readable phrase pacing: the
-    continuous edge may reach a meaning later than its Arabic word. Semantic
+    continuous edge may reach a meaning later than its Arabic word. On 2026-10-25 the user further
+    required steady movement through connected speech, holding the fractional
+    edge only in known quiet rather than restarting speed at every owner. Semantic
     tap/hold/repeat owners stay exact where known. Arabic and English word-card
     order retain their existing policy. Glimmer, repeat tint, seeks, and page transitions must never
     create gaps in the underlying wash. Any highlighting change must preserve

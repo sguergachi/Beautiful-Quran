@@ -1394,8 +1394,9 @@ Three rules make it usable:
   anchors define Arabic intervals; crossing intervals merge until they close.
   Their English washes together over that phrase's voiced time. A meaning can
   therefore appear later than its Arabic word. This is the user's explicit
-  October 24 clarification of the earlier immediate-meaning policy. Ordinary
-  monotone stretches retain word timing, and already laid ink never lifts.
+  October 24 clarification of the earlier immediate-meaning policy. The October 25 clarification uses steady movement through connected speech,
+  holding the exact reached prefix in measured quiet. Word ranges partition
+  geometry without restarting velocity; already laid ink never lifts.
   Word-card English keeps its existing linear occurrence clock, including the
   pause before the next owner's onset; this readable policy is translation-only.
 - **Boundaries sit between words.** Adjacent ranges tile the printed sentence,
@@ -1404,11 +1405,11 @@ Three rules make it usable:
   source interval. Page cuts project the whole-verse plan without restarting it.
 - **One semantic alignment and one presentation plan.** `EnglishVerseAlignments`
   retains the known Arabic owners for taps, holds and repeats. The cached
-  presentation plan is shared by drawing and carried-leaf follow. It uses the
-  union of first-pass spoken intervals, freezing in known gaps. A normal band
-  ends with its own speech; the terminal residual keeps the established verse
-  tail. A reordered block containing an internal backward repeat conservatively
-  retains its legacy occurrence fences instead of borrowing a later utterance.
+  presentation plan is shared by drawing and carried-leaf follow. It uses one
+  cumulative union of all speech in a safe forward run, subtracting measured
+  quiet once and freezing there without snapping to an English word. The
+  first-voice and terminal fences remain. Verses containing backward source
+  repeats conservatively retain their legacy occurrence policy.
   If adjacent presentation source intervals still overlap, the whole verse
   explicitly keeps the legacy occurrence bands and their complete voiced
   source union. This conservative fallback leaves ambiguous weak-clause

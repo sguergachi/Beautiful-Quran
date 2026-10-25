@@ -4,6 +4,7 @@ import com.beautifulquran.data.model.Segment
 import com.beautifulquran.domain.EnglishAlignment
 import com.beautifulquran.domain.EnglishPhrase
 import com.beautifulquran.domain.EnglishWordSpan
+import com.beautifulquran.domain.AudibleSilence
 
 /** One immutable whole-verse presentation, shared by paint and carried-leaf follow. */
 internal data class EnglishWashPlan(
@@ -14,18 +15,32 @@ internal data class EnglishWashPlan(
     val tailOwners: Map<Int, Int> = emptyMap(),
     /** A source-overlapping partition retains the whole verse's legacy occurrence bands. */
     val sourceOverlapFallbacks: Int = 0,
+    val readingFlow: EnglishReadingFlow? = null,
+    val readingFlowFallback: String? = null,
 )
 
 /** Exposure endpoints of one whole printed word, on the same clock as its soft edge. */
 internal fun englishWordExposure(plan: EnglishWashPlan, from: Float, to: Float): EnglishWashWindow? {
+    plan.readingFlow?.clock?.let {
+        return EnglishWashWindow(it.mediaAt(from, afterGap = true), it.mediaAt(to))
+    }
     val span = plan.spans.firstOrNull { to <= it.to + .00001f } ?: return null
     val window = plan.windows[span.position] ?: return null
     fun share(value: Float) = ((value - span.from) / (span.to - span.from)).coerceIn(0f, 1f)
     return EnglishWashWindow(window.mediaAt(share(from), afterGap = true), window.mediaAt(share(to)))
 }
 
-/** Reordered phrases use voiced source intervals; ordinary bands end with their own speech. */
+/** Published prose shares a steady audible-time clock; locked occurrence modes keep their policy. */
 internal fun englishPresentationPlan(
+    alignment: EnglishAlignment,
+    segments: List<Segment>,
+    voiceStartMs: Long = segments.firstOrNull()?.startMs ?: 0L,
+    silence: List<AudibleSilence> = emptyList(),
+): EnglishWashPlan = englishReadingPlan(alignment, segments,
+    englishPhrasePlan(alignment, segments, voiceStartMs), silence, voiceStartMs)
+
+/** Semantic phrase/occurrence anchors; the reading clock joins connected speech over these. */
+internal fun englishPhrasePlan(
     alignment: EnglishAlignment,
     segments: List<Segment>,
     voiceStartMs: Long = segments.firstOrNull()?.startMs ?: 0L,
