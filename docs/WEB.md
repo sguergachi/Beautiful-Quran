@@ -316,6 +316,36 @@ Renderers consume these; they do not re-derive curves.
   collapses the rest; search bypasses the preview and displays every match.
   Unmarking swaps the fixed-height reference line for an inline confirmation,
   focuses Keep, and reserves ruby for the existing ribbon component.
+- **Pinned chapters** mirror Android (`docs/DESIGN.md`, "Pinned chapters"):
+  `pinnedSurahIds` in settings; a PINNED flag over a square-cut band in
+  `--green-wash`, the Continue pill's green; pinned chapters move out of
+  the list.
+  Hold-to-pin, as Android: a click opens the chapter; held, the row
+  soaks with wet green ink (`--accent` at 30%) as an even `opacity` fill
+  (550 ms linear after 150 ms of settle), and full toggles the pin. Rows
+  keep one key per chapter (`chapter-N`), and a FLIP reflow
+  (`reflowDeltas`, 420 ms) slides every moved row from where it stood; the
+  moved row travels above the rest on its own paper while its wet ink
+  dries off (`data-drying`, 650 ms). Lifting early drains it
+  (180 ms). A release within 300 ms is the tap that opens; movement over
+  the slop (10 px) or leaving the row cancels, and a cancelled hold never
+  becomes a click. Only the primary pointer holds. A keyboard cannot hold,
+  so the context-menu event (right click, Mac Ctrl+click, Context Menu key,
+  Shift+F10) and Shift+Enter toggle the pin outright, and the row announces
+  `Hold, or Shift+Enter, to pin`; a touch or pen long-press's own
+  `contextmenu` is ignored (the hold owns it, and it can arrive after the
+  row has moved). Under reduced motion the tint steps on at 150 ms instead
+  of deepening; the pin still lands at 700 ms. While searching, results
+  list pinned chapters in place, so rows are only a click. The band is
+  painted out to the sheet's edges past the list's measure (`border-image`
+  outset; the Chapters scroller hides horizontal overflow). After a pin from
+  deep in the list, keyboard focus stays in view on the row that took the
+  moved one's place.
+  Pure decisions live in `ui/home/pinnedChapters.ts`; the row is
+  `ui/home/ChapterRow.tsx`.
+  Web rows carry no place ribbon and the Continue pill never docks, so the
+  place-row rule has nothing to move here. The pinning lesson is Android-only
+  for now.
 
 ## 7. Performance bar (non-negotiable)
 
@@ -778,8 +808,9 @@ Below that size nothing changes. Rationale in
    The top continue area uses Android's resting pill geometry: 28 px corners,
    16 px outer insets, a passive green place ribbon, gold chapter number,
    small CONTINUE flag, and bilingual chapter identity with the saved ayah.
-   Its dedicated `--continue-wash` follows Android PR #871: Paper `#B8EDDB`,
-   Nightfall `#134738`, Royal Green `#1F5141`.
+   It is washed in `--green-wash`, Android's `greenWash`. A dedicated mint
+   `--continue-wash` (from Android PR #871, since reverted there) was removed:
+   the owner rejects mint anywhere in the app.
    The single pill is one accessible button; long chapter names ellipsize while
    the ayah stays visible. Reading and listening retain separate saved places,
    with the last-heard place taking priority in the pill.

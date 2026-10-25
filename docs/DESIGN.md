@@ -1653,7 +1653,7 @@ row-visibility rule cannot see the row yet, and a launch whose reading row
 is already in view must behave as if the pill had always been docked away —
 no pop, dwell, or late flight. On departure the resting pill does not fade:
 it is replaced in place by the flight's own copy, so the departure is only
-ever one motion. Web keeps its mint pill in its top
+ever one motion. Web keeps its pill, in the same green wash, in its top
 continue area: a 28 px radius, 16 px outer inset, 40 px green place cloth,
 gold chapter number, CONTINUE flag, and compact bilingual chapter and ayah.
 The shared ribbon is decorative inside one accessible resume button. Only one
@@ -1669,6 +1669,86 @@ ribbon fully unfurled while the Bookmarks sheet opens, prevents a mark/unmark
 animation from being borrowed as navigation feedback, and leaves the shared
 component authoritative for its own visual language. Do not create another
 bookmark icon, a second ribbon shape, or a bespoke animated substitute.
+
+### Pinned chapters (Android)
+
+Press and hold a chapter row to pin it to the top of Chapters, or a pinned
+row to unpin it. The hold is its own confirmation — nothing asks. The row
+soaks evenly with **wet green ink** (`primary` at 0.30, plainly darker than
+the band's pale wash, so it reads under a finger): no shape spreads across a
+strip this thin (a deliberate form has no room to develop in it). The ink
+waits 150 ms under an unhurried finger — a soft haptic tick says the hold
+has taken — then deepens over the next 550 ms in step with the hold;
+holding it full is the act, marked by a firm confirm tick, and the pin
+toggles. The very row then **travels** to its new seat (one key per chapter
+inside one list; 420 ms, every row's placement animated, so the list closes or
+opens its gap around it), drawn above the rows it passes and carrying its
+own paper, and its wet ink **dries off** over 650 ms: down to the band's
+wash when pinned, to bare paper when unpinned. An even tint that only
+reached the band's own pale wash was too faint to feel, and a pinned row
+that vanished from the list and reappeared on the band read as a jump. Lifting early drains the tint (180 ms) and pins
+nothing: a release within 300 ms is the ordinary tap that opens the
+chapter; a longer one does nothing. A drag belongs to the list, and a
+cancelled or consumed release (a system back swipe begun on a row, the
+search dials' dismissing tap) is not a tap. The hold is timed on the frame
+clock, not by an animation, so the system's animator scale (animations off,
+or slowed) changes neither what a tap does nor how long a hold takes; a
+longer system touch & hold delay stretches all three timings in proportion
+(`holdPace`), so a slow tapper's tap still opens. Readers who cannot hold get Pin / Unpin as a TalkBack
+action, and a keyboard or D-pad opens with Enter and pins with Shift+Enter;
+the row is one merged, focusable control. While searching, results list
+pinned chapters in place, off the band, where a hold could show nothing of
+what it would do, so there the row is only a tap. Tried
+and rejected, in order: a written subtitle question answered by a verb and
+Cancel; the share selection's feathered ink soak (a smudged inset patch on
+a row this thin); a straight square wipe from the finger (no ink in it);
+and the lobed ink blot (even in rows' own proportions, a shaped spread
+reads wrong inside a thin strip). What the row can honestly fill is the
+even tint.
+
+Pinned chapters sit on a **band**: the Continue pill's green wash
+(`greenWash`) laid edge to edge across the sheet, square-cut like a strip of
+tinted paper, behind every pinned row. A small-caps **PINNED** flag on the
+names' rail (as CONTINUE heads its pill) stands on the paper just above the
+band, 8 dp clear of it. Each row carries its own slice of the wash; the
+slices meet, so it reads as one band however many chapters are pinned.
+Rows are set compact (10 dp bands against the list's 15 dp) on the list's
+own rails, so numbers and names stay aligned with the chapters below. The flag takes the search list's first-label air
+(16 dp) above it, and 20 dp of paper separates the band from the list.
+
+A pinned chapter **moves** into the band, and unpinning returns it to its
+place. The band is the head of the **one** chapter list, not a second list:
+pinning is a reorder to the top, so the row keeps its single key
+(`chapter-N`) inside a single lazy interval, which is both what lets it
+glide and what makes a second copy impossible. Never emit a chapter from a
+second `items(...)` interval: handing a row's key from one interval to
+another is what raised `Key "chapter-N" was already used` and killed the app
+as the filled row let go. `chapterRows` builds that one list; it drops any
+chapter the band already holds.
+
+Tried and rejected, in order: a twisted cord in the trailing gutter (ugly);
+an ink nuqta under a closing hairline; one inset rounded rectangle joining
+every pinned row (read as a card); a stack of separate Continue-style
+capsules; a feathered ink wash (its soft edge reads as a shadow). The owner
+chose the band from an on-device comparison of rectangle, capsules, band and
+wash.
+
+The current-place ribbon (and the Continue pill's docking target) is on the
+pinned row when the chapter is pinned; it hangs in the sheet-edge lane on
+the band. Search owns the sheet while active, so the band stands down.
+Pinning from the top of the sheet scrolls the band into view; a reader deep
+in the list keeps their place. Stored as `Settings.pinnedSurahIds`. The web
+mirrors it (`docs/WEB.md` §6.3) in the same Continue green, `--green-wash`.
+
+Press-and-hold is taught by a contextual guide (`PinChapterTip`, behind the
+developer guide gate like every lesson). It never opens during a scroll,
+and leaving Chapters by any route while it is up puts it away, so it can
+never hold the stack or Back from behind the reader. See
+[CONTEXTUAL_GUIDES.md](CONTEXTUAL_GUIDES.md).
+
+Implementation: `pinnedBand`, `chapterRows`, `holdToPin` / `holdOutcome` / `holdFillProgress` /
+`holdPace` and the list in
+`ui/home/HomeScreen.kt`.
 
 ### Chapters bookmark treatment
 
