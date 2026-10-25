@@ -90,6 +90,11 @@ The basmalah sites (drawable and QCF glyph) keep their wash for now.
   ahead of the edge; one next word is warmed without drawing it. Seek recess
   applies to the prefix present on entry, so newly washed words do not flash
   back under the verse cover while it is still lifting.
+  Reordered English phrases keep material freshness on each printed word's
+  presentation window, across Arabic owner boundaries. Pause/resume cannot
+  re-wet a settled word. A generation/reciter-scoped 850 ms cosmetic departure
+  releases old untouched words after a rewind even when the phrase's first
+  Arabic owner stays recited; re-entered words immediately use the new wash.
   Replacing printed ink clears its captured pixel support completely before
   drawing the shader. A fractional erase mask would leave old antialiased ink
   beneath the new glyph and darken its edges. The visible glyph keeps its

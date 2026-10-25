@@ -814,7 +814,7 @@ internal fun MushafPager(
         val clock = washClock.value?.takeIf { it.followsFirstWash(word, loadedSurahId) } ?: return null
         val alignment = alignmentsNow.value.alignment(word.ayah) ?: return null
         val windows = washWindowsNow.value[loadedSurahId to word.ayah] ?: return null
-        return englishWashThrough(alignment, windows, clock.positionMs + aheadMs, clock.voiceStartMs)
+        return englishWashThrough(windows, clock.positionMs + aheadMs)
     }
     // The leaf the voice is on, 1-based, or null. A Madinah page may be two
     // leaves, so which of them holds the verse is a question the book answers.

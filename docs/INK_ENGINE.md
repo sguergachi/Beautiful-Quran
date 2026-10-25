@@ -688,40 +688,55 @@ edge. Its clock is now the outgoing occurrence's media window. `LetterSweep`
 also exposes `plainProgress` without the Arabic letter map or wasl carry;
 English never claims an Arabic held letter as its own pacing.
 
-**English leaf pacing.** `EnglishWashClock` receives the same calibrated,
-seek-aware media samples that select the Arabic word, without recomposing the
-page on each tick. Each continuous English band lasts from its first Arabic
-owner until the next band's first occurrence, the first repeat, or
-the last spoken segment ends, whichever comes first. Re-says never extend the
-first wash: Alafasy's 24:1 “clear evidence” is fully laid when he returns to
-“and We revealed.” `EnglishWashClock` is metadata projected through the same
-V2 display frame as Arabic ink. Every coherent position poll feeds correction
-back into the pure core. There is no second English anchor that can drift by
-ignoring ordinary polls. Pause/buffering freeze it; speed changes alter its
-slope; corrections retain laid ink within the same performance.
-The painted edge uses `EnglishLeafVerse.fragmentWashProgress`, interpolating
-between cached letter anchors. The exact integer mapping still places owned
-ranges and taps. Applying that integer mapping on each animation frame made
-the edge wait for a whole letter and then jump, despite a continuous clock.
-The base covers and paper material both project that edge into individual
-printed words. Completed words keep their ink when the material dries; a
-shared Arabic owner cannot wet English words still ahead of the edge. The
-prefix present when a playback generation enters still rises through seek
-recess. Words washed after entry remain laid even during that rise.
-The active word's onset closes preceding ink before its repeat tint begins. In 24:2, “their punishment” starts on word 23 but
-keeps washing through the reordered Arabic “a group of the believers,” words
-24–26. It finishes at 36.25 s rather than 28.49 s for Alafasy. Pauses freeze
-the edge; speed changes and holds longer than the visual animation cap still
-follow media time. A carried band projects its progress through the page cut,
-so the second fragment waits for the first. Glimmer and repeat tint are clipped
-to laid ink; repeat tint uses the scrolling reader's uninterrupted repeat sweep. Seek
-generations reject stale samples; calibration changes cannot rewind laid ink.
-Carried-leaf ownership and follow read that same edge. Follow previews 500 ms
-at the current playback speed, preserving the existing turn lead and waiting
-cover; it no longer assumes that the next Arabic word starts the next leaf.
-Re-says use the existing semantic word location for carried leaves; completing
-the first wash cannot carry the voice away from its repeated phrase. Semantic
-ownership for taps, holds, and repeat labels stays in the alignment.
+**English leaf pacing.** `EnglishWashClock` reads the same calibrated V2
+media frame as Arabic. There is no second audio anchor. Pause and buffering
+freeze it; speed, seeks, reciter ownership and timing replacement retain the
+shared frame contract.
+
+Published translation uses a pure `EnglishWashPlan`. Verified content anchors
+retain their provenance from `align()`. Adjacent source intervals close their
+inversions into the smallest reordered phrases, including shared-owner ties.
+Weak grammar joins within that closed interval without setting its extent;
+normal sequences keep their word boundaries. This readable presentation can
+reach an English meaning later than its Arabic owner, as the user requested
+on October 24. Semantic taps, holds and repeat labels remain in the alignment.
+Word-card English retains its existing forward ranges and linear occurrence
+windows, including silence up to the next owner/repeat fence. Its null phrase
+plan selects that legacy clock explicitly; it does not acquire the published
+translation's voiced-end caps or voiced-time union.
+
+After phrase construction, adjacent source intervals must be disjoint. If weak
+next-clause text still shares a closed phrase's source tail, the partition is
+ambiguous (2:175). That whole verse explicitly retains legacy next-owner/repeat
+fences and all voiced speech before each fence. `sourceOverlapFallbacks` counts
+this separately from internal-repeat fallbacks. Grammar is not merged across
+the clause, and later text is not clamped to an exhausted source interval.
+
+Each window sums the union of actual voiced intervals, so known gaps hold the
+edge and overlaps count once. Normal bands end with their represented speech,
+without stretching across swallowed Arabic owners. Terminal residuals preserve
+the established verse-tail completion rule. A proposed phrase containing an
+internal backward repeat falls back to its legacy ranges and occurrence fences;
+it never borrows the later occurrence to lengthen the first pass. The 24:1
+repeat and 24:2 terminal-tail/carried-cut controls remain explicit tests.
+
+The renderer and carried-leaf follow consume the same cached whole-verse plan.
+`EnglishLeafVerse.fragmentWashProgress` projects its edge through exact letter
+anchors; page cuts do not restart the clock. Base covers and paper material use
+the same printed-word progress. Freshness follows each printed exposure window
+rather than the phrase's first Arabic motion; settled words keep cooling across
+pause/resume. First-pass glimmer follows the presentation edge and its ending
+motion's dry-down, while semantic repeat tint stays clipped to the laid prefix.
+A generation-scoped cosmetic 850 ms departure releases untouched old words on
+a mid-phrase rewind, including a seek within the same Arabic word. It does not
+change the audio clock. The existing prefix on entry still rises through seek
+recess; newly washed words remain laid.
+
+Follow previews 500 ms at the current playback speed using this same plan.
+Re-says locate their semantic word rather than the retained forward prefix.
+The earlier `washSpans` projection remains a legacy occurrence fallback and
+ownership diagnostic; its no-late-meaning assertion does not certify the new
+readable presentation's word timing.
 
 **Short wasl donors** (`مَن يَشْرِى`, `مِن رَّبِّكُم`, …) need a **speed
 ceiling** on that early bloom so the next opening does not race: details and

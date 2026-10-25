@@ -1,5 +1,10 @@
 # English Mushaf opening and flicker — 2026-10-24
 
+The user rejected the presentation in `75278a647`: it rushed the opening and
+then waited. The selected semantic labels and absence of paint flashes below
+were insufficient to validate pacing. The readable-phrase follow-up is recorded
+in [ENGLISH_PHRASE_PACING_2026-10-24.md](ENGLISH_PHRASE_PACING_2026-10-24.md).
+
 Hani Ar-Rifai, translation English Mushaf, 64:1 reproduced two independent
 problems: a delayed opening wash and words briefly returning to faint ink.
 The fixes affect runtime alignment and Android painting. No timing row,

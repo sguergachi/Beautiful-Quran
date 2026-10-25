@@ -82,6 +82,7 @@ import com.beautifulquran.domain.EnglishLeafBlock
 import com.beautifulquran.domain.EnglishVerseRun
 import com.beautifulquran.domain.EnglishVerseAlignments
 import com.beautifulquran.domain.EnglishAlignment
+import com.beautifulquran.domain.EnglishWordSpan
 import com.beautifulquran.domain.MushafPage
 import com.beautifulquran.domain.MushafToken
 import com.beautifulquran.domain.englishLeaf
@@ -597,7 +598,8 @@ internal data class EnglishProseVerse(
 )
 
 /** A range in the paragraph, owned by a 1-based Arabic word position. */
-internal data class EnglishInkSpan(val range: IntRange, val position: Int, val from: Float = 0f, val to: Float = 1f)
+internal data class EnglishInkSpan(val range: IntRange, val position: Int, val from: Float = 0f, val to: Float = 1f,
+    val tailPosition: Int = position)
 
 /** A fading tint after a backward seek must not reveal words beyond the new prefix. */
 internal fun englishInkLayerAllowed(state: InkEngine.State): Boolean = state != InkEngine.State.Upcoming
@@ -619,14 +621,16 @@ internal fun rememberEnglishWashWindows(
     clock: State<EnglishWashClock?>,
     alignments: EnglishVerseAlignments,
     content: SurahContent,
-): Map<Pair<Int, Int>, Map<Int, EnglishWashWindow>> {
+): Map<Pair<Int, Int>, EnglishWashPlan> {
     val segments by remember { derivedStateOf(structuralEqualityPolicy()) { clock.value?.segments.orEmpty() } }
     val verse by remember { derivedStateOf(structuralEqualityPolicy()) { clock.value?.let { it.surahId to it.ayah } } }
-    return remember(alignments, segments, verse, content) {
+    val voiceStart by remember { derivedStateOf { clock.value?.voiceStartMs ?: 0L } }
+    return remember(alignments, segments, verse, content, voiceStart) {
         verse?.takeIf { it.first == content.surah.id }?.let { key ->
-            val positions = alignments.alignment(key.second)?.washSpans?.map { it.position }
-                ?: content.ayahs.firstOrNull { it.number == key.second }?.words?.map { it.position }.orEmpty()
-            mapOf(key to englishWashWindows(positions, segments))
+            val alignment = alignments.alignment(key.second)
+            val positions = content.ayahs.firstOrNull { it.number == key.second }?.words?.map { it.position }.orEmpty()
+            mapOf(key to (alignment?.let { englishPresentationPlan(it, segments, voiceStart) }
+                ?: EnglishWashPlan(emptyList(), englishWashWindows(positions, segments))))
         }.orEmpty()
     }
 }
@@ -638,7 +642,16 @@ internal fun englishOwnedSpans(
     fragmentProgress: (Float) -> Float = { it },
     text: CharSequence = "",
     forwardWash: Boolean = true,
-): List<EnglishInkSpan> = (if (forwardWash) alignment.washSpans else alignment.spans).mapNotNull { span ->
+): List<EnglishInkSpan> = englishProjectedSpans(
+    range, if (forwardWash) alignment.washSpans else alignment.spans, fragmentProgress, text,
+)
+
+private fun englishProjectedSpans(
+    range: IntRange,
+    spans: List<EnglishWordSpan>,
+    fragmentProgress: (Float) -> Float,
+    text: CharSequence,
+): List<EnglishInkSpan> = spans.mapNotNull { span ->
     val printed = englishWashBands(
         range, fragmentProgress(span.from), fragmentProgress(span.to), 1f, text,
     ).saying
@@ -1427,7 +1440,7 @@ private fun EnglishProseBlock(
     activeWord: State<ActiveWord?>,
     activeSurahId: Int,
     clock: State<EnglishWashClock?>,
-    washWindows: Map<Pair<Int, Int>, Map<Int, EnglishWashWindow>>,
+    washWindows: Map<Pair<Int, Int>, EnglishWashPlan>,
     fontSize: TextUnit,
     lineHeight: TextUnit,
     /** The measure the ruler paginated against, which the lines are broken to. */
@@ -1454,10 +1467,33 @@ private fun EnglishProseBlock(
     // English words have their own positions within an Arabic owner's band.
     // Capture those positions rather than replaying the Arabic letter mask.
     val paperDeposits = remember(block) { HashMap<Int, PaperInkDeposit>() }
+    val paperDeparture = rememberEnglishPaperDeparture(activeWord, paperDeposits)
     val printedWords = remember(block.text, block.verses) {
         englishPaperInkWordRanges(block.text, block.verses.map { it.range })
     }
     val washEntries = remember(block) { HashMap<Pair<Int, Int>, EnglishWashEntry>() }
+    val presentationSpans = remember(block, washWindows) {
+        block.verses.associate { verse ->
+            val plan = washWindows[verse.surahId to verse.ayah]
+            val local = plan?.spans?.takeIf { it.isNotEmpty() }?.let {
+                englishProjectedSpans(0 until verse.range.count(), it, verse.fragmentProgress,
+                    block.text.subSequence(verse.range.first, verse.range.last + 1))
+            }?.map { it.copy(range = (verse.range.first + it.range.first)..(verse.range.first + it.range.last),
+                tailPosition = plan.tailOwners[it.position] ?: it.position) }
+            verse.range to (local ?: verse.washSpans)
+        }
+    }
+    val wordFinishes = remember(block, washWindows, printedWords) {
+        block.verses.flatMap { verse ->
+            val plan = washWindows[verse.surahId to verse.ayah]
+            printedWords[verse.range].orEmpty().mapNotNull { range ->
+                val through = verse.verseFractionAt(range.last + 1 - verse.range.first)
+                val span = plan?.spans?.firstOrNull { through <= it.to + .00001f } ?: return@mapNotNull null
+                val window = plan.windows[span.position] ?: return@mapNotNull null
+                range.first to window.mediaAt(((through - span.from) / (span.to - span.from)).coerceIn(0f, 1f))
+            }
+        }.toMap()
+    }
     Text(
         text = set,
         style = style,
@@ -1488,8 +1524,11 @@ private fun EnglishProseBlock(
                                     it.ayah == verse.ayah && activeSurahId == verse.surahId
                                 },
                                 clock = clock.value,
-                                windows = washWindows[verse.surahId to verse.ayah].orEmpty(),
+                                windows = washWindows[verse.surahId to verse.ayah]?.windows.orEmpty(),
+                                presentationSpans = presentationSpans[verse.range],
+                                wordFinishes = wordFinishes,
                                 paperDeposits = paperDeposits,
+                                paperDeparture = paperDeparture,
                                 printedWords = printedWords[verse.range].orEmpty(),
                                 washEntry = washEntries.getOrPut(verse.surahId to verse.ayah) { EnglishWashEntry() },
                             )
@@ -1577,7 +1616,10 @@ private fun englishVerseBlooms(
     word: ActiveWord?,
     clock: EnglishWashClock?,
     windows: Map<Int, EnglishWashWindow>,
+    presentationSpans: List<EnglishInkSpan>?,
+    wordFinishes: Map<Int, Long>,
     paperDeposits: MutableMap<Int, PaperInkDeposit>,
+    paperDeparture: EnglishPaperDeparture,
     printedWords: List<IntRange>,
     washEntry: EnglishWashEntry,
 ): List<ShapedWordBloom> {
@@ -1597,16 +1639,13 @@ private fun englishVerseBlooms(
             EnglishInkSpan(it, index + 1, index.toFloat() / motions.size, (index + 1f) / motions.size)
         }
     }
-    val washSpans = verse.washSpans ?: spans
+    val washSpans = presentationSpans ?: verse.washSpans ?: spans
     val performing = word?.takeIf { motions.any { motion -> motion.isActive } }
     val sample = performing?.let { active -> clock?.takeIf { it.matches(active, verse.surahId) } }
     val positionMs = performing?.let { englishWashPositionMs(it, sample, verse.surahId) }
     fun progress(span: EnglishInkSpan, motion: InkMotion): Float =
         if (positionMs != null && windows[span.position] != null) {
-            englishWashFragmentProgress(span, windows.getValue(span.position).progress(
-                positionMs,
-                if (span.position == 1) sample?.voiceStartMs ?: performing.startMs else Long.MIN_VALUE,
-            ), verse.washProgress)
+            englishWashFragmentProgress(span, windows.getValue(span.position).progress(positionMs), verse.washProgress)
         } else when (motion.ink.state) {
             InkEngine.State.Upcoming -> 0f
             InkEngine.State.Active -> if (motion.repeat) 1f else performing?.let {
@@ -1629,15 +1668,15 @@ private fun englishVerseBlooms(
         // wide pixel mask is a different edge and can re-cover a completed word
         // when its wet material stops drawing. Keep the fallback on the same edge.
         for (range in printedWords) {
-            val motion = washSpans.firstOrNull { range.first in it.range }
-                ?.let { motions.getOrNull(it.position - 1) }
-            val bloom = if (palette.paperInk != null && motion?.paperDeparture?.active == true) {
+            val raw = englishPaperInkWordProgress(washEdge, range.first, range.last + 1)
+            val departed = paperDeparture.word(range.first, raw)
+            val bloom = if (palette.paperInk != null && departed != null) {
                 ShapedWordBloom.InkReveal(
                     range = range,
-                    progress = (paperDeposits[range.first]?.progress ?: 0f).coerceAtLeast(0f),
+                    progress = departed.progress.coerceAtLeast(0f),
                     paper = paper,
                     restingAlpha = resting,
-                    revealedAlpha = motion.paperDepartureAlpha,
+                    revealedAlpha = resting + (1f - resting) * paperDeparture.opacity(range.first),
                 )
             } else englishWordWashCover(
                 range, englishPaperInkWordProgress(washEdge, range.first, range.last + 1),
@@ -1658,10 +1697,12 @@ private fun englishVerseBlooms(
         blooms += cover(verse.markRange, paper, markCover)
     }
     if (motions.isNotEmpty() && palette.paperInk != null) {
-        blooms.addEnglishPaperInk(printedWords, washSpans, motions, palette.paperInk, washEdge, paperDeposits)
+        blooms.addEnglishPaperInk(printedWords, washSpans, motions, palette.paperInk, washEdge, paperDeposits,
+            positionMs, wordFinishes, paperDeparture)
     }
     if (motions.isNotEmpty()) {
-        blooms.addEnglishInkLayerBlooms(washSpans, motions, palette, glintInk, repeatLayers = false, washEdge)
+        blooms.addEnglishInkLayerBlooms(washSpans, motions, palette, glintInk, repeatLayers = false, washEdge,
+            performingMotion = performing?.let { motions.getOrNull(it.wordPosition - 1) })
         blooms.addEnglishInkLayerBlooms(spans, motions, palette, glintInk, repeatLayers = true, washEdge,
             departures = paperDeposits.takeIf { palette.paperInk != null })
     }
@@ -1687,21 +1728,29 @@ private fun MutableList<ShapedWordBloom>.addEnglishPaperInk(
     style: PaperInkStyle,
     washEdge: Float,
     deposits: MutableMap<Int, PaperInkDeposit>,
+    positionMs: Long?,
+    wordFinishes: Map<Int, Long>,
+    departure: EnglishPaperDeparture,
 ) {
     // Observe settled owners too, so a rewind has a dry deposit to release.
     motions.forEach { it.paperInkLive }
+    val performanceWet = motions.maxOfOrNull { it.paperWetness } ?: 0f
     var warmedNext = false
     for (range in printedWords) {
         val i = range.first
         val j = range.last + 1
         val owner = washSpans.firstOrNull { i in it.range }?.let { motions.getOrNull(it.position - 1) }
         val raw = englishPaperInkWordProgress(washEdge, i, j)
-        val evaporating = owner?.paperDeparture?.active == true
-        val current = PaperInkDeposit(raw, owner?.paperWetness ?: 0f, 0f, 0f, 0f)
-        val deposit = if (evaporating) deposits[i] ?: current else current.also { deposits[i] = it }
+        val departed = departure.word(i, raw)
+        val evaporating = departed != null
+        val phaseWet = positionMs?.let { at -> wordFinishes[i]?.let { end ->
+            englishPaperWordWetness(raw, at, end, InkEngine.tuning.glintFadeMs, performanceWet, deposits[i])
+        } } ?: (owner?.paperWetness ?: 0f)
+        val current = PaperInkDeposit(raw, phaseWet, 0f, 0f, 0f, 0f)
+        val deposit = departed ?: current.also { deposits[i] = it }
         val wet = deposit.wet
         if (englishPaperInkWordVisible(deposit.progress, wet, evaporating) && owner != null) {
-            val frame = (owner ?: motions.first()).paperInkFrame(style)
+            val tuning = InkEngine.tuning
             add(
                 ShapedWordBloom.PaperInk(
                     range = range,
@@ -1712,17 +1761,17 @@ private fun MutableList<ShapedWordBloom>.addEnglishPaperInk(
                         repeatPass = 0f,
                         repeatTint = 0f,
                         retained = 0f,
-                        dryInk = frame.dryInk,
-                        wetInk = frame.wetInk,
-                        repeatColor = frame.repeatColor,
-                        unreadAlpha = frame.unreadAlpha,
-                        pooling = frame.pooling,
-                        reflection = frame.reflection,
-                        softness = frame.softness,
+                        dryInk = style.dryInk,
+                        wetInk = style.wetInk,
+                        repeatColor = style.repeatInk,
+                        unreadAlpha = InkEngine.State.Upcoming.inkAlpha(),
+                        pooling = tuning.paperInkPooling,
+                        reflection = tuning.paperInkReflection,
+                        softness = tuning.paperInkSoftness,
                         leadFade = ENGLISH_PAPER_INK_LEAD_FADE,
                         fadeLeadOnEntry = true,
-                        flowing = frame.flowing,
-                        evaporation = frame.evaporation,
+                        flowing = tuning.paperInkFlowing,
+                        evaporation = if (evaporating) 1f - departure.opacity(i) else 0f,
                     ),
                     fallback = emptyList(),
                 ),
@@ -1777,9 +1826,12 @@ private fun MutableList<ShapedWordBloom>.addEnglishInkLayerBlooms(
     repeatLayers: Boolean,
     washEdge: Float,
     departures: MutableMap<Int, PaperInkDeposit>? = null,
+    performingMotion: InkMotion? = null,
 ) {
     spans.forEach { owned ->
-        val motion = motions.getOrNull(owned.position - 1) ?: return@forEach
+        val phaseActive = !repeatLayers && washEdge > owned.range.first && washEdge < owned.range.last + 1
+        val motion = (if (phaseActive) performingMotion else null)
+            ?: motions.getOrNull((if (repeatLayers) owned.position else owned.tailPosition) - 1) ?: return@forEach
         val departing = repeatLayers && motion.paperDeparture?.active == true
         // Negative keys hold semantic tint spans; nonnegative keys hold the
         // first-pass English words. Both maps belong to this paragraph only.
@@ -1820,7 +1872,7 @@ private fun MutableList<ShapedWordBloom>.addEnglishInkLayerBlooms(
                     progress = minOf(laid, if (onRepeat) {
                         repeatProgress
                     } else {
-                        motion.plainSweepProgress.coerceIn(0f, 1f)
+                        laid
                     }),
                     color = motion.glintColor(if (onRepeat) palette.repeatInkColor else glintInk),
                     restingAlpha = 0f,

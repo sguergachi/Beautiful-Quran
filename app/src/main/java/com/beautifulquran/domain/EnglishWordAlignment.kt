@@ -7,9 +7,13 @@ import java.util.concurrent.ConcurrentHashMap
 /** A printed English span and the 1-based Arabic word that speaks its meaning. */
 data class EnglishWordSpan(val from: Float, val to: Float, val position: Int)
 
-/** Semantic owners for taps, and a continuous forward wash derived from those owners. */
-data class EnglishAlignment(val wordEnds: FloatArray, val spans: List<EnglishWordSpan>) {
-    /** A later spoken meaning brings every preceding English word into the same wash. */
+/** Semantic owners, their legacy immediate-meaning wash, and the readable presentation plan. */
+data class EnglishAlignment(
+    val wordEnds: FloatArray,
+    val spans: List<EnglishWordSpan>,
+    val phrases: List<EnglishPhrase>? = null,
+) {
+    /** Legacy immediate-meaning ranges, retained for occurrence fallback and ownership diagnostics. */
     val washSpans: List<EnglishWordSpan> = buildList {
         var position = Int.MAX_VALUE
         for (span in spans.asReversed()) {
@@ -21,6 +25,10 @@ data class EnglishAlignment(val wordEnds: FloatArray, val spans: List<EnglishWor
         }
         reverse()
     }
+
+    /** Reordered translation phrases retain one forward edge without the immediate-meaning rush. */
+    val presentationSpans: List<EnglishPhrase> = phrases
+        ?: washSpans.map { EnglishPhrase(it.from, it.to, it.position) }
 
     /** The Arabic owner of a point in the printed English, including reordered words. */
     fun positionAt(through: Float): Int =
@@ -47,8 +55,9 @@ data class EnglishAlignment(val wordEnds: FloatArray, val spans: List<EnglishWor
  * anchors their common words; unmatched runs interpolate between neighbours.
  *
  * Arabic is not English word order. Each recognized English span keeps its
- * Arabic owner for interaction. The wash reaches that meaning when it is
- * spoken, including all intervening English words in one continuous prefix.
+ * Arabic owner for interaction. Published-translation presentation closes
+ * reordered anchors into readable phrases; the legacy immediate-meaning wash
+ * remains available as a conservative occurrence fallback.
  * Ink already laid never lifts (docs/INK_ENGINE.md). Unmatched text uses the
  * guarded, interpolated alignment between recognized neighbours.
  * Synonyms outside the small shared vocabulary, ambiguous repetitions and
@@ -131,7 +140,16 @@ object EnglishWordAlignment {
                 spans[spans.lastIndex] = spans.last().copy(to = span.to)
             } else spans += span
         }
-        return EnglishAlignment(shares, spans)
+        val phrases = englishPhraseSpans(prose.mapIndexed { index, word ->
+            EnglishPhraseWord(
+                from = if (index == 0) 0f else prose[index - 1].end.toFloat() / translation.length,
+                to = if (index == prose.lastIndex) 1f else word.end.toFloat() / translation.length,
+                position = positions[index] + 1,
+                clause = word.sentence,
+                anchored = !word.added && word.text !in GRAMMAR && verified[index] >= 0,
+            )
+        })
+        return EnglishAlignment(shares, spans, phrases)
     }
 
     /**
@@ -877,7 +895,7 @@ class EnglishVerseAlignments(private val content: SurahContent, private val word
                         verse.words.map { it.translation },
                         verse.words.map { it.lemma },
                         verse.words.map { it.arabic },
-                    )
+                    )?.let { if (wordByWord) it.copy(phrases = null) else it }
                 }
                 ?: NONE
         }

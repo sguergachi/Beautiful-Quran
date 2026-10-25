@@ -89,6 +89,20 @@ internal fun englishWordWashCover(
 internal fun englishPaperInkWordVisible(progress: Float, wet: Float, departing: Boolean): Boolean =
     progress >= 0f && (progress < 1f || wet > 0f || departing)
 
+/** Freshness belongs to a printed word's presentation phase, across Arabic owner boundaries. */
+internal fun englishPaperWordWetness(
+    progress: Float, positionMs: Long, endMs: Long, dryMs: Int, performanceWet: Float,
+    previous: PaperInkDeposit? = null,
+): Float {
+    val phase = when {
+        progress < 0f -> 0f
+        progress < 1f -> 1f
+        else -> (1f - (positionMs - endMs).coerceAtLeast(0).toFloat() / dryMs.coerceAtLeast(1)).coerceIn(0f, 1f)
+    }
+    val cooled = previous?.takeIf { progress >= 1f && it.progress >= 1f }?.wet ?: 1f
+    return minOf(phase, performanceWet, cooled)
+}
+
 /** Only the prefix present on entry rises through seek recess; newly washed ink stays laid. */
 internal class EnglishWashEntry {
     private var activation: Long? = null

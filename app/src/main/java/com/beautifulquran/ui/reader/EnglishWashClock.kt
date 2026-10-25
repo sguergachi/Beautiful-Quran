@@ -29,16 +29,6 @@ internal data class EnglishWashClock(
     fun followsFirstWash(word: ActiveWord, surahId: Int): Boolean = matches(word, surahId) && !word.isRepeat
 }
 
-/** A first wash ends before a repeat, the next band, or the recitation's end. */
-internal data class EnglishWashWindow(val startMs: Long, val endMs: Long) {
-    fun progress(positionMs: Long, voiceStartMs: Long = startMs): Float {
-        val start = maxOf(startMs, voiceStartMs).coerceAtMost(endMs)
-        if (positionMs < start) return 0f
-        if (positionMs >= endMs) return 1f
-        return (positionMs - start).toFloat() / (endMs - start)
-    }
-}
-
 /**
  * Reordering can exhaust English bands before Arabic words (24:2 ends in
  * punishment, then Arabic continues with a group of believers). Keep the final

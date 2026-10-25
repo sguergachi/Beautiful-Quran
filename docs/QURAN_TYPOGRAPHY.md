@@ -1389,19 +1389,30 @@ words. Rahman and Rahim retain distinct owners when both occur.
 
 Three rules make it usable:
 
-- **One continuous forward wash, with no skipped words.** When Arabic names a
-  later English meaning, every intervening word joins its left-to-right wash.
-  “Painful punishment” washes together when Arabic says the noun first; later
-  hearing the adjective never moves the front backwards. In 24:31, “husbands'
-  fathers” washes together on “fathers.” Ink already laid never lifts.
+- **One continuous forward wash, with no skipped words.** Published translation
+  uses readable pacing for the smallest reordered phrases. Reliable content
+  anchors define Arabic intervals; crossing intervals merge until they close.
+  Their English washes together over that phrase's voiced time. A meaning can
+  therefore appear later than its Arabic word. This is the user's explicit
+  October 24 clarification of the earlier immediate-meaning policy. Ordinary
+  monotone stretches retain word timing, and already laid ink never lifts.
+  Word-card English keeps its existing linear occurrence clock, including the
+  pause before the next owner's onset; this readable policy is translation-only.
 - **Boundaries sit between words.** Adjacent ranges tile the printed sentence,
-  including punctuation. A missing English equivalent can own no span. A page
-  cut projects the ranges onto its fragment without changing their owners.
-- **One alignment for wash, tap, hold and follow.** `EnglishVerseAlignments`
-  caches semantic owners and the continuous wash derived from them for the
-  selected text source. Tapping or holding a word names its semantic Arabic
-  owner, even if the forward wash included it earlier. Carried-leaf follow
-  follows the wash without returning to an already advanced word.
+  including punctuation. A missing English equivalent can own no semantic
+  span. Weak grammar can join a neighboring phrase but cannot expand its
+  source interval. Page cuts project the whole-verse plan without restarting it.
+- **One semantic alignment and one presentation plan.** `EnglishVerseAlignments`
+  retains the known Arabic owners for taps, holds and repeats. The cached
+  presentation plan is shared by drawing and carried-leaf follow. It uses the
+  union of first-pass spoken intervals, freezing in known gaps. A normal band
+  ends with its own speech; the terminal residual keeps the established verse
+  tail. A reordered block containing an internal backward repeat conservatively
+  retains its legacy occurrence fences instead of borrowing a later utterance.
+  If adjacent presentation source intervals still overlap, the whole verse
+  explicitly keeps the legacy occurrence bands and their complete voiced
+  source union. This conservative fallback leaves ambiguous weak-clause
+  attachment for a later reviewed map; it does not certify phrase timing.
 
 Repeated content must keep its occurrence. Equal counts within a sentence pair
 exact forms first, then inflected or equivalent forms in occurrence order,
@@ -1449,21 +1460,16 @@ word blooming, however narrow its edge is made. Two attempts at the edge width
 (a line of the page, then 1.6 word-widths of the sentence) both missed for the
 same reason: the shape was wrong, not the size.
 
-The base wash bands follow English order, driven by the calibrated media clock.
-Each band's owner is the earliest spoken meaning at or beyond its English
-range, so all text before the active edge is included. Adjacent bands with the
-same owner merge, leaving one active soft edge. Timing remains band-based;
-base covers and paper material paint each printed word from the same character
-edge. This prevents completed words from fading again when their wet material
-retires. First-pass glimmer uses those
-same bands and cannot jump ahead of the wash. Repeat tint and repeat glimmer
-retain the semantic owners over the prefix already laid. Range projection is
-cached with the paragraph; frames only read clocks and build paint layers.
-Owned ranges retain the exact letter-count map; the animated edge interpolates
-between those letter anchors. Rounding the moving edge to source characters
-and then to printed letter ends made even a continuous clock paint in jumps.
-Every wash uses `Tuning.washFeather` unmodified, exactly as the scrolling reader
-does.
+Presentation ranges follow English order on the calibrated shared media clock.
+The plan is built for the whole verse from its immutable alignment and timing
+snapshot, then projected through the page cut. Base covers and paper material
+paint each printed word from the same continuous character edge. Completed
+words keep their ink when their wet material retires. First-pass glimmer uses
+that presentation edge; repeat tint retains semantic owners and stays clipped
+to laid ink. Range projection and word exposure endpoints are cached with the
+paragraph; frames read the plan rather than solving it again. The animated edge
+interpolates between exact source/printed letter anchors instead of rounding
+each frame to a whole letter. Every wash retains `Tuning.washFeather`.
 
 **Bands that abut must not reach past their boxes.** A paper cover is drawn
 `PaperCoverPad` (4 dp) wider than its own line box, to catch ink that overhangs
