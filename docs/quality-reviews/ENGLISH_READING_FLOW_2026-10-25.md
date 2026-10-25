@@ -4,6 +4,14 @@ Status: accepted for publication after independent final review of the source
 and silence fingerprints, full tests/audit, native render/transport evidence,
 production replay and exact-source R8 release. The limits below remain explicit.
 
+Follow-up: the user saw no noticeable improvement in this build and confirmed
+Translation Mushaf; word-by-word Mushaf already felt good. The clock checks
+below remain valid, but do not establish visible continuity between glyphs.
+The [visible-transition follow-up](ENGLISH_TRANSLATION_TRANSITIONS_2026-10-25.md)
+records the subsequent blank-distance/fallback-feather experiment and actual
+same-layout measurements. Its visible-character distance replaces the
+whitespace-inclusive distance described here for safe translation runs.
+
 The user rejected `08c813c96` as too much stop/go. They want constant paced
 movement through connected recitation and holds when the reciter stops. This
 supersedes independent per-band velocities for published English translation.

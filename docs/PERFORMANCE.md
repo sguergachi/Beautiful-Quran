@@ -61,7 +61,12 @@ text source, reciter, actual timing snapshot, first-voice gate and measured
 quiet; a provider timing replacement rebuilds it. Drawing and page follow read
 the same plan. Connected translation speech uses one cumulative audible-time
 clock, projected into cached geometry partitions. Its normalized speech union
-and quiet subtraction are built once; frames binary-search cached interval sums. Printed word ranges are cached with the paragraph. Both the base cover and
+and quiet subtraction are built once; frames binary-search cached interval sums.
+The alignment retains its printed source text by reference. A plan builds
+`EnglishReadingExtent` offset/prefix arrays once, giving blank-space travel zero
+time with O(1), allocation-free forward/inverse character projection. Sources
+whose whitespace is normalized by the leaf retain the prior projection instead.
+Printed word ranges are cached with the paragraph. Both the base cover and
 paper material use the same per-word projection of that edge; only one next
 unread word per verse requests material prewarming.
 First-pass glimmer shares that band; repeats keep the semantic ranges. Geometry

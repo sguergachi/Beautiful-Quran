@@ -12,6 +12,8 @@ data class EnglishAlignment(
     val wordEnds: FloatArray,
     val spans: List<EnglishWordSpan>,
     val phrases: List<EnglishPhrase>? = null,
+    /** Printed translation for presentation distance; semantic ownership never uses this field. */
+    val readingText: String? = null,
 ) {
     /** Legacy immediate-meaning ranges, retained for occurrence fallback and ownership diagnostics. */
     val washSpans: List<EnglishWordSpan> = buildList {
@@ -149,7 +151,7 @@ object EnglishWordAlignment {
                 anchored = !word.added && word.text !in GRAMMAR && verified[index] >= 0,
             )
         })
-        return EnglishAlignment(shares, spans, phrases)
+        return EnglishAlignment(shares, spans, phrases, readingText = translation)
     }
 
     /**

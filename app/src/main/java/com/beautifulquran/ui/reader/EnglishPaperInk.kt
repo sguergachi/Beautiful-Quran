@@ -78,9 +78,11 @@ internal fun englishWordWashCover(
     restingAlpha: Float,
     waitingCover: Float,
     recitedCover: Float,
+    letterFeather: Boolean = false,
 ): ShapedWordBloom? = when {
     progress <= 0f -> ShapedWordBloom.UpcomingDim(range, paper, waitingCover)
-    progress < 1f -> ShapedWordBloom.InkReveal(range, progress, paper, restingAlpha)
+    progress < 1f -> ShapedWordBloom.InkReveal(range, progress, paper, restingAlpha,
+        feather = if (letterFeather) 1f / range.count().coerceAtLeast(1) else null)
     recitedCover > 0f -> ShapedWordBloom.UpcomingDim(range, paper, recitedCover)
     else -> null
 }

@@ -34,7 +34,7 @@ fun main(args: Array<String>) {
     File(args[2], "exposure.tsv").bufferedWriter().use { exposures ->
         File(args[2], "plans.tsv").bufferedWriter().use { plans ->
             exposures.appendLine("reciter\tverse\tword\ttext\tstart_ms\tend_ms\tsemantic_owner\tend_minus_owner_end_ms")
-            plans.appendLine("reciter\tverse\tblocks\treordered_blocks\trepeat_fallbacks\tearly_words\tlate_words\tsource_overlap_fallbacks\tcontained_cores\tcrossing_cores\tcore_collapses\tnew_collapses\tsource_order_skips\trepeat_collapses\tother_legacy_collapses\twhitespace_collapses\treading_flow\treading_fallback\trate_checks\tpause_checks")
+            plans.appendLine("reciter\tverse\tblocks\treordered_blocks\trepeat_fallbacks\tearly_words\tlate_words\tsource_overlap_fallbacks\tcontained_cores\tcrossing_cores\tcore_collapses\tnew_collapses\tsource_order_skips\trepeat_collapses\tother_legacy_collapses\twhitespace_collapses\treading_flow\treading_fallback\trate_checks\tpause_checks\tblank_compression\tblank_compression_fallback")
             cores.appendLine("reciter\tverse\ttext\tfrom\tto\tband_owner\tstart_ms\tend_ms\tlegacy_start_ms\tlegacy_end_ms\treason")
             crossings.appendLine("reciter\tverse\ttext\tfrom\tto\tplan_contained\tlegacy_contained")
             File(args[1]).forEachLine { line ->
@@ -64,13 +64,14 @@ fun main(args: Array<String>) {
                     check(edge >= last) { "$reciter $key retreat" }; last = edge
                 }
                 var rateChecks = 0; var pauseChecks = 0
-                plan.readingFlow?.clock?.let { clock ->
+                plan.readingFlow?.let { flow ->
+                    val clock = flow.clock
                     val audible = clock.spoken.orEmpty()
                     val duration = audible.sumOf { it.last - it.first }
                     val boundaries = (segments.map { it.startMs } + plan.windows.values.map { it.endMs }).distinct()
                     for (at in boundaries) {
                         if (audible.none { at - 1 >= it.first && at + 1 <= it.last }) continue
-                        val delta = englishWashThrough(plan, at + 1)!! - englishWashThrough(plan, at - 1)!!
+                        val delta = flow.ink(englishWashThrough(plan, at + 1)!!) - flow.ink(englishWashThrough(plan, at - 1)!!)
                         check(kotlin.math.abs(delta - 2f / duration) < .00001f) { "$reciter $key rate reset at $at: $delta" }
                         rateChecks++
                     }
@@ -79,8 +80,8 @@ fun main(args: Array<String>) {
                         for (at in listOf(a.last, (a.last + b.first) / 2, b.first)) {
                             check(kotlin.math.abs(englishWashThrough(plan, at)!! - held) < .000001f) { "$reciter $key quiet moves" }
                         }
-                        check(kotlin.math.abs(clock.mediaAt(held) - a.last) <= 1) { "$reciter $key earliest pause finish" }
-                        check(kotlin.math.abs(clock.mediaAt(held, afterGap = true) - b.first) <= 1) { "$reciter $key latest pause start ${clock.mediaAt(held, afterGap = true)} vs ${b.first}" }
+                        check(kotlin.math.abs(flow.mediaAt(held) - a.last) <= 1) { "$reciter $key earliest pause finish" }
+                        check(kotlin.math.abs(flow.mediaAt(held, afterGap = true) - b.first) <= 1) { "$reciter $key latest pause start ${flow.mediaAt(held, afterGap = true)} vs ${b.first}" }
                         pauseChecks++
                     }
                 }
@@ -138,7 +139,7 @@ fun main(args: Array<String>) {
                     exposures.appendLine("$reciter\t$key\t${index + 1}\t${word.value}\t${window.startMs}\t${window.endMs}\t$owner\t${delta ?: ""}")
                 }
                 val reordered = alignment.presentationSpans.count { it.lastPosition > it.position }
-                plans.appendLine("$reciter\t$key\t${plan.spans.size}\t$reordered\t${plan.repeatFallbacks}\t$early\t$late\t${plan.sourceOverlapFallbacks}\t$coreCount\t$crossingCount\t$collapsed\t$introduced\t$skips\t$repeats\t$others\t$whitespaceCollapses\t${if (plan.readingFlow != null) 1 else 0}\t${plan.readingFlowFallback ?: ""}\t$rateChecks\t$pauseChecks")
+                plans.appendLine("$reciter\t$key\t${plan.spans.size}\t$reordered\t${plan.repeatFallbacks}\t$early\t$late\t${plan.sourceOverlapFallbacks}\t$coreCount\t$crossingCount\t$collapsed\t$introduced\t$skips\t$repeats\t$others\t$whitespaceCollapses\t${if (plan.readingFlow != null) 1 else 0}\t${plan.readingFlowFallback ?: ""}\t$rateChecks\t$pauseChecks\t${if (plan.readingFlow?.extent != null) 1 else 0}\t${plan.readingFlow?.extentFallback ?: ""}")
             }
         }
     }
@@ -159,7 +160,7 @@ def main():
     source = Path(__file__).resolve().parents[1] / "app/src/main/java/com/beautifulquran"
     names = ["domain/EnglishWordAlignment.kt", "domain/EnglishPhrase.kt", "domain/EnglishTypography.kt",
              "domain/ArabicNormalize.kt", "data/model/Models.kt", "ui/reader/EnglishWashPlan.kt",
-             "ui/reader/EnglishWashWindow.kt", "ui/reader/EnglishReadingFlow.kt", "domain/VerseOpening.kt"]
+             "ui/reader/EnglishWashWindow.kt", "ui/reader/EnglishReadingFlow.kt", "ui/reader/EnglishReadingExtent.kt", "domain/VerseOpening.kt"]
     sources = [source / name for name in names]
     with sqlite3.connect(f"file:{args.timings_cache.resolve()}?mode=ro", uri=True) as database:
         revisions = dict(database.execute("SELECT reciter_id, revision FROM timing_state"))
@@ -224,6 +225,9 @@ def main():
                                        for reason in sorted({row[17] for row in rows if row[17]})},
         "constant_rate_checks": sum(int(row[18]) for row in rows),
         "pause_plateau_checks": sum(int(row[19]) for row in rows),
+        "blank_compression_rows": sum(int(row[20]) for row in rows),
+        "blank_compression_fallback_rows": {reason: sum(row[21] == reason for row in rows)
+                                             for reason in sorted({row[21] for row in rows if row[21]})},
         "measured_silence_sources": silence_sources,
         "semantic_accuracy_established": False,
         "readability_certified": False,

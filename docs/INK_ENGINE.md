@@ -703,7 +703,12 @@ that connected speech should carry constant paced movement.
 `EnglishReadingFlow` sums the union of **all** source segments in the run,
 including owners swallowed by the English order, then subtracts the normalized,
 clipped measured quiet once. The printed prefix is linear in cumulative audible
-time. Source gaps and measured silence hold the exact fractional edge reached
+time measured in visible character slots. `EnglishReadingExtent` gives whitespace
+zero travel time; the next word still begins at zero progress. This removes a
+glyph-free dwell without changing the printed spacing or audio endpoints. The
+extent is disabled when the source has whitespace that the leaf normalizes;
+that case retains the continuous character projection and records
+`normalized_spacing`. Source gaps and measured silence hold the exact fractional edge reached
 at their start, including inside an inversion; neither punctuation nor a word
 boundary snaps that edge. Resuming continues at the same rate. The existing
 first-voice gate and terminal fence bound the run. No live integrator or extra
@@ -726,6 +731,14 @@ Measured quiet currently comes from the existing Hani asset, attached by actual
 audio ayah and reciter to `EnglishWashClock`; other voices use known timing gaps.
 This is limited pause evidence, not a claim that timing segments detect every
 acoustic stop. See the [steady-reading report](quality-reviews/ENGLISH_READING_FLOW_2026-10-25.md).
+
+The published steady-reading path also gives its fallback cover a feather one
+mean printed character wide instead of the generic whole-word feather. Its
+zero-progress unread floor and word-local soft entry remain. The Paper shader's
+lead-entry field is unchanged; matching edge width does not make their material
+kinetics identical. Cards, Scroll and occurrence fallback verses keep their
+existing covers. The [visible-transition report](quality-reviews/ENGLISH_TRANSLATION_TRANSITIONS_2026-10-25.md)
+records the same-layout comparison and its sampling limits.
 
 The renderer and carried-leaf follow consume the same cached whole-verse plan.
 `EnglishLeafVerse.fragmentWashProgress` projects its edge through exact letter

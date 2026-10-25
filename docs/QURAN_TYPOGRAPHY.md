@@ -1397,6 +1397,10 @@ Three rules make it usable:
   October 24 clarification of the earlier immediate-meaning policy. The October 25 clarification uses steady movement through connected speech,
   holding the exact reached prefix in measured quiet. Word ranges partition
   geometry without restarting velocity; already laid ink never lifts.
+  Presentation distance counts visible character slots, so crossing a printed
+  space consumes no audio time and the next word begins at zero reveal. The
+  typeset spaces, line breaks, font size and glyph geometry stay unchanged.
+  Normalized source whitespace retains the prior continuous projection.
   Word-card English keeps its existing linear occurrence clock, including the
   pause before the next owner's onset; this readable policy is translation-only.
 - **Boundaries sit between words.** Adjacent ranges tile the printed sentence,

@@ -90,6 +90,13 @@ The basmalah sites (drawable and QCF glyph) keep their wash for now.
   ahead of the edge; one next word is warmed without drawing it. Seek recess
   applies to the prefix present on entry, so newly washed words do not flash
   back under the verse cover while it is still lifting.
+  Published Translation Mushaf with an active steady-reading plan gives the
+  fallback cover a feather of `1 / printedWordLength`, approximately one mean
+  character advance at its zero cover padding. This shortens the broad
+  whole-word entrance/settling breath while retaining the zero-progress unread
+  floor. It changes fallback edge width, not the shader's per-letter lead-entry
+  or arrival field. Glyph widths and punctuation still vary. Cards, Scroll and
+  source-overlap/repeat fallback verses retain the default cover feather.
   Reordered English phrases keep material freshness on each printed word's
   presentation window, across Arabic owner boundaries. Pause/resume cannot
   re-wet a settled word. A generation/reciter-scoped 850 ms cosmetic departure

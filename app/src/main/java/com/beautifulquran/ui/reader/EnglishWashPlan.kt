@@ -21,7 +21,7 @@ internal data class EnglishWashPlan(
 
 /** Exposure endpoints of one whole printed word, on the same clock as its soft edge. */
 internal fun englishWordExposure(plan: EnglishWashPlan, from: Float, to: Float): EnglishWashWindow? {
-    plan.readingFlow?.clock?.let {
+    plan.readingFlow?.let {
         return EnglishWashWindow(it.mediaAt(from, afterGap = true), it.mediaAt(to))
     }
     val span = plan.spans.firstOrNull { to <= it.to + .00001f } ?: return null

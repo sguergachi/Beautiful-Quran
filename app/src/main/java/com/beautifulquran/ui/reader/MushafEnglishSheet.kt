@@ -1527,6 +1527,7 @@ private fun EnglishProseBlock(
                                 },
                                 clock = clock.value,
                                 windows = washWindows[verse.surahId to verse.ayah]?.windows.orEmpty(),
+                                steadyReading = washWindows[verse.surahId to verse.ayah]?.readingFlow != null,
                                 presentationSpans = presentationSpans[verse.range],
                                 wordFinishes = wordFinishes,
                                 paperDeposits = paperDeposits,
@@ -1618,6 +1619,7 @@ private fun englishVerseBlooms(
     word: ActiveWord?,
     clock: EnglishWashClock?,
     windows: Map<Int, EnglishWashWindow>,
+    steadyReading: Boolean,
     presentationSpans: List<EnglishInkSpan>?,
     wordFinishes: Map<Int, Long>,
     paperDeposits: MutableMap<Int, PaperInkDeposit>,
@@ -1684,6 +1686,7 @@ private fun englishVerseBlooms(
                 range, englishPaperInkWordProgress(washEdge, range.first, range.last + 1),
                 paper, resting, waiting,
                 if (performing != null) washEntry.recitedCover(range, cover) else cover,
+                letterFeather = steadyReading,
             )
             val previous = blooms.lastOrNull() as? ShapedWordBloom.UpcomingDim
             if (bloom is ShapedWordBloom.UpcomingDim && previous != null &&

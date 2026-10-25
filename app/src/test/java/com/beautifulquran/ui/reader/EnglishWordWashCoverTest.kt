@@ -81,4 +81,18 @@ class EnglishWordWashCoverTest {
         entry.onFrame(2, 1, .2f)
         assertEquals(0f, entry.recitedCover(0..7, .7f), 0f)
     }
+
+    @Test
+    fun `translation letter feather retains unread entry and completed ink without changing card defaults`() {
+        for (range in listOf(0..0, 0..1, 0..7, 0..15)) {
+            fun translation(progress: Float) = englishWordWashCover(range, progress, Color.White, .22f, .78f, 0f,
+                letterFeather = true)
+            assertEquals(.78f, (translation(0f) as ShapedWordBloom.UpcomingDim).coverAlpha, 0f)
+            assertNull(translation(1f))
+            val partial = translation(.5f) as ShapedWordBloom.InkReveal
+            assertEquals(1f, partial.feather!! * range.count(), .000001f)
+            assertEquals(.5f, partial.progress, 0f)
+            assertNull((cover(range, .5f) as ShapedWordBloom.InkReveal).feather)
+        }
+    }
 }

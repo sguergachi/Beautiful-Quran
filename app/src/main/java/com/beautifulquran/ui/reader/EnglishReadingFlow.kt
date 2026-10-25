@@ -5,15 +5,23 @@ import com.beautifulquran.domain.AudibleSilence
 import com.beautifulquran.domain.EnglishAlignment
 
 /** One cumulative audible-time clock across a safe forward reading run. */
-internal data class EnglishReadingFlow(val clock: EnglishWashWindow)
+internal data class EnglishReadingFlow(
+    val clock: EnglishWashWindow,
+    val extent: EnglishReadingExtent? = null,
+    val extentFallback: String? = null,
+) {
+    fun through(positionMs: Long): Float = clock.progress(positionMs).let { extent?.printed(it) ?: it }
+    fun ink(through: Float): Float = extent?.ink(through) ?: through
+    fun mediaAt(through: Float, afterGap: Boolean = false): Long = clock.mediaAt(ink(through), afterGap)
+}
 
 /** Geometry partitions share the run's rate; Arabic owners do not restart its speed. */
 internal data class EnglishReadingWindow(val flow: EnglishReadingFlow, val from: Float, val to: Float) {
     fun progress(positionMs: Long): Float =
-        ((flow.clock.progress(positionMs) - from) / (to - from)).coerceIn(0f, 1f)
+        ((flow.through(positionMs) - from) / (to - from)).coerceIn(0f, 1f)
 
     fun mediaAt(progress: Float, afterGap: Boolean): Long =
-        flow.clock.mediaAt(from + (to - from) * progress, afterGap)
+        flow.mediaAt(from + (to - from) * progress, afterGap)
 }
 
 /**
@@ -53,10 +61,18 @@ internal fun englishReadingPlan(
         }
     }
     if (audible.isEmpty()) return fallback("zero_audible_time")
-    val flow = EnglishReadingFlow(EnglishWashWindow(start, end, audible))
+    val text = alignment.readingText
+    // The leaf normalizes whitespace. Its legacy letter interpolation cannot
+    // project a discontinuous jump across a differently sized source gap.
+    val normalizedSpacing = text != null && (text.firstOrNull()?.isWhitespace() == true ||
+        text.lastOrNull()?.isWhitespace() == true || text.zipWithNext().any { (a, b) -> a.isWhitespace() && b.isWhitespace() })
+    val extent = text?.takeUnless { normalizedSpacing }?.let(::EnglishReadingExtent)
+    if (extent?.hasInk == false) return fallback("zero_printed_ink")
+    val flow = EnglishReadingFlow(EnglishWashWindow(start, end, audible), extent,
+        if (normalizedSpacing) "normalized_spacing" else null)
     val windows = anchors.spans.associate { span ->
         span.position to EnglishWashWindow(
-            flow.clock.mediaAt(span.from, afterGap = true), flow.clock.mediaAt(span.to),
+            flow.mediaAt(span.from, afterGap = true), flow.mediaAt(span.to),
             reading = EnglishReadingWindow(flow, span.from, span.to),
         )
     }
