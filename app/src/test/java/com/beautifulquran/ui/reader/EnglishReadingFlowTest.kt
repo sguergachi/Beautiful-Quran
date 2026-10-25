@@ -118,7 +118,7 @@ class EnglishReadingFlowTest {
         val segments = starts.zipWithNext().mapIndexed { i, (start, end) -> Segment(i + 1, start.toLong(), end.toLong()) }
         val plan = englishPresentationPlan(alignment, segments, 1020, listOf(AudibleSilence(9442, 9813)))
         val held = englishWashThrough(plan, 9442)!!
-        assertEquals(EnglishReadingExtent(row[1]).printed((9442f - 1020) / (14625 - 1020 - 371)), held, .000001f)
+        assertEquals(listOf(10, 12), plan.readingFlow!!.pace!!.finishes.map { it.word.position })
         for (at in 9442L..9813L step 17) assertEquals(held, englishWashThrough(plan, at)!!, .000001f)
         assertEquals(held, englishWashThrough(plan, 9813)!!, .000001f)
         assertTrue(englishWashThrough(plan, 9814)!! > held)

@@ -29,6 +29,10 @@ fun main(args: Array<String>) {
     }
     val cache = HashMap<String, EnglishAlignment>()
     var newCollapses = 0
+    File(args[2], "word-finishes.tsv").bufferedWriter().use { finishes ->
+    File(args[2], "pace-diagnostics.tsv").bufferedWriter().use { paces ->
+    finishes.appendLine("reciter\tverse\tword\towner\tdesired_ms\teffective_ms\tactual_ms\tsource_end_ms\tvoiced_end_ms\tlead_reason\tforward_finish_ms\tforward_phase\tforward_tolerance_chars")
+    paces.appendLine("reciter\tverse\tliteral_matches\taccepted\tdeferred\tminimum_velocity\tmaximum_velocity\trejections")
     File(args[2], "core-collapses.tsv").bufferedWriter().use { cores ->
     File(args[2], "core-crossings.tsv").bufferedWriter().use { crossings ->
     File(args[2], "exposure.tsv").bufferedWriter().use { exposures ->
@@ -68,11 +72,18 @@ fun main(args: Array<String>) {
                     val clock = flow.clock
                     val audible = clock.spoken.orEmpty()
                     val duration = audible.sumOf { it.last - it.first }
-                    val boundaries = (segments.map { it.startMs } + plan.windows.values.map { it.endMs }).distinct()
+                    val pace = flow.pace
+                    check(pace?.hasPositiveVelocity() != false) { "$reciter $key nonpositive pace" }
+                    val boundaries = (segments.map { it.startMs } + plan.windows.values.map { it.endMs } +
+                        pace?.finishes.orEmpty().map { it.deadlineMs }).distinct()
                     for (at in boundaries) {
                         if (audible.none { at - 1 >= it.first && at + 1 <= it.last }) continue
                         val delta = flow.ink(englishWashThrough(plan, at + 1)!!) - flow.ink(englishWashThrough(plan, at - 1)!!)
-                        check(kotlin.math.abs(delta - 2f / duration) < .00001f) { "$reciter $key rate reset at $at: $delta" }
+                        val before = clock.progress(at - 1)
+                        val after = clock.progress(at + 1)
+                        val expected = (pace?.through(after) ?: after) - (pace?.through(before) ?: before)
+                        check(delta >= 0 && kotlin.math.abs(delta - expected) < .00001f) { "$reciter $key projection reset at $at: $delta vs $expected" }
+                        if (pace?.finishes.isNullOrEmpty()) check(kotlin.math.abs(delta - 2f / duration) < .00001f)
                         rateChecks++
                     }
                     audible.zipWithNext().forEach { (a, b) ->
@@ -84,6 +95,31 @@ fun main(args: Array<String>) {
                         check(kotlin.math.abs(flow.mediaAt(held, afterGap = true) - b.first) <= 1) { "$reciter $key latest pause start ${flow.mediaAt(held, afterGap = true)} vs ${b.first}" }
                         pauseChecks++
                     }
+                    for (finish in pace?.finishes.orEmpty()) {
+                        val word = finish.word
+                        val actual = englishWordExposure(plan, word.from, word.to)!!.endMs
+                        check(kotlin.math.abs(actual - finish.deadlineMs) <= 1) { "$reciter $key finish drift $finish vs $actual" }
+                        val start = kotlin.math.round(word.from * text.length).toInt()
+                        val end = kotlin.math.round(word.to * text.length).toInt()
+                        fun phase(at: Long) = englishPaperInkWordProgress(englishWashThrough(plan, at)!! * text.length, start, end)
+                        // Normalized Float coordinates are projected back to
+                        // long-verse character offsets before word division.
+                        val toleranceChars = 4f * Math.ulp(word.to) * text.length
+                        val complete = 1f - toleranceChars / (end - start).coerceAtLeast(1)
+                        val value = phase(finish.deadlineMs)
+                        check(value >= complete) { "$reciter $key forward word incomplete $finish: $value vs $complete" }
+                        var low = clock.startMs
+                        var high = clock.endMs
+                        while (low < high) {
+                            val mid = (low + high) ushr 1
+                            if (phase(mid) >= complete) high = mid else low = mid + 1
+                        }
+                        check(kotlin.math.abs(low - finish.deadlineMs) <= 1) { "$reciter $key forward finish drift $finish vs $low" }
+                        val label = text.substring(kotlin.math.round(word.from * text.length).toInt(),
+                            kotlin.math.round(word.to * text.length).toInt())
+                        finishes.appendLine("$reciter\t$key\t$label\t${word.position}\t${finish.desiredMs}\t${finish.deadlineMs}\t$actual\t${finish.sourceEndMs}\t${finish.voicedEndMs}\t${finish.leadReason}\t$low\t$value\t$toleranceChars")
+                    }
+                    paces.appendLine("$reciter\t$key\t${alignment.timingWords.size}\t${pace?.finishes?.size ?: 0}\t${pace?.deferredMatches ?: 0}\t${pace?.velocityBounds?.first ?: 1}\t${pace?.velocityBounds?.second ?: 1}\t${pace?.rejected.orEmpty().entries.joinToString(";") { "${it.key}=${it.value}" }}")
                 }
                 val legacy = EnglishWashPlan(alignment.washSpans,
                     englishWashWindows(alignment.washSpans.map { it.position }, segments).mapValues { (owner, window) ->
@@ -145,6 +181,8 @@ fun main(args: Array<String>) {
     }
     }
     }
+    }
+    }
     check(newCollapses == 0) { "$newCollapses newly collapsed letter cores with positive legacy exposure" }
 }
 '''
@@ -160,7 +198,9 @@ def main():
     source = Path(__file__).resolve().parents[1] / "app/src/main/java/com/beautifulquran"
     names = ["domain/EnglishWordAlignment.kt", "domain/EnglishPhrase.kt", "domain/EnglishTypography.kt",
              "domain/ArabicNormalize.kt", "data/model/Models.kt", "ui/reader/EnglishWashPlan.kt",
-             "ui/reader/EnglishWashWindow.kt", "ui/reader/EnglishReadingFlow.kt", "ui/reader/EnglishReadingExtent.kt", "domain/VerseOpening.kt"]
+             "ui/reader/EnglishWashWindow.kt", "ui/reader/EnglishReadingFlow.kt", "ui/reader/EnglishReadingExtent.kt",
+             "ui/reader/EnglishReadingPace.kt", "domain/VerseOpening.kt"]
+    names.append("ui/reader/PaperInkEnglishWindows.kt")
     sources = [source / name for name in names]
     with sqlite3.connect(f"file:{args.timings_cache.resolve()}?mode=ro", uri=True) as database:
         revisions = dict(database.execute("SELECT reciter_id, revision FROM timing_state"))
@@ -204,6 +244,13 @@ def main():
             subprocess.run(["kotlinc", *map(str, sources), str(legacy), str(probe), "-include-runtime", "-d", str(jar)], check=True)
             subprocess.run(["java", "-jar", str(jar), str(args.corpus), str(timings), str(args.output_dir)], check=True)
     rows = [row.split("\t") for row in (args.output_dir / "plans.tsv").read_text().splitlines()[1:]]
+    pace_rows = [row.split("\t") for row in (args.output_dir / "pace-diagnostics.tsv").read_text().splitlines()[1:]]
+    finish_rows = [row.split("\t") for row in (args.output_dir / "word-finishes.tsv").read_text().splitlines()[1:]]
+    rejected = {}
+    for row in pace_rows:
+        for item in filter(None, row[7].split(";")):
+            reason, count = item.split("=")
+            rejected[reason] = rejected.get(reason, 0) + int(count)
     summary = {
         "timing_rows": len(rows), "verses": len({row[1] for row in rows}), "reciters": sorted(revisions),
         "reordered_blocks": sum(int(row[3]) for row in rows),
@@ -223,11 +270,22 @@ def main():
         "steady_reading_rows": sum(int(row[16]) for row in rows),
         "reading_flow_fallback_rows": {reason: sum(row[17] == reason for row in rows)
                                        for reason in sorted({row[17] for row in rows if row[17]})},
-        "constant_rate_checks": sum(int(row[18]) for row in rows),
+        "shared_projection_checks": sum(int(row[18]) for row in rows),
         "pause_plateau_checks": sum(int(row[19]) for row in rows),
         "blank_compression_rows": sum(int(row[20]) for row in rows),
         "blank_compression_fallback_rows": {reason: sum(row[21] == reason for row in rows)
                                              for reason in sorted({row[21] for row in rows if row[21]})},
+        "literal_matches_in_reading_rows": sum(int(row[2]) for row in pace_rows),
+        "accepted_word_finishes": len(finish_rows),
+        "deferred_literal_matches": rejected,
+        "accepted_finish_reasons": {reason: sum(row[9] == reason for row in finish_rows)
+                                    for reason in sorted({row[9] for row in finish_rows})},
+        "maximum_finish_error_ms": max((abs(int(row[5]) - int(row[6])) for row in finish_rows), default=0),
+        "maximum_forward_finish_error_ms": max((abs(int(row[5]) - int(row[10])) for row in finish_rows), default=0),
+        "minimum_forward_word_phase_at_deadline": min((float(row[11]) for row in finish_rows), default=1),
+        "maximum_forward_tolerance_chars": max((float(row[12]) for row in finish_rows), default=0),
+        "minimum_relative_velocity": min((float(row[5]) for row in pace_rows), default=1),
+        "maximum_relative_velocity": max((float(row[6]) for row in pace_rows), default=1),
         "measured_silence_sources": silence_sources,
         "semantic_accuracy_established": False,
         "readability_certified": False,

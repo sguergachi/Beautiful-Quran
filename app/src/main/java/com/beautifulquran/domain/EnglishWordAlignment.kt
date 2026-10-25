@@ -14,6 +14,8 @@ data class EnglishAlignment(
     val phrases: List<EnglishPhrase>? = null,
     /** Printed translation for presentation distance; semantic ownership never uses this field. */
     val readingText: String? = null,
+    /** Verified literal words before owner coalescing; interpolation and synonyms cannot set deadlines. */
+    val timingWords: List<EnglishWordSpan> = emptyList(),
 ) {
     /** Legacy immediate-meaning ranges, retained for occurrence fallback and ownership diagnostics. */
     val washSpans: List<EnglishWordSpan> = buildList {
@@ -151,7 +153,23 @@ object EnglishWordAlignment {
                 anchored = !word.added && word.text !in GRAMMAR && verified[index] >= 0,
             )
         })
-        return EnglishAlignment(shares, spans, phrases, readingText = translation)
+        val timingWords = prose.mapIndexedNotNull { index, word ->
+            val at = positions[index]
+            if (word.added || word.text in GRAMMAR || verified[index] != at ||
+                word.text.any { it.isWhitespace() } || spoken.none { it.second == at && it.first.text == word.text }) null
+            else {
+                val start = word.end - word.text.length
+                var first = start
+                while (first > 0 && !translation[first - 1].isWhitespace()) first--
+                var end = word.end
+                while (end < translation.length && !translation[end].isWhitespace()) end++
+                if (translation.substring(first, start).any { it.isLetterOrDigit() } ||
+                    translation.substring(word.end, end).any { it.isLetterOrDigit() }) null
+                else EnglishWordSpan(first.toFloat() / translation.length,
+                    end.toFloat() / translation.length, at + 1)
+            }
+        }
+        return EnglishAlignment(shares, spans, phrases, readingText = translation, timingWords = timingWords)
     }
 
     /**

@@ -9,10 +9,14 @@ internal data class EnglishReadingFlow(
     val clock: EnglishWashWindow,
     val extent: EnglishReadingExtent? = null,
     val extentFallback: String? = null,
+    val pace: EnglishReadingPace? = null,
 ) {
-    fun through(positionMs: Long): Float = clock.progress(positionMs).let { extent?.printed(it) ?: it }
+    fun through(positionMs: Long): Float = clock.progress(positionMs).let { pace?.through(it) ?: it }
+        .let { extent?.printed(it) ?: it }
     fun ink(through: Float): Float = extent?.ink(through) ?: through
-    fun mediaAt(through: Float, afterGap: Boolean = false): Long = clock.mediaAt(ink(through), afterGap)
+    fun mediaAt(through: Float, afterGap: Boolean = false): Long = ink(through).let {
+        clock.mediaAt(pace?.audible(it) ?: it, afterGap)
+    }
 }
 
 /** Geometry partitions share the run's rate; Arabic owners do not restart its speed. */
@@ -68,8 +72,9 @@ internal fun englishReadingPlan(
         text.lastOrNull()?.isWhitespace() == true || text.zipWithNext().any { (a, b) -> a.isWhitespace() && b.isWhitespace() })
     val extent = text?.takeUnless { normalizedSpacing }?.let(::EnglishReadingExtent)
     if (extent?.hasInk == false) return fallback("zero_printed_ink")
-    val flow = EnglishReadingFlow(EnglishWashWindow(start, end, audible), extent,
-        if (normalizedSpacing) "normalized_spacing" else null)
+    val clock = EnglishWashWindow(start, end, audible)
+    val flow = EnglishReadingFlow(clock, extent, if (normalizedSpacing) "normalized_spacing" else null,
+        englishReadingPace(alignment, segments, clock, extent))
     val windows = anchors.spans.associate { span ->
         span.position to EnglishWashWindow(
             flow.mediaAt(span.from, afterGap = true), flow.mediaAt(span.to),

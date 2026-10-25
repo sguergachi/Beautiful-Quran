@@ -4,6 +4,12 @@ Status: accepted for publication after independent review of the production
 diff, visible evidence, durable tool, current source fingerprints and final
 JVM/debug/replay/R8 gates. The limits below remain explicit.
 
+Follow-up: the user still found this build awkward and clarified that reliable
+word matches should finish in pace with the reciter, ideally 100 ms earlier.
+The visible idle reduction below did not establish that property. The
+[word-finish follow-up](ENGLISH_WORD_FINISHES_2026-10-25.md) records the endpoint
+policy and the separate forward/render checks for it.
+
 The user reported no visible change after the steady-reading build `cea2a088c`
 and confirmed **English Mushaf — Translation**. Word-by-word Mushaf already
 felt good and stays locked. This follow-up changes presentation distance and

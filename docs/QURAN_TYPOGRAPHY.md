@@ -1401,6 +1401,13 @@ Three rules make it usable:
   space consumes no audio time and the next word begins at zero reveal. The
   typeset spaces, line breaks, font size and glyph geometry stay unchanged.
   Normalized source whitespace retains the prior continuous projection.
+  A later October 25 clarification gives compatible literal matches priority
+  at their spoken ends, ideally 100 media milliseconds earlier. A shared
+  continuous pace joins those endpoints without stopping at each word. It
+  preserves the current movement through complete reordered and terminal
+  residual word units; an impossible deadline is deferred rather than forcing
+  a rush or changing ownership. This is presentation timing, not a new setting
+  of the line or a clock calibration.
   Word-card English keeps its existing linear occurrence clock, including the
   pause before the next owner's onset; this readable policy is translation-only.
 - **Boundaries sit between words.** Adjacent ranges tile the printed sentence,

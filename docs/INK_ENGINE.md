@@ -700,10 +700,29 @@ These ranges partition geometry; they no longer give every word a separate
 velocity or stop at an Arabic owner's end. The user clarified on October 25
 that connected speech should carry constant paced movement.
 
+The later clarification prioritizes the finish of a reliable literal word
+match. `EnglishReadingPace` joins compatible printed word ends to that source
+word's voiced end, preferring 100 **media** ms earlier where feasible (100 wall
+ms at 1x, 50 at 2x). Its monotone cubic keeps a positive shared velocity at
+interior joins rather than easing every word to rest. Literal provenance comes
+from the existing verified owner before spans coalesce; synonyms, grammar,
+translator additions and partial printed tokens cannot establish a deadline.
+The last printed endpoint of an expanded source unit is considered once.
+
+The warp is identity through full rendered word units in reordered phrases and
+the protected terminal residual, including punctuation. An exact word inside
+those regions cannot force earlier English through a rush. Ordering, gate,
+quiet and velocity conflicts get one retry at the available voiced end, then
+an explicit rejection. A heuristic admission range of .25–4 times the current
+per-verse pace excludes near-stalls and bursts; this bound does not certify
+perceptual steadiness. No admitted anchors leaves the current reading clock
+unchanged. See the [word-finish report](quality-reviews/ENGLISH_WORD_FINISHES_2026-10-25.md).
+
 `EnglishReadingFlow` sums the union of **all** source segments in the run,
 including owners swallowed by the English order, then subtracts the normalized,
-clipped measured quiet once. The printed prefix is linear in cumulative audible
-time measured in visible character slots. `EnglishReadingExtent` gives whitespace
+clipped measured quiet once. Its cumulative audible fraction passes through
+the cached word-finish warp, then into visible character slots.
+`EnglishReadingExtent` gives whitespace
 zero travel time; the next word still begins at zero progress. This removes a
 glyph-free dwell without changing the printed spacing or audio endpoints. The
 extent is disabled when the source has whitespace that the leaf normalizes;
@@ -716,6 +735,7 @@ calibration is involved.
 
 `EnglishReadingWindow` projects this same clock into each geometry span.
 Printed finish times, material cooling and follow invert the shared mapping.
+The inverse reverses extent, pace and audible clock in that order.
 Inverse targets are quantized to integer media milliseconds before choosing a
 pause's earliest finish or latest start. Rounded endpoints are diagnostics and
 must never re-anchor or clip the default runtime projection.

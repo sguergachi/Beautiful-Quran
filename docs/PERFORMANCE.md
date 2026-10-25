@@ -66,6 +66,13 @@ The alignment retains its printed source text by reference. A plan builds
 `EnglishReadingExtent` offset/prefix arrays once, giving blank-space travel zero
 time with O(1), allocation-free forward/inverse character projection. Sources
 whose whitespace is normalized by the leaf retain the prior projection instead.
+Verified literal word endpoints and whole-unit protection intervals are also
+cached with the plan. `EnglishReadingPace` fits a deterministic sequence of
+compatible endpoints once, with analytic derivative bounds. Draw frames
+binary-search its knot arrays and evaluate a cubic; they allocate nothing and
+never solve an inverse. Inverse root searches run when cached windows/finish
+times are constructed. No live integrator, per-word timer or cadence optimizer
+is introduced.
 Printed word ranges are cached with the paragraph. Both the base cover and
 paper material use the same per-word projection of that edge; only one next
 unread word per verse requests material prewarming.
