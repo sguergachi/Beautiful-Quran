@@ -11,11 +11,14 @@
   "components": {
     "data/quran.db": "a5f3972aeafe5a837657becd6c4aacbe894d0f00668593360e40820f52496dc8",
     "tools/ExportEnglishAlignment.kt": "71dc2d6d814f038ad06b3c91e79c75924f7da8bd6c5ec824cced59b3ffc5bf8f",
-    "tools/english_alignment_ledger.py": "f8aad83f09647c8bef2b694ff70fd9d3bbc2deaba54a4a1df04fa4c58b89fc43",
-    "docs/ENGLISH_ALIGNMENT_LEDGER.md": "3a427e6fd8087231b507c52e467b9add23fdd5c560d8d62ea3856d829b0762a2",
+    "tools/english_alignment_ledger.py": "2bac892a5bfddd076cb1599ef1f271b675dd3dc5562dfb4e8b4ca7ca7b3c5281",
+    "tools/review_english_chapters.py": "6b481a016d23b6b186d009d2d4e6c9422d2e79930447b0bc09ace2958b5f2918",
+    "tools/english_alignment_evidence.py": "ad5e92d00905830b8cd5a3a506f0198566f45b2ef6de137d38884cda70b96d1c",
+    "tools/english_chapter_review.md": "641edc8eb8854d639a0871ace3552df05eeb94f9e3ba702e0f1026d425de43a8",
+    "docs/ENGLISH_ALIGNMENT_LEDGER.md": "73033f2df2c873604a516acaad245834736da2f52af5fe4f8dc9cbe6f504a1d1",
     "app/src/main/java/com/beautifulquran/domain/EnglishTypography.kt": "39d6b6607d67dcfc04e4a7168cf383b6c690b8a6c266a73f40e92563c2bdc852",
     "app/src/main/java/com/beautifulquran/domain/ArabicNormalize.kt": "6143112ef6c9846a7314f533ce63fb44171f6f6ac9fca058f845a23de535babd",
-    "app/src/main/java/com/beautifulquran/domain/EnglishWordAlignment.kt": "715e5f35eed56dc48b30b24c0bf07bd758e040d583f21b0d86eac86ce9cd9f06",
+    "app/src/main/java/com/beautifulquran/domain/EnglishWordAlignment.kt": "8cb34ac06b3a2bca5ac86a2a942a5fe9ce766647d0a1284bc90ebe4bffdb6ddc",
     "app/src/main/java/com/beautifulquran/domain/EnglishPhrase.kt": "d961e550c4d7e2ac0665c70bf467420f38e84bdebb0f17f57b2e52680b2bdf10",
     "app/src/main/java/com/beautifulquran/domain/ReviewedEnglishAlignment.kt": "4019bfaf75eb2fe90193c95fdcf4c3f3034b12d588828d3924c3149d89e37abd",
     "app/src/main/java/com/beautifulquran/data/model/Models.kt": "316ed7121b1773f6e9dc502443fb672d95227694f0ce1ed17761da43ea430160"

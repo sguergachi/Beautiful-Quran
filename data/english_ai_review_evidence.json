@@ -1343,6 +1343,342 @@
         "tafsir.json": "a5b4cdccc599b60d343494e7ddf0b71f456ed3b806d6266ad39c11046c01eed5",
         "translation.json": "a43d634692a68b439b72ecc8043f00df86cd7b2bf4f16d520106c97552cc3897"
       }
+    },
+    "64": {
+      "name": "At-Taghabun",
+      "date": "2026-10-26",
+      "printed_tokens": 503,
+      "arabic_slots": 241,
+      "method": "source-grounded draft, deterministic unit-ID separation where needed, fresh critique; cached exact requests reused",
+      "independent_gold": false,
+      "playback_summary_sha256": "7d140c79995d9a08954cee2406f880f181a3fab68a03e59dff2d8192fff3009e",
+      "verse_evidence": {
+        "64:1": {
+          "printed_tokens": 31,
+          "arabic_slots": 17,
+          "package_sha256": "3a2f5d496c3c78699d391b62a182bb5ba6e4d6ba30a030282e669abf6d6bbb59",
+          "citations": [
+            "https://quran.com/64:1?translations=20",
+            "https://quran.com/64:1/tafsirs/926"
+          ],
+          "automation": {
+            "policy_sha256": "dc865d64ebf6774f2e745a04ea4b88f92ee8681466e7f08e2d5716fca8a19a83",
+            "rubric_sha256": "641edc8eb8854d639a0871ace3552df05eeb94f9e3ba702e0f1026d425de43a8",
+            "model": "gpt-6.1-sol",
+            "reasoning_effort": "xhigh",
+            "independent_gold": false,
+            "raw_draft_sha256": "55c043149bbd6d9d4fc09fe4569dd60f828779c204b4978e2447fae2dc7b59c4",
+            "critique_sha256": "466ae07cc028a24a40e6a03a59eea33ce24919a6855be74831841622b8467f29"
+          }
+        },
+        "64:2": {
+          "printed_tokens": 26,
+          "arabic_slots": 11,
+          "package_sha256": "9f591b671cf210a50a1bd9ea496fd2f6a28d3e49d9bfed3be2e42b3cb4d36a1f",
+          "citations": [
+            "https://quran.com/64:2?translations=20",
+            "https://quran.com/64:2/tafsirs/926"
+          ],
+          "automation": {
+            "policy_sha256": "dc865d64ebf6774f2e745a04ea4b88f92ee8681466e7f08e2d5716fca8a19a83",
+            "rubric_sha256": "641edc8eb8854d639a0871ace3552df05eeb94f9e3ba702e0f1026d425de43a8",
+            "model": "gpt-6.1-sol",
+            "reasoning_effort": "xhigh",
+            "independent_gold": false,
+            "raw_draft_sha256": "860582d7b5eeb5ff6649ae2f5b672eb529967923483abb745bd26910505bdbef",
+            "critique_sha256": "16d77340cd3ca5d94739f55ce9ae57c8264ff321fe0c36be478142faa7120cd4"
+          }
+        },
+        "64:3": {
+          "printed_tokens": 22,
+          "arabic_slots": 9,
+          "package_sha256": "547487c2e99df7deac08ab824c622f3653e76b3972c704adf279d161d734ee06",
+          "citations": [
+            "https://quran.com/64:3?translations=20",
+            "https://quran.com/64:3/tafsirs/926"
+          ],
+          "automation": {
+            "policy_sha256": "dc865d64ebf6774f2e745a04ea4b88f92ee8681466e7f08e2d5716fca8a19a83",
+            "rubric_sha256": "641edc8eb8854d639a0871ace3552df05eeb94f9e3ba702e0f1026d425de43a8",
+            "model": "gpt-6.1-sol",
+            "reasoning_effort": "xhigh",
+            "independent_gold": false,
+            "raw_draft_sha256": "8a2ef9139e7daae03f54b56d54d5c397c4c336b473c6241d6741c510a116dab6",
+            "critique_sha256": "a2b844da055bbb0859a5707bf17e81f42297d5fa2cb25ffcb757aa582e03676c"
+          }
+        },
+        "64:4": {
+          "printed_tokens": 27,
+          "arabic_slots": 14,
+          "package_sha256": "359c0a62d8ea71d58956e3551c65f858a1128fab68eb78dd3242115e7fa263bd",
+          "citations": [
+            "https://quran.com/64:4?translations=20",
+            "https://quran.com/64:4/tafsirs/926"
+          ],
+          "automation": {
+            "policy_sha256": "dc865d64ebf6774f2e745a04ea4b88f92ee8681466e7f08e2d5716fca8a19a83",
+            "rubric_sha256": "641edc8eb8854d639a0871ace3552df05eeb94f9e3ba702e0f1026d425de43a8",
+            "model": "gpt-6.1-sol",
+            "reasoning_effort": "xhigh",
+            "independent_gold": false,
+            "raw_draft_sha256": "2b70f3ac10c116530e16312dc9c7c13c4acd45d5b13c9ff1de12b21be185d5a7",
+            "critique_sha256": "3bb61f362d4b6864512fd849c8f55b300496c315a357602c167e1e25cc110705"
+          }
+        },
+        "64:5": {
+          "printed_tokens": 29,
+          "arabic_slots": 13,
+          "package_sha256": "ba4ac613a62980c3bc93ca9d637e41d29a04e781352eac52bafdebac68aab257",
+          "citations": [
+            "https://quran.com/64:5?translations=20",
+            "https://quran.com/64:5/tafsirs/926"
+          ],
+          "automation": {
+            "policy_sha256": "dc865d64ebf6774f2e745a04ea4b88f92ee8681466e7f08e2d5716fca8a19a83",
+            "rubric_sha256": "641edc8eb8854d639a0871ace3552df05eeb94f9e3ba702e0f1026d425de43a8",
+            "model": "gpt-6.1-sol",
+            "reasoning_effort": "xhigh",
+            "independent_gold": false,
+            "raw_draft_sha256": "202ffc3701357867986f8c0bb0242370ba88857ea370a66980c5eda1897e45d5",
+            "critique_sha256": "48cb529a57847ae112867fa3b3d0677852049f09c83653ed17b2ca854c818ff8"
+          }
+        },
+        "64:6": {
+          "printed_tokens": 39,
+          "arabic_slots": 16,
+          "package_sha256": "65f571537b0a2393d1239476b115f6f5383d449a7f769c0b56b608a394eb4cd5",
+          "citations": [
+            "https://quran.com/64:6?translations=20",
+            "https://quran.com/64:6/tafsirs/926"
+          ],
+          "automation": {
+            "policy_sha256": "dc865d64ebf6774f2e745a04ea4b88f92ee8681466e7f08e2d5716fca8a19a83",
+            "rubric_sha256": "641edc8eb8854d639a0871ace3552df05eeb94f9e3ba702e0f1026d425de43a8",
+            "model": "gpt-6.1-sol",
+            "reasoning_effort": "xhigh",
+            "independent_gold": false,
+            "raw_draft_sha256": "e6612b5bcde7f6d33182d4c2e0eda0bef7d8879eddb315c59f4a021cefc2a6e6",
+            "critique_sha256": "3444229d44b3d89d10d2f3086a22a26f5fe25a5e4ddb664b6e3ab61664f87dc9"
+          }
+        },
+        "64:7": {
+          "printed_tokens": 37,
+          "arabic_slots": 18,
+          "package_sha256": "d7f6ea360a3ffaafbfeb38f4cf0268ad74ee48c578e7e9914aa1a3b8db593d5d",
+          "citations": [
+            "https://quran.com/64:7?translations=20",
+            "https://quran.com/64:7/tafsirs/926"
+          ],
+          "automation": {
+            "policy_sha256": "dc865d64ebf6774f2e745a04ea4b88f92ee8681466e7f08e2d5716fca8a19a83",
+            "rubric_sha256": "641edc8eb8854d639a0871ace3552df05eeb94f9e3ba702e0f1026d425de43a8",
+            "model": "gpt-6.1-sol",
+            "reasoning_effort": "xhigh",
+            "independent_gold": false,
+            "raw_draft_sha256": "7f628f7d07733c3259017188b4fe33bebf652b46df649c2b73583cbec012c9f8",
+            "critique_sha256": "1601016cb8036f074fd2442543fe46452c7a842a0cddae540b912833534e638d"
+          }
+        },
+        "64:8": {
+          "printed_tokens": 23,
+          "arabic_slots": 10,
+          "package_sha256": "f0aa2e5f5f983ce9735795885ef406ba1def6c26287c4744ec2398b0616ce1b1",
+          "citations": [
+            "https://quran.com/64:8?translations=20",
+            "https://quran.com/64:8/tafsirs/926"
+          ],
+          "automation": {
+            "policy_sha256": "dc865d64ebf6774f2e745a04ea4b88f92ee8681466e7f08e2d5716fca8a19a83",
+            "rubric_sha256": "641edc8eb8854d639a0871ace3552df05eeb94f9e3ba702e0f1026d425de43a8",
+            "model": "gpt-6.1-sol",
+            "reasoning_effort": "xhigh",
+            "independent_gold": false,
+            "raw_draft_sha256": "316d970f51b2fa92d39be987b4403824f2ed67709f810b93186ffc18488e8202",
+            "critique_sha256": "1897092f1b1968a2a0d5053c2c4d2e7143c9f6e09856c39b4688d778827c42d0"
+          }
+        },
+        "64:9": {
+          "printed_tokens": 51,
+          "arabic_slots": 27,
+          "package_sha256": "5e4e2ab396744b24187ca8072ccb4b3b4eba02ab63ca1ce66f2b414247160448",
+          "citations": [
+            "https://quran.com/64:9?translations=20",
+            "https://quran.com/64:9/tafsirs/926"
+          ],
+          "automation": {
+            "policy_sha256": "dc865d64ebf6774f2e745a04ea4b88f92ee8681466e7f08e2d5716fca8a19a83",
+            "rubric_sha256": "641edc8eb8854d639a0871ace3552df05eeb94f9e3ba702e0f1026d425de43a8",
+            "model": "gpt-6.1-sol",
+            "reasoning_effort": "xhigh",
+            "independent_gold": false,
+            "raw_draft_sha256": "1fa0d42538cefe7c2fd0ea057cdaabf48af26e7d80944c499a1878643f464c15",
+            "critique_sha256": "dae165d98bf6e78568d3366a23a0f0b72567b7b48974065fe27d367d579cd7e4"
+          }
+        },
+        "64:10": {
+          "printed_tokens": 24,
+          "arabic_slots": 11,
+          "package_sha256": "37b38bf78217ae07d62f941ba47fdd023c05c52bbde4705ace462e9b1478a2c1",
+          "citations": [
+            "https://quran.com/64:10?translations=20",
+            "https://quran.com/64:10/tafsirs/926"
+          ],
+          "automation": {
+            "policy_sha256": "dc865d64ebf6774f2e745a04ea4b88f92ee8681466e7f08e2d5716fca8a19a83",
+            "rubric_sha256": "641edc8eb8854d639a0871ace3552df05eeb94f9e3ba702e0f1026d425de43a8",
+            "model": "gpt-6.1-sol",
+            "reasoning_effort": "xhigh",
+            "independent_gold": false,
+            "raw_draft_sha256": "ecb6e4ab2c023686293c8b7010a3c27fb9d9184bc67e7ec31b104522f023b496",
+            "critique_sha256": "a3d774f7e6937f298ee222a1ec65e7ae9947d118a7bfb5a1fd0ca1ccf0741b05"
+          }
+        },
+        "64:11": {
+          "printed_tokens": 25,
+          "arabic_slots": 16,
+          "package_sha256": "6e477a483e9df93eb01e966cef211c1289f41af66d1dec795316983bb2c55a33",
+          "citations": [
+            "https://quran.com/64:11?translations=20",
+            "https://quran.com/64:11/tafsirs/926"
+          ],
+          "automation": {
+            "policy_sha256": "dc865d64ebf6774f2e745a04ea4b88f92ee8681466e7f08e2d5716fca8a19a83",
+            "rubric_sha256": "641edc8eb8854d639a0871ace3552df05eeb94f9e3ba702e0f1026d425de43a8",
+            "model": "gpt-6.1-sol",
+            "reasoning_effort": "xhigh",
+            "independent_gold": false,
+            "raw_draft_sha256": "a84a5bbbb1152000f14a966cacdbbd46239b3f6cff4cd9b2dc004db58114943d",
+            "critique_sha256": "614bf0d67827dfd117a1003ca132a483ce96f208244383e073ab6fa3a0a6252a"
+          }
+        },
+        "64:12": {
+          "printed_tokens": 23,
+          "arabic_slots": 11,
+          "package_sha256": "d9996b63026afe6a943920113932f29ab4d863037978cd4b6c5e4b18072a8008",
+          "citations": [
+            "https://quran.com/64:12?translations=20",
+            "https://quran.com/64:12/tafsirs/926"
+          ],
+          "automation": {
+            "policy_sha256": "dc865d64ebf6774f2e745a04ea4b88f92ee8681466e7f08e2d5716fca8a19a83",
+            "rubric_sha256": "641edc8eb8854d639a0871ace3552df05eeb94f9e3ba702e0f1026d425de43a8",
+            "model": "gpt-6.1-sol",
+            "reasoning_effort": "xhigh",
+            "independent_gold": false,
+            "raw_draft_sha256": "85236dbe1ab1412f79b1cfd05c9662f6bce67c9a6af290d5cd9747ca54fa3193",
+            "critique_sha256": "485cceb12198b9791a70febe17250fae28076fa908f0db3da81a7f49f88fc053"
+          }
+        },
+        "64:13": {
+          "printed_tokens": 14,
+          "arabic_slots": 9,
+          "package_sha256": "7e7237bfa6cf6586455f4fcf204482f9ecd31cae4fb9534a01f70826dcfefacc",
+          "citations": [
+            "https://quran.com/64:13?translations=20",
+            "https://quran.com/64:13/tafsirs/926"
+          ],
+          "automation": {
+            "policy_sha256": "dc865d64ebf6774f2e745a04ea4b88f92ee8681466e7f08e2d5716fca8a19a83",
+            "rubric_sha256": "641edc8eb8854d639a0871ace3552df05eeb94f9e3ba702e0f1026d425de43a8",
+            "model": "gpt-6.1-sol",
+            "reasoning_effort": "xhigh",
+            "independent_gold": false,
+            "raw_draft_sha256": "5feb44bcc54d36414ca4c8c16891edb8fa6060716899905e9cb0fff412119b94",
+            "critique_sha256": "1af25738646be2bbfbc5c285d149d8aa0d32318fea554bb85f3e6b48924d2d56"
+          }
+        },
+        "64:14": {
+          "printed_tokens": 35,
+          "arabic_slots": 18,
+          "package_sha256": "a2a0d881a848757ee2c57fcaf1fc1091adc635bb17547c57cd444cf3d320b73f",
+          "citations": [
+            "https://quran.com/64:14?translations=20",
+            "https://quran.com/64:14/tafsirs/926"
+          ],
+          "automation": {
+            "policy_sha256": "dc865d64ebf6774f2e745a04ea4b88f92ee8681466e7f08e2d5716fca8a19a83",
+            "rubric_sha256": "641edc8eb8854d639a0871ace3552df05eeb94f9e3ba702e0f1026d425de43a8",
+            "model": "gpt-6.1-sol",
+            "reasoning_effort": "xhigh",
+            "independent_gold": false,
+            "raw_draft_sha256": "5d8514161ef4b99fba917ae68fa6600136803abb405a2c0740b94b684277116e",
+            "critique_sha256": "1d8d89970602bc23e4f1a3c03ba20c3a5d46a78d5ce79c4529da28946f815614"
+          }
+        },
+        "64:15": {
+          "printed_tokens": 17,
+          "arabic_slots": 8,
+          "package_sha256": "e3471cff34481d062c0544911771d04b76a0cbdcf7aa19885a7b92479c83e5d9",
+          "citations": [
+            "https://quran.com/64:15?translations=20",
+            "https://quran.com/64:15/tafsirs/926"
+          ],
+          "automation": {
+            "policy_sha256": "dc865d64ebf6774f2e745a04ea4b88f92ee8681466e7f08e2d5716fca8a19a83",
+            "rubric_sha256": "641edc8eb8854d639a0871ace3552df05eeb94f9e3ba702e0f1026d425de43a8",
+            "model": "gpt-6.1-sol",
+            "reasoning_effort": "xhigh",
+            "independent_gold": false,
+            "raw_draft_sha256": "d21f87e39184328b56f719b7f8b754df2d22392d07c914cac1a65d913c980a45",
+            "critique_sha256": "319808de702f5c2cc150ab7381be054d29014c1dcab99347fefb804d5e4833be"
+          }
+        },
+        "64:16": {
+          "printed_tokens": 44,
+          "arabic_slots": 16,
+          "package_sha256": "20c22bfc63e02496a0a5f0c4bad0154df208a6f9cc41d183b071af094545e7cd",
+          "citations": [
+            "https://quran.com/64:16?translations=20",
+            "https://quran.com/64:16/tafsirs/926"
+          ],
+          "automation": {
+            "policy_sha256": "dc865d64ebf6774f2e745a04ea4b88f92ee8681466e7f08e2d5716fca8a19a83",
+            "rubric_sha256": "641edc8eb8854d639a0871ace3552df05eeb94f9e3ba702e0f1026d425de43a8",
+            "model": "gpt-6.1-sol",
+            "reasoning_effort": "xhigh",
+            "independent_gold": false,
+            "raw_draft_sha256": "83f9503c9b28f668febb42d9326f637f1533e5dc0bdc84333970cb867323854b",
+            "critique_sha256": "cb70f43eef75295b41ae8d0b46e85ef36848d59e58760722fd8158d9651589fd"
+          }
+        },
+        "64:17": {
+          "printed_tokens": 23,
+          "arabic_slots": 12,
+          "package_sha256": "31ba2657be071fd65056bd200196ce8d65a3356df9d956ada33eb71d73db4522",
+          "citations": [
+            "https://quran.com/64:17?translations=20",
+            "https://quran.com/64:17/tafsirs/926"
+          ],
+          "automation": {
+            "policy_sha256": "dc865d64ebf6774f2e745a04ea4b88f92ee8681466e7f08e2d5716fca8a19a83",
+            "rubric_sha256": "641edc8eb8854d639a0871ace3552df05eeb94f9e3ba702e0f1026d425de43a8",
+            "model": "gpt-6.1-sol",
+            "reasoning_effort": "xhigh",
+            "independent_gold": false,
+            "raw_draft_sha256": "a9024d79c3e6656836b92377cdd9d4d3163df6187e68e3f1c860f121a56e6282",
+            "critique_sha256": "34691fc03af2bbeccc57e667885afad6bc4276cf14ffa4757eff29669a6abf6c"
+          }
+        },
+        "64:18": {
+          "printed_tokens": 13,
+          "arabic_slots": 5,
+          "package_sha256": "18a95a684b1042e452120736d2b53dc737708c3f1e18b4ee02239c12bd104f33",
+          "citations": [
+            "https://quran.com/64:18?translations=20",
+            "https://quran.com/64:18/tafsirs/926"
+          ],
+          "automation": {
+            "policy_sha256": "dc865d64ebf6774f2e745a04ea4b88f92ee8681466e7f08e2d5716fca8a19a83",
+            "rubric_sha256": "641edc8eb8854d639a0871ace3552df05eeb94f9e3ba702e0f1026d425de43a8",
+            "model": "gpt-6.1-sol",
+            "reasoning_effort": "xhigh",
+            "independent_gold": false,
+            "raw_draft_sha256": "65733879788c5ffb86f56dfd143c0fe6d6c9c35173015b15b011434caaeac669",
+            "critique_sha256": "2a875af2deb88819e8742ab21dd661581fb0880a6f3c983412772493d3c74ccd"
+          }
+        }
+      },
+      "verses": 18
     }
   }
 }

@@ -15,6 +15,7 @@ import tempfile
 
 PROBE = r'''
 import com.beautifulquran.domain.EnglishWordAlignment
+import com.beautifulquran.domain.EnglishTypography
 import com.beautifulquran.domain.EnglishAlignment
 import com.beautifulquran.domain.ReviewedEnglishAlignment
 import com.beautifulquran.domain.EnglishVerseAlignments
@@ -28,10 +29,14 @@ private val coreWords = Regex("\\p{L}[\\p{L}\\p{M}]*(?:['’][\\p{L}\\p{M}]+)*")
 
 fun main(args: Array<String>) {
     val corpus = File(args[0]).readLines().associate { line ->
-        val row = line.split('\t'); row[0] to row
+        val row = line.split('\t').toMutableList()
+        row[2] = row[2].split('|').joinToString("|", transform = EnglishTypography::typesetName)
+        row[0] to row
     }
     val cache = HashMap<String, EnglishAlignment>()
+    val baselineCache = HashMap<String, EnglishAlignment>()
     val reviewed = if (args.size > 3) File(args[3]).bufferedReader().use { ReviewedEnglishAlignment.read(it.lineSequence()) } else emptyMap()
+    val compareDefaults = args.size > 3
     check(reviewed.keys.all { it in corpus }) { "Reviewed artifact contains verses outside the corpus" }
     var cardChecks = 0
     var newCollapses = 0
@@ -44,8 +49,8 @@ fun main(args: Array<String>) {
     File(args[2], "exposure.tsv").bufferedWriter().use { exposures ->
         File(args[2], "plans.tsv").bufferedWriter().use { plans ->
             exposures.appendLine("reciter\tverse\tword\ttext\tstart_ms\tend_ms\tsemantic_owner\tend_minus_owner_end_ms")
-            plans.appendLine("reciter\tverse\tblocks\treordered_blocks\trepeat_fallbacks\tearly_words\tlate_words\tsource_overlap_fallbacks\tcontained_cores\tcrossing_cores\tcore_collapses\tnew_collapses\tsource_order_skips\trepeat_collapses\tother_legacy_collapses\twhitespace_collapses\treading_flow\treading_fallback\trate_checks\tpause_checks\tblank_compression\tblank_compression_fallback")
-            cores.appendLine("reciter\tverse\ttext\tfrom\tto\tband_owner\tstart_ms\tend_ms\tlegacy_start_ms\tlegacy_end_ms\treason")
+            plans.appendLine("reciter\tverse\tblocks\treordered_blocks\trepeat_fallbacks\tearly_words\tlate_words\tsource_overlap_fallbacks\tcontained_cores\tcrossing_cores\tcore_collapses\tnew_collapses\tsource_order_skips\trepeat_collapses\tother_legacy_collapses\twhitespace_collapses\treading_flow\treading_fallback\trate_checks\tpause_checks\tblank_compression\tblank_compression_fallback\texisting_default_collapses")
+            cores.appendLine("reciter\tverse\ttext\tfrom\tto\tband_owner\tstart_ms\tend_ms\tlegacy_start_ms\tlegacy_end_ms\tdefault_start_ms\tdefault_end_ms\treason")
             crossings.appendLine("reciter\tverse\ttext\tfrom\tto\tplan_contained\tlegacy_contained")
             File(args[1]).forEachLine { line ->
                 val (reciter, key, encoded, voiceStart, quiet) = line.split('\t')
@@ -79,6 +84,12 @@ fun main(args: Array<String>) {
                     val (s, e) = it.split(',').map(String::toLong); AudibleSilence(s, e)
                 }
                 val plan = englishPresentationPlan(alignment, segments, voiceStart.toLong(), silence)
+                val defaultPlan = if (key in reviewed) {
+                    val baseline = baselineCache.getOrPut(key) {
+                        EnglishWordAlignment.align(text, row[2].split('|'), row[3].split('|'), row[4].split('|'))!!
+                    }
+                    englishPresentationPlan(baseline, segments, voiceStart.toLong(), silence)
+                } else plan
                 check(plan.spans.first().from == 0f && plan.spans.last().to == 1f) { "$reciter $key ends" }
                 plan.spans.zipWithNext().forEach { (a, b) -> check(a.to == b.from) { "$key hole" } }
                 val windows = plan.spans.map { plan.windows.getValue(it.position) }
@@ -150,7 +161,7 @@ fun main(args: Array<String>) {
                         if (owner == 1) window.copy(startMs = maxOf(window.startMs, voiceStart.toLong()).coerceAtMost(window.endMs)) else window
                     })
                 var coreCount = 0; var crossingCount = 0; var collapsed = 0; var introduced = 0
-                var skips = 0; var repeats = 0; var others = 0
+                var skips = 0; var repeats = 0; var others = 0; var defaultCollapses = 0
                 coreWords.findAll(text).forEach { word ->
                     val from = word.range.first.toFloat() / text.length
                     val to = (word.range.last + 1f) / text.length
@@ -168,9 +179,12 @@ fun main(args: Array<String>) {
                     if (current.endMs > current.startMs) return@forEach
                     collapsed++
                     val old = englishWordExposure(legacy, from, to)!!
+                    val baseline = englishWordExposure(defaultPlan, from, to)!!
                     val band = plan.spans.first { to <= it.to + .00001f }
                     val first = segments.indexOfFirst { it.position >= band.position }
                     val reason = when {
+                        compareDefaults && baseline.endMs > baseline.startMs -> { introduced++; "AI_INTRODUCED_COLLAPSE" }
+                        old.endMs > old.startMs && compareDefaults -> { defaultCollapses++; "existing_default_collapse" }
                         old.endMs > old.startMs -> { introduced++; "NEW_COLLAPSE" }
                         first >= 0 && segments[first].position > band.position &&
                             segments.drop(first + 1).any { it.position == band.position } -> {
@@ -181,7 +195,7 @@ fun main(args: Array<String>) {
                         }
                         else -> { others++; "legacy_other" }
                     }
-                    cores.appendLine("$reciter\t$key\t${word.value}\t$from\t$to\t${band.position}\t${current.startMs}\t${current.endMs}\t${old.startMs}\t${old.endMs}\t$reason")
+                    cores.appendLine("$reciter\t$key\t${word.value}\t$from\t$to\t${band.position}\t${current.startMs}\t${current.endMs}\t${old.startMs}\t${old.endMs}\t${baseline.startMs}\t${baseline.endMs}\t$reason")
                 }
                 newCollapses += introduced
                 var early = 0; var late = 0; var whitespaceCollapses = 0
@@ -199,7 +213,7 @@ fun main(args: Array<String>) {
                     exposures.appendLine("$reciter\t$key\t${index + 1}\t${word.value}\t${window.startMs}\t${window.endMs}\t$owner\t${delta ?: ""}")
                 }
                 val reordered = alignment.presentationSpans.count { it.lastPosition > it.position }
-                plans.appendLine("$reciter\t$key\t${plan.spans.size}\t$reordered\t${plan.repeatFallbacks}\t$early\t$late\t${plan.sourceOverlapFallbacks}\t$coreCount\t$crossingCount\t$collapsed\t$introduced\t$skips\t$repeats\t$others\t$whitespaceCollapses\t${if (plan.readingFlow != null) 1 else 0}\t${plan.readingFlowFallback ?: ""}\t$rateChecks\t$pauseChecks\t${if (plan.readingFlow?.extent != null) 1 else 0}\t${plan.readingFlow?.extentFallback ?: ""}")
+                plans.appendLine("$reciter\t$key\t${plan.spans.size}\t$reordered\t${plan.repeatFallbacks}\t$early\t$late\t${plan.sourceOverlapFallbacks}\t$coreCount\t$crossingCount\t$collapsed\t$introduced\t$skips\t$repeats\t$others\t$whitespaceCollapses\t${if (plan.readingFlow != null) 1 else 0}\t${plan.readingFlowFallback ?: ""}\t$rateChecks\t$pauseChecks\t${if (plan.readingFlow?.extent != null) 1 else 0}\t${plan.readingFlow?.extentFallback ?: ""}\t$defaultCollapses")
             }
         }
     }
@@ -303,7 +317,10 @@ def main():
         "contained_letter_cores": sum(int(row[8]) for row in rows),
         "crossing_letter_cores": sum(int(row[9]) for row in rows),
         "collapsed_letter_cores": sum(int(row[10]) for row in rows),
-        "new_positive_legacy_collapses": sum(int(row[11]) for row in rows),
+        "new_positive_legacy_collapses": sum(int(row[11]) + int(row[22]) for row in rows),
+        "ai_introduced_collapses": sum(int(row[11]) for row in rows) if args.alignments else None,
+        "existing_default_collapses": sum(int(row[22]) for row in rows),
+        "collapse_comparison": "current_default" if args.alignments else "legacy_windows",
         "legacy_source_order_skips": sum(int(row[12]) for row in rows),
         "legacy_repeat_collapses": sum(int(row[13]) for row in rows),
         "other_legacy_collapses": sum(int(row[14]) for row in rows),

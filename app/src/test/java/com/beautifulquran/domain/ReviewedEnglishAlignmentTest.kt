@@ -115,9 +115,10 @@ class ReviewedEnglishAlignmentTest {
         assertFalse(human.usesAiReviewedRecord)
         java.io.File("../data/english-ai-alignments.tsv").bufferedReader().use { reader ->
             val records = ReviewedEnglishAlignment.read(reader.lineSequence())
-            assertEquals(144, records.size)
+            assertEquals(162, records.size)
             assertEquals((1..64).map { "24:$it" }.toSet(), records.keys.filter { it.startsWith("24:") }.toSet())
             assertEquals((1..77).map { "25:$it" }.toSet(), records.keys.filter { it.startsWith("25:") }.toSet())
+            assertEquals((1..18).map { "64:$it" }.toSet(), records.keys.filter { it.startsWith("64:") }.toSet())
         }
     }
 

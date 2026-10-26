@@ -6,6 +6,7 @@ from pathlib import Path
 import tempfile
 import unittest
 from unittest.mock import patch
+from threading import Event
 
 import english_alignment_ledger as ledger
 import review_english_chapters as runner
@@ -145,6 +146,67 @@ class ChapterReviewTest(unittest.TestCase):
                 self.assertEqual({"rerun": True}, runner.cached_model_call({"stage": "review"}, runner.DRAFT_SCHEMA, directory, "test", 5))
                 (directory / "answer.json").write_text('{"interrupted":')
                 self.assertEqual({"rerun": True}, runner.cached_model_call({"stage": "draft"}, runner.DRAFT_SCHEMA, directory, "test", 5))
+
+    def test_prior_ai_seed_is_reused_but_not_counted_as_a_fresh_critique(self):
+        mapped = runner.candidate(self.row, self.draft, self.binding, {"synthetic": True}, "TEST AI")
+        states = {}
+        runner.import_seed({"1:1": self.row}, {"verses": {"1:1": self.binding}}, states, {"1:1": mapped}, {1})
+        chapter = runner.summarize({"1:1": self.row}, states, {1}, "passed")["chapters"]["1"]
+        self.assertEqual((1, 0), (chapter["reused_prior_ai_verses"], chapter["freshly_critiqued_verses"]))
+        self.assertTrue(chapter["complete"])
+        self.assertEqual("model_reviewed", states["1:1"]["row"]["tokens"][0]["status"])
+        stale = copy.deepcopy(mapped); stale["text"] += "!"
+        with self.assertRaises(ValueError):
+            runner.import_seed({"1:1": self.row}, {"verses": {"1:1": self.binding}}, {}, {"1:1": stale}, {1})
+
+    def test_cancelled_run_does_not_launch_or_retry_a_model(self):
+        stop = Event(); stop.set()
+        with tempfile.TemporaryDirectory() as temporary, patch.object(runner, "model_call") as model:
+            with self.assertRaises(KeyboardInterrupt):
+                runner.cached_model_call({}, runner.DRAFT_SCHEMA, Path(temporary), "test", 5, stop)
+            model.assert_not_called()
+
+    def test_changed_validator_reuses_only_exact_prompt_schema_model_and_reasoning(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            old = root / "old-validator" / "1" / "draft"
+            new = root / "new-validator" / "1" / "draft"
+            payload = {"stage": "draft"}
+            for name, value in [("input.json", payload), ("schema.json", runner.DRAFT_SCHEMA), ("answer.json", self.draft)]:
+                runner.save(old / name, value)
+            (old / "stdout.log").write_text("")
+            (old / "stderr.log").write_text("header\nmodel: test\nreasoning effort: xhigh\nuser\n" + runner.RUBRIC.read_text() + "\nINPUT JSON:\n{}")
+            with patch.object(runner, "model_call", return_value={"rerun": True}) as model:
+                self.assertEqual(self.draft, runner.cached_model_call(payload, runner.DRAFT_SCHEMA, new, "test", 5))
+                model.assert_not_called()
+                self.assertTrue((new / "reuse.json").exists())
+                different = root / "different-model" / "1" / "draft"
+                self.assertEqual({"rerun": True}, runner.cached_model_call(payload, runner.DRAFT_SCHEMA, different, "other", 5))
+
+    def test_unit_separation_changes_only_invalid_group_identifiers(self):
+        original = copy.deepcopy(self.draft)
+        for token in original["tokens"]: token["unit"] = "shared"
+        split = runner.separate_units(original)
+        self.assertNotEqual(split["tokens"][0]["unit"], split["tokens"][1]["unit"])
+        for a, b in zip(original["tokens"], split["tokens"]):
+            self.assertEqual({k:v for k,v in a.items() if k != "unit"}, {k:v for k,v in b.items() if k != "unit"})
+        self.assertEqual(self.draft, runner.separate_units(self.draft))
+        repeated = copy.deepcopy(self.draft)
+        repeated["tokens"].append(dict(repeated["tokens"][0], index=2))
+        separated = runner.separate_units(repeated)
+        self.assertNotEqual(separated["tokens"][0]["unit"], separated["tokens"][2]["unit"])
+
+    def test_provider_limit_stops_without_spending_the_second_attempt(self):
+        calls = []
+        def unavailable(*args):
+            calls.append(True)
+            raise runner.ModelUnavailableError("ERROR: usage limit")
+        with tempfile.TemporaryDirectory() as temporary:
+            state = runner.review_verse(self.row, self.binding, {"synthetic": True}, Path(temporary), "test", 2, unavailable)
+        self.assertEqual(1, len(calls))
+        self.assertEqual("held", state["status"])
+        self.assertTrue(state["provider_unavailable"])
+        self.assertNotIn("row", state)
 
 
 if __name__ == "__main__":

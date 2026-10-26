@@ -22,6 +22,7 @@ APPROVED = {"reviewed", "blind_gold"}
 STATUSES = APPROVED | {"unresolved", "model_draft", "model_reviewed", "consensus_silver", "disputed"}
 COMPONENTS = [
     "data/quran.db", "tools/ExportEnglishAlignment.kt", "tools/english_alignment_ledger.py",
+    "tools/review_english_chapters.py", "tools/english_alignment_evidence.py", "tools/english_chapter_review.md",
     "docs/ENGLISH_ALIGNMENT_LEDGER.md",
     *[f"app/src/main/java/com/beautifulquran/{name}" for name in (
         "domain/EnglishTypography.kt", "domain/ArabicNormalize.kt", "domain/EnglishWordAlignment.kt", "domain/EnglishPhrase.kt",

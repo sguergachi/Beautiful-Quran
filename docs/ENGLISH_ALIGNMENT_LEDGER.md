@@ -1,7 +1,7 @@
 # Offline English alignment ledger — v1
 
 This implements the integrity stage of the offline mapping proposal and an
-opt-in AI-reviewed An-Nur and Al-Furqan translation corpus.
+opt-in AI-reviewed An-Nur, Al-Furqan and At-Taghabun translation corpus.
 The human-reviewed compiled artifact has **zero approved verses**; all 6,236
 verses still use the mapper by default. The existing 160 selected model adjudications are not
 human review or independent gold. There is no new semantic accuracy claim.
@@ -125,8 +125,8 @@ remain AI judgments. Silver agreement, drafts, disputed or unresolved decisions
 do not qualify. The default compiler still rejects model review as human approval.
 
 The AI artifact covers **all 64 An-Nur verses / 2,613 printed tokens** and
-**all 77 Al-Furqan verses / 1,847 tokens**, plus the retained regression verses
-9:4, 9:25 and 23:83: **144 verses / 4,571 tokens**
+**all 77 Al-Furqan verses / 1,847 tokens**, **all 18 At-Taghabun verses / 503 tokens**, plus the retained regression verses
+9:4, 9:25 and 23:83: **162 verses / 5,074 tokens**
 in total. One Codex model (`gpt-6.1-sol`) annotated every token using
 fetched Quran.ai Arabic text, Sahih International, word morphology and Jalalayn
 commentary. This was not an independent second-model review or a blind sample.
@@ -142,12 +142,16 @@ decomposed hamza in 24:11 slot 16. Runtime normalization is unchanged and record
 fingerprints still bind the exact app text and surfaces.
 
 The APK carries only a thin second lookup. Valid human-reviewed rows win; the
-toggle selects AI rows for prose only, with **6,092 fallback verses**. Word cards
+toggle selects AI rows for prose only, with **6,074 fallback verses**. Word cards
 and web remain unchanged. Wash, tapping, repeat and carried-leaf following share
 the selected mapping and preserve the continuous prefix. No model or Quran.ai
 request runs on the phone. Coverage records the AI policy explicitly and keeps
 semantic accuracy unestablished. The other chapters have not been AI-reviewed
-in full.
+in full. At-Taghabun uses the resumable runner below: source-grounded drafting
+and a separate critique per verse, with 61 changed tap heads and 62 changed ink
+anchors against the mapper draft. These are changed decisions, not independently
+measured error corrections. Its 33 null-linked tokens retain explicit navigation
+and presentation cues. Raw sources and all attempts remain private.
 
 Al-Furqan's model notes preserve edition-specific additions: 25:22's bracketed
 speaker and 25:77's supplied subject have explicit null links and timing cues.
@@ -185,12 +189,14 @@ python3 tools/review_english_chapters.py report \
 ```
 
 Use `--chapters 1-114`, a range or a comma-separated list for bulk processing.
-`--max-verses 25` bounds a batch; subsequent invocations resume completed work.
+`--max-verses 25` is the default batch budget; subsequent invocations resume
+completed work. Use a larger explicit budget for a longer unattended run.
 Each verse has a private atomic checkpoint. Only one process may own a work
 directory. Two verse workers run by default; `--workers 1` through `4` controls
 bounded concurrency while canonical fetches remain serial and rate limited.
-Completed model stages also resume after interruption when their exact input
-and schema match. Completed reviews are reused only with matching text, source
+Completed model stages also resume after interruption when their exact input,
+schema, rubric, model and reasoning setting match. Those same completed calls
+can be reused when a validator changes; the new validation gates still run. Completed reviews are reused only with matching text, source
 evidence, model, rubric and review implementation. Changed bindings fail closed;
 export into a new work directory after a typesetter/corpus binding change.
 `--retry-held` explicitly starts another bounded attempt budget and preserves
@@ -210,9 +216,16 @@ UTF-16 offsets and the complete 6,236-verse manifest. The prompt rubric is
 Every token needs a structurally valid decision before the fresh critique can
 approve the verse. Review disagreement, malformed output, missing evidence,
 invalid owners and incomplete units stay held. This is two model passes, not
-independent bilingual review or blind gold. Previous AI ledger records outside
-the selected chapters are reused with their original provenance and are
-reported separately, not relabelled as freshly critiqued.
+independent bilingual review or blind gold. Invalid local unit labels are split
+into contiguous portions with equal contributors; meanings, contributors, heads
+and ink anchors are unchanged. The raw draft and separation receipt are saved,
+and the critique sees the exact separated units that will compile. Quota/auth
+failures stop the batch without spending every remaining verse's retries;
+completed work survives and `--retry-held` resumes after access returns.
+Previous AI ledger records are
+reused with their original provenance and reported separately, not relabelled
+as freshly critiqued. `--refresh-reviewed` instead requests new drafting and
+critique for selected prior AI verses.
 
 The candidate lookup must then pass `audit_english_phrase_pacing.py` through
 the actual reviewed-record loader, `EnglishVerseAlignments`, presentation plan,
@@ -221,6 +234,12 @@ runtime voices plus the other bundled voices without filling withheld runtime
 rows. Word-card mappings with the toggle on/off must match. Corpus checks use
 the export's production-typeset edition, including neighbouring-verse quote
 state, rather than assuming an older private TSV already has current typography.
+With `--alignments`, collapse regression checks compare to the current default
+reader as well as legacy windows. The 13-voice pilot exposed six existing default
+collapsed cores in reciter 9, 7:40, outside the reviewed corpus; they are retained
+explicitly as `existing_default_collapse`, with both baseline exposure times.
+An AI mapping that removes positive default exposure fails the gate. Without
+`--alignments`, the original stricter legacy-window gate remains unchanged.
 Only a passing candidate becomes `english-ai-alignments.tsv` in the work
 directory. It never edits packaged data or publishes an APK on its own.
 

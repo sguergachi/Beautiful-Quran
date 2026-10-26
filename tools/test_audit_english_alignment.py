@@ -15,7 +15,7 @@ class SemanticGateTest(unittest.TestCase):
             corpus.write_text("24:4\tever after. Then [again]\tunrelated|absent\n")
             reference = root / "reviewed.tsv"
             for name, addition, expected_code in (
-                ("complete", "2", 0), ("missing-addition", "", 1),
+                ("complete", "2", 1), ("missing-addition", "", 1),
             ):
                 with self.subTest(reference=name):
                     reference.write_text(f"24:4\t0\t4\tever\t1\n24:4\t5\t10\tafter\t1\n24:4\t12\t16\tThen\t2\n24:4\t18\t23\tagain\t{addition}\n")
@@ -30,7 +30,8 @@ class SemanticGateTest(unittest.TestCase):
                     self.assertNotIn("Traceback", result.stderr)
                     report = json.loads((output / "semantic-certification.json").read_text())
                     self.assertEqual(4, report["population_printed_tokens"])
-                    self.assertEqual(name == "complete", report["established"])
+                    self.assertFalse(report["established"], "Model reference coverage is not semantic certification")
+                    self.assertEqual(name == "complete", report["reference_coverage_target_met"])
                     self.assertEqual(name == "missing-addition", report["unreviewed"] == 1)
                     if expected_code:
                         self.assertIn("semantic accuracy not established", result.stderr)

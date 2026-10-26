@@ -5,21 +5,34 @@ from concurrent.futures import ThreadPoolExecutor, wait, FIRST_COMPLETED
 import copy
 import inspect
 import json
+import os
 from pathlib import Path
+import shutil
+import signal
 import subprocess
 import tempfile
+from threading import Event
 
 import english_alignment_ledger as ledger
 from english_alignment_evidence import QuranEvidence, structured, surface
 
 RUBRIC = Path(__file__).with_name("english_chapter_review.md")
+REASONING = "xhigh"
+
+
+class ModelUnavailableError(RuntimeError):
+    """Stop the batch on provider quota/auth failures instead of spending each verse's retries."""
+
+
+def write_text(path, text):
+    path.parent.mkdir(parents=True, exist_ok=True)
+    temporary = path.with_suffix(path.suffix + ".tmp")
+    temporary.write_text(text)
+    temporary.replace(path)
 
 
 def save(path, value):
-    path.parent.mkdir(parents=True, exist_ok=True)
-    temporary = path.with_suffix(path.suffix + ".tmp")
-    temporary.write_text(json.dumps(value, ensure_ascii=False, indent=2) + "\n")
-    temporary.replace(path)
+    write_text(path, json.dumps(value, ensure_ascii=False, indent=2) + "\n")
 
 
 def chapters(value):
@@ -60,17 +73,27 @@ def model_call(payload, output_schema, directory, model, timeout):
     with tempfile.TemporaryDirectory(prefix="bq-annotation-") as working:
         command = ["codex", "exec", "--ignore-user-config", "--ephemeral", "--skip-git-repo-check",
                    "--sandbox", "read-only", "--model", model, "--cd", working,
-                   "-c", 'model_reasoning_effort="xhigh"',
+                   "-c", f'model_reasoning_effort="{REASONING}"',
                    "--output-schema", str((directory / "schema.json").resolve()),
                    "--output-last-message", str(answer.resolve()), "-"]
         with (directory / "stdout.log").open("w") as stdout, (directory / "stderr.log").open("w") as stderr:
-            subprocess.run(command, input=RUBRIC.read_text() + "\nINPUT JSON:\n" + json.dumps(payload, ensure_ascii=False),
-                           text=True, stdout=stdout, stderr=stderr, timeout=timeout, check=True)
+            try:
+                subprocess.run(command, input=RUBRIC.read_text() + "\nINPUT JSON:\n" + json.dumps(payload, ensure_ascii=False),
+                               text=True, stdout=stdout, stderr=stderr, timeout=timeout, check=True)
+            except subprocess.CalledProcessError:
+                stderr.flush()
+                errors = [line for line in (directory / "stderr.log").read_text().split("\n") if line.startswith("ERROR:")]
+                for error in errors:
+                    if any(marker in error.lower() for marker in ["usage limit", "quota", "not authenticated", "invalid api key"]):
+                        raise ModelUnavailableError(error) from None
+                raise
     return json.loads(answer.read_text())
 
 
-def cached_model_call(payload, output_schema, directory, model, timeout):
+def cached_model_call(payload, output_schema, directory, model, timeout, cancelled=None):
     """Resume a completed stage after interruption; the job directory binds model and rubric."""
+    if cancelled is not None and cancelled.is_set():
+        raise KeyboardInterrupt
     if all((directory / name).exists() for name in ["input.json", "schema.json", "answer.json"]):
         try:
             if (json.loads((directory / "input.json").read_text()) == payload and
@@ -78,7 +101,32 @@ def cached_model_call(payload, output_schema, directory, model, timeout):
                 return json.loads((directory / "answer.json").read_text())
         except json.JSONDecodeError:
             pass  # An interrupted partial write is not a completed model stage.
-    return model_call(payload, output_schema, directory, model, timeout)
+    # A validator change can invalidate a job without changing what the model
+    # was asked. Reuse that exact completed request, then run the new gates.
+    previous_stages = directory.parents[2].glob(f"*/*/{directory.name}") if len(directory.parents) > 2 and directory.name in {"draft", "review"} else []
+    for previous in previous_stages:
+        if previous == directory:
+            continue
+        try:
+            header, _, body = (previous / "stderr.log").read_text().partition("\nuser\n")
+            if (f"model: {model}" not in header.splitlines() or f"reasoning effort: {REASONING}" not in header.splitlines() or
+                    not body.startswith(RUBRIC.read_text() + "\nINPUT JSON:\n") or
+                    json.loads((previous / "input.json").read_text()) != payload or
+                    json.loads((previous / "schema.json").read_text()) != output_schema):
+                continue
+            answer = json.loads((previous / "answer.json").read_text())
+            directory.mkdir(parents=True, exist_ok=True)
+            for name in ["input.json", "schema.json", "answer.json", "stdout.log", "stderr.log"]:
+                shutil.copyfile(previous / name, directory / name)
+            save(directory / "reuse.json", {"from": str(previous), "answer_sha256": ledger.digest(ledger.encoded(answer))})
+            return answer
+        except (OSError, ValueError):
+            continue
+    try:
+        return model_call(payload, output_schema, directory, model, timeout)
+    finally:
+        if cancelled is not None and cancelled.is_set():
+            raise KeyboardInterrupt
 
 
 def fetch_evidence(client, row, directory, tafsir):
@@ -158,10 +206,32 @@ def candidate(row, answer, binding, evidence, model):
     return result
 
 
+def separate_units(answer):
+    """Split invalid unit IDs into contiguous contributor portions; never edit a meaning or owner."""
+    result = copy.deepcopy(answer)
+    units = {}
+    for index, token in enumerate(result["tokens"]):
+        units.setdefault(token["unit"], []).append(index)
+    occupied = set(units)
+    for unit, indices in units.items():
+        contributors = [tuple(sorted(result["tokens"][i]["contributors"])) for i in indices]
+        if indices[-1] - indices[0] + 1 == len(indices) and len(set(contributors)) == 1:
+            continue
+        last = None
+        for index, sources in zip(indices, contributors):
+            if last != (index - 1, sources):
+                label = f"portion-{index}"
+                while label in occupied:
+                    label += "-"
+                occupied.add(label)
+            result["tokens"][index]["unit"] = label
+            last = (index, sources)
+    return result
+
+
 def job_signature(row, binding, evidence, model):
     return ledger.digest(ledger.encoded([row, binding, evidence, model, RUBRIC.read_text(),
-        [inspect.getsource(f) for f in [candidate, review_verse, validate_evidence, model_call]],
-        Path(ledger.__file__).read_text(), Path(__file__).with_name("english_alignment_evidence.py").read_text()]))
+                                         REVIEW_POLICY]))
 
 
 def review_verse(row, binding, evidence, directory, model, attempts, call):
@@ -176,8 +246,14 @@ def review_verse(row, binding, evidence, directory, model, attempts, call):
         state["attempts"] += 1
         run = directory / signature / str(attempt + 1)
         try:
-            draft = call({"stage": "draft", "verse": row, "evidence": evidence, "feedback": feedback}, DRAFT_SCHEMA, run / "draft")
+            raw_draft = call({"stage": "draft", "verse": row, "evidence": evidence, "feedback": feedback}, DRAFT_SCHEMA, run / "draft")
+            draft = separate_units(raw_draft)
+            if draft != raw_draft:
+                save(run / "separated-units.json", draft)
             mapped = candidate(row, draft, binding, evidence, model)
+            if draft != raw_draft:
+                mapped["unit_separation"] = {"raw_draft_sha256": ledger.digest(ledger.encoded(raw_draft)),
+                    "policy": "Split contiguous contributor portions; all meaning/owner decisions unchanged"}
             # The critique receives token decisions, not the drafting transcript.
             review = call({"stage": "review", "verse": row, "decisions": draft, "evidence": evidence}, REVIEW_SCHEMA, run / "review")
             ledger.require(review.get("verse") == row["verse"] and type(review.get("approved")) is bool and
@@ -186,9 +262,18 @@ def review_verse(row, binding, evidence, directory, model, attempts, call):
             if review["approved"] and not review["issues"]:
                 for token in mapped["tokens"]:
                     token["review"]["evidence"].append(f"fresh critique sha256:{ledger.digest(ledger.encoded(review))}")
+                mapped["automation"] = {"policy_sha256": REVIEW_POLICY,
+                    "rubric_sha256": ledger.digest(RUBRIC.read_text().encode()),
+                    "model": model, "reasoning_effort": REASONING, "independent_gold": False,
+                    "raw_draft_sha256": ledger.digest(ledger.encoded(raw_draft)),
+                    "critique_sha256": ledger.digest(ledger.encoded(review))}
                 state.update(status="model_reviewed", row=mapped, issues=[])
                 break
             feedback = review["issues"] or ["Critique withheld approval"]
+        except ModelUnavailableError as error:
+            state.update(provider_unavailable=True, issues=[str(error)])
+            save(state_path, state)
+            return state
         except (ValueError, KeyError, TypeError, subprocess.SubprocessError, OSError) as error:
             feedback = [str(error)]
         state["issues"] = feedback
@@ -197,16 +282,45 @@ def review_verse(row, binding, evidence, directory, model, attempts, call):
     return state
 
 
+# Capture executed policy once. Looking up live source line numbers during a
+# long batch can accidentally bind a loaded function to a later editor change.
+REVIEW_POLICY = ledger.digest(ledger.encoded([
+    [inspect.getsource(f) for f in [candidate, separate_units, review_verse, validate_evidence, model_call]],
+    DRAFT_SCHEMA, REVIEW_SCHEMA, REASONING, Path(ledger.__file__).read_text(),
+    Path(__file__).with_name("english_alignment_evidence.py").read_text(),
+]))
+
+
 def summarize(rows, states, selected, playback):
     report = {"semantic_accuracy_established": False, "approval_policy": "ai_reviewed", "chapters": {}}
     for chapter in sorted(selected):
         keys = [key for key in rows if int(key.split(":")[0]) == chapter]
         approved = [key for key in keys if states.get(key, {}).get("status") == "model_reviewed"]
+        decisions = [(base, mapped) for key in approved for base, mapped in
+                     zip(rows[key].get("tokens", []), states[key].get("row", {}).get("tokens", []))]
         report["chapters"][str(chapter)] = {"verses": len(keys), "model_reviewed": len(approved),
+            "reused_prior_ai_verses": sum(states[key].get("origin") == "prior_ai_review" for key in approved),
+            "freshly_critiqued_verses": sum(states[key].get("origin") != "prior_ai_review" for key in approved),
+            "printed_tokens": sum(len(rows[key].get("tokens", [])) for key in keys),
+            "reviewed_tokens": len(decisions),
+            "changed_tap_heads": sum(a.get("head") != b["head"] for a, b in decisions),
+            "changed_ink_anchors": sum(a.get("ink_anchor") != b["ink_anchor"] for a, b in decisions),
+            "null_linked_tokens": sum(not b["contributors"] for _, b in decisions),
             "held": len(keys) - len(approved), "playback": playback,
             "complete": len(approved) == len(keys) and playback == "passed",
             "issues": {key: states.get(key, {}).get("issues", ["Not processed"]) for key in keys if key not in approved}}
     return report
+
+
+def import_seed(rows, manifest, states, seed_rows, selected):
+    """Reuse prior AI decisions explicitly; never claim they received this runner's fresh critique."""
+    for key, row in seed_rows.items():
+        if key in states or int(key.split(":")[0]) not in selected:
+            continue
+        ledger.require(key in rows and all(t["status"] == "model_reviewed" for t in row["tokens"]), "Invalid AI seed")
+        ledger.require(ledger.compile_verse(row, manifest["verses"][key], ai_reviewed=True), "Incomplete AI seed")
+        states[key] = {"verse": key, "status": "model_reviewed", "origin": "prior_ai_review",
+                       "seed_sha256": ledger.digest(ledger.encoded(row)), "row": row, "issues": []}
 
 
 def main():
@@ -221,9 +335,11 @@ def main():
     parser.add_argument("--timeout", type=int, default=600)
     parser.add_argument("--tafsir", default="ar-jalalayn")
     parser.add_argument("--seed-ledger", type=Path, default=ledger.REPO / "data/english_ai_alignment_ledger.jsonl",
-                        help="Retain previously AI-reviewed verses outside the selected chapters, bound and playback-tested again")
+                        help="Retain previously AI-reviewed verses, bound and playback-tested again")
+    parser.add_argument("--refresh-reviewed", action="store_true", help="Re-annotate selected prior AI verses instead of reusing them")
     parser.add_argument("--retry-held", action="store_true")
-    parser.add_argument("--max-verses", type=int, help="Bound a batch; every unprocessed verse remains in the chapter denominator")
+    parser.add_argument("--max-verses", type=int, default=25,
+                        help="New/retried verse budget (default 25); cached reviews do not consume it")
     parser.add_argument("--workers", type=int, default=2, help="1–4 concurrent verse reviews; canonical fetches remain serial")
     args = parser.parse_args()
     work = args.work_dir.resolve()
@@ -234,6 +350,15 @@ def main():
     ledger.require(1 <= args.attempts <= 3 and 1 <= args.timeout <= 1800, "Invalid retry/timeout budget")
     ledger.require(args.max_verses is None or args.max_verses > 0, "--max-verses must be positive")
     ledger.require(1 <= args.workers <= 4, "--workers must be 1–4")
+    cancelled = Event()
+    def interrupt(signum, frame):
+        cancelled.set()
+        # Direct children are this run's model/validation processes, never
+        # another worktree's runner. Do not leave paid requests orphaned.
+        subprocess.run(["pkill", "-TERM", "-P", str(os.getpid())], check=False)
+        raise KeyboardInterrupt
+    signal.signal(signal.SIGINT, interrupt)
+    signal.signal(signal.SIGTERM, interrupt)
     selected = chapters(args.chapters)
     work.mkdir(parents=True, exist_ok=True)
     # A process lock prevents two runners from overwriting the same resumable queue.
@@ -266,6 +391,11 @@ def main():
         ledger.require(args.tafsir in {e["edition_id"] for e in catalogue["editions"]}, "Unknown tafsir edition")
         state_file = work / "state.json"
         states = json.loads(state_file.read_text()) if state_file.exists() else {}
+        seeds = [json.loads(line) for line in args.seed_ledger.read_text().splitlines()]
+        seed_rows = {r["verse"]: r for r in seeds}
+        ledger.require(len(seed_rows) == len(seeds), "Duplicate AI seed verse")
+        if not args.refresh_reviewed:
+            import_seed(rows, manifest, states, seed_rows, selected)
         processed = 0
         pending_jobs = {}
         def checkpoint(key, state):
@@ -273,6 +403,10 @@ def main():
             save(state_file, states)
             save(work / "report.json", summarize(rows, states, selected, "pending"))
             print(f"{key}: {state['status']}", flush=True)
+            if state.get("provider_unavailable"):
+                cancelled.set()
+                subprocess.run(["pkill", "-TERM", "-P", str(os.getpid())], check=False)
+                raise SystemExit("AI provider unavailable; completed work is saved. Resume with --retry-held after access returns.")
 
         def collect():
             completed, _ = wait(pending_jobs, return_when=FIRST_COMPLETED)
@@ -286,6 +420,9 @@ def main():
                     continue
                 if args.max_verses is not None and processed >= args.max_verses:
                     break
+                if states.get(key, {}).get("origin") == "prior_ai_review" and not args.refresh_reviewed:
+                    checkpoint(key, states[key])
+                    continue
                 try:
                     evidence = fetch_evidence(client, row, work / "evidence", args.tafsir)
                     directory = work / "jobs" / key.replace(":", "-")
@@ -298,7 +435,7 @@ def main():
                             runs = old.with_suffix("")
                             if runs.exists():
                                 runs.rename(runs.with_name(runs.name + suffix))
-                    call = lambda payload, output, dest: cached_model_call(payload, output, dest, args.model, args.timeout)
+                    call = lambda payload, output, dest: cached_model_call(payload, output, dest, args.model, args.timeout, cancelled)
                     cached = (directory / (job_signature(row, manifest["verses"][key], evidence, args.model) + ".json")).exists()
                     future = pool.submit(review_verse, row, manifest["verses"][key], evidence, directory, args.model, args.attempts, call)
                     pending_jobs[future] = key
@@ -315,15 +452,18 @@ def main():
         for key, state in states.items():
             if state.get("status") != "model_reviewed" or key not in rows:
                 continue
+            if state.get("origin") == "prior_ai_review":
+                ledger.require(state["seed_sha256"] == ledger.digest(ledger.encoded(seed_rows[key])), "Prior AI decision changed")
+                accepted.append(state["row"])
+                continue
             evidence = json.loads((work / "evidence" / (key.replace(":", "-") + ".json")).read_text())
             if state["input_sha256"] == job_signature(rows[key], manifest["verses"][key], evidence, state["model"]):
                 accepted.append(state["row"])
             else:
                 state.update(status="held", issues=["Review inputs or policy changed; rerun this chapter"])
         save(state_file, states)
-        reused = 0
-        for line in args.seed_ledger.read_text().splitlines():
-            row = json.loads(line)
+        reused = sum(s.get("origin") == "prior_ai_review" for s in states.values() if s.get("status") == "model_reviewed")
+        for row in seeds:
             ledger.require(all(t["status"] == "model_reviewed" for t in row["tokens"]), "Seed must retain the AI-review policy")
             if int(row["verse"].split(":")[0]) in selected or row["verse"] in {r["verse"] for r in accepted}:
                 continue
@@ -343,13 +483,19 @@ def main():
             audit = subprocess.run(command, stdout=output, stderr=subprocess.STDOUT)
         report = summarize(rows, states, selected, "passed" if audit.returncode == 0 else "failed")
         report["reused_prior_ai_verses"] = reused
-        save(work / "report.json", report)
+        report["candidate_artifact_sha256"] = coverage["artifact_sha256"]
+        report["artifact_promoted"] = audit.returncode == 0
         if audit.returncode:
+            save(work / "report.json", report)
             raise ValueError(f"Playback audit failed; candidate withheld. See {work / 'playback.log'}")
-        (work / "english-ai-alignments.tsv").write_text(artifact)
+        write_text(work / "english-ai-alignments.tsv", artifact)
         save(work / "coverage.json", coverage)
+        save(work / "report.json", report)
         print(json.dumps(report, ensure_ascii=False, indent=2))
 
 
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    except KeyboardInterrupt:
+        raise SystemExit("Interrupted; completed reviews and model stages are saved for resume.")
