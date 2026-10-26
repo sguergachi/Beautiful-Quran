@@ -130,9 +130,6 @@ fun InkLabPanel(
                         TuningSlider("Reflection", t.paperInkReflection, 0f..1f) {
                             InkEngine.tuning = t.copy(paperInkReflection = it)
                         }
-                        TuningSlider("Softness", t.paperInkSoftness, 0f..1f) {
-                            InkEngine.tuning = t.copy(paperInkSoftness = it)
-                        }
                         TuningSlider("Lead fade", t.paperInkLeadFade, 0f..1f) {
                             InkEngine.tuning = t.copy(paperInkLeadFade = it)
                         }
@@ -725,6 +722,11 @@ internal fun formatTuningCopy(t: InkEngine.Tuning): String {
         appendLine("    tarjiAttackMs = ${f(t.tarjiAttackMs)},")
         appendLine("    tarjiReleaseMs = ${f(t.tarjiReleaseMs)},")
         appendLine("    tarjiEarDelayMs = ${f(t.tarjiEarDelayMs)},")
+        appendLine("    paperInk = ${t.paperInk},")
+        appendLine("    paperInkPooling = ${f(t.paperInkPooling)},")
+        appendLine("    paperInkReflection = ${f(t.paperInkReflection)},")
+        appendLine("    paperInkLeadFade = ${f(t.paperInkLeadFade)},")
+        appendLine("    paperInkFlowing = ${t.paperInkFlowing},")
         append(")")
     }
 }

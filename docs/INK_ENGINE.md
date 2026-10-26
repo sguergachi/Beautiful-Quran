@@ -823,8 +823,10 @@ meanings, defaults, ranges, and the halo artifact stress check are documented
 in [GLIMMER.md](GLIMMER.md#ink-lab-controls).
 
 The **Ink** tab starts with the Paper ink appearance controls: Paper ink and
-Flowing ink switches, pooling, reflection, softness, Arabic lead fade, and
+Flowing ink switches, pooling, reflection, Arabic lead fade, and
 **Dry-down ms**. Dry-down edits the same persisted `glintFadeMs` as Sweep's
 Glitter time, so it also adjusts glimmer decay. English keeps its fixed
 one-letter preview. These controls reuse the existing tuning, persistence,
-Copy values and Reset paths; neither appearance defaults nor pacing change.
+Copy values and Reset paths. Pooling defaults to 0.28, including a one-time
+migration from the previous stock 0.25; custom values remain. The Softness
+control and saved setting are retired. Pacing is unchanged.

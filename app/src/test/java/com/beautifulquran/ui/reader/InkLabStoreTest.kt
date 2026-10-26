@@ -22,6 +22,7 @@ class InkLabStoreTest {
         assertEquals(120, ink.waslPrefixMs)
         assertEquals(1.4185f, ink.cruiseCap, 0.0001f)
         assertEquals(0.3f, ink.holdCreep, 0.0001f)
+        assertEquals(0.28f, ink.paperInkPooling, 0f)
 
         val guide = ContextualGuideTuning()
         assertEquals(0.5f, guide.bodyEdge, 0.0001f)
@@ -64,6 +65,11 @@ class InkLabStoreTest {
             tajweedPacing = true,
             cruiseCap = 1.55f,
             holdGhunnah = true,
+            paperInk = false,
+            paperInkPooling = 0.6f,
+            paperInkReflection = 0.7f,
+            paperInkLeadFade = 0.3f,
+            paperInkFlowing = true,
             highlightLeadMs = 900,
             fadeLeadMs = 333,
             scrollLeadMs = 444,
@@ -108,6 +114,33 @@ class InkLabStoreTest {
         assertNull(InkLabSnapshot.decode(""))
         assertNull(InkLabSnapshot.decode("{"))
         assertNull(InkLabSnapshot.decode("not-json"))
+    }
+
+    @Test
+    fun oldStockPooling_adoptsNewDefaultWithoutRepeatingEarlierMigrations() {
+        val saved = InkLabSnapshot(schema = 6, paperInkPooling = 0.25f,
+            inkFadeMs = 400, ayahMarkFadeMs = 400, recessMs = 400,
+            scrollLeadMs = 444, paperInkReflection = 0.7f)
+        val migrated = InkLabSnapshot.decode(InkLabSnapshot.encode(saved))!!
+        assertEquals(saved.copy(schema = InkLabSnapshot.SCHEMA, paperInkPooling = 0.28f), migrated)
+
+        val custom = saved.copy(paperInkPooling = 0.4f)
+        assertEquals(custom.copy(schema = InkLabSnapshot.SCHEMA),
+            InkLabSnapshot.decode(InkLabSnapshot.encode(custom)))
+        // The old stock value is still a valid new audition after migration.
+        val retuned = migrated.copy(paperInkPooling = 0.25f)
+        assertEquals(retuned, InkLabSnapshot.decode(InkLabSnapshot.encode(retuned)))
+    }
+
+    @Test
+    fun retiredSoftness_isIgnoredAndDroppedFromTheNextSave() {
+        val raw = """{"schema":6,"paperInkSoftness":0.8,"paperInkPooling":0.4,
+            "paperInkReflection":0.7,"paperInkLeadFade":0.3,"paperInkFlowing":true}"""
+        val restored = InkLabSnapshot.decode(raw)!!
+        val expected = InkEngine.Tuning(paperInkPooling = 0.4f, paperInkReflection = 0.7f,
+            paperInkLeadFade = 0.3f, paperInkFlowing = true)
+        assertEquals(expected, restored.toTuning())
+        assertTrue(!InkLabSnapshot.encode(restored).contains("paperInkSoftness"))
     }
 
     @Test

@@ -1772,7 +1772,7 @@ private fun MutableList<ShapedWordBloom>.addEnglishPaperInk(
                         unreadAlpha = InkEngine.State.Upcoming.inkAlpha(),
                         pooling = tuning.paperInkPooling,
                         reflection = tuning.paperInkReflection,
-                        softness = tuning.paperInkSoftness,
+                        softness = 0f,
                         leadFade = ENGLISH_PAPER_INK_LEAD_FADE,
                         fadeLeadOnEntry = true,
                         flowing = tuning.paperInkFlowing,

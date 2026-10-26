@@ -233,13 +233,12 @@ object InkEngine {
         /**
          * Paper ink (docs/PAPER_INK.md): on Paper, Android 13+, every reader
          * surface draws words through the swelling-channel ink shader. Off
-         * keeps the paper-cover wash. The dials are the study's tuned defaults.
+         * keeps the paper-cover wash.
          */
         val paperInk: Boolean = true,
         /** Wet stroke-weight gain (study "Ink pooling"). */
-        val paperInkPooling: Float = 0.25f,
+        val paperInkPooling: Float = 0.28f,
         val paperInkReflection: Float = 0.5f,
-        val paperInkSoftness: Float = 0f,
         /** Fade-in ahead of the wet edge: 0.5 is one letter, 1 is two. */
         val paperInkLeadFade: Float = 0.5f,
         /** Flowing ink (quicker, cleaner swell) instead of Inside out. */

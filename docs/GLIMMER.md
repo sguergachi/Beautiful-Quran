@@ -707,7 +707,7 @@ on the clipboard (also written to Logcat under tag `InkLab`). Turn **Focus** off
 and inspect ink; the toggle is session-only and not part of `Tuning`.
 
 For the Paper theme's visual controls, use **Ink**: pooling, reflection,
-softness, Arabic lead fade, and **Dry-down ms**. Dry-down is another label for
+Arabic lead fade, and **Dry-down ms**. Dry-down is another label for
 the same saved value as Sweep's Glitter time. See [Paper ink tuning](PAPER_INK.md#tuning).
 
 | Slider | `InkEngine.Tuning` | Shipped value | Range | Effect |

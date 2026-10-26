@@ -104,9 +104,8 @@ data class InkLabSnapshot(
     val tarjiReleaseMs: Float = Tarji.RELEASE_MS,
     val tarjiEarDelayMs: Float = 0f,
     val paperInk: Boolean = true,
-    val paperInkPooling: Float = 0.25f,
+    val paperInkPooling: Float = 0.28f,
     val paperInkReflection: Float = 0.5f,
-    val paperInkSoftness: Float = 0f,
     val paperInkLeadFade: Float = 0.5f,
     val paperInkFlowing: Boolean = false,
     val guideBodyEdge: Float = 0.5f,
@@ -181,7 +180,6 @@ data class InkLabSnapshot(
         paperInk = paperInk,
         paperInkPooling = paperInkPooling,
         paperInkReflection = paperInkReflection,
-        paperInkSoftness = paperInkSoftness,
         paperInkLeadFade = paperInkLeadFade,
         paperInkFlowing = paperInkFlowing,
     )
@@ -205,8 +203,9 @@ data class InkLabSnapshot(
          * 4: retune that scroll lead to 100 ms, preserving the other knobs.
          * 5: give the repeat wash a slower 1.8 s release without resetting the camera.
          * 6: match old default verse fades to chrome; preserve custom fade auditions.
+         * 7: adopt 0.28 pooling for old stock profiles; retire the softness dial.
          */
-        const val SCHEMA = 6
+        const val SCHEMA = 7
 
         private val json = Json {
             ignoreUnknownKeys = true
@@ -270,16 +269,15 @@ data class InkLabSnapshot(
             tarjiMinVolume = tuning.tarjiMinVolume,
             tarjiMinDrama = tuning.tarjiMinDrama,
             tarjiPitchDrift = tuning.tarjiPitchDrift,
-        tarjiAttackMs = tuning.tarjiAttackMs,
-        tarjiReleaseMs = tuning.tarjiReleaseMs,
-        tarjiEarDelayMs = tuning.tarjiEarDelayMs,
-        paperInk = tuning.paperInk,
-        paperInkPooling = tuning.paperInkPooling,
-        paperInkReflection = tuning.paperInkReflection,
-        paperInkSoftness = tuning.paperInkSoftness,
-        paperInkLeadFade = tuning.paperInkLeadFade,
-        paperInkFlowing = tuning.paperInkFlowing,
-        guideBodyEdge = guide.bodyEdge,
+            tarjiAttackMs = tuning.tarjiAttackMs,
+            tarjiReleaseMs = tuning.tarjiReleaseMs,
+            tarjiEarDelayMs = tuning.tarjiEarDelayMs,
+            paperInk = tuning.paperInk,
+            paperInkPooling = tuning.paperInkPooling,
+            paperInkReflection = tuning.paperInkReflection,
+            paperInkLeadFade = tuning.paperInkLeadFade,
+            paperInkFlowing = tuning.paperInkFlowing,
+            guideBodyEdge = guide.bodyEdge,
             guideFeatherWidth = guide.featherWidth,
             guideFadeSoftness = guide.fadeSoftness,
             guideBlurRadiusDp = guide.blurRadiusDp,
@@ -313,11 +311,15 @@ data class InkLabSnapshot(
                 val repeat = if (saved.schema >= 5) camera else camera.copy(
                     repeatFadeOutMs = shipped.repeatFadeOutMs,
                 )
-                if (saved.schema >= SCHEMA) repeat else repeat.copy(
-                    schema = SCHEMA,
+                val fades = if (saved.schema >= 6) repeat else repeat.copy(
                     inkFadeMs = repeat.inkFadeMs.takeUnless { it == 400 } ?: shipped.inkFadeMs,
                     ayahMarkFadeMs = repeat.ayahMarkFadeMs.takeUnless { it == 400 } ?: shipped.ayahMarkFadeMs,
                     recessMs = repeat.recessMs.takeUnless { it == 400 } ?: shipped.recessMs,
+                )
+                if (saved.schema >= SCHEMA) fades else fades.copy(
+                    schema = SCHEMA,
+                    paperInkPooling = fades.paperInkPooling.takeUnless { it == 0.25f }
+                        ?: shipped.paperInkPooling,
                 )
             }
     }

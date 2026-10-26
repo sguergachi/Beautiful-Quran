@@ -123,7 +123,7 @@ internal fun InkMotion.paperInkFrame(style: PaperInkStyle): PaperInk.Frame {
         unreadAlpha = InkEngine.State.Upcoming.inkAlpha(),
         pooling = t.paperInkPooling,
         reflection = t.paperInkReflection,
-        softness = t.paperInkSoftness,
+        softness = 0f,
         leadFade = t.paperInkLeadFade,
         flowing = t.paperInkFlowing,
         evaporation = paperDeparture?.takeIf { it.active }?.let { 1f - it.remaining.value } ?: 0f,
