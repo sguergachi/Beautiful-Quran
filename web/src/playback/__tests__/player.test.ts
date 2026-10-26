@@ -1,9 +1,20 @@
-import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
+import {
+  afterAll,
+  afterEach,
+  beforeAll,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  vi,
+} from 'vitest'
 import type { Reciter, SurahContent } from '../../data/models'
 import type { AudioPrefetcher } from '../audioPrefetch'
 import { wantsGapless5Transport } from '../gaplessPolicy'
 import { FakeAudio } from './fakeAudio'
 import { PLAYBACK_MESSAGES } from '../playbackErrors'
+import { PreparedTimings } from '../../domain/HighlightEngine'
+import { highlightFrame, sampleHighlight, suspendHighlight, type HighlightSyncState } from '../../domain/HighlightSync'
 
 let PlayerController: typeof import('../player').PlayerController
 
@@ -75,9 +86,116 @@ describe('PlayerController event sequences', () => {
 
   afterAll(() => vi.unstubAllGlobals())
 
-  it('dismisses an error without changing the verse or playback, then reports another failure', () => {
+  it('publishes authoritative restart generations while pause, buffer and speed preserve ink', async () => {
     const audio = new FakeAudio()
     const player = new PlayerController(instantPrefetcher(), true, null, () => audio.asAudio())
+    player.loadSurah(content, reciter, 1, { quiet: true, warm: false })
+    await player.play()
+    const initial = player.getState().inkGeneration!
+    player.pause()
+    player.setSpeed(1.5)
+    audio.emit('waiting')
+    expect(player.getState().inkGeneration).toBe(initial)
+    player.seekMs(3000)
+    expect(player.getState().inkGeneration).toBe(initial + 1)
+    expect(player.getState().clockRevision).toBeGreaterThan(0)
+    player.seekMs(3000)
+    expect(player.getState().inkGeneration).toBe(initial + 2)
+    player.pause()
+  })
+
+  it.each([1, 2])('restarts V2 highlighting on ayah %i after playback is dismissed', async (ayah) => {
+    const audio = new FakeAudio()
+    const player = new PlayerController(instantPrefetcher(), true, null, () => audio.asAudio())
+    const timing = { revision: 1, voiceStartMs: 0, timings: PreparedTimings.prepare([
+      { position: 1, startMs: 0, endMs: 1000 },
+      { position: 2, startMs: 1000, endMs: 2000 },
+    ]) }
+    let sync: HighlightSyncState | null = null
+    let atNanos = 0
+    // Keep V2 alive across the same null-source interval as AppStore.
+    const unsubscribe = player.subscribe(state => {
+      atNanos += 1e6
+      const item = state.nowPlaying
+      if (!item) {
+        if (sync) sync = suspendHighlight(sync, atNanos)
+        return
+      }
+      sync = sampleHighlight(sync, {
+        item: { surah: item.surahId, ayah: item.ayah, reciter: item.reciterId },
+        positionMs: state.positionMs, sampledAtNanos: atNanos,
+        isPlaying: state.isPlaying, isBuffering: state.isBuffering || state.isPlaying && state.advances === false,
+        speed: state.speed, clockRevision: state.clockRevision!, inkGeneration: state.inkGeneration!,
+      }, timing)
+    })
+    try {
+      player.loadSurah(content, reciter, 1, { quiet: true, warm: false })
+      await player.play()
+      player.seekMs(1200)
+      player.seekMs(1500)
+      const prior = player.getState()
+      expect(highlightFrame(sync!, atNanos).active?.position).toBe(2)
+
+      player.stop()
+      player.loadSurah(content, reciter, ayah, { quiet: true, warm: false })
+      await player.play()
+      const frame = highlightFrame(sync!, atNanos)
+      expect(frame.item.ayah).toBe(ayah)
+      expect(frame.inkGeneration).toBeGreaterThan(prior.inkGeneration!)
+      expect(frame.active?.position).toBe(1)
+      expect(sync!.suspended).not.toBe(true)
+      expect(highlightFrame(sync!, atNanos + 100e6).inkMs).toBeGreaterThan(frame.inkMs)
+    } finally {
+      unsubscribe()
+      player.stop()
+    }
+  })
+
+  it('keeps play intent separate from actual advancement until the audio element starts', async () => {
+    const audio = new FakeAudio()
+    audio.readyState = 0
+    const player = new PlayerController(instantPrefetcher(), true, null, () => audio.asAudio())
+    player.loadSurah(content, reciter, 1, { quiet: true, warm: false })
+    const starting = player.play()
+    expect(player.getState().isPlaying).toBe(true)
+    expect(player.getState().advances).toBe(false)
+    audio.readyState = 4
+    audio.emit('canplay')
+    await starting
+    expect(player.getState().advances).toBe(true)
+    audio.emit('waiting')
+    expect(player.getState().advances).toBe(false)
+    audio.emit('playing')
+    expect(player.getState().advances).toBe(true)
+    player.pause()
+    expect(player.getState().advances).toBe(false)
+  })
+
+  it('native loop seeking rearms even when background polling missed the clip tail', async () => {
+    const audio = new FakeAudio()
+    const player = new PlayerController(instantPrefetcher(), true, null, () => audio.asAudio())
+    player.loadSurah(content, reciter, 1, { quiet: true, warm: false })
+    await player.play()
+    audio.loop = true
+    audio.currentTime = 4
+    audio.emit('timeupdate')
+    const before = player.getState().inkGeneration!
+    audio.currentTime = 0
+    audio.emit('seeking')
+    expect(player.getState().inkGeneration).toBe(before + 1)
+    expect(player.getState().positionMs).toBe(0)
+    player.seekMs(2000)
+    const explicit = player.getState().inkGeneration
+    audio.emit('seeking')
+    expect(player.getState().inkGeneration).toBe(explicit)
+    player.pause()
+  })
+
+  it('dismisses an error without changing the verse or playback, then reports another failure', () => {
+    const audio = new FakeAudio()
+    const player = new PlayerController(instantPrefetcher(), true, null, () =>
+      audio.asAudio(),
+    )
     player.loadSurah(content, reciter, 1, { quiet: true, warm: false })
     audio.emit('error')
     const failed = player.getState()
@@ -94,31 +212,31 @@ describe('PlayerController event sequences', () => {
   it('does not resume when pause wins while play is waiting for canplay', async () => {
     const audio = new FakeAudio()
     audio.readyState = 0
-    const player = new PlayerController(
-      instantPrefetcher(),
-      true,
-      null,
-      () => audio.asAudio(),
+    const player = new PlayerController(instantPrefetcher(), true, null, () =>
+      audio.asAudio(),
     )
     player.loadSurah(content, reciter, 1, { quiet: true, warm: false })
 
     const pendingPlay = player.play()
-    expect(player.getState()).toMatchObject({ isPlaying: true, isBuffering: true })
+    expect(player.getState()).toMatchObject({
+      isPlaying: true,
+      isBuffering: true,
+    })
     player.pause()
     audio.emit('canplay')
     await pendingPlay
 
-    expect(player.getState()).toMatchObject({ isPlaying: false, isBuffering: false })
+    expect(player.getState()).toMatchObject({
+      isPlaying: false,
+      isBuffering: false,
+    })
     expect(audio.play).not.toHaveBeenCalled()
   })
 
   it('resumes mid-ayah after pause without rewinding the clip', async () => {
     const audio = new FakeAudio()
-    const player = new PlayerController(
-      instantPrefetcher(),
-      true,
-      null,
-      () => audio.asAudio(),
+    const player = new PlayerController(instantPrefetcher(), true, null, () =>
+      audio.asAudio(),
     )
     player.loadSurah(content, reciter, 1, { quiet: true, warm: false })
     await player.play()
@@ -134,11 +252,8 @@ describe('PlayerController event sequences', () => {
 
   it('keeps Gapless-5 off at non-1× even when the join preference is on', async () => {
     const audio = new FakeAudio()
-    const player = new PlayerController(
-      instantPrefetcher(),
-      true,
-      null,
-      () => audio.asAudio(),
+    const player = new PlayerController(instantPrefetcher(), true, null, () =>
+      audio.asAudio(),
     )
     player.setSpeed(0.75)
     await player.setGapless5Enabled(true)
@@ -162,11 +277,8 @@ describe('PlayerController event sequences', () => {
     audio.load.mockImplementation(() => {
       audio.playbackRate = audio.defaultPlaybackRate
     })
-    const player = new PlayerController(
-      instantPrefetcher(),
-      true,
-      null,
-      () => audio.asAudio(),
+    const player = new PlayerController(instantPrefetcher(), true, null, () =>
+      audio.asAudio(),
     )
     // Preference applied before any clip is loaded (boot path).
     player.setSpeed(0.75)
@@ -202,11 +314,8 @@ describe('PlayerController event sequences', () => {
 
   it('suppresses multiple pause events during an autoplay src swap', async () => {
     const audio = new FakeAudio()
-    const player = new PlayerController(
-      instantPrefetcher(),
-      true,
-      null,
-      () => audio.asAudio(),
+    const player = new PlayerController(instantPrefetcher(), true, null, () =>
+      audio.asAudio(),
     )
     player.loadSurah(content, reciter, 1, { quiet: true, warm: false })
     await player.play()
@@ -246,11 +355,8 @@ describe('PlayerController event sequences', () => {
       throw new Error('NotAllowedError')
     })
 
-    const player = new PlayerController(
-      instantPrefetcher(),
-      true,
-      null,
-      () => audio.asAudio(),
+    const player = new PlayerController(instantPrefetcher(), true, null, () =>
+      audio.asAudio(),
     )
     player.loadSurah(content, reciter, 1, { quiet: true, warm: false })
     await player.play()
@@ -269,17 +375,22 @@ describe('PlayerController event sequences', () => {
     vi.useRealTimers()
   })
 
-  it('does not publish the old clip\'s position under the next verse while its clip loads', async () => {
+  it("does not publish the old clip's position under the next verse while its clip loads", async () => {
     const audio = new FakeAudio()
     const prefetcher = instantPrefetcher()
-    const player = new PlayerController(prefetcher, true, null, () => audio.asAudio())
+    const player = new PlayerController(prefetcher, true, null, () =>
+      audio.asAudio(),
+    )
     player.loadSurah(content, reciter, 1, { quiet: true, warm: false })
     await player.play()
 
     // The next clip is slow to arrive.
     let arrive: (src: string) => void = () => {}
     vi.mocked(prefetcher.ensure).mockImplementationOnce(
-      () => new Promise<string>((resolve) => { arrive = resolve }),
+      () =>
+        new Promise<string>((resolve) => {
+          arrive = resolve
+        }),
     )
     audio.currentTime = 4.5
     audio.ended = true
@@ -288,7 +399,10 @@ describe('PlayerController event sequences', () => {
 
     // The element still holds verse 1, 4.5 s in. That is not verse 2's time.
     audio.emit('timeupdate')
-    expect(player.getState()).toMatchObject({ nowPlaying: { ayah: 2 }, positionMs: 0 })
+    expect(player.getState()).toMatchObject({
+      nowPlaying: { ayah: 2 },
+      positionMs: 0,
+    })
 
     audio.ended = false
     audio.currentTime = 0
@@ -296,16 +410,16 @@ describe('PlayerController event sequences', () => {
     await vi.waitFor(() => expect(audio.play).toHaveBeenCalledTimes(2))
     audio.currentTime = 0.3
     audio.emit('timeupdate')
-    expect(player.getState()).toMatchObject({ nowPlaying: { ayah: 2 }, positionMs: 300 })
+    expect(player.getState()).toMatchObject({
+      nowPlaying: { ayah: 2 },
+      positionMs: 300,
+    })
   })
 
   it('advances on natural ended when gapless path is not used', async () => {
     const audio = new FakeAudio()
-    const player = new PlayerController(
-      instantPrefetcher(),
-      true,
-      null,
-      () => audio.asAudio(),
+    const player = new PlayerController(instantPrefetcher(), true, null, () =>
+      audio.asAudio(),
     )
     player.loadSurah(content, reciter, 1, { quiet: true, warm: false })
     await player.play()
@@ -326,5 +440,107 @@ describe('wantsGapless5Transport', () => {
     expect(wantsGapless5Transport(true, 1.25)).toBe(false)
     expect(wantsGapless5Transport(true, 1.5)).toBe(false)
     expect(wantsGapless5Transport(false, 1)).toBe(false)
+  })
+})
+
+// Exercise the actual controller callbacks without loading a browser-only UMD
+// transport. Every subscriber must receive a coherent verse/clock pair.
+describe('gapless verse-clock publication', () => {
+  it('publishes the new verse, position and duration in one notification', async () => {
+    vi.stubGlobal('Audio', FakeAudio)
+    vi.stubGlobal('navigator', {})
+    const { PlayerController } = await import('../player')
+    const p = new PlayerController(instantPrefetcher(), true, null, () =>
+      new FakeAudio().asAudio(),
+    )
+    p.loadSurah(content, reciter, 1, { quiet: true, warm: false })
+    const internal = p as unknown as {
+      gapless5Enabled: boolean
+      createGapless5Backend(): {
+        handlers: { onTime(ms: number, duration: number, index: number): void }
+      }
+    }
+    internal.gapless5Enabled = true
+    const states: unknown[] = []
+    const unsubscribe = p.subscribe((s) => states.push(s))
+    states.length = 0
+    internal.createGapless5Backend().handlers.onTime(24, 4100, 1)
+    expect(states).toHaveLength(1)
+    expect(states[0]).toMatchObject({
+      nowPlaying: { ayah: 2 },
+      positionMs: 24,
+      durationMs: 4100,
+    })
+    unsubscribe()
+    vi.unstubAllGlobals()
+  })
+})
+
+describe('repeat sheet playback application', () => {
+  afterEach(() => vi.unstubAllGlobals())
+  async function fixture(start: number, playing: boolean, ayah: number) {
+    vi.stubGlobal('Audio', FakeAudio)
+    vi.stubGlobal('navigator', {})
+    const { PlayerController } = await import('../player')
+    const p = new PlayerController(instantPrefetcher(), true, null, () => new FakeAudio().asAudio())
+    p.loadSurah(content, reciter, start, { quiet: true, warm: false })
+    const internal = p as unknown as {
+      state: import('../player').PlayerState
+      playlist: { ayah: number; url: string }[]
+      index: number
+      playIndex: ReturnType<typeof vi.fn>
+      gapless5Enabled: boolean
+      gapless5: { goto: ReturnType<typeof vi.fn>; getDurationMs: () => number; isPlaying: () => boolean }
+      createGapless5Backend(): { handlers: { onFinishedAll(): void } }
+    }
+    internal.state = { ...p.getState(), nowPlaying: { surahId: 1, reciterId: 1, ayah }, isPlaying: playing, positionMs: 432 }
+    internal.index = internal.playlist.findIndex(item => item.ayah === ayah)
+    internal.playIndex = vi.fn(async () => {})
+    return { p, internal }
+  }
+  it('keeps an in-range live utterance at its position', async () => {
+    const { p, internal } = await fixture(1, true, 2)
+    await p.applyRepeat('range', { first: 1, last: 3 })
+    expect(internal.playIndex).not.toHaveBeenCalled()
+    expect(p.getState()).toMatchObject({ positionMs: 432, repeatRange: { first: 1, last: 3 } })
+  })
+  it('does not reload a live range already present in a truncated playlist', async () => {
+    const { p, internal } = await fixture(2, true, 2)
+    await p.applyRepeat('range', { first: 2, last: 3 })
+    expect(internal.playIndex).not.toHaveBeenCalled()
+    expect(p.getState().positionMs).toBe(432)
+  })
+  it('abandons an old position restore after a newer repeat choice', async () => {
+    const { p, internal } = await fixture(3, false, 3)
+    let finish!: () => void
+    internal.playIndex = vi.fn(() => new Promise<void>(resolve => { finish = resolve }))
+    const seek = vi.spyOn(p, 'seekMs')
+    const pending = p.applyRepeat('surah', null)
+    await p.applyRepeat('off', null)
+    finish()
+    await pending
+    expect(seek).not.toHaveBeenCalled()
+    expect(p.getState().repeatMode).toBe('off')
+  })
+  it('rebuilds a truncated playlist for a whole-chapter loop', async () => {
+    const { p, internal } = await fixture(3, false, 3)
+    await p.applyRepeat('surah', null)
+    expect(internal.playlist.map(item => item.ayah)).toEqual([1, 2, 3])
+    expect(internal.playIndex).toHaveBeenCalledWith(2, false, { fadeIn: false })
+    expect(p.getState().repeatMode).toBe('surah')
+  })
+  it('starts from the range beginning when playback is outside it', async () => {
+    const { p, internal } = await fixture(1, true, 1)
+    await p.applyRepeat('range', { first: 2, last: 3 })
+    expect(internal.playIndex).toHaveBeenCalledWith(1, true, { fadeIn: false })
+  })
+  it('wraps a range ending at the final clip, including a single final ayah', async () => {
+    const { p, internal } = await fixture(1, true, 3)
+    internal.gapless5Enabled = true
+    internal.gapless5 = { goto: vi.fn(), getDurationMs: () => 4000, isPlaying: () => true }
+    internal.state = { ...internal.state, repeatMode: 'range', repeatRange: { first: 3, last: 3 } }
+    internal.createGapless5Backend().handlers.onFinishedAll()
+    expect(internal.gapless5.goto).toHaveBeenCalledWith(2, true)
+    expect(p.getState()).toMatchObject({ nowPlaying: { ayah: 3 }, isPlaying: true, positionMs: 0 })
   })
 })

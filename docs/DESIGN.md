@@ -28,16 +28,15 @@ the paper turning down into the gutter. Every sheet has one place in the
 book. The left page is Chapters, and Bookmarks is laid over it. The right
 page is whatever was opened from it: the title page before a chapter is
 chosen, then the chapter. **Settings is a loose sheet**, laid over the
-right-hand page as the word viewer is laid over the page facing its word: it
+left-hand page, as are repeat and the word viewer, from either leaf: it
 comes down onto the page from above the window, a step of the grid smaller
 than the page on every side, and is drawn back up off it. It is not a page
-of the book and turns nothing. (It used to lie on the left beside a
-scrolling chapter and on the right of facing leaves, and then as the book's
-last page, under the whole right-hand pile, where reaching it turned every
-page still to be read.) Customize carries its own preview leaf. A control both
-pages would carry shows once: the page being read keeps Settings, and
-Chapters gives its own up. The book closes from Chapters: a sweep back
-across it, or the strip of its fore-edge, whose mark shows only under a
+of the book and turns nothing. The paper beneath stays where it was, and
+closing Settings returns to that paper. Customize carries its own preview
+leaf. A control both pages would carry shows once: the page being read keeps
+Settings; when Chapters faces its return page, Chapters keeps it. The book
+closes from Chapters: a sweep back across it, or the strip of its fore-edge,
+whose mark shows only under a
 pointer, like the leaves' own.
 
 In **Mushaf** layout the spread is the bound book itself: two facing leaves,
@@ -45,8 +44,8 @@ the odd page on the right and the next on the left (1|2 … 603|604), their
 fifteen lines on one grid. They turn together — the arrow keys, a drag, or a
 strip of either fore-edge whose mark shows only under a pointer; pages run
 right to left, so the left edge is the way on. Chapters is then laid over the
-left leaf on demand, and touching the page still being read, anywhere on it,
-puts it away and does nothing else.
+left leaf on demand. Its facing page is quiet paper with a gilded medallion,
+bilingual chapter title, kept ayah, and return link; choosing it restores the kept folio.
 
 **One grid for the window (web, tablet and desktop spread).** Everything the
 book is made of is a power of φ times one module *u*, and *u* is the largest that
@@ -73,18 +72,18 @@ air they lie on neither. Nothing is added to a pile that was not turned onto
 it.
 
 **Chapters is the book's first page.** On facing leaves it stands at the
-start, on the left, and the page opposite it is always the book's first
-(Al-Fatihah), before any chapter is chosen and whenever Chapters is turned
-to. Pages run right to left, so at the start the whole block lies on the
-left, under Chapters. Choosing a chapter turns exactly the leaves that come
+start, on the left. The page opposite presents the kept reading place with
+gilding, the chapter's Arabic and English names, and the ayah. Before the
+first reading it carries the book's title page. Pages run right to left, so at the start the whole block
+lies on the left, under Chapters. Choosing a chapter turns exactly the leaves that come
 before it onto the right, as one pile: none for the first spread, nine
 tenths of the book for chapter 60, all of it for the last. Going to Chapters
 turns every leaf read back onto the left, and the pile lands *as* Chapters;
 leaving it, the pile lifts off with Chapters on its face. So the two piles
 are always how far into the book the reader is, and nothing but a turned
 leaf changes them. The place being read is kept while Chapters shows, and
-touching the page opposite it turns back there. A pile is stiffer and slower
-than a leaf: it barely curls, and the whole block takes half as long again
+the return link on the page opposite it turns back there. A pile is stiffer
+and slower than a leaf: it barely curls, and the whole block takes half as long again
 to turn. It turns about the middle of its own thickness, so it starts and
 lands level with the pages. (Chapters used to lie at the far end, under the
 whole left pile, with the reading page left showing beside it: going to it
@@ -115,7 +114,7 @@ shrinks until the leaf's widest line, at minimum word spaces, fills the
 block — never so far that fifteen lines would stand closer than 1.75 times
 the type. Each loose line then has its *letters* widened a few percent
 (6 by default; Settings → Developer offers 0, 4, 6, 8) toward a word space of
-0.42 em before any space is added between words: the stand-in for the print's
+0.3 em before any space is added between words: the stand-in for the print's
 elongated letters, and it adds nothing to the text. A line that fills less
 than 62% of the measure is centred at an ordinary word space instead of being
 justified, as the print centres a chapter's last line. On a phone, leading
@@ -126,12 +125,21 @@ leaf in Hafs, not in the page's own face, and Hafs sets narrower than the
 print — the print fills its line by elongating letters, which the app must
 not imitate by adding characters to the revelation. Justifying such lines
 out to the full page opened rivers three word-spaces wide. So the text block
-is drawn in to its widest line set with minimum word spaces (0.3 em), and
-every other line justifies to that; the type only ever shrinks, when a line
-would overrun the page. A verse mark is an item of the line like a word, so
-the space falls evenly on both its sides. Facing leaves keep one type size
-but each its own block width: two blocks of one width matter less than a
-sparse page not being all gaps. Running head and folio hang on the block.
+is drawn in to its widest line set with minimum word spaces (0.22 em), and
+every other line justifies to that. Type fits both the width and the height
+of the reading well, shrinking when either dimension would overflow. A verse
+mark remains a separate item of the line,
+with a smaller share of white on both sides: 0.85 of a word join, softening
+above 0.42 em. Opening leaves use a 0.22 em word space. Facing leaves keep
+one type size but each its own block width: two blocks of one width matter
+less than a sparse page not being all gaps. Running heads and folios follow
+the full leaf grid. The head and scripture occupy separate grid rows, with
+one rhythm step between them. Both leaves reserve the measured toolbar and
+transport heights plus a step of air; control hit-target floors and safe-area
+padding cannot intrude into the scripture. A short, wide window may draw its
+measured text block below the opening medallion’s 72% width floor, so height
+fitting does not reopen word-space rivers.
+
 What remains uneven is line against line — a line the print stretched with
 long letters still sets looser than a full one — and only the page faces
 would close that.
@@ -1220,15 +1228,21 @@ image, so it is crisp at any density and nearly free to render.
   assigns a distinct frame/interior/corner recipe and a distinct medallion
   structure across all 114 chapters; verse count varies their safe
   proportions. The same chapter always regrows the same ornament. The cover's
-  border frieze is one grammar, a **rumi scroll** after the running gold
-  borders of Ottoman and Mamluk illuminated Qur'ans: a vine waves along the
-  band, a split palmette (rumi) springs under each crest and ends in a beak
-  curling back over its own body, vein down its middle, glide-mirrored
-  under each trough, with a pearl between crest and rail. The seed only
-  nudges its proportions. It replaced five geometric grammars (scallops,
-  cable, Hankin strip, lozenge and khatam chains) whose straight crossings
-  and diamonds read as typed ASCII (`x`, `<>`) at band size; keep border
-  line work curved. On the cover, the **medallion and field build
+  border frieze is one of **five grammars grown per launch**: four geometries
+  of tooled mushaf bindings — interlocking scallops with a pearl in each
+  scale, a two-strand guilloche cable with pearl eyes, a nested lozenge
+  chain, a khatam chain of linked eight-fold stars — and the **rumi scroll**,
+  the running gold borders of Ottoman and Mamluk illuminated Qur'ans: a vine
+  waves along the band, a split palmette (rumi) springs under each crest and
+  ends in a beak curling back over its own body, vein down its middle,
+  glide-mirrored under each trough, with a pearl between crest and rail.
+  A single fixed scroll briefly replaced the five pickers (#868), which took
+  away the launch-to-launch variety the pattern families exist for; the
+  pickers came back around the scroll, and the Hankin star-and-cross strip
+  that once completed the set was culled for good on the user's verdict —
+  its open rays read as rows of typed `x` at band size. Keep border line
+  work curved. The scroll remains the one fully-fixed grammar (its seed
+  only nudges proportions). On the cover, the **medallion and field build
   in real time** — strokes ink themselves in along their length across
   ~3.4 s, field first, then medallion outside-in — so the illumination is
   drawn before the reader's eyes, not stamped; the **border and corner
@@ -1602,22 +1616,28 @@ ends; icon and text spacing is independent of the chapter-number grid.
 The pill is the fixed head of the chapter document: chapters and results move
 beneath it while it remains available at the top of the scrollport. Scrolling
 does not dismiss its focus. Its opaque paper head keeps 12 dp/px of breathing
-room below the pill so moving results never crowd its edge. Android Back, or
+room below the pill so moving results never crowd its edge. The air around the
+pill reads even on Android: the first chapter row's ink sits as far below it
+(34 dp) as the masthead title's ink sits above it, so the list padding trims
+the row's own 15 dp band above its ink. Android Back, or
 Escape on web, first dismisses the keyboard/focus while preserving the query
 and its results; only a later Back action may leave the sheet.
 Search results keep relevance in the existing paper hierarchy. The quiet
 metadata line explains why each result appeared (`7:154 · Text match`,
 `9:26 · Related · tranquility`, or `2:83 · Concept · Kindness to Parents`),
 while the section line gives the relevant-ayah count. These never become
-badges, chips, cards, confidence meters, or second headings. Every visible word
-that genuinely earned a result may take the gold accent; connective or merely
-similar words remain ordinary ink. Literal word hits still open with the word
+badges, chips, cards, confidence meters, or second headings. Every result has
+gold emphasis: precise matching words take the accent, including reordered
+query terms. A semantic hit without a precise word colors its full excerpt as
+ayah-level context, keeping the reader target at its honest scope.
+Literal word hits still open with the word
 flash; ayah-level concept and quoted-phrase hits open the verse without
 inventing an Arabic word to highlight.
 **Android:** continue listening no longer takes a persistent top band in the
 scrolling chapter document: the reading place lives in its chapter row, marked
-by the place ribbon in situ. While that row is scrolled out of view a quiet
-green-wash pill — the place ribbon, gold number, and a small-caps CONTINUE flag
+by the place ribbon in situ. While that row is scrolled out of view a quiet green
+pill (the same `greenWash` as the playback bar's return button) — the place
+ribbon, gold number, and a small-caps CONTINUE flag
 over the chapter row's bilingual identity, set in a rounded wash on the rows'
 own Arabic rail — floats at the bottom (above the gesture inset). It stands
 down entirely while the playback bar is up; the bar owns the bottom paper and
@@ -1627,8 +1647,18 @@ up to the row — resizing onto its exact bounds, squaring its corners, settling
 every inset, then fading to reveal the row — so the row owns the tap, and
 scrolling back down peels it off the top and settles it home again. Flights
 only ever arm off a fully-visible row and cancel the moment it leaves, so
-flings pass through untouched. *Web still shows the persistent Continue band;
-porting the pill is pending.* Both platforms keep the 28 dp/px outer lane, 26 dp/px number
+flings pass through untouched. The pill also never rises until the chapter
+list has measured its first pass: on the list's first composition the
+row-visibility rule cannot see the row yet, and a launch whose reading row
+is already in view must behave as if the pill had always been docked away —
+no pop, dwell, or late flight. On departure the resting pill does not fade:
+it is replaced in place by the flight's own copy, so the departure is only
+ever one motion. Web keeps its pill, in the same green wash, in its top
+continue area: a 28 px radius, 16 px outer inset, 40 px green place cloth,
+gold chapter number, CONTINUE flag, and compact bilingual chapter and ayah.
+The shared ribbon is decorative inside one accessible resume button. Only one
+continue pill appears: it resumes the last-heard place, using the saved reading
+place before any listening. Both platforms keep the 28 dp/px outer lane, 26 dp/px number
 column, and 4 dp/px name gap; the fixed masthead pairs its title with the same
 30 dp/px gilded rosette Settings affordance.
 
@@ -1639,6 +1669,86 @@ ribbon fully unfurled while the Bookmarks sheet opens, prevents a mark/unmark
 animation from being borrowed as navigation feedback, and leaves the shared
 component authoritative for its own visual language. Do not create another
 bookmark icon, a second ribbon shape, or a bespoke animated substitute.
+
+### Pinned chapters (Android)
+
+Press and hold a chapter row to pin it to the top of Chapters, or a pinned
+row to unpin it. The hold is its own confirmation — nothing asks. The row
+soaks evenly with **wet green ink** (`primary` at 0.30, plainly darker than
+the band's pale wash, so it reads under a finger): no shape spreads across a
+strip this thin (a deliberate form has no room to develop in it). The ink
+waits 150 ms under an unhurried finger — a soft haptic tick says the hold
+has taken — then deepens over the next 550 ms in step with the hold;
+holding it full is the act, marked by a firm confirm tick, and the pin
+toggles. The very row then **travels** to its new seat (one key per chapter
+inside one list; 420 ms, every row's placement animated, so the list closes or
+opens its gap around it), drawn above the rows it passes and carrying its
+own paper, and its wet ink **dries off** over 650 ms: down to the band's
+wash when pinned, to bare paper when unpinned. An even tint that only
+reached the band's own pale wash was too faint to feel, and a pinned row
+that vanished from the list and reappeared on the band read as a jump. Lifting early drains the tint (180 ms) and pins
+nothing: a release within 300 ms is the ordinary tap that opens the
+chapter; a longer one does nothing. A drag belongs to the list, and a
+cancelled or consumed release (a system back swipe begun on a row, the
+search dials' dismissing tap) is not a tap. The hold is timed on the frame
+clock, not by an animation, so the system's animator scale (animations off,
+or slowed) changes neither what a tap does nor how long a hold takes; a
+longer system touch & hold delay stretches all three timings in proportion
+(`holdPace`), so a slow tapper's tap still opens. Readers who cannot hold get Pin / Unpin as a TalkBack
+action, and a keyboard or D-pad opens with Enter and pins with Shift+Enter;
+the row is one merged, focusable control. While searching, results list
+pinned chapters in place, off the band, where a hold could show nothing of
+what it would do, so there the row is only a tap. Tried
+and rejected, in order: a written subtitle question answered by a verb and
+Cancel; the share selection's feathered ink soak (a smudged inset patch on
+a row this thin); a straight square wipe from the finger (no ink in it);
+and the lobed ink blot (even in rows' own proportions, a shaped spread
+reads wrong inside a thin strip). What the row can honestly fill is the
+even tint.
+
+Pinned chapters sit on a **band**: the Continue pill's green wash
+(`greenWash`) laid edge to edge across the sheet, square-cut like a strip of
+tinted paper, behind every pinned row. A small-caps **PINNED** flag on the
+names' rail (as CONTINUE heads its pill) stands on the paper just above the
+band, 8 dp clear of it. Each row carries its own slice of the wash; the
+slices meet, so it reads as one band however many chapters are pinned.
+Rows are set compact (10 dp bands against the list's 15 dp) on the list's
+own rails, so numbers and names stay aligned with the chapters below. The flag takes the search list's first-label air
+(16 dp) above it, and 20 dp of paper separates the band from the list.
+
+A pinned chapter **moves** into the band, and unpinning returns it to its
+place. The band is the head of the **one** chapter list, not a second list:
+pinning is a reorder to the top, so the row keeps its single key
+(`chapter-N`) inside a single lazy interval, which is both what lets it
+glide and what makes a second copy impossible. Never emit a chapter from a
+second `items(...)` interval: handing a row's key from one interval to
+another is what raised `Key "chapter-N" was already used` and killed the app
+as the filled row let go. `chapterRows` builds that one list; it drops any
+chapter the band already holds.
+
+Tried and rejected, in order: a twisted cord in the trailing gutter (ugly);
+an ink nuqta under a closing hairline; one inset rounded rectangle joining
+every pinned row (read as a card); a stack of separate Continue-style
+capsules; a feathered ink wash (its soft edge reads as a shadow). The owner
+chose the band from an on-device comparison of rectangle, capsules, band and
+wash.
+
+The current-place ribbon (and the Continue pill's docking target) is on the
+pinned row when the chapter is pinned; it hangs in the sheet-edge lane on
+the band. Search owns the sheet while active, so the band stands down.
+Pinning from the top of the sheet scrolls the band into view; a reader deep
+in the list keeps their place. Stored as `Settings.pinnedSurahIds`. The web
+mirrors it (`docs/WEB.md` §6.3) in the same Continue green, `--green-wash`.
+
+Press-and-hold is taught by a contextual guide (`PinChapterTip`, behind the
+developer guide gate like every lesson). It never opens during a scroll,
+and leaving Chapters by any route while it is up puts it away, so it can
+never hold the stack or Back from behind the reader. See
+[CONTEXTUAL_GUIDES.md](CONTEXTUAL_GUIDES.md).
+
+Implementation: `pinnedBand`, `chapterRows`, `holdToPin` / `holdOutcome` / `holdFillProgress` /
+`holdPace` and the list in
+`ui/home/HomeScreen.kt`.
 
 ### Chapters bookmark treatment
 

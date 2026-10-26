@@ -213,16 +213,44 @@ Free, no backend, no auth beyond the GitHub account:
    Do **not** paste every Lab issue straight into `tools/timing_overrides/`.
    Agent checklist (mandatory): [AGENTS.md — Landing Timings Lab / GitHub
    timing patches](../AGENTS.md#landing-timings-lab--github-timing-patches).
+   This is a standing user requirement for every future patch. Audit every
+   distinct defect class separately, report incomplete coverage as partial,
+   and keep unresolved work visible in
+   [OUTSTANDING.md](../tools/timing_verdicts/OUTSTANDING.md).
 
-   Before classifying, **diff the Lab positions against raw qdc**
-   (`tools/.cache/qdc_<id>.json`) and against the row **after**
-   `clean_qdc_artifacts` and **after** `timing_repairs` — the shipped DB may
-   already be wrong because a `drop` repair flattened a real re-say (#570).
+   First compare every edit with the **currently delivered** row. Alafasy,
+   Husary Murattal, Abdul Basit Murattal, Minshawi Murattal, Sudais and Hani
+   use `/api/timings/<appReciterId>` and the device's runtime cache; their
+   timings are absent from `data/quran.db`. A Lab export may contain old local
+   corrections that the service already delivers, or less accurate boundaries
+   than a reviewed fix. Preserve existing correct repeats and investigate
+   disagreements before applying the payload.
+
+   **Every patch requires a broader check.** Search the complete delivered
+   corpus for the same structural/acoustic cause across reciters, and review
+   analogous timing issues, existing corrections, repairs and holds. Record
+   the predicate, source revisions, row/candidate counts, accepted/retained/
+   uncertain decisions, errors and genuine-repeat controls. A regression for
+   only the reported verse does not establish a class fix. Use a reusable
+   detector to generate source-guarded repairs consistently; label any human
+   exception explicitly. Missing models or sources leave the audit incomplete,
+   not implicitly passed. Keep that limitation visible before publication.
+   For held words versus same-word repeats, use the complete, resumable
+   [acoustic ownership audit](WORD_SPLIT_AUDIT.md).
+
+   Before classifying, **diff the Lab positions against the pinned source**
+   for that voice: authenticated snapshots for QF runtime delivery, or
+   `tools/.cache/qdc_<id>.json` for a legacy-source audit. Compare the rows
+   after `clean_qdc_artifacts`, typed corrections, generated repairs and
+   reviewed holds. A delivered row may already be wrong because a `drop`
+   repair flattened a real re-say (#570); a Lab edit may also predate a fix.
 
    | Class | Where to fix | Unit test |
    |---|---|---|
    | Structural qdc noise (forward spikes, strays, split slivers, non-contiguous / gap phantoms) | `clean_qdc_artifacts` in `tools/build_db.py` | Add `tools/timing_patch_cases/<id>.json` — broken `input_*` + expected `expected_*` from the patch; run `python3 tools/test_build_db.py` |
    | Topology cannot distinguish a false loop from a genuine repeat | narrow typed operation under `tools/timing_corrections/` | `pipeline: timing_correction` case |
+   | Audio proves a substantial first-pass label before a rewind is unspoken | exact-source `discard_unspoken_rewind_onset`; keep the cleaner's 200 ms floor | `audio-vetted-rewind-onset-alafasy-5-2`, stale-source guard tests |
+   | Maintainer confirms one held word was split into two substantial labels | exact-source `merge_verified_word_split` after repairs; retain global peer protection | `verified-word-split-alafasy-47-4`, repair-order and stale-source tests |
    | Drop repair that flattens a real span-repeat | `apply_timing_repairs` span-protect (and regenerate repairs) | `pipeline: erases_span_repeat` case in `timing_patch_cases/` |
    | Repair flattens a peer same-word re-say while fixing elsewhere | per-position `preserve_peer_repeats` | `pipeline: preserve_peer_repeats` case |
    | Restore invents a flush same-word pair (gap < 300 ms) | `collapse_invented_flush_repeats` in `apply_timing_repairs` | `pipeline: invented_flush_restore` case |
@@ -247,16 +275,33 @@ Free, no backend, no auth beyond the GitHub account:
    per-ayah median clock offset. Quran-align has weight 2 and the bundled row
    weight 1; ≤250 ms supports a boundary and >500 ms conflicts. Timestamps are
    never averaged, and one-pass evidence never judges repeat backtracks.
-4. Typed corrections run before generated structural evidence. Repairs are
+4. Ordinary typed corrections run before generated structural evidence.
+   Reviewed held-word merges run after repairs, so their exact source pair
+   includes the repaired boundaries and no unrelated boundary moves. Repairs are
    rebased onto the latest source row. Only changed
    topology and its immediate neighbours use the repair clock; equal spans
    retain current source timings. Span protection rejects repairs that flatten
    a multi-word re-recitation; peer same-word re-says are restored per position
    so unrelated repairs still apply. Boundary repairs replace only their listed,
    uniquely occurring positions.
-5. Run `python3 tools/test_build_db.py`, rebuild `quran.db`, bump
-   `DB_FILE_NAME`, and commit the systematic code, regression case, and DB.
-   Delete any local override JSON first.
+5. Run `python3 tools/test_build_db.py`, then use the correct delivery path:
+   - **QF runtime voices:** replay the pinned authenticated snapshots against
+     the private reviewed baseline, obtain the required per-row acoustic
+     verdicts, and publish reviewed runtime resources using
+     `tools/sync_qf_timings.py`. Follow [QF_TIMING_PARITY.md](QF_TIMING_PARITY.md).
+     Default `build_db.py` preserves bundled timings; rebuilding the APK or
+     release database cannot update these voices. Keep QF snapshots and
+     generated databases outside the checkout. Do not claim a fix is delivered
+     until the published runtime row has been checked.
+   - **Independent bundled voices:** rebuild `quran.db`; if its content
+     changes, bump `DB_FILE_NAME` and the database fingerprint, and commit the
+     systematic code, regression case, evidence and DB.
+   Delete any local override JSON before committing. Missing acoustic evidence
+   leaves a candidate pending; it does not justify weakening the delta gate.
+
+The five-verse [#873 review](quality-reviews/TIMING_PATCH_873_2026-10-16.md)
+records already-delivered corrections, unsupported edits and the remaining
+acoustic review requirements.
 
 The patch JSON shape (also the shape `tools/timing_overrides/*.json` accepts):
 

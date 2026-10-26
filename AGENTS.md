@@ -263,6 +263,13 @@ python3 tools/test_build_db.py  # timing pipeline regressions (~1s, no Gradle)
    the **class** in `clean_qdc_artifacts`, use a narrow typed operation only
    when topology is irreducibly ambiguous, and lock it with
    `tools/timing_patch_cases/*.json` + `python3 tools/test_build_db.py`.
+   Every new patch also requires a corpus-wide search for the same cause,
+   including other reciters and genuine-repeat counterexamples. Record the
+   search predicate, source revisions, coverage counts, every candidate's
+   disposition and unresolved evidence. Exact-verse fixtures or source-guarded
+   typed entries alone are not a systematic fix. Generated entries must come
+   from a reusable, calibrated detector applied to the complete candidate set;
+   a necessary human exception stays explicitly exceptional.
    Override JSON is local reproduction scratch only and must not be committed.
    Canonical anti-pattern: the first #570 attempt (one-off override); the
    correct fix is #571 (gap phantoms + span-protect).
@@ -288,6 +295,16 @@ python3 tools/test_build_db.py  # timing pipeline regressions (~1s, no Gradle)
 
 ## Landing Timings Lab / GitHub timing patches
 
+**Standing user requirement for every future timing patch, regardless of size
+or source.** Follow the complete workflow without needing another reminder.
+Audit each distinct defect class in a patch separately. Completing one class
+does not complete another, and fixing the reported ayah does not complete the
+corpus audit. State incomplete coverage as partial, keep unresolved rows at
+baseline, and record remaining work in `tools/timing_verdicts/OUTSTANDING.md`.
+Every repair report or PR must identify the coverage, candidate dispositions,
+genuine-repeat controls, evidence locations and remaining uncertainty before
+production publication.
+
 When the user asks to "fix the timing issue", "apply the timings patch", or
 close a `Timings patch — …` GitHub issue, **do this checklist in order**:
 
@@ -305,6 +322,7 @@ close a `Timings patch — …` GitHub issue, **do this checklist in order**:
 | Word said twice, qdc hands the second utterance to the next word (next word starts a whole utterance early) | regenerate with `tools/find_flattened_resays.py` (dual-model repeat test → generated `restore_flattened_resay`) | `pipeline: "timing_correction"` case + `tools/test_find_flattened_resays.py` |
    | Repair flattens a multi-word re-say that cleaned qdc still has | `apply_timing_repairs` span-protect (`erases_span_repeat`) | `pipeline: "erases_span_repeat"` case |
 | Repair erases a peer same-word re-say while fixing elsewhere | per-position `preserve_peer_repeats` | `pipeline: "preserve_peer_repeats"` case |
+| "Re-say" is qdc labels running a word late before a skip (`1,1,2,5` for `1,2,3,4,5`); peer-protect restores it | `lagged_peer_positions` in `preserve_peer_repeats` | `lagged-peer-*` cases |
 | Same-position pair is really the previous word's held tail (qdc tiles gaplessly, so a madd gets the next word's index) | `false_same_position_leads` + `hand_lead_to_previous_word`, gated on quran-align's onset | `pipeline: "false_same_position_lead"` case |
 | Restore invents a flush same-word pair (gap < 300 ms) | `collapse_invented_flush_repeats` in `apply_timing_repairs` | `pipeline: "invented_flush_restore"` case |
 | qdc has 1..n+1 because QAC glued ما (وَمَالِيَ) | `fold_qdc_fused_ma` in `adjust_qdc_segments` | `pipeline: "adjust_qdc_segments"` case |
@@ -312,6 +330,15 @@ close a `Timings patch — …` GitHub issue, **do this checklist in order**:
 | Single boundary steal, no structural signal | weighted source-conflict validation + surgical `kind: "boundary"` repair | `pipeline: "boundary_repair"` case |
 | Whole ayah starts early because its MP3 has encoded silence | regenerate the reciter with `tools/detect_audio_onsets.py` | `pipeline: "leading_silence_offset"` case |
 | Missing positions, unsafe clock, or marks outside the MP3 | fix the source/class; `finalize_timing_rows` completes, falls back, or withholds | completion/physics checks in `tools/test_build_db.py` |
+3b. **Search the entire delivered corpus for the same cause**, including all
+   applicable reciters and analogous open/closed timing issues. Follow the
+   source → cleaner → correction → repair → reviewed-hold trace for matches.
+   Use real repeats and already-correct rows as negative controls. Run both
+   acoustic models for ambiguous topology candidates; compare start residuals
+   and waveform tails for boundaries. Report incomplete coverage and errors,
+   never silently exclude rows already owned by another correction or hold.
+   Keep a reproducible inventory and evidence for accepted, retained and
+   uncertain cases. Do this for every patch, even when its own fix is narrow.
 4. **Implement the class fix** + add the patch case (input = broken shape,
    expected = Lab/ear topology). Run `python3 tools/test_build_db.py`.
 4b. **Evidence**: a changed row ships only with a dual-model verdict in
@@ -388,6 +415,7 @@ this document combined: `ReaderComponents.kt` (~36k tokens),
 | `docs/CHESTERTON.md` | Worked examples for invariant #9 — guards that look wrong and aren't |
 | `docs/OUTPUT_LATENCY.md` | Route-based Bluetooth/output lag presets applied before the highlight clock |
 | `docs/DESIGN.md` | Any UI/visual change — the paper metaphor and its hard rules |
+| `docs/KEY_ART.md` | Marketing art and product-page videos — niche and rules, the intro Reel shot list, and the Android capture → Revideo edit pipeline in `tools/key_art/` |
 | `docs/CONTEXTUAL_GUIDES.md` | Adding or changing feature education — live-target contract, wiring, and device verification |
 | `docs/PERFORMANCE.md` | Anything touching the reader, scrolling, or the highlight loop |
 | `docs/REPEAT_HIGHLIGHTING.md` | Repeat-aware timings and the orange second fade |
@@ -417,28 +445,26 @@ this document combined: `ReaderComponents.kt` (~36k tokens),
   (exit 1 if none). Any APK you build for this thread goes there — don't leave
   it only in `app/build/outputs` or a `/tmp` name. `send_apk_to_phone.sh`
   always goes through it, and the **Send APK** action in T3 Code runs
-  `send_apk_to_phone.sh --release --zip --published --wait`, which shares
-  the APK there when it matches HEAD on a clean tree, and rebuilds it first
-  otherwise.
-- Send a clearly named APK to the Pixel 10 after every completed code change,
-  and **delete local staged copies once the phone confirms receipt**. Always
-  delegate this to the cheap `apk-sender` subagent (haiku) following
-  `docs/APK_DELIVERY.md` — do not run the send inline in the main session.
-  It stages the build under a name made from the work and the
-  commit, verifies the copy, shares it, and then removes every older staged
-  build. Three rules are baked into it and hold whether or not you use it:
-  - Never send a generic `app-debug.apk` / `app-release.apk`. A phone full of
-    identically-named builds is a phone you cannot test from, and KDE Connect
-    drops a repeat of the same filename to its notification rate limit — so a
-    generic name is a send that silently does not arrive.
-  - Delete the older builds after the new one is away, and delete the new
-    one's local copy too once the phone confirms receipt. They are a quarter
-    of a gigabyte each; left to pile up they filled `/tmp`, which truncated a
-    copy mid-send and shipped a broken APK to the phone. Scope any hand-rolled
-    cleanup to files you staged yourself — never a bare `/tmp/*.apk`.
-  - Verify the transfer completed rather than trusting the sender's exit code,
-    and do not connect to port 1739 to "check" — that steals the payload from
-    the phone. If it is unreachable, report that plainly.
+  `send_apk_to_phone.sh --release --zip --published --wait` (the script
+  ignores `--zip`: sends are plain APK now).
+- **APK delivery is one script, not an agent.** When the requested work is
+  complete, check the T3 queue (`t3_queue_list`): send only when it is
+  **empty** — queued work owns this build, and sends when it finishes.
+  Then trigger the script and you are done:
+
+  ```bash
+  scripts/send_apk_to_phone.sh --release --label "the work"
+  ```
+
+  It builds, stages a copy named after the work + commit, verifies the
+  whole copy, shares it, detects failed sends and retries them itself
+  (10s/30s/60s), and deletes older staged builds. Never hand-roll
+  `kdeconnect-cli` sends, never delegate the send to a subagent. If it
+  exits non-zero, report that plainly; the staged copy is kept for a
+  re-send, and port 1739 is never probed to "check". Cleanup is scoped to
+  the staging dir — never a bare `/tmp/*.apk`. The project's T3 scripts
+  carry the same script as a manual **Send APK** the user can trigger
+  (`--release --published --wait`).
 - Update the relevant doc in `docs/` when you change behavior it describes —
   the docs are load-bearing and kept accurate.
 

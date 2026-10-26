@@ -74,6 +74,7 @@ export class Gapless5Backend {
   private loadGen = 0
   private lastSrcsKey = ''
   private disposed = false
+  private srcs: string[] = []
   /** Cached UMD module — import alone does not create AudioContext. */
   private module: Gapless5Module | null = null
   private modulePromise: Promise<Gapless5Module> | null = null
@@ -180,8 +181,15 @@ export class Gapless5Backend {
     player.onerror = (_path, error) => {
       this.handlers.onError(describePlaybackError(error, 'gapless track failed'))
     }
-    player.onloadstart = () => this.handlers.onBuffering(true)
-    player.onload = () => this.handlers.onBuffering(false)
+    // The library also emits these for its look-ahead window. Loading a
+    // future verse must never interrupt the current verse's playback UI.
+    const isCurrent = (path: string) => this.srcs[player.getIndex()] === path
+    player.onloadstart = (path) => {
+      if (isCurrent(path) && !player.isPlaying()) this.handlers.onBuffering(true)
+    }
+    player.onload = (path) => {
+      if (isCurrent(path)) this.handlers.onBuffering(false)
+    }
     player.setCrossfade(0)
     this.g5 = player
   }
@@ -200,6 +208,7 @@ export class Gapless5Backend {
     if (key === this.lastSrcsKey && player.totalTracks() === srcs.length) return
 
     this.withSuppressedPause(() => {
+      this.srcs = srcs
       this.lastSrcsKey = key
       player.removeAllTracks(true)
       for (const src of srcs) player.addTrack(src)
@@ -247,6 +256,7 @@ export class Gapless5Backend {
   clear(): void {
     this.loadGen++
     this.lastSrcsKey = ''
+    this.srcs = []
     this.withSuppressedPause(() => {
       try {
         this.g5?.stop()

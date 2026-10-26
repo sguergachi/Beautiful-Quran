@@ -33,11 +33,18 @@ jobs:
       - name: Timing pipeline regressions
         run: |
           python3 tools/test_build_db.py
+          python3 tools/test_unspoken_rewind_onset.py
+          python3 tools/test_verified_word_split.py
+          python3 tools/test_word_split_evidence.py
           python3 tools/test_find_flattened_resays.py
           python3 tools/test_qf_timing_parity.py
           python3 tools/test_qf_timing_build.py
           python3 tools/test_sync_qf_timings.py
           python3 tools/test_qf_timing_assets.py
+          python3 tools/test_timing_delta.py
+
+      - name: Dictionary pipeline regressions
+        run: python3 tools/test_build_dictionary_db.py
 
       - name: English semantic acceptance gate regressions
         run: |

@@ -31,6 +31,7 @@ function buildLeafModel(page: number, rows: readonly RuntimeMushafWord[], conten
       translation: verses.get(`${item.surahId}:${item.ayah}`)?.translation,
     })),
     lastPositions,
+    verseWords: new Map([...verses].map(([key, ayah]) => [key, ayah.words])),
   }
 }
 

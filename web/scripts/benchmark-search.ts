@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs'
 import initSqlJs from 'sql.js/dist/sql-asm.js'
 import {
   matchWordSearch,
+  searchHitHighlightSpans,
   normalizeArabicForSearch,
   type RelatedSearchTerm,
   type SearchConcept,
@@ -102,12 +103,29 @@ const cases: [string, WordSearchSources][] = [
   ['corrupy', scroll],
   ['"day of judgment"', scroll],
   ['hell', mushaf],
+  ["doesn't love", mushaf],
+  ['does not love', mushaf],
+  ["doesn't lov", mushaf],
+  ['does not lov', mushaf],
 ]
 
 const medians: number[] = []
+const contractionHits = (query: string) => matchWordSearch(index, query, 400, concepts, thesaurus, mushaf)
+  .map((hit) => `${hit.surahId}:${hit.ayahNumber}`).sort().join(',')
+if (contractionHits("doesn't love") !== contractionHits('does not love')) {
+  throw new Error('Contracted and expanded search results differ')
+}
+if (contractionHits("doesn't lov") !== contractionHits('does not lov') || !contractionHits("doesn't lov")) {
+  throw new Error('Contracted and expanded final-prefix results differ or vanished')
+}
 console.log(`${index.length.toLocaleString()} word rows · ${concepts.length} concepts`)
 for (const [query, sources] of cases) {
-  matchWordSearch(index, query, 400, concepts, thesaurus, sources)
+  const renderedHits = matchWordSearch(index, query, 400, concepts, thesaurus, sources)
+  for (const hit of renderedHits) {
+    if (!searchHitHighlightSpans(hit, query).some((span) => span.highlighted && /[\p{L}\p{N}]/u.test(span.text))) {
+      throw new Error(`Unhighlighted search result: ${query} -> ${hit.surahId}:${hit.ayahNumber}`)
+    }
+  }
   const times: number[] = []
   let hits = 0
   for (let repeat = 0; repeat < 9; repeat++) {

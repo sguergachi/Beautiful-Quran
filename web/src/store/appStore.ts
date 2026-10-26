@@ -30,7 +30,8 @@ import {
   SURAH_FATIHA,
   surahOpensWithBasmalahPreface,
 } from '../domain/Basmalah'
-import { HighlightClock } from '../domain/HighlightClock'
+import { sampleHighlight, highlightFrame, suspendHighlight, type HighlightSyncState } from '../domain/HighlightSync'
+import { highlightTimeline } from '../playback/highlightTimeline'
 import { OutputLatency } from '../domain/OutputLatency'
 import { ReciterSync } from '../domain/ReciterSync'
 import {
@@ -51,6 +52,7 @@ import {
   SETTINGS_LAYER,
   hasReaderOpen,
   settingsLayerFor,
+  underlyingLayer,
   sheetAtLayer,
   type StackLayer,
 } from '../ui/paper/stack'
@@ -122,6 +124,8 @@ export interface AppState {
   loadProgress: number | null
   /** Paper-stack position: -1 Bookmarks · 0 Chapters · 1 Reader · 2 Settings. */
   stackLayer: StackLayer
+  /** Paper beneath Settings; closing the sheet returns here. */
+  settingsOrigin: StackLayer
   /** Derived top sheet name (for labels / legacy checks). */
   sheet: Sheet
   surahs: Surah[]
@@ -196,17 +200,16 @@ class AppStore {
   private timingSegments = new Map<number, Segment[]>()
   private lastActiveKey = ''
   private lastEmitKey = ''
-  private readonly highlightClock = new HighlightClock()
+  private highlightSync: HighlightSyncState | null = null
+  private timingRevision = 0
+  private observedPlayerInk = 0
+  private readonly emptyTimings = PreparedTimings.prepare([])
   /** Bumps on genuine seeks so replaying the same Active word restarts ink. */
   private inkActivation = 0
-  private lastInkMediaKey = ''
-  private lastInkClockMs = -1
-  /** Last applied word-ink lead so a lab change can reset the clock. */
-  private lastHighlightLeadMs = -1
   /**
-   * User seek target (ayah → ms) applied on the next poll once that ayah is
-   * the media item — so ink jumps to the tapped word without waiting for the
-   * media position estimate to catch up (Android [forcedHighlight] parity).
+   * Provisional UI seek target, consumed once that ayah is observed.
+   * V2 waits for the player's authoritative revision before resetting time;
+   * this mark only prevents an extra UI activation at acknowledgment.
    */
   private forcedHighlight: { ayah: number; seekMs: number } | null = null
   /** Bumps when a newer openSurah supersedes an in-flight peel→load. */
@@ -241,6 +244,7 @@ class AppStore {
     loadLabel: 'Opening the book…',
     loadProgress: null,
     stackLayer: COVER_LAYER,
+    settingsOrigin: COVER_LAYER,
     sheet: 'home',
     surahs: [],
     reciters: [],
@@ -279,6 +283,7 @@ class AppStore {
       this.forcedHighlight = null
       this.lastActiveKey = ''
       const content = this.state.content
+      ++this.timingRevision
       this.timingSegments = content
         ? withBasmalahLeadIn(QuranRepository.timings(currentReciter.id, content.surah.id),
           currentReciter.id, content.surah.id)
@@ -345,6 +350,9 @@ class AppStore {
         ps.nowPlaying?.surahId,
         ps.nowPlaying?.ayah,
         ps.repeatMode,
+        ps.repeatRange?.first,
+        ps.repeatRange?.last,
+        ps.speed,
         ps.error ?? '',
         this.lastActiveKey,
       ].join('|')
@@ -389,24 +397,36 @@ class AppStore {
   }
 
   /** Animate / snap the paper stack to a layer. */
-  setStackLayer(layer: number) {
+  setStackLayer(layer: number, settingsOrigin?: StackLayer) {
     const max = settingsLayerFor(this.hasReader())
     const min = this.state.bookmarks.length > 0 ? BOOKMARKS_LAYER : COVER_LAYER
     const stackLayer = Math.max(min, Math.min(max, Math.round(layer))) as StackLayer
     const sheet = deriveSheet(stackLayer, this.hasReader())
+    // Popping Settings reveals its original paper, including an open word sheet.
+    if (this.state.sheet !== 'settings' && (sheet === 'home' || sheet === 'bookmarks')) {
+      this.closeRootViewer(false)
+    }
     const leave = onLeaveReaderSheet(this.state.gathering && leavesReader(
       bookSpreadEnabled(window.matchMedia(BOOK_SPREAD_QUERY).matches, this.state.settings.pagePresentation),
       this.state.stackLayer, stackLayer, this.hasReader(),
+      this.state.settings.readingLayout === 'mushaf',
     ))
     this.set({
       stackLayer,
       sheet,
+      ...(sheet === 'settings' && this.state.sheet !== 'settings'
+        ? { settingsOrigin: settingsOrigin ?? this.state.stackLayer } : {}),
       ...(leave.type === 'exit' ? { gathering: false, gatherSelection: [], shareError: null } : {}),
     })
   }
 
   /** Peel one sheet back (Settings → Reader → Chapters). */
   goBack() {
+    // Settings lies above any word sheet already on the opening page.
+    if (this.state.sheet === 'settings') {
+      this.setStackLayer(underlyingLayer(this.state.stackLayer, this.hasReader(), this.state.settingsOrigin))
+      return
+    }
     // Match Android: only consume back while the bleed is open (not mid-exit).
     if (this.state.rootViewer && !this.state.rootViewerClosing) {
       this.closeRootViewer()
@@ -414,6 +434,7 @@ class AppStore {
     }
     if (this.state.gathering && readerVisible(
       bookSpreadEnabled(window.matchMedia(BOOK_SPREAD_QUERY).matches, this.state.settings.pagePresentation), this.state.stackLayer, this.hasReader(),
+      this.state.settings.readingLayout === 'mushaf',
     )) {
       this.exitGather()
       return
@@ -610,8 +631,9 @@ class AppStore {
     if (layoutChanged && this.state.content && this.state.readingPlace) {
       const { surahId, ayah } = this.state.readingPlace
       const layer = this.state.stackLayer
+      const origin = this.state.settingsOrigin
       this.openReading(surahId, ayah)
-      this.setStackLayer(layer)
+      this.setStackLayer(layer, origin)
     }
   }
 
@@ -625,6 +647,16 @@ class AppStore {
     })
   }
 
+  /** Pin a chapter to the top of Chapters, or return it to its place. */
+  togglePinnedSurah(id: number) {
+    const pinned = this.state.settings.pinnedSurahIds
+    this.updateSettings({
+      pinnedSurahIds: pinned.includes(id)
+        ? pinned.filter((surahId) => surahId !== id)
+        : [...pinned, id],
+    })
+  }
+
   private async reloadTimingsAndReciter(reciter: Reciter) {
     const content = this.state.content
     if (!content) return
@@ -632,6 +664,7 @@ class AppStore {
     const surahId = content.surah.id
     const ayah = this.state.player.nowPlaying?.ayah ?? this.state.settings.lastAyah
     const start = ayah > 0 ? ayah : 1
+    ++this.timingRevision
     this.timingSegments = new Map()
     this.prepared = new Map()
     player.loadSurah(content, reciter, start, { warm: false })
@@ -647,6 +680,7 @@ class AppStore {
       reciter.id,
       surahId,
     )
+    ++this.timingRevision
     this.timingSegments = map
     this.ensurePrepared(start)
     this.ensurePrepared(start + 1)
@@ -756,6 +790,7 @@ class AppStore {
 
     // Never let highlight lookups from the previous chapter leak into the new
     // sheet while audio metadata hydrates independently.
+    ++this.timingRevision
     this.timingSegments = new Map()
     this.prepared = new Map()
     this.longAyahMidpointConsumed = 0
@@ -803,6 +838,7 @@ class AppStore {
           surahId,
         )
         if (token !== this.openToken || timingToken !== this.timingLoadToken) return
+        ++this.timingRevision
         this.timingSegments = map
         this.ensurePrepared(ayah)
         this.ensurePrepared(ayah + 1)
@@ -1037,6 +1073,10 @@ class AppStore {
 
   clearPlaybackError() {
     player.clearError()
+  }
+
+  async applyRepeat(mode: PlayerState['repeatMode'], range: PlayerState['repeatRange']) {
+    await player.applyRepeat(mode, range)
   }
 
   setRepeat(mode: PlayerState['repeatMode'], range: PlayerState['repeatRange'] = null) {
@@ -1292,45 +1332,20 @@ class AppStore {
   }
 
   /**
-   * User-initiated play/seek: bump ink activation, accept the next clock
-   * sample, and pin highlight to [seekMs] on [ayah] so the wash restarts on
-   * the word being played (Android [noteInkRestart] parity).
+   * Keep the existing provisional UI activation. The pure V2 clock resets
+   * only when the player reports the authoritative seek revision.
    */
   private noteInkRestart(ayah: number, seekMs: number) {
     this.inkActivation++
-    this.highlightClock.acceptNextSample()
     this.forcedHighlight = { ayah, seekMs }
-  }
-
-  /**
-   * Karaoke query time: heard playhead + word-ink lead (ramped after the first
-   * segment). Forced word seeks stay on the media timeline. Web uses LOCAL
-   * output lag (0); route presets live in OutputLatency for a future monitor.
-   */
-  private highlightPositionMs(
-    mediaPositionMs: number,
-    forcedMediaMs: number | null,
-    firstWordStartMs: number,
-    reciterId: number,
-  ): number {
-    const latencyMs = OutputLatency.LOCAL_MS
-    const leadMs = getHighlightLeadMs() + ReciterSync.highlightAdvanceMs(reciterId)
-    if (leadMs !== this.lastHighlightLeadMs) {
-      this.lastHighlightLeadMs = leadMs
-      this.highlightClock.acceptNextSample()
-    }
-    if (forcedMediaMs != null) return forcedMediaMs
-    return OutputLatency.highlightMs(
-      mediaPositionMs,
-      latencyMs,
-      leadMs,
-      firstWordStartMs,
-    )
   }
 
   private recomputeActive(ps: PlayerState) {
     const np = ps.nowPlaying
     if (!np || np.surahId !== this.state.content?.surah.id) {
+      highlightTimeline.state = null
+      if (this.highlightSync && !this.highlightSync.suspended)
+        this.highlightSync = suspendHighlight(this.highlightSync, performance.now() * 1e6)
       if (this.state.activeWord || this.state.activeAyah || this.state.activeBasmalah) {
         this.state = {
           ...this.state,
@@ -1352,24 +1367,21 @@ class AppStore {
     const prepared = this.ensurePrepared(np.ayah)
     const firstWordStartMs = prepared?.segments[0]?.startMs ?? 0
     const heardMs = OutputLatency.heardMs(ps.positionMs, OutputLatency.LOCAL_MS)
-    const rawMs = this.highlightPositionMs(
-      ps.positionMs,
-      forcedMs,
-      firstWordStartMs,
-      np.reciterId,
-    )
-    const mediaKey = `${np.surahId}:${np.ayah}:${np.reciterId}`
-    const highlightPositionMs = this.highlightClock.sample(mediaKey, rawMs)
-    if (mediaKey !== this.lastInkMediaKey) {
-      this.lastInkMediaKey = mediaKey
-    } else if (
-      this.lastInkClockMs >= 0 &&
-      highlightPositionMs + HighlightClock.SEEK_THRESHOLD_MS < this.lastInkClockMs
-    ) {
-      // Large backward jump within the same media item: word tap / scrub.
-      this.inkActivation++
+    const playerInk = ps.inkGeneration ?? 0
+    if (playerInk !== this.observedPlayerInk) {
+      this.observedPlayerInk = playerInk
+      if (forcedMs == null) this.inkActivation++
     }
-    this.lastInkClockMs = highlightPositionMs
+    const atNanos = performance.now() * 1e6
+    this.highlightSync = sampleHighlight(this.highlightSync, {
+      item: { surah: np.surahId, ayah: np.ayah, reciter: np.reciterId },
+      positionMs: Math.max(0, ps.positionMs), sampledAtNanos: atNanos,
+      isPlaying: ps.isPlaying, isBuffering: ps.isBuffering || ps.isPlaying && ps.advances === false, speed: ps.speed,
+      clockRevision: ps.clockRevision ?? 0, inkGeneration: playerInk,
+    }, { revision: this.timingRevision, timings: prepared ?? this.emptyTimings, voiceStartMs: firstWordStartMs },
+    { outputLagWallMs: 0, wordLeadMs: getHighlightLeadMs() + ReciterSync.highlightAdvanceMs(np.reciterId) })
+    highlightTimeline.state = this.highlightSync
+    const highlightPositionMs = highlightFrame(this.highlightSync, atNanos).inkMs
     if (this.state.inkActivation !== this.inkActivation) {
       this.state = { ...this.state, inkActivation: this.inkActivation }
     }

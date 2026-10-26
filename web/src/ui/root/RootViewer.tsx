@@ -1,6 +1,6 @@
 import { useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { facingPage, useBookSpread, useLooseSheetSlot } from '../paper/bookSpread'
+import { useBookSpread, useLooseSheetSlot } from '../paper/bookSpread'
 import { SHEET_LAY_SCHEDULE, playFlip } from '../paper/pageTurnSounds'
 import { appStore, useAppSelector, type RootViewerState } from '../../store/appStore'
 import { IconClose, IconVolumeUp } from '../icons/PlaybackIcons'
@@ -128,7 +128,7 @@ function ExplainedHeading({
 /**
  * Root lexicon. On a phone it is an ink bleed over the reader sheet. On the
  * desktop spread it is a loose sheet slid down from the head of the book
- * onto the page facing the word, which stays in sight beside it.
+ * onto the left page, from either leaf.
  */
 export function RootViewer() {
   const rv = useAppSelector((s) => s.rootViewer)
@@ -158,7 +158,7 @@ export function RootViewer() {
 
   if (!rv) return null
   return sheet
-    ? createPortal(<RootViewerBleed closing={closing} rv={rv} page={facingPage(rv.origin)} />, slot)
+    ? createPortal(<RootViewerBleed closing={closing} rv={rv} page="verso" />, slot)
     : <RootViewerBleed closing={closing} rv={rv} />
 }
 
@@ -173,22 +173,46 @@ function RootViewerBleed({
   page?: 'recto' | 'verso'
 }) {
   const rootRef = useRef<HTMLDivElement>(null)
+  const ownsFocus = useRef(false)
+  const returnFocus = useRef<Element | null>(null)
   useLayoutEffect(() => {
     const root = rootRef.current
     if (!root) return
-    const previous = document.activeElement
-    // The facing origin page stays readable; only paper under this leaf is covered.
+    // Strict Mode replays layout effects; preserve the first real origin.
+    returnFocus.current ??= document.activeElement
+    const previous = returnFocus.current
+    const { sheet: originSheet, readerOpenRevision: originRevision } =
+      appStore.getSnapshot()
+    // App owns desktop page/slot inertness across every stack transition.
+    // The phone bleed lives inside the reader, so only its siblings are covered.
     const covered: (Element | null)[] = page
-      ? [document.querySelector<HTMLElement>(page === 'verso' ? '.book-verso-leaf' : '.sheet[data-name="reader"]')]
-      : Array.from(root.parentElement?.children ?? []).filter((node) => node !== root)
-    if (page !== 'verso') covered.push(document.querySelector<HTMLElement>('#playback-pin'))
-    const saved = covered.filter((node): node is HTMLElement => node instanceof HTMLElement).map((node) => [node, node.inert] as const)
+      ? []
+      : Array.from(root.parentElement?.children ?? []).filter(
+          (node) => node !== root && !(node instanceof HTMLDialogElement),
+        )
+    if (page !== 'verso')
+      covered.push(document.querySelector<HTMLElement>('#playback-pin'))
+    const saved = covered
+      .filter((node): node is HTMLElement => node instanceof HTMLElement)
+      .map((node) => [node, node.inert] as const)
     for (const [node] of saved) node.inert = true
     root.focus({ preventScroll: true })
     return () => {
-      const restore = root.contains(document.activeElement)
+      const restore = ownsFocus.current
       for (const [node, inert] of saved) node.inert = inert
-      if (restore && previous instanceof HTMLElement && previous.isConnected && !previous.closest('[inert]')) previous.focus({ preventScroll: true })
+      // Wait for App to uncover the originating page in the same commit.
+      if (restore && previous instanceof HTMLElement) {
+        queueMicrotask(() => {
+          const current = appStore.getSnapshot()
+          if (
+            current.sheet === originSheet &&
+            current.readerOpenRevision === originRevision &&
+            document.activeElement === document.body &&
+            previous.isConnected &&
+            !previous.closest('[inert]')
+          ) previous.focus({ preventScroll: true })
+        })
+      }
     }
   }, [page])
   const sections = useMemo(() => rootOccurrenceSections(rv.occurrences), [rv.occurrences])
@@ -255,6 +279,15 @@ function RootViewerBleed({
       tabIndex={-1}
       role="region"
       aria-label="Word meanings"
+      onFocusCapture={() => { ownsFocus.current = true }}
+      onBlurCapture={event => {
+        // Removal/inertness can blur to no element before layout cleanup.
+        // A real move to another control relinquishes focus ownership.
+        if (
+          event.relatedTarget instanceof Node &&
+          !event.currentTarget.contains(event.relatedTarget)
+        ) ownsFocus.current = false
+      }}
       className={page ? 'ink-bleed root-sheet' : 'ink-bleed'}
       data-page={page}
       data-closing={closing ? 'true' : undefined}

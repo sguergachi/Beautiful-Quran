@@ -401,10 +401,24 @@ tween-vs-snap rules, sweep entry and residual rules, repeat wash timing, the
   The base/repeat wash position is never part of this modulation.
   [GLIMMER.md](GLIMMER.md) is the canonical cross-platform rendering,
   tuning, and visual-verification specification.
+- **Stream wait**: while the spinner is up, the whole page — the recited tail,
+  the due verse and the opening basmalah included — waits under Upcoming paper
+  (`ReaderScreen.kt` holds `STREAM_WAIT_RELEASE_HOLD_MS`). The *wait is the
+  buffering itself*, not a question of whether anything has been spoken
+  (user rule): the recited tail from before a pause or an earlier seek stays
+  lit only while playback goes on — the moment the download holds the voice,
+  it goes under the paper like the rest. Mid-recitation stalls and
+  item-boundary joins dim the lit words exactly as a fresh play does. The
+  fade is one synchronized action the moment buffering begins (no engage
+  delay), and releases only after `STREAM_WAIT_RELEASE_HOLD_MS` of a carried
+  voice, so a starving stream's brief ready windows cannot strobe the page
+  between download bursts.
+  Web parity: `data-stream-wait` CSS covers in `styles.css`.
 - **Basmalah preface**: `prefaceState(isActive, dimmed)` /
   `prefaceWashProgress(positionMs, durationMs, segments)` for the surah-header
   basmalah VectorDrawable (Active during the Al-Fatihah 1:1 lead-in clip, with
-  an RTL `letterFadeIn` wash; Upcoming while recessed; Plain at rest). With the
+  an RTL `letterFadeIn` wash; Upcoming while recessed; Plain at rest; `dimmed`
+  beats `isActive` so the stream wait covers the preface too). With the
   clip's word `segments` the wash is locked to the voice by
   [`BasmalahWash`](../app/src/main/java/com/beautifulquran/domain/BasmalahWash.kt):
   each of the four words owns the **band of artwork its glyphs cover** (the
@@ -439,7 +453,7 @@ tween-vs-snap rules, sweep entry and residual rules, repeat wash timing, the
   snapshot-backed (`mutableStateOf`), so release builds read constants while
   the Ink Lab can retune a live session.
 - **Sync knobs, deliberately outside `Tuning`**: `highlightLeadMs` (default 0),
-  `fadeLeadMs` (default 500), `scrollLeadMs` (default 400 — the camera's own
+  `fadeLeadMs` (default 500), `scrollLeadMs` (default 500 — the camera's own
   lead, deliberately separate from the ink's; see `FocusEngine.playbackFocusTarget`)
   and `outputLatencyOverrideMs` (null = use Media3’s presentation clock;
   a manual value adds wall-time delay, scaled to media time by playback speed). These move *when* things fire rather than how the ink feels, so they
@@ -549,11 +563,12 @@ tween-vs-snap rules, sweep entry and residual rules, repeat wash timing, the
   soon as the word is known, even before the pager names the leaf, so the
   letter wash is not stuck under a blanket Upcoming cover. The seed is not
   treated as voice arrival — that dropped the cover and swapped the pack off
-  Active, disposing the wash Animatable — and the poll must not restamp
-  `activation` for that same word, or `rememberLetterSweep` rearms from zero.
+  Active, disposing its captured wash. The UI activation remains pinned for
+  that tapped word; V2 separately tracks the actual player generation and
+  acknowledges the provisional window without inventing voice arrival.
   The Active pack belongs to the leaf that has the word, not to
   `pageOwnsVoice` / `waitingForVoice`: those both drop at play-start and
-  the `when` that swaps packs disposes the Animatable, which read as the
+  the `when` that swaps packs disposes its motion history, which read as the
   wash running for a beat then vanishing.
   The chapter-opening
   basmalah is part of
@@ -586,64 +601,33 @@ tween-vs-snap rules, sweep entry and residual rules, repeat wash timing, the
 
 ### The sweep lifecycle
 
-The letter sweep is the one piece of motion whose *lifecycle* is subtle enough to
-be worth stating, because three separate requirements pull against each other.
-It is owned by each `InkMotion` through `rememberInkMotions` /
-`rememberLetterSweep` (ReaderComponents.kt), with its decisions in pure,
-`InkEngineTest`-covered helpers.
+HighlightEngine V2 owns speech time. `rememberInkMotions` remains the single
+motion owner for scroll and mushaf, delegating to `HighlightMediaMotions`.
+`HighlightWash.transition` captures an occurrence window; drawing projects the
+shared `HighlightTimeline` through that window. The replaced speech-time
+`Animatable` owners (`rememberLetterSweep` and `rememberRepeatWash`) are gone.
 
-1. **The `Animatable` outlives `Active`.** `sweepMs` can floor a short hold up to
-   `minSweepFloorMs()` (`minSweepMs + highlightLeadMs`), so the wash may still
-   be running when the word turns Recited.
-   `finishResidual` (true *only* for Active→Recited) lets it finish rather than
-   snap. Leaving Active for Upcoming/Plain instead — a seek, a recess — abandons
-   the residual immediately, because finishing toward full ink and then dimming
-   back would flash. English-only prose waits for that predecessor residual
-   before starting the next word, so a wrap never blooms the last word of one
-   line and the first word of the next line together. Arabic modes keep their
-   voice-led handoff and wasl behavior unchanged.
-2. **A persistent `Animatable` means the next word inherits progress 1.** The
-   draw phase can read it before the effect's `snapTo(0f)` lands, which showed as
-   a one-frame full-ink flash. `sweepEntryAction(…)` classifies each composition
-   as `Arm` / `Keep` / `Clear`. On `Arm`, a **MutableState** `applied` flag is
-   set false in `SideEffect` so the draw phase shows 0; `LaunchedEffect`
-   `snapTo(0f)` then sets `applied` true so the wash can run. Unmasking must
-   be State-driven: `activeWord` only recomposes the tree **once per word**
-   (`distinctUntilChanged`). A composition-only Boolean captured in
-   `derivedStateOf` stayed true for the whole Active span and killed every
-   wash after the first word (the first often got a free extra recompose from
-   player startup). Re-Arm still remasks via `SideEffect` even when
-   `(active, activation)` keys match a prior pass. If Active ends before the
-   reset, the residual only rewinds from the idle full-ink ceiling
-   (`residualSweepAnchor`) — a mid-wash value is never snapped back to unread.
-3. **The entry snapshot must survive the entry.** Duration, curve, feather, and
-   wasl `revealStart` are captured at `Arm` and held for the whole sweep, so
-   retuning tajweed or speed mid-word cannot remap a half-finished wash (which
-   read as "resetting and playing again"). The residual needs that snapshot after
-   the word is no longer Active, which is why it lives in a tracker rather than
-   the effect's closure — committed in a `SideEffect`, never written during
-   composition. The captured curve is released only once the residual finishes:
-   it is what maps the linear clock to wash position, so dropping it mid-wash
-   would jump the edge. The wasl edge is latched the same way
-   (`effectiveRevealStart`) so Active→Recited cannot drop an already-bloomed
-   prefix back to unread for a frame.
+- Active entry captures duration, tajweed curve, feather, and wasl carry once.
+  Mid-word tuning cannot replay the wash. The minimum visual floor remains,
+  converted from wall milliseconds to media duration at entry speed.
+- Active→Recited retains that word's independent residual window; Upcoming or
+  Plain abandons it. Pauses and buffering freeze residuals as well as active ink.
+  Speed changes alter the shared media clock instead of restarting animation.
+- A tap is provisional until a matching player generation arrives. Its first
+  draw is zero, without waiting for an effect to snap an idle animation down.
+- A consecutive same-word repeat starts another orange occurrence. Base ink
+  remains laid; orange waits for the base edge. Repeats never form a queue.
+- English predecessor gating preserves a continuous prefix while each window
+  stays anchored to speech, so short words cannot accumulate queued delay.
+- Completed residuals stop observing frame updates at the next word boundary.
+  Repeat completion is observed as a structurally compared Boolean; frame
+  progress itself is read in drawing, avoiding frame-driven composition.
 
-A **wasl continuation** (`waslWashProgress` / `waslContinuationStart` /
-`continuedSweepProgress`) is the fourth case: the prior word's freed tail runs
-the first segment of this word's ordinary ink wash (same feather), and the
-sweep starts from the edge actually reached instead of 0. A donor too short
-for the wasl speed ceiling carries an unfinished edge into the active word
-rather than forcing its opening letter complete at handoff — see
-[TAJWEED_PACING.md](TAJWEED_PACING.md). Continued progress is applied inside
-`rememberLetterSweep` (not at each draw site) so residual and glint share one
-latched edge.
-
-**The plain clock.** Both the tajweed map and the wasl continuation are claims
-about where inside an Arabic *word* the time is going, so `LetterSweep` also
-publishes `plainProgress` — the same Animatable with neither applied — surfaced
-as `InkMotion.plainSweepProgress`. English never applies the Arabic letter map
-or wasl carry-in: either would park English ink where only an Arabic letter is
-held. The scrolling reader passes `pacing = null` to `rememberInkMotions`.
+Wasl still uses `waslWashProgress` / `waslContinuationStart` /
+`continuedSweepProgress`, the same captured feather, and the reached handoff
+edge. Its clock is now the outgoing occurrence's media window. `LetterSweep`
+also exposes `plainProgress` without the Arabic letter map or wasl carry;
+English never claims an Arabic held letter as its own pacing.
 
 **English leaf pacing.** `EnglishWashClock` receives the same calibrated,
 seek-aware media samples that select the Arabic word, without recomposing the
@@ -651,13 +635,11 @@ page on each tick. Each continuous English band lasts from its first Arabic
 owner until the next band's first occurrence, the first repeat, or
 the last spoken segment ends, whichever comes first. Re-says never extend the
 first wash: Alafasy's 24:1 “clear evidence” is fully laid when he returns to
-“and We revealed.” Like scroll ink, a single continuous linear animation runs
-from the calibrated media position at the playback speed to the known spoken
-end. Ordinary position polls never stop or restart it. Pause, buffering, speed,
-seek, source and output-correction changes re-anchor it to the media clock.
-Re-anchoring retains the last drawn frame within one performance, so a lagging
-pause/speed poll cannot lift ink. Long-run drift against the media clock has
-not been measured; the continuous clock still ignores ordinary position polls.
+“and We revealed.” `EnglishWashClock` is metadata projected through the same
+V2 display frame as Arabic ink. Every coherent position poll feeds correction
+back into the pure core. There is no second English anchor that can drift by
+ignoring ordinary polls. Pause/buffering freeze it; speed changes alter its
+slope; corrections retain laid ink within the same performance.
 The painted edge uses `EnglishLeafVerse.fragmentWashProgress`, interpolating
 between cached letter anchors. The exact integer mapping still places owned
 ranges and taps. Applying that integer mapping on each animation frame made

@@ -47,6 +47,8 @@ export interface Settings {
   reciterId: number
   /** Voices kept on Settings; Android starts with its original seven. */
   favoriteReciterIds: number[]
+  /** Chapters held at the top of Chapters, on the green band (Android parity). */
+  pinnedSurahIds: number[]
   fontScale: number
   readingMode: ReadingMode
   readingLayout: ReadingLayout
@@ -94,7 +96,8 @@ export interface Settings {
 const DEFAULTS: Settings = {
   reciterId: 1,
   favoriteReciterIds: [1, 2, 3, 4, 5, 6, 7],
-  fontScale: 1,
+  pinnedSurahIds: [],
+  fontScale: 0.95,
   readingMode: 'arabic_english',
   readingLayout: 'scroll',
   pagePresentation: 'facing',
@@ -133,13 +136,19 @@ function clampFontScale(value: unknown): number {
   return Math.min(FONT_SCALE_MAX, Math.max(FONT_SCALE_MIN, n))
 }
 
+/** A stored id list, unique positive integers only; a broken list falls back. */
+function cleanIds(value: unknown, fallback: number[]): number[] {
+  return Array.isArray(value)
+    ? [...new Set(value.filter((id) => Number.isInteger(id) && id > 0))]
+    : [...fallback]
+}
+
 export function normalizeSettings(partial: Partial<Settings> = {}): Settings {
   return {
     ...DEFAULTS,
     ...partial,
-    favoriteReciterIds: Array.isArray(partial.favoriteReciterIds)
-      ? [...new Set(partial.favoriteReciterIds.filter((id) => Number.isInteger(id) && id > 0))]
-      : [...DEFAULTS.favoriteReciterIds],
+    favoriteReciterIds: cleanIds(partial.favoriteReciterIds, DEFAULTS.favoriteReciterIds),
+    pinnedSurahIds: cleanIds(partial.pinnedSurahIds, DEFAULTS.pinnedSurahIds),
     fontScale: clampFontScale(partial.fontScale ?? DEFAULTS.fontScale),
     pagePresentation: partial.pagePresentation === 'single' ? 'single' : 'facing',
     lastReadSurah: Number.isInteger(partial.lastReadSurah) && partial.lastReadSurah! >= 1 && partial.lastReadSurah! <= 114

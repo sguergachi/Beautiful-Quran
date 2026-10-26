@@ -41,6 +41,12 @@ describe('favorite reciters', () => {
     expect(normalizeSettings({ favoriteReciterIds: '7' as never }).favoriteReciterIds).toEqual([1, 2, 3, 4, 5, 6, 7])
   })
 
+  it('starts with nothing pinned and cleans a stored pinned list the same way', () => {
+    expect(normalizeSettings().pinnedSurahIds).toEqual([])
+    expect(normalizeSettings({ pinnedSurahIds: [36, 36, 0, -2, 1.5, '18' as never, 18] }).pinnedSurahIds).toEqual([36, 18])
+    expect(normalizeSettings({ pinnedSurahIds: '18' as never }).pinnedSurahIds).toEqual([])
+  })
+
   it('gives each settings snapshot its own favorites array', () => {
     const settings = normalizeSettings()
     settings.favoriteReciterIds.length = 0

@@ -6,9 +6,14 @@ virtualenv.  They do not load an acoustic model or touch quran.db.
 """
 
 import math
+import sqlite3
+import json
+import tempfile
+from contextlib import redirect_stdout
+from io import StringIO
 from pathlib import Path
 from types import SimpleNamespace
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 import numpy as np
 import torch
@@ -18,10 +23,12 @@ from audit_forced_alignment import (
     blank_id_for,
     decode_waveform,
     forced_ctc_viterbi,
+    force_one,
     normalize_for_mms,
     normalize_for_model,
     occurrence_frame_evidence,
     target_labels,
+    main as audit_main,
 )
 
 
@@ -136,6 +143,92 @@ def test_ffmpeg_decoder_uses_complete_float_pcm():
     assert run.call_args.args[0][-1] == "pipe:1"
 
 
+def test_hypotheses_share_inference_but_keep_distinct_ctc_paths():
+    class Processor:
+        feature_extractor = SimpleNamespace(sampling_rate=16_000)
+        tokenizer = SimpleNamespace(pad_token_id=0, word_delimiter_token="|",
+                                    get_vocab=lambda: {"<pad>": 0, "ا": 1, "|": 2})
+
+        def __call__(self, waveform, **kwargs):
+            return SimpleNamespace(input_values=torch.zeros((1, len(waveform))))
+
+    logits = torch.stack([log_row(.05, .9, .05), log_row(.9, .05, .05),
+                          log_row(.05, .05, .9), log_row(.9, .05, .05),
+                          log_row(.05, .9, .05), log_row(.9, .05, .05)])
+    model = MagicMock(return_value=SimpleNamespace(logits=logits.unsqueeze(0)))
+    db = sqlite3.connect(":memory:")
+    db.executescript("""
+        CREATE TABLE words(surah_id, ayah_number, position, arabic);
+        CREATE TABLE timings(reciter_id, surah_id, ayah_number, segments);
+        INSERT INTO words VALUES(1,1,1,'ا');
+        INSERT INTO timings VALUES(1,1,1,'[[1,0,30],[1,30,60]]');
+    """)
+    cache = {}
+    kwargs = dict(db=db, processor=Processor(), model=model, device=torch.device("cpu"),
+                  qasr_root=Path("unused"), reciter_id=1, slug="fixture", surah=1, ayah=1,
+                  min_label_probability=.15, max_residual_ms=250, include_alignment=True)
+    with patch("audit_forced_alignment.audio_path", return_value=Path("fixture.mp3")), \
+         patch("audit_forced_alignment.sha256", return_value="a" * 64), \
+         patch("audit_forced_alignment.decode_waveform", return_value=np.zeros(960)) as decode:
+        repeated = force_one(**kwargs, emission_cache=cache)
+        db.execute("UPDATE timings SET segments='[[1,0,60]]'")
+        single = force_one(**kwargs, emission_cache=cache)
+        assert model.call_count == decode.call_count == 1
+        assert repeated["occurrenceCount"] == 2 and single["occurrenceCount"] == 1
+        assert repeated["viterbiLogProbabilityPerFrame"] != single["viterbiLogProbabilityPerFrame"]
+        assert single["words"][0]["labelFrames"]
+        uncached = force_one(**kwargs)
+        assert uncached == single
+        assert model.call_count == 2
+    db.close()
+
+
+def test_resume_preserves_selected_errors_without_retrying_recorded_rows():
+    def row(ayah, error=False):
+        return {
+            "schema": 1,
+            "kind": "ctc_fixed_sequence_audio_audit_error" if error else "ctc_fixed_sequence_audio_audit",
+            "reciterId": 1, "surahId": 1, "ayah": ayah,
+            **({"error": "FileNotFoundError: missing audio"} if error else {"reviewCount": 0}),
+        }
+
+    cases = [
+        ("all-success", [row(1), row(2)], [], 0, 0, 0),
+        ("recorded-error", [row(1, True), row(2)], [], 1, 0, 1),
+        ("mixed-new-success", [row(1, True)], [], 1, 1, 1),
+        ("unselected-error", [row(1), row(2, True)], ["--surah", "1", "--ayah", "1"], 0, 0, 0),
+        ("unselected-error-new-success", [row(2, True)], ["--surah", "1", "--ayah", "1"], 0, 1, 0),
+        ("error-outside-shard", [row(1, True), row(2)], ["--shard", "2/2"], 0, 0, 0),
+    ]
+    for name, reports, selection, expected_code, expected_new, expected_recorded_errors in cases:
+        with tempfile.TemporaryDirectory(prefix=f"forced-audit-{name}-") as temporary:
+            root = Path(temporary)
+            database, report = root / "timings.db", root / "audit.jsonl"
+            with sqlite3.connect(database) as db:
+                db.executescript("""
+                    CREATE TABLE reciters(id, slug, has_timings);
+                    CREATE TABLE timings(reciter_id, surah_id, ayah_number);
+                    INSERT INTO reciters VALUES(1, 'fixture', 1);
+                    INSERT INTO timings VALUES(1, 1, 1), (1, 1, 2);
+                """)
+            original = "".join(json.dumps(item) + "\n" for item in reports)
+            report.write_text(original)
+            output = StringIO()
+            with patch("audit_forced_alignment.load_model", return_value=(None, None, None)) as load, \
+                 patch("audit_forced_alignment.force_one", side_effect=lambda **kwargs: row(kwargs["ayah"])) as force, \
+                 redirect_stdout(output):
+                code = audit_main([
+                    "--db", str(database), "--reciter-id", "1", "--output", str(report), "--resume",
+                    *selection,
+                ])
+            assert code == expected_code, (name, output.getvalue())
+            assert force.call_count == expected_new, name
+            assert load.call_count == bool(expected_new), name
+            assert f"recorded_errors={expected_recorded_errors}" in output.getvalue(), name
+            assert report.read_text().startswith(original), name
+            assert len(report.read_text().splitlines()) == len(reports) + expected_new, name
+
+
 def main():
     test_normalization()
     test_target_keeps_repeated_occurrences()
@@ -146,6 +239,8 @@ def main():
     test_viterbi_requires_blank_between_duplicate_labels()
     test_occurrence_evidence_does_not_merge_repeated_words()
     test_ffmpeg_decoder_uses_complete_float_pcm()
+    test_hypotheses_share_inference_but_keep_distinct_ctc_paths()
+    test_resume_preserves_selected_errors_without_retrying_recorded_rows()
     print("all forced-alignment audit tests pass")
 
 

@@ -1,0 +1,118 @@
+{
+  "title": "Al-Baqarah 14 · Alafasy · Royal green · repeat",
+  "aspect": "1:1",
+  "app": {
+    "surah": 2,
+    "ayah": 14,
+    "reciter": "alafasy",
+    "theme": "Royal green",
+    "seconds": 69
+  },
+  "edit": [
+    {
+      "in": 0,
+      "out": 24.867
+    }
+  ],
+  "background": {
+    "id": "valley"
+  },
+  "phone": {
+    "height": 0.8
+  },
+  "props": {
+    "phone_y": 0.035
+  },
+  "tracks": {
+    "zoom": [
+      {
+        "t": 0,
+        "v": 2.5
+      },
+      {
+        "t": 2.6,
+        "v": 1,
+        "ease": "inOutCubic"
+      },
+      {
+        "t": 10.4,
+        "v": 1
+      },
+      {
+        "t": 11.9,
+        "v": 2.2,
+        "ease": "inOutCubic"
+      },
+      {
+        "t": 19.237,
+        "v": 2.2
+      },
+      {
+        "t": 20.463,
+        "v": 1,
+        "ease": "inOutCubic"
+      }
+    ],
+    "pan_x": [
+      {
+        "t": 0,
+        "v": 0.5
+      },
+      {
+        "t": 2.6,
+        "v": 0.5,
+        "ease": "inOutCubic"
+      },
+      {
+        "t": 10.4,
+        "v": 0.5
+      },
+      {
+        "t": 11.9,
+        "v": 0.5,
+        "ease": "inOutCubic"
+      },
+      {
+        "t": 19.237,
+        "v": 0.5
+      },
+      {
+        "t": 20.463,
+        "v": 0.5,
+        "ease": "inOutCubic"
+      }
+    ],
+    "pan_y": [
+      {
+        "t": 0,
+        "v": 0.307
+      },
+      {
+        "t": 2.6,
+        "v": 0.5,
+        "ease": "inOutCubic"
+      },
+      {
+        "t": 10.4,
+        "v": 0.5
+      },
+      {
+        "t": 11.9,
+        "v": 0.393,
+        "ease": "inOutCubic"
+      },
+      {
+        "t": 19.237,
+        "v": 0.393
+      },
+      {
+        "t": 20.463,
+        "v": 0.5,
+        "ease": "inOutCubic"
+      }
+    ]
+  },
+  "audio": {
+    "fade_out": 2
+  }
+}

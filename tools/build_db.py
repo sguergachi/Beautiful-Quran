@@ -227,7 +227,8 @@ QF_SOURCE_SHA256 = {
     7: "ee3d429dbdd9ab80e2310e9bf770cf7b7f4cbdc6cfe2a90257ef6072fa4010c0",
     9: "a145f59301feca42b727d43456368e1c7f2f87465325dd4104c863060c7eaeb2",
 }
-QF_TIMING_BASELINE_SHA256 = "3489bd89a91177d2701a2bbc3e8e414d957e308a539c6ec71122a568015f7c8d"
+# Pin the latest accepted private generation so refreshes retain earlier runtime repairs.
+QF_TIMING_BASELINE_SHA256 = "1d4fc496babe533ad28f5a8f46fd328e0b24588f25d85427949d18ddd530f673"
 QF_VERDICTS_FILE = ROOT / "tools/timing_verdicts/qf-source-transition.json"
 QF_RUNTIME_DELIVERY = "authenticated Content Sync runtime cache; no bundled QF timings"
 
@@ -1017,6 +1018,59 @@ def hand_lead_to_previous_word(segs, leads):
     return out
 
 
+LAG_SKIP_COVER = 0.5   # pre-skip occurrence heard as the skipped words
+LAG_PEER_COVER = 1 / 3  # "re-say" heard as later words, not its own
+
+
+def _covered_by(seg, repaired, positions):
+    """Fraction of ``seg`` that ``repaired`` assigns to ``positions``."""
+    start, end = seg[1], seg[2]
+    covered = sum(
+        max(0, min(end, r[2]) - max(start, r[1]))
+        for r in repaired
+        if r[0] in positions
+    )
+    return covered / (end - start) if end > start else 0.0
+
+
+def lagged_peer_positions(current, repaired):
+    """Same-word pairs that are qdc labels running one word late, not re-says.
+
+    qdc tiles gaplessly, so when it loses a word its labels can lag: the
+    second half of word p is labelled p again, each following label sits on
+    the next word's audio, and the run then jumps over the words it lost
+    (Alafasy 24:25 reads 1,1,2,5 where the recitation is 1,2,3,4,5). A repair
+    that supplies the skipped words witnesses the lag twice over — the
+    occurrence just before the jump is mostly heard as the skipped words, and
+    the "re-say" is largely heard as later words rather than as p — so the
+    pair must not be restored as a peer repeat. A genuine re-say flattened by
+    a repair is heard as p itself, and a missing word with no jump (trailing,
+    or never labelled) leaves no lag to witness.
+    """
+    present = {seg[0] for seg in current}
+    supplied = {seg[0] for seg in repaired} - present
+    lagged = set()
+    for i in range(len(current) - 1):
+        p = current[i][0]
+        if current[i + 1][0] != p:
+            continue
+        k = i + 2
+        while k < len(current) and current[k][0] == current[k - 1][0] + 1:
+            k += 1
+        if k >= len(current) or current[k][0] <= current[k - 1][0] + 1:
+            continue
+        skipped = set(range(current[k - 1][0] + 1, current[k][0]))
+        if not skipped <= supplied:
+            continue
+        later = {pos for pos in supplied | present if pos > p}
+        if (
+            _covered_by(current[k - 1], repaired, skipped) >= LAG_SKIP_COVER
+            and _covered_by(current[i + 1], repaired, later) >= LAG_PEER_COVER
+        ):
+            lagged.add(p)
+    return lagged
+
+
 def preserve_peer_repeats(current, repaired, unwitnessed=()):
     """Keep substantial same-word re-says while applying unrelated repairs.
 
@@ -1025,8 +1079,11 @@ def preserve_peer_repeats(current, repaired, unwitnessed=()):
     occurrences, then restore only the unmatched peer utterances. Split
     fragments are deliberately excluded because the cleaner owns those, and so
     are ``unwitnessed`` positions — the pairs an independent aligner has
-    positively identified as false leads (see [false_same_position_leads]).
+    positively identified as false leads (see [false_same_position_leads]) —
+    and pairs the repair itself shows to be lagged qdc labels
+    (see [lagged_peer_positions]).
     """
+    unwitnessed = set(unwitnessed) | lagged_peer_positions(current, repaired)
     peer_positions = {
         current[i][0]
         for i in range(len(current) - 1)
@@ -2027,6 +2084,49 @@ def discard_false_same_position_lead(segs, position, requires_audio_verdict=Fals
     ]
 
 
+def discard_unspoken_rewind_onset(segs, source_window, requires_audio_verdict=False):
+    """Remove an audio-proven false label before a rewind, on its exact clock.
+
+    Substantial pre-rewind labels may be spoken words. Only a reviewed source
+    window can authorize removal; ordinary cleaning keeps its short-word floor.
+    The previous word retains the interval and the later real occurrence stays.
+    """
+    if not requires_audio_verdict:
+        raise ValueError("discard_unspoken_rewind_onset requires an audio verdict")
+    if len(source_window) != 3:
+        raise ValueError("discard_unspoken_rewind_onset needs a three-segment source window")
+    matches = [i for i in range(1, len(segs) - 1) if segs[i - 1:i + 2] == source_window]
+    if len(matches) != 1:
+        raise ValueError("discard_unspoken_rewind_onset source window changed or is ambiguous")
+    i = matches[0]
+    position = segs[i][0]
+    if (position != segs[i - 1][0] + 1 or
+            position <= max(seg[0] for seg in segs[:i]) or
+            segs[i + 1][0] >= position or
+            not any(seg[0] == position for seg in segs[i + 2:])):
+        raise ValueError("discard_unspoken_rewind_onset needs a new word before a rewind, recited later")
+    out = [list(seg) for seg in segs]
+    out[i - 1][2] = max(out[i - 1][2], out[i][2])
+    del out[i]
+    return out
+
+
+def merge_verified_word_split(segs, source_pair, requires_audio_verdict=False):
+    """Join one reviewed held word without merging other substantial peers."""
+    if not requires_audio_verdict:
+        raise ValueError("merge_verified_word_split requires an audio verdict")
+    if (len(source_pair) != 2 or source_pair[0][0] != source_pair[1][0]
+            or source_pair[0][2] != source_pair[1][1]):
+        raise ValueError("merge_verified_word_split needs a contiguous same-word source pair")
+    matches = [i for i in range(len(segs) - 1) if segs[i:i + 2] == source_pair]
+    if len(matches) != 1:
+        raise ValueError("merge_verified_word_split source pair changed or is ambiguous")
+    i = matches[0]
+    return [*[list(seg) for seg in segs[:i]],
+            [segs[i][0], segs[i][1], segs[i + 1][2]],
+            *[list(seg) for seg in segs[i + 2:]]]
+
+
 def restore_flattened_resay(
     segs,
     position,
@@ -2093,8 +2193,12 @@ def apply_timing_corrections(
     corrections_dir=CORRECTIONS_DIR,
     only_reciter_ids=None,
     source_profile="legacy",
+    phase="before_repairs",
 ):
     """Apply narrow typed verdicts that cannot be inferred from row topology."""
+    phases = {"before_repairs", "after_repairs"}
+    if phase not in phases:
+        raise ValueError(f"unknown timing correction phase {phase!r}")
     by_key = {
         (rid, sid, ay): json.loads(segs) if isinstance(segs, str) else segs
         for rid, sid, ay, segs in timing_rows
@@ -2108,6 +2212,11 @@ def apply_timing_corrections(
             print(f"  !! cannot parse correction {path.name}: {e}", file=sys.stderr)
             sys.exit(1)
         for edit in payload.get("edits") or []:
+            edit_phase = edit.get("phase", "before_repairs")
+            if edit_phase not in phases:
+                raise SystemExit(f"correction {path.name}: unknown phase {edit_phase!r}")
+            if edit_phase != phase:
+                continue
             key = (
                 int(edit["reciterId"]),
                 int(edit["surahId"]),
@@ -2145,6 +2254,14 @@ def apply_timing_corrections(
                         edit["sourcePair"],
                         bool(edit.get("requiresAudioVerdict")),
                     )
+                elif op == "discard_unspoken_rewind_onset":
+                    by_key[key] = discard_unspoken_rewind_onset(
+                        by_key[key], edit["sourceWindow"], bool(edit.get("requiresAudioVerdict"))
+                    )
+                elif op == "merge_verified_word_split":
+                    by_key[key] = merge_verified_word_split(
+                        by_key[key], edit["sourcePair"], bool(edit.get("requiresAudioVerdict"))
+                    )
                 else:
                     raise ValueError(f"unknown op {op!r}")
             except ValueError as e:
@@ -2154,7 +2271,7 @@ def apply_timing_corrections(
                 )
                 sys.exit(1)
             applied += 1
-    print(f"  typed corrections: {applied} verdict(s) across {len(files)} file(s)")
+    print(f"  typed corrections ({phase}): {applied} verdict(s) across {len(files)} file(s)")
     return [
         (rid, sid, ay, json.dumps(segs, separators=(",", ":")))
         for (rid, sid, ay), segs in sorted(by_key.items())
@@ -3117,10 +3234,21 @@ def authenticated_evidence_problem(change):
                 (not finite(model.get("newOccurrenceMinLabelProbability")) or
                  not 0.5 <= model["newOccurrenceMinLabelProbability"] <= 1)) for model in models):
             return "topology preference or new-occurrence confidence is insufficient"
-        if has_removed_occurrence and any(
-                not finite(model.get("removedOccurrenceMaxLabelProbability")) or
-                not 0 <= model["removedOccurrenceMaxLabelProbability"] < 0.5 for model in models):
-            return "a removed occurrence is heard or lacks baseline confidence on either model"
+        if has_removed_occurrence:
+            from word_split_evidence import ownership_problem
+
+            for model in models:
+                confidence = model.get("removedOccurrenceMaxLabelProbability")
+                if not finite(confidence) or not 0 <= confidence <= 1:
+                    return "a removed occurrence is heard or lacks baseline confidence on either model"
+                if confidence < 0.5:
+                    continue
+                # A label ordinal can disappear while its confident phonetic
+                # frames remain in the candidate's held word/adjacent speech.
+                # The proof permits only an exact flush same-word merge; all
+                # other removals keep the original symmetric confidence gate.
+                if ownership_problem(before["segments"], after["segments"], model) is not None:
+                    return "a removed occurrence is heard or lacks baseline confidence on either model"
     elif (all(old[1] == new[1] for old, new in zip(before["segments"], after["segments"])) or
           any(not finite(model.get(field)) or model[field] < 0
               for model in models for field in ("baselineResidualMs", "candidateResidualMs")) or
@@ -3530,6 +3658,12 @@ def main(argv=None):
                 print(f"[audit] {len(refitted)} displaced row(s) re-anchored on the voice")
                 for rid, sid, ay in refitted:
                     print(f"    re-anchored: reciter {rid} {sid}:{ay}")
+        if include_qdc_timings:
+            # Reviewed held-word merges run after peer protection, preserving
+            # repaired neighbour boundaries without weakening that protection.
+            timing_rows = apply_timing_corrections(
+                timing_rows, source_profile=source_profile, phase="after_repairs"
+            )
         print("[timing finalizer] completing coverage and enforcing file physics")
         timing_rows, audio_onsets = finalize_timing_rows(
             timing_rows,

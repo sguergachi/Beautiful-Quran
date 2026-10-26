@@ -1,0 +1,118 @@
+{
+  "title": "Al-Baqarah 16 · Hani · Nightfall · repeat + tarji",
+  "aspect": "9:16",
+  "app": {
+    "surah": 2,
+    "ayah": 16,
+    "reciter": "hani",
+    "theme": "Nightfall",
+    "seconds": 25
+  },
+  "edit": [
+    {
+      "in": 0.0,
+      "out": 23.0
+    }
+  ],
+  "background": {
+    "id": "rain-glass"
+  },
+  "phone": {
+    "height": 0.78
+  },
+  "props": {
+    "bg_brightness": 0.03
+  },
+  "tracks": {
+    "zoom": [
+      {
+        "t": 0,
+        "v": 1.3
+      },
+      {
+        "t": 3.5,
+        "v": 1.0,
+        "ease": "inOutSine"
+      },
+      {
+        "t": 10.8,
+        "v": 1.0
+      },
+      {
+        "t": 12.0,
+        "v": 1.3,
+        "ease": "inOutCubic"
+      },
+      {
+        "t": 19.4,
+        "v": 1.3
+      },
+      {
+        "t": 20.4,
+        "v": 1.0,
+        "ease": "inOutCubic"
+      }
+    ],
+    "pan_x": [
+      {
+        "t": 0,
+        "v": 0.5
+      },
+      {
+        "t": 3.5,
+        "v": 0.5,
+        "ease": "inOutSine"
+      },
+      {
+        "t": 10.8,
+        "v": 0.5
+      },
+      {
+        "t": 12.0,
+        "v": 0.5,
+        "ease": "inOutCubic"
+      },
+      {
+        "t": 19.4,
+        "v": 0.5
+      },
+      {
+        "t": 20.4,
+        "v": 0.5,
+        "ease": "inOutCubic"
+      }
+    ],
+    "pan_y": [
+      {
+        "t": 0,
+        "v": 0.3509
+      },
+      {
+        "t": 3.5,
+        "v": 0.5,
+        "ease": "inOutSine"
+      },
+      {
+        "t": 10.8,
+        "v": 0.5
+      },
+      {
+        "t": 12.0,
+        "v": 0.3658,
+        "ease": "inOutCubic"
+      },
+      {
+        "t": 19.4,
+        "v": 0.3658
+      },
+      {
+        "t": 20.4,
+        "v": 0.5,
+        "ease": "inOutCubic"
+      }
+    ]
+  },
+  "audio": {
+    "fade_out": 2.0
+  }
+}

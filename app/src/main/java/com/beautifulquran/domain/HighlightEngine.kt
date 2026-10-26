@@ -55,9 +55,15 @@ object HighlightEngine {
         private val infoByIndex: Array<ActiveInfo>,
     ) {
         fun activeInfo(positionMs: Long): ActiveInfo? {
-            val idx = activeIndex(segments, positionMs) ?: return null
+            val idx = activeOccurrence(positionMs) ?: return null
             return infoByIndex[idx]
         }
+
+        /** Stable occurrence identity, including consecutive re-says of the same word. */
+        internal fun activeOccurrence(positionMs: Long): Int? = activeIndex(segments, positionMs)
+
+        /** Metadata from the same lookup used to select an occurrence. */
+        internal fun infoAtOccurrence(index: Int): ActiveInfo = infoByIndex[index]
 
         companion object {
             fun prepare(segments: List<Segment>): PreparedTimings {

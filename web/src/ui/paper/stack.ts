@@ -49,6 +49,15 @@ export function settingsLayerFor(hasReader: boolean): StackLayer {
   return hasReader ? SETTINGS_LAYER : READER_LAYER
 }
 
+/** Settings keeps the paper it was opened over, including Chapters. */
+export function underlyingLayer(
+  stack: StackLayer,
+  hasReader: boolean,
+  settingsOrigin: StackLayer,
+): StackLayer {
+  return stack === settingsLayerFor(hasReader) ? settingsOrigin : stack
+}
+
 export function sheetAtLayer(
   layer: StackLayer,
   hasReader: boolean,

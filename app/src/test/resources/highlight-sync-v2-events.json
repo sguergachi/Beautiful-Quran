@@ -1,0 +1,40 @@
+{
+  "schemaVersion": 1,
+  "cases": [
+    {
+      "name": "pause buffer speed seek and stale confirmation",
+      "segments": [[1,0,1000],[2,1000,2000]],
+      "events": [
+        {"at":0,"raw":0,"ink":0,"word":1,"occurrence":0,"phase":"Speaking"},
+        {"at":400,"raw":400,"playing":false,"frameAt":900,"ink":400,"word":1,"occurrence":0,"phase":"Paused"},
+        {"at":900,"raw":400,"speed":2,"frameAt":1000,"ink":600,"word":1,"occurrence":0,"phase":"Speaking"},
+        {"at":1000,"raw":600,"speed":2,"buffering":true,"frameAt":1400,"ink":600,"word":1,"occurrence":0,"phase":"Buffering"},
+        {"at":1400,"raw":600,"speed":2,"frameAt":1500,"ink":800,"word":1,"occurrence":0,"phase":"Speaking"},
+        {"at":1500,"raw":100,"clock":1,"generation":1,"ink":100,"word":1,"occurrence":0,"phase":"Speaking"},
+        {"at":1510,"raw":9000,"ink":110,"word":1,"occurrence":0,"phase":"Speaking"},
+        {"at":1520,"raw":120,"clock":1,"generation":1,"playing":false,"ink":120,"word":1,"occurrence":0,"phase":"Paused"},
+        {"at":1530,"raw":120,"clock":1,"generation":1,"playing":false,"revision":2,"empty":true,"ink":120,"word":null,"occurrence":null,"phase":"MissingTimings"},
+        {"at":1540,"raw":120,"clock":1,"generation":1,"playing":false,"revision":3,"ink":120,"word":1,"occurrence":0,"phase":"Paused"}
+      ]
+    },
+    {
+      "name": "media projection precedes opening calibration",
+      "segments": [[1,0,1000],[2,1100,2000]],
+      "voice":300,"lag":101,"lead":100,
+      "events": [
+        {"at":0,"raw":200,"speed":1.5,"frameAt":200,"ink":398,"word":1,"occurrence":0,"phase":"Speaking"},
+        {"at":300,"raw":650,"speed":1.5,"playing":false,"frameAt":900,"ink":599,"word":1,"occurrence":0,"phase":"Paused"}
+      ]
+    },
+    {
+      "name": "consecutive same-word occurrences remain distinct through completion",
+      "segments": [[1,0,100],[1,100,200],[2,200,500]],
+      "events": [
+        {"at":50,"raw":50,"ink":50,"word":1,"occurrence":0,"phase":"Speaking"},
+        {"at":100,"raw":100,"ink":100,"word":1,"occurrence":1,"phase":"Speaking"},
+        {"at":200,"raw":200,"ink":200,"word":2,"occurrence":2,"phase":"Speaking"},
+        {"at":500,"raw":500,"ink":500,"word":null,"occurrence":null,"phase":"Completed"}
+      ]
+    }
+  ]
+}

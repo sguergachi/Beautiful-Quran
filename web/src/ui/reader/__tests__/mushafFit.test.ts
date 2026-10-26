@@ -4,6 +4,7 @@ import {
   MUSHAF_MIN_GAP,
   mushafFit,
   mushafLeafFit,
+  mushafLineGaps,
   mushafMeasure,
   naturalLineWidth,
   solveLine,
@@ -53,8 +54,14 @@ describe('measure', () => {
     expect(500 * fit).toBeLessThanOrEqual(600)
     // The line pitch only allows 5% more: stop there, block drawn in instead.
     expect(mushafLeafFit(600, 500, 1.05)).toBe(1.05)
-    // A pitch too tight for even the base size never shrinks a line that fits.
-    expect(mushafLeafFit(600, 500, 0.8)).toBe(1)
+    // The type must fit the reserved well even when width alone permits it.
+    expect(mushafLeafFit(600, 500, 0.8)).toBe(0.8)
+  })
+
+  it('fits both dimensions in a short window, including the opening leaves', () => {
+    expect(mushafLeafFit(400, 500, 0.6)).toBe(0.6)
+    expect(mushafLeafFit(500, 0, 0.6)).toBe(0.6)
+    expect(mushafLeafFit(400, 500, 1.2)).toBeCloseTo(0.792)
   })
 
   it('is neutral with nothing to measure', () => {
@@ -120,5 +127,33 @@ describe('solveLine', () => {
     expect(solveLine(300, 0, 600, em, 0.06)).toEqual({ widen: 1, short: false })
     expect(solveLine(0, 4, 600, em, 0.06)).toEqual({ widen: 1, short: false })
     expect(solveLine(300, 4, 0, em, 0.06)).toEqual({ widen: 1, short: false })
+  })
+})
+
+describe('verse-mark spacing', () => {
+  it('keeps opening marks closer than words at an ordinary word space', () => {
+    const { wordGap, markGap } = mushafLineGaps([false, false, true, true], 30, undefined, MUSHAF_MIN_GAP)
+    expect(wordGap).toBeCloseTo(6.6)
+    expect(markGap).toBeCloseTo(5.61)
+  })
+
+  it('softens sparse mark joins while spending all the line white', () => {
+    const joins = [false, true, true, false, true]
+    const { wordGap, markGap } = mushafLineGaps(joins, 20, 80)
+    expect(markGap).toBeLessThan(80 / joins.length)
+    expect(wordGap * 2 + markGap * 3).toBeCloseTo(80)
+    expect(markGap).toBeLessThan(wordGap * 0.85)
+  })
+
+  it('balances dense lines, all-mark joins and lines without verse marks', () => {
+    for (const joins of [[false, true, true], [true, true], [false, false]]) {
+      for (const space of [0, 5, 20, 100]) {
+        const gaps = mushafLineGaps(joins, 20, space)
+        expect(gaps.wordGap).toBeGreaterThanOrEqual(0)
+        expect(gaps.markGap).toBeGreaterThanOrEqual(0)
+        expect(joins.reduce((sum, mark) => sum + (mark ? gaps.markGap : gaps.wordGap), 0)).toBeCloseTo(space)
+      }
+    }
+    expect(mushafLineGaps([], 20)).toEqual({ wordGap: 6, markGap: 5.1 })
   })
 })

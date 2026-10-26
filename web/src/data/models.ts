@@ -96,6 +96,9 @@ export interface ActiveWord {
   ayah: number
   wordPosition: number
   durationMs: number
+  /** Source-clock utterance start and voiced duration (before the breath gap). */
+  startMs?: number
+  spokenMs?: number
   isRepeat: boolean
   highWater: number
   repeatStart: number

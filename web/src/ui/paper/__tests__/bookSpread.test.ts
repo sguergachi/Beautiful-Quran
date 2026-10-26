@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { CHAPTERS_PLACE, bookRightShare, bookmarkSwipeDestination, closesBook, facingPage, turnMs, leavesReader, readerVisible, spreadLayers, bookPiles, bookRest, forgetBookRest, restBook } from '../bookSpread'
+import { CHAPTERS_PLACE, bookRightShare, bookmarkSwipeDestination, closesBook, turnMs, leavesReader, readerVisible, spreadLayers, bookPiles, bookRest, forgetBookRest, restBook } from '../bookSpread'
 import { BOOKMARKS_LAYER, COVER_LAYER, READER_LAYER, SETTINGS_LAYER } from '../stack'
 
 describe('spreadLayers', () => {
@@ -13,9 +13,9 @@ describe('spreadLayers', () => {
     expect(spreadLayers(true, COVER_LAYER, true)).toEqual({ home: COVER_LAYER, reader: READER_LAYER })
   })
 
-  it('lays Bookmarks over Chapters and Settings over the chapter', () => {
+  it('keeps the right page mounted while an overlay owns the keys', () => {
     expect(spreadLayers(true, BOOKMARKS_LAYER, true)).toEqual({ home: BOOKMARKS_LAYER, reader: READER_LAYER })
-    // Chapters stays in reach beside Settings; the covered chapter is no longer on top.
+    // Chapters stays mounted beneath Settings; only Settings owns the keys.
     expect(spreadLayers(true, SETTINGS_LAYER, true)).toEqual({ home: COVER_LAYER, reader: SETTINGS_LAYER })
   })
 
@@ -29,12 +29,24 @@ describe('spreadLayers', () => {
   })
 
   it('keeps Chapters on top beside Settings before a chapter is opened', () => {
-    // Layer 1 is Settings here, laid over the title page on the right.
+    // Layer 1 is Settings here, laid over Chapters on the left.
     expect(spreadLayers(true, READER_LAYER, false)).toEqual({ home: COVER_LAYER, reader: READER_LAYER })
+  })
+
+  it('retains the left page Settings was opened over', () => {
+    expect(spreadLayers(true, SETTINGS_LAYER, true, true, COVER_LAYER)).toEqual({ home: COVER_LAYER, reader: SETTINGS_LAYER })
+    expect(spreadLayers(true, SETTINGS_LAYER, true, true, READER_LAYER)).toEqual({ home: READER_LAYER, reader: SETTINGS_LAYER })
+    expect(spreadLayers(true, SETTINGS_LAYER, true, false, BOOKMARKS_LAYER)).toEqual({ home: BOOKMARKS_LAYER, reader: SETTINGS_LAYER })
   })
 })
 
 describe('visible reader navigation', () => {
+  it('leaves the Mushaf reader when Chapters or Bookmarks faces blank paper', () => {
+    for (const layer of [COVER_LAYER, BOOKMARKS_LAYER] as const) {
+      expect(readerVisible(true, layer, true, true)).toBe(false)
+      expect(leavesReader(true, READER_LAYER, layer, true, true)).toBe(true)
+    }
+  })
   it('keeps gather on the desktop reader beside Chapters and Bookmarks', () => {
     for (const layer of [COVER_LAYER, BOOKMARKS_LAYER, READER_LAYER] as const) {
       expect(readerVisible(true, layer, true)).toBe(true)
@@ -76,13 +88,6 @@ describe('closing the book', () => {
     expect(closesBook(COVER_LAYER, 80)).toBe(false)
     expect(closesBook(READER_LAYER, -80)).toBe(false)
     expect(closesBook(BOOKMARKS_LAYER, -80)).toBe(false)
-  })
-})
-
-describe('a loose sheet', () => {
-  it('lies on the page facing the word, never over it', () => {
-    expect(facingPage('recto')).toBe('verso')
-    expect(facingPage('verso')).toBe('recto')
   })
 })
 

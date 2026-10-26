@@ -16,6 +16,9 @@ export function useVerseRoute(ready: boolean, place: AyahRef | null, revision: n
       const state = appStore.getSnapshot()
       const target = parseVerseHash(location.hash, (id) => state.surahs.find((surah) => surah.id === id)?.ayahCount)
       if (!target && location.hash !== '') return
+      // History navigation leaves the word sheet and must not resume its old
+      // playback snapshot over the arriving page.
+      if (state.rootViewer) appStore.closeRootViewer(false)
       player.pause()
       if (state.gathering) appStore.exitGather()
       if (target) {

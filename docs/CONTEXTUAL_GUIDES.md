@@ -4,6 +4,10 @@ Contextual guides teach a feature by letting the reader use that feature in
 place. They are a temporary change in the ink on the current paper, not a new
 sheet, dialog, card, tooltip, or modal layer.
 
+The web reader has no persistent word-hold/share hint strip or “Got it” line
+under its top bar. Word and verse actions stay discoverable through Reading
+help in Settings; do not add that tooltip back over the scripture.
+
 ## The contract
 
 The spotlighted feature is real and interactive. A guide that says “Tap, or
@@ -146,6 +150,15 @@ For the existing lessons, the acceptance actions are:
   inline note editor opens focused. A short tap does not unbookmark it.
 - Ayah rail: tap the spotlighted collapsed rail, or drag it vertically; the
   guide withdraws as the real scrub wheel blooms.
+- Pin a chapter (Chapters sheet): with nothing pinned, the lesson opens around
+  the fully visible row of the chapter being read. Press and hold that row
+  while the guide is up; the row fills evenly, and holding it full pins it
+  (haptic tick) and completes the lesson (pinning any row does). Releasing
+  early drains the fill and leaves the guide up. **Got it**, Back, scrolling
+  the list, or leaving Chapters by any route only dismiss; it never opens
+  mid-scroll. Paper-stack swipes stay
+  blocked while the guide is visible or closing
+  (`onInkOverlayVisibilityChange`).
 
 ## Common failures
 
@@ -170,6 +183,8 @@ For the existing lessons, the acceptance actions are:
   boundary, and dismiss action.
 - `ui/reader/BookmarkNoteTip.kt` — target-relative bookmark lesson.
 - `ui/reader/AyahRailTip.kt` — configurable left/right rail lesson.
+- `ui/home/PinChapterTip.kt` — Chapters pinning lesson; its trigger, success
+  and dismissals live in `ui/home/HomeScreen.kt`.
 - `ui/reader/ReaderScreen.kt` — trigger ownership, real target callbacks,
   completion persistence, Back/scroll dismissal, and overlay lifecycle.
 

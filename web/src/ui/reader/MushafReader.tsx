@@ -1,3 +1,5 @@
+import { WordMotionProvider } from '../../render/WordMotionContext'
+import type { WordMotion } from '../../render/useWordWash'
 import { suppliedWords } from '../../render/suppliedWords'
 import {
   Fragment,
@@ -9,7 +11,6 @@ import {
   useRef,
   useState,
   type CSSProperties,
-  type ReactNode,
   type Ref,
 } from 'react'
 import { createPortal } from 'react-dom'
@@ -38,29 +39,32 @@ import {
   useTurningLeafSlot,
   useVersoLeafSlot,
 } from '../paper/bookSpread'
-import { COVER_LAYER, READER_LAYER } from '../paper/stack'
+import { COVER_LAYER, READER_LAYER, underlyingLayer } from '../paper/stack'
 import { LeafPicture, TurningLeaf } from './TurningLeaf'
 import { finishPageTurn, requestPageTurn, type PageTurnQueue } from './pageTurnQueue'
 import {
   MUSHAF_MAX_CONDENSE,
   MUSHAF_MIN_LEADING,
+  MUSHAF_MIN_GAP,
   mushafFit,
   mushafLeafFit,
+  mushafLineGaps,
   mushafMeasure,
   naturalLineWidth,
   solveLine,
 } from './mushafFit'
 import { mushafLeafModel } from './mushafLeafModel'
+import { MushafChapterBand } from './MushafChapterBand'
+import { BASMALAH_UTHMANI } from '../../domain/Basmalah'
 import { pileTurnSchedule, playFlip, warmPageTurnSounds } from '../paper/pageTurnSounds'
 import { clearPagePictures, hasPagePicture, warmPageTurn } from '../paper/pageTurn'
 import { InkEngine, InkState, getTuning, type InkWord } from './InkEngine'
-import { MUSHAF_INK_IDLE, MUSHAF_STILL_INK, mushafMarkWaits, mushafTokenInk, type MushafInk } from './mushafInk'
+import { MUSHAF_STILL_INK, mushafMarkWaits, mushafTokenInk, type MushafInk } from './mushafInk'
 import { pageReadingPlace, type MushafToken } from '../../domain/mushafPage'
 import type { AyahRef } from '../../share/gather'
 import { HafsWord } from '../../render/HafsWord'
 import { BASMALAH_PLAYLIST_AYAH } from '../../domain/Basmalah'
 import { createWheelTurn, isSidewaysWheel } from './wheelTurn'
-import { RepeatWashGateProvider } from '../../render/RepeatWashContext'
 
 /** The share of the block between two pages: the pile a turn between them carries. */
 function pileBetween(from: number, to: number): number {
@@ -207,6 +211,9 @@ export function MushafReader({
   }, [ready, searchTarget])
 
   const stackLayer = useAppSelector((state) => state.stackLayer)
+  const bookLayer = useAppSelector((state) =>
+    underlyingLayer(state.stackLayer, state.content != null, state.settingsOrigin),
+  )
   const turn = (delta: number) => {
     // The leaves under Chapters are not being read.
     if (spread && stackLayer <= COVER_LAYER) return
@@ -315,7 +322,7 @@ export function MushafReader({
   // first page: while it shows, the book is open there, and the place being
   // read is kept for the way back. Going to Chapters turns every leaf read
   // back onto the left, and coming away turns the leaves before the place.
-  const atChapters = facing && stackLayer <= COVER_LAYER
+  const atChapters = facing && bookLayer <= COVER_LAYER
   const shown = atChapters ? CHAPTERS_PLACE : place
   // A reader is built anew for each chapter, but the book was already
   // somewhere: it starts there and turns what lies between (bookRest).
@@ -348,7 +355,7 @@ export function MushafReader({
     return pageHoldsVoice(pair.right, activeSurahId, voice) ||
       pageHoldsVoice(pair.left, activeSurahId, voice)
   }
-  const leafProps = { fitRevision, activeSurahId, activeAyah, english, pageNumberScript, glyphWiden, ink, onPlayWord, onHoldWord, onTurn: turn, onFit: reportFit }
+  const leafProps = { fitRevision, facing, activeSurahId, activeAyah, english, pageNumberScript, glyphWiden, ink, onPlayWord, onHoldWord, onTurn: turn, onFit: reportFit }
   // Nothing turns under a sheet laid over the leaves (Settings, the word
   // viewer): a leaf in the air would cross it. Under Chapters the leaves do
   // turn, since that is how the book gets there. A phone has one sheet, and
@@ -421,7 +428,7 @@ export function MushafReader({
   }, [motion, reset, endTurn])
 
   const turning = motion != null && !reset
-  const settled = reset ? place : queue.settled
+  const settled = reset ? shown : queue.settled
   useEffect(() => {
     if (!ready || turning || covered || atChapters) return
     const pages = facing ? [settled, settled + 1] : [settled]
@@ -622,7 +629,7 @@ export function MushafReader({
   const versoPage = turning && !forward ? was.left : now.left
   const live = leafLive(rectoPage)
   return (
-    <>
+    <WordMotionProvider>
       <MushafLeaf page={rectoPage} side="recto" fit={turning && forward ? motion.fromFit : fit} leafRef={rectoRef} {...leafProps}
         live={live} onFit={turning ? noFit : reportFit} />
       {probes}
@@ -673,49 +680,11 @@ export function MushafReader({
             turnSlot,
           )
         : null}
-    </>
+    </WordMotionProvider>
   )
 }
 
 function noFit() {}
-
-/**
- * The book's first page on the spread before any chapter is chosen: Chapters
- * stands at the start of the book, and the page opposite it is always the
- * first. A word on it opens its chapter there. [fallback] stands in until
- * the page map has arrived.
- */
-export function MushafStartLeaf({ fallback }: { fallback: ReactNode }) {
-  const settings = useAppSelector((state) => state.settings)
-  const [ready, setReady] = useState(() => runtimeMushafCache?.layoutReady() ?? false)
-  useEffect(() => {
-    if (!runtimeMushafCache) return
-    return runtimeMushafCache.subscribe(() => setReady(runtimeMushafCache.layoutReady()))
-  }, [])
-  const [fit, setFit] = useState(1)
-  const reportFit = useCallback((_: number, next: number) => {
-    setFit((current) => (Math.abs(current - next) < 0.002 ? current : next))
-  }, [])
-  if (!ready || !runtimeMushafCache) return <>{fallback}</>
-  return (
-    <MushafLeaf
-      page={CHAPTERS_PLACE}
-      side="recto"
-      fit={fit}
-      fitRevision={0}
-      activeSurahId={1}
-      activeAyah={null}
-      english={settings.readingMode === 'english_only'}
-      pageNumberScript={settings.pageNumberScript}
-      glyphWiden={settings.mushafGlyphWiden / 100}
-      ink={MUSHAF_INK_IDLE}
-      onPlayWord={(surahId, ayah) => appStore.openReading(surahId, ayah)}
-      onHoldWord={() => {}}
-      onTurn={() => {}}
-      onFit={reportFit}
-    />
-  )
-}
 
 /** Running head with the folio in-head: Western figure at the left, the chapter
     centred, the Arabic-Indic figure at the right; one script puts its figure
@@ -752,6 +721,7 @@ function MushafHead({
 function MushafLeaf({
   page,
   fitRevision,
+  facing,
   side,
   style,
   leafRef,
@@ -771,6 +741,8 @@ function MushafLeaf({
 }: {
   page: number
   fitRevision: number
+  /** Extra chapter furniture sets the same row pitch on both leaves. */
+  facing: boolean
   /** The hand both facing leaves are set in: the tighter page's fit. */
   fit: number
   onFit: (page: number, fit: number) => void
@@ -828,14 +800,14 @@ function MushafLeaf({
       // Rewriting the scale to measure at full size re-laid the block and
       // let the measurement chase its own result.
       const scale = Number(lines.style.getPropertyValue('--mushaf-fit')) || 1
-      const first = lines.firstElementChild
-      const gap = first ? parseFloat(getComputedStyle(first).columnGap) || 0 : 0
+      const textLines = Array.from(lines.querySelectorAll<HTMLElement>('.mushaf-line'))
+      const gap = parseFloat(getComputedStyle(lines).fontSize) * MUSHAF_MIN_GAP
       // A line already set narrow or wide carries its scale into every
       // item's box; divide it back out. The widest line may be condensed,
       // so it is measured as it would be set at the limit.
       const widest = opening
         ? 0
-        : Math.max(0, ...Array.from(lines.children, (line) => {
+        : Math.max(0, ...textLines.map((line) => {
             const set = Number((line as HTMLElement).style.getPropertyValue('--line-widen')) || 1
             return naturalLineWidth(
               Array.from(line.children, (item) => item.getBoundingClientRect().width / set),
@@ -845,16 +817,14 @@ function MushafLeaf({
           })) / scale
       const box = getComputedStyle(leaf)
       const available = leaf.clientWidth - parseFloat(box.paddingLeft) - parseFloat(box.paddingRight)
-      // Room to grow is bounded by the line pitch the page can give: the
-      // block's height, less its running head and folio, over fifteen lines.
+      // The grid has already reserved the running head and real controls.
+      // This well belongs entirely to the printed slots, including banners.
       const block = lines.parentElement
-      const furniture = block
-        ? Array.from(block.children).reduce((sum, child) => (child === lines ? sum : sum + child.clientHeight), 0)
-        : 0
-      const pitch = block ? (block.clientHeight - furniture) / MUSHAF_LINES_PER_PAGE : 0
+      const slots = Number(lines.style.getPropertyValue('--mushaf-slots')) || MUSHAF_LINES_PER_PAGE
+      const pitch = block ? block.clientHeight / slots : 0
       const baseEm = parseFloat(getComputedStyle(lines).fontSize) / scale
-      const maxGrow = pitch > 0 && baseEm > 0 ? pitch / (MUSHAF_MIN_LEADING * baseEm) : 1
-      onFit(page, mushafLeafFit(available, widest, maxGrow))
+      const heightFit = pitch > 0 && baseEm > 0 ? pitch / (MUSHAF_MIN_LEADING * baseEm) : 1
+      onFit(page, mushafLeafFit(available, widest, heightFit))
     }
     measure()
     const observer = new ResizeObserver(measure)
@@ -866,7 +836,7 @@ function MushafLeaf({
     void document.fonts?.ready.then(measure)
     return () => { disposed = true; observer.disconnect() }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [page, english, side, fitRevision, onFit === noFit])
+  }, [page, english, side, facing, fitRevision, onFit === noFit])
 
   // Once the hand and the measure are settled, set each line: widen the
   // letters of a loose line toward the target word space, and centre a line
@@ -880,31 +850,40 @@ function MushafLeaf({
       return
     }
     const em = parseFloat(getComputedStyle(lines).fontSize)
-    for (const line of Array.from(lines.children) as HTMLElement[]) {
+    const textLines = Array.from(lines.querySelectorAll<HTMLElement>('.mushaf-line'))
+    for (const line of textLines) {
       line.removeAttribute('data-widen')
       line.removeAttribute('data-short')
       line.style.removeProperty('--line-widen')
     }
-    if (opening) {
-      block?.style.removeProperty('width')
-      return
-    }
+    if (opening) block?.style.removeProperty('width')
     // Read every line before writing any, so the page is laid out once.
-    const set = (Array.from(lines.children) as HTMLElement[]).map((line) => ({
+    const set = textLines.map((line) => ({
       ink: Array.from(line.children).reduce((sum, item) => sum + item.getBoundingClientRect().width, 0),
       gaps: line.children.length - 1,
+      markJoins: Array.from(line.children).slice(1).map((item, index) =>
+        item.matches('.mushaf-mark') || line.children[index]!.matches('.mushaf-mark')),
     }))
     const leaf = lines.closest('.mushaf')
-    if (block && leaf instanceof HTMLElement) {
+    if (!opening && block && leaf instanceof HTMLElement) {
       const box = getComputedStyle(leaf)
       const available = leaf.clientWidth - parseFloat(box.paddingLeft) - parseFloat(box.paddingRight)
       block.style.width = `${mushafMeasure(set, em, available)}px`
     }
     // The block's floor (min-width) may hold it wider than asked.
     const measure = lines.clientWidth
-    const settings = set.map(({ ink, gaps }) => solveLine(ink, gaps, measure, em, glyphWiden))
+    const settings = set.map(({ ink, gaps }) => opening
+      ? { widen: 1, short: true } : solveLine(ink, gaps, measure, em, glyphWiden))
     settings.forEach((setting, index) => {
-      const line = lines.children[index] as HTMLElement
+      const line = textLines[index]
+      if (!line) return
+      const { wordGap, markGap } = mushafLineGaps(
+        set[index]!.markJoins, em,
+        setting.short ? undefined : measure / setting.widen - set[index]!.ink,
+        opening ? MUSHAF_MIN_GAP : undefined,
+      )
+      line.style.setProperty('--word-gap', `${wordGap.toFixed(4)}px`)
+      line.style.setProperty('--mark-gap', `${markGap.toFixed(4)}px`)
       if (setting.short) line.setAttribute('data-short', '')
       else if (Math.abs(setting.widen - 1) > 0.001) {
         line.setAttribute('data-widen', '')
@@ -915,10 +894,13 @@ function MushafLeaf({
 
   if (!runtimeMushafCache) return null
   const rows = runtimeMushafCache.pageWords(page) ?? []
-  const { leaf, headSurah, englishAyahs, lastPositions } = mushafLeafModel(page, rows, QuranRepository.surahContent)
+  const { leaf, headSurah, englishAyahs, lastPositions, verseWords } = mushafLeafModel(page, rows, QuranRepository.surahContent)
+  const peerPage = page % 2 === 1 ? page + 1 : page - 1
+  const peerRows = facing ? runtimeMushafCache.pageWords(peerPage) : null
+  const peerSlots = peerRows ? mushafLeafModel(peerPage, peerRows, QuranRepository.surahContent).leaf.lines.length : 0
   // The two opening leaves carry a few short lines, set in the middle of the
   // well; every other leaf hangs its fifteen lines from the head.
-  const lines = opening ? leaf.lines.filter((line) => line.tokens.length > 0) : leaf.lines
+  const lines = opening ? leaf.lines.filter((line) => line.tokens.length > 0 || line.chapter || line.basmalah) : leaf.lines
   const firstToken = lines.find((line) => line.tokens.length > 0)?.tokens[0]
   const isLive = live && !english
   const tuning = getTuning()
@@ -948,20 +930,24 @@ function MushafLeaf({
         drag.current = null
       }}
     >
-      {/* One measure: head and text share the text block's width. */}
-      <div className="mushaf-block" ref={blockRef}>
       <MushafHead
         page={page}
         script={english ? 'english' : pageNumberScript}
         chapter={headSurah?.nameTransliteration ?? ''}
       />
+      <div className="mushaf-block" ref={blockRef}>
       {english ? (
         <div className="mushaf-english">
           {englishAyahs.map((item) => {
             const active = item.surahId === activeSurahId && item.ayah === activeAyah
             return (
+              <Fragment key={`${item.surahId}:${item.ayah}`}>
+              {item.ayah === 1 ? (
+                <div className="mushaf-english-chapter">
+                  <MushafChapterBand surah={QuranRepository.surahContent(item.surahId).surah} latin />
+                </div>
+              ) : null}
               <p
-                key={`${item.surahId}:${item.ayah}`}
                 className="mushaf-english-ayah"
                 data-active={active || undefined}
               >
@@ -995,23 +981,31 @@ function MushafLeaf({
                   {formatAyahNumberMark(item.ayah, false)}
                 </button>
               </p>
+              </Fragment>
             )
           })}
         </div>
       ) : (
-        <RepeatWashGateProvider>
+        <WordMotionProvider>
         <div
           className="mushaf-lines"
           data-opening={opening || undefined}
           ref={linesRef}
           style={{
             ['--mushaf-fit' as string]: String(fit),
+            ['--mushaf-slots' as string]: String(Math.max(MUSHAF_LINES_PER_PAGE, leaf.lines.length, peerSlots)),
             ['--recess-ms' as string]: `${tuning.recessMs}ms`,
             ['--ayah-mark-fade-ms' as string]: `${tuning.ayahMarkFadeMs}ms`,
             ['--upcoming-alpha' as string]: String(tuning.upcomingAlpha),
           }}
         >
-          {lines.map((line) => (
+          {lines.map((line) => line.chapter ? (
+            <div className="mushaf-chapter-slot" key={line.number}>
+              <MushafChapterBand surah={QuranRepository.surahContent(line.chapter).surah} fit={fit} />
+            </div>
+          ) : line.basmalah ? (
+            <div className="mushaf-basmalah" key={line.number} lang="ar">{BASMALAH_UTHMANI}</div>
+          ) : (
             <p key={line.number} className="mushaf-line" lang="ar">
               {line.tokens.map((token) => {
                 const endsAyah = mushafTokenEndsAyah(
@@ -1026,7 +1020,7 @@ function MushafLeaf({
                 const owner = wordInk.state === InkState.Active
                 const { surahId, ayah, position } = token
                 // Word and mark are separate items of the line, so the
-                // justified space falls evenly on both sides of a mark.
+                // mark-specific spacing can fall on both sides of a mark.
                 return (
                   <Fragment key={`${surahId}:${ayah}:${position}`}>
                     {still ? (
@@ -1045,6 +1039,10 @@ function MushafLeaf({
                     ) : (
                       <MushafWord
                         token={token}
+                        motion={{ key: `${surahId}:${ayah}:${position}`, timing: owner ? ink.activeWord : null,
+                          isAyahFinal: position === lastPositions.get(`${surahId}:${ayah}`),
+                          previousArabic: verseWords.get(`${surahId}:${ayah}`)?.find(w => w.position === position - 1)?.arabic,
+                          nextArabic: verseWords.get(`${surahId}:${ayah}`)?.find(w => w.position === position + 1)?.arabic }}
                         tabIndex={token === firstToken ? 0 : -1}
                         ink={wordInk}
                         sweepMs={owner ? InkEngine.sweepMs(ink.activeWord, ink.speed) : null}
@@ -1073,7 +1071,7 @@ function MushafLeaf({
             </p>
           ))}
         </div>
-        </RepeatWashGateProvider>
+        </WordMotionProvider>
       )}
       </div>
     </div>
@@ -1088,6 +1086,7 @@ function MushafLeaf({
  */
 const MushafWord = memo(function MushafWord({
   token,
+  motion,
   ink,
   sweepMs,
   activation,
@@ -1096,6 +1095,7 @@ const MushafWord = memo(function MushafWord({
   tabIndex,
 }: {
   token: MushafToken
+  motion: WordMotion
   ink: InkWord
   sweepMs: number | null
   activation: number
@@ -1112,6 +1112,7 @@ const MushafWord = memo(function MushafWord({
       word={word}
       ink={ink}
       sweepMs={sweepMs}
+      motion={motion}
       activation={activation}
       tabIndex={tabIndex}
       onPlay={onPlay}
@@ -1128,4 +1129,8 @@ const MushafWord = memo(function MushafWord({
   prev.ink.state === next.ink.state &&
   prev.ink.repeat === next.ink.repeat &&
   prev.sweepMs === next.sweepMs &&
-  prev.activation === next.activation)
+  prev.activation === next.activation &&
+  prev.motion.timing === next.motion.timing &&
+  prev.motion.previousArabic === next.motion.previousArabic &&
+  prev.motion.nextArabic === next.motion.nextArabic &&
+  prev.motion.isAyahFinal === next.motion.isAyahFinal)

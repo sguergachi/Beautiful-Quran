@@ -27,6 +27,8 @@ describe('ReaderHighlightState', () => {
       ayah: 1,
       wordPosition: 1,
       durationMs: 100,
+      startMs: 200,
+      spokenMs: 100,
       isRepeat: true,
       highWater: 2,
       repeatStart: 1,

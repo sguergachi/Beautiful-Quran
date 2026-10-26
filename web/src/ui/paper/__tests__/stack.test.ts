@@ -8,9 +8,17 @@ import {
   settingsLayerFor,
   sheetAtLayer,
   showPinnedChapterBar,
+  underlyingLayer,
 } from '../stack'
 
 describe('hasReaderOpen', () => {
+  it('keeps Settings on its opening paper, with and without a loaded reader', () => {
+    expect(underlyingLayer(SETTINGS_LAYER, true, COVER_LAYER)).toBe(COVER_LAYER)
+    expect(underlyingLayer(SETTINGS_LAYER, true, READER_LAYER)).toBe(READER_LAYER)
+    expect(underlyingLayer(READER_LAYER, false, COVER_LAYER)).toBe(COVER_LAYER)
+    expect(underlyingLayer(READER_LAYER, true, COVER_LAYER)).toBe(READER_LAYER)
+    expect(underlyingLayer(BOOKMARKS_LAYER, true, READER_LAYER)).toBe(BOOKMARKS_LAYER)
+  })
   it('maps the left-hand layer to the bookmark sheet', () => {
     expect(sheetAtLayer(BOOKMARKS_LAYER, false)).toBe('bookmarks')
     expect(sheetAtLayer(BOOKMARKS_LAYER, true)).toBe('bookmarks')
@@ -54,5 +62,13 @@ describe('hasReaderOpen', () => {
     // Documents the bug: content-null peel with hasReader=false maps layer 1 → settings.
     expect(sheetAtLayer(READER_LAYER, false)).toBe('settings')
     expect(settingsLayerFor(false)).toBe(READER_LAYER)
+  })
+
+  it('keeps Chapters as the paper under Settings', () => {
+    // Regression: Chapters → Settings must return Back to Chapters, not peel
+    // into the reader one layer down.
+    expect(underlyingLayer(SETTINGS_LAYER, true, BOOKMARKS_LAYER)).toBe(BOOKMARKS_LAYER)
+    // Other layers pass through unchanged.
+    expect(underlyingLayer(READER_LAYER, true, COVER_LAYER)).toBe(READER_LAYER)
   })
 })

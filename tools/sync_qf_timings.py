@@ -29,7 +29,7 @@ def compact(value):
 def normalizer_hash():
     """Fingerprint the code and every reviewed normalization input, not timestamps."""
     paths = [ROOT / "tools" / name for name in (
-        "build_db.py", "qf_timing_parity.py", "timing_delta.py",
+        "build_db.py", "qf_timing_parity.py", "timing_delta.py", "word_split_evidence.py",
     )]
     for directory in ("timing_corrections", "timing_repairs", "timing_holds", "timing_verdicts", "audio_onsets"):
         paths.extend((ROOT / "tools" / directory).glob("*.json"))

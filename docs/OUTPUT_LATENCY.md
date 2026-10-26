@@ -3,11 +3,10 @@
 **Status: Android uses Media3’s output-corrected presentation clock; web uses
 its media clock. No automatic extra Bluetooth lag is subtracted.**
 An explicit Ink Lab lag is an additional wall-time correction, converted to
-media time at the current playback speed before `HighlightClock` sees it.
-Web ports the pure
-`OutputLatency` helpers and feeds `highlightMs(..., leadMs)` into
-`HighlightClock` (default lead 0). Browser output-route classification is
-still hard, so web lag stays at LOCAL (0 ms) until a monitor exists.
+media time at the current playback speed by `HighlightSync`. V2 reconciles and
+projects media first, then applies `OutputLatency` and the word-only opening
+lead. Web uses the same pure policy with LOCAL (0 ms) extra output lag.
+See [the V2 contract](HIGHLIGHT_ENGINE_V2_CONTRACT.md).
 
 ## Why
 
@@ -29,26 +28,21 @@ Sources: [Media3 1.10.1 position tracker](https://github.com/androidx/media/blob
 
 | Layer | Owns latency? |
 |---|---|
-| `HighlightEngine` | **No** — stays pure: segments + time *t* → word |
+| `HighlightSync` / `HighlightEngine` | Pure sync, calibration, projection, and timing lookup; no route observation |
 | Word timing segments / DB | **No** — lag is a device path, not reciter data |
 | `OutputLatency` (pure policy) | Manual wall lag → media lag |
 | `AudioOutputRoutes` (Android) | Watch the AudioTrack's actual routed device; refresh stale output state |
 | `VoiceEnergy` / `TarjiEarClock` | Map source PCM onto the same presentation clock as the words |
-| `ReaderViewModel` poll | `heardMs = positionMs − manualLagMs × speed` before `HighlightClock` |
+| Shared reader sample / frame | Supplies raw media, manual wall lag, speed, and word lead to V2 |
 
 ```
-ExoPlayer.currentPosition
-        │
-        ▼
-OutputLatency.mediaLagMs      (0 automatically; manual wall lag × speed)
-        │
-        ├──► OutputLatency.heardMs(...)      media − lag
-        │         └──► ayah fade lead + basmalah wash
-        │
-        └──► OutputLatency.highlightMs(...)  media − lag + word lead
-                  └──► HighlightClock.sample(...)
-                           └──► PreparedTimings.activeInfo(...)
+ExoPlayer.currentPosition → coherent playback sample
+        → HighlightSync.sample → accepted media anchor
+        → HighlightSync.frame → projected media position
+              ├── OutputLatency.heardMs → heard/follow/basmalah policy
+              └── OutputLatency.highlightMs → PreparedTimings → word + wash windows
 ```
+
 
 ## One heard position, two clocks
 
@@ -62,10 +56,9 @@ the other consumers must not:
 | Ayah fade lead (`ayahWithFadeLead`) | Heard position + its own `fadeLeadMs` |
 | Basmalah calligraphy wash | Heard position |
 
-Only the ink poll additionally arms `HighlightClock.acceptNextSample()` when the
-applied manual media lag or word lead steps, so the change is taken as a real
-jump instead of held as jitter. The pure heard-position reader cannot consume that latch on the
-ink poll's behalf.
+Calibration is an input to the shared V2 state. A correction can hold laid ink;
+it cannot manufacture an ink generation or consume another consumer's seek
+latch. V1's `acceptNextSample` survives only in the diagnostic comparator.
 
 **Continue Listening reads neither clock.** It persists the *playing media
 item*, because the fade-led ayah names the next verse before a note of it is
@@ -91,6 +84,13 @@ It uses the same opening ramp as the Ink Lab lead, so short first words remain
 visible instead of being skipped. Timing rows, ayah handoff, basmalah wash, and
 every other reciter stay on their existing clocks. Android and web share the
 same policy.
+
+Alafasy has no automatic Bluetooth-specific advance. The earlier 200 ms trim
+was based on a listener's report without isolating the output clock from the
+word timestamps, and was removed during timing report #873's review. Compare
+Alafasy and another reciter on speaker and Bluetooth before adding a measured
+correction. A route-specific error belongs to the output clock; a source-timing
+error requires recording-specific evidence, independent of the audio route.
 
 ## PCM on the presentation clock
 
@@ -141,17 +141,11 @@ identify the track's chosen route. The replacement uses Android's actual
 
 ## Reader wiring
 
-In `ReaderViewModel`:
-
-- Normal word polls: `highlightPositionMs(firstWordStartMs, reciterId)` →
-  `OutputLatency.highlightMs(player.positionMs, manualLagMs × speed, highlightLeadMs)`.
-  Automatic extra lag is zero.
-- **Forced word seeks** (tap-to-play): keep the **media** timeline target so
-  ink jumps to the sought word immediately; do not re-delay a deliberate seek.
-- On a **manual media-lag change**, call `HighlightClock.acceptNextSample()` so the
-  correction jump is not held as sampling jitter.
-- Ayah fade and basmalah preface wash use `heardPositionMs()` so they stay with
-  the voice on BT without inheriting the word-only lead.
+In `ReaderViewModel`, coherent samples carry raw media position, transport,
+speed, and clock/ink revisions. V2 projects media before speed-scaled manual
+lag, word lead, and the opening ramp. A tap seeds provisional ink; a current
+player generation confirms its actual landing. Ayah follow and basmalah use
+heard position without inheriting word-only lead.
 
 Focus follow rides `activeAyah` / `activeWord` and needs no separate lag
 logic.

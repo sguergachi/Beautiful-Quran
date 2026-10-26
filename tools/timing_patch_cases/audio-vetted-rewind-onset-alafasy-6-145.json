@@ -1,0 +1,22 @@
+{
+  "id": "audio-vetted-rewind-onset-alafasy-6-145",
+  "label": "Alafasy 6:145 real إِلَّا re-say behind an unspoken word 13 lead",
+  "refs": [
+    "device timing lab 2026-10-17 (v0.11 Pixel 10)",
+    "tools/timing_verdicts/qf-source-transition.json",
+    "tools/timing_evidence/alafasy-6-145-resay.jsonl"
+  ],
+  "pipeline": "timing_correction",
+  "correction_op": "discard_unspoken_rewind_onset",
+  "source_window": [[12, 13770, 14650], [13, 14650, 15390], [12, 15390, 17590]],
+  "requires_audio_verdict": true,
+  "notes": "Replaces the ear-less one_utterance [12,13] correction that collapsed a genuine re-say. The audio-proven unspoken lead is word 13 at 14650-15390 (XLSR/MMS label probability 0.0/0.0003; waveform silent), so its interval returns to word 12 and the later real word 13 at 17590 stays. The maintainer's Lab capture confirms word 12 is said twice; it painted the re-say at 15957-16557, but the decoded waveform shows one held vowel from 15460 to ~17560 at constant 216 Hz while XLSR/MMS force the second occurrence to 15446-16066/15506-16006 and decode no speech in between, so the reviewed boundaries use the source's own tiling and the Lab window is recorded as an ear-only estimate that sits inside the voiced span. quran-align independently gives word 12 one span to 17580 and word 13 from 17590.",
+  "input_segments": [
+    [11, 11340, 13770], [12, 13770, 14650], [13, 14650, 15390],
+    [12, 15390, 17590], [13, 17590, 18030], [14, 18030, 19510]
+  ],
+  "expected_segments": [
+    [11, 11340, 13770], [12, 13770, 15390], [12, 15390, 17590],
+    [13, 17590, 18030], [14, 18030, 19510]
+  ]
+}

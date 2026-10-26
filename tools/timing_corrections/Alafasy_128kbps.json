@@ -4,6 +4,16 @@
   "edits": [
     {
       "reciterId": 1,
+      "surahId": 5,
+      "ayah": 2,
+      "op": "discard_unspoken_rewind_onset",
+      "sourceWindow": [[14, 21530, 23340], [15, 23340, 24040], [11, 24070, 25430]],
+      "requiresAudioVerdict": true,
+      "evidence": ["Arabic XLSR", "MMS/uroman", "waveform inspection; no manual listening"],
+      "refs": ["GitHub issue #873", "tools/timing_verdicts/unspoken-rewind-onset-class.json"]
+    },
+    {
+      "reciterId": 1,
       "surahId": 2,
       "ayah": 229,
       "op": "one_utterance",
@@ -32,10 +42,11 @@
       "reciterId": 1,
       "surahId": 6,
       "ayah": 145,
-      "op": "one_utterance",
-      "positions": [12, 13],
-      "evidence": ["CTC", "quran-align"],
-      "refs": ["full-corpus acoustic audit"]
+      "op": "discard_unspoken_rewind_onset",
+      "sourceWindow": [[12, 13770, 14650], [13, 14650, 15390], [12, 15390, 17590]],
+      "requiresAudioVerdict": true,
+      "evidence": ["ear", "Arabic XLSR", "MMS/uroman", "quran-align", "waveform"],
+      "refs": ["device timing lab 2026-10-17", "tools/timing_verdicts/qf-source-transition.json", "docs/quality-reviews/TIMING_RUNTIME_PROMOTION_2026-10-17.md"]
     },
     {
       "reciterId": 1,

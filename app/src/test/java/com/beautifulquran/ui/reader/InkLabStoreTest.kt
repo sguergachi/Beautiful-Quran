@@ -37,7 +37,7 @@ class InkLabStoreTest {
         assertEquals(0, InkEngine.DEFAULT_HIGHLIGHT_LEAD_MS)
         assertEquals(500, InkEngine.DEFAULT_FADE_LEAD_MS)
         // The camera's lead is its own number, not a copy of the ink's.
-        assertEquals(400, InkEngine.DEFAULT_SCROLL_LEAD_MS)
+        assertEquals(500, InkEngine.DEFAULT_SCROLL_LEAD_MS)
         assertNull(InkLabSnapshot().outputLatencyOverrideMs)
     }
 

@@ -1,0 +1,135 @@
+# Promo studio UI review
+
+The October 20, 2026 review covers the browser editor in
+`tools/promo_studio/editor-app`, including Animate, Recording, Look, the video
+list, preview, playback toolbar, timeline, Emulators, Jobs, Shortcuts and
+context menus.
+
+## Findings and fixes
+
+| Surface | Finding | Result |
+|---|---|---|
+| Animate | The slider's intrinsic width expanded the grid's `1fr` track beyond the inspector. `overflow-x-hidden` concealed the numeric field. | The track uses `minmax(0,1fr)`; the range shrinks while the numeric field keeps its width. |
+| Inspector fields | Fixed label columns and segmented choices competed for narrow space. Edit inputs also imposed intrinsic widths. | Inputs shrink within their tracks; choices wrap; labels stack in inspectors no wider than 310 px. |
+| Recording | Record/select and split/whole-take rows could overflow; long spec paths did not wrap. | Actions wrap and paths remain readable. |
+| Take contents | Starting verse, recording sequence, playback duration and Edit verse range described one recording in separate places. | One Take contents flow joins chapter/reciter, ordered screens and a final Recitation or Hold step. Start/Stop verses, repeat and playback pause live in that final step. App appearance and Fine trim & cuts are collapsed secondary groups. Choosing a range sets the recording origin and includes the opening; timeline edge actions preserve their existing cut behavior. |
+| Contextual editing | Clip selection opened take setup; keys and audio actions could leave unrelated tabs visible, and sound controls were far below Canvas. | Explicit actions focus the relevant clip, keys, motion group, sound or appearance section. Selected clips have precise source trims, navigation, split and delete. Manual tabs and All restore the full inspector; ordinary playback, field edits and scrubbing do not retarget it. Desktop reveal waits for gesture completion; compact timeline gestures retain the timeline until Inspector is requested. |
+| Window layout | Stored wide panes could consume the preview, and a tall timeline could hide playback controls after resizing. | Pane widths fit the current window without replacing preferred widths. Timeline height reserves at least 96 px for the preview; its toolbar is included in the timeline's height. |
+| Compact windows | Both side panes could crowd out the central editor. | At widths of 1,000 CSS px or less, one pane opens over the editor with a dismissible backdrop. Resizing retains the pane being edited, and the timeline has its own stacking context so its ruler cannot paint over a side pane. |
+| Toolbars | Playback and editing occupied separate rows, with different button heights and uneven icon alignment. | One toolbar joins playback/timecode, edit/key navigation, camera actions and timeline zoom. Controls share a 32 px height, 4 px within-group gaps and centered SVG icons. Camera actions collapse into a menu below 1,140 px of toolbar width; below 680 px, Tools also contains editing commands. The row stays single-line. Compact headers keep aspect selection in Look → Canvas. |
+| Look | Canvas settings were buried below appearance controls; background controls were split between tabs, blur could not reach sharp, thumbnail labels were internal IDs, and phone choices had no nearby preview. | Canvas comes first because it defines the video, followed by Background, Phone and Sound. Background separates Image adjustments from Movement; Blur and Brightness share Animate's playhead-aware properties. Blur reaches zero through the renderer. Short background names and selected-state semantics make the picker readable. A whole-phone preview above Colour, Base size and Shadow shows appearance before camera crops, following the existing take or showing the theme when no take exists. |
+| Take quality and phone fit | Android's encoder could not record native 2K; the old take already contained clipped status icons, and the drawn camera/corners differed from the emulator. | Recording → Record take exposes 1080p / 2K, with separate take identities. Host capture retains the whole status bar and real cutout, centred for the native framebuffer. The mockup uses physical display corners and omits its synthetic camera for these takes. Existing recordings need recording again to replace missing source pixels. |
+| Export management | Older export files had no delete control and finished jobs could keep broken download links. | Each export has a visible Delete action with inline confirmation, Cancel focus return and error feedback. A live file count and total size update without an overlaid success message, with an empty state after the last file. The server checks file ownership, its exact revision and active render destinations before unlinking. Job links reflect whether the output still exists. |
+| Video list | Footer text overflowed at minimum width; titles lacked a full-text tooltip; actions required hover. | The batch action has the shared export icon and wrapping text; titles have tooltips and actions remain visible. |
+| Video management | Browser prompts interrupted the workspace; duplicates kept the original display title, file rename did not change that title, and a failed deletion cleared the current edit. Search omitted chapter/reciter names. | New, Duplicate, Rename and Delete use inline forms with validation, error recovery and Cancel focus return. Copies preserve the latest edit under their own title; Rename edits the visible title with a stable file identity. Deletion clears the editor after success, preserving it on failure. Search includes named metadata and transliteration, with clear and count controls. |
+| Drawers | Fixed drawer widths, shortcut columns and long progress messages could exceed the window. | Drawers fit the viewport, shortcut columns stack, and job/status text wraps. |
+| Keyboard context | Space could toggle playback instead of activating a button; shortcuts from drawers and menus could change the timeline. Drawers lacked focus containment. | Drawers make the workspace inert, contain Tab traversal and return focus on close. Menus take arrow/Home/End navigation and anchor to their trigger when opened with a keyboard. Editor shortcuts respect forms and open overlays. |
+| Context menus | Large menus could start above the window; scrolling dismissed them. | Menus stay inside the viewport, scroll vertically, and close on window resize. |
+| Empty preview | The record prompt could extend outside a narrow preview. | Prompt and action wrap inside the preview. |
+| Messages | Long errors could overflow or stack above the window. | Messages wrap, scroll within bounded space, and can be dismissed. |
+
+The native video preview, directional ink wash, compositor geometry, export
+settings and video specs are unchanged by these layout fixes.
+
+## Review matrix
+
+Chromium checks measured control bounds against their enclosing pane/window,
+with screenshots used to inspect the resulting layout. Vertical scrolling in
+inspectors/drawers and horizontal scrolling inside the timeline remain
+intentional. Truncated video titles expose their complete text on hover.
+
+| Viewport (CSS px) | Inspector width preference |
+|---|---:|
+| 1920 × 1080 | 340 |
+| 1440 × 900 | 280 (minimum) |
+| 1280 × 800 | 340 |
+| 1100 × 700 | 560, with a 460 px video-list preference |
+| 1024 × 768 | 340 |
+| 1000 × 700 | 340 |
+| 800 × 600 | 340 |
+| 640 × 480 | 340 |
+| 390 × 844 | 340 |
+| 360 × 640 | 340 |
+
+Each size was checked across all three inspector tabs, the workspace controls,
+and all three drawers: 70 layout combinations. Smaller CSS viewports also cover
+the reflow required when browser zoom reduces the usable window width.
+
+Additional states cover single/multiple selected keys, scrolling to the final
+Look field, menus opened at the bottom-right corner, an absent take, long
+queued-job messages and long error messages. These include 360 × 480. Short
+viewport menus are checked for scrolling without dismissal. Review is scoped to
+Chromium layout and interaction; it is not a cross-browser or assistive-technology
+certification.
+
+The existing 25 real-input browser checks cover ruler/playhead dragging, edge
+scrolling, key movement and selection, easing, split/trim/delete, pane and label
+resizing, typed timecodes, undo, blank videos, duplicate freshness and numeric
+input cancellation. Offline gates are the 31 Python regressions, 26 Node tests,
+strict TypeScript/production build and Android JVM suite. See the studio README
+for the build/test commands.
+
+The unified toolbar was checked at 19 viewport widths from 320 to 1,920 px,
+with side panes open and closed (38 combinations). Checks require one row,
+equal button heights, aligned control centres and no horizontal clipping.
+Interaction checks cover split/undo, previous/next key, loop, camera/Tools
+menus, keyboard activation, Fit, typed timecodes and a short viewport. Below
+500 px the slider is folded away while Fit and every editing command remain
+reachable; the timecode keeps its current time, with total duration in its tooltip.
+
+Look controls were checked at 1440, 1100, 800, 600, 390 and 320 px, including
+stacked field labels and all numeric inputs. Real keyboard checks cover zero
+blur, a sharp source plate, single-step undo/redo, brightness, animated blur at
+the playhead, neighboring-key preservation, and matching values in Animate.
+A rendered striped-image regression confirms zero blur retains detail.
+
+The inline phone preview was checked for colour changes, keyboard size/shadow
+edits, paused seeks, playback, tab remounts and the no-take state. Six widths
+from 320 to 1440 px at 2× device scale keep it contained; its raster stays
+bounded at 1.5×. Instrumentation confirmed only the original two video elements
+(screen and background plate), 35 thumbnail samples over five seconds of
+playback, and no redraws when scrolled entirely out of view. In that local
+SwiftShader run the main clock's median interval was 16.1 ms, p95 21.4 ms.
+
+The October 21 take-contents review checks real start/stop selection and its
+recording origin, one-step undo/redo, adding/reordering screens, dwell, repeated
+ranges, switching to screens-only and back, and saved reload. At six widths
+from 320 to 1440 px, both collapsed and expanded secondary groups keep all
+controls inside the inspector. Regression gates include ordinary edit-edge
+origin reuse, full-opening retention for take range selection, basmalah,
+repeated/screen-only range rejection, strict TypeScript/build and the JVM suite.
+
+Export deletion checks cover confirmation/Cancel and focus return, replaced-file
+conflicts, refresh, individual deletion, the last-file empty state, live-render
+disabling, and preservation of the edit/take. At 1440, 800, 390 and 320 px,
+long filenames and confirmation controls stay inside the drawer. HTTP
+regressions verify ownership/path and origin rejection, queued/running output
+protection, same-size/same-time replacement detection, another format remaining
+removable, and finished job links after deletion. QA deletes only owned fixtures.
+
+The workflow refinement pass verifies inline creation, collision feedback,
+duplicate freshness/title, rename with undo/redo and stable identity, search by
+chapter/reciter/unaccented title, and Cancel focus return. A simulated HTTP
+deletion failure leaves the current raw edit and loaded take intact; confirmed
+deletion removes only the owned spec while retaining its export. Real keyboard
+input covers Space activation, drawer Tab/Shift-Tab containment, Escape return,
+menu arrow navigation and isolation from destructive editor shortcuts. Six
+sizes from 1440 × 900 to 320 × 480 retain unfinished form text and keep controls
+inside the pane. Hit testing verifies the timeline cannot cover the compact
+video pane. Native 2K preview still advances, with no browser exceptions.
+Regression gates: 43 Python, 30 Node, strict TypeScript/production build and
+Android JVM tests. Export deletion browser checks also pass after these changes.
+
+Contextual editing verification covers selected-clip source trims, navigation,
+split/delete and undo, single/mixed key selection, manual-tab retention during
+playback, sound gain/fade targeting and stale-selection clearing. Preview clicks
+identify phone/background through their transforms without changing the edit;
+camera and Alt-phone drags reveal their matching motion group. Clip-edge and
+key drags retain their coordinate space until release, with Fit still active.
+Wheel reveal waits for idle and yields to a newer manual tab or active drag.
+Compact gestures keep the timeline visible until Inspector or Ctrl . is used.
+Fifty context/viewport combinations from 1440 to 320 px keep controls contained;
+context never enters the raw spec or saved UI, and no browser exceptions occur.
+The mapping/geometry regressions join 32 Node tests; the 43 Python tests,
+TypeScript/production build and Android JVM suite also pass. Only owned QA
+specs were edited and removed.

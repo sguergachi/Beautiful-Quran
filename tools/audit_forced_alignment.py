@@ -29,7 +29,8 @@ For parallel machines/workers, split the deterministic selected-row order:
     ... --all-reciters --shard 1/8 --output /home/sammy/qasr/audits/1-of-8.jsonl
 
 The output is intentionally JSONL: interrupted work is preserved and
-``--resume`` skips every ayah already represented in the file.
+``--resume`` skips every ayah already represented in the file. Recorded errors
+in the selected rows still make a resumed run fail, even when no work remains.
 """
 
 from __future__ import annotations
@@ -314,10 +315,12 @@ def occurrence_frame_evidence(
     labels: Sequence[int],
     label_occurrences: Sequence[int | None],
     occurrence_count: int,
+    include_alignment: bool = False,
 ) -> list[dict[str, float | int | None]]:
     """Collect emitting-frame ranges and CTC probabilities for each occurrence."""
     frames: list[list[int]] = [[] for _ in range(occurrence_count)]
     probabilities: list[list[float]] = [[] for _ in range(occurrence_count)]
+    emitting = [[] for _ in range(occurrence_count)]
     # A scalar ``.cpu()`` in this loop synchronizes CUDA once for every emitted
     # character frame.  Moving the small [frames, vocabulary] probability
     # matrix once per ayah keeps a full-corpus audit practical on GPU.
@@ -332,6 +335,8 @@ def occurrence_frame_evidence(
         label = labels[label_index]
         frames[occurrence_index].append(frame)
         probabilities[occurrence_index].append(float(cpu_probabilities[frame, label]))
+        if include_alignment:
+            emitting[occurrence_index].append([frame, label, float(cpu_probabilities[frame, label])])
 
     evidence: list[dict[str, float | int | None]] = []
     for occurrence_frames, occurrence_probabilities in zip(frames, probabilities):
@@ -351,6 +356,7 @@ def occurrence_frame_evidence(
             "lastFrameExclusive": occurrence_frames[-1] + 1,
             "meanLabelProbability": sum(occurrence_probabilities) / len(occurrence_probabilities),
             "minLabelProbability": min(occurrence_probabilities),
+            **({"labelFrames": emitting[len(evidence)]} if include_alignment else {}),
         })
     return evidence
 
@@ -450,6 +456,8 @@ def force_one(
     romanize: bool = False,
     model_name: str = MODEL_NAME,
     romanizer=None,
+    emission_cache: dict | None = None,
+    include_alignment: bool = False,
 ) -> dict:
     """Generate one self-contained audio-evidence report object."""
     if romanize:
@@ -478,16 +486,27 @@ def force_one(
     labels, label_occurrences, transcript = target_labels(occurrences, vocabulary, delimiter)
 
     sample_rate = processor.feature_extractor.sampling_rate
-    waveform = decode_waveform(path, sample_rate)
-    inputs = processor(waveform, sampling_rate=sample_rate, return_tensors="pt")
-    with torch.inference_mode():
-        logits = model(inputs.input_values.to(device)).logits[0]
-        log_probabilities = logits.log_softmax(dim=-1)
+    audio_hash = sha256(path)
+    cache_key = (audio_hash, id(model))
+    cached = emission_cache.get(cache_key) if emission_cache is not None else None
+    if cached is None:
+        waveform = decode_waveform(path, sample_rate)
+        inputs = processor(waveform, sampling_rate=sample_rate, return_tensors="pt")
+        with torch.inference_mode():
+            logits = model(inputs.input_values.to(device)).logits[0]
+            log_probabilities = logits.log_softmax(dim=-1).detach().cpu()
+        cached = (log_probabilities, len(waveform), str(device))
+        if emission_cache is not None:
+            # Compare every hypothesis with identical neural emissions, while
+            # retaining only one recording's tensor during a corpus audit.
+            emission_cache.clear()
+            emission_cache[cache_key] = cached
+    log_probabilities, sample_count, inference_device = cached
     state_path, viterbi_score = forced_ctc_viterbi(log_probabilities, labels, int(blank_id))
     evidence = occurrence_frame_evidence(
-        log_probabilities, state_path, labels, label_occurrences, len(occurrences)
+        log_probabilities, state_path, labels, label_occurrences, len(occurrences), include_alignment
     )
-    frame_ms = len(waveform) * 1000.0 / sample_rate / len(state_path)
+    frame_ms = sample_count * 1000.0 / sample_rate / len(state_path)
 
     words: list[dict] = []
     review_count = 0
@@ -542,15 +561,15 @@ def force_one(
         "schema": 1,
         "kind": "ctc_fixed_sequence_audio_audit",
         "model": model_name,
-        "ctcDevice": str(device),
+        "ctcDevice": inference_device,
         "reciterId": reciter_id,
         "reciterSlug": slug,
         "surahId": surah,
         "ayah": ayah,
         "audioPath": str(path),
-        "audioSha256": sha256(path),
+        "audioSha256": audio_hash,
         "audioDecoder": "ffmpeg",
-        "audioDurationMs": round(len(waveform) * 1000.0 / sample_rate),
+        "audioDurationMs": round(sample_count * 1000.0 / sample_rate),
         "ctcFrames": len(state_path),
         "ctcFrameMs": frame_ms,
         "fixedTranscript": transcript,
@@ -585,21 +604,25 @@ def selected_rows(
     ).fetchall()
 
 
-def completed_keys(path: Path) -> set[tuple[int, int, int]]:
-    """Read completed success/error rows so an interrupted audit can continue."""
+def completed_report_keys(path: Path) -> tuple[set[tuple[int, int, int]], set[tuple[int, int, int]]]:
+    """Read represented and failed row keys without discarding recorded gaps."""
     if not path.exists():
-        return set()
+        return set(), set()
     keys: set[tuple[int, int, int]] = set()
+    errors: set[tuple[int, int, int]] = set()
     with path.open(encoding="utf-8") as report:
         for number, line in enumerate(report, start=1):
             if not line.strip():
                 continue
             try:
                 row = json.loads(line)
-                keys.add((int(row["reciterId"]), int(row["surahId"]), int(row["ayah"])))
+                key = (int(row["reciterId"]), int(row["surahId"]), int(row["ayah"]))
+                keys.add(key)
+                if row.get("kind") == "ctc_fixed_sequence_audio_audit_error":
+                    errors.add(key)
             except (KeyError, TypeError, ValueError, json.JSONDecodeError) as error:
                 raise ValueError(f"invalid existing report line {number} in {path}") from error
-    return keys
+    return keys, errors
 
 
 def argument_parser() -> argparse.ArgumentParser:
@@ -655,11 +678,13 @@ def main(argv: Sequence[str] | None = None) -> int:
         if args.shard:
             part, total = args.shard
             rows = [row for index, row in enumerate(rows) if index % total == part]
-        done = completed_keys(args.output) if args.resume else set()
+        done, recorded_errors = completed_report_keys(args.output) if args.resume else (set(), set())
+        selected_keys = {(row[0], row[2], row[3]) for row in rows}
+        recorded_error_count = len(recorded_errors & selected_keys)
         rows = [row for row in rows if (row[0], row[2], row[3]) not in done]
         if not rows:
-            print("no rows left to audit", flush=True)
-            return 0
+            print(f"no rows left to audit; recorded_errors={recorded_error_count}", flush=True)
+            return 1 if recorded_error_count else 0
         processor, model, device = load_model(args.model, args.device)
         romanizer = None
         if args.romanize:
@@ -707,10 +732,11 @@ def main(argv: Sequence[str] | None = None) -> int:
                 report.flush()
                 print(f"[{index}/{len(rows)}] {message}", flush=True)
         print(
-            f"complete: rows={len(rows)} successful={success} review_words={review_words} errors={errors}",
+            f"complete: rows={len(rows)} successful={success} review_words={review_words} "
+            f"errors={errors} recorded_errors={recorded_error_count}",
             flush=True,
         )
-        return 1 if errors else 0
+        return 1 if errors or recorded_error_count else 0
     finally:
         db.close()
 

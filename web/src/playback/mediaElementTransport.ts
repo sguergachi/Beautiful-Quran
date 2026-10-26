@@ -6,6 +6,7 @@ export type AudioElementFactory = () => HTMLAudioElement
 export interface MediaElementEvents {
   timeUpdate(): void
   ended(): void
+  seeking?(): void
   play(): void
   playing(): void
   pause(): void
@@ -207,10 +208,11 @@ export class MediaElementTransport {
 
   private bind(audio: HTMLAudioElement): void {
     const active = (event: keyof MediaElementEvents) => () => {
-      if (audio === this.activeElement) this.events[event]()
+      if (audio === this.activeElement) this.events[event]?.()
     }
     audio.addEventListener('timeupdate', active('timeUpdate'))
     audio.addEventListener('ended', active('ended'))
+    audio.addEventListener('seeking', active('seeking'))
     audio.addEventListener('play', active('play'))
     audio.addEventListener('playing', active('playing'))
     audio.addEventListener('pause', active('pause'))

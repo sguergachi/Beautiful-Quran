@@ -1,3 +1,4 @@
+import { tarjiSignal } from './tarjiSignal'
 /**
  * Audio playback controller — HTMLAudioElement + Media Session.
  *
@@ -48,6 +49,11 @@ export interface NowPlaying {
 }
 
 export interface PlayerState {
+  /** Authoritative seeks and performance restarts; never inferred by the highlight core. */
+  /** Actual transport advancement, separate from optimistic play intent. */
+  advances?: boolean
+  clockRevision?: number
+  inkGeneration?: number
   nowPlaying: NowPlaying | null
   isPlaying: boolean
   /** True while fetching / waiting for enough audio to play (Android parity). */
@@ -64,6 +70,8 @@ type Listener = (state: PlayerState) => void
 
 const initial: PlayerState = {
   nowPlaying: null,
+  clockRevision: 0,
+  inkGeneration: 0,
   isPlaying: false,
   isBuffering: false,
   positionMs: 0,
@@ -101,6 +109,7 @@ export class PlayerController {
   private readonly joins: JoinCoordinator
   /** Bumps on every playIndex entry so a superseded load aborts after awaits. */
   private playToken = 0
+  private programmedSeek: { targetMs: number; atMs: number } | null = null
   private readonly stallWatchdog = new PlaybackStallWatchdog()
   private readonly mediaSession: MediaSessionBridge
   /** True while performing the pause/play cycle that revives frozen Safari audio. */
@@ -122,6 +131,7 @@ export class PlayerController {
    * the second would clear isPlaying mid-join.
    */
   private pauseSuppressRemaining = 0
+  private repeatSelectionGeneration = 0
   /**
    * Developer preference for Gapless-5 joins (Settings). Effective use also
    * requires 1× speed — see [wantsGapless5Transport].
@@ -148,6 +158,20 @@ export class PlayerController {
           this.maybePrepJoin()
         },
         ended: () => void this.onEnded(),
+        seeking: () => {
+          const pending = this.programmedSeek
+          if (pending && performance.now() - pending.atMs < 1000 &&
+              Math.abs(pending.targetMs - this.positionMs) < 100) {
+            this.programmedSeek = null
+            return
+          }
+          // Native loop seeking is authoritative even if background throttling
+          // missed the end of the clip. An arbitrary position poll cannot do this.
+          if (this.active.loop && !this.awaitingClip) {
+            this.notePerformance()
+            this.onTime()
+          }
+        },
         play: () => {
           this.pauseSuppressRemaining = 0
           this.patch({ isPlaying: true, error: null })
@@ -369,9 +393,10 @@ export class PlayerController {
     return new Gapless5Backend({
       onTime: (positionMs, durationMs, index) => {
         if (index >= 0 && index !== this.index) {
-          this.syncGapless5Index(index, positionMs)
+          this.syncGapless5Index(index, positionMs, durationMs)
+        } else if (index === this.index) {
+          this.patch({ positionMs, durationMs })
         }
-        this.patch({ positionMs, durationMs })
       },
       onPlay: () => {
         this.patch({ isPlaying: true, error: null })
@@ -383,8 +408,17 @@ export class PlayerController {
         this.stopTick()
         this.patch({ isPlaying: false })
       },
-      onIndex: (index) => this.syncGapless5Index(index),
+      onIndex: (index) => this.syncGapless5Index(
+        index, this.gapless5?.getPositionMs() ?? 0, this.gapless5?.getDurationMs() ?? 0, true,
+      ),
       onFinishedAll: () => {
+        const range = this.state.repeatMode === 'range' ? this.state.repeatRange : null
+        const first = range ? this.playlist.findIndex(item => item.ayah === range.first) : -1
+        if (first >= 0 && this.gapless5) {
+          this.gapless5.goto(first, true)
+          this.syncGapless5Index(first, 0, this.gapless5.getDurationMs(), true)
+          return
+        }
         this.setBuffering(false)
         this.stopTick()
         this.patch({ isPlaying: false })
@@ -398,9 +432,10 @@ export class PlayerController {
   }
 
   /** Apply Gapless-5 auto-advance; wrap range-repeat when it walks past last. */
-  private syncGapless5Index(index: number, positionMs = 0) {
+  private syncGapless5Index(index: number, positionMs = 0, durationMs = 0, force = false) {
     if (!this.gapless5Enabled || index < 0 || index >= this.playlist.length) return
 
+    let wrapped = false
     if (this.state.repeatMode === 'range' && this.state.repeatRange) {
       const item = this.playlist[index]
       if (item && item.ayah > this.state.repeatRange.last) {
@@ -410,11 +445,15 @@ export class PlayerController {
         if (first >= 0) {
           this.gapless5?.goto(first, true)
           index = first
+          wrapped = true
+          positionMs = this.gapless5?.getPositionMs() ?? 0
+          durationMs = this.gapless5?.getDurationMs() ?? 0
         }
       }
     }
 
-    if (index === this.index) return
+    if (index === this.index && !wrapped && !force) return
+    this.notePerformance()
     this.index = index
     const item = this.playlist[index]
     if (!item) return
@@ -429,6 +468,7 @@ export class PlayerController {
       // time update: the ink took whichever word of the new verse that time
       // fell in, and the highlight clock then held it there while it settled.
       positionMs,
+      durationMs,
       error: null,
     })
     this.updateMediaSession()
@@ -437,6 +477,10 @@ export class PlayerController {
 
   private patch(partial: Partial<PlayerState>) {
     this.state = { ...this.state, ...partial }
+    this.state = { ...this.state, advances: this.state.isPlaying && !this.state.isBuffering &&
+      (this.gapless5Enabled ? this.gapless5?.isPlaying() === true :
+        !this.awaitingClip && !this.active.paused && !this.active.seeking && this.active.readyState >= HAVE_FUTURE_DATA) }
+    tarjiSignal.setClock(this.playlist[this.index]?.url ?? '', this.state.positionMs, this.state.isPlaying, this.reciter?.id ?? 0, this.state.speed)
     for (const fn of this.listeners) fn(this.state)
   }
 
@@ -466,7 +510,9 @@ export class PlayerController {
         }
         if (this.gapless5) {
           const idx = this.gapless5.getIndex()
-          if (idx >= 0 && idx !== this.index) this.syncGapless5Index(idx)
+          if (idx >= 0 && idx !== this.index) {
+            this.syncGapless5Index(idx, this.gapless5.getPositionMs(), this.gapless5.getDurationMs())
+          }
         }
         this.onTime()
         this.tickTimer = window.requestAnimationFrame(loop)
@@ -562,6 +608,12 @@ export class PlayerController {
   private schedulePrefetch() {
     const urls = this.playlistUrls()
     this.prefetcher.readAhead(urls, this.index)
+    const reciterId = this.reciter?.id ?? 0
+    const analysisUrls = urls.slice(this.index, this.index + 2)
+    tarjiSignal.retain(analysisUrls, reciterId)
+    for (const url of analysisUrls) {
+      void tarjiSignal.prepare(url, reciterId, this.prefetcher)
+    }
     if (this.gapless5Enabled) return
     void this.prepareAudioBounds(this.index)
     const next = this.peekNextIndex({ forStandby: true })
@@ -795,6 +847,7 @@ export class PlayerController {
       this.patch({ isPlaying: false })
       return
     }
+    this.notePerformance()
     if (this.gapless5Enabled) {
       await this.playIndexGapless5(i, autoplay, opts)
       return
@@ -1255,12 +1308,19 @@ export class PlayerController {
     await this.seekToAyah(ayah, positionMs)
   }
 
+  private notePerformance() {
+    this.state = { ...this.state, clockRevision: (this.state.clockRevision ?? 0) + 1,
+      inkGeneration: (this.state.inkGeneration ?? 0) + 1 }
+  }
+
   seekMs(ms: number) {
+    this.notePerformance()
     if (this.gapless5Enabled) {
       this.gapless5?.seekMs(ms)
       this.onTime()
       return
     }
+    this.programmedSeek = { targetMs: Math.max(0, ms), atMs: performance.now() }
     this.active.currentTime = Math.max(0, ms / 1000)
     this.onTime()
     this.scheduleGaplessBoundary()
@@ -1275,7 +1335,41 @@ export class PlayerController {
     void this.applyGapless5Transport()
   }
 
+  /** Apply a repeat-sheet choice, preserving a live utterance inside its range. */
+  async applyRepeat(mode: PlayerState['repeatMode'], range: PlayerState['repeatRange']) {
+    if (!this.content || !this.reciter) return
+    const total = this.content.surah.ayahCount
+    const bounds = mode === 'range' && range ? {
+      first: Math.max(1, Math.min(total, Math.trunc(range.first))),
+      last: Math.max(1, Math.min(total, Math.trunc(range.last))),
+    } : null
+    if (bounds) bounds.last = Math.max(bounds.first, bounds.last)
+    const current = this.state.nowPlaying?.surahId === this.surahId
+      ? this.state.nowPlaying.ayah : this.playlist[this.index]?.ayah ?? 1
+    const inside = bounds != null && this.state.isPlaying && current >= bounds.first && current <= bounds.last
+    const target = bounds && !inside ? bounds.first : current
+    const position = bounds && !inside ? 0 : this.state.positionMs
+    const autoplay = bounds != null || this.state.isPlaying
+    const requiredStart = mode === 'surah' ? 1 : bounds?.first
+    const full = requiredStart != null && !this.playlist.some(item => item.ayah === requiredStart)
+    this.setRepeatMode(mode === 'range' && !bounds ? 'off' : mode, bounds)
+    const generation = this.repeatSelectionGeneration
+    if (full) {
+      this.playlist = buildPlaylist(this.content, this.reciter, 1)
+      this.joins.clearStandby()
+    }
+    const index = this.playlist.findIndex(item => item.ayah === target)
+    if (index >= 0 && (full || bounds && !inside)) {
+      const pending = this.playIndex(index, autoplay, { fadeIn: false })
+      const token = this.playToken
+      await pending
+      if (generation !== this.repeatSelectionGeneration || token !== this.playToken) return
+      if (position > 0) this.seekMs(position)
+    }
+  }
+
   setRepeatMode(mode: PlayerState['repeatMode'], range: PlayerState['repeatRange'] = null) {
+    this.repeatSelectionGeneration++
     this.patch({ repeatMode: mode, repeatRange: range })
     this.active.loop = mode === 'ayah'
     this.gapless5?.applyRepeat(mode)
@@ -1294,7 +1388,14 @@ export class PlayerController {
     this.playlist = []
     this.index = 0
     this.stopTick()
-    this.patch({ ...initial, speed: this.state.speed })
+    // Sync survives a dismissed session and rejects lower revisions as stale.
+    // Keep counters cumulative for this controller; the next play rearms ink.
+    this.patch({
+      ...initial,
+      speed: this.state.speed,
+      clockRevision: this.state.clockRevision,
+      inkGeneration: this.state.inkGeneration,
+    })
   }
 
   private async onEnded() {

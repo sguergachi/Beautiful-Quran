@@ -1,0 +1,13 @@
+diff --git a/app/src/main/java/com/beautifulquran/ui/reader/ReaderViewModel.kt b/app/src/main/java/com/beautifulquran/ui/reader/ReaderViewModel.kt
+index 6704acaa..b8bea946 100644
+--- a/app/src/main/java/com/beautifulquran/ui/reader/ReaderViewModel.kt
++++ b/app/src/main/java/com/beautifulquran/ui/reader/ReaderViewModel.kt
+@@ -1530,7 +1530,7 @@ class ReaderViewModel(
+         timings[ayah]?.lastOrNull()?.endMs
+ 
+     fun cycleSpeed() {
+-        val speeds = listOf(0.75f, 1f, 1.25f, 1.5f)
++        val speeds = listOf(0.25f, 0.5f, 0.75f, 1f, 1.25f, 1.5f)
+         val current = playerState.value.speed
+         val idx = speeds.indexOfFirst { kotlin.math.abs(it - current) < 0.01f }
+         player.setSpeed(speeds[(idx + 1).mod(speeds.size)])

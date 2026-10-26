@@ -52,3 +52,55 @@ describe('Gapless5Backend', () => {
     backend.dispose()
   })
 })
+
+it('ignores look-ahead load events while the current verse plays', () => {
+  const h = handlers()
+  let instance!: FakePlayer
+  class FakePlayer {
+    onloadstart!: (path: string) => void
+    onload!: (path: string, loaded: boolean) => void
+    index = 0
+    playing = true
+    tracks: string[] = []
+    constructor() {
+      instance = this
+    }
+    setCrossfade() {}
+    getIndex() {
+      return this.index
+    }
+    isPlaying() {
+      return this.playing
+    }
+    totalTracks() {
+      return this.tracks.length
+    }
+    removeAllTracks() {
+      this.tracks = []
+    }
+    addTrack(path: string) {
+      this.tracks.push(path)
+    }
+  }
+  const backend = new Gapless5Backend(h)
+  ;(
+    backend as unknown as { constructFromModule(m: unknown): void }
+  ).constructFromModule({ Gapless5: FakePlayer })
+  backend.syncPlaylist(
+    [
+      { ayah: 1, url: 'a' },
+      { ayah: 2, url: 'b' },
+    ],
+    {} as AudioPrefetcher,
+  )
+  instance.onloadstart('b')
+  instance.onload('b', true)
+  expect(h.onBuffering).not.toHaveBeenCalled()
+  instance.playing = false
+  instance.onloadstart('a')
+  expect(h.onBuffering).toHaveBeenLastCalledWith(true)
+  instance.onload('b', true)
+  expect(h.onBuffering).toHaveBeenCalledTimes(1)
+  instance.onload('a', true)
+  expect(h.onBuffering).toHaveBeenLastCalledWith(false)
+})

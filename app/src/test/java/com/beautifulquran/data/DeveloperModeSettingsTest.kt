@@ -72,7 +72,7 @@ class DeveloperModeSettingsTest {
 
     @Test
     fun `contextual lessons keep independent persisted moments`() {
-        assertEquals(2, EducationMoment.entries.size)
+        assertEquals(3, EducationMoment.entries.size)
         assertEquals(
             EducationMoment.entries.size,
             EducationMoment.entries.map { it.preferenceKey }.distinct().size,

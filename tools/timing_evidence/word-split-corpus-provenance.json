@@ -1,0 +1,161 @@
+{
+  "bundledDbSha256": "a5f3972aeafe5a837657becd6c4aacbe894d0f00668593360e40820f52496dc8",
+  "sourceProfile": "delivered runtime views, not private authenticated snapshots",
+  "resources": {
+    "1": {
+      "schemaVersion": 1,
+      "reciterId": 1,
+      "qfReciterId": 7,
+      "audioSlug": "Alafasy_128kbps",
+      "clock": "everyayah-ms",
+      "sourceSha256": "ee3d429dbdd9ab80e2310e9bf770cf7b7f4cbdc6cfe2a90257ef6072fa4010c0",
+      "sourceSyncSequence": 541039,
+      "sourceSyncedAtMs": 1792112436683,
+      "normalizerSha256": "0f70de6fb87ccb9d2e9a581764632305f2fc0bd48d287fed57dcbe0ec7e06316",
+      "revision": "5413f8f82f0c674892b0213b5f7fb90249df38418515af65b75c933190c7739b",
+      "responseSha256": "39c01cb434bab5bb64187a7ab4b8b7b1e2c65eb3c38ba87f721742c56b7fb350"
+    },
+    "2": {
+      "schemaVersion": 1,
+      "reciterId": 2,
+      "qfReciterId": 6,
+      "audioSlug": "Husary_64kbps",
+      "clock": "everyayah-ms",
+      "sourceSha256": "60b81b993afbdc60843de545a0c148bf5d885d93bc5b8b5bbb03b8b68f7f6656",
+      "sourceSyncSequence": 541039,
+      "sourceSyncedAtMs": 1792126836655,
+      "normalizerSha256": "0f70de6fb87ccb9d2e9a581764632305f2fc0bd48d287fed57dcbe0ec7e06316",
+      "revision": "62ab354f267b624101cc7e13e303623dc31ef704a4d87b8c341aafcfb878f99e",
+      "responseSha256": "1288e81efa07ca0ae891026e9e80c99a9f3c49bc769d12ceb549be0ce6c3c130"
+    },
+    "3": {
+      "schemaVersion": 1,
+      "reciterId": 3,
+      "qfReciterId": 2,
+      "audioSlug": "Abdul_Basit_Murattal_64kbps",
+      "clock": "everyayah-ms",
+      "sourceSha256": "1893d19fcf91d60ee0011b22855bd4d232acdafb06fc3520a87836f16fb0237a",
+      "sourceSyncSequence": 541039,
+      "sourceSyncedAtMs": 1792141236398,
+      "normalizerSha256": "0f70de6fb87ccb9d2e9a581764632305f2fc0bd48d287fed57dcbe0ec7e06316",
+      "revision": "2e0a56a058b357f748aa37e0bcc85f3d8d9a139e9b843f694ee305b75076e81a",
+      "responseSha256": "d70e2e09549c66356c482a8937a8b66ff8ef133f1b6cdc5f30b69357cfd06e93"
+    },
+    "4": {
+      "schemaVersion": 1,
+      "reciterId": 4,
+      "qfReciterId": 9,
+      "audioSlug": "Minshawy_Murattal_128kbps",
+      "clock": "everyayah-ms",
+      "sourceSha256": "a145f59301feca42b727d43456368e1c7f2f87465325dd4104c863060c7eaeb2",
+      "sourceSyncSequence": 541039,
+      "sourceSyncedAtMs": 1792155637636,
+      "normalizerSha256": "0f70de6fb87ccb9d2e9a581764632305f2fc0bd48d287fed57dcbe0ec7e06316",
+      "revision": "23f7f6574bf18ab2d464bfdea062b72561a0b335c8b63d013e3f3ee016c0dea8",
+      "responseSha256": "630ad8c50bec450f625a40409d6c76ed929e6a37416df50ecfe4b68132349d6e"
+    },
+    "5": {
+      "schemaVersion": 1,
+      "reciterId": 5,
+      "qfReciterId": 3,
+      "audioSlug": "Abdurrahmaan_As-Sudais_192kbps",
+      "clock": "everyayah-ms",
+      "sourceSha256": "cef161c719204cb5a571631e9af68fb2eb121fb77abe9b196a774bc0882afd6e",
+      "sourceSyncSequence": 541039,
+      "sourceSyncedAtMs": 1792170036220,
+      "normalizerSha256": "0f70de6fb87ccb9d2e9a581764632305f2fc0bd48d287fed57dcbe0ec7e06316",
+      "revision": "8f4ac99b342ab124f097b4e58c9bd3cac80182ccd2b6486a19ace009a4060f56",
+      "responseSha256": "8962e67ef2f3fa90cdb8073a86124885e6fde9dc13596ec96f3797e55bd83b0c"
+    },
+    "7": {
+      "schemaVersion": 1,
+      "reciterId": 7,
+      "qfReciterId": 5,
+      "audioSlug": "Hani_Rifai_192kbps",
+      "clock": "everyayah-ms",
+      "sourceSha256": "aac71cabf2c73163d7793d71edc7e6adcc9acf840a0b7c7a2c80feb56ca4d79c",
+      "sourceSyncSequence": 541039,
+      "sourceSyncedAtMs": 1792184435679,
+      "normalizerSha256": "0f70de6fb87ccb9d2e9a581764632305f2fc0bd48d287fed57dcbe0ec7e06316",
+      "revision": "884edbd3fb19930b322c020b459874e342f0db6b5b38bea2112950b073e1f613",
+      "responseSha256": "419e833ce99c7a30b06adc06a47a167b20efd1bd08ee0561d1deadbb86da9ca0"
+    }
+  },
+  "archives": {
+    "xlsr": {
+      "artifact": "tools/timing_evidence/word-splits-xlsr.excerpts.jsonl.gz",
+      "scope": "bounded actual inference excerpts, not complete timing rows",
+      "rawSha256": "a044c8d9d3f3f4afad9464142cc4bb78aaa1c23b4fc2743936a68befc48db58d",
+      "archiveSha256": "d544901086e22cce086dfd3137e89cd4a29913520021d6c516e5977554c0e49c",
+      "rows": 1021,
+      "fullRawSha256": "a72ea8f747b800fbbc6b98f5f67fc2fdd01fb1e72095266ad2c31e79590922ed",
+      "fullRawPath": "/home/sammy/qasr/audits/timing-repeat-class-20261016/evidence/xlsr.jsonl"
+    },
+    "mms": {
+      "artifact": "tools/timing_evidence/word-splits-mms.excerpts.jsonl.gz",
+      "scope": "bounded actual inference excerpts, not complete timing rows",
+      "rawSha256": "a48542a4cabf5bb91760bc7e8ef269858738594ac7ec1b0cbe628eec727d90b2",
+      "archiveSha256": "fc3826eac6cd2f401ebc72bc0d520952096a6f6af6a826224b8c7095e57fda67",
+      "rows": 1021,
+      "fullRawSha256": "c156c7c234630b748987f6d7fa1000d4da458639273683afb0286343221b73f5",
+      "fullRawPath": "/home/sammy/qasr/audits/timing-repeat-class-20261016/evidence/mms.jsonl"
+    }
+  },
+  "issues": {
+    "artifact": "tools/timing_evidence/word-split-issue-inventory.json",
+    "inputSha256": "b07f6bbf9e1a67f37d47b2a5485013a4d3e214f7792f8333a5014d31838983cf",
+    "query": "gh issue list --state all --limit 1000 --json number,title,state,body",
+    "issueCount": 60,
+    "timingPatchCount": 31,
+    "parseErrors": 0
+  },
+  "agentManualListening": false,
+  "auditBaseCommit": "c48145c9",
+  "auditCodeSha256": {
+    "tools/audit_forced_alignment.py": "1b80f5da28108f71bced81c02ea6fcab404e0fe14ef88fd447640a6990245153",
+    "tools/audit_word_splits.py": "18e772057819ef3f7e15fb5a5df36bee8f23e67f086fe71021e2fd0ab90a6319",
+    "tools/timing_source_trace.py": "8a06bd293bfb2e41b9d6e99ae5112bfdc54072c0852d64782aee3a4d109206cd",
+    "tools/word_split_evidence.py": "4a6abf3017ef2cbc13fc0f332281015c5c6df46b4d3a5b20dbdc9a127a1c7eb0",
+    "tools/build_db.py": "3a85c23333cba175845cac5df72a806ae14a51ab37dd56673c42ab7e918fd8b6",
+    "tools/find_flattened_resays.py": "865cbe8b3d4f89e6a20a16784b8819440f272e6b380c2063fb03aef1ca5719c9"
+  },
+  "modelRevisions": {
+    "xlsr": "af46c2d8531b8dcbb5e23b952f739b372c2e5d2d",
+    "mms": "49402e9577b1158620820667c218cd494cc44486"
+  },
+  "sourceTraceSha256": "051a4ffe8e138e4ccdb68d368952b02b491df3d37c315cf2a247b32fa426b68f",
+  "preRewindInventory": {
+    "artifact": "tools/timing_evidence/rewind-onset-inventory.pending.json",
+    "acousticallyComplete": false,
+    "candidates": 4337,
+    "operationCompatible": 4313,
+    "fullPrivatePath": "/home/sammy/qasr/audits/timing-repeat-class-20261016/evidence/rewind-onset-inventory.full.pending.json",
+    "fullPrivateSha256": "0c40b9085efea71579378f201117b971dad3120c935d5ea543af9846c020d090"
+  },
+  "validation": {
+    "timingPatchCases": 115,
+    "pythonSuites": [
+      "test_build_db",
+      "test_unspoken_rewind_onset",
+      "test_verified_word_split",
+      "test_word_split_evidence",
+      "test_find_flattened_resays",
+      "test_qf_timing_parity",
+      "test_qf_timing_build",
+      "test_sync_qf_timings",
+      "test_qf_timing_assets",
+      "test_audit_forced_alignment"
+    ],
+    "androidJvmTests": 1511,
+    "failures": 0,
+    "skips": 0,
+    "generatedPipelineReplays": 71,
+    "publicRegressionScope": "bounded operation windows and raw acoustic proofs; complete finalizer replays verified privately"
+  },
+  "fullPipelineReplays": {
+    "path": "/home/sammy/qasr/audits/timing-repeat-class-20261016/evidence/full-pipeline-replays.json",
+    "sha256": "498cc3bebf67661e0c413cd739cc2fc99daf42119a7a571f6712edea993e7c2c",
+    "rows": 71,
+    "locallyVerified": true
+  }
+}

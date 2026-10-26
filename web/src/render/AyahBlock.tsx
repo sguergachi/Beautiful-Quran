@@ -13,7 +13,7 @@ import { formatAyahNumberMark } from '../util/digits'
 import { WordUnit } from './WordUnit'
 import { HafsWord } from './HafsWord'
 import { VerseBookmarkRibbon } from './VerseBookmarkRibbon'
-import { RepeatWashGateProvider } from './RepeatWashContext'
+import { WordMotionProvider } from './WordMotionContext'
 import { runSearchHitWash } from './inkWash'
 import { SearchHitFlash, searchHitTextRanges } from '../ui/reader/SearchHitFlash'
 
@@ -196,7 +196,7 @@ function AyahBlockInner({
   const markWithLastWord = !arabicOnly && !englishOnly && words.length > 0
 
   return (
-    <RepeatWashGateProvider>
+    <WordMotionProvider>
     <article
       ref={ayahRef}
       className="ayah-block"
@@ -257,6 +257,9 @@ function AyahBlockInner({
                 word={w}
                 ink={ink}
                 sweepMs={isActive ? activeSweepMs : null}
+                  motion={{ key: `${ayah.surahId}:${ayah.number}:${w.position}`, timing: isActive ? activeWord : null,
+                    isAyahFinal: index === words.length - 1, previousArabic: words[index - 1]?.arabic,
+                    nextArabic: words[index + 1]?.arabic }}
                 activation={isActive ? (activeWord?.activation ?? 0) : 0}
                 searchFlash={searchFocusActive && searchTargets.has(w.position)}
                 searchRecessed={searchTargetAyah && !searchTargets.has(w.position)}
@@ -297,6 +300,9 @@ function AyahBlockInner({
                   englishText={englishOnly ? englishWords[index] : undefined}
                   ink={ink}
                   sweepMs={isActive ? activeSweepMs : null}
+                  motion={{ key: `${ayah.surahId}:${ayah.number}:${w.position}`, timing: isActive ? activeWord : null,
+                    isAyahFinal: index === words.length - 1, previousArabic: words[index - 1]?.arabic,
+                    nextArabic: words[index + 1]?.arabic }}
                   activation={isActive ? (activeWord?.activation ?? 0) : 0}
                   showGloss={!englishOnly && showWordGloss}
                   showTransliteration={showTransliteration}
@@ -344,7 +350,7 @@ function AyahBlockInner({
         </p>
       ) : null}
     </article>
-    </RepeatWashGateProvider>
+    </WordMotionProvider>
   )
 }
 

@@ -50,12 +50,15 @@ fun FloatingPaperControl(
     visible: Boolean,
     modifier: Modifier = Modifier,
     enter: EnterTransition = FloatingPaperEnter,
+    /** Flight hosts pass `ExitTransition.None`: their ghost already replaces
+     * the float in place, so the retiring copy must never fade under it. */
+    exit: ExitTransition = FloatingPaperExit,
     content: @Composable () -> Unit,
 ) {
     AnimatedVisibility(
         visible = visible,
         enter = enter,
-        exit = FloatingPaperExit,
+        exit = exit,
         modifier = modifier,
     ) {
         Box(

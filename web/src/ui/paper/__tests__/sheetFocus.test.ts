@@ -11,8 +11,20 @@ describe('visible paper and keyboard ownership', () => {
 
   it('keeps exposed facing pages usable', () => {
     expect(visibleSheets(true, false, 1, true)).toEqual(['home', 'reader'])
-    expect(visibleSheets(true, false, 2, true)).toEqual(['home', 'settings'])
+    expect(visibleSheets(true, false, 2, true)).toEqual(['settings'])
     expect(visibleSheets(true, false, -1, true)).toEqual(['reader', 'bookmarks'])
+  })
+
+  it('keeps left-page controls covered by a word sheet through Settings', () => {
+    expect(visibleSheets(true, false, 1, true, true)).toEqual(['reader'])
+    expect(visibleSheets(true, false, 2, true, true)).toEqual(['settings'])
+    expect(visibleSheets(true, false, -1, true, true)).toEqual(['reader'])
+    expect(visibleSheets(true, true, 1, true, true)).toEqual(['reader'])
+  })
+
+  it('keeps the phone reader available as the word bleed host', () => {
+    expect(visibleSheets(false, false, 1, true, true)).toEqual(['reader'])
+    expect(visibleSheets(false, false, 2, true, true)).toEqual(['settings'])
   })
 
   it('covers both Mushaf leaves with Settings, and keeps Chapters off an open verso', () => {
@@ -24,5 +36,11 @@ describe('visible paper and keyboard ownership', () => {
     expect(bookSpreadEnabled(true, 'facing')).toBe(true)
     expect(bookSpreadEnabled(true, 'single')).toBe(false)
     expect(bookSpreadEnabled(false, 'facing')).toBe(false)
+  })
+
+  it('parks Mushaf scripture while Chapters or Bookmarks faces the return page', () => {
+    expect(visibleSheets(true, true, 0, true)).toEqual(['home'])
+    expect(visibleSheets(true, true, -1, true)).toEqual(['bookmarks'])
+    expect(visibleSheets(true, false, 1, false)).toEqual(['settings'])
   })
 })

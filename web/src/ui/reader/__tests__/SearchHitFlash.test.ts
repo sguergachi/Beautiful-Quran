@@ -21,4 +21,10 @@ describe('SearchHitFlash', () => {
     expect(searchHitTextRanges('a companion [in Hellfire]', 'hell')).toEqual([[16, 24]])
     expect(searchHitTextRanges('a companion [in Hellfire]', '"Hell"')).toEqual([[16, 24]])
   })
+
+  it('locates equivalent contraction text while keeping quoted searches literal', () => {
+    expect(searchHitTextRanges('(does) not love', "doesn't love")).toEqual([[0, 15]])
+    expect(searchHitTextRanges("doesn't love", 'does not love')).toEqual([[0, 12]])
+    expect(searchHitTextRanges('does not love', '"doesn\'t love"')).toEqual([])
+  })
 })

@@ -86,5 +86,8 @@ but the permanent result is still a systematic pipeline fix.
 2. Fix `clean_qdc_artifacts`, repair rebasing, or the repair generator.
 3. Add `tools/timing_patch_cases/<id>.json` from the broken input and expected
    fix (see [timing_patch_cases/README.md](../timing_patch_cases/README.md)).
-4. Delete the local override, run `python3 tools/test_build_db.py`, rebuild the
-   database, and bump `DB_FILE_NAME`.
+4. Delete the local override and run `python3 tools/test_build_db.py`. For QF
+   runtime voices, follow the authenticated replay, acoustic-verdict and runtime
+   publication path in [TIMINGS_LAB.md](../../docs/TIMINGS_LAB.md#getting-corrections-upstream).
+   Rebuild the database and bump its version/fingerprint only when independent
+   bundled timing content changes.
