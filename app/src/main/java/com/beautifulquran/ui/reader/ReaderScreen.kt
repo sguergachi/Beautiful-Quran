@@ -1780,6 +1780,11 @@ fun ReaderScreen(
                             },
                             modifier = Modifier
                                 .fillMaxWidth()
+                                // The close mark is nudged onto the text rule
+                                // without moving its slot, so the query takes
+                                // its own air instead of starting under the
+                                // mark's trailing edge.
+                                .padding(start = 12.dp)
                                 .focusRequester(searchFocus),
                         )
                     } else {
@@ -1880,6 +1885,14 @@ fun ReaderScreen(
                                     },
                                     tint = MaterialTheme.colorScheme.onSurfaceVariant
                                         .copy(alpha = 0.55f),
+                                    // Centred on the query's cap height, not its
+                                    // line box: the descender pulls the box's
+                                    // middle ~2 dp below the line the eye reads.
+                                    modifier = if (search.active) {
+                                        Modifier.offset(y = (-2).dp)
+                                    } else {
+                                        Modifier
+                                    },
                                 )
                             }
                         } else {
@@ -1905,45 +1918,56 @@ fun ReaderScreen(
                 },
                 actions = {
                     if (search.active) {
-                        Text(
-                            text = if (searchMatches.isEmpty()) {
-                                if (activeQuery == null) "" else "0/0"
-                            } else {
-                                "${currentMatch + 1}/${searchMatches.size}"
-                            },
-                            style = MaterialTheme.typography.labelMedium,
-                            color = QuranTheme.ink.muted,
-                        )
-                        IconButton(
-                            onClick = {
-                                if (searchMatches.isNotEmpty()) {
-                                    keyboard?.hide()
-                                    search.index =
-                                        (currentMatch - 1 + searchMatches.size) % searchMatches.size
-                                }
-                            },
-                            enabled = searchMatches.isNotEmpty(),
+                        // The match group ends on the text rule, like the
+                        // settings mark, and reserves the count's slot so the
+                        // field's measure never jumps when the tally changes.
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.padding(end = topBarEndShift),
                         ) {
-                            Icon(
-                                Icons.Rounded.KeyboardArrowUp,
-                                contentDescription = "Previous match",
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            Text(
+                                text = if (searchMatches.isEmpty()) {
+                                    if (activeQuery == null) "" else "0/0"
+                                } else {
+                                    "${currentMatch + 1}/${searchMatches.size}"
+                                },
+                                style = MaterialTheme.typography.labelMedium,
+                                color = QuranTheme.ink.muted,
+                                textAlign = TextAlign.End,
+                                maxLines = 1,
+                                modifier = Modifier.widthIn(min = 40.dp),
                             )
-                        }
-                        IconButton(
-                            onClick = {
-                                if (searchMatches.isNotEmpty()) {
-                                    keyboard?.hide()
-                                    search.index = (currentMatch + 1) % searchMatches.size
-                                }
-                            },
-                            enabled = searchMatches.isNotEmpty(),
-                        ) {
-                            Icon(
-                                Icons.Rounded.KeyboardArrowDown,
-                                contentDescription = "Next match",
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
+                            IconButton(
+                                onClick = {
+                                    if (searchMatches.isNotEmpty()) {
+                                        keyboard?.hide()
+                                        search.index =
+                                            (currentMatch - 1 + searchMatches.size) % searchMatches.size
+                                    }
+                                },
+                                enabled = searchMatches.isNotEmpty(),
+                            ) {
+                                Icon(
+                                    Icons.Rounded.KeyboardArrowUp,
+                                    contentDescription = "Previous match",
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                            }
+                            IconButton(
+                                onClick = {
+                                    if (searchMatches.isNotEmpty()) {
+                                        keyboard?.hide()
+                                        search.index = (currentMatch + 1) % searchMatches.size
+                                    }
+                                },
+                                enabled = searchMatches.isNotEmpty(),
+                            ) {
+                                Icon(
+                                    Icons.Rounded.KeyboardArrowDown,
+                                    contentDescription = "Next match",
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                            }
                         }
                     } else {
                         if (!mushafMode) {
