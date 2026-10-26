@@ -16,9 +16,10 @@ illuminates in time with the audio, with its English meaning beneath it.
 
 ## Install on your phone
 
-Grab **BeautifulQuran.apk** from the
-[latest release](../../releases/latest), open it on your Android phone
-(Android 8.0+), and allow the install when prompted.
+Beautiful Quran is in closed beta on Google Play (Android 8.0+). Testers
+install it from the
+[Play Store listing](https://play.google.com/store/apps/details?id=com.beautifulquran);
+the product page at the project homepage is a coming-soon page that points there.
 
 ### Voice commands
 

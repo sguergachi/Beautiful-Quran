@@ -88,11 +88,11 @@ docs/                   Architecture, design language, performance, timings docs
 docs/QURAN_TYPOGRAPHY.md  What a mushaf page is: the rules a line is set by
                         (§13 is the English leaf — the same book in English)
 tools/measure_english_leaves.py  Where the English leaf's fit constants come from
-                        …and the GitHub Pages product page (index.html + styles.css)
+                        …and the product page (index.html + styles.css), served by Cloudflare
 docs/ornaments.css      Generated: the product page's ornaments (see below); do not hand-edit
 web/                    Browser port (Vite + React): Focus / Highlight / Ink + paper reader
 .github/workflows/build.yml   CI: tests on all branches; assembleRelease + publish APK on master only
-.github/workflows/web.yml     CI: Vitest + web build; deploys a Pages artifact on master
+.github/workflows/web.yml     CI: Vitest + web build + product-page staging check (no web deploy)
 ```
 
 ## Quran.ai MCP — reliable Quran reference
@@ -168,7 +168,7 @@ python3 tools/test_build_db.py  # timing pipeline regressions (~1s, no Gradle)
   and WordNet sources plus exact 6,236-ayah coverage. See `docs/SEARCH.md` and
   the adjacent attribution file.
 - `docs/ornaments.css` and `docs/ornaments/*.svg` are **committed** too: the
-  Pages workflow copies `docs/` verbatim, so the product page can't run the
+  site staging (`scripts/stage_site.mjs`) copies them verbatim, so the product page can't run the
   TypeScript ornament generator itself. `npm run build:ornaments` (from `web/`)
   re-runs it and rewrites both. Only do that to deliberately re-gild the page —
   a different seed grows an entirely different composition.

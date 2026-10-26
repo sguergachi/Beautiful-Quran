@@ -4,19 +4,14 @@ Browser port of Beautiful Quran: the same Focus / Highlight / Ink engines,
 the same paper metaphor, and word-by-word highlighting synced to
 recitation audio.
 
-## Live
+## Hosting
 
-https://sguergachi.github.io/Beautiful-Quran/app/
-
-Linked from the project homepage as **Open web reader**.
-
-GitHub Actions stages the marketing content from `docs/` and builds the reader
-under `/app/`, then deploys the combined tree as a GitHub Pages artifact. Build
-output is never committed back to `master`.
-
-Repository **Settings → Pages → Build and deployment → Source** must be
-**GitHub Actions**. Selecting the legacy `master /docs` source deploys only the
-marketing files and overwrites `/app/` with a 404.
+**The web reader is not deployed.** The repository is private and the product
+page is a mobile-app coming-soon page served by Cloudflare (`wrangler.jsonc`
+`assets`, staged by `scripts/stage_site.mjs`). CI still runs the web tests and
+build; nothing publishes `web/` output. Bringing it back means adding its build
+to the staging script and re-pointing `build:pages` (its base is still the old
+`/Beautiful-Quran/app/` Pages path).
 
 ## Repeat in the book
 
