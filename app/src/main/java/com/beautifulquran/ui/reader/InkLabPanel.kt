@@ -117,6 +117,30 @@ fun InkLabPanel(
                 val guide = InkEngine.contextualGuideTuning
                 when (tab) {
                     InkLabTab.Ink -> {
+                        LabCaption("Wet ink on the Paper theme. Turn off for the soft paper-cover wash.")
+                        TuningToggle("Paper ink", t.paperInk) {
+                            InkEngine.tuning = t.copy(paperInk = it)
+                        }
+                        TuningToggle("Flowing ink", t.paperInkFlowing) {
+                            InkEngine.tuning = t.copy(paperInkFlowing = it)
+                        }
+                        TuningSlider("Ink pooling", t.paperInkPooling, 0f..1f) {
+                            InkEngine.tuning = t.copy(paperInkPooling = it)
+                        }
+                        TuningSlider("Reflection", t.paperInkReflection, 0f..1f) {
+                            InkEngine.tuning = t.copy(paperInkReflection = it)
+                        }
+                        TuningSlider("Softness", t.paperInkSoftness, 0f..1f) {
+                            InkEngine.tuning = t.copy(paperInkSoftness = it)
+                        }
+                        TuningSlider("Lead fade", t.paperInkLeadFade, 0f..1f) {
+                            InkEngine.tuning = t.copy(paperInkLeadFade = it)
+                        }
+                        LabCaption("Lead fade adjusts the Arabic preview. English keeps its one-letter edge.")
+                        TuningSlider("Dry-down ms", t.glintFadeMs.toFloat(), 100f..2400f, integer = true) {
+                            InkEngine.tuning = t.copy(glintFadeMs = it.roundToInt())
+                        }
+                        LabCaption("How long wet ink takes to settle. Also controls the glimmer's decay.")
                         TuningSlider("Upcoming ink", t.upcomingAlpha, 0.05f..0.6f) {
                             InkEngine.tuning = t.copy(upcomingAlpha = it)
                         }
@@ -152,29 +176,6 @@ fun InkLabPanel(
                         }
                         TuningSlider("Halo blur", t.glintGlowRadius, 0f..10f) {
                             InkEngine.tuning = t.copy(glintGlowRadius = it)
-                        }
-                        LabCaption(
-                            "Paper ink (Paper theme, Android 13+): wet ink swells out " +
-                                "from each stroke's core and dries over Glitter time. " +
-                                "Off keeps the paper-cover wash. docs/PAPER_INK.md",
-                        )
-                        TuningToggle("Paper ink", t.paperInk) {
-                            InkEngine.tuning = t.copy(paperInk = it)
-                        }
-                        TuningToggle("Flowing ink", t.paperInkFlowing) {
-                            InkEngine.tuning = t.copy(paperInkFlowing = it)
-                        }
-                        TuningSlider("Ink pooling", t.paperInkPooling, 0f..1f) {
-                            InkEngine.tuning = t.copy(paperInkPooling = it)
-                        }
-                        TuningSlider("Reflection", t.paperInkReflection, 0f..1f) {
-                            InkEngine.tuning = t.copy(paperInkReflection = it)
-                        }
-                        TuningSlider("Softness", t.paperInkSoftness, 0f..1f) {
-                            InkEngine.tuning = t.copy(paperInkSoftness = it)
-                        }
-                        TuningSlider("Lead fade", t.paperInkLeadFade, 0f..1f) {
-                            InkEngine.tuning = t.copy(paperInkLeadFade = it)
                         }
                     }
 

@@ -191,11 +191,15 @@ are needed.
 
 ## Tuning
 
-Ink Lab → Sweep: **Paper ink** (on), **Flowing ink** (off = Inside out),
+Ink Lab → **Ink**: **Paper ink** (on), **Flowing ink** (off = Inside out),
 **Ink pooling** 0.25, **Reflection** 0.5, **Softness** 0, **Lead fade** 0.5
-(one letter). **Glitter time ms** is the dry-down for both the glimmer and the
-paper ink. Paper's repeat ink is the study's terracotta `#C25F3B`; the shader
-dries it toward warm paper.
+(one Arabic preview letter), and **Dry-down ms** 1,000. English retains its
+fixed one-letter preview within the current word. Dry-down edits the same
+saved value as Sweep → **Glitter time ms**, shared by glimmer and Paper ink.
+The controls apply live, persist across restarts, and participate in Reset and
+Copy values. Moving them into Ink does not change the shipped appearance or
+playback timing. Paper's repeat ink is the study's terracotta `#C25F3B`; the
+shader dries it toward warm paper.
 
 ## Tests
 

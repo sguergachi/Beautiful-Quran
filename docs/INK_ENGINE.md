@@ -821,3 +821,10 @@ starts above zero; more precision near the floor when it includes zero) so
 small values stay fine-grained while large ends stay reachable. Slider
 meanings, defaults, ranges, and the halo artifact stress check are documented
 in [GLIMMER.md](GLIMMER.md#ink-lab-controls).
+
+The **Ink** tab starts with the Paper ink appearance controls: Paper ink and
+Flowing ink switches, pooling, reflection, softness, Arabic lead fade, and
+**Dry-down ms**. Dry-down edits the same persisted `glintFadeMs` as Sweep's
+Glitter time, so it also adjusts glimmer decay. English keeps its fixed
+one-letter preview. These controls reuse the existing tuning, persistence,
+Copy values and Reset paths; neither appearance defaults nor pacing change.

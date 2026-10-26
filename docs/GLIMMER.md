@@ -706,6 +706,10 @@ on the clipboard (also written to Logcat under tag `InkLab`). Turn **Focus** off
 (next to Copy values) to freeze auto-home and word-band follow while you pan
 and inspect ink; the toggle is session-only and not part of `Tuning`.
 
+For the Paper theme's visual controls, use **Ink**: pooling, reflection,
+softness, Arabic lead fade, and **Dry-down ms**. Dry-down is another label for
+the same saved value as Sweep's Glitter time. See [Paper ink tuning](PAPER_INK.md#tuning).
+
 | Slider | `InkEngine.Tuning` | Shipped value | Range | Effect |
 |---|---|---:|---:|---|
 | Repeat ink | `repeatInkAlpha` | 1.0 | 0.2–1 | Peak strength of the orange repeat overlay (and search-hit flash). Hue stays theme-owned (`QuranAccents.repeatInk`). |
