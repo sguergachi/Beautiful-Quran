@@ -2,7 +2,7 @@
   "verses": 6236,
   "arabic_slots": 77429,
   "printed_tokens": 158066,
-  "manifest_sha256": "86eef80b40775775e71bcbae4ec6902d463a736398c1e3d6566e55bc535a2cae",
+  "manifest_sha256": "7cd8709096369b7ed63bbd4e40024c5abc0946e12393b38395d954cc48c08878",
   "approved_verses": 144,
   "approved_tokens": 4571,
   "fallback_verses": 6092,
@@ -13,5 +13,5 @@
   "approval_policy": "ai_reviewed",
   "ai_reviewed_verses": 144,
   "semantic_accuracy_established": false,
-  "artifact_sha256": "d46fbe518c70c6ff0501e40cee23568161099b2766268bdee7384314d6c5de14"
+  "artifact_sha256": "107b5e1cdb64e8a8c54397e3f5a389a496e4f8e4c3c05ccb6d81523c8ec3f147"
 }

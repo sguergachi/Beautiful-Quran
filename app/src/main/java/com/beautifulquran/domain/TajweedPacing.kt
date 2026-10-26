@@ -186,6 +186,7 @@ object TajweedPacing {
          * sustains the *previous* word's nūn, so the listener hears no hold
          * on this word. Gates the tarjīʿ shimmer's eligibility. */
         val hasStrongHold: Boolean = false,
+        private val letterCurve: Curve? = null,
     ) {
         /** Centre the wash's soft edge on each letter hold. The renderer travels
          * across the word plus its feather; endpoints still start unread and
@@ -200,8 +201,12 @@ object TajweedPacing {
                 },
                 letterCount,
                 hasStrongHold,
+                letterCurve ?: this,
             )
         }
+
+        /** Letter position before the paper-cover feather extends the wash's travel. */
+        fun atLetters(t: Float): Float = (letterCurve ?: this).at(t)
 
         fun at(t: Float): Float {
             if (t >= 1f) return 1f
@@ -467,6 +472,20 @@ object TajweedPacing {
         var madd = false
         var silent = false
         val haraka: Boolean get() = fatha || damma || kasra
+    }
+
+    /**
+     * Character offsets of the letters [curve] paces across, in text order:
+     * one per event of the tokenizer, so a renderer can put each letter's slot
+     * where the font drew it (the paper ink's letter-paced fields).
+     */
+    fun letterOffsets(arabic: String): IntArray {
+        val offsets = ArrayList<Int>(arabic.length)
+        for (i in arabic.indices) {
+            val ch = arabic[i]
+            if (ch == ALEF_MADDA || isBaseLetter(ch)) offsets += i
+        }
+        return offsets.toIntArray()
     }
 
     private fun tokenize(arabic: String): List<Event> {

@@ -76,6 +76,12 @@
                 android:resource="@xml/shortcuts" />
         </activity>
 
+        <activity
+            android:name=".ui.reader.PaperInkStudyActivity"
+            android:exported="true"
+            android:screenOrientation="portrait"
+            android:theme="@style/Theme.BeautifulQuran" />
+
         <service
             android:name=".playback.PlaybackService"
             android:exported="true"

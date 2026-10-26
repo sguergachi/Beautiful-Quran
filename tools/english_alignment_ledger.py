@@ -24,7 +24,7 @@ COMPONENTS = [
     "data/quran.db", "tools/ExportEnglishAlignment.kt", "tools/english_alignment_ledger.py",
     "docs/ENGLISH_ALIGNMENT_LEDGER.md",
     *[f"app/src/main/java/com/beautifulquran/{name}" for name in (
-        "domain/EnglishTypography.kt", "domain/ArabicNormalize.kt", "domain/EnglishWordAlignment.kt",
+        "domain/EnglishTypography.kt", "domain/ArabicNormalize.kt", "domain/EnglishWordAlignment.kt", "domain/EnglishPhrase.kt",
         "domain/ReviewedEnglishAlignment.kt", "data/model/Models.kt",
     )],
 ]
@@ -105,7 +105,7 @@ def export_corpus(output, draft_corpus=None):
         source = directory / "input.tsv"
         source.write_text("\n".join(lines) + "\n")
         jar = directory / "export.jar"
-        kotlin = [SOURCE / f for f in ("domain/EnglishWordAlignment.kt", "domain/EnglishTypography.kt",
+        kotlin = [SOURCE / f for f in ("domain/EnglishWordAlignment.kt", "domain/EnglishPhrase.kt", "domain/EnglishTypography.kt",
             "domain/ArabicNormalize.kt", "domain/ReviewedEnglishAlignment.kt", "data/model/Models.kt")]
         subprocess.run(["kotlinc", *map(str, kotlin), str(REPO / "tools/ExportEnglishAlignment.kt"),
             "-include-runtime", "-d", str(jar)], check=True)
@@ -185,7 +185,8 @@ def compile_verse(row, binding, ai_reviewed=False):
             require(len({t["ink_anchor"] for t in unit}) == 1, "A one-word expansion must share ink")
     ink = ",".join(str(t["ink_anchor"]) for t in tokens)
     heads = ",".join(str(t["head"]) for t in tokens)
-    return "\t".join([row["verse"], row["fingerprint"], ink, "=" if heads == ink else heads])
+    linked = "".join("1" if t["contributors"] else "0" for t in tokens)
+    return "\t".join([row["verse"], row["fingerprint"], ink, "=" if heads == ink else heads, linked])
 
 
 def compile_ledger(ledger, manifest, allow_partial=False, ai_reviewed=False):

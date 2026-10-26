@@ -37,8 +37,21 @@ class InkLabStoreTest {
         assertEquals(0, InkEngine.DEFAULT_HIGHLIGHT_LEAD_MS)
         assertEquals(500, InkEngine.DEFAULT_FADE_LEAD_MS)
         // The camera's lead is its own number, not a copy of the ink's.
-        assertEquals(500, InkEngine.DEFAULT_SCROLL_LEAD_MS)
+        assertEquals(100, InkEngine.DEFAULT_SCROLL_LEAD_MS)
         assertNull(InkLabSnapshot().outputLatencyOverrideMs)
+    }
+
+    @Test
+    fun oldSaves_adoptScrollLeadWithoutResettingOtherTuning() {
+        for ((schema, lead) in listOf(2 to 500, 3 to 0)) {
+            val saved = InkLabSnapshot(schema = schema, scrollLeadMs = lead,
+                glintGlowRadius = 8f, paperInkPooling = .4f, fadeLeadMs = 650)
+            val migrated = InkLabSnapshot.decode(InkLabSnapshot.encode(saved))!!
+            assertEquals(saved.copy(schema = InkLabSnapshot.SCHEMA, scrollLeadMs = 100), migrated)
+            // The migration runs once; subsequent scroll-lead auditions still persist.
+            val retuned = migrated.copy(scrollLeadMs = 444)
+            assertEquals(retuned, InkLabSnapshot.decode(InkLabSnapshot.encode(retuned)))
+        }
     }
 
     @Test
@@ -58,6 +71,36 @@ class InkLabStoreTest {
         )
         val restored = InkLabSnapshot.decode(InkLabSnapshot.encode(original))
         assertEquals(original, restored)
+    }
+
+    @Test
+    fun oldSaves_adoptSlowerRepeatReleaseWithoutResettingTheCameraOrInk() {
+        val saved = InkLabSnapshot(schema = 4, repeatFadeOutMs = 900,
+            scrollLeadMs = 444, paperInkPooling = .4f, glintGlowRadius = 8f, fadeLeadMs = 650)
+        val migrated = InkLabSnapshot.decode(InkLabSnapshot.encode(saved))!!
+        assertEquals(saved.copy(schema = InkLabSnapshot.SCHEMA, repeatFadeOutMs = 1_800), migrated)
+        // Only old profiles migrate; later auditions still survive a restart.
+        val retuned = migrated.copy(repeatFadeOutMs = 2_400)
+        assertEquals(retuned, InkLabSnapshot.decode(InkLabSnapshot.encode(retuned)))
+    }
+
+    @Test
+    fun oldSaves_matchChromeFadesWithoutResettingCustomTuning() {
+        val saved = InkLabSnapshot(schema = 5, inkFadeMs = 400,
+            ayahMarkFadeMs = 400, recessMs = 400, repeatFadeOutMs = 2_400,
+            scrollLeadMs = 444, paperInkPooling = .4f)
+        val migrated = InkLabSnapshot.decode(InkLabSnapshot.encode(saved))!!
+        assertEquals(saved.copy(schema = InkLabSnapshot.SCHEMA,
+            inkFadeMs = InkEngine.CHROME_RECEDE_MS,
+            ayahMarkFadeMs = InkEngine.CHROME_RECEDE_MS,
+            recessMs = InkEngine.CHROME_RECEDE_MS), migrated)
+
+        val custom = saved.copy(inkFadeMs = 640, ayahMarkFadeMs = 700, recessMs = 800)
+        assertEquals(custom.copy(schema = InkLabSnapshot.SCHEMA),
+            InkLabSnapshot.decode(InkLabSnapshot.encode(custom)))
+        // A new audition at the old duration must still survive a restart.
+        val retuned = migrated.copy(inkFadeMs = 400, ayahMarkFadeMs = 400, recessMs = 400)
+        assertEquals(retuned, InkLabSnapshot.decode(InkLabSnapshot.encode(retuned)))
     }
 
     @Test

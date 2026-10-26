@@ -6,6 +6,37 @@ import org.junit.Test
 
 class ReviewedEnglishAlignmentTest {
     @Test
+    fun `contributor provenance keeps reviewed inversions readable and literal deadlines honest`() {
+        val text = "Allah helped us."
+        val arabic = listOf("نَصَرَنَا", "ٱللَّهُ")
+        val record = EnglishAlignmentRecord(ReviewedEnglishAlignment.fingerprint(text, arabic),
+            listOf(2, 1, 1), sourceLinked = listOf(true, true, true))
+        val alignment = ReviewedEnglishAlignment.alignment(text, arabic, record, listOf("helped us", "Allah"))!!
+        assertEquals(text, alignment.readingText)
+        assertEquals(1, alignment.phrases!!.size)
+        assertEquals(2, alignment.phrases!!.single().lastPosition)
+        assertEquals(listOf(2, 1), alignment.timingWords.map { it.position })
+        assertEquals(2, alignment.positionAt(.1f))
+        val addition = ReviewedEnglishAlignment.alignment(text, arabic,
+            record.copy(sourceLinked = listOf(false, true, true)), listOf("helped us", "Allah"))!!
+        assertFalse(addition.timingWords.any { it.position == 2 })
+        val missingGlosses = ReviewedEnglishAlignment.alignment(text, arabic, record)!!
+        assertTrue(missingGlosses.timingWords.isEmpty())
+        assertNotNull(missingGlosses.phrases)
+    }
+
+    @Test
+    fun `compiled contributor bits are validated while older four-column records still load`() {
+        val header = "# ${ReviewedEnglishAlignment.FORMAT}"
+        val prefix = "1:1\t${record.fingerprint}\t1,1,1\t="
+        assertNull(ReviewedEnglishAlignment.read(sequenceOf(header, prefix)).getValue("1:1").sourceLinked)
+        assertEquals(listOf(true, false, true),
+            ReviewedEnglishAlignment.read(sequenceOf(header, "$prefix\t101")).getValue("1:1").sourceLinked)
+        for (bits in listOf("10", "102", "")) {
+            assertThrows(IllegalArgumentException::class.java) { ReviewedEnglishAlignment.read(sequenceOf(header, "$prefix\t$bits")) }
+        }
+    }
+    @Test
     fun `fixed contract agrees with offline SHA and tokenizer and real asset parses`() {
         val (text, surfaces, fingerprint, encoded) = javaClass.getResourceAsStream("/english-ledger-contract.tsv")!!
             .bufferedReader().use { it.readText().trim().split('\t') }

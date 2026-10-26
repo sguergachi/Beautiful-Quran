@@ -807,8 +807,8 @@ lyrics treatment, never a background block:
 | Upcoming (in the active ayah) | 30 % |
 | **Active (being recited)** | letters ink in one by one (below) |
 | Recited | settles to 80 % over 450 ms |
-| Non-active ayahs during playback | word-level Upcoming ink in every mode (already faint before handoff; no block-alpha brightening) |
-| Ayah number mark (`﴿N﴾`) | Upcoming ink while the verse is recessed; fades to full over 400 ms when that verse is in focus (gloss, English, and Arabic-only) |
+| Non-active ayahs during playback | Scroll: word-level Upcoming ink. Mushaf: earlier visible verses keep full ink; later verses wait under Upcoming paper. |
+| Ayah number mark (`﴿N﴾`) | Upcoming ink while the verse is recessed; fades to full over 520 ms when that verse is in focus (gloss, English, and Arabic-only) |
 
 The active word doesn't switch on — it is *written*: a soft alpha band
 sweeps across the glyphs (right-to-left for Arabic, left-to-right for the
@@ -831,7 +831,13 @@ recede over ~520 ms (Material ease-in-out): scroll/web chrome fades to 8 %,
 and mushaf secondary controls to 5 %. Enabled repeat (one verse, chapter, or
 range) and speed other than 1× stay fully lit and tappable alongside
 play/pause and rewind/forward. Pause, and the chrome breathes back. Non-active
-verses recess to upcoming ink over ~400 ms.
+Scroll verses, their secondary text and verse marks recess to upcoming ink
+over the same 520 ms and easing as the controls: any verse showing full ink —
+the page at rest when play begins, or the verse giving up the lyric line —
+eases back under its paper cover on that clock, while a verse that has only ever
+waited, or mounts during playback, keeps the Upcoming floor from its first frame.
+Mushaf keeps earlier verses inked on the current page as the wash advances, in
+both Arabic and English.
 
 In Mushaf, the reciter name and its chevron share the secondary controls'
 fade to 5 % while playing and return on pause. The name cannot be tapped
@@ -955,7 +961,9 @@ not the app's.
 - **Developer comparison**: Settings → Developer can switch to the previous
   EB Garamond / Cormorant / system-sans profile and its original type sizes
   and leading. The English leaf measures and paginates against the selected
-  book face, using the current whole-word rag and full-column bismillah fit.
+    book face, using whole-word justification and full-column bismillah fit.
+  Each selected book face uses one font size across all English leaves;
+  long verses continue onto the next leaf instead of shrinking the type.
   Customize previews and share images follow the selected profile too.
   Arabic typefaces and sizing stay the same.
 - **The reader's hand**: Junicode's real *Italic* at Medium for verse notes,
@@ -1422,7 +1430,7 @@ weight.
 ## Motion
 
 - Everything ≤ 400 ms except the deliberate slow moves: chrome recede
-  (520 ms), chapter-opening travel (480 ms), verse ink recess (400 ms), ayah dim (600 ms), and the
+  (520 ms), chapter-opening travel (480 ms), verse ink recess (520 ms), ayah dim (600 ms), and the
   hand-initiated ayah-jump scroll
   (≈280 ms nearby → a full **1000 ms** for a ~200-verse jump — a fast
   decelerating rush across a distance-scaled stretch of verses, truncated

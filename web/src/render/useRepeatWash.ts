@@ -2,6 +2,7 @@ import { useLayoutEffect, useRef, type RefObject } from 'react'
 import {
   getTuning,
   InkState,
+  minSweepFloorMs,
   pacing,
   type InkWord,
 } from '../ui/reader/InkEngine'
@@ -11,6 +12,7 @@ import { tarjiSignal } from '../playback/tarjiSignal'
 import { highlightTimeline, mediaWashProgress } from '../playback/highlightTimeline'
 import { cubicBezierEase } from '../ui/theme/Fade'
 import { applyMask, cachedWashMask, runRepeatFadeOut } from './inkWash'
+import { englishRevealDurationMs } from '../ui/reader/EnglishRevealTiming'
 
 /** Android rememberRepeatWash: measured dwell, concurrent residuals, history
  * already complete on seek. A preceding orange wash never delays live speech.
@@ -69,12 +71,15 @@ export function useRepeatWash(
       return
     }
     const t = { ...getTuning() }
-    const duration = Math.max(
+    const ordinaryDuration = Math.max(
       1,
       motion?.timing
         ? motion.timing.durationMs / tarjiSignal.speed
         : t.repeatSweepMs,
     )
+    const duration = english
+      ? englishRevealDurationMs(ordinaryDuration, minSweepFloorMs(), motion?.timing?.spokenMs, tarjiSignal.speed)
+      : ordinaryDuration
     const curve =
       !english && motion?.timing
         ? pacing(

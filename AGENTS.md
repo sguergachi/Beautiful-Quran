@@ -289,7 +289,13 @@ python3 tools/test_build_db.py  # timing pipeline regressions (~1s, no Gradle)
     When spoken Arabic maps to a later English word because of sentence order,
     advance the wash through that meaning and every English word before it.
     Prioritize the meaning being heard; preserve the soft leading edge required
-    by invariant #7. Glimmer, repeat tint, seeks, and page transitions must never
+    by invariant #7. For published English translation Mushaf, the user clarified
+    on 2026-10-24 that reordered phrases use readable phrase pacing: the
+    continuous edge may reach a meaning later than its Arabic word. On 2026-10-25 the user further
+    required steady movement through connected speech, holding the fractional
+    edge only in known quiet rather than restarting speed at every owner. Semantic
+    tap/hold/repeat owners stay exact where known. Arabic and English word-card
+    order retain their existing policy. Glimmer, repeat tint, seeks, and page transitions must never
     create gaps in the underlying wash. Any highlighting change must preserve
     this rule and test reordered phrases and interrupted playback.
 
@@ -420,6 +426,7 @@ this document combined: `ReaderComponents.kt` (~36k tokens),
 | `docs/PERFORMANCE.md` | Anything touching the reader, scrolling, or the highlight loop |
 | `docs/REPEAT_HIGHLIGHTING.md` | Repeat-aware timings and the orange second fade |
 | `docs/GLIMMER.md` | Nightfall glimmer lifecycle, repeat retriggering, halo rendering, tuning, and visual checks |
+| `docs/PAPER_INK.md` | Paper theme's wet-ink pipeline: one generator + shader every reader surface draws through, its fallbacks and tuning |
 | `docs/ANNOTATIONS.md` | Verse annotations (ḥawāshī) — reader's notes now, scholars' glosses later |
 | `docs/ROOT_VIEWER.md` | Hold-to-reveal root lexicon — concordance counts, ayah jumps, QAC data |
 | `docs/SEARCH.md` | Home search ranking, exact quotes, QAC roots, QSAC concepts, asset rebuild |

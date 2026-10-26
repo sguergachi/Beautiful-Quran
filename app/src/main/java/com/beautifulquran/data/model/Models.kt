@@ -70,7 +70,13 @@ data class SurahContent(
 )
 
 /** Compiled review decisions; exact text/surface binding is checked before use. */
-data class EnglishAlignmentRecord(val fingerprint: String, val inkAnchors: List<Int>, val heads: List<Int> = inkAnchors)
+data class EnglishAlignmentRecord(
+    val fingerprint: String,
+    val inkAnchors: List<Int>,
+    val heads: List<Int> = inkAnchors,
+    /** Null identifies an older artifact without contributor provenance. */
+    val sourceLinked: List<Boolean>? = null,
+)
 
 /** Read-only Quran text joined to one of the reader's persisted bookmarks. */
 data class BookmarkedAyah(

@@ -769,11 +769,18 @@ fun ReaderScreen(
     // tail is exactly the lit region the wait must cover), and it releases
     // only after the buffer has carried the voice for a moment, so a
     // starving stream's brief ready windows cannot strobe the page between
-    // download bursts.
+    // download bursts. Explicit word-play keeps its requested prefix through
+    // this cover; WordTapInk scopes that exception to the sought performance.
+    // A word tap is not that wait: until its sought word is heard the page
+    // keeps the ordinary recitation look (WordTapVoiceWait).
+    val wordTapAwaitingVoice by viewModel.wordTapAwaitingVoice.collectAsStateWithLifecycle()
+    val recessingAyahs = recitingActive || wordTapAwaitingVoice
     var streamWait by remember { mutableStateOf(false) }
-    LaunchedEffect(playerState.isBuffering) {
-        if (playerState.isBuffering) {
+    LaunchedEffect(playerState.isBuffering, wordTapAwaitingVoice) {
+        if (streamWaitEngages(playerState.isBuffering, wordTapAwaitingVoice)) {
             streamWait = true
+        } else if (wordTapAwaitingVoice) {
+            streamWait = false
         } else {
             delay(STREAM_WAIT_RELEASE_HOLD_MS)
             streamWait = false
@@ -904,23 +911,22 @@ fun ReaderScreen(
     }
     var listCoordinates by remember { mutableStateOf<LayoutCoordinates?>(null) }
     val scope = rememberCoroutineScope()
-    val onKeepWordInView: (() -> Pair<Float, Float>?) -> Unit = remember(
+    // Stay in the word modifier's LaunchedEffect: advancing the word, pausing,
+    // or hand scrolling must cancel its correction even while it waits for a
+    // verse glide's focus lock. A screen-scope launch outlives that word.
+    val onKeepWordInView: suspend (() -> Pair<Float, Float>?) -> Unit = remember(
         focusController,
         wordBandBottomMarginPx,
         wordFocusRequest,
     ) {
         val request = wordFocusRequest
         { measure ->
-            scope.launch {
-                val measured = focusController.keepWordInView(
-                    // Bottom-only: lift words clear of the play-bar fold; do not
-                    // pull short verses down from their reading-line anchor.
-                    bandTopMarginPx = 0f,
-                    bandBottomMarginPx = wordBandBottomMarginPx,
-                    measureInViewport = measure,
-                )
-                if (measured && wordFocusRequest == request) wordFocusRequest = null
-            }
+            val measured = focusController.keepWordInView(
+                bandTopMarginPx = 0f,
+                bandBottomMarginPx = wordBandBottomMarginPx,
+                measureInViewport = measure,
+            )
+            if (measured && wordFocusRequest == request) wordFocusRequest = null
         }
     }
     val onKeepAnnotationInView:
@@ -2789,7 +2795,7 @@ fun ReaderScreen(
                     SideEffect {
                         mushafPlayback.value = MushafPlayback(
                             activeAyah = activeAyah,
-                            reciting = recitingActive,
+                            reciting = recessingAyahs,
                             playingHere = isThisSurahPlaying,
                             basmalahActive = isThisSurahPlaying && activeBasmalah == true,
                             isPlaying = isThisSurahPlaying && playerState.isPlaying,
@@ -3151,7 +3157,7 @@ fun ReaderScreen(
                                     dimmed = if (streamWait) {
                                         true
                                     } else {
-                                        recitingActive && activeBasmalah != true
+                                        recessingAyahs && (wordTapAwaitingVoice || activeBasmalah != true)
                                     },
                                     fontScale = settings.fontScale,
                                     washProgress = viewModel.basmalahWashProgress,
@@ -3169,11 +3175,8 @@ fun ReaderScreen(
                             // never every visible AyahBlock (docs/PERFORMANCE.md).
                             val activeWord by remember(ayah.number) {
                                 derivedStateOf {
-                                    // The stream wait sees no recited word —
-                                    // even a tap seed's provisional wash gives
-                                    // way to the Upcoming cover.
-                                    activeWordState.value
-                                        ?.takeIf { it.ayah == ayah.number && !streamWait }
+                                    streamWaitActiveWord(activeWordState.value, streamWait)
+                                        ?.takeIf { it.ayah == ayah.number }
                                 }
                             }
                             // Ink policy matches web readerAyahInkPolicyActive: the
@@ -3182,10 +3185,10 @@ fun ReaderScreen(
                             // next verse can lift its recess before handoff.
                             val policyActive by remember(ayah.number, isThisSurahPlaying) {
                                 derivedStateOf {
-                                    if (!isThisSurahPlaying) return@derivedStateOf false
                                     val inkAyah = activeWordState.value?.ayah
+                                    if (!isThisSurahPlaying && !wordTapAwaitingVoice) return@derivedStateOf false
                                     val leadAyah = activeAyahState.value
-                                    ayah.number == inkAyah || ayah.number == leadAyah
+                                    readerAyahInkPolicyActive(ayah.number, inkAyah, leadAyah, wordTapAwaitingVoice)
                                 }
                             }
                             val bookmarked = ayah.number in bookmarkedAyahs
@@ -3224,9 +3227,9 @@ fun ReaderScreen(
                                 playbackSpeed = playerState.speed,
                                 isActiveAyah = policyActive,
                                 dimmed = if (streamWait) {
-                                    true
+                                    activeWord == null
                                 } else {
-                                    recitingActive && !policyActive
+                                    recessingAyahs && !policyActive
                                 },
                                 // Keep the page readable the moment a jump
                                 // commits — the decelerating scroll is the cue,
@@ -3354,15 +3357,7 @@ fun ReaderScreen(
                                         followWasEnabled = true
                                         pendingWordTapAyah = ayah.number
                                         dispatch(ReaderInteractionEvent.WordPlayRequested)
-                                        val start = viewModel.startMsForWord(
-                                            ayah.number,
-                                            word.position,
-                                        )
-                                        if (start != null) {
-                                            viewModel.playFromWord(ayah.number, start)
-                                        } else {
-                                            viewModel.playFromAyah(ayah.number)
-                                        }
+                                        viewModel.playFromAyahWord(ayah.number, word.position)
                                     }
                                 },
                                 onAyahClick = if (gathering) {
@@ -3764,7 +3759,7 @@ private tailrec fun Context.findActivity(): Activity? = when (this) {
 }
 
 /** Chrome / rail / bookmark fade while recitation starts or stops. */
-private const val ChromeRecedeMs = 520
+private const val ChromeRecedeMs = InkEngine.CHROME_RECEDE_MS
 
 /**
  * In-surah English search state: whether the top bar is in search mode, the

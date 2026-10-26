@@ -21,10 +21,11 @@
     "newRows": "hold"
   },
   "summary": {
+    "accepted_timestamp": 5,
     "accepted_topology": 69,
-    "held_timestamp": 159,
-    "held_topology": 155,
-    "held_added": 1
+    "held_added": 1,
+    "held_timestamp": 162,
+    "held_topology": 155
   },
   "verdicts": {
     "Abdul_Basit_Murattal_64kbps:2:34": {
@@ -35507,6 +35508,486 @@
         ]
       },
       "reason": "mean_start_residual_regresses_on_at_least_one_model"
+    },
+    "Alafasy_128kbps:43:46": {
+      "verdict": "accept",
+      "kinds": [
+        "timestamp"
+      ],
+      "baselinePayloadHash": "4a9ceebd32dc0eb7660c1b10e32ce5e002af67f738e19d59c2451ee58ad65f2d",
+      "candidatePayloadHash": "412314f922c3007db5a033fca24d20775934db545e46cc037134f46d1f4a0f21",
+      "reason": "both models improve; restored source onset within 250ms of both witnesses",
+      "evidence": {
+        "kind": "dual_model_boundary",
+        "models": [
+          {
+            "name": "arabic-xlsr-ctc",
+            "model": "jonatasgrosman/wav2vec2-large-xlsr-53-arabic",
+            "modelRevision": "af46c2d8531b8dcbb5e23b952f739b372c2e5d2d",
+            "metric": "meanAbsStartResidualMs",
+            "baselineResidualMs": 235.33333333333334,
+            "candidateResidualMs": 74.5,
+            "baselineScore": -235.33333333333334,
+            "candidateScore": -74.5,
+            "changedWord": {
+              "position": 5,
+              "forcedStartMs": 5984,
+              "candidateStartMs": 5900,
+              "candidateResidualMs": 84,
+              "meanLabelProbability": 0.3333308073098256
+            }
+          },
+          {
+            "name": "mms-uroman-ctc",
+            "model": "MahmoudAshraf/mms-300m-1130-forced-aligner",
+            "modelRevision": "49402e9577b1158620820667c218cd494cc44486",
+            "metric": "meanAbsStartResidualMs",
+            "baselineResidualMs": 245.41666666666666,
+            "candidateResidualMs": 84.58333333333333,
+            "baselineScore": -245.41666666666666,
+            "candidateScore": -84.58333333333333,
+            "changedWord": {
+              "position": 5,
+              "forcedStartMs": 6064,
+              "candidateStartMs": 5900,
+              "candidateResidualMs": 164,
+              "meanLabelProbability": 0.7450425100469147
+            }
+          }
+        ],
+        "audioSha256": "48370dd0080d05717ba7cea5dcce1cb1d6f2f0c609e7874356e2847f7fe4f55c",
+        "artifact": "tools/timing_evidence/fragment-lead-review.json",
+        "summary": "Exact two-boundary handoff: preceding held word regains its tail; every other timing and occurrence is unchanged.",
+        "waveformVeto": false,
+        "waveform": {
+          "method": "decoded audio bounds, identical occurrence sequence, unchanged or extended voiced ends",
+          "decodedDurationMs": 14989,
+          "boundsWithinTolerance": true,
+          "durationToleranceMs": 50,
+          "voicedEndToleranceMs": 250,
+          "voicedTailCutRisks": []
+        }
+      }
+    },
+    "Alafasy_128kbps:48:17": {
+      "verdict": "accept",
+      "kinds": [
+        "timestamp"
+      ],
+      "baselinePayloadHash": "9b332ca9a68a3b7a7c7c1555e50ad3c387c7eaca1837169e34e8abced3060d79",
+      "candidatePayloadHash": "493cbfdb44fc3abf0cd4c3b492a7e2bd3aa53cf4c282b626b6974c992ded64b8",
+      "reason": "both models improve; restored source onset within 250ms of both witnesses",
+      "evidence": {
+        "kind": "dual_model_boundary",
+        "models": [
+          {
+            "name": "arabic-xlsr-ctc",
+            "model": "jonatasgrosman/wav2vec2-large-xlsr-53-arabic",
+            "modelRevision": "af46c2d8531b8dcbb5e23b952f739b372c2e5d2d",
+            "metric": "meanAbsStartResidualMs",
+            "baselineResidualMs": 311.3703703703704,
+            "candidateResidualMs": 208.03703703703704,
+            "baselineScore": -311.3703703703704,
+            "candidateScore": -208.03703703703704,
+            "changedWord": {
+              "position": 23,
+              "forcedStartMs": 25172,
+              "candidateStartMs": 25120,
+              "candidateResidualMs": 52,
+              "meanLabelProbability": 0.97721994916598
+            }
+          },
+          {
+            "name": "mms-uroman-ctc",
+            "model": "MahmoudAshraf/mms-300m-1130-forced-aligner",
+            "modelRevision": "49402e9577b1158620820667c218cd494cc44486",
+            "metric": "meanAbsStartResidualMs",
+            "baselineResidualMs": 302.6296296296296,
+            "candidateResidualMs": 199.2962962962963,
+            "baselineScore": -302.6296296296296,
+            "candidateScore": -199.2962962962963,
+            "changedWord": {
+              "position": 23,
+              "forcedStartMs": 25172,
+              "candidateStartMs": 25120,
+              "candidateResidualMs": 52,
+              "meanLabelProbability": 0.6497422258059183
+            }
+          }
+        ],
+        "audioSha256": "12d117c3eaa2ac27e8d1626e1a71b988ab51d6552d010a0cf206a02dcf0f3e1f",
+        "artifact": "tools/timing_evidence/fragment-lead-review.json",
+        "summary": "Exact two-boundary handoff: preceding held word regains its tail; every other timing and occurrence is unchanged.",
+        "waveformVeto": false,
+        "waveform": {
+          "method": "decoded audio bounds, identical occurrence sequence, unchanged or extended voiced ends",
+          "decodedDurationMs": 32295,
+          "boundsWithinTolerance": true,
+          "durationToleranceMs": 50,
+          "voicedEndToleranceMs": 250,
+          "voicedTailCutRisks": []
+        }
+      }
+    },
+    "Alafasy_128kbps:64:11": {
+      "verdict": "accept",
+      "kinds": [
+        "timestamp"
+      ],
+      "baselinePayloadHash": "7de048c895c1902ad82fd16c689453afa9ec57f1b84d11860aa41daf12ebc493",
+      "candidatePayloadHash": "b98529ffee05f4fe0facaea6c2b24e095c9482c895da53b9cb0eff9e2441f4aa",
+      "reason": "both models improve; restored source onset within 250ms of both witnesses",
+      "evidence": {
+        "kind": "dual_model_boundary",
+        "models": [
+          {
+            "name": "arabic-xlsr-ctc",
+            "model": "jonatasgrosman/wav2vec2-large-xlsr-53-arabic",
+            "modelRevision": "af46c2d8531b8dcbb5e23b952f739b372c2e5d2d",
+            "metric": "meanAbsStartResidualMs",
+            "baselineResidualMs": 360.6875,
+            "candidateResidualMs": 241.9375,
+            "baselineScore": -360.6875,
+            "candidateScore": -241.9375,
+            "changedWord": {
+              "position": 8,
+              "forcedStartMs": 8965,
+              "candidateStartMs": 8910,
+              "candidateResidualMs": 55,
+              "meanLabelProbability": 0.9998665452003479
+            }
+          },
+          {
+            "name": "mms-uroman-ctc",
+            "model": "MahmoudAshraf/mms-300m-1130-forced-aligner",
+            "modelRevision": "49402e9577b1158620820667c218cd494cc44486",
+            "metric": "meanAbsStartResidualMs",
+            "baselineResidualMs": 361.0625,
+            "candidateResidualMs": 242.3125,
+            "baselineScore": -361.0625,
+            "candidateScore": -242.3125,
+            "changedWord": {
+              "position": 8,
+              "forcedStartMs": 8965,
+              "candidateStartMs": 8910,
+              "candidateResidualMs": 55,
+              "meanLabelProbability": 0.6938907702763876
+            }
+          }
+        ],
+        "audioSha256": "0e83df52ef4bf122d19b6dd26dd3fdd40788f67f64f67ab42534903895099e95",
+        "artifact": "tools/timing_evidence/fragment-lead-review.json",
+        "summary": "Exact two-boundary handoff: preceding held word regains its tail; every other timing and occurrence is unchanged.",
+        "waveformVeto": false,
+        "waveform": {
+          "method": "decoded audio bounds, identical occurrence sequence, unchanged or extended voiced ends",
+          "decodedDurationMs": 19850,
+          "boundsWithinTolerance": true,
+          "durationToleranceMs": 50,
+          "voicedEndToleranceMs": 250,
+          "voicedTailCutRisks": []
+        }
+      }
+    },
+    "Abdul_Basit_Murattal_64kbps:34:27": {
+      "verdict": "hold",
+      "kinds": [
+        "timestamp"
+      ],
+      "baselinePayloadHash": "4ea7bfa2d2e407d7905800bcf922ff96ef5b8e15a4803a83edc236c34c4dbf22",
+      "candidatePayloadHash": "b6e9b9b328be3ec0ee217911e48045baaf13820ff36e4f1599b6da3ca3074d62",
+      "reason": "retain baseline: source onset remains over 250ms from a model or waveform/metric veto",
+      "evidence": {
+        "kind": "dual_model_boundary",
+        "models": [
+          {
+            "name": "arabic-xlsr-ctc",
+            "model": "jonatasgrosman/wav2vec2-large-xlsr-53-arabic",
+            "modelRevision": "af46c2d8531b8dcbb5e23b952f739b372c2e5d2d",
+            "metric": "meanAbsStartResidualMs",
+            "baselineResidualMs": 160.83333333333334,
+            "candidateResidualMs": 142.5,
+            "baselineScore": -160.83333333333334,
+            "candidateScore": -142.5,
+            "changedWord": {
+              "position": 7,
+              "forcedStartMs": 8354,
+              "candidateStartMs": 8070,
+              "candidateResidualMs": 284,
+              "meanLabelProbability": 0.997591957449913
+            }
+          },
+          {
+            "name": "mms-uroman-ctc",
+            "model": "MahmoudAshraf/mms-300m-1130-forced-aligner",
+            "modelRevision": "49402e9577b1158620820667c218cd494cc44486",
+            "metric": "meanAbsStartResidualMs",
+            "baselineResidualMs": 199.41666666666666,
+            "candidateResidualMs": 181.08333333333334,
+            "baselineScore": -199.41666666666666,
+            "candidateScore": -181.08333333333334,
+            "changedWord": {
+              "position": 7,
+              "forcedStartMs": 8334,
+              "candidateStartMs": 8070,
+              "candidateResidualMs": 264,
+              "meanLabelProbability": 0.6400868091732264
+            }
+          }
+        ],
+        "audioSha256": "fa2e64a5aafcfeff8aea2115116d378f52ffc04184bafce043e4ce6de89ee335",
+        "artifact": "tools/timing_evidence/fragment-lead-review.json",
+        "summary": "Exact two-boundary handoff: preceding held word regains its tail; every other timing and occurrence is unchanged.",
+        "waveformVeto": false,
+        "waveform": {
+          "method": "decoded audio bounds, identical occurrence sequence, unchanged or extended voiced ends",
+          "decodedDurationMs": 14184,
+          "boundsWithinTolerance": true,
+          "durationToleranceMs": 50,
+          "voicedEndToleranceMs": 250,
+          "voicedTailCutRisks": []
+        }
+      }
+    },
+    "Abdurrahmaan_As-Sudais_192kbps:4:104": {
+      "verdict": "hold",
+      "kinds": [
+        "timestamp"
+      ],
+      "baselinePayloadHash": "9d992484df64d629e6002480c0d45cc97117b19d9230e5a441078fd800f8ee2b",
+      "candidatePayloadHash": "78ef83a2a032ba886475e58255bb8740118b1e1e2506619c46a446cc233ffb91",
+      "reason": "retain baseline: source onset remains over 250ms from a model or waveform/metric veto",
+      "evidence": {
+        "kind": "dual_model_boundary",
+        "models": [
+          {
+            "name": "arabic-xlsr-ctc",
+            "model": "jonatasgrosman/wav2vec2-large-xlsr-53-arabic",
+            "modelRevision": "af46c2d8531b8dcbb5e23b952f739b372c2e5d2d",
+            "metric": "meanAbsStartResidualMs",
+            "baselineResidualMs": 107.13636363636364,
+            "candidateResidualMs": 102.13636363636364,
+            "baselineScore": -107.13636363636364,
+            "candidateScore": -102.13636363636364,
+            "changedWord": {
+              "position": 6,
+              "forcedStartMs": 5802,
+              "candidateStartMs": 5530,
+              "candidateResidualMs": 272,
+              "meanLabelProbability": 0.4107034246210901
+            }
+          },
+          {
+            "name": "mms-uroman-ctc",
+            "model": "MahmoudAshraf/mms-300m-1130-forced-aligner",
+            "modelRevision": "49402e9577b1158620820667c218cd494cc44486",
+            "metric": "meanAbsStartResidualMs",
+            "baselineResidualMs": 95.31818181818181,
+            "candidateResidualMs": 90.31818181818181,
+            "baselineScore": -95.31818181818181,
+            "candidateScore": -90.31818181818181,
+            "changedWord": {
+              "position": 6,
+              "forcedStartMs": 5862,
+              "candidateStartMs": 5530,
+              "candidateResidualMs": 332,
+              "meanLabelProbability": 0.41130684316158295
+            }
+          }
+        ],
+        "audioSha256": "1ac0cc249f9fd787f9256c901b9d7e2994c6085f392ea5684c76109f3517bbcb",
+        "artifact": "tools/timing_evidence/fragment-lead-review.json",
+        "summary": "Exact two-boundary handoff: preceding held word regains its tail; every other timing and occurrence is unchanged.",
+        "waveformVeto": false,
+        "waveform": {
+          "method": "decoded audio bounds, identical occurrence sequence, unchanged or extended voiced ends",
+          "decodedDurationMs": 23066,
+          "boundsWithinTolerance": true,
+          "durationToleranceMs": 50,
+          "voicedEndToleranceMs": 250,
+          "voicedTailCutRisks": []
+        }
+      }
+    },
+    "Abdurrahmaan_As-Sudais_192kbps:8:69": {
+      "verdict": "accept",
+      "kinds": [
+        "timestamp"
+      ],
+      "baselinePayloadHash": "834200630936fc61c4068fa581d487eaebe87f67261c16cd421aac03cd53a866",
+      "candidatePayloadHash": "ea81e780cdb7be60189b62103468c368802136bcb0f9fc38bf8661d9fd942412",
+      "reason": "both models improve; restored source onset within 250ms of both witnesses",
+      "evidence": {
+        "kind": "dual_model_boundary",
+        "models": [
+          {
+            "name": "arabic-xlsr-ctc",
+            "model": "jonatasgrosman/wav2vec2-large-xlsr-53-arabic",
+            "modelRevision": "af46c2d8531b8dcbb5e23b952f739b372c2e5d2d",
+            "metric": "meanAbsStartResidualMs",
+            "baselineResidualMs": 102.54545454545455,
+            "candidateResidualMs": 78.9090909090909,
+            "baselineScore": -102.54545454545455,
+            "candidateScore": -78.9090909090909,
+            "changedWord": {
+              "position": 6,
+              "forcedStartMs": 6325,
+              "candidateStartMs": 6130,
+              "candidateResidualMs": 195,
+              "meanLabelProbability": 0.9667842864990235
+            }
+          },
+          {
+            "name": "mms-uroman-ctc",
+            "model": "MahmoudAshraf/mms-300m-1130-forced-aligner",
+            "modelRevision": "49402e9577b1158620820667c218cd494cc44486",
+            "metric": "meanAbsStartResidualMs",
+            "baselineResidualMs": 94.0,
+            "candidateResidualMs": 70.36363636363636,
+            "baselineScore": -94.0,
+            "candidateScore": -70.36363636363636,
+            "changedWord": {
+              "position": 6,
+              "forcedStartMs": 6305,
+              "candidateStartMs": 6130,
+              "candidateResidualMs": 175,
+              "meanLabelProbability": 0.699069564541181
+            }
+          }
+        ],
+        "audioSha256": "2a0a4a5fe3a4fac37746f40b9903668869bfd95997d365f4f8303716f4e7dfd9",
+        "artifact": "tools/timing_evidence/fragment-lead-review.json",
+        "summary": "Exact two-boundary handoff: preceding held word regains its tail; every other timing and occurrence is unchanged.",
+        "waveformVeto": false,
+        "waveform": {
+          "method": "decoded audio bounds, identical occurrence sequence, unchanged or extended voiced ends",
+          "decodedDurationMs": 11389,
+          "boundsWithinTolerance": true,
+          "durationToleranceMs": 50,
+          "voicedEndToleranceMs": 250,
+          "voicedTailCutRisks": []
+        }
+      }
+    },
+    "Abdurrahmaan_As-Sudais_192kbps:21:28": {
+      "verdict": "hold",
+      "kinds": [
+        "timestamp"
+      ],
+      "baselinePayloadHash": "426c36d1ce589a12414ef753f7ade9368e1596fcf8b471da7c818bfc05a5f069",
+      "candidatePayloadHash": "203205618b7b9483e97992a862cb1fdb921366f4db5d5d7f9ad279324d16cf5c",
+      "reason": "retain baseline: source onset remains over 250ms from a model or waveform/metric veto",
+      "evidence": {
+        "kind": "dual_model_boundary",
+        "models": [
+          {
+            "name": "arabic-xlsr-ctc",
+            "model": "jonatasgrosman/wav2vec2-large-xlsr-53-arabic",
+            "modelRevision": "af46c2d8531b8dcbb5e23b952f739b372c2e5d2d",
+            "metric": "meanAbsStartResidualMs",
+            "baselineResidualMs": 118.13333333333334,
+            "candidateResidualMs": 110.13333333333334,
+            "baselineScore": -118.13333333333334,
+            "candidateScore": -110.13333333333334,
+            "changedWord": {
+              "position": 12,
+              "forcedStartMs": 8274,
+              "candidateStartMs": 7990,
+              "candidateResidualMs": 284,
+              "meanLabelProbability": 0.7928005695343018
+            }
+          },
+          {
+            "name": "mms-uroman-ctc",
+            "model": "MahmoudAshraf/mms-300m-1130-forced-aligner",
+            "modelRevision": "49402e9577b1158620820667c218cd494cc44486",
+            "metric": "meanAbsStartResidualMs",
+            "baselineResidualMs": 119.13333333333334,
+            "candidateResidualMs": 111.13333333333334,
+            "baselineScore": -119.13333333333334,
+            "candidateScore": -111.13333333333334,
+            "changedWord": {
+              "position": 12,
+              "forcedStartMs": 8294,
+              "candidateStartMs": 7990,
+              "candidateResidualMs": 304,
+              "meanLabelProbability": 0.7774887184302012
+            }
+          }
+        ],
+        "audioSha256": "96ca5a0d89769705e5105a29ab3ace440a9f97619e81195956d01e5ccd75de33",
+        "artifact": "tools/timing_evidence/fragment-lead-review.json",
+        "summary": "Exact two-boundary handoff: preceding held word regains its tail; every other timing and occurrence is unchanged.",
+        "waveformVeto": false,
+        "waveform": {
+          "method": "decoded audio bounds, identical occurrence sequence, unchanged or extended voiced ends",
+          "decodedDurationMs": 12722,
+          "boundsWithinTolerance": true,
+          "durationToleranceMs": 50,
+          "voicedEndToleranceMs": 250,
+          "voicedTailCutRisks": []
+        }
+      }
+    },
+    "Abdurrahmaan_As-Sudais_192kbps:33:25": {
+      "verdict": "accept",
+      "kinds": [
+        "timestamp"
+      ],
+      "baselinePayloadHash": "037fa8c8b788a5541a10a97973914917620a1f94e41dade6b2e4267686c77632",
+      "candidatePayloadHash": "8348b9898f9e4f93a98ab6bca422bf8e36cbfd979bff591cdafd8d9e721a1956",
+      "reason": "both models improve; restored source onset within 250ms of both witnesses",
+      "evidence": {
+        "kind": "dual_model_boundary",
+        "models": [
+          {
+            "name": "arabic-xlsr-ctc",
+            "model": "jonatasgrosman/wav2vec2-large-xlsr-53-arabic",
+            "modelRevision": "af46c2d8531b8dcbb5e23b952f739b372c2e5d2d",
+            "metric": "meanAbsStartResidualMs",
+            "baselineResidualMs": 89.875,
+            "candidateResidualMs": 76.125,
+            "baselineScore": -89.875,
+            "candidateScore": -76.125,
+            "changedWord": {
+              "position": 9,
+              "forcedStartMs": 6951,
+              "candidateStartMs": 6750,
+              "candidateResidualMs": 201,
+              "meanLabelProbability": 0.7499956454807943
+            }
+          },
+          {
+            "name": "mms-uroman-ctc",
+            "model": "MahmoudAshraf/mms-300m-1130-forced-aligner",
+            "modelRevision": "49402e9577b1158620820667c218cd494cc44486",
+            "metric": "meanAbsStartResidualMs",
+            "baselineResidualMs": 74.875,
+            "candidateResidualMs": 61.125,
+            "baselineScore": -74.875,
+            "candidateScore": -61.125,
+            "changedWord": {
+              "position": 9,
+              "forcedStartMs": 6951,
+              "candidateStartMs": 6750,
+              "candidateResidualMs": 201,
+              "meanLabelProbability": 0.7889558523893356
+            }
+          }
+        ],
+        "audioSha256": "56b21e176578f5616db3426c48c2e2e32ae73484898ad175a963a872536549af",
+        "artifact": "tools/timing_evidence/fragment-lead-review.json",
+        "summary": "Exact two-boundary handoff: preceding held word regains its tail; every other timing and occurrence is unchanged.",
+        "waveformVeto": false,
+        "waveform": {
+          "method": "decoded audio bounds, identical occurrence sequence, unchanged or extended voiced ends",
+          "decodedDurationMs": 15125,
+          "boundsWithinTolerance": true,
+          "durationToleranceMs": 50,
+          "voicedEndToleranceMs": 250,
+          "voicedTailCutRisks": []
+        }
+      }
     }
   },
   "evidenceArchive": {

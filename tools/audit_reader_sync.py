@@ -169,7 +169,7 @@ data class EnglishInkSpan(val range: IntRange, val from: Float, val to: Float)
             output.write(f'{reciter}\t{key}\t{len(corpus[key])}\t' +
                          ';'.join(','.join(map(str, segment)) for segment in segments) + '\n')
     subprocess.run(["kotlinc", str(source / "domain/HighlightEngine.kt"),
-                    *[str(source / f) for f in ("domain/EnglishWordAlignment.kt", "domain/EnglishTypography.kt",
+                    *[str(source / f) for f in ("domain/EnglishWordAlignment.kt", "domain/EnglishPhrase.kt", "domain/EnglishTypography.kt",
                         "domain/ArabicNormalize.kt", "domain/ReviewedEnglishAlignment.kt", "ui/reader/EnglishWashClock.kt")],
                     str(source / "data/model/Models.kt"), str(directory / "RenderTypes.kt"), str(directory / "Probe.kt"),
                     "-include-runtime", "-d", str(directory / "probe.jar")], check=True)

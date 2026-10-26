@@ -19,10 +19,11 @@ object ReviewedEnglishAlignment {
     }
 
     /** Invalid or stale rows keep the existing mapper as an explicit fallback. */
-    fun alignment(text: String, arabic: List<String>, record: EnglishAlignmentRecord): EnglishAlignment? {
+    fun alignment(text: String, arabic: List<String>, record: EnglishAlignmentRecord, glosses: List<String> = emptyList()): EnglishAlignment? {
         val tokens = tokens(text)
         if (tokens.isEmpty() || '\u0000' in text || arabic.any { '\u0000' in it } || record.fingerprint != fingerprint(text, arabic) ||
             record.inkAnchors.size != tokens.size || record.heads.size != tokens.size ||
+            (record.sourceLinked != null && record.sourceLinked.size != tokens.size) ||
             (record.inkAnchors + record.heads).any { it !in 1..arabic.size }) return null
         fun spans(owners: List<Int>): List<EnglishWordSpan> = buildList {
             tokens.forEachIndexed { index, token ->
@@ -40,7 +41,12 @@ object ReviewedEnglishAlignment {
         val ends = FloatArray(arabic.size) { index ->
             ink.filter { it.position <= index + 1 }.maxOfOrNull { it.to } ?: 0f
         }
-        return EnglishAlignment(ends, spans(record.heads), continuousEnglishWash(ink), usesApprovedRecord = true)
+        val presentation = record.sourceLinked?.let {
+            EnglishWordAlignment.reviewedPresentation(text, record.inkAnchors, record.heads, it, glosses)
+        }
+        return EnglishAlignment(ends, spans(record.heads), phrases = presentation?.first,
+            readingText = text, timingWords = presentation?.second.orEmpty(),
+            washSpans = continuousEnglishWash(ink), usesApprovedRecord = true)
     }
 
     /** Parse the compiled, text-free artifact once on the repository's IO path. */
@@ -51,12 +57,15 @@ object ReviewedEnglishAlignment {
             iterator.forEach { line ->
                 if (line.isBlank() || line.startsWith('#')) return@forEach
                 val columns = line.split('\t')
-                require(columns.size == 4 && columns[0].matches(Regex("[1-9][0-9]*:[1-9][0-9]*")))
+                require(columns.size in 4..5 && columns[0].matches(Regex("[1-9][0-9]*:[1-9][0-9]*")))
                 require(columns[1].matches(Regex("[0-9a-f]{64}")))
                 val ink = columns[2].split(',').map(String::toInt)
                 val heads = if (columns[3] == "=") ink else columns[3].split(',').map(String::toInt)
                 require(ink.isNotEmpty() && ink.size == heads.size && (ink + heads).all { it > 0 })
-                require(put(columns[0], EnglishAlignmentRecord(columns[1], ink, heads)) == null) { "Duplicate alignment verse" }
+                val linked = columns.getOrNull(4)?.also { bits ->
+                    require(bits.length == ink.size && bits.all { it == '0' || it == '1' })
+                }?.map { it == '1' }
+                require(put(columns[0], EnglishAlignmentRecord(columns[1], ink, heads, linked)) == null) { "Duplicate alignment verse" }
             }
         }
     }

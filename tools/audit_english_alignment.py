@@ -72,7 +72,7 @@ with tempfile.TemporaryDirectory(prefix="english-alignment-audit-") as temporary
                                      '\t' + '|'.join(arabic[line.split('\t')[0]])
                                      for line in args.corpus.read_text().splitlines()) + '\n')
     (directory / "Probe.kt").write_text(probe)
-    sources = [source / f for f in ("domain/EnglishWordAlignment.kt", "domain/EnglishTypography.kt",
+    sources = [source / f for f in ("domain/EnglishWordAlignment.kt", "domain/EnglishPhrase.kt", "domain/EnglishTypography.kt",
                                    "domain/ArabicNormalize.kt", "domain/ReviewedEnglishAlignment.kt", "data/model/Models.kt")]
     subprocess.run(["kotlinc", *map(str, sources), str(directory / "Probe.kt"),
                     "-include-runtime", "-d", str(directory / "probe.jar")], check=True)

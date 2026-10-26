@@ -55,8 +55,9 @@ export function readerAyahInkPolicyActive(
   ayah: number,
   inkAyah: number | null | undefined,
   leadAyah: number | null | undefined,
+  awaitingWordStart = false,
 ): boolean {
-  return inkAyah === ayah || leadAyah === ayah
+  return inkAyah === ayah || (!awaitingWordStart && leadAyah === ayah)
 }
 
 /**
@@ -67,6 +68,15 @@ export function readerAyahInkPolicyActive(
  * the one simultaneous fade.
  */
 export const STREAM_WAIT_RELEASE_HOLD_MS = 700
+
+/**
+ * Whether buffering puts the page under the stream-wait cover. A word tap's
+ * own download is not that wait: until its sought word is heard the page keeps
+ * the ordinary recitation look (Android `streamWaitEngages`).
+ */
+export function streamWaitEngages(isBuffering: boolean, wordTapAwaitingVoice: boolean): boolean {
+  return isBuffering && !wordTapAwaitingVoice
+}
 
 /**
  * Pure playback-to-reader projection shared by every store tick. Keeping this

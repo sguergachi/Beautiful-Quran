@@ -81,13 +81,22 @@ after text/binding changes; unchanged verse decisions remain usable, while
 changed verses need review. Existing review
 exports are never overwritten.
 
-The TSV carries only keys, fingerprints, ink anchors and interaction heads;
+The TSV carries only keys, fingerprints, ink anchors, interaction heads and
+one contributor-presence bit per token;
 `=` avoids duplicating equal arrays. Android reads it once on IO, validates each
 verse's exact text/surfaces, then caches it through EnglishVerseAlignments. Stale
 records fall back with `usesApprovedRecord = false`. Missing or malformed
 assets also fall back and log the problem. Word-card mode remains a
 separate corpus and always uses its own mapper. Soft wash, page cuts, repeat
-clipping and frame interpolation remain shared. Metadata is read directly from
+clipping and frame interpolation remain shared. The optional fifth TSV column
+is the contributor bit string; older four-column records still load with the
+legacy presentation policy. New records build readable phrases from reviewed
+ink owners and contributor provenance, retaining separate semantic tap heads.
+Only a source-linked, whole printed literal also present in the selected
+owner's runtime gloss can establish a word-finish target. Additions, synonyms
+and missing glosses do not acquire fabricated exact deadlines. The same
+`EnglishReadingFlow` handles drawing, inverse finish times and carried follow.
+Metadata is read directly from
 assets; no SQLite extraction version bump or DB content change is needed.
 
 ## Developer AI approval
@@ -157,6 +166,72 @@ Al-Furqan adds 1,001 timing rows across the same 13 reciters, passing 1,620,211
 wash-edge queries, the same number of reverse-seek queries and 1,329
 repeat-window checks. All 77 lookup records load from the actual printed text
 offline; word-card mappings again remain identical with the toggle on and off.
+
+## Resumable chapter review
+
+`tools/review_english_chapters.py` runs the offline work with the authenticated
+local Codex CLI. It uses fresh, ephemeral, read-only sessions for drafting and
+critique, explicitly naming the requested model with xhigh reasoning. It adds
+no phone-side model, service, credentials or new Python dependency. The CLI's
+structured-output interface follows the [official Codex example](https://developers.openai.com/cookbook/examples/codex/build_iterative_repair_loops_with_codex).
+
+```bash
+python3 tools/review_english_chapters.py run --chapters 64 \
+  --work-dir "$HOME/.cache/bq-english-chapters" \
+  --corpus "$PRIVATE_RUNTIME_CORPUS" --timings-cache "$PRIVATE_TIMING_CACHE" \
+  --model gpt-6.1-sol
+python3 tools/review_english_chapters.py report \
+  --work-dir "$HOME/.cache/bq-english-chapters"
+```
+
+Use `--chapters 1-114`, a range or a comma-separated list for bulk processing.
+`--max-verses 25` bounds a batch; subsequent invocations resume completed work.
+Each verse has a private atomic checkpoint. Only one process may own a work
+directory. Two verse workers run by default; `--workers 1` through `4` controls
+bounded concurrency while canonical fetches remain serial and rate limited.
+Completed model stages also resume after interruption when their exact input
+and schema match. Completed reviews are reused only with matching text, source
+evidence, model, rubric and review implementation. Changed bindings fail closed;
+export into a new work directory after a typesetter/corpus binding change.
+`--retry-held` explicitly starts another bounded attempt budget and preserves
+the old attempt files. Drafting/critique defaults to two attempts per verse,
+with a configurable 1–3 limit and a 600-second model-call timeout.
+
+The runner fetches grounding rules first, discovers editions, and selects the
+concise Arabic Jalalayn commentary for lexical/phrase parsing. Every passage's
+edition, verse keys and pagination are checked. Morphology excludes explicit
+verse-number markers, then compares each actual reader position and normalized
+surface; equal counts alone never pass. Raw UTF-8 replies, source URLs and
+digests stay in the private work directory. Surface mismatches remain held.
+The model supplies decisions only; the runner retains immutable printed text,
+UTF-16 offsets and the complete 6,236-verse manifest. The prompt rubric is
+`tools/english_chapter_review.md`.
+
+Every token needs a structurally valid decision before the fresh critique can
+approve the verse. Review disagreement, malformed output, missing evidence,
+invalid owners and incomplete units stay held. This is two model passes, not
+independent bilingual review or blind gold. Previous AI ledger records outside
+the selected chapters are reused with their original provenance and are
+reported separately, not relabelled as freshly critiqued.
+
+The candidate lookup must then pass `audit_english_phrase_pacing.py` through
+the actual reviewed-record loader, `EnglishVerseAlignments`, presentation plan,
+forward word progress and inverse finish functions. It exercises the private
+runtime voices plus the other bundled voices without filling withheld runtime
+rows. Word-card mappings with the toggle on/off must match. Corpus checks use
+the export's production-typeset edition, including neighbouring-verse quote
+state, rather than assuming an older private TSV already has current typography.
+Only a passing candidate becomes `english-ai-alignments.tsv` in the work
+directory. It never edits packaged data or publishes an APK on its own.
+
+`report.json` keeps each selected chapter's full verse denominator, reviewed and
+held counts, reasons, playback state and completion flag. `coverage.json` keeps
+the full-book denominator and `semantic_accuracy_established: false`. The
+playback folder retains per-word exposure/deadline diagnostics, source and
+artifact hashes, explicit fallback reasons and baseline collapses. Playback
+passing is structural/timing evidence; it does not certify linguistic accuracy
+or universal visual steadiness. Bundling remains a normal reviewed code/data
+change using the existing developer toggle; word-by-word mode remains locked.
 
 ## Evidence still needed
 

@@ -7,16 +7,26 @@ import java.util.concurrent.ConcurrentHashMap
 /** A printed English span and the 1-based Arabic word that speaks its meaning. */
 data class EnglishWordSpan(val from: Float, val to: Float, val position: Int)
 
-/** Semantic owners for taps, and a continuous forward wash derived from those owners. */
+/** Semantic owners, their legacy immediate-meaning wash, and the readable presentation plan. */
 data class EnglishAlignment(
     val wordEnds: FloatArray,
     val spans: List<EnglishWordSpan>,
-    val washSpans: List<EnglishWordSpan> = continuousEnglishWash(spans),
-    /** Human review coverage, not semantic certification. AI review has its own flag. */
+    val phrases: List<EnglishPhrase>? = null,
+    /** Printed translation for presentation distance; semantic ownership never uses this field. */
+    val readingText: String? = null,
+    /** Verified literal words before owner coalescing; interpolation and synonyms cannot set deadlines. */
+    val timingWords: List<EnglishWordSpan> = emptyList(),
+    /** Human review coverage; AI approval is recorded separately. */
     val usesApprovedRecord: Boolean = false,
-    /** The developer experiment; it never impersonates human approval. */
+    /** Enabled only by the developer experiment, never human approval. */
     val usesAiReviewedRecord: Boolean = false,
+    /** Legacy occurrence ranges may use reviewed ink contributors instead of tap heads. */
+    val washSpans: List<EnglishWordSpan> = continuousEnglishWash(spans),
 ) {
+    /** Reordered translation phrases retain one forward edge without the immediate-meaning rush. */
+    val presentationSpans: List<EnglishPhrase> = phrases
+        ?: washSpans.map { EnglishPhrase(it.from, it.to, it.position) }
+
     /** The Arabic owner of a point in the printed English, including reordered words. */
     fun positionAt(through: Float): Int =
         spans.firstOrNull { through.coerceIn(0f, 1f) < it.to }?.position ?: spans.lastOrNull()?.position ?: 1
@@ -55,8 +65,9 @@ internal fun continuousEnglishWash(spans: List<EnglishWordSpan>): List<EnglishWo
  * anchors their common words; unmatched runs interpolate between neighbours.
  *
  * Arabic is not English word order. Each recognized English span keeps its
- * Arabic owner for interaction. The wash reaches that meaning when it is
- * spoken, including all intervening English words in one continuous prefix.
+ * Arabic owner for interaction. Published-translation presentation closes
+ * reordered anchors into readable phrases; the legacy immediate-meaning wash
+ * remains available as a conservative occurrence fallback.
  * Ink already laid never lifts (docs/INK_ENGINE.md). Unmatched text uses the
  * guarded, interpolated alignment between recognized neighbours.
  * Synonyms outside the small shared vocabulary, ambiguous repetitions and
@@ -67,6 +78,37 @@ internal fun continuousEnglishWash(spans: List<EnglishWordSpan>): List<EnglishWo
  * alignment table, which is nothing.
  */
 object EnglishWordAlignment {
+
+    /** Reviewed ink contributors define phrases; only equal literal glosses establish finish targets. */
+    internal fun reviewedPresentation(
+        text: String, owners: List<Int>, heads: List<Int>, linked: List<Boolean>, glosses: List<String>,
+    ): Pair<List<EnglishPhrase>, List<EnglishWordSpan>> {
+        val prose = words(text, emptySet())
+        require(prose.size == owners.size)
+        val phrases = englishPhraseSpans(prose.mapIndexed { index, word ->
+            EnglishPhraseWord(if (index == 0) 0f else prose[index - 1].end.toFloat() / text.length,
+                if (index == prose.lastIndex) 1f else word.end.toFloat() / text.length,
+                owners[index], word.sentence, linked[index] && !word.added && word.text !in GRAMMAR)
+        })
+        val literals = glosses.map { words(it, emptySet()).map { word -> word.text }.toSet() }
+        val timing = prose.mapIndexedNotNull { index, word ->
+            if (!linked[index] || word.added || word.text in GRAMMAR || heads[index] != owners[index] ||
+                word.text !in literals.getOrElse(owners[index] - 1) { emptySet() }) null
+            else literalTimingWord(text, word, owners[index])
+        }
+        return phrases to timing
+    }
+
+    private fun literalTimingWord(text: String, word: ProseWord, owner: Int): EnglishWordSpan? {
+        val start = word.end - word.text.length
+        var first = start
+        while (first > 0 && !text[first - 1].isWhitespace()) first--
+        var end = word.end
+        while (end < text.length && !text[end].isWhitespace()) end++
+        if (text.substring(first, start).any { it.isLetterOrDigit() } ||
+            text.substring(word.end, end).any { it.isLetterOrDigit() }) return null
+        return EnglishWordSpan(first.toFloat() / text.length, end.toFloat() / text.length, owner)
+    }
 
     /**
      * The share of [translation] each of [glosses] ends at, 0..1 and
@@ -139,7 +181,24 @@ object EnglishWordAlignment {
                 spans[spans.lastIndex] = spans.last().copy(to = span.to)
             } else spans += span
         }
-        return EnglishAlignment(shares, spans)
+        val phrases = englishPhraseSpans(prose.mapIndexed { index, word ->
+            EnglishPhraseWord(
+                from = if (index == 0) 0f else prose[index - 1].end.toFloat() / translation.length,
+                to = if (index == prose.lastIndex) 1f else word.end.toFloat() / translation.length,
+                position = positions[index] + 1,
+                clause = word.sentence,
+                anchored = !word.added && word.text !in GRAMMAR && verified[index] >= 0,
+            )
+        })
+        val timingWords = prose.mapIndexedNotNull { index, word ->
+            val at = positions[index]
+            if (word.added || word.text in GRAMMAR || verified[index] != at ||
+                word.text.any { it.isWhitespace() } || spoken.none { it.second == at && it.first.text == word.text }) null
+            else {
+                literalTimingWord(translation, word, at + 1)
+            }
+        }
+        return EnglishAlignment(shares, spans, phrases, readingText = translation, timingWords = timingWords)
     }
 
     /**
@@ -689,6 +748,7 @@ object EnglishWordAlignment {
         "slay" to "kill", "slays" to "kill", "slain" to "kill", "thankful" to "grateful",
         "flog" to "lash",
         "commerce" to "trade",
+        "glorify" to "exalt", "glorifi" to "exalt", "glorification" to "exalt",
         "bosom" to "chest",
         "tell" to "say", "apparent" to "appear",
         "poor" to "needy", "needy" to "needy",
@@ -882,11 +942,11 @@ class EnglishVerseAlignments(
                 .firstOrNull { it.number == number }
                 ?.let { verse ->
                     val approved = if (wordByWord) null else content.englishAlignmentRecords[number]?.let { record ->
-                        ReviewedEnglishAlignment.alignment(verse.translation, verse.words.map { it.arabic }, record)
+                        ReviewedEnglishAlignment.alignment(verse.translation, verse.words.map { it.arabic }, record, verse.words.map { it.translation })
                     }
                     val aiReviewed = if (wordByWord || !useAiReviewed || approved != null) null else
                         content.aiEnglishAlignmentRecords[number]?.let { record ->
-                            ReviewedEnglishAlignment.alignment(verse.translation, verse.words.map { it.arabic }, record)
+                            ReviewedEnglishAlignment.alignment(verse.translation, verse.words.map { it.arabic }, record, verse.words.map { it.translation })
                                 ?.copy(usesApprovedRecord = false, usesAiReviewedRecord = true)
                         }
                     approved ?: aiReviewed ?: EnglishWordAlignment.align(
@@ -896,7 +956,7 @@ class EnglishVerseAlignments(
                         verse.words.map { it.translation },
                         verse.words.map { it.lemma },
                         verse.words.map { it.arabic },
-                    )
+                    )?.let { if (wordByWord) it.copy(phrases = null) else it }
                 }
                 ?: NONE
         }

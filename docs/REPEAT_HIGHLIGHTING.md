@@ -483,6 +483,17 @@ The class fix retired the hand-written `discard_false_same_position_lead`
 verdict for Hani 66:6 — the rule reproduces that row byte-for-byte from
 evidence. Locked by `tools/timing_patch_cases/false-lead-*.json`.
 
+The same stolen-tail shape can have a short second occurrence. The fragment
+cleaner then correctly merges the duplicate but retains its false early start.
+`fragment_same_position_leads` inspects the original pair after clock rebase:
+only an exact merged occurrence, an adjacent preceding owner, tiled source
+spans, and quran-align corroboration of the second onset permit returning the
+lead. The existing fragment and genuine-repeat guards stay intact. Alafasy
+64:11 is this case: the next owner began at 7,010 ms; its witnessed second
+source onset is 8,910 ms. The authenticated acoustic gate separately accepts
+or holds each resulting row. See the
+[complete fragment-lead review](quality-reviews/TIMING_FRAGMENT_LEADS_2026-10-23.md).
+
 > **Why the previous word, not a gap.** The Timings Lab expresses the fix by
 > deleting the false segment, which leaves a hole. The audio has no hole: the
 > reciter is still sounding the previous word through that interval. Six other
@@ -576,8 +587,9 @@ HighlightEngine.PreparedTimings.activeInfo(positionMs)
   clock. Each word owns that captured animation, so an Active handoff cannot
   erase its pacing and a prior residual cannot delay the new word. On release,
   residual progress finishes independently, then alpha dissolves over
-  `Tuning.repeatFadeOutMs` (900 ms). Web keeps the constant 450 ms clock until
-  tajweed pacing is ported. A live chain member's displayed progress is pinned
+  `Tuning.repeatFadeOutMs` (1,800 ms on Android and web). Existing Ink Lab
+  profiles adopt this slower release once, retaining their camera and other
+  ink settings. A live chain member's displayed progress is pinned
   at 0 until its retained animation clock resets, preventing a one-frame full-
   orange/glimmer flash before the directional edge begins.
   On Nightfall, each newly active repeat word also

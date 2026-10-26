@@ -22,10 +22,10 @@ class LedgerTest(unittest.TestCase):
             "tokens_sha256": ledger.digest(ledger.encoded([[t["start"], t["end"], t["text"]] for t in self.row["tokens"]]))}
 
     def test_compiler_keeps_heads_and_ink_separate(self):
-        self.assertEqual(f"1:1\t{self.row['fingerprint']}\t1,1,1\t2,2,2", ledger.compile_verse(self.row, self.binding))
+        self.assertEqual(f"1:1\t{self.row['fingerprint']}\t1,1,1\t2,2,2\t111", ledger.compile_verse(self.row, self.binding))
         for t in self.row["tokens"]:
             t["head"] = 1
-        self.assertTrue(ledger.compile_verse(self.row, self.binding).endswith("\t="))
+        self.assertTrue(ledger.compile_verse(self.row, self.binding).endswith("\t=\t111"))
 
     def test_exported_reordered_draft_keeps_its_source_not_the_earlier_prefix(self):
         with tempfile.TemporaryDirectory(prefix="english-draft-order-") as temporary:
@@ -33,7 +33,7 @@ class LedgerTest(unittest.TestCase):
             b64 = lambda s: base64.b64encode(s.encode()).decode()
             (root / "input.tsv").write_text("\t".join(["1:1", b64("Allah helped us"),
                 b64("نَصَرَنَا\0ٱللَّهُ"), b64("helped us\0Allah"), b64("نَصَرَ\0ٱللَّه")]) + "\n")
-            sources = [ledger.SOURCE / p for p in ("domain/EnglishWordAlignment.kt", "domain/EnglishTypography.kt",
+            sources = [ledger.SOURCE / p for p in ("domain/EnglishWordAlignment.kt", "domain/EnglishPhrase.kt", "domain/EnglishTypography.kt",
                 "domain/ArabicNormalize.kt", "domain/ReviewedEnglishAlignment.kt", "data/model/Models.kt")]
             subprocess.run(["kotlinc", *map(str, sources), str(ledger.REPO / "tools/ExportEnglishAlignment.kt"),
                 "-include-runtime", "-d", str(root / "probe.jar")], check=True)

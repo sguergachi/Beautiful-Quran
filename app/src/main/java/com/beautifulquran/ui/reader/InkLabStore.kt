@@ -52,13 +52,13 @@ class InkLabStore(context: Context) {
 data class InkLabSnapshot(
     val schema: Int = SCHEMA,
     val upcomingAlpha: Float = 0.2661f,
-    val inkFadeMs: Int = 400,
-    val ayahMarkFadeMs: Int = 400,
-    val recessMs: Int = 400,
+    val inkFadeMs: Int = InkEngine.CHROME_RECEDE_MS,
+    val ayahMarkFadeMs: Int = InkEngine.CHROME_RECEDE_MS,
+    val recessMs: Int = InkEngine.CHROME_RECEDE_MS,
     val minSweepMs: Int = 140,
     val maxSweepMs: Int = 8_000,
     val repeatSweepMs: Int = 450,
-    val repeatFadeOutMs: Int = 900,
+    val repeatFadeOutMs: Int = 1_800,
     val repeatInkAlpha: Float = 1f,
     val glintFadeMs: Int = 1_000,
     val glintTintAlpha: Float = 0.88f,
@@ -103,6 +103,12 @@ data class InkLabSnapshot(
     val tarjiAttackMs: Float = Tarji.ATTACK_MS,
     val tarjiReleaseMs: Float = Tarji.RELEASE_MS,
     val tarjiEarDelayMs: Float = 0f,
+    val paperInk: Boolean = true,
+    val paperInkPooling: Float = 0.25f,
+    val paperInkReflection: Float = 0.5f,
+    val paperInkSoftness: Float = 0f,
+    val paperInkLeadFade: Float = 0.5f,
+    val paperInkFlowing: Boolean = false,
     val guideBodyEdge: Float = 0.5f,
     val guideFeatherWidth: Float = 0.2819f,
     val guideFadeSoftness: Float = 1.3329f,
@@ -172,6 +178,12 @@ data class InkLabSnapshot(
         tarjiAttackMs = tarjiAttackMs,
         tarjiReleaseMs = tarjiReleaseMs,
         tarjiEarDelayMs = tarjiEarDelayMs,
+        paperInk = paperInk,
+        paperInkPooling = paperInkPooling,
+        paperInkReflection = paperInkReflection,
+        paperInkSoftness = paperInkSoftness,
+        paperInkLeadFade = paperInkLeadFade,
+        paperInkFlowing = paperInkFlowing,
     )
 
     fun toContextualGuideTuning(): ContextualGuideTuning = ContextualGuideTuning(
@@ -189,8 +201,12 @@ data class InkLabSnapshot(
          * 2: the glow's numbers changed meaning — blur in dp in every reading
          * mode, swings in linear light. A save from before is dropped back to
          * shipped for those fields ([decode]); the rest of it is kept.
+         * 3: adopt zero scroll lead in existing saves; later auditions persist.
+         * 4: retune that scroll lead to 100 ms, preserving the other knobs.
+         * 5: give the repeat wash a slower 1.8 s release without resetting the camera.
+         * 6: match old default verse fades to chrome; preserve custom fade auditions.
          */
-        const val SCHEMA = 2
+        const val SCHEMA = 6
 
         private val json = Json {
             ignoreUnknownKeys = true
@@ -257,6 +273,12 @@ data class InkLabSnapshot(
         tarjiAttackMs = tuning.tarjiAttackMs,
         tarjiReleaseMs = tuning.tarjiReleaseMs,
         tarjiEarDelayMs = tuning.tarjiEarDelayMs,
+        paperInk = tuning.paperInk,
+        paperInkPooling = tuning.paperInkPooling,
+        paperInkReflection = tuning.paperInkReflection,
+        paperInkSoftness = tuning.paperInkSoftness,
+        paperInkLeadFade = tuning.paperInkLeadFade,
+        paperInkFlowing = tuning.paperInkFlowing,
         guideBodyEdge = guide.bodyEdge,
             guideFeatherWidth = guide.featherWidth,
             guideFadeSoftness = guide.fadeSoftness,
@@ -275,10 +297,8 @@ data class InkLabSnapshot(
 
         fun decode(raw: String): InkLabSnapshot? =
             runCatching { json.decodeFromString(serializer(), raw) }.getOrNull()?.let { saved ->
-                if (saved.schema >= 2) return@let saved
                 val shipped = InkLabSnapshot()
-                saved.copy(
-                    schema = SCHEMA,
+                val glow = if (saved.schema >= 2) saved else saved.copy(
                     glintGlowAlpha = shipped.glintGlowAlpha,
                     glintGlowRadius = shipped.glintGlowRadius,
                     glintBloomAlpha = shipped.glintBloomAlpha,
@@ -286,6 +306,18 @@ data class InkLabSnapshot(
                     tarjiLightRise = shipped.tarjiLightRise,
                     tarjiLightFall = shipped.tarjiLightFall,
                     tarjiGlowGain = shipped.tarjiGlowGain,
+                )
+                val camera = if (saved.schema >= 4) glow else glow.copy(
+                    scrollLeadMs = shipped.scrollLeadMs,
+                )
+                val repeat = if (saved.schema >= 5) camera else camera.copy(
+                    repeatFadeOutMs = shipped.repeatFadeOutMs,
+                )
+                if (saved.schema >= SCHEMA) repeat else repeat.copy(
+                    schema = SCHEMA,
+                    inkFadeMs = repeat.inkFadeMs.takeUnless { it == 400 } ?: shipped.inkFadeMs,
+                    ayahMarkFadeMs = repeat.ayahMarkFadeMs.takeUnless { it == 400 } ?: shipped.ayahMarkFadeMs,
+                    recessMs = repeat.recessMs.takeUnless { it == 400 } ?: shipped.recessMs,
                 )
             }
     }
