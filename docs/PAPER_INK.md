@@ -189,6 +189,16 @@ handoff to static text. Empty paper beyond the wet spread is skipped. The
 study uses the same sampling scheme; no additional textures or mask generation
 are needed.
 
+The extra wet spread has a very faint paper tooth: a smooth, fixed irregularity
+in font coordinates, capped at 12% of the added width and 0.12 px at the
+160 px reference font, whichever is smaller. At 80 px type and stock 0.28
+pooling the maximum displacement is about 0.059 device pixels. It affects
+only the pooled fringe, follows the same pattern on both coats, and vanishes
+with wetness. Dry glyph coverage, arrival fields and the eight-tap antialiasing
+stay intact. The study uses the same variation at its reference size.
+Grain is evaluated only where it can change the pooled contour's antialiasing
+band; the stroke interior and empty paper skip it. No extra texture is needed.
+
 ## Tuning
 
 Ink Lab → **Ink**: **Paper ink** (on), **Flowing ink** (off = Inside out),
@@ -232,6 +242,8 @@ Playback timing is unchanged. Paper's repeat ink is the study's terracotta
   then require a continuous soft fill in both spread methods, including
   partial undercoats and interrupted evaporation. Disabling the entry ramp
   reproduces the leading-letter flash in the same production shader.
+  Organic pooling is compared with a smooth control and a bounded spread
+  envelope; dry, zero-pooling, unread and first-entry pixels remain exact.
 - `PaperInkEvaporationTest` — unread entry, settled and partial/repeat
   departures, interrupted fades, re-entry and retained reciter repeats. The
   Skia gate also checks that evaporating first/repeat ink reaches the exact

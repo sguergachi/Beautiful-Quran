@@ -35,6 +35,25 @@ uniform float leadEntry;
 uniform float2 origin;
 uniform float evaporation;
 
+float paperHash(float2 p) {
+    return fract(52.9829189 * fract(dot(p, float2(0.06711056, 0.00583715))));
+}
+
+// Fixed paper tooth, confined to the added wet spread. Font coordinates keep
+// it attached to the word, and the small amplitude dries away with the film.
+float organicPooling(float2 p, float filmWet, float scale, float distance, float coverageAA) {
+    float spread = weight * filmWet;
+    float amplitude = min(weight * 0.12, 0.12 * scale) * filmWet;
+    if (amplitude <= 0.0 || abs(distance + spread) >= coverageAA * 0.5 + amplitude) return spread;
+    float2 at = p / (6.0 * scale);
+    float2 cell = floor(at);
+    float2 f = fract(at);
+    f = f * f * f * (f * (f * 6.0 - 15.0) + 10.0);
+    float grain = mix(mix(paperHash(cell), paperHash(cell + float2(1.0, 0.0)), f.x),
+        mix(paperHash(cell + float2(0.0, 1.0)), paperHash(cell + float2(1.0)), f.x), f.y);
+    return spread + (grain * 2.0 - 1.0) * amplitude;
+}
+
 half4 materialAt(float2 p, float base, float coverageAA, float phase, float wetness, float orange, float keep) {
     float4 shape = field.eval(p * fieldScale);
     float distance = (shape.b * 255.0 - 128.0) / 16.0;
@@ -53,7 +72,7 @@ half4 materialAt(float2 p, float base, float coverageAA, float phase, float wetn
     float filmWet = localWet * mix(0.82, 1.0, fresh);
     // Both passes gain weight while wet and return to the regular stroke as
     // they dry. The orange chain holds color only; it cannot hold font weight.
-    float wetStrokeWeight = weight * filmWet;
+    float wetStrokeWeight = organicPooling(p, filmWet, unit, distance, coverageAA);
     float expanded = max(base, smoothstep(-coverageAA * 0.5, coverageAA * 0.5, distance + wetStrokeWeight) * smoothstep(0.0, 0.05, filmWet));
     float2 slope = (surface.rg * 255.0 - 128.0) / 127.0;
     float volume = 0.6 + weight / (6.5 * unit);
@@ -141,7 +160,7 @@ half4 evaporated(half4 ink, float base) {
 half4 main(float2 p) {
     float distance = (field.eval(p * fieldScale).b * 255.0 - 128.0) / 16.0;
     float base = normals.eval(p).b;
-    if (base == 0.0 && distance < -weight - max(aa, 1.0)) return half4(0.0);
+    if (base == 0.0 && distance < -weight - 0.12 * unit - max(aa, 1.0)) return half4(0.0);
     if (max(wet, underWet * repeatPass) <= 0.0) return evaporated(inkAt(p, base, aa), base);
     // Eight distinct positions along both axes resolve thin reflected lines
     // on nearly vertical alifs; a 2x2 grid has only two horizontal samples.

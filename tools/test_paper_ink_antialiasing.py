@@ -16,6 +16,7 @@ from paper_ink_outline import outline_distance
 
 ROOT = Path(__file__).resolve().parents[1]
 SOURCE = (ROOT / 'app/src/main/assets/paper-ink/ink.agsl').read_text()
+PLAIN_SOURCE = SOURCE.replace('organicPooling(p, filmWet, unit, distance, coverageAA)', 'weight * filmWet')
 # Same material, sampled directly. At high resolution, this integrates the
 # pixel area independently of the production eight-tap approximation.
 POINT_SOURCE = SOURCE[:SOURCE.index('// Integrate the wet material')] + '''
@@ -82,6 +83,7 @@ class PaperInkAntialiasingTest(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         cls.effects = {'aa': skia.RuntimeEffect.MakeForShader(SOURCE),
+                       'plain': skia.RuntimeEffect.MakeForShader(PLAIN_SOURCE),
                        'point': skia.RuntimeEffect.MakeForShader(POINT_SOURCE),
                        'quad': skia.RuntimeEffect.MakeForShader(QUAD_SOURCE)}
         cls.words = [word('ٱللَّهِ', geometry.ARABIC_FONT, 40, True, 4),
@@ -208,6 +210,35 @@ class PaperInkAntialiasingTest(unittest.TestCase):
         point_error, filtered_error = np.mean(errors, axis=0)
         print(f'Wet pixel-area MSE: point={point_error:.4f}, antialiased={filtered_error:.4f}')
         self.assertLess(filtered_error, point_error * .85)
+
+    def test_paper_tooth_is_confined_to_a_small_wet_outline_envelope(self):
+        changed = 0
+        for specimen in self.words:
+            for pooling in (.28, 1.):
+                weight = pooling * 3.5 * specimen['unit']
+                bound = min(weight * .12, .12 * specimen['unit'])
+                for method in (0., 1.):
+                    for repeat in (0., 1.):
+                        options = dict(reflectionStrength=0., spreadMethod=method,
+                                       repeatPass=repeat, repeatTint=repeat)
+                        actual = self.render(specimen, weight=weight, **options).astype(int)
+                        plain = self.render(specimen, 'plain', weight=weight, **options).astype(int)
+                        lower = self.render(specimen, 'plain', weight=weight-bound, **options)[:, :, 3].astype(int)
+                        upper = self.render(specimen, 'plain', weight=weight+bound, **options)[:, :, 3].astype(int)
+                        self.assertTrue((actual[:, :, 3] >= lower - 1).all())
+                        self.assertTrue((actual[:, :, 3] <= upper + 1).all())
+                        core = specimen['coverage'] == 255
+                        np.testing.assert_array_equal(actual[core], plain[core])
+                        changed += np.count_nonzero(actual[:, :, 3] != plain[:, :, 3])
+        self.assertGreater(changed, 0, 'the wet outline must actually gain paper tooth')
+
+    def test_paper_tooth_leaves_dry_zero_pooling_and_unread_words_exact(self):
+        for specimen in self.words:
+            for options in (dict(wet=0.), dict(weight=0.),
+                            dict(progress=-1., retained=0.),
+                            dict(progress=0., retained=0., leadEntry=1.)):
+                np.testing.assert_array_equal(self.render(specimen, **options),
+                                              self.render(specimen, 'plain', **options))
 
     def test_final_word_fills_every_letter_without_a_retained_base(self):
         closing = word('ٱلۡمُسۡرِفِينَ', geometry.ARABIC_FONT, 80, True, 8)
