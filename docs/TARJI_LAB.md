@@ -133,9 +133,12 @@ later lab edits persist normally. Other stored reciter profiles are preserved.
   a moment of: `TarjiDrama` scores each event 0–1 against the verse's own
   voice — how long the pulse lasts (40 %), how long the note it rides is held
   (35 %), and how far the voice is lifted in loudness or pitch (25 %) — and
-  darkens those under the threshold. Shipped 50 %; "Any" (0) keeps every one.
-  On 26 recordings by 13 reciters it keeps 79 of 342 events, mostly closing
-  holds and long madds. Saved with the reciter's profile.
+  darkens those under the threshold. Shipped 53 %; "Any" (0) keeps every one.
+  Existing stock 50 % settings adopt 53 % once in both Ink Lab and saved
+  reciter profiles; custom thresholds and subsequent auditions persist.
+  Imported captures retain their recorded settings. The earlier 50 % audit
+  kept 79 of 342 events on 26 recordings by 13 reciters, mostly closing holds
+  and long madds; that count has not been remeasured at 53 %.
   A reciter may carry his own ranges (`TarjiDramaWeights.forReciter`); Hani's
   were fitted to all his verses — see
   [tarji-detection/hani-drama.md](tarji-detection/hani-drama.md).

@@ -23,6 +23,7 @@ class InkLabStoreTest {
         assertEquals(1.4185f, ink.cruiseCap, 0.0001f)
         assertEquals(0.3f, ink.holdCreep, 0.0001f)
         assertEquals(0.28f, ink.paperInkPooling, 0f)
+        assertEquals(0.53f, ink.tarjiMinDrama, 0f)
 
         val guide = ContextualGuideTuning()
         assertEquals(0.5f, guide.bodyEdge, 0.0001f)
@@ -141,6 +142,20 @@ class InkLabStoreTest {
             paperInkLeadFade = 0.3f, paperInkFlowing = true)
         assertEquals(expected, restored.toTuning())
         assertTrue(!InkLabSnapshot.encode(restored).contains("paperInkSoftness"))
+    }
+
+    @Test
+    fun oldStockDrama_adoptsNewDefaultWithoutRepeatingThePoolingMigration() {
+        val saved = InkLabSnapshot(schema = 7, tarjiMinDrama = 0.5f,
+            paperInkPooling = 0.25f, inkFadeMs = 400, scrollLeadMs = 444)
+        val migrated = InkLabSnapshot.decode(InkLabSnapshot.encode(saved))!!
+        assertEquals(saved.copy(schema = InkLabSnapshot.SCHEMA, tarjiMinDrama = 0.53f), migrated)
+
+        val custom = saved.copy(tarjiMinDrama = 0.7f)
+        assertEquals(custom.copy(schema = InkLabSnapshot.SCHEMA),
+            InkLabSnapshot.decode(InkLabSnapshot.encode(custom)))
+        val retuned = migrated.copy(tarjiMinDrama = 0.5f)
+        assertEquals(retuned, InkLabSnapshot.decode(InkLabSnapshot.encode(retuned)))
     }
 
     @Test

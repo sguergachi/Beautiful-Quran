@@ -1102,7 +1102,7 @@ class Tarji {
         /** Off-gate depth as a fraction of [minTremoloDepth] (hysteresis). */
         private const val DEPTH_OFF_RATIO = 0.7f
         /** Recording keeps the verse's standout reverberations — Tarjīʿ Lab: [minDrama]. */
-        const val MIN_DRAMA = 0.5f
+        const val MIN_DRAMA = 0.53f
         /** No volume threshold — Tarjīʿ Lab: [minVolume]. */
         const val MIN_VOLUME = 0f
         /** Level an open event may fall to, as a fraction of [minVolume] (hysteresis). */

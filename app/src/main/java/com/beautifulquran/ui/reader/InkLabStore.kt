@@ -204,8 +204,9 @@ data class InkLabSnapshot(
          * 5: give the repeat wash a slower 1.8 s release without resetting the camera.
          * 6: match old default verse fades to chrome; preserve custom fade auditions.
          * 7: adopt 0.28 pooling for old stock profiles; retire the softness dial.
+         * 8: raise the old stock recording-drama threshold from 50% to 53%.
          */
-        const val SCHEMA = 7
+        const val SCHEMA = 8
 
         private val json = Json {
             ignoreUnknownKeys = true
@@ -316,10 +317,14 @@ data class InkLabSnapshot(
                     ayahMarkFadeMs = repeat.ayahMarkFadeMs.takeUnless { it == 400 } ?: shipped.ayahMarkFadeMs,
                     recessMs = repeat.recessMs.takeUnless { it == 400 } ?: shipped.recessMs,
                 )
-                if (saved.schema >= SCHEMA) fades else fades.copy(
-                    schema = SCHEMA,
+                val pooling = if (saved.schema >= 7) fades else fades.copy(
                     paperInkPooling = fades.paperInkPooling.takeUnless { it == 0.25f }
                         ?: shipped.paperInkPooling,
+                )
+                if (saved.schema >= SCHEMA) pooling else pooling.copy(
+                    schema = SCHEMA,
+                    tarjiMinDrama = pooling.tarjiMinDrama.takeUnless { it == 0.5f }
+                        ?: shipped.tarjiMinDrama,
                 )
             }
     }
