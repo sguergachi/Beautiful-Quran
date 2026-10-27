@@ -4,6 +4,12 @@ The offline runner and the AI-reviewed Chapter 64 pilot are complete. The
 packaged experiment remains off by default, separate from human review.
 The existing word-card mapping/clock and the Arabic/source timing data are unchanged.
 
+The 2026-10-27 follow-up supersedes the pilot's raw-source retention and
+provider-stop behavior: see [automatic waits and source-use rules](../ENGLISH_ALIGNMENT_LEDGER.md#quranai--qf-source-use-rules).
+Source payloads/transcripts are removed in favor of hash receipts; usage limits
+wait automatically. The pilot counts and its accuracy limitations below remain
+historical evidence.
+
 ## Scope and result
 
 `review_english_chapters.py` supports chapter lists/ranges, a default budget of

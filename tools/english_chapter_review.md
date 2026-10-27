@@ -15,7 +15,9 @@ For a draft, return the verse key and one decision for EVERY token, in order:
   addition, supply an explicit nearby navigation cue, not an invented semantic source.
 - ink_anchor: a contributing source position initiating the forward wash, or a nearby presentation
   cue for a null-linked addition. Do not change meaning owners merely to force monotone English.
-- meaning: brief contextual justification, with null-linked additions identified explicitly.
+- meaning: a brief justification in your own words, with null-linked additions identified
+  explicitly. Do not reproduce tafsir passages. Attribute edition-specific interpretations;
+  your mapping judgment is synthesis, not a scholarly ruling or a statement by Quran.ai/QF.
 - unit: a local contiguous meaning sub-unit ID. One Arabic word expanded into several English
   tokens shares one unit and ink anchor. A phrase with different Arabic contributors needs separate
   portions: e.g. performance and prayer must retain their distinct sources. Do not group an entire

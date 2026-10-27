@@ -7,6 +7,7 @@ import inspect
 import json
 import os
 from pathlib import Path
+import re
 import shutil
 import signal
 import subprocess
@@ -15,13 +16,10 @@ from threading import Event
 
 import english_alignment_ledger as ledger
 from english_alignment_evidence import QuranEvidence, structured, surface
+from english_review_wait import ModelUnavailableError, UsageLimitError, UsageWait
 
 RUBRIC = Path(__file__).with_name("english_chapter_review.md")
 REASONING = "xhigh"
-
-
-class ModelUnavailableError(RuntimeError):
-    """Stop the batch on provider quota/auth failures instead of spending each verse's retries."""
 
 
 def write_text(path, text):
@@ -62,12 +60,21 @@ def entry_keys(entry):
     return {entry["ayah"]} if "ayah" in entry else set(entry.get("ayahs", []))
 
 
+def request_receipt(payload, output_schema, model):
+    """Keep exact-request provenance without retaining source text or a prompt transcript."""
+    return {"format": "english-review-request-v1", "input_sha256": ledger.digest(ledger.encoded(payload)),
+            "schema_sha256": ledger.digest(ledger.encoded(output_schema)), "model": model,
+            "reasoning_effort": REASONING, "rubric_sha256": ledger.digest(RUBRIC.read_bytes())}
+
+
 def model_call(payload, output_schema, directory, model, timeout):
-    """Fresh, read-only Codex invocation per pass; no API secret enters any artifact."""
+    """Source text and CLI transcripts remain in memory, including failed requests."""
     directory.mkdir(parents=True, exist_ok=True)
-    save(directory / "input.json", payload)
+    receipt = request_receipt(payload, output_schema, model)
+    save(directory / "request.json", dict(receipt, completed=False))
     save(directory / "schema.json", output_schema)
     answer = directory / "answer.json"
+    answer.unlink(missing_ok=True)
     # A separate empty working directory prevents project instructions from
     # turning annotation into a coding or memory-management task.
     with tempfile.TemporaryDirectory(prefix="bq-annotation-") as working:
@@ -76,30 +83,44 @@ def model_call(payload, output_schema, directory, model, timeout):
                    "-c", f'model_reasoning_effort="{REASONING}"',
                    "--output-schema", str((directory / "schema.json").resolve()),
                    "--output-last-message", str(answer.resolve()), "-"]
-        with (directory / "stdout.log").open("w") as stdout, (directory / "stderr.log").open("w") as stderr:
-            try:
-                subprocess.run(command, input=RUBRIC.read_text() + "\nINPUT JSON:\n" + json.dumps(payload, ensure_ascii=False),
-                               text=True, stdout=stdout, stderr=stderr, timeout=timeout, check=True)
-            except subprocess.CalledProcessError:
-                stderr.flush()
-                errors = [line for line in (directory / "stderr.log").read_text().split("\n") if line.startswith("ERROR:")]
-                for error in errors:
-                    if any(marker in error.lower() for marker in ["usage limit", "quota", "not authenticated", "invalid api key"]):
-                        raise ModelUnavailableError(error) from None
-                raise
-    return json.loads(answer.read_text())
+        process = None
+        try:
+            process = subprocess.run(command, input=RUBRIC.read_text() + "\nINPUT JSON:\n" + json.dumps(payload, ensure_ascii=False),
+                           text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=timeout, check=True)
+        except subprocess.CalledProcessError as error:
+            process = error
+            errors = [line for line in (error.stderr or '').split("\n") if line.startswith("ERROR:")]
+            for message in errors:
+                if any(marker in message.lower() for marker in ["usage limit", "quota", "rate limit", "too many requests"]):
+                    raise UsageLimitError(message) from None
+                if any(marker in message.lower() for marker in ["not authenticated", "invalid api key", "authentication", "unauthorized"]):
+                    raise ModelUnavailableError(message) from None
+            raise
+        finally:
+            if process is not None:
+                save(directory / "process.json", {"stdout_sha256": ledger.digest((process.stdout or '').encode()),
+                     "stderr_sha256": ledger.digest((process.stderr or '').encode())})
+    result = json.loads(answer.read_text())
+    save(directory / "request.json", dict(receipt, completed=True, answer_sha256=ledger.digest(ledger.encoded(result))))
+    return result
 
 
-def cached_model_call(payload, output_schema, directory, model, timeout, cancelled=None):
+def cached_model_call(payload, output_schema, directory, model, timeout, cancelled=None, usage_wait=None):
     """Resume a completed stage after interruption; the job directory binds model and rubric."""
     if cancelled is not None and cancelled.is_set():
         raise KeyboardInterrupt
-    if all((directory / name).exists() for name in ["input.json", "schema.json", "answer.json"]):
+    expected = request_receipt(payload, output_schema, model)
+    def completed(stage):
+        receipt = json.loads((stage / "request.json").read_text())
+        answer = json.loads((stage / "answer.json").read_text())
+        return answer if (receipt == dict(expected, completed=True,
+                        answer_sha256=ledger.digest(ledger.encoded(answer)))) else None
+    if (directory / "request.json").exists():
         try:
-            if (json.loads((directory / "input.json").read_text()) == payload and
-                    json.loads((directory / "schema.json").read_text()) == output_schema):
-                return json.loads((directory / "answer.json").read_text())
-        except json.JSONDecodeError:
+            answer = completed(directory)
+            if answer is not None:
+                return answer
+        except (OSError, ValueError):
             pass  # An interrupted partial write is not a completed model stage.
     # A validator change can invalidate a job without changing what the model
     # was asked. Reuse that exact completed request, then run the new gates.
@@ -108,38 +129,87 @@ def cached_model_call(payload, output_schema, directory, model, timeout, cancell
         if previous == directory:
             continue
         try:
-            header, _, body = (previous / "stderr.log").read_text().partition("\nuser\n")
-            if (f"model: {model}" not in header.splitlines() or f"reasoning effort: {REASONING}" not in header.splitlines() or
-                    not body.startswith(RUBRIC.read_text() + "\nINPUT JSON:\n") or
-                    json.loads((previous / "input.json").read_text()) != payload or
-                    json.loads((previous / "schema.json").read_text()) != output_schema):
+            answer = completed(previous)
+            if answer is None:
                 continue
-            answer = json.loads((previous / "answer.json").read_text())
             directory.mkdir(parents=True, exist_ok=True)
-            for name in ["input.json", "schema.json", "answer.json", "stdout.log", "stderr.log"]:
+            for name in ["request.json", "schema.json", "answer.json"]:
                 shutil.copyfile(previous / name, directory / name)
             save(directory / "reuse.json", {"from": str(previous), "answer_sha256": ledger.digest(ledger.encoded(answer))})
             return answer
         except (OSError, ValueError):
             continue
-    try:
-        return model_call(payload, output_schema, directory, model, timeout)
-    finally:
-        if cancelled is not None and cancelled.is_set():
-            raise KeyboardInterrupt
+    while True:
+        if usage_wait is not None:
+            usage_wait.wait()
+        try:
+            answer = model_call(payload, output_schema, directory, model, timeout)
+            if usage_wait is not None:
+                usage_wait.succeeded()
+            return answer
+        except UsageLimitError as error:
+            if usage_wait is None:
+                raise
+            usage_wait.defer(str(error))
+        finally:
+            if cancelled is not None and cancelled.is_set():
+                raise KeyboardInterrupt
+
+
+def evidence_receipt(package):
+    """An attribution/hash record is not an offline copy of the retrieved content."""
+    return {"format": "english-evidence-receipt-v1", "verse": package["verse"],
+            "fingerprint": package["fingerprint"], "tafsir_edition": package["tafsir_edition"],
+            "package_sha256": ledger.digest(ledger.encoded(package)),
+            "sources": {name: {"edition": source["edition"], "citation_url": source["entry"].get("citation_url"),
+                        "reply_sha256": source["reply_sha256"]} for name, source in package["sources"].items()},
+            "morphology_reply_sha256": package["morphology_reply_sha256"]}
+
+
+def purge_source_payloads(work):
+    """Remove legacy MCP reply/prompt copies, retaining decisions and hash receipts."""
+    import fcntl
+    with (work / ".lock").open("w") as lock:
+        fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        count = 0
+        for path in (work / "evidence").glob("*.json"):
+            value = json.loads(path.read_text())
+            if value.get("format") != "english-evidence-receipt-v1":
+                save(path, evidence_receipt(value)); count += 1
+        raw = work / "evidence" / "raw"
+        if raw.exists():
+            count += sum(p.is_file() for p in raw.rglob('*'))
+            shutil.rmtree(raw)
+        for path in (work / "jobs").rglob('input.json'):
+            # Preserve the hash even for an incomplete legacy request. It is not
+            # reusable without a completed request receipt from this implementation.
+            save(path.with_name('legacy-input-receipt.json'), {"input_sha256": ledger.digest(ledger.encoded(json.loads(path.read_text())))})
+            path.unlink(); count += 1
+        for pattern in ['stdout.log', 'stderr.log']:
+            for path in (work / "jobs").rglob(pattern):
+                save(path.with_name(path.name + '.receipt.json'), {"sha256": ledger.digest(path.read_bytes())})
+                path.unlink(); count += 1
+        orphans = list((work / 'evidence').glob('*.json.tmp')) + list((work / 'jobs').rglob('input.json.tmp'))
+        if orphans:
+            save(work / 'source-orphan-receipts.json', [{"path": str(p.relative_to(work)),
+                 "sha256": ledger.digest(p.read_bytes())} for p in orphans])
+            for path in orphans:
+                path.unlink(); count += 1
+        if count or not (work / 'source-purge.json').exists():
+            save(work / 'source-purge.json', {"removed_or_replaced_files": count,
+                 "retained": "AI decisions, source attribution and hashes; no MCP source replies or prompt transcripts"})
+        return count
 
 
 def fetch_evidence(client, row, directory, tafsir):
-    """Cache exact replies; validate verse keys, editions, pages and surface positions."""
+    """Retrieve and validate online; persist only citations and hashes, never source text."""
     path = directory / (row["verse"].replace(":", "-") + ".json")
-    if path.exists():
-        package = json.loads(path.read_text())
-        ledger.require(package["fingerprint"] == row["fingerprint"] and package["tafsir_edition"] == tafsir,
-                       "Stale evidence binding; use a new work directory")
-        validate_evidence(row, package)
-        return package
+    grounding = copy.deepcopy(client.grounding)
+    for block in grounding.get('content', []):
+        if block.get('type') == 'text':
+            block['text'] = re.split(r'\n---\nGROUNDING_NONCE:', block['text'])[0]
     package = {"verse": row["verse"], "fingerprint": row["fingerprint"], "tafsir_edition": tafsir,
-               "grounding_rules": client.grounding,
+               "grounding_rules": grounding,
                "tafsir_selection": "Concise lexical and phrase parsing; catalogue description retained.", "sources": {}}
     for name, edition in [("fetch_quran", "ar-uthmani-hafs"),
                           ("fetch_translation", "en-sahih-international"), ("fetch_tafsir", tafsir)]:
@@ -148,7 +218,6 @@ def fetch_evidence(client, row, directory, tafsir):
             arguments = {"continuation": continuation} if continuation else {"ayahs": row["verse"], "editions": edition}
             raw = client.call(name, arguments)
             pages.append(raw)
-            save(directory / "raw" / row["verse"].replace(":", "-") / (name + ".json"), pages)
             result = structured(raw)
             ledger.require(result.get("ayahs") == [row["verse"]], f"Wrong requested verse from {name}")
             ledger.require(set(result["results"]) == {edition}, f"Unexpected edition from {name}")
@@ -163,7 +232,6 @@ def fetch_evidence(client, row, directory, tafsir):
             continuation = next_page
         ledger.require(len(entries) == 1, f"Missing/duplicate canonical verse in {name}")
         package["sources"][name] = {"edition": edition, "entry": entries[0], "reply_sha256": ledger.digest(ledger.encoded(pages))}
-        save(directory / "raw" / row["verse"].replace(":", "-") / (name + ".json"), pages)
     morphology = client.call("fetch_word_morphology", {"ayah_key": row["verse"]})
     data = structured(morphology)
     ledger.require(data["ayah_key"] == row["verse"], "Wrong morphology verse")
@@ -171,8 +239,7 @@ def fetch_evidence(client, row, directory, tafsir):
     package["omitted_verse_markers"] = [w for w in data["words"] if not surface(w["text_uthmani"])]
     package["morphology_reply_sha256"] = ledger.digest(ledger.encoded(morphology))
     validate_evidence(row, package)
-    save(directory / "raw" / row["verse"].replace(":", "-") / "fetch_word_morphology.json", morphology)
-    save(path, package)
+    save(path, evidence_receipt(package))
     return package
 
 
@@ -230,7 +297,8 @@ def separate_units(answer):
 
 
 def job_signature(row, binding, evidence, model):
-    return ledger.digest(ledger.encoded([row, binding, evidence, model, RUBRIC.read_text(),
+    evidence_hash = evidence['package_sha256'] if evidence.get('format') == 'english-evidence-receipt-v1' else ledger.digest(ledger.encoded(evidence))
+    return ledger.digest(ledger.encoded([row, binding, evidence_hash, model, RUBRIC.read_text(),
                                          REVIEW_POLICY]))
 
 
@@ -325,7 +393,7 @@ def import_seed(rows, manifest, states, seed_rows, selected):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("command", choices=["run", "report"])
+    parser.add_argument("command", choices=["run", "report", "purge-source-cache"])
     parser.add_argument("--work-dir", type=Path, required=True)
     parser.add_argument("--chapters", default="1-114")
     parser.add_argument("--corpus", type=Path)
@@ -344,7 +412,13 @@ def main():
     args = parser.parse_args()
     work = args.work_dir.resolve()
     if args.command == "report":
-        print((work / "report.json").read_text())
+        report = json.loads((work / "report.json").read_text())
+        if (work / "usage-wait.json").exists():
+            report['usage_wait'] = json.loads((work / "usage-wait.json").read_text())
+        print(json.dumps(report, ensure_ascii=False, indent=2))
+        return
+    if args.command == "purge-source-cache":
+        print(f"Removed/replaced {purge_source_payloads(work)} legacy source-copy files.")
         return
     ledger.require(args.model and args.corpus and args.timings_cache, "run needs --model, --corpus and --timings-cache")
     ledger.require(1 <= args.attempts <= 3 and 1 <= args.timeout <= 1800, "Invalid retry/timeout budget")
@@ -365,6 +439,17 @@ def main():
     import fcntl
     with (work / ".lock").open("w") as lock:
         fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        ledger.require(not (work / 'evidence/raw').exists() and
+                       not next((work / 'jobs').rglob('input.json'), None) and
+                       not next((work / 'jobs').rglob('input.json.tmp'), None) and
+                       not next((work / 'evidence').glob('*.json.tmp'), None) and
+                       not next((work / 'jobs').rglob('stderr.log'), None) and
+                       not next((work / 'jobs').rglob('stdout.log'), None) and
+                       all(json.loads(p.read_text()).get('format') == 'english-evidence-receipt-v1'
+                           for p in (work / 'evidence').glob('*.json')),
+                       'Legacy source copies found; preserve decisions and run purge-source-cache before resuming')
+        usage_wait = UsageWait(work / "usage-wait.json", cancelled)
+        usage_wait.wait()
         export = work / "export"
         if not (export / "manifest.json").exists():
             ledger.export_corpus(export, args.corpus)
@@ -384,7 +469,7 @@ def main():
             corpus[key][1] = row["text"]
         printed_corpus = work / "printed-corpus.tsv"
         printed_corpus.write_text("".join("\t".join(corpus[key]) + "\n" for key in rows))
-        client = QuranEvidence()
+        client = QuranEvidence(cancelled=cancelled)
         save(work / "grounding.json", client.grounding)
         catalogue = structured(client.call("list_editions", {"edition_type": ["translation", "tafsir"]}))
         save(work / "editions.json", catalogue)
@@ -424,9 +509,11 @@ def main():
                     checkpoint(key, states[key])
                     continue
                 try:
+                    usage_wait.wait()
                     evidence = fetch_evidence(client, row, work / "evidence", args.tafsir)
                     directory = work / "jobs" / key.replace(":", "-")
-                    if args.retry_held and states.get(key, {}).get("status") == "held":
+                    old_state = states.get(key, {})
+                    if old_state.get("provider_unavailable") or (args.retry_held and old_state.get("status") == "held"):
                         old = directory / (states[key].get("input_sha256", "") + ".json")
                         if old.exists():
                             import time
@@ -435,7 +522,7 @@ def main():
                             runs = old.with_suffix("")
                             if runs.exists():
                                 runs.rename(runs.with_name(runs.name + suffix))
-                    call = lambda payload, output, dest: cached_model_call(payload, output, dest, args.model, args.timeout, cancelled)
+                    call = lambda payload, output, dest: cached_model_call(payload, output, dest, args.model, args.timeout, cancelled, usage_wait)
                     cached = (directory / (job_signature(row, manifest["verses"][key], evidence, args.model) + ".json")).exists()
                     future = pool.submit(review_verse, row, manifest["verses"][key], evidence, directory, args.model, args.attempts, call)
                     pending_jobs[future] = key

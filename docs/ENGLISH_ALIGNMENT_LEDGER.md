@@ -194,9 +194,10 @@ completed work. Use a larger explicit budget for a longer unattended run.
 Each verse has a private atomic checkpoint. Only one process may own a work
 directory. Two verse workers run by default; `--workers 1` through `4` controls
 bounded concurrency while canonical fetches remain serial and rate limited.
-Completed model stages also resume after interruption when their exact input,
-schema, rubric, model and reasoning setting match. Those same completed calls
-can be reused when a validator changes; the new validation gates still run. Completed reviews are reused only with matching text, source
+Completed model stages also resume after interruption when hashes of their exact
+input, schema and rubric, plus the model and reasoning setting, match. Those same
+completed calls can be reused when a validator changes; the new validation gates
+still run. Completed reviews are reused only with matching text, source
 evidence, model, rubric and review implementation. Changed bindings fail closed;
 export into a new work directory after a typesetter/corpus binding change.
 `--retry-held` explicitly starts another bounded attempt budget and preserves
@@ -207,8 +208,9 @@ The runner fetches grounding rules first, discovers editions, and selects the
 concise Arabic Jalalayn commentary for lexical/phrase parsing. Every passage's
 edition, verse keys and pagination are checked. Morphology excludes explicit
 verse-number markers, then compares each actual reader position and normalized
-surface; equal counts alone never pass. Raw UTF-8 replies, source URLs and
-digests stay in the private work directory. Surface mismatches remain held.
+surface; equal counts alone never pass. Source replies are used in memory for
+the current review. Only source URLs, edition IDs and digests are saved; surface
+mismatches remain held. A changed source reply changes the input binding.
 The model supplies decisions only; the runner retains immutable printed text,
 UTF-16 offsets and the complete 6,236-verse manifest. The prompt rubric is
 `tools/english_chapter_review.md`.
@@ -219,9 +221,19 @@ invalid owners and incomplete units stay held. This is two model passes, not
 independent bilingual review or blind gold. Invalid local unit labels are split
 into contiguous portions with equal contributors; meanings, contributors, heads
 and ink anchors are unchanged. The raw draft and separation receipt are saved,
-and the critique sees the exact separated units that will compile. Quota/auth
-failures stop the batch without spending every remaining verse's retries;
-completed work survives and `--retry-held` resumes after access returns.
+and the critique sees the exact separated units that will compile.
+
+Usage limits automatically pause all model workers. `usage-wait.json` records
+the provider's stated reset time with a safety minute; it survives process
+restarts. Unknown reset formats use an hourly backoff, increasing to six hours
+on repeated limits without a successful request. Waiting does not consume a
+semantic review attempt. The same draft or critique resumes after the cooldown;
+model, account and client identity are not changed. Waits are cancellable.
+Authentication/access errors still stop the run, preserving checkpoints, since
+waiting cannot repair credentials. Prior provider-held jobs can resume without
+manually granting another semantic attempt budget. `report` includes cooldown
+state when present. `--retry-held` remains an explicit bounded retry for mapping
+disagreements; waiting never approves a held mapping.
 Previous AI ledger records are
 reused with their original provenance and reported separately, not relabelled
 as freshly critiqued. `--refresh-reviewed` instead requests new drafting and
@@ -242,6 +254,60 @@ An AI mapping that removes positive default exposure fails the gate. Without
 `--alignments`, the original stricter legacy-window gate remains unchanged.
 Only a passing candidate becomes `english-ai-alignments.tsv` in the work
 directory. It never edits packaged data or publishes an APK on its own.
+
+### Quran.ai / QF source-use rules
+
+Checked 2026-10-27 against the [Quran.ai usage guide](https://github.com/quran/mcp.quran.ai/blob/master/skills/quran.ai-MCP-usage/SKILL.md),
+[Quran MCP software license](https://github.com/quran/quran-mcp/blob/master/LICENSE.md),
+[QF developer terms](https://api-docs.quran.com/legal/developer-terms/) (updated
+2026-10-11), and [Content Sync rules](https://api-docs.quran.com/docs/tutorials/content-sync/getting-started/).
+
+The client makes serial MCP tool calls at least 1.1 seconds apart and honors HTTP
+`Retry-After`, explicit tool retry delays and stated UTC daily resets. It waits
+using the same client/session and does not rotate identities or bypass quotas.
+Grounding rules are the first tool call, verified sources retain their edition
+and citation, and synthesis is labelled model judgment rather than scholarly
+consensus or a Quran.ai/QF endorsement.
+
+QF resources available through Content Sync must use that path for offline
+copies; a short cache TTL is not an alternative. The annotation runner therefore
+does **not** save MCP source replies, prompt inputs or CLI transcripts. CLI
+streams are captured in memory; persistent request/process receipts contain
+hashes only. The runner performs inference, not model training or fine-tuning.
+The source service sees verse references and editions, not user notes, app
+accounts or playback histories. Its [privacy policy](https://mcp.quran.ai/privacy)
+describes its own logging and retention; local cleanup does not control provider
+retention.
+
+Legacy work directories must be cleaned before the revised runner accepts them:
+
+```bash
+python3 tools/review_english_chapters.py purge-source-cache \
+  --work-dir "$HOME/.cache/bq-english-chapters"
+```
+
+This replaces saved source packages with attribution/hash receipts and removes
+raw replies and prompt/CLI transcript copies. It preserves completed mapping
+decisions, drafts, verdicts and their existing provenance. Historical completed
+rows can seed a new export via `--seed-ledger`; they remain explicitly prior AI
+review, never newly critiqued. The cleanup takes the same work-directory lock,
+so it cannot run alongside an active review.
+
+The MCP server's software license does not grant rights to translations or
+tafsir. Retrieved source text is not bundled or offered as a dataset. Input
+corpora must remain independently licensed or maintained under their applicable
+Content Sync contract; this tool does not renew those copies. Neither these
+controls nor AI-derived metadata establish additional content rights. Any future
+redistribution requiring separate authorization remains a separate decision.
+
+The 2026-10-27 checks cover 20 runner, 11 cooldown/MCP-retry, 12 compiler and two
+semantic-gate Python tests, plus 1,744 JVM tests (zero failures/errors, one
+existing skip). Cases include dated/daily/unknown resets, three workers sharing
+a cooldown, restart and cancellation, same-stage quota retries, HTTP/tool retry
+guidance, failed-call transcript isolation and legacy-source cleanup. The 201
+completed private AI reviews were retained unchanged as prior-review seeds;
+the packaged 162-verse lookup did not change. These checks establish neither
+legal clearance for additional uses nor independent semantic accuracy.
 
 `report.json` keeps each selected chapter's full verse denominator, reviewed and
 held counts, reasons, playback state and completion flag. `coverage.json` keeps

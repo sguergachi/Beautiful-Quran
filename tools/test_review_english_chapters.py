@@ -2,11 +2,13 @@
 """Gate tests: invalid mappings, disagreement, resume, staleness and chapter denominators."""
 import copy
 import json
+import subprocess
 from pathlib import Path
 import tempfile
 import unittest
 from unittest.mock import patch
 from threading import Event
+from types import SimpleNamespace
 
 import english_alignment_ledger as ledger
 import review_english_chapters as runner
@@ -117,18 +119,23 @@ class ChapterReviewTest(unittest.TestCase):
                 return {"structuredContent": {"ayahs": [row["verse"]], "results": {edition: [entry]}, "pagination": {"has_more": False}}}
         return Client()
 
-    def test_evidence_filters_only_verse_markers_and_revalidates_cached_surface_order(self):
+    def test_evidence_is_retrieved_online_and_only_hashes_and_citations_are_saved(self):
         with tempfile.TemporaryDirectory() as temporary:
             directory = Path(temporary); client = self.evidence_client()
             package = runner.fetch_evidence(client, self.row, directory, "ar-jalalayn")
             self.assertEqual(2, len(package["morphology"]["words"]))
             self.assertEqual(1, len(package["omitted_verse_markers"]))
             self.assertEqual(package, runner.fetch_evidence(client, self.row, directory, "ar-jalalayn"))
-            self.assertEqual(4, client.calls)
+            self.assertEqual(8, client.calls)
+            receipt = json.loads((directory / '1-1.json').read_text())
+            self.assertEqual(runner.evidence_receipt(package), receipt)
+            self.assertNotIn('synthetic only', (directory / '1-1.json').read_text())
+            self.assertFalse((directory / 'raw').exists())
+            self.assertEqual(runner.job_signature(self.row, self.binding, package, 'test'),
+                             runner.job_signature(self.row, self.binding, receipt, 'test'))
             package["morphology"]["words"].reverse()
-            runner.save(directory / "1-1.json", package)
             with self.assertRaisesRegex(ValueError, "positions"):
-                runner.fetch_evidence(client, self.row, directory, "ar-jalalayn")
+                runner.validate_evidence(self.row, package)
 
     def test_equal_word_counts_do_not_verify_a_wrong_arabic_surface(self):
         with tempfile.TemporaryDirectory() as temporary:
@@ -138,7 +145,9 @@ class ChapterReviewTest(unittest.TestCase):
     def test_completed_stage_resumes_but_changed_or_interrupted_input_does_not(self):
         with tempfile.TemporaryDirectory() as temporary:
             directory = Path(temporary)
-            for name, value in [("input.json", {"stage": "draft"}), ("schema.json", runner.DRAFT_SCHEMA),
+            receipt = dict(runner.request_receipt({'stage': 'draft'}, runner.DRAFT_SCHEMA, 'test'), completed=True,
+                           answer_sha256=ledger.digest(ledger.encoded(self.draft)))
+            for name, value in [("request.json", receipt), ("schema.json", runner.DRAFT_SCHEMA),
                                 ("answer.json", self.draft)]: runner.save(directory / name, value)
             with patch.object(runner, "model_call", return_value={"rerun": True}) as model:
                 self.assertEqual(self.draft, runner.cached_model_call({"stage": "draft"}, runner.DRAFT_SCHEMA, directory, "test", 5))
@@ -172,10 +181,10 @@ class ChapterReviewTest(unittest.TestCase):
             old = root / "old-validator" / "1" / "draft"
             new = root / "new-validator" / "1" / "draft"
             payload = {"stage": "draft"}
-            for name, value in [("input.json", payload), ("schema.json", runner.DRAFT_SCHEMA), ("answer.json", self.draft)]:
+            receipt = dict(runner.request_receipt(payload, runner.DRAFT_SCHEMA, 'test'), completed=True,
+                           answer_sha256=ledger.digest(ledger.encoded(self.draft)))
+            for name, value in [("request.json", receipt), ("schema.json", runner.DRAFT_SCHEMA), ("answer.json", self.draft)]:
                 runner.save(old / name, value)
-            (old / "stdout.log").write_text("")
-            (old / "stderr.log").write_text("header\nmodel: test\nreasoning effort: xhigh\nuser\n" + runner.RUBRIC.read_text() + "\nINPUT JSON:\n{}")
             with patch.object(runner, "model_call", return_value={"rerun": True}) as model:
                 self.assertEqual(self.draft, runner.cached_model_call(payload, runner.DRAFT_SCHEMA, new, "test", 5))
                 model.assert_not_called()
@@ -196,17 +205,76 @@ class ChapterReviewTest(unittest.TestCase):
         separated = runner.separate_units(repeated)
         self.assertNotEqual(separated["tokens"][0]["unit"], separated["tokens"][2]["unit"])
 
-    def test_provider_limit_stops_without_spending_the_second_attempt(self):
+    def test_auth_failure_stops_without_spending_the_second_attempt(self):
         calls = []
         def unavailable(*args):
             calls.append(True)
-            raise runner.ModelUnavailableError("ERROR: usage limit")
+            raise runner.ModelUnavailableError("ERROR: not authenticated")
         with tempfile.TemporaryDirectory() as temporary:
             state = runner.review_verse(self.row, self.binding, {"synthetic": True}, Path(temporary), "test", 2, unavailable)
         self.assertEqual(1, len(calls))
         self.assertEqual("held", state["status"])
         self.assertTrue(state["provider_unavailable"])
         self.assertNotIn("row", state)
+
+    def test_quota_wait_retries_the_same_stage_without_spending_a_semantic_attempt(self):
+        clock = [1000.0]
+        def sleep(seconds): clock[0] += seconds
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary); stop = Event()
+            gate = runner.UsageWait(root / 'usage-wait.json', stop, clock=lambda: clock[0], sleeper=sleep)
+            def call(payload, schema, directory):
+                return runner.cached_model_call(payload, schema, directory, 'test', 5, stop, gate)
+            with patch.object(runner, 'model_call', side_effect=[runner.UsageLimitError('retry in 2 seconds'), self.draft, self.review]) as model:
+                state = runner.review_verse(self.row, self.binding, {'synthetic': True}, root / 'jobs', 'test', 2, call)
+            self.assertEqual(('model_reviewed', 1, 3), (state['status'], state['attempts'], model.call_count))
+            self.assertEqual(1062, clock[0])
+
+    def test_live_prompt_and_cli_transcripts_are_not_saved_to_the_work_directory(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            def execute(command, **kwargs):
+                self.assertIn('private source sentinel', kwargs['input'])
+                Path(command[command.index('--output-last-message') + 1]).write_text(json.dumps(self.draft))
+                return SimpleNamespace(stdout='private source sentinel', stderr='user\nprivate source sentinel\n')
+            with patch.object(runner.subprocess, 'run', side_effect=execute):
+                self.assertEqual(self.draft, runner.model_call({'source': 'private source sentinel'}, runner.DRAFT_SCHEMA, root, 'test', 5))
+            for p in root.rglob('*'):
+                if p.is_file(): self.assertNotIn('private source sentinel', p.read_text())
+            self.assertTrue(json.loads((root / 'request.json').read_text())['completed'])
+
+    def test_failed_cli_calls_classify_quota_and_auth_without_retaining_the_prompt(self):
+        for message, kind in [('ERROR: usage limit; try again at 6:35 PM', runner.UsageLimitError),
+                              ('ERROR: not authenticated', runner.ModelUnavailableError)]:
+            with tempfile.TemporaryDirectory() as temporary:
+                root = Path(temporary)
+                failure = subprocess.CalledProcessError(1, ['codex'], output='private source sentinel',
+                            stderr='user\nprivate source sentinel\n' + message)
+                with patch.object(runner.subprocess, 'run', side_effect=failure):
+                    with self.assertRaises(kind):
+                        runner.model_call({'source': 'private source sentinel'}, runner.DRAFT_SCHEMA, root, 'test', 5)
+                self.assertFalse(json.loads((root / 'request.json').read_text())['completed'])
+                for p in root.rglob('*'):
+                    if p.is_file(): self.assertNotIn('private source sentinel', p.read_text())
+
+    def test_legacy_cleanup_preserves_decisions_and_replaces_source_copies_with_hashes(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            work = Path(temporary)
+            package = runner.fetch_evidence(self.evidence_client(), self.row, work / 'evidence', 'ar-jalalayn')
+            runner.save(work / 'evidence/1-1.json', package)
+            runner.save(work / 'evidence/raw/1-1/reply.json', {'source': 'private source sentinel'})
+            runner.save(work / 'jobs/1-1/a/1/draft/input.json', {'source': 'private source sentinel'})
+            transcript = work / 'jobs/1-1/a/1/draft/stderr.log'
+            transcript.write_text('private source sentinel')
+            runner.save(transcript.with_name('answer.json'), self.draft)
+            runner.save(work / 'state.json', {'preserved': True})
+            (work / 'evidence/2-1.json.tmp').write_text('interrupted private source sentinel')
+            transcript.with_name('input.json.tmp').write_text('interrupted private source sentinel')
+            self.assertEqual(6, runner.purge_source_payloads(work))
+            self.assertEqual({'preserved': True}, json.loads((work / 'state.json').read_text()))
+            self.assertEqual(self.draft, json.loads(transcript.with_name('answer.json').read_text()))
+            for p in work.rglob('*'):
+                if p.is_file(): self.assertNotIn('private source sentinel', p.read_text())
 
 
 if __name__ == "__main__":
