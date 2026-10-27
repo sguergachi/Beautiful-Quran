@@ -43,7 +43,7 @@ float paperHash(float2 p) {
 // it attached to the word, and the small amplitude dries away with the film.
 float organicPooling(float2 p, float filmWet, float scale, float distance, float coverageAA) {
     float spread = weight * filmWet;
-    float amplitude = min(weight * 0.12, 0.12 * scale) * filmWet;
+    float amplitude = min(weight * 0.6, 0.6 * scale) * filmWet;
     if (amplitude <= 0.0 || abs(distance + spread) >= coverageAA * 0.5 + amplitude) return spread;
     float2 at = p / (6.0 * scale);
     float2 cell = floor(at);
@@ -160,7 +160,7 @@ half4 evaporated(half4 ink, float base) {
 half4 main(float2 p) {
     float distance = (field.eval(p * fieldScale).b * 255.0 - 128.0) / 16.0;
     float base = normals.eval(p).b;
-    if (base == 0.0 && distance < -weight - 0.12 * unit - max(aa, 1.0)) return half4(0.0);
+    if (base == 0.0 && distance < -weight - 0.6 * unit - max(aa, 1.0)) return half4(0.0);
     if (max(wet, underWet * repeatPass) <= 0.0) return evaporated(inkAt(p, base, aa), base);
     // Eight distinct positions along both axes resolve thin reflected lines
     // on nearly vertical alifs; a 2x2 grid has only two horizontal samples.

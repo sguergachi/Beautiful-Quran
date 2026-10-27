@@ -189,10 +189,12 @@ handoff to static text. Empty paper beyond the wet spread is skipped. The
 study uses the same sampling scheme; no additional textures or mask generation
 are needed.
 
-The extra wet spread has a very faint paper tooth: a smooth, fixed irregularity
-in font coordinates, capped at 12% of the added width and 0.12 px at the
+The extra wet spread has a restrained paper tooth: a smooth, fixed irregularity
+in font coordinates, capped at 60% of the added width and 0.6 px at the
 160 px reference font, whichever is smaller. At 80 px type and stock 0.28
-pooling the maximum displacement is about 0.059 device pixels. It affects
+pooling the maximum displacement is about 0.294 device pixels. This is five
+times the earlier 0.12-reference-pixel amplitude, which the user found imperceptible.
+It affects
 only the pooled fringe, follows the same pattern on both coats, and vanishes
 with wetness. Dry glyph coverage, arrival fields and the eight-tap antialiasing
 stay intact. The study uses the same variation at its reference size.
@@ -244,6 +246,9 @@ Playback timing is unchanged. Paper's repeat ink is the study's terracotta
   reproduces the leading-letter flash in the same production shader.
   Organic pooling is compared with a smooth control and a bounded spread
   envelope; dry, zero-pooling, unread and first-entry pixels remain exact.
+  Stock-pooling Arabic and English controls also require at least three times
+  the edge-coverage RMS contrast of the superseded faint version. This locks
+  paint strength, not a universal perceptual threshold.
 - `PaperInkEvaporationTest` — unread entry, settled and partial/repeat
   departures, interrupted fades, re-entry and retained reciter repeats. The
   Skia gate also checks that evaporating first/repeat ink reaches the exact

@@ -17,6 +17,7 @@ from paper_ink_outline import outline_distance
 ROOT = Path(__file__).resolve().parents[1]
 SOURCE = (ROOT / 'app/src/main/assets/paper-ink/ink.agsl').read_text()
 PLAIN_SOURCE = SOURCE.replace('organicPooling(p, filmWet, unit, distance, coverageAA)', 'weight * filmWet')
+FAINT_SOURCE = SOURCE.replace('min(weight * 0.6, 0.6 * scale)', 'min(weight * 0.12, 0.12 * scale)')
 # Same material, sampled directly. At high resolution, this integrates the
 # pixel area independently of the production eight-tap approximation.
 POINT_SOURCE = SOURCE[:SOURCE.index('// Integrate the wet material')] + '''
@@ -84,6 +85,7 @@ class PaperInkAntialiasingTest(unittest.TestCase):
     def setUpClass(cls):
         cls.effects = {'aa': skia.RuntimeEffect.MakeForShader(SOURCE),
                        'plain': skia.RuntimeEffect.MakeForShader(PLAIN_SOURCE),
+                       'faint': skia.RuntimeEffect.MakeForShader(FAINT_SOURCE),
                        'point': skia.RuntimeEffect.MakeForShader(POINT_SOURCE),
                        'quad': skia.RuntimeEffect.MakeForShader(QUAD_SOURCE)}
         cls.words = [word('ٱللَّهِ', geometry.ARABIC_FONT, 40, True, 4),
@@ -216,7 +218,7 @@ class PaperInkAntialiasingTest(unittest.TestCase):
         for specimen in self.words:
             for pooling in (.28, 1.):
                 weight = pooling * 3.5 * specimen['unit']
-                bound = min(weight * .12, .12 * specimen['unit'])
+                bound = min(weight * .6, .6 * specimen['unit'])
                 for method in (0., 1.):
                     for repeat in (0., 1.):
                         options = dict(reflectionStrength=0., spreadMethod=method,
@@ -231,6 +233,21 @@ class PaperInkAntialiasingTest(unittest.TestCase):
                         np.testing.assert_array_equal(actual[core], plain[core])
                         changed += np.count_nonzero(actual[:, :, 3] != plain[:, :, 3])
         self.assertGreater(changed, 0, 'the wet outline must actually gain paper tooth')
+
+    def test_stock_pooling_exceeds_the_superseded_faint_edge_control(self):
+        # This measures paint contrast, not a universal perceptual threshold.
+        for text, font, size, rtl, letters in (
+                ('أُمِرُوٓاْ', geometry.ARABIC_FONT, 104, True, 5),
+                ('Merciful', geometry.ENGLISH_FONT, 64, False, 8)):
+            specimen = word(text, font, size, rtl, letters)
+            options = dict(weight=.28 * 3.5 * specimen['unit'])
+            plain = self.render(specimen, 'plain', **options)[:, :, 3].astype(float)
+            fringe = (plain > 0) & (plain < 255)
+            faint = self.render(specimen, 'faint', **options)[:, :, 3].astype(float)
+            actual = self.render(specimen, **options)[:, :, 3].astype(float)
+            old_rms = np.sqrt(((faint - plain)[fringe] ** 2).mean())
+            new_rms = np.sqrt(((actual - plain)[fringe] ** 2).mean())
+            self.assertGreater(new_rms, old_rms * 3, text)
 
     def test_paper_tooth_leaves_dry_zero_pooling_and_unread_words_exact(self):
         for specimen in self.words:
