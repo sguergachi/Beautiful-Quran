@@ -495,7 +495,7 @@ fun EntranceCover(
                 )
                 Spacer(Modifier.height(30.dp))
                 Text(
-                    text = "القرآن الكريم",
+                    text = "القرآن الجميل",
                     fontFamily = HafsFontFamily,
                     fontSize = 40.sp,
                     lineHeight = 1.6.em,

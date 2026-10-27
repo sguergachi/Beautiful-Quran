@@ -592,7 +592,7 @@ export function EntranceCover({
           />
           <div className="entrance-titles">
             <p ref={titleArRef} className="entrance-title-ar" lang="ar" dir="rtl">
-              القرآن الكريم
+              القرآن الجميل
             </p>
             <p ref={titleEnRef} className="entrance-title-en">
               Beautiful Quran

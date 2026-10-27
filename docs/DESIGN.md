@@ -1368,7 +1368,7 @@ three moments:
    are the binding's tooling and render complete on the very first
    frame — no wash, no fade. Tooled *inside* that frame, this launch's
    generated arabesque field (whisper ink) and the generated medallion
-   (`GeneratedMedallion`) with the title **القرآن الكريم** beneath it
+   (`GeneratedMedallion`) with the title **القرآن الجميل** beneath it
    in the Hafs hand, leafed in gold, and **Beautiful Quran** beneath in
    English, ink themselves onto the leather in real time as the ceremony
    arrives — the illumination, drawn before the reader's eyes.

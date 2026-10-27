@@ -46,7 +46,7 @@ export function BookTitlePage() {
     <div className="book-title-page">
       <BookMedallion className="book-title-medallion" />
       <p className="book-title-ar" lang="ar" dir="rtl">
-        القرآن الكريم
+        القرآن الجميل
       </p>
       <p className="book-title-en">Beautiful Quran</p>
       <p className="book-title-hint">Choose a chapter to begin reading</p>
