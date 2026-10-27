@@ -863,7 +863,11 @@ the left edge opposite the session Close, keeping the full message clear of
 both controls. It stays on one line, set in semibold type with
 the same ink strength as its × (**Dismiss playback error**); Android sizes the
 type down slightly on narrow screens rather than abbreviating the explanation.
-The notice stays until playback recovers or the × is tapped. Dismissal
+On Android, a notice appears only when a play attempt fails, including while
+buffering before audio starts. Failures from a paused, loaded stream stay in
+the log, so returning to an idle app does not reveal a new playback warning.
+Pausing, stopping, loading another queue, or recovering playback clears the
+notice; otherwise it stays until the × is tapped. Dismissal
 restores the normal band without changing playback or the selected verse;
 the notice never adds a row or opens reciter settings.
 
