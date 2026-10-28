@@ -926,6 +926,38 @@ def collapse_invented_flush_repeats(current, repaired, only_positions=None):
     return out
 
 
+def reject_reintroduced_orphans(current, repaired):
+    """Reject disconnected labels reinstated by an otherwise stale repair.
+
+    Peer re-says have already been protected. The source topology wins when
+    removing the repair's disconnected labels recovers its complete sequence.
+    Interior insertions retain surviving repair onsets and conserve their time.
+    Other structural repairs still require their ordinary acoustic verdict.
+    """
+    stats = {"noncontiguous_orphans": 0}
+    fixed, _ = adjudicate_backtrack_runs(repaired, stats)
+    if (stats["noncontiguous_orphans"] and not stats.get("gap_phantoms") and
+            [s[0] for s in fixed] == [s[0] for s in current]):
+        changes = SequenceMatcher(a=[s[0] for s in repaired],
+                                  b=[s[0] for s in current], autojunk=False).get_opcodes()
+        removed = set()
+        for tag, start, end, _, _ in changes:
+            if tag == "equal":
+                continue
+            if (tag != "delete" or start == 0 or end == len(repaired) or
+                    repaired[start - 1][0] + 1 != repaired[end][0]):
+                return current
+            removed.update(range(start, end))
+        out = []
+        for i, segment in enumerate(repaired):
+            if i in removed:
+                out[-1][2] = segment[2]
+            else:
+                out.append(list(segment))
+        return out
+    return repaired
+
+
 def false_same_position_leads(current, repaired, reference):
     """Same-position pairs the independent aligner refuses to call a re-say.
 
@@ -2093,7 +2125,7 @@ def apply_one_utterance(segs, positions):
     ]
 
 
-def discard_false_same_position_lead(segs, position, requires_audio_verdict=False):
+def discard_false_same_position_lead(segs, position, requires_audio_verdict=False, source_pair=None):
     """Discard one acoustically-vetted false lead before the real word.
 
     Equal positions can be a real re-say, so source topology alone is never
@@ -2114,6 +2146,8 @@ def discard_false_same_position_lead(segs, position, requires_audio_verdict=Fals
     if not requires_audio_verdict:
         raise ValueError("discard_false_same_position_lead requires an audio verdict")
     i = matches[0]
+    if source_pair is not None and segs[i:i + 2] != source_pair:
+        raise ValueError("false lead source pair changed")
     if i == 0:
         raise ValueError("false lead has no preceding word to retain its time")
     out = [list(seg) for seg in segs]
@@ -2286,6 +2320,7 @@ def apply_timing_corrections(
                         by_key[key],
                         int(edit["position"]),
                         bool(edit.get("requiresAudioVerdict")),
+                        edit.get("sourcePair"),
                     )
                 elif op == "restore_flattened_resay":
                     by_key[key] = restore_flattened_resay(
@@ -2485,6 +2520,7 @@ def apply_timing_repairs(
             if leads:
                 merged = hand_lead_to_previous_word(merged, leads)
                 false_leads += len(leads)
+            merged = reject_reintroduced_orphans(current, merged)
             if merged != translate_segments(segs, offset):
                 rebased += 1
             by_key[key] = json.dumps(merged, separators=(",", ":"))
@@ -3278,6 +3314,7 @@ def authenticated_evidence_problem(change):
             return "topology preference or new-occurrence confidence is insufficient"
         if has_removed_occurrence:
             from word_split_evidence import ownership_problem
+            from orphan_reassignment_evidence import orphan_reassignment_problem
 
             for model in models:
                 confidence = model.get("removedOccurrenceMaxLabelProbability")
@@ -3287,9 +3324,11 @@ def authenticated_evidence_problem(change):
                     continue
                 # A label ordinal can disappear while its confident phonetic
                 # frames remain in the candidate's held word/adjacent speech.
-                # The proof permits only an exact flush same-word merge; all
-                # other removals keep the original symmetric confidence gate.
-                if ownership_problem(before["segments"], after["segments"], model) is not None:
+                # Exact held-word merges and disconnected interior orphans
+                # have separate frame proofs; neither can discard confident
+                # speech that is absent from the adjacent retained owners.
+                if (ownership_problem(before["segments"], after["segments"], model) is not None and
+                        orphan_reassignment_problem(before["segments"], after["segments"], model) is not None):
                     return "a removed occurrence is heard or lacks baseline confidence on either model"
     elif (all(old[1] == new[1] for old, new in zip(before["segments"], after["segments"])) or
           any(not finite(model.get(field)) or model[field] < 0

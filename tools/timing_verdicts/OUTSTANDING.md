@@ -5,6 +5,28 @@ verdict has reviewed them yet. The fail-closed delta gate withholds each of
 them; this file keeps that from being silent. Remove an entry when its rows ship
 with a verdict, are held with their model scores, or its cause is reverted.
 
+## False-lead follow-up to Alafasy 28:9 (2026-10-28)
+
+The complete current 81,059-row corpus has 955 adjacent same-position pairs.
+All have two-model screening evidence: 942 exact prior whole-row reports and
+thirteen fresh recordings per model. The separate disconnected stale-repair
+class has exactly one source repair and one delivered row, 28:9; it is resolved.
+
+The false-lead cohort has 946 retained pairs, one fully reviewed accepted row
+(28:9), and eight acoustically promising hypotheses awaiting complete
+authenticated pipeline replay: Alafasy 2:58, 7:45, 7:140, 12:107, 18:18, 25:3,
+29:33 and 37:150. All eight remain byte-for-byte baseline. Do not promote their
+local removal scores as whole-row verdicts or silently exclude existing holds
+and corrections. Their other timing boundaries and finalizer interactions
+still need review. The newly encountered 6:145 pair is a genuine-repeat
+control: fresh models prefer retaining it.
+
+Every pair's disposition and exact source/model evidence is recorded in
+`../timing_evidence/alafasy-28-9-repeat-review.json`, with the explanation in
+[the October 28 report](../../docs/quality-reviews/TIMING_ALAFASY_28_9_2026-10-28.md).
+This follow-up class promotion is partial; the 28:9 row does not certify the
+remaining eight or overall timing accuracy.
+
 ## Merged fragment leads (2026-10-23)
 
 The [complete delivered-source review](../../docs/quality-reviews/TIMING_FRAGMENT_LEADS_2026-10-23.md)

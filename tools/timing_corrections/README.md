@@ -39,13 +39,18 @@ Supported operations:
   discarded lead interval. Hani 66:6 لَّا (#721) was this shape: the first
   15 is still voiced شداد, not a second لا.
 
-  **No entry uses this today.** That row is now reached systematically by
+  That row is now reached systematically by
   `false_same_position_leads` in `tools/build_db.py`, which asks quran-align
   where the word begins instead of taking a hand-written audio verdict, and
   reproduces the same row byte-for-byte (docs/REPEAT_HIGHLIGHTING.md, "False
   same-position lead"). The operation is kept as the escape hatch for a lead
   the witnesses cannot reach — an ayah with no quran-align row, where the rule
-  abstains by design.
+  abstains by design. Alafasy 28:9 uses that escape hatch because quran-align
+  starts the word at the false lead, while both models place its supported
+  utterance near the second onset. Its `sourcePair` pins the exact pair and
+  `phase: "after_repairs"` prevents peer protection from restoring the lead.
+  This separate false-lead audit's remaining eight candidates stay at baseline;
+  see `../timing_verdicts/OUTSTANDING.md`.
 
 - `restore_flattened_resay`: restore one audio-proven re-say that qdc
   labelled as the following word. The mirror of the false lead: a word said

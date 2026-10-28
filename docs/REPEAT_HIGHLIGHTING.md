@@ -17,6 +17,12 @@ windows, with no queue or accumulating animation delay. The underlying base
 wash remains continuous and completes before its repeat overlay. See
 [the V2 contract](HIGHLIGHT_ENGINE_V2_CONTRACT.md).
 
+An old repair can reintroduce a disconnected label the source cleaner already
+removed. Repair application now rejects that stale topology after protecting
+peer repeats. The Alafasy 28:9 audit reproduces the visible chain jump from word
+10 back to 6 and separately reviews the false word-16 lead; see the
+[source trace, acoustic proof and corpus dispositions](quality-reviews/TIMING_ALAFASY_28_9_2026-10-28.md).
+
 As of `quran-v66.db`, the six QF voices obtain reviewed repeat-aware timings
 from authenticated Content Sync through the app's Worker. The canonical Python
 pipeline combines those ordered occurrences with the EveryAyah clock, existing

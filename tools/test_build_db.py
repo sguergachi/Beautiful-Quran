@@ -61,6 +61,7 @@ from build_db import (  # noqa: E402
     refit_displaced_rows,
     rebase_qdc_clock,
     rebase_timing_repair,
+    reject_reintroduced_orphans,
     restore_flattened_resay,
     suspicious_pacing,
     trim_to_next_start,
@@ -94,6 +95,7 @@ PIPELINES = frozenset(
         "qdc_clock_rebase",
         "rebase_timing_repair",
         "recover_negative_opening",
+        "reintroduced_orphan",
         "timing_correction",
     }
 )
@@ -237,6 +239,8 @@ def run_pipeline(case, segs):
             collapse_invented_flush_repeats(segs, resolve_repair(case)),
             case.get("clock_offset_ms") or 0,
         )
+    if pipeline == "reintroduced_orphan":
+        return reject_reintroduced_orphans(segs, resolve_repair(case))
     if pipeline == "erases_span_repeat":
         repair = resolve_repair(case)
         got = erases_span_repeat(segs, repair)
@@ -274,7 +278,7 @@ def run_pipeline(case, segs):
             )
         if position is not None:
             return discard_false_same_position_lead(
-                segs, position, bool(case.get("requires_audio_verdict"))
+                segs, position, bool(case.get("requires_audio_verdict")), case.get("source_pair")
             )
         positions = case.get("correction_positions")
         if positions is None:
