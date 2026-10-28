@@ -211,8 +211,10 @@ there. The baked study activity retains its existing reference material.
 
 `PaperInkSubstrate` prepares one deterministic 1× opaque ARGB texture on the
 existing background worker. R is a bounded wicking preference and G is its
-correlated pigment-density preference. Smooth broad variation plus gently
-slanted connected fibres replace independent contour noise in this mode.
+correlated pigment-density preference. The first straight-fibre prototype
+looked too digital to the user. The revised field rotates and gently warps
+its coordinates before combining broad pools, curved long fibres and a weak
+finer grain. This avoids a uniform straight lattice at the contact line.
 The field is word-local, seeded by the printed text and independent of time,
 playback generation, repeats, and scrolling. Its material choice participates
 in the existing layout/subpixel cache key. Explicit LINEAR raw-buffer sampling
@@ -220,7 +222,9 @@ preserves data; neither existing field's alpha channel is repurposed.
 
 At each existing AA tap, the candidate contact line spreads by
 `weight × filmWet × mix(0.45, 1.8, wick)`. Only coverage beyond the original
-glyph receives the correlated `mix(0.5, 1, density)` deposition. Original
+glyph receives correlated `mix(0.5, 1, density)` deposition, tapering toward
+35% of that strength at the outer contact line. This gives the added margin
+uneven, diluted pigment rather than flat-ended dark teeth. Original
 coverage is a floor, so no glyph is eroded. This fractional deposition changes
 the strength of the added pigment rather than darkening an already black
 core. The unchanged loading/entry, repeat-undercoat and evaporation masks then
@@ -245,6 +249,10 @@ or a proven perceptual improvement. Native validation is blocked by the device
 controller's “Remote daemon is unavailable” error. The experiment must remain
 opt-in until actual reading-size appearance and native frame/cache cost are
 checked; no default-material promotion is implied by software tests or R8.
+Pass `--previous FROZEN_OUTPUT` to include the first prototype's original
+saved frames with the same masks, positions and optical correction. This
+comparison preserves both revisions instead of regenerating the old field
+with the new algorithm.
 
 ## Tuning
 

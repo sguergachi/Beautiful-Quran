@@ -20,8 +20,8 @@ class PaperInkSubstrateTest {
             val g = (pixels[i] ushr 8) and 255
             // Density shares the same fibre preference, without independent speckle.
             assertTrue(if (r >= 128) g >= r - 1 else g <= r + 1)
-            // Quintic interpolation bounds the horizontal change below 95/255
-            // at this reference scale; independent pixel noise has no such bound.
+            // Keep coarse connected structure at the reference scale instead
+            // of independent full-range changes between neighboring pixels.
             if (i % 160 != 0) assertTrue(abs(r - wick(i - 1)) <= 95)
         }
         assertTrue(pixels.map { (it ushr 16) and 255 }.distinct().size > 200)

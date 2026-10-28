@@ -274,7 +274,7 @@ class PaperInkAntialiasingTest(unittest.TestCase):
 
     def test_fibre_adds_only_bounded_connected_support_and_coupled_density(self):
         from scipy.ndimage import label
-        coverage_source = SOURCE.replace('mix(0.5, 1.0, fibre.g)', '1.0')
+        coverage_source = SOURCE.replace('mix(0.5, 1.0, fibre.g) * mix(0.35, 1.0, taper)', '1.0')
         self.effects['coverage_only'] = skia.RuntimeEffect.MakeForShader(coverage_source)
         for specimen in self.words:
             for amount in (.28, 1.):

@@ -67,7 +67,10 @@ float wetCoverage(float2 p, float base, float distance, float coverageAA, float 
     // Bounded support; density tapers weakly connected fibres into the paper.
     float spread = weight * filmWet * mix(0.45, 1.8, fibre.r);
     float candidate = smoothstep(-coverageAA * 0.5, coverageAA * 0.5, distance + spread);
-    float density = mix(0.5, 1.0, fibre.g);
+    // Dilute the outer margin instead of ending each fibre in a flat ink tooth.
+    // This is pigment falloff in added support, not a blur of the source glyph.
+    float taper = 1.0 - smoothstep(0.0, max(0.001, spread), max(0.0, -distance));
+    float density = mix(0.5, 1.0, fibre.g) * mix(0.35, 1.0, taper);
     return base + max(0.0, candidate - base) * density * smoothstep(0.0, 0.05, filmWet);
 }
 
