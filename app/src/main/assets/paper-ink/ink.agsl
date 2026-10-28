@@ -5,6 +5,9 @@
 // word's exact glyph coverage at device resolution.
 uniform shader field;
 uniform shader normals;
+// Optional Ink Lab material; opaque R/G = wicking / pigment density.
+uniform shader substrate;
+uniform float fibreFringe;
 // Mask samples per device pixel in the field texture.
 uniform float fieldScale;
 // Device px per px of the 160 px font every constant here was tuned at.
@@ -54,6 +57,20 @@ float organicPooling(float2 p, float filmWet, float scale, float distance, float
     return spread + (grain * 2.0 - 1.0) * amplitude;
 }
 
+// One cached substrate drives both the contact line and fringe deposition.
+float wetCoverage(float2 p, float base, float distance, float coverageAA, float filmWet) {
+    if (fibreFringe < 0.5 || weight <= 0.0 || filmWet <= 0.0) {
+        return max(base, smoothstep(-coverageAA * 0.5, coverageAA * 0.5, distance + organicPooling(p, filmWet, unit, distance, coverageAA))
+            * smoothstep(0.0, 0.05, filmWet));
+    }
+    float2 fibre = substrate.eval(p).rg;
+    // Bounded support; density tapers weakly connected fibres into the paper.
+    float spread = weight * filmWet * mix(0.45, 1.8, fibre.r);
+    float candidate = smoothstep(-coverageAA * 0.5, coverageAA * 0.5, distance + spread);
+    float density = mix(0.5, 1.0, fibre.g);
+    return base + max(0.0, candidate - base) * density * smoothstep(0.0, 0.05, filmWet);
+}
+
 half4 materialAt(float2 p, float base, float coverageAA, float phase, float wetness, float orange, float keep) {
     float4 shape = field.eval(p * fieldScale);
     float distance = (shape.b * 255.0 - 128.0) / 16.0;
@@ -72,8 +89,7 @@ half4 materialAt(float2 p, float base, float coverageAA, float phase, float wetn
     float filmWet = localWet * mix(0.82, 1.0, fresh);
     // Both passes gain weight while wet and return to the regular stroke as
     // they dry. The orange chain holds color only; it cannot hold font weight.
-    float wetStrokeWeight = organicPooling(p, filmWet, unit, distance, coverageAA);
-    float expanded = max(base, smoothstep(-coverageAA * 0.5, coverageAA * 0.5, distance + wetStrokeWeight) * smoothstep(0.0, 0.05, filmWet));
+    float expanded = wetCoverage(p, base, distance, coverageAA, filmWet);
     float2 slope = (surface.rg * 255.0 - 128.0) / 127.0;
     float volume = 0.6 + weight / (6.5 * unit);
     // A rounded advancing meniscus follows the same smooth arrival field as the ink.
@@ -160,7 +176,8 @@ half4 evaporated(half4 ink, float base) {
 half4 main(float2 p) {
     float distance = (field.eval(p * fieldScale).b * 255.0 - 128.0) / 16.0;
     float base = normals.eval(p).b;
-    if (base == 0.0 && distance < -weight - 0.6 * unit - max(aa, 1.0)) return half4(0.0);
+    float support = fibreFringe < 0.5 ? weight + 0.6 * unit : 1.8 * weight;
+    if (base == 0.0 && distance < -support - max(aa, 1.0)) return half4(0.0);
     if (max(wet, underWet * repeatPass) <= 0.0) return evaporated(inkAt(p, base, aa), base);
     // Eight distinct positions along both axes resolve thin reflected lines
     // on nearly vertical alifs; a 2x2 grid has only two horizontal samples.

@@ -23,6 +23,7 @@ class InkLabStoreTest {
         assertEquals(1.4185f, ink.cruiseCap, 0.0001f)
         assertEquals(0.3f, ink.holdCreep, 0.0001f)
         assertEquals(0.28f, ink.paperInkPooling, 0f)
+        assertEquals(false, ink.paperInkFibreFringe)
         assertEquals(0.53f, ink.tarjiMinDrama, 0f)
 
         val guide = ContextualGuideTuning()
@@ -41,6 +42,16 @@ class InkLabStoreTest {
         // The camera's lead is its own number, not a copy of the ink's.
         assertEquals(100, InkEngine.DEFAULT_SCROLL_LEAD_MS)
         assertNull(InkLabSnapshot().outputLatencyOverrideMs)
+    }
+
+    @Test
+    fun missingFibreExperimentStaysOffAndImportedChoiceSurvives() {
+        assertEquals(false, InkLabSnapshot.decode("{}")!!.paperInkFibreFringe)
+        val saved = InkLabSnapshot(paperInkFibreFringe = true)
+        val restored = InkLabSnapshot.decode(InkLabSnapshot.encode(saved))!!
+        assertEquals(saved, restored)
+        assertEquals(true, restored.toTuning().paperInkFibreFringe)
+        assertEquals(true, InkLabSnapshot.capture(restored.toTuning()).paperInkFibreFringe)
     }
 
     @Test
@@ -71,6 +82,7 @@ class InkLabStoreTest {
             paperInkReflection = 0.7f,
             paperInkLeadFade = 0.3f,
             paperInkFlowing = true,
+            paperInkFibreFringe = true,
             highlightLeadMs = 900,
             fadeLeadMs = 333,
             scrollLeadMs = 444,

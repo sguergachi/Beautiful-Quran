@@ -33,8 +33,8 @@ import kotlin.math.roundToInt
  * A surface supplies only a [Source]: one word laid out alone in the surface's
  * own hand, and where that layout sits. Everything else is here, once:
  * - capture: the word's glyphs rasterized on the UI thread (cheap);
- * - generation: [PaperInkField] on a background thread, packed into two small
- *   textures, cached by layout and sub-pixel phase;
+ * - generation: [PaperInkField] on a background thread, packed into two shape
+ *   textures plus an optional material, cached by layout, phase and material;
  * - drawing: [drawWord] erases the word's printed pixels from the surface's
  *   layer and draws [Frame] through one AGSL shader.
  *
@@ -90,12 +90,15 @@ object PaperInk {
         val underWet: Float = 0f,
         /** English words start unread; their lead fades in on their own clock. */
         val fadeLeadOnEntry: Boolean = false,
+        /** Opt-in lab material; the ordinary contact line is the default. */
+        val fibreFringe: Boolean = false,
     )
 
     /** A generated word, ready to draw. */
     class Word internal constructor(
         val arrival: Bitmap,
         val normals: Bitmap,
+        val substrate: Bitmap?,
         val erase: Bitmap,
         /** Host offset of the textures' top-left from the layout origin's integer cell. */
         val padX: Int,
@@ -105,11 +108,11 @@ object PaperInk {
     ) {
         val width: Int get() = normals.width
         val height: Int get() = normals.height
-        internal val bytes: Int get() = arrival.byteCount + normals.byteCount + erase.byteCount
+        internal val bytes: Int get() = arrival.byteCount + normals.byteCount + erase.byteCount + (substrate?.byteCount ?: 0)
         internal var shader: Any? = null
     }
 
-    private data class Key(val input: TextLayoutInput, val phaseX: Int, val phaseY: Int)
+    private data class Key(val input: TextLayoutInput, val phaseX: Int, val phaseY: Int, val fibreFringe: Boolean)
 
     private val cache = object : LruCache<Key, Word>(CACHE_BYTES) {
         override fun sizeOf(key: Key, value: Word): Int = value.bytes
@@ -134,10 +137,10 @@ object PaperInk {
      * this subscribes the caller's draw to [generation]. Captures are rationed
      * per frame so warming a verse never stalls one.
      */
-    fun word(source: Source): Word? {
+    fun word(source: Source, fibreFringe: Boolean = false): Word? {
         if (!supported || shaderSource == null) return null
         generation.intValue
-        val key = key(source)
+        val key = key(source, fibreFringe)
         cache.get(key)?.let { return it }
         if (key in pending) return null
         val now = SystemClock.uptimeMillis()
@@ -150,7 +153,7 @@ object PaperInk {
         val capture = capture(source) ?: return null
         pending += key
         worker.execute {
-            val word = runCatching { generate(capture) }.getOrNull()
+            val word = runCatching { generate(capture, fibreFringe) }.getOrNull()
             main.post {
                 pending -= key
                 if (word != null) cache.put(key, word)
@@ -160,10 +163,10 @@ object PaperInk {
         return null
     }
 
-    private fun key(source: Source): Key {
+    private fun key(source: Source, fibreFringe: Boolean): Key {
         val fx = source.originX - floor(source.originX)
         val fy = source.originY - floor(source.originY)
-        return Key(source.layout.layoutInput, (fx * PHASES).roundToInt() % PHASES, (fy * PHASES).roundToInt() % PHASES)
+        return Key(source.layout.layoutInput, (fx * PHASES).roundToInt() % PHASES, (fy * PHASES).roundToInt() % PHASES, fibreFringe)
     }
 
     private class Capture(
@@ -180,6 +183,7 @@ object PaperInk {
         val padX: Int,
         val padY: Int,
         val letterCount: Int,
+        val materialSeed: Int,
     )
 
     private fun capture(source: Source): Capture? {
@@ -246,6 +250,7 @@ object PaperInk {
             padX = padX,
             padY = padY,
             letterCount = if (letters.isEmpty()) source.letterCount else letters.size,
+            materialSeed = text.hashCode(),
         )
     }
 
@@ -254,7 +259,7 @@ object PaperInk {
         if (rtl) TajweedPacing.letterOffsets(text)
         else text.indices.filter { text[it].isLetterOrDigit() }.toIntArray()
 
-    private fun generate(c: Capture): Word? {
+    private fun generate(c: Capture, fibreFringe: Boolean): Word? {
         val result = PaperInkField.generate(
             c.alpha, c.width, c.height, SCALE, c.centers, c.baseline, c.rtl, c.fontPx, c.letterCount,
         ) ?: return null
@@ -289,7 +294,11 @@ object PaperInk {
         val normals = Bitmap.createBitmap(normalPixels, w, h, Bitmap.Config.ARGB_8888)
         val erase = Bitmap.createBitmap(w, h, Bitmap.Config.ALPHA_8)
         erase.copyPixelsFromBuffer(ByteBuffer.wrap(paperInkEraseMask(c.coverage)))
-        return Word(field, normals, erase, c.padX, c.padY, result.letterDuration, c.fontPx / 160f)
+        val substrate = if (fibreFringe) Bitmap.createBitmap(
+            PaperInkSubstrate.generate(w, h, c.fontPx / 160f, c.materialSeed),
+            w, h, Bitmap.Config.ARGB_8888,
+        ) else null
+        return Word(field, normals, substrate, erase, c.padX, c.padY, result.letterDuration, c.fontPx / 160f)
     }
 
     private val erasePaint = android.graphics.Paint().apply {
@@ -347,6 +356,10 @@ object PaperInk {
         shader.setInputBuffer("normals", android.graphics.BitmapShader(
             word.normals, android.graphics.Shader.TileMode.CLAMP, android.graphics.Shader.TileMode.CLAMP,
         ).apply { filterMode = android.graphics.BitmapShader.FILTER_MODE_LINEAR })
+        shader.setInputBuffer("substrate", android.graphics.BitmapShader(
+            word.substrate ?: word.normals, android.graphics.Shader.TileMode.CLAMP, android.graphics.Shader.TileMode.CLAMP,
+        ).apply { filterMode = android.graphics.BitmapShader.FILTER_MODE_LINEAR })
+        shader.setFloatUniform("fibreFringe", if (word.substrate != null) 1f else 0f)
         shader.setFloatUniform("fieldScale", SCALE.toFloat())
         shader.setFloatUniform("unit", word.unit)
         shader.setFloatUniform("letterDuration", word.letterDuration)

@@ -108,6 +108,7 @@ data class InkLabSnapshot(
     val paperInkReflection: Float = 0.5f,
     val paperInkLeadFade: Float = 0.5f,
     val paperInkFlowing: Boolean = false,
+    val paperInkFibreFringe: Boolean = false,
     val guideBodyEdge: Float = 0.5f,
     val guideFeatherWidth: Float = 0.2819f,
     val guideFadeSoftness: Float = 1.3329f,
@@ -182,6 +183,7 @@ data class InkLabSnapshot(
         paperInkReflection = paperInkReflection,
         paperInkLeadFade = paperInkLeadFade,
         paperInkFlowing = paperInkFlowing,
+        paperInkFibreFringe = paperInkFibreFringe,
     )
 
     fun toContextualGuideTuning(): ContextualGuideTuning = ContextualGuideTuning(
@@ -278,6 +280,7 @@ data class InkLabSnapshot(
             paperInkReflection = tuning.paperInkReflection,
             paperInkLeadFade = tuning.paperInkLeadFade,
             paperInkFlowing = tuning.paperInkFlowing,
+            paperInkFibreFringe = tuning.paperInkFibreFringe,
             guideBodyEdge = guide.bodyEdge,
             guideFeatherWidth = guide.featherWidth,
             guideFadeSoftness = guide.fadeSoftness,

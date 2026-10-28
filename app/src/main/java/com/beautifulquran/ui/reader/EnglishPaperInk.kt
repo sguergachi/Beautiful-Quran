@@ -31,7 +31,7 @@ internal fun englishPaperInkBlooms(
         when {
             words == null -> add(bloom)
             bloom is ShapedWordBloom.PaperInkWarm ->
-                words.forEach { add(ShapedWordBloom.PaperInkWarm(it)) }
+                words.forEach { add(ShapedWordBloom.PaperInkWarm(it, bloom.fibreFringe)) }
             bloom is ShapedWordBloom.PaperInk -> words.forEach { word ->
                 fun progress(value: Float): Float = englishPaperInkWordProgress(
                     bloom.range.first + value * (bloom.range.last - bloom.range.first + 1),

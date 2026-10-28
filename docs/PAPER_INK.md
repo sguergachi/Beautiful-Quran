@@ -201,6 +201,51 @@ stay intact. The study uses the same variation at its reference size.
 Grain is evaluated only where it can change the pooled contour's antialiasing
 band; the stroke interior and empty paper skip it. No extra texture is needed.
 
+### Fibre fringe experiment
+
+Ink Lab → Ink → **Fibre fringe** auditions a different surface-film material.
+It is **off by default**, including old profiles; the saved switch and Copy
+values include it. Restart playback after switching so the next words can
+prepare their fields. A word already washing in the fallback still finishes
+there. The baked study activity retains its existing reference material.
+
+`PaperInkSubstrate` prepares one deterministic 1× opaque ARGB texture on the
+existing background worker. R is a bounded wicking preference and G is its
+correlated pigment-density preference. Smooth broad variation plus gently
+slanted connected fibres replace independent contour noise in this mode.
+The field is word-local, seeded by the printed text and independent of time,
+playback generation, repeats, and scrolling. Its material choice participates
+in the existing layout/subpixel cache key. Explicit LINEAR raw-buffer sampling
+preserves data; neither existing field's alpha channel is repurposed.
+
+At each existing AA tap, the candidate contact line spreads by
+`weight × filmWet × mix(0.45, 1.8, wick)`. Only coverage beyond the original
+glyph receives the correlated `mix(0.5, 1, density)` deposition. Original
+coverage is a floor, so no glyph is eroded. This fractional deposition changes
+the strength of the added pigment rather than darkening an already black
+core. The unchanged loading/entry, repeat-undercoat and evaporation masks then
+compose that material once. Exact dry, zero-pooling and unread endpoints,
+one-letter English entry, normals, reflection, timing and semantic owners are
+preserved. The fringe is an artistic transient film; real absorbed pigment
+would not retract to the pristine font on drying.
+
+The optional bitmap adds 4 bytes per bounds pixel: roughly 19% over the usual
+21-byte raw footprint. It is included in the same 32 MiB cache budget and is
+not generated when the switch is off. A cache miss still uses the ordinary
+wash. This budget accounting is not a native GPU or frame-time result.
+
+`tools/compare_paper_ink_fringe.py OUTPUT` saves aligned, unamplified current,
+coupled, coverage-only and smooth paints with source digests. It calls the
+actual Kotlin field through `tools/paper_ink_substrate.py`. Fill positions use
+the same geometry, colors and reflection at pooling 0.28, with the optical
+correction at density 3/fontScale 1. Intrinsic raster pixels do not establish
+physical reading size on an arbitrary preview display. Initial software
+comparisons show a different, still subtle fringe, not accepted naturalness
+or a proven perceptual improvement. Native validation is blocked by the device
+controller's “Remote daemon is unavailable” error. The experiment must remain
+opt-in until actual reading-size appearance and native frame/cache cost are
+checked; no default-material promotion is implied by software tests or R8.
+
 ## Tuning
 
 Ink Lab → **Ink**: **Paper ink** (on), **Flowing ink** (off = Inside out),
@@ -249,6 +294,12 @@ Playback timing is unchanged. Paper's repeat ink is the study's terracotta
   Stock-pooling Arabic and English controls also require at least three times
   the edge-coverage RMS contrast of the superseded faint version. This locks
   paint strength, not a universal perceptual threshold.
+  The opt-in fringe also exercises entry, repeat undercoats, evaporation and
+  pixel-area reconstruction; bounds tests require preserved base coverage,
+  connected support, deterministic output and a genuine density ablation.
+- `PaperInkSubstrateTest` — deterministic opaque data, correlated preferences,
+  interpolation continuity and invalid-scale rejection. Store/Copy and English
+  warm-fragment tests preserve the material choice without changing clocks.
 - `PaperInkEvaporationTest` — unread entry, settled and partial/repeat
   departures, interrupted fades, re-entry and retained reciter repeats. The
   Skia gate also checks that evaporating first/repeat ink reaches the exact

@@ -126,6 +126,7 @@ internal fun InkMotion.paperInkFrame(style: PaperInkStyle): PaperInk.Frame {
         softness = 0f,
         leadFade = t.paperInkLeadFade,
         flowing = t.paperInkFlowing,
+        fibreFringe = t.paperInkFibreFringe,
         evaporation = paperDeparture?.takeIf { it.active }?.let { 1f - it.remaining.value } ?: 0f,
     )
 }
@@ -167,7 +168,7 @@ internal class PaperInkNode {
             }
             val frame = motion.paperInkFrame(style)
             val source = layout?.let { PaperInk.Source(it, 0f, 0f, rtl, letterCount) }
-            val word = if (latched || source == null) null else PaperInk.word(source)
+            val word = if (latched || source == null) null else PaperInk.word(source, frame.fibreFringe)
             if (word == null || source == null) {
                 if (frame.progress > PAPER_INK_NODE_LATCH || frame.wet > 0f) latched = true
                 drawing = false

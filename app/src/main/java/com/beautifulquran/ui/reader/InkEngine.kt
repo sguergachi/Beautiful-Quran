@@ -243,6 +243,8 @@ object InkEngine {
         val paperInkLeadFade: Float = 0.5f,
         /** Flowing ink (quicker, cleaner swell) instead of Inside out. */
         val paperInkFlowing: Boolean = false,
+        /** Experimental coupled fringe, disabled until native visual acceptance. */
+        val paperInkFibreFringe: Boolean = false,
     )
 
     /**

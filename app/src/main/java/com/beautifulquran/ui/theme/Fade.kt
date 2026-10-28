@@ -247,7 +247,7 @@ sealed class ShapedWordBloom {
     ) : ShapedWordBloom()
 
     /** Paper ink: generate this word's field ahead of its turn. Draws nothing. */
-    class PaperInkWarm(override val range: IntRange) : ShapedWordBloom()
+    class PaperInkWarm(override val range: IntRange, val fibreFringe: Boolean = false) : ShapedWordBloom()
 
     /** The Ink Lab's mark under a tarjīʿ candidate: a sparkline of the pulse
      * the word will be given ([drawPulseTrace]). Never drawn outside the lab. */
@@ -935,7 +935,7 @@ private class PaperInkBlooms(
             when (bloom) {
                 is ShapedWordBloom.PaperInkWarm -> {
                     source(bloom.range, layout, sharedLine)?.let {
-                        com.beautifulquran.ui.theme.paperink.PaperInk.word(it)
+                        com.beautifulquran.ui.theme.paperink.PaperInk.word(it, bloom.fibreFringe)
                     }
                 }
                 is ShapedWordBloom.PaperInk -> {
@@ -945,7 +945,7 @@ private class PaperInkBlooms(
                     val word = if (key in latched || source == null) {
                         null
                     } else {
-                        com.beautifulquran.ui.theme.paperink.PaperInk.word(source)
+                        com.beautifulquran.ui.theme.paperink.PaperInk.word(source, bloom.frame.fibreFringe)
                     }
                     if (capture != null) {
                         val choice = if (word != null) 2 else if (key in latched) 1 else 0
@@ -955,7 +955,8 @@ private class PaperInkBlooms(
                             val end = (bloom.range.last + 1).coerceIn(start, text.length)
                             com.beautifulquran.DevProfiling.recordEvent(
                                 "paper-field rtl=$rtl word=${text.substring(start, end).take(80)} range=${bloom.range} " +
-                                    "progress=${bloom.frame.progress} shader=${word != null} latched=${key in latched}",
+                                    "progress=${bloom.frame.progress} shader=${word != null} " +
+                                    "fibre=${word?.substrate != null} latched=${key in latched}",
                             )
                         }
                     }

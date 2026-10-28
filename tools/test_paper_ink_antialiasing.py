@@ -13,6 +13,7 @@ from scipy.ndimage import distance_transform_edt
 
 import build_paper_ink_study as geometry
 from paper_ink_outline import outline_distance
+from paper_ink_substrate import substrate
 
 ROOT = Path(__file__).resolve().parents[1]
 SOURCE = (ROOT / 'app/src/main/assets/paper-ink/ink.agsl').read_text()
@@ -74,7 +75,8 @@ def word(text, font, size, rtl, letters):
     coverage = np.rint(alpha.reshape(h, scale, w, scale).mean(axis=(1, 3)) * 255).astype('uint8')
     normals[:, :, 2] = coverage
     children = {}
-    for name, data in [('field', field), ('normals', normals)]:
+    for name, data in [('field', field), ('normals', normals),
+                       ('substrate', substrate(w, h, size / 160, text))]:
         children[name] = skia.Image.fromarray(data, colorType=skia.ColorType.kRGBA_8888_ColorType).makeRawShader(
             samplingOptions=skia.SamplingOptions(skia.FilterMode.kLinear))
     return dict(width=w, height=h, unit=size / 160, duration=duration, children=children, coverage=coverage)
@@ -96,7 +98,7 @@ class PaperInkAntialiasingTest(unittest.TestCase):
         builder = skia.RuntimeShaderBuilder(self.effects[effect])
         for name, child in word['children'].items():
             builder.setChild(name, child)
-        uniforms = dict(fieldScale=2., unit=word['unit'], progress=1., reflectionStrength=.5,
+        uniforms = dict(fibreFringe=getattr(self, 'fibre', 0.), fieldScale=2., unit=word['unit'], progress=1., reflectionStrength=.5,
             lightSoftness=0., retained=1., wet=1., underProgress=1., underWet=0.,
             weight=.875 * word['unit'], aa=.9 / resolution,
             dryInk=[52/255, 50/255, 46/255], wetInk=[6/255, 7/255, 8/255], unreadAlpha=.2661,
@@ -256,6 +258,49 @@ class PaperInkAntialiasingTest(unittest.TestCase):
                             dict(progress=0., retained=0., leadEntry=1.)):
                 np.testing.assert_array_equal(self.render(specimen, **options),
                                               self.render(specimen, 'plain', **options))
+
+    def test_fibre_fringe_keeps_the_existing_temporal_and_premultiplied_contracts(self):
+        self.fibre = 1.
+        try:
+            self.test_dry_glyphs_remain_pixel_exact_including_held_repeat_and_unread()
+            self.test_english_word_entry_does_not_pop_its_leading_letter()
+            self.test_english_entry_keeps_a_soft_continuous_fill_through_both_spread_methods()
+            self.test_repeat_starts_on_the_existing_wet_coat_and_replaces_it_without_a_dry_flash()
+            self.test_wet_undercoat_remains_a_complete_premultiplied_layer_during_repeat_and_release()
+            self.test_evaporation_dissolves_the_existing_deposit_to_exact_unread_ink()
+            self.test_wet_sampling_tracks_pixel_area_more_closely_than_one_point()
+        finally:
+            self.fibre = 0.
+
+    def test_fibre_adds_only_bounded_connected_support_and_coupled_density(self):
+        from scipy.ndimage import label
+        coverage_source = SOURCE.replace('mix(0.5, 1.0, fibre.g)', '1.0')
+        self.effects['coverage_only'] = skia.RuntimeEffect.MakeForShader(coverage_source)
+        for specimen in self.words:
+            for amount in (.28, 1.):
+                weight = amount * 3.5 * specimen['unit']
+                for method in (0., 1.):
+                    options = dict(weight=weight, fibreFringe=1., spreadMethod=method, reflectionStrength=0.)
+                    actual = self.render(specimen, **options)
+                    coverage_only = self.render(specimen, 'coverage_only', **options)
+                    upper = self.render(specimen, 'plain', **dict(options, weight=weight * 1.8, fibreFringe=0.))
+                    base = specimen['coverage']
+                    alpha = actual[:, :, 3].astype(int)
+                    self.assertTrue((alpha >= base).all())
+                    self.assertTrue((alpha <= upper[:, :, 3].astype(int) + 1).all())
+                    self.assertTrue((alpha <= coverage_only[:, :, 3].astype(int)).all())
+                    self.assertTrue((alpha < coverage_only[:, :, 3].astype(int)).any())
+                    np.testing.assert_array_equal(actual[base == 255], coverage_only[base == 255])
+                    # Every visible added component must still touch a glyph:
+                    # no independent dots are introduced in the empty paper.
+                    components, count = label(alpha > 1)
+                    for k in range(1, count + 1):
+                        self.assertTrue((base[components == k] > 0).any())
+                    np.testing.assert_array_equal(actual, self.render(specimen, **options))
+            for options in (dict(wet=0.), dict(weight=0.), dict(progress=-1., retained=0.),
+                            dict(progress=0., retained=0., leadEntry=1.)):
+                np.testing.assert_array_equal(self.render(specimen, fibreFringe=1., **options),
+                                              self.render(specimen, fibreFringe=0., **options))
 
     def test_final_word_fills_every_letter_without_a_retained_base(self):
         closing = word('ٱلۡمُسۡرِفِينَ', geometry.ARABIC_FONT, 80, True, 8)

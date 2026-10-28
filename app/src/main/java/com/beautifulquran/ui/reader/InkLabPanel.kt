@@ -124,6 +124,10 @@ fun InkLabPanel(
                         TuningToggle("Flowing ink", t.paperInkFlowing) {
                             InkEngine.tuning = t.copy(paperInkFlowing = it)
                         }
+                        TuningToggle("Fibre fringe", t.paperInkFibreFringe) {
+                            InkEngine.tuning = t.copy(paperInkFibreFringe = it)
+                        }
+                        LabCaption("Experimental wet edge. Restart playback to compare; dry type stays unchanged.")
                         TuningSlider("Ink pooling", t.paperInkPooling, 0f..1f) {
                             InkEngine.tuning = t.copy(paperInkPooling = it)
                         }
@@ -727,6 +731,7 @@ internal fun formatTuningCopy(t: InkEngine.Tuning): String {
         appendLine("    paperInkReflection = ${f(t.paperInkReflection)},")
         appendLine("    paperInkLeadFade = ${f(t.paperInkLeadFade)},")
         appendLine("    paperInkFlowing = ${t.paperInkFlowing},")
+        appendLine("    paperInkFibreFringe = ${t.paperInkFibreFringe},")
         append(")")
     }
 }

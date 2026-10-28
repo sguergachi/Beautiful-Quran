@@ -1776,13 +1776,14 @@ private fun MutableList<ShapedWordBloom>.addEnglishPaperInk(
                         leadFade = ENGLISH_PAPER_INK_LEAD_FADE,
                         fadeLeadOnEntry = true,
                         flowing = tuning.paperInkFlowing,
+                        fibreFringe = tuning.paperInkFibreFringe,
                         evaporation = if (evaporating) 1f - departure.opacity(i) else 0f,
                     ),
                     fallback = emptyList(),
                 ),
             )
         } else if (raw < 0f && !warmedNext) {
-            add(ShapedWordBloom.PaperInkWarm(range))
+            add(ShapedWordBloom.PaperInkWarm(range, InkEngine.tuning.paperInkFibreFringe))
             warmedNext = true
         }
     }

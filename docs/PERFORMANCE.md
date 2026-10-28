@@ -245,6 +245,11 @@ paints with:
 
 Settled inactive ayahs do **not** redraw continuously: their draw-scope state
 reads are static once the 400 ms recess/focus tween finishes.
+The optional Ink Lab fibre-fringe field is generated on the existing paper-ink
+worker and sampled at the existing wet AA taps. Its 1× RGBA bytes count toward
+the 32 MiB word cache; the default-off path creates no extra material bitmap.
+The experiment has software coverage evidence, not native GPU/frame or cache
+miss acceptance. See [PAPER_INK.md](PAPER_INK.md#fibre-fringe-experiment).
 Paper-cover bleed is horizontal-only and clipped to each text line's measured
 top/bottom; an unread line therefore cannot fade descenders belonging to the
 read line above it.

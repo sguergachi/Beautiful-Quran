@@ -22,6 +22,7 @@ class InkLabPanelTest {
             paperInkReflection = 0.7f,
             paperInkLeadFade = 0.3f,
             paperInkFlowing = true,
+            paperInkFibreFringe = true,
         )
         val text = formatTuningCopy(t)
         assertTrue(text.contains("InkEngine.Tuning("))
@@ -48,6 +49,7 @@ class InkLabPanelTest {
         assertTrue(text.contains("paperInkReflection = 0.7f"))
         assertTrue(text.contains("paperInkLeadFade = 0.3f"))
         assertTrue(text.contains("paperInkFlowing = true"))
+        assertTrue(text.contains("paperInkFibreFringe = true"))
         // Fields without lab sliders still snapshot so nothing is lost on apply.
         assertTrue(text.contains("sweepEaseX1 ="))
         assertTrue(text.contains("sweepEaseY2 ="))
