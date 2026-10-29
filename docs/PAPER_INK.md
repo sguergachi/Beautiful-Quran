@@ -209,17 +209,22 @@ schema 9 moves saves from before the switch to on, because "off" was then the
 experiment's default rather than a choice; an "off" saved since is kept.
 Switching applies to the next frame. No word needs regenerating.
 
-**The paper.** `PaperInkSubstrate` makes one seamless 720 × 720 tile in px of
-the 160 px reference font, once per process on the paper-ink worker (words
-drawn before it lands use the plain tooth). R is a bounded wicking preference,
-G its correlated pigment density. Broad pools, long curved fibres and a weak
+**The paper.** `PaperInkSubstrate` defines one seamless 720 × 720 tile in px
+of the 160 px reference font: a single wicking byte per px, shipped
+precomputed as `assets/paper-ink/paper.a8` (518 KB) and read once per process
+on the paper-ink worker (words drawn before it lands use the plain tooth).
+`PaperInkSubstrateTest` fails if the asset drifts from the generator;
+regenerate it with `python3 tools/paper_ink_substrate.py --write`. The
+shader derives pigment density as the same fibre's smoothstep of wicking. Broad pools, long curved fibres and a weak
 finer grain each run on an integer rotation of the tile, (2,1), (3,1) and
 (1,2), under a gentle warp. Every lattice period divides the tile along its
 rotated axes, so it wraps without a seam, and none of the grains lines up
 with the pixel grid (the first straight-fibre prototype read as digital).
 
 **Each word reads its own patch.** The shader samples the tile at
-`p / unit + fibreOffset`, repeating. The offset comes from the word's
+`p / unit + fibreOffset`, repeating, once per pixel and only within a fibre's
+reach of a contour; all eight AA taps share it, because the finest fibre spans
+several pixels. The offset comes from the word's
 `PaperInk.Source.placement`: the host paragraph's text and the word's start in
 it for shaped text, and a per-node counter for word nodes, held for the node's
 life. Without it every recurring word (English "the", "and"; ٱللَّهِ) bled in
@@ -251,16 +256,15 @@ owners are preserved. The fringe is an artistic transient film: real absorbed
 pigment would not retract to the pristine font on drying. The baked study
 activity keeps its existing reference material.
 
-**Cost.** One 2 MB tile per process, outside the 32 MiB word cache, made on
-its own thread; per-word fields carry no material bitmap. Taps outside the
-band a fibre can reach skip the paper. See [PERFORMANCE.md](PERFORMANCE.md)
-for the emulator frame measurements.
+**Cost.** One 518 KB alpha tile per process, outside the 32 MiB word cache,
+read in about 5 ms; per-word fields carry no material bitmap. At most one
+paper read per pixel. See [PERFORMANCE.md](PERFORMANCE.md) for the trace.
 
 `tools/compare_paper_ink_fringe.py OUTPUT` saves aligned, unamplified paints
 of the fringe, the plain tooth, a coverage-only control and a smooth control
 through the fill and the dry-down, including the same word at a second
-placement and at 24 px. It renders the production shader with the real
-Kotlin tile (`tools/paper_ink_substrate.py`), at pooling 0.28 with the
+placement and at 24 px. It renders the production shader with the shipped
+tile (`tools/paper_ink_substrate.py`), at pooling 0.28 with the
 optical correction at density 3/fontScale 1. These are software paints, not
 Android captures.
 

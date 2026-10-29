@@ -49,10 +49,12 @@ object PaperInk {
     val supported: Boolean = Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU
 
     private var shaderSource: String? = null
+    private var assets: android.content.res.AssetManager? = null
 
     /** Called once from QuranApp. */
     fun install(context: Context) {
         if (!supported || shaderSource != null) return
+        assets = context.applicationContext.assets
         shaderSource = context.assets.open("paper-ink/ink.agsl").bufferedReader().use { it.readText() }
     }
 
@@ -117,6 +119,9 @@ object PaperInk {
         internal var shader: Any? = null
         /** Whether [shader] samples the shared paper yet, not its placeholder. */
         internal var paperBound = false
+        /** The fibre uniforms [shader] holds, so an unchanged draw skips the JNI calls. */
+        internal var fibreOn = false
+        internal var fibreSpot = 0
     }
 
     private data class Key(val input: TextLayoutInput, val phaseX: Int, val phaseY: Int)
@@ -189,9 +194,9 @@ object PaperInk {
     private var paperShader: android.graphics.BitmapShader? = null
 
     /**
-     * The shared paper tile, or null while it is first made in the background
-     * (once per process, started when paper ink first warms a word, whether
-     * or not the fringe is on). Words drawn meanwhile use the plain paper tooth.
+     * The shared paper tile, or null until it is first read in the background
+     * (once per process, when paper ink first warms a word, whether or not the
+     * fringe is on). Words drawn meanwhile use the plain paper tooth.
      */
     private fun paper(): android.graphics.BitmapShader? {
         paperShader?.let { return it }
@@ -202,26 +207,33 @@ object PaperInk {
         }
         if (!paperRequested) {
             paperRequested = true
-            // Its own thread: about half a second of work, once, that must not
-            // hold up the fields of the words about to be read.
-            Thread({
-                Process.setThreadPriority(Process.THREAD_PRIORITY_BACKGROUND)
+            worker.execute {
                 val started = SystemClock.elapsedRealtime()
-                val tile = runCatching {
-                    Bitmap.createBitmap(
-                        PaperInkSubstrate.tile(), PaperInkSubstrate.TILE, PaperInkSubstrate.TILE,
-                        Bitmap.Config.ARGB_8888,
-                    )
-                }.getOrNull()
+                val tile = runCatching { paperTile() }.getOrNull()
                 val tookMs = SystemClock.elapsedRealtime() - started
                 main.post {
                     com.beautifulquran.DevProfiling.mark("paperTile ready=${tile != null} ${tookMs}ms")
                     paper = tile
                     generation.intValue++
                 }
-            }, "PaperInkPaper").start()
+            }
         }
         return null
+    }
+
+    /**
+     * The shipped tile (`paper-ink/paper.a8`, PaperInkSubstrate's output, kept
+     * identical by its test): a read of half a megabyte instead of building
+     * the paper on the phone. Builds it only if the asset is missing.
+     */
+    private fun paperTile(): Bitmap {
+        val size = PaperInkSubstrate.TILE
+        val bytes = runCatching {
+            assets?.open("paper-ink/paper.a8")?.use { it.readBytes() }
+        }.getOrNull()?.takeIf { it.size == size * size } ?: PaperInkSubstrate.tile()
+        return Bitmap.createBitmap(size, size, Bitmap.Config.ALPHA_8).apply {
+            copyPixelsFromBuffer(ByteBuffer.wrap(bytes))
+        }
     }
 
     private class Capture(
@@ -392,9 +404,15 @@ object PaperInk {
                 shader.setInputBuffer("substrate", paper)
                 word.paperBound = true
             }
-            shader.setFloatUniform("fibreFringe", if (paper != null) 1f else 0f)
-            val offset = paperInkFibreOffset(source.placement)
-            shader.setFloatUniform("fibreOffset", offset.first, offset.second)
+            if ((paper != null) != word.fibreOn) {
+                word.fibreOn = paper != null
+                shader.setFloatUniform("fibreFringe", if (word.fibreOn) 1f else 0f)
+            }
+            val spot = paperInkFibreSpot(source.placement)
+            if (word.fibreOn && spot != word.fibreSpot) {
+                word.fibreSpot = spot
+                shader.setFloatUniform("fibreOffset", paperInkFibreOffsetX(spot), paperInkFibreOffsetY(spot))
+            }
             inkPaint.shader = shader
             native.save()
             native.translate(left, top)
@@ -433,13 +451,17 @@ object PaperInk {
 }
 
 /**
- * Where in the shared paper tile (reference px) the occurrence [placement]
- * starts: well spread, so neighbouring placements land on unrelated fibres.
+ * Where in the shared paper tile the occurrence [placement] starts, as a
+ * hash; [paperInkFibreOffsetX]/[paperInkFibreOffsetY] read it in reference
+ * px. Well spread, so neighbouring placements land on unrelated fibres.
+ * Plain ints and floats: it runs for every wet word on every frame.
  */
-internal fun paperInkFibreOffset(placement: Int): Pair<Float, Float> {
+internal fun paperInkFibreSpot(placement: Int): Int {
     var h = placement * -0x61c88647
     h = (h xor (h ushr 16)) * 0x45d9f3b
-    h = h xor (h ushr 16)
-    val tile = PaperInkSubstrate.TILE.toFloat()
-    return ((h and 0xFFFF) / 65536f * tile) to ((h ushr 16) / 65536f * tile)
+    return h xor (h ushr 16)
 }
+
+internal fun paperInkFibreOffsetX(spot: Int): Float = (spot and 0xFFFF) / 65536f * PaperInkSubstrate.TILE
+
+internal fun paperInkFibreOffsetY(spot: Int): Float = (spot ushr 16) / 65536f * PaperInkSubstrate.TILE

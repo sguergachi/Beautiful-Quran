@@ -18,11 +18,11 @@ from paper_ink_substrate import paper
 ROOT = Path(__file__).resolve().parents[1]
 SOURCE = (ROOT / 'app/src/main/assets/paper-ink/ink.agsl').read_text()
 PLAIN_SOURCE = SOURCE.replace('organicPooling(p, filmWet, unit, distance, coverageAA)', 'weight * filmWet')
-DENSITY_CALL = 'fibreDensity(fibre.g, taper, 0.55 * dryingRing(wetness))'
+DENSITY_CALL = 'fibreDensity(wick, taper, 0.55 * ring)'
 CREEP_CALL = 'fibreCreep(depositAge, wetness)'
-RING_CALL = '0.55 * dryingRing(wetness)'
-EDGE_RING = '0.6 * dryingRing(wetness) * edge'
-for _hook in (DENSITY_CALL, CREEP_CALL, EDGE_RING):
+RING_CALL = 'fibreFringe > 0.5 ? dryingRing(wetness) : 0.0'
+EDGE_RING = '0.6 * ring * edge'
+for _hook in (DENSITY_CALL, CREEP_CALL, RING_CALL, EDGE_RING):
     assert _hook in SOURCE, _hook
 FAINT_SOURCE = SOURCE.replace('min(weight * 0.6, 0.6 * scale)', 'min(weight * 0.12, 0.12 * scale)')
 # Same material, sampled directly. At high resolution, this integrates the
@@ -32,17 +32,19 @@ uniform float2 samplePhase;
 half4 main(float2 p) {
     float base = normals.eval(floor(p + samplePhase) + 0.5 - samplePhase).b;
     float unread = base * unreadAlpha;
-    return mix(inkAt(p, base, aa), half4(dryInk * unread, unread), evaporation);
+    float distance = (field.eval(p * fieldScale).b * 255.0 - 128.0) / 16.0;
+    return mix(inkAt(p, base, aa, paperWick(p, base, distance)), half4(dryInk * unread, unread), evaporation);
 }
 '''
 QUAD_SOURCE = SOURCE[:SOURCE.index('// Integrate the wet material')] + '''
 half4 main(float2 p) {
     float base = normals.eval(p).b;
     float o = aa * (0.25 / 0.9);
-    half4 ink = (inkAt(p + float2(-o, -o), base, aa * 0.5) +
-        inkAt(p + float2(o, -o), base, aa * 0.5) +
-        inkAt(p + float2(-o, o), base, aa * 0.5) +
-        inkAt(p + float2(o, o), base, aa * 0.5)) * 0.25;
+    float wick = paperWick(p, base, (field.eval(p * fieldScale).b * 255.0 - 128.0) / 16.0);
+    half4 ink = (inkAt(p + float2(-o, -o), base, aa * 0.5, wick) +
+        inkAt(p + float2(o, -o), base, aa * 0.5, wick) +
+        inkAt(p + float2(-o, o), base, aa * 0.5, wick) +
+        inkAt(p + float2(o, o), base, aa * 0.5, wick)) * 0.25;
     float unread = base * unreadAlpha;
     return mix(ink, half4(dryInk * unread, unread), evaporation);
 }
@@ -85,7 +87,7 @@ def word(text, font, size, rtl, letters):
         children[name] = skia.Image.fromarray(data, colorType=skia.ColorType.kRGBA_8888_ColorType).makeRawShader(
             samplingOptions=skia.SamplingOptions(skia.FilterMode.kLinear))
     # The shared paper repeats, as the app's BitmapShader does.
-    children['substrate'] = skia.Image.fromarray(paper(), colorType=skia.ColorType.kRGBA_8888_ColorType).makeRawShader(
+    children['substrate'] = skia.Image.fromarray(np.ascontiguousarray(paper()), colorType=skia.ColorType.kAlpha_8_ColorType).makeRawShader(
         skia.TileMode.kRepeat, skia.TileMode.kRepeat, skia.SamplingOptions(skia.FilterMode.kLinear))
     return dict(width=w, height=h, unit=size / 160, duration=duration, children=children, coverage=coverage)
 

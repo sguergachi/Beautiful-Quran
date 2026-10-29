@@ -245,15 +245,25 @@ paints with:
 
 Settled inactive ayahs do **not** redraw continuously: their draw-scope state
 reads are static once the 400 ms recess/focus tween finishes.
-The fibre fringe reads one shared 720 × 720 paper tile (2 MB, outside the
-32 MiB word cache), made once per process on its own background thread when
-paper ink first warms a word, so it never queues behind word fields. The
-tile took 0.59–0.88 s on the emulator (debug build). Only AA taps inside the
-band a fibre can reach sample it. On the emulator, four interleaved 40 s
-playback pairs (debug, 1080 × 2400, Al-Baqarah) kept the median frame at
-18 ms in most runs; p95/p99 were 21–25/25–31 ms with the fringe against
-18–22/21–28 ms without, a tail cost of roughly 2–3 ms within run-to-run
-noise. That is not a Pixel measurement.
+The fibre fringe reads one shared 720 × 720 alpha paper tile, shipped
+precomputed (518 KB asset, outside the 32 MiB word cache) and read once per
+process: 5 ms on the emulator, where building it on device took 0.6–1.1 s
+(debug). The shader reads it at most once per pixel, only within a fibre's
+reach of a contour, instead of at each of the eight AA taps (sixteen during a
+repeat). Its two uniforms are set only when they change, so an unchanged draw
+makes no extra JNI calls. Perfetto traces of the same Al-Baqarah playback
+without glosses (where wet words do reach the shader; emulator, debug build,
+two pairs) put the fringe at parity: 56–58 µs per wet paper-ink word draw on
+vs 58–63 µs off, RenderThread frames 14.6–15.1 vs 13.1–16.0 ms, within noise.
+Skia's CPU rasteriser, a proxy for per-pixel shader cost, times it within
+noise of the plain paper tooth (wet −1%, drying −7%, repeat +0%); the
+fringe's early-outs skip the tooth's per-tap noise. The emulator cannot time
+the host GPU, and none of this is a Pixel measurement.
+
+Building one word's field took 340–380 ms on the emulator (debug), the
+dominant paper-ink cost. Shaped text warms fields ahead of the voice; a
+word-by-word gloss node only starts during its own fade-in lead, so on that
+emulator its live words fall back to the cover wash.
 See [PAPER_INK.md](PAPER_INK.md#fibre-fringe).
 Paper-cover bleed is horizontal-only and clipped to each text line's measured
 top/bottom; an unread line therefore cannot fade descenders belonging to the
