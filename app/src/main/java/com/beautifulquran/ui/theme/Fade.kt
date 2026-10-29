@@ -32,7 +32,11 @@ import androidx.compose.ui.text.TextMeasurer
 import androidx.compose.ui.text.style.TextIndent
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.style.ResolvedTextDirection
+import androidx.compose.ui.graphics.CompositingStrategy
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.layout.layout
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.offset
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
@@ -166,6 +170,49 @@ fun Modifier.glyphLayerAlpha(alpha: () -> Float): Modifier = drawWithContent {
     drawContent()
     drawIntoCanvas { canvas -> canvas.restore() }
 }
+
+/**
+ * A translucent layer's alpha, composited from a cached offscreen layer.
+ * Plain alpha on overlapping content already renders offscreen, but anew
+ * every frame the screen redraws (a "alpha caused saveLayer" render pass);
+ * the cached layer looks identical, is clipped to the same bounds, and is
+ * only re-rendered when its content changes. Opaque layers stay direct.
+ */
+fun androidx.compose.ui.graphics.GraphicsLayerScope.cachedAlpha(value: Float) {
+    alpha = value
+    compositingStrategy = if (value < 1f) CompositingStrategy.Offscreen else CompositingStrategy.Auto
+}
+
+/**
+ * Keeps content that is not changing in a cached render layer while [still]
+ * holds. The renderer replays everything on screen each frame, and an
+ * offscreen fade (a [letterFadeIn] at rest, a [glyphLayerAlpha]) inside it
+ * costs a whole GPU render pass every time; inside a cached layer it runs
+ * only when the content itself changes, and each frame just draws a texture.
+ *
+ * The layer reaches [bleed] past the content on every side without changing
+ * layout, so glyphs overhanging their box, which the fades' own layers keep,
+ * are not clipped. While [still] is false the content draws directly as
+ * before; read in the draw phase only, so switching never recomposes.
+ */
+fun Modifier.cachedWhileStill(bleed: Dp, still: () -> Boolean): Modifier = this
+    .layout { measurable, constraints ->
+        val room = bleed.roundToPx() * 2
+        val placeable = measurable.measure(constraints.offset(room, room))
+        layout(placeable.width - room, placeable.height - room) {
+            placeable.place(-room / 2, -room / 2)
+        }
+    }
+    .graphicsLayer {
+        compositingStrategy = if (still()) CompositingStrategy.Offscreen else CompositingStrategy.Auto
+    }
+    .layout { measurable, constraints ->
+        val room = bleed.roundToPx() * 2
+        val placeable = measurable.measure(constraints.offset(-room, -room))
+        layout(placeable.width + room, placeable.height + room) {
+            placeable.place(room / 2, room / 2)
+        }
+    }
 
 /**
  * One word-local bloom inside a larger shaped [Text] (Arabic-only / no-gloss).

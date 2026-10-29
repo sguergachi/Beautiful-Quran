@@ -157,7 +157,7 @@ object PaperInk {
         paper()
         val key = key(source)
         cache.get(key)?.let { return it }
-        if (key in pending) return null
+        if (key in pending || key in inkless) return null
         val now = SystemClock.uptimeMillis()
         if (now != captureFrame) {
             captureFrame = now
@@ -171,7 +171,13 @@ object PaperInk {
             val word = runCatching { generate(capture) }.getOrNull()
             main.post {
                 pending -= key
-                if (word != null) cache.put(key, word)
+                if (word != null) {
+                    cache.put(key, word)
+                } else {
+                    // Nothing to ink (or it failed): don't re-rasterize every frame.
+                    if (inkless.size >= INKLESS_LIMIT) inkless.clear()
+                    inkless += key
+                }
                 generation.intValue++
             }
         }
@@ -182,6 +188,20 @@ object PaperInk {
         val fx = source.originX - floor(source.originX)
         val fy = source.originY - floor(source.originY)
         return Key(source.layout.layoutInput, (fx * PHASES).roundToInt() % PHASES, (fy * PHASES).roundToInt() % PHASES)
+    }
+
+    /** Words whose capture held no ink, so asking again cannot help. */
+    private val inkless = HashSet<Key>()
+
+    /**
+     * Start [source]'s field ahead of its turn. True once it is ready or on
+     * its way; false while this frame's capture ration is spent (try again).
+     */
+    fun warm(source: Source): Boolean {
+        if (!supported || shaderSource == null) return true
+        if (word(source) != null) return true
+        val key = key(source)
+        return key in pending || key in inkless
     }
 
     private var nextPlacement = 0
@@ -237,7 +257,8 @@ object PaperInk {
     }
 
     private class Capture(
-        val alpha: FloatArray,
+        /** The raw raster at [SCALE]; normalized into alpha on the worker. */
+        val mask: ByteArray,
         val width: Int,
         val height: Int,
         val coverage: ByteArray,
@@ -281,18 +302,7 @@ object PaperInk {
         val maskBytes = ByteArray(width * height * SCALE * SCALE)
         maskBitmap.copyPixelsToBuffer(ByteBuffer.wrap(maskBytes))
         maskBitmap.recycle()
-        // A span may carry a translucent colour; the word's own ink is the mask.
-        var peak = 0
-        for (b in maskBytes) peak = maxOf(peak, b.toInt() and 0xFF)
-        if (peak == 0) return null
-        val alpha = FloatArray(maskBytes.size) { (maskBytes[it].toInt() and 0xFF) / peak.toFloat() }
-        var coveragePeak = 0
-        for (b in coverage) coveragePeak = maxOf(coveragePeak, b.toInt() and 0xFF)
-        if (coveragePeak in 1..254) {
-            for (i in coverage.indices) {
-                coverage[i] = ((coverage[i].toInt() and 0xFF) * 255 / coveragePeak).coerceAtMost(255).toByte()
-            }
-        }
+        // Per-pixel work waits for the worker ([generate]): this runs in a draw.
         val text = input.text.text
         val letters = letterOffsets(text, source.rtl)
         val centers = if (letters.isEmpty()) FloatArray(0) else FloatArray(letters.size) { k ->
@@ -303,7 +313,7 @@ object PaperInk {
             ((a + b) / 2f + padX + phaseX) * SCALE
         }
         return Capture(
-            alpha = alpha,
+            mask = maskBytes,
             width = width * SCALE,
             height = height * SCALE,
             coverage = coverage,
@@ -325,8 +335,21 @@ object PaperInk {
         else text.indices.filter { text[it].isLetterOrDigit() }.toIntArray()
 
     private fun generate(c: Capture): Word? {
+        // A span may carry a translucent colour; the word's own ink is the mask.
+        var peak = 0
+        for (b in c.mask) peak = maxOf(peak, b.toInt() and 0xFF)
+        if (peak == 0) return null
+        val alpha = FloatArray(c.mask.size) { (c.mask[it].toInt() and 0xFF) / peak.toFloat() }
+        val coverage = c.coverage
+        var coveragePeak = 0
+        for (b in coverage) coveragePeak = maxOf(coveragePeak, b.toInt() and 0xFF)
+        if (coveragePeak in 1..254) {
+            for (i in coverage.indices) {
+                coverage[i] = ((coverage[i].toInt() and 0xFF) * 255 / coveragePeak).coerceAtMost(255).toByte()
+            }
+        }
         val result = PaperInkField.generate(
-            c.alpha, c.width, c.height, SCALE, c.centers, c.baseline, c.rtl, c.fontPx, c.letterCount,
+            alpha, c.width, c.height, SCALE, c.centers, c.baseline, c.rtl, c.fontPx, c.letterCount,
         ) ?: return null
         val n = c.width * c.height
         val fieldPixels = IntArray(n) { i ->
@@ -447,6 +470,7 @@ object PaperInk {
 
     private const val PHASES = 8
     private const val CAPTURES_PER_FRAME = 3
+    private const val INKLESS_LIMIT = 256
     private const val CACHE_BYTES = 32 * 1024 * 1024
 }
 

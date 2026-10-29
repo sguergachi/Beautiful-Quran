@@ -16,10 +16,15 @@ internal object PaperInkOutline {
     fun distance(alpha: FloatArray, width: Int, height: Int, scale: Int, fallback: FloatArray): FloatArray {
         val offsets = IntArray(alpha.size) { -1 }
         val counts = ByteArray(alpha.size)
-        val segments = ArrayList<Float>()
+        // Plain floats, grown by doubling: one boxed Float per contour point
+        // used to dominate this pass.
+        var segments = FloatArray(1024)
+        var used = 0
         // Clockwise cell edges: top, right, bottom, left.
         val cornerX = floatArrayOf(0f, 1f, 1f, 0f)
         val cornerY = floatArrayOf(0f, 0f, 1f, 1f)
+        val values = FloatArray(4)
+        val points = FloatArray(8)
         for (y in 0 until height - 1) for (x in 0 until width - 1) {
             val i = y * width + x
             val a = alpha[i]
@@ -27,8 +32,10 @@ internal object PaperInkOutline {
             val c = alpha[i + width + 1]
             val d = alpha[i + width]
             if (min(min(a, b), min(c, d)) >= .5f || max(max(a, b), max(c, d)) < .5f) continue
-            val values = floatArrayOf(a, b, c, d)
-            val points = FloatArray(8)
+            values[0] = a
+            values[1] = b
+            values[2] = c
+            values[3] = d
             var n = 0
             for (edge in 0..3) {
                 val next = (edge + 1) % 4
@@ -37,19 +44,20 @@ internal object PaperInkOutline {
                 points[n++] = x + cornerX[edge] + t * (cornerX[next] - cornerX[edge])
                 points[n++] = y + cornerY[edge] + t * (cornerY[next] - cornerY[edge])
             }
-            offsets[i] = segments.size
+            offsets[i] = used
             counts[i] = (n / 4).toByte()
+            if (used + n > segments.size) segments = segments.copyOf(segments.size * 2)
             if (n == 8 && ((a + b + c + d) >= 2f) != (a >= .5f)) {
                 // A saddle contains two separate segments. Keep the centre on
                 // its coverage side instead of bridging diagonal corners.
-                for (j in intArrayOf(0, 1, 6, 7, 2, 3, 4, 5)) segments += points[j]
+                for (j in SADDLE_ORDER) segments[used++] = points[j]
             } else {
-                for (j in 0 until n) segments += points[j]
+                for (j in 0 until n) segments[used++] = points[j]
             }
         }
-        if (segments.isEmpty()) return fallback
+        if (used == 0) return fallback
         val nearest = PaperInkField.edt(BooleanArray(alpha.size) { offsets[it] < 0 }, width, height, true).index!!
-        val lines = segments.toFloatArray()
+        val lines = segments
         return FloatArray(alpha.size) { i ->
             val x = i % width
             val y = i / width
@@ -79,4 +87,6 @@ internal object PaperInkOutline {
             sqrt(best) / scale * if (alpha[i] >= .5f) 1f else -1f
         }
     }
+
+    private val SADDLE_ORDER = intArrayOf(0, 1, 6, 7, 2, 3, 4, 5)
 }

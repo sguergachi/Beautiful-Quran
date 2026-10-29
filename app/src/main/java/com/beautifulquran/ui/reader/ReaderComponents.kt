@@ -135,7 +135,9 @@ import com.beautifulquran.data.model.Word
 import com.beautifulquran.domain.EnglishTypography
 import com.beautifulquran.domain.TajweedPacing
 import com.beautifulquran.ui.reader.focus.FocusEngine
+import com.beautifulquran.ui.theme.cachedAlpha
 import com.beautifulquran.ui.theme.paperink.PaperInk
+import com.beautifulquran.ui.theme.cachedWhileStill
 import com.beautifulquran.ui.theme.quietSuppliedBrackets
 import com.beautifulquran.ui.theme.forCaps
 import com.beautifulquran.ui.theme.liningFigures
@@ -965,6 +967,20 @@ internal class InkMotion(
     /** Whether the white-gold glint overlay still has any sheen to show. */
     val showGlintLayer: Boolean get() = glintAlpha.value > 0f
 
+    /**
+     * Its ink is at rest (no wash, paper ink, orange or glimmer of its own)
+     * yet drawn through offscreen fades: unread, or recessed with its verse.
+     * A fully inked word at rest uses no offscreen fade and is left out.
+     */
+    val restsFaded: Boolean
+        get() = isQuiet && (sweepProgress <= 0f || lyricInk.value < 1f)
+
+    /** No wash, paper ink, orange or glimmer of its own: frame to frame, it
+     * changes only when its verse's recess fades. */
+    val isQuiet: Boolean
+        get() = !isActive && !paperInkLive && !showRepeatLayer && !showGlintLayer &&
+            (sweepProgress <= 0f || sweepProgress >= 1f)
+
     /** Draw-phase alpha for secondary lines (gloss, transliteration): they
      * fade with the word's sweep but never letter-reveal. Residual short-hold
      * wash after handoff keeps riding the same progress. */
@@ -1358,6 +1374,7 @@ private fun HighlightLayeredText(
     searchHitWash: RepeatWash? = null,
     recessedForSearch: Boolean = false,
     searchBackgroundAlpha: () -> Float = { 1f },
+    paperNode: PaperInkNode = rememberPaperInkNode(),
 ) {
     val repeatInk = LocalQuranAccents.current.repeatInk
     val paper = MaterialTheme.colorScheme.background
@@ -1370,7 +1387,6 @@ private fun HighlightLayeredText(
     val trace = motion.tarjiTrace
     // Paper: the shared ink pipeline draws this word while it is live.
     val paperInk = rememberPaperInkStyle(color)
-    val paperNode = rememberPaperInkNode()
     Box(if (trace != null) modifier.tarjiPulseTrace(trace, rtl, motion.tarjiTraceColor) else modifier) {
         // The glow is a light's falloff, glyph-shaped at every width — no
         // radial field: a wide faint veil, the halo, and a tight bloom.
@@ -1505,9 +1521,11 @@ private fun WordUnit(
     searchHitWash: RepeatWash? = null,
     recessedForSearch: Boolean = false,
     searchBackgroundAlpha: () -> Float = { 1f },
+    paperNode: PaperInkNode = rememberPaperInkNode(),
 ) {
     val repeatInk = LocalQuranAccents.current.repeatInk
     val glossWeight = if (searchHit) FontWeight.Bold else null
+    val searching = searchHitWash != null || recessedForSearch
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
         modifier = Modifier
@@ -1519,7 +1537,12 @@ private fun WordUnit(
                 onClick = onClick,
                 onLongClick = onLongClick,
             )
-            .padding(horizontal = WORD_TILE_PAD_H, vertical = WORD_TILE_PAD_V),
+            .padding(horizontal = WORD_TILE_PAD_H, vertical = WORD_TILE_PAD_V)
+            // A word resting at faded ink (unread, or recessed with its
+            // verse) draws through two offscreen fades, the Arabic and the
+            // gloss, that would otherwise be re-rendered every frame while
+            // anything on the page moves.
+            .cachedWhileStill(WORD_TILE_LAYER_BLEED) { !searching && motion.restsFaded },
     ) {
         HighlightLayeredText(
             text = word.arabic,
@@ -1535,6 +1558,7 @@ private fun WordUnit(
             searchHitWash = searchHitWash,
             recessedForSearch = recessedForSearch,
             searchBackgroundAlpha = searchBackgroundAlpha,
+            paperNode = paperNode,
         )
         if (showGloss) {
             Box {
@@ -1775,6 +1799,33 @@ private fun MutableList<ShapedWordBloom>.addShapedInkMotionBlooms(
 
 /** Words ahead of the voice whose paper ink fields are generated in advance. */
 private const val PAPER_INK_WARM_AHEAD = 10
+
+/**
+ * Word tiles build their paper ink field ahead of the voice, as shaped text
+ * does with [ShapedWordBloom.PaperInkWarm]: the next [PAPER_INK_WARM_AHEAD]
+ * words after the active one, a few captures a frame. Without it a tile
+ * first asks during its own fade-in lead and, on a slow device, washes in the
+ * fallback because the field is not ready. Effect only: nothing redraws.
+ */
+@Composable
+private fun WarmPaperInkAhead(motions: List<InkMotion>, nodes: List<PaperInkNode>) {
+    val accents = LocalQuranAccents.current
+    if (accents.glintInk != null || !PaperInk.supported || !InkEngine.tuning.paperInk) return
+    val active = motions.indexOfFirst { it.isActive }
+    LaunchedEffect(active, nodes) {
+        if (active < 0) return@LaunchedEffect
+        for (k in active + 1..minOf(nodes.lastIndex, active + PAPER_INK_WARM_AHEAD)) {
+            // Rationed per frame; a tile not laid out yet gets a few frames.
+            var frames = 0
+            while (!nodes[k].warm(rtl = true) && frames++ < PAPER_INK_WARM_FRAMES) withFrameNanos { }
+        }
+    }
+}
+
+private const val PAPER_INK_WARM_FRAMES = 30
+
+/** Room past a word tile for overhanging marks; matches the fades' own layer bleed. */
+private val WORD_TILE_LAYER_BLEED = 14.dp
 
 /**
  * The whole bloom list for one shaped frame, shared by the English paragraph
@@ -3134,6 +3185,7 @@ fun AyahBlock(
                 }
             },
     ) {
+        val wordTiles = readingMode == ReadingMode.ARABIC_ENGLISH && showGloss
         Column(
             modifier = Modifier
                 .fillMaxWidth()
@@ -3144,7 +3196,15 @@ fun AyahBlock(
                         top = ScrollGrid.VERSE_PAD,
                         bottom = ScrollGrid.VERSE_PAD,
                     ),
-                ),
+                )
+                // A shaped verse whose words all rest, some of them faded,
+                // draws its covers and fades through offscreen layers that
+                // would be re-rendered every frame. Word tiles cache
+                // themselves instead (nesting would only double the memory).
+                .cachedWhileStill(WORD_TILE_LAYER_BLEED) {
+                    !wordTiles && !searchTargetAyah &&
+                        motions.all { it.isQuiet } && motions.any { it.restsFaded }
+                },
         ) {
             val useArabicIndicDigits = verseNumberScript == VerseNumberScript.ARABIC
             if (readingMode == ReadingMode.ENGLISH_ONLY) {
@@ -3173,6 +3233,11 @@ fun AyahBlock(
                     useArabicIndicDigits = useArabicIndicDigits,
                 )
             } else if (readingMode == ReadingMode.ARABIC_ENGLISH && showGloss) {
+                // Hoisted so this verse can warm the next words' paper ink fields.
+                val paperNodes = remember(ayah.surahId, ayah.number, ayah.words.size) {
+                    List(ayah.words.size) { PaperInkNode() }
+                }
+                WarmPaperInkAhead(motions, paperNodes)
                 CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Rtl) {
                     FlowRow(
                         modifier = Modifier
@@ -3184,6 +3249,7 @@ fun AyahBlock(
                         val wordTile: @Composable (Int) -> Unit = { index ->
                             val word = ayah.words[index]
                             val motion = motions[index]
+                            val paperNode = paperNodes[index]
                             val flashing = word.position in searchTargets
                             WordUnit(
                                 word = word,
@@ -3200,6 +3266,7 @@ fun AyahBlock(
                                 searchHitWash = searchHitWash.takeIf { flashing },
                                 recessedForSearch = searchTargetAyah && !flashing,
                                 searchBackgroundAlpha = { searchBackgroundAlpha.value },
+                                paperNode = paperNode,
                             )
                         }
                         for (index in 0 until ayah.words.lastIndex) wordTile(index)
@@ -3210,11 +3277,11 @@ fun AyahBlock(
                             if (ayah.words.isNotEmpty()) wordTile(ayah.words.lastIndex)
                             Box(
                                 modifier = Modifier.graphicsLayer {
-                                    alpha = ayahMarkAlpha.value * if (searchTargetAyah) {
+                                    cachedAlpha(ayahMarkAlpha.value * if (searchTargetAyah) {
                                         searchBackgroundAlpha.value
                                     } else {
                                         1f
-                                    }
+                                    })
                                 },
                             ) {
                                 ArabicAyahNumberUnit(

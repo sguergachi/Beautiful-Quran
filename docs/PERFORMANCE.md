@@ -260,10 +260,18 @@ noise of the plain paper tooth (wet −1%, drying −7%, repeat +0%); the
 fringe's early-outs skip the tooth's per-tap noise. The emulator cannot time
 the host GPU, and none of this is a Pixel measurement.
 
-Building one word's field took 340–380 ms on the emulator (debug), the
-dominant paper-ink cost. Shaped text warms fields ahead of the voice; a
-word-by-word gloss node only starts during its own fade-in lead, so on that
-emulator its live words fall back to the cover wash.
+A word's paper-ink field is built on the CPU, on the paper-ink worker. The
+Gaussian behind its liquid normals (reflect-padded once per line, skipping
+exact-zero spans of empty paper) and an unboxed contour pass cut it from
+75 to 49 ms for a 90 px Arabic word, 34 to 21 ms for 64 px English, and 326
+to 129 ms at 160 px (warm desktop JVM), with bit-identical output. The draw
+that captures a word only rasterizes it; converting the 2× raster to floats
+happens on the worker, and a word with no ink is remembered rather than
+re-rasterized every frame. Shaped text warms fields ahead of the voice;
+word-by-word gloss tiles now do the same (`WarmPaperInkAhead`, the next ten
+words after the active one). On the emulator's debug build, where a field
+takes 340–380 ms, live gloss words went from never having their field ready
+to having it on two thirds of live frames.
 See [PAPER_INK.md](PAPER_INK.md#fibre-fringe).
 Paper-cover bleed is horizontal-only and clipped to each text line's measured
 top/bottom; an unread line therefore cannot fade descenders belonging to the
@@ -337,6 +345,37 @@ an alpha mask with `BlendMode.DstIn` — requires
 `CompositingStrategy.Offscreen`, which renders the whole list into an
 offscreen buffer **every frame while scrolling**. The overlay is visually
 identical on a solid background and costs almost nothing.
+
+### 4a. Cached layers for content at rest
+
+The renderer replays everything on screen every frame. An offscreen layer in
+that replay, whether a `saveLayer` (`letterFadeIn`, `glyphLayerAlpha`, a
+paper cover's punch) or a translucent `graphicsLayer` with the default
+compositing, is a whole GPU render pass each time, even when nothing in it
+changed. During playback in the word-by-word view that was 39 render passes
+a frame: two per word resting at faded ink (unread, or recessed with its
+verse), the Arabic and its gloss.
+
+`cachedWhileStill` gives such content an Offscreen (cached) layer while it is
+at rest, reaching the fades' own 14 dp bleed past the content without
+changing layout, so overhanging marks are not clipped. It re-renders only when
+the content changes; on other frames it costs one textured quad. Word tiles
+use it while `InkMotion.restsFaded`; a shaped verse whose words are all quiet,
+some faded, uses it whole (tiles are not nested inside it). `cachedAlpha` does
+the same for translucent chrome (player-bar buttons and reciter label, ayah
+marks): identical compositing, cached instead of redrawn. Live words keep
+drawing directly, so their halos and washes are never clipped.
+
+Perfetto on the emulator (debug, Al-Baqarah playback): render passes per frame
+fell from 39 to 4.3 in the word-by-word view and from 6.9 to 3.1 without
+glosses, and the frames drawn in the same 25 s window rose from about 650 to
+1,485 (gloss) and from 980 to 1,487. Total GPU memory during gloss playback
+was 29.8 MB (19.1 MB purgeable). Not a Pixel measurement.
+
+Adaptive antialiasing (four outer taps, all eight only where they disagree)
+was tried and dropped: on a desktop RTX 3080 through Skia's GL backend it saved
+nothing, because the eight taps' cost sits at contours, which must keep them,
+not in flat stroke interiors.
 
 ### 4b. Transient progressive vellum
 

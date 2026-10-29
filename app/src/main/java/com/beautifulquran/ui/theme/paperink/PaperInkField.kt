@@ -201,7 +201,8 @@ internal object PaperInkField {
             val fed = sampleColumns(sweep, column)
             val rim = 1f - (interior[i] / max(halfWidth[i], 1e-6f)).coerceIn(0f, 1f)
             insideOut[i] = fed + INSIDE_OUT_LAG / count * rim.pow(INSIDE_OUT_SHAPE)
-            flowing[i] = fed + FLOWING_LAG / count * rim.pow(FLOWING_SHAPE)
+            // x^1 is x exactly; skip the transcendental call per pixel.
+            flowing[i] = fed + FLOWING_LAG / count * if (FLOWING_SHAPE == 1f) rim else rim.pow(FLOWING_SHAPE)
         }
         // Paper takes its nearest ink's arrival, so wet spread past the contour agrees.
         val nearest = nearestInk ?: edt(BooleanArray(n) { !ink[it] }, width, height, wantIndex = true).index!!
@@ -452,24 +453,54 @@ internal object PaperInkField {
         }
     }
 
-    /** scipy `gaussian_filter(mode='reflect')`, truncate 4, separable. */
+    /**
+     * scipy `gaussian_filter(mode='reflect')`, truncate 4, separable.
+     *
+     * The hot loop of field generation, and most of a word's box is empty
+     * paper. Each row or column is reflect-padded once, then every window only
+     * visits its stretch of nonzero samples: the skipped terms are exact zeros,
+     * and the rest are summed in the same order, so the result is unchanged
+     * to the bit.
+     */
     internal fun gaussian2dReflect(values: FloatArray, width: Int, height: Int, sigma: Float): FloatArray {
         if (sigma <= 0f) return values.copyOf()
         val kernel = gaussianKernel(sigma)
         val r = kernel.size / 2
+        val line = FloatArray(max(width, height) + 2 * r)
         val rows = FloatArray(values.size)
-        for (y in 0 until height) for (x in 0 until width) {
-            var sum = 0f
-            for (k in kernel.indices) sum += kernel[k] * values[y * width + reflect(x + k - r, width)]
-            rows[y * width + x] = sum
+        for (y in 0 until height) {
+            for (j in 0 until width + 2 * r) line[j] = values[y * width + reflect(j - r, width)]
+            convolveLine(line, width, kernel, rows, y * width, 1)
         }
         val out = FloatArray(values.size)
-        for (y in 0 until height) for (x in 0 until width) {
-            var sum = 0f
-            for (k in kernel.indices) sum += kernel[k] * rows[reflect(y + k - r, height) * width + x]
-            out[y * width + x] = sum
+        for (x in 0 until width) {
+            for (j in 0 until height + 2 * r) line[j] = rows[reflect(j - r, height) * width + x]
+            convolveLine(line, height, kernel, out, x, width)
         }
         return out
+    }
+
+    /** One padded [line] (count + 2r samples) through [kernel], into [dst]. */
+    private fun convolveLine(line: FloatArray, count: Int, kernel: FloatArray, dst: FloatArray, offset: Int, stride: Int) {
+        val span = kernel.size
+        var first = -1
+        var last = -1
+        for (j in 0 until count + span - 1) if (line[j] != 0f) {
+            if (first < 0) first = j
+            last = j
+        }
+        for (x in 0 until count) {
+            var sum = 0f
+            if (first >= 0) {
+                val from = max(0, first - x)
+                val to = min(span - 1, last - x)
+                for (k in from..to) {
+                    val v = line[x + k]
+                    if (v != 0f) sum += kernel[k] * v
+                }
+            }
+            dst[offset + x * stride] = sum
+        }
     }
 
     private fun gaussianKernel(sigma: Float): FloatArray {

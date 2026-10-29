@@ -181,6 +181,15 @@ internal class PaperInkNode {
             with(PaperInk) { drawWord(word, source, frame, erase = false) }
         }
 
+    /**
+     * Start this word's field before its turn (see [PaperInk.warm]). A word
+     * node otherwise first asks during its own fade-in lead, and a field takes
+     * longer than that to build on a slow device, so the word would wash in
+     * the fallback. False until laid out or while the frame's ration is spent.
+     */
+    fun warm(rtl: Boolean, letterCount: Int = 0): Boolean =
+        layout?.let { PaperInk.warm(PaperInk.Source(it, 0f, 0f, rtl, letterCount, placement)) } ?: false
+
     /** An overlay of this word (orange repeat, wasl, glint) that the ink replaces. */
     fun Modifier.hiddenWhilePaperInk(): Modifier = drawWithContent {
         if (!drawing) drawContent()
