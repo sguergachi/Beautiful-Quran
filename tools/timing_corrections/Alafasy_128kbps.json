@@ -85,27 +85,10 @@
       "op": "discard_false_same_position_lead",
       "position": 16,
       "phase": "after_repairs",
-      "sourcePair": [
-        [
-          16,
-          27120,
-          28090
-        ],
-        [
-          16,
-          28090,
-          28740
-        ]
-      ],
+      "sourcePair": [[16, 27120, 28090], [16, 28090, 28740]],
       "requiresAudioVerdict": true,
-      "evidence": [
-        "Arabic XLSR",
-        "MMS/uroman",
-        "exact recording decoded bounds; no manual listening"
-      ],
-      "refs": [
-        "tools/timing_evidence/alafasy-28-9-repeat-review.json"
-      ],
+      "evidence": ["Arabic XLSR", "MMS/uroman", "exact recording decoded bounds; no manual listening"],
+      "refs": ["tools/timing_evidence/alafasy-28-9-repeat-review.json"],
       "notes": "Quran-align starts this word on the false lead, so its source-onset rule abstains. Both models place the sole supported utterance at 28136 ms; word 15 retains the false lead."
     }
   ]
