@@ -172,7 +172,11 @@ leaves an Arabic word unowned, plus a deterministic 10% draw of the covered
 rest (`--audit-rate`), so the untouched majority keeps a measured error bound
 instead of an assertion. The queue is 2,846 verses; `--selection all` restores
 the exhaustive pass, and the same verse is drawn on every run, so a resumed run
-does not re-sample its own audit. `report.json` and `selection.json` record
+does not re-sample its own audit. A flagged verse is reviewed in one draft and
+one fresh-critique call carrying up to `--batch` verses (default 6); a verse
+that fails the critique is retried on its own, so the per-verse attention is
+restored exactly where it is needed. `--batch 1` keeps the audited per-verse
+stage cache. `report.json` and `selection.json` record
 `queued`, `flagged_uncovered`, `audit_sampled` and `left_at_baseline` per
 chapter, and `python3 tools/test_review_english_selection.py` pins the filter,
 the draw and the chapter bound. A verse already reviewed re-binds to its

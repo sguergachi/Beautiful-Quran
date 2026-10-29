@@ -309,10 +309,10 @@ def separate_units(answer):
     return result
 
 
-def job_signature(row, binding, evidence, model):
+def job_signature(row, binding, evidence, model, policy=None):
     evidence_hash = evidence['package_sha256'] if evidence.get('format') == 'english-evidence-receipt-v1' else ledger.digest(ledger.encoded(evidence))
     return ledger.digest(ledger.encoded([row, binding, evidence_hash, model, RUBRIC.read_text(),
-                                         REVIEW_POLICY]))
+                                         REVIEW_POLICY if policy is None else policy]))
 
 
 def review_verse(row, binding, evidence, directory, model, attempts, call):
@@ -368,6 +368,121 @@ def review_verse(row, binding, evidence, directory, model, attempts, call):
 REVIEW_POLICY = ledger.digest(ledger.encoded([
     [inspect.getsource(f) for f in [candidate, separate_units, review_verse, validate_evidence, model_call]],
     DRAFT_SCHEMA, REVIEW_SCHEMA, REASONING, Path(ledger.__file__).read_text(),
+    Path(__file__).with_name("english_alignment_evidence.py").read_text(),
+]))
+
+# One paid call can carry several verses; the per-verse schema and rubric are
+# unchanged, so the only new decisions are the container and this instruction.
+BATCH_INSTRUCTION = ("One output entry per input verse, in the same order. Apply every rubric rule "
+                     "independently to each verse; never trade one verse's ownership for another's.")
+BATCH_DRAFT_SCHEMA = {"type": "object", "properties": {"verses": {"type": "array", "minItems": 1, "items": DRAFT_SCHEMA}},
+                      "required": ["verses"], "additionalProperties": False}
+BATCH_REVIEW_SCHEMA = {"type": "object", "properties": {"verses": {"type": "array", "minItems": 1, "items": REVIEW_SCHEMA}},
+                       "required": ["verses"], "additionalProperties": False}
+
+
+def batch_signature(items, model):
+    """Bind a shared call to each verse's own row, binding and evidence."""
+    return ledger.digest(ledger.encoded([job_signature(i["row"], i["binding"], i["evidence"], model, BATCH_POLICY)
+                                         for i in items]))
+
+
+def batch_directory(work, items, model):
+    """Stage cache keyed by the verse set and evidence alone, so a policy edit can still reuse a paid answer."""
+    identity = [[i["row"]["verse"], i["row"]["fingerprint"],
+                 job_signature(i["row"], i["binding"], i["evidence"], model, BATCH_POLICY)] for i in items]
+    return work / "jobs" / "batched" / ledger.digest(ledger.encoded(identity))[:16]
+
+
+def state_path_of(items, signature, directory, model):
+    """The file the writer keeps this unit's state in: a verse's own job directory for a lone verse."""
+    if len(items) == 1:
+        item = items[0]
+        return item["directory"] / (job_signature(item["row"], item["binding"], item["evidence"], model) + ".json")
+    return directory / (signature + ".json")
+
+
+def review_batch(items, signature, directory, model, attempts, call):
+    """One draft and one fresh critique for several verses; a lone verse keeps the audited per-verse path."""
+    if len(items) == 1:
+        item = items[0]
+        return {item["row"]["verse"]: review_verse(item["row"], item["binding"], item["evidence"],
+                                                   item["directory"], model, attempts, call)}
+    state_path = state_path_of(items, signature, directory, model)
+    if state_path.exists():
+        return json.loads(state_path.read_text())
+    states = {}
+    for item in items:
+        states[item["row"]["verse"]] = {"verse": item["row"]["verse"], "model": model, "attempts": 0,
+            "input_sha256": job_signature(item["row"], item["binding"], item["evidence"], model, BATCH_POLICY),
+            "status": "held", "issues": []}
+    pending, feedback = list(items), {}
+    for attempt in range(attempts):
+        run = directory / signature / str(attempt + 1)
+        for item in pending:
+            states[item["row"]["verse"]]["attempts"] += 1
+        try:
+            drafts = call({"stage": "draft", "batching": BATCH_INSTRUCTION, "verses": [
+                {"verse": item["row"], "evidence": item["evidence"], "feedback": feedback.get(item["row"]["verse"], [])}
+                for item in pending]}, BATCH_DRAFT_SCHEMA, run / "draft")
+            offered = {draft.get("verse"): draft for draft in drafts["verses"]}
+            decided, rejected = {}, {}
+            for item in pending:
+                key = item["row"]["verse"]
+                try:
+                    raw = offered[key]
+                    draft = separate_units(raw)
+                    if draft != raw:
+                        save(run / ("separated-units-" + key.replace(":", "-") + ".json"), draft)
+                    mapped = candidate(item["row"], draft, item["binding"], item["evidence"], model)
+                    if draft != raw:
+                        mapped["unit_separation"] = {"raw_draft_sha256": ledger.digest(ledger.encoded(raw)),
+                            "policy": "Split contiguous contributor portions; all meaning/owner decisions unchanged"}
+                    decided[key] = (draft, mapped)
+                except (KeyError, ValueError, TypeError) as error:
+                    rejected[key] = [str(error)]
+            reviews = call({"stage": "review", "batching": BATCH_INSTRUCTION, "verses": [
+                {"verse": item["row"], "decisions": decided[item["row"]["verse"]][0]}
+                for item in pending if item["row"]["verse"] in decided]},
+                BATCH_REVIEW_SCHEMA, run / "review") if decided else {"verses": []}
+            verdicts = {review.get("verse"): review for review in reviews["verses"]}
+            for key, (draft, mapped) in decided.items():
+                verdict = verdicts.get(key, {})
+                approved = verdict.get("approved") is True and isinstance(verdict.get("issues"), list) \
+                    and not verdict["issues"]
+                if not approved:
+                    rejected[key] = verdict.get("issues") or ["Critique withheld approval"]
+                    continue
+                for token in mapped["tokens"]:
+                    token["review"]["evidence"].append(f"fresh critique sha256:{ledger.digest(ledger.encoded(verdict))}")
+                mapped["automation"] = {"policy_sha256": BATCH_POLICY,
+                    "rubric_sha256": ledger.digest(RUBRIC.read_text().encode()),
+                    "model": model, "reasoning_effort": REASONING, "independent_gold": False,
+                    "raw_draft_sha256": ledger.digest(ledger.encoded(offered[key])),
+                    "critique_sha256": ledger.digest(ledger.encoded(verdict))}
+                states[key].update(status="model_reviewed", row=mapped, issues=[])
+        except ModelUnavailableError as error:
+            for item in pending:
+                states[item["row"]["verse"]].update(provider_unavailable=True, issues=[str(error)])
+            save(state_path, states)
+            return states
+        except (ValueError, KeyError, TypeError, subprocess.SubprocessError, OSError) as error:
+            feedback = {item["row"]["verse"]: [str(error)] for item in pending}
+            save(state_path, states)
+            continue
+        for key, issues in rejected.items():
+            states[key]["issues"] = issues
+            feedback[key] = issues
+        pending = [item for item in pending if states[item["row"]["verse"]]["status"] != "model_reviewed"]
+        save(state_path, states)
+        if not pending:
+            break
+    return states
+
+
+BATCH_POLICY = ledger.digest(ledger.encoded([
+    inspect.getsource(review_batch), BATCH_INSTRUCTION, BATCH_DRAFT_SCHEMA, BATCH_REVIEW_SCHEMA,
+    REVIEW_POLICY, REASONING, Path(ledger.__file__).read_text(),
     Path(__file__).with_name("english_alignment_evidence.py").read_text(),
 ]))
 
@@ -428,6 +543,8 @@ def main():
                         help="risky: only verses whose baseline leaves an Arabic word unowned, plus the audit sample")
     parser.add_argument("--audit-rate", type=float, default=0.1,
                         help="Share of baseline-covered verses still reviewed to bound their error rate")
+    parser.add_argument("--batch", type=int, default=6,
+                        help="Verses per paid draft/critique pair; 1 keeps the per-verse stage cache")
     parser.add_argument("--workers", type=int, default=2, help="1–4 concurrent verse reviews; canonical fetches remain serial")
     args = parser.parse_args()
     work = args.work_dir.resolve()
@@ -444,6 +561,7 @@ def main():
     ledger.require(1 <= args.attempts <= 3 and 1 <= args.timeout <= 1800, "Invalid retry/timeout budget")
     ledger.require(args.max_verses is None or args.max_verses > 0, "--max-verses must be positive")
     ledger.require(0 <= args.audit_rate <= 1, "--audit-rate must be a share of verses")
+    ledger.require(1 <= args.batch <= 8, "--batch must keep one call's verse set reviewable")
     ledger.require(1 <= args.workers <= 4, "--workers must be 1–4")
     cancelled = Event()
     def interrupt(signum, frame):
@@ -524,40 +642,50 @@ def main():
         def collect():
             completed, _ = wait(pending_jobs, return_when=FIRST_COMPLETED)
             for future in completed:
-                key = pending_jobs.pop(future)
-                checkpoint(key, future.result())
+                pending_jobs.pop(future)
+                for key, state in future.result().items():
+                    checkpoint(key, state)
 
+        call = lambda payload, output, dest: cached_model_call(payload, output, dest, args.model, args.timeout, cancelled, usage_wait)
+        groups = [queue[index:index + args.batch] for index in range(0, len(queue), args.batch)]
         with ThreadPoolExecutor(max_workers=args.workers) as pool:
-            for key in queue:
-                row = rows[key]
+            for group in groups:
+                items = []
                 if args.max_verses is not None and processed >= args.max_verses:
                     break
-                if states.get(key, {}).get("origin") == "prior_ai_review" and not args.refresh_reviewed:
-                    checkpoint(key, states[key])
+                for key in group:
+                    row = rows[key]
+                    if states.get(key, {}).get("origin") == "prior_ai_review" and not args.refresh_reviewed:
+                        checkpoint(key, states[key])
+                        continue
+                    try:
+                        usage_wait.wait()
+                        old_state = states.get(key, {})
+                        evidence = (stored_evidence(work, row) if old_state.get("status") == "model_reviewed" else None) \
+                            or fetch_evidence(client, row, work / "evidence", args.tafsir)
+                        items.append({"row": row, "binding": manifest["verses"][key], "evidence": evidence,
+                                      "directory": work / "jobs" / key.replace(":", "-")})
+                    except (ValueError, OSError, KeyError) as error:
+                        checkpoint(key, {"verse": key, "status": "held", "issues": [str(error)]})
+                        processed += 1
+                if not items:
                     continue
-                try:
-                    usage_wait.wait()
-                    old_state = states.get(key, {})
-                    evidence = (stored_evidence(work, row) if old_state.get("status") == "model_reviewed" else None) \
-                        or fetch_evidence(client, row, work / "evidence", args.tafsir)
-                    directory = work / "jobs" / key.replace(":", "-")
-                    if old_state.get("provider_unavailable") or (args.retry_held and old_state.get("status") == "held"):
-                        old = directory / (states[key].get("input_sha256", "") + ".json")
-                        if old.exists():
-                            import time
-                            suffix = f".held-{time.time_ns()}"
-                            old.rename(old.with_suffix(suffix + ".json"))
-                            runs = old.with_suffix("")
-                            if runs.exists():
-                                runs.rename(runs.with_name(runs.name + suffix))
-                    call = lambda payload, output, dest: cached_model_call(payload, output, dest, args.model, args.timeout, cancelled, usage_wait)
-                    cached = (directory / (job_signature(row, manifest["verses"][key], evidence, args.model) + ".json")).exists()
-                    future = pool.submit(review_verse, row, manifest["verses"][key], evidence, directory, args.model, args.attempts, call)
-                    pending_jobs[future] = key
-                    processed += not cached
-                except (ValueError, OSError, KeyError) as error:
-                    checkpoint(key, {"verse": key, "status": "held", "issues": [str(error)]})
-                    processed += 1
+                signature = batch_signature(items, args.model)
+                directory = batch_directory(work, items, args.model)
+                state_path = state_path_of(items, signature, directory, args.model)
+                if any(states.get(item["row"]["verse"], {}).get("provider_unavailable")
+                       or (args.retry_held and states.get(item["row"]["verse"], {}).get("status") == "held")
+                       for item in items) and state_path.exists():
+                    import time
+                    suffix = f".held-{time.time_ns()}"
+                    state_path.rename(state_path.with_suffix(suffix + ".json"))
+                    runs = directory / signature
+                    if runs.exists():
+                        runs.rename(runs.with_name(runs.name + suffix))
+                cached = state_path.exists()
+                pending_jobs[pool.submit(review_batch, items, signature, directory, args.model,
+                                         args.attempts, call)] = items
+                processed += 0 if cached else len(items)
                 if len(pending_jobs) >= args.workers:
                     collect()
             while pending_jobs:
@@ -572,7 +700,9 @@ def main():
                 accepted.append(state["row"])
                 continue
             evidence = json.loads((work / "evidence" / (key.replace(":", "-") + ".json")).read_text())
-            if state["input_sha256"] == job_signature(rows[key], manifest["verses"][key], evidence, state["model"]):
+            signed = {job_signature(rows[key], manifest["verses"][key], evidence, state["model"], policy)
+                      for policy in (REVIEW_POLICY, BATCH_POLICY)}
+            if state["input_sha256"] in signed:
                 accepted.append(state["row"])
             else:
                 state.update(status="held", issues=["Review inputs or policy changed; rerun this chapter"])
