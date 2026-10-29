@@ -80,6 +80,14 @@ internal fun PlaybackPositionEvents.afterDiscontinuity(
 )
 
 /**
+ * Media3 reports a playlist replacement only when an old timeline existed, so
+ * the first load after launch would keep the old ink and a word tap waiting
+ * for its new performance would wait out its confirmation timeout instead.
+ */
+internal fun PlaybackPositionEvents.afterFirstPlaylist(positionMs: Long): PlaybackPositionEvents =
+    afterDiscontinuity(Player.DISCONTINUITY_REASON_REMOVE, itemChanged = true, positionMs = positionMs)
+
+/**
  * Same-verse silence seeks that must not restart the letter wash.
  * Matched by landing position so a word tap or a verse change cannot consume
  * the mark, and a mark cannot keep the ink of a different jump.
@@ -444,7 +452,13 @@ class PlayerController(private val context: Context) {
         withController(epoch, holdSilenceSkip = true) { c ->
             val startPos = if (queue.startIndex == 0 && queue.hasBasmalahLeadIn) 0L
             else startPositionMs
+            val firstPlaylist = c.currentTimeline.isEmpty
             c.setMediaItems(queue.items, queue.startIndex, startPos)
+            if (firstPlaylist) {
+                _state.value = _state.value.copy(
+                    positionEvents = _state.value.positionEvents.afterFirstPlaylist(startPos),
+                )
+            }
             // A quiet load must not inherit play intent from the old queue.
             c.playWhenReady = autoplay
             c.prepare()

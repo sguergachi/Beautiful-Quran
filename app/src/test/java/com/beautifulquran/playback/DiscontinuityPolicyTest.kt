@@ -79,6 +79,17 @@ class DiscontinuityPolicyTest {
         assertEquals(1_951L, landed.positionMs)
     }
     @Test
+    fun `the first playlist after launch starts a new ink performance`() {
+        // A cold word tap seeds inkId + 1 and waits for exactly that performance.
+        val loaded = PlaybackPositionEvents().afterFirstPlaylist(positionMs = 640L)
+
+        assertEquals(1L, loaded.inkId)
+        assertEquals(1L, loaded.clockId)
+        assertTrue(loaded.itemChanged)
+        assertEquals(640L, loaded.positionMs)
+    }
+
+    @Test
     fun `manual seek clears a silence mark even at the same landing`() {
         val ink = SilenceInk()
         ink.arm(4283)
