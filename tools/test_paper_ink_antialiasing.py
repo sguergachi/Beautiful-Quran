@@ -13,11 +13,17 @@ from scipy.ndimage import distance_transform_edt
 
 import build_paper_ink_study as geometry
 from paper_ink_outline import outline_distance
-from paper_ink_substrate import substrate
+from paper_ink_substrate import paper
 
 ROOT = Path(__file__).resolve().parents[1]
 SOURCE = (ROOT / 'app/src/main/assets/paper-ink/ink.agsl').read_text()
 PLAIN_SOURCE = SOURCE.replace('organicPooling(p, filmWet, unit, distance, coverageAA)', 'weight * filmWet')
+DENSITY_CALL = 'fibreDensity(fibre.g, taper, 0.55 * dryingRing(wetness))'
+CREEP_CALL = 'fibreCreep(depositAge, wetness)'
+RING_CALL = '0.55 * dryingRing(wetness)'
+EDGE_RING = '0.6 * dryingRing(wetness) * edge'
+for _hook in (DENSITY_CALL, CREEP_CALL, EDGE_RING):
+    assert _hook in SOURCE, _hook
 FAINT_SOURCE = SOURCE.replace('min(weight * 0.6, 0.6 * scale)', 'min(weight * 0.12, 0.12 * scale)')
 # Same material, sampled directly. At high resolution, this integrates the
 # pixel area independently of the production eight-tap approximation.
@@ -75,10 +81,12 @@ def word(text, font, size, rtl, letters):
     coverage = np.rint(alpha.reshape(h, scale, w, scale).mean(axis=(1, 3)) * 255).astype('uint8')
     normals[:, :, 2] = coverage
     children = {}
-    for name, data in [('field', field), ('normals', normals),
-                       ('substrate', substrate(w, h, size / 160, text))]:
+    for name, data in [('field', field), ('normals', normals)]:
         children[name] = skia.Image.fromarray(data, colorType=skia.ColorType.kRGBA_8888_ColorType).makeRawShader(
             samplingOptions=skia.SamplingOptions(skia.FilterMode.kLinear))
+    # The shared paper repeats, as the app's BitmapShader does.
+    children['substrate'] = skia.Image.fromarray(paper(), colorType=skia.ColorType.kRGBA_8888_ColorType).makeRawShader(
+        skia.TileMode.kRepeat, skia.TileMode.kRepeat, skia.SamplingOptions(skia.FilterMode.kLinear))
     return dict(width=w, height=h, unit=size / 160, duration=duration, children=children, coverage=coverage)
 
 
@@ -103,7 +111,8 @@ class PaperInkAntialiasingTest(unittest.TestCase):
             weight=.875 * word['unit'], aa=.9 / resolution,
             dryInk=[52/255, 50/255, 46/255], wetInk=[6/255, 7/255, 8/255], unreadAlpha=.2661,
             repeatColor=[194/255, 95/255, 59/255], repeatPass=0., repeatTint=0., spreadMethod=0.,
-            letterDuration=word['duration'], lead=1., leadEntry=0., origin=[0., 0.], evaporation=0.)
+            letterDuration=word['duration'], lead=1., leadEntry=0., origin=[0., 0.], evaporation=0.,
+            fibreOffset=[0., 0.])
         uniforms.update(values)
         for name, value in uniforms.items():
             builder.setUniform(name, value)
@@ -274,7 +283,7 @@ class PaperInkAntialiasingTest(unittest.TestCase):
 
     def test_fibre_adds_only_bounded_connected_support_and_coupled_density(self):
         from scipy.ndimage import label
-        coverage_source = SOURCE.replace('mix(0.5, 1.0, fibre.g) * mix(0.35, 1.0, taper)', '1.0')
+        coverage_source = SOURCE.replace(DENSITY_CALL, '1.0')
         self.effects['coverage_only'] = skia.RuntimeEffect.MakeForShader(coverage_source)
         for specimen in self.words:
             for amount in (.28, 1.):
@@ -283,7 +292,10 @@ class PaperInkAntialiasingTest(unittest.TestCase):
                     options = dict(weight=weight, fibreFringe=1., spreadMethod=method, reflectionStrength=0.)
                     actual = self.render(specimen, **options)
                     coverage_only = self.render(specimen, 'coverage_only', **options)
-                    upper = self.render(specimen, 'plain', **dict(options, weight=weight * 1.8, fibreFringe=0.))
+                    # No fibre carries the film past the plain paper tooth's envelope,
+                    # which keeps small type's optical attenuation.
+                    reach = weight + min(weight * .6, .6 * specimen['unit'])
+                    upper = self.render(specimen, 'plain', **dict(options, weight=reach, fibreFringe=0.))
                     base = specimen['coverage']
                     alpha = actual[:, :, 3].astype(int)
                     self.assertTrue((alpha >= base).all())
@@ -301,6 +313,50 @@ class PaperInkAntialiasingTest(unittest.TestCase):
                             dict(progress=0., retained=0., leadEntry=1.)):
                 np.testing.assert_array_equal(self.render(specimen, fibreFringe=1., **options),
                                               self.render(specimen, fibreFringe=0., **options))
+
+    def test_each_placement_reads_its_own_patch_of_paper(self):
+        for specimen in self.words:
+            options = dict(weight=3.5 * specimen['unit'], fibreFringe=1., reflectionStrength=0.)
+            here = self.render(specimen, **options)
+            there = self.render(specimen, **dict(options, fibreOffset=[313., 97.]))
+            self.assertTrue((here != there).any())
+            # A whole tile away is the same paper: the tile wraps without a seam.
+            np.testing.assert_array_equal(here, self.render(specimen, **dict(options, fibreOffset=[720., -720.])))
+            for dry in (dict(wet=0.), dict(progress=-1., retained=0.)):
+                np.testing.assert_array_equal(self.render(specimen, **dict(options, **dry)),
+                                              self.render(specimen, **dict(options, fibreOffset=[313., 97.], **dry)))
+
+    def test_fibre_fringe_creeps_out_after_the_ink_lands(self):
+        self.effects['no_creep'] = skia.RuntimeEffect.MakeForShader(SOURCE.replace(CREEP_CALL, '1.0'))
+        for specimen in self.words:
+            options = dict(weight=3.5 * specimen['unit'], fibreFringe=1., reflectionStrength=0., retained=0.)
+            for progress in (.35, .7, 1.):
+                actual = self.render(specimen, progress=progress, **options)[:, :, 3].astype(int)
+                full = self.render(specimen, 'no_creep', progress=progress, **options)[:, :, 3].astype(int)
+                self.assertTrue((actual <= full + 1).all())
+                self.assertTrue((actual < full).any())
+            # Once the word starts drying its last letters finish creeping.
+            dried_in = dict(options, wet=.5)
+            np.testing.assert_array_equal(self.render(specimen, **dried_in),
+                                          self.render(specimen, 'no_creep', **dried_in))
+
+    def test_drying_film_briefly_darkens_its_contact_line(self):
+        source = SOURCE.replace(RING_CALL, '0.0').replace(EDGE_RING, '0.0')
+        self.effects['no_ring'] = skia.RuntimeEffect.MakeForShader(source)
+        paper_rgb = np.array([250, 243, 232], dtype=float)
+        def luminance(rgba):
+            rgb = rgba[:, :, :3] + paper_rgb * (1 - rgba[:, :, 3:4] / 255)
+            return rgb @ np.array([.2126, .7152, .0722])
+        for specimen in self.words:
+            options = dict(weight=3.5 * specimen['unit'], fibreFringe=1., reflectionStrength=0.)
+            ring = luminance(self.render(specimen, wet=.45, **options))
+            plain = luminance(self.render(specimen, 'no_ring', wet=.45, **options))
+            self.assertTrue((ring <= plain + .5).all())
+            self.assertGreater((plain - ring).max(), 8.)
+            # Wet and dry endpoints are untouched.
+            for wet in (0., 1.):
+                np.testing.assert_array_equal(self.render(specimen, wet=wet, **options),
+                                              self.render(specimen, 'no_ring', wet=wet, **options))
 
     def test_final_word_fills_every_letter_without_a_retained_base(self):
         closing = word('ٱلۡمُسۡرِفِينَ', geometry.ARABIC_FONT, 80, True, 8)

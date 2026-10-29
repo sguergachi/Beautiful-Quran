@@ -1706,7 +1706,7 @@ private fun MutableList<ShapedWordBloom>.addShapedInkMotionBlooms(
                 ),
             )
         } else if (firstLive >= 0 && index > firstLive && index <= firstLive + PAPER_INK_WARM_AHEAD) {
-            add(ShapedWordBloom.PaperInkWarm(range, InkEngine.tuning.paperInkFibreFringe))
+            add(ShapedWordBloom.PaperInkWarm(range))
         }
         if (paperInk != null && motion.paperInkLive) {
             return@forEachIndexed

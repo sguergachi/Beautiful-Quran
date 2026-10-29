@@ -108,7 +108,7 @@ data class InkLabSnapshot(
     val paperInkReflection: Float = 0.5f,
     val paperInkLeadFade: Float = 0.5f,
     val paperInkFlowing: Boolean = false,
-    val paperInkFibreFringe: Boolean = false,
+    val paperInkFibreFringe: Boolean = true,
     val guideBodyEdge: Float = 0.5f,
     val guideFeatherWidth: Float = 0.2819f,
     val guideFadeSoftness: Float = 1.3329f,
@@ -207,8 +207,11 @@ data class InkLabSnapshot(
          * 6: match old default verse fades to chrome; preserve custom fade auditions.
          * 7: adopt 0.28 pooling for old stock profiles; retire the softness dial.
          * 8: raise the old stock recording-drama threshold from 50% to 53%.
+         * 9: the fibre fringe ships on. Before this it was an off-by-default
+         *    experiment, so an old save's "off" is the old default, not a
+         *    choice; an "off" saved from 9 on is kept.
          */
-        const val SCHEMA = 8
+        const val SCHEMA = 9
 
         private val json = Json {
             ignoreUnknownKeys = true
@@ -324,10 +327,13 @@ data class InkLabSnapshot(
                     paperInkPooling = fades.paperInkPooling.takeUnless { it == 0.25f }
                         ?: shipped.paperInkPooling,
                 )
-                if (saved.schema >= SCHEMA) pooling else pooling.copy(
-                    schema = SCHEMA,
+                val drama = if (saved.schema >= 8) pooling else pooling.copy(
                     tarjiMinDrama = pooling.tarjiMinDrama.takeUnless { it == 0.5f }
                         ?: shipped.tarjiMinDrama,
+                )
+                if (saved.schema >= SCHEMA) drama else drama.copy(
+                    schema = SCHEMA,
+                    paperInkFibreFringe = shipped.paperInkFibreFringe,
                 )
             }
     }

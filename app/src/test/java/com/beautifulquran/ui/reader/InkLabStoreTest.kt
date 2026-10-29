@@ -23,7 +23,7 @@ class InkLabStoreTest {
         assertEquals(1.4185f, ink.cruiseCap, 0.0001f)
         assertEquals(0.3f, ink.holdCreep, 0.0001f)
         assertEquals(0.28f, ink.paperInkPooling, 0f)
-        assertEquals(false, ink.paperInkFibreFringe)
+        assertEquals(true, ink.paperInkFibreFringe)
         assertEquals(0.53f, ink.tarjiMinDrama, 0f)
 
         val guide = ContextualGuideTuning()
@@ -45,13 +45,24 @@ class InkLabStoreTest {
     }
 
     @Test
-    fun missingFibreExperimentStaysOffAndImportedChoiceSurvives() {
-        assertEquals(false, InkLabSnapshot.decode("{}")!!.paperInkFibreFringe)
-        val saved = InkLabSnapshot(paperInkFibreFringe = true)
-        val restored = InkLabSnapshot.decode(InkLabSnapshot.encode(saved))!!
-        assertEquals(saved, restored)
-        assertEquals(true, restored.toTuning().paperInkFibreFringe)
-        assertEquals(true, InkLabSnapshot.capture(restored.toTuning()).paperInkFibreFringe)
+    fun fibreFringeShipsOnAndAChoiceMadeSinceSurvives() {
+        assertEquals(true, InkLabSnapshot.decode("{}")!!.paperInkFibreFringe)
+        val off = InkLabSnapshot(paperInkFibreFringe = false)
+        val restored = InkLabSnapshot.decode(InkLabSnapshot.encode(off))!!
+        assertEquals(off, restored)
+        assertEquals(false, restored.toTuning().paperInkFibreFringe)
+        assertEquals(false, InkLabSnapshot.capture(restored.toTuning()).paperInkFibreFringe)
+    }
+
+    @Test
+    fun oldExperimentOff_adoptsTheShippedFringeWithoutTouchingOtherKnobs() {
+        // Before 9 the fringe was an off-by-default experiment: "off" was the default.
+        val saved = InkLabSnapshot(schema = 8, paperInkFibreFringe = false,
+            tarjiMinDrama = 0.5f, paperInkPooling = 0.25f, scrollLeadMs = 444)
+        val migrated = InkLabSnapshot.decode(InkLabSnapshot.encode(saved))!!
+        assertEquals(saved.copy(schema = InkLabSnapshot.SCHEMA, paperInkFibreFringe = true), migrated)
+        val turnedOff = migrated.copy(paperInkFibreFringe = false)
+        assertEquals(turnedOff, InkLabSnapshot.decode(InkLabSnapshot.encode(turnedOff)))
     }
 
     @Test

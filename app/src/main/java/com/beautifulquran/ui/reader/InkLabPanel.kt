@@ -127,7 +127,7 @@ fun InkLabPanel(
                         TuningToggle("Fibre fringe", t.paperInkFibreFringe) {
                             InkEngine.tuning = t.copy(paperInkFibreFringe = it)
                         }
-                        LabCaption("Experimental wet edge. Restart playback to compare; dry type stays unchanged.")
+                        LabCaption("Paper fibres shape the wet edge as it soaks in and dries. Dry type stays unchanged.")
                         TuningSlider("Ink pooling", t.paperInkPooling, 0f..1f) {
                             InkEngine.tuning = t.copy(paperInkPooling = it)
                         }

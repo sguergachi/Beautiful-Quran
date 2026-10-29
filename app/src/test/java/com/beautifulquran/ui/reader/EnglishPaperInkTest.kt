@@ -74,9 +74,9 @@ class EnglishPaperInkTest {
     }
 
     @Test fun `warming uses printed fields while Arabic blooms keep their identity`() {
-        val warm = englishPaperInkBlooms(listOf(ShapedWordBloom.PaperInkWarm(owner, fibreFringe = true)), bounds)
+        val warm = englishPaperInkBlooms(listOf(ShapedWordBloom.PaperInkWarm(owner)), bounds)
         assertEquals(listOf(0..1, 3..4, 6..9), warm.map { it.range })
-        assertTrue(warm.all { (it as ShapedWordBloom.PaperInkWarm).fibreFringe })
+        assertTrue(warm.all { it is ShapedWordBloom.PaperInkWarm })
         val arabic = ShapedWordBloom.PaperInk(20..24, frame, emptyList())
         assertTrue(englishPaperInkBlooms(listOf(arabic), bounds).single() === arabic)
         assertTrue(!arabic.frame.fadeLeadOnEntry)

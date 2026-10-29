@@ -65,6 +65,12 @@ object PaperInk {
         val rtl: Boolean,
         /** Letters to pace across when the text has none of its own (QCF glyph codes). */
         val letterCount: Int = 0,
+        /**
+         * Where on the page this occurrence sits, as a stable identity: picks
+         * its patch of the shared paper, so a word printed twice does not
+         * bleed in the same shape. Any value is valid; equal values share paper.
+         */
+        val placement: Int = 0,
     )
 
     /** The live values one frame of a word needs, all from its InkMotion. */
@@ -90,15 +96,14 @@ object PaperInk {
         val underWet: Float = 0f,
         /** English words start unread; their lead fades in on their own clock. */
         val fadeLeadOnEntry: Boolean = false,
-        /** Opt-in lab material; the ordinary contact line is the default. */
-        val fibreFringe: Boolean = false,
+        /** The paper's fibres shape the wet contact line; off draws the plain paper tooth. */
+        val fibreFringe: Boolean = true,
     )
 
     /** A generated word, ready to draw. */
     class Word internal constructor(
         val arrival: Bitmap,
         val normals: Bitmap,
-        val substrate: Bitmap?,
         val erase: Bitmap,
         /** Host offset of the textures' top-left from the layout origin's integer cell. */
         val padX: Int,
@@ -108,11 +113,13 @@ object PaperInk {
     ) {
         val width: Int get() = normals.width
         val height: Int get() = normals.height
-        internal val bytes: Int get() = arrival.byteCount + normals.byteCount + erase.byteCount + (substrate?.byteCount ?: 0)
+        internal val bytes: Int get() = arrival.byteCount + normals.byteCount + erase.byteCount
         internal var shader: Any? = null
+        /** Whether [shader] samples the shared paper yet, not its placeholder. */
+        internal var paperBound = false
     }
 
-    private data class Key(val input: TextLayoutInput, val phaseX: Int, val phaseY: Int, val fibreFringe: Boolean)
+    private data class Key(val input: TextLayoutInput, val phaseX: Int, val phaseY: Int)
 
     private val cache = object : LruCache<Key, Word>(CACHE_BYTES) {
         override fun sizeOf(key: Key, value: Word): Int = value.bytes
@@ -137,10 +144,13 @@ object PaperInk {
      * this subscribes the caller's draw to [generation]. Captures are rationed
      * per frame so warming a verse never stalls one.
      */
-    fun word(source: Source, fibreFringe: Boolean = false): Word? {
+    fun word(source: Source): Word? {
         if (!supported || shaderSource == null) return null
         generation.intValue
-        val key = key(source, fibreFringe)
+        // Warming a verse is the first sign of ink to come: start the paper
+        // now, so the fibres are ready before the voice reaches it.
+        paper()
+        val key = key(source)
         cache.get(key)?.let { return it }
         if (key in pending) return null
         val now = SystemClock.uptimeMillis()
@@ -153,7 +163,7 @@ object PaperInk {
         val capture = capture(source) ?: return null
         pending += key
         worker.execute {
-            val word = runCatching { generate(capture, fibreFringe) }.getOrNull()
+            val word = runCatching { generate(capture) }.getOrNull()
             main.post {
                 pending -= key
                 if (word != null) cache.put(key, word)
@@ -163,10 +173,55 @@ object PaperInk {
         return null
     }
 
-    private fun key(source: Source, fibreFringe: Boolean): Key {
+    private fun key(source: Source): Key {
         val fx = source.originX - floor(source.originX)
         val fy = source.originY - floor(source.originY)
-        return Key(source.layout.layoutInput, (fx * PHASES).roundToInt() % PHASES, (fy * PHASES).roundToInt() % PHASES, fibreFringe)
+        return Key(source.layout.layoutInput, (fx * PHASES).roundToInt() % PHASES, (fy * PHASES).roundToInt() % PHASES)
+    }
+
+    private var nextPlacement = 0
+
+    /** A fresh [Source.placement] for a word node that has no page position of its own. */
+    fun nextPlacement(): Int = ++nextPlacement
+
+    @Volatile private var paper: Bitmap? = null
+    private var paperRequested = false
+    private var paperShader: android.graphics.BitmapShader? = null
+
+    /**
+     * The shared paper tile, or null while it is first made in the background
+     * (once per process, started when paper ink first warms a word, whether
+     * or not the fringe is on). Words drawn meanwhile use the plain paper tooth.
+     */
+    private fun paper(): android.graphics.BitmapShader? {
+        paperShader?.let { return it }
+        paper?.let { tile ->
+            return android.graphics.BitmapShader(
+                tile, android.graphics.Shader.TileMode.REPEAT, android.graphics.Shader.TileMode.REPEAT,
+            ).apply { filterMode = android.graphics.BitmapShader.FILTER_MODE_LINEAR }.also { paperShader = it }
+        }
+        if (!paperRequested) {
+            paperRequested = true
+            // Its own thread: about half a second of work, once, that must not
+            // hold up the fields of the words about to be read.
+            Thread({
+                Process.setThreadPriority(Process.THREAD_PRIORITY_BACKGROUND)
+                val started = SystemClock.elapsedRealtime()
+                val tile = runCatching {
+                    Bitmap.createBitmap(
+                        PaperInkSubstrate.tile(), PaperInkSubstrate.TILE, PaperInkSubstrate.TILE,
+                        Bitmap.Config.ARGB_8888,
+                    )
+                }.getOrNull()
+                val tookMs = SystemClock.elapsedRealtime() - started
+                main.post {
+                    com.beautifulquran.DevProfiling.mark("paperTile ready=${tile != null} ${tookMs}ms")
+                    paper = tile
+                    generation.intValue++
+                }
+            }, "PaperInkPaper").start()
+        }
+        return null
     }
 
     private class Capture(
@@ -183,7 +238,6 @@ object PaperInk {
         val padX: Int,
         val padY: Int,
         val letterCount: Int,
-        val materialSeed: Int,
     )
 
     private fun capture(source: Source): Capture? {
@@ -250,7 +304,6 @@ object PaperInk {
             padX = padX,
             padY = padY,
             letterCount = if (letters.isEmpty()) source.letterCount else letters.size,
-            materialSeed = text.hashCode(),
         )
     }
 
@@ -259,7 +312,7 @@ object PaperInk {
         if (rtl) TajweedPacing.letterOffsets(text)
         else text.indices.filter { text[it].isLetterOrDigit() }.toIntArray()
 
-    private fun generate(c: Capture, fibreFringe: Boolean): Word? {
+    private fun generate(c: Capture): Word? {
         val result = PaperInkField.generate(
             c.alpha, c.width, c.height, SCALE, c.centers, c.baseline, c.rtl, c.fontPx, c.letterCount,
         ) ?: return null
@@ -294,11 +347,7 @@ object PaperInk {
         val normals = Bitmap.createBitmap(normalPixels, w, h, Bitmap.Config.ARGB_8888)
         val erase = Bitmap.createBitmap(w, h, Bitmap.Config.ALPHA_8)
         erase.copyPixelsFromBuffer(ByteBuffer.wrap(paperInkEraseMask(c.coverage)))
-        val substrate = if (fibreFringe) Bitmap.createBitmap(
-            PaperInkSubstrate.generate(w, h, c.fontPx / 160f, c.materialSeed),
-            w, h, Bitmap.Config.ARGB_8888,
-        ) else null
-        return Word(field, normals, substrate, erase, c.padX, c.padY, result.letterDuration, c.fontPx / 160f)
+        return Word(field, normals, erase, c.padX, c.padY, result.letterDuration, c.fontPx / 160f)
     }
 
     private val erasePaint = android.graphics.Paint().apply {
@@ -338,6 +387,14 @@ object PaperInk {
             shader.setFloatUniform("leadEntry", if (frame.fadeLeadOnEntry) 1f else 0f)
             shader.setFloatUniform("spreadMethod", if (frame.flowing) 1f else 0f)
             shader.setFloatUniform("origin", left / word.unit, top / word.unit)
+            val paper = if (frame.fibreFringe) paper() else null
+            if (paper != null && !word.paperBound) {
+                shader.setInputBuffer("substrate", paper)
+                word.paperBound = true
+            }
+            shader.setFloatUniform("fibreFringe", if (paper != null) 1f else 0f)
+            val offset = paperInkFibreOffset(source.placement)
+            shader.setFloatUniform("fibreOffset", offset.first, offset.second)
             inkPaint.shader = shader
             native.save()
             native.translate(left, top)
@@ -356,10 +413,12 @@ object PaperInk {
         shader.setInputBuffer("normals", android.graphics.BitmapShader(
             word.normals, android.graphics.Shader.TileMode.CLAMP, android.graphics.Shader.TileMode.CLAMP,
         ).apply { filterMode = android.graphics.BitmapShader.FILTER_MODE_LINEAR })
+        // Placeholder until the shared paper is bound in [drawWord]; unread
+        // while fibreFringe is 0.
         shader.setInputBuffer("substrate", android.graphics.BitmapShader(
-            word.substrate ?: word.normals, android.graphics.Shader.TileMode.CLAMP, android.graphics.Shader.TileMode.CLAMP,
-        ).apply { filterMode = android.graphics.BitmapShader.FILTER_MODE_LINEAR })
-        shader.setFloatUniform("fibreFringe", if (word.substrate != null) 1f else 0f)
+            word.normals, android.graphics.Shader.TileMode.CLAMP, android.graphics.Shader.TileMode.CLAMP,
+        ))
+        shader.setFloatUniform("fibreFringe", 0f)
         shader.setFloatUniform("fieldScale", SCALE.toFloat())
         shader.setFloatUniform("unit", word.unit)
         shader.setFloatUniform("letterDuration", word.letterDuration)
@@ -371,4 +430,16 @@ object PaperInk {
     private const val PHASES = 8
     private const val CAPTURES_PER_FRAME = 3
     private const val CACHE_BYTES = 32 * 1024 * 1024
+}
+
+/**
+ * Where in the shared paper tile (reference px) the occurrence [placement]
+ * starts: well spread, so neighbouring placements land on unrelated fibres.
+ */
+internal fun paperInkFibreOffset(placement: Int): Pair<Float, Float> {
+    var h = placement * -0x61c88647
+    h = (h xor (h ushr 16)) * 0x45d9f3b
+    h = h xor (h ushr 16)
+    val tile = PaperInkSubstrate.TILE.toFloat()
+    return ((h and 0xFFFF) / 65536f * tile) to ((h ushr 16) / 65536f * tile)
 }

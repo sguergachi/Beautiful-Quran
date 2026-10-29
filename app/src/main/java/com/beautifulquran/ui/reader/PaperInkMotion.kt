@@ -146,6 +146,8 @@ internal class PaperInkNode {
     var drawing: Boolean = false
         private set
     private var latched = false
+    /** This node's patch of the shared paper, kept for as long as the node lives. */
+    private val placement = PaperInk.nextPlacement()
 
     fun Modifier.paperInkBase(motion: InkMotion, style: PaperInkStyle?, rtl: Boolean): Modifier =
         paperInkBase({ motion }, style, rtl)
@@ -167,8 +169,8 @@ internal class PaperInkNode {
                 return@drawWithContent
             }
             val frame = motion.paperInkFrame(style)
-            val source = layout?.let { PaperInk.Source(it, 0f, 0f, rtl, letterCount) }
-            val word = if (latched || source == null) null else PaperInk.word(source, frame.fibreFringe)
+            val source = layout?.let { PaperInk.Source(it, 0f, 0f, rtl, letterCount, placement) }
+            val word = if (latched || source == null) null else PaperInk.word(source)
             if (word == null || source == null) {
                 if (frame.progress > PAPER_INK_NODE_LATCH || frame.wet > 0f) latched = true
                 drawing = false

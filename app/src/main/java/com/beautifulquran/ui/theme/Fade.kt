@@ -247,7 +247,7 @@ sealed class ShapedWordBloom {
     ) : ShapedWordBloom()
 
     /** Paper ink: generate this word's field ahead of its turn. Draws nothing. */
-    class PaperInkWarm(override val range: IntRange, val fibreFringe: Boolean = false) : ShapedWordBloom()
+    class PaperInkWarm(override val range: IntRange) : ShapedWordBloom()
 
     /** The Ink Lab's mark under a tarjīʿ candidate: a sparkline of the pulse
      * the word will be given ([drawPulseTrace]). Never drawn outside the lab. */
@@ -935,7 +935,7 @@ private class PaperInkBlooms(
             when (bloom) {
                 is ShapedWordBloom.PaperInkWarm -> {
                     source(bloom.range, layout, sharedLine)?.let {
-                        com.beautifulquran.ui.theme.paperink.PaperInk.word(it, bloom.fibreFringe)
+                        com.beautifulquran.ui.theme.paperink.PaperInk.word(it)
                     }
                 }
                 is ShapedWordBloom.PaperInk -> {
@@ -945,7 +945,7 @@ private class PaperInkBlooms(
                     val word = if (key in latched || source == null) {
                         null
                     } else {
-                        com.beautifulquran.ui.theme.paperink.PaperInk.word(source, bloom.frame.fibreFringe)
+                        com.beautifulquran.ui.theme.paperink.PaperInk.word(source)
                     }
                     if (capture != null) {
                         val choice = if (word != null) 2 else if (key in latched) 1 else 0
@@ -956,7 +956,7 @@ private class PaperInkBlooms(
                             com.beautifulquran.DevProfiling.recordEvent(
                                 "paper-field rtl=$rtl word=${text.substring(start, end).take(80)} range=${bloom.range} " +
                                     "progress=${bloom.frame.progress} shader=${word != null} " +
-                                    "fibre=${word?.substrate != null} latched=${key in latched}",
+                                    "fibre=${bloom.frame.fibreFringe} latched=${key in latched}",
                             )
                         }
                     }
@@ -1001,12 +1001,17 @@ private class PaperInkBlooms(
         val start = range.first.coerceIn(0, length)
         val endExclusive = (range.last + 1).coerceIn(start, length)
         if (endExclusive <= start) return null
+        // The host's text and the word's place in it: deterministic, and
+        // distinct for a word that recurs within the paragraph.
+        val placement = layout.layoutInput.text.text.hashCode() * 31 + start
         if (!sharedLine) {
-            return com.beautifulquran.ui.theme.paperink.PaperInk.Source(layout, 0f, 0f, rtl)
+            return com.beautifulquran.ui.theme.paperink.PaperInk.Source(layout, 0f, 0f, rtl, placement = placement)
         }
         val ink = wordInk.inkFor(layout, start, endExclusive, lineBounds.boundsFor(layout, start, endExclusive))
             ?: return null
-        return com.beautifulquran.ui.theme.paperink.PaperInk.Source(ink.layout, ink.offset.x, ink.offset.y, rtl)
+        return com.beautifulquran.ui.theme.paperink.PaperInk.Source(
+            ink.layout, ink.offset.x, ink.offset.y, rtl, placement = placement,
+        )
     }
 
     private fun rangeKey(range: IntRange): Long = (range.first.toLong() shl 32) or (range.last.toLong() and 0xFFFFFFFFL)

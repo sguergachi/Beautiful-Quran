@@ -201,63 +201,73 @@ stay intact. The study uses the same variation at its reference size.
 Grain is evaluated only where it can change the pooled contour's antialiasing
 band; the stroke interior and empty paper skip it. No extra texture is needed.
 
-### Fibre fringe experiment
+### Fibre fringe
 
-Ink Lab → Ink → **Fibre fringe** auditions a different surface-film material.
-It is **off by default**, including old profiles; the saved switch and Copy
-values include it. Restart playback after switching so the next words can
-prepare their fields. A word already washing in the fallback still finishes
-there. The baked study activity retains its existing reference material.
+Paper fibres shape the wet contact line. It is **on by default** (Ink Lab →
+Ink → **Fibre fringe**); off draws the plain paper tooth above. Ink Lab
+schema 9 moves saves from before the switch to on, because "off" was then the
+experiment's default rather than a choice; an "off" saved since is kept.
+Switching applies to the next frame. No word needs regenerating.
 
-`PaperInkSubstrate` prepares one deterministic 1× opaque ARGB texture on the
-existing background worker. R is a bounded wicking preference and G is its
-correlated pigment-density preference. The first straight-fibre prototype
-looked too digital to the user. The revised field rotates and gently warps
-its coordinates before combining broad pools, curved long fibres and a weak
-finer grain. This avoids a uniform straight lattice at the contact line.
-The field is word-local, seeded by the printed text and independent of time,
-playback generation, repeats, and scrolling. Its material choice participates
-in the existing layout/subpixel cache key. Explicit LINEAR raw-buffer sampling
-preserves data; neither existing field's alpha channel is repurposed.
+**The paper.** `PaperInkSubstrate` makes one seamless 720 × 720 tile in px of
+the 160 px reference font, once per process on the paper-ink worker (words
+drawn before it lands use the plain tooth). R is a bounded wicking preference,
+G its correlated pigment density. Broad pools, long curved fibres and a weak
+finer grain each run on an integer rotation of the tile, (2,1), (3,1) and
+(1,2), under a gentle warp. Every lattice period divides the tile along its
+rotated axes, so it wraps without a seam, and none of the grains lines up
+with the pixel grid (the first straight-fibre prototype read as digital).
 
-At each existing AA tap, the candidate contact line spreads by
-`weight × filmWet × mix(0.45, 1.8, wick)`. Only coverage beyond the original
-glyph receives correlated `mix(0.5, 1, density)` deposition, tapering toward
-35% of that strength at the outer contact line. This gives the added margin
-uneven, diluted pigment rather than flat-ended dark teeth. Original
-coverage is a floor, so no glyph is eroded. This fractional deposition changes
-the strength of the added pigment rather than darkening an already black
-core. The unchanged loading/entry, repeat-undercoat and evaporation masks then
-compose that material once. Exact dry, zero-pooling and unread endpoints,
-one-letter English entry, normals, reflection, timing and semantic owners are
-preserved. The fringe is an artistic transient film; real absorbed pigment
-would not retract to the pristine font on drying.
+**Each word reads its own patch.** The shader samples the tile at
+`p / unit + fibreOffset`, repeating. The offset comes from the word's
+`PaperInk.Source.placement`: the host paragraph's text and the word's start in
+it for shaped text, and a per-node counter for word nodes, held for the node's
+life. Without it every recurring word (English "the", "and"; ٱللَّهِ) bled in
+the same shape whenever two were wet at once. Placement never enters the
+field cache key: identical words still share one generated field.
 
-The optional bitmap adds 4 bytes per bounds pixel: roughly 19% over the usual
-21-byte raw footprint. It is included in the same 32 MiB cache budget and is
-not generated when the switch is off. A cache miss still uses the ordinary
-wash. This budget accounting is not a native GPU or frame-time result.
+**Soak, creep and dry.** At each existing AA tap the contact line spreads by
+`min(weight × mix(0.45, 1.8, wick), reach) × filmWet × creep`:
 
-`tools/compare_paper_ink_fringe.py OUTPUT` saves aligned, unamplified current,
-coupled, coverage-only and smooth paints with source digests. It calls the
-actual Kotlin field through `tools/paper_ink_substrate.py`. Fill positions use
-the same geometry, colors and reflection at pooling 0.28, with the optical
-correction at density 3/fontScale 1. Intrinsic raster pixels do not establish
-physical reading size on an arbitrary preview display. Initial software
-comparisons show a different, still subtle fringe, not accepted naturalness
-or a proven perceptual improvement. Native validation is blocked by the device
-controller's “Remote daemon is unavailable” error. The experiment must remain
-opt-in until actual reading-size appearance and native frame/cache cost are
-checked; no default-material promotion is implied by software tests or R8.
-Pass `--previous FROZEN_OUTPUT` to include the first prototype's original
-saved frames with the same masks, positions and optical correction. This
-comparison preserves both revisions instead of regenerating the old field
-with the new algorithm.
+- `reach` is the plain tooth's own envelope, `weight + min(0.6 weight,
+  0.6 unit)`, so small type keeps the optical attenuation `weight` carries
+  and the shader's early-out support is unchanged.
+- `creep` grows from 0.4 to 1 with the square root of the deposit's age over
+  about two letters: paper wicks quickly as ink lands, then slows. A word's
+  last letters finish creeping as its film begins to dry.
+- Only coverage beyond the original glyph receives `mix(0.5, 1, density)`
+  pigment, tapering to 35% at the outer contact line instead of ending each
+  fibre in a flat tooth.
+- While the film dries, pigment gathers at the contact line for a moment (a
+  coffee ring). `dryingRing` rises over the first third of the dry-down and
+  is gone before the end. It thickens the fringe's outer margin and holds wet
+  pigment along the glyph's own edge within two reference px.
+
+Original coverage is a floor, so no glyph is eroded. The ring is zero while
+wet and once dry. The unchanged loading/entry, repeat-undercoat and evaporation
+masks compose this material once. Exact dry, zero-pooling and unread
+endpoints, one-letter English entry, normals, reflection, timing and semantic
+owners are preserved. The fringe is an artistic transient film: real absorbed
+pigment would not retract to the pristine font on drying. The baked study
+activity keeps its existing reference material.
+
+**Cost.** One 2 MB tile per process, outside the 32 MiB word cache, made on
+its own thread; per-word fields carry no material bitmap. Taps outside the
+band a fibre can reach skip the paper. See [PERFORMANCE.md](PERFORMANCE.md)
+for the emulator frame measurements.
+
+`tools/compare_paper_ink_fringe.py OUTPUT` saves aligned, unamplified paints
+of the fringe, the plain tooth, a coverage-only control and a smooth control
+through the fill and the dry-down, including the same word at a second
+placement and at 24 px. It renders the production shader with the real
+Kotlin tile (`tools/paper_ink_substrate.py`), at pooling 0.28 with the
+optical correction at density 3/fontScale 1. These are software paints, not
+Android captures.
 
 ## Tuning
 
 Ink Lab → **Ink**: **Paper ink** (on), **Flowing ink** (off = Inside out),
-**Ink pooling** 0.28, **Reflection** 0.5, **Lead fade** 0.5
+**Fibre fringe** (on), **Ink pooling** 0.28, **Reflection** 0.5, **Lead fade** 0.5
 (one Arabic preview letter), and **Dry-down ms** 1,000. English retains its
 fixed one-letter preview within the current word. Dry-down edits the same
 saved value as Sweep → **Glitter time ms**, shared by glimmer and Paper ink.

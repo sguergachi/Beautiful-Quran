@@ -245,11 +245,16 @@ paints with:
 
 Settled inactive ayahs do **not** redraw continuously: their draw-scope state
 reads are static once the 400 ms recess/focus tween finishes.
-The optional Ink Lab fibre-fringe field is generated on the existing paper-ink
-worker and sampled at the existing wet AA taps. Its 1× RGBA bytes count toward
-the 32 MiB word cache; the default-off path creates no extra material bitmap.
-The experiment has software coverage evidence, not native GPU/frame or cache
-miss acceptance. See [PAPER_INK.md](PAPER_INK.md#fibre-fringe-experiment).
+The fibre fringe reads one shared 720 × 720 paper tile (2 MB, outside the
+32 MiB word cache), made once per process on its own background thread when
+paper ink first warms a word, so it never queues behind word fields. The
+tile took 0.59–0.88 s on the emulator (debug build). Only AA taps inside the
+band a fibre can reach sample it. On the emulator, four interleaved 40 s
+playback pairs (debug, 1080 × 2400, Al-Baqarah) kept the median frame at
+18 ms in most runs; p95/p99 were 21–25/25–31 ms with the fringe against
+18–22/21–28 ms without, a tail cost of roughly 2–3 ms within run-to-run
+noise. That is not a Pixel measurement.
+See [PAPER_INK.md](PAPER_INK.md#fibre-fringe).
 Paper-cover bleed is horizontal-only and clipped to each text line's measured
 top/bottom; an unread line therefore cannot fade descenders belonging to the
 read line above it.

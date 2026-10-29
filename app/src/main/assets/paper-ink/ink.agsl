@@ -5,9 +5,14 @@
 // word's exact glyph coverage at device resolution.
 uniform shader field;
 uniform shader normals;
-// Optional Ink Lab material; opaque R/G = wicking / pigment density.
+// The page's shared paper tile (PaperInkSubstrate), in reference px and
+// repeating; opaque R/G = wicking / pigment density. fibreFringe 0 leaves it
+// unread and draws the plain paper tooth instead.
 uniform shader substrate;
 uniform float fibreFringe;
+// This occurrence's patch of the paper, so a recurring word does not bleed
+// in the same shape twice.
+uniform float2 fibreOffset;
 // Mask samples per device pixel in the field texture.
 uniform float fieldScale;
 // Device px per px of the 160 px font every constant here was tuned at.
@@ -57,20 +62,47 @@ float organicPooling(float2 p, float filmWet, float scale, float distance, float
     return spread + (grain * 2.0 - 1.0) * amplitude;
 }
 
-// One cached substrate drives both the contact line and fringe deposition.
-float wetCoverage(float2 p, float base, float distance, float coverageAA, float filmWet) {
+// The farthest a fibre may carry the film: the plain paper tooth's own
+// envelope, so small type keeps the optical attenuation [weight] carries.
+float fibreReach() {
+    return weight + min(weight * 0.6, 0.6 * unit);
+}
+
+// Paper wicks after ink lands, quickly at first and then slowing, over about
+// two letters. A word's last letters finish their creep as its film dries.
+float fibreCreep(float depositAge, float wetness) {
+    float age = clamp(depositAge * 0.5 + (1.0 - wetness) * 2.0, 0.0, 1.0);
+    return 0.4 + 0.6 * sqrt(age);
+}
+
+// While the film dries, pigment carried to the contact line darkens it for a
+// moment (a coffee ring). Zero while wet and once dry, so neither endpoint moves.
+float dryingRing(float wetness) {
+    float drying = 1.0 - wetness;
+    return smoothstep(0.0, 0.35, drying) * (1.0 - smoothstep(0.55, 1.0, drying));
+}
+
+// Pigment in the added margin: the fibre's body, diluted toward the outer
+// edge instead of ending each fibre in a flat ink tooth, and gathered there
+// by the drying [ring]. Fractional strength, never a blur of the source glyph.
+float fibreDensity(float body, float taper, float ring) {
+    return min(1.0, mix(0.5, 1.0, body) * mix(0.35, 1.0, taper) + ring * (1.0 - taper));
+}
+
+// One paper drives both the contact line and fringe deposition.
+float wetCoverage(float2 p, float base, float distance, float coverageAA, float filmWet, float creep, float wetness) {
     if (fibreFringe < 0.5 || weight <= 0.0 || filmWet <= 0.0) {
         return max(base, smoothstep(-coverageAA * 0.5, coverageAA * 0.5, distance + organicPooling(p, filmWet, unit, distance, coverageAA))
             * smoothstep(0.0, 0.05, filmWet));
     }
-    float2 fibre = substrate.eval(p).rg;
-    // Bounded support; density tapers weakly connected fibres into the paper.
-    float spread = weight * filmWet * mix(0.45, 1.8, fibre.r);
+    // Only the band a fibre can reach reads the paper: solid stroke stays
+    // solid, and paper past the farthest contact line stays bare.
+    if (base >= 1.0 || distance + fibreReach() * filmWet * creep <= -coverageAA * 0.5) return base;
+    float2 fibre = substrate.eval(p / unit + fibreOffset).rg;
+    float spread = min(weight * mix(0.45, 1.8, fibre.r), fibreReach()) * filmWet * creep;
     float candidate = smoothstep(-coverageAA * 0.5, coverageAA * 0.5, distance + spread);
-    // Dilute the outer margin instead of ending each fibre in a flat ink tooth.
-    // This is pigment falloff in added support, not a blur of the source glyph.
     float taper = 1.0 - smoothstep(0.0, max(0.001, spread), max(0.0, -distance));
-    float density = mix(0.5, 1.0, fibre.g) * mix(0.35, 1.0, taper);
+    float density = fibreDensity(fibre.g, taper, 0.55 * dryingRing(wetness));
     return base + max(0.0, candidate - base) * density * smoothstep(0.0, 0.05, filmWet);
 }
 
@@ -92,7 +124,7 @@ half4 materialAt(float2 p, float base, float coverageAA, float phase, float wetn
     float filmWet = localWet * mix(0.82, 1.0, fresh);
     // Both passes gain weight while wet and return to the regular stroke as
     // they dry. The orange chain holds color only; it cannot hold font weight.
-    float expanded = wetCoverage(p, base, distance, coverageAA, filmWet);
+    float expanded = wetCoverage(p, base, distance, coverageAA, filmWet, fibreCreep(depositAge, wetness), wetness);
     float2 slope = (surface.rg * 255.0 - 128.0) / 127.0;
     float volume = 0.6 + weight / (6.5 * unit);
     // A rounded advancing meniscus follows the same smooth arrival field as the ink.
@@ -128,7 +160,14 @@ half4 materialAt(float2 p, float base, float coverageAA, float phase, float wetn
     pigment = mix(pigment, float3(0.86, 0.86, 0.82), window * reflectionStrength * filmWet);
     // Both passes deposit the same liquid layer through the same soft front.
     // The repeat retains its dry underprint and holds orange after the film dries.
-    float3 ink = mix(dryInk, pigment, mix(moisture, 1.0, orange));
+    float wetMix = mix(moisture, 1.0, orange);
+    if (fibreFringe > 0.5) {
+        // The contact line holds its wet pigment a moment longer as the film
+        // dries: the same ring as the fringe, along the glyph's own edge.
+        float edge = 1.0 - smoothstep(0.0, 2.0 * unit, abs(distance));
+        wetMix = max(wetMix, 0.6 * dryingRing(wetness) * edge);
+    }
+    float3 ink = mix(dryInk, pigment, wetMix);
     // The letter ahead of the wet edge fades in toward fresh ink, so the edge
     // is feathered over about a letter before the liquid arrives. The repeat's
     // text is already dry; tinting it toward orange there turns muddy.
@@ -179,7 +218,8 @@ half4 evaporated(half4 ink, float base) {
 half4 main(float2 p) {
     float distance = (field.eval(p * fieldScale).b * 255.0 - 128.0) / 16.0;
     float base = normals.eval(p).b;
-    float support = fibreFringe < 0.5 ? weight + 0.6 * unit : 1.8 * weight;
+    // Neither the paper tooth nor a fibre reaches past this.
+    float support = weight + 0.6 * unit;
     if (base == 0.0 && distance < -support - max(aa, 1.0)) return half4(0.0);
     if (max(wet, underWet * repeatPass) <= 0.0) return evaporated(inkAt(p, base, aa), base);
     // Eight distinct positions along both axes resolve thin reflected lines

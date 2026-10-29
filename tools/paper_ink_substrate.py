@@ -1,4 +1,4 @@
-"""Use the production pure Kotlin substrate in offline shader tests/renders.
+"""Use the production pure Kotlin paper tile in offline shader tests/renders.
 
 Requires JDK 21 and kotlinc in addition to the renderer's Python dependencies.
 The compiled helper is temporary; no generated material is checked in.
@@ -22,11 +22,9 @@ def _helper():
     runner = folder / 'Main.kt'
     runner.write_text('''
 import com.beautifulquran.ui.theme.paperink.PaperInkSubstrate
-fun main(args: Array<String>) {
-    val pixels = PaperInkSubstrate.generate(args[0].toInt(), args[1].toInt(),
-        args[2].toFloat(), args[3].toInt())
-    val out = java.io.DataOutputStream(System.out)
-    pixels.forEach { out.writeInt(it) }
+fun main() {
+    val out = java.io.DataOutputStream(java.io.BufferedOutputStream(System.out))
+    PaperInkSubstrate.tile().forEach { out.writeInt(it) }
     out.flush()
 }
 ''')
@@ -36,15 +34,12 @@ fun main(args: Array<String>) {
     return jar
 
 
-@lru_cache(maxsize=64)
-def substrate(width, height, unit, text):
-    seed = 0
-    units = text.encode("utf-16-be")
-    for at in range(0, len(units), 2):
-        seed = (seed * 31 + int.from_bytes(units[at:at + 2], "big")) & 0xffffffff
-    if seed >= 0x80000000:
-        seed -= 0x100000000
-    raw = subprocess.run(['java', '-jar', str(_helper()), str(width), str(height), str(unit), str(seed)],
-                         check=True, capture_output=True).stdout
-    packed = np.frombuffer(raw, dtype='>u4').reshape(height, width)
+TILE = 720
+
+
+@lru_cache(maxsize=1)
+def paper():
+    """The production shared paper tile, RGBA uint8, TILE x TILE reference px."""
+    raw = subprocess.run(['java', '-jar', str(_helper())], check=True, capture_output=True).stdout
+    packed = np.frombuffer(raw, dtype='>u4').reshape(TILE, TILE)
     return np.stack([(packed >> shift) & 255 for shift in (16, 8, 0, 24)], axis=-1).astype('uint8')

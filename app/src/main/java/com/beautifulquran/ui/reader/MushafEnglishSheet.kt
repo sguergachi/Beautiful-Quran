@@ -1783,7 +1783,7 @@ private fun MutableList<ShapedWordBloom>.addEnglishPaperInk(
                 ),
             )
         } else if (raw < 0f && !warmedNext) {
-            add(ShapedWordBloom.PaperInkWarm(range, InkEngine.tuning.paperInkFibreFringe))
+            add(ShapedWordBloom.PaperInkWarm(range))
             warmedNext = true
         }
     }
