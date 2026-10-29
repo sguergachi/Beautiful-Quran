@@ -281,7 +281,13 @@ class PlayerController(private val context: Context) {
                 endedLoopHandledIndex = null
             }
             val loopRestarted = loopSingleAyahIfNeeded(player) || loopRangeIfNeeded(player)
-            syncFromController(player, forcePlaying = loopRestarted)
+            syncFromController(
+                player,
+                forcePlaying = loopRestarted,
+                newErrorCode = if (events.contains(Player.EVENT_PLAYER_ERROR)) {
+                    player.playerError?.errorCode
+                } else null,
+            )
             if (DevProfiling.captureStart.get() != null) DevProfiling.recordEvent(
                 "controller-state item=${player.currentMediaItem?.mediaId} playing=${player.isPlaying} " +
                     "state=${player.playbackState} speed=${player.playbackParameters.speed} intent=${_state.value.positionIntentId}",
@@ -294,11 +300,14 @@ class PlayerController(private val context: Context) {
         override fun onPlayerError(error: PlaybackException) {
             DevProfiling.recordEvent("player-error code=${error.errorCodeName}")
             Log.w(TAG, "Playback error ${error.errorCodeName}", error)
-            _state.value = _state.value.copy(error = playbackErrorMessage(error.errorCode))
         }
     }
 
-    private fun syncFromController(player: Player, forcePlaying: Boolean = false) {
+    private fun syncFromController(
+        player: Player,
+        forcePlaying: Boolean = false,
+        newErrorCode: Int? = null,
+    ) {
         basmalahLeadIn = player.mediaItemCount > 0 &&
             parseMediaId(player.getMediaItemAt(0).mediaId)?.ayah == 0
         val ended = player.playbackState == Player.STATE_ENDED
@@ -314,8 +323,13 @@ class PlayerController(private val context: Context) {
             repeatMode = player.repeatMode,
             repeatRange = repeatRange,
             speed = player.playbackParameters.speed,
-            // Playing again means we recovered; retire any stale error line.
-            error = if (player.isPlaying) null else _state.value.error,
+            // onEvents sees the error and transport intent from the same batch.
+            error = playbackErrorNotice(
+                previousMessage = _state.value.error,
+                playWhenReady = player.playWhenReady && !ended && player.mediaItemCount > 0,
+                isPlaying = playing,
+                newErrorCode = newErrorCode,
+            ),
         )
         voiceEnergy.playbackSpeed = player.playbackParameters.speed
         // The sink owns PCM lifecycle; its play/pause snapshots close the
@@ -434,7 +448,7 @@ class PlayerController(private val context: Context) {
             }
         repeatRange = boundedRange
         if (boundedRange == null) repeatEndPositionMs = null
-        _state.value = _state.value.copy(repeatRange = boundedRange)
+        _state.value = _state.value.copy(repeatRange = boundedRange, error = null)
 
         val queue = recitationQueue(
             surah = Surah(surahId, "", surahName, "", "", ayahCount),
@@ -453,8 +467,9 @@ class PlayerController(private val context: Context) {
             val startPos = if (queue.startIndex == 0 && queue.hasBasmalahLeadIn) 0L
             else startPositionMs
             c.setMediaItems(queue.items, queue.startIndex, startPos)
+            // A quiet load must not inherit play intent from the old queue.
+            c.playWhenReady = autoplay
             c.prepare()
-            if (autoplay) c.play()
             if (boundedRange != null) startRepeatBoundaryMonitor()
         }
     }
@@ -568,6 +583,7 @@ class PlayerController(private val context: Context) {
      * start audio after this returns.
      */
     fun stop() {
+        clearError()
         beginPositionIntent()
         resetRepeatState()
         silenceInk.clear()

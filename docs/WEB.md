@@ -10,9 +10,8 @@ engines with Vitest parity, WASM SQLite over a web core derived from the
 committed `quran.db`, lazy per-reciter timing corpora,
 paper-stack UI (Bookmarks / Home / Reader / Settings), cold-start entrance cover (closed
 mushaf + isti'adha text fade-in), directional ink wash, focus follow, bookmarks, root
-viewer, and a PWA shell. Production build is published to GitHub Pages at
-[`/app/`](https://sguergachi.github.io/Beautiful-Quran/app/)
-(as an immutable Pages artifact built by CI from `master`). See
+viewer, and a PWA shell. The web reader is not deployed while the app is in closed beta on Google Play
+(the product page is a coming-soon page served by Cloudflare). See
 `web/README.md` for run instructions. The sections
 below remain the design record and quality bar.
 
@@ -105,7 +104,7 @@ a browser. Controllers and renderers are the only DOM-touching layers.
 | Virtualization | Custom or `@tanstack/react-virtual` | Surah lists + ayah lists must virtualize |
 | Fonts | Bundle Hafs + EB Garamond + Cormorant from `app/src/main/res/font/` | No Google Fonts dependency for scripture |
 | Tests | Vitest for engines; Playwright smoke for reader | Engines = JVM parity; UI = few critical paths |
-| Hosting | Static GitHub Pages + narrow timing facade | PWA shell/DB/audio remain offline; facade URL is a build-time public variable |
+| Hosting | Not deployed (closed beta); previously static GitHub Pages + narrow timing facade | PWA shell/DB/audio remain offline; facade URL is a build-time public variable |
 
 **Rejected for v1:** Next.js/SSR (no SEO need for a reader PWA), Room-like
 ORMs, a custom glyph text engine, QCF V2 page fonts (103 MB split archives —
@@ -316,6 +315,36 @@ Renderers consume these; they do not re-derive curves.
   collapses the rest; search bypasses the preview and displays every match.
   Unmarking swaps the fixed-height reference line for an inline confirmation,
   focuses Keep, and reserves ruby for the existing ribbon component.
+- **Pinned chapters** mirror Android (`docs/DESIGN.md`, "Pinned chapters"):
+  `pinnedSurahIds` in settings; a PINNED flag over a square-cut band in
+  `--green-wash`, the Continue pill's green; pinned chapters move out of
+  the list.
+  Hold-to-pin, as Android: a click opens the chapter; held, the row
+  soaks with wet green ink (`--accent` at 30%) as an even `opacity` fill
+  (550 ms linear after 150 ms of settle), and full toggles the pin. Rows
+  keep one key per chapter (`chapter-N`), and a FLIP reflow
+  (`reflowDeltas`, 420 ms) slides every moved row from where it stood; the
+  moved row travels above the rest on its own paper while its wet ink
+  dries off (`data-drying`, 650 ms). Lifting early drains it
+  (180 ms). A release within 300 ms is the tap that opens; movement over
+  the slop (10 px) or leaving the row cancels, and a cancelled hold never
+  becomes a click. Only the primary pointer holds. A keyboard cannot hold,
+  so the context-menu event (right click, Mac Ctrl+click, Context Menu key,
+  Shift+F10) and Shift+Enter toggle the pin outright, and the row announces
+  `Hold, or Shift+Enter, to pin`; a touch or pen long-press's own
+  `contextmenu` is ignored (the hold owns it, and it can arrive after the
+  row has moved). Under reduced motion the tint steps on at 150 ms instead
+  of deepening; the pin still lands at 700 ms. While searching, results
+  list pinned chapters in place, so rows are only a click. The band is
+  painted out to the sheet's edges past the list's measure (`border-image`
+  outset; the Chapters scroller hides horizontal overflow). After a pin from
+  deep in the list, keyboard focus stays in view on the row that took the
+  moved one's place.
+  Pure decisions live in `ui/home/pinnedChapters.ts`; the row is
+  `ui/home/ChapterRow.tsx`.
+  Web rows carry no place ribbon and the Continue pill never docks, so the
+  place-row rule has nothing to move here. The pinning lesson is Android-only
+  for now.
 
 ## 7. Performance bar (non-negotiable)
 
@@ -778,8 +807,9 @@ Below that size nothing changes. Rationale in
    The top continue area uses Android's resting pill geometry: 28 px corners,
    16 px outer insets, a passive green place ribbon, gold chapter number,
    small CONTINUE flag, and bilingual chapter identity with the saved ayah.
-   Its dedicated `--continue-wash` follows Android PR #871: Paper `#B8EDDB`,
-   Nightfall `#134738`, Royal Green `#1F5141`.
+   It is washed in `--green-wash`, Android's `greenWash`. A dedicated mint
+   `--continue-wash` (from Android PR #871, since reverted there) was removed:
+   the owner rejects mint anywhere in the app.
    The single pill is one accessible button; long chapter names ellipsize while
    the ayah stays visible. Reading and listening retain separate saved places,
    with the last-heard place taking priority in the pill.
@@ -985,10 +1015,9 @@ the design docs — not shared UI code.
 
 - `.github/workflows/web.yml`: `npm ci` + Vitest + `npm run build` on every
   push/PR that touches `web/`.
-- On `master` only: after tests pass, stage the marketing site from `docs/`,
-  run `npm run build:pages` into `_site/app`, and deploy `_site` through the
-  GitHub Pages artifact actions. Generated reader files never enter Git
-  history and concurrent master builds are serialized by workflow concurrency.
+- No deploy: the reader is withheld until it is ready. The `site` job stages the
+  product page with `scripts/stage_site.mjs` and fails if it links to `app/`.
+  Cloudflare's Git integration (not Actions) deploys it with the Worker.
 - Android `assembleRelease` stays in `build.yml` — web failures do not block it.
 
 ## 13. Quality gates (definition of done)

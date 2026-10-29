@@ -9,6 +9,8 @@ on:
       - 'data/lexicon.db'
       - 'data/dictionary.db'
       - 'docs/**'
+      - 'scripts/stage_site.mjs'
+      - 'wrangler.jsonc'
       - 'licenses/**'
       - '.github/workflows/web.yml'
   pull_request:
@@ -18,11 +20,13 @@ on:
       - 'data/lexicon.db'
       - 'data/dictionary.db'
       - 'docs/**'
+      - 'scripts/stage_site.mjs'
+      - 'wrangler.jsonc'
       - 'licenses/**'
       - '.github/workflows/web.yml'
 
 concurrency:
-  group: pages-${{ github.ref }}
+  group: web-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -51,59 +55,20 @@ jobs:
           test -s ../data/lexicon.db && test -s dist/lexicon.db
           test -s ../data/dictionary.db && test -s dist/dictionary.db
 
-  # The public project has an active Pages site, so deployment is a hard gate.
-  build-pages:
-    if: (github.event_name == 'push' || github.event_name == 'workflow_dispatch') && github.ref == 'refs/heads/master'
-    needs: test
+  # The product page ships from Cloudflare (wrangler.jsonc `assets`), built by
+  # Cloudflare's Git integration. This only proves the staging whitelist works.
+  site:
     runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      pages: write
-      id-token: write
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-          cache: npm
-          cache-dependency-path: web/package-lock.json
-      - name: Install web dependencies
-        working-directory: web
-        run: npm ci
-      - name: Stage marketing site
+      - run: node scripts/stage_site.mjs
+      - name: No web reader on the site
         run: |
-          mkdir -p _site
-          cp -R docs/. _site/
-      - name: Build reader into Pages site
-        working-directory: web
-        run: npm run build:pages
-      - name: Verify Pages routes
-        run: |
-          test -s _site/index.html
-          test -s _site/app/index.html
-          test -s _site/app/fonts.css
-          grep -Fq '/Beautiful-Quran/app/' _site/app/index.html
-          if grep -Fq '/Beautiful-Quran-/app/' _site/app/index.html; then
-            echo 'Reader still targets the former trailing-dash repository path.'
+          test ! -e _site/app
+          if grep -rIlE 'href="app/|github\.io' _site --include='*.html'; then
+            echo 'The site must not link to the web reader.'
             exit 1
           fi
-      - name: Configure GitHub Pages
-        uses: actions/configure-pages@v5
-      - uses: actions/upload-pages-artifact@v4
-        with:
-          path: _site
-
-  deploy-pages:
-    if: (github.event_name == 'push' || github.event_name == 'workflow_dispatch') && github.ref == 'refs/heads/master'
-    needs: build-pages
-    runs-on: ubuntu-latest
-    permissions:
-      pages: write
-      id-token: write
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
-    steps:
-      - name: Deploy GitHub Pages
-        id: deployment
-        uses: actions/deploy-pages@v4

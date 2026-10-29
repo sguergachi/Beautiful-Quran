@@ -3,6 +3,22 @@ package com.beautifulquran.playback
 import androidx.media3.common.PlaybackException
 
 /**
+ * A loaded, paused stream can fail long after listening stopped. Only a
+ * failed play attempt needs a notice; buffering counts even before audio starts.
+ * A dismissed notice stays dismissed until a new error event arrives.
+ */
+internal fun playbackErrorNotice(
+    previousMessage: String?,
+    playWhenReady: Boolean,
+    isPlaying: Boolean,
+    newErrorCode: Int? = null,
+): String? = when {
+    !playWhenReady || isPlaying -> null
+    newErrorCode != null -> playbackErrorMessage(newErrorCode)
+    else -> previousMessage
+}
+
+/**
  * The line a reader sees when recitation stops on an error. Media3's code
  * names (`ERROR_CODE_IO_UNSPECIFIED`…) are for the log, never the page: each
  * code family maps to what happened and what to do next, in plain words.

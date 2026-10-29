@@ -85,6 +85,7 @@ internal val DEFAULT_FAVORITE_RECITER_IDS = (1..7).toSet()
 enum class EducationMoment(val preferenceKey: String) {
     BOOKMARK_NOTE("educationBookmarkNoteV1"),
     AYAH_RAIL("educationAyahRailV1"),
+    PIN_CHAPTER("educationPinChapterV1"),
 }
 
 /**
@@ -109,6 +110,8 @@ enum class BrushCircleStyle {
 data class Settings(
     val reciterId: Int = 1,
     val favoriteReciterIds: Set<Int> = DEFAULT_FAVORITE_RECITER_IDS,
+    /** Chapters pinned atop Chapters, on the green band. */
+    val pinnedSurahIds: Set<Int> = emptySet(),
     val fontScale: Float = 1f,
     val readingMode: ReadingMode = ReadingMode.ARABIC_ENGLISH,
     val readingLayout: ReadingLayout = ReadingLayout.SCROLL,
@@ -200,6 +203,8 @@ class SettingsRepository(context: Context) {
         favoriteReciterIds = decodeFavoriteReciterIds(
             prefs.getStringSet("favoriteReciterIds", null),
         ),
+        pinnedSurahIds = prefs.getStringSet("pinnedSurahIds", null)
+            .orEmpty().mapNotNull(String::toIntOrNull).toSet(),
         fontScale = prefs.getFloat("fontScale", 1f),
         readingMode = prefs.enum("readingMode", ReadingMode.ARABIC_ENGLISH),
         readingLayout = prefs.enum("readingLayout", ReadingLayout.SCROLL),
@@ -314,6 +319,7 @@ class SettingsRepository(context: Context) {
                 "favoriteReciterIds",
                 next.favoriteReciterIds.map(Int::toString).toSet(),
             )
+            putStringSet("pinnedSurahIds", next.pinnedSurahIds.map(Int::toString).toSet())
             putFloat("fontScale", next.fontScale)
             putInt("readingMode", next.readingMode.ordinal)
             putInt("readingLayout", next.readingLayout.ordinal)

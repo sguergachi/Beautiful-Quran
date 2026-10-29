@@ -3,6 +3,7 @@ package com.beautifulquran.ui.home
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.media3.common.Player
+import com.beautifulquran.data.EducationMoment
 import com.beautifulquran.data.QuranRepository
 import com.beautifulquran.data.ReadingLayout
 import com.beautifulquran.data.Settings
@@ -49,6 +50,9 @@ data class HomeUiState(
     /** Reading place parked on the previous visit, kept visible as the green
      * marker even while the chapter list is filtered. */
     val continueTarget: ContinueTarget? = null,
+    /** Pinned chapters, in Quranic order — gathered on the band above the
+     * full list, which leaves them out (they move, never show twice). */
+    val pinned: List<Surah> = emptyList(),
     /** When the query is a `surah:ayah` reference, the ayah to open the matched surah at. */
     val ayahTarget: Int? = null,
     /** Verse currently loaded in the player — drives the floating transport. */
@@ -174,6 +178,7 @@ class HomeViewModel(
                     surahs = surahs,
                     lastSurah = prefs.lastSurah,
                     lastAyah = prefs.lastAyah,
+                    pinnedOrder = prefs.pinnedSurahIds,
                     reciterId = prefs.reciterId,
                     playerState = playerState,
                     names = names,
@@ -200,6 +205,7 @@ class HomeViewModel(
                 surahs = filtered,
                 allSurahs = base.surahs,
                 continueTarget = continueTarget,
+                pinned = base.surahs.filter { it.id in base.pinnedOrder },
                 ayahTarget = ayahTarget,
                 floatingPlayback = floating,
                 playerState = base.playerState,
@@ -273,6 +279,22 @@ class HomeViewModel(
         }
     }
 
+    /** Pins or unpins a chapter at the top of Chapters. */
+    fun togglePinned(surahId: Int) = settings.update {
+        val ids = it.pinnedSurahIds
+        it.copy(pinnedSurahIds = if (surahId in ids) ids - surahId else ids + surahId)
+    }
+
+    /** The pinning lesson runs behind the developer guide gate, once. */
+    fun shouldShowPinTip(): Boolean {
+        val current = settings.settings.value
+        return current.developerModeEnabled &&
+            current.educationGuidesEnabled &&
+            !settings.isEducationDismissed(EducationMoment.PIN_CHAPTER)
+    }
+
+    fun dismissPinTip() = settings.dismissEducation(EducationMoment.PIN_CHAPTER)
+
     fun togglePlayPause() = player.togglePlayPause()
 
     fun clearPlaybackError() = player.clearError()
@@ -311,6 +333,7 @@ private data class HomeCombineBase(
     val surahs: List<Surah>,
     val lastSurah: Int,
     val lastAyah: Int,
+    val pinnedOrder: Set<Int>,
     val reciterId: Int,
     val playerState: PlayerUiState,
     val names: Map<Int, String>,

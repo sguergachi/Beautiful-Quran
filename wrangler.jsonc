@@ -1,6 +1,9 @@
 {
   "name": "beautiful-quran",
   "main": "worker/src/entry.mjs",
+  // The product page: scripts/stage_site.mjs whitelists it into _site/ at deploy time.
+  "build": { "command": "node scripts/stage_site.mjs" },
+  "assets": { "directory": "./_site" },
   "compatibility_date": "2026-09-05",
   "workers_dev": true,
   "observability": { "enabled": true, "logs": { "invocation_logs": false } },
