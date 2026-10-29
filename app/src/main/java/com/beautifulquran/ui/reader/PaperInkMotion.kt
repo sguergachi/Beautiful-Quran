@@ -138,7 +138,14 @@ internal fun InkMotion.paperInkFrame(style: PaperInkStyle): PaperInk.Frame {
  * content. Overlays for the same word ([hiddenWhilePaperInk]) stand aside
  * while it does. A word that began washing in its fallback finishes there.
  */
-internal class PaperInkNode {
+internal class PaperInkNode(
+    /**
+     * Which patch of the shared paper this word bleeds into. Pass something
+     * stable for the word (its ayah and position), so it bleeds the same way
+     * each time its node is recreated by scrolling.
+     */
+    private val placement: Int = PaperInk.nextPlacement(),
+) {
     /** Set from the node's `onTextLayout`. */
     var layout: TextLayoutResult? = null
 
@@ -146,8 +153,6 @@ internal class PaperInkNode {
     var drawing: Boolean = false
         private set
     private var latched = false
-    /** This node's patch of the shared paper, kept for as long as the node lives. */
-    private val placement = PaperInk.nextPlacement()
 
     fun Modifier.paperInkBase(motion: InkMotion, style: PaperInkStyle?, rtl: Boolean): Modifier =
         paperInkBase({ motion }, style, rtl)
@@ -197,7 +202,8 @@ internal class PaperInkNode {
 }
 
 @Composable
-internal fun rememberPaperInkNode(): PaperInkNode = remember { PaperInkNode() }
+internal fun rememberPaperInkNode(placement: Int? = null): PaperInkNode =
+    remember(placement) { placement?.let(::PaperInkNode) ?: PaperInkNode() }
 
 /** Past this much of its wash, a word that began in the fallback finishes there. */
 private const val PAPER_INK_NODE_LATCH = 0.12f

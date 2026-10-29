@@ -912,7 +912,9 @@ private fun MushafQcfWord(
     var layoutResult by remember { mutableStateOf<TextLayoutResult?>(null) }
     // Paper: the shared ink pipeline draws this word while it is live, in place
     // of the whole wash chain below (docs/PAPER_INK.md).
-    val paperNode = rememberPaperInkNode()
+    val paperNode = rememberPaperInkNode(
+        (token.surahId * 1_000 + token.ayah) * 1_000 + token.word.position,
+    )
     val packKey = remember(token.surahId, token.ayah) { token.surahId to token.ayah }
     val packState = remember(packs, packKey) { derivedStateOf { packs[packKey] } }
     val pack = packState.value

@@ -978,8 +978,10 @@ internal class InkMotion(
     /** No wash, paper ink, orange or glimmer of its own: frame to frame, it
      * changes only when its verse's recess fades. */
     val isQuiet: Boolean
-        get() = !isActive && !paperInkLive && !showRepeatLayer && !showGlintLayer &&
-            (sweepProgress <= 0f || sweepProgress >= 1f)
+        get() = !isActive && (sweepProgress <= 0f || sweepProgress >= 1f) &&
+            !showRepeatLayer && !showGlintLayer &&
+            // Last: it works out the paper deposit, which the rest need not.
+            !paperInkLive
 
     /** Draw-phase alpha for secondary lines (gloss, transliteration): they
      * fade with the word's sweep but never letter-reveal. Residual short-hold
@@ -3235,7 +3237,9 @@ fun AyahBlock(
             } else if (readingMode == ReadingMode.ARABIC_ENGLISH && showGloss) {
                 // Hoisted so this verse can warm the next words' paper ink fields.
                 val paperNodes = remember(ayah.surahId, ayah.number, ayah.words.size) {
-                    List(ayah.words.size) { PaperInkNode() }
+                    List(ayah.words.size) { index ->
+                        PaperInkNode((ayah.surahId * 1_000 + ayah.number) * 1_000 + index)
+                    }
                 }
                 WarmPaperInkAhead(motions, paperNodes)
                 CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Rtl) {

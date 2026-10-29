@@ -226,8 +226,9 @@ with the pixel grid (the first straight-fibre prototype read as digital).
 reach of a contour; all eight AA taps share it, because the finest fibre spans
 several pixels. The offset comes from the word's
 `PaperInk.Source.placement`: the host paragraph's text and the word's start in
-it for shaped text, and a per-node counter for word nodes, held for the node's
-life. Without it every recurring word (English "the", "and"; ٱللَّهِ) bled in
+it for shaped text, and (surah, ayah, word position) for word nodes and the
+Mushaf, so a word bleeds the same way each time scrolling recreates its node.
+Without it every recurring word (English "the", "and"; ٱللَّهِ) bled in
 the same shape whenever two were wet at once. Placement never enters the
 field cache key: identical words still share one generated field.
 

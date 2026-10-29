@@ -149,7 +149,10 @@ object PaperInk {
      * this subscribes the caller's draw to [generation]. Captures are rationed
      * per frame so warming a verse never stalls one.
      */
-    fun word(source: Source): Word? {
+    fun word(source: Source): Word? = word(source, CAPTURES_PER_FRAME)
+
+    /** [word] with at most [rationLimit] captures a frame (warming leaves the rest to live words). */
+    private fun word(source: Source, rationLimit: Int): Word? {
         if (!supported || shaderSource == null) return null
         generation.intValue
         // Warming a verse is the first sign of ink to come: start the paper
@@ -157,13 +160,13 @@ object PaperInk {
         paper()
         val key = key(source)
         cache.get(key)?.let { return it }
-        if (key in pending || key in inkless) return null
         val now = SystemClock.uptimeMillis()
+        if (key in pending || inklessUntil[key]?.let { it > now } == true) return null
         if (now != captureFrame) {
             captureFrame = now
             capturesThisFrame = 0
         }
-        if (capturesThisFrame >= CAPTURES_PER_FRAME) return null
+        if (capturesThisFrame >= rationLimit) return null
         capturesThisFrame++
         val capture = capture(source) ?: return null
         pending += key
@@ -173,10 +176,12 @@ object PaperInk {
                 pending -= key
                 if (word != null) {
                     cache.put(key, word)
+                    inklessUntil.remove(key)
                 } else {
-                    // Nothing to ink (or it failed): don't re-rasterize every frame.
-                    if (inkless.size >= INKLESS_LIMIT) inkless.clear()
-                    inkless += key
+                    // Nothing to ink (a font still loading, or a failed build):
+                    // don't re-rasterize every frame, but look again shortly.
+                    if (inklessUntil.size >= INKLESS_LIMIT) inklessUntil.clear()
+                    inklessUntil[key] = SystemClock.uptimeMillis() + INKLESS_RETRY_MS
                 }
                 generation.intValue++
             }
@@ -190,8 +195,8 @@ object PaperInk {
         return Key(source.layout.layoutInput, (fx * PHASES).roundToInt() % PHASES, (fy * PHASES).roundToInt() % PHASES)
     }
 
-    /** Words whose capture held no ink, so asking again cannot help. */
-    private val inkless = HashSet<Key>()
+    /** Words whose capture held no ink, and when to try them again. */
+    private val inklessUntil = HashMap<Key, Long>()
 
     /**
      * Start [source]'s field ahead of its turn. True once it is ready or on
@@ -199,9 +204,11 @@ object PaperInk {
      */
     fun warm(source: Source): Boolean {
         if (!supported || shaderSource == null) return true
-        if (word(source) != null) return true
+        // One capture a frame stays free for the word being recited, whose own
+        // draw would otherwise find the ration spent and wash in the fallback.
+        if (word(source, CAPTURES_PER_FRAME - 1) != null) return true
         val key = key(source)
-        return key in pending || key in inkless
+        return key in pending || inklessUntil[key]?.let { it > SystemClock.uptimeMillis() } == true
     }
 
     private var nextPlacement = 0
@@ -234,6 +241,9 @@ object PaperInk {
                 main.post {
                     com.beautifulquran.DevProfiling.mark("paperTile ready=${tile != null} ${tookMs}ms")
                     paper = tile
+                    // A failed read may succeed later (memory, a busy disk):
+                    // let the next draw ask again.
+                    if (tile == null) paperRequested = false
                     generation.intValue++
                 }
             }
@@ -471,6 +481,7 @@ object PaperInk {
     private const val PHASES = 8
     private const val CAPTURES_PER_FRAME = 3
     private const val INKLESS_LIMIT = 256
+    private const val INKLESS_RETRY_MS = 2_000L
     private const val CACHE_BYTES = 32 * 1024 * 1024
 }
 
