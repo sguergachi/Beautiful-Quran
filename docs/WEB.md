@@ -10,9 +10,8 @@ engines with Vitest parity, WASM SQLite over a web core derived from the
 committed `quran.db`, lazy per-reciter timing corpora,
 paper-stack UI (Bookmarks / Home / Reader / Settings), cold-start entrance cover (closed
 mushaf + isti'adha text fade-in), directional ink wash, focus follow, bookmarks, root
-viewer, and a PWA shell. Production build is published to GitHub Pages at
-[`/app/`](https://sguergachi.github.io/Beautiful-Quran/app/)
-(as an immutable Pages artifact built by CI from `master`). See
+viewer, and a PWA shell. The web reader is not deployed while the app is in closed beta on Google Play
+(the product page is a coming-soon page served by Cloudflare). See
 `web/README.md` for run instructions. The sections
 below remain the design record and quality bar.
 
@@ -105,7 +104,7 @@ a browser. Controllers and renderers are the only DOM-touching layers.
 | Virtualization | Custom or `@tanstack/react-virtual` | Surah lists + ayah lists must virtualize |
 | Fonts | Bundle Hafs + EB Garamond + Cormorant from `app/src/main/res/font/` | No Google Fonts dependency for scripture |
 | Tests | Vitest for engines; Playwright smoke for reader | Engines = JVM parity; UI = few critical paths |
-| Hosting | Static GitHub Pages + narrow timing facade | PWA shell/DB/audio remain offline; facade URL is a build-time public variable |
+| Hosting | Not deployed (closed beta); previously static GitHub Pages + narrow timing facade | PWA shell/DB/audio remain offline; facade URL is a build-time public variable |
 
 **Rejected for v1:** Next.js/SSR (no SEO need for a reader PWA), Room-like
 ORMs, a custom glyph text engine, QCF V2 page fonts (103 MB split archives —
@@ -1016,10 +1015,9 @@ the design docs — not shared UI code.
 
 - `.github/workflows/web.yml`: `npm ci` + Vitest + `npm run build` on every
   push/PR that touches `web/`.
-- On `master` only: after tests pass, stage the marketing site from `docs/`,
-  run `npm run build:pages` into `_site/app`, and deploy `_site` through the
-  GitHub Pages artifact actions. Generated reader files never enter Git
-  history and concurrent master builds are serialized by workflow concurrency.
+- No deploy: the reader is withheld until it is ready. The `site` job stages the
+  product page with `scripts/stage_site.mjs` and fails if it links to `app/`.
+  Cloudflare's Git integration (not Actions) deploys it with the Worker.
 - Android `assembleRelease` stays in `build.yml` — web failures do not block it.
 
 ## 13. Quality gates (definition of done)
