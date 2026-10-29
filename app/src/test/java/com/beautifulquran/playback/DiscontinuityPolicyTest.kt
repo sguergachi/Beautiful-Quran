@@ -78,6 +78,20 @@ class DiscontinuityPolicyTest {
 
         assertEquals(1_951L, landed.positionMs)
     }
+
+    @Test
+    fun `only filling an empty playlist needs its own ink event`() {
+        val changed = Player.TIMELINE_CHANGE_REASON_PLAYLIST_CHANGED
+        assertTrue(filledEmptyPlaylist(wasEmpty = true, isEmpty = false, reason = changed))
+        // A replacement already arrives as a REMOVE discontinuity; counting it again is a second performance.
+        assertFalse(filledEmptyPlaylist(wasEmpty = false, isEmpty = false, reason = changed))
+        assertFalse(filledEmptyPlaylist(wasEmpty = false, isEmpty = true, reason = changed))
+        assertFalse(filledEmptyPlaylist(wasEmpty = true, isEmpty = true, reason = changed))
+        // A duration resolving on the same items is not a new playlist.
+        assertFalse(filledEmptyPlaylist(wasEmpty = true, isEmpty = false,
+            reason = Player.TIMELINE_CHANGE_REASON_SOURCE_UPDATE))
+    }
+
     @Test
     fun `the first playlist after launch starts a new ink performance`() {
         // A cold word tap seeds inkId + 1 and waits for exactly that performance.

@@ -6,6 +6,7 @@ import android.content.Context
 import android.util.Log
 import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
+import androidx.media3.common.Timeline
 import androidx.media3.session.MediaController
 import androidx.media3.session.SessionToken
 import com.beautifulquran.data.model.Reciter
@@ -34,7 +35,8 @@ data class NowPlaying(
     val reciterId: Int,
 )
 
-/** Cumulative Media3 position events. Every jump advances [clockId], while
+/** Cumulative Media3 position events, plus the playlist fill Media3 leaves
+ * unreported ([filledEmptyPlaylist]). Every jump advances [clockId], while
  * only a new ink performance advances [inkId]. [reason] is the latest
  * discontinuity. [itemChanged] is true when that jump landed on a different
  * playlist item. [positionMs] is where that jump landed, on the file clock. */
@@ -80,10 +82,15 @@ internal fun PlaybackPositionEvents.afterDiscontinuity(
 )
 
 /**
- * Media3 reports a playlist replacement only when an old timeline existed, so
- * the first load after launch would keep the old ink and a word tap waiting
- * for its new performance would wait out its confirmation timeout instead.
+ * Media3 reports a playlist replacement (REMOVE) only when an old timeline
+ * existed. Filling an empty one — the first load after launch, or a media
+ * button resuming a cleared session — is a new performance too; without it a
+ * word tap waiting for inkId + 1 waits out its confirmation timeout and then
+ * snaps its word full.
  */
+internal fun filledEmptyPlaylist(wasEmpty: Boolean, isEmpty: Boolean, reason: Int): Boolean =
+    wasEmpty && !isEmpty && reason == Player.TIMELINE_CHANGE_REASON_PLAYLIST_CHANGED
+
 internal fun PlaybackPositionEvents.afterFirstPlaylist(positionMs: Long): PlaybackPositionEvents =
     afterDiscontinuity(Player.DISCONTINUITY_REASON_REMOVE, itemChanged = true, positionMs = positionMs)
 
@@ -149,6 +156,8 @@ class PlayerController(private val context: Context) {
      * at index N (basmalah at 0). Otherwise ayah N sits at index N - 1.
      */
     private var basmalahLeadIn: Boolean = false
+    /** Last timeline emptiness this controller reported; see [filledEmptyPlaylist]. */
+    private var timelineEmpty = true
 
     val positionMs: Long
         get() = controller?.currentPosition ?: 0L
@@ -245,6 +254,7 @@ class PlayerController(private val context: Context) {
             })
             .buildAsync()
             .await()
+        timelineEmpty = c.currentTimeline.isEmpty
         c.addListener(listener)
         controller = c
         _state.value = _state.value.copy(isConnected = true)
@@ -253,6 +263,16 @@ class PlayerController(private val context: Context) {
     }
 
     private val listener = object : Player.Listener {
+        override fun onTimelineChanged(timeline: Timeline, reason: Int) {
+            val wasEmpty = timelineEmpty
+            timelineEmpty = timeline.isEmpty
+            if (!filledEmptyPlaylist(wasEmpty, timeline.isEmpty, reason)) return
+            val positionMs = controller?.currentPosition ?: 0L
+            _state.value = _state.value.copy(
+                positionEvents = _state.value.positionEvents.afterFirstPlaylist(positionMs),
+            )
+        }
+
         override fun onPositionDiscontinuity(
             oldPosition: Player.PositionInfo,
             newPosition: Player.PositionInfo,
@@ -452,13 +472,7 @@ class PlayerController(private val context: Context) {
         withController(epoch, holdSilenceSkip = true) { c ->
             val startPos = if (queue.startIndex == 0 && queue.hasBasmalahLeadIn) 0L
             else startPositionMs
-            val firstPlaylist = c.currentTimeline.isEmpty
             c.setMediaItems(queue.items, queue.startIndex, startPos)
-            if (firstPlaylist) {
-                _state.value = _state.value.copy(
-                    positionEvents = _state.value.positionEvents.afterFirstPlaylist(startPos),
-                )
-            }
             // A quiet load must not inherit play intent from the old queue.
             c.playWhenReady = autoplay
             c.prepare()
