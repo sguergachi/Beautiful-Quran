@@ -142,6 +142,16 @@ class ChapterReviewTest(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, "surface"):
                 runner.fetch_evidence(self.evidence_client(wrong_surface=True), self.row, Path(temporary), "ar-jalalayn")
 
+    def test_completed_review_evidence_is_rebound_without_a_paid_refetch(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            work = Path(temporary)
+            runner.fetch_evidence(self.evidence_client(), self.row, work / "evidence", "ar-jalalayn")
+            receipt = json.loads((work / "evidence" / "1-1.json").read_text())
+            self.assertEqual(receipt, runner.stored_evidence(work, self.row))
+            self.assertIsNone(runner.stored_evidence(work, dict(self.row, fingerprint="0" * 64)))
+            (work / "evidence" / "1-1.json").write_text('{"interrupted":')
+            self.assertIsNone(runner.stored_evidence(work, self.row))
+
     def test_completed_stage_resumes_but_changed_or_interrupted_input_does_not(self):
         with tempfile.TemporaryDirectory() as temporary:
             directory = Path(temporary)

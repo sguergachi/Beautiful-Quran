@@ -51,6 +51,7 @@ jobs:
           python3 tools/test_audit_english_alignment.py
           python3 tools/test_english_alignment_ledger.py
           python3 tools/test_review_english_chapters.py
+          python3 tools/test_review_english_selection.py
           python3 tools/test_english_review_wait.py
 
       - name: QF proxy regressions

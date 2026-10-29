@@ -156,6 +156,33 @@ App reciter 1 is Alafasy (QF 7); app reciter 7 is Hani (QF 5), so source
 and app IDs must not be interchanged. General regressions cover
 sentence punctuation, separately spoken tails, missing anchors and reflexives.
 
+## Which verses get a model review
+
+Reviewing every printed verse is not the cheapest path to the same result, and
+the queue is now chosen by measurement rather than by convenience. On the 392
+verses reviewed before this policy, the baseline leaves at least one Arabic
+word named by no printed token in **2,476 of 6,236 verses (40%)**; every one of
+those verses changed under review, they account for **all 177** cases where the
+model had to name a previously unowned word, and **65%** of the ≥2-word
+ownership moves. A verse the baseline covers completely still moved 28% of the
+time, so coverage is a filter, not a certificate.
+
+`tools/english_review_selection.py` therefore queues a verse when its baseline
+leaves an Arabic word unowned, plus a deterministic 10% draw of the covered
+rest (`--audit-rate`), so the untouched majority keeps a measured error bound
+instead of an assertion. The queue is 2,846 verses; `--selection all` restores
+the exhaustive pass, and the same verse is drawn on every run, so a resumed run
+does not re-sample its own audit. `report.json` and `selection.json` record
+`queued`, `flagged_uncovered`, `audit_sampled` and `left_at_baseline` per
+chapter, and `python3 tools/test_review_english_selection.py` pins the filter,
+the draw and the chapter bound. A verse already reviewed re-binds to its
+recorded evidence receipt instead of paying for the same four Quran.ai fetches
+again; the hashes, citations and decisions are unchanged.
+
+Staying at baseline is still not certification. The audit sample bounds how
+often a covered verse would have moved; it does not make its owners reviewed,
+and `semantic_accuracy_established` remains false.
+
 ## Establishing a semantic accuracy claim
 
 Any `--require-semantic-accuracy` threshold or `--semantic-reference` now

@@ -15,6 +15,7 @@ import tempfile
 from threading import Event
 
 import english_alignment_ledger as ledger
+import english_review_selection as selection
 from english_alignment_evidence import QuranEvidence, structured, surface
 from english_review_wait import ModelUnavailableError, UsageLimitError, UsageWait
 
@@ -201,6 +202,18 @@ def purge_source_payloads(work):
         return count
 
 
+def stored_evidence(work, row):
+    """A completed review's own evidence receipt re-binds it without a paid refetch."""
+    path = work / "evidence" / (row["verse"].replace(":", "-") + ".json")
+    try:
+        receipt = json.loads(path.read_text())
+    except (OSError, ValueError):
+        return None
+    bound = receipt.get("format") == "english-evidence-receipt-v1" and receipt.get("verse") == row["verse"] \
+        and receipt.get("fingerprint") == row["fingerprint"]
+    return receipt if bound else None
+
+
 def fetch_evidence(client, row, directory, tafsir):
     """Retrieve and validate online; persist only citations and hashes, never source text."""
     path = directory / (row["verse"].replace(":", "-") + ".json")
@@ -359,14 +372,17 @@ REVIEW_POLICY = ledger.digest(ledger.encoded([
 ]))
 
 
-def summarize(rows, states, selected, playback):
+def summarize(rows, states, selected, playback, queued=None):
     report = {"semantic_accuracy_established": False, "approval_policy": "ai_reviewed", "chapters": {}}
+    queued = set(queued if queued is not None else rows)
     for chapter in sorted(selected):
         keys = [key for key in rows if int(key.split(":")[0]) == chapter]
-        approved = [key for key in keys if states.get(key, {}).get("status") == "model_reviewed"]
+        reviewable = [key for key in keys if key in queued]
+        approved = [key for key in reviewable if states.get(key, {}).get("status") == "model_reviewed"]
         decisions = [(base, mapped) for key in approved for base, mapped in
                      zip(rows[key].get("tokens", []), states[key].get("row", {}).get("tokens", []))]
-        report["chapters"][str(chapter)] = {"verses": len(keys), "model_reviewed": len(approved),
+        report["chapters"][str(chapter)] = {"verses": len(keys), "queued": len(reviewable),
+            "model_reviewed": len(approved), "left_at_baseline": len(keys) - len(reviewable),
             "reused_prior_ai_verses": sum(states[key].get("origin") == "prior_ai_review" for key in approved),
             "freshly_critiqued_verses": sum(states[key].get("origin") != "prior_ai_review" for key in approved),
             "printed_tokens": sum(len(rows[key].get("tokens", [])) for key in keys),
@@ -374,9 +390,9 @@ def summarize(rows, states, selected, playback):
             "changed_tap_heads": sum(a.get("head") != b["head"] for a, b in decisions),
             "changed_ink_anchors": sum(a.get("ink_anchor") != b["ink_anchor"] for a, b in decisions),
             "null_linked_tokens": sum(not b["contributors"] for _, b in decisions),
-            "held": len(keys) - len(approved), "playback": playback,
-            "complete": len(approved) == len(keys) and playback == "passed",
-            "issues": {key: states.get(key, {}).get("issues", ["Not processed"]) for key in keys if key not in approved}}
+            "held": len(reviewable) - len(approved), "playback": playback,
+            "complete": len(approved) == len(reviewable) and playback == "passed",
+            "issues": {key: states.get(key, {}).get("issues", ["Not processed"]) for key in reviewable if key not in approved}}
     return report
 
 
@@ -408,6 +424,10 @@ def main():
     parser.add_argument("--retry-held", action="store_true")
     parser.add_argument("--max-verses", type=int, default=25,
                         help="New/retried verse budget (default 25); cached reviews do not consume it")
+    parser.add_argument("--selection", choices=["risky", "all"], default="risky",
+                        help="risky: only verses whose baseline leaves an Arabic word unowned, plus the audit sample")
+    parser.add_argument("--audit-rate", type=float, default=0.1,
+                        help="Share of baseline-covered verses still reviewed to bound their error rate")
     parser.add_argument("--workers", type=int, default=2, help="1–4 concurrent verse reviews; canonical fetches remain serial")
     args = parser.parse_args()
     work = args.work_dir.resolve()
@@ -423,6 +443,7 @@ def main():
     ledger.require(args.model and args.corpus and args.timings_cache, "run needs --model, --corpus and --timings-cache")
     ledger.require(1 <= args.attempts <= 3 and 1 <= args.timeout <= 1800, "Invalid retry/timeout budget")
     ledger.require(args.max_verses is None or args.max_verses > 0, "--max-verses must be positive")
+    ledger.require(0 <= args.audit_rate <= 1, "--audit-rate must be a share of verses")
     ledger.require(1 <= args.workers <= 4, "--workers must be 1–4")
     cancelled = Event()
     def interrupt(signum, frame):
@@ -481,12 +502,19 @@ def main():
         ledger.require(len(seed_rows) == len(seeds), "Duplicate AI seed verse")
         if not args.refresh_reviewed:
             import_seed(rows, manifest, states, seed_rows, selected)
+        queue = selection.review_queue(rows, selected, args.selection, args.audit_rate,
+                                       {key for key, state in states.items() if state.get("status") == "held"})
+        flagged = sum(selection.needs_review(rows[key]) for key in queue)
+        save(work / "selection.json", {"policy": args.selection, "audit_rate": args.audit_rate,
+             "selection_sha256": ledger.digest(Path(selection.__file__).read_bytes()),
+             "queued": len(queue), "flagged_uncovered": flagged, "audit_sampled": len(queue) - flagged,
+             "left_at_baseline": sum(int(key.split(":")[0]) in selected for key in rows) - len(queue)})
         processed = 0
         pending_jobs = {}
         def checkpoint(key, state):
             states[key] = state
             save(state_file, states)
-            save(work / "report.json", summarize(rows, states, selected, "pending"))
+            save(work / "report.json", summarize(rows, states, selected, "pending", queue))
             print(f"{key}: {state['status']}", flush=True)
             if state.get("provider_unavailable"):
                 cancelled.set()
@@ -500,9 +528,8 @@ def main():
                 checkpoint(key, future.result())
 
         with ThreadPoolExecutor(max_workers=args.workers) as pool:
-            for key, row in rows.items():
-                if int(key.split(":")[0]) not in selected:
-                    continue
+            for key in queue:
+                row = rows[key]
                 if args.max_verses is not None and processed >= args.max_verses:
                     break
                 if states.get(key, {}).get("origin") == "prior_ai_review" and not args.refresh_reviewed:
@@ -510,9 +537,10 @@ def main():
                     continue
                 try:
                     usage_wait.wait()
-                    evidence = fetch_evidence(client, row, work / "evidence", args.tafsir)
-                    directory = work / "jobs" / key.replace(":", "-")
                     old_state = states.get(key, {})
+                    evidence = (stored_evidence(work, row) if old_state.get("status") == "model_reviewed" else None) \
+                        or fetch_evidence(client, row, work / "evidence", args.tafsir)
+                    directory = work / "jobs" / key.replace(":", "-")
                     if old_state.get("provider_unavailable") or (args.retry_held and old_state.get("status") == "held"):
                         old = directory / (states[key].get("input_sha256", "") + ".json")
                         if old.exists():
@@ -568,8 +596,9 @@ def main():
         command.append("--include-bundled")
         with (work / "playback.log").open("w") as output:
             audit = subprocess.run(command, stdout=output, stderr=subprocess.STDOUT)
-        report = summarize(rows, states, selected, "passed" if audit.returncode == 0 else "failed")
+        report = summarize(rows, states, selected, "passed" if audit.returncode == 0 else "failed", queue)
         report["reused_prior_ai_verses"] = reused
+        report["selection"] = json.loads((work / "selection.json").read_text())
         report["candidate_artifact_sha256"] = coverage["artifact_sha256"]
         report["artifact_promoted"] = audit.returncode == 0
         if audit.returncode:
