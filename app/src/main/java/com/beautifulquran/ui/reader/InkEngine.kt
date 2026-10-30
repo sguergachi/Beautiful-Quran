@@ -38,6 +38,14 @@ object InkEngine {
     /** Shared duration for playback chrome and the surrounding verse ink. */
     const val CHROME_RECEDE_MS = 520
 
+    /**
+     * How long read ink takes to leave: the paper ink's rewind evaporation,
+     * and the verse that was just recited fading back as the next begins.
+     * Slower than [CHROME_RECEDE_MS], which still paces verses that were only
+     * waiting when play starts; the finished verse lingers a little longer.
+     */
+    const val INK_DEPARTURE_MS = 850
+
     /** The four ink states every reading mode shares. */
     enum class State {
         /** Idle page, no recitation touching this ayah: full ink. */

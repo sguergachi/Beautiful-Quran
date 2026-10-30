@@ -47,7 +47,11 @@ internal fun rememberPaperInkDeparture(enabled: Boolean, state: InkEngine.State)
     SideEffect { history.transition(upcoming, read) }
     val remaining = animateFloatAsState(
         targetValue = if (upcoming) 0f else 1f,
-        animationSpec = if (upcoming) tween(850, easing = FastOutSlowInEasing) else snap(),
+        animationSpec = if (upcoming) {
+            tween(InkEngine.INK_DEPARTURE_MS, easing = FastOutSlowInEasing)
+        } else {
+            snap()
+        },
         label = "paperInkEvaporation",
     )
     return remember(history, remaining) { PaperInkDeparture(history, remaining) }

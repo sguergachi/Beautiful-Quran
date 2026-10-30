@@ -429,7 +429,9 @@ tween-vs-snap rules, sweep entry and residual rules, repeat wash timing, the
   including during a word tap's own loading. Their ink, secondary text and
   marks share the chrome's 520 ms Material ease-in-out fade on Android and
   web. Existing default Ink Lab fades migrate to that duration; custom
-  auditions persist. Scroll ignores a stale fade-led
+  auditions persist. The verse just recited, fading back as the next begins,
+  takes 850 ms (`INK_DEPARTURE_MS`, the paper ink's rewind-evaporation pace)
+  on Android; the web still uses 520 ms there. Scroll ignores a stale fade-led
   focus during that wait. Mushaf keeps earlier visible verses inked on the
   current page, including preceding chapters sharing the leaf. Arabic and
   English leaves cover later verses while the current verse carries the wash

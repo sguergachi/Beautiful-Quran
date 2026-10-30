@@ -264,11 +264,11 @@ internal data class RenderedLineText(
  * upcoming ink; when the verse is in focus the mark fades up to full.
  */
 @Composable
-internal fun rememberAyahMarkAlpha(focused: Boolean): State<Float> =
+internal fun rememberAyahMarkAlpha(focused: Boolean, leaving: Boolean = false): State<Float> =
     animateFloatAsState(
         targetValue = if (focused) 1f else InkEngine.State.Upcoming.inkAlpha(),
         animationSpec = tween(
-            InkEngine.tuning.ayahMarkFadeMs,
+            if (leaving) InkEngine.INK_DEPARTURE_MS else InkEngine.tuning.ayahMarkFadeMs,
             easing = FastOutSlowInEasing,
         ),
         label = "ayahMarkAlpha",
@@ -376,7 +376,12 @@ private fun Rect.expandToInclude(other: Rect): Rect =
  * Upcoming does not flash full ink.
  */
 @Composable
-private fun animatedInkAlpha(state: InkEngine.State, tappedPrefix: Boolean = false): State<Float> =
+private fun animatedInkAlpha(
+    state: InkEngine.State,
+    tappedPrefix: Boolean = false,
+    /** Its verse has been recited and is now fading back under the next. */
+    leaving: Boolean = false,
+): State<Float> =
     animateFloatAsState(
         targetValue = state.inkAlpha(),
         // The active word's base ink is carried by the letter sweep, not this
@@ -387,7 +392,10 @@ private fun animatedInkAlpha(state: InkEngine.State, tappedPrefix: Boolean = fal
         animationSpec = if (state == InkEngine.State.Active || tappedPrefix) {
             snap<Float>()
         } else {
-            tween(InkEngine.tuning.inkFadeMs, easing = FastOutSlowInEasing)
+            tween(
+                if (leaving) InkEngine.INK_DEPARTURE_MS else InkEngine.tuning.inkFadeMs,
+                easing = FastOutSlowInEasing,
+            )
         },
         label = "inkAlpha",
     )
@@ -1205,6 +1213,8 @@ internal fun rememberInkMotions(
     /** True while a voice is actually laying this ink. False dries the wet-ink
      * glint where the highlight has stopped moving — see [InkEngine.glinting]. */
     wetInk: Boolean = true,
+    /** The verse was just recited and is fading back: its ink leaves at [InkEngine.INK_DEPARTURE_MS]. */
+    leavingVerse: Boolean = false,
 ): List<InkMotion> {
     require(words.size == inks.size && inks.size == waslPrefixes.size) {
         "words, inks, and wasl prefixes must align"
@@ -1249,7 +1259,7 @@ internal fun rememberInkMotions(
         motions += InkMotion(
             ink = ink,
             lyricInk = if (animateLyricInk) {
-                animatedInkAlpha(ink.state, tappedPrefix)
+                animatedInkAlpha(ink.state, tappedPrefix, leavingVerse)
             } else {
                 rememberUpdatedState(ink.state.inkAlpha())
             },
@@ -2957,6 +2967,10 @@ fun AyahBlock(
     var hasFullInk by remember(ayah.surahId, ayah.number) { mutableStateOf(!dimmed) }
     val paperTheme = LocalQuranAccents.current.glintInk == null
     val softHandoff = paperTheme && dimmed && (hasOwnedInk || hasFullInk)
+    // The verse just recited, dimming as the next begins. It fades at the
+    // pace of ink leaving (rewind evaporation), not the chrome's: a verse that
+    // only ever waited keeps the chrome pace when play starts.
+    val leavingVerse = dimmed && hasOwnedInk
     SideEffect {
         if (isActiveAyah || activeWord != null) hasOwnedInk = true
         if (!dimmed) hasFullInk = true
@@ -3109,6 +3123,7 @@ fun AyahBlock(
         sequentialSweeps = readingMode == ReadingMode.ENGLISH_ONLY,
         animateLyricInk =
             readingMode == ReadingMode.ARABIC_ENGLISH && showGloss,
+        leavingVerse = leavingVerse,
         wetInk = reciting,
         activeWord = activeWord,
         playbackSpeed = playbackSpeed,
@@ -3143,18 +3158,24 @@ fun AyahBlock(
         } else {
             0f
         },
-        animationSpec = tween(InkEngine.tuning.recessMs, easing = FastOutSlowInEasing),
+        animationSpec = tween(
+            if (leavingVerse) InkEngine.INK_DEPARTURE_MS else InkEngine.tuning.recessMs,
+            easing = FastOutSlowInEasing,
+        ),
         label = "recessCover",
     )
 
     // Shared across gloss, English, and Arabic-only: mark sits at upcoming
     // ink while recessed, then fades up to full when this verse is in focus.
-    val ayahMarkAlpha = rememberAyahMarkAlpha(focused = !dimmed)
+    val ayahMarkAlpha = rememberAyahMarkAlpha(focused = !dimmed, leaving = leavingVerse)
     // Translation recess matches word ink. Animate a 0..1 multiplier read
     // only in graphicsLayer — never in composition (docs/PERFORMANCE.md).
     val translationRecess = animateFloatAsState(
         targetValue = if (dimmed) InkEngine.State.Upcoming.inkAlpha() else 1f,
-        animationSpec = tween(InkEngine.tuning.inkFadeMs, easing = FastOutSlowInEasing),
+        animationSpec = tween(
+            if (leavingVerse) InkEngine.INK_DEPARTURE_MS else InkEngine.tuning.inkFadeMs,
+            easing = FastOutSlowInEasing,
+        ),
         label = "translationRecess",
     )
 
