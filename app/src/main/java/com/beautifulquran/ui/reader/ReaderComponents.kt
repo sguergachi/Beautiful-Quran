@@ -396,9 +396,11 @@ private const val ARABIC_ONLY_HAFS_FONT_MULTIPLIER = 1.0f
 
 // The inline ayah end-marker (﴿N﴾) is set smaller than the Quranic words it
 // closes, matching the standalone [AyahNumberMark] used in the other reading
-// modes (20sp against the 30sp word body). Without this the marker inherits the
-// full word size and reads as oversized in the Arabic-only view.
-private const val AYAH_MARK_SIZE_RATIO = 20f / 30f
+// modes (17sp against the 30sp word body). Without this the marker inherits the
+// full word size and reads as oversized in the Arabic-only view. It was 20sp
+// until it read as too big beside the words in Scroll.
+private const val AYAH_MARK_SP = 17f
+private const val AYAH_MARK_SIZE_RATIO = AYAH_MARK_SP / 30f
 
 internal data class RepeatWash(
     val progress: State<Float>,
@@ -2452,7 +2454,7 @@ fun AyahNumberMark(
             appendAyahNumberMark(
                 number = number,
                 useArabicIndicDigits = useArabicIndicDigits,
-                style = SpanStyle(color = accents.gold, fontSize = 20.sp * fontScale),
+                style = SpanStyle(color = accents.gold, fontSize = AYAH_MARK_SP.sp * fontScale),
                 bookFontFamily = translationFontFamily,
             )
         }
