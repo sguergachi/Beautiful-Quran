@@ -38,13 +38,17 @@ object InkEngine {
     /** Shared duration for playback chrome and the surrounding verse ink. */
     const val CHROME_RECEDE_MS = 520
 
-    /**
-     * How long read ink takes to leave: the paper ink's rewind evaporation,
-     * and the verse that was just recited fading back as the next begins.
-     * Slower than [CHROME_RECEDE_MS], which still paces verses that were only
-     * waiting when play starts; the finished verse lingers a little longer.
-     */
+    /** How long the paper ink's rewind evaporation takes to dissolve read ink. */
     const val INK_DEPARTURE_MS = 850
+
+    /**
+     * How long the verse that was just recited takes to fade back as the next
+     * begins: the pace of the repeat ink's slow evaporation. The ease-out
+     * curve puts most of a fade's visible change in its first third, so 850 ms
+     * still read as instant; verses that only waited keep [CHROME_RECEDE_MS]
+     * when play starts.
+     */
+    const val VERSE_DEPARTURE_MS = 1_800
 
     /** The four ink states every reading mode shares. */
     enum class State {
