@@ -35,7 +35,13 @@ internal class PaperInkEvaporation(
     /** Record even static ink, so a long-settled word cannot resurrect old gloss. */
     fun sample(current: PaperInkDeposit, remaining: Float): PaperInkDeposit {
         if (isEvaporating(remaining)) return departing!!
-        last = current
+        // The word's state can read unread a moment before [transition] hears
+        // of it (the state flips in composition; the transition runs after).
+        // That frame's deposit is not the ink the word is leaving: recording it
+        // made the departure start from unread, so the shader painted the faded
+        // ink at once and no fade length mattered. While this still believes
+        // the word is read, an unread deposit is that race and is not kept.
+        if (!(read && !upcoming && current.progress < 0f)) last = current
         return current
     }
 }

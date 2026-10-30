@@ -15,6 +15,20 @@ class PaperInkEvaporationTest {
         assertFalse(ink.isEvaporating(1f))
     }
 
+    @Test fun anUnreadFrameBeforeTheTransitionDoesNotBecomeTheDepartingInk() {
+        // Verse handoff: the word's state reads unread (and is sampled) one
+        // frame before the transition arrives. The ink it leaves is still the
+        // settled deposit, so it dissolves from that, not from unread.
+        val ink = PaperInkEvaporation(false)
+        ink.sample(dry, 1f)
+        ink.sample(unread, 1f)
+        ink.transition(true)
+        assertTrue(ink.isEvaporating(1f))
+        assertEquals(dry, ink.sample(unread, 1f))
+        assertEquals(dry, ink.sample(unread, .5f))
+        assertFalse(ink.isEvaporating(0f))
+    }
+
     @Test fun startingPlaybackDoesNotReleaseUnrecitedPlainText() {
         val ink = PaperInkEvaporation(upcoming = false, read = false)
         ink.sample(dry, 1f)

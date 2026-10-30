@@ -39,7 +39,12 @@ internal class PaperInkDeparture(
 }
 
 @Composable
-internal fun rememberPaperInkDeparture(enabled: Boolean, state: InkEngine.State): PaperInkDeparture? {
+internal fun rememberPaperInkDeparture(
+    enabled: Boolean,
+    state: InkEngine.State,
+    /** The word's verse was just recited: its ink leaves at the verse's slow pace. */
+    leavingVerse: Boolean = false,
+): PaperInkDeparture? {
     if (!enabled) return null
     val upcoming = state == InkEngine.State.Upcoming
     val read = state == InkEngine.State.Active || state == InkEngine.State.Recited
@@ -48,7 +53,10 @@ internal fun rememberPaperInkDeparture(enabled: Boolean, state: InkEngine.State)
     val remaining = animateFloatAsState(
         targetValue = if (upcoming) 0f else 1f,
         animationSpec = if (upcoming) {
-            tween(InkEngine.INK_DEPARTURE_MS, easing = FastOutSlowInEasing)
+            tween(
+                if (leavingVerse) InkEngine.VERSE_DEPARTURE_MS else InkEngine.INK_DEPARTURE_MS,
+                easing = FastOutSlowInEasing,
+            )
         } else {
             snap()
         },

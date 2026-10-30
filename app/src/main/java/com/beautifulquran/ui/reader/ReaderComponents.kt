@@ -1295,6 +1295,7 @@ internal fun rememberInkMotions(
             paperDeparture = rememberPaperInkDeparture(
                 enabled = glintInk == null && InkEngine.tuning.paperInk && PaperInk.supported,
                 state = ink.state,
+                leavingVerse = leavingVerse,
             ),
         )
         predecessor = sweep.progress
