@@ -7,10 +7,12 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class EnglishSmoothTrackTest {
-    // A short Arabic word with a long gloss between two long words with short ones.
+    // A short Arabic word between two long ones, its gloss at an ordinary reading
+    // speed (10 letters a second) but three times its neighbours'. Faster glosses
+    // borrow time instead (see the levelling test below).
     private val segments = listOf(Segment(1, 0, 900), Segment(2, 900, 1100), Segment(3, 1100, 2000),
         Segment(4, 3000, 3800))
-    private val lengths = intArrayOf(3, 12, 3, 5)
+    private val lengths = intArrayOf(3, 2, 3, 5)
 
     private fun clock(sigma: Float) = requireNotNull(
         EnglishScrollClock.of(lengths, intArrayOf(1, 2, 3, 4), { null }, segments, sigma) { null })
@@ -39,8 +41,8 @@ class EnglishSmoothTrackTest {
     fun `smoothing blends the speed across a word boundary without leaving the word`() {
         val exact = clock(0f)
         val smooth = clock(100f)
-        assertTrue(boundaryJump(exact, 900) > 10)
-        assertTrue("jump ${boundaryJump(smooth, 900)}", boundaryJump(smooth, 900) < 2.5)
+        assertTrue(boundaryJump(exact, 900) > 2.5)
+        assertTrue("jump ${boundaryJump(smooth, 900)}", boundaryJump(smooth, 900) < 1.8)
         // The middle of each word stays on its word, and a held pause stays held.
         assertEquals(exact.progress(2, 1550)!!, smooth.progress(2, 1550)!!, 0.05f)
         assertEquals(position(smooth, 2400), position(smooth, 2600), 0.01)
@@ -91,6 +93,27 @@ class EnglishSmoothTrackTest {
         // Far from the stop the timing is untouched.
         assertEquals(crisp.at(1200), eased.at(1200), 0.05f)
         assertEquals(crisp.at(5600), eased.at(5600), 0.05f)
+    }
+
+    @Test
+    fun `a short word with a long gloss borrows time from its neighbours`() {
+        // Alafasy 3:4's close: azizun 1730 ms, dhu 260 ms ("All-Able (of)"), intiqam.
+        val timed = listOf(Segment(16, 20365, 22095), Segment(17, 22095, 22355), Segment(18, 22355, 26030))
+        val lengths = intArrayOf(15, 13, 11)
+        val clock = requireNotNull(EnglishScrollClock.of(lengths, intArrayOf(16, 17, 18), { null }, timed, 140f) { null })
+        fun fillMs(i: Int): Long {
+            val t10 = (19000L..27000L step 5).first { clock.progress(i, it)!! >= 0.1f }
+            val t90 = (19000L..27000L step 5).first { clock.progress(i, it)!! >= 0.9f }
+            return t90 - t10
+        }
+        // Without borrowing it filled in about 200 ms (~50 letters a second).
+        assertTrue("dhu fills in ${fillMs(1)} ms", fillMs(1) >= 550)
+        // It still sits on its word: half-inked within 350 ms of the Arabic word's middle.
+        val half = (19000L..27000L step 5).first { clock.progress(1, it)!! >= 0.5f }
+        assertTrue("half at $half", kotlin.math.abs(half - 22225) <= 350)
+        // An ordinary neighbour keeps its timing.
+        val azizHalf = (19000L..27000L step 5).first { clock.progress(0, it)!! >= 0.5f }
+        assertTrue("aziz half at $azizHalf", kotlin.math.abs(azizHalf - 21230) <= 250)
     }
 }
 

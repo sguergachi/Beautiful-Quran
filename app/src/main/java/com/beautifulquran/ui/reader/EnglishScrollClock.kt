@@ -30,6 +30,80 @@ internal class EnglishScrollClock private constructor(
 
     companion object {
         private const val TEMPO_KNOTS = 8
+        /**
+         * A short Arabic word can carry a long gloss: ذُو in 3:4 lasts 260 ms
+         * and its English "All-Able (of)" is 13 letters, 50 a second between
+         * neighbours at about 9 — a flick the smoothing cannot absorb. Only a
+         * gloss faster than [LEVEL_FAST] letters a second borrows time, and
+         * only enough to come down to that speed or to [LEVEL_RATIO] times its
+         * neighbour's (whichever needs less), by moving the boundary it shares
+         * with the slower neighbour at most [LEVEL_SHIFT_MS]. Ordinary words
+         * keep their exact timing; never across a stop, and a gloss holding a
+         * stop inside keeps its boundaries.
+         */
+        private const val LEVEL_RATIO = 1.6
+        private const val LEVEL_FAST = 0.014
+        private const val LEVEL_SHIFT_MS = 350.0
+
+        private fun levelGlossSpeeds(glosses: List<MutableList<Pair<Long, Float>>>) {
+            val count = glosses.size
+            if (count < 2) return
+            val start = DoubleArray(count) { glosses[it].first().first.toDouble() }
+            val end = DoubleArray(count) { glosses[it].last().first.toDouble() }
+            val chars = DoubleArray(count) { (glosses[it].last().second - glosses[it].first().second).toDouble() }
+            val holds = BooleanArray(count) { g ->
+                glosses[g].zipWithNext().any { (a, b) -> b.first - a.first >= ENGLISH_PAUSE_MS && b.second - a.second < 1e-4f }
+            }
+            val originalStart = start.copyOf()
+            val originalEnd = end.copyOf()
+            val movable = BooleanArray(count - 1) { k ->
+                kotlin.math.abs(end[k] - start[k + 1]) <= 1.0 && !holds[k] && !holds[k + 1] &&
+                    chars[k] > 0 && chars[k + 1] > 0
+            }
+            repeat(40) {
+                var moved = false
+                for (k in 0 until count - 1) {
+                    if (!movable[k]) continue
+                    val a = start[k]
+                    val c = end[k + 1]
+                    val b = end[k]
+                    val left = chars[k] / (b - a).coerceAtLeast(1.0)
+                    val right = chars[k + 1] / (c - b).coerceAtLeast(1.0)
+                    val target = when {
+                        left > LEVEL_FAST && left > LEVEL_RATIO * right -> minOf(
+                            (chars[k] * c + LEVEL_RATIO * chars[k + 1] * a) / (chars[k] + LEVEL_RATIO * chars[k + 1]),
+                            a + chars[k] / LEVEL_FAST,
+                        ).coerceAtLeast(b)
+                        right > LEVEL_FAST && right > LEVEL_RATIO * left -> maxOf(
+                            (LEVEL_RATIO * chars[k] * c + chars[k + 1] * a) / (LEVEL_RATIO * chars[k] + chars[k + 1]),
+                            c - chars[k + 1] / LEVEL_FAST,
+                        ).coerceAtMost(b)
+                        else -> continue
+                    }
+                    val home = originalEnd[k]
+                    val next = target.coerceIn(home - LEVEL_SHIFT_MS, home + LEVEL_SHIFT_MS)
+                        .coerceIn(a + (b - a) * 0.4, c - (c - b) * 0.4)
+                    if (kotlin.math.abs(next - b) > 0.5) {
+                        end[k] = next
+                        start[k + 1] = next
+                        moved = true
+                    }
+                }
+                if (!moved) return@repeat
+            }
+            for (g in 0 until count) {
+                val s0 = originalStart[g]
+                val e0 = originalEnd[g]
+                if (s0 == start[g] && e0 == end[g] || e0 <= s0) continue
+                val knots = glosses[g]
+                for (i in knots.indices) {
+                    val (t, v) = knots[i]
+                    val u = (t - s0) / (e0 - s0)
+                    knots[i] = (start[g] + u * (end[g] - start[g])).toLong() to v
+                }
+            }
+        }
+
         /** Audible scraps a pause leaves at a word's edge shorter than this are part of the pause. */
         private const val SLIVER_MS = 120L
 
@@ -92,7 +166,8 @@ internal class EnglishScrollClock private constructor(
                 if (heard.size == 1 && heard[0] == from..to) return heard
                 return heard.filter { it.last - it.first >= SLIVER_MS }.ifEmpty { heard }
             }
-            val knots = ArrayList<Pair<Long, Float>>()
+            // Each gloss's own knots, in order; levelled below, then joined.
+            val glossKnots = ArrayList<MutableList<Pair<Long, Float>>>()
             var previousEnd = Long.MIN_VALUE
             runs.forEachIndexed { r, run ->
                 val own = run.first().first
@@ -113,7 +188,9 @@ internal class EnglishScrollClock private constructor(
                 val voiced = pieces.sumOf { list -> list.sumOf { it.last - it.first } }.toFloat()
                 if (voiced <= 0f) return@forEachIndexed
                 var from = starts[own]
-                if (knots.isNotEmpty() && knots.last().second > from) from = knots.last().second
+                val previous = glossKnots.lastOrNull()?.lastOrNull()
+                if (previous != null && previous.second > from) from = previous.second
+                val knots = ArrayList<Pair<Long, Float>>().also { glossKnots += it }
                 run.forEachIndexed { k, (index, _) ->
                     val list = pieces[k]
                     val time = list.sumOf { it.last - it.first }.toFloat()
@@ -132,6 +209,8 @@ internal class EnglishScrollClock private constructor(
                     from += share
                 }
             }
+            levelGlossSpeeds(glossKnots)
+            val knots = glossKnots.flatten()
             // Holds the blur must not cross: every stretch where the ink stands still.
             val ordered = knots.sortedBy { it.first }
             val breaks = ordered.zipWithNext().mapNotNull { (a, b) ->

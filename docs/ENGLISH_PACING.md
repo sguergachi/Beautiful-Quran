@@ -214,6 +214,25 @@ Two changes, measured on Alafasy 3:7 with its real audio, timings and marks:
 Peak acceleration on 3:7 fell from 1,867 to 168 chars/s² (p99 125 → 89);
 every pause still holds visibly still for 300–780 ms.
 
+## 9. A short word with a long gloss borrows time
+
+Smoothing blends speed over ±140 ms; it cannot absorb a gloss that must cross
+13 letters in a quarter second. Alafasy's ذُو in 3:4 lasts 260 ms and carries
+"All-Able (of)": about 30 letters a second on screen between neighbours at 9
+and 3. `EnglishScrollClock.levelGlossSpeeds` lets only a gloss faster than
+14 letters a second borrow time, and only enough to come down to that speed
+or to 1.6× its neighbour's (whichever needs less), by moving the boundary it
+shares with the slower neighbour at most 350 ms — never across a stop, never
+for a gloss holding a stop inside. The tajweed shape inside each gloss is
+stretched with it.
+
+3:4: "All-Able (of)" 355 ms at 29 letters/s → 765 ms at 14; "(as) guidance"
+27 → 16; nothing in the verse above 16. Over 4,236 fills (60 verses, three
+reciters): the fastest gloss 66 → 39 letters/s, p99 29 → 23. Levelling every
+boundary to 1.6× was tried and rejected: it moved ordinary words off their
+Arabic (gloss-middle to Arabic-middle p90 35 → 180 ms). Targeted, the median
+stays at 10 ms and p90 is 115 ms — the fast glosses themselves.
+
 ## Fences
 
 Each of these was tried and measured, and each is load-bearing:
