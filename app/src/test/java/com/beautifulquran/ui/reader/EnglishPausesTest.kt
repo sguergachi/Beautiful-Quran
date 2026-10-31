@@ -79,11 +79,41 @@ class EnglishPausesTest {
         // Detection lands: only pauses after the next word (and the margin) are adopted, for Scroll.
         val field = EnglishPauses::class.java.getDeclaredField("ready").apply { isAccessible = true }
         @Suppress("UNCHECKED_CAST")
-        val ready = field.get(EnglishPauses) as MutableMap<String, List<AudibleSilence>>
-        synchronized(ready) { ready[url] = listOf(AudibleSilence(700, 900), AudibleSilence(16760, 17560)) }
+        val ready = field.get(EnglishPauses) as MutableMap<String, EnglishPauses.Loudness>
+        // 20 ms hops of loud voice with deep quiet at 700–900 and 16760–17560 ms.
+        val db = FloatArray(1000) { h -> if (h * 20 in 700 until 900 || h * 20 in 16760 until 17560) -30f else -3f }
+        synchronized(ready) { ready[url] = EnglishPauses.Loudness(20.0, db) }
         EnglishPauses.pin(1, 3, 7, 1L, url, positionMs = 600, voiceStartMs = 0, nextWordMs = 1000)
         assertEquals(listOf(AudibleSilence(16760, 17560)), EnglishPauses.aheadFor(3, 7))
         assertTrue(EnglishPauses.pinnedFor(3, 7).isEmpty())
+    }
+
+    @Test
+    fun `a shallow quiet counts only next to a marked stop`() {
+        // A −15 dB, 400 ms quiet around 53135 ms, and the same at an unmarked 25000 ms.
+        val db = FloatArray(3000) { h ->
+            val ms = h * 20
+            if (ms in 53140 until 53540 || ms in 25000 until 25400) -15f else -3f
+        }
+        val loudness = EnglishPauses.Loudness(20.0, db)
+        assertTrue(loudness.pauses.isEmpty())
+        val marked = loudness.pausesWith(listOf(53135L))
+        assertEquals(1, marked.size)
+        assertEquals(53140.0, marked[0].startMs.toDouble(), 20.0)
+        assertTrue(EnglishPauses.marksStop("رَبِّنَاۗ"))
+        assertTrue(EnglishPauses.marksStop("مُتَشَٰبِهَٰتٞۖ"))
+        assertTrue(!EnglishPauses.marksStop("رَبِّنَا"))
+    }
+
+    @Test
+    fun `a word timed just before the silence does not take a sliver of ink`() {
+        // 3:7: "wa ma" is timed from 53135 but the reciter is silent 53160..53560.
+        val timed = listOf(Segment(1, 51875, 53135), Segment(2, 53135, 54135))
+        val clock = requireNotNull(EnglishScrollClock.of(intArrayOf(8, 7), intArrayOf(1, 2), { null }, timed, 100f,
+            listOf(AudibleSilence(53160, 53560)), 200f) { null })
+        for (t in 53160L..53740L step 20) assertEquals(0f, clock.progress(1, t)!!, 0f)
+        assertTrue(clock.progress(1, 53900)!! > 0.2f)
+        assertEquals(1f, clock.progress(0, 53160)!!, 0.01f)
     }
 }
 

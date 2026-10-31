@@ -30,6 +30,8 @@ internal class EnglishScrollClock private constructor(
 
     companion object {
         private const val TEMPO_KNOTS = 8
+        /** Audible scraps a pause leaves at a word's edge shorter than this are part of the pause. */
+        private const val SLIVER_MS = 120L
 
         /**
          * [glossLengths] per Arabic word, in reading order (0 for a gloss merged
@@ -81,7 +83,12 @@ internal class EnglishScrollClock private constructor(
                     else listOfNotNull((p.first..q.first).takeIf { q.first > p.first },
                         (q.last..p.last).takeIf { q.last < p.last })
                 }
-                return pieces.filter { it.last > it.first }
+                // A word timed to start a breath before the silence would take a
+                // sliver of ink and then hold — read as flowing into it. Cut
+                // slivers go to the pause (unless nothing else of the word is heard).
+                val heard = pieces.filter { it.last > it.first }
+                if (heard.size == 1 && heard[0] == from..to) return heard
+                return heard.filter { it.last - it.first >= SLIVER_MS }.ifEmpty { heard }
             }
             val knots = ArrayList<Pair<Long, Float>>()
             var previousEnd = Long.MIN_VALUE

@@ -41,7 +41,7 @@ word's glyphs are.
 |---|---|---|
 | Source | `PaperInk.Source` | One word laid out **alone** in the surface's own font and style, and the host position of that layout's origin. |
 | Field generator | `PaperInkField` (pure Kotlin) | From the word's 2× glyph mask: signed outline distance, the swelling-channel arrival for both spread methods, the liquid film normal. Port of `tools/build_paper_ink_study.py`. |
-| Cache | `PaperInk.word` | Captures the mask on the UI thread (rationed to 3 words a frame), generates on one background thread, keeps ~32 MB of words keyed by layout and sub-pixel phase. |
+| Cache | `PaperInk.word` | Captures the mask on the UI thread (rationed to 3 words a frame), generates on one background thread, keeps ~32 MB of words keyed by layout and exact sub-pixel phase (a rounded phase lands glyphs off the printed ones). |
 | Draw | `PaperInk.drawWord` + `assets/paper-ink/ink.agsl` | Erases the word's printed pixels from the surface's layer, then draws the ink. |
 | Clock | `InkMotion` | Letter progress (`paperSweepProgress`), wetness (`paperWetness`), repeat (`paperRepeatProgress` / `repeatAlpha`), and `paperAhead` for the lead fade. No clocks of its own. |
 

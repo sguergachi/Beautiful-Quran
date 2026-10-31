@@ -506,6 +506,13 @@ exact endpoints, and rests at the voiced end through a breath.
   detection never rebuilds a running clock); this verse and the next two are
   decoded ahead. On Hani 64:1 the leaf now holds on "[all] praise," through
   the 9.44–9.80 s breath instead of drifting on.
+  At a word the Mushaf marks for a stop (ۖ ۗ ۚ ۘ ۛ, saktah ۜ; never ۙ) a pause
+  can be shallow — Alafasy after رَبِّنَاۗ in 3:7 sits only 15–19 dB under his
+  voice — so next to a marked word −12 dB for ≥150 ms counts
+  (`EnglishPauses.MARKED_DB`). At 3:7's four marked boundaries he holds below
+  −12 dB for 400–850 ms; at unmarked ones never past 90 ms. A word timed to
+  start a breath before the silence keeps no sliver (<120 ms) of ink ahead of
+  it: that sliver read as flowing on into the next word.
 - **Lead.** In English reading the highlight clock runs
   `Tuning.englishLeadMs` (Ink Lab "English lead", 200 ms) ahead of the voice.
   A reader takes in a word's meaning as it is heard; ink that only finishes as

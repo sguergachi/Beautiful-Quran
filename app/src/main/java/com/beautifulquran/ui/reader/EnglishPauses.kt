@@ -32,10 +32,72 @@ internal object EnglishPauses {
         runCatching { android.util.Log.d(TAG, message) }
     }
 
-    /** Pauses in decoded PCM ([hopSamples] per [hopMs] hop), on the media clock. Pure. */
-    fun detect(pcm: FloatArray, hopSamples: Int, hopMs: Double): List<AudibleSilence> {
+    /**
+     * At a word the Mushaf marks for a stop (ۖ ۗ ۚ ۘ ۛ, or the saktah ۜ),
+     * a reciter's pause can be shallow: Alafasy's after رَبِّنَاۗ in 3:7 sits
+     * only 15–19 dB under his voice. Next to a marked word a quiet of
+     * [MARKED_DB] for [MARKED_MIN_MS] is a pause: at 3:7's four marked
+     * boundaries he holds below −12 dB for 400–850 ms, at unmarked ones never
+     * past 90 ms. Within [MARKED_BEFORE_MS] before the next word's timed start
+     * to [MARKED_AFTER_MS] after it.
+     */
+    const val MARKED_DB = -12f
+    const val MARKED_MIN_MS = 150L
+    private const val MARKED_BEFORE_MS = 600L
+    private const val MARKED_AFTER_MS = 800L
+
+    /** Waqf signs a reciter may stop at; ۙ (U+06D9) forbids a stop and is not one. */
+    fun marksStop(arabic: String): Boolean = arabic.any { it in "\u06D6\u06D7\u06D8\u06DA\u06DB\u06DC" }
+
+    /** A verse's loudness, median-filtered, in dB relative to its 95th percentile, per [hopMs] hop. */
+    class Loudness(val hopMs: Double, private val db: FloatArray) {
+        private fun runs(threshold: Float, from: Int, to: Int): List<LongArray> {
+            val out = ArrayList<LongArray>()
+            var h = from
+            while (h < to) {
+                if (db[h] < threshold) {
+                    val start = h
+                    while (h < to && db[h] < threshold) h++
+                    val a = (start * hopMs).toLong()
+                    val b = (h * hopMs).toLong()
+                    val last = out.lastOrNull()
+                    if (last != null && a - last[1] <= BRIDGE_MS) last[1] = b else out += longArrayOf(a, b)
+                } else h++
+            }
+            return out
+        }
+
+        /** Deep quiet anywhere: a breath the timings call voiced. */
+        val pauses: List<AudibleSilence> by lazy {
+            runs(QUIET_DB, 0, db.size).filter { it[1] - it[0] >= MIN_MS }.map { AudibleSilence(it[0], it[1]) }
+        }
+
+        /** The longest shallow quiet around a marked stop whose next word starts at [boundaryMs]. */
+        fun pauseNear(boundaryMs: Long): AudibleSilence? {
+            val from = ((boundaryMs - MARKED_BEFORE_MS) / hopMs).toInt().coerceIn(0, db.size)
+            val to = ((boundaryMs + MARKED_AFTER_MS) / hopMs).toInt().coerceIn(from, db.size)
+            return runs(MARKED_DB, from, to).filter { it[1] - it[0] >= MARKED_MIN_MS }
+                .maxByOrNull { it[1] - it[0] }?.let { AudibleSilence(it[0], it[1]) }
+        }
+
+        /** Every pause for a verse whose marked stops lead into words timed at [stopBoundaries]. */
+        fun pausesWith(stopBoundaries: List<Long>): List<AudibleSilence> {
+            val all = (pauses + stopBoundaries.mapNotNull(::pauseNear)).sortedBy { it.startMs }
+            val merged = ArrayList<AudibleSilence>()
+            for (p in all) {
+                val last = merged.lastOrNull()
+                if (last != null && p.startMs <= last.endMs) {
+                    merged[merged.lastIndex] = AudibleSilence(last.startMs, maxOf(last.endMs, p.endMs))
+                } else merged += p
+            }
+            return merged
+        }
+    }
+
+    /** [pcm]'s loudness ([hopSamples] per [hopMs] hop), on the media clock. Pure. */
+    fun analyze(pcm: FloatArray, hopSamples: Int, hopMs: Double): Loudness {
         val hops = pcm.size / hopSamples.coerceAtLeast(1)
-        if (hops < 4) return emptyList()
+        if (hops < 4) return Loudness(hopMs, FloatArray(0))
         val db = FloatArray(hops) { h ->
             var sum = 0.0
             for (i in h * hopSamples until (h + 1) * hopSamples) sum += pcm[i] * pcm[i]
@@ -43,34 +105,26 @@ internal object EnglishPauses {
         }
         val half = maxOf(1, (MEDIAN_MS / hopMs / 2).toInt())
         val window = FloatArray(2 * half + 1)
+        val reference = db.sortedArray()[((hops - 1) * 0.95).toInt()]
         val smooth = FloatArray(hops) { h ->
             for (k in window.indices) window[k] = db[(h - half + k).coerceIn(0, hops - 1)]
             window.sort()
-            window[half]
+            window[half] - reference
         }
-        val reference = db.sortedArray()[((hops - 1) * 0.95).toInt()]
-        val runs = ArrayList<LongArray>()
-        var h = 0
-        while (h < hops) {
-            if (smooth[h] < reference + QUIET_DB) {
-                val start = h
-                while (h < hops && smooth[h] < reference + QUIET_DB) h++
-                val from = (start * hopMs).toLong()
-                val to = (h * hopMs).toLong()
-                val last = runs.lastOrNull()
-                if (last != null && from - last[1] <= BRIDGE_MS) last[1] = to else runs += longArrayOf(from, to)
-            } else h++
-        }
-        return runs.filter { it[1] - it[0] >= MIN_MS }.map { AudibleSilence(it[0], it[1]) }
+        return Loudness(hopMs, smooth)
     }
 
-    private val ready = object : LinkedHashMap<String, List<AudibleSilence>>(KEPT, 0.75f, true) {
-        override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, List<AudibleSilence>>?) = size > KEPT
+    /** Deep-quiet pauses in [pcm]. Pure. */
+    fun detect(pcm: FloatArray, hopSamples: Int, hopMs: Double): List<AudibleSilence> =
+        analyze(pcm, hopSamples, hopMs).pauses
+
+    private val ready = object : LinkedHashMap<String, Loudness>(KEPT, 0.75f, true) {
+        override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, Loudness>?) = size > KEPT
     }
     private val pending = HashSet<String>()
 
-    /** Detected pauses for a verse's audio, if worked out yet. Any thread. */
-    fun ready(url: String): List<AudibleSilence>? = synchronized(ready) { ready[url] }
+    /** A verse's analysed loudness, if worked out yet. Any thread. */
+    fun ready(url: String): Loudness? = synchronized(ready) { ready[url] }
 
     /** Main thread: work out [url]'s pauses in the background, once. */
     suspend fun request(context: Context, url: String) {
@@ -78,10 +132,10 @@ internal object EnglishPauses {
         try {
             val audio = TarjiVersePulse.decodedAudio(context, url)
             val found = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) {
-                detect(audio.pcm, audio.hopSamples, audio.hopMs)
+                analyze(audio.pcm, audio.hopSamples, audio.hopMs)
             }
             synchronized(ready) { ready[url] = found }
-            log("${url.substringAfterLast('/')}: ${found.joinToString { "${it.startMs}-${it.endMs}" }}")
+            log("${url.substringAfterLast('/')}: ${found.pauses.joinToString { "${it.startMs}-${it.endMs}" }}")
         } catch (cancelled: kotlinx.coroutines.CancellationException) {
             throw cancelled
         } catch (failed: Throwable) {
@@ -116,11 +170,13 @@ internal object EnglishPauses {
      * starts after [positionMs] (null past the last).
      */
     fun pin(reciterId: Int, surahId: Int, ayah: Int, generation: Long, url: String,
-            positionMs: Long, voiceStartMs: Long, nextWordMs: Long? = null): List<AudibleSilence> {
+            positionMs: Long, voiceStartMs: Long, nextWordMs: Long? = null,
+            /** Timed starts of words that follow a marked stop ([marksStop]). */
+            stopBoundaries: List<Long> = emptyList()): List<AudibleSilence> {
         val current = pinned.value
         val same = current != null && current.reciterId == reciterId && current.surahId == surahId &&
             current.ayah == ayah && current.generation == generation
-        val found = ready(url)
+        val found = ready(url)?.pausesWith(stopBoundaries)
         val next = if (same && current.locked) {
             val from = maxOf(nextWordMs ?: Long.MAX_VALUE, positionMs + LATE_MARGIN_MS)
             val late = found.orEmpty().filter { it.startMs >= from && it !in current.ahead }

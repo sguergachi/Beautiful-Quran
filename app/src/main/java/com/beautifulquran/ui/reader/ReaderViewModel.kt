@@ -617,7 +617,23 @@ class ReaderViewModel(
         val item = playback.item
         val url = audioUrlFor(item.reciter, item.surah, item.ayah) ?: return
         EnglishPauses.pin(item.reciter, item.surah, item.ayah, playback.inkGeneration, url, positionMs, voiceStartMs,
-            nextWordMs = segments.firstOrNull { it.startMs > positionMs }?.startMs)
+            nextWordMs = segments.firstOrNull { it.startMs > positionMs }?.startMs,
+            stopBoundaries = stopBoundaries(item.surah, item.ayah, segments))
+    }
+
+    /**
+     * Where the words after a marked stop (EnglishPauses.marksStop) are timed to
+     * begin: a reciter's pause there can be shallow, so it is looked for there.
+     */
+    private fun stopBoundaries(surahId: Int, ayah: Int, segments: List<Segment>): List<Long> {
+        val words = _uiState.value.content?.takeIf { it.surah.id == surahId }
+            ?.ayahs?.firstOrNull { it.number == ayah }?.words ?: return emptyList()
+        var highWater = Int.MIN_VALUE
+        val firstStart = HashMap<Int, Long>()
+        for (s in segments) if (s.position > highWater) { highWater = s.position; firstStart[s.position] = s.startMs }
+        return words.zipWithNext().mapNotNull { (word, next) ->
+            if (EnglishPauses.marksStop(word.arabic)) firstStart[next.position] else null
+        }
     }
 
     /** Verses whose pauses the English should know before they play: this one and the next two. */

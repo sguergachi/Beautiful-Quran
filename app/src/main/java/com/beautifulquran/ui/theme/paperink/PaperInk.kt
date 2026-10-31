@@ -121,7 +121,14 @@ object PaperInk {
         internal var paperBound = false
     }
 
-    private data class Key(val input: TextLayoutInput, val phaseX: Int, val phaseY: Int)
+    /**
+     * A layout at its exact sub-pixel phase. Glyphs are positioned on Skia's
+     * own sub-pixel grid and the baseline rounded to a pixel, so a capture at
+     * a rounded phase can land a glyph a bin or a row off the printed one; the
+     * erase then misses that sliver and it shows as a black hairline on an
+     * unread word.
+     */
+    private data class Key(val input: TextLayoutInput, val phaseX: Float, val phaseY: Float)
 
     private val cache = object : LruCache<Key, Word>(CACHE_BYTES) {
         override fun sizeOf(key: Key, value: Word): Int = value.bytes
@@ -185,10 +192,10 @@ object PaperInk {
         return null
     }
 
+    private fun phase(origin: Float): Float = origin - floor(origin)
+
     private fun key(source: Source): Key {
-        val fx = source.originX - floor(source.originX)
-        val fy = source.originY - floor(source.originY)
-        return Key(source.layout.layoutInput, (fx * PHASES).roundToInt() % PHASES, (fy * PHASES).roundToInt() % PHASES)
+        return Key(source.layout.layoutInput, phase(source.originX), phase(source.originY))
     }
 
     /** Words whose capture held no ink, and when to try them again. */
@@ -287,8 +294,8 @@ object PaperInk {
         val fontPx = with(input.density) { input.style.fontSize.takeIf { it.isSp }?.toPx() }
             ?: (layout.size.height * 0.75f)
         if (layout.size.width <= 0 || layout.size.height <= 0) return null
-        val phaseX = ((source.originX - floor(source.originX)) * PHASES).roundToInt() % PHASES / PHASES.toFloat()
-        val phaseY = ((source.originY - floor(source.originY)) * PHASES).roundToInt() % PHASES / PHASES.toFloat()
+        val phaseX = phase(source.originX)
+        val phaseY = phase(source.originY)
         // Room for Hafs marks and tails, and Latin serifs, that ink past the box.
         val padX = ceil(fontPx * 0.45f).toInt()
         val padY = ceil(fontPx * 0.35f).toInt()
@@ -469,7 +476,6 @@ object PaperInk {
         return shader
     }
 
-    private const val PHASES = 8
     private const val CAPTURES_PER_FRAME = 3
     private const val INKLESS_LIMIT = 256
     private const val INKLESS_RETRY_MS = 2_000L
