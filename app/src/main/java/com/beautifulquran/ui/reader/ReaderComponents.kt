@@ -268,7 +268,7 @@ internal fun rememberAyahMarkAlpha(focused: Boolean, leaving: Boolean = false): 
     animateFloatAsState(
         targetValue = if (focused) 1f else InkEngine.State.Upcoming.inkAlpha(),
         animationSpec = tween(
-            if (leaving) InkEngine.VERSE_DEPARTURE_MS else InkEngine.tuning.ayahMarkFadeMs,
+            if (leaving) InkEngine.INK_DEPARTURE_MS else InkEngine.tuning.ayahMarkFadeMs,
             easing = FastOutSlowInEasing,
         ),
         label = "ayahMarkAlpha",
@@ -393,7 +393,7 @@ private fun animatedInkAlpha(
             snap<Float>()
         } else {
             tween(
-                if (leaving) InkEngine.VERSE_DEPARTURE_MS else InkEngine.tuning.inkFadeMs,
+                if (leaving) InkEngine.INK_DEPARTURE_MS else InkEngine.tuning.inkFadeMs,
                 easing = FastOutSlowInEasing,
             )
         },
@@ -1213,7 +1213,7 @@ internal fun rememberInkMotions(
     /** True while a voice is actually laying this ink. False dries the wet-ink
      * glint where the highlight has stopped moving — see [InkEngine.glinting]. */
     wetInk: Boolean = true,
-    /** The verse was just recited and is fading back: its ink leaves at [InkEngine.VERSE_DEPARTURE_MS]. */
+    /** The verse was just recited and is fading back: its ink leaves at [InkEngine.INK_DEPARTURE_MS]. */
     leavingVerse: Boolean = false,
 ): List<InkMotion> {
     require(words.size == inks.size && inks.size == waslPrefixes.size) {
@@ -1295,7 +1295,6 @@ internal fun rememberInkMotions(
             paperDeparture = rememberPaperInkDeparture(
                 enabled = glintInk == null && InkEngine.tuning.paperInk && PaperInk.supported,
                 state = ink.state,
-                leavingVerse = leavingVerse,
             ),
         )
         predecessor = sweep.progress
@@ -3160,7 +3159,7 @@ fun AyahBlock(
             0f
         },
         animationSpec = tween(
-            if (leavingVerse) InkEngine.VERSE_DEPARTURE_MS else InkEngine.tuning.recessMs,
+            if (leavingVerse) InkEngine.INK_DEPARTURE_MS else InkEngine.tuning.recessMs,
             easing = FastOutSlowInEasing,
         ),
         label = "recessCover",
@@ -3174,7 +3173,7 @@ fun AyahBlock(
     val translationRecess = animateFloatAsState(
         targetValue = if (dimmed) InkEngine.State.Upcoming.inkAlpha() else 1f,
         animationSpec = tween(
-            if (leavingVerse) InkEngine.VERSE_DEPARTURE_MS else InkEngine.tuning.inkFadeMs,
+            if (leavingVerse) InkEngine.INK_DEPARTURE_MS else InkEngine.tuning.inkFadeMs,
             easing = FastOutSlowInEasing,
         ),
         label = "translationRecess",

@@ -138,7 +138,7 @@ The basmalah sites (drawable and QCF glyph) keep their wash for now.
   tap publishes before playback starts and completes any old prefix wash;
   only the words ahead of the new target become unread.
   The verse just recited dissolves the same way as the next verse begins,
-  over 1.8 s (`VERSE_DEPARTURE_MS`). The departing ink must be the settled
+  at the same 850 ms (`INK_DEPARTURE_MS`). The departing ink must be the settled
   deposit: the word's state reads unread a moment before the evaporation
   hears of the change, and recording that frame as "the ink being left" made
   the shader paint the faded ink at once, whatever the duration.

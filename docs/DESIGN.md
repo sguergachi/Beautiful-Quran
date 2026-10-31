@@ -836,10 +836,9 @@ over the same 520 ms and easing as the controls: the page at rest when play
 begins eases back under its paper cover on that clock, while a verse that has
 only ever waited, or mounts during playback, keeps the Upcoming floor from its
 first frame. The verse giving up the lyric line, already recited, fades back
-more slowly, over 1.8 s (`InkEngine.VERSE_DEPARTURE_MS`): the pace of the
-repeat ink's evaporation, so the finished verse lingers as the next begins
-(850 ms still read as instant: the ease-out puts most of a fade in its first
-third).
+more slowly, over 850 ms (`InkEngine.INK_DEPARTURE_MS`): the same pace as
+read ink dissolving on a rewind, since it is the same effect, so the finished
+verse lingers as the next begins.
 Mushaf keeps earlier verses inked on the current page as the wash advances, in
 both Arabic and English.
 
@@ -1438,7 +1437,7 @@ weight.
 ## Motion
 
 - Everything ≤ 400 ms except the deliberate slow moves: chrome recede
-  (520 ms), chapter-opening travel (480 ms), verse ink recess (520 ms; 1.8 s for the verse just recited), ayah dim (600 ms), and the
+  (520 ms), chapter-opening travel (480 ms), verse ink recess (520 ms; 850 ms for the verse just recited), ayah dim (600 ms), and the
   hand-initiated ayah-jump scroll
   (≈280 ms nearby → a full **1000 ms** for a ~200-verse jump — a fast
   decelerating rush across a distance-scaled stretch of verses, truncated
