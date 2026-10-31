@@ -1150,9 +1150,12 @@ private class WordInkCache {
 
     private var layout: TextLayoutResult? = null
     private var measurer: TextMeasurer? = null
-    private val byRange = object : LinkedHashMap<Long, WordInk?>(8, 0.75f, true) {
+    // Paper ink asks for every word of the paragraph each frame, in order: a
+    // cap under the paragraph's word count evicts each entry before its next
+    // use and re-shapes every word every frame. Cleared on relayout anyway.
+    private val byRange = object : LinkedHashMap<Long, WordInk?>(32, 0.75f, true) {
         override fun removeEldestEntry(eldest: MutableMap.MutableEntry<Long, WordInk?>?): Boolean =
-            size > 16
+            size > 512
     }
 
     /** [lineBoxes] are the range's line boxes, shifted for justification. */
