@@ -16,16 +16,9 @@ private data class MediaEntry(
     val feather: Float? = null,
     val revealStart: Float = 0f,
     val letterRevealStart: Float = 0f,
-    /** English: the reciter's tempo, replacing the per-word ease (null in [steady] is linear). */
-    val tempo: TajweedPacing.Curve? = null,
-    val steady: Boolean = false,
 ) {
-    /** The sweep clock before any letter map: eased per word, or the English tempo. */
-    fun clock(linear: Float): Float = when {
-        steady -> tempo?.at(linear) ?: linear
-        pacing != null -> linear
-        else -> InkEngine.sweepEasing.transform(linear)
-    }
+    /** The sweep clock before any letter map: linear under a pacing curve, otherwise eased. */
+    fun clock(linear: Float): Float = if (pacing != null) linear else InkEngine.sweepEasing.transform(linear)
 }
 private class MediaHistory(var entry: MediaEntry = MediaEntry())
 
@@ -41,8 +34,6 @@ private fun rememberMediaEntry(
     revealStart: Float = 0f,
     repeatOccurrence: Boolean = false,
     letterRevealStart: Float = 0f,
-    tempo: TajweedPacing.Curve? = null,
-    steady: Boolean = false,
 ): State<MediaEntry> {
     val timeline = LocalHighlightTimeline.current
     val history = remember { MediaHistory() }
@@ -55,7 +46,7 @@ private fun rememberMediaEntry(
     }
     val entry = if (next.window != prior.wash.window || next.provisional != prior.wash.provisional) {
         MediaEntry(next, pacing, pacing?.let { InkEngine.pacedFeather() },
-            revealStart.coerceIn(0f, 1f), letterRevealStart.coerceIn(0f, 1f), tempo, steady)
+            revealStart.coerceIn(0f, 1f), letterRevealStart.coerceIn(0f, 1f))
     } else prior.copy(wash = next)
     SideEffect { history.entry = entry }
     return rememberUpdatedState(entry)
@@ -79,14 +70,12 @@ internal fun rememberMediaLetterSweep(
     revealStart: Float,
     predecessor: State<Float>?,
     letterRevealStart: Float = 0f,
-    tempo: TajweedPacing.Curve? = null,
-    steady: Boolean = false,
     /** English verse clock: this word's progress at a frame's ink time, replacing its own window. */
     verseClock: ((Long) -> Float?)? = null,
 ): LetterSweep {
     val timeline = LocalHighlightTimeline.current
     val entry = rememberMediaEntry(active, retain, activation, window, provisional, pacing, revealStart,
-        letterRevealStart = letterRevealStart, tempo = tempo, steady = steady)
+        letterRevealStart = letterRevealStart)
     val prior = rememberUpdatedState(predecessor)
     val clock = rememberUpdatedState(verseClock)
     val raw = remember {
@@ -135,12 +124,10 @@ internal fun rememberMediaRepeatWash(
     provisional: Boolean,
     pacing: TajweedPacing.Curve?,
     base: State<Float>,
-    tempo: TajweedPacing.Curve? = null,
-    steady: Boolean = false,
 ): RepeatWash {
     val timeline = LocalHighlightTimeline.current
     val entry = rememberMediaEntry(repeat && active, true, activation, window, provisional, pacing,
-        repeatOccurrence = true, tempo = tempo, steady = steady)
+        repeatOccurrence = true)
     val baseState = rememberUpdatedState(base)
     val raw = remember {
         derivedStateOf {

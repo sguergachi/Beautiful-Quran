@@ -588,24 +588,6 @@ object InkEngine {
     ): TajweedPacing.Curve? =
         letterPacing(arabic, spokenFraction(activeWord), isAyahFinal, prevArabic)?.forWash(tuning.pacedFeather)
 
-    /**
-     * The reciter's tempo through the active word for an English renderer:
-     * [TajweedPacing.Curve.tempo] at [Tuning.englishTajweedTempo] — slower on
-     * held letters, never parked. Null keeps a steady pace (no dramatic
-     * letter, tajweed pacing off, or tempo 0).
-     */
-    fun englishTempo(
-        arabic: String,
-        activeWord: ActiveWord,
-        isAyahFinal: Boolean,
-        prevArabic: String? = null,
-    ): TajweedPacing.Curve? {
-        val strength = tuning.englishTajweedTempo
-        if (strength <= 0f) return null
-        val spoken = spokenFraction(activeWord)
-        return letterPacing(arabic, spoken, isAyahFinal, prevArabic)?.tempo(strength, spoken)
-    }
-
     /** One spoken Arabic word's tempo across exactly its own voiced span, for the English leaf's clock. */
     fun englishSegmentTempo(arabic: String, isAyahFinal: Boolean, prevArabic: String? = null): TajweedPacing.Curve? {
         val strength = tuning.englishTajweedTempo

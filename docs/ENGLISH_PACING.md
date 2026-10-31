@@ -34,6 +34,27 @@ word makes the speed jump at every boundary; smoothing the speed blurs the
 stops; leading the voice makes a stop end early. The rest of this document is
 how each tension was resolved.
 
+## The one rule: the clock owns English Scroll
+
+In English Scroll the verse clock decides both **how far** each gloss is inked
+and **which** gloss is the active word. `EnglishScrollPerformance` is the only
+place that turns timings into those two answers; the verse block passes its
+clock and its active word to `rememberInkMotions` together.
+
+The Arabic's per-word machinery — a word gets ink only while its Arabic word
+is active, and its window is released (snapped full) when that word ends —
+must never get a say of its own in English Scroll. Anything the clock does
+across an Arabic word boundary (borrowed time, smoothing, the lead, a held
+pause) is otherwise cut back to the Arabic word's span. That happened once:
+levelling passed every clock test and changed nothing on the phone, because
+"All-Able (of)" could still only ink inside ذُو's 260 ms.
+
+When adding an English Scroll timing feature, put it in the clock and test it
+through `EnglishScrollClock.wordAt`/`window` and `englishClockActiveWord`, not
+only `progress`. Exceptions, by design: re-says (the orange repeat) and
+unconfirmed taps keep the voiced word, and a verse's first frame (before its
+clock exists) uses the voiced word's eased window (`EnglishRevealTiming`).
+
 ## The pipeline
 
 ```
@@ -56,16 +77,18 @@ Mushaf text ──┼─ stop marks ──► stop boundaries ─► pauses (dee
 | Piece | File | Role |
 |---|---|---|
 | Tempo curve | `domain/TajweedPacing.kt` (`Curve.tempo`) | The reciter's speed through one word, never parked |
-| Scroll verse clock | `ui/reader/EnglishScrollClock.kt` | One position across a verse's glosses |
+| Scroll owner | `ui/reader/EnglishScrollPerformance.kt` | The clock plus the active word it implies; the one rule above |
+| Scroll verse clock | `ui/reader/EnglishScrollClock.kt` | One position across a verse's glosses; which gloss is inking |
 | Mushaf tempo warp | `ui/reader/EnglishReadingFlow.kt` (`EnglishTempoWarp`) | The same tempo inside the leaf's audible-time clock |
 | Speed smoothing | `ui/reader/EnglishSmoothTrack.kt` | Gaussian on position, narrowing to nothing at pauses |
 | Heard pauses | `ui/reader/EnglishPauses.kt` | Loudness from the verse audio; stop-mark boundaries; pinning |
 | Lead | `ui/reader/ReaderViewModel.kt` (`englishLeadMs`) | English reading runs the highlight clock ahead |
 | Word overlap (Mushaf) | `ui/reader/PaperInkEnglishWindows.kt` | Printed words' fills overlap half a letter in connected speech |
-| Fallback | `ui/reader/EnglishRevealTiming.kt` | Per-word windows when no verse clock exists |
+| Fallback | `ui/reader/EnglishRevealTiming.kt` | A verse's first frame, before its clock exists (and the web reader) |
 
-Ink Lab → Tajweed: **English tajweed tempo** (0.6), **English smoothing**
-(140 ms), **English ease** (260 ms), **English lead** (200 ms).
+Ink Lab → Tajweed: **English tajweed tempo** (0.6; 0 is a steady pace inside
+each word — the clock stays on), **English smoothing** (140 ms), **English
+ease** (260 ms), **English lead** (200 ms).
 
 ## 1. Stop at a pause, not at every word
 
@@ -246,6 +269,8 @@ stays at 10 ms and p90 is 115 ms — the fast glosses themselves.
 
 Each of these was tried and measured, and each is load-bearing:
 
+- **Do not let the Arabic's word state gate English Scroll.** The clock owns
+  both progress and the active word (the one rule above).
 - **Do not finish every word early.** That is a stop per word (section 1).
 - **Do not feed English the Arabic letter map.** It parks and races (29c47d4e9).
 - **Do not smooth across a pause or a verse's ends.** The stop disappears.

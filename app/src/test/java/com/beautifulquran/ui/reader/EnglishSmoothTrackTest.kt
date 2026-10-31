@@ -137,5 +137,27 @@ class EnglishSmoothTrackTest {
             last = at
         }
     }
+
+    @Test
+    fun `the clock's gloss becomes the active word across its whole window`() {
+        // The rule that keeps the clock in charge (EnglishScrollPerformance): when
+        // the clock inks dhu's gloss early, the active word is dhu, timed across
+        // the borrowed window, and words past it are not left recited.
+        val ayah = com.beautifulquran.data.model.Ayah(3, 4, "", "", words = (16..18).map {
+            com.beautifulquran.data.model.Word(position = it, arabic = "", translation = "", transliteration = "")
+        })
+        val voiced = ActiveWord(4, 16, startMs = 20365, durationMs = 1730, highWater = 16, activation = 3)
+        val active = englishClockActiveWord(voiced, ayah, index = 1, window = 21640L..22430L)
+        assertEquals(17, active.wordPosition)
+        assertEquals(21640L, active.startMs)
+        assertEquals(22430L - 21640L + ENGLISH_CLOCK_RESIDUAL_MS, active.durationMs)
+        assertEquals(17, active.highWater)
+        assertEquals(18, active.nextWordPosition)
+        assertEquals(3L, active.activation)
+        // Lagging behind the voice: the Arabic is on 18 but the clock still inks 17,
+        // so 18 must not be counted as recited.
+        val ahead = voiced.copy(wordPosition = 18, highWater = 18)
+        assertEquals(17, englishClockActiveWord(ahead, ayah, 1, 21640L..22430L).highWater)
+    }
 }
 

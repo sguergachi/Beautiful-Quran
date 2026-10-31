@@ -201,7 +201,7 @@ fun InkLabPanel(
                         TuningSlider("English tajweed tempo", t.englishTajweedTempo, 0f..1f) {
                             InkEngine.tuning = t.copy(englishTajweedTempo = it)
                         }
-                        LabCaption("How much English ink slows on held letters and quickens through short ones. 0 is steady; 1 parks on a madd like the Arabic.")
+                        LabCaption("How much English ink slows on held letters and quickens through short ones. 0 is a steady pace inside each word; 1 parks on a madd like the Arabic.")
                         TuningSlider("English smoothing (ms)", t.englishSmoothMs, 0f..250f) {
                             InkEngine.tuning = t.copy(englishSmoothMs = it)
                         }
