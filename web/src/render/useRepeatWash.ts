@@ -2,7 +2,6 @@ import { useLayoutEffect, useRef, type RefObject } from 'react'
 import {
   getTuning,
   InkState,
-  minSweepFloorMs,
   pacing,
   type InkWord,
 } from '../ui/reader/InkEngine'
@@ -78,7 +77,7 @@ export function useRepeatWash(
         : t.repeatSweepMs,
     )
     const duration = english
-      ? englishRevealDurationMs(ordinaryDuration, minSweepFloorMs(), motion?.timing?.spokenMs, tarjiSignal.speed)
+      ? englishRevealDurationMs(ordinaryDuration, motion?.timing?.spokenMs, tarjiSignal.speed)
       : ordinaryDuration
     const curve =
       !english && motion?.timing

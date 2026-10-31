@@ -3126,10 +3126,10 @@ fun AyahBlock(
         words = ayah.words,
         inks = inks,
         activeSweepMs = if (readingMode == ReadingMode.ENGLISH_ONLY) {
-            englishRevealDurationMs(sweepMs, InkEngine.minSweepFloorMs(), activeWord?.spokenMs, playbackSpeed)
+            englishRevealDurationMs(sweepMs, activeWord?.spokenMs, playbackSpeed)
         } else sweepMs,
         activeRepeatDwellMs = if (readingMode == ReadingMode.ENGLISH_ONLY) {
-            englishRevealDurationMs(repeatDwellMs, InkEngine.minSweepFloorMs(), activeWord?.spokenMs, playbackSpeed)
+            englishRevealDurationMs(repeatDwellMs, activeWord?.spokenMs, playbackSpeed)
         } else repeatDwellMs,
         // English has no Arabic letter-pacing paint, but shares every other
         // lifecycle rule and the same low-level shaped bloom primitive.

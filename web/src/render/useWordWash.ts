@@ -11,7 +11,6 @@ import { cubicBezierEase } from '../ui/theme/Fade'
 import {
   getTuning,
   InkState,
-  minSweepFloorMs,
   pacing,
   type InkWord,
 } from '../ui/reader/InkEngine'
@@ -160,7 +159,7 @@ export function useWordWash({
     const tuning = { ...getTuning() }
     const ordinaryDuration = Math.max(1, durationMs ?? tuning.repeatSweepMs)
     const duration = english
-      ? englishRevealDurationMs(ordinaryDuration, minSweepFloorMs(), motion?.timing?.spokenMs, tarjiSignal.speed)
+      ? englishRevealDurationMs(ordinaryDuration, motion?.timing?.spokenMs, tarjiSignal.speed)
       : ordinaryDuration
     const from = !english ? (registry.prefixes.get(key) ?? 0) : 0
     const curve =

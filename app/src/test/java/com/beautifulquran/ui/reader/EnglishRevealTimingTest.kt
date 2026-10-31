@@ -26,43 +26,43 @@ class EnglishRevealTimingTest {
     )
 
     @Test
-    fun `word finishes one hundred milliseconds sooner then holds until next onset`() {
-        val window = mediaWashWindow(verse, first, englishRevealDurationMs(1000, 140), 1f)!!
+    fun `connected speech flows to the next onset without stopping`() {
+        // A 10 ms segment gap is connected speech: the sweep spans the whole hold.
+        val joined = first.copy(spokenMs = 990)
+        val window = mediaWashWindow(verse, joined, englishRevealDurationMs(1000, joined.spokenMs), 1f)!!
         val next = mediaWashWindow(verse, first.copy(wordPosition = 2, startMs = 2000),
-            englishRevealDurationMs(1000, 140), 1f)!!
+            englishRevealDurationMs(1000), 1f)!!
         assertEquals(1000L, window.startMs)
-        assertEquals(900L, window.durationMs)
-        for (at in 1900L..1999L step 11L) {
-            assertEquals(1f, window.progress(frame(at)), 0f)
-            assertEquals(0f, next.progress(frame(at)), 0f)
-            assertEquals(1, frame(at).active?.position)
+        assertEquals(1000L, window.durationMs)
+        var previous = 0f
+        for (at in 1000L..1999L step 11L) {
+            val progress = window.progress(frame(at))
+            assertTrue("still moving at $at", progress < 1f && progress >= previous)
+            previous = progress
         }
-        assertEquals(2, frame(2000).active?.position)
         assertEquals(0f, next.progress(frame(2000)), 0f)
     }
 
     @Test
-    fun `soft edge minimum and short repeat dwell never become opacity pops or stretched repeats`() {
-        assertEquals(140, englishRevealDurationMs(140, 140))
-        assertEquals(140, englishRevealDurationMs(220, 140))
-        assertEquals(80, englishRevealDurationMs(80, 140))
-        assertNull(englishRevealDurationMs(null, 140))
+    fun `pause threshold separates connected speech from a held silence`() {
+        assertEquals(1000, englishRevealDurationMs(1000, 1000 - ENGLISH_PAUSE_MS + 1))
+        assertEquals((1000 - ENGLISH_PAUSE_MS).toInt(), englishRevealDurationMs(1000, 1000 - ENGLISH_PAUSE_MS))
+        // At 2x the same media gap is half the wall time; the threshold is media.
+        assertEquals(500, englishRevealDurationMs(500, 1000 - ENGLISH_PAUSE_MS + 1, 2f))
+        assertEquals(425, englishRevealDurationMs(500, 1000 - ENGLISH_PAUSE_MS, 2f))
     }
 
     @Test
-    fun `one hundred wall milliseconds is converted to media time exactly once at entry speed`() {
-        for (speed in listOf(0.5f, 1f, 1.5f, 2f)) {
-            val wall = (1000 / speed).toInt()
-            val old = mediaWashWindow(verse, first, wall, speed)!!
-            val faster = mediaWashWindow(verse, first, englishRevealDurationMs(wall, 140), speed)!!
-            assertEquals(old.startMs, faster.startMs)
-            assertEquals((100 * speed).toLong(), old.durationMs - faster.durationMs)
-        }
+    fun `floored sweep and short repeat dwell keep their existing duration`() {
+        assertEquals(140, englishRevealDurationMs(140))
+        assertEquals(220, englishRevealDurationMs(220))
+        assertEquals(80, englishRevealDurationMs(80))
+        assertNull(englishRevealDurationMs(null))
     }
 
     @Test
-    fun `paused early finish remains complete and a tap still waits for confirmation`() {
-        val window = mediaWashWindow(verse, first, englishRevealDurationMs(1000, 140), 1f)!!
+    fun `paused finish remains complete and a tap still waits for confirmation`() {
+        val window = mediaWashWindow(verse, first, englishRevealDurationMs(1000, 700), 1f)!!
         val tap = HighlightWash.transition(HighlightWashState(), true, false, 1, window, provisional = true)
         assertEquals(0f, HighlightWash.progress(tap, frame(1900)), 0f)
         val confirmed = HighlightWash.transition(tap, true, false, 1, window)
@@ -73,7 +73,7 @@ class EnglishRevealTimingTest {
     fun `voiced end finishes the edge before the entire pause not just its final hundred milliseconds`() {
         val spoken = first.copy(spokenMs = 700)
         val window = mediaWashWindow(verse, spoken, englishRevealDurationMs(
-            InkEngine.sweepMs(spoken, 1f), InkEngine.minSweepFloorMs(), spoken.spokenMs, 1f,
+            InkEngine.sweepMs(spoken, 1f), spoken.spokenMs, 1f,
         ), 1f)!!
         val next = mediaWashWindow(verse, first.copy(wordPosition = 2, startMs = 2000), 900, 1f)!!
         assertEquals(700L, window.durationMs)
@@ -90,7 +90,7 @@ class EnglishRevealTimingTest {
     fun `short voiced word keeps a sweep but its floor cannot overrun the spoken end`() {
         val spoken = first.copy(durationMs = 300, spokenMs = 80)
         val window = mediaWashWindow(verse, spoken, englishRevealDurationMs(
-            InkEngine.sweepMs(spoken, 1f), InkEngine.minSweepFloorMs(), spoken.spokenMs, 1f,
+            InkEngine.sweepMs(spoken, 1f), spoken.spokenMs, 1f,
         ), 1f)!!
         assertEquals(80L, window.durationMs)
         assertEquals(0f, window.progress(frame(1000)), 0f)
@@ -103,7 +103,7 @@ class EnglishRevealTimingTest {
     fun `repeat ends at its own voiced boundary without moving its occurrence start`() {
         val repeat = first.copy(startMs = 2000, durationMs = 400, spokenMs = 60, isRepeat = true, activation = 2)
         val window = mediaWashWindow(verse, repeat, englishRevealDurationMs(
-            InkEngine.repeatDwellMs(repeat, 1f), InkEngine.minSweepFloorMs(), repeat.spokenMs, 1f,
+            InkEngine.repeatDwellMs(repeat, 1f), repeat.spokenMs, 1f,
         ), 1f)!!
         assertEquals(2000L, window.startMs)
         assertEquals(60L, window.durationMs)
@@ -119,7 +119,7 @@ class EnglishRevealTimingTest {
             for (voiced in listOf(1L, 79L, 140L, 700L, 1000L)) {
                 val spoken = first.copy(spokenMs = voiced)
                 val duration = englishRevealDurationMs(
-                    InkEngine.sweepMs(spoken, speed), InkEngine.minSweepFloorMs(), voiced, speed,
+                    InkEngine.sweepMs(spoken, speed), voiced, speed,
                 )
                 val window = mediaWashWindow(verse, spoken, duration, speed)!!
                 assertEquals(first.startMs, window.startMs)
@@ -130,10 +130,10 @@ class EnglishRevealTimingTest {
     }
 
     @Test
-    fun `missing voiced metadata keeps existing pacing and known speech retains earlier finish`() {
-        assertEquals(900, englishRevealDurationMs(1000, 140, spokenMs = null))
-        assertEquals(900, englishRevealDurationMs(1000, 140, spokenMs = 0))
-        assertEquals(900, englishRevealDurationMs(1000, 140, spokenMs = 1000))
-        assertNull(englishRevealDurationMs(null, 140, spokenMs = 700))
+    fun `missing voiced metadata keeps the full hold`() {
+        assertEquals(1000, englishRevealDurationMs(1000, spokenMs = null))
+        assertEquals(1000, englishRevealDurationMs(1000, spokenMs = 0))
+        assertEquals(1000, englishRevealDurationMs(1000, spokenMs = 1000))
+        assertNull(englishRevealDurationMs(null, spokenMs = 700))
     }
 }

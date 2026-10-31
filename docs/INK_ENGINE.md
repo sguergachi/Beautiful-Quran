@@ -653,7 +653,7 @@ shared `HighlightTimeline` through that window. The replaced speech-time
 - Active entry captures duration, tajweed curve, feather, and wasl carry once.
   Mid-word tuning cannot replay the wash. The visual floor is converted from
   wall milliseconds to media duration at entry speed; English Scroll also
-  bounds it by the voiced end below.
+  bounds it by the voiced end at a pause, below.
 - Active→Recited retains that word's independent residual window; Upcoming or
   Plain abandons it. Pauses and buffering freeze residuals as well as active ink.
   Speed changes alter the shared media clock instead of restarting animation.
@@ -666,16 +666,16 @@ shared `HighlightTimeline` through that window. The replaced speech-time
   remains laid; orange waits for the base edge. Repeats never form a queue.
 - English predecessor gating preserves a continuous prefix while each window
   stays anchored to speech, so short words cannot accumulate queued delay.
-  English Scroll starts from the eased hold-duration window, including the
-  first-pass minimum and maximum, then finishes its reveal up to **100 wall
-  milliseconds earlier**. A positive occurrence-specific `spokenMs` then caps
-  that window at the actual voiced end. The karaoke hold includes silence up
-  to the next onset; subtracting 100 ms from that hold alone can still leave
-  the edge moving through most of a pause. The onset stays fixed and completed
-  ink holds through the remaining silence. The soft-edge minimum is retained
-  wherever it fits before the voiced end; it cannot extend into that silence.
-  Repeats use their own voiced span and are never stretched to meet the floor.
-  Missing or zero voiced metadata retains the earlier hold-based fallback.
+  English Scroll uses the eased hold-duration window, including the
+  first-pass minimum and maximum, so through connected speech each word's
+  reveal runs right up to the next onset and the ink flows word to word. Where
+  the reciter pauses — a media gap of at least `ENGLISH_PAUSE_MS` (150 ms)
+  between the occurrence's positive `spokenMs` and the next onset — the reveal
+  finishes at the voiced end instead and completed ink holds through the
+  silence; the onset stays fixed. Timed words are bimodal: 96% leave under
+  20 ms between them and pauses mostly run past a second. Finishing every word
+  up to 100 ms early (the earlier policy) stopped the ink at each word.
+  Missing or zero voiced metadata keeps the hold.
   `EnglishRevealTiming` applies the policy before the shared window converts
   speed once. Android and web use the same policy. Paper ink consumes that
   progress; its one-letter lead stays inside each printed word. English leaf

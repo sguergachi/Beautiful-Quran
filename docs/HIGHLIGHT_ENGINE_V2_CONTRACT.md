@@ -30,15 +30,16 @@ dwell, have independent windows, and cannot wait behind a repeat queue.
 Prose can gate on its predecessor without shifting its own window into the
 future. Cosmetic recess/glimmer/tint dissolution still use their existing fades.
 
-English Scroll shortens the eased visual reveal by up to 100 wall milliseconds,
-then caps it at the occurrence's positive `spokenMs`. The karaoke hold includes
-the silence before the next onset; the reveal must finish by the voiced end
-even when that silence is longer than 100 ms or the spoken span is shorter
-than the visual floor. Completed ink holds through the pause, with the next
-word's actual start unchanged. Short repeat occurrences use their own voiced
-span and are never stretched to meet the floor. Missing or zero voiced metadata
-keeps the earlier hold-based fallback. This policy is applied before the entry
-duration's single speed conversion; the audio/highlight clock is not advanced.
+English Scroll's eased visual reveal spans the whole karaoke hold through
+connected speech, so each word flows into the next. Only where the media gap
+between the occurrence's positive `spokenMs` and the next onset reaches
+`ENGLISH_PAUSE_MS` (150 ms) does the reveal finish at the voiced end, even
+below the visual floor; completed ink then holds through the pause, with the
+next word's actual start unchanged. Short repeat occurrences use the same rule
+on their own voiced span. Missing or zero voiced metadata keeps the hold. This
+policy is applied before the entry duration's single speed conversion; the
+audio/highlight clock is not advanced. (An earlier policy finished every word
+up to 100 ms early; in connected speech that stopped the ink at every word.)
 
 `EnglishWashClock` is metadata projected through that same frame. It owns no
 second interpolation anchor and cannot ignore ordinary clock corrections.
