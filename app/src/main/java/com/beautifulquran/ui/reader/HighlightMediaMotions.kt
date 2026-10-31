@@ -81,18 +81,28 @@ internal fun rememberMediaLetterSweep(
     letterRevealStart: Float = 0f,
     tempo: TajweedPacing.Curve? = null,
     steady: Boolean = false,
+    /** English verse clock: this word's progress at a frame's ink time, replacing its own window. */
+    verseClock: ((Long) -> Float?)? = null,
 ): LetterSweep {
     val timeline = LocalHighlightTimeline.current
     val entry = rememberMediaEntry(active, retain, activation, window, provisional, pacing, revealStart,
         letterRevealStart = letterRevealStart, tempo = tempo, steady = steady)
     val prior = rememberUpdatedState(predecessor)
+    val clock = rememberUpdatedState(verseClock)
     val raw = remember {
         derivedStateOf {
             if (prior.value?.value?.let { !canStartSequentialSweep(it) } == true) 0f else {
                 val e = entry.value
-                val linear = if (e.wash.window == null) { if (e.wash.active) 0f else 1f }
-                    else HighlightWash.progress(e.wash, timeline.frame())
-                e.clock(linear)
+                val frame = timeline.frame()
+                val window = e.wash.window
+                val onClock = if (window != null && !e.wash.provisional && frame != null && window.matches(frame)) {
+                    clock.value?.invoke(frame.inkMs)
+                } else null
+                onClock ?: run {
+                    val linear = if (window == null) { if (e.wash.active) 0f else 1f }
+                        else HighlightWash.progress(e.wash, frame)
+                    e.clock(linear)
+                }
             }
         }
     }

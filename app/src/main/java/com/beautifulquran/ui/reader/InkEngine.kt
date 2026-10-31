@@ -168,6 +168,13 @@ object InkEngine {
          *  a steady pace, 1 the full Arabic letter map (which parks on a madd).
          *  See [TajweedPacing.Curve.tempo]. */
         val englishTajweedTempo: Float = 0.6f,
+        /** Gaussian σ (ms) blending English ink's speed across word boundaries
+         *  and tempo kinks — see [EnglishSmoothTrack]. 0 reads the exact clock. */
+        val englishSmoothMs: Float = 100f,
+        /** How far English ink runs ahead of the voice (media ms), in English
+         *  reading. A reader takes in the meaning as the word is heard; ink that
+         *  only finishes as the Arabic word ends reads as behind. */
+        val englishLeadMs: Float = 200f,
         /** Feather of a paced word. Slightly sharper than [washFeather] so
          *  holds read clearly while the edge stays soft (see
          *  docs/TAJWEED_PACING.md). */

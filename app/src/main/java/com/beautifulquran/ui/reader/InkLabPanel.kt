@@ -202,6 +202,14 @@ fun InkLabPanel(
                             InkEngine.tuning = t.copy(englishTajweedTempo = it)
                         }
                         LabCaption("How much English ink slows on held letters and quickens through short ones. 0 is steady; 1 parks on a madd like the Arabic.")
+                        TuningSlider("English smoothing (ms)", t.englishSmoothMs, 0f..250f) {
+                            InkEngine.tuning = t.copy(englishSmoothMs = it)
+                        }
+                        LabCaption("Blends English ink's speed across word boundaries so it never jumps. 0 follows each word exactly.")
+                        TuningSlider("English lead (ms)", t.englishLeadMs, 0f..500f) {
+                            InkEngine.tuning = t.copy(englishLeadMs = it)
+                        }
+                        LabCaption("How far English ink runs ahead of the voice, so the meaning is read as the word is heard.")
                         TuningToggle("Hold: madd", t.holdMadd) {
                             InkEngine.tuning = t.copy(holdMadd = it)
                         }
@@ -707,6 +715,8 @@ internal fun formatTuningCopy(t: InkEngine.Tuning): String {
         appendLine("    sweepEaseY2 = ${f(t.sweepEaseY2)},")
         appendLine("    tajweedPacing = ${t.tajweedPacing},")
         appendLine("    englishTajweedTempo = ${f(t.englishTajweedTempo)},")
+        appendLine("    englishSmoothMs = ${f(t.englishSmoothMs)},")
+        appendLine("    englishLeadMs = ${f(t.englishLeadMs)},")
         appendLine("    pacedFeather = ${f(t.pacedFeather)},")
         appendLine("    holdMadd = ${t.holdMadd},")
         appendLine("    holdGhunnah = ${t.holdGhunnah},")

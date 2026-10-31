@@ -14,13 +14,18 @@ internal data class EnglishReadingFlow(
     val pace: EnglishReadingPace? = null,
     /** The reciter's tajweed tempo inside each spoken word; null is a steady clock. */
     val tempo: EnglishTempoWarp? = null,
+    /** Ink distance with its speed smoothed ([EnglishSmoothTrack]); null reads the exact clock. */
+    val smooth: EnglishSmoothTrack? = null,
 ) {
-    fun through(positionMs: Long): Float = clock.progress(tempo?.forward(positionMs) ?: positionMs)
+    /** Ink distance (blank space takes none) on the exact, unsmoothed clock. */
+    fun exactInk(positionMs: Long): Float = clock.progress(tempo?.forward(positionMs) ?: positionMs)
         .let { pace?.through(it) ?: it }
+    fun through(positionMs: Long): Float = (smooth?.at(positionMs) ?: exactInk(positionMs))
         .let { extent?.printed(it) ?: it }
     fun ink(through: Float): Float = extent?.ink(through) ?: through
     fun mediaAt(through: Float, afterGap: Boolean = false): Long = ink(through).let {
-        clock.mediaAt(pace?.audible(it) ?: it, afterGap).let { at -> tempo?.inverse(at) ?: at }
+        smooth?.mediaAt(it, afterGap)
+            ?: clock.mediaAt(pace?.audible(it) ?: it, afterGap).let { at -> tempo?.inverse(at) ?: at }
     }
 }
 
@@ -102,6 +107,7 @@ internal fun englishReadingPlan(
     silence: List<AudibleSilence>,
     voiceStartMs: Long,
     tempo: EnglishTempoWarp? = null,
+    smoothMs: Float = 0f,
 ): EnglishWashPlan {
     if (alignment.phrases == null) return anchors
     fun fallback(reason: String) = anchors.copy(readingFlowFallback = reason)
@@ -137,8 +143,9 @@ internal fun englishReadingPlan(
     val extent = text?.takeUnless { normalizedSpacing }?.let(::EnglishReadingExtent)
     if (extent?.hasInk == false) return fallback("zero_printed_ink")
     val clock = EnglishWashWindow(start, end, audible)
-    val flow = EnglishReadingFlow(clock, extent, if (normalizedSpacing) "normalized_spacing" else null,
+    val exact = EnglishReadingFlow(clock, extent, if (normalizedSpacing) "normalized_spacing" else null,
         englishReadingPace(alignment, segments, clock, extent) { clock.progress(tempo?.forward(it) ?: it) }, tempo)
+    val flow = EnglishSmoothTrack.of(start, end, smoothMs, exact::exactInk)?.let { exact.copy(smooth = it) } ?: exact
     val windows = anchors.spans.associate { span ->
         span.position to EnglishWashWindow(
             flow.mediaAt(span.from, afterGap = true), flow.mediaAt(span.to),

@@ -477,14 +477,27 @@ Ink Lab "English tajweed tempo", default 0.6, 0 = steady). It slows on held
 letters (0.4x at 0.6, never zero) and quickens through short ones, keeps
 exact endpoints, and rests at the voiced end through a breath.
 
-- **Scroll English** sweeps each word on its tempo over the whole hold (the
-  curve's rest handles a pause), with no per-word ease. Words with no
-  dramatic letter sweep linearly on `englishRevealDurationMs`.
+- **Scroll English** reads one verse clock (`EnglishScrollClock`): each gloss
+  is anchored to its Arabic word (or the words it was merged across), follows
+  that word's tempo inside it, finishes at the voiced end and holds through a
+  real pause, and the whole track is speed-smoothed (`EnglishSmoothTrack`,
+  Ink Lab "English smoothing", σ 100 ms). Word-by-word windows changed speed at
+  every boundary — p90 3.6x, p99 7.6x over 4,236 real fills — and read as
+  jerks; smoothed they are 1.3x / 1.5x, with no fill under 100 ms and about a
+  fifth of a character of drift inside a pause.
 - **Mushaf English** keeps its continuous verse clock; `EnglishTempoWarp`
   maps each spoken Arabic word's media span onto itself through its tempo
   before the audible clock, the literal-finish pace and every inverse read it.
   Word boundaries, pauses and deadlines land at the same media time. Words
   overlapping a neighbour or holding measured quiet keep the steady clock.
+  Its ink distance is then speed-smoothed the same way (before blank space is
+  mapped back, so spaces still take no time): on Hani 64:1 the largest speed
+  change in 60 ms falls from 2.4x to 1.25x.
+- **Lead.** In English reading the highlight clock runs
+  `Tuning.englishLeadMs` (Ink Lab "English lead", 200 ms) ahead of the voice.
+  A reader takes in a word's meaning as it is heard; ink that only finishes as
+  the Arabic word ends reads as behind. It is a shift, not a shortened sweep,
+  so nothing stops at a word.
 - Web English Scroll does not follow the tempo yet.
 
 ## Non-goals

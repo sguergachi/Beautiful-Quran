@@ -49,6 +49,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
+import androidx.compose.runtime.referentialEqualityPolicy
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.State
 import androidx.compose.runtime.getValue
@@ -1206,6 +1207,8 @@ internal fun rememberInkMotions(
     /** English prose: sweep at the reciter's tajweed tempo instead of easing each word. */
     englishTempo: TajweedPacing.Curve? = null,
     steadySweeps: Boolean = false,
+    /** English verse clock ([EnglishScrollClock]) driving every word's first pass. */
+    englishClock: EnglishScrollClock? = null,
     activeRevealStart: Float = 0f,
     waslPrefixes: List<WaslPrefix?>,
     activation: Long = 0L,
@@ -1269,6 +1272,7 @@ internal fun rememberInkMotions(
             predecessor = predecessor.takeIf { sequentialSweeps },
             tempo = entryTempo,
             steady = steadySweeps,
+            verseClock = englishClock?.let { clock -> { inkMs: Long -> clock.progress(index, inkMs) } },
         )
         motions += InkMotion(
             ink = ink,
@@ -3056,6 +3060,8 @@ fun AyahBlock(
         }
     }
 
+    val englishClock = if (englishSteady) rememberEnglishScrollClock(ayah) else null
+
     // Each word's ink behaviour, derived once for the whole ayah. All the
     // policy (upcoming/active/recited/high-water, repeat chain) lives in
     // InkEngine; the render branches below only draw what it decided.
@@ -3154,7 +3160,7 @@ fun AyahBlock(
         words = ayah.words,
         inks = inks,
         // A tempo curve already rests at the voiced end through any pause.
-        activeSweepMs = if (readingMode == ReadingMode.ENGLISH_ONLY && englishTempo == null) {
+        activeSweepMs = if (readingMode == ReadingMode.ENGLISH_ONLY && englishTempo == null && englishClock == null) {
             englishRevealDurationMs(sweepMs, activeWord?.spokenMs, playbackSpeed)
         } else sweepMs,
         activeRepeatDwellMs = if (readingMode == ReadingMode.ENGLISH_ONLY && englishTempo == null) {
@@ -3165,6 +3171,7 @@ fun AyahBlock(
         pacing = pacing.takeUnless { readingMode == ReadingMode.ENGLISH_ONLY },
         englishTempo = englishTempo,
         steadySweeps = englishSteady,
+        englishClock = englishClock,
         activeRevealStart = activeRevealStart.takeUnless {
             readingMode == ReadingMode.ENGLISH_ONLY
         } ?: 0f,
@@ -4272,3 +4279,41 @@ fun BackToOriginPill(
         modifier = modifier,
     )
 }
+
+/**
+ * The verse clock for English Scroll while [ayah] is the one being recited
+ * (null otherwise). Rebuilt only when its timings or tuning change, never per
+ * frame or poll.
+ */
+@Composable
+private fun rememberEnglishScrollClock(ayah: Ayah): EnglishScrollClock? {
+    val timeline = LocalHighlightTimeline.current
+    val timings by remember(ayah.surahId, ayah.number) {
+        derivedStateOf(referentialEqualityPolicy()) {
+            timeline.sample.value?.takeIf { it.sample.item.surah == ayah.surahId && it.sample.item.ayah == ayah.number }
+                ?.timing?.timings
+        }
+    }
+    val tuning = InkEngine.tuning
+    val glosses = remember(ayah) {
+        EnglishTypography.lyricize(ayah.words.map { it.translation }, ayah.words.map { it.arabic })
+    }
+    return remember(ayah, timings, glosses, tuning.englishSmoothMs, tuning.englishTajweedTempo, tuning.tajweedPacing,
+        tuning.holdMadd, tuning.holdGhunnah, tuning.holdWaqf, tuning.holdConnect) {
+        val segments = timings?.segments ?: return@remember null
+        val words = ayah.words
+        val translations = words.map { it.translation }
+        val arabic = words.map { it.arabic }
+        EnglishScrollClock.of(
+            glossLengths = IntArray(words.size) { glosses[it].length },
+            positions = IntArray(words.size) { words[it].position },
+            owner = { EnglishTypography.coalescedGlossOwnerIndex(translations, arabic, it) },
+            segments = segments,
+            sigmaMs = tuning.englishSmoothMs,
+            tempo = { index ->
+                InkEngine.englishSegmentTempo(arabic[index], index == words.lastIndex, arabic.getOrNull(index - 1))
+            },
+        )
+    }
+}
+

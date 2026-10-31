@@ -15,6 +15,7 @@ import com.beautifulquran.DevProfiling
 import com.beautifulquran.data.EnglishBookCache
 import com.beautifulquran.data.englishBookContentKey
 import com.beautifulquran.data.QuranDatabase
+import com.beautifulquran.data.ReadingMode
 import com.beautifulquran.data.SettingsRepository
 import com.beautifulquran.data.model.Reciter
 import com.beautifulquran.data.model.Segment
@@ -599,6 +600,12 @@ class ReaderViewModel(
         }
     }
 
+    /** English reading (Scroll or leaf) runs its ink [InkEngine.Tuning.englishLeadMs] ahead of the voice. */
+    private fun englishLeadMs(): Long =
+        if (settings.settings.value.readingMode == ReadingMode.ENGLISH_ONLY) {
+            InkEngine.tuning.englishLeadMs.toLong().coerceAtLeast(0L)
+        } else 0L
+
     private data class HighlightPoll(
         val playback: HighlightPlaybackSample,
         val timing: HighlightTimingContext,
@@ -619,7 +626,7 @@ class ReaderViewModel(
             val calibration = HighlightCalibration(
                 outputLagWallMs = InkEngine.outputLatencyOverrideMs?.toLong()?.coerceAtLeast(0L) ?: 0L,
                 wordLeadMs = InkEngine.highlightLeadMs.toLong().coerceAtLeast(0L) +
-                    ReciterSync.highlightAdvanceMs(np.reciterId),
+                    ReciterSync.highlightAdvanceMs(np.reciterId) + englishLeadMs(),
             )
             val timing = HighlightTimingContext(timingPublicationRevision, prepared, voiceMs)
             val observation = highlightSession.observe(playback, timing, calibration, DevProfiling.captureStart.get())
