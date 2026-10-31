@@ -466,6 +466,8 @@ the curve, not the weights, is the module boundary.
 
 ## English follows the tempo, not the letters
 
+The full design, its measurements and fences: [ENGLISH_PACING.md](ENGLISH_PACING.md).
+
 English ink follows the reciter's tajweed tempo too — the reciter recites at
 that pace, so a steady English wash drifts against the voice. It cannot take
 the letter map itself: that parks on a held madd and then races, because
@@ -510,7 +512,8 @@ exact endpoints, and rests at the voiced end through a breath.
   can be shallow — Alafasy after رَبِّنَاۗ in 3:7 sits only 15–19 dB under his
   voice — so next to a marked word −12 dB for ≥150 ms counts
   (`EnglishPauses.MARKED_DB`). At 3:7's four marked boundaries he holds below
-  −12 dB for 400–850 ms; at unmarked ones never past 90 ms. A word timed to
+  −12 dB for 400–850 ms. It is applied only at marked words: the same window
+  around unmarked ones finds up to 440 ms. See docs/ENGLISH_PACING.md. A word timed to
   start a breath before the silence keeps no sliver (<120 ms) of ink ahead of
   it: that sliver read as flowing on into the next word.
 - **Lead.** In English reading the highlight clock runs

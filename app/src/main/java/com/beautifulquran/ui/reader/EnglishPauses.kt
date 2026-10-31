@@ -37,9 +37,12 @@ internal object EnglishPauses {
      * a reciter's pause can be shallow: Alafasy's after رَبِّنَاۗ in 3:7 sits
      * only 15–19 dB under his voice. Next to a marked word a quiet of
      * [MARKED_DB] for [MARKED_MIN_MS] is a pause: at 3:7's four marked
-     * boundaries he holds below −12 dB for 400–850 ms, at unmarked ones never
-     * past 90 ms. Within [MARKED_BEFORE_MS] before the next word's timed start
-     * to [MARKED_AFTER_MS] after it.
+     * boundaries he holds below −12 dB for 400–850 ms. The rule is applied
+     * only at marked words because the same window around unmarked ones also
+     * finds up to 440 ms (`tools/english_pause_probe.py verse`); a marked stop
+     * he recites through can likewise yield a short (~200 ms) hold. Within
+     * [MARKED_BEFORE_MS] before the next word's timed start to
+     * [MARKED_AFTER_MS] after it.
      */
     const val MARKED_DB = -12f
     const val MARKED_MIN_MS = 150L

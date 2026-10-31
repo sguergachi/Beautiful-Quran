@@ -418,6 +418,7 @@ this document combined: `ReaderComponents.kt` (~36k tokens),
 | `docs/HIGHLIGHT_ENGINE.md` | The pure word-sync engine — karaoke model, binary search, repeat/high-water logic |
 | `docs/INK_ENGINE.md` | **The wash itself** — `InkEngine.kt`, the most-changed subsystem in the repo |
 | `docs/TAJWEED_PACING.md` | Letter-level ink pacing, wasl handoff, QPC orthography pitfalls |
+| `docs/ENGLISH_PACING.md` | **English ink in time with the voice** — tajweed tempo, one smoothed verse clock, lead, pauses heard from the audio and the Mushaf's stop marks; its fences |
 | `docs/CHESTERTON.md` | Worked examples for invariant #9 — guards that look wrong and aren't |
 | `docs/OUTPUT_LATENCY.md` | Route-based Bluetooth/output lag presets applied before the highlight clock |
 | `docs/DESIGN.md` | Any UI/visual change — the paper metaphor and its hard rules |

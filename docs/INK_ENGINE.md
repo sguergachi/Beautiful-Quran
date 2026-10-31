@@ -666,7 +666,7 @@ shared `HighlightTimeline` through that window. The replaced speech-time
   remains laid; orange waits for the base edge. Repeats never form a queue.
 - English predecessor gating preserves a continuous prefix while each window
   stays anchored to speech, so short words cannot accumulate queued delay.
-  English Scroll reads one smoothed verse clock instead of each word's window
+  English Scroll reads one smoothed verse clock (docs/ENGLISH_PACING.md) instead of each word's window
   (`EnglishScrollClock`; docs/TAJWEED_PACING.md, "English follows the tempo"),
   and English reading leads the voice by `englishLeadMs`. Without timings it
   falls back to each word's tempo over the whole hold. Otherwise it uses the hold-duration window, including the
