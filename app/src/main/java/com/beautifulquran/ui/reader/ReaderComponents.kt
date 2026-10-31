@@ -1269,7 +1269,9 @@ internal fun rememberInkMotions(
             pacing = entryPacing,
             revealStart = activeRevealStart.takeIf { isActive } ?: 0f,
             letterRevealStart = if (isActive) waslPrefixes[index]?.letterProgress() ?: 0f else 0f,
-            predecessor = predecessor.takeIf { sequentialSweeps },
+            // The verse clock is already one ordered motion; waiting on a floored
+            // predecessor would hold a short next word back and then snap it.
+            predecessor = predecessor.takeIf { sequentialSweeps && englishClock == null },
             tempo = entryTempo,
             steady = steadySweeps,
             verseClock = englishClock?.let { clock -> { inkMs: Long -> clock.progress(index, inkMs) } },
