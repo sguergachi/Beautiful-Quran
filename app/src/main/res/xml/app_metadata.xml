@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <AppFunctionAppMetadata xmlns:appfn="http://schemas.android.com/apk/androidx.appfunctions"
-    appfn:description="Beautiful Quran provides hands-free Quran recitation, reader navigation, search, bookmarks, and reader preferences.
+    appfn:instructions="Beautiful Quran provides hands-free Quran recitation, reader navigation, search, bookmarks, and reader preferences.
 
 Operational Patterns:
 - Chapter and verse parameters work across the complete Quran; an omitted verse means verse 1.

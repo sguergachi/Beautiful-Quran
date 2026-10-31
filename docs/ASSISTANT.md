@@ -101,6 +101,13 @@ The AppFunctions compiler generates the static XML index and global service;
 the manifest registers that service and the activity-scoped metadata. The
 functions are visible in Android's on-device registry on Android 17.
 
+As of this build the app compiles against `androidx.appfunctions` 1.0.0-beta01
+(migrated from 1.0.0-alpha10): `@AppFunction` was renamed to
+`@AppFunctionDeclaration`, `AppFunctionAppMetadata.description` became
+`instructions`, `isDescribedByKDoc` must now be set explicitly, and
+`@AppFunctionSignature` requires an `ExperimentalAppFunctionsApi` opt-in. The
+beta does not lift Google's trusted-tester gate on Gemini invocation.
+
 This is the intended long-term Gemini integration, but it is not yet a normal
 consumer integration. Google's official documentation says that, as of May
 2026, Gemini invocation is a private preview for trusted testers. A regular

@@ -1,3 +1,5 @@
+@file:OptIn(androidx.appfunctions.ExperimentalAppFunctionsApi::class)
+
 package com.beautifulquran.assistant
 
 import android.app.appfunctions.AppFunction
