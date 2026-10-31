@@ -3,9 +3,11 @@ package com.beautifulquran.tarjilab
 import android.content.Context
 import android.content.SharedPreferences
 import androidx.core.content.edit
+import com.beautifulquran.playback.Tarji
 import com.beautifulquran.ui.reader.InkEngine
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.jsonObject
 
 /**
  * Per-reciter detector knobs. Each reciter has a signature — voice, room,
@@ -81,6 +83,8 @@ internal val HANI_TUNING = TarjiLabKnobs(
 @Serializable
 data class ReciterTarjiProfileBook(
     val profiles: Map<String, TarjiLabKnobs> = emptyMap(),
+    /** Books before version 1 used a stock 50% drama threshold. */
+    val schema: Int = 1,
 ) {
     companion object {
         private val json = Json { ignoreUnknownKeys = true; encodeDefaults = true }
@@ -88,8 +92,14 @@ data class ReciterTarjiProfileBook(
         fun encode(book: ReciterTarjiProfileBook): String =
             json.encodeToString(serializer(), book)
 
-        fun decode(raw: String): ReciterTarjiProfileBook =
-            runCatching { json.decodeFromString(serializer(), raw) }
-                .getOrDefault(ReciterTarjiProfileBook())
+        fun decode(raw: String): ReciterTarjiProfileBook = runCatching {
+            val encoded = json.parseToJsonElement(raw).jsonObject
+            val book = json.decodeFromJsonElement(serializer(), encoded)
+            if ("schema" in encoded) book else book.copy(
+                profiles = book.profiles.mapValues { (_, knobs) ->
+                    if (knobs.minDrama == 0.5f) knobs.copy(minDrama = Tarji.MIN_DRAMA) else knobs
+                },
+            )
+        }.getOrDefault(ReciterTarjiProfileBook())
     }
 }

@@ -26,6 +26,14 @@ This enforces *no known regression*, not an impossible claim of absolute
 acoustic certainty. Ambiguous candidate changes retain the baseline until a
 separate, reproducible review supplies the missing evidence.
 
+Alafasy 28:9 adds a separate, bounded proof for a disconnected interior orphan:
+every confident emitting frame must remain on an adjacent retained owner,
+with identical model/audio emissions and unchanged retained starts. Raw
+confidence is recomputed, and connected repeat components remain protected.
+The optional connected-noon spelling is an explicit audit target on both
+hypotheses, with canonical scores retained alongside it; Quran text and the
+default audit do not change. See the [complete review](../../docs/quality-reviews/TIMING_ALAFASY_28_9_2026-10-28.md).
+
 An entirely new reciter uses the separate `tools/timing_sources/` corpus gate.
 That gate accepts only added rows, requires the complete expected row count,
 and binds every row key and payload hash to pinned source archives. It cannot

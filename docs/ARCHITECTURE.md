@@ -38,7 +38,7 @@ app (runtime)                                           ▼
 Android and web. One coherent playback stream feeds pure `HighlightSync`,
 which projects a display-frame clock. Arabic, English, repeat, and wasl washes
 use captured media windows; follow/voice retain their distinct heard-clock
-policies. Normal use records nothing. Explicit developer profiles can include
+policies. Normal use records nothing. Explicit developer log exports include
 bounded local sample/frame replay with exact timing fingerprints. V1 remains
 a diagnostic comparator. Physical speaker/Bluetooth accuracy is a separate
 release acceptance check.
@@ -366,7 +366,15 @@ ReaderFocusController ── holds the LazyListState; the sole writer to it
   `ReaderFocusController.keepWordInView` applies a **bottom-only** reading-band
   correction (pure `wordBandDeltaPx`) so the active line lifts clear of the
   player-bar fold / edge fade. Top margin stays 0 so short-verse reading-line
-  anchors are not fought. Verse-level `anchorOffsetPx` also takes a bottom
+  anchors are not fought. A correction suspends in its word's `LaunchedEffect`:
+  advancing the word, disabling follow, or pausing cancels it even while it
+  waits behind a verse glide. Old words cannot queue reverse corrections after
+  the next verse lands. Shaped paragraphs wait for a layout of the same text
+  before measuring, so content arriving from the cache cannot apply its new
+  word offsets to an older paragraph. Word tiles report their full, unclipped
+  viewport bounds
+  so a line below the fold clears it in one glide; empty or invalid bounds never
+  drive scroll. Verse-level `anchorOffsetPx` also takes a bottom
   guard so a near-full-height verse is not parked with its last lines under
   that chrome. A repeat-aware timing backtrack to word one is a fresh verse
   focus event even though its media item and ayah key did not change, restoring
@@ -598,6 +606,10 @@ ViewModels get their dependencies from `QuranApp` (Application) through
 `AppViewModelFactory`. Settings changes propagate reactively: e.g.
 `ReaderViewModel` observes `reciterId` and reloads timings / restarts the
 current ayah in the new voice when it changes on the settings sheet.
+The shared reader poll checks that the installed timing publication belongs to
+the audio item's reciter before publishing word or follow state. Replacing the
+timings ahead of the asynchronous playlist switch therefore cannot expose the
+new table on the previous voice; superseded queued publications are rejected.
 
 ## Code conventions
 

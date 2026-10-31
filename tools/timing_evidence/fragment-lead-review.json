@@ -1,0 +1,2754 @@
+{
+  "schemaVersion": 1,
+  "deliveredRows": 81059,
+  "deliveredRowsByReciter": {
+    "1": 6235,
+    "2": 6236,
+    "3": 6236,
+    "4": 6236,
+    "5": 6232,
+    "6": 6232,
+    "7": 6236,
+    "9": 6236,
+    "14": 6236,
+    "16": 6236,
+    "17": 6236,
+    "18": 6236,
+    "19": 6236
+  },
+  "sourceHashes": {
+    "7": "ee3d429dbdd9ab80e2310e9bf770cf7b7f4cbdc6cfe2a90257ef6072fa4010c0",
+    "6": "60b81b993afbdc60843de545a0c148bf5d885d93bc5b8b5bbb03b8b68f7f6656",
+    "2": "1893d19fcf91d60ee0011b22855bd4d232acdafb06fc3520a87836f16fb0237a",
+    "9": "a145f59301feca42b727d43456368e1c7f2f87465325dd4104c863060c7eaeb2",
+    "3": "cef161c719204cb5a571631e9af68fb2eb121fb77abe9b196a774bc0882afd6e",
+    "5": "aac71cabf2c73163d7793d71edc7e6adcc9acf840a0b7c7a2c80feb56ca4d79c"
+  },
+  "sourceRows": {
+    "1": 6236,
+    "2": 6236,
+    "3": 6236,
+    "4": 6236,
+    "5": 6236,
+    "7": 6235
+  },
+  "criteria": {
+    "candidateOnsetMaxAbsResidualMs": 250,
+    "boundaryMetric": "meanAbsStartResidualMs",
+    "bothModelsMustNotRegress": true
+  },
+  "summary": {
+    "retain": 185,
+    "accept": 5,
+    "hold": 3
+  },
+  "negativeControls": [
+    {
+      "key": [
+        1,
+        3,
+        21
+      ],
+      "unchanged": true,
+      "models": [
+        {
+          "model": "jonatasgrosman/wav2vec2-large-xlsr-53-arabic",
+          "modelRevision": "af46c2d8531b8dcbb5e23b952f739b372c2e5d2d",
+          "baselineResidualMs": 59.578947368421055,
+          "candidateResidualMs": 59.578947368421055,
+          "audioSha256": "b3e28b732c7d8ff77825897497d49ab914310a9f737596d71dc3b1fac157d197"
+        },
+        {
+          "model": "MahmoudAshraf/mms-300m-1130-forced-aligner",
+          "modelRevision": "49402e9577b1158620820667c218cd494cc44486",
+          "baselineResidualMs": 56.526315789473685,
+          "candidateResidualMs": 56.526315789473685,
+          "audioSha256": "b3e28b732c7d8ff77825897497d49ab914310a9f737596d71dc3b1fac157d197"
+        }
+      ]
+    },
+    {
+      "key": [
+        1,
+        19,
+        48
+      ],
+      "unchanged": true,
+      "models": [
+        {
+          "model": "jonatasgrosman/wav2vec2-large-xlsr-53-arabic",
+          "modelRevision": "af46c2d8531b8dcbb5e23b952f739b372c2e5d2d",
+          "baselineResidualMs": 120.21428571428571,
+          "candidateResidualMs": 120.21428571428571,
+          "audioSha256": "857ac034c07e0590f14c5c918802d2a1b711265098c9a49097a4e5ad570ced26"
+        },
+        {
+          "model": "MahmoudAshraf/mms-300m-1130-forced-aligner",
+          "modelRevision": "49402e9577b1158620820667c218cd494cc44486",
+          "baselineResidualMs": 109.5,
+          "candidateResidualMs": 109.5,
+          "audioSha256": "857ac034c07e0590f14c5c918802d2a1b711265098c9a49097a4e5ad570ced26"
+        }
+      ]
+    },
+    {
+      "key": [
+        7,
+        4,
+        4
+      ],
+      "unchanged": true,
+      "models": [
+        {
+          "model": "jonatasgrosman/wav2vec2-large-xlsr-53-arabic",
+          "modelRevision": "af46c2d8531b8dcbb5e23b952f739b372c2e5d2d",
+          "baselineResidualMs": 225.0,
+          "candidateResidualMs": 225.0,
+          "audioSha256": "4adfa11eca85907d3ee6b3f0e612ade8175a1ce9a9b1cb0045195ec4e17fb452"
+        },
+        {
+          "model": "MahmoudAshraf/mms-300m-1130-forced-aligner",
+          "modelRevision": "49402e9577b1158620820667c218cd494cc44486",
+          "baselineResidualMs": 211.66666666666666,
+          "candidateResidualMs": 211.66666666666666,
+          "audioSha256": "4adfa11eca85907d3ee6b3f0e612ade8175a1ce9a9b1cb0045195ec4e17fb452"
+        }
+      ]
+    },
+    {
+      "key": [
+        7,
+        66,
+        6
+      ],
+      "unchanged": true,
+      "models": [
+        {
+          "model": "jonatasgrosman/wav2vec2-large-xlsr-53-arabic",
+          "modelRevision": "af46c2d8531b8dcbb5e23b952f739b372c2e5d2d",
+          "baselineResidualMs": 144.1304347826087,
+          "candidateResidualMs": 144.1304347826087,
+          "audioSha256": "0c35e4be2e30eafe49a79a54dceda6e6c6ab696f1d33600bd26b59ad2216d2ae"
+        },
+        {
+          "model": "MahmoudAshraf/mms-300m-1130-forced-aligner",
+          "modelRevision": "49402e9577b1158620820667c218cd494cc44486",
+          "baselineResidualMs": 142.1304347826087,
+          "candidateResidualMs": 142.1304347826087,
+          "audioSha256": "0c35e4be2e30eafe49a79a54dceda6e6c6ab696f1d33600bd26b59ad2216d2ae"
+        }
+      ]
+    }
+  ],
+  "modelCoverage": {
+    "xlsr": 12,
+    "mms": 12
+  },
+  "dispositions": [
+    {
+      "key": [
+        1,
+        2,
+        30
+      ],
+      "position": 13,
+      "detected": false,
+      "disposition": "retain",
+      "reason": "retain: reference corroborates the earlier onset"
+    },
+    {
+      "key": [
+        1,
+        2,
+        162
+      ],
+      "position": 3,
+      "detected": false,
+      "disposition": "retain",
+      "reason": "retain: reference does not corroborate the second onset"
+    },
+    {
+      "key": [
+        1,
+        2,
+        212
+      ],
+      "position": 17,
+      "detected": false,
+      "disposition": "retain",
+      "reason": "retain: reference corroborates the earlier onset"
+    },
+    {
+      "key": [
+        1,
+        2,
+        247
+      ],
+      "position": 39,
+      "detected": false,
+      "disposition": "retain",
+      "reason": "retain: reference corroborates the earlier onset"
+    },
+    {
+      "key": [
+        1,
+        2,
+        272
+      ],
+      "position": 7,
+      "detected": false,
+      "disposition": "retain",
+      "reason": "retain: reference corroborates the earlier onset"
+    },
+    {
+      "key": [
+        1,
+        4,
+        6
+      ],
+      "position": 18,
+      "detected": false,
+      "disposition": "retain",
+      "reason": "retain: reference corroborates the earlier onset"
+    },
+    {
+      "key": [
+        1,
+        4,
+        25
+      ],
+      "position": 34,
+      "detected": false,
+      "disposition": "retain",
+      "reason": "retain: reference corroborates the earlier onset"
+    },
+    {
+      "key": [
+        1,
+        4,
+        92
+      ],
+      "position": 40,
+      "detected": false,
+      "disposition": "retain",
+      "reason": "retain: reference does not corroborate the second onset"
+    },
+    {
+      "key": [
+        1,
+        4,
+        92
+      ],
+      "position": 40,
+      "detected": false,
+      "disposition": "retain",
+      "reason": "retain: preceding label is not the previous canonical word"
+    },
+    {
+      "key": [
+        1,
+        4,
+        171
+      ],
+      "position": 40,
+      "detected": false,
+      "disposition": "retain",
+      "reason": "retain: reference corroborates the earlier onset"
+    },
+    {
+      "key": [
+        1,
+        5,
+        108
+      ],
+      "position": 2,
+      "detected": false,
+      "disposition": "retain",
+      "reason": "retain: reference corroborates the earlier onset"
+    },
+    {
+      "key": [
+        1,
+        6,
+        148
+      ],
+      "position": 10,
+      "detected": false,
+      "disposition": "retain",
+      "reason": "retain: reference corroborates the earlier onset"
+    },
+    {
+      "key": [
+        1,
+        7,
+        195
+      ],
+      "position": 4,
+      "detected": false,
+      "disposition": "retain",
+      "reason": "retain: reference corroborates the earlier onset"
+    },
+    {
+      "key": [
+        1,
+        8,
+        42
+      ],
+      "position": 25,
+      "detected": false,
+      "disposition": "retain",
+      "reason": "retain: reference corroborates the earlier onset"
+    },
+    {
+      "key": [
+        1,
+        8,
+        67
+      ],
+      "position": 4,
+      "detected": false,
+      "disposition": "retain",
+      "reason": "retain: reference corroborates the earlier onset"
+    },
+    {
+      "key": [
+        1,
+        9,
+        27
+      ],
+      "position": 8,
+      "detected": false,
+      "disposition": "retain",
+      "reason": "retain: reference corroborates the earlier onset"
+    },
+    {
+      "key": [
+        1,
+        9,
+        99
+      ],
+      "position": 3,
+      "detected": false,
+      "disposition": "retain",
+      "reason": "retain: reference corroborates the earlier onset"
+    },
+    {
+      "key": [
+        1,
+        10,
+        41
+      ],
+      "position": 8,
+      "detected": false,
+      "disposition": "retain",
+      "reason": "retain: reference corroborates the earlier onset"
+    },
+    {
+      "key": [
+        1,
+        11,
+        31
+      ],
+      "position": 19,
+      "detected": false,
+      "disposition": "retain",
+      "reason": "retain: reference corroborates the earlier onset"
+    },
+    {
+      "key": [
+        1,
+        12,
+        37
+      ],
+      "position": 10,
+      "detected": false,
+      "disposition": "retain",
+      "reason": "retain: reference corroborates the earlier onset"
+    },
+    {
+      "key": [
+        1,
+        12,
+        83
+      ],
+      "position": 8,
+      "detected": false,
+      "disposition": "retain",
+      "reason": "retain: reference corroborates the earlier onset"
+    },
+    {
+      "key": [
+        1,
+        12,
+        83
+      ],
+      "position": 8,
+      "detected": false,
+      "disposition": "retain",
+      "reason": "retain: preceding label is not the previous canonical word"
+    },
+    {
+      "key": [
+        1,
+        16,
+        61
+      ],
+      "position": 10,
+      "detected": false,
+      "disposition": "retain",
+      "reason": "retain: reference corroborates the earlier onset"
+    },
+    {
+      "key": [
+        1,
+        16,
+        89
+      ],
+      "position": 21,
+      "detected": false,
+      "disposition": "retain",
+      "reason": "retain: reference corroborates the earlier onset"
+    },
+    {
+      "key": [
+        1,
+        17,
+        5
+      ],
+      "position": 8,
+      "detected": false,
+      "disposition": "retain",
+      "reason": "retain: reference corroborates the earlier onset"
+    },
+    {
+      "key": [
+        1,
+        17,
+        8
+      ],
+      "position": 3,
+      "detected": false,
+      "disposition": "retain",
+      "reason": "retain: reference corroborates the earlier onset"
+    },
+    {
+      "key": [
+        1,
+        17,
+        46
+      ],
+      "position": 5,
+      "detected": false,
+      "disposition": "retain",
+      "reason": "retain: reference corroborates the earlier onset"
+    },
+    {
+      "key": [
+        1,
+        18,
+        17
+      ],
+      "position": 23,
+      "detected": false,
+      "disposition": "retain",
+      "reason": "retain: reference corroborates the earlier onset"
+    },
+    {
+      "key": [
+        1,
+        19,
+        43
+      ],
+      "position": 10,
+      "detected": false,
+      "disposition": "retain",
+      "reason": "retain: preceding label is not the previous canonical word"
+    },
+    {
+      "key": [
+        1,
+        22,
+        33
+      ],
+      "position": 6,
+      "detected": false,
+      "disposition": "retain",
+      "reason": "retain: preceding label is not the previous canonical word"
+    },
+    {
+      "key": [
+        1,
+        27,
+        61
+      ],
+      "position": 6,
+      "detected": false,
+      "disposition": "retain",
+      "reason": "retain: reference corroborates the earlier onset"
+    },
+    {
+      "key": [
+        1,
+        30,
+        37
+      ],
+      "position": 7,
+      "detected": false,
+      "disposition": "retain",
+      "reason": "retain: reference corroborates the earlier onset"
+    },
+    {
+      "key": [
+        1,
+        33,
+        13
+      ],
+      "position": 22,
+      "detected": false,
+      "disposition": "retain",
+      "reason": "retain: reference corroborates the earlier onset"
+    },
+    {
+      "key": [
+        1,
+        36,
+        38
+      ],
+      "position": 4,
+      "detected": false,
+      "disposition": "retain",
+      "reason": "retain: reference corroborates the earlier onset"
+    },
+    {
+      "key": [
+        1,
+        39,
+        3
+      ],
+      "position": 16,
+      "detected": false,
+      "disposition": "retain",
+      "reason": "retain: reference corroborates the earlier onset"
+    },
+    {
+      "key": [
+        1,
+        39,
+        3
+      ],
+      "position": 33,
+      "detected": false,
+      "disposition": "retain",
+      "reason": "retain: reference corroborates the earlier onset"
+    },
+    {
+      "key": [
+        1,
+        39,
+        21
+      ],
+      "position": 7,
+      "detected": false,
+      "disposition": "retain",
+      "reason": "retain: reference corroborates the earlier onset"
+    },
+    {
+      "key": [
+        1,
+        39,
+        23
+      ],
+      "position": 26,
+      "detected": false,
+      "disposition": "retain",
+      "reason": "retain: reference corroborates the earlier onset"
+    },
+    {
+      "key": [
+        1,
+        40,
+        34
+      ],
+      "position": 18,
+      "detected": false,
+      "disposition": "retain",
+      "reason": "retain: reference corroborates the earlier onset"
+    },
+    {
+      "key": [
+        1,
+        42,
+        8
+      ],
+      "position": 9,
+      "detected": false,
+      "disposition": "retain",
+      "reason": "retain: reference corroborates the earlier onset"
+    },
+    {
+      "key": [
+        1,
+        42,
+        46
+      ],
+      "position": 16,
+      "detected": false,
+      "disposition": "retain",
+      "reason": "retain: reference corroborates the earlier onset"
+    },
+    {
+      "key": [
+        1,
+        43,
+        17
+      ],
+      "position": 11,
+      "detected": false,
+      "disposition": "retain",
+      "reason": "retain: reference corroborates the earlier onset"
+    },
+    {
+      "key": [
+        1,
+        43,
+        46
+      ],
+      "position": 5,
+      "detected": true,
+      "disposition": "accept",
+      "reason": "both models improve; restored source onset within 250ms of both witnesses"
+    },
+    {
+      "key": [
+        1,
+        46,
+        15
+      ],
+      "position": 27,
+      "detected": false,
+      "disposition": "retain",
+      "reason": "retain: reference corroborates the earlier onset"
+    },
+    {
+      "key": [
+        1,
+        46,
+        15
+      ],
+      "position": 27,
+      "detected": false,
+      "disposition": "retain",
+      "reason": "retain: preceding label is not the previous canonical word"
+    },
+    {
+      "key": [
+        1,
+        47,
+        15
+      ],
+      "position": 6,
+      "detected": false,
+      "disposition": "retain",
+      "reason": "retain: reference corroborates the earlier onset"
+    },
+    {
+      "key": [
+        1,
+        47,
+        24
+      ],
+      "position": 1,
+      "detected": false,
+      "disposition": "retain",
+      "reason": "retain: preceding label is not the previous canonical word"
+    },
+    {
+      "key": [
+        1,
+        48,
+        17
+      ],
+      "position": 23,
+      "detected": true,
+      "disposition": "accept",
+      "reason": "both models improve; restored source onset within 250ms of both witnesses"
+    },
+    {
+      "key": [
+        1,
+        52,
+        14
+      ],
+      "position": 4,
+      "detected": false,
+      "disposition": "retain",
+      "reason": "retain: reference corroborates the earlier onset"
+    },
+    {
+      "key": [
+        1,
+        57,
+        25
+      ],
+      "position": 21,
+      "detected": false,
+      "disposition": "retain",
+      "reason": "retain: reference corroborates the earlier onset"
+    },
+    {
+      "key": [
+        1,
+        57,
+        29
+      ],
+      "position": 17,
+      "detected": false,
+      "disposition": "retain",
+      "reason": "retain: reference corroborates the earlier onset"
+    },
+    {
+      "key": [
+        1,
+        63,
+        10
+      ],
+      "position": 11,
+      "detected": false,
+      "disposition": "retain",
+      "reason": "retain: reference corroborates the earlier onset"
+    },
+    {
+      "key": [
+        1,
+        64,
+        11
+      ],
+      "position": 8,
+      "detected": true,
+      "disposition": "accept",
+      "reason": "both models improve; restored source onset within 250ms of both witnesses"
+    },
+    {
+      "key": [
+        1,
+        68,
+        32
+      ],
+      "position": 8,
+      "detected": false,
+      "disposition": "retain",
+      "reason": "retain: reference does not corroborate the second onset"
+    },
+    {
+      "key": [
+        1,
+        72,
+        23
+      ],
+      "position": 6,
+      "detected": false,
+      "disposition": "retain",
+      "reason": "retain: reference corroborates the earlier onset"
+    },
+    {
+      "key": [
+        2,
+        2,
+        111
+      ],
+      "position": 13,
+      "detected": false,
+      "disposition": "retain",
+      "reason": "retain: reference does not corroborate the second onset"
+    },
+    {
+      "key": [
+        2,
+        2,
+        219
+      ],
+      "position": 5,
+      "detected": false,
+      "disposition": "retain",
+      "reason": "retain: reference does not corroborate the second onset"
+    },
+    {
+      "key": [
+        2,
+        2,
+        286
+      ],
+      "position": 44,
+      "detected": false,
+      "disposition": "retain",
+      "reason": "retain: reference does not corroborate the second onset"
+    },
+    {
+      "key": [
+        2,
+        3,
+        40
+      ],
+      "position": 12,
+      "detected": false,
+      "disposition": "retain",
+      "reason": "retain: reference does not corroborate the second onset"
+    },
+    {
+      "key": [
+        2,
+        3,
+        119
+      ],
+      "position": 20,
+      "detected": false,
+      "disposition": "retain",
+      "reason": "retain: reference does not corroborate the second onset"
+    },
+    {
+      "key": [
+        2,
+        3,
+        167
+      ],
+      "position": 18,
+      "detected": false,
+      "disposition": "retain",
+      "reason": "retain: reference corroborates the earlier onset"
+    },
+    {
+      "key": [
+        2,
+        3,
+        199
+      ],
+      "position": 27,
+      "detected": false,
+      "disposition": "retain",
+      "reason": "retain: reference does not corroborate the second onset"
+    },
+    {
+      "key": [
+        2,
+        9,
+        61
+      ],
+      "position": 8,
+      "detected": false,
+      "disposition": "retain",
+      "reason": "retain: reference does not corroborate the second onset"
+    },
+    {
+      "key": [
+        2,
+        9,
+        94
+      ],
+      "position": 6,
+      "detected": false,
+      "disposition": "retain",
+      "reason": "retain: reference corroborates the earlier onset"
+    },
+    {
+      "key": [
+        2,
+        10,
+        53
+      ],
+      "position": 4,
+      "detected": false,
+      "disposition": "retain",
+      "reason": "retain: reference does not corroborate the second onset"
+    },
+    {
+      "key": [
+        2,
+        17,
+        25
+      ],
+      "position": 6,
+      "detected": false,
+      "disposition": "retain",
+      "reason": "retain: reference does not corroborate the second onset"
+    },
+    {
+      "key": [
+        2,
+        17,
+        81
+      ],
+      "position": 6,
+      "detected": false,
+      "disposition": "retain",
+      "reason": "retain: reference does not corroborate the second onset"
+    },
+    {
+      "key": [
+        2,
+        17,
+        93
+      ],
+      "position": 19,
+      "detected": false,
+      "disposition": "retain",
+      "reason": "retain: reference does not corroborate the second onset"
+    },
+    {
+      "key": [
+        2,
+        18,
+        22
+      ],
+      "position": 15,
+      "detected": false,
+      "disposition": "retain",
+      "reason": "retain: reference does not corroborate the second onset"
+    },
+    {
+      "key": [
+        2,
+        27,
+        81
+      ],
+      "position": 7,
+      "detected": false,
+      "disposition": "retain",
+      "reason": "retain: reference does not corroborate the second onset"
+    },
+    {
+      "key": [
+        2,
+        28,
+        19
+      ],
+      "position": 17,
+      "detected": false,
+      "disposition": "retain",
+      "reason": "retain: reference corroborates the earlier onset"
+    },
+    {
+      "key": [
+        2,
+        28,
+        88
+      ],
+      "position": 11,
+      "detected": false,
+      "disposition": "retain",
+      "reason": "retain: reference does not corroborate the second onset"
+    },
+    {
+      "key": [
+        2,
+        29,
+        51
+      ],
+      "position": 9,
+      "detected": false,
+      "disposition": "retain",
+      "reason": "retain: reference does not corroborate the second onset"
+    },
+    {
+      "key": [
+        2,
+        30,
+        37
+      ],
+      "position": 10,
+      "detected": false,
+      "disposition": "retain",
+      "reason": "retain: reference does not corroborate the second onset"
+    },
+    {
+      "key": [
+        2,
+        45,
+        24
+      ],
+      "position": 18,
+      "detected": false,
+      "disposition": "retain",
+      "reason": "retain: reference does not corroborate the second onset"
+    },
+    {
+      "key": [
+        2,
+        50,
+        14
+      ],
+      "position": 5,
+      "detected": false,
+      "disposition": "retain",
+      "reason": "retain: reference does not corroborate the second onset"
+    },
+    {
+      "key": [
+        3,
+        2,
+        61
+      ],
+      "position": 31,
+      "detected": false,
+      "disposition": "retain",
+      "reason": "retain: reference does not corroborate the second onset"
+    },
+    {
+      "key": [
+        3,
+        2,
+        88
+      ],
+      "position": 4,
+      "detected": false,
+      "disposition": "retain",
+      "reason": "retain: reference does not corroborate the second onset"
+    },
+    {
+      "key": [
+        3,
+        2,
+        102
+      ],
+      "position": 34,
+      "detected": false,
+      "disposition": "retain",
+      "reason": "retain: reference corroborates the earlier onset"
+    },
+    {
+      "key": [
+        3,
+        2,
+        187
+      ],
+      "position": 65,
+      "detected": false,
+      "disposition": "retain",
+      "reason": "retain: reference corroborates the earlier onset"
+    },
+    {
+      "key": [
+        3,
+        2,
+        208
+      ],
+      "position": 5,
+      "detected": false,
+      "disposition": "retain",
+      "reason": "retain: reference corroborates the earlier onset"
+    },
+    {
+      "key": [
+        3,
+        2,
+        217
+      ],
+      "position": 49,
+      "detected": false,
+      "disposition": "retain",
+      "reason": "retain: reference corroborates the earlier onset"
+    },
+    {
+      "key": [
+        3,
+        2,
+        229
+      ],
+      "position": 12,
+      "detected": false,
+      "disposition": "retain",
+      "reason": "retain: reference corroborates the earlier onset"
+    },
+    {
+      "key": [
+        3,
+        2,
+        235
+      ],
+      "position": 27,
+      "detected": false,
+      "disposition": "retain",
+      "reason": "retain: reference does not corroborate the second onset"
+    },
+    {
+      "key": [
+        3,
+        2,
+        266
+      ],
+      "position": 35,
+      "detected": false,
+      "disposition": "retain",
+      "reason": "retain: reference corroborates the earlier onset"
+    },
+    {
+      "key": [
+        3,
+        3,
+        49
+      ],
+      "position": 7,
+      "detected": false,
+      "disposition": "retain",
+      "reason": "retain: reference corroborates the earlier onset"
+    },
+    {
+      "key": [
+        3,
+        3,
+        168
+      ],
+      "position": 12,
+      "detected": false,
+      "disposition": "retain",
+      "reason": "retain: reference corroborates the earlier onset"
+    },
+    {
+      "key": [
+        3,
+        4,
+        66
+      ],
+      "position": 27,
+      "detected": false,
+      "disposition": "retain",
+      "reason": "retain: reference corroborates the earlier onset"
+    },
+    {
+      "key": [
+        3,
+        4,
+        102
+      ],
+      "position": 24,
+      "detected": false,
+      "disposition": "retain",
+      "reason": "retain: reference corroborates the earlier onset"
+    },
+    {
+      "key": [
+        3,
+        4,
+        141
+      ],
+      "position": 7,
+      "detected": false,
+      "disposition": "retain",
+      "reason": "retain: reference corroborates the earlier onset"
+    },
+    {
+      "key": [
+        3,
+        5,
+        2
+      ],
+      "position": 49,
+      "detected": false,
+      "disposition": "retain",
+      "reason": "retain: reference does not corroborate the second onset"
+    },
+    {
+      "key": [
+        3,
+        5,
+        5
+      ],
+      "position": 33,
+      "detected": false,
+      "disposition": "retain",
+      "reason": "retain: reference does not corroborate the second onset"
+    },
+    {
+      "key": [
+        3,
+        5,
+        7
+      ],
+      "position": 15,
+      "detected": false,
+      "disposition": "retain",
+      "reason": "retain: reference does not corroborate the second onset"
+    },
+    {
+      "key": [
+        3,
+        5,
+        8
+      ],
+      "position": 22,
+      "detected": false,
+      "disposition": "retain",
+      "reason": "retain: reference does not corroborate the second onset"
+    },
+    {
+      "key": [
+        3,
+        5,
+        17
+      ],
+      "position": 11,
+      "detected": false,
+      "disposition": "retain",
+      "reason": "retain: reference does not corroborate the second onset"
+    },
+    {
+      "key": [
+        3,
+        5,
+        33
+      ],
+      "position": 28,
+      "detected": false,
+      "disposition": "retain",
+      "reason": "retain: reference corroborates the earlier onset"
+    },
+    {
+      "key": [
+        3,
+        5,
+        41
+      ],
+      "position": 39,
+      "detected": false,
+      "disposition": "retain",
+      "reason": "retain: reference corroborates the earlier onset"
+    },
+    {
+      "key": [
+        3,
+        6,
+        98
+      ],
+      "position": 9,
+      "detected": false,
+      "disposition": "retain",
+      "reason": "retain: reference does not corroborate the second onset"
+    },
+    {
+      "key": [
+        3,
+        6,
+        124
+      ],
+      "position": 14,
+      "detected": false,
+      "disposition": "retain",
+      "reason": "retain: reference does not corroborate the second onset"
+    },
+    {
+      "key": [
+        3,
+        7,
+        105
+      ],
+      "position": 10,
+      "detected": false,
+      "disposition": "retain",
+      "reason": "retain: reference does not corroborate the second onset"
+    },
+    {
+      "key": [
+        3,
+        7,
+        157
+      ],
+      "position": 10,
+      "detected": false,
+      "disposition": "retain",
+      "reason": "retain: reference corroborates the earlier onset"
+    },
+    {
+      "key": [
+        3,
+        9,
+        61
+      ],
+      "position": 8,
+      "detected": false,
+      "disposition": "retain",
+      "reason": "retain: reference does not corroborate the second onset"
+    },
+    {
+      "key": [
+        3,
+        9,
+        74
+      ],
+      "position": 36,
+      "detected": false,
+      "disposition": "retain",
+      "reason": "retain: reference corroborates the earlier onset"
+    },
+    {
+      "key": [
+        3,
+        10,
+        25
+      ],
+      "position": 11,
+      "detected": false,
+      "disposition": "retain",
+      "reason": "retain: reference corroborates the earlier onset"
+    },
+    {
+      "key": [
+        3,
+        13,
+        31
+      ],
+      "position": 15,
+      "detected": false,
+      "disposition": "retain",
+      "reason": "retain: reference does not corroborate the second onset"
+    },
+    {
+      "key": [
+        3,
+        14,
+        21
+      ],
+      "position": 7,
+      "detected": false,
+      "disposition": "retain",
+      "reason": "retain: reference corroborates the earlier onset"
+    },
+    {
+      "key": [
+        3,
+        17,
+        47
+      ],
+      "position": 16,
+      "detected": false,
+      "disposition": "retain",
+      "reason": "retain: reference corroborates the earlier onset"
+    },
+    {
+      "key": [
+        3,
+        22,
+        54
+      ],
+      "position": 21,
+      "detected": false,
+      "disposition": "retain",
+      "reason": "retain: reference corroborates the earlier onset"
+    },
+    {
+      "key": [
+        3,
+        28,
+        23
+      ],
+      "position": 16,
+      "detected": false,
+      "disposition": "retain",
+      "reason": "retain: reference does not corroborate the second onset"
+    },
+    {
+      "key": [
+        3,
+        30,
+        50
+      ],
+      "position": 17,
+      "detected": false,
+      "disposition": "retain",
+      "reason": "retain: no corroborated file clock"
+    },
+    {
+      "key": [
+        3,
+        33,
+        1
+      ],
+      "position": 9,
+      "detected": false,
+      "disposition": "retain",
+      "reason": "retain: reference does not corroborate the second onset"
+    },
+    {
+      "key": [
+        3,
+        34,
+        17
+      ],
+      "position": 5,
+      "detected": false,
+      "disposition": "retain",
+      "reason": "retain: reference does not corroborate the second onset"
+    },
+    {
+      "key": [
+        3,
+        34,
+        27
+      ],
+      "position": 7,
+      "detected": true,
+      "disposition": "hold",
+      "reason": "retain baseline: source onset remains over 250ms from a model or waveform/metric veto"
+    },
+    {
+      "key": [
+        3,
+        34,
+        44
+      ],
+      "position": 6,
+      "detected": false,
+      "disposition": "retain",
+      "reason": "retain: reference does not corroborate the second onset"
+    },
+    {
+      "key": [
+        3,
+        34,
+        46
+      ],
+      "position": 12,
+      "detected": false,
+      "disposition": "retain",
+      "reason": "retain: reference does not corroborate the second onset"
+    },
+    {
+      "key": [
+        3,
+        35,
+        3
+      ],
+      "position": 16,
+      "detected": false,
+      "disposition": "retain",
+      "reason": "retain: reference does not corroborate the second onset"
+    },
+    {
+      "key": [
+        3,
+        37,
+        11
+      ],
+      "position": 8,
+      "detected": false,
+      "disposition": "retain",
+      "reason": "retain: reference does not corroborate the second onset"
+    },
+    {
+      "key": [
+        3,
+        38,
+        8
+      ],
+      "position": 6,
+      "detected": false,
+      "disposition": "retain",
+      "reason": "retain: reference does not corroborate the second onset"
+    },
+    {
+      "key": [
+        3,
+        39,
+        5
+      ],
+      "position": 20,
+      "detected": false,
+      "disposition": "retain",
+      "reason": "retain: reference does not corroborate the second onset"
+    },
+    {
+      "key": [
+        3,
+        40,
+        16
+      ],
+      "position": 10,
+      "detected": false,
+      "disposition": "retain",
+      "reason": "retain: reference does not corroborate the second onset"
+    },
+    {
+      "key": [
+        3,
+        46,
+        8
+      ],
+      "position": 13,
+      "detected": false,
+      "disposition": "retain",
+      "reason": "retain: reference does not corroborate the second onset"
+    },
+    {
+      "key": [
+        3,
+        48,
+        15
+      ],
+      "position": 15,
+      "detected": false,
+      "disposition": "retain",
+      "reason": "retain: reference corroborates the earlier onset"
+    },
+    {
+      "key": [
+        3,
+        49,
+        1
+      ],
+      "position": 12,
+      "detected": false,
+      "disposition": "retain",
+      "reason": "retain: reference does not corroborate the second onset"
+    },
+    {
+      "key": [
+        3,
+        53,
+        32
+      ],
+      "position": 28,
+      "detected": false,
+      "disposition": "retain",
+      "reason": "retain: reference does not corroborate the second onset"
+    },
+    {
+      "key": [
+        3,
+        58,
+        19
+      ],
+      "position": 10,
+      "detected": false,
+      "disposition": "retain",
+      "reason": "retain: reference does not corroborate the second onset"
+    },
+    {
+      "key": [
+        3,
+        59,
+        7
+      ],
+      "position": 34,
+      "detected": false,
+      "disposition": "retain",
+      "reason": "retain: reference does not corroborate the second onset"
+    },
+    {
+      "key": [
+        3,
+        65,
+        11
+      ],
+      "position": 30,
+      "detected": false,
+      "disposition": "retain",
+      "reason": "retain: reference does not corroborate the second onset"
+    },
+    {
+      "key": [
+        3,
+        74,
+        53
+      ],
+      "position": 2,
+      "detected": false,
+      "disposition": "retain",
+      "reason": "retain: no corroborated file clock"
+    },
+    {
+      "key": [
+        3,
+        74,
+        54
+      ],
+      "position": 2,
+      "detected": false,
+      "disposition": "retain",
+      "reason": "retain: no corroborated file clock"
+    },
+    {
+      "key": [
+        3,
+        76,
+        15
+      ],
+      "position": 5,
+      "detected": false,
+      "disposition": "retain",
+      "reason": "retain: reference corroborates the earlier onset"
+    },
+    {
+      "key": [
+        3,
+        89,
+        17
+      ],
+      "position": 2,
+      "detected": false,
+      "disposition": "retain",
+      "reason": "retain: no corroborated file clock"
+    },
+    {
+      "key": [
+        3,
+        89,
+        21
+      ],
+      "position": 2,
+      "detected": false,
+      "disposition": "retain",
+      "reason": "retain: reference does not corroborate the second onset"
+    },
+    {
+      "key": [
+        3,
+        96,
+        15
+      ],
+      "position": 2,
+      "detected": false,
+      "disposition": "retain",
+      "reason": "retain: reference does not corroborate the second onset"
+    },
+    {
+      "key": [
+        4,
+        2,
+        80
+      ],
+      "position": 8,
+      "detected": false,
+      "disposition": "retain",
+      "reason": "retain: reference does not corroborate the second onset"
+    },
+    {
+      "key": [
+        4,
+        2,
+        111
+      ],
+      "position": 13,
+      "detected": false,
+      "disposition": "retain",
+      "reason": "retain: reference does not corroborate the second onset"
+    },
+    {
+      "key": [
+        4,
+        2,
+        120
+      ],
+      "position": 10,
+      "detected": false,
+      "disposition": "retain",
+      "reason": "retain: reference does not corroborate the second onset"
+    },
+    {
+      "key": [
+        4,
+        2,
+        226
+      ],
+      "position": 7,
+      "detected": false,
+      "disposition": "retain",
+      "reason": "retain: reference corroborates the earlier onset"
+    },
+    {
+      "key": [
+        4,
+        2,
+        273
+      ],
+      "position": 23,
+      "detected": false,
+      "disposition": "retain",
+      "reason": "retain: reference does not corroborate the second onset"
+    },
+    {
+      "key": [
+        4,
+        2,
+        275
+      ],
+      "position": 21,
+      "detected": false,
+      "disposition": "retain",
+      "reason": "retain: reference does not corroborate the second onset"
+    },
+    {
+      "key": [
+        4,
+        2,
+        286
+      ],
+      "position": 44,
+      "detected": false,
+      "disposition": "retain",
+      "reason": "retain: reference does not corroborate the second onset"
+    },
+    {
+      "key": [
+        4,
+        3,
+        40
+      ],
+      "position": 12,
+      "detected": false,
+      "disposition": "retain",
+      "reason": "retain: reference does not corroborate the second onset"
+    },
+    {
+      "key": [
+        4,
+        3,
+        47
+      ],
+      "position": 10,
+      "detected": false,
+      "disposition": "retain",
+      "reason": "retain: reference does not corroborate the second onset"
+    },
+    {
+      "key": [
+        4,
+        3,
+        81
+      ],
+      "position": 20,
+      "detected": false,
+      "disposition": "retain",
+      "reason": "retain: reference does not corroborate the second onset"
+    },
+    {
+      "key": [
+        4,
+        3,
+        136
+      ],
+      "position": 13,
+      "detected": false,
+      "disposition": "retain",
+      "reason": "retain: reference does not corroborate the second onset"
+    },
+    {
+      "key": [
+        4,
+        3,
+        169
+      ],
+      "position": 9,
+      "detected": false,
+      "disposition": "retain",
+      "reason": "retain: reference does not corroborate the second onset"
+    },
+    {
+      "key": [
+        4,
+        4,
+        78
+      ],
+      "position": 30,
+      "detected": false,
+      "disposition": "retain",
+      "reason": "retain: reference does not corroborate the second onset"
+    },
+    {
+      "key": [
+        4,
+        4,
+        135
+      ],
+      "position": 23,
+      "detected": false,
+      "disposition": "retain",
+      "reason": "retain: reference does not corroborate the second onset"
+    },
+    {
+      "key": [
+        4,
+        4,
+        169
+      ],
+      "position": 10,
+      "detected": false,
+      "disposition": "retain",
+      "reason": "retain: no corroborated file clock"
+    },
+    {
+      "key": [
+        4,
+        5,
+        17
+      ],
+      "position": 11,
+      "detected": false,
+      "disposition": "retain",
+      "reason": "retain: reference does not corroborate the second onset"
+    },
+    {
+      "key": [
+        4,
+        5,
+        101
+      ],
+      "position": 23,
+      "detected": false,
+      "disposition": "retain",
+      "reason": "retain: reference does not corroborate the second onset"
+    },
+    {
+      "key": [
+        4,
+        6,
+        65
+      ],
+      "position": 21,
+      "detected": false,
+      "disposition": "retain",
+      "reason": "retain: reference corroborates the earlier onset"
+    },
+    {
+      "key": [
+        4,
+        6,
+        128
+      ],
+      "position": 23,
+      "detected": false,
+      "disposition": "retain",
+      "reason": "retain: reference does not corroborate the second onset"
+    },
+    {
+      "key": [
+        4,
+        7,
+        88
+      ],
+      "position": 18,
+      "detected": false,
+      "disposition": "retain",
+      "reason": "retain: reference does not corroborate the second onset"
+    },
+    {
+      "key": [
+        4,
+        7,
+        195
+      ],
+      "position": 5,
+      "detected": false,
+      "disposition": "retain",
+      "reason": "retain: reference does not corroborate the second onset"
+    },
+    {
+      "key": [
+        4,
+        7,
+        195
+      ],
+      "position": 10,
+      "detected": false,
+      "disposition": "retain",
+      "reason": "retain: reference does not corroborate the second onset"
+    },
+    {
+      "key": [
+        4,
+        7,
+        195
+      ],
+      "position": 15,
+      "detected": false,
+      "disposition": "retain",
+      "reason": "retain: reference does not corroborate the second onset"
+    },
+    {
+      "key": [
+        4,
+        11,
+        95
+      ],
+      "position": 5,
+      "detected": false,
+      "disposition": "retain",
+      "reason": "retain: reference does not corroborate the second onset"
+    },
+    {
+      "key": [
+        4,
+        16,
+        65
+      ],
+      "position": 11,
+      "detected": false,
+      "disposition": "retain",
+      "reason": "retain: reference does not corroborate the second onset"
+    },
+    {
+      "key": [
+        4,
+        17,
+        15
+      ],
+      "position": 11,
+      "detected": false,
+      "disposition": "retain",
+      "reason": "retain: reference does not corroborate the second onset"
+    },
+    {
+      "key": [
+        4,
+        18,
+        21
+      ],
+      "position": 14,
+      "detected": false,
+      "disposition": "retain",
+      "reason": "retain: reference does not corroborate the second onset"
+    },
+    {
+      "key": [
+        4,
+        28,
+        60
+      ],
+      "position": 9,
+      "detected": false,
+      "disposition": "retain",
+      "reason": "retain: reference does not corroborate the second onset"
+    },
+    {
+      "key": [
+        4,
+        33,
+        9
+      ],
+      "position": 17,
+      "detected": false,
+      "disposition": "retain",
+      "reason": "retain: reference does not corroborate the second onset"
+    },
+    {
+      "key": [
+        4,
+        34,
+        22
+      ],
+      "position": 8,
+      "detected": false,
+      "disposition": "retain",
+      "reason": "retain: reference does not corroborate the second onset"
+    },
+    {
+      "key": [
+        4,
+        46,
+        8
+      ],
+      "position": 4,
+      "detected": false,
+      "disposition": "retain",
+      "reason": "retain: reference does not corroborate the second onset"
+    },
+    {
+      "key": [
+        4,
+        48,
+        11
+      ],
+      "position": 32,
+      "detected": false,
+      "disposition": "retain",
+      "reason": "retain: reference does not corroborate the second onset"
+    },
+    {
+      "key": [
+        5,
+        2,
+        171
+      ],
+      "position": 13,
+      "detected": false,
+      "disposition": "retain",
+      "reason": "retain: reference does not corroborate the second onset"
+    },
+    {
+      "key": [
+        5,
+        2,
+        182
+      ],
+      "position": 13,
+      "detected": false,
+      "disposition": "retain",
+      "reason": "retain: reference does not corroborate the second onset"
+    },
+    {
+      "key": [
+        5,
+        2,
+        200
+      ],
+      "position": 11,
+      "detected": false,
+      "disposition": "retain",
+      "reason": "retain: reference does not corroborate the second onset"
+    },
+    {
+      "key": [
+        5,
+        2,
+        203
+      ],
+      "position": 19,
+      "detected": false,
+      "disposition": "retain",
+      "reason": "retain: reference corroborates the earlier onset"
+    },
+    {
+      "key": [
+        5,
+        2,
+        273
+      ],
+      "position": 23,
+      "detected": false,
+      "disposition": "retain",
+      "reason": "retain: reference does not corroborate the second onset"
+    },
+    {
+      "key": [
+        5,
+        3,
+        3
+      ],
+      "position": 8,
+      "detected": false,
+      "disposition": "retain",
+      "reason": "retain: reference corroborates the earlier onset"
+    },
+    {
+      "key": [
+        5,
+        3,
+        28
+      ],
+      "position": 21,
+      "detected": false,
+      "disposition": "retain",
+      "reason": "retain: reference corroborates the earlier onset"
+    },
+    {
+      "key": [
+        5,
+        3,
+        41
+      ],
+      "position": 15,
+      "detected": false,
+      "disposition": "retain",
+      "reason": "retain: reference does not corroborate the second onset"
+    },
+    {
+      "key": [
+        5,
+        4,
+        92
+      ],
+      "position": 9,
+      "detected": false,
+      "disposition": "retain",
+      "reason": "retain: reference does not corroborate the second onset"
+    },
+    {
+      "key": [
+        5,
+        4,
+        104
+      ],
+      "position": 6,
+      "detected": true,
+      "disposition": "hold",
+      "reason": "retain baseline: source onset remains over 250ms from a model or waveform/metric veto"
+    },
+    {
+      "key": [
+        5,
+        7,
+        164
+      ],
+      "position": 14,
+      "detected": false,
+      "disposition": "retain",
+      "reason": "retain: reference does not corroborate the second onset"
+    },
+    {
+      "key": [
+        5,
+        8,
+        69
+      ],
+      "position": 6,
+      "detected": true,
+      "disposition": "accept",
+      "reason": "both models improve; restored source onset within 250ms of both witnesses"
+    },
+    {
+      "key": [
+        5,
+        16,
+        116
+      ],
+      "position": 15,
+      "detected": false,
+      "disposition": "retain",
+      "reason": "retain: reference does not corroborate the second onset"
+    },
+    {
+      "key": [
+        5,
+        19,
+        29
+      ],
+      "position": 2,
+      "detected": false,
+      "disposition": "retain",
+      "reason": "retain: reference corroborates the earlier onset"
+    },
+    {
+      "key": [
+        5,
+        20,
+        77
+      ],
+      "position": 14,
+      "detected": false,
+      "disposition": "retain",
+      "reason": "retain: reference does not corroborate the second onset"
+    },
+    {
+      "key": [
+        5,
+        21,
+        28
+      ],
+      "position": 12,
+      "detected": true,
+      "disposition": "hold",
+      "reason": "retain baseline: source onset remains over 250ms from a model or waveform/metric veto"
+    },
+    {
+      "key": [
+        5,
+        21,
+        47
+      ],
+      "position": 10,
+      "detected": false,
+      "disposition": "retain",
+      "reason": "retain: reference does not corroborate the second onset"
+    },
+    {
+      "key": [
+        5,
+        26,
+        118
+      ],
+      "position": 4,
+      "detected": false,
+      "disposition": "retain",
+      "reason": "retain: reference corroborates the earlier onset"
+    },
+    {
+      "key": [
+        5,
+        30,
+        60
+      ],
+      "position": 6,
+      "detected": false,
+      "disposition": "retain",
+      "reason": "retain: reference does not corroborate the second onset"
+    },
+    {
+      "key": [
+        5,
+        33,
+        25
+      ],
+      "position": 9,
+      "detected": true,
+      "disposition": "accept",
+      "reason": "both models improve; restored source onset within 250ms of both witnesses"
+    },
+    {
+      "key": [
+        5,
+        36,
+        20
+      ],
+      "position": 7,
+      "detected": false,
+      "disposition": "retain",
+      "reason": "retain: reference does not corroborate the second onset"
+    },
+    {
+      "key": [
+        5,
+        40,
+        13
+      ],
+      "position": 10,
+      "detected": false,
+      "disposition": "retain",
+      "reason": "retain: reference does not corroborate the second onset"
+    },
+    {
+      "key": [
+        7,
+        3,
+        73
+      ],
+      "position": 18,
+      "detected": false,
+      "disposition": "retain",
+      "reason": "retain: reference does not corroborate the second onset"
+    },
+    {
+      "key": [
+        7,
+        4,
+        15
+      ],
+      "position": 18,
+      "detected": false,
+      "disposition": "retain",
+      "reason": "retain: reference does not corroborate the second onset"
+    },
+    {
+      "key": [
+        7,
+        4,
+        143
+      ],
+      "position": 10,
+      "detected": false,
+      "disposition": "retain",
+      "reason": "retain: reference does not corroborate the second onset"
+    },
+    {
+      "key": [
+        7,
+        7,
+        155
+      ],
+      "position": 10,
+      "detected": false,
+      "disposition": "retain",
+      "reason": "retain: reference corroborates the earlier onset"
+    },
+    {
+      "key": [
+        7,
+        28,
+        57
+      ],
+      "position": 18,
+      "detected": false,
+      "disposition": "retain",
+      "reason": "retain: reference corroborates the earlier onset"
+    },
+    {
+      "key": [
+        7,
+        40,
+        49
+      ],
+      "position": 7,
+      "detected": false,
+      "disposition": "retain",
+      "reason": "retain: reference does not corroborate the second onset"
+    }
+  ],
+  "verdicts": {
+    "Alafasy_128kbps:43:46": {
+      "verdict": "accept",
+      "kinds": [
+        "timestamp"
+      ],
+      "baselinePayloadHash": "4a9ceebd32dc0eb7660c1b10e32ce5e002af67f738e19d59c2451ee58ad65f2d",
+      "candidatePayloadHash": "412314f922c3007db5a033fca24d20775934db545e46cc037134f46d1f4a0f21",
+      "reason": "both models improve; restored source onset within 250ms of both witnesses",
+      "evidence": {
+        "kind": "dual_model_boundary",
+        "models": [
+          {
+            "name": "arabic-xlsr-ctc",
+            "model": "jonatasgrosman/wav2vec2-large-xlsr-53-arabic",
+            "modelRevision": "af46c2d8531b8dcbb5e23b952f739b372c2e5d2d",
+            "metric": "meanAbsStartResidualMs",
+            "baselineResidualMs": 235.33333333333334,
+            "candidateResidualMs": 74.5,
+            "baselineScore": -235.33333333333334,
+            "candidateScore": -74.5,
+            "changedWord": {
+              "position": 5,
+              "forcedStartMs": 5984,
+              "candidateStartMs": 5900,
+              "candidateResidualMs": 84,
+              "meanLabelProbability": 0.3333308073098256
+            }
+          },
+          {
+            "name": "mms-uroman-ctc",
+            "model": "MahmoudAshraf/mms-300m-1130-forced-aligner",
+            "modelRevision": "49402e9577b1158620820667c218cd494cc44486",
+            "metric": "meanAbsStartResidualMs",
+            "baselineResidualMs": 245.41666666666666,
+            "candidateResidualMs": 84.58333333333333,
+            "baselineScore": -245.41666666666666,
+            "candidateScore": -84.58333333333333,
+            "changedWord": {
+              "position": 5,
+              "forcedStartMs": 6064,
+              "candidateStartMs": 5900,
+              "candidateResidualMs": 164,
+              "meanLabelProbability": 0.7450425100469147
+            }
+          }
+        ],
+        "audioSha256": "48370dd0080d05717ba7cea5dcce1cb1d6f2f0c609e7874356e2847f7fe4f55c",
+        "artifact": "tools/timing_evidence/fragment-lead-review.json",
+        "summary": "Exact two-boundary handoff: preceding held word regains its tail; every other timing and occurrence is unchanged.",
+        "waveformVeto": false,
+        "waveform": {
+          "method": "decoded audio bounds, identical occurrence sequence, unchanged or extended voiced ends",
+          "decodedDurationMs": 14989,
+          "boundsWithinTolerance": true,
+          "durationToleranceMs": 50,
+          "voicedEndToleranceMs": 250,
+          "voicedTailCutRisks": []
+        }
+      }
+    },
+    "Alafasy_128kbps:48:17": {
+      "verdict": "accept",
+      "kinds": [
+        "timestamp"
+      ],
+      "baselinePayloadHash": "9b332ca9a68a3b7a7c7c1555e50ad3c387c7eaca1837169e34e8abced3060d79",
+      "candidatePayloadHash": "493cbfdb44fc3abf0cd4c3b492a7e2bd3aa53cf4c282b626b6974c992ded64b8",
+      "reason": "both models improve; restored source onset within 250ms of both witnesses",
+      "evidence": {
+        "kind": "dual_model_boundary",
+        "models": [
+          {
+            "name": "arabic-xlsr-ctc",
+            "model": "jonatasgrosman/wav2vec2-large-xlsr-53-arabic",
+            "modelRevision": "af46c2d8531b8dcbb5e23b952f739b372c2e5d2d",
+            "metric": "meanAbsStartResidualMs",
+            "baselineResidualMs": 311.3703703703704,
+            "candidateResidualMs": 208.03703703703704,
+            "baselineScore": -311.3703703703704,
+            "candidateScore": -208.03703703703704,
+            "changedWord": {
+              "position": 23,
+              "forcedStartMs": 25172,
+              "candidateStartMs": 25120,
+              "candidateResidualMs": 52,
+              "meanLabelProbability": 0.97721994916598
+            }
+          },
+          {
+            "name": "mms-uroman-ctc",
+            "model": "MahmoudAshraf/mms-300m-1130-forced-aligner",
+            "modelRevision": "49402e9577b1158620820667c218cd494cc44486",
+            "metric": "meanAbsStartResidualMs",
+            "baselineResidualMs": 302.6296296296296,
+            "candidateResidualMs": 199.2962962962963,
+            "baselineScore": -302.6296296296296,
+            "candidateScore": -199.2962962962963,
+            "changedWord": {
+              "position": 23,
+              "forcedStartMs": 25172,
+              "candidateStartMs": 25120,
+              "candidateResidualMs": 52,
+              "meanLabelProbability": 0.6497422258059183
+            }
+          }
+        ],
+        "audioSha256": "12d117c3eaa2ac27e8d1626e1a71b988ab51d6552d010a0cf206a02dcf0f3e1f",
+        "artifact": "tools/timing_evidence/fragment-lead-review.json",
+        "summary": "Exact two-boundary handoff: preceding held word regains its tail; every other timing and occurrence is unchanged.",
+        "waveformVeto": false,
+        "waveform": {
+          "method": "decoded audio bounds, identical occurrence sequence, unchanged or extended voiced ends",
+          "decodedDurationMs": 32295,
+          "boundsWithinTolerance": true,
+          "durationToleranceMs": 50,
+          "voicedEndToleranceMs": 250,
+          "voicedTailCutRisks": []
+        }
+      }
+    },
+    "Alafasy_128kbps:64:11": {
+      "verdict": "accept",
+      "kinds": [
+        "timestamp"
+      ],
+      "baselinePayloadHash": "7de048c895c1902ad82fd16c689453afa9ec57f1b84d11860aa41daf12ebc493",
+      "candidatePayloadHash": "b98529ffee05f4fe0facaea6c2b24e095c9482c895da53b9cb0eff9e2441f4aa",
+      "reason": "both models improve; restored source onset within 250ms of both witnesses",
+      "evidence": {
+        "kind": "dual_model_boundary",
+        "models": [
+          {
+            "name": "arabic-xlsr-ctc",
+            "model": "jonatasgrosman/wav2vec2-large-xlsr-53-arabic",
+            "modelRevision": "af46c2d8531b8dcbb5e23b952f739b372c2e5d2d",
+            "metric": "meanAbsStartResidualMs",
+            "baselineResidualMs": 360.6875,
+            "candidateResidualMs": 241.9375,
+            "baselineScore": -360.6875,
+            "candidateScore": -241.9375,
+            "changedWord": {
+              "position": 8,
+              "forcedStartMs": 8965,
+              "candidateStartMs": 8910,
+              "candidateResidualMs": 55,
+              "meanLabelProbability": 0.9998665452003479
+            }
+          },
+          {
+            "name": "mms-uroman-ctc",
+            "model": "MahmoudAshraf/mms-300m-1130-forced-aligner",
+            "modelRevision": "49402e9577b1158620820667c218cd494cc44486",
+            "metric": "meanAbsStartResidualMs",
+            "baselineResidualMs": 361.0625,
+            "candidateResidualMs": 242.3125,
+            "baselineScore": -361.0625,
+            "candidateScore": -242.3125,
+            "changedWord": {
+              "position": 8,
+              "forcedStartMs": 8965,
+              "candidateStartMs": 8910,
+              "candidateResidualMs": 55,
+              "meanLabelProbability": 0.6938907702763876
+            }
+          }
+        ],
+        "audioSha256": "0e83df52ef4bf122d19b6dd26dd3fdd40788f67f64f67ab42534903895099e95",
+        "artifact": "tools/timing_evidence/fragment-lead-review.json",
+        "summary": "Exact two-boundary handoff: preceding held word regains its tail; every other timing and occurrence is unchanged.",
+        "waveformVeto": false,
+        "waveform": {
+          "method": "decoded audio bounds, identical occurrence sequence, unchanged or extended voiced ends",
+          "decodedDurationMs": 19850,
+          "boundsWithinTolerance": true,
+          "durationToleranceMs": 50,
+          "voicedEndToleranceMs": 250,
+          "voicedTailCutRisks": []
+        }
+      }
+    },
+    "Abdul_Basit_Murattal_64kbps:34:27": {
+      "verdict": "hold",
+      "kinds": [
+        "timestamp"
+      ],
+      "baselinePayloadHash": "4ea7bfa2d2e407d7905800bcf922ff96ef5b8e15a4803a83edc236c34c4dbf22",
+      "candidatePayloadHash": "b6e9b9b328be3ec0ee217911e48045baaf13820ff36e4f1599b6da3ca3074d62",
+      "reason": "retain baseline: source onset remains over 250ms from a model or waveform/metric veto",
+      "evidence": {
+        "kind": "dual_model_boundary",
+        "models": [
+          {
+            "name": "arabic-xlsr-ctc",
+            "model": "jonatasgrosman/wav2vec2-large-xlsr-53-arabic",
+            "modelRevision": "af46c2d8531b8dcbb5e23b952f739b372c2e5d2d",
+            "metric": "meanAbsStartResidualMs",
+            "baselineResidualMs": 160.83333333333334,
+            "candidateResidualMs": 142.5,
+            "baselineScore": -160.83333333333334,
+            "candidateScore": -142.5,
+            "changedWord": {
+              "position": 7,
+              "forcedStartMs": 8354,
+              "candidateStartMs": 8070,
+              "candidateResidualMs": 284,
+              "meanLabelProbability": 0.997591957449913
+            }
+          },
+          {
+            "name": "mms-uroman-ctc",
+            "model": "MahmoudAshraf/mms-300m-1130-forced-aligner",
+            "modelRevision": "49402e9577b1158620820667c218cd494cc44486",
+            "metric": "meanAbsStartResidualMs",
+            "baselineResidualMs": 199.41666666666666,
+            "candidateResidualMs": 181.08333333333334,
+            "baselineScore": -199.41666666666666,
+            "candidateScore": -181.08333333333334,
+            "changedWord": {
+              "position": 7,
+              "forcedStartMs": 8334,
+              "candidateStartMs": 8070,
+              "candidateResidualMs": 264,
+              "meanLabelProbability": 0.6400868091732264
+            }
+          }
+        ],
+        "audioSha256": "fa2e64a5aafcfeff8aea2115116d378f52ffc04184bafce043e4ce6de89ee335",
+        "artifact": "tools/timing_evidence/fragment-lead-review.json",
+        "summary": "Exact two-boundary handoff: preceding held word regains its tail; every other timing and occurrence is unchanged.",
+        "waveformVeto": false,
+        "waveform": {
+          "method": "decoded audio bounds, identical occurrence sequence, unchanged or extended voiced ends",
+          "decodedDurationMs": 14184,
+          "boundsWithinTolerance": true,
+          "durationToleranceMs": 50,
+          "voicedEndToleranceMs": 250,
+          "voicedTailCutRisks": []
+        }
+      }
+    },
+    "Abdurrahmaan_As-Sudais_192kbps:4:104": {
+      "verdict": "hold",
+      "kinds": [
+        "timestamp"
+      ],
+      "baselinePayloadHash": "9d992484df64d629e6002480c0d45cc97117b19d9230e5a441078fd800f8ee2b",
+      "candidatePayloadHash": "78ef83a2a032ba886475e58255bb8740118b1e1e2506619c46a446cc233ffb91",
+      "reason": "retain baseline: source onset remains over 250ms from a model or waveform/metric veto",
+      "evidence": {
+        "kind": "dual_model_boundary",
+        "models": [
+          {
+            "name": "arabic-xlsr-ctc",
+            "model": "jonatasgrosman/wav2vec2-large-xlsr-53-arabic",
+            "modelRevision": "af46c2d8531b8dcbb5e23b952f739b372c2e5d2d",
+            "metric": "meanAbsStartResidualMs",
+            "baselineResidualMs": 107.13636363636364,
+            "candidateResidualMs": 102.13636363636364,
+            "baselineScore": -107.13636363636364,
+            "candidateScore": -102.13636363636364,
+            "changedWord": {
+              "position": 6,
+              "forcedStartMs": 5802,
+              "candidateStartMs": 5530,
+              "candidateResidualMs": 272,
+              "meanLabelProbability": 0.4107034246210901
+            }
+          },
+          {
+            "name": "mms-uroman-ctc",
+            "model": "MahmoudAshraf/mms-300m-1130-forced-aligner",
+            "modelRevision": "49402e9577b1158620820667c218cd494cc44486",
+            "metric": "meanAbsStartResidualMs",
+            "baselineResidualMs": 95.31818181818181,
+            "candidateResidualMs": 90.31818181818181,
+            "baselineScore": -95.31818181818181,
+            "candidateScore": -90.31818181818181,
+            "changedWord": {
+              "position": 6,
+              "forcedStartMs": 5862,
+              "candidateStartMs": 5530,
+              "candidateResidualMs": 332,
+              "meanLabelProbability": 0.41130684316158295
+            }
+          }
+        ],
+        "audioSha256": "1ac0cc249f9fd787f9256c901b9d7e2994c6085f392ea5684c76109f3517bbcb",
+        "artifact": "tools/timing_evidence/fragment-lead-review.json",
+        "summary": "Exact two-boundary handoff: preceding held word regains its tail; every other timing and occurrence is unchanged.",
+        "waveformVeto": false,
+        "waveform": {
+          "method": "decoded audio bounds, identical occurrence sequence, unchanged or extended voiced ends",
+          "decodedDurationMs": 23066,
+          "boundsWithinTolerance": true,
+          "durationToleranceMs": 50,
+          "voicedEndToleranceMs": 250,
+          "voicedTailCutRisks": []
+        }
+      }
+    },
+    "Abdurrahmaan_As-Sudais_192kbps:8:69": {
+      "verdict": "accept",
+      "kinds": [
+        "timestamp"
+      ],
+      "baselinePayloadHash": "834200630936fc61c4068fa581d487eaebe87f67261c16cd421aac03cd53a866",
+      "candidatePayloadHash": "ea81e780cdb7be60189b62103468c368802136bcb0f9fc38bf8661d9fd942412",
+      "reason": "both models improve; restored source onset within 250ms of both witnesses",
+      "evidence": {
+        "kind": "dual_model_boundary",
+        "models": [
+          {
+            "name": "arabic-xlsr-ctc",
+            "model": "jonatasgrosman/wav2vec2-large-xlsr-53-arabic",
+            "modelRevision": "af46c2d8531b8dcbb5e23b952f739b372c2e5d2d",
+            "metric": "meanAbsStartResidualMs",
+            "baselineResidualMs": 102.54545454545455,
+            "candidateResidualMs": 78.9090909090909,
+            "baselineScore": -102.54545454545455,
+            "candidateScore": -78.9090909090909,
+            "changedWord": {
+              "position": 6,
+              "forcedStartMs": 6325,
+              "candidateStartMs": 6130,
+              "candidateResidualMs": 195,
+              "meanLabelProbability": 0.9667842864990235
+            }
+          },
+          {
+            "name": "mms-uroman-ctc",
+            "model": "MahmoudAshraf/mms-300m-1130-forced-aligner",
+            "modelRevision": "49402e9577b1158620820667c218cd494cc44486",
+            "metric": "meanAbsStartResidualMs",
+            "baselineResidualMs": 94.0,
+            "candidateResidualMs": 70.36363636363636,
+            "baselineScore": -94.0,
+            "candidateScore": -70.36363636363636,
+            "changedWord": {
+              "position": 6,
+              "forcedStartMs": 6305,
+              "candidateStartMs": 6130,
+              "candidateResidualMs": 175,
+              "meanLabelProbability": 0.699069564541181
+            }
+          }
+        ],
+        "audioSha256": "2a0a4a5fe3a4fac37746f40b9903668869bfd95997d365f4f8303716f4e7dfd9",
+        "artifact": "tools/timing_evidence/fragment-lead-review.json",
+        "summary": "Exact two-boundary handoff: preceding held word regains its tail; every other timing and occurrence is unchanged.",
+        "waveformVeto": false,
+        "waveform": {
+          "method": "decoded audio bounds, identical occurrence sequence, unchanged or extended voiced ends",
+          "decodedDurationMs": 11389,
+          "boundsWithinTolerance": true,
+          "durationToleranceMs": 50,
+          "voicedEndToleranceMs": 250,
+          "voicedTailCutRisks": []
+        }
+      }
+    },
+    "Abdurrahmaan_As-Sudais_192kbps:21:28": {
+      "verdict": "hold",
+      "kinds": [
+        "timestamp"
+      ],
+      "baselinePayloadHash": "426c36d1ce589a12414ef753f7ade9368e1596fcf8b471da7c818bfc05a5f069",
+      "candidatePayloadHash": "203205618b7b9483e97992a862cb1fdb921366f4db5d5d7f9ad279324d16cf5c",
+      "reason": "retain baseline: source onset remains over 250ms from a model or waveform/metric veto",
+      "evidence": {
+        "kind": "dual_model_boundary",
+        "models": [
+          {
+            "name": "arabic-xlsr-ctc",
+            "model": "jonatasgrosman/wav2vec2-large-xlsr-53-arabic",
+            "modelRevision": "af46c2d8531b8dcbb5e23b952f739b372c2e5d2d",
+            "metric": "meanAbsStartResidualMs",
+            "baselineResidualMs": 118.13333333333334,
+            "candidateResidualMs": 110.13333333333334,
+            "baselineScore": -118.13333333333334,
+            "candidateScore": -110.13333333333334,
+            "changedWord": {
+              "position": 12,
+              "forcedStartMs": 8274,
+              "candidateStartMs": 7990,
+              "candidateResidualMs": 284,
+              "meanLabelProbability": 0.7928005695343018
+            }
+          },
+          {
+            "name": "mms-uroman-ctc",
+            "model": "MahmoudAshraf/mms-300m-1130-forced-aligner",
+            "modelRevision": "49402e9577b1158620820667c218cd494cc44486",
+            "metric": "meanAbsStartResidualMs",
+            "baselineResidualMs": 119.13333333333334,
+            "candidateResidualMs": 111.13333333333334,
+            "baselineScore": -119.13333333333334,
+            "candidateScore": -111.13333333333334,
+            "changedWord": {
+              "position": 12,
+              "forcedStartMs": 8294,
+              "candidateStartMs": 7990,
+              "candidateResidualMs": 304,
+              "meanLabelProbability": 0.7774887184302012
+            }
+          }
+        ],
+        "audioSha256": "96ca5a0d89769705e5105a29ab3ace440a9f97619e81195956d01e5ccd75de33",
+        "artifact": "tools/timing_evidence/fragment-lead-review.json",
+        "summary": "Exact two-boundary handoff: preceding held word regains its tail; every other timing and occurrence is unchanged.",
+        "waveformVeto": false,
+        "waveform": {
+          "method": "decoded audio bounds, identical occurrence sequence, unchanged or extended voiced ends",
+          "decodedDurationMs": 12722,
+          "boundsWithinTolerance": true,
+          "durationToleranceMs": 50,
+          "voicedEndToleranceMs": 250,
+          "voicedTailCutRisks": []
+        }
+      }
+    },
+    "Abdurrahmaan_As-Sudais_192kbps:33:25": {
+      "verdict": "accept",
+      "kinds": [
+        "timestamp"
+      ],
+      "baselinePayloadHash": "037fa8c8b788a5541a10a97973914917620a1f94e41dade6b2e4267686c77632",
+      "candidatePayloadHash": "8348b9898f9e4f93a98ab6bca422bf8e36cbfd979bff591cdafd8d9e721a1956",
+      "reason": "both models improve; restored source onset within 250ms of both witnesses",
+      "evidence": {
+        "kind": "dual_model_boundary",
+        "models": [
+          {
+            "name": "arabic-xlsr-ctc",
+            "model": "jonatasgrosman/wav2vec2-large-xlsr-53-arabic",
+            "modelRevision": "af46c2d8531b8dcbb5e23b952f739b372c2e5d2d",
+            "metric": "meanAbsStartResidualMs",
+            "baselineResidualMs": 89.875,
+            "candidateResidualMs": 76.125,
+            "baselineScore": -89.875,
+            "candidateScore": -76.125,
+            "changedWord": {
+              "position": 9,
+              "forcedStartMs": 6951,
+              "candidateStartMs": 6750,
+              "candidateResidualMs": 201,
+              "meanLabelProbability": 0.7499956454807943
+            }
+          },
+          {
+            "name": "mms-uroman-ctc",
+            "model": "MahmoudAshraf/mms-300m-1130-forced-aligner",
+            "modelRevision": "49402e9577b1158620820667c218cd494cc44486",
+            "metric": "meanAbsStartResidualMs",
+            "baselineResidualMs": 74.875,
+            "candidateResidualMs": 61.125,
+            "baselineScore": -74.875,
+            "candidateScore": -61.125,
+            "changedWord": {
+              "position": 9,
+              "forcedStartMs": 6951,
+              "candidateStartMs": 6750,
+              "candidateResidualMs": 201,
+              "meanLabelProbability": 0.7889558523893356
+            }
+          }
+        ],
+        "audioSha256": "56b21e176578f5616db3426c48c2e2e32ae73484898ad175a963a872536549af",
+        "artifact": "tools/timing_evidence/fragment-lead-review.json",
+        "summary": "Exact two-boundary handoff: preceding held word regains its tail; every other timing and occurrence is unchanged.",
+        "waveformVeto": false,
+        "waveform": {
+          "method": "decoded audio bounds, identical occurrence sequence, unchanged or extended voiced ends",
+          "decodedDurationMs": 15125,
+          "boundsWithinTolerance": true,
+          "durationToleranceMs": 50,
+          "voicedEndToleranceMs": 250,
+          "voicedTailCutRisks": []
+        }
+      }
+    }
+  }
+}

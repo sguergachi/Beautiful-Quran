@@ -117,6 +117,31 @@ fun InkLabPanel(
                 val guide = InkEngine.contextualGuideTuning
                 when (tab) {
                     InkLabTab.Ink -> {
+                        LabCaption("Wet ink on the Paper theme. Turn off for the soft paper-cover wash.")
+                        TuningToggle("Paper ink", t.paperInk) {
+                            InkEngine.tuning = t.copy(paperInk = it)
+                        }
+                        TuningToggle("Flowing ink", t.paperInkFlowing) {
+                            InkEngine.tuning = t.copy(paperInkFlowing = it)
+                        }
+                        TuningToggle("Fibre fringe", t.paperInkFibreFringe) {
+                            InkEngine.tuning = t.copy(paperInkFibreFringe = it)
+                        }
+                        LabCaption("Paper fibres shape the wet edge as it soaks in and dries. Dry type stays unchanged.")
+                        TuningSlider("Ink pooling", t.paperInkPooling, 0f..1f) {
+                            InkEngine.tuning = t.copy(paperInkPooling = it)
+                        }
+                        TuningSlider("Reflection", t.paperInkReflection, 0f..1f) {
+                            InkEngine.tuning = t.copy(paperInkReflection = it)
+                        }
+                        TuningSlider("Lead fade", t.paperInkLeadFade, 0f..1f) {
+                            InkEngine.tuning = t.copy(paperInkLeadFade = it)
+                        }
+                        LabCaption("Lead fade adjusts the Arabic preview. English keeps its one-letter edge.")
+                        TuningSlider("Dry-down ms", t.glintFadeMs.toFloat(), 100f..2400f, integer = true) {
+                            InkEngine.tuning = t.copy(glintFadeMs = it.roundToInt())
+                        }
+                        LabCaption("How long wet ink takes to settle. Also controls the glimmer's decay.")
                         TuningSlider("Upcoming ink", t.upcomingAlpha, 0.05f..0.6f) {
                             InkEngine.tuning = t.copy(upcomingAlpha = it)
                         }
@@ -173,6 +198,18 @@ fun InkLabPanel(
                         TuningToggle("Tajweed pacing", t.tajweedPacing) {
                             InkEngine.tuning = t.copy(tajweedPacing = it)
                         }
+                        TuningSlider("English tajweed tempo", t.englishTajweedTempo, 0f..1f) {
+                            InkEngine.tuning = t.copy(englishTajweedTempo = it)
+                        }
+                        LabCaption("How much English ink slows on held letters and quickens through short ones. 0 is steady; 1 parks on a madd like the Arabic.")
+                        TuningSlider("English smoothing (ms)", t.englishSmoothMs, 0f..250f) {
+                            InkEngine.tuning = t.copy(englishSmoothMs = it)
+                        }
+                        LabCaption("Blends English ink's speed across word boundaries so it never jumps. 0 follows each word exactly.")
+                        TuningSlider("English lead (ms)", t.englishLeadMs, 0f..500f) {
+                            InkEngine.tuning = t.copy(englishLeadMs = it)
+                        }
+                        LabCaption("How far English ink runs ahead of the voice, so the meaning is read as the word is heard.")
                         TuningToggle("Hold: madd", t.holdMadd) {
                             InkEngine.tuning = t.copy(holdMadd = it)
                         }
@@ -677,6 +714,9 @@ internal fun formatTuningCopy(t: InkEngine.Tuning): String {
         appendLine("    sweepEaseX2 = ${f(t.sweepEaseX2)},")
         appendLine("    sweepEaseY2 = ${f(t.sweepEaseY2)},")
         appendLine("    tajweedPacing = ${t.tajweedPacing},")
+        appendLine("    englishTajweedTempo = ${f(t.englishTajweedTempo)},")
+        appendLine("    englishSmoothMs = ${f(t.englishSmoothMs)},")
+        appendLine("    englishLeadMs = ${f(t.englishLeadMs)},")
         appendLine("    pacedFeather = ${f(t.pacedFeather)},")
         appendLine("    holdMadd = ${t.holdMadd},")
         appendLine("    holdGhunnah = ${t.holdGhunnah},")
@@ -701,6 +741,12 @@ internal fun formatTuningCopy(t: InkEngine.Tuning): String {
         appendLine("    tarjiAttackMs = ${f(t.tarjiAttackMs)},")
         appendLine("    tarjiReleaseMs = ${f(t.tarjiReleaseMs)},")
         appendLine("    tarjiEarDelayMs = ${f(t.tarjiEarDelayMs)},")
+        appendLine("    paperInk = ${t.paperInk},")
+        appendLine("    paperInkPooling = ${f(t.paperInkPooling)},")
+        appendLine("    paperInkReflection = ${f(t.paperInkReflection)},")
+        appendLine("    paperInkLeadFade = ${f(t.paperInkLeadFade)},")
+        appendLine("    paperInkFlowing = ${t.paperInkFlowing},")
+        appendLine("    paperInkFibreFringe = ${t.paperInkFibreFringe},")
         append(")")
     }
 }

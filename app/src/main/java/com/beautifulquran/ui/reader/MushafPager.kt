@@ -814,7 +814,7 @@ internal fun MushafPager(
         val clock = washClock.value?.takeIf { it.followsFirstWash(word, loadedSurahId) } ?: return null
         val alignment = alignmentsNow.value.alignment(word.ayah) ?: return null
         val windows = washWindowsNow.value[loadedSurahId to word.ayah] ?: return null
-        return englishWashThrough(alignment, windows, clock.positionMs + aheadMs, clock.voiceStartMs)
+        return englishWashThrough(windows, clock.positionMs + aheadMs)
     }
     // The leaf the voice is on, 1-based, or null. A Madinah page may be two
     // leaves, so which of them holds the verse is a question the book answers.
@@ -1539,8 +1539,7 @@ private fun MushafPageSheet(
     // They get a recess pack keyed the same way, driven by nothing but where
     // they stand relative to the chapter the voice is in. The mushaf runs in
     // chapter order, so a lower id on this leaf is behind the reciter and
-    // keeps its ink, and a higher one is still to come and waits with the rest
-    // of what is ahead.
+    // keeps its ink; a higher id waits with what is ahead.
     val upcomingOnPage = remember(page.page, content.surah.id) {
         page.ayahKeys.filter { (surahId, _) -> surahId > content.surah.id }
     }
@@ -1855,8 +1854,7 @@ internal fun MushafPageInkClocks(
     /** Verses of a chapter this leaf shares but has not loaded, standing after
      * the loaded one: they wait with everything else still to come. */
     upcoming: List<Pair<Int, Int>>,
-    /** The same, standing before it: the reader has passed them, so they keep
-     * their ink like any verse already read. */
+    /** Earlier chapters sharing the leaf keep their ink like verses already read. */
     recited: List<Pair<Int, Int>>,
     activeWordState: State<ActiveWord?>,
     playback: State<MushafPlayback>,
@@ -1936,7 +1934,7 @@ internal fun MushafPageInkClocks(
                     ayah = ayah,
                     activeWord = activeWord,
                     playbackSpeed = playbackSpeed,
-                    // A drying verse is read: Plain, full ink, glint receding.
+                    // A completed verse keeps its ink while the last wet word dries.
                     isActiveAyah = voiced,
                     dimmed = false,
                     flashWordPosition = flashWordPosition?.takeIf { flashHere },
@@ -2000,7 +1998,7 @@ internal fun MushafPageInkClocks(
     }
     // No text of theirs is loaded, so there is nothing to clock word by word.
     // A later chapter on the voice's leaf still waits under paper; a chapter
-    // already passed and every manually browsed leaf remain full scripture.
+    // already passed keeps its ink. A manually browsed leaf remains full scripture.
     upcoming.forEach { key ->
         key(key.first, key.second) {
             val pack = rememberMushafRecessPack(

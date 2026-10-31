@@ -11,6 +11,226 @@ glimmer on Android and web. Repeat-chain timing and orange ink are documented
 in [REPEAT_HIGHLIGHTING.md](REPEAT_HIGHLIGHTING.md); the shared word-state and
 motion policy lives in [INK_ENGINE.md](INK_ENGINE.md).
 
+## Paper ink experiment — Al-Fatihah 1:1–3
+
+Settings → Developer → **Paper ink study** opens a native Android 13+ test
+sheet for three verses. The existing Al-Shatri audio queue plays **1 → 2 →
+2 → 3**: Media3 repeats the middle item once, then resumes the queue. The
+normal reader wash is unchanged; this is an isolated visual experiment.
+
+**Arabic / English** switches the three verses without restarting audio or
+changing the dials. Arabic uses Hafs; English uses the bundled Junicode face
+and the canonical Saheeh International verse translation, wrapped into centred
+lines. Text stays in its normal reading order. **Letter starts and words** progress
+right-to-left in Arabic and left-to-right in English, matching each script's
+reading order. The continuous wash never skips an earlier word.
+
+**Inside out / Flowing ink** switches the ink spread without restarting
+playback or changing the other controls. Both use the swelling-channel spread.
+A front moves along the baseline in reading order (right to left in Arabic,
+left to right in English) and lays a fine wet line down the core of every
+stroke it passes. Each stroke then swells from that line out to both edges,
+like ink pooling into a channel, with a crisp liquid boundary rather than a
+fading wipe edge. Swell depth is normalized by the local stroke half-width,
+so bowls and hairlines fill out in the same time.
+
+- **No climbing.** The front feeds whole stroke heights at once, so upright
+  alif and lam strokes never fill bottom-up. Leaning stems are fed from the
+  baseline foot they stand on (a vertical-preferring ink path), so a slant
+  does not fill diagonally either. Shallow strokes keep their own position.
+- **One continuing flow.** A detached letter begins only once the previous
+  one is mostly inked; only its finest hairlines may still be swelling.
+- **Letter pacing.** Each letter gets an equal time slot, the slots
+  `TajweedPacing` already assumes, so holds land on the letter being voiced;
+  a Gaussian over the slot map (0.45 letter widths) keeps speed smooth.
+
+Inside out (default) swells over 1.6 letter slots with a fuller profile;
+Flowing ink is the cleaner, quicker swell (1 slot). This keeps the earlier
+merging-pools look, where ink appears inside a letter and grows outward,
+without the rejected versions' faults: separate starts in one stroke, the
+geodesic wave's bottom-up lam, and the straight baseline wipe. The moving
+meniscus highlight is tempered on steep fronts so a swelling channel keeps
+a gentle bulge instead of ridged stripes. The existing Arabic tajweed pacing
+maps the front to the word's media clock; English uses its linear clock.
+
+**Lead fade** feathers the edge: the letter ahead of the wet ink fades in
+from the faint unread tone toward fresh black (60%) before the liquid
+arrives. The default 50% is one letter slot; 100% is two, 0 disables it. An
+upcoming word's first letter starts fading in while the previous word's last
+letter is voiced (`PaperInkClock.ahead`). The orange repeat skips the fade:
+its text is already dry charcoal, and tinting that toward orange turns muddy.
+
+HarfBuzz shaping, with a second measurement run without contextual/ligature
+substitutions, still counts the letters in each word to keep the existing
+feather duration and word window. The original shaped font always supplies
+the printed contour. The arrival field is defined on paper too, so wet spread
+beyond the contour shares its column's arrival. All travel is baked into the
+maps, adding no shader work or runtime sampling.
+
+This is a geometry-guided approximation of liquid spread, not a fluid solver
+or an inferred pen route. There is no pen or animated random noise.
+
+The wash is based on media time, so pausing freezes filling and changing
+playback speed scales it with the recitation. Before its turn, a word remains
+visible beneath the paper.
+
+Wet ink is optically fuller than dry ink, with a rounded liquid film across
+the stroke interior and localized window reflections. Fresh carbon pigment
+is a near-black `#060708`; it settles to the slightly lighter warm charcoal
+`#34322E` as it dries. Pooling can deepen the wet pigment further, while the
+localized reflection still catches light. The wet orange repeat accent
+(`#C25F3B`, a warm orange terracotta)
+dries to a slightly paler, less saturated terracotta (about `#CA8164`)
+while its chain is held, then releases to dry charcoal with the chain. The
+surface keeps curving through broad strokes rather than flattening behind a
+thick outline. The just-deposited film is a little fuller and more reflective;
+it levels behind the advancing front while retaining its dark pigment. The
+existing word-level dry-down then settles it to charcoal. A controlled light pass follows
+the word's media progress and dry-down; it needs no phone movement or sensor.
+Both gloss and the optical expansion settle over the existing
+`InkEngine.tuning.glintFadeMs`. Hafs has no variable weight axis. No glow,
+pixel noise, or surrounding shadow is added.
+
+First and repeat passes deposit the same liquid layer through the same
+arrival field and soft front, including expansion, the rounded meniscus and
+reflection. The repeat's stronger retained dry underprint preserves legibility;
+it does not replace the liquid fill with an early-saturating color reveal.
+English surface depth, height and smoothing are scaled to its 80 px font
+raster, matching Arabic's 160 px material units. This keeps the smaller
+Junicode strokes from receiving a shallow, over-smoothed film. Printed contours,
+letter timing and dial values are unchanged.
+
+**Reflection** adjusts the window reflection's strength from 0–100%, default
+50%. **Softness** changes its spread from a focused, antialiased reflection
+to a broad soft light, default 0%. Both work during timed playback and Hold
+fill without changing the fill amount, pooling, or clock. Surface normals
+are smoothed independently of the printed contour; even the focused light
+retains a soft edge to avoid pixel-scale sparkle. A rounded moving
+meniscus follows the advancing ink front; its normal comes from smooth
+arrival-field gradients sampled at a scale-aware radius. The light blends
+with the pigment rather than adding unbounded brightness, preserving the
+orange repeat at high settings. Fully dry text is unaffected by either dial.
+
+The **Ink pooling** dial changes wet spread and liquid depth live, including
+in Hold fill. Its 0–100% range corresponds to 0–3.5 font pixels of optical
+expansion; the default is 25% (0.875 pixels), down from the previous fixed
+2.6 pixels. Zero keeps a thin wet film with no expansion. Dry ink always
+returns to the original font contour, at every dial setting. The dial does
+not change timing or restart playback.
+The **Font size** dial scales the fitted sample from 50% to 100%, centred on
+the same three verse groups, default 91%. It changes only drawing scale,
+keeping playback and the pooling setting intact. All dials reset when the study is reopened.
+
+When verse 2 repeats, its entire previously read black base stays visible.
+Any first-pass wet ink keeps drying on its original clock beneath the new
+orange front, retaining its width and reflection until the front reaches it.
+The wash brings in the wet terracotta orange (`#C25F3B`)
+together with the fuller wet shape and reflection. Every reached word holds
+orange with the chain, softening to the paler dry orange as its individual
+wet film dries. Both passes
+gain the same stroke weight while wet and return to the regular weight during
+the same per-word dry-down. The pooling dial sets the amount on both passes,
+scaled to the actual font size with gentle relief for smaller type. The study
+uses the same rule as the reader, including its smaller English face.
+Only the color is held by the chain; weight and reflection follow wetness. Later words
+stay black until their turn. Pausing retains the reached orange prefix while
+the sheen settles. Only when playback leaves verse 2 does the complete chain
+dissolve together to charcoal over `InkEngine.tuning.repeatFadeOutMs` (900 ms).
+The repeat film evaporates softly from thin edges into the fuller stroke
+interiors, revealing the complete charcoal underprint. Any remaining wet
+spread and reflection recede with that film; there is no loss of recited ink.
+The tint envelope is independent of wetness, so earlier words do not become
+brown or black while later words repeat. Carbon pooling does not darken orange;
+its pigment travels through the same feathered liquid fill as the first pass.
+**Again** restarts the three-verse demonstration and rearms its one repeat.
+The repeat mode is cleared when the study stops.
+
+**Inspect fill** scrubs a paused, fully wet material preview from 0–100%.
+It starts at 100%, showing the completed wet material; lower values expose
+the organic front and its wet reflection. Touching it pauses audio, and
+**Hold fill** restores that inspected phase. **Dry ink** shows complete dry
+text. **Follow voice**, Play or Again returns to timed filling. Controls
+keep their fixed slots. Normal and half-speed playback are available.
+
+English uses the reader's existing continuous semantic wash bands when
+word glosses are available. Each band is divided into adjacent printed-word
+clocks; English follows linear media time without Arabic tajweed pacing.
+Without cached word glosses, the sample uses continuous proportional verse
+time, an approximation rather than claimed word-level translation timing.
+Both languages' clocks stay warm across a toggle, including pause/dry-down
+and the one orange middle repeat.
+
+Cached native AGSL shaders draw ten Arabic and 27 English word instances.
+Committed 4× contour maps preserve the font; smooth surface maps supply normal XY and film
+depth. There is no per-frame shaping, rasterization, or bitmap upload. The
+material maps are generated from the font outlines, without stroke inference.
+Field R carries the Inside out arrival phase, G the Flowing ink
+phase, and B the unchanged contour distance. The manifest supplies letter
+duration once at shader creation. The surface map carries normal XY and film depth. The
+sweep is solved only in the generator. The shader uses the same cached textures,
+with two additional field samples for the moving meniscus:
+
+```bash
+# Python environment: numpy, scipy, uharfbuzz, Pillow with RAQM
+python3 tools/build_paper_ink_study.py
+python3 tools/test_paper_ink_study.py
+adb shell am start -n com.beautifulquran/.ui.reader.PaperInkStudyActivity
+```
+
+The study verifies the generated maps against the app's canonical text when loading;
+it changes no database. `PaperInkClockTest` covers application, handoff, pause/resume, dry-down and
+backward reset.
+It also checks that a completed, dried word receives the identical wet/dry
+cycle when repeated. `tools/test_paper_ink_shader.py` is an optional direct
+Skia render gate (requires `skia-python` and `numpy`): it checks equal wet
+stroke weight on both passes in both scripts and spread modes, plus narrowing
+back to the regular contour while the repeat remains fully orange, and that
+the lead fade darkens only about a letter ahead and leaves the repeat clean.
+`PaperInkSequenceTest` covers the one middle repeat and restarting the study.
+`PaperInkRepeatChainTest` checks holding orange across word handoffs and pause,
+releasing only after the repeated verse, and clearing the chain on Again.
+`PaperInkEnglishWindowsTest` checks reordered meaning, continuous word clocks,
+proportional fallback and finishing before a repeat.
+The generator's geometry regressions check that an upright stroke fills
+together rather than rising, that a leaning stem is fed from its foot, that
+strokes swell symmetrically from the core (more in Inside out), equal letter
+time slots, that the pictured Arabic forms' core lines arrive in reading
+order, reproducible builds, that detached marks arrive with the body beneath
+them and that detached letters continue in reading order.
+They also cover unchanged contours across modes, full-word completion,
+ligature letter counts and equivalent film depth and curvature at half-size
+font rasterization.
+The controlled reflection is identical in recordings and on a still phone;
+physical-device performance and reading comfort still need evaluation.
+
+[Pentiment's font designers](https://lettermatic.com/custom/pentiment) are a
+material reference for ink bleed and small stroke overlaps. Their animation
+uses authored stroke-order diagrams and individually cut strokes. This study
+borrows deposition and settling cues while retaining voice-paced interior
+filling; it does not reconstruct their pen animation.
+
+The material target is carbon calligraphy ink on smooth, sized paper,
+settling to a matte finish. It is an art-directed approximation compressed
+into the existing highlight duration, not a fluid simulation or a universal
+claim about ink: some formulations and papers retain gloss after drying.
+Research references and their roles:
+
+- [Calligraphy Qalam: tools and materials](https://www.calligraphyqalam.com/process/tools/):
+  soot/gum/water ink, controlled qalam loading and smooth, less absorbent ahar paper.
+- [Sumi wet/dry product photograph](https://store.shopping.yahoo.co.jp/bungle/1515902.html):
+  a dark stroke with localized liquid reflections, settling to matte without a large silhouette change.
+- [Togawa paper comparison](https://www.togawaseishi.com/SHOP/10003100.html):
+  both examples are dry; the retained shine differs with the paper.
+- [Iwai, Hamada and Sumi, 1966](https://doi.org/10.11413/nig1958.9.2):
+  printing-ink penetration increases surface micro-roughness and reduces gloss.
+  This supports the direction of the optical change, not a measured timing for qalam ink.
+- [PBRT: specular reflection](https://www.pbr-book.org/4ed/Reflection_Models/Specular_Reflection_and_Transmission):
+  the surface reflects the lit surroundings according to its normal and the viewing direction.
+- [Kim et al., Hydrodynamics of Writing with Ink, 2011](https://doi.org/10.1103/PhysRevLett.107.264501):
+  moving ink supply, speed and substrate properties govern the trail and its
+  advancing front. The study uses a model capillary pen and micropillar paper;
+  it motivates these deposition cues without calibrating this qalam rendering.
+
 ## When it appears
 
 The word half of the gate is:
@@ -21,7 +241,8 @@ state == Active
 
 The theme half requires the white-gold glimmer accent (`#F8E9BE`) provided by
 Nightfall and Royal Green. Paper does not define that accent, so it does not
-glimmer.
+glimmer; on Paper the same wet/dry clock drives the paper ink instead
+([PAPER_INK.md](PAPER_INK.md)).
 
 This produces three deliberate cases:
 
@@ -484,6 +705,10 @@ defaults and **Copy values** puts a paste-ready `InkEngine.Tuning(…)` construc
 on the clipboard (also written to Logcat under tag `InkLab`). Turn **Focus** off
 (next to Copy values) to freeze auto-home and word-band follow while you pan
 and inspect ink; the toggle is session-only and not part of `Tuning`.
+
+For the Paper theme's visual controls, use **Ink**: pooling, reflection,
+Arabic lead fade, and **Dry-down ms**. Dry-down is another label for
+the same saved value as Sweep's Glitter time. See [Paper ink tuning](PAPER_INK.md#tuning).
 
 | Slider | `InkEngine.Tuning` | Shipped value | Range | Effect |
 |---|---|---:|---:|---|

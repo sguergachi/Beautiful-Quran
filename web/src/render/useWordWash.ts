@@ -23,6 +23,7 @@ import {
   clearPaperCover,
 } from './inkWash'
 import { useWordMotionRegistry } from './WordMotionContext'
+import { englishRevealDurationMs } from '../ui/reader/EnglishRevealTiming'
 
 export interface WordMotion {
   key: string
@@ -155,8 +156,11 @@ export function useWordWash({
     cancel()
     onActive()
     registry.enter(activation)
-    const tuning = { ...getTuning() },
-      duration = Math.max(1, durationMs ?? tuning.repeatSweepMs)
+    const tuning = { ...getTuning() }
+    const ordinaryDuration = Math.max(1, durationMs ?? tuning.repeatSweepMs)
+    const duration = english
+      ? englishRevealDurationMs(ordinaryDuration, motion?.timing?.spokenMs, tarjiSignal.speed)
+      : ordinaryDuration
     const from = !english ? (registry.prefixes.get(key) ?? 0) : 0
     const curve =
       !english && motion?.timing

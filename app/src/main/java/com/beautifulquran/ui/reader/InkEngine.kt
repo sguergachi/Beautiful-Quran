@@ -35,6 +35,21 @@ import com.beautifulquran.ui.theme.inkSmootherstep
  */
 object InkEngine {
 
+    /** Shared duration for playback chrome and the surrounding verse ink. */
+    const val CHROME_RECEDE_MS = 520
+
+    /**
+     * How long read ink takes to leave: the paper ink's rewind evaporation and
+     * the verse just recited fading back as the next begins are one effect, so
+     * one pace. Slower than [CHROME_RECEDE_MS], which still paces verses that
+     * were only waiting when play starts; the orange repeat ink's 1.8 s is a
+     * deliberate slow move of its own.
+     */
+    const val INK_DEPARTURE_MS = 850
+
+    /** A fade's duration: [ownMs] normally, [INK_DEPARTURE_MS] for the verse just recited. */
+    fun fadeMs(ownMs: Int, leaving: Boolean): Int = if (leaving) INK_DEPARTURE_MS else ownMs
+
     /** The four ink states every reading mode shares. */
     enum class State {
         /** Idle page, no recitation touching this ayah: full ink. */
@@ -79,19 +94,19 @@ object InkEngine {
         val upcomingAlpha: Float = 0.2661f,
         /** State tween between resting inks (Active snaps — see
          *  ReaderComponents.animatedInkAlpha for why). */
-        val inkFadeMs: Int = 400,
+        val inkFadeMs: Int = CHROME_RECEDE_MS,
         /** Fade of the ﴿N﴾ ayah mark up to full when its verse gains focus. */
-        val ayahMarkFadeMs: Int = 400,
+        val ayahMarkFadeMs: Int = CHROME_RECEDE_MS,
         /** Softening when a verse recesses or returns (Arabic-only paper cover).
          *  Matched to [inkFadeMs] so every reading mode moves at the same pace. */
-        val recessMs: Int = 400,
+        val recessMs: Int = CHROME_RECEDE_MS,
         /** Letter-sweep duration clamps around the reciter's actual dwell. */
         val minSweepMs: Int = 140,
         val maxSweepMs: Int = 8_000,
         /** Repeat sweep fallback when no live active-word timing exists. */
         val repeatSweepMs: Int = 450,
         /** Dissolve of the orange wash once the repeat chain releases. */
-        val repeatFadeOutMs: Int = 900,
+        val repeatFadeOutMs: Int = 1_800,
         /** Peak strength of the orange repeat overlay (and search-hit flash).
          *  Multiplies [com.beautifulquran.ui.theme.QuranAccents.repeatInk]
          *  so the hue stays theme-owned while visibility is live-tunable. */
@@ -149,6 +164,17 @@ object InkEngine {
          *  constant rate. On by default; still auditionable via the Ink Lab.
          *  See docs/TAJWEED_PACING.md. */
         val tajweedPacing: Boolean = true,
+        /** How much of the reciter's tajweed tempo English ink follows: 0 is
+         *  a steady pace, 1 the full Arabic letter map (which parks on a madd).
+         *  See [TajweedPacing.Curve.tempo]. */
+        val englishTajweedTempo: Float = 0.6f,
+        /** Gaussian σ (ms) blending English ink's speed across word boundaries
+         *  and tempo kinks — see [EnglishSmoothTrack]. 0 reads the exact clock. */
+        val englishSmoothMs: Float = 100f,
+        /** How far English ink runs ahead of the voice (media ms), in English
+         *  reading. A reader takes in the meaning as the word is heard; ink that
+         *  only finishes as the Arabic word ends reads as behind. */
+        val englishLeadMs: Float = 200f,
         /** Feather of a paced word. Slightly sharper than [washFeather] so
          *  holds read clearly while the edge stays soft (see
          *  docs/TAJWEED_PACING.md). */
@@ -227,6 +253,21 @@ object InkEngine {
         val tarjiReleaseMs: Float = com.beautifulquran.playback.Tarji.RELEASE_MS,
         /** Additional wall-time trim on the pulse and its graph (ms); shipped 0. */
         val tarjiEarDelayMs: Float = 0f,
+        /**
+         * Paper ink (docs/PAPER_INK.md): on Paper, Android 13+, every reader
+         * surface draws words through the swelling-channel ink shader. Off
+         * keeps the paper-cover wash.
+         */
+        val paperInk: Boolean = true,
+        /** Wet stroke-weight gain (study "Ink pooling"). */
+        val paperInkPooling: Float = 0.28f,
+        val paperInkReflection: Float = 0.5f,
+        /** Fade-in ahead of the wet edge: 0.5 is one letter, 1 is two. */
+        val paperInkLeadFade: Float = 0.5f,
+        /** Flowing ink (quicker, cleaner swell) instead of Inside out. */
+        val paperInkFlowing: Boolean = false,
+        /** The paper's fibres shape the wet contact line (the plain paper tooth when off). */
+        val paperInkFibreFringe: Boolean = true,
     )
 
     /**
@@ -357,7 +398,7 @@ object InkEngine {
     /** Shipped defaults for highlight sync (lab knobs start here). */
     const val DEFAULT_HIGHLIGHT_LEAD_MS = 0
     const val DEFAULT_FADE_LEAD_MS = 500
-    const val DEFAULT_SCROLL_LEAD_MS = 500
+    const val DEFAULT_SCROLL_LEAD_MS = 100
 
     /**
      * Attach [store] and restore any saved lab numbers. Call once from
@@ -443,11 +484,22 @@ object InkEngine {
         dimmed: Boolean,
     ): State = when {
         activeWord == null -> if (isActiveAyah || dimmed) State.Upcoming else State.Plain
+        inTappedPrefix(position, activeWord) &&
+            !(activeWord.isRepeat && position == activeWord.wordPosition) -> State.Recited
         position == activeWord.wordPosition -> State.Active
         position < activeWord.wordPosition -> State.Recited
         position <= activeWord.highWater -> State.Recited
         else -> State.Upcoming
     }
+
+    /** A word-play intent establishes full base ink even while its media cursor settles earlier. */
+    fun inTappedPrefix(position: Int, activeWord: ActiveWord?): Boolean =
+        activeWord?.tapStartPosition?.let { position < it } == true
+
+    /** Natural handoffs finish their residual; a deliberately skipped prefix is already complete. */
+    fun retainWordSweep(position: Int, state: State, activeWord: ActiveWord?): Boolean =
+        !inTappedPrefix(position, activeWord) &&
+            (state == State.Recited || state == State.Active && activeWord?.isRepeat == true)
 
     /**
      * Whether the word at [position] belongs to the active repeat chain: from
@@ -530,12 +582,46 @@ object InkEngine {
         activeWord: ActiveWord,
         isAyahFinal: Boolean,
         prevArabic: String? = null,
+    ): TajweedPacing.Curve? =
+        letterPacing(arabic, spokenFraction(activeWord), isAyahFinal, prevArabic)?.forWash(tuning.pacedFeather)
+
+    /**
+     * The reciter's tempo through the active word for an English renderer:
+     * [TajweedPacing.Curve.tempo] at [Tuning.englishTajweedTempo] — slower on
+     * held letters, never parked. Null keeps a steady pace (no dramatic
+     * letter, tajweed pacing off, or tempo 0).
+     */
+    fun englishTempo(
+        arabic: String,
+        activeWord: ActiveWord,
+        isAyahFinal: Boolean,
+        prevArabic: String? = null,
+    ): TajweedPacing.Curve? {
+        val strength = tuning.englishTajweedTempo
+        if (strength <= 0f) return null
+        val spoken = spokenFraction(activeWord)
+        return letterPacing(arabic, spoken, isAyahFinal, prevArabic)?.tempo(strength, spoken)
+    }
+
+    /** One spoken Arabic word's tempo across exactly its own voiced span, for the English leaf's clock. */
+    fun englishSegmentTempo(arabic: String, isAyahFinal: Boolean, prevArabic: String? = null): TajweedPacing.Curve? {
+        val strength = tuning.englishTajweedTempo
+        if (strength <= 0f) return null
+        return letterPacing(arabic, 1f, isAyahFinal, prevArabic)?.tempo(strength, 1f)
+    }
+
+    private fun spokenFraction(activeWord: ActiveWord): Float =
+        if (activeWord.durationMs <= 0L) 1f else activeWord.spokenMs.toFloat() / activeWord.durationMs
+
+    /** The letter map before any wash feather: where on the Arabic letters the voice is. */
+    private fun letterPacing(
+        arabic: String,
+        spokenFraction: Float,
+        isAyahFinal: Boolean,
+        prevArabic: String?,
     ): TajweedPacing.Curve? {
         val t = tuning
         if (!t.tajweedPacing) return null
-        val spokenFraction =
-            if (activeWord.durationMs <= 0L) 1f
-            else activeWord.spokenMs.toFloat() / activeWord.durationMs
         return TajweedPacing.curve(
             arabic = arabic,
             spokenFraction = spokenFraction,
@@ -551,7 +637,7 @@ object InkEngine {
                 creep = t.holdCreep,
             ),
             prevArabic = prevArabic,
-        )?.forWash(t.pacedFeather)
+        )
     }
 
     private var detectorMode by mutableStateOf(com.beautifulquran.playback.TarjiDetectorMode.DEFAULT)

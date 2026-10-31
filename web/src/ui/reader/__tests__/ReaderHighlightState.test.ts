@@ -5,8 +5,7 @@ import {
   readerAyahInkPolicyActive,
   readerHighlightKey,
   readerHighlightState,
-  readerInkAyah,
-} from '../ReaderHighlightState'
+  readerInkAyah, streamWaitEngages } from '../ReaderHighlightState'
 
 function prepared(segments: Segment[]) {
   return PreparedTimings.prepare(segments)
@@ -87,6 +86,13 @@ describe('ReaderHighlightState', () => {
     expect(readerAyahInkPolicyActive(1, null, null)).toBe(false)
   })
 
+  it('a loading word start focuses only its verse despite a stale lead', () => {
+    for (const staleLead of [6, 7, 8]) {
+      expect([6, 7, 8].filter(ayah => readerAyahInkPolicyActive(ayah, 7, staleLead, true)))
+        .toEqual([7])
+    }
+  })
+
   it('distinguishes the real handoff when adjacent words share a position', () => {
     const timings = prepared([{ position: 1, startMs: 0, endMs: 1_000 }])
     const lead = readerHighlightState(
@@ -114,5 +120,13 @@ describe('ReaderHighlightState', () => {
         activeWord: { ...base.activeWord, durationMs: 120, repeatStart: 1 },
       }),
     )
+  })
+})
+
+describe('stream wait and word taps', () => {
+  it("never puts the page under the stream wait for a word tap's own download", () => {
+    expect(streamWaitEngages(true, false)).toBe(true)
+    expect(streamWaitEngages(true, true)).toBe(false)
+    expect(streamWaitEngages(false, false)).toBe(false)
   })
 })

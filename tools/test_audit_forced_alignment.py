@@ -20,6 +20,7 @@ import torch
 
 from audit_forced_alignment import (
     Occurrence,
+    connected_noon,
     blank_id_for,
     decode_waveform,
     forced_ctc_viterbi,
@@ -40,6 +41,21 @@ def test_normalization():
     assert normalize_for_model("بِسْمِ") == "بسم"
     assert normalize_for_model("ٱلرَّحْمَٰنِ") == "الرحمن"
     assert normalize_for_model("يَسْـَٔلُونَ") == "يسءلون"
+
+
+def test_connected_noon_is_an_optional_model_spelling_only():
+    def pair(arabic, gap=0):
+        return [Occurrence(11, arabic, normalize_for_model(arabic), 0, 100),
+                Occurrence(12, "يَنفَعَنَا", "ينفعنا", 100 + gap, 200 + gap)]
+    for spelling in ("أَن", "أَنْ", "أَنۡ"):
+        original = pair(spelling)
+        spoken = connected_noon(original, normalize_for_model)
+        assert spoken[0].normalized == "اي"
+        assert spoken[0].arabic == spelling
+        assert original[0].normalized == "ان"
+        assert (spoken[0].position, spoken[0].start_ms, spoken[0].end_ms) == (11, 0, 100)
+    for original in (pair("إِنَّ"), pair("عَيۡنٖ"), pair("دُنۡيَا"), pair("أَن", 50)):
+        assert connected_noon(original, normalize_for_model) == original
 
 
 def test_target_keeps_repeated_occurrences():
@@ -231,6 +247,7 @@ def test_resume_preserves_selected_errors_without_retrying_recorded_rows():
 
 def main():
     test_normalization()
+    test_connected_noon_is_an_optional_model_spelling_only()
     test_target_keeps_repeated_occurrences()
     test_target_concatenates_when_delimiter_is_none()
     test_blank_id_prefers_named_blank_over_pad()

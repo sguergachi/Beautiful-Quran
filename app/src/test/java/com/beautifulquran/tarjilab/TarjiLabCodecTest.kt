@@ -45,6 +45,20 @@ class TarjiLabCodecTest {
     }
 
     @Test
+    fun `old stock drama profiles adopt 53 percent but custom and later auditions persist`() {
+        val old = ReciterTarjiProfileBook.decode("""{"profiles":{
+            "7":{"minDrama":0.5,"holdMinMs":900},
+            "1":{"minDrama":0.7,"glintBrightness":1.6}}}""")
+        assertEquals(0.53f, old.profiles.getValue("7").minDrama, 0f)
+        assertEquals(900f, old.profiles.getValue("7").holdMinMs, 0f)
+        assertEquals(0.7f, old.profiles.getValue("1").minDrama, 0f)
+        assertEquals(1.6f, old.profiles.getValue("1").glintBrightness, 0f)
+        val retuned = old.copy(profiles = old.profiles +
+            ("7" to old.profiles.getValue("7").copy(minDrama = 0.5f)))
+        assertEquals(retuned, ReciterTarjiProfileBook.decode(ReciterTarjiProfileBook.encode(retuned)))
+    }
+
+    @Test
     fun `export freezes an imported capture and live tuning before the picker opens`() {
         val audio = captureOf(note(1f))
         val live = TarjiLabKnobs(holdMinMs = 720f)

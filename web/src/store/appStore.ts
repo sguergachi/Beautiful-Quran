@@ -116,6 +116,9 @@ const WORD_CLIP_POLL_MS = 16
 const WORD_CLIP_READY_TIMEOUT_MS = 4_000
 const WORD_CLIP_SEEK_SLACK_MS = 40
 
+/** Longest a word tap may hold the stream-wait cover off (Android parity). */
+const WORD_TAP_VOICE_WAIT_MAX_MS = 30_000
+
 export interface AppState {
   ready: boolean
   error: string | null
@@ -135,6 +138,12 @@ export interface AppState {
   content: SurahContent | null
   player: PlayerState
   activeWord: ActiveWord | null
+  /**
+   * True from a word tap until its sought word is heard: the tap's own
+   * download wait never puts the page under the stream-wait cover
+   * (Android `ReaderViewModel.wordTapAwaitingVoice`).
+   */
+  wordTapAwaitingVoice: boolean
   /** Playback generation, available even before the first word of a restart. */
   inkActivation: number
   activeAyah: number | null
@@ -253,6 +262,7 @@ class AppStore {
     content: null,
     player: player.getState(),
     activeWord: null,
+    wordTapAwaitingVoice: false,
     inkActivation: 0,
     activeAyah: null,
     activeBasmalah: false,
@@ -327,6 +337,10 @@ class AppStore {
       const prev = this.state.player
       this.state = { ...this.state, player: ps }
       this.recomputeActive(ps)
+      // A word tap's wait ends the first time its landed seek is audible.
+      if (this.state.wordTapAwaitingVoice && this.wordTapLanded && ps.isPlaying && !ps.isBuffering) {
+        this.endWordTapWait()
+      }
 
       // Continue Listening tracks verses actually recited, not open/scroll.
       // Quiet chapter open parks a new nowPlaying while pause is async — never
@@ -955,7 +969,20 @@ class AppStore {
     await player.seekToAyah(ayah)
   }
 
+  /** Whether the tapped word's seek has been issued (Android `WordTapVoiceWait`). */
+  private wordTapLanded = false
+  private wordTapTimer: number | null = null
+
+  private endWordTapWait() {
+    if (this.wordTapTimer != null) window.clearTimeout(this.wordTapTimer)
+    this.wordTapTimer = null
+    this.wordTapLanded = false
+    if (this.state.wordTapAwaitingVoice) this.set({ wordTapAwaitingVoice: false })
+  }
+
   async playAyah(ayah: number, includeBasmalah = ayah === 1) {
+    // Not a word tap: an ordinary download wait covers the page again.
+    this.endWordTapWait()
     this.noteInkRestart(ayah, 0)
     await player.playFrom(ayah, includeBasmalah && ayah === 1)
     const surahId = this.state.content?.surah.id
@@ -969,6 +996,10 @@ class AppStore {
    * the ayah start (no basmalah preface).
    */
   async playFromWord(ayah: number, wordPosition: number) {
+    this.endWordTapWait()
+    this.set({ wordTapAwaitingVoice: true })
+    // Bounded: a seek that never plays cannot hold the cover off forever.
+    this.wordTapTimer = window.setTimeout(() => this.endWordTapWait(), WORD_TAP_VOICE_WAIT_MAX_MS)
     const startMs = this.segmentStartMs(ayah, wordPosition)
     if (startMs != null) {
       this.noteInkRestart(ayah, startMs)
@@ -977,6 +1008,7 @@ class AppStore {
       this.noteInkRestart(ayah, 0)
       await player.playFrom(ayah, false)
     }
+    this.wordTapLanded = true
     const surahId = this.state.content?.surah.id
     if (surahId != null) this.rememberListened(surahId, ayah)
     this.set({ followEnabled: true })

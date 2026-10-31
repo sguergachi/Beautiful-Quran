@@ -49,6 +49,7 @@ from build_db import (  # noqa: E402
     discard_unspoken_rewind_onset,
     declared_reciter_rows,
     false_same_position_leads,
+    fragment_same_position_leads,
     hand_lead_to_previous_word,
     normalize_text,
     offset_for_audio_onset,
@@ -60,6 +61,7 @@ from build_db import (  # noqa: E402
     refit_displaced_rows,
     rebase_qdc_clock,
     rebase_timing_repair,
+    reject_reintroduced_orphans,
     restore_flattened_resay,
     suspicious_pacing,
     trim_to_next_start,
@@ -86,12 +88,14 @@ PIPELINES = frozenset(
         "complete_repeat_topology",
         "erases_span_repeat",
         "false_same_position_lead",
+        "fragment_same_position_lead",
         "invented_flush_restore",
         "leading_silence_offset",
         "preserve_peer_repeats",
         "qdc_clock_rebase",
         "rebase_timing_repair",
         "recover_negative_opening",
+        "reintroduced_orphan",
         "timing_correction",
     }
 )
@@ -203,6 +207,11 @@ def run_pipeline(case, segs):
         return adjust_qdc_segments(segs, n_words, stats, words=words)
     if pipeline == "boundary_repair":
         return apply_boundary_repair(segs, resolve_repair(case), case.get("occurrence"))
+    if pipeline == "fragment_same_position_lead":
+        from collections import defaultdict
+        cleaned = clean_qdc_artifacts(segs, defaultdict(int))
+        leads = fragment_same_position_leads(segs, cleaned, case.get("reference_segments"), 0)
+        return hand_lead_to_previous_word(cleaned, leads)
     if pipeline == "clock_shifted_repair":
         offset = case.get("clock_offset_ms")
         if offset is None:
@@ -230,6 +239,8 @@ def run_pipeline(case, segs):
             collapse_invented_flush_repeats(segs, resolve_repair(case)),
             case.get("clock_offset_ms") or 0,
         )
+    if pipeline == "reintroduced_orphan":
+        return reject_reintroduced_orphans(segs, resolve_repair(case))
     if pipeline == "erases_span_repeat":
         repair = resolve_repair(case)
         got = erases_span_repeat(segs, repair)
@@ -267,7 +278,7 @@ def run_pipeline(case, segs):
             )
         if position is not None:
             return discard_false_same_position_lead(
-                segs, position, bool(case.get("requires_audio_verdict"))
+                segs, position, bool(case.get("requires_audio_verdict")), case.get("source_pair")
             )
         positions = case.get("correction_positions")
         if positions is None:

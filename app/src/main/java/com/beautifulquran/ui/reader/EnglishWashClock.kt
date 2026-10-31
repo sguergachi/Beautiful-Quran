@@ -3,6 +3,7 @@ package com.beautifulquran.ui.reader
 import com.beautifulquran.data.model.Segment
 import com.beautifulquran.domain.EnglishAlignment
 import com.beautifulquran.domain.HighlightFrame
+import com.beautifulquran.domain.AudibleSilence
 
 /** The same calibrated, seek-aware media sample that selects the Arabic word. */
 internal data class EnglishWashClock(
@@ -13,6 +14,7 @@ internal data class EnglishWashClock(
     val voiceStartMs: Long,
     val segments: List<Segment> = emptyList(),
     val reciterId: Int? = null,
+    val silence: List<AudibleSilence> = emptyList(),
 ) {
     /** Project only this performance; all time policy lives in HighlightSync. */
     fun onFrame(frame: HighlightFrame?): EnglishWashClock =
@@ -27,16 +29,6 @@ internal data class EnglishWashClock(
 
     /** Re-says locate their semantic word, rather than the retained forward prefix. */
     fun followsFirstWash(word: ActiveWord, surahId: Int): Boolean = matches(word, surahId) && !word.isRepeat
-}
-
-/** A first wash ends before a repeat, the next band, or the recitation's end. */
-internal data class EnglishWashWindow(val startMs: Long, val endMs: Long) {
-    fun progress(positionMs: Long, voiceStartMs: Long = startMs): Float {
-        val start = maxOf(startMs, voiceStartMs).coerceAtMost(endMs)
-        if (positionMs < start) return 0f
-        if (positionMs >= endMs) return 1f
-        return (positionMs - start).toFloat() / (endMs - start)
-    }
 }
 
 /**

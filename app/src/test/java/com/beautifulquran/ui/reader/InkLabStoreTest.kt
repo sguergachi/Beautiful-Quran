@@ -22,6 +22,9 @@ class InkLabStoreTest {
         assertEquals(120, ink.waslPrefixMs)
         assertEquals(1.4185f, ink.cruiseCap, 0.0001f)
         assertEquals(0.3f, ink.holdCreep, 0.0001f)
+        assertEquals(0.28f, ink.paperInkPooling, 0f)
+        assertEquals(true, ink.paperInkFibreFringe)
+        assertEquals(0.53f, ink.tarjiMinDrama, 0f)
 
         val guide = ContextualGuideTuning()
         assertEquals(0.5f, guide.bodyEdge, 0.0001f)
@@ -37,8 +40,42 @@ class InkLabStoreTest {
         assertEquals(0, InkEngine.DEFAULT_HIGHLIGHT_LEAD_MS)
         assertEquals(500, InkEngine.DEFAULT_FADE_LEAD_MS)
         // The camera's lead is its own number, not a copy of the ink's.
-        assertEquals(500, InkEngine.DEFAULT_SCROLL_LEAD_MS)
+        assertEquals(100, InkEngine.DEFAULT_SCROLL_LEAD_MS)
         assertNull(InkLabSnapshot().outputLatencyOverrideMs)
+    }
+
+    @Test
+    fun fibreFringeShipsOnAndAChoiceMadeSinceSurvives() {
+        assertEquals(true, InkLabSnapshot.decode("{}")!!.paperInkFibreFringe)
+        val off = InkLabSnapshot(paperInkFibreFringe = false)
+        val restored = InkLabSnapshot.decode(InkLabSnapshot.encode(off))!!
+        assertEquals(off, restored)
+        assertEquals(false, restored.toTuning().paperInkFibreFringe)
+        assertEquals(false, InkLabSnapshot.capture(restored.toTuning()).paperInkFibreFringe)
+    }
+
+    @Test
+    fun oldExperimentOff_adoptsTheShippedFringeWithoutTouchingOtherKnobs() {
+        // Before 9 the fringe was an off-by-default experiment: "off" was the default.
+        val saved = InkLabSnapshot(schema = 8, paperInkFibreFringe = false,
+            tarjiMinDrama = 0.5f, paperInkPooling = 0.25f, scrollLeadMs = 444)
+        val migrated = InkLabSnapshot.decode(InkLabSnapshot.encode(saved))!!
+        assertEquals(saved.copy(schema = InkLabSnapshot.SCHEMA, paperInkFibreFringe = true), migrated)
+        val turnedOff = migrated.copy(paperInkFibreFringe = false)
+        assertEquals(turnedOff, InkLabSnapshot.decode(InkLabSnapshot.encode(turnedOff)))
+    }
+
+    @Test
+    fun oldSaves_adoptScrollLeadWithoutResettingOtherTuning() {
+        for ((schema, lead) in listOf(2 to 500, 3 to 0)) {
+            val saved = InkLabSnapshot(schema = schema, scrollLeadMs = lead,
+                glintGlowRadius = 8f, paperInkPooling = .4f, fadeLeadMs = 650)
+            val migrated = InkLabSnapshot.decode(InkLabSnapshot.encode(saved))!!
+            assertEquals(saved.copy(schema = InkLabSnapshot.SCHEMA, scrollLeadMs = 100), migrated)
+            // The migration runs once; subsequent scroll-lead auditions still persist.
+            val retuned = migrated.copy(scrollLeadMs = 444)
+            assertEquals(retuned, InkLabSnapshot.decode(InkLabSnapshot.encode(retuned)))
+        }
     }
 
     @Test
@@ -51,6 +88,12 @@ class InkLabStoreTest {
             tajweedPacing = true,
             cruiseCap = 1.55f,
             holdGhunnah = true,
+            paperInk = false,
+            paperInkPooling = 0.6f,
+            paperInkReflection = 0.7f,
+            paperInkLeadFade = 0.3f,
+            paperInkFlowing = true,
+            paperInkFibreFringe = true,
             highlightLeadMs = 900,
             fadeLeadMs = 333,
             scrollLeadMs = 444,
@@ -61,10 +104,81 @@ class InkLabStoreTest {
     }
 
     @Test
+    fun oldSaves_adoptSlowerRepeatReleaseWithoutResettingTheCameraOrInk() {
+        val saved = InkLabSnapshot(schema = 4, repeatFadeOutMs = 900,
+            scrollLeadMs = 444, paperInkPooling = .4f, glintGlowRadius = 8f, fadeLeadMs = 650)
+        val migrated = InkLabSnapshot.decode(InkLabSnapshot.encode(saved))!!
+        assertEquals(saved.copy(schema = InkLabSnapshot.SCHEMA, repeatFadeOutMs = 1_800), migrated)
+        // Only old profiles migrate; later auditions still survive a restart.
+        val retuned = migrated.copy(repeatFadeOutMs = 2_400)
+        assertEquals(retuned, InkLabSnapshot.decode(InkLabSnapshot.encode(retuned)))
+    }
+
+    @Test
+    fun oldSaves_matchChromeFadesWithoutResettingCustomTuning() {
+        val saved = InkLabSnapshot(schema = 5, inkFadeMs = 400,
+            ayahMarkFadeMs = 400, recessMs = 400, repeatFadeOutMs = 2_400,
+            scrollLeadMs = 444, paperInkPooling = .4f)
+        val migrated = InkLabSnapshot.decode(InkLabSnapshot.encode(saved))!!
+        assertEquals(saved.copy(schema = InkLabSnapshot.SCHEMA,
+            inkFadeMs = InkEngine.CHROME_RECEDE_MS,
+            ayahMarkFadeMs = InkEngine.CHROME_RECEDE_MS,
+            recessMs = InkEngine.CHROME_RECEDE_MS), migrated)
+
+        val custom = saved.copy(inkFadeMs = 640, ayahMarkFadeMs = 700, recessMs = 800)
+        assertEquals(custom.copy(schema = InkLabSnapshot.SCHEMA),
+            InkLabSnapshot.decode(InkLabSnapshot.encode(custom)))
+        // A new audition at the old duration must still survive a restart.
+        val retuned = migrated.copy(inkFadeMs = 400, ayahMarkFadeMs = 400, recessMs = 400)
+        assertEquals(retuned, InkLabSnapshot.decode(InkLabSnapshot.encode(retuned)))
+    }
+
+    @Test
     fun decode_returnsNullForMalformedJson() {
         assertNull(InkLabSnapshot.decode(""))
         assertNull(InkLabSnapshot.decode("{"))
         assertNull(InkLabSnapshot.decode("not-json"))
+    }
+
+    @Test
+    fun oldStockPooling_adoptsNewDefaultWithoutRepeatingEarlierMigrations() {
+        val saved = InkLabSnapshot(schema = 6, paperInkPooling = 0.25f,
+            inkFadeMs = 400, ayahMarkFadeMs = 400, recessMs = 400,
+            scrollLeadMs = 444, paperInkReflection = 0.7f)
+        val migrated = InkLabSnapshot.decode(InkLabSnapshot.encode(saved))!!
+        assertEquals(saved.copy(schema = InkLabSnapshot.SCHEMA, paperInkPooling = 0.28f), migrated)
+
+        val custom = saved.copy(paperInkPooling = 0.4f)
+        assertEquals(custom.copy(schema = InkLabSnapshot.SCHEMA),
+            InkLabSnapshot.decode(InkLabSnapshot.encode(custom)))
+        // The old stock value is still a valid new audition after migration.
+        val retuned = migrated.copy(paperInkPooling = 0.25f)
+        assertEquals(retuned, InkLabSnapshot.decode(InkLabSnapshot.encode(retuned)))
+    }
+
+    @Test
+    fun retiredSoftness_isIgnoredAndDroppedFromTheNextSave() {
+        val raw = """{"schema":6,"paperInkSoftness":0.8,"paperInkPooling":0.4,
+            "paperInkReflection":0.7,"paperInkLeadFade":0.3,"paperInkFlowing":true}"""
+        val restored = InkLabSnapshot.decode(raw)!!
+        val expected = InkEngine.Tuning(paperInkPooling = 0.4f, paperInkReflection = 0.7f,
+            paperInkLeadFade = 0.3f, paperInkFlowing = true)
+        assertEquals(expected, restored.toTuning())
+        assertTrue(!InkLabSnapshot.encode(restored).contains("paperInkSoftness"))
+    }
+
+    @Test
+    fun oldStockDrama_adoptsNewDefaultWithoutRepeatingThePoolingMigration() {
+        val saved = InkLabSnapshot(schema = 7, tarjiMinDrama = 0.5f,
+            paperInkPooling = 0.25f, inkFadeMs = 400, scrollLeadMs = 444)
+        val migrated = InkLabSnapshot.decode(InkLabSnapshot.encode(saved))!!
+        assertEquals(saved.copy(schema = InkLabSnapshot.SCHEMA, tarjiMinDrama = 0.53f), migrated)
+
+        val custom = saved.copy(tarjiMinDrama = 0.7f)
+        assertEquals(custom.copy(schema = InkLabSnapshot.SCHEMA),
+            InkLabSnapshot.decode(InkLabSnapshot.encode(custom)))
+        val retuned = migrated.copy(tarjiMinDrama = 0.5f)
+        assertEquals(retuned, InkLabSnapshot.decode(InkLabSnapshot.encode(retuned)))
     }
 
     @Test

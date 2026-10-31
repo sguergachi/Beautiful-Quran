@@ -96,6 +96,29 @@ class HighlightEngineTest {
     }
 
     @Test
+    fun `Alafasy 28 9 corrected chain never pulls earlier words into orange`() {
+        val reviewed = listOf(
+            Segment(15, 16840, 18520),
+            Segment(10, 18520, 20430),
+            Segment(11, 20430, 21530),
+            Segment(12, 21530, 24530),
+            Segment(13, 24530, 24930),
+            Segment(14, 24930, 26550),
+            Segment(15, 26550, 28090),
+            Segment(16, 28090, 28740),
+        )
+        val timings = HighlightEngine.PreparedTimings.prepare(reviewed)
+        // Repeated lookups also cover pause/resume and seeking within the chain.
+        for (clock in listOf(18520L, 20430L, 20720L, 20720L, 24530L, 19000L, 28089L)) {
+            val info = timings.activeInfo(clock)!!
+            assertEquals(true, info.isRepeat)
+            assertEquals(10, info.repeatStart)
+            assertEquals(15, info.highWater)
+        }
+        assertEquals(false, timings.activeInfo(28090)!!.isRepeat)
+    }
+
+    @Test
     fun `advancing past the repeat clears the repeat flag`() {
         val info = HighlightEngine.activeInfo(withRepeat, 5500)!!
         assertEquals(4, info.position)

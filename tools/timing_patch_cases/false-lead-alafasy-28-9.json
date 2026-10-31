@@ -1,0 +1,60 @@
+{
+  "id": "false-lead-alafasy-28-9",
+  "label": "Alafasy 28:9 held tail before the sole wahum",
+  "pipeline": "timing_correction",
+  "op": "discard_false_same_position_lead",
+  "requires_audio_verdict": true,
+  "input_segments": [
+    [
+      15,
+      26550,
+      27120
+    ],
+    [
+      16,
+      27120,
+      28090
+    ],
+    [
+      16,
+      28090,
+      28740
+    ],
+    [
+      17,
+      28740,
+      29180
+    ]
+  ],
+  "expected_segments": [
+    [
+      15,
+      26550,
+      28090
+    ],
+    [
+      16,
+      28090,
+      28740
+    ],
+    [
+      17,
+      28740,
+      29180
+    ]
+  ],
+  "notes": "Both independent fixed transcripts prefer one occurrence; the first label is unsupported. A merge retaining 27120 ms would start the word a second too early.",
+  "correction_position": 16,
+  "source_pair": [
+    [
+      16,
+      27120,
+      28090
+    ],
+    [
+      16,
+      28090,
+      28740
+    ]
+  ]
+}
