@@ -69,4 +69,21 @@ class EnglishPausesTest {
         for (t in 1600L..2200L step 20) assertEquals(stop, flow.through(t), 1e-4f)
         assertTrue(flow.through(2300) > stop)
     }
+
+    @Test
+    fun `pauses found after a verse starts still reach the words to come`() {
+        val url = "test://late-${System.nanoTime()}"
+        // Playback started before detection finished: Mushaf's set is locked empty.
+        EnglishPauses.pin(1, 3, 7, 1L, url, positionMs = 500, voiceStartMs = 0)
+        assertTrue(EnglishPauses.pinnedFor(3, 7).isEmpty())
+        // Detection lands: only pauses after the next word (and the margin) are adopted, for Scroll.
+        val field = EnglishPauses::class.java.getDeclaredField("ready").apply { isAccessible = true }
+        @Suppress("UNCHECKED_CAST")
+        val ready = field.get(EnglishPauses) as MutableMap<String, List<AudibleSilence>>
+        synchronized(ready) { ready[url] = listOf(AudibleSilence(700, 900), AudibleSilence(16760, 17560)) }
+        EnglishPauses.pin(1, 3, 7, 1L, url, positionMs = 600, voiceStartMs = 0, nextWordMs = 1000)
+        assertEquals(listOf(AudibleSilence(16760, 17560)), EnglishPauses.aheadFor(3, 7))
+        assertTrue(EnglishPauses.pinnedFor(3, 7).isEmpty())
+    }
 }
+

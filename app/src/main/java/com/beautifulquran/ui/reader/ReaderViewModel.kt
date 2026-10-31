@@ -607,11 +607,17 @@ class ReaderViewModel(
     }
 
     /** English reading holds the reciter's real pauses ([EnglishPauses]); fixed once a verse's voice begins. */
-    private fun pinEnglishPauses(playback: HighlightPlaybackSample, positionMs: Long, voiceStartMs: Long) {
+    private fun pinEnglishPauses(
+        playback: HighlightPlaybackSample,
+        positionMs: Long,
+        voiceStartMs: Long,
+        segments: List<Segment>,
+    ) {
         if (settings.settings.value.readingMode != ReadingMode.ENGLISH_ONLY) return
         val item = playback.item
         val url = audioUrlFor(item.reciter, item.surah, item.ayah) ?: return
-        EnglishPauses.pin(item.reciter, item.surah, item.ayah, playback.inkGeneration, url, positionMs, voiceStartMs)
+        EnglishPauses.pin(item.reciter, item.surah, item.ayah, playback.inkGeneration, url, positionMs, voiceStartMs,
+            nextWordMs = segments.firstOrNull { it.startMs > positionMs }?.startMs)
     }
 
     /** Verses whose pauses the English should know before they play: this one and the next two. */
@@ -652,7 +658,7 @@ class ReaderViewModel(
             val timing = HighlightTimingContext(timingPublicationRevision, prepared, voiceMs)
             val observation = highlightSession.observe(playback, timing, calibration, DevProfiling.captureStart.get())
             DevProfiling.recordHighlight(playback, timing, calibration, observation)
-            pinEnglishPauses(playback, observation.visiblePositionMs, voiceMs)
+            pinEnglishPauses(playback, observation.visiblePositionMs, voiceMs, prepared.segments)
             HighlightPoll(playback, timing, observation)
         }
     }.onCompletion { highlightSession.suspendObservation(System.nanoTime()) }

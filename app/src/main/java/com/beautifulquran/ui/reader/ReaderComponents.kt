@@ -4303,7 +4303,7 @@ private fun rememberEnglishScrollClock(ayah: Ayah): EnglishScrollClock? {
         EnglishTypography.lyricize(ayah.words.map { it.translation }, ayah.words.map { it.arabic })
     }
     // The reciter's heard pauses, fixed once this verse's voice begins (EnglishPauses).
-    val pauses = EnglishPauses.pinnedFor(ayah.surahId, ayah.number)
+    val pauses = EnglishPauses.aheadFor(ayah.surahId, ayah.number)
     return remember(ayah, timings, glosses, pauses, tuning.englishSmoothMs, tuning.englishLeadMs,
         tuning.englishTajweedTempo, tuning.tajweedPacing,
         tuning.holdMadd, tuning.holdGhunnah, tuning.holdWaqf, tuning.holdConnect) {
