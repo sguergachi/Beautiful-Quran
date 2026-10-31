@@ -9,6 +9,32 @@ import kotlin.math.roundToLong
 internal fun englishPaperInkWordProgress(washEdge: Float, start: Int, end: Int): Float =
     if (washEdge < start) -1f else ((washEdge - start) / (end - start).coerceAtLeast(1)).coerceIn(0f, 1f)
 
+/**
+ * Ink characters a printed word starts before the edge leaves the word before
+ * it, where speech runs straight on. Each word's liquid eases in and out on its
+ * own field, so butted end to end the ink stopped for most of a character at
+ * every space; overlapping by half a character keeps it moving (boundary time
+ * below a quarter of the mean fill rate: 14.6% -> 4.6% on rendered prose).
+ * Never across a pause: there it would show the next word's first letter.
+ */
+internal const val ENGLISH_WORD_OVERLAP_CHARS = 0.5f
+
+/** Where a printed word's fill begins: [lead] ink characters into the previous word's end. */
+internal data class EnglishWordLead(val previousEnd: Int, val lead: Float)
+
+/** [englishPaperInkWordProgress] with the word's fill begun [EnglishWordLead.lead] early. */
+internal fun englishPaperInkWordProgress(washEdge: Float, start: Int, end: Int, lead: EnglishWordLead?): Float {
+    if (lead == null || lead.lead <= 0f || lead.previousEnd > start) return englishPaperInkWordProgress(washEdge, start, end)
+    val from = lead.previousEnd - lead.lead
+    if (washEdge < from) return -1f
+    val distance = when {
+        washEdge <= lead.previousEnd -> washEdge - from
+        washEdge < start -> lead.lead
+        else -> lead.lead + washEdge - start
+    }
+    return (distance / ((end - start).coerceAtLeast(1) + lead.lead)).coerceIn(0f, 1f)
+}
+
 /** Split the reader's continuous English bands into word clocks for the material study. */
 internal fun paperInkEnglishWindows(
     ranges: List<IntRange>,

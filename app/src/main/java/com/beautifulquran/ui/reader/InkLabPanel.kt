@@ -198,6 +198,10 @@ fun InkLabPanel(
                         TuningToggle("Tajweed pacing", t.tajweedPacing) {
                             InkEngine.tuning = t.copy(tajweedPacing = it)
                         }
+                        TuningSlider("English tajweed tempo", t.englishTajweedTempo, 0f..1f) {
+                            InkEngine.tuning = t.copy(englishTajweedTempo = it)
+                        }
+                        LabCaption("How much English ink slows on held letters and quickens through short ones. 0 is steady; 1 parks on a madd like the Arabic.")
                         TuningToggle("Hold: madd", t.holdMadd) {
                             InkEngine.tuning = t.copy(holdMadd = it)
                         }
@@ -702,6 +706,7 @@ internal fun formatTuningCopy(t: InkEngine.Tuning): String {
         appendLine("    sweepEaseX2 = ${f(t.sweepEaseX2)},")
         appendLine("    sweepEaseY2 = ${f(t.sweepEaseY2)},")
         appendLine("    tajweedPacing = ${t.tajweedPacing},")
+        appendLine("    englishTajweedTempo = ${f(t.englishTajweedTempo)},")
         appendLine("    pacedFeather = ${f(t.pacedFeather)},")
         appendLine("    holdMadd = ${t.holdMadd},")
         appendLine("    holdGhunnah = ${t.holdGhunnah},")

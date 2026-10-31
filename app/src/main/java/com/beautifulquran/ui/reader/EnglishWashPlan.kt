@@ -36,8 +36,9 @@ internal fun englishPresentationPlan(
     segments: List<Segment>,
     voiceStartMs: Long = segments.firstOrNull()?.startMs ?: 0L,
     silence: List<AudibleSilence> = emptyList(),
+    tempo: EnglishTempoWarp? = null,
 ): EnglishWashPlan = englishReadingPlan(alignment, segments,
-    englishPhrasePlan(alignment, segments, voiceStartMs), silence, voiceStartMs)
+    englishPhrasePlan(alignment, segments, voiceStartMs), silence, voiceStartMs, tempo)
 
 /** Semantic phrase/occurrence anchors; the reading clock joins connected speech over these. */
 internal fun englishPhrasePlan(

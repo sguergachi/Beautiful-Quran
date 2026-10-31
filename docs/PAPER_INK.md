@@ -343,3 +343,16 @@ Playback timing is unchanged. Paper's repeat ink is the study's terracotta
 - Web: follows in its own PR (WebGL per word), as AGENTS.md #7 requires.
 - Basmalah sites.
 - The Paper ink study still renders its baked maps rather than this pipeline.
+
+### English word boundaries
+
+Each printed English word has its own field, and its liquid eases in and out
+within it, so butted end to end the leaf's ink stopped for most of a
+character at every space even on a continuous clock. Where speech runs
+straight on, the Mushaf leaf starts each word's fill
+`ENGLISH_WORD_OVERLAP_CHARS` (0.5) ink characters before the edge leaves the
+word before it: on rendered prose the time spent below a quarter of the mean
+fill rate fell from 14.6% to 4.6%, the longest stall from 0.81 to 0.49
+characters. A pause of `ENGLISH_PAUSE_MS` or more between two words keeps the
+boundary — there the overlap would show about 11% of the next first letter.
+

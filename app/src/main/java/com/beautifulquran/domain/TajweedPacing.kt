@@ -208,6 +208,28 @@ object TajweedPacing {
         /** Letter position before the paper-cover feather extends the wash's travel. */
         fun atLetters(t: Float): Float = (letterCurve ?: this).at(t)
 
+        /**
+         * The reciter's tempo through this word, for English: how far through
+         * the word's *speech* the voice is, not which Arabic letter it is on.
+         * The letter map parks on a held madd and then races (29c47d4e9 — prose
+         * has no letter being held), so it is blended with the steady clock:
+         * [strength] of the letter map's speed, the rest constant. The English
+         * slows where the reciter sustains and quickens through short letters,
+         * yet never stops, and still reaches 1 at the voiced end
+         * ([spokenFraction] of the hold), resting there through any breath.
+         */
+        fun tempo(strength: Float, spokenFraction: Float): Curve {
+            val share = strength.coerceIn(0f, 1f)
+            val spoken = spokenFraction.coerceIn(0.001f, 1f)
+            val t = ((0..TEMPO_SAMPLES).map { it.toFloat() / TEMPO_SAMPLES } + spoken).distinct().sorted()
+            val x = FloatArray(t.size) { i ->
+                ((1f - share) * minOf(1f, t[i] / spoken) + share * atLetters(t[i])).coerceIn(0f, 1f)
+            }
+            for (i in 1 until x.size) x[i] = maxOf(x[i], x[i - 1])
+            x[x.lastIndex] = 1f
+            return Curve(t.toFloatArray(), x, letterCount, hasStrongHold)
+        }
+
         fun at(t: Float): Float {
             if (t >= 1f) return 1f
             val c = t.coerceAtLeast(0f)
@@ -584,6 +606,8 @@ object TajweedPacing {
     /** Floor on the voiced share so degenerate timing data cannot compress
      * the whole word into a blink followed by a long rest. */
     private const val MIN_SPOKEN_FRACTION = 0.25f
+    /** Samples of the English tempo curve across a word: finer than any letter. */
+    private const val TEMPO_SAMPLES = 48
     /** Ceiling on the dwell budget: past this the rest of the word has to
      * sprint, which is the very problem the gate exists to avoid. */
     private const val MAX_DWELL_SHARE = 0.85f

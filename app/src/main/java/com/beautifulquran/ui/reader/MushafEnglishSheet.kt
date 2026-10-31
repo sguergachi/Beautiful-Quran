@@ -627,11 +627,23 @@ internal fun rememberEnglishWashWindows(
     val voiceStart by remember { derivedStateOf { clock.value?.voiceStartMs ?: 0L } }
     val silence by remember { derivedStateOf { clock.value?.silence.orEmpty() } }
     val reciter by remember { derivedStateOf { clock.value?.reciterId } }
-    return remember(alignments, segments, verse, content, voiceStart, silence, reciter) {
+    val tuning = InkEngine.tuning
+    val tempoKey = tuning.englishTajweedTempo.takeIf { tuning.tajweedPacing } to
+        listOf(tuning.holdMadd, tuning.holdGhunnah, tuning.holdWaqf, tuning.holdConnect)
+    return remember(alignments, segments, verse, content, voiceStart, silence, reciter, tempoKey) {
         verse?.takeIf { it.first == content.surah.id }?.let { key ->
             val alignment = alignments.alignment(key.second)
-            val positions = content.ayahs.firstOrNull { it.number == key.second }?.words?.map { it.position }.orEmpty()
-            mapOf(key to (alignment?.let { englishPresentationPlan(it, segments, voiceStart, silence) }
+            val words = content.ayahs.firstOrNull { it.number == key.second }?.words.orEmpty()
+            val positions = words.map { it.position }
+            // The reciter's tajweed tempo inside each spoken word (TajweedPacing.Curve.tempo).
+            val tempo = EnglishTempoWarp.of(segments, silence) { segment ->
+                val index = words.indexOfFirst { it.position == segment.position }
+                words.getOrNull(index)?.let { word ->
+                    InkEngine.englishSegmentTempo(word.arabic, index == words.lastIndex,
+                        words.getOrNull(index - 1)?.arabic)
+                }
+            }
+            mapOf(key to (alignment?.let { englishPresentationPlan(it, segments, voiceStart, silence, tempo) }
                 ?: EnglishWashPlan(emptyList(), englishWashWindows(positions, segments))))
         }.orEmpty()
     }
@@ -1496,6 +1508,22 @@ private fun EnglishProseBlock(
             }
         }.toMap()
     }
+    // Connected speech overlaps each printed word's fill with the one before
+    // (ENGLISH_WORD_OVERLAP_CHARS); a pause between them keeps the boundary.
+    val wordLeads = remember(block, washWindows, printedWords) {
+        block.verses.flatMap { verse ->
+            val plan = washWindows[verse.surahId to verse.ayah] ?: return@flatMap emptyList()
+            fun exposure(range: IntRange) = englishWordExposure(plan,
+                verse.verseFractionAt(range.first - verse.range.first),
+                verse.verseFractionAt(range.last + 1 - verse.range.first))
+            printedWords[verse.range].orEmpty().zipWithNext().mapNotNull { (previous, range) ->
+                val before = exposure(previous) ?: return@mapNotNull null
+                val after = exposure(range) ?: return@mapNotNull null
+                if (after.startMs - before.endMs >= ENGLISH_PAUSE_MS) return@mapNotNull null
+                range.first to EnglishWordLead(previous.last + 1, ENGLISH_WORD_OVERLAP_CHARS)
+            }
+        }.toMap()
+    }
     Text(
         text = set,
         style = style,
@@ -1530,6 +1558,7 @@ private fun EnglishProseBlock(
                                 steadyReading = washWindows[verse.surahId to verse.ayah]?.readingFlow != null,
                                 presentationSpans = presentationSpans[verse.range],
                                 wordFinishes = wordFinishes,
+                                wordLeads = wordLeads,
                                 paperDeposits = paperDeposits,
                                 paperDeparture = paperDeparture,
                                 printedWords = printedWords[verse.range].orEmpty(),
@@ -1622,6 +1651,7 @@ private fun englishVerseBlooms(
     steadyReading: Boolean,
     presentationSpans: List<EnglishInkSpan>?,
     wordFinishes: Map<Int, Long>,
+    wordLeads: Map<Int, EnglishWordLead>,
     paperDeposits: MutableMap<Int, PaperInkDeposit>,
     paperDeparture: EnglishPaperDeparture,
     printedWords: List<IntRange>,
@@ -1703,7 +1733,7 @@ private fun englishVerseBlooms(
     }
     if (motions.isNotEmpty() && palette.paperInk != null) {
         blooms.addEnglishPaperInk(printedWords, washSpans, motions, palette.paperInk, washEdge, paperDeposits,
-            positionMs, wordFinishes, paperDeparture)
+            positionMs, wordFinishes, paperDeparture, wordLeads.takeIf { performing != null }.orEmpty())
     }
     if (motions.isNotEmpty()) {
         blooms.addEnglishInkLayerBlooms(washSpans, motions, palette, glintInk, repeatLayers = false, washEdge,
@@ -1736,6 +1766,7 @@ private fun MutableList<ShapedWordBloom>.addEnglishPaperInk(
     positionMs: Long?,
     wordFinishes: Map<Int, Long>,
     departure: EnglishPaperDeparture,
+    leads: Map<Int, EnglishWordLead> = emptyMap(),
 ) {
     // Observe settled owners too, so a rewind has a dry deposit to release.
     motions.forEach { it.paperInkLive }
@@ -1745,7 +1776,7 @@ private fun MutableList<ShapedWordBloom>.addEnglishPaperInk(
         val i = range.first
         val j = range.last + 1
         val owner = washSpans.firstOrNull { i in it.range }?.let { motions.getOrNull(it.position - 1) }
-        val raw = englishPaperInkWordProgress(washEdge, i, j)
+        val raw = englishPaperInkWordProgress(washEdge, i, j, leads[i])
         val departed = departure.word(i, raw)
         val evaporating = departed != null
         val phaseWet = positionMs?.let { at -> wordFinishes[i]?.let { end ->

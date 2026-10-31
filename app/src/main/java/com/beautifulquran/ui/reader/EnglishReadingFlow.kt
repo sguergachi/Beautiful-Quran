@@ -3,6 +3,8 @@ package com.beautifulquran.ui.reader
 import com.beautifulquran.data.model.Segment
 import com.beautifulquran.domain.AudibleSilence
 import com.beautifulquran.domain.EnglishAlignment
+import com.beautifulquran.domain.TajweedPacing
+import kotlin.math.roundToLong
 
 /** One cumulative audible-time clock across a safe forward reading run. */
 internal data class EnglishReadingFlow(
@@ -10,12 +12,73 @@ internal data class EnglishReadingFlow(
     val extent: EnglishReadingExtent? = null,
     val extentFallback: String? = null,
     val pace: EnglishReadingPace? = null,
+    /** The reciter's tajweed tempo inside each spoken word; null is a steady clock. */
+    val tempo: EnglishTempoWarp? = null,
 ) {
-    fun through(positionMs: Long): Float = clock.progress(positionMs).let { pace?.through(it) ?: it }
+    fun through(positionMs: Long): Float = clock.progress(tempo?.forward(positionMs) ?: positionMs)
+        .let { pace?.through(it) ?: it }
         .let { extent?.printed(it) ?: it }
     fun ink(through: Float): Float = extent?.ink(through) ?: through
     fun mediaAt(through: Float, afterGap: Boolean = false): Long = ink(through).let {
-        clock.mediaAt(pace?.audible(it) ?: it, afterGap)
+        clock.mediaAt(pace?.audible(it) ?: it, afterGap).let { at -> tempo?.inverse(at) ?: at }
+    }
+}
+
+/**
+ * Tajweed tempo on the media clock. Each spoken Arabic word's span maps onto
+ * itself through [TajweedPacing.Curve.tempo], so the English edge slows where
+ * the reciter holds a letter and quickens through short ones, yet every
+ * word boundary, pause and deadline lands at the same media time.
+ */
+internal class EnglishTempoWarp(private val pieces: List<Piece>) {
+    class Piece(val startMs: Long, val endMs: Long, val curve: TajweedPacing.Curve)
+
+    private fun piece(ms: Long): Piece? {
+        var low = 0
+        var high = pieces.size
+        while (low < high) {
+            val mid = (low + high) ushr 1
+            if (pieces[mid].startMs <= ms) low = mid + 1 else high = mid
+        }
+        return pieces.getOrNull(low - 1)?.takeIf { ms < it.endMs }
+    }
+
+    fun forward(ms: Long): Long {
+        val p = piece(ms) ?: return ms
+        val span = p.endMs - p.startMs
+        return p.startMs + (p.curve.at((ms - p.startMs).toFloat() / span) * span).roundToLong().coerceIn(0, span)
+    }
+
+    fun inverse(ms: Long): Long {
+        val p = piece(ms) ?: return ms
+        val span = p.endMs - p.startMs
+        val target = (ms - p.startMs).toFloat() / span
+        var low = 0f
+        var high = 1f
+        repeat(24) {
+            val mid = (low + high) / 2
+            if (p.curve.at(mid) < target) low = mid else high = mid
+        }
+        return p.startMs + (high * span).roundToLong().coerceIn(0, span)
+    }
+
+    companion object {
+        /** Words that overlap a neighbour or hold measured quiet keep the steady clock. */
+        fun of(
+            segments: List<Segment>,
+            silence: List<AudibleSilence>,
+            tempo: (Segment) -> TajweedPacing.Curve?,
+        ): EnglishTempoWarp? {
+            val sorted = segments.sortedBy { it.startMs }
+            val pieces = sorted.mapIndexedNotNull { i, s ->
+                if (s.endMs <= s.startMs) return@mapIndexedNotNull null
+                if (sorted.getOrNull(i - 1)?.let { it.endMs > s.startMs } == true) return@mapIndexedNotNull null
+                if (sorted.getOrNull(i + 1)?.let { it.startMs < s.endMs } == true) return@mapIndexedNotNull null
+                if (silence.any { it.startMs < s.endMs && it.endMs > s.startMs }) return@mapIndexedNotNull null
+                tempo(s)?.let { Piece(s.startMs, s.endMs, it) }
+            }
+            return pieces.takeIf { it.isNotEmpty() }?.let(::EnglishTempoWarp)
+        }
     }
 }
 
@@ -38,6 +101,7 @@ internal fun englishReadingPlan(
     anchors: EnglishWashPlan,
     silence: List<AudibleSilence>,
     voiceStartMs: Long,
+    tempo: EnglishTempoWarp? = null,
 ): EnglishWashPlan {
     if (alignment.phrases == null) return anchors
     fun fallback(reason: String) = anchors.copy(readingFlowFallback = reason)
@@ -74,7 +138,7 @@ internal fun englishReadingPlan(
     if (extent?.hasInk == false) return fallback("zero_printed_ink")
     val clock = EnglishWashWindow(start, end, audible)
     val flow = EnglishReadingFlow(clock, extent, if (normalizedSpacing) "normalized_spacing" else null,
-        englishReadingPace(alignment, segments, clock, extent))
+        englishReadingPace(alignment, segments, clock, extent) { clock.progress(tempo?.forward(it) ?: it) }, tempo)
     val windows = anchors.spans.associate { span ->
         span.position to EnglishWashWindow(
             flow.mediaAt(span.from, afterGap = true), flow.mediaAt(span.to),

@@ -915,7 +915,9 @@ internal class InkMotion(
      * then races it to catch up, which reads as ink out of time with the
      * voice. The scrolling reader's English mode already drops both
      * corrections at the source (`rememberInkMotions(pacing = null)`); the
-     * mushaf cannot, because the same pack draws the Arabic leaf.
+     * mushaf cannot, because the same pack draws the Arabic leaf. English
+     * follows the reciter's *tempo* instead (`TajweedPacing.Curve.tempo`),
+     * which slows on a held letter without parking.
      */
     val plainSweepProgress: Float get() = sweep.plainProgress.value
     val sweepFeather: Float?
@@ -1201,6 +1203,9 @@ internal fun rememberInkMotions(
     activeSweepMs: Int?,
     activeRepeatDwellMs: Int?,
     pacing: TajweedPacing.Curve? = null,
+    /** English prose: sweep at the reciter's tajweed tempo instead of easing each word. */
+    englishTempo: TajweedPacing.Curve? = null,
+    steadySweeps: Boolean = false,
     activeRevealStart: Float = 0f,
     waslPrefixes: List<WaslPrefix?>,
     activation: Long = 0L,
@@ -1236,6 +1241,9 @@ internal fun rememberInkMotions(
         val entryPacing = remember(isActive, wordActivation, activeWordStartMs, activeWord?.fromTap, activeWord?.playbackActivation, activeWord?.reciterId) {
             pacing.takeIf { isActive }
         }
+        val entryTempo = remember(isActive, wordActivation, activeWordStartMs, activeWord?.fromTap, activeWord?.playbackActivation, activeWord?.reciterId) {
+            englishTempo.takeIf { isActive }
+        }
         val glinting = glintInk != null && InkEngine.glinting(ink.state, wetInk)
         val glintIdentity = rememberGlintIdentity(glinting, ink.repeat)
         // Tarjīʿ only runs its vsync sampler on the Active strong-hold word.
@@ -1259,6 +1267,8 @@ internal fun rememberInkMotions(
             revealStart = activeRevealStart.takeIf { isActive } ?: 0f,
             letterRevealStart = if (isActive) waslPrefixes[index]?.letterProgress() ?: 0f else 0f,
             predecessor = predecessor.takeIf { sequentialSweeps },
+            tempo = entryTempo,
+            steady = steadySweeps,
         )
         motions += InkMotion(
             ink = ink,
@@ -1276,6 +1286,8 @@ internal fun rememberInkMotions(
                 provisional = activeWord?.fromTap == true,
                 pacing = entryPacing,
                 base = sweep.progress,
+                tempo = entryTempo,
+                steady = steadySweeps,
             ),
             glintAlpha = rememberGlintAlpha(glinting),
             glintIsRepeat = glintIdentity.repeat,
@@ -3028,6 +3040,22 @@ fun AyahBlock(
             }
         }
 
+    // English follows the reciter's tempo through the same word (slower on
+    // held letters, never parked): TajweedPacing.Curve.tempo. Tempo 0 in the
+    // Ink Lab restores the eased per-word sweep.
+    val englishSteady = readingMode == ReadingMode.ENGLISH_ONLY && InkEngine.tuning.englishTajweedTempo > 0f
+    val englishTempo = if (!englishSteady) null else activeWord?.let { aw ->
+        val idx = ayah.words.indexOfFirst { it.position == aw.wordPosition }
+        ayah.words.getOrNull(idx)?.let { word ->
+            InkEngine.englishTempo(
+                arabic = word.arabic,
+                activeWord = aw,
+                isAyahFinal = word.position == ayah.words.lastOrNull()?.position,
+                prevArabic = ayah.words.getOrNull(idx - 1)?.arabic,
+            )
+        }
+    }
+
     // Each word's ink behaviour, derived once for the whole ayah. All the
     // policy (upcoming/active/recited/high-water, repeat chain) lives in
     // InkEngine; the render branches below only draw what it decided.
@@ -3125,15 +3153,18 @@ fun AyahBlock(
     val motions = rememberInkMotions(
         words = ayah.words,
         inks = inks,
-        activeSweepMs = if (readingMode == ReadingMode.ENGLISH_ONLY) {
+        // A tempo curve already rests at the voiced end through any pause.
+        activeSweepMs = if (readingMode == ReadingMode.ENGLISH_ONLY && englishTempo == null) {
             englishRevealDurationMs(sweepMs, activeWord?.spokenMs, playbackSpeed)
         } else sweepMs,
-        activeRepeatDwellMs = if (readingMode == ReadingMode.ENGLISH_ONLY) {
+        activeRepeatDwellMs = if (readingMode == ReadingMode.ENGLISH_ONLY && englishTempo == null) {
             englishRevealDurationMs(repeatDwellMs, activeWord?.spokenMs, playbackSpeed)
         } else repeatDwellMs,
         // English has no Arabic letter-pacing paint, but shares every other
         // lifecycle rule and the same low-level shaped bloom primitive.
         pacing = pacing.takeUnless { readingMode == ReadingMode.ENGLISH_ONLY },
+        englishTempo = englishTempo,
+        steadySweeps = englishSteady,
         activeRevealStart = activeRevealStart.takeUnless {
             readingMode == ReadingMode.ENGLISH_ONLY
         } ?: 0f,

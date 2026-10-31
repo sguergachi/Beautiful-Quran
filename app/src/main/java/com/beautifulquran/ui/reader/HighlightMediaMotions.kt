@@ -16,7 +16,17 @@ private data class MediaEntry(
     val feather: Float? = null,
     val revealStart: Float = 0f,
     val letterRevealStart: Float = 0f,
-)
+    /** English: the reciter's tempo, replacing the per-word ease (null in [steady] is linear). */
+    val tempo: TajweedPacing.Curve? = null,
+    val steady: Boolean = false,
+) {
+    /** The sweep clock before any letter map: eased per word, or the English tempo. */
+    fun clock(linear: Float): Float = when {
+        steady -> tempo?.at(linear) ?: linear
+        pacing != null -> linear
+        else -> InkEngine.sweepEasing.transform(linear)
+    }
+}
 private class MediaHistory(var entry: MediaEntry = MediaEntry())
 
 /** Capture visual pacing once; transport and every residual use the shared media timeline. */
@@ -31,6 +41,8 @@ private fun rememberMediaEntry(
     revealStart: Float = 0f,
     repeatOccurrence: Boolean = false,
     letterRevealStart: Float = 0f,
+    tempo: TajweedPacing.Curve? = null,
+    steady: Boolean = false,
 ): State<MediaEntry> {
     val timeline = LocalHighlightTimeline.current
     val history = remember { MediaHistory() }
@@ -43,7 +55,7 @@ private fun rememberMediaEntry(
     }
     val entry = if (next.window != prior.wash.window || next.provisional != prior.wash.provisional) {
         MediaEntry(next, pacing, pacing?.let { InkEngine.pacedFeather() },
-            revealStart.coerceIn(0f, 1f), letterRevealStart.coerceIn(0f, 1f))
+            revealStart.coerceIn(0f, 1f), letterRevealStart.coerceIn(0f, 1f), tempo, steady)
     } else prior.copy(wash = next)
     SideEffect { history.entry = entry }
     return rememberUpdatedState(entry)
@@ -67,10 +79,12 @@ internal fun rememberMediaLetterSweep(
     revealStart: Float,
     predecessor: State<Float>?,
     letterRevealStart: Float = 0f,
+    tempo: TajweedPacing.Curve? = null,
+    steady: Boolean = false,
 ): LetterSweep {
     val timeline = LocalHighlightTimeline.current
     val entry = rememberMediaEntry(active, retain, activation, window, provisional, pacing, revealStart,
-        letterRevealStart = letterRevealStart)
+        letterRevealStart = letterRevealStart, tempo = tempo, steady = steady)
     val prior = rememberUpdatedState(predecessor)
     val raw = remember {
         derivedStateOf {
@@ -78,7 +92,7 @@ internal fun rememberMediaLetterSweep(
                 val e = entry.value
                 val linear = if (e.wash.window == null) { if (e.wash.active) 0f else 1f }
                     else HighlightWash.progress(e.wash, timeline.frame())
-                if (e.pacing != null) linear else InkEngine.sweepEasing.transform(linear)
+                e.clock(linear)
             }
         }
     }
@@ -109,10 +123,12 @@ internal fun rememberMediaRepeatWash(
     provisional: Boolean,
     pacing: TajweedPacing.Curve?,
     base: State<Float>,
+    tempo: TajweedPacing.Curve? = null,
+    steady: Boolean = false,
 ): RepeatWash {
     val timeline = LocalHighlightTimeline.current
     val entry = rememberMediaEntry(repeat && active, true, activation, window, provisional, pacing,
-        repeatOccurrence = true)
+        repeatOccurrence = true, tempo = tempo, steady = steady)
     val baseState = rememberUpdatedState(base)
     val raw = remember {
         derivedStateOf {
@@ -120,7 +136,7 @@ internal fun rememberMediaRepeatWash(
                 val e = entry.value
                 val linear = if (e.wash.window == null) { if (e.wash.active) 0f else 1f }
                     else HighlightWash.progress(e.wash, timeline.frame())
-                if (e.pacing != null) linear else InkEngine.sweepEasing.transform(linear)
+                e.clock(linear)
             }
         }
     }

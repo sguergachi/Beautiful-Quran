@@ -98,6 +98,8 @@ internal fun englishReadingPace(
     segments: List<Segment>,
     clock: EnglishWashWindow,
     extent: EnglishReadingExtent?,
+    /** Audible progress at a media time, through the same tempo the flow reads. */
+    progressAt: (Long) -> Float = clock::progress,
 ): EnglishReadingPace? {
     if (alignment.timingWords.isEmpty()) return null
     val finishes = ArrayList<EnglishWordFinish>()
@@ -139,7 +141,7 @@ internal fun englishReadingPace(
     }
     val fixed = (listOf(0.0, 1.0) + protected.flatMap { listOf(it.first, it.second) }).distinct().sorted()
     fun knots() = (fixed.map { it to it } + finishes.map {
-        clock.progress(it.deadlineMs).toDouble() to distance(it.word.to)
+        progressAt(it.deadlineMs).toDouble() to distance(it.word.to)
     }).sortedBy { it.second }
     fun fitted(): EnglishReadingPace {
         val points = knots()
@@ -173,8 +175,8 @@ internal fun englishReadingPace(
         if (before == null || after == null || after.second == end || protected.any { end in it.first..it.second }) {
             reject("protected_range"); continue
         }
-        fun compatible(at: Long) = clock.progress(at).toDouble() > before.first &&
-            clock.progress(at).toDouble() < after.first
+        fun compatible(at: Long) = progressAt(at).toDouble() > before.first &&
+            progressAt(at).toDouble() < after.first
         var accepted = false
         var reason = "crossing_target"
         for (deadline in listOfNotNull(desired.takeIf { idealVoiced }, voicedEnd).distinct()) {

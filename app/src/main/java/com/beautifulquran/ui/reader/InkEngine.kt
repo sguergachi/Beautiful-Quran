@@ -164,6 +164,10 @@ object InkEngine {
          *  constant rate. On by default; still auditionable via the Ink Lab.
          *  See docs/TAJWEED_PACING.md. */
         val tajweedPacing: Boolean = true,
+        /** How much of the reciter's tajweed tempo English ink follows: 0 is
+         *  a steady pace, 1 the full Arabic letter map (which parks on a madd).
+         *  See [TajweedPacing.Curve.tempo]. */
+        val englishTajweedTempo: Float = 0.6f,
         /** Feather of a paced word. Slightly sharper than [washFeather] so
          *  holds read clearly while the edge stays soft (see
          *  docs/TAJWEED_PACING.md). */
@@ -571,12 +575,46 @@ object InkEngine {
         activeWord: ActiveWord,
         isAyahFinal: Boolean,
         prevArabic: String? = null,
+    ): TajweedPacing.Curve? =
+        letterPacing(arabic, spokenFraction(activeWord), isAyahFinal, prevArabic)?.forWash(tuning.pacedFeather)
+
+    /**
+     * The reciter's tempo through the active word for an English renderer:
+     * [TajweedPacing.Curve.tempo] at [Tuning.englishTajweedTempo] — slower on
+     * held letters, never parked. Null keeps a steady pace (no dramatic
+     * letter, tajweed pacing off, or tempo 0).
+     */
+    fun englishTempo(
+        arabic: String,
+        activeWord: ActiveWord,
+        isAyahFinal: Boolean,
+        prevArabic: String? = null,
+    ): TajweedPacing.Curve? {
+        val strength = tuning.englishTajweedTempo
+        if (strength <= 0f) return null
+        val spoken = spokenFraction(activeWord)
+        return letterPacing(arabic, spoken, isAyahFinal, prevArabic)?.tempo(strength, spoken)
+    }
+
+    /** One spoken Arabic word's tempo across exactly its own voiced span, for the English leaf's clock. */
+    fun englishSegmentTempo(arabic: String, isAyahFinal: Boolean, prevArabic: String? = null): TajweedPacing.Curve? {
+        val strength = tuning.englishTajweedTempo
+        if (strength <= 0f) return null
+        return letterPacing(arabic, 1f, isAyahFinal, prevArabic)?.tempo(strength, 1f)
+    }
+
+    private fun spokenFraction(activeWord: ActiveWord): Float =
+        if (activeWord.durationMs <= 0L) 1f else activeWord.spokenMs.toFloat() / activeWord.durationMs
+
+    /** The letter map before any wash feather: where on the Arabic letters the voice is. */
+    private fun letterPacing(
+        arabic: String,
+        spokenFraction: Float,
+        isAyahFinal: Boolean,
+        prevArabic: String?,
     ): TajweedPacing.Curve? {
         val t = tuning
         if (!t.tajweedPacing) return null
-        val spokenFraction =
-            if (activeWord.durationMs <= 0L) 1f
-            else activeWord.spokenMs.toFloat() / activeWord.durationMs
         return TajweedPacing.curve(
             arabic = arabic,
             spokenFraction = spokenFraction,
@@ -592,7 +630,7 @@ object InkEngine {
                 creep = t.holdCreep,
             ),
             prevArabic = prevArabic,
-        )?.forWash(t.pacedFeather)
+        )
     }
 
     private var detectorMode by mutableStateOf(com.beautifulquran.playback.TarjiDetectorMode.DEFAULT)

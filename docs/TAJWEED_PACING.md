@@ -464,6 +464,29 @@ the curve, not the weights, is the module boundary.
 - Existing `HighlightEngine`/`InkEngine` tests untouched — nothing upstream
   changed.
 
+## English follows the tempo, not the letters
+
+English ink follows the reciter's tajweed tempo too — the reciter recites at
+that pace, so a steady English wash drifts against the voice. It cannot take
+the letter map itself: that parks on a held madd and then races, because
+prose has no letter being held (29c47d4e9 measured 35% of recitation time on
+paced words, the English up to 1.0 s ahead or 0.7 s behind). So English reads
+`Curve.tempo(strength, spokenFraction)`: the letter map's speed blended with
+the steady clock, `strength` of the former (`Tuning.englishTajweedTempo`,
+Ink Lab "English tajweed tempo", default 0.6, 0 = steady). It slows on held
+letters (0.4x at 0.6, never zero) and quickens through short ones, keeps
+exact endpoints, and rests at the voiced end through a breath.
+
+- **Scroll English** sweeps each word on its tempo over the whole hold (the
+  curve's rest handles a pause), with no per-word ease. Words with no
+  dramatic letter sweep linearly on `englishRevealDurationMs`.
+- **Mushaf English** keeps its continuous verse clock; `EnglishTempoWarp`
+  maps each spoken Arabic word's media span onto itself through its tempo
+  before the audible clock, the literal-finish pace and every inverse read it.
+  Word boundaries, pauses and deadlines land at the same media time. Words
+  overlapping a neighbour or holding measured quiet keep the steady clock.
+- Web English Scroll does not follow the tempo yet.
+
 ## Non-goals
 
 - No tajweed *color-coding* of letters (this is motion, not annotation — the
