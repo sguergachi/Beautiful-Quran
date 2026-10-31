@@ -493,11 +493,26 @@ exact endpoints, and rests at the voiced end through a breath.
   Its ink distance is then speed-smoothed the same way (before blank space is
   mapped back, so spaces still take no time): on Hani 64:1 the largest speed
   change in 60 ms falls from 2.4x to 1.25x.
+- **Heard pauses.** Word timings rarely mark a stop — 96% of word boundaries
+  leave under 20 ms — so a breath or waqf sits inside the word before it and
+  the English ran straight through it. `EnglishPauses` reads the verse's own
+  audio (the tarjīʿ decoder's cache) for stretches ≥180 ms whose
+  median-filtered loudness is 20 dB under the verse's 95th percentile: 26 of
+  27 of Hani's measured pauses on a 25-verse sample, a little early (the
+  voice's tail). Both English clocks take that time out of the word, so its
+  English lands as the voice stops and stands still for the whole silence;
+  the smoothing narrows to nothing at a pause (and at the verse's ends), so
+  the stop is crisp. Pauses are pinned once a verse's voice begins (a late
+  detection never rebuilds a running clock); this verse and the next two are
+  decoded ahead. On Hani 64:1 the leaf now holds on "[all] praise," through
+  the 9.44–9.80 s breath instead of drifting on.
 - **Lead.** In English reading the highlight clock runs
   `Tuning.englishLeadMs` (Ink Lab "English lead", 200 ms) ahead of the voice.
   A reader takes in a word's meaning as it is heard; ink that only finishes as
   the Arabic word ends reads as behind. It is a shift, not a shortened sweep,
-  so nothing stops at a word.
+  so nothing stops at a word. At a pause the ink lands that much early but
+  holds on until the voice returns (at most 60% of the speech after it), so
+  the next word leaves with the reciter, never before him.
 - Web English Scroll does not follow the tempo yet.
 
 ## Non-goals

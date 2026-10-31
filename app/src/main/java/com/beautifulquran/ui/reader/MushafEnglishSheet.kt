@@ -629,6 +629,7 @@ internal fun rememberEnglishWashWindows(
     val reciter by remember { derivedStateOf { clock.value?.reciterId } }
     val tuning = InkEngine.tuning
     val tempoKey = listOf(tuning.englishTajweedTempo.takeIf { tuning.tajweedPacing }, tuning.englishSmoothMs,
+        tuning.englishLeadMs,
         tuning.holdMadd, tuning.holdGhunnah, tuning.holdWaqf, tuning.holdConnect)
     return remember(alignments, segments, verse, content, voiceStart, silence, reciter, tempoKey) {
         verse?.takeIf { it.first == content.surah.id }?.let { key ->
@@ -643,7 +644,8 @@ internal fun rememberEnglishWashWindows(
                         words.getOrNull(index - 1)?.arabic)
                 }
             }
-            mapOf(key to (alignment?.let { englishPresentationPlan(it, segments, voiceStart, silence, tempo, tuning.englishSmoothMs) }
+            mapOf(key to (alignment?.let { englishPresentationPlan(it, segments, voiceStart, silence, tempo,
+                tuning.englishSmoothMs, tuning.englishLeadMs) }
                 ?: EnglishWashPlan(emptyList(), englishWashWindows(positions, segments))))
         }.orEmpty()
     }

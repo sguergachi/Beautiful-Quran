@@ -1012,6 +1012,13 @@ fun ReaderScreen(
     // Two numbers for one handoff, on purpose: see [InkEngine.scrollLeadMs].
     // During the basmalah lead-in the target is ayah 0 (its dedicated item).
     val listeningAyah = playerState.nowPlaying?.ayah
+    // English reading holds the reciter's real pauses: work them out from the
+    // audio ahead of the voice (EnglishPauses).
+    if (settings.readingMode == ReadingMode.ENGLISH_ONLY) {
+        LaunchedEffect(playerState.nowPlaying?.surahId, listeningAyah, settings.reciterId) {
+            viewModel.englishPauseUrls().forEach { url -> launch { EnglishPauses.request(quranApp, url) } }
+        }
+    }
     val scrollLeadAyah by viewModel.scrollFocusAyah.collectAsStateWithLifecycle()
     val playbackFocusTarget = FocusEngine.playbackFocusTarget(
         playingAyah = (scrollLeadAyah ?: listeningAyah)

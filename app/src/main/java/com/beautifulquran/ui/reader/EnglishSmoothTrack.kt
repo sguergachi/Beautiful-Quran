@@ -14,6 +14,12 @@ import kotlin.math.roundToInt
  * each speed change over about ±σ, and leaves a held pause held: inside a
  * silence longer than ~3σ nothing moves. Measured on 1,412 Scroll glosses,
  * σ = 100 ms takes the p90 speed jump at a word boundary from 3.8x to 1.3x.
+ *
+ * A reciter's pause is a break the blur must not cross: smoothed across it,
+ * the ink eases on into the silence and is already moving before the voice
+ * returns, so the stop is never seen. Within [breaks] the kernel narrows to a
+ * third of the distance to the pause, so the word lands, the ink stands still
+ * for the whole silence, and the next word leaves as the voice does.
  */
 internal class EnglishSmoothTrack private constructor(
     private val originMs: Long,
@@ -63,22 +69,48 @@ internal class EnglishSmoothTrack private constructor(
         const val STEP_MS = 4L
 
         /** Smooth any monotone [track] over [fromMs, toMs]; null when σ rounds to nothing. */
-        fun of(fromMs: Long, toMs: Long, sigmaMs: Float, track: (Long) -> Float): EnglishSmoothTrack? {
+        fun of(
+            fromMs: Long,
+            toMs: Long,
+            sigmaMs: Float,
+            breaks: List<LongRange> = emptyList(),
+            track: (Long) -> Float,
+        ): EnglishSmoothTrack? {
             if (sigmaMs < STEP_MS || toMs <= fromMs) return null
             val radius = (3 * sigmaMs / STEP_MS).roundToInt()
             val origin = fromMs - radius * STEP_MS
             val count = ((toMs - fromMs) / STEP_MS + 1 + 2 * radius).toInt()
             val padded = count + 2 * radius
             val raw = FloatArray(padded) { track(origin + (it - radius) * STEP_MS) }
-            val kernel = FloatArray(2 * radius + 1) { k ->
-                val x = (k - radius) * STEP_MS / sigmaMs
+            // One kernel per narrowed width, in whole steps: index r has radius r.
+            val kernels = arrayOfNulls<FloatArray>(radius + 1)
+            fun kernel(r: Int): FloatArray = kernels[r] ?: FloatArray(2 * r + 1) { k ->
+                val x = (k - r) * 3f / maxOf(r, 1)
                 exp(-0.5f * x * x)
+            }.also { k -> val sum = k.sum(); for (j in k.indices) k[j] /= sum; kernels[r] = k }
+            // The verse's own start and end are edges too: the first word leaves
+            // with the voice and the last lands on time, not blurred past them.
+            val edges = (breaks.flatMap { listOf(it.first, it.last) } + fromMs + toMs).sorted().toLongArray()
+            fun room(ms: Long): Long {
+                if (edges.isEmpty()) return Long.MAX_VALUE
+                var low = 0
+                var high = edges.size
+                while (low < high) {
+                    val mid = (low + high) ushr 1
+                    if (edges[mid] < ms) low = mid + 1 else high = mid
+                }
+                val after = edges.getOrNull(low)?.let { it - ms } ?: Long.MAX_VALUE
+                val before = edges.getOrNull(low - 1)?.let { ms - it } ?: Long.MAX_VALUE
+                return minOf(after, before)
             }
-            val sum = kernel.sum()
-            for (k in kernel.indices) kernel[k] /= sum
             val values = FloatArray(count) { i ->
+                val ms = origin + i * STEP_MS
+                val inBreak = breaks.any { ms >= it.first && ms <= it.last }
+                val r = if (inBreak) 0 else minOf(radius.toLong(), room(ms) / STEP_MS).toInt()
+                if (r == 0) return@FloatArray raw[i + radius]
+                val k = kernel(r)
                 var acc = 0f
-                for (k in kernel.indices) acc += raw[i + k] * kernel[k]
+                for (j in k.indices) acc += raw[i + radius - r + j] * k[j]
                 acc
             }
             for (i in 1 until values.size) values[i] = maxOf(values[i], values[i - 1])
@@ -86,7 +118,11 @@ internal class EnglishSmoothTrack private constructor(
         }
 
         /** A piecewise-linear track through ascending (media ms, position) knots, then smoothed. */
-        fun through(knots: List<Pair<Long, Float>>, sigmaMs: Float): EnglishSmoothTrack? {
+        fun through(
+            knots: List<Pair<Long, Float>>,
+            sigmaMs: Float,
+            breaks: List<LongRange> = emptyList(),
+        ): EnglishSmoothTrack? {
             if (knots.size < 2) return null
             val times = LongArray(knots.size) { knots[it].first }
             val positions = FloatArray(knots.size) { knots[it].second }
@@ -103,7 +139,7 @@ internal class EnglishSmoothTrack private constructor(
                 if (span <= 0) return positions[high]
                 return positions[low] + (positions[high] - positions[low]) * (ms - times[low]).toFloat() / span
             }
-            return of(times.first(), times.last(), sigmaMs, ::linear)
+            return of(times.first(), times.last(), sigmaMs, breaks, ::linear)
         }
     }
 }

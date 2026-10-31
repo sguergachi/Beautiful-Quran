@@ -11,7 +11,9 @@ import com.beautifulquran.domain.TajweedPacing
  * merged across): it starts as that word starts and is through as the next
  * begins. Inside a word the position follows the reciter's tajweed tempo
  * ([TajweedPacing.Curve.tempo] — slower on a held madd, never parked). A real
- * pause ([ENGLISH_PAUSE_MS]) finishes the gloss at the voiced end and holds.
+ * pause — a gap between timed words or quiet heard in the audio
+ * ([EnglishPauses]), [ENGLISH_PAUSE_MS] or more — finishes the gloss as the
+ * voice stops and holds, crisply, until it returns.
  * The whole track is then speed-smoothed ([EnglishSmoothTrack]) so no word
  * boundary is a jump. Spaces between glosses take no time.
  */
@@ -40,6 +42,10 @@ internal class EnglishScrollClock private constructor(
             owner: (Int) -> Int?,
             segments: List<Segment>,
             sigmaMs: Float,
+            /** The reciter's real pauses ([EnglishPauses]) on the media clock. */
+            pauses: List<com.beautifulquran.domain.AudibleSilence> = emptyList(),
+            /** The English reading lead: a pause releases when the voice does. */
+            leadMs: Float = 0f,
             tempo: (Int) -> TajweedPacing.Curve?,
         ): EnglishScrollClock? {
             val starts = FloatArray(glossLengths.size)
@@ -62,7 +68,23 @@ internal class EnglishScrollClock private constructor(
                 if (runs.lastOrNull()?.first()?.first == own) runs.last() += own to segment
                 else runs += mutableListOf(own to segment)
             }
+            // Audible time only: the reciter's pauses ([pauses], and gaps between
+            // timed words) are taken out of every word, so its gloss lands as the
+            // voice stops and stands still until it returns. The ink leads the
+            // voice, so a pause holds on [leadMs] more (at most 60% of the speech
+            // after it): the next word leaves with the voice, not before it.
+            val quiet = pauses.filter { it.endMs - it.startMs >= ENGLISH_PAUSE_MS }.map { it.startMs..it.endMs }
+            fun audible(from: Long, to: Long): List<LongRange> {
+                var pieces = listOf(from..to)
+                for (q in quiet) pieces = pieces.flatMap { p ->
+                    if (q.last <= p.first || q.first >= p.last) listOf(p)
+                    else listOfNotNull((p.first..q.first).takeIf { q.first > p.first },
+                        (q.last..p.last).takeIf { q.last < p.last })
+                }
+                return pieces.filter { it.last > it.first }
+            }
             val knots = ArrayList<Pair<Long, Float>>()
+            var previousEnd = Long.MIN_VALUE
             runs.forEachIndexed { r, run ->
                 val own = run.first().first
                 val nextOnset = runs.getOrNull(r + 1)?.first()?.second?.startMs
@@ -71,23 +93,39 @@ internal class EnglishScrollClock private constructor(
                     val next = run.getOrNull(k + 1)?.second?.startMs ?: nextOnset ?: return segment.endMs
                     return if (next - segment.endMs >= ENGLISH_PAUSE_MS) segment.endMs else next
                 }
-                val spans = run.indices.map { k -> run[k].second.startMs to maxOf(endOf(k), run[k].second.startMs + 1) }
-                val voiced = spans.sumOf { it.second - it.first }.toFloat()
+                val pieces = run.indices.map { k ->
+                    audible(run[k].second.startMs, maxOf(endOf(k), run[k].second.startMs + 1)).map { piece ->
+                        if (previousEnd != Long.MIN_VALUE && piece.first - previousEnd >= ENGLISH_PAUSE_MS && leadMs > 0f) {
+                            (piece.first + minOf(leadMs.toLong(), (piece.last - piece.first) * 6 / 10))..piece.last
+                        } else piece
+                    }.also { if (it.isNotEmpty()) previousEnd = it.last().last }
+                }
+                val voiced = pieces.sumOf { list -> list.sumOf { it.last - it.first } }.toFloat()
+                if (voiced <= 0f) return@forEachIndexed
                 var from = starts[own]
                 if (knots.isNotEmpty() && knots.last().second > from) from = knots.last().second
                 run.forEachIndexed { k, (index, _) ->
-                    val (a, b) = spans[k]
-                    val share = glossLengths[own] * (b - a) / voiced
+                    val list = pieces[k]
+                    val time = list.sumOf { it.last - it.first }.toFloat()
+                    if (time <= 0f) return@forEachIndexed
+                    val share = glossLengths[own] * time / voiced
                     val curve = tempo(index)
-                    for (j in 0..TEMPO_KNOTS) {
-                        val u = j.toFloat() / TEMPO_KNOTS
-                        val at = a + ((b - a) * u).toLong()
-                        knots += at to from + share * (curve?.at(u) ?: u)
+                    var spent = 0L
+                    for (piece in list) {
+                        for (j in 0..TEMPO_KNOTS) {
+                            val at = piece.first + (piece.last - piece.first) * j / TEMPO_KNOTS
+                            val u = (spent + (at - piece.first)) / time
+                            knots += at to from + share * (curve?.at(u) ?: u)
+                        }
+                        spent += piece.last - piece.first
                     }
                     from += share
                 }
-                // Hold through a pause, to the next onset.
-                if (nextOnset != null && nextOnset > spans.last().second) knots += nextOnset to from
+            }
+            // Holds the blur must not cross: every stretch where the ink stands still.
+            val ordered = knots.sortedBy { it.first }
+            val breaks = ordered.zipWithNext().mapNotNull { (a, b) ->
+                (a.first..b.first).takeIf { b.first - a.first >= ENGLISH_PAUSE_MS && b.second - a.second < 1e-4f }
             }
             val sorted = knots.sortedBy { it.first }.let { list ->
                 // Monotone in both coordinates; ties in time keep the furthest.
@@ -102,7 +140,7 @@ internal class EnglishScrollClock private constructor(
                 }
                 out
             }
-            val track = EnglishSmoothTrack.through(sorted, maxOf(sigmaMs, EnglishSmoothTrack.STEP_MS.toFloat()))
+            val track = EnglishSmoothTrack.through(sorted, maxOf(sigmaMs, EnglishSmoothTrack.STEP_MS.toFloat()), breaks)
                 ?: return null
             return EnglishScrollClock(track, starts, FloatArray(glossLengths.size) { glossLengths[it].toFloat() })
         }

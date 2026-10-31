@@ -93,8 +93,10 @@ internal fun rememberMediaLetterSweep(
         derivedStateOf {
             if (prior.value?.value?.let { !canStartSequentialSweep(it) } == true) 0f else {
                 val e = entry.value
-                val frame = timeline.frame()
                 val window = e.wash.window
+                // Only a word with a window reads the frame: every composed
+                // word subscribing to it revalidates the whole page each frame.
+                val frame = if (window != null) timeline.frame() else null
                 val onClock = if (window != null && !e.wash.provisional && frame != null && window.matches(frame)) {
                     clock.value?.invoke(frame.inkMs)
                 } else null

@@ -744,7 +744,7 @@ internal fun rememberWaslProgress(
     val progress = remember(identity, activation, entryWindow, provisional) {
         derivedStateOf {
             entryConnection?.at(
-                if (provisional) 0f else timeline.frame()?.takeIf { entryWindow?.matches(it) == true }
+                if (provisional || entryWindow == null) 0f else timeline.frame()?.takeIf { entryWindow.matches(it) }
                     ?.let { entryWindow!!.progress(it) } ?: 0f,
                 entryPrefixStart, entryCompletion,
             ) ?: 0f
@@ -1274,7 +1274,9 @@ internal fun rememberInkMotions(
             predecessor = predecessor.takeIf { sequentialSweeps && englishClock == null },
             tempo = entryTempo,
             steady = steadySweeps,
-            verseClock = englishClock?.let { clock -> { inkMs: Long -> clock.progress(index, inkMs) } },
+            verseClock = remember(englishClock, index) {
+                englishClock?.let { clock -> { inkMs: Long -> clock.progress(index, inkMs) } }
+            },
         )
         motions += InkMotion(
             ink = ink,
@@ -4300,7 +4302,10 @@ private fun rememberEnglishScrollClock(ayah: Ayah): EnglishScrollClock? {
     val glosses = remember(ayah) {
         EnglishTypography.lyricize(ayah.words.map { it.translation }, ayah.words.map { it.arabic })
     }
-    return remember(ayah, timings, glosses, tuning.englishSmoothMs, tuning.englishTajweedTempo, tuning.tajweedPacing,
+    // The reciter's heard pauses, fixed once this verse's voice begins (EnglishPauses).
+    val pauses = EnglishPauses.pinnedFor(ayah.surahId, ayah.number)
+    return remember(ayah, timings, glosses, pauses, tuning.englishSmoothMs, tuning.englishLeadMs,
+        tuning.englishTajweedTempo, tuning.tajweedPacing,
         tuning.holdMadd, tuning.holdGhunnah, tuning.holdWaqf, tuning.holdConnect) {
         val segments = timings?.segments ?: return@remember null
         val words = ayah.words
@@ -4312,6 +4317,8 @@ private fun rememberEnglishScrollClock(ayah: Ayah): EnglishScrollClock? {
             owner = { EnglishTypography.coalescedGlossOwnerIndex(translations, arabic, it) },
             segments = segments,
             sigmaMs = tuning.englishSmoothMs,
+            pauses = pauses,
+            leadMs = tuning.englishLeadMs,
             tempo = { index ->
                 InkEngine.englishSegmentTempo(arabic[index], index == words.lastIndex, arabic.getOrNull(index - 1))
             },

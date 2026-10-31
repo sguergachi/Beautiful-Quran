@@ -108,6 +108,8 @@ internal fun englishReadingPlan(
     voiceStartMs: Long,
     tempo: EnglishTempoWarp? = null,
     smoothMs: Float = 0f,
+    /** The English reading lead: a pause holds until the voice is back, not this much before. */
+    leadMs: Float = 0f,
 ): EnglishWashPlan {
     if (alignment.phrases == null) return anchors
     fun fallback(reason: String) = anchors.copy(readingFlowFallback = reason)
@@ -121,7 +123,7 @@ internal fun englishReadingPlan(
     // Every source owner contributes speech, including swallowed/weak owners.
     val speech = normalizedIntervals(segments.map { it.startMs..it.endMs }, start, end)
     val quiet = normalizedIntervals(silence.map { it.startMs..it.endMs }, start, end)
-    val audible = buildList {
+    val heard = buildList {
         for (span in speech) {
             var cursor = span.first
             for (pause in quiet) {
@@ -134,6 +136,17 @@ internal fun englishReadingPlan(
             if (cursor < span.last) add(cursor..span.last)
         }
     }
+    // The ink leads the voice by [leadMs], so a pause read as-is would release
+    // that early. Hold each one on until the voice returns (at most 60% of the
+    // speech after it), and never blur across one: the stop must be seen.
+    val audible = heard.mapIndexed { i, span ->
+        val gap = if (i == 0) 0L else span.first - heard[i - 1].last
+        if (gap < ENGLISH_PAUSE_MS || leadMs <= 0f) span
+        else (span.first + minOf(leadMs.toLong(), (span.last - span.first) * 6 / 10))..span.last
+    }
+    val pauses = audible.zipWithNext().mapNotNull { (a, b) ->
+        (a.last..b.first).takeIf { b.first - a.last >= ENGLISH_PAUSE_MS }
+    }
     if (audible.isEmpty()) return fallback("zero_audible_time")
     val text = alignment.readingText
     // The leaf normalizes whitespace. Its legacy letter interpolation cannot
@@ -145,7 +158,7 @@ internal fun englishReadingPlan(
     val clock = EnglishWashWindow(start, end, audible)
     val exact = EnglishReadingFlow(clock, extent, if (normalizedSpacing) "normalized_spacing" else null,
         englishReadingPace(alignment, segments, clock, extent) { clock.progress(tempo?.forward(it) ?: it) }, tempo)
-    val flow = EnglishSmoothTrack.of(start, end, smoothMs, exact::exactInk)?.let { exact.copy(smooth = it) } ?: exact
+    val flow = EnglishSmoothTrack.of(start, end, smoothMs, pauses, exact::exactInk)?.let { exact.copy(smooth = it) } ?: exact
     val windows = anchors.spans.associate { span ->
         span.position to EnglishWashWindow(
             flow.mediaAt(span.from, afterGap = true), flow.mediaAt(span.to),

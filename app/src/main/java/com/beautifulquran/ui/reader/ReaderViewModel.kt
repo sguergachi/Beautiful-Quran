@@ -600,6 +600,27 @@ class ReaderViewModel(
         }
     }
 
+    /** The verse audio a poll's item plays (the basmalah lead-in is Al-Fatihah 1:1). */
+    private fun audioUrlFor(reciterId: Int, surahId: Int, ayah: Int): String? {
+        val reciter = _uiState.value.reciters.firstOrNull { it.id == reciterId } ?: return null
+        return if (ayah == BASMALAH_PLAYLIST_AYAH) reciter.audioUrl(SURAH_FATIHA, 1) else reciter.audioUrl(surahId, ayah)
+    }
+
+    /** English reading holds the reciter's real pauses ([EnglishPauses]); fixed once a verse's voice begins. */
+    private fun pinEnglishPauses(playback: HighlightPlaybackSample, positionMs: Long, voiceStartMs: Long) {
+        if (settings.settings.value.readingMode != ReadingMode.ENGLISH_ONLY) return
+        val item = playback.item
+        val url = audioUrlFor(item.reciter, item.surah, item.ayah) ?: return
+        EnglishPauses.pin(item.reciter, item.surah, item.ayah, playback.inkGeneration, url, positionMs, voiceStartMs)
+    }
+
+    /** Verses whose pauses the English should know before they play: this one and the next two. */
+    internal fun englishPauseUrls(): List<String> {
+        val np = player.state.value.nowPlaying ?: return emptyList()
+        val reciterId = settings.settings.value.reciterId
+        return (0..2).mapNotNull { audioUrlFor(reciterId, np.surahId, np.ayah + it) }
+    }
+
     /** English reading (Scroll or leaf) runs its ink [InkEngine.Tuning.englishLeadMs] ahead of the voice. */
     private fun englishLeadMs(): Long =
         if (settings.settings.value.readingMode == ReadingMode.ENGLISH_ONLY) {
@@ -631,6 +652,7 @@ class ReaderViewModel(
             val timing = HighlightTimingContext(timingPublicationRevision, prepared, voiceMs)
             val observation = highlightSession.observe(playback, timing, calibration, DevProfiling.captureStart.get())
             DevProfiling.recordHighlight(playback, timing, calibration, observation)
+            pinEnglishPauses(playback, observation.visiblePositionMs, voiceMs)
             HighlightPoll(playback, timing, observation)
         }
     }.onCompletion { highlightSession.suspendObservation(System.nanoTime()) }
@@ -648,7 +670,8 @@ class ReaderViewModel(
                 playback.item.surah, playback.item.ayah, playback.inkGeneration,
                 it.observation.visiblePositionMs, it.timing.voiceStartMs, it.timing.timings.segments,
                 reciterId = playback.item.reciter,
-                silence = audibleSilenceFor(playback.item.reciter, playback.item.surah, playback.item.ayah),
+                silence = (audibleSilenceFor(playback.item.reciter, playback.item.surah, playback.item.ayah) +
+                    EnglishPauses.pinnedFor(playback.item.surah, playback.item.ayah)).sortedBy { s -> s.startMs },
             )
         }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(0, replayExpirationMillis = 0), null)
