@@ -250,8 +250,10 @@ precomputed (518 KB asset, outside the 32 MiB word cache) and read once per
 process: 5 ms on the emulator, where building it on device took 0.6–1.1 s
 (debug). The shader reads it at most once per pixel, only within a fibre's
 reach of a contour, instead of at each of the eight AA taps (sixteen during a
-repeat). Its two uniforms are set only when they change, so an unchanged draw
-makes no extra JNI calls. Perfetto traces of the same Al-Baqarah playback
+repeat). Its two uniforms are set on every draw: they hold per-occurrence
+state, and one cached word serves every occurrence of it. The traces below
+were taken when an unchanged draw skipped those two calls; the difference is
+microseconds and was not re-measured. Perfetto traces of the same Al-Baqarah playback
 without glosses (where wet words do reach the shader; emulator, debug build,
 two pairs) put the fringe at parity: 56–58 µs per wet paper-ink word draw on
 vs 58–63 µs off, RenderThread frames 14.6–15.1 vs 13.1–16.0 ms, within noise.

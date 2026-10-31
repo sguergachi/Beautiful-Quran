@@ -92,8 +92,10 @@ internal object PaperInkSubstrate {
 
     private fun hash(x: Int, y: Int, seed: Int): Float {
         var h = seed xor (x * 0x1f123bb5) xor (y * 0x5f356495)
-        h = (h xor (h ushr 16)) * 0x45d9f3b
-        h = (h xor (h ushr 16)) * 0x45d9f3b
+        h = paperInkMix(paperInkMix(h))
         return ((h xor (h ushr 16)) ushr 8) / 16777215f
     }
 }
+
+/** One round of the integer hash behind the paper tile and each word's patch of it. */
+internal fun paperInkMix(h: Int): Int = (h xor (h ushr 16)) * 0x45d9f3b

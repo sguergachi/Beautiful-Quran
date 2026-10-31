@@ -119,9 +119,6 @@ object PaperInk {
         internal var shader: Any? = null
         /** Whether [shader] samples the shared paper yet, not its placeholder. */
         internal var paperBound = false
-        /** The fibre uniforms [shader] holds, so an unchanged draw skips the JNI calls. */
-        internal var fibreOn = false
-        internal var fibreSpot = 0
     }
 
     private data class Key(val input: TextLayoutInput, val phaseX: Int, val phaseY: Int)
@@ -149,19 +146,18 @@ object PaperInk {
      * this subscribes the caller's draw to [generation]. Captures are rationed
      * per frame so warming a verse never stalls one.
      */
-    fun word(source: Source): Word? = word(source, CAPTURES_PER_FRAME)
+    fun word(source: Source): Word? = word(source, key(source), CAPTURES_PER_FRAME)
 
     /** [word] with at most [rationLimit] captures a frame (warming leaves the rest to live words). */
-    private fun word(source: Source, rationLimit: Int): Word? {
+    private fun word(source: Source, key: Key, rationLimit: Int): Word? {
         if (!supported || shaderSource == null) return null
         generation.intValue
         // Warming a verse is the first sign of ink to come: start the paper
         // now, so the fibres are ready before the voice reaches it.
         paper()
-        val key = key(source)
         cache.get(key)?.let { return it }
         val now = SystemClock.uptimeMillis()
-        if (key in pending || inklessUntil[key]?.let { it > now } == true) return null
+        if (key in pending || isInkless(key, now)) return null
         if (now != captureFrame) {
             captureFrame = now
             capturesThisFrame = 0
@@ -198,6 +194,8 @@ object PaperInk {
     /** Words whose capture held no ink, and when to try them again. */
     private val inklessUntil = HashMap<Key, Long>()
 
+    private fun isInkless(key: Key, now: Long): Boolean = (inklessUntil[key] ?: 0L) > now
+
     /**
      * Start [source]'s field ahead of its turn. True once it is ready or on
      * its way; false while this frame's capture ration is spent (try again).
@@ -206,9 +204,9 @@ object PaperInk {
         if (!supported || shaderSource == null) return true
         // One capture a frame stays free for the word being recited, whose own
         // draw would otherwise find the ration spent and wash in the fallback.
-        if (word(source, CAPTURES_PER_FRAME - 1) != null) return true
         val key = key(source)
-        return key in pending || inklessUntil[key]?.let { it > SystemClock.uptimeMillis() } == true
+        if (word(source, key, CAPTURES_PER_FRAME - 1) != null) return true
+        return key in pending || isInkless(key, SystemClock.uptimeMillis())
     }
 
     private var nextPlacement = 0
@@ -437,15 +435,9 @@ object PaperInk {
                 shader.setInputBuffer("substrate", paper)
                 word.paperBound = true
             }
-            if ((paper != null) != word.fibreOn) {
-                word.fibreOn = paper != null
-                shader.setFloatUniform("fibreFringe", if (word.fibreOn) 1f else 0f)
-            }
+            shader.setFloatUniform("fibreFringe", if (paper != null) 1f else 0f)
             val spot = paperInkFibreSpot(source.placement)
-            if (word.fibreOn && spot != word.fibreSpot) {
-                word.fibreSpot = spot
-                shader.setFloatUniform("fibreOffset", paperInkFibreOffsetX(spot), paperInkFibreOffsetY(spot))
-            }
+            shader.setFloatUniform("fibreOffset", paperInkFibreOffsetX(spot), paperInkFibreOffsetY(spot))
             inkPaint.shader = shader
             native.save()
             native.translate(left, top)
@@ -469,7 +461,6 @@ object PaperInk {
         shader.setInputBuffer("substrate", android.graphics.BitmapShader(
             word.normals, android.graphics.Shader.TileMode.CLAMP, android.graphics.Shader.TileMode.CLAMP,
         ))
-        shader.setFloatUniform("fibreFringe", 0f)
         shader.setFloatUniform("fieldScale", SCALE.toFloat())
         shader.setFloatUniform("unit", word.unit)
         shader.setFloatUniform("letterDuration", word.letterDuration)
@@ -492,8 +483,7 @@ object PaperInk {
  * Plain ints and floats: it runs for every wet word on every frame.
  */
 internal fun paperInkFibreSpot(placement: Int): Int {
-    var h = placement * -0x61c88647
-    h = (h xor (h ushr 16)) * 0x45d9f3b
+    val h = paperInkMix(placement * -0x61c88647)
     return h xor (h ushr 16)
 }
 

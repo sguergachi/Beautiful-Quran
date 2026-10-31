@@ -196,14 +196,18 @@ internal class PaperInkNode(
      * longer than that to build on a slow device, so the word would wash in
      * the fallback. False until laid out or while the frame's ration is spent.
      */
-    fun warm(rtl: Boolean, letterCount: Int = 0): Boolean =
-        layout?.let { PaperInk.warm(PaperInk.Source(it, 0f, 0f, rtl, letterCount, placement)) } ?: false
+    fun warm(): Boolean =
+        layout?.let { PaperInk.warm(PaperInk.Source(it, 0f, 0f, rtl = true, placement = placement)) } ?: false
 
     /** An overlay of this word (orange repeat, wasl, glint) that the ink replaces. */
     fun Modifier.hiddenWhilePaperInk(): Modifier = drawWithContent {
         if (!drawing) drawContent()
     }
 }
+
+/** The stable identity of one printed word, for [PaperInkNode]: its patch of paper. */
+internal fun paperInkPlacement(surahId: Int, ayah: Int, wordPosition: Int): Int =
+    (surahId * 1_000 + ayah) * 1_000 + wordPosition
 
 @Composable
 internal fun rememberPaperInkNode(placement: Int? = null): PaperInkNode =

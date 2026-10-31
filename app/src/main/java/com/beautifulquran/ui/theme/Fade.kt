@@ -195,7 +195,7 @@ fun androidx.compose.ui.graphics.GraphicsLayerScope.cachedAlpha(value: Float) {
  * are not clipped. While [still] is false the content draws directly as
  * before; read in the draw phase only, so switching never recomposes.
  */
-fun Modifier.cachedWhileStill(bleed: Dp, still: () -> Boolean): Modifier = this
+fun Modifier.cachedWhileStill(bleed: Dp = FadeLayerBleed, still: () -> Boolean): Modifier = this
     .layout { measurable, constraints ->
         val room = bleed.roundToPx() * 2
         val placeable = measurable.measure(constraints.offset(room, room))
@@ -206,6 +206,7 @@ fun Modifier.cachedWhileStill(bleed: Dp, still: () -> Boolean): Modifier = this
     .graphicsLayer {
         compositingStrategy = if (still()) CompositingStrategy.Offscreen else CompositingStrategy.Auto
     }
+    // Undoes the first layout, so the content's own layout size is unchanged.
     .layout { measurable, constraints ->
         val room = bleed.roundToPx() * 2
         val placeable = measurable.measure(constraints.offset(-room, -room))

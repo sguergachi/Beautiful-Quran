@@ -37,7 +37,6 @@ internal object PaperInkField {
     const val INSIDE_OUT_LAG = 1.6f
     const val INSIDE_OUT_SHAPE = 0.7f
     const val FLOWING_LAG = 1f
-    const val FLOWING_SHAPE = 1f
 
     class Result(
         val width: Int,
@@ -201,8 +200,8 @@ internal object PaperInkField {
             val fed = sampleColumns(sweep, column)
             val rim = 1f - (interior[i] / max(halfWidth[i], 1e-6f)).coerceIn(0f, 1f)
             insideOut[i] = fed + INSIDE_OUT_LAG / count * rim.pow(INSIDE_OUT_SHAPE)
-            // x^1 is x exactly; skip the transcendental call per pixel.
-            flowing[i] = fed + FLOWING_LAG / count * if (FLOWING_SHAPE == 1f) rim else rim.pow(FLOWING_SHAPE)
+            // Flowing ink's core-to-edge profile is linear (the Python reference's exponent of 1).
+            flowing[i] = fed + FLOWING_LAG / count * rim
         }
         // Paper takes its nearest ink's arrival, so wet spread past the contour agrees.
         val nearest = nearestInk ?: edt(BooleanArray(n) { !ink[it] }, width, height, wantIndex = true).index!!

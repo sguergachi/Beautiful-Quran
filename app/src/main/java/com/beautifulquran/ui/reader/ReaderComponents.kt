@@ -268,7 +268,7 @@ internal fun rememberAyahMarkAlpha(focused: Boolean, leaving: Boolean = false): 
     animateFloatAsState(
         targetValue = if (focused) 1f else InkEngine.State.Upcoming.inkAlpha(),
         animationSpec = tween(
-            if (leaving) InkEngine.INK_DEPARTURE_MS else InkEngine.tuning.ayahMarkFadeMs,
+            InkEngine.fadeMs(InkEngine.tuning.ayahMarkFadeMs, leaving),
             easing = FastOutSlowInEasing,
         ),
         label = "ayahMarkAlpha",
@@ -393,7 +393,7 @@ private fun animatedInkAlpha(
             snap<Float>()
         } else {
             tween(
-                if (leaving) InkEngine.INK_DEPARTURE_MS else InkEngine.tuning.inkFadeMs,
+                InkEngine.fadeMs(InkEngine.tuning.inkFadeMs, leaving),
                 easing = FastOutSlowInEasing,
             )
         },
@@ -983,7 +983,11 @@ internal class InkMotion(
      * A fully inked word at rest uses no offscreen fade and is left out.
      */
     val restsFaded: Boolean
-        get() = isQuiet && (sweepProgress <= 0f || lyricInk.value < 1f)
+        get() = isQuiet && fadedAtRest
+
+    /** Unread, or recessed below full ink; only meaningful for a [isQuiet] word. */
+    internal val fadedAtRest: Boolean
+        get() = sweepProgress <= 0f || lyricInk.value < 1f
 
     /** No wash, paper ink, orange or glimmer of its own: frame to frame, it
      * changes only when its verse's recess fades. */
@@ -1556,7 +1560,7 @@ private fun WordUnit(
             // verse) draws through two offscreen fades, the Arabic and the
             // gloss, that would otherwise be re-rendered every frame while
             // anything on the page moves.
-            .cachedWhileStill(WORD_TILE_LAYER_BLEED) { !searching && motion.restsFaded },
+            .cachedWhileStill { !searching && motion.restsFaded },
     ) {
         HighlightLayeredText(
             text = word.arabic,
@@ -1826,20 +1830,39 @@ private fun WarmPaperInkAhead(motions: List<InkMotion>, nodes: List<PaperInkNode
     val accents = LocalQuranAccents.current
     if (accents.glintInk != null || !PaperInk.supported || !InkEngine.tuning.paperInk) return
     val active = motions.indexOfFirst { it.isActive }
+    // The words already warmed, so each step ahead only starts the one entering.
+    val warmedThrough = remember(nodes) { intArrayOf(-1) }
     LaunchedEffect(active, nodes) {
         if (active < 0) return@LaunchedEffect
-        for (k in active + 1..minOf(nodes.lastIndex, active + PAPER_INK_WARM_AHEAD)) {
+        var contiguous = true
+        for (k in maxOf(active + 1, warmedThrough[0] + 1)..minOf(nodes.lastIndex, active + PAPER_INK_WARM_AHEAD)) {
             // Rationed per frame; a tile not laid out yet gets a few frames.
+            var ready = nodes[k].warm()
             var frames = 0
-            while (!nodes[k].warm(rtl = true) && frames++ < PAPER_INK_WARM_FRAMES) withFrameNanos { }
+            while (!ready && frames++ < PAPER_INK_WARM_FRAMES) {
+                withFrameNanos { }
+                ready = nodes[k].warm()
+            }
+            if (ready && contiguous) warmedThrough[0] = k else contiguous = false
         }
     }
 }
 
 private const val PAPER_INK_WARM_FRAMES = 30
 
-/** Room past a word tile for overhanging marks; matches the fades' own layer bleed. */
-private val WORD_TILE_LAYER_BLEED = 14.dp
+/**
+ * Every word of the verse is quiet and some rest faded: the verse would replay
+ * offscreen fades each frame, so it takes a cached layer. One pass: each word's
+ * paper deposit is worked out once.
+ */
+internal fun List<InkMotion>.restsFadedAsVerse(): Boolean {
+    var faded = false
+    for (motion in this) {
+        if (!motion.isQuiet) return false
+        if (motion.fadedAtRest) faded = true
+    }
+    return faded
+}
 
 /**
  * The whole bloom list for one shaped frame, shared by the English paragraph
@@ -3159,7 +3182,7 @@ fun AyahBlock(
             0f
         },
         animationSpec = tween(
-            if (leavingVerse) InkEngine.INK_DEPARTURE_MS else InkEngine.tuning.recessMs,
+            InkEngine.fadeMs(InkEngine.tuning.recessMs, leavingVerse),
             easing = FastOutSlowInEasing,
         ),
         label = "recessCover",
@@ -3173,7 +3196,7 @@ fun AyahBlock(
     val translationRecess = animateFloatAsState(
         targetValue = if (dimmed) InkEngine.State.Upcoming.inkAlpha() else 1f,
         animationSpec = tween(
-            if (leavingVerse) InkEngine.INK_DEPARTURE_MS else InkEngine.tuning.inkFadeMs,
+            InkEngine.fadeMs(InkEngine.tuning.inkFadeMs, leavingVerse),
             easing = FastOutSlowInEasing,
         ),
         label = "translationRecess",
@@ -3226,10 +3249,7 @@ fun AyahBlock(
                 // draws its covers and fades through offscreen layers that
                 // would be re-rendered every frame. Word tiles cache
                 // themselves instead (nesting would only double the memory).
-                .cachedWhileStill(WORD_TILE_LAYER_BLEED) {
-                    !wordTiles && !searchTargetAyah &&
-                        motions.all { it.isQuiet } && motions.any { it.restsFaded }
-                },
+                .cachedWhileStill { !wordTiles && !searchTargetAyah && motions.restsFadedAsVerse() },
         ) {
             val useArabicIndicDigits = verseNumberScript == VerseNumberScript.ARABIC
             if (readingMode == ReadingMode.ENGLISH_ONLY) {
@@ -3261,7 +3281,7 @@ fun AyahBlock(
                 // Hoisted so this verse can warm the next words' paper ink fields.
                 val paperNodes = remember(ayah.surahId, ayah.number, ayah.words.size) {
                     List(ayah.words.size) { index ->
-                        PaperInkNode((ayah.surahId * 1_000 + ayah.number) * 1_000 + index)
+                        PaperInkNode(paperInkPlacement(ayah.surahId, ayah.number, ayah.words[index].position))
                     }
                 }
                 WarmPaperInkAhead(motions, paperNodes)

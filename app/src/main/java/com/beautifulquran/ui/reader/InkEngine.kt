@@ -47,6 +47,9 @@ object InkEngine {
      */
     const val INK_DEPARTURE_MS = 850
 
+    /** A fade's duration: [ownMs] normally, [INK_DEPARTURE_MS] for the verse just recited. */
+    fun fadeMs(ownMs: Int, leaving: Boolean): Int = if (leaving) INK_DEPARTURE_MS else ownMs
+
     /** The four ink states every reading mode shares. */
     enum class State {
         /** Idle page, no recitation touching this ayah: full ink. */
