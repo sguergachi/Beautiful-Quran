@@ -65,7 +65,7 @@ Mushaf text ──┼─ stop marks ──► stop boundaries ─► pauses (dee
 | Fallback | `ui/reader/EnglishRevealTiming.kt` | Per-word windows when no verse clock exists |
 
 Ink Lab → Tajweed: **English tajweed tempo** (0.6), **English smoothing**
-(100 ms), **English lead** (200 ms).
+(140 ms), **English ease** (260 ms), **English lead** (200 ms).
 
 ## 1. Stop at a pause, not at every word
 
@@ -100,7 +100,8 @@ jumped **3.6× at the p90 boundary and 7.6× at p99**.
 `EnglishScrollClock` builds one position track for the whole verse. Every gloss
 still starts with its Arabic word (or every word it was merged across) and is
 through as the next begins; inside it the position follows that word's tempo.
-`EnglishSmoothTrack` then convolves the position with a Gaussian (σ 100 ms):
+`EnglishSmoothTrack` then convolves the position with a Gaussian (σ 100 ms,
+since raised to 140 ms — see section 8):
 monotone, no added delay (the kernel is symmetric), speed changes blended over
 about ±σ. Boundary jumps fall to **1.3× (p90) / 1.5× (p99)**, no fill is
 shorter than 100 ms, and word midpoints stay on their words.
@@ -188,6 +189,31 @@ but only those starting after the next word and 400 ms of smoothing margin; the
 word being said is never reshaped. The Mushaf leaf's clock is one audible-time
 run, so it keeps the strict pin.
 
+## 8. Grace: ease into a stop, anticipate the start
+
+With the stops crisp the timing was right but the motion could feel sudden:
+the ink braked to a dead stop at full speed and left again at full speed.
+Two changes, measured on Alafasy 3:7 with its real audio, timings and marks:
+
+- **Ease.** Within `englishEaseMs` (260 ms) of each stop and of the verse's
+  ends, the track's time is re-timed with a raised-cosine weight: speed falls
+  to rest into the stop and rises from rest out of it. The time this costs is
+  repaid by a gentle swell (at most 1.33×) over the next three ease lengths,
+  so the stop stays exactly where and as long as it was, and words further
+  from it keep their timing. Repaying it across the whole moving stretch
+  instead pushed the p90 word-timing error from 212 to 300 ms; locally it is
+  230 ms (the median stays at the intended 200 ms lead).
+- **Anticipation.** After a pause the ink now sets off half an ease ahead of
+  the voice (about 100 ms before he resumes), gathering speed as he speaks,
+  instead of leaving from rest at full speed exactly on his voice
+  (`englishPauseHoldMs`).
+- **Smoothing** in connected speech widened from σ 100 to 140 ms. A saved
+  Ink Lab profile's old default (100) migrates; any other value is kept
+  (InkLab schema 10).
+
+Peak acceleration on 3:7 fell from 1,867 to 168 chars/s² (p99 125 → 89);
+every pause still holds visibly still for 300–780 ms.
+
 ## Fences
 
 Each of these was tried and measured, and each is load-bearing:
@@ -195,6 +221,7 @@ Each of these was tried and measured, and each is load-bearing:
 - **Do not finish every word early.** That is a stop per word (section 1).
 - **Do not feed English the Arabic letter map.** It parks and races (29c47d4e9).
 - **Do not smooth across a pause or a verse's ends.** The stop disappears.
+  Ease into it instead (section 8): the stop keeps its place and length.
 - **Do not lower the deep threshold globally to catch shallow pauses.** The
   shallow rule exists only beside a stop mark.
 - **Do not rebuild a running verse clock with new pauses** except for words

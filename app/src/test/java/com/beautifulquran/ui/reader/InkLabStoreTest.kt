@@ -55,6 +55,16 @@ class InkLabStoreTest {
     }
 
     @Test
+    fun oldEnglishSmoothingDefault_adoptsTheGracefulDefaultButKeepsAChoice() {
+        val saved = InkLabSnapshot(schema = 9, englishSmoothMs = 100f, englishLeadMs = 250f)
+        val migrated = InkLabSnapshot.decode(InkLabSnapshot.encode(saved))!!
+        assertEquals(saved.copy(schema = InkLabSnapshot.SCHEMA, englishSmoothMs = 140f), migrated)
+        val chosen = InkLabSnapshot(schema = 9, englishSmoothMs = 60f)
+        assertEquals(chosen.copy(schema = InkLabSnapshot.SCHEMA),
+            InkLabSnapshot.decode(InkLabSnapshot.encode(chosen)))
+    }
+
+    @Test
     fun oldExperimentOff_adoptsTheShippedFringeWithoutTouchingOtherKnobs() {
         // Before 9 the fringe was an off-by-default experiment: "off" was the default.
         val saved = InkLabSnapshot(schema = 8, paperInkFibreFringe = false,

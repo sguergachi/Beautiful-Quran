@@ -110,6 +110,8 @@ internal fun englishReadingPlan(
     smoothMs: Float = 0f,
     /** The English reading lead: a pause holds until the voice is back, not this much before. */
     leadMs: Float = 0f,
+    /** Ease into and out of every stop over this long; half of it anticipates the voice's return. */
+    easeMs: Float = 0f,
 ): EnglishWashPlan {
     if (alignment.phrases == null) return anchors
     fun fallback(reason: String) = anchors.copy(readingFlowFallback = reason)
@@ -141,8 +143,9 @@ internal fun englishReadingPlan(
     // speech after it), and never blur across one: the stop must be seen.
     val audible = heard.mapIndexed { i, span ->
         val gap = if (i == 0) 0L else span.first - heard[i - 1].last
-        if (gap < ENGLISH_PAUSE_MS || leadMs <= 0f) span
-        else (span.first + minOf(leadMs.toLong(), (span.last - span.first) * 6 / 10))..span.last
+        val hold = englishPauseHoldMs(leadMs, easeMs)
+        if (gap < ENGLISH_PAUSE_MS || hold <= 0) span
+        else (span.first + minOf(hold, (span.last - span.first) * 6 / 10))..span.last
     }
     val pauses = audible.zipWithNext().mapNotNull { (a, b) ->
         (a.last..b.first).takeIf { b.first - a.last >= ENGLISH_PAUSE_MS }
@@ -158,7 +161,8 @@ internal fun englishReadingPlan(
     val clock = EnglishWashWindow(start, end, audible)
     val exact = EnglishReadingFlow(clock, extent, if (normalizedSpacing) "normalized_spacing" else null,
         englishReadingPace(alignment, segments, clock, extent) { clock.progress(tempo?.forward(it) ?: it) }, tempo)
-    val flow = EnglishSmoothTrack.of(start, end, smoothMs, pauses, exact::exactInk)?.let { exact.copy(smooth = it) } ?: exact
+    val flow = EnglishSmoothTrack.of(start, end, smoothMs, pauses, easeMs, exact::exactInk)
+        ?.let { exact.copy(smooth = it) } ?: exact
     val windows = anchors.spans.associate { span ->
         span.position to EnglishWashWindow(
             flow.mediaAt(span.from, afterGap = true), flow.mediaAt(span.to),
@@ -183,3 +187,14 @@ private fun normalizedIntervals(input: List<LongRange>, start: Long, end: Long):
         else add(from..to)
     }
 }
+
+/**
+ * How much longer than the heard silence the ink holds after a pause. The ink
+ * leads the voice by [leadMs], so a stop read as-is would release that early;
+ * holding the full lead made the next word leave exactly with the voice, but
+ * from rest at full speed. It now leaves half an ease ahead, gathering speed
+ * as the voice returns.
+ */
+internal fun englishPauseHoldMs(leadMs: Float, easeMs: Float): Long =
+    (leadMs - easeMs / 2).coerceAtLeast(0f).toLong()
+

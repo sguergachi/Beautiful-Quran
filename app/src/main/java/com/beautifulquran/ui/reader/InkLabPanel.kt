@@ -206,6 +206,10 @@ fun InkLabPanel(
                             InkEngine.tuning = t.copy(englishSmoothMs = it)
                         }
                         LabCaption("Blends English ink's speed across word boundaries so it never jumps. 0 follows each word exactly.")
+                        TuningSlider("English ease (ms)", t.englishEaseMs, 0f..500f) {
+                            InkEngine.tuning = t.copy(englishEaseMs = it)
+                        }
+                        LabCaption("How gently English ink comes to rest before a pause and sets off after it; half of it moves ahead of the voice.")
                         TuningSlider("English lead (ms)", t.englishLeadMs, 0f..500f) {
                             InkEngine.tuning = t.copy(englishLeadMs = it)
                         }
@@ -716,6 +720,7 @@ internal fun formatTuningCopy(t: InkEngine.Tuning): String {
         appendLine("    tajweedPacing = ${t.tajweedPacing},")
         appendLine("    englishTajweedTempo = ${f(t.englishTajweedTempo)},")
         appendLine("    englishSmoothMs = ${f(t.englishSmoothMs)},")
+        appendLine("    englishEaseMs = ${f(t.englishEaseMs)},")
         appendLine("    englishLeadMs = ${f(t.englishLeadMs)},")
         appendLine("    pacedFeather = ${f(t.pacedFeather)},")
         appendLine("    holdMadd = ${t.holdMadd},")

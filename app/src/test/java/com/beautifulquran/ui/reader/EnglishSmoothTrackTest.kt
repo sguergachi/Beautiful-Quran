@@ -73,4 +73,24 @@ class EnglishSmoothTrackTest {
         assertTrue(track.mediaAt(1f, afterGap = true) >= 2980)
         assertNull(EnglishSmoothTrack.of(0, 1000, 1f) { 0f })
     }
+
+    @Test
+    fun `ease brings the ink to rest at a stop and keeps distant timing`() {
+        // Steady 10 chars/s, a stop 3000..3600, steady again.
+        val knots = listOf(0L to 0f, 3000L to 30f, 3600L to 30f, 6600L to 60f)
+        val stop = listOf(3000L..3600L)
+        val crisp = requireNotNull(EnglishSmoothTrack.through(knots, 140f, stop))
+        val eased = requireNotNull(EnglishSmoothTrack.through(knots, 140f, stop, easeMs = 260f))
+        fun speed(track: EnglishSmoothTrack, t: Long) = (track.at(t + 20) - track.at(t)) * 1000f / 20
+        // Arriving: crisp is still at full speed 40 ms before the stop; eased has nearly come to rest.
+        assertTrue(speed(crisp, 2960) > 8f)
+        assertTrue("eased ${speed(eased, 2960)}", speed(eased, 2960) < 2f)
+        // The stop holds, and the ink lands exactly where it did.
+        assertEquals(30f, eased.at(3000), 0.01f)
+        assertEquals(30f, eased.at(3500), 0.01f)
+        // Far from the stop the timing is untouched.
+        assertEquals(crisp.at(1200), eased.at(1200), 0.05f)
+        assertEquals(crisp.at(5600), eased.at(5600), 0.05f)
+    }
 }
+

@@ -48,6 +48,8 @@ internal class EnglishScrollClock private constructor(
             pauses: List<com.beautifulquran.domain.AudibleSilence> = emptyList(),
             /** The English reading lead: a pause releases when the voice does. */
             leadMs: Float = 0f,
+            /** Ease into and out of every stop over this long ([EnglishSmoothTrack]); half of it anticipates the voice's return. */
+            easeMs: Float = 0f,
             tempo: (Int) -> TajweedPacing.Curve?,
         ): EnglishScrollClock? {
             val starts = FloatArray(glossLengths.size)
@@ -102,8 +104,9 @@ internal class EnglishScrollClock private constructor(
                 }
                 val pieces = run.indices.map { k ->
                     audible(run[k].second.startMs, maxOf(endOf(k), run[k].second.startMs + 1)).map { piece ->
-                        if (previousEnd != Long.MIN_VALUE && piece.first - previousEnd >= ENGLISH_PAUSE_MS && leadMs > 0f) {
-                            (piece.first + minOf(leadMs.toLong(), (piece.last - piece.first) * 6 / 10))..piece.last
+                        val hold = englishPauseHoldMs(leadMs, easeMs)
+                        if (previousEnd != Long.MIN_VALUE && piece.first - previousEnd >= ENGLISH_PAUSE_MS && hold > 0) {
+                            (piece.first + minOf(hold, (piece.last - piece.first) * 6 / 10))..piece.last
                         } else piece
                     }.also { if (it.isNotEmpty()) previousEnd = it.last().last }
                 }
@@ -147,7 +150,7 @@ internal class EnglishScrollClock private constructor(
                 }
                 out
             }
-            val track = EnglishSmoothTrack.through(sorted, maxOf(sigmaMs, EnglishSmoothTrack.STEP_MS.toFloat()), breaks)
+            val track = EnglishSmoothTrack.through(sorted, maxOf(sigmaMs, EnglishSmoothTrack.STEP_MS.toFloat()), breaks, easeMs)
                 ?: return null
             return EnglishScrollClock(track, starts, FloatArray(glossLengths.size) { glossLengths[it].toFloat() })
         }

@@ -80,7 +80,8 @@ data class InkLabSnapshot(
     val sweepEaseY2: Float = 0.78f,
     val tajweedPacing: Boolean = true,
     val englishTajweedTempo: Float = 0.6f,
-    val englishSmoothMs: Float = 100f,
+    val englishSmoothMs: Float = 140f,
+    val englishEaseMs: Float = 260f,
     val englishLeadMs: Float = 200f,
     val pacedFeather: Float = 1.1092f,
     val holdMadd: Boolean = true,
@@ -156,6 +157,7 @@ data class InkLabSnapshot(
         tajweedPacing = tajweedPacing,
         englishTajweedTempo = englishTajweedTempo,
         englishSmoothMs = englishSmoothMs,
+        englishEaseMs = englishEaseMs,
         englishLeadMs = englishLeadMs,
         pacedFeather = pacedFeather,
         holdMadd = holdMadd,
@@ -216,8 +218,10 @@ data class InkLabSnapshot(
          * 9: the fibre fringe ships on. Before this it was an off-by-default
          *    experiment, so an old save's "off" is the old default, not a
          *    choice; an "off" saved from 9 on is kept.
+         * 10: English smoothing ships at 140 ms with a 260 ms ease. A saved 100
+         *    is the old default, not a choice; any other value is kept.
          */
-        const val SCHEMA = 9
+        const val SCHEMA = 10
 
         private val json = Json {
             ignoreUnknownKeys = true
@@ -262,6 +266,7 @@ data class InkLabSnapshot(
             tajweedPacing = tuning.tajweedPacing,
             englishTajweedTempo = tuning.englishTajweedTempo,
             englishSmoothMs = tuning.englishSmoothMs,
+            englishEaseMs = tuning.englishEaseMs,
             englishLeadMs = tuning.englishLeadMs,
             pacedFeather = tuning.pacedFeather,
             holdMadd = tuning.holdMadd,
@@ -340,9 +345,12 @@ data class InkLabSnapshot(
                     tarjiMinDrama = pooling.tarjiMinDrama.takeUnless { it == 0.5f }
                         ?: shipped.tarjiMinDrama,
                 )
-                if (saved.schema >= SCHEMA) drama else drama.copy(
-                    schema = SCHEMA,
+                val fringe = if (saved.schema >= 9) drama else drama.copy(
                     paperInkFibreFringe = shipped.paperInkFibreFringe,
+                )
+                if (saved.schema >= SCHEMA) fringe else fringe.copy(
+                    schema = SCHEMA,
+                    englishSmoothMs = fringe.englishSmoothMs.takeUnless { it == 100f } ?: shipped.englishSmoothMs,
                 )
             }
     }

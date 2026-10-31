@@ -4304,7 +4304,7 @@ private fun rememberEnglishScrollClock(ayah: Ayah): EnglishScrollClock? {
     }
     // The reciter's heard pauses, fixed once this verse's voice begins (EnglishPauses).
     val pauses = EnglishPauses.aheadFor(ayah.surahId, ayah.number)
-    return remember(ayah, timings, glosses, pauses, tuning.englishSmoothMs, tuning.englishLeadMs,
+    return remember(ayah, timings, glosses, pauses, tuning.englishSmoothMs, tuning.englishLeadMs, tuning.englishEaseMs,
         tuning.englishTajweedTempo, tuning.tajweedPacing,
         tuning.holdMadd, tuning.holdGhunnah, tuning.holdWaqf, tuning.holdConnect) {
         val segments = timings?.segments ?: return@remember null
@@ -4319,6 +4319,7 @@ private fun rememberEnglishScrollClock(ayah: Ayah): EnglishScrollClock? {
             sigmaMs = tuning.englishSmoothMs,
             pauses = pauses,
             leadMs = tuning.englishLeadMs,
+            easeMs = tuning.englishEaseMs,
             tempo = { index ->
                 InkEngine.englishSegmentTempo(arabic[index], index == words.lastIndex, arabic.getOrNull(index - 1))
             },

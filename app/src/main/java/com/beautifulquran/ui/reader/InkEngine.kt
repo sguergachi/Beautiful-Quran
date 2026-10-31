@@ -170,7 +170,10 @@ object InkEngine {
         val englishTajweedTempo: Float = 0.6f,
         /** Gaussian σ (ms) blending English ink's speed across word boundaries
          *  and tempo kinks — see [EnglishSmoothTrack]. 0 reads the exact clock. */
-        val englishSmoothMs: Float = 100f,
+        val englishSmoothMs: Float = 140f,
+        /** English ink eases to rest before a stop and from rest after it over
+         *  this long, leaving half of it ahead of the voice's return. */
+        val englishEaseMs: Float = 260f,
         /** How far English ink runs ahead of the voice (media ms), in English
          *  reading. A reader takes in the meaning as the word is heard; ink that
          *  only finishes as the Arabic word ends reads as behind. */

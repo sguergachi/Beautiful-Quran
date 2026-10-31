@@ -39,8 +39,9 @@ internal fun englishPresentationPlan(
     tempo: EnglishTempoWarp? = null,
     smoothMs: Float = 0f,
     leadMs: Float = 0f,
+    easeMs: Float = 0f,
 ): EnglishWashPlan = englishReadingPlan(alignment, segments,
-    englishPhrasePlan(alignment, segments, voiceStartMs), silence, voiceStartMs, tempo, smoothMs, leadMs)
+    englishPhrasePlan(alignment, segments, voiceStartMs), silence, voiceStartMs, tempo, smoothMs, leadMs, easeMs)
 
 /** Semantic phrase/occurrence anchors; the reading clock joins connected speech over these. */
 internal fun englishPhrasePlan(

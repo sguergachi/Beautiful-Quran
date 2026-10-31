@@ -20,6 +20,13 @@ import kotlin.math.roundToInt
  * returns, so the stop is never seen. Within [breaks] the kernel narrows to a
  * third of the distance to the pause, so the word lands, the ink stands still
  * for the whole silence, and the next word leaves as the voice does.
+ *
+ * Crisp is not abrupt. Within [easeMs] of each stop (and of the verse's ends)
+ * the track's time is eased — a raised-cosine slow-down into the stop and
+ * speed-up out of it, the time it borrows repaid by a gentle swell just
+ * beyond — so the ink comes to rest and leaves again with grace, the stop
+ * stays exactly where and as long as it was, and words away from it keep
+ * their timing.
  */
 internal class EnglishSmoothTrack private constructor(
     private val originMs: Long,
@@ -74,6 +81,7 @@ internal class EnglishSmoothTrack private constructor(
             toMs: Long,
             sigmaMs: Float,
             breaks: List<LongRange> = emptyList(),
+            easeMs: Float = 0f,
             track: (Long) -> Float,
         ): EnglishSmoothTrack? {
             if (sigmaMs < STEP_MS || toMs <= fromMs) return null
@@ -81,16 +89,18 @@ internal class EnglishSmoothTrack private constructor(
             val origin = fromMs - radius * STEP_MS
             val count = ((toMs - fromMs) / STEP_MS + 1 + 2 * radius).toInt()
             val padded = count + 2 * radius
-            val raw = FloatArray(padded) { track(origin + (it - radius) * STEP_MS) }
+            // The verse's own start and end are edges too: the first word leaves
+            // with the voice and the last lands on time, not blurred past them.
+            val edges = (breaks.flatMap { listOf(it.first, it.last) } + fromMs + toMs).sorted().toLongArray()
+            val times = DoubleArray(padded) { (origin + (it - radius) * STEP_MS).toDouble() }
+            if (easeMs >= STEP_MS) ease(times, edges, breaks, easeMs)
+            val raw = FloatArray(padded) { track(kotlin.math.round(times[it]).toLong()) }
             // One kernel per narrowed width, in whole steps: index r has radius r.
             val kernels = arrayOfNulls<FloatArray>(radius + 1)
             fun kernel(r: Int): FloatArray = kernels[r] ?: FloatArray(2 * r + 1) { k ->
                 val x = (k - r) * 3f / maxOf(r, 1)
                 exp(-0.5f * x * x)
             }.also { k -> val sum = k.sum(); for (j in k.indices) k[j] /= sum; kernels[r] = k }
-            // The verse's own start and end are edges too: the first word leaves
-            // with the voice and the last lands on time, not blurred past them.
-            val edges = (breaks.flatMap { listOf(it.first, it.last) } + fromMs + toMs).sorted().toLongArray()
             fun room(ms: Long): Long {
                 if (edges.isEmpty()) return Long.MAX_VALUE
                 var low = 0
@@ -117,11 +127,55 @@ internal class EnglishSmoothTrack private constructor(
             return EnglishSmoothTrack(origin, values)
         }
 
+        /**
+         * Re-time each moving stretch between [edges] (skipping the stops in
+         * [breaks]) so its speed rises from rest over [easeMs] and falls back to
+         * rest over the last [easeMs]: a raised-cosine weight, integrated and
+         * rescaled so both ends of the stretch stay put. In place on [times].
+         */
+        private fun ease(times: DoubleArray, edges: LongArray, breaks: List<LongRange>, easeMs: Float) {
+            for (k in 0 until edges.size - 1) {
+                val a = edges[k].toDouble()
+                val b = edges[k + 1].toDouble()
+                if (b - a < 2 * STEP_MS) continue
+                if (breaks.any { it.first <= a && it.last >= b }) continue
+                val first = times.indexOfFirst { it >= a }
+                val last = times.indexOfLast { it <= b }
+                if (first < 0 || last <= first) continue
+                val e = minOf(easeMs.toDouble(), (b - a) / 2)
+                // Rest → speed over e, then the time that cost repaid by a gentle
+                // swell (at most 1.33x) over the next 3e, so words further from
+                // the stop keep their exact timing.
+                fun weight(t: Double): Double {
+                    val d = (minOf(t - a, b - t)).coerceAtLeast(0.0)
+                    return when {
+                        d < e -> 0.5 - 0.5 * kotlin.math.cos(Math.PI * d / e)
+                        d < 4 * e -> 1.0 + kotlin.math.sin(Math.PI * (d - e) / (3 * e)).let { it * it } / 3
+                        else -> 1.0
+                    }
+                }
+                // Cumulative weight from a, sampled at each grid time and at b.
+                val cumulative = DoubleArray(last - first + 1)
+                var acc = 0.0
+                var at = a
+                for (i in first..last) {
+                    val t = times[i]
+                    acc += weight((at + t) / 2) * (t - at)
+                    cumulative[i - first] = acc
+                    at = t
+                }
+                val total = acc + weight((at + b) / 2) * (b - at)
+                if (total <= 0) continue
+                for (i in first..last) times[i] = a + (b - a) * cumulative[i - first] / total
+            }
+        }
+
         /** A piecewise-linear track through ascending (media ms, position) knots, then smoothed. */
         fun through(
             knots: List<Pair<Long, Float>>,
             sigmaMs: Float,
             breaks: List<LongRange> = emptyList(),
+            easeMs: Float = 0f,
         ): EnglishSmoothTrack? {
             if (knots.size < 2) return null
             val times = LongArray(knots.size) { knots[it].first }
@@ -139,7 +193,7 @@ internal class EnglishSmoothTrack private constructor(
                 if (span <= 0) return positions[high]
                 return positions[low] + (positions[high] - positions[low]) * (ms - times[low]).toFloat() / span
             }
-            return of(times.first(), times.last(), sigmaMs, breaks, ::linear)
+            return of(times.first(), times.last(), sigmaMs, breaks, easeMs, ::linear)
         }
     }
 }
