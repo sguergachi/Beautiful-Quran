@@ -277,7 +277,10 @@ def candidate(row, answer, binding, evidence, model):
     result = copy.deepcopy(row)
     result["qac_trust"] = "surface_verified"
     evidence_id = ledger.digest(ledger.encoded(evidence))
-    citations = [s["entry"]["citation_url"] for s in evidence.get("sources", {}).values() if s["entry"].get("citation_url")]
+    citations = [citation for citation in
+                (source.get("entry", {}).get("citation_url") if "entry" in source else source.get("citation_url")
+                 for source in evidence.get("sources", {}).values())
+                if citation]
     for token, decision in zip(result["tokens"], decisions):
         token.update({k: decision[k] for k in ["contributors", "head", "ink_anchor", "meaning", "unit"]})
         token.update(status="model_reviewed", review={"method": "model_review", "reviewer": model,
