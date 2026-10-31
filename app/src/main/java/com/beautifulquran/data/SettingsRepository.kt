@@ -137,6 +137,8 @@ data class Settings(
      *  repeatedly tapping the Settings logo; persisted so the reader can
      *  honour it. See docs/ROOT_VIEWER.md and docs/TIMINGS_LAB.md. */
     val developerModeEnabled: Boolean = false,
+    /** Opt-in to the separate AI-reviewed English prose artifact. */
+    val aiEnglishAlignmentEnabled: Boolean = false,
     /** Developer A/B of the English type; readers always get [BookTypeface.JUNICODE]. */
     val bookTypeface: BookTypeface = BookTypeface.JUNICODE,
     /** Developer A/B of the Scroll's Arabic; readers always get [ScrollArabicFace.HAFS]. */
@@ -147,6 +149,10 @@ data class Settings(
     /** Developer-only: which ink-brush circle to paint around selected enums. */
     val brushCircleStyle: BrushCircleStyle = BrushCircleStyle.BASELINE,
 ) {
+    /** Disabling developer mode also disables this experiment, retaining its preference. */
+    val useAiEnglishAlignment: Boolean
+        get() = developerModeEnabled && aiEnglishAlignmentEnabled
+
     /** The typeface actually set: the A/B choice only counts in developer mode. */
     val activeBookTypeface: BookTypeface
         get() = if (developerModeEnabled) bookTypeface else BookTypeface.JUNICODE
@@ -221,6 +227,7 @@ class SettingsRepository(context: Context) {
         lastSurah = prefs.getInt("lastSurah", 0),
         lastAyah = prefs.getInt("lastAyah", 1),
         developerModeEnabled = prefs.getBoolean("developerModeEnabled", false),
+        aiEnglishAlignmentEnabled = prefs.getBoolean("aiEnglishAlignmentEnabled", false),
         bookTypeface = bookTypefaceFor(
             storedCode = if (prefs.contains("bookTypeface")) prefs.getInt("bookTypeface", 0) else null,
             legacyTimeless = if (prefs.contains("timelessTypographyEnabled")) {
@@ -336,6 +343,7 @@ class SettingsRepository(context: Context) {
             putInt("lastSurah", next.lastSurah)
             putInt("lastAyah", next.lastAyah)
             putBoolean("developerModeEnabled", next.developerModeEnabled)
+            putBoolean("aiEnglishAlignmentEnabled", next.aiEnglishAlignmentEnabled)
             putInt("bookTypeface", next.bookTypeface.code)
             remove("timelessTypographyEnabled")
             putInt("scrollArabicFace", next.scrollArabicFace.code)

@@ -15,7 +15,11 @@ import tempfile
 
 PROBE = r'''
 import com.beautifulquran.domain.EnglishWordAlignment
+import com.beautifulquran.domain.EnglishTypography
 import com.beautifulquran.domain.EnglishAlignment
+import com.beautifulquran.domain.ReviewedEnglishAlignment
+import com.beautifulquran.domain.EnglishVerseAlignments
+import com.beautifulquran.data.model.*
 import com.beautifulquran.domain.AudibleSilence
 import com.beautifulquran.data.model.Segment
 import com.beautifulquran.ui.reader.*
@@ -25,9 +29,16 @@ private val coreWords = Regex("\\p{L}[\\p{L}\\p{M}]*(?:['’][\\p{L}\\p{M}]+)*")
 
 fun main(args: Array<String>) {
     val corpus = File(args[0]).readLines().associate { line ->
-        val row = line.split('\t'); row[0] to row
+        val row = line.split('\t').toMutableList()
+        row[2] = row[2].split('|').joinToString("|", transform = EnglishTypography::typesetName)
+        row[0] to row
     }
     val cache = HashMap<String, EnglishAlignment>()
+    val baselineCache = HashMap<String, EnglishAlignment>()
+    val reviewed = if (args.size > 3) File(args[3]).bufferedReader().use { ReviewedEnglishAlignment.read(it.lineSequence()) } else emptyMap()
+    val compareDefaults = args.size > 3
+    check(reviewed.keys.all { it in corpus }) { "Reviewed artifact contains verses outside the corpus" }
+    var cardChecks = 0
     var newCollapses = 0
     File(args[2], "word-finishes.tsv").bufferedWriter().use { finishes ->
     File(args[2], "pace-diagnostics.tsv").bufferedWriter().use { paces ->
@@ -38,15 +49,33 @@ fun main(args: Array<String>) {
     File(args[2], "exposure.tsv").bufferedWriter().use { exposures ->
         File(args[2], "plans.tsv").bufferedWriter().use { plans ->
             exposures.appendLine("reciter\tverse\tword\ttext\tstart_ms\tend_ms\tsemantic_owner\tend_minus_owner_end_ms")
-            plans.appendLine("reciter\tverse\tblocks\treordered_blocks\trepeat_fallbacks\tearly_words\tlate_words\tsource_overlap_fallbacks\tcontained_cores\tcrossing_cores\tcore_collapses\tnew_collapses\tsource_order_skips\trepeat_collapses\tother_legacy_collapses\twhitespace_collapses\treading_flow\treading_fallback\trate_checks\tpause_checks\tblank_compression\tblank_compression_fallback")
-            cores.appendLine("reciter\tverse\ttext\tfrom\tto\tband_owner\tstart_ms\tend_ms\tlegacy_start_ms\tlegacy_end_ms\treason")
+            plans.appendLine("reciter\tverse\tblocks\treordered_blocks\trepeat_fallbacks\tearly_words\tlate_words\tsource_overlap_fallbacks\tcontained_cores\tcrossing_cores\tcore_collapses\tnew_collapses\tsource_order_skips\trepeat_collapses\tother_legacy_collapses\twhitespace_collapses\treading_flow\treading_fallback\trate_checks\tpause_checks\tblank_compression\tblank_compression_fallback\texisting_default_collapses")
+            cores.appendLine("reciter\tverse\ttext\tfrom\tto\tband_owner\tstart_ms\tend_ms\tlegacy_start_ms\tlegacy_end_ms\tdefault_start_ms\tdefault_end_ms\treason")
             crossings.appendLine("reciter\tverse\ttext\tfrom\tto\tplan_contained\tlegacy_contained")
             File(args[1]).forEachLine { line ->
                 val (reciter, key, encoded, voiceStart, quiet) = line.split('\t')
                 val row = corpus[key] ?: error("Missing verse $key")
                 val text = row[1]
                 val alignment = cache.getOrPut(key) {
-                    EnglishWordAlignment.align(text, row[2].split('|'), row[3].split('|'), row[4].split('|'))!!
+                    reviewed[key]?.let { record ->
+                        val arabic = row[4].split('|'); val glosses = row[2].split('|'); val lemmas = row[3].split('|')
+                        val direct = ReviewedEnglishAlignment.alignment(text, arabic, record, glosses)
+                            ?: error("Stale reviewed record $key")
+                        val (surah, ayah) = key.split(':').map(String::toInt)
+                        val verse = Ayah(surah, ayah, arabic.joinToString(" "), text,
+                            words = arabic.mapIndexed { index, value -> Word(index + 1, value, glosses[index], "", lemma = lemmas[index]) })
+                        val content = SurahContent(Surah(surah, "", "", "", "", 1), listOf(verse),
+                            aiEnglishAlignmentRecords = mapOf(ayah to record))
+                        val selected = EnglishVerseAlignments(content, useAiReviewed = true).alignment(ayah)!!
+                        check(selected.usesAiReviewedRecord && selected.spans == direct.spans &&
+                            selected.phrases == direct.phrases && selected.timingWords == direct.timingWords) { "$key lookup bypass" }
+                        val cards = EnglishVerseAlignments(content, wordByWord = true).alignment(ayah)!!
+                        val toggledCards = EnglishVerseAlignments(content, wordByWord = true, useAiReviewed = true).alignment(ayah)!!
+                        check(!toggledCards.usesAiReviewedRecord && cards.phrases == null && toggledCards.phrases == null &&
+                            cards.spans == toggledCards.spans && cards.wordEnds.contentEquals(toggledCards.wordEnds)) { "$key word-card change" }
+                        cardChecks++
+                        selected
+                    } ?: EnglishWordAlignment.align(text, row[2].split('|'), row[3].split('|'), row[4].split('|'))!!
                 }
                 val segments = encoded.split(';').map {
                     val (p, s, e) = it.split(',').map(String::toLong); Segment(p.toInt(), s, e)
@@ -55,6 +84,12 @@ fun main(args: Array<String>) {
                     val (s, e) = it.split(',').map(String::toLong); AudibleSilence(s, e)
                 }
                 val plan = englishPresentationPlan(alignment, segments, voiceStart.toLong(), silence)
+                val defaultPlan = if (key in reviewed) {
+                    val baseline = baselineCache.getOrPut(key) {
+                        EnglishWordAlignment.align(text, row[2].split('|'), row[3].split('|'), row[4].split('|'))!!
+                    }
+                    englishPresentationPlan(baseline, segments, voiceStart.toLong(), silence)
+                } else plan
                 check(plan.spans.first().from == 0f && plan.spans.last().to == 1f) { "$reciter $key ends" }
                 plan.spans.zipWithNext().forEach { (a, b) -> check(a.to == b.from) { "$key hole" } }
                 val windows = plan.spans.map { plan.windows.getValue(it.position) }
@@ -126,7 +161,7 @@ fun main(args: Array<String>) {
                         if (owner == 1) window.copy(startMs = maxOf(window.startMs, voiceStart.toLong()).coerceAtMost(window.endMs)) else window
                     })
                 var coreCount = 0; var crossingCount = 0; var collapsed = 0; var introduced = 0
-                var skips = 0; var repeats = 0; var others = 0
+                var skips = 0; var repeats = 0; var others = 0; var defaultCollapses = 0
                 coreWords.findAll(text).forEach { word ->
                     val from = word.range.first.toFloat() / text.length
                     val to = (word.range.last + 1f) / text.length
@@ -144,9 +179,12 @@ fun main(args: Array<String>) {
                     if (current.endMs > current.startMs) return@forEach
                     collapsed++
                     val old = englishWordExposure(legacy, from, to)!!
+                    val baseline = englishWordExposure(defaultPlan, from, to)!!
                     val band = plan.spans.first { to <= it.to + .00001f }
                     val first = segments.indexOfFirst { it.position >= band.position }
                     val reason = when {
+                        compareDefaults && baseline.endMs > baseline.startMs -> { introduced++; "AI_INTRODUCED_COLLAPSE" }
+                        old.endMs > old.startMs && compareDefaults -> { defaultCollapses++; "existing_default_collapse" }
                         old.endMs > old.startMs -> { introduced++; "NEW_COLLAPSE" }
                         first >= 0 && segments[first].position > band.position &&
                             segments.drop(first + 1).any { it.position == band.position } -> {
@@ -157,7 +195,7 @@ fun main(args: Array<String>) {
                         }
                         else -> { others++; "legacy_other" }
                     }
-                    cores.appendLine("$reciter\t$key\t${word.value}\t$from\t$to\t${band.position}\t${current.startMs}\t${current.endMs}\t${old.startMs}\t${old.endMs}\t$reason")
+                    cores.appendLine("$reciter\t$key\t${word.value}\t$from\t$to\t${band.position}\t${current.startMs}\t${current.endMs}\t${old.startMs}\t${old.endMs}\t${baseline.startMs}\t${baseline.endMs}\t$reason")
                 }
                 newCollapses += introduced
                 var early = 0; var late = 0; var whitespaceCollapses = 0
@@ -175,7 +213,7 @@ fun main(args: Array<String>) {
                     exposures.appendLine("$reciter\t$key\t${index + 1}\t${word.value}\t${window.startMs}\t${window.endMs}\t$owner\t${delta ?: ""}")
                 }
                 val reordered = alignment.presentationSpans.count { it.lastPosition > it.position }
-                plans.appendLine("$reciter\t$key\t${plan.spans.size}\t$reordered\t${plan.repeatFallbacks}\t$early\t$late\t${plan.sourceOverlapFallbacks}\t$coreCount\t$crossingCount\t$collapsed\t$introduced\t$skips\t$repeats\t$others\t$whitespaceCollapses\t${if (plan.readingFlow != null) 1 else 0}\t${plan.readingFlowFallback ?: ""}\t$rateChecks\t$pauseChecks\t${if (plan.readingFlow?.extent != null) 1 else 0}\t${plan.readingFlow?.extentFallback ?: ""}")
+                plans.appendLine("$reciter\t$key\t${plan.spans.size}\t$reordered\t${plan.repeatFallbacks}\t$early\t$late\t${plan.sourceOverlapFallbacks}\t$coreCount\t$crossingCount\t$collapsed\t$introduced\t$skips\t$repeats\t$others\t$whitespaceCollapses\t${if (plan.readingFlow != null) 1 else 0}\t${plan.readingFlowFallback ?: ""}\t$rateChecks\t$pauseChecks\t${if (plan.readingFlow?.extent != null) 1 else 0}\t${plan.readingFlow?.extentFallback ?: ""}\t$defaultCollapses")
             }
         }
     }
@@ -184,6 +222,8 @@ fun main(args: Array<String>) {
     }
     }
     check(newCollapses == 0) { "$newCollapses newly collapsed letter cores with positive legacy exposure" }
+    val loaded = reviewed.keys.filter { it in cache }
+    File(args[2], "lookup.json").writeText("""{"reviewed_verses_loaded":${loaded.size},"card_isolation_checks":$cardChecks,"unexercised_reviewed_verses":${reviewed.size - loaded.size}}""")
 }
 '''
 
@@ -193,17 +233,33 @@ def main():
     parser.add_argument("corpus", type=Path)
     parser.add_argument("timings_cache", type=Path)
     parser.add_argument("--output-dir", type=Path, required=True)
+    parser.add_argument("--alignments", type=Path, help="Exercise a compiled ledger through the actual reviewed-record loader")
+    parser.add_argument("--chapters", help="Comma-separated chapter numbers; omitted means the complete corpus")
+    parser.add_argument("--include-bundled", action="store_true", help="Also exercise independent bundled voices; never fill withheld runtime rows")
     args = parser.parse_args()
     args.output_dir.mkdir(parents=True, exist_ok=True)
     source = Path(__file__).resolve().parents[1] / "app/src/main/java/com/beautifulquran"
-    names = ["domain/EnglishWordAlignment.kt", "domain/EnglishPhrase.kt", "domain/EnglishTypography.kt",
+    names = ["domain/EnglishWordAlignment.kt", "domain/ReviewedEnglishAlignment.kt", "domain/EnglishPhrase.kt", "domain/EnglishTypography.kt",
              "domain/ArabicNormalize.kt", "data/model/Models.kt", "ui/reader/EnglishWashPlan.kt",
              "ui/reader/EnglishWashWindow.kt", "ui/reader/EnglishReadingFlow.kt", "ui/reader/EnglishReadingExtent.kt",
              "ui/reader/EnglishReadingPace.kt", "domain/VerseOpening.kt"]
     names.append("ui/reader/PaperInkEnglishWindows.kt")
     sources = [source / name for name in names]
+    chapters = set(map(int, args.chapters.split(','))) if args.chapters else None
     with sqlite3.connect(f"file:{args.timings_cache.resolve()}?mode=ro", uri=True) as database:
         revisions = dict(database.execute("SELECT reciter_id, revision FROM timing_state"))
+        timing_rows = list(database.execute(
+            "SELECT reciter_id,surah_id,ayah_number,segments,audio_onset_ms FROM timing_rows ORDER BY reciter_id,surah_id,ayah_number"))
+        if args.include_bundled:
+            bundled_path = Path(__file__).resolve().parents[1] / "data/quran.db"
+            bundled_revision = "bundled:" + hashlib.sha256(bundled_path.read_bytes()).hexdigest()
+            with sqlite3.connect(f"file:{bundled_path}?mode=ro", uri=True) as bundled:
+                runtime_voices = set(revisions)
+                for row in bundled.execute("SELECT reciter_id,surah_id,ayah_number,segments,audio_onset_ms FROM timings"):
+                    if row[0] not in runtime_voices:
+                        timing_rows.append(row)
+                        revisions[row[0]] = bundled_revision
+            timing_rows.sort(key=lambda row: row[:3])
         silence_by_key = {}
         silence_sources = {}
         for reciter in revisions:
@@ -221,9 +277,9 @@ def main():
             directory = Path(directory)
             timings = directory / "timings.tsv"
             with timings.open("w") as stream:
-                for reciter, surah, ayah, encoded, onset in database.execute(
-                    "SELECT reciter_id,surah_id,ayah_number,segments,audio_onset_ms FROM timing_rows ORDER BY reciter_id,surah_id,ayah_number"
-                ):
+                for reciter, surah, ayah, encoded, onset in timing_rows:
+                    if chapters is not None and surah not in chapters:
+                        continue
                     segments = json.loads(encoded)
                     if not segments:
                         raise ValueError(f"Empty timing row: {reciter} {surah}:{ayah}")
@@ -242,7 +298,8 @@ def main():
             probe.write_text(PROBE)
             jar = directory / "probe.jar"
             subprocess.run(["kotlinc", *map(str, sources), str(legacy), str(probe), "-include-runtime", "-d", str(jar)], check=True)
-            subprocess.run(["java", "-jar", str(jar), str(args.corpus), str(timings), str(args.output_dir)], check=True)
+            subprocess.run(["java", "-jar", str(jar), str(args.corpus), str(timings), str(args.output_dir),
+                            *([str(args.alignments)] if args.alignments else [])], check=True)
     rows = [row.split("\t") for row in (args.output_dir / "plans.tsv").read_text().splitlines()[1:]]
     pace_rows = [row.split("\t") for row in (args.output_dir / "pace-diagnostics.tsv").read_text().splitlines()[1:]]
     finish_rows = [row.split("\t") for row in (args.output_dir / "word-finishes.tsv").read_text().splitlines()[1:]]
@@ -260,7 +317,10 @@ def main():
         "contained_letter_cores": sum(int(row[8]) for row in rows),
         "crossing_letter_cores": sum(int(row[9]) for row in rows),
         "collapsed_letter_cores": sum(int(row[10]) for row in rows),
-        "new_positive_legacy_collapses": sum(int(row[11]) for row in rows),
+        "new_positive_legacy_collapses": sum(int(row[11]) + int(row[22]) for row in rows),
+        "ai_introduced_collapses": sum(int(row[11]) for row in rows) if args.alignments else None,
+        "existing_default_collapses": sum(int(row[22]) for row in rows),
+        "collapse_comparison": "current_default" if args.alignments else "legacy_windows",
         "legacy_source_order_skips": sum(int(row[12]) for row in rows),
         "legacy_repeat_collapses": sum(int(row[13]) for row in rows),
         "other_legacy_collapses": sum(int(row[14]) for row in rows),
@@ -293,8 +353,12 @@ def main():
         "timing_revisions": revisions,
         "corpus_sha256": hashlib.sha256(args.corpus.read_bytes()).hexdigest(),
         "source_sha256": {name: hashlib.sha256(path.read_bytes()).hexdigest() for name, path in zip(names, sources)},
+        "alignment_artifact_sha256": hashlib.sha256(args.alignments.read_bytes()).hexdigest() if args.alignments else None,
+        **json.loads((args.output_dir / "lookup.json").read_text()),
     }
     (args.output_dir / "summary.json").write_text(json.dumps(summary, indent=2) + "\n")
+    if args.alignments and not args.chapters and summary["unexercised_reviewed_verses"]:
+        raise ValueError("Compiled records were not all exercised by the supplied timing population")
     print(json.dumps({key: value for key, value in summary.items() if key not in ("source_sha256", "timing_revisions")}))
 
 

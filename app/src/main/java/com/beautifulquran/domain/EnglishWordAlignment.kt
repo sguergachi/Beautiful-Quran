@@ -16,20 +16,13 @@ data class EnglishAlignment(
     val readingText: String? = null,
     /** Verified literal words before owner coalescing; interpolation and synonyms cannot set deadlines. */
     val timingWords: List<EnglishWordSpan> = emptyList(),
+    /** Human review coverage; AI approval is recorded separately. */
+    val usesApprovedRecord: Boolean = false,
+    /** Enabled only by the developer experiment, never human approval. */
+    val usesAiReviewedRecord: Boolean = false,
+    /** Legacy occurrence ranges may use reviewed ink contributors instead of tap heads. */
+    val washSpans: List<EnglishWordSpan> = continuousEnglishWash(spans),
 ) {
-    /** Legacy immediate-meaning ranges, retained for occurrence fallback and ownership diagnostics. */
-    val washSpans: List<EnglishWordSpan> = buildList {
-        var position = Int.MAX_VALUE
-        for (span in spans.asReversed()) {
-            position = minOf(position, span.position)
-            val previous = lastOrNull()
-            if (previous?.position == position) {
-                this[lastIndex] = previous.copy(from = span.from)
-            } else add(span.copy(position = position))
-        }
-        reverse()
-    }
-
     /** Reordered translation phrases retain one forward edge without the immediate-meaning rush. */
     val presentationSpans: List<EnglishPhrase> = phrases
         ?: washSpans.map { EnglishPhrase(it.from, it.to, it.position) }
@@ -40,6 +33,19 @@ data class EnglishAlignment(
 
     /** Where the forward wash begins; words already included never move it backwards. */
     fun through(position: Int): Float = washSpans.firstOrNull { it.position >= position }?.from ?: 1f
+}
+
+/** A later spoken meaning brings every preceding English word into the same wash. */
+internal fun continuousEnglishWash(spans: List<EnglishWordSpan>): List<EnglishWordSpan> = buildList {
+    var position = Int.MAX_VALUE
+    for (span in spans.asReversed()) {
+        position = minOf(position, span.position)
+        val previous = lastOrNull()
+        if (previous?.position == position) {
+            this[lastIndex] = previous.copy(from = span.from)
+        } else add(span.copy(position = position))
+    }
+    reverse()
 }
 
 /**
@@ -72,6 +78,37 @@ data class EnglishAlignment(
  * alignment table, which is nothing.
  */
 object EnglishWordAlignment {
+
+    /** Reviewed ink contributors define phrases; only equal literal glosses establish finish targets. */
+    internal fun reviewedPresentation(
+        text: String, owners: List<Int>, heads: List<Int>, linked: List<Boolean>, glosses: List<String>,
+    ): Pair<List<EnglishPhrase>, List<EnglishWordSpan>> {
+        val prose = words(text, emptySet())
+        require(prose.size == owners.size)
+        val phrases = englishPhraseSpans(prose.mapIndexed { index, word ->
+            EnglishPhraseWord(if (index == 0) 0f else prose[index - 1].end.toFloat() / text.length,
+                if (index == prose.lastIndex) 1f else word.end.toFloat() / text.length,
+                owners[index], word.sentence, linked[index] && !word.added && word.text !in GRAMMAR)
+        })
+        val literals = glosses.map { words(it, emptySet()).map { word -> word.text }.toSet() }
+        val timing = prose.mapIndexedNotNull { index, word ->
+            if (!linked[index] || word.added || word.text in GRAMMAR || heads[index] != owners[index] ||
+                word.text !in literals.getOrElse(owners[index] - 1) { emptySet() }) null
+            else literalTimingWord(text, word, owners[index])
+        }
+        return phrases to timing
+    }
+
+    private fun literalTimingWord(text: String, word: ProseWord, owner: Int): EnglishWordSpan? {
+        val start = word.end - word.text.length
+        var first = start
+        while (first > 0 && !text[first - 1].isWhitespace()) first--
+        var end = word.end
+        while (end < text.length && !text[end].isWhitespace()) end++
+        if (text.substring(first, start).any { it.isLetterOrDigit() } ||
+            text.substring(word.end, end).any { it.isLetterOrDigit() }) return null
+        return EnglishWordSpan(first.toFloat() / text.length, end.toFloat() / text.length, owner)
+    }
 
     /**
      * The share of [translation] each of [glosses] ends at, 0..1 and
@@ -158,15 +195,7 @@ object EnglishWordAlignment {
             if (word.added || word.text in GRAMMAR || verified[index] != at ||
                 word.text.any { it.isWhitespace() } || spoken.none { it.second == at && it.first.text == word.text }) null
             else {
-                val start = word.end - word.text.length
-                var first = start
-                while (first > 0 && !translation[first - 1].isWhitespace()) first--
-                var end = word.end
-                while (end < translation.length && !translation[end].isWhitespace()) end++
-                if (translation.substring(first, start).any { it.isLetterOrDigit() } ||
-                    translation.substring(word.end, end).any { it.isLetterOrDigit() }) null
-                else EnglishWordSpan(first.toFloat() / translation.length,
-                    end.toFloat() / translation.length, at + 1)
+                literalTimingWord(translation, word, at + 1)
             }
         }
         return EnglishAlignment(shares, spans, phrases, readingText = translation, timingWords = timingWords)
@@ -894,7 +923,11 @@ object EnglishWordAlignment {
  * [NONE] rather than not stored, so an unalignable verse is not re-solved on
  * every frame that asks.
  */
-class EnglishVerseAlignments(private val content: SurahContent, private val wordByWord: Boolean = false) {
+class EnglishVerseAlignments(
+    private val content: SurahContent,
+    private val wordByWord: Boolean = false,
+    private val useAiReviewed: Boolean = false,
+) {
 
     private val solved = ConcurrentHashMap<Int, EnglishAlignment>()
 
@@ -908,7 +941,15 @@ class EnglishVerseAlignments(private val content: SurahContent, private val word
             content.ayahs
                 .firstOrNull { it.number == number }
                 ?.let { verse ->
-                    EnglishWordAlignment.align(
+                    val approved = if (wordByWord) null else content.englishAlignmentRecords[number]?.let { record ->
+                        ReviewedEnglishAlignment.alignment(verse.translation, verse.words.map { it.arabic }, record, verse.words.map { it.translation })
+                    }
+                    val aiReviewed = if (wordByWord || !useAiReviewed || approved != null) null else
+                        content.aiEnglishAlignmentRecords[number]?.let { record ->
+                            ReviewedEnglishAlignment.alignment(verse.translation, verse.words.map { it.arabic }, record, verse.words.map { it.translation })
+                                ?.copy(usesApprovedRecord = false, usesAiReviewedRecord = true)
+                        }
+                    approved ?: aiReviewed ?: EnglishWordAlignment.align(
                         if (wordByWord) EnglishTypography.lyricize(
                             verse.words.map { it.translation }, verse.words.map { it.arabic },
                         ).filter { it.isNotBlank() }.joinToString(" ") else verse.translation,
