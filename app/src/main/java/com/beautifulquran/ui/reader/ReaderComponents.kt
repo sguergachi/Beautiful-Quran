@@ -3019,6 +3019,14 @@ fun AyahBlock(
         if (!dimmed) hasFullInk = true
     }
 
+    // English Scroll reads one verse clock (EnglishScrollClock). Which English
+    // word is active follows that clock, not the Arabic word's own timing: a
+    // gloss that borrows time from a neighbour must be allowed to start and
+    // finish where its ink does, or it is held back and then snapped full.
+    val englishSteady = readingMode == ReadingMode.ENGLISH_ONLY && InkEngine.tuning.englishTajweedTempo > 0f
+    val englishClock = if (englishSteady) rememberEnglishScrollClock(ayah) else null
+    val activeWord = rememberEnglishClockWord(activeWord, englishClock, ayah)
+
     // The letter fade paces itself to how long the reciter dwells on the
     // word, corrected for the chosen playback speed.
     RequestTarjiPulseLines(ayah, isActiveAyah)
@@ -3051,7 +3059,6 @@ fun AyahBlock(
     // English follows the reciter's tempo through the same word (slower on
     // held letters, never parked): TajweedPacing.Curve.tempo. Tempo 0 in the
     // Ink Lab restores the eased per-word sweep.
-    val englishSteady = readingMode == ReadingMode.ENGLISH_ONLY && InkEngine.tuning.englishTajweedTempo > 0f
     val englishTempo = if (!englishSteady) null else activeWord?.let { aw ->
         val idx = ayah.words.indexOfFirst { it.position == aw.wordPosition }
         ayah.words.getOrNull(idx)?.let { word ->
@@ -3063,8 +3070,6 @@ fun AyahBlock(
             )
         }
     }
-
-    val englishClock = if (englishSteady) rememberEnglishScrollClock(ayah) else null
 
     // Each word's ink behaviour, derived once for the whole ayah. All the
     // policy (upcoming/active/recited/high-water, repeat chain) lives in
@@ -4326,4 +4331,46 @@ private fun rememberEnglishScrollClock(ayah: Ayah): EnglishScrollClock? {
         )
     }
 }
+
+/**
+ * The active word English Scroll draws: the voiced word, except that while the
+ * verse clock is inking a different gloss, that gloss is the active one, timed
+ * across its own (levelled) window. Re-says and unconfirmed taps keep the
+ * voiced word. Recomposes only when the inked gloss changes.
+ */
+@Composable
+private fun rememberEnglishClockWord(voiced: ActiveWord?, clock: EnglishScrollClock?, ayah: Ayah): ActiveWord? {
+    val timeline = LocalHighlightTimeline.current
+    val current = rememberUpdatedState(voiced)
+    val index by remember(clock, ayah) {
+        derivedStateOf {
+            val word = current.value
+            val frame = timeline.frame()
+            if (clock == null || word == null || word.isRepeat || word.fromTap || frame == null ||
+                frame.item.surah != ayah.surahId || frame.item.ayah != ayah.number) null
+            else clock.wordAt(frame.inkMs)
+        }
+    }
+    val at = index ?: return voiced
+    val word = ayah.words.getOrNull(at) ?: return voiced
+    val window = clock?.window(at) ?: return voiced
+    if (voiced == null) return null
+    return remember(voiced, at, window) {
+        // The window runs on past its end so a finishing residual reads the
+        // clock to full rather than being released a few letters short.
+        val span = window.last - window.first + ENGLISH_CLOCK_RESIDUAL_MS
+        voiced.copy(
+            wordPosition = word.position,
+            startMs = window.first,
+            durationMs = span,
+            spokenMs = span,
+            nextWordPosition = ayah.words.getOrNull(at + 1)?.position,
+            highWater = word.position,
+            repeatStart = word.position,
+        )
+    }
+}
+
+/** How long past its levelled end an English gloss's window stays open (about 3σ of smoothing). */
+private const val ENGLISH_CLOCK_RESIDUAL_MS = 450L
 

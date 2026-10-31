@@ -115,5 +115,27 @@ class EnglishSmoothTrackTest {
         val azizHalf = (19000L..27000L step 5).first { clock.progress(0, it)!! >= 0.5f }
         assertTrue("aziz half at $azizHalf", kotlin.math.abs(azizHalf - 21230) <= 250)
     }
+
+    @Test
+    fun `the inked gloss is the active word, across its borrowed window`() {
+        val timed = listOf(Segment(16, 20365, 22095), Segment(17, 22095, 22355), Segment(18, 22355, 26030))
+        val clock = requireNotNull(EnglishScrollClock.of(intArrayOf(15, 13, 11), intArrayOf(16, 17, 18), { null },
+            timed, 140f) { null })
+        val dhu = requireNotNull(clock.window(1))
+        // "All-Able (of)" starts before dhu's own onset and runs past its end.
+        assertTrue("window $dhu", dhu.first < 22095 - 150 && dhu.last > 22355 + 150)
+        // While it inks, it is the active word, not the Arabic word being voiced.
+        assertEquals(1, clock.wordAt(22000))
+        assertEquals(1, clock.wordAt(22500))
+        assertEquals(0, clock.wordAt(21000))
+        assertEquals(2, clock.wordAt(23500))
+        // Active ownership never runs backward.
+        var last = -1
+        for (t in 20000L..26500L step 10) {
+            val at = clock.wordAt(t) ?: continue
+            assertTrue(at >= last)
+            last = at
+        }
+    }
 }
 

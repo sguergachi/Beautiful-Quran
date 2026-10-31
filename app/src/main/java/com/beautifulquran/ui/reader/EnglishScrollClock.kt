@@ -21,7 +21,25 @@ internal class EnglishScrollClock private constructor(
     private val track: EnglishSmoothTrack,
     private val starts: FloatArray,
     private val lengths: FloatArray,
+    /** Each gloss's span on the media clock after levelling; null for a merged-away gloss. */
+    private val windows: Array<LongRange?>,
 ) {
+    /**
+     * The gloss the English ink is in at [inkMs]: the furthest one already
+     * begun. English Scroll makes this the active word, so a gloss that
+     * borrows time starts and finishes as the ink does rather than inside its
+     * Arabic word's own timing. Null before the verse's first ink.
+     */
+    fun wordAt(inkMs: Long): Int? {
+        val at = track.at(inkMs)
+        var found: Int? = null
+        for (i in lengths.indices) if (lengths[i] > 0f && at > starts[i] + 0.002f * lengths[i]) found = i
+        return found
+    }
+
+    /** Where gloss [index] runs, levelled; null if it has no time of its own. */
+    fun window(index: Int): LongRange? = windows.getOrNull(index)
+
     /** How far through word [index]'s gloss the ink is at media [inkMs]; null when it has none. */
     fun progress(index: Int, inkMs: Long): Float? {
         val length = lengths.getOrNull(index)?.takeIf { it > 0f } ?: return null
@@ -168,6 +186,7 @@ internal class EnglishScrollClock private constructor(
             }
             // Each gloss's own knots, in order; levelled below, then joined.
             val glossKnots = ArrayList<MutableList<Pair<Long, Float>>>()
+            val glossOwners = ArrayList<Int>()
             var previousEnd = Long.MIN_VALUE
             runs.forEachIndexed { r, run ->
                 val own = run.first().first
@@ -190,7 +209,7 @@ internal class EnglishScrollClock private constructor(
                 var from = starts[own]
                 val previous = glossKnots.lastOrNull()?.lastOrNull()
                 if (previous != null && previous.second > from) from = previous.second
-                val knots = ArrayList<Pair<Long, Float>>().also { glossKnots += it }
+                val knots = ArrayList<Pair<Long, Float>>().also { glossKnots += it; glossOwners += own }
                 run.forEachIndexed { k, (index, _) ->
                     val list = pieces[k]
                     val time = list.sumOf { it.last - it.first }.toFloat()
@@ -210,6 +229,10 @@ internal class EnglishScrollClock private constructor(
                 }
             }
             levelGlossSpeeds(glossKnots)
+            val windows = arrayOfNulls<LongRange>(glossLengths.size)
+            glossKnots.forEachIndexed { g, list ->
+                if (list.isNotEmpty()) windows[glossOwners[g]] = list.first().first..list.last().first
+            }
             val knots = glossKnots.flatten()
             // Holds the blur must not cross: every stretch where the ink stands still.
             val ordered = knots.sortedBy { it.first }
@@ -231,7 +254,7 @@ internal class EnglishScrollClock private constructor(
             }
             val track = EnglishSmoothTrack.through(sorted, maxOf(sigmaMs, EnglishSmoothTrack.STEP_MS.toFloat()), breaks, easeMs)
                 ?: return null
-            return EnglishScrollClock(track, starts, FloatArray(glossLengths.size) { glossLengths[it].toFloat() })
+            return EnglishScrollClock(track, starts, FloatArray(glossLengths.size) { glossLengths[it].toFloat() }, windows)
         }
     }
 }

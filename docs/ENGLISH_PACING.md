@@ -226,6 +226,15 @@ shares with the slower neighbour at most 350 ms — never across a stop, never
 for a gloss holding a stop inside. The tajweed shape inside each gloss is
 stretched with it.
 
+Borrowed time is only real if the word may use it. English Scroll's ink is
+gated by word state: a word stays unread until its Arabic word is active, and
+its window is released (snapped full) when that word ends. So the active
+English word follows the clock (`EnglishScrollClock.wordAt`,
+`rememberEnglishClockWord`): the gloss being inked is the active word, timed
+across its levelled window (plus 450 ms for its smoothed tail). Re-says and
+unconfirmed taps keep the voiced word. The first build of the levelling
+missed this, and on the phone "All-Able (of)" still filled inside dhū.
+
 3:4: "All-Able (of)" 355 ms at 29 letters/s → 765 ms at 14; "(as) guidance"
 27 → 16; nothing in the verse above 16. Over 4,236 fills (60 verses, three
 reciters): the fastest gloss 66 → 39 letters/s, p99 29 → 23. Levelling every
