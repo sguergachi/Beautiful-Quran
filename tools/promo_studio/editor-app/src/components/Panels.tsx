@@ -97,11 +97,6 @@ export function EmulatorsPanel() {
   return (
     <Drawer title="Emulators" onClose={() => openPanel(null)} width={460}
       right={<Button size="sm" variant="primary" onClick={() => bootEmulator(+cores)}>{Icon.plus} Start one</Button>}>
-      <p className="mb-4 text-[12.5px] leading-relaxed text-mute">
-        Takes are recorded on Android emulators, picture and sound together. Each one runs the real app; several can record in parallel.
-        A new emulator needs the app once (<em>Prepare</em>): it installs it and lets it download the recitation timings.
-        Record one take at a time for the smoothest ink; parallel captures share the host's CPU and GPU.
-      </p>
       <div className="mb-4 flex flex-wrap items-center gap-2 rounded-lg border border-line bg-panel2 p-2.5">
         <span className="text-mute">New emulators get</span>
         <div className="w-28"><Select value={cores} options={[["4", "4 cores"], ["6", "6 cores"], ["8", "8 cores"]]} onChange={setCores} /></div>
