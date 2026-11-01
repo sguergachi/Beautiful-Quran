@@ -96,6 +96,8 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.AlignmentLine
 import androidx.compose.ui.layout.FirstBaseline
 import androidx.compose.ui.layout.layout
+import androidx.compose.ui.layout.onPlaced
+import androidx.compose.ui.layout.positionInParent
 import androidx.compose.ui.layout.LayoutCoordinates
 import androidx.compose.ui.layout.boundsInWindow
 import androidx.compose.ui.layout.onGloballyPositioned
@@ -375,7 +377,7 @@ private fun Modifier.markHoldShamsa(
     // The same finger-sized disc the tap itself resolves against.
     val hitRadiusPx = with(LocalDensity.current) { MarkTapMinRadiusDp.dp.toPx() }
     val watch = if (onHold != null) {
-        Modifier.markPressWatcher(hold.press) { position ->
+        Modifier.markPressWatcher(hold) { position ->
             layout()?.markContains(position, markRange, hitRadiusPx) == true
         }
     } else {
@@ -2369,6 +2371,10 @@ private fun ArabicAyahNumberUnit(
     // is gathering now), and the pop must play out regardless.
     val hold = rememberMarkHold(onHold ?: {})
     val markColor = QuranTheme.ink.body
+    val sideAirPx = with(density) { 8.dp.toPx() }
+    // Where the mark sits inside the unit's padded content, for the finger's
+    // translation into the mark's own pixels. Read only when a press lands.
+    val markPlacement = remember { mutableStateOf(Offset.Zero) }
     val arabicLineHeight = with(density) {
         (ArabicWordStyle.fontSize * fontScale * 1.9f).toDp()
     }
@@ -2384,7 +2390,18 @@ private fun ArabicAyahNumberUnit(
                 if (onClick != null || onLongClick != null || onHold != null) {
                     // The whole unit is the mark's target, so any press on it is the hold.
                     Modifier
-                        .then(if (onHold != null) Modifier.markPressWatcher(hold.press) { true } else Modifier)
+                        .then(
+                            if (onHold != null) {
+                                // Watched here, drawn on the mark: past the 8 dp side
+                                // air below, then wherever the mark was placed.
+                                Modifier.markPressWatcher(
+                                    hold,
+                                    toDrawSpace = { -Offset(sideAirPx, 0f) - markPlacement.value },
+                                ) { true }
+                            } else {
+                                Modifier
+                            },
+                        )
                         .quietClickable(
                             onClick = onClick ?: {},
                             // A held mark takes the long press, so the release after
@@ -2405,6 +2422,7 @@ private fun ArabicAyahNumberUnit(
         val markBaseline = remember { mutableFloatStateOf(Float.NaN) }
         Box(
             modifier = Modifier
+                .onPlaced { markPlacement.value = it.positionInParent() }
                 .layout { measurable, constraints ->
                     val placeable = measurable.measure(constraints)
                     val baseline = placeable[FirstBaseline]

@@ -204,10 +204,15 @@ The hold is drawn as an illuminator's shamsa round the mark, in page ink
 six-fold count:
 
 1. **Press.** Faint stubs ring the mark the moment the finger lands.
-2. **Hold.** The rays catch in turn round the ring, from the top in reading
-   order (anticlockwise in Arabic), each lengthening and darkening while the
-   sunburst breathes 1.5 dp outward. It fills in 550 ms — longer than the
-   system long-press, so a held mark's long press swallows the release tap.
+2. **Hold.** The finger covers the mark, so the ring grows out from the cups
+   to a 34 dp circle re-centred on the fingertip (fully out by 45% of the
+   hold), its rays lengthening to 10 dp and thickening as it goes — the whole
+   sunburst stands clear around the finger. The rays catch in turn round it,
+   from the top in reading order (anticlockwise in Arabic), each lengthening
+   and darkening. It fills in 550 ms — longer than the system long-press, so
+   a held mark's long press swallows the release tap. (The gloss row watches
+   the whole unit but draws on the mark, so the fingertip is moved into the
+   mark's pixels: past the 8 dp side air, then the mark's placement.)
 3. **Pop.** The full ring bursts: rays fly 6 dp out, lengthen, thin and fade
    (420 ms), with the paper toggle haptic. The gather starts 120 ms into the
    flight, so entering the mode (a whole-reader recomposition that stalls the
@@ -216,11 +221,14 @@ six-fold count:
    from the mark. Nothing stays on the number.
 4. **Let go early — the tap lesson.** A tap, or a hold let go before the
    ring closes, is a reader who does not yet know the mark wants holding, so
-   the shamsa shows them: the sweep carries on to 40% of the ring (200 ms),
-   the unlit stubs pulse darker and longer to point at the gap (440 ms), and
-   the ring drains back in reverse like a progress ring let go too soon
-   (460 ms). About a second in all; nothing is gathered. Press again
-   mid-lesson and the hold carries on from the ring as it stands.
+   the shamsa shows them, as a power-up and power-down. **Up:** the ring
+   surges out round the finger to half full (260 ms), every ray swelling,
+   darkening and pushing 3 dp past itself, then settling. **The gap:** as it
+   settles, the unlit stubs pulse darker and longer. **Down:** the ring
+   drains in reverse and contracts back into the mark, quickening as it goes
+   (460 ms). The beats overlap — about a second in all; a ring left still
+   between them read as stuck. Nothing is gathered. Press again mid-lesson
+   and the hold carries on from the ring as it stands.
 5. **Cancel.** Slide past touch slop into a scroll and the rays simply draw
    back (180 ms) — a scroll is not a tap, and earns no lesson. The press
    watcher reports how the finger left (`MarkPress.Released` vs `Cancelled`).

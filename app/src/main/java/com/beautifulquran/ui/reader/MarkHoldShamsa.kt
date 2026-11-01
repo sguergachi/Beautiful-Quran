@@ -1,6 +1,7 @@
 package com.beautifulquran.ui.reader
 
 import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.FastOutLinearInEasing
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.tween
@@ -18,6 +19,7 @@ import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.geometry.isSpecified
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.DrawScope
@@ -26,6 +28,7 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.unit.dp
 import com.beautifulquran.ui.theme.paperToggleHaptic
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
@@ -40,14 +43,16 @@ import kotlin.math.sin
  * illuminator's shamsa round the mark. See docs/VERSE_ACTIONS.md.
  *
  * 1. **Press.** Faint stubs of sixteen rays ring the mark under the finger.
- * 2. **Hold.** The rays catch in turn round the ring, in reading order, each
- *    lengthening and darkening while the whole sunburst breathes outward — a
- *    progress ring drawn in the page's own ornament. [MARK_HOLD_MS] fills it.
+ * 2. **Hold.** The ring grows out from the cups to stand clear around the
+ *    fingertip ([shamsaExpansion]), and the rays catch in turn round it, in
+ *    reading order, each lengthening and darkening — a progress ring drawn in
+ *    the page's own ornament. [MARK_HOLD_MS] fills it.
  * 3. **Pop.** The full shamsa bursts: rays fly out, thin and fade, as gather
  *    mode's gold ink spreads from the mark. Nothing stays on the number.
- * 4. **Let go early.** A tap — or a hold let go too soon — gets a lesson: the
- *    sweep carries on to [MARK_TAP_TEASE], the unlit rays pulse to show the
- *    gap, and the ring drains back. Slide into a scroll and the rays simply
+ * 4. **Let go early.** A tap — or a hold let go too soon — gets a lesson:
+ *    power up (the ring surges out round the finger to [MARK_TAP_TEASE],
+ *    swelling past itself), the unlit rays pulse to show the gap, then power
+ *    down (an accelerating drain as the ring contracts back into the mark). Slide into a scroll and the rays simply
  *    draw back.
  *
  * Geometry and the per-frame look are pure functions so tests can hold them;
@@ -76,10 +81,25 @@ private const val MARK_HOLD_RETRACT_MS = 180
  * once ([shamsaRayLook]'s hint) to point at what is missing, and the ring
  * drains back in reverse — a progress ring that was let go too soon.
  */
-internal const val MARK_TAP_TEASE = 0.4f
-private const val MARK_TAP_TEASE_RISE_MS = 200
-private const val MARK_TAP_HINT_IN_MS = 140
-private const val MARK_TAP_HINT_OUT_MS = 300
+internal const val MARK_TAP_TEASE = 0.5f
+
+/*
+ * The lesson's score, about a second end to end. The beats overlap: a ring
+ * left sitting still between them read as stuck, not as powering down.
+ *
+ *   0 ─ rise ──── 260                      charge → peak
+ *   0 ─ surge in ─ 200 ─ surge out ─ 500   swell past itself, settle
+ *        220 ─ gap pulse ─ 580             unlit rays darken, fade
+ *                          580 ─ drain ─ 1040   power down, accelerating
+ */
+private const val MARK_TAP_TEASE_RISE_MS = 260
+private const val MARK_TAP_SURGE_IN_MS = 200
+private const val MARK_TAP_SURGE_OUT_MS = 300
+private const val MARK_TAP_HINT_DELAY_MS = 220L
+private const val MARK_TAP_HINT_IN_MS = 120
+private const val MARK_TAP_HINT_OUT_MS = 240
+
+/** Powering down: the drain accelerates as the ring contracts back into the mark. */
 private const val MARK_TAP_DRAIN_MS = 460
 
 /** Where the tap lesson carries the ring to: never back, at least [MARK_TAP_TEASE]. */
@@ -176,6 +196,42 @@ internal fun shamsaRays(
     }
 }
 
+// ------------------------------------------------------- around the finger
+
+/**
+ * The finger covers the mark it holds, so a shamsa the size of the cups is
+ * hidden under it. As the hold builds, the ring grows from the cups out to
+ * [EXPANDED_RADIUS_DP] and re-centres on the fingertip, its rays lengthening
+ * and thickening as it goes, so the whole sunburst stands clear around the
+ * finger. It is driven by [charge], so letting go contracts it back too.
+ */
+internal const val EXPANDED_RADIUS_DP = 34f
+
+/** Rays at full expansion, in dp: long, short, half width. */
+internal const val EXPANDED_LONG_RAY_DP = 10f
+internal const val EXPANDED_SHORT_RAY_DP = 5.5f
+internal const val EXPANDED_HALF_WIDTH_DP = 1.6f
+
+/** 0 at the cups, 1 around the finger; reached by 45% of the hold, so it shows early. */
+internal fun shamsaExpansion(charge: Float): Float = easeOutCubic((charge / 0.45f).coerceIn(0f, 1f))
+
+private fun lerp(a: Float, b: Float, t: Float): Float = a + (b - a) * t
+
+/**
+ * The ring's ellipse at [expansion]: the mark's own [frame] at 0, a circle of
+ * [expandedRadius] on [finger] at 1. Without a finger it grows in place.
+ */
+internal fun expandedFrame(frame: MarkFrame, finger: Offset, expandedRadius: Float, expansion: Float): MarkFrame {
+    val e = expansion.coerceIn(0f, 1f)
+    val centre = if (finger.isSpecified) finger else Offset(frame.cx, frame.cy)
+    return MarkFrame(
+        cx = lerp(frame.cx, centre.x, e),
+        cy = lerp(frame.cy, centre.y, e),
+        rx = lerp(frame.rx, expandedRadius, e),
+        ry = lerp(frame.ry, expandedRadius, e),
+    )
+}
+
 // --------------------------------------------------------------- the look
 
 /**
@@ -194,14 +250,25 @@ internal const val CHARGE_LIFT_DP = 1.5f
 /** How far the rays fly at the pop, in dp. */
 internal const val BURST_LIFT_DP = 6f
 
+/** How far the tap lesson's power-up pushes the rays out, in dp. */
+internal const val SURGE_LIFT_DP = 3f
+
 /**
  * [charge] is the hold, 0..1; [burst] the pop after it fills, 0..1. A ray
  * catches when the sweep reaches it and grows from its stub to full; at the
  * pop every ray flies out, lengthens, thins and fades together. [hint] is the
  * tap lesson's pulse: it darkens and stretches only the rays still unlit, so
- * the eye goes to the part of the ring the hold has not reached.
+ * the eye goes to the part of the ring the hold has not reached. [surge] is
+ * the lesson's power-up: every ray swells, darkens and pushes out together.
  */
-internal fun shamsaRayLook(index: Int, count: Int, charge: Float, burst: Float, hint: Float = 0f): ShamsaRayLook {
+internal fun shamsaRayLook(
+    index: Int,
+    count: Int,
+    charge: Float,
+    burst: Float,
+    hint: Float = 0f,
+    surge: Float = 0f,
+): ShamsaRayLook {
     val lit = easeOutCubic(staggered(charge, index, count, spread = 0.65f))
     // The ring itself fades in over the first moment of the press.
     val arrive = (charge / 0.06f).coerceIn(0f, 1f)
@@ -213,6 +280,13 @@ internal fun shamsaRayLook(index: Int, count: Int, charge: Float, burst: Float, 
         val unlit = (1f - lit) * hint.coerceIn(0f, 1f)
         alpha += 0.32f * unlit * arrive
         length += 0.2f * unlit
+    }
+    if (surge > 0f) {
+        val s = surge.coerceIn(0f, 1f)
+        length *= 1f + 0.3f * s
+        width *= 1f + 0.2f * s
+        lift += SURGE_LIFT_DP * s
+        alpha = minOf(1f, alpha + 0.14f * s * arrive)
     }
     if (burst > 0f) {
         val fly = easeOutCubic(burst)
@@ -245,10 +319,18 @@ internal class MarkHold internal constructor(
     private val chargeAnim: Animatable<Float, *>,
     private val burstAnim: Animatable<Float, *>,
     private val hintAnim: Animatable<Float, *>,
+    private val surgeAnim: Animatable<Float, *>,
 ) {
     val charge: Float get() = chargeAnim.value
     val burst: Float get() = burstAnim.value
     val hint: Float get() = hintAnim.value
+    val surge: Float get() = surgeAnim.value
+
+    /**
+     * Where the finger came down, in the drawing node's own pixels. Read only
+     * at draw time, and only while the ring is up, so a plain field will do.
+     */
+    var finger: Offset = Offset.Unspecified
     val visible: Boolean get() = charge > 0f || burst > 0f
 }
 
@@ -264,6 +346,7 @@ internal fun rememberMarkHold(onHold: () -> Unit): MarkHold {
     val charge = remember { Animatable(0f) }
     val burst = remember { Animatable(0f) }
     val hint = remember { Animatable(0f) }
+    val surge = remember { Animatable(0f) }
     // Whether this press already popped. A lift after a pop is no lesson; and
     // a tap so quick its down and up arrive as one update must still get one.
     val popped = remember { booleanArrayOf(false) }
@@ -278,6 +361,7 @@ internal fun rememberMarkHold(onHold: () -> Unit): MarkHold {
                 // Pressing again mid-lesson carries on from the ring as it stands.
                 popped[0] = false
                 hint.snapTo(0f)
+                surge.snapTo(0f)
                 charge.animateTo(
                     1f,
                     tween(durationMillis = (MARK_HOLD_MS * (1f - charge.value)).toInt(), easing = LinearEasing),
@@ -296,21 +380,40 @@ internal fun rememberMarkHold(onHold: () -> Unit): MarkHold {
                     latestOnHold.value()
                 }
             } else if (state == MarkPress.Released && !popped[0]) {
-                // The tap lesson: carry on, point at the gap, drain back.
+                // The tap lesson. Power up: the ring surges out round the
+                // finger to the lesson's peak, swelling past itself…
                 val peak = markTapTeasePeak(charge.value)
-                if (charge.value < peak) {
-                    charge.animateTo(peak, tween(durationMillis = MARK_TAP_TEASE_RISE_MS, easing = FastOutSlowInEasing))
+                coroutineScope {
+                    if (charge.value < peak) {
+                        launch {
+                            charge.animateTo(
+                                peak,
+                                tween(durationMillis = MARK_TAP_TEASE_RISE_MS, easing = FastOutSlowInEasing),
+                            )
+                        }
+                    }
+                    launch {
+                        surge.animateTo(1f, tween(durationMillis = MARK_TAP_SURGE_IN_MS, easing = FastOutSlowInEasing))
+                        surge.animateTo(0f, tween(durationMillis = MARK_TAP_SURGE_OUT_MS, easing = FastOutSlowInEasing))
+                    }
+                    // …points at the gap the hold never reached, as it settles…
+                    launch {
+                        delay(MARK_TAP_HINT_DELAY_MS)
+                        hint.animateTo(1f, tween(durationMillis = MARK_TAP_HINT_IN_MS, easing = FastOutSlowInEasing))
+                        hint.animateTo(0f, tween(durationMillis = MARK_TAP_HINT_OUT_MS, easing = FastOutSlowInEasing))
+                    }
                 }
-                hint.animateTo(1f, tween(durationMillis = MARK_TAP_HINT_IN_MS, easing = FastOutSlowInEasing))
-                hint.animateTo(0f, tween(durationMillis = MARK_TAP_HINT_OUT_MS, easing = FastOutSlowInEasing))
-                charge.animateTo(0f, tween(durationMillis = MARK_TAP_DRAIN_MS, easing = FastOutSlowInEasing))
+                // …and powers down, the drain quickening as the ring contracts
+                // back into the mark.
+                charge.animateTo(0f, tween(durationMillis = MARK_TAP_DRAIN_MS, easing = FastOutLinearInEasing))
             } else if (state == MarkPress.Cancelled) {
                 hint.snapTo(0f)
+                surge.snapTo(0f)
                 charge.animateTo(0f, tween(durationMillis = MARK_HOLD_RETRACT_MS, easing = FastOutSlowInEasing))
             }
         }
     }
-    return remember(press, charge, burst, hint) { MarkHold(press, charge, burst, hint) }
+    return remember(press, charge, burst, hint, surge) { MarkHold(press, charge, burst, hint, surge) }
 }
 
 /**
@@ -318,11 +421,18 @@ internal fun rememberMarkHold(onHold: () -> Unit): MarkHold {
  * anything: the verse's own tap handling still owns the gesture. A press
  * ends on release, or as soon as it travels past touch slop into a scroll.
  */
-internal fun Modifier.markPressWatcher(press: MutableState<MarkPress>, hits: (Offset) -> Boolean): Modifier =
+internal fun Modifier.markPressWatcher(
+    hold: MarkHold,
+    /** From this node's pixels to the drawing node's, where they differ. */
+    toDrawSpace: () -> Offset = { Offset.Zero },
+    hits: (Offset) -> Boolean,
+): Modifier =
     pointerInput(Unit) {
+        val press = hold.press
         awaitEachGesture {
             val down = awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Initial)
             if (!hits(down.position)) return@awaitEachGesture
+            hold.finger = down.position + toDrawSpace()
             press.value = MarkPress.Down
             // Anything but a clean lift in place — slop, a lost pointer, the
             // gesture torn down — is not a tap, and earns no lesson.
@@ -359,19 +469,25 @@ internal fun DrawScope.drawMarkHold(
     if (!hold.visible || bounds.width <= 0f) return
     val charge = hold.charge
     val burst = hold.burst
-    val frame = markFrame(bounds, baseline, minRy = 9.dp.toPx())
+    val dpPx = 1.dp.toPx()
+    val expansion = shamsaExpansion(charge)
+    val frame = expandedFrame(
+        frame = markFrame(bounds, baseline, minRy = 9.dp.toPx()),
+        finger = hold.finger,
+        expandedRadius = EXPANDED_RADIUS_DP * dpPx,
+        expansion = expansion,
+    )
     val rays = shamsaRays(
         frame = frame,
         gap = 2.5.dp.toPx(),
-        longRay = 5.dp.toPx(),
-        shortRay = 2.8.dp.toPx(),
-        halfWidth = 1.dp.toPx(),
+        longRay = lerp(5f, EXPANDED_LONG_RAY_DP, expansion) * dpPx,
+        shortRay = lerp(2.8f, EXPANDED_SHORT_RAY_DP, expansion) * dpPx,
+        halfWidth = lerp(1f, EXPANDED_HALF_WIDTH_DP, expansion) * dpPx,
         rtl = rtl,
     )
-    val dpPx = 1.dp.toPx()
     val path = Path()
     rays.forEachIndexed { i, ray ->
-        val look = shamsaRayLook(i, rays.size, charge, burst, hold.hint)
+        val look = shamsaRayLook(i, rays.size, charge, burst, hold.hint, hold.surge)
         if (look.alpha <= 0.004f) return@forEachIndexed
         val lift = look.lift * dpPx
         val baseX = ray.base.x + ray.dirX * lift

@@ -1,5 +1,6 @@
 package com.beautifulquran.ui.reader
 
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotEquals
@@ -145,5 +146,42 @@ class MarkHoldShamsaTest {
         assertEquals(litRest.alpha, litPulse.alpha, 0.02f)
         // Even pulsed, an unlit ray stays lighter than a lit one: it is the gap.
         assertTrue(gapPulse.alpha < litRest.alpha)
+    }
+
+    @Test
+    fun `the ring grows from the cups to stand clear around the finger`() {
+        val finger = Offset(130f, 40f)
+        val atPress = expandedFrame(frame, finger, expandedRadius = 34f, expansion = 0f)
+        assertEquals(frame, atPress)
+        val grown = expandedFrame(frame, finger, expandedRadius = 34f, expansion = 1f)
+        assertEquals(finger.x, grown.cx, 0.001f)
+        assertEquals(finger.y, grown.cy, 0.001f)
+        assertEquals(34f, grown.rx, 0.001f)
+        assertEquals(34f, grown.ry, 0.001f)
+        // No finger known: it grows in place.
+        val inPlace = expandedFrame(frame, Offset.Unspecified, expandedRadius = 34f, expansion = 1f)
+        assertEquals(frame.cx, inPlace.cx, 0.001f)
+    }
+
+    @Test
+    fun `expansion shows early in the hold and follows the charge back down`() {
+        assertEquals(0f, shamsaExpansion(0f), 0.0001f)
+        assertEquals(1f, shamsaExpansion(0.45f), 0.0001f)
+        assertEquals(1f, shamsaExpansion(1f), 0.0001f)
+        assertTrue(shamsaExpansion(0.15f) > 0.5f)
+        // The tap lesson's peak reaches the full sunburst: a real power-up.
+        assertEquals(1f, shamsaExpansion(MARK_TAP_TEASE), 0.0001f)
+    }
+
+    @Test
+    fun `the lesson's surge swells every ray together`() {
+        repeat(SHAMSA_RAY_COUNT) { i ->
+            val rest = shamsaRayLook(i, SHAMSA_RAY_COUNT, charge = MARK_TAP_TEASE, burst = 0f)
+            val surged = shamsaRayLook(i, SHAMSA_RAY_COUNT, charge = MARK_TAP_TEASE, burst = 0f, surge = 1f)
+            assertTrue(surged.length > rest.length)
+            assertTrue(surged.lift > rest.lift)
+            assertTrue(surged.alpha >= rest.alpha)
+            assertTrue(surged.alpha <= 1f)
+        }
     }
 }
