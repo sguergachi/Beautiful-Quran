@@ -626,6 +626,16 @@ class ReaderViewModel(
      * begin: a reciter's pause there can be shallow, so it is looked for there.
      */
     private fun stopBoundaries(surahId: Int, ayah: Int, segments: List<Segment>): List<Long> {
+        // Fixed per verse and timing table; the poll asks every frame.
+        stopBoundaryCache?.let { (key, value) -> if (key.first == surahId && key.second == ayah && key.third === segments) return value }
+        return computeStopBoundaries(surahId, ayah, segments).also {
+            stopBoundaryCache = Triple(surahId, ayah, segments) to it
+        }
+    }
+
+    private var stopBoundaryCache: Pair<Triple<Int, Int, List<Segment>>, List<Long>>? = null
+
+    private fun computeStopBoundaries(surahId: Int, ayah: Int, segments: List<Segment>): List<Long> {
         val words = _uiState.value.content?.takeIf { it.surah.id == surahId }
             ?.ayahs?.firstOrNull { it.number == ayah }?.words ?: return emptyList()
         var highWater = Int.MIN_VALUE
@@ -639,8 +649,9 @@ class ReaderViewModel(
     /** Verses whose pauses the English should know before they play: this one and the next two. */
     internal fun englishPauseUrls(): List<String> {
         val np = player.state.value.nowPlaying ?: return emptyList()
-        val reciterId = settings.settings.value.reciterId
-        return (0..2).mapNotNull { audioUrlFor(reciterId, np.surahId, np.ayah + it) }
+        // The verses actually queued: the playing reciter, never past the surah's end.
+        val last = _uiState.value.content?.takeIf { it.surah.id == np.surahId }?.surah?.ayahCount ?: np.ayah
+        return (np.ayah..minOf(np.ayah + 2, last)).mapNotNull { audioUrlFor(np.reciterId, np.surahId, it) }
     }
 
     /** English reading (Scroll or leaf) runs its ink [InkEngine.Tuning.englishLeadMs] ahead of the voice. */

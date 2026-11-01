@@ -630,7 +630,8 @@ internal fun rememberEnglishWashWindows(
     val tuning = InkEngine.tuning
     val tempoKey = listOf(tuning.englishTajweedTempo.takeIf { tuning.tajweedPacing }, tuning.englishSmoothMs,
         tuning.englishLeadMs, tuning.englishEaseMs,
-        tuning.holdMadd, tuning.holdGhunnah, tuning.holdWaqf, tuning.holdConnect)
+        tuning.holdMadd, tuning.holdGhunnah, tuning.holdWaqf, tuning.holdConnect,
+        tuning.cruiseCap, tuning.waqfShare, tuning.waqfLengthScale, tuning.holdCreep)
     return remember(alignments, segments, verse, content, voiceStart, silence, reciter, tempoKey) {
         verse?.takeIf { it.first == content.surah.id }?.let { key ->
             val alignment = alignments.alignment(key.second)

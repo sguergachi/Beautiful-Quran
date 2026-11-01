@@ -3,6 +3,7 @@ package com.beautifulquran.ui.reader
 import android.content.Context
 import androidx.compose.runtime.mutableStateOf
 import com.beautifulquran.domain.AudibleSilence
+import kotlinx.coroutines.launch
 import kotlin.math.log10
 import kotlin.math.sqrt
 
@@ -129,9 +130,24 @@ internal object EnglishPauses {
     /** A verse's analysed loudness, if worked out yet. Any thread. */
     fun ready(url: String): Loudness? = synchronized(ready) { ready[url] }
 
-    /** Main thread: work out [url]'s pauses in the background, once. */
-    suspend fun request(context: Context, url: String) {
+    /**
+     * Detection runs here, not in the caller's scope: the reader restarts its
+     * request effect on every verse change, and cancelling a detection mid-way
+     * left its url pending, so the relaunch skipped it and that verse played
+     * with no pauses. Main thread, for the decoder's cache.
+     */
+    private val scope by lazy {
+        kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.SupervisorJob() + kotlinx.coroutines.Dispatchers.Main.immediate)
+    }
+
+    /** Main thread: work out [url]'s pauses in the background, once; returns at once. */
+    fun request(context: Context, url: String) {
         synchronized(ready) { if (ready.containsKey(url) || !pending.add(url)) return }
+        val app = context.applicationContext
+        scope.launch { detect(app, url) }
+    }
+
+    private suspend fun detect(context: Context, url: String) {
         try {
             val audio = TarjiVersePulse.decodedAudio(context, url)
             val found = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) {
@@ -179,7 +195,7 @@ internal object EnglishPauses {
         val current = pinned.value
         val same = current != null && current.reciterId == reciterId && current.surahId == surahId &&
             current.ayah == ayah && current.generation == generation
-        val found = ready(url)?.pausesWith(stopBoundaries)
+        val found = ready(url)?.let { merged(url, it, stopBoundaries) }
         val next = if (same && current.locked) {
             val from = maxOf(nextWordMs ?: Long.MAX_VALUE, positionMs + LATE_MARGIN_MS)
             val late = found.orEmpty().filter { it.startMs >= from && it !in current.ahead }
@@ -192,6 +208,19 @@ internal object EnglishPauses {
                 "pauses=${next.pauses.size} ahead=${next.ahead.size} at=$positionMs voice=$voiceStartMs")
         }
         return next.pauses
+    }
+
+    private var mergedKey: Triple<String, EnglishPauses.Loudness, List<Long>>? = null
+    private var mergedValue: List<AudibleSilence> = emptyList()
+
+    /** [Loudness.pausesWith], once per verse and boundaries: the poll pins every frame. */
+    private fun merged(url: String, loudness: Loudness, boundaries: List<Long>): List<AudibleSilence> {
+        val key = mergedKey
+        if (key != null && key.first == url && key.second === loudness && key.third == boundaries) return mergedValue
+        return loudness.pausesWith(boundaries).also {
+            mergedKey = Triple(url, loudness, boundaries)
+            mergedValue = it
+        }
     }
 
     /** The pauses fixed at this verse's first voice (Mushaf leaf). */

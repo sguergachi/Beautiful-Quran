@@ -210,12 +210,14 @@ internal class EnglishScrollClock private constructor(
                 val previous = glossKnots.lastOrNull()?.lastOrNull()
                 if (previous != null && previous.second > from) from = previous.second
                 val knots = ArrayList<Pair<Long, Float>>().also { glossKnots += it; glossOwners += own }
-                run.forEachIndexed { k, (index, _) ->
+                run.forEachIndexed { k, (_, segment) ->
                     val list = pieces[k]
                     val time = list.sumOf { it.last - it.first }.toFloat()
                     if (time <= 0f) return@forEachIndexed
                     val share = glossLengths[own] * time / voiced
-                    val curve = tempo(index)
+                    // Each Arabic word's own tempo, even inside a gloss merged across
+                    // several words (the run is keyed by the gloss owner).
+                    val curve = indexOf[segment.position]?.let(tempo)
                     var spent = 0L
                     for (piece in list) {
                         for (j in 0..TEMPO_KNOTS) {

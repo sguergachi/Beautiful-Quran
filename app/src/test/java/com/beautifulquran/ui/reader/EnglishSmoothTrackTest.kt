@@ -159,5 +159,17 @@ class EnglishSmoothTrackTest {
         val ahead = voiced.copy(wordPosition = 18, highWater = 18)
         assertEquals(17, englishClockActiveWord(ahead, ayah, 1, 21640L..22430L).highWater)
     }
+
+    @Test
+    fun `a gloss merged across words paces each word on its own tempo`() {
+        val asked = mutableListOf<Int>()
+        // Word 2's gloss was merged into word 1's ("6, 0"); word 3 is its own.
+        requireNotNull(EnglishScrollClock.of(intArrayOf(6, 0, 4), intArrayOf(1, 2, 3), { if (it == 1) 0 else null },
+            listOf(Segment(1, 0, 500), Segment(2, 500, 1000), Segment(3, 1000, 1500)), 4f) { index ->
+            asked += index
+            null
+        })
+        assertEquals(listOf(0, 1, 2), asked)
+    }
 }
 

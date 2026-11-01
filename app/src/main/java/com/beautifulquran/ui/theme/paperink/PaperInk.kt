@@ -177,7 +177,10 @@ object PaperInk {
         // erases its printed glyph exactly (no hairline).
         if (lastField.size > PHASE_MEMORY) lastField.clear()
         val standIn = lastField[key.input]?.let { cache.get(it) }
-        if (standIn != null && !atRest) return standIn
+        if (standIn != null && !atRest) {
+            settleSoon()
+            return standIn
+        }
         val now = SystemClock.uptimeMillis()
         if (key in pending || isInkless(key, now)) return standIn
         if (now != captureFrame) {
@@ -206,6 +209,23 @@ object PaperInk {
             }
         }
         return standIn
+    }
+
+    private var settleQueued = false
+
+    /**
+     * A word drawn in motion on the last frame before it stops would otherwise
+     * keep its stand-in until something else redraws it — paused, nothing may —
+     * and its hairline would return. Redraw once shortly after motion, so a word
+     * now at rest is seen at the same phase twice and gets its exact capture.
+     */
+    private fun settleSoon() {
+        if (settleQueued) return
+        settleQueued = true
+        main.postDelayed({
+            settleQueued = false
+            generation.intValue++
+        }, SETTLE_REDRAW_MS)
     }
 
     private fun phase(origin: Float): Float = origin - floor(origin)
@@ -495,6 +515,8 @@ object PaperInk {
     private const val CAPTURES_PER_FRAME = 3
     /** Layouts whose last phase and field are remembered; cleared past this. */
     private const val PHASE_MEMORY = 512
+    /** A couple of frames: long enough for motion to have stopped, short enough to be unseen. */
+    private const val SETTLE_REDRAW_MS = 34L
     private const val INKLESS_LIMIT = 256
     private const val INKLESS_RETRY_MS = 2_000L
     private const val CACHE_BYTES = 32 * 1024 * 1024

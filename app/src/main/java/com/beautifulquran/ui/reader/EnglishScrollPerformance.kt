@@ -66,9 +66,11 @@ internal fun rememberEnglishScrollPerformance(ayah: Ayah, voiced: ActiveWord?): 
     val index by remember(clock, ayah) {
         derivedStateOf {
             val word = current.value
+            // Only the verse being recited reads the per-frame clock; every other
+            // block stops here without subscribing to the timeline.
+            if (clock == null || word == null || word.isRepeat || word.fromTap) return@derivedStateOf null
             val frame = timeline.frame()
-            if (clock == null || word == null || word.isRepeat || word.fromTap || frame == null ||
-                frame.item.surah != ayah.surahId || frame.item.ayah != ayah.number) null
+            if (frame == null || frame.item.surah != ayah.surahId || frame.item.ayah != ayah.number) null
             else clock.wordAt(frame.inkMs)
         }
     }
@@ -100,7 +102,8 @@ private fun rememberEnglishScrollClock(ayah: Ayah): EnglishScrollClock? {
     val pauses = EnglishPauses.aheadFor(ayah.surahId, ayah.number)
     return remember(ayah, timings, glosses, pauses, tuning.englishSmoothMs, tuning.englishLeadMs, tuning.englishEaseMs,
         tuning.englishTajweedTempo, tuning.tajweedPacing,
-        tuning.holdMadd, tuning.holdGhunnah, tuning.holdWaqf, tuning.holdConnect) {
+        tuning.holdMadd, tuning.holdGhunnah, tuning.holdWaqf, tuning.holdConnect,
+        tuning.cruiseCap, tuning.waqfShare, tuning.waqfLengthScale, tuning.holdCreep) {
         val segments = timings?.segments ?: return@remember null
         val words = ayah.words
         val translations = words.map { it.translation }

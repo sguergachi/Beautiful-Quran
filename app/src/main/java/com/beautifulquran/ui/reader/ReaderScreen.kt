@@ -1016,7 +1016,7 @@ fun ReaderScreen(
     // audio ahead of the voice (EnglishPauses).
     if (settings.readingMode == ReadingMode.ENGLISH_ONLY) {
         LaunchedEffect(playerState.nowPlaying?.surahId, listeningAyah, settings.reciterId) {
-            viewModel.englishPauseUrls().forEach { url -> launch { EnglishPauses.request(quranApp, url) } }
+            viewModel.englishPauseUrls().forEach { url -> EnglishPauses.request(quranApp, url) }
         }
     }
     val scrollLeadAyah by viewModel.scrollFocusAyah.collectAsStateWithLifecycle()
