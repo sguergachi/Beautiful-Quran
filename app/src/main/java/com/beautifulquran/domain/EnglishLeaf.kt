@@ -423,11 +423,41 @@ fun englishLeaf(
  * closed up — the source keeps a few, and a book page does not break a
  * sentence in the middle for them.
  */
-private fun englishVerseProse(text: String): String {
-    return text.replace(WHITESPACE_RUN, " ").trim()
+internal fun englishVerseProse(text: String): String {
+    // Same answer as `replace(Regex("\\s+"), " ").trim()`, by hand. The book is
+    // paginated by setting every verse of the Quran, often several times over,
+    // and Android's Matcher.appendReplacement runs a compat-change check on
+    // every call: in a release trace that check and the regex were two thirds
+    // of the whole pagination's CPU, on a background thread that is still
+    // running when the first chapter opens. Most verses have no run to close
+    // up, so they skip the builder entirely.
+    var needsCollapse = false
+    var i = 0
+    while (i < text.length) {
+        if (isRegexSpace(text[i]) && (text[i] != ' ' || (i + 1 < text.length && isRegexSpace(text[i + 1])))) {
+            needsCollapse = true
+            break
+        }
+        i++
+    }
+    if (!needsCollapse) return text.trim()
+    val out = StringBuilder(text.length)
+    var inRun = false
+    for (c in text) {
+        if (isRegexSpace(c)) {
+            if (!inRun) out.append(' ')
+            inRun = true
+        } else {
+            out.append(c)
+            inRun = false
+        }
+    }
+    return out.toString().trim()
 }
 
-private val WHITESPACE_RUN = Regex("\\s+")
+/** Java's `\s` without UNICODE_CHARACTER_CLASS: ASCII whitespace only, so U+00A0 / U+202F stay. */
+private fun isRegexSpace(c: Char): Boolean =
+    c == ' ' || c == '\t' || c == '\n' || c == '\u000B' || c == '\u000C' || c == '\r'
 
 /**
  * The word of a verse to start reciting from, given how far into the verse's

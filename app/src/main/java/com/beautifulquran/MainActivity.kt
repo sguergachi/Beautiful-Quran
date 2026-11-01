@@ -68,6 +68,7 @@ import com.beautifulquran.assistant.AssistantAction
 import com.beautifulquran.assistant.AssistantIntents
 import com.beautifulquran.assistant.ForegroundAppFunctions
 import com.beautifulquran.data.ReadingLayout
+import com.beautifulquran.data.model.SurahContent
 import com.beautifulquran.data.ReadingMode
 import com.beautifulquran.data.RuntimeCachePhase
 import com.beautifulquran.data.ThemeMode
@@ -91,6 +92,8 @@ import com.beautifulquran.ui.reader.BackToOriginPill
 import com.beautifulquran.ui.reader.PinnedChapterPlayback
 import com.beautifulquran.ui.reader.PinnedPlaybackHost
 import com.beautifulquran.ui.reader.ReaderPlaybackSnapshot
+import com.beautifulquran.ui.reader.ReaderRehearsal
+import com.beautifulquran.ui.reader.ReaderRehearsalState
 import com.beautifulquran.ui.reader.ReaderScreen
 import com.beautifulquran.ui.reader.pinnedBarTurn
 import com.beautifulquran.ui.reader.pinnedBarReveal
@@ -396,6 +399,8 @@ private const val BOOKMARKS_LAYER = -1
 private const val COVER_LAYER = 0
 private const val AYAH_LAYER = 1
 private const val SETTINGS_LAYER = 2
+/** Al-Baqarah: a chapter opening, a basmalah preface and ordinary verses. */
+private const val REHEARSAL_SURAH_ID = 2
 private const val STACK_PAGE_DURATION_MS = 460
 private const val STACK_PAGE_TURN_THRESHOLD = 0.15f
 private const val STACK_PAGE_FLING_THRESHOLD = 0.30f
@@ -1181,6 +1186,42 @@ private fun PaperStackApp(
                         )
                         null -> {}
                     }
+                }
+            }
+        }
+
+        // The first open of a chapter after launch hitched where every later
+        // open, of any chapter, did not: it was the first time this process
+        // drew a reader page. Draw one once, in the reader's own slot under
+        // the home sheet, as soon as the cover has finished — see
+        // ReaderRehearsal. Scroll only: the mushaf leaf draws other things.
+        // An opened reader already lives in this slot under Home for the rest
+        // of the session, so this adds no new kind of overdraw.
+        var rehearsalContent by remember { mutableStateOf<SurahContent?>(null) }
+        LaunchedEffect(entranceVisible, settings.readingLayout, selectedSurahId) {
+            if (selectedSurahId != 0) {
+                // A real open has done the rehearsal's work, or is about to.
+                ReaderRehearsalState.done = true
+                rehearsalContent = null
+                return@LaunchedEffect
+            }
+            if (ReaderRehearsalState.done || entranceVisible) return@LaunchedEffect
+            if (settings.readingLayout != ReadingLayout.SCROLL) return@LaunchedEffect
+            rehearsalContent = runCatching {
+                app.repository.surahContent(REHEARSAL_SURAH_ID)
+            }.getOrNull()
+        }
+        val rehearsal = rehearsalContent
+        if (rehearsal != null && selectedSurahId == 0) {
+            PaperPage(
+                layer = PaperLayer.Ayah,
+                stackPosition = stackPositionProvider,
+                settingsLayer = settingsLayer,
+                modifier = Modifier.zIndex(1f),
+            ) {
+                ReaderRehearsal(content = rehearsal, settings = settings) {
+                    ReaderRehearsalState.done = true
+                    rehearsalContent = null
                 }
             }
         }
