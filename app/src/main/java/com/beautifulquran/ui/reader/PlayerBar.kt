@@ -57,6 +57,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.media3.common.Player
 import com.beautifulquran.playback.PlayerUiState
+import com.beautifulquran.ui.theme.cachedAlpha
 import com.beautifulquran.ui.theme.DisclosureChevron
 import com.beautifulquran.ui.theme.QuranTheme
 import com.beautifulquran.ui.theme.quietClickable
@@ -151,7 +152,7 @@ fun PlayerBar(
                         modifier = Modifier
                             .align(Alignment.Center)
                             .padding(horizontal = if (state.error != null) 0.dp else centeredInset)
-                            .graphicsLayer { alpha = if (state.error != null) 1f else chromeAlpha() },
+                            .graphicsLayer { cachedAlpha(if (state.error != null) 1f else chromeAlpha()) },
                     )
                 }
                 if (inkLabAvailable && state.error == null) {
@@ -160,7 +161,7 @@ fun PlayerBar(
                         onClick = onInkLabClick,
                         modifier = Modifier
                             .align(Alignment.CenterStart)
-                            .graphicsLayer { alpha = chromeAlpha() },
+                            .graphicsLayer { cachedAlpha(chromeAlpha()) },
                     )
                 }
                 edgeChrome()
@@ -189,7 +190,7 @@ fun PlayerBar(
                     enabled = enabled,
                     modifier = Modifier
                         .size(48.dp)
-                        .graphicsLayer { alpha = if (repeatActive) 1f else chromeAlpha() },
+                        .graphicsLayer { cachedAlpha(if (repeatActive) 1f else chromeAlpha()) },
                 ) {
                     Icon(
                         imageVector = if (state.repeatMode == Player.REPEAT_MODE_ONE || singleAyahRange) {
@@ -258,7 +259,7 @@ fun PlayerBar(
                     contentPadding = PaddingValues(0.dp),
                     modifier = Modifier
                         .size(48.dp)
-                        .graphicsLayer { alpha = if (speedActive) 1f else chromeAlpha() },
+                        .graphicsLayer { cachedAlpha(if (speedActive) 1f else chromeAlpha()) },
                 ) {
                     Text(
                         text = "${if (state.speed % 1f == 0f) state.speed.toInt() else state.speed}×",

@@ -27,7 +27,7 @@ class MushafLocationWordTest {
     @Test
     fun `the last word keeps its player generation when a tap pins its wash generation`() {
         val polled = ActiveWord(ayah = 29, wordPosition = 17, durationMs = 500, activation = 9)
-        val shown = resolveActiveWord(polled, null, last)!!
+        val shown = WordTapInk(last).resolve(polled)!!
         assertEquals(8, shown.activation)
         assertEquals(9, shown.playbackActivation)
         assertEquals(shown, mushafLocationWord(null, shown, 29, 9))

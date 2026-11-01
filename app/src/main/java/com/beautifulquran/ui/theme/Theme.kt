@@ -439,7 +439,9 @@ private val LightAccents = QuranAccents(
     greenWash = Color(0xFFE2E4D8),
     embossDark = Color(0x24000000),
     embossLight = Color(0x59FFFFFF),
-    repeatInk = Color(0xFFB4551E),
+    // Terracotta, tuned in the Paper ink study: wet it is this; the paper ink
+    // dries it paler (docs/PAPER_INK.md). Web follows in its port.
+    repeatInk = Color(0xFFC25F3B),
     // Deep ruby: saturated enough to sit as ink on warm paper without glowing.
     bookmarkRibbon = Color(0xFFB3122F),
     // Dark maroon inky red — dried red ink on warm paper, not pale rose.

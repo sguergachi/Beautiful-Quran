@@ -5,6 +5,49 @@ verdict has reviewed them yet. The fail-closed delta gate withholds each of
 them; this file keeps that from being silent. Remove an entry when its rows ship
 with a verdict, are held with their model scores, or its cause is reverted.
 
+## False-lead follow-up to Alafasy 28:9 (2026-10-28)
+
+The complete current 81,059-row corpus has 955 adjacent same-position pairs.
+All have two-model screening evidence: 942 exact prior whole-row reports and
+thirteen fresh recordings per model. The separate disconnected stale-repair
+class has exactly one source repair and one delivered row, 28:9; it is resolved.
+
+The false-lead cohort has 946 retained pairs, one fully reviewed accepted row
+(28:9), and eight acoustically promising hypotheses awaiting complete
+authenticated pipeline replay: Alafasy 2:58, 7:45, 7:140, 12:107, 18:18, 25:3,
+29:33 and 37:150. All eight remain byte-for-byte baseline. Do not promote their
+local removal scores as whole-row verdicts or silently exclude existing holds
+and corrections. Their other timing boundaries and finalizer interactions
+still need review. The newly encountered 6:145 pair is a genuine-repeat
+control: fresh models prefer retaining it.
+
+Every pair's disposition and exact source/model evidence is recorded in
+`../timing_evidence/alafasy-28-9-repeat-review.json`, with the explanation in
+[the October 28 report](../../docs/quality-reviews/TIMING_ALAFASY_28_9_2026-10-28.md).
+This follow-up class promotion is partial; the 28:9 row does not certify the
+remaining eight or overall timing accuracy.
+
+## Merged fragment leads (2026-10-23)
+
+The [complete delivered-source review](../../docs/quality-reviews/TIMING_FRAGMENT_LEADS_2026-10-23.md)
+inspected 193 eligible source fragment pairs across the six authenticated
+voices, within an 81,059-row delivered corpus. Eight qualify for the new
+stolen-tail detector; all eight and four genuine-repeat/older-lead controls
+have both acoustic witnesses. Five candidates pass; three remain at baseline:
+Abdul Basit 34:27, Sudais 4:104 and Sudais 21:28. Their source-derived starts
+improve both row means but remain 264–332 ms from an acoustic witness, beyond
+this review's 250 ms onset limit. Do not silently promote those partial
+boundary improvements. Their exact candidates and model metrics are held in
+`qf-source-transition.json` and `../timing_evidence/fragment-lead-review.json`.
+
+The legacy source scan found twelve qualifying rows. Four extra legacy
+examples (Alafasy 4:171, 5:5, 7:117, 33:51) are absent from the authenticated
+candidate cohort; that old-source replay is not a publication verdict.
+Other non-duplicate boundary residuals in Alafasy 64:11 (positions 4, 9, 10)
+are outside this detector and remain unchanged. Forced-label residuals alone
+do not establish an exact spoken onset; these require their own waveform and
+class review. No general timing-accuracy claim follows from this cohort.
+
 ## Audio-vetted rewind onset (#873)
 
 The typed Alafasy 5:2 correction removes only the unspoken word 15 at

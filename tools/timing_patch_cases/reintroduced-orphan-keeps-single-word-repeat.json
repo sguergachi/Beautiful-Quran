@@ -1,0 +1,67 @@
+{
+  "id": "reintroduced-orphan-keeps-single-word-repeat",
+  "label": "reintroduced orphan keeps single word repeat",
+  "pipeline": "reintroduced_orphan",
+  "input_segments": [
+    [
+      11,
+      0,
+      800
+    ],
+    [
+      12,
+      800,
+      1600
+    ],
+    [
+      13,
+      1600,
+      2400
+    ]
+  ],
+  "repair_segments": [
+    [
+      11,
+      0,
+      800
+    ],
+    [
+      12,
+      800,
+      1600
+    ],
+    [
+      12,
+      1600,
+      2400
+    ],
+    [
+      13,
+      2400,
+      3200
+    ]
+  ],
+  "expected_segments": [
+    [
+      11,
+      0,
+      800
+    ],
+    [
+      12,
+      800,
+      1600
+    ],
+    [
+      12,
+      1600,
+      2400
+    ],
+    [
+      13,
+      2400,
+      3200
+    ]
+  ],
+  "notes": "Substantial same-word repeats remain eligible; there is no disconnected component."
+}

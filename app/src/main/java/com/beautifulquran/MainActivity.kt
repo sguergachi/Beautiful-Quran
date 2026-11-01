@@ -337,9 +337,10 @@ class MainActivity : ComponentActivity() {
                                 onAssistantActionConsumed = {
                                     pendingAssistantAction.value = null
                                 },
-                                onRecordSystemTrace = {
-                                    DevProfiling.recordSystemTrace(this@MainActivity)
+                                onLogExport = {
+                                    LogExport.toggle(this@MainActivity)
                                 },
+                                onShareLogExport = { LogExport.shareLatest(this@MainActivity) },
                             )
                         }
                         if (!entranceDone) {
@@ -410,7 +411,8 @@ private fun PaperStackApp(
     entranceVisible: Boolean,
     pendingAssistantAction: AssistantAction? = null,
     onAssistantActionConsumed: () -> Unit = {},
-    onRecordSystemTrace: () -> Unit,
+    onLogExport: () -> Unit,
+    onShareLogExport: () -> Unit,
 ) {
     val app = LocalContext.current.applicationContext as QuranApp
     val activity = LocalContext.current as? android.app.Activity
@@ -1136,7 +1138,8 @@ private fun PaperStackApp(
                     onOpenTimingsLab = { openTimingsLab() },
                     onOpenTarjiLab = { openTarjiLab() },
                     onOpenOrnamentsLab = { openOrnamentsLab() },
-                    onRecordSystemTrace = onRecordSystemTrace,
+                    onLogExport = onLogExport,
+                    onShareLogExport = onShareLogExport,
                 )
             }
         }

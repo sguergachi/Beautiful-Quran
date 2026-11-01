@@ -71,20 +71,20 @@ class ReaderPlaybackPollingTest {
     @Test
     fun `incoherent read is skipped and timing publication samples immediately while paused`() = runTest {
         val state = MutableStateFlow(PlayerUiState(nowPlaying = item))
-        val revision = MutableStateFlow(1L)
+        val publication = MutableStateFlow(ReaderTimingPublication(1L, item.reciterId))
         val samples = mutableListOf<ReaderPlaybackPoll?>()
         var coherent = true
         backgroundScope.launch {
             readerPlaybackPolls(state, MutableStateFlow(24), {
                 sample(state.value, testScheduler.currentTime).takeIf { coherent }
-            }, timingRevision = revision).collect { samples += it }
+            }, timingPublication = publication).collect { samples += it }
         }
         runCurrent()
         coherent = false
         advanceTimeBy(250); runCurrent()
         assertEquals(1, samples.size)
         coherent = true
-        revision.value++; runCurrent()
+        publication.value = publication.value.copy(revision = 2L); runCurrent()
         assertEquals(2, samples.size)
         assertEquals(250L, samples.last()!!.playback.positionMs)
     }
@@ -101,5 +101,65 @@ class ReaderPlaybackPollingTest {
         runCurrent()
         loaded.value = 25; runCurrent()
         assertNull(samples.last())
+    }
+
+    @Test
+    fun `new reciter timings cannot sample the previous voice before its playlist switches`() = runTest {
+        val state = MutableStateFlow(PlayerUiState(nowPlaying = item, isPlaying = true))
+        val publication = MutableStateFlow(ReaderTimingPublication(1L, item.reciterId))
+        val samples = mutableListOf<ReaderPlaybackPoll?>()
+        var reads = 0
+        backgroundScope.launch {
+            readerPlaybackPolls(state, MutableStateFlow(item.surahId), { expected ->
+                reads++
+                sample(state.value, testScheduler.currentTime).copy(
+                    item = HighlightItem(expected.surahId, expected.ayah, expected.reciterId),
+                )
+            }, timingPublication = publication).collect { samples += it }
+        }
+        runCurrent()
+        assertNotNull(samples.last())
+        publication.value = ReaderTimingPublication(2L, 1)
+        runCurrent()
+        assertNull(samples.last())
+        val readsBeforeSwitch = reads
+        advanceTimeBy(300); runCurrent()
+        assertEquals(readsBeforeSwitch, reads)
+        state.value = state.value.copy(nowPlaying = item.copy(reciterId = 1))
+        runCurrent()
+        assertEquals(1, samples.last()!!.playback.item.reciter)
+        assertEquals(publication.value, samples.last()!!.timingPublication)
+    }
+
+    @Test
+    fun `paused reciter changes reject superseded audio and resume on the selected timings`() = runTest {
+        val state = MutableStateFlow(PlayerUiState(nowPlaying = item))
+        val publication = MutableStateFlow(ReaderTimingPublication(1L, item.reciterId))
+        val samples = mutableListOf<ReaderPlaybackPoll?>()
+        backgroundScope.launch {
+            readerPlaybackPolls(state, MutableStateFlow(item.surahId), { expected ->
+                sample(state.value, testScheduler.currentTime).copy(
+                    item = HighlightItem(expected.surahId, expected.ayah, expected.reciterId),
+                )
+            }, timingPublication = publication).collect { samples += it }
+        }
+        runCurrent()
+        val oldPacket = samples.last()!!
+        advanceTimeBy(20)
+        publication.value = ReaderTimingPublication(2L, 1); runCurrent()
+        assertNull(samples.last())
+        publication.value = ReaderTimingPublication(3L, 5); runCurrent()
+        state.value = state.value.copy(nowPlaying = item.copy(reciterId = 1)); runCurrent()
+        assertNull(samples.last())
+        state.value = state.value.copy(nowPlaying = item.copy(reciterId = 5)); runCurrent()
+        assertEquals(20L, samples.last()!!.playback.positionMs)
+        assertEquals(publication.value, samples.last()!!.timingPublication)
+        assertNotEquals(publication.value, oldPacket.timingPublication)
+
+        // A refreshed (or withdrawn) table for the same voice must still wake a paused poll.
+        advanceTimeBy(20)
+        publication.value = publication.value.copy(revision = 4L); runCurrent()
+        assertEquals(40L, samples.last()!!.playback.positionMs)
+        assertEquals(4L, samples.last()!!.timingPublication.revision)
     }
 }

@@ -50,10 +50,9 @@ export const MUSHAF_STILL_INK: InkWord = { state: InkState.Recited, repeat: fals
 
 /**
  * One word's ink on a leaf that carries the voice. Port of Android
- * `mushafInkPackKind`: the voiced verse runs the karaoke wash, every verse
- * still to come waits under Upcoming paper, and what has been read keeps
- * full ink. A leaf the reader has browsed to, away from the voice, is
- * [live] = false and stays plain.
+ * `mushafInkPackKind`: the voiced verse runs the karaoke wash, later verses
+ * wait under Upcoming paper, and earlier verses on the page keep their ink.
+ * A leaf browsed to away from the voice is [live] = false and stays plain.
  *
  * The clip of a verse runs on a little after its last word. The voice has
  * no word then, exactly as before the first one, but the verse is read:

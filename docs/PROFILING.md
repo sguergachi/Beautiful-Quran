@@ -172,16 +172,47 @@ cannot create an EGL display in a headless session), which yields `No process
 found` rather than a measurement. Emulator-renderer instability is not an app
 regression, and a fabricated before/after must not enter the performance record.
 
-## Local performance capture
+## Local log export
 
-`DevProfiling` lives in the main source set. Developer → **Record performance
-profile** is available in debug and release builds on every supported API.
-It watches ten seconds of use, then offers one share with a text report of
-frame callback intervals, main-thread stack samples, and named marks. API 35+
-requests a system trace through Jetpack `SystemTraceRequestBuilder`; older
-versions use ART method sampling. If the platform rejects a trace request,
-the text report still shares. Trace delivery has a bounded 30-second wait
-after recording ends. Nothing is sent until the user chooses a destination.
+Developer → **Log export** is available in debug and release builds on every
+supported API. Tap it to start, reproduce the issue in the reader, then return
+to Settings and tap **Stop and share log**. Recording stops and offers the share
+sheet automatically after three minutes. **Share latest log** reopens the
+chooser if it was dismissed. Nothing is sent until a destination is chosen.
+
+The single `bq-log-*.txt` attachment contains build/source and device metadata,
+reader mode/layout/font/theme, output-device type (without its personal name),
+calibration/tuning, reciter changes, taps, playlist/discontinuity events and
+Paper shader/fallback choices. While recording, the playback service samples
+its actual player every 100 ms on the same monotonic clock as the reader's
+MediaController and V2 sample/frame replay. Exact used timing triples and their
+fingerprints are embedded; a provider fetch is not needed to replay the log.
+Settings at both endpoints and relevant changes during capture are retained.
+
+This capture starts no ART method sampling or system trace, and records no
+microphone audio or screen video. Its clocks can identify an internal mismatch;
+they cannot measure when sound reaches a speaker or headset. Pair a log with an
+audio screen recording when physical output timing needs verification.
+Recording is bounded to 6,000 samples, 24,000 highlight frames and 12,000 named
+events, with truncation counts reported. Encoding and file writing run off the
+main thread. Only the three newest log files are retained in the share cache.
+
+1. Enable Developer by tapping the app mark three times.
+2. Tap **Log export**, return to the reader, and reproduce the discrepancy.
+3. Include natural verse transitions, a first-word tap, or a reciter change
+   when those distinguish the problem.
+4. Return to Settings, tap **Stop and share log**, and choose a destination.
+
+Normal use records no log, and notes, bookmarks and credentials are excluded.
+
+## System profiling
+
+`DevProfiling.recordSystemTrace` remains available to development tools for a
+ten-second performance capture with frame callback intervals, main-thread
+stacks and named marks. API 35+ requests a system trace through Jetpack
+`SystemTraceRequestBuilder`; older versions use ART method sampling. Platform
+rejection still allows the text report to share. Trace delivery has a bounded
+30-second wait after recording ends.
 
 Release captures are opt-in. Automatic ceremony traces and Android 17
 cold-start / fully-drawn triggers remain debug-only. On API 37,
@@ -197,18 +228,15 @@ are obfuscated: retain the matching build's `mapping.txt` for retracing.
 Frame callback intervals indicate missed callbacks, not GPU render duration;
 use Perfetto's frame timeline for a full attribution.
 
-During recitation, requested profiles also sample the live tarjīʿ tap and active
+During recitation, explicit captures also sample the live tarjīʿ tap and active
 eligible word at most ten times a second. `tarji tap` records the PCM hop count,
 gain, output delays and tuning switches; `tarji word` records acoustic ownership,
 the admitted crest, the light the voice asks for and its smoothed glow — all
 read at the ear's position, as the paint is. To diagnose a missing glint,
 return to the reader and replay that word during the recording window.
 
-1. Install the APK and enable Developer by tapping the app mark three times.
-2. Tap **Record performance profile**.
-3. Return to the chapter and swipe to Settings during the next ten seconds.
-4. Choose a destination in the share sheet. Open an attached system trace in
-   [Perfetto](https://ui.perfetto.dev/).
+Open a system trace from the advanced performance capture in
+[Perfetto](https://ui.perfetto.dev/).
 
 Result paths and errors also appear in `adb logcat -s BeautifulQuranProfile`.
 For repeated local requests, disable

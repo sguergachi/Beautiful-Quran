@@ -32,7 +32,11 @@ import androidx.compose.ui.text.TextMeasurer
 import androidx.compose.ui.text.style.TextIndent
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.style.ResolvedTextDirection
+import androidx.compose.ui.graphics.CompositingStrategy
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.layout.layout
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.offset
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
@@ -69,6 +73,8 @@ fun Modifier.letterFadeIn(
     revealFraction: Float = 1f,
     /** Room the offscreen wash layer keeps past the word; see [glowLayerBleed]. */
     bleed: Dp = FadeLayerBleed,
+    /** Draw-phase strength of deposited ink; unread ink keeps [restingAlpha]. */
+    revealedAlpha: () -> Float = { 1f },
 ): Modifier {
     // Alpha profile across the feathered edge, sampled into gradient stops.
     // The seam-free smootherstep shape lives in [inkSmootherstep].
@@ -82,9 +88,11 @@ fun Modifier.letterFadeIn(
     // See [WashBrushCache] for why a fresh Brush each frame is expensive.
     var cachedBrush: Brush? = null
     var cachedEdge = Float.NaN
+    var cachedReveal = 1f
     return drawWithContent {
         val p = progress().coerceIn(0f, 1f)
-        if (p >= 1f && revealFraction >= 1f) {
+        val revealed = revealedAlpha().coerceIn(restingAlpha, 1f)
+        if (p >= 1f && revealFraction >= 1f && revealed >= 1f) {
             drawContent()
             return@drawWithContent
         }
@@ -109,14 +117,19 @@ fun Modifier.letterFadeIn(
             // finishes exactly at p = 1.
             val edge = (w * feather).coerceAtLeast(1f)
             val head = p * (w * revealFraction.coerceIn(0f, 1f) + edge)
-            val brush = cachedBrush?.takeIf { cachedEdge == edge }
+            val brush = cachedBrush?.takeIf { cachedEdge == edge && cachedReveal == revealed }
                 ?: Brush.horizontalGradient(
-                    colors = washColors,
+                    colors = if (revealed == 1f) washColors else stops.map { t ->
+                        val a = restingAlpha + (revealed - restingAlpha) *
+                            (if (rtl) inkSmootherstep(t) else 1f - inkSmootherstep(t))
+                        Color.White.copy(alpha = a)
+                    },
                     startX = 0f,
                     endX = edge,
                 ).also {
                     cachedBrush = it
                     cachedEdge = edge
+                    cachedReveal = revealed
                 }
             // Built at the origin, so the canvas moves under it rather than the
             // gradient moving across the canvas. TileMode.Clamp extends the end
@@ -157,6 +170,50 @@ fun Modifier.glyphLayerAlpha(alpha: () -> Float): Modifier = drawWithContent {
     drawContent()
     drawIntoCanvas { canvas -> canvas.restore() }
 }
+
+/**
+ * A translucent layer's alpha, composited from a cached offscreen layer.
+ * Plain alpha on overlapping content already renders offscreen, but anew
+ * every frame the screen redraws (a "alpha caused saveLayer" render pass);
+ * the cached layer looks identical, is clipped to the same bounds, and is
+ * only re-rendered when its content changes. Opaque layers stay direct.
+ */
+fun androidx.compose.ui.graphics.GraphicsLayerScope.cachedAlpha(value: Float) {
+    alpha = value
+    compositingStrategy = if (value < 1f) CompositingStrategy.Offscreen else CompositingStrategy.Auto
+}
+
+/**
+ * Keeps content that is not changing in a cached render layer while [still]
+ * holds. The renderer replays everything on screen each frame, and an
+ * offscreen fade (a [letterFadeIn] at rest, a [glyphLayerAlpha]) inside it
+ * costs a whole GPU render pass every time; inside a cached layer it runs
+ * only when the content itself changes, and each frame just draws a texture.
+ *
+ * The layer reaches [bleed] past the content on every side without changing
+ * layout, so glyphs overhanging their box, which the fades' own layers keep,
+ * are not clipped. While [still] is false the content draws directly as
+ * before; read in the draw phase only, so switching never recomposes.
+ */
+fun Modifier.cachedWhileStill(bleed: Dp = FadeLayerBleed, still: () -> Boolean): Modifier = this
+    .layout { measurable, constraints ->
+        val room = bleed.roundToPx() * 2
+        val placeable = measurable.measure(constraints.offset(room, room))
+        layout(placeable.width - room, placeable.height - room) {
+            placeable.place(-room / 2, -room / 2)
+        }
+    }
+    .graphicsLayer {
+        compositingStrategy = if (still()) CompositingStrategy.Offscreen else CompositingStrategy.Auto
+    }
+    // Undoes the first layout, so the content's own layout size is unchanged.
+    .layout { measurable, constraints ->
+        val room = bleed.roundToPx() * 2
+        val placeable = measurable.measure(constraints.offset(-room, -room))
+        layout(placeable.width + room, placeable.height + room) {
+            placeable.place(room / 2, room / 2)
+        }
+    }
 
 /**
  * One word-local bloom inside a larger shaped [Text] (Arabic-only / no-gloss).
@@ -218,7 +275,27 @@ sealed class ShapedWordBloom {
         val paper: Color,
         val restingAlpha: Float,
         val feather: Float? = null,
+        /** Deposited ink can dissolve in place while its old edge stays fixed. */
+        val revealedAlpha: Float = 1f,
     ) : ShapedWordBloom()
+
+    /**
+     * Paper ink (docs/PAPER_INK.md): this word is drawn by the shared paper
+     * ink pipeline — its printed glyphs erased from the layer, then the ink
+     * shader. Until the word's field is generated it draws [fallback], the
+     * blooms it would otherwise have had, and a word that started its wash in
+     * the fallback finishes it there rather than switching mid-letter.
+     * [after] is drawn over the ink (a verse recess dimming a drying word).
+     */
+    class PaperInk(
+        override val range: IntRange,
+        val frame: com.beautifulquran.ui.theme.paperink.PaperInk.Frame,
+        val fallback: List<ShapedWordBloom>,
+        val after: List<ShapedWordBloom> = emptyList(),
+    ) : ShapedWordBloom()
+
+    /** Paper ink: generate this word's field ahead of its turn. Draws nothing. */
+    class PaperInkWarm(override val range: IntRange) : ShapedWordBloom()
 
     /** The Ink Lab's mark under a tarjīʿ candidate: a sparkline of the pulse
      * the word will be given ([drawPulseTrace]). Never drawn outside the lab. */
@@ -435,19 +512,23 @@ fun Modifier.shapedWordBloom(
     val wordInkCache = WordInkCache()
     val raisedMarkTrace = RaisedMarkTraceCache()
     val washBrushCache = WashBrushCache(rtl, stops)
+    val paperInk = PaperInkBlooms(rtl, lineBoundsCache, wordInkCache)
     return drawWithContent {
         // The one place a frame is consumed, and so the one place the
         // covers-before-ink order can be guaranteed. Enforcing it in the
         // builders instead left it to be re-broken by every caller that
         // concatenates their output — which is how a cover kept landing on a
         // lit word's halo after the builders had been fixed. See [coversFirst].
-        val bloomList = blooms().coversFirst()
+        val bloomList = paperInk.resolve(blooms().coversFirst(), layout(), clipTintToRange)
         val punchLayer = bloomList.any { bloom ->
             when (bloom) {
                 is ShapedWordBloom.UpcomingDim -> bloom.coverAlpha > 0f
-                is ShapedWordBloom.InkReveal -> bloom.progress < 1f
+                is ShapedWordBloom.InkReveal -> bloom.progress < 1f || bloom.revealedAlpha < 1f
                 is ShapedWordBloom.ColorReveal -> false
                 is ShapedWordBloom.PulseTrace -> false
+                // Erasing the printed glyphs needs this word's own layer.
+                is ShapedWordBloom.PaperInk -> true
+                is ShapedWordBloom.PaperInkWarm -> false
             }
         }
         val coverBlend = paperCoverBlendMode(punchLayer)
@@ -479,6 +560,8 @@ fun Modifier.shapedWordBloom(
             // the shaped glyph path. Deriving both for every bloom meant a long
             // ayah rebuilt ~2 paths per word on every animation frame.
             when (bloom) {
+                is ShapedWordBloom.PaperInk -> paperInk.draw(this, bloom)
+                is ShapedWordBloom.PaperInkWarm -> Unit
                 is ShapedWordBloom.PulseTrace -> {
                     lineBoundsCache.boundsFor(textLayout, start, endExclusive).forEach { bounds ->
                         drawPulseTrace(
@@ -537,7 +620,7 @@ fun Modifier.shapedWordBloom(
                     // wash so glyphs breathe in. Padded clip covers mark/AA
                     // overhangs (same as UpcomingDim).
                     val p = bloom.progress.coerceIn(0f, 1f)
-                    if (p >= 1f) return@forEach
+                    if (p >= 1f && bloom.revealedAlpha >= 1f) return@forEach
                     val lineBounds = lineBoundsCache.boundsFor(textLayout, start, endExclusive)
                     val pad = coverPad.toPx()
                     // One wash across the whole range, however many lines it
@@ -560,7 +643,7 @@ fun Modifier.shapedWordBloom(
                     }
                     total = total.coerceAtLeast(1f)
                     val edge = (total * (bloom.feather ?: feather)).coerceAtLeast(1f)
-                    val brush = washBrushCache.brushFor(bloom.paper, bloom.restingAlpha, edge)
+                    val brush = washBrushCache.brushFor(bloom.paper, bloom.restingAlpha, edge, bloom.revealedAlpha)
                     val head = p * (total + edge)
                     var travelled = 0f
                     for (i in lineBounds.indices) {
@@ -858,6 +941,134 @@ fun Modifier.shapedWordBloom(
 }
 
 /**
+ * The paper ink's adapter for shaped text: maps a word's range to a
+ * [com.beautifulquran.ui.theme.paperink.PaperInk.Source] — the word laid out
+ * alone ([WordInkCache]) where words share a line, the node's own layout where
+ * each word is its own node — and swaps in a word's fallback blooms until its
+ * field is ready.
+ */
+private class PaperInkBlooms(
+    private val rtl: Boolean,
+    private val lineBounds: LineBoundsCache,
+    private val wordInk: WordInkCache,
+) {
+    private val latched = HashSet<Long>()
+    private val seen = HashSet<Long>()
+    private val sources = HashMap<Long, com.beautifulquran.ui.theme.paperink.PaperInk.Source>()
+    private val words = HashMap<Long, com.beautifulquran.ui.theme.paperink.PaperInk.Word>()
+    private var logCapture: Long? = null
+    private var logLayout: TextLayoutResult? = null
+    private val logChoices = HashMap<Long, Int>()
+
+    fun resolve(
+        blooms: List<ShapedWordBloom>,
+        layout: TextLayoutResult?,
+        sharedLine: Boolean,
+    ): List<ShapedWordBloom> {
+        val capture = com.beautifulquran.DevProfiling.captureStart.get()
+        if (capture != logCapture || capture != null && layout !== logLayout) {
+            logChoices.clear()
+            logCapture = capture
+            logLayout = if (capture == null) null else layout
+        }
+        if (blooms.none { it is ShapedWordBloom.PaperInk || it is ShapedWordBloom.PaperInkWarm }) {
+            latched.clear()
+            return blooms
+        }
+        sources.clear()
+        words.clear()
+        seen.clear()
+        val out = ArrayList<ShapedWordBloom>(blooms.size + 4)
+        for (bloom in blooms) {
+            when (bloom) {
+                is ShapedWordBloom.PaperInkWarm -> {
+                    source(bloom.range, layout, sharedLine)?.let {
+                        com.beautifulquran.ui.theme.paperink.PaperInk.word(it)
+                    }
+                }
+                is ShapedWordBloom.PaperInk -> {
+                    val key = rangeKey(bloom.range)
+                    seen += key
+                    val source = source(bloom.range, layout, sharedLine)
+                    val word = if (key in latched || source == null) {
+                        null
+                    } else {
+                        com.beautifulquran.ui.theme.paperink.PaperInk.word(source)
+                    }
+                    if (capture != null) {
+                        val choice = if (word != null) 2 else if (key in latched) 1 else 0
+                        if (logChoices.put(key, choice) != choice) {
+                            val text = layout?.layoutInput?.text?.text.orEmpty()
+                            val start = bloom.range.first.coerceIn(0, text.length)
+                            val end = (bloom.range.last + 1).coerceIn(start, text.length)
+                            com.beautifulquran.DevProfiling.recordEvent(
+                                "paper-field rtl=$rtl word=${text.substring(start, end).take(80)} range=${bloom.range} " +
+                                    "progress=${bloom.frame.progress} shader=${word != null} " +
+                                    "fibre=${bloom.frame.fibreFringe} latched=${key in latched}",
+                            )
+                        }
+                    }
+                    if (word != null && source != null) {
+                        sources[key] = source
+                        words[key] = word
+                        out += bloom
+                        out += bloom.after
+                    } else {
+                        // A word already visibly washing in the fallback stays
+                        // there, rather than changing hands mid-letter.
+                        if (bloom.frame.progress > PAPER_INK_LATCH_PROGRESS || bloom.frame.wet > 0f) {
+                            latched += key
+                        }
+                        out += bloom.fallback
+                    }
+                }
+                else -> out += bloom
+            }
+        }
+        latched.retainAll(seen)
+        if (capture != null) logChoices.keys.retainAll(seen)
+        return out
+    }
+
+    fun draw(scope: DrawScope, bloom: ShapedWordBloom.PaperInk) {
+        val key = rangeKey(bloom.range)
+        val word = words[key] ?: return
+        val source = sources[key] ?: return
+        with(com.beautifulquran.ui.theme.paperink.PaperInk) {
+            scope.drawWord(word, source, bloom.frame, erase = true)
+        }
+    }
+
+    private fun source(
+        range: IntRange,
+        layout: TextLayoutResult?,
+        sharedLine: Boolean,
+    ): com.beautifulquran.ui.theme.paperink.PaperInk.Source? {
+        layout ?: return null
+        val length = layout.layoutInput.text.length
+        val start = range.first.coerceIn(0, length)
+        val endExclusive = (range.last + 1).coerceIn(start, length)
+        if (endExclusive <= start) return null
+        // The host's text and the word's place in it: deterministic, and
+        // distinct for a word that recurs within the paragraph.
+        val placement = layout.layoutInput.text.text.hashCode() * 31 + start
+        if (!sharedLine) {
+            return com.beautifulquran.ui.theme.paperink.PaperInk.Source(layout, 0f, 0f, rtl, placement = placement)
+        }
+        val ink = wordInk.inkFor(layout, start, endExclusive, lineBounds.boundsFor(layout, start, endExclusive))
+            ?: return null
+        return com.beautifulquran.ui.theme.paperink.PaperInk.Source(
+            ink.layout, ink.offset.x, ink.offset.y, rtl, placement = placement,
+        )
+    }
+
+    private fun rangeKey(range: IntRange): Long = (range.first.toLong() shl 32) or (range.last.toLong() and 0xFFFFFFFFL)
+}
+
+/** Past this much of its wash, a word that began in the fallback finishes there. */
+private const val PAPER_INK_LATCH_PROGRESS = 0.12f
+
+/**
  * Per-word line boxes for one [TextLayoutResult], memoised across draw frames.
  *
  * The boxes are pure geometry of (layout, character range): they move only when
@@ -939,9 +1150,12 @@ private class WordInkCache {
 
     private var layout: TextLayoutResult? = null
     private var measurer: TextMeasurer? = null
-    private val byRange = object : LinkedHashMap<Long, WordInk?>(8, 0.75f, true) {
+    // Paper ink asks for every word of the paragraph each frame, in order: a
+    // cap under the paragraph's word count evicts each entry before its next
+    // use and re-shapes every word every frame. Cleared on relayout anyway.
+    private val byRange = object : LinkedHashMap<Long, WordInk?>(32, 0.75f, true) {
         override fun removeEldestEntry(eldest: MutableMap.MutableEntry<Long, WordInk?>?): Boolean =
-            size > 16
+            size > 512
     }
 
     /** [lineBoxes] are the range's line boxes, shifted for justification. */
@@ -1304,19 +1518,19 @@ private fun DrawScope.coverRaisedMarks(
  * null asks for the white `DstIn` mask ([ShapedWordBloom.ColorReveal]).
  */
 private class WashBrushCache(private val rtl: Boolean, private val stops: FloatArray) {
-    private data class Key(val paper: Color?, val restingAlphaBits: Int, val edgeBits: Int)
+    private data class Key(val paper: Color?, val restingAlphaBits: Int, val edgeBits: Int, val revealedAlphaBits: Int)
 
     private val byKey = object : LinkedHashMap<Key, Brush>(8, 0.75f, true) {
         override fun removeEldestEntry(eldest: MutableMap.MutableEntry<Key, Brush>?): Boolean =
             size > 8
     }
 
-    fun brushFor(paper: Color?, restingAlpha: Float, edge: Float): Brush {
-        val key = Key(paper, restingAlpha.toBits(), edge.toBits())
+    fun brushFor(paper: Color?, restingAlpha: Float, edge: Float, revealedAlpha: Float = 1f): Brush {
+        val key = Key(paper, restingAlpha.toBits(), edge.toBits(), revealedAlpha.toBits())
         byKey[key]?.let { return it }
         val colors = stops.map { t ->
             val s = inkSmootherstep(t)
-            val glyphAlpha = restingAlpha + (1f - restingAlpha) * (if (rtl) s else 1f - s)
+            val glyphAlpha = restingAlpha + (revealedAlpha - restingAlpha) * (if (rtl) s else 1f - s)
             if (paper == null) {
                 Color.White.copy(alpha = glyphAlpha)
             } else {

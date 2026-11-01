@@ -395,6 +395,16 @@ internal object TarjiVersePulse {
         }
     }
 
+    /** Main thread: [url]'s audio from the shared decode cache (English pause detection reads it too). */
+    internal suspend fun decodedAudio(context: Context, url: String): Decoded = try {
+        audio.getOrPut(url) { scope.async { decoders.withPermit { decode(context.applicationContext, url) } } }.await()
+    } catch (cancelled: kotlinx.coroutines.CancellationException) {
+        throw cancelled
+    } catch (failed: Throwable) {
+        audio.remove(url)
+        throw failed
+    }
+
     private fun failed(why: String): Outcome {
         lastFailure = why
         return Outcome.Failed

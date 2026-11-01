@@ -34,6 +34,10 @@ measure and carried-line setting remain in the keys.
 The ruler, height fitter and renderer use the same carried-line setting. A line
 without gaps keeps its natural width, so the model cannot count it as fitting
 by shrink alone. The hand still calibrates at natural spacing.
+Every leaf keeps that same book hand. Page fitting adjusts only leading and
+checks its drawn height; it never reruns the layout at a smaller font size. Oversized
+verses are carried by the measured pagination. The debug justification audit
+also reports leaf font-size extrema and vertical overflow.
 
 Pagination runs off the main thread and is written to `EnglishBookCache`.
 The cache key includes the justification tuning and algorithm version; a
@@ -52,6 +56,26 @@ English ownership is solved lazily per verse and cached for the selected text
 source. Semantic ranges and continuous forward wash bands are projected once
 when the paragraph is built. Frames read the existing Arabic motions; adjacent
 paper covers with equal alpha merge, and one band carries the active soft edge.
+The pure whole-verse phrase plan is cached against the immutable alignment,
+text source, reciter, actual timing snapshot, first-voice gate and measured
+quiet; a provider timing replacement rebuilds it. Drawing and page follow read
+the same plan. Connected translation speech uses one cumulative audible-time
+clock, projected into cached geometry partitions. Its normalized speech union
+and quiet subtraction are built once; frames binary-search cached interval sums.
+The alignment retains its printed source text by reference. A plan builds
+`EnglishReadingExtent` offset/prefix arrays once, giving blank-space travel zero
+time with O(1), allocation-free forward/inverse character projection. Sources
+whose whitespace is normalized by the leaf retain the prior projection instead.
+Verified literal word endpoints and whole-unit protection intervals are also
+cached with the plan. `EnglishReadingPace` fits a deterministic sequence of
+compatible endpoints once, with analytic derivative bounds. Draw frames
+binary-search its knot arrays and evaluate a cubic; they allocate nothing and
+never solve an inverse. Inverse root searches run when cached windows/finish
+times are constructed. No live integrator, per-word timer or cadence optimizer
+is introduced.
+Printed word ranges are cached with the paragraph. Both the base cover and
+paper material use the same per-word projection of that edge; only one next
+unread word per verse requests material prewarming.
 First-pass glimmer shares that band; repeats keep the semantic ranges. Geometry
 stays cached by layout and range, and only repeat/glint layers request shaped
 paths.
@@ -221,6 +245,36 @@ paints with:
 
 Settled inactive ayahs do **not** redraw continuously: their draw-scope state
 reads are static once the 400 ms recess/focus tween finishes.
+The fibre fringe reads one shared 720 × 720 alpha paper tile, shipped
+precomputed (518 KB asset, outside the 32 MiB word cache) and read once per
+process: 5 ms on the emulator, where building it on device took 0.6–1.1 s
+(debug). The shader reads it at most once per pixel, only within a fibre's
+reach of a contour, instead of at each of the eight AA taps (sixteen during a
+repeat). Its two uniforms are set on every draw: they hold per-occurrence
+state, and one cached word serves every occurrence of it. The traces below
+were taken when an unchanged draw skipped those two calls; the difference is
+microseconds and was not re-measured. Perfetto traces of the same Al-Baqarah playback
+without glosses (where wet words do reach the shader; emulator, debug build,
+two pairs) put the fringe at parity: 56–58 µs per wet paper-ink word draw on
+vs 58–63 µs off, RenderThread frames 14.6–15.1 vs 13.1–16.0 ms, within noise.
+Skia's CPU rasteriser, a proxy for per-pixel shader cost, times it within
+noise of the plain paper tooth (wet −1%, drying −7%, repeat +0%); the
+fringe's early-outs skip the tooth's per-tap noise. The emulator cannot time
+the host GPU, and none of this is a Pixel measurement.
+
+A word's paper-ink field is built on the CPU, on the paper-ink worker. The
+Gaussian behind its liquid normals (reflect-padded once per line, skipping
+exact-zero spans of empty paper) and an unboxed contour pass cut it from
+75 to 49 ms for a 90 px Arabic word, 34 to 21 ms for 64 px English, and 326
+to 129 ms at 160 px (warm desktop JVM), with bit-identical output. The draw
+that captures a word only rasterizes it; converting the 2× raster to floats
+happens on the worker, and a word with no ink is remembered rather than
+re-rasterized every frame. Shaped text warms fields ahead of the voice;
+word-by-word gloss tiles now do the same (`WarmPaperInkAhead`, the next ten
+words after the active one). On the emulator's debug build, where a field
+takes 340–380 ms, live gloss words went from never having their field ready
+to having it on two thirds of live frames.
+See [PAPER_INK.md](PAPER_INK.md#fibre-fringe).
 Paper-cover bleed is horizontal-only and clipped to each text line's measured
 top/bottom; an unread line therefore cannot fade descenders belonging to the
 read line above it.
@@ -263,6 +317,15 @@ changes. The steady 30 Hz word poll therefore allocates no per-word objects;
 both allocation and downstream emission happen only at real ink boundaries
 (~2–3×/second).
 
+`WordInkPublication` applies an explicit word tap synchronously before its
+player command, then consumes those boundary polls. Keeping tap intent and
+the displayed word in one publication avoids an asynchronous `combine`
+turn where playback has begun recessing the page but the tap prefix is
+still missing. Frame clocks and per-ayah derived subscriptions are unchanged.
+The word-play exception follows the player's position intent, so a second
+MediaController acknowledgement of the same seek does not discard its
+prefix. Actual media generations still own the captured wash windows.
+
 ### 3b. Playlist preload + cache warm
 
 ExoPlayer's `PreloadConfiguration` buffers ~5 s of the *next* ayah in the
@@ -284,6 +347,37 @@ an alpha mask with `BlendMode.DstIn` — requires
 `CompositingStrategy.Offscreen`, which renders the whole list into an
 offscreen buffer **every frame while scrolling**. The overlay is visually
 identical on a solid background and costs almost nothing.
+
+### 4a. Cached layers for content at rest
+
+The renderer replays everything on screen every frame. An offscreen layer in
+that replay, whether a `saveLayer` (`letterFadeIn`, `glyphLayerAlpha`, a
+paper cover's punch) or a translucent `graphicsLayer` with the default
+compositing, is a whole GPU render pass each time, even when nothing in it
+changed. During playback in the word-by-word view that was 39 render passes
+a frame: two per word resting at faded ink (unread, or recessed with its
+verse), the Arabic and its gloss.
+
+`cachedWhileStill` gives such content an Offscreen (cached) layer while it is
+at rest, reaching the fades' own 14 dp bleed past the content without
+changing layout, so overhanging marks are not clipped. It re-renders only when
+the content changes; on other frames it costs one textured quad. Word tiles
+use it while `InkMotion.restsFaded`; a shaped verse whose words are all quiet,
+some faded, uses it whole (tiles are not nested inside it). `cachedAlpha` does
+the same for translucent chrome (player-bar buttons and reciter label, ayah
+marks): identical compositing, cached instead of redrawn. Live words keep
+drawing directly, so their halos and washes are never clipped.
+
+Perfetto on the emulator (debug, Al-Baqarah playback): render passes per frame
+fell from 39 to 4.3 in the word-by-word view and from 6.9 to 3.1 without
+glosses, and the frames drawn in the same 25 s window rose from about 650 to
+1,485 (gloss) and from 980 to 1,487. Total GPU memory during gloss playback
+was 29.8 MB (19.1 MB purgeable). Not a Pixel measurement.
+
+Adaptive antialiasing (four outer taps, all eight only where they disagree)
+was tried and dropped: on a desktop RTX 3080 through Skia's GL backend it saved
+nothing, because the eight taps' cost sits at contours, which must keep them,
+not in flat stroke interiors.
 
 ### 4b. Transient progressive vellum
 

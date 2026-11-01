@@ -150,4 +150,29 @@ class EnglishLeafFitTest {
             0f,
         )
     }
+
+    @Test
+    fun `a pixel-rounded paragraph overrun closes at fixed type size`() {
+        val hand = 50f
+        val leading = 1.407f
+        val room = 1801f
+        val pitches = 22.6f * hand
+        // Prose rounds each baseline pitch; chapter furniture remains fractional.
+        fun height(at: Float) = 22f * kotlin.math.ceil(at * hand) + 0.6f * at * hand + 200f
+        val fractional = englishLeafFittedLeadingEm(leading, height(leading), room, pitches)
+        assertTrue("a subpixel correction leaves the same prose pitch", height(fractional) > room)
+        val closed = englishLeafClosingLeadingEm(fractional, height(fractional), room, pitches, hand)
+        assertTrue("the rounded paragraph must fit", height(closed) <= room)
+        assertTrue("the baseline pitch closes by at least one pixel", closed * hand <= fractional * hand - 0.999f)
+    }
+
+    @Test
+    fun `overflow correction preserves readable leading and never closes a page that fits`() {
+        assertEquals(ENGLISH_LEAF_MIN_LEADING_EM, englishLeafClosingLeadingEm(
+            1.4f, well * 3f, well, pitchesPx = 600f, handPx = 50f,
+        ), 0f)
+        assertEquals(1.4f, englishLeafClosingLeadingEm(
+            1.4f, well, well, pitchesPx = 600f, handPx = 50f,
+        ), 0f)
+    }
 }

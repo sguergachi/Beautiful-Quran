@@ -1,0 +1,15 @@
+{
+ "width": 176,
+ "height": 122,
+ "scale": 2,
+ "fontPx": 40,
+ "centers": [
+  135.0,
+  104.0,
+  73.0,
+  42.0
+ ],
+ "baseline": 78.0,
+ "rtl": true,
+ "letterDuration": 0.48275862068965514
+}

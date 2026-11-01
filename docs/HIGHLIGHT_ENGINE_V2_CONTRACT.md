@@ -22,12 +22,24 @@ is observed in composition, with structural equality.
 
 `HighlightMediaMotions` captures a `HighlightWashWindow`, pacing, feather, and
 wasl carry at entry. Progress is a function of calibrated media time rather
-than elapsed animation time. The existing minimum sweep floor is retained:
-its wall duration is converted to media duration once at entry speed. A later
+than elapsed animation time. The existing minimum sweep floor is retained
+where it fits the English voiced-end deadline below; its wall duration is
+converted to media duration once at entry speed. A later
 speed change changes the shared clock slope. Repeat occurrences use measured
 dwell, have independent windows, and cannot wait behind a repeat queue.
 Prose can gate on its predecessor without shifting its own window into the
 future. Cosmetic recess/glimmer/tint dissolution still use their existing fades.
+
+English Scroll's eased visual reveal spans the whole karaoke hold through
+connected speech, so each word flows into the next. Only where the media gap
+between the occurrence's positive `spokenMs` and the next onset reaches
+`ENGLISH_PAUSE_MS` (150 ms) does the reveal finish at the voiced end, even
+below the visual floor; completed ink then holds through the pause, with the
+next word's actual start unchanged. Short repeat occurrences use the same rule
+on their own voiced span. Missing or zero voiced metadata keeps the hold. This
+policy is applied before the entry duration's single speed conversion; the
+audio/highlight clock is not advanced. (An earlier policy finished every word
+up to 100 ms early; in connected speech that stopped the ink at every word.)
 
 `EnglishWashClock` is metadata projected through that same frame. It owns no
 second interpolation anchor and cannot ignore ordinary clock corrections.
@@ -66,6 +78,14 @@ ink even when it restarts the same verse. A new controller
 requires a new sync session. Negative monotonic timestamp origins are valid.
 Timing publication, provider generation, reader navigation, clock revision,
 performance generation, and occurrence identity remain distinct.
+
+Android's shared reader poll carries the installed timing revision and its
+reciter together. While a reciter change replaces the playlist, an old audio
+item cannot be sampled against the new voice's table. A mismatched handoff
+suspends observation until the matching item arrives; queued packets from a
+superseded timing publication are also discarded. A same-reciter refresh or
+withdrawal still wakes the paused poll immediately. This is an input ownership
+check around V2, not an extra timing offset.
 
 ## Numerical policy
 
@@ -108,7 +128,7 @@ adapter changes together; changing a version label is not a rollback switch.
 
 ## Local capture and replay
 
-Developer → **Record performance profile** explicitly records a bounded local
+Developer → **Log export** explicitly records a bounded local
 report. Sharing remains an explicit user action. Normal use records no trace,
 uploads no samples, and introduces no analytics.
 
@@ -116,9 +136,11 @@ Trace schema 2 (`sample-and-frame-clock`) records source SHA/dirty flag, app
 version, actual visible engine, exact timing triples/voice gates and SHA-256,
 ordered playback/calibration/revision samples, V1 checkpoint, live V2 checkpoint,
 and display frames referring to their actual accepted sample. A mid-verse
-capture preserves live V2 rather than resetting it. Storage keeps a prefix of
-1,024 samples and 2,048 frames, with separate dropped counters. Schema 1 sample
-captures remain replayable.
+capture preserves live V2 rather than resetting it. A three-minute log keeps a
+prefix of 6,000 samples and 24,000 frames, with separate dropped counters.
+The legacy performance-capture API retains its smaller 1,024/2,048 budgets.
+Schema 1 sample captures remain replayable. See [log export](PROFILING.md#local-log-export)
+for service-player positions, action/renderer events and sharing instructions.
 
 ```sh
 ./gradlew testDebugUnitTest --tests '*HighlightReplayTest' \

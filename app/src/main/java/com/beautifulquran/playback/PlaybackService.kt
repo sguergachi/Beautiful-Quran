@@ -26,6 +26,8 @@ import androidx.media3.session.MediaLibraryService.LibraryParams
 import androidx.media3.session.MediaLibraryService.MediaLibrarySession
 import androidx.media3.session.MediaSession
 import com.beautifulquran.MainActivity
+import com.beautifulquran.DevProfiling
+import com.beautifulquran.LogExport
 import com.beautifulquran.QuranApp
 import com.beautifulquran.assistant.AssistantAction
 import com.beautifulquran.assistant.AssistantIntents
@@ -38,6 +40,11 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
+import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.guava.future
 import kotlinx.coroutines.launch
 
@@ -92,6 +99,30 @@ class PlaybackService : MediaLibraryService() {
             }
 
         player.addListener(PrefetchListener(player, prefetcher))
+        // Observe the actual service player only during an explicit log capture.
+        // The reader's MediaController samples and these samples share nanoTime.
+        serviceScope.launch {
+            LogExport.state.map { it.recording }.distinctUntilChanged().collectLatest { recording ->
+                if (!recording) return@collectLatest
+                var lastRoute: Int? = null
+                var routeType: Int? = null
+                while (isActive) {
+                    val route = (application as QuranApp).outputRoutes.deviceId.value
+                    if (route != lastRoute) {
+                        routeType = LogExport.routeType(this@PlaybackService, route)
+                        lastRoute = route
+                    }
+                    val positionMs = player.currentPosition
+                    val sampledAtNanos = System.nanoTime()
+                    DevProfiling.recordEvent(
+                        "service sampledAtNanos=$sampledAtNanos item=${player.currentMediaItem?.mediaId} positionMs=$positionMs " +
+                            "playing=${player.isPlaying} state=${player.playbackState} speed=${player.playbackParameters.speed} " +
+                            "routeId=$route routeType=$routeType",
+                    )
+                    delay(100L)
+                }
+            }
+        }
         player.addListener(BasmalahSkipListener(player))
         assistantAudioResume = AssistantAudioResume(
             player,

@@ -32,6 +32,7 @@ class ShapedBloomOrderTest {
         sweep: Float,
         glint: Float,
         repeat: Boolean = false,
+        prefix: WaslPrefix? = null,
     ): InkMotion = InkMotion(
         ink = InkEngine.Word(state = state, repeat = repeat),
         lyricInk = mutableStateOf(1f),
@@ -48,7 +49,7 @@ class ShapedBloomOrderTest {
         glintAlpha = mutableStateOf(glint),
         glintIsRepeat = false,
         glintReplacedByRepeat = false,
-        waslPrefix = null,
+        waslPrefix = prefix,
         tarji = mutableStateOf(InkEngine.GlintResonance.Idle),
     )
 
@@ -64,6 +65,25 @@ class ShapedBloomOrderTest {
         paper = Color.Black,
         repeatInk = Color(0xFFE06A18),
     )
+
+    @Test fun `paper wasl overlay belongs only to its field fallback`() {
+        val list = buildShapedBlooms(
+            motions = listOf(motion(InkEngine.State.Upcoming, 0f, 0f,
+                prefix = WaslPrefix(mutableStateOf(.4f), .3f, 1.6f, .15f))),
+            words = listOf(word(1)),
+            rendered = RenderedLineText(AnnotatedString("كلمة"), listOf(0..3), IntRange.EMPTY),
+            palette = WordInkPalette(Color.Black, Color.White, Color.Red,
+                PaperInkStyle(Color.Black, Color.Red)),
+            glintInk = null, markAlpha = { 1f }, recessCover = { 0f },
+            flashWordPositions = emptySet(), waslInk = Color.Black,
+            searchHitWash = RepeatWash(mutableStateOf(0f), mutableStateOf(0f), mutableStateOf(null)),
+        )
+        val liquid = list.filterIsInstance<ShapedWordBloom.PaperInk>().single()
+        assertTrue("a missing field must still reveal the connected opening",
+            liquid.fallback.any { it is ShapedWordBloom.ColorReveal })
+        assertTrue("ordinary wasl must not paint over the liquid front",
+            list.none { it is ShapedWordBloom.ColorReveal })
+    }
 
     /** A lit word mid-ayah: one behind it done, one ahead still unread. */
     private fun blooms(): List<ShapedWordBloom> = buildShapedBlooms(

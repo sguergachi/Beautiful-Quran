@@ -47,7 +47,10 @@ Spearman 0.996.
 | score | √(sustain × lift): held **and** lifted |
 | gate | peak gain ≥ 0.3 |
 | cap | the two most dramatic events of a verse |
-| threshold | the profile's Drama, 0.5 |
+| threshold | the profile's Drama, 0.5 for this audit |
+
+The shipped default is now 0.53. The results below were measured at 0.5 and
+have not been remeasured at the new threshold.
 
 ## Result, through the real detector
 

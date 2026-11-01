@@ -89,6 +89,22 @@ class TajweedPacingTest {
     }
 
     @Test
+    fun `liquid ink holds the closing nun in its own letter slot`() {
+        val letters = curveOf("ٱلۡمُسۡرِفِينَ", hold = Hold(isAyahFinal = true,
+            waqfShare = .5932f, waqfLengthScale = 1f, creep = .3f))
+        for (feather in listOf(.4f, 1.1092f, 2f)) {
+            val wash = letters.forWash(feather)
+            for (step in 0..100) {
+                val time = step / 100f
+                assertEquals(letters.at(time), wash.atLetters(time), 0f)
+            }
+            assertTrue("the closing nun must be filling during its hold", wash.atLetters(.85f) >= 7f / 8f)
+            assertTrue("the wide wash has a different coordinate", wash.at(.85f) < 7f / 8f)
+            assertEquals(1f, wash.atLetters(1f), 0f)
+        }
+    }
+
+    @Test
     fun `turning off the madd rule takes the gate with it`() {
         assertNull(TajweedPacing.curve(dallin, 1f, Hold(madd = false)))
     }
