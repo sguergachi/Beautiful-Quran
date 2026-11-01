@@ -619,20 +619,22 @@ def record(s, log=print, force=False):
     radius = re.search(r'RoundedCorner\{position=TopLeft, radius=(\d+)', window)
     scale = width / info['native_width']
     info['display'] = {'camera_baked': True, 'corner_radius': round(int(radius[1]) * scale, 3) if radius else None}
-    conform(d, log, marks, info)
+    conform(d, log, marks, info, s["app"])
     if rep:
         rep.progress(1.0, "take ready")
     return d
 
 
-def conform(d, log=print, marks=None, capture_info=None):
+def conform(d, log=print, marks=None, capture_info=None, app=None):
     """raw.mkv -> clip.mp4 (60 fps CFR) + audio.wav on one timeline.
 
     `marks` (recording seconds): "play", when playback was asked for (the
     recitation is searched for after it); "intro", when the opening began;
     "dwell", the still seconds to keep before the recitation. With an intro
     the take starts with it, otherwise `dwell` s before the recitation.
-    `lead` in meta.json is where the recitation starts on the take's clock.
+    `lead` in meta.json is where the recitation starts on the take's clock,
+    and `app` is the resolved recording settings, so the editor can mark
+    what changed since the take.
     """
     marks = marks or {}
     raw = os.path.join(d, "raw.mkv")
@@ -665,6 +667,7 @@ def conform(d, log=print, marks=None, capture_info=None):
     meta = {"onset_raw": onset, "video_first_pts": v0, "lead": round(onset - start, 3) if onset is not None else length, "length": length, "marks": marks, **{k: round(v, 1) for k, v in rates.items()},
             "width": w, "height": h, "recorded": time.strftime("%Y-%m-%d %H:%M")}
     if capture_info: meta.update(capture=capture_info, display=capture_info['display'])
+    if app is not None: meta["app"] = app
     with open(os.path.join(d, "meta.json"), "w") as f:
         json.dump(meta, f, indent=1)
     log(f"take ready: {d} ({length:.1f}s, active cadence {rates['active_fps']:.1f} fps, p90 frame interval {rates['frame_p90_ms']:.0f} ms)")

@@ -19,7 +19,8 @@ and open `http://<this computer's LAN IP>:8765/`. The default bind remains local
 In the editor: pick or create a video on the left, set what the app plays
 (Recording tab) and the look (Look tab), press **Record take**, then edit on
 the timeline and **Export…** (Ctrl+E). Every change is undoable (Ctrl+Z /
-Ctrl+Shift+Z) and saved as you go. Exports land in
+Ctrl+Shift+Z) and saved as you go. Recording settings changed since the take
+carry a gold dot until the next recording is submitted. Exports land in
 `~/Videos/beautiful-quran-promo/` (`BQ_PROMO_OUT`); takes, plates and
 downloads are cached in `~/.cache/bq-promo/` (`BQ_PROMO_CACHE`), never `/tmp`.
 

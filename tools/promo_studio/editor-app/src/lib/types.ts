@@ -73,7 +73,7 @@ export interface ApkInfo {
 export interface PhoneGeometry { W: number; H: number; bw: number; bh: number; body_r: number; sx0: number; sy0: number; sw: number; sh: number; screen_r: number; k: number }
 export interface Geo {
   W: number; H: number; fps: number; g: PhoneGeometry;
-  take: { length: number; lead: number; capture_fps: number; active_fps?: number; frame_p90_ms?: number; width: number; height: number; recorded: string } | null;
+  take: { length: number; lead: number; capture_fps: number; active_fps?: number; frame_p90_ms?: number; width: number; height: number; recorded: string; app?: Spec["app"] } | null;
   frame: string; clip: string | null; audio: string | null; peaks: string | null;
   plate: { w: number; h: number; k: number };
 }

@@ -1,5 +1,5 @@
 import { nextVerseRange, verseRange, type VerseAction } from "../lib/verses.ts";
-import { changeVerse, editVerses, inspect, loadTimeline, useStore } from "../state/store.ts";
+import { changeVerse, editVerses, inspect, loadTimeline, useStaleRecordingFields, useStore } from "../state/store.ts";
 import { openMenu } from "./Menu.tsx";
 import { Field, Select } from "./ui.tsx";
 
@@ -37,11 +37,12 @@ export function TimelineVerseControls() {
 
 export function VerseRangeEditor() {
   const { spec, tl, count, range, busy, error } = useVerseEdit();
+  const stale = useStaleRecordingFields();
   if (!spec) return null;
   const current = range ?? { start: spec.app.ayah, end: spec.app.ayah };
   const options: [number, string][] = Array.from({ length: count }, (_, i) => [i + 1, `${spec.app.surah}:${i + 1}`]);
   return <div className="mb-4" aria-busy={busy}>
-    <Field label="Start verse"><Select disabled={busy} value={current.start} options={options}
+    <Field label="Start verse" dot={stale.has("ayah")}><Select disabled={busy} value={current.start} options={options}
       onChange={(v) => void editVerses(+v, Math.max(+v, current.end), undefined, true)} /></Field>
     <Field label="Stop verse"><Select disabled={busy} value={current.end} options={options.filter(([v]) => +v >= current.start)}
       onChange={(v) => void editVerses(Math.min(current.start, +v), +v, undefined, true)} /></Field>

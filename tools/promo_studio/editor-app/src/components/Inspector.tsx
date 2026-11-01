@@ -9,9 +9,9 @@ import type { Ease, Emulator, Job } from "../lib/types.ts";
 import { clock, useTime } from "../state/clock.ts";
 import {
   cancelJob, deleteSelection, endGesture, inspectSelection, mutate, openPanel, record, select, setEase, setProp, setUI, split, toggleKey,
-  useStore, wholeTake, type Tab,
+  useStaleRecordingFields, useStore, wholeTake, type Tab,
 } from "../state/store.ts";
-import { Button, Dot, Empty, Field, Icon, Progress, Section, Segmented, Select, Slider, TextInput } from "./ui.tsx";
+import { Button, Dot, Empty, Field, Icon, Progress, Section, Segmented, Select, Slider, StaleDot, TextInput } from "./ui.tsx";
 import { Opening } from "./Opening.tsx";
 import { PhoneLookPreview } from "./PhoneLookPreview.tsx";
 import { ClipEditor } from "./ClipEditor.tsx";
@@ -27,6 +27,7 @@ export function Inspector() {
   const tab = useStore((s) => s.ui.tab), spec = useStore((s) => s.spec);
   const context = useStore((s) => activeContext(s.inspector, s.sel));
   const capture = useStore((s) => s.jobs.find((j) => j.kind === "capture" && j.name === s.name && (j.state === "running" || j.state === "queued")));
+  const stale = useStaleRecordingFields();
   return (
     <div className="inspector flex h-full min-h-0 min-w-0 flex-col bg-panel">
       <div className="flex shrink-0 gap-1 border-b border-line p-2">
@@ -34,6 +35,7 @@ export function Inspector() {
           <button key={t} aria-pressed={tab === t} onClick={() => setUI({ tab: t })}
             className={`relative flex-1 rounded-md py-1.5 capitalize transition-colors ${tab === t ? "bg-raised text-ink" : "text-mute hover:text-ink"}`}>
             {t}{t === "recording" && capture && <span className="absolute right-2 top-2 size-1.5 rounded-full bg-orange animate-pulse-soft" />}
+            {t === "recording" && !capture && stale.size > 0 && <span title="Settings changed since the take was recorded" className="absolute left-2 top-2 size-1.5 rounded-full bg-gold" />}
           </button>
         ))}
       </div>
@@ -136,6 +138,8 @@ function Recording({ contentsOnly = false }: { contentsOnly?: boolean }) {
   const job = useStore((s) => s.jobs.find((j) => j.kind === "capture" && j.name === s.name));
   const live = job && (job.state === "running" || job.state === "queued") ? job : null;
   const [serial, setSerial] = useState<string>("auto");
+  const stale = useStaleRecordingFields();
+  const appearanceStale = ["theme", "layout", "view", "text_size"].some((k) => stale.has(k));
   const a = spec.app, take = geo?.take;
   const activeFps = take?.active_fps;
   const takeShort = take && Math.max(...spec.edit.map((p) => p.out)) > take.length + 0.05;
@@ -143,8 +147,8 @@ function Recording({ contentsOnly = false }: { contentsOnly?: boolean }) {
   return (
     <>
       <Section title="Take contents">
-        <Field label="Reciter"><Select value={a.reciter} options={Object.entries(meta.reciters)} onChange={(v) => set("app.reciter", v)} /></Field>
-        <Field label="Chapter"><Select value={a.surah} options={meta.surahs.map((s) => [s.id, `${s.id}. ${s.name} (${s.ayahs})`])} onChange={(v) => mutate((r) => {
+        <Field label="Reciter" dot={stale.has("reciter")}><Select value={a.reciter} options={Object.entries(meta.reciters)} onChange={(v) => set("app.reciter", v)} /></Field>
+        <Field label="Chapter" dot={stale.has("surah")}><Select value={a.surah} options={meta.surahs.map((s) => [s.id, `${s.id}. ${s.name} (${s.ayahs})`])} onChange={(v) => mutate((r) => {
           const count = meta.surahs.find((s) => s.id === +v)!.ayahs, ayah = Math.min(a.ayah, count);
           r.app = { ...r.app, surah: +v, ayah, ...(a.repeat === "range" ? { repeat_to: Math.max(ayah, Math.min(a.repeat_to ?? ayah, count)) } : {}) };
         })} /></Field>
@@ -153,19 +157,19 @@ function Recording({ contentsOnly = false }: { contentsOnly?: boolean }) {
 
       {!contentsOnly && <>
       <details className="mb-5 rounded-md border border-line p-2.5">
-        <summary className="cursor-pointer text-mute">App appearance <span className="text-[11px] text-faint">· {a.theme} · {a.layout} · {a.view}</span></summary>
+        <summary className="cursor-pointer text-mute">App appearance {appearanceStale && <StaleDot />} <span className="text-[11px] text-faint">· {a.theme} · {a.layout} · {a.view}</span></summary>
         <div className="mt-3">
-          <Field label="Theme" hint={a.theme === "Paper" ? "Tarjīʿ glimmer only shows on Nightfall and Royal green." : undefined}>
+          <Field label="Theme" dot={stale.has("theme")} hint={a.theme === "Paper" ? "Tarjīʿ glimmer only shows on Nightfall and Royal green." : undefined}>
             <Segmented size="sm" value={a.theme} options={Object.keys(meta.themes).map((t) => [t, t.replace("Royal green", "Royal")])} onChange={(v) => set("app.theme", v)} />
           </Field>
-          <Field label="Layout"><Segmented size="sm" value={a.layout} options={meta.layouts.map((l) => [l, l])} onChange={(v) => set("app.layout", v)} /></Field>
-          <Field label="View"><Segmented size="sm" value={a.view} options={meta.views.map((v) => [v, v])} onChange={(v) => set("app.view", v)} /></Field>
-          <Field label="Text size"><Segmented size="sm" value={a.text_size} options={[["default", "Default"], ["max", "Largest"]]} onChange={(v) => set("app.text_size", v)} /></Field>
+          <Field label="Layout" dot={stale.has("layout")}><Segmented size="sm" value={a.layout} options={meta.layouts.map((l) => [l, l])} onChange={(v) => set("app.layout", v)} /></Field>
+          <Field label="View" dot={stale.has("view")}><Segmented size="sm" value={a.view} options={meta.views.map((v) => [v, v])} onChange={(v) => set("app.view", v)} /></Field>
+          <Field label="Text size" dot={stale.has("text_size")}><Segmented size="sm" value={a.text_size} options={[["default", "Default"], ["max", "Largest"]]} onChange={(v) => set("app.text_size", v)} /></Field>
         </div>
       </details>
 
       <Section title="Record take">
-        <Field label="Resolution" hint="2K records native 1440 × 3200 detail. Existing 1080p takes stay available.">
+        <Field label="Resolution" dot={stale.has("capture")} hint="2K records native 1440 × 3200 detail. Existing 1080p takes stay available.">
           <Segmented size="sm" value={a.capture} options={[["1080p", "1080p"], ["2k", "2K"]]} onChange={(v) => set("app.capture", v)} />
         </Field>
         {live ? <CaptureCard job={live} /> : (
@@ -179,6 +183,9 @@ function Recording({ contentsOnly = false }: { contentsOnly?: boolean }) {
             {take?.frame_p90_ms != null && <p className="mb-2.5 text-[11.5px] text-faint">90% of active frame intervals are within {take.frame_p90_ms} ms. Still holds are excluded.</p>}
             {takeShort && (
               <p className="mb-2.5 text-[12px] text-orange">This edit needs a longer take. The recording length is set to include it; record the full range to preview and export the added verses.</p>
+            )}
+            {take && stale.size > 0 && (
+              <p className="mb-2.5 flex items-center gap-1.5 text-[12px] text-gold"><StaleDot /> Settings changed since this take — record again to include them.</p>
             )}
             {take && a.intro.play && Math.max(...spec.edit.map((p) => p.out)) <= take.lead && <p className="mb-2.5 text-[12px] text-gold">This edit ends during the opening. Use the whole take to include playback.</p>}
             {take && <Button size="sm" className="mb-2.5" onClick={wholeTake}>Use whole take · {take.length.toFixed(1)} s</Button>}

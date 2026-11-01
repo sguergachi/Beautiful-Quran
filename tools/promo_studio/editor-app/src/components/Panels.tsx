@@ -93,13 +93,14 @@ function ApkCard() {
 
 export function EmulatorsPanel() {
   const { emus, booting, emusLoaded, meta } = useStore();
-  const [cores, setCores] = useState("6");
+  const [cores, setCores] = useState(() => { try { return localStorage.getItem("promo.emuCores") || "6"; } catch { return "6"; } });
+  const pickCores = (v: string) => { setCores(v); try { localStorage.setItem("promo.emuCores", v); } catch { /* private mode */ } };
   return (
     <Drawer title="Emulators" onClose={() => openPanel(null)} width={460}
       right={<Button size="sm" variant="primary" onClick={() => bootEmulator(+cores)}>{Icon.plus} Start one</Button>}>
       <div className="mb-4 flex flex-wrap items-center gap-2 rounded-lg border border-line bg-panel2 p-2.5">
         <span className="text-mute">New emulators get</span>
-        <div className="w-28"><Select value={cores} options={[["4", "4 cores"], ["6", "6 cores"], ["8", "8 cores"]]} onChange={setCores} /></div>
+        <div className="w-28"><Select value={cores} options={[["4", "4 cores"], ["6", "6 cores"], ["8", "8 cores"]]} onChange={pickCores} /></div>
         <span className="text-[11.5px] text-faint">6 recommended for a single capture</span>
       </div>
       <ApkCard />

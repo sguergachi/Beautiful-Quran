@@ -33,14 +33,19 @@ export function Segmented<T extends string>({ value, options, onChange, size = "
   );
 }
 
-export function Field({ label, hint, children }: { label: ReactNode; hint?: ReactNode; children: ReactNode }) {
+export function Field({ label, hint, dot, dotTitle, children }: { label: ReactNode; hint?: ReactNode; dot?: boolean; dotTitle?: string; children: ReactNode }) {
   return (
     <label className="inspector-field mb-2.5 grid grid-cols-[104px_minmax(0,1fr)] items-center gap-2">
-      <span className="text-mute">{label}</span>
+      <span className="text-mute">{label}{dot && <> <StaleDot title={dotTitle} /></>}</span>
       <div className="min-w-0">{children}</div>
       {hint && <p className="col-span-full -mt-1 text-[11.5px] leading-snug text-faint">{hint}</p>}
     </label>
   );
+}
+
+// Changed since the take was recorded: submit a recording to clear it.
+export function StaleDot({ title = "Changed since the take was recorded" }: { title?: string }) {
+  return <span title={title} aria-label={title} className="inline-block size-1.5 rounded-full bg-gold align-middle" />;
 }
 
 const inputCls = "h-8 min-w-0 max-w-full w-full rounded-md border border-line bg-panel2 px-2 outline-none focus:border-gold/70";

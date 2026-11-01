@@ -6,6 +6,7 @@ import { api } from "../lib/api.ts";
 import * as E from "../lib/edit.ts";
 import { applyVersePlan, nextVerseRange, verseRange, type VerseAction } from "../lib/verses.ts";
 import { clamp, plateLook, resolve, soundOnset, takeKey } from "../lib/model.ts";
+import { loadSubmitted, recordingReference, saveSubmitted, staleRecordingFields } from "../lib/recorded.ts";
 import type { Ease, Emulator, ExportFile, ExportOptions, Geo, Job, Meta, Plate, RawSpec, Selection, Spec, SpecStatus, Timeline, Wave } from "../lib/types.ts";
 import { clock, media } from "./clock.ts";
 import { videoSlug } from "../lib/videos.ts";
@@ -183,6 +184,21 @@ export function save(): Promise<boolean> {
 }
 const geoKey = (s: Spec) => [takeKey(s), s.aspect, s.phone.color].join("|");
 const timelineKey = (s: Spec) => JSON.stringify([takeKey(s), s.app.seconds, Math.max(...s.edit.map((p) => p.out))]);
+
+if (typeof window !== "undefined") {
+  // Autosave must survive a closed tab: flush the debounced save when the
+  // page hides, and beacon it when the page is going away for good.
+  addEventListener("visibilitychange", () => { if (document.visibilityState === "hidden") void save(); });
+  addEventListener("pagehide", () => {
+    const { name, saveState } = get();
+    if (!name || saveState === "saved" || saveState === "error") return;
+    clearTimeout(saveTimer);
+    fetch(`/api/spec/${name}`, {
+      method: "PUT", body: snapshot(), keepalive: true,
+      headers: { "Content-Type": "application/json" },
+    }).catch(() => {});
+  });
+}
 
 // -------------------------------------------------------------- loading
 
@@ -432,7 +448,22 @@ async function job(p: Promise<Job>, what: string) {
 export async function record(serial: string | null, force: boolean) {
   const { name } = get();
   if (!name || !(await save())) return;
-  return job(api.capture(name, { force, serial }), "Recording");
+  const j = await job(api.capture(name, { force, serial }), "Recording");
+  if (j && get().name === name && get().spec) saveSubmitted(name, get().spec!.app);
+  return j;
+}
+
+// Recording settings that differ from what the take was recorded with: gold
+// dots until the new settings are submitted. Re-checks when jobs land, since
+// submitting is what clears them.
+const NO_STALE: Set<string> = new Set();
+export function useStaleRecordingFields(): Set<string> {
+  const spec = useStore((s) => s.spec);
+  const take = useStore((s) => s.geo?.take);
+  const name = useStore((s) => s.name);
+  useStore((s) => s.jobs);
+  if (!spec) return NO_STALE;
+  return staleRecordingFields(spec.app, recordingReference(take?.app ?? null, loadSubmitted(name)));
 }
 /** The export settings in force: the saved choice over the server's defaults. */
 export function exportOptions(): ExportOptions {
