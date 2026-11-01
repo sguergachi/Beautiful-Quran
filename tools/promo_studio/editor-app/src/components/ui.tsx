@@ -33,14 +33,19 @@ export function Segmented<T extends string>({ value, options, onChange, size = "
   );
 }
 
-export function Field({ label, hint, children }: { label: ReactNode; hint?: ReactNode; children: ReactNode }) {
+export function Field({ label, hint, dot, dotTitle, children }: { label: ReactNode; hint?: ReactNode; dot?: boolean; dotTitle?: string; children: ReactNode }) {
   return (
     <label className="inspector-field mb-2.5 grid grid-cols-[104px_minmax(0,1fr)] items-center gap-2">
-      <span className="text-mute">{label}</span>
+      <span className="text-mute">{label}{dot && <> <StaleDot title={dotTitle} /></>}</span>
       <div className="min-w-0">{children}</div>
       {hint && <p className="col-span-full -mt-1 text-[11.5px] leading-snug text-faint">{hint}</p>}
     </label>
   );
+}
+
+// Changed since the take was recorded: submit a recording to clear it.
+export function StaleDot({ title = "Changed since the take was recorded" }: { title?: string }) {
+  return <span title={title} aria-label={title} className="inline-block size-1.5 rounded-full bg-gold align-middle" />;
 }
 
 const inputCls = "h-8 min-w-0 max-w-full w-full rounded-md border border-line bg-panel2 px-2 outline-none focus:border-gold/70";
@@ -182,4 +187,5 @@ export const Icon = {
   check: <svg viewBox="0 0 16 16" className="size-3.5" fill="none" stroke="currentColor" strokeWidth="2"><path d="m3 8.5 3 3 7-7" /></svg>,
   dots: <svg viewBox="0 0 16 16" className="size-4" fill="currentColor"><circle cx="3.5" cy="8" r="1.3" /><circle cx="8" cy="8" r="1.3" /><circle cx="12.5" cy="8" r="1.3" /></svg>,
   exportIcon: <svg viewBox="0 0 16 16" className="size-4" fill="none" stroke="currentColor" strokeWidth="1.6"><path d="M8 10V2.5m0 0L5 5.5m3-3 3 3M3 10v3.5h10V10" /></svg>,
+  install: <svg viewBox="0 0 16 16" className="size-4" fill="none" stroke="currentColor" strokeWidth="1.6"><path d="M8 2.5v8m0 0-3-3m3 3 3-3M3 13.5h10" /></svg>,
 };

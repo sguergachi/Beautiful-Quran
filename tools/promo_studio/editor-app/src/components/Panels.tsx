@@ -1,9 +1,10 @@
 // Slide-over panels: Emulators, Jobs, Shortcuts (Export is in ExportPanel.tsx).
-import { useLayoutEffect, useRef, useState, type ReactNode } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { closeMenu } from "./Menu.tsx";
 import type { Emulator, Job } from "../lib/types.ts";
+import { fmtBytes } from "../lib/exporting.ts";
 import {
-  bootEmulator, cancelJob, openPanel, pollJobs, prepareEmulator, stopEmulator, useStore,
+  bootEmulator, buildApk, cancelJob, openPanel, pollJobs, prepareEmulator, refreshApk, stopEmulator, useStore,
 } from "../state/store.ts";
 import { api } from "../lib/api.ts";
 import { CaptureCard, LiveScreen, emulatorTone } from "./Inspector.tsx";
@@ -48,25 +49,61 @@ function statusOf(e: Emulator): { text: string; tone: ReturnType<typeof emulator
   return { text: "Ready to record", tone: "green" };
 }
 
+function ApkCard() {
+  const meta = useStore((s) => s.meta);
+  const jobs = useStore((s) => s.jobs);
+  const info = meta?.apk_info;
+  useEffect(() => { refreshApk(); }, []);
+  if (!info) return null;
+  const apkJobs = jobs.filter((j) => j.kind === "apk-build");
+  const build = apkJobs.find((j) => j.state === "running" || j.state === "queued");
+  const latest = apkJobs.reduce<Job | null>((a, b) => (a && a.created > b.created ? a : b), null);
+  const failed = !build && latest?.state === "error" ? latest : null;
+  const tone = build ? "orange" : !info.exists ? "gold" : info.up_to_date ? "green" : "gold";
+  const status = build ? build.msg
+    : !info.exists ? "No release APK yet — build one before preparing an emulator."
+    : info.up_to_date ? "Up to date with HEAD."
+    : info.head_dirty ? "The app has uncommitted changes this build does not include."
+    : `Behind HEAD (${info.head_commit}).`;
+  const bits = [
+    info.version && `v${info.version}`,
+    info.commit,
+    info.size_bytes != null && fmtBytes(info.size_bytes),
+    info.built_at && new Date(info.built_at * 1000).toLocaleString(undefined, { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" }),
+  ].filter(Boolean).join(" · ");
+  return (
+    <div className="mb-4 rounded-lg border border-line bg-panel2 p-3">
+      <div className="flex flex-wrap items-center gap-2">
+        <Dot tone={tone} />
+        <span className="font-semibold">Release APK</span>
+        <div className="flex-1" />
+        {!build && <Button size="sm" variant={info.up_to_date ? "subtle" : "primary"} onClick={buildApk} title="Run ./gradlew assembleRelease on this machine">Build latest</Button>}
+        {build && <Button size="sm" variant="ghost" onClick={() => cancelJob(build.id)}>Cancel</Button>}
+      </div>
+      {info.exists && <p className="num mt-1.5 text-[12px] text-mute">{bits}{!info.exact && <span className="text-faint" title="No studio build record; the commit is the newest one older than the file."> · estimated</span>}</p>}
+      {info.exists && info.commit_message && <p className="mt-0.5 truncate text-[12px] text-faint" title={info.commit_message}>{info.commit_message}</p>}
+      <p className="mt-1.5 flex min-w-0 flex-wrap items-baseline gap-x-2 gap-y-0.5 text-[12.5px]">
+        <span className={`min-w-0 break-words ${build ? "text-ink" : failed ? "text-danger" : "text-mute"}`}>{failed ? failed.error?.split("\n")[0] : status}</span>
+        {failed && <button className="shrink-0 text-[11.5px] text-faint hover:text-ink" onClick={() => openPanel("jobs")}>Full log</button>}
+      </p>
+      {build && <div className="mt-2"><Progress value={build.progress} indeterminate={build.state === "queued"} /></div>}
+    </div>
+  );
+}
+
 export function EmulatorsPanel() {
   const { emus, booting, emusLoaded, meta } = useStore();
-  const [cores, setCores] = useState("6");
+  const [cores, setCores] = useState(() => { try { return localStorage.getItem("promo.emuCores") || "6"; } catch { return "6"; } });
+  const pickCores = (v: string) => { setCores(v); try { localStorage.setItem("promo.emuCores", v); } catch { /* private mode */ } };
   return (
     <Drawer title="Emulators" onClose={() => openPanel(null)} width={460}
       right={<Button size="sm" variant="primary" onClick={() => bootEmulator(+cores)}>{Icon.plus} Start one</Button>}>
-      <p className="mb-4 text-[12.5px] leading-relaxed text-mute">
-        Takes are recorded on Android emulators, picture and sound together. Each one runs the real app; several can record in parallel.
-        A new emulator needs the app once (<em>Prepare</em>): it installs it and lets it download the recitation timings.
-        Record one take at a time for the smoothest ink; parallel captures share the host's CPU and GPU.
-      </p>
       <div className="mb-4 flex flex-wrap items-center gap-2 rounded-lg border border-line bg-panel2 p-2.5">
         <span className="text-mute">New emulators get</span>
-        <div className="w-28"><Select value={cores} options={[["4", "4 cores"], ["6", "6 cores"], ["8", "8 cores"]]} onChange={setCores} /></div>
+        <div className="w-28"><Select value={cores} options={[["4", "4 cores"], ["6", "6 cores"], ["8", "8 cores"]]} onChange={pickCores} /></div>
         <span className="text-[11.5px] text-faint">6 recommended for a single capture</span>
       </div>
-      {!meta?.apk_exists && (
-        <p className="mb-4 rounded border border-gold/40 bg-gold/10 p-2.5 text-[12px] text-gold">No release APK at {meta?.apk}. Build one (<code>./gradlew assembleRelease</code>) before preparing an emulator.</p>
-      )}
+      <ApkCard />
       {booting.map((j) => <JobRow key={j.id} job={j} />)}
       {emusLoaded && !emus.length && !booting.length && (
         <div className="rounded-lg border border-dashed border-line2 p-6 text-center text-mute">

@@ -8,9 +8,11 @@ import {
 } from "../state/store.ts";
 import { openMenu } from "./Menu.tsx";
 import { Button, Dot, Icon, Segmented } from "./ui.tsx";
+import { usePwaInstall } from "../lib/pwa.ts";
 
 export function TopBar() {
   const { spec, meta, undo: u, redo: r, saveState, saveError, jobs, emus, ui, name, panel } = useStore();
+  const { canInstall, install } = usePwaInstall();
   const live = jobs.filter((j) => j.state === "running" || j.state === "queued");
   const ready = emus.filter((e) => e.ready).length, busy = emus.filter((e) => e.job).length;
   const progress = live.length ? live.reduce((a, j) => a + j.progress, 0) / live.length : 0;
@@ -56,6 +58,12 @@ export function TopBar() {
           </span>
         )}
       </Button>
+      {canInstall && (
+        <Button variant="subtle" onClick={install} title="Install Promo Studio as a standalone app">
+          {Icon.install}
+          <span>Install</span>
+        </Button>
+      )}
       <Button variant="ghost" size="icon" onClick={() => openPanel("help")} title="Shortcuts (?)">?</Button>
       <Button variant="primary" disabled={!spec} active={panel === "export"} onClick={() => openPanel("export")} title="Format, size and quality, then export (Ctrl E)">
         {Icon.exportIcon}{renderJob ? `Exporting ${Math.round(renderJob.progress * 100)}%` : "Export…"}

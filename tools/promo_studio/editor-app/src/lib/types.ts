@@ -58,12 +58,22 @@ export interface Meta {
   export: ExportMeta;
   apk: string;
   apk_exists: boolean;
+  apk_info: ApkInfo;
+}
+
+/** The release APK on disk: what it was built from, and what HEAD has since. */
+export interface ApkInfo {
+  path: string; exists: boolean;
+  version: string | null; commit: string | null; commit_message: string | null;
+  built_at: number | null; size_bytes: number | null; exact: boolean;
+  head_version: string | null; head_commit: string | null; head_commit_message: string | null;
+  head_dirty: boolean; up_to_date: boolean;
 }
 
 export interface PhoneGeometry { W: number; H: number; bw: number; bh: number; body_r: number; sx0: number; sy0: number; sw: number; sh: number; screen_r: number; k: number }
 export interface Geo {
   W: number; H: number; fps: number; g: PhoneGeometry;
-  take: { length: number; lead: number; capture_fps: number; active_fps?: number; frame_p90_ms?: number; width: number; height: number; recorded: string } | null;
+  take: { length: number; lead: number; capture_fps: number; active_fps?: number; frame_p90_ms?: number; width: number; height: number; recorded: string; app?: Spec["app"] } | null;
   frame: string; clip: string | null; audio: string | null; peaks: string | null;
   plate: { w: number; h: number; k: number };
 }
@@ -103,7 +113,7 @@ export interface ExportMeta {
 
 export type JobState = "queued" | "running" | "done" | "error" | "cancelled";
 export interface Job {
-  id: string; kind: "capture" | "render" | "emu-boot" | "emu-prepare"; name: string; title: string;
+  id: string; kind: "capture" | "render" | "emu-boot" | "emu-prepare" | "apk-build"; name: string; title: string;
   serial: string | null; state: JobState; stage: { key: string; msg: string } | null;
   stages: { key: string; msg: string; at: number }[]; progress: number; msg: string; log: string[];
   created: number; started: number | null; ended: number | null; result: unknown; error: string | null;

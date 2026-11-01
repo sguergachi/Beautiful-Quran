@@ -36,6 +36,8 @@ export const api = {
   capture: (name: string, opts: { force?: boolean; serial?: string | null }) => post<Job>(`/api/capture/${name}`, opts),
   render: (name: string, opts: ExportOptions) => post<Job>(`/api/render/${name}`, opts),
   emus: (fresh = false) => call<{ emulators: Emulator[]; booting: Job[] }>(`/api/emus${fresh ? "?fresh=1" : ""}`),
+  apk: () => call<Meta["apk_info"]>("/api/apk"),
+  buildApk: () => post<Job>("/api/apk/build"),
   bootEmu: (cores: number) => post<Job>("/api/emus/boot", { cores }),
   prepareEmu: (serial: string) => post<Job>(`/api/emus/${serial}/prepare`),
   stopEmu: (serial: string) => post<{ ok: true }>(`/api/emus/${serial}/stop`),

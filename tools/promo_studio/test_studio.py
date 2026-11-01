@@ -504,4 +504,148 @@ class ServerTests(unittest.TestCase):
             self.assertEqual(json.loads(Path(d, "jobs.json").read_text()), [])
 
 
+class ApkTests(unittest.TestCase):
+    """The Build Latest card: what the APK was built from, and rebuilding it."""
+
+    def _git(self, log_before="f" * 40 + "\x00abcdef123\x00an old commit", dirty=""):
+        def fake(*args, **kwargs):
+            if args[:2] == ("rev-parse", "HEAD"):
+                return "a" * 40
+            if args[:2] == ("rev-parse", "--short=9"):
+                return "a" * 9
+            if args[:3] == ("log", "-1", "--format=%s"):
+                return "head commit"
+            if args[0] == "status":
+                return dirty
+            if args[0] == "log":
+                return log_before
+            raise AssertionError(f"unexpected git call: {args}")
+        return fake
+
+    def _apk_paths(self, d):
+        apk = str(Path(d, "app-release.apk"))
+        return apk, apk + ".json"
+
+    def test_missing_apk_still_reports_head(self):
+        with tempfile.TemporaryDirectory(dir=SCRATCH) as d:
+            apk, side = self._apk_paths(d)
+            with patch.object(server.emus, "DEFAULT_APK", apk), patch.object(server.emus, "APK_SIDECAR", side), \
+                    patch.object(server.emus, "_git", self._git()), \
+                    patch.object(server.emus, "gradle_version", lambda: "0.12 (13)"):
+                info = server.emus.apk_info()
+        self.assertEqual((info["exists"], info["up_to_date"], info["commit"]), (False, False, None))
+        self.assertEqual((info["head_commit"], info["head_version"]), ("a" * 9, "0.12 (13)"))
+
+    def test_sidecar_reports_the_exact_revision(self):
+        with tempfile.TemporaryDirectory(dir=SCRATCH) as d:
+            apk, side = self._apk_paths(d)
+            Path(apk).write_bytes(b"fake-apk")
+            st = os.stat(apk)
+            Path(side).write_text(json.dumps({"version": "0.12 (13)", "commit": "a" * 9, "commit_full": "a" * 40,
+                                              "commit_message": "head commit", "built_at": st.st_mtime,
+                                              "mtime_ns": st.st_mtime_ns, "size_bytes": st.st_size}))
+            with patch.object(server.emus, "DEFAULT_APK", apk), patch.object(server.emus, "APK_SIDECAR", side), \
+                    patch.object(server.emus, "_git", self._git()), \
+                    patch.object(server.emus, "gradle_version", lambda: "0.12 (13)"):
+                info = server.emus.apk_info()
+        self.assertEqual((info["exact"], info["version"], info["commit"]), (True, "0.12 (13)", "a" * 9))
+        self.assertTrue(info["up_to_date"])
+
+    def test_dirty_app_sources_mark_a_matching_build_stale(self):
+        with tempfile.TemporaryDirectory(dir=SCRATCH) as d:
+            apk, side = self._apk_paths(d)
+            Path(apk).write_bytes(b"fake-apk")
+            st = os.stat(apk)
+            Path(side).write_text(json.dumps({"version": "0.12 (13)", "commit": "a" * 9, "commit_full": "a" * 40,
+                                              "commit_message": "head commit", "built_at": st.st_mtime,
+                                              "mtime_ns": st.st_mtime_ns, "size_bytes": st.st_size}))
+            with patch.object(server.emus, "DEFAULT_APK", apk), patch.object(server.emus, "APK_SIDECAR", side), \
+                    patch.object(server.emus, "_git", self._git(dirty=" M app/src/main/Foo.kt")), \
+                    patch.object(server.emus, "gradle_version", lambda: "0.12 (13)"):
+                info = server.emus.apk_info()
+        self.assertTrue(info["head_dirty"])
+        self.assertFalse(info["up_to_date"])
+
+    def test_hand_built_apk_is_dated_not_exact(self):
+        with tempfile.TemporaryDirectory(dir=SCRATCH) as d:
+            apk, side = self._apk_paths(d)
+            Path(apk).write_bytes(b"fake-apk")
+            with patch.object(server.emus, "DEFAULT_APK", apk), patch.object(server.emus, "APK_SIDECAR", side), \
+                    patch.object(server.emus, "_git", self._git()), \
+                    patch.object(server.emus, "gradle_version", lambda: "0.12 (13)"):
+                info = server.emus.apk_info()
+        self.assertEqual((info["exact"], info["commit"], info["commit_message"], info["version"]),
+                         (False, "abcdef123", "an old commit", None))
+        self.assertFalse(info["up_to_date"])
+
+    def test_apk_build_yields_to_recordings_and_exports(self):
+        with tempfile.TemporaryDirectory(dir=SCRATCH) as d, patch.object(server, "JOB_DIR", d), \
+                patch.object(server.Jobs, "_loop", lambda self: None), \
+                patch.object(server.Jobs, "_start", lambda self, j: j.update(state="running")):
+            jobs = server.Jobs()
+            cap = jobs.submit("capture", "x", ["capture", "x"], serial="emulator-5650")
+            build = jobs.submit("apk-build", "release APK", ["apk-build"])
+            self.assertEqual((cap["state"], build["state"]), ("running", "queued"))
+            self.assertIn("recording", build["msg"])
+            with self.assertRaises(ValueError):
+                jobs.submit("apk-build", "release APK", ["apk-build"])
+            jobs.get(cap["id"])["state"] = "done"
+            jobs._pump()
+            self.assertEqual(jobs.get(build["id"])["state"], "running")
+            render = jobs.submit("render", "r", ["render", "r"])
+            self.assertEqual(render["state"], "queued", "an export waits for the APK build")
+
+    def test_find_jdk21_prefers_a_java_home_with_21(self):
+        with tempfile.TemporaryDirectory(dir=SCRATCH) as d:
+            bindir = Path(d, "jdk", "bin")
+            bindir.mkdir(parents=True)
+            java = bindir / "java"
+            java.write_text('#!/bin/sh\necho \'openjdk version "21.0.7" 2025-04-15\' >&2\n')
+            java.chmod(0o755)
+            with patch.dict(os.environ, {"JAVA_HOME": str(Path(d, "jdk"))}):
+                self.assertEqual(server.emus._find_jdk21(), str(Path(d, "jdk")))
+
+    def _fake_build(self, apk, code=0, lines=("> Task :app:assembleRelease", "BUILD SUCCESSFUL")):
+        class Proc:
+            def __init__(self, *a, **k):
+                self.stdout = list(lines)
+                self.returncode = code
+                if code == 0:
+                    Path(apk).write_bytes(b"fake-apk")
+            def poll(self): return 0
+            def terminate(self): pass
+        return Proc
+
+    def test_build_apk_streams_tasks_and_records_its_revision(self):
+        class Rep:
+            def __init__(self): self.stages, self.progresses, self.logs = [], [], []
+            def stage(self, key, msg=None, progress=None): self.stages.append(key)
+            def progress(self, value, msg=None): self.progresses.append(value)
+            def log(self, msg): self.logs.append(msg)
+            def result(self, value): pass
+        with tempfile.TemporaryDirectory(dir=SCRATCH) as d:
+            apk, side = self._apk_paths(d)
+            rep = Rep()
+            with patch.object(server.emus, "DEFAULT_APK", apk), patch.object(server.emus, "APK_SIDECAR", side), \
+                    patch.object(server.emus, "_find_jdk21", lambda: "/fake/jdk"), \
+                    patch.object(server.emus, "_git", self._git()), \
+                    patch.object(server.emus, "gradle_version", lambda: "0.12 (13)"), \
+                    patch("subprocess.Popen", self._fake_build(apk)):
+                self.assertEqual(server.emus.build_apk(rep), apk)
+            self.assertIn("> Task :app:assembleRelease", rep.logs)
+            self.assertEqual(rep.progresses[-1], 1.0)
+            written = json.loads(Path(side).read_text())
+            self.assertEqual((written["version"], written["commit"], written["size_bytes"]),
+                             ("0.12 (13)", "a" * 9, len(b"fake-apk")))
+
+    def test_build_apk_failure_reports_the_tail(self):
+        with tempfile.TemporaryDirectory(dir=SCRATCH) as d:
+            apk, side = self._apk_paths(d)
+            with patch.object(server.emus, "DEFAULT_APK", apk), patch.object(server.emus, "APK_SIDECAR", side), \
+                    patch.object(server.emus, "_find_jdk21", lambda: "/fake/jdk"), \
+                    patch("subprocess.Popen", self._fake_build(apk, code=1, lines=("> Task :app:kotlin", ":app: FAILED", "e: boom.kt"))):
+                with self.assertRaisesRegex(RuntimeError, "FAILED"):
+                    server.emus.build_apk()
+
+
 if __name__ == "__main__": unittest.main()

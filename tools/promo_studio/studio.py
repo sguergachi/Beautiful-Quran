@@ -48,7 +48,7 @@ def main():
     p.add_argument("--apk", default=os.path.join(S.REPO, "app/build/outputs/apk/release/app-release.apk"))
     p.add_argument("--cores", type=int, default=6); p.add_argument("--port", type=int)
     # the editor runs long work as `studio.py job ...`: JSON progress lines on stdout
-    p = sub.add_parser("job"); p.add_argument("kind", choices=["capture", "render", "emu-boot", "emu-prepare"])
+    p = sub.add_parser("job"); p.add_argument("kind", choices=["capture", "render", "emu-boot", "emu-prepare", "apk-build"])
     p.add_argument("target", nargs="?"); p.add_argument("--force", action="store_true")
     p.add_argument("--scale", type=float, default=1.0); p.add_argument("--cores", type=int, default=6)
     p.add_argument("--port", type=int); p.add_argument("--apk"); p.add_argument("--options", help="export settings, JSON")
@@ -151,6 +151,9 @@ def run_job(a):
         elif a.kind == "emu-prepare":
             import emus
             rep.result(emus.prepare(a.target, a.apk or emus.DEFAULT_APK, rep))
+        elif a.kind == "apk-build":
+            import emus
+            rep.result(emus.build_apk(rep))
     except BaseException as e:                 # SystemExit carries the user-facing errors
         rep.error(str(e) or e.__class__.__name__)
         if not isinstance(e, SystemExit):

@@ -275,4 +275,29 @@ class SequenceTests(unittest.TestCase):
             self.assertEqual(build.call_args.args[1], 90)
 
 
+class TakeMetaTests(unittest.TestCase):
+    def test_conform_records_the_settings_it_recorded(self):
+        import json
+        import tempfile
+        from pathlib import Path
+        app = spec.resolve({'app': {'reciter': 'hani', 'seconds': 60}})['app']
+
+        def fake_run(cmd, **kwargs):
+            m = Mock()
+            m.returncode = 0
+            joined = " ".join(cmd)
+            m.stdout = "12.5\n" if "format=duration" in joined else "1080,2400\n" if "width,height" in joined else ""
+            return m
+
+        with tempfile.TemporaryDirectory() as d, \
+                patch.object(capture, "audio_onset", return_value=5.0), \
+                patch.object(capture, "first_video_pts", return_value=0.0), \
+                patch.object(capture, "cadence", return_value={"active_fps": 60.0, "frame_p90_ms": 20.0}), \
+                patch("subprocess.run", side_effect=fake_run):
+            capture.conform(d, log=lambda m: None, marks={}, app=app)
+            meta = json.loads(Path(d, "meta.json").read_text())
+        self.assertEqual(meta["app"]["reciter"], "hani")
+        self.assertEqual(meta["app"]["seconds"], 60)
+
+
 if __name__ == '__main__': unittest.main()

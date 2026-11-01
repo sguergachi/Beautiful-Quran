@@ -310,12 +310,14 @@ class Jobs:
     def _can_start(self, j, running):
         # Recording must keep the emulator's cadence. Exporting on the same
         # host saturated CPU/memory and dropped capture/preview frames.
-        if j["kind"] in ("capture", "render") and any({r["kind"], j["kind"]} == {"capture", "render"} for r in running):
+        # A Gradle build is the same kind of load, so it waits its turn too.
+        BUILD = ("render", "apk-build")
+        if j["kind"] in ("capture", *BUILD) and any({r["kind"], j["kind"]} in ({"capture", "render"}, {"capture", "apk-build"}) for r in running):
             return False
         if j.get("take_key") and any(r.get("take_key") == j["take_key"] and "capture" in (j["kind"], r["kind"]) for r in running):
             return False
-        if j["kind"] == "render":
-            return not any(r["kind"] == "render" for r in running)
+        if j["kind"] in BUILD:
+            return not any(r["kind"] in BUILD for r in running)
         if j.get("serial"):
             return not any(r.get("serial") == j["serial"] for r in running)
         return True
@@ -329,9 +331,9 @@ class Jobs:
                     self._start(j)
                     running.append(j)
                     started = True
-                elif j["kind"] in ("capture", "render"):
+                elif j["kind"] in ("capture", "render", "apk-build"):
                     kinds = {r["kind"] for r in running}
-                    j["msg"] = "Waiting for recording to finish" if "capture" in kinds else "Waiting for export to finish" if "render" in kinds else "Waiting for emulator to be ready"
+                    j["msg"] = "Waiting for recording to finish" if "capture" in kinds else "Waiting for a build to finish" if kinds & {"render", "apk-build"} else "Waiting for emulator to be ready"
             if started:
                 self._save()
 
@@ -532,6 +534,8 @@ class Handler(BaseHTTPRequestHandler):
             self.send_header("Accept-Ranges", "bytes")
             self.send_header("Content-Length", str(end - start + 1))
             self.send_header("Cache-Control", cache)
+            if path.endswith("sw.js"):
+                self.send_header("Service-Worker-Allowed", "/")
             if download:
                 self.send_header("Content-Disposition", f'attachment; filename="{os.path.basename(path)}"')
             self.end_headers()
@@ -634,9 +638,11 @@ class Handler(BaseHTTPRequestHandler):
                 "backgrounds": {k: {"title": v["title"], "label": v.get("label", v["title"]), "suits": v["suits"], "thumb": f"/media/thumb/{k}.jpg"}
                                 for k, v in bgs.items()},
                 "surahs": surahs(), "out_dir": S.OUT, "export": formats.meta(), "apk": emus.DEFAULT_APK,
-                "apk_exists": os.path.exists(emus.DEFAULT_APK)})
+                "apk_exists": os.path.exists(emus.DEFAULT_APK), "apk_info": emus.apk_info()})
         if p == "/api/health":
             return self.send_json({"ok": True, "jobs": len(JOBS.jobs)})
+        if p == "/api/apk":
+            return self.send_json(emus.apk_info())
         if p == "/api/specs":
             names = sorted(f[:-5] for f in os.listdir(S.SPECS) if f.endswith(".json"))
             return self.send_json([spec_status(n) for n in names])
@@ -825,6 +831,8 @@ class Handler(BaseHTTPRequestHandler):
             emus.stop(m.group(1))
             _EMU_CACHE["at"] = 0
             return self.send_json({"ok": True})
+        if p == "/api/apk/build":
+            return self.send_json(JOBS.submit("apk-build", "release APK", ["apk-build"], title="Build APK"))
         self.send_json({"error": "not found"}, 404)
 
 
@@ -860,6 +868,8 @@ def ensure_built(force=False):
     """Build the editor when its sources are newer than the last build."""
     index = os.path.join(DIST, "index.html")
     src = [os.path.join(r, f) for r, _, fs in os.walk(os.path.join(APP_DIR, "src")) for f in fs]
+    if os.path.isdir(os.path.join(APP_DIR, "public")):
+        src += [os.path.join(r, f) for r, _, fs in os.walk(os.path.join(APP_DIR, "public")) for f in fs]
     src += [os.path.join(APP_DIR, f) for f in ("index.html", "package.json", "vite.config.ts")]
     newest = max((os.path.getmtime(f) for f in src if os.path.exists(f)), default=0)
     if not force and os.path.exists(index) and os.path.getmtime(index) >= newest:
