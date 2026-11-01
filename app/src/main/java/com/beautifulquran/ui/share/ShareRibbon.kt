@@ -10,10 +10,11 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.FormatQuote
-import androidx.compose.material.icons.rounded.Image
+import androidx.compose.material.icons.outlined.Image
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -59,7 +60,12 @@ fun ShareRibbon(
     val ink = MaterialTheme.colorScheme.onPrimary
     val busy = preparingText || preparingImage
     val canExport = count >= 1 && !busy
-    val exportTint = if (canExport) ink else ink.copy(alpha = 0.35f)
+    // Send is the bar's action, but two solid white glyphs against one pale
+    // cross tipped it to the right: ease the pair off pure ink, lift the cross,
+    // and draw the image as an outline — a filled block was the heaviest mark
+    // on the bar, at its far edge — to match the cross's line weight. The
+    // quotation marks stay solid: they are only two commas.
+    val exportTint = if (canExport) ink.copy(alpha = 0.88f) else ink.copy(alpha = 0.35f)
     val errorLine = error?.takeIf { it.isNotBlank() && !busy }
 
     Surface(
@@ -83,7 +89,7 @@ fun ShareRibbon(
             ShareBarIcon(
                 imageVector = Icons.Rounded.Close,
                 contentDescription = "Cancel share",
-                tint = ink.copy(alpha = 0.55f),
+                tint = ink.copy(alpha = 0.78f),
                 onClick = onCancel,
             )
             if (errorLine != null) {
@@ -102,11 +108,12 @@ fun ShareRibbon(
                 GatherHint(
                     ink = ink,
                     // One icon sits before the middle and two after it, so the
-                    // middle's own centre is off the bar's. Pulling its start in
-                    // by the difference (56 dp) centres the label on the bar.
+                    // middle's own centre is off the bar's. The left rule runs
+                    // 56 dp longer than the right to put the label back on the
+                    // bar's centre — and to fill the side the cross leaves bare.
                     modifier = Modifier
                         .weight(1f)
-                        .padding(start = 56.dp),
+                        .padding(horizontal = 8.dp),
                 )
             }
             Row(
@@ -122,7 +129,7 @@ fun ShareRibbon(
                     onClick = onShareText,
                 )
                 ShareBarIcon(
-                    imageVector = Icons.Rounded.Image,
+                    imageVector = Icons.Outlined.Image,
                     contentDescription = "Share as image",
                     tint = exportTint,
                     enabled = canExport,
@@ -135,6 +142,9 @@ fun ShareRibbon(
 }
 
 private const val GATHER_HINT = "Tap verses to share"
+
+/** How much longer the label's left rule runs than its right: the bar has one icon before the middle and two after. */
+private val GATHER_HINT_LEFT_EXTRA = 56.dp
 
 /**
  * The bar's centred label: small caps at whisper ink, flanked by hairlines
@@ -151,6 +161,7 @@ private fun GatherHint(ink: Color, modifier: Modifier = Modifier) {
         verticalAlignment = Alignment.CenterVertically,
         modifier = modifier.fillMaxWidth(),
     ) {
+        Box(Modifier.width(GATHER_HINT_LEFT_EXTRA).height(hairline).background(rule))
         Box(Modifier.weight(1f).height(hairline).background(rule))
         Text(
             text = GATHER_HINT.uppercase(),

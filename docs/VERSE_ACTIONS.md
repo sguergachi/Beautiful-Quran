@@ -257,12 +257,23 @@ The gather bar is not a copy of play. One row, two jobs: Close at the
 start (leave), Text and Image a tight pair at the end (send). The count
 lives on the verses. The middle carries one quiet line, TAP VERSES TO SHARE:
 true small caps (`forCaps`, the same label voice as NEXT) at 60% ink,
-centred on the bar between two one-pixel hairlines at 28% ink that run out
-toward the icons. One icon sits before the middle and two after it, so the
-middle is pulled in 56 dp at its start to centre the label on the bar, not
-on the middle. An export error replaces it. (`Dp.Hairline` is zero as a
-layout height; the rules are sized to one physical pixel.) The bar is the theme
-primary (DeepGreen on Paper) — gather's foot of the sheet, not play's
+centred on the bar between two one-pixel hairlines at 28% ink. An export
+error replaces it.
+
+**Balance.** One icon sits before the middle and two after it, so the bar
+leans right unless it is corrected, and it was: two solid white glyphs
+against one pale cross, with the rule stopping 70 dp short of the cross but
+17 dp from the quote. Three corrections: the left rule runs 56 dp longer than
+the right, which both centres the label on the bar (measured 538 vs 540 px on
+1080) and fills the side the cross leaves bare; the cross is lifted to 78%
+ink while the send pair eases to 88% (disabled 35%); and the image is drawn
+as an outline — a filled block was the heaviest mark on the bar, at its far
+edge — to match the cross's line weight. The quotation marks stay solid:
+they are only two commas, and their outlined form was fussier and bulkier.
+(`Dp.Hairline` is zero as a layout height; the rules are sized to one
+physical pixel.)
+
+The bar is the theme primary (DeepGreen on Paper) — gather's foot of the sheet, not play's
 paper. No Send page on the happy path; back leaves gather.
 
 Policy lives in `share/ShareUx.kt` (pure, JVM-tested). Do not invent
