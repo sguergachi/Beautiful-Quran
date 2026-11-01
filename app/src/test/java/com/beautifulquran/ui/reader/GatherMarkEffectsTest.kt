@@ -110,12 +110,32 @@ class GatherMarkEffectsTest {
     }
 
     @Test
-    fun `scribe tick leans on the trailing shoulder`() {
-        val ltr = scribeTickOrigin(frame, size = 17f, rtl = false)
-        val rtl = scribeTickOrigin(frame, size = 17f, rtl = true)
-        assertTrue(ltr.x + 17f / 2f > frame.cx)
-        assertTrue(rtl.x + 17f / 2f < frame.cx)
-        assertTrue(ltr.y < frame.cy - frame.ry)
+    fun `taj crown floats over the cups and is mirror-symmetric`() {
+        val dpPx = 1f
+        val foot = tajFoot(frame, dpPx)
+        assertEquals(frame.cx, foot.x, 0.001f)
+        assertTrue(foot.y < frame.cy - frame.ry)
+        val (right, _) = tajVolute(frame, dpPx, right = true)
+        val (left, _) = tajVolute(frame, dpPx, right = false)
+        right.zip(left).forEach { (r, l) ->
+            assertEquals(frame.cx - r.x, l.x - frame.cx, 0.01f)
+            assertEquals(r.y, l.y, 0.01f)
+        }
+    }
+
+    @Test
+    fun `taj volutes curl up and back inward, never down into the cups`() {
+        val dpPx = 1f
+        val (points, tangents) = tajVolute(frame, dpPx, right = true)
+        val foot = tajFoot(frame, dpPx)
+        // Every point stays above the cups' top.
+        points.forEach { assertTrue(it.y < frame.cy - frame.ry) }
+        // The curl rises above its foot and, partway round, heads back toward
+        // the centre (its last turn swings out again as the spiral closes).
+        assertTrue(points.minOf { it.y } < foot.y)
+        assertTrue(tangents.any { it.x < -0.5f })
+        // And it stays on its own side of the drop.
+        points.forEach { assertTrue(it.x > frame.cx) }
     }
 
     @Test

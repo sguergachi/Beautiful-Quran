@@ -208,7 +208,7 @@ interaction):
 | Qalam swash | A tapered kashida under the number, written from the line's start (right to left in Arabic), flicking up at its end |
 | Shamsa rays | Sixteen long-and-short rays drawn round the mark in reading order |
 | Pearl ring | Fourteen pearls and beads pressed in one after another |
-| Scribe's tick | A brush check at the mark's trailing shoulder |
+| Tāj crown | The illuminator's crown: a teardrop rises over the cups, two palmette volutes unfurl and curl in, pearls set at their ends |
 
 Dropping a verse lifts any effect off as a whole in 220 ms. Effects sit on
 the cups, not the line box: Hafs' cups stand 0.71 of their width tall,

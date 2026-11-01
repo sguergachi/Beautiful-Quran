@@ -17,6 +17,6 @@ enum class GatherMarkEffect(val label: String, val paintMs: Int) {
     SHAMSA_RAYS("Shamsa rays", 640),
     /** The illuminated roundel's pearl-and-bead border, each bead pressed in after the last. */
     PEARL_RING("Pearl ring", 620),
-    /** A scribe's brush tick at the mark's trailing shoulder, as in a collated margin. */
-    SCRIBE_TICK("Scribe's tick", 520),
+    /** The illuminator's tāj: a teardrop and two palmette volutes crowning the medallion. */
+    TAJ_CROWN("Tāj crown", 680),
 }

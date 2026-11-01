@@ -15,16 +15,13 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
-import androidx.compose.ui.graphics.drawscope.translate
 import androidx.compose.ui.unit.dp
 import com.beautifulquran.data.BrushCircleStyle
 import com.beautifulquran.data.GatherMarkEffect
 import com.beautifulquran.ui.theme.BrushOutline
 import com.beautifulquran.ui.theme.brushCircleParams
 import com.beautifulquran.ui.theme.hash11
-import com.beautifulquran.ui.theme.inkBrushCheckPath
 import com.beautifulquran.ui.theme.inkBrushCirclePath
-import com.beautifulquran.ui.theme.shippedCheckParams
 import com.beautifulquran.ui.theme.toClosedCubic
 import kotlin.math.PI
 import kotlin.math.cos
@@ -142,7 +139,7 @@ internal fun DrawScope.drawGatherMark(
         GatherMarkEffect.QALAM_SWASH -> drawQalamSwash(frame, paint, color, presence, rtl)
         GatherMarkEffect.SHAMSA_RAYS -> drawShamsaRays(frame, paint, color, presence, rtl)
         GatherMarkEffect.PEARL_RING -> drawPearlRing(frame, paint, color, presence, rtl)
-        GatherMarkEffect.SCRIBE_TICK -> drawScribeTick(frame, paint, color, presence, rtl)
+        GatherMarkEffect.TAJ_CROWN -> drawTajCrown(frame, paint, color, presence)
     }
 }
 
@@ -428,28 +425,133 @@ private fun DrawScope.drawPearlRing(frame: MarkFrame, paint: Float, color: Color
     }
 }
 
-// ------------------------------------------------------------- scribe tick
-
-/** The scribe's tick: the Settings brush check, smaller and a touch heavier. */
-private val GatherTickParams = shippedCheckParams().copy(peakHalfDp = 2.1f, alpha = 0.85f)
+// ---------------------------------------------------------------- tāj crown
 
 /**
- * Top-left of the tick's square at the mark's trailing shoulder: upper right
- * of an English mark, upper left of an Arabic one. It leans on the cups so
- * it reads as belonging to that number, not to the line above.
+ * The tāj: the small crown an illuminator sets atop a verse or ḥizb medallion.
+ * A teardrop rises from the cups' crown and two palmette volutes flare out
+ * from its foot, curling up and back in, each ending in a pearl. Symmetric on
+ * purpose — a single curl beside a number reads as a question mark.
+ *
+ * Sizes are dp for a 25 dp mark and scale with the mark, so the crown keeps
+ * its proportion at every type size.
  */
-internal fun scribeTickOrigin(frame: MarkFrame, size: Float, rtl: Boolean): Offset {
-    val y = frame.cy - frame.ry - size * 0.55f
-    val x = if (rtl) frame.cx - frame.rx - size * 0.55f else frame.cx + frame.rx - size * 0.35f
-    return Offset(x, y)
+internal object TajCrown {
+    const val MARK_WIDTH_DP = 25f
+    const val GAP_DP = 2.4f
+    const val DROP_DP = 7f
+    const val DROP_WIDTH_DP = 2.4f
+    const val FOOT_DP = 0.9f
+    const val VOLUTE_DP = 12f
+    const val STEM_HALF_DP = 0.72f
+    const val PEARL_DP = 0.8f
+
+    /** Leaves the foot heading out and a touch down… */
+    const val START_HEADING = 0.45f
+
+    /** …then turns 315° the other way, so it lifts and curls back over itself. */
+    val TURN = -1.75f * PI.toFloat()
+
+    /** Share of the turn kept for the end: the curl tightens as it grows, like a tendril. */
+    const val CURL_BIAS = 0.85f
 }
 
-private fun DrawScope.drawScribeTick(frame: MarkFrame, paint: Float, color: Color, presence: Float, rtl: Boolean) {
+/** The crown's own scale: 1 at a 25 dp mark. */
+internal fun tajScale(frame: MarkFrame, dpPx: Float): Float =
+    (2f * frame.rx) / (TajCrown.MARK_WIDTH_DP * dpPx)
+
+/** Where the crown stands: centred over the cups, a hair above their top. */
+internal fun tajFoot(frame: MarkFrame, dpPx: Float): Offset =
+    Offset(frame.cx, frame.cy - frame.ry - TajCrown.GAP_DP * dpPx * tajScale(frame, dpPx))
+
+/**
+ * One volute's centreline, foot to curl, as points and unit tangents.
+ * [right] picks the side; the left one is its mirror image.
+ */
+internal fun tajVolute(
+    frame: MarkFrame,
+    dpPx: Float,
+    right: Boolean,
+    steps: Int = 48,
+): Pair<List<Offset>, List<Offset>> {
+    val scale = tajScale(frame, dpPx)
+    val foot = tajFoot(frame, dpPx)
+    val side = if (right) 1f else -1f
+    val step = TajCrown.VOLUTE_DP * dpPx * scale / steps
+    var x = foot.x + side * TajCrown.FOOT_DP * dpPx * scale
+    var y = foot.y
+    val points = ArrayList<Offset>(steps + 1).apply { add(Offset(x, y)) }
+    val tangents = ArrayList<Offset>(steps + 1).apply {
+        add(Offset(side * cos(TajCrown.START_HEADING), sin(TajCrown.START_HEADING)))
+    }
+    for (i in 1..steps) {
+        val u = (i - 0.5f) / steps
+        val heading = TajCrown.START_HEADING +
+            TajCrown.TURN * ((1f - TajCrown.CURL_BIAS) * u + TajCrown.CURL_BIAS * u.pow(2.2f))
+        val tx = side * cos(heading)
+        val ty = sin(heading)
+        x += step * tx
+        y += step * ty
+        points += Offset(x, y)
+        tangents += Offset(tx, ty)
+    }
+    return points to tangents
+}
+
+private fun DrawScope.drawTajCrown(frame: MarkFrame, paint: Float, color: Color, presence: Float) {
     if (paint <= 0f) return
-    val size = 17.dp.toPx()
-    val origin = scribeTickOrigin(frame, size, rtl)
-    val path = inkBrushCheckPath(size = size, progress = easeOutCubic(paint), params = GatherTickParams)
-    translate(origin.x, origin.y) {
-        drawPath(path, color.copy(alpha = GatherTickParams.alpha * presence))
+    val dpPx = 1.dp.toPx()
+    val scale = tajScale(frame, dpPx)
+    val foot = tajFoot(frame, dpPx)
+    val tint = color.copy(alpha = 0.85f * presence)
+
+    // 1. The teardrop rises from the foot.
+    val rise = easeOutBack(paint / 0.45f, overshoot = 1.5f)
+    if (rise > 0f) {
+        val length = TajCrown.DROP_DP * dpPx * scale * rise
+        val halfWidth = TajCrown.DROP_WIDTH_DP * dpPx * scale * 0.5f * rise.coerceAtMost(1f)
+        val drop = Path()
+        val n = 24
+        for (j in 0..n) {
+            val t = j / n.toFloat()
+            val off = halfWidth * sin(PI.toFloat() * t.pow(0.65f)) * (1f - 0.15f * t)
+            val px = foot.x + off
+            val py = foot.y - length * t
+            if (j == 0) drop.moveTo(px, py) else drop.lineTo(px, py)
+        }
+        for (j in n downTo 0) {
+            val t = j / n.toFloat()
+            val off = halfWidth * sin(PI.toFloat() * t.pow(0.65f)) * (1f - 0.15f * t)
+            drop.lineTo(foot.x - off, foot.y - length * t)
+        }
+        drop.close()
+        drawPath(drop, tint)
+    }
+
+    // 2. Both volutes unfurl outward together, tapering as they curl.
+    val unfurl = easeOutCubic((paint - 0.15f) / 0.6f)
+    if (unfurl <= 0.02f) return
+    val stemHalf = TajCrown.STEM_HALF_DP * dpPx * scale
+    val hairline = 0.16f * dpPx * scale
+    for (right in booleanArrayOf(true, false)) {
+        val (points, tangents) = tajVolute(frame, dpPx, right)
+        val last = (points.lastIndex * unfurl).toInt().coerceAtLeast(1)
+        val tops = ArrayList<Offset>(last + 1)
+        val bottoms = ArrayList<Offset>(last + 1)
+        for (i in 0..last) {
+            val u = i / points.lastIndex.toFloat()
+            val w = stemHalf * (1f - 0.75f * u) * minOf(1f, u / 0.08f + 0.5f) + hairline
+            val nx = -tangents[i].y
+            val ny = tangents[i].x
+            tops += Offset(points[i].x + nx * w, points[i].y + ny * w)
+            bottoms += Offset(points[i].x - nx * w, points[i].y - ny * w)
+        }
+        drawPath(BrushOutline(top = tops, bottom = bottoms).toPath(), tint)
+
+        // 3. A pearl sets at each curl's end once it has closed.
+        val pearl = easeOutBack((paint - 0.72f) / 0.28f)
+        if (pearl > 0f) {
+            drawCircle(tint, radius = TajCrown.PEARL_DP * dpPx * scale * pearl, center = points.last())
+        }
     }
 }
