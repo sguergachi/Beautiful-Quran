@@ -532,6 +532,8 @@ class Handler(BaseHTTPRequestHandler):
             self.send_header("Accept-Ranges", "bytes")
             self.send_header("Content-Length", str(end - start + 1))
             self.send_header("Cache-Control", cache)
+            if path.endswith("sw.js"):
+                self.send_header("Service-Worker-Allowed", "/")
             if download:
                 self.send_header("Content-Disposition", f'attachment; filename="{os.path.basename(path)}"')
             self.end_headers()
@@ -860,6 +862,8 @@ def ensure_built(force=False):
     """Build the editor when its sources are newer than the last build."""
     index = os.path.join(DIST, "index.html")
     src = [os.path.join(r, f) for r, _, fs in os.walk(os.path.join(APP_DIR, "src")) for f in fs]
+    if os.path.isdir(os.path.join(APP_DIR, "public")):
+        src += [os.path.join(r, f) for r, _, fs in os.walk(os.path.join(APP_DIR, "public")) for f in fs]
     src += [os.path.join(APP_DIR, f) for f in ("index.html", "package.json", "vite.config.ts")]
     newest = max((os.path.getmtime(f) for f in src if os.path.exists(f)), default=0)
     if not force and os.path.exists(index) and os.path.getmtime(index) >= newest:
