@@ -9,6 +9,8 @@ internal data class WordTapInk(
     val seed: ActiveWord? = null,
     val pending: Boolean = seed != null,
     val positionIntentId: Long? = null,
+    /** The furthest word this tap's own performance has been heard at, once acknowledged. */
+    val latest: ActiveWord? = null,
 ) {
     /** Stale polls cannot release a tap; later words retain its prefix within this request. */
     fun onPoll(polled: ActiveWord?): WordTapInk {
@@ -19,18 +21,18 @@ internal data class WordTapInk(
             return if (sameVerse && polled.wordPosition == target.wordPosition &&
                 polled.playbackActivation >= target.playbackActivation
             ) {
-                copy(seed = target.copy(playbackActivation = polled.playbackActivation), pending = false)
+                copy(seed = target.copy(playbackActivation = polled.playbackActivation), pending = false, latest = polled)
             } else this
         }
         if (!sameVerse) return WordTapInk()
-        if (polled.playbackActivation == target.playbackActivation) return this
+        if (polled.playbackActivation == target.playbackActivation) return copy(latest = polled)
         // MediaController can report both its immediate seek and the session's
         // acknowledgement. They share one requested place, but each advances
         // the media generation. Only the same landing may rebase this origin.
         return if (positionIntentId != null &&
             polled.playbackActivation > target.playbackActivation &&
             polled.wordPosition == target.wordPosition && polled.startMs == target.startMs
-        ) copy(seed = target.copy(playbackActivation = polled.playbackActivation))
+        ) copy(seed = target.copy(playbackActivation = polled.playbackActivation), latest = polled)
             else WordTapInk()
     }
 
@@ -39,8 +41,20 @@ internal data class WordTapInk(
         val current = onPoll(polled)
         val target = current.seed ?: return polled
         if (current.pending) return target
-        // A temporarily missing timing anchor cannot erase the requested prefix.
-        if (polled == null) return target
+        // A temporarily missing timing anchor cannot erase the requested prefix
+        // (f65deb8a4) — but it must not rewind either. Falling back to the seed
+        // made the tapped word active again at a verse's end, so the words heard
+        // after it faded a second before the prefix did. Keep the latest heard
+        // word; once that was the verse's last, the verse is over and the tap
+        // lets go like any verse, so the whole verse fades together.
+        if (polled == null) {
+            val heard = current.latest ?: return target
+            if (heard.nextWordPosition == null && heard.wordPosition > target.wordPosition) return null
+            return heard.copy(
+                activation = if (heard.wordPosition == target.wordPosition) target.activation else heard.activation,
+                tapStartPosition = target.wordPosition,
+            )
+        }
         return polled.copy(
             activation = if (polled.wordPosition == target.wordPosition) target.activation else polled.activation,
             tapStartPosition = target.wordPosition,

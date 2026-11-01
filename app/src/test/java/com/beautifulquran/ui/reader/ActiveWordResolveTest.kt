@@ -295,4 +295,28 @@ class ActiveWordResolveTest {
         assertFalse(wait.heard(inkId = 0, isPlaying = false, isBuffering = true))
         assertTrue(wait.heard(inkId = 0, isPlaying = true, isBuffering = false))
     }
+
+    @Test
+    fun `a missing poll after the tap holds the heard word rather than rewinding to the tap`() {
+        val seed = word(position = 5, fromTap = true)
+        val tap = WordTapInk(seed).onPoll(word(position = 5, activation = 7))
+            .onPoll(word(position = 9, activation = 7).copy(nextWordPosition = 10))
+        val shown = tap.onPoll(null).resolve(null)!!
+        assertEquals(9, shown.wordPosition)
+        assertEquals(5, shown.tapStartPosition)
+        // Every word up to the heard one stays read: nothing after the tap fades early.
+        for (position in 1..8) {
+            assertEquals(InkEngine.State.Recited,
+                InkEngine.wordState(position, shown, isActiveAyah = true, dimmed = false))
+        }
+    }
+
+    @Test
+    fun `after the verse's last word a missing poll lets the whole verse go together`() {
+        val seed = word(position = 5, fromTap = true)
+        val last = word(position = 12, activation = 7)  // nextWordPosition null: the verse's last word
+        val tap = WordTapInk(seed).onPoll(word(position = 5, activation = 7)).onPoll(last)
+        assertNull(tap.onPoll(null).resolve(null))
+    }
 }
+
