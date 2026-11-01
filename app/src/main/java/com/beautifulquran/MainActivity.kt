@@ -2,6 +2,7 @@ package com.beautifulquran
 
 import android.content.Intent
 import android.os.Bundle
+import android.util.Log
 import android.widget.Toast
 import androidx.activity.compose.BackHandler
 import androidx.activity.ComponentActivity
@@ -17,6 +18,7 @@ import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.navigationBarsIgnoringVisibility
 import androidx.compose.foundation.layout.navigationBarsPadding
@@ -144,6 +146,7 @@ import com.beautifulquran.ui.theme.SettingsPaper
 import com.beautifulquran.ui.theme.TimingsLabAccents
 import com.beautifulquran.ui.theme.absorbPointerEvents
 import com.beautifulquran.ui.theme.contrastingOverlayColorScheme
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.launch
@@ -401,6 +404,11 @@ private const val AYAH_LAYER = 1
 private const val SETTINGS_LAYER = 2
 /** Al-Baqarah: a chapter opening, a basmalah preface and ordinary verses. */
 private const val REHEARSAL_SURAH_ID = 2
+/** The verses it sets: enough to fill a phone's first screen. */
+private const val REHEARSAL_AYAHS = 3
+/** Untouched this long before it starts: past the end of a fling on Home. */
+private const val REHEARSAL_QUIET_MS = 1_500L
+private const val REHEARSAL_POLL_MS = 250L
 private const val STACK_PAGE_DURATION_MS = 460
 private const val STACK_PAGE_TURN_THRESHOLD = 0.15f
 private const val STACK_PAGE_FLING_THRESHOLD = 0.30f
@@ -1030,10 +1038,12 @@ private fun PaperStackApp(
     // Read where the pinned bar draws, never in composition.
     val stackHeightPx = remember { mutableIntStateOf(0) }
     var dragSnapJob by remember { mutableStateOf<kotlinx.coroutines.Job?>(null) }
+    val touchQuiet = remember { TouchQuiet() }
     Box(
         modifier = Modifier
             .fillMaxSize()
             .background(MaterialTheme.colorScheme.background)
+            .watchTouches(touchQuiet)
             .onSizeChanged { stackHeightPx.intValue = it.height }
             .paperStackDrag(
                 gestureKey = selectedSurahId,
@@ -1192,37 +1202,83 @@ private fun PaperStackApp(
 
         // The first open of a chapter after launch hitched where every later
         // open, of any chapter, did not: it was the first time this process
-        // drew a reader page. Draw one once, in the reader's own slot under
-        // the home sheet, as soon as the cover has finished — see
-        // ReaderRehearsal. Scroll only: the mushaf leaf draws other things.
-        // An opened reader already lives in this slot under Home for the rest
-        // of the session, so this adds no new kind of overdraw.
-        var rehearsalContent by remember { mutableStateOf<SurahContent?>(null) }
-        LaunchedEffect(entranceVisible, settings.readingLayout, selectedSurahId) {
-            if (selectedSurahId != 0) {
-                // A real open has done the rehearsal's work, or is about to.
+        // drew a reader page. Draw one once, out of sight, so the real open is
+        // not the first — see ReaderRehearsal. Scroll only: the mushaf leaf
+        // draws other things.
+        //
+        // It must never cost a visible frame, so it only exists while Home lies
+        // settled on top of the stack — the one place the reader's slot is
+        // hidden (with no chapter open, Settings takes that slot as soon as the
+        // stack moves) — with no overlay or keyboard up and the screen
+        // untouched for REHEARSAL_QUIET_MS. A touch, a turn, an overlay or
+        // the keyboard takes it away at once; it tries again at the next
+        // quiet moment.
+        //
+        // Typing in Home's search happens in the keyboard's window, out of
+        // the touch watcher's sight: an open keyboard is not quiet either.
+        val imeInsets = WindowInsets.ime
+        val rehearsalDensity = LocalDensity.current
+        val rehearsalWindow by remember {
+            derivedStateOf {
+                settledLayer == COVER_LAYER &&
+                    abs(stackPosition.value - COVER_LAYER) < 0.001f &&
+                    imeInsets.getBottom(rehearsalDensity) == 0
+            }
+        }
+        val rehearsalWanted = selectedSurahId == 0 && !entranceVisible && rehearsalWindow &&
+            !overlayBlocking && settings.readingLayout == ReadingLayout.SCROLL
+        var rehearsalSource by remember { mutableStateOf<SurahContent?>(null) }
+        var rehearsing by remember { mutableStateOf(false) }
+        var rehearsalRetry by remember { mutableIntStateOf(0) }
+        LaunchedEffect(selectedSurahId, settings.readingLayout) {
+            // A real scroll open has done the rehearsal's work, or is about to.
+            if (selectedSurahId != 0 && settings.readingLayout == ReadingLayout.SCROLL) {
                 ReaderRehearsalState.done = true
-                rehearsalContent = null
+            }
+        }
+        LaunchedEffect(rehearsalWanted, rehearsalRetry) {
+            if (!rehearsalWanted || ReaderRehearsalState.done) {
+                rehearsing = false
                 return@LaunchedEffect
             }
-            if (ReaderRehearsalState.done || entranceVisible) return@LaunchedEffect
-            if (settings.readingLayout != ReadingLayout.SCROLL) return@LaunchedEffect
-            rehearsalContent = runCatching {
-                app.repository.surahContent(REHEARSAL_SURAH_ID)
-            }.getOrNull()
+            if (rehearsalSource == null) {
+                rehearsalSource = try {
+                    app.repository.surahContent(REHEARSAL_SURAH_ID, throughAyah = REHEARSAL_AYAHS)
+                } catch (cancelled: CancellationException) {
+                    throw cancelled
+                } catch (failure: Exception) {
+                    // Nothing breaks without it; the first open is only slower.
+                    Log.w("ReaderRehearsal", "could not load the rehearsal page", failure)
+                    ReaderRehearsalState.done = true
+                    return@LaunchedEffect
+                }
+            }
+            while (!touchQuiet.quietFor(REHEARSAL_QUIET_MS)) delay(REHEARSAL_POLL_MS)
+            rehearsing = true
         }
-        val rehearsal = rehearsalContent
-        if (rehearsal != null && selectedSurahId == 0) {
+        val rehearsal = rehearsalSource
+        if (rehearsing && rehearsalWanted && rehearsal != null && !ReaderRehearsalState.done) {
             PaperPage(
                 layer = PaperLayer.Ayah,
                 stackPosition = stackPositionProvider,
                 settingsLayer = settingsLayer,
                 modifier = Modifier.zIndex(1f),
             ) {
-                ReaderRehearsal(content = rehearsal, settings = settings) {
-                    ReaderRehearsalState.done = true
-                    rehearsalContent = null
-                }
+                ReaderRehearsal(
+                    content = rehearsal,
+                    settings = settings,
+                    shouldYield = { !touchQuiet.quietFor(REHEARSAL_QUIET_MS) },
+                    onYield = {
+                        // Back to waiting for quiet: re-key the effect above.
+                        rehearsing = false
+                        rehearsalRetry++
+                    },
+                    onDone = {
+                        ReaderRehearsalState.done = true
+                        rehearsing = false
+                        rehearsalSource = null
+                    },
+                )
             }
         }
 
@@ -1761,6 +1817,32 @@ private fun Modifier.paperDropShadow(
             topLeft = Offset(size.width, 0f),
             size = Size(shadowWidth, size.height),
         )
+    }
+}
+
+/**
+ * When the screen was last touched — read by background work that must only run
+ * while nobody is using the app (the reader rehearsal). Plain fields, not
+ * Compose state: written on every pointer event, read only by polling, so it
+ * never recomposes anything.
+ */
+private class TouchQuiet {
+    @Volatile var pressed: Boolean = false
+    @Volatile var lastEventNanos: Long = System.nanoTime()
+
+    /** Nothing down, and no pointer event for [millis] (a fling has time to end). */
+    fun quietFor(millis: Long): Boolean =
+        !pressed && System.nanoTime() - lastEventNanos >= millis * 1_000_000L
+}
+
+/** Notes every pointer event for [quiet]; consumes nothing, so no gesture changes. */
+private fun Modifier.watchTouches(quiet: TouchQuiet): Modifier = pointerInput(quiet) {
+    awaitPointerEventScope {
+        while (true) {
+            val event = awaitPointerEvent(PointerEventPass.Initial)
+            quiet.pressed = event.changes.any { it.pressed }
+            quiet.lastEventNanos = System.nanoTime()
+        }
     }
 }
 

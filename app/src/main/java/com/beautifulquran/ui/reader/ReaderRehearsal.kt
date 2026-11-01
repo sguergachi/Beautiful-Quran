@@ -6,6 +6,10 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Modifier
 import com.beautifulquran.data.AyahSelectorSide
@@ -30,23 +34,35 @@ import com.beautifulquran.ui.theme.LocalGildingTilt
  *
  * It is the real [ChapterOpening], [BasmalahBlock] and [AyahBlock] with the
  * reader's own settings — a lookalike would warm the wrong shaders and faces.
- * Nothing is interactive and nothing reaches a view model. [onDone] removes it
- * after a few frames; it is drawn exactly where an opened reader sits under
- * the home sheet, so it is never visible.
+ * Nothing is interactive and nothing reaches a view model.
+ *
+ * It must never cost a frame the reader can see. The caller only mounts it
+ * while Home lies settled on top and nobody is touching the screen, and takes
+ * it away the moment that stops. Here it is set one block per frame — the
+ * opening, then the basmalah, then each verse — so no single frame carries the
+ * whole page's composition and first draw; before every block it asks
+ * [shouldYield], and on a yes it stops and calls [onYield] without [onDone]:
+ * the caller tries again at the next quiet moment. [onDone] comes a few frames
+ * after the last block has been drawn.
  */
 @Composable
 internal fun ReaderRehearsal(
     content: SurahContent,
     settings: Settings,
+    shouldYield: () -> Boolean,
+    onYield: () -> Unit,
     onDone: () -> Unit,
 ) {
     val surah = content.surah
+    val verses = content.ayahs.take(REHEARSED_AYAHS)
+    // 1 = opening, 2 = + basmalah, 3.. = + each verse.
+    var blocks by remember { mutableIntStateOf(0) }
     Column(
         Modifier
             .fillMaxSize()
             .background(MaterialTheme.colorScheme.background),
     ) {
-        ChapterOpening(
+        if (blocks >= 1) ChapterOpening(
             chapterNumber = surah.id,
             nameArabic = surah.nameArabic,
             nameTransliteration = surah.nameTransliteration,
@@ -55,13 +71,13 @@ internal fun ReaderRehearsal(
             ayahCount = surah.ayahCount,
             sheen = LocalGildingTilt.current,
         )
-        BasmalahBlock(
+        if (blocks >= 2) BasmalahBlock(
             active = false,
             dimmed = false,
             fontScale = settings.fontScale,
         )
-        content.ayahs.take(REHEARSED_AYAHS).forEach { ayah ->
-            AyahBlock(
+        verses.forEachIndexed { index, ayah ->
+            if (blocks >= 3 + index) AyahBlock(
                 ayah = ayah,
                 readingMode = settings.readingMode,
                 activeWord = null,
@@ -82,16 +98,24 @@ internal fun ReaderRehearsal(
         }
     }
     LaunchedEffect(Unit) {
-        // Composition, then a draw the render thread has to execute: a few
-        // frames so the recorded page has actually reached the GPU.
-        repeat(REHEARSAL_FRAMES) { withFrameNanos { } }
+        val total = 2 + verses.size
+        // A block per frame, then a few frames so the last recorded block has
+        // actually reached the GPU.
+        repeat(total + REHEARSAL_SETTLE_FRAMES) { frame ->
+            withFrameNanos { }
+            if (shouldYield()) {
+                onYield()
+                return@LaunchedEffect
+            }
+            if (frame < total) blocks = frame + 1
+        }
         onDone()
     }
 }
 
 /** Enough verses to fill a phone's first screen in every reading mode. */
 private const val REHEARSED_AYAHS = 3
-private const val REHEARSAL_FRAMES = 4
+private const val REHEARSAL_SETTLE_FRAMES = 4
 
 /** Once per process: the caches it warms live as long as the process does. */
 internal object ReaderRehearsalState {
