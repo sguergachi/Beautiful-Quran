@@ -53,6 +53,7 @@ import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.State
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
@@ -87,12 +88,13 @@ import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.Shadow
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.StrokeJoin
-import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.clipRect
 import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.AlignmentLine
+import androidx.compose.ui.layout.FirstBaseline
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.layout.LayoutCoordinates
 import androidx.compose.ui.layout.boundsInWindow
@@ -157,7 +159,6 @@ import com.beautifulquran.ui.theme.gilded
 import com.beautifulquran.ui.theme.glyphLayerAlpha
 import com.beautifulquran.ui.theme.brushCircleParams
 import com.beautifulquran.ui.theme.inkBrushCircleMark
-import com.beautifulquran.ui.theme.inkBrushCirclePath
 import com.beautifulquran.ui.theme.inkBrushCircleTarget
 import com.beautifulquran.ui.theme.inkSpotHighlight
 import com.beautifulquran.ui.theme.rememberInkBrushCircle
@@ -354,75 +355,29 @@ internal fun TextLayoutResult.markContains(
     return markRadiusHits(tap, bounds, minRadiusPx)
 }
 
-/** The brush that circles a gathered verse's `﴿N﴾`: the gather ordinal's tight loop, a little roomier. */
-private val GatheredMarkBrush = brushCircleParams(BrushCircleStyle.BASELINE).copy(
-    padXDp = 4f,
-    padYDp = 0f,
-    bow = 2.5f,
-    peakHalfDp = 1.7f,
-    paintMs = 480,
-)
-
 /**
- * How far the brush has circled a verse's `﴿N﴾`. Painting follows [gathered]
- * going true — the reader's tap answered on the very number they touched —
- * and the loop draws back off when the verse is dropped. A mark that scrolls
- * in already gathered starts drawn, so nothing repaints as the list recycles.
+ * Marks the `﴿N﴾` inside a shaped verse line while its verse is gathered,
+ * with the developer-chosen [LocalGatherMarkEffect]. Draw-phase only: bounds
+ * and progress are read at draw time, so a tap costs a redraw, never a relayout.
  */
 @Composable
-private fun rememberGatheredMarkProgress(gathered: Boolean): State<Float> {
-    val progress = remember { Animatable(if (gathered) 1f else 0f) }
-    LaunchedEffect(gathered) {
-        if (gathered) {
-            progress.animateTo(
-                1f,
-                tween(durationMillis = GatheredMarkBrush.paintMs, easing = FastOutSlowInEasing),
-            )
-        } else {
-            progress.animateTo(0f, tween(durationMillis = 220, easing = FastOutSlowInEasing))
-        }
-    }
-    return progress.asState()
-}
-
-/** Strokes the gathered-mark loop in [ink] around [bounds] (this node's own coordinates). */
-private fun DrawScope.drawGatheredMarkCircle(bounds: Rect, progress: Float, ink: Color) {
-    if (progress <= 0f || bounds.width <= 0f) return
-    val rx = bounds.width / 2f + GatheredMarkBrush.padXDp.dp.toPx()
-    // The line box is much taller than the cups; keep the loop close to the
-    // painted ornament rather than the leading around it.
-    val ry = minOf(bounds.height / 2f, rx * 0.78f).coerceAtLeast(10.dp.toPx())
-    val path = inkBrushCirclePath(
-        cx = bounds.center.x,
-        cy = bounds.center.y,
-        rx = rx,
-        ry = ry,
-        peakHalf = GatheredMarkBrush.peakHalfDp.dp.toPx(),
-        bowPx = GatheredMarkBrush.bow.dp.toPx(),
-        progress = progress,
-        params = GatheredMarkBrush,
-    )
-    drawPath(path, ink.copy(alpha = GatheredMarkBrush.alpha))
-}
-
-/**
- * Circles the `﴿N﴾` inside a shaped verse line while its verse is gathered.
- * Draw-phase only: the bounds and progress are read at draw time, so tapping
- * costs a redraw, never a relayout.
- */
-@Composable
-private fun Modifier.gatheredMarkCircle(
+private fun Modifier.gatheredMarkEffect(
     gathered: Boolean,
     layout: () -> TextLayoutResult?,
     markRange: IntRange,
+    rtl: Boolean,
+    seed: Int,
 ): Modifier {
-    val progress = rememberGatheredMarkProgress(gathered)
-    val ink = QuranTheme.ink.body
+    val effect = LocalGatherMarkEffect.current
+    val ink = rememberGatherMarkInk(gathered, effect.paintMs)
+    val color = QuranTheme.ink.body
     return drawBehind {
-        val p = progress.value
-        if (p <= 0f) return@drawBehind
-        val bounds = layout()?.markGlyphBounds(markRange) ?: return@drawBehind
-        drawGatheredMarkCircle(bounds, p, ink)
+        if (ink.presence <= 0f) return@drawBehind
+        val text = layout() ?: return@drawBehind
+        val bounds = text.markGlyphBounds(markRange) ?: return@drawBehind
+        // The cups close the verse, so their last glyph names the line.
+        val baseline = text.getLineBaseline(text.getLineForOffset(markRange.last))
+        drawGatherMark(effect, bounds, baseline, ink, color, rtl = rtl, seed = seed)
     }
 }
 
@@ -2007,10 +1962,12 @@ private fun ResponsiveEnglishAyah(
                 rtl = false,
                 feather = InkEngine.tuning.washFeather,
             )
-            .gatheredMarkCircle(
+            .gatheredMarkEffect(
                 gathered = markGathered,
                 layout = { layoutResult },
                 markRange = rendered.markRange,
+                rtl = false,
+                seed = ayah.number,
             )
             .ayahTapTarget(
                 ayah = ayah,
@@ -2264,10 +2221,12 @@ private fun ResponsiveHafsAyah(
                 rtl = true,
                 feather = InkEngine.tuning.washFeather,
             )
-            .gatheredMarkCircle(
+            .gatheredMarkEffect(
                 gathered = markGathered,
                 layout = { layoutResult },
                 markRange = rendered.markRange,
+                rtl = true,
+                seed = ayah.number,
             )
             .ayahTapTarget(
                 ayah = ayah,
@@ -2393,8 +2352,9 @@ private fun ArabicAyahNumberUnit(
     onLongClick: (() -> Unit)? = null,
 ) {
     val density = LocalDensity.current
-    val markProgress = rememberGatheredMarkProgress(gathered)
-    val markInk = QuranTheme.ink.body
+    val markEffect = LocalGatherMarkEffect.current
+    val markInk = rememberGatherMarkInk(gathered, markEffect.paintMs)
+    val markColor = QuranTheme.ink.body
     val arabicLineHeight = with(density) {
         (ArabicWordStyle.fontSize * fontScale * 1.9f).toDp()
     }
@@ -2421,11 +2381,30 @@ private fun ArabicAyahNumberUnit(
             .padding(horizontal = 8.dp),
         contentAlignment = Alignment.Center,
     ) {
+        // The mark's own baseline, carried up from its Text, so the effect
+        // sits on the cups and not on the font's padded line box.
+        val markBaseline = remember { mutableFloatStateOf(Float.NaN) }
         Box(
-            modifier = Modifier.drawBehind {
-                val p = markProgress.value
-                if (p > 0f) drawGatheredMarkCircle(Rect(Offset.Zero, size), p, markInk)
-            },
+            modifier = Modifier
+                .layout { measurable, constraints ->
+                    val placeable = measurable.measure(constraints)
+                    val baseline = placeable[FirstBaseline]
+                    markBaseline.floatValue =
+                        if (baseline == AlignmentLine.Unspecified) Float.NaN else baseline.toFloat()
+                    layout(placeable.width, placeable.height) { placeable.place(0, 0) }
+                }
+                .drawBehind {
+                    // The gloss row is Arabic: the verse reads right to left.
+                    drawGatherMark(
+                        markEffect,
+                        Rect(Offset.Zero, size),
+                        markBaseline.floatValue.takeUnless { it.isNaN() },
+                        markInk,
+                        markColor,
+                        rtl = true,
+                        seed = number,
+                    )
+                },
         ) {
             AyahNumberMark(number, fontScale, useArabicIndicDigits = useArabicIndicDigits)
         }

@@ -196,10 +196,25 @@ to add or drop it. Word long-press stays Root Viewer when idle; notes stay
 on the bookmark ribbon. Idle transport has no Share / Gather control
 (#519).
 
-The tapped `﴿N﴾` answers the touch itself: while its verse is gathered an
-ink brush circle (the same loop the gather ordinal uses) paints around the
-mark in 480 ms, and draws back off in 220 ms when the verse is dropped. Page
-ink, not gold — gold never marks interaction. Scroll reader, all three modes.
+The tapped `﴿N﴾` answers the touch itself. Readers get an ink brush circle
+(the gather ordinal's loop) painted round the mark; Settings → Developer →
+**Gather mark** A/Bs five more, all in page ink, never gold (gold never marks
+interaction):
+
+| Effect | What it does |
+|---|---|
+| Brush circle | The ordinal's brush loop round the cups (480 ms) |
+| Ink drop | A wet drop lands behind the number, runs past its edge, dries to a pale stain with a darker tide line |
+| Qalam swash | A tapered kashida under the number, written from the line's start (right to left in Arabic), flicking up at its end |
+| Shamsa rays | Sixteen long-and-short rays drawn round the mark in reading order |
+| Pearl ring | Fourteen pearls and beads pressed in one after another |
+| Scribe's tick | A brush check at the mark's trailing shoulder |
+
+Dropping a verse lifts any effect off as a whole in 220 ms. Effects sit on
+the cups, not the line box: Hafs' cups stand 0.71 of their width tall,
+centred 0.105 widths above the shared baseline (measured on device in
+English and Arabic lines). Ring counts are never six-fold. Code:
+`ui/reader/GatherMarkEffects.kt`. Scroll reader, all three modes.
 
 Marking uses the paper toggle haptic: a confirm click on, a lighter clock
 tick off. Same family as Settings checks and the ayah rail.

@@ -73,6 +73,7 @@ import com.beautifulquran.R
 import com.beautifulquran.data.BookTypeface
 import com.beautifulquran.data.ScrollArabicFace
 import com.beautifulquran.data.BrushCircleStyle
+import com.beautifulquran.data.GatherMarkEffect
 import com.beautifulquran.data.MushafBannerStyle
 import com.beautifulquran.data.RuntimeCachePhase
 import com.beautifulquran.data.RuntimeMushafCache
@@ -408,6 +409,17 @@ private fun DeveloperSection(
         )
     }
     Caption("Shared by Arabic and English Mushaf.")
+
+    Spacer(Modifier.height(20.dp))
+    SectionLabel("Gather mark")
+    GatherMarkEffect.entries.forEach { effect ->
+        SelectRow(
+            label = effect.label,
+            selected = settings.gatherMarkEffect == effect,
+            onClick = { viewModel.settings.update { it.copy(gatherMarkEffect = effect) } },
+        )
+    }
+    Caption("How a verse number answers the tap that gathers it. Readers get the brush circle.")
 
     Spacer(Modifier.height(20.dp))
     val app = context.applicationContext as QuranApp
