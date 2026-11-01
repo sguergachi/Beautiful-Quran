@@ -130,12 +130,13 @@ becomes share tools; multi is extension) without taxing bookmark.
 **Share ribbon (replaces PlayerBar while sharing)**
 
 ```text
-  Cancel          Text  Image
+  ✕  ───────  ❝ TEXT · ▣ IMAGE  ───────        (one or more gathered)
+  ✕  ─────  TAP VERSES TO SHARE  ─────        (none gathered)
 ```
 
-- Count lives on the verse ordinals, not the bar. The empty middle stays
-  empty unless export fails, then a quiet ink line sits there.
-- `Text` / `Image` are faint until `N ≥ 1`
+- Count lives on the verse ordinals, not the bar. The bar's middle is one
+  centred slot between hairlines whose content follows the gather (see
+  below); an export failure takes the slot.
 - `Cancel`, system back, or swiping the reader sheet away drops selection
   and restores transport. Cancel also aborts an in-flight export.
 - Completing share restores transport
@@ -253,25 +254,30 @@ Marking another verse while gathering uses the paper toggle haptic: a
 confirm click on, a lighter clock tick off. Same family as Settings checks
 and the ayah rail.
 
-The gather bar is not a copy of play. One row, two jobs: Close at the
-start (leave), Text and Image a tight pair at the end (send). The count
-lives on the verses. The middle carries one quiet line, TAP VERSES TO SHARE:
-true small caps (`forCaps`, the same label voice as NEXT) at 60% ink,
-centred on the bar between two one-pixel hairlines at 28% ink. An export
-error replaces it.
+The gather bar is not a copy of play. Close sits at the start (leave);
+everything else is **one centred slot** between two one-pixel hairlines at
+28% ink, and what it holds follows the gather (`gatherBarMiddle`, tested):
 
-**Balance.** One icon sits before the middle and two after it, so the bar
-leans right unless it is corrected, and it was: two solid white glyphs
-against one pale cross, with the rule stopping 70 dp short of the cross but
-17 dp from the quote. Three corrections: the left rule runs 56 dp longer than
-the right, which both centres the label on the bar (measured 538 vs 540 px on
-1080) and fills the side the cross leaves bare; the cross is lifted to 78%
-ink while the send pair eases to 88% (disabled 35%); and the image is drawn
-as an outline — a filled block was the heaviest mark on the bar, at its far
-edge — to match the cross's line weight. The quotation marks stay solid:
-they are only two commas, and their outlined form was fussier and bulkier.
-(`Dp.Hairline` is zero as a layout height; the rules are sized to one
-physical pixel.)
+- **Nothing gathered:** TAP VERSES TO SHARE — true small caps (`forCaps`,
+  NEXT's voice) at 60% ink. Gather opens with the held verse already in it,
+  so this shows only once the reader has dropped every verse: the one
+  moment they need telling.
+- **One or more gathered:** the ways the selection can go, named — ❝ TEXT ·
+  ▣ IMAGE, glyph and small-caps word, each a 48 dp target. Each shows its own
+  spinner while preparing; both stand down while either runs.
+- **An export failed:** the error, until the next export starts.
+
+The rules stay put and only the slot cross-fades (180 ms). Nothing sits at
+the end of the bar: a blank the cross's width mirrors it, so the slot is
+centred on the bar rather than on what is left of it.
+
+**Why not icons at the end.** The first bar was one control before the
+middle and two after it, with a label centred between. It leaned right, and
+no amount of tone or rule length balanced it — the asymmetry was structural.
+Three structures were mocked on device (running head, title-and-flow, one
+action per side); the answer was that the label and the options never need
+to show together, so they share the centre. (`Dp.Hairline` is zero as a
+layout height; the rules are sized to one physical pixel.)
 
 The bar is the theme primary (DeepGreen on Paper) — gather's foot of the sheet, not play's
 paper. No Send page on the happy path; back leaves gather.
