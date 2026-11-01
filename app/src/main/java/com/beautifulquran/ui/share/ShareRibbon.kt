@@ -1,10 +1,12 @@
 package com.beautifulquran.ui.share
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -22,20 +24,26 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.beautifulquran.ui.reader.CAPS_LABEL_SIZE
+import com.beautifulquran.ui.reader.CAPS_TRACKING
+import com.beautifulquran.ui.theme.forCaps
 import com.beautifulquran.ui.theme.quietClickable
 
 /**
  * Replaces the player bar while gathering. Not a copy of play.
  *
  * One row, two jobs, like a running head: leave at the start, send at the
- * end. The count lives on the verses. The empty middle is still empty;
- * the bar itself is the theme's DeepGreen, so gather is a different
+ * end. The count lives on the verses. The middle carries one quiet line —
+ * TAP VERSES TO SHARE, in small caps, between two hairlines that run out to
+ * the icons on either side — which gives way to an export error when there
+ * is one. The bar itself is the theme's DeepGreen, so gather is a different
  * foot of the sheet than play.
  */
 @Composable
@@ -68,7 +76,8 @@ fun ShareRibbon(
                 .padding(start = 4.dp, end = 4.dp, bottom = 4.dp)
                 .semantics {
                     contentDescription =
-                        if (count == 1) "1 verse selected" else "$count verses selected"
+                        (if (count == 1) "1 verse selected" else "$count verses selected") +
+                        ". $GATHER_HINT"
                 },
         ) {
             ShareBarIcon(
@@ -90,7 +99,15 @@ fun ShareRibbon(
                         .padding(horizontal = 8.dp),
                 )
             } else {
-                Spacer(Modifier.weight(1f))
+                GatherHint(
+                    ink = ink,
+                    // One icon sits before the middle and two after it, so the
+                    // middle's own centre is off the bar's. Pulling its start in
+                    // by the difference (56 dp) centres the label on the bar.
+                    modifier = Modifier
+                        .weight(1f)
+                        .padding(start = 56.dp),
+                )
             }
             Row(
                 verticalAlignment = Alignment.CenterVertically,
@@ -114,6 +131,38 @@ fun ShareRibbon(
                 )
             }
         }
+    }
+}
+
+private const val GATHER_HINT = "Tap verses to share"
+
+/**
+ * The bar's centred label: small caps at whisper ink, flanked by hairlines
+ * that extend to the edges of the middle. Page furniture, not a control, so
+ * it is quieter than the icons beside it and takes no touches.
+ */
+@Composable
+private fun GatherHint(ink: Color, modifier: Modifier = Modifier) {
+    val rule = ink.copy(alpha = 0.28f)
+    // One physical pixel. (Dp.Hairline is a stroke width: as a layout height
+    // it is zero, and the rules would not exist.)
+    val hairline = with(LocalDensity.current) { 1f.toDp() }
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = modifier.fillMaxWidth(),
+    ) {
+        Box(Modifier.weight(1f).height(hairline).background(rule))
+        Text(
+            text = GATHER_HINT.uppercase(),
+            style = MaterialTheme.typography.labelSmall
+                .copy(fontSize = CAPS_LABEL_SIZE, letterSpacing = CAPS_TRACKING)
+                .forCaps(),
+            color = ink.copy(alpha = 0.6f),
+            maxLines = 1,
+            softWrap = false,
+            modifier = Modifier.padding(horizontal = 12.dp),
+        )
+        Box(Modifier.weight(1f).height(hairline).background(rule))
     }
 }
 

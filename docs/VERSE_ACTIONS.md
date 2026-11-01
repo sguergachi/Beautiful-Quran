@@ -255,7 +255,13 @@ and the ayah rail.
 
 The gather bar is not a copy of play. One row, two jobs: Close at the
 start (leave), Text and Image a tight pair at the end (send). The count
-lives on the verses; the empty middle stays empty. The bar is the theme
+lives on the verses. The middle carries one quiet line, TAP VERSES TO SHARE:
+true small caps (`forCaps`, the same label voice as NEXT) at 60% ink,
+centred on the bar between two one-pixel hairlines at 28% ink that run out
+toward the icons. One icon sits before the middle and two after it, so the
+middle is pulled in 56 dp at its start to centre the label on the bar, not
+on the middle. An export error replaces it. (`Dp.Hairline` is zero as a
+layout height; the rules are sized to one physical pixel.) The bar is the theme
 primary (DeepGreen on Paper) — gather's foot of the sheet, not play's
 paper. No Send page on the happy path; back leaves gather.
 
