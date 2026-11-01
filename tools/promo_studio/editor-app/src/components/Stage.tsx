@@ -8,7 +8,7 @@ import { phoneMatrix } from "../lib/geometry.ts";
 import { previewContext } from "../lib/inspector.ts";
 import { Preview } from "../lib/render.ts";
 import { clock, media } from "../state/clock.ts";
-import { endGesture, hideExact, inspect, select, setProp, setUI, useStore } from "../state/store.ts";
+import { endGesture, hideExact, inspect, record, select, setProp, setUI, useStore } from "../state/store.ts";
 import { Button, Icon } from "./ui.tsx";
 
 export function Stage() {
@@ -138,7 +138,7 @@ export function Stage() {
       {spec && geo && !geo.clip && (
         <div className="absolute bottom-3 left-1/2 flex w-max max-w-[calc(100%-24px)] -translate-x-1/2 flex-wrap items-center justify-center gap-3 rounded-lg border border-line bg-panel/95 px-4 py-2.5 text-center shadow-xl">
           <span className="text-mute">This video has no take yet.</span>
-          <Button variant="primary" size="sm" onClick={() => setUI({ tab: "recording", hideR: false })}>{Icon.rec} Record a take</Button>
+          <Button variant="primary" size="sm" onClick={() => { setUI({ tab: "recording", hideR: false }); void record(null, false); }}>{Icon.rec} Record a take</Button>
         </div>
       )}
       {spec && !geo && <p role="status" className="absolute rounded bg-panel/95 px-3 py-2 text-mute">Loading take…</p>}
