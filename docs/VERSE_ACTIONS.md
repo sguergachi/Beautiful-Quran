@@ -130,13 +130,12 @@ becomes share tools; multi is extension) without taxing bookmark.
 **Share ribbon (replaces PlayerBar while sharing)**
 
 ```text
-  ✕  ───────  ❝ TEXT · ▣ IMAGE  ───────        (one or more gathered)
-  ✕  ─────  TAP VERSES TO SHARE  ─────        (none gathered)
+  ✕                                   ❝   ▣    (one or more gathered)
+  ✕  ──────────────  TAP VERSES TO SHARE        (none gathered)
 ```
 
-- Count lives on the verse ordinals, not the bar. The bar's middle is one
-  centred slot between hairlines whose content follows the gather (see
-  below); an export failure takes the slot.
+- Count lives on the verse ordinals, not the bar. What follows the cross
+  follows the gather (see below); an export failure takes the middle.
 - `Cancel`, system back, or swiping the reader sheet away drops selection
   and restores transport. Cancel also aborts an in-flight export.
 - Completing share restores transport
@@ -255,29 +254,28 @@ confirm click on, a lighter clock tick off. Same family as Settings checks
 and the ayah rail.
 
 The gather bar is not a copy of play. Close sits at the start (leave);
-everything else is **one centred slot** between two one-pixel hairlines at
-28% ink, and what it holds follows the gather (`gatherBarMiddle`, tested):
+what follows it depends on the gather (`gatherBarMiddle`, tested):
 
-- **Nothing gathered:** TAP VERSES TO SHARE — true small caps (`forCaps`,
-  NEXT's voice) at 60% ink. Gather opens with the held verse already in it,
-  so this shows only once the reader has dropped every verse: the one
-  moment they need telling.
-- **One or more gathered:** the ways the selection can go, named — ❝ TEXT ·
-  ▣ IMAGE, glyph and small-caps word, each a 48 dp target. Each shows its own
-  spinner while preparing; both stand down while either runs.
-- **An export failed:** the error, until the next export starts.
+- **One or more gathered:** the send controls at the end — text and image, a
+  tight pair — with the middle empty. One row, two jobs, like a running head.
+- **Nothing gathered:** a one-pixel hairline at 28% ink runs from the cross
+  to TAP VERSES TO SHARE, true small caps (`forCaps`, NEXT's voice) at 60%
+  ink, set at the end of the bar where the controls will come, its right edge
+  where the image glyph's will be. Gather opens with the held verse already in
+  it, so this shows only once every verse has been dropped — the one moment
+  the reader needs telling, and a moment with nothing to send.
+- **An export failed:** the error in the middle; the controls stay.
 
-The rules stay put and only the slot cross-fades (180 ms). Nothing sits at
-the end of the bar: a blank the cross's width mirrors it, so the slot is
-centred on the bar rather than on what is left of it.
+The states cross-fade (180 ms).
 
-**Why not icons at the end.** The first bar was one control before the
-middle and two after it, with a label centred between. It leaned right, and
-no amount of tone or rule length balanced it — the asymmetry was structural.
-Three structures were mocked on device (running head, title-and-flow, one
-action per side); the answer was that the label and the options never need
-to show together, so they share the centre. (`Dp.Hairline` is zero as a
-layout height; the rules are sized to one physical pixel.)
+**What was tried.** A label centred between the cross and the send pair
+leaned right — one control before the middle and two after it — and no tone
+or rule length fixed that. Centring everything (the options named in one
+slot, or `✕ CLOSE · TEXT · IMAGE` on one line, or a count seal mirroring the
+cross) balanced the row but moved send off the end, where the reader
+expects it. The answer was that the hint and the controls never need to
+show together. (`Dp.Hairline` is zero as a layout height; the rule is sized
+to one physical pixel.)
 
 The bar is the theme primary (DeepGreen on Paper) — gather's foot of the sheet, not play's
 paper. No Send page on the happy path; back leaves gather.

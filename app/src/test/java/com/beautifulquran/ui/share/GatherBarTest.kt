@@ -10,10 +10,10 @@ class GatherBarTest {
     }
 
     @Test
-    fun `anything gathered names the ways it can go`() {
+    fun `anything gathered brings the send controls`() {
         assertEquals(GatherBarMiddle.Options, gatherBarMiddle(count = 1, error = null, busy = false))
         assertEquals(GatherBarMiddle.Options, gatherBarMiddle(count = 7, error = null, busy = false))
-        // Preparing keeps the options up (each shows its own spinner).
+        // Preparing keeps the controls up (each shows its own spinner).
         assertEquals(GatherBarMiddle.Options, gatherBarMiddle(count = 1, error = null, busy = true))
     }
 

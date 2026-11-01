@@ -50,8 +50,8 @@ its layout; it grows ordinals in the margin.
   in-flight text/image prepare. **Commit** from the gather bar: quote =
   text, image = PNG
   ([ShareRibbon](../app/src/main/java/com/beautifulquran/ui/share/ShareRibbon.kt)).
-  A failed export writes a quiet line in the ribbon's centred slot, where
-  the share options otherwise sit.
+  A failed export writes a quiet line in the ribbon's middle; the send
+  controls stay at the end.
 
 Idle, only `﴿N﴾` enters gather. While gathering, a tap anywhere on a verse
 adds or drops it; word long-press does not open the Root Viewer, and the
@@ -86,7 +86,7 @@ It carries:
    (Hafs), reference, and a gold **×** to remove (no drag-reorder yet).
 2. Outputs: **Share as text** · **Share as image** (video later).
 3. Quiet error line if load/render fails (Send page, and the gather
-   ribbon's centred slot on the happy path).
+   ribbon's middle on the happy path).
 
 Theme / aspect / reciter toggles and drag-reorder stay deferred.
 
