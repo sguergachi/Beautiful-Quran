@@ -87,6 +87,7 @@ import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.Shadow
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.StrokeJoin
+import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.clipRect
 import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
@@ -156,6 +157,7 @@ import com.beautifulquran.ui.theme.gilded
 import com.beautifulquran.ui.theme.glyphLayerAlpha
 import com.beautifulquran.ui.theme.brushCircleParams
 import com.beautifulquran.ui.theme.inkBrushCircleMark
+import com.beautifulquran.ui.theme.inkBrushCirclePath
 import com.beautifulquran.ui.theme.inkBrushCircleTarget
 import com.beautifulquran.ui.theme.inkSpotHighlight
 import com.beautifulquran.ui.theme.rememberInkBrushCircle
@@ -327,12 +329,9 @@ internal fun markRadiusHits(tap: Offset, bounds: Rect, minRadiusPx: Float): Bool
     return dx * dx + dy * dy <= radius * radius
 }
 
-internal fun TextLayoutResult.markContains(
-    tap: Offset,
-    range: IntRange,
-    minRadiusPx: Float,
-): Boolean {
-    if (range.isEmpty()) return false
+/** Union of the painted glyph boxes in [range] — zero-width format chars and spaces excluded. */
+internal fun TextLayoutResult.markGlyphBounds(range: IntRange): Rect? {
+    if (range.isEmpty()) return null
     val text = layoutInput.text
     val boxes = ArrayList<Rect>(range.count())
     for (i in range) {
@@ -343,8 +342,88 @@ internal fun TextLayoutResult.markContains(
         val box = getBoundingBox(i)
         if (box.width > 0.5f && box.height > 0.5f) boxes += box
     }
-    val bounds = boxes.reduceOrNull { acc, rect -> acc.expandToInclude(rect) } ?: return false
+    return boxes.reduceOrNull { acc, rect -> acc.expandToInclude(rect) }
+}
+
+internal fun TextLayoutResult.markContains(
+    tap: Offset,
+    range: IntRange,
+    minRadiusPx: Float,
+): Boolean {
+    val bounds = markGlyphBounds(range) ?: return false
     return markRadiusHits(tap, bounds, minRadiusPx)
+}
+
+/** The brush that circles a gathered verse's `﴿N﴾`: the gather ordinal's tight loop, a little roomier. */
+private val GatheredMarkBrush = brushCircleParams(BrushCircleStyle.BASELINE).copy(
+    padXDp = 4f,
+    padYDp = 0f,
+    bow = 2.5f,
+    peakHalfDp = 1.7f,
+    paintMs = 480,
+)
+
+/**
+ * How far the brush has circled a verse's `﴿N﴾`. Painting follows [gathered]
+ * going true — the reader's tap answered on the very number they touched —
+ * and the loop draws back off when the verse is dropped. A mark that scrolls
+ * in already gathered starts drawn, so nothing repaints as the list recycles.
+ */
+@Composable
+private fun rememberGatheredMarkProgress(gathered: Boolean): State<Float> {
+    val progress = remember { Animatable(if (gathered) 1f else 0f) }
+    LaunchedEffect(gathered) {
+        if (gathered) {
+            progress.animateTo(
+                1f,
+                tween(durationMillis = GatheredMarkBrush.paintMs, easing = FastOutSlowInEasing),
+            )
+        } else {
+            progress.animateTo(0f, tween(durationMillis = 220, easing = FastOutSlowInEasing))
+        }
+    }
+    return progress.asState()
+}
+
+/** Strokes the gathered-mark loop in [ink] around [bounds] (this node's own coordinates). */
+private fun DrawScope.drawGatheredMarkCircle(bounds: Rect, progress: Float, ink: Color) {
+    if (progress <= 0f || bounds.width <= 0f) return
+    val rx = bounds.width / 2f + GatheredMarkBrush.padXDp.dp.toPx()
+    // The line box is much taller than the cups; keep the loop close to the
+    // painted ornament rather than the leading around it.
+    val ry = minOf(bounds.height / 2f, rx * 0.78f).coerceAtLeast(10.dp.toPx())
+    val path = inkBrushCirclePath(
+        cx = bounds.center.x,
+        cy = bounds.center.y,
+        rx = rx,
+        ry = ry,
+        peakHalf = GatheredMarkBrush.peakHalfDp.dp.toPx(),
+        bowPx = GatheredMarkBrush.bow.dp.toPx(),
+        progress = progress,
+        params = GatheredMarkBrush,
+    )
+    drawPath(path, ink.copy(alpha = GatheredMarkBrush.alpha))
+}
+
+/**
+ * Circles the `﴿N﴾` inside a shaped verse line while its verse is gathered.
+ * Draw-phase only: the bounds and progress are read at draw time, so tapping
+ * costs a redraw, never a relayout.
+ */
+@Composable
+private fun Modifier.gatheredMarkCircle(
+    gathered: Boolean,
+    layout: () -> TextLayoutResult?,
+    markRange: IntRange,
+): Modifier {
+    val progress = rememberGatheredMarkProgress(gathered)
+    val ink = QuranTheme.ink.body
+    return drawBehind {
+        val p = progress.value
+        if (p <= 0f) return@drawBehind
+        val bounds = layout()?.markGlyphBounds(markRange) ?: return@drawBehind
+        drawGatheredMarkCircle(bounds, p, ink)
+    }
 }
 
 internal fun TextLayoutResult.wordIndexAt(
@@ -1798,6 +1877,8 @@ private fun ResponsiveEnglishAyah(
     onMarkClick: (() -> Unit)? = null,
     onMarkLongClick: (() -> Unit)? = null,
     useArabicIndicDigits: Boolean = false,
+    /** This verse is gathered: its `﴿N﴾` is circled in ink. */
+    markGathered: Boolean = false,
 ) {
     val palette = rememberWordInkPalette()
     val translationFontFamily = TranslationFontFamily
@@ -1925,6 +2006,11 @@ private fun ResponsiveEnglishAyah(
                 layout = { layoutResult },
                 rtl = false,
                 feather = InkEngine.tuning.washFeather,
+            )
+            .gatheredMarkCircle(
+                gathered = markGathered,
+                layout = { layoutResult },
+                markRange = rendered.markRange,
             )
             .ayahTapTarget(
                 ayah = ayah,
@@ -2076,6 +2162,8 @@ private fun ResponsiveHafsAyah(
     onWordLongClick: ((Word) -> Unit)? = null,
     onMarkClick: (() -> Unit)? = null,
     onMarkLongClick: (() -> Unit)? = null,
+    /** This verse is gathered: its `﴿N﴾` is circled in ink. */
+    markGathered: Boolean = false,
 ) {
     val palette = rememberWordInkPalette()
     val translationFontFamily = TranslationFontFamily
@@ -2175,6 +2263,11 @@ private fun ResponsiveHafsAyah(
                 layout = { layoutResult },
                 rtl = true,
                 feather = InkEngine.tuning.washFeather,
+            )
+            .gatheredMarkCircle(
+                gathered = markGathered,
+                layout = { layoutResult },
+                markRange = rendered.markRange,
             )
             .ayahTapTarget(
                 ayah = ayah,
@@ -2295,10 +2388,13 @@ private fun ArabicAyahNumberUnit(
     number: Int,
     fontScale: Float,
     useArabicIndicDigits: Boolean = true,
+    gathered: Boolean = false,
     onClick: (() -> Unit)? = null,
     onLongClick: (() -> Unit)? = null,
 ) {
     val density = LocalDensity.current
+    val markProgress = rememberGatheredMarkProgress(gathered)
+    val markInk = QuranTheme.ink.body
     val arabicLineHeight = with(density) {
         (ArabicWordStyle.fontSize * fontScale * 1.9f).toDp()
     }
@@ -2325,7 +2421,14 @@ private fun ArabicAyahNumberUnit(
             .padding(horizontal = 8.dp),
         contentAlignment = Alignment.Center,
     ) {
-        AyahNumberMark(number, fontScale, useArabicIndicDigits = useArabicIndicDigits)
+        Box(
+            modifier = Modifier.drawBehind {
+                val p = markProgress.value
+                if (p > 0f) drawGatheredMarkCircle(Rect(Offset.Zero, size), p, markInk)
+            },
+        ) {
+            AyahNumberMark(number, fontScale, useArabicIndicDigits = useArabicIndicDigits)
+        }
     }
 }
 
@@ -2979,6 +3082,7 @@ fun AyahBlock(
                     onWordLongClick = onWordLongClick,
                     onMarkClick = onAyahMarkClick,
                     useArabicIndicDigits = useArabicIndicDigits,
+                    markGathered = gatherOrdinal != null,
                 )
             } else if (readingMode == ReadingMode.ARABIC_ENGLISH && showGloss) {
                 CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Rtl) {
@@ -3029,6 +3133,7 @@ fun AyahBlock(
                                     ayah.number,
                                     fontScale,
                                     useArabicIndicDigits = useArabicIndicDigits,
+                                    gathered = gatherOrdinal != null,
                                     onClick = onAyahMarkClick,
                                 )
                             }
@@ -3058,6 +3163,7 @@ fun AyahBlock(
                         onWordClick = onWordClick?.let { handler -> { word -> handler(word) } },
                         onWordLongClick = onWordLongClick?.let { handler -> { word -> handler(word) } },
                         onMarkClick = onAyahMarkClick,
+                        markGathered = gatherOrdinal != null,
                     )
                 }
             }

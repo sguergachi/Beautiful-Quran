@@ -196,6 +196,11 @@ to add or drop it. Word long-press stays Root Viewer when idle; notes stay
 on the bookmark ribbon. Idle transport has no Share / Gather control
 (#519).
 
+The tapped `﴿N﴾` answers the touch itself: while its verse is gathered an
+ink brush circle (the same loop the gather ordinal uses) paints around the
+mark in 480 ms, and draws back off in 220 ms when the verse is dropped. Page
+ink, not gold — gold never marks interaction. Scroll reader, all three modes.
+
 Marking uses the paper toggle haptic: a confirm click on, a lighter clock
 tick off. Same family as Settings checks and the ayah rail.
 
