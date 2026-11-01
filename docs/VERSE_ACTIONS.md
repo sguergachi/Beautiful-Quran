@@ -214,14 +214,22 @@ six-fold count:
    main thread for a moment) lands while the rays are already flying — run
    first, it froze a full ring with nothing happening. The gold soak spreads
    from the mark. Nothing stays on the number.
-4. **Cancel.** Let go early, or slide past touch slop into a scroll, and the
-   rays draw back (180 ms). An idle tap on `﴿N﴾` does nothing but flicker the
-   stubs — the only hint that the mark wants holding.
+4. **Let go early — the tap lesson.** A tap, or a hold let go before the
+   ring closes, is a reader who does not yet know the mark wants holding, so
+   the shamsa shows them: the sweep carries on to 40% of the ring (200 ms),
+   the unlit stubs pulse darker and longer to point at the gap (440 ms), and
+   the ring drains back in reverse like a progress ring let go too soon
+   (460 ms). About a second in all; nothing is gathered. Press again
+   mid-lesson and the hold carries on from the ring as it stands.
+5. **Cancel.** Slide past touch slop into a scroll and the rays simply draw
+   back (180 ms) — a scroll is not a tap, and earns no lesson. The press
+   watcher reports how the finger left (`MarkPress.Released` vs `Cancelled`).
 
-**Known trade-off.** Hidden gestures were the reason the earlier Hold A/B
+**Discoverability.** Hidden gestures were the reason the earlier Hold A/B
 (hold → a Share glyph appears) was dropped: a hold on the mark is a power
-move. This hold has no confirm step — the pop *is* the gather — and keeps
-word hold for the Root Viewer, but it is no more discoverable than before.
+move. This hold has no confirm step — the pop *is* the gather — keeps word
+hold for the Root Viewer, and answers the natural first try (a tap) with the
+lesson above, which shows the gesture rather than describing it.
 
 The rays sit on the cups, not the line box: Hafs' cups stand 0.71 of their
 width tall, centred 0.105 widths above the shared baseline (measured on

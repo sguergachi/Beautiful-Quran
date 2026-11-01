@@ -119,4 +119,31 @@ class MarkHoldShamsaTest {
         assertTrue(staggered(0.1f, 0, 10, spread = 0.6f) > 0f)
         assertEquals(1f, staggered(1f, 9, 10, spread = 0.6f), 0.001f)
     }
+
+    @Test
+    fun `a tap carries the ring on to the lesson, never back`() {
+        assertEquals(MARK_TAP_TEASE, markTapTeasePeak(0f), 0.0001f)
+        assertEquals(MARK_TAP_TEASE, markTapTeasePeak(0.1f), 0.0001f)
+        // A hold let go late keeps what it earned.
+        assertEquals(0.8f, markTapTeasePeak(0.8f), 0.0001f)
+        // The lesson's ring is visibly partial: some rays lit, some still stubs.
+        val lit = shamsaRayLook(0, SHAMSA_RAY_COUNT, charge = MARK_TAP_TEASE, burst = 0f)
+        val unlit = shamsaRayLook(SHAMSA_RAY_COUNT - 1, SHAMSA_RAY_COUNT, charge = MARK_TAP_TEASE, burst = 0f)
+        assertEquals(1f, lit.length, 0.05f)
+        assertEquals(RAY_STUB, unlit.length, 0.001f)
+    }
+
+    @Test
+    fun `the lesson's pulse points at the unlit rays only`() {
+        val charge = MARK_TAP_TEASE
+        val litRest = shamsaRayLook(0, SHAMSA_RAY_COUNT, charge, burst = 0f, hint = 0f)
+        val litPulse = shamsaRayLook(0, SHAMSA_RAY_COUNT, charge, burst = 0f, hint = 1f)
+        val gapRest = shamsaRayLook(SHAMSA_RAY_COUNT - 1, SHAMSA_RAY_COUNT, charge, burst = 0f, hint = 0f)
+        val gapPulse = shamsaRayLook(SHAMSA_RAY_COUNT - 1, SHAMSA_RAY_COUNT, charge, burst = 0f, hint = 1f)
+        assertTrue(gapPulse.alpha > gapRest.alpha + 0.2f)
+        assertTrue(gapPulse.length > gapRest.length)
+        assertEquals(litRest.alpha, litPulse.alpha, 0.02f)
+        // Even pulsed, an unlit ray stays lighter than a lit one: it is the gap.
+        assertTrue(gapPulse.alpha < litRest.alpha)
+    }
 }

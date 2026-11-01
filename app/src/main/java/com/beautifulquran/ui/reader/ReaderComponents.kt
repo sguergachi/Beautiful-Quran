@@ -375,7 +375,7 @@ private fun Modifier.markHoldShamsa(
     // The same finger-sized disc the tap itself resolves against.
     val hitRadiusPx = with(LocalDensity.current) { MarkTapMinRadiusDp.dp.toPx() }
     val watch = if (onHold != null) {
-        Modifier.markPressWatcher(hold.pressed) { position ->
+        Modifier.markPressWatcher(hold.press) { position ->
             layout()?.markContains(position, markRange, hitRadiusPx) == true
         }
     } else {
@@ -2384,7 +2384,7 @@ private fun ArabicAyahNumberUnit(
                 if (onClick != null || onLongClick != null || onHold != null) {
                     // The whole unit is the mark's target, so any press on it is the hold.
                     Modifier
-                        .then(if (onHold != null) Modifier.markPressWatcher(hold.pressed) { true } else Modifier)
+                        .then(if (onHold != null) Modifier.markPressWatcher(hold.press) { true } else Modifier)
                         .quietClickable(
                             onClick = onClick ?: {},
                             // A held mark takes the long press, so the release after

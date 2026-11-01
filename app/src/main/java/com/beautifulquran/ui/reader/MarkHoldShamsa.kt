@@ -45,7 +45,10 @@ import kotlin.math.sin
  *    progress ring drawn in the page's own ornament. [MARK_HOLD_MS] fills it.
  * 3. **Pop.** The full shamsa bursts: rays fly out, thin and fade, as gather
  *    mode's gold ink spreads from the mark. Nothing stays on the number.
- * 4. **Cancel.** Let go early, or slide into a scroll, and the rays draw back.
+ * 4. **Let go early.** A tap — or a hold let go too soon — gets a lesson: the
+ *    sweep carries on to [MARK_TAP_TEASE], the unlit rays pulse to show the
+ *    gap, and the ring drains back. Slide into a scroll and the rays simply
+ *    draw back.
  *
  * Geometry and the per-frame look are pure functions so tests can hold them;
  * the draw function only turns them into paths.
@@ -63,8 +66,24 @@ internal const val MARK_HOLD_BURST_MS = 420
  */
 internal const val MARK_HOLD_ACTION_DELAY_MS = 120L
 
-/** Let go early: the rays draw back a little faster than they came. */
+/** A press that slid into a scroll: the rays draw back quickly, no lesson. */
 private const val MARK_HOLD_RETRACT_MS = 180
+
+/**
+ * The tap lesson. A finger lifted before the ring closes is a reader who
+ * does not yet know the mark wants holding, so the shamsa shows them: the
+ * sweep carries on to [MARK_TAP_TEASE] of the ring, the unlit stubs pulse
+ * once ([shamsaRayLook]'s hint) to point at what is missing, and the ring
+ * drains back in reverse — a progress ring that was let go too soon.
+ */
+internal const val MARK_TAP_TEASE = 0.4f
+private const val MARK_TAP_TEASE_RISE_MS = 200
+private const val MARK_TAP_HINT_IN_MS = 140
+private const val MARK_TAP_HINT_OUT_MS = 300
+private const val MARK_TAP_DRAIN_MS = 460
+
+/** Where the tap lesson carries the ring to: never back, at least [MARK_TAP_TEASE]. */
+internal fun markTapTeasePeak(charge: Float): Float = maxOf(charge, MARK_TAP_TEASE)
 
 /** Sixteen: an illuminator's count, and never a six-fold star. */
 internal const val SHAMSA_RAY_COUNT = 16
@@ -178,9 +197,11 @@ internal const val BURST_LIFT_DP = 6f
 /**
  * [charge] is the hold, 0..1; [burst] the pop after it fills, 0..1. A ray
  * catches when the sweep reaches it and grows from its stub to full; at the
- * pop every ray flies out, lengthens, thins and fades together.
+ * pop every ray flies out, lengthens, thins and fades together. [hint] is the
+ * tap lesson's pulse: it darkens and stretches only the rays still unlit, so
+ * the eye goes to the part of the ring the hold has not reached.
  */
-internal fun shamsaRayLook(index: Int, count: Int, charge: Float, burst: Float): ShamsaRayLook {
+internal fun shamsaRayLook(index: Int, count: Int, charge: Float, burst: Float, hint: Float = 0f): ShamsaRayLook {
     val lit = easeOutCubic(staggered(charge, index, count, spread = 0.65f))
     // The ring itself fades in over the first moment of the press.
     val arrive = (charge / 0.06f).coerceIn(0f, 1f)
@@ -188,6 +209,11 @@ internal fun shamsaRayLook(index: Int, count: Int, charge: Float, burst: Float):
     var width = 0.7f + 0.3f * lit
     var lift = CHARGE_LIFT_DP * charge.coerceIn(0f, 1f)
     var alpha = (0.22f + 0.66f * lit) * arrive
+    if (hint > 0f) {
+        val unlit = (1f - lit) * hint.coerceIn(0f, 1f)
+        alpha += 0.32f * unlit * arrive
+        length += 0.2f * unlit
+    }
     if (burst > 0f) {
         val fly = easeOutCubic(burst)
         length *= 1f + 0.7f * fly
@@ -200,15 +226,29 @@ internal fun shamsaRayLook(index: Int, count: Int, charge: Float, burst: Float):
 
 // ------------------------------------------------------------ the gesture
 
-/** The hold's live state: the finger, how full the shamsa is, and its pop. */
+/** How the finger is on the mark — and, once it is not, how it left. */
+internal enum class MarkPress {
+    Idle,
+    Down,
+
+    /** Lifted in place: a tap, or a hold let go too soon. */
+    Released,
+
+    /** Slid past touch slop: the reader is scrolling, not holding. */
+    Cancelled,
+}
+
+/** The hold's live state: the finger, how full the shamsa is, its pop and its tap lesson. */
 @Stable
 internal class MarkHold internal constructor(
-    val pressed: MutableState<Boolean>,
+    val press: MutableState<MarkPress>,
     private val chargeAnim: Animatable<Float, *>,
     private val burstAnim: Animatable<Float, *>,
+    private val hintAnim: Animatable<Float, *>,
 ) {
     val charge: Float get() = chargeAnim.value
     val burst: Float get() = burstAnim.value
+    val hint: Float get() = hintAnim.value
     val visible: Boolean get() = charge > 0f || burst > 0f
 }
 
@@ -220,23 +260,31 @@ internal class MarkHold internal constructor(
  */
 @Composable
 internal fun rememberMarkHold(onHold: () -> Unit): MarkHold {
-    val pressed = remember { mutableStateOf(false) }
+    val press = remember { mutableStateOf(MarkPress.Idle) }
     val charge = remember { Animatable(0f) }
     val burst = remember { Animatable(0f) }
+    val hint = remember { Animatable(0f) }
+    // Whether this press already popped. A lift after a pop is no lesson; and
+    // a tap so quick its down and up arrive as one update must still get one.
+    val popped = remember { booleanArrayOf(false) }
     val latestOnHold = rememberUpdatedState(onHold)
     val view = LocalView.current
     // The pop outlives the finger: lifting it mid-burst must not cut it short.
     val popScope = rememberCoroutineScope()
-    LaunchedEffect(pressed) {
-        snapshotFlow { pressed.value }.collectLatest { down ->
-            if (down) {
-                if (burst.value > 0f) return@collectLatest
+    LaunchedEffect(press) {
+        snapshotFlow { press.value }.collectLatest { state ->
+            if (burst.value > 0f) return@collectLatest
+            if (state == MarkPress.Down) {
+                // Pressing again mid-lesson carries on from the ring as it stands.
+                popped[0] = false
+                hint.snapTo(0f)
                 charge.animateTo(
                     1f,
                     tween(durationMillis = (MARK_HOLD_MS * (1f - charge.value)).toInt(), easing = LinearEasing),
                 )
                 // Still down when the ring closed: that is the hold. Feel it
                 // now, see it burst now, and let the action follow mid-flight.
+                popped[0] = true
                 view.paperToggleHaptic(turningOn = true)
                 popScope.launch {
                     burst.animateTo(1f, tween(durationMillis = MARK_HOLD_BURST_MS, easing = LinearEasing))
@@ -247,12 +295,22 @@ internal fun rememberMarkHold(onHold: () -> Unit): MarkHold {
                     delay(MARK_HOLD_ACTION_DELAY_MS)
                     latestOnHold.value()
                 }
-            } else if (burst.value == 0f) {
+            } else if (state == MarkPress.Released && !popped[0]) {
+                // The tap lesson: carry on, point at the gap, drain back.
+                val peak = markTapTeasePeak(charge.value)
+                if (charge.value < peak) {
+                    charge.animateTo(peak, tween(durationMillis = MARK_TAP_TEASE_RISE_MS, easing = FastOutSlowInEasing))
+                }
+                hint.animateTo(1f, tween(durationMillis = MARK_TAP_HINT_IN_MS, easing = FastOutSlowInEasing))
+                hint.animateTo(0f, tween(durationMillis = MARK_TAP_HINT_OUT_MS, easing = FastOutSlowInEasing))
+                charge.animateTo(0f, tween(durationMillis = MARK_TAP_DRAIN_MS, easing = FastOutSlowInEasing))
+            } else if (state == MarkPress.Cancelled) {
+                hint.snapTo(0f)
                 charge.animateTo(0f, tween(durationMillis = MARK_HOLD_RETRACT_MS, easing = FastOutSlowInEasing))
             }
         }
     }
-    return remember(pressed, charge, burst) { MarkHold(pressed, charge, burst) }
+    return remember(press, charge, burst, hint) { MarkHold(press, charge, burst, hint) }
 }
 
 /**
@@ -260,22 +318,28 @@ internal fun rememberMarkHold(onHold: () -> Unit): MarkHold {
  * anything: the verse's own tap handling still owns the gesture. A press
  * ends on release, or as soon as it travels past touch slop into a scroll.
  */
-internal fun Modifier.markPressWatcher(pressed: MutableState<Boolean>, hits: (Offset) -> Boolean): Modifier =
+internal fun Modifier.markPressWatcher(press: MutableState<MarkPress>, hits: (Offset) -> Boolean): Modifier =
     pointerInput(Unit) {
         awaitEachGesture {
             val down = awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Initial)
             if (!hits(down.position)) return@awaitEachGesture
-            pressed.value = true
+            press.value = MarkPress.Down
+            // Anything but a clean lift in place — slop, a lost pointer, the
+            // gesture torn down — is not a tap, and earns no lesson.
+            var ended = MarkPress.Cancelled
             try {
                 val slop = viewConfiguration.touchSlop
                 while (true) {
                     val event = awaitPointerEvent(PointerEventPass.Initial)
                     val change = event.changes.firstOrNull { it.id == down.id } ?: break
-                    if (!change.pressed) break
+                    if (!change.pressed) {
+                        ended = MarkPress.Released
+                        break
+                    }
                     if ((change.position - down.position).getDistance() > slop) break
                 }
             } finally {
-                pressed.value = false
+                press.value = ended
             }
         }
     }
@@ -307,7 +371,7 @@ internal fun DrawScope.drawMarkHold(
     val dpPx = 1.dp.toPx()
     val path = Path()
     rays.forEachIndexed { i, ray ->
-        val look = shamsaRayLook(i, rays.size, charge, burst)
+        val look = shamsaRayLook(i, rays.size, charge, burst, hold.hint)
         if (look.alpha <= 0.004f) return@forEachIndexed
         val lift = look.lift * dpPx
         val baseX = ray.base.x + ray.dirX * lift
