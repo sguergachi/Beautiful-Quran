@@ -147,11 +147,6 @@ function Recording({ contentsOnly = false }: { contentsOnly?: boolean }) {
   return (
     <>
       <Section title="Take contents">
-        <Field label="Reciter" dot={stale.has("reciter")}><Select value={a.reciter} options={Object.entries(meta.reciters)} onChange={(v) => set("app.reciter", v)} /></Field>
-        <Field label="Chapter" dot={stale.has("surah")}><Select value={a.surah} options={meta.surahs.map((s) => [s.id, `${s.id}. ${s.name} (${s.ayahs})`])} onChange={(v) => mutate((r) => {
-          const count = meta.surahs.find((s) => s.id === +v)!.ayahs, ayah = Math.min(a.ayah, count);
-          r.app = { ...r.app, surah: +v, ayah, ...(a.repeat === "range" ? { repeat_to: Math.max(ayah, Math.min(a.repeat_to ?? ayah, count)) } : {}) };
-        })} /></Field>
         <Opening />
       </Section>
 

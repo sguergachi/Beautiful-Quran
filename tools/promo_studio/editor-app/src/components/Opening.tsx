@@ -56,6 +56,11 @@ export function Opening() {
       <li className="rounded border border-gold/30 bg-gold/[0.04] p-2.5">
         <div className="mb-3 flex items-center gap-2"><span className="num text-faint">{steps.length + 1}.</span><span className="font-medium">{a.intro.play ? "Recitation" : "Hold final screen"}</span>{stale.has("intro.play") && <StaleDot />}</div>
         <div className="mb-3" role="group" aria-label="Finish with"><Segmented size="sm" value={a.intro.play ? "play" : "hold"} options={[["play", "Recitation"], ["hold", "Screens only"]]} onChange={(v) => mutate((r) => { r.app = { ...r.app, intro: { ...r.app?.intro, play: v === "play" } }; })} /></div>
+        {a.intro.play && <Field label="Reciter" dot={stale.has("reciter")}><Select value={a.reciter} options={Object.entries(meta.reciters)} onChange={(v) => mutate((r) => { r.app = { ...r.app, reciter: v }; })} /></Field>}
+        <Field label="Chapter" dot={stale.has("surah")}><Select value={a.surah} options={meta.surahs.map((s) => [s.id, `${s.id}. ${s.name} (${s.ayahs})`])} onChange={(v) => mutate((r) => {
+          const ayahs = meta.surahs.find((s) => s.id === +v)!.ayahs, ayah = Math.min(a.ayah, ayahs);
+          r.app = { ...r.app, surah: +v, ayah, ...(a.repeat === "range" ? { repeat_to: Math.max(ayah, Math.min(a.repeat_to ?? ayah, ayahs)) } : {}) };
+        })} /></Field>
         {a.intro.play ? <>
           <div className="mb-3" role="group" aria-label="Repeat"><span className="mb-1.5 block text-mute">Repeat {stale.has("repeat") && <StaleDot />}</span><Segmented size="sm" value={a.repeat} options={[["off", "Off"], ["ayah", "One verse"], ["range", "Range"]]} onChange={(repeat) => mutate((r) => { r.app = { ...r.app, repeat, repeat_to: repeat === "range" ? Math.min(count, Math.max(a.ayah, a.repeat_to ?? a.ayah + 1)) : null }; })} /></div>
           {a.repeat === "off" ? <VerseRangeEditor /> : <>
