@@ -199,9 +199,13 @@ stay on the bookmark ribbon. Idle transport has no Share / Gather control
 
 ### The shamsa hold
 
-The hold is drawn as an illuminator's shamsa round the mark, in page ink
-(gold never marks interaction), sixteen long-and-short rays — never a
-six-fold count:
+The hold is drawn as an illuminator's gilded shamsa round the mark,
+sixteen long-and-short rays — never a six-fold count. It is the one place
+gold marks an interaction ([DESIGN.md](DESIGN.md)): it is the ayah mark's
+own illumination. Each ray is gilt from base to tip, with stops chosen per
+page for contrast rather than the mark's muted gold — `goldDeep` warming to
+`gold` on cream, `gold` kindling to `goldBright` on Nightfall and Royal
+Green — at full opacity:
 
 1. **Press.** Faint stubs ring the mark the moment the finger lands.
 2. **Hold.** The finger covers the mark, so the ring grows out from the cups

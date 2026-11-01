@@ -2,6 +2,8 @@ package com.beautifulquran.ui.reader
 
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.luminance
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertTrue
@@ -183,5 +185,22 @@ class MarkHoldShamsaTest {
             assertTrue(surged.alpha >= rest.alpha)
             assertTrue(surged.alpha <= 1f)
         }
+    }
+
+    @Test
+    fun `the gilt leans on the gold stop that stands off the page`() {
+        val gold = Color(0xFFA8831D)
+        val bright = Color(0xFFC9AE67)
+        val deep = Color(0xFF7A5B05)
+        // Cream: the deep gold carries the ray, warming to gold at the tip.
+        val cream = markHoldGold(gold, bright, deep, darkPage = false)
+        assertEquals(deep, cream.base)
+        assertEquals(gold, cream.tip)
+        assertTrue(cream.base.luminance() < gold.luminance())
+        // Night: the gold carries it, kindling to bright gold at the tip.
+        val night = markHoldGold(gold, bright, deep, darkPage = true)
+        assertEquals(gold, night.base)
+        assertEquals(bright, night.tip)
+        assertTrue(night.tip.luminance() > gold.luminance())
     }
 }

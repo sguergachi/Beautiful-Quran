@@ -373,7 +373,7 @@ private fun Modifier.markHoldShamsa(
     // Remembered unconditionally: the hold's own success flips the reader into
     // gathering, which nulls [onHold] — and the pop must outlive that.
     val hold = rememberMarkHold(onHold ?: {})
-    val color = QuranTheme.ink.body
+    val gold = rememberMarkHoldGold()
     // The same finger-sized disc the tap itself resolves against.
     val hitRadiusPx = with(LocalDensity.current) { MarkTapMinRadiusDp.dp.toPx() }
     val watch = if (onHold != null) {
@@ -389,7 +389,7 @@ private fun Modifier.markHoldShamsa(
         val bounds = text.markGlyphBounds(markRange) ?: return@drawBehind
         // The cups close the verse, so their last glyph names the line.
         val baseline = text.getLineBaseline(text.getLineForOffset(markRange.last))
-        drawMarkHold(bounds, baseline, hold, color, rtl = rtl)
+        drawMarkHold(bounds, baseline, hold, gold, rtl = rtl)
     }
 }
 
@@ -2370,7 +2370,7 @@ private fun ArabicAyahNumberUnit(
     // Remembered unconditionally: the hold's success nulls [onHold] (the reader
     // is gathering now), and the pop must play out regardless.
     val hold = rememberMarkHold(onHold ?: {})
-    val markColor = QuranTheme.ink.body
+    val markGold = rememberMarkHoldGold()
     val sideAirPx = with(density) { 8.dp.toPx() }
     // Where the mark sits inside the unit's padded content, for the finger's
     // translation into the mark's own pixels. Read only when a press lands.
@@ -2436,7 +2436,7 @@ private fun ArabicAyahNumberUnit(
                         Rect(Offset.Zero, size),
                         markBaseline.floatValue.takeUnless { it.isNaN() },
                         hold,
-                        markColor,
+                        markGold,
                         rtl = true,
                     )
                 },

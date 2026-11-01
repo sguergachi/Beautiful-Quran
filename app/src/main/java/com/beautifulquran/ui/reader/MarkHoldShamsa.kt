@@ -1,6 +1,11 @@
 package com.beautifulquran.ui.reader
 
 import androidx.compose.animation.core.Animatable
+import com.beautifulquran.ui.theme.LocalQuranAccents
+import androidx.compose.ui.graphics.luminance
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.runtime.Immutable
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.animation.core.FastOutLinearInEasing
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.LinearEasing
@@ -40,7 +45,7 @@ import kotlin.math.sin
 
 /**
  * Gather is entered by holding a verse's `﴿N﴾`, and the hold is drawn as an
- * illuminator's shamsa round the mark. See docs/VERSE_ACTIONS.md.
+ * illuminator's gilded shamsa round the mark ([MarkHoldGold]). See docs/VERSE_ACTIONS.md.
  *
  * 1. **Press.** Faint stubs of sixteen rays ring the mark under the finger.
  * 2. **Hold.** The ring grows out from the cups to stand clear around the
@@ -454,6 +459,36 @@ internal fun Modifier.markPressWatcher(
         }
     }
 
+// ------------------------------------------------------------------ gilding
+
+/**
+ * The shamsa is gilded: it is the ayah mark's own illumination, the one place
+ * gold marks an interaction (docs/DESIGN.md). Each ray runs from [base] at
+ * the ring to [tip] at its point. The stops are chosen per page for contrast,
+ * not the mark's own muted gold: on cream the deep gold
+ * carries the ray and warms toward its tip; on a dark page the gold carries
+ * it and kindles to bright gold at the tip.
+ */
+@Immutable
+internal data class MarkHoldGold(val base: Color, val tip: Color)
+
+internal fun markHoldGold(gold: Color, goldBright: Color, goldDeep: Color, darkPage: Boolean): MarkHoldGold =
+    if (darkPage) {
+        MarkHoldGold(base = gold, tip = goldBright)
+    } else {
+        MarkHoldGold(base = goldDeep, tip = gold)
+    }
+
+/** This page's [MarkHoldGold]. */
+@Composable
+internal fun rememberMarkHoldGold(): MarkHoldGold {
+    val accents = LocalQuranAccents.current
+    val darkPage = MaterialTheme.colorScheme.background.luminance() < 0.5f
+    return remember(accents, darkPage) {
+        markHoldGold(accents.gold, accents.goldBright, accents.goldDeep, darkPage)
+    }
+}
+
 /**
  * Paints the hold's shamsa round the ornament at [bounds], sitting on the
  * line's [baseline] when it is known. [rtl] is the verse's writing direction:
@@ -463,7 +498,7 @@ internal fun DrawScope.drawMarkHold(
     bounds: Rect,
     baseline: Float?,
     hold: MarkHold,
-    color: Color,
+    gold: MarkHoldGold,
     rtl: Boolean,
 ) {
     if (!hold.visible || bounds.width <= 0f) return
@@ -484,6 +519,18 @@ internal fun DrawScope.drawMarkHold(
         shortRay = lerp(2.8f, EXPANDED_SHORT_RAY_DP, expansion) * dpPx,
         halfWidth = lerp(1f, EXPANDED_HALF_WIDTH_DP, expansion) * dpPx,
         rtl = rtl,
+    )
+    // One gilt field for the whole sunburst: base gold where the rays leave
+    // the ring, tip gold where the longest reach. Rays flown past it at the
+    // pop hold the tip colour.
+    val inner = maxOf(frame.rx, frame.ry) + 2.5.dp.toPx()
+    val outer = inner + lerp(5f, EXPANDED_LONG_RAY_DP, expansion) * dpPx * 1.2f
+    val gilt = Brush.radialGradient(
+        0f to gold.base,
+        (inner / outer).coerceIn(0f, 0.99f) to gold.base,
+        1f to gold.tip,
+        center = Offset(frame.cx, frame.cy),
+        radius = outer,
     )
     val path = Path()
     rays.forEachIndexed { i, ray ->
@@ -507,6 +554,6 @@ internal fun DrawScope.drawMarkHold(
         path.quadraticTo(waistX + px * 0.35f, waistY + py * 0.35f, tipX, tipY)
         path.quadraticTo(waistX - px * 0.35f, waistY - py * 0.35f, baseX - px, baseY - py)
         path.close()
-        drawPath(path, color.copy(alpha = 0.85f * look.alpha))
+        drawPath(path, gilt, alpha = look.alpha.coerceIn(0f, 1f))
     }
 }
