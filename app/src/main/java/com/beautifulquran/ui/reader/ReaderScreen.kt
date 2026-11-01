@@ -3350,11 +3350,23 @@ fun ReaderScreen(
                                 },
                                 gatherOrdinal = gatheredHere,
                                 gathering = gathering,
+                                // Gather is entered by holding ﴿N﴾ (its shamsa fills,
+                                // then pops). Once gathering, a tap on the mark adds
+                                // or drops the verse like a tap anywhere on it; idle,
+                                // a tap only flickers the shamsa — a hint to hold.
                                 onAyahMarkClick = {
-                                    view.paperToggleHaptic(
-                                        turningOn = gatheredHere == null,
-                                    )
-                                    onShareMarkTap(ayah.surahId, ayah.number)
+                                    if (gathering) {
+                                        view.paperToggleHaptic(
+                                            turningOn = gatheredHere == null,
+                                        )
+                                        onShareMarkTap(ayah.surahId, ayah.number)
+                                    }
+                                },
+                                // The hold plays its own haptic at the pop.
+                                onAyahMarkHold = if (gathering) {
+                                    null
+                                } else {
+                                    { onShareMarkTap(ayah.surahId, ayah.number) }
                                 },
                                 onWordClick = if (gathering) {
                                     {

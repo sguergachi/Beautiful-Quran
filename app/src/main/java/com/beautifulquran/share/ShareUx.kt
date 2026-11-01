@@ -1,7 +1,8 @@
 package com.beautifulquran.share
 
 /**
- * Verse-share entry is Mark UX: tap `﴿N﴾` to gather that verse.
+ * Verse-share entry is Mark UX: hold `﴿N﴾` (its shamsa fills and pops) to
+ * gather that verse; [onMarkTap] is what the pop calls.
  *
  * Word long-press stays Root Viewer. Notes stay on the bookmark ribbon.
  * Icon / Reveal / Hold were A/B options and are gone.

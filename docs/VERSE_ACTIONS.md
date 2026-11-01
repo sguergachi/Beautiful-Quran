@@ -1,6 +1,6 @@
 # Verse actions: bookmark · note · share
 
-**Status: Mark UX is the product.** Tap `﴿N﴾` to gather that verse; then tap
+**Status: Mark UX is the product.** Hold `﴿N﴾` to gather that verse; then tap
 anywhere on more verses to add or drop them. Export (text/image) is shipped.
 Icon / Reveal / Hold A/B toggles are gone.
 
@@ -19,7 +19,7 @@ Related: [DESIGN.md](DESIGN.md) (paper rules), [ANNOTATIONS.md](ANNOTATIONS.md)
 |---|---|---|---|
 | **Bookmark** | Personal mark — ruby ribbon in outer margin | No | Works well (one tap) |
 | **Note** | Write under *this* verse (ḥāshiya) | No | Hold the saved bookmark ribbon |
-| **Share** | Export text / image (video later) | Yes — start with one, add more | Tap `﴿N﴾` → gold soak + DeepGreen ribbon; no Send on the happy path |
+| **Share** | Export text / image (video later) | Yes — start with one, add more | Hold `﴿N﴾` → gold soak + DeepGreen ribbon; no Send on the happy path |
 
 They are **not** three buttons on one toolbar. They are three intents with
 different shapes. Unification is **conceptual** (everything is “about this
@@ -115,14 +115,14 @@ becomes share tools; multi is extension) without taxing bookmark.
 |---|---|
 | Bookmark | Tap ribbon |
 | Note | Hold the saved bookmark ribbon → write |
-| Share one | Tap `﴿N﴾` → **Text** *or* **Image** |
-| Share many | Tap `﴿N﴾` → tap more verses (gold soak) → **Text** *or* **Image** |
+| Share one | Hold `﴿N﴾` → **Text** *or* **Image** |
+| Share many | Hold `﴿N﴾` → tap more verses (gold soak) → **Text** *or* **Image** |
 
 ### Interaction detail
 
 **Enter share**
 
-- Short-tap `﴿N﴾` pauses playback, selects *that* verse (`1` + pale gold
+- Holding `﴿N﴾` until its shamsa pops pauses playback, selects *that* verse (`1` + pale gold
   soak under the ayah), and replaces the player bar with the **share ribbon**.
 - Word long-press stays Root Viewer. Notes stay on the bookmark ribbon.
   There is no colophon and no body-hold entry.
@@ -191,39 +191,47 @@ With G1, the intermediate Send list is **optional**:
 
 ## Entry: Mark UX
 
-Tap `﴿N﴾` to share that verse. While gathering, tap anywhere on a verse
-to add or drop it. Word long-press stays Root Viewer when idle; notes stay
-on the bookmark ribbon. Idle transport has no Share / Gather control
+Hold `﴿N﴾` to share that verse. While gathering, tap anywhere on a verse
+to add or drop it (the mark included). Word long-press stays Root Viewer
+when idle — the hold belongs to the mark's finger-sized disc only; notes
+stay on the bookmark ribbon. Idle transport has no Share / Gather control
 (#519).
 
-The tapped `﴿N﴾` answers the touch itself. Readers get an ink brush circle
-(the gather ordinal's loop) painted round the mark; Settings → Developer →
-**Gather mark** A/Bs five more, all in page ink, never gold (gold never marks
-interaction):
+### The shamsa hold
 
-| Effect | What it does |
-|---|---|
-| Brush circle | The ordinal's brush loop round the cups (480 ms) |
-| Ink drop | A wet drop lands behind the number, runs past its edge, dries to a pale stain with a darker tide line |
-| Qalam swash | A tapered kashida under the number, written from the line's start (right to left in Arabic), flicking up at its end |
-| Shamsa rays | Sixteen long-and-short rays drawn round the mark in reading order |
-| Pearl ring | Fourteen pearls and beads pressed in one after another |
-| Tāj crown | The illuminator's crown: a teardrop rises over the cups, two palmette volutes unfurl and curl in, pearls set at their ends |
+The hold is drawn as an illuminator's shamsa round the mark, in page ink
+(gold never marks interaction), sixteen long-and-short rays — never a
+six-fold count:
 
-The tap is a micro interaction in three beats, shared by every effect:
-**press** — the pen touches: the first 12% of the effect appears under the
-finger in 90 ms, pressed in to 90% size; **release** — the effect completes
-from that bead (380–520 ms) on a springy pop that overshoots and settles;
-**cancel** — a press that slides past touch slop into a scroll draws its bead
-back off. Pressing a gathered mark lifts its ink to 65% before release drops
-it; dropping lifts any effect off as a whole in 220 ms. Effects sit on
-the cups, not the line box: Hafs' cups stand 0.71 of their width tall,
-centred 0.105 widths above the shared baseline (measured on device in
-English and Arabic lines). Ring counts are never six-fold. Code:
-`ui/reader/GatherMarkEffects.kt`. Scroll reader, all three modes.
+1. **Press.** Faint stubs ring the mark the moment the finger lands.
+2. **Hold.** The rays catch in turn round the ring, from the top in reading
+   order (anticlockwise in Arabic), each lengthening and darkening while the
+   sunburst breathes 1.5 dp outward. It fills in 550 ms — longer than the
+   system long-press, so a held mark's long press swallows the release tap.
+3. **Pop.** The full ring bursts: rays fly 6 dp out, lengthen, thin and fade
+   (420 ms), with the paper toggle haptic. The gather starts 120 ms into the
+   flight, so entering the mode (a whole-reader recomposition that stalls the
+   main thread for a moment) lands while the rays are already flying — run
+   first, it froze a full ring with nothing happening. The gold soak spreads
+   from the mark. Nothing stays on the number.
+4. **Cancel.** Let go early, or slide past touch slop into a scroll, and the
+   rays draw back (180 ms). An idle tap on `﴿N﴾` does nothing but flicker the
+   stubs — the only hint that the mark wants holding.
 
-Marking uses the paper toggle haptic: a confirm click on, a lighter clock
-tick off. Same family as Settings checks and the ayah rail.
+**Known trade-off.** Hidden gestures were the reason the earlier Hold A/B
+(hold → a Share glyph appears) was dropped: a hold on the mark is a power
+move. This hold has no confirm step — the pop *is* the gather — and keeps
+word hold for the Root Viewer, but it is no more discoverable than before.
+
+The rays sit on the cups, not the line box: Hafs' cups stand 0.71 of their
+width tall, centred 0.105 widths above the shared baseline (measured on
+device in English and Arabic lines). Code: `ui/reader/MarkHoldShamsa.kt`.
+Scroll reader, all three modes. The hold state is remembered even after the
+reader flips to gathering (which nulls the hold), so the pop plays out.
+
+Marking another verse while gathering uses the paper toggle haptic: a
+confirm click on, a lighter clock tick off. Same family as Settings checks
+and the ayah rail.
 
 The gather bar is not a copy of play. One row, two jobs: Close at the
 start (leave), Text and Image a tight pair at the end (send). The count
@@ -240,7 +248,7 @@ Icon / Reveal / Hold were in-app A/B designs and have been deleted.
 
 1. Gold wash on `AyahBlock` when `gatherOrdinal != null`
 2. Share ribbon composable replacing `PlayerBar` when gathering
-3. Tap `﴿N﴾` enters gather with that verse already selected
+3. Holding `﴿N﴾` (the shamsa pops) enters gather with that verse already selected
 4. Ribbon Text / Image → existing `shareAsText` / `shareAsImage`
 5. #519 stays: idle transport has no Gather
 6. Happy path skips Send; chooser completion leaves gather
@@ -270,3 +278,5 @@ Shipped answers: no body-hold entry, no colophon, no Send until proven.
 - UX review (player takeover, gold wash, fewer steps) → this document
 - Mark UX shipped as G1: tap `﴿N﴾`, gold soak, DeepGreen ribbon, no Send
   on the happy path, no A/B toggles
+- Entry became a hold on `﴿N﴾` drawn as a filling shamsa that pops into
+  gather (#904)

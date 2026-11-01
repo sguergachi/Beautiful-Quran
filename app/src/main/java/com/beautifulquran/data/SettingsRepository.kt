@@ -146,8 +146,6 @@ data class Settings(
     val educationGuidesEnabled: Boolean = false,
     /** Developer-only: which ink-brush circle to paint around selected enums. */
     val brushCircleStyle: BrushCircleStyle = BrushCircleStyle.BASELINE,
-    /** Developer A/B of how a gathered verse's `﴿N﴾` answers the tap; see [activeGatherMarkEffect]. */
-    val gatherMarkEffect: GatherMarkEffect = GatherMarkEffect.BRUSH_CIRCLE,
 ) {
     /** The typeface actually set: the A/B choice only counts in developer mode. */
     val activeBookTypeface: BookTypeface
@@ -156,10 +154,6 @@ data class Settings(
     /** The Scroll's Arabic actually set: the A/B choice only counts in developer mode. */
     val activeScrollArabicFace: ScrollArabicFace
         get() = if (developerModeEnabled) scrollArabicFace else ScrollArabicFace.HAFS
-
-    /** The gather-mark effect actually painted: the A/B choice only counts in developer mode. */
-    val activeGatherMarkEffect: GatherMarkEffect
-        get() = if (developerModeEnabled) gatherMarkEffect else GatherMarkEffect.BRUSH_CIRCLE
 }
 
 /** Maps a persisted ordinal back to an enum entry, falling back to [default]
@@ -238,7 +232,6 @@ class SettingsRepository(context: Context) {
         scrollArabicFace = ScrollArabicFace.forCode(prefs.getInt("scrollArabicFace", ScrollArabicFace.HAFS.code)),
         educationGuidesEnabled = prefs.getBoolean("educationGuidesEnabled", false),
         brushCircleStyle = prefs.enum("brushCircleStyle", BrushCircleStyle.BASELINE),
-        gatherMarkEffect = prefs.enum("gatherMarkEffect", GatherMarkEffect.BRUSH_CIRCLE),
     )
 
     /**
@@ -355,7 +348,6 @@ class SettingsRepository(context: Context) {
             remove("colorSystem")
             remove("hideEnglishParentheticals")
             putInt("brushCircleStyle", next.brushCircleStyle.ordinal)
-            putInt("gatherMarkEffect", next.gatherMarkEffect.ordinal)
             remove("shareUxVariant")
         }
     }

@@ -356,41 +356,38 @@ internal fun TextLayoutResult.markContains(
 }
 
 /**
- * Marks the `﴿N﴾` inside a shaped verse line while its verse is gathered,
- * with the developer-chosen [LocalGatherMarkEffect]. Draw-phase only: bounds
- * and progress are read at draw time, so a tap costs a redraw, never a relayout.
+ * The hold-to-gather shamsa on the `﴿N﴾` inside a shaped verse line
+ * ([MarkHoldShamsa.kt]). Null [onHold] means the mark cannot be held — while
+ * gathering, or where the verse has no share — and then nothing is watched.
+ * Draw-phase only: the hold redraws the line, never relays it out.
  */
 @Composable
-private fun Modifier.gatheredMarkEffect(
-    gathered: Boolean,
+private fun Modifier.markHoldShamsa(
+    onHold: (() -> Unit)?,
     layout: () -> TextLayoutResult?,
     markRange: IntRange,
     rtl: Boolean,
-    seed: Int,
-    /** False when the mark has no tap action: then a press must promise nothing. */
-    tappable: Boolean,
 ): Modifier {
-    val effect = LocalGatherMarkEffect.current
-    val pressed = remember { mutableStateOf(false) }
-    val ink = rememberGatherMarkInk(gathered, effect.paintMs, pressed)
+    // Remembered unconditionally: the hold's own success flips the reader into
+    // gathering, which nulls [onHold] — and the pop must outlive that.
+    val hold = rememberMarkHold(onHold ?: {})
     val color = QuranTheme.ink.body
     // The same finger-sized disc the tap itself resolves against.
     val hitRadiusPx = with(LocalDensity.current) { MarkTapMinRadiusDp.dp.toPx() }
-    val watch = if (tappable) {
-        Modifier.markPressWatcher(pressed) { position ->
+    val watch = if (onHold != null) {
+        Modifier.markPressWatcher(hold.pressed) { position ->
             layout()?.markContains(position, markRange, hitRadiusPx) == true
         }
     } else {
         Modifier
     }
     return then(watch).drawBehind {
-        // Nothing gathered and no finger down: skip the layout walk.
-        if (ink.presence <= 0f && ink.press <= 0f) return@drawBehind
+        if (!hold.visible) return@drawBehind
         val text = layout() ?: return@drawBehind
         val bounds = text.markGlyphBounds(markRange) ?: return@drawBehind
         // The cups close the verse, so their last glyph names the line.
         val baseline = text.getLineBaseline(text.getLineForOffset(markRange.last))
-        drawGatherMark(effect, bounds, baseline, ink, color, rtl = rtl, seed = seed)
+        drawMarkHold(bounds, baseline, hold, color, rtl = rtl)
     }
 }
 
@@ -1845,8 +1842,8 @@ private fun ResponsiveEnglishAyah(
     onMarkClick: (() -> Unit)? = null,
     onMarkLongClick: (() -> Unit)? = null,
     useArabicIndicDigits: Boolean = false,
-    /** This verse is gathered: its `﴿N﴾` is circled in ink. */
-    markGathered: Boolean = false,
+    /** Holding `﴿N﴾` until its shamsa fills; null when the mark cannot be held. */
+    onMarkHold: (() -> Unit)? = null,
 ) {
     val palette = rememberWordInkPalette()
     val translationFontFamily = TranslationFontFamily
@@ -1975,13 +1972,11 @@ private fun ResponsiveEnglishAyah(
                 rtl = false,
                 feather = InkEngine.tuning.washFeather,
             )
-            .gatheredMarkEffect(
-                gathered = markGathered,
+            .markHoldShamsa(
+                onHold = onMarkHold,
                 layout = { layoutResult },
                 markRange = rendered.markRange,
                 rtl = false,
-                seed = ayah.number,
-                tappable = onMarkClick != null,
             )
             .ayahTapTarget(
                 ayah = ayah,
@@ -1992,7 +1987,9 @@ private fun ResponsiveEnglishAyah(
                 onWordClick = onWordClick,
                 onWordLongClick = onWordLongClick,
                 onMarkClick = onMarkClick,
-                onMarkLongClick = onMarkLongClick,
+                // A held mark takes the long press, so the finger lifting after
+                // the shamsa pops is not also a tap on the now-gathering verse.
+                onMarkLongClick = onMarkLongClick ?: onMarkHold?.let { { } },
                 markRadiusPx = markRadiusPx,
             ),
         onTextLayout = { layoutResult = it },
@@ -2133,8 +2130,8 @@ private fun ResponsiveHafsAyah(
     onWordLongClick: ((Word) -> Unit)? = null,
     onMarkClick: (() -> Unit)? = null,
     onMarkLongClick: (() -> Unit)? = null,
-    /** This verse is gathered: its `﴿N﴾` is circled in ink. */
-    markGathered: Boolean = false,
+    /** Holding `﴿N﴾` until its shamsa fills; null when the mark cannot be held. */
+    onMarkHold: (() -> Unit)? = null,
 ) {
     val palette = rememberWordInkPalette()
     val translationFontFamily = TranslationFontFamily
@@ -2235,13 +2232,11 @@ private fun ResponsiveHafsAyah(
                 rtl = true,
                 feather = InkEngine.tuning.washFeather,
             )
-            .gatheredMarkEffect(
-                gathered = markGathered,
+            .markHoldShamsa(
+                onHold = onMarkHold,
                 layout = { layoutResult },
                 markRange = rendered.markRange,
                 rtl = true,
-                seed = ayah.number,
-                tappable = onMarkClick != null,
             )
             .ayahTapTarget(
                 ayah = ayah,
@@ -2252,7 +2247,9 @@ private fun ResponsiveHafsAyah(
                 onWordClick = onWordClick,
                 onWordLongClick = onWordLongClick,
                 onMarkClick = onMarkClick,
-                onMarkLongClick = onMarkLongClick,
+                // A held mark takes the long press, so the finger lifting after
+                // the shamsa pops is not also a tap on the now-gathering verse.
+                onMarkLongClick = onMarkLongClick ?: onMarkHold?.let { { } },
                 markRadiusPx = markRadiusPx,
             ),
         onTextLayout = { layoutResult = it },
@@ -2362,14 +2359,15 @@ private fun ArabicAyahNumberUnit(
     number: Int,
     fontScale: Float,
     useArabicIndicDigits: Boolean = true,
-    gathered: Boolean = false,
+    /** Holding the mark until its shamsa fills; null when it cannot be held. */
+    onHold: (() -> Unit)? = null,
     onClick: (() -> Unit)? = null,
     onLongClick: (() -> Unit)? = null,
 ) {
     val density = LocalDensity.current
-    val markEffect = LocalGatherMarkEffect.current
-    val markPressed = remember { mutableStateOf(false) }
-    val markInk = rememberGatherMarkInk(gathered, markEffect.paintMs, markPressed)
+    // Remembered unconditionally: the hold's success nulls [onHold] (the reader
+    // is gathering now), and the pop must play out regardless.
+    val hold = rememberMarkHold(onHold ?: {})
     val markColor = QuranTheme.ink.body
     val arabicLineHeight = with(density) {
         (ArabicWordStyle.fontSize * fontScale * 1.9f).toDp()
@@ -2383,13 +2381,15 @@ private fun ArabicAyahNumberUnit(
             .padding(top = WORD_TILE_PAD_V)
             .requiredHeight(maxOf(arabicLineHeight, 56.dp))
             .then(
-                if (onClick != null || onLongClick != null) {
-                    // The whole unit is the mark's target, so any press on it is the pen.
+                if (onClick != null || onLongClick != null || onHold != null) {
+                    // The whole unit is the mark's target, so any press on it is the hold.
                     Modifier
-                        .then(if (onClick != null) Modifier.markPressWatcher(markPressed) { true } else Modifier)
+                        .then(if (onHold != null) Modifier.markPressWatcher(hold.pressed) { true } else Modifier)
                         .quietClickable(
                             onClick = onClick ?: {},
-                            onLongClick = onLongClick,
+                            // A held mark takes the long press, so the release after
+                            // the pop is not also a tap on the now-gathering verse.
+                            onLongClick = onLongClick ?: onHold?.let { { } },
                         )
                 } else {
                     Modifier
@@ -2414,14 +2414,12 @@ private fun ArabicAyahNumberUnit(
                 }
                 .drawBehind {
                     // The gloss row is Arabic: the verse reads right to left.
-                    drawGatherMark(
-                        markEffect,
+                    drawMarkHold(
                         Rect(Offset.Zero, size),
                         markBaseline.floatValue.takeUnless { it.isNaN() },
-                        markInk,
+                        hold,
                         markColor,
                         rtl = true,
-                        seed = number,
                     )
                 },
         ) {
@@ -2761,6 +2759,9 @@ fun AyahBlock(
     /** When true, the whole verse block toggles selection, not only its ink. */
     gathering: Boolean = false,
     onAyahMarkClick: (() -> Unit)? = null,
+    /** Holding `﴿N﴾` until its shamsa fills — the gather entry. Null while
+     * gathering (taps own the mode then) or where the verse cannot be shared. */
+    onAyahMarkHold: (() -> Unit)? = null,
     onWordClick: ((Word) -> Unit)?,
     onWordLongClick: ((Word) -> Unit)? = null,
     onAyahClick: () -> Unit,
@@ -3080,7 +3081,7 @@ fun AyahBlock(
                     onWordLongClick = onWordLongClick,
                     onMarkClick = onAyahMarkClick,
                     useArabicIndicDigits = useArabicIndicDigits,
-                    markGathered = gatherOrdinal != null,
+                    onMarkHold = onAyahMarkHold,
                 )
             } else if (readingMode == ReadingMode.ARABIC_ENGLISH && showGloss) {
                 CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Rtl) {
@@ -3131,7 +3132,7 @@ fun AyahBlock(
                                     ayah.number,
                                     fontScale,
                                     useArabicIndicDigits = useArabicIndicDigits,
-                                    gathered = gatherOrdinal != null,
+                                    onHold = onAyahMarkHold,
                                     onClick = onAyahMarkClick,
                                 )
                             }
@@ -3161,7 +3162,7 @@ fun AyahBlock(
                         onWordClick = onWordClick?.let { handler -> { word -> handler(word) } },
                         onWordLongClick = onWordLongClick?.let { handler -> { word -> handler(word) } },
                         onMarkClick = onAyahMarkClick,
-                        markGathered = gatherOrdinal != null,
+                        onMarkHold = onAyahMarkHold,
                     )
                 }
             }
