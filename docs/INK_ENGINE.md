@@ -425,6 +425,11 @@ tween-vs-snap rules, sweep entry and residual rules, repeat wash timing, the
   prefix onto the new generation. A different landing still releases it.
   The tapped word still waits for its own media clock;
   words after it retain the ordinary Upcoming treatment.
+  A poll with no word (a timing gap, or the end of a verse) keeps the latest
+  word heard, never the original tap: falling back to the tap made the tapped
+  word active again at a verse's end, so the part heard after it faded about
+  a second before the prefix. Once the heard word was the verse's last, the
+  tap lets go and the whole verse fades together, like any other.
   In Scroll, other verses above and below fade from the start request,
   including during a word tap's own loading. Their ink, secondary text and
   marks share the chrome's 520 ms Material ease-in-out fade on Android and
