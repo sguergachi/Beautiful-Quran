@@ -134,6 +134,9 @@ object PaperInk {
         override fun sizeOf(key: Key, value: Word): Int = value.bytes
     }
     private val pending = HashSet<Key>()
+    /** Per layout, its most recent field (any phase): what a moving word keeps drawing. */
+    private val lastField = HashMap<TextLayoutInput, Key>()
+    private val phases = PaperInkPhaseHistory<TextLayoutInput, Key>()
     private val main = Handler(Looper.getMainLooper())
     private val worker = Executors.newSingleThreadExecutor { task ->
         Thread({
@@ -162,16 +165,28 @@ object PaperInk {
         // Warming a verse is the first sign of ink to come: start the paper
         // now, so the fibres are ready before the voice reaches it.
         paper()
+        val frame = android.view.animation.AnimationUtils.currentAnimationTimeMillis()
+        val atRest = phases.seen(frame, key.input, key)
         cache.get(key)?.let { return it }
+        // A word in motion (a verse scrolling away as it fades) lands on a new
+        // sub-pixel phase every frame. Each would miss the exact-phase cache and
+        // drop the word to its fallback for that frame — a flicker — and queue a
+        // capture for a phase it is only passing through. While it moves it keeps
+        // its last field (a sub-pixel off, unseen in motion); once it holds a
+        // phase for a frame the exact capture runs, so a word at rest still
+        // erases its printed glyph exactly (no hairline).
+        if (lastField.size > PHASE_MEMORY) lastField.clear()
+        val standIn = lastField[key.input]?.let { cache.get(it) }
+        if (standIn != null && !atRest) return standIn
         val now = SystemClock.uptimeMillis()
-        if (key in pending || isInkless(key, now)) return null
+        if (key in pending || isInkless(key, now)) return standIn
         if (now != captureFrame) {
             captureFrame = now
             capturesThisFrame = 0
         }
-        if (capturesThisFrame >= rationLimit) return null
+        if (capturesThisFrame >= rationLimit) return standIn
         capturesThisFrame++
-        val capture = capture(source) ?: return null
+        val capture = capture(source) ?: return standIn
         pending += key
         worker.execute {
             val word = runCatching { generate(capture) }.getOrNull()
@@ -179,6 +194,7 @@ object PaperInk {
                 pending -= key
                 if (word != null) {
                     cache.put(key, word)
+                    lastField[key.input] = key
                     inklessUntil.remove(key)
                 } else {
                     // Nothing to ink (a font still loading, or a failed build):
@@ -189,7 +205,7 @@ object PaperInk {
                 generation.intValue++
             }
         }
-        return null
+        return standIn
     }
 
     private fun phase(origin: Float): Float = origin - floor(origin)
@@ -477,6 +493,8 @@ object PaperInk {
     }
 
     private const val CAPTURES_PER_FRAME = 3
+    /** Layouts whose last phase and field are remembered; cleared past this. */
+    private const val PHASE_MEMORY = 512
     private const val INKLESS_LIMIT = 256
     private const val INKLESS_RETRY_MS = 2_000L
     private const val CACHE_BYTES = 32 * 1024 * 1024
@@ -496,3 +514,28 @@ internal fun paperInkFibreSpot(placement: Int): Int {
 internal fun paperInkFibreOffsetX(spot: Int): Float = (spot and 0xFFFF) / 65536f * PaperInkSubstrate.TILE
 
 internal fun paperInkFibreOffsetY(spot: Int): Float = (spot ushr 16) / 65536f * PaperInkSubstrate.TILE
+
+/**
+ * Which exact placements of each layout were drawn on the previous frame. A
+ * placement drawn again at the same key is at rest; one at a new key is moving
+ * (or new). Tracks every placement, so a word printed several times on a page
+ * ("the") is not mistaken for one word jumping between them. Pure.
+ */
+internal class PaperInkPhaseHistory<I, K> {
+    private var frame = Long.MIN_VALUE
+    private var now = HashMap<I, MutableSet<K>>()
+    private var before = HashMap<I, MutableSet<K>>()
+
+    /** Records [key] for [input] on [frame]; true if the previous frame drew it at the same key. */
+    fun seen(frame: Long, input: I, key: K): Boolean {
+        if (frame != this.frame) {
+            // Skipped frames still count as consecutive: only a draw at a new key is motion.
+            this.frame = frame
+            before = now
+            now = HashMap()
+        }
+        now.getOrPut(input) { HashSet(2) } += key
+        return before[input]?.contains(key) == true
+    }
+}
+
