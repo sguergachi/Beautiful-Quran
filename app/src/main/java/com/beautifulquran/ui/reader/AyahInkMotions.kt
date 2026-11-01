@@ -135,6 +135,7 @@ internal fun rememberAyahInkPack(
                     windowProgress = fullWaslWindow,
                     endProgress = activeRevealStart,
                     feather = waslMainFeather,
+                    letterEndProgress = waslWashProgress(incomingHandoff, incomingConnection.prefixFraction),
                 )
             index == activeIndex + 1 && outgoingConnection != null ->
                 WaslPrefix(
@@ -144,6 +145,7 @@ internal fun rememberAyahInkPack(
                         mainFeather = waslMainFeather,
                     ),
                     feather = waslMainFeather,
+                    letterEndProgress = outgoingConnection.prefixFraction,
                 )
             else -> null
         }

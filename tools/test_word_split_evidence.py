@@ -215,9 +215,12 @@ class WordSplitEvidenceTest(unittest.TestCase):
                          {d["id"] for d in review["decisions"] if d["decision"] == "repair"})
         self.assertEqual({c["key"][0] for c in cases}, set(build.QDC_REPEAT_RECITERS))
         rows = [(*c["key"], json.dumps(c["inputSegments"])) for c in cases]
+        lead = json.loads((root / "timing_patch_cases/false-lead-alafasy-28-9.json").read_text())
+        rows.append((1, 28, 9, json.dumps(lead["input_segments"])))
         with contextlib.redirect_stdout(io.StringIO()):
             corrected = build.apply_timing_corrections(rows, phase="after_repairs")
         actual = {tuple(row[:3]): json.loads(row[3]) for row in corrected}
+        self.assertEqual(actual[1, 28, 9], lead["expected_segments"])
         ledger = json.loads((root / "timing_evidence/word-split-corpus-candidates.verdict.json").read_text())["verdicts"]
         from timing_delta import make_payload
         for case in cases:

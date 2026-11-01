@@ -44,7 +44,9 @@ object HighlightWash {
         repeatOccurrence: Boolean = false,
     ): HighlightWashState {
         if (!active) {
-            return if (retain) previous.copy(active = false) else HighlightWashState()
+            // A later tap can make an unconfirmed target part of the recited
+            // prefix. Its provisional zero is not a spoken residual to retain.
+            return if (retain && !previous.provisional) previous.copy(active = false) else HighlightWashState()
         }
         if (window == null) return HighlightWashState(active = true, activation = activation)
         val rearm = !previous.active || previous.activation != activation || previous.window == null ||

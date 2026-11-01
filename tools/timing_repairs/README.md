@@ -21,6 +21,14 @@ reintroducing unrelated stale boundaries when qdc later improves them.
 Regression fixtures pin the stale-repair failures from Alafasy 2:214 and 5:52,
 alongside the existing cleaner and span-protection cases.
 
+A repair also cannot reinstate disconnected labels whose removal recovers the
+cleaned source's complete topology. This check runs after peer protection. An
+interior orphan between consecutive retained owners returns its interval to
+the preceding owner while keeping other repair boundaries; otherwise the
+source is retained. Alafasy 28:9 is the sole delivered/raw-repair match in the
+81,059-row October 28 audit. Its exact changed row still needs the ordinary
+publication verdict; the topology check alone does not authorize shipping it.
+
 ## How these are produced
 
 The generator lives outside this repo (`~/qasr`, see

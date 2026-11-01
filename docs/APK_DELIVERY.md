@@ -26,9 +26,10 @@ Only plain APKs are sent; the zip detour is retired. `--zip` is still
 accepted and ignored, solely so the T3 Code **Send APK** action's hardcoded
 `--release --zip --published --wait` flags keep parsing.
 
-The project's T3 Code scripts also carry a manual **Send APK**
-(`scripts/send_apk_to_phone.sh --release --published --wait`) the user can
-trigger themselves; in a thread's terminal it is the same script.
+The project's checked-in `t3.json` defines a project action, **Send APK**
+(`scripts/send_apk_to_phone.sh --release --published --wait`), that T3 Code
+offers in its scripts menu the user can trigger themselves; in a thread's
+terminal it is the same script.
 
 Rules the script already enforces: named after work + short SHA (never
 generic `app-*.apk`; KDE drops repeats of the same filename), whole-copy

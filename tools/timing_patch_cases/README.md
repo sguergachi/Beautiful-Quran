@@ -26,6 +26,7 @@ Agents landing a GitHub `Timings patch` issue must follow the full checklist in
      `preserve_peer_repeats`
    - stale full-row repair timing → `rebase_timing_repair`
    - repair row on a translated source clock → `clock_shifted_repair`
+   - stale repair reinstates a cleaned disconnected label → `reintroduced_orphan`
    - qdc row on the wrong MP3 clock → `qdc_clock_rebase`
    - restore invents a flush same-word pair (gap < 300 ms) → `invented_flush_restore`
    - independently supported local boundary → `boundary_repair`

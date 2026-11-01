@@ -85,8 +85,12 @@ fun HighlightTrace.encodeForReplay(): String = highlightTraceJson.encodeToString
  * Storage is bounded; source tables are hashed once per publication/gate.
  * The recorder has no network, file, player, or clock access.
  */
-class HighlightTraceRecorder(private val header: HighlightTraceHeader, private val maxSamples: Int = 1024) {
-    init { require(maxSamples > 0) }
+class HighlightTraceRecorder(
+    private val header: HighlightTraceHeader,
+    private val maxSamples: Int = 1024,
+    private val maxFrames: Int = 2048,
+) {
+    init { require(maxSamples > 0 && maxFrames > 0) }
     private val samples = ArrayList<HighlightTraceSample>()
     private val tables = linkedMapOf<String, HighlightTraceTiming>()
     private var previousTiming: HighlightTimingContext? = null
@@ -131,7 +135,7 @@ class HighlightTraceRecorder(private val header: HighlightTraceHeader, private v
             it.surah == state.sample.item.surah && it.ayah == state.sample.item.ayah &&
             it.reciter == state.sample.item.reciter && it.timingRevision == state.timing.revision }
         if (index < 0) return
-        if (frames.size >= 2048) { droppedFrames++; return }
+        if (frames.size >= maxFrames) { droppedFrames++; return }
         val frame = HighlightSync.frame(state, atNanos)
         frames += HighlightTraceFrame(index, atNanos, frame.mediaMs, frame.inkMs, frame.occurrence, frame.linearProgress)
     }

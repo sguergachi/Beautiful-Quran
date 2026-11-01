@@ -1,0 +1,9 @@
+{
+  "id": "fragment-lead-alafasy-64-11",
+  "label": "Alafasy 64:11 held Allah must not reveal And whoever before its onset",
+  "refs": ["Pixel report 2026-10-23", "quran-align", "XLSR and MMS forced onset 8965ms"],
+  "pipeline": "fragment_same_position_lead",
+  "input_segments": [[7,6570,7010],[8,7010,8910],[8,8910,9270],[9,9270,10210]],
+  "reference_segments": [[7,6580,8890],[8,8900,10080],[9,10090,11700]],
+  "expected_segments": [[7,6570,8910],[8,8910,9270],[9,9270,10210]]
+}

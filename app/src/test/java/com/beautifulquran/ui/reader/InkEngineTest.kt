@@ -53,6 +53,58 @@ class InkEngineTest {
         )
     }
 
+    @Test
+    fun `a verse at rest recedes on the recess clock, not the floor`() {
+        val upcomingCover = 0.73f
+
+        // Play pressed while this verse is showing full ink: its cover starts
+        // with the recess (so the ink fades over the chrome's 520 ms) instead
+        // of jumping to the Upcoming floor on the first frame.
+        assertEquals(
+            0f,
+            shapedWordCoverAlpha(
+                State.Upcoming, 0f, upcomingCover,
+                softHandoff = true, keepUnreadFloor = false,
+            ),
+            0f,
+        )
+        assertEquals(
+            0.3f,
+            shapedWordCoverAlpha(
+                State.Upcoming, 0.3f, upcomingCover,
+                softHandoff = true, keepUnreadFloor = false,
+            ),
+            0f,
+        )
+
+        // The verse leaving the mic keeps the floor under ink it never read,
+        // and a verse that mounts during playback keeps it from frame one.
+        assertEquals(
+            upcomingCover,
+            shapedWordCoverAlpha(
+                State.Upcoming, 0.1f, upcomingCover,
+                softHandoff = true, keepUnreadFloor = true,
+            ),
+            0f,
+        )
+        assertEquals(
+            upcomingCover,
+            shapedWordCoverAlpha(
+                State.Upcoming, 0.1f, upcomingCover,
+                softHandoff = false, keepUnreadFloor = true,
+            ),
+            0f,
+        )
+    }
+
+    @Test
+    fun `every verse ink fade ships on the chrome recess clock`() {
+        val tuning = InkEngine.Tuning()
+        assertEquals(InkEngine.CHROME_RECEDE_MS, tuning.inkFadeMs)
+        assertEquals(InkEngine.CHROME_RECEDE_MS, tuning.ayahMarkFadeMs)
+        assertEquals(InkEngine.CHROME_RECEDE_MS, tuning.recessMs)
+    }
+
     private fun active(
         wordPosition: Int,
         durationMs: Long = 600,

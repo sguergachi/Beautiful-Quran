@@ -39,11 +39,12 @@ import argparse
 import hashlib
 import json
 import math
+import re
 import sqlite3
 import subprocess
 import sys
 import unicodedata
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import Iterable, Sequence
 
@@ -131,6 +132,23 @@ def normalize_for_mms(text: str, romanizer) -> str:
     if not letters:
         raise ValueError("romanizer produced no MMS letters")
     return "".join(letters)
+
+
+def connected_noon(occurrences, normalize):
+    """Optional acoustic spelling of final silent noon assimilated into يرملون.
+
+    This changes model targets only, never Quran text or timing positions.
+    Vocalized/internal noon, uncovered timing gaps and other rules stay unchanged.
+    Apply the same rule to both competing occurrence sequences.
+    """
+    out = list(occurrences)
+    for i, (word, following) in enumerate(zip(occurrences, occurrences[1:])):
+        onset = normalize_for_model(following.arabic)[:1]
+        if (onset in set("يرملون") and following.start_ms - word.end_ms < 50 and
+                re.search(r"ن[ْۡ]?$", word.arabic)):
+            spoken = re.sub(r"ن[ْۡ]?$", onset, word.arabic)
+            out[i] = replace(word, normalized=normalize(spoken))
+    return out
 
 
 def blank_id_for(tokenizer) -> int:
@@ -458,6 +476,7 @@ def force_one(
     romanizer=None,
     emission_cache: dict | None = None,
     include_alignment: bool = False,
+    assimilate_noon: bool = False,
 ) -> dict:
     """Generate one self-contained audio-evidence report object."""
     if romanize:
@@ -475,6 +494,9 @@ def force_one(
         )
     else:
         occurrences = timing_occurrences(db, reciter_id, surah, ayah)
+    if assimilate_noon:
+        normalize = (lambda text: normalize_for_mms(text, romanizer)) if romanize else normalize_for_model
+        occurrences = connected_noon(occurrences, normalize)
     path = audio_path(qasr_root, slug, surah, ayah)
     vocabulary = processor.tokenizer.get_vocab()
     blank_id = blank_id_for(processor.tokenizer)
@@ -573,6 +595,7 @@ def force_one(
         "ctcFrames": len(state_path),
         "ctcFrameMs": frame_ms,
         "fixedTranscript": transcript,
+        "transcriptPolicy": "connected_noon_v1" if assimilate_noon else "canonical",
         "viterbiLogProbabilityPerFrame": viterbi_score / len(state_path),
         "occurrenceCount": len(words),
         "reviewCount": review_count,
@@ -646,6 +669,10 @@ def argument_parser() -> argparse.ArgumentParser:
         help="uroman+MMS latin transcript (required for the MMS forced-aligner)",
     )
     parser.add_argument("--device", choices=("auto", "cpu", "cuda"), default="auto")
+    parser.add_argument("--assimilate-noon", action="store_true",
+                        help="compare connected final-noon spellings; never changes Quran text")
+    parser.add_argument("--include-alignment", action="store_true",
+                        help="retain emitting frames for exact acoustic ownership proofs")
     parser.add_argument("--min-label-probability", type=float, default=0.15,
                         help="below this mean CTC label probability, mark word review")
     parser.add_argument("--max-residual-ms", type=int, default=250,
@@ -710,6 +737,8 @@ def main(argv: Sequence[str] | None = None) -> int:
                         romanize=args.romanize,
                         model_name=args.model,
                         romanizer=romanizer,
+                        assimilate_noon=args.assimilate_noon,
+                        include_alignment=args.include_alignment,
                     )
                     success += 1
                     review_words += evidence["reviewCount"]

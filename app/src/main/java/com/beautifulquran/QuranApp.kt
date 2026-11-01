@@ -144,6 +144,8 @@ class QuranApp : Application() {
         }
         // Restore last lab audition before any reader opens.
         InkEngine.attachLabStore(inkLab)
+        // The Paper theme's shared word ink (docs/PAPER_INK.md).
+        com.beautifulquran.ui.theme.paperink.PaperInk.install(this)
         tarjiProfiles.applyToEngine(settings.settings.value.reciterId)
         // Long-press app icon → Continue / Bookmarks (works without App Actions review).
         VoiceShortcuts.publishDynamic(this)

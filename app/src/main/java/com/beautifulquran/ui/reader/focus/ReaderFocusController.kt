@@ -144,7 +144,8 @@ class ReaderFocusController internal constructor(
      * [measureInViewport] is invoked **inside** the lock (and again after each
      * glide) so bounds stay live: top/bottom are distances from the LazyColumn
      * content-start edge (0 = top of the list viewport). Return null when the
-     * word is not currently laid out.
+     * word is not currently laid out. Call from that word's effect coroutine
+     * so a word change cancels any correction waiting on the verse focus lock.
      *
      * Pass [bandTopMarginPx] = 0 for bottom-only correction — lifts words clear
      * of the player-bar fold without fighting the verse-level top anchor.

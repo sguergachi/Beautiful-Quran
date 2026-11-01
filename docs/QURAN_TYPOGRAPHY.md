@@ -898,18 +898,26 @@ opening leaves of their own. Sad is the case to look at: it used to stop
 mid-verse at *"about My message. Rather,"* with two and a half lines of white
 under it, and now carries 38:1–8 whole and fills to the foot.
 
-**One leaf is over capacity and always will be.** 2:282 is a single sentence of
-1,333 characters, half as long again as a leaf holds.
+**One font size for the selected book face, on every leaf.** The measured ruler
+cuts the text at that size and carries oversized verses, including 2:282, across
+leaves. Page content never selects a smaller font size. The old overflow shrink
+was introduced when a sentence had to remain whole; carried verses removed
+that restriction, and the shrink fallback is now removed as well.
 
-**The rescue, in order.** The leaf is measured as it will be drawn, and if the
-block would run past the foot its leading closes — only on that leaf, only by
-the overflow. The leading stops at `ENGLISH_LEAF_MIN_LEADING_EM` = 1.15, because
-unbounded it will close as far as the arithmetic asks and a page whose ascenders
-touch the descenders above them is not a tight page but an unreadable one. What
-the floor cannot take, the hand does: `englishLeafOverflowHandPx` gives up a few
-percent of type on that leaf alone. That breaks §13.3 knowingly — on 2:282 the
-alternatives are overlapping lines or revelation clipped off the foot, and a page
-set a little small is the only one of the three a reader can still read.
+The leaf is measured as it will be drawn. Its leading can close for rounding
+or open within the existing carding range, with a floor of
+`ENGLISH_LEAF_MIN_LEADING_EM` = 1.15 so lines cannot overlap. Font size stays the
+book's size throughout. The debug justification audit reports the actual
+minimum and maximum leaf font sizes and every leaf overflowing its well.
+The fitted height is checked again: rounded paragraph heights and fractional
+chapter-opening furniture can leave a few pixels past the target. Any such
+overrun closes the leading by the measured amount, with at least one pixel of
+baseline-pitch change so rounded prose actually moves. Font size stays fixed.
+
+The 2026-10-24 native audit at a 1,006 px measure and 1,824 px well set all
+706 Junicode leaves at exactly 49.569916 px. All 15,933 lines stayed within
+their leaves, with zero vertical overflows and zero justified edge misses.
+The long 2:282 sentence continues across adjacent leaves at that same size.
 
 ### 13.5 Justified, with whole words
 
@@ -1381,19 +1389,42 @@ words. Rahman and Rahim retain distinct owners when both occur.
 
 Three rules make it usable:
 
-- **One continuous forward wash, with no skipped words.** When Arabic names a
-  later English meaning, every intervening word joins its left-to-right wash.
-  “Painful punishment” washes together when Arabic says the noun first; later
-  hearing the adjective never moves the front backwards. In 24:31, “husbands'
-  fathers” washes together on “fathers.” Ink already laid never lifts.
+- **One continuous forward wash, with no skipped words.** Published translation
+  uses readable pacing for the smallest reordered phrases. Reliable content
+  anchors define Arabic intervals; crossing intervals merge until they close.
+  Their English washes together over that phrase's voiced time. A meaning can
+  therefore appear later than its Arabic word. This is the user's explicit
+  October 24 clarification of the earlier immediate-meaning policy. The October 25 clarification uses steady movement through connected speech,
+  holding the exact reached prefix in measured quiet. Word ranges partition
+  geometry without restarting velocity; already laid ink never lifts.
+  Presentation distance counts visible character slots, so crossing a printed
+  space consumes no audio time and the next word begins at zero reveal. The
+  typeset spaces, line breaks, font size and glyph geometry stay unchanged.
+  Normalized source whitespace retains the prior continuous projection.
+  A later October 25 clarification gives compatible literal matches priority
+  at their spoken ends, ideally 100 media milliseconds earlier. A shared
+  continuous pace joins those endpoints without stopping at each word. It
+  preserves the current movement through complete reordered and terminal
+  residual word units; an impossible deadline is deferred rather than forcing
+  a rush or changing ownership. This is presentation timing, not a new setting
+  of the line or a clock calibration.
+  Word-card English keeps its existing linear occurrence clock, including the
+  pause before the next owner's onset; this readable policy is translation-only.
 - **Boundaries sit between words.** Adjacent ranges tile the printed sentence,
-  including punctuation. A missing English equivalent can own no span. A page
-  cut projects the ranges onto its fragment without changing their owners.
-- **One alignment for wash, tap, hold and follow.** `EnglishVerseAlignments`
-  caches semantic owners and the continuous wash derived from them for the
-  selected text source. Tapping or holding a word names its semantic Arabic
-  owner, even if the forward wash included it earlier. Carried-leaf follow
-  follows the wash without returning to an already advanced word.
+  including punctuation. A missing English equivalent can own no semantic
+  span. Weak grammar can join a neighboring phrase but cannot expand its
+  source interval. Page cuts project the whole-verse plan without restarting it.
+- **One semantic alignment and one presentation plan.** `EnglishVerseAlignments`
+  retains the known Arabic owners for taps, holds and repeats. The cached
+  presentation plan is shared by drawing and carried-leaf follow. It uses one
+  cumulative union of all speech in a safe forward run, subtracting measured
+  quiet once and freezing there without snapping to an English word. The
+  first-voice and terminal fences remain. Verses containing backward source
+  repeats conservatively retain their legacy occurrence policy.
+  If adjacent presentation source intervals still overlap, the whole verse
+  explicitly keeps the legacy occurrence bands and their complete voiced
+  source union. This conservative fallback leaves ambiguous weak-clause
+  attachment for a later reviewed map; it does not certify phrase timing.
 
 Repeated content must keep its occurrence. Equal counts within a sentence pair
 exact forms first, then inflected or equivalent forms in occurrence order,
@@ -1441,18 +1472,16 @@ word blooming, however narrow its edge is made. Two attempts at the edge width
 (a line of the page, then 1.6 word-widths of the sentence) both missed for the
 same reason: the shape was wrong, not the size.
 
-The base wash bands follow English order, driven by the calibrated media clock.
-Each band's owner is the earliest spoken meaning at or beyond its English
-range, so all text before the active edge is included. Adjacent bands with the
-same owner merge, leaving one active soft edge. First-pass glimmer uses those
-same bands and cannot jump ahead of the wash. Repeat tint and repeat glimmer
-retain the semantic owners over the prefix already laid. Range projection is
-cached with the paragraph; frames only read clocks and build paint layers.
-Owned ranges retain the exact letter-count map; the animated edge interpolates
-between those letter anchors. Rounding the moving edge to source characters
-and then to printed letter ends made even a continuous clock paint in jumps.
-Every wash uses `Tuning.washFeather` unmodified, exactly as the scrolling reader
-does.
+Presentation ranges follow English order on the calibrated shared media clock.
+The plan is built for the whole verse from its immutable alignment and timing
+snapshot, then projected through the page cut. Base covers and paper material
+paint each printed word from the same continuous character edge. Completed
+words keep their ink when their wet material retires. First-pass glimmer uses
+that presentation edge; repeat tint retains semantic owners and stays clipped
+to laid ink. Range projection and word exposure endpoints are cached with the
+paragraph; frames read the plan rather than solving it again. The animated edge
+interpolates between exact source/printed letter anchors instead of rounding
+each frame to a whole letter. Every wash retains `Tuning.washFeather`.
 
 **Bands that abut must not reach past their boxes.** A paper cover is drawn
 `PaperCoverPad` (4 dp) wider than its own line box, to catch ink that overhangs
@@ -1460,8 +1489,8 @@ it. That is right where a bloom covers a word with whitespace either side, as
 in the scrolling reader: the reach lands on the space and nothing shows. These
 bands touch, so the reach put paper over the same strip of prose twice, and an
 8 dp notch of half-erased text travelled along with the voice — the shimmer at
-the wash's edge. The leaf passes `coverPad = 0`; the bands tile the sentence
-exactly, so they have nothing to close over. Their edges are also kept out of
+the wash's edge. The leaf passes `coverPad = 0`; adjacent unread word covers
+merge across their intervening spaces without overlapping. Band edges are also kept out of
 the middle of a word (`englishBandEdge`), because two abutting covers meeting
 inside a letter is a hard cut down it — the alignment's own boundaries are word
 ends already, but a carried verse or one with its asides hidden is a shorter

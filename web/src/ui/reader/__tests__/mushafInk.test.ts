@@ -54,7 +54,7 @@ describe('mushaf leaf ink', () => {
     expect(state(at(5, 4), ink)).toBe(InkState.Upcoming)
   })
 
-  it('keeps what has been read in full ink and holds what is to come under paper', () => {
+  it('retains earlier verses and chapters while later ones wait under paper', () => {
     const ink = voice({})
     expect(state(at(4, 9), ink)).toBe(InkState.Plain)
     expect(state(at(6, 1), ink)).toBe(InkState.Upcoming)
@@ -121,7 +121,7 @@ describe('mushaf verse numbers', () => {
     expect(waits(5, voice({ activeWord: null, inkAyahRead: false }))).toBe(false)
   })
 
-  it('keeps the numbers of verses still to come under paper, and those read lit', () => {
+  it('keeps earlier verse numbers lit while later ones wait', () => {
     const ink = voice({})
     expect(waits(6, ink)).toBe(true)
     expect(waits(4, ink)).toBe(false)

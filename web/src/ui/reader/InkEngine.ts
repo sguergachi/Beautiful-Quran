@@ -49,6 +49,9 @@ export interface InkTuning {
   sweepEaseY2: number
 }
 
+/** Matches --chrome-recede-ms: surrounding ink and controls fade together. */
+export const CHROME_RECEDE_MS = 520
+
 export const DEFAULT_TUNING: InkTuning = {
   tajweedPacing: true,
   pacedFeather: 1.1092,
@@ -63,13 +66,13 @@ export const DEFAULT_TUNING: InkTuning = {
   waslPrefixMs: 120,
   waslHandoff: 0.45,
   upcomingAlpha: 0.2661,
-  inkFadeMs: 400,
-  ayahMarkFadeMs: 400,
-  recessMs: 400,
+  inkFadeMs: CHROME_RECEDE_MS,
+  ayahMarkFadeMs: CHROME_RECEDE_MS,
+  recessMs: CHROME_RECEDE_MS,
   minSweepMs: 140,
   maxSweepMs: 8_000,
   repeatSweepMs: 450,
-  repeatFadeOutMs: 900,
+  repeatFadeOutMs: 1_800,
   glintFadeMs: 1_000,
   washFeather: 1.6,
   sweepEaseX1: 0.3,

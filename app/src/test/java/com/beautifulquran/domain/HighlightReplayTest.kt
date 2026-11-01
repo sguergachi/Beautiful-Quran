@@ -124,6 +124,43 @@ class HighlightReplayTest {
     }
 
     @Test
+    fun `log export keeps sample and frame evidence beyond the old short capture limits`() {
+        val session = HighlightSession()
+        val recorder = HighlightTraceRecorder(header, maxSamples = 6000, maxFrames = 24000)
+        repeat(1250) { index ->
+            val input = sample(index * 33L, index * 33L)
+            val observation = session.observe(input, timing, calibration, 1)
+            recorder.record(input, timing, calibration, observation)
+            repeat(3) { frame -> recorder.recordFrame(observation.syncState!!, input.sampledAtNanos + frame * 10_000_000L) }
+        }
+        val trace = recorder.snapshot()
+        assertEquals(1250, trace.samples.size)
+        assertEquals(3750, trace.frames.size)
+        assertEquals(0, trace.droppedSamples)
+        assertEquals(0, trace.droppedFrames)
+        val report = DiagnosticLog(listOf("word-tap", "reciter-selection"), trace).report(mapOf("device" to "test"))
+        val decoded = Json.decodeFromString<HighlightTrace>(
+            report.substringAfter("highlight-sync-trace-begin").substringBefore("highlight-sync-trace-end").trim(),
+        )
+        assertEquals(trace, decoded)
+        replay(decoded)
+    }
+
+    @Test
+    fun `frame storage limit remains explicit when a long log reaches its budget`() {
+        val session = HighlightSession()
+        val recorder = HighlightTraceRecorder(header, maxFrames = 2)
+        val input = sample(0, 0)
+        val observation = session.observe(input, timing, calibration, 1)
+        recorder.record(input, timing, calibration, observation)
+        repeat(5) { recorder.recordFrame(observation.syncState!!, it * 1_000_000L) }
+        val trace = recorder.snapshot()
+        assertEquals(2, trace.frames.size)
+        assertEquals(3, trace.droppedFrames)
+        replay(trace)
+    }
+
+    @Test
     fun `production capture explicitly serializes schema scope and active engine versions`() {
         val trace = HighlightTraceRecorder(header).snapshot()
         val json = Json.parseToJsonElement(trace.encodeForReplay()).jsonObject.getValue("header").jsonObject

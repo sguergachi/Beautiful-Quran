@@ -1,0 +1,62 @@
+{
+  "id": "reintroduced-orphan-keeps-connected-repeat",
+  "label": "reintroduced orphan keeps connected repeat",
+  "pipeline": "reintroduced_orphan",
+  "input_segments": [
+    [
+      3,
+      0,
+      800
+    ],
+    [
+      4,
+      800,
+      1600
+    ]
+  ],
+  "repair_segments": [
+    [
+      3,
+      0,
+      800
+    ],
+    [
+      2,
+      800,
+      1600
+    ],
+    [
+      3,
+      1600,
+      2400
+    ],
+    [
+      4,
+      2400,
+      3200
+    ]
+  ],
+  "expected_segments": [
+    [
+      3,
+      0,
+      800
+    ],
+    [
+      2,
+      800,
+      1600
+    ],
+    [
+      3,
+      1600,
+      2400
+    ],
+    [
+      4,
+      2400,
+      3200
+    ]
+  ],
+  "notes": "A new connected phrase repeat is not a disconnected source phantom."
+}
